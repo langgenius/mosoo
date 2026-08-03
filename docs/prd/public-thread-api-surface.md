@@ -1,6 +1,6 @@
 # Public Thread API
 
-Status: Available for App-owner integrations with a limited identity model. The
+Status: Available for App-owner integrations with an application-user identity. The
 exact HTTP contract is the
 [OpenAPI document](https://cloud.mosoo.ai/api/v1/openapi.json).
 
@@ -13,14 +13,15 @@ that an integration can start, follow, continue, and recover.
 ## Who uses it
 
 - An App owner connects an exposed Agent to a server-side integration.
-- An App user may trigger that integration, but does not authenticate directly
-  with mosoo today.
+- An App user may trigger that integration, but authenticates with the Builder's
+  product rather than directly with mosoo.
 
 ## User flow
 
 1. The owner exposes an Agent, creates an Access Token, and stores it on a
    trusted backend.
-2. The backend creates a Thread, empty or with an initial message and files.
+2. After authenticating its user, the backend creates a Thread with that user's
+   opaque `userId`, empty or with an initial message and files.
 3. It reads or streams public events, checks the latest Run, and can send a
    follow-up, answer a permission request, or interrupt work.
 4. It can list, retrieve, archive, restore, or delete Threads, and upload,
@@ -35,9 +36,12 @@ Agent's API Access panel shows its identifier, token creation, and API reference
 
 - Access Tokens belong to the App owner. The Agent must be exposed, owned by
   that same owner, and remain inside the same App.
-- mosoo does not yet represent the integration's end users. Every public Thread
-  is attributed to the App owner's mosoo account, so the integration must
-  enforce end-user access and maintain its own user-to-Thread mapping.
+- `userId` is supplied only by the trusted backend, is immutable after Thread
+  creation, and scopes the Thread, its Runs, files, and delegated MCP calls.
+- The identity boundary is `(App, userId)`. A user may own multiple Threads;
+  `userId` is not a unique Thread key.
+- mosoo records this opaque identifier but does not authenticate the End User.
+  The Builder's product remains responsible for login and authorization.
 - Tokens are backend secrets and are not suitable for browser or mobile clients
   that cannot keep them private.
 - Public events show stable progress and outcomes, not private diagnostics or

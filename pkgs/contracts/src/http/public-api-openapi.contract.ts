@@ -3,12 +3,12 @@ import { PLATFORM_ID_INPUT_PATTERN } from "@mosoo/id";
 import { AGENT_KIND_VALUES } from "../agent/agent.contract.ts";
 import {
   PUBLIC_API_ERROR_CODES,
-  PUBLIC_THREAD_CLIENT_EXTERNAL_REF_MAX_LENGTH,
   PUBLIC_THREAD_EVENT_LOG_STATUSES,
   PUBLIC_THREAD_EVENT_LOG_TYPES,
   PUBLIC_THREAD_FILE_ID_MAX_LENGTH,
   PUBLIC_THREAD_INPUT_TEXT_MAX_LENGTH,
   PUBLIC_THREAD_RUN_TERMINAL_STATUSES,
+  PUBLIC_THREAD_USER_ID_MAX_LENGTH,
 } from "./public-api-core.contract";
 
 export type PublicApiOpenApiSchema = Record<string, unknown>;
@@ -49,9 +49,9 @@ export const PUBLIC_API_OPENAPI_SCHEMAS = {
             items: { $ref: "#/components/schemas/FileResource" },
             type: "array",
           },
-          clientRequestId: {
+          requestId: {
             description:
-              "Optional caller-supplied correlation ID echoed back on the matching event result so you can pair responses with the message you sent.",
+              "Optional caller-supplied request ID echoed back on the matching event result so you can pair responses with the message you sent.",
             type: ["string", "null"],
           },
           text: {
@@ -309,9 +309,9 @@ export const PUBLIC_API_OPENAPI_SCHEMAS = {
     additionalProperties: false,
     description: "Outcome of a single submitted event.",
     properties: {
-      clientRequestId: {
+      requestId: {
         description:
-          "The `clientRequestId` echoed from the submitted user message, or null when none was provided or the event type does not carry one.",
+          "The `requestId` echoed from the submitted user message, or null when none was provided or the event type does not carry one.",
         type: ["string", "null"],
       },
       run: {
@@ -324,7 +324,7 @@ export const PUBLIC_API_OPENAPI_SCHEMAS = {
         enum: ["permission_decision", "user_interrupt", "user_message"],
       },
     },
-    required: ["clientRequestId", "run", "type"],
+    required: ["requestId", "run", "type"],
     type: "object",
   },
   CreateThreadRequest: {
@@ -332,10 +332,11 @@ export const PUBLIC_API_OPENAPI_SCHEMAS = {
     description:
       "Request body for creating a Thread. All fields are optional: omit `input` to create an empty IDLE Thread, or include it to queue the initial Run.",
     properties: {
-      client_external_ref: {
+      userId: {
         description:
-          "Optional caller-owned reference (for example an external ticket key) stored on the Thread for correlation. Not unique and not validated by mosoo.",
-        maxLength: PUBLIC_THREAD_CLIENT_EXTERNAL_REF_MAX_LENGTH,
+          "Opaque application-user identifier supplied by the trusted backend. It is immutable for the lifetime of the Thread and is delegated to MCP servers during Runs.",
+        maxLength: PUBLIC_THREAD_USER_ID_MAX_LENGTH,
+        minLength: 1,
         type: "string",
       },
       resources: {
@@ -491,34 +492,6 @@ export const PUBLIC_API_OPENAPI_SCHEMAS = {
     required: ["file"],
     type: "object",
   },
-  ThreadAttributedUser: {
-    additionalProperties: false,
-    description: "The account a Thread is attributed to (the Access Token owner).",
-    properties: {
-      id: {
-        ...PLATFORM_ID_SCHEMA,
-        description: "Account ID (bare ULID) the Thread is attributed to.",
-      },
-    },
-    required: ["id"],
-    type: "object",
-  },
-  ThreadCaller: {
-    additionalProperties: false,
-    description: "The credential that created the Thread.",
-    properties: {
-      id: {
-        ...PLATFORM_ID_SCHEMA,
-        description: "ID (bare ULID) of the caller that created the Thread.",
-      },
-      kind: {
-        description: "Caller credential type. `access_token` identifies an Access Token caller.",
-        enum: ["access_token"],
-      },
-    },
-    required: ["id", "kind"],
-    type: "object",
-  },
   ThreadLinks: {
     additionalProperties: false,
     description: "Convenience links for a Thread.",
@@ -539,24 +512,10 @@ export const PUBLIC_API_OPENAPI_SCHEMAS = {
         ...PLATFORM_ID_SCHEMA,
         description: "ID (bare ULID) of the Agent API Endpoint this Thread belongs to.",
       },
-      attributed_user: {
-        description:
-          "The account the Thread is attributed to, or null when not attributed to an account.",
-        oneOf: [{ $ref: "#/components/schemas/ThreadAttributedUser" }, { type: "null" }],
-      },
-      client_external_ref: {
-        description:
-          "The caller-owned reference supplied at creation, or null when none was provided.",
-        type: ["string", "null"],
-      },
       created_at: {
         description: "Timestamp (RFC 3339) at which the Thread was created.",
         format: "date-time",
         type: "string",
-      },
-      created_by: {
-        $ref: "#/components/schemas/ThreadCaller",
-        description: "The credential that created the Thread.",
       },
       id: {
         ...PLATFORM_ID_SCHEMA,
@@ -589,13 +548,15 @@ export const PUBLIC_API_OPENAPI_SCHEMAS = {
         format: "date-time",
         type: "string",
       },
+      userId: {
+        description:
+          "Opaque application-user identifier, or null for a legacy Thread created before this field existed.",
+        type: ["string", "null"],
+      },
     },
     required: [
       "agent_id",
-      "attributed_user",
-      "client_external_ref",
       "created_at",
-      "created_by",
       "id",
       "kind",
       "last_run_id",
@@ -603,6 +564,7 @@ export const PUBLIC_API_OPENAPI_SCHEMAS = {
       "status",
       "title",
       "updated_at",
+      "userId",
     ],
     type: "object",
   },

@@ -54,14 +54,16 @@ export interface ChannelSessionTriggeredByMetadata {
 
 export interface AgentSessionMetadata {
   public_api?: {
-    client_external_ref: string | null;
     created_by: {
+      account_id: string;
       id: string;
       kind: "access_token";
       token_id: string;
       token_label: string;
     };
+    idempotency_key: string | null;
     source: "public_api";
+    user_id: string | null;
   };
   triggered_by?: ChannelSessionTriggeredByMetadata;
 }

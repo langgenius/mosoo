@@ -95,11 +95,12 @@ async function toAgentSessionEventInput(input: {
     fileIds,
     threadId: input.threadId,
   });
-  const { resources: _resources, ...event } = input.event;
+  const { requestId, resources: _resources, ...event } = input.event;
 
   return {
     ...event,
     ...(attachmentIds.length === 0 ? {} : { attachmentIds }),
+    ...(requestId === undefined ? {} : { clientRequestId: requestId }),
   };
 }
 
@@ -138,7 +139,6 @@ export async function sendPublicThreadSessionEvents(
   return toPublicThreadEventBatch({
     batch,
     thread: toPublicThreadSummary({
-      attributedUserId: admission.session.attributed_user_id,
       metadata: admission.metadata,
       session: toPublicThreadSessionSummary(batch.session),
     }),

@@ -21,12 +21,12 @@ import type {
 type FetchFunction = typeof fetch;
 
 interface CreateThreadRequestBody {
-  client_external_ref?: string;
   input?: {
     content: { text: string; type: "text" }[];
     type: "user.message";
   };
   resources?: { file_id: string; type: "file" }[];
+  userId?: string;
 }
 
 interface SseMessage {
@@ -45,11 +45,11 @@ export interface MosooPublicThreadClientOptions {
 
 export interface MosooCreateThreadInput {
   agentId: string;
-  clientExternalRef?: string;
   fileIds?: string[];
   idempotencyKey?: string;
   input?: string;
   signal?: AbortSignal | undefined;
+  userId?: string;
 }
 
 export interface MosooUploadAgentFileInput {
@@ -225,8 +225,8 @@ function isBrowserLikeRuntime(): boolean {
 function createCreateThreadBody(input: MosooCreateThreadInput): CreateThreadRequestBody {
   const body: CreateThreadRequestBody = {};
 
-  if (input.clientExternalRef !== undefined) {
-    body.client_external_ref = input.clientExternalRef;
+  if (input.userId !== undefined) {
+    body.userId = input.userId;
   }
 
   if (input.fileIds !== undefined && input.fileIds.length > 0) {

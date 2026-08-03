@@ -25,6 +25,7 @@ import {
   requireActiveRuntimeLlmProxyDriver,
   resolveRuntimeLlmProxyTarget,
 } from "../../../modules/runtime/application/runtime-llm-proxy.service";
+import { RUNTIME_MCP_DELEGATION_HEADER } from "../../../modules/runtime/application/runtime-mcp-delegation";
 import {
   createRuntimeMcpProxyError,
   runtimeMcpProxyErrorBody,
@@ -82,16 +83,24 @@ async function requireDriverAuthorizationGrant(c: Context<ApiGatewayEnvironment>
   return verifyRuntimeActionToken(c.env, grant);
 }
 
-function copyProxyRequestHeaders(headers: Headers, upstreamAccessToken: string): Headers {
+export function copyProxyRequestHeaders(
+  headers: Headers,
+  upstreamAccessToken: string,
+  delegationToken?: string | null,
+): Headers {
   const nextHeaders = new Headers();
 
   for (const [key, value] of headers) {
-    if (!HOP_BY_HOP_HEADERS.has(key.toLowerCase())) {
+    if (
+      !HOP_BY_HOP_HEADERS.has(key.toLowerCase()) &&
+      key.toLowerCase() !== RUNTIME_MCP_DELEGATION_HEADER.toLowerCase()
+    ) {
       nextHeaders.set(key, value);
     }
   }
 
   nextHeaders.set("Authorization", `Bearer ${upstreamAccessToken}`);
+  if (delegationToken) nextHeaders.set(RUNTIME_MCP_DELEGATION_HEADER, delegationToken);
   return nextHeaders;
 }
 
@@ -435,12 +444,17 @@ async function proxyRuntimeLlmRequest(
 async function proxyRuntimeMcpRequest(
   request: Request,
   input: {
+    delegationToken?: string | null;
     upstreamAccessToken: string;
     url: string;
   },
 ): Promise<Response> {
   const init: RequestInit = {
-    headers: copyProxyRequestHeaders(request.headers, input.upstreamAccessToken),
+    headers: copyProxyRequestHeaders(
+      request.headers,
+      input.upstreamAccessToken,
+      input.delegationToken,
+    ),
     method: request.method,
   };
 

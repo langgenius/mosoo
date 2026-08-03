@@ -46,7 +46,7 @@ The App Owner is the Builder responsible for the mosoo App and its Agents. In Al
 
 ### End User
 
-An End User may trigger Agent work through the Builder's product, but mosoo does not represent or authenticate that person today. The Builder's trusted backend enforces end-user access and maps its users to mosoo Threads.
+An End User may trigger Agent work through the Builder's product. The Builder's trusted backend authenticates that person and supplies an opaque `userId` when creating a public Thread. mosoo does not authenticate the End User; it carries the immutable `(App, userId)` context across the Thread, its Runs, files, and delegated MCP calls.
 
 ### mosoo Account
 
@@ -60,7 +60,7 @@ A mosoo Account authenticates the Builder to the mosoo control plane. It is neve
 4. **A Thread is the durable work boundary.** Messages, Runs, public events, and managed files remain addressable across individual executions.
 5. **A Run is one observable execution.** Console and API entry points produce the same lifecycle records.
 6. **Sandbox state is explicit.** Temporary execution state is not confused with durable Threads, files, Agent configuration, or bounded Assistant continuity.
-7. **The public API is backend-to-backend.** App-owner tokens stay on trusted servers; mosoo does not claim App User authentication.
+7. **The public API is backend-to-backend.** App-owner tokens stay on trusted servers; the backend supplies `userId`, while mosoo does not claim App User authentication.
 8. **High-impact side effects are mediated.** Permission requests and confirmation gates are enforceable runtime boundaries, not prompt conventions.
 9. **Usage is observable, not billing truth.** Recorded model usage supports operational decisions without pretending to replace provider invoices.
 10. **Do not broaden the product to hide missing proof.** App hosting, broad provider matrices, channels, governance, and recovery become promises only after their user-visible paths are proven.

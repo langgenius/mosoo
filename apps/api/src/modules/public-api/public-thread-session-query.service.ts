@@ -175,7 +175,6 @@ export async function listAgentApiEndpointThreads(
 
       return [
         toPublicThreadSummary({
-          attributedUserId: row.attributed_user_id,
           metadata,
           session: toPublicThreadSessionSummary(buildSessionSummaryFromJoinedRow(row)),
         }),

@@ -87,6 +87,6 @@ Run broader repo checks only when code, generated files, schemas, or contracts c
 For the Public Thread API, keep phrases like:
 
 - "Help me get this Agent to do one thing."
-- "Preserve Linear ENG-123 as non-unique `client_external_ref` correlation
-  metadata; use the returned Thread id to continue that specific Thread."
+- "The trusted backend supplies an immutable `userId`; the same user can own
+  several Threads and continues a specific one by its returned Thread id."
 - "A background API call should show up only in the Access Token owner's private Threads."

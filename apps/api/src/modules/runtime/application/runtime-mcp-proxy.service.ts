@@ -1,18 +1,60 @@
+import { sessionsTable } from "@mosoo/db";
 import { parsePlatformId } from "@mosoo/id";
 import type { CredentialId, DriverInstanceId, McpServerId } from "@mosoo/id";
+import { eq } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
+import { getAppDatabase } from "../../../platform/db/drizzle";
 import { isTruthy } from "../../../shared/truthiness";
 import { readMcpCredentialSecret } from "../../mcp/application/mcp-credential-secret-resolution";
 import { getCredentialByIdOrNull } from "../../mcp/application/mcp-credential.repository";
 import { getCredentialStatus } from "../../mcp/application/mcp-mappers";
 import { getServerRowOrNull } from "../../mcp/application/mcp-server.repository";
+import { parsePublicApiThreadMetadata } from "../../public-api/public-thread-metadata";
 import { getDriverInstanceMcpProxyGrant } from "../infrastructure/driver-instance/mcp-grants.repository";
+import { getRuntimeSessionLink } from "../infrastructure/driver-instance/session-link.repository";
+import { createRuntimeMcpDelegationToken } from "./runtime-mcp-delegation";
 import { createRuntimeMcpProxyError } from "./runtime-mcp-proxy-errors";
 export interface RuntimeMcpProxyTarget {
+  delegationToken: string | null;
   serverId: McpServerId;
   upstreamAccessToken: string;
   url: string;
+}
+
+async function createDelegationToken(
+  bindings: ApiBindings,
+  input: { accessToken: string; driverInstanceId: DriverInstanceId; url: string },
+): Promise<string | null> {
+  const link = await getRuntimeSessionLink(bindings.DB, input.driverInstanceId);
+  if (link.sessionId === null) return null;
+  const row = await getAppDatabase(bindings.DB)
+    .select({ metadataJson: sessionsTable.metadataJson })
+    .from(sessionsTable)
+    .where(eq(sessionsTable.id, link.sessionId))
+    .limit(1)
+    .get();
+  if (!row) return null;
+  const metadata = parsePublicApiThreadMetadata(row.metadataJson);
+  if (!metadata?.user_id) return null;
+  if (link.agentId === null || link.appId === null) {
+    throw createRuntimeMcpProxyError({
+      code: "mcp_proxy_forbidden",
+      message: "MCP end-user delegation context is unavailable.",
+      status: 403,
+    });
+  }
+  return createRuntimeMcpDelegationToken({
+    accessToken: input.accessToken,
+    audience: input.url,
+    claims: {
+      agentId: link.agentId,
+      appId: link.appId,
+      userId: metadata.user_id,
+      runId: link.sessionRunId,
+      threadId: link.sessionId,
+    },
+  });
 }
 
 export async function resolveRuntimeMcpProxyTarget(
@@ -120,6 +162,11 @@ export async function resolveRuntimeMcpProxyTarget(
   }
 
   return {
+    delegationToken: await createDelegationToken(bindings, {
+      accessToken: accessToken.value,
+      driverInstanceId: input.driverInstanceId,
+      url: server.url,
+    }),
     serverId: server.id,
     upstreamAccessToken: accessToken.value,
     url: server.url,

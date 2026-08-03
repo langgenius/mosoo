@@ -13,10 +13,10 @@ export interface PublicApiThreadCreatedByMetadata {
 }
 
 export interface PublicApiThreadMetadata {
-  client_external_ref: string | null;
   created_by: PublicApiThreadCreatedByMetadata;
   idempotency_key: string | null;
   source: "public_api";
+  user_id: string | null;
 }
 
 interface PublicApiThreadMetadataInput {
@@ -25,8 +25,8 @@ interface PublicApiThreadMetadataInput {
     tokenId: PersonalAccessTokenId;
     tokenLabel: string;
   };
-  clientExternalRef: string | null;
   idempotencyKey: string | null;
+  userId: string | null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -81,7 +81,6 @@ export function createPublicApiThreadMetadata(
   );
 
   return {
-    client_external_ref: input.clientExternalRef,
     created_by: {
       account_id: createdById,
       id: createdById,
@@ -94,6 +93,7 @@ export function createPublicApiThreadMetadata(
     },
     idempotency_key: input.idempotencyKey,
     source: "public_api",
+    user_id: input.userId,
   };
 }
 
@@ -116,22 +116,22 @@ export function parsePublicApiThreadMetadata(raw: string): PublicApiThreadMetada
     return null;
   }
 
-  const clientExternalRef = metadata["client_external_ref"];
   const createdBy = readCreatedByMetadata(metadata["created_by"]);
   const idempotencyKey = metadata["idempotency_key"] ?? null;
+  const userId = metadata["user_id"] ?? metadata["external_user_id"] ?? null;
 
   if (
-    (clientExternalRef !== null && typeof clientExternalRef !== "string") ||
     (idempotencyKey !== null && typeof idempotencyKey !== "string") ||
+    (userId !== null && typeof userId !== "string") ||
     createdBy === null
   ) {
     return null;
   }
 
   return {
-    client_external_ref: clientExternalRef,
     created_by: createdBy,
     idempotency_key: idempotencyKey,
     source: "public_api",
+    user_id: userId,
   };
 }
