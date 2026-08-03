@@ -239,14 +239,55 @@ In GoGym, Supabase owns application identity and persistent business data. Cloud
 
 This separation is a feature, not a weakness. Cloudflare, Supabase, or the model provider may be replaced without changing the product-level reason Mosoo exists.
 
+## What the GoGym Workarounds Revealed
+
+GoGym still had to write a meaningful amount of Mosoo-specific integration code before it could embed an Agent safely. The important distinction is not whether this code is "glue." It is whether the code expresses application policy or reimplements a Mosoo protocol contract.
+
+| GoGym implementation                                                                     | Correct owner            | Why                                                                                  |
+| ---------------------------------------------------------------------------------------- | ------------------------ | ------------------------------------------------------------------------------------ |
+| Supabase login, RLS, storage, and user deletion                                          | GoGym / Supabase         | These are application identity, data, and lifecycle policies.                        |
+| Fitness Tool schemas and MCP handlers                                                    | GoGym                    | Tool meaning, authorization, and side effects are business logic.                    |
+| Browser WebSocket and user-facing progress states                                        | GoGym                    | The application owns its interaction model and business vocabulary.                  |
+| Public Thread API types, authentication, errors, and file upload                         | Mosoo client             | These duplicate Mosoo's public protocol.                                             |
+| SSE parsing, reconnect, history reconciliation, deduplication, and terminal-state checks | Mosoo client             | Only Mosoo can define correct recovery semantics across API versions.                |
+| Delegation JWT parsing and verification                                                  | Mosoo integration helper | This is a security boundary defined by Mosoo's issuer, claims, and signing contract. |
+| Pairing Tool start and completion events without a stable call ID                        | Mosoo event contract     | Applications should not infer identity from FIFO order or Tool names.                |
+| Replacing a missing Thread and uploading attachments again                               | Neither                  | This workaround hides data loss and can duplicate work; recovery must be explicit.   |
+
+This produces a narrower conclusion than "Mosoo should own all Agent App glue." Mosoo should own the code whose correctness depends on Mosoo's protocol, identity, event, and recovery guarantees. The application should continue to own its users, permissions, data, Tools, and interface.
+
+## A Thin Integration Kit, Not Another Framework
+
+The repository already contains most low-level Public Thread behavior in `@mosoo/public-api-client`, but the package is private. The minimum useful response is to publish and extend that implementation rather than create a parallel SDK.
+
+The thin integration surface should add only three high-leverage helpers:
+
+- a resumable `watchRun()` that reconnects, reconciles persisted history, deduplicates stable event IDs, and checks terminal state;
+- a runtime-neutral `verifyDelegation()` that returns a typed Mosoo execution context after validating signature, issuer, audience, time bounds, and required claims;
+- mutation helpers that accept a caller-stable `requestId` and map it to `Idempotency-Key`, instead of generating a new random key during each retry.
+
+This scope is tracked in [#489](https://github.com/langgenius/mosoo/issues/489). Stable Tool identity and business-side idempotency require the server contract proposed in [#488](https://github.com/langgenius/mosoo/issues/488). Uncertain external effects and provider reconciliation remain separate runtime concerns in [#412](https://github.com/langgenius/mosoo/issues/412) and [#446](https://github.com/langgenius/mosoo/issues/446).
+
+The kit should not generate MCP servers, own Tool schemas, wrap Supabase, deploy the Web application, or define business events. Those additions would turn a small correctness layer into another framework and recreate the ownership ambiguity that GoGym helped expose.
+
+## Glue Is Adoption Cost, Not the Moat
+
+Coding Agents can generate ordinary API adapters quickly. Therefore, reducing boilerplate alone is not a durable product advantage.
+
+What a Coding Agent cannot generate locally is an authoritative upstream guarantee that remains correct when Mosoo changes: who the Agent represents, whether an event is the same event after reconnect, which Tool call completed, whether a retry is safe, and whether a Run is terminal. Mosoo is the only party that can define and preserve those semantics end to end.
+
+The integration kit is therefore product hygiene: it removes dangerous duplication and shortens time to first production use. The defensible value remains in the server-side identity, execution, event, and recovery contracts that the kit exposes.
+
 ## Product Implications
 
 This reflection suggests a focused product sequence:
 
 1. Make `userId` a clear, immutable Thread-level contract and delegate it safely to MCP.
-2. Stabilize application-oriented Thread, Run, Message/Event, File, and Artifact semantics.
-3. Verify the same MCP tools across every supported Harness and expose capability gaps honestly.
-4. Provide a small, stable event vocabulary for Web applications, plus an extension path for application-defined business events.
-5. Publish examples that begin with a real multi-user application, not an isolated Agent playground.
+2. Give every structured Tool event a stable `toolCallId` so applications can audit and deduplicate side effects without guessing.
+3. Publish the existing Public Thread client with resumable Run watching, delegation verification, and retry-safe idempotency.
+4. Make missing history, disconnected streams, and lost Threads explicit failure states rather than silent replacement paths.
+5. Verify the same MCP tools across every supported Harness and expose capability gaps honestly.
+6. Keep Mosoo's event vocabulary small and stable while allowing applications to define their own business events.
+7. Publish examples that begin with a real multi-user application, not an isolated Agent playground.
 
-The GoGym lesson is ultimately simple: hosting an Agent is not enough. The durable value is making an Agent behave like a safe, composable backend capability inside a real product.
+The GoGym lesson is ultimately simple: hosting an Agent is not enough, and writing glue is not enough. The durable value is making an Agent behave like a safe, observable, and recoverable backend capability inside a real product.
