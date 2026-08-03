@@ -63,7 +63,6 @@ export async function createPublicThread(
   const metadata = createPublicApiThreadMetadata({
     admission,
     idempotencyKey: request.idempotencyKey,
-    userId: request.input.userId ?? null,
   });
 
   try {
@@ -77,7 +76,7 @@ export async function createPublicThread(
       },
       options: {
         accessViewer: admission.accessViewer,
-        attributedUserId: admission.attributedUserId,
+        endUserId: request.input.userId,
         metadata: { public_api: metadata },
       },
       ...(request.input.inputText === undefined ? { requestUrl: request.requestUrl } : {}),
@@ -102,7 +101,7 @@ export async function createPublicThread(
 
     if (request.input.inputText === undefined) {
       return toCreateThreadResponse({
-        metadata,
+        endUserId: request.input.userId,
         run: null,
         session: toCreateEmptyThreadSessionSummary(session),
       });
@@ -147,7 +146,7 @@ export async function createPublicThread(
     });
 
     return toCreateThreadResponse({
-      metadata,
+      endUserId: request.input.userId,
       run,
       session: updatedSession,
     });
@@ -190,7 +189,7 @@ export async function recoverPublicThreadCreation(
   }
 
   return toCreateThreadResponse({
-    metadata: snapshot.metadata,
+    endUserId: snapshot.endUserId,
     run: snapshot.session.lastRun,
     session: toPublicThreadSessionSummary(snapshot.session),
   });

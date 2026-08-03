@@ -95,7 +95,7 @@ export function buildAgentApiCurl(
     `  -H "Authorization: Bearer $MOSOO_API_TOKEN" \\`,
     `  -H "Content-Type: application/json" \\`,
     `  -H "Idempotency-Key: create-thread-$(date +%s)" \\`,
-    `  -d '{"input":{"type":"user.message","content":[{"type":"text","text":"Say hello"}]},"client_external_ref":"demo-thread-001"}'`,
+    `  -d '{"userId":"your-user-id","input":{"type":"user.message","content":[{"type":"text","text":"Say hello"}]}}'`,
   ].join("\n");
 }
 

@@ -84,7 +84,7 @@ async function hashCreateThreadIdempotencyBody(
   return hashPublicApiIdempotencyBody({
     fileIds: body.fileIds,
     inputText: body.inputText ?? null,
-    userId: body.userId ?? null,
+    userId: body.userId,
   });
 }
 

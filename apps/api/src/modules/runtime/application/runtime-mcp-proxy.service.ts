@@ -10,7 +10,6 @@ import { readMcpCredentialSecret } from "../../mcp/application/mcp-credential-se
 import { getCredentialByIdOrNull } from "../../mcp/application/mcp-credential.repository";
 import { getCredentialStatus } from "../../mcp/application/mcp-mappers";
 import { getServerRowOrNull } from "../../mcp/application/mcp-server.repository";
-import { parsePublicApiThreadMetadata } from "../../public-api/public-thread-metadata";
 import { getDriverInstanceMcpProxyGrant } from "../infrastructure/driver-instance/mcp-grants.repository";
 import { getRuntimeSessionLink } from "../infrastructure/driver-instance/session-link.repository";
 import { createRuntimeMcpDelegationToken } from "./runtime-mcp-delegation";
@@ -29,14 +28,13 @@ async function createDelegationToken(
   const link = await getRuntimeSessionLink(bindings.DB, input.driverInstanceId);
   if (link.sessionId === null) return null;
   const row = await getAppDatabase(bindings.DB)
-    .select({ metadataJson: sessionsTable.metadataJson })
+    .select({ endUserId: sessionsTable.endUserId })
     .from(sessionsTable)
     .where(eq(sessionsTable.id, link.sessionId))
     .limit(1)
     .get();
   if (!row) return null;
-  const metadata = parsePublicApiThreadMetadata(row.metadataJson);
-  if (!metadata?.user_id) return null;
+  if (row.endUserId === null) return null;
   if (link.agentId === null || link.appId === null) {
     throw createRuntimeMcpProxyError({
       code: "mcp_proxy_forbidden",
@@ -50,7 +48,7 @@ async function createDelegationToken(
     claims: {
       agentId: link.agentId,
       appId: link.appId,
-      userId: metadata.user_id,
+      endUserId: row.endUserId,
       runId: link.sessionRunId,
       threadId: link.sessionId,
     },

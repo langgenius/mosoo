@@ -26,7 +26,7 @@ interface CreateThreadRequestBody {
     type: "user.message";
   };
   resources?: { file_id: string; type: "file" }[];
-  userId?: string;
+  userId: string;
 }
 
 interface SseMessage {
@@ -49,7 +49,7 @@ export interface MosooCreateThreadInput {
   idempotencyKey?: string;
   input?: string;
   signal?: AbortSignal | undefined;
-  userId?: string;
+  userId: string;
 }
 
 export interface MosooUploadAgentFileInput {
@@ -223,11 +223,7 @@ function isBrowserLikeRuntime(): boolean {
 }
 
 function createCreateThreadBody(input: MosooCreateThreadInput): CreateThreadRequestBody {
-  const body: CreateThreadRequestBody = {};
-
-  if (input.userId !== undefined) {
-    body.userId = input.userId;
-  }
+  const body: CreateThreadRequestBody = { userId: input.userId };
 
   if (input.fileIds !== undefined && input.fileIds.length > 0) {
     body.resources = input.fileIds.map((fileId) => ({ file_id: fileId, type: "file" }));

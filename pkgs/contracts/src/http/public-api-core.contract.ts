@@ -148,7 +148,7 @@ export interface PublicThreadSummary {
   status: PublicThreadStatus;
   title: string | null;
   updated_at: string;
-  userId: string | null;
+  userId: string;
 }
 
 export interface PublicThreadLinks {

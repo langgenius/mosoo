@@ -6,7 +6,7 @@ import type { PublicApiCaller } from "../auth/application/public-api-caller.serv
 export interface CreatePublicThreadInput {
   fileIds: FileId[];
   inputText?: string | undefined;
-  userId?: string | undefined;
+  userId: string;
 }
 
 export interface CreatePublicThreadRequest {

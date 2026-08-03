@@ -139,7 +139,7 @@ export async function sendPublicThreadSessionEvents(
   return toPublicThreadEventBatch({
     batch,
     thread: toPublicThreadSummary({
-      metadata: admission.metadata,
+      endUserId: admission.session.end_user_id,
       session: toPublicThreadSessionSummary(batch.session),
     }),
   });

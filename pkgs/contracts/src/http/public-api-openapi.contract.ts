@@ -330,7 +330,7 @@ export const PUBLIC_API_OPENAPI_SCHEMAS = {
   CreateThreadRequest: {
     additionalProperties: false,
     description:
-      "Request body for creating a Thread. All fields are optional: omit `input` to create an empty IDLE Thread, or include it to queue the initial Run.",
+      "Request body for creating a Thread. `userId` is required. Omit `input` to create an empty IDLE Thread, or include it to queue the initial Run.",
     properties: {
       userId: {
         description:
@@ -382,7 +382,7 @@ export const PUBLIC_API_OPENAPI_SCHEMAS = {
         type: "object",
       },
     },
-    required: [],
+    required: ["userId"],
     type: "object",
   },
   CreateThreadResponse: {
@@ -550,8 +550,10 @@ export const PUBLIC_API_OPENAPI_SCHEMAS = {
       },
       userId: {
         description:
-          "Opaque application-user identifier, or null for a legacy Thread created before this field existed.",
-        type: ["string", "null"],
+          "Immutable opaque application-user identifier supplied when the Thread was created.",
+        maxLength: PUBLIC_THREAD_USER_ID_MAX_LENGTH,
+        minLength: 1,
+        type: "string",
       },
     },
     required: [

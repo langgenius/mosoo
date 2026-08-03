@@ -182,7 +182,7 @@ describe("agent session retrieve", () => {
     });
   });
 
-  test("does not treat unsupported public API creator metadata as a human thread creator", async () => {
+  test("keeps Public API Threads visible to the Access Token owner", async () => {
     const database = createAgentSessionRetrieveDatabase();
 
     await database
@@ -190,13 +190,11 @@ describe("agent session retrieve", () => {
       .bind(
         JSON.stringify({
           public_api: {
-            client_external_ref: null,
             created_by: {
-              id: "01J00000000000000000000067",
-              kind: "machine",
               token_id: "01J00000000000000000000067",
               token_label: "Automation",
             },
+            idempotency_key: null,
             source: "public_api",
           },
         }),
@@ -204,11 +202,11 @@ describe("agent session retrieve", () => {
       )
       .run();
 
-    await expect(
-      retrieveThreadAgentSession(database, VIEWER, {
-        appId: APP_ID,
-        sessionId: "session-1",
-      }),
-    ).rejects.toThrow();
+    const result = await retrieveThreadAgentSession(database, VIEWER, {
+      appId: APP_ID,
+      sessionId: "session-1",
+    });
+
+    expect(result.session.id).toBe("session-1");
   });
 });

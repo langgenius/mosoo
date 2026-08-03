@@ -5,16 +5,10 @@ import { getAccountViewer } from "../auth/application/public-api-caller.service"
 import type { AuthenticatedViewer } from "../auth/application/viewer-auth.service";
 import { admitAgentApiEndpointCaller } from "./agent-api-endpoint-admission.service";
 import { publicNotFound } from "./public-api-errors";
-import type { PublicApiThreadCreatedByMetadata } from "./public-thread-metadata";
-import type { PublicApiThreadMetadata } from "./public-thread-metadata";
 
 export interface ThreadCreationAdmission {
   accessViewer: AuthenticatedViewer;
-  attributedUserId: AccountId | null;
-  createdById: PlatformId;
-  createdByKind: PublicApiThreadCreatedByMetadata["kind"];
   creatorViewer: AuthenticatedViewer;
-  executionOwnerId: AccountId;
   fileViewer: AuthenticatedViewer;
   appId: AppId;
   tokenId: PersonalAccessTokenId;
@@ -22,9 +16,7 @@ export interface ThreadCreationAdmission {
 }
 
 interface ThreadReadSnapshot {
-  metadata: PublicApiThreadMetadata;
   row: {
-    attributed_user_id: AccountId | null;
     creator_account_id: PlatformId;
   };
   session: {
@@ -49,11 +41,7 @@ function canReadThreadFromOwnership(
   caller: PublicApiCaller,
   snapshot: ThreadReadSnapshot,
 ): boolean {
-  return (
-    snapshot.row.attributed_user_id === caller.viewer.id ||
-    (snapshot.metadata.created_by.kind === "access_token" &&
-      snapshot.row.creator_account_id === caller.viewer.id)
-  );
+  return snapshot.row.creator_account_id === caller.viewer.id;
 }
 
 export async function admitPublicThreadReader(
@@ -78,11 +66,7 @@ export async function admitPublicThreadCreator(
   const agent = await admitAgentApiEndpointCaller(database, caller.viewer, input.agentId);
   return {
     accessViewer: await getOwnerViewer(database, agent.ownerId),
-    attributedUserId: caller.viewer.id,
-    createdById: caller.viewer.id,
-    createdByKind: "access_token",
     creatorViewer: caller.viewer,
-    executionOwnerId: agent.ownerId,
     fileViewer: caller.viewer,
     appId: agent.appId,
     tokenId: caller.tokenId,

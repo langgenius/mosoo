@@ -24,7 +24,7 @@ interface DelegationInput {
     appId: string;
     runId: string | null;
     threadId: string;
-    userId: string;
+    endUserId: string;
   };
   nowMs?: number;
 }
@@ -48,7 +48,7 @@ export async function createRuntimeMcpDelegationToken(input: DelegationInput): P
     iss: ISSUER,
     jti: crypto.randomUUID(),
     run_id: input.claims.runId,
-    sub: input.claims.userId,
+    sub: input.claims.endUserId,
     thread_id: input.claims.threadId,
   };
   if (!claims.sub || !claims.aud)

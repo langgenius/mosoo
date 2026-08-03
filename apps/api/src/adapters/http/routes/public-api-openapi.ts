@@ -400,7 +400,7 @@ export function createPublicApiOpenApiDocument(origin: string): PublicApiOpenApi
       }),
       post: operation({
         description:
-          "Creates a Thread and the backing AgentSession. If input is present, mosoo also queues the initial Run. If input is omitted, the Thread is immediately visible with IDLE status and no run. A trusted backend can bind the Thread to an application user with `userId`.",
+          "Creates a Thread and the backing AgentSession for the required application `userId`. If input is present, mosoo also queues the initial Run. If input is omitted, the Thread is immediately visible with IDLE status and no run.",
         parameters: [exampleAgentIdParameter, idempotencyKeyParameter],
         requestBody: jsonRequestBodyExamples(
           { $ref: "#/components/schemas/CreateThreadRequest" },
@@ -448,7 +448,7 @@ export function createPublicApiOpenApiDocument(origin: string): PublicApiOpenApi
               },
             },
           },
-          { required: false },
+          { required: true },
         ),
         success: {
           "201": idempotentJsonResponse("Created Thread.", {

@@ -530,7 +530,6 @@ describe("API to web boundary", () => {
     ]);
     expectNoProperties(threadProperties, [
       "attributed_user",
-      "client_external_ref",
       "created_by",
       "deploymentVersionId",
       "deploymentVersionNumber",
@@ -660,11 +659,7 @@ describe("API to web boundary", () => {
             `https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`,
             {
               body: JSON.stringify({
-                attributed_user_id: PUBLIC_API_TEST_IDS.nonOwnerAccount,
-                input: {
-                  content: [{ text: "Do the work.", type: "text" }],
-                  type: "user.message",
-                },
+                userId: "   ",
               }),
               headers: { "Content-Type": "application/json" },
               method: "POST",
@@ -719,6 +714,7 @@ describe("API to web boundary", () => {
               ],
               type: "user.message",
             },
+            userId: "customer-123",
           },
           7,
         ),
@@ -728,6 +724,7 @@ describe("API to web boundary", () => {
     expect(parsed).toEqual({
       fileIds: [PUBLIC_API_TEST_IDS.file, PUBLIC_API_TEST_IDS.fileAlt],
       inputText: "Summarize the launch plan.\nList two follow-ups.",
+      userId: "customer-123",
     });
   });
 

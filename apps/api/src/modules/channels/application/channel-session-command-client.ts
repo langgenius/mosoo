@@ -133,7 +133,6 @@ export function createChannelSessionClient(input: {
               },
               options: {
                 accessViewer: input.binding.owner,
-                attributedUserId: null,
                 metadata: {
                   triggered_by: toTriggeredByMetadata(input.binding, command.trigger),
                 },

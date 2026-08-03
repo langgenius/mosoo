@@ -204,7 +204,7 @@ export async function getFileUploadAccessContextByFileId(
           eq(sessionsTable.id, fileUploadsTable.scopeId),
           or(
             eq(sessionsTable.creatorAccountId, viewerId),
-            eq(sessionsTable.attributedUserId, viewerId),
+            eq(sessionsTable.participantAccountId, viewerId),
           ),
         ),
       )

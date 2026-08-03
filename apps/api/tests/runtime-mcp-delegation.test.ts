@@ -11,7 +11,7 @@ const claims = {
   appId: "01J0000000000000000000000Q",
   runId: "01J0000000000000000000000N",
   threadId: "01J0000000000000000000000B",
-  userId: "customer-123",
+  endUserId: "customer-123",
 };
 
 describe("runtime MCP end-user delegation", () => {
@@ -74,6 +74,6 @@ describe("runtime MCP end-user delegation", () => {
         nowMs: 1_800_000_030_000,
         token,
       }),
-    ).resolves.toMatchObject({ run_id: null, sub: claims.userId });
+    ).resolves.toMatchObject({ run_id: null, sub: claims.endUserId });
   });
 });

@@ -32,12 +32,13 @@ import { parsePublicApiThreadMetadata } from "./public-thread-metadata";
 import type { PublicApiThreadMetadata } from "./public-thread-metadata";
 
 export interface ThreadSnapshotRow extends SessionSummaryWithLastRunRow {
-  attributed_user_id: AccountId | null;
   creator_account_id: AccountId;
+  end_user_id: string;
   metadata_json: string;
 }
 
 export interface ThreadSnapshot {
+  endUserId: string;
   metadata: PublicApiThreadMetadata;
   row: ThreadSnapshotRow;
   session: SessionSummary;
@@ -85,8 +86,8 @@ export async function getThreadSnapshot(
     (await getAppDatabase(database)
       .select({
         ...sessionSummaryWithLastRunColumns(),
-        attributed_user_id: sessionsTable.attributedUserId,
         creator_account_id: sessionsTable.creatorAccountId,
+        end_user_id: sessionsTable.endUserId,
         metadata_json: sessionsTable.metadataJson,
       })
       .from(sessionsTable)
@@ -101,15 +102,17 @@ export async function getThreadSnapshot(
 
   const metadata = parsePublicApiThreadMetadata(row.metadata_json);
 
-  if (!metadata) {
+  if (!metadata || row.end_user_id === null) {
     throw publicNotFound("Thread not found.");
   }
 
   return {
+    endUserId: row.end_user_id,
     metadata,
     row: {
       ...row,
       creator_account_id: parsePlatformId<AccountId>(row.creator_account_id, "Creator account ID"),
+      end_user_id: row.end_user_id,
     },
     session: buildSessionSummaryFromJoinedRow(row),
   };
@@ -127,8 +130,8 @@ export async function findPublicThreadSnapshotByIdempotencyKey(
     (await getAppDatabase(database)
       .select({
         ...sessionSummaryWithLastRunColumns(),
-        attributed_user_id: sessionsTable.attributedUserId,
         creator_account_id: sessionsTable.creatorAccountId,
+        end_user_id: sessionsTable.endUserId,
         metadata_json: sessionsTable.metadataJson,
       })
       .from(sessionsTable)
@@ -150,15 +153,17 @@ export async function findPublicThreadSnapshotByIdempotencyKey(
 
   const metadata = parsePublicApiThreadMetadata(row.metadata_json);
 
-  if (!metadata || metadata.idempotency_key !== input.idempotencyKey) {
+  if (!metadata || metadata.idempotency_key !== input.idempotencyKey || row.end_user_id === null) {
     return null;
   }
 
   return {
+    endUserId: row.end_user_id,
     metadata,
     row: {
       ...row,
       creator_account_id: parsePlatformId<AccountId>(row.creator_account_id, "Creator account ID"),
+      end_user_id: row.end_user_id,
     },
     session: buildSessionSummaryFromJoinedRow(row),
   };

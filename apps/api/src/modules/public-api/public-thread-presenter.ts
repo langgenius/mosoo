@@ -14,7 +14,6 @@ import {
   toPublicThreadSessionSummary,
 } from "./public-thread-api-presenter";
 import type { PublicThreadSessionProjection } from "./public-thread-api-presenter";
-import type { PublicApiThreadMetadata } from "./public-thread-metadata";
 
 function createThreadLinks(threadId: PublicThreadId): PublicThreadLinks {
   return {
@@ -23,7 +22,7 @@ function createThreadLinks(threadId: PublicThreadId): PublicThreadLinks {
 }
 
 export function toPublicThreadSummary(input: {
-  metadata: PublicApiThreadMetadata;
+  endUserId: string;
   session: PublicThreadSessionProjection;
 }): PublicThreadSummary {
   return {
@@ -36,7 +35,7 @@ export function toPublicThreadSummary(input: {
     status: input.session.status,
     title: input.session.title,
     updated_at: input.session.updatedAt,
-    userId: input.metadata.user_id,
+    userId: input.endUserId,
   };
 }
 
@@ -69,7 +68,7 @@ export function toCreateEmptyThreadSessionSummary(
 }
 
 export function toCreateThreadResponse(input: {
-  metadata: PublicApiThreadMetadata;
+  endUserId: string;
   run: SessionRunSummary | null;
   session: PublicThreadSessionProjection;
 }): PublicThreadApiCreateThreadResponse {
@@ -77,15 +76,15 @@ export function toCreateThreadResponse(input: {
     links: createThreadLinks(input.session.id),
     run: toPublicThreadRunSummary(input.run),
     thread: toPublicThreadSummary({
-      metadata: input.metadata,
+      endUserId: input.endUserId,
       session: input.session,
     }),
   };
 }
 
 export function toRetrieveThreadResponse(input: {
+  endUserId: string;
   finalOutput: PublicThreadFinalOutput | null;
-  metadata: PublicApiThreadMetadata;
   session: SessionSummary;
 }): PublicThreadApiRetrieveThreadResponse {
   const session = toPublicThreadSessionSummary(input.session);
@@ -97,7 +96,7 @@ export function toRetrieveThreadResponse(input: {
         ? null
         : toPublicThreadRunSummary(input.session.lastRun, { finalOutput: input.finalOutput }),
     thread: toPublicThreadSummary({
-      metadata: input.metadata,
+      endUserId: input.endUserId,
       session,
     }),
   };

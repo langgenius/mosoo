@@ -48,7 +48,7 @@ const CREATE_THREAD_REQUEST_FIELDS: ReadonlySet<string> = new Set(["input", "res
 export interface ParsedCreateThreadRequest {
   fileIds: FileId[];
   inputText?: string | undefined;
-  userId?: string | undefined;
+  userId: string;
 }
 
 function parseContentLength(value: string | null): number | null {
@@ -256,28 +256,6 @@ function readOptionalStringOrNull(
   }
 
   throw publicInvalidRequest(`${field} must be a string or null.`);
-}
-
-function readOptionalLimitedStringField(
-  input: Record<string, unknown>,
-  field: string,
-  maxLength: number,
-): string | undefined {
-  const value = input[field];
-
-  if (value === undefined) {
-    return undefined;
-  }
-
-  if (typeof value !== "string" || value.trim().length === 0) {
-    throw publicInvalidRequest(`${field} must be a non-empty string.`);
-  }
-
-  if (value.length > maxLength) {
-    throw publicInvalidRequest(`${field} must be ${maxLength} characters or fewer.`);
-  }
-
-  return value;
 }
 
 function readPublicThreadResourceFileIds(
@@ -490,12 +468,12 @@ export async function readCreateThreadRequest(
   }
 
   assertOnlyFields(body, CREATE_THREAD_REQUEST_FIELDS, "create thread");
-  const userId = readOptionalLimitedStringField(body, "userId", PUBLIC_THREAD_USER_ID_MAX_LENGTH);
+  const userId = readLimitedStringField(body, "userId", PUBLIC_THREAD_USER_ID_MAX_LENGTH);
   const inputText = readCreateThreadInputText(body);
 
   return {
     fileIds: readCreateThreadFileIds(body),
     ...(inputText === undefined ? {} : { inputText }),
-    ...(userId === undefined ? {} : { userId }),
+    userId,
   };
 }

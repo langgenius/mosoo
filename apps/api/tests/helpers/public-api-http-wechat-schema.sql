@@ -120,6 +120,7 @@ CREATE TABLE session (
   app_id text NOT NULL,
   creator_account_id text NOT NULL,
   attributed_user_id text,
+  end_user_id text,
   agent_id text NOT NULL,
   deployment_version_id text,
   deployment_version_number integer,

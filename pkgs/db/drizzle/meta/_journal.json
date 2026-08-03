@@ -36,6 +36,13 @@
       "when": 1785082039000,
       "tag": "0004_usage-rollup-receipt",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1785774269305,
+      "tag": "0005_public-thread-end-user",
+      "breakpoints": true
     }
   ]
 }
