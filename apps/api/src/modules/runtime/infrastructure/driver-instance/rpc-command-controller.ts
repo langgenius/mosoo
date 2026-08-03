@@ -1,15 +1,24 @@
 import type {
   DriverCommandUpdateInput,
+  DriverExternalToolEffectClaimInput,
+  DriverExternalToolEffectClaimOutput,
+  DriverExternalToolEffectCompleteInput,
+  DriverExternalToolEffectUnknownInput,
   DriverNextCommandInput,
   DriverNextCommandOutput,
 } from "@mosoo/agent-driver/orpc";
-import { RuntimeCommandResult } from "@mosoo/contracts/runtime-command";
+import { McpExecuteCommandResult, RuntimeCommandResult } from "@mosoo/contracts/runtime-command";
 import type { RuntimeCommand } from "@mosoo/contracts/runtime-command";
 import { parseSchemaValue } from "@mosoo/contracts/validation";
 import { parsePlatformId } from "@mosoo/id";
 import type { DriverCommandId } from "@mosoo/id";
 
 import { createErrorLogContext, logError } from "../../../../platform/cloudflare/logger";
+import {
+  claimExternalToolEffect,
+  completeExternalToolEffect,
+  markExternalToolEffectUnknown,
+} from "../session-runs/external-tool-effect-store.repository";
 import {
   claimNextQueuedRuntimeCommandRecord,
   createRuntimeCommandRecord,
@@ -107,6 +116,63 @@ export class DriverInstanceRpcCommandController {
       this.#dependencies.waitUntil(release);
     }
 
+    return { ok: true };
+  }
+
+  async handleClaimExternalToolEffect(
+    input: DriverExternalToolEffectClaimInput,
+    context: DriverInstanceRpcOperationContext,
+  ): Promise<DriverExternalToolEffectClaimOutput> {
+    const { env, state } = this.#dependencies;
+
+    if (input.driverInstanceId !== state.requireDriverInstanceId()) {
+      throw new Error("Driver instance id mismatch.");
+    }
+    context.assertActiveConnection();
+
+    return claimExternalToolEffect(env.DB, {
+      commandId: parsePlatformId<DriverCommandId>(input.commandId, "driver command id"),
+      driverInstanceId: state.requireDriverInstanceId(),
+    });
+  }
+
+  async handleCompleteExternalToolEffect(
+    input: DriverExternalToolEffectCompleteInput,
+    context: DriverInstanceRpcOperationContext,
+  ): Promise<{ ok: true }> {
+    const { env, state } = this.#dependencies;
+
+    if (input.driverInstanceId !== state.requireDriverInstanceId()) {
+      throw new Error("Driver instance id mismatch.");
+    }
+    context.assertActiveConnection();
+    await completeExternalToolEffect(env.DB, {
+      commandId: parsePlatformId<DriverCommandId>(input.commandId, "driver command id"),
+      driverInstanceId: state.requireDriverInstanceId(),
+      ...(input.providerReceiptJson === undefined
+        ? {}
+        : { providerReceiptJson: input.providerReceiptJson }),
+      result: parseSchemaValue(McpExecuteCommandResult, input.result),
+    });
+    context.assertActiveConnection();
+    return { ok: true };
+  }
+
+  async handleMarkExternalToolEffectUnknown(
+    input: DriverExternalToolEffectUnknownInput,
+    context: DriverInstanceRpcOperationContext,
+  ): Promise<{ ok: true }> {
+    const { env, state } = this.#dependencies;
+
+    if (input.driverInstanceId !== state.requireDriverInstanceId()) {
+      throw new Error("Driver instance id mismatch.");
+    }
+    context.assertActiveConnection();
+    await markExternalToolEffectUnknown(env.DB, {
+      commandId: parsePlatformId<DriverCommandId>(input.commandId, "driver command id"),
+      driverInstanceId: state.requireDriverInstanceId(),
+    });
+    context.assertActiveConnection();
     return { ok: true };
   }
 

@@ -59,6 +59,12 @@ function createDriverInstanceRecordDatabase(): SqliteD1Database {
       updated_at integer NOT NULL
     );
 
+    CREATE TABLE external_tool_effect (
+      driver_instance_id text NOT NULL,
+      id text PRIMARY KEY NOT NULL,
+      status text NOT NULL
+    );
+
     CREATE TABLE driver_instance (
       boot_token_expires_at integer NOT NULL,
       boot_token_hash blob NOT NULL,
@@ -322,6 +328,19 @@ describe("driver instance records", () => {
       errorMessage: "Runtime driver heartbeat timed out.",
       status: "failed",
     });
+  });
+
+  test("maintenance retains expired terminal drivers with unresolved external effects", async () => {
+    const database = createDriverInstanceRecordDatabase();
+    insertDriverRecord(database, { status: "failed" });
+    database.execute(`
+      INSERT INTO external_tool_effect (driver_instance_id, id, status)
+      VALUES ('${DRIVER_INSTANCE_ID}', '01J0000000000000000000000Z', 'unknown')
+    `);
+
+    await cleanupDriverInstances(createBindings(database));
+
+    await expect(readDriverRecord(database)).resolves.toMatchObject({ status: "failed" });
   });
 
   test("maintenance gives connecting drivers the cold ready budget", async () => {
