@@ -13,6 +13,7 @@ import { syncSessionViewerState } from "../../../sessions/application/session-vi
 import { RESCHEDULING_RECONNECT_WINDOW_MS } from "../../../sessions/domain/session-lifecycle";
 import { createSessionLifecycleTerminatedEvent } from "../../application/session-runs/session-run-view-events.service";
 import { reconcileStaleActiveSessionRuns } from "../../application/session-runs/stale-run-reconciliation.service";
+import { reconcileTerminalSessionRuns } from "../../application/session-runs/terminal-run-reconciliation.service";
 import { getRuntimeKindPolicy } from "../../domain/runtime-kind-policy";
 import { cleanupDriverInstances } from "../driver-instance/maintenance";
 import { repairRuntimeCommandRecords } from "../session-runs/runtime-command-store.repository";
@@ -292,8 +293,16 @@ export async function runSandboxMaintenance(bindings: ApiBindings): Promise<void
   const staleRunReconciliation = await reconcileStaleActiveSessionRuns(bindings.DB, {
     limit: MAINTENANCE_BATCH_SIZE,
   });
+  const terminalRunReconciliation = await reconcileTerminalSessionRuns(bindings, {
+    limit: MAINTENANCE_BATCH_SIZE,
+  });
   await processInBatches(
-    staleRunReconciliation.reconciledSessionIds,
+    [
+      ...new Set([
+        ...staleRunReconciliation.reconciledSessionIds,
+        ...terminalRunReconciliation.reconciledSessionIds,
+      ]),
+    ],
     RESCHEDULING_TIMEOUT_IO_BATCH_SIZE,
     async (sessionId) => syncSessionViewerState(bindings, sessionId),
   );

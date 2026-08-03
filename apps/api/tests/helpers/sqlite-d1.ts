@@ -10,6 +10,7 @@ const statementQueries = new WeakMap<D1PreparedStatement, string>();
 export class SqliteD1Database implements D1Database {
   readonly #database = new Database(":memory:");
   readonly #maxBoundParams: number | undefined;
+  #batchTail: Promise<void> = Promise.resolve();
 
   constructor(input: { foreignKeys?: boolean; maxBoundParams?: number } = {}) {
     this.#maxBoundParams = input.maxBoundParams;
@@ -29,10 +30,18 @@ export class SqliteD1Database implements D1Database {
   }
 
   async batch<T = unknown>(statements: D1PreparedStatement[]): Promise<D1Result<T>[]> {
+    let releaseBatch: (() => void) | null = null;
+    const previousBatch = this.#batchTail;
+    this.#batchTail = new Promise<void>((resolve) => {
+      releaseBatch = resolve;
+    });
+    await previousBatch;
+
     const results: D1Result<T>[] = [];
-    this.#database.run("BEGIN");
 
     try {
+      this.#database.run("BEGIN");
+
       for (const statement of statements) {
         const query = statementQueries.get(statement) ?? "";
         const returnsRows = /^\s*(select|with)\b/i.test(query) || /\breturning\b/i.test(query);
@@ -45,6 +54,8 @@ export class SqliteD1Database implements D1Database {
     } catch (error) {
       this.#database.run("ROLLBACK");
       throw error;
+    } finally {
+      releaseBatch?.();
     }
   }
 

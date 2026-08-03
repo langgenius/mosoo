@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 import type { DriverInstanceId, SessionRunId } from "@mosoo/id";
 
 import { recordCanonicalSessionRunFailure } from "../src/modules/runtime/application/session-runs/session-run-terminal-failure.service";
+import { reconcileTerminalSessionRuns } from "../src/modules/runtime/application/session-runs/terminal-run-reconciliation.service";
 import { getRuntimeSessionLink } from "../src/modules/runtime/infrastructure/driver-instance/session-link.repository";
 import { recordDriverInstanceFailure } from "../src/modules/runtime/infrastructure/driver-instance/terminal-driver-events";
 import { setSessionRunStatus } from "../src/modules/runtime/infrastructure/session-runs/session-run-store.repository";
@@ -300,6 +301,152 @@ describe("canonical session run terminal failure", () => {
         source_event_id: CANONICAL_FAILURE_SOURCE_ID,
       },
     ]);
+  });
+
+  test("repairs a lost terminal event after the Driver has stopped", async () => {
+    const database = await createPublicHttpContractDatabase();
+    await insertLinkedRunFixture(database);
+    const bindings = createPublicHttpTestBindings(database) as ApiBindings;
+
+    await setSessionRunStatus(database, {
+      error: PROVISION_ERROR,
+      runId: RUN_ID,
+      source: "api",
+      status: "failed",
+    });
+
+    await database
+      .prepare("UPDATE driver_instance SET status = ? WHERE id = ?")
+      .bind("stopped", DRIVER_ID)
+      .run();
+
+    expect(await readFailureEvents(database)).toEqual([]);
+
+    const firstRepair = await reconcileTerminalSessionRuns(bindings, { limit: 10 });
+    const secondRepair = await reconcileTerminalSessionRuns(bindings, { limit: 10 });
+
+    expect(firstRepair.reconciledRunIds).toEqual([RUN_ID]);
+    expect(secondRepair.reconciledRunIds).toEqual([]);
+    expect(await readFailureEvents(database)).toEqual([
+      {
+        content_text: PROVISION_ERROR.message,
+        event_type: "run.failed",
+        source_event_id: CANONICAL_FAILURE_SOURCE_ID,
+      },
+    ]);
+  });
+
+  test("repairs an inherited terminal Run whose Session and completion event are both stale", async () => {
+    const database = await createPublicHttpContractDatabase();
+    await insertLinkedRunFixture(database, "completed");
+    const bindings = createPublicHttpTestBindings(database) as ApiBindings;
+
+    await database
+      .prepare("UPDATE session SET status = ? WHERE id = ?")
+      .bind("RUNNING", PUBLIC_API_TEST_IDS.ownerSession)
+      .run();
+    await database
+      .prepare("UPDATE driver_instance SET status = ? WHERE id = ?")
+      .bind("stopped", DRIVER_ID)
+      .run();
+
+    const repaired = await reconcileTerminalSessionRuns(bindings, { limit: 10 });
+    const session = await database
+      .prepare("SELECT status FROM session WHERE id = ?")
+      .bind(PUBLIC_API_TEST_IDS.ownerSession)
+      .first<{ status: string }>();
+    const completedEvents = await database
+      .prepare(
+        `
+          SELECT event_type, source_event_id
+          FROM session_event
+          WHERE run_id = ? AND event_type = 'run.completed'
+        `,
+      )
+      .bind(RUN_ID)
+      .all<{ event_type: string; source_event_id: string }>();
+
+    expect(repaired.reconciledRunIds).toEqual([RUN_ID]);
+    expect(session).toEqual({ status: "IDLE" });
+    expect(completedEvents.results).toEqual([
+      {
+        event_type: "run.completed",
+        source_event_id: `session-run-terminal:${RUN_ID}:run.completed`,
+      },
+    ]);
+  });
+
+  test("repairs an old terminal receipt without changing a newer Run", async () => {
+    const database = await createPublicHttpContractDatabase();
+    await insertLinkedRunFixture(database, "completed");
+    const bindings = createPublicHttpTestBindings(database) as ApiBindings;
+
+    await database
+      .prepare(
+        `
+          INSERT INTO session_run (
+            id,
+            session_id,
+            agent_id,
+            created_by_account_id,
+            trigger,
+            status,
+            provider,
+            model,
+            runtime_id,
+            trace_id,
+            created_at,
+            updated_at
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+      )
+      .bind(
+        PUBLIC_API_TEST_IDS.runAlt,
+        PUBLIC_API_TEST_IDS.ownerSession,
+        PUBLIC_API_TEST_IDS.agent,
+        PUBLIC_API_TEST_IDS.ownerAccount,
+        "user_prompt",
+        "running",
+        "openai",
+        "gpt-5.4",
+        "openai-runtime",
+        "trace-newer-run",
+        2,
+        2,
+      )
+      .run();
+    await database
+      .prepare("UPDATE session SET last_run_id = ?, status = ? WHERE id = ?")
+      .bind(PUBLIC_API_TEST_IDS.runAlt, "RUNNING", PUBLIC_API_TEST_IDS.ownerSession)
+      .run();
+    await database
+      .prepare("UPDATE driver_instance SET status = ? WHERE id = ?")
+      .bind("stopped", DRIVER_ID)
+      .run();
+
+    await reconcileTerminalSessionRuns(bindings, { limit: 10 });
+
+    const session = await database
+      .prepare("SELECT last_run_id, status FROM session WHERE id = ?")
+      .bind(PUBLIC_API_TEST_IDS.ownerSession)
+      .first<{ last_run_id: string; status: string }>();
+
+    expect(session).toEqual({
+      last_run_id: PUBLIC_API_TEST_IDS.runAlt,
+      status: "RUNNING",
+    });
+    const completedEvent = await database
+      .prepare(
+        "SELECT source_event_id FROM session_event WHERE run_id = ? AND event_type = 'run.completed'",
+      )
+      .bind(RUN_ID)
+      .first<{ source_event_id: string }>();
+
+    expect(completedEvent).toEqual({
+      source_event_id: `session-run-terminal:${RUN_ID}:run.completed`,
+    });
+    expect(await readFailureEvents(database)).toEqual([]);
   });
 
   test("does not append a failure after a non-failed terminal outcome", async () => {
