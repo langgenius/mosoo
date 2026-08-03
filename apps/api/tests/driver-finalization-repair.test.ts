@@ -15,6 +15,7 @@ import { createDriverStartInputFromBootPayload } from "../../driver/src/protocol
 import type { RuntimeCommand as DriverRuntimeCommand } from "../../driver/src/runtime-command";
 import { driverBootPayload } from "../../driver/tests/driver-boot-payload-fixture";
 import { recordCanonicalSessionRunFailure } from "../src/modules/runtime/application/session-runs/session-run-terminal-failure.service";
+import { cleanupDriverInstances } from "../src/modules/runtime/infrastructure/driver-instance/maintenance";
 import { repairFinalizedTerminalDriverRunState } from "../src/modules/runtime/infrastructure/driver-instance/terminal-run-release";
 import {
   claimExternalToolEffect,
@@ -200,6 +201,7 @@ function createPersistentEffectDispatcher(input: {
     driverInstanceId: PUBLIC_API_TEST_IDS.driverOwner,
     isShuttingDown: () => input.io.isDrained(),
     permissionRequests: new DriverPermissionBroker(() => logger),
+    rememberRunFailure: () => {},
     runtimeContextFactory: (socket, runtimeLogger) =>
       createAgentDriverContext({
         eventSink: socket,
@@ -700,6 +702,41 @@ describe("driver finalization repair", () => {
       await database
         .prepare("SELECT completed_at, status FROM external_tool_effect_attempt")
         .first<{ completed_at: number; status: string }>(),
+    ).toMatchObject({ status: "unknown" });
+  });
+
+  test("retains an unknown MCP effect after terminal Driver maintenance", async () => {
+    const database = await createPublicHttpContractDatabase();
+    await insertFinalizedDriverLeaseFixture(database);
+    const bindings = createPublicHttpTestBindings(database) as ApiBindings;
+
+    await createRuntimeCommandRecord(database, {
+      command: mcpExecuteCommand(MCP_COMMAND_ID),
+      driverInstanceId: PUBLIC_API_TEST_IDS.driverOwner as DriverInstanceId,
+      status: "accepted",
+    });
+    await claimExternalToolEffect(database, {
+      commandId: MCP_COMMAND_ID,
+      driverInstanceId: PUBLIC_API_TEST_IDS.driverOwner as DriverInstanceId,
+    });
+    await repairFinalizedTerminalDriverRunState(bindings, {
+      driverInstanceId: PUBLIC_API_TEST_IDS.driverOwner as DriverInstanceId,
+      status: "stopped",
+    });
+
+    await cleanupDriverInstances(bindings);
+
+    expect(
+      await database
+        .prepare("SELECT id FROM driver_instance WHERE id = ?")
+        .bind(PUBLIC_API_TEST_IDS.driverOwner)
+        .first<{ id: string }>(),
+    ).toEqual({ id: PUBLIC_API_TEST_IDS.driverOwner });
+    expect(
+      await getExternalToolEffectForCommand(database, {
+        commandId: MCP_COMMAND_ID,
+        driverInstanceId: PUBLIC_API_TEST_IDS.driverOwner as DriverInstanceId,
+      }),
     ).toMatchObject({ status: "unknown" });
   });
 

@@ -1,5 +1,5 @@
-import { driverInstancesTable } from "@mosoo/db";
-import { and, eq, inArray, isNull, lte, sql } from "drizzle-orm";
+import { driverInstancesTable, externalToolEffectsTable } from "@mosoo/db";
+import { and, eq, inArray, isNull, lte, notExists, sql } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../../platform/db/drizzle";
@@ -12,6 +12,7 @@ import {
 import { driverInstanceExpiresAt } from "./status";
 
 export async function cleanupDriverInstances(bindings: ApiBindings): Promise<void> {
+  const database = getAppDatabase(bindings.DB);
   const now = currentTimestampMs();
   const failedStatusPatch = {
     expiresAt: driverInstanceExpiresAt(now),
@@ -23,7 +24,7 @@ export async function cleanupDriverInstances(bindings: ApiBindings): Promise<voi
     updatedAt: now,
   } as const;
 
-  await getAppDatabase(bindings.DB)
+  await database
     .update(driverInstancesTable)
     .set({
       ...failedStatusPatch,
@@ -38,7 +39,7 @@ export async function cleanupDriverInstances(bindings: ApiBindings): Promise<voi
     )
     .run();
 
-  await getAppDatabase(bindings.DB)
+  await database
     .update(driverInstancesTable)
     .set({
       ...failedStatusPatch,
@@ -57,7 +58,7 @@ export async function cleanupDriverInstances(bindings: ApiBindings): Promise<voi
     )
     .run();
 
-  await getAppDatabase(bindings.DB)
+  await database
     .update(driverInstancesTable)
     .set({
       ...failedStatusPatch,
@@ -76,12 +77,23 @@ export async function cleanupDriverInstances(bindings: ApiBindings): Promise<voi
     )
     .run();
 
-  await getAppDatabase(bindings.DB)
+  await database
     .delete(driverInstancesTable)
     .where(
       and(
         inArray(driverInstancesTable.status, ["stopped", "failed"]),
         lte(driverInstancesTable.expiresAt, now),
+        notExists(
+          database
+            .select({ id: externalToolEffectsTable.id })
+            .from(externalToolEffectsTable)
+            .where(
+              and(
+                eq(externalToolEffectsTable.driverInstanceId, driverInstancesTable.id),
+                inArray(externalToolEffectsTable.status, ["executing", "unknown"]),
+              ),
+            ),
+        ),
       ),
     )
     .run();
