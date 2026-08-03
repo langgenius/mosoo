@@ -279,25 +279,22 @@ async function insertPublicThread(
     .values({
       agentId: PUBLIC_API_TEST_IDS.agent,
       archivedAt: null,
-      attributedUserId: null,
       createdAt: input.updatedAt,
       creatorAccountId: PUBLIC_API_TEST_IDS.ownerAccount,
       deploymentVersionId: PUBLIC_API_TEST_IDS.deployment,
       deploymentVersionNumber: 1,
       id: input.id,
       kind: "pet",
+      endUserId: "customer-123",
       lastMessageAt: null,
       lastRunId: null,
       metadataJson: JSON.stringify({
         public_api: {
-          client_external_ref: null,
           created_by: {
-            account_id: PUBLIC_API_TEST_IDS.ownerAccount,
-            id: PUBLIC_API_TEST_IDS.ownerAccount,
-            kind: "human_pat",
             token_id: PUBLIC_API_TEST_IDS.patOwner,
             token_label: PUBLIC_API_TEST_IDS.patOwner,
           },
+          idempotency_key: null,
           source: "public_api",
         },
       }),
@@ -391,11 +388,11 @@ describe("Public Thread API e2e", () => {
         database,
         new Request(`https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`, {
           body: JSON.stringify({
-            client_external_ref: "linear-ENG-123",
             input: {
               content: [{ text: "Summarize the launch plan.", type: "text" }],
               type: "user.message",
             },
+            userId: "customer-123",
           }),
           headers: {
             Authorization: bearer(TOKENS.owner),
@@ -414,11 +411,9 @@ describe("Public Thread API e2e", () => {
       const threadId = expectString(thread["id"]);
       expect(thread).toMatchObject({
         agent_id: PUBLIC_API_TEST_IDS.agent,
-        attributed_user: { id: PUBLIC_API_TEST_IDS.ownerAccount },
-        client_external_ref: "linear-ENG-123",
-        created_by: { id: PUBLIC_API_TEST_IDS.ownerAccount, kind: "access_token" },
         id: threadId,
         source: "api",
+        userId: "customer-123",
       });
       expect(threadId).toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/);
       expect(run["id"]).toBeString();
@@ -436,25 +431,27 @@ describe("Public Thread API e2e", () => {
 
       const sessionRow = await database
         .prepare(
-          `SELECT attributed_user_id, last_run_id, metadata_json
+          `SELECT attributed_user_id, end_user_id, last_run_id, metadata_json
              FROM session
             WHERE id = ?`,
         )
         .bind(threadId)
         .first<{
           attributed_user_id: string | null;
+          end_user_id: string;
           last_run_id: string | null;
           metadata_json: string;
         }>();
       expect(sessionRow).not.toBeNull();
       expect(sessionRow).toMatchObject({
-        attributed_user_id: PUBLIC_API_TEST_IDS.ownerAccount,
+        attributed_user_id: null,
+        end_user_id: "customer-123",
         last_run_id: run["id"],
       });
       const metadata = expectRecord(JSON.parse(expectString(sessionRow?.metadata_json)));
       expect(metadata["public_api"]).toMatchObject({
-        client_external_ref: "linear-ENG-123",
-        created_by: { id: PUBLIC_API_TEST_IDS.ownerAccount, kind: "access_token" },
+        created_by: { token_id: PUBLIC_API_TEST_IDS.patOwner },
+        idempotency_key: "thread-create-1",
         source: "public_api",
       });
 
@@ -466,7 +463,10 @@ describe("Public Thread API e2e", () => {
         }),
       );
       expect(retrieveResponse.status).toBe(200);
-      expect(expectRecord((await readJson(retrieveResponse))["thread"])["id"]).toBe(threadId);
+      expect(expectRecord((await readJson(retrieveResponse))["thread"])).toMatchObject({
+        id: threadId,
+        userId: "customer-123",
+      });
 
       await database.prepare("DELETE FROM session_event WHERE session_id = ?").bind(threadId).run();
 
@@ -648,7 +648,9 @@ describe("Public Thread API e2e", () => {
         }),
       );
       expect(listResponse.status).toBe(200);
-      expect(expectArray(expectRecord(await readJson(listResponse))["threads"]).length).toBe(1);
+      const listedThreads = expectArray(expectRecord(await readJson(listResponse))["threads"]);
+      expect(listedThreads).toHaveLength(1);
+      expect(expectRecord(listedThreads[0])["userId"]).toBe("customer-123");
 
       const taskRouteResponse = await requestPublicApi(
         app,
@@ -696,6 +698,7 @@ describe("Public Thread API e2e", () => {
               content: [{ text: "Non-owner callers must not get API access.", type: "text" }],
               type: "user.message",
             },
+            userId: "customer-123",
           }),
           headers: {
             Authorization: bearer(TOKENS.nonOwner),
@@ -719,6 +722,7 @@ describe("Public Thread API e2e", () => {
               content: [{ text: "Legacy grants must not get API access.", type: "text" }],
               type: "user.message",
             },
+            userId: "customer-123",
           }),
           headers: {
             Authorization: bearer(TOKENS.legacyGrant),
@@ -749,6 +753,7 @@ describe("Public Thread API e2e", () => {
               content: [{ text: "Trigger a failed public run.", type: "text" }],
               type: "user.message",
             },
+            userId: "customer-123",
           }),
           headers: {
             Authorization: bearer(TOKENS.owner),
@@ -820,7 +825,7 @@ describe("Public Thread API e2e", () => {
     const createEmptyThreadRequest = () =>
       new Request(`https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`, {
         body: JSON.stringify({
-          client_external_ref: "draft-empty-thread",
+          userId: "customer-123",
         }),
         headers: {
           Authorization: bearer(TOKENS.owner),
@@ -839,10 +844,10 @@ describe("Public Thread API e2e", () => {
       const thread = expectRecord(body["thread"]);
       const threadId = expectString(thread["id"]);
       expect(thread).toMatchObject({
-        client_external_ref: "draft-empty-thread",
         last_run_id: null,
         status: "IDLE",
         title: null,
+        userId: "customer-123",
       });
 
       const sessionRow = await database
@@ -904,7 +909,7 @@ describe("Public Thread API e2e", () => {
           body: JSON.stringify({
             events: [
               {
-                clientRequestId: "first-message",
+                requestId: "first-message",
                 text: "Start the work now.",
                 type: "user_message",
               },
@@ -920,10 +925,10 @@ describe("Public Thread API e2e", () => {
       expect(firstMessageResponse.status).toBe(200);
       const firstMessageBody = await readJson(firstMessageResponse);
       const firstEvent = expectRecord(expectArray(firstMessageBody["events"])[0]);
-      expect(firstEvent["clientRequestId"]).toBe("first-message");
+      expect(firstEvent["requestId"]).toBe("first-message");
       expect(expectRecord(firstEvent["run"])["trigger"]).toBe("user_prompt");
 
-      const zeroBodyResponse = await requestPublicApi(
+      const missingUserResponse = await requestPublicApi(
         app,
         database,
         new Request(`https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`, {
@@ -931,12 +936,10 @@ describe("Public Thread API e2e", () => {
           method: "POST",
         }),
       );
-      expect(zeroBodyResponse.status).toBe(201);
-      const zeroBodyThread = expectRecord(expectRecord(await readJson(zeroBodyResponse))["thread"]);
-      expect(zeroBodyThread).toMatchObject({
-        last_run_id: null,
-        status: "IDLE",
-        title: null,
+      expect(missingUserResponse.status).toBe(400);
+      expect(expectRecord(await readJson(missingUserResponse))["error"]).toMatchObject({
+        code: "invalid_request",
+        message: "userId is required.",
       });
     });
   });
@@ -951,7 +954,7 @@ describe("Public Thread API e2e", () => {
         app,
         database,
         new Request(`https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`, {
-          body: JSON.stringify({}),
+          body: JSON.stringify({ userId: "customer-123" }),
           headers: {
             Authorization: bearer(TOKENS.owner),
             "Content-Type": "application/json",
@@ -1179,7 +1182,7 @@ describe("Public Thread API e2e", () => {
       const createThreadResponse = await requestThreadApi(
         new Request(`https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`, {
           body: JSON.stringify({
-            client_external_ref: "thread-files-lifecycle",
+            userId: "customer-123",
           }),
           headers: {
             Authorization: bearer(TOKENS.owner),
@@ -1600,12 +1603,12 @@ describe("Public Thread API e2e", () => {
       const createThreadResponse = await requestThreadApi(
         new Request(`https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`, {
           body: JSON.stringify({
-            client_external_ref: "thread-upload-first-message",
             input: {
               content: [{ text: "Read the attached launch note.", type: "text" }],
               type: "user.message",
             },
             resources: [{ file_id: fileId, type: "file" }],
+            userId: "customer-123",
           }),
           headers: {
             Authorization: bearer(TOKENS.owner),
@@ -1880,33 +1883,6 @@ describe("Public Thread API e2e", () => {
       .first<{ id: string }>();
     expect(ownerThreadStillExists).toEqual({ id: ownerThreadId });
 
-    await ownerThreadDatabase
-      .prepare("UPDATE session SET attributed_user_id = ? WHERE id = ?")
-      .bind(PUBLIC_API_TEST_IDS.nonOwnerAccount, ownerThreadId)
-      .run();
-    const attributedNonOwnerDeleteResponse = await requestPublicApi(
-      app,
-      ownerThreadDatabase,
-      new Request(`https://api.example.com/api/v1/threads/${ownerThreadId}`, {
-        headers: { Authorization: bearer(TOKENS.nonOwner) },
-        method: "DELETE",
-      }),
-    );
-    expect(attributedNonOwnerDeleteResponse.status).toBe(403);
-    expect(expectRecord(await readJson(attributedNonOwnerDeleteResponse))["error"]).toMatchObject({
-      code: "forbidden",
-      message: "Caller is not the App owner for this Agent.",
-    });
-
-    const attributedNonOwnerThreadStillExists = await ownerThreadDatabase
-      .prepare("SELECT attributed_user_id, id FROM session WHERE id = ?")
-      .bind(ownerThreadId)
-      .first<{ attributed_user_id: string; id: string }>();
-    expect(attributedNonOwnerThreadStillExists).toEqual({
-      attributed_user_id: PUBLIC_API_TEST_IDS.nonOwnerAccount,
-      id: ownerThreadId,
-    });
-
     const mismatchedAppDatabase = await createPublicHttpContractDatabase();
     const mismatchedAppThreadId = generatedPublicThreadId(122);
     await insertPublicThread(mismatchedAppDatabase, {
@@ -2028,13 +2004,13 @@ describe("Public Thread API e2e", () => {
   test("replays create Thread responses by Idempotency-Key", async () => {
     const database = await createPublicHttpContractDatabase();
     const app = createPublicThreadApiTestApp();
-    const createRequest = (clientExternalRef: string) => ({
+    const createRequest = (userId: string) => ({
       body: JSON.stringify({
-        client_external_ref: clientExternalRef,
         input: {
           content: [{ text: "Retry-safe work.", type: "text" }],
           type: "user.message",
         },
+        userId,
       }),
       headers: {
         Authorization: bearer(TOKENS.owner),
@@ -2084,6 +2060,7 @@ describe("Public Thread API e2e", () => {
             content: [{ text: "Recover the completed Thread.", type: "text" }],
             type: "user.message",
           },
+          userId: "customer-123",
         }),
         headers: {
           Authorization: bearer(TOKENS.owner),
@@ -2204,6 +2181,7 @@ describe("Public Thread API e2e", () => {
           content: [{ text: "Rate-limited work.", type: "text" }],
           type: "user.message",
         },
+        userId: "customer-123",
       }),
       headers: {
         Authorization: bearer(TOKENS.owner),
@@ -2248,50 +2226,51 @@ describe("Public Thread API e2e", () => {
     });
   });
 
-  test("treats client external refs as part of create Thread idempotency identity", async () => {
+  test("requires a non-empty userId when creating a Thread", async () => {
     const database = await createPublicHttpContractDatabase();
     const app = createPublicThreadApiTestApp();
-    const createRequest = (clientExternalRef: string) => ({
-      body: JSON.stringify({
-        client_external_ref: clientExternalRef,
-        input: {
-          content: [{ text: "Retry-safe work.", type: "text" }],
-          type: "user.message",
+    const response = await requestPublicApi(
+      app,
+      database,
+      new Request(`https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`, {
+        body: JSON.stringify({}),
+        headers: {
+          Authorization: bearer(TOKENS.owner),
+          "Content-Type": "application/json",
         },
+        method: "POST",
       }),
-      headers: {
-        Authorization: bearer(TOKENS.owner),
-        "Content-Type": "application/json",
-        "Idempotency-Key": "thread-create-ref-conflict",
-      },
-      method: "POST",
+    );
+
+    expect(response.status).toBe(400);
+    expect(expectRecord(await readJson(response))["error"]).toMatchObject({
+      code: "invalid_request",
+      message: "userId is required.",
     });
+  });
+
+  test("treats userId as part of create Thread idempotency identity", async () => {
+    const database = await createPublicHttpContractDatabase();
+    const app = createPublicThreadApiTestApp();
+    const createRequest = (userId: string) =>
+      new Request(`https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`, {
+        body: JSON.stringify({ userId }),
+        headers: {
+          Authorization: bearer(TOKENS.owner),
+          "Content-Type": "application/json",
+          "Idempotency-Key": "thread-create-user-conflict",
+        },
+        method: "POST",
+      });
 
     await withProviderProbeMock(async () => {
-      const first = await requestPublicApi(
-        app,
-        database,
-        new Request(
-          `https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`,
-          createRequest("linear-ENG-1"),
-        ),
-      );
+      const first = await requestPublicApi(app, database, createRequest("customer-1"));
       expect(first.status).toBe(201);
 
-      const conflict = await requestPublicApi(
-        app,
-        database,
-        new Request(
-          `https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`,
-          createRequest("linear-ENG-2"),
-        ),
-      );
+      const conflict = await requestPublicApi(app, database, createRequest("customer-2"));
       expect(conflict.status).toBe(409);
-      expect(await readJson(conflict)).toEqual({
-        error: {
-          code: "idempotency_conflict",
-          message: "Idempotency-Key was already used for a different request.",
-        },
+      expect(expectRecord(await readJson(conflict))["error"]).toMatchObject({
+        code: "idempotency_conflict",
       });
     });
   });

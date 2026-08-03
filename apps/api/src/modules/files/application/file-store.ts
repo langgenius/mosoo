@@ -532,7 +532,10 @@ function visibleSessionFilesCondition(
     eq(fileRecordsTable.scopeKind, "session"),
     eq(fileRecordsTable.scopeId, sessionsTable.id),
     eq(sessionsTable.appId, appId),
-    or(eq(sessionsTable.creatorAccountId, viewerId), eq(sessionsTable.attributedUserId, viewerId))!,
+    or(
+      eq(sessionsTable.creatorAccountId, viewerId),
+      eq(sessionsTable.participantAccountId, viewerId),
+    )!,
   ];
 
   if (sessionId !== undefined) {

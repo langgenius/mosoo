@@ -1,10 +1,9 @@
 import { PUBLIC_THREAD_API_THREADS_MAX_LIMIT } from "@mosoo/contracts/public-api";
 import type { PublicThreadApiListThreadsResponse } from "@mosoo/contracts/public-api";
 import { sessionRunsTable, sessionsTable } from "@mosoo/db";
-import { parsePlatformId } from "@mosoo/id";
 import type { AccountId, AgentId, AppId, PublicThreadId, SessionId } from "@mosoo/id";
 import type { SQL } from "drizzle-orm";
-import { and, desc, eq, isNotNull, isNull, or, sql } from "drizzle-orm";
+import { and, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
 
 import { getAppDatabase } from "../../platform/db/drizzle";
 import type { AgentRow } from "../agents/application/agent-types";
@@ -18,26 +17,22 @@ import { publicNotFound } from "./public-api-errors";
 import { toPublicThreadSessionSummary } from "./public-thread-api-presenter";
 import { toBackingSessionId } from "./public-thread-ids";
 import { parsePublicApiThreadMetadata } from "./public-thread-metadata";
-import type { PublicApiThreadMetadata } from "./public-thread-metadata";
 import { toPublicThreadSummary } from "./public-thread-presenter";
 
 interface PublicThreadSessionRow {
   agent_id: AgentId;
-  attributed_user_id: AccountId | null;
-  creator_account_id: AccountId;
+  end_user_id: string;
   id: SessionId;
   app_id: AppId;
   title: string | null;
 }
 
 interface PublicThreadSessionAccess {
-  metadata: PublicApiThreadMetadata;
   row: PublicThreadSessionRow;
 }
 
 interface PublicThreadSessionAdmission {
   agent: AgentRow;
-  metadata: PublicApiThreadMetadata;
   session: PublicThreadSessionRow;
 }
 
@@ -51,8 +46,7 @@ async function getPublicThreadSessionAccess(
     (await getAppDatabase(database)
       .select({
         agent_id: sessionsTable.agentId,
-        attributed_user_id: sessionsTable.attributedUserId,
-        creator_account_id: sessionsTable.creatorAccountId,
+        end_user_id: sessionsTable.endUserId,
         id: sessionsTable.id,
         metadata_json: sessionsTable.metadataJson,
         app_id: sessionsTable.appId,
@@ -62,10 +56,7 @@ async function getPublicThreadSessionAccess(
       .where(
         and(
           eq(sessionsTable.id, sessionId),
-          or(
-            eq(sessionsTable.creatorAccountId, callerId),
-            eq(sessionsTable.attributedUserId, callerId),
-          ),
+          eq(sessionsTable.creatorAccountId, callerId),
           sql`json_extract(${sessionsTable.metadataJson}, '$.public_api.source') = 'public_api'`,
         ),
       )
@@ -78,24 +69,14 @@ async function getPublicThreadSessionAccess(
 
   const metadata = parsePublicApiThreadMetadata(row.metadata_json);
 
-  if (!metadata) {
-    throw publicNotFound("Thread not found.");
-  }
-
-  const canRead =
-    row.attributed_user_id === callerId ||
-    (metadata.created_by.kind === "access_token" && row.creator_account_id === callerId);
-
-  if (!canRead) {
+  if (!metadata || row.end_user_id === null) {
     throw publicNotFound("Thread not found.");
   }
 
   return {
-    metadata,
     row: {
       agent_id: row.agent_id,
-      attributed_user_id: row.attributed_user_id,
-      creator_account_id: parsePlatformId<AccountId>(row.creator_account_id, "Creator account ID"),
+      end_user_id: row.end_user_id,
       id: row.id,
       app_id: row.app_id,
       title: row.title,
@@ -117,7 +98,6 @@ export async function admitPublicSessionCaller(
 
   return {
     agent,
-    metadata: access.metadata,
     session: access.row,
   };
 }
@@ -132,20 +112,11 @@ export async function listAgentApiEndpointThreads(
 ): Promise<PublicThreadApiListThreadsResponse> {
   await admitAgentApiEndpointCaller(database, caller, input.agentId);
 
-  const participantFilter = or(
-    and(
-      eq(sessionsTable.creatorAccountId, caller.id),
-      sql`json_extract(${sessionsTable.metadataJson}, '$.public_api.created_by.kind') IN ('access_token', 'human_pat')`,
-    ),
-    eq(sessionsTable.attributedUserId, caller.id),
-  );
   const filters: SQL[] = [
     eq(sessionsTable.agentId, input.agentId),
+    eq(sessionsTable.creatorAccountId, caller.id),
     sql`json_extract(${sessionsTable.metadataJson}, '$.public_api.source') = 'public_api'`,
   ];
-  if (participantFilter) {
-    filters.push(participantFilter);
-  }
 
   if (input.archived !== null) {
     filters.push(
@@ -156,7 +127,7 @@ export async function listAgentApiEndpointThreads(
   const rows = await getAppDatabase(database)
     .select({
       ...sessionSummaryWithLastRunColumns(),
-      attributed_user_id: sessionsTable.attributedUserId,
+      end_user_id: sessionsTable.endUserId,
       metadata_json: sessionsTable.metadataJson,
     })
     .from(sessionsTable)
@@ -169,14 +140,13 @@ export async function listAgentApiEndpointThreads(
   return {
     threads: rows.flatMap((row) => {
       const metadata = parsePublicApiThreadMetadata(row.metadata_json);
-      if (!metadata) {
+      if (!metadata || row.end_user_id === null) {
         return [];
       }
 
       return [
         toPublicThreadSummary({
-          attributedUserId: row.attributed_user_id,
-          metadata,
+          endUserId: row.end_user_id,
           session: toPublicThreadSessionSummary(buildSessionSummaryFromJoinedRow(row)),
         }),
       ];

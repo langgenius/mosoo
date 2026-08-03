@@ -400,7 +400,7 @@ export function createPublicApiOpenApiDocument(origin: string): PublicApiOpenApi
       }),
       post: operation({
         description:
-          "Creates a Thread and the backing AgentSession. If input is present, mosoo also queues the initial Run. If input is omitted, the Thread is immediately visible with IDLE status and no run. Access Token callers are attributed to the token owner.",
+          "Creates a Thread and the backing AgentSession for the required application `userId`. If input is present, mosoo also queues the initial Run. If input is omitted, the Thread is immediately visible with IDLE status and no run.",
         parameters: [exampleAgentIdParameter, idempotencyKeyParameter],
         requestBody: jsonRequestBodyExamples(
           { $ref: "#/components/schemas/CreateThreadRequest" },
@@ -408,13 +408,12 @@ export function createPublicApiOpenApiDocument(origin: string): PublicApiOpenApi
             emptyThread: {
               summary: "Create an empty Thread",
               value: {
-                client_external_ref: "draft-empty-thread",
+                userId: "customer-123",
               },
             },
             accessTokenWithFile: {
               summary: "Access Token with an uploaded file",
               value: {
-                client_external_ref: "linear-ENG-123",
                 input: {
                   content: [
                     {
@@ -425,16 +424,17 @@ export function createPublicApiOpenApiDocument(origin: string): PublicApiOpenApi
                   type: "user.message",
                 },
                 resources: [{ file_id: EXAMPLE_FILE_ID, type: "file" }],
+                userId: "customer-123",
               },
             },
             accessTokenBasic: {
               summary: "Access Token",
               value: {
-                client_external_ref: "demo-thread-001",
                 input: {
                   content: [{ text: "Say hello from the API.", type: "text" }],
                   type: "user.message",
                 },
+                userId: "customer-123",
               },
             },
             cattleAgentSameShape: {
@@ -444,10 +444,11 @@ export function createPublicApiOpenApiDocument(origin: string): PublicApiOpenApi
                   content: [{ text: "Run this one-off Public Thread API request.", type: "text" }],
                   type: "user.message",
                 },
+                userId: "automation",
               },
             },
           },
-          { required: false },
+          { required: true },
         ),
         success: {
           "201": idempotentJsonResponse("Created Thread.", {

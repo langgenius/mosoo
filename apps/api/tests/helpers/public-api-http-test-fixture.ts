@@ -556,7 +556,7 @@ async function insertSession(
       archivedAt: null,
       createdAt: nowMsForTest(),
       creatorAccountId: input.creatorAccountId,
-      attributedUserId: null,
+      participantAccountId: null,
       deploymentVersionId: PUBLIC_API_TEST_IDS.deployment,
       deploymentVersionNumber: 1,
       id: input.id,

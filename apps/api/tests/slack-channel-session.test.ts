@@ -75,7 +75,7 @@ describe("Slack channel sessions", () => {
       const sessionRow = await database
         .app()
         .select({
-          attributedUserId: sessionsTable.attributedUserId,
+          participantAccountId: sessionsTable.participantAccountId,
           creatorAccountId: sessionsTable.creatorAccountId,
           metadataJson: sessionsTable.metadataJson,
           type: sessionsTable.type,
@@ -84,7 +84,7 @@ describe("Slack channel sessions", () => {
         .where(eq(sessionsTable.id, first.sessionId))
         .get();
       expect(sessionRow).toMatchObject({
-        attributedUserId: null,
+        participantAccountId: null,
         creatorAccountId: "01J00000000000000000000001",
         type: "api_channel",
       });

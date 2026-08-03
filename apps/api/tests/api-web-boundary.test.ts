@@ -522,14 +522,15 @@ describe("API to web boundary", () => {
     const threadProperties = openApiSchemaProperties("ThreadSummary");
     expectProperties(threadProperties, [
       "agent_id",
-      "attributed_user",
-      "created_by",
       "id",
       "last_run_id",
       "source",
       "status",
+      "userId",
     ]);
     expectNoProperties(threadProperties, [
+      "attributed_user",
+      "created_by",
       "deploymentVersionId",
       "deploymentVersionNumber",
       "lastMessageAt",
@@ -612,7 +613,7 @@ describe("API to web boundary", () => {
             `https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`,
             {
               body: JSON.stringify({
-                client_external_ref: "empty-thread-draft",
+                userId: "customer-123",
               }),
               headers: { "Content-Type": "application/json" },
               method: "POST",
@@ -621,8 +622,8 @@ describe("API to web boundary", () => {
         },
       }),
     ).resolves.toEqual({
-      clientExternalRef: "empty-thread-draft",
       fileIds: [],
+      userId: "customer-123",
     });
 
     await expect(
@@ -632,12 +633,12 @@ describe("API to web boundary", () => {
             `https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`,
             {
               body: JSON.stringify({
-                client_external_ref: "linear-ENG-123",
                 input: {
                   content: [{ text: "Summarize the launch plan.", type: "text" }],
                   type: "user.message",
                 },
                 resources: [{ file_id: PUBLIC_API_TEST_IDS.file, type: "file" }],
+                userId: "customer-123",
               }),
               headers: { "Content-Type": "application/json" },
               method: "POST",
@@ -646,9 +647,9 @@ describe("API to web boundary", () => {
         },
       }),
     ).resolves.toEqual({
-      clientExternalRef: "linear-ENG-123",
       fileIds: [PUBLIC_API_TEST_IDS.file],
       inputText: "Summarize the launch plan.",
+      userId: "customer-123",
     });
 
     await expect(
@@ -658,11 +659,7 @@ describe("API to web boundary", () => {
             `https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`,
             {
               body: JSON.stringify({
-                attributed_user_id: PUBLIC_API_TEST_IDS.nonOwnerAccount,
-                input: {
-                  content: [{ text: "Do the work.", type: "text" }],
-                  type: "user.message",
-                },
+                userId: "   ",
               }),
               headers: { "Content-Type": "application/json" },
               method: "POST",
@@ -717,6 +714,7 @@ describe("API to web boundary", () => {
               ],
               type: "user.message",
             },
+            userId: "customer-123",
           },
           7,
         ),
@@ -726,6 +724,7 @@ describe("API to web boundary", () => {
     expect(parsed).toEqual({
       fileIds: [PUBLIC_API_TEST_IDS.file, PUBLIC_API_TEST_IDS.fileAlt],
       inputText: "Summarize the launch plan.\nList two follow-ups.",
+      userId: "customer-123",
     });
   });
 
@@ -783,7 +782,7 @@ describe("API to web boundary", () => {
           json: async () => ({
             events: [
               {
-                clientRequestId: "client-1",
+                requestId: "client-1",
                 resources: [{ file_id: PUBLIC_API_TEST_IDS.file, type: "file" }],
                 text: "hello",
                 type: "user_message",
@@ -804,7 +803,7 @@ describe("API to web boundary", () => {
     ).resolves.toEqual({
       events: [
         {
-          clientRequestId: "client-1",
+          requestId: "client-1",
           resources: [{ file_id: PUBLIC_API_TEST_IDS.file, type: "file" }],
           text: "hello",
           type: "user_message",

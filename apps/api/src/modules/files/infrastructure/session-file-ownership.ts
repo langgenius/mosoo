@@ -34,7 +34,7 @@ export async function ensureSessionFileAccess(
           eq(sessionsTable.id, sessionId),
           or(
             eq(sessionsTable.creatorAccountId, viewerId),
-            eq(sessionsTable.attributedUserId, viewerId),
+            eq(sessionsTable.participantAccountId, viewerId),
           ),
         ),
       )
@@ -73,7 +73,7 @@ export async function ensureAppSessionFileAccess(
           eq(sessionsTable.appId, input.appId),
           or(
             eq(sessionsTable.creatorAccountId, viewerId),
-            eq(sessionsTable.attributedUserId, viewerId),
+            eq(sessionsTable.participantAccountId, viewerId),
           ),
         ),
       )

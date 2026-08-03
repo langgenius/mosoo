@@ -82,9 +82,9 @@ async function hashCreateThreadIdempotencyBody(
   body: ParsedCreateThreadRequest,
 ): Promise<string | null> {
   return hashPublicApiIdempotencyBody({
-    clientExternalRef: body.clientExternalRef ?? null,
     fileIds: body.fileIds,
     inputText: body.inputText ?? null,
+    userId: body.userId,
   });
 }
 

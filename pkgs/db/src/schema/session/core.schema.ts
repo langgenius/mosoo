@@ -21,7 +21,8 @@ export const sessionsTable = sqliteTable(
   {
     agentId: platformIdColumn<AgentId>("agent_id").notNull(),
     archivedAt: integer("archived_at"),
-    attributedUserId: platformIdColumn<AccountId>("attributed_user_id"),
+    endUserId: text("end_user_id"),
+    participantAccountId: platformIdColumn<AccountId>("attributed_user_id"),
     createdAt: integer("created_at").notNull(),
     creatorAccountId: platformIdColumn<PlatformId>("creator_account_id").notNull(),
     deploymentVersionId: platformIdColumn<AgentDeploymentVersionId>("deployment_version_id"),
@@ -61,7 +62,7 @@ export const sessionsTable = sqliteTable(
     ),
     index("session_app_attributed_archived_updated_idx").on(
       table.appId,
-      table.attributedUserId,
+      table.participantAccountId,
       table.archivedAt,
       table.updatedAt,
       table.id,
@@ -76,7 +77,7 @@ export const sessionsTable = sqliteTable(
     ),
     index("session_app_attributed_type_archived_updated_idx").on(
       table.appId,
-      table.attributedUserId,
+      table.participantAccountId,
       table.type,
       table.archivedAt,
       table.updatedAt,

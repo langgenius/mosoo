@@ -7,14 +7,13 @@ import type {
 } from "@mosoo/contracts/public-api";
 import type { SessionSummary } from "@mosoo/contracts/session";
 import type { SessionRunSummary } from "@mosoo/contracts/session-run";
-import type { AccountId, PublicThreadId } from "@mosoo/id";
+import type { PublicThreadId } from "@mosoo/id";
 
 import {
   toPublicThreadRunSummary,
   toPublicThreadSessionSummary,
 } from "./public-thread-api-presenter";
 import type { PublicThreadSessionProjection } from "./public-thread-api-presenter";
-import type { PublicApiThreadMetadata } from "./public-thread-metadata";
 
 function createThreadLinks(threadId: PublicThreadId): PublicThreadLinks {
   return {
@@ -23,24 +22,12 @@ function createThreadLinks(threadId: PublicThreadId): PublicThreadLinks {
 }
 
 export function toPublicThreadSummary(input: {
-  attributedUserId: AccountId | null;
-  metadata: PublicApiThreadMetadata;
+  endUserId: string;
   session: PublicThreadSessionProjection;
 }): PublicThreadSummary {
   return {
     agent_id: input.session.agentId,
-    attributed_user:
-      input.attributedUserId === null
-        ? null
-        : {
-            id: input.attributedUserId,
-          },
-    client_external_ref: input.metadata.client_external_ref,
     created_at: input.session.createdAt,
-    created_by: {
-      id: input.metadata.created_by.id,
-      kind: input.metadata.created_by.kind,
-    },
     id: input.session.id,
     kind: input.session.kind,
     last_run_id: input.session.lastRun?.id ?? null,
@@ -48,6 +35,7 @@ export function toPublicThreadSummary(input: {
     status: input.session.status,
     title: input.session.title,
     updated_at: input.session.updatedAt,
+    userId: input.endUserId,
   };
 }
 
@@ -80,8 +68,7 @@ export function toCreateEmptyThreadSessionSummary(
 }
 
 export function toCreateThreadResponse(input: {
-  attributedUserId: AccountId | null;
-  metadata: PublicApiThreadMetadata;
+  endUserId: string;
   run: SessionRunSummary | null;
   session: PublicThreadSessionProjection;
 }): PublicThreadApiCreateThreadResponse {
@@ -89,17 +76,15 @@ export function toCreateThreadResponse(input: {
     links: createThreadLinks(input.session.id),
     run: toPublicThreadRunSummary(input.run),
     thread: toPublicThreadSummary({
-      attributedUserId: input.attributedUserId,
-      metadata: input.metadata,
+      endUserId: input.endUserId,
       session: input.session,
     }),
   };
 }
 
 export function toRetrieveThreadResponse(input: {
-  attributedUserId: AccountId | null;
+  endUserId: string;
   finalOutput: PublicThreadFinalOutput | null;
-  metadata: PublicApiThreadMetadata;
   session: SessionSummary;
 }): PublicThreadApiRetrieveThreadResponse {
   const session = toPublicThreadSessionSummary(input.session);
@@ -111,8 +96,7 @@ export function toRetrieveThreadResponse(input: {
         ? null
         : toPublicThreadRunSummary(input.session.lastRun, { finalOutput: input.finalOutput }),
     thread: toPublicThreadSummary({
-      attributedUserId: input.attributedUserId,
-      metadata: input.metadata,
+      endUserId: input.endUserId,
       session,
     }),
   };

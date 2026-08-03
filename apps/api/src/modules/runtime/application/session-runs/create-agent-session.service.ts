@@ -36,8 +36,9 @@ import type { SessionExecutionPlan } from "../session-definition/session-executi
 
 export interface CreateAgentSessionOptions {
   accessViewer?: AuthenticatedViewer;
-  attributedUserId?: string | AccountId | null | undefined;
+  endUserId?: string | null | undefined;
   metadata?: AgentSessionMetadata | null | undefined;
+  participantAccountId?: string | AccountId | null | undefined;
   sessionId?: SessionId | undefined;
 }
 
@@ -54,13 +55,11 @@ export interface ChannelSessionTriggeredByMetadata {
 
 export interface AgentSessionMetadata {
   public_api?: {
-    client_external_ref: string | null;
     created_by: {
-      id: string;
-      kind: "access_token";
       token_id: string;
       token_label: string;
     };
+    idempotency_key: string | null;
     source: "public_api";
   };
   triggered_by?: ChannelSessionTriggeredByMetadata;
@@ -218,8 +217,9 @@ async function insertAgentSessionSnapshot(input: {
   source: AgentSessionExecutionSource;
   timestampMs: number;
   type: SessionType;
-  attributedUserId: AccountId | null;
+  endUserId: string | null;
   metadata: AgentSessionMetadata | null;
+  participantAccountId: AccountId | null;
   viewer: AuthenticatedViewer;
 }): Promise<void> {
   const viewerId: AccountId = parsePlatformId(input.viewer.id, "viewer id");
@@ -227,17 +227,18 @@ async function insertAgentSessionSnapshot(input: {
   await runAppDatabaseBatch(input.bindings.DB, (database) => [
     database.insert(sessionsTable).values({
       agentId: input.source.agent.id,
-      attributedUserId: input.attributedUserId,
       createdAt: input.timestampMs,
       creatorAccountId: viewerId,
       deploymentVersionId: input.source.liveVersion?.id ?? null,
       deploymentVersionNumber: input.source.liveVersion?.versionNumber ?? null,
       id: input.sessionId,
       kind: input.source.kind,
+      ...(input.endUserId === null ? {} : { endUserId: input.endUserId }),
       metadataJson: JSON.stringify(input.metadata ?? {}),
       model: input.source.model,
       appId: input.source.agent.appId,
       provider: input.source.provider,
+      participantAccountId: input.participantAccountId,
       renamed: false,
       runtimeId: input.source.runtimeId,
       status: "IDLE",
@@ -327,11 +328,12 @@ export async function createAgentSession(
     source,
     timestampMs,
     type: sessionType,
-    attributedUserId: parseNullablePlatformId<AccountId>(
-      options.attributedUserId,
-      "attributed user id",
-    ),
+    endUserId: options.endUserId ?? null,
     metadata: options.metadata ?? null,
+    participantAccountId: parseNullablePlatformId<AccountId>(
+      options.participantAccountId,
+      "participant account id",
+    ),
     viewer: request.viewer,
   });
 

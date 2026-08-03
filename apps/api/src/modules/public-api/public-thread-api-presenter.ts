@@ -97,7 +97,7 @@ export function toPublicThreadEventBatch(input: {
   return {
     acceptedAt: input.batch.acceptedAt,
     events: input.batch.events.map((event) => ({
-      clientRequestId: event.clientRequestId,
+      requestId: event.clientRequestId,
       run: toPublicThreadRunSummary(event.run),
       type: event.type,
     })),

@@ -24,9 +24,8 @@ export async function retrievePublicThread(
       : null;
 
   return toRetrieveThreadResponse({
-    attributedUserId: snapshot.row.attributed_user_id,
+    endUserId: snapshot.endUserId,
     finalOutput,
-    metadata: snapshot.metadata,
     session: snapshot.session,
   });
 }

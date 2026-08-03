@@ -90,7 +90,7 @@ describe("agent channel bindings", () => {
         {
           agentId: "01J00000000000000000000009",
           archivedAt: null,
-          attributedUserId: null,
+          participantAccountId: null,
           createdAt: nowMs - 10,
           creatorAccountId: "01J00000000000000000000001",
           deploymentVersionId: "01J0000000000000000000000A",
@@ -114,7 +114,7 @@ describe("agent channel bindings", () => {
         {
           agentId: "01J00000000000000000000009",
           archivedAt: null,
-          attributedUserId: null,
+          participantAccountId: null,
           createdAt: nowMs,
           creatorAccountId: "01J00000000000000000000001",
           deploymentVersionId: "01J0000000000000000000000A",
@@ -138,7 +138,7 @@ describe("agent channel bindings", () => {
         {
           agentId: "01J00000000000000000000009",
           archivedAt: null,
-          attributedUserId: null,
+          participantAccountId: null,
           createdAt: nowMs,
           creatorAccountId: "01J00000000000000000000001",
           deploymentVersionId: "01J0000000000000000000000A",

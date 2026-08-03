@@ -4,9 +4,9 @@ import type { ApiBindings } from "../../platform/cloudflare/worker-types";
 import type { PublicApiCaller } from "../auth/application/public-api-caller.service";
 
 export interface CreatePublicThreadInput {
-  clientExternalRef?: string | undefined;
   fileIds: FileId[];
   inputText?: string | undefined;
+  userId: string;
 }
 
 export interface CreatePublicThreadRequest {

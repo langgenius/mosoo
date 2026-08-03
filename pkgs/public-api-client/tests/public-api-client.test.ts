@@ -26,10 +26,7 @@ const FILE_ID = "01J0000000000000000000000J";
 function threadResponse(status: "RUNNING" | "IDLE" = "RUNNING") {
   return {
     agent_id: "01J00000000000000000000001",
-    attributed_user: { id: "01J00000000000000000000002" },
-    client_external_ref: "demo-thread-001",
     created_at: "2026-05-19T00:00:00.000Z",
-    created_by: { id: "01J00000000000000000000002", kind: "access_token" },
     id: THREAD_ID,
     kind: "pet",
     last_run_id: RUN_ID,
@@ -37,6 +34,7 @@ function threadResponse(status: "RUNNING" | "IDLE" = "RUNNING") {
     status,
     title: "Say hello",
     updated_at: "2026-05-19T00:00:01.000Z",
+    userId: "customer-123",
   } as const;
 }
 
@@ -105,6 +103,7 @@ describe("MosooPublicThreadClient", () => {
       agentId: "agent-1",
       fileIds: [FILE_ID],
       input: "Summarize the file.",
+      userId: "customer-123",
     });
 
     expect(requests[0]?.body).toEqual({
@@ -113,6 +112,7 @@ describe("MosooPublicThreadClient", () => {
         type: "user.message",
       },
       resources: [{ file_id: FILE_ID, type: "file" }],
+      userId: "customer-123",
     });
   });
 

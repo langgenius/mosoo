@@ -2,10 +2,10 @@ import type { PublicThreadApiSendEventsRequest } from "@mosoo/contracts/public-a
 import {
   PUBLIC_THREAD_EVENTS_DEFAULT_LIMIT,
   PUBLIC_THREAD_EVENTS_MAX_LIMIT,
-  PUBLIC_THREAD_CLIENT_EXTERNAL_REF_MAX_LENGTH,
   PUBLIC_THREAD_FILE_ID_MAX_LENGTH,
   PUBLIC_THREAD_INPUT_TEXT_MAX_LENGTH,
   PUBLIC_THREAD_JSON_BODY_MAX_BYTES,
+  PUBLIC_THREAD_USER_ID_MAX_LENGTH,
 } from "@mosoo/contracts/public-api";
 import { parsePlatformId } from "@mosoo/id";
 import type { AgentId, FileId, PublicThreadId, SessionRunId } from "@mosoo/id";
@@ -35,7 +35,7 @@ const THREAD_EVENT_USER_MESSAGE_FIELDS: ReadonlySet<string> = new Set([
   "type",
   "text",
   "resources",
-  "clientRequestId",
+  "requestId",
 ]);
 const THREAD_EVENT_PERMISSION_DECISION_FIELDS: ReadonlySet<string> = new Set([
   "type",
@@ -43,16 +43,12 @@ const THREAD_EVENT_PERMISSION_DECISION_FIELDS: ReadonlySet<string> = new Set([
   "decision",
 ]);
 const THREAD_EVENT_USER_INTERRUPT_FIELDS: ReadonlySet<string> = new Set(["type", "runId"]);
-const CREATE_THREAD_REQUEST_FIELDS: ReadonlySet<string> = new Set([
-  "input",
-  "resources",
-  "client_external_ref",
-]);
+const CREATE_THREAD_REQUEST_FIELDS: ReadonlySet<string> = new Set(["input", "resources", "userId"]);
 
 export interface ParsedCreateThreadRequest {
-  clientExternalRef?: string | undefined;
   fileIds: FileId[];
   inputText?: string | undefined;
+  userId: string;
 }
 
 function parseContentLength(value: string | null): number | null {
@@ -262,28 +258,6 @@ function readOptionalStringOrNull(
   throw publicInvalidRequest(`${field} must be a string or null.`);
 }
 
-function readOptionalLimitedStringField(
-  input: Record<string, unknown>,
-  field: string,
-  maxLength: number,
-): string | undefined {
-  const value = input[field];
-
-  if (value === undefined) {
-    return undefined;
-  }
-
-  if (typeof value !== "string" || value.trim().length === 0) {
-    throw publicInvalidRequest(`${field} must be a non-empty string.`);
-  }
-
-  if (value.length > maxLength) {
-    throw publicInvalidRequest(`${field} must be ${maxLength} characters or fewer.`);
-  }
-
-  return value;
-}
-
 function readPublicThreadResourceFileIds(
   input: Record<string, unknown>,
   fieldName: "resources",
@@ -393,7 +367,7 @@ function readPublicThreadEvent(input: unknown): PublicThreadApiSendEventsRequest
         type: "user_message",
       };
       const resourceFileIds = readPublicThreadResourceFileIds(input, "resources");
-      const clientRequestId = readOptionalStringOrNull(input, "clientRequestId");
+      const requestId = readOptionalStringOrNull(input, "requestId");
 
       if (resourceFileIds !== undefined) {
         event.resources = resourceFileIds.map((fileId) => ({
@@ -402,8 +376,8 @@ function readPublicThreadEvent(input: unknown): PublicThreadApiSendEventsRequest
         }));
       }
 
-      if (clientRequestId !== undefined) {
-        event.clientRequestId = clientRequestId;
+      if (requestId !== undefined) {
+        event.requestId = requestId;
       }
 
       return event;
@@ -494,16 +468,12 @@ export async function readCreateThreadRequest(
   }
 
   assertOnlyFields(body, CREATE_THREAD_REQUEST_FIELDS, "create thread");
-  const clientExternalRef = readOptionalLimitedStringField(
-    body,
-    "client_external_ref",
-    PUBLIC_THREAD_CLIENT_EXTERNAL_REF_MAX_LENGTH,
-  );
+  const userId = readLimitedStringField(body, "userId", PUBLIC_THREAD_USER_ID_MAX_LENGTH);
   const inputText = readCreateThreadInputText(body);
 
   return {
     fileIds: readCreateThreadFileIds(body),
     ...(inputText === undefined ? {} : { inputText }),
-    ...(clientExternalRef === undefined ? {} : { clientExternalRef }),
+    userId,
   };
 }

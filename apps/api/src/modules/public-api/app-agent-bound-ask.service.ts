@@ -177,7 +177,6 @@ async function ensureRecoverableBoundSession(input: {
       },
       options: {
         accessViewer: input.ownerViewer,
-        attributedUserId: input.ownerViewer.id,
         metadata: null,
         sessionId: input.sessionId,
       },
@@ -315,7 +314,6 @@ async function startBoundAgentRun(input: {
             },
             options: {
               accessViewer: input.ownerViewer,
-              attributedUserId: input.ownerViewer.id,
               metadata: null,
             },
             viewer: input.ownerViewer,

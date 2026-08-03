@@ -172,7 +172,7 @@ describe("multi-provider channel sessions", () => {
       const sessionRow = await database
         .app()
         .select({
-          attributedUserId: sessionsTable.attributedUserId,
+          participantAccountId: sessionsTable.participantAccountId,
           metadataJson: sessionsTable.metadataJson,
           type: sessionsTable.type,
         })
@@ -181,7 +181,7 @@ describe("multi-provider channel sessions", () => {
         .get();
 
       expect(sessionRow).toMatchObject({
-        attributedUserId: null,
+        participantAccountId: null,
         type: "api_channel",
       });
       const metadata = parseJsonRecord(sessionRow?.metadataJson ?? "{}");

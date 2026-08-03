@@ -1,13 +1,5 @@
 import { PLATFORM_ID_INPUT_PATTERN } from "@mosoo/id";
-import type {
-  AccountId,
-  AgentId,
-  FileId,
-  PlatformId,
-  PublicThreadId,
-  RuntimeEventId,
-  SessionRunId,
-} from "@mosoo/id";
+import type { AgentId, FileId, PublicThreadId, RuntimeEventId, SessionRunId } from "@mosoo/id";
 
 import type { AgentKind } from "../agent/agent.contract";
 import { SINGLE_PUT_THRESHOLD_BYTES } from "../file/file.contract";
@@ -25,7 +17,7 @@ export const PUBLIC_API_PREFIX = "/api";
 export const PUBLIC_API_VERSION_PREFIX = "/v1";
 export const PUBLIC_API_VERSION = "v1";
 export const PUBLIC_THREAD_INPUT_TEXT_MAX_LENGTH = 32_000;
-export const PUBLIC_THREAD_CLIENT_EXTERNAL_REF_MAX_LENGTH = 255;
+export const PUBLIC_THREAD_USER_ID_MAX_LENGTH = 255;
 export const PUBLIC_THREAD_FILE_ID_MAX_LENGTH = 26;
 export const PUBLIC_THREAD_FILE_UPLOAD_MAX_BYTES = SINGLE_PUT_THRESHOLD_BYTES;
 export const PUBLIC_THREAD_ID_PATTERN = PLATFORM_ID_INPUT_PATTERN;
@@ -123,7 +115,7 @@ export interface PublicThreadFileResourceInput {
 
 export type PublicThreadEventInput =
   | {
-      clientRequestId?: string | null;
+      requestId?: string | null;
       resources?: PublicThreadFileResourceInput[];
       text: string;
       type: "user_message";
@@ -139,28 +131,16 @@ export type PublicThreadEventInput =
     };
 
 export interface PublicThreadEventResult {
-  clientRequestId: string | null;
+  requestId: string | null;
   run: PublicThreadRunSummary | null;
   type: PublicThreadEventType;
-}
-
-export interface PublicThreadCallerSummary {
-  id: PlatformId;
-  kind: "access_token";
-}
-
-export interface PublicThreadAttributedUserSummary {
-  id: AccountId;
 }
 
 export type PublicThreadStatus = "IDLE" | "RESCHEDULING" | "RUNNING" | "TERMINATED";
 
 export interface PublicThreadSummary {
   agent_id: AgentId;
-  attributed_user: PublicThreadAttributedUserSummary | null;
-  client_external_ref: string | null;
   created_at: string;
-  created_by: PublicThreadCallerSummary;
   id: PublicThreadId;
   kind: AgentKind;
   last_run_id: SessionRunId | null;
@@ -168,6 +148,7 @@ export interface PublicThreadSummary {
   status: PublicThreadStatus;
   title: string | null;
   updated_at: string;
+  userId: string;
 }
 
 export interface PublicThreadLinks {

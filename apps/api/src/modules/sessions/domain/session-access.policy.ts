@@ -49,16 +49,7 @@ export function resolveSessionActionCreatorFlag(input: {
 }
 
 function humanSessionCreatorCondition(viewerId: AccountId): SQL {
-  return and(
-    eq(sessionsTable.creatorAccountId, viewerId),
-    or(
-      sql`json_extract(${sessionsTable.metadataJson}, '$.public_api.source') IS NULL`,
-      and(
-        sql`json_extract(${sessionsTable.metadataJson}, '$.public_api.source') = 'public_api'`,
-        sql`json_extract(${sessionsTable.metadataJson}, '$.public_api.created_by.kind') IN ('access_token', 'human_pat')`,
-      ),
-    ),
-  )!;
+  return eq(sessionsTable.creatorAccountId, viewerId);
 }
 
 export function sessionCreatorCondition(viewerId: AccountId): SQL {
@@ -66,7 +57,10 @@ export function sessionCreatorCondition(viewerId: AccountId): SQL {
 }
 
 export function sessionParticipantCondition(viewerId: AccountId): SQL {
-  return or(humanSessionCreatorCondition(viewerId), eq(sessionsTable.attributedUserId, viewerId))!;
+  return or(
+    humanSessionCreatorCondition(viewerId),
+    eq(sessionsTable.participantAccountId, viewerId),
+  )!;
 }
 
 export function sessionCreatorFlag(viewerId: AccountId): SQL<number> {
