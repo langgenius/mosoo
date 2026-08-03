@@ -23,7 +23,7 @@ When a bound capability is accepted, the Run records the App, Agent, Deployment,
 
 ## App Secrets
 
-An App owner can save, rotate, list by name, or revoke App-scoped deployment secrets through the Console, generated CLI, and GraphQL API. Values are write-only: they are encrypted in the Vault, never returned by list/read surfaces, and never stored in `.mosoo.toml`, Deployment plans, generated Wrangler configuration, build Sandbox state, logs, or API responses.
+An App owner can save, rotate, list by name, or delete App-scoped deployment secrets through the Console, generated CLI, and GraphQL API. Values are write-only: they are encrypted in the Vault, never returned by list/read surfaces, and never stored in `.mosoo.toml`, Deployment plans, generated Wrangler configuration, build Sandbox state, logs, or API responses.
 
 The CLI implementation lives in `mosoo-connector`, where Lathe generates `mosoo console` commands from this repository's Console GraphQL schema. The mosoo-side contract is therefore the GraphQL fields and their stable generated command paths:
 
@@ -50,7 +50,7 @@ A Worker repository declares only the required names:
 required = ["MOSOO_API_TOKEN"]
 ```
 
-Before build or Cloudflare submission, deployment verifies that every declared name has an App-owned value. On a Worker deployment, values are sent only as Cloudflare `secret_text` bindings; plain-text Agent capability URLs remain distinct bindings. Static deployments cannot declare secrets in this Alpha surface. A saved or rotated value takes effect on the next successful deployment. Deleting a managed deployment first removes its Cloudflare resources, then revokes and deletes its App deployment secrets; if Cloudflare cleanup fails, values remain for a safe retry.
+Before build, deployment verifies that every declared name has an App-owned value. Immediately before Cloudflare submission, after the build completes and mosoo reloads the active deployment context, it resolves the current values. On a Worker deployment, values are sent only as Cloudflare `secret_text` bindings; plain-text Agent capability URLs remain distinct bindings. Static deployments cannot declare secrets in this Alpha surface. A saved or rotated value takes effect on the next successful deployment. Deleting a stored value prevents it from being submitted by future deployments; it does not remove the binding from an already deployed Worker, which remains until a later successful Worker deployment replaces its binding set. Deleting a managed deployment first removes its Cloudflare resources, then deletes its App deployment secrets; if Cloudflare cleanup fails, values remain for a safe retry.
 
 ## Current Availability and Boundary
 

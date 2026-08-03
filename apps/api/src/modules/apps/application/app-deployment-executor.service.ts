@@ -38,6 +38,7 @@ import {
 import type { AppDeploymentPlan, AppDeploymentRepositorySnapshot } from "./app-deployment-detector";
 import {
   AppDeploymentSecretResolutionError,
+  assertAppDeploymentSecretNamesAvailable,
   resolveAppDeploymentSecretValues,
 } from "./app-deployment-secret.service";
 
@@ -918,21 +919,13 @@ export async function dispatchAppDeploymentRun(
       return;
     }
 
-    let envVars: Record<string, string>;
-    let secretVars: Record<string, string>;
     try {
-      [envVars, secretVars] = await Promise.all([
-        resolveDeploymentEnvVars(bindings, context.deployment, context.run, plan),
-        resolveAppDeploymentSecretValues(bindings, {
-          appId: context.deployment.appId,
-          names: plan.secretNames,
-        }),
-      ]);
+      await assertAppDeploymentSecretNamesAvailable(bindings, {
+        appId: context.deployment.appId,
+        names: plan.secretNames,
+      });
     } catch (error) {
-      if (
-        error instanceof AppAgentBindingResolutionError ||
-        error instanceof AppDeploymentSecretResolutionError
-      ) {
+      if (error instanceof AppDeploymentSecretResolutionError) {
         await failDeploymentRunIfActive({
           database: bindings.DB,
           errorCode: error.code,
@@ -970,6 +963,32 @@ export async function dispatchAppDeploymentRun(
         runId: input.appDeploymentRunId,
       });
       return;
+    }
+
+    let envVars: Record<string, string>;
+    let secretVars: Record<string, string>;
+    try {
+      [envVars, secretVars] = await Promise.all([
+        resolveDeploymentEnvVars(bindings, context.deployment, context.run, plan),
+        resolveAppDeploymentSecretValues(bindings, {
+          appId: context.deployment.appId,
+          names: plan.secretNames,
+        }),
+      ]);
+    } catch (error) {
+      if (
+        error instanceof AppAgentBindingResolutionError ||
+        error instanceof AppDeploymentSecretResolutionError
+      ) {
+        await failDeploymentRunIfActive({
+          database: bindings.DB,
+          errorCode: error.code,
+          errorMessage: error.message,
+          runId: context.run.id,
+        });
+        return;
+      }
+      throw error;
     }
 
     externallyAttemptedDeployment = context.deployment;

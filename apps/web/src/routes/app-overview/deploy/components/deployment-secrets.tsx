@@ -51,7 +51,7 @@ function SecretList({
           <Button
             variant="ghost"
             size="icon-sm"
-            aria-label={`Revoke ${secret.name}`}
+            aria-label={`Remove ${secret.name} from future deployments`}
             disabled={deleting !== null}
             onClick={() => onDelete(secret.name)}
           >
@@ -108,13 +108,17 @@ export function DeploymentSecrets({ appId }: { appId: string }) {
     }
   }
 
-  async function revoke(nameToDelete: string) {
+  async function removeForFutureDeployments(nameToDelete: string) {
     setFormError(null);
 
     try {
       await deleteSecretMutation.mutateAsync({ appId: typedAppId, name: nameToDelete });
     } catch (error) {
-      setFormError(error instanceof Error ? error.message : "Could not revoke App secret.");
+      setFormError(
+        error instanceof Error
+          ? error.message
+          : "Could not remove App secret from future deployments.",
+      );
     }
   }
 
@@ -136,6 +140,11 @@ export function DeploymentSecrets({ appId }: { appId: string }) {
             deployment. Declare names, never values, in <code>[secrets].required</code> in
             <code> .mosoo.toml</code>; save or rotate a value here, then redeploy.
           </p>
+          <p className="text-fg-3 mt-2 max-w-2xl text-[13px] leading-5">
+            Removing a value stops future deployments from submitting it. It does not remove the
+            binding from an already deployed Worker; a later successful deployment replaces that
+            Worker binding set.
+          </p>
         </div>
       </div>
 
@@ -152,7 +161,7 @@ export function DeploymentSecrets({ appId }: { appId: string }) {
             deleting={
               deleteSecretMutation.isPending ? (deleteSecretMutation.variables?.name ?? null) : null
             }
-            onDelete={(nameToDelete) => void revoke(nameToDelete)}
+            onDelete={(nameToDelete) => void removeForFutureDeployments(nameToDelete)}
           />
         )}
 

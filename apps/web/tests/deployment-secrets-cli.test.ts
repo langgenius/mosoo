@@ -48,6 +48,8 @@ describe("deployment secrets CLI surface", () => {
     expect(source).toContain("setAppDeploymentSecretCommand");
     expect(source).toContain("deleteAppDeploymentSecretCommand");
     expect(source).toContain("use a JSON body file");
+    expect(source).toContain("does not remove the");
+    expect(source).toContain("binding from an already deployed Worker");
     expect(source).toContain("multiline");
   });
 });
