@@ -1,4 +1,4 @@
-import { MoreHorizontal, Pencil, Trash2, Unplug } from "lucide-react";
+import { MoreHorizontal, Pencil, Power, PowerOff, Trash2, Unplug } from "lucide-react";
 
 import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
@@ -101,6 +101,7 @@ export function McpListItem({
               </DropdownMenuItem>
             )}
             <DropdownMenuItem onClick={onToggleEnabled}>
+              {server.enabled ? <PowerOff /> : <Power />}
               {server.enabled ? "Disable" : "Enable"}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
