@@ -1,11 +1,11 @@
 # Product analytics (PostHog Cloud)
 
-Mosoo sends explicit, low-volume product events to one PostHog Cloud project. Browser events cover intent and navigation; API events cover authoritative business outcomes. Analytics failures never fail the business operation.
+mosoo sends explicit, low-volume product events to one PostHog Cloud project. Browser events cover intent and navigation; API events cover authoritative business outcomes. Analytics failures never fail the business operation.
 
 ## Identity and privacy
 
 - Before login, the web app uses a persistent random `mosoo_anon_*` ID.
-- After login, `$identify` joins that anonymous history to the stable Mosoo account ID.
+- After login, `$identify` joins that anonymous history to the stable mosoo account ID.
 - Logout creates a fresh anonymous ID so two accounts on one browser are not mixed.
 - Email addresses, prompts, credentials, task content, and model responses are not sent.
 - PostHog autocapture and session replay are not enabled by this integration.
@@ -61,4 +61,4 @@ Also create:
 - a breakdown of `integration_connected` by `vendor_id`;
 - a breakdown of all funnels by `environment` and `deployment_mode`.
 
-Payments and subscriptions are not currently Mosoo product surfaces, so no synthetic payment events are emitted.
+Payments and subscriptions are not currently mosoo product surfaces, so no synthetic payment events are emitted.

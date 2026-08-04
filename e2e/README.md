@@ -88,7 +88,7 @@ runtime. Treat these remote refs as one staging-only overlay:
 | `langgenius/mosoo`              | `origin/perf/runtime-e2e-scoreboard-infra` |
 | `langgenius/mosoo-agent-driver` | `origin/feat/runtime-performance-evidence` |
 
-The Mosoo ref pins the paired Driver revision through `apps/driver`. Follow the
+The mosoo ref pins the paired Driver revision through `apps/driver`. Follow the
 [canonical overlay instructions](https://github.com/langgenius/mosoo/blob/perf/runtime-e2e-scoreboard-infra/e2e/README.md#unmerged-runtime-performance-overlay)
 for disposable worktrees, provenance, validation, and staging cleanup.
 
@@ -108,9 +108,9 @@ test "$(git -C "$PERF_OVERLAY_ROOT/before/apps/driver" rev-parse HEAD)" = \
     rev-parse origin/feat/runtime-performance-evidence)"
 ```
 
-For instrumentation acceptance, compare target Mosoo/Driver SHAs with those
+For instrumentation acceptance, compare target mosoo/Driver SHAs with those
 same SHAs plus the overlay. For product experiments, both sides must use the
-same overlay and only the candidate may add the Mosoo and/or Driver
+same overlay and only the candidate may add the mosoo and/or Driver
 optimization. An API-only candidate must keep the Driver submodule identical
 on both sides.
 
