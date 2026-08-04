@@ -8,10 +8,10 @@ import PlusSignIcon from "@hugeicons/core-free-icons/PlusSignIcon";
 import type { AppSummary } from "@mosoo/contracts/app";
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { useTranslation } from "@/shared/i18n";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { HelpMenu } from "@/features/help/help-menu";
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
 import {

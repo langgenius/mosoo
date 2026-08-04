@@ -7,9 +7,9 @@ import Settings02Icon from "@hugeicons/core-free-icons/Settings02Icon";
 import SlidersHorizontalIcon from "@hugeicons/core-free-icons/SlidersHorizontalIcon";
 import type { MouseEvent } from "react";
 import { useState } from "react";
-import { useTranslation } from "@/shared/i18n";
 import { Link } from "react-router-dom";
 
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import {
   DropdownMenu,
@@ -44,7 +44,11 @@ function useNavSections(): AppNavSection[] {
   return [
     {
       items: [
-        { icon: createHugeicon(DashboardSquare01Icon, "OverviewIcon"), label: t("nav.overview"), path: "/" },
+        {
+          icon: createHugeicon(DashboardSquare01Icon, "OverviewIcon"),
+          label: t("nav.overview"),
+          path: "/",
+        },
         { icon: createHugeicon(InboxIcon, "ThreadsIcon"), label: t("nav.runs"), path: "/threads" },
         { icon: createHugeicon(BotIcon, "AgentsIcon"), label: t("nav.agents"), path: "/agent" },
         { icon: createHugeicon(Files02Icon, "FilesIcon"), label: t("nav.files"), path: "/files" },

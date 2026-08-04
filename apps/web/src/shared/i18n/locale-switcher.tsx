@@ -1,6 +1,5 @@
-import { HugeiconsIcon } from "@hugeicons/react";
 import { LanguageCircleIcon } from "@hugeicons/core-free-icons";
-import { useTranslation } from "./provider";
+import { HugeiconsIcon } from "@hugeicons/react";
 
 import { cn } from "@/shared/lib/class-names";
 import {
@@ -11,6 +10,7 @@ import {
 } from "@/shared/ui/dropdown-menu";
 
 import { LOCALE_DISPLAY_NAMES, SUPPORTED_LOCALES } from "./locales";
+import { useTranslation } from "./provider";
 
 interface LocaleSwitcherProps {
   className?: string;
