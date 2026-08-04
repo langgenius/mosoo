@@ -18,7 +18,9 @@
   <a href="https://cloud.mosoo.ai">Try mosoo</a> ·
   <a href="https://mosoo.ai">Website</a> ·
   <a href="https://mosoo.ai/docs">API Documentation</a> ·
-  <a href="https://github.com/langgenius/mosoo-connector">mosoo Connector</a>
+  <a href="https://github.com/langgenius/mosoo-agent-driver">mosoo-agent-driver</a> ·
+  <a href="https://github.com/langgenius/mosoo-connector">mosoo-connector</a> ·
+  <a href="https://github.com/langgenius/mosoo-skills">mosoo-skills</a>
 </p>
 
 mosoo provides a Cloudflare-native control plane to stream tool activity, inspect Run history, and keep Threads and files across executions. It is self-hostable in your own account.
