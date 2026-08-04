@@ -190,10 +190,8 @@ function ConsoleSidebarFooter({
 
   return (
     <>
-      <div className={cn("pb-2", collapsed ? "flex justify-center" : "px-0.5")}>
+      <div className={cn("flex flex-col gap-0.5 pb-2", collapsed ? "items-center" : "px-0.5")}>
         <HelpMenu collapsed={collapsed} shortcutEnabled={helpShortcutEnabled} />
-      </div>
-      <div className={cn("pb-2", collapsed ? "flex justify-center" : "px-0.5")}>
         <LocaleSwitcher collapsed={collapsed} />
       </div>
       <Separator className="bg-border-soft" />
