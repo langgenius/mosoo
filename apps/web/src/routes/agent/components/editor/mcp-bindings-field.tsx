@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { useMcpRegistryQuery } from "@/domains/mcp/query/mcp-queries";
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import {
   DropdownMenu,
@@ -134,6 +135,7 @@ export function AgentMcpBindingsField({
   selectedServers: McpServer[];
   setServers: (servers: McpServer[]) => void;
 }) {
+  const { t } = useTranslation();
   const [addOpen, setAddOpen] = useState(false);
   const registryQuery = useMcpRegistryQuery(appId);
 
@@ -213,7 +215,7 @@ export function AgentMcpBindingsField({
 
             {!readOnly ? (
               <button
-                aria-label="Remove"
+                aria-label={t("common.remove")}
                 className="text-muted-foreground hover:text-destructive opacity-0 transition-colors group-hover:opacity-100"
                 onClick={() => removeServer(server.id)}
                 type="button"

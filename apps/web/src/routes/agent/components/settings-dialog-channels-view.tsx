@@ -14,6 +14,7 @@ import { useState } from "react";
 
 import type { AgentChannelBindingFieldsFragment } from "@/gql/graphql";
 import { toChannelBindingId } from "@/routes/typed-id";
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -317,6 +318,7 @@ export function AgentSettingsChannelsView({
   pendingRemoveBindingId: string | null;
   selectedChannelId: ChannelId;
 }) {
+  const { t } = useTranslation();
   const selectedChannel = DISTRIBUTION_CHANNELS.find((channel) => channel.id === selectedChannelId);
   const selectedBinding =
     channelBindings.find((binding) => binding.provider === selectedChannelId) ?? null;
@@ -333,7 +335,7 @@ export function AgentSettingsChannelsView({
         <div className="flex items-center gap-1.5">
           {onBackToSettings ? (
             <Button
-              aria-label="Back to Agent Settings"
+              aria-label={t("nav.backTo", { label: t("agent.settings") })}
               className="text-muted-foreground -ml-1.5"
               onClick={onBackToSettings}
               size="icon-xs"
@@ -375,7 +377,7 @@ export function AgentSettingsChannelsView({
                   <span className="min-w-0 truncate">{channel.label}</span>
                 </div>
                 {!channel.enabled ? (
-                  <span className="text-muted-foreground text-[10px]">Soon</span>
+                  <span className="text-muted-foreground text-[10px]">{t("agent.soon")}</span>
                 ) : connected ? (
                   <CircleCheck className="size-3.5 text-green-600" />
                 ) : null}
@@ -389,9 +391,9 @@ export function AgentSettingsChannelsView({
             <ChannelBrandIcon channelId={selectedChannel.id} className="size-6 shrink-0" />
             <div className="text-foreground text-sm font-semibold">{selectedChannel.label}</div>
             {selectedBinding ? (
-              <Badge variant="primary">Connected</Badge>
+              <Badge variant="primary">{t("agent.connected")}</Badge>
             ) : !selectedChannel.enabled ? (
-              <Badge variant="default">Soon</Badge>
+              <Badge variant="default">{t("agent.soon")}</Badge>
             ) : null}
           </div>
 
@@ -448,15 +450,15 @@ export function AgentSettingsChannelsView({
       >
         <DialogContent className="sm:max-w-[440px]">
           <DialogHeader>
-            <DialogTitle>Remove channel binding?</DialogTitle>
+            <DialogTitle>{t("agent.removeChannelBinding")}</DialogTitle>
             <DialogDescription>
               Events for this channel app will be acknowledged and dropped after removal.
             </DialogDescription>
           </DialogHeader>
           <div className="text-muted-foreground space-y-2 text-sm">
-            <p>The Agent will no longer respond in the connected channel surface.</p>
-            <p>Existing mosoo Sessions keep their channel source metadata.</p>
-            <p>To recover, create a new binding and paste the credentials again.</p>
+            <p>{t("agent.removeChannelBindingDescription")}</p>
+            <p>{t("agent.channelSourceMetadata")}</p>
+            <p>{t("agent.recoverBinding")}</p>
           </div>
           <DialogFooter>
             <Button

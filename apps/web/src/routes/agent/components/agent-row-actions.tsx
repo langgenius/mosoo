@@ -7,6 +7,7 @@ import { useNavigate } from "react-router-dom";
 import { createAgentFork, deleteAgent, getAgentManifest } from "@/domains/agent/api/agent-client";
 import { agentKeys } from "@/domains/agent/query/agent-queries";
 import { toAgentId, toAppId } from "@/routes/typed-id";
+import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import {
   Dialog,
@@ -55,6 +56,7 @@ function getActionErrorMessage(error: unknown, defaultMessage: string): string {
 }
 
 export function AgentRowActions({ agent }: { agent: Agent }): ReactElement {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -134,7 +136,7 @@ export function AgentRowActions({ agent }: { agent: Agent }): ReactElement {
           <Button
             variant="ghost"
             size="icon-xs"
-            aria-label="More actions"
+            aria-label={t("common.moreActions")}
             onClick={(event) => {
               event.stopPropagation();
             }}
@@ -209,7 +211,7 @@ export function AgentRowActions({ agent }: { agent: Agent }): ReactElement {
       >
         <DialogContent className="sm:max-w-[440px]">
           <DialogHeader>
-            <DialogTitle>Delete this agent?</DialogTitle>
+            <DialogTitle>{t("agent.deletePrompt")}</DialogTitle>
             <DialogDescription>
               <strong>{agent.name}</strong> and all its records will be permanently removed. This
               cannot be undone.
@@ -258,7 +260,7 @@ export function AgentRowActions({ agent }: { agent: Agent }): ReactElement {
       >
         <DialogContent className="sm:max-w-[420px]">
           <DialogHeader>
-            <DialogTitle>Action failed</DialogTitle>
+            <DialogTitle>{t("agent.actionFailed")}</DialogTitle>
             <DialogDescription>
               {actionError ?? "The action could not be completed."}
             </DialogDescription>

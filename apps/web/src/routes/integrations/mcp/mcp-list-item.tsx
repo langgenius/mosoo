@@ -1,5 +1,6 @@
 import { MoreHorizontal, Pencil, Trash2, Unplug } from "lucide-react";
 
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
 import {
@@ -31,6 +32,7 @@ export function McpListItem({
   onDelete,
   onToggleEnabled,
 }: Props) {
+  const { t } = useTranslation();
   const status = server.credentialStatus;
   const isAuthorized = status === "active";
   const metaParts = [authTypeLabel(server.authType)];
@@ -81,7 +83,7 @@ export function McpListItem({
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
-              aria-label="Server actions"
+              aria-label={t("mcp.serverActions")}
               variant="ghost"
               size="icon"
               className="text-muted-foreground size-8"

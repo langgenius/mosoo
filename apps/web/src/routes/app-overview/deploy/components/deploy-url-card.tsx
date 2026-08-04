@@ -1,5 +1,6 @@
 import { ExternalLink } from "lucide-react";
 
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 
 import type { DeploymentRunVM, DeploymentVM } from "../deploy-console-data";
@@ -96,6 +97,7 @@ export function DeployUrlCard({
   latestRun: DeploymentRunVM | undefined;
   localPreview: LocalDeploymentPreviewState;
 }) {
+  const { t } = useTranslation();
   const now = useNowTick();
   const inFlight = latestRun?.outcome === "deploying";
   const failed = latestRun?.outcome === "failed";
@@ -110,10 +112,10 @@ export function DeployUrlCard({
           <DevelopmentPreviewRow status={localPreview.status} url={localPreview.url} />
           <StatusBadge outcome={latestRun.outcome} scopeLabel="Production" />
           {deployment.liveUrl === null ? null : (
-            <DomainRow label="Production still serving" url={deployment.liveUrl} />
+            <DomainRow label={t("deploy.productionServing")} url={deployment.liveUrl} />
           )}
           {deployment.liveUrl !== null || deployment.plannedUrl === null ? null : (
-            <DomainRow label="Production reserved" url={deployment.plannedUrl} />
+            <DomainRow label={t("deploy.productionReserved")} url={deployment.plannedUrl} />
           )}
         </div>
       ) : failed && latestRun !== undefined ? (
@@ -121,14 +123,14 @@ export function DeployUrlCard({
           <DevelopmentPreviewRow status={localPreview.status} url={localPreview.url} />
           {deployment.liveUrl === null ? null : (
             <div className="flex min-w-0 flex-col gap-1">
-              <DomainRow label="Production still serving" url={deployment.liveUrl} />
+              <DomainRow label={t("deploy.productionServing")} url={deployment.liveUrl} />
               <p className="text-fg-3 text-[13px]">
                 Your live site is unaffected — this domain still serves the last successful deploy.
               </p>
             </div>
           )}
           {deployment.liveUrl !== null || deployment.plannedUrl === null ? null : (
-            <DomainRow label="Production reserved" url={deployment.plannedUrl} />
+            <DomainRow label={t("deploy.productionReserved")} url={deployment.plannedUrl} />
           )}
         </div>
       ) : productionUrl !== null ? (

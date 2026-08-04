@@ -2,6 +2,7 @@ import { GitBranch, Rocket } from "lucide-react";
 import type { FormEvent } from "react";
 import { useState } from "react";
 
+import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import { CommandBlock } from "@/shared/ui/command-block";
 import { Input } from "@/shared/ui/input";
@@ -30,6 +31,7 @@ export function RepoDeployForm({
   serverError: string | null;
   onDeploy: (repoUrl: string) => void;
 }) {
+  const { t } = useTranslation();
   const [repoUrl, setRepoUrl] = useState("");
   const [shapeError, setShapeError] = useState<string | null>(null);
 
@@ -52,7 +54,7 @@ export function RepoDeployForm({
     <form onSubmit={handleSubmit} className="flex flex-col gap-2">
       <div className="flex flex-col gap-2 sm:flex-row">
         <Input
-          aria-label="Public GitHub repo URL"
+          aria-label={t("deploy.repoUrl")}
           placeholder="https://github.com/owner/repo"
           value={repoUrl}
           onChange={(event) => {

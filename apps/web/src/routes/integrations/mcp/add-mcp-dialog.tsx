@@ -1,6 +1,7 @@
 import { ChevronDown } from "lucide-react";
 import { useReducer } from "react";
 
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
 import {
@@ -103,6 +104,7 @@ function addMcpDialogReducer(
 }
 
 export function AddMcpDialog({ open, onOpenChange, onSubmit }: Props) {
+  const { t } = useTranslation();
   const [state, dispatch] = useReducer(addMcpDialogReducer, ADD_MCP_DIALOG_INITIAL_STATE);
   const {
     advancedOpen,
@@ -155,7 +157,7 @@ export function AddMcpDialog({ open, onOpenChange, onSubmit }: Props) {
       handleOpenChange(false);
     } catch (error) {
       dispatch({
-        error: error instanceof Error ? error.message : "Failed to add MCP connection.",
+        error: error instanceof Error ? error.message : t("mcp.failedToAdd"),
         type: "setSubmitError",
       });
     } finally {
@@ -167,10 +169,8 @@ export function AddMcpDialog({ open, onOpenChange, onSubmit }: Props) {
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Add MCP connection</DialogTitle>
-          <DialogDescription>
-            Add an MCP server over Remote HTTPS. Authorization starts immediately after you save.
-          </DialogDescription>
+          <DialogTitle>{t("mcp.addConnection")}</DialogTitle>
+          <DialogDescription>{t("mcp.addDescription")} </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
@@ -183,21 +183,21 @@ export function AddMcpDialog({ open, onOpenChange, onSubmit }: Props) {
               size={44}
             />
             <div className="flex-1 space-y-1.5">
-              <Label htmlFor="mcp-name">Name</Label>
+              <Label htmlFor="mcp-name">{t("mcp.name")}</Label>
               <Input
                 id="mcp-name"
                 value={name}
                 onChange={(e) => {
                   dispatch({ name: e.target.value, type: "changeName" });
                 }}
-                placeholder="For example: Figma"
+                placeholder={t("mcp.namePlaceholder")}
               />
             </div>
           </div>
 
           {/* URL */}
           <div className="space-y-1.5">
-            <Label htmlFor="mcp-url">Server URL</Label>
+            <Label htmlFor="mcp-url">{t("mcp.serverUrl")}</Label>
             <Input
               id="mcp-url"
               value={url}
@@ -207,33 +207,35 @@ export function AddMcpDialog({ open, onOpenChange, onSubmit }: Props) {
               placeholder="https://mcp.figma.com/mcp"
             />
             {url.length > 0 && !urlValid && (
-              <p className="text-destructive text-[11px]">URL must start with https://</p>
+              <p className="text-destructive text-[11px]">{t("mcp.urlMustStartWithHttps")}</p>
             )}
           </div>
 
           {/* Auth type selector */}
           <div className="space-y-1.5">
-            <Label>Authorization</Label>
+            <Label>{t("mcp.authorization")}</Label>
             <div className="grid grid-cols-2 gap-2">
-              {(["oauth", "bearer"] as const).map((t) => (
+              {(["oauth", "bearer"] as const).map((authTypeOption) => (
                 <button
-                  key={t}
+                  key={authTypeOption}
                   type="button"
                   onClick={() => {
-                    dispatch({ authType: t, type: "changeAuthType" });
+                    dispatch({ authType: authTypeOption, type: "changeAuthType" });
                   }}
                   className={cn(
                     "rounded-md border px-3 py-2 text-[13px] text-left transition",
-                    authType === t
+                    authType === authTypeOption
                       ? "border-primary bg-primary/5 text-foreground"
                       : "border-border text-muted-foreground hover:bg-muted/40",
                   )}
                 >
                   <div className="text-foreground font-medium">
-                    {t === "oauth" ? "OAuth" : "Bearer token"}
+                    {authTypeOption === "oauth" ? t("mcp.oauth") : t("mcp.bearerToken")}
                   </div>
                   <div className="text-muted-foreground mt-0.5 text-[11px]">
-                    {t === "oauth" ? "Authorize with the provider" : "Paste a token"}
+                    {authTypeOption === "oauth"
+                      ? t("mcp.authorizeWithProvider")
+                      : t("mcp.pasteAToken")}
                   </div>
                 </button>
               ))}
@@ -258,7 +260,7 @@ export function AddMcpDialog({ open, onOpenChange, onSubmit }: Props) {
             {advancedOpen && (
               <div className="border-border bg-muted/30 mt-3 space-y-4 rounded-md border p-3">
                 <div className="space-y-1.5">
-                  <Label htmlFor="mcp-icon">Icon URL (optional)</Label>
+                  <Label htmlFor="mcp-icon">{t("mcp.iconUrl")}</Label>
                   <Input
                     id="mcp-icon"
                     value={iconUrl}
@@ -268,12 +270,12 @@ export function AddMcpDialog({ open, onOpenChange, onSubmit }: Props) {
                     placeholder="https://logo.clearbit.com/example.com"
                   />
                   <p className="text-muted-foreground text-[10px]">
-                    Leave empty to use the initial as the icon.
+                    {t("mcp.leaveEmptyToUseInitial")}
                   </p>
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label htmlFor="mcp-desc">Description (optional)</Label>
+                  <Label htmlFor="mcp-desc">{t("mcp.descriptionOptional")}</Label>
                   <Textarea
                     id="mcp-desc"
                     value={description}
@@ -281,14 +283,14 @@ export function AddMcpDialog({ open, onOpenChange, onSubmit }: Props) {
                       dispatch({ description: e.target.value, type: "changeDescription" });
                     }}
                     rows={2}
-                    placeholder="What capabilities does this MCP server provide?"
+                    placeholder={t("mcp.descriptionPlaceholder")}
                   />
                 </div>
 
                 {authType === "oauth" && (
                   <>
                     <div className="space-y-1.5">
-                      <Label htmlFor="mcp-client-id">OAuth Client ID (optional)</Label>
+                      <Label htmlFor="mcp-client-id">{t("mcp.oauthClientId")}</Label>
                       <Input
                         id="mcp-client-id"
                         value={oauthClientId}
@@ -298,11 +300,11 @@ export function AddMcpDialog({ open, onOpenChange, onSubmit }: Props) {
                             type: "changeOauthClientId",
                           });
                         }}
-                        placeholder="Leave empty to use dynamic client registration"
+                        placeholder={t("mcp.oauthClientIdPlaceholder")}
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <Label htmlFor="mcp-client-secret">OAuth Client Secret (optional)</Label>
+                      <Label htmlFor="mcp-client-secret">{t("mcp.oauthClientSecret")}</Label>
                       <Input
                         id="mcp-client-secret"
                         type="password"
@@ -335,10 +337,10 @@ export function AddMcpDialog({ open, onOpenChange, onSubmit }: Props) {
             }}
             disabled={submitting}
           >
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button disabled={!canSubmit || submitting} onClick={() => void handleSubmit()}>
-            {submitting ? "Adding..." : "Add"}
+            {submitting ? t("mcp.adding") : t("mcp.add")}
           </Button>
         </DialogFooter>
       </DialogContent>

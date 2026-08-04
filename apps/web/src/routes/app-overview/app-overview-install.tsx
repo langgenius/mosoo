@@ -2,6 +2,7 @@ import { MousePointerClick, SquareTerminal } from "lucide-react";
 import type { ReactElement } from "react";
 import { useState } from "react";
 
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { writeClipboardText } from "@/shared/lib/clipboard";
 import { Button } from "@/shared/ui/button";
@@ -59,6 +60,7 @@ function SetupLaneTab({
 }
 
 function CodingAgentLane(): ReactElement {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   const [copyFailed, setCopyFailed] = useState(false);
 
@@ -94,7 +96,7 @@ function CodingAgentLane(): ReactElement {
           variant="accent"
         >
           <CopyCheckIcon copied={copied} />
-          {copied ? "Copied" : "Copy"}
+          {copied ? t("common.copied") : t("common.copy")}
         </Button>
       </div>
 
@@ -109,14 +111,12 @@ function CodingAgentLane(): ReactElement {
             }}
             className="border-border bg-bg-sunken text-fg-1 w-full rounded-md border px-3 py-2 font-mono text-xs"
           />
-          <p className="text-fg-3 mt-1 text-xs">Copy failed. Select and copy the command above.</p>
+          <p className="text-fg-3 mt-1 text-xs">{t("onboarding.copyFailed")}</p>
         </div>
       ) : null}
 
       <p className="text-fg-3 mt-3 max-w-2xl text-[13px] leading-5">
-        One command installs the mosoo CLI and the @mosoo skill, signs in to cloud.mosoo.ai, and
-        checks cloud readiness. Sign-in creates your API token automatically; you will be asked for
-        a provider key before sessions can run.
+        {t("onboarding.setupDescription")}
       </p>
 
       <OnboardingActions />
@@ -144,6 +144,7 @@ function ConsoleLane(): ReactElement {
  * coding-agent lane.
  */
 export function AppOverviewInstallGuide(): ReactElement {
+  const { t } = useTranslation();
   const [lane, setLane] = useState<SetupLane>(() => readStoredSetupLane() ?? "cli");
 
   function selectLane(nextLane: SetupLane): void {
@@ -155,17 +156,17 @@ export function AppOverviewInstallGuide(): ReactElement {
     <section className="py-8 sm:py-10">
       <div className="mx-auto flex max-w-3xl flex-col items-center text-center">
         <h2 className="text-foreground text-3xl font-semibold tracking-tight sm:text-4xl">
-          Build agent app with <span className="text-[rgb(111_211_4)]">mosoo</span>
+          {t("onboarding.title")}
         </h2>
         <p className="text-muted-foreground mt-3 max-w-2xl text-base leading-7">
-          Pick how you want to set up. Progress counts the same either way.
+          {t("onboarding.subtitle")}
         </p>
 
         <div className="border-border bg-bg-sunken mt-7 inline-flex rounded-lg border p-1">
           <SetupLaneTab
             active={lane === "cli"}
             icon={<SquareTerminal className="size-4" />}
-            label="In your coding agent"
+            label={t("onboarding.inCodingAgent")}
             onSelect={() => {
               selectLane("cli");
             }}
@@ -173,7 +174,7 @@ export function AppOverviewInstallGuide(): ReactElement {
           <SetupLaneTab
             active={lane === "console"}
             icon={<MousePointerClick className="size-4" />}
-            label="In the console"
+            label={t("onboarding.inConsole")}
             onSelect={() => {
               selectLane("console");
             }}

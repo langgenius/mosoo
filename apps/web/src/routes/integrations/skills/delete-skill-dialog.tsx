@@ -1,6 +1,7 @@
 import type { SkillSummary } from "@mosoo/contracts/skill";
 import { useState } from "react";
 
+import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import {
   Dialog,
@@ -24,6 +25,7 @@ interface Props {
 }
 
 export function DeleteSkillDialog({ onDeleted, onOpenChange, open, registry, skill }: Props) {
+  const { t } = useTranslation();
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -43,7 +45,7 @@ export function DeleteSkillDialog({ onDeleted, onOpenChange, open, registry, ski
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Delete skill</DialogTitle>
+          <DialogTitle>{t("skills.deleteSkill")}</DialogTitle>
           <DialogDescription>
             This removes <span className="font-medium">{skill.name}</span> from your registry.
           </DialogDescription>
@@ -66,7 +68,7 @@ export function DeleteSkillDialog({ onDeleted, onOpenChange, open, registry, ski
             Cancel
           </Button>
           <Button variant="destructive" onClick={() => void handleDelete()} disabled={deleting}>
-            {deleting ? "Deleting..." : "Delete skill"}
+            {deleting ? "Deleting..." : t("skills.deleteSkill")}
           </Button>
         </DialogFooter>
       </DialogContent>

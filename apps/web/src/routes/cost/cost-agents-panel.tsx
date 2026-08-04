@@ -1,6 +1,7 @@
 import { ExternalLink } from "lucide-react";
 import { Link } from "react-router-dom";
 
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 
 import {
@@ -32,6 +33,7 @@ export function CostAgentsPanel({
   setSort: (value: AgentCostSort) => void;
   sort: AgentCostSort;
 }) {
+  const { t } = useTranslation();
   const sortedAgents = sortCostAgents(agents, sort);
 
   return (
@@ -60,13 +62,13 @@ export function CostAgentsPanel({
       </div>
 
       <div className="border-border bg-muted/30 text-muted-foreground grid grid-cols-[minmax(180px,1.4fr)_150px_110px_110px_110px_110px_110px_120px] border-b px-4 py-2 text-[11px] font-semibold tracking-[0.12em] uppercase">
-        <div>Agent</div>
-        <div>Owner</div>
-        <div>Run mix</div>
+        <div>{t("cost.agent")}</div>
+        <div>{t("cost.owner")}</div>
+        <div>{t("cost.runMix")}</div>
         <div>vs. Prev</div>
-        <div>Requests</div>
-        <div>Tokens</div>
-        <div>Cache hit</div>
+        <div>{t("cost.requests")}</div>
+        <div>{t("cost.tokens")}</div>
+        <div>{t("cost.cacheHit")}</div>
         <div className="text-right">Cost</div>
       </div>
       {agents.length === 0 ? (

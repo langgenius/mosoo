@@ -54,7 +54,7 @@ describe("Two-layer console boundary", () => {
     const appsList = readSource("../src/routes/apps/apps-list.route.tsx");
 
     expect(appsList).toContain("createApp");
-    expect(appsList).toContain("New app");
+    expect(appsList).toContain('t("apps.new")');
     expect(appsList).toContain("AppIdBadge");
     expect(appsList).not.toContain("coming soon");
   });

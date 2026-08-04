@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { useTranslation } from "@/shared/i18n";
 import type {
   FileUploadRecoveryCandidate,
   FileUploadResumeResult,
@@ -30,6 +31,7 @@ export function UploadRecoveryDialogContent({
 }: {
   initialCandidates: FileUploadRecoveryCandidate[];
 }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(true);
   const [candidates, setCandidates] = useState<FileUploadRecoveryCandidate[]>(initialCandidates);
   const [recovering, setRecovering] = useState(false);
@@ -112,7 +114,7 @@ export function UploadRecoveryDialogContent({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="sm:max-w-[460px]" showCloseButton={false}>
         <DialogHeader>
-          <DialogTitle>Resume unfinished uploads</DialogTitle>
+          <DialogTitle>{t("common.resumeUnfinishedUploads")}</DialogTitle>
           <DialogDescription>
             Found {candidates.length} unfinished upload{candidates.length === 1 ? "" : "s"}. If you
             continue, they will resume one by one while each upload keeps chunk-level concurrency.

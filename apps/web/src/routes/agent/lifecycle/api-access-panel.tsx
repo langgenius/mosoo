@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import type { ReactElement, ReactNode } from "react";
 import { Link } from "react-router-dom";
 
+import { useTranslation } from "@/shared/i18n";
 import { writeClipboardText } from "@/shared/lib/clipboard";
 import { Button } from "@/shared/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
@@ -52,6 +53,7 @@ export function AgentApiAccessPanel({
   agent,
   showTitle = true,
 }: AgentApiAccessPanelProps): ReactElement {
+  const { t } = useTranslation();
   const distribution = useMemo(() => buildAgentDistribution(agent), [agent]);
   const [copiedKey, setCopiedKey] = useState<ApiAccessClipboardKey | null>(null);
 
@@ -91,7 +93,7 @@ export function AgentApiAccessPanel({
               {copiedKey === "agent" ? "Copied" : "Copy"}
             </Button>
           }
-          label="Agent ID"
+          label={t("agent.agentId")}
           value={agent.id}
         />
         <ApiAccessDetailRow
@@ -103,7 +105,7 @@ export function AgentApiAccessPanel({
               </Link>
             </Button>
           }
-          label="API token"
+          label={t("agent.apiToken")}
           value="Settings / API Tokens"
         />
         <ApiAccessDetailRow
@@ -128,7 +130,7 @@ export function AgentApiAccessPanel({
               </Button>
             </div>
           }
-          label="API reference"
+          label={t("agent.apiReference")}
           value={distribution.apiDocsUrl}
         />
       </div>

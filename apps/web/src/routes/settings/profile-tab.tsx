@@ -1,6 +1,7 @@
 import { Check, Loader2, Upload } from "lucide-react";
 import { useEffect, useReducer, useRef } from "react";
 
+import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 
 import { useAppSession } from "../../app/session-provider";
@@ -91,6 +92,7 @@ function sanitizeAvatarSrc(value: string): string {
 }
 
 export function ProfileTab() {
+  const { t } = useTranslation();
   const { refreshOrganizations, user } = useAppSession();
   const [state, dispatch] = useReducer(profileFormReducer, {
     avatarInput: user?.image ?? "",
@@ -182,7 +184,7 @@ export function ProfileTab() {
 
   return (
     <>
-      <SettingsTabHeader title="Profile" />
+      <SettingsTabHeader title={t("settings.profile")} />
       <SettingsTabBody>
         <div className="mb-8 flex items-center gap-5">
           {isTruthy(avatarPreviewSrc) ? (
@@ -206,7 +208,7 @@ export function ProfileTab() {
             <div className="mt-2">
               <input
                 ref={fileInputRef}
-                aria-label="Upload profile picture"
+                aria-label={t("settings.uploadProfilePicture")}
                 type="file"
                 accept="image/*"
                 className="hidden"
@@ -246,7 +248,7 @@ export function ProfileTab() {
             Upload an image above, or paste an image URL to use as your avatar.
           </p>
           <input
-            aria-label="Profile picture URL"
+            aria-label={t("settings.profilePictureUrl")}
             id="profile-avatar-url"
             type="text"
             inputMode="url"
@@ -267,7 +269,7 @@ export function ProfileTab() {
             Display name
           </label>
           <input
-            aria-label="Display name"
+            aria-label={t("settings.displayName")}
             id="profile-display-name"
             type="text"
             value={name}
@@ -283,7 +285,7 @@ export function ProfileTab() {
             Email
           </label>
           <input
-            aria-label="Email"
+            aria-label={t("settings.email")}
             id="profile-email"
             type="email"
             value={user?.email ?? ""}

@@ -1,5 +1,6 @@
 import type { ReactElement } from "react";
 
+import { useTranslation } from "@/shared/i18n";
 import { Input } from "@/shared/ui/input";
 
 import type { Agent } from "../agent.types";
@@ -8,6 +9,7 @@ import { AgentIdBadge } from "./agent-id-badge";
 import { RuntimeIcon } from "./runtime-icon";
 
 export function AgentSettingsSummary({ agent }: { agent: Agent }): ReactElement {
+  const { t } = useTranslation();
   const runtime = getRuntimeInfo(agent.runtime);
 
   return (
@@ -20,7 +22,7 @@ export function AgentSettingsSummary({ agent }: { agent: Agent }): ReactElement 
         <Input
           className="text-muted-foreground h-9 rounded-md text-sm"
           defaultValue={agent.description}
-          placeholder="Description..."
+          placeholder={t("agent.summaryPlaceholder")}
         />
         {agent.status === "published" ? (
           <AgentIdBadge agentId={agent.id} className="w-fit" />

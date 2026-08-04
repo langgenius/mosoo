@@ -19,6 +19,7 @@ import {
 } from "@/features/session-files/session-files-store";
 import { uploadSessionResource } from "@/features/session-files/session-resource-upload";
 import { toAppId, toSessionId } from "@/routes/typed-id";
+import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 
 import { isTruthy } from "../../../shared/lib/truthiness";
@@ -49,6 +50,7 @@ export function AgentSessionPanel({
   tone: "preview" | "consume";
   appId: string | null;
 }) {
+  const { t } = useTranslation();
   const model = useAgentSessionPanelModel({
     agentId,
     configurationChangedAt: configurationChangedAt ?? null,
@@ -278,7 +280,7 @@ export function AgentSessionPanel({
                     </div>
                     <div className="flex shrink-0 gap-1.5">
                       <Button
-                        aria-label="Dismiss permission request"
+                        aria-label={t("agent.dismissPermissionRequest")}
                         onClick={() =>
                           void model.resolvePermission(model.permissionRequests[0]!, "reject_once")
                         }

@@ -18,6 +18,7 @@ import type {
   PollLarkAgentChannelRegistrationInput,
 } from "@/gql/graphql";
 import { toAgentId, toAppId } from "@/routes/typed-id";
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
@@ -499,6 +500,7 @@ function LarkConfigurationSection({
   savePending: boolean;
   state: LarkChannelInlineSetupState;
 }) {
+  const { t } = useTranslation();
   const { larkAppId, appSecret, connectionMode, domain, encryptKey, verificationToken } = state;
 
   return (
@@ -507,7 +509,7 @@ function LarkConfigurationSection({
         <div className="text-foreground text-sm font-semibold">Configuration</div>
 
         <div className="grid gap-1.5">
-          <Label>Connection mode</Label>
+          <Label>{t("agent.connectionMode")}</Label>
           <div className="bg-muted/30 grid rounded-md border p-1">
             {LARK_CONNECTION_MODE_OPTIONS.map((option) => (
               <button
@@ -535,7 +537,7 @@ function LarkConfigurationSection({
         </div>
 
         <div className="grid gap-1.5">
-          <Label>Open platform</Label>
+          <Label>{t("agent.openPlatform")}</Label>
           <div className="bg-muted/30 grid grid-cols-2 rounded-md border p-1">
             {LARK_DOMAIN_OPTIONS.map((option) => (
               <button
@@ -558,7 +560,7 @@ function LarkConfigurationSection({
         </div>
 
         <div className="grid gap-1.5">
-          <Label htmlFor="lark-app-id">App ID</Label>
+          <Label htmlFor="lark-app-id">{t("agent.appId")}</Label>
           <Input
             autoComplete="off"
             id="lark-app-id"
@@ -570,7 +572,7 @@ function LarkConfigurationSection({
         </div>
 
         <div className="grid gap-1.5">
-          <Label htmlFor="lark-app-secret">App Secret</Label>
+          <Label htmlFor="lark-app-secret">{t("agent.appSecret")}</Label>
           <Input
             autoComplete="off"
             id="lark-app-secret"
@@ -627,6 +629,8 @@ function LarkWebhookFields({
   eventConfigUrl: string | null;
   verificationToken: string;
 }) {
+  const { t } = useTranslation();
+
   return (
     <>
       {eventConfigUrl ? (
@@ -643,7 +647,7 @@ function LarkWebhookFields({
         </div>
       ) : null}
       <div className="grid gap-1.5">
-        <Label htmlFor="lark-verification-token">Verification Token</Label>
+        <Label htmlFor="lark-verification-token">{t("agent.verificationToken")}</Label>
         <Input
           autoComplete="off"
           id="lark-verification-token"
@@ -658,7 +662,7 @@ function LarkWebhookFields({
         />
       </div>
       <div className="grid gap-1.5">
-        <Label htmlFor="lark-encrypt-key">Encrypt Key</Label>
+        <Label htmlFor="lark-encrypt-key">{t("agent.encryptKey")}</Label>
         <Input
           autoComplete="off"
           id="lark-encrypt-key"

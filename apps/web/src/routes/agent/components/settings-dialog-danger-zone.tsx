@@ -6,6 +6,7 @@ import { useState } from "react";
 import { resetAgentState, unpublishAgent } from "@/domains/agent/api/agent-client";
 import { agentKeys } from "@/domains/agent/query/agent-queries";
 import { toAgentDeploymentVersionId, toAgentId, toAppId } from "@/routes/typed-id";
+import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import {
   Dialog,
@@ -30,6 +31,7 @@ function toRuntimeOperationTargetVersion(agent: Agent) {
 }
 
 export function AgentSettingsDangerZone({ agent }: { agent: Agent }) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmResetState, setConfirmResetState] = useState(false);
@@ -240,20 +242,20 @@ export function AgentSettingsDangerZone({ agent }: { agent: Agent }) {
                 <div>
                   <div className="text-foreground font-medium">What will be cleared</div>
                   <ul className="mt-1 list-disc space-y-1 pl-4">
-                    <li>Login state</li>
-                    <li>Cache</li>
-                    <li>Long-term memory</li>
-                    <li>Session runtime directories</li>
-                    <li>Native runtime resume references</li>
+                    <li>{t("agent.loginState")}</li>
+                    <li>{t("agent.cache")}</li>
+                    <li>{t("agent.longTermMemory")}</li>
+                    <li>{t("agent.sessionRuntimeDirs")}</li>
+                    <li>{t("agent.nativeRuntimeResume")}</li>
                   </ul>
                 </div>
                 <div>
                   <div className="text-foreground font-medium">What will be preserved</div>
                   <ul className="mt-1 list-disc space-y-1 pl-4">
-                    <li>Agent profile, prompts, Skills, and MCP refs</li>
-                    <li>Session files</li>
-                    <li>Past sessions and transcripts</li>
-                    <li>Cost history</li>
+                    <li>{t("agent.agentProfile")}</li>
+                    <li>{t("agent.sessionFiles")}</li>
+                    <li>{t("agent.pastSessions")}</li>
+                    <li>{t("agent.costHistory")}</li>
                   </ul>
                 </div>
               </div>

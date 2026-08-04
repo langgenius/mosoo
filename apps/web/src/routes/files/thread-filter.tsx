@@ -2,6 +2,7 @@ import { Check, ChevronDown, Copy } from "lucide-react";
 import type { MouseEvent, ReactElement } from "react";
 import { useState } from "react";
 
+import { useTranslation } from "@/shared/i18n";
 import { writeClipboardText } from "@/shared/lib/clipboard";
 import { Button } from "@/shared/ui/button";
 import {
@@ -33,11 +34,14 @@ export function ThreadFilter({
   sessions,
   value,
 }: ThreadFilterProps): ReactElement {
+  const { t } = useTranslation();
   const [copiedSessionId, setCopiedSessionId] = useState<string | null>(null);
   const selectedSession = sessions.find((session) => session.id === value);
   const agentNameById = new Map(agents.map((agent) => [agent.id, agent.name]));
   const selectedLabel =
-    selectedSession === undefined ? "All Threads" : formatThreadTitle(selectedSession.title);
+    selectedSession === undefined
+      ? t("files.allThreads")
+      : formatThreadTitle(selectedSession.title);
 
   async function handleCopy(
     event: MouseEvent<HTMLButtonElement>,
@@ -63,7 +67,7 @@ export function ThreadFilter({
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
-            aria-label="Thread filter"
+            aria-label={t("files.threadFilter")}
             className="w-full min-w-0 justify-between px-2 font-normal"
             disabled={disabled}
             size="sm"
@@ -85,7 +89,7 @@ export function ThreadFilter({
               onChange("");
             }}
           >
-            <span>All Threads</span>
+            <span>{t("files.allThreads")}</span>
             {value === "" ? <Check className="text-accent-press size-3.5" /> : null}
           </DropdownMenuItem>
           {sessions.map((session) => {

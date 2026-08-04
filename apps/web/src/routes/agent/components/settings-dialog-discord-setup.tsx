@@ -6,6 +6,7 @@ import type { FormEvent } from "react";
 import { createDiscordAgentChannelBinding } from "@/domains/agent/api/agent-client";
 import { useInvalidateAgentChannelBindings } from "@/domains/agent/query/agent-queries";
 import { toAgentId, toAppId } from "@/routes/typed-id";
+import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
@@ -26,6 +27,7 @@ export function DiscordChannelInlineSetup({
   agent: ChannelInlineSetupAgent;
   onSuccess?: () => void;
 }) {
+  const { t } = useTranslation();
   const invalidateChannelBindings = useInvalidateAgentChannelBindings(agent.appId, agent.id);
   const [applicationId, setApplicationId] = useState("");
   const [botToken, setBotToken] = useState("");
@@ -79,7 +81,7 @@ export function DiscordChannelInlineSetup({
         </div>
         <div className="grid gap-4">
           <div className="grid gap-1.5">
-            <Label htmlFor="discord-application-id">Application ID</Label>
+            <Label htmlFor="discord-application-id">{t("agent.applicationId")}</Label>
             <Input
               autoComplete="off"
               id="discord-application-id"
@@ -90,7 +92,7 @@ export function DiscordChannelInlineSetup({
             />
           </div>
           <div className="grid gap-1.5">
-            <Label htmlFor="discord-bot-token">Bot Token</Label>
+            <Label htmlFor="discord-bot-token">{t("agent.botToken")}</Label>
             <Input
               autoComplete="off"
               id="discord-bot-token"

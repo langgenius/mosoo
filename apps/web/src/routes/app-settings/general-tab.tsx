@@ -7,6 +7,7 @@ import { useAppSession } from "@/app/session-provider";
 import { renameApp } from "@/domains/app/api/app-client";
 import { appKeys } from "@/domains/app/query/app-queries";
 import { toAppId } from "@/routes/typed-id";
+import { useTranslation } from "@/shared/i18n";
 import { isTruthy } from "@/shared/lib/truthiness";
 import { Button } from "@/shared/ui/button";
 import { CommandBlock } from "@/shared/ui/command-block";
@@ -21,6 +22,7 @@ export function GeneralTab() {
 }
 
 function GeneralForm({ activeApp }: { activeApp: AppSummary | null }) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
 
   const [name, setName] = useState(activeApp?.name ?? "");
@@ -56,7 +58,7 @@ function GeneralForm({ activeApp }: { activeApp: AppSummary | null }) {
 
   return (
     <>
-      <SettingsTabHeader title="General" />
+      <SettingsTabHeader title={t("settings.general")} />
       <SettingsTabBody>
         <div className="space-y-2">
           <label className="text-foreground text-sm font-medium" htmlFor="app-name">
@@ -66,7 +68,7 @@ function GeneralForm({ activeApp }: { activeApp: AppSummary | null }) {
             The App is your engineering and delivery boundary for Agents and resources.
           </p>
           <input
-            aria-label="App name"
+            aria-label={t("settings.appName")}
             id="app-name"
             type="text"
             value={name}

@@ -3,6 +3,7 @@ import { ChevronRight } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { ReactElement } from "react";
 
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
 import { CopyCheckIcon } from "@/shared/ui/copy-check-icon";
@@ -99,6 +100,7 @@ function SessionTimeline({
 }
 
 function SessionEventLegend({ events }: { events: readonly SessionProcessEvent[] }): ReactElement {
+  const { t } = useTranslation();
   const counts = countSessionTurnDomains(events);
 
   return (
@@ -113,7 +115,7 @@ function SessionEventLegend({ events }: { events: readonly SessionProcessEvent[]
       ))}
       <span className="inline-flex items-center gap-1">
         <span className="border-destructive/40 bg-destructive/40 size-2 rounded-sm border" />
-        <span>Error</span>
+        <span>{t("common.error")}</span>
       </span>
     </div>
   );

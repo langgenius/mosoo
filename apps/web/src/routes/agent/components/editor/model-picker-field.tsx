@@ -3,6 +3,7 @@ import { ChevronDown } from "lucide-react";
 import type { ReactElement } from "react";
 
 import { toAppId } from "@/routes/typed-id";
+import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import {
   DropdownMenu,
@@ -32,6 +33,7 @@ export function ModelPickerField({
   appId: string;
   readOnly: boolean;
 }): ReactElement {
+  const { t } = useTranslation();
   const runtimeId = model.draft.runtime;
   const currentModelId = model.draft.model === "" ? null : model.draft.model;
   const currentVendorId = model.draft.provider === "" ? null : model.draft.provider;
@@ -78,7 +80,7 @@ export function ModelPickerField({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-[var(--anchor-width)]">
-          <DropdownMenuLabel>Available models</DropdownMenuLabel>
+          <DropdownMenuLabel>{t("agent.availableModels")}</DropdownMenuLabel>
           <DropdownMenuSeparator />
           <div className="max-h-[280px] overflow-y-auto">
             {menuIsEmpty ? <ModelPickerEmptyItem /> : null}

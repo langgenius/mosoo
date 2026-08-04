@@ -1,6 +1,7 @@
 import { Code2, ExternalLink, GitBranch } from "lucide-react";
 import { useState } from "react";
 
+import { useTranslation } from "@/shared/i18n";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Separator } from "@/shared/ui/separator";
@@ -35,6 +36,7 @@ function PreviewFrame({
   deployment: DeploymentVM;
   localPreview: LocalDeploymentPreviewState;
 }) {
+  const { t } = useTranslation();
   const localPreviewReady = localPreview.url !== null && localPreview.status === "online";
   const previewLinkUrl = localPreviewReady ? localPreview.url : deployment.liveUrl;
   const previewLabel =
@@ -59,7 +61,7 @@ function PreviewFrame({
               href={previewLinkUrl}
               target="_blank"
               rel="noreferrer"
-              aria-label="Open deployment preview"
+              aria-label={t("deploy.openPreview")}
               className="group focus-visible:ring-ring absolute inset-0 cursor-pointer rounded-lg focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
             >
               <span className="border-border/80 bg-background/92 text-fg-2 group-hover:text-fg-1 group-hover:border-accent absolute top-2 right-2 inline-flex size-8 items-center justify-center rounded-md border opacity-0 shadow-sm backdrop-blur transition group-hover:opacity-100 group-focus-visible:opacity-100">

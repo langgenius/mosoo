@@ -6,6 +6,7 @@ import type { AgentKind } from "@mosoo/contracts/agent";
 import { ChevronDown, Bot, Zap, Lock, Sparkles, Layers, AlertTriangle, Target } from "lucide-react";
 import { useState } from "react";
 
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 
@@ -40,10 +41,11 @@ export function KindSelector({
   onFork?: () => void;
   onLockedCardClick?: (target: AgentKind) => void;
 }) {
+  const { t } = useTranslation();
   const [compareOpen, setCompareOpen] = useState(false);
 
   return (
-    <section aria-label="Agent type" className="border-border-subtle border-b pb-5">
+    <section aria-label={t("agent.agentType")} className="border-border-subtle border-b pb-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-foreground text-[13px] font-semibold">Agent type</h2>
@@ -72,7 +74,7 @@ export function KindSelector({
 
         <div
           role="tablist"
-          aria-label="Agent type"
+          aria-label={t("agent.agentType")}
           className="border-border-subtle bg-bg-1 inline-flex shrink-0 items-center gap-0.5 rounded-md border p-0.5"
         >
           {CARDS.map((card) => {

@@ -1,6 +1,7 @@
 import { MoreHorizontal, RotateCw, Trash2 } from "lucide-react";
 import { useState } from "react";
 
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
 import {
@@ -49,6 +50,7 @@ export function DeployActions({
   scope?: DeployActionScope;
   developmentStatus?: LocalDeploymentPreviewStatus | null;
 }) {
+  const { t } = useTranslation();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const label =
@@ -77,7 +79,7 @@ export function DeployActions({
       </Button>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="icon-sm" aria-label="More deployment actions">
+          <Button variant="outline" size="icon-sm" aria-label={t("deploy.moreActions")}>
             <MoreHorizontal className="size-4" />
           </Button>
         </DropdownMenuTrigger>
@@ -96,7 +98,7 @@ export function DeployActions({
       <Dialog open={confirmingDelete} onOpenChange={setConfirmingDelete}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete this deployment?</DialogTitle>
+            <DialogTitle>{t("deploy.deletePrompt")}</DialogTitle>
             <DialogDescription>
               This removes the deployment for{" "}
               <span className="text-fg-1 font-semibold">{appName}</span>, its Cloudflare Worker, and

@@ -1,5 +1,4 @@
 import type { SupportedLocale } from "./locales";
-import { DEFAULT_LOCALE } from "./locales";
 import { useTranslation } from "./provider";
 
 /**
@@ -8,7 +7,7 @@ import { useTranslation } from "./provider";
  */
 export function useLocale(): SupportedLocale {
   const { i18n } = useTranslation();
-  return i18n.language === "zh-CN" ? "zh-CN" : DEFAULT_LOCALE;
+  return i18n.language;
 }
 
 /**

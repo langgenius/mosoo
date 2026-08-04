@@ -1,6 +1,7 @@
 import { Box, Loader2 } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { AppIdBadge } from "@/shared/ui/app-id-badge";
 import { Badge } from "@/shared/ui/badge";
@@ -35,6 +36,8 @@ function LoadErrorBanner({ className, message }: { className?: string; message: 
 }
 
 function DevelopmentPreviewBadge({ localPreview }: { localPreview: LocalDeploymentPreviewState }) {
+  const { t } = useTranslation();
+
   if (localPreview.url === null) {
     return null;
   }
@@ -57,10 +60,12 @@ function DevelopmentPreviewBadge({ localPreview }: { localPreview: LocalDeployme
     );
   }
 
-  return <Badge variant="outline">Development offline</Badge>;
+  return <Badge variant="outline">{t("deploy.developmentOffline")}</Badge>;
 }
 
 function ProductionEnvironmentBadge({ status }: { status: ProductionEnvironmentStatus }) {
+  const { t } = useTranslation();
+
   if (status === "live") {
     return (
       <Badge variant="success">
@@ -79,7 +84,7 @@ function ProductionEnvironmentBadge({ status }: { status: ProductionEnvironmentS
     );
   }
 
-  return <Badge variant="danger">Production unavailable</Badge>;
+  return <Badge variant="danger">{t("deploy.productionUnavailable")}</Badge>;
 }
 
 /**

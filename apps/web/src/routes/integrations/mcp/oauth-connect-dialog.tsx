@@ -2,6 +2,7 @@ import type { McpOAuthFlowState, StartMcpOAuthPayload } from "@mosoo/contracts/m
 import { Check, ExternalLink, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import {
   Dialog,
@@ -42,6 +43,7 @@ export function OAuthConnectDialog({
   onPollOAuthFlow,
   onStartOAuth,
 }: Props) {
+  const { t } = useTranslation();
   const [stage, setStage] = useState<Stage>("confirm");
   const [token, setToken] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -194,7 +196,7 @@ export function OAuthConnectDialog({
 
         {isBearer ? (
           <div className="space-y-1.5 py-2">
-            <Label htmlFor="bearer-token">Bearer Token</Label>
+            <Label htmlFor="bearer-token">{t("mcp.bearerToken")}</Label>
             <Input
               id="bearer-token"
               type="password"
@@ -202,7 +204,7 @@ export function OAuthConnectDialog({
               onChange={(e) => {
                 setToken(e.target.value);
               }}
-              placeholder="Paste token"
+              placeholder={t("mcp.bearerTokenPlaceholder")}
             />
           </div>
         ) : stage === "confirm" ? (

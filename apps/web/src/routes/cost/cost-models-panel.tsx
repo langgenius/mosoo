@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 
 import {
@@ -14,6 +15,7 @@ import {
 import type { CostModelRow } from "./cost-model";
 
 export function CostModelsPanel({ models }: { models: CostModelRow[] }) {
+  const { t } = useTranslation();
   const totalCost = models.reduce((sum, model) => sum + model.totalCostUsd, 0);
   const vendors = summarizeCostVendors(models);
 
@@ -61,11 +63,11 @@ export function CostModelsPanel({ models }: { models: CostModelRow[] }) {
 
       <div className="border-border bg-card overflow-x-auto rounded-lg border">
         <div className="border-border bg-muted/30 text-muted-foreground grid min-w-[980px] grid-cols-[minmax(180px,1.2fr)_110px_100px_120px_90px_120px_120px_100px_100px] border-b px-4 py-2 text-[11px] font-semibold tracking-[0.12em] uppercase">
-          <div>Model</div>
-          <div>Vendor</div>
-          <div>Requests</div>
-          <div>Tokens</div>
-          <div>Cache hit</div>
+          <div>{t("cost.model")}</div>
+          <div>{t("cost.vendor")}</div>
+          <div>{t("cost.requests")}</div>
+          <div>{t("cost.tokens")}</div>
+          <div>{t("cost.cacheHit")}</div>
           <div>Input / Output</div>
           <div>Cache R / W</div>
           <div className="text-right">Cost</div>

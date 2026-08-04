@@ -45,7 +45,7 @@ const HELP_MENU_SOURCE = readFileSync(
 
 describe("mobile console boundaries", () => {
   test("App and Org shells expose a discoverable mobile navigation drawer", () => {
-    expect(APP_SHELL_SOURCE).toContain('aria-label="Open navigation"');
+    expect(APP_SHELL_SOURCE).toContain('aria-label={t("apps.openNavigation")}');
     expect(APP_SHELL_SOURCE).toContain("mobileSidebar");
     expect(APP_SHELL_SOURCE).toContain('className="md:hidden"');
     expect(APP_SHELL_SOURCE).toContain("left-0");

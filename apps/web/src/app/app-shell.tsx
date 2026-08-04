@@ -94,7 +94,7 @@ function AppSwitcher({
   const trigger = (
     <button
       type="button"
-      aria-label="Switch app"
+      aria-label={t("apps.switchApp")}
       className={cn(
         "border-border bg-background text-foreground hover:border-border-strong flex items-center rounded-md border text-[13px] font-semibold transition-colors",
         collapsed ? "mx-auto mb-3 size-9 justify-center" : "mx-0.5 mb-4 gap-2 px-2.5 py-2",
@@ -124,7 +124,7 @@ function AppSwitcher({
         className="w-[224px] rounded-lg p-1"
       >
         <DropdownMenuLabel className="text-fg-3 px-2 py-1 text-[10.5px] font-semibold tracking-wider uppercase">
-          Apps
+          {t("pageTitle.apps")}
         </DropdownMenuLabel>
         {apps.map((app) => (
           <DropdownMenuItem
@@ -208,6 +208,7 @@ function MobileNavigation({
   title?: string | null;
 }) {
   const location = useLocation();
+  const { t } = useTranslation();
   const navigationLocation = `${location.pathname}${location.search}`;
   const [openedAtLocation, setOpenedAtLocation] = useState<string | null>(null);
   const open = openedAtLocation === navigationLocation;
@@ -239,7 +240,7 @@ function MobileNavigation({
     <div className="md:hidden">
       <header className="border-border-soft bg-background flex h-14 shrink-0 items-center gap-3 border-b px-4">
         <button
-          aria-label="Open navigation"
+          aria-label={t("apps.openNavigation")}
           className="text-fg-2 hover:bg-ink-900/[0.04] hover:text-fg-1 flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-md px-2 transition-colors"
           onClick={() => {
             setOpenedAtLocation(navigationLocation);
@@ -417,6 +418,7 @@ export function Layout({ children }: { children: ReactNode }) {
 // dedicated Org sidebar. Deliberately distinct from the App shell so the Apps
 // list / pre-App console reads as the account layer, not an App detail page.
 export function OrgLayout({ children }: { children: ReactNode }) {
+  const { t } = useTranslation();
   const { activeOrganization } = useAppSession();
   const location = useLocation();
   const headerTitle = getOrgHeaderTitle(location.pathname);
@@ -426,7 +428,7 @@ export function OrgLayout({ children }: { children: ReactNode }) {
       <div className="bg-background flex h-dvh flex-col">
         <header className="border-border-soft hidden shrink-0 border-b md:flex">
           <div className="flex min-h-[76px] w-[224px] shrink-0 items-center gap-2 px-4">
-            <Link to="/apps" aria-label="Apps" className="flex items-center">
+            <Link to="/apps" aria-label={t("pageTitle.apps")} className="flex items-center">
               <img src="/brand/logo-mark.svg" alt="mosoo" className="block size-6" />
             </Link>
             {activeOrganization === null ? null : (

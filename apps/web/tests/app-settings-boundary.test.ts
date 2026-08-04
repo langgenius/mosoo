@@ -22,8 +22,8 @@ describe("App settings boundary", () => {
     const routeRegistry = readSource("../src/app/route-registry.tsx");
     const settingsNav = readSource("../src/routes/settings/settings-nav.tsx");
 
-    expect(settingsNav).toContain('label: "Profile"');
-    expect(settingsNav).toContain('label: "API tokens"');
+    expect(settingsNav).toContain('labelKey: "settings.profile"');
+    expect(settingsNav).toContain('labelKey: "settings.accessTokens"');
     expect(settingsNav).not.toContain('label: "App usage"');
     expect(settingsNav).not.toContain('label: "App"');
     expect(settingsNav).not.toContain('path: "/settings/usage"');
@@ -42,7 +42,7 @@ describe("App settings boundary", () => {
     const routeRegistry = readSource("../src/app/route-registry.tsx");
     const primaryNav = readSource("../src/app/navigation.tsx");
 
-    expect(settingsNav).toContain('label: "Account"');
+    expect(settingsNav).toContain('labelKey: "settings.account"');
     expect(settingsNav).not.toContain('label: "General"');
     expect(settingsNav).not.toContain('path: "/settings/app"');
     expect(primaryNav).toContain('t("nav.settings")');

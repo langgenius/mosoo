@@ -2,6 +2,7 @@ import { Compass, Library, Search, Sparkles, Upload } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
 import { EmptyState } from "@/shared/ui/empty-state";
@@ -19,6 +20,7 @@ type SkillsTabMode = "discover" | "installed";
 
 export function SkillsTab() {
   const registry = useSkillRegistry();
+  const { t } = useTranslation();
   const [search, setSearch] = useState("");
   const [mode, setMode] = useState<SkillsTabMode>("installed");
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -55,7 +57,10 @@ export function SkillsTab() {
 
   return (
     <div className="flex h-full flex-col">
-      <PageHeader title="Skills" description="Reusable capabilities you can attach to Agents.">
+      <PageHeader
+        title={t("skills.title")}
+        description="Reusable capabilities you can attach to Agents."
+      >
         <Button
           onClick={() => {
             setUploadOpen(true);
@@ -70,13 +75,13 @@ export function SkillsTab() {
       <div className="flex shrink-0 flex-wrap items-center gap-3 px-4 pb-4 sm:px-8">
         <div
           role="tablist"
-          aria-label="Skill view"
+          aria-label={t("skills.skillView")}
           className="border-border-subtle inline-flex h-8 items-center gap-5 border-b"
         >
           <SkillsModeButton
             active={mode === "installed"}
             icon={Library}
-            label="Installed"
+            label={t("skills.installed")}
             onClick={() => {
               setMode("installed");
             }}
@@ -84,7 +89,7 @@ export function SkillsTab() {
           <SkillsModeButton
             active={mode === "discover"}
             icon={Compass}
-            label="Discover"
+            label={t("skills.discover")}
             onClick={() => {
               setMode("discover");
             }}
@@ -218,12 +223,14 @@ function SkillsModeButton({
 }
 
 function SkillsEmptyState({ onUpload, searching }: { onUpload: () => void; searching: boolean }) {
+  const { t } = useTranslation();
+
   if (searching) {
     return (
       <EmptyState
         icon={Search}
-        title="No matching skills"
-        description="Try a different search term."
+        title={t("skills.noMatchingTitle")}
+        description={t("skills.noMatchingDescription")}
       />
     );
   }
@@ -231,7 +238,7 @@ function SkillsEmptyState({ onUpload, searching }: { onUpload: () => void; searc
   return (
     <EmptyState
       icon={Sparkles}
-      title="No skills yet"
+      title={t("skills.noSkillsYet")}
       description="Upload a `SKILL.md` file, import from GitHub or skills.sh, or fork an existing skill."
     >
       <Button onClick={onUpload} size="sm">

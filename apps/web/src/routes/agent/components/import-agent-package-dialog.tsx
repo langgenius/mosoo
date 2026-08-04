@@ -8,6 +8,7 @@ import { importAgentPackage } from "@/domains/agent/api/agent-client";
 import { agentKeys } from "@/domains/agent/query/agent-queries";
 import { uploadAgentPackageFile } from "@/domains/file/api/agent-package-file-client";
 import { toAppId } from "@/routes/typed-id";
+import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import {
   Dialog,
@@ -32,6 +33,7 @@ export function ImportAgentPackageDialog({
   open: boolean;
   appId: string | null;
 }): ReactElement {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [packageFileId, setPackageFileId] = useState<FileId | null>(null);
@@ -112,7 +114,7 @@ export function ImportAgentPackageDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-hidden p-0 sm:max-w-[720px]">
         <DialogHeader className="px-6 pt-6">
-          <DialogTitle>Import agent</DialogTitle>
+          <DialogTitle>{t("agent.importAgent")}</DialogTitle>
           <DialogDescription>
             Upload a portable .agent file to create a new draft in this App.
           </DialogDescription>
@@ -121,7 +123,7 @@ export function ImportAgentPackageDialog({
         <div className="space-y-4 overflow-y-auto px-6 pb-2">
           <input
             accept=".agent"
-            aria-label="Upload agent package file"
+            aria-label={t("agent.uploadAgentPackage")}
             className="hidden"
             disabled={uploading || importMutation.isPending || Boolean(importedAgentId)}
             onChange={(event) => void handleFileChange(event)}
@@ -184,7 +186,7 @@ export function ImportAgentPackageDialog({
 
         <DialogFooter className="border-border border-t px-6 py-4">
           {isTruthy(importedAgentId) ? (
-            <Button onClick={openImportedAgent}>Open draft</Button>
+            <Button onClick={openImportedAgent}>{t("agent.openDraft")}</Button>
           ) : (
             <Button
               disabled={

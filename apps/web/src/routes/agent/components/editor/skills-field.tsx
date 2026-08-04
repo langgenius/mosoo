@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { ReactElement } from "react";
 import { Link } from "react-router-dom";
 
+import { useTranslation } from "@/shared/i18n";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,6 +40,7 @@ export function AgentSkillsField({
   setSkills,
   appId,
 }: AgentSkillsFieldProps): ReactElement {
+  const { t } = useTranslation();
   const model = useAgentSkillsFieldModel({
     appId,
     selectedSkills,
@@ -60,6 +62,7 @@ export function AgentSkillsField({
     noOptions,
     onAdd: handleAddSkill,
     selectedSkills,
+    t,
   });
 
   return (
@@ -163,11 +166,13 @@ function renderSkillsDropdownContent({
   noOptions,
   onAdd,
   selectedSkills,
+  t,
 }: {
   model: ReturnType<typeof useAgentSkillsFieldModel>;
   noOptions: boolean;
   onAdd(skill: SkillSummary): void;
   selectedSkills: SkillInfo[];
+  t: ReturnType<typeof useTranslation>["t"];
 }): ReactElement {
   if (model.skillsError) {
     return (
@@ -188,7 +193,11 @@ function renderSkillsDropdownContent({
 
   return (
     <>
-      <SkillPickerGroup label="App skills" onAdd={onAdd} skills={model.availablePersonalSkills} />
+      <SkillPickerGroup
+        label={t("agent.appSkills")}
+        onAdd={onAdd}
+        skills={model.availablePersonalSkills}
+      />
     </>
   );
 }

@@ -4,6 +4,7 @@ import type { ReactElement } from "react";
 
 import { useAppSession } from "@/app/session-provider";
 import type { ListedFileEntry } from "@/domains/file/api/files";
+import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import { EmptyState } from "@/shared/ui/empty-state";
 import { ListPageContent, ListPageToolbar, ListPageToolbarSpacer } from "@/shared/ui/list-page";
@@ -56,6 +57,7 @@ function ThreadsWorkspace({
   viewerImage,
   viewerName,
 }: ThreadsWorkspaceProps): ReactElement {
+  const { t } = useTranslation();
   const route = useThreadRouteState();
   const ui = useThreadUiState({
     appId: activeAppId,
@@ -165,10 +167,7 @@ function ThreadsWorkspace({
 
   return (
     <div className="bg-background flex h-full flex-1 flex-col overflow-hidden">
-      <PageHeader
-        title="Threads"
-        description="Dispatch agents and track progress. Reopen threads by replying asynchronously."
-      >
+      <PageHeader title={t("threads.threadsTitle")} description={t("threads.threadsDescription")}>
         <Button onClick={route.openComposeDialog} size="sm">
           <Plus className="size-3.5" />
           New thread
@@ -213,8 +212,8 @@ function ThreadsWorkspace({
           <div className="py-12">
             <EmptyState
               icon={Inbox}
-              title="No matching threads"
-              description="Try another filter."
+              title={t("threads.noMatchingTitle")}
+              description={t("threads.tryAnotherFilter")}
             />
           </div>
         ) : (

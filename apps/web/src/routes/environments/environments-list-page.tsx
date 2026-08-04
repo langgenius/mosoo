@@ -14,6 +14,7 @@ import {
   useAppEnvironmentsQuery,
 } from "@/domains/environment/query/environment-queries";
 import { toEnvironmentId, toAppId } from "@/routes/typed-id";
+import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import { EmptyState } from "@/shared/ui/empty-state";
 import { ListPageContent, ListPageSearch, ListPageToolbar } from "@/shared/ui/list-page";
@@ -24,6 +25,7 @@ import { EnvironmentListTable } from "./environment-list-table";
 import { filterEnvironments } from "./environments-list-model";
 
 export function EnvironmentsListPage() {
+  const { t } = useTranslation();
   const { activeAppId } = useAppSession();
   const appId = activeAppId;
   const environmentsQuery = useAppEnvironmentsQuery(appId);
@@ -102,7 +104,10 @@ export function EnvironmentsListPage() {
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
-      <PageHeader title="Environments" description="Runtime templates that Agents can run inside.">
+      <PageHeader
+        title={t("environments.title")}
+        description="Runtime templates that Agents can run inside."
+      >
         <Button
           onClick={() => {
             setCreateOpen(true);
@@ -138,8 +143,8 @@ export function EnvironmentsListPage() {
         ) : filteredEnvironments.length === 0 ? (
           <EmptyState
             icon={Box}
-            title="No environments yet"
-            description="Create an environment to define the runtime your Agents run inside."
+            title={t("environments.noEnvironments")}
+            description={t("environments.noEnvironmentsDescription")}
             action={
               <Button
                 onClick={() => {

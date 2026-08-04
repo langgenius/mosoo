@@ -23,6 +23,7 @@ import type { ReactElement } from "react";
 import type { ListedFileEntry } from "@/domains/file/api/files";
 import { triggerAgentSessionPrewarm } from "@/domains/session/api/agent-session";
 import { toSessionId } from "@/routes/typed-id";
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -174,9 +175,16 @@ function ThreadDetailHeader({
   threadActionCapabilities: ReturnType<typeof getThreadActionCapabilities>;
   working: boolean;
 }): ReactElement {
+  const { t } = useTranslation();
+
   return (
     <div className="border-border-subtle flex h-12 shrink-0 items-center gap-2 border-b px-4">
-      <Button size="icon-sm" variant="ghost" onClick={onBack} aria-label="Back to threads">
+      <Button
+        size="icon-sm"
+        variant="ghost"
+        onClick={onBack}
+        aria-label={t("threads.backToThreads")}
+      >
         <ArrowLeft className="size-4" />
       </Button>
       <div className="text-fg-3 flex min-w-0 items-center gap-1.5 text-[12px]">
@@ -197,12 +205,12 @@ function ThreadDetailHeader({
           >
             <button
               type="button"
-              aria-label="Open event flow"
-              title="Open event flow"
+              aria-label={t("threads.openEventFlow")}
+              title={t("threads.openEventFlow")}
               onClick={onOpenProcess}
             >
               <ThreadStateIcon glyph={stateGlyph} />
-              <span>Working</span>
+              <span>{t("threads.working")}</span>
             </button>
           </Badge>
         ) : thread.failed ? (
@@ -214,7 +222,7 @@ function ThreadDetailHeader({
               onClick={onOpenProcess}
             >
               <ThreadStateIcon glyph={stateGlyph} />
-              <span>Failed</span>
+              <span>{t("threads.failed")}</span>
             </button>
           </Badge>
         ) : (
@@ -237,7 +245,7 @@ function ThreadDetailHeader({
         ) : null}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button size="icon-sm" variant="ghost" aria-label="More actions">
+            <Button size="icon-sm" variant="ghost" aria-label={t("common.moreActions")}>
               <MoreHorizontal className="size-4" />
             </Button>
           </DropdownMenuTrigger>
@@ -288,6 +296,8 @@ function ThreadReplyComposer({
   thread: ThreadListItem;
   threadActionCapabilities: ReturnType<typeof getThreadActionCapabilities>;
 }): ReactElement {
+  const { t } = useTranslation();
+
   return (
     <div className="border-border-subtle bg-background shrink-0 border-t px-6 py-4">
       <div className="mx-auto max-w-[760px]">
@@ -330,7 +340,7 @@ function ThreadReplyComposer({
             type="button"
             size="icon-xs"
             variant="ghost"
-            aria-label="Attach files"
+            aria-label={t("threads.attachFiles")}
             className="text-fg-3 shrink-0"
             disabled
           >
@@ -398,6 +408,7 @@ export function ThreadDetail({
   thread: ThreadListItem;
   viewer: ViewerInfo;
 }): ReactElement {
+  const { t } = useTranslation();
   const [reply, setReply] = useState("");
   const [processOpen, setProcessOpen] = useState(false);
   const [previewArtifact, setPreviewArtifact] = useState<ListedFileEntry | null>(null);
@@ -491,8 +502,8 @@ export function ThreadDetail({
           ) : activityMessages.length === 0 && firstUserMessage === null ? (
             <EmptyState
               icon={Inbox}
-              title="No messages yet"
-              description="This thread exists, but no durable message has been recorded."
+              title={t("threads.noMessagesTitle")}
+              description={t("threads.noMessagesDescription")}
             />
           ) : activityMessages.length > 0 ? (
             <div className="mt-6">
@@ -557,15 +568,17 @@ export function ThreadDetail({
 }
 
 export function ThreadsMissingDetail({ onBack }: { onBack: () => void }): ReactElement {
+  const { t } = useTranslation();
+
   return (
     <div className="bg-background flex h-full min-w-0 flex-1 items-center justify-center">
       <EmptyState
         icon={Inbox}
-        title="Thread no longer exists"
-        description="It may have been deleted or removed from this App."
+        title={t("threads.threadNoLongerExists")}
+        description={t("threads.threadDeletedDescription")}
       >
         <Button onClick={onBack} size="sm" variant="outline">
-          Back to threads
+          {t("threads.backToThreads")}
         </Button>
       </EmptyState>
     </div>

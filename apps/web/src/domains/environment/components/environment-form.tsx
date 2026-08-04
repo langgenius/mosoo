@@ -1,6 +1,7 @@
 import { isWritableEnvironmentPackageManager } from "@mosoo/contracts/environment";
 import { Check, Plus, Trash2 } from "lucide-react";
 
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
@@ -32,11 +33,13 @@ function EnvironmentPackagesSection({
   packageManagerError: string | null;
   packages: EditablePackageRow[];
 }) {
+  const { t } = useTranslation();
+
   return (
     <EnvironmentFormSection
       action={
         <Button
-          aria-label="Add package"
+          aria-label={t("environments.addPackage")}
           className="size-8"
           disabled={disabled}
           onClick={onAdd}
@@ -47,8 +50,8 @@ function EnvironmentPackagesSection({
           <Plus className="size-4" />
         </Button>
       }
-      description="Public packages with exact versions. npm provides CLIs and CommonJS require; Node ESM imports require a project-local install. PyPI provides Python imports and scripts."
-      title="Packages"
+      description={t("environments.packagesDescription")}
+      title={t("environments.packages")}
     >
       <div className="environment-scroll-area max-h-[220px] space-y-2 overflow-y-auto pr-1">
         {packages.map((row) => (
@@ -67,7 +70,7 @@ function EnvironmentPackagesSection({
               value={row.manager}
             />
             <Input
-              aria-label="Package name and version"
+              aria-label={t("environments.packageNameVersion")}
               className={cn(
                 "font-mono text-[12px]",
                 row.packagesText.trim() &&
@@ -86,7 +89,7 @@ function EnvironmentPackagesSection({
               value={row.packagesText}
             />
             <Button
-              aria-label="Remove package"
+              aria-label={t("environments.removePackage")}
               className="text-fg-3 hover:text-destructive size-9"
               disabled={disabled}
               onClick={() => {
@@ -122,13 +125,14 @@ function EnvironmentVariablesSection({
   onChange: (transform: (current: EnvironmentDraft) => EnvironmentDraft) => void;
   onRemove: (id: string) => void;
 }) {
+  const { t } = useTranslation();
   const envVarCount = envVars.length;
 
   return (
     <EnvironmentFormSection
       action={
         <Button
-          aria-label="Add environment variable"
+          aria-label={t("environments.addEnvVar")}
           className="size-8"
           disabled={disabled}
           onClick={onAdd}
@@ -139,8 +143,8 @@ function EnvironmentVariablesSection({
           <Plus className="size-4" />
         </Button>
       }
-      description="Values are encrypted after save. Existing values can stay blank."
-      title="Environment variables"
+      description={t("environments.envVarsDescription")}
+      title={t("environments.envVars")}
     >
       <div className="environment-scroll-area max-h-[220px] space-y-2 overflow-y-auto pr-1">
         {envVarCount === 0 ? (
@@ -155,7 +159,7 @@ function EnvironmentVariablesSection({
             key={envVar.id}
           >
             <Input
-              aria-label="Variable name"
+              aria-label={t("environments.varName")}
               className="font-mono text-[12px]"
               disabled={disabled}
               onChange={(event) => {
@@ -172,7 +176,7 @@ function EnvironmentVariablesSection({
               value={envVar.key}
             />
             <Input
-              aria-label="Variable value"
+              aria-label={t("environments.varValue")}
               className="font-mono text-[12px]"
               disabled={disabled}
               onChange={(event) => {
@@ -196,7 +200,7 @@ function EnvironmentVariablesSection({
               value={envVar.value}
             />
             <Button
-              aria-label="Remove environment variable"
+              aria-label={t("environments.removeEnvVar")}
               className="text-fg-3 hover:text-destructive size-9"
               disabled={disabled}
               onClick={() => {
@@ -230,6 +234,7 @@ export function EnvironmentForm({
   onSubmit: () => void;
   submitLabel: string;
 }) {
+  const { t } = useTranslation();
   const limited = draft.networkPolicy === "limited";
   const packageManagerError = getPackageManagerError(draft.packages);
 
@@ -285,12 +290,12 @@ export function EnvironmentForm({
   return (
     <div className="space-y-5">
       <EnvironmentFormSection
-        description="Name this reusable runtime container template."
-        title="Basics"
+        description={t("environments.basicsDescription")}
+        title={t("environments.basics")}
       >
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1.5">
-            <Label>Name</Label>
+            <Label>{t("environments.name")}</Label>
             <Input
               disabled={disabled}
               onChange={(event) => {
@@ -304,7 +309,7 @@ export function EnvironmentForm({
             />
           </div>
           <div className="space-y-1.5">
-            <Label>Description</Label>
+            <Label>{t("environments.description")}</Label>
             <Input
               disabled={disabled}
               onChange={(event) => {
@@ -313,7 +318,7 @@ export function EnvironmentForm({
                   description: event.target.value,
                 }));
               }}
-              placeholder="Runtime template for analysis agents"
+              placeholder={t("environments.templatePlaceholder")}
               value={draft.description}
             />
           </div>
@@ -321,12 +326,12 @@ export function EnvironmentForm({
       </EnvironmentFormSection>
 
       <EnvironmentFormSection
-        description="Limited is enforced only for Task Agent session sandboxes. It denies egress by default and allows the listed hosts plus Mosoo control and artifact endpoints. Assistant Agents cannot start with Limited; local development also fails closed."
-        title="Networking"
+        description={t("environments.networkingDescription")}
+        title={t("environments.networking")}
       >
         <div className="space-y-3">
           <div className="space-y-1.5">
-            <Label>Type</Label>
+            <Label>{t("environments.type")}</Label>
             <NetworkPolicySelect
               disabled={disabled}
               onChange={(networkPolicy) => {
@@ -376,7 +381,7 @@ export function EnvironmentForm({
                 />
               </label>
               <div className="space-y-1.5">
-                <Label>Allowed hosts</Label>
+                <Label>{t("environments.allowedHosts")}</Label>
                 <Textarea
                   className="min-h-[96px] font-mono text-[12px]"
                   disabled={disabled}
@@ -405,8 +410,8 @@ export function EnvironmentForm({
       />
 
       <EnvironmentFormSection
-        description="Runs after prepared packages are restored in every new Sandbox. Do not install persistent dependencies here."
-        title="Setup script"
+        description={t("environments.setupScriptDescription")}
+        title={t("environments.setupScript")}
       >
         <Textarea
           className="min-h-[110px] font-mono text-[12px]"

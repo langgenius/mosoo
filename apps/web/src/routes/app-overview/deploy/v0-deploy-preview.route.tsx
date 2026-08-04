@@ -1,6 +1,7 @@
 import { CircleAlert } from "lucide-react";
 
 import { Layout } from "@/app/app-shell";
+import { useTranslation } from "@/shared/i18n";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 
@@ -19,6 +20,7 @@ import { useDeployConsole } from "./use-deploy-console";
  * the demo control in the header showcases the failed state.
  */
 export function V0DeployPreviewPage() {
+  const { t } = useTranslation();
   const demo = useDeployConsole();
   const { deployment } = demo.state;
 
@@ -30,7 +32,7 @@ export function V0DeployPreviewPage() {
         deploy={demo}
         deployError={null}
         emptyHero={<AppOverviewInstallGuide />}
-        headerBadges={<Badge variant="soil">Demo data</Badge>}
+        headerBadges={<Badge variant="soil">{t("deploy.demoData")}</Badge>}
         headerActions={
           deployment === null || demo.deploying ? null : (
             <Button variant="outline" size="sm" onClick={demo.failDeploy}>

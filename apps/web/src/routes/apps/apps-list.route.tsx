@@ -8,6 +8,7 @@ import { useAppSession } from "@/app/session-provider";
 import { useVisibleAgentsQuery } from "@/domains/agent/query/agent-queries";
 import { createApp } from "@/domains/app/api/app-client";
 import { appKeys } from "@/domains/app/query/app-queries";
+import { useTranslation } from "@/shared/i18n";
 import { AppIdBadge } from "@/shared/ui/app-id-badge";
 import { Button } from "@/shared/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
@@ -58,6 +59,7 @@ function AppCard({
 // Each App is a top-level resource boundary; selecting one enters its App
 // console. Creating an App calls the createApp mutation, then switches into it.
 export function AppsListPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { activeApp, activeOrganization, apps, appsLoading, setActiveApp } = useAppSession();
@@ -129,7 +131,7 @@ export function AppsListPage() {
             }}
           >
             <Plus className="size-3.5" />
-            New app
+            {t("apps.new")}
           </Button>
         </div>
 
@@ -172,7 +174,7 @@ export function AppsListPage() {
       >
         <DialogContent className="sm:max-w-[420px]">
           <DialogHeader>
-            <DialogTitle>New app</DialogTitle>
+            <DialogTitle>{t("apps.new")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-2">
             <label htmlFor="new-app-name" className="text-foreground text-sm font-medium">

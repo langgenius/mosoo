@@ -8,6 +8,7 @@ import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
 import type { ReactElement, RefObject } from "react";
 
 import "@xterm/xterm/css/xterm.css";
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
 
@@ -246,6 +247,7 @@ function getConnectionTone(state: ConnectionState): string {
 }
 
 export function TerminalMode({ agent }: { agent: Agent }): ReactElement {
+  const { t } = useTranslation();
   const { connectionError, connectionState, containerRef, reconnect } =
     useOwnerDebugTerminalController(agent.id);
   const runtimePolicy = getAgentKindRuntimePolicy(agent.kind);
@@ -274,7 +276,7 @@ export function TerminalMode({ agent }: { agent: Agent }): ReactElement {
             <span>{getConnectionLabel(connectionState)}</span>
           </div>
           <Button
-            aria-label="Reconnect owner debug terminal"
+            aria-label={t("agent.reconnectDebugTerminal")}
             className="border-white/10 bg-white/[0.04] text-white/70 hover:bg-white/10 hover:text-white"
             onClick={reconnect}
             size="icon-sm"

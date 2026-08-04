@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { ReactElement } from "react";
 import { Link } from "react-router-dom";
 
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
 import {
@@ -43,6 +44,8 @@ export function EnvironmentListTable({
   onDelete,
   onSetDefault,
 }: EnvironmentListTableProps): ReactElement {
+  const { t } = useTranslation();
+
   // Delete is destructive and irreversible, so it sits behind a confirm dialog
   // (same convention as deleting a deployment in deploy-actions.tsx).
   const [confirmingDelete, setConfirmingDelete] = useState<EnvironmentSummary | null>(null);
@@ -92,7 +95,7 @@ export function EnvironmentListTable({
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
-                aria-label="Environment actions"
+                aria-label={t("environments.actions")}
                 className="size-8"
                 size="icon"
                 variant="ghost"
@@ -102,7 +105,7 @@ export function EnvironmentListTable({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem asChild>
-                <Link to={`/environment/${environment.id}`}>Open</Link>
+                <Link to={`/environment/${environment.id}`}>{t("common.open")}</Link>
               </DropdownMenuItem>
               {environment.canEdit && !environment.isDefault ? (
                 <DropdownMenuItem
@@ -141,7 +144,7 @@ export function EnvironmentListTable({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete this environment?</DialogTitle>
+            <DialogTitle>{t("environments.deletePrompt")}</DialogTitle>
             <DialogDescription>
               This permanently deletes{" "}
               <span className="text-fg-1 font-semibold">{confirmingDelete?.name}</span> from this

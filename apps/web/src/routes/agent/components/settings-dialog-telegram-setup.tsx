@@ -6,6 +6,7 @@ import type { FormEvent } from "react";
 import { createTelegramAgentChannelBinding } from "@/domains/agent/api/agent-client";
 import { useInvalidateAgentChannelBindings } from "@/domains/agent/query/agent-queries";
 import { toAgentId, toAppId } from "@/routes/typed-id";
+import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
@@ -19,6 +20,7 @@ export function TelegramChannelInlineSetup({
   agent: ChannelInlineSetupAgent;
   onSuccess?: () => void;
 }) {
+  const { t } = useTranslation();
   const invalidateChannelBindings = useInvalidateAgentChannelBindings(agent.appId, agent.id);
   const [botToken, setBotToken] = useState("");
   const [webhookSecret, setWebhookSecret] = useState("");
@@ -57,7 +59,7 @@ export function TelegramChannelInlineSetup({
       <section className="border-border bg-card rounded-lg border p-4">
         <div className="grid gap-4">
           <div className="grid gap-1.5">
-            <Label htmlFor="telegram-bot-token">Bot Token</Label>
+            <Label htmlFor="telegram-bot-token">{t("agent.botToken")}</Label>
             <Input
               autoComplete="off"
               id="telegram-bot-token"
@@ -69,7 +71,7 @@ export function TelegramChannelInlineSetup({
             />
           </div>
           <div className="grid gap-1.5">
-            <Label htmlFor="telegram-webhook-secret">Webhook Secret</Label>
+            <Label htmlFor="telegram-webhook-secret">{t("agent.webhookSecret")}</Label>
             <Input
               autoComplete="off"
               id="telegram-webhook-secret"

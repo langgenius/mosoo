@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Badge } from "@/shared/ui/badge";
 
@@ -24,6 +25,7 @@ export function CostOverviewPanel({
   range: CostRange;
   setActiveTab: (tab: CostTab) => void;
 }) {
+  const { t } = useTranslation();
   const totals = card?.totals;
   const previousTotals = card?.previousTotals;
 
@@ -72,7 +74,7 @@ export function CostOverviewPanel({
         <div className="border-border bg-card rounded-lg border p-4">
           <h2 className="text-foreground mb-3 text-sm font-semibold">Top agents</h2>
           {(card?.agents ?? []).length === 0 ? (
-            <PanelEmpty>No agent spend in this range.</PanelEmpty>
+            <PanelEmpty>{t("cost.noAgentSpend")}</PanelEmpty>
           ) : null}
           <div className="space-y-2">
             {(card?.agents ?? []).slice(0, 5).map((agent) => (
@@ -101,7 +103,7 @@ export function CostOverviewPanel({
         <div className="border-border bg-card rounded-lg border p-4">
           <h2 className="text-foreground mb-3 text-sm font-semibold">Spend by model</h2>
           {(card?.models ?? []).length === 0 ? (
-            <PanelEmpty>No model spend in this range.</PanelEmpty>
+            <PanelEmpty>{t("cost.noModelSpend")}</PanelEmpty>
           ) : null}
           <div className="space-y-3">
             {(card?.models ?? []).slice(0, 5).map((model) => {

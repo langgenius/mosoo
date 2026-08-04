@@ -18,6 +18,7 @@ import { canUseCustomEndpoint } from "@/domains/vendor-credential/model/provider
 import { getErrorMessage } from "@/domains/vendor-credential/model/provider-credential-error";
 import { formatProviderErrorMessage } from "@/domains/vendor-credential/model/provider-readiness-copy";
 import { toAppId, toVendorCredentialId } from "@/routes/typed-id";
+import { useTranslation } from "@/shared/i18n";
 import { VendorIcon, hasVendorIcon } from "@/shared/ui/brand-icons";
 import { Button } from "@/shared/ui/button";
 import {
@@ -130,6 +131,7 @@ function credentialsByVendor(
 }
 
 export function ProvidersTab({ appId }: { appId: string }): ReactElement {
+  const { t } = useTranslation();
   const typedAppId = toAppId(appId);
   const queryClient = useQueryClient();
   const [form, setForm] = useState<CredentialForm>(EMPTY_FORM);
@@ -297,8 +299,8 @@ export function ProvidersTab({ appId }: { appId: string }): ReactElement {
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <PageHeader
         className="border-border-subtle border-b"
-        title="Providers"
-        description="Provider keys are stored and resolved inside the active App."
+        title={t("providers.title")}
+        description={t("providers.description")}
       >
         <Button onClick={() => startCreate(CUSTOM_PROVIDER_VENDOR_ID)} size="sm" variant="outline">
           <Plus className="size-3.5" />
@@ -398,6 +400,7 @@ function ProviderCredentialDialogForm({
   saving: boolean;
   testState: TestState;
 }): ReactElement {
+  const { t } = useTranslation();
   const endpointEnabled = canUseCustomEndpoint(form.vendorId);
   const formId = useId();
   const nameInputId = `${formId}-name`;
@@ -411,7 +414,7 @@ function ProviderCredentialDialogForm({
         <DialogTitle>
           {form.id === null ? "Add" : "Edit"} {vendorLabel(form.vendorId)} key
         </DialogTitle>
-        <DialogDescription>Store this Provider credential inside the active App.</DialogDescription>
+        <DialogDescription>{t("providers.storeCredential")}</DialogDescription>
       </DialogHeader>
       <div className="space-y-3">
         <div className={endpointEnabled ? "grid gap-3 sm:grid-cols-2" : "grid gap-3"}>
@@ -419,7 +422,7 @@ function ProviderCredentialDialogForm({
             <div className="text-muted-foreground text-xs font-medium">Name</div>
             <Input
               id={nameInputId}
-              placeholder="Production"
+              placeholder={t("providers.productionPlaceholder")}
               value={form.name}
               onChange={(event) => onChange({ ...form, name: event.target.value })}
             />

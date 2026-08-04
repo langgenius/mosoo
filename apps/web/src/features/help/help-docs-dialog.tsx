@@ -3,6 +3,7 @@ import { useMemo, useRef, useState } from "react";
 
 import { HELP_DOCS_HOME_URL, searchHelpDocs } from "@/shared/config/help-docs";
 import type { HelpDoc } from "@/shared/config/help-docs";
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import {
   Dialog,
@@ -33,6 +34,7 @@ export function HelpDocsDialog({
 }
 
 function HelpDocsDialogContent({ onOpenChange }: { onOpenChange: (open: boolean) => void }) {
+  const { t } = useTranslation();
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -75,7 +77,7 @@ function HelpDocsDialogContent({ onOpenChange }: { onOpenChange: (open: boolean)
       initialFocus={inputRef}
     >
       <DialogHeader className="sr-only">
-        <DialogTitle>Help &amp; docs</DialogTitle>
+        <DialogTitle>{t("help.helpAndDocs")}</DialogTitle>
         <DialogDescription>
           Search the mosoo documentation hosted at mosoo.ai/docs.
         </DialogDescription>
@@ -91,7 +93,7 @@ function HelpDocsDialogContent({ onOpenChange }: { onOpenChange: (open: boolean)
           }}
           onKeyDown={handleInputKeyDown}
           placeholder="Search help & documentation…"
-          aria-label="Search help and documentation"
+          aria-label={t("help.searchHelp")}
           className="h-12 border-0 bg-transparent px-0 text-sm focus-visible:ring-0"
         />
       </div>

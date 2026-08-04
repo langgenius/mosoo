@@ -1,5 +1,6 @@
 import type { ReactElement } from "react";
 
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 
 import type { ThreadProcessEvent } from "../model/process";
@@ -10,6 +11,8 @@ export function ProcessLegend({
 }: {
   events: readonly ThreadProcessEvent[];
 }): ReactElement {
+  const { t } = useTranslation();
+
   return (
     <div className="text-fg-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10.5px]">
       {VARIANT_ORDER.map((variant) => (
@@ -20,11 +23,11 @@ export function ProcessLegend({
       ))}
       <span className="inline-flex items-center gap-1">
         <span className="border-border bg-muted size-2 rounded-sm border" />
-        <span>Unsupported</span>
+        <span>{t("threads.unsupported")}</span>
       </span>
       <span className="inline-flex items-center gap-1">
         <span className="border-destructive/40 bg-destructive/40 size-2 rounded-sm border" />
-        <span>Error</span>
+        <span>{t("common.error")}</span>
       </span>
     </div>
   );

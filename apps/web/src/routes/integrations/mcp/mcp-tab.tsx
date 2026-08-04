@@ -1,6 +1,7 @@
 import { Plus, Search, Zap } from "lucide-react";
 import { Fragment, useMemo, useReducer } from "react";
 
+import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import { EmptyState } from "@/shared/ui/empty-state";
 import { Input } from "@/shared/ui/input";
@@ -48,6 +49,7 @@ function mcpTabReducer(state: McpTabState, action: McpTabAction): McpTabState {
 
 export function McpTab() {
   const registry = useMcpRegistry();
+  const { t } = useTranslation();
   const [state, dispatch] = useReducer(mcpTabReducer, MCP_TAB_INITIAL_STATE);
   const { addOpen, editServer, oauthServer, search } = state;
 
@@ -86,10 +88,7 @@ export function McpTab() {
 
   return (
     <div className="flex h-full flex-col">
-      <PageHeader
-        title="MCP servers"
-        description="Extend this App with external capabilities. V1 supports Remote HTTPS only."
-      >
+      <PageHeader title={t("mcp.title")} description={t("mcp.description")}>
         <Button
           onClick={() => {
             dispatch({ open: true, type: "setAddOpen" });
@@ -105,7 +104,7 @@ export function McpTab() {
         <div className="relative w-full sm:w-[260px]">
           <Search className="text-fg-3 absolute top-1/2 left-3 size-3.5 -translate-y-1/2" />
           <Input
-            placeholder="Search MCP servers..."
+            placeholder={t("mcp.searchPlaceholder")}
             value={search}
             onChange={(e) => {
               dispatch({ search: e.target.value, type: "setSearch" });
@@ -214,12 +213,14 @@ export function McpTab() {
 }
 
 function McpEmptyState({ searching, onAdd }: { searching: boolean; onAdd: () => void }) {
+  const { t } = useTranslation();
+
   if (searching) {
     return (
       <EmptyState
         icon={Search}
-        title="No matching MCP servers"
-        description="Try a different search term."
+        title={t("mcp.noMatchingTitle")}
+        description={t("mcp.noMatchingDescription")}
       />
     );
   }
@@ -227,8 +228,8 @@ function McpEmptyState({ searching, onAdd }: { searching: boolean; onAdd: () => 
   return (
     <EmptyState
       icon={Zap}
-      title="No MCP servers yet"
-      description="Add an HTTPS MCP server and finish authorization to make it available to agents in this App."
+      title={t("mcp.noServersTitle")}
+      description={t("mcp.noServersDescription")}
     >
       <Button onClick={onAdd} size="sm">
         <Plus className="size-3.5" />

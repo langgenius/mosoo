@@ -13,6 +13,7 @@ import type { LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useReducer, useState } from "react";
 
 import { useSkillsShCatalogQuery } from "@/domains/skill/query/skill-queries";
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -93,6 +94,7 @@ export function SkillsShCatalog({
   registry: ReturnType<typeof useSkillRegistry>;
   search: string;
 }) {
+  const { t } = useTranslation();
   const [state, dispatch] = useReducer(skillsShCatalogReducer, SKILLS_SH_CATALOG_INITIAL_STATE);
   const [confirmingSkill, setConfirmingSkill] = useState<SkillsShCatalogSkill | null>(null);
   const { availableOnly, error, installingId, page, view } = state;
@@ -153,7 +155,7 @@ export function SkillsShCatalog({
           <CatalogViewButton
             active={view === "trending"}
             icon={TrendingUp}
-            label="Trending"
+            label={t("skills.trending")}
             onClick={() => {
               dispatch({ type: "setView", view: "trending" });
             }}
@@ -169,7 +171,7 @@ export function SkillsShCatalog({
           <CatalogViewButton
             active={view === "all-time"}
             icon={Check}
-            label="All-time"
+            label={t("skills.allTime")}
             onClick={() => {
               dispatch({ type: "setView", view: "all-time" });
             }}
@@ -220,8 +222,8 @@ export function SkillsShCatalog({
       ) : skills.length === 0 ? (
         <EmptyState
           icon={RefreshCw}
-          title="No skills found"
-          description="Try a different search term or view."
+          title={t("skills.noSkillsFound")}
+          description={t("skills.tryDifferentSearch")}
         />
       ) : (
         <div
@@ -317,6 +319,8 @@ function SkillsShInstallConfirmDialog({
   onOpenChange: (open: boolean) => void;
   skill: SkillsShCatalogSkill | null;
 }) {
+  const { t } = useTranslation();
+
   return (
     <Dialog open={skill !== null} onOpenChange={onOpenChange}>
       {skill ? (
@@ -344,14 +348,16 @@ function SkillsShInstallConfirmDialog({
                     <ExternalLink className="size-3 shrink-0" />
                   </a>
                 </div>
-                {skill.isOfficial ? <Badge variant="success">Official</Badge> : null}
+                {skill.isOfficial ? <Badge variant="success">{t("skills.official")}</Badge> : null}
               </div>
 
               <div className="mt-3 flex flex-wrap items-center gap-1.5">
                 <Badge variant="outline">
                   {skill.sourceType === "github" ? "GitHub" : "Well-known"}
                 </Badge>
-                {skill.isDuplicate ? <Badge variant="warning">Duplicate</Badge> : null}
+                {skill.isDuplicate ? (
+                  <Badge variant="warning">{t("skills.duplicate")}</Badge>
+                ) : null}
                 <Badge variant="default">{formatCatalogCount(skill.installs)} installs</Badge>
               </div>
             </div>
@@ -412,6 +418,7 @@ function SkillsShCatalogCard({
   onInstall: () => void;
   skill: SkillsShCatalogSkill;
 }) {
+  const { t } = useTranslation();
   const installable = authConfigured || skill.sourceType === "github";
   const installRequiresApi = !installable && skill.sourceType === "well-known";
 
@@ -431,12 +438,12 @@ function SkillsShCatalogCard({
             <ExternalLink className="size-3 shrink-0" />
           </a>
         </div>
-        {skill.isOfficial ? <Badge variant="success">Official</Badge> : null}
+        {skill.isOfficial ? <Badge variant="success">{t("skills.official")}</Badge> : null}
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5">
         <Badge variant="outline">{skill.sourceType === "github" ? "GitHub" : "Well-known"}</Badge>
-        {skill.isDuplicate ? <Badge variant="warning">Duplicate</Badge> : null}
+        {skill.isDuplicate ? <Badge variant="warning">{t("skills.duplicate")}</Badge> : null}
       </div>
 
       <div className="flex-1" />

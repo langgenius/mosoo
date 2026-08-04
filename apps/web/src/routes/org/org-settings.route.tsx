@@ -3,12 +3,14 @@ import { useEffect, useState } from "react";
 
 import { useAppSession } from "@/app/session-provider";
 import { renameOrganization } from "@/domains/organization/api/organization-client";
+import { useTranslation } from "@/shared/i18n";
 import { isTruthy } from "@/shared/lib/truthiness";
 import { Button } from "@/shared/ui/button";
 import { CommandBlock } from "@/shared/ui/command-block";
 
 // Org-layer General settings — the account/billing shell's identity.
 export function OrgSettingsPage() {
+  const { t } = useTranslation();
   const { activeOrganization, organizationsLoading, refreshOrganizations } = useAppSession();
 
   const [name, setName] = useState(activeOrganization?.name ?? "");
@@ -61,7 +63,7 @@ export function OrgSettingsPage() {
                   Name
                 </label>
                 <input
-                  aria-label="Organization name"
+                  aria-label={t("org.organizationName")}
                   id="org-name"
                   type="text"
                   value={name}

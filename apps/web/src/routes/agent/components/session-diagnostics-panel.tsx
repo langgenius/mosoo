@@ -4,6 +4,7 @@ import type { ReactElement } from "react";
 import { useState } from "react";
 
 import type { AgentSessionDiagnosticsQuery } from "@/gql/graphql";
+import { useTranslation } from "@/shared/i18n";
 import { Badge } from "@/shared/ui/badge";
 import { ScrollArea } from "@/shared/ui/scroll-area";
 
@@ -39,6 +40,7 @@ export function SessionDiagnosticsPanel({
   loading: boolean;
   selected: SessionSummary;
 }): ReactElement {
+  const { t } = useTranslation();
   const [collapsed, setCollapsed] = useState(true);
   const execution = diagnostics?.execution ?? null;
   const binding = execution?.binding ?? null;
@@ -66,7 +68,7 @@ export function SessionDiagnosticsPanel({
           onClick={() => {
             setCollapsed(false);
           }}
-          aria-label="Expand diagnostics"
+          aria-label={t("agent.expandDiagnostics")}
           aria-expanded={false}
           className="text-muted-foreground hover:text-foreground hover:bg-accent/40 flex w-full items-center justify-between gap-2 px-4 py-3 text-left transition-colors xl:flex-col xl:justify-start xl:px-0 xl:py-3"
         >
@@ -95,7 +97,7 @@ export function SessionDiagnosticsPanel({
               onClick={() => {
                 setCollapsed(true);
               }}
-              aria-label="Collapse diagnostics"
+              aria-label={t("agent.collapseDiagnostics")}
               aria-expanded={true}
               className="text-muted-foreground hover:text-foreground hover:bg-accent/40 -mr-1 inline-flex size-5 items-center justify-center rounded transition-colors"
             >
@@ -113,16 +115,22 @@ export function SessionDiagnosticsPanel({
               Session snapshot
             </div>
             <DiagnosticRow
-              label="Deployment"
+              label={t("agent.deployment")}
               value={
                 versionNumber !== null
                   ? `v${versionNumber} - ${shortId(deploymentVersionId)}`
                   : null
               }
             />
-            <DiagnosticRow label="Runtime" value={binding?.runtimeId ?? selected.runtimeId} />
-            <DiagnosticRow label="Provider" value={binding?.provider ?? selected.provider} />
-            <DiagnosticRow label="Model" value={binding?.model ?? selected.model} />
+            <DiagnosticRow
+              label={t("agent.runtime")}
+              value={binding?.runtimeId ?? selected.runtimeId}
+            />
+            <DiagnosticRow
+              label={t("agent.provider")}
+              value={binding?.provider ?? selected.provider}
+            />
+            <DiagnosticRow label={t("agent.model")} value={binding?.model ?? selected.model} />
           </section>
 
           <section>
@@ -130,16 +138,19 @@ export function SessionDiagnosticsPanel({
               Run state
             </div>
             <DiagnosticRow label="Run" value={shortId(run?.id ?? null)} />
-            <DiagnosticRow label="Status" value={run?.status ?? selected.status} />
-            <DiagnosticRow label="Trace" value={shortId(run?.traceId ?? null)} />
-            <CountRow count={diagnostics?.pendingPermissionCount ?? null} label="Permissions" />
+            <DiagnosticRow label={t("agent.status")} value={run?.status ?? selected.status} />
+            <DiagnosticRow label={t("agent.trace")} value={shortId(run?.traceId ?? null)} />
+            <CountRow
+              count={diagnostics?.pendingPermissionCount ?? null}
+              label={t("agent.permissions")}
+            />
           </section>
 
           <section>
             <div className="text-muted-foreground mb-2 text-[11px] font-medium uppercase">
               Frozen inputs
             </div>
-            <CountRow count={execution?.skills.length ?? null} label="Skills" />
+            <CountRow count={execution?.skills.length ?? null} label={t("agent.skills")} />
             <CountRow count={execution?.tools.length ?? null} label="MCP" />
           </section>
 
@@ -147,14 +158,20 @@ export function SessionDiagnosticsPanel({
             <div className="text-muted-foreground mb-2 text-[11px] font-medium uppercase">
               Native ref
             </div>
-            <DiagnosticRow label="Status" value={diagnostics?.nativeRuntimeRef.status ?? null} />
-            <DiagnosticRow label="Kind" value={diagnostics?.nativeRuntimeRef.kind ?? null} />
             <DiagnosticRow
-              label="Runtime"
+              label={t("agent.status")}
+              value={diagnostics?.nativeRuntimeRef.status ?? null}
+            />
+            <DiagnosticRow
+              label={t("agent.kind")}
+              value={diagnostics?.nativeRuntimeRef.kind ?? null}
+            />
+            <DiagnosticRow
+              label={t("agent.runtime")}
               value={diagnostics?.nativeRuntimeRef.runtimeId ?? null}
             />
             <DiagnosticRow
-              label="Value"
+              label={t("agent.value")}
               value={diagnostics?.nativeRuntimeRef.valuePreview ?? null}
             />
           </section>

@@ -5,6 +5,7 @@ import { useState } from "react";
 import { createEnvironment } from "@/domains/environment/api/environment-client";
 import { EnvironmentCliCallout } from "@/domains/environment/components/environment-cli-callout";
 import { environmentKeys } from "@/domains/environment/query/environment-queries";
+import { useTranslation } from "@/shared/i18n";
 import {
   Dialog,
   DialogContent,
@@ -27,6 +28,7 @@ export function CreateEnvironmentDialog({
   open: boolean;
   appId: string;
 }) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState(() => createEnvironmentDraft());
   const [error, setError] = useState<string | null>(null);
@@ -67,7 +69,7 @@ export function CreateEnvironmentDialog({
     >
       <DialogContent className="max-h-[88vh] overflow-y-auto sm:max-w-3xl">
         <DialogHeader>
-          <DialogTitle>Create environment</DialogTitle>
+          <DialogTitle>{t("environments.create")}</DialogTitle>
           <DialogDescription>
             Define a reusable runtime container template for new sessions.
           </DialogDescription>

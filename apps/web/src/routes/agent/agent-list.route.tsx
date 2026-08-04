@@ -5,6 +5,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAppSession } from "@/app/session-provider";
 import { useVisibleAgentsQuery } from "@/domains/agent/query/agent-queries";
 import { useAuth } from "@/domains/auth/use-auth";
+import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import { EmptyState } from "@/shared/ui/empty-state";
 import {
@@ -60,6 +61,7 @@ function agentListPageReducer(
 }
 
 export function AgentListPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { activeApp } = useAppSession();
@@ -88,7 +90,7 @@ export function AgentListPage() {
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
-      <PageHeader title="Agents" description="Reusable workers for this App.">
+      <PageHeader title={t("agent.title")} description="Reusable workers for this App.">
         <Button
           disabled={appId === null}
           onClick={() => {
@@ -144,8 +146,8 @@ export function AgentListPage() {
         ) : filteredAgents.length === 0 ? (
           <EmptyState
             icon={Bot}
-            title="No agents yet"
-            description="Create your first agent for this App."
+            title={t("agent.noAgentsTitle")}
+            description={t("agent.noAgentsDescription")}
           >
             <Button
               disabled={appId === null}

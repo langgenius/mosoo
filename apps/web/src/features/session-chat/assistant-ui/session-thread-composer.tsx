@@ -4,6 +4,7 @@ import type React from "react";
 import type { ReactElement } from "react";
 
 import type { ComposerError } from "@/routes/agent/components/agent-session-panel-model-types";
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { isTruthy } from "@/shared/lib/truthiness";
 import { Button } from "@/shared/ui/button";
@@ -92,6 +93,8 @@ export function SessionThreadComposer({
   sessionResourceMentions,
   showSendDisabledReason = true,
 }: SessionThreadComposerProps): ReactElement {
+  const { t } = useTranslation();
+
   return (
     <ComposerPrimitive.Root
       className={cn("border-border-strong bg-card rounded-lg border")}
@@ -128,7 +131,7 @@ export function SessionThreadComposer({
         placeholder="Describe a task for the agent…"
         className="text-fg-1 placeholder:text-fg-muted w-full resize-none bg-transparent px-3.5 pt-3 pb-1 text-[14.5px] leading-[1.5] outline-none"
         data-testid="agent-session-composer-input"
-        aria-label="Describe a task for the agent"
+        aria-label={t("chat.describeTask")}
       />
 
       <div className="flex items-center justify-between px-2 pb-2">
@@ -137,7 +140,7 @@ export function SessionThreadComposer({
           type="file"
           multiple
           className="hidden"
-          aria-label="Attach files"
+          aria-label={t("threads.attachFiles")}
           onChange={(event) => {
             if (event.target.files) {
               onFilesSelected([...event.target.files]);
@@ -155,7 +158,7 @@ export function SessionThreadComposer({
             onTypingActivity?.();
             fileInputRef.current?.click();
           }}
-          aria-label="Attach file"
+          aria-label={t("chat.attachFile")}
         >
           <Paperclip className="size-4" />
         </Button>
@@ -166,7 +169,7 @@ export function SessionThreadComposer({
               type="button"
               size="icon-sm"
               className="rounded-full"
-              aria-label="Send"
+              aria-label={t("chat.send")}
               data-testid="agent-session-send"
             >
               <ArrowUp className="size-4" />
@@ -180,8 +183,8 @@ export function SessionThreadComposer({
               type="button"
               size="icon-sm"
               className="rounded-full"
-              aria-label="Stop generating"
-              title="Stop generating"
+              aria-label={t("chat.stopGenerating")}
+              title={t("chat.stopGenerating")}
             >
               <span aria-hidden className="size-2.5 rounded-[2px] bg-current" />
             </Button>

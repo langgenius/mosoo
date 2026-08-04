@@ -4,6 +4,7 @@ import { ChevronRight, Copy } from "lucide-react";
 import type { ReactElement } from "react";
 import { useState } from "react";
 
+import { useTranslation } from "@/shared/i18n";
 import { Markdown } from "@/shared/ui/markdown";
 
 import { SessionToolPart } from "./session-tool-part";
@@ -92,6 +93,7 @@ export function UserMessage(): ReactElement {
 }
 
 export function AssistantMessage(): ReactElement {
+  const { t } = useTranslation();
   // Copy only makes sense when the turn actually produced prose. Tool-only turns
   // (e.g. a file write that emits just tool cards) have nothing to copy, so we
   // drop the action bar entirely rather than render an empty copy button under
@@ -124,7 +126,7 @@ export function AssistantMessage(): ReactElement {
             className="text-fg-3 mt-1 flex h-6 gap-1 opacity-0 transition-opacity group-hover/aui-msg:opacity-100"
           >
             <ActionBarPrimitive.Copy
-              aria-label="Copy message"
+              aria-label={t("chat.copyMessage")}
               className="hover:bg-ink-900/[0.05] hover:text-fg-1 inline-flex size-6 items-center justify-center rounded-md transition-colors"
             >
               <Copy className="size-3.5" />

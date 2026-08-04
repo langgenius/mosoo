@@ -12,6 +12,7 @@ import {
 import { useState } from "react";
 import type { ReactElement } from "react";
 
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
 import { EmptyState } from "@/shared/ui/empty-state";
@@ -84,6 +85,7 @@ export function NotificationPrompt({
   dismissed: boolean;
   onDismiss: () => void;
 }): ReactElement | null {
+  const { t } = useTranslation();
   const [permission, setPermission] = useState(getNotificationPermission);
 
   if (dismissed || permission === "granted" || permission === "unsupported") {
@@ -105,7 +107,7 @@ export function NotificationPrompt({
       >
         Enable
       </Button>
-      <Button size="icon-xs" variant="ghost" onClick={onDismiss} aria-label="Dismiss">
+      <Button size="icon-xs" variant="ghost" onClick={onDismiss} aria-label={t("common.dismiss")}>
         <ChevronRight className="size-3" />
       </Button>
     </div>
@@ -129,6 +131,7 @@ function ThreadRow({
     bucket: thread.bucket,
     failed: thread.failed,
   });
+  const { t } = useTranslation();
   const actionCapabilities = getThreadActionCapabilities({
     bucket: thread.bucket,
     capabilities: thread.actionCapabilities,
@@ -160,7 +163,7 @@ function ThreadRow({
         />
 
         {thread.pinned ? (
-          <Pin className="text-amber -mr-1 size-3 shrink-0" aria-label="Pinned" />
+          <Pin className="text-amber -mr-1 size-3 shrink-0" aria-label={t("threads.pinned")} />
         ) : null}
 
         <span
@@ -218,7 +221,7 @@ function ThreadRow({
             <Button
               size="icon-xs"
               variant="ghost"
-              aria-label="Archive thread"
+              aria-label={t("threads.archiveThread")}
               onClick={() => {
                 onArchive(thread.id);
               }}
@@ -229,7 +232,7 @@ function ThreadRow({
           <Button
             size="icon-xs"
             variant="ghost"
-            aria-label="Delete thread"
+            aria-label={t("threads.deleteThread")}
             disabled={!actionCapabilities.delete.available}
             title={actionCapabilities.delete.reason ?? undefined}
             onClick={() => {
@@ -315,11 +318,13 @@ export function ThreadSectionGroup({
 }
 
 export function ThreadsEmptyState({ onNewThread }: { onNewThread: () => void }): ReactElement {
+  const { t } = useTranslation();
+
   return (
     <EmptyState
       icon={Inbox}
-      title="No threads yet"
-      description="Dispatch your first task to an agent."
+      title={t("threads.noThreadsTitle")}
+      description={t("threads.noThreadsDescription")}
     >
       <Button onClick={onNewThread} size="sm">
         <Plus className="size-3.5" />

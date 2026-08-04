@@ -16,6 +16,7 @@ import { useMemo, useReducer, useRef } from "react";
 import type { ReactElement } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
 import {
@@ -296,6 +297,7 @@ export function NewThreadDialog({
   open,
   submitting,
 }: NewThreadDialogProps): ReactElement {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [state, dispatch] = useReducer(
@@ -400,7 +402,7 @@ export function NewThreadDialog({
                 "resize-none border-0 bg-transparent p-0 text-[14px] leading-relaxed shadow-none focus-visible:ring-0",
                 expanded ? "min-h-[420px]" : "min-h-[280px]",
               )}
-              placeholder="Describe the goal, context, and success criteria for this task..."
+              placeholder={t("threads.describeGoal")}
             />
           </div>
 
@@ -457,7 +459,7 @@ export function NewThreadDialog({
           ref={fileInputRef}
           type="file"
           multiple
-          aria-label="Attach files to thread"
+          aria-label={t("threads.attachFilesToThread")}
           className="hidden"
           onChange={(event) => {
             const selectedFiles = event.target.files;
@@ -473,7 +475,7 @@ export function NewThreadDialog({
         <DialogFooter className="border-border-subtle gap-2 border-t px-5 py-3">
           <div className="mr-auto flex items-center gap-2">
             <Button
-              aria-label="Attach files"
+              aria-label={t("threads.attachFiles")}
               size="icon-xs"
               type="button"
               variant="ghost"

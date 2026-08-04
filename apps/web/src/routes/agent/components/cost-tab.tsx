@@ -19,9 +19,11 @@ import {
 } from "@/routes/cost/cost-model";
 import type { CostRange, CostRunPurpose } from "@/routes/cost/cost-model";
 import { toAgentId, toAppId } from "@/routes/typed-id";
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 
 export function AgentCostTab({ agentId, appId }: { agentId: string; appId: string }): ReactElement {
+  const { t } = useTranslation();
   const [range, setRange] = useState<CostRange>("30d");
   const [purpose, setPurpose] = useState<CostRunPurpose | "all">("all");
   const runPurposes = runPurposeToQuery(purpose);
@@ -146,7 +148,7 @@ export function AgentCostTab({ agentId, appId }: { agentId: string; appId: strin
         </section>
 
         <section>
-          <Panel title="Model usage">
+          <Panel title={t("agent.modelUsage")}>
             {(card?.models ?? []).length === 0 ? (
               <div className="text-muted-foreground px-4 py-8 text-sm">
                 No model usage in this range.
@@ -174,7 +176,7 @@ export function AgentCostTab({ agentId, appId }: { agentId: string; appId: strin
           </Panel>
         </section>
 
-        <Panel title="Recent sessions">
+        <Panel title={t("agent.recentSessions")}>
           {(card?.recentSessions ?? []).length === 0 ? (
             <div className="text-muted-foreground px-4 py-8 text-sm">
               No sessions in this range.

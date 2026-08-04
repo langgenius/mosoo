@@ -6,6 +6,7 @@ import type { FormEvent } from "react";
 import { createSlackAgentChannelBinding } from "@/domains/agent/api/agent-client";
 import { useInvalidateAgentChannelBindings } from "@/domains/agent/query/agent-queries";
 import { toAgentId, toAppId } from "@/routes/typed-id";
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
@@ -88,6 +89,7 @@ export function SlackChannelInlineSetup({
   agent: ChannelInlineSetupAgent;
   onSuccess?: () => void;
 }) {
+  const { t } = useTranslation();
   const invalidateChannelBindings = useInvalidateAgentChannelBindings(agent.appId, agent.id);
   const [state, dispatch] = useReducer(
     slackChannelInlineSetupReducer,
@@ -190,7 +192,7 @@ export function SlackChannelInlineSetup({
       <section className="border-border bg-card rounded-lg border p-4">
         <div className="grid gap-4">
           <div className="grid gap-1.5">
-            <Label htmlFor="slack-bot-token">Bot Token</Label>
+            <Label htmlFor="slack-bot-token">{t("agent.botToken")}</Label>
             <Input
               autoComplete="off"
               id="slack-bot-token"
@@ -202,7 +204,7 @@ export function SlackChannelInlineSetup({
             />
           </div>
           <div className="grid gap-1.5">
-            <Label htmlFor="slack-signing-secret">Signing Secret</Label>
+            <Label htmlFor="slack-signing-secret">{t("agent.signingSecret")}</Label>
             <Input
               autoComplete="off"
               id="slack-signing-secret"

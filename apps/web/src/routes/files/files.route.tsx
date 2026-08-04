@@ -10,6 +10,7 @@ import { fileKeys, listFiles } from "@/domains/file/api/files";
 import type { ListedFileEntry } from "@/domains/file/api/files";
 import { allThreadSessions } from "@/domains/session/api/list";
 import { toAppId } from "@/routes/typed-id";
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -125,12 +126,14 @@ function FileTable({
   files: FilesTableEntry[];
   onPreview: (file: ListedFileEntry) => void;
 }): ReactElement {
+  const { t } = useTranslation();
+
   return (
     <div className="bg-card border-border-strong overflow-hidden rounded-md border">
       <Table>
         <TableHeader>
           <TableRow className="bg-paper-100 hover:bg-paper-100">
-            <TableHead>Name</TableHead>
+            <TableHead>{t("files.name")}</TableHead>
             <TableHead className="hidden md:table-cell">Category</TableHead>
             <TableHead className="hidden lg:table-cell">Agent</TableHead>
             <TableHead className="hidden text-right md:table-cell">Size</TableHead>
@@ -202,6 +205,7 @@ function FileTable({
 
 export function FilesPage(): ReactElement {
   const { activeAppId } = useAppSession();
+  const { t } = useTranslation();
   const [agentId, setAgentId] = useState("");
   const [sessionId, setSessionId] = useState("");
   const [sessionKind, setSessionKind] = useState<SessionKindFilter>("all");
@@ -280,7 +284,10 @@ export function FilesPage(): ReactElement {
 
   return (
     <div className="bg-background flex h-full flex-1 flex-col overflow-hidden">
-      <PageHeader title="Files" description="App files, Thread attachments, and runtime artifacts.">
+      <PageHeader
+        title={t("files.title")}
+        description="App files, Thread attachments, and runtime artifacts."
+      >
         <Button
           disabled={refreshing}
           onClick={() => {
@@ -306,7 +313,7 @@ export function FilesPage(): ReactElement {
             }}
             value={filesView.agentId}
           >
-            <SelectTrigger aria-label="Agent filter" className="w-full">
+            <SelectTrigger aria-label={t("files.agentFilter")} className="w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -326,7 +333,7 @@ export function FilesPage(): ReactElement {
           value={filesView.sessionId}
         />
         <SegmentedButtonGroup<SessionKindFilter>
-          label="Thread file category"
+          label={t("files.threadFileCategory")}
           onChange={setSessionKind}
           options={SESSION_KIND_OPTIONS}
           value={sessionKind}
@@ -335,7 +342,7 @@ export function FilesPage(): ReactElement {
         <ListPageSearch
           className="w-full sm:w-auto sm:min-w-[240px] sm:grow lg:w-[280px] lg:grow-0"
           onChange={setSearch}
-          placeholder="Search files..."
+          placeholder={t("files.searchPlaceholder")}
           value={search}
         />
       </ListPageToolbar>
@@ -351,7 +358,7 @@ export function FilesPage(): ReactElement {
           <EmptyState
             icon={FileStack}
             title={filtersActive ? "No matching files" : "No files"}
-            description="App files, Thread attachments, and runtime artifacts will appear here."
+            description={t("files.emptyDescription")}
           />
         ) : (
           <FileTable files={filesView.files} onPreview={setPreviewFile} />

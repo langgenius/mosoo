@@ -6,6 +6,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useAppSession } from "@/app/session-provider";
 import { useAgentDetailQuery, useAgentEditorStateQuery } from "@/domains/agent/query/agent-queries";
 import { useAuth } from "@/domains/auth/use-auth";
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
 
@@ -117,11 +118,13 @@ function AgentDetailHeader({
   onSelectMode: (mode: DetailMode) => void;
   runtime: ReturnType<typeof getRuntimeInfo> | null;
 }) {
+  const { t } = useTranslation();
+
   return (
     <header className="border-border-subtle relative flex min-h-13 shrink-0 flex-wrap items-center gap-y-2 border-b bg-white px-3 py-2 sm:px-5 md:h-13 md:flex-nowrap md:py-0">
       <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
         <Button
-          aria-label="Back to agents"
+          aria-label={t("agent.backToAgents")}
           variant="ghost"
           size="icon-sm"
           onClick={onBack}
@@ -143,7 +146,7 @@ function AgentDetailHeader({
             type="button"
             onClick={onOpenVersions}
             className="focus-visible:ring-ring bg-amber-bg text-amber-fg hover:bg-amber-bg/70 ml-1 inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors focus:outline-none focus-visible:ring-2"
-            aria-label="Open version history"
+            aria-label={t("agent.openVersionHistory")}
           >
             Draft
           </button>
@@ -152,7 +155,7 @@ function AgentDetailHeader({
             type="button"
             onClick={onOpenVersions}
             className="focus-visible:ring-ring ml-1 inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-medium text-green-800 transition-colors hover:bg-green-200/70 focus:outline-none focus-visible:ring-2"
-            aria-label="Open version history"
+            aria-label={t("agent.openVersionHistory")}
           >
             v{agent.liveVersion.versionNumber} live
           </button>
@@ -187,7 +190,7 @@ function AgentDetailHeader({
                 ? "bg-ink-100 text-fg-1"
                 : "text-muted-foreground hover:bg-accent",
             )}
-            aria-label="Open Terminal"
+            aria-label={t("agent.openTerminal")}
           >
             Terminal
           </button>
@@ -218,6 +221,7 @@ function PanelLoading(): ReactElement {
 }
 
 export function AgentDetailPage() {
+  const { t } = useTranslation();
   const { agentId } = useParams<{ agentId: string }>();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -320,7 +324,7 @@ export function AgentDetailPage() {
             void navigate(basePath);
           }}
         >
-          Back to agents
+          {t("agent.backToAgents")}
         </Button>
       </div>
     );
@@ -338,7 +342,7 @@ export function AgentDetailPage() {
             void navigate(basePath);
           }}
         >
-          Back to agents
+          {t("agent.backToAgents")}
         </Button>
       </div>
     );

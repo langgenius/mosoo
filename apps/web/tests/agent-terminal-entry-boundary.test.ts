@@ -8,7 +8,7 @@ function readSource(path: string): string {
 describe("Agent terminal entry boundary", () => {
   test("keeps Pet owner Terminal as a gated header tab", () => {
     const source = readSource("../src/routes/agent/agent-detail.route.tsx");
-    const terminalButtonIndex = source.indexOf('aria-label="Open Terminal"');
+    const terminalButtonIndex = source.indexOf('aria-label={t("agent.openTerminal")}');
     const gatedEntryIndex = source.lastIndexOf("canUseTerminal &&", terminalButtonIndex);
 
     expect(source).toContain('import { ArrowLeft, Settings } from "lucide-react";');
