@@ -16,7 +16,7 @@ if (!container) {
 // Initialise i18n before rendering so the first paint already uses the
 // correct locale. The init promise resolves synchronously when resources
 // are bundled (no async chunk load), so this does not delay the render.
-initI18n().then(() => {
+void initI18n().then(() => {
   createRoot(container).render(
     <StrictMode>
       <AppProviders>

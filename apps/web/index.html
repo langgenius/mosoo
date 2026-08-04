@@ -37,7 +37,7 @@
          browser uses the correct spelling dictionary and accessibility
          voice from the first paint. -->
     <script>
-      (function() {
+      (function () {
         var stored = localStorage.getItem("mosoo-locale");
         var lang = stored || navigator.language || "en";
         if (lang.toLowerCase().startsWith("zh")) lang = "zh-CN";

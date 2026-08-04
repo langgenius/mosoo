@@ -1,10 +1,10 @@
 import { createContext, useContext, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
-import en from "./translations/en.json";
-import zhCN from "./translations/zh-CN.json";
 import { DEFAULT_LOCALE, resolveLocale } from "./locales";
 import type { SupportedLocale } from "./locales";
+import en from "./translations/en.json";
+import zhCN from "./translations/zh-CN.json";
 
 type TranslationValue = string | Record<string, unknown>;
 type TranslationTree = Record<string, TranslationValue>;
@@ -33,22 +33,25 @@ function detectInitialLocale(): SupportedLocale {
 
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [language, setLanguage] = useState<SupportedLocale>(detectInitialLocale);
-  const value = useMemo<I18nContextValue>(() => ({
-    language,
-    changeLanguage(next) {
-      setLanguage(next);
-      localStorage.setItem("mosoo-locale", next);
-      document.documentElement.lang = next;
-    },
-    t(key, variables) {
-      let text = lookup(resources[language], key);
-      if (text === key && language !== DEFAULT_LOCALE) text = lookup(resources.en, key);
-      return Object.entries(variables ?? {}).reduce(
-        (result, [name, replacement]) => result.replaceAll(`{{${name}}}`, replacement),
-        text,
-      );
-    },
-  }), [language]);
+  const value = useMemo<I18nContextValue>(
+    () => ({
+      language,
+      changeLanguage(next) {
+        setLanguage(next);
+        localStorage.setItem("mosoo-locale", next);
+        document.documentElement.lang = next;
+      },
+      t(key, variables) {
+        let text = lookup(resources[language], key);
+        if (text === key && language !== DEFAULT_LOCALE) text = lookup(resources.en, key);
+        return Object.entries(variables ?? {}).reduce(
+          (result, [name, replacement]) => result.replaceAll(`{{${name}}}`, replacement),
+          text,
+        );
+      },
+    }),
+    [language],
+  );
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 }

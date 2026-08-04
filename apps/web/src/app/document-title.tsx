@@ -1,6 +1,7 @@
 import { useEffect } from "react";
-import { useTranslation } from "@/shared/i18n";
 import { matchPath, useLocation } from "react-router-dom";
+
+import { useTranslation } from "@/shared/i18n";
 
 import { useAppSession } from "./session-provider";
 
@@ -101,7 +102,8 @@ export function resolveDocumentTitle(input: {
     return joinDocumentTitle([input.activeAppName]);
   }
 
-  const title = input.t?.(rule.titleKey) ?? DEFAULT_TITLE_TRANSLATIONS[rule.titleKey] ?? rule.titleKey;
+  const title =
+    input.t?.(rule.titleKey) ?? DEFAULT_TITLE_TRANSLATIONS[rule.titleKey] ?? rule.titleKey;
 
   if (rule.scope === "app") {
     return joinDocumentTitle([title, input.activeAppName]);

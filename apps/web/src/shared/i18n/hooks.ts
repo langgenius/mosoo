@@ -1,7 +1,6 @@
-import { useTranslation } from "./provider";
-
 import type { SupportedLocale } from "./locales";
 import { DEFAULT_LOCALE } from "./locales";
+import { useTranslation } from "./provider";
 
 /**
  * Returns the current locale for use with Intl formatters.

@@ -65,7 +65,7 @@ export function SettingsNav() {
           </div>
         );
       })}
-      <div className="mt-auto border-t border-border-soft pt-3">
+      <div className="border-border-soft mt-auto border-t pt-3">
         <div className="text-fg-3 px-2.5 pb-1 text-[10px] font-semibold tracking-[0.14em] uppercase">
           {t("settings.language")}
         </div>

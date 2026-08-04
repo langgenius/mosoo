@@ -1,7 +1,8 @@
 import { lazy } from "react";
 import type { ReactElement, ReactNode } from "react";
-import { useTranslation } from "@/shared/i18n";
 import { Navigate, useLocation } from "react-router-dom";
+
+import { useTranslation } from "@/shared/i18n";
 
 import { UploadRecoveryDialog } from "../features/files/upload-recovery/upload-recovery-dialog";
 import { useAppSession } from "./session-provider";
@@ -30,7 +31,9 @@ interface RouteChildrenProps {
 export function AppLoading(): ReactElement {
   const { t } = useTranslation();
   return (
-    <div className="text-muted-foreground flex h-dvh items-center justify-center">{t("common.loading")}</div>
+    <div className="text-muted-foreground flex h-dvh items-center justify-center">
+      {t("common.loading")}
+    </div>
   );
 }
 
