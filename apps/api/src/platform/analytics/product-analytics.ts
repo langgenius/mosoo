@@ -1,6 +1,7 @@
 export const SERVER_PRODUCT_ANALYTICS_EVENTS = {
   agentCreated: "agent_created",
   appCreated: "app_created",
+  sandboxCreated: "sandbox_created",
   taskSucceeded: "task_succeeded",
   integrationConnected: "integration_connected",
   onboardingCompleted: "onboarding_completed",

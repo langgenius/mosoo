@@ -14,6 +14,10 @@ import type {
 import { createPlatformId } from "@mosoo/id";
 import { RUNTIME_DIAGNOSTIC_EVENT } from "@mosoo/runtime-events";
 
+import {
+  captureServerProductEvent,
+  SERVER_PRODUCT_ANALYTICS_EVENTS,
+} from "../../../../platform/analytics/product-analytics";
 import { createErrorLogContext, logWarn } from "../../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { currentTimestampMs } from "../../../../time";
@@ -241,6 +245,27 @@ export class RuntimeSubjectLifecycleService {
 
       if (!activated) {
         throw new Error("Runtime subject activation claim expired before completion.");
+      }
+
+      if (isCold) {
+        await captureServerProductEvent(this.#bindings, {
+          distinctId: input.executionOwnerUserId,
+          event: SERVER_PRODUCT_ANALYTICS_EVENTS.sandboxCreated,
+          properties: {
+            activation_purpose: purpose,
+            agent_id:
+              input.diagnosticContext?.agentId ??
+              (input.subjectKind === "agent" ? input.subjectId : undefined),
+            execution_owner_id: input.executionOwnerUserId,
+            sandbox_id: input.runtimeSubjectId,
+            sandbox_kind: input.kind,
+            session_id:
+              input.diagnosticContext?.sessionId ??
+              (input.subjectKind === "session" ? input.subjectId : undefined),
+            subject_id: input.subjectId,
+            subject_kind: input.subjectKind,
+          },
+        });
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Runtime subject activation failed.";

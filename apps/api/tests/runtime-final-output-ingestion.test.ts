@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 
 import type { DriverEventEnvelope } from "@mosoo/agent-driver/events";
 import type { DriverEventReceipt } from "@mosoo/agent-driver/orpc";
@@ -27,6 +27,7 @@ import { recordDriverInstanceCompletion } from "../src/modules/runtime/infrastru
 import { loadSessionViewerState } from "../src/modules/sessions/application/session-live-state.service";
 import { createSessionProcessEventsFromSessionEventRows } from "../src/modules/sessions/application/session-process-events.service";
 import type { SessionEventProcessRow } from "../src/modules/sessions/application/session-process-events.service";
+import { setServerProductAnalyticsTransportForTests } from "../src/platform/analytics/product-analytics";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import {
   createPublicHttpContractDatabase,
@@ -65,6 +66,10 @@ const PROGRESS_TEXTS = [
   "进度 2：工具调用已经完成。",
   "进度 3：artifact 已创建。",
 ] as const;
+
+afterEach(() => {
+  setServerProductAnalyticsTransportForTests(null);
+});
 
 interface TestDriverState {
   createDriverEventReceipts(events: readonly DriverEventEnvelope[]): DriverEventReceipt[];
@@ -306,7 +311,15 @@ describe("runtime final output ingestion", () => {
     async (_driverBehavior, driverProvidesSnapshot) => {
       const database = await createPublicHttpContractDatabase();
       await insertRuntimeFixture(database);
-      const bindings = createPublicHttpTestBindings(database) as ApiBindings;
+      const capturedEvents: unknown[] = [];
+      setServerProductAnalyticsTransportForTests(async (_input, init) => {
+        capturedEvents.push(JSON.parse(init.body as string) as unknown);
+        return new Response(null, { status: 200 });
+      });
+      const bindings = {
+        ...createPublicHttpTestBindings(database),
+        POSTHOG_PROJECT_KEY: "phc_test",
+      } as ApiBindings;
       const finalText = "The final answer.";
       const fragmentTexts = ["The ", "final ", "answer."];
       const finalMessageId = createPlatformId<SessionMessageId>();
@@ -360,6 +373,18 @@ describe("runtime final output ingestion", () => {
           .map((row) => row.content_text),
       ).toEqual([finalText]);
       expect(assistantMessages.map((event) => event.content)).toEqual([finalText]);
+      expect(capturedEvents).toEqual([
+        expect.objectContaining({
+          event: "task_succeeded",
+          properties: expect.objectContaining({
+            run_duration_ms: expect.any(Number),
+            sandbox_id: PUBLIC_API_TEST_IDS.sandbox,
+            sandbox_kind: "pet",
+            sandbox_subject_kind: "agent",
+            session_type: "api_channel",
+          }),
+        }),
+      ]);
     },
   );
 

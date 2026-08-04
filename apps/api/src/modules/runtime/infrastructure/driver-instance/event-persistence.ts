@@ -91,6 +91,19 @@ function isMatchingStaleTerminalRunTransition(input: {
   return input.transition !== undefined && input.outcome.currentStatus === input.transition.status;
 }
 
+function getRunDurationMs(outcome: SessionRunTransitionOutcome): number | null {
+  if (
+    outcome.kind !== "applied" ||
+    outcome.run.startedAt === null ||
+    outcome.run.completedAt === null
+  ) {
+    return null;
+  }
+
+  const durationMs = Date.parse(outcome.run.completedAt) - Date.parse(outcome.run.startedAt);
+  return Number.isFinite(durationMs) ? Math.max(0, durationMs) : null;
+}
+
 async function autoTitleRuntimeSession(
   database: D1Database,
   link: RuntimeSessionLink,
@@ -360,6 +373,8 @@ export async function persistProjectedRuntimeDriverEvents(
     runTransitionOutcome?.kind === "applied" &&
     link.executionOwnerId !== null
   ) {
+    const runDurationMs = getRunDurationMs(runTransitionOutcome);
+
     await captureServerProductEvent(bindings, {
       distinctId: link.executionOwnerId,
       event: SERVER_PRODUCT_ANALYTICS_EVENTS.taskSucceeded,
@@ -367,7 +382,12 @@ export async function persistProjectedRuntimeDriverEvents(
         agent_id: link.agentId,
         app_id: link.appId,
         run_id: link.sessionRunId,
+        run_duration_ms: runDurationMs,
+        sandbox_id: link.sandboxId,
+        sandbox_kind: link.sandboxKind,
+        sandbox_subject_kind: link.sandboxSubjectKind,
         session_id: link.sessionId,
+        session_type: link.sessionType,
       },
     });
   }

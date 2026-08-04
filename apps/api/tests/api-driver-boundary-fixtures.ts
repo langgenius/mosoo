@@ -198,6 +198,7 @@ export function createRuntimeSessionLink(): RuntimeSessionLink {
     sessionId: API_DRIVER_BOUNDARY_IDS.session,
     sessionRunId: API_DRIVER_BOUNDARY_IDS.sessionRun,
     sessionRunStatus: "running",
+    sessionType: "preview",
     traceId: "trace-1",
   };
 }
