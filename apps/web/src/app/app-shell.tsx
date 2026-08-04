@@ -12,6 +12,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { HelpMenu } from "@/features/help/help-menu";
 import { useTranslation } from "@/shared/i18n";
+import { LocaleSwitcher } from "@/shared/i18n/locale-switcher";
 import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
 import {
@@ -191,6 +192,9 @@ function ConsoleSidebarFooter({
     <>
       <div className={cn("pb-2", collapsed ? "flex justify-center" : "px-0.5")}>
         <HelpMenu collapsed={collapsed} shortcutEnabled={helpShortcutEnabled} />
+      </div>
+      <div className={cn("pb-2", collapsed ? "flex justify-center" : "px-0.5")}>
+        <LocaleSwitcher collapsed={collapsed} />
       </div>
       <Separator className="bg-border-soft" />
       <AccountMenu collapsed={collapsed} user={user} />

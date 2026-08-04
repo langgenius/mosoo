@@ -3,7 +3,6 @@ import { KeyRound, User } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 import { useTranslation } from "@/shared/i18n";
-import { LocaleSwitcher } from "@/shared/i18n/locale-switcher";
 import { cn } from "@/shared/lib/class-names";
 
 interface SettingsNavItem {
@@ -65,12 +64,6 @@ export function SettingsNav() {
           </div>
         );
       })}
-      <div className="border-border-soft mt-auto border-t pt-3">
-        <div className="text-fg-3 px-2.5 pb-1 text-[10px] font-semibold tracking-[0.14em] uppercase">
-          {t("settings.language")}
-        </div>
-        <LocaleSwitcher className="w-full justify-start" />
-      </div>
     </aside>
   );
 }
