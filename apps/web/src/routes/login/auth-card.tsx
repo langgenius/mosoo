@@ -1,6 +1,7 @@
 import { Loader2 } from "lucide-react";
 import type { CSSProperties, ReactElement } from "react";
 
+import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Separator } from "@/shared/ui/separator";
@@ -39,12 +40,16 @@ export function LoginAuthCard({
   otpVerifying,
   step,
 }: LoginAuthCardProps): ReactElement {
+  const { t } = useTranslation();
   const isOtpStep = step === "otp";
-  const heading = step === "otp" ? "Check your email" : "Start building in 30 seconds";
-  const subheading =
-    step === "otp"
-      ? "Enter the verification code we just sent you."
-      : "No credit card required. Free to start.";
+  const heading = isOtpStep ? t("login.checkEmail") : t("login.title");
+  const subheading = isOtpStep ? t("login.enterCode") : t("login.subtitle");
+
+  // Map error codes (from copy.ts / use-login.ts) to translated messages.
+  // Keys that start with "login." are i18n keys; everything else is already a
+  // user-facing message (e.g. from an Error instance).
+  const resolvedError: string | null =
+    error === null ? null : error.startsWith("login.") ? t(error) : error;
 
   return (
     <div className="flex flex-1 items-center justify-center px-6 pb-16">
@@ -61,7 +66,7 @@ export function LoginAuthCard({
           {isOtpStep ? (
             <>
               <p className="text-fg-2 text-center text-[13px]">
-                We sent a code to <span className="text-fg-1 font-semibold">{email}</span>.
+                {t("login.sentCode")} <span className="text-fg-1 font-semibold">{email}</span>.
               </p>
               <Input
                 type="text"
@@ -93,10 +98,10 @@ export function LoginAuthCard({
                 {otpVerifying ? (
                   <>
                     <Loader2 className="size-4 animate-spin" />
-                    Verifying…
+                    {t("login.verifyContinue")}
                   </>
                 ) : (
-                  "Verify and continue"
+                  t("login.verifyContinue")
                 )}
               </Button>
               <button
@@ -104,7 +109,7 @@ export function LoginAuthCard({
                 onClick={onUseDifferentEmail}
                 className="text-fg-2 hover:text-fg-1 block w-full text-center text-[13px] transition-colors"
               >
-                Use a different email
+                {t("login.useDifferentEmail")}
               </button>
             </>
           ) : (
@@ -133,20 +138,20 @@ export function LoginAuthCard({
                     fill="#EA4335"
                   />
                 </svg>
-                Continue with Google
+                {t("login.continueWithGoogle")}
               </Button>
 
               <div className="flex items-center gap-3">
                 <Separator className="flex-1" />
                 <span className="text-fg-3 text-[11.5px] font-semibold tracking-[0.14em] uppercase">
-                  or
+                  {t("login.or")}
                 </span>
                 <Separator className="flex-1" />
               </div>
 
               <Input
                 type="email"
-                placeholder="you@company.com"
+                placeholder={t("login.emailPlaceholder")}
                 value={email}
                 onChange={(event) => {
                   onChangeEmail(event.target.value);
@@ -173,22 +178,20 @@ export function LoginAuthCard({
                 {otpSending ? (
                   <>
                     <Loader2 className="size-4 animate-spin" />
-                    Sending…
+                    {t("login.sending")}
                   </>
                 ) : (
-                  "Send code"
+                  t("login.sendCode")
                 )}
               </Button>
             </>
           )}
 
-          {error === null ? null : (
-            <p className="text-destructive text-center text-[13px]">{error}</p>
+          {resolvedError === null ? null : (
+            <p className="text-destructive text-center text-[13px]">{resolvedError}</p>
           )}
 
-          <p className="text-fg-3 pt-2 text-center text-[13px]">
-            If this is your first time, we&apos;ll create your default App after verification.
-          </p>
+          <p className="text-fg-3 pt-2 text-center text-[13px]">{t("login.firstTimeNote")}</p>
         </div>
       </div>
     </div>

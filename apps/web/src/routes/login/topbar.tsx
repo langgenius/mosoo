@@ -2,6 +2,9 @@ import { MOSOO_MARKETING_ORIGIN } from "@mosoo/contracts/origin";
 import { ArrowLeft } from "lucide-react";
 import type { ReactElement } from "react";
 
+import { useTranslation } from "@/shared/i18n";
+import { LocaleSwitcher } from "@/shared/i18n/locale-switcher";
+
 function Brand(): ReactElement {
   return (
     <span aria-label="mosoo" className="inline-flex items-center">
@@ -11,6 +14,8 @@ function Brand(): ReactElement {
 }
 
 export function LoginAuthTopbar(): ReactElement {
+  const { t } = useTranslation();
+
   return (
     <div className="flex items-center justify-between px-10 py-[22px]">
       <a
@@ -18,10 +23,10 @@ export function LoginAuthTopbar(): ReactElement {
         className="text-fg-2 hover:text-fg-1 flex items-center gap-1.5 text-[13px] font-semibold transition-colors"
       >
         <ArrowLeft className="size-3.5" />
-        Back to mosoo
+        {t("login.backToMosoo")}
       </a>
       <Brand />
-      <div className="w-[100px]" />
+      <LocaleSwitcher />
     </div>
   );
 }

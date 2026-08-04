@@ -39,18 +39,31 @@
     "deploymentPreview": "Deployment preview"
   },
   "login": {
+    "backToMosoo": "Back to mosoo",
     "title": "Start building in 30 seconds",
     "subtitle": "No credit card required. Free to start.",
     "checkEmail": "Check your email",
     "enterCode": "Enter the verification code we just sent you.",
     "sentCode": "We sent a code to",
     "verifyContinue": "Verify and continue",
+    "verifying": "Verifying…",
+    "useDifferentEmail": "Use a different email",
     "googleCancelled": "Google sign-in was cancelled.",
     "googleNotConfigured": "Google SSO is not configured.",
-    "emailPlaceholder": "Enter your email",
+    "googleResumeFailed": "Google sign-in could not be resumed. Please try again.",
+    "googleSignInFailed": "Google sign-in failed. Please try again.",
+    "emailPlaceholder": "you@company.com",
     "continueWithEmail": "Continue with email",
     "continueWithGoogle": "Continue with Google",
-    "or": "or"
+    "or": "or",
+    "sendCode": "Send code",
+    "sending": "Sending…",
+    "firstTimeNote": "If this is your first time, we'll create your default App after verification.",
+    "invalidEmail": "Please enter a valid email address",
+    "enterCodePrompt": "Please enter the verification code",
+    "sendCodeFailed": "Failed to send verification code",
+    "invalidCode": "Invalid verification code",
+    "unexpectedError": "Unexpected error"
   },
   "onboarding": {
     "title": "Build agent app with mosoo",
