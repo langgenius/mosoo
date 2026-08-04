@@ -4,7 +4,9 @@ import type { ReactNode } from "react";
 import { DEFAULT_LOCALE, resolveLocale } from "./locales";
 import type { SupportedLocale } from "./locales";
 import en from "./translations/en.json";
+import ja from "./translations/ja.json";
 import zhCN from "./translations/zh-CN.json";
+import zhTW from "./translations/zh-TW.json";
 
 type TranslationValue = string | Record<string, unknown>;
 type TranslationTree = Record<string, TranslationValue>;
@@ -15,7 +17,12 @@ type I18nContextValue = {
   t: (key: string, variables?: Record<string, string>) => string;
 };
 
-const resources: Record<SupportedLocale, TranslationTree> = { en, "zh-CN": zhCN };
+const resources: Record<SupportedLocale, TranslationTree> = {
+  en,
+  ja,
+  "zh-CN": zhCN,
+  "zh-TW": zhTW,
+};
 const I18nContext = createContext<I18nContextValue | null>(null);
 
 function lookup(tree: TranslationTree, key: string): string {

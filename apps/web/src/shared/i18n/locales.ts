@@ -5,7 +5,7 @@
  * current locale rather than hardcoded "en-US" — use the `useLocale()` hook
  * or the `useFormatDate()` / `useFormatNumber()` helpers.
  */
-export const SUPPORTED_LOCALES = ["en", "zh-CN"] as const;
+export const SUPPORTED_LOCALES = ["en", "zh-CN", "zh-TW", "ja"] as const;
 
 export type SupportedLocale = (typeof SUPPORTED_LOCALES)[number];
 
@@ -15,6 +15,8 @@ export const DEFAULT_LOCALE: SupportedLocale = "en";
 export const LOCALE_DISPLAY_NAMES: Record<SupportedLocale, string> = {
   en: "English",
   "zh-CN": "简体中文",
+  "zh-TW": "繁體中文",
+  ja: "日本語",
 };
 
 /**
@@ -24,7 +26,14 @@ export const LOCALE_DISPLAY_NAMES: Record<SupportedLocale, string> = {
 export function resolveLocale(raw: string): SupportedLocale {
   const normalized = raw.trim().toLowerCase();
   if (normalized.startsWith("zh") || normalized.startsWith("cn")) {
+    // zh-Hant / zh-TW → zh-TW; zh-Hans / zh-CN → zh-CN
+    if (normalized.includes("hant") || normalized.includes("tw")) {
+      return "zh-TW";
+    }
     return "zh-CN";
+  }
+  if (normalized.startsWith("ja")) {
+    return "ja";
   }
   return DEFAULT_LOCALE;
 }

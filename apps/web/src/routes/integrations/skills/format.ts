@@ -6,7 +6,17 @@ const DATE_FORMATTERS: Record<SupportedLocale, Intl.DateTimeFormat> = {
     month: "short",
     year: "numeric",
   }),
+  ja: new Intl.DateTimeFormat("ja-JP", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }),
   "zh-CN": new Intl.DateTimeFormat("zh-CN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }),
+  "zh-TW": new Intl.DateTimeFormat("zh-TW", {
     day: "numeric",
     month: "short",
     year: "numeric",
