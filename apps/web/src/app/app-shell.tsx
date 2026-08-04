@@ -8,6 +8,7 @@ import PlusSignIcon from "@hugeicons/core-free-icons/PlusSignIcon";
 import type { AppSummary } from "@mosoo/contracts/app";
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
+import { useTranslation } from "@/shared/i18n";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { HelpMenu } from "@/features/help/help-menu";
@@ -41,11 +42,13 @@ const SwitcherChevronIcon = createHugeicon(ChevronsDownUpIcon, "SwitcherChevronI
 
 // One-click return to the parent Org layer (the Apps list).
 function BackToOrgLink({ collapsed, orgName }: { collapsed: boolean; orgName: string | null }) {
-  const label = orgName ?? "Apps";
+  const { t } = useTranslation();
+  const label = orgName ?? t("pageTitle.apps");
+  const backToLabel = t("nav.backTo", { label });
   const link = (
     <Link
       to="/apps"
-      aria-label={`Back to ${label}`}
+      aria-label={backToLabel}
       className={cn(
         "text-fg-3 hover:text-fg-1 flex items-center gap-1 rounded-md transition-colors",
         collapsed
@@ -65,7 +68,7 @@ function BackToOrgLink({ collapsed, orgName }: { collapsed: boolean; orgName: st
   return (
     <Tooltip>
       <TooltipTrigger asChild>{link}</TooltipTrigger>
-      <TooltipContent side="right">Back to {label}</TooltipContent>
+      <TooltipContent side="right">{backToLabel}</TooltipContent>
     </Tooltip>
   );
 }
@@ -84,7 +87,8 @@ function AppSwitcher({
   loading: boolean;
   onSwitch: (appId: string) => void;
 }) {
-  const displayLabel = activeApp?.name ?? (loading ? "Loading app" : "No app");
+  const { t } = useTranslation();
+  const displayLabel = activeApp?.name ?? (loading ? t("common.loadingApp") : t("common.noApp"));
 
   const trigger = (
     <button
@@ -140,8 +144,9 @@ function AppSwitcher({
 }
 
 function NewAgentCta({ collapsed, disabled }: { collapsed: boolean; disabled: boolean }) {
+  const { t } = useTranslation();
   const className = cn("mb-4", collapsed ? "mx-auto size-9 p-0" : "w-full justify-center");
-  const label = "New agent";
+  const label = t("agent.create");
 
   if (disabled) {
     return (

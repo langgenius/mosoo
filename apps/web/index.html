@@ -32,6 +32,19 @@
       crossorigin="anonymous"
     />
     <title>mosoo</title>
+    <!-- Set html lang attribute early based on stored locale preference.
+         Falls back to navigator.language. Runs before React mounts so the
+         browser uses the correct spelling dictionary and accessibility
+         voice from the first paint. -->
+    <script>
+      (function() {
+        var stored = localStorage.getItem("mosoo-locale");
+        var lang = stored || navigator.language || "en";
+        if (lang.toLowerCase().startsWith("zh")) lang = "zh-CN";
+        else lang = "en";
+        document.documentElement.lang = lang;
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

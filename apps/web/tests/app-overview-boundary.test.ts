@@ -162,7 +162,10 @@ describe("App overview boundary", () => {
     expect(stepsSource).not.toContain(" · ");
   });
 
-  test("keeps the App console root free of Chinese copy", () => {
+  test("keeps the App console root free of hardcoded Chinese copy in source", () => {
+    // Chinese text belongs in translation JSON files (src/shared/i18n/translations/),
+    // not hardcoded in TSX source. The CJK boundary test now verifies that
+    // source files use i18n keys instead of inline Chinese strings.
     const routeSource = readSource("../src/routes/app-overview/app-overview.route.tsx");
     const installSource = readSource("../src/routes/app-overview/app-overview-install.tsx");
     const stepsSource = readSource("../src/routes/app-overview/onboarding-steps.tsx");
@@ -173,5 +176,17 @@ describe("App overview boundary", () => {
     expect(cjk.test(installSource)).toBe(false);
     expect(cjk.test(stepsSource)).toBe(false);
     expect(cjk.test(promptSource)).toBe(false);
+  });
+
+  test("translation files contain Chinese for zh-CN locale", () => {
+    const zhCN = readSource("../src/shared/i18n/translations/zh-CN.json");
+    const cjk = /[一-鿿]/u;
+    expect(cjk.test(zhCN)).toBe(true);
+  });
+
+  test("translation files contain no Chinese in en locale", () => {
+    const en = readSource("../src/shared/i18n/translations/en.json");
+    const cjk = /[一-鿿]/u;
+    expect(cjk.test(en)).toBe(false);
   });
 });
