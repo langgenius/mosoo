@@ -7,7 +7,6 @@ import { Badge } from "@/shared/ui/badge";
 
 import { DeployActions } from "./components/deploy-actions";
 import { DeployOverview } from "./components/deploy-overview";
-import { DeployRepoCard } from "./components/deploy-repo-card";
 import { ActivitySection } from "./components/deployments-history";
 import type { DeployConsoleState } from "./deploy-console-data";
 import type { ProductionEnvironmentStatus } from "./deployment-status";
@@ -180,12 +179,6 @@ export function DeploySurface({
           <div className="mx-auto flex max-w-4xl flex-col gap-8">
             {loadError === null ? null : <LoadErrorBanner message={loadError} />}
             {emptyHero}
-            <DeployRepoCard
-              appId={appId}
-              deploying={deploy.deploying}
-              serverError={deployError}
-              onDeploy={deploy.deployRepo}
-            />
             <ActivitySection preDeploy runs={[]} error={runsError} />
           </div>
         ) : (
