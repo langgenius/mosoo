@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 
 import { createPlatformId } from "@mosoo/id";
 import type { SandboxId, SessionId } from "@mosoo/id";
@@ -15,6 +15,7 @@ import {
 } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-store";
 import { encodeSandboxBackupIdForStorage } from "../src/modules/runtime/infrastructure/sandbox-backup-id";
 import type { SandboxHandle } from "../src/modules/runtime/infrastructure/sandbox-handles";
+import { setServerProductAnalyticsTransportForTests } from "../src/platform/analytics/product-analytics";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
@@ -30,6 +31,10 @@ const RUNTIME_SUBJECT_QUOTA_SCOPE = {
   appId: APP_ID,
   executionOwnerUserId: ACCOUNT_ID,
 } as const;
+
+afterEach(() => {
+  setServerProductAnalyticsTransportForTests(null);
+});
 
 function createRuntimeSubjectLifecycleDatabase(): SqliteD1Database {
   const database = new SqliteD1Database();
@@ -472,6 +477,48 @@ describe("runtime subject lifecycle machine", () => {
       claim_expires_at: null,
       claim_owner: null,
       status: "active",
+    });
+  });
+
+  test("captures one sandbox creation when a cold subject becomes active", async () => {
+    const database = createRuntimeSubjectLifecycleDatabase();
+    await insertRuntimeSubject(database, { status: "cold" });
+    const capturedEvents: unknown[] = [];
+    setServerProductAnalyticsTransportForTests(async (_input, init) => {
+      capturedEvents.push(JSON.parse(init.body as string) as unknown);
+      return new Response(null, { status: 200 });
+    });
+    const bindings = {
+      ...createBindings(database),
+      POSTHOG_PROJECT_KEY: "phc_test",
+    } as ApiBindings;
+    const service = createRuntimeSubjectLifecycleService(bindings);
+    const activation = {
+      executionOwnerUserId: "01J00000000000000000000002",
+      kind: "cattle" as const,
+      networkConstraints: { allowedHosts: [], networkPolicy: "full" as const },
+      runtimeSubjectId: RUNTIME_SUBJECT_ID,
+      spaceAliases: [],
+      subjectId: "01J00000000000000000000009",
+      subjectKind: "session" as const,
+    };
+
+    await service.activate(activation);
+    await service.activate(activation);
+
+    expect(capturedEvents).toHaveLength(1);
+    expect(capturedEvents[0]).toMatchObject({
+      event: "sandbox_created",
+      properties: {
+        activation_purpose: "interactive",
+        distinct_id: activation.executionOwnerUserId,
+        execution_owner_id: activation.executionOwnerUserId,
+        sandbox_id: RUNTIME_SUBJECT_ID,
+        sandbox_kind: "cattle",
+        session_id: activation.subjectId,
+        subject_id: activation.subjectId,
+        subject_kind: "session",
+      },
     });
   });
 

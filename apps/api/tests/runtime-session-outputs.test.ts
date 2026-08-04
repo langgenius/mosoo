@@ -148,6 +148,7 @@ function createRuntimeLink(): RuntimeSessionLink {
     sessionId: PUBLIC_API_TEST_IDS.ownerSession,
     sessionRunId: PUBLIC_API_TEST_IDS.run,
     sessionRunStatus: "running",
+    sessionType: "ui",
     traceId: "trace-session-outputs",
   };
 }

@@ -26,7 +26,8 @@ function createRuntimeSessionLinkDatabase(): SqliteD1Database {
       id text PRIMARY KEY NOT NULL,
       agent_id text NOT NULL,
       app_id text,
-      creator_account_id text NOT NULL
+      creator_account_id text NOT NULL,
+      type text DEFAULT 'preview' NOT NULL
 );
 
     CREATE TABLE agent (
@@ -77,6 +78,7 @@ describe("runtime session link", () => {
       sessionId: "session-1",
       sessionRunId: "run-1",
       sessionRunStatus: "running",
+      sessionType: "preview",
     });
   });
 });

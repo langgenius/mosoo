@@ -1,6 +1,7 @@
 import type { SessionUsageSummary } from "@mosoo/ag-ui-session";
 import type { AgentKind } from "@mosoo/contracts/agent";
 import type { SandboxSubjectKind } from "@mosoo/contracts/sandbox";
+import type { SessionType } from "@mosoo/contracts/session";
 import type { SessionRunStatus } from "@mosoo/contracts/session-run";
 import type {
   AccountId,
@@ -31,6 +32,7 @@ export interface RuntimeSessionLink {
   sessionId: SessionId | null;
   sessionRunId: SessionRunId | null;
   sessionRunStatus: SessionRunStatus | null;
+  sessionType: SessionType | null;
   traceId: string | null;
   sandboxSubjectKind: SandboxSubjectKind | null;
 }

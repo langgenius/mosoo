@@ -39,8 +39,9 @@ function createDriverSessionLinkDatabase(): SqliteD1Database {
       agent_id text,
       app_id text,
       creator_account_id text NOT NULL,
-      id text PRIMARY KEY NOT NULL
-);
+      id text PRIMARY KEY NOT NULL,
+      type text DEFAULT 'preview' NOT NULL
+    );
 
     CREATE TABLE agent (
       id text PRIMARY KEY NOT NULL,
@@ -109,6 +110,7 @@ describe("driver runtime session link", () => {
         sessionId: SESSION_ID,
         sessionRunId: null,
         sessionRunStatus: null,
+        sessionType: "preview",
         traceId: null,
       }),
     ).toBe(true);
