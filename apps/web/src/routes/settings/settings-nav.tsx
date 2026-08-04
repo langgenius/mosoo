@@ -2,6 +2,8 @@ import type { LucideIcon } from "lucide-react";
 import { KeyRound, User } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
+import { useTranslation } from "@/shared/i18n";
+import { LocaleSwitcher } from "@/shared/i18n/locale-switcher";
 import { cn } from "@/shared/lib/class-names";
 
 interface SettingsNavItem {
@@ -28,16 +30,18 @@ const SETTINGS_NAV_SECTIONS: SettingsNavSection[] = [
 ];
 
 export function SettingsNav() {
+  const { t } = useTranslation();
+
   return (
     <aside className="border-border-soft flex w-full shrink-0 flex-col gap-3 overflow-x-auto border-b px-4 py-2 md:w-[220px] md:overflow-visible md:border-r md:border-b-0 md:px-3 md:py-5">
       <div className="text-fg-3 hidden px-2.5 pb-1 text-[10px] font-semibold tracking-[0.14em] uppercase md:block">
-        Settings
+        {t("pageTitle.settings")}
       </div>
       {SETTINGS_NAV_SECTIONS.map((section) => {
         return (
           <div key={section.label} className="flex flex-col gap-1">
             <div className="text-fg-3 hidden px-2.5 pb-1 text-[10px] font-semibold tracking-[0.14em] uppercase md:block">
-              {section.label}
+              {t("settings.account")}
             </div>
             <div className="flex gap-1 md:flex-col md:gap-0.5">
               {section.items.map((item) => (
@@ -61,6 +65,12 @@ export function SettingsNav() {
           </div>
         );
       })}
+      <div className="mt-auto border-t border-border-soft pt-3">
+        <div className="text-fg-3 px-2.5 pb-1 text-[10px] font-semibold tracking-[0.14em] uppercase">
+          {t("settings.language")}
+        </div>
+        <LocaleSwitcher className="w-full justify-start" />
+      </div>
     </aside>
   );
 }

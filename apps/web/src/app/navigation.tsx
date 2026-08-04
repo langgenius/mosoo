@@ -7,6 +7,7 @@ import Settings02Icon from "@hugeicons/core-free-icons/Settings02Icon";
 import SlidersHorizontalIcon from "@hugeicons/core-free-icons/SlidersHorizontalIcon";
 import type { MouseEvent } from "react";
 import { useState } from "react";
+import { useTranslation } from "@/shared/i18n";
 import { Link } from "react-router-dom";
 
 import { cn } from "@/shared/lib/class-names";
@@ -38,38 +39,41 @@ interface AppNavSection {
   items: AppNavItem[];
 }
 
-const NAV_SECTIONS: AppNavSection[] = [
-  {
-    items: [
-      { icon: createHugeicon(DashboardSquare01Icon, "OverviewIcon"), label: "Overview", path: "/" },
-      { icon: createHugeicon(InboxIcon, "ThreadsIcon"), label: "Runs", path: "/threads" },
-      { icon: createHugeicon(BotIcon, "AgentsIcon"), label: "Agents", path: "/agent" },
-      { icon: createHugeicon(Files02Icon, "FilesIcon"), label: "Files", path: "/files" },
-      {
-        children: [
-          { label: "Skills", path: "/integrations/skills" },
-          { label: "MCP servers", path: "/integrations/mcp" },
-          { label: "Providers", path: "/providers" },
-          { label: "Environments", path: "/environment" },
-        ],
-        icon: createHugeicon(SlidersHorizontalIcon, "ConfigIcon"),
-        label: "Config",
-        path: "/integrations",
-      },
-    ],
-    label: "App",
-  },
-  {
-    items: [
-      {
-        icon: createHugeicon(Settings02Icon, "AppSettingsIcon"),
-        label: "Settings",
-        path: "/app-settings",
-      },
-    ],
-    label: "Account",
-  },
-];
+function useNavSections(): AppNavSection[] {
+  const { t } = useTranslation();
+  return [
+    {
+      items: [
+        { icon: createHugeicon(DashboardSquare01Icon, "OverviewIcon"), label: t("nav.overview"), path: "/" },
+        { icon: createHugeicon(InboxIcon, "ThreadsIcon"), label: t("nav.runs"), path: "/threads" },
+        { icon: createHugeicon(BotIcon, "AgentsIcon"), label: t("nav.agents"), path: "/agent" },
+        { icon: createHugeicon(Files02Icon, "FilesIcon"), label: t("nav.files"), path: "/files" },
+        {
+          children: [
+            { label: t("nav.skills"), path: "/integrations/skills" },
+            { label: t("nav.mcpServers"), path: "/integrations/mcp" },
+            { label: t("nav.providers"), path: "/providers" },
+            { label: t("nav.environments"), path: "/environment" },
+          ],
+          icon: createHugeicon(SlidersHorizontalIcon, "ConfigIcon"),
+          label: t("nav.config"),
+          path: "/integrations",
+        },
+      ],
+      label: t("nav.app"),
+    },
+    {
+      items: [
+        {
+          icon: createHugeicon(Settings02Icon, "AppSettingsIcon"),
+          label: t("nav.settings"),
+          path: "/app-settings",
+        },
+      ],
+      label: t("nav.account"),
+    },
+  ];
+}
 
 const ExpandIcon = createHugeicon(ChevronRightIcon, "ExpandIcon");
 
@@ -288,9 +292,10 @@ function NavSection({
 }
 
 export function AppNavigation({ collapsed, pathname }: { collapsed: boolean; pathname: string }) {
+  const sections = useNavSections();
   return (
     <div className={cn("flex flex-col", collapsed ? "gap-1" : "gap-0")}>
-      {NAV_SECTIONS.map((section, index) => (
+      {sections.map((section, index) => (
         <div key={section.label ?? `section-${index}`} className="flex flex-col">
           {collapsed && index > 0 ? (
             <div aria-hidden="true" className="bg-border-soft mx-auto my-1.5 h-px w-6" />
