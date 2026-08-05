@@ -303,7 +303,9 @@ export function RuntimeAdvancedSettingsField({
           {showBuiltInTools ? (
             <div className="border-border/70 space-y-2 border-t pt-3">
               <div className="flex items-center justify-between gap-3">
-                <Label className="text-muted-foreground text-[12px]">{t("agentEditor.tools")}</Label>
+                <Label className="text-muted-foreground text-[12px]">
+                  {t("agentEditor.tools")}
+                </Label>
                 <span className="text-muted-foreground text-[10px]">tools</span>
               </div>
               <BuiltInToolsField

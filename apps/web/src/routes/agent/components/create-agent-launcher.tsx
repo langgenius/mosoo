@@ -9,8 +9,8 @@ import { useAppSession } from "@/app/session-provider";
 import { createAgent } from "@/domains/agent/api/agent-client";
 import { agentKeys } from "@/domains/agent/query/agent-queries";
 import { useVendorCredentialsQuery } from "@/domains/vendor-credential/model/provider-credential-query";
-import { cn } from "@/shared/lib/class-names";
 import { useTranslation } from "@/shared/i18n";
+import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
 import { Input } from "@/shared/ui/input";
@@ -151,7 +151,9 @@ function CreateAgentLauncherBody({
         <div className="space-y-2">
           <Label className="text-muted-foreground text-[12px]">{t("agent.runtime")}</Label>
           {runtimeOptions.length === 0 ? (
-            <div className="text-muted-foreground text-[13px]">{t("agent.noRuntimesAvailable")}</div>
+            <div className="text-muted-foreground text-[13px]">
+              {t("agent.noRuntimesAvailable")}
+            </div>
           ) : (
             <div className="grid grid-cols-2 gap-3">
               {runtimeOptions.map((runtime) => {

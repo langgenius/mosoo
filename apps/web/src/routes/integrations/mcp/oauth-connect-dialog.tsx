@@ -152,7 +152,9 @@ export function OAuthConnectDialog({
         handleOpenChange(false);
       } catch (connectError) {
         setStage("confirm");
-        setError(connectError instanceof Error ? connectError.message : t("mcp.bearerConnectFailed"));
+        setError(
+          connectError instanceof Error ? connectError.message : t("mcp.bearerConnectFailed"),
+        );
       }
 
       return;
@@ -183,7 +185,9 @@ export function OAuthConnectDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
-            {isBearer ? t("mcp.connectServer", { name: server.name }) : t("mcp.authorizeServer", { name: server.name })}
+            {isBearer
+              ? t("mcp.connectServer", { name: server.name })
+              : t("mcp.authorizeServer", { name: server.name })}
           </DialogTitle>
           <DialogDescription>
             {isBearer ? t("mcp.bearerDescription") : t("mcp.oauthDescription")}

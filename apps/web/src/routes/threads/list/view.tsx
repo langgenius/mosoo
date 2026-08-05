@@ -237,7 +237,9 @@ function ThreadRow({
             variant="ghost"
             aria-label={t("threads.deleteThread")}
             disabled={!actionCapabilities.delete.available}
-            title={actionCapabilities.delete.reason ? t(actionCapabilities.delete.reason) : undefined}
+            title={
+              actionCapabilities.delete.reason ? t(actionCapabilities.delete.reason) : undefined
+            }
             onClick={() => {
               onDelete(thread.id);
             }}

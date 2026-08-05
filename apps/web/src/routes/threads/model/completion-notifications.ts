@@ -25,17 +25,14 @@ export function useThreadCompletionNotifications(
       const previousBucket = previousBuckets.get(thread.id) ?? null;
 
       if (previousBucket === "working" && thread.bucket === "completed" && !thread.read) {
-        const notification = new globalThis.Notification(
-          t("threads.notificationThreadCompleted"),
-          {
-            body: t("threads.notificationThreadCompletedBody", {
-              agentName: t(thread.agentName),
-              statusLine: translateThreadStatusLine(thread.statusLine, t),
-              title: t(thread.title),
-            }),
-            tag: thread.id,
-          },
-        );
+        const notification = new globalThis.Notification(t("threads.notificationThreadCompleted"), {
+          body: t("threads.notificationThreadCompletedBody", {
+            agentName: t(thread.agentName),
+            statusLine: translateThreadStatusLine(thread.statusLine, t),
+            title: t(thread.title),
+          }),
+          tag: thread.id,
+        });
         const threadId = thread.id;
         const onClick = (): void => {
           globalThis.window.focus();

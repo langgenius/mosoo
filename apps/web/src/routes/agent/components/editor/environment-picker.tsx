@@ -249,7 +249,11 @@ function EnvironmentMenuContent({
   const { t } = useTranslation();
 
   if (loading) {
-    return <div className="text-muted-foreground p-3 text-[12px]">{t("agentEditor.loadingEnvironments")}</div>;
+    return (
+      <div className="text-muted-foreground p-3 text-[12px]">
+        {t("agentEditor.loadingEnvironments")}
+      </div>
+    );
   }
 
   if (error) {

@@ -38,7 +38,11 @@ export function CostOverviewPanel({
             formatCurrency(totals?.totalCostUsd ?? 0),
             formatPercent(totals && previousTotals ? costDelta(totals, previousTotals) : 0),
           ],
-          [t("cost.totalRequests"), formatCompactNumber(totals?.requestCount ?? 0), t("cost.requests")],
+          [
+            t("cost.totalRequests"),
+            formatCompactNumber(totals?.requestCount ?? 0),
+            t("cost.requests"),
+          ],
           [
             t("cost.totalTokens"),
             formatCompactNumber(totals ? tokensTotal(totals) : 0),

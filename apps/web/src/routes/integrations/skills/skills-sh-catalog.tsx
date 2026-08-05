@@ -135,8 +135,7 @@ export function SkillsShCatalog({
       onInstalled(created.id);
     } catch (caughtError) {
       dispatch({
-        error:
-          caughtError instanceof Error ? caughtError.message : t("skills.failedToInstall"),
+        error: caughtError instanceof Error ? caughtError.message : t("skills.failedToInstall"),
         type: "installFailed",
       });
     }
@@ -198,9 +197,7 @@ export function SkillsShCatalog({
           <div className="text-fg-3 flex items-center gap-1.5 text-[12px] tabular-nums">
             <span>
               {formatCatalogCount(result.total ?? result.count)}
-              {result.source === "public-page"
-                ? t("skills.publicIndex")
-                : t("skills.skillsShApi")}
+              {result.source === "public-page" ? t("skills.publicIndex") : t("skills.skillsShApi")}
             </span>
             <SkillsShSourceTooltip source={result.source} />
           </div>
@@ -214,9 +211,7 @@ export function SkillsShCatalog({
       ) : null}
 
       {catalogQuery.isLoading ? (
-        <div className="text-fg-3 py-12 text-center text-[13px]">
-          {t("skills.loadingSkillsSh")}
-        </div>
+        <div className="text-fg-3 py-12 text-center text-[13px]">{t("skills.loadingSkillsSh")}</div>
       ) : catalogQuery.error ? (
         <div className="border-destructive/30 bg-destructive/5 text-destructive rounded-md border px-3 py-2 text-xs">
           {catalogQuery.error instanceof Error

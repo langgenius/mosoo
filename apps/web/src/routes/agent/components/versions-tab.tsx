@@ -44,7 +44,9 @@ export function VersionsTab({ agent }: { agent: Agent }): ReactElement {
         <div className="mx-auto w-full max-w-4xl p-5">
           {agent.versions.length === 0 ? (
             <div className="border-border rounded-lg border border-dashed bg-white px-5 py-8 text-center">
-              <div className="text-foreground text-[14px] font-medium">{t("agent.noPublishedVersions")}</div>
+              <div className="text-foreground text-[14px] font-medium">
+                {t("agent.noPublishedVersions")}
+              </div>
               <div className="text-muted-foreground mt-1 text-[12px]">
                 {t("agent.publishToCreateVersion")}
               </div>

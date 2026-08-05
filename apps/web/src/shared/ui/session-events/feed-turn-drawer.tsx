@@ -225,7 +225,10 @@ export function SessionTurnDrawer({
   const { t } = useTranslation();
   const events = useMemo(() => turn?.events ?? [], [turn?.events]);
   const visibleEvents = useMemo(() => events.filter(isSessionEventVisibleInMainFeed), [events]);
-  const title = turn === null ? t("sessionEvents.turnTitle") : t("sessionEvents.turn", { number: String(turn.index) });
+  const title =
+    turn === null
+      ? t("sessionEvents.turnTitle")
+      : t("sessionEvents.turn", { number: String(turn.index) });
   const [copied, setCopied] = useState(false);
   const totalDurationMs = visibleEvents.reduce(
     (total, event) => total + (event.durationMs ?? 0),
@@ -263,8 +266,9 @@ export function SessionTurnDrawer({
                 ) : null}
               </div>
               <DialogDescription className="text-fg-3 mt-0.5 text-[11.5px] tabular-nums">
-                {formatTotalDuration(totalDurationMs)} · {visibleEvents.length} {t("sessionEvents.events")} ·{" "}
-                {formatTokens(totalTokens)} {t("sessionEvents.tokens")}
+                {formatTotalDuration(totalDurationMs)} · {visibleEvents.length}{" "}
+                {t("sessionEvents.events")} · {formatTokens(totalTokens)}{" "}
+                {t("sessionEvents.tokens")}
               </DialogDescription>
             </div>
             <Button
@@ -285,8 +289,12 @@ export function SessionTurnDrawer({
           EventComponent={DrawerEventRow}
           emptyState={
             <div className="px-7 py-12 text-center">
-              <div className="text-fg-1 text-sm font-semibold">{t("sessionEvents.noEventsRecorded")}</div>
-              <div className="text-fg-3 mt-1 text-[12.5px]">{t("sessionEvents.noDurableEvents")}</div>
+              <div className="text-fg-1 text-sm font-semibold">
+                {t("sessionEvents.noEventsRecorded")}
+              </div>
+              <div className="text-fg-3 mt-1 text-[12.5px]">
+                {t("sessionEvents.noDurableEvents")}
+              </div>
             </div>
           }
           events={visibleEvents}

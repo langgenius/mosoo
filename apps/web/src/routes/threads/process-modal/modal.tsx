@@ -84,7 +84,11 @@ export function ThreadProcessModal({
                         <span className="bg-primary relative size-2 rounded-full" />
                       </span>
                     ) : null}
-                    {threadFailed ? t("threads.failed") : threadWorking ? t("threads.working") : t("threads.completed")}
+                    {threadFailed
+                      ? t("threads.failed")
+                      : threadWorking
+                        ? t("threads.working")
+                        : t("threads.completed")}
                   </span>
                 </div>
                 <DialogDescription className="text-fg-3 mt-0.5 text-[11.5px] tabular-nums">

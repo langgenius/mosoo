@@ -23,7 +23,9 @@ export function CliAuthPage() {
       const result = await confirmCliOAuthDeviceFlow(code);
       setStatus(result.status);
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError : new Error(t("cliAuth.failedToAuthorize")));
+      setError(
+        caughtError instanceof Error ? caughtError : new Error(t("cliAuth.failedToAuthorize")),
+      );
     } finally {
       setConfirming(false);
     }

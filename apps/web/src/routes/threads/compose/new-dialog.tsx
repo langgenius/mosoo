@@ -266,7 +266,9 @@ function AgentAssignField({
                         {agent.kind}
                       </span>
                       {agent.status !== "published" ? (
-                        <span className="text-fg-3 shrink-0 text-[10.5px]">{t("threads.draft")}</span>
+                        <span className="text-fg-3 shrink-0 text-[10.5px]">
+                          {t("threads.draft")}
+                        </span>
                       ) : null}
                     </div>
                     {agent.description ? (

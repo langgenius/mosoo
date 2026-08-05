@@ -143,9 +143,7 @@ export function buildAgentInstructionPrompt(
 ): string {
   const description = agent.description.trim() || t("agentLifecycle.noDescriptionProvided");
   const kindHint =
-    agent.kind === "pet"
-      ? t("agentLifecycle.kindHintAssistant")
-      : t("agentLifecycle.kindHintTask");
+    agent.kind === "pet" ? t("agentLifecycle.kindHintAssistant") : t("agentLifecycle.kindHintTask");
 
   return `${t("agentLifecycle.instructionForLlmHeading", { agentName: agent.name })}
 

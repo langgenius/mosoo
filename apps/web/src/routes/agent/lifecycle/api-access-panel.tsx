@@ -92,11 +92,7 @@ export function AgentApiAccessPanel({
               size="xs"
               variant="outline"
             >
-              {copiedKey === "agent" ? (
-                <Check className="size-3" />
-              ) : (
-                <Copy className="size-3" />
-              )}
+              {copiedKey === "agent" ? <Check className="size-3" /> : <Copy className="size-3" />}
               {copiedKey === "agent" ? t("common.copied") : t("common.copy")}
             </Button>
           }

@@ -179,9 +179,7 @@ export function EditMcpDialog({ server, onOpenChange, onSubmit }: Props) {
               }}
               placeholder="https://logo.clearbit.com/example.com"
             />
-            <p className="text-muted-foreground text-[10px]">
-              {t("mcp.leaveEmptyToUseInitial")}
-            </p>
+            <p className="text-muted-foreground text-[10px]">{t("mcp.leaveEmptyToUseInitial")}</p>
           </div>
 
           {/* Description */}

@@ -231,7 +231,9 @@ function ThreadDetailHeader({
         ) : (
           <Badge variant="outline">
             <ThreadStateIcon glyph={stateGlyph} />
-            <span>{thread.bucket === "archived" ? t("threads.archived") : t("threads.completed")}</span>
+            <span>
+              {thread.bucket === "archived" ? t("threads.archived") : t("threads.completed")}
+            </span>
           </Badge>
         )}
         {threadActionCapabilities.archive.available ? (
@@ -482,7 +484,9 @@ export function ThreadDetail({
             />
             <span>{t(thread.agentName)}</span>
             <span>·</span>
-            <span>{t("threads.created", { time: formatRelativeTime(thread.session.createdAt, t) })}</span>
+            <span>
+              {t("threads.created", { time: formatRelativeTime(thread.session.createdAt, t) })}
+            </span>
           </div>
 
           {firstUserMessage !== null ? (
@@ -504,7 +508,9 @@ export function ThreadDetail({
           />
 
           {messagesLoading ? (
-            <div className="text-fg-3 py-12 text-center text-[13px]">{t("threads.loadingThread")}</div>
+            <div className="text-fg-3 py-12 text-center text-[13px]">
+              {t("threads.loadingThread")}
+            </div>
           ) : messagesError ? (
             <div className="text-destructive py-12 text-center text-[13px]">
               {messagesError.message}

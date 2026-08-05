@@ -245,15 +245,15 @@ function ChannelConnectionPanel({
       </div>
       {webhookUrl ? (
         <div className="mt-4 grid gap-1.5">
-          <div className="text-muted-foreground text-[11px] font-medium">{t("agent.webhookUrl")}</div>
+          <div className="text-muted-foreground text-[11px] font-medium">
+            {t("agent.webhookUrl")}
+          </div>
           <div className="flex min-w-0 gap-2">
             <code className="bg-muted text-muted-foreground min-w-0 flex-1 truncate rounded-md border px-2 py-1.5 text-[11px]">
               {webhookUrl}
             </code>
             <Button
-              aria-label={
-                copiedWebhook ? t("agent.webhookUrlCopied") : t("agent.copyWebhookUrl")
-              }
+              aria-label={copiedWebhook ? t("agent.webhookUrlCopied") : t("agent.copyWebhookUrl")}
               onClick={() => {
                 void handleCopyWebhook();
               }}
@@ -359,9 +359,7 @@ export function AgentSettingsChannelsView({
           ) : null}
           <DialogTitle className="text-base">{t("agent.channels")}</DialogTitle>
         </div>
-        <DialogDescription>
-          {t("agent.connectChannels", { name: agent.name })}
-        </DialogDescription>
+        <DialogDescription>{t("agent.connectChannels", { name: agent.name })}</DialogDescription>
       </DialogHeader>
 
       <div className="border-border-subtle flex min-h-0 flex-1 border-t">

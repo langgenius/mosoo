@@ -76,9 +76,7 @@ export function EnvironmentsListPage() {
       });
     } catch (caughtError) {
       setError(
-        caughtError instanceof Error
-          ? caughtError.message
-          : t("environments.setDefaultFailed"),
+        caughtError instanceof Error ? caughtError.message : t("environments.setDefaultFailed"),
       );
     }
   }
@@ -94,9 +92,7 @@ export function EnvironmentsListPage() {
         appId: toAppId(appId),
       });
     } catch (caughtError) {
-      setError(
-        caughtError instanceof Error ? caughtError.message : t("environments.deleteFailed"),
-      );
+      setError(caughtError instanceof Error ? caughtError.message : t("environments.deleteFailed"));
     }
   }
 
@@ -106,10 +102,7 @@ export function EnvironmentsListPage() {
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
-      <PageHeader
-        title={t("environments.title")}
-        description={t("environments.listDescription")}
-      >
+      <PageHeader title={t("environments.title")} description={t("environments.listDescription")}>
         <Button
           onClick={() => {
             setCreateOpen(true);
@@ -139,9 +132,7 @@ export function EnvironmentsListPage() {
         ) : null}
 
         {environmentsQuery.isLoading ? (
-          <div className="text-fg-3 py-12 text-center text-[13px]">
-            {t("environments.loading")}
-          </div>
+          <div className="text-fg-3 py-12 text-center text-[13px]">{t("environments.loading")}</div>
         ) : environmentsQuery.error ? (
           <div className="text-destructive py-12 text-center text-[13px]">
             {environmentsQuery.error instanceof Error

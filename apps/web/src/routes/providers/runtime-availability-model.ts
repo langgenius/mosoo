@@ -25,10 +25,7 @@ const defaultTranslate: Translate = (key, variables) =>
     DEFAULT_TRANSLATIONS[key] ?? key,
   );
 
-function formatJoin(
-  items: readonly string[],
-  t: Translate,
-): string {
+function formatJoin(items: readonly string[], t: Translate): string {
   if (items.length <= 2) {
     return items.join(` ${t("providers.or")} `);
   }

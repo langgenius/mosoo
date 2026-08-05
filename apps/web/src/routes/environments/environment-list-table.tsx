@@ -33,10 +33,7 @@ export interface EnvironmentListTableProps {
 
 type Translate = (key: string, variables?: Record<string, string>) => string;
 
-function networkLabel(
-  environment: EnvironmentSummary,
-  t: Translate,
-): string {
+function networkLabel(environment: EnvironmentSummary, t: Translate): string {
   if (environment.networkPolicy === "full") {
     return t("environments.networkFullLabel");
   }

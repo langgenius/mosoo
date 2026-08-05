@@ -70,7 +70,10 @@ export function runPurposeToQuery(value: CostRunPurpose | "all"): CostRunPurpose
   return [value];
 }
 
-export function formatCurrency(value: number, locale: SupportedLocale = getCurrentLocale()): string {
+export function formatCurrency(
+  value: number,
+  locale: SupportedLocale = getCurrentLocale(),
+): string {
   return new Intl.NumberFormat(locale, {
     currency: "USD",
     maximumFractionDigits: value >= 100 ? 0 : 2,
@@ -78,7 +81,10 @@ export function formatCurrency(value: number, locale: SupportedLocale = getCurre
   }).format(value);
 }
 
-export function formatCompactNumber(value: number, locale: SupportedLocale = getCurrentLocale()): string {
+export function formatCompactNumber(
+  value: number,
+  locale: SupportedLocale = getCurrentLocale(),
+): string {
   return new Intl.NumberFormat(locale, {
     maximumFractionDigits: 1,
     notation: "compact",
@@ -90,7 +96,10 @@ export function formatPercent(value: number, locale: SupportedLocale = getCurren
   return `${value >= 0 ? "+" : ""}${amount}%`;
 }
 
-export function formatPlainPercent(value: number, locale: SupportedLocale = getCurrentLocale()): string {
+export function formatPlainPercent(
+  value: number,
+  locale: SupportedLocale = getCurrentLocale(),
+): string {
   return `${new Intl.NumberFormat(locale).format(Math.round(value * 100))}%`;
 }
 

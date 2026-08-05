@@ -6,10 +6,7 @@ import { cn } from "@/shared/lib/class-names";
 type Translate = (key: string, variables?: Record<string, string>) => string;
 const defaultTranslate: Translate = (key) => key;
 
-export function formatSkillFileCount(
-  count: number,
-  t: Translate = defaultTranslate,
-): string {
+export function formatSkillFileCount(count: number, t: Translate = defaultTranslate): string {
   if (count === 1) {
     return t("skills.fileCountOne");
   }

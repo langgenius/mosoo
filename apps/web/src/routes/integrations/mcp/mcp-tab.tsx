@@ -121,9 +121,7 @@ export function McpTab() {
           </div>
         )}
         {registry.loading ? (
-          <div className="text-fg-3 py-12 text-center text-[13px]">
-            {t("mcp.loadingRegistry")}
-          </div>
+          <div className="text-fg-3 py-12 text-center text-[13px]">{t("mcp.loadingRegistry")}</div>
         ) : list.length === 0 ? (
           <McpEmptyState
             searching={search.length > 0}

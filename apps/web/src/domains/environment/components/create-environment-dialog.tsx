@@ -50,9 +50,7 @@ export function CreateEnvironmentDialog({
       onCreated?.(created);
       onOpenChange(false);
     } catch (caughtError) {
-      setError(
-        caughtError instanceof Error ? caughtError.message : t("environments.createFailed"),
-      );
+      setError(caughtError instanceof Error ? caughtError.message : t("environments.createFailed"));
     }
   }
 

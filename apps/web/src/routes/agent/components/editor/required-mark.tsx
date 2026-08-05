@@ -6,7 +6,11 @@ export function RequiredMark(): ReactElement {
   const { t } = useTranslation();
 
   return (
-    <span aria-label={t("agent.required")} className="text-destructive ml-0.5" title={t("agent.required")}>
+    <span
+      aria-label={t("agent.required")}
+      className="text-destructive ml-0.5"
+      title={t("agent.required")}
+    >
       *
     </span>
   );

@@ -3,11 +3,11 @@ import { describe, expect, test } from "bun:test";
 import type { SessionRunStatus, SessionRunSummary } from "@mosoo/contracts/session-run";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import { I18nProvider } from "../src/shared/i18n";
 import {
   getThreadRunFailure,
   ThreadRunFailureNotice,
 } from "../src/routes/threads/detail/run-failure-notice";
+import { I18nProvider } from "../src/shared/i18n";
 
 function createRun(
   status: SessionRunStatus,

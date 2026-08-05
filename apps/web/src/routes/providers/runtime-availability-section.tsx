@@ -64,7 +64,9 @@ export function RuntimeAvailabilitySection({
   return (
     <section className="border-border bg-card rounded-lg border p-4">
       <div className="mb-3">
-        <h2 className="text-foreground text-sm font-semibold">{t("providers.runtimeAvailability")}</h2>
+        <h2 className="text-foreground text-sm font-semibold">
+          {t("providers.runtimeAvailability")}
+        </h2>
         <p className="text-muted-foreground mt-1 text-xs">
           {t("providers.runtimeAvailabilityDescription")}
         </p>

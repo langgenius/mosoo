@@ -87,7 +87,9 @@ export function AgentSettingsDangerZone({ agent }: { agent: Agent }) {
           {showUnpublish ? (
             confirmUnpublish ? (
               <div className="space-y-2 p-3">
-                <p className="text-foreground text-sm">{t("agent.unpublishPrompt", { name: agent.name })}</p>
+                <p className="text-foreground text-sm">
+                  {t("agent.unpublishPrompt", { name: agent.name })}
+                </p>
                 <p className="text-muted-foreground text-xs">{t("agent.unpublishDescription")}</p>
                 {unpublishMutation.error ? (
                   <div className="text-destructive text-xs">
@@ -122,7 +124,9 @@ export function AgentSettingsDangerZone({ agent }: { agent: Agent }) {
             ) : (
               <div className="flex items-center justify-between gap-3 p-3">
                 <div className="min-w-0">
-                  <div className="text-foreground text-sm font-medium">{t("agent.unpublishThisAgent")}</div>
+                  <div className="text-foreground text-sm font-medium">
+                    {t("agent.unpublishThisAgent")}
+                  </div>
                   <p className="text-muted-foreground mt-0.5 text-xs">
                     {t("agent.unpublishThisAgentDescription")}
                   </p>
@@ -145,7 +149,9 @@ export function AgentSettingsDangerZone({ agent }: { agent: Agent }) {
           {showResetAgentState ? (
             <div className="flex items-center justify-between gap-3 p-3">
               <div className="min-w-0">
-                <div className="text-foreground text-sm font-medium">{t("agent.resetAgentState")}</div>
+                <div className="text-foreground text-sm font-medium">
+                  {t("agent.resetAgentState")}
+                </div>
                 <p className="text-muted-foreground mt-0.5 text-xs">
                   {t("agent.resetAgentStateDescription")}
                 </p>
@@ -189,7 +195,9 @@ export function AgentSettingsDangerZone({ agent }: { agent: Agent }) {
           ) : (
             <div className="flex items-center justify-between gap-3 p-3">
               <div className="min-w-0">
-                <div className="text-foreground text-sm font-medium">{t("agent.deleteThisAgent")}</div>
+                <div className="text-foreground text-sm font-medium">
+                  {t("agent.deleteThisAgent")}
+                </div>
                 <p className="text-muted-foreground mt-0.5 text-xs">
                   {t("agent.deleteThisAgentDescription")}
                 </p>
@@ -222,9 +230,7 @@ export function AgentSettingsDangerZone({ agent }: { agent: Agent }) {
         <DialogContent className="border-destructive/60 rounded-lg sm:max-w-[480px]">
           <DialogHeader>
             <DialogTitle>{t("agent.resetAgentStatePrompt", { name: agent.name })}</DialogTitle>
-            <DialogDescription>
-              {t("agent.resetAgentStateDialogDescription")}
-            </DialogDescription>
+            <DialogDescription>{t("agent.resetAgentStateDialogDescription")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="border-destructive/20 bg-destructive/[0.04] rounded-lg border p-3">
@@ -245,7 +251,9 @@ export function AgentSettingsDangerZone({ agent }: { agent: Agent }) {
                   </ul>
                 </div>
                 <div>
-                  <div className="text-foreground font-medium">{t("agent.whatWillBePreserved")}</div>
+                  <div className="text-foreground font-medium">
+                    {t("agent.whatWillBePreserved")}
+                  </div>
                   <ul className="mt-1 list-disc space-y-1 pl-4">
                     <li>{t("agent.agentProfile")}</li>
                     <li>{t("agent.sessionFiles")}</li>

@@ -21,8 +21,8 @@ import {
   updateAppMcpServer,
 } from "@/domains/mcp/api/mcp-client";
 import { mcpKeys, useMcpRegistryQuery } from "@/domains/mcp/query/mcp-queries";
-import { useTranslation } from "@/shared/i18n";
 import { toMcpOAuthFlowId, toMcpServerId, toAppId } from "@/routes/typed-id";
+import { useTranslation } from "@/shared/i18n";
 
 import { isTruthy } from "../../../shared/lib/truthiness";
 

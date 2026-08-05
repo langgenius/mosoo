@@ -210,7 +210,9 @@ function ThreadsWorkspace({
             {getMutationErrorMessage(threads.loadError, t("threads.failedToLoadThreads"))}
           </div>
         ) : threads.isLoading ? (
-          <div className="text-fg-3 py-12 text-center text-[13px]">{t("threads.loadingThreads")}</div>
+          <div className="text-fg-3 py-12 text-center text-[13px]">
+            {t("threads.loadingThreads")}
+          </div>
         ) : threads.allThreads.length === 0 ? (
           <ThreadsEmptyState onNewThread={route.openComposeDialog} />
         ) : threads.filteredThreads.length === 0 ? (

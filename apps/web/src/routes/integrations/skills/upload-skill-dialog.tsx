@@ -333,9 +333,7 @@ export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, r
               <div className="text-foreground text-[15px] font-medium">
                 {t("skills.dragAndDrop")}
               </div>
-              <div className="text-muted-foreground text-xs">
-                {t("skills.dropFileOrFolder")}
-              </div>
+              <div className="text-muted-foreground text-xs">{t("skills.dropFileOrFolder")}</div>
             </button>
             <div className="text-muted-foreground text-center text-xs">
               {t("skills.or")}{" "}

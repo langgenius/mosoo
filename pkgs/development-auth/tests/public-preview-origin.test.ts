@@ -14,8 +14,8 @@ describe("Mosoo development auth preview host policy", () => {
   });
 
   test("continues to reject non-mosoo.ai accounts", () => {
-    expect(
-      canUseMosooAiDevelopmentBackdoor("rock@example.com", "http://139.99.68.217:55173"),
-    ).toBe(false);
+    expect(canUseMosooAiDevelopmentBackdoor("rock@example.com", "http://139.99.68.217:55173")).toBe(
+      false,
+    );
   });
 });

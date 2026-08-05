@@ -178,7 +178,9 @@ function renderSkillsDropdownContent({
   if (model.skillsError) {
     return (
       <div className="text-destructive p-3 text-[12px]">
-        {model.skillsError instanceof Error ? model.skillsError.message : t("agentEditor.failedToLoadSkills")}
+        {model.skillsError instanceof Error
+          ? model.skillsError.message
+          : t("agentEditor.failedToLoadSkills")}
       </div>
     );
   }

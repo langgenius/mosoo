@@ -162,9 +162,7 @@ function FileTable({
                   </button>
                 </TableCell>
                 <TableCell className="hidden md:table-cell">
-                  <Badge variant={fileCategoryVariant(file)}>
-                    {formatFileCategory(file, t)}
-                  </Badge>
+                  <Badge variant={fileCategoryVariant(file)}>{formatFileCategory(file, t)}</Badge>
                 </TableCell>
                 <TableCell className="hidden lg:table-cell">
                   {file.agent === null ? (
@@ -190,7 +188,10 @@ function FileTable({
                 </TableCell>
                 <TableCell className="text-right">
                   <Button asChild size="icon-xs" variant="ghost">
-                    <a aria-label={t("files.downloadFile", { name: file.name })} href={download.url}>
+                    <a
+                      aria-label={t("files.downloadFile", { name: file.name })}
+                      href={download.url}
+                    >
                       <Download className="size-3.5" />
                     </a>
                   </Button>
@@ -293,10 +294,7 @@ export function FilesPage(): ReactElement {
 
   return (
     <div className="bg-background flex h-full flex-1 flex-col overflow-hidden">
-      <PageHeader
-        title={t("files.title")}
-        description={t("files.pageDescription")}
-      >
+      <PageHeader title={t("files.title")} description={t("files.pageDescription")}>
         <Button
           disabled={refreshing}
           onClick={() => {

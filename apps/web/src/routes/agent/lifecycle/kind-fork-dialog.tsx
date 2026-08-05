@@ -82,12 +82,7 @@ export function KindForkDialog({
 
         <div className="border-border-subtle bg-bg-1 rounded-lg border px-3 py-2.5">
           <div className="flex items-center gap-2 text-[12.5px]">
-            <KindChip
-              icon={CurrentIcon}
-              label={current.title}
-              tagline={currentTagline}
-              muted
-            />
+            <KindChip icon={CurrentIcon} label={current.title} tagline={currentTagline} muted />
             <ArrowRight className="text-fg-3 size-4 shrink-0" />
             <KindChip icon={TargetIcon} label={target.title} tagline={targetTagline} />
           </div>
@@ -111,7 +106,12 @@ export function KindForkDialog({
           ) : null}
 
           {added.length > 0 ? (
-            <Section heading={t("agentLifecycle.forkAdded")} tone="info" items={added} icon={Plus} />
+            <Section
+              heading={t("agentLifecycle.forkAdded")}
+              tone="info"
+              items={added}
+              icon={Plus}
+            />
           ) : null}
 
           <Section
@@ -127,7 +127,9 @@ export function KindForkDialog({
             {t("common.cancel")}
           </Button>
           <Button disabled={busy} onClick={onConfirm} size="sm">
-            {busy ? t("agentLifecycle.forking") : t("agentLifecycle.forkAs", { title: target.title })}
+            {busy
+              ? t("agentLifecycle.forking")
+              : t("agentLifecycle.forkAs", { title: target.title })}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -118,9 +118,7 @@ export function ThreadFilter({
                   {value === session.id ? <Check className="text-accent-press size-3.5" /> : null}
                 </DropdownMenuItem>
                 <Button
-                  aria-label={
-                    copied ? t("files.threadIdCopied") : t("files.copyThreadId")
-                  }
+                  aria-label={copied ? t("files.threadIdCopied") : t("files.copyThreadId")}
                   className="text-fg-3 hover:text-fg-1 size-7"
                   onClick={(event) => {
                     void handleCopy(event, session.id);

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
-import { renderToStaticMarkup } from "react-dom/server";
 import type { ReactElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 
 import { I18nProvider } from "../src/shared/i18n";
 import { Markdown } from "../src/shared/ui/markdown";

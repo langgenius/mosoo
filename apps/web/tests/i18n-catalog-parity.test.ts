@@ -17,7 +17,7 @@ function flatten(value: unknown, prefix = ""): Map<string, string> {
 }
 
 function variables(text: string): string[] {
-  return [...text.matchAll(/\{\{(\w+)\}\}/g)].map((match) => match[1] ?? "").sort();
+  return [...text.matchAll(/\{\{(\w+)\}\}/g)].map((match) => match[1] ?? "").toSorted();
 }
 
 describe("translation catalog parity", () => {
@@ -29,13 +29,15 @@ describe("translation catalog parity", () => {
   ) as Record<(typeof localeFiles)[number], Map<string, string>>;
 
   test("every locale has exactly the English keys", () => {
-    const expected = [...catalogs.en.keys()].sort();
-    for (const locale of localeFiles) expect([...catalogs[locale].keys()].sort()).toEqual(expected);
+    const expected = [...catalogs.en.keys()].toSorted();
+    for (const locale of localeFiles)
+      expect([...catalogs[locale].keys()].toSorted()).toEqual(expected);
   });
 
   test("interpolation variables match English", () => {
     for (const [key, english] of catalogs.en) {
-      for (const locale of localeFiles) expect(variables(catalogs[locale].get(key) ?? "")).toEqual(variables(english));
+      for (const locale of localeFiles)
+        expect(variables(catalogs[locale].get(key) ?? "")).toEqual(variables(english));
     }
   });
 });

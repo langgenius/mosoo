@@ -155,9 +155,7 @@ export function EnvironmentDetailPage({ environmentId }: { environmentId: string
       });
     } catch (caughtError) {
       setError(
-        caughtError instanceof Error
-          ? caughtError.message
-          : t("environments.setDefaultFailed"),
+        caughtError instanceof Error ? caughtError.message : t("environments.setDefaultFailed"),
       );
     }
   }
@@ -173,9 +171,7 @@ export function EnvironmentDetailPage({ environmentId }: { environmentId: string
         appId: environment.appId,
       });
     } catch (caughtError) {
-      setError(
-        caughtError instanceof Error ? caughtError.message : t("environments.deleteFailed"),
-      );
+      setError(caughtError instanceof Error ? caughtError.message : t("environments.deleteFailed"));
     }
   }
 
@@ -223,7 +219,9 @@ export function EnvironmentDetailPage({ environmentId }: { environmentId: string
             draft={effectiveDraft}
             onChange={setDraftOverride}
             onSubmit={() => void handleSave()}
-            submitLabel={updateMutation.isPending ? t("settings.saving") : t("settings.saveChanges")}
+            submitLabel={
+              updateMutation.isPending ? t("settings.saving") : t("settings.saveChanges")
+            }
           />
           {!environment.canEdit ? (
             <div className="bg-secondary text-fg-3 mt-3 flex items-center gap-2 rounded-md px-3 py-2 text-[12px]">

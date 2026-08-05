@@ -61,7 +61,9 @@ function SessionResourceChips({
           <FileText className="size-3 shrink-0" />
           <span className="max-w-[180px] truncate font-medium">{file.name}</span>
           <span className="text-fg-3 shrink-0">
-            {file.status === "failed" ? t("chat.uploadFailed") : `${Math.round(file.progress ?? 0)}%`}
+            {file.status === "failed"
+              ? t("chat.uploadFailed")
+              : `${Math.round(file.progress ?? 0)}%`}
           </span>
         </span>
       ))}

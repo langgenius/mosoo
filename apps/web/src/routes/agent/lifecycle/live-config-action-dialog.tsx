@@ -79,7 +79,10 @@ const META = {
   },
 } satisfies Record<LifecycleActionKind, ActionMeta>;
 
-function resolveMeta(t: ReturnType<typeof useTranslation>["t"], kind: LifecycleActionKind): ActionMeta {
+function resolveMeta(
+  t: ReturnType<typeof useTranslation>["t"],
+  kind: LifecycleActionKind,
+): ActionMeta {
   const meta = META[kind];
   return {
     body: t(meta.body),

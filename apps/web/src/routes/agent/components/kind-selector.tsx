@@ -120,7 +120,9 @@ export function KindSelector({
                   <p className="mt-1 text-[11.5px] leading-relaxed">{card.copy.description}</p>
                   <p className="mt-1 text-[11px] italic opacity-80">{card.copy.examples}</p>
                   {isLockedAlternative ? (
-                    <p className="mt-1.5 text-[11px] font-medium opacity-90">{t("agent.forkToSwitchType")}</p>
+                    <p className="mt-1.5 text-[11px] font-medium opacity-90">
+                      {t("agent.forkToSwitchType")}
+                    </p>
                   ) : null}
                 </TooltipContent>
               </Tooltip>
@@ -145,7 +147,9 @@ export function KindSelector({
             <thead className="bg-bg-1 text-fg-3 text-[11px] tracking-wide uppercase">
               <tr>
                 <th className="w-[140px] px-3 py-2 font-medium">{t("agent.dimension")}</th>
-                <th className="text-foreground px-3 py-2 font-medium">{t("agent.assistantAgent")}</th>
+                <th className="text-foreground px-3 py-2 font-medium">
+                  {t("agent.assistantAgent")}
+                </th>
                 <th className="text-foreground px-3 py-2 font-medium">{t("agent.taskAgent")}</th>
               </tr>
             </thead>
