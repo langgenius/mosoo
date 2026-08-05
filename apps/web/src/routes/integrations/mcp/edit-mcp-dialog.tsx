@@ -119,7 +119,7 @@ export function EditMcpDialog({ server, onOpenChange, onSubmit }: Props) {
 
   return (
     <Dialog open onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{t("mcp.editConnection")}</DialogTitle>
           <DialogDescription>
@@ -127,7 +127,7 @@ export function EditMcpDialog({ server, onOpenChange, onSubmit }: Props) {
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-2">
+        <div className="min-h-0 space-y-4 overflow-y-auto py-2 pr-1">
           {/* Name + icon preview */}
           <div className="flex items-start gap-3">
             <IconAvatar

@@ -106,7 +106,7 @@ export function AgentRowActions({ agent }: { agent: Agent }): ReactElement {
 
       void navigate(`${getBasePath()}/${result.agent.id}`);
     } catch (error) {
-      setActionError(getActionErrorMessage(error, "Failed to duplicate agent."));
+      setActionError(getActionErrorMessage(error, t("agent.duplicateFailed")));
     }
   }
 
@@ -120,7 +120,7 @@ export function AgentRowActions({ agent }: { agent: Agent }): ReactElement {
         manifest.yaml,
       );
     } catch (error) {
-      setActionError(getActionErrorMessage(error, "Failed to export agent manifest."));
+      setActionError(getActionErrorMessage(error, t("agent.exportConfigFailed")));
     }
   }
 
@@ -147,12 +147,12 @@ export function AgentRowActions({ agent }: { agent: Agent }): ReactElement {
         <DropdownMenuContent align="end" className="w-[180px]">
           {isEditor && (
             <DropdownMenuItem className="gap-2" onSelect={handleConfig}>
-              <Settings className="size-3.5" /> Config
+              <Settings className="size-3.5" /> {t("nav.config")}
             </DropdownMenuItem>
           )}
           {isEditor && (
             <DropdownMenuItem className="gap-2" onSelect={handleEdit}>
-              <Pencil className="size-3.5" /> Edit
+              <Pencil className="size-3.5" /> {t("common.edit")}
             </DropdownMenuItem>
           )}
           <DropdownMenuItem
@@ -164,7 +164,7 @@ export function AgentRowActions({ agent }: { agent: Agent }): ReactElement {
             }}
           >
             <Copy className="size-3.5" />
-            {forkMutation.isPending ? "Duplicating…" : "Duplicate"}
+            {forkMutation.isPending ? t("agent.duplicating") : t("skills.duplicate")}
           </DropdownMenuItem>
           {isEditor && (
             <DropdownMenuItem
@@ -176,7 +176,7 @@ export function AgentRowActions({ agent }: { agent: Agent }): ReactElement {
               }}
             >
               <Download className="size-3.5" />
-              {exportMutation.isPending ? "Exporting…" : "Export config"}
+              {exportMutation.isPending ? t("agent.exporting") : t("agent.exportConfig")}
             </DropdownMenuItem>
           )}
           {canDelete && (
@@ -190,7 +190,7 @@ export function AgentRowActions({ agent }: { agent: Agent }): ReactElement {
                   setConfirmDelete(true);
                 }}
               >
-                <Trash2 className="size-3.5" /> Delete
+                <Trash2 className="size-3.5" /> {t("common.delete")}
               </DropdownMenuItem>
             </>
           )}
@@ -213,8 +213,7 @@ export function AgentRowActions({ agent }: { agent: Agent }): ReactElement {
           <DialogHeader>
             <DialogTitle>{t("agent.deletePrompt")}</DialogTitle>
             <DialogDescription>
-              <strong>{agent.name}</strong> and all its records will be permanently removed. This
-              cannot be undone.
+              {t("agent.deleteDescription", { name: agent.name })}
             </DialogDescription>
           </DialogHeader>
 
@@ -222,7 +221,7 @@ export function AgentRowActions({ agent }: { agent: Agent }): ReactElement {
             <div className="border-destructive/30 bg-destructive/5 text-destructive rounded-md border px-3 py-2 text-xs">
               {deleteMutation.error instanceof Error
                 ? deleteMutation.error.message
-                : "Failed to delete agent."}
+                : t("agent.deleteFailed")}
             </div>
           ) : null}
 
@@ -235,7 +234,7 @@ export function AgentRowActions({ agent }: { agent: Agent }): ReactElement {
                 setConfirmDelete(false);
               }}
             >
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button
               variant="destructive"
@@ -244,7 +243,7 @@ export function AgentRowActions({ agent }: { agent: Agent }): ReactElement {
               onClick={() => void handleConfirmDelete()}
             >
               <Trash2 className="size-3.5" />
-              {deleteMutation.isPending ? "Deleting…" : "Delete agent"}
+              {deleteMutation.isPending ? t("agent.deleting") : t("agent.deleteAgent")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -262,7 +261,7 @@ export function AgentRowActions({ agent }: { agent: Agent }): ReactElement {
           <DialogHeader>
             <DialogTitle>{t("agent.actionFailed")}</DialogTitle>
             <DialogDescription>
-              {actionError ?? "The action could not be completed."}
+              {actionError ?? t("agent.actionCouldNotBeCompleted")}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -272,7 +271,7 @@ export function AgentRowActions({ agent }: { agent: Agent }): ReactElement {
                 setActionError(null);
               }}
             >
-              Close
+              {t("common.close")}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -8,6 +8,7 @@ import { createAgentFork, exportAgentPackage } from "@/domains/agent/api/agent-c
 import { agentKeys } from "@/domains/agent/query/agent-queries";
 import { createFileDownload } from "@/domains/file/api/file-download-client";
 import { toAgentId, toAppId } from "@/routes/typed-id";
+import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 
 import type { Agent } from "../agent.types";
@@ -17,8 +18,8 @@ function currentAgentBasePath(): string {
   return globalThis.location.pathname.startsWith("/demo") ? "/demo/agent" : "/agent";
 }
 
-function packageErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "Agent package action failed.";
+function packageErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
 }
 
 export function AgentSettingsPackageActions({
@@ -30,6 +31,7 @@ export function AgentSettingsPackageActions({
   canManageAccess: boolean;
   onSettingsOpenChange: (open: boolean) => void;
 }): ReactElement {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const typedAgentId = toAgentId(agent.id);
@@ -83,7 +85,7 @@ export function AgentSettingsPackageActions({
           variant="outline"
         >
           <Download className="size-3.5" />
-          {exportPackageMutation.isPending ? "Exporting..." : "Export agent"}
+          {exportPackageMutation.isPending ? t("agent.exporting") : t("agent.exportAgent")}
         </Button>
         <Button
           className="gap-1.5 rounded-lg text-[12px]"
@@ -95,7 +97,7 @@ export function AgentSettingsPackageActions({
           variant="outline"
         >
           <Upload className="size-3.5" />
-          Import agent
+          {t("agent.importAgent")}
         </Button>
         <Button
           className="gap-1.5 rounded-lg text-[12px]"
@@ -105,11 +107,13 @@ export function AgentSettingsPackageActions({
           variant="outline"
         >
           <Copy className="size-3.5" />
-          {forkMutation.isPending ? "Forking..." : "Fork agent"}
+          {forkMutation.isPending ? t("agentLifecycle.forking") : t("agent.forkAgent")}
         </Button>
       </div>
       {packageActionError !== null ? (
-        <div className="text-destructive text-xs">{packageErrorMessage(packageActionError)}</div>
+        <div className="text-destructive text-xs">
+          {packageErrorMessage(packageActionError, t("agent.packageActionFailed"))}
+        </div>
       ) : null}
       <ImportAgentPackageDialog
         onImportedAgentOpen={handleImportedAgentOpen}

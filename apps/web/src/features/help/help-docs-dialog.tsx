@@ -1,7 +1,7 @@
 import { ArrowUpRight, BookOpen, Search } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 
-import { HELP_DOCS_HOME_URL, searchHelpDocs } from "@/shared/config/help-docs";
+import { HELP_DOCS, HELP_DOCS_HOME_URL, searchHelpDocs } from "@/shared/config/help-docs";
 import type { HelpDoc } from "@/shared/config/help-docs";
 import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
@@ -14,6 +14,22 @@ import {
 } from "@/shared/ui/dialog";
 import { Input } from "@/shared/ui/input";
 import { ScrollArea } from "@/shared/ui/scroll-area";
+
+import { HELP_DOC_COPY_KEYS, HELP_SECTION_COPY_KEYS } from "./help-doc-copy";
+
+function translatedDocTitle(doc: HelpDoc, t: (key: string) => string): string {
+  const titleKey = HELP_DOC_COPY_KEYS[doc.url];
+  return titleKey === undefined ? doc.title : t(titleKey);
+}
+
+function translatedSection(section: string, t: (key: string) => string): string {
+  const sectionKey = HELP_SECTION_COPY_KEYS[section];
+  return sectionKey === undefined ? section : t(sectionKey);
+}
+
+function translatedHelpCopy(doc: HelpDoc, t: (key: string) => string): string {
+  return `${translatedDocTitle(doc, t)}\n${translatedSection(doc.section, t)}`.toLocaleLowerCase();
+}
 
 function openDoc(url: string): void {
   globalThis.open(url, "_blank", "noopener,noreferrer");
@@ -39,7 +55,19 @@ function HelpDocsDialogContent({ onOpenChange }: { onOpenChange: (open: boolean)
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const results = useMemo(() => searchHelpDocs(query), [query]);
+  const results = useMemo(() => {
+    const canonicalResults = searchHelpDocs(query);
+    const needle = query.trim().toLocaleLowerCase();
+    if (needle === "") return canonicalResults;
+
+    const matchedUrls = new Set(canonicalResults.map((doc) => doc.url));
+    return [
+      ...canonicalResults,
+      ...HELP_DOCS.filter(
+        (doc) => !matchedUrls.has(doc.url) && translatedHelpCopy(doc, t).includes(needle),
+      ),
+    ];
+  }, [query, t]);
   const activeResultIndex = activeIndex >= results.length ? 0 : activeIndex;
 
   function handleSelect(doc: HelpDoc): void {
@@ -112,7 +140,7 @@ function HelpDocsDialogContent({ onOpenChange }: { onOpenChange: (open: boolean)
                 <li key={doc.url}>
                   {showSectionHeader ? (
                     <div className="text-fg-3 px-2.5 pt-2.5 pb-1 text-[11px] font-semibold tracking-wide uppercase">
-                      {doc.section}
+                      {translatedSection(doc.section, t)}
                     </div>
                   ) : null}
                   <button
@@ -129,7 +157,9 @@ function HelpDocsDialogContent({ onOpenChange }: { onOpenChange: (open: boolean)
                     )}
                   >
                     <BookOpen className="text-fg-3 size-4 shrink-0" />
-                    <span className="min-w-0 flex-1 truncate font-medium">{doc.title}</span>
+                    <span className="min-w-0 flex-1 truncate font-medium">
+                      {translatedDocTitle(doc, t)}
+                    </span>
                     <ArrowUpRight
                       className={cn(
                         "size-3.5 shrink-0 transition-opacity",

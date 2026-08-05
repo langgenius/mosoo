@@ -17,9 +17,14 @@ import { useTranslation } from "./provider";
 interface LocaleSwitcherProps {
   className?: string;
   collapsed?: boolean;
+  compact?: boolean;
 }
 
-export function LocaleSwitcher({ className, collapsed = false }: LocaleSwitcherProps) {
+export function LocaleSwitcher({
+  className,
+  collapsed = false,
+  compact = false,
+}: LocaleSwitcherProps) {
   const { i18n, t } = useTranslation();
   const current = i18n.language;
   const currentLabel = LOCALE_DISPLAY_NAMES[current] ?? current;
@@ -29,13 +34,22 @@ export function LocaleSwitcher({ className, collapsed = false }: LocaleSwitcherP
       aria-label={`${t("settings.language")}: ${currentLabel}`}
       className={cn(
         "text-fg-2 hover:bg-ink-900/[0.04] hover:text-fg-1 flex items-center rounded-md text-[13.5px] font-semibold transition-colors",
-        collapsed ? "size-9 justify-center self-center" : "w-full gap-2.5 px-2.5 py-2",
+        collapsed
+          ? "size-9 justify-center self-center"
+          : compact
+            ? "w-auto gap-2 px-2.5 py-2"
+            : "w-full gap-2.5 px-2.5 py-2",
         className,
       )}
     >
       <HugeiconsIcon icon={LanguageCircleIcon} className="size-4 shrink-0" />
       {collapsed ? null : (
-        <span className="sidebar-label-enter min-w-0 flex-1 truncate text-left">
+        <span
+          className={cn(
+            "sidebar-label-enter min-w-0 truncate text-left",
+            compact ? "max-w-32" : "flex-1",
+          )}
+        >
           {currentLabel}
         </span>
       )}
@@ -44,8 +58,8 @@ export function LocaleSwitcher({ className, collapsed = false }: LocaleSwitcherP
 
   const content = (
     <DropdownMenuContent
-      align="start"
-      side={collapsed ? "right" : "top"}
+      align={compact ? "end" : "start"}
+      side={collapsed ? "right" : compact ? "bottom" : "top"}
       className="w-[220px] rounded-lg p-1"
     >
       {SUPPORTED_LOCALES.map((locale) => (

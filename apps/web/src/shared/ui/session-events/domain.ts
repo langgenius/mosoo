@@ -32,7 +32,7 @@ const SESSION_EVENT_DOMAIN_BY_TYPE = {
   "user.message": "user",
 } as const satisfies Record<SessionProcessEventType, SessionEventDomain>;
 
-const SESSION_EVENT_TYPE_LABEL_KEY = {
+export const SESSION_EVENT_TYPE_LABEL_KEY = {
   "agent.message.delta": "sessionEvents.eventAssistantMessage",
   "agent.thinking.delta": "sessionEvents.eventThinking",
   "file.changed": "sessionEvents.eventFileChanged",

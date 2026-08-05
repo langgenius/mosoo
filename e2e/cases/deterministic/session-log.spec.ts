@@ -380,6 +380,18 @@ async function fulfillGraphQLFixture(route: Route): Promise<void> {
       });
       return;
     }
+    case "McpRegistry": {
+      await fulfillJson(route, {
+        mcpRegistry: {
+          appId,
+          currentUserEmail: viewerEmail,
+          currentUserId: ownerAccountId,
+          currentUserName: owner.name,
+          servers: [],
+        },
+      });
+      return;
+    }
     case "AgentEditorState": {
       await fulfillJson(route, {
         agentEditorState: editorState,
@@ -494,6 +506,7 @@ test("Session log acceptance replay renders durable transcript and diagnostics w
   await expect(logs).toBeVisible();
   await expect(logs).toContainText("Harness contract acceptance replay");
   await expect(logs).toContainText("Sessions");
+  await expect(logs).not.toContainText("sessionEvents.event");
   runtimeSignals.checkpoint("session-log.list.visible", {
     sessionId,
   });
@@ -518,4 +531,54 @@ test("Session log acceptance replay renders durable transcript and diagnostics w
   });
   runtimeSignals.assertCoverage();
   await runtimeSignals.attachArtifact(testInfo);
+});
+
+test("reported Chinese help copy and MCP dialog scrolling render in a real browser", async ({
+  page,
+}) => {
+  await installDeterministicFixtures(page);
+  await page.addInitScript(() => {
+    localStorage.setItem("mosoo-locale", "zh-CN");
+  });
+
+  await page.goto(`/agent/${agentId}?tab=logs`);
+  await page.getByRole("button", { name: "帮助与文档" }).click();
+
+  const helpDialog = page.getByRole("dialog");
+  await expect(helpDialog).toBeVisible();
+  await expect(helpDialog).toContainText("入门指南");
+  await expect(helpDialog).toContainText("快速开始");
+  await expect(helpDialog).toContainText("身份验证与访问");
+  await expect(helpDialog).toContainText("Thread 与运行");
+  await expect(helpDialog).not.toContainText("Getting started");
+  await expect(helpDialog).not.toContainText("Authentication and access");
+  await helpDialog.getByRole("textbox", { name: "搜索帮助和文档" }).fill("归档");
+  await expect(helpDialog).toContainText("归档 Thread");
+  await expect(helpDialog).toContainText("取消归档 Thread");
+  await expect(helpDialog).not.toContainText("Archive a Thread");
+  await page.keyboard.press("Escape");
+
+  await page.setViewportSize({ height: 500, width: 900 });
+  await page.goto("/integrations/mcp");
+  await page.getByRole("button", { name: "添加 MCP" }).first().click();
+  const mcpDialog = page.getByRole("dialog");
+  await expect(mcpDialog).toContainText("添加 MCP 连接");
+  await mcpDialog.getByRole("button", { name: "高级设置" }).click();
+
+  const scrollBody = mcpDialog.locator(".overflow-y-auto");
+  const before = await scrollBody.evaluate((element) => ({
+    clientHeight: element.clientHeight,
+    scrollHeight: element.scrollHeight,
+    scrollTop: element.scrollTop,
+  }));
+  expect(before.scrollHeight).toBeGreaterThan(before.clientHeight);
+  await scrollBody.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+  });
+  const after = await scrollBody.evaluate((element) => element.scrollTop);
+  expect(after).toBeGreaterThan(0);
+
+  const cancelBox = await mcpDialog.getByRole("button", { name: "取消" }).boundingBox();
+  expect(cancelBox).not.toBeNull();
+  expect((cancelBox?.y ?? 501) + (cancelBox?.height ?? 0)).toBeLessThanOrEqual(500);
 });
