@@ -5,6 +5,7 @@ import { useState } from "react";
 import { createEnvironment } from "@/domains/environment/api/environment-client";
 import { EnvironmentCliCallout } from "@/domains/environment/components/environment-cli-callout";
 import { environmentKeys } from "@/domains/environment/query/environment-queries";
+import { useTranslation } from "@/shared/i18n";
 import {
   Dialog,
   DialogContent,
@@ -27,6 +28,7 @@ export function CreateEnvironmentDialog({
   open: boolean;
   appId: string;
 }) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState(() => createEnvironmentDraft());
   const [error, setError] = useState<string | null>(null);
@@ -43,14 +45,12 @@ export function CreateEnvironmentDialog({
     setError(null);
 
     try {
-      const created = await createMutation.mutateAsync(toCreateEnvironmentInput(appId, draft));
+      const created = await createMutation.mutateAsync(toCreateEnvironmentInput(appId, draft, t));
       setDraft(createEnvironmentDraft());
       onCreated?.(created);
       onOpenChange(false);
     } catch (caughtError) {
-      setError(
-        caughtError instanceof Error ? caughtError.message : "Failed to create environment.",
-      );
+      setError(caughtError instanceof Error ? caughtError.message : t("environments.createFailed"));
     }
   }
 
@@ -67,10 +67,8 @@ export function CreateEnvironmentDialog({
     >
       <DialogContent className="max-h-[88vh] overflow-y-auto sm:max-w-3xl">
         <DialogHeader>
-          <DialogTitle>Create environment</DialogTitle>
-          <DialogDescription>
-            Define a reusable runtime container template for new sessions.
-          </DialogDescription>
+          <DialogTitle>{t("environments.create")}</DialogTitle>
+          <DialogDescription>{t("environments.dialogDescription")}</DialogDescription>
         </DialogHeader>
 
         <EnvironmentCliCallout />
@@ -89,7 +87,9 @@ export function CreateEnvironmentDialog({
           }}
           onChange={setDraft}
           onSubmit={() => void handleCreate()}
-          submitLabel={createMutation.isPending ? "Creating…" : "Create environment"}
+          submitLabel={
+            createMutation.isPending ? t("environments.creating") : t("environments.create")
+          }
         />
       </DialogContent>
     </Dialog>

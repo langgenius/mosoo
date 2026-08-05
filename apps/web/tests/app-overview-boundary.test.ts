@@ -10,8 +10,8 @@ describe("App overview boundary", () => {
     const routeSource = readSource("../src/routes/app-overview/app-overview.route.tsx");
 
     expect(routeSource).toContain("AppOverviewInstallGuide");
-    expect(routeSource).toContain("Provider keys");
-    expect(routeSource).toContain("New agent");
+    expect(routeSource).toContain('t("appOverview.providerKeys")');
+    expect(routeSource).toContain('t("appOverview.newAgent")');
 
     // The overview dashboard and its per-resource queries were removed; the root
     // no longer aggregates loads (which surfaced "data failed to load").
@@ -41,18 +41,14 @@ describe("App overview boundary", () => {
 
     expect(routeSource).toContain("AppOverviewInstallGuide");
     expect(surfaceSource).toContain("AppIdBadge");
-    expect(installSource).toContain("Build agent app with");
+    expect(installSource).toContain('t("onboarding.title")');
     expect(installSource).toContain("coding");
-    expect(installSource).toContain("text-[rgb(111_211_4)]");
     expect(installSource).toContain("bg-[rgb(111_211_4)]");
     expect(installSource).toContain("hover:bg-[rgb(111_211_4)]");
     expect(promptSource).toContain("curl -fsSL https://install.mosoo.ai/install.sh | bash");
-    expect(installSource).toContain("installs the mosoo CLI");
-    expect(installSource).toContain("@mosoo skill");
-    expect(installSource).toContain("checks cloud readiness");
-    expect(installSource).toContain("cloud.mosoo.ai");
-    expect(installSource).toContain('"Copy"');
-    expect(appIdBadgeSource).toContain("Copy app ID");
+    expect(installSource).toContain('t("onboarding.setupDescription")');
+    expect(installSource).toContain('t("common.copy")');
+    expect(appIdBadgeSource).toContain('t("agent.copyAppId")');
 
     expect(installSource).not.toContain("Codex skill");
     expect(installSource).not.toContain("or updates");
@@ -91,10 +87,10 @@ describe("App overview boundary", () => {
     // The hero splits into two explicit setup lanes: the coding-agent lane
     // (install command plus follow-up actions) and the console lane (the
     // checklist). The last chosen lane is remembered locally.
-    expect(installSource).toContain('label="In your coding agent"');
-    expect(installSource).toContain('label="In the console"');
+    expect(installSource).toContain('label={t("onboarding.inCodingAgent")}');
+    expect(installSource).toContain('label={t("onboarding.inConsole")}');
     expect(installSource).toContain("aria-pressed");
-    expect(installSource).toContain("Pick how you want to set up");
+    expect(installSource).toContain('t("onboarding.subtitle")');
     expect(installSource).toContain("mosoo_overview_setup_lane");
     expect(installSource).toContain("OnboardingSteps");
     expect(installSource).toContain("OnboardingActions");
@@ -102,12 +98,12 @@ describe("App overview boundary", () => {
 
     // Three steps, each a link into the matching console surface. Provider
     // credentials are required before a Run; API tokens are optional.
-    expect(stepsSource).toContain("Add a provider key");
+    expect(stepsSource).toContain('t("onboarding.addProviderKey")');
     expect(stepsSource).toContain('to: "/providers"');
-    expect(stepsSource).toContain("Optional");
-    expect(stepsSource).toContain("Create an API token");
+    expect(stepsSource).toContain('t("onboarding.optional")');
+    expect(stepsSource).toContain('t("onboarding.createApiToken")');
     expect(stepsSource).toContain('to: "/settings/access-tokens"');
-    expect(stepsSource).toContain("Create an agent and run a session");
+    expect(stepsSource).toContain('t("onboarding.createAgent")');
     expect(stepsSource).toContain("/agent?create=1");
     expect(stepsSource).toContain("/threads?compose=1");
 
@@ -117,13 +113,13 @@ describe("App overview boundary", () => {
 
     // Follow-up actions: copy a setup prompt for any coding agent, or read
     // the docs.
-    expect(stepsSource).toContain("Set up with your coding agent");
+    expect(stepsSource).toContain('t("onboarding.setupWithAgent")');
     expect(stepsSource).toContain("buildOnboardingSetupPrompt");
     expect(stepsSource).toContain("DocsAction");
-    expect(stepsSource).toContain("Read the docs");
+    expect(stepsSource).toContain('t("onboarding.readDocs")');
     expect(stepsSource).toContain("HELP_DOCS_HOME_URL");
     expect(stepsSource).toContain("CODING_AGENT_HARNESSES");
-    expect(stepsSource).toContain("Supported coding agent harnesses");
+    expect(stepsSource).toContain('t("onboarding.harnesses")');
     expect(stepsSource).toContain("Codex");
     expect(stepsSource).toContain("Claude Code");
     expect(stepsSource).toContain("OpenCode");
@@ -132,12 +128,12 @@ describe("App overview boundary", () => {
 
     // The setup prompt mirrors the checklist and keeps the human-owned
     // provider key as an ask, not something an agent invents.
-    expect(promptSource).toContain("MOSOO_CONSOLE_URL");
-    expect(promptSource).toContain("/providers");
-    expect(promptSource).toContain("/settings/access-tokens");
-    expect(promptSource).toContain("/agent?create=1");
-    expect(promptSource).toContain("ask the user");
-    expect(promptSource).toContain("Never print or commit secrets");
+    expect(promptSource).toContain('t("appOverview.setupPrompt"');
+    expect(promptSource).toContain("HELP_DOCS_BASE_URL");
+    expect(promptSource).toContain("INSTALL_COMMAND");
+    expect(promptSource).toContain("docsUrl");
+    expect(promptSource).toContain("installCommand");
+    expect(promptSource).toContain("origin");
   });
 
   test("keeps the install guide responsive and accessible", () => {
@@ -151,7 +147,7 @@ describe("App overview boundary", () => {
     expect(installSource).toContain("sm:flex-row");
     expect(stepsSource).toContain("text-sm leading-6");
     expect(stepsSource).toContain("sm:text-base");
-    expect(stepsSource).toContain('aria-label="Onboarding steps"');
+    expect(stepsSource).toContain('aria-label={t("onboarding.steps")}');
     expect(installSource).not.toContain("aria-expanded");
     expect(installSource).not.toContain("aria-controls");
     expect(installSource).not.toContain("Codex, Cursor, Cline");
@@ -162,7 +158,10 @@ describe("App overview boundary", () => {
     expect(stepsSource).not.toContain(" · ");
   });
 
-  test("keeps the App console root free of Chinese copy", () => {
+  test("keeps the App console root free of hardcoded Chinese copy in source", () => {
+    // Chinese text belongs in translation JSON files (src/shared/i18n/translations/),
+    // not hardcoded in TSX source. The CJK boundary test now verifies that
+    // source files use i18n keys instead of inline Chinese strings.
     const routeSource = readSource("../src/routes/app-overview/app-overview.route.tsx");
     const installSource = readSource("../src/routes/app-overview/app-overview-install.tsx");
     const stepsSource = readSource("../src/routes/app-overview/onboarding-steps.tsx");
@@ -173,5 +172,17 @@ describe("App overview boundary", () => {
     expect(cjk.test(installSource)).toBe(false);
     expect(cjk.test(stepsSource)).toBe(false);
     expect(cjk.test(promptSource)).toBe(false);
+  });
+
+  test("translation files contain Chinese for zh-CN locale", () => {
+    const zhCN = readSource("../src/shared/i18n/translations/zh-CN.json");
+    const cjk = /[一-鿿]/u;
+    expect(cjk.test(zhCN)).toBe(true);
+  });
+
+  test("translation files contain no Chinese in en locale", () => {
+    const en = readSource("../src/shared/i18n/translations/en.json");
+    const cjk = /[一-鿿]/u;
+    expect(cjk.test(en)).toBe(false);
   });
 });

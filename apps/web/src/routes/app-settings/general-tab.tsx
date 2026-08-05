@@ -7,6 +7,7 @@ import { useAppSession } from "@/app/session-provider";
 import { renameApp } from "@/domains/app/api/app-client";
 import { appKeys } from "@/domains/app/query/app-queries";
 import { toAppId } from "@/routes/typed-id";
+import { useTranslation } from "@/shared/i18n";
 import { isTruthy } from "@/shared/lib/truthiness";
 import { Button } from "@/shared/ui/button";
 import { CommandBlock } from "@/shared/ui/command-block";
@@ -21,6 +22,7 @@ export function GeneralTab() {
 }
 
 function GeneralForm({ activeApp }: { activeApp: AppSummary | null }) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
 
   const [name, setName] = useState(activeApp?.name ?? "");
@@ -48,7 +50,7 @@ function GeneralForm({ activeApp }: { activeApp: AppSummary | null }) {
         setSaved(false);
       }, 2000);
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "Failed to rename app.");
+      setError(nextError instanceof Error ? nextError.message : t("settings.renameFailed"));
     } finally {
       setSaving(false);
     }
@@ -56,17 +58,15 @@ function GeneralForm({ activeApp }: { activeApp: AppSummary | null }) {
 
   return (
     <>
-      <SettingsTabHeader title="General" />
+      <SettingsTabHeader title={t("settings.general")} />
       <SettingsTabBody>
         <div className="space-y-2">
           <label className="text-foreground text-sm font-medium" htmlFor="app-name">
-            App name
+            {t("settings.appName")}
           </label>
-          <p className="text-fg-2 text-[12px]">
-            The App is your engineering and delivery boundary for Agents and resources.
-          </p>
+          <p className="text-fg-2 text-[12px]">{t("settings.appDescription")}</p>
           <input
-            aria-label="App name"
+            aria-label={t("settings.appName")}
             id="app-name"
             type="text"
             value={name}
@@ -83,14 +83,14 @@ function GeneralForm({ activeApp }: { activeApp: AppSummary | null }) {
           <Button onClick={() => void handleSave()} disabled={!canSave} size="sm">
             {saving ? (
               <>
-                <Loader2 className="mr-1 size-4 animate-spin" /> Saving...
+                <Loader2 className="mr-1 size-4 animate-spin" /> {t("settings.saving")}
               </>
             ) : saved ? (
               <>
-                <Check className="mr-1 size-4" /> Saved
+                <Check className="mr-1 size-4" /> {t("settings.saved")}
               </>
             ) : (
-              "Save changes"
+              t("settings.saveChanges")
             )}
           </Button>
         </div>
@@ -98,10 +98,8 @@ function GeneralForm({ activeApp }: { activeApp: AppSummary | null }) {
         {activeApp === null ? null : (
           <div className="mt-8 space-y-6">
             <div className="space-y-2">
-              <div className="text-foreground text-sm font-medium">App ID</div>
-              <p className="text-fg-2 text-[12px]">
-                The CLI and API use this id to target this App.
-              </p>
+              <div className="text-foreground text-sm font-medium">{t("agent.appId")}</div>
+              <p className="text-fg-2 text-[12px]">{t("appSettings.appIdDescription")}</p>
               <CommandBlock command={activeApp.id} prompt={null} />
             </div>
           </div>

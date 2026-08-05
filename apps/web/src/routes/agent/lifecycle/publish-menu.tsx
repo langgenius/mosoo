@@ -2,6 +2,7 @@ import { Check, ChevronDown, Code, Copy, Inbox, MessageSquare, Upload } from "lu
 import type { ReactElement } from "react";
 import { useMemo, useState } from "react";
 
+import { useTranslation } from "@/shared/i18n";
 import { writeClipboardText } from "@/shared/lib/clipboard";
 import { Button } from "@/shared/ui/button";
 import {
@@ -37,20 +38,21 @@ export function PublishMenu({
   onPublish,
   showChannelSetup = false,
 }: PublishMenuProps): ReactElement {
+  const { t } = useTranslation();
   const isLive = agent.status === "published";
   const distribution = useMemo(() => buildAgentDistribution(agent), [agent]);
   const [copiedInstruction, setCopiedInstruction] = useState(false);
 
   const triggerLabel = busy
     ? isLive
-      ? "Republishing…"
-      : "Publishing…"
+      ? t("agentLifecycle.republishing")
+      : t("agentLifecycle.publishing")
     : isLive
-      ? "Re-publish"
-      : "Publish";
+      ? t("agentLifecycle.republish")
+      : t("agentLifecycle.publish");
 
   async function handleInstructionCopy(): Promise<void> {
-    const prompt = buildAgentInstructionPrompt(agent, distribution);
+    const prompt = buildAgentInstructionPrompt(agent, distribution, t);
     const didCopy = await writeClipboardText(prompt);
     if (!didCopy) {
       return;
@@ -86,12 +88,12 @@ export function PublishMenu({
           <Upload className="mt-0.5 size-4" />
           <div className="flex min-w-0 flex-col">
             <span className="text-[13px] font-medium">
-              {isLive ? "Republish update" : "Publish"}
+              {isLive ? t("agentLifecycle.republishUpdate") : t("agentLifecycle.publish")}
             </span>
             <span className="text-muted-foreground text-[11.5px] leading-snug">
               {isLive
-                ? "Push the latest config live for all callers."
-                : "Make this agent reachable across all surfaces."}
+                ? t("agentLifecycle.republishDescription")
+                : t("agentLifecycle.publishDescription")}
             </span>
           </div>
         </DropdownMenuItem>
@@ -102,7 +104,7 @@ export function PublishMenu({
         ) : null}
         <DropdownMenuSeparator />
         <DropdownMenuLabel className="text-[10.5px] tracking-wide uppercase">
-          Distribution
+          {t("agentLifecycle.distribution")}
         </DropdownMenuLabel>
         <DropdownMenuItem
           className="items-start gap-2.5 py-2"
@@ -118,11 +120,11 @@ export function PublishMenu({
             <Copy className="mt-0.5 size-4" />
           )}
           <div className="flex min-w-0 flex-col">
-            <span className="text-[13px] font-medium">Instruction for LLM</span>
+            <span className="text-[13px] font-medium">{t("agentLifecycle.instructionForLlm")}</span>
             <span className="text-muted-foreground text-[11.5px] leading-snug">
               {copiedInstruction
-                ? "Copied to clipboard."
-                : "Copy coding-agent instructions for this agent."}
+                ? t("agentLifecycle.copiedToClipboard")
+                : t("agentLifecycle.copyInstructionDescription")}
             </span>
           </div>
         </DropdownMenuItem>
@@ -136,9 +138,9 @@ export function PublishMenu({
         >
           <Code className="mt-0.5 size-4" />
           <div className="flex min-w-0 flex-col">
-            <span className="text-[13px] font-medium">API Access</span>
+            <span className="text-[13px] font-medium">{t("agentLifecycle.apiAccess")}</span>
             <span className="text-muted-foreground text-[11.5px] leading-snug">
-              Agent ID · API token · API reference.
+              {t("agentLifecycle.apiAccessDescription")}
             </span>
           </div>
         </DropdownMenuItem>
@@ -149,9 +151,9 @@ export function PublishMenu({
         >
           <Inbox className="mt-0.5 size-4" />
           <div className="flex min-w-0 flex-col">
-            <span className="text-[13px] font-medium">Thread</span>
+            <span className="text-[13px] font-medium">{t("pageTitle.thread")}</span>
             <span className="text-muted-foreground text-[11.5px] leading-snug">
-              Start a thread with this agent in mosoo.
+              {t("agentLifecycle.threadDescription")}
             </span>
           </div>
         </DropdownMenuItem>
@@ -166,9 +168,10 @@ export function PublishMenu({
           >
             <MessageSquare className="mt-0.5 size-4" />
             <div className="flex min-w-0 flex-col">
-              <span className="text-[13px] font-medium">Channel</span>
+              <span className="text-[13px] font-medium">{t("agentLifecycle.channel")}</span>
               <span className="text-muted-foreground text-[11.5px] leading-snug">
-                Slack · Lark · Discord · Telegram · WeChat
+                {t("channelNames.slack")} · {t("channelNames.lark")} · {t("channelNames.discord")} ·{" "}
+                {t("channelNames.telegram")} · {t("channelNames.wechat")}
               </span>
             </div>
           </DropdownMenuItem>

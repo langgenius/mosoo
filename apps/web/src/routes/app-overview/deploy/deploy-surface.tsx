@@ -1,6 +1,7 @@
 import { Box, Loader2 } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { AppIdBadge } from "@/shared/ui/app-id-badge";
 import { Badge } from "@/shared/ui/badge";
@@ -26,15 +27,19 @@ export interface DeployConsoleController {
 }
 
 function LoadErrorBanner({ className, message }: { className?: string; message: string }) {
+  const { t } = useTranslation();
   return (
     <div className={cn("bg-destructive/8 rounded-md px-3 py-2 text-[12.5px]", className)}>
-      <span className="text-destructive font-semibold">Couldn&apos;t load deployment status: </span>
-      <span className="text-fg-2">{message}</span>
+      <span className="text-destructive font-semibold">
+        {t("deploy.loadStatusFailed", { message })}
+      </span>
     </div>
   );
 }
 
 function DevelopmentPreviewBadge({ localPreview }: { localPreview: LocalDeploymentPreviewState }) {
+  const { t } = useTranslation();
+
   if (localPreview.url === null) {
     return null;
   }
@@ -43,7 +48,7 @@ function DevelopmentPreviewBadge({ localPreview }: { localPreview: LocalDeployme
     return (
       <Badge variant="success">
         <span className="size-1.5 rounded-full bg-current" aria-hidden />
-        Development ready
+        {t("deploy.developmentReady")}
       </Badge>
     );
   }
@@ -52,20 +57,22 @@ function DevelopmentPreviewBadge({ localPreview }: { localPreview: LocalDeployme
     return (
       <Badge variant="warning">
         <Loader2 className="size-3 animate-spin" />
-        Development checking
+        {t("deploy.developmentChecking")}
       </Badge>
     );
   }
 
-  return <Badge variant="outline">Development offline</Badge>;
+  return <Badge variant="outline">{t("deploy.developmentOffline")}</Badge>;
 }
 
 function ProductionEnvironmentBadge({ status }: { status: ProductionEnvironmentStatus }) {
+  const { t } = useTranslation();
+
   if (status === "live") {
     return (
       <Badge variant="success">
         <span className="size-1.5 rounded-full bg-current" aria-hidden />
-        Production live
+        {t("deploy.productionLive")}
       </Badge>
     );
   }
@@ -74,12 +81,12 @@ function ProductionEnvironmentBadge({ status }: { status: ProductionEnvironmentS
     return (
       <Badge variant="warning">
         <Loader2 className="size-3 animate-spin" />
-        Production deploying
+        {t("deploy.productionDeploying")}
       </Badge>
     );
   }
 
-  return <Badge variant="danger">Production unavailable</Badge>;
+  return <Badge variant="danger">{t("deploy.productionUnavailable")}</Badge>;
 }
 
 /**
@@ -124,6 +131,7 @@ export function DeploySurface({
   /** The run-list read failed — surfaced inside the Activity section. */
   runsError?: string | null;
 }) {
+  const { t } = useTranslation();
   const { deployment, runs, agents } = deploy.state;
   const latestRun = runs[0];
   const localPreview = useLocalDeploymentPreview();
@@ -139,7 +147,7 @@ export function DeploySurface({
         <div className="min-w-0">
           <div className="text-muted-foreground flex items-center gap-2 text-xs font-semibold uppercase">
             <Box className="size-3.5" />
-            App
+            {t("nav.app")}
           </div>
           <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
             <h1 className="text-foreground min-w-0 truncate text-2xl font-semibold tracking-normal">
@@ -174,7 +182,7 @@ export function DeploySurface({
       <main className="min-h-0 flex-1 overflow-y-auto px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
         {loading ? (
           <p className="text-muted-foreground flex h-full items-center justify-center text-sm">
-            Loading deployment…
+            {t("deploy.loadingDeployment")}
           </p>
         ) : deployment === null ? (
           <div className="mx-auto flex max-w-4xl flex-col gap-8">

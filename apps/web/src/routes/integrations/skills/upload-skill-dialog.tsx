@@ -1,6 +1,7 @@
 import type { SkillInspectResult } from "@mosoo/contracts/skill";
 import { useReducer, useRef } from "react";
 
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
 import {
@@ -92,6 +93,7 @@ interface Props {
 }
 
 export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, registry }: Props) {
+  const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const [state, dispatch] = useReducer(uploadSkillReducer, UPLOAD_SKILL_INITIAL_STATE);
@@ -118,7 +120,7 @@ export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, r
     const preview = registry ? await registry.inspectFile(file) : null;
 
     if (!preview) {
-      throw new Error("Skill inspect service is unavailable.");
+      throw new Error(t("skills.inspectUnavailable"));
     }
 
     dispatch({ prepared: { kind: "file", file, preview }, type: "prepare" });
@@ -126,9 +128,9 @@ export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, r
 
   function dispatchInspectError(caughtError: unknown) {
     dispatch({
-      error:
-        "Failed to inspect: " +
-        (caughtError instanceof Error ? caughtError.message : String(caughtError)),
+      error: t("skills.failedToInspect", {
+        error: caughtError instanceof Error ? caughtError.message : String(caughtError),
+      }),
       type: "setError",
     });
   }
@@ -173,15 +175,15 @@ export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, r
       const preview = registry ? await registry.inspectGithub(trimmed) : null;
 
       if (!preview) {
-        throw new Error("Skill inspect service is unavailable.");
+        throw new Error(t("skills.inspectUnavailable"));
       }
 
       dispatch({ prepared: { kind: "url", preview, url: trimmed }, type: "prepare" });
     } catch (caughtError) {
       dispatch({
-        error:
-          "Failed to inspect: " +
-          (caughtError instanceof Error ? caughtError.message : String(caughtError)),
+        error: t("skills.failedToInspect", {
+          error: caughtError instanceof Error ? caughtError.message : String(caughtError),
+        }),
         type: "setError",
       });
     }
@@ -201,9 +203,9 @@ export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, r
       handleOpenChange(false);
     } catch (caughtError) {
       dispatch({
-        error:
-          "Failed to add skill: " +
-          (caughtError instanceof Error ? caughtError.message : String(caughtError)),
+        error: t("skills.failedToAdd", {
+          error: caughtError instanceof Error ? caughtError.message : String(caughtError),
+        }),
         type: "setError",
       });
     }
@@ -213,10 +215,9 @@ export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, r
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Add skill</DialogTitle>
+          <DialogTitle>{t("skills.addSkill")}</DialogTitle>
           <DialogDescription className="sr-only">
-            Upload a .md, .zip, or .skill file, upload a local skill folder, or import a skill from
-            a GitHub or skills.sh URL.
+            {t("skills.uploadDialogDescription")}
           </DialogDescription>
         </DialogHeader>
 
@@ -224,7 +225,7 @@ export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, r
           ref={inputRef}
           type="file"
           accept=".md,.zip,.skill"
-          aria-label="Upload skill file"
+          aria-label={t("skills.uploadSkillFile")}
           className="sr-only"
           onChange={(e) => {
             void handleFiles(e.target.files);
@@ -239,7 +240,7 @@ export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, r
             }
           }}
           type="file"
-          aria-label="Upload skill folder"
+          aria-label={t("skills.uploadSkillFolder")}
           className="sr-only"
           onChange={(e) => {
             const files = e.target.files;
@@ -251,7 +252,7 @@ export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, r
           <div className="border-border-strong bg-card inline-flex w-fit items-center overflow-hidden rounded-md border">
             <ModeButton
               active={mode === "file"}
-              label="Upload file"
+              label={t("skills.uploadFile")}
               onClick={() => {
                 dispatch({ mode: "file", type: "setMode" });
               }}
@@ -259,7 +260,7 @@ export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, r
             <span className="bg-border-strong h-5 w-px" />
             <ModeButton
               active={mode === "url"}
-              label="From URL"
+              label={t("skills.fromUrl")}
               onClick={() => {
                 dispatch({ mode: "url", type: "setMode" });
               }}
@@ -276,12 +277,14 @@ export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, r
               <SkillFileCountBadge count={countSkillFiles(prepared.preview.entries)} />
             </div>
             <div>
-              <div className="text-muted-foreground text-[11px] tracking-wider uppercase">Name</div>
+              <div className="text-muted-foreground text-[11px] tracking-wider uppercase">
+                {t("skills.name")}
+              </div>
               <div className="text-sm font-medium">{prepared.preview.frontmatter.name}</div>
             </div>
             <div>
               <div className="text-muted-foreground text-[11px] tracking-wider uppercase">
-                Description
+                {t("skills.descriptionLabel")}
               </div>
               <div className="text-foreground text-sm">
                 {prepared.preview.frontmatter.description}
@@ -289,7 +292,7 @@ export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, r
             </div>
             {isTruthy(prepared.preview.frontmatter.author) ? (
               <div className="text-muted-foreground text-xs">
-                by {prepared.preview.frontmatter.author}
+                {t("skills.byAuthor", { author: prepared.preview.frontmatter.author })}
               </div>
             ) : null}
           </div>
@@ -328,22 +331,20 @@ export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, r
               type="button"
             >
               <div className="text-foreground text-[15px] font-medium">
-                Drag and drop or click to upload
+                {t("skills.dragAndDrop")}
               </div>
-              <div className="text-muted-foreground text-xs">
-                Drop a file or a whole skill folder
-              </div>
+              <div className="text-muted-foreground text-xs">{t("skills.dropFileOrFolder")}</div>
             </button>
             <div className="text-muted-foreground text-center text-xs">
-              or{" "}
+              {t("skills.or")}{" "}
               <button
                 type="button"
                 className="text-primary underline-offset-2 hover:underline"
                 onClick={() => folderInputRef.current?.click()}
               >
-                select a folder
+                {t("skills.selectAFolder")}
               </button>{" "}
-              from your computer
+              {t("skills.fromYourComputer")}
             </div>
           </div>
         ) : (
@@ -352,7 +353,7 @@ export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, r
               <Input
                 value={url}
                 placeholder="https://github.com/owner/repo or npx skills add … --skill name"
-                aria-label="Skill source URL or install command"
+                aria-label={t("skills.sourceUrlPlaceholder")}
                 onChange={(e) => {
                   dispatch({ type: "setUrl", url: e.target.value });
                 }}
@@ -370,7 +371,7 @@ export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, r
                 }}
                 disabled={inspecting || url.trim().length === 0}
               >
-                {inspecting ? "Checking…" : "Preview"}
+                {inspecting ? t("skills.checking") : t("skills.preview")}
               </Button>
             </div>
           </div>
@@ -384,34 +385,36 @@ export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, r
 
         {!prepared && mode === "file" ? (
           <div className="space-y-2">
-            <div className="text-foreground text-[13px] font-medium">File requirements</div>
+            <div className="text-foreground text-[13px] font-medium">
+              {t("skills.fileRequirements")}
+            </div>
             <ul className="text-muted-foreground marker:text-muted-foreground/60 list-disc space-y-1 pl-4 text-[12.5px]">
-              <li>.md file must contain skill name and description formatted in YAML</li>
-              <li>.zip or .skill file must include a SKILL.md file</li>
-              <li>A folder must include a SKILL.md file at its root</li>
+              <li>{t("skills.fileRequirementMd")}</li>
+              <li>{t("skills.fileRequirementArchive")}</li>
+              <li>{t("skills.folderMustIncludeSkillMd")}</li>
             </ul>
           </div>
         ) : null}
 
         {!prepared && mode === "url" ? (
           <div className="space-y-2">
-            <div className="text-foreground text-[13px] font-medium">Supported sources</div>
+            <div className="text-foreground text-[13px] font-medium">
+              {t("skills.supportedSources")}
+            </div>
             <ul className="text-muted-foreground marker:text-muted-foreground/60 list-disc space-y-1 pl-4 text-[12.5px]">
-              <li>A GitHub repo, directory, or SKILL.md link</li>
+              <li>{t("skills.githubRepoLink")}</li>
               <li>
-                A{" "}
                 <a
                   href="https://www.skills.sh/"
                   target="_blank"
                   rel="noreferrer"
                   className="text-primary underline-offset-2 hover:underline"
                 >
-                  skills.sh
-                </a>{" "}
-                skill page URL
+                  {t("skills.skillPageUrl")}
+                </a>
               </li>
               <li>
-                The install command copied from skills.sh, e.g.{" "}
+                {t("skills.installCommandExample")}{" "}
                 <code className="font-mono text-[11.5px]">npx skills add …&nbsp;--skill name</code>
               </li>
             </ul>
@@ -426,15 +429,15 @@ export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, r
             }}
             disabled={submitting}
           >
-            Cancel
+            {t("common.cancel")}
           </Button>
           {prepared ? (
             <Button variant="outline" onClick={reset} disabled={submitting}>
-              Change
+              {t("skills.change")}
             </Button>
           ) : null}
           <Button disabled={!prepared || submitting} onClick={handleConfirm}>
-            {submitting ? "Adding…" : "Add skill"}
+            {submitting ? t("skills.adding") : t("skills.addSkill")}
           </Button>
         </DialogFooter>
       </DialogContent>

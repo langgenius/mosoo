@@ -6,6 +6,7 @@ import { useState } from "react";
 import { resetAgentState, unpublishAgent } from "@/domains/agent/api/agent-client";
 import { agentKeys } from "@/domains/agent/query/agent-queries";
 import { toAgentDeploymentVersionId, toAgentId, toAppId } from "@/routes/typed-id";
+import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import {
   Dialog,
@@ -30,6 +31,7 @@ function toRuntimeOperationTargetVersion(agent: Agent) {
 }
 
 export function AgentSettingsDangerZone({ agent }: { agent: Agent }) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmResetState, setConfirmResetState] = useState(false);
@@ -79,24 +81,21 @@ export function AgentSettingsDangerZone({ agent }: { agent: Agent }) {
   return (
     <>
       <div className="space-y-3 px-6 py-5">
-        <h3 className="text-destructive text-sm font-semibold">Danger zone</h3>
+        <h3 className="text-destructive text-sm font-semibold">{t("agent.dangerZone")}</h3>
 
         <div className="divide-border border-border divide-y rounded-lg border">
           {showUnpublish ? (
             confirmUnpublish ? (
               <div className="space-y-2 p-3">
                 <p className="text-foreground text-sm">
-                  Unpublish <strong>{agent.name}</strong>?
+                  {t("agent.unpublishPrompt", { name: agent.name })}
                 </p>
-                <p className="text-muted-foreground text-xs">
-                  New sessions stop accepting. Existing sessions, cost, and the live version stay
-                  accessible. You can re-publish anytime from the same App.
-                </p>
+                <p className="text-muted-foreground text-xs">{t("agent.unpublishDescription")}</p>
                 {unpublishMutation.error ? (
                   <div className="text-destructive text-xs">
                     {unpublishMutation.error instanceof Error
                       ? unpublishMutation.error.message
-                      : "Unpublish failed."}
+                      : t("agent.unpublishFailed")}
                   </div>
                 ) : null}
                 <div className="flex justify-end gap-2">
@@ -108,7 +107,7 @@ export function AgentSettingsDangerZone({ agent }: { agent: Agent }) {
                     size="sm"
                     variant="ghost"
                   >
-                    Cancel
+                    {t("common.cancel")}
                   </Button>
                   <Button
                     className="border-amber/45 text-amber-fg hover:bg-amber-bg hover:text-amber-fg"
@@ -118,16 +117,18 @@ export function AgentSettingsDangerZone({ agent }: { agent: Agent }) {
                     variant="outline"
                   >
                     <PowerOff className="size-3.5" />
-                    {unpublishMutation.isPending ? "Unpublishing…" : "Unpublish"}
+                    {unpublishMutation.isPending ? t("agent.unpublishing") : t("agent.unpublish")}
                   </Button>
                 </div>
               </div>
             ) : (
               <div className="flex items-center justify-between gap-3 p-3">
                 <div className="min-w-0">
-                  <div className="text-foreground text-sm font-medium">Unpublish this agent</div>
+                  <div className="text-foreground text-sm font-medium">
+                    {t("agent.unpublishThisAgent")}
+                  </div>
                   <p className="text-muted-foreground mt-0.5 text-xs">
-                    Stop accepting new sessions. History stays. Re-publishable anytime.
+                    {t("agent.unpublishThisAgentDescription")}
                   </p>
                 </div>
                 <Button
@@ -139,7 +140,7 @@ export function AgentSettingsDangerZone({ agent }: { agent: Agent }) {
                   variant="outline"
                 >
                   <PowerOff className="size-3.5" />
-                  Unpublish
+                  {t("agent.unpublish")}
                 </Button>
               </div>
             )
@@ -148,9 +149,11 @@ export function AgentSettingsDangerZone({ agent }: { agent: Agent }) {
           {showResetAgentState ? (
             <div className="flex items-center justify-between gap-3 p-3">
               <div className="min-w-0">
-                <div className="text-foreground text-sm font-medium">Reset agent-state</div>
+                <div className="text-foreground text-sm font-medium">
+                  {t("agent.resetAgentState")}
+                </div>
                 <p className="text-muted-foreground mt-0.5 text-xs">
-                  Clears the current Sandbox, memory, and Session runtime directories.
+                  {t("agent.resetAgentStateDescription")}
                 </p>
               </div>
               <Button
@@ -163,7 +166,7 @@ export function AgentSettingsDangerZone({ agent }: { agent: Agent }) {
                 variant="outline"
               >
                 <RotateCcw className="size-3.5" />
-                Reset
+                {t("agent.reset")}
               </Button>
             </div>
           ) : null}
@@ -171,7 +174,7 @@ export function AgentSettingsDangerZone({ agent }: { agent: Agent }) {
           {confirmDelete ? (
             <div className="space-y-2 p-3">
               <p className="text-foreground text-sm">
-                Delete <strong>{agent.name}</strong> permanently?
+                {t("agent.deleteAgentPermanently", { name: agent.name })}
               </p>
               <div className="flex justify-end gap-2">
                 <Button
@@ -181,20 +184,22 @@ export function AgentSettingsDangerZone({ agent }: { agent: Agent }) {
                     setConfirmDelete(false);
                   }}
                 >
-                  Cancel
+                  {t("common.cancel")}
                 </Button>
                 <Button variant="destructive" size="sm">
                   <Trash2 className="size-3.5" />
-                  Delete agent
+                  {t("agent.deleteAgent")}
                 </Button>
               </div>
             </div>
           ) : (
             <div className="flex items-center justify-between gap-3 p-3">
               <div className="min-w-0">
-                <div className="text-foreground text-sm font-medium">Delete this agent</div>
+                <div className="text-foreground text-sm font-medium">
+                  {t("agent.deleteThisAgent")}
+                </div>
                 <p className="text-muted-foreground mt-0.5 text-xs">
-                  Permanently remove this agent and all its records.
+                  {t("agent.deleteThisAgentDescription")}
                 </p>
               </div>
               <Button
@@ -206,7 +211,7 @@ export function AgentSettingsDangerZone({ agent }: { agent: Agent }) {
                 variant="outline"
               >
                 <Trash2 className="size-3.5" />
-                Delete
+                {t("common.delete")}
               </Button>
             </div>
           )}
@@ -216,7 +221,7 @@ export function AgentSettingsDangerZone({ agent }: { agent: Agent }) {
           <div className="text-destructive text-xs">
             {resetAgentStateMutation.error instanceof Error
               ? resetAgentStateMutation.error.message
-              : "Reset agent-state failed."}
+              : t("agent.resetAgentStateFailed")}
           </div>
         ) : null}
       </div>
@@ -224,46 +229,46 @@ export function AgentSettingsDangerZone({ agent }: { agent: Agent }) {
       <Dialog open={confirmResetState} onOpenChange={handleResetDialogOpenChange}>
         <DialogContent className="border-destructive/60 rounded-lg sm:max-w-[480px]">
           <DialogHeader>
-            <DialogTitle>Reset agent-state for "{agent.name}"?</DialogTitle>
-            <DialogDescription>
-              This clears session runtime state and Agent memory for this Agent.
-            </DialogDescription>
+            <DialogTitle>{t("agent.resetAgentStatePrompt", { name: agent.name })}</DialogTitle>
+            <DialogDescription>{t("agent.resetAgentStateDialogDescription")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="border-destructive/20 bg-destructive/[0.04] rounded-lg border p-3">
               <div className="border-destructive/20 bg-destructive/10 text-destructive inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-semibold">
                 <XCircle className="size-3.5" />
                 <LockKeyhole className="size-3.5" />
-                agent-state will be cleared
+                {t("agent.agentStateWillBeCleared")}
               </div>
               <div className="text-muted-foreground mt-3 space-y-3 text-xs leading-5">
                 <div>
-                  <div className="text-foreground font-medium">What will be cleared</div>
+                  <div className="text-foreground font-medium">{t("agent.whatWillBeCleared")}</div>
                   <ul className="mt-1 list-disc space-y-1 pl-4">
-                    <li>Login state</li>
-                    <li>Cache</li>
-                    <li>Long-term memory</li>
-                    <li>Session runtime directories</li>
-                    <li>Native runtime resume references</li>
+                    <li>{t("agent.loginState")}</li>
+                    <li>{t("agent.cache")}</li>
+                    <li>{t("agent.longTermMemory")}</li>
+                    <li>{t("agent.sessionRuntimeDirs")}</li>
+                    <li>{t("agent.nativeRuntimeResume")}</li>
                   </ul>
                 </div>
                 <div>
-                  <div className="text-foreground font-medium">What will be preserved</div>
+                  <div className="text-foreground font-medium">
+                    {t("agent.whatWillBePreserved")}
+                  </div>
                   <ul className="mt-1 list-disc space-y-1 pl-4">
-                    <li>Agent profile, prompts, Skills, and MCP refs</li>
-                    <li>Session files</li>
-                    <li>Past sessions and transcripts</li>
-                    <li>Cost history</li>
+                    <li>{t("agent.agentProfile")}</li>
+                    <li>{t("agent.sessionFiles")}</li>
+                    <li>{t("agent.pastSessions")}</li>
+                    <li>{t("agent.costHistory")}</li>
                   </ul>
                 </div>
               </div>
             </div>
             <div className="space-y-2">
               <label className="text-foreground text-xs font-medium" htmlFor="reset-agent-state">
-                Type the agent name to confirm: {agent.name}
+                {t("agent.typeAgentNameToConfirm", { name: agent.name })}
               </label>
               <Input
-                placeholder="agent name"
+                placeholder={t("agent.agentNamePlaceholder")}
                 id="reset-agent-state"
                 onChange={(event) => {
                   setResetConfirmValue(event.target.value);
@@ -280,7 +285,7 @@ export function AgentSettingsDangerZone({ agent }: { agent: Agent }) {
                 size="sm"
                 variant="ghost"
               >
-                Cancel
+                {t("common.cancel")}
               </Button>
               <Button
                 disabled={
@@ -290,7 +295,7 @@ export function AgentSettingsDangerZone({ agent }: { agent: Agent }) {
                 size="sm"
                 variant="destructive"
               >
-                Reset agent-state
+                {t("agent.resetAgentState")}
               </Button>
             </div>
           </div>

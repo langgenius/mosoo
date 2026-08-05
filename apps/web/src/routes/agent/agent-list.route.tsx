@@ -5,6 +5,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAppSession } from "@/app/session-provider";
 import { useVisibleAgentsQuery } from "@/domains/agent/query/agent-queries";
 import { useAuth } from "@/domains/auth/use-auth";
+import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import { EmptyState } from "@/shared/ui/empty-state";
 import {
@@ -60,6 +61,7 @@ function agentListPageReducer(
 }
 
 export function AgentListPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { activeApp } = useAppSession();
@@ -88,7 +90,7 @@ export function AgentListPage() {
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
-      <PageHeader title="Agents" description="Reusable workers for this App.">
+      <PageHeader title={t("agent.title")} description={t("agent.description")}>
         <Button
           disabled={appId === null}
           onClick={() => {
@@ -97,7 +99,7 @@ export function AgentListPage() {
           size="sm"
         >
           <Plus className="size-3.5" />
-          Create agent
+          {t("agent.create")}
         </Button>
       </PageHeader>
 
@@ -107,7 +109,7 @@ export function AgentListPage() {
           onChange={(nextSearch) => {
             dispatch({ search: nextSearch, type: "setSearch" });
           }}
-          placeholder="Search agents…"
+          placeholder={t("agent.searchPlaceholder")}
         />
 
         <ListPageToolbarSpacer />
@@ -121,7 +123,7 @@ export function AgentListPage() {
           size="sm"
         >
           <Upload className="size-3.5" />
-          Import package
+          {t("agent.importPackage")}
         </Button>
 
         <ViewToggle
@@ -134,18 +136,18 @@ export function AgentListPage() {
 
       <ListPageContent>
         {agentsQuery.isLoading ? (
-          <div className="text-fg-3 py-12 text-center text-[13px]">Loading agents…</div>
+          <div className="text-fg-3 py-12 text-center text-[13px]">{t("agent.loadingAgents")}</div>
         ) : agentsQuery.error ? (
           <div className="text-destructive py-12 text-center text-[13px]">
             {agentsQuery.error instanceof Error
               ? agentsQuery.error.message
-              : "Failed to load agents."}
+              : t("agent.failedToLoadAgents")}
           </div>
         ) : filteredAgents.length === 0 ? (
           <EmptyState
             icon={Bot}
-            title="No agents yet"
-            description="Create your first agent for this App."
+            title={t("agent.noAgentsTitle")}
+            description={t("agent.noAgentsDescription")}
           >
             <Button
               disabled={appId === null}
@@ -155,7 +157,7 @@ export function AgentListPage() {
               size="sm"
             >
               <Plus className="size-3.5" />
-              Create agent
+              {t("agent.create")}
             </Button>
           </EmptyState>
         ) : view === "list" ? (

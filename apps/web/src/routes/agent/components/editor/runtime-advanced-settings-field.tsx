@@ -7,6 +7,7 @@ import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 import type { ReactElement } from "react";
 
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
@@ -98,6 +99,7 @@ function SelectSettingControl({
   selected: number | string | undefined;
   setSetting(value: string | undefined): void;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-5">
       {definition.defaultValue === undefined ? (
@@ -116,7 +118,7 @@ function SelectSettingControl({
           }}
           type="button"
         >
-          Runtime default
+          {t("agent.runtimeDefault")}
         </button>
       ) : null}
 
@@ -159,6 +161,8 @@ function NumberSettingControl({
   selected: number | string | undefined;
   setSetting(value: number | undefined): void;
 }) {
+  const { t } = useTranslation();
+
   return (
     <Input
       aria-label={definition.label}
@@ -183,7 +187,7 @@ function NumberSettingControl({
           setSetting(parsed);
         }
       }}
-      placeholder="Runtime default"
+      placeholder={t("agent.runtimeDefault")}
       readOnly={readOnly}
       step={definition.step ?? 1}
       type="number"
@@ -209,6 +213,7 @@ export function RuntimeAdvancedSettingsField({
   setBuiltInTools?(tools: AgentBuiltInToolConfig[]): void;
   setSettings(settings: JsonObject): void;
 }): ReactElement | null {
+  const { t } = useTranslation();
   const definitions = listRuntimeAdvancedSettings(runtimeId, modelId);
   const showBuiltInTools =
     runtimeId === CLAUDE_AGENT_SDK_RUNTIME_ID &&
@@ -249,10 +254,10 @@ export function RuntimeAdvancedSettingsField({
         type="button"
       >
         <ChevronDown className={cn("size-3.5 transition-transform", open && "rotate-180")} />
-        <span>Advanced runtime settings</span>
+        <span>{t("agent.advancedRuntimeSettings")}</span>
         {customCount > 0 ? (
           <span className="border-border bg-muted text-muted-foreground ml-1 rounded-full border px-1.5 py-0.5 text-[10px] leading-none">
-            {customCount} custom
+            {t("agentEditor.customCount", { count: String(customCount) })}
           </span>
         ) : null}
       </button>
@@ -260,7 +265,7 @@ export function RuntimeAdvancedSettingsField({
       {open ? (
         <div className="border-border bg-muted/30 mt-3 space-y-4 rounded-md border p-3">
           <p className="text-muted-foreground text-[11px] leading-relaxed">
-            Runtime-specific settings. These settings are not portable across runtimes.
+            {t("agentEditor.runtimeSettingsNotPortable")}
           </p>
 
           {definitions.map((definition) => {
@@ -298,7 +303,9 @@ export function RuntimeAdvancedSettingsField({
           {showBuiltInTools ? (
             <div className="border-border/70 space-y-2 border-t pt-3">
               <div className="flex items-center justify-between gap-3">
-                <Label className="text-muted-foreground text-[12px]">Tools</Label>
+                <Label className="text-muted-foreground text-[12px]">
+                  {t("agentEditor.tools")}
+                </Label>
                 <span className="text-muted-foreground text-[10px]">tools</span>
               </div>
               <BuiltInToolsField

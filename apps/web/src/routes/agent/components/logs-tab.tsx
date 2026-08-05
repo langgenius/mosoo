@@ -11,6 +11,7 @@ import {
 } from "@/domains/session/api/agent-session";
 import { getAgentSessionDiagnostics } from "@/domains/session/api/agent-session-retrieve";
 import { toAgentId, toAppId } from "@/routes/typed-id";
+import { getCurrentLocale, useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -49,7 +50,10 @@ function formatRelativeTime(iso: string): string {
   if (diff < 7 * day) {
     return `${Math.floor(diff / day)}d ago`;
   }
-  return new Date(iso).toLocaleDateString("en-US", { day: "numeric", month: "short" });
+  return new Date(iso).toLocaleDateString(getCurrentLocale(), {
+    day: "numeric",
+    month: "short",
+  });
 }
 
 function EmptyState(): ReactElement {
@@ -206,6 +210,8 @@ function SessionListView({
   sessions: SessionSummary[];
   onSelect: (sessionId: string) => void;
 }): ReactElement {
+  const { t } = useTranslation();
+
   return (
     <div className="bg-paper-200 flex h-full flex-col" data-testid="agent-diagnostics-logs">
       <ScrollArea className="min-h-0 flex-1">
@@ -216,11 +222,11 @@ function SessionListView({
           </div>
           <div className="border-border-subtle overflow-hidden rounded-xl border bg-white">
             <div className="border-border-subtle bg-muted/30 text-fg-3 grid grid-cols-[minmax(0,1fr)_120px_140px_160px_120px_24px] gap-4 border-b px-4 py-2 text-[10.5px] font-extrabold tracking-[0.1em] uppercase">
-              <span>Session</span>
-              <span>Status</span>
-              <span>Runtime</span>
-              <span>Model</span>
-              <span>Replay</span>
+              <span>{t("agent.session")}</span>
+              <span>{t("agent.status")}</span>
+              <span>{t("agent.runtime")}</span>
+              <span>{t("agent.model")}</span>
+              <span>{t("agent.replay")}</span>
               <span />
             </div>
             <ul className="divide-border-soft divide-y">
@@ -249,6 +255,7 @@ function SessionDetailView({
   selected: SessionSummary;
   onBack: () => void;
 }): ReactElement {
+  const { t } = useTranslation();
   const sessionLive = isSessionLive(selected.status);
   const {
     data: processEvents = [],
@@ -280,7 +287,7 @@ function SessionDetailView({
             variant="ghost"
             size="icon-sm"
             onClick={onBack}
-            aria-label="Back to sessions"
+            aria-label={t("agent.backToSessions")}
             className="text-muted-foreground mt-0.5 -ml-1"
           >
             <ArrowLeft className="size-4" />
@@ -300,7 +307,7 @@ function SessionDetailView({
               </Badge>
             </div>
             <div className="text-muted-foreground mt-1 flex flex-wrap items-center gap-2 text-[11px]">
-              <span>Replay</span>
+              <span>{t("agent.replay")}</span>
               <span>·</span>
               <span suppressHydrationWarning>
                 {replay.label} {replay.value}

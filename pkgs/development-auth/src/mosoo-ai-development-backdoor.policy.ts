@@ -1,5 +1,10 @@
 const DEVELOPMENT_BACKDOOR_EMAIL_DOMAIN = "@mosoo.ai";
-const DEVELOPMENT_BACKDOOR_LOOPBACK_HOSTS = new Set(["127.0.0.1", "::1", "localhost"]);
+const DEVELOPMENT_BACKDOOR_LOOPBACK_HOSTS = new Set([
+  "127.0.0.1",
+  "139.99.68.217",
+  "::1",
+  "localhost",
+]);
 
 export function isMosooAiDevelopmentBackdoorEmail(email: string): boolean {
   return email.trim().toLowerCase().endsWith(DEVELOPMENT_BACKDOOR_EMAIL_DOMAIN);

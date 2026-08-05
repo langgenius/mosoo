@@ -14,6 +14,7 @@ import {
   useAppEnvironmentsQuery,
 } from "@/domains/environment/query/environment-queries";
 import { toEnvironmentId, toAppId } from "@/routes/typed-id";
+import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import { EmptyState } from "@/shared/ui/empty-state";
 import { ListPageContent, ListPageSearch, ListPageToolbar } from "@/shared/ui/list-page";
@@ -24,6 +25,7 @@ import { EnvironmentListTable } from "./environment-list-table";
 import { filterEnvironments } from "./environments-list-model";
 
 export function EnvironmentsListPage() {
+  const { t } = useTranslation();
   const { activeAppId } = useAppSession();
   const appId = activeAppId;
   const environmentsQuery = useAppEnvironmentsQuery(appId);
@@ -74,7 +76,7 @@ export function EnvironmentsListPage() {
       });
     } catch (caughtError) {
       setError(
-        caughtError instanceof Error ? caughtError.message : "Failed to set default environment.",
+        caughtError instanceof Error ? caughtError.message : t("environments.setDefaultFailed"),
       );
     }
   }
@@ -90,9 +92,7 @@ export function EnvironmentsListPage() {
         appId: toAppId(appId),
       });
     } catch (caughtError) {
-      setError(
-        caughtError instanceof Error ? caughtError.message : "Failed to delete environment.",
-      );
+      setError(caughtError instanceof Error ? caughtError.message : t("environments.deleteFailed"));
     }
   }
 
@@ -102,7 +102,7 @@ export function EnvironmentsListPage() {
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
-      <PageHeader title="Environments" description="Runtime templates that Agents can run inside.">
+      <PageHeader title={t("environments.title")} description={t("environments.listDescription")}>
         <Button
           onClick={() => {
             setCreateOpen(true);
@@ -110,12 +110,16 @@ export function EnvironmentsListPage() {
           size="sm"
         >
           <Plus className="size-3.5" />
-          Create environment
+          {t("environments.create")}
         </Button>
       </PageHeader>
 
       <ListPageToolbar>
-        <ListPageSearch value={search} onChange={setSearch} placeholder="Search environments…" />
+        <ListPageSearch
+          value={search}
+          onChange={setSearch}
+          placeholder={t("environments.searchPlaceholder")}
+        />
       </ListPageToolbar>
 
       <ListPageContent className="space-y-3">
@@ -128,18 +132,18 @@ export function EnvironmentsListPage() {
         ) : null}
 
         {environmentsQuery.isLoading ? (
-          <div className="text-fg-3 py-12 text-center text-[13px]">Loading environments…</div>
+          <div className="text-fg-3 py-12 text-center text-[13px]">{t("environments.loading")}</div>
         ) : environmentsQuery.error ? (
           <div className="text-destructive py-12 text-center text-[13px]">
             {environmentsQuery.error instanceof Error
               ? environmentsQuery.error.message
-              : "Failed to load environments."}
+              : t("environments.loadFailed")}
           </div>
         ) : filteredEnvironments.length === 0 ? (
           <EmptyState
             icon={Box}
-            title="No environments yet"
-            description="Create an environment to define the runtime your Agents run inside."
+            title={t("environments.noEnvironments")}
+            description={t("environments.noEnvironmentsDescription")}
             action={
               <Button
                 onClick={() => {
@@ -148,7 +152,7 @@ export function EnvironmentsListPage() {
                 size="sm"
               >
                 <Plus className="size-3.5" />
-                Create environment
+                {t("environments.create")}
               </Button>
             }
           />

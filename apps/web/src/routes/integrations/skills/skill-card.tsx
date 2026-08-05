@@ -1,12 +1,14 @@
 import type { SkillSummary } from "@mosoo/contracts/skill";
 
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { formatSkillFileCount } from "@/shared/ui/skill-file-count-badge";
 
 import { formatDate } from "./format";
 
 export function SkillCard({ onOpen, skill }: { onOpen: () => void; skill: SkillSummary }) {
-  const sourceLabel = skill.sourceKind === "official" ? "Official" : skill.ownerName;
+  const { t } = useTranslation();
+  const sourceLabel = skill.sourceKind === "official" ? t("skills.official") : skill.ownerName;
 
   return (
     <button
@@ -37,7 +39,7 @@ export function SkillCard({ onOpen, skill }: { onOpen: () => void; skill: SkillS
           </span>
         </span>
         <span className="shrink-0 font-mono tabular-nums">
-          Updated {formatDate(skill.updatedAt)}
+          {t("skills.updated", { date: formatDate(skill.updatedAt) })}
         </span>
       </div>
     </button>

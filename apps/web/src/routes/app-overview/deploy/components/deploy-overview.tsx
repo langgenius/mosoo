@@ -1,6 +1,7 @@
 import { Code2, ExternalLink, GitBranch } from "lucide-react";
 import { useState } from "react";
 
+import { useTranslation } from "@/shared/i18n";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Separator } from "@/shared/ui/separator";
@@ -15,17 +16,18 @@ import { DeployUrlCard } from "./deploy-url-card";
 function previewUnavailableLabel(
   deployment: DeploymentVM,
   localPreview: LocalDeploymentPreviewState,
+  t: (key: string) => string,
 ): string {
   if (localPreview.status === "checking") {
-    return "Checking development preview";
+    return t("deploy.checkingDevelopmentPreview");
   }
   if (localPreview.status === "offline") {
-    return "Development preview offline";
+    return t("deploy.developmentPreviewOffline");
   }
   if (deployment.liveUrl !== null) {
     return hostOf(deployment.liveUrl);
   }
-  return "Preview unavailable";
+  return t("deploy.previewUnavailable");
 }
 
 function PreviewFrame({
@@ -35,12 +37,13 @@ function PreviewFrame({
   deployment: DeploymentVM;
   localPreview: LocalDeploymentPreviewState;
 }) {
+  const { t } = useTranslation();
   const localPreviewReady = localPreview.url !== null && localPreview.status === "online";
   const previewLinkUrl = localPreviewReady ? localPreview.url : deployment.liveUrl;
   const previewLabel =
     localPreviewReady && localPreview.url !== null
       ? hostOf(localPreview.url)
-      : previewUnavailableLabel(deployment, localPreview);
+      : previewUnavailableLabel(deployment, localPreview, t);
 
   return (
     <div className="border-border bg-bg-sunken/60 rounded-xl border p-1.5 lg:h-[var(--deploy-preview-height)]">
@@ -48,7 +51,7 @@ function PreviewFrame({
         {previewLinkUrl !== null ? (
           <>
             <iframe
-              title={`${deployment.appName} deployment preview`}
+              title={t("deploy.previewFrameTitle", { appName: deployment.appName })}
               src={previewLinkUrl}
               className="bg-background pointer-events-none absolute top-0 left-0 h-[142.86%] w-[142.86%] origin-top-left scale-[0.7] border-0"
               sandbox="allow-forms allow-popups allow-popups-to-escape-sandbox allow-scripts"
@@ -59,7 +62,7 @@ function PreviewFrame({
               href={previewLinkUrl}
               target="_blank"
               rel="noreferrer"
-              aria-label="Open deployment preview"
+              aria-label={t("deploy.openPreview")}
               className="group focus-visible:ring-ring absolute inset-0 cursor-pointer rounded-lg focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
             >
               <span className="border-border/80 bg-background/92 text-fg-2 group-hover:text-fg-1 group-hover:border-accent absolute top-2 right-2 inline-flex size-8 items-center justify-center rounded-md border opacity-0 shadow-sm backdrop-blur transition group-hover:opacity-100 group-focus-visible:opacity-100">
@@ -103,11 +106,12 @@ function SourceGroup({
   deployError: string | null;
   onDeployRepo: (repoUrl: string) => void;
 }) {
+  const { t } = useTranslation();
   const [changingRepo, setChangingRepo] = useState(false);
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="text-fg-3 text-[13px]">Source</div>
+      <div className="text-fg-3 text-[13px]">{t("deploy.source")}</div>
       <div className="flex min-w-0 flex-wrap items-center gap-2">
         <a
           href={`https://${deployment.repoUrl}`}
@@ -139,7 +143,7 @@ function SourceGroup({
         <div className="mt-1">
           <RepoDeployForm deploying={deploying} serverError={deployError} onDeploy={onDeployRepo} />
           <Button variant="ghost" size="xs" className="mt-1" onClick={() => setChangingRepo(false)}>
-            Cancel
+            {t("common.cancel")}
           </Button>
         </div>
       ) : (
@@ -148,7 +152,7 @@ function SourceGroup({
           onClick={() => setChangingRepo(true)}
           className="text-accent-press w-fit cursor-pointer text-[13px] font-medium hover:underline"
         >
-          Change repo…
+          {t("deploy.changeRepo")}
         </button>
       )}
     </div>

@@ -1,12 +1,14 @@
 import type { ReactElement } from "react";
 
+import { useTranslation } from "@/shared/i18n";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 
 import type { ToolInfo } from "../agent.types";
 
 export function ToolIcons({ tools }: { tools: ToolInfo[] }): ReactElement {
+  const { t } = useTranslation();
   if (tools.length === 0) {
-    return <span className="text-fg-3 text-[12px]">No tools</span>;
+    return <span className="text-fg-3 text-[12px]">{t("agent.noTools")}</span>;
   }
 
   return (

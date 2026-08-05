@@ -16,12 +16,14 @@ describe("Agent runtime lock boundary", () => {
     ].map(readSource);
     const combinedSource = sources.join("\n");
 
-    expect(combinedSource).toContain("Runtime is locked after publishing.");
-    expect(combinedSource).toContain("Fork the Agent to switch runtime");
-    expect(combinedSource).toContain("Fork the Agent to change type or runtime after publishing.");
-    expect(combinedSource).toContain("Fork to switch type");
-    expect(combinedSource).toContain("Agent type is locked after publishing.");
-    expect(combinedSource).toContain("Runtime changes are not allowed in-place after publishing.");
+    // Published-lock strings now live in translation keys; the remaining
+    // hardcoded English belongs to copy that is still wired through policy
+    // data or in-file error constants.
+    expect(combinedSource).toContain('t("agent.runtimeLocked")');
+    expect(combinedSource).toContain('t("agentEditor.forkAgentRequired")');
+    expect(combinedSource).toContain('t("agent.forkToSwitchType")');
+    expect(combinedSource).toContain('t("agent.typeLocked")');
+    expect(combinedSource).toContain('title: "agentLifecycle.liveRestartTitle"');
     expect(combinedSource).toContain(
       "Consume mode keeps a config entry point back into the editor.",
     );

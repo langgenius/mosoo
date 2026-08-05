@@ -3,9 +3,11 @@ import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { confirmCliOAuthDeviceFlow } from "@/domains/auth/api/cli-oauth-client";
+import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 
 export function CliAuthPage() {
+  const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const code = searchParams.get("code")?.trim() ?? "";
   const [status, setStatus] = useState<string | null>(null);
@@ -21,7 +23,9 @@ export function CliAuthPage() {
       const result = await confirmCliOAuthDeviceFlow(code);
       setStatus(result.status);
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError : new Error("Failed to authorize CLI."));
+      setError(
+        caughtError instanceof Error ? caughtError : new Error(t("cliAuth.failedToAuthorize")),
+      );
     } finally {
       setConfirming(false);
     }
@@ -35,12 +39,10 @@ export function CliAuthPage() {
             <KeyRound className="size-5" />
           </div>
           <div className="min-w-0 flex-1">
-            <h1 className="text-fg-1 text-lg font-semibold">Authorize CLI access</h1>
-            <p className="text-fg-2 mt-2 text-sm leading-6">
-              Connect this browser session to the mosoo CLI request below.
-            </p>
+            <h1 className="text-fg-1 text-lg font-semibold">{t("cliAuth.title")}</h1>
+            <p className="text-fg-2 mt-2 text-sm leading-6">{t("cliAuth.connectDescription")}</p>
             <div className="border-border-default bg-bg-sunken text-fg-1 mt-4 rounded-md border px-3 py-2 font-mono text-sm">
-              {code || "Missing code"}
+              {code || t("cliAuth.missingCode")}
             </div>
           </div>
         </div>
@@ -48,7 +50,7 @@ export function CliAuthPage() {
         <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
           <Button disabled={!canConfirm} onClick={() => void handleConfirm()}>
             {confirming ? <Loader2 className="size-4 animate-spin" /> : null}
-            Authorize CLI
+            {t("cliAuth.authorize")}
           </Button>
           <StatusMessage error={error} status={status} />
         </div>
@@ -58,6 +60,8 @@ export function CliAuthPage() {
 }
 
 function StatusMessage({ error, status }: { error: Error | null; status: string | null }) {
+  const { t } = useTranslation();
+
   if (error) {
     return (
       <p className="text-danger inline-flex items-center gap-2 text-sm">
@@ -71,7 +75,7 @@ function StatusMessage({ error, status }: { error: Error | null; status: string 
     return (
       <p className="text-success inline-flex items-center gap-2 text-sm">
         <CheckCircle2 className="success-check-enter size-4" />
-        CLI access authorized.
+        {t("cliAuth.authorized")}
       </p>
     );
   }
@@ -80,7 +84,7 @@ function StatusMessage({ error, status }: { error: Error | null; status: string 
     return (
       <p className="text-danger inline-flex items-center gap-2 text-sm">
         <AlertCircle className="size-4" />
-        This code has expired.
+        {t("cliAuth.codeExpired")}
       </p>
     );
   }
@@ -89,13 +93,13 @@ function StatusMessage({ error, status }: { error: Error | null; status: string 
     return (
       <p className="text-fg-2 inline-flex items-center gap-2 text-sm">
         <CheckCircle2 className="size-4" />
-        This code has already been used.
+        {t("cliAuth.codeConsumed")}
       </p>
     );
   }
 
   if (status) {
-    return <p className="text-fg-2 text-sm">Status: {status}</p>;
+    return <p className="text-fg-2 text-sm">{t("cliAuth.status", { status })}</p>;
   }
 
   return null;

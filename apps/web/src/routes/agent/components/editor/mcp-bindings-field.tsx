@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { useMcpRegistryQuery } from "@/domains/mcp/query/mcp-queries";
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import {
   DropdownMenu,
@@ -57,6 +58,7 @@ function McpAddDropdown({
   open: boolean;
   servers: PoolServer[];
 }) {
+  const { t } = useTranslation();
   const availableServers = servers.filter((server) => !addedIds.has(server.id));
   const nothingLeft = availableServers.length === 0;
   const noServersAtAll = servers.length === 0;
@@ -69,7 +71,7 @@ function McpAddDropdown({
           type="button"
         >
           <Plus className="size-3.5 shrink-0" />
-          Add MCP
+          {t("agentEditor.addMcp")}
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
@@ -78,14 +80,12 @@ function McpAddDropdown({
       >
         {nothingLeft ? (
           <div className="text-muted-foreground p-3 text-[12px]">
-            {noServersAtAll
-              ? "No MCP servers available. Head to Manage MCP servers to add one."
-              : "All available MCP servers are already added."}
+            {noServersAtAll ? t("mcp.noServers") : t("mcp.allAdded")}
           </div>
         ) : (
           <>
             <DropdownMenuLabel className="text-muted-foreground text-[10px] tracking-wider uppercase">
-              App MCP
+              {t("agentEditor.appMcp")}
             </DropdownMenuLabel>
             {availableServers.map((server) => (
               <McpPickerItem key={server.id} server={server} onPick={() => onPick(server)} />
@@ -100,7 +100,7 @@ function McpAddDropdown({
             to="/integrations/mcp"
           >
             <ExternalLink className="size-3" />
-            Manage MCP servers
+            {t("agentEditor.manageMcpServers")}
           </Link>
         </DropdownMenuItem>
       </DropdownMenuContent>
@@ -134,6 +134,7 @@ export function AgentMcpBindingsField({
   selectedServers: McpServer[];
   setServers: (servers: McpServer[]) => void;
 }) {
+  const { t } = useTranslation();
   const [addOpen, setAddOpen] = useState(false);
   const registryQuery = useMcpRegistryQuery(appId);
 
@@ -160,7 +161,7 @@ export function AgentMcpBindingsField({
   if (!isTruthy(appId)) {
     return (
       <div className="border-border text-muted-foreground rounded-lg border p-3 text-[12px]">
-        Select an App before managing MCP bindings.
+        {t("agentEditor.selectAppFirst")}
       </div>
     );
   }
@@ -170,7 +171,7 @@ export function AgentMcpBindingsField({
       <div className="border-destructive/30 text-destructive rounded-lg border p-3 text-[12px]">
         {registryQuery.error instanceof Error
           ? registryQuery.error.message
-          : "Failed to load MCP registry."}
+          : t("agentEditor.failedToLoadMcpRegistry")}
       </div>
     );
   }
@@ -183,7 +184,7 @@ export function AgentMcpBindingsField({
     <div className="border-border divide-border-subtle divide-y overflow-hidden rounded-lg border">
       {selectedServers.map((server) => {
         const pool = poolServerById.get(server.id);
-        const sourceLabel = `App · ${pool?.ownerName ?? "Owner"}`;
+        const sourceLabel = `${t("nav.app")} · ${pool?.ownerName ?? t("agentEditor.owner")}`;
 
         return (
           <div
@@ -213,7 +214,7 @@ export function AgentMcpBindingsField({
 
             {!readOnly ? (
               <button
-                aria-label="Remove"
+                aria-label={t("common.remove")}
                 className="text-muted-foreground hover:text-destructive opacity-0 transition-colors group-hover:opacity-100"
                 onClick={() => removeServer(server.id)}
                 type="button"

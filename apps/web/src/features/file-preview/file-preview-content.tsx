@@ -5,15 +5,17 @@ import type { ReactElement } from "react";
 import { createFileDownload, readFileText } from "@/domains/file/api/file-download-client";
 import { fileKeys } from "@/domains/file/api/files";
 import type { ListedFileEntry } from "@/domains/file/api/files";
+import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import { StaticMarkdown } from "@/shared/ui/static-markdown";
 
 import {
   getFilePreviewKind,
   getTableDelimiter,
+  MAX_TABLE_PREVIEW_COLUMNS,
+  MAX_TABLE_PREVIEW_ROWS,
   MAX_TEXT_PREVIEW_BYTES,
   parseDelimitedText,
-  UNSUPPORTED_FILE_PREVIEW_MESSAGE,
 } from "./model";
 import type { FilePreviewKind } from "./model";
 
@@ -41,6 +43,8 @@ export function formatFileSize(size: number): string {
 }
 
 function TextPreview({ content, file, kind }: TextPreviewProps): ReactElement {
+  const { t } = useTranslation();
+
   if (kind === "markdown") {
     return <StaticMarkdown className="mx-auto max-w-4xl px-6 py-5">{content}</StaticMarkdown>;
   }
@@ -51,7 +55,9 @@ function TextPreview({ content, file, kind }: TextPreviewProps): ReactElement {
 
     if (header.length === 0) {
       return (
-        <div className="text-fg-3 px-6 py-12 text-center text-[13px]">This table is empty.</div>
+        <div className="text-fg-3 px-6 py-12 text-center text-[13px]">
+          {t("filePreview.tableEmpty")}
+        </div>
       );
     }
 
@@ -89,7 +95,10 @@ function TextPreview({ content, file, kind }: TextPreviewProps): ReactElement {
         </div>
         {table.truncated ? (
           <p className="text-fg-3 mt-3 text-[12px]">
-            Preview limited to the first 200 rows and 50 columns.
+            {t("filePreview.tableTruncated", {
+              columns: String(MAX_TABLE_PREVIEW_COLUMNS),
+              rows: String(MAX_TABLE_PREVIEW_ROWS),
+            })}
           </p>
         ) : null}
       </div>
@@ -110,6 +119,7 @@ function PreviewUnavailable({
   file: ListedFileEntry;
   message: string;
 }): ReactElement {
+  const { t } = useTranslation();
   const download = createFileDownload(file.id);
 
   return (
@@ -119,7 +129,7 @@ function PreviewUnavailable({
       <Button asChild size="sm" variant="outline">
         <a href={download.url}>
           <Download className="size-3.5" />
-          Download file
+          {t("common.downloadFile")}
         </a>
       </Button>
     </div>
@@ -127,6 +137,7 @@ function PreviewUnavailable({
 }
 
 export function FilePreviewContent({ file }: { file: ListedFileEntry }): ReactElement {
+  const { t } = useTranslation();
   const kind: FilePreviewKind = getFilePreviewKind(file.name, file.mimeType);
   const inlineDownload = createFileDownload(file.id, "inline");
   const needsText = kind === "markdown" || kind === "table" || kind === "text";
@@ -157,20 +168,20 @@ export function FilePreviewContent({ file }: { file: ListedFileEntry }): ReactEl
         data={inlineDownload.url}
         type="application/pdf"
       >
-        <PreviewUnavailable file={file} message="This browser cannot display the PDF preview." />
+        <PreviewUnavailable file={file} message={t("filePreview.pdfUnsupported")} />
       </object>
     );
   }
 
   if (kind === "unsupported") {
-    return <PreviewUnavailable file={file} message={UNSUPPORTED_FILE_PREVIEW_MESSAGE} />;
+    return <PreviewUnavailable file={file} message={t("filePreview.unsupported")} />;
   }
 
   if (!canLoadText) {
     return (
       <PreviewUnavailable
         file={file}
-        message={`Text preview is limited to ${formatFileSize(MAX_TEXT_PREVIEW_BYTES)} files.`}
+        message={t("filePreview.textLimit", { size: formatFileSize(MAX_TEXT_PREVIEW_BYTES) })}
       />
     );
   }
@@ -179,7 +190,7 @@ export function FilePreviewContent({ file }: { file: ListedFileEntry }): ReactEl
     return (
       <div className="text-fg-3 flex h-full items-center justify-center gap-2 text-[13px]">
         <LoaderCircle className="size-4 animate-spin" />
-        Loading preview...
+        {t("filePreview.loading")}
       </div>
     );
   }
@@ -188,7 +199,7 @@ export function FilePreviewContent({ file }: { file: ListedFileEntry }): ReactEl
     return (
       <PreviewUnavailable
         file={file}
-        message={error instanceof Error ? error.message : "Failed to load file preview."}
+        message={error instanceof Error ? error.message : t("filePreview.failedToLoad")}
       />
     );
   }

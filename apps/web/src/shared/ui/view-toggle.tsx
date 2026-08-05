@@ -1,6 +1,7 @@
 import { Grid2X2, List } from "lucide-react";
 import type { ReactElement } from "react";
 
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 
 type ViewMode = "list" | "grid";
@@ -14,6 +15,8 @@ export function ViewToggle({
   onChange: (value: ViewMode) => void;
   className?: string;
 }): ReactElement {
+  const { t } = useTranslation();
+
   return (
     <div
       className={cn(
@@ -30,7 +33,7 @@ export function ViewToggle({
           "h-full w-8 flex items-center justify-center transition-colors",
           value === "list" ? "bg-paper-200 text-fg-1" : "text-fg-3 hover:bg-paper-200/50",
         )}
-        aria-label="List view"
+        aria-label={t("common.listView")}
         aria-pressed={value === "list"}
       >
         <List className="size-3.5" />
@@ -45,7 +48,7 @@ export function ViewToggle({
           "h-full w-8 flex items-center justify-center transition-colors",
           value === "grid" ? "bg-paper-200 text-fg-1" : "text-fg-3 hover:bg-paper-200/50",
         )}
-        aria-label="Grid view"
+        aria-label={t("common.gridView")}
         aria-pressed={value === "grid"}
       >
         <Grid2X2 className="size-3.5" />

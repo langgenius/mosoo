@@ -1,5 +1,6 @@
 import type { ReactElement } from "react";
 
+import { useTranslation } from "@/shared/i18n";
 import {
   Dialog,
   DialogContent,
@@ -25,15 +26,17 @@ export function SettingsSheet({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }): ReactElement {
+  const { t } = useTranslation();
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] gap-0 overflow-x-hidden overflow-y-auto rounded-lg p-0 sm:max-w-[620px]">
         <DialogHeader className="px-6 pt-6 pb-0">
-          <DialogTitle>Agent settings</DialogTitle>
+          <DialogTitle>{t("agent.settings")}</DialogTitle>
           <DialogDescription>
             {canManageAccess
-              ? `Manage settings for "${agent.name}".`
-              : `View settings for "${agent.name}".`}
+              ? t("agent.manageSettingsFor", { name: agent.name })
+              : t("agent.viewSettingsFor", { name: agent.name })}
           </DialogDescription>
         </DialogHeader>
 

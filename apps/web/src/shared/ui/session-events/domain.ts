@@ -32,21 +32,31 @@ const SESSION_EVENT_DOMAIN_BY_TYPE = {
   "user.message": "user",
 } as const satisfies Record<SessionProcessEventType, SessionEventDomain>;
 
-const SESSION_EVENT_TYPE_LABEL = {
-  "agent.message.delta": "Assistant message",
-  "agent.thinking.delta": "Thinking",
-  "file.changed": "File changed",
-  "run.completed": "Run completed",
-  "run.failed": "Run failed",
-  "run.started": "Run started",
-  "session.status": "Session status",
-  "session_files.updated": "Session files",
-  "tool.confirmation.required": "Approval requested",
-  "tool.use.completed": "Tool result",
-  "tool.use.started": "Tool use",
-  "usage.updated": "Usage updated",
-  "user.message": "User input",
+const SESSION_EVENT_TYPE_LABEL_KEY = {
+  "agent.message.delta": "sessionEvents.eventAssistantMessage",
+  "agent.thinking.delta": "sessionEvents.eventThinking",
+  "file.changed": "sessionEvents.eventFileChanged",
+  "run.completed": "sessionEvents.eventRunCompleted",
+  "run.failed": "sessionEvents.eventRunFailed",
+  "run.started": "sessionEvents.eventRunStarted",
+  "session.status": "sessionEvents.eventSessionStatus",
+  "session_files.updated": "sessionEvents.eventSessionFiles",
+  "tool.confirmation.required": "sessionEvents.eventApprovalRequested",
+  "tool.use.completed": "sessionEvents.eventToolResult",
+  "tool.use.started": "sessionEvents.eventToolUse",
+  "usage.updated": "sessionEvents.eventUsageUpdated",
+  "user.message": "sessionEvents.eventUserMessage",
 } as const satisfies Record<SessionProcessEventType, string>;
+
+const SESSION_EVENT_DOMAIN_LABEL_KEY = {
+  agent: "sessionEvents.domainAgent",
+  session: "sessionEvents.domainSession",
+  span: "sessionEvents.domainSpan",
+  user: "sessionEvents.domainUser",
+} as const satisfies Record<SessionEventDomain, string>;
+
+type Translate = (key: string, variables?: Record<string, string>) => string;
+const defaultTranslate: Translate = (key) => key;
 
 export interface SessionEventDomainTone {
   bar: string;
@@ -175,8 +185,18 @@ export function getSessionEventDomain(type: SessionProcessEventType): SessionEve
   return SESSION_EVENT_DOMAIN_BY_TYPE[type];
 }
 
-export function getSessionEventLabel(type: SessionProcessEventType): string {
-  return SESSION_EVENT_TYPE_LABEL[type];
+export function getSessionEventLabel(
+  type: SessionProcessEventType,
+  t: Translate = defaultTranslate,
+): string {
+  return t(SESSION_EVENT_TYPE_LABEL_KEY[type]);
+}
+
+export function getSessionEventDomainLabel(
+  domain: SessionEventDomain,
+  t: Translate = defaultTranslate,
+): string {
+  return t(SESSION_EVENT_DOMAIN_LABEL_KEY[domain]);
 }
 
 export function getSessionEventChipTone(event: SessionProcessEvent): SessionEventDomainTone {
@@ -214,16 +234,19 @@ export function getSessionEventChipTone(event: SessionProcessEvent): SessionEven
   }
 }
 
-export function getSessionEventStatusLabel(status: SessionProcessEventStatus): string {
+export function getSessionEventStatusLabel(
+  status: SessionProcessEventStatus,
+  t: Translate = defaultTranslate,
+): string {
   switch (status) {
     case "available": {
-      return "ok";
+      return t("sessionEvents.statusOk");
     }
     case "error": {
-      return "error";
+      return t("sessionEvents.statusError");
     }
     case "unsupported": {
-      return "unsupported";
+      return t("sessionEvents.statusUnsupported");
     }
   }
 }
@@ -253,9 +276,12 @@ export function isSessionEventVisibleInMainFeed(event: SessionProcessEvent): boo
   return event.type !== "usage.updated" && !isSyntheticNoRuntimeEventsEvent(event);
 }
 
-export function summarizeSessionEvent(event: SessionProcessEvent): string {
+export function summarizeSessionEvent(
+  event: SessionProcessEvent,
+  t: Translate = defaultTranslate,
+): string {
   const normalized = event.content.replaceAll(/\s+/g, " ").trim();
-  return normalized.length > 0 ? normalized : getSessionEventLabel(event.type);
+  return normalized.length > 0 ? normalized : getSessionEventLabel(event.type, t);
 }
 
 export function isSyntheticNoRuntimeEventsEvent(event: SessionProcessEvent): boolean {

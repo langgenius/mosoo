@@ -3,6 +3,7 @@ import { Check, Copy } from "lucide-react";
 import { useState } from "react";
 import type { ReactElement } from "react";
 
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
 import {
@@ -41,12 +42,13 @@ export function ThreadProcessModal({
   threadFailed,
   threadWorking,
 }: ThreadProcessModalProps): ReactElement {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   const totalDurationMs = events.reduce((total, event) => total + (event.durationMs ?? 0), 0);
   const totalTokens = events.reduce((total, event) => total + (event.tokens ?? 0), 0);
 
   async function copyProcessEvents(): Promise<void> {
-    await navigator.clipboard.writeText(createProcessCopyText({ agentName, events }));
+    await navigator.clipboard.writeText(createProcessCopyText({ agentName, events }, t));
     setCopied(true);
     globalThis.setTimeout(() => {
       setCopied(false);
@@ -82,12 +84,16 @@ export function ThreadProcessModal({
                         <span className="bg-primary relative size-2 rounded-full" />
                       </span>
                     ) : null}
-                    {threadFailed ? "Failed" : threadWorking ? "Working" : "Completed"}
+                    {threadFailed
+                      ? t("threads.failed")
+                      : threadWorking
+                        ? t("threads.working")
+                        : t("threads.completed")}
                   </span>
                 </div>
                 <DialogDescription className="text-fg-3 mt-0.5 text-[11.5px] tabular-nums">
-                  {formatTotalDuration(totalDurationMs)} · {events.length} events ·{" "}
-                  {formatTokens(totalTokens)} tokens
+                  {formatTotalDuration(totalDurationMs)} · {events.length} {t("threads.events")} ·{" "}
+                  {formatTokens(totalTokens)} {t("cost.tokens")}
                 </DialogDescription>
               </div>
             </div>
@@ -99,7 +105,7 @@ export function ThreadProcessModal({
               variant="outline"
             >
               {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-              {copied ? "Copied" : "Copy"}
+              {copied ? t("common.copied") : t("common.copy")}
             </Button>
           </div>
         </DialogHeader>
@@ -109,9 +115,11 @@ export function ThreadProcessModal({
           EventComponent={ProcessEventRow}
           emptyState={
             <div className="px-7 py-12 text-center">
-              <div className="text-fg-1 text-sm font-semibold">No process events recorded</div>
+              <div className="text-fg-1 text-sm font-semibold">
+                {t("threads.noProcessEventsRecorded")}
+              </div>
               <div className="text-fg-3 mt-1 text-[12.5px]">
-                {errorMessage ?? "The backend returned no durable events for this thread."}
+                {errorMessage ?? t("threads.noDurableEvents")}
               </div>
             </div>
           }

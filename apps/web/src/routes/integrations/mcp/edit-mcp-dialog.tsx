@@ -1,5 +1,6 @@
 import { useReducer } from "react";
 
+import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import {
   Dialog,
@@ -80,6 +81,7 @@ function editMcpDialogReducer(
 }
 
 export function EditMcpDialog({ server, onOpenChange, onSubmit }: Props) {
+  const { t } = useTranslation();
   const [state, dispatch] = useReducer(editMcpDialogReducer, server, createInitialState);
   const { description, iconUrl, name, submitError, submitting, url } = state;
 
@@ -107,7 +109,7 @@ export function EditMcpDialog({ server, onOpenChange, onSubmit }: Props) {
       onOpenChange(false);
     } catch (error) {
       dispatch({
-        error: error instanceof Error ? error.message : "Failed to update MCP connection.",
+        error: error instanceof Error ? error.message : t("mcp.failedToUpdate"),
         type: "setSubmitError",
       });
     } finally {
@@ -119,10 +121,9 @@ export function EditMcpDialog({ server, onOpenChange, onSubmit }: Props) {
     <Dialog open onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Edit MCP connection</DialogTitle>
+          <DialogTitle>{t("mcp.editConnection")}</DialogTitle>
           <DialogDescription>
-            Update this MCP server. Authorization type ({authTypeLabel(server.authType)}) cannot be
-            changed.
+            {t("mcp.editDescription", { authType: authTypeLabel(server.authType, t) })}
           </DialogDescription>
         </DialogHeader>
 
@@ -136,21 +137,21 @@ export function EditMcpDialog({ server, onOpenChange, onSubmit }: Props) {
               size={44}
             />
             <div className="flex-1 space-y-1.5">
-              <Label htmlFor="mcp-edit-name">Name</Label>
+              <Label htmlFor="mcp-edit-name">{t("mcp.name")}</Label>
               <Input
                 id="mcp-edit-name"
                 value={name}
                 onChange={(e) => {
                   dispatch({ name: e.target.value, type: "changeName" });
                 }}
-                placeholder="For example: Figma"
+                placeholder={t("mcp.namePlaceholder")}
               />
             </div>
           </div>
 
           {/* URL */}
           <div className="space-y-1.5">
-            <Label htmlFor="mcp-edit-url">Server URL</Label>
+            <Label htmlFor="mcp-edit-url">{t("mcp.serverUrl")}</Label>
             <Input
               id="mcp-edit-url"
               value={url}
@@ -160,18 +161,16 @@ export function EditMcpDialog({ server, onOpenChange, onSubmit }: Props) {
               placeholder="https://mcp.figma.com/mcp"
             />
             {url.length > 0 && !urlValid && (
-              <p className="text-destructive text-[11px]">URL must start with https://</p>
+              <p className="text-destructive text-[11px]">{t("mcp.urlMustStartWithHttps")}</p>
             )}
             {disconnectsOnSave && (
-              <p className="text-amber-fg text-[11px]">
-                Changing the URL disconnects the current credential. You will need to connect again.
-              </p>
+              <p className="text-amber-fg text-[11px]">{t("mcp.urlChangeDisconnects")}</p>
             )}
           </div>
 
           {/* Icon URL */}
           <div className="space-y-1.5">
-            <Label htmlFor="mcp-edit-icon">Icon URL (optional)</Label>
+            <Label htmlFor="mcp-edit-icon">{t("mcp.iconUrl")}</Label>
             <Input
               id="mcp-edit-icon"
               value={iconUrl}
@@ -180,14 +179,12 @@ export function EditMcpDialog({ server, onOpenChange, onSubmit }: Props) {
               }}
               placeholder="https://logo.clearbit.com/example.com"
             />
-            <p className="text-muted-foreground text-[10px]">
-              Leave empty to use the initial as the icon.
-            </p>
+            <p className="text-muted-foreground text-[10px]">{t("mcp.leaveEmptyToUseInitial")}</p>
           </div>
 
           {/* Description */}
           <div className="space-y-1.5">
-            <Label htmlFor="mcp-edit-desc">Description (optional)</Label>
+            <Label htmlFor="mcp-edit-desc">{t("mcp.descriptionOptional")}</Label>
             <Textarea
               id="mcp-edit-desc"
               value={description}
@@ -195,7 +192,7 @@ export function EditMcpDialog({ server, onOpenChange, onSubmit }: Props) {
                 dispatch({ description: e.target.value, type: "changeDescription" });
               }}
               rows={2}
-              placeholder="What capabilities does this MCP server provide?"
+              placeholder={t("mcp.descriptionPlaceholder")}
             />
           </div>
         </div>
@@ -213,10 +210,10 @@ export function EditMcpDialog({ server, onOpenChange, onSubmit }: Props) {
             }}
             disabled={submitting}
           >
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button disabled={!canSubmit || submitting} onClick={() => void handleSubmit()}>
-            {submitting ? "Saving..." : "Save"}
+            {submitting ? t("mcp.saving") : t("common.save")}
           </Button>
         </DialogFooter>
       </DialogContent>

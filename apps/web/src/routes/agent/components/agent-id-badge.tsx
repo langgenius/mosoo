@@ -2,6 +2,7 @@ import { Check, Copy } from "lucide-react";
 import type { ReactElement } from "react";
 import { useState } from "react";
 
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { writeClipboardText } from "@/shared/lib/clipboard";
 import { Button } from "@/shared/ui/button";
@@ -13,6 +14,7 @@ export function AgentIdBadge({
   agentId: string;
   className?: string;
 }): ReactElement {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
 
   async function handleCopy(event: React.MouseEvent): Promise<void> {
@@ -36,16 +38,16 @@ export function AgentIdBadge({
       )}
     >
       <span title={agentId} className="min-w-0 truncate font-mono">
-        ID: {agentId}
+        {t("agent.idPrefix")} {agentId}
       </span>
       <Button
-        aria-label={copied ? "Agent ID copied" : "Copy agent ID"}
+        aria-label={copied ? t("agent.agentIdCopied") : t("agent.copyAgentId")}
         className="text-muted-foreground hover:text-foreground size-4"
         onClick={(event) => {
           void handleCopy(event);
         }}
         size="icon-xs"
-        title={copied ? "Copied" : "Copy agent ID"}
+        title={copied ? t("common.copied") : t("agent.copyAgentId")}
         type="button"
         variant="ghost"
       >

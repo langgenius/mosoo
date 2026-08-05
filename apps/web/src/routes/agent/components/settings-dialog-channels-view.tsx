@@ -14,6 +14,7 @@ import { useState } from "react";
 
 import type { AgentChannelBindingFieldsFragment } from "@/gql/graphql";
 import { toChannelBindingId } from "@/routes/typed-id";
+import { getCurrentLocale, useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -47,13 +48,11 @@ function readMetadataString(
   return trimmed.length > 0 ? trimmed : null;
 }
 
-const TIMESTAMP_FORMATTER = new Intl.DateTimeFormat("en-US", {
-  dateStyle: "medium",
-  timeStyle: "short",
-});
-
 function formatTimestamp(value: string): string {
-  return TIMESTAMP_FORMATTER.format(new Date(value));
+  return new Intl.DateTimeFormat(getCurrentLocale(), {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
 }
 
 function getOperatorWebhookUrl(channelId: ChannelId, bindingId: string): string | null {
@@ -79,13 +78,16 @@ function getOperatorWebhookUrl(channelId: ChannelId, bindingId: string): string 
   }
 }
 
-function getDiscordBindingErrorCopy(errorCode: string): string | null {
+function getDiscordBindingErrorCopy(
+  errorCode: string,
+  t: (key: string, variables?: Record<string, string>) => string,
+): string | null {
   if (errorCode === "discord_gateway_disallowed_intents") {
-    return "Discord refused the connection because Message Content Intent is disabled. Open the Discord Developer Portal → Bot → Privileged Gateway Intents, enable Message Content Intent, save, then disconnect and reconnect Discord here.";
+    return t("agent.discordIntentError");
   }
 
   if (errorCode === "discord_gateway_authentication_failed") {
-    return "Discord rejected the bot token. Reset the token in the Discord Developer Portal, then disconnect and reconnect Discord here with the new value.";
+    return t("agent.discordTokenError");
   }
 
   return null;
@@ -107,14 +109,15 @@ interface ConnectionSummary {
 function getConnectionSummary(
   binding: AgentChannelBindingFieldsFragment,
   channelId: ChannelId,
+  t: (key: string, variables?: Record<string, string>) => string,
 ): ConnectionSummary {
   if (channelId === "slack") {
     return {
-      detailIconLabel: "Workspace",
+      detailIconLabel: t("agent.workspace"),
       detailTitle:
         readMetadataString(binding, "workspace_name") ??
         binding.externalTenantId ??
-        "Slack workspace",
+        t("agent.slackWorkspace"),
       detailValue: readMetadataString(binding, "bot_handle") ?? binding.externalBotId,
     };
   }
@@ -124,7 +127,7 @@ function getConnectionSummary(
     const domainLabel = domain === "lark" ? "Lark" : "Feishu";
 
     return {
-      detailIconLabel: "App",
+      detailIconLabel: t("agent.app"),
       detailTitle: readMetadataString(binding, "app_name") ?? binding.externalTenantId,
       detailValue: `${domainLabel} / ${readMetadataString(binding, "bot_open_id") ?? binding.externalBotId}`,
     };
@@ -134,16 +137,16 @@ function getConnectionSummary(
     const username = readMetadataString(binding, "bot_username");
     return {
       detailHref: getTelegramBotDeepLink(username),
-      detailIconLabel: "Bot",
+      detailIconLabel: t("agent.bot"),
       detailTitle: username
         ? `@${username}`
-        : (readMetadataString(binding, "bot_first_name") ?? "Telegram bot"),
+        : (readMetadataString(binding, "bot_first_name") ?? t("agent.telegramBot")),
       detailValue: binding.externalBotId,
     };
   }
 
   return {
-    detailIconLabel: "Channel",
+    detailIconLabel: t("agent.channel"),
     detailTitle: binding.externalTenantId,
     detailValue: binding.externalBotId,
   };
@@ -164,8 +167,9 @@ function ChannelConnectionPanel({
   onRemove: () => void;
   pendingRemove: boolean;
 }) {
+  const { t } = useTranslation();
   const [copiedWebhook, setCopiedWebhook] = useState(false);
-  const summary = getConnectionSummary(binding, channelId);
+  const summary = getConnectionSummary(binding, channelId, t);
   const statusTone =
     binding.status === "active"
       ? "border-green-200 bg-green-50 text-green-800"
@@ -187,7 +191,7 @@ function ChannelConnectionPanel({
   return (
     <div className="border-border bg-card rounded-lg border p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <div className="text-foreground text-sm font-semibold">Connection</div>
+        <div className="text-foreground text-sm font-semibold">{t("agent.connection")}</div>
         <span
           className={`inline-flex h-7 items-center gap-1 rounded-md border px-2 text-[11px] font-medium ${statusTone}`}
         >
@@ -196,7 +200,7 @@ function ChannelConnectionPanel({
           ) : (
             <TriangleAlert className="size-3" />
           )}
-          {binding.status === "active" ? "Active" : "Error"}
+          {binding.status === "active" ? t("agent.active") : t("common.error")}
         </span>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
@@ -227,27 +231,29 @@ function ChannelConnectionPanel({
         <div className="min-w-0">
           <div className="text-muted-foreground mb-1 flex items-center gap-1.5 text-[11px] font-medium">
             <Activity className="size-3" />
-            Activity
+            {t("agent.activity")}
           </div>
           <div className="text-foreground truncate text-sm font-medium">
             {binding.activityLastTriggeredAt
               ? formatTimestamp(binding.activityLastTriggeredAt)
-              : "No channel sessions yet"}
+              : t("agent.noChannelSessions")}
           </div>
           <div className="text-muted-foreground mt-0.5 truncate text-[11px]">
-            {binding.activitySessionCount7d} sessions in last 7 days
+            {t("agent.sessionsInLast7Days", { count: String(binding.activitySessionCount7d) })}
           </div>
         </div>
       </div>
       {webhookUrl ? (
         <div className="mt-4 grid gap-1.5">
-          <div className="text-muted-foreground text-[11px] font-medium">Webhook URL</div>
+          <div className="text-muted-foreground text-[11px] font-medium">
+            {t("agent.webhookUrl")}
+          </div>
           <div className="flex min-w-0 gap-2">
             <code className="bg-muted text-muted-foreground min-w-0 flex-1 truncate rounded-md border px-2 py-1.5 text-[11px]">
               {webhookUrl}
             </code>
             <Button
-              aria-label={copiedWebhook ? "Copied webhook URL" : "Copy webhook URL"}
+              aria-label={copiedWebhook ? t("agent.webhookUrlCopied") : t("agent.copyWebhookUrl")}
               onClick={() => {
                 void handleCopyWebhook();
               }}
@@ -256,7 +262,7 @@ function ChannelConnectionPanel({
               variant="outline"
             >
               {copiedWebhook ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-              Copy
+              {t("common.copy")}
             </Button>
           </div>
         </div>
@@ -264,16 +270,22 @@ function ChannelConnectionPanel({
       {binding.status === "error" && binding.lastErrorCode ? (
         <div className="border-amber/30 bg-amber-bg text-amber-fg mt-3 rounded-md border px-3 py-2 text-xs">
           {channelId === "discord"
-            ? (getDiscordBindingErrorCopy(binding.lastErrorCode) ??
-              `${channelLabel} delivery failed with ${binding.lastErrorCode}. Remove and reconnect ${channelLabel} to recover.`)
-            : `${channelLabel} delivery failed with ${binding.lastErrorCode}. Remove and reconnect ${channelLabel} to recover.`}
+            ? (getDiscordBindingErrorCopy(binding.lastErrorCode, t) ??
+              t("agent.deliveryFailedRecover", {
+                channel: channelLabel,
+                code: binding.lastErrorCode,
+              }))
+            : t("agent.deliveryFailedRecover", {
+                channel: channelLabel,
+                code: binding.lastErrorCode,
+              })}
         </div>
       ) : null}
       {canManageChannels ? (
         <div className="mt-4 flex justify-end">
           <Button disabled={pendingRemove} onClick={onRemove} size="sm" variant="outline">
             <Trash2 className="size-3.5" />
-            Disconnect {channelLabel}
+            {t("agent.disconnectChannel", { channel: channelLabel })}
           </Button>
         </div>
       ) : null}
@@ -282,13 +294,15 @@ function ChannelConnectionPanel({
 }
 
 function ComingSoonPanel({ channelLabel }: { channelLabel: string }) {
+  const { t } = useTranslation();
   return (
     <div className="border-border bg-muted/20 rounded-lg border px-5 py-10 text-center">
       <Inbox className="text-muted-foreground mx-auto mb-3 size-8" />
-      <div className="text-foreground text-sm font-medium">{channelLabel} support is coming</div>
+      <div className="text-foreground text-sm font-medium">
+        {t("agent.supportComing", { channel: channelLabel })}
+      </div>
       <p className="text-muted-foreground mx-auto mt-2 max-w-sm text-xs leading-relaxed">
-        We're working on letting agents receive and answer messages through {channelLabel}. Pick
-        another channel for now, or come back soon.
+        {t("agent.supportComingDescription", { channel: channelLabel })}
       </p>
     </div>
   );
@@ -317,6 +331,7 @@ export function AgentSettingsChannelsView({
   pendingRemoveBindingId: string | null;
   selectedChannelId: ChannelId;
 }) {
+  const { t } = useTranslation();
   const selectedChannel = DISTRIBUTION_CHANNELS.find((channel) => channel.id === selectedChannelId);
   const selectedBinding =
     channelBindings.find((binding) => binding.provider === selectedChannelId) ?? null;
@@ -333,7 +348,7 @@ export function AgentSettingsChannelsView({
         <div className="flex items-center gap-1.5">
           {onBackToSettings ? (
             <Button
-              aria-label="Back to Agent Settings"
+              aria-label={t("nav.backTo", { label: t("agent.settings") })}
               className="text-muted-foreground -ml-1.5"
               onClick={onBackToSettings}
               size="icon-xs"
@@ -342,12 +357,9 @@ export function AgentSettingsChannelsView({
               <ArrowLeft className="size-3.5" />
             </Button>
           ) : null}
-          <DialogTitle className="text-base">Channels</DialogTitle>
+          <DialogTitle className="text-base">{t("agent.channels")}</DialogTitle>
         </div>
-        <DialogDescription>
-          Connect {agent.name} to external messaging channels so callers can reach it from their
-          tools.
-        </DialogDescription>
+        <DialogDescription>{t("agent.connectChannels", { name: agent.name })}</DialogDescription>
       </DialogHeader>
 
       <div className="border-border-subtle flex min-h-0 flex-1 border-t">
@@ -375,7 +387,7 @@ export function AgentSettingsChannelsView({
                   <span className="min-w-0 truncate">{channel.label}</span>
                 </div>
                 {!channel.enabled ? (
-                  <span className="text-muted-foreground text-[10px]">Soon</span>
+                  <span className="text-muted-foreground text-[10px]">{t("agent.soon")}</span>
                 ) : connected ? (
                   <CircleCheck className="size-3.5 text-green-600" />
                 ) : null}
@@ -389,16 +401,16 @@ export function AgentSettingsChannelsView({
             <ChannelBrandIcon channelId={selectedChannel.id} className="size-6 shrink-0" />
             <div className="text-foreground text-sm font-semibold">{selectedChannel.label}</div>
             {selectedBinding ? (
-              <Badge variant="primary">Connected</Badge>
+              <Badge variant="primary">{t("agent.connected")}</Badge>
             ) : !selectedChannel.enabled ? (
-              <Badge variant="default">Soon</Badge>
+              <Badge variant="default">{t("agent.soon")}</Badge>
             ) : null}
           </div>
 
           {!selectedChannel.enabled ? (
             <ComingSoonPanel channelLabel={selectedChannel.label} />
           ) : channelBindingsLoading ? (
-            <div className="text-muted-foreground text-sm">Loading…</div>
+            <div className="text-muted-foreground text-sm">{t("common.loading")}</div>
           ) : selectedBinding ? (
             <ChannelConnectionPanel
               binding={selectedBinding}
@@ -412,11 +424,11 @@ export function AgentSettingsChannelsView({
             />
           ) : !isPublished ? (
             <div className="border-amber/30 bg-amber-bg text-amber-fg rounded-md border px-3 py-2 text-xs">
-              Publish this Agent before connecting {selectedChannel.label}.
+              {t("agent.publishBeforeConnectChannel", { channel: selectedChannel.label })}
             </div>
           ) : !canManageChannels ? (
             <div className="border-border bg-muted/20 text-muted-foreground rounded-md border px-3 py-2 text-xs">
-              Only the Agent owner in this App can connect channels.
+              {t("agent.onlyOwnerCanConnectChannels")}
             </div>
           ) : selectedChannel.id === "slack" ? (
             <SlackChannelInlineSetup agent={agent} />
@@ -448,15 +460,13 @@ export function AgentSettingsChannelsView({
       >
         <DialogContent className="sm:max-w-[440px]">
           <DialogHeader>
-            <DialogTitle>Remove channel binding?</DialogTitle>
-            <DialogDescription>
-              Events for this channel app will be acknowledged and dropped after removal.
-            </DialogDescription>
+            <DialogTitle>{t("agent.removeChannelBinding")}</DialogTitle>
+            <DialogDescription>{t("agent.channelEventsDropped")}</DialogDescription>
           </DialogHeader>
           <div className="text-muted-foreground space-y-2 text-sm">
-            <p>The Agent will no longer respond in the connected channel surface.</p>
-            <p>Existing mosoo Sessions keep their channel source metadata.</p>
-            <p>To recover, create a new binding and paste the credentials again.</p>
+            <p>{t("agent.removeChannelBindingDescription")}</p>
+            <p>{t("agent.channelSourceMetadata")}</p>
+            <p>{t("agent.recoverBinding")}</p>
           </div>
           <DialogFooter>
             <Button
@@ -467,7 +477,7 @@ export function AgentSettingsChannelsView({
               size="sm"
               variant="ghost"
             >
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button
               disabled={pendingRemoveBindingId !== null || confirmRemoveBinding === null}

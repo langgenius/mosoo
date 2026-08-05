@@ -1,6 +1,7 @@
 import { MoreHorizontal, RotateCw, Trash2 } from "lucide-react";
 import { useState } from "react";
 
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
 import {
@@ -49,20 +50,21 @@ export function DeployActions({
   scope?: DeployActionScope;
   developmentStatus?: LocalDeploymentPreviewStatus | null;
 }) {
+  const { t } = useTranslation();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const label =
     scope === "development"
       ? deploying
-        ? "Checking development..."
+        ? t("deploy.checkingDevelopment")
         : developmentStatus === "online"
-          ? "Refresh development"
-          : "Retry development"
+          ? t("deploy.refreshDevelopment")
+          : t("deploy.retryDevelopment")
       : deploying
-        ? "Refreshing production…"
+        ? t("deploy.refreshingProduction")
         : latestOutcome === "failed"
-          ? "Retry production"
-          : "Refresh production";
+          ? t("deploy.retryProduction")
+          : t("deploy.refreshProduction");
 
   function confirmDelete() {
     onDelete();
@@ -77,7 +79,7 @@ export function DeployActions({
       </Button>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="icon-sm" aria-label="More deployment actions">
+          <Button variant="outline" size="icon-sm" aria-label={t("deploy.moreActions")}>
             <MoreHorizontal className="size-4" />
           </Button>
         </DropdownMenuTrigger>
@@ -88,7 +90,7 @@ export function DeployActions({
             onSelect={() => setConfirmingDelete(true)}
           >
             <Trash2 className="size-3.5" />
-            Delete deployment
+            {t("deploy.deleteDeployment")}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -96,21 +98,21 @@ export function DeployActions({
       <Dialog open={confirmingDelete} onOpenChange={setConfirmingDelete}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete this deployment?</DialogTitle>
+            <DialogTitle>{t("deploy.deletePrompt")}</DialogTitle>
             <DialogDescription>
-              This removes the deployment for{" "}
-              <span className="text-fg-1 font-semibold">{appName}</span>, its Cloudflare Worker, and
-              the {agentCount} agent bindings. The public repo is the source of truth and is
-              untouched.
+              {t("deploy.deleteDescription", {
+                agentCount: String(agentCount),
+                appName,
+              })}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setConfirmingDelete(false)}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button variant="destructive" onClick={confirmDelete}>
               <Trash2 className="size-4" />
-              Delete deployment
+              {t("deploy.deleteDeployment")}
             </Button>
           </DialogFooter>
         </DialogContent>

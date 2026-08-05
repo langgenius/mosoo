@@ -1,6 +1,8 @@
 import { ChevronRight, Loader2, ShieldAlert } from "lucide-react";
 import type { ReactElement } from "react";
 
+import { useTranslation } from "@/shared/i18n";
+
 import { isTruthy } from "../../shared/lib/truthiness";
 export interface ToolCall {
   approvalInput?: string | null;
@@ -16,16 +18,17 @@ export interface ToolCallCardProps {
 }
 
 export function ToolCallCard({ call }: ToolCallCardProps): ReactElement {
+  const { t } = useTranslation();
   const inputText = call.argsText.trim().length > 0 ? call.argsText : (call.approvalInput ?? "");
   const hasInput = inputText.trim().length > 0;
   const hasOutput = call.output !== undefined && call.output.length > 0;
   const isCompleted = call.status === "completed";
   const statusLabel =
     call.status === "completed"
-      ? "done"
+      ? t("common.done")
       : call.status === "needs_approval"
-        ? "needs approval"
-        : "running";
+        ? t("chat.toolNeedsApproval")
+        : t("chat.toolRunning");
 
   return (
     <details
@@ -68,12 +71,12 @@ export function ToolCallCard({ call }: ToolCallCardProps): ReactElement {
       ) : isCompleted ? (
         <div className="mt-1.5 space-y-1.5">
           <p className="bg-paper-200 text-fg-3 rounded-sm p-2 font-mono text-[11.5px] leading-snug italic">
-            (no output)
+            {t("chat.noOutput")}
           </p>
         </div>
       ) : (
         <p className="bg-paper-200 text-fg-3 mt-1.5 rounded-sm p-2 font-mono text-[11.5px] leading-snug italic">
-          Waiting for tool input or output.
+          {t("chat.toolWaiting")}
         </p>
       )}
     </details>

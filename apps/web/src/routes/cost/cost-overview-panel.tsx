@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Badge } from "@/shared/ui/badge";
 
@@ -24,6 +25,7 @@ export function CostOverviewPanel({
   range: CostRange;
   setActiveTab: (tab: CostTab) => void;
 }) {
+  const { t } = useTranslation();
   const totals = card?.totals;
   const previousTotals = card?.previousTotals;
 
@@ -32,17 +34,23 @@ export function CostOverviewPanel({
       <section className="grid gap-3 md:grid-cols-4">
         {[
           [
-            "Total Spend",
+            t("cost.totalSpend"),
             formatCurrency(totals?.totalCostUsd ?? 0),
             formatPercent(totals && previousTotals ? costDelta(totals, previousTotals) : 0),
           ],
-          ["Total Requests", formatCompactNumber(totals?.requestCount ?? 0), "requests"],
           [
-            "Total Tokens",
-            formatCompactNumber(totals ? tokensTotal(totals) : 0),
-            `${Math.round((totals ? cacheHitRate(totals) : 0) * 100)}% cache hit`,
+            t("cost.totalRequests"),
+            formatCompactNumber(totals?.requestCount ?? 0),
+            t("cost.requests"),
           ],
-          ["Active Actors", String(totals?.activeUsers ?? 0), "non-channel usage"],
+          [
+            t("cost.totalTokens"),
+            formatCompactNumber(totals ? tokensTotal(totals) : 0),
+            t("cost.cacheHitPercent", {
+              percent: String(Math.round((totals ? cacheHitRate(totals) : 0) * 100)),
+            }),
+          ],
+          [t("cost.activeActors"), String(totals?.activeUsers ?? 0), t("cost.nonChannelUsage")],
         ].map(([label, value, detail], index) => (
           <div
             key={label}
@@ -63,16 +71,16 @@ export function CostOverviewPanel({
       <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="border-border bg-card rounded-lg border p-4">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-foreground text-sm font-semibold">Daily spend</h2>
-            <Badge variant="outline">{rangeLabel(range)}</Badge>
+            <h2 className="text-foreground text-sm font-semibold">{t("cost.dailySpend")}</h2>
+            <Badge variant="outline">{t(rangeLabel(range))}</Badge>
           </div>
           <DailySpendChart dailyCosts={card?.daily ?? []} />
         </div>
 
         <div className="border-border bg-card rounded-lg border p-4">
-          <h2 className="text-foreground mb-3 text-sm font-semibold">Top agents</h2>
+          <h2 className="text-foreground mb-3 text-sm font-semibold">{t("cost.topAgents")}</h2>
           {(card?.agents ?? []).length === 0 ? (
-            <PanelEmpty>No agent spend in this range.</PanelEmpty>
+            <PanelEmpty>{t("cost.noAgentSpend")}</PanelEmpty>
           ) : null}
           <div className="space-y-2">
             {(card?.agents ?? []).slice(0, 5).map((agent) => (
@@ -99,9 +107,9 @@ export function CostOverviewPanel({
 
       <section>
         <div className="border-border bg-card rounded-lg border p-4">
-          <h2 className="text-foreground mb-3 text-sm font-semibold">Spend by model</h2>
+          <h2 className="text-foreground mb-3 text-sm font-semibold">{t("cost.spendByModel")}</h2>
           {(card?.models ?? []).length === 0 ? (
-            <PanelEmpty>No model spend in this range.</PanelEmpty>
+            <PanelEmpty>{t("cost.noModelSpend")}</PanelEmpty>
           ) : null}
           <div className="space-y-3">
             {(card?.models ?? []).slice(0, 5).map((model) => {
@@ -142,12 +150,13 @@ function PanelEmpty({ children }: { children: ReactNode }) {
 }
 
 function DailySpendChart({ dailyCosts }: { dailyCosts: { date: string; totalCostUsd: number }[] }) {
+  const { t } = useTranslation();
   const maxSpend = Math.max(...dailyCosts.map((entry) => entry.totalCostUsd), 1);
 
   if (dailyCosts.length === 0) {
     return (
       <div className="text-muted-foreground flex h-[220px] items-center justify-center text-sm">
-        No cost events in this range.
+        {t("cost.noCostEvents")}
       </div>
     );
   }

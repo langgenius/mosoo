@@ -1,11 +1,13 @@
 const RELATIVE_TIME_FORMATTER = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
 
-export function formatRelativeTime(value: string): string {
+type Translate = (key: string, variables?: Record<string, string>) => string;
+
+export function formatRelativeTime(value: string, t: Translate = (key) => key): string {
   const deltaMs = new Date(value).getTime() - Date.now();
   const absMs = Math.abs(deltaMs);
 
   if (absMs < 60_000) {
-    return "now";
+    return t("threads.now");
   }
 
   if (absMs < 3_600_000) {
@@ -19,12 +21,12 @@ export function formatRelativeTime(value: string): string {
   return RELATIVE_TIME_FORMATTER.format(Math.round(deltaMs / 86_400_000), "day");
 }
 
-export function formatShortRelative(value: string): string {
+export function formatShortRelative(value: string, t: Translate = (key) => key): string {
   const deltaMs = Date.now() - new Date(value).getTime();
   const absMs = Math.abs(deltaMs);
 
   if (absMs < 60_000) {
-    return "now";
+    return t("threads.now");
   }
 
   if (absMs < 3_600_000) {

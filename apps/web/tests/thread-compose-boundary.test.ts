@@ -9,9 +9,9 @@ describe("Thread compose boundary", () => {
   test("keeps the composer scoped to one Agent in the active App", () => {
     const source = readSource("../src/routes/threads/compose/new-dialog.tsx");
 
-    expect(source).toContain("Start a Thread for one Agent.");
-    expect(source).toContain("This Agent is not available in this App.");
-    expect(source).toContain("Publish this Agent before starting a Thread.");
+    expect(source).toContain('t("threads.description")');
+    expect(source).toContain('t("agent.notAvailable")');
+    expect(source).toContain('t("agent.publishFirst")');
 
     expect(source.toLowerCase()).not.toContain("published agent");
     expect(source).not.toContain("current organization");

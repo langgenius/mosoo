@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 
 import { useAppSession } from "@/app/session-provider";
 import { HELP_DOCS_HOME_URL } from "@/shared/config/help-docs";
+import { useTranslation } from "@/shared/i18n";
 import { writeClipboardText } from "@/shared/lib/clipboard";
 import { Badge } from "@/shared/ui/badge";
 import { RuntimeIcon } from "@/shared/ui/brand-icons";
@@ -30,11 +31,13 @@ interface OnboardingStepView {
 }
 
 function StepMarker({ done, number }: { done: boolean; number: number }): ReactElement {
+  const { t } = useTranslation();
+
   if (done) {
     return (
       <span className="text-on-accent flex size-6 shrink-0 items-center justify-center rounded-full bg-green-500">
         <Check className="size-3.5" strokeWidth={3} />
-        <span className="sr-only">Done:</span>
+        <span className="sr-only">{t("common.done")}</span>
       </span>
     );
   }
@@ -47,6 +50,8 @@ function StepMarker({ done, number }: { done: boolean; number: number }): ReactE
 }
 
 function StepRow({ step }: { step: OnboardingStepView }): ReactElement {
+  const { t } = useTranslation();
+
   return (
     <Link
       className="group hover:bg-paper-100 flex items-center gap-3 px-4 py-3.5 transition-colors"
@@ -56,7 +61,7 @@ function StepRow({ step }: { step: OnboardingStepView }): ReactElement {
       <span className="text-fg-1 min-w-0 flex-1 truncate text-left text-sm leading-6 font-medium sm:text-base">
         {step.label}
       </span>
-      {step.optional ? <Badge variant="outline">Optional</Badge> : null}
+      {step.optional ? <Badge variant="outline">{t("onboarding.optional")}</Badge> : null}
       <ChevronRight className="text-fg-3 size-4 shrink-0 transition-transform group-hover:translate-x-0.5" />
     </Link>
   );
@@ -72,26 +77,27 @@ function StepRow({ step }: { step: OnboardingStepView }): ReactElement {
  */
 export function OnboardingSteps(): ReactElement {
   const { activeAppId } = useAppSession();
+  const { t } = useTranslation();
   const progress = useOnboardingProgress(activeAppId);
 
   const steps: OnboardingStepView[] = [
     {
       done: progress.hasProviderKey === true,
-      label: "Add a provider key",
+      label: t("onboarding.addProviderKey"),
       number: 1,
       optional: false,
       to: "/providers",
     },
     {
       done: progress.hasApiToken === true,
-      label: "Create an API token",
+      label: t("onboarding.createApiToken"),
       number: 2,
       optional: true,
       to: "/settings/access-tokens",
     },
     {
       done: progress.hasAgent === true && progress.hasRunThread === true,
-      label: "Create an agent and run a session",
+      label: t("onboarding.createAgent"),
       number: 3,
       optional: false,
       to: progress.hasAgent === true ? "/threads?compose=1" : "/agent?create=1",
@@ -100,7 +106,7 @@ export function OnboardingSteps(): ReactElement {
 
   return (
     <nav
-      aria-label="Onboarding steps"
+      aria-label={t("onboarding.steps")}
       className="border-border bg-card divide-border mt-8 w-full divide-y overflow-hidden rounded-lg border text-left shadow-xs"
     >
       {steps.map((step) => (
@@ -112,6 +118,8 @@ export function OnboardingSteps(): ReactElement {
 
 /** Link row into the hosted docs, shared by both setup lanes. */
 export function DocsAction(): ReactElement {
+  const { t } = useTranslation();
+
   return (
     <a
       className="group border-border bg-card hover:bg-paper-100 flex w-full items-center gap-4 rounded-lg border px-4 py-3.5 text-left transition-colors"
@@ -121,10 +129,10 @@ export function DocsAction(): ReactElement {
     >
       <div className="min-w-0 flex-1">
         <span className="text-fg-1 text-sm leading-6 font-semibold sm:text-base">
-          Read the docs
+          {t("onboarding.readDocs")}
         </span>
         <p className="text-fg-3 mt-0.5 text-[13px] leading-5">
-          Quickstart, Thread API, and CLI reference.
+          {t("onboarding.quickstartDescription")}
         </p>
       </div>
       <ArrowUpRight className="text-fg-2 size-4 shrink-0 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
@@ -137,13 +145,14 @@ export function DocsAction(): ReactElement {
  * lets any coding agent finish mosoo setup, or read the docs.
  */
 export function OnboardingActions(): ReactElement {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   const [copyFailed, setCopyFailed] = useState(false);
 
   async function copySetupPrompt(): Promise<void> {
     setCopyFailed(false);
 
-    const didCopy = await writeClipboardText(buildOnboardingSetupPrompt());
+    const didCopy = await writeClipboardText(buildOnboardingSetupPrompt(undefined, t));
 
     if (!didCopy) {
       setCopyFailed(true);
@@ -167,14 +176,14 @@ export function OnboardingActions(): ReactElement {
       >
         <div className="min-w-0 flex-1">
           <span className="text-fg-1 text-sm leading-6 font-semibold sm:text-base">
-            {copied ? "Setup prompt copied" : "Set up with your coding agent"}
+            {copied ? t("onboarding.setupPromptCopied") : t("onboarding.setupWithAgent")}
           </span>
           <p className="text-fg-3 mt-0.5 text-[13px] leading-5">
-            Copies a setup prompt that walks any coding agent through the full setup.
+            {t("onboarding.docsDescription")}
           </p>
         </div>
         <span
-          aria-label="Supported coding agent harnesses"
+          aria-label={t("onboarding.harnesses")}
           className="hidden items-center gap-1.5 sm:flex"
         >
           {CODING_AGENT_HARNESSES.map((harness) => (
@@ -194,15 +203,15 @@ export function OnboardingActions(): ReactElement {
       {copyFailed ? (
         <div className="w-full text-left">
           <textarea
-            aria-label="mosoo setup prompt"
+            aria-label={t("appOverview.setupPromptLabel")}
             className="border-border bg-bg-sunken text-fg-1 h-28 w-full rounded-md border px-3 py-2 font-mono text-xs"
             onFocus={(event) => {
               event.currentTarget.select();
             }}
             readOnly
-            value={buildOnboardingSetupPrompt()}
+            value={buildOnboardingSetupPrompt(undefined, t)}
           />
-          <p className="text-fg-3 mt-1 text-xs">Copy failed. Select and copy the prompt above.</p>
+          <p className="text-fg-3 mt-1 text-xs">{t("appOverview.copyPromptFailed")}</p>
         </div>
       ) : null}
 

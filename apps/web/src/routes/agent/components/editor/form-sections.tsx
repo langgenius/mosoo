@@ -1,5 +1,6 @@
 import { AlertTriangle } from "lucide-react";
 
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
@@ -19,6 +20,7 @@ import { AgentSkillsField } from "./skills-field";
 import type { AgentEditorModel } from "./use-model";
 
 function PackageResolutionBanner({ agent }: { agent: Agent }) {
+  const { t } = useTranslation();
   const resolution = agent.packageResolution;
 
   if (!resolution || resolution.report.issues.length === 0) {
@@ -40,11 +42,12 @@ function PackageResolutionBanner({ agent }: { agent: Agent }) {
     >
       <div className="flex items-center gap-2 text-[13px] font-semibold">
         <AlertTriangle className="size-4 shrink-0" />
-        Package repair {blockingIssues.length > 0 ? "required" : "recommended"}
+        {blockingIssues.length > 0
+          ? t("agentEditor.packageRepairRequired")
+          : t("agentEditor.packageRepairRecommended")}
       </div>
       <div className="mt-1 text-[12px] leading-relaxed">
-        This draft was created by {resolution.source}. Required unresolved items block preview and
-        publish until repaired.
+        {t("agentEditor.packageRepairDescription", { source: resolution.source })}
       </div>
       <div className="mt-3 space-y-2">
         {resolution.report.issues.map((issue) => (
@@ -68,16 +71,18 @@ export function BasicsSection({
   model: AgentEditorModel;
   readOnly: boolean;
 }) {
+  const { t } = useTranslation();
+
   return (
     <div className="space-y-5">
       {agent.packageResolution ? <PackageResolutionBanner agent={agent} /> : null}
 
       <div>
-        <SectionHeader>Identity</SectionHeader>
+        <SectionHeader>{t("agent.identity")}</SectionHeader>
         <div className="space-y-4">
           <div className="space-y-2">
             <Label className="text-muted-foreground text-[12px]" htmlFor="agent-name">
-              Name
+              {t("agentEditor.name")}
               <RequiredMark />
             </Label>
             <Input
@@ -93,16 +98,16 @@ export function BasicsSection({
 
           <div className="space-y-2">
             <Label className="text-muted-foreground text-[12px]" htmlFor="agent-description">
-              Description
+              {t("agent.descriptionLabel")}
             </Label>
             <textarea
-              aria-label="Description"
+              aria-label={t("agent.descriptionLabel")}
               className="border-border focus:ring-brand-ring w-full rounded-lg border bg-white px-3 py-2 text-[13px] outline-none focus:ring-2"
               id="agent-description"
               onChange={(event) => {
                 model.setDescription(event.target.value);
               }}
-              placeholder="Describe what this agent does."
+              placeholder={t("agent.descriptionPlaceholder")}
               readOnly={readOnly}
               rows={3}
               value={model.draft.description}
@@ -112,15 +117,15 @@ export function BasicsSection({
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label className="text-muted-foreground text-[12px]">
-                Runtime
+                {t("agent.runtime")}
                 <RequiredMark />
               </Label>
               {agent.status === "published" ? (
                 <span
                   className="text-muted-foreground text-[11px]"
-                  title="Runtime is locked after publishing. Fork the Agent to switch runtime; existing sessions, cost, logs, and agent-state stay attached here."
+                  title={t("agent.runtimeLocked")}
                 >
-                  Locked · Fork Agent to switch
+                  {t("agentEditor.runtimeLockedHint")}
                 </span>
               ) : null}
             </div>
@@ -153,12 +158,12 @@ export function BasicsSection({
                       <div className="text-foreground text-[13px] font-medium">{runtime.name}</div>
                       <div className="text-muted-foreground text-[11px]">
                         {publishedRuntimeLocked
-                          ? "Fork Agent required"
+                          ? t("agentEditor.forkAgentRequired")
                           : selectable
                             ? runtime.vendor
                             : selected
-                              ? "Runtime disabled"
-                              : "Runtime unavailable"}
+                              ? t("agentEditor.runtimeDisabled")
+                              : t("agentEditor.runtimeUnavailable")}
                       </div>
                     </div>
                   </button>
@@ -181,17 +186,14 @@ export function BasicsSection({
       </div>
 
       <div>
-        <SectionHeader>System prompt</SectionHeader>
+        <SectionHeader>{t("agent.systemPrompt")}</SectionHeader>
         <textarea
-          aria-label="System prompt"
+          aria-label={t("agent.systemPrompt")}
           className="border-border focus:ring-brand-ring w-full resize-y rounded-lg border bg-white px-4 py-3 text-[13px] leading-relaxed outline-none focus:ring-2"
           onChange={(event) => {
             model.setPrompt(event.target.value);
           }}
-          placeholder={`Describe this agent's role, boundaries, answer style, and when it should ask clarifying questions.
-
-Example:
-You are a concise operations agent. Confirm scope before changing production data. Ask clarifying questions when user intent, source data, or approval boundaries are unclear.`}
+          placeholder={t("agentEditor.systemPromptPlaceholder")}
           readOnly={readOnly}
           rows={8}
           value={model.draft.prompt}
@@ -210,10 +212,12 @@ export function IntegrationsSection({
   appId: string | null;
   readOnly: boolean;
 }) {
+  const { t } = useTranslation();
+
   return (
     <div className="space-y-5">
       <div>
-        <SectionHeader>Skills</SectionHeader>
+        <SectionHeader>{t("agent.skills")}</SectionHeader>
         <AgentSkillsField
           appId={appId}
           readOnly={readOnly}
@@ -223,7 +227,7 @@ export function IntegrationsSection({
       </div>
 
       <div className="scroll-mt-24" id="agent-mcp-bindings">
-        <SectionHeader>MCP servers</SectionHeader>
+        <SectionHeader>{t("agent.mcpServers")}</SectionHeader>
         <AgentMcpBindingsField
           appId={appId}
           readOnly={readOnly}
@@ -246,16 +250,18 @@ export function EnvironmentSection({
   readOnly: boolean;
   showChannels: boolean;
 }) {
+  const { t } = useTranslation();
+
   return (
     <div className="space-y-5">
       <div>
-        <SectionHeader>Environment</SectionHeader>
+        <SectionHeader>{t("agent.environment")}</SectionHeader>
         <EnvironmentPicker model={model} appId={agent.appId} readOnly={readOnly} />
       </div>
 
       {showChannels ? (
         <div>
-          <SectionHeader>Channels</SectionHeader>
+          <SectionHeader>{t("agent.channels")}</SectionHeader>
           <AgentChannelsField agent={agent} />
         </div>
       ) : null}

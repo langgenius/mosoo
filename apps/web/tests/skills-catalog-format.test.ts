@@ -15,12 +15,8 @@ describe("formatCatalogCount", () => {
     expect(formatCatalogCount(1_234_567)).toBe("1.2M");
   });
 
-  test("uses en-US units regardless of runtime locale", () => {
-    // Regression: an unpinned locale rendered zh-CN units ("2.1万 installs")
-    // inside the English catalog copy.
+  test("uses the requested locale for compact units", () => {
     expect(formatCatalogCount(21_000)).toBe("21K");
-    for (const value of [10_000, 21_000, 123_456, 10_000_000]) {
-      expect(formatCatalogCount(value)).not.toMatch(/[万亿]/);
-    }
+    expect(formatCatalogCount(21_000, "zh-CN")).toBe("2.1万");
   });
 });

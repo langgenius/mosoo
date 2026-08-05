@@ -19,6 +19,7 @@ import {
 } from "@/features/session-files/session-files-store";
 import { uploadSessionResource } from "@/features/session-files/session-resource-upload";
 import { toAppId, toSessionId } from "@/routes/typed-id";
+import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 
 import { isTruthy } from "../../../shared/lib/truthiness";
@@ -49,6 +50,7 @@ export function AgentSessionPanel({
   tone: "preview" | "consume";
   appId: string | null;
 }) {
+  const { t } = useTranslation();
   const model = useAgentSessionPanelModel({
     agentId,
     configurationChangedAt: configurationChangedAt ?? null,
@@ -65,17 +67,20 @@ export function AgentSessionPanel({
   const previewResetMode = sessionControlMode === "reset";
   const stopped = pill === "Stopped";
   const setupBlocked = pill === "Setup required";
-  const setupSummary = readinessBlockSummary(model.readiness) ?? model.readinessBlockMessage;
+  const setupSummary = readinessBlockSummary(model.readiness, t) ?? model.readinessBlockMessage;
   const reconnectingSubtitle =
-    model.reconnecting || model.lifecycle === "RESCHEDULING" ? "reconnecting" : null;
-  const sendDisabledReason = sendDisabledReasonForSession({
-    configurationRefreshRequired: model.configurationRefreshRequired,
-    lifecycle: model.lifecycle,
-    reconnecting: model.reconnecting,
-    setupBlocked,
-    setupSummary,
-    stopped,
-  });
+    model.reconnecting || model.lifecycle === "RESCHEDULING" ? t("agent.reconnecting") : null;
+  const sendDisabledReason = sendDisabledReasonForSession(
+    {
+      configurationRefreshRequired: model.configurationRefreshRequired,
+      lifecycle: model.lifecycle,
+      reconnecting: model.reconnecting,
+      setupBlocked,
+      setupSummary,
+      stopped,
+    },
+    t,
+  );
 
   const queryClient = useQueryClient();
   const { pendingBySession } = useSessionFilesStore();
@@ -99,13 +104,15 @@ export function AgentSessionPanel({
     ];
   });
   const sessionLoadErrorMessage = previewResetMode
-    ? "Failed to load the previous preview chat. You can still send a new test message."
-    : "Failed to load previous sessions. You can still start a new live run.";
+    ? t("agent.failedToLoadPreviewChat")
+    : t("agent.failedToLoadSessions");
   const configurationRefreshMessage = previewResetMode
-    ? "Reset chat to test latest config"
-    : "Start new session to test latest config";
-  const configurationRefreshActionLabel = previewResetMode ? "Reset chat" : "Start new session";
-  const stoppedActionLabel = previewResetMode ? "Reset chat" : "New session";
+    ? t("agent.resetChatToTestConfig")
+    : t("agent.startNewSessionToTestConfig");
+  const configurationRefreshActionLabel = previewResetMode
+    ? t("agent.resetChat")
+    : t("agent.startNewSession");
+  const stoppedActionLabel = previewResetMode ? t("agent.resetChat") : t("agent.newSession");
   const handleResetPreviewSession = async (): Promise<void> => {
     resourceDraft.clearActiveMentions();
     await model.handleResetSession();
@@ -225,7 +232,7 @@ export function AgentSessionPanel({
             <div className="relative min-h-0 flex-1 overflow-hidden">
               {model.isConversationLoading ? (
                 <div className="text-muted-foreground flex h-full items-center justify-center text-[13px]">
-                  Loading conversation…
+                  {t("agent.loadingConversation")}
                 </div>
               ) : (
                 <SessionThread />
@@ -241,11 +248,10 @@ export function AgentSessionPanel({
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
                       <div className="text-destructive text-[13px] font-semibold">
-                        Session stopped
+                        {t("agent.sessionStopped")}
                       </div>
                       <div className="text-fg-2 mt-0.5 text-[12px] leading-relaxed">
-                        {model.run.error?.message ??
-                          "Start a new session after fixing runtime diagnostics."}
+                        {model.run.error?.message ?? t("agent.startNewAfterRuntimeDiagnostics")}
                       </div>
                     </div>
                     <Button
@@ -278,7 +284,7 @@ export function AgentSessionPanel({
                     </div>
                     <div className="flex shrink-0 gap-1.5">
                       <Button
-                        aria-label="Dismiss permission request"
+                        aria-label={t("agent.dismissPermissionRequest")}
                         onClick={() =>
                           void model.resolvePermission(model.permissionRequests[0]!, "reject_once")
                         }
@@ -294,7 +300,7 @@ export function AgentSessionPanel({
                         size="sm"
                         variant="ghost"
                       >
-                        Reject once
+                        {t("agent.rejectOnce")}
                       </Button>
                       <Button
                         onClick={() =>
@@ -302,7 +308,7 @@ export function AgentSessionPanel({
                         }
                         size="sm"
                       >
-                        Allow once
+                        {t("agent.allowOnce")}
                       </Button>
                     </div>
                   </div>

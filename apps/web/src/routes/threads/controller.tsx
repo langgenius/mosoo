@@ -4,6 +4,7 @@ import type { ReactElement } from "react";
 
 import { useAppSession } from "@/app/session-provider";
 import type { ListedFileEntry } from "@/domains/file/api/files";
+import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import { EmptyState } from "@/shared/ui/empty-state";
 import { ListPageContent, ListPageToolbar, ListPageToolbarSpacer } from "@/shared/ui/list-page";
@@ -37,6 +38,7 @@ const EMPTY_ARTIFACTS: ListedFileEntry[] = [];
 
 export function ThreadsController(): ReactElement {
   const { activeAppId, user } = useAppSession();
+  const { t } = useTranslation();
   const scopeKey = `${user?.id ?? "guest"}:${activeAppId ?? "none"}`;
 
   return (
@@ -45,7 +47,7 @@ export function ThreadsController(): ReactElement {
       activeAppId={activeAppId}
       userId={user?.id ?? null}
       viewerImage={user?.image ?? null}
-      viewerName={user?.name ?? "You"}
+      viewerName={user?.name ?? t("threads.you")}
     />
   );
 }
@@ -56,6 +58,7 @@ function ThreadsWorkspace({
   viewerImage,
   viewerName,
 }: ThreadsWorkspaceProps): ReactElement {
+  const { t } = useTranslation();
   const route = useThreadRouteState();
   const ui = useThreadUiState({
     appId: activeAppId,
@@ -85,12 +88,12 @@ function ThreadsWorkspace({
   });
   const handleReadSyncError = useCallback(
     (error: unknown) => {
-      actions.setActionError(getMutationErrorMessage(error, "Failed to mark thread read."));
+      actions.setActionError(getMutationErrorMessage(error, t("threads.failedToMarkThreadRead")));
     },
-    [actions],
+    [actions, t],
   );
 
-  useThreadCompletionNotifications(threads.allThreads);
+  useThreadCompletionNotifications(threads.allThreads, t);
   useSelectedThreadReadSync({
     markRead: actions.markThreadRead,
     onError: handleReadSyncError,
@@ -137,7 +140,7 @@ function ThreadsWorkspace({
           />
         ) : threads.isLoading ? (
           <div className="text-fg-3 flex h-full items-center justify-center text-[13px]">
-            Loading thread…
+            {t("threads.loadingThread")}
           </div>
         ) : (
           <ThreadsMissingDetail onBack={route.backToList} />
@@ -165,13 +168,10 @@ function ThreadsWorkspace({
 
   return (
     <div className="bg-background flex h-full flex-1 flex-col overflow-hidden">
-      <PageHeader
-        title="Threads"
-        description="Dispatch agents and track progress. Reopen threads by replying asynchronously."
-      >
+      <PageHeader title={t("threads.threadsTitle")} description={t("threads.threadsDescription")}>
         <Button onClick={route.openComposeDialog} size="sm">
           <Plus className="size-3.5" />
-          New thread
+          {t("threads.newThread")}
         </Button>
       </PageHeader>
 
@@ -184,12 +184,16 @@ function ThreadsWorkspace({
         <ListPageToolbarSpacer />
         <div className="text-fg-3 text-[12px] tabular-nums">
           <span className={threads.bucketCounts.working > 0 ? "text-fg-1 font-medium" : undefined}>
-            {threads.bucketCounts.working} working
+            {threads.bucketCounts.working} {t("threads.working")}
           </span>
           <span className="mx-1.5">·</span>
-          <span>{threads.bucketCounts.completed} completed</span>
+          <span>
+            {threads.bucketCounts.completed} {t("threads.completed")}
+          </span>
           <span className="mx-1.5">·</span>
-          <span>({threads.bucketCounts.archived} archived)</span>
+          <span>
+            ({threads.bucketCounts.archived} {t("threads.archived")})
+          </span>
         </div>
       </ListPageToolbar>
 
@@ -203,18 +207,20 @@ function ThreadsWorkspace({
 
         {threads.loadError ? (
           <div className="text-destructive border-destructive/20 bg-destructive/[0.06] rounded-md border px-3 py-2 text-[13px]">
-            {getMutationErrorMessage(threads.loadError, "Failed to load threads.")}
+            {getMutationErrorMessage(threads.loadError, t("threads.failedToLoadThreads"))}
           </div>
         ) : threads.isLoading ? (
-          <div className="text-fg-3 py-12 text-center text-[13px]">Loading threads…</div>
+          <div className="text-fg-3 py-12 text-center text-[13px]">
+            {t("threads.loadingThreads")}
+          </div>
         ) : threads.allThreads.length === 0 ? (
           <ThreadsEmptyState onNewThread={route.openComposeDialog} />
         ) : threads.filteredThreads.length === 0 ? (
           <div className="py-12">
             <EmptyState
               icon={Inbox}
-              title="No matching threads"
-              description="Try another filter."
+              title={t("threads.noMatchingTitle")}
+              description={t("threads.tryAnotherFilter")}
             />
           </div>
         ) : (

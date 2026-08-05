@@ -96,9 +96,9 @@ describe("deployment status presentation", () => {
       "../src/routes/app-overview/deploy/components/deploy-url-card.tsx",
     );
 
-    expect(badgeSource).toContain('"Deploying…"');
-    expect(badgeSource).toContain('"Successful"');
-    expect(badgeSource).toContain('"Failed"');
+    expect(badgeSource).toContain('t("deploy.deploying")');
+    expect(badgeSource).toContain('t("deploy.successful")');
+    expect(badgeSource).toContain('t("deploy.failed")');
     expect(badgeSource).not.toMatch(/Queued|Preparing|Building|Submitting|Submitted|Activating/u);
     expect(badgeSource).not.toContain("Superseded");
     expect(urlCardSource).not.toContain("DEPLOY_PHASES");

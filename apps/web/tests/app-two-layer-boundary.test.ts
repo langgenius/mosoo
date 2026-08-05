@@ -36,7 +36,7 @@ describe("Two-layer console boundary", () => {
     const shell = readSource("../src/app/app-shell.tsx");
     const appsList = readSource("../src/routes/apps/apps-list.route.tsx");
 
-    expect(shell).toContain('title: "Apps"');
+    expect(shell).toContain('titleKey: "pageTitle.apps"');
     expect(shell).toContain("getOrgHeaderTitle");
     expect(appsList).not.toContain(">Apps</h1>");
   });
@@ -45,7 +45,7 @@ describe("Two-layer console boundary", () => {
     const shell = readSource("../src/app/app-shell.tsx");
     const orgSettings = readSource("../src/routes/org/org-settings.route.tsx");
 
-    expect(shell).toContain('path: "/org/settings", title: "Org settings"');
+    expect(shell).toContain('titleKey: "pageTitle.orgSettings"');
     expect(orgSettings).not.toContain("<PageHeader");
     expect(orgSettings).not.toContain('title="Org settings"');
   });
@@ -54,7 +54,7 @@ describe("Two-layer console boundary", () => {
     const appsList = readSource("../src/routes/apps/apps-list.route.tsx");
 
     expect(appsList).toContain("createApp");
-    expect(appsList).toContain("New app");
+    expect(appsList).toContain('t("apps.new")');
     expect(appsList).toContain("AppIdBadge");
     expect(appsList).not.toContain("coming soon");
   });

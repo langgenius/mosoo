@@ -2,17 +2,18 @@ import type { LucideIcon } from "lucide-react";
 import { KeyRound, User } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 
 interface SettingsNavItem {
   icon: LucideIcon;
-  label: string;
+  labelKey: string;
   path: string;
 }
 
 interface SettingsNavSection {
   items: SettingsNavItem[];
-  label: string;
+  labelKey: string;
 }
 
 // Settings keeps account-global controls. App-scoped settings live in the
@@ -20,24 +21,26 @@ interface SettingsNavSection {
 const SETTINGS_NAV_SECTIONS: SettingsNavSection[] = [
   {
     items: [
-      { icon: User, label: "Profile", path: "/settings/profile" },
-      { icon: KeyRound, label: "API tokens", path: "/settings/access-tokens" },
+      { icon: User, labelKey: "settings.profile", path: "/settings/profile" },
+      { icon: KeyRound, labelKey: "settings.accessTokens", path: "/settings/access-tokens" },
     ],
-    label: "Account",
+    labelKey: "settings.account",
   },
 ];
 
 export function SettingsNav() {
+  const { t } = useTranslation();
+
   return (
     <aside className="border-border-soft flex w-full shrink-0 flex-col gap-3 overflow-x-auto border-b px-4 py-2 md:w-[220px] md:overflow-visible md:border-r md:border-b-0 md:px-3 md:py-5">
       <div className="text-fg-3 hidden px-2.5 pb-1 text-[10px] font-semibold tracking-[0.14em] uppercase md:block">
-        Settings
+        {t("pageTitle.settings")}
       </div>
       {SETTINGS_NAV_SECTIONS.map((section) => {
         return (
-          <div key={section.label} className="flex flex-col gap-1">
+          <div key={section.labelKey} className="flex flex-col gap-1">
             <div className="text-fg-3 hidden px-2.5 pb-1 text-[10px] font-semibold tracking-[0.14em] uppercase md:block">
-              {section.label}
+              {t(section.labelKey)}
             </div>
             <div className="flex gap-1 md:flex-col md:gap-0.5">
               {section.items.map((item) => (
@@ -54,7 +57,7 @@ export function SettingsNav() {
                   }
                 >
                   <item.icon className="size-4" />
-                  <span>{item.label}</span>
+                  <span>{t(item.labelKey)}</span>
                 </NavLink>
               ))}
             </div>

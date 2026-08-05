@@ -1,6 +1,7 @@
 import { ChevronDown, Code2, GitBranch, Rocket } from "lucide-react";
 import { Fragment, useState } from "react";
 
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui/table";
 
@@ -9,9 +10,6 @@ import type { DeploymentRunVM } from "../deploy-console-data";
 import { relativeLabel } from "../deploy-console-mapping";
 import { useNowTick } from "../use-now-tick";
 import { StatusBadge } from "./deploy-status-badge";
-
-const PRE_DEPLOY_HINT =
-  "After your first production deploy, every build shows up here: commit · status · target · duration.";
 
 function ActivityPlaceholder({ children }: { children: string }) {
   return (
@@ -39,19 +37,21 @@ export function ActivitySection({
   preDeploy?: boolean;
   runs: DeploymentRunVM[];
 }) {
+  const { t } = useTranslation();
+
   return (
     <section className={className}>
-      <h2 className="text-fg-1 mb-4 text-[15px] font-semibold">Production Activity</h2>
+      <h2 className="text-fg-1 mb-4 text-[15px] font-semibold">{t("deploy.productionActivity")}</h2>
       {error === null ? null : (
         <p className="text-destructive mb-2 text-[13px]">
-          Couldn&apos;t load the run history: {error}
+          {t("deploy.loadHistoryFailed", { error })}
         </p>
       )}
       {runs.length > 0 ? (
         <DeploymentsHistory runs={runs} />
       ) : (
         <ActivityPlaceholder>
-          {preDeploy ? PRE_DEPLOY_HINT : "No deployment runs yet."}
+          {preDeploy ? t("deploy.preDeployHint") : t("deploy.noRunsYet")}
         </ActivityPlaceholder>
       )}
     </section>
@@ -63,6 +63,7 @@ export function ActivitySection({
  * branch HEAD; failed runs expose their error inline below the row.
  */
 export function DeploymentsHistory({ runs }: { runs: DeploymentRunVM[] }) {
+  const { t } = useTranslation();
   const now = useNowTick();
   const [expandedRunIds, setExpandedRunIds] = useState<ReadonlySet<string>>(() => new Set());
 
@@ -94,10 +95,12 @@ export function DeploymentsHistory({ runs }: { runs: DeploymentRunVM[] }) {
                   </span>
                   <div className="min-w-0">
                     <div className="text-fg-1 text-[13.5px] font-semibold">
-                      {run.number === null ? "Deploy" : `Deploy #${String(run.number)}`}
+                      {run.number === null
+                        ? t("deploy.deploy")
+                        : t("deploy.deployNumbered", { number: String(run.number) })}
                     </div>
                     <div className="text-fg-3 text-[12.5px]">
-                      {relativeLabel(run.createdAt, now)}
+                      {relativeLabel(run.createdAt, now, t)}
                     </div>
                   </div>
                 </div>
@@ -115,7 +118,7 @@ export function DeploymentsHistory({ runs }: { runs: DeploymentRunVM[] }) {
                 <GitBranch className="size-3.5 shrink-0" />
                 <span className="font-mono">
                   {run.targetKind === null
-                    ? "detecting target"
+                    ? t("deploy.detectingTarget")
                     : DEPLOY_TARGET_LABELS[run.targetKind]}
                 </span>
               </div>
@@ -128,7 +131,7 @@ export function DeploymentsHistory({ runs }: { runs: DeploymentRunVM[] }) {
                     onClick={() => toggleRun(run.id)}
                     type="button"
                   >
-                    Details
+                    {t("deploy.details")}
                     <ChevronDown
                       className={cn("size-3.5 transition-transform", expanded && "rotate-180")}
                     />
@@ -138,7 +141,7 @@ export function DeploymentsHistory({ runs }: { runs: DeploymentRunVM[] }) {
                       <div className="overflow-hidden">
                         <div className="mt-1 text-[13px]">
                           <div className="text-fg-3 mb-1 text-[11.5px] font-medium">
-                            Failure details
+                            {t("deploy.failureDetails")}
                           </div>
                           {run.errorCode === null ? null : (
                             <span className="text-destructive mr-2 font-mono text-[12px] font-semibold">
@@ -161,9 +164,15 @@ export function DeploymentsHistory({ runs }: { runs: DeploymentRunVM[] }) {
         <Table>
           <TableHeader>
             <TableRow className="border-border hover:bg-transparent">
-              <TableHead className="text-fg-3 h-11 pl-5 text-[13px] font-medium">Deploy</TableHead>
-              <TableHead className="text-fg-3 h-11 text-[13px] font-medium">Status</TableHead>
-              <TableHead className="text-fg-3 h-11 pr-5 text-[13px] font-medium">Changes</TableHead>
+              <TableHead className="text-fg-3 h-11 pl-5 text-[13px] font-medium">
+                {t("deploy.deploy")}
+              </TableHead>
+              <TableHead className="text-fg-3 h-11 text-[13px] font-medium">
+                {t("agent.status")}
+              </TableHead>
+              <TableHead className="text-fg-3 h-11 pr-5 text-[13px] font-medium">
+                {t("deploy.changes")}
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -181,10 +190,12 @@ export function DeploymentsHistory({ runs }: { runs: DeploymentRunVM[] }) {
                         </span>
                         <div className="min-w-0">
                           <div className="text-fg-1 text-[13.5px] font-semibold">
-                            {run.number === null ? "Deploy" : `Deploy #${String(run.number)}`}
+                            {run.number === null
+                              ? t("deploy.deploy")
+                              : t("deploy.deployNumbered", { number: String(run.number) })}
                           </div>
                           <div className="text-fg-3 text-[12.5px]">
-                            {relativeLabel(run.createdAt, now)}
+                            {relativeLabel(run.createdAt, now, t)}
                           </div>
                         </div>
                       </div>
@@ -197,15 +208,15 @@ export function DeploymentsHistory({ runs }: { runs: DeploymentRunVM[] }) {
                         <div className="min-w-0">
                           <div className="text-fg-2 flex min-w-0 items-center gap-1.5 text-[13px]">
                             <Code2 className="text-fg-3 size-3.5 shrink-0" />
-                            <span>commit</span>
+                            <span>{t("deploy.commit")}</span>
                             <span className="text-fg-1 truncate font-mono">{run.commitSha}</span>
-                            <span className="text-fg-3">· default branch HEAD</span>
+                            <span className="text-fg-3">· {t("deploy.defaultBranchHead")}</span>
                           </div>
                           <div className="text-fg-3 mt-0.5 flex items-center gap-1.5 text-[12px]">
                             <GitBranch className="size-3.5" />
                             <span className="font-mono">
                               {run.targetKind === null
-                                ? "detecting target"
+                                ? t("deploy.detectingTarget")
                                 : DEPLOY_TARGET_LABELS[run.targetKind]}
                             </span>
                           </div>
@@ -217,7 +228,7 @@ export function DeploymentsHistory({ runs }: { runs: DeploymentRunVM[] }) {
                             onClick={() => toggleRun(run.id)}
                             className="text-fg-3 hover:text-fg-1 focus-visible:ring-ring inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-[12px] font-medium transition-colors focus:outline-none focus-visible:ring-2"
                           >
-                            Details
+                            {t("deploy.details")}
                             <ChevronDown
                               className={cn(
                                 "size-3.5 transition-transform",
@@ -236,7 +247,7 @@ export function DeploymentsHistory({ runs }: { runs: DeploymentRunVM[] }) {
                           <div className="overflow-hidden">
                             <div className="text-[13px]">
                               <div className="text-fg-3 mb-1 text-[11.5px] font-medium">
-                                Failure details
+                                {t("deploy.failureDetails")}
                               </div>
                               {run.errorCode === null ? null : (
                                 <span className="text-destructive mr-2 font-mono text-[12px] font-semibold">

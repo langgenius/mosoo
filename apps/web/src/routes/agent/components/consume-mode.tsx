@@ -2,6 +2,7 @@ import { ArrowLeft, Settings } from "lucide-react";
 import type { ReactElement } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 
 import type { Agent } from "../agent.types";
@@ -18,6 +19,7 @@ export function ConsumeMode({
   showConfigButton?: boolean;
   onOpenConfig?: () => void;
 }): ReactElement {
+  const { t } = useTranslation();
   const runtime = getRuntimeInfo(agent.runtime);
   const navigate = useNavigate();
   const basePath = globalThis.location.pathname.startsWith("/demo") ? "/demo/agent" : "/agent";
@@ -33,7 +35,7 @@ export function ConsumeMode({
             void navigate(basePath);
           }}
           className="text-muted-foreground"
-          aria-label="Back to agents"
+          aria-label={t("agent.backToAgents")}
         >
           <ArrowLeft className="size-4" />
         </Button>

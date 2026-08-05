@@ -3,6 +3,8 @@ import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useReducer } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { useTranslation } from "@/shared/i18n";
+
 import { captureProductEvent, PRODUCT_ANALYTICS_EVENTS } from "../../analytics/product-analytics";
 import { useAppSession } from "../../app/session-provider";
 import { onboardingBootstrap } from "../../domains/onboarding/api/onboarding-client";
@@ -25,7 +27,7 @@ const ONBOARDING_INITIAL_STATE: OnboardingState = {
 };
 
 function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "Unexpected error";
+  return error instanceof Error ? error.message : "login.unexpectedError";
 }
 
 function toOnboardingBootstrapInput(input?: {
@@ -74,7 +76,7 @@ export function Onboarding() {
         void navigate("/", { replace: true });
       } catch (caughtError: unknown) {
         dispatch({
-          error: getErrorMessage(caughtError) || "Something went wrong",
+          error: getErrorMessage(caughtError) || "common.somethingWentWrong",
           type: "bootstrapFailed",
         });
       }
@@ -123,28 +125,35 @@ export function Onboarding() {
 }
 
 function OnboardingLoadingScreen() {
+  const { t } = useTranslation();
   return (
     <div className="bg-background fixed inset-0 flex items-center justify-center">
       <div className="flex flex-col items-center gap-4">
         <Loader2 className="text-primary size-8 animate-spin" />
-        <p className="text-muted-foreground text-sm">Setting things up…</p>
+        <p className="text-muted-foreground text-sm">{t("onboarding.settingUp")}</p>
       </div>
     </div>
   );
 }
 
 function OnboardingProvisioningScreen() {
+  const { t } = useTranslation();
   return (
     <div className="bg-background fixed inset-0 flex items-center justify-center">
       <div className="flex flex-col items-center gap-4">
         <Loader2 className="text-primary size-8 animate-spin" />
-        <p className="text-muted-foreground text-sm">Creating your default App…</p>
+        <p className="text-muted-foreground text-sm">{t("onboarding.creatingDefaultApp")}</p>
       </div>
     </div>
   );
 }
 
 function OnboardingErrorScreen({ error, onRetry }: { error: string | null; onRetry: () => void }) {
+  const { t } = useTranslation();
+  const errorText = isTruthy(error) ? error : t("onboarding.createDefaultAppFailed");
+  const resolvedError =
+    errorText.startsWith("login.") || errorText.startsWith("common.") ? t(errorText) : errorText;
+
   return (
     <div className="bg-background fixed inset-0 flex flex-col">
       <div className="flex items-center px-4 py-5 sm:px-8">
@@ -153,10 +162,10 @@ function OnboardingErrorScreen({ error, onRetry }: { error: string | null; onRet
 
       <div className="flex flex-1 items-center justify-center">
         <div className="w-full max-w-[520px] px-6">
-          <h2 className="text-foreground text-center text-2xl font-semibold">App setup failed</h2>
-          <p className="text-muted-foreground mt-2 text-center text-sm">
-            {isTruthy(error) ? error : "mosoo could not create your default App."}
-          </p>
+          <h2 className="text-foreground text-center text-2xl font-semibold">
+            {t("onboarding.setupFailed")}
+          </h2>
+          <p className="text-muted-foreground mt-2 text-center text-sm">{resolvedError}</p>
 
           <div className="mt-6">
             <button
@@ -164,7 +173,7 @@ function OnboardingErrorScreen({ error, onRetry }: { error: string | null; onRet
               onClick={onRetry}
               className="text-muted-foreground hover:bg-accent/50 hover:text-foreground flex w-full items-center justify-center gap-2 rounded-lg p-3 text-sm font-medium transition-colors"
             >
-              Retry
+              {t("agent.retry")}
             </button>
           </div>
         </div>

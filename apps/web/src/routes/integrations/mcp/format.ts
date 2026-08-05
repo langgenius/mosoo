@@ -1,12 +1,14 @@
 import type { McpAuthType, McpCredentialStatus } from "./mcp-types";
 
-export function authTypeLabel(t: McpAuthType): string {
+type Translate = (key: string, variables?: Record<string, string>) => string;
+
+export function authTypeLabel(t: McpAuthType, translate: Translate): string {
   switch (t) {
     case "oauth": {
-      return "OAuth";
+      return translate("mcp.oauth");
     }
     case "bearer": {
-      return "Bearer Token";
+      return translate("mcp.bearerToken");
     }
     default: {
       return unreachableCase(t, "Unsupported MCP auth type.");
@@ -14,19 +16,19 @@ export function authTypeLabel(t: McpAuthType): string {
   }
 }
 
-export function statusText(s: McpCredentialStatus): string {
+export function statusText(s: McpCredentialStatus, translate: Translate): string {
   switch (s) {
     case "active": {
-      return "Authorized";
+      return translate("mcp.statusAuthorized");
     }
     case "expired": {
-      return "Expired";
+      return translate("mcp.statusExpired");
     }
     case "revoked": {
-      return "Revoked";
+      return translate("mcp.statusRevoked");
     }
     case "none": {
-      return "Needs authorization";
+      return translate("mcp.statusNeedsAuthorization");
     }
     default: {
       return unreachableCase(s, "Unsupported MCP credential status.");

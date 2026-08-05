@@ -79,11 +79,24 @@ describe("agent instruction prompt", () => {
     expect(prompt).not.toContain("skill.md");
   });
 
+  test("uses a supplied translator for instruction copy", () => {
+    const prompt = buildAgentInstructionPrompt(agent(), distribution, (key, variables) => {
+      if (key === "agentLifecycle.instructionForLlmHeading") {
+        return `# Localized instruction: ${variables?.agentName ?? ""}`;
+      }
+      return `localized:${key}`;
+    });
+
+    expect(prompt).toContain("# Localized instruction: Research Agent");
+    expect(prompt).toContain("localized:agentLifecycle.instructionIntro");
+    expect(prompt).toContain("> localized:agentLifecycle.kindHintTask");
+  });
+
   test("uses the publish menu item as a clipboard instruction action", () => {
     const source = readSource("../src/routes/agent/lifecycle/publish-menu.tsx");
 
-    expect(source).toContain("Instruction for LLM");
-    expect(source).toContain("buildAgentInstructionPrompt(agent, distribution)");
+    expect(source).toContain('t("agentLifecycle.instructionForLlm")');
+    expect(source).toContain("buildAgentInstructionPrompt(agent, distribution, t)");
     expect(source).toContain('import { writeClipboardText } from "@/shared/lib/clipboard"');
     expect(source).not.toContain("downloadTextFile");
     expect(source).not.toContain("skill.md</span>");

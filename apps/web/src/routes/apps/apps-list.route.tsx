@@ -8,6 +8,7 @@ import { useAppSession } from "@/app/session-provider";
 import { useVisibleAgentsQuery } from "@/domains/agent/query/agent-queries";
 import { createApp } from "@/domains/app/api/app-client";
 import { appKeys } from "@/domains/app/query/app-queries";
+import { useTranslation } from "@/shared/i18n";
 import { AppIdBadge } from "@/shared/ui/app-id-badge";
 import { Button } from "@/shared/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
@@ -22,17 +23,22 @@ function AppCard({
   isCurrent: boolean;
   onEnter: () => void;
 }) {
+  const { t } = useTranslation();
   const agentsQuery = useVisibleAgentsQuery(app.id);
   const agentCount = agentsQuery.data?.length;
   const agentLabel =
-    agentCount === undefined ? "—" : `${agentCount} ${agentCount === 1 ? "agent" : "agents"}`;
+    agentCount === undefined
+      ? "—"
+      : agentCount === 1
+        ? t("apps.agentCount", { count: String(agentCount) })
+        : t("apps.agentsCount", { count: String(agentCount) });
 
   return (
     <div className="border-border bg-card hover:border-border-strong group relative flex min-h-[120px] flex-col gap-3 rounded-md border p-4 text-left transition-colors">
       <button
         type="button"
         onClick={onEnter}
-        aria-label={`Open ${app.name}`}
+        aria-label={t("apps.openApp", { name: app.name })}
         className="focus-visible:border-ring focus-visible:ring-ring absolute inset-0 rounded-md outline-none focus-visible:ring-[2px]"
       />
       <div className="pointer-events-none relative z-10 flex items-center gap-2">
@@ -41,7 +47,7 @@ function AppCard({
         </span>
         {isCurrent ? (
           <span className="bg-accent-soft text-accent-press rounded-full px-2 py-0.5 text-[10.5px] font-semibold">
-            Current
+            {t("apps.current")}
           </span>
         ) : null}
         <ChevronRight className="text-fg-3 group-hover:text-fg-1 size-4 shrink-0 transition-colors" />
@@ -58,6 +64,7 @@ function AppCard({
 // Each App is a top-level resource boundary; selecting one enters its App
 // console. Creating an App calls the createApp mutation, then switches into it.
 export function AppsListPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { activeApp, activeOrganization, apps, appsLoading, setActiveApp } = useAppSession();
@@ -73,13 +80,13 @@ export function AppsListPage() {
   const createMutation = useMutation({
     mutationFn: async () => {
       if (activeOrganization === null) {
-        throw new Error("No active organization.");
+        throw new Error(t("common.noActiveOrganization"));
       }
 
       return createApp({ name: name.trim(), organizationId: activeOrganization.id });
     },
     onError: (mutationError) => {
-      setError(mutationError instanceof Error ? mutationError.message : "Could not create App.");
+      setError(mutationError instanceof Error ? mutationError.message : t("apps.couldNotCreate"));
     },
     onSuccess: async (app) => {
       setCreateOpen(false);
@@ -113,7 +120,7 @@ export function AppsListPage() {
             <Search className="text-fg-3 absolute top-1/2 left-3 size-3.5 -translate-y-1/2" />
             <Input
               className="h-9 pl-9"
-              placeholder="Search apps…"
+              placeholder={t("apps.searchPlaceholder")}
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
@@ -129,22 +136,22 @@ export function AppsListPage() {
             }}
           >
             <Plus className="size-3.5" />
-            New app
+            {t("apps.new")}
           </Button>
         </div>
 
         <div className="mt-5">
           {appsLoading ? (
             <div className="border-border bg-card text-muted-foreground rounded-md border px-4 py-6 text-sm">
-              Loading Apps…
+              {t("apps.loadingApps")}
             </div>
           ) : apps.length === 0 ? (
             <div className="border-border text-muted-foreground rounded-md border border-dashed px-4 py-10 text-center text-sm">
-              No Apps yet. Create one to get started.
+              {t("apps.noAppsYet")}
             </div>
           ) : filteredApps.length === 0 ? (
             <div className="border-border text-muted-foreground rounded-md border border-dashed px-4 py-10 text-center text-sm">
-              No apps match “{search}”.
+              {t("apps.noAppsMatch", { search })}
             </div>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -172,11 +179,11 @@ export function AppsListPage() {
       >
         <DialogContent className="sm:max-w-[420px]">
           <DialogHeader>
-            <DialogTitle>New app</DialogTitle>
+            <DialogTitle>{t("apps.new")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-2">
             <label htmlFor="new-app-name" className="text-foreground text-sm font-medium">
-              App name
+              {t("settings.appName")}
             </label>
             <Input
               id="new-app-name"
@@ -193,14 +200,14 @@ export function AppsListPage() {
           </div>
           <DialogFooter>
             <Button variant="ghost" size="sm" onClick={() => setCreateOpen(false)}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button
               size="sm"
               disabled={name.trim().length === 0 || createMutation.isPending}
               onClick={submitCreate}
             >
-              {createMutation.isPending ? "Creating…" : "Create app"}
+              {createMutation.isPending ? t("apps.creating") : t("apps.create")}
             </Button>
           </DialogFooter>
         </DialogContent>

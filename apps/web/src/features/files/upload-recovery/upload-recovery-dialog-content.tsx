@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { useTranslation } from "@/shared/i18n";
 import type {
   FileUploadRecoveryCandidate,
   FileUploadResumeResult,
@@ -30,6 +31,7 @@ export function UploadRecoveryDialogContent({
 }: {
   initialCandidates: FileUploadRecoveryCandidate[];
 }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(true);
   const [candidates, setCandidates] = useState<FileUploadRecoveryCandidate[]>(initialCandidates);
   const [recovering, setRecovering] = useState(false);
@@ -81,14 +83,22 @@ export function UploadRecoveryDialogContent({
       const retryableCount = retryableResults.length;
       const summaryParts = [
         completedCount > 0
-          ? `Recovered ${completedCount} upload${completedCount === 1 ? "" : "s"}`
+          ? completedCount === 1
+            ? t("uploadRecovery.recoveredUpload")
+            : t("uploadRecovery.recoveredUploads", { count: String(completedCount) })
           : null,
-        terminalCount > 0 ? `${terminalCount} terminated` : null,
-        retryableCount > 0 ? `${retryableCount} can still be retried` : null,
+        terminalCount > 0
+          ? t("uploadRecovery.terminatedCount", { count: String(terminalCount) })
+          : null,
+        retryableCount > 0
+          ? t("uploadRecovery.retryableCount", { count: String(retryableCount) })
+          : null,
       ].filter(Boolean);
 
       setSummary(
-        summaryParts.length > 0 ? `${summaryParts.join(", ")}.` : "No uploads need recovery.",
+        summaryParts.length > 0
+          ? `${summaryParts.join(", ")}.`
+          : t("uploadRecovery.noUploadsNeedRecovery"),
       );
     } finally {
       setRecovering(false);
@@ -112,20 +122,24 @@ export function UploadRecoveryDialogContent({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="sm:max-w-[460px]" showCloseButton={false}>
         <DialogHeader>
-          <DialogTitle>Resume unfinished uploads</DialogTitle>
+          <DialogTitle>{t("common.resumeUnfinishedUploads")}</DialogTitle>
           <DialogDescription>
-            Found {candidates.length} unfinished upload{candidates.length === 1 ? "" : "s"}. If you
-            continue, they will resume one by one while each upload keeps chunk-level concurrency.
+            {candidates.length === 1
+              ? t("uploadRecovery.foundUpload")
+              : t("uploadRecovery.foundUploads", { count: String(candidates.length) })}{" "}
+            {t("uploadRecovery.resumeNote")}
           </DialogDescription>
         </DialogHeader>
         <div className="border-border-subtle bg-secondary/30 text-muted-foreground rounded-lg border px-3 py-2 text-sm">
           {candidates.length === 0
-            ? "There are no uploads to recover right now."
+            ? t("uploadRecovery.noUploads")
             : candidates
                 .slice(0, 5)
                 .map((candidate) => candidate.fileName)
                 .join(", ")}
-          {candidates.length > 5 ? ` and ${candidates.length} files total` : ""}
+          {candidates.length > 5
+            ? t("uploadRecovery.andFilesTotal", { count: String(candidates.length) })
+            : ""}
         </div>
         {isTruthy(summary) ? <div className="text-muted-foreground text-sm">{summary}</div> : null}
         <DialogFooter>
@@ -136,16 +150,16 @@ export function UploadRecoveryDialogContent({
             }}
             disabled={recovering}
           >
-            Later
+            {t("uploadRecovery.later")}
           </Button>
           <Button variant="outline" onClick={() => void handleDiscardAll()} disabled={recovering}>
-            Discard all
+            {t("uploadRecovery.discardAll")}
           </Button>
           <Button
             onClick={() => void handleContinueAll()}
             disabled={recovering || candidates.length === 0}
           >
-            {recovering ? "Resuming..." : "Resume all"}
+            {recovering ? t("uploadRecovery.resuming") : t("uploadRecovery.resumeAll")}
           </Button>
         </DialogFooter>
       </DialogContent>

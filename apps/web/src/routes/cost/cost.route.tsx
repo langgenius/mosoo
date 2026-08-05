@@ -5,6 +5,7 @@ import { useState } from "react";
 import { fetchAppCost } from "@/domains/cost/api/cost-client";
 import type { CostRunPurpose } from "@/domains/cost/api/cost-client";
 import { toAppId } from "@/routes/typed-id";
+import { useTranslation } from "@/shared/i18n";
 
 import { useAppSession } from "../../app/session-provider";
 import { CostAgentsPanel } from "./cost-agents-panel";
@@ -16,6 +17,7 @@ import { CostPageHeader } from "./cost-page-header";
 import { CostTabBar } from "./cost-tab-bar";
 
 export function CostPage() {
+  const { t } = useTranslation();
   const { activeApp, appsLoading } = useAppSession();
   const [range, setRange] = useState<CostRange>("30d");
   const [activeTab, setActiveTab] = useState<CostTab>("overview");
@@ -31,7 +33,7 @@ export function CostPage() {
   if (!activeApp) {
     return (
       <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
-        {appsLoading ? "Loading app…" : "No app available."}
+        {appsLoading ? t("common.loadingApp") : t("common.noApp")}
       </div>
     );
   }
@@ -52,7 +54,7 @@ export function CostPage() {
         <div className="max-w-6xl space-y-5">
           {isLoading ? (
             <div className="border-border bg-card text-muted-foreground rounded-lg border px-4 py-10 text-center text-sm">
-              Loading cost data…
+              {t("common.loadingCost")}
             </div>
           ) : null}
 
@@ -66,7 +68,7 @@ export function CostPage() {
 
           <div className="border-border bg-card text-muted-foreground flex items-center gap-2 rounded-lg border px-4 py-3 text-xs">
             <BarChart3 className="size-3.5" />
-            Costs use cache-adjusted input tokens: billable input = max(0, input - cache read).
+            {t("cost.cacheNote")}
           </div>
         </div>
       </main>

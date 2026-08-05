@@ -10,6 +10,7 @@ import { listAgentSessions, triggerAgentSessionPrewarm } from "@/domains/session
 import { createSessionResourceMentionMessagePayload } from "@/features/session-chat/session-resource-mentions";
 import { useSessionChatLayoutState } from "@/features/session-chat/use-session-chat-layout-state";
 import { toAgentId, toAppId, toSessionId } from "@/routes/typed-id";
+import { useTranslation } from "@/shared/i18n";
 
 import type {
   AgentSessionPanelModel,
@@ -93,6 +94,7 @@ export function removeSessionConfigurationRevisionKeys(
 export function useAgentSessionPanelModel(
   input: UseAgentSessionPanelModelInput,
 ): AgentSessionPanelModel {
+  const { t } = useTranslation();
   const [selectedSessionId, setSelectedSessionId] = useState<string | null | undefined>();
   const [sessionConfigurationRevisions, setSessionConfigurationRevisions] = useState<
     Record<string, string>
@@ -272,8 +274,8 @@ export function useAgentSessionPanelModel(
       });
     } catch (error) {
       setComposerError({
-        actionLabel: "Retry",
-        message: error instanceof Error ? error.message : "Session setup failed.",
+        actionLabel: t("agent.retry"),
+        message: error instanceof Error ? error.message : t("agent.sessionSetupFailed"),
         retryable: true,
       });
     } finally {
@@ -318,7 +320,7 @@ export function useAgentSessionPanelModel(
       await refreshSessions();
     } catch (error) {
       setComposerError({
-        message: error instanceof Error ? error.message : "Session reset failed.",
+        message: error instanceof Error ? error.message : t("agent.sessionResetFailed"),
         retryable: false,
       });
     } finally {
@@ -414,8 +416,8 @@ export function useAgentSessionPanelModel(
       await createSessionAndSelect();
     } catch (error) {
       setComposerError({
-        actionLabel: "Retry",
-        message: error instanceof Error ? error.message : "Provider check failed.",
+        actionLabel: t("agent.retry"),
+        message: error instanceof Error ? error.message : t("agent.providerCheckFailed"),
         retryable: true,
       });
     } finally {
@@ -519,8 +521,8 @@ export function useAgentSessionPanelModel(
         current.filter((pending) => pending.clientRequestId !== clientRequestId),
       );
       setComposerError({
-        actionLabel: "Retry send",
-        message: error instanceof Error ? error.message : "Message send failed.",
+        actionLabel: t("agent.retrySend"),
+        message: error instanceof Error ? error.message : t("agent.messageSendFailed"),
         retryable: true,
       });
       return false;

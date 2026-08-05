@@ -126,7 +126,7 @@ export function useLoginFlow(): LoginFlow {
     const normalizedEmail = email.trim();
 
     if (normalizedEmail.length === 0 || !normalizedEmail.includes("@")) {
-      setError("Please enter a valid email address");
+      setError("login.invalidEmail");
       return;
     }
 
@@ -156,7 +156,7 @@ export function useLoginFlow(): LoginFlow {
       persistLoginState("otp", normalizedEmail);
     } catch (nextError: unknown) {
       const message = getErrorMessage(nextError);
-      setError(message.length > 0 ? message : "Failed to send verification code");
+      setError(message.length > 0 ? message : "login.sendCodeFailed");
     } finally {
       setOtpSending(false);
     }
@@ -164,7 +164,7 @@ export function useLoginFlow(): LoginFlow {
 
   async function handleVerifyOtp(): Promise<void> {
     if (otp.length < 4) {
-      setError("Please enter the verification code");
+      setError("login.enterCodePrompt");
       return;
     }
 
@@ -187,7 +187,7 @@ export function useLoginFlow(): LoginFlow {
       await finishSuccessfulLogin();
     } catch (nextError: unknown) {
       const message = getErrorMessage(nextError);
-      setError(message.length > 0 ? message : "Invalid verification code");
+      setError(message.length > 0 ? message : "login.invalidCode");
     } finally {
       setOtpVerifying(false);
     }

@@ -3,6 +3,7 @@ import { ChevronDown } from "lucide-react";
 import type { ReactElement } from "react";
 
 import { toAppId } from "@/routes/typed-id";
+import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import {
   DropdownMenu,
@@ -32,6 +33,7 @@ export function ModelPickerField({
   appId: string;
   readOnly: boolean;
 }): ReactElement {
+  const { t } = useTranslation();
   const runtimeId = model.draft.runtime;
   const currentModelId = model.draft.model === "" ? null : model.draft.model;
   const currentVendorId = model.draft.provider === "" ? null : model.draft.provider;
@@ -48,21 +50,21 @@ export function ModelPickerField({
   const pickerEntries = listModelPickerEntries(entries, currentModelId, currentVendorId);
   const currentEntry = findCurrentModelEntry(entries, currentModelId, currentVendorId);
   const hasAvailable = entries.some((entry) => entry.available);
-  const triggerLabel = currentEntry?.displayName ?? "Pick an available model";
+  const triggerLabel = currentEntry?.displayName ?? t("agentEditor.pickAvailableModel");
   const showInvalidHint = currentEntry?.available === false && currentEntry.reason !== "needs-key";
   const isEmpty = !loading && !hasAvailable;
   const menuIsEmpty = !loading && pickerEntries.length === 0;
   const lockedVendors = listLockedVendorLabels(entries);
   let buttonLabel = triggerLabel;
   if (loading) {
-    buttonLabel = "Loading models...";
+    buttonLabel = t("agentEditor.loadingModels");
   } else if (currentEntry === null && isEmpty) {
-    buttonLabel = "No models available";
+    buttonLabel = t("agentEditor.noModelsAvailable");
   }
 
   return (
     <div className="space-y-2">
-      <Label className="text-muted-foreground text-[12px]">Model</Label>
+      <Label className="text-muted-foreground text-[12px]">{t("agent.model")}</Label>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
@@ -78,7 +80,7 @@ export function ModelPickerField({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-[var(--anchor-width)]">
-          <DropdownMenuLabel>Available models</DropdownMenuLabel>
+          <DropdownMenuLabel>{t("agent.availableModels")}</DropdownMenuLabel>
           <DropdownMenuSeparator />
           <div className="max-h-[280px] overflow-y-auto">
             {menuIsEmpty ? <ModelPickerEmptyItem /> : null}

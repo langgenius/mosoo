@@ -11,6 +11,8 @@ import type { ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { HelpMenu } from "@/features/help/help-menu";
+import { useTranslation } from "@/shared/i18n";
+import { LocaleSwitcher } from "@/shared/i18n/locale-switcher";
 import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
 import {
@@ -41,11 +43,13 @@ const SwitcherChevronIcon = createHugeicon(ChevronsDownUpIcon, "SwitcherChevronI
 
 // One-click return to the parent Org layer (the Apps list).
 function BackToOrgLink({ collapsed, orgName }: { collapsed: boolean; orgName: string | null }) {
-  const label = orgName ?? "Apps";
+  const { t } = useTranslation();
+  const label = orgName ?? t("pageTitle.apps");
+  const backToLabel = t("nav.backTo", { label });
   const link = (
     <Link
       to="/apps"
-      aria-label={`Back to ${label}`}
+      aria-label={backToLabel}
       className={cn(
         "text-fg-3 hover:text-fg-1 flex items-center gap-1 rounded-md transition-colors",
         collapsed
@@ -65,7 +69,7 @@ function BackToOrgLink({ collapsed, orgName }: { collapsed: boolean; orgName: st
   return (
     <Tooltip>
       <TooltipTrigger asChild>{link}</TooltipTrigger>
-      <TooltipContent side="right">Back to {label}</TooltipContent>
+      <TooltipContent side="right">{backToLabel}</TooltipContent>
     </Tooltip>
   );
 }
@@ -84,12 +88,13 @@ function AppSwitcher({
   loading: boolean;
   onSwitch: (appId: string) => void;
 }) {
-  const displayLabel = activeApp?.name ?? (loading ? "Loading app" : "No app");
+  const { t } = useTranslation();
+  const displayLabel = activeApp?.name ?? (loading ? t("common.loadingApp") : t("common.noApp"));
 
   const trigger = (
     <button
       type="button"
-      aria-label="Switch app"
+      aria-label={t("apps.switchApp")}
       className={cn(
         "border-border bg-background text-foreground hover:border-border-strong flex items-center rounded-md border text-[13px] font-semibold transition-colors",
         collapsed ? "mx-auto mb-3 size-9 justify-center" : "mx-0.5 mb-4 gap-2 px-2.5 py-2",
@@ -100,7 +105,7 @@ function AppSwitcher({
         <>
           <div className="sidebar-label-enter min-w-0 flex-1 text-left">
             <div className="text-muted-foreground text-[10.5px] leading-3 font-semibold uppercase">
-              App
+              {t("nav.app")}
             </div>
             <div className="truncate">{displayLabel}</div>
           </div>
@@ -119,7 +124,7 @@ function AppSwitcher({
         className="w-[224px] rounded-lg p-1"
       >
         <DropdownMenuLabel className="text-fg-3 px-2 py-1 text-[10.5px] font-semibold tracking-wider uppercase">
-          Apps
+          {t("pageTitle.apps")}
         </DropdownMenuLabel>
         {apps.map((app) => (
           <DropdownMenuItem
@@ -140,8 +145,9 @@ function AppSwitcher({
 }
 
 function NewAgentCta({ collapsed, disabled }: { collapsed: boolean; disabled: boolean }) {
+  const { t } = useTranslation();
   const className = cn("mb-4", collapsed ? "mx-auto size-9 p-0" : "w-full justify-center");
-  const label = "New agent";
+  const label = t("agent.create");
 
   if (disabled) {
     return (
@@ -184,8 +190,9 @@ function ConsoleSidebarFooter({
 
   return (
     <>
-      <div className={cn("pb-2", collapsed ? "flex justify-center" : "px-0.5")}>
+      <div className={cn("flex flex-col gap-0.5 pb-2", collapsed ? "items-center" : "px-0.5")}>
         <HelpMenu collapsed={collapsed} shortcutEnabled={helpShortcutEnabled} />
+        <LocaleSwitcher collapsed={collapsed} />
       </div>
       <Separator className="bg-border-soft" />
       <AccountMenu collapsed={collapsed} user={user} />
@@ -201,6 +208,7 @@ function MobileNavigation({
   title?: string | null;
 }) {
   const location = useLocation();
+  const { t } = useTranslation();
   const navigationLocation = `${location.pathname}${location.search}`;
   const [openedAtLocation, setOpenedAtLocation] = useState<string | null>(null);
   const open = openedAtLocation === navigationLocation;
@@ -232,7 +240,7 @@ function MobileNavigation({
     <div className="md:hidden">
       <header className="border-border-soft bg-background flex h-14 shrink-0 items-center gap-3 border-b px-4">
         <button
-          aria-label="Open navigation"
+          aria-label={t("apps.openNavigation")}
           className="text-fg-2 hover:bg-ink-900/[0.04] hover:text-fg-1 flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-md px-2 transition-colors"
           onClick={() => {
             setOpenedAtLocation(navigationLocation);
@@ -240,7 +248,7 @@ function MobileNavigation({
           type="button"
         >
           <ExpandSidebarIcon className="size-5" />
-          <span className="text-xs font-semibold">Menu</span>
+          <span className="text-xs font-semibold">{t("common.menu")}</span>
         </button>
         <img src="/brand/logo-wordmark-onlight.svg" alt="mosoo" className="block h-5" />
         {title ? (
@@ -255,7 +263,7 @@ function MobileNavigation({
         open={open}
       >
         <SheetContent className="bg-sidebar data-[closed]:slide-out-to-left data-[open]:slide-in-from-left right-auto left-0 flex w-[min(20rem,calc(100vw-2rem))] max-w-none flex-col p-3">
-          <SheetTitle className="sr-only">Navigation</SheetTitle>
+          <SheetTitle className="sr-only">{t("common.navigation")}</SheetTitle>
           <div className="flex h-11 shrink-0 items-center px-1.5">
             <img src="/brand/logo-wordmark-onlight.svg" alt="mosoo" className="block h-[22px]" />
           </div>
@@ -278,14 +286,14 @@ function MobileNavigation({
 }
 
 const ORG_HEADER_TITLES = [
-  { path: "/apps", title: "Apps" },
-  { path: "/org/settings", title: "Org settings" },
+  { path: "/apps", titleKey: "pageTitle.apps" },
+  { path: "/org/settings", titleKey: "pageTitle.orgSettings" },
 ] as const;
 
 function getOrgHeaderTitle(pathname: string): string | null {
   return (
     ORG_HEADER_TITLES.find((item) => pathname === item.path || pathname.startsWith(`${item.path}/`))
-      ?.title ?? null
+      ?.titleKey ?? null
   );
 }
 
@@ -304,8 +312,9 @@ function ConsoleShell({
   onToggleCollapsed: () => void;
   sidebar: ReactNode;
 }) {
+  const { t } = useTranslation();
   const ToggleIcon = collapsed ? ExpandSidebarIcon : CollapseSidebarIcon;
-  const toggleLabel = collapsed ? "Expand sidebar" : "Collapse sidebar";
+  const toggleLabel = collapsed ? t("nav.expandSidebar") : t("nav.collapseSidebar");
 
   return (
     <div className="bg-sidebar flex h-dvh">
@@ -410,16 +419,18 @@ export function Layout({ children }: { children: ReactNode }) {
 // dedicated Org sidebar. Deliberately distinct from the App shell so the Apps
 // list / pre-App console reads as the account layer, not an App detail page.
 export function OrgLayout({ children }: { children: ReactNode }) {
+  const { t } = useTranslation();
   const { activeOrganization } = useAppSession();
   const location = useLocation();
   const headerTitle = getOrgHeaderTitle(location.pathname);
+  const resolvedHeaderTitle = headerTitle === null ? null : t(headerTitle);
 
   return (
     <TooltipProvider>
       <div className="bg-background flex h-dvh flex-col">
         <header className="border-border-soft hidden shrink-0 border-b md:flex">
           <div className="flex min-h-[76px] w-[224px] shrink-0 items-center gap-2 px-4">
-            <Link to="/apps" aria-label="Apps" className="flex items-center">
+            <Link to="/apps" aria-label={t("pageTitle.apps")} className="flex items-center">
               <img src="/brand/logo-mark.svg" alt="mosoo" className="block size-6" />
             </Link>
             {activeOrganization === null ? null : (
@@ -431,17 +442,17 @@ export function OrgLayout({ children }: { children: ReactNode }) {
               </>
             )}
           </div>
-          {headerTitle === null ? null : (
+          {resolvedHeaderTitle === null ? null : (
             <div className="flex min-w-0 flex-1 items-center px-8">
               <h1 className="text-foreground truncate text-2xl font-semibold tracking-normal">
-                {headerTitle}
+                {resolvedHeaderTitle}
               </h1>
             </div>
           )}
         </header>
         <MobileNavigation
           renderNavigation={() => <OrgNavigation collapsed={false} pathname={location.pathname} />}
-          title={headerTitle}
+          title={resolvedHeaderTitle}
         />
         <div className="flex min-h-0 flex-1">
           <aside className="border-border-soft hidden w-[224px] shrink-0 flex-col border-r px-3 py-4 md:flex">

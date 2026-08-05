@@ -23,6 +23,7 @@ import type { ReactElement } from "react";
 import type { ListedFileEntry } from "@/domains/file/api/files";
 import { triggerAgentSessionPrewarm } from "@/domains/session/api/agent-session";
 import { toSessionId } from "@/routes/typed-id";
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -73,9 +74,10 @@ function ThreadActivityCard({
   processEventCount: number;
   viewer: ViewerInfo;
 }): ReactElement {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(true);
   const isUser = message.role === "user";
-  const kindLabel = isUser ? "user comment" : "agent reply";
+  const kindLabel = isUser ? t("threads.userComment") : t("threads.agentReply");
   const author = isUser ? viewer.name : agentName;
 
   return (
@@ -110,7 +112,7 @@ function ThreadActivityCard({
         <span className="text-fg-1 shrink-0 text-[12.5px] font-semibold">{author}</span>
         <span className="text-fg-3 shrink-0 text-[11.5px]">{kindLabel}</span>
         <span className="text-fg-3 ml-auto shrink-0 text-[11.5px]">
-          {formatRelativeTime(message.createdAt)}
+          {formatRelativeTime(message.createdAt, t)}
         </span>
       </button>
       <div
@@ -141,7 +143,9 @@ function ThreadActivityCard({
                   <ChevronRight className="size-3" />
                   {processButtonText}
                   {processEventCount > 0 ? (
-                    <span className="text-fg-3 ml-1">· {processEventCount} events</span>
+                    <span className="text-fg-3 ml-1">
+                      · {processEventCount} {t("threads.events")}
+                    </span>
                   ) : null}
                 </Button>
               </div>
@@ -174,18 +178,25 @@ function ThreadDetailHeader({
   threadActionCapabilities: ReturnType<typeof getThreadActionCapabilities>;
   working: boolean;
 }): ReactElement {
+  const { t } = useTranslation();
+
   return (
     <div className="border-border-subtle flex h-12 shrink-0 items-center gap-2 border-b px-4">
-      <Button size="icon-sm" variant="ghost" onClick={onBack} aria-label="Back to threads">
+      <Button
+        size="icon-sm"
+        variant="ghost"
+        onClick={onBack}
+        aria-label={t("threads.backToThreads")}
+      >
         <ArrowLeft className="size-4" />
       </Button>
       <div className="text-fg-3 flex min-w-0 items-center gap-1.5 text-[12px]">
         <button type="button" onClick={onBack} className="hover:text-fg-1 transition-colors">
-          Threads
+          {t("threads.threadsTitle")}
         </button>
         <ChevronRight className="size-3 shrink-0" />
-        <span className="text-fg-1 truncate text-[12.5px] font-medium" title={thread.title}>
-          {thread.title}
+        <span className="text-fg-1 truncate text-[12.5px] font-medium" title={t(thread.title)}>
+          {t(thread.title)}
         </span>
       </div>
       <div className="ml-auto flex shrink-0 items-center gap-2">
@@ -197,30 +208,32 @@ function ThreadDetailHeader({
           >
             <button
               type="button"
-              aria-label="Open event flow"
-              title="Open event flow"
+              aria-label={t("threads.openEventFlow")}
+              title={t("threads.openEventFlow")}
               onClick={onOpenProcess}
             >
               <ThreadStateIcon glyph={stateGlyph} />
-              <span>Working</span>
+              <span>{t("threads.working")}</span>
             </button>
           </Badge>
         ) : thread.failed ? (
           <Badge asChild variant="danger" className="cursor-pointer focus-visible:ring-offset-1">
             <button
               type="button"
-              aria-label="Open failed run process"
-              title="Open failed run process"
+              aria-label={t("threads.openFailedRunProcess")}
+              title={t("threads.openFailedRunProcess")}
               onClick={onOpenProcess}
             >
               <ThreadStateIcon glyph={stateGlyph} />
-              <span>Failed</span>
+              <span>{t("threads.failed")}</span>
             </button>
           </Badge>
         ) : (
           <Badge variant="outline">
             <ThreadStateIcon glyph={stateGlyph} />
-            <span>{thread.bucket === "archived" ? "Archived" : "Completed"}</span>
+            <span>
+              {thread.bucket === "archived" ? t("threads.archived") : t("threads.completed")}
+            </span>
           </Badge>
         )}
         {threadActionCapabilities.archive.available ? (
@@ -232,12 +245,12 @@ function ThreadDetailHeader({
             }}
           >
             <Archive className="size-3.5" />
-            Archive
+            {t("threads.archive")}
           </Button>
         ) : null}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button size="icon-sm" variant="ghost" aria-label="More actions">
+            <Button size="icon-sm" variant="ghost" aria-label={t("common.moreActions")}>
               <MoreHorizontal className="size-4" />
             </Button>
           </DropdownMenuTrigger>
@@ -248,17 +261,21 @@ function ThreadDetailHeader({
               }}
             >
               {thread.pinned ? <PinOff className="size-3.5" /> : <Pin className="size-3.5" />}
-              {thread.pinned ? "Unpin" : "Pin"}
+              {thread.pinned ? t("threads.unpin") : t("threads.pin")}
             </DropdownMenuItem>
             <DropdownMenuItem
               disabled={!threadActionCapabilities.delete.available}
-              title={threadActionCapabilities.delete.reason ?? undefined}
+              title={
+                threadActionCapabilities.delete.reason
+                  ? t(threadActionCapabilities.delete.reason)
+                  : undefined
+              }
               onSelect={() => {
                 onDelete(thread.id);
               }}
             >
               <Trash2 className="size-3.5" />
-              Delete
+              {t("common.delete")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -288,12 +305,14 @@ function ThreadReplyComposer({
   thread: ThreadListItem;
   threadActionCapabilities: ReturnType<typeof getThreadActionCapabilities>;
 }): ReactElement {
+  const { t } = useTranslation();
+
   return (
     <div className="border-border-subtle bg-background shrink-0 border-t px-6 py-4">
       <div className="mx-auto max-w-[760px]">
         {readOnlyReason ? (
           <div className="border-border bg-muted/40 text-fg-2 mb-2 rounded-md border px-3 py-2 text-[12.5px]">
-            {readOnlyReason}
+            {t(readOnlyReason)}
           </div>
         ) : null}
         {actionError ? (
@@ -323,14 +342,16 @@ function ThreadReplyComposer({
             }}
             className="max-h-[200px] min-h-[36px] flex-1 resize-none border-0 bg-transparent p-0 text-[13px] shadow-none focus-visible:ring-0"
             placeholder={
-              followUpMode ? `Follow up and re-dispatch to ${thread.agentName}` : "Add a comment..."
+              followUpMode
+                ? t("threads.followUpReDispatch", { agentName: t(thread.agentName) })
+                : t("threads.addComment")
             }
           />
           <Button
             type="button"
             size="icon-xs"
             variant="ghost"
-            aria-label="Attach files"
+            aria-label={t("threads.attachFiles")}
             className="text-fg-3 shrink-0"
             disabled
           >
@@ -341,7 +362,7 @@ function ThreadReplyComposer({
             size="icon-sm"
             variant="ghost"
             disabled={!canSend}
-            aria-label={followUpMode ? "Follow up" : "Send comment"}
+            aria-label={followUpMode ? t("threads.followUp") : t("threads.sendComment")}
             className="text-fg-3 hover:text-fg-1 shrink-0"
             onClick={() => {
               void onSend();
@@ -398,18 +419,20 @@ export function ThreadDetail({
   thread: ThreadListItem;
   viewer: ViewerInfo;
 }): ReactElement {
+  const { t } = useTranslation();
   const [reply, setReply] = useState("");
   const [processOpen, setProcessOpen] = useState(false);
   const [previewArtifact, setPreviewArtifact] = useState<ListedFileEntry | null>(null);
   const artifactLinkResolver = useMemo(
-    () => createThreadArtifactLinkResolver(artifacts, setPreviewArtifact),
-    [artifacts],
+    () => createThreadArtifactLinkResolver(artifacts, setPreviewArtifact, t),
+    [artifacts, t],
   );
   const working = isThreadWorking(thread.session);
   const followUpMode = thread.bucket === "archived" || !working;
   const threadActionCapabilities = getThreadActionCapabilities({
     bucket: thread.bucket,
     capabilities: sessionActionCapabilities,
+    t,
   });
   const readOnlyReason = threadActionCapabilities.followUp.available
     ? null
@@ -417,10 +440,10 @@ export function ThreadDetail({
   const canSend =
     reply.trim().length > 0 && threadActionCapabilities.followUp.available && !sending;
   const processButtonText = processEventsLoading
-    ? "Loading process"
+    ? t("threads.processLoading")
     : processEventsError
-      ? "Process unavailable"
-      : "Show process";
+      ? t("threads.processUnavailable")
+      : t("threads.showProcess");
   const stateGlyph = getThreadStateGlyph({ bucket: thread.bucket, failed: thread.failed });
   const firstUserMessage = messages.find((message) => message.role === "user") ?? null;
   const activityMessages = messages.filter((message) => message.id !== firstUserMessage?.id);
@@ -452,22 +475,24 @@ export function ThreadDetail({
 
       <div className="min-h-0 flex-1 overflow-y-auto p-6">
         <div className="mx-auto w-full max-w-[760px]">
-          <h1 className="text-fg-1 text-[24px] leading-tight font-bold">{thread.title}</h1>
+          <h1 className="text-fg-1 text-[24px] leading-tight font-bold">{t(thread.title)}</h1>
           <div className="text-fg-3 mt-1.5 flex flex-wrap items-center gap-1.5 text-[12px]">
             <AgentAvatar
               agent={thread.agent}
-              defaultName={thread.agentName}
+              defaultName={t(thread.agentName)}
               className="size-4 text-[8px] font-bold"
             />
-            <span>{thread.agentName}</span>
+            <span>{t(thread.agentName)}</span>
             <span>·</span>
-            <span>created {formatRelativeTime(thread.session.createdAt)}</span>
+            <span>
+              {t("threads.created", { time: formatRelativeTime(thread.session.createdAt, t) })}
+            </span>
           </div>
 
           {firstUserMessage !== null ? (
             <div className="border-border-subtle bg-card mt-5 rounded-lg border px-4 py-3">
               <div className="text-fg-3 mb-1.5 text-[10.5px] font-bold tracking-[0.16em] uppercase">
-                User request
+                {t("threads.userRequest")}
               </div>
               <div className="text-fg-1 text-[13.5px] leading-relaxed whitespace-pre-wrap">
                 {firstUserMessage.content}
@@ -483,7 +508,9 @@ export function ThreadDetail({
           />
 
           {messagesLoading ? (
-            <div className="text-fg-3 py-12 text-center text-[13px]">Loading thread…</div>
+            <div className="text-fg-3 py-12 text-center text-[13px]">
+              {t("threads.loadingThread")}
+            </div>
           ) : messagesError ? (
             <div className="text-destructive py-12 text-center text-[13px]">
               {messagesError.message}
@@ -491,20 +518,20 @@ export function ThreadDetail({
           ) : activityMessages.length === 0 && firstUserMessage === null ? (
             <EmptyState
               icon={Inbox}
-              title="No messages yet"
-              description="This thread exists, but no durable message has been recorded."
+              title={t("threads.noMessagesTitle")}
+              description={t("threads.noMessagesDescription")}
             />
           ) : activityMessages.length > 0 ? (
             <div className="mt-6">
               <div className="text-fg-2 mb-2.5 text-[12.5px] font-semibold">
-                Activity · {activityMessages.length}
+                {t("threads.activity")} · {activityMessages.length}
               </div>
               <div className="flex flex-col gap-2.5">
                 {activityMessages.map((message) => (
                   <ThreadActivityCard
                     key={message.id}
                     agent={agent}
-                    agentName={thread.agentName}
+                    agentName={t(thread.agentName)}
                     artifactLinkResolver={artifactLinkResolver}
                     message={message}
                     onOpenProcess={() => {
@@ -535,7 +562,7 @@ export function ThreadDetail({
 
       <ThreadProcessModal
         agent={agent}
-        agentName={thread.agentName}
+        agentName={t(thread.agentName)}
         errorMessage={processEventsError?.message ?? null}
         events={processEvents}
         onOpenChange={setProcessOpen}
@@ -557,15 +584,17 @@ export function ThreadDetail({
 }
 
 export function ThreadsMissingDetail({ onBack }: { onBack: () => void }): ReactElement {
+  const { t } = useTranslation();
+
   return (
     <div className="bg-background flex h-full min-w-0 flex-1 items-center justify-center">
       <EmptyState
         icon={Inbox}
-        title="Thread no longer exists"
-        description="It may have been deleted or removed from this App."
+        title={t("threads.threadNoLongerExists")}
+        description={t("threads.threadDeletedDescription")}
       >
         <Button onClick={onBack} size="sm" variant="outline">
-          Back to threads
+          {t("threads.backToThreads")}
         </Button>
       </EmptyState>
     </div>

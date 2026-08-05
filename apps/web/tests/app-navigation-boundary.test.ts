@@ -8,10 +8,10 @@ function readSource(path: string): string {
 describe("App navigation boundary", () => {
   test("puts App Overview before Agent-first surfaces", () => {
     const source = readSource("../src/app/navigation.tsx");
-    const overviewIndex = source.indexOf('label: "Overview"');
-    const runsIndex = source.indexOf('label: "Runs"');
-    const agentsIndex = source.indexOf('label: "Agents"');
-    const filesIndex = source.indexOf('label: "Files"');
+    const overviewIndex = source.indexOf('t("nav.overview")');
+    const runsIndex = source.indexOf('t("nav.runs")');
+    const agentsIndex = source.indexOf('t("nav.agents")');
+    const filesIndex = source.indexOf('t("nav.files")');
 
     expect(overviewIndex).toBeGreaterThan(-1);
     expect(runsIndex).toBeGreaterThan(-1);
@@ -35,8 +35,8 @@ describe("App navigation boundary", () => {
 
   test("places App Settings directly below Providers in primary App nav", () => {
     const source = readSource("../src/app/navigation.tsx");
-    const providersIndex = source.indexOf('label: "Providers"');
-    const settingsIndex = source.indexOf('label: "Settings"');
+    const providersIndex = source.indexOf('t("nav.providers")');
+    const settingsIndex = source.indexOf('t("nav.settings")');
 
     expect(providersIndex).toBeGreaterThan(-1);
     expect(settingsIndex).toBeGreaterThan(providersIndex);
@@ -49,7 +49,7 @@ describe("App navigation boundary", () => {
 
     expect(source).toContain("BackToOrgLink");
     expect(source).toContain("AppSwitcher");
-    expect(source).toContain("New agent");
+    expect(source).toContain('t("agent.create")');
     expect(source).not.toContain("Manage apps");
     expect(source).not.toContain("App settings");
     expect(source).not.toContain("OrganizationSwitcher");

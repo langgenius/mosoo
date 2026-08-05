@@ -1,9 +1,15 @@
 import { describe, expect, test } from "bun:test";
 
+import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
+import { I18nProvider } from "../src/shared/i18n";
 import { Markdown } from "../src/shared/ui/markdown";
 import type { MarkdownLinkResolver } from "../src/shared/ui/markdown";
+
+function renderMarkdown(element: ReactElement): string {
+  return renderToStaticMarkup(<I18nProvider>{element}</I18nProvider>);
+}
 
 describe("Markdown artifact links", () => {
   test("resolves output links before hardening", () => {
@@ -29,7 +35,7 @@ describe("Markdown artifact links", () => {
       return null;
     };
 
-    const html = renderToStaticMarkup(
+    const html = renderMarkdown(
       <Markdown linkResolver={linkResolver}>
         {["[Open report](outputs/report.md)", "[Missing](outputs/missing.md)"].join("\n\n")}
       </Markdown>,
@@ -38,7 +44,7 @@ describe("Markdown artifact links", () => {
     expect(html).toContain('<button aria-label="Preview report.md"');
     expect(html).toContain("Open report");
     expect(html).toContain("Missing");
-    expect(html).toContain("file unavailable");
+    expect(html).toContain("(File unavailable)");
     expect(html).not.toContain("[blocked]");
   });
 
@@ -52,7 +58,7 @@ describe("Markdown artifact links", () => {
             unavailable: true,
           }
         : null;
-    const unavailableHtml = renderToStaticMarkup(
+    const unavailableHtml = renderMarkdown(
       <Markdown linkResolver={unavailableResolver}>[Open report](outputs/report.md)</Markdown>,
     );
     const downloadHref = "/api/files/01J000000000000000000000F1/content?disposition=inline";
@@ -64,11 +70,11 @@ describe("Markdown artifact links", () => {
             onOpen: () => {},
           }
         : null;
-    const availableHtml = renderToStaticMarkup(
+    const availableHtml = renderMarkdown(
       <Markdown linkResolver={availableResolver}>[Open report](outputs/report.md)</Markdown>,
     );
 
-    expect(unavailableHtml).toContain("file unavailable");
+    expect(unavailableHtml).toContain("(File unavailable)");
     expect(availableHtml).toContain('<button aria-label="Preview report.md"');
     expect(availableHtml).not.toContain("file unavailable");
   });

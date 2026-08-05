@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { ReactElement } from "react";
 import { Link } from "react-router-dom";
 
+import { getCurrentLocale, useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
 import {
@@ -30,12 +31,16 @@ export interface EnvironmentListTableProps {
   readonly onSetDefault: (environmentId: string) => void;
 }
 
-function networkLabel({ allowedHosts, networkPolicy }: EnvironmentSummary): string {
-  if (networkPolicy === "full") {
-    return "Full intent · not enforced";
+type Translate = (key: string, variables?: Record<string, string>) => string;
+
+function networkLabel(environment: EnvironmentSummary, t: Translate): string {
+  if (environment.networkPolicy === "full") {
+    return t("environments.networkFullLabel");
   }
 
-  return `Limited intent · ${allowedHosts.length} hosts · not enforced`;
+  return t("environments.networkLimitedLabel", {
+    count: String(environment.allowedHosts.length),
+  });
 }
 
 export function EnvironmentListTable({
@@ -43,6 +48,8 @@ export function EnvironmentListTable({
   onDelete,
   onSetDefault,
 }: EnvironmentListTableProps): ReactElement {
+  const { t } = useTranslation();
+
   // Delete is destructive and irreversible, so it sits behind a confirm dialog
   // (same convention as deleting a deployment in deploy-actions.tsx).
   const [confirmingDelete, setConfirmingDelete] = useState<EnvironmentSummary | null>(null);
@@ -75,24 +82,27 @@ export function EnvironmentListTable({
               <EnvironmentBadges environment={environment} />
             </div>
             <div className="text-fg-3 mt-1 line-clamp-1 text-[12px]">
-              {environment.description || "No description"}
+              {environment.description || t("environments.noDescription")}
             </div>
             {environment.forkOrigin ? (
               <div className="text-fg-3 mt-1 flex items-center gap-1.5 text-[11.5px]">
                 <GitFork className="size-3" />
-                Forked from {environment.forkOrigin.ownerName}'s {environment.forkOrigin.name}
+                {t("environments.forkedFrom", {
+                  owner: environment.forkOrigin.ownerName,
+                  name: environment.forkOrigin.name,
+                })}
               </div>
             ) : null}
           </div>
-          <div className="text-fg-2 text-[12px]">{networkLabel(environment)}</div>
+          <div className="text-fg-2 text-[12px]">{networkLabel(environment, t)}</div>
           <div className="text-fg-2 font-mono text-[12px]">{environment.usedByAgentCount}</div>
           <div className="text-fg-3 text-[12px]" suppressHydrationWarning>
-            {new Date(environment.updatedAt).toLocaleDateString("en-US")}
+            {new Date(environment.updatedAt).toLocaleDateString(getCurrentLocale())}
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
-                aria-label="Environment actions"
+                aria-label={t("environments.actions")}
                 className="size-8"
                 size="icon"
                 variant="ghost"
@@ -102,7 +112,7 @@ export function EnvironmentListTable({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem asChild>
-                <Link to={`/environment/${environment.id}`}>Open</Link>
+                <Link to={`/environment/${environment.id}`}>{t("common.open")}</Link>
               </DropdownMenuItem>
               {environment.canEdit && !environment.isDefault ? (
                 <DropdownMenuItem
@@ -110,7 +120,7 @@ export function EnvironmentListTable({
                     onSetDefault(environment.id);
                   }}
                 >
-                  Set as App default
+                  {t("environments.setAsAppDefault")}
                 </DropdownMenuItem>
               ) : null}
               {environment.canDelete ? (
@@ -122,7 +132,7 @@ export function EnvironmentListTable({
                       setConfirmingDelete(environment);
                     }}
                   >
-                    Delete
+                    {t("common.delete")}
                   </DropdownMenuItem>
                 </>
               ) : null}
@@ -141,15 +151,18 @@ export function EnvironmentListTable({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete this environment?</DialogTitle>
+            <DialogTitle>{t("environments.deletePrompt")}</DialogTitle>
             <DialogDescription>
-              This permanently deletes{" "}
-              <span className="text-fg-1 font-semibold">{confirmingDelete?.name}</span> from this
-              App and cannot be undone.
+              {t("environments.deleteDescription", {
+                name: confirmingDelete?.name ?? "",
+              })}
               {confirmingDelete !== null && confirmingDelete.usedByAgentCount > 0
-                ? ` It is currently used by ${String(confirmingDelete.usedByAgentCount)} ${
-                    confirmingDelete.usedByAgentCount === 1 ? "agent" : "agents"
-                  }.`
+                ? t(
+                    confirmingDelete.usedByAgentCount === 1
+                      ? "environments.deleteInUseOne"
+                      : "environments.deleteInUseMany",
+                    { count: String(confirmingDelete.usedByAgentCount) },
+                  )
                 : null}
             </DialogDescription>
           </DialogHeader>
@@ -160,11 +173,11 @@ export function EnvironmentListTable({
                 setConfirmingDelete(null);
               }}
             >
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button variant="destructive" onClick={confirmDelete}>
               <Trash2 className="size-4" />
-              Delete environment
+              {t("environments.delete")}
             </Button>
           </DialogFooter>
         </DialogContent>

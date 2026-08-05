@@ -20,6 +20,7 @@ import {
   useEnvironmentDetailQuery,
 } from "@/domains/environment/query/environment-queries";
 import { toEnvironmentId, toAppId } from "@/routes/typed-id";
+import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 
 import { isTruthy } from "../../shared/lib/truthiness";
@@ -38,11 +39,13 @@ function EnvironmentDetailHeader({
   onDelete: () => void;
   onSetDefault: () => void;
 }) {
+  const { t } = useTranslation();
+
   return (
     <div className="border-border flex flex-col gap-3 border-b pb-5 md:flex-row md:items-end md:justify-between">
       <div>
         <Link className="text-fg-3 hover:text-fg-1 text-[12px] font-medium" to="/environment">
-          Environments
+          {t("environments.title")}
         </Link>
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <h1 className="text-fg-1 text-2xl font-semibold">{environment.name}</h1>
@@ -53,12 +56,12 @@ function EnvironmentDetailHeader({
         {isAdmin && !environment.isDefault ? (
           <Button className="gap-2" onClick={onSetDefault} variant="outline">
             <Star className="size-4" />
-            Set default
+            {t("environments.setDefault")}
           </Button>
         ) : null}
         {environment.canDelete ? (
           <Button onClick={onDelete} variant="outline">
-            Delete
+            {t("common.delete")}
           </Button>
         ) : null}
       </div>
@@ -67,6 +70,7 @@ function EnvironmentDetailHeader({
 }
 
 export function EnvironmentDetailPage({ environmentId }: { environmentId: string }) {
+  const { t } = useTranslation();
   const { activeAppId } = useAppSession();
   const appId = activeAppId;
   const typedEnvironmentId = toEnvironmentId(environmentId);
@@ -131,11 +135,11 @@ export function EnvironmentDetailPage({ environmentId }: { environmentId: string
     setError(null);
     try {
       const updated = await updateMutation.mutateAsync(
-        toUpdateEnvironmentInput(environment.appId, environment.id, effectiveDraft),
+        toUpdateEnvironmentInput(environment.appId, environment.id, effectiveDraft, t),
       );
       setDraftOverride(createEnvironmentDraft(updated));
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : "Failed to save environment.");
+      setError(caughtError instanceof Error ? caughtError.message : t("environments.saveFailed"));
     }
   }
 
@@ -151,7 +155,7 @@ export function EnvironmentDetailPage({ environmentId }: { environmentId: string
       });
     } catch (caughtError) {
       setError(
-        caughtError instanceof Error ? caughtError.message : "Failed to set default environment.",
+        caughtError instanceof Error ? caughtError.message : t("environments.setDefaultFailed"),
       );
     }
   }
@@ -167,16 +171,14 @@ export function EnvironmentDetailPage({ environmentId }: { environmentId: string
         appId: environment.appId,
       });
     } catch (caughtError) {
-      setError(
-        caughtError instanceof Error ? caughtError.message : "Failed to delete environment.",
-      );
+      setError(caughtError instanceof Error ? caughtError.message : t("environments.deleteFailed"));
     }
   }
 
   if (environmentQuery.isLoading) {
     return (
       <div className="text-fg-3 flex-1 overflow-y-auto py-12 text-center text-[13px]">
-        Loading environment…
+        {t("environments.loadingDetail")}
       </div>
     );
   }
@@ -186,7 +188,7 @@ export function EnvironmentDetailPage({ environmentId }: { environmentId: string
       <div className="text-destructive flex-1 overflow-y-auto py-12 text-center text-[13px]">
         {environmentQuery.error instanceof Error
           ? environmentQuery.error.message
-          : "Environment not found."}
+          : t("environments.notFound")}
       </div>
     );
   }
@@ -217,12 +219,14 @@ export function EnvironmentDetailPage({ environmentId }: { environmentId: string
             draft={effectiveDraft}
             onChange={setDraftOverride}
             onSubmit={() => void handleSave()}
-            submitLabel={updateMutation.isPending ? "Saving…" : "Save changes"}
+            submitLabel={
+              updateMutation.isPending ? t("settings.saving") : t("settings.saveChanges")
+            }
           />
           {!environment.canEdit ? (
             <div className="bg-secondary text-fg-3 mt-3 flex items-center gap-2 rounded-md px-3 py-2 text-[12px]">
               <Lock className="size-3.5" />
-              This App environment is read-only. Fork it from the list to customize.
+              {t("environments.readOnly")}
             </div>
           ) : null}
         </section>

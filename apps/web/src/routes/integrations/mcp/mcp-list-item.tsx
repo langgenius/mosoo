@@ -1,5 +1,6 @@
 import { MoreHorizontal, Pencil, Trash2, Unplug } from "lucide-react";
 
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
 import {
@@ -31,9 +32,10 @@ export function McpListItem({
   onDelete,
   onToggleEnabled,
 }: Props) {
+  const { t } = useTranslation();
   const status = server.credentialStatus;
   const isAuthorized = status === "active";
-  const metaParts = [authTypeLabel(server.authType)];
+  const metaParts = [authTypeLabel(server.authType, t)];
   const subjectLabel = server.credential?.subjectLabel;
 
   if (isAuthorized && subjectLabel !== null && subjectLabel !== undefined) {
@@ -58,7 +60,9 @@ export function McpListItem({
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="text-foreground truncate text-[14px] font-medium">{server.name}</span>
-          {!server.enabled && <span className="text-amber-fg shrink-0 text-[10px]">Disabled</span>}
+          {!server.enabled && (
+            <span className="text-amber-fg shrink-0 text-[10px]">{t("mcp.disabled")}</span>
+          )}
         </div>
         {server.description && (
           <p className="text-muted-foreground mt-0.5 truncate text-[12px]">{server.description}</p>
@@ -71,17 +75,17 @@ export function McpListItem({
       <div className="flex shrink-0 items-center gap-1">
         {isAuthorized ? (
           <span className="inline-flex items-center rounded-sm bg-green-100 px-2.5 py-0.5 text-[11px] font-bold tracking-[0.02em] text-green-800">
-            {statusText("active")}
+            {statusText("active", t)}
           </span>
         ) : (
           <Button onClick={onConnect} size="sm" variant="outline">
-            Connect
+            {t("mcp.connect")}
           </Button>
         )}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
-              aria-label="Server actions"
+              aria-label={t("mcp.serverActions")}
               variant="ghost"
               size="icon"
               className="text-muted-foreground size-8"
@@ -92,16 +96,16 @@ export function McpListItem({
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={onEdit}>
               <Pencil />
-              Edit
+              {t("common.edit")}
             </DropdownMenuItem>
             {isAuthorized && (
               <DropdownMenuItem onClick={onRevoke}>
                 <Unplug />
-                Revoke credential
+                {t("mcp.revokeCredential")}
               </DropdownMenuItem>
             )}
             <DropdownMenuItem onClick={onToggleEnabled}>
-              {server.enabled ? "Disable" : "Enable"}
+              {server.enabled ? t("mcp.disable") : t("mcp.enable")}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
@@ -109,7 +113,7 @@ export function McpListItem({
               className="text-destructive focus:text-destructive"
             >
               <Trash2 />
-              Delete
+              {t("common.delete")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

@@ -2,6 +2,7 @@ import { Check, Copy } from "lucide-react";
 import type { ReactElement } from "react";
 import { useState } from "react";
 
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { writeClipboardText } from "@/shared/lib/clipboard";
 
@@ -10,7 +11,7 @@ import { writeClipboardText } from "@/shared/lib/clipboard";
 export function CommandBlock({
   className,
   command,
-  copyLabel = "Copy command",
+  copyLabel,
   prompt = "$",
 }: {
   className?: string;
@@ -18,6 +19,7 @@ export function CommandBlock({
   copyLabel?: string;
   prompt?: string | null;
 }): ReactElement {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
 
   function copy() {
@@ -46,7 +48,7 @@ export function CommandBlock({
       </code>
       <button
         type="button"
-        aria-label={copied ? "Copied" : copyLabel}
+        aria-label={copied ? t("common.copied") : (copyLabel ?? t("common.copyCommand"))}
         onClick={copy}
         className="text-fg-3 hover:bg-ink-900/[0.06] hover:text-fg-1 flex size-7 shrink-0 items-center justify-center rounded-md transition-colors"
       >

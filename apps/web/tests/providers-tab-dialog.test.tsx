@@ -61,6 +61,15 @@ function installDom(): void {
     configurable: true,
     value: window.navigator,
   });
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    value: {
+      getItem: () => null,
+      setItem: () => undefined,
+      removeItem: () => undefined,
+      clear: () => undefined,
+    },
+  });
   Object.defineProperty(globalThis, "IS_REACT_ACT_ENVIRONMENT", {
     configurable: true,
     value: true,
@@ -194,9 +203,10 @@ function setupFetch(credentials: unknown[] = []): CapturedGraphQLBody[] {
 }
 
 async function renderProviders(): Promise<void> {
-  const [{ createRoot }, { ProvidersTab }] = await Promise.all([
+  const [{ createRoot }, { ProvidersTab }, { I18nProvider }] = await Promise.all([
     import("react-dom/client"),
     import("../src/routes/providers/providers-tab"),
+    import("../src/shared/i18n/provider"),
   ]);
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -213,7 +223,9 @@ async function renderProviders(): Promise<void> {
   await act(async () => {
     root?.render(
       <QueryClientProvider client={queryClient}>
-        <ProvidersTab appId={APP_ID} />
+        <I18nProvider>
+          <ProvidersTab appId={APP_ID} />
+        </I18nProvider>
       </QueryClientProvider>,
     );
   });

@@ -13,6 +13,7 @@ import type { LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useReducer, useState } from "react";
 
 import { useSkillsShCatalogQuery } from "@/domains/skill/query/skill-queries";
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -93,6 +94,7 @@ export function SkillsShCatalog({
   registry: ReturnType<typeof useSkillRegistry>;
   search: string;
 }) {
+  const { t } = useTranslation();
   const [state, dispatch] = useReducer(skillsShCatalogReducer, SKILLS_SH_CATALOG_INITIAL_STATE);
   const [confirmingSkill, setConfirmingSkill] = useState<SkillsShCatalogSkill | null>(null);
   const { availableOnly, error, installingId, page, view } = state;
@@ -133,8 +135,7 @@ export function SkillsShCatalog({
       onInstalled(created.id);
     } catch (caughtError) {
       dispatch({
-        error:
-          caughtError instanceof Error ? caughtError.message : "Failed to install skills.sh skill.",
+        error: caughtError instanceof Error ? caughtError.message : t("skills.failedToInstall"),
         type: "installFailed",
       });
     }
@@ -147,13 +148,13 @@ export function SkillsShCatalog({
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
         <div
-          aria-label="skills.sh catalog view"
+          aria-label={t("skills.catalogView")}
           className="inline-flex flex-wrap items-center gap-1"
         >
           <CatalogViewButton
             active={view === "trending"}
             icon={TrendingUp}
-            label="Trending"
+            label={t("skills.trending")}
             onClick={() => {
               dispatch({ type: "setView", view: "trending" });
             }}
@@ -161,7 +162,7 @@ export function SkillsShCatalog({
           <CatalogViewButton
             active={view === "hot"}
             icon={Flame}
-            label="Hot"
+            label={t("skills.hot")}
             onClick={() => {
               dispatch({ type: "setView", view: "hot" });
             }}
@@ -169,7 +170,7 @@ export function SkillsShCatalog({
           <CatalogViewButton
             active={view === "all-time"}
             icon={Check}
-            label="All-time"
+            label={t("skills.allTime")}
             onClick={() => {
               dispatch({ type: "setView", view: "all-time" });
             }}
@@ -187,7 +188,7 @@ export function SkillsShCatalog({
               dispatch({ availableOnly: checked, type: "setAvailableOnly" });
             }}
           />
-          Show available only
+          {t("skills.showAvailableOnly")}
         </label>
 
         <div className="flex-1" />
@@ -196,7 +197,7 @@ export function SkillsShCatalog({
           <div className="text-fg-3 flex items-center gap-1.5 text-[12px] tabular-nums">
             <span>
               {formatCatalogCount(result.total ?? result.count)}
-              {result.source === "public-page" ? " · public index" : " · skills.sh API"}
+              {result.source === "public-page" ? t("skills.publicIndex") : t("skills.skillsShApi")}
             </span>
             <SkillsShSourceTooltip source={result.source} />
           </div>
@@ -210,18 +211,18 @@ export function SkillsShCatalog({
       ) : null}
 
       {catalogQuery.isLoading ? (
-        <div className="text-fg-3 py-12 text-center text-[13px]">Loading skills.sh…</div>
+        <div className="text-fg-3 py-12 text-center text-[13px]">{t("skills.loadingSkillsSh")}</div>
       ) : catalogQuery.error ? (
         <div className="border-destructive/30 bg-destructive/5 text-destructive rounded-md border px-3 py-2 text-xs">
           {catalogQuery.error instanceof Error
             ? catalogQuery.error.message
-            : "Failed to load skills.sh."}
+            : t("skills.failedToLoad")}
         </div>
       ) : skills.length === 0 ? (
         <EmptyState
           icon={RefreshCw}
-          title="No skills found"
-          description="Try a different search term or view."
+          title={t("skills.noSkillsFound")}
+          description={t("skills.tryDifferentSearch")}
         />
       ) : (
         <div
@@ -253,7 +254,7 @@ export function SkillsShCatalog({
             }}
           >
             <ArrowLeft className="size-3.5" />
-            Previous
+            {t("skills.previous")}
           </Button>
           <Button
             size="sm"
@@ -263,7 +264,7 @@ export function SkillsShCatalog({
               dispatch({ page: page + 1, type: "setPage" });
             }}
           >
-            Next
+            {t("skills.next")}
             <ArrowRight className="size-3.5" />
           </Button>
         </div>
@@ -286,21 +287,20 @@ export function SkillsShCatalog({
 }
 
 function SkillsShSourceTooltip({ source }: { source: "api" | "public-page" }) {
+  const { t } = useTranslation();
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <button
           type="button"
-          aria-label="skills.sh source"
+          aria-label={t("skills.source")}
           className="text-fg-3 hover:text-fg-1 focus-visible:ring-brand-ring inline-flex size-5 items-center justify-center rounded-full transition-colors focus-visible:ring-2 focus-visible:outline-none"
         >
           <Info className="size-3.5" />
         </button>
       </TooltipTrigger>
       <TooltipContent side="bottom" align="end" className="max-w-[280px] text-left">
-        {source === "api"
-          ? "Discover results are sourced from the skills.sh API, so Well-known entries can be installed directly."
-          : "Discover results are sourced from the public skills.sh directory. GitHub skills can install directly; Well-known entries need server-side skills.sh API access."}
+        {source === "api" ? t("skills.sourceApiTooltip") : t("skills.sourcePublicTooltip")}
       </TooltipContent>
     </Tooltip>
   );
@@ -317,15 +317,15 @@ function SkillsShInstallConfirmDialog({
   onOpenChange: (open: boolean) => void;
   skill: SkillsShCatalogSkill | null;
 }) {
+  const { t } = useTranslation();
+
   return (
     <Dialog open={skill !== null} onOpenChange={onOpenChange}>
       {skill ? (
         <DialogContent className="z-[60] sm:max-w-[520px]">
           <DialogHeader>
-            <DialogTitle>Install {skill.name}</DialogTitle>
-            <DialogDescription>
-              Review this skills.sh entry before installing it into the current app.
-            </DialogDescription>
+            <DialogTitle>{t("skills.installTitle", { name: skill.name })}</DialogTitle>
+            <DialogDescription>{t("skills.installDescription")}</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
@@ -344,30 +344,34 @@ function SkillsShInstallConfirmDialog({
                     <ExternalLink className="size-3 shrink-0" />
                   </a>
                 </div>
-                {skill.isOfficial ? <Badge variant="success">Official</Badge> : null}
+                {skill.isOfficial ? <Badge variant="success">{t("skills.official")}</Badge> : null}
               </div>
 
               <div className="mt-3 flex flex-wrap items-center gap-1.5">
                 <Badge variant="outline">
                   {skill.sourceType === "github" ? "GitHub" : "Well-known"}
                 </Badge>
-                {skill.isDuplicate ? <Badge variant="warning">Duplicate</Badge> : null}
-                <Badge variant="default">{formatCatalogCount(skill.installs)} installs</Badge>
+                {skill.isDuplicate ? (
+                  <Badge variant="warning">{t("skills.duplicate")}</Badge>
+                ) : null}
+                <Badge variant="default">
+                  {formatCatalogCount(skill.installs)} {t("common.installs")}
+                </Badge>
               </div>
             </div>
 
             <dl className="grid grid-cols-[96px_minmax(0,1fr)] gap-x-3 gap-y-2 text-[12.5px]">
-              <dt className="text-fg-3">Registry</dt>
+              <dt className="text-fg-3">{t("skills.registry")}</dt>
               <dd className="text-fg-1 min-w-0">skills.sh</dd>
-              <dt className="text-fg-3">Skill ID</dt>
+              <dt className="text-fg-3">{t("skills.skillId")}</dt>
               <dd className="text-fg-1 min-w-0 truncate font-mono" title={skill.id}>
                 {skill.id}
               </dd>
-              <dt className="text-fg-3">Slug</dt>
+              <dt className="text-fg-3">{t("skills.slug")}</dt>
               <dd className="text-fg-1 min-w-0 truncate font-mono" title={skill.slug}>
                 {skill.slug}
               </dd>
-              <dt className="text-fg-3">Install from</dt>
+              <dt className="text-fg-3">{t("skills.installFrom")}</dt>
               <dd className="text-fg-1 min-w-0 truncate font-mono" title={skill.installUrl ?? ""}>
                 {skill.installUrl ?? "skills.sh API"}
               </dd>
@@ -382,7 +386,7 @@ function SkillsShInstallConfirmDialog({
                 onOpenChange(false);
               }}
             >
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button
               disabled={installing}
@@ -390,7 +394,7 @@ function SkillsShInstallConfirmDialog({
                 onConfirm(skill);
               }}
             >
-              {installing ? "Installing…" : "Install skill"}
+              {installing ? t("skills.installing") : t("skills.installSkill")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -412,6 +416,7 @@ function SkillsShCatalogCard({
   onInstall: () => void;
   skill: SkillsShCatalogSkill;
 }) {
+  const { t } = useTranslation();
   const installable = authConfigured || skill.sourceType === "github";
   const installRequiresApi = !installable && skill.sourceType === "well-known";
 
@@ -431,12 +436,12 @@ function SkillsShCatalogCard({
             <ExternalLink className="size-3 shrink-0" />
           </a>
         </div>
-        {skill.isOfficial ? <Badge variant="success">Official</Badge> : null}
+        {skill.isOfficial ? <Badge variant="success">{t("skills.official")}</Badge> : null}
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5">
         <Badge variant="outline">{skill.sourceType === "github" ? "GitHub" : "Well-known"}</Badge>
-        {skill.isDuplicate ? <Badge variant="warning">Duplicate</Badge> : null}
+        {skill.isDuplicate ? <Badge variant="warning">{t("skills.duplicate")}</Badge> : null}
       </div>
 
       <div className="flex-1" />
@@ -444,7 +449,7 @@ function SkillsShCatalogCard({
       <div className="flex min-w-0 items-center justify-between gap-3">
         <div className="text-fg-3 min-w-0 text-[11px]">
           <span className="font-mono tabular-nums">{formatCatalogCount(skill.installs)}</span>{" "}
-          installs
+          {t("common.installs")}
         </div>
         {installRequiresApi ? (
           <Tooltip>
@@ -453,18 +458,17 @@ function SkillsShCatalogCard({
                 type="button"
                 size="sm"
                 aria-disabled="true"
-                aria-label={`Cannot install ${skill.name}: skills.sh API access is required`}
+                aria-label={t("skills.cannotInstallLabel", { name: skill.name })}
                 className="hover:bg-primary cursor-not-allowed opacity-40 active:scale-100"
                 onClick={(event) => {
                   event.preventDefault();
                 }}
               >
-                API required
+                {t("skills.apiRequired")}
               </Button>
             </TooltipTrigger>
             <TooltipContent side="top" align="end" className="max-w-[280px] text-left">
-              This Well-known entry needs server-side skills.sh API access before mosoo can download
-              its files. GitHub-sourced skills can install without it.
+              {t("skills.apiRequiredTooltip")}
             </TooltipContent>
           </Tooltip>
         ) : (
@@ -477,12 +481,12 @@ function SkillsShCatalogCard({
             {installed ? (
               <>
                 <Check className="size-3.5" />
-                Installed
+                {t("skills.installed")}
               </>
             ) : installing ? (
-              "Installing…"
+              t("skills.installing")
             ) : (
-              "Install"
+              t("skills.install")
             )}
           </Button>
         )}

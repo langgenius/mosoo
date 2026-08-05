@@ -1,6 +1,7 @@
 import { HelpCircle } from "lucide-react";
 import { lazy, Suspense, useEffect, useState } from "react";
 
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 
@@ -29,6 +30,7 @@ export function HelpMenu({
   collapsed: boolean;
   shortcutEnabled?: boolean;
 }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   // Keep the dialog mounted once it has been opened so its close animation can
   // still play, but never mount it before the first open so the chunk is not
@@ -78,14 +80,14 @@ export function HelpMenu({
       onClick={() => {
         openHelp();
       }}
-      aria-label="Help & docs"
+      aria-label={t("help.helpAndDocs")}
       className={cn(
         "text-fg-2 hover:bg-ink-900/[0.04] hover:text-fg-1 flex items-center rounded-md text-[13.5px] font-semibold transition-colors",
         collapsed ? "size-9 justify-center self-center" : "w-full gap-2.5 px-2.5 py-2",
       )}
     >
       <HelpCircle className="size-4" />
-      {collapsed ? null : <span className="sidebar-label-enter">Help &amp; docs</span>}
+      {collapsed ? null : <span className="sidebar-label-enter">{t("help.helpAndDocs")}</span>}
     </button>
   );
 
@@ -94,7 +96,7 @@ export function HelpMenu({
       {collapsed ? (
         <Tooltip>
           <TooltipTrigger asChild>{button}</TooltipTrigger>
-          <TooltipContent side="right">Help &amp; docs</TooltipContent>
+          <TooltipContent side="right">{t("help.helpAndDocs")}</TooltipContent>
         </Tooltip>
       ) : (
         button

@@ -4,6 +4,7 @@ import type { ComponentProps, ReactElement } from "react";
 import { Streamdown, defaultRehypePlugins } from "streamdown";
 import type { Components } from "streamdown";
 
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 
 interface MarkdownProps {
@@ -203,7 +204,10 @@ function createResolvedLinkPlugin(linkResolver: MarkdownLinkResolver): ResolvedL
   return resolvedLinkPlugin;
 }
 
-function createMarkdownComponents(linkResolver: MarkdownLinkResolver | undefined): Components {
+function createMarkdownComponents(
+  linkResolver: MarkdownLinkResolver | undefined,
+  t: (key: string) => string,
+): Components {
   if (linkResolver === undefined) {
     return chatMarkdownComponents;
   }
@@ -217,7 +221,7 @@ function createMarkdownComponents(linkResolver: MarkdownLinkResolver | undefined
         return (
           <span className={cn("text-fg-3", className)} title={resolution.label}>
             {children}
-            <span className="text-[0.9em]"> (file unavailable)</span>
+            <span className="text-[0.9em]"> ({t("chat.fileUnavailable")})</span>
           </span>
         );
       }
@@ -254,7 +258,8 @@ export function Markdown({
   linkResolver,
   streaming = false,
 }: MarkdownProps): ReactElement {
-  const components = useMemo(() => createMarkdownComponents(linkResolver), [linkResolver]);
+  const { t } = useTranslation();
+  const components = useMemo(() => createMarkdownComponents(linkResolver, t), [linkResolver, t]);
   const resolvedLinkPlugin = useMemo(
     () => (linkResolver === undefined ? null : createResolvedLinkPlugin(linkResolver)),
     [linkResolver],

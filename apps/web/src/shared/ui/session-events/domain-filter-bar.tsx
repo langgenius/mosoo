@@ -1,12 +1,13 @@
 import { AlertTriangle } from "lucide-react";
 import type { ReactElement } from "react";
 
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 
 import {
-  SESSION_EVENT_DOMAIN_LABEL,
   SESSION_EVENT_DOMAIN_TONE,
   SESSION_EVENT_FILTER_DOMAINS,
+  getSessionEventDomainLabel,
 } from "./domain";
 import type { SessionEventDomain } from "./domain";
 
@@ -27,6 +28,7 @@ export function DomainFilterBar({
   totalCount: number;
   visibleCount: number;
 }): ReactElement {
+  const { t } = useTranslation();
   const filtered = visibleCount !== totalCount;
 
   return (
@@ -49,7 +51,7 @@ export function DomainFilterBar({
               )}
             >
               <span className={cn("size-2 rounded-sm", tone.swatch)} />
-              {SESSION_EVENT_DOMAIN_LABEL[domain]}
+              {getSessionEventDomainLabel(domain, t)}
             </button>
           );
         })}
@@ -64,12 +66,15 @@ export function DomainFilterBar({
           )}
         >
           {errorsOnly ? <AlertTriangle className="size-3" /> : null}
-          {errorsOnly ? "Errors only" : "All"}
+          {errorsOnly ? t("sessionEvents.errorsOnly") : t("threads.all")}
         </button>
       </div>
       <div className="text-fg-3 flex items-center gap-2 text-[11px]">
         <span>
-          Showing {visibleCount} of {totalCount} events
+          {t("sessionEvents.showingEvents", {
+            totalCount: String(totalCount),
+            visibleCount: String(visibleCount),
+          })}
         </span>
         {filtered ? (
           <button
@@ -77,7 +82,7 @@ export function DomainFilterBar({
             onClick={onReset}
             className="text-accent-press font-semibold hover:underline"
           >
-            Reset filter
+            {t("sessionEvents.resetFilter")}
           </button>
         ) : null}
       </div>

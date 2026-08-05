@@ -18,6 +18,7 @@ import { canUseCustomEndpoint } from "@/domains/vendor-credential/model/provider
 import { getErrorMessage } from "@/domains/vendor-credential/model/provider-credential-error";
 import { formatProviderErrorMessage } from "@/domains/vendor-credential/model/provider-readiness-copy";
 import { toAppId, toVendorCredentialId } from "@/routes/typed-id";
+import { useTranslation } from "@/shared/i18n";
 import { VendorIcon, hasVendorIcon } from "@/shared/ui/brand-icons";
 import { Button } from "@/shared/ui/button";
 import {
@@ -37,7 +38,7 @@ import { RuntimeAvailabilitySection } from "./runtime-availability-section";
 const CUSTOM_PROVIDER_VENDOR_ID = "openai-compatible";
 const CUSTOM_PROVIDER_DISPLAY: Pick<RuntimeCatalogVendor, "iconKey" | "label" | "vendorId"> = {
   iconKey: "openai",
-  label: "Custom models",
+  label: "providers.customModels",
   vendorId: CUSTOM_PROVIDER_VENDOR_ID,
 };
 
@@ -84,8 +85,11 @@ function defaultApiBaseForVendor(vendorId: string): string {
   return getVendor(vendorId)?.defaultApiBase ?? "";
 }
 
-function displayApiBase(credential: VendorCredential): string {
-  return credential.apiBase ?? "Provider endpoint";
+function displayApiBase(
+  credential: VendorCredential,
+  t: ReturnType<typeof useTranslation>["t"],
+): string {
+  return credential.apiBase ?? t("providers.providerEndpoint");
 }
 
 function formModels(form: CredentialForm): string[] | undefined {
@@ -103,18 +107,23 @@ function formModels(form: CredentialForm): string[] | undefined {
 
 function vendorLabel(vendorId: string): string {
   if (vendorId === CUSTOM_PROVIDER_VENDOR_ID) {
-    return CUSTOM_PROVIDER_DISPLAY.label;
+    return "providers.customModels";
   }
 
   return PUBLIC_VENDORS.find((vendor) => vendor.vendorId === vendorId)?.label ?? vendorId;
 }
 
-function apiKeyPlaceholder(form: CredentialForm): string {
+function apiKeyPlaceholder(
+  form: CredentialForm,
+  t: ReturnType<typeof useTranslation>["t"],
+): string {
   if (form.id === null) {
     return "sk-...";
   }
 
-  return form.maskedApiKey ? `Current key: ${form.maskedApiKey}` : "Current key is saved";
+  return form.maskedApiKey
+    ? t("providers.currentKey", { key: form.maskedApiKey })
+    : t("providers.currentKeySaved");
 }
 
 function credentialsByVendor(
@@ -130,6 +139,7 @@ function credentialsByVendor(
 }
 
 export function ProvidersTab({ appId }: { appId: string }): ReactElement {
+  const { t } = useTranslation();
   const typedAppId = toAppId(appId);
   const queryClient = useQueryClient();
   const [form, setForm] = useState<CredentialForm>(EMPTY_FORM);
@@ -154,12 +164,12 @@ export function ProvidersTab({ appId }: { appId: string }): ReactElement {
 
       if (name.length === 0 || (nextForm.id === null && apiKey.length === 0)) {
         throw new Error(
-          nextForm.id === null ? "Name and API key are required." : "Name is required.",
+          nextForm.id === null ? "providers.nameAndApiKeyRequired" : "providers.nameRequired",
         );
       }
 
       if (nextForm.vendorId === CUSTOM_PROVIDER_VENDOR_ID && (!models || models.length === 0)) {
-        throw new Error("OpenAI-compatible providers require at least one model id.");
+        throw new Error("providers.modelsRequired");
       }
 
       if (nextForm.id === null) {
@@ -211,7 +221,7 @@ export function ProvidersTab({ appId }: { appId: string }): ReactElement {
     try {
       await saveMutation.mutateAsync(form);
     } catch (caughtError) {
-      setFormError(getErrorMessage(caughtError, "Failed to save provider key."));
+      setFormError(t(getErrorMessage(caughtError, "providers.failedToSaveProviderKey")));
     }
   }
 
@@ -220,7 +230,7 @@ export function ProvidersTab({ appId }: { appId: string }): ReactElement {
     const firstModel = formModels(form)?.[0] ?? null;
 
     if (form.vendorId.length === 0 || apiKey.length === 0) {
-      setFormError("Provider and API key are required before testing.");
+      setFormError(t("providers.providerAndApiKeyRequired"));
       return;
     }
 
@@ -237,12 +247,15 @@ export function ProvidersTab({ appId }: { appId: string }): ReactElement {
       });
       setTestState(result.ok ? "success" : "failure");
       if (!result.ok && result.errorCode !== null) {
-        setFormError(formatProviderErrorMessage(result.errorCode));
+        setFormError(formatProviderErrorMessage(result.errorCode, t));
       }
     } catch (caughtError) {
       setTestState("failure");
       setFormError(
-        formatProviderErrorMessage(getErrorMessage(caughtError, "Connection test failed.")),
+        formatProviderErrorMessage(
+          t(getErrorMessage(caughtError, "providers.connectionTestFailed")),
+          t,
+        ),
       );
     }
   }
@@ -297,12 +310,12 @@ export function ProvidersTab({ appId }: { appId: string }): ReactElement {
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <PageHeader
         className="border-border-subtle border-b"
-        title="Providers"
-        description="Provider keys are stored and resolved inside the active App."
+        title={t("providers.title")}
+        description={t("providers.description")}
       >
         <Button onClick={() => startCreate(CUSTOM_PROVIDER_VENDOR_ID)} size="sm" variant="outline">
           <Plus className="size-3.5" />
-          Add custom model
+          {t("providers.addCustomModel")}
         </Button>
       </PageHeader>
 
@@ -310,7 +323,7 @@ export function ProvidersTab({ appId }: { appId: string }): ReactElement {
         <div className="mx-auto max-w-4xl space-y-6">
           {credentialsLoading ? (
             <div className="border-border bg-card text-muted-foreground rounded-lg border px-4 py-6 text-sm">
-              Loading providers…
+              {t("providers.loading")}
             </div>
           ) : null}
 
@@ -329,13 +342,17 @@ export function ProvidersTab({ appId }: { appId: string }): ReactElement {
               onCreate={() => startCreate(vendor.vendorId)}
               onDelete={(credential) => {
                 void deleteMutation.mutateAsync(credential).catch((caughtError) => {
-                  setPageError(getErrorMessage(caughtError, "Failed to delete provider key."));
+                  setPageError(
+                    t(getErrorMessage(caughtError, "providers.failedToDeleteProviderKey")),
+                  );
                 });
               }}
               onEdit={startEdit}
               onSetDefault={(credential) => {
                 void setDefaultMutation.mutateAsync(credential).catch((caughtError) => {
-                  setPageError(getErrorMessage(caughtError, "Failed to set default provider key."));
+                  setPageError(
+                    t(getErrorMessage(caughtError, "providers.failedToSetDefaultProviderKey")),
+                  );
                 });
               }}
               vendor={vendor}
@@ -348,13 +365,17 @@ export function ProvidersTab({ appId }: { appId: string }): ReactElement {
               onCreate={() => startCreate(CUSTOM_PROVIDER_VENDOR_ID)}
               onDelete={(credential) => {
                 void deleteMutation.mutateAsync(credential).catch((caughtError) => {
-                  setPageError(getErrorMessage(caughtError, "Failed to delete provider key."));
+                  setPageError(
+                    t(getErrorMessage(caughtError, "providers.failedToDeleteProviderKey")),
+                  );
                 });
               }}
               onEdit={startEdit}
               onSetDefault={(credential) => {
                 void setDefaultMutation.mutateAsync(credential).catch((caughtError) => {
-                  setPageError(getErrorMessage(caughtError, "Failed to set default provider key."));
+                  setPageError(
+                    t(getErrorMessage(caughtError, "providers.failedToSetDefaultProviderKey")),
+                  );
                 });
               }}
               vendor={CUSTOM_PROVIDER_DISPLAY}
@@ -398,35 +419,41 @@ function ProviderCredentialDialogForm({
   saving: boolean;
   testState: TestState;
 }): ReactElement {
+  const { t } = useTranslation();
   const endpointEnabled = canUseCustomEndpoint(form.vendorId);
   const formId = useId();
   const nameInputId = `${formId}-name`;
   const apiKeyInputId = `${formId}-api-key`;
   const apiBaseInputId = `${formId}-api-base`;
   const modelsInputId = `${formId}-models`;
+  const vendorName = t(vendorLabel(form.vendorId));
 
   return (
     <>
       <DialogHeader>
         <DialogTitle>
-          {form.id === null ? "Add" : "Edit"} {vendorLabel(form.vendorId)} key
+          {form.id === null
+            ? t("providers.addKeyTitle", { vendor: vendorName })
+            : t("providers.editKeyTitle", { vendor: vendorName })}
         </DialogTitle>
-        <DialogDescription>Store this Provider credential inside the active App.</DialogDescription>
+        <DialogDescription>{t("providers.storeCredential")}</DialogDescription>
       </DialogHeader>
       <div className="space-y-3">
         <div className={endpointEnabled ? "grid gap-3 sm:grid-cols-2" : "grid gap-3"}>
           <label className="space-y-1" htmlFor={nameInputId}>
-            <div className="text-muted-foreground text-xs font-medium">Name</div>
+            <div className="text-muted-foreground text-xs font-medium">{t("providers.name")}</div>
             <Input
               id={nameInputId}
-              placeholder="Production"
+              placeholder={t("providers.productionPlaceholder")}
               value={form.name}
               onChange={(event) => onChange({ ...form, name: event.target.value })}
             />
           </label>
           {endpointEnabled ? (
             <label className="space-y-1" htmlFor={apiBaseInputId}>
-              <div className="text-muted-foreground text-xs font-medium">Base URL</div>
+              <div className="text-muted-foreground text-xs font-medium">
+                {t("providers.baseUrl")}
+              </div>
               <Input
                 id={apiBaseInputId}
                 placeholder={defaultApiBaseForVendor(form.vendorId) || "https://api.example.com/v1"}
@@ -437,13 +464,13 @@ function ProviderCredentialDialogForm({
           ) : null}
         </div>
         <label className="block space-y-1" htmlFor={apiKeyInputId}>
-          <div className="text-muted-foreground text-xs font-medium">API key</div>
+          <div className="text-muted-foreground text-xs font-medium">{t("providers.apiKey")}</div>
           <Input
             autoComplete="new-password"
             data-1p-ignore="true"
             id={apiKeyInputId}
             name={`${apiKeyInputId}-provider-secret`}
-            placeholder={apiKeyPlaceholder(form)}
+            placeholder={apiKeyPlaceholder(form, t)}
             type="password"
             value={form.apiKey}
             onChange={(event) => onChange({ ...form, apiKey: event.target.value })}
@@ -451,7 +478,7 @@ function ProviderCredentialDialogForm({
         </label>
         {form.vendorId === CUSTOM_PROVIDER_VENDOR_ID ? (
           <label className="block space-y-1" htmlFor={modelsInputId}>
-            <div className="text-muted-foreground text-xs font-medium">Models</div>
+            <div className="text-muted-foreground text-xs font-medium">{t("providers.models")}</div>
             <Input
               id={modelsInputId}
               placeholder="gpt-4.1, claude-sonnet-4"
@@ -469,17 +496,17 @@ function ProviderCredentialDialogForm({
       <DialogFooter>
         <div className="flex flex-1 items-center gap-2">
           <Button onClick={onCancel} size="sm" variant="ghost">
-            Cancel
+            {t("common.cancel")}
           </Button>
         </div>
         <div className="flex items-center gap-2">
           <Button disabled={testState === "running"} onClick={onTest} size="sm" variant="outline">
-            {testState === "running" ? "Testing..." : "Test"}
+            {testState === "running" ? t("providers.testing") : t("providers.test")}
           </Button>
           <ProviderTestStatus state={testState} />
         </div>
         <Button disabled={saving} onClick={onSave} size="sm">
-          {saving ? "Saving..." : "Save"}
+          {saving ? t("providers.saving") : t("common.save")}
         </Button>
       </DialogFooter>
     </>
@@ -501,6 +528,8 @@ function ProviderCredentialSection({
   onSetDefault: (credential: VendorCredential) => void;
   vendor: Pick<RuntimeCatalogVendor, "iconKey" | "label" | "vendorId">;
 }): ReactElement {
+  const { t } = useTranslation();
+
   return (
     <section className="border-border bg-card space-y-3 rounded-lg border p-4">
       <div className="flex items-center justify-between gap-3">
@@ -512,13 +541,13 @@ function ProviderCredentialSection({
             />
           ) : null}
           <div className="min-w-0">
-            <h2 className="text-fg-1 truncate text-[15px] font-semibold">{vendor.label}</h2>
-            <p className="text-muted-foreground text-[12px]">App-level provider keys</p>
+            <h2 className="text-fg-1 truncate text-[15px] font-semibold">{t(vendor.label)}</h2>
+            <p className="text-muted-foreground text-[12px]">{t("providers.appLevelKeys")}</p>
           </div>
         </div>
         <Button onClick={onCreate} size="sm" variant="outline">
           <Plus className="size-3.5" />
-          Add key
+          {t("providers.addKey")}
         </Button>
       </div>
       {credentials.length > 0 ? (
@@ -535,14 +564,14 @@ function ProviderCredentialSection({
                   </span>
                   {credential.isDefault ? (
                     <span className="bg-success-bg text-success-fg shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium">
-                      Default
+                      {t("providers.default")}
                     </span>
                   ) : null}
                 </div>
                 <div className="text-muted-foreground truncate font-mono text-[12px]">
                   {credential.maskedApiKey}
                   <span className="text-muted-foreground/60 ml-2">
-                    {displayApiBase(credential)}
+                    {displayApiBase(credential, t)}
                   </span>
                 </div>
               </div>
@@ -554,11 +583,11 @@ function ProviderCredentialSection({
                     size="sm"
                     variant="ghost"
                   >
-                    Set default
+                    {t("providers.setDefault")}
                   </Button>
                 )}
                 <Button
-                  aria-label={`Edit ${credential.name} key`}
+                  aria-label={t("providers.editCredentialKey", { name: credential.name })}
                   onClick={() => onEdit(credential)}
                   size="icon"
                   variant="ghost"
@@ -566,7 +595,7 @@ function ProviderCredentialSection({
                   <Pencil className="size-4" />
                 </Button>
                 <Button
-                  aria-label={`Delete ${credential.name} key`}
+                  aria-label={t("providers.deleteCredentialKey", { name: credential.name })}
                   className="text-destructive hover:text-destructive"
                   onClick={() => onDelete(credential)}
                   size="icon"
@@ -580,7 +609,7 @@ function ProviderCredentialSection({
         </div>
       ) : (
         <div className="text-muted-foreground/70 rounded-md border border-dashed px-3 py-3 text-[13px]">
-          No key configured in this App.
+          {t("providers.noKeyConfigured")}
         </div>
       )}
     </section>

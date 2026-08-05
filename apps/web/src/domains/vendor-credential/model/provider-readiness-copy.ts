@@ -1,8 +1,10 @@
 import type { AgentReadinessIssue } from "@mosoo/contracts/agent";
 
-export const PROVIDER_KEY_REQUIRED_TEXT = "Provider key required";
-export const ADD_PROVIDER_KEY_TEXT = "Add provider key";
-export const RETRY_PROVIDER_CHECK_TEXT = "Retry";
+type Translate = (key: string, variables?: Record<string, string>) => string;
+
+export const PROVIDER_KEY_REQUIRED_TEXT = "agent.providerKeyRequired";
+export const ADD_PROVIDER_KEY_TEXT = "agent.addProviderKey";
+export const RETRY_PROVIDER_CHECK_TEXT = "agent.retry";
 
 export type ProviderReadinessAction = "add-provider-key" | "retry-provider-check";
 
@@ -33,20 +35,23 @@ function stripProviderErrorPrefix(message: string): string {
     : message;
 }
 
-function withProviderErrorPrefix(message: string): string {
-  return `Provider error: ${message}`;
+function withProviderErrorPrefix(t: Translate, message: string): string {
+  return `${t("providers.providerErrorPrefix")}${message}`;
 }
 
-function appendProviderErrorDetail(message: string, detail: string | undefined): string {
-  return detail === undefined || detail.length === 0 ? message : `${message} ${detail}`;
+function detailInterpolation(detail: string | undefined): string {
+  return detail === undefined || detail.length === 0 ? "" : ` ${detail}`;
 }
 
-export function formatProviderErrorMessage(message: string | null | undefined): string {
+export function formatProviderErrorMessage(
+  message: string | null | undefined,
+  t: Translate,
+): string {
   const detail = sanitizeProviderErrorDetail(
     stripProviderErrorPrefix(stripReadinessNextAction(message?.trim() ?? "")),
   );
   if (detail.length === 0) {
-    return "Provider error";
+    return t("providers.providerError");
   }
 
   const httpMatch = /^(http_(\d{3}))(?:\s*:\s*(.+))?$/u.exec(detail);
@@ -54,51 +59,53 @@ export function formatProviderErrorMessage(message: string | null | undefined): 
   if (httpMatch !== null) {
     const status = Number(httpMatch[2]);
     const responseDetail = httpMatch[3];
+    const responseValue = detailInterpolation(responseDetail);
 
     switch (status) {
       case 400: {
         return withProviderErrorPrefix(
-          appendProviderErrorDetail("The provider rejected the request (400).", responseDetail),
+          t,
+          t("providers.credentialError.status400", { detail: responseValue }),
         );
       }
       case 401: {
         return withProviderErrorPrefix(
-          appendProviderErrorDetail("API key was rejected (401).", responseDetail),
+          t,
+          t("providers.credentialError.status401", { detail: responseValue }),
         );
       }
       case 403: {
         return withProviderErrorPrefix(
-          appendProviderErrorDetail(
-            "The key does not have permission for this provider or model (403).",
-            responseDetail,
-          ),
+          t,
+          t("providers.credentialError.status403", { detail: responseValue }),
         );
       }
       case 404: {
         return withProviderErrorPrefix(
-          appendProviderErrorDetail(
-            "The provider endpoint or model route was not found (404).",
-            responseDetail,
-          ),
+          t,
+          t("providers.credentialError.status404", { detail: responseValue }),
         );
       }
       case 408:
       case 504: {
         return withProviderErrorPrefix(
-          appendProviderErrorDetail("The provider request timed out.", responseDetail),
+          t,
+          t("providers.credentialError.statusTimeout", { detail: responseValue }),
         );
       }
       case 429: {
         return withProviderErrorPrefix(
-          appendProviderErrorDetail(
-            "The provider rate limited this request (429).",
-            responseDetail,
-          ),
+          t,
+          t("providers.credentialError.status429", { detail: responseValue }),
         );
       }
       default: {
         return withProviderErrorPrefix(
-          appendProviderErrorDetail(`Provider returned HTTP ${status}.`, responseDetail),
+          t,
+          t("providers.credentialError.httpStatus", {
+            detail: responseValue,
+            status: String(status),
+          }),
         );
       }
     }
@@ -106,39 +113,31 @@ export function formatProviderErrorMessage(message: string | null | undefined): 
 
   switch (detail) {
     case "blocked_api_base": {
-      return withProviderErrorPrefix(
-        "Base URL points to localhost, a private IP, or includes credentials.",
-      );
+      return withProviderErrorPrefix(t, t("providers.credentialError.blockedApiBase"));
     }
     case "invalid_api_base": {
-      return withProviderErrorPrefix("Base URL is invalid. Use a valid http(s) endpoint.");
+      return withProviderErrorPrefix(t, t("providers.credentialError.invalidApiBase"));
     }
     case "missing_api_base": {
-      return withProviderErrorPrefix("Base URL is required for this provider.");
+      return withProviderErrorPrefix(t, t("providers.credentialError.missingApiBase"));
     }
     case "missing_api_key": {
-      return withProviderErrorPrefix("API key is required.");
+      return withProviderErrorPrefix(t, t("providers.credentialError.missingApiKey"));
     }
     case "missing_model_id": {
-      return withProviderErrorPrefix("Model ID is required for this provider test.");
+      return withProviderErrorPrefix(t, t("providers.credentialError.missingModelId"));
     }
     case "model_not_found": {
-      return withProviderErrorPrefix(
-        "The configured model was not found by the provider. Check the model id.",
-      );
+      return withProviderErrorPrefix(t, t("providers.credentialError.modelNotFound"));
     }
     case "network_error": {
-      return withProviderErrorPrefix(
-        "Network request failed. Check the endpoint, proxy, or local network.",
-      );
+      return withProviderErrorPrefix(t, t("providers.credentialError.networkError"));
     }
     case "timeout": {
-      return withProviderErrorPrefix(
-        "Request timed out. Check the endpoint, proxy, or local network.",
-      );
+      return withProviderErrorPrefix(t, t("providers.credentialError.timeout"));
     }
     default: {
-      return withProviderErrorPrefix(detail);
+      return withProviderErrorPrefix(t, detail);
     }
   }
 }
@@ -161,17 +160,21 @@ function createProviderKeyRequiredPresentation(
   };
 }
 
-function createProviderErrorPresentation(originalMessage: string): ProviderReadinessPresentation {
+function createProviderErrorPresentation(
+  originalMessage: string,
+  t: Translate,
+): ProviderReadinessPresentation {
   return {
     action: "retry-provider-check",
-    message: formatProviderErrorMessage(originalMessage),
+    message: formatProviderErrorMessage(originalMessage, t),
     originalMessage,
-    title: "Provider error",
+    title: "providers.providerError",
   };
 }
 
 function getProviderReadinessPresentation(
   issue: AgentReadinessIssue,
+  t: Translate,
 ): ProviderReadinessPresentation | null {
   const originalMessage = stripReadinessNextAction(issue.message);
 
@@ -180,7 +183,7 @@ function getProviderReadinessPresentation(
   }
 
   if (issue.code === `${READINESS_CAPABILITY_PREFIX}provider.error`) {
-    return createProviderErrorPresentation(originalMessage);
+    return createProviderErrorPresentation(originalMessage, t);
   }
 
   return null;
@@ -188,6 +191,7 @@ function getProviderReadinessPresentation(
 
 export function getPrimaryProviderReadinessPresentation(
   issues: readonly AgentReadinessIssue[],
+  t: Translate,
 ): ProviderReadinessPresentation | null {
   const errors = issues.filter((issue) => issue.severity === "error");
 
@@ -199,7 +203,7 @@ export function getPrimaryProviderReadinessPresentation(
   }
 
   for (const issue of errors) {
-    const presentation = getProviderReadinessPresentation(issue);
+    const presentation = getProviderReadinessPresentation(issue, t);
     if (presentation !== null) {
       return presentation;
     }
@@ -208,7 +212,10 @@ export function getPrimaryProviderReadinessPresentation(
   return null;
 }
 
-export function formatReadinessIssueMessages(issues: readonly AgentReadinessIssue[]): string[] {
+export function formatReadinessIssueMessages(
+  issues: readonly AgentReadinessIssue[],
+  t: Translate,
+): string[] {
   const messages = new Set<string>();
 
   for (const issue of issues) {
@@ -216,13 +223,16 @@ export function formatReadinessIssueMessages(issues: readonly AgentReadinessIssu
       continue;
     }
 
-    const presentation = getProviderReadinessPresentation(issue);
-    messages.add(presentation?.message ?? issue.message);
+    const presentation = getProviderReadinessPresentation(issue, t);
+    messages.add(t(presentation?.message ?? issue.message));
   }
 
   return [...messages];
 }
 
-export function formatReadinessIssueMessage(issue: AgentReadinessIssue): string {
-  return getProviderReadinessPresentation(issue)?.message ?? issue.message;
+export function formatReadinessIssueMessage(
+  issue: AgentReadinessIssue,
+  t: Translate = (key) => key,
+): string {
+  return t(getProviderReadinessPresentation(issue, t)?.message ?? issue.message);
 }

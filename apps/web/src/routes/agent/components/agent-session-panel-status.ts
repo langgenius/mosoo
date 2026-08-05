@@ -6,6 +6,8 @@ import { formatReadinessIssueMessage } from "@/domains/vendor-credential/model/p
 import { isTruthy } from "../../../shared/lib/truthiness";
 import type { AgentSessionPanelModel } from "./agent-session-panel-model-types";
 
+type Translate = (key: string, variables?: Record<string, string>) => string;
+
 export type SessionPill = "Setup required" | "Ready" | "Working" | "Needs approval" | "Stopped";
 
 export function deriveSessionPill(model: AgentSessionPanelModel): SessionPill {
@@ -28,7 +30,10 @@ export function deriveSessionPill(model: AgentSessionPanelModel): SessionPill {
   return "Ready";
 }
 
-export function readinessBlockSummary(readiness: AgentReadiness | null): string | null {
+export function readinessBlockSummary(
+  readiness: AgentReadiness | null,
+  t: Translate = (key) => key,
+): string | null {
   const errors = readiness?.issues.filter((issue) => issue.severity === "error") ?? [];
 
   if (errors.length === 0) {
@@ -41,44 +46,49 @@ export function readinessBlockSummary(readiness: AgentReadiness | null): string 
     return null;
   }
 
-  const primaryMessage = formatReadinessIssueMessage(primary);
+  const primaryMessage = formatReadinessIssueMessage(primary, t);
 
   if (remainingErrors.length === 0) {
     return primaryMessage;
   }
 
-  return `${primaryMessage} ${remainingErrors.length} more blockers remain.`;
+  return `${primaryMessage} ${t("agent.moreBlockersRemain", {
+    count: String(remainingErrors.length),
+  })}`;
 }
 
-export function sendDisabledReasonForSession({
-  configurationRefreshRequired,
-  lifecycle,
-  reconnecting,
-  setupBlocked,
-  setupSummary,
-  stopped,
-}: {
-  configurationRefreshRequired: boolean;
-  lifecycle: SessionLiveState["lifecycle"];
-  reconnecting: boolean;
-  setupBlocked: boolean;
-  setupSummary: string | null;
-  stopped: boolean;
-}): string | null {
+export function sendDisabledReasonForSession(
+  {
+    configurationRefreshRequired,
+    lifecycle,
+    reconnecting,
+    setupBlocked,
+    setupSummary,
+    stopped,
+  }: {
+    configurationRefreshRequired: boolean;
+    lifecycle: SessionLiveState["lifecycle"];
+    reconnecting: boolean;
+    setupBlocked: boolean;
+    setupSummary: string | null;
+    stopped: boolean;
+  },
+  t: Translate = (key) => key,
+): string | null {
   if (setupBlocked) {
-    return setupSummary ?? "Fix setup before starting a run.";
+    return setupSummary ?? t("agent.fixSetupBeforeRun");
   }
 
   if (configurationRefreshRequired) {
-    return "Start new session to test latest config";
+    return t("agent.startNewSessionToTestConfig");
   }
 
   if (reconnecting || lifecycle === "RESCHEDULING") {
-    return "Agent is updating. Please wait for the session to reconnect.";
+    return t("agent.updatingWaitForReconnect");
   }
 
   if (stopped) {
-    return "This session stopped. Start a new session to continue.";
+    return t("agent.sessionStoppedStartNew");
   }
 
   return null;

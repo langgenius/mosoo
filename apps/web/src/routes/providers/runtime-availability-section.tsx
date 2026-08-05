@@ -1,6 +1,7 @@
 import type { ReactElement } from "react";
 
 import type { VendorCredential } from "@/domains/vendor-credential/api/vendor-credential-client";
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { RuntimeIcon, hasRuntimeIcon } from "@/shared/ui/brand-icons";
 
@@ -57,15 +58,17 @@ export function RuntimeAvailabilitySection({
 }: {
   credentials: readonly VendorCredential[];
 }): ReactElement {
-  const rows = listRuntimeAvailabilityRows(credentials);
+  const { t } = useTranslation();
+  const rows = listRuntimeAvailabilityRows(credentials, t);
 
   return (
     <section className="border-border bg-card rounded-lg border p-4">
       <div className="mb-3">
-        <h2 className="text-foreground text-sm font-semibold">Runtime availability</h2>
+        <h2 className="text-foreground text-sm font-semibold">
+          {t("providers.runtimeAvailability")}
+        </h2>
         <p className="text-muted-foreground mt-1 text-xs">
-          Runtimes are agent drivers. Each runtime resolves one Provider key in this App before
-          launch.
+          {t("providers.runtimeAvailabilityDescription")}
         </p>
       </div>
       <div className="space-y-2">

@@ -2,16 +2,17 @@ import type { SessionProcessEvent } from "@mosoo/contracts/session";
 import { ChevronRight, Clock3 } from "lucide-react";
 import type { ReactElement } from "react";
 
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
 
 import {
   getSessionEventChipTone,
   getSessionEventDomain,
+  getSessionEventDomainLabel,
   getSessionEventLabel,
   getSessionEventStatusLabel,
   isSessionEventVisibleInMainFeed,
-  SESSION_EVENT_DOMAIN_LABEL,
   SESSION_EVENT_DOMAIN_TONE,
   SESSION_EVENT_FILTER_DOMAINS,
   summarizeSessionEvent,
@@ -28,6 +29,7 @@ import { calculateSessionTurnDuration, countSessionTurnDomains } from "./turns";
 import type { SessionTurn } from "./turns";
 
 function TurnStats({ events }: { events: readonly SessionProcessEvent[] }): ReactElement {
+  const { t } = useTranslation();
   const counts = countSessionTurnDomains(events);
 
   return (
@@ -35,7 +37,7 @@ function TurnStats({ events }: { events: readonly SessionProcessEvent[] }): Reac
       {SESSION_EVENT_FILTER_DOMAINS.map((domain) => (
         <span key={domain} className="inline-flex items-center gap-1">
           <span className={cn("size-1.5 rounded-sm", SESSION_EVENT_DOMAIN_TONE[domain].swatch)} />
-          {counts[domain]} {SESSION_EVENT_DOMAIN_LABEL[domain]}
+          {counts[domain]} {getSessionEventDomainLabel(domain, t)}
         </span>
       ))}
     </div>
@@ -49,10 +51,11 @@ function SessionEventRow({
   event: SessionProcessEvent;
   onOpen: () => void;
 }): ReactElement {
+  const { t } = useTranslation();
   const domain = getSessionEventDomain(event.type);
   const domainTone = SESSION_EVENT_DOMAIN_TONE[domain];
   const chipTone = getSessionEventChipTone(event);
-  const preview = clipPreview(summarizeSessionEvent(event));
+  const preview = clipPreview(summarizeSessionEvent(event, t));
 
   return (
     <button
@@ -69,10 +72,10 @@ function SessionEventRow({
           chipTone.chip,
         )}
       >
-        {getSessionEventLabel(event.type)}
+        {getSessionEventLabel(event.type, t)}
       </span>
       <span className="text-fg-1 truncate text-[12px] font-semibold">
-        {SESSION_EVENT_DOMAIN_LABEL[domain]}
+        {getSessionEventDomainLabel(domain, t)}
       </span>
       <span className="text-fg-3 min-w-0 truncate text-[12px]">{preview}</span>
       <span className="text-fg-3 justify-self-end font-mono text-[10.5px] tabular-nums">
@@ -84,7 +87,7 @@ function SessionEventRow({
           statusClassName(event.status),
         )}
       >
-        {getSessionEventStatusLabel(event.status)}
+        {getSessionEventStatusLabel(event.status, t)}
       </span>
     </button>
   );
@@ -103,6 +106,7 @@ export function TurnCard({
   onToggleCollapsed: () => void;
   turn: SessionTurn;
 }): ReactElement {
+  const { t } = useTranslation();
   const durationMs = calculateSessionTurnDuration(turn);
   const visible = filteredEvents.length > 0;
   const visibleTurnEventCount = turn.events.filter(isSessionEventVisibleInMainFeed).length;
@@ -125,20 +129,24 @@ export function TurnCard({
           </span>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h3 className="text-fg-1 text-[13px] font-semibold">Turn #{turn.index}</h3>
+              <h3 className="text-fg-1 text-[13px] font-semibold">
+                {t("sessionEvents.turn", { number: String(turn.index) })}
+              </h3>
               <span
                 className={cn(
                   "rounded-sm border px-1 py-0.5 text-[10.5px] font-semibold",
                   turnStatusClassName(turn.status),
                 )}
               >
-                {turnStatusLabel(turn.status)}
+                {turnStatusLabel(turn.status, t)}
               </span>
               <span className="text-fg-3 inline-flex items-center gap-1 text-[11px] tabular-nums">
                 <Clock3 className="size-3" />
                 {formatTotalDuration(durationMs)}
               </span>
-              {!visible ? <span className="text-fg-3 text-[11px]">No matching events</span> : null}
+              {!visible ? (
+                <span className="text-fg-3 text-[11px]">{t("sessionEvents.noMatchingEvents")}</span>
+              ) : null}
             </div>
             <div className="mt-1">
               <TurnStats events={turn.events} />
@@ -152,7 +160,7 @@ export function TurnCard({
           size="xs"
           variant="outline"
         >
-          Open drawer
+          {t("sessionEvents.openDrawer")}
           <span className="text-fg-3">{visibleTurnEventCount}</span>
         </Button>
       </div>

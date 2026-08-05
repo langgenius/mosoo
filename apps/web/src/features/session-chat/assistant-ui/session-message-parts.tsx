@@ -4,6 +4,7 @@ import { ChevronRight, Copy } from "lucide-react";
 import type { ReactElement } from "react";
 import { useState } from "react";
 
+import { useTranslation } from "@/shared/i18n";
 import { Markdown } from "@/shared/ui/markdown";
 
 import { SessionToolPart } from "./session-tool-part";
@@ -25,13 +26,15 @@ const UserText: TextMessagePartComponent = ({ text }) => (
 // turn completes or lingers on a message that ends with a tool call. The label
 // shimmers left-to-right (see `.mosoo-thinking` in app.css).
 function ThinkingIndicator({ status }: { status: { readonly type: string } }): ReactElement | null {
+  const { t } = useTranslation();
+
   if (status.type !== "running") {
     return null;
   }
 
   return (
     <span className="inline-flex items-center gap-1.5 text-[14px] font-medium">
-      <span className="mosoo-thinking">Thinking</span>
+      <span className="mosoo-thinking">{t("chat.thinking")}</span>
       <span
         aria-hidden
         className="mosoo-thinking-dots text-fg-3 inline-flex items-center gap-[3px]"
@@ -49,6 +52,7 @@ function ThinkingIndicator({ status }: { status: { readonly type: string } }): R
 // so the user sees live progress — shimmering "Thinking" plus a growing
 // character count — instead of dead air, and can expand the raw thought text.
 const AssistantReasoning: ReasoningMessagePartComponent = ({ status, text }) => {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const running = status.type === "running";
   const charCount = text.length;
@@ -62,8 +66,14 @@ const AssistantReasoning: ReasoningMessagePartComponent = ({ status, text }) => 
         className="hover:text-fg-1 inline-flex items-center gap-1 font-medium transition-colors"
       >
         <ChevronRight className={`size-3.5 transition-transform ${expanded ? "rotate-90" : ""}`} />
-        {running ? <span className="mosoo-thinking">Thinking</span> : <span>Thought</span>}
-        <span className="font-normal tabular-nums">· {charCount.toLocaleString()} chars</span>
+        {running ? (
+          <span className="mosoo-thinking">{t("chat.thinking")}</span>
+        ) : (
+          <span>{t("chat.thought")}</span>
+        )}
+        <span className="font-normal tabular-nums">
+          · {charCount.toLocaleString()} {t("common.chars")}
+        </span>
         {running ? (
           <span aria-hidden className="mosoo-thinking-dots inline-flex items-center gap-[3px]">
             <span className="size-1 rounded-full bg-current" />
@@ -92,6 +102,7 @@ export function UserMessage(): ReactElement {
 }
 
 export function AssistantMessage(): ReactElement {
+  const { t } = useTranslation();
   // Copy only makes sense when the turn actually produced prose. Tool-only turns
   // (e.g. a file write that emits just tool cards) have nothing to copy, so we
   // drop the action bar entirely rather than render an empty copy button under
@@ -124,7 +135,7 @@ export function AssistantMessage(): ReactElement {
             className="text-fg-3 mt-1 flex h-6 gap-1 opacity-0 transition-opacity group-hover/aui-msg:opacity-100"
           >
             <ActionBarPrimitive.Copy
-              aria-label="Copy message"
+              aria-label={t("chat.copyMessage")}
               className="hover:bg-ink-900/[0.05] hover:text-fg-1 inline-flex size-6 items-center justify-center rounded-md transition-colors"
             >
               <Copy className="size-3.5" />

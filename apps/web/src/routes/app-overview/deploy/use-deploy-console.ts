@@ -23,11 +23,6 @@ const SUCCESS_STEPS: AppDeploymentRunStatus[] = [
 
 const FAILURE_STEPS: AppDeploymentRunStatus[] = ["queued", "preparing", "building", "failed"];
 
-const FAILURE_ERROR = {
-  errorCode: "build_failed",
-  errorMessage: "Build failed: `vite build` exited with code 1 (missing dependency).",
-} as const;
-
 const STEP_INTERVAL_MS = 750;
 
 export interface DeployConsole {
@@ -55,7 +50,7 @@ function nextRunNumber(runs: DeploymentRunVM[]): number {
   return runs.reduce((max, run) => Math.max(max, run.number ?? 0), 0) + 1;
 }
 
-export function useDeployConsole(): DeployConsole {
+export function useDeployConsole(t: (key: string) => string = (key) => key): DeployConsole {
   const [state, setState] = useState<DeployConsoleState>(createDeployConsoleFixture);
   const [deploying, setDeploying] = useState(false);
   const timersRef = useRef<number[]>([]);
@@ -123,7 +118,12 @@ export function useDeployConsole(): DeployConsole {
                   outcome: toDeploymentRunOutcome(status),
                   targetKind: status === "queued" ? null : "cloudflare_worker",
                   liveUrl: status === "success" ? DEPLOY_APP_IDENTITY.liveUrl : null,
-                  ...(status === "failed" ? FAILURE_ERROR : null),
+                  ...(status === "failed"
+                    ? {
+                        errorCode: "build_failed",
+                        errorMessage: t("deploy.demoBuildFailed"),
+                      }
+                    : null),
                 };
               });
               if (status !== "success" || prev.deployment === null) {
@@ -147,7 +147,7 @@ export function useDeployConsole(): DeployConsole {
         timersRef.current.push(timer);
       });
     },
-    [deploying],
+    [deploying, t],
   );
 
   const deployRepo = useCallback(

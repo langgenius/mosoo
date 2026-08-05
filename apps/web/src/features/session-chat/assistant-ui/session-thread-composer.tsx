@@ -4,6 +4,7 @@ import type React from "react";
 import type { ReactElement } from "react";
 
 import type { ComposerError } from "@/routes/agent/components/agent-session-panel-model-types";
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { isTruthy } from "@/shared/lib/truthiness";
 import { Button } from "@/shared/ui/button";
@@ -38,6 +39,8 @@ function SessionResourceChips({
   mentions: SessionResourceMention[];
   pendingFiles: PendingSessionFileChip[];
 }): ReactElement | null {
+  const { t } = useTranslation();
+
   if (mentions.length === 0 && pendingFiles.length === 0) {
     return null;
   }
@@ -58,7 +61,9 @@ function SessionResourceChips({
           <FileText className="size-3 shrink-0" />
           <span className="max-w-[180px] truncate font-medium">{file.name}</span>
           <span className="text-fg-3 shrink-0">
-            {file.status === "failed" ? "failed" : `${Math.round(file.progress ?? 0)}%`}
+            {file.status === "failed"
+              ? t("chat.uploadFailed")
+              : `${Math.round(file.progress ?? 0)}%`}
           </span>
         </span>
       ))}
@@ -92,6 +97,8 @@ export function SessionThreadComposer({
   sessionResourceMentions,
   showSendDisabledReason = true,
 }: SessionThreadComposerProps): ReactElement {
+  const { t } = useTranslation();
+
   return (
     <ComposerPrimitive.Root
       className={cn("border-border-strong bg-card rounded-lg border")}
@@ -106,7 +113,7 @@ export function SessionThreadComposer({
               onClick={onRetry}
               className="text-destructive mt-1 text-[12px] font-semibold underline underline-offset-4"
             >
-              {composerError.actionLabel ?? "Retry"}
+              {composerError.actionLabel ?? t("agent.retry")}
             </button>
           ) : null}
         </div>
@@ -125,10 +132,10 @@ export function SessionThreadComposer({
         minRows={1}
         maxRows={8}
         onChange={onTypingActivity}
-        placeholder="Describe a task for the agent…"
+        placeholder={t("chat.describeTask")}
         className="text-fg-1 placeholder:text-fg-muted w-full resize-none bg-transparent px-3.5 pt-3 pb-1 text-[14.5px] leading-[1.5] outline-none"
         data-testid="agent-session-composer-input"
-        aria-label="Describe a task for the agent"
+        aria-label={t("chat.describeTask")}
       />
 
       <div className="flex items-center justify-between px-2 pb-2">
@@ -137,7 +144,7 @@ export function SessionThreadComposer({
           type="file"
           multiple
           className="hidden"
-          aria-label="Attach files"
+          aria-label={t("threads.attachFiles")}
           onChange={(event) => {
             if (event.target.files) {
               onFilesSelected([...event.target.files]);
@@ -155,7 +162,7 @@ export function SessionThreadComposer({
             onTypingActivity?.();
             fileInputRef.current?.click();
           }}
-          aria-label="Attach file"
+          aria-label={t("chat.attachFile")}
         >
           <Paperclip className="size-4" />
         </Button>
@@ -166,7 +173,7 @@ export function SessionThreadComposer({
               type="button"
               size="icon-sm"
               className="rounded-full"
-              aria-label="Send"
+              aria-label={t("chat.send")}
               data-testid="agent-session-send"
             >
               <ArrowUp className="size-4" />
@@ -180,8 +187,8 @@ export function SessionThreadComposer({
               type="button"
               size="icon-sm"
               className="rounded-full"
-              aria-label="Stop generating"
-              title="Stop generating"
+              aria-label={t("chat.stopGenerating")}
+              title={t("chat.stopGenerating")}
             >
               <span aria-hidden className="size-2.5 rounded-[2px] bg-current" />
             </Button>

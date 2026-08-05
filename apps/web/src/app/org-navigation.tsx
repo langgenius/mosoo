@@ -4,6 +4,7 @@ import Settings02Icon from "@hugeicons/core-free-icons/Settings02Icon";
 import Wallet02Icon from "@hugeicons/core-free-icons/Wallet02Icon";
 import { Link } from "react-router-dom";
 
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 
@@ -12,7 +13,7 @@ import { createHugeicon } from "./hugeicon";
 
 interface OrgNavItem {
   icon: AppIcon;
-  label: string;
+  labelKey: string;
   path: string | null;
   soon?: boolean;
 }
@@ -20,17 +21,22 @@ interface OrgNavItem {
 // Org layer = the account/billing shell. Usage and Billing are not built yet, so
 // they render as inert "coming soon" entries.
 const ORG_NAV_ITEMS: OrgNavItem[] = [
-  { icon: createHugeicon(GridViewIcon, "AppsIcon"), label: "Apps", path: "/apps" },
+  { icon: createHugeicon(GridViewIcon, "AppsIcon"), labelKey: "pageTitle.apps", path: "/apps" },
   {
     icon: createHugeicon(ChartLineData01Icon, "UsageIcon"),
-    label: "Usage",
+    labelKey: "pageTitle.usage",
     path: null,
     soon: true,
   },
-  { icon: createHugeicon(Wallet02Icon, "BillingIcon"), label: "Billing", path: null, soon: true },
+  {
+    icon: createHugeicon(Wallet02Icon, "BillingIcon"),
+    labelKey: "org.billing",
+    path: null,
+    soon: true,
+  },
   {
     icon: createHugeicon(Settings02Icon, "OrgSettingsIcon"),
-    label: "Org settings",
+    labelKey: "pageTitle.orgSettings",
     path: "/org/settings",
   },
 ];
@@ -48,6 +54,7 @@ function ComingSoonItem({
   icon: AppIcon;
   label: string;
 }) {
+  const { t } = useTranslation();
   const content = (
     <div
       aria-disabled="true"
@@ -61,7 +68,7 @@ function ComingSoonItem({
         <>
           <span className="flex-1 truncate text-left">{label}</span>
           <span className="bg-bg-sunken text-fg-3 rounded-full px-1.5 py-0.5 text-[9.5px] font-semibold tracking-wide uppercase">
-            Soon
+            {t("agent.soon")}
           </span>
         </>
       )}
@@ -75,7 +82,7 @@ function ComingSoonItem({
   return (
     <Tooltip>
       <TooltipTrigger asChild>{content}</TooltipTrigger>
-      <TooltipContent side="right">{label} · coming soon</TooltipContent>
+      <TooltipContent side="right">{t("org.comingSoon", { label })}</TooltipContent>
     </Tooltip>
   );
 }
@@ -121,23 +128,24 @@ function OrgNavLink({
 }
 
 export function OrgNavigation({ collapsed, pathname }: { collapsed: boolean; pathname: string }) {
+  const { t } = useTranslation();
   return (
     <div className={cn("flex flex-col", collapsed ? "gap-1" : "gap-0.5")}>
       {ORG_NAV_ITEMS.map((item) =>
         item.path === null || item.soon === true ? (
           <ComingSoonItem
-            key={item.label}
+            key={item.labelKey}
             collapsed={collapsed}
             icon={item.icon}
-            label={item.label}
+            label={t(item.labelKey)}
           />
         ) : (
           <OrgNavLink
-            key={item.label}
+            key={item.labelKey}
             collapsed={collapsed}
             icon={item.icon}
             isActive={isOrgNavItemActive(pathname, item.path)}
-            label={item.label}
+            label={t(item.labelKey)}
             path={item.path}
           />
         ),

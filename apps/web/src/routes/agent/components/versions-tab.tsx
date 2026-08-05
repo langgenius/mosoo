@@ -1,6 +1,7 @@
 import { GitBranch } from "lucide-react";
 import type { ReactElement } from "react";
 
+import { useFormatDate, useTranslation } from "@/shared/i18n";
 import { Badge } from "@/shared/ui/badge";
 import { ScrollArea } from "@/shared/ui/scroll-area";
 
@@ -8,16 +9,9 @@ import type { Agent } from "../agent.types";
 import { getRuntimeInfo } from "../runtime-catalog";
 import { RuntimeIcon } from "./runtime-icon";
 
-function formatVersionTime(value: string): string {
-  return new Date(value).toLocaleString("en-US", {
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    month: "short",
-  });
-}
-
 export function VersionsTab({ agent }: { agent: Agent }): ReactElement {
+  const { t } = useTranslation();
+  const { dateTime } = useFormatDate();
   const runtime = getRuntimeInfo(agent.runtime);
 
   return (
@@ -28,20 +22,19 @@ export function VersionsTab({ agent }: { agent: Agent }): ReactElement {
             <GitBranch className="text-muted-foreground size-4" />
           </div>
           <div className="min-w-0">
-            <div className="text-foreground text-[14px] font-medium">Versions</div>
+            <div className="text-foreground text-[14px] font-medium">{t("agent.versions")}</div>
             <div className="text-muted-foreground mt-0.5 text-[12px]">
-              New sessions use the live version. Existing sessions keep their pinned execution
-              binding.
+              {t("agent.versionsDescription")}
             </div>
           </div>
           <div className="flex-1" />
           {agent.liveVersion ? (
             <Badge variant="success" className="h-5 text-[11px]">
-              v{agent.liveVersion.versionNumber} live
+              {t("agent.versionLive", { version: String(agent.liveVersion.versionNumber) })}
             </Badge>
           ) : (
             <Badge variant="outline" className="h-5 text-[11px]">
-              No live version
+              {t("agent.noLiveVersion")}
             </Badge>
           )}
         </div>
@@ -51,9 +44,11 @@ export function VersionsTab({ agent }: { agent: Agent }): ReactElement {
         <div className="mx-auto w-full max-w-4xl p-5">
           {agent.versions.length === 0 ? (
             <div className="border-border rounded-lg border border-dashed bg-white px-5 py-8 text-center">
-              <div className="text-foreground text-[14px] font-medium">No published versions.</div>
+              <div className="text-foreground text-[14px] font-medium">
+                {t("agent.noPublishedVersions")}
+              </div>
               <div className="text-muted-foreground mt-1 text-[12px]">
-                Publish this Agent to create its first live DeploymentVersion.
+                {t("agent.publishToCreateVersion")}
               </div>
             </div>
           ) : (
@@ -69,7 +64,7 @@ export function VersionsTab({ agent }: { agent: Agent }): ReactElement {
                     </span>
                     {version.isLive ? (
                       <Badge variant="success" className="h-4 text-[10px]">
-                        live
+                        {t("agent.live")}
                       </Badge>
                     ) : null}
                   </div>
@@ -87,10 +82,10 @@ export function VersionsTab({ agent }: { agent: Agent }): ReactElement {
                   </div>
 
                   <div className="text-muted-foreground text-right text-[11px]">
-                    {formatVersionTime(version.createdAt)}
+                    {dateTime(version.createdAt)}
                     {index === 0 && !version.isLive ? (
                       <div className="text-muted-foreground mt-1 text-[10.5px]">
-                        Historical version
+                        {t("agent.historicalVersion")}
                       </div>
                     ) : null}
                   </div>

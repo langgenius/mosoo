@@ -1,5 +1,5 @@
 export function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "Unexpected error";
+  return error instanceof Error ? error.message : "login.unexpectedError";
 }
 
 export function getAuthClientErrorMessage(
@@ -11,7 +11,7 @@ export function getAuthClientErrorMessage(
   } | null,
 ): string {
   if (!error) {
-    return "Unexpected error";
+    return "login.unexpectedError";
   }
 
   const decodedError =
@@ -21,10 +21,10 @@ export function getAuthClientErrorMessage(
   }
 
   if (error.status === 404) {
-    return "Google SSO is not configured.";
+    return "login.googleNotConfigured";
   }
 
-  return error.message ?? error.error ?? "Unexpected error";
+  return error.message ?? error.error ?? "login.unexpectedError";
 }
 
 export function getSocialAuthErrorMessage(
@@ -45,20 +45,20 @@ export function decodeAuthError(errorCode: string | null | undefined): string | 
 
   switch (errorCode.toLowerCase()) {
     case "access_denied": {
-      return "Google sign-in was cancelled.";
+      return "login.googleCancelled";
     }
     case "provider_not_found":
     case "oauth_provider_not_found": {
-      return "Google SSO is not configured.";
+      return "login.googleNotConfigured";
     }
     case "state_not_found":
     case "invalid_callback_request":
     case "invalid_state": {
-      return "Google sign-in could not be resumed. Please try again.";
+      return "login.googleResumeFailed";
     }
     case "invalid_code":
     case "callback_failed": {
-      return "Google sign-in failed. Please try again.";
+      return "login.googleSignInFailed";
     }
     default: {
       return null;

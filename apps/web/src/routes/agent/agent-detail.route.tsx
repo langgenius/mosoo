@@ -6,6 +6,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useAppSession } from "@/app/session-provider";
 import { useAgentDetailQuery, useAgentEditorStateQuery } from "@/domains/agent/query/agent-queries";
 import { useAuth } from "@/domains/auth/use-auth";
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
 
@@ -63,10 +64,11 @@ const VersionsSheet = lazy(async () => {
   const { VersionsTab } = versionsModule;
 
   function VersionsSheetContent({ agent, onOpenChange, open }: VersionsSheetProps) {
+    const { t } = useTranslation();
     return (
       <Sheet open={open} onOpenChange={onOpenChange}>
         <SheetContent className="w-[560px] max-w-[calc(100vw-2rem)] p-0">
-          <SheetTitle className="sr-only">Versions</SheetTitle>
+          <SheetTitle className="sr-only">{t("agent.versions")}</SheetTitle>
           <VersionsTab agent={agent} />
         </SheetContent>
       </Sheet>
@@ -76,10 +78,10 @@ const VersionsSheet = lazy(async () => {
   return { default: VersionsSheetContent };
 });
 
-const MODE_TABS: { id: DetailMode; label: string }[] = [
-  { id: "preview", label: "Preview" },
-  { id: "logs", label: "Logs" },
-  { id: "cost", label: "Cost" },
+const MODE_TABS: { id: DetailMode; labelKey: string }[] = [
+  { id: "preview", labelKey: "agent.preview" },
+  { id: "logs", labelKey: "agent.logs" },
+  { id: "cost", labelKey: "agent.cost" },
 ];
 
 function toDetailMode(value: string | null): DetailMode | null {
@@ -117,11 +119,13 @@ function AgentDetailHeader({
   onSelectMode: (mode: DetailMode) => void;
   runtime: ReturnType<typeof getRuntimeInfo> | null;
 }) {
+  const { t } = useTranslation();
+
   return (
     <header className="border-border-subtle relative flex min-h-13 shrink-0 flex-wrap items-center gap-y-2 border-b bg-white px-3 py-2 sm:px-5 md:h-13 md:flex-nowrap md:py-0">
       <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
         <Button
-          aria-label="Back to agents"
+          aria-label={t("agent.backToAgents")}
           variant="ghost"
           size="icon-sm"
           onClick={onBack}
@@ -143,18 +147,18 @@ function AgentDetailHeader({
             type="button"
             onClick={onOpenVersions}
             className="focus-visible:ring-ring bg-amber-bg text-amber-fg hover:bg-amber-bg/70 ml-1 inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors focus:outline-none focus-visible:ring-2"
-            aria-label="Open version history"
+            aria-label={t("agent.openVersionHistory")}
           >
-            Draft
+            {t("agent.draft")}
           </button>
         ) : agent.liveVersion ? (
           <button
             type="button"
             onClick={onOpenVersions}
             className="focus-visible:ring-ring ml-1 inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-medium text-green-800 transition-colors hover:bg-green-200/70 focus:outline-none focus-visible:ring-2"
-            aria-label="Open version history"
+            aria-label={t("agent.openVersionHistory")}
           >
-            v{agent.liveVersion.versionNumber} live
+            v{agent.liveVersion.versionNumber} {t("agent.live")}
           </button>
         ) : null}
       </div>
@@ -172,7 +176,7 @@ function AgentDetailHeader({
               mode === tab.id ? "bg-ink-100 text-fg-1" : "text-muted-foreground hover:bg-accent",
             )}
           >
-            {tab.label}
+            {t(tab.labelKey)}
           </button>
         ))}
         {canUseTerminal && (
@@ -187,9 +191,9 @@ function AgentDetailHeader({
                 ? "bg-ink-100 text-fg-1"
                 : "text-muted-foreground hover:bg-accent",
             )}
-            aria-label="Open Terminal"
+            aria-label={t("agent.openTerminal")}
           >
-            Terminal
+            {t("agent.terminal")}
           </button>
         )}
       </div>
@@ -210,14 +214,16 @@ function AgentDetailHeader({
 }
 
 function PanelLoading(): ReactElement {
+  const { t } = useTranslation();
   return (
     <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
-      Loading…
+      {t("common.loading")}
     </div>
   );
 }
 
 export function AgentDetailPage() {
+  const { t } = useTranslation();
   const { agentId } = useParams<{ agentId: string }>();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -293,7 +299,7 @@ export function AgentDetailPage() {
   if (!isTruthy(agentId)) {
     return (
       <div className="text-destructive flex h-full items-center justify-center text-sm">
-        Agent id is missing.
+        {t("agent.agentIdMissing")}
       </div>
     );
   }
@@ -301,7 +307,7 @@ export function AgentDetailPage() {
   if (detailQuery.isLoading || (canEdit && editorStateQuery.isLoading && !editorStateQuery.data)) {
     return (
       <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
-        Loading agent…
+        {t("agent.loadingAgent")}
       </div>
     );
   }
@@ -312,7 +318,7 @@ export function AgentDetailPage() {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-4">
         <div className="text-destructive text-sm">
-          {loadError instanceof Error ? loadError.message : "Agent not found."}
+          {loadError instanceof Error ? loadError.message : t("agent.notFound")}
         </div>
         <Button
           variant="outline"
@@ -320,7 +326,7 @@ export function AgentDetailPage() {
             void navigate(basePath);
           }}
         >
-          Back to agents
+          {t("agent.backToAgents")}
         </Button>
       </div>
     );
@@ -331,14 +337,14 @@ export function AgentDetailPage() {
   if (!detail) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-4">
-        <div className="text-destructive text-sm">Agent not found.</div>
+        <div className="text-destructive text-sm">{t("agent.notFound")}</div>
         <Button
           variant="outline"
           onClick={() => {
             void navigate(basePath);
           }}
         >
-          Back to agents
+          {t("agent.backToAgents")}
         </Button>
       </div>
     );
