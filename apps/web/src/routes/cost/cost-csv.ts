@@ -1,5 +1,7 @@
 import type { CostAttributionCard } from "./cost-model";
 
+type TranslateFn = (key: string, variables?: Record<string, string>) => string;
+
 export function downloadCsv(filename: string, rows: string[][]) {
   const body = rows
     .map((row) => row.map((value) => `"${value.replaceAll('"', '""')}"`).join(","))
@@ -13,7 +15,7 @@ export function downloadCsv(filename: string, rows: string[][]) {
   URL.revokeObjectURL(url);
 }
 
-function attributionCsvRows(label: string, card: CostAttributionCard): string[][] {
+function attributionCsvRows(label: string, card: CostAttributionCard, t: TranslateFn): string[][] {
   return [
     [label, "summary", "total_cost", "", String(card.totals.totalCostUsd), ""],
     [label, "summary", "requests", "", "", String(card.totals.requestCount)],
@@ -26,7 +28,7 @@ function attributionCsvRows(label: string, card: CostAttributionCard): string[][
       agent.agentName,
       agent.ownerName,
       String(agent.totalCostUsd),
-      `${agent.requestCount} requests`,
+      t("cost.csvRequests", { count: String(agent.requestCount) }),
     ]),
     ...card.models.map((model) => [
       label,
@@ -34,18 +36,25 @@ function attributionCsvRows(label: string, card: CostAttributionCard): string[][
       model.vendor,
       model.model,
       String(model.totalCostUsd),
-      `${model.requestCount} requests; unpriced ${model.unpricedRequestCount}`,
+      t("cost.csvRequestsUnpriced", {
+        count: String(model.requestCount),
+        unpriced: String(model.unpricedRequestCount),
+      }),
     ]),
   ];
 }
 
-export function exportAttributionCostCsv(filename: string, card: CostAttributionCard | undefined) {
+export function exportAttributionCostCsv(
+  filename: string,
+  card: CostAttributionCard | undefined,
+  t: TranslateFn = (key) => key,
+) {
   if (!card) {
     return;
   }
 
   downloadCsv(filename, [
     ["scope", "kind", "name", "secondary", "cost", "quantity"],
-    ...attributionCsvRows("cost", card),
+    ...attributionCsvRows("cost", card, t),
   ]);
 }

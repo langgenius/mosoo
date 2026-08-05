@@ -109,7 +109,7 @@ export function EditMcpDialog({ server, onOpenChange, onSubmit }: Props) {
       onOpenChange(false);
     } catch (error) {
       dispatch({
-        error: error instanceof Error ? error.message : "Failed to update MCP connection.",
+        error: error instanceof Error ? error.message : t("mcp.failedToUpdate"),
         type: "setSubmitError",
       });
     } finally {
@@ -123,8 +123,7 @@ export function EditMcpDialog({ server, onOpenChange, onSubmit }: Props) {
         <DialogHeader>
           <DialogTitle>{t("mcp.editConnection")}</DialogTitle>
           <DialogDescription>
-            Update this MCP server. Authorization type ({authTypeLabel(server.authType)}) cannot be
-            changed.
+            {t("mcp.editDescription", { authType: authTypeLabel(server.authType, t) })}
           </DialogDescription>
         </DialogHeader>
 
@@ -162,12 +161,10 @@ export function EditMcpDialog({ server, onOpenChange, onSubmit }: Props) {
               placeholder="https://mcp.figma.com/mcp"
             />
             {url.length > 0 && !urlValid && (
-              <p className="text-destructive text-[11px]">URL must start with https://</p>
+              <p className="text-destructive text-[11px]">{t("mcp.urlMustStartWithHttps")}</p>
             )}
             {disconnectsOnSave && (
-              <p className="text-amber-fg text-[11px]">
-                Changing the URL disconnects the current credential. You will need to connect again.
-              </p>
+              <p className="text-amber-fg text-[11px]">{t("mcp.urlChangeDisconnects")}</p>
             )}
           </div>
 
@@ -183,7 +180,7 @@ export function EditMcpDialog({ server, onOpenChange, onSubmit }: Props) {
               placeholder="https://logo.clearbit.com/example.com"
             />
             <p className="text-muted-foreground text-[10px]">
-              Leave empty to use the initial as the icon.
+              {t("mcp.leaveEmptyToUseInitial")}
             </p>
           </div>
 
@@ -215,10 +212,10 @@ export function EditMcpDialog({ server, onOpenChange, onSubmit }: Props) {
             }}
             disabled={submitting}
           >
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button disabled={!canSubmit || submitting} onClick={() => void handleSubmit()}>
-            {submitting ? "Saving..." : "Save"}
+            {submitting ? t("mcp.saving") : t("common.save")}
           </Button>
         </DialogFooter>
       </DialogContent>

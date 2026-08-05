@@ -5,6 +5,7 @@ import type { SessionRunStatus } from "@mosoo/contracts/session-run";
 
 export type ThreadBucket = "archived" | "completed" | "working";
 export type ThreadSection = "archived" | "completed" | "pinned" | "working";
+export type Translate = (key: string, variables?: Record<string, string>) => string;
 
 export const SECTION_ORDER: ThreadSection[] = ["pinned", "working", "completed", "archived"];
 export type ThreadFilter = "all" | "failed" | "pinned" | "unread";
@@ -35,7 +36,8 @@ export interface ThreadSummaryCounts {
   counts: Record<ThreadFilter, number>;
 }
 
-const TITLE_FALLBACK = "Untitled thread";
+const TITLE_FALLBACK = "threads.untitled";
+const AGENT_UNAVAILABLE = "threads.agentUnavailable";
 const TITLE_DISPLAY_LIMIT = 80;
 
 function getThreadDisplayTitle(session: Pick<SessionSummary, "title">): string {
@@ -128,7 +130,7 @@ function getThreadStatusLine(session: SessionSummary): string {
   const lifecycle = getAgentSessionUserLifecycleProjection(session);
 
   if (lifecycle.state === "asleep") {
-    return "archived";
+    return "threads.archived";
   }
 
   if (session.status === "RESCHEDULING" && !hasTerminalLastRun(session)) {
@@ -137,32 +139,32 @@ function getThreadStatusLine(session: SessionSummary): string {
       archivedAt: null,
       status: "IDLE",
     });
-    return `${previous} · reconnecting`;
+    return `${previous} · threads.statusReconnecting`;
   }
 
   if (isThreadWorking(session)) {
-    return "working";
+    return "threads.working";
   }
 
   const runStatus = session.lastRun?.status ?? null;
 
   if (runStatus === "failed") {
-    return "failed ✗";
+    return "threads.statusFailed";
   }
 
   if (runStatus === "cancelled") {
-    return "cancelled ✗";
+    return "threads.statusCancelled";
   }
 
   if (runStatus === "expired") {
-    return "expired ✗";
+    return "threads.statusExpired";
   }
 
   if (lifecycle.terminal) {
-    return "terminated";
+    return "threads.statusTerminated";
   }
 
-  return "done ✓";
+  return "threads.statusDone";
 }
 
 export function toThreadListItem(input: {
@@ -179,7 +181,7 @@ export function toThreadListItem(input: {
   return {
     actionCapabilities: input.actionCapabilities,
     agent,
-    agentName: agent?.name ?? "Agent unavailable",
+    agentName: agent?.name ?? AGENT_UNAVAILABLE,
     bucket: getThreadBucket(input.session),
     failed: isThreadFailed(input.session),
     id: input.session.id,
@@ -190,6 +192,13 @@ export function toThreadListItem(input: {
     statusLine: getThreadStatusLine(input.session),
     title: getThreadDisplayTitle(input.session),
   };
+}
+
+export function translateThreadStatusLine(statusLine: string, t: Translate): string {
+  return statusLine
+    .split(" · ")
+    .map((part) => t(part))
+    .join(" · ");
 }
 
 export function matchesThreadFilter(thread: ThreadListItem, filter: ThreadFilter): boolean {

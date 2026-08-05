@@ -20,6 +20,7 @@ import { AgentSkillsField } from "./skills-field";
 import type { AgentEditorModel } from "./use-model";
 
 function PackageResolutionBanner({ agent }: { agent: Agent }) {
+  const { t } = useTranslation();
   const resolution = agent.packageResolution;
 
   if (!resolution || resolution.report.issues.length === 0) {
@@ -41,11 +42,12 @@ function PackageResolutionBanner({ agent }: { agent: Agent }) {
     >
       <div className="flex items-center gap-2 text-[13px] font-semibold">
         <AlertTriangle className="size-4 shrink-0" />
-        Package repair {blockingIssues.length > 0 ? "required" : "recommended"}
+        {blockingIssues.length > 0
+          ? t("agentEditor.packageRepairRequired")
+          : t("agentEditor.packageRepairRecommended")}
       </div>
       <div className="mt-1 text-[12px] leading-relaxed">
-        This draft was created by {resolution.source}. Required unresolved items block preview and
-        publish until repaired.
+        {t("agentEditor.packageRepairDescription", { source: resolution.source })}
       </div>
       <div className="mt-3 space-y-2">
         {resolution.report.issues.map((issue) => (
@@ -80,7 +82,7 @@ export function BasicsSection({
         <div className="space-y-4">
           <div className="space-y-2">
             <Label className="text-muted-foreground text-[12px]" htmlFor="agent-name">
-              Name
+              {t("agentEditor.name")}
               <RequiredMark />
             </Label>
             <Input
@@ -115,7 +117,7 @@ export function BasicsSection({
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label className="text-muted-foreground text-[12px]">
-                Runtime
+                {t("agent.runtime")}
                 <RequiredMark />
               </Label>
               {agent.status === "published" ? (
@@ -123,7 +125,7 @@ export function BasicsSection({
                   className="text-muted-foreground text-[11px]"
                   title={t("agent.runtimeLocked")}
                 >
-                  Locked · Fork Agent to switch
+                  {t("agentEditor.runtimeLockedHint")}
                 </span>
               ) : null}
             </div>
@@ -156,12 +158,12 @@ export function BasicsSection({
                       <div className="text-foreground text-[13px] font-medium">{runtime.name}</div>
                       <div className="text-muted-foreground text-[11px]">
                         {publishedRuntimeLocked
-                          ? "Fork Agent required"
+                          ? t("agentEditor.forkAgentRequired")
                           : selectable
                             ? runtime.vendor
                             : selected
-                              ? "Runtime disabled"
-                              : "Runtime unavailable"}
+                              ? t("agentEditor.runtimeDisabled")
+                              : t("agentEditor.runtimeUnavailable")}
                       </div>
                     </div>
                   </button>
@@ -191,10 +193,7 @@ export function BasicsSection({
           onChange={(event) => {
             model.setPrompt(event.target.value);
           }}
-          placeholder={`Describe this agent's role, boundaries, answer style, and when it should ask clarifying questions.
-
-Example:
-You are a concise operations agent. Confirm scope before changing production data. Ask clarifying questions when user intent, source data, or approval boundaries are unclear.`}
+          placeholder={t("agentEditor.systemPromptPlaceholder")}
           readOnly={readOnly}
           rows={8}
           value={model.draft.prompt}

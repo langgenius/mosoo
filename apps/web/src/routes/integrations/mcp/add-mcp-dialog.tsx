@@ -254,7 +254,7 @@ export function AddMcpDialog({ open, onOpenChange, onSubmit }: Props) {
               <ChevronDown
                 className={cn("size-3.5 transition-transform", advancedOpen && "rotate-180")}
               />
-              Advanced settings
+              {t("mcp.advancedSettings")}
             </button>
 
             {advancedOpen && (

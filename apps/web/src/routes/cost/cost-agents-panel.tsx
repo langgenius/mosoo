@@ -17,11 +17,11 @@ import {
 } from "./cost-model";
 import type { AgentCostSort, CostAgentRow } from "./cost-model";
 
-const SORT_OPTIONS: { label: string; value: AgentCostSort }[] = [
-  { label: "Cost desc", value: "cost_desc" },
-  { label: "Cost asc", value: "cost_asc" },
-  { label: "Runs", value: "runs_desc" },
-  { label: "Biggest spike", value: "spike_desc" },
+const SORT_OPTIONS: { labelKey: string; value: AgentCostSort }[] = [
+  { labelKey: "cost.sortCostDesc", value: "cost_desc" },
+  { labelKey: "cost.sortCostAsc", value: "cost_asc" },
+  { labelKey: "cost.sortRuns", value: "runs_desc" },
+  { labelKey: "cost.sortBiggestSpike", value: "spike_desc" },
 ];
 
 export function CostAgentsPanel({
@@ -40,11 +40,11 @@ export function CostAgentsPanel({
     <section className="border-border bg-card overflow-hidden rounded-lg border">
       <div className="border-border flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
         <div>
-          <h2 className="text-foreground text-sm font-semibold">By Agent</h2>
-          <p className="text-muted-foreground mt-0.5 text-xs">Owner, run mix, and spend trend</p>
+          <h2 className="text-foreground text-sm font-semibold">{t("cost.byAgent")}</h2>
+          <p className="text-muted-foreground mt-0.5 text-xs">{t("cost.agentsSubtitle")}</p>
         </div>
         <label className="text-muted-foreground flex items-center gap-2 text-xs font-semibold">
-          Sort
+          {t("cost.sort")}
           <select
             value={sort}
             onChange={(event) => {
@@ -54,7 +54,7 @@ export function CostAgentsPanel({
           >
             {SORT_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
-                {option.label}
+                {t(option.labelKey)}
               </option>
             ))}
           </select>
@@ -65,15 +65,15 @@ export function CostAgentsPanel({
         <div>{t("cost.agent")}</div>
         <div>{t("cost.owner")}</div>
         <div>{t("cost.runMix")}</div>
-        <div>vs. Prev</div>
+        <div>{t("cost.vsPrev")}</div>
         <div>{t("cost.requests")}</div>
         <div>{t("cost.tokens")}</div>
         <div>{t("cost.cacheHit")}</div>
-        <div className="text-right">Cost</div>
+        <div className="text-right">{t("cost.cost")}</div>
       </div>
       {agents.length === 0 ? (
         <div className="text-muted-foreground px-4 py-10 text-center text-sm">
-          No agent cost events in this range.
+          {t("cost.noAgentCostEvents")}
         </div>
       ) : null}
       {sortedAgents.map((agent) => (
@@ -86,7 +86,7 @@ export function CostAgentsPanel({
             <div className="text-foreground truncate font-semibold">{agent.agentName}</div>
             <div className="text-muted-foreground mt-0.5 flex items-center gap-1 text-xs">
               <ExternalLink className="size-3" />
-              Open cost tab
+              {t("cost.openCostTab")}
             </div>
           </div>
           <div className="text-muted-foreground min-w-0">
@@ -111,10 +111,11 @@ export function CostAgentsPanel({
 }
 
 function AgentDelta({ agent }: { agent: CostAgentRow }) {
+  const { t } = useTranslation();
   const delta = agentCostChange(agent);
 
   if (delta === null) {
-    return <div className="text-muted-foreground text-xs">New</div>;
+    return <div className="text-muted-foreground text-xs">{t("cost.new")}</div>;
   }
 
   return (

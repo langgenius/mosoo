@@ -1,9 +1,20 @@
 import type { ReactElement } from "react";
 
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 
-export function formatSkillFileCount(count: number): string {
-  return count === 1 ? "1 file" : `${count} files`;
+type Translate = (key: string, variables?: Record<string, string>) => string;
+const defaultTranslate: Translate = (key) => key;
+
+export function formatSkillFileCount(
+  count: number,
+  t: Translate = defaultTranslate,
+): string {
+  if (count === 1) {
+    return t("skills.fileCountOne");
+  }
+
+  return t("skills.fileCount", { count: String(count) });
 }
 
 export function SkillFileCountBadge({
@@ -13,6 +24,8 @@ export function SkillFileCountBadge({
   className?: string;
   count: number;
 }): ReactElement {
+  const { t } = useTranslation();
+
   return (
     <span
       className={cn(
@@ -20,7 +33,7 @@ export function SkillFileCountBadge({
         className,
       )}
     >
-      {formatSkillFileCount(count)}
+      {formatSkillFileCount(count, t)}
     </span>
   );
 }

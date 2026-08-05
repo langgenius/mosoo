@@ -47,7 +47,7 @@ export function DeleteSkillDialog({ onDeleted, onOpenChange, open, registry, ski
         <DialogHeader>
           <DialogTitle>{t("skills.deleteSkill")}</DialogTitle>
           <DialogDescription>
-            This removes <span className="font-medium">{skill.name}</span> from your registry.
+            {t("skills.deleteDescription", { name: skill.name })}
           </DialogDescription>
         </DialogHeader>
 
@@ -65,10 +65,10 @@ export function DeleteSkillDialog({ onDeleted, onOpenChange, open, registry, ski
             }}
             disabled={deleting}
           >
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button variant="destructive" onClick={() => void handleDelete()} disabled={deleting}>
-            {deleting ? "Deleting..." : t("skills.deleteSkill")}
+            {deleting ? t("skills.deleting") : t("skills.deleteSkill")}
           </Button>
         </DialogFooter>
       </DialogContent>

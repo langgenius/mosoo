@@ -53,6 +53,8 @@ function DevelopmentPreviewRow({
   status: LocalDeploymentPreviewStatus;
   url: string | null;
 }) {
+  const { t } = useTranslation();
+
   if (url === null) {
     return null;
   }
@@ -61,7 +63,7 @@ function DevelopmentPreviewRow({
 
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px]">
-      <span className="text-fg-3">Development preview</span>
+      <span className="text-fg-3">{t("deploy.developmentPreview")}</span>
       {online ? (
         <DomainLink url={url} />
       ) : (
@@ -77,7 +79,11 @@ function DevelopmentPreviewRow({
               : "bg-bg-sunken text-fg-3",
         )}
       >
-        {online ? "ready" : status === "checking" ? "checking" : "offline"}
+        {online
+          ? t("deploy.statusReady")
+          : status === "checking"
+            ? t("deploy.statusChecking")
+            : t("deploy.statusOffline")}
       </span>
     </div>
   );
@@ -105,12 +111,12 @@ export function DeployUrlCard({
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="text-fg-3 text-[13px]">Environments</div>
+      <div className="text-fg-3 text-[13px]">{t("nav.environments")}</div>
 
       {inFlight && latestRun !== undefined ? (
         <div className="flex flex-col gap-2.5">
           <DevelopmentPreviewRow status={localPreview.status} url={localPreview.url} />
-          <StatusBadge outcome={latestRun.outcome} scopeLabel="Production" />
+          <StatusBadge outcome={latestRun.outcome} scopeLabel={t("cost.production")} />
           {deployment.liveUrl === null ? null : (
             <DomainRow label={t("deploy.productionServing")} url={deployment.liveUrl} />
           )}
@@ -124,9 +130,7 @@ export function DeployUrlCard({
           {deployment.liveUrl === null ? null : (
             <div className="flex min-w-0 flex-col gap-1">
               <DomainRow label={t("deploy.productionServing")} url={deployment.liveUrl} />
-              <p className="text-fg-3 text-[13px]">
-                Your live site is unaffected — this domain still serves the last successful deploy.
-              </p>
+              <p className="text-fg-3 text-[13px]">{t("deploy.liveSiteUnaffected")}</p>
             </div>
           )}
           {deployment.liveUrl !== null || deployment.plannedUrl === null ? null : (
@@ -136,23 +140,29 @@ export function DeployUrlCard({
       ) : productionUrl !== null ? (
         <div className="flex flex-col gap-1">
           <DomainRow
-            label={deployment.liveUrl === null ? "Production reserved" : "Production live"}
+            label={
+              deployment.liveUrl === null
+                ? t("deploy.productionReserved")
+                : t("deploy.productionLive")
+            }
             url={productionUrl}
             large
           />
           <DevelopmentPreviewRow status={localPreview.status} url={localPreview.url} />
           {latestRun === undefined ? null : (
             <div className="text-fg-3 text-[13px]">
-              {latestRun.number === null ? null : <>Deploy #{latestRun.number} · </>}
+              {latestRun.number === null
+                ? null
+                : `${t("deploy.deployNumbered", { number: String(latestRun.number) })} · `}
               <span className="font-mono">{latestRun.commitSha}</span> ·{" "}
-              {relativeLabel(latestRun.createdAt, now)}
+              {relativeLabel(latestRun.createdAt, now, t)}
             </div>
           )}
         </div>
       ) : localPreview.url !== null ? (
         <DevelopmentPreviewRow status={localPreview.status} url={localPreview.url} />
       ) : (
-        <p className="text-fg-3 text-[13px]">No production or development preview URL yet.</p>
+        <p className="text-fg-3 text-[13px]">{t("deploy.noUrlYet")}</p>
       )}
     </div>
   );

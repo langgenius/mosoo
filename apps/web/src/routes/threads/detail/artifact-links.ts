@@ -2,7 +2,19 @@ import { createFileDownload } from "@/domains/file/api/file-download-client";
 import type { ListedFileEntry } from "@/domains/file/api/files";
 import type { MarkdownLinkResolver } from "@/shared/ui/markdown";
 
+type Translate = (key: string, variables?: Record<string, string>) => string;
+
 const UNAVAILABLE_ARTIFACT_HREF = "/api/files/unavailable/content";
+const DEFAULT_TRANSLATIONS: Record<string, string> = {
+  "threads.fileUnavailable": "File unavailable",
+  "threads.previewFile": "Preview {{name}}",
+};
+
+const defaultTranslate: Translate = (key, variables) =>
+  Object.entries(variables ?? {}).reduce(
+    (text, [name, value]) => text.replaceAll(`{{${name}}}`, value),
+    DEFAULT_TRANSLATIONS[key] ?? key,
+  );
 
 export function normalizeArtifactSourcePath(href: string): string | null {
   const trimmed = href.trim();
@@ -42,6 +54,7 @@ export function normalizeArtifactSourcePath(href: string): string | null {
 export function createThreadArtifactLinkResolver(
   artifacts: readonly ListedFileEntry[],
   onOpenArtifact: (file: ListedFileEntry) => void,
+  t: Translate = defaultTranslate,
 ): MarkdownLinkResolver {
   const artifactBySourcePath = new Map<string, ListedFileEntry>();
   const artifactByDownloadHref = new Map<string, ListedFileEntry>();
@@ -64,7 +77,7 @@ export function createThreadArtifactLinkResolver(
     if (linkedArtifact !== undefined) {
       return {
         href,
-        label: `Preview ${linkedArtifact.name}`,
+        label: t("threads.previewFile", { name: linkedArtifact.name }),
         onOpen: () => {
           onOpenArtifact(linkedArtifact);
         },
@@ -74,7 +87,7 @@ export function createThreadArtifactLinkResolver(
     if (href === UNAVAILABLE_ARTIFACT_HREF) {
       return {
         href,
-        label: "File unavailable",
+        label: t("threads.fileUnavailable"),
         unavailable: true,
       };
     }
@@ -90,7 +103,7 @@ export function createThreadArtifactLinkResolver(
     if (artifact === undefined) {
       return {
         href: UNAVAILABLE_ARTIFACT_HREF,
-        label: "File unavailable",
+        label: t("threads.fileUnavailable"),
         unavailable: true,
       };
     }
@@ -99,7 +112,7 @@ export function createThreadArtifactLinkResolver(
 
     return {
       href: download.url,
-      label: `Preview ${artifact.name}`,
+      label: t("threads.previewFile", { name: artifact.name }),
       onOpen: () => {
         onOpenArtifact(artifact);
       },

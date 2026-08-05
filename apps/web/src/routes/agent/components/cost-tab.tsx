@@ -19,7 +19,7 @@ import {
 } from "@/routes/cost/cost-model";
 import type { CostRange, CostRunPurpose } from "@/routes/cost/cost-model";
 import { toAgentId, toAppId } from "@/routes/typed-id";
-import { useTranslation } from "@/shared/i18n";
+import { getCurrentLocale, useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 
 export function AgentCostTab({ agentId, appId }: { agentId: string; appId: string }): ReactElement {
@@ -188,7 +188,7 @@ export function AgentCostTab({ agentId, appId }: { agentId: string; appId: strin
               className="border-border grid grid-cols-[120px_minmax(160px,1fr)_130px_130px_100px] items-center border-b px-4 py-3 text-sm last:border-b-0"
             >
               <div className="text-muted-foreground text-xs" suppressHydrationWarning>
-                {new Date(session.createdAt).toLocaleString("en-US")}
+                {new Date(session.createdAt).toLocaleString(getCurrentLocale())}
               </div>
               <div className="min-w-0">
                 <div className="text-foreground truncate font-medium">{session.actorName}</div>

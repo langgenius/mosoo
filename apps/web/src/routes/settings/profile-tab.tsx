@@ -147,7 +147,7 @@ export function ProfileTab() {
       }, 2000);
     } catch (nextError) {
       dispatch({
-        error: nextError instanceof Error ? nextError.message : "Failed to save changes.",
+        error: nextError instanceof Error ? nextError.message : t("settings.failedToSaveChanges"),
         type: "saveError",
       });
     }
@@ -155,17 +155,17 @@ export function ProfileTab() {
 
   async function handleFileSelected(file: File) {
     if (!file.type.startsWith("image/")) {
-      dispatch({ error: "Please choose an image file.", type: "setError" });
+      dispatch({ error: t("settings.chooseImageFile"), type: "setError" });
       return;
     }
 
     if (file.size > MAX_AVATAR_FILE_BYTES) {
-      dispatch({ error: "Image must be 5 MB or smaller.", type: "setError" });
+      dispatch({ error: t("settings.imageSizeLimit"), type: "setError" });
       return;
     }
 
     if (!isTruthy(user?.id)) {
-      dispatch({ error: "Unable to upload right now. Please try again.", type: "setError" });
+      dispatch({ error: t("settings.uploadUnavailable"), type: "setError" });
       return;
     }
 
@@ -176,7 +176,7 @@ export function ProfileTab() {
       dispatch({ avatarInput: imageUrl, type: "uploadSuccess" });
     } catch (nextError) {
       dispatch({
-        error: nextError instanceof Error ? nextError.message : "Failed to upload image.",
+        error: nextError instanceof Error ? nextError.message : t("settings.uploadImageFailed"),
         type: "uploadError",
       });
     }
@@ -228,11 +228,11 @@ export function ProfileTab() {
               >
                 {uploading ? (
                   <>
-                    <Loader2 className="mr-1 size-4 animate-spin" /> Uploading…
+                    <Loader2 className="mr-1 size-4 animate-spin" /> {t("settings.uploading")}
                   </>
                 ) : (
                   <>
-                    <Upload className="mr-1 size-4" /> Upload image
+                    <Upload className="mr-1 size-4" /> {t("settings.uploadImage")}
                   </>
                 )}
               </Button>
@@ -242,11 +242,9 @@ export function ProfileTab() {
 
         <div className="space-y-2">
           <label className="text-foreground text-sm font-medium" htmlFor="profile-avatar-url">
-            Profile picture URL
+            {t("settings.profilePictureUrl")}
           </label>
-          <p className="text-fg-2 text-[12px]">
-            Upload an image above, or paste an image URL to use as your avatar.
-          </p>
+          <p className="text-fg-2 text-[12px]">{t("settings.avatarHelp")}</p>
           <input
             aria-label={t("settings.profilePictureUrl")}
             id="profile-avatar-url"
@@ -260,13 +258,13 @@ export function ProfileTab() {
             className="border-border bg-background text-foreground focus:ring-primary/20 focus:border-primary h-10 w-full rounded-lg border px-3 text-sm transition-colors focus:ring-2 focus:outline-none"
           />
           {trimmedAvatar !== "" && !avatarValid ? (
-            <p className="text-destructive text-[12px]">Enter a valid http or https URL.</p>
+            <p className="text-destructive text-[12px]">{t("settings.invalidUrl")}</p>
           ) : null}
         </div>
 
         <div className="mt-4 space-y-2">
           <label className="text-foreground text-sm font-medium" htmlFor="profile-display-name">
-            Display name
+            {t("settings.displayName")}
           </label>
           <input
             aria-label={t("settings.displayName")}
@@ -282,7 +280,7 @@ export function ProfileTab() {
 
         <div className="mt-4 space-y-2">
           <label className="text-foreground text-sm font-medium" htmlFor="profile-email">
-            Email
+            {t("settings.email")}
           </label>
           <input
             aria-label={t("settings.email")}
@@ -304,14 +302,14 @@ export function ProfileTab() {
           <Button onClick={() => void handleSave()} disabled={!canSave} size="sm">
             {saving ? (
               <>
-                <Loader2 className="mr-1 size-4 animate-spin" /> Saving…
+                <Loader2 className="mr-1 size-4 animate-spin" /> {t("settings.saving")}
               </>
             ) : saved ? (
               <>
-                <Check className="mr-1 size-4" /> Saved
+                <Check className="mr-1 size-4" /> {t("settings.saved")}
               </>
             ) : (
-              "Save changes"
+              t("settings.saveChanges")
             )}
           </Button>
         </div>

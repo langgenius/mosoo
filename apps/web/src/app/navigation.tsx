@@ -134,6 +134,7 @@ function NavGroup({
   item: AppNavItem;
   pathname: string;
 }) {
+  const { t } = useTranslation();
   const Icon = item.icon;
   const onPath =
     isNavItemActive(pathname, item.path) ||
@@ -205,7 +206,11 @@ function NavGroup({
         {item.children && item.children.length > 0 ? (
           <button
             type="button"
-            aria-label={expanded ? `Collapse ${item.label}` : `Expand ${item.label}`}
+            aria-label={
+              expanded
+                ? t("nav.collapse", { label: item.label })
+                : t("nav.expand", { label: item.label })
+            }
             aria-expanded={expanded}
             onClick={toggleExpansion}
             className="text-fg-3 hover:text-fg-1 flex w-7 shrink-0 items-center justify-center rounded-md transition-colors"

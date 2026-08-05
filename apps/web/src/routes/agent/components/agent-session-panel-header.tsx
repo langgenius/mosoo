@@ -1,6 +1,7 @@
 import { Plus, RotateCcw } from "lucide-react";
 import type React from "react";
 
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -15,6 +16,14 @@ const PILL_VARIANTS: Record<SessionPill, React.ComponentProps<typeof Badge>["var
   "Setup required": "danger",
   Stopped: "outline",
   Working: "primary",
+};
+
+const PILL_LABEL_KEYS: Record<SessionPill, string> = {
+  "Needs approval": "agent.pillNeedsApproval",
+  Ready: "agent.pillReady",
+  "Setup required": "agent.setupRequired",
+  Stopped: "agent.pillStopped",
+  Working: "agent.pillWorking",
 };
 
 export function AgentSessionPanelHeader({
@@ -38,21 +47,23 @@ export function AgentSessionPanelHeader({
   sessionCount: number;
   tone: "preview" | "consume";
 }) {
+  const { t } = useTranslation();
   const SessionControlIcon = sessionControlMode === "reset" ? RotateCcw : Plus;
-  const sessionControlLabel = sessionControlMode === "reset" ? "Reset chat" : "New session";
+  const sessionControlLabel =
+    sessionControlMode === "reset" ? t("agent.resetChat") : t("agent.newSession");
 
   return (
     <div className="border-border-subtle flex h-10 shrink-0 items-center gap-2 border-b bg-white px-4">
       <div className={cn("size-2 rounded-full", sessionIndicatorClassName(pill))} />
       <span className="text-foreground min-w-0 truncate text-[12px] font-medium">
-        {tone === "preview" ? `Testing ${agentName}` : agentName}
+        {tone === "preview" ? t("agent.testing", { name: agentName }) : agentName}
       </span>
       <Badge
         variant={PILL_VARIANTS[pill]}
         className="h-4 text-[10px]"
         data-testid="agent-session-pill"
       >
-        {pill}
+        {t(PILL_LABEL_KEYS[pill])}
       </Badge>
       {reconnectingSubtitle ? (
         <span className="text-muted-foreground text-[10.5px]">{reconnectingSubtitle}</span>
@@ -62,7 +73,9 @@ export function AgentSessionPanelHeader({
       ) : null}
       <div className="flex-1" />
       {sessionControlMode === "new_session" && sessionCount > 0 ? (
-        <span className="text-muted-foreground text-[10.5px]">{sessionCount} sessions</span>
+        <span className="text-muted-foreground text-[10.5px]">
+          {t("agent.sessionCount", { count: String(sessionCount) })}
+        </span>
       ) : null}
       <Button
         className="gap-1.5"

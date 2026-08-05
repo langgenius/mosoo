@@ -31,7 +31,7 @@ describe("Channels IA boundary", () => {
     expect(fieldSource).toContain("useAgentChannelBindingsQuery(agent.appId, agent.id)");
     expect(fieldSource).toContain('agent.role === "owner"');
     expect(fieldSource).not.toContain('agent.role === "admin"');
-    expect(settingsSource).toContain("Only the Agent owner in this App can connect channels.");
+    expect(settingsSource).toContain('t("agent.onlyOwnerCanConnectChannels")');
     expect(settingsSource).not.toContain("Owners and Admins");
   });
 });

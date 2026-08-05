@@ -31,18 +31,6 @@ const LARK_DOMAIN_OPTIONS: { label: string; value: LarkDomain }[] = [
   { label: "Lark", value: "lark" },
 ];
 
-const LARK_CONNECTION_MODE_OPTIONS: {
-  description: string;
-  label: string;
-  value: LarkConnectionMode;
-}[] = [
-  {
-    description: "Inbound webhook. You'll need to copy two values from the Lark Open Platform.",
-    label: "Webhook",
-    value: "webhook",
-  },
-];
-
 const LARK_REGISTRATION_POLL_INTERVAL_MS = 3_000;
 
 const LARK_OPEN_PLATFORM_ORIGIN: Record<LarkDomain, string> = {
@@ -64,27 +52,28 @@ function getLarkEventConfigUrl(domain: LarkDomain, larkAppId: string): string | 
 
 function getLarkRegistrationStatusCopy(
   status: LarkAgentChannelRegistrationFieldsFragment["status"] | null,
+  t: (key: string) => string,
   connectionMode: LarkConnectionMode = "webhook",
 ): string {
   switch (status) {
     case "access_denied":
-      return "Authorization was denied. Use manual setup or start again.";
+      return t("agent.larkRegistrationDenied");
     case "confirmed":
       return connectionMode === "websocket"
-        ? "App created. App ID and App Secret were copied. You're ready to save."
-        : "App created. App ID and App Secret were copied into the manual fields.";
+        ? t("agent.larkRegistrationConfirmedWebsocket")
+        : t("agent.larkRegistrationConfirmedWebhook");
     case "expired":
-      return "The authorization session expired. Start again or use manual setup.";
+      return t("agent.larkRegistrationExpired");
     case "failed":
-      return "Scan-to-create failed. Manual setup is still available.";
+      return t("agent.larkRegistrationFailed");
     case "qr_pending":
-      return "Open the authorization link and scan it with Lark / Feishu on your phone.";
+      return t("agent.larkRegistrationQrPending");
     case "slow_down":
-      return "The platform asked us to poll more slowly. Keep the authorization page open.";
+      return t("agent.larkRegistrationSlowDown");
     case null:
       return connectionMode === "websocket"
-        ? "Create a Lark / Feishu app by scan, then click Save."
-        : "Create a Lark / Feishu app by scan first, then finish the webhook fields below.";
+        ? t("agent.larkRegistrationReadyWebsocket")
+        : t("agent.larkRegistrationReadyWebhook");
   }
 }
 
@@ -403,17 +392,20 @@ function LarkRegistrationSection({
   registrationStatus: LarkAgentChannelRegistrationFieldsFragment["status"] | null;
   startPending: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <section className="border-border bg-card rounded-lg border p-4">
       <div className="grid gap-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="text-foreground text-sm font-semibold">Scan-to-create</div>
+            <div className="text-foreground text-sm font-semibold">
+              {t("agent.larkScanToCreate")}
+            </div>
             <div className="text-muted-foreground mt-1 text-xs leading-relaxed">
-              Scan creates a Lark / Feishu app and pre-fills App ID and App Secret.{" "}
+              {t("agent.larkScanToCreateDescription")}{" "}
               {connectionMode === "websocket"
-                ? "WebSocket mode is set up the moment Save is clicked."
-                : "Webhook fields still come from the Lark Open Platform event-subscription page."}
+                ? t("agent.larkWebsocketSetupDescription")
+                : t("agent.larkWebhookSetupDescription")}
             </div>
           </div>
           <Button
@@ -422,12 +414,12 @@ function LarkRegistrationSection({
             type="button"
           >
             {startPending ? <Loader2 className="size-4 animate-spin" /> : null}
-            Start
+            {t("agent.start")}
           </Button>
         </div>
 
         <div className="border-border-subtle bg-muted/20 rounded-md border px-3 py-2 text-xs leading-relaxed">
-          {getLarkRegistrationStatusCopy(registrationStatus, connectionMode)}
+          {getLarkRegistrationStatusCopy(registrationStatus, t, connectionMode)}
         </div>
 
         {registration?.qrUrl ? (
@@ -444,7 +436,7 @@ function LarkRegistrationSection({
               <Button asChild variant="outline">
                 <a href={registration.qrUrl} rel="noreferrer" target="_blank">
                   <ExternalLink className="size-4" />
-                  Open authorization
+                  {t("agent.openAuthorization")}
                 </a>
               </Button>
               <Button
@@ -460,7 +452,7 @@ function LarkRegistrationSection({
                 ) : (
                   <RefreshCw className="size-4" />
                 )}
-                Check
+                {t("agent.check")}
               </Button>
               {registration.userCode ? (
                 <code className="bg-muted text-muted-foreground rounded-md border px-2 py-1 text-[11px]">
@@ -506,12 +498,12 @@ function LarkConfigurationSection({
   return (
     <section className="border-border bg-card rounded-lg border p-4">
       <div className="grid gap-4">
-        <div className="text-foreground text-sm font-semibold">Configuration</div>
+        <div className="text-foreground text-sm font-semibold">{t("agent.configuration")}</div>
 
         <div className="grid gap-1.5">
           <Label>{t("agent.connectionMode")}</Label>
           <div className="bg-muted/30 grid rounded-md border p-1">
-            {LARK_CONNECTION_MODE_OPTIONS.map((option) => (
+            {([{ label: "Webhook", value: "webhook" }] as const).map((option) => (
               <button
                 className={cn(
                   "rounded-sm px-3 py-1.5 text-sm font-medium transition-colors",
@@ -530,9 +522,7 @@ function LarkConfigurationSection({
             ))}
           </div>
           <div className="text-muted-foreground text-xs leading-relaxed">
-            {LARK_CONNECTION_MODE_OPTIONS.find((option) => option.value === connectionMode)
-              ?.description ?? ""}
-            {" Values entered for one mode aren't applied to the other on save."}
+            {t("agent.larkWebhookModeDescription")} {t("agent.larkModeValuesIndependent")}
           </div>
         </div>
 
@@ -597,7 +587,7 @@ function LarkConfigurationSection({
 
       {agentStatus !== "published" ? (
         <div className="border-amber/30 bg-amber-bg text-amber-fg mt-4 rounded-md border px-3 py-2 text-xs">
-          Publish this Agent before connecting Feishu.
+          {t("agent.publishBeforeConnectingFeishu")}
         </div>
       ) : null}
       {saveError ? (
@@ -609,7 +599,7 @@ function LarkConfigurationSection({
       <div className="mt-4 flex justify-end">
         <Button disabled={!canSubmit} type="submit">
           {savePending ? <Loader2 className="size-4 animate-spin" /> : null}
-          Save
+          {t("common.save")}
         </Button>
       </div>
     </section>
@@ -638,11 +628,11 @@ function LarkWebhookFields({
           <Button asChild variant="outline">
             <a href={eventConfigUrl} rel="noreferrer" target="_blank">
               <ExternalLink className="size-4" />
-              Open {domainLabel} event-subscription page
+              {t("agent.openEventSubscriptionPage", { domain: domainLabel })}
             </a>
           </Button>
           <div className="text-muted-foreground text-xs">
-            Copy Verification Token + Encrypt Key from there.
+            {t("agent.copyLarkWebhookCredentials")}
           </div>
         </div>
       ) : null}

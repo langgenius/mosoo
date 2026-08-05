@@ -2,6 +2,7 @@ import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
 import { XIcon } from "lucide-react";
 import type { ComponentProps, ReactElement } from "react";
 
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 
 function Sheet({ ...props }: ComponentProps<typeof DialogPrimitive.Root>): ReactElement {
@@ -29,6 +30,8 @@ function SheetContent({
   children,
   ...props
 }: ComponentProps<typeof DialogPrimitive.Popup>): ReactElement {
+  const { t } = useTranslation();
+
   return (
     <DialogPrimitive.Portal>
       <SheetOverlay />
@@ -46,7 +49,7 @@ function SheetContent({
           className="ring-offset-background focus:ring-ring absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
         >
           <XIcon />
-          <span className="sr-only">Close</span>
+          <span className="sr-only">{t("common.close")}</span>
         </DialogPrimitive.Close>
       </DialogPrimitive.Popup>
     </DialogPrimitive.Portal>

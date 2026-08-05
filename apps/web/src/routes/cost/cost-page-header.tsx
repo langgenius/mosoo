@@ -1,5 +1,6 @@
 import { Download } from "lucide-react";
 
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
 
@@ -10,6 +11,7 @@ import {
   formatCurrency,
   formatModelPricingSummary,
   rangeLabel,
+  rangeLabelKey,
 } from "./cost-model";
 import type { CostRange, CostRunPurpose, CostTab, AppCostCard } from "./cost-model";
 
@@ -28,12 +30,14 @@ export function CostPageHeader({
   setRange: (range: CostRange) => void;
   setRunPurpose: (value: CostRunPurpose | "all") => void;
 }) {
+  const { t } = useTranslation();
+
   return (
     <header className="border-border-subtle flex min-h-12 shrink-0 flex-col items-stretch gap-2 border-b px-4 py-3 sm:px-6 lg:h-12 lg:flex-row lg:items-center lg:justify-between lg:py-0">
       <div className="flex min-w-0 items-baseline gap-2">
-        <span className="text-sm font-medium">App Usage</span>
+        <span className="text-sm font-medium">{t("cost.appUsage")}</span>
         <span className="text-fg-3 hidden truncate text-xs sm:inline">
-          {`${card?.appName ?? "App"} · ${rangeLabel(range)} · ${formatCurrency(card?.totals.totalCostUsd ?? 0)}`}
+          {`${card?.appName ?? t("nav.app")} · ${t(rangeLabel(range))} · ${formatCurrency(card?.totals.totalCostUsd ?? 0)}`}
         </span>
       </div>
       <div className="flex w-full flex-wrap items-center gap-2 lg:w-auto lg:flex-nowrap">
@@ -50,7 +54,7 @@ export function CostPageHeader({
                 runPurpose === item.value ? "bg-ink-100 text-fg-1" : "text-muted-foreground",
               )}
             >
-              {item.label}
+              {t(item.labelKey)}
             </button>
           ))}
         </div>
@@ -67,7 +71,7 @@ export function CostPageHeader({
                 range === value ? "bg-ink-100 text-fg-1" : "text-muted-foreground",
               )}
             >
-              {value}
+              {t(rangeLabelKey(value))}
             </button>
           ))}
         </div>
@@ -75,19 +79,23 @@ export function CostPageHeader({
           variant="outline"
           size="xs"
           onClick={() => {
-            exportCostCsv(effectiveTab, card);
+            exportCostCsv(effectiveTab, card, t);
           }}
           disabled={!card}
         >
           <Download className="size-3.5" />
-          Export CSV
+          {t("cost.exportCsv")}
         </Button>
       </div>
     </header>
   );
 }
 
-function exportCostCsv(effectiveTab: CostTab, card: AppCostCard | undefined) {
+function exportCostCsv(
+  effectiveTab: CostTab,
+  card: AppCostCard | undefined,
+  t: (key: string, variables?: Record<string, string>) => string,
+) {
   if (!card) {
     return;
   }
@@ -139,7 +147,7 @@ function exportCostCsv(effectiveTab: CostTab, card: AppCostCard | undefined) {
         "tokens",
       ],
       ...card.models.map((row) => {
-        const pricing = formatModelPricingSummary(row);
+        const pricing = formatModelPricingSummary(row, t);
 
         return [
           row.vendor,

@@ -1,5 +1,6 @@
 import type { ReactElement } from "react";
 
+import { getCurrentLocale, useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { AvatarFallback } from "@/shared/ui/avatar-fallback";
 import { AvatarImage } from "@/shared/ui/avatar-image";
@@ -15,7 +16,7 @@ import { ToolIcons } from "./tool-icons";
 
 function formatDate(iso: string): string {
   const d = new Date(iso);
-  return d.toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" });
+  return d.toLocaleDateString(getCurrentLocale(), { day: "numeric", month: "short", year: "numeric" });
 }
 
 function getOwnerInitial(name: string): string {
@@ -34,6 +35,7 @@ export function AgentTable({
   showOwner?: boolean;
   className?: string;
 }): ReactElement {
+  const { t } = useTranslation();
   const gridCols = showOwner
     ? "grid-cols-[minmax(0,1fr)_auto_32px] lg:grid-cols-[minmax(0,1fr)_160px_120px_180px_140px_48px]"
     : "grid-cols-[minmax(0,1fr)_auto_32px] lg:grid-cols-[minmax(0,1fr)_160px_120px_140px_48px]";
@@ -43,21 +45,21 @@ export function AgentTable({
       <div className="border-border bg-card overflow-hidden rounded-lg border">
         <div className={cn("grid h-10 items-center px-4 border-b border-border", gridCols)}>
           <span className="text-fg-3 text-[11px] font-extrabold tracking-[0.1em] uppercase">
-            Agent
+            {t("agent.agent")}
           </span>
           <span className="text-fg-3 hidden text-[11px] font-extrabold tracking-[0.1em] uppercase lg:block">
-            Tools
+            {t("agent.tools")}
           </span>
           <span className="text-fg-3 text-[11px] font-extrabold tracking-[0.1em] uppercase">
-            Status
+            {t("agent.status")}
           </span>
           {showOwner && (
             <span className="text-fg-3 hidden text-[11px] font-extrabold tracking-[0.1em] uppercase lg:block">
-              Owner
+              {t("agent.owner")}
             </span>
           )}
           <span className="text-fg-3 hidden text-[11px] font-extrabold tracking-[0.1em] uppercase lg:block">
-            Created
+            {t("agent.created")}
           </span>
           <span />
         </div>
@@ -74,7 +76,7 @@ export function AgentTable({
               )}
             >
               <button
-                aria-label={`Open ${agent.name}`}
+                aria-label={t("agent.openAgent", { name: agent.name })}
                 className="contents cursor-pointer text-left"
                 onClick={() => {
                   onSelect(agent.id);
@@ -131,7 +133,7 @@ export function AgentTable({
         })}
 
         {agents.length === 0 && (
-          <div className="text-fg-3 py-12 text-center text-[13px]">No agents found.</div>
+          <div className="text-fg-3 py-12 text-center text-[13px]">{t("agent.noAgentsFound")}</div>
         )}
       </div>
     </div>

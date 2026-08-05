@@ -96,7 +96,7 @@ export function McpTab() {
           size="sm"
         >
           <Plus className="size-3.5" />
-          Add MCP
+          {t("mcp.addMcp")}
         </Button>
       </PageHeader>
 
@@ -121,7 +121,9 @@ export function McpTab() {
           </div>
         )}
         {registry.loading ? (
-          <div className="text-fg-3 py-12 text-center text-[13px]">Loading MCP registry...</div>
+          <div className="text-fg-3 py-12 text-center text-[13px]">
+            {t("mcp.loadingRegistry")}
+          </div>
         ) : list.length === 0 ? (
           <McpEmptyState
             searching={search.length > 0}
@@ -205,7 +207,7 @@ export function McpTab() {
         onStartOAuth={async () =>
           oauthServer
             ? registry.startOAuth(oauthServer.id)
-            : Promise.reject(new Error("Server missing."))
+            : Promise.reject(new Error(t("mcp.serverMissing")))
         }
       />
     </div>
@@ -233,7 +235,7 @@ function McpEmptyState({ searching, onAdd }: { searching: boolean; onAdd: () => 
     >
       <Button onClick={onAdd} size="sm">
         <Plus className="size-3.5" />
-        Add MCP
+        {t("mcp.addMcp")}
       </Button>
     </EmptyState>
   );

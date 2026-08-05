@@ -56,15 +56,15 @@ export function DeployActions({
   const label =
     scope === "development"
       ? deploying
-        ? "Checking development..."
+        ? t("deploy.checkingDevelopment")
         : developmentStatus === "online"
-          ? "Refresh development"
-          : "Retry development"
+          ? t("deploy.refreshDevelopment")
+          : t("deploy.retryDevelopment")
       : deploying
-        ? "Refreshing production…"
+        ? t("deploy.refreshingProduction")
         : latestOutcome === "failed"
-          ? "Retry production"
-          : "Refresh production";
+          ? t("deploy.retryProduction")
+          : t("deploy.refreshProduction");
 
   function confirmDelete() {
     onDelete();
@@ -90,7 +90,7 @@ export function DeployActions({
             onSelect={() => setConfirmingDelete(true)}
           >
             <Trash2 className="size-3.5" />
-            Delete deployment
+            {t("deploy.deleteDeployment")}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -100,19 +100,19 @@ export function DeployActions({
           <DialogHeader>
             <DialogTitle>{t("deploy.deletePrompt")}</DialogTitle>
             <DialogDescription>
-              This removes the deployment for{" "}
-              <span className="text-fg-1 font-semibold">{appName}</span>, its Cloudflare Worker, and
-              the {agentCount} agent bindings. The public repo is the source of truth and is
-              untouched.
+              {t("deploy.deleteDescription", {
+                agentCount: String(agentCount),
+                appName,
+              })}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setConfirmingDelete(false)}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button variant="destructive" onClick={confirmDelete}>
               <Trash2 className="size-4" />
-              Delete deployment
+              {t("deploy.deleteDeployment")}
             </Button>
           </DialogFooter>
         </DialogContent>

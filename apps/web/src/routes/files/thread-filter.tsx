@@ -22,9 +22,12 @@ interface ThreadFilterProps {
   value: string;
 }
 
-function formatThreadTitle(title: string | null): string {
+function formatThreadTitle(
+  title: string | null,
+  t: ReturnType<typeof useTranslation>["t"],
+): string {
   const normalized = title?.trim();
-  return normalized ? normalized : "Untitled Thread";
+  return normalized ? normalized : t("files.untitledThread");
 }
 
 export function ThreadFilter({
@@ -41,7 +44,7 @@ export function ThreadFilter({
   const selectedLabel =
     selectedSession === undefined
       ? t("files.allThreads")
-      : formatThreadTitle(selectedSession.title);
+      : formatThreadTitle(selectedSession.title, t);
 
   async function handleCopy(
     event: MouseEvent<HTMLButtonElement>,
@@ -63,7 +66,7 @@ export function ThreadFilter({
 
   return (
     <div className="flex w-full min-w-0 flex-col gap-1 sm:w-[360px]">
-      <span className="text-fg-3 text-[11px] font-semibold">Thread</span>
+      <span className="text-fg-3 text-[11px] font-semibold">{t("files.thread")}</span>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
@@ -93,7 +96,7 @@ export function ThreadFilter({
             {value === "" ? <Check className="text-accent-press size-3.5" /> : null}
           </DropdownMenuItem>
           {sessions.map((session) => {
-            const title = formatThreadTitle(session.title);
+            const title = formatThreadTitle(session.title, t);
             const copied = copiedSessionId === session.id;
 
             return (
@@ -109,19 +112,21 @@ export function ThreadFilter({
                       {title}
                     </span>
                     <span className="text-fg-3 truncate text-[11px]">
-                      {agentNameById.get(session.agentId) ?? "Agent unavailable"}
+                      {agentNameById.get(session.agentId) ?? t("files.agentUnavailable")}
                     </span>
                   </div>
                   {value === session.id ? <Check className="text-accent-press size-3.5" /> : null}
                 </DropdownMenuItem>
                 <Button
-                  aria-label={copied ? "Thread ID copied" : "Copy Thread ID"}
+                  aria-label={
+                    copied ? t("files.threadIdCopied") : t("files.copyThreadId")
+                  }
                   className="text-fg-3 hover:text-fg-1 size-7"
                   onClick={(event) => {
                     void handleCopy(event, session.id);
                   }}
                   size="icon-xs"
-                  title={copied ? "Copied" : "Copy Thread ID"}
+                  title={copied ? t("common.copied") : t("files.copyThreadId")}
                   type="button"
                   variant="ghost"
                 >

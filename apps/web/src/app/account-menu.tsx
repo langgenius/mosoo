@@ -4,6 +4,7 @@ import Settings02Icon from "@hugeicons/core-free-icons/Settings02Icon";
 import { Link } from "react-router-dom";
 
 import { resetProductAnalytics } from "@/analytics/product-analytics";
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
 import {
@@ -73,19 +74,20 @@ export function AccountMenu({
   collapsed: boolean;
   user: AccountMenuUser | null;
 }) {
+  const { t } = useTranslation();
   const wrapperClassName = cn(collapsed ? "flex justify-center pb-3 pt-2" : "px-2 pb-3 pt-2");
   const trigger = collapsed ? (
     <Tooltip>
       <TooltipTrigger asChild>
         <Button
           variant="ghost"
-          aria-label={user?.name ?? "Account"}
+          aria-label={user?.name ?? t("nav.account")}
           className="hover:bg-ink-900/[0.04] size-9 justify-center self-center rounded-full p-0"
         >
           <UserAvatar size={28} user={user} />
         </Button>
       </TooltipTrigger>
-      <TooltipContent side="right">{user?.name ?? "Account"}</TooltipContent>
+      <TooltipContent side="right">{user?.name ?? t("nav.account")}</TooltipContent>
     </Tooltip>
   ) : (
     <Button
@@ -115,7 +117,7 @@ export function AccountMenu({
           <DropdownMenuItem asChild className="cursor-pointer rounded-md">
             <Link to="/settings">
               <AccountMenuSettingsIcon className="size-4" />
-              Settings
+              {t("nav.settings")}
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem
@@ -129,7 +131,7 @@ export function AccountMenu({
             }}
           >
             <AccountMenuSignOutIcon className="size-4" />
-            Sign out
+            {t("common.signOut")}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

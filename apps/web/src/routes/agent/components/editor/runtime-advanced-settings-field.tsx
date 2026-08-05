@@ -99,6 +99,7 @@ function SelectSettingControl({
   selected: number | string | undefined;
   setSetting(value: string | undefined): void;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-5">
       {definition.defaultValue === undefined ? (
@@ -117,7 +118,7 @@ function SelectSettingControl({
           }}
           type="button"
         >
-          Runtime default
+          {t("agent.runtimeDefault")}
         </button>
       ) : null}
 
@@ -256,7 +257,7 @@ export function RuntimeAdvancedSettingsField({
         <span>{t("agent.advancedRuntimeSettings")}</span>
         {customCount > 0 ? (
           <span className="border-border bg-muted text-muted-foreground ml-1 rounded-full border px-1.5 py-0.5 text-[10px] leading-none">
-            {customCount} custom
+            {t("agentEditor.customCount", { count: String(customCount) })}
           </span>
         ) : null}
       </button>
@@ -264,7 +265,7 @@ export function RuntimeAdvancedSettingsField({
       {open ? (
         <div className="border-border bg-muted/30 mt-3 space-y-4 rounded-md border p-3">
           <p className="text-muted-foreground text-[11px] leading-relaxed">
-            Runtime-specific settings. These settings are not portable across runtimes.
+            {t("agentEditor.runtimeSettingsNotPortable")}
           </p>
 
           {definitions.map((definition) => {
@@ -302,7 +303,7 @@ export function RuntimeAdvancedSettingsField({
           {showBuiltInTools ? (
             <div className="border-border/70 space-y-2 border-t pt-3">
               <div className="flex items-center justify-between gap-3">
-                <Label className="text-muted-foreground text-[12px]">Tools</Label>
+                <Label className="text-muted-foreground text-[12px]">{t("agentEditor.tools")}</Label>
                 <span className="text-muted-foreground text-[10px]">tools</span>
               </div>
               <BuiltInToolsField

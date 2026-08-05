@@ -1,6 +1,7 @@
 import { ArrowRight, Check, Globe } from "lucide-react";
 import { useMemo } from "react";
 
+import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import {
   Dialog,
@@ -26,6 +27,7 @@ export function PublishSuccessModal({
   onViewDistribution?: () => void;
   open: boolean;
 }) {
+  const { t } = useTranslation();
   const distribution = useMemo(() => buildAgentDistribution(agent), [agent]);
 
   function openThreadDialog(): void {
@@ -41,10 +43,11 @@ export function PublishSuccessModal({
               <Check className="size-5" strokeWidth={2.5} />
             </div>
             <div className="min-w-0">
-              <DialogTitle className="text-[16px]">Published "{agent.name}"</DialogTitle>
+              <DialogTitle className="text-[16px]">
+                {t("agentLifecycle.published", { agentName: agent.name })}
+              </DialogTitle>
               <DialogDescription className="mt-0.5 text-[12.5px]">
-                Allowed callers can reach this agent now. Personal-token authenticated,
-                access-gated.
+                {t("agentLifecycle.publishedDescription")}
               </DialogDescription>
             </div>
           </div>
@@ -55,8 +58,12 @@ export function PublishSuccessModal({
             <div className="flex items-start gap-3">
               <Globe className="text-fg-3 mt-0.5 size-4 shrink-0" />
               <div className="min-w-0 flex-1">
-                <div className="text-foreground text-[13px] font-medium">Try in mosoo</div>
-                <div className="text-fg-2 mt-0.5 text-[12px]">Start a Thread with this agent.</div>
+                <div className="text-foreground text-[13px] font-medium">
+                  {t("agentLifecycle.tryInMosoo")}
+                </div>
+                <div className="text-fg-2 mt-0.5 text-[12px]">
+                  {t("agentLifecycle.startThreadDescription")}
+                </div>
               </div>
               <Button
                 className="gap-1 text-[11.5px]"
@@ -64,7 +71,7 @@ export function PublishSuccessModal({
                 size="xs"
                 variant="outline"
               >
-                Open
+                {t("common.open")}
                 <ArrowRight className="size-3" />
               </Button>
             </div>
@@ -78,7 +85,7 @@ export function PublishSuccessModal({
             <Separator />
             <div className="flex justify-end gap-2 px-6 py-3">
               <Button onClick={onViewDistribution} size="sm" variant="outline">
-                View distribution
+                {t("agentLifecycle.viewDistribution")}
               </Button>
             </div>
           </>

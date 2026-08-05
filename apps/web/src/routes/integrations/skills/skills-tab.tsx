@@ -57,10 +57,7 @@ export function SkillsTab() {
 
   return (
     <div className="flex h-full flex-col">
-      <PageHeader
-        title={t("skills.title")}
-        description="Reusable capabilities you can attach to Agents."
-      >
+      <PageHeader title={t("skills.title")} description={t("skills.description")}>
         <Button
           onClick={() => {
             setUploadOpen(true);
@@ -68,7 +65,7 @@ export function SkillsTab() {
           size="sm"
         >
           <Upload className="size-3.5" />
-          Add skill
+          {t("skills.addSkill")}
         </Button>
       </PageHeader>
 
@@ -101,7 +98,11 @@ export function SkillsTab() {
         <div className="relative w-full sm:w-[260px]">
           <Search className="text-fg-3 absolute top-1/2 left-3 size-3.5 -translate-y-1/2" />
           <Input
-            placeholder={mode === "installed" ? "Search installed skills…" : "Search skills.sh…"}
+            placeholder={
+              mode === "installed"
+                ? t("skills.searchInstalledPlaceholder")
+                : t("skills.searchSkillsShPlaceholder")
+            }
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
@@ -171,8 +172,12 @@ function InstalledSkillsGrid({
   onUpload: () => void;
   search: string;
 }) {
+  const { t } = useTranslation();
+
   if (loading) {
-    return <div className="text-fg-3 py-12 text-center text-[13px]">Loading skills…</div>;
+    return (
+      <div className="text-fg-3 py-12 text-center text-[13px]">{t("skills.loadingSkills")}</div>
+    );
   }
 
   if (filtered.length === 0) {
@@ -239,11 +244,11 @@ function SkillsEmptyState({ onUpload, searching }: { onUpload: () => void; searc
     <EmptyState
       icon={Sparkles}
       title={t("skills.noSkillsYet")}
-      description="Upload a `SKILL.md` file, import from GitHub or skills.sh, or fork an existing skill."
+      description={t("skills.emptyStateDescription")}
     >
       <Button onClick={onUpload} size="sm">
         <Upload className="size-3.5" />
-        Add skill
+        {t("skills.addSkill")}
       </Button>
     </EmptyState>
   );

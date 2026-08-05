@@ -86,7 +86,7 @@ export function OAuthConnectDialog({
 
         if (flow.serverId !== serverId) {
           setStage("confirm");
-          setError("OAuth flow returned an unexpected server.");
+          setError(t("mcp.oauthUnexpectedServer"));
           return;
         }
 
@@ -108,9 +108,7 @@ export function OAuthConnectDialog({
         setStage("confirm");
         setError(
           flow.errorMessage ??
-            (flow.status === "expired"
-              ? "OAuth authorization expired."
-              : "OAuth authorization failed."),
+            (flow.status === "expired" ? t("mcp.oauthExpired") : t("mcp.oauthFailed")),
         );
       } catch (flowError) {
         if (cancelled) {
@@ -118,7 +116,7 @@ export function OAuthConnectDialog({
         }
 
         setStage("confirm");
-        setError(flowError instanceof Error ? flowError.message : "OAuth status check failed.");
+        setError(flowError instanceof Error ? flowError.message : t("mcp.oauthStatusCheckFailed"));
       }
     }
 
@@ -131,7 +129,7 @@ export function OAuthConnectDialog({
       cancelled = true;
       globalThis.clearInterval(interval);
     };
-  }, [handleOpenChange, onConnected, onPollOAuthFlow, open, server, stage]);
+  }, [handleOpenChange, onConnected, onPollOAuthFlow, open, server, stage, t]);
 
   if (!server) {
     return null;
@@ -154,7 +152,7 @@ export function OAuthConnectDialog({
         handleOpenChange(false);
       } catch (connectError) {
         setStage("confirm");
-        setError(connectError instanceof Error ? connectError.message : "Bearer connect failed.");
+        setError(connectError instanceof Error ? connectError.message : t("mcp.bearerConnectFailed"));
       }
 
       return;
@@ -167,7 +165,7 @@ export function OAuthConnectDialog({
 
       if (!popup) {
         setStage("confirm");
-        setError("The browser blocked the authorization popup.");
+        setError(t("mcp.popupBlocked"));
         return;
       }
 
@@ -176,7 +174,7 @@ export function OAuthConnectDialog({
       setStage("pending");
     } catch (oauthError) {
       setStage("confirm");
-      setError(oauthError instanceof Error ? oauthError.message : "OAuth start failed.");
+      setError(oauthError instanceof Error ? oauthError.message : t("mcp.oauthStartFailed"));
     }
   }
 
@@ -185,12 +183,10 @@ export function OAuthConnectDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
-            {isBearer ? `Connect ${server.name}` : `Authorize ${server.name}`}
+            {isBearer ? t("mcp.connectServer", { name: server.name }) : t("mcp.authorizeServer", { name: server.name })}
           </DialogTitle>
           <DialogDescription>
-            {isBearer
-              ? "Paste your bearer token. It will be stored encrypted and used only for your own calls."
-              : "You will be redirected to the provider authorization page and returned automatically when finished."}
+            {isBearer ? t("mcp.bearerDescription") : t("mcp.oauthDescription")}
           </DialogDescription>
         </DialogHeader>
 
@@ -209,7 +205,7 @@ export function OAuthConnectDialog({
           </div>
         ) : stage === "confirm" ? (
           <div className="space-y-3 py-2">
-            <div className="text-muted-foreground text-[12px]">Will open:</div>
+            <div className="text-muted-foreground text-[12px]">{t("mcp.willOpen")}</div>
             <div className="text-muted-foreground bg-muted/50 rounded-md px-3 py-2 font-mono text-[11px] break-all">
               {server.url}
             </div>
@@ -217,14 +213,18 @@ export function OAuthConnectDialog({
         ) : stage === "pending" ? (
           <div className="flex flex-col items-center justify-center gap-3 py-10">
             <Loader2 className="text-primary size-6 animate-spin" />
-            <div className="text-muted-foreground text-[13px]">Completing authorization…</div>
+            <div className="text-muted-foreground text-[13px]">
+              {t("mcp.completingAuthorization")}
+            </div>
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center gap-3 py-10">
             <div className="flex size-9 items-center justify-center rounded-full bg-green-500/15">
               <Check className="text-success-fg size-4" />
             </div>
-            <div className="text-foreground text-[13px] font-medium">Authorization complete</div>
+            <div className="text-foreground text-[13px] font-medium">
+              {t("mcp.authorizationComplete")}
+            </div>
           </div>
         )}
 
@@ -238,15 +238,15 @@ export function OAuthConnectDialog({
                 handleOpenChange(false);
               }}
             >
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button onClick={handleConfirm} disabled={isBearer && token.trim().length === 0}>
               {isBearer ? (
-                "Save token"
+                t("mcp.saveToken")
               ) : (
                 <>
                   <ExternalLink />
-                  Continue
+                  {t("mcp.continue")}
                 </>
               )}
             </Button>

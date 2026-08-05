@@ -6,6 +6,7 @@ import {
   ADD_PROVIDER_KEY_TEXT,
   PROVIDER_KEY_REQUIRED_TEXT,
 } from "@/domains/vendor-credential/model/provider-readiness-copy";
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Badge } from "@/shared/ui/badge";
 import { DropdownMenuItem } from "@/shared/ui/dropdown-menu";
@@ -13,10 +14,12 @@ import { DropdownMenuItem } from "@/shared/ui/dropdown-menu";
 import type { ResolvedModelEntry } from "../../../../domains/vendor-credential/api/vendor-credential-client";
 
 export function ModelProviderLink({ lockedVendors }: { lockedVendors: string[] }): ReactElement {
-  const quickNavLabel = lockedVendors.length > 0 ? ADD_PROVIDER_KEY_TEXT : "Manage Providers";
+  const { t } = useTranslation();
+  const quickNavLabel =
+    lockedVendors.length > 0 ? t(ADD_PROVIDER_KEY_TEXT) : t("agent.manageProviders");
   const title =
     lockedVendors.length > 0
-      ? `${PROVIDER_KEY_REQUIRED_TEXT}: ${lockedVendors.join(", ")}`
+      ? `${t(PROVIDER_KEY_REQUIRED_TEXT)}: ${lockedVendors.join(", ")}`
       : undefined;
 
   return (
@@ -32,9 +35,11 @@ export function ModelProviderLink({ lockedVendors }: { lockedVendors: string[] }
 }
 
 export function ModelPickerEmptyItem(): ReactElement {
+  const { t } = useTranslation();
+
   return (
     <div className="text-muted-foreground px-3 py-6 text-center text-[12px]">
-      No matching models. Configure a Provider to unlock models.
+      {t("providers.noMatchingModels")}
     </div>
   );
 }

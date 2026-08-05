@@ -7,6 +7,7 @@ import { Link } from "react-router-dom";
 
 import { CreateEnvironmentDialog } from "@/domains/environment/components/create-environment-dialog";
 import { useAppEnvironmentsQuery } from "@/domains/environment/query/environment-queries";
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Label } from "@/shared/ui/label";
 
@@ -28,6 +29,7 @@ function EnvironmentOption({
   selected: boolean;
   onSelect: () => void;
 }): ReactElement {
+  const { t } = useTranslation();
   return (
     <button
       className={cn(
@@ -53,11 +55,11 @@ function EnvironmentOption({
           {environment.isDefault ? <Star className="size-3 shrink-0" /> : null}
         </div>
         <div className="text-muted-foreground mt-0.5 text-[11px]">
-          {describeEnvironment(environment)}
+          {describeEnvironment(environment, t)}
         </div>
         {disabled ? (
           <div className="text-amber-fg mt-1 text-[11px]">
-            {ASSISTANT_LIMITED_ENVIRONMENT_REASON}
+            {t(ASSISTANT_LIMITED_ENVIRONMENT_REASON)}
           </div>
         ) : null}
       </div>
@@ -74,6 +76,7 @@ export function EnvironmentPicker({
   appId: string | null;
   readOnly?: boolean;
 }): ReactElement {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [selectionNotice, setSelectionNotice] = useState<string | null>(null);
@@ -92,14 +95,19 @@ export function EnvironmentPicker({
   const selectedEnvironmentUnsupported =
     selectedEnvironment === null
       ? false
-      : getEnvironmentSelectionBlockReason({
-          kind: model.draft.kind,
-          networkPolicy: selectedEnvironment.networkPolicy,
-        }) !== null;
+      : getEnvironmentSelectionBlockReason(
+          {
+            kind: model.draft.kind,
+            networkPolicy: selectedEnvironment.networkPolicy,
+          },
+          t,
+        ) !== null;
 
   return (
     <div className="space-y-2">
-      <Label className="text-muted-foreground text-[12px]">Runtime Environment</Label>
+      <Label className="text-muted-foreground text-[12px]">
+        {t("agentEditor.runtimeEnvironment")}
+      </Label>
       <Popover.Root modal={false} onOpenChange={setOpen} open={open}>
         <Popover.Trigger
           className={cn(
@@ -118,8 +126,8 @@ export function EnvironmentPicker({
               <div className="flex items-center gap-1.5">
                 <span className="text-foreground truncate text-[13px] font-semibold">
                   {selectedEnvironmentMissing
-                    ? "Loading selected environment..."
-                    : (selectedEnvironment?.name ?? "App default")}
+                    ? t("agentEditor.loadingSelectedEnvironment")
+                    : (selectedEnvironment?.name ?? t("agentEditor.appDefault"))}
                 </span>
                 {selectedEnvironment?.isDefault === true ? (
                   <Star className="text-brand size-3" />
@@ -127,10 +135,10 @@ export function EnvironmentPicker({
               </div>
               <div className="text-muted-foreground mt-0.5 text-[11px]">
                 {selectedEnvironment
-                  ? describeEnvironment(selectedEnvironment)
+                  ? describeEnvironment(selectedEnvironment, t)
                   : selectedEnvironmentMissing
-                    ? "Refreshing Environment list"
-                    : "Resolved when the session starts"}
+                    ? t("agentEditor.refreshingEnvironmentList")
+                    : t("agentEditor.resolvedWhenSessionStarts")}
               </div>
             </div>
           </div>
@@ -165,7 +173,7 @@ export function EnvironmentPicker({
                   type="button"
                 >
                   <Plus className="size-4" />
-                  Create environment
+                  {t("environments.create")}
                 </button>
                 {selectedEnvironment ? (
                   <Link
@@ -176,7 +184,7 @@ export function EnvironmentPicker({
                     to={`/environment/${selectedEnvironment.id}`}
                   >
                     <ExternalLink className="size-4" />
-                    Open selected environment
+                    {t("agentEditor.openSelectedEnvironment")}
                   </Link>
                 ) : null}
               </div>
@@ -187,23 +195,25 @@ export function EnvironmentPicker({
 
       {selectedEnvironmentUnsupported ? (
         <div className="text-amber-fg text-[12px]" role="alert">
-          Assistant Agents cannot use Limited network Environments. Choose a Full network
-          Environment before previewing or publishing.
+          {t("agentEditor.assistantLimitedWarning")}
         </div>
       ) : null}
       {selectionNotice ? (
         <output className="text-amber-fg block text-[12px]">
-          {selectionNotice} The new Environment was created but was not selected.
+          {selectionNotice} {t("agentEditor.createdButNotSelected")}
         </output>
       ) : null}
 
       {activeAppId !== null ? (
         <CreateEnvironmentDialog
           onCreated={(environment) => {
-            const blockReason = getEnvironmentSelectionBlockReason({
-              kind: model.draft.kind,
-              networkPolicy: environment.networkPolicy,
-            });
+            const blockReason = getEnvironmentSelectionBlockReason(
+              {
+                kind: model.draft.kind,
+                networkPolicy: environment.networkPolicy,
+              },
+              t,
+            );
 
             if (blockReason === null) {
               model.setEnvironmentId(environment.id);
@@ -236,21 +246,25 @@ function EnvironmentMenuContent({
   onSelect(environmentId: string): void;
   selectedEnvironment: EnvironmentSummary | null;
 }): ReactElement {
+  const { t } = useTranslation();
+
   if (loading) {
-    return <div className="text-muted-foreground p-3 text-[12px]">Loading environments…</div>;
+    return <div className="text-muted-foreground p-3 text-[12px]">{t("agentEditor.loadingEnvironments")}</div>;
   }
 
   if (error) {
     return (
       <div className="text-destructive p-3 text-[12px]">
-        {error instanceof Error ? error.message : "Failed to load environments."}
+        {error instanceof Error ? error.message : t("agentEditor.failedToLoadEnvironments")}
       </div>
     );
   }
 
   if (environments.length === 0) {
     return (
-      <div className="text-muted-foreground p-3 text-[12px]">No environments are available.</div>
+      <div className="text-muted-foreground p-3 text-[12px]">
+        {t("agentEditor.noEnvironmentsAvailable")}
+      </div>
     );
   }
 
@@ -259,10 +273,13 @@ function EnvironmentMenuContent({
       {environments.map((environment) => (
         <EnvironmentOption
           disabled={
-            getEnvironmentSelectionBlockReason({
-              kind,
-              networkPolicy: environment.networkPolicy,
-            }) !== null
+            getEnvironmentSelectionBlockReason(
+              {
+                kind,
+                networkPolicy: environment.networkPolicy,
+              },
+              t,
+            ) !== null
           }
           environment={environment}
           key={environment.id}

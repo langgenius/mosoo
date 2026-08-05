@@ -166,10 +166,12 @@ function AgentAssignField({
   selectedAgent: AgentSummary | null;
   selectedAgentId: string | null;
 }): ReactElement {
+  const { t } = useTranslation();
+
   return (
     <div className="flex items-center gap-3">
       <span className="text-fg-3 shrink-0 text-[10.5px] font-bold tracking-[0.16em] uppercase">
-        Assign to
+        {t("threads.assignTo")}
       </span>
       {noAgentsAvailable ? (
         <Button
@@ -184,10 +186,10 @@ function AgentAssignField({
             </span>
             <span className="min-w-0 flex-1">
               <span className="text-fg-1 block truncate text-[13px] leading-snug font-semibold">
-                Create your first agent
+                {t("threads.createFirstAgent")}
               </span>
               <span className="text-fg-3 block truncate text-[11.5px] leading-snug">
-                No agents yet; set one up to dispatch this thread.
+                {t("threads.noAgents")}
               </span>
             </span>
           </span>
@@ -201,7 +203,7 @@ function AgentAssignField({
           <AgentBadge agent={selectedAgent} size="sm" />
           <span className="min-w-0 flex-1">
             <span className="text-fg-1 block truncate text-[13px] leading-snug font-semibold">
-              {selectedAgent?.name ?? "Select an agent"}
+              {selectedAgent?.name ?? t("threads.selectAgent")}
             </span>
             {selectedAgent?.description ? (
               <span className="text-fg-3 block truncate text-[11.5px] leading-snug">
@@ -222,7 +224,7 @@ function AgentAssignField({
                 <AgentBadge agent={selectedAgent} size="sm" />
                 <span className="min-w-0 flex-1">
                   <span className="text-fg-1 block truncate text-[13px] leading-snug font-semibold">
-                    {selectedAgent?.name ?? "Select an agent"}
+                    {selectedAgent?.name ?? t("threads.selectAgent")}
                   </span>
                   {selectedAgent?.description ? (
                     <span className="text-fg-3 block truncate text-[11.5px] leading-snug">
@@ -264,7 +266,7 @@ function AgentAssignField({
                         {agent.kind}
                       </span>
                       {agent.status !== "published" ? (
-                        <span className="text-fg-3 shrink-0 text-[10.5px]">draft</span>
+                        <span className="text-fg-3 shrink-0 text-[10.5px]">{t("threads.draft")}</span>
                       ) : null}
                     </div>
                     {agent.description ? (
@@ -348,13 +350,13 @@ export function NewThreadDialog({
         <DialogHeader className="border-border-subtle border-b px-5 py-3">
           <div className="flex items-start justify-between gap-4 pr-8">
             <div className="min-w-0">
-              <DialogTitle className="text-fg-1 text-[14px] font-semibold">New thread</DialogTitle>
-              <DialogDescription className="sr-only">
-                Start a Thread for one Agent.
-              </DialogDescription>
+              <DialogTitle className="text-fg-1 text-[14px] font-semibold">
+                {t("threads.newThread")}
+              </DialogTitle>
+              <DialogDescription className="sr-only">{t("threads.description")}</DialogDescription>
             </div>
             <Button
-              aria-label={expanded ? "Collapse composer" : "Expand composer"}
+              aria-label={expanded ? t("threads.collapseComposer") : t("threads.expandComposer")}
               size="icon-sm"
               type="button"
               variant="ghost"
@@ -417,7 +419,7 @@ export function NewThreadDialog({
                   <span className="max-w-[180px] truncate">{file.name}</span>
                   <button
                     type="button"
-                    aria-label={`Remove ${file.name}`}
+                    aria-label={t("threads.removeFile", { name: file.name })}
                     onClick={() => {
                       dispatch({ index, type: "removeFile" });
                     }}
@@ -432,13 +434,13 @@ export function NewThreadDialog({
 
           {missingLockedAgent ? (
             <div className="border-destructive/20 bg-destructive/[0.06] text-destructive rounded-md border px-3 py-2 text-[12.5px]">
-              This Agent is not available in this App.
+              {t("agent.notAvailable")}
             </div>
           ) : null}
 
           {draftSelected ? (
             <div className="border-amber/30 bg-amber-bg text-amber-fg rounded-md border px-3 py-2 text-[12.5px]">
-              Publish this Agent before starting a Thread.
+              {t("agent.publishFirst")}
             </div>
           ) : null}
 
@@ -450,7 +452,7 @@ export function NewThreadDialog({
 
           {discardWarning ? (
             <div className="border-amber/30 bg-amber-bg text-amber-fg rounded-md border px-3 py-2 text-[12.5px]">
-              Closing will discard this draft.
+              {t("threads.discardDraft")}
             </div>
           ) : null}
         </div>
@@ -487,7 +489,7 @@ export function NewThreadDialog({
               <Paperclip className="size-3.5" />
             </Button>
             <span className="text-fg-3 text-[11.5px] tabular-nums">
-              {charCount.toLocaleString()} chars
+              {charCount.toLocaleString()} {t("common.chars")}
             </span>
           </div>
           <Button
@@ -499,7 +501,7 @@ export function NewThreadDialog({
             className={cn(submitting && "opacity-70")}
           >
             <Send className="size-3.5" />
-            {submitting ? "Dispatching" : "Dispatch"}
+            {submitting ? t("threads.dispatching") : t("threads.dispatch")}
           </Button>
         </DialogFooter>
       </DialogContent>

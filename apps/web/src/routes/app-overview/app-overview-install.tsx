@@ -103,7 +103,7 @@ function CodingAgentLane(): ReactElement {
       {copyFailed ? (
         <div className="mt-2 w-full text-left">
           <input
-            aria-label="mosoo install command"
+            aria-label={t("appOverview.installCommandLabel")}
             readOnly
             value={INSTALL_COMMAND}
             onFocus={(event) => {

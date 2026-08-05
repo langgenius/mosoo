@@ -2,6 +2,7 @@ import { ShieldCheck, Undo2 } from "lucide-react";
 import { useState } from "react";
 import type { ReactElement } from "react";
 
+import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 
 import type { Agent } from "../agent.types";
@@ -25,6 +26,7 @@ export function PendingChangesBanner({
   onAfterApply,
   onDiscard,
 }: PendingChangesBannerProps): ReactElement | null {
+  const { t } = useTranslation();
   const [dialogOpen, setDialogOpen] = useState(false);
 
   if (!model.dirty || model.changePlan.fieldLabels.length === 0) {
@@ -78,15 +80,17 @@ export function PendingChangesBanner({
           <div className="text-amber-fg flex min-w-0 items-center gap-2 text-[12.5px]">
             <ShieldCheck className="size-3.5 shrink-0" />
             <span className="min-w-0 truncate">
-              {fieldCount} field{fieldCount === 1 ? "" : "s"} edited ·{" "}
-              <span className="font-medium">{model.changePlan.actionLabel}</span>
+              {fieldCount === 1
+                ? t("agentLifecycle.fieldEdited", { count: String(fieldCount) })
+                : t("agentLifecycle.fieldsEdited", { count: String(fieldCount) })}{" "}
+              · <span className="font-medium">{model.changePlan.actionLabel}</span>
               {model.changePlan.agentStatePreserved && action !== "direct-update" ? (
                 <span className="text-amber-fg/70">
                   {action === "recreate-preserving-state"
-                    ? " · checkpointed paths restored"
+                    ? ` · ${t("agentLifecycle.checkpointedPathsRestored")}`
                     : action === "fork-agent"
-                      ? " · original Agent state unchanged"
-                      : " · current Sandbox retained"}
+                      ? ` · ${t("agentLifecycle.originalStateUnchanged")}`
+                      : ` · ${t("agentLifecycle.currentSandboxRetained")}`}
                 </span>
               ) : null}
             </span>
@@ -100,7 +104,7 @@ export function PendingChangesBanner({
               variant="ghost"
             >
               <Undo2 className="size-3" />
-              Discard
+              {t("agentLifecycle.discard")}
             </Button>
             <Button
               className="bg-amber hover:bg-amber/85"
@@ -108,15 +112,13 @@ export function PendingChangesBanner({
               onClick={handleApplyClick}
               size="xs"
             >
-              {model.saving ? "Applying…" : "Apply changes"}
+              {model.saving ? t("agentLifecycle.applying") : t("agentLifecycle.applyChanges")}
             </Button>
           </div>
         </div>
         <p className="text-amber-fg/80 mt-1 pl-[22px] text-[12px] leading-relaxed">
-          The preview chat keeps using the saved config until you apply.
-          {agent.status === "published"
-            ? " After applying, Re-publish to roll the new version out."
-            : null}
+          {t("agentLifecycle.previewKeepsSavedConfig")}
+          {agent.status === "published" ? ` ${t("agentLifecycle.republishHint")}` : null}
         </p>
       </div>
 

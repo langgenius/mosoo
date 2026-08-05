@@ -10,6 +10,7 @@ import { createAgent } from "@/domains/agent/api/agent-client";
 import { agentKeys } from "@/domains/agent/query/agent-queries";
 import { useVendorCredentialsQuery } from "@/domains/vendor-credential/model/provider-credential-query";
 import { cn } from "@/shared/lib/class-names";
+import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
 import { Input } from "@/shared/ui/input";
@@ -20,8 +21,6 @@ import { isRuntimeSelectable, listRuntimeOptions } from "../runtime-catalog";
 import { resolveDefaultAgentRuntime } from "../runtime-default";
 import { RuntimeIcon } from "./runtime-icon";
 
-const DEFAULT_AGENT_NAME = "Untitled agent";
-
 export function CreateAgentLauncherDialog({
   open,
   onOpenChange,
@@ -29,15 +28,16 @@ export function CreateAgentLauncherDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }): ReactElement {
+  const { t } = useTranslation();
   const { activeOrganization, activeApp } = useAppSession();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent showCloseButton className="gap-0 overflow-hidden rounded-lg sm:max-w-[460px]">
         {activeOrganization === null ? (
-          <LauncherStatus message="Finish App setup before creating agents." />
+          <LauncherStatus message={t("agent.finishSetup")} />
         ) : activeApp === null ? (
-          <LauncherStatus message="Create an App before creating agents." />
+          <LauncherStatus message={t("agent.createAppFirst")} />
         ) : (
           <CreateAgentLauncherBody onOpenChange={onOpenChange} appId={activeApp.id} />
         )}
@@ -53,6 +53,7 @@ function CreateAgentLauncherBody({
   onOpenChange: (open: boolean) => void;
   appId: AppId;
 }): ReactElement {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { credentials, loading: credentialsLoading } = useVendorCredentialsQuery(appId);
@@ -124,33 +125,33 @@ function CreateAgentLauncherBody({
   const noRuntimeAvailable = !credentialsLoading && defaultRuntime === null;
   const mutationError =
     createAgentMutation.error instanceof Error ? createAgentMutation.error.message : null;
-  const error = noRuntimeAvailable ? "Configure a provider before creating agents." : mutationError;
+  const error = noRuntimeAvailable ? t("agent.configureProviderBeforeCreating") : mutationError;
 
   return (
     <form onSubmit={handleSubmit}>
       <DialogHeader className="px-6 pt-6">
-        <DialogTitle className="text-[16px]">New Agent</DialogTitle>
+        <DialogTitle className="text-[16px]">{t("agent.newAgent")}</DialogTitle>
       </DialogHeader>
 
       <div className="space-y-5 px-6 py-5">
         <div className="space-y-2">
           <Label className="text-muted-foreground text-[12px]" htmlFor="new-agent-name">
-            Name
+            {t("agent.name")}
           </Label>
           <Input
             id="new-agent-name"
             onChange={(event) => {
               setName(event.target.value);
             }}
-            placeholder={DEFAULT_AGENT_NAME}
+            placeholder={t("agent.untitled")}
             value={name}
           />
         </div>
 
         <div className="space-y-2">
-          <Label className="text-muted-foreground text-[12px]">Runtime</Label>
+          <Label className="text-muted-foreground text-[12px]">{t("agent.runtime")}</Label>
           {runtimeOptions.length === 0 ? (
-            <div className="text-muted-foreground text-[13px]">No runtimes available.</div>
+            <div className="text-muted-foreground text-[13px]">{t("agent.noRuntimesAvailable")}</div>
           ) : (
             <div className="grid grid-cols-2 gap-3">
               {runtimeOptions.map((runtime) => {
@@ -194,16 +195,16 @@ function CreateAgentLauncherBody({
           type="button"
           variant="outline"
         >
-          Cancel
+          {t("common.cancel")}
         </Button>
         <Button disabled={!canSubmit} type="submit">
           {createAgentMutation.isPending ? (
             <>
               <Loader2 className="size-4 animate-spin" />
-              Creating…
+              {t("agent.creating")}
             </>
           ) : (
-            "Create"
+            t("agent.createAction")
           )}
         </Button>
       </DialogFooter>
@@ -236,9 +237,10 @@ function resolveRuntimeConfig(
 }
 
 function LauncherStatus({ message }: { message: string }): ReactElement {
+  const { t } = useTranslation();
   return (
     <div className="text-muted-foreground px-7 py-10 text-center text-[13px]">
-      <DialogTitle className="sr-only">Create agent</DialogTitle>
+      <DialogTitle className="sr-only">{t("agent.create")}</DialogTitle>
       {message}
     </div>
   );

@@ -18,10 +18,10 @@ import {
 import {
   getSessionEventChipTone,
   getSessionEventDomain,
+  getSessionEventDomainLabel,
   getSessionEventLabel,
   isSessionEventAttentionWorthy,
   isSessionEventVisibleInMainFeed,
-  SESSION_EVENT_DOMAIN_LABEL,
   SESSION_EVENT_DOMAIN_TONE,
   SESSION_EVENT_FILTER_DOMAINS,
   summarizeSessionEvent,
@@ -46,6 +46,8 @@ function SessionTimelineBar({
   onSelect: (eventId: string) => void;
   selectedId: string | null;
 }): ReactElement {
+  const { t } = useTranslation();
+
   return (
     <div className="border-border-subtle bg-muted/10 flex h-7 w-full max-w-full min-w-0 items-center gap-0.5 overflow-hidden rounded-md border p-1">
       {events.map((event) => {
@@ -61,7 +63,9 @@ function SessionTimelineBar({
             onClick={() => {
               onSelect(event.id);
             }}
-            aria-label={`Select ${getSessionEventLabel(event.type)}`}
+            aria-label={t("sessionEvents.selectEvent", {
+              label: getSessionEventLabel(event.type, t),
+            })}
             style={{ flexGrow: Math.max(event.durationMs ?? 1, 1) }}
             className={cn(
               "h-full min-w-[2px] rounded-[1px] border text-[0] transition-colors",
@@ -109,7 +113,7 @@ function SessionEventLegend({ events }: { events: readonly SessionProcessEvent[]
         <span key={domain} className="inline-flex items-center gap-1">
           <span className={cn("size-2 rounded-sm", SESSION_EVENT_DOMAIN_TONE[domain].swatch)} />
           <span>
-            {SESSION_EVENT_DOMAIN_LABEL[domain]} {counts[domain]}
+            {getSessionEventDomainLabel(domain, t)} {counts[domain]}
           </span>
         </span>
       ))}
@@ -138,8 +142,9 @@ function DrawerEventRow({
   onToggleExpanded: () => void;
   selected: boolean;
 }): ReactElement {
+  const { t } = useTranslation();
   const chipTone = getSessionEventChipTone(event);
-  const preview = clipPreview(summarizeSessionEvent(event));
+  const preview = clipPreview(summarizeSessionEvent(event, t));
 
   return (
     <div
@@ -168,10 +173,10 @@ function DrawerEventRow({
             chipTone.chip,
           )}
         >
-          {getSessionEventLabel(event.type)}
+          {getSessionEventLabel(event.type, t)}
         </span>
         <span className="text-fg-1 truncate text-[12.5px] font-semibold">
-          {getSessionEventLabel(event.type)}
+          {getSessionEventLabel(event.type, t)}
         </span>
         <span className="text-fg-3 min-w-0 truncate text-[12px]">{preview}</span>
         <span className="text-fg-3 justify-self-end text-[11px] tabular-nums">
@@ -193,7 +198,7 @@ function DrawerEventRow({
           <div className="overflow-hidden">
             <div className="border-border-subtle bg-muted/20 border-t px-3 py-2">
               <div className="text-fg-3 text-[10.5px] font-bold tracking-[0.14em] uppercase">
-                content
+                {t("sessionEvents.content")}
               </div>
               <pre className="text-fg-2 mt-1 max-h-48 overflow-auto font-mono text-[11px] leading-relaxed whitespace-pre-wrap">
                 {event.content}
@@ -217,9 +222,10 @@ export function SessionTurnDrawer({
   open: boolean;
   turn: SessionTurn | null;
 }): ReactElement {
+  const { t } = useTranslation();
   const events = useMemo(() => turn?.events ?? [], [turn?.events]);
   const visibleEvents = useMemo(() => events.filter(isSessionEventVisibleInMainFeed), [events]);
-  const title = turn === null ? "Turn" : `Turn #${turn.index}`;
+  const title = turn === null ? t("sessionEvents.turnTitle") : t("sessionEvents.turn", { number: String(turn.index) });
   const [copied, setCopied] = useState(false);
   const totalDurationMs = visibleEvents.reduce(
     (total, event) => total + (event.durationMs ?? 0),
@@ -257,8 +263,8 @@ export function SessionTurnDrawer({
                 ) : null}
               </div>
               <DialogDescription className="text-fg-3 mt-0.5 text-[11.5px] tabular-nums">
-                {formatTotalDuration(totalDurationMs)} · {visibleEvents.length} events ·{" "}
-                {formatTokens(totalTokens)} tokens
+                {formatTotalDuration(totalDurationMs)} · {visibleEvents.length} {t("sessionEvents.events")} ·{" "}
+                {formatTokens(totalTokens)} {t("sessionEvents.tokens")}
               </DialogDescription>
             </div>
             <Button
@@ -269,7 +275,7 @@ export function SessionTurnDrawer({
               variant="outline"
             >
               <CopyCheckIcon copied={copied} />
-              {copied ? "Copied" : "Copy"}
+              {copied ? t("common.copied") : t("common.copy")}
             </Button>
           </div>
         </DialogHeader>
@@ -279,8 +285,8 @@ export function SessionTurnDrawer({
           EventComponent={DrawerEventRow}
           emptyState={
             <div className="px-7 py-12 text-center">
-              <div className="text-fg-1 text-sm font-semibold">No events recorded</div>
-              <div className="text-fg-3 mt-1 text-[12.5px]">This turn has no durable events.</div>
+              <div className="text-fg-1 text-sm font-semibold">{t("sessionEvents.noEventsRecorded")}</div>
+              <div className="text-fg-3 mt-1 text-[12.5px]">{t("sessionEvents.noDurableEvents")}</div>
             </div>
           }
           events={visibleEvents}

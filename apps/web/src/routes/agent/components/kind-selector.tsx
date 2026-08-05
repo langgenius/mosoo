@@ -48,26 +48,25 @@ export function KindSelector({
     <section aria-label={t("agent.agentType")} className="border-border-subtle border-b pb-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="text-foreground text-[13px] font-semibold">Agent type</h2>
+          <h2 className="text-foreground text-[13px] font-semibold">{t("agent.agentType")}</h2>
           <p className="text-fg-3 mt-0.5 text-[12px] leading-relaxed">
             {locked ? (
               <>
-                Agent type is locked after publishing. Fork to switch type; sessions, cost, logs,
-                and agent-state stay attached here.{" "}
+                {t("agent.typeLocked")}{" "}
                 {canFork && onFork ? (
                   <button
                     className="text-brand focus-visible:ring-brand-ring rounded-sm font-medium hover:underline focus-visible:ring-2 focus-visible:outline-none"
                     onClick={onFork}
                     type="button"
                   >
-                    Fork agent
+                    {t("agent.forkAgent")}
                   </button>
                 ) : (
-                  "Contact owner to fork."
+                  t("agent.contactOwnerToFork")
                 )}
               </>
             ) : (
-              "Choose how this agent runs. You can change this freely until you publish."
+              t("agent.chooseAgentType")
             )}
           </p>
         </div>
@@ -121,7 +120,7 @@ export function KindSelector({
                   <p className="mt-1 text-[11.5px] leading-relaxed">{card.copy.description}</p>
                   <p className="mt-1 text-[11px] italic opacity-80">{card.copy.examples}</p>
                   {isLockedAlternative ? (
-                    <p className="mt-1.5 text-[11px] font-medium opacity-90">Fork to switch type</p>
+                    <p className="mt-1.5 text-[11px] font-medium opacity-90">{t("agent.forkToSwitchType")}</p>
                   ) : null}
                 </TooltipContent>
               </Tooltip>
@@ -137,7 +136,7 @@ export function KindSelector({
         className="text-fg-2 hover:text-brand focus-visible:ring-brand-ring -my-1 mt-3 inline-flex min-h-6 items-center gap-1 rounded-sm py-1 text-[12px] font-medium focus-visible:ring-2 focus-visible:outline-none"
       >
         <ChevronDown className={cn("size-3.5 transition-transform", compareOpen && "rotate-180")} />
-        {compareOpen ? "Hide comparison" : "Compare types"}
+        {compareOpen ? t("agent.hideComparison") : t("agent.compareTypes")}
       </button>
 
       {compareOpen ? (
@@ -145,9 +144,9 @@ export function KindSelector({
           <table className="w-full border-collapse text-left text-[12px]">
             <thead className="bg-bg-1 text-fg-3 text-[11px] tracking-wide uppercase">
               <tr>
-                <th className="w-[140px] px-3 py-2 font-medium">Dimension</th>
-                <th className="text-foreground px-3 py-2 font-medium">Assistant Agent</th>
-                <th className="text-foreground px-3 py-2 font-medium">Task Agent</th>
+                <th className="w-[140px] px-3 py-2 font-medium">{t("agent.dimension")}</th>
+                <th className="text-foreground px-3 py-2 font-medium">{t("agent.assistantAgent")}</th>
+                <th className="text-foreground px-3 py-2 font-medium">{t("agent.taskAgent")}</th>
               </tr>
             </thead>
             <tbody className="divide-border-subtle divide-y">

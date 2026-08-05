@@ -11,7 +11,7 @@ import {
 } from "@/domains/session/api/agent-session";
 import { getAgentSessionDiagnostics } from "@/domains/session/api/agent-session-retrieve";
 import { toAgentId, toAppId } from "@/routes/typed-id";
-import { useTranslation } from "@/shared/i18n";
+import { getCurrentLocale, useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -50,7 +50,10 @@ function formatRelativeTime(iso: string): string {
   if (diff < 7 * day) {
     return `${Math.floor(diff / day)}d ago`;
   }
-  return new Date(iso).toLocaleDateString("en-US", { day: "numeric", month: "short" });
+  return new Date(iso).toLocaleDateString(getCurrentLocale(), {
+    day: "numeric",
+    month: "short",
+  });
 }
 
 function EmptyState(): ReactElement {

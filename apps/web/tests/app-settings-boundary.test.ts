@@ -48,8 +48,8 @@ describe("App settings boundary", () => {
     expect(primaryNav).toContain('t("nav.settings")');
     expect(primaryNav).not.toContain('label: "App usage"');
     expect(primaryNav).toContain('path: "/app-settings"');
-    expect(appSettingsNav).toContain('label: "General"');
-    expect(appSettingsNav).toContain('label: "App usage"');
+    expect(appSettingsNav).toContain('labelKey: "settings.general"');
+    expect(appSettingsNav).toContain('labelKey: "appSettings.usage"');
     expect(appSettingsNav).toContain('path: "/app-settings/general"');
     expect(appSettingsNav).toContain('path: "/app-settings/usage"');
     expect(routeRegistry).toContain(
@@ -80,9 +80,8 @@ describe("App settings boundary", () => {
     const helpDocs = readSource("../src/shared/config/help-docs.ts");
     const combinedSource = `${accessTokens}\n${helpDocs}`;
 
-    expect(accessTokens).toContain(
-      "Create API tokens to call Agent API endpoints. Requests are tied to your account.",
-    );
+    expect(accessTokens).toContain('t("settings.createTokenDescription")');
+    expect(accessTokens).toContain('t("agent.apiReference")');
     expect(helpDocs).toContain('title: "Create a Thread for an Agent API Endpoint"');
     expect(helpDocs).toContain('title: "List Threads for an Agent API Endpoint"');
     expect(combinedSource.toLowerCase()).not.toContain("published agent");

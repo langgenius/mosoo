@@ -55,12 +55,32 @@ export const PACKAGE_MANAGER_LABELS: Record<EnvironmentPackageManager, string> =
 };
 
 export const NETWORK_POLICY_LABELS: Record<EnvironmentNetworkPolicy, string> = {
-  full: "Full",
-  limited: "Limited",
+  full: "environments.networkPolicyFull",
+  limited: "environments.networkPolicyLimited",
 };
 
-function unsupportedPackageManagerMessage(manager: EnvironmentPackageManager): string {
-  return `${PACKAGE_MANAGER_LABELS[manager]} is not supported by the current Driver runtime. Change it to ${WRITABLE_PACKAGE_MANAGER_NAMES}, or remove this row before saving.`;
+type Translate = (key: string, variables?: Record<string, string>) => string;
+
+const DEFAULT_TRANSLATIONS: Record<string, string> = {
+  "environments.choosePackageManager": "Choose a package manager for every package row.",
+  "environments.packageManagerNotSupported":
+    "{{manager}} is not supported by the current Driver runtime. Change it to {{writable}}, or remove this row before saving.",
+};
+
+const defaultTranslate: Translate = (key, variables) =>
+  Object.entries(variables ?? {}).reduce(
+    (text, [name, value]) => text.replaceAll(`{{${name}}}`, value),
+    DEFAULT_TRANSLATIONS[key] ?? key,
+  );
+
+function unsupportedPackageManagerMessage(
+  manager: EnvironmentPackageManager,
+  t: Translate = defaultTranslate,
+): string {
+  return t("environments.packageManagerNotSupported", {
+    manager: PACKAGE_MANAGER_LABELS[manager] ?? manager,
+    writable: WRITABLE_PACKAGE_MANAGER_NAMES,
+  });
 }
 
 export function createDraftId(): string {
@@ -134,7 +154,7 @@ function parseAllowedHosts(text: string): string[] {
   });
 }
 
-function parsePackages(rows: EditablePackageRow[]) {
+function parsePackages(rows: EditablePackageRow[], t: Translate = defaultTranslate) {
   return rows.flatMap((row) => {
     if (!row.manager) {
       return [];
@@ -146,7 +166,7 @@ function parsePackages(rows: EditablePackageRow[]) {
     });
 
     if (packages.length > 0 && !isWritableEnvironmentPackageManager(row.manager)) {
-      throw new Error(unsupportedPackageManagerMessage(row.manager));
+      throw new Error(unsupportedPackageManagerMessage(row.manager, t));
     }
 
     return packages.length > 0
@@ -167,11 +187,14 @@ function toEnvVarInputs(envVars: EditableEnvVar[]) {
   });
 }
 
-export function getPackageManagerError(rows: EditablePackageRow[]): string | null {
+export function getPackageManagerError(
+  rows: EditablePackageRow[],
+  t: Translate = defaultTranslate,
+): string | null {
   const invalidRow = rows.find((row) => row.packagesText.trim() && !row.manager);
 
   if (invalidRow) {
-    return "Choose a package manager for every package row.";
+    return t("environments.choosePackageManager");
   }
 
   const unsupportedRow = rows.find(
@@ -182,7 +205,7 @@ export function getPackageManagerError(rows: EditablePackageRow[]): string | nul
   );
 
   if (unsupportedRow?.manager) {
-    return unsupportedPackageManagerMessage(unsupportedRow.manager);
+    return unsupportedPackageManagerMessage(unsupportedRow.manager, t);
   }
 
   return null;
@@ -191,6 +214,7 @@ export function getPackageManagerError(rows: EditablePackageRow[]): string | nul
 export function toCreateEnvironmentInput(
   appId: string,
   draft: EnvironmentDraft,
+  t: Translate = defaultTranslate,
 ): CreateEnvironmentInput {
   return {
     allowMcpServers: draft.allowMcpServers,
@@ -201,7 +225,7 @@ export function toCreateEnvironmentInput(
     envVars: toEnvVarInputs(draft.envVars),
     name: draft.name.trim(),
     networkPolicy: draft.networkPolicy,
-    packages: parsePackages(draft.packages),
+    packages: parsePackages(draft.packages, t),
     appId: toAppId(appId),
     setupScript: draft.setupScript,
   };
@@ -211,6 +235,7 @@ export function toUpdateEnvironmentInput(
   appId: string,
   environmentId: string,
   draft: EnvironmentDraft,
+  t: Translate = defaultTranslate,
 ): UpdateEnvironmentInput {
   return {
     allowMcpServers: draft.allowMcpServers,
@@ -222,7 +247,7 @@ export function toUpdateEnvironmentInput(
     environmentId: toEnvironmentId(environmentId),
     name: draft.name.trim(),
     networkPolicy: draft.networkPolicy,
-    packages: parsePackages(draft.packages),
+    packages: parsePackages(draft.packages, t),
     appId: toAppId(appId),
     setupScript: draft.setupScript,
   };

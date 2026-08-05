@@ -2,6 +2,7 @@ import type { SessionRunStatus, SessionRunSummary } from "@mosoo/contracts/sessi
 import { ChevronRight, CircleX } from "lucide-react";
 import type { ReactElement } from "react";
 
+import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 
 interface ThreadRunFailureDetails {
@@ -10,39 +11,61 @@ interface ThreadRunFailureDetails {
   title: string;
 }
 
+type Translate = (key: string, variables?: Record<string, string>) => string;
+
 const FAILURE_STATUSES = new Set<SessionRunStatus>(["cancelled", "expired", "failed"]);
+
+const DEFAULT_FAILURE_COPY: Record<string, string> = {
+  "threads.runCancelledMessage": "The run was cancelled before it completed.",
+  "threads.runCancelledTitle": "Run cancelled",
+  "threads.runExpiredMessage": "The run expired before it completed.",
+  "threads.runExpiredTitle": "Run expired",
+  "threads.runFailedMessage": "The run failed before an error message was recorded.",
+  "threads.runFailedTitle": "Run failed",
+};
+
+function defaultTranslate(key: string, variables?: Record<string, string>): string {
+  return Object.entries(variables ?? {}).reduce(
+    (result, [name, replacement]) => result.replaceAll(`{{${name}}}`, replacement),
+    DEFAULT_FAILURE_COPY[key] ?? key,
+  );
+}
 
 function getFailureFallback(
   status: SessionRunStatus,
+  t: Translate,
 ): Pick<ThreadRunFailureDetails, "message" | "title"> {
   switch (status) {
     case "cancelled": {
       return {
-        message: "The run was cancelled before it completed.",
-        title: "Run cancelled",
+        message: t("threads.runCancelledMessage"),
+        title: t("threads.runCancelledTitle"),
       };
     }
     case "expired": {
       return {
-        message: "The run expired before it completed.",
-        title: "Run expired",
+        message: t("threads.runExpiredMessage"),
+        title: t("threads.runExpiredTitle"),
       };
     }
     default: {
       return {
-        message: "The run failed before an error message was recorded.",
-        title: "Run failed",
+        message: t("threads.runFailedMessage"),
+        title: t("threads.runFailedTitle"),
       };
     }
   }
 }
 
-export function getThreadRunFailure(run: SessionRunSummary | null): ThreadRunFailureDetails | null {
+export function getThreadRunFailure(
+  run: SessionRunSummary | null,
+  t: Translate = defaultTranslate,
+): ThreadRunFailureDetails | null {
   if (run === null || !FAILURE_STATUSES.has(run.status)) {
     return null;
   }
 
-  const fallback = getFailureFallback(run.status);
+  const fallback = getFailureFallback(run.status, t);
   const errorMessage = run.error?.message.trim() ?? "";
 
   return {
@@ -59,7 +82,8 @@ export function ThreadRunFailureNotice({
   onOpenProcess: () => void;
   run: SessionRunSummary | null;
 }): ReactElement | null {
-  const failure = getThreadRunFailure(run);
+  const { t } = useTranslation();
+  const failure = getThreadRunFailure(run, t);
 
   if (failure === null) {
     return null;
@@ -84,7 +108,7 @@ export function ThreadRunFailureNotice({
         </div>
       </div>
       <Button size="xs" variant="outline" className="shrink-0 self-start" onClick={onOpenProcess}>
-        View process
+        {t("threads.viewProcess")}
         <ChevronRight className="size-3" />
       </Button>
     </div>

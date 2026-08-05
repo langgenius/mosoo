@@ -1,5 +1,6 @@
 import { ArrowRight, Bot, Check, Info, Plus, X, Zap } from "lucide-react";
 
+import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import {
   Dialog,
@@ -12,28 +13,33 @@ import {
 
 import type { AgentKind } from "../agent.types";
 
-const KIND_LABELS: Record<AgentKind, { title: string; tagline: string; icon: typeof Bot }> = {
-  pet: { title: "Assistant Agent", tagline: "Always-on assistant", icon: Bot },
-  cattle: { title: "Task Agent", tagline: "On-demand worker", icon: Zap },
+const KIND_LABELS: Record<AgentKind, { title: string; icon: typeof Bot }> = {
+  pet: { title: "Assistant Agent", icon: Bot },
+  cattle: { title: "Task Agent", icon: Zap },
+};
+
+const KIND_TAGLINE_KEYS: Record<AgentKind, string> = {
+  pet: "agentLifecycle.kindPetTagline",
+  cattle: "agentLifecycle.kindCattleTagline",
 };
 
 const CARRIED_OVER = [
-  "Manifest fields (name, description, model, prompt)",
-  "Skills",
-  "MCP server bindings",
-  "Environment variables",
-  "Setup script",
+  "agentLifecycle.forkCarriedManifestFields",
+  "agent.skills",
+  "agentLifecycle.forkCarriedMcpBindings",
+  "agentLifecycle.forkCarriedEnvVars",
+  "environments.setupScript",
 ];
 
-const DROPPED_PET_TO_CATTLE = ["Assistant Agent stable Sandbox state"];
+const DROPPED_PET_TO_CATTLE = ["agentLifecycle.assistantSandboxState"];
 
-const ADDED_CATTLE_TO_PET = ["A new stable Assistant Agent Sandbox"];
+const ADDED_CATTLE_TO_PET = ["agentLifecycle.forkAddedSandbox"];
 
 const STAYS_ON_ORIGINAL = [
-  "Existing sessions",
-  "Cost history",
-  "Runtime logs",
-  "Assistant Agent stable Sandbox state",
+  "agentLifecycle.forkStaysSessions",
+  "agent.costHistory",
+  "agentLifecycle.forkStaysRuntimeLogs",
+  "agentLifecycle.assistantSandboxState",
 ];
 
 export function KindForkDialog({
@@ -53,63 +59,75 @@ export function KindForkDialog({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
+  const { t } = useTranslation();
   const current = KIND_LABELS[currentKind];
   const target = KIND_LABELS[targetKind];
   const CurrentIcon = current.icon;
   const TargetIcon = target.icon;
+  const currentTagline = t(KIND_TAGLINE_KEYS[currentKind]);
+  const targetTagline = t(KIND_TAGLINE_KEYS[targetKind]);
   const isPetToCattle = currentKind === "pet" && targetKind === "cattle";
-  const dropped = isPetToCattle ? DROPPED_PET_TO_CATTLE : [];
-  const added = !isPetToCattle ? ADDED_CATTLE_TO_PET : [];
+  const dropped = isPetToCattle ? DROPPED_PET_TO_CATTLE.map((key) => t(key)) : [];
+  const added = !isPetToCattle ? ADDED_CATTLE_TO_PET.map((key) => t(key)) : [];
 
   return (
     <Dialog open={open} onOpenChange={(next) => (next ? null : onCancel())}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle className="text-[15px]">Fork agent to switch type</DialogTitle>
+          <DialogTitle className="text-[15px]">{t("agentLifecycle.forkTitle")}</DialogTitle>
           <DialogDescription className="text-fg-2 text-[12.5px] leading-relaxed">
-            Fork creates a new {target.title} with the same Manifest. The original {agentName} keeps
-            its sessions, memory, and history. Continue?
+            {t("agentLifecycle.forkDescription", { agentName, target: target.title })}
           </DialogDescription>
         </DialogHeader>
 
         <div className="border-border-subtle bg-bg-1 rounded-lg border px-3 py-2.5">
           <div className="flex items-center gap-2 text-[12.5px]">
-            <KindChip icon={CurrentIcon} label={current.title} tagline={current.tagline} muted />
+            <KindChip
+              icon={CurrentIcon}
+              label={current.title}
+              tagline={currentTagline}
+              muted
+            />
             <ArrowRight className="text-fg-3 size-4 shrink-0" />
-            <KindChip icon={TargetIcon} label={target.title} tagline={target.tagline} />
+            <KindChip icon={TargetIcon} label={target.title} tagline={targetTagline} />
           </div>
         </div>
 
         <div className="space-y-3">
           <Section
-            heading="Carried over to the fork"
+            heading={t("agentLifecycle.forkCarriedOver")}
             tone="positive"
-            items={CARRIED_OVER}
+            items={CARRIED_OVER.map((key) => t(key))}
             icon={Check}
           />
 
           {dropped.length > 0 ? (
-            <Section heading="Dropped on switch" tone="warning" items={dropped} icon={X} />
+            <Section
+              heading={t("agentLifecycle.forkDropped")}
+              tone="warning"
+              items={dropped}
+              icon={X}
+            />
           ) : null}
 
           {added.length > 0 ? (
-            <Section heading="Added on switch" tone="info" items={added} icon={Plus} />
+            <Section heading={t("agentLifecycle.forkAdded")} tone="info" items={added} icon={Plus} />
           ) : null}
 
           <Section
-            heading={`Stays here on ${agentName}`}
+            heading={t("agentLifecycle.forkStaysHere", { agentName })}
             tone="muted"
-            items={STAYS_ON_ORIGINAL}
+            items={STAYS_ON_ORIGINAL.map((key) => t(key))}
             icon={Info}
           />
         </div>
 
         <DialogFooter>
           <Button disabled={busy} onClick={onCancel} size="sm" variant="outline">
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button disabled={busy} onClick={onConfirm} size="sm">
-            {busy ? "Forking…" : `Fork as ${target.title}`}
+            {busy ? t("agentLifecycle.forking") : t("agentLifecycle.forkAs", { title: target.title })}
           </Button>
         </DialogFooter>
       </DialogContent>

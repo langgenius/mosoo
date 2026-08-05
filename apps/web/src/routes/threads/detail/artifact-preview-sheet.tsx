@@ -4,6 +4,7 @@ import type { ReactElement } from "react";
 import { createFileDownload } from "@/domains/file/api/file-download-client";
 import type { ListedFileEntry } from "@/domains/file/api/files";
 import { FilePreviewContent, formatFileSize } from "@/features/file-preview/file-preview-content";
+import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/shared/ui/sheet";
 
@@ -14,6 +15,7 @@ export function ArtifactPreviewSheet({
   file: ListedFileEntry;
   onClose: () => void;
 }): ReactElement {
+  const { t } = useTranslation();
   const download = createFileDownload(file.id);
 
   return (
@@ -30,13 +32,13 @@ export function ArtifactPreviewSheet({
           <div className="min-w-0">
             <SheetTitle className="truncate text-[15px]">{file.name}</SheetTitle>
             <p className="text-fg-3 mt-1 truncate text-[12px]">
-              {formatFileSize(file.size)} · {file.mimeType ?? "Unknown format"}
+              {formatFileSize(file.size)} · {file.mimeType ?? t("threads.unknownFormat")}
             </p>
           </div>
           <Button asChild size="sm" variant="outline">
             <a href={download.url}>
               <Download className="size-3.5" />
-              Download
+              {t("threads.download")}
             </a>
           </Button>
         </header>

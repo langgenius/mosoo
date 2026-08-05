@@ -78,9 +78,7 @@ function HelpDocsDialogContent({ onOpenChange }: { onOpenChange: (open: boolean)
     >
       <DialogHeader className="sr-only">
         <DialogTitle>{t("help.helpAndDocs")}</DialogTitle>
-        <DialogDescription>
-          Search the mosoo documentation hosted at mosoo.ai/docs.
-        </DialogDescription>
+        <DialogDescription>{t("help.searchDocsDescription")}</DialogDescription>
       </DialogHeader>
 
       <div className="border-border-soft flex items-center gap-2.5 border-b px-4">
@@ -92,7 +90,7 @@ function HelpDocsDialogContent({ onOpenChange }: { onOpenChange: (open: boolean)
             setQuery(event.target.value);
           }}
           onKeyDown={handleInputKeyDown}
-          placeholder="Search help & documentation…"
+          placeholder={t("help.searchHelp")}
           aria-label={t("help.searchHelp")}
           className="h-12 border-0 bg-transparent px-0 text-sm focus-visible:ring-0"
         />
@@ -101,7 +99,7 @@ function HelpDocsDialogContent({ onOpenChange }: { onOpenChange: (open: boolean)
       <ScrollArea className="max-h-[min(60vh,420px)]">
         {results.length === 0 ? (
           <p className="text-fg-3 px-4 py-8 text-center text-sm">
-            No documentation matches “{query.trim()}”.
+            {t("help.noResults", { query: query.trim() })}
           </p>
         ) : (
           <ul className="p-1.5">
@@ -156,11 +154,11 @@ function HelpDocsDialogContent({ onOpenChange }: { onOpenChange: (open: boolean)
             onOpenChange(false);
           }}
         >
-          Browse all docs
+          {t("help.browseAllDocs")}
           <ArrowUpRight className="size-3.5" />
         </a>
         <span className="text-fg-muted hidden text-[11px] sm:inline">
-          ↑↓ to navigate · ↵ to open
+          {t("help.keyboardHints")}
         </span>
       </div>
     </DialogContent>

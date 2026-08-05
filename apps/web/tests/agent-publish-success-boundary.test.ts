@@ -9,9 +9,8 @@ describe("agent publish success boundary", () => {
   test("keeps the Thread entry in the modal body without the footer Try CTA", () => {
     const source = readSource("../src/routes/agent/lifecycle/publish-success-modal.tsx");
 
-    expect(source.match(/Try in mosoo/g)?.length ?? 0).toBe(1);
-    expect(source).toContain("Try in mosoo");
-    expect(source).toContain("Start a Thread with this agent.");
+    expect(source).toContain('t("agentLifecycle.tryInMosoo")');
+    expect(source).toContain('t("agentLifecycle.startThreadDescription")');
     expect(source).toContain("globalThis.location.assign(distribution.threadsPath)");
 
     expect(source).not.toContain("Web UI");

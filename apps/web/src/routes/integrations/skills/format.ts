@@ -36,7 +36,7 @@ export function formatDate(iso: string, locale: SupportedLocale = "en"): string 
  * en: "2.1M", "21K" — zh-CN: "2.1万", "210万"
  */
 export function formatCatalogCount(value: number, locale: SupportedLocale = "en"): string {
-  return new Intl.NumberFormat(locale === "zh-CN" ? "zh-CN" : "en-US", {
+  return new Intl.NumberFormat(locale, {
     maximumFractionDigits: value >= 1000 ? 1 : 0,
     notation: value >= 10_000 ? "compact" : "standard",
   }).format(value);

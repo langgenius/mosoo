@@ -10,7 +10,7 @@ import { fileKeys, listFiles } from "@/domains/file/api/files";
 import type { ListedFileEntry } from "@/domains/file/api/files";
 import { allThreadSessions } from "@/domains/session/api/list";
 import { toAppId } from "@/routes/typed-id";
-import { useTranslation } from "@/shared/i18n";
+import { getCurrentLocale, useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -30,19 +30,7 @@ import { createFilesViewModel } from "./files-list-model";
 import type { FilesTableEntry, SessionKindFilter } from "./files-list-model";
 import { ThreadFilter } from "./thread-filter";
 
-const SESSION_KIND_OPTIONS: { label: string; value: SessionKindFilter }[] = [
-  { label: "All", value: "all" },
-  { label: "Attachments", value: "attachment" },
-  { label: "Artifacts", value: "artifact" },
-];
 const EMPTY_FILES: ListedFileEntry[] = [];
-const FILE_UPDATED_AT_FORMATTER = new Intl.DateTimeFormat("en-US", {
-  day: "2-digit",
-  hour: "2-digit",
-  minute: "2-digit",
-  month: "short",
-  year: "numeric",
-});
 
 function SegmentedButtonGroup<T extends string>({
   label,
@@ -100,19 +88,28 @@ function formatBytes(size: number): string {
 }
 
 function formatDateTime(value: string): string {
-  return FILE_UPDATED_AT_FORMATTER.format(new Date(value));
+  return new Intl.DateTimeFormat(getCurrentLocale(), {
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(new Date(value));
 }
 
-function formatFileCategory(file: ListedFileEntry): string {
+function formatFileCategory(
+  file: ListedFileEntry,
+  t: ReturnType<typeof useTranslation>["t"],
+): string {
   if (file.sessionKind === "artifact") {
-    return "Artifact";
+    return t("files.artifact");
   }
 
   if (file.sessionKind === null) {
-    return "File";
+    return t("files.file");
   }
 
-  return "Attachment";
+  return t("files.attachment");
 }
 
 function fileCategoryVariant(file: ListedFileEntry): "default" | "soil" {
@@ -134,10 +131,10 @@ function FileTable({
         <TableHeader>
           <TableRow className="bg-paper-100 hover:bg-paper-100">
             <TableHead>{t("files.name")}</TableHead>
-            <TableHead className="hidden md:table-cell">Category</TableHead>
-            <TableHead className="hidden lg:table-cell">Agent</TableHead>
-            <TableHead className="hidden text-right md:table-cell">Size</TableHead>
-            <TableHead className="hidden lg:table-cell">Updated</TableHead>
+            <TableHead className="hidden md:table-cell">{t("files.category")}</TableHead>
+            <TableHead className="hidden lg:table-cell">{t("files.agent")}</TableHead>
+            <TableHead className="hidden text-right md:table-cell">{t("files.size")}</TableHead>
+            <TableHead className="hidden lg:table-cell">{t("files.updated")}</TableHead>
             <TableHead className="w-10 text-right"> </TableHead>
           </TableRow>
         </TableHeader>
@@ -149,7 +146,7 @@ function FileTable({
               <TableRow key={file.id}>
                 <TableCell className="min-w-[220px]">
                   <button
-                    aria-label={`Preview ${file.name}`}
+                    aria-label={t("files.previewFile", { name: file.name })}
                     className="flex max-w-full min-w-0 cursor-pointer flex-col gap-1 text-left"
                     onClick={() => {
                       onPreview(file);
@@ -165,18 +162,22 @@ function FileTable({
                   </button>
                 </TableCell>
                 <TableCell className="hidden md:table-cell">
-                  <Badge variant={fileCategoryVariant(file)}>{formatFileCategory(file)}</Badge>
+                  <Badge variant={fileCategoryVariant(file)}>
+                    {formatFileCategory(file, t)}
+                  </Badge>
                 </TableCell>
                 <TableCell className="hidden lg:table-cell">
                   {file.agent === null ? (
-                    <span className="text-fg-3 text-[12px]">Not linked</span>
+                    <span className="text-fg-3 text-[12px]">{t("files.notLinked")}</span>
                   ) : (
                     <div className="flex min-w-0 flex-col gap-0.5">
                       <span className="text-fg-1 max-w-[180px] truncate text-[12px] font-medium">
                         {file.agent.name}
                       </span>
                       <span className="text-fg-3 text-[11px]">
-                        {file.agent.relation === "created" ? "Created" : "Reads"}
+                        {file.agent.relation === "created"
+                          ? t("files.relationCreated")
+                          : t("files.relationReads")}
                       </span>
                     </div>
                   )}
@@ -189,7 +190,7 @@ function FileTable({
                 </TableCell>
                 <TableCell className="text-right">
                   <Button asChild size="icon-xs" variant="ghost">
-                    <a aria-label={`Download ${file.name}`} href={download.url}>
+                    <a aria-label={t("files.downloadFile", { name: file.name })} href={download.url}>
                       <Download className="size-3.5" />
                     </a>
                   </Button>
@@ -254,6 +255,14 @@ export function FilesPage(): ReactElement {
         : fileKeys.list({ appId: toAppId(activeAppId) }),
   });
   const files = fileList?.files ?? EMPTY_FILES;
+  const sessionKindOptions: { label: string; value: SessionKindFilter }[] = useMemo(
+    () => [
+      { label: t("files.all"), value: "all" },
+      { label: t("files.attachments"), value: "attachment" },
+      { label: t("files.artifacts"), value: "artifact" },
+    ],
+    [t],
+  );
   const filesView = useMemo(
     () =>
       createFilesViewModel(
@@ -270,10 +279,10 @@ export function FilesPage(): ReactElement {
   );
   const agentItems = useMemo(
     () => [
-      { label: "All agents", value: "" },
+      { label: t("files.allAgents"), value: "" },
       ...filesView.agentOptions.map((agent) => ({ label: agent.name, value: agent.id })),
     ],
-    [filesView.agentOptions],
+    [filesView.agentOptions, t],
   );
   const filtersActive =
     filesView.agentId !== "" ||
@@ -286,7 +295,7 @@ export function FilesPage(): ReactElement {
     <div className="bg-background flex h-full flex-1 flex-col overflow-hidden">
       <PageHeader
         title={t("files.title")}
-        description="App files, Thread attachments, and runtime artifacts."
+        description={t("files.pageDescription")}
       >
         <Button
           disabled={refreshing}
@@ -297,13 +306,13 @@ export function FilesPage(): ReactElement {
           variant="outline"
         >
           <RefreshCw className={cn("size-3.5", refreshing && "animate-spin")} />
-          Refresh
+          {t("common.refresh")}
         </Button>
       </PageHeader>
 
       <ListPageToolbar className="flex-wrap items-end">
         <div className="flex w-full min-w-0 flex-col gap-1 sm:w-[220px]">
-          <span className="text-fg-3 text-[11px] font-semibold">Agent</span>
+          <span className="text-fg-3 text-[11px] font-semibold">{t("files.agent")}</span>
           <Select
             disabled={sessionOptionsLoading || sessionOptionsError !== null}
             items={agentItems}
@@ -335,7 +344,7 @@ export function FilesPage(): ReactElement {
         <SegmentedButtonGroup<SessionKindFilter>
           label={t("files.threadFileCategory")}
           onChange={setSessionKind}
-          options={SESSION_KIND_OPTIONS}
+          options={sessionKindOptions}
           value={sessionKind}
         />
         <ListPageToolbarSpacer />
@@ -350,14 +359,14 @@ export function FilesPage(): ReactElement {
       <ListPageContent className="space-y-3">
         {filesError ? (
           <div className="text-destructive border-destructive/20 bg-destructive/[0.06] rounded-md border px-3 py-2 text-[13px]">
-            {filesError instanceof Error ? filesError.message : "Failed to load files."}
+            {filesError instanceof Error ? filesError.message : t("files.failedToLoad")}
           </div>
         ) : filesLoading ? (
-          <div className="text-fg-3 py-12 text-center text-[13px]">Loading files...</div>
+          <div className="text-fg-3 py-12 text-center text-[13px]">{t("files.loading")}</div>
         ) : filesView.files.length === 0 ? (
           <EmptyState
             icon={FileStack}
-            title={filtersActive ? "No matching files" : "No files"}
+            title={filtersActive ? t("files.noMatchingTitle") : t("files.noFilesTitle")}
             description={t("files.emptyDescription")}
           />
         ) : (

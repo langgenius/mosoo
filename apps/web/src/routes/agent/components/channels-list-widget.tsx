@@ -1,6 +1,7 @@
 import { ChevronRight, CircleCheck } from "lucide-react";
 
 import type { AgentChannelBindingFieldsFragment } from "@/gql/graphql";
+import { useTranslation } from "@/shared/i18n";
 import { ChannelBrandIcon } from "@/shared/ui/channel-brand-icon";
 
 import { DISTRIBUTION_CHANNELS } from "./settings-dialog-model";
@@ -26,25 +27,26 @@ export function ChannelsListWidget({
   isPublished: boolean;
   onOpenChannelView: (channelId: ChannelId) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <ul className="divide-border-subtle border-border bg-background divide-y rounded-md border">
       {DISTRIBUTION_CHANNELS.map((channel) => {
         const connected =
           channel.enabled && channelBindings.some((binding) => binding.provider === channel.id);
         const statusLabel = !channel.enabled
-          ? "Soon"
+          ? t("agent.soon")
           : connected
-            ? "Connected"
+            ? t("agent.connected")
             : !isPublished
-              ? "Publish first"
+              ? t("agent.publishFirstBadge")
               : !canManageChannels
-                ? "View"
-                : "Not connected";
+                ? t("agent.view")
+                : t("agent.notConnected");
 
         return (
           <li key={channel.id}>
             <button
-              aria-label={`Open ${channel.label} channel settings`}
+              aria-label={t("agent.openChannelSettings", { name: channel.label })}
               className="hover:bg-muted/30 focus-visible:bg-muted/30 flex w-full min-w-0 items-center justify-between gap-3 px-3 py-2.5 text-left transition-colors"
               onClick={() => {
                 onOpenChannelView(channel.id);

@@ -2,6 +2,7 @@ import type { AgentConfigChangeAction } from "@mosoo/contracts/agent-config-chan
 import { AlertTriangle, Lock, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
 import {
@@ -35,50 +36,60 @@ interface ActionMeta {
   danger: "low" | "medium" | "high";
 }
 
-const META: Record<LifecycleActionKind, ActionMeta> = {
+const META = {
   "patch-and-restart": {
-    body: "These edits update the native runtime config (model, skills, env vars). The Agent will restart and reload login state from the same machine. Nothing is wiped.",
+    body: "agentLifecycle.livePatchBody",
     danger: "low",
     preservesState: true,
-    primary: "Apply now",
-    stateNotice: "The current Sandbox is reused, so its runtime-local state remains in place.",
-    title: "Apply changes · patch native config + restart",
+    primary: "agentLifecycle.applyNow",
+    stateNotice: "agentLifecycle.sandboxReusedNotice",
+    title: "agentLifecycle.livePatchTitle",
   },
   "recreate-preserving-state": {
-    body: "The setup output or saved network-policy intent changed. The container will be rebuilt from a clean image. Only checkpoint-covered memory and eligible Session workspaces are restored; saved network policy is not currently enforced. Expect ~10-30s of downtime.",
+    body: "agentLifecycle.liveRecreateBody",
     danger: "medium",
     preservesState: true,
-    primary: "Recreate now",
-    stateNotice:
-      "Checkpoint-covered memory and eligible Session workspaces are restored. Login, cache, and other home paths are not guaranteed.",
-    title: "Apply changes · recreate sandbox (checkpointed paths restored)",
+    primary: "agentLifecycle.recreateNow",
+    stateNotice: "agentLifecycle.recreateStateNotice",
+    title: "agentLifecycle.liveRecreateTitle",
   },
   "fork-agent": {
-    body: "Runtime changes are not allowed in-place after publishing. Fork this Agent with the new runtime; sessions, cost, and agent-state stay attached to the original.",
+    body: "agentLifecycle.liveForkBody",
     danger: "medium",
     preservesState: true,
-    primary: "Fork with new runtime",
-    stateNotice: "Sessions, cost, and runtime state remain attached to the original Agent.",
-    title: "Switching runtime forks a new agent",
+    primary: "agentLifecycle.forkWithNewRuntime",
+    stateNotice: "agentLifecycle.forkStateNotice",
+    title: "agentLifecycle.liveForkTitle",
   },
   "reset-agent-state": {
-    body: "This destroys the current Pet Sandbox after clearing long-term memory, Session runtime directories, and native resume references; login and cache disappear with the container. Your Agent profile is untouched. Cannot be undone.",
+    body: "agentLifecycle.resetStateBody",
     danger: "high",
     preservesState: false,
-    primary: "Reset agent-state",
-    stateNotice:
-      "Sandbox-local login/cache, checkpointed memory, Session runtime directories, and native resume references are cleared.",
-    title: "Reset agent-state · destructive",
+    primary: "agentLifecycle.resetStatePrimary",
+    stateNotice: "agentLifecycle.resetStateNotice",
+    title: "agentLifecycle.resetStateTitle",
   },
   "restart-process": {
-    body: "The Agent process will be restarted to pick up the new configuration. Existing live sessions will reconnect automatically.",
+    body: "agentLifecycle.liveRestartBody",
     danger: "low",
     preservesState: true,
-    primary: "Apply now",
-    stateNotice: "The current Sandbox is reused, so its runtime-local state remains in place.",
-    title: "Apply changes · restart Agent process",
+    primary: "agentLifecycle.applyNow",
+    stateNotice: "agentLifecycle.sandboxReusedNotice",
+    title: "agentLifecycle.liveRestartTitle",
   },
-};
+} satisfies Record<LifecycleActionKind, ActionMeta>;
+
+function resolveMeta(t: ReturnType<typeof useTranslation>["t"], kind: LifecycleActionKind): ActionMeta {
+  const meta = META[kind];
+  return {
+    body: t(meta.body),
+    danger: meta.danger,
+    preservesState: meta.preservesState,
+    primary: t(meta.primary),
+    stateNotice: t(meta.stateNotice),
+    title: t(meta.title),
+  };
+}
 
 export function LiveConfigActionDialog({
   agentName,
@@ -97,7 +108,8 @@ export function LiveConfigActionDialog({
   onConfirm: () => void;
   open: boolean;
 }) {
-  const meta = META[kind];
+  const { t } = useTranslation();
+  const meta = resolveMeta(t, kind);
   const requireStrongConfirm = kind === "reset-agent-state";
   const [typed, setTyped] = useState("");
 
@@ -131,7 +143,7 @@ export function LiveConfigActionDialog({
           {affectedFields.length > 0 ? (
             <div className="border-border-subtle bg-bg-1 rounded-md border px-3 py-2">
               <div className="text-fg-3 mb-1 text-[11px] font-medium tracking-wide uppercase">
-                Fields in this change
+                {t("agentLifecycle.fieldsInChange")}
               </div>
               <ul className="text-foreground space-y-0.5 text-[12.5px]">
                 {affectedFields.map((field) => (
@@ -143,15 +155,14 @@ export function LiveConfigActionDialog({
 
           {forkBlocked ? (
             <div className="border-amber/30 bg-amber-bg text-amber-fg rounded-md border px-3 py-2 text-[12px] leading-relaxed">
-              Runtime fork is not yet wired to apply these unsaved changes. To switch runtime,
-              create a fork manually and choose the new runtime in the copy.
+              {t("agentLifecycle.forkNotWiredNotice")}
             </div>
           ) : null}
 
           {requireStrongConfirm ? (
             <div className="space-y-1.5">
               <div className="text-fg-2 text-[12px]">
-                Type <span className="font-mono font-semibold">{agentName}</span> to confirm.
+                {t("agentLifecycle.typeToConfirm", { agentName })}
               </div>
               <Input
                 onChange={(event) => {
@@ -174,7 +185,7 @@ export function LiveConfigActionDialog({
             size="sm"
             variant="outline"
           >
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button
             className={cn(
@@ -189,7 +200,7 @@ export function LiveConfigActionDialog({
             }}
             size="sm"
           >
-            {busy ? "Working…" : meta.primary}
+            {busy ? t("agentLifecycle.working") : meta.primary}
           </Button>
         </DialogFooter>
       </DialogContent>

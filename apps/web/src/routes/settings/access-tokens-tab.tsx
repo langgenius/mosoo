@@ -9,7 +9,7 @@ import {
   revokePersonalAccessToken,
 } from "@/domains/auth/api/personal-access-token-client";
 import { MOSOO_API_REFERENCE_URL } from "@/shared/config/external-links";
-import { useTranslation } from "@/shared/i18n";
+import { getCurrentLocale, useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import { CopyCheckIcon } from "@/shared/ui/copy-check-icon";
 import { Input } from "@/shared/ui/input";
@@ -50,12 +50,12 @@ function accessTokensReducer(
   }
 }
 
-function formatDateTime(value: string | null): string {
+function formatDateTime(value: string | null): string | null {
   if (!isTruthy(value)) {
-    return "Never";
+    return null;
   }
 
-  return new Date(value).toLocaleString("en-US", {
+  return new Date(value).toLocaleString(getCurrentLocale(), {
     dateStyle: "medium",
     timeStyle: "short",
   });
@@ -131,7 +131,7 @@ export function AccessTokensTab() {
           <Button asChild className="gap-1 text-[11.5px]" size="xs" variant="outline">
             <a href={MOSOO_API_REFERENCE_URL} rel="noreferrer noopener" target="_blank">
               <ExternalLink className="size-3" />
-              API reference
+              {t("agent.apiReference")}
             </a>
           </Button>
         }
@@ -195,7 +195,7 @@ function PersonalTokenSection({
             {t("settings.apiTokens")}
           </div>
           <p className="text-muted-foreground mt-1 max-w-2xl text-[12.5px] leading-relaxed">
-            Create API tokens to call Agent API endpoints. Requests are tied to your account.
+            {t("settings.createTokenDescription")}
           </p>
         </div>
       </div>
@@ -225,7 +225,7 @@ function PersonalTokenSection({
           ) : (
             <Plus className="size-3.5" />
           )}
-          Create
+          {t("settings.createToken")}
         </Button>
       </div>
 
@@ -259,6 +259,8 @@ function CreatedTokenPanel({
   token: string | null;
   tooltip: string;
 }) {
+  const { t } = useTranslation();
+
   if (!isTruthy(token)) {
     return null;
   }
@@ -266,9 +268,7 @@ function CreatedTokenPanel({
   return (
     <div className="border-brand/25 bg-brand-light mt-4 rounded-md border p-3">
       <div className="text-foreground text-[12px] font-medium">{title}</div>
-      <p className="text-muted-foreground mt-1 text-[11.5px]">
-        Copy this token now. It will not be shown again.
-      </p>
+      <p className="text-muted-foreground mt-1 text-[11.5px]">{t("settings.copyTokenWarning")}</p>
       <div className="mt-2 flex min-w-0 items-center gap-2">
         <code className="border-border-subtle text-foreground min-w-0 flex-1 truncate rounded border bg-white px-2.5 py-1.5 text-[12px]">
           {token}
@@ -301,7 +301,11 @@ function AccessTokensTable({
   tokens: PersonalAccessTokenSummary[] | null;
 }) {
   const { t } = useTranslation();
-  const emptyState = loading ? "Loading tokens..." : tokens?.length === 0 ? "No tokens yet." : null;
+  const emptyState = loading
+    ? t("settings.loadingTokens")
+    : tokens?.length === 0
+      ? t("settings.noTokensYet")
+      : null;
 
   return (
     <section className="border-border bg-card overflow-hidden rounded-lg border xl:overflow-x-auto">
@@ -315,7 +319,9 @@ function AccessTokensTable({
               <div className="min-w-0">
                 <div className="text-foreground truncate text-sm font-medium">{token.label}</div>
                 <div className="text-muted-foreground mt-1 text-xs">
-                  Created {formatDateTime(token.createdAt)}
+                  {t("settings.createdAt", {
+                    date: formatDateTime(token.createdAt) ?? t("settings.never"),
+                  })}
                 </div>
               </div>
               <Button
@@ -338,8 +344,10 @@ function AccessTokensTable({
                 <dd className="text-foreground mt-0.5 font-mono break-all">{token.id}</dd>
               </div>
               <div>
-                <dt className="text-muted-foreground">Last used</dt>
-                <dd className="text-foreground mt-0.5">{formatDateTime(token.lastUsedAt)}</dd>
+                <dt className="text-muted-foreground">{t("settings.lastUsed")}</dt>
+                <dd className="text-foreground mt-0.5">
+                  {formatDateTime(token.lastUsedAt) ?? t("settings.never")}
+                </dd>
               </div>
             </dl>
           </div>
@@ -351,7 +359,7 @@ function AccessTokensTable({
           <div>{t("settings.label")}</div>
           <div>{t("settings.tokenId")}</div>
           <div>{t("settings.lastUsed")}</div>
-          <div className="text-right">Action</div>
+          <div className="text-right">{t("settings.action")}</div>
         </div>
 
         {emptyState === null ? null : (
@@ -389,11 +397,15 @@ function AccessTokenRow({
       <div className="min-w-0">
         <div className="text-foreground truncate font-medium">{token.label}</div>
         <div className="text-muted-foreground mt-0.5 text-xs">
-          Created {formatDateTime(token.createdAt)}
+          {t("settings.createdAt", {
+            date: formatDateTime(token.createdAt) ?? t("settings.never"),
+          })}
         </div>
       </div>
       <code className="text-muted-foreground truncate text-xs">{token.id}</code>
-      <div className="text-muted-foreground text-xs">{formatDateTime(token.lastUsedAt)}</div>
+      <div className="text-muted-foreground text-xs">
+        {formatDateTime(token.lastUsedAt) ?? t("settings.never")}
+      </div>
       <div className="flex justify-end">
         <Button
           aria-label={t("settings.revokeToken")}

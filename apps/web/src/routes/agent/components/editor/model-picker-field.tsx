@@ -50,21 +50,21 @@ export function ModelPickerField({
   const pickerEntries = listModelPickerEntries(entries, currentModelId, currentVendorId);
   const currentEntry = findCurrentModelEntry(entries, currentModelId, currentVendorId);
   const hasAvailable = entries.some((entry) => entry.available);
-  const triggerLabel = currentEntry?.displayName ?? "Pick an available model";
+  const triggerLabel = currentEntry?.displayName ?? t("agentEditor.pickAvailableModel");
   const showInvalidHint = currentEntry?.available === false && currentEntry.reason !== "needs-key";
   const isEmpty = !loading && !hasAvailable;
   const menuIsEmpty = !loading && pickerEntries.length === 0;
   const lockedVendors = listLockedVendorLabels(entries);
   let buttonLabel = triggerLabel;
   if (loading) {
-    buttonLabel = "Loading models...";
+    buttonLabel = t("agentEditor.loadingModels");
   } else if (currentEntry === null && isEmpty) {
-    buttonLabel = "No models available";
+    buttonLabel = t("agentEditor.noModelsAvailable");
   }
 
   return (
     <div className="space-y-2">
-      <Label className="text-muted-foreground text-[12px]">Model</Label>
+      <Label className="text-muted-foreground text-[12px]">{t("agent.model")}</Label>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button

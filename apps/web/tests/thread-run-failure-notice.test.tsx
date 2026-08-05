@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 import type { SessionRunStatus, SessionRunSummary } from "@mosoo/contracts/session-run";
 import { renderToStaticMarkup } from "react-dom/server";
 
+import { I18nProvider } from "../src/shared/i18n";
 import {
   getThreadRunFailure,
   ThreadRunFailureNotice,
@@ -38,7 +39,9 @@ describe("thread run failure notice", () => {
       retryable: true,
     });
     const html = renderToStaticMarkup(
-      <ThreadRunFailureNotice onOpenProcess={() => undefined} run={run} />,
+      <I18nProvider>
+        <ThreadRunFailureNotice onOpenProcess={() => undefined} run={run} />
+      </I18nProvider>,
     );
 
     expect(html).toContain('role="alert"');
@@ -58,6 +61,12 @@ describe("thread run failure notice", () => {
       message: "The run expired before it completed.",
       title: "Run expired",
     });
+
+    const translated = getThreadRunFailure(createRun("cancelled"), (key) => `translated:${key}`);
+    expect(translated).toMatchObject({
+      message: "translated:threads.runCancelledMessage",
+      title: "translated:threads.runCancelledTitle",
+    });
   });
 
   test("does not render for a successful run", () => {
@@ -65,7 +74,11 @@ describe("thread run failure notice", () => {
 
     expect(getThreadRunFailure(run)).toBeNull();
     expect(
-      renderToStaticMarkup(<ThreadRunFailureNotice onOpenProcess={() => undefined} run={run} />),
+      renderToStaticMarkup(
+        <I18nProvider>
+          <ThreadRunFailureNotice onOpenProcess={() => undefined} run={run} />
+        </I18nProvider>,
+      ),
     ).toBe("");
   });
 });

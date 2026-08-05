@@ -76,7 +76,9 @@ export function EnvironmentsListPage() {
       });
     } catch (caughtError) {
       setError(
-        caughtError instanceof Error ? caughtError.message : "Failed to set default environment.",
+        caughtError instanceof Error
+          ? caughtError.message
+          : t("environments.setDefaultFailed"),
       );
     }
   }
@@ -93,7 +95,7 @@ export function EnvironmentsListPage() {
       });
     } catch (caughtError) {
       setError(
-        caughtError instanceof Error ? caughtError.message : "Failed to delete environment.",
+        caughtError instanceof Error ? caughtError.message : t("environments.deleteFailed"),
       );
     }
   }
@@ -106,7 +108,7 @@ export function EnvironmentsListPage() {
     <div className="flex flex-1 flex-col overflow-hidden">
       <PageHeader
         title={t("environments.title")}
-        description="Runtime templates that Agents can run inside."
+        description={t("environments.listDescription")}
       >
         <Button
           onClick={() => {
@@ -115,12 +117,16 @@ export function EnvironmentsListPage() {
           size="sm"
         >
           <Plus className="size-3.5" />
-          Create environment
+          {t("environments.create")}
         </Button>
       </PageHeader>
 
       <ListPageToolbar>
-        <ListPageSearch value={search} onChange={setSearch} placeholder="Search environments…" />
+        <ListPageSearch
+          value={search}
+          onChange={setSearch}
+          placeholder={t("environments.searchPlaceholder")}
+        />
       </ListPageToolbar>
 
       <ListPageContent className="space-y-3">
@@ -133,12 +139,14 @@ export function EnvironmentsListPage() {
         ) : null}
 
         {environmentsQuery.isLoading ? (
-          <div className="text-fg-3 py-12 text-center text-[13px]">Loading environments…</div>
+          <div className="text-fg-3 py-12 text-center text-[13px]">
+            {t("environments.loading")}
+          </div>
         ) : environmentsQuery.error ? (
           <div className="text-destructive py-12 text-center text-[13px]">
             {environmentsQuery.error instanceof Error
               ? environmentsQuery.error.message
-              : "Failed to load environments."}
+              : t("environments.loadFailed")}
           </div>
         ) : filteredEnvironments.length === 0 ? (
           <EmptyState
@@ -153,7 +161,7 @@ export function EnvironmentsListPage() {
                 size="sm"
               >
                 <Plus className="size-3.5" />
-                Create environment
+                {t("environments.create")}
               </Button>
             }
           />

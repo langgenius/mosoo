@@ -1,5 +1,6 @@
 import { Check, Loader2 } from "lucide-react";
 
+import { useTranslation } from "@/shared/i18n";
 import { Badge } from "@/shared/ui/badge";
 
 import type { DeploymentRunOutcome } from "../deployment-status";
@@ -19,8 +20,13 @@ export function StatusBadge({
   outcome: DeploymentRunOutcome;
   scopeLabel?: string | undefined;
 }) {
+  const { t } = useTranslation();
   const label =
-    outcome === "deploying" ? "Deploying…" : outcome === "failed" ? "Failed" : "Successful";
+    outcome === "deploying"
+      ? t("deploy.deploying")
+      : outcome === "failed"
+        ? t("deploy.failed")
+        : t("deploy.successful");
   const scopedLabel = withScope(label, scopeLabel);
 
   if (outcome === "deploying") {

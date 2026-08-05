@@ -3,6 +3,7 @@ import { useEffect, useMemo, useReducer } from "react";
 
 import { skillPackageUrl } from "@/domains/skill/api/skill-client";
 import { countSkillFiles } from "@/domains/skill/lib/skill-entries";
+import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import {
   Dialog,
@@ -77,6 +78,7 @@ function skillDetailDialogReducer(
 }
 
 export function SkillDetailDialog({ onOpenChange, registry, skill }: Props) {
+  const { t } = useTranslation();
   const [state, dispatch] = useReducer(skillDetailDialogReducer, SKILL_DETAIL_DIALOG_INITIAL_STATE);
   const { actionError, content, contentError, contentLoading, detail, forking, showDelete } = state;
 
@@ -119,7 +121,7 @@ export function SkillDetailDialog({ onOpenChange, registry, skill }: Props) {
       await registry.createSkillFork(skill.id);
     } catch (error) {
       dispatch({
-        error: error instanceof Error ? error.message : "Failed to fork skill.",
+        error: error instanceof Error ? error.message : t("skills.failedToFork"),
         type: "setActionError",
       });
     } finally {
@@ -144,7 +146,7 @@ export function SkillDetailDialog({ onOpenChange, registry, skill }: Props) {
               <DialogTitle className="flex items-baseline gap-2 text-[18px] font-semibold">
                 <span className="truncate">{displaySkill.name}</span>
                 <span className="text-muted-foreground shrink-0 text-[13px] font-medium">
-                  Skill
+                  {t("skills.skill")}
                 </span>
               </DialogTitle>
               {isTruthy(displaySkill.description) ? (
@@ -166,16 +168,18 @@ export function SkillDetailDialog({ onOpenChange, registry, skill }: Props) {
             </div>
             {displaySkill.forkOrigin ? (
               <div className="bg-muted/50 text-muted-foreground mb-4 rounded-md px-2.5 py-1.5 text-[11px]">
-                Forked from{" "}
+                {t("skills.forkedFrom")}{" "}
                 <span className="text-foreground font-medium">
                   {displaySkill.forkOrigin.ownerName} / {displaySkill.forkOrigin.name}
                 </span>
               </div>
             ) : null}
             {contentLoading ? (
-              <p className="text-muted-foreground">Loading…</p>
+              <p className="text-muted-foreground">{t("common.loading")}</p>
             ) : isTruthy(contentError) ? (
-              <p className="text-destructive">Failed to load content: {contentError}</p>
+              <p className="text-destructive">
+                {t("skills.failedToLoadContent", { error: contentError })}
+              </p>
             ) : (
               <StaticMarkdown>{body}</StaticMarkdown>
             )}
@@ -199,13 +203,13 @@ export function SkillDetailDialog({ onOpenChange, registry, skill }: Props) {
                   }}
                   className="text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30"
                 >
-                  Uninstall
+                  {t("skills.uninstall")}
                 </Button>
               ) : null}
             </div>
             <div className="flex items-center gap-1.5">
               <Button variant="outline" size="sm" onClick={handleDownload}>
-                Download
+                {t("skills.download")}
               </Button>
               <Button
                 variant="outline"
@@ -213,7 +217,7 @@ export function SkillDetailDialog({ onOpenChange, registry, skill }: Props) {
                 onClick={() => void handleFork()}
                 disabled={forking}
               >
-                {forking ? "Forking..." : "Fork"}
+                {forking ? t("skills.forking") : t("skills.fork")}
               </Button>
             </div>
           </div>

@@ -35,8 +35,8 @@ export function SettingsSheet({
           <DialogTitle>{t("agent.settings")}</DialogTitle>
           <DialogDescription>
             {canManageAccess
-              ? `Manage settings for "${agent.name}".`
-              : `View settings for "${agent.name}".`}
+              ? t("agent.manageSettingsFor", { name: agent.name })
+              : t("agent.viewSettingsFor", { name: agent.name })}
           </DialogDescription>
         </DialogHeader>
 

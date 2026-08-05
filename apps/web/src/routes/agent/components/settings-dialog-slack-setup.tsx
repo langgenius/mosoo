@@ -15,14 +15,10 @@ import { Switch } from "@/shared/ui/switch";
 import { Textarea } from "@/shared/ui/textarea";
 
 import type { ChannelInlineSetupAgent } from "./settings-dialog-channel-agent";
-import {
-  SLACK_APP_LEVEL_TOKEN_LABEL,
-  SLACK_MANIFEST_HELP_URL,
-  SLACK_THREAD_REPLY_MENTION_LABEL,
-  buildSlackManifest,
-} from "./settings-dialog-slack-manifest";
+import { SLACK_MANIFEST_HELP_URL, buildSlackManifest } from "./settings-dialog-slack-manifest";
 
 function SlackManifestHelpLink() {
+  const { t } = useTranslation();
   return (
     <a
       className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs font-medium underline-offset-2 hover:underline"
@@ -30,7 +26,7 @@ function SlackManifestHelpLink() {
       rel="noreferrer"
       target="_blank"
     >
-      Where do I paste this YAML?
+      {t("agent.slackManifestHelp")}
       <ExternalLink className="size-3.5" />
     </a>
   );
@@ -155,7 +151,9 @@ export function SlackChannelInlineSetup({
           }}
           type="button"
         >
-          <span className="text-foreground text-sm font-semibold">Manifest YAML</span>
+          <span className="text-foreground text-sm font-semibold">
+            {t("agent.slackManifestYaml")}
+          </span>
           <ChevronDown
             className={cn(
               "text-muted-foreground size-4 transition-transform",
@@ -168,7 +166,7 @@ export function SlackChannelInlineSetup({
             <div className="mb-2 flex items-center justify-between gap-3">
               <SlackManifestHelpLink />
               <Button
-                aria-label={copied ? "Copied manifest" : "Copy manifest"}
+                aria-label={copied ? t("agent.slackManifestCopied") : t("agent.slackCopyManifest")}
                 onClick={() => {
                   void handleCopyManifest();
                 }}
@@ -177,7 +175,7 @@ export function SlackChannelInlineSetup({
                 variant="outline"
               >
                 {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-                Copy
+                {t("common.copy")}
               </Button>
             </div>
             <Textarea
@@ -216,7 +214,7 @@ export function SlackChannelInlineSetup({
             />
           </div>
           <div className="grid gap-1.5">
-            <Label htmlFor="slack-app-level-token">{SLACK_APP_LEVEL_TOKEN_LABEL}</Label>
+            <Label htmlFor="slack-app-level-token">{t("agent.slackAppLevelToken")}</Label>
             <Input
               autoComplete="off"
               id="slack-app-level-token"
@@ -232,7 +230,7 @@ export function SlackChannelInlineSetup({
             htmlFor="slack-thread-reply-mention"
           >
             <span className="text-foreground text-sm font-medium">
-              {SLACK_THREAD_REPLY_MENTION_LABEL}
+              {t("agent.slackRequireThreadMentions")}
             </span>
             <Switch
               checked={threadRepliesRequireMention}
@@ -246,19 +244,19 @@ export function SlackChannelInlineSetup({
 
         {agent.status !== "published" ? (
           <div className="border-amber/30 bg-amber-bg text-amber-fg mt-4 rounded-md border px-3 py-2 text-xs">
-            Publish this Agent before connecting Slack.
+            {t("agent.publishBeforeConnectingSlack")}
           </div>
         ) : null}
         {mutation.error ? (
           <div className="border-ember/25 bg-ember-bg text-ember-fg mt-4 rounded-md border px-3 py-2 text-xs">
-            {mutation.error instanceof Error ? mutation.error.message : "Slack setup failed."}
+            {mutation.error instanceof Error ? mutation.error.message : t("agent.slackSetupFailed")}
           </div>
         ) : null}
 
         <div className="mt-4 flex justify-end">
           <Button disabled={!canSubmit} type="submit">
             {mutation.isPending ? <Loader2 className="size-4 animate-spin" /> : null}
-            Save
+            {t("common.save")}
           </Button>
         </div>
       </section>

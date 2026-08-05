@@ -1,6 +1,7 @@
 import { ChevronRight } from "lucide-react";
 import type { ReactElement } from "react";
 
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { getSessionEventChipTone, getSessionEventLabel } from "@/shared/ui/session-events";
 
@@ -26,6 +27,7 @@ export function ProcessEventRow({
   onSelect,
   onToggleExpanded,
 }: ProcessEventRowProps): ReactElement {
+  const { t } = useTranslation();
   const chipTone = getSessionEventChipTone(event);
   const statusOverride = statusChipClassName(event.status);
   const chipClass = statusOverride ?? chipTone.chip;
@@ -79,7 +81,7 @@ export function ProcessEventRow({
           <div className="overflow-hidden">
             <div className="border-border-subtle bg-muted/20 border-t px-3 py-2">
               <div className="text-fg-3 text-[10.5px] font-bold tracking-[0.14em] uppercase">
-                content
+                {t("threads.content")}
               </div>
               <pre className="text-fg-2 mt-1 max-h-40 overflow-auto font-mono text-[11px] leading-relaxed whitespace-pre-wrap">
                 {event.content}

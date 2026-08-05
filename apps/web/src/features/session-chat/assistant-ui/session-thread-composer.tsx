@@ -39,6 +39,8 @@ function SessionResourceChips({
   mentions: SessionResourceMention[];
   pendingFiles: PendingSessionFileChip[];
 }): ReactElement | null {
+  const { t } = useTranslation();
+
   if (mentions.length === 0 && pendingFiles.length === 0) {
     return null;
   }
@@ -59,7 +61,7 @@ function SessionResourceChips({
           <FileText className="size-3 shrink-0" />
           <span className="max-w-[180px] truncate font-medium">{file.name}</span>
           <span className="text-fg-3 shrink-0">
-            {file.status === "failed" ? "failed" : `${Math.round(file.progress ?? 0)}%`}
+            {file.status === "failed" ? t("chat.uploadFailed") : `${Math.round(file.progress ?? 0)}%`}
           </span>
         </span>
       ))}
@@ -109,7 +111,7 @@ export function SessionThreadComposer({
               onClick={onRetry}
               className="text-destructive mt-1 text-[12px] font-semibold underline underline-offset-4"
             >
-              {composerError.actionLabel ?? "Retry"}
+              {composerError.actionLabel ?? t("agent.retry")}
             </button>
           ) : null}
         </div>
@@ -128,7 +130,7 @@ export function SessionThreadComposer({
         minRows={1}
         maxRows={8}
         onChange={onTypingActivity}
-        placeholder="Describe a task for the agent…"
+        placeholder={t("chat.describeTask")}
         className="text-fg-1 placeholder:text-fg-muted w-full resize-none bg-transparent px-3.5 pt-3 pb-1 text-[14.5px] leading-[1.5] outline-none"
         data-testid="agent-session-composer-input"
         aria-label={t("chat.describeTask")}

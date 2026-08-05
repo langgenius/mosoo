@@ -152,7 +152,7 @@ export function OnboardingActions(): ReactElement {
   async function copySetupPrompt(): Promise<void> {
     setCopyFailed(false);
 
-    const didCopy = await writeClipboardText(buildOnboardingSetupPrompt());
+    const didCopy = await writeClipboardText(buildOnboardingSetupPrompt(undefined, t));
 
     if (!didCopy) {
       setCopyFailed(true);
@@ -203,15 +203,15 @@ export function OnboardingActions(): ReactElement {
       {copyFailed ? (
         <div className="w-full text-left">
           <textarea
-            aria-label="mosoo setup prompt"
+            aria-label={t("appOverview.setupPromptLabel")}
             className="border-border bg-bg-sunken text-fg-1 h-28 w-full rounded-md border px-3 py-2 font-mono text-xs"
             onFocus={(event) => {
               event.currentTarget.select();
             }}
             readOnly
-            value={buildOnboardingSetupPrompt()}
+            value={buildOnboardingSetupPrompt(undefined, t)}
           />
-          <p className="text-fg-3 mt-1 text-xs">Copy failed. Select and copy the prompt above.</p>
+          <p className="text-fg-3 mt-1 text-xs">{t("appOverview.copyPromptFailed")}</p>
         </div>
       ) : null}
 

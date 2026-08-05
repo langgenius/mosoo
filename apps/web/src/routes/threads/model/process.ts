@@ -10,12 +10,18 @@ export type ThreadProcessVariant =
   | "Write"
   | "exec_command";
 
-function formatProcessValue(value: number | null, unit: "ms" | "tokens"): string {
+type Translate = (key: string, variables?: Record<string, string>) => string;
+
+function formatProcessValue(
+  value: number | null,
+  unit: "ms" | "tokens",
+  t: Translate = (key) => key,
+): string {
   if (value === null) {
-    return "unavailable";
+    return t("threads.unavailable");
   }
 
-  return unit === "ms" ? `${value}ms` : `${value} tokens`;
+  return unit === "ms" ? `${value}ms` : `${value} ${t("threads.tokens")}`;
 }
 
 function getToolVariant(content: string): ThreadProcessVariant {
@@ -68,19 +74,22 @@ export function getProcessEventVariant(event: ThreadProcessEvent): ThreadProcess
   }
 }
 
-export function createProcessCopyText(input: {
-  agentName: string;
-  events: readonly ThreadProcessEvent[];
-}): string {
+export function createProcessCopyText(
+  input: {
+    agentName: string;
+    events: readonly ThreadProcessEvent[];
+  },
+  t: Translate = (key) => key,
+): string {
   return [
-    `agent\t${input.agentName}`,
-    "type\tstatus\ttokens\tduration\tcontent",
+    `${t("threads.copyAgent")}\t${input.agentName}`,
+    `${t("threads.copyType")}\t${t("threads.copyStatus")}\t${t("threads.copyTokens")}\t${t("threads.copyDuration")}\t${t("threads.copyContent")}`,
     ...input.events.map((event) =>
       [
         getProcessEventVariant(event),
         event.status,
-        formatProcessValue(event.tokens, "tokens"),
-        formatProcessValue(event.durationMs, "ms"),
+        formatProcessValue(event.tokens, "tokens", t),
+        formatProcessValue(event.durationMs, "ms", t),
         event.content.replaceAll(/\s+/g, " ").trim(),
       ].join("\t"),
     ),

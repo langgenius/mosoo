@@ -13,10 +13,12 @@ import {
   publishSkillPackage,
 } from "../../../domains/skill/api/skill-client";
 import { skillKeys, useAppSkillsQuery } from "../../../domains/skill/query/skill-queries";
+import { useTranslation } from "../../../shared/i18n";
 import { isTruthy } from "../../../shared/lib/truthiness";
 import { toAppId, toSkillId } from "../../typed-id";
 export function useSkillRegistry() {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
   const { activeAppId, appsLoading } = useAppSession();
   const appId = activeAppId;
   const skillsQuery = useAppSkillsQuery(appId);
@@ -42,23 +44,23 @@ export function useSkillRegistry() {
   const getSkillDetail = useCallback(
     async (skillId: string): Promise<SkillDetail> => {
       if (!isTruthy(appId)) {
-        throw new Error("App is required.");
+        throw new Error(t("skills.appRequired"));
       }
 
       return getSkillDetailRemote(toAppId(appId), toSkillId(skillId));
     },
-    [appId],
+    [appId, t],
   );
 
   const getSkillSource = useCallback(
     async (skillId: string): Promise<string> => {
       if (!isTruthy(appId)) {
-        throw new Error("App is required.");
+        throw new Error(t("skills.appRequired"));
       }
 
       return fetchSkillSource(toAppId(appId), toSkillId(skillId));
     },
-    [appId],
+    [appId, t],
   );
 
   const publishFromFile = useCallback(
@@ -106,7 +108,7 @@ export function useSkillRegistry() {
   const createSkillFork = useCallback(
     async (skillId: string): Promise<SkillSummary> => {
       if (!isTruthy(appId)) {
-        throw new Error("App is required.");
+        throw new Error(t("skills.appRequired"));
       }
 
       const created = await createSkillForkRemote({
@@ -116,7 +118,7 @@ export function useSkillRegistry() {
       await refresh();
       return created;
     },
-    [refresh, appId],
+    [refresh, appId, t],
   );
 
   const installSkillsShSkill = useCallback(
@@ -126,7 +128,7 @@ export function useSkillRegistry() {
       slug: string;
     }): Promise<SkillSummary> => {
       if (!isTruthy(appId)) {
-        throw new Error("App is required.");
+        throw new Error(t("skills.appRequired"));
       }
 
       const created = await installSkillsShSkillRemote({
@@ -138,19 +140,19 @@ export function useSkillRegistry() {
       await refresh();
       return created;
     },
-    [refresh, appId],
+    [refresh, appId, t],
   );
 
   const deleteOwnedSkill = useCallback(
     async (skillId: string) => {
       if (!isTruthy(appId)) {
-        throw new Error("App is required.");
+        throw new Error(t("skills.appRequired"));
       }
 
       await deleteOwnedSkillRemote(toAppId(appId), toSkillId(skillId));
       await refresh();
     },
-    [refresh, appId],
+    [refresh, appId, t],
   );
 
   return {

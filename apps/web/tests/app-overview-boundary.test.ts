@@ -10,8 +10,8 @@ describe("App overview boundary", () => {
     const routeSource = readSource("../src/routes/app-overview/app-overview.route.tsx");
 
     expect(routeSource).toContain("AppOverviewInstallGuide");
-    expect(routeSource).toContain("Provider keys");
-    expect(routeSource).toContain("New agent");
+    expect(routeSource).toContain('t("appOverview.providerKeys")');
+    expect(routeSource).toContain('t("appOverview.newAgent")');
 
     // The overview dashboard and its per-resource queries were removed; the root
     // no longer aggregates loads (which surfaced "data failed to load").
@@ -48,7 +48,7 @@ describe("App overview boundary", () => {
     expect(promptSource).toContain("curl -fsSL https://install.mosoo.ai/install.sh | bash");
     expect(installSource).toContain('t("onboarding.setupDescription")');
     expect(installSource).toContain('t("common.copy")');
-    expect(appIdBadgeSource).toContain("Copy app ID");
+    expect(appIdBadgeSource).toContain('t("agent.copyAppId")');
 
     expect(installSource).not.toContain("Codex skill");
     expect(installSource).not.toContain("or updates");
@@ -128,12 +128,12 @@ describe("App overview boundary", () => {
 
     // The setup prompt mirrors the checklist and keeps the human-owned
     // provider key as an ask, not something an agent invents.
-    expect(promptSource).toContain("MOSOO_CONSOLE_URL");
-    expect(promptSource).toContain("/providers");
-    expect(promptSource).toContain("/settings/access-tokens");
-    expect(promptSource).toContain("/agent?create=1");
-    expect(promptSource).toContain("ask the user");
-    expect(promptSource).toContain("Never print or commit secrets");
+    expect(promptSource).toContain('t("appOverview.setupPrompt"');
+    expect(promptSource).toContain("HELP_DOCS_BASE_URL");
+    expect(promptSource).toContain("INSTALL_COMMAND");
+    expect(promptSource).toContain("docsUrl");
+    expect(promptSource).toContain("installCommand");
+    expect(promptSource).toContain("origin");
   });
 
   test("keeps the install guide responsive and accessible", () => {

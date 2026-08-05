@@ -105,7 +105,7 @@ function AppSwitcher({
         <>
           <div className="sidebar-label-enter min-w-0 flex-1 text-left">
             <div className="text-muted-foreground text-[10.5px] leading-3 font-semibold uppercase">
-              App
+              {t("nav.app")}
             </div>
             <div className="truncate">{displayLabel}</div>
           </div>
@@ -248,7 +248,7 @@ function MobileNavigation({
           type="button"
         >
           <ExpandSidebarIcon className="size-5" />
-          <span className="text-xs font-semibold">Menu</span>
+          <span className="text-xs font-semibold">{t("common.menu")}</span>
         </button>
         <img src="/brand/logo-wordmark-onlight.svg" alt="mosoo" className="block h-5" />
         {title ? (
@@ -263,7 +263,7 @@ function MobileNavigation({
         open={open}
       >
         <SheetContent className="bg-sidebar data-[closed]:slide-out-to-left data-[open]:slide-in-from-left right-auto left-0 flex w-[min(20rem,calc(100vw-2rem))] max-w-none flex-col p-3">
-          <SheetTitle className="sr-only">Navigation</SheetTitle>
+          <SheetTitle className="sr-only">{t("common.navigation")}</SheetTitle>
           <div className="flex h-11 shrink-0 items-center px-1.5">
             <img src="/brand/logo-wordmark-onlight.svg" alt="mosoo" className="block h-[22px]" />
           </div>
@@ -286,14 +286,14 @@ function MobileNavigation({
 }
 
 const ORG_HEADER_TITLES = [
-  { path: "/apps", title: "Apps" },
-  { path: "/org/settings", title: "Org settings" },
+  { path: "/apps", titleKey: "pageTitle.apps" },
+  { path: "/org/settings", titleKey: "pageTitle.orgSettings" },
 ] as const;
 
 function getOrgHeaderTitle(pathname: string): string | null {
   return (
     ORG_HEADER_TITLES.find((item) => pathname === item.path || pathname.startsWith(`${item.path}/`))
-      ?.title ?? null
+      ?.titleKey ?? null
   );
 }
 
@@ -312,8 +312,9 @@ function ConsoleShell({
   onToggleCollapsed: () => void;
   sidebar: ReactNode;
 }) {
+  const { t } = useTranslation();
   const ToggleIcon = collapsed ? ExpandSidebarIcon : CollapseSidebarIcon;
-  const toggleLabel = collapsed ? "Expand sidebar" : "Collapse sidebar";
+  const toggleLabel = collapsed ? t("nav.expandSidebar") : t("nav.collapseSidebar");
 
   return (
     <div className="bg-sidebar flex h-dvh">
@@ -422,6 +423,7 @@ export function OrgLayout({ children }: { children: ReactNode }) {
   const { activeOrganization } = useAppSession();
   const location = useLocation();
   const headerTitle = getOrgHeaderTitle(location.pathname);
+  const resolvedHeaderTitle = headerTitle === null ? null : t(headerTitle);
 
   return (
     <TooltipProvider>
@@ -440,17 +442,17 @@ export function OrgLayout({ children }: { children: ReactNode }) {
               </>
             )}
           </div>
-          {headerTitle === null ? null : (
+          {resolvedHeaderTitle === null ? null : (
             <div className="flex min-w-0 flex-1 items-center px-8">
               <h1 className="text-foreground truncate text-2xl font-semibold tracking-normal">
-                {headerTitle}
+                {resolvedHeaderTitle}
               </h1>
             </div>
           )}
         </header>
         <MobileNavigation
           renderNavigation={() => <OrgNavigation collapsed={false} pathname={location.pathname} />}
-          title={headerTitle}
+          title={resolvedHeaderTitle}
         />
         <div className="flex min-h-0 flex-1">
           <aside className="border-border-soft hidden w-[224px] shrink-0 flex-col border-r px-3 py-4 md:flex">

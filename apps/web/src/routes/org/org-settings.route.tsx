@@ -42,7 +42,7 @@ export function OrgSettingsPage() {
         setSaved(false);
       }, 2000);
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "Failed to rename organization.");
+      setError(nextError instanceof Error ? nextError.message : t("org.renameFailed"));
     } finally {
       setSaving(false);
     }
@@ -54,13 +54,13 @@ export function OrgSettingsPage() {
         <div className="max-w-[560px]">
           {activeOrganization === null ? (
             <div className="text-muted-foreground text-sm">
-              {organizationsLoading ? "Loading…" : "No active organization."}
+              {organizationsLoading ? t("common.loading") : t("common.noActiveOrganization")}
             </div>
           ) : (
             <div className="space-y-6">
               <div className="space-y-2">
                 <label className="text-foreground text-sm font-medium" htmlFor="org-name">
-                  Name
+                  {t("org.name")}
                 </label>
                 <input
                   aria-label={t("org.organizationName")}
@@ -79,26 +79,24 @@ export function OrgSettingsPage() {
                 <Button onClick={() => void handleSave()} disabled={!canSave} size="sm">
                   {saving ? (
                     <>
-                      <Loader2 className="mr-1 size-4 animate-spin" /> Saving…
+                      <Loader2 className="mr-1 size-4 animate-spin" /> {t("settings.saving")}
                     </>
                   ) : saved ? (
                     <>
-                      <Check className="mr-1 size-4" /> Saved
+                      <Check className="mr-1 size-4" /> {t("settings.saved")}
                     </>
                   ) : (
-                    "Save changes"
+                    t("settings.saveChanges")
                   )}
                 </Button>
               </div>
 
               <div className="space-y-2">
-                <div className="text-foreground text-sm font-medium">Org ID</div>
-                <p className="text-fg-2 text-[12px]">
-                  This is the identifier for the active organization.
-                </p>
+                <div className="text-foreground text-sm font-medium">{t("org.orgId")}</div>
+                <p className="text-fg-2 text-[12px]">{t("org.orgIdDescription")}</p>
                 <CommandBlock
                   command={activeOrganization.id}
-                  copyLabel="Copy org ID"
+                  copyLabel={t("org.copyOrgId")}
                   prompt={null}
                 />
               </div>

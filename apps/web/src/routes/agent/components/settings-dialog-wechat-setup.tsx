@@ -14,6 +14,7 @@ import type {
   WeChatAgentChannelPairingFieldsFragment,
 } from "@/gql/graphql";
 import { toAgentId, toAppId } from "@/routes/typed-id";
+import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 
 import type { ChannelInlineSetupAgent } from "./settings-dialog-channel-agent";
@@ -27,42 +28,45 @@ interface WeChatPairingStatusCopy {
   label: string;
 }
 
-function getWeChatPairingStatusCopy(status: WeChatPairingStatus | null): WeChatPairingStatusCopy {
+function getWeChatPairingStatusCopy(
+  status: WeChatPairingStatus | null,
+  t: (key: string) => string,
+): WeChatPairingStatusCopy {
   switch (status) {
     case "confirmed":
       return {
-        detail: "The channel binding is saved.",
-        label: "Connected",
+        detail: t("agent.wechatPairingConnectedDetail"),
+        label: t("agent.connected"),
       };
     case "expired":
       return {
-        detail: "Start a new pairing session.",
-        label: "QR code expired",
+        detail: t("agent.wechatPairingExpiredDetail"),
+        label: t("agent.wechatQrExpired"),
       };
     case "failed":
       return {
-        detail: "Start again after checking the WeChat account.",
-        label: "Pairing failed",
+        detail: t("agent.wechatPairingFailedDetail"),
+        label: t("agent.wechatPairingFailed"),
       };
     case "idle":
       return {
-        detail: "Start pairing to create a QR code.",
-        label: "Ready to pair",
+        detail: t("agent.wechatPairingReadyDetail"),
+        label: t("agent.wechatReadyToPair"),
       };
     case "qr_pending":
       return {
-        detail: "Waiting for the QR code to be scanned.",
-        label: "Scan QR code",
+        detail: t("agent.wechatQrPendingDetail"),
+        label: t("agent.wechatScanQrCode"),
       };
     case "scanned":
       return {
-        detail: "Confirm the login on your WeChat device.",
-        label: "Confirm on device",
+        detail: t("agent.wechatScannedDetail"),
+        label: t("agent.wechatConfirmOnDevice"),
       };
     case null:
       return {
-        detail: "Start pairing to create a QR code.",
-        label: "Ready to pair",
+        detail: t("agent.wechatPairingReadyDetail"),
+        label: t("agent.wechatReadyToPair"),
       };
   }
 }
@@ -124,6 +128,7 @@ export function WeChatChannelInlineSetup({
   agent: ChannelInlineSetupAgent;
   onSuccess?: () => void;
 }) {
+  const { t } = useTranslation();
   const invalidateChannelBindings = useInvalidateAgentChannelBindings(agent.appId, agent.id);
   const [pairing, setPairing] = useState<WeChatAgentChannelPairingFieldsFragment | null>(null);
   const typedAgentId = toAgentId(agent.id);
@@ -183,7 +188,7 @@ export function WeChatChannelInlineSetup({
   }
 
   const status = pairing?.status ?? null;
-  const statusCopy = getWeChatPairingStatusCopy(status);
+  const statusCopy = getWeChatPairingStatusCopy(status, t);
   const embeddedQrImage = pairing?.qrCodeImageSrc
     ? toEmbeddableQrImageSrc(pairing.qrCodeImageSrc)
     : null;
@@ -195,15 +200,16 @@ export function WeChatChannelInlineSetup({
       <div className="grid gap-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="text-foreground text-sm font-semibold">QR pairing</div>
+            <div className="text-foreground text-sm font-semibold">
+              {t("agent.wechatQrPairing")}
+            </div>
             <div className="text-muted-foreground mt-1 text-xs leading-relaxed">
-              Personal WeChat uses the iLink QR-paired bot identity. Credentials stay server-side
-              after confirmation.
+              {t("agent.wechatQrPairingDescription")}
             </div>
           </div>
           <Button disabled={!canStart} onClick={handleStartPairing} type="button">
             {startMutation.isPending ? <Loader2 className="size-4 animate-spin" /> : null}
-            {pairing ? "Restart" : "Start"}
+            {pairing ? t("agent.restart") : t("agent.start")}
           </Button>
         </div>
 
@@ -220,7 +226,7 @@ export function WeChatChannelInlineSetup({
             <div className="border-border-subtle bg-background flex size-52 items-center justify-center rounded-md border p-3">
               {embeddedQrImage ? (
                 <img
-                  alt="WeChat pairing QR code"
+                  alt={t("agent.wechatPairingQrCode")}
                   className="max-h-full max-w-full"
                   src={embeddedQrImage}
                 />
@@ -245,7 +251,7 @@ export function WeChatChannelInlineSetup({
                 ) : (
                   <RefreshCw className="size-4" />
                 )}
-                Check
+                {t("agent.check")}
               </Button>
             </div>
           </div>
@@ -254,7 +260,7 @@ export function WeChatChannelInlineSetup({
 
       {agent.status !== "published" ? (
         <div className="border-amber/30 bg-amber-bg text-amber-fg mt-4 rounded-md border px-3 py-2 text-xs">
-          Publish this Agent before connecting WeChat.
+          {t("agent.publishBeforeConnectingWechat")}
         </div>
       ) : null}
       {startMutation.error || pollMutation.error ? (
@@ -263,7 +269,7 @@ export function WeChatChannelInlineSetup({
             ? startMutation.error.message
             : pollMutation.error instanceof Error
               ? pollMutation.error.message
-              : "WeChat setup failed."}
+              : t("agent.wechatSetupFailed")}
         </div>
       ) : null}
     </section>

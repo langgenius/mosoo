@@ -21,7 +21,7 @@ import { useDeployConsole } from "./use-deploy-console";
  */
 export function V0DeployPreviewPage() {
   const { t } = useTranslation();
-  const demo = useDeployConsole();
+  const demo = useDeployConsole(t);
   const { deployment } = demo.state;
 
   return (
@@ -37,7 +37,7 @@ export function V0DeployPreviewPage() {
           deployment === null || demo.deploying ? null : (
             <Button variant="outline" size="sm" onClick={demo.failDeploy}>
               <CircleAlert className="size-3.5" />
-              Simulate failed deploy
+              {t("deploy.simulateFailedDeploy")}
             </Button>
           )
         }

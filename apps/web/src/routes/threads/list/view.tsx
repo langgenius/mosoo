@@ -20,22 +20,22 @@ import { EmptyState } from "@/shared/ui/empty-state";
 import { AgentAvatar } from "../agent-avatar";
 import { getNotificationPermission, formatShortRelative } from "../model/format";
 import { getThreadActionCapabilities } from "../model/session-capabilities";
-import { getThreadStateGlyph } from "../model/thread";
+import { getThreadStateGlyph, translateThreadStatusLine } from "../model/thread";
 import type { ThreadFilter, ThreadListItem, ThreadSection } from "../model/thread";
 import { ThreadStateIcon } from "../thread-state-icon";
 
 const THREAD_FILTERS: { label: string; value: ThreadFilter }[] = [
-  { label: "All", value: "all" },
-  { label: "Unread", value: "unread" },
-  { label: "Pinned", value: "pinned" },
-  { label: "Failed", value: "failed" },
+  { label: "threads.all", value: "all" },
+  { label: "threads.unread", value: "unread" },
+  { label: "threads.pinned", value: "pinned" },
+  { label: "threads.failed", value: "failed" },
 ];
 
 const SECTION_LABELS: Record<ThreadSection, string> = {
-  archived: "Archive",
-  completed: "Completed",
-  pinned: "Pinned",
-  working: "Working",
+  archived: "threads.archive",
+  completed: "threads.completed",
+  pinned: "threads.pinned",
+  working: "threads.working",
 };
 
 export function ThreadFilterBar({
@@ -47,6 +47,8 @@ export function ThreadFilterBar({
   counts: Record<ThreadFilter, number>;
   onFilterChange: (filter: ThreadFilter) => void;
 }): ReactElement {
+  const { t } = useTranslation();
+
   return (
     <div className="flex flex-wrap items-center gap-1">
       {THREAD_FILTERS.map((filter) => (
@@ -63,7 +65,7 @@ export function ThreadFilterBar({
               : "text-fg-2 hover:bg-ink-900/[0.05] hover:text-fg-1",
           )}
         >
-          <span>{filter.label}</span>
+          <span>{t(filter.label)}</span>
           <span
             className={cn(
               "text-[10.5px] font-medium",
@@ -96,7 +98,7 @@ export function NotificationPrompt({
     <div className="border-border-subtle bg-ink-50 mb-3 flex items-center gap-2 rounded-md border px-3 py-2">
       <Bell className="text-fg-3 size-3.5 shrink-0" />
       <div className="text-fg-2 min-w-0 flex-1 text-[12px] font-medium">
-        Enable notifications to be pinged when an agent finishes.
+        {t("threads.enableNotifications")}
       </div>
       <Button
         size="xs"
@@ -105,7 +107,7 @@ export function NotificationPrompt({
           void globalThis.Notification.requestPermission().then(setPermission);
         }}
       >
-        Enable
+        {t("threads.enable")}
       </Button>
       <Button size="icon-xs" variant="ghost" onClick={onDismiss} aria-label={t("common.dismiss")}>
         <ChevronRight className="size-3" />
@@ -135,6 +137,7 @@ function ThreadRow({
   const actionCapabilities = getThreadActionCapabilities({
     bucket: thread.bucket,
     capabilities: thread.actionCapabilities,
+    t,
   });
 
   return (
@@ -158,7 +161,7 @@ function ThreadRow({
 
         <AgentAvatar
           agent={thread.agent}
-          defaultName={thread.agentName}
+          defaultName={t(thread.agentName)}
           className="size-5 text-[9px] font-bold"
         />
 
@@ -171,21 +174,21 @@ function ThreadRow({
             "min-w-0 flex-1 truncate text-[12.5px] tracking-tight",
             thread.read ? "text-fg-2" : "text-fg-1 font-semibold",
           )}
-          title={thread.title}
+          title={t(thread.title)}
         >
-          {thread.title}
+          {t(thread.title)}
         </span>
 
-        <span className="text-fg-3 shrink-0 text-[12px]">[{thread.agentName}]</span>
+        <span className="text-fg-3 shrink-0 text-[12px]">[{t(thread.agentName)}]</span>
 
         <span
           className={cn("shrink-0 text-[12px]", thread.failed ? "text-destructive" : "text-fg-3")}
         >
-          {thread.statusLine}
+          {translateThreadStatusLine(thread.statusLine, t)}
         </span>
 
         <span className="text-fg-3 shrink-0 text-[11.5px] tabular-nums">
-          {formatShortRelative(thread.lastActivityAt)}
+          {formatShortRelative(thread.lastActivityAt, t)}
         </span>
       </button>
 
@@ -210,7 +213,7 @@ function ThreadRow({
           <Button
             size="icon-xs"
             variant="ghost"
-            aria-label={thread.pinned ? "Unpin thread" : "Pin thread"}
+            aria-label={thread.pinned ? t("threads.unpinThread") : t("threads.pinThread")}
             onClick={() => {
               onPinToggle(thread.id);
             }}
@@ -234,7 +237,7 @@ function ThreadRow({
             variant="ghost"
             aria-label={t("threads.deleteThread")}
             disabled={!actionCapabilities.delete.available}
-            title={actionCapabilities.delete.reason ?? undefined}
+            title={actionCapabilities.delete.reason ? t(actionCapabilities.delete.reason) : undefined}
             onClick={() => {
               onDelete(thread.id);
             }}
@@ -266,6 +269,8 @@ export function ThreadSectionGroup({
   section: ThreadSection;
   threads: ThreadListItem[];
 }): ReactElement | null {
+  const { t } = useTranslation();
+
   if (threads.length === 0 && section === "pinned") {
     return null;
   }
@@ -281,7 +286,7 @@ export function ThreadSectionGroup({
           className="text-fg-3 hover:text-fg-1 flex h-7 items-center gap-1.5 text-[11px] font-bold tracking-[0.12em] uppercase"
         >
           {collapsed ? <ChevronRight className="size-3" /> : <ChevronDown className="size-3" />}
-          {SECTION_LABELS[section]} ({threads.length})
+          {t(SECTION_LABELS[section])} ({threads.length})
         </button>
       </section>
     );
@@ -297,7 +302,7 @@ export function ThreadSectionGroup({
         className="text-fg-3 hover:text-fg-1 flex h-7 items-center gap-1.5 text-[11px] font-bold tracking-[0.12em] uppercase"
       >
         {collapsed ? <ChevronRight className="size-3" /> : <ChevronDown className="size-3" />}
-        {SECTION_LABELS[section]} ({threads.length})
+        {t(SECTION_LABELS[section])} ({threads.length})
       </button>
       {collapsed ? null : (
         <div className="mt-1 flex flex-col gap-0.5">
@@ -328,7 +333,7 @@ export function ThreadsEmptyState({ onNewThread }: { onNewThread: () => void }):
     >
       <Button onClick={onNewThread} size="sm">
         <Plus className="size-3.5" />
-        New thread
+        {t("threads.newThread")}
       </Button>
     </EmptyState>
   );

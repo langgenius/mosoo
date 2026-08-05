@@ -1,9 +1,13 @@
 import { useEffect, useRef } from "react";
 
 import { getNotificationPermission } from "./format";
-import type { ThreadBucket, ThreadListItem } from "./thread";
+import { translateThreadStatusLine } from "./thread";
+import type { ThreadBucket, ThreadListItem, Translate } from "./thread";
 
-export function useThreadCompletionNotifications(threads: readonly ThreadListItem[]): void {
+export function useThreadCompletionNotifications(
+  threads: readonly ThreadListItem[],
+  t: Translate,
+): void {
   const previousBucketsRef = useRef<Map<string, ThreadBucket> | null>(null);
 
   useEffect(() => {
@@ -21,10 +25,17 @@ export function useThreadCompletionNotifications(threads: readonly ThreadListIte
       const previousBucket = previousBuckets.get(thread.id) ?? null;
 
       if (previousBucket === "working" && thread.bucket === "completed" && !thread.read) {
-        const notification = new globalThis.Notification("Thread completed", {
-          body: `${thread.title} · ${thread.statusLine} by ${thread.agentName}`,
-          tag: thread.id,
-        });
+        const notification = new globalThis.Notification(
+          t("threads.notificationThreadCompleted"),
+          {
+            body: t("threads.notificationThreadCompletedBody", {
+              agentName: t(thread.agentName),
+              statusLine: translateThreadStatusLine(thread.statusLine, t),
+              title: t(thread.title),
+            }),
+            tag: thread.id,
+          },
+        );
         const threadId = thread.id;
         const onClick = (): void => {
           globalThis.window.focus();
@@ -40,5 +51,5 @@ export function useThreadCompletionNotifications(threads: readonly ThreadListIte
         notification.removeEventListener("click", onClick);
       }
     };
-  }, [threads]);
+  }, [threads, t]);
 }

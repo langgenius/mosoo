@@ -1,5 +1,6 @@
 import type { ReactElement } from "react";
 
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import {
   SESSION_EVENT_DOMAIN_TONE,
@@ -21,6 +22,8 @@ export function ProcessTimelineBar({
   onSelect,
   selectedId,
 }: ProcessTimelineBarProps): ReactElement {
+  const { t } = useTranslation();
+
   return (
     <div className="border-border-subtle bg-muted/10 flex h-7 w-full max-w-full min-w-0 items-center gap-0.5 overflow-hidden rounded-md border p-1">
       {events.map((event) => {
@@ -37,7 +40,7 @@ export function ProcessTimelineBar({
             onClick={() => {
               onSelect(event.id);
             }}
-            aria-label={`Select ${getSessionEventLabel(event.type)}`}
+            aria-label={t("threads.selectEvent", { label: getSessionEventLabel(event.type) })}
             style={{ flexGrow: getTimelineSegmentFlexGrow(event) }}
             className={cn(
               "h-full min-w-[2px] rounded-[1px] border transition-colors text-[0]",

@@ -5,6 +5,7 @@ import type {
 import { Check, ChevronDown } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { useTranslation } from "@/shared/i18n";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,9 +43,11 @@ export function NetworkPolicySelect({
   onChange: (value: EnvironmentNetworkPolicy) => void;
   value: EnvironmentNetworkPolicy;
 }) {
+  const { t } = useTranslation();
+
   return (
     <DropdownMenu>
-      <SelectButton disabled={disabled} label={NETWORK_POLICY_LABELS[value]} />
+      <SelectButton disabled={disabled} label={t(NETWORK_POLICY_LABELS[value])} />
       <DropdownMenuContent
         align="start"
         className="environment-scroll-area max-h-64 w-[var(--anchor-width)] overflow-y-auto"
@@ -57,7 +60,7 @@ export function NetworkPolicySelect({
               onChange(policy);
             }}
           >
-            {NETWORK_POLICY_LABELS[policy]}
+            {t(NETWORK_POLICY_LABELS[policy])}
             {policy === value ? <Check className="text-primary size-3.5" /> : null}
           </DropdownMenuItem>
         ))}
@@ -75,9 +78,14 @@ export function PackageManagerSelect({
   onChange: (value: EnvironmentPackageManager) => void;
   value: EnvironmentPackageManager | null;
 }) {
+  const { t } = useTranslation();
+
   return (
     <DropdownMenu>
-      <SelectButton disabled={disabled} label={value ? PACKAGE_MANAGER_LABELS[value] : "Manager"} />
+      <SelectButton
+        disabled={disabled}
+        label={value ? PACKAGE_MANAGER_LABELS[value] : t("environments.manager")}
+      />
       <DropdownMenuContent
         align="start"
         className="environment-scroll-area max-h-56 w-[var(--anchor-width)] overflow-y-auto"

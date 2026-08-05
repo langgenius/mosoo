@@ -35,11 +35,12 @@ export function AgentApiAccessDialog({
   onOpenChange,
   open,
 }: AgentApiAccessDialogProps): ReactElement {
+  const { t } = useTranslation();
   return (
     <Dialog onOpenChange={onOpenChange} open={open}>
       <DialogContent className="rounded-lg p-0 sm:max-w-[520px]">
         <DialogHeader className="px-6 pt-6 pb-3">
-          <DialogTitle className="text-[16px]">API Access</DialogTitle>
+          <DialogTitle className="text-[16px]">{t("agentLifecycle.apiAccess")}</DialogTitle>
         </DialogHeader>
         <div className="px-6 pb-5">
           <AgentApiAccessPanel agent={agent} showTitle={false} />
@@ -74,7 +75,9 @@ export function AgentApiAccessPanel({
       {showTitle ? (
         <div className="border-border-subtle flex items-center gap-2 border-b px-3.5 py-2.5">
           <Code className="text-fg-3 size-4 shrink-0" />
-          <div className="text-foreground text-[13px] font-medium">API Access</div>
+          <div className="text-foreground text-[13px] font-medium">
+            {t("agentLifecycle.apiAccess")}
+          </div>
         </div>
       ) : null}
 
@@ -89,8 +92,12 @@ export function AgentApiAccessPanel({
               size="xs"
               variant="outline"
             >
-              {copiedKey === "agent" ? <Check className="size-3" /> : <Copy className="size-3" />}
-              {copiedKey === "agent" ? "Copied" : "Copy"}
+              {copiedKey === "agent" ? (
+                <Check className="size-3" />
+              ) : (
+                <Copy className="size-3" />
+              )}
+              {copiedKey === "agent" ? t("common.copied") : t("common.copy")}
             </Button>
           }
           label={t("agent.agentId")}
@@ -101,12 +108,12 @@ export function AgentApiAccessPanel({
             <Button asChild className="gap-1 text-[11.5px]" size="xs" variant="outline">
               <Link to={distribution.tokenSettingsPath}>
                 <KeyRound className="size-3" />
-                Create token
+                {t("agentLifecycle.createToken")}
               </Link>
             </Button>
           }
           label={t("agent.apiToken")}
-          value="Settings / API Tokens"
+          value={t("agentLifecycle.apiTokenSettingsLocation")}
         />
         <ApiAccessDetailRow
           action={
@@ -120,12 +127,12 @@ export function AgentApiAccessPanel({
                 variant="outline"
               >
                 {copiedKey === "docs" ? <Check className="size-3" /> : <Copy className="size-3" />}
-                {copiedKey === "docs" ? "Copied" : "Copy"}
+                {copiedKey === "docs" ? t("common.copied") : t("common.copy")}
               </Button>
               <Button asChild className="gap-1 text-[11.5px]" size="xs" variant="outline">
                 <a href={distribution.apiDocsUrl} rel="noreferrer" target="_blank">
                   <BookOpen className="size-3" />
-                  Open
+                  {t("common.open")}
                 </a>
               </Button>
             </div>

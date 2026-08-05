@@ -35,11 +35,15 @@ function shortSha(sha: string): string {
 }
 
 /** Relative "when" label, computed at render time against `nowMs`. */
-export function relativeLabel(iso: string, nowMs: number): string {
+export function relativeLabel(
+  iso: string,
+  nowMs: number,
+  t: (key: string) => string = (key) => key,
+): string {
   const deltaMs = nowMs - new Date(iso).getTime();
 
   if (Number.isNaN(deltaMs) || deltaMs < 60_000) {
-    return "just now";
+    return t("deploy.justNow");
   }
   if (deltaMs < 3_600_000) {
     return `${String(Math.round(deltaMs / 60_000))}m`;

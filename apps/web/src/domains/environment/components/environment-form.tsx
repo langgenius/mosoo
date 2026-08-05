@@ -149,7 +149,7 @@ function EnvironmentVariablesSection({
       <div className="environment-scroll-area max-h-[220px] space-y-2 overflow-y-auto pr-1">
         {envVarCount === 0 ? (
           <div className="border-border text-fg-3 rounded-md border border-dashed p-3 text-[12px]">
-            No environment variables.
+            {t("environments.noEnvVars")}
           </div>
         ) : null}
 
@@ -191,10 +191,10 @@ function EnvironmentVariablesSection({
               }}
               placeholder={
                 envVar.status === "pending"
-                  ? "pending value"
+                  ? t("environments.pendingValue")
                   : isTruthy(envVar.preview)
-                    ? `Keep ${envVar.preview}`
-                    : "value"
+                    ? t("environments.keepValue", { value: envVar.preview })
+                    : t("environments.valuePlaceholder")
               }
               type="password"
               value={envVar.value}
@@ -236,7 +236,7 @@ export function EnvironmentForm({
 }) {
   const { t } = useTranslation();
   const limited = draft.networkPolicy === "limited";
-  const packageManagerError = getPackageManagerError(draft.packages);
+  const packageManagerError = getPackageManagerError(draft.packages, t);
 
   function update(transform: (current: EnvironmentDraft) => EnvironmentDraft) {
     onChange(transform(draft));
@@ -350,7 +350,7 @@ export function EnvironmentForm({
                 className="text-fg-1 flex items-center justify-between gap-3 text-[13px] font-medium"
                 htmlFor="environment-form-allow-mcp-servers"
               >
-                Allow MCP endpoints (saved only)
+                {t("environments.allowMcpServers")}
                 <Switch
                   checked={draft.allowMcpServers}
                   disabled={disabled}
@@ -367,7 +367,7 @@ export function EnvironmentForm({
                 className="text-fg-1 flex items-center justify-between gap-3 text-[13px] font-medium"
                 htmlFor="environment-form-allow-package-registries"
               >
-                Allow package registries (saved only)
+                {t("environments.allowPackageRegistries")}
                 <Switch
                   checked={draft.allowPackageManagers}
                   disabled={disabled}
@@ -438,12 +438,12 @@ export function EnvironmentForm({
       <div className="border-border flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="text-fg-3 flex items-center gap-2 text-[12px]">
           <Check className="size-3.5" />
-          Save creates a new revision; in-flight sessions are unaffected.
+          {t("environments.saveRevisionNote")}
         </div>
         <div className="flex justify-end gap-2">
           {onCancel ? (
             <Button disabled={disabled} onClick={onCancel} type="button" variant="outline">
-              Cancel
+              {t("common.cancel")}
             </Button>
           ) : null}
           <Button

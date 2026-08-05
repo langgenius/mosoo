@@ -86,19 +86,21 @@ export function TelegramChannelInlineSetup({
 
         {agent.status !== "published" ? (
           <div className="border-amber/30 bg-amber-bg text-amber-fg mt-4 rounded-md border px-3 py-2 text-xs">
-            Publish this Agent before connecting Telegram.
+            {t("agent.publishBeforeConnectingTelegram")}
           </div>
         ) : null}
         {mutation.error ? (
           <div className="border-ember/25 bg-ember-bg text-ember-fg mt-4 rounded-md border px-3 py-2 text-xs">
-            {mutation.error instanceof Error ? mutation.error.message : "Telegram setup failed."}
+            {mutation.error instanceof Error
+              ? mutation.error.message
+              : t("agent.telegramSetupFailed")}
           </div>
         ) : null}
 
         <div className="mt-4 flex justify-end">
           <Button disabled={!canSubmit} type="submit">
             {mutation.isPending ? <Loader2 className="size-4 animate-spin" /> : null}
-            Save
+            {t("common.save")}
           </Button>
         </div>
       </section>

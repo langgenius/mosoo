@@ -1,8 +1,8 @@
 export const MAX_TEXT_PREVIEW_BYTES = 2 * 1024 * 1024;
 export const UNSUPPORTED_FILE_PREVIEW_MESSAGE =
   "Preview isn't available for this file type. Download the file to view it.";
-const MAX_TABLE_PREVIEW_COLUMNS = 50;
-const MAX_TABLE_PREVIEW_ROWS = 200;
+export const MAX_TABLE_PREVIEW_COLUMNS = 50;
+export const MAX_TABLE_PREVIEW_ROWS = 200;
 
 export type FilePreviewKind = "image" | "markdown" | "pdf" | "table" | "text" | "unsupported";
 

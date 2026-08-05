@@ -21,13 +21,13 @@ export function EnvironmentBadges({
       {environment.isDefault ? (
         <Badge className="gap-1" variant="warning">
           <Star className="size-3" />
-          Default
+          {t("environments.default")}
         </Badge>
       ) : null}
       <Badge variant={environment.networkPolicy === "limited" ? "soil" : "default"}>
         {environment.networkPolicy === "limited"
-          ? "Limited network · Task sessions"
-          : "Full network"}
+          ? t("environments.limitedNetwork")
+          : t("environments.fullNetwork")}
       </Badge>
     </div>
   );

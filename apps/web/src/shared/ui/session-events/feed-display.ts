@@ -1,5 +1,7 @@
 import type { SessionProcessEvent } from "@mosoo/contracts/session";
 
+import { getCurrentLocale } from "@/shared/i18n";
+
 import { getSessionEventDomain, summarizeSessionEvent } from "./domain";
 import { formatDuration, formatTokens } from "./format";
 import type { SessionTurnStatus } from "./turns";
@@ -7,7 +9,7 @@ import type { SessionTurnStatus } from "./turns";
 const MAX_PREVIEW_LENGTH = 180;
 
 export function formatEventTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString("en-US", {
+  return new Date(iso).toLocaleTimeString(getCurrentLocale(), {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
@@ -61,25 +63,31 @@ export function turnStatusClassName(status: SessionTurnStatus): string {
   }
 }
 
-export function turnStatusLabel(status: SessionTurnStatus): string {
+type Translate = (key: string, variables?: Record<string, string>) => string;
+const defaultTranslate: Translate = (key) => key;
+
+export function turnStatusLabel(
+  status: SessionTurnStatus,
+  t: Translate = defaultTranslate,
+): string {
   switch (status) {
     case "completed": {
-      return "Completed";
+      return t("threads.completed");
     }
     case "failed": {
-      return "Failed";
+      return t("threads.failed");
     }
     case "pending": {
-      return "Pending";
+      return t("sessionEvents.turnStatusPending");
     }
     case "rescheduling": {
-      return "Reconnecting";
+      return t("sessionEvents.turnStatusReconnecting");
     }
     case "running": {
-      return "Running";
+      return t("sessionEvents.turnStatusRunning");
     }
     case "terminated": {
-      return "Terminated";
+      return t("sessionEvents.turnStatusTerminated");
     }
   }
 }

@@ -2,24 +2,27 @@ import { BarChart3, Box } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 
 interface AppSettingsNavItem {
   icon: LucideIcon;
-  label: string;
+  labelKey: string;
   path: string;
 }
 
 const APP_SETTINGS_NAV_ITEMS: AppSettingsNavItem[] = [
-  { icon: Box, label: "General", path: "/app-settings/general" },
-  { icon: BarChart3, label: "App usage", path: "/app-settings/usage" },
+  { icon: Box, labelKey: "settings.general", path: "/app-settings/general" },
+  { icon: BarChart3, labelKey: "appSettings.usage", path: "/app-settings/usage" },
 ];
 
 export function AppSettingsNav() {
+  const { t } = useTranslation();
+
   return (
     <aside className="border-border-soft flex w-full shrink-0 flex-col gap-3 overflow-x-auto border-b px-4 py-2 md:w-[220px] md:overflow-visible md:border-r md:border-b-0 md:px-3 md:py-5">
       <div className="text-fg-3 hidden px-2.5 pb-1 text-[10px] font-semibold tracking-[0.14em] uppercase md:block">
-        App
+        {t("nav.app")}
       </div>
       <div className="flex gap-1 md:flex-col md:gap-0.5">
         {APP_SETTINGS_NAV_ITEMS.map((item) => (
@@ -36,7 +39,7 @@ export function AppSettingsNav() {
             }
           >
             <item.icon className="size-4" />
-            <span>{item.label}</span>
+            <span>{t(item.labelKey)}</span>
           </NavLink>
         ))}
       </div>

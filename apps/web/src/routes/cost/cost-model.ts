@@ -10,6 +10,8 @@ import type {
   OrganizationBillingCostCard,
   AppCostCard,
 } from "@/domains/cost/api/cost-client";
+import { getCurrentLocale } from "@/shared/i18n";
+import type { SupportedLocale } from "@/shared/i18n/locales";
 
 export const COST_RANGES = ["7d", "30d", "mtd", "90d"] as const;
 
@@ -38,16 +40,20 @@ export interface ModelPricingSummary {
   needsPricingAction: boolean;
 }
 
-export const COST_TABS: { id: CostTab; label: string }[] = [
-  { id: "overview", label: "Overview" },
-  { id: "agents", label: "By Agent" },
-  { id: "models", label: "By Model" },
+export const COST_TABS: { id: CostTab; labelKey: string }[] = [
+  { id: "overview", labelKey: "cost.overview" },
+  { id: "agents", labelKey: "cost.byAgent" },
+  { id: "models", labelKey: "cost.byModel" },
 ];
 
-export const RUN_PURPOSE_FILTERS: { label: string; value: CostRunPurpose | "all" }[] = [
-  { label: "All", value: "all" },
-  { label: "Production", value: "production" },
-  { label: "Debug", value: "debug" },
+export const RUN_PURPOSE_FILTERS: {
+  label: string;
+  labelKey: string;
+  value: CostRunPurpose | "all";
+}[] = [
+  { label: "All", labelKey: "cost.all", value: "all" },
+  { label: "Production", labelKey: "cost.production", value: "production" },
+  { label: "Debug", labelKey: "cost.debug", value: "debug" },
 ];
 
 // The UI only distinguishes production vs. debug usage. "Debug" covers every
@@ -64,37 +70,28 @@ export function runPurposeToQuery(value: CostRunPurpose | "all"): CostRunPurpose
   return [value];
 }
 
-const CURRENCY_FORMATTER_PRECISE = new Intl.NumberFormat("en-US", {
-  currency: "USD",
-  maximumFractionDigits: 2,
-  style: "currency",
-});
-
-const CURRENCY_FORMATTER_WHOLE = new Intl.NumberFormat("en-US", {
-  currency: "USD",
-  maximumFractionDigits: 0,
-  style: "currency",
-});
-
-const COMPACT_NUMBER_FORMATTER = new Intl.NumberFormat("en-US", {
-  maximumFractionDigits: 1,
-  notation: "compact",
-});
-
-export function formatCurrency(value: number): string {
-  return (value >= 100 ? CURRENCY_FORMATTER_WHOLE : CURRENCY_FORMATTER_PRECISE).format(value);
+export function formatCurrency(value: number, locale: SupportedLocale = getCurrentLocale()): string {
+  return new Intl.NumberFormat(locale, {
+    currency: "USD",
+    maximumFractionDigits: value >= 100 ? 0 : 2,
+    style: "currency",
+  }).format(value);
 }
 
-export function formatCompactNumber(value: number): string {
-  return COMPACT_NUMBER_FORMATTER.format(value);
+export function formatCompactNumber(value: number, locale: SupportedLocale = getCurrentLocale()): string {
+  return new Intl.NumberFormat(locale, {
+    maximumFractionDigits: 1,
+    notation: "compact",
+  }).format(value);
 }
 
-export function formatPercent(value: number): string {
-  return `${value >= 0 ? "+" : ""}${Math.round(value * 100)}%`;
+export function formatPercent(value: number, locale: SupportedLocale = getCurrentLocale()): string {
+  const amount = new Intl.NumberFormat(locale).format(Math.round(value * 100));
+  return `${value >= 0 ? "+" : ""}${amount}%`;
 }
 
-export function formatPlainPercent(value: number): string {
-  return `${Math.round(value * 100)}%`;
+export function formatPlainPercent(value: number, locale: SupportedLocale = getCurrentLocale()): string {
+  return `${new Intl.NumberFormat(locale).format(Math.round(value * 100))}%`;
 }
 
 export function rangeToInput(range: CostRange): CostRangeInput {
@@ -112,15 +109,28 @@ export function rangeToInput(range: CostRange): CostRangeInput {
 
 export function rangeLabel(range: CostRange): string {
   if (range === "7d") {
-    return "Last 7 days";
+    return "cost.rangeLast7d";
   }
   if (range === "mtd") {
-    return "Month to date";
+    return "cost.rangeMonthToDate";
   }
   if (range === "90d") {
-    return "Last 90 days";
+    return "cost.rangeLast90d";
   }
-  return "Last 30 days";
+  return "cost.rangeLast30d";
+}
+
+export function rangeLabelKey(range: CostRange): string {
+  if (range === "7d") {
+    return "cost.range7d";
+  }
+  if (range === "30d") {
+    return "cost.range30d";
+  }
+  if (range === "mtd") {
+    return "cost.rangeMtd";
+  }
+  return "cost.range90d";
 }
 
 export function tokensTotal(row: Pick<CostTotals, "inputTokens" | "outputTokens">): number {
@@ -190,18 +200,26 @@ export function runMixSegments(agent: CostAgentRow): RunMixSegment[] {
   ].filter((segment) => segment.value > 0);
 }
 
-function formatPricePerMillion(value: number | null): string {
-  return value === null ? "Unknown" : `$${value}`;
+function formatPricePerMillion(
+  value: number | null,
+  t: (key: string) => string,
+  locale: SupportedLocale,
+): string {
+  return value === null ? t("cost.unknown") : `$${new Intl.NumberFormat(locale).format(value)}`;
 }
 
-export function formatModelPricingSummary(model: CostModelRow): ModelPricingSummary {
+export function formatModelPricingSummary(
+  model: CostModelRow,
+  t: (key: string) => string,
+  locale: SupportedLocale = getCurrentLocale(),
+): ModelPricingSummary {
   return {
-    cacheHitLabel: formatPlainPercent(cacheHitRate(model)),
-    cacheReadPriceLabel: formatPricePerMillion(model.cacheReadUsdPerMillion),
-    cacheWritePriceLabel: formatPricePerMillion(model.cacheWriteUsdPerMillion),
+    cacheHitLabel: formatPlainPercent(cacheHitRate(model), locale),
+    cacheReadPriceLabel: formatPricePerMillion(model.cacheReadUsdPerMillion, t, locale),
+    cacheWritePriceLabel: formatPricePerMillion(model.cacheWriteUsdPerMillion, t, locale),
     inputOutputPriceLabel:
       model.inputUsdPerMillion === null || model.outputUsdPerMillion === null
-        ? "Unknown"
+        ? t("cost.unknown")
         : `$${model.inputUsdPerMillion}/$${model.outputUsdPerMillion}`,
     needsPricingAction:
       model.unpricedRequestCount > 0 ||

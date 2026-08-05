@@ -19,9 +19,46 @@ export interface AgentDistribution {
   webUrl: string;
 }
 
+type Translate = (key: string, variables?: Record<string, string>) => string;
+
 const ACCESS_TOKEN_SETTINGS_PATH = "/settings/access-tokens";
 const AGENT_API_ENDPOINT_BASE_PATH = `${PUBLIC_API_PREFIX}${PUBLIC_API_VERSION_PREFIX}`;
 const AGENT_API_ENDPOINT_OPENAPI_PATH = `${AGENT_API_ENDPOINT_BASE_PATH}/openapi.json`;
+
+const DEFAULT_INSTRUCTION_COPY: Record<string, string> = {
+  "agentLifecycle.instructionAgentHeading": "## Agent",
+  "agentLifecycle.instructionCreateThreadExample": "## Create-thread example",
+  "agentLifecycle.instructionForLlmHeading": "# Instruction for LLM: {{agentName}}",
+  "agentLifecycle.instructionGeneratedVariables": "## Generated variables",
+  "agentLifecycle.instructionIntro":
+    "Use this `.md` instruction with a coding agent that needs to control or use this mosoo agent programmatically.",
+  "agentLifecycle.instructionProgrammaticControl": "## Programmatic control",
+  "agentLifecycle.instructionStep1":
+    "Create a mosoo API token in the console if one is not already available.",
+  "agentLifecycle.instructionStep2": "Store it locally as `MOSOO_API_TOKEN`.",
+  "agentLifecycle.instructionStep3":
+    "Create a thread by sending a user message to `MOSOO_CREATE_THREAD_URL` with a bearer token.",
+  "agentLifecycle.instructionStep4":
+    "Persist the returned thread and run identifiers so follow-up calls can continue the same work.",
+  "agentLifecycle.instructionStep5":
+    "Use the API docs and OpenAPI document above for the exact response schema and continuation endpoints.",
+  "agentLifecycle.instructionThreadResponse":
+    "The create-thread response returns `thread/run`; continue the conversation through the Thread API when the task needs more turns.",
+  "agentLifecycle.instructionTokenRead":
+    "Read `MOSOO_API_TOKEN` from the environment. Do not hard-code or print the token.",
+  "agentLifecycle.kindHintAssistant":
+    "Conversational chat agent designed for back-and-forth dialogue.",
+  "agentLifecycle.kindHintTask":
+    "Job-style agent designed for one-shot calls that return a structured result.",
+  "agentLifecycle.noDescriptionProvided": "No description provided.",
+};
+
+function defaultTranslate(key: string, variables?: Record<string, string>): string {
+  return Object.entries(variables ?? {}).reduce(
+    (result, [name, replacement]) => result.replaceAll(`{{${name}}}`, replacement),
+    DEFAULT_INSTRUCTION_COPY[key] ?? key,
+  );
+}
 
 function shortSlug(id: string): string {
   return (
@@ -102,18 +139,19 @@ export function buildAgentApiCurl(
 export function buildAgentInstructionPrompt(
   agent: Agent,
   distribution: AgentDistribution = buildAgentDistribution(agent),
+  t: Translate = defaultTranslate,
 ): string {
-  const description = agent.description.trim() || "No description provided.";
+  const description = agent.description.trim() || t("agentLifecycle.noDescriptionProvided");
   const kindHint =
     agent.kind === "pet"
-      ? "Conversational chat agent designed for back-and-forth dialogue."
-      : "Job-style agent designed for one-shot calls that return a structured result.";
+      ? t("agentLifecycle.kindHintAssistant")
+      : t("agentLifecycle.kindHintTask");
 
-  return `# Instruction for LLM: ${agent.name}
+  return `${t("agentLifecycle.instructionForLlmHeading", { agentName: agent.name })}
 
-Use this \`.md\` instruction with a coding agent that needs to control or use this mosoo agent programmatically.
+${t("agentLifecycle.instructionIntro")}
 
-## Generated variables
+${t("agentLifecycle.instructionGeneratedVariables")}
 
 \`\`\`text
 MOSOO_AGENT_ID=${agent.id}
@@ -125,28 +163,28 @@ MOSOO_OPENAPI_URL=${distribution.openApiUrl}
 MOSOO_THREAD_URL=${distribution.threadsUrl}
 \`\`\`
 
-Read \`MOSOO_API_TOKEN\` from the environment. Do not hard-code or print the token.
+${t("agentLifecycle.instructionTokenRead")}
 
-## Agent
+${t("agentLifecycle.instructionAgentHeading")}
 
 ${description}
 
 > ${kindHint}
 
-## Programmatic control
+${t("agentLifecycle.instructionProgrammaticControl")}
 
-1. Create a mosoo API token in the console if one is not already available.
-2. Store it locally as \`MOSOO_API_TOKEN\`.
-3. Create a thread by sending a user message to \`MOSOO_CREATE_THREAD_URL\` with a bearer token.
-4. Persist the returned thread and run identifiers so follow-up calls can continue the same work.
-5. Use the API docs and OpenAPI document above for the exact response schema and continuation endpoints.
+1. ${t("agentLifecycle.instructionStep1")}
+2. ${t("agentLifecycle.instructionStep2")}
+3. ${t("agentLifecycle.instructionStep3")}
+4. ${t("agentLifecycle.instructionStep4")}
+5. ${t("agentLifecycle.instructionStep5")}
 
-## Create-thread example
+${t("agentLifecycle.instructionCreateThreadExample")}
 
 \`\`\`bash
 ${buildAgentApiCurl(agent, distribution)}
 \`\`\`
 
-The create-thread response returns \`thread/run\`; continue the conversation through the Thread API when the task needs more turns.
+${t("agentLifecycle.instructionThreadResponse")}
 `;
 }

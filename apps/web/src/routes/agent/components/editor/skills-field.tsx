@@ -27,9 +27,10 @@ interface AgentSkillsFieldProps {
 }
 
 function MissingSkillBadge(): ReactElement {
+  const { t } = useTranslation();
   return (
     <span className="bg-amber-bg text-amber-fg rounded-md px-1.5 py-0.5 text-[10px] font-medium">
-      Missing
+      {t("agentEditor.missing")}
     </span>
   );
 }
@@ -49,7 +50,7 @@ export function AgentSkillsField({
   const [open, setOpen] = useState(false);
 
   const noOptions = model.availableSkills.length === 0;
-  const triggerLabel = model.skillsLoading ? "Loading skills…" : "Add skill";
+  const triggerLabel = model.skillsLoading ? t("agentEditor.loadingSkills") : t("skills.addSkill");
   const previewFileCount = model.previewSkill
     ? (model.fileCountBySkillId.get(model.previewSkill.id) ?? null)
     : null;
@@ -104,7 +105,7 @@ export function AgentSkillsField({
                     }}
                     type="button"
                   >
-                    Remove
+                    {t("common.remove")}
                   </button>
                 ) : null}
               </div>
@@ -135,7 +136,7 @@ export function AgentSkillsField({
                     to="/integrations/skills"
                   >
                     <ExternalLink className="size-3" />
-                    Manage skills
+                    {t("agentEditor.manageSkills")}
                   </Link>
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -177,7 +178,7 @@ function renderSkillsDropdownContent({
   if (model.skillsError) {
     return (
       <div className="text-destructive p-3 text-[12px]">
-        {model.skillsError instanceof Error ? model.skillsError.message : "Failed to load skills."}
+        {model.skillsError instanceof Error ? model.skillsError.message : t("agentEditor.failedToLoadSkills")}
       </div>
     );
   }
@@ -185,8 +186,8 @@ function renderSkillsDropdownContent({
   if (noOptions) {
     const message =
       selectedSkills.length === 0
-        ? "No skills available. Head to Manage skills to upload one."
-        : "All available skills are already added.";
+        ? t("agentEditor.noSkillsAvailable")
+        : t("agentEditor.allSkillsAdded");
 
     return <div className="text-muted-foreground p-3 text-[12px]">{message}</div>;
   }

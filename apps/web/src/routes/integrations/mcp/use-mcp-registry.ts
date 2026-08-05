@@ -21,6 +21,7 @@ import {
   updateAppMcpServer,
 } from "@/domains/mcp/api/mcp-client";
 import { mcpKeys, useMcpRegistryQuery } from "@/domains/mcp/query/mcp-queries";
+import { useTranslation } from "@/shared/i18n";
 import { toMcpOAuthFlowId, toMcpServerId, toAppId } from "@/routes/typed-id";
 
 import { isTruthy } from "../../../shared/lib/truthiness";
@@ -31,6 +32,7 @@ async function getOAuthFlowState(flowId: string) {
 
 export function useMcpRegistry() {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
   const { activeAppId, appsLoading } = useAppSession();
   const appId = activeAppId;
   const registryQuery = useMcpRegistryQuery(appId);
@@ -38,7 +40,7 @@ export function useMcpRegistry() {
 
   async function refresh(): Promise<McpRegistry> {
     if (!isTruthy(appId)) {
-      throw new Error("App is not ready.");
+      throw new Error(t("mcp.appNotReady"));
     }
 
     await queryClient.invalidateQueries({
@@ -54,7 +56,7 @@ export function useMcpRegistry() {
     input: Omit<CreateAppMcpServerInput, "appId">,
   ): Promise<McpServerWithCredential> {
     if (!isTruthy(appId)) {
-      throw new Error("MCP registry is not ready.");
+      throw new Error(t("mcp.registryNotReady"));
     }
 
     const created = await createAppMcpServer({
@@ -69,7 +71,7 @@ export function useMcpRegistry() {
     input: Omit<UpdateAppMcpServerInput, "appId">,
   ): Promise<McpServerWithCredential> {
     if (!isTruthy(appId)) {
-      throw new Error("MCP registry is not ready.");
+      throw new Error(t("mcp.registryNotReady"));
     }
 
     const updated = await updateAppMcpServer({
@@ -84,7 +86,7 @@ export function useMcpRegistry() {
     input: Omit<ConnectMcpBearerInput, "appId">,
   ): Promise<McpServerWithCredential> {
     if (!isTruthy(appId)) {
-      throw new Error("MCP registry is not ready.");
+      throw new Error(t("mcp.registryNotReady"));
     }
 
     const nextServer = await connectMcpBearer({
@@ -97,7 +99,7 @@ export function useMcpRegistry() {
 
   async function revokeCredential(serverId: string): Promise<McpServerWithCredential> {
     if (!isTruthy(appId)) {
-      throw new Error("MCP registry is not ready.");
+      throw new Error(t("mcp.registryNotReady"));
     }
 
     const nextServer = await revokeMcpCredential(toAppId(appId), toMcpServerId(serverId));
@@ -107,7 +109,7 @@ export function useMcpRegistry() {
 
   async function removeServerById(serverId: string): Promise<void> {
     if (!isTruthy(appId)) {
-      throw new Error("MCP registry is not ready.");
+      throw new Error(t("mcp.registryNotReady"));
     }
 
     await deleteMcpServer(toAppId(appId), toMcpServerId(serverId));
@@ -119,7 +121,7 @@ export function useMcpRegistry() {
     enabled: boolean,
   ): Promise<McpServerWithCredential> {
     if (!isTruthy(appId)) {
-      throw new Error("MCP registry is not ready.");
+      throw new Error(t("mcp.registryNotReady"));
     }
 
     const nextServer = await setMcpServerEnabled(toAppId(appId), toMcpServerId(serverId), enabled);
@@ -129,7 +131,7 @@ export function useMcpRegistry() {
 
   async function startOAuthFlow(serverId: string): Promise<StartMcpOAuthPayload> {
     if (!isTruthy(appId)) {
-      throw new Error("MCP registry is not ready.");
+      throw new Error(t("mcp.registryNotReady"));
     }
 
     return startMcpOAuth({
@@ -148,7 +150,7 @@ export function useMcpRegistry() {
       registryQuery.error instanceof Error
         ? registryQuery.error.message
         : registryQuery.error
-          ? "Failed to load MCP registry."
+          ? t("mcp.failedToLoad")
           : null,
     getOAuthFlowState,
     loading: isTruthy(appId) ? registryQuery.isLoading : appsLoading,

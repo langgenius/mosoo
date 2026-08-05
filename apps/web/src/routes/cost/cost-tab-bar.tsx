@@ -1,3 +1,4 @@
+import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 
 import { COST_TABS } from "./cost-model";
@@ -10,6 +11,8 @@ export function CostTabBar({
   effectiveTab: CostTab;
   setActiveTab: (tab: CostTab) => void;
 }) {
+  const { t } = useTranslation();
+
   return (
     <div className="border-border-subtle flex shrink-0 gap-1 overflow-x-auto border-b px-4 py-3 sm:px-6">
       {COST_TABS.map((tab) => (
@@ -26,7 +29,7 @@ export function CostTabBar({
               : "text-muted-foreground hover:bg-muted/60",
           )}
         >
-          {tab.label}
+          {t(tab.labelKey)}
         </button>
       ))}
     </div>
