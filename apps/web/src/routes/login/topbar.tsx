@@ -17,7 +17,7 @@ export function LoginAuthTopbar(): ReactElement {
   const { t } = useTranslation();
 
   return (
-    <div className="flex items-center justify-between px-10 py-[22px]">
+    <div className="grid grid-cols-[1fr_auto_1fr] items-center px-6 py-[22px] sm:px-10">
       <a
         href={MOSOO_MARKETING_ORIGIN}
         className="text-fg-2 hover:text-fg-1 flex items-center gap-1.5 text-[13px] font-semibold transition-colors"
@@ -26,7 +26,9 @@ export function LoginAuthTopbar(): ReactElement {
         {t("login.backToMosoo")}
       </a>
       <Brand />
-      <LocaleSwitcher />
+      <div className="flex justify-end">
+        <LocaleSwitcher compact />
+      </div>
     </div>
   );
 }

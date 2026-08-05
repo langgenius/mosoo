@@ -57,7 +57,7 @@ export function ProcessEventRow({
             chipClass,
           )}
         >
-          {getSessionEventLabel(event.type)}
+          {getSessionEventLabel(event.type, t)}
         </span>
 
         <span className="text-fg-2 min-w-0 truncate text-[12.5px]">{previewShort}</span>

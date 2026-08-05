@@ -40,7 +40,9 @@ export function ProcessTimelineBar({
             onClick={() => {
               onSelect(event.id);
             }}
-            aria-label={t("threads.selectEvent", { label: getSessionEventLabel(event.type) })}
+            aria-label={t("threads.selectEvent", {
+              label: getSessionEventLabel(event.type, t),
+            })}
             style={{ flexGrow: getTimelineSegmentFlexGrow(event) }}
             className={cn(
               "h-full min-w-[2px] rounded-[1px] border transition-colors text-[0]",

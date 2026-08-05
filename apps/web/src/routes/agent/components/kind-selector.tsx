@@ -26,6 +26,55 @@ const COMPARE_ICONS = {
   switch_cost: Lock,
 } as const satisfies Record<(typeof COMPARE_ROWS)[number]["id"], typeof Sparkles>;
 
+const CARD_COPY_KEYS = {
+  cattle: {
+    description: "agent.kindTaskDescription",
+    examples: "agent.kindTaskExamples",
+    label: "agent.taskAgent",
+    tagline: "agent.kindTaskTagline",
+  },
+  pet: {
+    description: "agent.kindAssistantDescription",
+    examples: "agent.kindAssistantExamples",
+    label: "agent.assistantAgent",
+    tagline: "agent.kindAssistantTagline",
+  },
+} as const satisfies Record<
+  AgentKind,
+  Record<"description" | "examples" | "label" | "tagline", string>
+>;
+
+const COMPARISON_COPY_KEYS = {
+  best_for: {
+    cattle: "agent.kindComparisonBestForTask",
+    label: "agent.kindComparisonBestFor",
+    pet: "agent.kindComparisonBestForAssistant",
+  },
+  cross_session_memory: {
+    cattle: "agent.kindComparisonMemoryTask",
+    label: "agent.kindComparisonMemory",
+    pet: "agent.kindComparisonMemoryAssistant",
+  },
+  failure_pattern: {
+    cattle: "agent.kindComparisonFailureTask",
+    label: "agent.kindComparisonFailure",
+    pet: "agent.kindComparisonFailureAssistant",
+  },
+  scaling: {
+    cattle: "agent.kindComparisonScalingTask",
+    label: "agent.kindComparisonScaling",
+    pet: "agent.kindComparisonScalingAssistant",
+  },
+  switch_cost: {
+    cattle: "agent.kindComparisonSwitchCostTask",
+    label: "agent.kindComparisonSwitchCost",
+    pet: "agent.kindComparisonSwitchCostAssistant",
+  },
+} as const satisfies Record<
+  (typeof COMPARE_ROWS)[number]["id"],
+  Record<AgentKind | "label", string>
+>;
+
 export function KindSelector({
   value,
   locked,
@@ -78,6 +127,7 @@ export function KindSelector({
         >
           {CARDS.map((card) => {
             const Icon = CARD_ICONS[card.kind];
+            const copyKeys = CARD_COPY_KEYS[card.kind];
             const selected = value === card.kind;
             const isLockedAlternative = locked && !selected;
 
@@ -108,17 +158,17 @@ export function KindSelector({
                     )}
                   >
                     <Icon className="size-3.5" />
-                    <span>{card.copy.label}</span>
+                    <span>{t(copyKeys.label)}</span>
                     {isLockedAlternative ? <Lock className="size-3 opacity-70" /> : null}
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" className="max-w-xs text-left">
-                  <div className="text-[12px] font-semibold">{card.copy.label}</div>
+                  <div className="text-[12px] font-semibold">{t(copyKeys.label)}</div>
                   <div className="mt-0.5 text-[10.5px] tracking-wide uppercase opacity-70">
-                    {card.copy.tagline}
+                    {t(copyKeys.tagline)}
                   </div>
-                  <p className="mt-1 text-[11.5px] leading-relaxed">{card.copy.description}</p>
-                  <p className="mt-1 text-[11px] italic opacity-80">{card.copy.examples}</p>
+                  <p className="mt-1 text-[11.5px] leading-relaxed">{t(copyKeys.description)}</p>
+                  <p className="mt-1 text-[11px] italic opacity-80">{t(copyKeys.examples)}</p>
                   {isLockedAlternative ? (
                     <p className="mt-1.5 text-[11px] font-medium opacity-90">
                       {t("agent.forkToSwitchType")}
@@ -155,17 +205,19 @@ export function KindSelector({
             </thead>
             <tbody className="divide-border-subtle divide-y">
               {COMPARE_ROWS.map((row) => {
-                const Icon = COMPARE_ICONS[row.id as keyof typeof COMPARE_ICONS];
+                const rowId = row.id as keyof typeof COMPARISON_COPY_KEYS;
+                const Icon = COMPARE_ICONS[rowId];
+                const copyKeys = COMPARISON_COPY_KEYS[rowId];
                 return (
                   <tr key={row.id} className="bg-white">
                     <td className="text-fg-2 px-3 py-2 align-top">
                       <div className="flex items-center gap-1.5">
                         <Icon className="text-fg-3 size-3" />
-                        {row.label}
+                        {t(copyKeys.label)}
                       </div>
                     </td>
-                    <td className="text-foreground px-3 py-2 align-top">{row.values.pet}</td>
-                    <td className="text-foreground px-3 py-2 align-top">{row.values.cattle}</td>
+                    <td className="text-foreground px-3 py-2 align-top">{t(copyKeys.pet)}</td>
+                    <td className="text-foreground px-3 py-2 align-top">{t(copyKeys.cattle)}</td>
                   </tr>
                 );
               })}
