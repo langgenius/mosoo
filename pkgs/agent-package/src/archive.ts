@@ -63,6 +63,7 @@ function buildMcpJson(agentPackage: AgentPackage): string {
     agentPackage.manifest.mcpServers.map((server) => [
       server.name,
       {
+        authType: server.authType,
         ...(server.iconUrl === null ? {} : { iconUrl: server.iconUrl }),
         type: server.url.endsWith("/sse") ? "sse" : "http",
         url: server.url,
@@ -150,7 +151,7 @@ export function createAgentPackageArchiveBytes(agentPackage: AgentPackage): Uint
 
   assertArchiveEntriesAdmitted(entries);
 
-  return createZipArchive(entries);
+  return createZipArchive(entries, { pathsAlreadyAdmitted: true });
 }
 
 export function parseAgentPackageArchiveBytes(
@@ -171,7 +172,10 @@ export function parseAgentPackageArchiveBytes(
 
   try {
     entries = toArchiveEntryRecord(
-      extractZipArchive(archiveBytes, AGENT_PACKAGE_ARCHIVE_EXTRACT_OPTIONS),
+      extractZipArchive(archiveBytes, {
+        ...AGENT_PACKAGE_ARCHIVE_EXTRACT_OPTIONS,
+        pathsAlreadyAdmitted: true,
+      }),
     );
   } catch {
     return invalidArchiveResult(
