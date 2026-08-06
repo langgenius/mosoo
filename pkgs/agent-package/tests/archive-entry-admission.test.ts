@@ -171,6 +171,30 @@ describe("agent package archive entry admission", () => {
     ]);
   });
 
+  test("round-trips the reserved MCP sidecar", () => {
+    const agentPackage = createAgentPackageFixture({
+      mcpServers: [
+        {
+          authType: "bearer",
+          credentialMode: "runtime_resolved",
+          credentialScope: "app",
+          enabled: true,
+          iconUrl: null,
+          name: "Go Gym Production MCP",
+          serverId: null,
+          source: "app",
+          url: "https://go-gym.example/mcp",
+        },
+      ],
+    });
+
+    const archiveBytes = createAgentPackageArchiveBytes(agentPackage);
+    const parsed = parseAgentPackageArchiveBytes(archiveBytes);
+
+    expect(parsed.package).not.toBeNull();
+    expect(parsed.manifest?.mcpServers).toEqual(agentPackage.manifest.mcpServers);
+  });
+
   test("admits nested package assets under declared skill roots", () => {
     const parsed = parseAgentPackageArchiveBytes(
       createStoredZipArchive([
@@ -243,6 +267,7 @@ function createAgentPackageFixture(
   input: {
     assets?: AgentPackage["assets"];
     avatarAssetKey?: string | null;
+    mcpServers?: AgentPackage["manifest"]["mcpServers"];
     skills?: AgentPackage["manifest"]["skills"];
   } = {},
 ): AgentPackage {
@@ -266,7 +291,7 @@ function createAgentPackageFixture(
       },
       kind: "pet",
       manifestVersion: AGENT_MANIFEST_VERSION,
-      mcpServers: [],
+      mcpServers: input.mcpServers ?? [],
       metadata: {
         description: "Test package",
         name: "Test Agent",

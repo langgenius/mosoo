@@ -24,6 +24,11 @@ export interface SkillArchiveExtractOptions {
   maxEntryCount?: number;
   maxFileBytes?: number;
   maxTotalFileBytes?: number;
+  pathsAlreadyAdmitted?: boolean;
+}
+
+export interface SkillArchiveCreateOptions {
+  pathsAlreadyAdmitted?: boolean;
 }
 
 interface ZipArchiveMetadata {
@@ -33,12 +38,17 @@ interface ZipArchiveMetadata {
   uncompressedSize: number;
 }
 
-export function createZipArchive(entries: SkillPackageEntry[]): Uint8Array {
+export function createZipArchive(
+  entries: SkillPackageEntry[],
+  options: SkillArchiveCreateOptions = {},
+): Uint8Array {
   const archive: Zippable = {};
-  const admission = createSkillPackagePathAdmission();
+  const admission = options.pathsAlreadyAdmitted ? null : createSkillPackagePathAdmission();
 
   for (const entry of entries) {
-    const admittedPath = admission.admit(entry.path, entry.entryKind).path;
+    const admittedPath =
+      admission?.admit(entry.path, entry.entryKind).path ??
+      normalizeAdmittedArchivePath(entry.path, entry.entryKind);
     const archivePath = entry.entryKind === "directory" ? `${admittedPath}/` : admittedPath;
 
     archive[archivePath] = [entry.body, createZipEntryOptions(entry)];
@@ -72,7 +82,7 @@ export function extractZipArchive(
       return;
     }
 
-    const admittedEntry = readAdmittedZipArchivePath(file.name);
+    const admittedEntry = readAdmittedZipArchivePath(file.name, options.pathsAlreadyAdmitted);
 
     if (admittedEntry instanceof SkillPackageError) {
       extractionState.error = admittedEntry;
@@ -300,7 +310,7 @@ function listZipArchiveEntries(
   const centralDirectorySize = readUint32LE(bytes, endOfCentralDirectoryOffset + 12);
   const centralDirectoryOffset = readUint32LE(bytes, endOfCentralDirectoryOffset + 16);
   const metadata: ZipArchiveMetadata[] = [];
-  const admission = createSkillPackagePathAdmission();
+  const admission = options.pathsAlreadyAdmitted ? null : createSkillPackagePathAdmission();
   let totalFileBytes = 0;
   let offset = centralDirectoryOffset;
   const endOffset = centralDirectoryOffset + centralDirectorySize;
@@ -342,7 +352,8 @@ function listZipArchiveEntries(
     }
 
     const entryKind = inferZipEntryKind(rawPath);
-    const path = admission.admit(rawPath, entryKind).path;
+    const path =
+      admission?.admit(rawPath, entryKind).path ?? normalizeAdmittedArchivePath(rawPath, entryKind);
 
     if (options.maxEntryCount !== undefined && metadata.length >= options.maxEntryCount) {
       throw new SkillPackageError(
@@ -424,12 +435,28 @@ function findEndOfCentralDirectory(bytes: Uint8Array): number {
   return -1;
 }
 
-function readAdmittedZipArchivePath(path: string): AdmittedSkillPackagePath | SkillPackageError {
+function readAdmittedZipArchivePath(
+  path: string,
+  pathsAlreadyAdmitted = false,
+): AdmittedSkillPackagePath | SkillPackageError {
+  if (pathsAlreadyAdmitted) {
+    const entryKind = inferZipEntryKind(path);
+
+    return {
+      entryKind,
+      path: normalizeAdmittedArchivePath(path, entryKind),
+    };
+  }
+
   try {
     return admitSkillPackagePath(path, inferZipEntryKind(path));
   } catch (error) {
     return toSkillZipError(error, "Skill zip decompression failed.");
   }
+}
+
+function normalizeAdmittedArchivePath(path: string, entryKind: SkillPackagePathKind): string {
+  return entryKind === "directory" && path.endsWith("/") ? path.slice(0, -1) : path;
 }
 
 function inferZipEntryKind(path: string): SkillPackagePathKind {
