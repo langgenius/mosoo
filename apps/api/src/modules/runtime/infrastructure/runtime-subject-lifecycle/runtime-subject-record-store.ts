@@ -2,7 +2,15 @@ import type { AgentKind } from "@mosoo/contracts/agent";
 import type { RuntimeSubjectErrorCode, SandboxSubjectKind } from "@mosoo/contracts/sandbox";
 import { sandboxesTable } from "@mosoo/db";
 import { createPlatformId } from "@mosoo/id";
-import type { PlatformId, RuntimeOperationId, SandboxBackupId, SandboxId } from "@mosoo/id";
+import type {
+  AccountId,
+  AgentId,
+  PlatformId,
+  AppId,
+  RuntimeOperationId,
+  SandboxBackupId,
+  SandboxId,
+} from "@mosoo/id";
 import { and, eq, inArray, isNull, lte, notExists, or, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 
@@ -30,6 +38,41 @@ import type {
   RuntimeSubjectRecord,
   RuntimeSubjectStatus,
 } from "./runtime-subject-store.types";
+
+// ponytail: every hosted account is on Free today; replace constants with
+// entitlements only when paid plans actually ship.
+export const FREE_PLAN_CONCURRENT_SANDBOX_LIMITS = {
+  account: 20,
+  agent: 3,
+  app: 10,
+} as const;
+
+interface RuntimeSubjectQuotaScope {
+  readonly agentId: AgentId;
+  readonly appId: AppId;
+  readonly executionOwnerUserId: AccountId;
+}
+
+function runtimeSubjectQuotaCapacityPredicate(
+  input: RuntimeSubjectQuotaScope & { readonly now: number },
+): SQL {
+  const limits = FREE_PLAN_CONCURRENT_SANDBOX_LIMITS;
+
+  // ponytail: the production pool is capped at 50, so one guarded scan is cheaper
+  // than quota counters; add counters only if the pool ceiling grows materially.
+  return sql`(
+    SELECT
+      COALESCE(SUM(CASE WHEN quota_sandbox.agent_id = ${input.agentId} THEN 1 ELSE 0 END), 0) < ${limits.agent}
+      AND COALESCE(SUM(CASE WHEN quota_sandbox.app_id = ${input.appId} THEN 1 ELSE 0 END), 0) < ${limits.app}
+      AND COALESCE(SUM(CASE WHEN quota_sandbox.owner_account_id = ${input.executionOwnerUserId} THEN 1 ELSE 0 END), 0) < ${limits.account}
+    FROM ${sandboxesTable} AS quota_sandbox
+    WHERE quota_sandbox.status <> 'cold'
+      OR (
+        quota_sandbox.claim_owner IS NOT NULL
+        AND quota_sandbox.claim_expires_at > ${input.now}
+      )
+  )`;
+}
 
 function runtimeSubjectStatusPatch(input: {
   readonly now: number;
@@ -108,8 +151,12 @@ export async function getRuntimeSubjectIdByTuple(
 export async function ensureRuntimeSubjectId(
   database: D1Database,
   input: {
+    readonly agentId: AgentId;
+    readonly appId: AppId;
+    readonly executionOwnerUserId: AccountId;
     readonly kind: AgentKind;
     readonly now?: number;
+    readonly runtimeSubjectId?: SandboxId;
     readonly subjectId: PlatformId;
     readonly subjectKind: SandboxSubjectKind;
   },
@@ -121,10 +168,12 @@ export async function ensureRuntimeSubjectId(
   }
 
   const now = input.now ?? currentTimestampMs();
-  const runtimeSubjectId = createPlatformId<SandboxId>(now);
+  const runtimeSubjectId = input.runtimeSubjectId ?? createPlatformId<SandboxId>(now);
   const result = await getAppDatabase(database)
     .insert(sandboxesTable)
     .values({
+      agentId: input.agentId,
+      appId: input.appId,
       bindMountReady: false,
       claimExpiresAt: null,
       claimOwner: null,
@@ -133,6 +182,7 @@ export async function ensureRuntimeSubjectId(
       id: runtimeSubjectId,
       inactiveDeadlineAt: getRuntimeSubjectInactiveDeadline(getRuntimeKindPolicy(input.kind), now),
       kind: input.kind,
+      ownerAccountId: input.executionOwnerUserId,
       status: "cold",
       statusChangedAt: now,
       statusEvent: toRuntimeSubjectStatusLifecycleEventName("cold"),
@@ -223,51 +273,9 @@ export async function getRuntimeSubjectActivationRecord(
   };
 }
 
-export async function createClaimedColdRuntimeSubjectRecord(
-  database: D1Database,
-  input: {
-    readonly claimExpiresAt: number;
-    readonly claimOwner: string;
-    readonly kind: AgentKind;
-    readonly now: number;
-    readonly runtimeSubjectId: SandboxId;
-    readonly subjectId: PlatformId;
-    readonly subjectKind: SandboxSubjectKind;
-  },
-): Promise<boolean> {
-  const result = await getAppDatabase(database)
-    .insert(sandboxesTable)
-    .values({
-      bindMountReady: false,
-      claimExpiresAt: input.claimExpiresAt,
-      claimOwner: input.claimOwner,
-      createdAt: input.now,
-      globalMountsJson: "[]",
-      id: input.runtimeSubjectId,
-      inactiveDeadlineAt: getRuntimeSubjectInactiveDeadline(
-        getRuntimeKindPolicy(input.kind),
-        input.now,
-      ),
-      kind: input.kind,
-      status: "cold",
-      statusChangedAt: input.now,
-      statusEvent: toRuntimeSubjectStatusLifecycleEventName("cold"),
-      statusOperationId: null,
-      statusSeq: 0,
-      statusSource: "api",
-      subjectId: input.subjectId,
-      subjectKind: input.subjectKind,
-      updatedAt: input.now,
-    })
-    .onConflictDoNothing()
-    .run();
-
-  return getD1ChangeCount(result) > 0;
-}
-
 export async function claimRuntimeSubjectActivation(
   database: D1Database,
-  input: {
+  input: RuntimeSubjectQuotaScope & {
     readonly claimExpiresAt: number;
     readonly claimOwner: string;
     readonly expectedStatus: RuntimeSubjectStatus;
@@ -279,8 +287,11 @@ export async function claimRuntimeSubjectActivation(
     (await getAppDatabase(database)
       .update(sandboxesTable)
       .set({
+        agentId: input.agentId,
+        appId: input.appId,
         claimExpiresAt: input.claimExpiresAt,
         claimOwner: input.claimOwner,
+        ownerAccountId: input.executionOwnerUserId,
         updatedAt: input.now,
       })
       .where(
@@ -293,6 +304,7 @@ export async function claimRuntimeSubjectActivation(
             isNull(sandboxesTable.claimExpiresAt),
             lte(sandboxesTable.claimExpiresAt, input.now),
           ),
+          ...(input.expectedStatus === "cold" ? [runtimeSubjectQuotaCapacityPredicate(input)] : []),
         ),
       )
       .returning({ id: sandboxesTable.id })

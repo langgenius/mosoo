@@ -3,8 +3,10 @@ import type { SandboxSubjectKind } from "@mosoo/contracts/sandbox";
 import type { RuntimeSubjectErrorCode } from "@mosoo/contracts/sandbox";
 import type {
   AccountId,
+  AgentId,
   DriverInstanceId,
   PlatformId,
+  AppId,
   RuntimeOperationId,
   SandboxId,
   SandboxSessionId,
@@ -16,6 +18,7 @@ import { RUNTIME_DIAGNOSTIC_EVENT } from "@mosoo/runtime-events";
 
 import { createErrorLogContext, logWarn } from "../../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
+import { validationError } from "../../../../platform/errors";
 import { currentTimestampMs } from "../../../../time";
 import {
   appendRuntimeDiagnosticEvent,
@@ -52,7 +55,8 @@ import {
 } from "./runtime-subject-platform";
 import {
   claimRuntimeSubjectActivation,
-  createClaimedColdRuntimeSubjectRecord,
+  ensureRuntimeSubjectId,
+  FREE_PLAN_CONCURRENT_SANDBOX_LIMITS,
   getRuntimeConversationSessionState,
   getRuntimeSubjectActivationRecord,
   markRuntimeSubjectActivationDestroying,
@@ -78,15 +82,25 @@ const MAINTENANCE_CLAIM_OWNER_PREFIXES = ["scheduled-", "immediate-"] as const;
 export type RuntimeSubjectActivationPurpose = "interactive" | "prewarm";
 
 export interface ActivateRuntimeSubjectInput {
+  readonly agentId: AgentId;
   readonly executionOwnerUserId: AccountId;
   readonly kind: AgentKind;
   readonly diagnosticContext?: RuntimeDiagnosticContext;
   readonly networkConstraints: SandboxNetworkConstraints;
   readonly purpose?: RuntimeSubjectActivationPurpose;
   readonly runtimeSubjectId: SandboxId;
+  readonly appId: AppId;
   readonly subjectId: PlatformId;
   readonly subjectKind: SandboxSubjectKind;
   readonly timing?: RuntimeTimingRecorder;
+}
+
+function freePlanSandboxLimitError() {
+  const limits = FREE_PLAN_CONCURRENT_SANDBOX_LIMITS;
+
+  return validationError(
+    `Free plan concurrent sandbox limit reached (${limits.agent} per Agent, ${limits.app} per App, ${limits.account} per account). Wait for a sandbox to stop before trying again.`,
+  );
 }
 
 export interface ActiveRuntimeSubject {
@@ -403,15 +417,19 @@ export class RuntimeSubjectLifecycleService {
     );
 
     if (!record) {
-      const created = await createClaimedColdRuntimeSubjectRecord(this.#bindings.DB, {
-        ...input,
-        claimExpiresAt,
-        claimOwner,
+      const runtimeSubjectId = await ensureRuntimeSubjectId(this.#bindings.DB, {
+        agentId: input.agentId,
+        appId: input.appId,
+        executionOwnerUserId: input.executionOwnerUserId,
+        kind: input.kind,
         now,
+        runtimeSubjectId: input.runtimeSubjectId,
+        subjectId: input.subjectId,
+        subjectKind: input.subjectKind,
       });
 
-      if (created) {
-        return null;
+      if (runtimeSubjectId !== input.runtimeSubjectId) {
+        throw new Error("Runtime subject activation resolved a different lifecycle record.");
       }
 
       const createdByAnotherActivation = await getRuntimeSubjectActivationRecord(
@@ -523,14 +541,31 @@ export class RuntimeSubjectLifecycleService {
     }
 
     const claimed = await claimRuntimeSubjectActivation(this.#bindings.DB, {
+      agentId: input.activation.agentId,
+      appId: input.activation.appId,
       claimExpiresAt: input.claimExpiresAt,
       claimOwner: input.claimOwner,
+      executionOwnerUserId: input.activation.executionOwnerUserId,
       expectedStatus: record.status,
       now: currentTimestampMs(),
       runtimeSubjectId: input.activation.runtimeSubjectId,
     });
 
     if (!claimed) {
+      if (record.status === "cold") {
+        const refreshed = await getRuntimeSubjectActivationRecord(
+          this.#bindings.DB,
+          input.activation.runtimeSubjectId,
+        );
+
+        if (
+          refreshed?.status === "cold" &&
+          !hasActiveRuntimeSubjectClaim(refreshed, currentTimestampMs())
+        ) {
+          throw freePlanSandboxLimitError();
+        }
+      }
+
       throw new Error("Runtime subject is busy with lifecycle maintenance.");
     }
 

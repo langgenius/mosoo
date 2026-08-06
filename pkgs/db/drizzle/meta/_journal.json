@@ -43,6 +43,13 @@
       "when": 1785774269305,
       "tag": "0005_public-thread-end-user",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1786028822757,
+      "tag": "0006_runtime_subject_quota_scope",
+      "breakpoints": true
     }
   ]
 }

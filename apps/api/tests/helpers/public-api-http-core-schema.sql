@@ -178,6 +178,8 @@ CREATE TABLE vendor_credential (
 
 CREATE TABLE sandbox (
   id text PRIMARY KEY NOT NULL,
+  agent_id text,
+  app_id text,
   kind text NOT NULL,
   subject_kind text NOT NULL,
   subject_id text NOT NULL,
@@ -196,6 +198,7 @@ CREATE TABLE sandbox (
   claim_owner text,
   claim_expires_at integer,
   inactive_deadline_at integer,
+  owner_account_id text,
   created_at integer NOT NULL,
   updated_at integer NOT NULL
 );

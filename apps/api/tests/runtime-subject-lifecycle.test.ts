@@ -1,11 +1,16 @@
 import { describe, expect, test } from "bun:test";
 
+import { createPlatformId } from "@mosoo/id";
+import type { AgentId, AppId, SandboxId, SessionId } from "@mosoo/id";
+
 import { decideRuntimeSubjectTransition } from "../src/modules/runtime/domain/runtime-subject-lifecycle.machine";
 import { createRuntimeSubjectLifecycleService } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-lifecycle.service";
+import type { ActivateRuntimeSubjectInput } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-lifecycle.service";
 import { destroyRuntimeSubjectContainer } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-platform";
 import { recycleRuntimeSubject } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-recycle.service";
 import {
   advanceRuntimeSubjectOperationStatus,
+  FREE_PLAN_CONCURRENT_SANDBOX_LIMITS,
   markRuntimeSubjectCold,
   markRuntimeSubjectOperationStarted,
 } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-store";
@@ -15,14 +20,25 @@ import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
 const RUNTIME_SUBJECT_ID = "01J0000000000000000000000D";
+const ACCOUNT_ID = "01J00000000000000000000002";
+const AGENT_ID = "01J00000000000000000000001";
+const APP_ID = "01J00000000000000000000003";
+const SESSION_ID = "01J00000000000000000000009";
 const CLOUDFLARE_BACKUP_ID = "550e8400-e29b-41d4-a716-446655440000";
 const STORED_BACKUP_ID = encodeSandboxBackupIdForStorage(CLOUDFLARE_BACKUP_ID);
+const RUNTIME_SUBJECT_QUOTA_SCOPE = {
+  agentId: AGENT_ID,
+  appId: APP_ID,
+  executionOwnerUserId: ACCOUNT_ID,
+} as const;
 
 function createRuntimeSubjectLifecycleDatabase(): SqliteD1Database {
   const database = new SqliteD1Database();
 
   database.execute(`
     CREATE TABLE sandbox (
+      agent_id text,
+      app_id text,
       bind_mount_ready integer DEFAULT false NOT NULL,
       claim_expires_at integer,
       claim_owner text,
@@ -35,6 +51,7 @@ function createRuntimeSubjectLifecycleDatabase(): SqliteD1Database {
       last_error text,
       last_error_code text,
       last_restore_backup_id text,
+      owner_account_id text,
       status text NOT NULL,
       status_changed_at integer DEFAULT 0 NOT NULL,
       status_event text DEFAULT 'runtime_subject.cold' NOT NULL,
@@ -125,7 +142,7 @@ async function insertRuntimeSubject(
       `runtime_subject.${input.status === "backing_up" ? "back_up" : input.status}`,
       input.statusSeq ?? 0,
       "test",
-      "01J00000000000000000000009",
+      SESSION_ID,
       "session",
       1,
     )
@@ -277,12 +294,12 @@ describe("runtime subject lifecycle machine", () => {
 
     await expect(
       createRuntimeSubjectLifecycleService(createBindings(database)).activate({
-        executionOwnerUserId: "01J00000000000000000000002",
+        ...RUNTIME_SUBJECT_QUOTA_SCOPE,
         kind: "pet",
         networkConstraints: { allowedHosts: ["api.example.com"], networkPolicy: "limited" },
         runtimeSubjectId: RUNTIME_SUBJECT_ID,
         spaceAliases: [],
-        subjectId: "01J00000000000000000000009",
+        subjectId: AGENT_ID,
         subjectKind: "agent",
       }),
     ).rejects.toThrow("only for Task Agents");
@@ -290,6 +307,45 @@ describe("runtime subject lifecycle machine", () => {
     await expect(
       database.prepare("SELECT id FROM sandbox WHERE id = ?").bind(RUNTIME_SUBJECT_ID).first("id"),
     ).resolves.toBeNull();
+  });
+
+  test("atomically caps Free sandboxes per Agent, App, and account", async () => {
+    for (const scope of ["agent", "app", "account"] as const) {
+      const database = createRuntimeSubjectLifecycleDatabase();
+      const inputs: ActivateRuntimeSubjectInput[] = [];
+      const limit = FREE_PLAN_CONCURRENT_SANDBOX_LIMITS[scope];
+
+      for (let index = 0; index <= limit; index += 1) {
+        const agentId = scope === "agent" ? AGENT_ID : createPlatformId<AgentId>();
+        const appId = scope === "account" ? createPlatformId<AppId>() : APP_ID;
+        const sessionId = createPlatformId<SessionId>();
+
+        inputs.push({
+          agentId,
+          appId,
+          executionOwnerUserId: ACCOUNT_ID,
+          kind: "cattle",
+          networkConstraints: { allowedHosts: [], networkPolicy: "full" },
+          runtimeSubjectId: createPlatformId<SandboxId>(),
+          subjectId: sessionId,
+          subjectKind: "session",
+        });
+      }
+
+      const lifecycle = createRuntimeSubjectLifecycleService(createBindings(database));
+      const outcomes = await Promise.allSettled(inputs.map((input) => lifecycle.activate(input)));
+      const rejected = outcomes.filter(
+        (outcome): outcome is PromiseRejectedResult => outcome.status === "rejected",
+      );
+      const active = await database
+        .prepare("SELECT COUNT(*) AS count FROM sandbox WHERE status = 'active'")
+        .first<{ count: number }>();
+
+      expect(outcomes.filter((outcome) => outcome.status === "fulfilled")).toHaveLength(limit);
+      expect(rejected).toHaveLength(1);
+      expect(String(rejected[0]?.reason)).toContain("Free plan concurrent sandbox limit reached");
+      expect(active?.count).toBe(limit);
+    }
   });
 
   test("records operation transitions with monotonic status metadata", async () => {
@@ -359,12 +415,12 @@ describe("runtime subject lifecycle machine", () => {
     const activation = await createRuntimeSubjectLifecycleService(
       createBindings(database),
     ).activate({
-      executionOwnerUserId: "01J00000000000000000000002",
+      ...RUNTIME_SUBJECT_QUOTA_SCOPE,
       kind: "cattle",
       networkConstraints: { allowedHosts: [], networkPolicy: "full" },
       runtimeSubjectId: RUNTIME_SUBJECT_ID,
       spaceAliases: [],
-      subjectId: "01J00000000000000000000009",
+      subjectId: SESSION_ID,
       subjectKind: "session",
     });
 
@@ -465,8 +521,10 @@ describe("runtime subject lifecycle machine", () => {
       )
       .run();
     await database
-      .prepare("UPDATE sandbox SET kind = ?, last_backup_id = ?, subject_kind = ? WHERE id = ?")
-      .bind("pet", STORED_BACKUP_ID, "agent", RUNTIME_SUBJECT_ID)
+      .prepare(
+        "UPDATE sandbox SET kind = ?, last_backup_id = ?, subject_id = ?, subject_kind = ? WHERE id = ?",
+      )
+      .bind("pet", STORED_BACKUP_ID, AGENT_ID, "agent", RUNTIME_SUBJECT_ID)
       .run();
     let restoredBackup: { readonly dir: string; readonly id: string } | null = null;
     let configureNetworkCalls = 0;
@@ -481,12 +539,12 @@ describe("runtime subject lifecycle machine", () => {
         },
       }),
     ).activate({
-      executionOwnerUserId: "01J00000000000000000000002",
+      ...RUNTIME_SUBJECT_QUOTA_SCOPE,
       kind: "pet",
       networkConstraints: { allowedHosts: [], networkPolicy: "full" },
       runtimeSubjectId: RUNTIME_SUBJECT_ID,
       spaceAliases: [],
-      subjectId: "01J00000000000000000000009",
+      subjectId: AGENT_ID,
       subjectKind: "agent",
     });
 
@@ -514,12 +572,12 @@ describe("runtime subject lifecycle machine", () => {
     const activation = await createRuntimeSubjectLifecycleService(
       createBindings(database),
     ).activate({
-      executionOwnerUserId: "01J00000000000000000000002",
+      ...RUNTIME_SUBJECT_QUOTA_SCOPE,
       kind: "cattle",
       networkConstraints: { allowedHosts: [], networkPolicy: "full" },
       runtimeSubjectId: RUNTIME_SUBJECT_ID,
       spaceAliases: [],
-      subjectId: "01J00000000000000000000009",
+      subjectId: SESSION_ID,
       subjectKind: "session",
     });
 
@@ -559,12 +617,12 @@ describe("runtime subject lifecycle machine", () => {
 
     await expect(
       createRuntimeSubjectLifecycleService(createBindings(database, { prepareError })).activate({
-        executionOwnerUserId: "01J00000000000000000000002",
+        ...RUNTIME_SUBJECT_QUOTA_SCOPE,
         kind: "cattle",
         networkConstraints: { allowedHosts: [], networkPolicy: "full" },
         runtimeSubjectId: RUNTIME_SUBJECT_ID,
         spaceAliases: [],
-        subjectId: "01J00000000000000000000009",
+        subjectId: SESSION_ID,
         subjectKind: "session",
       }),
     ).rejects.toThrow("Runtime subject filesystem prepare timed out after 15000ms.");
@@ -609,12 +667,12 @@ describe("runtime subject lifecycle machine", () => {
           prepareError,
         }),
       ).activate({
-        executionOwnerUserId: "01J00000000000000000000002",
+        ...RUNTIME_SUBJECT_QUOTA_SCOPE,
         kind: "cattle",
         networkConstraints: { allowedHosts: [], networkPolicy: "full" },
         runtimeSubjectId: RUNTIME_SUBJECT_ID,
         spaceAliases: [],
-        subjectId: "01J00000000000000000000009",
+        subjectId: SESSION_ID,
         subjectKind: "session",
       }),
     ).rejects.toThrow("original activation failure");
@@ -671,12 +729,12 @@ describe("runtime subject lifecycle machine", () => {
           onDestroy: () => (destroyCalls += 1),
         }),
       ).activate({
-        executionOwnerUserId: "01J00000000000000000000002",
+        ...RUNTIME_SUBJECT_QUOTA_SCOPE,
         kind: "cattle",
         networkConstraints: { allowedHosts: [], networkPolicy: "limited" },
         runtimeSubjectId: RUNTIME_SUBJECT_ID,
         spaceAliases: [],
-        subjectId: "01J00000000000000000000009",
+        subjectId: SESSION_ID,
         subjectKind: "session",
       }),
     ).rejects.toThrow("cannot be enforced");
@@ -700,12 +758,12 @@ describe("runtime subject lifecycle machine", () => {
       createRuntimeSubjectLifecycleService(
         createBindings(database, { onDestroy: () => (destroyCalls += 1), prepareError }),
       ).activate({
-        executionOwnerUserId: "01J00000000000000000000002",
+        ...RUNTIME_SUBJECT_QUOTA_SCOPE,
         kind: "cattle",
         networkConstraints: { allowedHosts: [], networkPolicy: "full" },
         runtimeSubjectId: RUNTIME_SUBJECT_ID,
         spaceAliases: [],
-        subjectId: "01J00000000000000000000009",
+        subjectId: SESSION_ID,
         subjectKind: "session",
       }),
     ).rejects.toThrow("filesystem prepare timed out");
@@ -717,12 +775,12 @@ describe("runtime subject lifecycle machine", () => {
     // manual recreate needed.
     const recovered = await createRuntimeSubjectLifecycleService(createBindings(database)).activate(
       {
-        executionOwnerUserId: "01J00000000000000000000002",
+        ...RUNTIME_SUBJECT_QUOTA_SCOPE,
         kind: "cattle",
         networkConstraints: { allowedHosts: [], networkPolicy: "full" },
         runtimeSubjectId: RUNTIME_SUBJECT_ID,
         spaceAliases: [],
-        subjectId: "01J00000000000000000000009",
+        subjectId: SESSION_ID,
         subjectKind: "session",
       },
     );

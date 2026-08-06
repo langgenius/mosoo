@@ -3,7 +3,15 @@ import type { SessionSummary } from "@mosoo/contracts/session";
 import type { UserWarning } from "@mosoo/contracts/session-run";
 import type { ResolvedRunSkill } from "@mosoo/contracts/skill";
 import { createPlatformId } from "@mosoo/id";
-import type { AgentId, PlatformId, AppId, SandboxId, SandboxSessionId, SessionId } from "@mosoo/id";
+import type {
+  AccountId,
+  AgentId,
+  PlatformId,
+  AppId,
+  SandboxId,
+  SandboxSessionId,
+  SessionId,
+} from "@mosoo/id";
 import { getRuntimeCatalogEntry, getRuntimeCatalogVendorForProvider } from "@mosoo/runtime-catalog";
 import { RUNTIME_DIAGNOSTIC_EVENT } from "@mosoo/runtime-events";
 
@@ -61,6 +69,8 @@ async function resolveRuntimeProfileIds(
   bindings: ApiBindings,
   input: {
     agentId: AgentId;
+    appId: AppId;
+    executionOwnerUserId: AccountId;
     kind: DriverProfileConfig["kind"];
     sessionId: SessionId;
   },
@@ -70,7 +80,12 @@ async function resolveRuntimeProfileIds(
 }> {
   const sandboxSubject = resolveAgentRuntimeSandboxSubject(input);
   const [sandboxId, existingConversationSession] = await Promise.all([
-    ensureRuntimeSubjectId(bindings.DB, sandboxSubject),
+    ensureRuntimeSubjectId(bindings.DB, {
+      ...sandboxSubject,
+      agentId: input.agentId,
+      appId: input.appId,
+      executionOwnerUserId: input.executionOwnerUserId,
+    }),
     getRuntimeConversationSession(bindings.DB, input.sessionId),
   ]);
 
@@ -273,6 +288,8 @@ async function hydrateRunContextFromSession(
   let profile: DriverProfileConfig;
   const runtimeProfileIds = await resolveRuntimeProfileIds(bindings, {
     agentId: agent.id,
+    appId: session.appId,
+    executionOwnerUserId: agent.ownerId,
     kind: binding.kind,
     sessionId: session.id,
   });
@@ -427,6 +444,8 @@ async function refreshCachedRunContextVolatileFields(
 
   const runtimeProfileIds = await resolveRuntimeProfileIds(bindings, {
     agentId: agent.id,
+    appId: session.appId,
+    executionOwnerUserId: agent.ownerId,
     kind: binding.kind,
     sessionId: session.id,
   });
