@@ -116,18 +116,12 @@
       "indexes": {
         "agent_deployment_version_agent_number_idx": {
           "name": "agent_deployment_version_agent_number_idx",
-          "columns": [
-            "agent_id",
-            "version_number"
-          ],
+          "columns": ["agent_id", "version_number"],
           "isUnique": true
         },
         "agent_deployment_version_agent_created_idx": {
           "name": "agent_deployment_version_agent_created_idx",
-          "columns": [
-            "agent_id",
-            "created_at"
-          ],
+          "columns": ["agent_id", "created_at"],
           "isUnique": false
         }
       },
@@ -209,25 +203,17 @@
       "indexes": {
         "agent_mcp_binding_agent_sort_idx": {
           "name": "agent_mcp_binding_agent_sort_idx",
-          "columns": [
-            "agent_id",
-            "sort_order"
-          ],
+          "columns": ["agent_id", "sort_order"],
           "isUnique": true
         },
         "agent_mcp_binding_server_idx": {
           "name": "agent_mcp_binding_server_idx",
-          "columns": [
-            "server_id"
-          ],
+          "columns": ["server_id"],
           "isUnique": false
         },
         "agent_mcp_binding_profile_server_idx": {
           "name": "agent_mcp_binding_profile_server_idx",
-          "columns": [
-            "agent_id",
-            "server_id"
-          ],
+          "columns": ["agent_id", "server_id"],
           "isUnique": true
         }
       },
@@ -276,20 +262,14 @@
       "indexes": {
         "agent_skill_agent_sort_idx": {
           "name": "agent_skill_agent_sort_idx",
-          "columns": [
-            "agent_id",
-            "sort_order"
-          ],
+          "columns": ["agent_id", "sort_order"],
           "isUnique": false
         }
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "agent_skill_agent_id_skill_id_pk": {
-          "columns": [
-            "agent_id",
-            "skill_id"
-          ],
+          "columns": ["agent_id", "skill_id"],
           "name": "agent_skill_agent_id_skill_id_pk"
         }
       },
@@ -425,25 +405,17 @@
       "indexes": {
         "agent_app_owner_account_idx": {
           "name": "agent_app_owner_account_idx",
-          "columns": [
-            "app_id",
-            "owner_account_id"
-          ],
+          "columns": ["app_id", "owner_account_id"],
           "isUnique": false
         },
         "agent_app_status_idx": {
           "name": "agent_app_status_idx",
-          "columns": [
-            "app_id",
-            "status"
-          ],
+          "columns": ["app_id", "status"],
           "isUnique": false
         },
         "agent_environment_idx": {
           "name": "agent_environment_idx",
-          "columns": [
-            "environment_id"
-          ],
+          "columns": ["environment_id"],
           "isUnique": false
         }
       },
@@ -556,25 +528,17 @@
       "indexes": {
         "api_command_dedupe_idx": {
           "name": "api_command_dedupe_idx",
-          "columns": [
-            "dedupe_key"
-          ],
+          "columns": ["dedupe_key"],
           "isUnique": true
         },
         "api_command_status_updated_idx": {
           "name": "api_command_status_updated_idx",
-          "columns": [
-            "status",
-            "updated_at"
-          ],
+          "columns": ["status", "updated_at"],
           "isUnique": false
         },
         "api_command_claim_idx": {
           "name": "api_command_claim_idx",
-          "columns": [
-            "status",
-            "claim_expires_at"
-          ],
+          "columns": ["status", "claim_expires_at"],
           "isUnique": false
         }
       },
@@ -681,17 +645,12 @@
       "indexes": {
         "auth_account_provider_account_idx": {
           "name": "auth_account_provider_account_idx",
-          "columns": [
-            "provider_id",
-            "provider_account_id"
-          ],
+          "columns": ["provider_id", "provider_account_id"],
           "isUnique": true
         },
         "auth_account_account_id_idx": {
           "name": "auth_account_account_id_idx",
-          "columns": [
-            "account_id"
-          ],
+          "columns": ["account_id"],
           "isUnique": false
         }
       },
@@ -763,23 +722,17 @@
       "indexes": {
         "auth_session_expires_at_idx": {
           "name": "auth_session_expires_at_idx",
-          "columns": [
-            "expires_at"
-          ],
+          "columns": ["expires_at"],
           "isUnique": false
         },
         "auth_session_token_idx": {
           "name": "auth_session_token_idx",
-          "columns": [
-            "token"
-          ],
+          "columns": ["token"],
           "isUnique": true
         },
         "auth_session_account_id_idx": {
           "name": "auth_session_account_id_idx",
-          "columns": [
-            "account_id"
-          ],
+          "columns": ["account_id"],
           "isUnique": false
         }
       },
@@ -837,16 +790,12 @@
       "indexes": {
         "auth_verification_expires_at_idx": {
           "name": "auth_verification_expires_at_idx",
-          "columns": [
-            "expires_at"
-          ],
+          "columns": ["expires_at"],
           "isUnique": false
         },
         "auth_verification_identifier_idx": {
           "name": "auth_verification_identifier_idx",
-          "columns": [
-            "identifier"
-          ],
+          "columns": ["identifier"],
           "isUnique": false
         }
       },
@@ -946,24 +895,17 @@
       "indexes": {
         "cli_oauth_flow_status_expires_idx": {
           "name": "cli_oauth_flow_status_expires_idx",
-          "columns": [
-            "status",
-            "expires_at"
-          ],
+          "columns": ["status", "expires_at"],
           "isUnique": false
         },
         "cli_oauth_flow_device_code_hash_idx": {
           "name": "cli_oauth_flow_device_code_hash_idx",
-          "columns": [
-            "device_code_hash"
-          ],
+          "columns": ["device_code_hash"],
           "isUnique": true
         },
         "cli_oauth_flow_user_code_idx": {
           "name": "cli_oauth_flow_user_code_idx",
-          "columns": [
-            "user_code"
-          ],
+          "columns": ["user_code"],
           "isUnique": true
         }
       },
@@ -1035,17 +977,12 @@
       "indexes": {
         "personal_access_token_account_created_idx": {
           "name": "personal_access_token_account_created_idx",
-          "columns": [
-            "account_id",
-            "created_at"
-          ],
+          "columns": ["account_id", "created_at"],
           "isUnique": false
         },
         "personal_access_token_hash_idx": {
           "name": "personal_access_token_hash_idx",
-          "columns": [
-            "token_hash"
-          ],
+          "columns": ["token_hash"],
           "isUnique": true
         }
       },
@@ -1146,35 +1083,22 @@
       "indexes": {
         "agent_channel_binding_agent_provider_idx": {
           "name": "agent_channel_binding_agent_provider_idx",
-          "columns": [
-            "agent_id",
-            "provider"
-          ],
+          "columns": ["agent_id", "provider"],
           "isUnique": true
         },
         "agent_channel_binding_provider_tenant_bot_idx": {
           "name": "agent_channel_binding_provider_tenant_bot_idx",
-          "columns": [
-            "provider",
-            "external_tenant_id",
-            "external_bot_id"
-          ],
+          "columns": ["provider", "external_tenant_id", "external_bot_id"],
           "isUnique": true
         },
         "agent_channel_binding_agent_status_idx": {
           "name": "agent_channel_binding_agent_status_idx",
-          "columns": [
-            "agent_id",
-            "status"
-          ],
+          "columns": ["agent_id", "status"],
           "isUnique": false
         },
         "agent_channel_binding_app_status_idx": {
           "name": "agent_channel_binding_app_status_idx",
-          "columns": [
-            "app_id",
-            "status"
-          ],
+          "columns": ["app_id", "status"],
           "isUnique": false
         }
       },
@@ -1183,12 +1107,8 @@
           "name": "agent_channel_binding_agent_id_agent_id_fk",
           "tableFrom": "agent_channel_binding",
           "tableTo": "agent",
-          "columnsFrom": [
-            "agent_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["agent_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1196,12 +1116,8 @@
           "name": "agent_channel_binding_encrypted_creds_secret_id_vault_secret_id_fk",
           "tableFrom": "agent_channel_binding",
           "tableTo": "vault_secret",
-          "columnsFrom": [
-            "encrypted_creds_secret_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["encrypted_creds_secret_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -1209,12 +1125,8 @@
           "name": "agent_channel_binding_app_id_app_id_fk",
           "tableFrom": "agent_channel_binding",
           "tableTo": "app",
-          "columnsFrom": [
-            "app_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["app_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1337,27 +1249,17 @@
       "indexes": {
         "channel_runtime_state_provider_binding_account_idx": {
           "name": "channel_runtime_state_provider_binding_account_idx",
-          "columns": [
-            "provider",
-            "binding_id",
-            "runtime_account_id"
-          ],
+          "columns": ["provider", "binding_id", "runtime_account_id"],
           "isUnique": true
         },
         "channel_runtime_state_status_lease_idx": {
           "name": "channel_runtime_state_status_lease_idx",
-          "columns": [
-            "status",
-            "lease_expires_at"
-          ],
+          "columns": ["status", "lease_expires_at"],
           "isUnique": false
         },
         "channel_runtime_state_binding_updated_idx": {
           "name": "channel_runtime_state_binding_updated_idx",
-          "columns": [
-            "binding_id",
-            "updated_at"
-          ],
+          "columns": ["binding_id", "updated_at"],
           "isUnique": false
         }
       },
@@ -1366,12 +1268,8 @@
           "name": "channel_runtime_state_binding_id_agent_channel_binding_id_fk",
           "tableFrom": "channel_runtime_state",
           "tableTo": "agent_channel_binding",
-          "columnsFrom": [
-            "binding_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["binding_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1450,26 +1348,17 @@
       "indexes": {
         "channel_event_receipt_provider_tenant_event_idx": {
           "name": "channel_event_receipt_provider_tenant_event_idx",
-          "columns": [
-            "provider",
-            "external_tenant_id",
-            "external_event_id"
-          ],
+          "columns": ["provider", "external_tenant_id", "external_event_id"],
           "isUnique": true
         },
         "channel_event_receipt_binding_updated_idx": {
           "name": "channel_event_receipt_binding_updated_idx",
-          "columns": [
-            "binding_id",
-            "updated_at"
-          ],
+          "columns": ["binding_id", "updated_at"],
           "isUnique": false
         },
         "channel_event_receipt_expires_idx": {
           "name": "channel_event_receipt_expires_idx",
-          "columns": [
-            "expires_at"
-          ],
+          "columns": ["expires_at"],
           "isUnique": false
         }
       },
@@ -1478,12 +1367,8 @@
           "name": "channel_event_receipt_binding_id_agent_channel_binding_id_fk",
           "tableFrom": "channel_event_receipt",
           "tableTo": "agent_channel_binding",
-          "columnsFrom": [
-            "binding_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["binding_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1584,25 +1469,17 @@
       "indexes": {
         "channel_final_delivery_provider_binding_event_idx": {
           "name": "channel_final_delivery_provider_binding_event_idx",
-          "columns": [
-            "provider",
-            "binding_id",
-            "external_event_id"
-          ],
+          "columns": ["provider", "binding_id", "external_event_id"],
           "isUnique": true
         },
         "channel_final_delivery_session_idx": {
           "name": "channel_final_delivery_session_idx",
-          "columns": [
-            "session_id"
-          ],
+          "columns": ["session_id"],
           "isUnique": false
         },
         "channel_final_delivery_run_idx": {
           "name": "channel_final_delivery_run_idx",
-          "columns": [
-            "run_id"
-          ],
+          "columns": ["run_id"],
           "isUnique": false
         }
       },
@@ -1611,12 +1488,8 @@
           "name": "channel_final_delivery_job_binding_id_agent_channel_binding_id_fk",
           "tableFrom": "channel_final_delivery_job",
           "tableTo": "agent_channel_binding",
-          "columnsFrom": [
-            "binding_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["binding_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1624,12 +1497,8 @@
           "name": "channel_final_delivery_job_run_id_session_run_id_fk",
           "tableFrom": "channel_final_delivery_job",
           "tableTo": "session_run",
-          "columnsFrom": [
-            "run_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["run_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1637,12 +1506,8 @@
           "name": "channel_final_delivery_job_session_id_session_id_fk",
           "tableFrom": "channel_final_delivery_job",
           "tableTo": "session",
-          "columnsFrom": [
-            "session_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["session_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1707,18 +1572,12 @@
       "indexes": {
         "channel_thread_session_provider_binding_thread_idx": {
           "name": "channel_thread_session_provider_binding_thread_idx",
-          "columns": [
-            "provider",
-            "binding_id",
-            "external_thread_id"
-          ],
+          "columns": ["provider", "binding_id", "external_thread_id"],
           "isUnique": true
         },
         "channel_thread_session_session_idx": {
           "name": "channel_thread_session_session_idx",
-          "columns": [
-            "session_id"
-          ],
+          "columns": ["session_id"],
           "isUnique": false
         }
       },
@@ -1727,12 +1586,8 @@
           "name": "channel_thread_session_binding_id_agent_channel_binding_id_fk",
           "tableFrom": "channel_thread_session",
           "tableTo": "agent_channel_binding",
-          "columnsFrom": [
-            "binding_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["binding_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1740,12 +1595,8 @@
           "name": "channel_thread_session_session_id_session_id_fk",
           "tableFrom": "channel_thread_session",
           "tableTo": "session",
-          "columnsFrom": [
-            "session_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["session_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1888,33 +1739,22 @@
       "indexes": {
         "wechat_channel_account_agent_idx": {
           "name": "wechat_channel_account_agent_idx",
-          "columns": [
-            "agent_id"
-          ],
+          "columns": ["agent_id"],
           "isUnique": true
         },
         "wechat_channel_account_external_idx": {
           "name": "wechat_channel_account_external_idx",
-          "columns": [
-            "external_account_id",
-            "external_bot_id"
-          ],
+          "columns": ["external_account_id", "external_bot_id"],
           "isUnique": true
         },
         "wechat_channel_account_status_idx": {
           "name": "wechat_channel_account_status_idx",
-          "columns": [
-            "status",
-            "updated_at"
-          ],
+          "columns": ["status", "updated_at"],
           "isUnique": false
         },
         "wechat_channel_account_app_status_idx": {
           "name": "wechat_channel_account_app_status_idx",
-          "columns": [
-            "app_id",
-            "status"
-          ],
+          "columns": ["app_id", "status"],
           "isUnique": false
         }
       },
@@ -1923,12 +1763,8 @@
           "name": "wechat_channel_account_agent_id_agent_id_fk",
           "tableFrom": "wechat_channel_account",
           "tableTo": "agent",
-          "columnsFrom": [
-            "agent_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["agent_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1936,12 +1772,8 @@
           "name": "wechat_channel_account_encrypted_creds_secret_id_vault_secret_id_fk",
           "tableFrom": "wechat_channel_account",
           "tableTo": "vault_secret",
-          "columnsFrom": [
-            "encrypted_creds_secret_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["encrypted_creds_secret_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -1949,12 +1781,8 @@
           "name": "wechat_channel_account_owner_account_id_account_id_fk",
           "tableFrom": "wechat_channel_account",
           "tableTo": "account",
-          "columnsFrom": [
-            "owner_account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["owner_account_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1962,12 +1790,8 @@
           "name": "wechat_channel_account_app_id_app_id_fk",
           "tableFrom": "wechat_channel_account",
           "tableTo": "app",
-          "columnsFrom": [
-            "app_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["app_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2046,34 +1870,22 @@
       "indexes": {
         "wechat_channel_pairing_qr_token_hash_idx": {
           "name": "wechat_channel_pairing_qr_token_hash_idx",
-          "columns": [
-            "qr_token_hash"
-          ],
+          "columns": ["qr_token_hash"],
           "isUnique": true
         },
         "wechat_channel_pairing_agent_creator_idx": {
           "name": "wechat_channel_pairing_agent_creator_idx",
-          "columns": [
-            "agent_id",
-            "created_by_account_id",
-            "consumed_at"
-          ],
+          "columns": ["agent_id", "created_by_account_id", "consumed_at"],
           "isUnique": false
         },
         "wechat_channel_pairing_app_creator_idx": {
           "name": "wechat_channel_pairing_app_creator_idx",
-          "columns": [
-            "app_id",
-            "created_by_account_id",
-            "consumed_at"
-          ],
+          "columns": ["app_id", "created_by_account_id", "consumed_at"],
           "isUnique": false
         },
         "wechat_channel_pairing_expires_idx": {
           "name": "wechat_channel_pairing_expires_idx",
-          "columns": [
-            "expires_at"
-          ],
+          "columns": ["expires_at"],
           "isUnique": false
         }
       },
@@ -2082,12 +1894,8 @@
           "name": "wechat_channel_pairing_agent_id_agent_id_fk",
           "tableFrom": "wechat_channel_pairing",
           "tableTo": "agent",
-          "columnsFrom": [
-            "agent_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["agent_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2095,12 +1903,8 @@
           "name": "wechat_channel_pairing_created_by_account_id_account_id_fk",
           "tableFrom": "wechat_channel_pairing",
           "tableTo": "account",
-          "columnsFrom": [
-            "created_by_account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["created_by_account_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2108,12 +1912,8 @@
           "name": "wechat_channel_pairing_app_id_app_id_fk",
           "tableFrom": "wechat_channel_pairing",
           "tableTo": "app",
-          "columnsFrom": [
-            "app_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["app_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2192,26 +1992,17 @@
       "indexes": {
         "wechat_context_token_key_idx": {
           "name": "wechat_context_token_key_idx",
-          "columns": [
-            "context_token_key"
-          ],
+          "columns": ["context_token_key"],
           "isUnique": true
         },
         "wechat_context_token_account_peer_idx": {
           "name": "wechat_context_token_account_peer_idx",
-          "columns": [
-            "account_id",
-            "external_account_id",
-            "peer_id"
-          ],
+          "columns": ["account_id", "external_account_id", "peer_id"],
           "isUnique": true
         },
         "wechat_context_token_account_updated_idx": {
           "name": "wechat_context_token_account_updated_idx",
-          "columns": [
-            "account_id",
-            "updated_at"
-          ],
+          "columns": ["account_id", "updated_at"],
           "isUnique": false
         }
       },
@@ -2220,12 +2011,8 @@
           "name": "wechat_context_token_account_id_wechat_channel_account_id_fk",
           "tableFrom": "wechat_context_token",
           "tableTo": "wechat_channel_account",
-          "columnsFrom": [
-            "account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2233,12 +2020,8 @@
           "name": "wechat_context_token_encrypted_context_token_secret_id_vault_secret_id_fk",
           "tableFrom": "wechat_context_token",
           "tableTo": "vault_secret",
-          "columnsFrom": [
-            "encrypted_context_token_secret_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["encrypted_context_token_secret_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -2317,17 +2100,12 @@
       "indexes": {
         "email_log_created_at_idx": {
           "name": "email_log_created_at_idx",
-          "columns": [
-            "created_at"
-          ],
+          "columns": ["created_at"],
           "isUnique": false
         },
         "email_log_type_status_idx": {
           "name": "email_log_type_status_idx",
-          "columns": [
-            "type",
-            "status"
-          ],
+          "columns": ["type", "status"],
           "isUnique": false
         }
       },
@@ -2427,18 +2205,12 @@
       "indexes": {
         "environment_revision_environment_created_at_idx": {
           "name": "environment_revision_environment_created_at_idx",
-          "columns": [
-            "environment_id",
-            "created_at"
-          ],
+          "columns": ["environment_id", "created_at"],
           "isUnique": false
         },
         "environment_revision_app_created_at_idx": {
           "name": "environment_revision_app_created_at_idx",
-          "columns": [
-            "app_id",
-            "created_at"
-          ],
+          "columns": ["app_id", "created_at"],
           "isUnique": false
         }
       },
@@ -2536,35 +2308,23 @@
       "indexes": {
         "environment_app_updated_at_idx": {
           "name": "environment_app_updated_at_idx",
-          "columns": [
-            "app_id",
-            "updated_at"
-          ],
+          "columns": ["app_id", "updated_at"],
           "isUnique": false
         },
         "environment_owner_updated_at_idx": {
           "name": "environment_owner_updated_at_idx",
-          "columns": [
-            "owner_account_id",
-            "updated_at"
-          ],
+          "columns": ["owner_account_id", "updated_at"],
           "isUnique": false
         },
         "environment_owner_name_idx": {
           "name": "environment_owner_name_idx",
-          "columns": [
-            "app_id",
-            "owner_account_id",
-            "name"
-          ],
+          "columns": ["app_id", "owner_account_id", "name"],
           "isUnique": true,
           "where": "\"environment\".\"owner_account_id\" IS NOT NULL"
         },
         "environment_system_default_idx": {
           "name": "environment_system_default_idx",
-          "columns": [
-            "app_id"
-          ],
+          "columns": ["app_id"],
           "isUnique": true,
           "where": "\"environment\".\"owner_account_id\" IS NULL"
         }
@@ -2728,91 +2488,52 @@
       "indexes": {
         "file_record_object_key_idx": {
           "name": "file_record_object_key_idx",
-          "columns": [
-            "object_key"
-          ],
+          "columns": ["object_key"],
           "isUnique": true
         },
         "file_record_unscoped_parent_path_name_status_idx": {
           "name": "file_record_unscoped_parent_path_name_status_idx",
-          "columns": [
-            "scope_kind",
-            "parent_path",
-            "name",
-            "status"
-          ],
+          "columns": ["scope_kind", "parent_path", "name", "status"],
           "isUnique": true,
           "where": "\"file_record\".\"scope_id\" IS NULL"
         },
         "file_record_scoped_parent_path_name_status_idx": {
           "name": "file_record_scoped_parent_path_name_status_idx",
-          "columns": [
-            "scope_kind",
-            "scope_id",
-            "parent_path",
-            "name",
-            "status"
-          ],
+          "columns": ["scope_kind", "scope_id", "parent_path", "name", "status"],
           "isUnique": true
         },
         "file_record_unscoped_pending_path_idx": {
           "name": "file_record_unscoped_pending_path_idx",
-          "columns": [
-            "scope_kind",
-            "path"
-          ],
+          "columns": ["scope_kind", "path"],
           "isUnique": true,
           "where": "\"file_record\".\"status\" = 'pending' AND \"file_record\".\"scope_id\" IS NULL"
         },
         "file_record_scoped_pending_path_idx": {
           "name": "file_record_scoped_pending_path_idx",
-          "columns": [
-            "scope_kind",
-            "scope_id",
-            "path"
-          ],
+          "columns": ["scope_kind", "scope_id", "path"],
           "isUnique": true,
           "where": "\"file_record\".\"status\" = 'pending' AND \"file_record\".\"scope_id\" IS NOT NULL"
         },
         "file_record_unscoped_ready_path_idx": {
           "name": "file_record_unscoped_ready_path_idx",
-          "columns": [
-            "scope_kind",
-            "path"
-          ],
+          "columns": ["scope_kind", "path"],
           "isUnique": true,
           "where": "\"file_record\".\"status\" = 'ready' AND \"file_record\".\"scope_id\" IS NULL"
         },
         "file_record_scoped_ready_path_idx": {
           "name": "file_record_scoped_ready_path_idx",
-          "columns": [
-            "scope_kind",
-            "scope_id",
-            "path"
-          ],
+          "columns": ["scope_kind", "scope_id", "path"],
           "isUnique": true,
           "where": "\"file_record\".\"status\" = 'ready' AND \"file_record\".\"scope_id\" IS NOT NULL"
         },
         "file_record_governance_idx": {
           "name": "file_record_governance_idx",
-          "columns": [
-            "purpose",
-            "owner_kind",
-            "owner_id",
-            "status",
-            "expires_at"
-          ],
+          "columns": ["purpose", "owner_kind", "owner_id", "status", "expires_at"],
           "isUnique": false
         },
         "file_record_listing_idx": {
           "name": "file_record_listing_idx",
-          "columns": [
-            "scope_kind",
-            "scope_id",
-            "parent_path",
-            "status",
-            "lower(\"name\")"
-          ],
+          "columns": ["scope_kind", "scope_id", "parent_path", "status", "lower(\"name\")"],
           "isUnique": false
         }
       },
@@ -2940,17 +2661,12 @@
       "indexes": {
         "file_upload_file_id_idx": {
           "name": "file_upload_file_id_idx",
-          "columns": [
-            "file_id"
-          ],
+          "columns": ["file_id"],
           "isUnique": true
         },
         "file_upload_status_expires_idx": {
           "name": "file_upload_status_expires_idx",
-          "columns": [
-            "status",
-            "expires_at"
-          ],
+          "columns": ["status", "expires_at"],
           "isUnique": false
         }
       },
@@ -3078,35 +2794,22 @@
       "indexes": {
         "file_version_object_key_idx": {
           "name": "file_version_object_key_idx",
-          "columns": [
-            "object_key"
-          ],
+          "columns": ["object_key"],
           "isUnique": true
         },
         "file_version_scope_path_created_idx": {
           "name": "file_version_scope_path_created_idx",
-          "columns": [
-            "scope_kind",
-            "scope_id",
-            "path",
-            "created_at"
-          ],
+          "columns": ["scope_kind", "scope_id", "path", "created_at"],
           "isUnique": false
         },
         "file_version_file_created_idx": {
           "name": "file_version_file_created_idx",
-          "columns": [
-            "file_id",
-            "created_at"
-          ],
+          "columns": ["file_id", "created_at"],
           "isUnique": false
         },
         "file_version_pending_idx": {
           "name": "file_version_pending_idx",
-          "columns": [
-            "committed",
-            "created_at"
-          ],
+          "columns": ["committed", "created_at"],
           "isUnique": false,
           "where": "\"file_version\".\"committed\" = 0"
         }
@@ -3249,38 +2952,23 @@
       "indexes": {
         "mcp_credential_server_scope_status_idx": {
           "name": "mcp_credential_server_scope_status_idx",
-          "columns": [
-            "server_id",
-            "scope",
-            "status"
-          ],
+          "columns": ["server_id", "scope", "status"],
           "isUnique": false
         },
         "mcp_credential_app_scope_status_idx": {
           "name": "mcp_credential_app_scope_status_idx",
-          "columns": [
-            "app_id",
-            "scope",
-            "status"
-          ],
+          "columns": ["app_id", "scope", "status"],
           "isUnique": false
         },
         "mcp_credential_app_scope_idx": {
           "name": "mcp_credential_app_scope_idx",
-          "columns": [
-            "server_id",
-            "scope"
-          ],
+          "columns": ["server_id", "scope"],
           "isUnique": true,
           "where": "\"mcp_credential\".\"scope\" = 'app'"
         },
         "mcp_credential_agent_scope_idx": {
           "name": "mcp_credential_agent_scope_idx",
-          "columns": [
-            "server_id",
-            "agent_id",
-            "scope"
-          ],
+          "columns": ["server_id", "agent_id", "scope"],
           "isUnique": true,
           "where": "\"mcp_credential\".\"scope\" = 'agent' AND \"mcp_credential\".\"agent_id\" IS NOT NULL"
         }
@@ -3450,34 +3138,22 @@
       "indexes": {
         "mcp_oauth_flow_status_cleanup_after_idx": {
           "name": "mcp_oauth_flow_status_cleanup_after_idx",
-          "columns": [
-            "status",
-            "cleanup_after"
-          ],
+          "columns": ["status", "cleanup_after"],
           "isUnique": false
         },
         "mcp_oauth_flow_expires_at_idx": {
           "name": "mcp_oauth_flow_expires_at_idx",
-          "columns": [
-            "expires_at"
-          ],
+          "columns": ["expires_at"],
           "isUnique": false
         },
         "mcp_oauth_flow_server_account_idx": {
           "name": "mcp_oauth_flow_server_account_idx",
-          "columns": [
-            "server_id",
-            "initiator_account_id"
-          ],
+          "columns": ["server_id", "initiator_account_id"],
           "isUnique": false
         },
         "mcp_oauth_flow_app_server_account_idx": {
           "name": "mcp_oauth_flow_app_server_account_idx",
-          "columns": [
-            "app_id",
-            "server_id",
-            "initiator_account_id"
-          ],
+          "columns": ["app_id", "server_id", "initiator_account_id"],
           "isUnique": false
         }
       },
@@ -3611,26 +3287,17 @@
       "indexes": {
         "mcp_server_app_enabled_idx": {
           "name": "mcp_server_app_enabled_idx",
-          "columns": [
-            "app_id",
-            "enabled"
-          ],
+          "columns": ["app_id", "enabled"],
           "isUnique": false
         },
         "mcp_server_owner_app_idx": {
           "name": "mcp_server_owner_app_idx",
-          "columns": [
-            "owner_account_id",
-            "app_id"
-          ],
+          "columns": ["owner_account_id", "app_id"],
           "isUnique": false
         },
         "mcp_server_app_url_idx": {
           "name": "mcp_server_app_url_idx",
-          "columns": [
-            "app_id",
-            "url"
-          ],
+          "columns": ["app_id", "url"],
           "isUnique": true
         }
       },
@@ -3715,10 +3382,7 @@
       "indexes": {
         "vault_secret_kind_created_at_idx": {
           "name": "vault_secret_kind_created_at_idx",
-          "columns": [
-            "kind",
-            "created_at"
-          ],
+          "columns": ["kind", "created_at"],
           "isUnique": false
         }
       },
@@ -3776,9 +3440,7 @@
       "indexes": {
         "organization_creator_account_idx": {
           "name": "organization_creator_account_idx",
-          "columns": [
-            "creator_account_id"
-          ],
+          "columns": ["creator_account_id"],
           "isUnique": true,
           "where": "\"organization\".\"creator_account_id\" IS NOT NULL"
         }
@@ -3935,25 +3597,17 @@
       "indexes": {
         "app_deployment_run_app_id_idx": {
           "name": "app_deployment_run_app_id_idx",
-          "columns": [
-            "app_id",
-            "id"
-          ],
+          "columns": ["app_id", "id"],
           "isUnique": false
         },
         "app_deployment_run_deployment_id_idx": {
           "name": "app_deployment_run_deployment_id_idx",
-          "columns": [
-            "deployment_id",
-            "id"
-          ],
+          "columns": ["deployment_id", "id"],
           "isUnique": false
         },
         "app_deployment_run_active_app_idx": {
           "name": "app_deployment_run_active_app_idx",
-          "columns": [
-            "app_id"
-          ],
+          "columns": ["app_id"],
           "isUnique": true,
           "where": "\"app_deployment_run\".\"status\" IN ('queued', 'preparing', 'building', 'submitting', 'submitted', 'activating')"
         }
@@ -4077,17 +3731,13 @@
       "indexes": {
         "app_deployment_active_app_idx": {
           "name": "app_deployment_active_app_idx",
-          "columns": [
-            "app_id"
-          ],
+          "columns": ["app_id"],
           "isUnique": true,
           "where": "\"app_deployment\".\"deleted_at\" IS NULL"
         },
         "app_deployment_active_subdomain_idx": {
           "name": "app_deployment_active_subdomain_idx",
-          "columns": [
-            "mosoo_subdomain"
-          ],
+          "columns": ["mosoo_subdomain"],
           "isUnique": true,
           "where": "\"app_deployment\".\"deleted_at\" IS NULL"
         }
@@ -4224,17 +3874,12 @@
       "indexes": {
         "bound_agent_call_idempotency_subject_key_idx": {
           "name": "bound_agent_call_idempotency_subject_key_idx",
-          "columns": [
-            "subject_hash",
-            "idempotency_key"
-          ],
+          "columns": ["subject_hash", "idempotency_key"],
           "isUnique": true
         },
         "bound_agent_call_idempotency_updated_idx": {
           "name": "bound_agent_call_idempotency_updated_idx",
-          "columns": [
-            "updated_at"
-          ],
+          "columns": ["updated_at"],
           "isUnique": false
         }
       },
@@ -4320,17 +3965,12 @@
       "indexes": {
         "public_api_idempotency_token_key_idx": {
           "name": "public_api_idempotency_token_key_idx",
-          "columns": [
-            "token_id",
-            "idempotency_key"
-          ],
+          "columns": ["token_id", "idempotency_key"],
           "isUnique": true
         },
         "public_api_idempotency_updated_idx": {
           "name": "public_api_idempotency_updated_idx",
-          "columns": [
-            "updated_at"
-          ],
+          "columns": ["updated_at"],
           "isUnique": false
         }
       },
@@ -4382,20 +4022,14 @@
       "indexes": {
         "public_api_rate_limit_window_updated_idx": {
           "name": "public_api_rate_limit_window_updated_idx",
-          "columns": [
-            "updated_at"
-          ],
+          "columns": ["updated_at"],
           "isUnique": false
         }
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "public_api_rate_limit_window_bucket_key_window_start_shard_pk": {
-          "columns": [
-            "bucket_key",
-            "window_start",
-            "shard"
-          ],
+          "columns": ["bucket_key", "window_start", "shard"],
           "name": "public_api_rate_limit_window_bucket_key_window_start_shard_pk"
         }
       },
@@ -4500,19 +4134,12 @@
       "indexes": {
         "driver_command_instance_seq_idx": {
           "name": "driver_command_instance_seq_idx",
-          "columns": [
-            "driver_instance_id",
-            "seq"
-          ],
+          "columns": ["driver_instance_id", "seq"],
           "isUnique": true
         },
         "driver_command_instance_status_idx": {
           "name": "driver_command_instance_status_idx",
-          "columns": [
-            "driver_instance_id",
-            "status",
-            "expires_at"
-          ],
+          "columns": ["driver_instance_id", "status", "expires_at"],
           "isUnique": false
         }
       },
@@ -4521,12 +4148,8 @@
           "name": "driver_command_driver_instance_id_driver_instance_id_fk",
           "tableFrom": "driver_command",
           "tableTo": "driver_instance",
-          "columnsFrom": [
-            "driver_instance_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["driver_instance_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -4614,18 +4237,12 @@
       "indexes": {
         "driver_instance_mcp_grant_instance_server_idx": {
           "name": "driver_instance_mcp_grant_instance_server_idx",
-          "columns": [
-            "driver_instance_id",
-            "server_id"
-          ],
+          "columns": ["driver_instance_id", "server_id"],
           "isUnique": true
         },
         "driver_instance_mcp_grant_instance_credential_idx": {
           "name": "driver_instance_mcp_grant_instance_credential_idx",
-          "columns": [
-            "driver_instance_id",
-            "credential_id"
-          ],
+          "columns": ["driver_instance_id", "credential_id"],
           "isUnique": false
         }
       },
@@ -4634,12 +4251,8 @@
           "name": "driver_instance_mcp_grant_driver_instance_id_driver_instance_id_fk",
           "tableFrom": "driver_instance_mcp_grant",
           "tableTo": "driver_instance",
-          "columnsFrom": [
-            "driver_instance_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["driver_instance_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -4879,52 +4492,34 @@
       "indexes": {
         "driver_instance_completed_idx": {
           "name": "driver_instance_completed_idx",
-          "columns": [
-            "expires_at",
-            "status"
-          ],
+          "columns": ["expires_at", "status"],
           "isUnique": false
         },
         "driver_instance_connection_idx": {
           "name": "driver_instance_connection_idx",
-          "columns": [
-            "connection_id"
-          ],
+          "columns": ["connection_id"],
           "isUnique": true,
           "where": "\"driver_instance\".\"connection_id\" IS NOT NULL"
         },
         "driver_instance_boot_token_expiry_idx": {
           "name": "driver_instance_boot_token_expiry_idx",
-          "columns": [
-            "status",
-            "boot_token_expires_at"
-          ],
+          "columns": ["status", "boot_token_expires_at"],
           "isUnique": false,
           "where": "\"driver_instance\".\"boot_token_used_at\" IS NULL"
         },
         "driver_instance_boot_token_hash_idx": {
           "name": "driver_instance_boot_token_hash_idx",
-          "columns": [
-            "boot_token_hash"
-          ],
+          "columns": ["boot_token_hash"],
           "isUnique": true
         },
         "driver_instance_sandbox_session_idx": {
           "name": "driver_instance_sandbox_session_idx",
-          "columns": [
-            "sandbox_id",
-            "sandbox_session_id",
-            "status",
-            "updated_at"
-          ],
+          "columns": ["sandbox_id", "sandbox_session_id", "status", "updated_at"],
           "isUnique": false
         },
         "driver_instance_live_sandbox_session_idx": {
           "name": "driver_instance_live_sandbox_session_idx",
-          "columns": [
-            "sandbox_id",
-            "sandbox_session_id"
-          ],
+          "columns": ["sandbox_id", "sandbox_session_id"],
           "isUnique": true,
           "where": "\"driver_instance\".\"status\" IN ('provisioning', 'connecting', 'ready', 'stopping')"
         }
@@ -5006,10 +4601,7 @@
       "indexes": {
         "native_resume_ref_runtime_updated_idx": {
           "name": "native_resume_ref_runtime_updated_idx",
-          "columns": [
-            "runtime_id",
-            "updated_at"
-          ],
+          "columns": ["runtime_id", "updated_at"],
           "isUnique": false
         }
       },
@@ -5018,12 +4610,8 @@
           "name": "native_resume_ref_session_id_session_id_fk",
           "tableFrom": "native_resume_ref",
           "tableTo": "session",
-          "columnsFrom": [
-            "session_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["session_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -5103,11 +4691,7 @@
       "indexes": {
         "sandbox_backup_sandbox_status_created_idx": {
           "name": "sandbox_backup_sandbox_status_created_idx",
-          "columns": [
-            "sandbox_id",
-            "status",
-            "created_at"
-          ],
+          "columns": ["sandbox_id", "status", "created_at"],
           "isUnique": false
         }
       },
@@ -5179,18 +4763,12 @@
       "indexes": {
         "sandbox_session_sandbox_status_idx": {
           "name": "sandbox_session_sandbox_status_idx",
-          "columns": [
-            "sandbox_id",
-            "status",
-            "updated_at"
-          ],
+          "columns": ["sandbox_id", "status", "updated_at"],
           "isUnique": false
         },
         "sandbox_session_cloudflare_session_idx": {
           "name": "sandbox_session_cloudflare_session_idx",
-          "columns": [
-            "cloudflare_session_id"
-          ],
+          "columns": ["cloudflare_session_id"],
           "isUnique": true
         }
       },
@@ -5199,12 +4777,8 @@
           "name": "sandbox_session_session_id_session_id_fk",
           "tableFrom": "sandbox_session",
           "tableTo": "session",
-          "columnsFrom": [
-            "session_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["session_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -5373,28 +4947,17 @@
       "indexes": {
         "sandbox_subject_idx": {
           "name": "sandbox_subject_idx",
-          "columns": [
-            "kind",
-            "subject_kind",
-            "subject_id"
-          ],
+          "columns": ["kind", "subject_kind", "subject_id"],
           "isUnique": true
         },
         "sandbox_status_deadline_idx": {
           "name": "sandbox_status_deadline_idx",
-          "columns": [
-            "status",
-            "inactive_deadline_at",
-            "updated_at"
-          ],
+          "columns": ["status", "inactive_deadline_at", "updated_at"],
           "isUnique": false
         },
         "sandbox_claim_idx": {
           "name": "sandbox_claim_idx",
-          "columns": [
-            "claim_expires_at",
-            "claim_owner"
-          ],
+          "columns": ["claim_expires_at", "claim_owner"],
           "isUnique": false
         }
       },
@@ -5489,17 +5052,12 @@
       "indexes": {
         "session_message_session_seq_idx": {
           "name": "session_message_session_seq_idx",
-          "columns": [
-            "session_id",
-            "seq"
-          ],
+          "columns": ["session_id", "seq"],
           "isUnique": true
         },
         "session_message_run_idx": {
           "name": "session_message_run_idx",
-          "columns": [
-            "session_run_id"
-          ],
+          "columns": ["session_run_id"],
           "isUnique": false
         }
       },
@@ -5508,12 +5066,8 @@
           "name": "session_message_session_id_session_id_fk",
           "tableFrom": "session_message",
           "tableTo": "session",
-          "columnsFrom": [
-            "session_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["session_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -5716,75 +5270,37 @@
       "indexes": {
         "session_agent_updated_idx": {
           "name": "session_agent_updated_idx",
-          "columns": [
-            "agent_id",
-            "updated_at",
-            "id"
-          ],
+          "columns": ["agent_id", "updated_at", "id"],
           "isUnique": false
         },
         "session_app_creator_archived_updated_idx": {
           "name": "session_app_creator_archived_updated_idx",
-          "columns": [
-            "app_id",
-            "creator_account_id",
-            "archived_at",
-            "updated_at",
-            "id"
-          ],
+          "columns": ["app_id", "creator_account_id", "archived_at", "updated_at", "id"],
           "isUnique": false
         },
         "session_app_attributed_archived_updated_idx": {
           "name": "session_app_attributed_archived_updated_idx",
-          "columns": [
-            "app_id",
-            "attributed_user_id",
-            "archived_at",
-            "updated_at",
-            "id"
-          ],
+          "columns": ["app_id", "attributed_user_id", "archived_at", "updated_at", "id"],
           "isUnique": false
         },
         "session_app_creator_type_archived_updated_idx": {
           "name": "session_app_creator_type_archived_updated_idx",
-          "columns": [
-            "app_id",
-            "creator_account_id",
-            "type",
-            "archived_at",
-            "updated_at",
-            "id"
-          ],
+          "columns": ["app_id", "creator_account_id", "type", "archived_at", "updated_at", "id"],
           "isUnique": false
         },
         "session_app_attributed_type_archived_updated_idx": {
           "name": "session_app_attributed_type_archived_updated_idx",
-          "columns": [
-            "app_id",
-            "attributed_user_id",
-            "type",
-            "archived_at",
-            "updated_at",
-            "id"
-          ],
+          "columns": ["app_id", "attributed_user_id", "type", "archived_at", "updated_at", "id"],
           "isUnique": false
         },
         "session_status_operation_updated_idx": {
           "name": "session_status_operation_updated_idx",
-          "columns": [
-            "status",
-            "status_operation_id",
-            "updated_at"
-          ],
+          "columns": ["status", "status_operation_id", "updated_at"],
           "isUnique": false
         },
         "session_status_updated_idx": {
           "name": "session_status_updated_idx",
-          "columns": [
-            "status",
-            "updated_at",
-            "id"
-          ],
+          "columns": ["status", "updated_at", "id"],
           "isUnique": false
         }
       },
@@ -5833,12 +5349,8 @@
           "name": "session_execution_snapshot_session_id_session_id_fk",
           "tableFrom": "session_execution_snapshot",
           "tableTo": "session",
-          "columnsFrom": [
-            "session_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["session_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -5931,10 +5443,7 @@
       "indexes": {
         "session_run_skill_run_resolution_idx": {
           "name": "session_run_skill_run_resolution_idx",
-          "columns": [
-            "session_run_id",
-            "resolution_mode"
-          ],
+          "columns": ["session_run_id", "resolution_mode"],
           "isUnique": false
         }
       },
@@ -5943,22 +5452,15 @@
           "name": "session_run_skill_session_run_id_session_run_id_fk",
           "tableFrom": "session_run_skill",
           "tableTo": "session_run",
-          "columnsFrom": [
-            "session_run_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["session_run_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
         "session_run_skill_session_run_id_skill_id_pk": {
-          "columns": [
-            "session_run_id",
-            "skill_id"
-          ],
+          "columns": ["session_run_id", "skill_id"],
           "name": "session_run_skill_session_run_id_skill_id_pk"
         }
       },
@@ -6193,34 +5695,23 @@
       "indexes": {
         "session_run_driver_instance_idx": {
           "name": "session_run_driver_instance_idx",
-          "columns": [
-            "driver_instance_id",
-            "created_at"
-          ],
+          "columns": ["driver_instance_id", "created_at"],
           "isUnique": false
         },
         "session_run_active_driver_lease_idx": {
           "name": "session_run_active_driver_lease_idx",
-          "columns": [
-            "driver_instance_id"
-          ],
+          "columns": ["driver_instance_id"],
           "isUnique": true,
           "where": "\"session_run\".\"driver_instance_id\" IS NOT NULL AND \"session_run\".\"status\" IN ('queued', 'booting', 'running', 'waiting_input')"
         },
         "session_run_session_created_at_idx": {
           "name": "session_run_session_created_at_idx",
-          "columns": [
-            "session_id",
-            "created_at"
-          ],
+          "columns": ["session_id", "created_at"],
           "isUnique": false
         },
         "session_run_session_status_idx": {
           "name": "session_run_session_status_idx",
-          "columns": [
-            "session_id",
-            "status"
-          ],
+          "columns": ["session_id", "status"],
           "isUnique": false
         }
       },
@@ -6229,12 +5720,8 @@
           "name": "session_run_session_id_session_id_fk",
           "tableFrom": "session_run",
           "tableTo": "session",
-          "columnsFrom": [
-            "session_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["session_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -6385,56 +5872,32 @@
       "indexes": {
         "session_event_agent_family_created_idx": {
           "name": "session_event_agent_family_created_idx",
-          "columns": [
-            "agent_id",
-            "family",
-            "created_at",
-            "id"
-          ],
+          "columns": ["agent_id", "family", "created_at", "id"],
           "isUnique": false
         },
         "session_event_agent_visibility_created_idx": {
           "name": "session_event_agent_visibility_created_idx",
-          "columns": [
-            "agent_id",
-            "visibility",
-            "created_at",
-            "id"
-          ],
+          "columns": ["agent_id", "visibility", "created_at", "id"],
           "isUnique": false
         },
         "session_event_agent_created_idx": {
           "name": "session_event_agent_created_idx",
-          "columns": [
-            "agent_id",
-            "created_at",
-            "id"
-          ],
+          "columns": ["agent_id", "created_at", "id"],
           "isUnique": false
         },
         "session_event_session_visibility_seq_idx": {
           "name": "session_event_session_visibility_seq_idx",
-          "columns": [
-            "session_id",
-            "visibility",
-            "seq"
-          ],
+          "columns": ["session_id", "visibility", "seq"],
           "isUnique": false
         },
         "session_event_session_seq_idx": {
           "name": "session_event_session_seq_idx",
-          "columns": [
-            "session_id",
-            "seq"
-          ],
+          "columns": ["session_id", "seq"],
           "isUnique": true
         },
         "session_event_session_source_idx": {
           "name": "session_event_session_source_idx",
-          "columns": [
-            "session_id",
-            "source_event_id"
-          ],
+          "columns": ["session_id", "source_event_id"],
           "isUnique": true
         }
       },
@@ -6443,12 +5906,8 @@
           "name": "session_event_session_id_session_id_fk",
           "tableFrom": "session_event",
           "tableTo": "session",
-          "columnsFrom": [
-            "session_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["session_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -6625,34 +6084,22 @@
       "indexes": {
         "session_model_call_run_created_idx": {
           "name": "session_model_call_run_created_idx",
-          "columns": [
-            "session_run_id",
-            "created_at"
-          ],
+          "columns": ["session_run_id", "created_at"],
           "isUnique": false
         },
         "session_model_call_session_created_idx": {
           "name": "session_model_call_session_created_idx",
-          "columns": [
-            "session_id",
-            "created_at"
-          ],
+          "columns": ["session_id", "created_at"],
           "isUnique": false
         },
         "session_model_call_run_key_idx": {
           "name": "session_model_call_run_key_idx",
-          "columns": [
-            "session_run_id",
-            "call_key"
-          ],
+          "columns": ["session_run_id", "call_key"],
           "isUnique": true
         },
         "session_model_call_native_idx": {
           "name": "session_model_call_native_idx",
-          "columns": [
-            "driver_instance_id",
-            "native_call_id"
-          ],
+          "columns": ["driver_instance_id", "native_call_id"],
           "isUnique": true
         }
       },
@@ -6661,12 +6108,8 @@
           "name": "session_model_call_session_id_session_id_fk",
           "tableFrom": "session_model_call",
           "tableTo": "session",
-          "columnsFrom": [
-            "session_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["session_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -6674,12 +6117,8 @@
           "name": "session_model_call_session_run_id_session_run_id_fk",
           "tableFrom": "session_model_call",
           "tableTo": "session_run",
-          "columnsFrom": [
-            "session_run_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["session_run_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -6765,10 +6204,7 @@
       "indexes": {
         "session_permission_request_run_idx": {
           "name": "session_permission_request_run_idx",
-          "columns": [
-            "session_id",
-            "run_id"
-          ],
+          "columns": ["session_id", "run_id"],
           "isUnique": false
         }
       },
@@ -6777,22 +6213,15 @@
           "name": "session_permission_request_session_id_session_id_fk",
           "tableFrom": "session_permission_request",
           "tableTo": "session",
-          "columnsFrom": [
-            "session_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["session_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
         "session_permission_request_session_id_request_id_pk": {
-          "columns": [
-            "session_id",
-            "request_id"
-          ],
+          "columns": ["session_id", "request_id"],
           "name": "session_permission_request_session_id_request_id_pk"
         }
       },
@@ -6830,12 +6259,8 @@
           "name": "session_readiness_snapshot_session_id_session_id_fk",
           "tableFrom": "session_readiness_snapshot",
           "tableTo": "session",
-          "columnsFrom": [
-            "session_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["session_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -6901,10 +6326,7 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "skill_snapshot_entry_snapshot_id_path_pk": {
-          "columns": [
-            "snapshot_id",
-            "path"
-          ],
+          "columns": ["snapshot_id", "path"],
           "name": "skill_snapshot_entry_snapshot_id_path_pk"
         }
       },
@@ -7002,18 +6424,12 @@
       "indexes": {
         "skill_snapshot_app_created_at_idx": {
           "name": "skill_snapshot_app_created_at_idx",
-          "columns": [
-            "app_id",
-            "created_at"
-          ],
+          "columns": ["app_id", "created_at"],
           "isUnique": false
         },
         "skill_snapshot_blob_sha256_idx": {
           "name": "skill_snapshot_blob_sha256_idx",
-          "columns": [
-            "app_id",
-            "blob_sha256"
-          ],
+          "columns": ["app_id", "blob_sha256"],
           "isUnique": true
         }
       },
@@ -7127,18 +6543,12 @@
       "indexes": {
         "skill_app_updated_at_idx": {
           "name": "skill_app_updated_at_idx",
-          "columns": [
-            "app_id",
-            "updated_at"
-          ],
+          "columns": ["app_id", "updated_at"],
           "isUnique": false
         },
         "skill_owner_account_updated_at_idx": {
           "name": "skill_owner_account_updated_at_idx",
-          "columns": [
-            "owner_account_id",
-            "updated_at"
-          ],
+          "columns": ["owner_account_id", "updated_at"],
           "isUnique": false
         }
       },
@@ -7217,16 +6627,12 @@
       "indexes": {
         "account_email_idx": {
           "name": "account_email_idx",
-          "columns": [
-            "email"
-          ],
+          "columns": ["email"],
           "isUnique": true
         },
         "account_last_active_organization_idx": {
           "name": "account_last_active_organization_idx",
-          "columns": [
-            "last_active_organization_id"
-          ],
+          "columns": ["last_active_organization_id"],
           "isUnique": false
         }
       },
@@ -7361,42 +6767,27 @@
       "indexes": {
         "usage_daily_rollup_app_date_idx": {
           "name": "usage_daily_rollup_app_date_idx",
-          "columns": [
-            "app_id",
-            "date"
-          ],
+          "columns": ["app_id", "date"],
           "isUnique": false
         },
         "usage_daily_rollup_organization_date_idx": {
           "name": "usage_daily_rollup_organization_date_idx",
-          "columns": [
-            "organization_id",
-            "date"
-          ],
+          "columns": ["organization_id", "date"],
           "isUnique": false
         },
         "usage_daily_rollup_agent_date_idx": {
           "name": "usage_daily_rollup_agent_date_idx",
-          "columns": [
-            "agent_id",
-            "date"
-          ],
+          "columns": ["agent_id", "date"],
           "isUnique": false
         },
         "usage_daily_rollup_actor_date_idx": {
           "name": "usage_daily_rollup_actor_date_idx",
-          "columns": [
-            "actor_user_id",
-            "date"
-          ],
+          "columns": ["actor_user_id", "date"],
           "isUnique": false
         },
         "usage_daily_rollup_owner_date_idx": {
           "name": "usage_daily_rollup_owner_date_idx",
-          "columns": [
-            "agent_owner_user_id",
-            "date"
-          ],
+          "columns": ["agent_owner_user_id", "date"],
           "isUnique": false
         }
       },
@@ -7449,19 +6840,14 @@
       "indexes": {
         "usage_event_rollup_receipt_rolled_up_at_idx": {
           "name": "usage_event_rollup_receipt_rolled_up_at_idx",
-          "columns": [
-            "rolled_up_at"
-          ],
+          "columns": ["rolled_up_at"],
           "isUnique": false
         }
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "usage_event_rollup_receipt_source_source_event_id_pk": {
-          "columns": [
-            "source",
-            "source_event_id"
-          ],
+          "columns": ["source", "source_event_id"],
           "name": "usage_event_rollup_receipt_source_source_event_id_pk"
         }
       },
@@ -7650,57 +7036,37 @@
       "indexes": {
         "usage_event_app_created_idx": {
           "name": "usage_event_app_created_idx",
-          "columns": [
-            "app_id",
-            "created_at"
-          ],
+          "columns": ["app_id", "created_at"],
           "isUnique": false
         },
         "usage_event_organization_created_idx": {
           "name": "usage_event_organization_created_idx",
-          "columns": [
-            "organization_id",
-            "created_at"
-          ],
+          "columns": ["organization_id", "created_at"],
           "isUnique": false
         },
         "usage_event_agent_created_idx": {
           "name": "usage_event_agent_created_idx",
-          "columns": [
-            "agent_id",
-            "created_at"
-          ],
+          "columns": ["agent_id", "created_at"],
           "isUnique": false
         },
         "usage_event_actor_created_idx": {
           "name": "usage_event_actor_created_idx",
-          "columns": [
-            "actor_user_id",
-            "created_at"
-          ],
+          "columns": ["actor_user_id", "created_at"],
           "isUnique": false
         },
         "usage_event_owner_created_idx": {
           "name": "usage_event_owner_created_idx",
-          "columns": [
-            "agent_owner_user_id",
-            "created_at"
-          ],
+          "columns": ["agent_owner_user_id", "created_at"],
           "isUnique": false
         },
         "usage_event_session_run_idx": {
           "name": "usage_event_session_run_idx",
-          "columns": [
-            "session_run_id"
-          ],
+          "columns": ["session_run_id"],
           "isUnique": false
         },
         "usage_event_source_event_idx": {
           "name": "usage_event_source_event_idx",
-          "columns": [
-            "source",
-            "source_event_id"
-          ],
+          "columns": ["source", "source_event_id"],
           "isUnique": true
         }
       },
@@ -7787,19 +7153,12 @@
       "indexes": {
         "vendor_credential_app_vendor_idx": {
           "name": "vendor_credential_app_vendor_idx",
-          "columns": [
-            "app_id",
-            "vendor_id"
-          ],
+          "columns": ["app_id", "vendor_id"],
           "isUnique": false
         },
         "vendor_credential_app_vendor_name_idx": {
           "name": "vendor_credential_app_vendor_name_idx",
-          "columns": [
-            "app_id",
-            "vendor_id",
-            "name"
-          ],
+          "columns": ["app_id", "vendor_id", "name"],
           "isUnique": true
         }
       },
@@ -7843,17 +7202,12 @@
       "indexes": {
         "app_deployment_secret_app_name_idx": {
           "name": "app_deployment_secret_app_name_idx",
-          "columns": [
-            "app_id",
-            "name"
-          ],
+          "columns": ["app_id", "name"],
           "isUnique": true
         },
         "app_deployment_secret_vault_secret_idx": {
           "name": "app_deployment_secret_vault_secret_idx",
-          "columns": [
-            "vault_secret_id"
-          ],
+          "columns": ["vault_secret_id"],
           "isUnique": true
         }
       },
@@ -7862,12 +7216,8 @@
           "name": "app_deployment_secret_vault_secret_id_vault_secret_id_fk",
           "tableFrom": "app_deployment_secret",
           "tableTo": "vault_secret",
-          "columnsFrom": [
-            "vault_secret_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["vault_secret_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -7895,4 +7245,4 @@
       }
     }
   }
-}\n
+}
