@@ -23,6 +23,7 @@ test("serves OAuth protected resource metadata before assets", async () => {
       resource: origin,
       resource_documentation: "https://mosoo.ai/docs/api-reference/",
       resource_name: "Mosoo Public Thread API",
+      scopes_supported: [],
     });
   }
 
