@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 
 import worker from "../src/worker";
 
-test("serves OAuth protected resource metadata before assets", async () => {
+test("serves agent authentication metadata before assets", async () => {
   const env = {
     ASSETS: {
       fetch: () => Promise.reject(new Error("metadata must not reach the asset fallback")),
@@ -23,7 +23,29 @@ test("serves OAuth protected resource metadata before assets", async () => {
       resource: origin,
       resource_documentation: "https://mosoo.ai/docs/api-reference/",
       resource_name: "Mosoo Public Thread API",
-      scopes_supported: [],
+      scopes_supported: ["full_account_access"],
+    });
+
+    const authorizationResponse = await worker.fetch(
+      new Request(`${origin}/.well-known/oauth-authorization-server`),
+      env,
+    );
+
+    expect(authorizationResponse.status).toBe(200);
+    expect(await authorizationResponse.json()).toEqual({
+      agent_auth: {
+        identity_types_supported: ["user_authorization"],
+        register_uri: `${origin}/settings/access-tokens`,
+        skill: "https://mosoo.ai/auth.md",
+        user_authorization: {
+          authorization_uri: `${origin}/login`,
+          credential_types_supported: ["mosoo_personal_access_token"],
+          provisioning_endpoint: `${origin}/settings/access-tokens`,
+          revocation_uri: `${origin}/settings/access-tokens`,
+        },
+      },
+      issuer: origin,
+      scopes_supported: ["full_account_access"],
     });
   }
 

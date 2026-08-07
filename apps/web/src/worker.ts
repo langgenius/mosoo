@@ -27,7 +27,10 @@ export default {
       return Response.redirect(url.toString(), 308);
     }
 
-    if (url.pathname === "/.well-known/oauth-protected-resource") {
+    if (
+      url.pathname === "/.well-known/oauth-protected-resource" ||
+      url.pathname === "/.well-known/oauth-authorization-server"
+    ) {
       if (request.method !== "GET" && request.method !== "HEAD") {
         return new Response(null, {
           headers: { allow: "GET, HEAD" },
@@ -35,14 +38,32 @@ export default {
         });
       }
 
-      const body = JSON.stringify({
-        authorization_servers: [url.origin],
-        bearer_methods_supported: ["header"],
-        resource: url.origin,
-        resource_documentation: "https://mosoo.ai/docs/api-reference/",
-        resource_name: "Mosoo Public Thread API",
-        scopes_supported: [],
-      });
+      const metadata =
+        url.pathname === "/.well-known/oauth-protected-resource"
+          ? {
+              authorization_servers: [url.origin],
+              bearer_methods_supported: ["header"],
+              resource: url.origin,
+              resource_documentation: "https://mosoo.ai/docs/api-reference/",
+              resource_name: "Mosoo Public Thread API",
+              scopes_supported: ["full_account_access"],
+            }
+          : {
+              agent_auth: {
+                identity_types_supported: ["user_authorization"],
+                register_uri: `${url.origin}/settings/access-tokens`,
+                skill: "https://mosoo.ai/auth.md",
+                user_authorization: {
+                  authorization_uri: `${url.origin}/login`,
+                  credential_types_supported: ["mosoo_personal_access_token"],
+                  provisioning_endpoint: `${url.origin}/settings/access-tokens`,
+                  revocation_uri: `${url.origin}/settings/access-tokens`,
+                },
+              },
+              issuer: url.origin,
+              scopes_supported: ["full_account_access"],
+            };
+      const body = JSON.stringify(metadata);
 
       return new Response(request.method === "HEAD" ? null : body, {
         headers: { "content-type": "application/json" },
