@@ -34,15 +34,15 @@ test("serves agent authentication metadata before assets", async () => {
     expect(authorizationResponse.status).toBe(200);
     expect(await authorizationResponse.json()).toEqual({
       agent_auth: {
-        identity_types_supported: ["user_authorization"],
-        register_uri: `${origin}/settings/access-tokens`,
-        skill: "https://mosoo.ai/auth.md",
-        user_authorization: {
-          authorization_uri: `${origin}/login`,
+        anonymous: {
+          claim_uri: `${origin}/settings/access-tokens`,
           credential_types_supported: ["mosoo_personal_access_token"],
-          provisioning_endpoint: `${origin}/settings/access-tokens`,
-          revocation_uri: `${origin}/settings/access-tokens`,
         },
+        claim_uri: `${origin}/settings/access-tokens`,
+        identity_types_supported: ["anonymous"],
+        register_uri: `${origin}/settings/access-tokens`,
+        revocation_uri: `${origin}/settings/access-tokens`,
+        skill: "https://mosoo.ai/auth.md",
       },
       issuer: origin,
       scopes_supported: ["full_account_access"],
