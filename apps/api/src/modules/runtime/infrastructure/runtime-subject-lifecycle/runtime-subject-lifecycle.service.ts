@@ -18,7 +18,6 @@ import { RUNTIME_DIAGNOSTIC_EVENT } from "@mosoo/runtime-events";
 
 import { createErrorLogContext, logWarn } from "../../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
-import { validationError } from "../../../../platform/errors";
 import { currentTimestampMs } from "../../../../time";
 import {
   appendRuntimeDiagnosticEvent,
@@ -56,7 +55,6 @@ import {
 import {
   claimRuntimeSubjectActivation,
   ensureRuntimeSubjectId,
-  FREE_PLAN_CONCURRENT_SANDBOX_LIMITS,
   getRuntimeConversationSessionState,
   getRuntimeSubjectActivationRecord,
   markRuntimeSubjectActivationDestroying,
@@ -93,14 +91,6 @@ export interface ActivateRuntimeSubjectInput {
   readonly subjectId: PlatformId;
   readonly subjectKind: SandboxSubjectKind;
   readonly timing?: RuntimeTimingRecorder;
-}
-
-function freePlanSandboxLimitError() {
-  const limits = FREE_PLAN_CONCURRENT_SANDBOX_LIMITS;
-
-  return validationError(
-    `Free plan concurrent sandbox limit reached (${limits.agent} per Agent, ${limits.app} per App, ${limits.account} per account). Wait for a sandbox to stop before trying again.`,
-  );
 }
 
 export interface ActiveRuntimeSubject {
@@ -552,20 +542,6 @@ export class RuntimeSubjectLifecycleService {
     });
 
     if (!claimed) {
-      if (record.status === "cold") {
-        const refreshed = await getRuntimeSubjectActivationRecord(
-          this.#bindings.DB,
-          input.activation.runtimeSubjectId,
-        );
-
-        if (
-          refreshed?.status === "cold" &&
-          !hasActiveRuntimeSubjectClaim(refreshed, currentTimestampMs())
-        ) {
-          throw freePlanSandboxLimitError();
-        }
-      }
-
       throw new Error("Runtime subject is busy with lifecycle maintenance.");
     }
 
