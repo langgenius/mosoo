@@ -27,6 +27,26 @@ export default {
       return Response.redirect(url.toString(), 308);
     }
 
+    if (url.pathname === "/.well-known/oauth-protected-resource") {
+      if (request.method !== "GET" && request.method !== "HEAD") {
+        return new Response(null, {
+          headers: { allow: "GET, HEAD" },
+          status: 405,
+        });
+      }
+
+      const body = JSON.stringify({
+        bearer_methods_supported: ["header"],
+        resource: url.origin,
+        resource_documentation: "https://mosoo.ai/docs/api-reference/",
+        resource_name: "Mosoo Public Thread API",
+      });
+
+      return new Response(request.method === "HEAD" ? null : body, {
+        headers: { "content-type": "application/json" },
+      });
+    }
+
     if (url.pathname === "/api" || url.pathname.startsWith("/api/")) {
       if (env.API === undefined) {
         return new Response("API binding is not configured.", { status: 502 });
