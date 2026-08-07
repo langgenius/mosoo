@@ -41,6 +41,7 @@ export default {
         resource: url.origin,
         resource_documentation: "https://mosoo.ai/docs/api-reference/",
         resource_name: "Mosoo Public Thread API",
+        scopes_supported: [],
       });
 
       return new Response(request.method === "HEAD" ? null : body, {
