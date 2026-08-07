@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { createPlatformId } from "@mosoo/id";
-import type { AgentId, AppId, SandboxId, SessionId } from "@mosoo/id";
+import type { SandboxId, SessionId } from "@mosoo/id";
 
 import { decideRuntimeSubjectTransition } from "../src/modules/runtime/domain/runtime-subject-lifecycle.machine";
 import { createRuntimeSubjectLifecycleService } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-lifecycle.service";
@@ -10,7 +10,6 @@ import { destroyRuntimeSubjectContainer } from "../src/modules/runtime/infrastru
 import { recycleRuntimeSubject } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-recycle.service";
 import {
   advanceRuntimeSubjectOperationStatus,
-  FREE_PLAN_CONCURRENT_SANDBOX_LIMITS,
   markRuntimeSubjectCold,
   markRuntimeSubjectOperationStarted,
 } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-store";
@@ -309,43 +308,33 @@ describe("runtime subject lifecycle machine", () => {
     ).resolves.toBeNull();
   });
 
-  test("atomically caps Free sandboxes per Agent, App, and account", async () => {
-    for (const scope of ["agent", "app", "account"] as const) {
-      const database = createRuntimeSubjectLifecycleDatabase();
-      const inputs: ActivateRuntimeSubjectInput[] = [];
-      const limit = FREE_PLAN_CONCURRENT_SANDBOX_LIMITS[scope];
+  test("allows more than three concurrent sandboxes for one Agent", async () => {
+    const database = createRuntimeSubjectLifecycleDatabase();
+    const inputs: ActivateRuntimeSubjectInput[] = Array.from({ length: 4 }, () => {
+      const sessionId = createPlatformId<SessionId>();
 
-      for (let index = 0; index <= limit; index += 1) {
-        const agentId = scope === "agent" ? AGENT_ID : createPlatformId<AgentId>();
-        const appId = scope === "account" ? createPlatformId<AppId>() : APP_ID;
-        const sessionId = createPlatformId<SessionId>();
+      return {
+        agentId: AGENT_ID,
+        appId: APP_ID,
+        executionOwnerUserId: ACCOUNT_ID,
+        kind: "cattle",
+        networkConstraints: { allowedHosts: [], networkPolicy: "full" },
+        runtimeSubjectId: createPlatformId<SandboxId>(),
+        subjectId: sessionId,
+        subjectKind: "session",
+      };
+    });
 
-        inputs.push({
-          agentId,
-          appId,
-          executionOwnerUserId: ACCOUNT_ID,
-          kind: "cattle",
-          networkConstraints: { allowedHosts: [], networkPolicy: "full" },
-          runtimeSubjectId: createPlatformId<SandboxId>(),
-          subjectId: sessionId,
-          subjectKind: "session",
-        });
-      }
+    const lifecycle = createRuntimeSubjectLifecycleService(createBindings(database));
 
-      const lifecycle = createRuntimeSubjectLifecycleService(createBindings(database));
-      const outcomes = await Promise.allSettled(inputs.map((input) => lifecycle.activate(input)));
-      const rejected = outcomes.filter(
-        (outcome): outcome is PromiseRejectedResult => outcome.status === "rejected",
-      );
-      const active = await database
+    await expect(
+      Promise.all(inputs.map((input) => lifecycle.activate(input))),
+    ).resolves.toHaveLength(inputs.length);
+    await expect(
+      database
         .prepare("SELECT COUNT(*) AS count FROM sandbox WHERE status = 'active'")
-        .first<{ count: number }>();
-
-      expect(outcomes.filter((outcome) => outcome.status === "fulfilled")).toHaveLength(limit);
-      expect(rejected).toHaveLength(1);
-      expect(String(rejected[0]?.reason)).toContain("Free plan concurrent sandbox limit reached");
-      expect(active?.count).toBe(limit);
-    }
+        .first<{ count: number }>(),
+    ).resolves.toEqual({ count: inputs.length });
   });
 
   test("records operation transitions with monotonic status metadata", async () => {
