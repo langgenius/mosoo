@@ -50,15 +50,15 @@ export default {
             }
           : {
               agent_auth: {
-                identity_types_supported: ["user_authorization"],
-                register_uri: `${url.origin}/settings/access-tokens`,
-                skill: "https://mosoo.ai/auth.md",
-                user_authorization: {
-                  authorization_uri: `${url.origin}/login`,
+                anonymous: {
+                  claim_uri: `${url.origin}/settings/access-tokens`,
                   credential_types_supported: ["mosoo_personal_access_token"],
-                  provisioning_endpoint: `${url.origin}/settings/access-tokens`,
-                  revocation_uri: `${url.origin}/settings/access-tokens`,
                 },
+                claim_uri: `${url.origin}/settings/access-tokens`,
+                identity_types_supported: ["anonymous"],
+                register_uri: `${url.origin}/settings/access-tokens`,
+                revocation_uri: `${url.origin}/settings/access-tokens`,
+                skill: "https://mosoo.ai/auth.md",
               },
               issuer: url.origin,
               scopes_supported: ["full_account_access"],
