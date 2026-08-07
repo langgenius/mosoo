@@ -20,6 +20,8 @@ export interface CloudflarePagesDomainInput {
 export interface CloudflareWorkerModuleInput {
   compatibilityDate: string;
   mainModuleName: string;
+  /** Write-only Worker bindings. Never include these in generated config or logs. */
+  secrets: Record<string, string>;
   scriptContent: string;
   scriptName: string;
   /** Plain-text env vars injected into the Worker (e.g. agent thread URLs). */
@@ -333,11 +335,18 @@ export function createWorkerModuleUpload(input: CloudflareWorkerModuleInput): Fo
     type: "application/javascript+module",
   });
   const metadata = {
-    bindings: Object.entries(input.vars).map(([name, text]) => ({
-      name,
-      text,
-      type: "plain_text" as const,
-    })),
+    bindings: [
+      ...Object.entries(input.vars).map(([name, text]) => ({
+        name,
+        text,
+        type: "plain_text" as const,
+      })),
+      ...Object.entries(input.secrets).map(([name, text]) => ({
+        name,
+        text,
+        type: "secret_text" as const,
+      })),
+    ],
     compatibility_date: input.compatibilityDate,
     main_module: input.mainModuleName,
   };

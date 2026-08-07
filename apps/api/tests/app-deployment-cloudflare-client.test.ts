@@ -8,6 +8,7 @@ describe("app deployment Cloudflare client", () => {
     const upload = createWorkerModuleUpload({
       compatibilityDate: "2026-07-14",
       mainModuleName: "worker.js",
+      secrets: { MOSOO_API_TOKEN: "secret-value" },
       scriptContent,
       scriptName: "example",
       vars: { MOSOO_AGENT_URL: "https://example.com/bound/token" },
@@ -28,6 +29,11 @@ describe("app deployment Cloudflare client", () => {
             name: "MOSOO_AGENT_URL",
             text: "https://example.com/bound/token",
             type: "plain_text",
+          },
+          {
+            name: "MOSOO_API_TOKEN",
+            text: "secret-value",
+            type: "secret_text",
           },
         ],
         compatibility_date: "2026-07-14",

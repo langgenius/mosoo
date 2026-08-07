@@ -12,11 +12,13 @@ export function CommandBlock({
   className,
   command,
   copyLabel,
+  multiline = false,
   prompt = "$",
 }: {
   className?: string;
   command: string;
   copyLabel?: string;
+  multiline?: boolean;
   prompt?: string | null;
 }): ReactElement {
   const { t } = useTranslation();
@@ -38,11 +40,17 @@ export function CommandBlock({
   return (
     <div
       className={cn(
-        "border-border bg-bg-sunken flex items-center gap-3 rounded-md border px-3 py-2.5",
+        "border-border bg-bg-sunken flex gap-3 rounded-md border px-3 py-2.5",
+        multiline ? "items-start" : "items-center",
         className,
       )}
     >
-      <code className="text-fg-1 min-w-0 flex-1 truncate font-mono text-[13px]">
+      <code
+        className={cn(
+          "text-fg-1 min-w-0 flex-1 font-mono text-[13px]",
+          multiline ? "whitespace-pre-wrap break-words leading-relaxed" : "truncate",
+        )}
+      >
         {prompt === null ? null : <span className="text-fg-3 select-none">{prompt} </span>}
         {command}
       </code>
@@ -50,7 +58,10 @@ export function CommandBlock({
         type="button"
         aria-label={copied ? t("common.copied") : (copyLabel ?? t("common.copyCommand"))}
         onClick={copy}
-        className="text-fg-3 hover:bg-ink-900/[0.06] hover:text-fg-1 flex size-7 shrink-0 items-center justify-center rounded-md transition-colors"
+        className={cn(
+          "text-fg-3 hover:bg-ink-900/[0.06] hover:text-fg-1 flex size-7 shrink-0 items-center justify-center rounded-md transition-colors",
+          multiline ? "mt-0.5" : null,
+        )}
       >
         {copied ? <Check className="text-success size-3.5" /> : <Copy className="size-3.5" />}
       </button>

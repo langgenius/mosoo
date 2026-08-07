@@ -202,7 +202,10 @@ describe("App overview", () => {
     const credential = schema.getType("AppOverviewProviderCredential");
     const deployment = schema.getType("AppDeployment");
     const deploymentRun = schema.getType("AppDeploymentRun");
+    const deploymentSecret = schema.getType("AppDeploymentSecret");
+    const deleteDeploymentSecretInput = schema.getType("DeleteAppDeploymentSecretInput");
     const deployInput = schema.getType("DeployAppInput");
+    const setDeploymentSecretInput = schema.getType("SetAppDeploymentSecretInput");
 
     if (
       !query ||
@@ -211,6 +214,9 @@ describe("App overview", () => {
       !isObjectType(credential) ||
       !isObjectType(deployment) ||
       !isObjectType(deploymentRun) ||
+      !isObjectType(deploymentSecret) ||
+      !isInputObjectType(deleteDeploymentSecretInput) ||
+      !isInputObjectType(setDeploymentSecretInput) ||
       !isInputObjectType(deployInput)
     ) {
       throw new Error("Expected App overview GraphQL types.");
@@ -218,9 +224,12 @@ describe("App overview", () => {
 
     const overview = query.getFields().appOverview;
     const deploymentStatus = query.getFields().appDeploymentStatus;
+    const deploymentSecrets = query.getFields().appDeploymentSecretList;
     const controlPlaneOverview = query.getFields().controlPlaneOverview;
     const deploy = mutation.getFields().deployApp;
     const deleteDeployment = mutation.getFields().deleteAppDeployment;
+    const deleteDeploymentSecret = mutation.getFields().deleteAppDeploymentSecret;
+    const setDeploymentSecret = mutation.getFields().setAppDeploymentSecret;
 
     expect(overview).toBeDefined();
     expect(String(overview.args.find((arg) => arg.name === "appId")?.type)).toBe("ULID!");
@@ -230,9 +239,14 @@ describe("App overview", () => {
     expect(String(deployment.getFields().latestRun.type)).toBe("AppDeploymentRun");
     expect(String(deploymentRun.getFields().status.type)).toBe("AppDeploymentRunStatus!");
     expect(String(deploymentStatus.type)).toBe("AppDeploymentRun");
+    expect(String(deploymentSecrets.type)).toBe("[AppDeploymentSecret!]!");
     expect(String(deploy.type)).toBe("AppDeploymentRun!");
     expect(String(deleteDeployment.type)).toBe("OperationResult!");
+    expect(String(deleteDeploymentSecret.type)).toBe("OperationResult!");
+    expect(String(setDeploymentSecret.type)).toBe("AppDeploymentSecret!");
     expect(String(deployInput.getFields().repoUrl.type)).toBe("String!");
+    expect(deploymentSecret.getFields().value).toBeUndefined();
+    expect(String(setDeploymentSecretInput.getFields().value.type)).toBe("String!");
     expect(controlPlaneOverview).toBeDefined();
     expect(String(controlPlaneOverview.args.find((arg) => arg.name === "appLimit")?.type)).toBe(
       "Int",

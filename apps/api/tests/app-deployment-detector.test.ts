@@ -197,6 +197,93 @@ env = "TRIAGE_THREAD_URL"
     ]);
   });
 
+  test("parses write-only App secret names without values", () => {
+    expect(
+      detect({
+        ".mosoo.toml": `
+schema = 1
+
+[deploy]
+adapter = "cloudflare-workers"
+
+[worker]
+entry = "src/index.js"
+
+[secrets]
+required = ["MOSOO_API_TOKEN", "THIRD_PARTY_KEY"]
+`,
+      }),
+    ).toMatchObject({
+      secretNames: ["MOSOO_API_TOKEN", "THIRD_PARTY_KEY"],
+      targetKind: "cloudflare_worker",
+    });
+  });
+
+  test("rejects secret values and secret bindings on static deployments", () => {
+    expect(() =>
+      detect({
+        ".mosoo.toml": `
+type = "static"
+
+[build]
+output = "dist"
+
+[secrets]
+required = ["MOSOO_API_TOKEN"]
+`,
+      }),
+    ).toThrow("App secrets ([secrets].required) require a worker deployment");
+
+    expect(() =>
+      detect({
+        ".mosoo.toml": `
+type = "worker"
+
+[worker]
+entry = "src/index.js"
+
+[secrets]
+value = "must-not-be-here"
+`,
+      }),
+    ).toThrow(".mosoo.toml secrets.value is not supported");
+  });
+
+  test("rejects duplicate and agent-colliding App secret names", () => {
+    expect(() =>
+      detect({
+        ".mosoo.toml": `
+type = "worker"
+
+[worker]
+entry = "src/index.js"
+
+[secrets]
+required = ["MOSOO_TOKEN", "MOSOO_TOKEN"]
+`,
+      }),
+    ).toThrow(".mosoo.toml secrets.required must not contain duplicate names");
+
+    expect(() =>
+      detect({
+        ".mosoo.toml": `
+type = "worker"
+
+[worker]
+entry = "src/index.js"
+
+[[agents]]
+env = "MOSOO_TOKEN"
+expose = "public_thread"
+name = "assistant"
+
+[secrets]
+required = ["MOSOO_TOKEN"]
+`,
+      }),
+    ).toThrow('secret "MOSOO_TOKEN" conflicts with an agents.env binding');
+  });
+
   test("parses the schema-v1 product manifest into a worker target", () => {
     const plan = detect({
       ".mosoo.toml": `
