@@ -36,6 +36,7 @@ export default {
       }
 
       const body = JSON.stringify({
+        authorization_servers: [url.origin],
         bearer_methods_supported: ["header"],
         resource: url.origin,
         resource_documentation: "https://mosoo.ai/docs/api-reference/",

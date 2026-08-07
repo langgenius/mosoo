@@ -18,6 +18,7 @@ test("serves OAuth protected resource metadata before assets", async () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toBe("application/json");
     expect(await response.json()).toEqual({
+      authorization_servers: [origin],
       bearer_methods_supported: ["header"],
       resource: origin,
       resource_documentation: "https://mosoo.ai/docs/api-reference/",
