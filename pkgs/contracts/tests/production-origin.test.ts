@@ -19,7 +19,7 @@ describe("production origins", () => {
   test("pins the production Sandbox capacity accepted by the account quota", () => {
     const apiWrangler = readRepoFile("apps/api/wrangler.toml");
 
-    expect(apiWrangler).toContain('instance_type = "standard-2"\nmax_instances = 500');
+    expect(apiWrangler).toContain('instance_type = "standard-2"\nmax_instances = 50');
   });
 
   test("keeps Cloudflare routes and OAuth origin aligned", () => {

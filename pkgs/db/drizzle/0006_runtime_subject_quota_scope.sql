@@ -1,0 +1,3 @@
+ALTER TABLE `sandbox` ADD `agent_id` text CHECK ("agent_id" = upper("agent_id") AND length("agent_id") = 26 AND substr("agent_id", 1, 1) GLOB '[0-7]' AND "agent_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*');--> statement-breakpoint
+ALTER TABLE `sandbox` ADD `app_id` text CHECK ("app_id" = upper("app_id") AND length("app_id") = 26 AND substr("app_id", 1, 1) GLOB '[0-7]' AND "app_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*');--> statement-breakpoint
+ALTER TABLE `sandbox` ADD `owner_account_id` text CHECK ("owner_account_id" = upper("owner_account_id") AND length("owner_account_id") = 26 AND substr("owner_account_id", 1, 1) GLOB '[0-7]' AND "owner_account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*');

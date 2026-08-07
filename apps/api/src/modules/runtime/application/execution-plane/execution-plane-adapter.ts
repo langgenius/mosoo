@@ -44,11 +44,6 @@ export interface DispatchRuntimeTurnInput {
   sessionRunId: SessionRunId;
 }
 
-export interface RuntimeExecutionTerminalOptions {
-  cols?: number;
-  rows?: number;
-}
-
 export interface StopRuntimeSubjectDriversInput {
   operationId?: RuntimeOperationId;
   runtimeSubjectId: SandboxId;
@@ -78,15 +73,6 @@ export interface RuntimeSubjectOperationSessionTarget {
 }
 
 export interface RuntimeExecutionPlaneAdapter {
-  connectTerminal(
-    bindings: ApiBindings,
-    input: {
-      runtimeSubjectId: SandboxId;
-      options?: RuntimeExecutionTerminalOptions;
-      request: Request;
-      terminalSessionId?: string;
-    },
-  ): Promise<Response>;
   dispatchTurn(bindings: ApiBindings, input: DispatchRuntimeTurnInput): Promise<void>;
   materializeActiveSessionResources(
     bindings: ApiBindings,

@@ -1,4 +1,5 @@
-import type { SandboxId, SessionId } from "@mosoo/id";
+import type { PtyOptions } from "@cloudflare/sandbox";
+import type { SessionId } from "@mosoo/id";
 import { RUNTIME_DIAGNOSTIC_EVENT } from "@mosoo/runtime-events";
 
 import {
@@ -10,7 +11,6 @@ import { createStopwatch } from "../../../../time";
 import type {
   DispatchRuntimeTurnInput,
   PrepareRuntimeRunInput,
-  RuntimeExecutionTerminalOptions,
   RuntimeExecutionPlaneAdapter,
   RuntimeExecutionPlaneRunLease,
   RuntimeSubjectOperationInput,
@@ -26,7 +26,6 @@ import { dispatchDriverTurn, ensureDriverSessionReady } from "../driver-session.
 import {
   createRuntimeSubjectLifecycleService,
   getRuntimeSubjectKeepAliveHandle,
-  prepareRuntimeSubjectFilesystem,
 } from "../runtime-subject-lifecycle/runtime-subject-lifecycle.service";
 import { resolveRuntimeSubjectNetworkConstraints } from "../runtime-subject-lifecycle/runtime-subject-network";
 import {
@@ -50,7 +49,7 @@ function releaseRunResources(handles: {
 }
 
 type TerminalSessionHandle = ExecutionSessionHandle & {
-  terminal(request: Request, options?: RuntimeExecutionTerminalOptions): Promise<Response>;
+  terminal(request: Request, options?: PtyOptions): Promise<Response>;
 };
 
 function isSessionAlreadyExistsError(error: unknown): boolean {
@@ -94,32 +93,23 @@ async function ensureTerminalSession(
   }
 }
 
-class SandboxExecutionPlaneAdapter implements RuntimeExecutionPlaneAdapter {
-  async connectTerminal(
-    bindings: ApiBindings,
-    input: {
-      runtimeSubjectId: SandboxId;
-      options?: { cols?: number; rows?: number };
-      request: Request;
-      terminalSessionId?: string;
-    },
-  ): Promise<Response> {
-    const subject = await getRuntimeSubjectKeepAliveHandle(bindings, input.runtimeSubjectId);
-
-    // Owners can open the terminal before any run has executed prepareRun, so the
-    // sandbox container may be live but /workspace/{cache,memory,se} have never
-    // been provisioned — ls would show an empty workspace and look broken.
-    // Re-assert the platform roots before opening the sandbox terminal.
-    await prepareRuntimeSubjectFilesystem(subject);
-
-    if (input.terminalSessionId) {
-      const terminalSession = await ensureTerminalSession(subject, input.terminalSessionId);
-      return terminalSession.terminal(input.request, input.options);
-    }
-
-    return subject.terminal(input.request, input.options);
+export async function connectPreparedSandboxTerminal(
+  subject: SandboxHandle,
+  input: {
+    options?: PtyOptions;
+    request: Request;
+    terminalSessionId?: string;
+  },
+): Promise<Response> {
+  if (input.terminalSessionId) {
+    const terminalSession = await ensureTerminalSession(subject, input.terminalSessionId);
+    return terminalSession.terminal(input.request, input.options);
   }
 
+  return subject.terminal(input.request, input.options);
+}
+
+class SandboxExecutionPlaneAdapter implements RuntimeExecutionPlaneAdapter {
   async prepareRun(
     bindings: ApiBindings,
     requestUrl: string,
@@ -164,6 +154,7 @@ class SandboxExecutionPlaneAdapter implements RuntimeExecutionPlaneAdapter {
       });
       const { subject: sandbox } = await timing.measure("activateRuntimeSubject", () =>
         runtimeSubjectLifecycle.activate({
+          agentId: input.profile.agentId,
           diagnosticContext: {
             agentId: input.profile.configRevision.agentId,
             sessionId: input.sessionId,
@@ -179,6 +170,7 @@ class SandboxExecutionPlaneAdapter implements RuntimeExecutionPlaneAdapter {
             subjectKind: input.profile.sandbox.subjectKind,
           }),
           runtimeSubjectId: sandboxId,
+          appId: input.profile.vendorCredential.appId,
           subjectId: input.profile.sandbox.subjectId,
           subjectKind: input.profile.sandbox.subjectKind,
           timing,

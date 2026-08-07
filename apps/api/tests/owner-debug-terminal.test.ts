@@ -109,7 +109,7 @@ describe("owner debug terminal", () => {
     });
   });
 
-  test("provisions /workspace skeleton before opening the terminal session", async () => {
+  test("activates the sandbox before opening the terminal session", async () => {
     const database = await createPublicHttpContractDatabase();
     const spy = createTerminalSandboxHandleSpy();
     const bindings = {
@@ -124,6 +124,12 @@ describe("owner debug terminal", () => {
       viewer: OWNER_VIEWER,
     });
 
+    expect(
+      await database
+        .prepare("SELECT status FROM sandbox WHERE subject_id = ?")
+        .bind(PUBLIC_API_TEST_IDS.agent)
+        .first(),
+    ).toEqual({ status: "active" });
     expect(spy.setKeepAliveCalls).toEqual([true]);
     expect(new Set(spy.mkdirCalls)).toEqual(
       new Set([SANDBOX_CACHE_PATH, SANDBOX_MEMORY_PATH, SANDBOX_SESSION_ROOT]),

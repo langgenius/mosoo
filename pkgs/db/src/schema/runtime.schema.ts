@@ -11,6 +11,8 @@ import type {
   SandboxSubjectKind,
 } from "@mosoo/contracts/sandbox";
 import type {
+  AccountId,
+  AgentId,
   CredentialId,
   DriverCommandId,
   DriverInstanceId,
@@ -41,6 +43,8 @@ import { sessionsTable } from "./session/core.schema";
 export const sandboxesTable = sqliteTable(
   "sandbox",
   {
+    agentId: platformIdColumn<AgentId>("agent_id"),
+    appId: platformIdColumn<AppId>("app_id"),
     bindMountReady: integer("bind_mount_ready", { mode: "boolean" }).notNull().default(false),
     claimExpiresAt: integer("claim_expires_at"),
     claimOwner: text("claim_owner"),
@@ -53,6 +57,7 @@ export const sandboxesTable = sqliteTable(
     lastError: text("last_error"),
     lastErrorCode: text("last_error_code").$type<RuntimeSubjectErrorCode>(),
     lastRestoreBackupId: platformIdColumn<SandboxBackupId>("last_restore_backup_id"),
+    ownerAccountId: platformIdColumn<AccountId>("owner_account_id"),
     status: text("status").$type<SandboxStatus>().notNull(),
     statusChangedAt: integer("status_changed_at").notNull().default(0),
     statusEvent: text("status_event").notNull().default("runtime_subject.cold"),

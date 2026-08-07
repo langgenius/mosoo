@@ -46,9 +46,16 @@
     },
     {
       "idx": 6,
-      "version": "7",
-      "when": 1786032000000,
-      "tag": "0006_app-deployment-secrets",
+      "version": "6",
+      "when": 1786028822757,
+      "tag": "0006_runtime_subject_quota_scope",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1786086077012,
+      "tag": "0007_app-deployment-secrets",
       "breakpoints": true
     }
   ]

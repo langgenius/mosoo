@@ -200,8 +200,9 @@ class_name = "Sandbox"
 [[env.prod.containers]]
 class_name = "Sandbox"
 image = "../driver/Containerfile"
+# ponytail: early-stage spend fuse; raise only after sustained demand is measured.
 instance_type = "standard-2"
-max_instances = 500
+max_instances = 50
 
 [[env.prod.r2_buckets]]
 binding = "FILE_BUCKET"

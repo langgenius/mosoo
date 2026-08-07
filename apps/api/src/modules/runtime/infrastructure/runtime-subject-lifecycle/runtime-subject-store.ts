@@ -19,8 +19,8 @@ export {
 export {
   advanceRuntimeSubjectOperationStatus,
   claimRuntimeSubjectActivation,
-  createClaimedColdRuntimeSubjectRecord,
   ensureRuntimeSubjectId,
+  FREE_PLAN_CONCURRENT_SANDBOX_LIMITS,
   getRuntimeSubject,
   getRuntimeSubjectActivationRecord,
   getRuntimeSubjectIdByTuple,
