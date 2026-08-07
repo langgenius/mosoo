@@ -45,6 +45,27 @@ interface RuntimeSubjectQuotaScope {
   readonly executionOwnerUserId: AccountId;
 }
 
+function runtimeSubjectAccountCapacityPredicate(input: {
+  readonly accountConcurrentSandboxLimit: number;
+  readonly executionOwnerUserId: AccountId;
+  readonly now: number;
+}): SQL {
+  // ponytail: use the existing status/claim indexes until measured contention
+  // justifies durable admission counters.
+  return sql`(
+    SELECT COUNT(*)
+    FROM ${sandboxesTable} AS account_sandbox
+    WHERE account_sandbox.owner_account_id = ${input.executionOwnerUserId}
+      AND (
+        account_sandbox.status IN ('restoring', 'active', 'backing_up', 'destroying')
+        OR (
+          account_sandbox.claim_owner IS NOT NULL
+          AND account_sandbox.claim_expires_at > ${input.now}
+        )
+      )
+  ) < ${input.accountConcurrentSandboxLimit}`;
+}
+
 function runtimeSubjectStatusPatch(input: {
   readonly now: number;
   readonly operationId: RuntimeOperationId | null;
@@ -247,6 +268,7 @@ export async function getRuntimeSubjectActivationRecord(
 export async function claimRuntimeSubjectActivation(
   database: D1Database,
   input: RuntimeSubjectQuotaScope & {
+    readonly accountConcurrentSandboxLimit: number;
     readonly claimExpiresAt: number;
     readonly claimOwner: string;
     readonly expectedStatus: RuntimeSubjectStatus;
@@ -275,6 +297,9 @@ export async function claimRuntimeSubjectActivation(
             isNull(sandboxesTable.claimExpiresAt),
             lte(sandboxesTable.claimExpiresAt, input.now),
           ),
+          ...(input.expectedStatus === "cold"
+            ? [runtimeSubjectAccountCapacityPredicate(input)]
+            : []),
         ),
       )
       .returning({ id: sandboxesTable.id })

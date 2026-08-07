@@ -237,6 +237,7 @@ function createSandboxHandle(
 function createBindings(
   database: D1Database,
   options: {
+    readonly accountConcurrentSandboxLimit?: string;
     readonly configureNetworkError?: Error;
     readonly destroyError?: Error;
     readonly destroyPromise?: Promise<void>;
@@ -248,6 +249,7 @@ function createBindings(
 ): ApiBindings {
   return {
     DB: database,
+    MOSOO_ACCOUNT_CONCURRENT_SANDBOX_LIMIT: options.accountConcurrentSandboxLimit ?? "5",
     SANDBOX_FILE_BUCKET_LOCAL: "true",
     runtimeSubjectHandleFactory: () => createSandboxHandle(options),
   } as unknown as ApiBindings;
@@ -308,9 +310,9 @@ describe("runtime subject lifecycle machine", () => {
     ).resolves.toBeNull();
   });
 
-  test("allows more than three concurrent sandboxes for one Agent", async () => {
+  test("atomically applies the configured concurrent sandbox limit per account", async () => {
     const database = createRuntimeSubjectLifecycleDatabase();
-    const inputs: ActivateRuntimeSubjectInput[] = Array.from({ length: 4 }, () => {
+    const inputs: ActivateRuntimeSubjectInput[] = Array.from({ length: 3 }, () => {
       const sessionId = createPlatformId<SessionId>();
 
       return {
@@ -325,16 +327,53 @@ describe("runtime subject lifecycle machine", () => {
       };
     });
 
-    const lifecycle = createRuntimeSubjectLifecycleService(createBindings(database));
+    const lifecycle = createRuntimeSubjectLifecycleService(
+      createBindings(database, { accountConcurrentSandboxLimit: "2" }),
+    );
+    const outcomes = await Promise.allSettled(inputs.map((input) => lifecycle.activate(input)));
+    const admittedIndex = outcomes.findIndex((outcome) => outcome.status === "fulfilled");
 
-    await expect(
-      Promise.all(inputs.map((input) => lifecycle.activate(input))),
-    ).resolves.toHaveLength(inputs.length);
+    expect(outcomes.filter((outcome) => outcome.status === "fulfilled")).toHaveLength(2);
+    expect(outcomes.filter((outcome) => outcome.status === "rejected")).toHaveLength(1);
+    expect(admittedIndex).toBeGreaterThanOrEqual(0);
     await expect(
       database
-        .prepare("SELECT COUNT(*) AS count FROM sandbox WHERE status = 'active'")
+        .prepare(
+          "SELECT COUNT(*) AS count FROM sandbox WHERE owner_account_id = ? AND status = 'active'",
+        )
+        .bind(ACCOUNT_ID)
         .first<{ count: number }>(),
-    ).resolves.toEqual({ count: inputs.length });
+    ).resolves.toEqual({ count: 2 });
+    await expect(lifecycle.activate(inputs[admittedIndex])).resolves.toBeDefined();
+
+    await expect(
+      lifecycle.activate({
+        ...inputs[0],
+        agentId: createPlatformId(),
+        appId: createPlatformId(),
+        runtimeSubjectId: createPlatformId<SandboxId>(),
+        subjectId: createPlatformId<SessionId>(),
+      }),
+    ).rejects.toThrow();
+
+    await expect(
+      lifecycle.activate({
+        ...inputs[0],
+        executionOwnerUserId: createPlatformId(),
+        runtimeSubjectId: createPlatformId<SandboxId>(),
+        subjectId: createPlatformId<SessionId>(),
+      }),
+    ).resolves.toBeDefined();
+  });
+
+  test("rejects an invalid concurrent sandbox limit", () => {
+    expect(() =>
+      createRuntimeSubjectLifecycleService(
+        createBindings(createRuntimeSubjectLifecycleDatabase(), {
+          accountConcurrentSandboxLimit: "0",
+        }),
+      ),
+    ).toThrow("MOSOO_ACCOUNT_CONCURRENT_SANDBOX_LIMIT must be a positive integer.");
   });
 
   test("records operation transitions with monotonic status metadata", async () => {

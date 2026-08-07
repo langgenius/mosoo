@@ -171,9 +171,21 @@ export function selectRuntimeSubjectRestoreBackup(input: {
 }
 
 export class RuntimeSubjectLifecycleService {
+  readonly #accountConcurrentSandboxLimit: number;
   readonly #bindings: ApiBindings;
 
   constructor(bindings: ApiBindings) {
+    const accountConcurrentSandboxLimit = Number(
+      bindings.MOSOO_ACCOUNT_CONCURRENT_SANDBOX_LIMIT ?? 5,
+    );
+    if (
+      !Number.isSafeInteger(accountConcurrentSandboxLimit) ||
+      accountConcurrentSandboxLimit <= 0
+    ) {
+      throw new Error("MOSOO_ACCOUNT_CONCURRENT_SANDBOX_LIMIT must be a positive integer.");
+    }
+
+    this.#accountConcurrentSandboxLimit = accountConcurrentSandboxLimit;
     this.#bindings = bindings;
   }
 
@@ -531,6 +543,7 @@ export class RuntimeSubjectLifecycleService {
     }
 
     const claimed = await claimRuntimeSubjectActivation(this.#bindings.DB, {
+      accountConcurrentSandboxLimit: this.#accountConcurrentSandboxLimit,
       agentId: input.activation.agentId,
       appId: input.activation.appId,
       claimExpiresAt: input.claimExpiresAt,
