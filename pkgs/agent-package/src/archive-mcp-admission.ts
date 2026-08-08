@@ -3,7 +3,7 @@ import type { AgentResolutionIssue } from "@mosoo/contracts/agent-manifest";
 import { createArchiveIssue } from "./archive-issue";
 
 const MCP_REMOTE_TRANSPORT_TYPES = new Set(["http", "sse"]);
-const MCP_REMOTE_SIDECAR_FIELDS = new Set(["description", "iconUrl", "type", "url"]);
+const MCP_REMOTE_SIDECAR_FIELDS = new Set(["authType", "description", "iconUrl", "type", "url"]);
 const MCP_SIDECAR_FORBIDDEN_SECRET_FIELDS = new Set([
   "access_token",
   "accesstoken",
@@ -52,6 +52,7 @@ export function admitMcpSidecarServer(
   server: Record<string, unknown>,
 ): McpSidecarAdmissionResult {
   const type = typeof server["type"] === "string" ? server["type"] : null;
+  const authType = server["authType"] === "bearer" ? "bearer" : "oauth";
   const hasCommand = typeof server["command"] === "string";
 
   if (hasCommand || type === "stdio") {
@@ -114,10 +115,10 @@ export function admitMcpSidecarServer(
 
   return {
     normalizedServer: {
-      authType: "oauth",
-      credentialScope: "user",
+      authType,
+      credentialScope: "app",
       iconUrl: typeof server["iconUrl"] === "string" ? server["iconUrl"] : null,
-      source: "personal",
+      source: "app",
       url,
     },
     ok: true,
