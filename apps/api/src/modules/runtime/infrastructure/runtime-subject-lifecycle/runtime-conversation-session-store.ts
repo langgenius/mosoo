@@ -5,6 +5,10 @@ import type { SandboxId, SandboxSessionId, SessionId } from "@mosoo/id";
 import { and, desc, eq, inArray, lte, notExists, sql } from "drizzle-orm";
 
 import { getAppDatabase, runAppDatabaseBatch } from "../../../../platform/db/drizzle";
+import {
+  getRuntimeKindPolicy,
+  getRuntimeSubjectInactiveDeadline,
+} from "../../domain/runtime-kind-policy";
 import { toRuntimeSubjectStatusLifecycleEventName } from "../../domain/runtime-subject-lifecycle.machine";
 import {
   activeConversationSessionQuery,
@@ -280,6 +284,11 @@ export async function recordRuntimeConversationSessionActive(
     readonly sessionId: SessionId;
   },
 ): Promise<void> {
+  const petInactiveDeadlineAt = getRuntimeSubjectInactiveDeadline(
+    getRuntimeKindPolicy("pet"),
+    input.now,
+  );
+
   await runAppDatabaseBatch(database, (appDb) => [
     appDb
       .insert(sandboxSessionsTable)
@@ -307,7 +316,8 @@ export async function recordRuntimeConversationSessionActive(
       .set({
         inactiveDeadlineAt: sql`
           CASE
-            WHEN ${sandboxesTable.kind} = 'pet' THEN ${sandboxesTable.inactiveDeadlineAt}
+            WHEN ${sandboxesTable.kind} = 'pet'
+              THEN COALESCE(${sandboxesTable.inactiveDeadlineAt}, ${petInactiveDeadlineAt})
             ELSE NULL
           END
         `,

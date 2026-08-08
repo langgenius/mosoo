@@ -293,6 +293,19 @@ describe("ensureSandboxConversationSession", () => {
     });
   });
 
+  test("arms an idle deadline when a legacy Pet session has none", async () => {
+    const database = createConversationSessionDatabase();
+    database.execute("UPDATE sandbox SET inactive_deadline_at = NULL");
+    const sandbox = createSandbox();
+    const startedAt = Date.now();
+
+    await ensureSandboxConversationSession(createBindings(database), createInput(sandbox));
+
+    const deadline = await readInactiveDeadline(database);
+    expect(deadline).toBeGreaterThanOrEqual(startedAt + 5 * 60_000);
+    expect(deadline).toBeLessThanOrEqual(Date.now() + 5 * 60_000);
+  });
+
   test("continues a closed cattle session with a new execution session id", async () => {
     const database = createConversationSessionDatabase("cattle");
     await insertConversationSession(database, { status: "closed" });
