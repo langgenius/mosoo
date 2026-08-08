@@ -18,8 +18,8 @@ const MEMORY_NEW_BACKUP_ID = "01J000000000000000000000H6";
 const MEMORY_OLD_BACKUP_ID = "01J000000000000000000000H7";
 const SESSION_BACKUP_ID = "01J000000000000000000000H8";
 
-function createSandboxBackupDatabase(): SqliteD1Database {
-  const database = new SqliteD1Database();
+function createSandboxBackupDatabase(input: { maxBoundParams?: number } = {}): SqliteD1Database {
+  const database = new SqliteD1Database(input);
 
   database.execute(`
     CREATE TABLE sandbox (
@@ -182,5 +182,34 @@ describe("sandbox backup pruning", () => {
       status: "backing_up",
       status_seq: 0,
     });
+  });
+
+  test("records more backups than fit in one D1 statement", async () => {
+    const database = createSandboxBackupDatabase({ maxBoundParams: 100 });
+    await insertSandbox(database);
+    const suffixes = [..."123456789ABCDEFG"];
+
+    await recordCreatedSandboxBackups(database, {
+      backups: suffixes.map((suffix, index) => ({
+        backup: {
+          dir: index === suffixes.length - 1 ? "/memory" : `/workspace/${index}`,
+          id: `01J000000000000000000000H${suffix}`,
+        },
+        updateSandboxLastBackup: index === suffixes.length - 1,
+      })),
+      sandboxId: "01J0000000000000000000000D",
+      ttlSeconds: 100,
+    });
+
+    const backupCount = await database
+      .prepare("SELECT COUNT(*) AS count FROM sandbox_backup")
+      .first<{ count: number }>();
+    const sandbox = await database
+      .prepare("SELECT last_backup_id FROM sandbox WHERE id = ?")
+      .bind("01J0000000000000000000000D")
+      .first<{ last_backup_id: string }>();
+
+    expect(backupCount?.count).toBe(16);
+    expect(sandbox?.last_backup_id).toBe("01J000000000000000000000HG");
   });
 });

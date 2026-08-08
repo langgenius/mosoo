@@ -9,8 +9,17 @@ import { parsePlatformId } from "@mosoo/id";
 import type { RuntimeOperationId, SandboxBackupId, SandboxId, SessionId } from "@mosoo/id";
 import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 
-import { getAppDatabase, getD1ChangeCount } from "../../../platform/db/drizzle";
+import type { AppDatabase } from "../../../platform/db/drizzle";
+import {
+  getAppDatabase,
+  getD1ChangeCount,
+  runAppDatabaseBatch,
+} from "../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../time";
+
+// Each row binds nine values; ten rows stay below D1's per-statement variable limit.
+const SANDBOX_BACKUP_INSERT_BATCH_SIZE = 10;
+type AppDatabaseBatchItem = Parameters<AppDatabase["batch"]>[0][number];
 
 export interface CreatedSandboxBackupRecord {
   readonly dir: string;
@@ -132,30 +141,54 @@ export async function recordCreatedSandboxBackups(
     }
   }
 
+  const results = await runAppDatabaseBatch(database, (appDb) => {
+    const queries: [AppDatabaseBatchItem, ...AppDatabaseBatchItem[]] = [
+      appDb
+        .insert(sandboxBackupsTable)
+        .values(backupRows.slice(0, SANDBOX_BACKUP_INSERT_BATCH_SIZE)),
+    ];
+
+    for (
+      let index = SANDBOX_BACKUP_INSERT_BATCH_SIZE;
+      index < backupRows.length;
+      index += SANDBOX_BACKUP_INSERT_BATCH_SIZE
+    ) {
+      queries.push(
+        appDb
+          .insert(sandboxBackupsTable)
+          .values(backupRows.slice(index, index + SANDBOX_BACKUP_INSERT_BATCH_SIZE)),
+      );
+    }
+
+    if (subjectCheckpointBackup) {
+      queries.push(
+        appDb
+          .update(sandboxesTable)
+          .set({
+            lastBackupId: parsePlatformId<SandboxBackupId>(
+              subjectCheckpointBackup.id,
+              "checkpoint sandbox backup id",
+            ),
+            updatedAt: now,
+          })
+          .where(
+            and(
+              eq(sandboxesTable.id, sandboxId),
+              inArray(sandboxesTable.status, ["backing_up", "destroying"]),
+              ...sandboxStatusOperationCondition(operationId),
+            ),
+          ),
+      );
+    }
+
+    return queries;
+  });
+
   if (!subjectCheckpointBackup) {
-    await getAppDatabase(database).insert(sandboxBackupsTable).values(backupRows).run();
     return;
   }
 
-  const appDb = getAppDatabase(database);
-  await appDb.insert(sandboxBackupsTable).values(backupRows).run();
-  const updated = await appDb
-    .update(sandboxesTable)
-    .set({
-      lastBackupId: parsePlatformId<SandboxBackupId>(
-        subjectCheckpointBackup.id,
-        "checkpoint sandbox backup id",
-      ),
-      updatedAt: now,
-    })
-    .where(
-      and(
-        eq(sandboxesTable.id, sandboxId),
-        inArray(sandboxesTable.status, ["backing_up", "destroying"]),
-        ...sandboxStatusOperationCondition(operationId),
-      ),
-    )
-    .run();
+  const updated = results.at(-1);
 
   if (getD1ChangeCount(updated) === 0) {
     throw new Error("Runtime subject changed before checkpoint backup was recorded.");
