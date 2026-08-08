@@ -40,11 +40,11 @@ export function AppLoading(): ReactElement {
 export function GuestRoute({ children }: RouteChildrenProps): ReactNode {
   const { onboardingState, user, userLoading } = useAppSession();
 
-  if (userLoading) {
-    return <AppLoading />;
-  }
   if (!user) {
     return children;
+  }
+  if (userLoading) {
+    return <AppLoading />;
   }
   if (onboardingState === "loading" || onboardingState === null) {
     return <AppLoading />;
