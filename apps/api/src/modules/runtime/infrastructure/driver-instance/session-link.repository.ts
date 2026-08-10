@@ -1,5 +1,6 @@
 import type { AgentKind } from "@mosoo/contracts/agent";
 import type { SandboxSubjectKind } from "@mosoo/contracts/sandbox";
+import type { SessionType } from "@mosoo/contracts/session";
 import type { SessionRunStatus } from "@mosoo/contracts/session-run";
 import {
   agentsTable,
@@ -40,6 +41,7 @@ interface RuntimeSessionLinkRow {
   session_id: SessionId | null;
   session_run_id: SessionRunId | null;
   session_run_status: SessionRunStatus | null;
+  session_type: SessionType | null;
   trace_id: string | null;
 }
 
@@ -104,6 +106,7 @@ export async function getRuntimeSessionLink(
         session_id: linkedSessionId.as("session_id"),
         session_run_id: sessionRunsTable.id,
         session_run_status: sessionRunsTable.status,
+        session_type: sessionsTable.type,
         trace_id: sessionRunsTable.traceId,
       })
       .from(driverInstancesTable)
@@ -132,6 +135,7 @@ export async function getRuntimeSessionLink(
     sessionId: row?.session_id ?? null,
     sessionRunId: row?.session_run_id ?? null,
     sessionRunStatus: row?.session_run_status ?? null,
+    sessionType: row?.session_type ?? null,
     traceId: row?.trace_id ?? null,
   };
 }
