@@ -7,7 +7,7 @@ import {
 import type { DriverEventEnvelope } from "@mosoo/agent-driver/events";
 import { parsePlatformId } from "@mosoo/id";
 import type { DriverInstanceId } from "@mosoo/id";
-import type { AccountId, SessionId } from "@mosoo/id";
+import type { AccountId, SessionId, SessionRunId } from "@mosoo/id";
 import {
   parseRuntimeEventEnvelope,
   readRuntimeEventFileChanges,
@@ -142,6 +142,7 @@ async function recordRuntimeSessionOutputFile(input: {
   path: string;
   recordedArtifacts: Set<string>;
   sessionId: SessionId;
+  sessionRunId: SessionRunId;
 }): Promise<void> {
   const contentSha256 = await createRuntimeOutputContentSha256(input.body);
   const artifactKey = createRuntimeOutputParentPath(input.path, contentSha256);
@@ -158,6 +159,7 @@ async function recordRuntimeSessionOutputFile(input: {
     createdBy: input.createdBy,
     path: input.path,
     sessionId: input.sessionId,
+    sessionRunId: input.sessionRunId,
   });
   input.recordedArtifacts.add(artifactKey);
   input.existingArtifacts.add(artifactKey);
@@ -221,6 +223,7 @@ async function recordRuntimeFileChanges(input: {
   link: RuntimeSessionLink;
 }): Promise<void> {
   const sessionId = input.link.sessionId;
+  const sessionRunId = input.link.sessionRunId;
   const sandboxId = input.link.sandboxId;
   const createdBy = resolveRuntimeOutputCreator(input.link);
   const changes = readRuntimeEventFileChanges(input.event).filter(
@@ -231,12 +234,13 @@ async function recordRuntimeFileChanges(input: {
     return;
   }
 
-  if (sessionId === null || sandboxId === null || createdBy === null) {
+  if (sessionId === null || sessionRunId === null || sandboxId === null || createdBy === null) {
     logWarn("runtime.file_artifact.record_skipped", {
       driverInstanceId: input.event.driverInstanceId ?? null,
       hasCreatedBy: createdBy !== null,
       sandboxId,
       sessionId,
+      sessionRunId,
     });
     return;
   }
@@ -267,7 +271,7 @@ async function recordRuntimeFileChanges(input: {
 
   const parsedSessionId = parsePlatformId<SessionId>(sessionId, "runtime output session ID");
   const existingArtifacts = new Set(
-    await fileStore.listReadySessionArtifactKeys(input.bindings.DB, parsedSessionId),
+    await fileStore.listReadySessionArtifactKeys(input.bindings.DB, parsedSessionId, sessionRunId),
   );
   const recordedArtifacts = new Set<string>();
 
@@ -287,6 +291,7 @@ async function recordRuntimeFileChanges(input: {
             path: outputFile.artifactPath,
             recordedArtifacts,
             sessionId: parsedSessionId,
+            sessionRunId,
           });
         } catch (error) {
           logWarn("runtime.file_artifact.record_failed", {
@@ -307,10 +312,11 @@ async function recordRuntimeSessionOutputDirectory(input: {
   link: RuntimeSessionLink;
 }): Promise<void> {
   const sessionId = input.link.sessionId;
+  const sessionRunId = input.link.sessionRunId;
   const sandboxId = input.link.sandboxId;
   const createdBy = resolveRuntimeOutputCreator(input.link);
 
-  if (sessionId === null || sandboxId === null || createdBy === null) {
+  if (sessionId === null || sessionRunId === null || sandboxId === null || createdBy === null) {
     return;
   }
 
@@ -346,7 +352,11 @@ async function recordRuntimeSessionOutputDirectory(input: {
         }
 
         const existingArtifacts = new Set(
-          await fileStore.listReadySessionArtifactKeys(input.bindings.DB, parsedSessionId),
+          await fileStore.listReadySessionArtifactKeys(
+            input.bindings.DB,
+            parsedSessionId,
+            sessionRunId,
+          ),
         );
         const recordedArtifacts = new Set<string>();
 
@@ -363,6 +373,7 @@ async function recordRuntimeSessionOutputDirectory(input: {
               path: artifactPath,
               recordedArtifacts,
               sessionId: parsedSessionId,
+              sessionRunId,
             });
           } catch (error) {
             logWarn("runtime.file_artifact.output_record_failed", {

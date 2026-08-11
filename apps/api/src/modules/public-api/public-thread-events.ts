@@ -1,6 +1,7 @@
 import { OpenAiPrivateCitationStreamFilter } from "@mosoo/agent-driver/provider-output";
 import type {
   PublicThreadApiListThreadEventsResponse,
+  PublicThreadArtifact,
   PublicThreadEventLogEntry,
   PublicThreadEventLogType,
   PublicThreadFinalOutput,
@@ -12,14 +13,15 @@ import {
 import type { SessionProcessEvent } from "@mosoo/contracts/session";
 import { parseJsonObject } from "@mosoo/contracts/validation";
 import type { JsonObject } from "@mosoo/contracts/validation";
-import { sessionEventsTable, sessionMessagesTable } from "@mosoo/db";
+import { sessionEventsTable, sessionMessagesTable, sessionRunArtifactsTable } from "@mosoo/db";
 import { parsePlatformId } from "@mosoo/id";
-import type { RuntimeEventId, SessionId, SessionRunId } from "@mosoo/id";
+import type { FileId, RuntimeEventId, SessionId, SessionRunId } from "@mosoo/id";
 import { and, asc, desc, eq, gt, lt } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 
 import { createErrorLogContext, logWarn } from "../../platform/cloudflare/logger";
 import { getAppDatabase } from "../../platform/db/drizzle";
+import { toIsoString } from "../../time";
 import { createSessionProcessEventsFromSessionEventRows } from "../sessions/application/session-process-events.service";
 import type { SessionEventProcessRow } from "../sessions/application/session-process-events.service";
 import { connectSessionPublicEventWebSocket } from "../sessions/infrastructure/session/client";
@@ -50,10 +52,48 @@ interface PublicThreadEventWindow {
 }
 
 interface PublicThreadEventProcessRow extends SessionEventProcessRow {
+  artifact_created_at: number | null;
+  artifact_file_id: FileId | null;
+  artifact_mime_type: string | null;
+  artifact_name: string | null;
+  artifact_run_id: SessionRunId | null;
+  artifact_size: number | null;
   run_id: SessionRunId | null;
   tool_call_id: string | null;
   tool_input_json: string | null;
   tool_name: string | null;
+}
+
+function toPublicThreadArtifact(
+  row: Pick<
+    PublicThreadEventProcessRow,
+    | "artifact_created_at"
+    | "artifact_file_id"
+    | "artifact_mime_type"
+    | "artifact_name"
+    | "artifact_run_id"
+    | "artifact_size"
+  >,
+): PublicThreadArtifact | null {
+  if (
+    row.artifact_created_at === null ||
+    row.artifact_file_id === null ||
+    row.artifact_name === null ||
+    row.artifact_run_id === null ||
+    row.artifact_size === null
+  ) {
+    return null;
+  }
+
+  return {
+    createdAt: toIsoString(row.artifact_created_at),
+    fileId: parsePlatformId<FileId>(row.artifact_file_id, "Artifact file ID"),
+    kind: "artifact",
+    mimeType: row.artifact_mime_type,
+    name: row.artifact_name,
+    runId: parsePlatformId<SessionRunId>(row.artifact_run_id, "Artifact Run ID"),
+    size: row.artifact_size,
+  };
 }
 
 interface LiveMessageState {
@@ -315,6 +355,7 @@ function normalizePublicThreadEventsLimit(limit: number): number {
 }
 
 function toPublicThreadEventLogEntry(input: {
+  artifact: PublicThreadArtifact | null;
   event: SessionProcessEvent;
   row: PublicThreadEventProcessRow | undefined;
 }): PublicThreadEventLogEntry | null {
@@ -331,6 +372,7 @@ function toPublicThreadEventLogEntry(input: {
   }
 
   return {
+    ...(input.artifact === null ? {} : { artifact: input.artifact }),
     content: sanitizePublicOutput(event.content).text,
     durationMs: event.durationMs,
     id: parsePlatformId(event.id, "Runtime event ID") as RuntimeEventId,
@@ -356,9 +398,16 @@ function toPublicThreadEventLogEntries(
   const rowsByEventId = new Map<RuntimeEventId, PublicThreadEventProcessRow>(
     rows.map((row) => [row.id, row]),
   );
+  const artifactsByEventId = new Map<RuntimeEventId, PublicThreadArtifact>(
+    rows.flatMap((row) => {
+      const artifact = toPublicThreadArtifact(row);
+      return artifact === null ? [] : [[row.id, artifact]];
+    }),
+  );
 
   return createSessionProcessEventsFromSessionEventRows(rows, options).flatMap((event) => {
     const publicEvent = toPublicThreadEventLogEntry({
+      artifact: artifactsByEventId.get(event.id) ?? null,
       event,
       row: rowsByEventId.get(event.id),
     });
@@ -374,6 +423,12 @@ function selectPublicThreadEventRows(input: {
 }) {
   return getAppDatabase(input.database)
     .select({
+      artifact_created_at: sessionRunArtifactsTable.createdAt,
+      artifact_file_id: sessionRunArtifactsTable.fileId,
+      artifact_mime_type: sessionRunArtifactsTable.mimeType,
+      artifact_name: sessionRunArtifactsTable.name,
+      artifact_run_id: sessionRunArtifactsTable.sessionRunId,
+      artifact_size: sessionRunArtifactsTable.size,
       content_text: sessionEventsTable.contentText,
       ended_at: sessionEventsTable.endedAt,
       event_type: sessionEventsTable.eventType,
@@ -389,6 +444,10 @@ function selectPublicThreadEventRows(input: {
       tokens: sessionEventsTable.tokens,
     })
     .from(sessionEventsTable)
+    .leftJoin(
+      sessionRunArtifactsTable,
+      eq(sessionRunArtifactsTable.committedEventId, sessionEventsTable.sourceEventId),
+    )
     .where(and(...input.filters))
     .orderBy(input.order)
     .limit(input.pageSize)
@@ -510,6 +569,30 @@ export async function readPublicThreadRunFinalOutput(input: {
     text: sanitizedOutput.text,
     ...(sanitizedOutput.warnings.length === 0 ? {} : { warnings: sanitizedOutput.warnings }),
   };
+}
+
+export async function readPublicThreadRunArtifacts(input: {
+  database: D1Database;
+  runId: SessionRunId;
+}): Promise<PublicThreadArtifact[]> {
+  const rows = await getAppDatabase(input.database)
+    .select({
+      artifact_created_at: sessionRunArtifactsTable.createdAt,
+      artifact_file_id: sessionRunArtifactsTable.fileId,
+      artifact_mime_type: sessionRunArtifactsTable.mimeType,
+      artifact_name: sessionRunArtifactsTable.name,
+      artifact_run_id: sessionRunArtifactsTable.sessionRunId,
+      artifact_size: sessionRunArtifactsTable.size,
+    })
+    .from(sessionRunArtifactsTable)
+    .where(eq(sessionRunArtifactsTable.sessionRunId, input.runId))
+    .orderBy(asc(sessionRunArtifactsTable.createdAt), asc(sessionRunArtifactsTable.fileId))
+    .all();
+
+  return rows.flatMap((row) => {
+    const artifact = toPublicThreadArtifact(row);
+    return artifact === null ? [] : [artifact];
+  });
 }
 
 async function resolvePublicThreadEventSessionId(

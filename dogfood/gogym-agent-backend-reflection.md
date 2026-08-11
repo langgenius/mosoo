@@ -249,7 +249,7 @@ GoGym still had to write a meaningful amount of mosoo-specific integration code 
 | Fitness Tool schemas and MCP handlers                                                    | GoGym                    | Tool meaning, authorization, and side effects are business logic.                    |
 | Browser WebSocket and user-facing progress states                                        | GoGym                    | The application owns its interaction model and business vocabulary.                  |
 | Public Thread API types, authentication, errors, and file upload                         | mosoo client             | These duplicate mosoo's public protocol.                                             |
-| SSE parsing, reconnect, history reconciliation, deduplication, and terminal-state checks | mosoo client             | Only mosoo can define correct recovery semantics across API versions.                |
+| SSE parsing plus terminal Run polling and final-output checks                            | mosoo client             | Only mosoo can define its wire format and terminal recovery semantics.                |
 | Delegation JWT parsing and verification                                                  | mosoo integration helper | This is a security boundary defined by mosoo's issuer, claims, and signing contract. |
 | Pairing Tool start and completion events without a stable call ID                        | mosoo event contract     | Applications should not infer identity from FIFO order or Tool names.                |
 | Replacing a missing Thread and uploading attachments again                               | Neither                  | This workaround hides data loss and can duplicate work; recovery must be explicit.   |
@@ -258,13 +258,15 @@ This produces a narrower conclusion than "mosoo should own all Agent App glue." 
 
 ## A Thin Integration Kit, Not Another Framework
 
-The repository already contains most low-level Public Thread behavior in `@mosoo/public-api-client`, but the package is private. The minimum useful response is to publish and extend that implementation rather than create a parallel SDK.
+The repository now evolves the former private Public Thread client directly as the `@mosoo/sdk` Public Beta candidate. The minimum useful response remains to publish that implementation rather than create a parallel SDK.
 
 The thin integration surface should add only three high-leverage helpers:
 
-- a resumable `watchRun()` that reconnects, reconciles persisted history, deduplicates stable event IDs, and checks terminal state;
+- a recoverable Thread/Run flow that returns IDs before waiting, then reads the persisted terminal Run snapshot and canonical final output from a new process when needed;
 - a runtime-neutral `verifyDelegation()` that returns a typed mosoo execution context after validating signature, issuer, audience, time bounds, and required claims;
-- mutation helpers that accept a caller-stable `requestId` and map it to `Idempotency-Key`, instead of generating a new random key during each retry.
+- mutation helpers that accept a caller-stable `idempotencyKey`, instead of generating a new random key during each retry.
+
+The first Beta deliberately does not promise a lossless `watchRun()`: current event snapshots can be truncated and live SSE is a best-effort progress surface. Completion correctness comes from the terminal Run snapshot; refresh-safe product timelines require a separate server contract.
 
 This scope is tracked in [#489](https://github.com/langgenius/mosoo/issues/489). Stable Tool identity and business-side idempotency require the server contract proposed in [#488](https://github.com/langgenius/mosoo/issues/488). Uncertain external effects and provider reconciliation remain separate runtime concerns in [#412](https://github.com/langgenius/mosoo/issues/412) and [#446](https://github.com/langgenius/mosoo/issues/446).
 
@@ -284,7 +286,7 @@ This reflection suggests a focused product sequence:
 
 1. Make `userId` a clear, immutable Thread-level contract and delegate it safely to MCP.
 2. Give every structured Tool event a stable `toolCallId` so applications can audit and deduplicate side effects without guessing.
-3. Publish the existing Public Thread client with resumable Run watching, delegation verification, and retry-safe idempotency.
+3. Publish the existing Public Thread client with recoverable terminal Run snapshots, delegation verification, and retry-safe idempotency.
 4. Make missing history, disconnected streams, and lost Threads explicit failure states rather than silent replacement paths.
 5. Verify the same MCP tools across every supported Harness and expose capability gaps honestly.
 6. Keep mosoo's event vocabulary small and stable while allowing applications to define their own business events.

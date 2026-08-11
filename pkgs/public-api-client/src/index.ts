@@ -1,7 +1,4 @@
-import {
-  PUBLIC_THREAD_EVENTS_MAX_LIMIT,
-  PUBLIC_THREAD_RUN_TERMINAL_STATUSES,
-} from "@mosoo/contracts/public-api";
+import { PUBLIC_THREAD_RUN_TERMINAL_STATUSES } from "./types.ts";
 import type {
   PublicApiErrorCode,
   PublicFileResponse,
@@ -12,16 +9,22 @@ import type {
   PublicThreadApiSendEventsResponse,
   PublicThreadEventLogEntry,
   PublicThreadFinalOutput,
+  PublicThreadFileListResponse,
   PublicThreadRunStatus,
   PublicThreadRunSummary,
   PublicThreadRunTerminalStatus,
   PublicThreadSummary,
-} from "@mosoo/contracts/public-api";
+} from "./types.ts";
+
+export type * from "./types.ts";
+export * from "./delegation.ts";
 
 export type MosooPublicApiFetch = (
   input: RequestInfo | URL,
   init?: RequestInit,
 ) => Promise<Response>;
+
+export const MOSOO_CLOUD_BASE_URL = "https://cloud.mosoo.ai";
 
 interface CreateThreadRequestBody {
   input?: {
@@ -40,7 +43,7 @@ interface SseMessage {
 
 export interface MosooPublicThreadClientOptions {
   allowBrowserToken?: boolean;
-  baseUrl: string;
+  baseUrl?: string;
   fetch?: MosooPublicApiFetch;
   pollIntervalMs?: number;
   token: string;
@@ -75,10 +78,14 @@ export interface MosooListEventsInput {
   threadId: string;
 }
 
+export interface MosooListFilesInput {
+  signal?: AbortSignal | undefined;
+  threadId: string;
+}
+
 export interface MosooStreamEventsInput extends MosooListEventsInput {}
 
 export interface MosooWaitForRunInput {
-  eventLimit?: number;
   pollIntervalMs?: number;
   runId?: string;
   signal?: AbortSignal | undefined;
@@ -87,18 +94,15 @@ export interface MosooWaitForRunInput {
 }
 
 export interface MosooCreateThreadAndWaitInput extends MosooCreateThreadInput {
-  eventLimit?: number;
   pollIntervalMs?: number;
   timeoutMs?: number;
   throwOnFailedRun?: boolean;
 }
 
 export interface MosooPublicThreadWaitResult {
-  events: PublicThreadEventLogEntry[];
   finalOutput: PublicThreadFinalOutput | null;
   run: PublicThreadRunSummary;
   thread: PublicThreadSummary;
-  truncated: boolean;
 }
 
 export interface MosooCreateThreadAndWaitFinalOutputInput extends MosooCreateThreadAndWaitInput {
@@ -124,19 +128,15 @@ export interface MosooPublicThreadUnsuccessfulRunSummary extends PublicThreadRun
 }
 
 export interface MosooPublicThreadFinalOutputResult {
-  events: PublicThreadEventLogEntry[];
   finalOutput: PublicThreadFinalOutput;
   run: MosooPublicThreadCompletedRunSummary;
   thread: PublicThreadSummary;
-  truncated: boolean;
 }
 
 export interface MosooPublicThreadTerminalRunErrorInput {
-  events: PublicThreadEventLogEntry[];
   finalOutput: PublicThreadFinalOutput | null;
   run: MosooPublicThreadUnsuccessfulRunSummary;
   thread: PublicThreadSummary;
-  truncated: boolean;
 }
 
 export interface ExtractFinalOutputOptions {
@@ -174,24 +174,42 @@ export class MosooPublicApiTimeoutError extends Error {
   }
 }
 
+export class MosooPublicApiAbortError extends Error {
+  readonly code = "aborted";
+
+  constructor() {
+    super("Operation aborted.");
+    this.name = "MosooPublicApiAbortError";
+  }
+}
+
+export class MosooPublicThreadRunMismatchError extends Error {
+  readonly actualRunId: string;
+  readonly code = "run_mismatch";
+  readonly expectedRunId: string;
+
+  constructor(expectedRunId: string, actualRunId: string) {
+    super(`Thread current Run is ${actualRunId}, not requested Run ${expectedRunId}.`);
+    this.name = "MosooPublicThreadRunMismatchError";
+    this.actualRunId = actualRunId;
+    this.expectedRunId = expectedRunId;
+  }
+}
+
 export class MosooPublicThreadTerminalRunError extends Error {
   readonly code = "run_terminal_failure";
-  readonly events: PublicThreadEventLogEntry[];
   readonly finalOutput: PublicThreadFinalOutput | null;
   readonly run: MosooPublicThreadUnsuccessfulRunSummary;
   readonly runStatus: MosooPublicThreadUnsuccessfulTerminalStatus;
   readonly thread: PublicThreadSummary;
-  readonly truncated: boolean;
 
   constructor(input: MosooPublicThreadTerminalRunErrorInput) {
     super(`Public Thread run ${input.run.id} finished with status ${input.run.status}.`);
     this.name = "MosooPublicThreadTerminalRunError";
-    this.events = input.events;
     this.finalOutput = input.finalOutput;
     this.run = input.run;
     this.runStatus = input.run.status;
     this.thread = input.thread;
-    this.truncated = input.truncated;
   }
 }
 
@@ -204,7 +222,24 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function normalizePublicApiBaseUrl(baseUrl: string): string {
-  const url = new URL(baseUrl);
+  let url: URL;
+
+  try {
+    url = new URL(baseUrl);
+  } catch {
+    throw new TypeError("Mosoo baseUrl must be a valid absolute URL.");
+  }
+
+  if (url.username || url.password || url.search || url.hash) {
+    throw new TypeError("Mosoo baseUrl must not include credentials, query, or fragment.");
+  }
+
+  const isLoopback = ["127.0.0.1", "::1", "localhost"].includes(url.hostname);
+
+  if (url.protocol !== "https:" && !(url.protocol === "http:" && isLoopback)) {
+    throw new TypeError("Mosoo baseUrl must use HTTPS, except for HTTP loopback development.");
+  }
+
   const pathname = url.pathname.replace(/\/+$/, "");
 
   if (pathname.endsWith("/api/v1")) {
@@ -215,10 +250,21 @@ function normalizePublicApiBaseUrl(baseUrl: string): string {
     url.pathname = `${pathname}/api/v1`;
   }
 
-  url.hash = "";
-  url.search = "";
-
   return url.toString().replace(/\/$/, "");
+}
+
+function encodePathSegment(value: string, name: string): string {
+  if (value.trim().length === 0) {
+    throw new TypeError(`${name} must not be empty.`);
+  }
+
+  return encodeURIComponent(value);
+}
+
+function assertPositiveFinite(value: number, name: string): void {
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new RangeError(`${name} must be a positive finite number.`);
+  }
 }
 
 function isBrowserLikeRuntime(): boolean {
@@ -386,20 +432,20 @@ function parseThreadErrorMessage(message: SseMessage): MosooPublicApiError | nul
 
 function delay(ms: number, signal: AbortSignal | undefined): Promise<void> {
   if (signal?.aborted === true) {
-    return Promise.reject(new Error("Operation aborted."));
+    return Promise.reject(new MosooPublicApiAbortError());
   }
 
   return new Promise((resolve, reject) => {
-    const timeout = setTimeout(resolve, ms);
+    const onAbort = () => {
+      clearTimeout(timeout);
+      reject(new MosooPublicApiAbortError());
+    };
+    const timeout = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
 
-    signal?.addEventListener(
-      "abort",
-      () => {
-        clearTimeout(timeout);
-        reject(new Error("Operation aborted."));
-      },
-      { once: true },
-    );
+    signal?.addEventListener("abort", onAbort, { once: true });
   });
 }
 
@@ -425,11 +471,9 @@ function assertFinalOutputResult(
     };
 
     throw new MosooPublicThreadTerminalRunError({
-      events: result.events,
       finalOutput: result.finalOutput,
       run,
       thread: result.thread,
-      truncated: result.truncated,
     });
   }
 
@@ -450,11 +494,9 @@ function assertFinalOutputResult(
   };
 
   return {
-    events: result.events,
     finalOutput: result.finalOutput,
     run,
     thread: result.thread,
-    truncated: result.truncated,
   };
 }
 
@@ -499,19 +541,38 @@ export class MosooPublicThreadClient {
       throw new Error("MosooPublicThreadClient requires a fetch implementation.");
     }
 
-    this.apiBaseUrl = normalizePublicApiBaseUrl(options.baseUrl);
-    this.fetchImpl = fetchImpl.bind(globalThis);
+    if (options.token.trim().length === 0) {
+      throw new TypeError("Mosoo token must not be empty.");
+    }
+
+    if (options.pollIntervalMs !== undefined) {
+      assertPositiveFinite(options.pollIntervalMs, "pollIntervalMs");
+    }
+
+    this.apiBaseUrl = normalizePublicApiBaseUrl(options.baseUrl ?? MOSOO_CLOUD_BASE_URL);
+
+    if (options.fetch === undefined) {
+      this.fetchImpl = fetchImpl.bind(globalThis);
+    } else {
+      const suppliedFetch = options.fetch;
+      this.fetchImpl = (input, init) => suppliedFetch(input, init);
+    }
+
     this.pollIntervalMs = options.pollIntervalMs ?? 1_000;
     this.token = options.token;
   }
 
   async createThread(input: MosooCreateThreadInput): Promise<PublicThreadApiCreateThreadResponse> {
-    return this.requestJson("POST", `/agents/${input.agentId}/threads`, {
-      body: createCreateThreadBody(input),
-      idempotencyKey: input.idempotencyKey,
-      signal: input.signal,
-      status: 201,
-    });
+    return this.requestJson(
+      "POST",
+      `/agents/${encodePathSegment(input.agentId, "agentId")}/threads`,
+      {
+        body: createCreateThreadBody(input),
+        idempotencyKey: input.idempotencyKey,
+        signal: input.signal,
+        status: 201,
+      },
+    );
   }
 
   async uploadAgentFile(input: MosooUploadAgentFileInput): Promise<PublicFileResponse> {
@@ -523,34 +584,53 @@ export class MosooPublicThreadClient {
       formData.append("file", input.file, input.filename);
     }
 
-    return this.requestJson("POST", `/agents/${input.agentId}/files`, {
-      body: formData,
-      signal: input.signal,
-      status: 201,
-    });
+    return this.requestJson(
+      "POST",
+      `/agents/${encodePathSegment(input.agentId, "agentId")}/files`,
+      {
+        body: formData,
+        signal: input.signal,
+        status: 201,
+      },
+    );
   }
 
   async retrieveThread(
     threadId: string,
     options: { signal?: AbortSignal | undefined } = {},
   ): Promise<PublicThreadApiRetrieveThreadResponse> {
-    return this.requestJson("GET", `/threads/${threadId}`, {
+    return this.requestJson("GET", `/threads/${encodePathSegment(threadId, "threadId")}`, {
       signal: options.signal,
       status: 200,
     });
   }
 
+  async listFiles(input: MosooListFilesInput): Promise<PublicThreadFileListResponse> {
+    return this.requestJson(
+      "GET",
+      `/threads/${encodePathSegment(input.threadId, "threadId")}/files`,
+      {
+        signal: input.signal,
+        status: 200,
+      },
+    );
+  }
+
   async sendEvents(input: MosooSendEventsInput): Promise<PublicThreadApiSendEventsResponse> {
-    return this.requestJson("POST", `/threads/${input.threadId}/events`, {
-      body: { events: input.events },
-      idempotencyKey: input.idempotencyKey,
-      signal: input.signal,
-      status: 200,
-    });
+    return this.requestJson(
+      "POST",
+      `/threads/${encodePathSegment(input.threadId, "threadId")}/events`,
+      {
+        body: { events: input.events },
+        idempotencyKey: input.idempotencyKey,
+        signal: input.signal,
+        status: 200,
+      },
+    );
   }
 
   async listEvents(input: MosooListEventsInput): Promise<PublicThreadApiListThreadEventsResponse> {
-    const url = this.url(`/threads/${input.threadId}/events`);
+    const url = this.url(`/threads/${encodePathSegment(input.threadId, "threadId")}/events`);
     appendQuery(url, "limit", input.limit);
 
     return this.requestJsonUrl("GET", url, {
@@ -560,7 +640,7 @@ export class MosooPublicThreadClient {
   }
 
   async *streamEvents(input: MosooStreamEventsInput): AsyncGenerator<PublicThreadEventLogEntry> {
-    const url = this.url(`/threads/${input.threadId}/events/stream`);
+    const url = this.url(`/threads/${encodePathSegment(input.threadId, "threadId")}/events/stream`);
     appendQuery(url, "limit", input.limit);
 
     const response = await this.requestResponseUrl("GET", url, {
@@ -576,90 +656,122 @@ export class MosooPublicThreadClient {
     const decoder = new TextDecoder();
     let buffer = "";
 
-    for (;;) {
-      const chunk = await reader.read();
-
-      if (chunk.done) {
-        buffer += decoder.decode();
-      } else {
-        buffer += decoder.decode(chunk.value, { stream: true });
-      }
-
+    try {
       for (;;) {
-        const separator = /\r?\n\r?\n/.exec(buffer);
+        const chunk = await reader.read();
 
-        if (separator === null) {
+        if (chunk.done) {
+          buffer += decoder.decode();
+        } else {
+          buffer += decoder.decode(chunk.value, { stream: true });
+        }
+
+        for (;;) {
+          const separator = /\r?\n\r?\n/.exec(buffer);
+
+          if (separator === null) {
+            break;
+          }
+
+          const block = buffer.slice(0, separator.index);
+          buffer = buffer.slice(separator.index + separator[0].length);
+          const message = parseSseMessage(block);
+
+          if (message === null) {
+            continue;
+          }
+
+          const error = parseThreadErrorMessage(message);
+
+          if (error !== null) {
+            throw error;
+          }
+
+          const event = parseThreadEventMessage(message);
+
+          if (event !== null) {
+            yield event;
+          }
+        }
+
+        if (chunk.done) {
           break;
         }
-
-        const block = buffer.slice(0, separator.index);
-        buffer = buffer.slice(separator.index + separator[0].length);
-        const message = parseSseMessage(block);
-
-        if (message === null) {
-          continue;
-        }
-
-        const error = parseThreadErrorMessage(message);
-
-        if (error !== null) {
-          throw error;
-        }
-
-        const event = parseThreadEventMessage(message);
-
-        if (event !== null) {
-          yield event;
-        }
       }
-
-      if (chunk.done) {
-        break;
-      }
+    } finally {
+      await reader.cancel().catch(() => undefined);
+      reader.releaseLock();
     }
   }
 
   async waitForRun(input: MosooWaitForRunInput): Promise<MosooPublicThreadWaitResult> {
     const timeoutMs = input.timeoutMs ?? 60_000;
+    const pollIntervalMs = input.pollIntervalMs ?? this.pollIntervalMs;
+    assertPositiveFinite(timeoutMs, "timeoutMs");
+    assertPositiveFinite(pollIntervalMs, "pollIntervalMs");
     const startedAt = Date.now();
+    const controller = new AbortController();
+    let timedOut = false;
+    let rejectStopped: (reason: Error) => void = () => {};
+    const stopped = new Promise<never>((_resolve, reject) => {
+      rejectStopped = reject;
+    });
+    const onAbort = () => {
+      controller.abort();
+      rejectStopped(new MosooPublicApiAbortError());
+    };
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+      rejectStopped(new MosooPublicApiTimeoutError(timeoutMs));
+    }, timeoutMs);
+    input.signal?.addEventListener("abort", onAbort, { once: true });
+    if (input.signal?.aborted === true) {
+      onAbort();
+    }
 
-    for (;;) {
-      const retrieved = await this.retrieveThread(input.threadId, { signal: input.signal });
-      const run = retrieved.run;
+    try {
+      for (;;) {
+        const retrieved = await Promise.race([
+          this.retrieveThread(input.threadId, { signal: controller.signal }),
+          stopped,
+        ]);
+        const run = retrieved.run;
 
-      if (run === null) {
-        throw new Error("Thread does not have a current Run.");
+        if (run === null) {
+          throw new Error("Thread does not have a current Run.");
+        }
+
+        if (input.runId !== undefined && run.id !== input.runId) {
+          throw new MosooPublicThreadRunMismatchError(input.runId, run.id);
+        }
+
+        if (isPublicThreadRunTerminalStatus(run.status)) {
+          return {
+            finalOutput: run.finalOutput,
+            run,
+            thread: retrieved.thread,
+          };
+        }
+
+        const elapsedMs = Date.now() - startedAt;
+
+        if (elapsedMs >= timeoutMs) {
+          throw new MosooPublicApiTimeoutError(timeoutMs);
+        }
+
+        await delay(Math.min(pollIntervalMs, timeoutMs - elapsedMs), controller.signal);
       }
-
-      if (input.runId !== undefined && run.id !== input.runId) {
-        throw new Error(`Thread current Run is ${run.id}, not requested Run ${input.runId}.`);
-      }
-
-      if (isPublicThreadRunTerminalStatus(run.status)) {
-        const eventPage = await this.listEvents({
-          limit: input.eventLimit ?? PUBLIC_THREAD_EVENTS_MAX_LIMIT,
-          signal: input.signal,
-          threadId: input.threadId,
-        });
-        return {
-          events: eventPage.events,
-          finalOutput: run.finalOutput,
-          run,
-          thread: retrieved.thread,
-          truncated: eventPage.truncated,
-        };
-      }
-
-      const elapsedMs = Date.now() - startedAt;
-
-      if (elapsedMs >= timeoutMs) {
+    } catch (error) {
+      if (timedOut) {
         throw new MosooPublicApiTimeoutError(timeoutMs);
       }
 
-      await delay(
-        Math.min(input.pollIntervalMs ?? this.pollIntervalMs, timeoutMs - elapsedMs),
-        input.signal,
-      );
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+      input.signal?.removeEventListener("abort", onAbort);
+      controller.abort();
     }
   }
 
@@ -706,10 +818,6 @@ export class MosooPublicThreadClient {
       runId: created.run.id,
       threadId: created.thread.id,
     };
-
-    if (input.eventLimit !== undefined) {
-      waitInput.eventLimit = input.eventLimit;
-    }
 
     if (input.pollIntervalMs !== undefined) {
       waitInput.pollIntervalMs = input.pollIntervalMs;
@@ -808,7 +916,17 @@ export class MosooPublicThreadClient {
       init.signal = options.signal;
     }
 
-    const response = await this.fetchImpl(url, init);
+    let response: Response;
+
+    try {
+      response = await this.fetchImpl(url, init);
+    } catch (error) {
+      if (options.signal?.aborted === true) {
+        throw new MosooPublicApiAbortError();
+      }
+
+      throw error;
+    }
 
     if (!response.ok) {
       await this.throwPublicApiError(response);
@@ -824,8 +942,10 @@ export class MosooPublicThreadClient {
     throw new MosooPublicApiError({
       body,
       code: payload.code,
-      message: payload.message ?? `mosoo Public API request failed with HTTP ${response.status}.`,
+      message: payload.message ?? `Mosoo Public API request failed with HTTP ${response.status}.`,
       status: response.status,
     });
   }
 }
+
+export { MosooPublicThreadClient as Mosoo };

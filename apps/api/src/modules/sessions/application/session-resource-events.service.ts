@@ -1,7 +1,7 @@
 import type { SessionViewFile } from "@mosoo/ag-ui-session";
 import type { FileRecord } from "@mosoo/contracts/file";
 import { parsePlatformId } from "@mosoo/id";
-import type { FileId, SessionId } from "@mosoo/id";
+import type { FileId, RuntimeEventId, SessionId, SessionRunId } from "@mosoo/id";
 
 import { createErrorLogContext, logWarn } from "../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
@@ -41,6 +41,7 @@ async function bestEffortMaterializeSessionResources(
 export async function publishSessionResourceUpsert(
   bindings: ApiBindings,
   file: FileRecord,
+  options?: { eventId: RuntimeEventId; runId: SessionRunId },
 ): Promise<void> {
   if (file.scope.kind !== "session") {
     return;
@@ -48,6 +49,7 @@ export async function publishSessionResourceUpsert(
 
   const sessionId = parsePlatformId<SessionId>(file.scope.id, "Session resource scope ID");
   const event = createSessionRuntimeEvent({
+    ...(options === undefined ? {} : { id: options.eventId, runId: options.runId }),
     kind: "session.files.updated",
     origin: "file",
     payload: {
