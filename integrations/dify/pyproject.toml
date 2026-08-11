@@ -1,0 +1,10 @@
+[project]
+name = "mosoo-dify-plugin"
+version = "0.1.0"
+description = "Run published mosoo Agents from Dify"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = ["dify_plugin==0.10.2"]
+
+[dependency-groups]
+dev = []

@@ -1,0 +1,84 @@
+identity:
+  name: run_mosoo_agent
+  author: mosoo-ai
+  label:
+    en_US: mosoo managed agent
+    zh_Hans: mosoo managed agent
+    ja_JP: mosoo managed agent
+    pt_BR: mosoo managed agent
+description:
+  human:
+    en_US: Start, continue, or wait for a durable mosoo Agent Thread from a Dify Agent, Chatflow, or Workflow.
+    zh_Hans: 在 Dify Agent、Chatflow 或 Workflow 中新建、续聊或等待一个持久化 mosoo Agent Thread。
+    ja_JP: Dify Agent、Chatflow、Workflow から mosoo Agent Thread を開始、継続、または待機します。
+    pt_BR: Inicie, continue ou aguarde uma Thread duravel do mosoo Agent no Dify.
+  llm: Delegate substantial work to a published mosoo Agent. mosoo owns the configured model, harness, tools, sandbox, and memory. Send a prompt without thread_id to start; send prompt plus thread_id to continue; send only thread_id to wait for an existing run. Reuse the returned thread_id for continuity.
+parameters:
+  - name: prompt
+    type: string
+    required: false
+    label:
+      en_US: Task
+      zh_Hans: 任务
+      ja_JP: タスク
+      pt_BR: Tarefa
+    human_description:
+      en_US: The task for the mosoo Agent. Omit only when waiting on an existing Thread.
+      zh_Hans: 交给 mosoo 智能体的任务；仅在等待现有 Thread 时留空。
+      ja_JP: mosoo Agent に渡すタスク。既存 Thread の待機時のみ省略します。
+      pt_BR: A tarefa para o mosoo Agent. Omita apenas ao aguardar uma Thread existente.
+    llm_description: A complete task for the mosoo Agent. Required when starting a new Thread. Omit when thread_id identifies a run that only needs more waiting time.
+    form: llm
+  - name: thread_id
+    type: string
+    required: false
+    label:
+      en_US: Thread ID
+      zh_Hans: Thread ID
+      ja_JP: Thread ID
+      pt_BR: ID da Thread
+    human_description:
+      en_US: A prior mosoo thread_id to continue or wait for. Leave empty to start a new Thread.
+      zh_Hans: 用于续聊或继续等待的 mosoo thread_id；留空则新建 Thread。
+      ja_JP: 継続または待機する mosoo thread_id。新規 Thread は空欄にします。
+      pt_BR: Um thread_id anterior para continuar ou aguardar. Deixe vazio para iniciar outra Thread.
+    llm_description: Reuse a thread_id returned by this tool for the same Dify user. Never invent one.
+    form: llm
+  - name: timeout_seconds
+    type: number
+    required: false
+    default: 120
+    min: 10
+    max: 240
+    label:
+      en_US: Wait timeout (seconds)
+      zh_Hans: 等待超时（秒）
+      ja_JP: 待機タイムアウト（秒）
+      pt_BR: Tempo limite (segundos)
+    human_description:
+      en_US: How long Dify waits. A still-running task returns its thread_id so it can be checked again.
+      zh_Hans: Dify 等待时长；任务仍在运行时会返回 thread_id，可再次查询。
+      ja_JP: Dify の待機時間。実行中なら再確認用 thread_id を返します。
+      pt_BR: Quanto tempo o Dify aguarda. Uma tarefa em execucao retorna thread_id para nova consulta.
+    form: form
+output_schema:
+  type: object
+  properties:
+    text:
+      type: string
+      description: Canonical final Agent answer when completed.
+    thread_id:
+      type: string
+      description: Durable mosoo Thread ID for continuation or recovery.
+    run_id:
+      type: string
+      description: mosoo Run ID, or an empty string when no Run exists.
+    status:
+      type: string
+      description: queued, booting, running, waiting_input, completed, failed, cancelled, expired, idle, or timed_out.
+    error:
+      type: string
+      description: Public-safe error or recovery instruction; empty on success.
+extra:
+  python:
+    source: tools/run_agent.py

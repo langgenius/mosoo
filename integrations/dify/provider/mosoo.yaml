@@ -1,0 +1,60 @@
+identity:
+  author: mosoo-ai
+  name: mosoo
+  label:
+    en_US: mosoo managed agent
+    zh_Hans: mosoo managed agent
+    ja_JP: mosoo managed agent
+    pt_BR: mosoo managed agent
+  description:
+    en_US: Delegate work to a published mosoo Agent running on Claude Agent SDK, OpenAI Runtime, OpenCode, or an ACP-backed runtime.
+    zh_Hans: 将任务委派给运行于 Claude Agent SDK、OpenAI Runtime、OpenCode 或 ACP 运行时的已发布 mosoo 智能体。
+    ja_JP: Claude Agent SDK、OpenAI Runtime、OpenCode、または ACP ランタイム上の公開済み mosoo Agent に作業を委任します。
+    pt_BR: Delegue trabalho a um mosoo Agent publicado em Claude Agent SDK, OpenAI Runtime, OpenCode ou runtime ACP.
+  icon: icon.svg
+  tags:
+    - productivity
+credentials_for_provider:
+  api_token:
+    type: secret-input
+    required: true
+    label:
+      en_US: mosoo API token
+      zh_Hans: mosoo API Token
+      ja_JP: mosoo API token
+      pt_BR: Token da API mosoo
+    placeholder:
+      en_US: mst_...
+      zh_Hans: mst_...
+      ja_JP: mst_...
+      pt_BR: mst_...
+    help:
+      en_US: Create a token in mosoo Settings, then paste it here. It is sent only to mosoo Cloud.
+      zh_Hans: 在 mosoo 设置中创建 Token 后粘贴到这里；它只会发送给 mosoo Cloud。
+      ja_JP: mosoo Settings で token を作成して貼り付けてください。mosoo Cloud のみに送信されます。
+      pt_BR: Crie um token nas configuracoes do mosoo e cole aqui. Ele e enviado apenas ao mosoo Cloud.
+    url: https://cloud.mosoo.ai/settings/access-tokens
+  agent_id:
+    type: text-input
+    required: true
+    label:
+      en_US: Published Agent ID
+      zh_Hans: 已发布 Agent ID
+      ja_JP: 公開済み Agent ID
+      pt_BR: ID do Agent publicado
+    placeholder:
+      en_US: 01J00000000000000000000001
+      zh_Hans: 01J00000000000000000000001
+      ja_JP: 01J00000000000000000000001
+      pt_BR: 01J00000000000000000000001
+    help:
+      en_US: Copy the 26-character ID from a published Agent in mosoo.
+      zh_Hans: 从 mosoo 已发布 Agent 页面复制 26 位 ID。
+      ja_JP: mosoo の公開済み Agent から 26 文字の ID をコピーします。
+      pt_BR: Copie o ID de 26 caracteres de um Agent publicado no mosoo.
+    url: https://cloud.mosoo.ai/agent
+tools:
+  - tools/run_agent.yaml
+extra:
+  python:
+    source: provider/mosoo.py

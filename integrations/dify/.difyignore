@@ -1,0 +1,8 @@
+.env
+.pytest_cache/
+.ruff_cache/
+.venv/
+__pycache__/
+*.difypkg
+*.py[cod]
+tests/

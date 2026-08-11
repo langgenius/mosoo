@@ -1,0 +1,36 @@
+version: 0.1.0
+type: plugin
+author: mosoo-ai
+name: mosoo
+label:
+  en_US: mosoo managed agent
+  zh_Hans: mosoo managed agent
+  ja_JP: mosoo managed agent
+  pt_BR: mosoo managed agent
+description:
+  en_US: Run published mosoo Agents from Dify. mosoo normalizes Claude Agent SDK, OpenAI Runtime, OpenCode, and ACP-backed runtimes behind one Thread API.
+  zh_Hans: 从 Dify 运行已发布的 mosoo 智能体；通过统一 Thread API 调用 Claude Agent SDK、OpenAI Runtime、OpenCode 与 ACP 运行时。
+  ja_JP: Dify から公開済み mosoo Agent を実行し、Claude Agent SDK、OpenAI Runtime、OpenCode、ACP ランタイムを単一の Thread API で利用します。
+  pt_BR: Execute mosoo Agents publicados no Dify por uma unica API de Threads para Claude Agent SDK, OpenAI Runtime, OpenCode e runtimes ACP.
+icon: icon.svg
+resource:
+  memory: 67108864
+  permission: {}
+plugins:
+  tools:
+    - provider/mosoo.yaml
+meta:
+  version: 0.0.1
+  arch:
+    - amd64
+    - arm64
+  runner:
+    language: python
+    version: "3.12"
+    entrypoint: main
+  minimum_dify_version: 1.10.0
+created_at: 2026-08-11T00:00:00Z
+privacy: PRIVACY.md
+repo: https://github.com/langgenius/mosoo/tree/main/integrations/dify
+contact: business@dify.ai
+verified: false
