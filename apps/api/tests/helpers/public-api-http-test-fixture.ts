@@ -11,10 +11,12 @@ import {
   personalAccessTokensTable,
   appsTable,
   sessionExecutionSnapshotsTable,
+  sessionRunsTable,
   sessionsTable,
   vendorCredentialsTable,
 } from "@mosoo/db";
 import type { VendorCredentialId } from "@mosoo/id";
+import { eq } from "drizzle-orm";
 
 import { hashTokenValue } from "../../src/modules/auth/application/personal-access-token.service";
 import { storeVendorCredentialSecret } from "../../src/modules/vendor-credentials/application/vendor-credential.secret-resolution";
@@ -511,6 +513,46 @@ export async function insertOwnerSession(database: SqliteD1Database): Promise<vo
     id: PUBLIC_API_TEST_IDS.ownerSession,
     title: "Owner route session",
   });
+}
+
+export async function insertRunningSessionRun(
+  database: SqliteD1Database,
+  input: {
+    runId?: string;
+    sessionId?: string;
+  } = {},
+): Promise<void> {
+  const nowMs = nowMsForTest();
+  const runId = input.runId ?? PUBLIC_API_TEST_IDS.run;
+  const sessionId = input.sessionId ?? PUBLIC_API_TEST_IDS.ownerSession;
+
+  await database
+    .app()
+    .insert(sessionRunsTable)
+    .values({
+      agentId: PUBLIC_API_TEST_IDS.agent,
+      createdAt: nowMs,
+      createdByAccountId: PUBLIC_API_TEST_IDS.ownerAccount,
+      id: runId,
+      sessionId,
+      startedAt: nowMs,
+      status: "running",
+      statusChangedAt: nowMs,
+      statusEvent: "run.start",
+      statusSeq: 1,
+      statusSource: "runtime",
+      traceId: `trace-${runId}`,
+      trigger: "user_prompt",
+      updatedAt: nowMs,
+    })
+    .run();
+
+  await database
+    .app()
+    .update(sessionsTable)
+    .set({ lastRunId: runId, status: "RUNNING", updatedAt: nowMs })
+    .where(eq(sessionsTable.id, sessionId))
+    .run();
 }
 
 async function insertPat(input: {

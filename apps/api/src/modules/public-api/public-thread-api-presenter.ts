@@ -1,6 +1,7 @@
 import type { AgentKind } from "@mosoo/contracts/agent";
 import type {
   PublicThreadApiSendEventsResponse,
+  PublicThreadArtifact,
   PublicThreadFinalOutput,
   PublicThreadRunError,
   PublicThreadRunSummary,
@@ -28,6 +29,7 @@ export interface PublicThreadSessionProjection {
 }
 
 interface PublicThreadRunSummaryOptions {
+  artifacts?: PublicThreadArtifact[];
   finalOutput?: PublicThreadFinalOutput | null;
 }
 
@@ -61,6 +63,7 @@ export function toPublicThreadRunSummary(
   }
 
   return {
+    ...(options.artifacts === undefined ? {} : { artifacts: options.artifacts }),
     completedAt: run.completedAt,
     createdAt: run.createdAt,
     error: toPublicThreadRunError(run.error),
