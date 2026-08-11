@@ -341,6 +341,9 @@ function isPublicThreadEventLogEntry(value: unknown): value is PublicThreadEvent
     typeof value["occurredAt"] === "string" &&
     (typeof value["runId"] === "string" || value["runId"] === null) &&
     typeof value["status"] === "string" &&
+    (value["toolCallId"] === undefined || typeof value["toolCallId"] === "string") &&
+    (value["toolInput"] === undefined || isRecord(value["toolInput"])) &&
+    (value["toolName"] === undefined || typeof value["toolName"] === "string") &&
     typeof value["type"] === "string"
   );
 }

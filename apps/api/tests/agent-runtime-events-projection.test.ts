@@ -145,6 +145,7 @@ describe("agent runtime event projection", () => {
         occurredAt: "2026-05-26T00:00:00.000Z",
         origin: "driver",
         payload: {
+          rawInput: '{"timeout":30,"command":"echo hello"}',
           rawOutput: "hello\nworld",
           status: "completed",
           title: "Shell",
@@ -174,12 +175,38 @@ describe("agent runtime event projection", () => {
       contentText: "Shell result: hello world",
       processStatus: "available",
       processType: "tool.use.completed",
+      toolCallId: "tool-1",
+      toolInputJson: '{"command":"echo hello","timeout":30}',
+      toolName: "Shell",
     });
     expect(failed).toMatchObject({
       contentText: "Shell result: permission denied",
       processStatus: "error",
       processType: "tool.use.completed",
+      toolCallId: "tool-2",
+      toolInputJson: null,
+      toolName: "Shell",
     });
+  });
+
+  test("keeps incomplete streamed tool input out of the canonical projection", () => {
+    const projection = createSessionRuntimeEventProjection(
+      createRuntimeEvent({
+        actor: "driver",
+        id: "tool-stream",
+        kind: "tool.call.updated",
+        occurredAt: "2026-05-26T00:00:00.000Z",
+        origin: "driver",
+        payload: {
+          rawInput: '{"command":',
+          status: "running",
+          toolCallId: "tool-stream",
+        },
+        sessionId: "session-1",
+      }),
+    );
+
+    expect(projection.toolInputJson).toBeNull();
   });
 
   test("rejects malformed completed tool output before process projection", () => {
@@ -290,6 +317,34 @@ describe("agent runtime event projection", () => {
       },
     ]);
     expect(readPermissionRequestViews([])).toEqual([]);
+  });
+
+  test("projects permission requests with the logical tool identity", () => {
+    const projection = createSessionRuntimeEventProjection(
+      createRuntimeEvent({
+        actor: "driver",
+        driverInstanceId: "driver-1",
+        id: "permission-1",
+        kind: "permission.requested",
+        occurredAt: "2026-05-26T00:00:00.000Z",
+        origin: "driver",
+        payload: {
+          details: '{"command":"echo hello"}',
+          requestId: "permission-1",
+          targetItemId: "tool-1",
+          title: "Allow shell command?",
+          toolCall: { kind: "Bash" },
+        },
+        runId: "run-1",
+        sessionId: "session-1",
+      }),
+    );
+
+    expect(projection).toMatchObject({
+      toolCallId: "tool-1",
+      toolInputJson: null,
+      toolName: null,
+    });
   });
 
   test("rejects malformed permission request payloads before process projection", () => {

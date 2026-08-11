@@ -43,6 +43,7 @@ export const McpExecuteCommand = type({
   kind: '"mcp.execute"',
   requestId: NonEmptyString,
   serverId: NonEmptyString,
+  toolCallId: NonEmptyString,
   toolName: NonEmptyString,
 });
 export type McpExecuteCommand = typeof McpExecuteCommand.infer;

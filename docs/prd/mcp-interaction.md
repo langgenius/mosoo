@@ -25,3 +25,9 @@ The complete add-to-use path is available for remote HTTPS MCP servers. Binding 
 “Connected” means mosoo has an active stored credential; it does not prove the server or its tools work. There is no standalone connection test or tool browser, so failures appear when an Agent first uses the server.
 
 Credentials are encrypted, are never shown again after entry, and stay inside their App. mosoo gives Agents temporary, connection-specific access rather than revealing the stored secret. Exporting or forking an Agent does not carry credentials; the destination App must reconnect. Local-process servers, cross-App sharing, a connector marketplace, and tool-level selection are not available.
+
+For Driver-managed custom tool execution, the signed `X-Mosoo-Delegation` JWT
+includes the same `tool_call_id` exposed by Public Thread events. Business MCP
+servers should verify the JWT, enforce a uniqueness boundary such as
+`(app_id, tool_call_id)`, and return the stored result on duplicate delivery.
+This is an idempotency key, not an exactly-once guarantee.

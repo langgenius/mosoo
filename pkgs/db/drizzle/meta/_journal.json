@@ -57,6 +57,13 @@
       "when": 1786086077012,
       "tag": "0007_app-deployment-secrets",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1786436940239,
+      "tag": "0008_public-thread-tool-call-identity",
+      "breakpoints": true
     }
   ]
 }

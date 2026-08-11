@@ -12,6 +12,7 @@ import type {
   SessionProcessEventStatus,
   SessionProcessEventType,
 } from "../session/session.contract";
+import type { JsonObject } from "../validation/primitives.contract";
 
 export const PUBLIC_API_PREFIX = "/api";
 export const PUBLIC_API_VERSION_PREFIX = "/v1";
@@ -189,6 +190,9 @@ export interface PublicThreadEventLogEntry {
   occurredAt: string;
   runId: SessionRunId | null;
   status: PublicThreadEventLogStatus;
+  toolCallId?: string;
+  toolInput?: JsonObject;
+  toolName?: string;
   tokens: number | null;
   type: PublicThreadEventLogType;
 }

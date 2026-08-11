@@ -35,8 +35,8 @@ export type {
 } from "./session-runtime-event-store.types";
 
 const MAX_SESSION_RUNTIME_EVENT_INSERT_ATTEMPTS = 5;
-// D1 accepts at most 100 bound parameters; each session_event row binds 18.
-const MAX_SESSION_EVENT_ROWS_PER_INSERT = 5;
+// D1 accepts at most 100 bound parameters; each session_event row binds 21.
+const MAX_SESSION_EVENT_ROWS_PER_INSERT = 4;
 const WRITABLE_SESSION_STATUSES = ["IDLE", "RUNNING", "RESCHEDULING"] as const;
 const TERMINAL_LIFECYCLE_WRITABLE_SESSION_STATUSES = [
   ...WRITABLE_SESSION_STATUSES,
@@ -563,6 +563,9 @@ function toSessionRuntimeEventInsertValue(input: {
     sessionId: input.sessionId,
     sourceEventId: input.row.sourceEventId,
     source: input.row.projection.source,
+    toolCallId: input.row.projection.toolCallId,
+    toolInputJson: input.row.projection.toolInputJson,
+    toolName: input.row.projection.toolName,
     tokens: input.row.projection.tokens,
     traceId: input.row.projection.traceId,
     visibility: input.row.projection.visibility,

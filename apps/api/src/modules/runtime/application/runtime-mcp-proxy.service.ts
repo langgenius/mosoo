@@ -23,7 +23,12 @@ export interface RuntimeMcpProxyTarget {
 
 async function createDelegationToken(
   bindings: ApiBindings,
-  input: { accessToken: string; driverInstanceId: DriverInstanceId; url: string },
+  input: {
+    accessToken: string;
+    driverInstanceId: DriverInstanceId;
+    toolCallId: string | null;
+    url: string;
+  },
 ): Promise<string | null> {
   const link = await getRuntimeSessionLink(bindings.DB, input.driverInstanceId);
   if (link.sessionId === null) return null;
@@ -51,6 +56,7 @@ async function createDelegationToken(
       endUserId: row.endUserId,
       runId: link.sessionRunId,
       threadId: link.sessionId,
+      toolCallId: input.toolCallId,
     },
   });
 }
@@ -60,6 +66,7 @@ export async function resolveRuntimeMcpProxyTarget(
   input: {
     driverInstanceId: DriverInstanceId;
     serverId: McpServerId;
+    toolCallId: string | null;
   },
 ): Promise<RuntimeMcpProxyTarget> {
   const grant = await getDriverInstanceMcpProxyGrant(bindings.DB, input);
@@ -163,6 +170,7 @@ export async function resolveRuntimeMcpProxyTarget(
     delegationToken: await createDelegationToken(bindings, {
       accessToken: accessToken.value,
       driverInstanceId: input.driverInstanceId,
+      toolCallId: input.toolCallId,
       url: server.url,
     }),
     serverId: server.id,

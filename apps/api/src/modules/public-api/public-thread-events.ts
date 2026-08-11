@@ -10,6 +10,8 @@ import {
   PUBLIC_THREAD_EVENTS_MAX_LIMIT,
 } from "@mosoo/contracts/public-api";
 import type { SessionProcessEvent } from "@mosoo/contracts/session";
+import { parseJsonObject } from "@mosoo/contracts/validation";
+import type { JsonObject } from "@mosoo/contracts/validation";
 import { sessionEventsTable, sessionMessagesTable } from "@mosoo/db";
 import { parsePlatformId } from "@mosoo/id";
 import type { RuntimeEventId, SessionId, SessionRunId } from "@mosoo/id";
@@ -49,6 +51,9 @@ interface PublicThreadEventWindow {
 
 interface PublicThreadEventProcessRow extends SessionEventProcessRow {
   run_id: SessionRunId | null;
+  tool_call_id: string | null;
+  tool_input_json: string | null;
+  tool_name: string | null;
 }
 
 interface LiveMessageState {
@@ -311,7 +316,7 @@ function normalizePublicThreadEventsLimit(limit: number): number {
 
 function toPublicThreadEventLogEntry(input: {
   event: SessionProcessEvent;
-  runId: SessionRunId | null;
+  row: PublicThreadEventProcessRow | undefined;
 }): PublicThreadEventLogEntry | null {
   const { event } = input;
 
@@ -319,13 +324,26 @@ function toPublicThreadEventLogEntry(input: {
     return null;
   }
 
+  let toolInput: JsonObject | undefined;
+
+  if (input.row?.tool_input_json !== null && input.row?.tool_input_json !== undefined) {
+    toolInput = parseJsonObject(JSON.parse(input.row.tool_input_json), "Persisted tool input");
+  }
+
   return {
     content: sanitizePublicOutput(event.content).text,
     durationMs: event.durationMs,
     id: parsePlatformId(event.id, "Runtime event ID") as RuntimeEventId,
     occurredAt: event.occurredAt,
-    runId: input.runId,
+    runId: input.row?.run_id ?? null,
     status: event.status,
+    ...(input.row?.tool_call_id === null || input.row?.tool_call_id === undefined
+      ? {}
+      : { toolCallId: input.row.tool_call_id }),
+    ...(toolInput === undefined ? {} : { toolInput }),
+    ...(input.row?.tool_name === null || input.row?.tool_name === undefined
+      ? {}
+      : { toolName: input.row.tool_name }),
     tokens: event.tokens,
     type: event.type,
   };
@@ -335,14 +353,14 @@ function toPublicThreadEventLogEntries(
   rows: PublicThreadEventProcessRow[],
   options: { foldStreamedRows?: boolean } = {},
 ): PublicThreadEventLogEntry[] {
-  const runIdsByEventId = new Map<RuntimeEventId, SessionRunId | null>(
-    rows.map((row) => [row.id, row.run_id]),
+  const rowsByEventId = new Map<RuntimeEventId, PublicThreadEventProcessRow>(
+    rows.map((row) => [row.id, row]),
   );
 
   return createSessionProcessEventsFromSessionEventRows(rows, options).flatMap((event) => {
     const publicEvent = toPublicThreadEventLogEntry({
       event,
-      runId: runIdsByEventId.get(event.id) ?? null,
+      row: rowsByEventId.get(event.id),
     });
     return publicEvent === null ? [] : [publicEvent];
   });
@@ -365,6 +383,9 @@ function selectPublicThreadEventRows(input: {
       process_type: sessionEventsTable.processType,
       run_id: sessionEventsTable.runId,
       seq: sessionEventsTable.seq,
+      tool_call_id: sessionEventsTable.toolCallId,
+      tool_input_json: sessionEventsTable.toolInputJson,
+      tool_name: sessionEventsTable.toolName,
       tokens: sessionEventsTable.tokens,
     })
     .from(sessionEventsTable)
