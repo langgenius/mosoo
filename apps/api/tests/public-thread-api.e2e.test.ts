@@ -501,6 +501,7 @@ describe("Public Thread API e2e", () => {
         kind: "tool.call.updated",
         occurredAt: 950,
         payload: {
+          rawInput: '{"calories":420,"mealId":"meal-1"}',
           rawOutput: '{"ok":true}',
           status: "completed",
           toolCallId: "tool-call-1",
@@ -526,11 +527,14 @@ describe("Public Thread API e2e", () => {
         "tool-call-1",
       ]);
       expect(toolEvents[0]).toMatchObject({
-        toolInput: { calories: 420, mealId: "meal-1" },
         toolName: "record_meal",
         type: "tool.use.started",
       });
-      expect(toolEvents[1]?.["type"]).toBe("tool.use.completed");
+      expectNoProperties(toolEvents[0], ["toolInput"]);
+      expect(toolEvents[1]).toMatchObject({
+        toolInput: { calories: 420, mealId: "meal-1" },
+        type: "tool.use.completed",
+      });
 
       await database.prepare("DELETE FROM session_event WHERE session_id = ?").bind(threadId).run();
 
@@ -1180,7 +1184,7 @@ describe("Public Thread API e2e", () => {
       expect(text.match(/delta A/gu)).toHaveLength(1);
       expect(text).toContain('"type":"agent.message.delta"');
       expect(text).toContain('"toolCallId":"tool-call-stream-1"');
-      expect(text).toContain('"toolInput":{"calories":420,"mealId":"meal-1"}');
+      expect(text).not.toContain('"toolInput"');
       expect(text).toContain('"toolName":"record_meal"');
       expect(text).toContain('"runId":null');
       expect(text).toContain('"content":"');

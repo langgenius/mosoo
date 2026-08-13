@@ -33,11 +33,12 @@ import {
 const APP_ID = parsePlatformId<AppId>("01J0000000000000000000000A", "app id");
 
 describe("Environment package artifacts", () => {
-  test("configures the Sandbox SDK backup bucket in local and production", () => {
+  test("configures the Sandbox SDK backup bucket in local, stage, and production", () => {
     const wrangler = readFileSync(new URL("../wrangler.toml", import.meta.url), "utf8");
 
-    expect(wrangler.match(/^binding = "BACKUP_BUCKET"$/gmu)).toHaveLength(2);
+    expect(wrangler.match(/^binding = "BACKUP_BUCKET"$/gmu)).toHaveLength(3);
     expect(wrangler.match(/^BACKUP_BUCKET_NAME = "mosoo-sandbox-state"$/gmu)).toHaveLength(2);
+    expect(wrangler.match(/^BACKUP_BUCKET_NAME = "mosoo-stage-sandbox-state"$/gmu)).toHaveLength(1);
   });
 
   test("normalizes pinned npm and pip packages into a stable artifact key", async () => {
