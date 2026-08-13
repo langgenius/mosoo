@@ -126,6 +126,134 @@ max_batch_timeout = 5
 max_retries = 5
 dead_letter_queue = "channel-final-delivery-dlq"
 
+[env.stage]
+name = "mosoo-api-stage"
+workers_dev = true
+
+# Stage mirrors production behavior and topology but uses isolated resources
+# and synthetic data behind its workers.dev origin.
+[env.stage.observability]
+enabled = true
+
+[env.stage.observability.logs]
+enabled = true
+head_sampling_rate = 1
+
+[env.stage.observability.traces]
+enabled = true
+head_sampling_rate = 0.1
+
+[env.stage.vars]
+APP_NAME = "mosoo"
+WEB_ORIGIN = "https://mosoo-api-stage.wh-2099.workers.dev"
+AUTH_EMAIL_FROM = "mosoo AUTH <auth@mosoo.ai>"
+FILE_BUCKET_NAME = "mosoo-stage-file"
+BACKUP_BUCKET_NAME = "mosoo-stage-sandbox-state"
+SANDBOX_STATE_BUCKET_NAME = "mosoo-stage-sandbox-state"
+SANDBOX_FILE_BUCKET_LOCAL = "false"
+MOSOO_APP_DEPLOYMENT_DOMAIN = "apps-stage.mosoo.ai"
+MOSOO_ACCOUNT_CONCURRENT_SANDBOX_LIMIT = "5"
+MOSOO_DEPLOYMENT_MODE = "cloud"
+MOSOO_ENVIRONMENT = "production"
+POSTHOG_API_HOST = "https://us.i.posthog.com"
+
+[[env.stage.send_email]]
+name = "AUTH_EMAIL"
+
+[env.stage.secrets]
+required = [
+  "BETTER_AUTH_SECRET",
+  "RUNTIME_ACTION_TOKEN_SECRET",
+  "VAULT_ROOT_SECRET",
+  "R2_ACCESS_KEY_ID",
+  "R2_SECRET_ACCESS_KEY",
+  "CLOUDFLARE_ACCOUNT_ID",
+  "CLOUDFLARE_API_TOKEN",
+  "CLOUDFLARE_ZONE_ID",
+  "GOOGLE_OAUTH_CLIENT_ID",
+  "GOOGLE_OAUTH_CLIENT_SECRET",
+]
+
+[[env.stage.durable_objects.bindings]]
+name = "DriverConnection"
+class_name = "DriverConnection"
+
+[[env.stage.durable_objects.bindings]]
+name = "Session"
+class_name = "Session"
+
+[[env.stage.durable_objects.bindings]]
+name = "ChannelConnection"
+class_name = "ChannelConnection"
+
+[[env.stage.durable_objects.bindings]]
+name = "Sandbox"
+class_name = "Sandbox"
+
+[[env.stage.containers]]
+class_name = "Sandbox"
+image = "../driver/Containerfile"
+instance_type = "standard-2"
+max_instances = 50
+
+[[env.stage.r2_buckets]]
+binding = "FILE_BUCKET"
+bucket_name = "mosoo-stage-file"
+
+[[env.stage.r2_buckets]]
+binding = "BACKUP_BUCKET"
+bucket_name = "mosoo-stage-sandbox-state"
+
+[[env.stage.r2_buckets]]
+binding = "SANDBOX_STATE_BUCKET"
+bucket_name = "mosoo-stage-sandbox-state"
+
+[[env.stage.d1_databases]]
+binding = "DB"
+database_name = "mosoo-stage"
+database_id = "bf8ac0d9-fca6-4628-96be-26e93e357364"
+migrations_dir = "../../pkgs/db/drizzle"
+
+[[env.stage.queues.producers]]
+binding = "API_COMMAND_QUEUE"
+queue = "mosoo-stage-api-command"
+
+[[env.stage.queues.producers]]
+binding = "ENVIRONMENT_ARTIFACT_BUILD_QUEUE"
+queue = "mosoo-stage-environment-artifact-build"
+
+[[env.stage.queues.producers]]
+binding = "CHANNEL_FINAL_DELIVERY_QUEUE"
+queue = "mosoo-stage-channel-final-delivery"
+
+[[env.stage.queues.consumers]]
+queue = "mosoo-stage-api-command"
+max_batch_size = 10
+max_batch_timeout = 2
+max_retries = 5
+dead_letter_queue = "mosoo-stage-api-command-dlq"
+
+[[env.stage.queues.consumers]]
+queue = "mosoo-stage-api-command-dlq"
+max_batch_size = 10
+max_batch_timeout = 5
+max_retries = 1
+
+[[env.stage.queues.consumers]]
+queue = "mosoo-stage-environment-artifact-build"
+max_batch_size = 1
+max_batch_timeout = 1
+max_retries = 5
+max_concurrency = 5
+dead_letter_queue = "mosoo-stage-api-command-dlq"
+
+[[env.stage.queues.consumers]]
+queue = "mosoo-stage-channel-final-delivery"
+max_batch_size = 10
+max_batch_timeout = 5
+max_retries = 5
+dead_letter_queue = "mosoo-stage-channel-final-delivery-dlq"
+
 [env.prod]
 name = "mosoo-api-prod"
 workers_dev = false
@@ -143,6 +271,9 @@ head_sampling_rate = 1
 [env.prod.observability.traces]
 enabled = true
 head_sampling_rate = 0.1
+
+[[env.prod.tail_consumers]]
+service = "mosoo-website-prod"
 
 [env.prod.vars]
 APP_NAME = "mosoo"
@@ -272,5 +403,9 @@ tag = "v1"
 new_sqlite_classes = ["DriverConnection", "Sandbox", "Session", "ChannelConnection"]
 
 [[env.prod.migrations]]
+tag = "v1"
+new_sqlite_classes = ["DriverConnection", "Sandbox", "Session", "ChannelConnection"]
+
+[[env.stage.migrations]]
 tag = "v1"
 new_sqlite_classes = ["DriverConnection", "Sandbox", "Session", "ChannelConnection"]

@@ -67,9 +67,9 @@ function toCanonicalToolInputJson(rawInput: string | null): string | null {
   }
 
   try {
-    return JSON.stringify(
-      sortJsonValue(parseJsonObject(JSON.parse(rawInput), "Runtime tool input")),
-    );
+    const input = parseJsonObject(JSON.parse(rawInput), "Runtime tool input");
+
+    return Object.keys(input).length === 0 ? null : JSON.stringify(sortJsonValue(input));
   } catch {
     return null;
   }
@@ -85,8 +85,11 @@ function readProjectedToolCall(event: RuntimeEventEnvelope): {
 
     return {
       toolCallId: toolCall.toolCallId,
-      toolInputJson: toCanonicalToolInputJson(toolCall.rawInput),
-      toolName: toolCall.title || toolCall.kind,
+      // Running input is streamed and may be valid JSON before it is complete.
+      toolInputJson:
+        toolCall.status === "running" ? null : toCanonicalToolInputJson(toolCall.rawInput),
+      // Terminal titles are provider display labels and may differ from the stable start name.
+      toolName: toolCall.status === "running" ? toolCall.title || toolCall.kind : null,
     };
   }
 

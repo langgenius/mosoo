@@ -130,6 +130,55 @@ function advanceRunBeforeBatch(
 }
 
 describe("session run lifecycle", () => {
+  test("emits one structured business log for an applied terminal transition", async () => {
+    const database = await createPublicHttpContractDatabase();
+    await insertNonOwnerSession(database);
+    await insertSessionRun(database, {
+      runId: "run-terminal-log",
+      status: "running",
+    });
+
+    const originalConsoleInfo = console.info;
+    const output: string[] = [];
+    console.info = (...values: unknown[]) => output.push(values.map(String).join(" "));
+
+    try {
+      await setSessionRunStatus(database, {
+        runId: "run-terminal-log",
+        source: "driver",
+        status: "completed",
+      });
+      await setSessionRunStatus(database, {
+        runId: "run-terminal-log",
+        source: "driver",
+        status: "completed",
+      });
+    } finally {
+      console.info = originalConsoleInfo;
+    }
+
+    const terminalEntries = output
+      .map((entry) => JSON.parse(entry))
+      .filter((entry) => entry.message === "session.run.terminal");
+
+    expect(terminalEntries).toHaveLength(1);
+    expect(terminalEntries[0]).toMatchObject({
+      level: "info",
+      metadata: {
+        errorCode: null,
+        runId: "run-terminal-log",
+        runtimeId: "openai-runtime",
+        sessionType: "api_channel",
+        source: "driver",
+        status: "completed",
+        traceId: "trace-run-terminal-log",
+        trigger: "user_prompt",
+      },
+      namespace: "api",
+    });
+    expect(terminalEntries[0]?.metadata.durationMs).toBeGreaterThanOrEqual(0);
+  });
+
   test("does not let a stale terminal event revive or overwrite a completed run", async () => {
     const database = await createPublicHttpContractDatabase();
     await insertNonOwnerSession(database);

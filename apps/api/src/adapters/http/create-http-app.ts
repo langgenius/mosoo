@@ -24,7 +24,6 @@ import { registerPublicApiRoute } from "./routes/public-api-route";
 import { registerRootRoute } from "./routes/root-route";
 import { registerSkillRoute } from "./routes/skill-route";
 import { registerSlackEventsRoute } from "./routes/slack-events-route";
-import { registerStatusCanaryInternalRoute } from "./routes/status-canary-internal-route";
 import { registerTelegramEventsRoute } from "./routes/telegram-events-route";
 
 export function createHttpApp() {
@@ -53,7 +52,6 @@ export function createHttpApp() {
   registerLarkEventsRoute(publicApi);
   registerLarkGatewayInternalRoute(publicApi);
   registerSlackEventsRoute(publicApi);
-  registerStatusCanaryInternalRoute(publicApi);
   registerTelegramEventsRoute(publicApi);
   registerGraphQLRoute(publicApi);
   app.route(PUBLIC_API_PREFIX, publicApi);

@@ -447,16 +447,17 @@ describe("session runtime event store", () => {
       process_type: "tool.use.completed",
       tool_call_id: "tool-1",
       tool_input_json: '{"query":"mosoo"}',
-      tool_name: "Search",
+      tool_name: null,
     });
   });
 
-  test("rejects a reused tool call ID with a different canonical identity", async () => {
+  test("accepts streamed arguments but rejects terminal tool input reuse", async () => {
     const database = createRuntimeEventStoreDatabase();
     const persistToolEvent = (input: {
       id: string;
       rawInput: string;
       sourceEventId: string;
+      status: "completed" | "running";
       title: string;
     }) =>
       persistSessionRuntimeEvents(database, {
@@ -468,7 +469,7 @@ describe("session runtime event store", () => {
               occurredAtMs: 2_000,
               payload: {
                 rawInput: input.rawInput,
-                status: "running",
+                status: input.status,
                 title: input.title,
                 toolCallId: "tool-1",
               },
@@ -483,30 +484,40 @@ describe("session runtime event store", () => {
 
     await persistToolEvent({
       id: "tool-start",
-      rawInput: '{"query":"mosoo","page":1}',
+      rawInput: '{"cwd":"/workspace"}',
       sourceEventId: "source-tool-start",
-      title: "Search",
+      status: "running",
+      title: "bash",
     });
     await persistToolEvent({
-      id: "tool-replay",
-      rawInput: '{"page":1,"query":"mosoo"}',
-      sourceEventId: "source-tool-replay",
-      title: "Search",
+      id: "tool-enriched",
+      rawInput: '{"cwd":"/workspace","command":"python calc_1rm.py"}',
+      sourceEventId: "source-tool-enriched",
+      status: "running",
+      title: "bash",
+    });
+    await persistToolEvent({
+      id: "tool-completed",
+      rawInput: '{"command":"python calc_1rm.py","cwd":"/workspace"}',
+      sourceEventId: "source-tool-completed",
+      status: "completed",
+      title: "Command exited 0",
     });
 
     await expect(
       persistToolEvent({
         id: "tool-conflict",
-        rawInput: '{"page":1,"query":"pitchpilot"}',
+        rawInput: '{"command":"python other.py","cwd":"/workspace"}',
         sourceEventId: "source-tool-conflict",
-        title: "Write",
+        status: "completed",
+        title: "Command exited 0",
       }),
     ).rejects.toThrow("session_event tool identity conflict");
 
     const count = await database
       .prepare("SELECT COUNT(*) AS count FROM session_event")
       .first<{ count: number }>();
-    expect(count?.count).toBe(2);
+    expect(count?.count).toBe(3);
   });
 
   test("rejects runtime event batches for a different envelope session", async () => {

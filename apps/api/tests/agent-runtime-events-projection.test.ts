@@ -177,7 +177,7 @@ describe("agent runtime event projection", () => {
       processType: "tool.use.completed",
       toolCallId: "tool-1",
       toolInputJson: '{"command":"echo hello","timeout":30}',
-      toolName: "Shell",
+      toolName: null,
     });
     expect(failed).toMatchObject({
       contentText: "Shell result: permission denied",
@@ -185,29 +185,32 @@ describe("agent runtime event projection", () => {
       processType: "tool.use.completed",
       toolCallId: "tool-2",
       toolInputJson: null,
-      toolName: "Shell",
+      toolName: null,
     });
   });
 
-  test("keeps incomplete streamed tool input out of the canonical projection", () => {
-    const projection = createSessionRuntimeEventProjection(
-      createRuntimeEvent({
-        actor: "driver",
-        id: "tool-stream",
-        kind: "tool.call.updated",
-        occurredAt: "2026-05-26T00:00:00.000Z",
-        origin: "driver",
-        payload: {
-          rawInput: '{"command":',
-          status: "running",
-          toolCallId: "tool-stream",
-        },
-        sessionId: "session-1",
-      }),
-    );
+  test.each(["{}", '{"command":', '{"cwd":"/workspace"}'])(
+    "keeps running streamed tool input %s out of the canonical projection",
+    (rawInput) => {
+      const projection = createSessionRuntimeEventProjection(
+        createRuntimeEvent({
+          actor: "driver",
+          id: "tool-stream",
+          kind: "tool.call.updated",
+          occurredAt: "2026-05-26T00:00:00.000Z",
+          origin: "driver",
+          payload: {
+            rawInput,
+            status: "running",
+            toolCallId: "tool-stream",
+          },
+          sessionId: "session-1",
+        }),
+      );
 
-    expect(projection.toolInputJson).toBeNull();
-  });
+      expect(projection.toolInputJson).toBeNull();
+    },
+  );
 
   test("rejects malformed completed tool output before process projection", () => {
     const event = createRuntimeEvent({
