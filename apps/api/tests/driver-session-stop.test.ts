@@ -46,9 +46,11 @@ function createDriverStopDatabase(): SqliteD1Database {
     CREATE TABLE session (
       id text PRIMARY KEY NOT NULL,
       last_run_id text,
+      runtime_id text DEFAULT 'openai-runtime' NOT NULL,
       status text NOT NULL,
       status_operation_id text,
       status_seq integer DEFAULT 0 NOT NULL,
+      type text DEFAULT 'api_channel' NOT NULL,
       updated_at integer NOT NULL
     );
 

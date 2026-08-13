@@ -144,6 +144,9 @@ head_sampling_rate = 1
 enabled = true
 head_sampling_rate = 0.1
 
+[[env.prod.tail_consumers]]
+service = "mosoo-website-prod"
+
 [env.prod.vars]
 APP_NAME = "mosoo"
 WEB_ORIGIN = "https://cloud.mosoo.ai"

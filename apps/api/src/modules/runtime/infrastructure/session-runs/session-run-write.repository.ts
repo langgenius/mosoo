@@ -1,4 +1,4 @@
-import type { SessionStatus } from "@mosoo/contracts/session";
+import type { SessionStatus, SessionType } from "@mosoo/contracts/session";
 import type {
   RunError,
   SessionRunStatus,
@@ -19,6 +19,7 @@ import { generateTraceId } from "@mosoo/observability";
 import { and, eq, exists, inArray, notInArray, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 
+import { createErrorLogContext, logInfo, logWarn } from "../../../../platform/cloudflare/logger";
 import {
   getAppDatabase,
   getD1ChangeCount,
@@ -99,9 +100,11 @@ interface LoadedSessionRunLifecycleRow {
   id: SessionRunId;
   model: string | null;
   provider: string | null;
+  runtime_id: string;
   session_id: SessionId;
   session_last_run_id: SessionRunId | null;
   session_status: SessionStatus;
+  session_type: SessionType;
   started_at: number | null;
   status: SessionRunStatus;
   status_seq: number;
@@ -174,6 +177,38 @@ function createSessionRunStatusUpdate(input: SessionRunStatusUpdateInput, timest
   };
 }
 
+function logTerminalSessionRun(
+  current: LoadedSessionRunLifecycleRow,
+  input: SessionRunStatusUpdateInput,
+  timestampMs: number,
+): void {
+  if (!isTerminalSessionRunStatus(input.status)) return;
+
+  try {
+    logInfo("session.run.terminal", {
+      durationMs: Math.max(0, timestampMs - (current.started_at ?? current.created_at)),
+      endToEndMs: Math.max(0, timestampMs - current.created_at),
+      errorCode: input.error?.code ?? null,
+      runId: current.id,
+      runtimeId: current.runtime_id,
+      sessionType: current.session_type,
+      source: input.source ?? "system",
+      status: input.status,
+      traceId: current.trace_id,
+      trigger: current.trigger,
+    });
+  } catch (error) {
+    try {
+      logWarn("session.run.terminal_log.failed", {
+        ...createErrorLogContext(error),
+        runId: current.id,
+      });
+    } catch {
+      // Observability must never turn a committed Run transition into an API failure.
+    }
+  }
+}
+
 function applySessionRunStatusUpdate(
   run: SessionRunSummary,
   input: SessionRunStatusUpdateInput,
@@ -211,9 +246,11 @@ function sessionRunLifecycleColumns() {
     id: sessionRunsTable.id,
     model: sessionRunsTable.model,
     provider: sessionRunsTable.provider,
+    runtime_id: sessionsTable.runtimeId,
     session_id: sessionRunsTable.sessionId,
     session_last_run_id: sessionsTable.lastRunId,
     session_status: sessionsTable.status,
+    session_type: sessionsTable.type,
     started_at: sessionRunsTable.startedAt,
     status: sessionRunsTable.status,
     status_seq: sessionRunsTable.statusSeq,
@@ -727,6 +764,8 @@ async function transitionSessionRunStatus(
       };
     }
 
+    logTerminalSessionRun(current, input, timestampMs);
+
     return {
       kind: "applied",
       previousStatus: current.status,
@@ -757,6 +796,8 @@ async function transitionSessionRunStatus(
         targetStatus: input.status,
       };
     }
+
+    logTerminalSessionRun(current, input, timestampMs);
 
     return {
       kind: "applied",
@@ -815,6 +856,8 @@ async function transitionSessionRunStatus(
       targetStatus: input.status,
     };
   }
+
+  logTerminalSessionRun(current, input, timestampMs);
 
   if (getD1ChangeCount(sessionUpdateResult) === 0 && current.session_status !== "TERMINATED") {
     return {
