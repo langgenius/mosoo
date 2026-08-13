@@ -273,6 +273,23 @@ export const PUBLIC_API_OPENAPI_SCHEMAS = {
           "Delivery status of the event: `available` when the event is fully populated, `error` when it failed, `unsupported` when this event type cannot be rendered on the public surface.",
         enum: PUBLIC_THREAD_EVENT_LOG_STATUSES,
       },
+      toolCallId: {
+        description:
+          "Opaque, durable ID shared by lifecycle events for one logical tool invocation. Use this value, not the event `id`, to correlate start, confirmation, and terminal events.",
+        minLength: 1,
+        type: "string",
+      },
+      toolInput: {
+        additionalProperties: true,
+        description:
+          "Structured tool arguments when this event carries a complete canonical input object.",
+        type: "object",
+      },
+      toolName: {
+        description: "Harness-neutral tool name when supplied by the runtime.",
+        minLength: 1,
+        type: "string",
+      },
       tokens: {
         description:
           "Token count associated with the event when applicable (for example model usage). Null when not measured.",

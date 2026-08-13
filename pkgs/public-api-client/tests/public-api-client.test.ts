@@ -505,7 +505,7 @@ describe("MosooPublicThreadClient", () => {
           start(controller) {
             controller.enqueue(
               encoder.encode(
-                `: connected\n\nevent: thread.event\nid: 01J00000000000000000000010\ndata: {"content":"streamed","durationMs":0,"id":"01J00000000000000000000010","occurredAt":"2026-05-19T00:00:00.000Z","runId":"${RUN_ID}","status":"available","tokens":null,"type":"agent.message.delta"}\n\n`,
+                `: connected\n\nevent: thread.event\nid: 01J00000000000000000000010\ndata: {"content":"record_meal","durationMs":0,"id":"01J00000000000000000000010","occurredAt":"2026-05-19T00:00:00.000Z","runId":"${RUN_ID}","status":"available","toolCallId":"tool-1","toolInput":{"calories":420},"toolName":"record_meal","tokens":null,"type":"tool.use.started"}\n\n`,
               ),
             );
             controller.close();
@@ -529,14 +529,17 @@ describe("MosooPublicThreadClient", () => {
 
     expect(events).toEqual([
       {
-        content: "streamed",
+        content: "record_meal",
         durationMs: 0,
         id: "01J00000000000000000000010",
         occurredAt: "2026-05-19T00:00:00.000Z",
         runId: RUN_ID,
         status: "available",
+        toolCallId: "tool-1",
+        toolInput: { calories: 420 },
+        toolName: "record_meal",
         tokens: null,
-        type: "agent.message.delta",
+        type: "tool.use.started",
       },
     ]);
   });

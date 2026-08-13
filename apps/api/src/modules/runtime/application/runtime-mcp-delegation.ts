@@ -1,6 +1,8 @@
 import { fromBase64Url, toArrayBuffer, toBase64Url } from "../../../shared/bytes";
 
 export const RUNTIME_MCP_DELEGATION_HEADER = "X-Mosoo-Delegation";
+export const RUNTIME_MCP_TOOL_CALL_ID_HEADER = "X-Mosoo-Tool-Call-Id";
+const TOOL_CALL_ID_MAX_LENGTH = 255;
 const ISSUER = "mosoo";
 const LIFETIME_SECONDS = 60;
 
@@ -14,6 +16,7 @@ export interface RuntimeMcpDelegationClaims {
   run_id: string | null;
   sub: string;
   thread_id: string;
+  tool_call_id: string | null;
 }
 
 interface DelegationInput {
@@ -25,6 +28,7 @@ interface DelegationInput {
     runId: string | null;
     threadId: string;
     endUserId: string;
+    toolCallId: string | null;
   };
   nowMs?: number;
 }
@@ -50,6 +54,7 @@ export async function createRuntimeMcpDelegationToken(input: DelegationInput): P
     run_id: input.claims.runId,
     sub: input.claims.endUserId,
     thread_id: input.claims.threadId,
+    tool_call_id: input.claims.toolCallId,
   };
   if (!claims.sub || !claims.aud)
     throw new Error("MCP delegation subject and audience are required.");
@@ -103,10 +108,28 @@ export async function verifyRuntimeMcpDelegationToken(input: {
     claims.exp - claims.iat > LIFETIME_SECONDS ||
     typeof claims.thread_id !== "string" ||
     claims.thread_id === "" ||
+    (claims.tool_call_id !== null &&
+      (typeof claims.tool_call_id !== "string" || claims.tool_call_id === "")) ||
     (claims.run_id !== null && (typeof claims.run_id !== "string" || claims.run_id === "")) ||
     typeof claims.act?.agent_id !== "string" ||
     typeof claims.act?.app_id !== "string"
   )
     throw new Error("MCP delegation token claims are invalid.");
   return claims;
+}
+
+export function readRuntimeMcpToolCallId(headers: Headers): string | null {
+  const value = headers.get(RUNTIME_MCP_TOOL_CALL_ID_HEADER);
+
+  if (value === null) {
+    return null;
+  }
+
+  const toolCallId = value.trim();
+
+  if (toolCallId.length === 0 || toolCallId.length > TOOL_CALL_ID_MAX_LENGTH) {
+    throw new TypeError("MCP tool call ID header is invalid.");
+  }
+
+  return toolCallId;
 }

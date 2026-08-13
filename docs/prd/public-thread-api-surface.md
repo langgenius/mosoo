@@ -46,6 +46,14 @@ Agent's API Access panel shows its identifier, token creation, and API reference
   that cannot keep them private.
 - Public events show stable progress and outcomes, not private diagnostics or
   raw runtime data.
+- Tool lifecycle events expose an opaque `toolCallId`; start events also expose
+  `toolName` and complete structured `toolInput` when available. Consumers use
+  `toolCallId` to correlate start, confirmation, and terminal events across
+  listing, replay, and SSE reconnects instead of pairing human-readable text.
+- `toolCallId` is an idempotency key, not an exactly-once guarantee. A
+  write-capable integration should enforce a uniqueness boundary such as
+  `(app_id, tool_call_id)` and return its stored result when the call is
+  delivered again.
 - Thread files include explicit attachments and recorded Agent artifacts, not a
   complete runtime workspace. Thread history also does not guarantee that every
   later Run receives prior private runtime state or every earlier file.

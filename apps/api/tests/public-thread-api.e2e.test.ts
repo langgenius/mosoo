@@ -485,6 +485,56 @@ describe("Public Thread API e2e", () => {
 
       const runId = expectString(run["id"]);
       await insertRuntimeEvent(database, {
+        kind: "tool.call.updated",
+        occurredAt: 900,
+        payload: {
+          rawInput: '{"calories":420,"mealId":"meal-1"}',
+          status: "running",
+          title: "record_meal",
+          toolCallId: "tool-call-1",
+        },
+        runId,
+        seq: 1,
+        sessionId: threadId,
+      });
+      await insertRuntimeEvent(database, {
+        kind: "tool.call.updated",
+        occurredAt: 950,
+        payload: {
+          rawOutput: '{"ok":true}',
+          status: "completed",
+          toolCallId: "tool-call-1",
+        },
+        runId,
+        seq: 2,
+        sessionId: threadId,
+      });
+
+      const toolEventsResponse = await requestPublicApi(
+        app,
+        database,
+        new Request(`https://api.example.com/api/v1/threads/${threadId}/events`, {
+          headers: { Authorization: bearer(TOKENS.owner) },
+        }),
+      );
+      expect(toolEventsResponse.status).toBe(200);
+      const toolEvents = expectArray((await readJson(toolEventsResponse))["events"]).map(
+        expectRecord,
+      );
+      expect(toolEvents.map((event) => event["toolCallId"])).toEqual([
+        "tool-call-1",
+        "tool-call-1",
+      ]);
+      expect(toolEvents[0]).toMatchObject({
+        toolInput: { calories: 420, mealId: "meal-1" },
+        toolName: "record_meal",
+        type: "tool.use.started",
+      });
+      expect(toolEvents[1]?.["type"]).toBe("tool.use.completed");
+
+      await database.prepare("DELETE FROM session_event WHERE session_id = ?").bind(threadId).run();
+
+      await insertRuntimeEvent(database, {
         kind: "run.started",
         occurredAt: 1_000,
         payload: {
@@ -981,12 +1031,13 @@ describe("Public Thread API e2e", () => {
         sessionId: threadId,
       });
       await insertRuntimeEvent(database, {
-        kind: "message.added",
+        kind: "tool.call.updated",
         occurredAt: 3_050,
         payload: {
-          content: "Initial stream history B",
-          messageId: "assistant-stream-initial-2",
-          role: "agent",
+          rawInput: '{"calories":420,"mealId":"meal-1"}',
+          status: "running",
+          title: "record_meal",
+          toolCallId: "tool-call-stream-1",
         },
         runId,
         seq: 2,
@@ -1128,6 +1179,9 @@ describe("Public Thread API e2e", () => {
       expect(text.match(/Live stream /gu)).toHaveLength(1);
       expect(text.match(/delta A/gu)).toHaveLength(1);
       expect(text).toContain('"type":"agent.message.delta"');
+      expect(text).toContain('"toolCallId":"tool-call-stream-1"');
+      expect(text).toContain('"toolInput":{"calories":420,"mealId":"meal-1"}');
+      expect(text).toContain('"toolName":"record_meal"');
       expect(text).toContain('"runId":null');
       expect(text).toContain('"content":"');
       expect(text).not.toContain("owner_debug");

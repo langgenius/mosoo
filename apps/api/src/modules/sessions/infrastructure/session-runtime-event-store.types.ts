@@ -88,6 +88,9 @@ export interface SessionEventInsertValue {
   readonly sessionId: SessionId;
   readonly source: SessionRuntimeEventProjection["source"];
   readonly sourceEventId: string;
+  readonly toolCallId: string | null;
+  readonly toolInputJson: string | null;
+  readonly toolName: string | null;
   readonly tokens: number | null;
   readonly traceId: string | null;
   readonly visibility: SessionRuntimeEventProjection["visibility"];

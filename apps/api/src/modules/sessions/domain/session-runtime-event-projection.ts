@@ -5,12 +5,15 @@ import type {
   SessionRuntimeEventSource,
   SessionRuntimeEventVisibility,
 } from "@mosoo/contracts/session";
+import { parseJsonObject } from "@mosoo/contracts/validation";
+import type { JsonValue } from "@mosoo/contracts/validation";
 import type { SessionRunId } from "@mosoo/id";
 import {
   createProcessDraftFromRuntimeEvent,
   getRuntimeEventSessionFamily,
   getRuntimeEventParticipantVisibility,
   getRuntimeEventSource,
+  readRuntimeEventPermissionRequest,
   readRuntimeEventToolCallUpdate,
 } from "@mosoo/runtime-events";
 import type { RuntimeEventEnvelope } from "@mosoo/runtime-events";
@@ -23,6 +26,9 @@ export interface SessionRuntimeEventProjection {
   processType: SessionProcessEventType;
   runId: SessionRunId | null;
   source: SessionRuntimeEventSource;
+  toolCallId: string | null;
+  toolInputJson: string | null;
+  toolName: string | null;
   traceId: string | null;
   tokens: number | null;
   visibility: SessionRuntimeEventVisibility;
@@ -37,6 +43,62 @@ function isKnownRuntimeEventSource(value: unknown): value is SessionRuntimeEvent
 function normalizeContentText(value: string): string {
   const normalized = value.replaceAll(/\s+/g, " ").trim();
   return normalized.length > 0 ? normalized : value;
+}
+
+function sortJsonValue(value: JsonValue): JsonValue {
+  if (Array.isArray(value)) {
+    return value.map(sortJsonValue);
+  }
+
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value)
+        .toSorted(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+        .map(([key, entry]) => [key, sortJsonValue(entry)]),
+    );
+  }
+
+  return value;
+}
+
+function toCanonicalToolInputJson(rawInput: string | null): string | null {
+  if (rawInput === null || rawInput.length === 0) {
+    return null;
+  }
+
+  try {
+    return JSON.stringify(
+      sortJsonValue(parseJsonObject(JSON.parse(rawInput), "Runtime tool input")),
+    );
+  } catch {
+    return null;
+  }
+}
+
+function readProjectedToolCall(event: RuntimeEventEnvelope): {
+  toolCallId: string | null;
+  toolInputJson: string | null;
+  toolName: string | null;
+} {
+  if (event.kind === "tool.call.updated") {
+    const toolCall = readRuntimeEventToolCallUpdate(event);
+
+    return {
+      toolCallId: toolCall.toolCallId,
+      toolInputJson: toCanonicalToolInputJson(toolCall.rawInput),
+      toolName: toolCall.title || toolCall.kind,
+    };
+  }
+
+  const permission = readRuntimeEventPermissionRequest(event);
+
+  return permission === null
+    ? { toolCallId: null, toolInputJson: null, toolName: null }
+    : {
+        toolCallId: permission.toolCallId,
+        toolInputJson: null,
+        toolName: null,
+      };
 }
 
 function readProjectedContentText(
@@ -82,6 +144,7 @@ export function createSessionRuntimeEventProjection(
 ): SessionRuntimeEventProjection {
   const draft = createProcessDraftFromRuntimeEvent(event);
   const source = getRuntimeEventSource(event);
+  const toolCall = readProjectedToolCall(event);
 
   return {
     contentText: readProjectedContentText(event, draft),
@@ -91,6 +154,7 @@ export function createSessionRuntimeEventProjection(
     processType: draft.type,
     runId: event.runId ?? null,
     source: isKnownRuntimeEventSource(source) ? source : "system",
+    ...toolCall,
     traceId: event.traceId ?? null,
     tokens: draft.tokens ?? null,
     visibility: getRuntimeEventParticipantVisibility(event),

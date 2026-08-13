@@ -25,7 +25,11 @@ import {
   requireActiveRuntimeLlmProxyDriver,
   resolveRuntimeLlmProxyTarget,
 } from "../../../modules/runtime/application/runtime-llm-proxy.service";
-import { RUNTIME_MCP_DELEGATION_HEADER } from "../../../modules/runtime/application/runtime-mcp-delegation";
+import {
+  RUNTIME_MCP_DELEGATION_HEADER,
+  RUNTIME_MCP_TOOL_CALL_ID_HEADER,
+  readRuntimeMcpToolCallId,
+} from "../../../modules/runtime/application/runtime-mcp-delegation";
 import {
   createRuntimeMcpProxyError,
   runtimeMcpProxyErrorBody,
@@ -93,7 +97,8 @@ export function copyProxyRequestHeaders(
   for (const [key, value] of headers) {
     if (
       !HOP_BY_HOP_HEADERS.has(key.toLowerCase()) &&
-      key.toLowerCase() !== RUNTIME_MCP_DELEGATION_HEADER.toLowerCase()
+      key.toLowerCase() !== RUNTIME_MCP_DELEGATION_HEADER.toLowerCase() &&
+      key.toLowerCase() !== RUNTIME_MCP_TOOL_CALL_ID_HEADER.toLowerCase()
     ) {
       nextHeaders.set(key, value);
     }
@@ -816,6 +821,16 @@ export function registerDriverRoute(app: Hono<ApiGatewayEnvironment>) {
     }
 
     let target: Awaited<ReturnType<typeof resolveRuntimeMcpProxyTarget>>;
+    let toolCallId: string | null;
+
+    try {
+      toolCallId = readRuntimeMcpToolCallId(c.req.raw.headers);
+    } catch (error) {
+      return Response.json(
+        { error: error instanceof Error ? error.message : "MCP tool call ID header is invalid." },
+        { status: 400 },
+      );
+    }
 
     try {
       target = await resolveRuntimeMcpProxyTarget(c.env, {
@@ -824,6 +839,7 @@ export function registerDriverRoute(app: Hono<ApiGatewayEnvironment>) {
           "Driver instance ID",
         ),
         serverId,
+        toolCallId,
       });
     } catch (error) {
       const details = toRuntimeMcpProxyPublicErrorDetails(error);
