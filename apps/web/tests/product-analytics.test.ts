@@ -100,7 +100,7 @@ describe("product analytics", () => {
     configureProductAnalytics({ projectKey: "phc_public" });
 
     const anonymousId = getProductAnalyticsState().distinctId;
-    identifyProductUser({ accountId: "acct_123", name: "Rock" });
+    identifyProductUser({ accountId: "acct_123", email: "rock@dify.ai", name: "Rock" });
     captureProductEvent("page_viewed", { route: "/apps" });
     await Promise.resolve();
 
@@ -108,7 +108,11 @@ describe("product analytics", () => {
     const identifyProperties = requests[0]?.body["properties"] as Record<string, unknown>;
     expect(identifyProperties["distinct_id"]).toBe("acct_123");
     expect(identifyProperties["$anon_distinct_id"]).toBe(anonymousId);
-    expect(identifyProperties["$set"]).toEqual({ name: "Rock" });
+    expect(identifyProperties["$set"]).toEqual({
+      $internal_or_test_user: true,
+      name: "Rock",
+    });
+    expect(JSON.stringify(requests[0]?.body)).not.toContain("rock@dify.ai");
     const pageProperties = requests[1]?.body["properties"] as Record<string, unknown>;
     expect(pageProperties["distinct_id"]).toBe("acct_123");
   });
@@ -116,7 +120,7 @@ describe("product analytics", () => {
   it("resets to a fresh anonymous identity on logout", () => {
     installBrowserLocation();
     configureProductAnalytics({ projectKey: "phc_public" });
-    identifyProductUser({ accountId: "acct_123" });
+    identifyProductUser({ accountId: "acct_123", email: "rock@example.com" });
 
     resetProductAnalytics();
 

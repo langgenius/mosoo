@@ -25,7 +25,7 @@ export function ProductAnalyticsProvider({ children }: { children: ReactNode }) 
 
   useEffect(() => {
     if (user !== null) {
-      identifyProductUser({ accountId: user.id, name: user.name });
+      identifyProductUser({ accountId: user.id, email: user.email, name: user.name });
     }
   }, [user]);
 
