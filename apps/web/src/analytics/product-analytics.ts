@@ -21,6 +21,7 @@ export interface ProductAnalyticsConfig {
 
 export interface ProductAnalyticsIdentity {
   accountId: string;
+  email: string;
   name?: string | null;
 }
 
@@ -169,10 +170,14 @@ export function identifyProductUser(identity: ProductAnalyticsIdentity): void {
   }
 
   const anonymousId = state.distinctId;
+  const internalOrTestUser = identity.email.trim().toLowerCase().endsWith("@dify.ai");
   state = { ...state, distinctId: accountId, identifiedAccountId: accountId };
   postEvent("$identify", {
     $anon_distinct_id: anonymousId,
-    $set: sanitizeProperties({ name: identity.name ?? undefined }),
+    $set: sanitizeProperties({
+      $internal_or_test_user: internalOrTestUser,
+      name: identity.name ?? undefined,
+    }),
   });
 }
 
