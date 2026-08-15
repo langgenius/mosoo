@@ -127,11 +127,12 @@ jobs:
           wait_for_redirect \
             'https://try.mosoo.ai/' \
             '308 https://cloud.mosoo.ai/'
+          # Cloudflare's zone-level HTTPS redirect runs before either Worker.
           wait_for_redirect \
             'http://cloud.mosoo.ai/' \
-            '308 https://cloud.mosoo.ai/'
+            '301 https://cloud.mosoo.ai/'
           wait_for_redirect \
             'http://cloud.mosoo.ai/api/health' \
-            '308 https://cloud.mosoo.ai/api/health'
+            '301 https://cloud.mosoo.ai/api/health'
           curl "${curl_args[@]}" https://try.mosoo.ai/api/health \
             | jq -e '.name == "mosoo" and .ok == true'
