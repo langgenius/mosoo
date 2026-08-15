@@ -19,7 +19,7 @@ mock.module("@cloudflare/sandbox", () => ({
   },
 }));
 
-const { ensureSandboxConversationSession } =
+const { closeIdleCattleConversationSession, ensureSandboxConversationSession } =
   await import("../src/modules/runtime/infrastructure/sandbox-session/sandbox-conversation-session.service");
 
 const ORIGIN = {
@@ -84,6 +84,22 @@ function createConversationSessionDatabase(kind: AgentKind = "pet"): SqliteD1Dat
       sandbox_id text NOT NULL,
       status text NOT NULL
     );
+
+    CREATE TABLE session (
+      agent_id text,
+      id text PRIMARY KEY NOT NULL
+    );
+
+    CREATE TABLE driver_instance (
+      id text PRIMARY KEY NOT NULL,
+      sandbox_id text NOT NULL
+    );
+
+    CREATE TABLE session_run (
+      driver_instance_id text,
+      id text PRIMARY KEY NOT NULL,
+      status text NOT NULL
+    );
   `);
 
   database.execute(`
@@ -100,6 +116,10 @@ async function insertConversationSession(
     readonly status: SandboxSessionStatus;
   },
 ): Promise<void> {
+  await database
+    .prepare("INSERT INTO session (agent_id, id) VALUES (?, ?) ON CONFLICT (id) DO NOTHING")
+    .bind(null, "session-1")
+    .run();
   await database
     .prepare(
       `
@@ -203,6 +223,7 @@ function createExecutionSession(options: { cwdHasContent: boolean }): ExecutionS
 function createSandbox(
   options: {
     cwdHasContent?: boolean;
+    deleteSessionError?: Error;
     onRestore?: (backup: { readonly dir: string; readonly id: string }) => void;
   } = {},
 ): SandboxHandle {
@@ -219,8 +240,12 @@ function createSandbox(
     async createSession() {
       return executionSession;
     },
-    async deleteSession() {
-      return { sessionId: "session-1", success: true, timestamp: new Date(0).toISOString() };
+    async deleteSession(sessionId) {
+      if (options.deleteSessionError) {
+        throw options.deleteSessionError;
+      }
+
+      return { sessionId, success: true, timestamp: new Date(0).toISOString() };
     },
     async destroy() {},
     async getSession() {
@@ -241,8 +266,11 @@ function createSandbox(
   };
 }
 
-function createBindings(database: D1Database): ApiBindings {
-  return { DB: database } as ApiBindings;
+function createBindings(database: D1Database, sandbox?: SandboxHandle): ApiBindings {
+  return {
+    DB: database,
+    ...(sandbox ? { runtimeSubjectHandleFactory: () => sandbox } : {}),
+  } as ApiBindings;
 }
 
 function createInput(sandbox: SandboxHandle, kind: AgentKind = "pet") {
@@ -352,5 +380,31 @@ describe("ensureSandboxConversationSession", () => {
       cloudflare_session_id: "01J00000000000000000000001",
       status: "active",
     });
+  });
+});
+
+describe("closeIdleCattleConversationSession", () => {
+  test("arms subject reclamation when the remote session is already absent", async () => {
+    const database = createConversationSessionDatabase("cattle");
+    await insertConversationSession(database, { status: "active" });
+    database.execute("UPDATE sandbox SET inactive_deadline_at = NULL");
+    const sandboxSessionId = "01J00000000000000000000001";
+    const sandbox = createSandbox({
+      deleteSessionError: new Error(`Session '${sandboxSessionId}' not found`),
+    });
+    const startedAt = Date.now();
+
+    await expect(
+      closeIdleCattleConversationSession(createBindings(database, sandbox), {
+        idleSinceLte: 1,
+        sandboxId: "01J0000000000000000000000D",
+        sessionId: "session-1",
+      }),
+    ).rejects.toThrow(`Session '${sandboxSessionId}' not found`);
+
+    await expect(readConversationSession(database)).resolves.toMatchObject({ status: "closed" });
+    const deadline = await readInactiveDeadline(database);
+    expect(deadline).toBeGreaterThanOrEqual(startedAt + 5 * 60_000);
+    expect(deadline).toBeLessThanOrEqual(Date.now() + 5 * 60_000);
   });
 });

@@ -8,13 +8,18 @@ import {
 import type { DriverInstanceId, SandboxId, SessionId } from "@mosoo/id";
 import { and, asc, eq, exists, inArray, isNotNull, isNull, lte, notExists, or } from "drizzle-orm";
 
-import { getAppDatabase, runAppDatabaseBatch } from "../../../../platform/db/drizzle";
+import {
+  getAppDatabase,
+  getD1ChangeCount,
+  runAppDatabaseBatch,
+} from "../../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../../time";
 import { RUNTIME_SUBJECT_OPERATION_STATUSES } from "../../domain/runtime-subject-lifecycle.machine";
 import { ACTIVE_SESSION_RUN_STATUSES } from "../../domain/session-run-lifecycle.machine";
 import {
   activeConversationSessionQuery,
   activeConversationSessionQueryForListedSubject,
+  getRuntimeSubjectInactiveDeadlineSql,
   LIVE_DRIVER_STATUSES,
   runLeaseQuery,
   runLeaseQueryForListedSubject,
@@ -147,6 +152,31 @@ export async function listInactiveRuntimeSubjects(
     .orderBy(asc(sandboxesTable.inactiveDeadlineAt))
     .limit(input.limit)
     .all();
+}
+
+export async function repairStrandedCattleRuntimeSubjectDeadlines(
+  database: D1Database,
+  input: { readonly now: number },
+): Promise<number> {
+  const appDb = getAppDatabase(database);
+  const result = await appDb
+    .update(sandboxesTable)
+    .set({
+      inactiveDeadlineAt: getRuntimeSubjectInactiveDeadlineSql(input.now),
+      updatedAt: input.now,
+    })
+    .where(
+      and(
+        eq(sandboxesTable.status, "active"),
+        eq(sandboxesTable.kind, "cattle"),
+        isNull(sandboxesTable.inactiveDeadlineAt),
+        notExists(activeConversationSessionQueryForListedSubject(appDb)),
+        notExists(runLeaseQueryForListedSubject(appDb)),
+      ),
+    )
+    .run();
+
+  return getD1ChangeCount(result);
 }
 
 export async function listStaleRuntimeSubjectOperations(

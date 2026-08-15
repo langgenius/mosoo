@@ -21,6 +21,7 @@ import { createSessionStatusTransitionPatch } from "../session-runs/session-life
 import { setSessionRunStatus } from "../session-runs/session-run-store.repository";
 import type { SessionRunTransitionOutcome } from "../session-runs/session-run-store.repository";
 import { listIdleSessionScopedConversationSessions } from "./runtime-conversation-session-store";
+import { repairStrandedCattleRuntimeSubjectDeadlines } from "./runtime-subject-maintenance-store";
 import {
   claimInactiveRuntimeSubject,
   listInactiveRuntimeSubjects,
@@ -312,6 +313,11 @@ export async function runSandboxMaintenance(bindings: ApiBindings): Promise<void
     staleUpdatedAtLte: now - MAINTENANCE_OPERATION_REPAIR_AFTER_MS,
   });
   await closeIdleSessionScopedConversationSessions(bindings, now);
+  const repairedDeadlines = await repairStrandedCattleRuntimeSubjectDeadlines(bindings.DB, { now });
+
+  if (repairedDeadlines > 0) {
+    logWarn("runtime.subject.inactive_deadline_repaired", { count: repairedDeadlines });
+  }
 
   const [candidates, repairCandidates] = await Promise.all([
     listInactiveRuntimeSubjects(bindings.DB, {

@@ -317,33 +317,36 @@ async function finalizeSandboxConversationClose(
   const { deleteActiveSandboxConversationSession } =
     await import("./sandbox-conversation-session-delete");
 
-  await deleteActiveSandboxConversationSession(bindings, {
-    sandboxSessionId: input.state.sandboxSessionId,
-    sandboxId: input.sandboxId,
-  });
+  try {
+    await deleteActiveSandboxConversationSession(bindings, {
+      sandboxSessionId: input.state.sandboxSessionId,
+      sandboxId: input.sandboxId,
+    });
 
-  if (input.state.agentId) {
-    await appendRuntimeDiagnosticEvent(bindings, {
-      eventName: RUNTIME_DIAGNOSTIC_EVENT.sandboxSessionDestroyed.name,
+    if (input.state.agentId) {
+      await appendRuntimeDiagnosticEvent(bindings, {
+        eventName: RUNTIME_DIAGNOSTIC_EVENT.sandboxSessionDestroyed.name,
+        sessionId: input.sessionId,
+        value: {
+          ...toRuntimeDiagnosticBaseValue({
+            agentId: input.state.agentId,
+            sessionId: input.sessionId,
+          }),
+          reason: "runtime_subject_session_closed",
+          sandboxId: input.sandboxId,
+        },
+      });
+    }
+  } finally {
+    // Remote cleanup must not strand the local subject outside reclamation.
+    await recordRuntimeConversationSessionClosed(bindings.DB, {
+      inactiveDeadlineAt: getRuntimeSubjectInactiveDeadline(
+        getRuntimeKindPolicy(input.state.kind),
+        now,
+      ),
+      now,
+      runtimeSubjectId: input.sandboxId,
       sessionId: input.sessionId,
-      value: {
-        ...toRuntimeDiagnosticBaseValue({
-          agentId: input.state.agentId,
-          sessionId: input.sessionId,
-        }),
-        reason: "runtime_subject_session_closed",
-        sandboxId: input.sandboxId,
-      },
     });
   }
-
-  await recordRuntimeConversationSessionClosed(bindings.DB, {
-    inactiveDeadlineAt: getRuntimeSubjectInactiveDeadline(
-      getRuntimeKindPolicy(input.state.kind),
-      now,
-    ),
-    now,
-    runtimeSubjectId: input.sandboxId,
-    sessionId: input.sessionId,
-  });
 }
