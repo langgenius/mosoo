@@ -4,6 +4,7 @@ import { isPlatformId, parsePlatformId } from "@mosoo/id";
 import type { RuntimeOperationId } from "@mosoo/id";
 import { PLATFORM_ID_FIXTURES } from "@mosoo/id/testing";
 
+import { repairStrandedCattleRuntimeSubjectDeadlines } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-maintenance-store";
 import {
   recycleInactiveRuntimeSubjectNow,
   recycleRuntimeSubject,
@@ -205,6 +206,40 @@ function createSandboxHandle(): SandboxHandle {
 }
 
 describe("runtime subject recycle", () => {
+  test("repairs stranded cattle subjects without touching active conversations", async () => {
+    const database = createRuntimeSubjectRecycleDatabase();
+    database.execute(`
+      UPDATE sandbox
+      SET claim_expires_at = NULL,
+          claim_owner = NULL,
+          inactive_deadline_at = NULL,
+          kind = 'cattle'
+      WHERE id = '${SANDBOX_ID}';
+
+      INSERT INTO sandbox_session (cwd, sandbox_id, session_id, status, updated_at)
+      VALUES ('/workspace', '${SANDBOX_ID}', 'session-1', 'closed', 1);
+    `);
+
+    await expect(repairStrandedCattleRuntimeSubjectDeadlines(database, { now: 10 })).resolves.toBe(
+      1,
+    );
+    await expect(
+      listInactiveRuntimeSubjects(database, { limit: 10, now: 300_009 }),
+    ).resolves.toEqual([]);
+    await expect(
+      listInactiveRuntimeSubjects(database, { limit: 10, now: 300_010 }),
+    ).resolves.toEqual([{ id: SANDBOX_ID, kind: "cattle" }]);
+
+    database.execute(`
+      UPDATE sandbox SET inactive_deadline_at = NULL WHERE id = '${SANDBOX_ID}';
+      UPDATE sandbox_session SET status = 'active' WHERE session_id = 'session-1';
+    `);
+
+    await expect(repairStrandedCattleRuntimeSubjectDeadlines(database, { now: 20 })).resolves.toBe(
+      0,
+    );
+  });
+
   test("uses a generated operation id instead of the maintenance claim owner", async () => {
     const database = createRuntimeSubjectRecycleDatabase();
     currentSandbox = createSandboxHandle();
