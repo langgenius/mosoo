@@ -57,3 +57,28 @@ Agent's API Access panel shows its identifier, token creation, and API reference
 - Thread files include explicit attachments and recorded Agent artifacts, not a
   complete runtime workspace. Thread history also does not guarantee that every
   later Run receives prior private runtime state or every earlier file.
+
+## `/api/v1` compatibility policy
+
+`/api/v1` is backward compatible by default. Existing request fields, accepted
+values, response fields, operations, and documented behavior must not be removed
+or narrowed in place. A semantic change that cannot remain compatible must use a
+new versioned endpoint.
+
+Staged enforcement inside v1 is reserved for security or correctness boundaries
+that cannot safely remain permissive. It must first ship an additive compatibility
+phase, publish a minimum supported client version and enforcement date, and record
+those facts in the compatibility approval consumed by the OpenAPI breaking-change
+gate (`config/public-api-v1-breaking-change-approvals.json`). Each approval is
+bound to the normalized base OpenAPI digest, the compatibility issue, minimum
+client version, and rollout dates. The old shape remains accepted until that
+phase is complete. Documentation, generated clients, CLI/skill artifacts, and a
+non-production smoke must be ready before enforcement. A production deploy is
+not the place to discover downstream contract drift.
+
+The reusable `Public API non-production smoke` workflow is the deployed release
+check. It fetches the live OpenAPI, verifies the exact create contract, submits
+the documented minimal `{ "userId": "..." }` body, and checks the returned
+Thread identity. Its URL guard refuses every production Mosoo host; configure a
+separate `public-api-nonproduction` GitHub Environment with a synthetic Agent and
+Access Token. Production deployment and release remain explicit human steps.

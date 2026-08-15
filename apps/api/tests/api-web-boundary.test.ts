@@ -415,7 +415,13 @@ describe("API to web boundary", () => {
     });
 
     const createThreadSchema = document.components.schemas.CreateThreadRequest;
-    expect(createThreadSchema.required).not.toContain("input");
+    expect(Object.keys(createThreadSchema.properties).toSorted()).toEqual([
+      "input",
+      "resources",
+      "userId",
+    ]);
+    expect(createThreadSchema.required).toEqual(["userId"]);
+    expect(document.paths["/agents/{agentId}/threads"]?.post?.requestBody?.required).toBe(true);
     const createThreadResponseProperties = openApiSchemaProperties("CreateThreadResponse");
     expect(createThreadResponseProperties["run"]).toMatchObject({
       oneOf: [{ $ref: "#/components/schemas/RunSummary" }, { type: "null" }],
@@ -753,6 +759,7 @@ describe("API to web boundary", () => {
       } else {
         expect(parsed.inputText?.length).toBeGreaterThan(0);
       }
+      expect(parsed.userId.length).toBeGreaterThan(0);
       expect(Array.isArray(parsed.fileIds)).toBe(true);
       hasFileExample ||= (parsed.fileIds?.length ?? 0) > 0;
     }

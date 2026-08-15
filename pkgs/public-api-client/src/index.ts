@@ -18,7 +18,10 @@ import type {
   PublicThreadSummary,
 } from "@mosoo/contracts/public-api";
 
-type FetchFunction = typeof fetch;
+export type MosooPublicApiFetch = (
+  input: RequestInfo | URL,
+  init?: RequestInit,
+) => Promise<Response>;
 
 interface CreateThreadRequestBody {
   input?: {
@@ -38,7 +41,7 @@ interface SseMessage {
 export interface MosooPublicThreadClientOptions {
   allowBrowserToken?: boolean;
   baseUrl: string;
-  fetch?: FetchFunction;
+  fetch?: MosooPublicApiFetch;
   pollIntervalMs?: number;
   token: string;
 }
@@ -479,7 +482,7 @@ export function extractFinalOutput(
 
 export class MosooPublicThreadClient {
   private readonly apiBaseUrl: string;
-  private readonly fetchImpl: FetchFunction;
+  private readonly fetchImpl: MosooPublicApiFetch;
   private readonly pollIntervalMs: number;
   private readonly token: string;
 

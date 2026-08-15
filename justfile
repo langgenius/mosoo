@@ -120,6 +120,18 @@ react-doctor-report:
 help-docs-index:
     bun run help-docs-index
 
+# Regenerate the canonical Public API OpenAPI artifact.
+public-api-openapi:
+    bun run public-api:openapi:generate
+
+# Check Public API artifact freshness and v1 backward compatibility.
+public-api-openapi-check:
+    bun run public-api:contract:check
+
+# Smoke the documented minimal Thread shape against configured non-production.
+public-api-smoke:
+    bun run public-api:smoke
+
 # Run E2E cases. Use `just e2e --help`.
 e2e *args:
     bun run e2e -- {{args}}

@@ -202,6 +202,12 @@ Acceptance:
 
 ## Real Deploy Safe Sequence
 
+Before advancing a reviewed commit to production, run the repository's `Public
+API non-production smoke` workflow against a deployed staging/preview base URL
+ending in `/api/v1`. The workflow validates the live OpenAPI and creates an empty
+Thread with the documented `userId`-only body. It hard-rejects `cloud.mosoo.ai`,
+`try.mosoo.ai`, and `mosoo.ai`; never repoint it at production.
+
 The normal production entry point is
 `.github/workflows/deploy-try.yml`. A push to `deploy/try` in
 `langgenius/mosoo` runs the simulation steps, invokes `just deploy`, and verifies
