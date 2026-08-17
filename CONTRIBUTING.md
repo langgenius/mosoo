@@ -143,6 +143,9 @@ just lint              # generate Cloudflare types, then run lint
 just tc                # run workspace typecheck
 just test              # run regular unit tests
 just check             # fmt + doc links + lint + tc + tests + GraphQL freshness
+just public-api-openapi # regenerate the versioned Public API OpenAPI artifact
+just public-api-openapi-check # check artifact freshness and v1 compatibility
+just public-api-smoke   # smoke a configured deployed non-production API only
 just graphql-codegen   # regenerate GraphQL schema and web gql output
 just db-generate name  # append a Drizzle migration from the schema
 just db-reset-local    # destroy local D1 state and reapply migrations

@@ -1,13 +1,16 @@
 import { describe, expect, test } from "bun:test";
 
 import type {
+  PublicFileResponse,
   PublicThreadApiCreateThreadResponse,
   PublicThreadApiListThreadEventsResponse,
   PublicThreadApiRetrieveThreadResponse,
   PublicThreadEventLogEntry,
   PublicThreadFinalOutput,
+  PublicThreadRunSummary,
+  PublicThreadSummary,
 } from "@mosoo/contracts/public-api";
-import type { MosooPublicApiError } from "@mosoo/public-api-client";
+import type { MosooPublicApiError, MosooPublicApiFetch } from "@mosoo/public-api-client";
 import { MosooPublicThreadClient } from "@mosoo/public-api-client";
 import { MosooPublicThreadTerminalRunError } from "@mosoo/public-api-client";
 import { extractFinalOutput } from "@mosoo/public-api-client";
@@ -19,13 +22,18 @@ interface RecordedRequest {
   url: string;
 }
 
-const THREAD_ID = "01J00000000000000000000009";
-const RUN_ID = "01J0000000000000000000000A";
-const FILE_ID = "01J0000000000000000000000J";
+const AGENT_ID = "01J00000000000000000000001" as PublicThreadSummary["agent_id"];
+const THREAD_ID = "01J00000000000000000000009" as PublicThreadSummary["id"];
+const RUN_ID = "01J0000000000000000000000A" as NonNullable<PublicThreadSummary["last_run_id"]>;
+const ALT_RUN_ID = "01J0000000000000000000000B" as NonNullable<PublicThreadSummary["last_run_id"]>;
+const FILE_ID = "01J0000000000000000000000J" as PublicFileResponse["file"]["id"];
+const EVENT_ID_10 = "01J00000000000000000000010" as PublicThreadEventLogEntry["id"];
+const EVENT_ID_11 = "01J00000000000000000000011" as PublicThreadEventLogEntry["id"];
+const EVENT_ID_12 = "01J00000000000000000000012" as PublicThreadEventLogEntry["id"];
 
-function threadResponse(status: "RUNNING" | "IDLE" = "RUNNING") {
+function threadResponse(status: "RUNNING" | "IDLE" = "RUNNING"): PublicThreadSummary {
   return {
-    agent_id: "01J00000000000000000000001",
+    agent_id: AGENT_ID,
     created_at: "2026-05-19T00:00:00.000Z",
     id: THREAD_ID,
     kind: "pet",
@@ -35,13 +43,13 @@ function threadResponse(status: "RUNNING" | "IDLE" = "RUNNING") {
     title: "Say hello",
     updated_at: "2026-05-19T00:00:01.000Z",
     userId: "customer-123",
-  } as const;
+  };
 }
 
 function runResponse(
   status: "completed" | "failed" | "running" = "running",
   finalOutput: PublicThreadFinalOutput | null = null,
-) {
+): PublicThreadRunSummary {
   return {
     completedAt: status === "running" ? null : "2026-05-19T00:00:02.000Z",
     createdAt: "2026-05-19T00:00:00.000Z",
@@ -59,7 +67,7 @@ function runResponse(
     status,
     trigger: "user_prompt",
     updatedAt: "2026-05-19T00:00:02.000Z",
-  } as const;
+  };
 }
 
 async function readRequestBody(request: Request): Promise<unknown> {
@@ -75,7 +83,7 @@ function jsonResponse(value: unknown, status = 200): Response {
 describe("MosooPublicThreadClient", () => {
   test("maps createThread fileIds to public file resources", async () => {
     const requests: RecordedRequest[] = [];
-    const fetchMock: typeof fetch = async (input, init) => {
+    const fetchMock: MosooPublicApiFetch = async (input, init) => {
       const request = new Request(input, init);
       requests.push({
         body: await readRequestBody(request.clone()),
@@ -117,7 +125,7 @@ describe("MosooPublicThreadClient", () => {
   });
 
   test("uploads Agent files through multipart/form-data", async () => {
-    const fetchMock: typeof fetch = async (input, init) => {
+    const fetchMock: MosooPublicApiFetch = async (input, init) => {
       const request = new Request(input, init);
       const formData = await request.formData();
       const file = formData.get("file");
@@ -162,7 +170,7 @@ describe("MosooPublicThreadClient", () => {
 
   test("creates a Thread and returns the canonical final output from retrieve", async () => {
     const requests: RecordedRequest[] = [];
-    const fetchMock: typeof fetch = async (input, init) => {
+    const fetchMock: MosooPublicApiFetch = async (input, init) => {
       const request = new Request(input, init);
       requests.push({
         body: await readRequestBody(request.clone()),
@@ -196,9 +204,9 @@ describe("MosooPublicThreadClient", () => {
             {
               content: "Old output",
               durationMs: 0,
-              id: "01J00000000000000000000010",
+              id: EVENT_ID_10,
               occurredAt: "2026-05-19T00:00:00.000Z",
-              runId: "01J0000000000000000000000B",
+              runId: ALT_RUN_ID,
               status: "available",
               tokens: null,
               type: "agent.message.delta",
@@ -206,7 +214,7 @@ describe("MosooPublicThreadClient", () => {
             {
               content: "进度：正在生成最终答复。",
               durationMs: 0,
-              id: "01J00000000000000000000011",
+              id: EVENT_ID_11,
               occurredAt: "2026-05-19T00:00:01.000Z",
               runId: RUN_ID,
               status: "available",
@@ -216,7 +224,7 @@ describe("MosooPublicThreadClient", () => {
             {
               content: "不应被拼入最终答复。",
               durationMs: 0,
-              id: "01J00000000000000000000012",
+              id: EVENT_ID_12,
               occurredAt: "2026-05-19T00:00:02.000Z",
               runId: RUN_ID,
               status: "available",
@@ -241,6 +249,7 @@ describe("MosooPublicThreadClient", () => {
       idempotencyKey: "thread-create-1",
       input: "Say hello from the API.",
       timeoutMs: 1_000,
+      userId: "customer-123",
     });
 
     expect(result.finalOutput).toEqual({ text: "最终答复：完整的中文、Markdown 和 😀。" });
@@ -252,6 +261,7 @@ describe("MosooPublicThreadClient", () => {
         content: [{ text: "Say hello from the API.", type: "text" }],
         type: "user.message",
       },
+      userId: "customer-123",
     });
     expect(requests.map((request) => new URL(request.url).pathname)).toEqual([
       "/api/v1/agents/agent-1/threads",
@@ -261,7 +271,7 @@ describe("MosooPublicThreadClient", () => {
   });
 
   test("throws a structured error when createThreadAndWait reaches a failed run", async () => {
-    const fetchMock: typeof fetch = async (input, init) => {
+    const fetchMock: MosooPublicApiFetch = async (input, init) => {
       const request = new Request(input, init);
 
       if (request.method === "POST" && request.url.endsWith("/agents/agent-1/threads")) {
@@ -304,6 +314,7 @@ describe("MosooPublicThreadClient", () => {
         agentId: "agent-1",
         input: "Fail loudly.",
         timeoutMs: 1_000,
+        userId: "customer-123",
       });
     } catch (error) {
       thrown = error;
@@ -327,7 +338,7 @@ describe("MosooPublicThreadClient", () => {
   });
 
   test("can opt out of failed terminal run throwing", async () => {
-    const fetchMock: typeof fetch = async (input, init) => {
+    const fetchMock: MosooPublicApiFetch = async (input, init) => {
       const request = new Request(input, init);
 
       if (request.method === "POST" && request.url.endsWith("/agents/agent-1/threads")) {
@@ -369,6 +380,7 @@ describe("MosooPublicThreadClient", () => {
       input: "Return terminal status.",
       throwOnFailedRun: false,
       timeoutMs: 1_000,
+      userId: "customer-123",
     });
 
     expect(result.run.status).toBe("failed");
@@ -381,7 +393,7 @@ describe("MosooPublicThreadClient", () => {
   });
 
   test("does not reconstruct a completed final output from progress events", async () => {
-    const fetchMock: typeof fetch = async (input, init) => {
+    const fetchMock: MosooPublicApiFetch = async (input, init) => {
       const request = new Request(input, init);
 
       if (request.method === "GET" && request.url.endsWith(`/threads/${THREAD_ID}`)) {
@@ -398,7 +410,7 @@ describe("MosooPublicThreadClient", () => {
             {
               content: "进度：读取资料。",
               durationMs: 0,
-              id: "01J00000000000000000000010",
+              id: EVENT_ID_10,
               occurredAt: "2026-05-19T00:00:00.000Z",
               runId: RUN_ID,
               status: "available",
@@ -408,7 +420,7 @@ describe("MosooPublicThreadClient", () => {
             {
               content: "错误的事件拼接候选。",
               durationMs: 0,
-              id: "01J00000000000000000000011",
+              id: EVENT_ID_11,
               occurredAt: "2026-05-19T00:00:01.000Z",
               runId: RUN_ID,
               status: "available",
@@ -428,7 +440,16 @@ describe("MosooPublicThreadClient", () => {
       token: "mst_test",
     });
 
-    await expect(client.waitForFinalOutput({ threadId: THREAD_ID })).rejects.toThrow(
+    let thrown: unknown = null;
+
+    try {
+      await client.waitForFinalOutput({ threadId: THREAD_ID });
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(Error);
+    expect((thrown as Error).message).toBe(
       `Completed Public Thread run ${RUN_ID} did not include final output.`,
     );
   });
@@ -440,7 +461,7 @@ describe("MosooPublicThreadClient", () => {
           {
             content: "first",
             durationMs: 0,
-            id: "01J00000000000000000000010",
+            id: EVENT_ID_10,
             occurredAt: "2026-05-19T00:00:00.000Z",
             runId: RUN_ID,
             status: "available",
@@ -450,9 +471,9 @@ describe("MosooPublicThreadClient", () => {
           {
             content: "ignored",
             durationMs: 0,
-            id: "01J00000000000000000000011",
+            id: EVENT_ID_11,
             occurredAt: "2026-05-19T00:00:01.000Z",
-            runId: "01J0000000000000000000000B",
+            runId: ALT_RUN_ID,
             status: "available",
             tokens: null,
             type: "agent.message.delta",
@@ -460,7 +481,7 @@ describe("MosooPublicThreadClient", () => {
           {
             content: " second",
             durationMs: 0,
-            id: "01J00000000000000000000012",
+            id: EVENT_ID_12,
             occurredAt: "2026-05-19T00:00:02.000Z",
             runId: RUN_ID,
             status: "available",
@@ -474,7 +495,7 @@ describe("MosooPublicThreadClient", () => {
   });
 
   test("throws structured public API errors", async () => {
-    const fetchMock: typeof fetch = async () =>
+    const fetchMock: MosooPublicApiFetch = async () =>
       jsonResponse(
         {
           error: {
@@ -490,7 +511,15 @@ describe("MosooPublicThreadClient", () => {
       token: "mst_test",
     });
 
-    await expect(client.listEvents({ threadId: THREAD_ID })).rejects.toMatchObject({
+    let thrown: unknown = null;
+
+    try {
+      await client.listEvents({ threadId: THREAD_ID });
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toMatchObject({
       code: "rate_limited",
       message: "Too many requests.",
       status: 429,
@@ -499,7 +528,7 @@ describe("MosooPublicThreadClient", () => {
 
   test("streams thread.event SSE payloads", async () => {
     const encoder = new TextEncoder();
-    const fetchMock: typeof fetch = async () =>
+    const fetchMock: MosooPublicApiFetch = async () =>
       new Response(
         new ReadableStream<Uint8Array>({
           start(controller) {
@@ -531,7 +560,7 @@ describe("MosooPublicThreadClient", () => {
       {
         content: "record_meal",
         durationMs: 0,
-        id: "01J00000000000000000000010",
+        id: EVENT_ID_10,
         occurredAt: "2026-05-19T00:00:00.000Z",
         runId: RUN_ID,
         status: "available",

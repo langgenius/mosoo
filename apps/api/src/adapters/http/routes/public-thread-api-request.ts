@@ -5,6 +5,7 @@ import {
   PUBLIC_THREAD_FILE_ID_MAX_LENGTH,
   PUBLIC_THREAD_INPUT_TEXT_MAX_LENGTH,
   PUBLIC_THREAD_JSON_BODY_MAX_BYTES,
+  PUBLIC_API_OPENAPI_SCHEMAS,
   PUBLIC_THREAD_USER_ID_MAX_LENGTH,
 } from "@mosoo/contracts/public-api";
 import { parsePlatformId } from "@mosoo/id";
@@ -43,7 +44,9 @@ const THREAD_EVENT_PERMISSION_DECISION_FIELDS: ReadonlySet<string> = new Set([
   "decision",
 ]);
 const THREAD_EVENT_USER_INTERRUPT_FIELDS: ReadonlySet<string> = new Set(["type", "runId"]);
-const CREATE_THREAD_REQUEST_FIELDS: ReadonlySet<string> = new Set(["input", "resources", "userId"]);
+const CREATE_THREAD_REQUEST_FIELDS: ReadonlySet<string> = new Set(
+  Object.keys(PUBLIC_API_OPENAPI_SCHEMAS.CreateThreadRequest.properties),
+);
 
 export interface ParsedCreateThreadRequest {
   fileIds: FileId[];

@@ -1,0 +1,66 @@
+name: Public API non-production smoke
+
+on:
+  workflow_call:
+    inputs:
+      base_url:
+        description: Deployed non-production Public API base URL ending in /api/v1
+        required: true
+        type: string
+      user_id:
+        description: Opaque synthetic user ID for the smoke Thread
+        required: false
+        type: string
+      input_text:
+        description: Optional synthetic input that also exercises the Agent runtime
+        required: false
+        type: string
+    secrets:
+      MOSOO_PUBLIC_API_SMOKE_AGENT_ID:
+        required: true
+      MOSOO_PUBLIC_API_SMOKE_TOKEN:
+        required: true
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: Deployed non-production Public API base URL ending in /api/v1
+        required: true
+        type: string
+      user_id:
+        default: contract-smoke
+        description: Opaque synthetic user ID for the smoke Thread
+        required: false
+        type: string
+      input_text:
+        description: Optional synthetic input that also exercises the Agent runtime
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: create documented minimal Thread
+    if: github.repository == 'langgenius/mosoo'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: public-api-nonproduction
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: canary
+
+      - name: Verify deployed Public Thread contract
+        env:
+          MOSOO_PUBLIC_API_SMOKE_AGENT_ID: ${{ secrets.MOSOO_PUBLIC_API_SMOKE_AGENT_ID }}
+          MOSOO_PUBLIC_API_SMOKE_BASE_URL: ${{ inputs.base_url }}
+          MOSOO_PUBLIC_API_SMOKE_INPUT_TEXT: ${{ inputs.input_text }}
+          MOSOO_PUBLIC_API_SMOKE_TOKEN: ${{ secrets.MOSOO_PUBLIC_API_SMOKE_TOKEN }}
+          MOSOO_PUBLIC_API_SMOKE_USER_ID: ${{ inputs.user_id }}
+        run: bun scripts/public-api-nonproduction-smoke.ts

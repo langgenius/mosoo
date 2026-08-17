@@ -10,7 +10,7 @@
   "scripts": {
     "build": "vp run --filter @mosoo/agent-driver build && vp run --filter @mosoo/web build",
     "cf:types": "vp run --filter @mosoo/api cf:types",
-    "check": "vp run -w fmt:check && vp run -w docs:check && vp run -w lint && vp run -w tc && vp run -w test",
+    "check": "vp run -w fmt:check && vp run -w docs:check && vp run -w lint && vp run -w tc && vp run -w test && vp run -w public-api:contract:check",
     "db:migrate:local": "vp run --filter @mosoo/api db:migrate:local",
     "deploy": "vp run -w deploy:api && vp run -w deploy:web",
     "deploy:api": "vp run --filter @mosoo/api deploy",
@@ -30,11 +30,16 @@
     "hooks:install": "vp exec prek -c config/prek.toml install",
     "knip": "vp exec knip --config config/knip.jsonc",
     "lint": "vp run -w cf:types && vp lint vite.config.ts config/bun-script-types.d.ts config/vite-plus.shared.ts scripts apps/api apps/web pkgs e2e",
+    "public-api:breaking:check": "vp exec bun scripts/check-public-api-breaking-changes.ts",
+    "public-api:contract:check": "vp run -w public-api:openapi:check && vp run -w public-api:breaking:check",
+    "public-api:openapi:check": "vp exec bun scripts/public-api-openapi-artifact.ts --check",
+    "public-api:openapi:generate": "vp exec bun scripts/public-api-openapi-artifact.ts --write",
+    "public-api:smoke": "vp exec bun scripts/public-api-nonproduction-smoke.ts",
     "react-doctor": "vp exec react-doctor apps/web --scope full --blocking none",
     "react-doctor:diff": "vp exec react-doctor apps/web --verbose --scope changed --blocking none",
     "react-doctor:report": "vp exec react-doctor apps/web --json --json-compact --scope full --blocking none",
     "tc": "vp run -r tc",
-    "test": "vp exec bun test config/commit-policy.test.ts scripts/validate-commit-message.test.ts && vp run --filter @mosoo/api --filter @mosoo/agent-driver --filter @mosoo/web --filter @mosoo/ag-ui-session --filter @mosoo/agent-package --filter @mosoo/contracts --filter @mosoo/db --filter @mosoo/id --filter @mosoo/public-api-client --filter @mosoo/runtime-catalog --filter @mosoo/runtime-events --filter @mosoo/session-policy --filter @mosoo/skill-package test && vp run -w graphql:codegen:check"
+    "test": "vp exec bun test config/commit-policy.test.ts config/public-api-compatibility.test.ts scripts/public-api-nonproduction-smoke.test.ts scripts/validate-commit-message.test.ts && vp run --filter @mosoo/api --filter @mosoo/agent-driver --filter @mosoo/web --filter @mosoo/ag-ui-session --filter @mosoo/agent-package --filter @mosoo/contracts --filter @mosoo/db --filter @mosoo/id --filter @mosoo/public-api-client --filter @mosoo/runtime-catalog --filter @mosoo/runtime-events --filter @mosoo/session-policy --filter @mosoo/skill-package test && vp run -w graphql:codegen:check"
   },
   "devDependencies": {
     "@graphql-codegen/cli": "^7.2.0",
