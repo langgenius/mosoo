@@ -53,6 +53,12 @@ function document(input: {
 }
 
 describe("public API compatibility", () => {
+  test("keeps the production check supplied with main history", async () => {
+    const workflow = await Bun.file(".github/workflows/deploy-try.yml").text();
+
+    expect(workflow).toMatch(/actions\/checkout@[^\n]*\n\s+with:\n\s+fetch-depth: 0\n/);
+  });
+
   test("reports request tightening, field removal, enum narrowing, and response removal", () => {
     const before = document({});
     const after = document({
