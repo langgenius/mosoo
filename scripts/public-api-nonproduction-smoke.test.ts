@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 import {
   assertCreateThreadContract,
   assertNonProductionBaseUrl,
+  createSmokeThreadBody,
 } from "./public-api-nonproduction-smoke";
 
 function createDocument() {
@@ -50,5 +51,17 @@ describe("Public API non-production smoke", () => {
     const staleDocument = createDocument();
     staleDocument.components.schemas.CreateThreadRequest.required = [];
     expect(() => assertCreateThreadContract(staleDocument)).toThrow("must require exactly userId");
+  });
+
+  test("builds the high-usage runtime case without changing the public request shape", () => {
+    const inputText = "x".repeat(1_430);
+
+    expect(createSmokeThreadBody("contract-smoke", inputText)).toEqual({
+      input: {
+        content: [{ text: inputText, type: "text" }],
+        type: "user.message",
+      },
+      userId: "contract-smoke",
+    });
   });
 });

@@ -11,6 +11,10 @@ on:
         description: Opaque synthetic user ID for the smoke Thread
         required: false
         type: string
+      input_text:
+        description: Optional synthetic input that also exercises the Agent runtime
+        required: false
+        type: string
     secrets:
       MOSOO_PUBLIC_API_SMOKE_AGENT_ID:
         required: true
@@ -25,6 +29,10 @@ on:
       user_id:
         default: contract-smoke
         description: Opaque synthetic user ID for the smoke Thread
+        required: false
+        type: string
+      input_text:
+        description: Optional synthetic input that also exercises the Agent runtime
         required: false
         type: string
 
@@ -52,6 +60,7 @@ jobs:
         env:
           MOSOO_PUBLIC_API_SMOKE_AGENT_ID: ${{ secrets.MOSOO_PUBLIC_API_SMOKE_AGENT_ID }}
           MOSOO_PUBLIC_API_SMOKE_BASE_URL: ${{ inputs.base_url }}
+          MOSOO_PUBLIC_API_SMOKE_INPUT_TEXT: ${{ inputs.input_text }}
           MOSOO_PUBLIC_API_SMOKE_TOKEN: ${{ secrets.MOSOO_PUBLIC_API_SMOKE_TOKEN }}
           MOSOO_PUBLIC_API_SMOKE_USER_ID: ${{ inputs.user_id }}
         run: bun scripts/public-api-nonproduction-smoke.ts

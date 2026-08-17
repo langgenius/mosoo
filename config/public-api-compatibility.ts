@@ -109,19 +109,23 @@ function compareSchema(
   );
 
   if (Array.isArray(afterValue["enum"])) {
-    for (const enumValue of beforeEnum) {
-      if (!afterEnum.has(stableValue(enumValue))) {
-        changes.push(`${location}.enum removed ${stableValue(enumValue)}`);
+    if (!Array.isArray(beforeValue["enum"])) {
+      changes.push(`${location}.enum was added`);
+    } else {
+      for (const enumValue of beforeEnum) {
+        if (!afterEnum.has(stableValue(enumValue))) {
+          changes.push(`${location}.enum removed ${stableValue(enumValue)}`);
+        }
       }
     }
   }
 
-  if (
-    Object.hasOwn(beforeValue, "const") &&
-    Object.hasOwn(afterValue, "const") &&
-    stableValue(beforeValue["const"]) !== stableValue(afterValue["const"])
-  ) {
-    changes.push(`${location}.const changed from ${stableValue(beforeValue["const"])}`);
+  if (Object.hasOwn(afterValue, "const")) {
+    if (!Object.hasOwn(beforeValue, "const")) {
+      changes.push(`${location}.const was added`);
+    } else if (stableValue(beforeValue["const"]) !== stableValue(afterValue["const"])) {
+      changes.push(`${location}.const changed from ${stableValue(beforeValue["const"])}`);
+    }
   }
 
   const beforeProperties = readRecord(beforeValue["properties"]);
@@ -205,9 +209,13 @@ function compareSchema(
     );
 
     if (Array.isArray(afterValue[keyword])) {
-      for (const option of beforeOptions) {
-        if (!afterOptions.has(stableValue(option))) {
-          changes.push(`${location}.${keyword} removed option ${stableValue(option)}`);
+      if (!Array.isArray(beforeValue[keyword])) {
+        changes.push(`${location}.${keyword} was added`);
+      } else {
+        for (const option of beforeOptions) {
+          if (!afterOptions.has(stableValue(option))) {
+            changes.push(`${location}.${keyword} removed option ${stableValue(option)}`);
+          }
         }
       }
     }

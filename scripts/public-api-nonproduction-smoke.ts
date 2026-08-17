@@ -68,6 +68,19 @@ export function assertCreateThreadContract(documentValue: unknown): void {
   }
 }
 
+export function createSmokeThreadBody(userId: string, inputText?: string): Record<string, unknown> {
+  const body: Record<string, unknown> = { userId };
+
+  if (inputText) {
+    body["input"] = {
+      content: [{ text: inputText, type: "text" }],
+      type: "user.message",
+    };
+  }
+
+  return body;
+}
+
 async function readJson(response: Response, label: string): Promise<unknown> {
   const text = await response.text();
 
@@ -83,6 +96,7 @@ async function main(): Promise<void> {
   const agentId = process.env["MOSOO_PUBLIC_API_SMOKE_AGENT_ID"]?.trim();
   const token = process.env["MOSOO_PUBLIC_API_SMOKE_TOKEN"]?.trim();
   const userId = process.env["MOSOO_PUBLIC_API_SMOKE_USER_ID"]?.trim() || "contract-smoke";
+  const inputText = process.env["MOSOO_PUBLIC_API_SMOKE_INPUT_TEXT"]?.trim();
 
   if (!baseUrlValue || !agentId || !token) {
     throw new Error(
@@ -104,7 +118,7 @@ async function main(): Promise<void> {
   const createResponse = await fetch(
     new URL(`${baseUrl.pathname}/agents/${encodeURIComponent(agentId)}/threads`, baseUrl),
     {
-      body: JSON.stringify({ userId }),
+      body: JSON.stringify(createSmokeThreadBody(userId, inputText)),
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
@@ -128,8 +142,12 @@ async function main(): Promise<void> {
     throw new Error("Created Thread did not preserve the documented userId contract.");
   }
 
-  if (createResult["run"] !== null) {
-    throw new Error("Minimal create Thread smoke unexpectedly started a Run.");
+  if (inputText ? !isRecord(createResult["run"]) : createResult["run"] !== null) {
+    throw new Error(
+      inputText
+        ? "Create Thread smoke with input did not start a Run."
+        : "Minimal create Thread smoke unexpectedly started a Run.",
+    );
   }
 
   console.log(`Public API non-production smoke passed for ${baseUrl.origin}${baseUrl.pathname}.`);

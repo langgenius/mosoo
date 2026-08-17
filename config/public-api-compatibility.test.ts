@@ -84,6 +84,32 @@ describe("public API compatibility", () => {
     expect(findOpenApiBreakingChanges(before, after)).toEqual([]);
   });
 
+  test("reports newly introduced enum, const, and composition constraints", () => {
+    const before = document({});
+    const beforeUserId = before.components.schemas.CreateThreadRequest.properties.userId as Record<
+      string,
+      unknown
+    >;
+    delete beforeUserId["enum"];
+
+    for (const [keyword, value] of [
+      ["enum", ["contract-smoke"]],
+      ["const", "contract-smoke"],
+      ["oneOf", [{ const: "contract-smoke" }]],
+    ] as const) {
+      const after = structuredClone(before);
+      const afterUserId = after.components.schemas.CreateThreadRequest.properties.userId as Record<
+        string,
+        unknown
+      >;
+      afterUserId[keyword] = value;
+
+      expect(findOpenApiBreakingChanges(before, after)).toContain(
+        `components.schemas.CreateThreadRequest.properties.userId.${keyword} was added`,
+      );
+    }
+  });
+
   test("requires staged approvals to bind to the base digest and rollout facts", () => {
     const baselineSha256 = "a".repeat(64);
 
