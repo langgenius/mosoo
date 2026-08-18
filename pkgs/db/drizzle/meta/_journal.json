@@ -64,6 +64,13 @@
       "when": 1786436940239,
       "tag": "0008_public-thread-tool-call-identity",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1787057554558,
+      "tag": "0009_terminal_event_lookup_index",
+      "breakpoints": true
     }
   ]
 }
