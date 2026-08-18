@@ -11,6 +11,10 @@ export interface LongRunningContainer extends ContainerInstance {
 
 const RUNNING_STATES = new Set(["provisioning", "running", "stopping", "unhealthy"]);
 
+export function findActiveContainers(instances: readonly ContainerInstance[]): ContainerInstance[] {
+  return instances.filter((instance) => RUNNING_STATES.has(instance.state));
+}
+
 export function findLongRunningContainers(
   instances: readonly ContainerInstance[],
   now: number,
@@ -47,31 +51,47 @@ function readThresholdHours(raw: string | undefined): number {
 if (import.meta.main) {
   const inputPath = process.argv[2];
   if (!inputPath) {
-    throw new Error("Usage: bun scripts/check-container-runtime.ts <instances.json> [hours]");
+    throw new Error(
+      "Usage: bun scripts/check-container-runtime.ts <instances.json> [hours] [active-count]",
+    );
   }
 
   const thresholdHours = readThresholdHours(process.argv[3]);
+  const activeContainerThreshold = Number(process.argv[4] ?? "10");
+  if (!Number.isSafeInteger(activeContainerThreshold) || activeContainerThreshold <= 0) {
+    throw new Error("Active container threshold must be a positive integer.");
+  }
+
   const instances = (await Bun.file(inputPath).json()) as ContainerInstance[];
+  const activeContainers = findActiveContainers(instances);
   const longRunning = findLongRunningContainers(instances, Date.now(), thresholdHours);
 
-  if (longRunning.length === 0) {
-    console.log(`No production container has run for ${thresholdHours} hours.`);
+  if (activeContainers.length < activeContainerThreshold && longRunning.length === 0) {
+    console.log(
+      `${activeContainers.length} active production container(s); none has run for ${thresholdHours} hours.`,
+    );
     process.exit(0);
   }
 
-  console.log(`# Production container runtime alert\n`);
+  console.log(`# Production container capacity alert\n`);
   console.log(
-    `${longRunning.length} container(s) have run for at least ${thresholdHours} hours.\n`,
+    `- Active containers: ${activeContainers.length} (alert threshold: ${activeContainerThreshold})`,
   );
-  console.log("| Container | State | Age | Created (UTC) |");
-  console.log("| --- | --- | ---: | --- |");
-  for (const instance of longRunning) {
-    console.log(
-      `| \`${instance.name ?? instance.id ?? "unknown"}\` | ${instance.state} | ${instance.ageHours.toFixed(1)}h | ${instance.created} |`,
-    );
+  console.log(
+    `- Long-running containers: ${longRunning.length} (alert threshold: ${thresholdHours} hours)\n`,
+  );
+
+  if (longRunning.length > 0) {
+    console.log("| Container | State | Age | Created (UTC) |");
+    console.log("| --- | --- | ---: | --- |");
+    for (const instance of longRunning) {
+      console.log(
+        `| \`${instance.name ?? instance.id ?? "unknown"}\` | ${instance.state} | ${instance.ageHours.toFixed(1)}h | ${instance.created} |`,
+      );
+    }
   }
   console.log(
-    "\nInvestigate active Runs and stop any orphaned container before closing this issue.",
+    "\nInvestigate active Runs and stop any orphaned container before closing this issue. No container was stopped automatically.",
   );
   process.exit(2);
 }

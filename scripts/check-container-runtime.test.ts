@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { findLongRunningContainers } from "./check-container-runtime";
+import { findActiveContainers, findLongRunningContainers } from "./check-container-runtime";
 
 describe("container runtime alert", () => {
   test("reports only billable states older than the threshold", () => {
@@ -13,6 +13,21 @@ describe("container runtime alert", () => {
 
     expect(findLongRunningContainers(instances, now, 2).map((instance) => instance.id)).toEqual([
       "old",
+    ]);
+  });
+
+  test("counts every active platform state for capacity alerts", () => {
+    const instances = [
+      { created: null, id: "starting", state: "provisioning" },
+      { created: null, id: "ready", state: "running" },
+      { created: null, id: "stuck", state: "unhealthy" },
+      { created: null, id: "done", state: "inactive" },
+    ];
+
+    expect(findActiveContainers(instances).map((instance) => instance.id)).toEqual([
+      "starting",
+      "ready",
+      "stuck",
     ]);
   });
 });
