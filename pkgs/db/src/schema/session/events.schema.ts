@@ -104,6 +104,7 @@ export const sessionEventsTable = sqliteTable(
       table.visibility,
       table.seq,
     ),
+    index("session_event_run_event_type_idx").on(table.runId, table.eventType),
     uniqueIndex("session_event_session_seq_idx").on(table.sessionId, table.seq),
     uniqueIndex("session_event_session_source_idx").on(table.sessionId, table.sourceEventId),
   ],
