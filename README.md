@@ -119,6 +119,12 @@ The public landing page and blog live in the private `langgenius/mosoo-website` 
 
 Contributions are welcome. Read [CONTRIBUTING.md](./CONTRIBUTING.md) for the development workflow, commit policy, and verification expectations. Contributions are covered by the [Contributor License Agreement](./CLA.md); CLA Assistant will prompt you on your first pull request.
 
+## Contributors
+
+<a href="https://github.com/langgenius/mosoo/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=langgenius/mosoo" alt="mosoo contributors" />
+</a>
+
 ## License
 
 mosoo is licensed under the [Apache License 2.0](./LICENSE).
