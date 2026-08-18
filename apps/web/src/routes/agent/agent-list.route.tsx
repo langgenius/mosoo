@@ -89,7 +89,7 @@ export function AgentListPage() {
   const filteredAgents = filterAgents(agents, search);
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden">
+    <div className="flex h-full flex-col overflow-hidden">
       <PageHeader title={t("agent.title")} description={t("agent.description")}>
         <Button
           disabled={appId === null}
