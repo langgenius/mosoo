@@ -183,7 +183,9 @@ Acceptance:
   latest local Drizzle snapshot, apply pending remote D1 migrations (its first
   remote mutation), verify every expected table exists in prod (the
   DEPLOY-D1-001 missing-table guard), ensure the required artifact and
-  channel-delivery queues, build the Driver, then deploy the API Worker.
+  channel-delivery queues, build the Driver, then deploy the API Worker with an
+  immediate Container rollout so the API and Driver protocol cannot split
+  across a gradual image rollout.
 - The guard does not compare columns, indexes, constraints, or extra live
   tables. The script performs no clean-worktree check and no dry-run of its own;
   Steps 0-7 of this runbook are the only preflight.
