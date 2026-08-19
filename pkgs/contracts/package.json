@@ -17,6 +17,7 @@
     "./external-tool-effect": "./src/runtime/external-tool-effect.contract.ts",
     "./environment": "./src/environment/environment.contract.ts",
     "./file": "./src/file/file.contract.ts",
+    "./harness": "./src/harness/harness.contract.ts",
     "./mcp": "./src/mcp/mcp.contract.ts",
     "./models": "./models/index.ts",
     "./operation-result": "./src/transport/operation-result.contract.ts",

@@ -43,6 +43,7 @@ export type SkillId = SemanticPlatformId<"SkillId">;
 export type SkillSnapshotId = SemanticPlatformId<"SkillSnapshotId">;
 export type UploadId = SemanticPlatformId<"UploadId">;
 export type VendorCredentialId = SemanticPlatformId<"VendorCredentialId">;
+export type WorkspaceApiKeyId = SemanticPlatformId<"WorkspaceApiKeyId">;
 
 export const PLATFORM_ID_PATTERN = "^[0-7][0-9A-HJKMNP-TV-Z]{25}$";
 export const PLATFORM_ID_INPUT_PATTERN = "^[0-7][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{25}$";

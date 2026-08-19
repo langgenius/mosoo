@@ -25,6 +25,7 @@ import { registerRootRoute } from "./routes/root-route";
 import { registerSkillRoute } from "./routes/skill-route";
 import { registerSlackEventsRoute } from "./routes/slack-events-route";
 import { registerTelegramEventsRoute } from "./routes/telegram-events-route";
+import { registerWorkspaceApiKeyRoute } from "./routes/workspace-api-key-route";
 
 export function createHttpApp() {
   const app = new Hono<ApiGatewayEnvironment>();
@@ -42,6 +43,7 @@ export function createHttpApp() {
   registerRootRoute(app);
   registerHealthRoute(publicApi);
   registerAccessTokenRoute(publicApi);
+  registerWorkspaceApiKeyRoute(publicApi);
   registerAuthRoute(publicApi);
   registerFileRoute(publicApi);
   registerMcpRoute(publicApi);

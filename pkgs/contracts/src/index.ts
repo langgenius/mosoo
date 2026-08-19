@@ -7,6 +7,7 @@ export * from "./agent/agent-manifest-serializer.contract";
 export type * from "./auth/auth.contract";
 export * from "./channel/channel.contract";
 export type * from "./environment/environment.contract";
+export * from "./harness/harness.contract";
 export * from "./file/file.contract";
 export type * from "./mcp/mcp.contract";
 export type * from "./metadata/app-info.contract";

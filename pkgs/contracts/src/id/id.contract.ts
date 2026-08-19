@@ -35,4 +35,5 @@ export type {
   SkillSnapshotId,
   UploadId,
   VendorCredentialId,
+  WorkspaceApiKeyId,
 } from "@mosoo/id";

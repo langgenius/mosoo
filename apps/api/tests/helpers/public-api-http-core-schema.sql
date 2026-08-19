@@ -21,6 +21,18 @@ CREATE TABLE personal_access_token (
   revoked_at integer
 );
 
+CREATE TABLE workspace_api_key (
+  id text PRIMARY KEY NOT NULL,
+  account_id text NOT NULL,
+  app_id text NOT NULL,
+  label text NOT NULL,
+  token_hash text NOT NULL,
+  created_at integer NOT NULL,
+  updated_at integer NOT NULL,
+  last_used_at integer,
+  revoked_at integer
+);
+
 CREATE TABLE organization (
   id text PRIMARY KEY NOT NULL,
   name text NOT NULL,

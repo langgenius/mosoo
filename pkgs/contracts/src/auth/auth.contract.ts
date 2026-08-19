@@ -1,4 +1,4 @@
-import type { PersonalAccessTokenId } from "../id/id.contract";
+import type { PersonalAccessTokenId, AppId, WorkspaceApiKeyId } from "../id/id.contract";
 
 export type AuthMethod = "email_otp" | "google_oauth";
 
@@ -23,6 +23,28 @@ export interface CreatePersonalAccessTokenResponse {
 
 export interface PersonalAccessTokenListResponse {
   tokens: PersonalAccessTokenSummary[];
+}
+
+export interface WorkspaceApiKeySummary {
+  createdAt: string;
+  id: WorkspaceApiKeyId;
+  label: string;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+  workspaceId: AppId;
+}
+
+export interface CreateWorkspaceApiKeyRequest {
+  label: string;
+}
+
+export interface CreateWorkspaceApiKeyResponse {
+  key: WorkspaceApiKeySummary;
+  value: string;
+}
+
+export interface WorkspaceApiKeyListResponse {
+  keys: WorkspaceApiKeySummary[];
 }
 
 export type CliOAuthDeviceStatus = "pending" | "authorized" | "consumed" | "denied" | "expired";

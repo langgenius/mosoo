@@ -1,4 +1,10 @@
-import type { AccountId, CliOAuthFlowId, PersonalAccessTokenId } from "@mosoo/id";
+import type {
+  AccountId,
+  CliOAuthFlowId,
+  PersonalAccessTokenId,
+  AppId,
+  WorkspaceApiKeyId,
+} from "@mosoo/id";
 import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 import { platformIdColumn } from "./id-column";
@@ -90,6 +96,28 @@ export const personalAccessTokensTable = sqliteTable(
 );
 
 export type PersonalAccessTokenRow = typeof personalAccessTokensTable.$inferSelect;
+
+export const workspaceApiKeysTable = sqliteTable(
+  "workspace_api_key",
+  {
+    accountId: platformIdColumn<AccountId>("account_id").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    id: platformIdColumn<WorkspaceApiKeyId>("id").primaryKey(),
+    label: text("label").notNull(),
+    lastUsedAt: integer("last_used_at", { mode: "timestamp_ms" }),
+    revokedAt: integer("revoked_at", { mode: "timestamp_ms" }),
+    appId: platformIdColumn<AppId>("app_id").notNull(),
+    tokenHash: text("token_hash").notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [
+    index("workspace_api_key_app_created_idx").on(table.appId, table.createdAt),
+    index("workspace_api_key_account_app_idx").on(table.accountId, table.appId),
+    uniqueIndex("workspace_api_key_hash_idx").on(table.tokenHash),
+  ],
+);
+
+export type WorkspaceApiKeyRow = typeof workspaceApiKeysTable.$inferSelect;
 
 export const cliOAuthFlowsTable = sqliteTable(
   "cli_oauth_flow",
