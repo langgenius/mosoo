@@ -52,11 +52,8 @@ type Documents = {
     "\n  mutation RenameApp($input: RenameAppInput!) {\n    renameApp(input: $input) {\n      createdAt\n      defaultEnvironmentId\n      id\n      name\n      ownerAccountId\n    }\n  }\n": typeof types.RenameAppDocument,
     "\n  query AppDeploymentOverview($appId: ULID!) {\n    appOverview(appId: $appId) {\n      app {\n        id\n        name\n      }\n      boundAgents {\n        agentId\n        envVar\n        expose\n        name\n      }\n      deployment {\n        appId\n        createdAt\n        defaultBranch\n        id\n        liveUrl\n        plannedUrl\n        repoName\n        repoOwner\n        repoUrl\n        updatedAt\n        latestRun {\n          appId\n          createdAt\n          deploymentId\n          errorCode\n          errorMessage\n          id\n          liveUrl\n          plannedUrl\n          sourceBranch\n          sourceCommitSha\n          status\n          targetKind\n          updatedAt\n        }\n      }\n    }\n  }\n": typeof types.AppDeploymentOverviewDocument,
     "\n  query AppDeploymentRunList($appId: ULID!, $limit: Int) {\n    appDeploymentRunList(appId: $appId, limit: $limit) {\n      appId\n      createdAt\n      deploymentId\n      errorCode\n      errorMessage\n      id\n      liveUrl\n      plannedUrl\n      sourceBranch\n      sourceCommitSha\n      status\n      targetKind\n      updatedAt\n    }\n  }\n": typeof types.AppDeploymentRunListDocument,
-    "\n  query AppDeploymentSecretList($appId: ULID!) {\n    appDeploymentSecretList(appId: $appId) {\n      appId\n      createdAt\n      name\n      updatedAt\n    }\n  }\n": typeof types.AppDeploymentSecretListDocument,
     "\n  mutation DeployApp($input: DeployAppInput!) {\n    deployApp(input: $input) {\n      appId\n      createdAt\n      deploymentId\n      errorCode\n      errorMessage\n      id\n      liveUrl\n      plannedUrl\n      sourceBranch\n      sourceCommitSha\n      status\n      targetKind\n      updatedAt\n    }\n  }\n": typeof types.DeployAppDocument,
     "\n  mutation DeleteAppDeployment($input: DeleteAppDeploymentInput!) {\n    deleteAppDeployment(input: $input) {\n      ok\n    }\n  }\n": typeof types.DeleteAppDeploymentDocument,
-    "\n  mutation SetAppDeploymentSecret($input: SetAppDeploymentSecretInput!) {\n    setAppDeploymentSecret(input: $input) {\n      appId\n      createdAt\n      name\n      updatedAt\n    }\n  }\n": typeof types.SetAppDeploymentSecretDocument,
-    "\n  mutation DeleteAppDeploymentSecret($input: DeleteAppDeploymentSecretInput!) {\n    deleteAppDeploymentSecret(input: $input) {\n      ok\n    }\n  }\n": typeof types.DeleteAppDeploymentSecretDocument,
     "\n  fragment CostTotalsFields on CostAggregate {\n    activeUsers\n    cacheCreationTokens\n    cacheReadTokens\n    inputTokens\n    outputTokens\n    requestCount\n    totalCostUsd\n    unpricedRequestCount\n  }\n": typeof types.CostTotalsFieldsFragmentDoc,
     "\n  fragment CostDailyFields on CostDailyPoint {\n    activeUsers\n    cacheCreationTokens\n    cacheReadTokens\n    date\n    inputTokens\n    outputTokens\n    requestCount\n    totalCostUsd\n    unpricedRequestCount\n  }\n": typeof types.CostDailyFieldsFragmentDoc,
     "\n  fragment CostAgentFields on CostAgentRow {\n    activeUsers\n    agentId\n    agentName\n    cacheCreationTokens\n    cacheReadTokens\n    debugCostUsd\n    evalCostUsd\n    inputTokens\n    outputTokens\n    ownerEmail\n    ownerId\n    ownerName\n    previousCostUsd\n    previewCostUsd\n    productionCostUsd\n    requestCount\n    scheduledCostUsd\n    totalCostUsd\n    unpricedRequestCount\n  }\n": typeof types.CostAgentFieldsFragmentDoc,
@@ -159,11 +156,8 @@ const documents: Documents = {
     "\n  mutation RenameApp($input: RenameAppInput!) {\n    renameApp(input: $input) {\n      createdAt\n      defaultEnvironmentId\n      id\n      name\n      ownerAccountId\n    }\n  }\n": types.RenameAppDocument,
     "\n  query AppDeploymentOverview($appId: ULID!) {\n    appOverview(appId: $appId) {\n      app {\n        id\n        name\n      }\n      boundAgents {\n        agentId\n        envVar\n        expose\n        name\n      }\n      deployment {\n        appId\n        createdAt\n        defaultBranch\n        id\n        liveUrl\n        plannedUrl\n        repoName\n        repoOwner\n        repoUrl\n        updatedAt\n        latestRun {\n          appId\n          createdAt\n          deploymentId\n          errorCode\n          errorMessage\n          id\n          liveUrl\n          plannedUrl\n          sourceBranch\n          sourceCommitSha\n          status\n          targetKind\n          updatedAt\n        }\n      }\n    }\n  }\n": types.AppDeploymentOverviewDocument,
     "\n  query AppDeploymentRunList($appId: ULID!, $limit: Int) {\n    appDeploymentRunList(appId: $appId, limit: $limit) {\n      appId\n      createdAt\n      deploymentId\n      errorCode\n      errorMessage\n      id\n      liveUrl\n      plannedUrl\n      sourceBranch\n      sourceCommitSha\n      status\n      targetKind\n      updatedAt\n    }\n  }\n": types.AppDeploymentRunListDocument,
-    "\n  query AppDeploymentSecretList($appId: ULID!) {\n    appDeploymentSecretList(appId: $appId) {\n      appId\n      createdAt\n      name\n      updatedAt\n    }\n  }\n": types.AppDeploymentSecretListDocument,
     "\n  mutation DeployApp($input: DeployAppInput!) {\n    deployApp(input: $input) {\n      appId\n      createdAt\n      deploymentId\n      errorCode\n      errorMessage\n      id\n      liveUrl\n      plannedUrl\n      sourceBranch\n      sourceCommitSha\n      status\n      targetKind\n      updatedAt\n    }\n  }\n": types.DeployAppDocument,
     "\n  mutation DeleteAppDeployment($input: DeleteAppDeploymentInput!) {\n    deleteAppDeployment(input: $input) {\n      ok\n    }\n  }\n": types.DeleteAppDeploymentDocument,
-    "\n  mutation SetAppDeploymentSecret($input: SetAppDeploymentSecretInput!) {\n    setAppDeploymentSecret(input: $input) {\n      appId\n      createdAt\n      name\n      updatedAt\n    }\n  }\n": types.SetAppDeploymentSecretDocument,
-    "\n  mutation DeleteAppDeploymentSecret($input: DeleteAppDeploymentSecretInput!) {\n    deleteAppDeploymentSecret(input: $input) {\n      ok\n    }\n  }\n": types.DeleteAppDeploymentSecretDocument,
     "\n  fragment CostTotalsFields on CostAggregate {\n    activeUsers\n    cacheCreationTokens\n    cacheReadTokens\n    inputTokens\n    outputTokens\n    requestCount\n    totalCostUsd\n    unpricedRequestCount\n  }\n": types.CostTotalsFieldsFragmentDoc,
     "\n  fragment CostDailyFields on CostDailyPoint {\n    activeUsers\n    cacheCreationTokens\n    cacheReadTokens\n    date\n    inputTokens\n    outputTokens\n    requestCount\n    totalCostUsd\n    unpricedRequestCount\n  }\n": types.CostDailyFieldsFragmentDoc,
     "\n  fragment CostAgentFields on CostAgentRow {\n    activeUsers\n    agentId\n    agentName\n    cacheCreationTokens\n    cacheReadTokens\n    debugCostUsd\n    evalCostUsd\n    inputTokens\n    outputTokens\n    ownerEmail\n    ownerId\n    ownerName\n    previousCostUsd\n    previewCostUsd\n    productionCostUsd\n    requestCount\n    scheduledCostUsd\n    totalCostUsd\n    unpricedRequestCount\n  }\n": types.CostAgentFieldsFragmentDoc,
@@ -380,23 +374,11 @@ export function graphql(source: "\n  query AppDeploymentRunList($appId: ULID!, $
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
-export function graphql(source: "\n  query AppDeploymentSecretList($appId: ULID!) {\n    appDeploymentSecretList(appId: $appId) {\n      appId\n      createdAt\n      name\n      updatedAt\n    }\n  }\n"): typeof import('./graphql').AppDeploymentSecretListDocument;
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
 export function graphql(source: "\n  mutation DeployApp($input: DeployAppInput!) {\n    deployApp(input: $input) {\n      appId\n      createdAt\n      deploymentId\n      errorCode\n      errorMessage\n      id\n      liveUrl\n      plannedUrl\n      sourceBranch\n      sourceCommitSha\n      status\n      targetKind\n      updatedAt\n    }\n  }\n"): typeof import('./graphql').DeployAppDocument;
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  mutation DeleteAppDeployment($input: DeleteAppDeploymentInput!) {\n    deleteAppDeployment(input: $input) {\n      ok\n    }\n  }\n"): typeof import('./graphql').DeleteAppDeploymentDocument;
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  mutation SetAppDeploymentSecret($input: SetAppDeploymentSecretInput!) {\n    setAppDeploymentSecret(input: $input) {\n      appId\n      createdAt\n      name\n      updatedAt\n    }\n  }\n"): typeof import('./graphql').SetAppDeploymentSecretDocument;
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  mutation DeleteAppDeploymentSecret($input: DeleteAppDeploymentSecretInput!) {\n    deleteAppDeploymentSecret(input: $input) {\n      ok\n    }\n  }\n"): typeof import('./graphql').DeleteAppDeploymentSecretDocument;
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
