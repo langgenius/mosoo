@@ -122,7 +122,7 @@ async function insertDriverInstance(
       lastHeartbeatAt: input.lastHeartbeatAt ?? null,
       processId: null,
       protocol: "orpc-ws",
-      protocolVersion: 1,
+      protocolVersion: 2,
       runtime: "claude-agent-sdk",
       sandboxId: PUBLIC_API_TEST_IDS.sandbox,
       sandboxSessionId: PUBLIC_API_TEST_IDS.ownerSession,

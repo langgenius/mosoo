@@ -111,7 +111,7 @@ async function insertDriverInstance(
       lastHeartbeatAt: null,
       processId: null,
       protocol: "orpc-ws",
-      protocolVersion: 1,
+      protocolVersion: 2,
       runtime: "openai-runtime",
       sandboxId: PUBLIC_API_TEST_IDS.sandbox,
       sandboxSessionId: PUBLIC_API_TEST_IDS.ownerSession,
