@@ -194,6 +194,6 @@ writeStdout("▶ Building driver");
 runVp(["run", "--filter", "agent-driver", "build"]);
 
 writeStdout("▶ Deploying worker");
-run(["deploy", "--env", ENV, "--minify"]);
+run(["deploy", "--env", ENV, "--minify", "--containers-rollout", "immediate"]);
 
 writeStdout("✓ deploy complete");
