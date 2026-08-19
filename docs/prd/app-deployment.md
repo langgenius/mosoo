@@ -21,6 +21,32 @@ Bound Agent URLs are signed bearer capabilities tied to one Deployment and its l
 
 When a bound capability is accepted, the Run records the App, Agent, Deployment, successful Deployment Run, and binding environment/name that delegated that authority. The record never contains the capability URL or signed token and is available only through owner-authorized audit access. It follows the `session_run` lifecycle and is removed with its Run; it has no separate retention store.
 
+## Deployment Identity
+
+A deployed App never holds the owner's account-wide Access Token. Deploying from the signed-in Console or authenticated CLI already authorizes mosoo to act for that App, so mosoo issues the deployed App a narrowly scoped runtime identity automatically: each `[[agents]]` binding in `.mosoo.toml` (`expose = "public_thread"`) becomes one injected environment variable whose value is a bound Agent URL. The Builder never creates, copies, stores, or rotates a mosoo secret for this flow; a redeploy mints a fresh URL and the previous one stops working.
+
+The bound URL carries the whole Public Thread and file workflow, with the same request and response shapes as the [Public Thread API](./public-thread-api-surface.md) and no `Authorization` header:
+
+| Operation                                    | Route under the injected URL                                   |
+| -------------------------------------------- | -------------------------------------------------------------- |
+| Blocking single reply                        | `POST {url}`                                                   |
+| Upload an attachment                         | `POST {url}/files`                                             |
+| Create a Thread (input, resources, `userId`) | `POST {url}/threads`                                           |
+| List this deployment's Threads               | `GET {url}/threads`                                            |
+| Observe a Thread and its last Run            | `GET {url}/threads/{threadId}`                                 |
+| Read or stream public events                 | `GET {url}/threads/{threadId}/events[/stream]`                 |
+| Continue a Thread                            | `POST {url}/threads/{threadId}/events`                         |
+| List attachments and artifacts               | `GET {url}/threads/{threadId}/files`                           |
+| Read artifact metadata / content             | `GET {url}/files/{fileId}`, `GET {url}/files/{fileId}/content` |
+
+The identity is scoped to the owning App, the declared Agent binding, and the active Deployment revision:
+
+- The Agent is fixed by the binding; the deployed App cannot address another Agent or App, and an uploaded file is visible to it only once attached to one of its Threads.
+- Threads created through a Deployment are visible only to that Deployment's capabilities (across its revisions), never to other Deployments or to Threads the owner's Access Token integrations created. The owner keeps full visibility of every Thread through the Console and the Access Token API.
+- `Idempotency-Key` works on create and continue and is shared across the revisions of one Deployment, so a retry after a redeploy replays instead of duplicating work. Every Run started this way records the bound capability provenance and repeats the Deployment authority condition inside the Run insert.
+- Deleting the Deployment, or successfully publishing a revision that removes the binding, immediately rejects every bound operation with `409 agent_not_published`; an unpublished Agent is rejected the same way. Archive, restore, and delete remain owner-only operations.
+- Responses never echo the capability URL or token. The bound URL is a server-side value; it must not reach browsers or client code.
+
 ## Current Availability and Boundary
 
 The console flow, deployment processing, history, retry, and deletion are implemented. Repository evidence does not prove a successful real production deployment or recovery exercise, so the honest claim is **implemented**, not **production-proven**.

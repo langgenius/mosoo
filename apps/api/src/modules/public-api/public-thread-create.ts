@@ -6,6 +6,7 @@ import type { ApiBindings } from "../../platform/cloudflare/worker-types";
 import type { AuthenticatedViewer } from "../auth/application/viewer-auth.service";
 import { fileStore } from "../files/application/file-store";
 import { createAgentSession, queueSessionRun } from "../runtime/application/session-run.service";
+import { createDeploymentCapabilityRunAdmission } from "./deployment-capability-caller.service";
 import { admitPublicThreadCreator } from "./public-thread-admission";
 import type { ThreadCreationAdmission } from "./public-thread-admission";
 import { toPublicThreadSessionSummary } from "./public-thread-api-presenter";
@@ -61,7 +62,7 @@ export async function createPublicThread(
   });
   let createdSessionId: SessionId | null = null;
   const metadata = createPublicApiThreadMetadata({
-    admission,
+    createdBy: admission.createdBy,
     idempotencyKey: request.idempotencyKey,
   });
 
@@ -107,12 +108,19 @@ export async function createPublicThread(
       });
     }
 
+    // A deployment capability stamps its delegation facts on the Run and
+    // repeats the Deployment authority condition inside the Run insert, so a
+    // deletion or revision replacement that commits mid-request cannot create
+    // an owner-billed Run (docs/prd/app-deployment.md).
     const queuedRun = await queueSessionRun({
       bindings: request.bindings,
       executionContext: request.executionContext ?? null,
       input: {
         accessViewer: admission.accessViewer,
         attachmentIds: request.input.fileIds,
+        ...(request.caller.kind === "deployment_capability"
+          ? createDeploymentCapabilityRunAdmission(request.caller.capability)
+          : {}),
         clientRequestId: null,
         prompt: request.input.inputText,
         session: {
@@ -180,8 +188,8 @@ export async function recoverPublicThreadCreation(
   });
   const snapshot = await findPublicThreadSnapshotByIdempotencyKey(request.bindings.DB, {
     agentId: request.agentId,
+    createdBy: admission.createdBy,
     idempotencyKey: request.idempotencyKey,
-    tokenId: admission.tokenId,
   });
 
   if (!snapshot) {
