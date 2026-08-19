@@ -2,6 +2,12 @@
 
 Status: canonical product contract for the current mosoo Alpha direction.
 
+> **Experiment branch:** this branch evaluates a Run-first Harness Marketplace
+> boundary. Its scoped contract, historical evidence, falsification criteria,
+> and source impact map live in
+> [Harness Marketplace Experiment](./prd/harness-marketplace-experiment.md).
+> The experiment is not a production migration and must not be merged as-is.
+
 This document defines what mosoo is building and the boundaries it guarantees. It supersedes older App-hosting, Deployable Repo, Release, Workspace, and Organization-governance language whenever they disagree. Current product notes and code remain the authority for what is shipped today.
 
 This Spec is deliberately narrower than a general-purpose application platform. Exact API schemas, manifest fields, quotas, and internal topology belong in implementation contracts.

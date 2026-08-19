@@ -1,5 +1,11 @@
 # Managed Agent Runtime Architecture
 
+> **Experiment branch:** the public boundary in this branch is Workspace- and
+> Run-first. See the [Harness Marketplace Experiment](./prd/harness-marketplace-experiment.md)
+> for the target topology, semantic delete/keep map, and the explicit Driver
+> protocol compatibility boundary. Internal App and Agent-version names may
+> remain while the branch tests the product thesis.
+
 ## 1. Vision And Principles
 
 mosoo provides an App-scoped control plane for configuring, publishing, running, and observing coding Agents through the console and Public Thread API.
