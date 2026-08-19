@@ -17,8 +17,6 @@ const DOCKER_HOST_ENV_KEY = "DOCKER_HOST";
 const DEV_DOCKER_HOST_ENV_KEY = "MOSOO_API_DEV_DOCKER_HOST";
 const DEV_RUNTIME_PROXY_HOST_ENV_KEY = "MOSOO_API_DEV_RUNTIME_PROXY_HOST";
 const RUNTIME_CONTROL_ORIGIN_ENV_KEY = "MOSOO_RUNTIME_CONTROL_ORIGIN";
-const LARK_SIDECAR_DISABLED_ENV_KEY = "MOSOO_LARK_SIDECAR_DISABLED";
-const LARK_SIDECAR_SECRET_ENV_KEY = "MOSOO_LARK_SIDECAR_SECRET";
 const SCRUB_HOST_PROXY_ENV_KEY = "MOSOO_API_DEV_SCRUB_HOST_PROXY";
 const USE_DEFAULT_DOCKER_ENV_KEY = "MOSOO_API_DEV_USE_DEFAULT_DOCKER";
 const SCHEDULED_HANDLER_PUMP_INTERVAL_ENV_KEY = "MOSOO_API_DEV_SCHEDULED_PUMP_INTERVAL_MS";
@@ -232,50 +230,6 @@ function createRuntimeControlOriginVarArgs(env: NodeJS.ProcessEnv): string[] {
     : ["--var", `${RUNTIME_CONTROL_ORIGIN_ENV_KEY}:${value}`];
 }
 
-function unquoteDevVarValue(value: string): string {
-  const trimmed = value.trim();
-
-  if (
-    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
-    (trimmed.startsWith("'") && trimmed.endsWith("'"))
-  ) {
-    return trimmed.slice(1, -1);
-  }
-
-  return trimmed;
-}
-
-async function readLocalDevVars(): Promise<Record<string, string>> {
-  const devVarsPath = `${apiDir}/.dev.vars`;
-
-  if (!(await Bun.file(devVarsPath).exists())) {
-    return {};
-  }
-
-  const entries: Record<string, string> = {};
-  const content = await Bun.file(devVarsPath).text();
-
-  for (const rawLine of content.split(/\r?\n/u)) {
-    const line = rawLine.trim();
-
-    if (line.length === 0 || line.startsWith("#")) {
-      continue;
-    }
-
-    const separatorIndex = line.indexOf("=");
-
-    if (separatorIndex <= 0) {
-      continue;
-    }
-
-    const key = line.slice(0, separatorIndex).trim();
-    const value = unquoteDevVarValue(line.slice(separatorIndex + 1));
-    entries[key] = value;
-  }
-
-  return entries;
-}
-
 function readNonEmptyEnvValue(env: NodeJS.ProcessEnv, keys: readonly string[]): string | undefined {
   for (const key of keys) {
     const value = env[key]?.trim();
@@ -288,21 +242,8 @@ function readNonEmptyEnvValue(env: NodeJS.ProcessEnv, keys: readonly string[]): 
   return undefined;
 }
 
-async function createWeChatIlinkBaseUrlVarArgs(env: NodeJS.ProcessEnv): Promise<string[]> {
-  const devVars = await readLocalDevVars();
-  const value =
-    readNonEmptyEnvValue(env, ["WECHAT_ILINK_BASE_URL"]) ??
-    readNonEmptyEnvValue(devVars, ["WECHAT_ILINK_BASE_URL"]);
-
-  return typeof value === "string" && value.trim().length > 0
-    ? ["--var", `WECHAT_ILINK_BASE_URL:${value.trim()}`]
-    : [];
-}
-
-// Wrangler dev does not fire `[triggers] crons` automatically; cron-driven flows like
-// channel_final_delivery_job stay queued until something POSTs `/cdn-cgi/handler/scheduled`.
-// This pump mirrors the prod `* * * * *` cron locally so Slack/Discord/Lark/Telegram/WeChat
-// replies drain without manual curls. Returns null when explicitly disabled.
+// Wrangler dev does not fire `[triggers] crons` automatically. This pump mirrors the
+// production schedule locally so maintenance and usage jobs run without manual requests.
 function parseScheduledHandlerPumpIntervalMs(env: NodeJS.ProcessEnv): number | null {
   const raw = env[SCHEDULED_HANDLER_PUMP_INTERVAL_ENV_KEY]?.trim();
   if (raw === undefined || raw.length === 0) {
@@ -329,7 +270,7 @@ function startScheduledHandlerPump(port: string, intervalMs: number): void {
         announced = true;
         writeStderr(
           `[mosoo/api] Local scheduled-handler pump active at ${url} every ${Math.round(intervalMs / 1000)}s. ` +
-            `Mirrors the prod * * * * * cron so cron-picked channel queues drain locally. ` +
+            `Mirrors the production maintenance cron. ` +
             `Set ${SCHEDULED_HANDLER_PUMP_INTERVAL_ENV_KEY}=off to disable.`,
         );
       }
@@ -342,55 +283,6 @@ function startScheduledHandlerPump(port: string, intervalMs: number): void {
     void fire();
     setInterval(() => void fire(), intervalMs);
   }, SCHEDULED_HANDLER_PUMP_BOOT_DELAY_MS);
-}
-
-// The official Lark long-connection SDK is Node-only, so local dev runs it in a
-// sidecar process and authenticates loopback callbacks with a boot secret.
-function shouldStartLarkSidecar(env: NodeJS.ProcessEnv): boolean {
-  const raw = env[LARK_SIDECAR_DISABLED_ENV_KEY]?.trim().toLowerCase();
-  return raw !== "1" && raw !== "true" && raw !== "yes";
-}
-
-function createLarkSidecarVarArgs(secret: string): string[] {
-  return ["--var", `${LARK_SIDECAR_SECRET_ENV_KEY}:${secret}`];
-}
-
-function startLarkSidecar(input: {
-  apiDir: string;
-  env: NodeJS.ProcessEnv;
-  secret: string;
-  workerUrl: string;
-}): void {
-  const child = Bun.spawn([vpBin, "exec", "bun", "bin/lark-ws-sidecar.ts"], {
-    cwd: input.apiDir,
-    env: {
-      ...input.env,
-      MOSOO_API_BASE_URL: input.workerUrl,
-      [LARK_SIDECAR_SECRET_ENV_KEY]: input.secret,
-    },
-    stderr: "inherit",
-    stdin: "inherit",
-    stdout: "inherit",
-  });
-
-  void child.exited.then((code) => {
-    if (code !== 0 && code !== 130 && code !== 143) {
-      writeStderr(`[mosoo/api] Lark WebSocket sidecar exited unexpectedly (code=${code})`);
-    }
-  });
-
-  process.on("exit", () => {
-    try {
-      child.kill();
-    } catch {
-      // best effort
-    }
-  });
-
-  writeStderr(
-    `[mosoo/api] Lark WebSocket sidecar started (pid=${child.pid ?? "?"}, worker=${input.workerUrl}). ` +
-      `Set ${LARK_SIDECAR_DISABLED_ENV_KEY}=1 to disable.`,
-  );
 }
 
 function resolveDevWebOrigin(env: NodeJS.ProcessEnv): string {
@@ -454,16 +346,6 @@ const scheduledPumpIntervalMs = parseScheduledHandlerPumpIntervalMs(wranglerEnv)
 if (scheduledPumpIntervalMs !== null) {
   startScheduledHandlerPump(wranglerPort, scheduledPumpIntervalMs);
 }
-const larkSidecarEnabled = shouldStartLarkSidecar(wranglerEnv);
-const larkSidecarSecret = larkSidecarEnabled ? crypto.randomUUID() : null;
-if (larkSidecarEnabled && larkSidecarSecret) {
-  startLarkSidecar({
-    apiDir,
-    env: wranglerEnv,
-    secret: larkSidecarSecret,
-    workerUrl: `http://127.0.0.1:${wranglerPort}`,
-  });
-}
 const wranglerResult = await run(
   wranglerBin,
   [
@@ -478,8 +360,6 @@ const wranglerResult = await run(
     ...createProviderFetchProxyVarArgs(providerFetchProxy),
     ...createRuntimeControlOriginVarArgs(wranglerEnv),
     ...createRuntimeProxyVarArgs(wranglerEnv),
-    ...(await createWeChatIlinkBaseUrlVarArgs(wranglerEnv)),
-    ...(larkSidecarSecret ? createLarkSidecarVarArgs(larkSidecarSecret) : []),
   ],
   {
     cwd: apiDir,

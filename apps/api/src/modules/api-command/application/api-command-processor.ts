@@ -1,34 +1,11 @@
-import { apiCommandsTable, appDeploymentRunsTable } from "@mosoo/db";
+import { apiCommandsTable } from "@mosoo/db";
 import type { ApiCommandId } from "@mosoo/db";
-import type { AppDeploymentRunId } from "@mosoo/id";
-import { parsePlatformId } from "@mosoo/id";
-import { and, eq, inArray } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 import { createErrorLogContext, logError, logInfo } from "../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../time";
-import { dispatchAppDeploymentRun } from "../../apps/application/app-deployment-executor.service";
-import { ACTIVE_APP_DEPLOYMENT_RUN_STATUSES } from "../../apps/domain/app-deployment-lifecycle";
-import { cleanupOrphanChannelBindingCredentialSecrets } from "../../channels/application/agent-channel-binding-maintenance.service";
-import { resolveAgentChannelBindingContextById } from "../../channels/application/channel-binding-context";
-import { createChannelFinalDeliveryScheduler } from "../../channels/application/channel-final-delivery.service";
-import { createChannelSessionClient } from "../../channels/application/channel-session-command-client";
-import { runDiscordGatewayConnectionMaintenance } from "../../channels/application/discord-gateway-connection-maintenance.service";
-import { runLarkLongConnectionMaintenance } from "../../channels/application/lark-long-connection-maintenance.service";
-import {
-  createSlackAdapterConfig,
-  createSlackChannelSessionClient,
-  resolveSlackChannelBindingContextById,
-} from "../../channels/application/slack-channel-session.service";
-import { runWeChatPollingOwnerMaintenance } from "../../channels/application/wechat-polling-owner-maintenance.service";
-import { parseDiscordCredentials } from "../../channels/discord/discord-credentials";
-import { processDiscordWorkTrigger } from "../../channels/discord/discord-first-party-adapter";
-import { parseLarkCredentials } from "../../channels/lark/lark-credentials";
-import { processLarkWorkTrigger } from "../../channels/lark/lark-first-party-adapter";
-import { processSlackWorkTrigger } from "../../channels/slack/slack-first-party-adapter";
-import { parseTelegramCredentials } from "../../channels/telegram/telegram-credentials";
-import { processTelegramWorkTrigger } from "../../channels/telegram/telegram-first-party-adapter";
 import {
   parseCostLedgerReconciliationActivationMode,
   reconcileCostLedgerPage,
@@ -37,10 +14,7 @@ import { runUsageDailyRollup } from "../../cost/application/cost-rollup.service"
 import { buildEnvironmentPackageArtifact } from "../../environments/application/environment-package-artifact-build.service";
 import { dispatchQueuedSessionRun } from "../../runtime/application/session-runs/dispatch-queued-run.service";
 import { runSandboxMaintenance } from "../../runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-maintenance.service";
-import {
-  APP_DEPLOYMENT_RUN_DISPATCH_DEDUPE_PREFIX,
-  enqueueCostLedgerReconciliationCommand,
-} from "./api-command-enqueue";
+import { enqueueCostLedgerReconciliationCommand } from "./api-command-enqueue";
 import {
   API_COMMAND_LEASE_RENEWAL_INTERVAL_MS,
   claimApiCommand,
@@ -55,18 +29,11 @@ import { parseApiCommandMessage } from "./api-command-message";
 import type { ApiCommandMessage } from "./api-command-message";
 import { ApiCommandPayloadError, parseApiCommandPayload } from "./api-command-payload";
 import type {
-  AppDeploymentRunDispatchCommandPayload,
-  ChannelWorkTriggerCommandPayload,
   CostLedgerReconciliationCommandPayload,
   EnvironmentPackageArtifactBuildCommandPayload,
   ScheduledMaintenanceCommandPayload,
   SessionRunDispatchCommandPayload,
 } from "./api-command-payload";
-import {
-  APP_DEPLOYMENT_RUN_DISPATCH_MAX_ATTEMPTS,
-  APP_DEPLOYMENT_RUN_DISPATCH_RETRY_EXHAUSTED_CODE,
-  createAppDeploymentDispatchRetryExhaustedMessage,
-} from "./api-command-policy";
 
 const API_COMMAND_RETRY_DELAY_SECONDS = 30;
 
@@ -104,13 +71,7 @@ async function processScheduledMaintenanceCommand(
   payload: ScheduledMaintenanceCommandPayload,
 ): Promise<void> {
   const scheduledAt = new Date(payload.scheduledTime);
-  const tasks: Promise<unknown>[] = [
-    runSandboxMaintenance(bindings),
-    runDiscordGatewayConnectionMaintenance(bindings, scheduledAt),
-    cleanupOrphanChannelBindingCredentialSecrets(bindings, scheduledAt),
-    runLarkLongConnectionMaintenance(bindings, scheduledAt),
-    runWeChatPollingOwnerMaintenance(bindings, scheduledAt, { executionContext: null }),
-  ];
+  const tasks: Promise<unknown>[] = [runSandboxMaintenance(bindings)];
 
   if (shouldRunUsageDailyRollup(scheduledAt)) {
     tasks.push(runUsageDailyRollup(bindings, scheduledAt));
@@ -167,221 +128,6 @@ async function processCostLedgerReconciliationCommand(
   });
 }
 
-async function processSlackChannelWorkTrigger(
-  bindings: ApiBindings,
-  payload: Extract<ChannelWorkTriggerCommandPayload, { provider: "slack" }>,
-): Promise<void> {
-  const binding = await resolveSlackChannelBindingContextById(bindings, {
-    bindingId: payload.bindingId,
-  });
-
-  if (!binding) {
-    logInfo("api-command.channel_work_trigger.binding_not_found", {
-      bindingId: payload.bindingId,
-      provider: payload.provider,
-    });
-    return;
-  }
-
-  if (binding.agentStatus !== "published") {
-    logInfo("api-command.channel_work_trigger.agent_unpublished", {
-      agentId: binding.agentId,
-      bindingId: binding.bindingId,
-      eventId: payload.trigger.eventId,
-      provider: payload.provider,
-    });
-    return;
-  }
-
-  await processSlackWorkTrigger({
-    config: createSlackAdapterConfig({
-      binding,
-      sessionLinkBaseUrl: bindings.WEB_ORIGIN,
-    }),
-    finalDeliveryScheduler: createChannelFinalDeliveryScheduler(bindings),
-    sessionClient: createSlackChannelSessionClient({
-      binding,
-      bindings,
-      executionContext: null,
-      requestUrl: payload.requestUrl,
-    }),
-    trigger: payload.trigger,
-  });
-}
-
-async function processTelegramChannelWorkTrigger(
-  bindings: ApiBindings,
-  payload: Extract<ChannelWorkTriggerCommandPayload, { provider: "telegram" }>,
-): Promise<void> {
-  const binding = await resolveAgentChannelBindingContextById(bindings, {
-    bindingId: payload.bindingId,
-    provider: payload.provider,
-  });
-
-  if (!binding) {
-    logInfo("api-command.channel_work_trigger.binding_not_found", {
-      bindingId: payload.bindingId,
-      provider: payload.provider,
-    });
-    return;
-  }
-
-  if (binding.agentStatus !== "published") {
-    logInfo("api-command.channel_work_trigger.agent_unpublished", {
-      agentId: binding.agentId,
-      bindingId: binding.bindingId,
-      eventId: payload.trigger.eventId,
-      provider: payload.provider,
-    });
-    return;
-  }
-
-  const credentials = parseTelegramCredentials(binding.credentialsJson);
-
-  await processTelegramWorkTrigger({
-    config: {
-      agentId: binding.agentId,
-      bindingId: binding.bindingId,
-      botToken: credentials.botToken,
-      sessionLinkBaseUrl: bindings.WEB_ORIGIN,
-    },
-    finalDeliveryScheduler: createChannelFinalDeliveryScheduler(bindings),
-    sessionClient: createChannelSessionClient({
-      binding,
-      bindings,
-      executionContext: null,
-      requestUrl: payload.requestUrl,
-    }),
-    trigger: payload.trigger,
-  });
-}
-
-async function processDiscordChannelWorkTrigger(
-  bindings: ApiBindings,
-  payload: Extract<ChannelWorkTriggerCommandPayload, { provider: "discord" }>,
-): Promise<void> {
-  const binding = await resolveAgentChannelBindingContextById(bindings, {
-    bindingId: payload.bindingId,
-    provider: payload.provider,
-  });
-
-  if (!binding) {
-    logInfo("api-command.channel_work_trigger.binding_not_found", {
-      bindingId: payload.bindingId,
-      provider: payload.provider,
-    });
-    return;
-  }
-
-  if (binding.agentStatus !== "published") {
-    logInfo("api-command.channel_work_trigger.agent_unpublished", {
-      agentId: binding.agentId,
-      bindingId: binding.bindingId,
-      eventId: payload.trigger.eventId,
-      provider: payload.provider,
-    });
-    return;
-  }
-
-  const credentials = parseDiscordCredentials(binding.credentialsJson);
-  const result = await processDiscordWorkTrigger({
-    config: {
-      agentId: binding.agentId,
-      bindingId: binding.bindingId,
-      botToken: credentials.botToken,
-      sessionLinkBaseUrl: bindings.WEB_ORIGIN,
-    },
-    finalDeliveryScheduler: createChannelFinalDeliveryScheduler(bindings),
-    sessionClient: createChannelSessionClient({
-      binding,
-      bindings,
-      executionContext: null,
-      requestUrl: payload.requestUrl,
-    }),
-    trigger: payload.trigger,
-  });
-
-  if (!result.ok) {
-    const error = new Error("Discord work trigger processing failed.");
-    error.name = result.code;
-    throw error;
-  }
-}
-
-async function processLarkChannelWorkTrigger(
-  bindings: ApiBindings,
-  payload: Extract<ChannelWorkTriggerCommandPayload, { provider: "lark" }>,
-): Promise<void> {
-  const binding = await resolveAgentChannelBindingContextById(bindings, {
-    bindingId: payload.bindingId,
-    provider: payload.provider,
-  });
-
-  if (!binding) {
-    logInfo("api-command.channel_work_trigger.binding_not_found", {
-      bindingId: payload.bindingId,
-      provider: payload.provider,
-    });
-    return;
-  }
-
-  if (binding.agentStatus !== "published") {
-    logInfo("api-command.channel_work_trigger.agent_unpublished", {
-      agentId: binding.agentId,
-      bindingId: binding.bindingId,
-      eventId: payload.trigger.eventId,
-      provider: payload.provider,
-    });
-    return;
-  }
-
-  const credentials = parseLarkCredentials(binding.credentialsJson);
-
-  await processLarkWorkTrigger({
-    config: {
-      agentId: binding.agentId,
-      appId: credentials.appId,
-      appSecret: credentials.appSecret,
-      bindingId: binding.bindingId,
-      connectionMode: credentials.connectionMode,
-      domain: credentials.domain,
-      sessionLinkBaseUrl: bindings.WEB_ORIGIN,
-    },
-    finalDeliveryScheduler: createChannelFinalDeliveryScheduler(bindings),
-    sessionClient: createChannelSessionClient({
-      binding,
-      bindings,
-      executionContext: null,
-      requestUrl: payload.requestUrl,
-    }),
-    trigger: payload.trigger,
-  });
-}
-
-async function processChannelWorkTriggerCommand(
-  bindings: ApiBindings,
-  payload: ChannelWorkTriggerCommandPayload,
-): Promise<void> {
-  switch (payload.provider) {
-    case "discord": {
-      await processDiscordChannelWorkTrigger(bindings, payload);
-      return;
-    }
-    case "lark": {
-      await processLarkChannelWorkTrigger(bindings, payload);
-      return;
-    }
-    case "slack": {
-      await processSlackChannelWorkTrigger(bindings, payload);
-      return;
-    }
-    case "telegram": {
-      await processTelegramChannelWorkTrigger(bindings, payload);
-      return;
-    }
-  }
-}
-
 async function processSessionRunDispatchCommand(
   bindings: ApiBindings,
   payload: SessionRunDispatchCommandPayload,
@@ -403,99 +149,6 @@ async function processSessionRunDispatchCommand(
   });
 }
 
-async function failActiveAppDeploymentRun(
-  bindings: ApiBindings,
-  runId: AppDeploymentRunId,
-  input: { errorCode: string; errorMessage: string; nowMs: number },
-): Promise<void> {
-  await getAppDatabase(bindings.DB)
-    .update(appDeploymentRunsTable)
-    .set({
-      errorCode: input.errorCode,
-      errorMessage: input.errorMessage,
-      status: "failed",
-      updatedAt: input.nowMs,
-    })
-    .where(
-      and(
-        eq(appDeploymentRunsTable.id, runId),
-        inArray(appDeploymentRunsTable.status, ACTIVE_APP_DEPLOYMENT_RUN_STATUSES),
-      ),
-    )
-    .run();
-}
-
-async function failAppDeploymentRunFromPayloadJson(
-  bindings: ApiBindings,
-  input: {
-    errorCode: string;
-    errorMessage: string;
-    fallbackDedupeKey?: string;
-    nowMs: number;
-    payloadJson: string;
-  },
-  logEventName?: string,
-): Promise<void> {
-  try {
-    const runId = readAppDeploymentRunIdFromPayload(input);
-
-    if (runId === null) {
-      return;
-    }
-
-    await failActiveAppDeploymentRun(bindings, runId, input);
-  } catch (error) {
-    if (logEventName === undefined) {
-      throw error;
-    }
-
-    logError(logEventName, {
-      ...createErrorLogContext(error),
-      errorCode: getErrorCode(error),
-    });
-  }
-}
-
-function readAppDeploymentRunIdFromPayload(input: {
-  fallbackDedupeKey?: string;
-  payloadJson: string;
-}): AppDeploymentRunId | null {
-  try {
-    return (
-      parseApiCommandPayload(
-        "app_deployment_run_dispatch",
-        input.payloadJson,
-      ) as AppDeploymentRunDispatchCommandPayload
-    ).appDeploymentRunId;
-  } catch (error) {
-    logError("api-command.app_deployment_run_payload_invalid", {
-      ...createErrorLogContext(error),
-      errorCode: getErrorCode(error),
-    });
-  }
-
-  if (input.fallbackDedupeKey === undefined) {
-    return null;
-  }
-
-  if (!input.fallbackDedupeKey.startsWith(APP_DEPLOYMENT_RUN_DISPATCH_DEDUPE_PREFIX)) {
-    return null;
-  }
-
-  try {
-    return parsePlatformId<AppDeploymentRunId>(
-      input.fallbackDedupeKey.slice(APP_DEPLOYMENT_RUN_DISPATCH_DEDUPE_PREFIX.length),
-      "app deployment run dispatch dedupe key",
-    );
-  } catch (error) {
-    logError("api-command.app_deployment_run_dedupe_invalid", {
-      ...createErrorLogContext(error),
-      errorCode: getErrorCode(error),
-    });
-    return null;
-  }
-}
-
 async function processClaimedApiCommand(
   bindings: ApiBindings,
   claim: ApiCommandClaim,
@@ -504,40 +157,27 @@ async function processClaimedApiCommand(
   const payload = parseApiCommandPayload(claim.kind, claim.payloadJson);
 
   switch (claim.kind) {
-    case "app_deployment_run_dispatch": {
-      await dispatchAppDeploymentRun(bindings, payload as AppDeploymentRunDispatchCommandPayload);
-      return;
-    }
-    case "channel_work_trigger": {
-      await processChannelWorkTriggerCommand(bindings, payload as ChannelWorkTriggerCommandPayload);
-      return;
-    }
-    case "cost_ledger_reconciliation": {
+    case "cost_ledger_reconciliation":
       await processCostLedgerReconciliationCommand(
         bindings,
         payload as CostLedgerReconciliationCommandPayload,
         processedAtMs,
       );
       return;
-    }
-    case "environment_package_artifact_build": {
+    case "environment_package_artifact_build":
       await buildEnvironmentPackageArtifact(
         bindings,
         payload as EnvironmentPackageArtifactBuildCommandPayload,
       );
       return;
-    }
-    case "scheduled_maintenance": {
+    case "scheduled_maintenance":
       await processScheduledMaintenanceCommand(
         bindings,
         payload as ScheduledMaintenanceCommandPayload,
       );
       return;
-    }
-    case "session_run_dispatch": {
+    case "session_run_dispatch":
       await processSessionRunDispatchCommand(bindings, payload as SessionRunDispatchCommandPayload);
-      return;
-    }
   }
 }
 
@@ -611,11 +251,10 @@ export async function processApiCommandMessage(
   }
 
   const ownerId = createClaimOwnerId(message);
-  const startMs = nowMs();
   const claim = await claimApiCommand({
     commandId,
     database: bindings.DB,
-    nowMs: startMs,
+    nowMs: nowMs(),
     ownerId,
   });
 
@@ -644,55 +283,6 @@ export async function processApiCommandMessage(
       errorCode,
       kind: claim.kind,
     });
-
-    const appDeploymentRunHasTerminalError =
-      claim.kind === "app_deployment_run_dispatch" &&
-      (error instanceof ApiCommandPayloadError ||
-        (error instanceof Error &&
-          (error.name === "AppDeploymentDetectionError" ||
-            error.name === "AppDeploymentNonRetryableError")));
-    const appDeploymentRunRetryExhausted =
-      claim.kind === "app_deployment_run_dispatch" &&
-      !appDeploymentRunHasTerminalError &&
-      claim.attemptCount >= APP_DEPLOYMENT_RUN_DISPATCH_MAX_ATTEMPTS;
-    const shouldFailAppDeploymentRun =
-      appDeploymentRunHasTerminalError || appDeploymentRunRetryExhausted;
-
-    if (shouldFailAppDeploymentRun) {
-      const failedAtMs = nowMs();
-      const failureCode = appDeploymentRunRetryExhausted
-        ? APP_DEPLOYMENT_RUN_DISPATCH_RETRY_EXHAUSTED_CODE
-        : errorCode;
-      const failureMessage = appDeploymentRunRetryExhausted
-        ? createAppDeploymentDispatchRetryExhaustedMessage({
-            attemptCount: claim.attemptCount,
-            lastErrorMessage: errorMessage,
-          })
-        : errorMessage;
-
-      await failAppDeploymentRunFromPayloadJson(
-        bindings,
-        {
-          errorCode: failureCode,
-          errorMessage: failureMessage,
-          fallbackDedupeKey: claim.dedupeKey,
-          nowMs: failedAtMs,
-          payloadJson: claim.payloadJson,
-        },
-        "api-command.app_deployment_run_fail_failed",
-      );
-
-      await markApiCommandFailed({
-        commandId,
-        database: bindings.DB,
-        errorCode: failureCode,
-        errorMessage: failureMessage,
-        nowMs: failedAtMs,
-        ownerId,
-      });
-      message.ack();
-      return;
-    }
 
     if (error instanceof ApiCommandPayloadError) {
       await markApiCommandFailed({
@@ -726,35 +316,17 @@ export async function processApiCommandDeadLetterMessage(
 ): Promise<void> {
   try {
     const { commandId } = parseApiCommandMessage(message.body);
-    const deadLetteredAtMs = nowMs();
     const command =
       (await getAppDatabase(bindings.DB)
         .select({
-          dedupeKey: apiCommandsTable.dedupeKey,
           kind: apiCommandsTable.kind,
           lastErrorCode: apiCommandsTable.lastErrorCode,
           lastErrorMessage: apiCommandsTable.lastErrorMessage,
-          payloadJson: apiCommandsTable.payloadJson,
         })
         .from(apiCommandsTable)
         .where(eq(apiCommandsTable.id, commandId))
         .limit(1)
         .get()) ?? null;
-
-    if (command?.kind === "app_deployment_run_dispatch") {
-      await failAppDeploymentRunFromPayloadJson(
-        bindings,
-        {
-          errorCode: "queue_dead_lettered",
-          errorMessage: "Deployment dispatch reached the queue dead-letter consumer.",
-          fallbackDedupeKey: command.dedupeKey,
-          nowMs: deadLetteredAtMs,
-          payloadJson: command.payloadJson,
-        },
-        "api-command.app_deployment_run_dead_letter_fail_failed",
-      );
-    }
-
     const preserveArtifactFailure = command?.kind === "environment_package_artifact_build";
 
     await markApiCommandDeadLettered({
@@ -768,7 +340,7 @@ export async function processApiCommandDeadLetterMessage(
         preserveArtifactFailure && command.lastErrorMessage
           ? command.lastErrorMessage
           : "API command reached the queue dead-letter consumer.",
-      nowMs: deadLetteredAtMs,
+      nowMs: nowMs(),
     });
   } catch (error) {
     logError("api-command.dead_letter_invalid", {

@@ -1,7 +1,6 @@
 export * from "./schema/agent.schema";
 export * from "./schema/api-command.schema";
 export * from "./schema/auth.schema";
-export * from "./schema/channel.schema";
 export * from "./schema/email.schema";
 export * from "./schema/environment.schema";
 export * from "./schema/file.schema";

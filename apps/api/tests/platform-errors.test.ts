@@ -16,8 +16,8 @@ import type { ApiErrorCode, ApiErrorStatus } from "../src/platform/errors";
 describe("platform error taxonomy", () => {
   test("maps public error codes to finite HTTP statuses", () => {
     expect(getApiErrorStatusForCode(API_ERROR_CODE.notFound)).toBe(API_ERROR_STATUS.notFound);
-    expect(getApiErrorStatusForCode(API_ERROR_CODE.wechatQrStartFailed)).toBe(
-      API_ERROR_STATUS.badGateway,
+    expect(getApiErrorStatusForCode(API_ERROR_CODE.environmentArtifactFailed)).toBe(
+      API_ERROR_STATUS.conflict,
     );
     expect(
       createApiError(API_ERROR_CODE.websocketRequired, "Expected WebSocket upgrade."),

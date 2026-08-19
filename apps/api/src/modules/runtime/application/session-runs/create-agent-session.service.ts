@@ -55,18 +55,10 @@ export interface ChannelSessionTriggeredByMetadata {
 
 export interface AgentSessionMetadata {
   public_api?: {
-    created_by:
-      | {
-          token_id: string;
-          token_label: string;
-        }
-      | {
-          binding_env: string;
-          binding_name: string;
-          deployment_id: string;
-          deployment_run_id: string;
-          kind: "deployment_capability";
-        };
+    created_by: {
+      token_id: string;
+      token_label: string;
+    };
     idempotency_key: string | null;
     source: "public_api";
   };

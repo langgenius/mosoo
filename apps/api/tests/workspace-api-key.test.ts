@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
 import { PUBLIC_API_PREFIX } from "@mosoo/contracts/public-api";
-import type { WorkspaceApiKeyId } from "@mosoo/id";
 
 import { createHttpApp } from "../src/adapters/http/create-http-app";
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
@@ -73,7 +72,7 @@ describe("Workspace API keys", () => {
     });
 
     await revokeWorkspaceApiKey(database, OWNER, {
-      keyId: created.key.id as WorkspaceApiKeyId,
+      keyId: created.key.id,
       workspaceId: PUBLIC_API_TEST_IDS.app,
     });
 

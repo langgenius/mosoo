@@ -51,7 +51,7 @@ export function EnvironmentListTable({
   const { t } = useTranslation();
 
   // Delete is destructive and irreversible, so it sits behind a confirm dialog
-  // (same convention as deleting a deployment in deploy-actions.tsx).
+  // Keep destructive actions explicit and separate from row navigation.
   const [confirmingDelete, setConfirmingDelete] = useState<EnvironmentSummary | null>(null);
 
   function confirmDelete(): void {

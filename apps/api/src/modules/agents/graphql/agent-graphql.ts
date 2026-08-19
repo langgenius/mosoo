@@ -4,11 +4,6 @@ import type { AgentId, AppId } from "@mosoo/id";
 import type { GraphQLModule } from "../../../adapters/graphql/graphql-module";
 import { agentGraphQLSpec } from "../../../adapters/graphql/graphql-module-specs";
 import {
-  recreateSandbox,
-  resetAgentState,
-  restartDriver,
-} from "../../runtime/application/runtime-state-operations.service";
-import {
   createAgent,
   deleteAgent,
   publishAgent,
@@ -50,10 +45,6 @@ interface PublishAgentArgs {
   input: Parameters<typeof publishAgent>[2];
 }
 
-interface RuntimeStateOperationArgs {
-  input: Parameters<typeof restartDriver>[2];
-}
-
 interface UpdateAgentConfigArgs {
   input: Parameters<typeof updateAgentConfig>[2];
 }
@@ -85,12 +76,6 @@ export const agentGraphQLModule = {
       importAgentPackage(context.bindings, context.viewer, args.input),
     publishAgent: async (_parent, args: PublishAgentArgs, context) =>
       publishAgent(context.bindings, context.viewer, args.input),
-    recreateSandbox: async (_parent, args: RuntimeStateOperationArgs, context) =>
-      recreateSandbox(context.bindings, context.viewer, args.input),
-    resetAgentState: async (_parent, args: RuntimeStateOperationArgs, context) =>
-      resetAgentState(context.bindings, context.viewer, args.input),
-    restartDriver: async (_parent, args: RuntimeStateOperationArgs, context) =>
-      restartDriver(context.bindings, context.viewer, args.input),
     unpublishAgent: async (_parent, args: AppAgentIdArgs, context) =>
       unpublishAgent(context.bindings.DB, context.viewer, {
         agentId: parseAgentId(args.agentId),

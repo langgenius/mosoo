@@ -66,7 +66,7 @@ describe("parseExpectedTableNames", () => {
     const snapshot = await Bun.file(new URL(snapshotFilename, metaDir)).text();
     const tableNames = parseExpectedTableNames(snapshot);
 
-    expect(tableNames).toContain("bound_agent_call_idempotency_key");
+    expect(tableNames).toContain("api_command");
     expect(tableNames).toContain("usage_event_rollup_receipt");
   });
 });

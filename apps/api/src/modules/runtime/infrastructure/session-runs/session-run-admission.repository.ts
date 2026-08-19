@@ -30,13 +30,11 @@ import {
 import type { AppDatabase } from "../../../../platform/db/drizzle";
 import type { PreparedApiCommand } from "../../../api-command/application/api-command-ledger";
 import { createSessionRuntimeEventProjection } from "../../../sessions/domain/session-runtime-event-projection";
-import type { BoundCapabilityRunProvenance } from "../../domain/bound-capability-run-provenance";
 import { ACTIVE_SESSION_RUN_STATUSES } from "../../domain/session-run-lifecycle.machine";
 import { createSessionStatusTransitionPatch } from "./session-lifecycle-projection.repository";
 
 interface QueuedRunAdmissionRecord {
   agentId: AgentId;
-  boundCapabilityProvenance?: BoundCapabilityRunProvenance;
   createdBy: AccountId;
   deploymentVersionId: AgentDeploymentVersionId | null;
   deploymentVersionNumber: number | null;
@@ -238,30 +236,6 @@ function createRunInsertQuery(db: AppDatabase, input: CommitQueuedSessionRunAdmi
     db
       .select({
         agentId: selectedValue(input.run.agentId, "agent_id"),
-        boundCapabilityAgentId: selectedValue(
-          input.run.boundCapabilityProvenance?.agentId ?? null,
-          "bound_capability_agent_id",
-        ),
-        boundCapabilityAppId: selectedValue(
-          input.run.boundCapabilityProvenance?.appId ?? null,
-          "bound_capability_app_id",
-        ),
-        boundCapabilityBindingEnv: selectedValue(
-          input.run.boundCapabilityProvenance?.bindingEnv ?? null,
-          "bound_capability_binding_env",
-        ),
-        boundCapabilityBindingName: selectedValue(
-          input.run.boundCapabilityProvenance?.bindingName ?? null,
-          "bound_capability_binding_name",
-        ),
-        boundCapabilityDeploymentId: selectedValue(
-          input.run.boundCapabilityProvenance?.deploymentId ?? null,
-          "bound_capability_deployment_id",
-        ),
-        boundCapabilityDeploymentRunId: selectedValue(
-          input.run.boundCapabilityProvenance?.deploymentRunId ?? null,
-          "bound_capability_deployment_run_id",
-        ),
         completedAt: selectedValue(null, "completed_at"),
         createdAt: selectedValue(input.run.timestampMs, "created_at"),
         createdByAccountId: selectedValue(input.run.createdBy, "created_by_account_id"),

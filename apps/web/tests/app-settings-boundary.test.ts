@@ -45,9 +45,9 @@ describe("App settings boundary", () => {
     expect(settingsNav).toContain('labelKey: "settings.account"');
     expect(settingsNav).not.toContain('label: "General"');
     expect(settingsNav).not.toContain('path: "/settings/app"');
-    expect(primaryNav).toContain('t("nav.settings")');
+    expect(primaryNav).toContain('t("nav.workspaceSettings")');
     expect(primaryNav).not.toContain('label: "App usage"');
-    expect(primaryNav).toContain('path: "/app-settings"');
+    expect(primaryNav).toContain('path: "/app-settings/general"');
     expect(appSettingsNav).toContain('labelKey: "settings.general"');
     expect(appSettingsNav).toContain('labelKey: "appSettings.usage"');
     expect(appSettingsNav).toContain('path: "/app-settings/general"');
@@ -116,7 +116,7 @@ describe("App settings boundary", () => {
 
     expect(accountMenu).toContain('to="/settings"');
     expect(accountMenu).not.toContain('to="/apps"');
-    expect(primaryNav).toContain('t("nav.settings")');
-    expect(primaryNav).toContain('path: "/app-settings"');
+    expect(primaryNav).toContain('t("nav.workspaceSettings")');
+    expect(primaryNav).toContain('path: "/app-settings/general"');
   });
 });

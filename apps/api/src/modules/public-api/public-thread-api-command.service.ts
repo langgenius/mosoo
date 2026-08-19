@@ -11,7 +11,6 @@ import { eq } from "drizzle-orm";
 
 import type { ApiBindings } from "../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../platform/db/drizzle";
-import type { PublicApiCaller } from "../auth/application/public-api-caller.service";
 import type { AuthenticatedViewer } from "../auth/application/viewer-auth.service";
 import { sendAgentSessionEvents } from "../runtime/application/session-run.service";
 import {
@@ -19,7 +18,6 @@ import {
   deleteAgentSession,
   unarchiveAgentSession,
 } from "../sessions/application/session-lifecycle-mutation.service";
-import { createDeploymentCapabilityRunAdmission } from "./deployment-capability-caller.service";
 import { publicNotFound } from "./public-api-errors";
 import {
   toPublicThreadEventBatch,
@@ -63,7 +61,7 @@ async function getAccountViewer(
 
 export interface SendPublicThreadSessionEventsRequest {
   bindings: ApiBindings;
-  caller: PublicApiCaller;
+  caller: AuthenticatedViewer;
   executionContext: Pick<ExecutionContext, "waitUntil"> | null;
   input: PublicThreadApiSendEventsRequest;
   requestUrl: string;
@@ -72,19 +70,19 @@ export interface SendPublicThreadSessionEventsRequest {
 
 export interface PublicThreadSessionMutationRequest {
   bindings: ApiBindings;
-  caller: PublicApiCaller;
+  caller: AuthenticatedViewer;
   threadId: PublicThreadId;
 }
 
 export interface UnarchivePublicThreadSessionRequest {
-  caller: PublicApiCaller;
+  caller: AuthenticatedViewer;
   database: D1Database;
   threadId: PublicThreadId;
 }
 
 async function toAgentSessionEventInput(input: {
   bindings: ApiBindings;
-  caller: PublicApiCaller;
+  caller: AuthenticatedViewer;
   event: PublicThreadEventInput;
   threadId: PublicThreadId;
 }): Promise<AgentSessionEventInput> {
@@ -134,17 +132,9 @@ export async function sendPublicThreadSessionEvents(
       appId: admission.session.app_id,
       sessionId,
     },
-    options: {
-      accessViewer,
-      actionAuthorization: "admitted",
-      // Follow-up Runs started through a deployment capability carry the same
-      // provenance and D1 revocation fence as the Thread's first Run.
-      ...(request.caller.kind === "deployment_capability"
-        ? { boundCapability: createDeploymentCapabilityRunAdmission(request.caller.capability) }
-        : {}),
-    },
+    options: { accessViewer, actionAuthorization: "admitted" },
     requestUrl: request.requestUrl,
-    viewer: request.caller.viewer,
+    viewer: request.caller,
   });
   return toPublicThreadEventBatch({
     batch,
@@ -169,7 +159,7 @@ export async function archivePublicThreadSession(
     bindings: request.bindings,
     appId: admission.session.app_id,
     sessionId,
-    viewer: request.caller.viewer,
+    viewer: request.caller,
   });
 }
 
@@ -187,7 +177,7 @@ export async function unarchivePublicThreadSession(
     database: request.database,
     appId: admission.session.app_id,
     sessionId,
-    viewer: request.caller.viewer,
+    viewer: request.caller,
   });
 }
 
@@ -205,6 +195,6 @@ export async function deletePublicThreadSession(
     bindings: request.bindings,
     appId: admission.session.app_id,
     sessionId,
-    viewer: request.caller.viewer,
+    viewer: request.caller,
   });
 }

@@ -7,7 +7,6 @@ import {
   processApiCommandDeadLetterMessage,
   processApiCommandMessage,
 } from "../../modules/api-command/application/api-command-processor";
-import type { ChannelFinalDeliveryMessage } from "../../modules/channels/application/channel-final-delivery-message";
 import type { ApiBindings } from "./worker-types";
 
 interface ApiHttpApp {
@@ -74,16 +73,6 @@ export function createApiWorker(): ExportedHandler<ApiBindings> {
         }
 
         return;
-      }
-
-      if (isQueue("channel-final-delivery")) {
-        const { processChannelFinalDeliveryMessage } =
-          await import("../../modules/channels/application/channel-final-delivery.service");
-        const channelBatch = batch as MessageBatch<ChannelFinalDeliveryMessage>;
-
-        for (const message of channelBatch.messages) {
-          await processChannelFinalDeliveryMessage(env, message);
-        }
       }
     },
   } satisfies ExportedHandler<ApiBindings>;

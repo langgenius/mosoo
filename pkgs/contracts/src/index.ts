@@ -5,7 +5,6 @@ export * from "./agent/agent-manifest.contract";
 export * from "./agent/agent-manifest-parser.contract";
 export * from "./agent/agent-manifest-serializer.contract";
 export type * from "./auth/auth.contract";
-export * from "./channel/channel.contract";
 export type * from "./environment/environment.contract";
 export * from "./harness/harness.contract";
 export * from "./file/file.contract";

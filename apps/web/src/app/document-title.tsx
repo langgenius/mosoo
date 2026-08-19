@@ -10,6 +10,7 @@ const DEFAULT_TITLE_TRANSLATIONS: Record<string, string> = {
   "pageTitle.apps": "Apps",
   "pageTitle.mcpAuth": "MCP authorization",
   "pageTitle.appSettings": "App settings",
+  "pageTitle.apiKeys": "API keys",
   "pageTitle.usage": "Usage",
   "pageTitle.accessTokens": "Access tokens",
   "pageTitle.profile": "Profile",
@@ -24,7 +25,6 @@ const DEFAULT_TITLE_TRANSLATIONS: Record<string, string> = {
   "pageTitle.agents": "Agents",
   "pageTitle.files": "Files",
   "pageTitle.cliAuth": "CLI authorization",
-  "pageTitle.deploymentPreview": "Deployment preview",
   "pageTitle.onboarding": "Onboarding",
   "pageTitle.signIn": "Sign in",
   "pageTitle.orgSettings": "Org settings",
@@ -41,6 +41,7 @@ interface DocumentTitleRule {
 
 const DOCUMENT_TITLE_RULES: DocumentTitleRule[] = [
   { path: "/integrations/mcp/oauth-complete", scope: "app", titleKey: "pageTitle.mcpAuth" },
+  { path: "/api-keys", scope: "app", titleKey: "pageTitle.apiKeys" },
   { path: "/app-settings/general", scope: "app", titleKey: "pageTitle.appSettings" },
   { path: "/app-settings/usage", scope: "app", titleKey: "pageTitle.usage" },
   { path: "/app-settings", scope: "app", titleKey: "pageTitle.appSettings" },
@@ -58,7 +59,6 @@ const DOCUMENT_TITLE_RULES: DocumentTitleRule[] = [
   { path: "/agent", scope: "app", titleKey: "pageTitle.agents" },
   { path: "/files", scope: "app", titleKey: "pageTitle.files" },
   { path: "/cli-auth", scope: "global", titleKey: "pageTitle.cliAuth" },
-  { path: "/v0-deploy-preview", scope: "global", titleKey: "pageTitle.deploymentPreview" },
   { path: "/onboarding", scope: "global", titleKey: "pageTitle.onboarding" },
   { path: "/login", scope: "global", titleKey: "pageTitle.signIn" },
   { path: "/org/settings", scope: "org", titleKey: "pageTitle.orgSettings" },

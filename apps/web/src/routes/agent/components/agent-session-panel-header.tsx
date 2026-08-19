@@ -1,4 +1,4 @@
-import { Plus, RotateCcw } from "lucide-react";
+import { Plus } from "lucide-react";
 import type React from "react";
 
 import { useTranslation } from "@/shared/i18n";
@@ -6,7 +6,6 @@ import { cn } from "@/shared/lib/class-names";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 
-import type { SessionControlMode } from "./agent-session-panel-rules";
 import { sessionIndicatorClassName } from "./agent-session-panel-status";
 import type { SessionPill } from "./agent-session-panel-status";
 
@@ -32,7 +31,6 @@ export function AgentSessionPanelHeader({
   onSessionControlClick,
   pill,
   reconnectingSubtitle,
-  sessionControlMode,
   sending,
   sessionCount,
   tone,
@@ -42,15 +40,11 @@ export function AgentSessionPanelHeader({
   onSessionControlClick: () => Promise<void>;
   pill: SessionPill;
   reconnectingSubtitle: string | null;
-  sessionControlMode: SessionControlMode;
   sending: boolean;
   sessionCount: number;
   tone: "preview" | "consume";
 }) {
   const { t } = useTranslation();
-  const SessionControlIcon = sessionControlMode === "reset" ? RotateCcw : Plus;
-  const sessionControlLabel =
-    sessionControlMode === "reset" ? t("agent.resetChat") : t("agent.newSession");
 
   return (
     <div className="border-border-subtle flex h-10 shrink-0 items-center gap-2 border-b bg-white px-4">
@@ -72,7 +66,7 @@ export function AgentSessionPanelHeader({
         <span className="text-muted-foreground min-w-0 truncate text-[11px]">{activeTitle}</span>
       ) : null}
       <div className="flex-1" />
-      {sessionControlMode === "new_session" && sessionCount > 0 ? (
+      {sessionCount > 0 ? (
         <span className="text-muted-foreground text-[10.5px]">
           {t("agent.sessionCount", { count: String(sessionCount) })}
         </span>
@@ -84,8 +78,8 @@ export function AgentSessionPanelHeader({
         size="xs"
         variant="ghost"
       >
-        <SessionControlIcon className="size-3" />
-        {sessionControlLabel}
+        <Plus className="size-3" />
+        {t("agent.newSession")}
       </Button>
     </div>
   );

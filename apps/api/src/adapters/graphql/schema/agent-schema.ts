@@ -57,7 +57,6 @@ export const agentSchema = /* GraphQL */ `
 
   enum AgentResolutionTargetType {
     agent
-    channel
     environment
     model
     mcp_server
@@ -69,12 +68,6 @@ export const agentSchema = /* GraphQL */ `
   enum AgentPackageResolutionSource {
     fork
     import
-  }
-
-  enum RuntimeStateOperation {
-    recreateSandbox
-    resetAgentState
-    restartDriver
   }
 
   type AgentSkillReference {
@@ -186,26 +179,6 @@ export const agentSchema = /* GraphQL */ `
   type AgentPackageImportResult {
     agent: Agent!
     resolution: AgentPackageResolutionReport!
-  }
-
-  type RuntimeStateOperationResult {
-    affectedSessionCount: Int!
-    agentId: ULID!
-    ok: Boolean!
-    operation: RuntimeStateOperation!
-  }
-
-  input RuntimeStateOperationInput {
-    affectedFields: [String!]
-    agentId: ULID!
-    applyActionKind: String
-    targetVersion: RuntimeStateTargetVersionInput
-    appId: ULID!
-  }
-
-  input RuntimeStateTargetVersionInput {
-    id: ULID!
-    versionNumber: Int!
   }
 
   type AgentOwnerSummary {

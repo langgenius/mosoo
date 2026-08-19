@@ -878,26 +878,34 @@
       },
       "HarnessCatalogEntry": {
         "additionalProperties": false,
+        "description": "One curated coding-agent Harness available to a Workspace.",
         "properties": {
           "capabilities": {
             "additionalProperties": false,
+            "description": "Normalized lifecycle capabilities exposed by this Harness.",
             "properties": {
               "approve": {
+                "description": "Support level for the approve Run capability.",
                 "enum": ["native", "normalized", "unsupported"]
               },
               "artifacts": {
+                "description": "Support level for the artifacts Run capability.",
                 "enum": ["native", "normalized", "unsupported"]
               },
               "cancel": {
+                "description": "Support level for the cancel Run capability.",
                 "enum": ["native", "normalized", "unsupported"]
               },
               "resume": {
+                "description": "Support level for the resume Run capability.",
                 "enum": ["native", "normalized", "unsupported"]
               },
               "stream": {
+                "description": "Support level for the stream Run capability.",
                 "enum": ["native", "normalized", "unsupported"]
               },
               "subagents": {
+                "description": "Support level for the subagents Run capability.",
                 "enum": ["native", "normalized", "unsupported"]
               }
             },
@@ -905,52 +913,65 @@
             "type": "object"
           },
           "defaultModel": {
+            "description": "Default model selected for this Harness.",
             "type": "string"
           },
           "description": {
+            "description": "Short explanation of the Harness use case.",
             "type": "string"
           },
           "environment": {
             "additionalProperties": false,
+            "description": "Default Environment behavior for new Harness Runs.",
             "properties": {
               "default": {
-                "const": "workspace"
+                "const": "workspace",
+                "description": "Environment selection default."
               },
               "repositoryRequired": {
-                "const": false
+                "const": false,
+                "description": "Whether a repository is required to launch."
               }
             },
             "required": ["default", "repositoryRequired"],
             "type": "object"
           },
           "label": {
+            "description": "Human-readable Harness name.",
             "type": "string"
           },
           "quickstart": {
+            "description": "One-line command for starting this Harness.",
             "type": "string"
           },
           "requiredCredentials": {
+            "description": "Credential providers required before launch.",
             "items": {
               "type": "string"
             },
             "type": "array"
           },
           "runtimeId": {
+            "description": "Internal runtime implementation identifier.",
             "type": "string"
           },
           "slug": {
+            "description": "Stable Harness identifier accepted by the Run API.",
             "enum": ["claude-code", "openai-codex", "opencode"]
           },
           "status": {
+            "description": "Current launch availability for this Harness.",
             "enum": ["available", "unavailable"]
           },
           "supportedModels": {
+            "description": "Models currently offered by this Harness.",
             "items": {
               "type": "string"
             },
             "type": "array"
           },
           "version": {
+            "description": "Frozen Harness package version.",
             "type": "string"
           }
         },
@@ -971,15 +992,19 @@
         "type": "object"
       },
       "WorkspaceRunRequest": {
+        "description": "Request to start a Run from exactly one supported source.",
         "oneOf": [
           {
             "additionalProperties": false,
             "properties": {
               "agent": {
+                "description": "Published Agent identifier or unambiguous Agent name.",
                 "minLength": 1,
                 "type": "string"
               },
-              "input": {}
+              "input": {
+                "description": "Task input delivered to the selected Agent."
+              }
             },
             "required": ["agent", "input"],
             "type": "object"
@@ -988,14 +1013,19 @@
             "additionalProperties": false,
             "properties": {
               "environment": {
+                "description": "Optional Environment identifier or unambiguous name.",
                 "minLength": 1,
                 "type": "string"
               },
               "harness": {
+                "description": "Curated Harness to launch for this Run.",
                 "enum": ["claude-code", "openai-codex", "opencode"]
               },
-              "input": {},
+              "input": {
+                "description": "Task input delivered to the selected Harness."
+              },
               "model": {
+                "description": "Optional supported model override for the Harness.",
                 "minLength": 1,
                 "type": "string"
               }
@@ -1007,17 +1037,22 @@
       },
       "WorkspaceRunResponse": {
         "additionalProperties": false,
+        "description": "Current state and immutable snapshots for one Workspace Run.",
         "properties": {
           "environment": {
             "additionalProperties": false,
+            "description": "Frozen Environment revision used by this Run.",
             "properties": {
               "id": {
+                "description": "Environment identifier used by this Run.",
                 "type": "string"
               },
               "name": {
+                "description": "Environment name captured for display.",
                 "type": "string"
               },
               "revisionId": {
+                "description": "Frozen Environment revision identifier.",
                 "type": "string"
               }
             },
@@ -1025,27 +1060,35 @@
             "type": "object"
           },
           "id": {
+            "description": "Stable identifier for this Run.",
             "type": "string"
           },
           "links": {
             "additionalProperties": false,
+            "description": "Run lifecycle and result endpoint links.",
             "properties": {
               "approve": {
+                "description": "Relative link for the Run approve endpoint.",
                 "type": "string"
               },
               "artifacts": {
+                "description": "Relative link for the Run artifacts endpoint.",
                 "type": "string"
               },
               "cancel": {
+                "description": "Relative link for the Run cancel endpoint.",
                 "type": "string"
               },
               "events": {
+                "description": "Relative link for the Run events endpoint.",
                 "type": "string"
               },
               "result": {
+                "description": "Relative link for the Run result endpoint.",
                 "type": "string"
               },
               "stream": {
+                "description": "Relative link for the Run stream endpoint.",
                 "type": "string"
               }
             },
@@ -1053,24 +1096,30 @@
             "type": "object"
           },
           "model": {
+            "description": "Frozen model selected for this Run.",
             "type": "string"
           },
           "source": {
+            "description": "Immutable source snapshot selected for this Run.",
             "oneOf": [
               {
                 "additionalProperties": false,
                 "properties": {
                   "agentId": {
+                    "description": "Published Agent selected as the Run source.",
                     "type": "string"
                   },
                   "agentVersionId": {
+                    "description": "Frozen Agent version identifier, when published.",
                     "type": ["string", "null"]
                   },
                   "agentVersionNumber": {
+                    "description": "Frozen Agent version number, when published.",
                     "type": ["integer", "null"]
                   },
                   "kind": {
-                    "const": "agent"
+                    "const": "agent",
+                    "description": "Discriminator for an Agent-backed Run."
                   }
                 },
                 "required": ["agentId", "agentVersionId", "agentVersionNumber", "kind"],
@@ -1080,12 +1129,15 @@
                 "additionalProperties": false,
                 "properties": {
                   "harness": {
+                    "description": "Curated Harness selected as the Run source.",
                     "enum": ["claude-code", "openai-codex", "opencode"]
                   },
                   "kind": {
-                    "const": "harness"
+                    "const": "harness",
+                    "description": "Discriminator for a Harness-backed Run."
                   },
                   "version": {
+                    "description": "Frozen Harness version used by the Run.",
                     "type": "string"
                   }
                 },
@@ -1095,6 +1147,7 @@
             ]
           },
           "status": {
+            "description": "Current lifecycle status for this Run.",
             "enum": [
               "queued",
               "booting",
@@ -1107,9 +1160,11 @@
             ]
           },
           "threadId": {
+            "description": "Backing Thread identifier for event history.",
             "type": "string"
           },
           "workspaceId": {
+            "description": "Workspace that owns this Run.",
             "type": "string"
           }
         },
@@ -1127,8 +1182,10 @@
       },
       "WorkspaceRunResultResponse": {
         "additionalProperties": false,
+        "description": "Run state paired with its canonical final output.",
         "properties": {
           "output": {
+            "description": "Canonical final assistant output, or null while unavailable.",
             "oneOf": [
               {
                 "$ref": "#/components/schemas/RunFinalOutput"
@@ -1139,7 +1196,8 @@
             ]
           },
           "run": {
-            "$ref": "#/components/schemas/WorkspaceRunResponse"
+            "$ref": "#/components/schemas/WorkspaceRunResponse",
+            "description": "Latest lifecycle state for the requested Run."
           }
         },
         "required": ["output", "run"],

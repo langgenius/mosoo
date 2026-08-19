@@ -11,21 +11,11 @@ import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
 
 import { isTruthy } from "../../shared/lib/truthiness";
-import { canShowAgentDebugMenuItem } from "./agent-debug-menu-policy";
 import { mapAgentDetailToView } from "./agent-view.mapper";
 import type { Agent, AgentMode } from "./agent.types";
 import { PreviewMode } from "./components/preview-mode";
 import { RuntimeIcon } from "./components/runtime-icon";
 import { getRuntimeInfo } from "./runtime-catalog";
-
-// The terminal pulls in the full xterm engine (~250 kB) and its stylesheet, yet
-// it only renders in the debug-only "terminal" mode that most agent visits never
-// open. Loading it lazily keeps xterm out of the agent-detail route's initial
-// chunk so the default modes paint without paying for the terminal.
-const TerminalMode = lazy(async () => {
-  const mod = await import("./components/terminal-mode");
-  return { default: mod.TerminalMode };
-});
 
 const LogsTab = lazy(async () => {
   const mod = await import("./components/logs-tab");
@@ -47,7 +37,7 @@ const ConsumeMode = lazy(async () => {
   return { default: mod.ConsumeMode };
 });
 
-type DetailMode = AgentMode | "cost" | "logs" | "terminal";
+type DetailMode = AgentMode | "cost" | "logs";
 
 interface VersionsSheetProps {
   agent: Agent;
@@ -91,7 +81,6 @@ function toDetailMode(value: string | null): DetailMode | null {
     case "create":
     case "logs":
     case "preview":
-    case "terminal":
       return value;
     default:
       return null;
@@ -100,7 +89,6 @@ function toDetailMode(value: string | null): DetailMode | null {
 
 function AgentDetailHeader({
   agent,
-  canUseTerminal,
   headerActionTargetRef,
   mode,
   onBack,
@@ -110,7 +98,6 @@ function AgentDetailHeader({
   runtime,
 }: {
   agent: Agent;
-  canUseTerminal: boolean;
   headerActionTargetRef: (node: HTMLDivElement | null) => void;
   mode: DetailMode;
   onBack: () => void;
@@ -179,23 +166,6 @@ function AgentDetailHeader({
             {t(tab.labelKey)}
           </button>
         ))}
-        {canUseTerminal && (
-          <button
-            type="button"
-            onClick={() => {
-              onSelectMode("terminal");
-            }}
-            className={cn(
-              "rounded-lg px-3.5 py-1.5 text-[13px] font-medium transition-all",
-              mode === "terminal"
-                ? "bg-ink-100 text-fg-1"
-                : "text-muted-foreground hover:bg-accent",
-            )}
-            aria-label={t("agent.openTerminal")}
-          >
-            {t("agent.terminal")}
-          </button>
-        )}
       </div>
 
       <div className="flex shrink-0 items-center gap-1 sm:gap-2">
@@ -249,11 +219,6 @@ export function AgentDetailPage() {
   const basePath = globalThis.location.pathname.startsWith("/demo") ? "/demo/agent" : "/agent";
   const runtime = useMemo(() => (agent ? getRuntimeInfo(agent.runtime) : null), [agent]);
   const canManageAgentAccess = detailQuery.data?.viewerRole === "owner";
-  const canUseTerminal = canShowAgentDebugMenuItem({
-    agentKind: agent?.kind ?? null,
-    itemId: "terminal",
-    viewerRole: detailQuery.data?.viewerRole ?? null,
-  });
   const urlMode = toDetailMode(searchParams.get("tab") ?? searchParams.get("mode"));
 
   const handleSelectMode = useCallback(
@@ -293,8 +258,7 @@ export function AgentDetailPage() {
   // via `?tab=consume` (e.g. the post-publish success modal's "Open Chat" CTA),
   // and the Preview tab offers an in-context test chat.
   const defaultMode: DetailMode = "preview";
-  const requestedMode = selectedMode ?? urlMode ?? defaultMode;
-  const mode = requestedMode === "terminal" && !canUseTerminal ? defaultMode : requestedMode;
+  const mode = selectedMode ?? urlMode ?? defaultMode;
 
   if (!isTruthy(agentId)) {
     return (
@@ -369,7 +333,6 @@ export function AgentDetailPage() {
     <div className="flex h-full flex-col">
       <AgentDetailHeader
         agent={agent}
-        canUseTerminal={canUseTerminal}
         headerActionTargetRef={setHeaderActionTarget}
         mode={mode}
         onBack={() => {
@@ -398,11 +361,6 @@ export function AgentDetailPage() {
         {mode === "cost" && (
           <Suspense fallback={<PanelLoading />}>
             <AgentCostTab agentId={agent.id} appId={agent.appId} />
-          </Suspense>
-        )}
-        {mode === "terminal" && (
-          <Suspense fallback={<PanelLoading />}>
-            <TerminalMode key={agent.id} agent={agent} />
           </Suspense>
         )}
       </div>

@@ -62,27 +62,6 @@ enum AgentBuiltInToolName {
   write
 }
 
-type AgentChannelBinding {
-  activityLastTriggeredAt: String
-  activitySessionCount7d: Int!
-  agentId: ULID!
-  appId: ULID!
-  createdAt: String!
-  displayMetadata: PrimitiveRecord!
-  externalBotId: String!
-  externalTenantId: String!
-  id: ULID!
-  lastErrorCode: String
-  provider: ChannelProvider!
-  status: AgentChannelBindingStatus!
-  updatedAt: String!
-}
-
-enum AgentChannelBindingStatus {
-  active
-  error
-}
-
 type AgentCostCard {
   agentId: ULID!
   agentName: String!
@@ -275,7 +254,6 @@ enum AgentResolutionStatus {
 
 enum AgentResolutionTargetType {
   agent
-  channel
   environment
   mcp_server
   model
@@ -476,123 +454,10 @@ type AppCostCard {
   totals: CostTotals!
 }
 
-type AppDeployment {
-  appId: ULID!
-  createdAt: String!
-  defaultBranch: String!
-  id: ULID!
-  latestRun: AppDeploymentRun
-  liveUrl: String
-  plannedUrl: String!
-  repoName: String!
-  repoOwner: String!
-  repoUrl: String!
-  updatedAt: String!
-}
-
-type AppDeploymentRun {
-  appId: ULID!
-  createdAt: String!
-  deploymentId: ULID!
-  errorCode: String
-  errorMessage: String
-  id: ULID!
-  liveUrl: String
-  plannedUrl: String!
-  sourceBranch: String!
-  sourceCommitSha: String!
-  status: AppDeploymentRunStatus!
-  targetKind: AppDeploymentTargetKind
-  updatedAt: String!
-}
-
-enum AppDeploymentRunStatus {
-  activating
-  building
-  failed
-  preparing
-  queued
-  submitted
-  submitting
-  success
-}
-
-enum AppDeploymentTargetKind {
-  cloudflare_pages
-  cloudflare_worker
-}
-
 type AppInfo {
   api: String!
   name: String!
   runtime: String!
-}
-
-type AppOverview {
-  agents: AppOverviewAgentList!
-  app: App!
-  boundAgents: [AppOverviewBoundAgent!]!
-  deployment: AppDeployment
-  providerCredentials: AppOverviewProviderCredentialList!
-}
-
-type AppOverviewAgent {
-  appId: ULID!
-  description: String
-  id: ULID!
-  kind: AgentKind!
-  model: String!
-  name: String!
-  provider: String!
-  runtimeId: String!
-  status: AgentStatus!
-  updatedAt: String!
-}
-
-type AppOverviewAgentList {
-  hasMore: Boolean!
-  items: [AppOverviewAgent!]!
-  limit: Int!
-}
-
-type AppOverviewBoundAgent {
-  agentId: ULID!
-  envVar: String!
-  expose: AppOverviewBoundAgentExposure!
-  name: String!
-}
-
-enum AppOverviewBoundAgentExposure {
-  public_thread
-}
-
-type AppOverviewProviderCredential {
-  appId: ULID!
-  hasCustomApiBase: Boolean!
-  id: ULID!
-  isDefault: Boolean!
-  modelCount: Int!
-  name: String!
-  status: AppOverviewProviderCredentialStatus!
-  vendorId: String!
-}
-
-type AppOverviewProviderCredentialList {
-  byVendor: [AppOverviewProviderCredentialVendorCount!]!
-  configuredCount: Int!
-  hasMore: Boolean!
-  items: [AppOverviewProviderCredential!]!
-  limit: Int!
-}
-
-enum AppOverviewProviderCredentialStatus {
-  configured
-}
-
-type AppOverviewProviderCredentialVendorCount {
-  count: Int!
-  defaultCredentialId: ULID
-  vendorId: String!
 }
 
 enum AuthMethod {
@@ -610,40 +475,11 @@ input BootstrapOnboardingInput {
   name: String
 }
 
-type BoundCapabilityRunProvenance {
-  agentId: ULID!
-  appId: ULID!
-  bindingEnv: String!
-  bindingName: String!
-  deploymentId: ULID!
-  deploymentRunId: ULID!
-  runId: ULID!
-}
-
-enum ChannelProvider {
-  discord
-  lark
-  slack
-  telegram
-  wechat
-}
-
 input ConnectMcpBearerInput {
   appId: ULID!
   serverId: ULID!
   subjectLabel: String
   token: String!
-}
-
-type ControlPlaneOverview {
-  activeOrganization: Organization
-  apps: ControlPlaneOverviewAppList!
-}
-
-type ControlPlaneOverviewAppList {
-  hasMore: Boolean!
-  items: [AppOverview!]!
-  limit: Int!
 }
 
 type CostAgentRow implements CostAggregate {
@@ -800,14 +636,6 @@ input CreateAppMcpServerInput {
   url: String!
 }
 
-input CreateDiscordAgentChannelBindingInput {
-  agentId: ULID!
-  appId: ULID!
-  applicationId: String!
-  botToken: String!
-  relaySecret: String!
-}
-
 input CreateEnvironmentForkInput {
   appId: ULID!
   environmentId: ULID!
@@ -826,36 +654,9 @@ input CreateEnvironmentInput {
   setupScript: String!
 }
 
-input CreateLarkAgentChannelBindingInput {
-  agentId: ULID!
-  appId: ULID!
-  appSecret: String!
-  connectionMode: LarkConnectionMode!
-  domain: LarkDomain!
-  encryptKey: String
-  larkAppId: String!
-  verificationToken: String
-}
-
 input CreateSkillForkInput {
   appId: ULID!
   skillId: ULID!
-}
-
-input CreateSlackAgentChannelBindingInput {
-  agentId: ULID!
-  appId: ULID!
-  appLevelToken: String
-  botToken: String!
-  signingSecret: String!
-  threadRepliesRequireMention: Boolean
-}
-
-input CreateTelegramAgentChannelBindingInput {
-  agentId: ULID!
-  appId: ULID!
-  botToken: String!
-  webhookSecret: String!
 }
 
 input CreateVendorCredentialInput {
@@ -867,17 +668,8 @@ input CreateVendorCredentialInput {
   vendorId: String!
 }
 
-input DeleteAgentChannelBindingInput {
-  appId: ULID!
-  bindingId: ULID!
-}
-
 input DeleteAgentInput {
   agentId: ULID!
-  appId: ULID!
-}
-
-input DeleteAppDeploymentInput {
   appId: ULID!
 }
 
@@ -889,12 +681,6 @@ input DeleteEnvironmentInput {
 input DeleteVendorCredentialInput {
   appId: ULID!
   id: ULID!
-}
-
-input DeployAppInput {
-  appId: ULID!
-  configPath: String
-  repoUrl: String!
 }
 
 type EnvironmentDetail {
@@ -1098,39 +884,6 @@ input ImportAgentPackageInput {
 
 scalar JsonObject
 
-type LarkAgentChannelRegistration {
-  appId: String
-  appSecret: String
-  deviceCode: String
-  domain: LarkDomain!
-  expireIn: Int
-  interval: Int
-  lastErrorCode: String
-  openId: String
-  qrUrl: String
-  status: LarkAppRegistrationStatus!
-  userCode: String
-}
-
-enum LarkAppRegistrationStatus {
-  access_denied
-  confirmed
-  expired
-  failed
-  qr_pending
-  slow_down
-}
-
-enum LarkConnectionMode {
-  webhook
-  websocket
-}
-
-enum LarkDomain {
-  feishu
-  lark
-}
-
 enum McpAuthType {
   bearer
   oauth
@@ -1254,36 +1007,24 @@ type Mutation {
   createAgentSession(input: CreateAgentSessionInput!): Session!
   createApp(input: CreateAppInput!): App!
   createAppMcpServer(input: CreateAppMcpServerInput!): McpServerWithCredential!
-  createDiscordAgentChannelBinding(input: CreateDiscordAgentChannelBindingInput!): AgentChannelBinding!
   createEnvironment(input: CreateEnvironmentInput!): EnvironmentSummary!
   createEnvironmentFork(input: CreateEnvironmentForkInput!): EnvironmentSummary!
-  createLarkAgentChannelBinding(input: CreateLarkAgentChannelBindingInput!): AgentChannelBinding!
   createSkillFork(input: CreateSkillForkInput!): SkillSummary!
-  createSlackAgentChannelBinding(input: CreateSlackAgentChannelBindingInput!): AgentChannelBinding!
-  createTelegramAgentChannelBinding(input: CreateTelegramAgentChannelBindingInput!): AgentChannelBinding!
   createVendorCredential(input: CreateVendorCredentialInput!): VendorCredential!
   deleteAgent(input: DeleteAgentInput!): OperationResult!
-  deleteAgentChannelBinding(input: DeleteAgentChannelBindingInput!): OperationResult!
   deleteAgentSession(appId: ULID!, sessionId: ULID!): OperationResult!
-  deleteAppDeployment(input: DeleteAppDeploymentInput!): OperationResult!
   deleteEnvironment(input: DeleteEnvironmentInput!): OperationResult!
   deleteMcpServer(appId: ULID!, serverId: ULID!): OperationResult!
   deleteOwnedSkill(appId: ULID!, skillId: ULID!): OperationResult!
   deleteVendorCredential(input: DeleteVendorCredentialInput!): OperationResult!
-  deployApp(input: DeployAppInput!): AppDeploymentRun!
   importAgentPackage(input: ImportAgentPackageInput!): AgentPackageImportResult!
   onboardingBootstrap(input: BootstrapOnboardingInput!): OnboardingStatus!
-  pollLarkAgentChannelRegistration(input: PollLarkAgentChannelRegistrationInput!): LarkAgentChannelRegistration!
-  pollWeChatAgentChannelPairing(input: PollWeChatAgentChannelPairingInput!): WeChatAgentChannelPairing!
   prewarmAgentSession(appId: ULID!, sessionId: ULID!): SessionRuntimePrewarmAck!
   publishAgent(input: PublishAgentInput!): Agent!
-  recreateSandbox(input: RuntimeStateOperationInput!): RuntimeStateOperationResult!
   removeSessionResource(input: RemoveSessionResourceInput!): OperationResult!
   renameApp(input: RenameAppInput!): App!
   renameOrganization(input: RenameOrganizationInput!): Organization!
   renameSession(input: RenameSessionInput!): Session!
-  resetAgentState(input: RuntimeStateOperationInput!): RuntimeStateOperationResult!
-  restartDriver(input: RuntimeStateOperationInput!): RuntimeStateOperationResult!
   revokeMcpCredential(appId: ULID!, serverId: ULID!): McpServerWithCredential!
   sendAgentSessionEvents(appId: ULID!, events: [AgentSessionEventInput!]!, sessionId: ULID!): AgentSessionEventBatch!
   setAppDefaultEnvironment(input: SetAppDefaultEnvironmentInput!): EnvironmentSummary!
@@ -1292,9 +1033,7 @@ type Mutation {
   setMcpServerEnabled(appId: ULID!, enabled: Boolean!, serverId: ULID!): McpServerWithCredential!
   setSystemAgentModel(input: SetSystemAgentModelInput!): Account!
   startAgentRun(input: StartAgentRunInput!): AgentRunWorkflow!
-  startLarkAgentChannelRegistration(input: StartLarkAgentChannelRegistrationInput!): LarkAgentChannelRegistration!
   startMcpOAuth(input: StartMcpOAuthInput!): StartMcpOAuthPayload!
-  startWeChatAgentChannelPairing(input: StartWeChatAgentChannelPairingInput!): WeChatAgentChannelPairing!
   testVendorCredential(input: TestVendorCredentialInput!): TestVendorCredentialResult!
   unarchiveAgentSession(appId: ULID!, sessionId: ULID!): OperationResult!
   unpublishAgent(agentId: ULID!, appId: ULID!): Agent!
@@ -1328,19 +1067,6 @@ type OrganizationBillingCostCard {
   totals: CostTotals!
 }
 
-input PollLarkAgentChannelRegistrationInput {
-  agentId: ULID!
-  appId: ULID!
-  deviceCode: String!
-  domain: LarkDomain!
-}
-
-input PollWeChatAgentChannelPairingInput {
-  agentId: ULID!
-  appId: ULID!
-  qrToken: String!
-}
-
 scalar PrimitiveRecord
 
 input PublishAgentInput {
@@ -1351,7 +1077,6 @@ input PublishAgentInput {
 type Query {
   accessibleAgentList(appId: ULID!): [AgentSummary!]!
   agent(agentId: ULID!, appId: ULID!): AgentDetail!
-  agentChannelBindingList(agentId: ULID!, appId: ULID!): [AgentChannelBinding!]!
   agentCostCard(agentId: ULID!, appId: ULID!, range: CostRange!, runPurposes: [CostRunPurpose!]): AgentCostCard!
   agentEditorState(agentId: ULID!, appId: ULID!): AgentEditorState!
   agentManifest(agentId: ULID!, appId: ULID!): AgentManifestExport!
@@ -1359,16 +1084,11 @@ type Query {
   agentSessionList(agentId: ULID!, appId: ULID!, archived: Boolean, beforeCursor: String, limit: Int, participantOnly: Boolean, type: SessionType): SessionConnection!
   agentSessionRetrieve(appId: ULID!, sessionId: ULID!): AgentSessionRetrieve!
   appCostCard(appId: ULID!, range: CostRange!, runPurposes: [CostRunPurpose!]): AppCostCard!
-  appDeploymentRunList(appId: ULID!, limit: Int): [AppDeploymentRun!]!
-  appDeploymentStatus(appId: ULID!): AppDeploymentRun
   appEnvironmentList(appId: ULID!): [EnvironmentSummary!]!
   appInfo: AppInfo!
   appList(organizationId: ULID!): [App!]!
-  appOverview(agentLimit: Int, appId: ULID!, credentialLimit: Int): AppOverview!
   appSkillList(appId: ULID!): [SkillSummary!]!
   availableAgentModels(appId: ULID!, currentModelId: String, currentVendorId: String, runtimeId: String!): [ResolvedModelEntry!]!
-  boundCapabilityRunProvenance(appId: ULID!, runId: ULID!): BoundCapabilityRunProvenance
-  controlPlaneOverview(agentLimit: Int, appLimit: Int, credentialLimit: Int): ControlPlaneOverview!
   environment(appId: ULID!, environmentId: ULID!): EnvironmentDetail!
   exportAgentPackage(agentId: ULID!, appId: ULID!): AgentPackageExport!
   fileList(input: FileListInput!): FileListing!
@@ -1439,32 +1159,6 @@ enum RunStatus {
   queued
   running
   waiting_input
-}
-
-enum RuntimeStateOperation {
-  recreateSandbox
-  resetAgentState
-  restartDriver
-}
-
-input RuntimeStateOperationInput {
-  affectedFields: [String!]
-  agentId: ULID!
-  appId: ULID!
-  applyActionKind: String
-  targetVersion: RuntimeStateTargetVersionInput
-}
-
-type RuntimeStateOperationResult {
-  affectedSessionCount: Int!
-  agentId: ULID!
-  ok: Boolean!
-  operation: RuntimeStateOperation!
-}
-
-input RuntimeStateTargetVersionInput {
-  id: ULID!
-  versionNumber: Int!
 }
 
 type Session {
@@ -1785,12 +1479,6 @@ input StartAgentRunInput {
   waitForRuntimeReady: Boolean
 }
 
-input StartLarkAgentChannelRegistrationInput {
-  agentId: ULID!
-  appId: ULID!
-  domain: LarkDomain!
-}
-
 input StartMcpOAuthInput {
   appId: ULID!
   returnUrl: String
@@ -1800,11 +1488,6 @@ input StartMcpOAuthInput {
 type StartMcpOAuthPayload {
   authorizationUrl: String!
   flowId: ULID!
-}
-
-input StartWeChatAgentChannelPairingInput {
-  agentId: ULID!
-  appId: ULID!
 }
 
 type SystemAgentModelSetting {
@@ -1908,21 +1591,4 @@ type Viewer {
 type ViewerAuth {
   currentSecurityLevel: AuthSecurityLevel!
   methods: [AuthMethod!]!
-}
-
-type WeChatAgentChannelPairing {
-  binding: AgentChannelBinding
-  lastErrorCode: String
-  qrCodeImageSrc: String
-  qrToken: String
-  status: WeChatQrPairingStatus!
-}
-
-enum WeChatQrPairingStatus {
-  confirmed
-  expired
-  failed
-  idle
-  qr_pending
-  scanned
 }
