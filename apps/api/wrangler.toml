@@ -145,7 +145,7 @@ head_sampling_rate = 0.1
 
 [env.stage.vars]
 APP_NAME = "mosoo"
-WEB_ORIGIN = "https://mosoo-api-stage.wh-2099.workers.dev"
+WEB_ORIGIN = "https://mosoo-web-stage.wh-2099.workers.dev"
 AUTH_EMAIL_FROM = "mosoo AUTH <auth@mosoo.ai>"
 FILE_BUCKET_NAME = "mosoo-stage-file"
 BACKUP_BUCKET_NAME = "mosoo-stage-sandbox-state"

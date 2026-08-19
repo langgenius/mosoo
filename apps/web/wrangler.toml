@@ -13,6 +13,14 @@ run_worker_first = true
 # handled by react-router.
 not_found_handling = "none"
 
+[env.stage]
+name = "mosoo-web-stage"
+workers_dev = true
+
+[[env.stage.services]]
+binding = "API"
+service = "mosoo-api-stage"
+
 [env.prod]
 name = "mosoo-web-prod"
 workers_dev = false

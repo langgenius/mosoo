@@ -16,6 +16,17 @@ function readRepoFile(path: string): string {
 }
 
 describe("production origins", () => {
+  test("keeps staging CLI auth on a Web origin backed by the staging API", () => {
+    const apiWrangler = readRepoFile("apps/api/wrangler.toml");
+    const webWrangler = readRepoFile("apps/web/wrangler.toml");
+
+    expect(apiWrangler).toContain(
+      'WEB_ORIGIN = "https://mosoo-web-stage.wh-2099.workers.dev"',
+    );
+    expect(webWrangler).toContain('[env.stage]\nname = "mosoo-web-stage"');
+    expect(webWrangler).toContain('binding = "API"\nservice = "mosoo-api-stage"');
+  });
+
   test("pins the production Sandbox capacity accepted by the account quota", () => {
     const apiWrangler = readRepoFile("apps/api/wrangler.toml");
 
