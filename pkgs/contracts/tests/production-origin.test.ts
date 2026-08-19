@@ -20,9 +20,7 @@ describe("production origins", () => {
     const apiWrangler = readRepoFile("apps/api/wrangler.toml");
     const webWrangler = readRepoFile("apps/web/wrangler.toml");
 
-    expect(apiWrangler).toContain(
-      'WEB_ORIGIN = "https://mosoo-web-stage.wh-2099.workers.dev"',
-    );
+    expect(apiWrangler).toContain('WEB_ORIGIN = "https://mosoo-web-stage.wh-2099.workers.dev"');
     expect(webWrangler).toContain('[env.stage]\nname = "mosoo-web-stage"');
     expect(webWrangler).toContain('binding = "API"\nservice = "mosoo-api-stage"');
   });
