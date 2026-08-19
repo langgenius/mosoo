@@ -241,6 +241,7 @@ function mcpExecuteCommand(id: DriverCommandId): RuntimeCommand {
     kind: "mcp.execute",
     requestId: `request-${id}`,
     serverId: "01J0000000000000000000000Y",
+    toolCallId: `tool-${id}`,
     toolName: "createIssue",
   };
 }
