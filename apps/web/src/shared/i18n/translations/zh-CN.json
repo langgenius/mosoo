@@ -1171,7 +1171,7 @@
     "oneLifecycle": "统一运行生命周期",
     "optional": "可选",
     "quickRun": "快速运行",
-    "quickstart": "同一个客户端、同一把密钥，只需切换 Harness。",
+    "quickstart": "同一个客户端、同一把密钥，选择一个锁定的 Profile 版本。",
     "quickstartKeyLabel": "首页快速体验",
     "reproducible": "冻结环境版本",
     "runNow": "立即运行",

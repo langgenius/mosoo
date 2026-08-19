@@ -111,7 +111,12 @@ describe("MosooPublicThreadClient", () => {
           source: {
             harness: "openai-codex",
             kind: "harness",
-            version: "2026.08-experiment.1",
+            profile: {
+              id: "openai-codex/mosoo-baseline",
+              revision: "4e834acc7ef873b4dc884ecea42c7651f808e0c0",
+              version: "2026.08-experiment.2",
+            },
+            version: "2026.08-experiment.2",
           },
           status: "queued",
           threadId: THREAD_ID,
@@ -129,6 +134,7 @@ describe("MosooPublicThreadClient", () => {
     const run = await mosoo.run({
       harness: "openai-codex",
       input: "Review this repository",
+      profile: "openai-codex/mosoo-baseline@2026.08-experiment.2",
     });
 
     expect(run).toMatchObject({
@@ -136,7 +142,11 @@ describe("MosooPublicThreadClient", () => {
       source: { harness: "openai-codex", kind: "harness" },
     });
     expect(requests[0]).toMatchObject({
-      body: { harness: "openai-codex", input: "Review this repository" },
+      body: {
+        harness: "openai-codex",
+        input: "Review this repository",
+        profile: "openai-codex/mosoo-baseline@2026.08-experiment.2",
+      },
       method: "POST",
       url: "https://api.example.com/api/v1/runs",
     });

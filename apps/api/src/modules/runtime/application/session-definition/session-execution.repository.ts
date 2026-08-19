@@ -288,9 +288,16 @@ function parseSource(value: unknown, binding: SessionExecutionPlan["binding"]): 
   }
 
   if (record["kind"] === "harness") {
+    const profile = readRecord(record["profile"], "sessionExecutionPlan.source.profile");
+
     return {
       harness: readHarnessSlug(record["harness"], "sessionExecutionPlan.source.harness"),
       kind: "harness",
+      profile: {
+        id: readString(profile["id"], "sessionExecutionPlan.source.profile.id"),
+        revision: readString(profile["revision"], "sessionExecutionPlan.source.profile.revision"),
+        version: readString(profile["version"], "sessionExecutionPlan.source.profile.version"),
+      },
       version: readString(record["version"], "sessionExecutionPlan.source.version"),
     };
   }

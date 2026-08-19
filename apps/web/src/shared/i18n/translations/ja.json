@@ -1171,7 +1171,7 @@
     "oneLifecycle": "1 つの Run ライフサイクル",
     "optional": "任意",
     "quickRun": "クイック Run",
-    "quickstart": "同じクライアント、同じキー。Harness だけを変更。",
+    "quickstart": "同じクライアント、同じキー。ロック済みの Profile Version を選択。",
     "quickstartKeyLabel": "ホームクイックスタート",
     "reproducible": "固定された環境リビジョン",
     "runNow": "今すぐ実行",

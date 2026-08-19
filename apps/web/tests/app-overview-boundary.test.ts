@@ -15,6 +15,7 @@ describe("Harness marketplace Workspace home", () => {
     expect(route).toContain("state.selectedHarness");
     expect(route).toContain("state.task.trim()");
     expect(route).toContain("state.environment.trim()");
+    expect(route).toContain("harness.defaultProfile");
     expect(route).toContain('to="/api-keys"');
     expect(route).toContain("runMutation.data.threadId");
     expect(route).not.toContain("agentId");
@@ -22,13 +23,16 @@ describe("Harness marketplace Workspace home", () => {
     expect(route).not.toContain("Channel");
   });
 
-  test("offers the curated Claude Code, Codex, and OpenCode catalog responsively", () => {
+  test("offers curated complete Profiles and keeps unavailable Harnesses non-runnable", () => {
     const route = readSource("../src/routes/app-overview/app-overview.route.tsx");
     const catalog = readSource("../../../pkgs/runtime-catalog/src/harness-catalog.ts");
 
     expect(catalog).toContain('slug: "claude-code"');
     expect(catalog).toContain('slug: "openai-codex"');
     expect(catalog).toContain('slug: "opencode"');
+    expect(catalog).toContain('slug: "deepseek-harness"');
+    expect(catalog).toContain('profileId: "openai-codex/mosoo-baseline"');
+    expect(route).toContain('disabled={harness.status !== "available"}');
     expect(route).toContain("HARNESSES.map");
     expect(route).toContain("sm:text-5xl");
     expect(route).toContain("lg:grid-cols-");

@@ -12,8 +12,12 @@ import type {
   SandboxSessionId,
   SessionId,
 } from "@mosoo/id";
-import { getRuntimeCatalogEntry, getRuntimeCatalogVendorForProvider } from "@mosoo/runtime-catalog";
-import { getHarnessCatalogEntry } from "@mosoo/runtime-catalog";
+import {
+  getHarnessCatalogEntry,
+  getHarnessProfileVersion,
+  getRuntimeCatalogEntry,
+  getRuntimeCatalogVendorForProvider,
+} from "@mosoo/runtime-catalog";
 import { RUNTIME_DIAGNOSTIC_EVENT } from "@mosoo/runtime-events";
 
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
@@ -195,13 +199,22 @@ async function resolveExecutionSourceContext(input: {
   }
 
   const harness = getHarnessCatalogEntry(source.harness);
+  const profile = getHarnessProfileVersion(
+    source.harness,
+    `${source.profile.id}@${source.profile.version}`,
+  );
   if (
     harness === null ||
     harness.status !== "available" ||
     harness.version !== source.version ||
-    harness.runtimeId !== binding.runtimeId
+    profile === null ||
+    profile.status !== "available" ||
+    profile.provenance.revision !== source.profile.revision ||
+    profile.runtimeId !== binding.runtimeId
   ) {
-    throw new Error(`Frozen Harness ${source.harness}@${source.version} is unavailable.`);
+    throw new Error(
+      `Frozen Harness profile ${source.profile.id}@${source.profile.version} is unavailable.`,
+    );
   }
 
   const workspace = await ensureAppOwnership(input.bindings.DB, input.accessViewerId, input.appId);

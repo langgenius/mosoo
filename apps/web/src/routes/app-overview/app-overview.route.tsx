@@ -103,10 +103,17 @@ export function AppOverviewPage() {
   const runMutation = useMutation({
     mutationFn: async () => {
       const environment = state.environment.trim();
+      const harness = HARNESSES.find((entry) => entry.slug === state.selectedHarness);
+
+      if (harness === undefined || harness.status !== "available") {
+        throw new Error(t("harnessMarketplace.unavailable"));
+      }
+
       return createWorkspaceRun(state.apiKey, {
         ...(environment.length === 0 ? {} : { environment }),
         harness: state.selectedHarness,
         input: state.task.trim(),
+        profile: harness.defaultProfile,
       });
     },
   });
@@ -330,6 +337,7 @@ export function AppOverviewPage() {
                   disabled={
                     state.apiKey.trim().length === 0 ||
                     state.task.trim().length === 0 ||
+                    selectedHarness?.status !== "available" ||
                     runMutation.isPending
                   }
                   onClick={() => runMutation.mutate()}
@@ -378,7 +386,7 @@ export function AppOverviewPage() {
               <Badge variant="outline">TypeScript</Badge>
             </div>
             <pre className="text-fg-2 overflow-x-auto p-5 text-xs leading-6 sm:text-sm">
-              <code>{`const mosoo = new MosooClient({\n  token: process.env.MOSOO_WORKSPACE_API_KEY!,\n});\n\nconst run = await mosoo.run({\n  harness: "${state.selectedHarness}",\n  input: "Review this repository",\n});`}</code>
+              <code>{`const mosoo = new MosooClient({\n  token: process.env.MOSOO_WORKSPACE_API_KEY!,\n});\n\nconst run = await mosoo.run({\n  harness: "${state.selectedHarness}",\n  profile: "${selectedHarness?.defaultProfile ?? ""}",\n  input: "Review this repository",\n});`}</code>
             </pre>
           </section>
 
@@ -418,11 +426,12 @@ function HarnessCard({
     <button
       aria-label={harness.label}
       aria-pressed={selected}
-      className={`group w-full rounded-xl border p-4 text-left transition-all ${
+      className={`group w-full rounded-xl border p-4 text-left transition-all disabled:cursor-not-allowed disabled:opacity-60 ${
         selected
           ? "border-accent-press/40 bg-accent-soft shadow-[0_0_0_1px_rgba(73,128,0,0.08)]"
           : "border-border bg-card hover:border-border-strong hover:shadow-xs"
       }`}
+      disabled={harness.status !== "available"}
       onClick={onSelect}
       type="button"
     >
@@ -445,7 +454,7 @@ function HarnessCard({
           <div className="mt-3 flex flex-wrap gap-1.5">
             <Badge variant="outline">{harness.slug}</Badge>
             <Badge variant="outline">{harness.defaultModel}</Badge>
-            <Badge variant="outline">v{harness.version}</Badge>
+            <Badge variant="outline">profile v{harness.profiles[0]?.version}</Badge>
           </div>
         </div>
         <span

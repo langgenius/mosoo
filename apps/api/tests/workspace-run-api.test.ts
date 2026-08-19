@@ -70,7 +70,17 @@ describe("Workspace Run API", () => {
       "claude-code",
       "openai-codex",
       "opencode",
+      "deepseek-harness",
     ]);
+    expect(body.harnesses.at(-1)).toMatchObject({
+      profiles: [
+        {
+          id: "deepseek-harness/headless",
+          provenance: { revision: "141eb6fef83422698aef7a981029e843e8161534" },
+        },
+      ],
+      status: "unavailable",
+    });
   });
 
   test("launches two Harnesses with one Workspace key and creates no Agent rows", async () => {
@@ -84,7 +94,11 @@ describe("Workspace Run API", () => {
     const [codexResponse, openCodeResponse] = await withProviderProbeMock(async () => [
       await runRequest(
         key.value,
-        { harness: "openai-codex", input: "Review this repository" },
+        {
+          harness: "openai-codex",
+          input: "Review this repository",
+          profile: "openai-codex/mosoo-baseline@2026.08-experiment.2",
+        },
         bindings,
       ),
       await runRequest(
@@ -98,23 +112,47 @@ describe("Workspace Run API", () => {
     expect(openCodeResponse.status).toBe(201);
     const codexRun = await codexResponse.json<{
       id: string;
-      source: { harness: string; kind: string; version: string };
+      source: {
+        harness: string;
+        kind: string;
+        profile: { id: string; revision: string; version: string };
+        version: string;
+      };
       threadId: string;
       workspaceId: string;
     }>();
     const openCodeRun = await openCodeResponse.json<{
       id: string;
-      source: { harness: string; kind: string; version: string };
+      source: {
+        harness: string;
+        kind: string;
+        profile: { id: string; revision: string; version: string };
+        version: string;
+      };
       threadId: string;
       workspaceId: string;
     }>();
 
     expect(codexRun).toMatchObject({
-      source: { harness: "openai-codex", kind: "harness" },
+      source: {
+        harness: "openai-codex",
+        kind: "harness",
+        profile: {
+          id: "openai-codex/mosoo-baseline",
+          version: "2026.08-experiment.2",
+        },
+      },
       workspaceId: PUBLIC_API_TEST_IDS.app,
     });
     expect(openCodeRun).toMatchObject({
-      source: { harness: "opencode", kind: "harness" },
+      source: {
+        harness: "opencode",
+        kind: "harness",
+        profile: {
+          id: "opencode/mosoo-baseline",
+          version: "2026.08-experiment.2",
+        },
+      },
       workspaceId: PUBLIC_API_TEST_IDS.app,
     });
     expect(codexRun.source.version).toBe(openCodeRun.source.version);
@@ -176,6 +214,43 @@ describe("Workspace Run API", () => {
         code: "invalid_request",
         message: "Exactly one of agent or harness is required.",
       },
+    });
+    const sessions = await database
+      .prepare("SELECT COUNT(*) AS count FROM session")
+      .first<{ count: number }>();
+    expect(sessions?.count).toBe(0);
+  });
+
+  test("rejects unknown Profile Versions and unavailable Harness distributions", async () => {
+    const database = await createPublicHttpContractDatabase();
+    const bindings = createPublicHttpTestBindings(database) as ApiBindings;
+    const key = await createWorkspaceApiKey(database, OWNER, {
+      label: "Locked profile contract",
+      workspaceId: PUBLIC_API_TEST_IDS.app,
+    });
+
+    const unknownProfile = await runRequest(
+      key.value,
+      {
+        harness: "openai-codex",
+        input: "This must be rejected",
+        profile: "openai-codex/unlocked-local-plugins@latest",
+      },
+      bindings,
+    );
+    const deepSeekWithoutAdapter = await runRequest(
+      key.value,
+      { harness: "deepseek-harness", input: "This must also be rejected" },
+      bindings,
+    );
+
+    expect(unknownProfile.status).toBe(400);
+    expect(await unknownProfile.json()).toMatchObject({
+      error: { message: expect.stringContaining("Harness profile") },
+    });
+    expect(deepSeekWithoutAdapter.status).toBe(400);
+    expect(await deepSeekWithoutAdapter.json()).toMatchObject({
+      error: { message: "Harness deepseek-harness is unavailable." },
     });
     const sessions = await database
       .prepare("SELECT COUNT(*) AS count FROM session")

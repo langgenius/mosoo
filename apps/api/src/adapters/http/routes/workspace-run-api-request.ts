@@ -22,6 +22,7 @@ const RUN_FIELDS: ReadonlySet<string> = new Set([
   "harness",
   "input",
   "model",
+  "profile",
 ]);
 const APPROVAL_FIELDS: ReadonlySet<string> = new Set(["decision", "requestId"]);
 
@@ -98,8 +99,12 @@ export async function readCreateWorkspaceRunRequest(
   }
 
   if (agent !== undefined) {
-    if (body["environment"] !== undefined || body["model"] !== undefined) {
-      throw publicInvalidRequest("environment and model can only be used with harness.");
+    if (
+      body["environment"] !== undefined ||
+      body["model"] !== undefined ||
+      body["profile"] !== undefined
+    ) {
+      throw publicInvalidRequest("environment, model, and profile can only be used with harness.");
     }
 
     return { agent, input };
@@ -107,6 +112,7 @@ export async function readCreateWorkspaceRunRequest(
 
   const environment = readOptionalNonEmptyString(body, "environment");
   const model = readOptionalNonEmptyString(body, "model");
+  const profile = readOptionalNonEmptyString(body, "profile");
   const harness = readHarnessSlug(harnessValue as string);
 
   return {
@@ -114,6 +120,7 @@ export async function readCreateWorkspaceRunRequest(
     harness,
     input,
     ...(model === undefined ? {} : { model }),
+    ...(profile === undefined ? {} : { profile }),
   };
 }
 

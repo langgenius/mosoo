@@ -4,7 +4,11 @@ import type { SessionSummary } from "@mosoo/contracts/session";
 import { environmentsTable, sessionExecutionSnapshotsTable, sessionsTable } from "@mosoo/db";
 import { createPlatformId, isPlatformId, parsePlatformId } from "@mosoo/id";
 import type { AccountId, EnvironmentId, AppId, SessionId } from "@mosoo/id";
-import { getHarnessCatalogEntry, getRuntimeCatalogEntry } from "@mosoo/runtime-catalog";
+import {
+  getHarnessCatalogEntry,
+  getHarnessProfileVersion,
+  getRuntimeCatalogEntry,
+} from "@mosoo/runtime-catalog";
 import { and, eq } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
@@ -29,6 +33,7 @@ export interface CreateHarnessSessionRequest {
   environment?: string | undefined;
   harness: HarnessSlug;
   model?: string | undefined;
+  profile?: string | undefined;
   viewer: AuthenticatedViewer;
   workspaceId: AppId;
 }
@@ -68,12 +73,13 @@ function buildExecutionPlan(input: {
   environment: EnvironmentRecordRow;
   harness: NonNullable<ReturnType<typeof getHarnessCatalogEntry>>;
   model: string;
+  profile: NonNullable<ReturnType<typeof getHarnessProfileVersion>>;
   sessionId: SessionId;
 }): SessionExecutionPlan {
-  const runtime = getRuntimeCatalogEntry(input.harness.runtimeId);
+  const runtime = getRuntimeCatalogEntry(input.profile.runtimeId);
 
   if (runtime === null) {
-    throw new Error(`Harness runtime ${input.harness.runtimeId} is unavailable.`);
+    throw new Error(`Harness profile runtime ${input.profile.runtimeId} is unavailable.`);
   }
 
   return {
@@ -104,6 +110,11 @@ function buildExecutionPlan(input: {
     source: {
       harness: input.harness.slug,
       kind: "harness",
+      profile: {
+        id: input.profile.id,
+        revision: input.profile.provenance.revision,
+        version: input.profile.version,
+      },
       version: input.harness.version,
     },
     tools: [],
@@ -122,7 +133,14 @@ export async function createHarnessSession(
     throw validationError(`Harness ${request.harness} is unavailable.`);
   }
 
-  const model = request.model?.trim() || harness.defaultModel;
+  const profile = getHarnessProfileVersion(harness.slug, request.profile?.trim());
+  if (profile === null || profile.status !== "available") {
+    throw validationError(
+      `Harness profile ${request.profile ?? harness.defaultProfile} is unavailable.`,
+    );
+  }
+
+  const model = request.model?.trim() || profile.defaultModel;
   if (!harness.supportedModels.includes(model)) {
     throw validationError(`Model ${model} is not supported by Harness ${harness.slug}.`);
   }
@@ -140,6 +158,7 @@ export async function createHarnessSession(
     environment: environmentAccess.row,
     harness,
     model,
+    profile,
     sessionId,
   });
   const readiness = await computeAgentReadiness(request.bindings.DB, workspace.ownerAccountId, {

@@ -1171,7 +1171,7 @@
     "oneLifecycle": "One Run lifecycle",
     "optional": "optional",
     "quickRun": "Quick Run",
-    "quickstart": "Same client. Same key. Change only the Harness.",
+    "quickstart": "Same client. Same key. Select one locked Profile Version.",
     "quickstartKeyLabel": "Home quickstart",
     "reproducible": "Frozen Environment revision",
     "runNow": "Run now",

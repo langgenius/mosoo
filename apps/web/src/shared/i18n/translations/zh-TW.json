@@ -1171,7 +1171,7 @@
     "oneLifecycle": "統一執行生命週期",
     "optional": "選填",
     "quickRun": "快速執行",
-    "quickstart": "同一個用戶端、同一把金鑰，只需切換 Harness。",
+    "quickstart": "同一個用戶端、同一把金鑰，選擇一個鎖定的 Profile 版本。",
     "quickstartKeyLabel": "首頁快速體驗",
     "reproducible": "凍結環境版本",
     "runNow": "立即執行",

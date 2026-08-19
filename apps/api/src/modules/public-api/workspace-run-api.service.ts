@@ -175,6 +175,7 @@ export async function startWorkspaceRun(
           environment: request.input.environment,
           harness: request.input.harness,
           model: request.input.model,
+          profile: request.input.profile,
           viewer: request.caller.viewer,
           workspaceId: request.caller.workspaceId,
         });
