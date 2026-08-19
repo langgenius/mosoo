@@ -29,11 +29,14 @@ export interface SessionEventProcessRow {
 
 const DEFAULT_PROCESS_EVENT_LIMIT = 500;
 const MAX_PROCESS_EVENT_LIMIT = 1000;
+// Longer gaps may be permission or user waits, not continuous execution.
+const MAX_INFERRED_PROCESS_EVENT_DURATION_MS = 5 * 60 * 1000;
 
 interface ProcessEventProjection {
   event: SessionProcessEvent;
   endMs: number;
   order: number;
+  runId: SessionRunId | null;
   startMs: number;
 }
 
@@ -63,12 +66,18 @@ function finalizeProcessEventDurations(
 
   return sortedProjections.map((projection, index) => {
     const next = sortedProjections[index + 1] ?? null;
+    const inferredDurationMs = next === null ? 0 : next.startMs - projection.startMs;
+    const canInferDuration =
+      projection.runId !== null &&
+      next?.runId === projection.runId &&
+      inferredDurationMs >= 0 &&
+      inferredDurationMs <= MAX_INFERRED_PROCESS_EVENT_DURATION_MS;
     const durationMs =
       projection.endMs > projection.startMs
         ? projection.endMs - projection.startMs
-        : next === null
-          ? 0
-          : Math.max(0, next.startMs - projection.startMs);
+        : canInferDuration
+          ? inferredDurationMs
+          : 0;
 
     return {
       content: projection.event.content,
@@ -97,6 +106,7 @@ function toProcessEventProjectionFromSessionEventRow(
       type: row.process_type,
     },
     order: row.seq,
+    runId: row.run_id,
     startMs: row.occurred_at,
   };
 }
