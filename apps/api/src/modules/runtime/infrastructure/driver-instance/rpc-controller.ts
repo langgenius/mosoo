@@ -3,6 +3,10 @@ import type {
   DriverCompletionInput,
   DriverEventBatchInput,
   DriverEventBatchOutput,
+  DriverExternalToolEffectClaimInput,
+  DriverExternalToolEffectClaimOutput,
+  DriverExternalToolEffectCompleteInput,
+  DriverExternalToolEffectUnknownInput,
   DriverFailureInput,
   DriverHeartbeatInput,
   DriverHelloInput,
@@ -44,6 +48,20 @@ export class DriverInstanceRpcController implements DriverInstanceRpcHandler {
     context: DriverInstanceRpcOperationContext,
   ): Promise<{ ok: true }> {
     return this.#commands.handleCommandUpdate(input, context);
+  }
+
+  async handleClaimExternalToolEffect(
+    input: DriverExternalToolEffectClaimInput,
+    context: DriverInstanceRpcOperationContext,
+  ): Promise<DriverExternalToolEffectClaimOutput> {
+    return this.#commands.handleClaimExternalToolEffect(input, context);
+  }
+
+  async handleCompleteExternalToolEffect(
+    input: DriverExternalToolEffectCompleteInput,
+    context: DriverInstanceRpcOperationContext,
+  ): Promise<{ ok: true }> {
+    return this.#commands.handleCompleteExternalToolEffect(input, context);
   }
 
   async handleCompleteRun(
@@ -99,6 +117,13 @@ export class DriverInstanceRpcController implements DriverInstanceRpcHandler {
     context: DriverInstanceRpcOperationContext,
   ): Promise<DriverLogBatchOutput> {
     return this.#events.handlePushLogs(input, context);
+  }
+
+  async handleMarkExternalToolEffectUnknown(
+    input: DriverExternalToolEffectUnknownInput,
+    context: DriverInstanceRpcOperationContext,
+  ): Promise<{ ok: true }> {
+    return this.#commands.handleMarkExternalToolEffectUnknown(input, context);
   }
 
   async handleReady(

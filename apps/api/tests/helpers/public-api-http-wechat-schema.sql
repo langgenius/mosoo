@@ -331,6 +331,45 @@ CREATE TABLE driver_instance (
   updated_at integer NOT NULL
 );
 
+CREATE TABLE external_tool_effect (
+  attempt_count integer DEFAULT 0 NOT NULL,
+  command_id text NOT NULL,
+  created_at integer NOT NULL,
+  driver_instance_id text NOT NULL,
+  id text PRIMARY KEY NOT NULL,
+  idempotency_key text NOT NULL,
+  provider_receipt_json text,
+  result_json text,
+  server_id text NOT NULL,
+  session_run_id text NOT NULL,
+  status text NOT NULL,
+  tool_name text NOT NULL,
+  updated_at integer NOT NULL
+);
+
+CREATE UNIQUE INDEX external_tool_effect_command_idx
+  ON external_tool_effect (command_id);
+CREATE UNIQUE INDEX external_tool_effect_idempotency_key_idx
+  ON external_tool_effect (idempotency_key);
+CREATE INDEX external_tool_effect_run_status_idx
+  ON external_tool_effect (session_run_id, status, id);
+CREATE INDEX external_tool_effect_driver_status_idx
+  ON external_tool_effect (driver_instance_id, status);
+
+CREATE TABLE external_tool_effect_attempt (
+  attempt integer NOT NULL,
+  completed_at integer,
+  created_at integer NOT NULL,
+  effect_id text NOT NULL,
+  provider_receipt_json text,
+  result_json text,
+  status text NOT NULL,
+  PRIMARY KEY (effect_id, attempt)
+);
+
+CREATE INDEX external_tool_effect_attempt_status_idx
+  ON external_tool_effect_attempt (status, created_at);
+
 CREATE TABLE file_record (
   id text PRIMARY KEY NOT NULL,
   scope_kind text NOT NULL,

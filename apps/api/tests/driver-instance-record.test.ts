@@ -59,6 +59,12 @@ function createDriverInstanceRecordDatabase(): SqliteD1Database {
       updated_at integer NOT NULL
     );
 
+    CREATE TABLE external_tool_effect (
+      driver_instance_id text NOT NULL,
+      id text PRIMARY KEY NOT NULL,
+      status text NOT NULL
+    );
+
     CREATE TABLE driver_instance (
       boot_token_expires_at integer NOT NULL,
       boot_token_hash blob NOT NULL,
@@ -324,6 +330,19 @@ describe("driver instance records", () => {
     });
   });
 
+  test("maintenance retains expired terminal drivers with unresolved external effects", async () => {
+    const database = createDriverInstanceRecordDatabase();
+    insertDriverRecord(database, { status: "failed" });
+    database.execute(`
+      INSERT INTO external_tool_effect (driver_instance_id, id, status)
+      VALUES ('${DRIVER_INSTANCE_ID}', '01J0000000000000000000000Z', 'unknown')
+    `);
+
+    await cleanupDriverInstances(createBindings(database));
+
+    await expect(readDriverRecord(database)).resolves.toMatchObject({ status: "failed" });
+  });
+
   test("maintenance gives connecting drivers the cold ready budget", async () => {
     const database = createDriverInstanceRecordDatabase();
     insertDriverRecord(database, {
@@ -482,7 +501,7 @@ describe("driver instance records", () => {
         capabilities: [],
         driverVersion: "driver-test",
         pid: 11,
-        protocolVersion: 1,
+        protocolVersion: 2,
         runtime: "openai-runtime",
         startedAt: "2026-05-08T00:00:00.000Z",
       },
@@ -503,7 +522,7 @@ describe("driver instance records", () => {
           capabilities: [],
           driverVersion: "late-driver-test",
           pid: 99,
-          protocolVersion: 1,
+          protocolVersion: 2,
           runtime: "openai-runtime",
           startedAt: "2026-05-08T00:00:02.000Z",
         },

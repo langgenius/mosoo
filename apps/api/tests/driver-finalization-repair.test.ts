@@ -3,8 +3,26 @@ import { describe, expect, test } from "bun:test";
 import type { RuntimeCommand } from "@mosoo/contracts/runtime-command";
 import type { DriverCommandId, DriverInstanceId, SessionRunId } from "@mosoo/id";
 
+import type { AgentDriverBackend } from "../../driver/src/core/agent-driver-backend";
+import { createAgentDriverContext } from "../../driver/src/core/agent-driver-backend";
+import { DriverCommandDispatcher } from "../../driver/src/core/driver-command-dispatcher";
+import { DriverPermissionBroker } from "../../driver/src/core/driver-permission-broker";
+import type { DriverRuntimeIo } from "../../driver/src/core/driver-runtime-io";
+import { DriverRuntimeStateMachine } from "../../driver/src/core/driver-runtime-state";
+import type { AgentDriverMcpPort } from "../../driver/src/host-ports";
+import { createBufferedSinkLogger } from "../../driver/src/observability";
+import { createDriverStartInputFromBootPayload } from "../../driver/src/protocol/start";
+import type { RuntimeCommand as DriverRuntimeCommand } from "../../driver/src/runtime-command";
+import { driverBootPayload } from "../../driver/tests/driver-boot-payload-fixture";
 import { recordCanonicalSessionRunFailure } from "../src/modules/runtime/application/session-runs/session-run-terminal-failure.service";
+import { cleanupDriverInstances } from "../src/modules/runtime/infrastructure/driver-instance/maintenance";
 import { repairFinalizedTerminalDriverRunState } from "../src/modules/runtime/infrastructure/driver-instance/terminal-run-release";
+import {
+  claimExternalToolEffect,
+  completeExternalToolEffect,
+  getExternalToolEffectForCommand,
+  markExternalToolEffectUnknown,
+} from "../src/modules/runtime/infrastructure/session-runs/external-tool-effect-store.repository";
 import {
   createRuntimeCommandRecord,
   getRuntimeCommandRecord,
@@ -20,6 +38,7 @@ import type { SqliteD1Database } from "./helpers/public-api-http-test-fixture";
 
 const FINALIZE_RUN_ID = "01J0000000000000000000000T" as SessionRunId;
 const FINALIZE_COMMAND_ID = "01J0000000000000000000000V" as DriverCommandId;
+const MCP_COMMAND_ID = "01J0000000000000000000000X" as DriverCommandId;
 const FINALIZE_CLOUDFLARE_SESSION_ID = "01J0000000000000000000000W";
 const TURN_INTERRUPTED_MESSAGE =
   "This turn was interrupted before it completed. Please resend your last request.";
@@ -53,6 +72,156 @@ interface DriverInterruptionBenchmarkMetrics {
   viewerTerminalRate: string;
 }
 
+class PersistentEffectDriverIo implements DriverRuntimeIo {
+  readonly completedReceipt = Promise.withResolvers<void>();
+  readonly effectPersisted = Promise.withResolvers<void>();
+  readonly updates: Parameters<DriverRuntimeIo["commandUpdate"]>[0][] = [];
+  readonly #commands: readonly DriverRuntimeCommand[];
+  readonly #database: SqliteD1Database;
+  readonly #driverInstanceId: DriverInstanceId;
+  readonly #loseCompletedReceipt: boolean;
+  #commandIndex = 0;
+
+  constructor(input: {
+    commands: readonly DriverRuntimeCommand[];
+    database: SqliteD1Database;
+    driverInstanceId: DriverInstanceId;
+    loseCompletedReceipt?: boolean;
+  }) {
+    this.#commands = input.commands;
+    this.#database = input.database;
+    this.#driverInstanceId = input.driverInstanceId;
+    this.#loseCompletedReceipt = input.loseCompletedReceipt ?? false;
+  }
+
+  beginRun(): void {}
+
+  async claimExternalToolEffect(
+    input: Parameters<DriverRuntimeIo["claimExternalToolEffect"]>[0],
+    _signal: AbortSignal,
+  ): ReturnType<DriverRuntimeIo["claimExternalToolEffect"]> {
+    return claimExternalToolEffect(this.#database, {
+      commandId: input.commandId as DriverCommandId,
+      driverInstanceId: this.#driverInstanceId,
+    });
+  }
+
+  async commandUpdate(
+    input: Parameters<DriverRuntimeIo["commandUpdate"]>[0],
+    _signal: AbortSignal,
+  ): Promise<void> {
+    this.updates.push(input);
+
+    if (this.#loseCompletedReceipt && input.status === "completed") {
+      throw new Error("injected terminal receipt loss after durable effect completion");
+    }
+
+    if (input.status === "completed") {
+      this.completedReceipt.resolve();
+    }
+  }
+
+  async completeExternalToolEffect(
+    input: Parameters<DriverRuntimeIo["completeExternalToolEffect"]>[0],
+    _signal: AbortSignal,
+  ): Promise<void> {
+    await completeExternalToolEffect(this.#database, {
+      commandId: input.commandId as DriverCommandId,
+      driverInstanceId: this.#driverInstanceId,
+      ...(input.providerReceiptJson === undefined
+        ? {}
+        : { providerReceiptJson: input.providerReceiptJson }),
+      result: input.result,
+    });
+    this.effectPersisted.resolve();
+  }
+
+  async completeRun(): Promise<void> {}
+
+  endRun(): void {}
+
+  async failRun(): Promise<void> {}
+
+  async heartbeat(): ReturnType<DriverRuntimeIo["heartbeat"]> {
+    return { heartbeatCount: 1, ok: true };
+  }
+
+  isDrained(): boolean {
+    return this.#commandIndex >= this.#commands.length;
+  }
+
+  async markExternalToolEffectUnknown(
+    input: Parameters<DriverRuntimeIo["markExternalToolEffectUnknown"]>[0],
+    _signal: AbortSignal,
+  ): Promise<void> {
+    await markExternalToolEffectUnknown(this.#database, {
+      commandId: input.commandId as DriverCommandId,
+      driverInstanceId: this.#driverInstanceId,
+    });
+  }
+
+  async nextCommand(_signal: AbortSignal): Promise<DriverRuntimeCommand | null> {
+    const command = this.#commands[this.#commandIndex] ?? null;
+
+    if (command !== null) {
+      this.#commandIndex += 1;
+    }
+
+    return command;
+  }
+
+  async pushEvents(
+    input: Parameters<DriverRuntimeIo["pushEvents"]>[0],
+  ): ReturnType<DriverRuntimeIo["pushEvents"]> {
+    return {
+      accepted: input.events.map((event, index) => ({ seq: index + 1, type: event.kind })),
+    };
+  }
+}
+
+function createPersistentEffectDispatcher(input: {
+  io: PersistentEffectDriverIo;
+  mcpExecute: AgentDriverMcpPort["execute"];
+}): { dispatcher: DriverCommandDispatcher; logger: ReturnType<typeof createBufferedSinkLogger> } {
+  const logger = createBufferedSinkLogger({
+    level: "debug",
+    service: "persistent-effect-dispatcher-test",
+    sink: async () => {},
+  });
+  const backend: AgentDriverBackend = {
+    cancelActiveTurn: async () => {},
+    handleInput: async () => {},
+    runtime: "openai-runtime",
+    start: async () => {},
+    stop: async () => {},
+  };
+  const payload = createDriverStartInputFromBootPayload(driverBootPayload);
+  const dispatcher = new DriverCommandDispatcher({
+    backend,
+    driverInstanceId: PUBLIC_API_TEST_IDS.driverOwner,
+    isShuttingDown: () => input.io.isDrained(),
+    permissionRequests: new DriverPermissionBroker(() => logger),
+    rememberRunFailure: () => {},
+    runtimeContextFactory: (socket, runtimeLogger) =>
+      createAgentDriverContext({
+        eventSink: socket,
+        logger: runtimeLogger,
+        payload,
+        permission: { request: async () => "reject_once" },
+        ports: {
+          commandSource: { nextCommand: (signal) => socket.nextCommand(signal) },
+          mcp: { execute: input.mcpExecute },
+        },
+      }),
+    runtimeState: new DriverRuntimeStateMachine("ready"),
+    sandboxId: payload.sandboxId,
+    shutdown: async () => {},
+    shutdownSignal: new AbortController().signal,
+  });
+
+  return { dispatcher, logger };
+}
+
 function inputStartCommand(id: DriverCommandId): RuntimeCommand {
   return {
     commandId: id,
@@ -62,6 +231,18 @@ function inputStartCommand(id: DriverCommandId): RuntimeCommand {
     kind: "input.start",
     requestId: `request-${id}`,
     runId: FINALIZE_RUN_ID,
+  };
+}
+
+function mcpExecuteCommand(id: DriverCommandId): RuntimeCommand {
+  return {
+    argumentsJson: '{"title":"do not duplicate"}',
+    commandId: id,
+    kind: "mcp.execute",
+    requestId: `request-${id}`,
+    serverId: "01J0000000000000000000000Y",
+    toolCallId: `tool-${id}`,
+    toolName: "createIssue",
   };
 }
 
@@ -82,6 +263,33 @@ async function insertFinalizedDriverLeaseFixture(database: SqliteD1Database): Pr
       result_json text,
       seq integer NOT NULL,
       status text NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS external_tool_effect (
+      attempt_count integer NOT NULL,
+      command_id text NOT NULL UNIQUE,
+      created_at integer NOT NULL,
+      driver_instance_id text NOT NULL,
+      id text PRIMARY KEY NOT NULL,
+      idempotency_key text NOT NULL UNIQUE,
+      provider_receipt_json text,
+      result_json text,
+      server_id text NOT NULL,
+      session_run_id text NOT NULL,
+      status text NOT NULL,
+      tool_name text NOT NULL,
+      updated_at integer NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS external_tool_effect_attempt (
+      attempt integer NOT NULL,
+      completed_at integer,
+      created_at integer NOT NULL,
+      effect_id text NOT NULL,
+      provider_receipt_json text,
+      result_json text,
+      status text NOT NULL,
+      PRIMARY KEY (effect_id, attempt)
     );
   `);
   await database
@@ -419,6 +627,245 @@ describe("driver finalization repair", () => {
     expect(failureEvents[0]?.source_event_id).toBe(
       `session-run-terminal:${FINALIZE_RUN_ID}:run.failed`,
     );
+  });
+
+  test("does not queue an MCP command when its durable effect intent cannot be prepared", async () => {
+    const database = await createPublicHttpContractDatabase();
+    await insertFinalizedDriverLeaseFixture(database);
+    await database
+      .prepare("UPDATE session_run SET status = 'failed' WHERE id = ?")
+      .bind(FINALIZE_RUN_ID)
+      .run();
+
+    await expect(
+      createRuntimeCommandRecord(database, {
+        command: mcpExecuteCommand(MCP_COMMAND_ID),
+        driverInstanceId: PUBLIC_API_TEST_IDS.driverOwner as DriverInstanceId,
+        status: "accepted",
+      }),
+    ).rejects.toThrow("MCP external tool effects require an active Session Run.");
+
+    expect(
+      await getRuntimeCommandRecord(
+        database,
+        PUBLIC_API_TEST_IDS.driverOwner as DriverInstanceId,
+        MCP_COMMAND_ID,
+      ),
+    ).toBeNull();
+  });
+
+  test("persists the MCP effect intent and fences it as unknown after Driver loss", async () => {
+    const database = await createPublicHttpContractDatabase();
+    await insertFinalizedDriverLeaseFixture(database);
+    const bindings = createPublicHttpTestBindings(database) as ApiBindings;
+
+    await createRuntimeCommandRecord(database, {
+      command: mcpExecuteCommand(MCP_COMMAND_ID),
+      driverInstanceId: PUBLIC_API_TEST_IDS.driverOwner as DriverInstanceId,
+      status: "accepted",
+    });
+
+    const intent = await getExternalToolEffectForCommand(database, {
+      commandId: MCP_COMMAND_ID,
+      driverInstanceId: PUBLIC_API_TEST_IDS.driverOwner as DriverInstanceId,
+    });
+    expect(intent).toMatchObject({
+      attemptCount: 0,
+      sessionRunId: FINALIZE_RUN_ID,
+      status: "intent",
+    });
+    expect(intent?.idempotencyKey).toHaveLength(26);
+
+    const claim = await claimExternalToolEffect(database, {
+      commandId: MCP_COMMAND_ID,
+      driverInstanceId: PUBLIC_API_TEST_IDS.driverOwner as DriverInstanceId,
+    });
+    expect(claim).toMatchObject({ attempt: 1, kind: "execute" });
+
+    await repairFinalizedTerminalDriverRunState(bindings, {
+      driverInstanceId: PUBLIC_API_TEST_IDS.driverOwner as DriverInstanceId,
+      status: "failed",
+    });
+
+    await expect(
+      claimExternalToolEffect(database, {
+        commandId: MCP_COMMAND_ID,
+        driverInstanceId: PUBLIC_API_TEST_IDS.driverOwner as DriverInstanceId,
+      }),
+    ).resolves.toMatchObject({ kind: "unknown" });
+    expect(
+      await getExternalToolEffectForCommand(database, {
+        commandId: MCP_COMMAND_ID,
+        driverInstanceId: PUBLIC_API_TEST_IDS.driverOwner as DriverInstanceId,
+      }),
+    ).toMatchObject({ attemptCount: 1, status: "unknown" });
+    expect(
+      await database
+        .prepare("SELECT completed_at, status FROM external_tool_effect_attempt")
+        .first<{ completed_at: number; status: string }>(),
+    ).toMatchObject({ status: "unknown" });
+  });
+
+  test("retains an unknown MCP effect after terminal Driver maintenance", async () => {
+    const database = await createPublicHttpContractDatabase();
+    await insertFinalizedDriverLeaseFixture(database);
+    const bindings = createPublicHttpTestBindings(database) as ApiBindings;
+
+    await createRuntimeCommandRecord(database, {
+      command: mcpExecuteCommand(MCP_COMMAND_ID),
+      driverInstanceId: PUBLIC_API_TEST_IDS.driverOwner as DriverInstanceId,
+      status: "accepted",
+    });
+    await claimExternalToolEffect(database, {
+      commandId: MCP_COMMAND_ID,
+      driverInstanceId: PUBLIC_API_TEST_IDS.driverOwner as DriverInstanceId,
+    });
+    await repairFinalizedTerminalDriverRunState(bindings, {
+      driverInstanceId: PUBLIC_API_TEST_IDS.driverOwner as DriverInstanceId,
+      status: "stopped",
+    });
+
+    await cleanupDriverInstances(bindings);
+
+    expect(
+      await database
+        .prepare("SELECT id FROM driver_instance WHERE id = ?")
+        .bind(PUBLIC_API_TEST_IDS.driverOwner)
+        .first<{ id: string }>(),
+    ).toEqual({ id: PUBLIC_API_TEST_IDS.driverOwner });
+    expect(
+      await getExternalToolEffectForCommand(database, {
+        commandId: MCP_COMMAND_ID,
+        driverInstanceId: PUBLIC_API_TEST_IDS.driverOwner as DriverInstanceId,
+      }),
+    ).toMatchObject({ status: "unknown" });
+  });
+
+  test("redelivers a persisted successful MCP result without a second provider invocation", async () => {
+    const database = await createPublicHttpContractDatabase();
+    await insertFinalizedDriverLeaseFixture(database);
+
+    await createRuntimeCommandRecord(database, {
+      command: mcpExecuteCommand(MCP_COMMAND_ID),
+      driverInstanceId: PUBLIC_API_TEST_IDS.driverOwner as DriverInstanceId,
+      status: "accepted",
+    });
+    await claimExternalToolEffect(database, {
+      commandId: MCP_COMMAND_ID,
+      driverInstanceId: PUBLIC_API_TEST_IDS.driverOwner as DriverInstanceId,
+    });
+    await completeExternalToolEffect(database, {
+      commandId: MCP_COMMAND_ID,
+      driverInstanceId: PUBLIC_API_TEST_IDS.driverOwner as DriverInstanceId,
+      providerReceiptJson: '{"orderId":"A-1"}',
+      result: {
+        outputText: "created issue A-1",
+        requestId: "request-01J0000000000000000000000X",
+        serverId: "01J0000000000000000000000Y",
+        toolName: "createIssue",
+      },
+    });
+
+    await expect(
+      claimExternalToolEffect(database, {
+        commandId: MCP_COMMAND_ID,
+        driverInstanceId: PUBLIC_API_TEST_IDS.driverOwner as DriverInstanceId,
+      }),
+    ).resolves.toMatchObject({
+      kind: "completed",
+      result: {
+        outputText: "created issue A-1",
+        requestId: "request-01J0000000000000000000000X",
+        serverId: "01J0000000000000000000000Y",
+        toolName: "createIssue",
+      },
+    });
+    expect(
+      await getExternalToolEffectForCommand(database, {
+        commandId: MCP_COMMAND_ID,
+        driverInstanceId: PUBLIC_API_TEST_IDS.driverOwner as DriverInstanceId,
+      }),
+    ).toMatchObject({ providerReceiptJson: '{"orderId":"A-1"}', status: "succeeded" });
+    expect(
+      await database
+        .prepare("SELECT provider_receipt_json FROM external_tool_effect_attempt")
+        .first<{ provider_receipt_json: string | null }>(),
+    ).toEqual({ provider_receipt_json: '{"orderId":"A-1"}' });
+  });
+
+  test("restarts a real Driver dispatcher without replaying a persisted MCP effect", async () => {
+    const database = await createPublicHttpContractDatabase();
+    await insertFinalizedDriverLeaseFixture(database);
+    const command = mcpExecuteCommand(MCP_COMMAND_ID) as DriverRuntimeCommand;
+    const driverInstanceId = PUBLIC_API_TEST_IDS.driverOwner as DriverInstanceId;
+    await createRuntimeCommandRecord(database, {
+      command,
+      driverInstanceId,
+      status: "accepted",
+    });
+
+    let providerCalls = 0;
+    const firstIo = new PersistentEffectDriverIo({
+      commands: [command],
+      database,
+      driverInstanceId,
+      loseCompletedReceipt: true,
+    });
+    const first = createPersistentEffectDispatcher({
+      io: firstIo,
+      mcpExecute: async (request) => {
+        providerCalls += 1;
+        return {
+          outputText: "created issue A-1",
+          providerReceiptJson: '{"orderId":"A-1"}',
+          requestId: request.requestId,
+          serverId: request.serverId,
+          toolName: request.toolName,
+        };
+      },
+    });
+
+    await first.dispatcher.run(firstIo, first.logger);
+    await firstIo.effectPersisted.promise;
+    await first.logger.destroy();
+
+    const secondIo = new PersistentEffectDriverIo({
+      commands: [structuredClone(command)],
+      database,
+      driverInstanceId,
+    });
+    const second = createPersistentEffectDispatcher({
+      io: secondIo,
+      mcpExecute: async () => {
+        providerCalls += 1;
+        throw new Error("provider must not run after durable effect completion");
+      },
+    });
+
+    await second.dispatcher.run(secondIo, second.logger);
+    await secondIo.completedReceipt.promise;
+    await second.logger.destroy();
+
+    expect(providerCalls).toBe(1);
+    expect(secondIo.updates).toMatchObject([
+      { commandId: command.commandId, status: "accepted" },
+      {
+        commandId: command.commandId,
+        result: {
+          outputText: "created issue A-1",
+          requestId: command.requestId,
+          serverId: command.serverId,
+          toolName: command.toolName,
+        },
+        status: "completed",
+      },
+    ]);
+    expect(
+      await getExternalToolEffectForCommand(database, {
+        commandId: MCP_COMMAND_ID,
+        driverInstanceId,
+      }),
+    ).toMatchObject({ providerReceiptJson: '{"orderId":"A-1"}', status: "succeeded" });
   });
 
   test("benchmarks driver interruption finalization over 20 fault injections", async () => {

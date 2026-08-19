@@ -14,10 +14,10 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const driverEntries = [
-  ".dockerignore",
+  ".containerignore",
   ".github",
   ".gitignore",
-  "Dockerfile",
+  "Containerfile",
   "README.md",
   "package.json",
   "src",
