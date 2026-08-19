@@ -1,3 +1,10 @@
+import type {
+  CreateWorkspaceRunRequest,
+  HarnessCatalogEntry,
+  WorkspaceRunArtifactListResponse,
+  WorkspaceRunResponse,
+  WorkspaceRunResultResponse,
+} from "@mosoo/contracts/harness";
 import {
   PUBLIC_THREAD_EVENTS_MAX_LIMIT,
   PUBLIC_THREAD_RUN_TERMINAL_STATUSES,
@@ -45,6 +52,11 @@ export interface MosooPublicThreadClientOptions {
   pollIntervalMs?: number;
   token: string;
 }
+
+export type MosooClientOptions = MosooPublicThreadClientOptions;
+export type MosooRunInput = CreateWorkspaceRunRequest & {
+  signal?: AbortSignal | undefined;
+};
 
 export interface MosooCreateThreadInput {
   agentId: string;
@@ -514,6 +526,64 @@ export class MosooPublicThreadClient {
     });
   }
 
+  async listHarnesses(options: { signal?: AbortSignal | undefined } = {}): Promise<{
+    harnesses: HarnessCatalogEntry[];
+  }> {
+    return this.requestJson("GET", "/harnesses", {
+      signal: options.signal,
+      status: 200,
+    });
+  }
+
+  async run(input: MosooRunInput): Promise<WorkspaceRunResponse> {
+    const { signal, ...body } = input;
+    return this.requestJson("POST", "/runs", {
+      body,
+      signal,
+      status: 201,
+    });
+  }
+
+  async retrieveRun(
+    runId: string,
+    options: { signal?: AbortSignal | undefined } = {},
+  ): Promise<WorkspaceRunResponse> {
+    return this.requestJson("GET", `/runs/${runId}`, {
+      signal: options.signal,
+      status: 200,
+    });
+  }
+
+  async retrieveRunResult(
+    runId: string,
+    options: { signal?: AbortSignal | undefined } = {},
+  ): Promise<WorkspaceRunResultResponse> {
+    return this.requestJson("GET", `/runs/${runId}/result`, {
+      signal: options.signal,
+      status: 200,
+    });
+  }
+
+  async listRunArtifacts(
+    runId: string,
+    options: { signal?: AbortSignal | undefined } = {},
+  ): Promise<WorkspaceRunArtifactListResponse> {
+    return this.requestJson("GET", `/runs/${runId}/artifacts`, {
+      signal: options.signal,
+      status: 200,
+    });
+  }
+
+  async cancelRun(
+    runId: string,
+    options: { signal?: AbortSignal | undefined } = {},
+  ): Promise<WorkspaceRunResponse> {
+    return this.requestJson("POST", `/runs/${runId}/cancel`, {
+      signal: options.signal,
+      status: 200,
+    });
+  }
+
   async uploadAgentFile(input: MosooUploadAgentFileInput): Promise<PublicFileResponse> {
     const formData = new FormData();
 
@@ -829,3 +899,5 @@ export class MosooPublicThreadClient {
     });
   }
 }
+
+export class MosooClient extends MosooPublicThreadClient {}

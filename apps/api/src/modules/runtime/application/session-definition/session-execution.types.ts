@@ -1,5 +1,6 @@
 import type { AgentBuiltInToolConfig } from "@mosoo/contracts/agent";
 import type { EnvironmentNetworkPolicy } from "@mosoo/contracts/environment";
+import type { RunSourceSnapshot } from "@mosoo/contracts/harness";
 import type {
   SessionExecutionBinding,
   SessionExecutionSkillReference,
@@ -31,6 +32,7 @@ export interface SessionExecutionPlan {
     setupScript: string;
   };
   skills: Omit<SessionExecutionSkillReference, "sessionId">[];
+  source: RunSourceSnapshot;
   tools: Omit<SessionExecutionToolReference, "sessionId">[];
 }
 

@@ -19,6 +19,7 @@ import { and, asc, desc, eq, gt, lt } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 
 import { createErrorLogContext, logWarn } from "../../platform/cloudflare/logger";
+import type { ApiBindings } from "../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../platform/db/drizzle";
 import { createSessionProcessEventsFromSessionEventRows } from "../sessions/application/session-process-events.service";
 import type { SessionEventProcessRow } from "../sessions/application/session-process-events.service";
@@ -286,7 +287,7 @@ class PublicThreadEventWakeup {
 }
 
 async function connectPublicThreadEventWakeup(
-  request: StreamPublicThreadEventsRequest,
+  request: { bindings: ApiBindings },
   sessionId: SessionId,
 ): Promise<PublicThreadEventWakeup> {
   try {
@@ -525,12 +526,24 @@ async function resolvePublicThreadEventSessionId(
 export async function listPublicThreadEvents(
   request: ListPublicThreadEventsRequest,
 ): Promise<PublicThreadApiListThreadEventsResponse> {
-  const limit = normalizePublicThreadEventsLimit(request.limit);
   const sessionId = await resolvePublicThreadEventSessionId(request);
-  const window = await readPublicThreadEventWindow({
+  return listPublicSessionEvents({
     database: request.database,
-    limit,
+    limit: request.limit,
     sessionId,
+  });
+}
+
+export async function listPublicSessionEvents(input: {
+  database: D1Database;
+  limit: number;
+  sessionId: SessionId;
+}): Promise<PublicThreadApiListThreadEventsResponse> {
+  const limit = normalizePublicThreadEventsLimit(input.limit);
+  const window = await readPublicThreadEventWindow({
+    database: input.database,
+    limit,
+    sessionId: input.sessionId,
   });
 
   return {
@@ -592,16 +605,32 @@ function toSseErrorPayload(error: unknown) {
 export async function createPublicThreadEventStream(
   request: StreamPublicThreadEventsRequest,
 ): Promise<ReadableStream<Uint8Array>> {
-  const limit = normalizePublicThreadEventsLimit(request.limit);
   const sessionId = await resolvePublicThreadEventSessionId(request);
-  const wakeup = await connectPublicThreadEventWakeup(request, sessionId);
+  return createPublicSessionEventStream({
+    bindings: request.bindings,
+    database: request.database,
+    limit: request.limit,
+    signal: request.signal,
+    sessionId,
+  });
+}
+
+export async function createPublicSessionEventStream(request: {
+  bindings: ApiBindings;
+  database: D1Database;
+  limit: number;
+  signal: AbortSignal | null | undefined;
+  sessionId: SessionId;
+}): Promise<ReadableStream<Uint8Array>> {
+  const limit = normalizePublicThreadEventsLimit(request.limit);
+  const wakeup = await connectPublicThreadEventWakeup(request, request.sessionId);
   let initialWindow: PublicThreadEventWindow;
 
   try {
     initialWindow = await readPublicThreadEventWindow({
       database: request.database,
       limit,
-      sessionId,
+      sessionId: request.sessionId,
     });
   } catch (error) {
     wakeup.close();
@@ -642,7 +671,7 @@ export async function createPublicThreadEventStream(
             const rows = await readPublicThreadEventRowsAfterSeq({
               afterSeq: lastSeenSeq,
               database: request.database,
-              sessionId,
+              sessionId: request.sessionId,
             });
 
             if (rows.length === 0) {

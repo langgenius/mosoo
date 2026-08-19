@@ -1,4 +1,5 @@
 import type { AppId } from "../id/id.contract";
+import type { SessionRunStatus } from "../session/session-run.contract";
 import type { JsonObject, JsonValue } from "../validation/primitives.contract";
 
 export const HARNESS_SLUGS = ["claude-code", "openai-codex", "opencode"] as const;
@@ -92,7 +93,27 @@ export interface WorkspaceRunResponse {
   links: WorkspaceRunLinks;
   model: string;
   source: RunSourceSnapshot;
-  status: string;
+  status: SessionRunStatus;
   threadId: string;
   workspaceId: AppId;
+}
+
+export interface WorkspaceRunArtifact {
+  createdAt: string;
+  id: string;
+  mimeType: string | null;
+  name: string;
+  size: number;
+}
+
+export interface WorkspaceRunArtifactListResponse {
+  artifacts: WorkspaceRunArtifact[];
+}
+
+export interface WorkspaceRunResultResponse {
+  output: {
+    text: string;
+    warnings?: { code: string; count: number }[];
+  } | null;
+  run: WorkspaceRunResponse;
 }

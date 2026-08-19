@@ -1,5 +1,6 @@
 import { PUBLIC_API_VERSION_PREFIX } from "@mosoo/contracts/public-api";
 import type { AgentId, PublicThreadId } from "@mosoo/id";
+import { getHarnessCatalogEntry, listHarnessCatalog } from "@mosoo/runtime-catalog";
 import { Hono } from "hono";
 import type { Context } from "hono";
 
@@ -23,6 +24,8 @@ import {
   runPublicApiThreadMutation,
   runPublicApiThreadReadJson,
   runPublicApiThreadReadResponse,
+  runWorkspaceApiAuthenticatedJson,
+  runWorkspaceApiAuthenticatedResponse,
 } from "./public-api-route-support";
 import type { PublicApiCallerOptions } from "./public-api-route-support";
 import {
@@ -30,6 +33,7 @@ import {
   parseOptionalBoolean,
   parseAgentIdParam,
   parseFileIdParam,
+  parseRunIdParam,
   parseThreadIdParam,
   parseThreadEventsLimit,
   readBoundAgentCallRequestBody,
@@ -37,6 +41,10 @@ import {
   readSendEventsRequest,
 } from "./public-thread-api-request";
 import type { ParsedCreateThreadRequest } from "./public-thread-api-request";
+import {
+  readCreateWorkspaceRunRequest,
+  readWorkspaceRunApprovalRequest,
+} from "./workspace-run-api-request";
 
 type PublicApiRouteContext = Context<ApiGatewayEnvironment>;
 interface PublicAgentFileUploadRequest {
@@ -106,6 +114,10 @@ async function loadPublicThreadFileService() {
 
 async function loadBoundAgentAskService() {
   return import("../../../modules/public-api/app-agent-bound-ask.service");
+}
+
+async function loadWorkspaceRunService() {
+  return import("../../../modules/public-api/workspace-run-api.service");
 }
 
 async function runPublicThreadFileRoute<T>(
@@ -417,6 +429,122 @@ export function registerPublicApiRoute(app: Hono<ApiGatewayEnvironment>) {
   const v1 = new Hono<ApiGatewayEnvironment>();
 
   v1.get("/openapi.json", (c) => c.json(createPublicApiOpenApiDocument(new URL(c.req.url).origin)));
+
+  v1.get("/harnesses", (c) => c.json({ harnesses: listHarnessCatalog() }));
+
+  v1.get("/harnesses/:slug", (c) => {
+    const harness = getHarnessCatalogEntry(c.req.param("slug"));
+
+    return harness === null
+      ? c.json({ error: { code: "not_found", message: "Harness was not found." } }, 404)
+      : c.json({ harness });
+  });
+
+  v1.post("/runs", (c) =>
+    runWorkspaceApiAuthenticatedJson(
+      c,
+      async (caller) => {
+        const service = await loadWorkspaceRunService();
+        return service.startWorkspaceRun({
+          bindings: c.env,
+          caller,
+          executionContext: c.executionCtx,
+          input: await readCreateWorkspaceRunRequest(c),
+          requestUrl: c.req.url,
+        });
+      },
+      201,
+    ),
+  );
+
+  v1.get("/runs/:runId", (c) =>
+    runWorkspaceApiAuthenticatedJson(c, async (caller) => {
+      const service = await loadWorkspaceRunService();
+      return service.retrieveWorkspaceRun(c.env.DB, caller, parseRunIdParam(c.req.param("runId")));
+    }),
+  );
+
+  v1.get("/runs/:runId/events", (c) =>
+    runWorkspaceApiAuthenticatedJson(c, async (caller) => {
+      const service = await loadWorkspaceRunService();
+      return service.listWorkspaceRunEvents({
+        caller,
+        database: c.env.DB,
+        limit: parseThreadEventsLimit(c.req.query("limit")),
+        runId: parseRunIdParam(c.req.param("runId")),
+      });
+    }),
+  );
+
+  v1.get("/runs/:runId/events/stream", (c) =>
+    runWorkspaceApiAuthenticatedResponse(c, async (caller) => {
+      const service = await loadWorkspaceRunService();
+      const stream = await service.streamWorkspaceRunEvents({
+        bindings: c.env,
+        caller,
+        limit: parseThreadEventsLimit(c.req.query("limit")),
+        runId: parseRunIdParam(c.req.param("runId")),
+        signal: c.req.raw.signal,
+      });
+
+      return new Response(stream, {
+        headers: {
+          "Cache-Control": "no-store",
+          "Content-Type": "text/event-stream; charset=utf-8",
+          "X-Accel-Buffering": "no",
+        },
+      });
+    }),
+  );
+
+  v1.get("/runs/:runId/result", (c) =>
+    runWorkspaceApiAuthenticatedJson(c, async (caller) => {
+      const service = await loadWorkspaceRunService();
+      return service.retrieveWorkspaceRunResult({
+        caller,
+        database: c.env.DB,
+        runId: parseRunIdParam(c.req.param("runId")),
+      });
+    }),
+  );
+
+  v1.get("/runs/:runId/artifacts", (c) =>
+    runWorkspaceApiAuthenticatedJson(c, async (caller) => {
+      const service = await loadWorkspaceRunService();
+      return service.listWorkspaceRunArtifacts({
+        bindings: c.env,
+        caller,
+        runId: parseRunIdParam(c.req.param("runId")),
+      });
+    }),
+  );
+
+  v1.post("/runs/:runId/approve", (c) =>
+    runWorkspaceApiAuthenticatedJson(c, async (caller) => {
+      const service = await loadWorkspaceRunService();
+      const approval = await readWorkspaceRunApprovalRequest(c);
+      return service.approveWorkspaceRun({
+        bindings: c.env,
+        caller,
+        decision: approval.decision,
+        executionContext: c.executionCtx,
+        requestId: approval.requestId,
+        requestUrl: c.req.url,
+        runId: parseRunIdParam(c.req.param("runId")),
+      });
+    }),
+  );
+
+  v1.post("/runs/:runId/cancel", (c) =>
+    runWorkspaceApiAuthenticatedJson(c, async (caller) => {
+      const service = await loadWorkspaceRunService();
+      return service.cancelWorkspaceRun({
+        bindings: c.env,
+        caller,
+        runId: parseRunIdParam(c.req.param("runId")),
+      });
+    }),
+  );
 
   // The blocking bound-agent ask: POST the injected capability URL itself.
   v1.post(BOUND_CAPABILITY_ROUTE_BASE, async (c) => {

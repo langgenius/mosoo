@@ -112,7 +112,10 @@ async function readRequestTextWithLimit(request: Request, maxBytes: number): Pro
   }
 }
 
-async function readJsonBodyWithLimit(c: RawJsonRequestContext, maxBytes: number): Promise<unknown> {
+export async function readJsonBodyWithLimit(
+  c: RawJsonRequestContext,
+  maxBytes: number,
+): Promise<unknown> {
   return JSON.parse(await readRequestTextWithLimit(c.req.raw, maxBytes));
 }
 
@@ -198,6 +201,10 @@ export function parseAgentIdParam(value: string): AgentId {
 
 export function parseThreadIdParam(value: string): PublicThreadId {
   return parsePublicPlatformId(value, "Thread ID") as PublicThreadId;
+}
+
+export function parseRunIdParam(value: string): SessionRunId {
+  return parsePublicPlatformId(value, "Run ID") as SessionRunId;
 }
 
 export function parseFileIdParam(value: string): FileId {

@@ -214,6 +214,12 @@ async function buildSessionExecutionPlan(input: {
       setupScript: environmentSnapshot.setupScript,
     },
     skills,
+    source: {
+      agentId: input.source.agent.id,
+      agentVersionId: input.source.liveVersion?.id ?? null,
+      agentVersionNumber: input.source.liveVersion?.versionNumber ?? null,
+      kind: "agent",
+    },
     tools,
   };
 }

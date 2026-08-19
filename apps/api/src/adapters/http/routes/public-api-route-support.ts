@@ -10,6 +10,11 @@ import type {
   DeploymentCapabilityPublicApiCaller,
   PublicApiCaller,
 } from "../../../modules/auth/application/public-api-caller.service";
+import {
+  authenticateWorkspaceApiKey,
+  readWorkspaceApiKey,
+} from "../../../modules/auth/application/workspace-api-key.service";
+import type { WorkspaceApiKeyCaller } from "../../../modules/auth/application/workspace-api-key.service";
 import { FileControlError } from "../../../modules/files/application/file-control-errors";
 import {
   admitDeploymentCapability,
@@ -107,6 +112,25 @@ async function requireAccessTokenCaller(c: PublicApiRouteContext): Promise<Publi
     throw publicUnauthenticated("Access Token is invalid or revoked.");
   }
 
+  return caller;
+}
+
+async function requireRateLimitedWorkspaceApiKeyCaller(
+  c: PublicApiRouteContext,
+): Promise<WorkspaceApiKeyCaller> {
+  const value = readWorkspaceApiKey(c.req.raw);
+
+  if (!isTruthy(value)) {
+    throw publicUnauthenticated("A valid Workspace API key is required.");
+  }
+
+  const caller = await authenticateWorkspaceApiKey(c.env.DB, value);
+
+  if (caller === null) {
+    throw publicUnauthenticated("Workspace API key is invalid or revoked.");
+  }
+
+  await enforcePublicApiRateLimit(c.env.DB, caller.keyId);
   return caller;
 }
 
@@ -445,6 +469,31 @@ export async function runPublicApiAuthenticatedResponse(
       c,
       options.resolveCaller ?? requireAccessTokenCaller,
     );
+    return await operation(caller);
+  } catch (error) {
+    return toErrorResponse(error);
+  }
+}
+
+export async function runWorkspaceApiAuthenticatedJson<T>(
+  c: PublicApiRouteContext,
+  operation: (caller: WorkspaceApiKeyCaller) => Promise<T>,
+  status = 200,
+): Promise<Response> {
+  try {
+    const caller = await requireRateLimitedWorkspaceApiKeyCaller(c);
+    return Response.json(await operation(caller), { status });
+  } catch (error) {
+    return toErrorResponse(error);
+  }
+}
+
+export async function runWorkspaceApiAuthenticatedResponse(
+  c: PublicApiRouteContext,
+  operation: (caller: WorkspaceApiKeyCaller) => Promise<Response>,
+): Promise<Response> {
+  try {
+    const caller = await requireRateLimitedWorkspaceApiKeyCaller(c);
     return await operation(caller);
   } catch (error) {
     return toErrorResponse(error);

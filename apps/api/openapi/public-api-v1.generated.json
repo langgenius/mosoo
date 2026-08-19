@@ -875,6 +875,275 @@
         },
         "required": ["code", "message"],
         "type": "object"
+      },
+      "HarnessCatalogEntry": {
+        "additionalProperties": false,
+        "properties": {
+          "capabilities": {
+            "additionalProperties": false,
+            "properties": {
+              "approve": {
+                "enum": ["native", "normalized", "unsupported"]
+              },
+              "artifacts": {
+                "enum": ["native", "normalized", "unsupported"]
+              },
+              "cancel": {
+                "enum": ["native", "normalized", "unsupported"]
+              },
+              "resume": {
+                "enum": ["native", "normalized", "unsupported"]
+              },
+              "stream": {
+                "enum": ["native", "normalized", "unsupported"]
+              },
+              "subagents": {
+                "enum": ["native", "normalized", "unsupported"]
+              }
+            },
+            "required": ["approve", "artifacts", "cancel", "resume", "stream", "subagents"],
+            "type": "object"
+          },
+          "defaultModel": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "environment": {
+            "additionalProperties": false,
+            "properties": {
+              "default": {
+                "const": "workspace"
+              },
+              "repositoryRequired": {
+                "const": false
+              }
+            },
+            "required": ["default", "repositoryRequired"],
+            "type": "object"
+          },
+          "label": {
+            "type": "string"
+          },
+          "quickstart": {
+            "type": "string"
+          },
+          "requiredCredentials": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "runtimeId": {
+            "type": "string"
+          },
+          "slug": {
+            "enum": ["claude-code", "openai-codex", "opencode"]
+          },
+          "status": {
+            "enum": ["available", "unavailable"]
+          },
+          "supportedModels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "capabilities",
+          "defaultModel",
+          "description",
+          "environment",
+          "label",
+          "quickstart",
+          "requiredCredentials",
+          "runtimeId",
+          "slug",
+          "status",
+          "supportedModels",
+          "version"
+        ],
+        "type": "object"
+      },
+      "WorkspaceRunRequest": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "agent": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "input": {}
+            },
+            "required": ["agent", "input"],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "environment": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "harness": {
+                "enum": ["claude-code", "openai-codex", "opencode"]
+              },
+              "input": {},
+              "model": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": ["harness", "input"],
+            "type": "object"
+          }
+        ]
+      },
+      "WorkspaceRunResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "environment": {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "revisionId": {
+                "type": "string"
+              }
+            },
+            "required": ["id", "name", "revisionId"],
+            "type": "object"
+          },
+          "id": {
+            "type": "string"
+          },
+          "links": {
+            "additionalProperties": false,
+            "properties": {
+              "approve": {
+                "type": "string"
+              },
+              "artifacts": {
+                "type": "string"
+              },
+              "cancel": {
+                "type": "string"
+              },
+              "events": {
+                "type": "string"
+              },
+              "result": {
+                "type": "string"
+              },
+              "stream": {
+                "type": "string"
+              }
+            },
+            "required": ["approve", "artifacts", "cancel", "events", "result", "stream"],
+            "type": "object"
+          },
+          "model": {
+            "type": "string"
+          },
+          "source": {
+            "oneOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "agentId": {
+                    "type": "string"
+                  },
+                  "agentVersionId": {
+                    "type": ["string", "null"]
+                  },
+                  "agentVersionNumber": {
+                    "type": ["integer", "null"]
+                  },
+                  "kind": {
+                    "const": "agent"
+                  }
+                },
+                "required": ["agentId", "agentVersionId", "agentVersionNumber", "kind"],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "harness": {
+                    "enum": ["claude-code", "openai-codex", "opencode"]
+                  },
+                  "kind": {
+                    "const": "harness"
+                  },
+                  "version": {
+                    "type": "string"
+                  }
+                },
+                "required": ["harness", "kind", "version"],
+                "type": "object"
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "booting",
+              "running",
+              "waiting_input",
+              "completed",
+              "failed",
+              "cancelled",
+              "expired"
+            ]
+          },
+          "threadId": {
+            "type": "string"
+          },
+          "workspaceId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "environment",
+          "id",
+          "links",
+          "model",
+          "source",
+          "status",
+          "threadId",
+          "workspaceId"
+        ],
+        "type": "object"
+      },
+      "WorkspaceRunResultResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "output": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RunFinalOutput"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "run": {
+            "$ref": "#/components/schemas/WorkspaceRunResponse"
+          }
+        },
+        "required": ["output", "run"],
+        "type": "object"
       }
     },
     "securitySchemes": {
@@ -883,16 +1152,686 @@
         "description": "Use Authorization: Bearer mst_... . Access Tokens identify an account and do not carry scopes.",
         "scheme": "bearer",
         "type": "http"
+      },
+      "workspaceApiKey": {
+        "bearerFormat": "mosoo Workspace API key",
+        "description": "Use Authorization: Bearer msk_... . A Workspace API key can start and control Runs only in its bound Workspace.",
+        "scheme": "bearer",
+        "type": "http"
       }
     }
   },
   "info": {
-    "description": "Public HTTPS API for creating and retrieving Threads on mosoo Agent API Endpoints. v1 resource identifiers are bare ULIDs, not prefixed IDs. Access Tokens identify the account caller. Runtime execution resolves the Agent API Endpoint owner's capabilities while the Thread is attributed to the token owner.",
-    "title": "mosoo Public Thread API",
+    "description": "Public HTTPS API for starting Workspace-scoped Runs from curated Harnesses or published Agents, plus the legacy Thread surface. v1 resource identifiers are bare ULIDs. Workspace API keys use the msk_ prefix; account Access Tokens use mst_.",
+    "title": "mosoo Run API",
     "version": "v1"
   },
   "openapi": "3.1.0",
   "paths": {
+    "/harnesses": {
+      "get": {
+        "description": "Lists curated coding-agent Harnesses and the normalized capabilities each exposes through the Run API.",
+        "security": [],
+        "summary": "List Harnesses",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "harnesses": {
+                      "items": {
+                        "$ref": "#/components/schemas/HarnessCatalogEntry"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": ["harnesses"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Harness catalog."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/harnesses/{slug}": {
+      "get": {
+        "description": "Returns one curated Harness and its normalized capabilities.",
+        "parameters": [
+          {
+            "description": "Curated Harness slug.",
+            "example": "openai-codex",
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "enum": ["claude-code", "openai-codex", "opencode"],
+              "type": "string"
+            }
+          }
+        ],
+        "security": [],
+        "summary": "Retrieve a Harness",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "harness": {
+                      "$ref": "#/components/schemas/HarnessCatalogEntry"
+                    }
+                  },
+                  "required": ["harness"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Harness catalog entry."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/runs": {
+      "post": {
+        "description": "Creates an isolated Cattle Run from exactly one source: a curated Harness or a published Workspace Agent. Harness Runs do not create Agent records. The selected source, model, and Environment revision are frozen into the Run snapshot.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "examples": {
+                "harness": {
+                  "summary": "Run a curated Harness",
+                  "value": {
+                    "harness": "openai-codex",
+                    "input": "Review this repository"
+                  }
+                },
+                "agent": {
+                  "summary": "Run a published Workspace Agent",
+                  "value": {
+                    "agent": "researcher",
+                    "input": {
+                      "query": "Summarize Q2 notes"
+                    }
+                  }
+                }
+              },
+              "schema": {
+                "$ref": "#/components/schemas/WorkspaceRunRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "workspaceApiKey": []
+          }
+        ],
+        "summary": "Create a Run",
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceRunResponse"
+                }
+              }
+            },
+            "description": "Created Run."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/runs/{runId}": {
+      "get": {
+        "description": "Returns the Run state and its immutable source and Environment snapshots.",
+        "parameters": [
+          {
+            "description": "Run ID returned by POST /runs.",
+            "example": "01J0000000000000000000000A",
+            "in": "path",
+            "name": "runId",
+            "required": true,
+            "schema": {
+              "example": "01J0000000000000000000000A",
+              "format": "ulid",
+              "pattern": "^[0-7][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{25}$",
+              "type": "string",
+              "x-default": "01J0000000000000000000000A"
+            }
+          }
+        ],
+        "security": [
+          {
+            "workspaceApiKey": []
+          }
+        ],
+        "summary": "Retrieve a Run",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceRunResponse"
+                }
+              }
+            },
+            "description": "Run state."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/runs/{runId}/approve": {
+      "post": {
+        "description": "Allows or rejects one pending permission request for the Run.",
+        "parameters": [
+          {
+            "description": "Run ID returned by POST /runs.",
+            "example": "01J0000000000000000000000A",
+            "in": "path",
+            "name": "runId",
+            "required": true,
+            "schema": {
+              "example": "01J0000000000000000000000A",
+              "format": "ulid",
+              "pattern": "^[0-7][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{25}$",
+              "type": "string",
+              "x-default": "01J0000000000000000000000A"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "decision": {
+                    "enum": ["allow_once", "reject_once"]
+                  },
+                  "requestId": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": ["decision", "requestId"],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "workspaceApiKey": []
+          }
+        ],
+        "summary": "Approve or reject a Run action",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "ok": {
+                      "const": true
+                    }
+                  },
+                  "required": ["ok"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Permission decision accepted."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/runs/{runId}/artifacts": {
+      "get": {
+        "description": "Lists ready artifacts produced in this Run's isolated session.",
+        "parameters": [
+          {
+            "description": "Run ID returned by POST /runs.",
+            "example": "01J0000000000000000000000A",
+            "in": "path",
+            "name": "runId",
+            "required": true,
+            "schema": {
+              "example": "01J0000000000000000000000A",
+              "format": "ulid",
+              "pattern": "^[0-7][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{25}$",
+              "type": "string",
+              "x-default": "01J0000000000000000000000A"
+            }
+          }
+        ],
+        "security": [
+          {
+            "workspaceApiKey": []
+          }
+        ],
+        "summary": "List Run artifacts",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "artifacts": {
+                      "items": {
+                        "$ref": "#/components/schemas/PublicFile"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": ["artifacts"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Run artifact list."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/runs/{runId}/cancel": {
+      "post": {
+        "description": "Cancels the Run if it is active and returns its latest state.",
+        "parameters": [
+          {
+            "description": "Run ID returned by POST /runs.",
+            "example": "01J0000000000000000000000A",
+            "in": "path",
+            "name": "runId",
+            "required": true,
+            "schema": {
+              "example": "01J0000000000000000000000A",
+              "format": "ulid",
+              "pattern": "^[0-7][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{25}$",
+              "type": "string",
+              "x-default": "01J0000000000000000000000A"
+            }
+          }
+        ],
+        "security": [
+          {
+            "workspaceApiKey": []
+          }
+        ],
+        "summary": "Cancel a Run",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceRunResponse"
+                }
+              }
+            },
+            "description": "Cancelled Run."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/runs/{runId}/events": {
+      "get": {
+        "description": "Returns normalized, public-safe Run events in chronological order.",
+        "parameters": [
+          {
+            "description": "Run ID returned by POST /runs.",
+            "example": "01J0000000000000000000000A",
+            "in": "path",
+            "name": "runId",
+            "required": true,
+            "schema": {
+              "example": "01J0000000000000000000000A",
+              "format": "ulid",
+              "pattern": "^[0-7][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{25}$",
+              "type": "string",
+              "x-default": "01J0000000000000000000000A"
+            }
+          },
+          {
+            "description": "Maximum number of latest Thread events to return.",
+            "example": 100,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 100,
+              "maximum": 1000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "security": [
+          {
+            "workspaceApiKey": []
+          }
+        ],
+        "summary": "List Run events",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreadEventListResponse"
+                }
+              }
+            },
+            "description": "Run event list."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/runs/{runId}/events/stream": {
+      "get": {
+        "description": "Streams normalized Run events as Server-Sent Events.",
+        "parameters": [
+          {
+            "description": "Run ID returned by POST /runs.",
+            "example": "01J0000000000000000000000A",
+            "in": "path",
+            "name": "runId",
+            "required": true,
+            "schema": {
+              "example": "01J0000000000000000000000A",
+              "format": "ulid",
+              "pattern": "^[0-7][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{25}$",
+              "type": "string",
+              "x-default": "01J0000000000000000000000A"
+            }
+          },
+          {
+            "description": "Maximum number of latest Thread events to return.",
+            "example": 100,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 100,
+              "maximum": 1000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "security": [
+          {
+            "workspaceApiKey": []
+          }
+        ],
+        "summary": "Stream Run events",
+        "responses": {
+          "200": {
+            "content": {
+              "text/event-stream": {
+                "example": ": connected\n\nevent: thread.event\nid: 01J00000000000000000000010\ndata: {\"id\":\"01J00000000000000000000010\",\"runId\":\"01J0000000000000000000000A\",\"type\":\"run.started\",\"status\":\"available\",\"content\":\"01J0000000000000000000000A\",\"occurredAt\":\"2026-05-19T00:00:01.000Z\",\"durationMs\":null,\"tokens\":null}\n\n",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Run event stream."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/runs/{runId}/result": {
+      "get": {
+        "description": "Returns the latest Run state and its canonical final assistant output when available.",
+        "parameters": [
+          {
+            "description": "Run ID returned by POST /runs.",
+            "example": "01J0000000000000000000000A",
+            "in": "path",
+            "name": "runId",
+            "required": true,
+            "schema": {
+              "example": "01J0000000000000000000000A",
+              "format": "ulid",
+              "pattern": "^[0-7][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{25}$",
+              "type": "string",
+              "x-default": "01J0000000000000000000000A"
+            }
+          }
+        ],
+        "security": [
+          {
+            "workspaceApiKey": []
+          }
+        ],
+        "summary": "Retrieve a Run result",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceRunResultResponse"
+                }
+              }
+            },
+            "description": "Run result."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
     "/agents/{agentId}/files": {
       "post": {
         "description": "Uploads a file into the Agent API Endpoint's App draft scope before a Thread exists. Use the returned file ID in create-thread or send-events resources.",
