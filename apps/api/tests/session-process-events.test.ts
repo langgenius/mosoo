@@ -284,6 +284,139 @@ describe("session process event projection", () => {
     expect(events.map((event) => event.type)).toEqual(["run.started"]);
   });
 
+  test("keeps valid explicit durations authoritative", async () => {
+    const database = createProcessEventQueryDatabase();
+    await insertSessionProcessEvent(database, {
+      endedAt: 901_000,
+      id: "event-1",
+      occurredAt: 1_000,
+      runId: "run-1",
+      seq: 1,
+    });
+    await insertSessionProcessEvent(database, {
+      id: "event-2",
+      occurredAt: 2_000,
+      runId: "run-2",
+      seq: 2,
+    });
+
+    const events = await getThreadSessionProcessEvents(database, VIEWER, {
+      appId: APP_ID,
+      sessionId: SESSION_ID,
+    });
+
+    expect(events[0]?.durationMs).toBe(900_000);
+  });
+
+  test("infers adjacent event durations within the same run", async () => {
+    const database = createProcessEventQueryDatabase();
+    await insertSessionProcessEvent(database, {
+      id: "event-1",
+      occurredAt: 1_000,
+      runId: "run-1",
+      seq: 1,
+    });
+    await insertSessionProcessEvent(database, {
+      id: "event-2",
+      occurredAt: 2_500,
+      runId: "run-1",
+      seq: 2,
+    });
+
+    const events = await getThreadSessionProcessEvents(database, VIEWER, {
+      appId: APP_ID,
+      sessionId: SESSION_ID,
+    });
+
+    expect(events.map((event) => event.durationMs)).toEqual([1_500, 0]);
+  });
+
+  test("does not infer durations without an identified shared run", async () => {
+    const database = createProcessEventQueryDatabase();
+    await insertSessionProcessEvent(database, {
+      id: "event-1",
+      occurredAt: 1_000,
+      runId: null,
+      seq: 1,
+    });
+    await insertSessionProcessEvent(database, {
+      id: "event-2",
+      occurredAt: 2_000,
+      runId: "run-1",
+      seq: 2,
+    });
+
+    const events = await getThreadSessionProcessEvents(database, VIEWER, {
+      appId: APP_ID,
+      sessionId: SESSION_ID,
+    });
+
+    expect(events.map((event) => event.durationMs)).toEqual([0, 0]);
+  });
+
+  test("does not infer same-run durations across waits longer than five minutes", async () => {
+    const database = createProcessEventQueryDatabase();
+    await insertSessionProcessEvent(database, {
+      id: "event-1",
+      occurredAt: 1_000,
+      runId: "run-1",
+      seq: 1,
+    });
+    await insertSessionProcessEvent(database, {
+      id: "event-2",
+      occurredAt: 301_001,
+      runId: "run-1",
+      seq: 2,
+    });
+
+    const events = await getThreadSessionProcessEvents(database, VIEWER, {
+      appId: APP_ID,
+      sessionId: SESSION_ID,
+    });
+
+    expect(events.map((event) => event.durationMs)).toEqual([0, 0]);
+  });
+
+  test("excludes a twelve-day idle gap between runs from total duration", async () => {
+    const database = createProcessEventQueryDatabase();
+    const runBStartMs = 12 * 24 * 60 * 60 * 1000;
+    await insertSessionProcessEvent(database, {
+      endedAt: 1_000,
+      id: "run-a-started",
+      occurredAt: 0,
+      runId: "run-a",
+      seq: 1,
+    });
+    await insertSessionProcessEvent(database, {
+      id: "run-a-files-updated",
+      occurredAt: 2_000,
+      processType: "session.files.updated",
+      runId: "run-a",
+      seq: 2,
+    });
+    await insertSessionProcessEvent(database, {
+      id: "run-b-started",
+      occurredAt: runBStartMs,
+      runId: "run-b",
+      seq: 3,
+    });
+    await insertSessionProcessEvent(database, {
+      id: "run-b-completed",
+      occurredAt: runBStartMs + 2_000,
+      processType: "run.completed",
+      runId: "run-b",
+      seq: 4,
+    });
+
+    const events = await getThreadSessionProcessEvents(database, VIEWER, {
+      appId: APP_ID,
+      sessionId: SESSION_ID,
+    });
+
+    expect(events.map((event) => event.durationMs)).toEqual([1_000, 0, 2_000, 0]);
+    expect(events.reduce((total, event) => total + (event.durationMs ?? 0), 0)).toBe(3_000);
+  });
+
   test("folds persisted assistant message fragments into one process event", async () => {
     const database = createProcessEventQueryDatabase();
     await insertSessionProcessEvent(database, {
