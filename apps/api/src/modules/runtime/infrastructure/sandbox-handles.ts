@@ -60,7 +60,11 @@ export interface ExecutionSessionHandle {
       recursive?: boolean;
     },
   ): Promise<ReadableStream<Uint8Array>>;
-  writeFile(path: string, content: string): Promise<void>;
+  writeFile(
+    path: string,
+    content: string,
+    options?: { encoding?: "base64" | "utf8" },
+  ): Promise<void>;
 }
 
 export interface SandboxHandle extends ExecutionSessionHandle {

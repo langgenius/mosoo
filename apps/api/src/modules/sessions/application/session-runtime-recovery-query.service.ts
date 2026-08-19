@@ -7,6 +7,11 @@ import { getAppDatabase } from "../../../platform/db/drizzle";
 import { sanitizeProviderPrivateMarkup } from "../domain/provider-private-markup";
 
 const MAX_RUNTIME_RECOVERY_MESSAGES = 100;
+// Replayed history rides the driver boot payload and, for prompt-replay
+// runtimes, the first turn's prompt, so the transcript stays token-bounded:
+// the newest contiguous messages that fit this content budget are kept and
+// older history is dropped.
+const MAX_RUNTIME_RECOVERY_CONTENT_CHARS = 32_000;
 
 export async function getSessionRuntimeRecoveryMessages(
   database: D1Database,
@@ -36,10 +41,31 @@ export async function getSessionRuntimeRecoveryMessages(
     .limit(MAX_RUNTIME_RECOVERY_MESSAGES)
     .all();
 
-  return rows.toReversed().flatMap((row) => {
+  const newestFirst: DriverRecoveryMessage[] = [];
+  let remainingChars = MAX_RUNTIME_RECOVERY_CONTENT_CHARS;
+
+  for (const row of rows) {
     const content =
       row.role === "assistant" ? sanitizeProviderPrivateMarkup(row.content).text : row.content;
 
-    return content.trim().length === 0 ? [] : [{ content, role: row.role }];
-  });
+    if (content.trim().length === 0) {
+      continue;
+    }
+
+    if (content.length > remainingChars) {
+      // Keep the window contiguous: stop at the first message that no longer
+      // fits instead of skipping past it. The newest message alone is kept
+      // truncated so an oversized latest exchange cannot erase all context.
+      if (newestFirst.length === 0) {
+        newestFirst.push({ content: content.slice(0, remainingChars), role: row.role });
+      }
+
+      break;
+    }
+
+    newestFirst.push({ content, role: row.role });
+    remainingChars -= content.length;
+  }
+
+  return newestFirst.toReversed();
 }

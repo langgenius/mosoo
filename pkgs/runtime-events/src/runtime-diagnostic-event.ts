@@ -168,6 +168,12 @@ export const RUNTIME_DIAGNOSTIC_EVENT = {
     "restore",
     "failed",
   ),
+  sandboxSessionArtifactsRestored: runtimeDiagnosticEvent(
+    "runtime.sandbox.session.artifacts.restored",
+    "runtime.sandbox.updated",
+    "restore",
+    "completed",
+  ),
   sandboxSessionDestroyed: runtimeDiagnosticEvent(
     "runtime.sandbox.session.destroyed",
     "runtime.sandbox.updated",
@@ -287,6 +293,10 @@ export interface RuntimeDiagnosticSandboxRestoreFailedValue extends RuntimeDiagn
 
 export interface RuntimeDiagnosticSandboxTerminatedValue extends RuntimeDiagnosticSandboxValue {
   readonly reason: string;
+}
+
+export interface RuntimeDiagnosticSandboxArtifactsRestoredValue extends RuntimeDiagnosticSandboxValue {
+  readonly artifactCount: number;
 }
 
 export interface RuntimeDiagnosticDriverValue extends RuntimeDiagnosticBaseValue {
@@ -436,6 +446,8 @@ export interface RuntimeDiagnosticEventValueByName {
     .name]: RuntimeDiagnosticSandboxCheckpointFailedValue;
   readonly [RUNTIME_DIAGNOSTIC_EVENT.sandboxRestoreFailed
     .name]: RuntimeDiagnosticSandboxRestoreFailedValue;
+  readonly [RUNTIME_DIAGNOSTIC_EVENT.sandboxSessionArtifactsRestored
+    .name]: RuntimeDiagnosticSandboxArtifactsRestoredValue;
   readonly [RUNTIME_DIAGNOSTIC_EVENT.sandboxSessionDestroyed
     .name]: RuntimeDiagnosticSandboxTerminatedValue;
   readonly [RUNTIME_DIAGNOSTIC_EVENT.sandboxTerminated

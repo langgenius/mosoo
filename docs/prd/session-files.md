@@ -31,11 +31,13 @@ saved.
 
 ## Current experience and boundaries
 
-Attachments and recorded artifacts outlive an individual Run. Other files in
-the Agent's temporary workspace are not saved automatically. Earlier attachments
-remain listed on the Thread, but they are not automatically included in a later
-Run; the later message must reference them again through a surface that supports
-attachments.
+Attachments and recorded artifacts outlive an individual Run. When a Task
+Agent's Thread continues, its recorded artifacts are placed back into the fresh
+working environment at their original locations, so the Agent can keep editing
+earlier outputs without re-uploads. Other files in the Agent's temporary
+workspace are not saved automatically. Earlier attachments remain listed on the
+Thread, but they are not automatically included in a later Run; the later
+message must reference them again through a surface that supports attachments.
 
 The new-Thread composer and Agent session chat support attachments. The main
 Thread detail reply composer does not yet support them. The Files page has no

@@ -97,6 +97,7 @@ export async function prewarmAgentSessionRuntime(
 
     const executionSession = await timing.measure("ensureSandboxConversationSession", () =>
       ensureSandboxConversationSession(bindings, {
+        agentId: hydrated.value.profile.configRevision.agentId,
         kind: hydrated.value.profile.kind,
         mountSessionResources: false,
         origin: hydrated.value.profile.session.origin,

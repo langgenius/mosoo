@@ -275,6 +275,78 @@ describe("session message query", () => {
     expect(messages.at(-1)?.content).toBe("Recovery 100");
   });
 
+  test("bounds recovery history to a contiguous newest window within the content budget", async () => {
+    const database = createSessionMessageQueryDatabase();
+    // 15k chars per message against the 32k budget: only the newest two fit.
+    const contents = ["a".repeat(15_000), "b".repeat(15_000), "c".repeat(15_000)];
+
+    for (const [index, content] of contents.entries()) {
+      await database
+        .prepare(
+          `INSERT INTO session_message (
+            id, content_text, created_at, created_by_account_id, plan_json, role,
+            segments_json, seq, session_id, session_run_id
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(
+          `budget-message-${index}`,
+          content,
+          2000 + index,
+          VIEWER_ID,
+          null,
+          "user",
+          null,
+          3 + index,
+          SESSION_ID,
+          null,
+        )
+        .run();
+    }
+
+    const messages = await getSessionRuntimeRecoveryMessages(database, {
+      excludeRunId: null,
+      sessionId: SESSION_ID,
+    });
+
+    expect(messages).toHaveLength(2);
+    expect(messages.at(0)?.content.at(0)).toBe("b");
+    expect(messages.at(-1)?.content.at(0)).toBe("c");
+  });
+
+  test("keeps an oversized newest message truncated to the content budget", async () => {
+    const database = createSessionMessageQueryDatabase();
+
+    await database
+      .prepare(
+        `INSERT INTO session_message (
+          id, content_text, created_at, created_by_account_id, plan_json, role,
+          segments_json, seq, session_id, session_run_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        "oversized-message-1",
+        "d".repeat(40_000),
+        2000,
+        VIEWER_ID,
+        null,
+        "assistant",
+        null,
+        3,
+        SESSION_ID,
+        null,
+      )
+      .run();
+
+    const messages = await getSessionRuntimeRecoveryMessages(database, {
+      excludeRunId: null,
+      sessionId: SESSION_ID,
+    });
+
+    expect(messages).toHaveLength(1);
+    expect(messages.at(0)?.content).toHaveLength(32_000);
+    expect(messages.at(0)?.role).toBe("assistant");
+  });
+
   test("removes provider-private citations from stored assistant message projections", async () => {
     const database = createSessionMessageQueryDatabase();
     const privateCitation = "\uE200cite\uE202turn2view0\uE202turn8view0\uE201";

@@ -39,6 +39,10 @@ export interface RuntimeKindPolicy {
     readonly createOnReset: readonly RuntimeCheckpointRule[];
     readonly restoreOnActivate: readonly RuntimeCheckpointRule[];
   };
+  readonly continuation: {
+    readonly replayRecoveryMessages: boolean;
+    readonly restoreSessionArtifacts: boolean;
+  };
   readonly kind: AgentKind;
   readonly lease: {
     readonly closeOnRunTerminal: boolean;
@@ -105,6 +109,14 @@ export const RUNTIME_KIND_POLICIES = {
       createOnReset: [],
       restoreOnActivate: [],
     },
+    // Cattle continuation runs after a recycle land in a blank workspace with
+    // a fresh provider session. Recorded session artifacts and a bounded
+    // platform-history replay are the only durable state restored: temporary
+    // files, caches, login state, and native runtime state stay gone.
+    continuation: {
+      replayRecoveryMessages: true,
+      restoreSessionArtifacts: true,
+    },
     kind: "cattle",
     lease: {
       // Keeping the conversation session open across terminal runs keeps the
@@ -138,6 +150,13 @@ export const RUNTIME_KIND_POLICIES = {
       createOnRecreate: [SESSION_WORKSPACES_CHECKPOINT, SUBJECT_MEMORY_CHECKPOINT],
       createOnReset: [SESSION_WORKSPACES_CHECKPOINT],
       restoreOnActivate: [SUBJECT_MEMORY_CHECKPOINT],
+    },
+    // Pet continuity comes from the stable container plus workspace/memory
+    // checkpoints and platform-persisted native resume, so no artifact or
+    // history replay is layered on top.
+    continuation: {
+      replayRecoveryMessages: false,
+      restoreSessionArtifacts: false,
     },
     kind: "pet",
     lease: {

@@ -39,6 +39,7 @@ import type {
   EnsureSandboxConversationSessionInput,
   SandboxConversationSessionResult,
 } from "./sandbox-session.types";
+import { restoreSessionArtifactsToWorkspace } from "./session-artifact-restore.service";
 
 function measureOptional<T>(
   timing: EnsureSandboxConversationSessionInput["timing"],
@@ -56,12 +57,22 @@ function resolveConversationContinuationPlan(input: {
   shouldCreateCloudflareSession: boolean;
   shouldDeleteErrorSession: boolean;
   shouldRestoreCwd: boolean;
+  shouldRestoreSessionArtifacts: boolean;
 } {
+  const policy = getRuntimeKindPolicy(input.kind);
+  // A workspace being (re)created is the artifact-restore trigger: recorded
+  // session artifacts are the only durable workspace state a policy without
+  // workspace checkpoints can rehydrate after the sandbox was recycled. A
+  // first-ever conversation passes through the same path and finds no
+  // artifacts to restore.
+  const shouldRestoreSessionArtifacts = policy.continuation.restoreSessionArtifacts;
+
   if (input.existingSession === null) {
     return {
       shouldCreateCloudflareSession: true,
       shouldDeleteErrorSession: false,
       shouldRestoreCwd: false,
+      shouldRestoreSessionArtifacts,
     };
   }
 
@@ -70,10 +81,10 @@ function resolveConversationContinuationPlan(input: {
       shouldCreateCloudflareSession: false,
       shouldDeleteErrorSession: false,
       shouldRestoreCwd: false,
+      shouldRestoreSessionArtifacts: false,
     };
   }
 
-  const policy = getRuntimeKindPolicy(input.kind);
   const shouldRestoreCwd = runtimeCheckpointRulesInclude(
     policy.checkpoint.createOnHibernate,
     "session_workspaces",
@@ -88,6 +99,7 @@ function resolveConversationContinuationPlan(input: {
     shouldCreateCloudflareSession: true,
     shouldDeleteErrorSession: input.existingSession.status === "error",
     shouldRestoreCwd,
+    shouldRestoreSessionArtifacts,
   };
 }
 
@@ -164,6 +176,18 @@ export async function ensureSandboxConversationSession(
         sandbox: input.sandbox,
       }),
     );
+
+    if (continuation.shouldRestoreSessionArtifacts) {
+      await measureOptional(input.timing, "conversation.restoreSessionArtifacts", () =>
+        restoreSessionArtifactsToWorkspace(bindings, {
+          agentId: input.agentId,
+          cwd,
+          sandbox: input.sandbox,
+          sandboxId: input.sandboxId,
+          sessionId: input.sessionId,
+        }),
+      );
+    }
   }
 
   if (input.mountSessionResources) {
