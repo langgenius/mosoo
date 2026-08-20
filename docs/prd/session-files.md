@@ -6,8 +6,8 @@ Status: partially available.
 
 Builders often need an Agent to read a brief, dataset, or reference document and
 keep useful output after a Run ends. Thread files give each conversation a
-durable, bounded file context without implying that the whole Agent workspace is
-saved.
+durable, reviewable file surface. They are distinct from the private Thread
+workspace checkpoint used to continue a Task Agent.
 
 ## Who uses it
 
@@ -31,13 +31,13 @@ saved.
 
 ## Current experience and boundaries
 
-Attachments and recorded artifacts outlive an individual Run. When a Task
-Agent's Thread continues, its recorded artifacts are placed back into the fresh
-working environment at their original locations, so the Agent can keep editing
-earlier outputs without re-uploads. Other files in the Agent's temporary
-workspace are not saved automatically. Earlier attachments remain listed on the
-Thread, but they are not automatically included in a later Run; the later
-message must reference them again through a surface that supports attachments.
+Attachments and recorded artifacts outlive an individual Run. A Task Agent's
+private Thread checkpoint separately restores the complete working directory for
+continuation, including files that were not promoted to artifacts. That checkpoint
+is not a browseable file library and does not create `file_record` entries.
+Earlier attachments remain listed on the Thread, but they are not included in a
+later Run unless that message references them again through a surface that
+supports attachments; the attachment mount itself is excluded from checkpoints.
 
 The new-Thread composer and Agent session chat support attachments. The main
 Thread detail reply composer does not yet support them. The Files page has no

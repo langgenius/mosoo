@@ -24,6 +24,7 @@ function createConversationSessionDatabase(): SqliteD1Database {
       dir text NOT NULL,
       id text PRIMARY KEY NOT NULL,
       sandbox_id text NOT NULL,
+      session_run_id text,
       status text NOT NULL
     );
   `);

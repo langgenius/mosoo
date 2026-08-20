@@ -32,6 +32,7 @@ import { getSupportedRuntimeId } from "../../domain/runtime-config";
 import {
   commitQueuedSessionRunAdmission,
   hasSessionRunAdmissionClientRequestReceipt,
+  isCattleTerminalCheckpointReadyForNextRun,
 } from "../../infrastructure/session-runs/session-run-admission.repository";
 import { getActiveSessionRunSummary } from "../../infrastructure/session-runs/session-run-read.repository";
 import { SessionRunCreationGuardRejectedError } from "../../infrastructure/session-runs/session-run-store.repository";
@@ -106,6 +107,13 @@ export async function queueSessionRun(request: QueueSessionRunRequest): Promise<
   // paying three serial D1 round trips before the run row exists.
   await Promise.all([
     reconcileStaleActiveSessionRun(bindings.DB, input.session.id),
+    isCattleTerminalCheckpointReadyForNextRun(bindings.DB, input.session.id).then((ready) => {
+      if (!ready) {
+        throw new Error(
+          `Thread ${input.session.id} is still committing its previous workspace checkpoint. Retry after checkpointing finishes; if the error persists, contact support.`,
+        );
+      }
+    }),
     getSessionExecutionPlan(bindings.DB, input.session.id).then((executionPlan) =>
       resolveReadyEnvironmentPackageArtifact(
         bindings,

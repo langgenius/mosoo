@@ -16,6 +16,7 @@ export type RuntimeCheckpointRule =
       readonly updateSubjectCheckpoint: true;
     }
   | {
+      readonly sanitizeTransientState: boolean;
       readonly type: "session_workspaces";
       readonly updateSubjectCheckpoint: false;
     };
@@ -37,6 +38,7 @@ export interface RuntimeKindPolicy {
     readonly createOnHibernate: readonly RuntimeCheckpointRule[];
     readonly createOnRecreate: readonly RuntimeCheckpointRule[];
     readonly createOnReset: readonly RuntimeCheckpointRule[];
+    readonly createOnTerminal: readonly RuntimeCheckpointRule[];
     readonly restoreOnActivate: readonly RuntimeCheckpointRule[];
   };
   readonly continuation: {
@@ -87,8 +89,14 @@ const SUBJECT_MEMORY_CHECKPOINT = {
 } as const satisfies RuntimeCheckpointRule;
 
 const SESSION_WORKSPACES_CHECKPOINT = {
+  sanitizeTransientState: false,
   type: "session_workspaces",
   updateSubjectCheckpoint: false,
+} as const satisfies RuntimeCheckpointRule;
+
+const CATTLE_SESSION_WORKSPACE_CHECKPOINT = {
+  ...SESSION_WORKSPACES_CHECKPOINT,
+  sanitizeTransientState: true,
 } as const satisfies RuntimeCheckpointRule;
 
 const SUBJECT_MEMORY_CLEAR = {
@@ -107,15 +115,15 @@ export const RUNTIME_KIND_POLICIES = {
       createOnHibernate: [],
       createOnRecreate: [],
       createOnReset: [],
-      restoreOnActivate: [],
+      createOnTerminal: [CATTLE_SESSION_WORKSPACE_CHECKPOINT],
+      restoreOnActivate: [CATTLE_SESSION_WORKSPACE_CHECKPOINT],
     },
-    // Cattle continuation runs after a recycle land in a blank workspace with
-    // a fresh provider session. Recorded session artifacts and a bounded
-    // platform-history replay are the only durable state restored: temporary
-    // files, caches, login state, and native runtime state stay gone.
+    // Cattle commits the complete session workspace, including provider-native
+    // state, before terminal lease release. Platform history remains the
+    // fallback for runtimes that do not expose a native resume reference.
     continuation: {
       replayRecoveryMessages: true,
-      restoreSessionArtifacts: true,
+      restoreSessionArtifacts: false,
     },
     kind: "cattle",
     lease: {
@@ -149,7 +157,8 @@ export const RUNTIME_KIND_POLICIES = {
       createOnHibernate: [SESSION_WORKSPACES_CHECKPOINT, SUBJECT_MEMORY_CHECKPOINT],
       createOnRecreate: [SESSION_WORKSPACES_CHECKPOINT, SUBJECT_MEMORY_CHECKPOINT],
       createOnReset: [SESSION_WORKSPACES_CHECKPOINT],
-      restoreOnActivate: [SUBJECT_MEMORY_CHECKPOINT],
+      createOnTerminal: [],
+      restoreOnActivate: [SESSION_WORKSPACES_CHECKPOINT, SUBJECT_MEMORY_CHECKPOINT],
     },
     // Pet continuity comes from the stable container plus workspace/memory
     // checkpoints and platform-persisted native resume, so no artifact or

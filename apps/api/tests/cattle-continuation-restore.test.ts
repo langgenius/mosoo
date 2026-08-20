@@ -1,18 +1,17 @@
 import { describe, expect, test } from "bun:test";
 
-import { sandboxSessionsTable, sandboxesTable, sessionsTable } from "@mosoo/db";
-import type { AccountId, SessionId } from "@mosoo/id";
+import { sandboxBackupsTable, sandboxSessionsTable, sandboxesTable } from "@mosoo/db";
 
-import { fileStore } from "../src/modules/files/application/file-store";
+import { encodeSandboxBackupIdForStorage } from "../src/modules/runtime/infrastructure/sandbox-backup-id";
 import type {
   ExecutionSessionHandle,
+  RuntimeCommandResultHandle,
   SandboxHandle,
 } from "../src/modules/runtime/infrastructure/sandbox-handles";
 import { ensureSandboxConversationSession } from "../src/modules/runtime/infrastructure/sandbox-session/sandbox-conversation-session.service";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import {
   PUBLIC_API_TEST_IDS,
-  PublicApiMemoryFileBucket,
   createPublicHttpContractDatabase,
   createPublicHttpTestBindings,
   insertOwnerSession,
@@ -20,9 +19,10 @@ import {
 } from "./helpers/public-api-http-test-fixture";
 import type { SqliteD1Database } from "./helpers/sqlite-d1";
 
-const SESSION_CWD = "/workspace/session";
-const OTHER_SESSION_ID = "01J000000000000000000000Z1" as SessionId;
+const SESSION_CWD = "/workspace/se/01J00000000000000000000007";
 const PRIOR_SANDBOX_SESSION_ID = "01J000000000000000000000Z2";
+const CLOUDFLARE_BACKUP_ID = "550e8400-e29b-41d4-a716-446655440000";
+const STORED_BACKUP_ID = encodeSandboxBackupIdForStorage(CLOUDFLARE_BACKUP_ID);
 const ORIGIN = {
   callerUserId: PUBLIC_API_TEST_IDS.ownerAccount,
   entrypoint: "api",
@@ -30,28 +30,26 @@ const ORIGIN = {
   type: "agent",
 } as const;
 
-interface CapturedFileWrite {
-  content: string;
-  encoding: string | undefined;
+function commandResult(success: boolean): RuntimeCommandResultHandle {
+  return {
+    exitCode: success ? 0 : 1,
+    stderr: "",
+    stdout: "",
+    success,
+  };
 }
 
-function decodeBase64(value: string): string {
-  return new TextDecoder().decode(Uint8Array.from(atob(value), (char) => char.codePointAt(0) ?? 0));
-}
-
-function createContinuationSandbox(): {
-  mkdirs: string[];
+function createContinuationSandbox(input: { restoreError?: Error } = {}): {
+  restoredBackups: Array<{ readonly dir: string; readonly id: string }>;
   sandbox: SandboxHandle;
-  writes: Map<string, CapturedFileWrite>;
 } {
-  const mkdirs: string[] = [];
-  const writes = new Map<string, CapturedFileWrite>();
-  const unavailable = async () => {
+  const restoredBackups: Array<{ readonly dir: string; readonly id: string }> = [];
+  const unavailable = async (): Promise<never> => {
     throw new Error("Unexpected sandbox test method call.");
   };
   const executionSession: ExecutionSessionHandle = {
     exec: unavailable,
-    mkdir: unavailable,
+    mkdir: async () => {},
     readFile: unavailable,
     startProcess: unavailable,
     watch: unavailable,
@@ -59,209 +57,145 @@ function createContinuationSandbox(): {
   };
 
   return {
-    mkdirs,
+    restoredBackups,
     sandbox: {
       configureNetworkConstraints: unavailable,
       createBackup: unavailable,
       createSession: async () => executionSession,
       deleteSession: unavailable,
       destroy: unavailable,
-      exec: unavailable,
+      exec: async () => commandResult(false),
       getSession: async () => executionSession,
-      async mkdir(path) {
-        mkdirs.push(path);
-      },
+      mkdir: async () => {},
       mountBucket: unavailable,
       readFile: unavailable,
-      restoreBackup: unavailable,
+      async restoreBackup(backup) {
+        if (input.restoreError) {
+          throw input.restoreError;
+        }
+
+        restoredBackups.push(backup);
+        return backup;
+      },
       setKeepAlive: unavailable,
       startProcess: unavailable,
       terminal: unavailable,
+      unmountBucket: unavailable,
       watch: unavailable,
-      async writeFile(path, content, options) {
-        writes.set(path, { content, encoding: options?.encoding });
-      },
+      writeFile: unavailable,
       wsConnect: unavailable,
     },
-    writes,
   };
 }
 
 async function createContinuationFixture(): Promise<{
   bindings: ApiBindings;
-  bucket: PublicApiMemoryFileBucket;
   database: SqliteD1Database;
 }> {
   const database = await createPublicHttpContractDatabase();
   await insertOwnerSession(database);
-  const bucket = new PublicApiMemoryFileBucket();
-  const bindings = createPublicHttpTestBindings(database, {
-    fileBucket: bucket as unknown as R2Bucket,
-  }) as ApiBindings;
-  const nowMs = nowMsForTest();
+  const bindings = createPublicHttpTestBindings(database) as ApiBindings;
+  const now = nowMsForTest();
 
   await database
     .app()
     .insert(sandboxesTable)
     .values({
-      createdAt: nowMs,
+      createdAt: now,
       id: PUBLIC_API_TEST_IDS.sandbox,
       kind: "cattle",
       status: "active",
       subjectId: PUBLIC_API_TEST_IDS.ownerSession,
       subjectKind: "session",
-      updatedAt: nowMs,
+      updatedAt: now,
     })
     .run();
-  await database
-    .app()
-    .insert(sessionsTable)
-    .values({
-      agentId: PUBLIC_API_TEST_IDS.agent,
-      appId: PUBLIC_API_TEST_IDS.app,
-      createdAt: nowMs,
-      creatorAccountId: PUBLIC_API_TEST_IDS.ownerAccount,
-      id: OTHER_SESSION_ID,
-      kind: "cattle",
-      model: "model-1",
-      provider: "provider-1",
-      renamed: false,
-      runtimeId: "claude-agent-sdk",
-      status: "IDLE",
-      title: "Other thread",
-      updatedAt: nowMs,
-    })
-    .run();
-
-  return { bindings, bucket, database };
-}
-
-async function insertClosedConversation(database: SqliteD1Database): Promise<void> {
   await database
     .app()
     .insert(sandboxSessionsTable)
     .values({
-      createdAt: nowMsForTest(),
+      createdAt: now,
       cwd: SESSION_CWD,
       originJson: JSON.stringify(ORIGIN),
       sandboxId: PUBLIC_API_TEST_IDS.sandbox,
       sandboxSessionId: PRIOR_SANDBOX_SESSION_ID,
       sessionId: PUBLIC_API_TEST_IDS.ownerSession,
       status: "closed",
-      updatedAt: nowMsForTest(),
+      updatedAt: now,
     })
     .run();
+  await database
+    .app()
+    .insert(sandboxBackupsTable)
+    .values({
+      createdAt: now - 20 * 24 * 60 * 60 * 1000,
+      dir: SESSION_CWD,
+      id: STORED_BACKUP_ID,
+      keep: false,
+      sandboxId: PUBLIC_API_TEST_IDS.sandbox,
+      status: "ready",
+      ttlSeconds: 10 * 365 * 24 * 60 * 60,
+      updatedAt: now,
+    })
+    .run();
+
+  return { bindings, database };
 }
 
-async function recordArtifact(
-  bindings: ApiBindings,
-  input: {
-    body: string;
-    path: string;
-    sessionId?: SessionId;
-  },
-): Promise<void> {
-  await fileStore.recordRuntimeOutput({
-    bindings,
-    body: new TextEncoder().encode(input.body),
-    contentType: "text/plain",
-    createdBy: PUBLIC_API_TEST_IDS.ownerAccount as AccountId,
-    path: input.path,
-    sessionId: input.sessionId ?? (PUBLIC_API_TEST_IDS.ownerSession as SessionId),
-  });
+function createInput(sandbox: SandboxHandle) {
+  return {
+    agentId: PUBLIC_API_TEST_IDS.agent,
+    kind: "cattle" as const,
+    mountSessionResources: false,
+    origin: ORIGIN,
+    sandbox,
+    sandboxId: PUBLIC_API_TEST_IDS.sandbox,
+    sessionId: PUBLIC_API_TEST_IDS.ownerSession,
+  };
 }
 
 describe("recycled cattle sandbox continuation", () => {
-  test("restores the latest ready artifacts into the fresh session workspace", async () => {
-    const { bindings, database } = await createContinuationFixture();
+  test("restores the complete 20-day-old Thread checkpoint before opening a new execution session", async () => {
+    const { bindings } = await createContinuationFixture();
+    const { restoredBackups, sandbox } = createContinuationSandbox();
 
-    // Run 1 records artifacts, including two content versions of one path.
-    await recordArtifact(bindings, {
-      body: "<html>v1</html>",
-      path: "outputs/presentation/index.html",
-    });
-    await recordArtifact(bindings, {
-      body: "<html>v2</html>",
-      path: "outputs/presentation/index.html",
-    });
-    await recordArtifact(bindings, { body: "notes v1", path: "outputs/notes.md" });
-    // Another thread's artifact must never leak into this session workspace.
-    await recordArtifact(bindings, {
-      body: "other thread",
-      path: "outputs/other.txt",
-      sessionId: OTHER_SESSION_ID,
-    });
-
-    // The terminal run released the sandbox and the recycle sweep closed the
-    // conversation; only control-plane records remain.
-    await insertClosedConversation(database);
-
-    const { mkdirs, sandbox, writes } = createContinuationSandbox();
-    const result = await ensureSandboxConversationSession(bindings, {
-      agentId: PUBLIC_API_TEST_IDS.agent,
-      kind: "cattle",
-      mountSessionResources: false,
-      origin: ORIGIN,
-      sandbox,
-      sandboxId: PUBLIC_API_TEST_IDS.sandbox,
-      sessionId: PUBLIC_API_TEST_IDS.ownerSession,
-    });
+    const result = await ensureSandboxConversationSession(bindings, createInput(sandbox));
 
     expect(result.sandboxSessionId).not.toBe(PRIOR_SANDBOX_SESSION_ID);
     expect(result.cwd).toBe(SESSION_CWD);
-
-    expect([...writes.keys()].toSorted()).toEqual([
-      `${SESSION_CWD}/outputs/notes.md`,
-      `${SESSION_CWD}/outputs/presentation/index.html`,
+    expect(restoredBackups).toEqual([
+      {
+        dir: SESSION_CWD,
+        id: CLOUDFLARE_BACKUP_ID,
+      },
     ]);
-    const indexWrite = writes.get(`${SESSION_CWD}/outputs/presentation/index.html`);
-    expect(indexWrite?.encoding).toBe("base64");
-    expect(decodeBase64(indexWrite?.content ?? "")).toBe("<html>v2</html>");
-    const notesWrite = writes.get(`${SESSION_CWD}/outputs/notes.md`);
-    expect(decodeBase64(notesWrite?.content ?? "")).toBe("notes v1");
-    expect(mkdirs).toContain(`${SESSION_CWD}/outputs/presentation`);
   });
 
-  test("continues without artifact writes when the session recorded none", async () => {
+  test("leaves a failed restore retryable and idempotently restores the same committed checkpoint", async () => {
     const { bindings, database } = await createContinuationFixture();
-    await insertClosedConversation(database);
-
-    const { sandbox, writes } = createContinuationSandbox();
-    const result = await ensureSandboxConversationSession(bindings, {
-      agentId: PUBLIC_API_TEST_IDS.agent,
-      kind: "cattle",
-      mountSessionResources: false,
-      origin: ORIGIN,
-      sandbox,
-      sandboxId: PUBLIC_API_TEST_IDS.sandbox,
-      sessionId: PUBLIC_API_TEST_IDS.ownerSession,
+    const failed = createContinuationSandbox({
+      restoreError: new Error("backup unavailable"),
     });
-
-    expect(result.sandboxSessionId).not.toBe(PRIOR_SANDBOX_SESSION_ID);
-    expect(writes.size).toBe(0);
-  });
-
-  test("fails closed when a ready artifact object is missing from storage", async () => {
-    const { bindings, bucket, database } = await createContinuationFixture();
-    await recordArtifact(bindings, {
-      body: "<html>v1</html>",
-      path: "outputs/presentation/index.html",
-    });
-    bucket.objects.clear();
-    await insertClosedConversation(database);
-
-    const { sandbox } = createContinuationSandbox();
 
     await expect(
-      ensureSandboxConversationSession(bindings, {
-        agentId: PUBLIC_API_TEST_IDS.agent,
-        kind: "cattle",
-        mountSessionResources: false,
-        origin: ORIGIN,
-        sandbox,
-        sandboxId: PUBLIC_API_TEST_IDS.sandbox,
-        sessionId: PUBLIC_API_TEST_IDS.ownerSession,
-      }),
-    ).rejects.toThrow("missing from storage");
+      ensureSandboxConversationSession(bindings, createInput(failed.sandbox)),
+    ).rejects.toThrow("workspace checkpoint could not be restored");
+
+    const rowAfterFailure = await database
+      .app()
+      .select({ status: sandboxSessionsTable.status })
+      .from(sandboxSessionsTable)
+      .get();
+    expect(rowAfterFailure?.status).toBe("closed");
+
+    const retried = createContinuationSandbox();
+    await ensureSandboxConversationSession(bindings, createInput(retried.sandbox));
+
+    expect(retried.restoredBackups).toEqual([
+      {
+        dir: SESSION_CWD,
+        id: CLOUDFLARE_BACKUP_ID,
+      },
+    ]);
   });
 });

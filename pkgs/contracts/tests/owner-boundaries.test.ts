@@ -96,7 +96,7 @@ describe("contracts owner boundaries", () => {
         tagline: "On-demand worker",
       },
       nativeResume: {
-        persistence: "volatile",
+        persistence: "platform",
       },
       terminal: {
         target: "unavailable",
@@ -107,7 +107,7 @@ describe("contracts owner boundaries", () => {
       id: "cross_session_memory",
       label: "Cross-session memory",
       values: {
-        cattle: "Only explicit session files",
+        cattle: "None; isolated Thread checkpoint",
         pet: "Stable sandbox continuity",
       },
     });

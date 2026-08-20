@@ -439,6 +439,7 @@ function createTestSandboxHandle(
     restoreBackup: unexpectedSandboxCall,
     startProcess: unexpectedSandboxCall,
     terminal: unexpectedSandboxCall,
+    unmountBucket: unexpectedSandboxCall,
     watch: unexpectedSandboxCall,
     wsConnect: unexpectedSandboxCall,
   };
@@ -503,6 +504,7 @@ function createWorkerDeploymentSandboxHandle(id: string, events: string[]): Sand
     restoreBackup: unexpectedSandboxCall,
     startProcess: unexpectedSandboxCall,
     terminal: unexpectedSandboxCall,
+    unmountBucket: unexpectedSandboxCall,
     watch: unexpectedSandboxCall,
     wsConnect: unexpectedSandboxCall,
   };

@@ -1,6 +1,8 @@
 import type { SessionRunTrigger } from "@mosoo/contracts/session-run";
 import {
   apiCommandsTable,
+  sandboxBackupsTable,
+  sandboxSessionsTable,
   sessionEventsTable,
   sessionMessagesTable,
   sessionRunsTable,
@@ -17,7 +19,7 @@ import type {
   SessionRunId,
 } from "@mosoo/id";
 import type { RuntimeEventEnvelope } from "@mosoo/runtime-events";
-import { and, eq, exists, inArray, isNull, notExists, sql } from "drizzle-orm";
+import { and, eq, exists, inArray, isNull, ne, notExists, or, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 
 import {
@@ -91,6 +93,40 @@ function claimableSessionPredicate(db: AppDatabase, input: CommitQueuedSessionRu
     isNull(sessionsTable.archivedAt),
     eq(sessionsTable.status, "IDLE"),
     isNull(sessionsTable.statusOperationId),
+    or(
+      ne(sessionsTable.kind, "cattle"),
+      isNull(sessionsTable.lastRunId),
+      notExists(
+        db
+          .select({ id: sessionRunsTable.id })
+          .from(sessionRunsTable)
+          .where(
+            and(
+              eq(sessionRunsTable.id, sessionsTable.lastRunId),
+              eq(sessionRunsTable.status, "completed"),
+            ),
+          ),
+      ),
+      exists(
+        db
+          .select({ id: sandboxBackupsTable.id })
+          .from(sandboxBackupsTable)
+          .innerJoin(
+            sandboxSessionsTable,
+            and(
+              eq(sandboxSessionsTable.sessionId, sessionsTable.id),
+              eq(sandboxSessionsTable.sandboxId, sandboxBackupsTable.sandboxId),
+              eq(sandboxSessionsTable.cwd, sandboxBackupsTable.dir),
+            ),
+          )
+          .where(
+            and(
+              eq(sandboxBackupsTable.sessionRunId, sessionsTable.lastRunId),
+              eq(sandboxBackupsTable.status, "ready"),
+            ),
+          ),
+      ),
+    ),
     notExists(
       db
         .select({ id: sessionRunsTable.id })
@@ -117,6 +153,57 @@ function claimableSessionPredicate(db: AppDatabase, input: CommitQueuedSessionRu
         ),
     input.runCreationGuard ?? sql`TRUE`,
   );
+}
+
+export async function isCattleTerminalCheckpointReadyForNextRun(
+  database: D1Database,
+  sessionId: SessionId,
+): Promise<boolean> {
+  const appDb = getAppDatabase(database);
+  const session =
+    (await appDb
+      .select({
+        kind: sessionsTable.kind,
+        lastRunId: sessionsTable.lastRunId,
+        lastRunStatus: sessionRunsTable.status,
+      })
+      .from(sessionsTable)
+      .leftJoin(sessionRunsTable, eq(sessionRunsTable.id, sessionsTable.lastRunId))
+      .where(eq(sessionsTable.id, sessionId))
+      .limit(1)
+      .get()) ?? null;
+
+  if (
+    session === null ||
+    session.kind !== "cattle" ||
+    session.lastRunId === null ||
+    session.lastRunStatus !== "completed"
+  ) {
+    return true;
+  }
+
+  const checkpoint =
+    (await appDb
+      .select({ id: sandboxBackupsTable.id })
+      .from(sandboxBackupsTable)
+      .innerJoin(
+        sandboxSessionsTable,
+        and(
+          eq(sandboxSessionsTable.sessionId, sessionId),
+          eq(sandboxSessionsTable.sandboxId, sandboxBackupsTable.sandboxId),
+          eq(sandboxSessionsTable.cwd, sandboxBackupsTable.dir),
+        ),
+      )
+      .where(
+        and(
+          eq(sandboxBackupsTable.sessionRunId, session.lastRunId),
+          eq(sandboxBackupsTable.status, "ready"),
+        ),
+      )
+      .limit(1)
+      .get()) ?? null;
+
+  return checkpoint !== null;
 }
 
 export async function hasSessionRunAdmissionClientRequestReceipt(

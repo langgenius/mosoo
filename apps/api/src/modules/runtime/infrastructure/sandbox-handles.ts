@@ -96,6 +96,7 @@ export interface SandboxHandle extends ExecutionSessionHandle {
   }): Promise<{ dir: string; id: string }>;
   setKeepAlive(keepAlive: boolean): Promise<void>;
   terminal(request: Request, options?: PtyOptions): Promise<Response>;
+  unmountBucket(mountPath: string): Promise<void>;
   wsConnect(request: Request, port: number): Promise<Response>;
 }
 
@@ -114,6 +115,7 @@ const SANDBOX_HANDLE_METHODS = [
   "setKeepAlive",
   "startProcess",
   "terminal",
+  "unmountBucket",
   "watch",
   "writeFile",
   "wsConnect",

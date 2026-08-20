@@ -18,6 +18,7 @@ their machine-readable contracts, code, or [Architecture](../architecture.md).
 - [Runs and Threads](./default-consumption-surface.md)
 - [Agent Work History](./agent-session-api.md)
 - [Thread Lifecycle](./session-lifecycle.md)
+- [Thread Continuation](./thread-continuation.md)
 - [Runtime State Operations](./runtime-state-operations.md)
 - [Agent Terminal](./agent-terminal.md)
 - [Session Log](./session-log.md)

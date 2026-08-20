@@ -186,6 +186,68 @@ async function createFixture() {
 }
 
 describe("Session Run atomic admission", () => {
+  test("blocks a cattle follow-up until the previous completed Run has a ready checkpoint", async () => {
+    const { database, viewer } = await createFixture();
+    const apiCommandQueue = createApiCommandQueueStub();
+    const bindings = createPublicHttpTestBindings(database, { apiCommandQueue }) as ApiBindings;
+    await database
+      .prepare("UPDATE session SET kind = 'cattle' WHERE id = ?")
+      .bind(PUBLIC_API_TEST_IDS.ownerSession)
+      .run();
+    const first = await queueOwnerRun({
+      bindings,
+      clientRequestId: "checkpoint-run-a",
+      viewer,
+    });
+    await database
+      .prepare("UPDATE session_run SET status = 'completed' WHERE id = ?")
+      .bind(first.run.id)
+      .run();
+    await database
+      .prepare("UPDATE session SET status = 'IDLE' WHERE id = ?")
+      .bind(PUBLIC_API_TEST_IDS.ownerSession)
+      .run();
+
+    await expect(
+      queueOwnerRun({ bindings, clientRequestId: "checkpoint-run-b", viewer }),
+    ).rejects.toThrow("still committing its previous workspace checkpoint");
+
+    database.execute(`
+      INSERT INTO sandbox (
+        id, kind, subject_kind, subject_id, status, bind_mount_ready,
+        global_mounts_json, created_at, updated_at
+      )
+      VALUES (
+        '${PUBLIC_API_TEST_IDS.sandbox}', 'cattle', 'session', '${PUBLIC_API_TEST_IDS.ownerSession}',
+        'active', 1, '[]', 1, 1
+      );
+
+      INSERT INTO sandbox_session (
+        cloudflare_session_id, created_at, cwd, origin_json, sandbox_id,
+        session_id, status, updated_at
+      )
+      VALUES (
+        '01J0000000000000000000000Z', 1, '/workspace/se/${PUBLIC_API_TEST_IDS.ownerSession}', '{}',
+        '${PUBLIC_API_TEST_IDS.sandbox}', '${PUBLIC_API_TEST_IDS.ownerSession}', 'active', 1
+      );
+
+      INSERT INTO sandbox_backup (
+        created_at, dir, id, keep, sandbox_id, session_run_id, status, ttl_seconds, updated_at
+      )
+      VALUES (
+        1, '/workspace/se/${PUBLIC_API_TEST_IDS.ownerSession}', '${PUBLIC_API_TEST_IDS.operation}',
+        0, '${PUBLIC_API_TEST_IDS.sandbox}', '${first.run.id}', 'ready', 315360000, 1
+      );
+    `);
+
+    const second = await queueOwnerRun({
+      bindings,
+      clientRequestId: "checkpoint-run-b",
+      viewer,
+    });
+    expect(second.run.status).toBe("queued");
+  });
+
   for (const failurePoint of FAILURE_POINTS) {
     test(`rolls back every durable admission record when the ${failurePoint.label} fails`, async () => {
       const { database, viewer } = await createFixture();

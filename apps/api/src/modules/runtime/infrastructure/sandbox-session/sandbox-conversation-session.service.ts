@@ -54,6 +54,7 @@ function resolveConversationContinuationPlan(input: {
   kind: EnsureSandboxConversationSessionInput["kind"];
 }): {
   sandboxSessionId?: SandboxSessionId;
+  requireCwdCheckpoint: boolean;
   shouldCreateCloudflareSession: boolean;
   shouldDeleteErrorSession: boolean;
   shouldRestoreCwd: boolean;
@@ -71,6 +72,7 @@ function resolveConversationContinuationPlan(input: {
     return {
       shouldCreateCloudflareSession: true,
       shouldDeleteErrorSession: false,
+      requireCwdCheckpoint: false,
       shouldRestoreCwd: false,
       shouldRestoreSessionArtifacts,
     };
@@ -80,13 +82,14 @@ function resolveConversationContinuationPlan(input: {
     return {
       shouldCreateCloudflareSession: false,
       shouldDeleteErrorSession: false,
+      requireCwdCheckpoint: false,
       shouldRestoreCwd: false,
       shouldRestoreSessionArtifacts: false,
     };
   }
 
   const shouldRestoreCwd = runtimeCheckpointRulesInclude(
-    policy.checkpoint.createOnHibernate,
+    policy.checkpoint.restoreOnActivate,
     "session_workspaces",
   );
   const shouldUseNewCloudflareSession =
@@ -98,6 +101,7 @@ function resolveConversationContinuationPlan(input: {
       : {}),
     shouldCreateCloudflareSession: true,
     shouldDeleteErrorSession: input.existingSession.status === "error",
+    requireCwdCheckpoint: input.kind === "cattle" && input.existingSession.status === "closed",
     shouldRestoreCwd,
     shouldRestoreSessionArtifacts,
   };
@@ -106,20 +110,35 @@ function resolveConversationContinuationPlan(input: {
 async function restoreSandboxSessionCwdIfMissing(input: {
   cwd: string;
   latestReadyBackup: RuntimeConversationSessionRecord["latestReadyBackup"];
+  requireCheckpoint: boolean;
   sandbox: EnsureSandboxConversationSessionInput["sandbox"];
+  sessionId: SessionId;
 }): Promise<void> {
   if (await sandboxConversationDirectoryHasContent(input.sandbox, input.cwd)) {
     return;
   }
 
   if (!input.latestReadyBackup) {
+    if (input.requireCheckpoint) {
+      throw new Error(
+        `Thread ${input.sessionId} has no committed workspace checkpoint. Retry after the previous turn finishes checkpointing; if the error persists, start a new Thread or contact support.`,
+      );
+    }
+
     return;
   }
 
-  await restoreSandboxConversationDirectoryBackup(input.sandbox, {
-    backup: input.latestReadyBackup,
-    cwd: input.cwd,
-  });
+  try {
+    await restoreSandboxConversationDirectoryBackup(input.sandbox, {
+      backup: input.latestReadyBackup,
+      cwd: input.cwd,
+    });
+  } catch (cause) {
+    throw new Error(
+      `Thread ${input.sessionId} workspace checkpoint could not be restored. Retry the continuation; if the error persists, start a new Thread or contact support.`,
+      { cause },
+    );
+  }
 }
 
 export async function ensureSandboxConversationSession(
@@ -164,7 +183,9 @@ export async function ensureSandboxConversationSession(
       restoreSandboxSessionCwdIfMissing({
         cwd,
         latestReadyBackup: existingSession.latestReadyBackup,
+        requireCheckpoint: continuation.requireCwdCheckpoint,
         sandbox: input.sandbox,
+        sessionId: input.sessionId,
       }),
     );
   }

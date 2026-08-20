@@ -99,6 +99,7 @@ function createSandboxHandle(files: ReadonlyMap<string, string>): SandboxHandle 
     setKeepAlive: unavailable,
     startProcess: unavailable,
     terminal: unavailable,
+    unmountBucket: unavailable,
     watch: unavailable,
     writeFile: unavailable,
     wsConnect: unavailable,

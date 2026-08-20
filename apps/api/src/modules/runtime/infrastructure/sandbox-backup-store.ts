@@ -3,11 +3,18 @@ import {
   sandboxBackupsTable,
   sandboxSessionsTable,
   sandboxesTable,
+  nativeResumeRefsTable,
   sessionsTable,
 } from "@mosoo/db";
 import { parsePlatformId } from "@mosoo/id";
-import type { RuntimeOperationId, SandboxBackupId, SandboxId, SessionId } from "@mosoo/id";
-import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
+import type {
+  RuntimeOperationId,
+  SandboxBackupId,
+  SandboxId,
+  SessionId,
+  SessionRunId,
+} from "@mosoo/id";
+import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 
 import type { AppDatabase } from "../../../platform/db/drizzle";
 import {
@@ -17,8 +24,8 @@ import {
 } from "../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../time";
 
-// Each row binds nine values; ten rows stay below D1's per-statement variable limit.
-const SANDBOX_BACKUP_INSERT_BATCH_SIZE = 10;
+// Each row binds ten values; nine rows stay below D1's per-statement variable limit.
+const SANDBOX_BACKUP_INSERT_BATCH_SIZE = 9;
 type AppDatabaseBatchItem = Parameters<AppDatabase["batch"]>[0][number];
 
 export interface CreatedSandboxBackupRecord {
@@ -35,6 +42,33 @@ export interface ReadySandboxBackupForPruning {
   readonly dir: string;
   readonly id: SandboxBackupId;
   readonly keep: boolean;
+}
+
+export async function listReadySandboxBackupsForSessionRun(
+  database: D1Database,
+  input: {
+    readonly sandboxId: string;
+    readonly sessionRunId: string;
+  },
+): Promise<CreatedSandboxBackupRecord[]> {
+  const sandboxId = parsePlatformId<SandboxId>(input.sandboxId, "sandbox id");
+  const sessionRunId = parsePlatformId<SessionRunId>(input.sessionRunId, "session run id");
+  const rows = await getAppDatabase(database)
+    .select({
+      dir: sandboxBackupsTable.dir,
+      id: sandboxBackupsTable.id,
+    })
+    .from(sandboxBackupsTable)
+    .where(
+      and(
+        eq(sandboxBackupsTable.sandboxId, sandboxId),
+        eq(sandboxBackupsTable.sessionRunId, sessionRunId),
+        eq(sandboxBackupsTable.status, "ready"),
+      ),
+    )
+    .all();
+
+  return rows;
 }
 
 export interface SandboxSessionBackupCandidate {
@@ -107,8 +141,10 @@ export async function recordCreatedSandboxBackups(
   database: D1Database,
   input: {
     readonly backups: readonly CreatedSandboxBackupWrite[];
+    readonly checkpointSessionId?: string;
     readonly operationId?: string | null;
     readonly sandboxId: string;
+    readonly sessionRunId?: string;
     readonly ttlSeconds: number;
   },
 ): Promise<void> {
@@ -117,10 +153,18 @@ export async function recordCreatedSandboxBackups(
   }
 
   const sandboxId = parsePlatformId<SandboxId>(input.sandboxId, "sandbox id");
+  const checkpointSessionId =
+    input.checkpointSessionId === undefined
+      ? null
+      : parsePlatformId<SessionId>(input.checkpointSessionId, "checkpoint session id");
   const operationId =
     input.operationId === undefined || input.operationId === null
       ? input.operationId
       : parsePlatformId<RuntimeOperationId>(input.operationId, "runtime operation id");
+  const sessionRunId =
+    input.sessionRunId === undefined
+      ? null
+      : parsePlatformId<SessionRunId>(input.sessionRunId, "session run id");
   const now = currentTimestampMs();
   const backupRows = input.backups.map((entry, index) => ({
     createdAt: now,
@@ -129,6 +173,7 @@ export async function recordCreatedSandboxBackups(
     id: parsePlatformId<SandboxBackupId>(entry.backup.id, `sandbox backup id ${index}`),
     keep: false,
     sandboxId,
+    sessionRunId,
     status: "ready" as const,
     ttlSeconds: input.ttlSeconds,
     updatedAt: now,
@@ -157,6 +202,23 @@ export async function recordCreatedSandboxBackups(
         appDb
           .insert(sandboxBackupsTable)
           .values(backupRows.slice(index, index + SANDBOX_BACKUP_INSERT_BATCH_SIZE)),
+      );
+    }
+
+    if (checkpointSessionId !== null && sessionRunId !== null) {
+      queries.push(
+        appDb
+          .update(nativeResumeRefsTable)
+          .set({
+            committedSessionRunId: sessionRunId,
+            committedValue: sql`${nativeResumeRefsTable.value}`,
+          })
+          .where(
+            and(
+              eq(nativeResumeRefsTable.sessionId, checkpointSessionId),
+              eq(nativeResumeRefsTable.observedSessionRunId, sessionRunId),
+            ),
+          ),
       );
     }
 

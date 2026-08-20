@@ -8,10 +8,12 @@ import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../../platform/db/drizzle";
 import { appendSessionRuntimeEvents } from "../../../sessions/application/session-event-write.service";
 import { createFailedSessionRunRuntimeEvent } from "../../application/session-runs/session-run-view-events.service";
+import { getRuntimeKindPolicy } from "../../domain/runtime-kind-policy";
 import { classifyReclaim, decideReclaimRecovery } from "../../domain/session-run-reclaim-recovery";
 import { isTerminalSessionRunStatus } from "../../domain/session-run-status";
 import { createSessionRunTerminalFailureSourceId } from "../../domain/session-run-terminal-event-id";
 import { recordRuntimeRunLeaseReleasedOutcome } from "../runtime-subject-lifecycle/runtime-run-lease-store";
+import { createSandboxCheckpoints } from "../sandbox-backup.service";
 import { markExecutingExternalToolEffectsUnknownForDriver } from "../session-runs/external-tool-effect-store.repository";
 import { failAcceptedRuntimeCommandsForTerminalDriver } from "../session-runs/runtime-command-store.repository";
 import { setSessionRunStatus } from "../session-runs/session-run-store.repository";
@@ -28,6 +30,34 @@ interface LinkedSessionRunStatusRow {
 export interface TerminalDriverInstanceSessionRunReleaseResult {
   readonly link: RuntimeSessionLink | null;
   readonly released: boolean;
+}
+
+async function checkpointTerminalRuntimeSessionIfNeeded(
+  bindings: ApiBindings,
+  link: RuntimeSessionLink,
+): Promise<void> {
+  if (
+    link.sandboxId === null ||
+    link.sandboxKind === null ||
+    link.sessionId === null ||
+    link.sessionRunId === null ||
+    link.sessionRunStatus !== "completed"
+  ) {
+    return;
+  }
+
+  const rules = getRuntimeKindPolicy(link.sandboxKind).checkpoint.createOnTerminal;
+
+  if (rules.length === 0) {
+    return;
+  }
+
+  await createSandboxCheckpoints(bindings, {
+    requiredSessionId: link.sessionId,
+    rules,
+    sandboxId: link.sandboxId,
+    sessionRunId: link.sessionRunId,
+  });
 }
 
 function toFinalizedDriverRunTransitionRun(
@@ -83,7 +113,12 @@ export async function releaseTerminalDriverInstanceSessionRun(
   },
 ): Promise<TerminalDriverInstanceSessionRunReleaseResult> {
   const database = bindings.DB;
-  const link = await getRuntimeSessionLink(database, input.driverInstanceId);
+  const link = await getRuntimeSessionLink(database, input.driverInstanceId, {
+    sessionRunId: input.sessionRunId,
+  });
+
+  await checkpointTerminalRuntimeSessionIfNeeded(bindings, link);
+
   const outcome = await recordRuntimeRunLeaseReleasedOutcome(database, {
     driverInstanceId: input.driverInstanceId,
     expectedSessionRunId: input.sessionRunId,

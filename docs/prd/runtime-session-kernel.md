@@ -23,9 +23,10 @@ Preview runs real sessions for the runtime choices currently offered by mosoo; i
 
 ## User-visible boundaries
 
-- Conversation history and recorded files can outlive an execution environment; temporary files and machine state do not automatically become durable assets.
-- Assistant Agents keep bounded working continuity, while Task Agents use disposable environments. Neither is a promise of a complete machine backup.
+- Conversation history and recorded files can outlive an execution environment. A Task Agent also restores its private Thread working directory at the next turn, but that checkpoint is not a user-visible file asset or a complete machine image.
+- Assistant Agents keep bounded shared-Agent continuity. Task Agents keep isolated Thread continuity while using disposable live containers. Neither promises live processes, sockets, an in-memory kernel, machine-wide temporary state, or persisted short-lived credentials.
 - Existing sessions do not silently adopt later configuration changes.
 - Interrupted requests are not silently replayed; the user may need to resend them.
 
 Exact execution and persistence mechanics belong in [Architecture](../architecture.md).
+The user-visible Task Agent guarantee is defined in [Thread Continuation](./thread-continuation.md).

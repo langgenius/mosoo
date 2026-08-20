@@ -39,6 +39,20 @@ function createDatabase(): SqliteD1Database {
       driver_instance_id text,
       status text NOT NULL
     );
+
+    CREATE TABLE session (
+      id text PRIMARY KEY NOT NULL,
+      kind text NOT NULL,
+      last_run_id text
+    );
+
+    CREATE TABLE sandbox_backup (
+      dir text NOT NULL,
+      id text PRIMARY KEY NOT NULL,
+      sandbox_id text NOT NULL,
+      session_run_id text,
+      status text NOT NULL
+    );
   `);
 
   return database;
@@ -60,6 +74,13 @@ async function insertConversation(
         ON CONFLICT (id) DO NOTHING`,
     )
     .bind(input.sandboxId, input.kind)
+    .run();
+  await database
+    .prepare(
+      `INSERT INTO session (id, kind, last_run_id) VALUES (?, ?, NULL)
+        ON CONFLICT (id) DO NOTHING`,
+    )
+    .bind(input.sessionId, input.kind)
     .run();
   await database
     .prepare(
@@ -95,6 +116,55 @@ async function insertActiveRunLease(
 }
 
 describe("idle session-scoped conversation sweep", () => {
+  test("keeps a completed cattle turn alive until its workspace checkpoint is ready", async () => {
+    const database = createDatabase();
+    await insertConversation(database, {
+      kind: "cattle",
+      sandboxId: "sb-checkpoint",
+      sessionId: "session-checkpoint",
+      status: "active",
+      updatedAt: NOW - GRACE_MS - 1,
+    });
+    await database
+      .prepare("INSERT INTO session_run (id, driver_instance_id, status) VALUES (?, NULL, ?)")
+      .bind("run-checkpoint", "completed")
+      .run();
+    await database
+      .prepare("UPDATE session SET last_run_id = ? WHERE id = ?")
+      .bind("run-checkpoint", "session-checkpoint")
+      .run();
+
+    await expect(
+      listIdleSessionScopedConversationSessions(database, {
+        idleSinceLte: NOW - GRACE_MS,
+        limit: 10,
+      }),
+    ).resolves.toEqual([]);
+    await expect(
+      claimIdleSessionScopedConversationForClose(database, {
+        idleSinceLte: NOW - GRACE_MS,
+        now: NOW,
+        runtimeSubjectId: "sb-checkpoint" as never,
+        sandboxSessionId: "cf-session-checkpoint" as never,
+        sessionId: "session-checkpoint" as never,
+      }),
+    ).resolves.toBe(false);
+
+    await database
+      .prepare(
+        "INSERT INTO sandbox_backup (dir, id, sandbox_id, session_run_id, status) VALUES (?, ?, ?, ?, ?)",
+      )
+      .bind("cwd", "backup-checkpoint", "sb-checkpoint", "run-checkpoint", "ready")
+      .run();
+
+    await expect(
+      listIdleSessionScopedConversationSessions(database, {
+        idleSinceLte: NOW - GRACE_MS,
+        limit: 10,
+      }),
+    ).resolves.toEqual([{ sandboxId: "sb-checkpoint", sessionId: "session-checkpoint" }]);
+  });
+
   test("lists only idle active cattle conversations without a run lease", async () => {
     const database = createDatabase();
     await insertConversation(database, {

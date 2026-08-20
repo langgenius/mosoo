@@ -82,12 +82,15 @@ function createConversationSessionDatabase(kind: AgentKind = "pet"): SqliteD1Dat
       dir text NOT NULL,
       id text PRIMARY KEY NOT NULL,
       sandbox_id text NOT NULL,
+      session_run_id text,
       status text NOT NULL
     );
 
     CREATE TABLE session (
       agent_id text,
-      id text PRIMARY KEY NOT NULL
+      id text PRIMARY KEY NOT NULL,
+      kind text DEFAULT '${kind}' NOT NULL,
+      last_run_id text
     );
 
     CREATE TABLE driver_instance (
@@ -162,7 +165,10 @@ async function insertConversationSession(
     .run();
 }
 
-async function insertConversationBackup(database: D1Database): Promise<void> {
+async function insertConversationBackup(
+  database: D1Database,
+  input: { createdAt?: number; dir?: string } = {},
+): Promise<void> {
   await database
     .prepare(
       `
@@ -176,7 +182,13 @@ async function insertConversationBackup(database: D1Database): Promise<void> {
         VALUES (?, ?, ?, ?, ?)
       `,
     )
-    .bind(1, "/workspace/se/session-1", STORED_BACKUP_ID, "01J0000000000000000000000D", "ready")
+    .bind(
+      input.createdAt ?? 1,
+      input.dir ?? "/workspace/se/session-1",
+      STORED_BACKUP_ID,
+      "01J0000000000000000000000D",
+      "ready",
+    )
     .run();
 }
 
@@ -238,6 +250,7 @@ function createSandbox(
     cwdHasContent?: boolean;
     deleteSessionError?: Error;
     onRestore?: (backup: { readonly dir: string; readonly id: string }) => void;
+    restoreError?: Error;
   } = {},
 ): SandboxHandle {
   const executionSession = createExecutionSession({
@@ -266,6 +279,10 @@ function createSandbox(
     },
     async mountBucket() {},
     async restoreBackup(backup) {
+      if (options.restoreError) {
+        throw options.restoreError;
+      }
+
       options.onRestore?.(backup);
       return backup;
     },
@@ -273,6 +290,7 @@ function createSandbox(
     async terminal() {
       return new Response();
     },
+    async unmountBucket() {},
     async wsConnect() {
       return new Response(null, { status: 101 });
     },
@@ -348,7 +366,7 @@ describe("ensureSandboxConversationSession", () => {
     expect(deadline).toBeLessThanOrEqual(Date.now() + 5 * 60_000);
   });
 
-  test("continues a closed cattle session with a new execution session id", async () => {
+  test("continues a warm closed cattle session with a new execution session id", async () => {
     const database = createConversationSessionDatabase("cattle");
     await insertConversationSession(database, { status: "closed" });
     const sandbox = createSandbox();
@@ -366,6 +384,56 @@ describe("ensureSandboxConversationSession", () => {
       status: "active",
     });
     await expect(readInactiveDeadline(database)).resolves.toBeNull();
+  });
+
+  test("restores a cold cattle session from a 20-day-old committed checkpoint", async () => {
+    const database = createConversationSessionDatabase("cattle");
+    await insertConversationSession(database, { status: "closed" });
+    await insertConversationBackup(database, {
+      createdAt: Date.now() - 20 * 24 * 60 * 60 * 1000,
+    });
+    let restoredBackup: { readonly dir: string; readonly id: string } | null = null;
+    const sandbox = createSandbox({
+      cwdHasContent: false,
+      onRestore: (backup) => {
+        restoredBackup = backup;
+      },
+    });
+
+    await ensureSandboxConversationSession(
+      createBindings(database),
+      createInput(sandbox, "cattle"),
+    );
+
+    expect(restoredBackup).toEqual({
+      dir: "/workspace/se/session-1",
+      id: CLOUDFLARE_BACKUP_ID,
+    });
+  });
+
+  test("fails cold cattle continuation when its exact Thread checkpoint is missing", async () => {
+    const database = createConversationSessionDatabase("cattle");
+    await insertConversationSession(database, { status: "closed" });
+    await insertConversationBackup(database, { dir: "/workspace/se/another-session" });
+    const sandbox = createSandbox({ cwdHasContent: false });
+
+    await expect(
+      ensureSandboxConversationSession(createBindings(database), createInput(sandbox, "cattle")),
+    ).rejects.toThrow("has no committed workspace checkpoint");
+  });
+
+  test("reports an actionable error for a corrupt cattle checkpoint", async () => {
+    const database = createConversationSessionDatabase("cattle");
+    await insertConversationSession(database, { status: "closed" });
+    await insertConversationBackup(database);
+    const sandbox = createSandbox({
+      cwdHasContent: false,
+      restoreError: new Error("backup checksum mismatch"),
+    });
+
+    await expect(
+      ensureSandboxConversationSession(createBindings(database), createInput(sandbox, "cattle")),
+    ).rejects.toThrow("workspace checkpoint could not be restored. Retry the continuation");
   });
 
   test("continues a closed pet session through the stable restore path", async () => {

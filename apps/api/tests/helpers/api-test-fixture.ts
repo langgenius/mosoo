@@ -611,6 +611,7 @@ function createApiTestSchema(database: SqliteD1Database): void {
       id text PRIMARY KEY NOT NULL,
       keep integer DEFAULT 0 NOT NULL,
       sandbox_id text NOT NULL,
+      session_run_id text,
       status text NOT NULL,
       ttl_seconds integer NOT NULL,
       updated_at integer NOT NULL

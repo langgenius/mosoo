@@ -4,21 +4,16 @@ import type { DriverInstanceId, RuntimeEventId, SessionId, SessionRunId } from "
 import { createRuntimeEvent } from "@mosoo/runtime-events";
 import type { RuntimeEventEnvelope } from "@mosoo/runtime-events";
 
-import { logWarn } from "../../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { appendSessionRuntimeEvents } from "../../../sessions/application/session-event-write.service";
 import { appRuntimeEventToSessionDeliveryEvents } from "../../../sessions/application/session-live-state.service";
 import { recordCanonicalSessionRunFailure } from "../../application/session-runs/session-run-terminal-failure.service";
 import { isTerminalSessionRunStatus } from "../../domain/session-run-status";
-import { recordRuntimeRunLeaseReleasedOutcome } from "../runtime-subject-lifecycle/runtime-run-lease-store";
 import { setSessionRunStatus } from "../session-runs/session-run-store.repository";
 import type { SessionRunTransitionOutcome } from "../session-runs/session-run-store.repository";
 import type { RuntimeSessionLink } from "./event-types";
 import { getRuntimeSessionLink } from "./session-link.repository";
-import {
-  closeTerminalRuntimeConversationIfNeeded,
-  recycleReleasedTerminalRuntimeLeaseIfNeeded,
-} from "./terminal-runtime-lease";
+import { releaseTerminalDriverInstanceSessionRun } from "./terminal-run-release";
 
 function assertTerminalDriverSessionRunTransition(outcome: SessionRunTransitionOutcome): void {
   switch (outcome.kind) {
@@ -87,12 +82,10 @@ export async function recordDriverInstanceCompletion(
     });
   }
 
-  const released = await releaseLinkedRunLease(bindings, {
+  await releaseLinkedRunLease(bindings, {
     driverInstanceId: input.driverInstanceId,
-    link,
     sessionRunId: link.sessionRunId,
   });
-  await recycleReleasedTerminalRuntimeLeaseIfNeeded(bindings, { link, released });
 }
 
 export async function recordDriverInstanceFailure(
@@ -126,12 +119,10 @@ export async function recordDriverInstanceFailure(
     assertTerminalDriverSessionRunTransition(outcome);
   }
 
-  const released = await releaseLinkedRunLease(bindings, {
+  await releaseLinkedRunLease(bindings, {
     driverInstanceId: input.driverInstanceId,
-    link,
     sessionRunId: link.sessionRunId,
   });
-  await recycleReleasedTerminalRuntimeLeaseIfNeeded(bindings, { link, released });
 }
 
 async function synthesizeDriverRunFinished(
@@ -211,7 +202,6 @@ async function releaseLinkedRunLease(
   bindings: ApiBindings,
   input: {
     readonly driverInstanceId: DriverInstanceId;
-    readonly link: RuntimeSessionLink;
     readonly sessionRunId: SessionRunId | null;
   },
 ): Promise<boolean> {
@@ -219,24 +209,10 @@ async function releaseLinkedRunLease(
     return false;
   }
 
-  const outcome = await recordRuntimeRunLeaseReleasedOutcome(bindings.DB, {
+  const outcome = await releaseTerminalDriverInstanceSessionRun(bindings, {
     driverInstanceId: input.driverInstanceId,
-    expectedSessionRunId: input.sessionRunId,
+    sessionRunId: input.sessionRunId,
   });
-  const released = outcome.status === "applied";
 
-  if (!released) {
-    logWarn("runtime.run.lease.release_skipped", {
-      driverInstanceId: input.driverInstanceId,
-      reason: "reason" in outcome ? outcome.reason : outcome.status,
-      sessionRunId: input.sessionRunId,
-      status: outcome.status,
-    });
-  }
-
-  if (released) {
-    await closeTerminalRuntimeConversationIfNeeded(bindings, input.link);
-  }
-
-  return released;
+  return outcome.released;
 }

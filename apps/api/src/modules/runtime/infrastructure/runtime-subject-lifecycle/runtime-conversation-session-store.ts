@@ -1,8 +1,14 @@
 import type { RuntimeSubjectErrorCode } from "@mosoo/contracts/sandbox";
-import { sandboxesTable, sandboxSessionsTable, sessionsTable } from "@mosoo/db";
+import {
+  sandboxBackupsTable,
+  sandboxesTable,
+  sandboxSessionsTable,
+  sessionRunsTable,
+  sessionsTable,
+} from "@mosoo/db";
 import { createPlatformId } from "@mosoo/id";
 import type { SandboxId, SandboxSessionId, SessionId } from "@mosoo/id";
-import { and, desc, eq, inArray, lte, notExists, sql } from "drizzle-orm";
+import { and, desc, eq, exists, inArray, isNull, lte, notExists, or, sql } from "drizzle-orm";
 
 import { getAppDatabase, runAppDatabaseBatch } from "../../../../platform/db/drizzle";
 import {
@@ -10,6 +16,7 @@ import {
   getRuntimeSubjectInactiveDeadline,
 } from "../../domain/runtime-kind-policy";
 import { toRuntimeSubjectStatusLifecycleEventName } from "../../domain/runtime-subject-lifecycle.machine";
+import { isCattleTerminalCheckpointReadyForNextRun } from "../session-runs/session-run-admission.repository";
 import {
   activeConversationSessionQuery,
   mapReadyRuntimeSubjectBackup,
@@ -118,12 +125,40 @@ export async function listIdleSessionScopedConversationSessions(
     })
     .from(sandboxSessionsTable)
     .innerJoin(sandboxesTable, eq(sandboxesTable.id, sandboxSessionsTable.sandboxId))
+    .innerJoin(sessionsTable, eq(sessionsTable.id, sandboxSessionsTable.sessionId))
     .where(
       and(
         eq(sandboxSessionsTable.status, "active"),
         eq(sandboxesTable.kind, "cattle"),
         sql`${sandboxSessionsTable.updatedAt} <= ${input.idleSinceLte}`,
         notExists(runLeaseQueryForListedSubject(appDb)),
+        or(
+          isNull(sessionsTable.lastRunId),
+          notExists(
+            appDb
+              .select({ id: sessionRunsTable.id })
+              .from(sessionRunsTable)
+              .where(
+                and(
+                  eq(sessionRunsTable.id, sessionsTable.lastRunId),
+                  eq(sessionRunsTable.status, "completed"),
+                ),
+              ),
+          ),
+          exists(
+            appDb
+              .select({ id: sandboxBackupsTable.id })
+              .from(sandboxBackupsTable)
+              .where(
+                and(
+                  eq(sandboxBackupsTable.sandboxId, sandboxSessionsTable.sandboxId),
+                  eq(sandboxBackupsTable.dir, sandboxSessionsTable.cwd),
+                  eq(sandboxBackupsTable.sessionRunId, sessionsTable.lastRunId),
+                  eq(sandboxBackupsTable.status, "ready"),
+                ),
+              ),
+          ),
+        ),
       ),
     )
     .limit(input.limit)
@@ -150,6 +185,10 @@ export async function claimIdleSessionScopedConversationForClose(
     readonly sessionId: SessionId;
   },
 ): Promise<boolean> {
+  if (!(await isCattleTerminalCheckpointReadyForNextRun(database, input.sessionId))) {
+    return false;
+  }
+
   const appDb = getAppDatabase(database);
   const claimed = await appDb
     .update(sandboxSessionsTable)

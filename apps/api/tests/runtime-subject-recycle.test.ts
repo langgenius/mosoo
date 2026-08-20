@@ -70,6 +70,7 @@ function createRuntimeSubjectRecycleDatabase(): SqliteD1Database {
       id text PRIMARY KEY NOT NULL,
       keep integer NOT NULL,
       sandbox_id text NOT NULL,
+      session_run_id text,
       status text NOT NULL,
       ttl_seconds integer NOT NULL,
       updated_at integer NOT NULL
@@ -199,6 +200,7 @@ function createSandboxHandle(): SandboxHandle {
     setKeepAlive: async () => {},
     startProcess: unavailable,
     terminal: unavailable,
+    unmountBucket: unavailable,
     watch: unavailable,
     writeFile: unavailable,
     wsConnect: unavailable,
