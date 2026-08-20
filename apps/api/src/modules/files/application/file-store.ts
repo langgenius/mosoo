@@ -57,6 +57,7 @@ import {
   fileRecordRowColumns,
   listFileRecords,
   listFileRecordsById,
+  parseRuntimeOutputSourcePath,
   toFileEntry,
   toFileRecord,
   toSessionFile,
@@ -69,7 +70,7 @@ import {
   uploadFileContent,
   uploadFilePart,
 } from "../infrastructure/file-upload-transfer";
-import { putObject } from "../infrastructure/r2-s3-client";
+import { getObjectBody, putObject } from "../infrastructure/r2-s3-client";
 import { normalizeR2Etag } from "../infrastructure/r2-s3-client";
 import { ensureAppSessionFileAccess } from "../infrastructure/session-file-ownership";
 
@@ -110,6 +111,12 @@ export interface SessionResourcePathEntry {
   name: string;
   path: string;
   size: number;
+}
+
+export interface SessionArtifactSource {
+  objectKey: string;
+  size: number;
+  sourcePath: string;
 }
 
 export interface FileStore {
@@ -179,6 +186,10 @@ export interface FileStore {
     viewer: AuthenticatedViewer,
     query: FileListQuery,
   ): Promise<FileListing>;
+  listLatestReadySessionArtifactSources(
+    database: D1Database,
+    sessionId: SessionId,
+  ): Promise<SessionArtifactSource[]>;
   listReadySessionArtifactKeys(database: D1Database, sessionId: SessionId): Promise<string[]>;
   listReadySessionFiles(database: D1Database, sessionId: SessionId): Promise<SessionFile[]>;
   listSessionResourcePathEntries(
@@ -200,6 +211,7 @@ export interface FileStore {
     partNumber: number,
     body: ContentBody,
   ): Promise<UploadFilePartResponse>;
+  readSessionArtifactBytes(bindings: ApiBindings, objectKey: string): Promise<Uint8Array | null>;
   recordRuntimeOutput(input: RuntimeOutputFileInput): Promise<FileRecord>;
   streamContent(
     bindings: ApiBindings,
@@ -636,6 +648,53 @@ async function listReadySessionArtifactKeys(
   return rows.map((row) => row.parentPath);
 }
 
+async function listLatestReadySessionArtifactSources(
+  database: D1Database,
+  sessionId: SessionId,
+): Promise<SessionArtifactSource[]> {
+  const rows = await getAppDatabase(database)
+    .select({
+      id: fileRecordsTable.id,
+      createdAt: fileRecordsTable.createdAt,
+      objectKey: fileRecordsTable.objectKey,
+      parentPath: fileRecordsTable.parentPath,
+      size: fileRecordsTable.size,
+    })
+    .from(fileRecordsTable)
+    .where(
+      and(
+        eq(fileRecordsTable.scopeKind, "session"),
+        eq(fileRecordsTable.scopeId, sessionId),
+        eq(fileRecordsTable.status, "ready"),
+        eq(fileRecordsTable.sessionKind, "artifact"),
+      ),
+    )
+    .orderBy(asc(fileRecordsTable.createdAt), asc(fileRecordsTable.id))
+    .all();
+
+  // Ascending scan + map overwrite keeps the newest record per source path
+  // (ULID ids break created-at ties in creation order).
+  const latestBySourcePath = new Map<string, SessionArtifactSource>();
+
+  for (const row of rows) {
+    const sourcePath = parseRuntimeOutputSourcePath(row.parentPath);
+
+    if (sourcePath === null) {
+      continue;
+    }
+
+    latestBySourcePath.set(sourcePath, {
+      objectKey: row.objectKey,
+      size: row.size,
+      sourcePath,
+    });
+  }
+
+  return [...latestBySourcePath.values()].toSorted((left, right) =>
+    left.sourcePath.localeCompare(right.sourcePath),
+  );
+}
+
 async function listSessionResources(
   database: D1Database,
   sessionId: SessionId,
@@ -819,6 +878,17 @@ async function ensureSessionAttachments(
   });
 }
 
+// Internal runtime read for artifact re-materialization; artifact object keys
+// come from this module's own session-artifact records, not caller input.
+async function readSessionArtifactBytes(
+  bindings: ApiBindings,
+  objectKey: string,
+): Promise<Uint8Array | null> {
+  const body = await getObjectBody(bindings, objectKey);
+
+  return body === null ? null : new Uint8Array(await body.arrayBuffer());
+}
+
 async function recordRuntimeOutput(input: RuntimeOutputFileInput): Promise<FileRecord> {
   const fileId = createPlatformId<FileId>();
   const name = getRuntimeOutputName(input.path);
@@ -905,12 +975,14 @@ export const fileStore: FileStore = {
   getRecord,
   getUpload,
   list,
+  listLatestReadySessionArtifactSources,
   listReadySessionArtifactKeys,
   listReadySessionFiles,
   listSessionResourcePathEntries,
   listSessionResources,
   putContent,
   putPart,
+  readSessionArtifactBytes,
   recordRuntimeOutput,
   streamContent,
   update,

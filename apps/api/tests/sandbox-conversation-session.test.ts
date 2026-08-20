@@ -100,6 +100,19 @@ function createConversationSessionDatabase(kind: AgentKind = "pet"): SqliteD1Dat
       id text PRIMARY KEY NOT NULL,
       status text NOT NULL
     );
+
+    CREATE TABLE file_record (
+      id text PRIMARY KEY NOT NULL,
+      created_at integer NOT NULL,
+      name text NOT NULL,
+      object_key text NOT NULL,
+      parent_path text NOT NULL,
+      scope_id text,
+      scope_kind text NOT NULL,
+      session_kind text,
+      size integer NOT NULL,
+      status text NOT NULL
+    );
   `);
 
   database.execute(`
@@ -275,6 +288,7 @@ function createBindings(database: D1Database, sandbox?: SandboxHandle): ApiBindi
 
 function createInput(sandbox: SandboxHandle, kind: AgentKind = "pet") {
   return {
+    agentId: "01J00000000000000000000009",
     kind,
     mountSessionResources: false,
     origin: ORIGIN,

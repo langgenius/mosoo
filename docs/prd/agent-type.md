@@ -9,7 +9,7 @@ mosoo supports two Agent types because users need different kinds of continuity.
 ## The two choices
 
 - **Assistant Agent** keeps a stable working environment across sessions. It suits daily helpers, knowledge assistants, and copilots that benefit from ongoing context. Sessions may share local working state, so it is not the right choice when every job must be isolated. Continuity is bounded: a rebuild preserves selected memory and workspace content, but may lose local sign-ins, caches, or tool-specific state.
-- **Task Agent** starts with a clean working environment for each run and releases it when the run ends. It suits PR reviews, ticket triage, webhooks, and batch work. Conversation records remain visible, but temporary working state does not carry into the next run. Users must attach any files needed again.
+- **Task Agent** starts with a clean working environment for each run and releases it when the run ends. It suits PR reviews, ticket triage, webhooks, and batch work. When a conversation continues, its recorded output files come back at their original locations and the Agent sees a bounded window of the recent conversation, so follow-up requests can build on earlier results. Temporary working state still does not carry into the next run, and earlier attachments must be attached again to be readable.
 
 ## User flow
 

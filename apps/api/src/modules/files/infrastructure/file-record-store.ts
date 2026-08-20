@@ -11,6 +11,7 @@ export {
 } from "./file-record-mutations";
 export {
   fileRecordRowColumns,
+  parseRuntimeOutputSourcePath,
   toFileEntry,
   toFileRecord,
   toSessionFile,

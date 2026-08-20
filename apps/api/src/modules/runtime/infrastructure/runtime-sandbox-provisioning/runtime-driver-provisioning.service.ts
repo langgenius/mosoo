@@ -246,15 +246,23 @@ async function provisionDriver(
     if (driverRecord.status === "skipped") {
       throw new DriverPrewarmProvisionSkippedError(driverInstanceId);
     }
-    const recoveryMessages =
-      nativeResumeRef === null || input.runtime !== "openai-runtime"
-        ? []
-        : await timing.measure("getRuntimeRecoveryMessages", () =>
-            getSessionRuntimeRecoveryMessages(env.DB, {
-              excludeRunId: input.sessionRunId ?? null,
-              sessionId: input.sandboxSessionId,
-            }),
-          );
+    // A fresh driver without a native session to resume can only recover
+    // conversation context through a bounded platform-history replay. Cattle
+    // policy opts in for every runtime because its native resume is volatile;
+    // openai-runtime additionally keeps the semantic-recovery fallback for a
+    // present-but-unmaterialized rollout.
+    const shouldReplayRecoveryMessages =
+      nativeResumeRef === null
+        ? policy.continuation.replayRecoveryMessages
+        : input.runtime === "openai-runtime";
+    const recoveryMessages = shouldReplayRecoveryMessages
+      ? await timing.measure("getRuntimeRecoveryMessages", () =>
+          getSessionRuntimeRecoveryMessages(env.DB, {
+            excludeRunId: input.sessionRunId ?? null,
+            sessionId: input.sandboxSessionId,
+          }),
+        )
+      : [];
     const activeDriverGeneration = driverRecord.generation;
     driverGeneration = activeDriverGeneration;
 

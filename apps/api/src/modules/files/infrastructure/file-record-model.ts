@@ -93,12 +93,12 @@ export interface FileUploadRow {
 const RUNTIME_OUTPUT_PARENT_ROOT = "runtime-output";
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
 
-function toRuntimeOutputSourcePath(row: FileRecordRow): string | null {
-  if (row.session_kind !== "artifact") {
-    return null;
-  }
-
-  const segments = row.parent_path.split("/");
+// Inverse of createRuntimeOutputParentPath: recovers the cwd-relative source
+// path an artifact was recorded from. Path segments the writer could never
+// produce (empty, ".", "..") mark the record malformed, which keeps the value
+// safe to use as a workspace-relative write target.
+export function parseRuntimeOutputSourcePath(parentPath: string): string | null {
+  const segments = parentPath.split("/");
   const contentSha256 = segments.at(-1);
 
   if (
@@ -110,7 +110,20 @@ function toRuntimeOutputSourcePath(row: FileRecordRow): string | null {
     return null;
   }
 
-  return segments.slice(1, -1).join("/");
+  const pathSegments = segments.slice(1, -1);
+  const hasUnsafeSegment = pathSegments.some(
+    (segment) => segment.length === 0 || segment === "." || segment === "..",
+  );
+
+  return hasUnsafeSegment ? null : pathSegments.join("/");
+}
+
+function toRuntimeOutputSourcePath(row: FileRecordRow): string | null {
+  if (row.session_kind !== "artifact") {
+    return null;
+  }
+
+  return parseRuntimeOutputSourcePath(row.parent_path);
 }
 
 export interface FileCleanupRow extends FileRecordRow {

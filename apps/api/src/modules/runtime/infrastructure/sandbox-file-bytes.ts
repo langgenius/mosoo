@@ -27,3 +27,23 @@ export async function readSandboxFileBytes(
 
   return new TextEncoder().encode(file.content);
 }
+
+function encodeBase64(bytes: Uint8Array): string {
+  let binary = "";
+  // Chunked conversion keeps String.fromCharCode off argument-count limits.
+  const chunkSize = 0x8000;
+
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize));
+  }
+
+  return btoa(binary);
+}
+
+export async function writeSandboxFileBytes(
+  handle: ExecutionSessionHandle,
+  path: string,
+  bytes: Uint8Array,
+): Promise<void> {
+  await handle.writeFile(path, encodeBase64(bytes), { encoding: "base64" });
+}
