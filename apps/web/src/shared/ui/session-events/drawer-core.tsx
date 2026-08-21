@@ -1,6 +1,8 @@
 import { useMemo, useRef, useState } from "react";
 import type { ComponentType, ReactElement, ReactNode } from "react";
 
+import { findVirtualizedStartIndex } from "./drawer-virtualization";
+
 const SESSION_EVENT_DRAWER_ROW_HEIGHT = 70;
 const SESSION_EVENT_DRAWER_OVERSCAN = 6;
 
@@ -66,15 +68,6 @@ function createEventOffsets(input: {
   };
 }
 
-function findStartIndex(offsets: readonly number[], scrollTop: number): number {
-  const firstVisible = offsets.findIndex((offset, index) => {
-    const nextOffset = offsets[index + 1] ?? Number.POSITIVE_INFINITY;
-    return nextOffset >= scrollTop && offset <= scrollTop;
-  });
-
-  return Math.max(0, firstVisible === -1 ? 0 : firstVisible - SESSION_EVENT_DRAWER_OVERSCAN);
-}
-
 function calculateCumulativeOffsetsMs(events: readonly SessionEventDrawerCoreEvent[]): number[] {
   const result: number[] = [];
   let running = 0;
@@ -125,7 +118,7 @@ export function SessionEventDrawerCore<TEvent extends SessionEventDrawerCoreEven
       return { end: events.length, start: 0 };
     }
 
-    const start = findStartIndex(offsets, scrollTop);
+    const start = findVirtualizedStartIndex(offsets, scrollTop, SESSION_EVENT_DRAWER_OVERSCAN);
     const viewportHeight = listRef.current?.clientHeight ?? 420;
     const end = Math.min(
       events.length,
