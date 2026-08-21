@@ -66,7 +66,12 @@ function resolveConversationContinuationPlan(input: {
   // workspace checkpoints can rehydrate after the sandbox was recycled. A
   // first-ever conversation passes through the same path and finds no
   // artifacts to restore.
-  const shouldRestoreSessionArtifacts = policy.continuation.restoreSessionArtifacts;
+  const isLegacyCattleContinuation =
+    input.kind === "cattle" &&
+    input.existingSession !== null &&
+    !input.existingSession.workspaceCheckpointRequired;
+  const shouldRestoreSessionArtifacts =
+    policy.continuation.restoreSessionArtifacts || isLegacyCattleContinuation;
 
   if (input.existingSession === null) {
     return {
@@ -101,7 +106,10 @@ function resolveConversationContinuationPlan(input: {
       : {}),
     shouldCreateCloudflareSession: true,
     shouldDeleteErrorSession: input.existingSession.status === "error",
-    requireCwdCheckpoint: input.kind === "cattle" && input.existingSession.status === "closed",
+    requireCwdCheckpoint:
+      input.kind === "cattle" &&
+      input.existingSession.status === "closed" &&
+      input.existingSession.workspaceCheckpointRequired,
     shouldRestoreCwd,
     shouldRestoreSessionArtifacts,
   };

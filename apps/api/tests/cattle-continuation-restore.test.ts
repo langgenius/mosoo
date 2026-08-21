@@ -94,6 +94,10 @@ async function createContinuationFixture(): Promise<{
 }> {
   const database = await createPublicHttpContractDatabase();
   await insertOwnerSession(database);
+  await database
+    .prepare("UPDATE session SET kind = 'cattle', workspace_checkpoint_required = 1 WHERE id = ?")
+    .bind(PUBLIC_API_TEST_IDS.ownerSession)
+    .run();
   const bindings = createPublicHttpTestBindings(database) as ApiBindings;
   const now = nowMsForTest();
 

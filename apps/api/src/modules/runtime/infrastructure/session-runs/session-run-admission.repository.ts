@@ -95,6 +95,7 @@ function claimableSessionPredicate(db: AppDatabase, input: CommitQueuedSessionRu
     isNull(sessionsTable.statusOperationId),
     or(
       ne(sessionsTable.kind, "cattle"),
+      eq(sessionsTable.workspaceCheckpointRequired, false),
       isNull(sessionsTable.lastRunId),
       notExists(
         db
@@ -166,6 +167,7 @@ export async function isCattleTerminalCheckpointReadyForNextRun(
         kind: sessionsTable.kind,
         lastRunId: sessionsTable.lastRunId,
         lastRunStatus: sessionRunsTable.status,
+        workspaceCheckpointRequired: sessionsTable.workspaceCheckpointRequired,
       })
       .from(sessionsTable)
       .leftJoin(sessionRunsTable, eq(sessionRunsTable.id, sessionsTable.lastRunId))
@@ -176,6 +178,7 @@ export async function isCattleTerminalCheckpointReadyForNextRun(
   if (
     session === null ||
     session.kind !== "cattle" ||
+    !session.workspaceCheckpointRequired ||
     session.lastRunId === null ||
     session.lastRunStatus !== "completed"
   ) {

@@ -43,8 +43,10 @@ export async function getRuntimeConversationSession(
         originJson: sandboxSessionsTable.originJson,
         sandboxId: sandboxSessionsTable.sandboxId,
         status: sandboxSessionsTable.status,
+        workspaceCheckpointRequired: sessionsTable.workspaceCheckpointRequired,
       })
       .from(sandboxSessionsTable)
+      .leftJoin(sessionsTable, eq(sessionsTable.id, sandboxSessionsTable.sessionId))
       .leftJoin(
         readyConversationBackupTable,
         and(
@@ -72,6 +74,7 @@ export async function getRuntimeConversationSession(
     originJson: row.originJson,
     sandboxId: row.sandboxId,
     status: row.status,
+    workspaceCheckpointRequired: row.workspaceCheckpointRequired ?? false,
   };
 }
 
@@ -133,6 +136,7 @@ export async function listIdleSessionScopedConversationSessions(
         sql`${sandboxSessionsTable.updatedAt} <= ${input.idleSinceLte}`,
         notExists(runLeaseQueryForListedSubject(appDb)),
         or(
+          eq(sessionsTable.workspaceCheckpointRequired, false),
           isNull(sessionsTable.lastRunId),
           notExists(
             appDb

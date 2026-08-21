@@ -27,12 +27,18 @@ function createConversationSessionDatabase(): SqliteD1Database {
       session_run_id text,
       status text NOT NULL
     );
+
+    CREATE TABLE session (
+      id text PRIMARY KEY NOT NULL,
+      workspace_checkpoint_required integer DEFAULT 0 NOT NULL
+    );
   `);
 
   return database;
 }
 
 async function insertConversationSession(database: D1Database): Promise<void> {
+  await database.prepare("INSERT INTO session (id) VALUES (?)").bind("session-1").run();
   await database
     .prepare(
       `

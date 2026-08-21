@@ -32,6 +32,15 @@ completed turn is committed. Restore is retryable and idempotent. A missing,
 expired, corrupt, or unrestorable checkpoint fails the continuation with an
 actionable error instead of opening an empty workspace.
 
+## Rollout compatibility
+
+Threads whose last successful turn predates the workspace-checkpoint rollout are
+grandfathered: they remain admissible and a cold continuation re-materializes their
+recorded ready artifacts instead of requiring a checkpoint that could not have
+existed. The first successful post-rollout turn atomically marks that Thread as
+checkpoint-required while committing its complete workspace. Every later successful
+turn then uses the strict Run-bound admission and restore contract above.
+
 ## Retention and deletion
 
 A committed Task Thread checkpoint remains restorable for at least 20 days while

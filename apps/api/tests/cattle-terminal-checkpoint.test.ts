@@ -79,7 +79,8 @@ async function createTerminalCheckpointFixture(): Promise<{
   await insertOwnerSession(database);
   database.execute(`
     UPDATE session
-    SET kind = 'cattle', last_message_at = 1, last_run_id = '${PUBLIC_API_TEST_IDS.run}', status = 'IDLE'
+    SET kind = 'cattle', last_message_at = 1, last_run_id = '${PUBLIC_API_TEST_IDS.run}',
+        status = 'IDLE', workspace_checkpoint_required = 1
     WHERE id = '${PUBLIC_API_TEST_IDS.ownerSession}';
 
     INSERT INTO sandbox (

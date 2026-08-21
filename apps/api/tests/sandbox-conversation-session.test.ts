@@ -11,6 +11,7 @@ import type {
   SandboxHandle,
 } from "../src/modules/runtime/infrastructure/sandbox-handles";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
+import { PublicApiMemoryFileBucket } from "./helpers/public-api-http-test-fixture";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
 mock.module("@cloudflare/sandbox", () => ({
@@ -30,6 +31,7 @@ const ORIGIN = {
 } as const;
 const CLOUDFLARE_BACKUP_ID = "550e8400-e29b-41d4-a716-446655440000";
 const STORED_BACKUP_ID = encodeSandboxBackupIdForStorage(CLOUDFLARE_BACKUP_ID);
+const ARTIFACT_SHA256 = "a".repeat(64);
 
 function commandResult(): RuntimeCommandResultHandle {
   return {
@@ -90,7 +92,8 @@ function createConversationSessionDatabase(kind: AgentKind = "pet"): SqliteD1Dat
       agent_id text,
       id text PRIMARY KEY NOT NULL,
       kind text DEFAULT '${kind}' NOT NULL,
-      last_run_id text
+      last_run_id text,
+      workspace_checkpoint_required integer DEFAULT 0 NOT NULL
     );
 
     CREATE TABLE driver_instance (
@@ -226,7 +229,10 @@ async function readInactiveDeadline(database: D1Database): Promise<number | null
     .first<number>("inactive_deadline_at");
 }
 
-function createExecutionSession(options: { cwdHasContent: boolean }): ExecutionSessionHandle {
+function createExecutionSession(options: {
+  cwdHasContent: boolean;
+  onWriteFile?: (path: string) => void;
+}): ExecutionSessionHandle {
   return {
     async exec() {
       return options.cwdHasContent ? commandResult() : failedCommandResult();
@@ -241,7 +247,9 @@ function createExecutionSession(options: { cwdHasContent: boolean }): ExecutionS
     async watch() {
       return new ReadableStream<Uint8Array>();
     },
-    async writeFile() {},
+    async writeFile(path) {
+      options.onWriteFile?.(path);
+    },
   };
 }
 
@@ -250,11 +258,13 @@ function createSandbox(
     cwdHasContent?: boolean;
     deleteSessionError?: Error;
     onRestore?: (backup: { readonly dir: string; readonly id: string }) => void;
+    onWriteFile?: (path: string) => void;
     restoreError?: Error;
   } = {},
 ): SandboxHandle {
   const executionSession = createExecutionSession({
     cwdHasContent: options.cwdHasContent ?? true,
+    ...(options.onWriteFile ? { onWriteFile: options.onWriteFile } : {}),
   });
 
   return {
@@ -297,11 +307,26 @@ function createSandbox(
   };
 }
 
-function createBindings(database: D1Database, sandbox?: SandboxHandle): ApiBindings {
+function createBindings(
+  database: D1Database,
+  sandbox?: SandboxHandle,
+  fileBucket?: R2Bucket,
+): ApiBindings {
   return {
     DB: database,
+    ...(fileBucket ? { FILE_BUCKET: fileBucket } : {}),
     ...(sandbox ? { runtimeSubjectHandleFactory: () => sandbox } : {}),
   } as ApiBindings;
+}
+
+async function setWorkspaceCheckpointRequired(
+  database: D1Database,
+  required: boolean,
+): Promise<void> {
+  await database
+    .prepare("UPDATE session SET workspace_checkpoint_required = ? WHERE id = ?")
+    .bind(required ? 1 : 0, "session-1")
+    .run();
 }
 
 function createInput(sandbox: SandboxHandle, kind: AgentKind = "pet") {
@@ -389,6 +414,7 @@ describe("ensureSandboxConversationSession", () => {
   test("restores a cold cattle session from a 20-day-old committed checkpoint", async () => {
     const database = createConversationSessionDatabase("cattle");
     await insertConversationSession(database, { status: "closed" });
+    await setWorkspaceCheckpointRequired(database, true);
     await insertConversationBackup(database, {
       createdAt: Date.now() - 20 * 24 * 60 * 60 * 1000,
     });
@@ -414,6 +440,7 @@ describe("ensureSandboxConversationSession", () => {
   test("fails cold cattle continuation when its exact Thread checkpoint is missing", async () => {
     const database = createConversationSessionDatabase("cattle");
     await insertConversationSession(database, { status: "closed" });
+    await setWorkspaceCheckpointRequired(database, true);
     await insertConversationBackup(database, { dir: "/workspace/se/another-session" });
     const sandbox = createSandbox({ cwdHasContent: false });
 
@@ -425,6 +452,7 @@ describe("ensureSandboxConversationSession", () => {
   test("reports an actionable error for a corrupt cattle checkpoint", async () => {
     const database = createConversationSessionDatabase("cattle");
     await insertConversationSession(database, { status: "closed" });
+    await setWorkspaceCheckpointRequired(database, true);
     await insertConversationBackup(database);
     const sandbox = createSandbox({
       cwdHasContent: false,
@@ -434,6 +462,35 @@ describe("ensureSandboxConversationSession", () => {
     await expect(
       ensureSandboxConversationSession(createBindings(database), createInput(sandbox, "cattle")),
     ).rejects.toThrow("workspace checkpoint could not be restored. Retry the continuation");
+  });
+
+  test("restores recorded artifacts for a pre-rollout cattle Thread", async () => {
+    const database = createConversationSessionDatabase("cattle");
+    await insertConversationSession(database, { status: "closed" });
+    database.execute(`
+      INSERT INTO file_record (
+        id, created_at, name, object_key, parent_path, scope_id, scope_kind,
+        session_kind, size, status
+      ) VALUES (
+        'artifact-legacy', 1, 'legacy.txt', 'artifacts/legacy.txt',
+        'runtime-output/outputs/legacy.txt/${ARTIFACT_SHA256}', 'session-1', 'session',
+        'artifact', 14, 'ready'
+      );
+    `);
+    const bucket = new PublicApiMemoryFileBucket();
+    await bucket.put("artifacts/legacy.txt", "legacy output\n");
+    const restoredPaths: string[] = [];
+    const sandbox = createSandbox({
+      cwdHasContent: false,
+      onWriteFile: (path) => restoredPaths.push(path),
+    });
+
+    await ensureSandboxConversationSession(
+      createBindings(database, undefined, bucket as unknown as R2Bucket),
+      createInput(sandbox, "cattle"),
+    );
+
+    expect(restoredPaths).toContain("/workspace/se/session-1/outputs/legacy.txt");
   });
 
   test("continues a closed pet session through the stable restore path", async () => {

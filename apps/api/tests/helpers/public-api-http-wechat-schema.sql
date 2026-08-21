@@ -136,6 +136,7 @@ CREATE TABLE session (
   last_message_at integer,
   message_seq_cursor integer DEFAULT 0 NOT NULL,
   runtime_event_seq_cursor integer DEFAULT 0 NOT NULL,
+  workspace_checkpoint_required integer DEFAULT 0 NOT NULL,
   archived_at integer,
   renamed integer DEFAULT 0 NOT NULL,
   status_operation_id text,

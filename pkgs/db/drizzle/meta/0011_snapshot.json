@@ -5613,6 +5613,14 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "workspace_checkpoint_required": {
+          "name": "workspace_checkpoint_required",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
         }
       },
       "indexes": {

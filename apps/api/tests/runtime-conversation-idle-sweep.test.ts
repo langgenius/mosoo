@@ -43,7 +43,8 @@ function createDatabase(): SqliteD1Database {
     CREATE TABLE session (
       id text PRIMARY KEY NOT NULL,
       kind text NOT NULL,
-      last_run_id text
+      last_run_id text,
+      workspace_checkpoint_required integer DEFAULT 0 NOT NULL
     );
 
     CREATE TABLE sandbox_backup (
@@ -130,7 +131,7 @@ describe("idle session-scoped conversation sweep", () => {
       .bind("run-checkpoint", "completed")
       .run();
     await database
-      .prepare("UPDATE session SET last_run_id = ? WHERE id = ?")
+      .prepare("UPDATE session SET last_run_id = ?, workspace_checkpoint_required = 1 WHERE id = ?")
       .bind("run-checkpoint", "session-checkpoint")
       .run();
 
@@ -163,6 +164,41 @@ describe("idle session-scoped conversation sweep", () => {
         limit: 10,
       }),
     ).resolves.toEqual([{ sandboxId: "sb-checkpoint", sessionId: "session-checkpoint" }]);
+  });
+
+  test("lets the idle sweep recycle a pre-rollout cattle conversation", async () => {
+    const database = createDatabase();
+    await insertConversation(database, {
+      kind: "cattle",
+      sandboxId: "sb-legacy",
+      sessionId: "session-legacy",
+      status: "active",
+      updatedAt: NOW - GRACE_MS - 1,
+    });
+    await database
+      .prepare("INSERT INTO session_run (id, driver_instance_id, status) VALUES (?, NULL, ?)")
+      .bind("run-legacy", "completed")
+      .run();
+    await database
+      .prepare("UPDATE session SET last_run_id = ? WHERE id = ?")
+      .bind("run-legacy", "session-legacy")
+      .run();
+
+    await expect(
+      listIdleSessionScopedConversationSessions(database, {
+        idleSinceLte: NOW - GRACE_MS,
+        limit: 10,
+      }),
+    ).resolves.toEqual([{ sandboxId: "sb-legacy", sessionId: "session-legacy" }]);
+    await expect(
+      claimIdleSessionScopedConversationForClose(database, {
+        idleSinceLte: NOW - GRACE_MS,
+        now: NOW,
+        runtimeSubjectId: "sb-legacy" as never,
+        sandboxSessionId: "cf-session-legacy" as never,
+        sessionId: "session-legacy" as never,
+      }),
+    ).resolves.toBe(true);
   });
 
   test("lists only idle active cattle conversations without a run lease", async () => {

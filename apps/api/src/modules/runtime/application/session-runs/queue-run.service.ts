@@ -88,6 +88,13 @@ export interface QueuedSessionRunState {
 
 export { SessionRunCreationGuardRejectedError };
 
+function createCheckpointPendingError(sessionId: SessionId) {
+  return createApiError(
+    API_ERROR_CODE.sessionRunCheckpointPending,
+    `Thread ${sessionId} is still committing its previous workspace checkpoint. Retry after checkpointing finishes; if the error persists, contact support.`,
+  );
+}
+
 export async function queueSessionRun(request: QueueSessionRunRequest): Promise<{
   run: SessionRunSummary;
   sessionState: QueuedSessionRunState;
@@ -109,9 +116,7 @@ export async function queueSessionRun(request: QueueSessionRunRequest): Promise<
     reconcileStaleActiveSessionRun(bindings.DB, input.session.id),
     isCattleTerminalCheckpointReadyForNextRun(bindings.DB, input.session.id).then((ready) => {
       if (!ready) {
-        throw new Error(
-          `Thread ${input.session.id} is still committing its previous workspace checkpoint. Retry after checkpointing finishes; if the error persists, contact support.`,
-        );
+        throw createCheckpointPendingError(input.session.id);
       }
     }),
     getSessionExecutionPlan(bindings.DB, input.session.id).then((executionPlan) =>
@@ -222,6 +227,10 @@ export async function queueSessionRun(request: QueueSessionRunRequest): Promise<
 
     if (activeRun !== null) {
       throw new SessionActiveRunExistsError(activeRun);
+    }
+
+    if (!(await isCattleTerminalCheckpointReadyForNextRun(bindings.DB, input.session.id))) {
+      throw createCheckpointPendingError(input.session.id);
     }
 
     if (input.runCreationGuard !== undefined) {

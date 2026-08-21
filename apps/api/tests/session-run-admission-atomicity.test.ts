@@ -1,12 +1,13 @@
 import { describe, expect, test } from "bun:test";
 
 import { parsePlatformId } from "@mosoo/id";
-import type { AgentDeploymentVersionId, SessionId } from "@mosoo/id";
+import type { AgentDeploymentVersionId, SessionId, SessionRunId } from "@mosoo/id";
 
 import { API_COMMAND_QUEUE_SEND_FAILED_CODE } from "../src/modules/api-command/application/api-command-ledger";
 import { getAccountViewer } from "../src/modules/auth/application/public-api-caller.service";
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
 import { queueSessionRun } from "../src/modules/runtime/application/session-run.service";
+import { setSessionRunStatus } from "../src/modules/runtime/infrastructure/session-runs/session-run-store.repository";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import { API_ERROR_CODE } from "../src/platform/errors";
 import {
@@ -185,6 +186,17 @@ async function createFixture() {
   return { database, viewer };
 }
 
+async function completeRun(database: D1Database, runId: SessionRunId): Promise<void> {
+  for (const status of ["booting", "running", "completed"] as const) {
+    const outcome = await setSessionRunStatus(database, {
+      runId,
+      source: "driver",
+      status,
+    });
+    expect(outcome.kind).toBe("applied");
+  }
+}
+
 describe("Session Run atomic admission", () => {
   test("blocks a cattle follow-up until the previous completed Run has a ready checkpoint", async () => {
     const { database, viewer } = await createFixture();
@@ -199,18 +211,22 @@ describe("Session Run atomic admission", () => {
       clientRequestId: "checkpoint-run-a",
       viewer,
     });
-    await database
-      .prepare("UPDATE session_run SET status = 'completed' WHERE id = ?")
-      .bind(first.run.id)
-      .run();
-    await database
-      .prepare("UPDATE session SET status = 'IDLE' WHERE id = ?")
-      .bind(PUBLIC_API_TEST_IDS.ownerSession)
-      .run();
+    await completeRun(database, first.run.id);
+
+    await expect(
+      database
+        .prepare("SELECT workspace_checkpoint_required FROM session WHERE id = ?")
+        .bind(PUBLIC_API_TEST_IDS.ownerSession)
+        .first<number>("workspace_checkpoint_required"),
+    ).resolves.toBe(1);
 
     await expect(
       queueOwnerRun({ bindings, clientRequestId: "checkpoint-run-b", viewer }),
-    ).rejects.toThrow("still committing its previous workspace checkpoint");
+    ).rejects.toMatchObject({
+      code: API_ERROR_CODE.sessionRunCheckpointPending,
+      message: expect.stringContaining("still committing its previous workspace checkpoint"),
+      status: 409,
+    });
 
     database.execute(`
       INSERT INTO sandbox (
@@ -246,6 +262,44 @@ describe("Session Run atomic admission", () => {
       viewer,
     });
     expect(second.run.status).toBe("queued");
+  });
+
+  test("grandfathers a completed cattle Run from before the checkpoint rollout", async () => {
+    const { database, viewer } = await createFixture();
+    const bindings = createPublicHttpTestBindings(database, {
+      apiCommandQueue: createApiCommandQueueStub(),
+    }) as ApiBindings;
+    await database
+      .prepare("UPDATE session SET kind = 'cattle' WHERE id = ?")
+      .bind(PUBLIC_API_TEST_IDS.ownerSession)
+      .run();
+    const first = await queueOwnerRun({
+      bindings,
+      clientRequestId: "legacy-checkpoint-run-a",
+      viewer,
+    });
+    await database
+      .prepare("UPDATE session_run SET status = 'completed' WHERE id = ?")
+      .bind(first.run.id)
+      .run();
+    await database
+      .prepare("UPDATE session SET status = 'IDLE' WHERE id = ?")
+      .bind(PUBLIC_API_TEST_IDS.ownerSession)
+      .run();
+
+    const second = await queueOwnerRun({
+      bindings,
+      clientRequestId: "legacy-checkpoint-run-b",
+      viewer,
+    });
+
+    expect(second.run.status).toBe("queued");
+    await expect(
+      database
+        .prepare("SELECT workspace_checkpoint_required FROM session WHERE id = ?")
+        .bind(PUBLIC_API_TEST_IDS.ownerSession)
+        .first<number>("workspace_checkpoint_required"),
+    ).resolves.toBe(0);
   });
 
   for (const failurePoint of FAILURE_POINTS) {
