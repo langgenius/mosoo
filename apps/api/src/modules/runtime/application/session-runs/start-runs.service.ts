@@ -5,6 +5,7 @@ import type { AccountId, FileId, AppId, SessionId } from "@mosoo/id";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import type { AuthenticatedViewer } from "../../../auth/application/viewer-auth.service";
 import { getActiveAppSessionQueueAccess } from "../../../sessions/domain/session-access.policy";
+import type { BoundCapabilityRunAdmission } from "../../domain/bound-capability-run-provenance";
 import { queueSessionRun } from "./queue-run.service";
 import type { QueuedSessionRunState } from "./queue-run.service";
 
@@ -31,6 +32,7 @@ export interface QueueSessionRunsOutput {
 
 export interface StartRunsOptions {
   accessViewer?: AuthenticatedViewer;
+  boundCapability?: BoundCapabilityRunAdmission;
 }
 
 export interface StartRunsRequest {
@@ -86,6 +88,7 @@ async function queueRunRequest(
       prompt,
       session,
       ...(context.options.accessViewer ? { accessViewer: context.options.accessViewer } : {}),
+      ...context.options.boundCapability,
     },
     requestUrl: context.requestUrl,
     viewer: context.viewer,

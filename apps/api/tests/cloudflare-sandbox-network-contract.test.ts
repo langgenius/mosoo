@@ -8,12 +8,12 @@ interface PackageMetadata {
 }
 
 describe("pinned Cloudflare Sandbox network contract", () => {
-  test("keeps the 0.12.4 start-time and persisted interception semantics we enforce", async () => {
+  test("keeps the 0.12.6 start-time and persisted interception semantics we enforce", async () => {
     const workspaceRequire = createRequire(import.meta.url);
     const sandboxPackagePath = workspaceRequire.resolve("@cloudflare/sandbox/package.json");
     const sandboxPackage = (await Bun.file(sandboxPackagePath).json()) as PackageMetadata;
 
-    expect(sandboxPackage.version).toBe("0.12.4");
+    expect(sandboxPackage.version).toBe("0.12.6");
 
     const sandboxRequire = createRequire(sandboxPackagePath);
     const containersPackagePath = sandboxRequire.resolve("@cloudflare/containers/package.json");

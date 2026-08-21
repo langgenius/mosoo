@@ -20,18 +20,18 @@ import type { ThreadListItem } from "./thread";
 export function useThreadActions({
   activeAppId,
   activeThreadId,
-  allThreads,
   closeComposeDialog,
   markThreadReadLocal,
   navigateToList,
+  threadsById,
   togglePinnedThreadLocal,
 }: {
   activeAppId: string | null;
   activeThreadId: string | null;
-  allThreads: readonly ThreadListItem[];
   closeComposeDialog: () => void;
   markThreadReadLocal: (input: { readAt: string; threadId: string }) => void;
   navigateToList: () => void;
+  threadsById: ReadonlyMap<string, ThreadListItem>;
   togglePinnedThreadLocal: (threadId: string) => void;
 }) {
   const queryClient = useQueryClient();
@@ -156,7 +156,7 @@ export function useThreadActions({
 
   const togglePinnedThread = useCallback(
     async (threadId: string): Promise<void> => {
-      const thread = allThreads.find((candidate) => candidate.id === threadId) ?? null;
+      const thread = threadsById.get(threadId) ?? null;
 
       if (thread === null) {
         return;
@@ -169,12 +169,12 @@ export function useThreadActions({
         setActionError(getMutationErrorMessage(error, "Failed to update pinned state."));
       }
     },
-    [allThreads, togglePinnedThreadLocal],
+    [threadsById, togglePinnedThreadLocal],
   );
 
   const archiveThread = useCallback(
     async (threadId: string): Promise<void> => {
-      const thread = allThreads.find((candidate) => candidate.id === threadId) ?? null;
+      const thread = threadsById.get(threadId) ?? null;
 
       try {
         if (thread === null) {
@@ -190,7 +190,7 @@ export function useThreadActions({
         setActionError(getMutationErrorMessage(error, "Failed to archive thread."));
       }
     },
-    [allThreads, archiveMutation],
+    [threadsById, archiveMutation],
   );
 
   const deleteThread = useCallback(
@@ -201,7 +201,7 @@ export function useThreadActions({
       }
 
       try {
-        const thread = allThreads.find((candidate) => candidate.id === threadId) ?? null;
+        const thread = threadsById.get(threadId) ?? null;
 
         if (thread === null) {
           throw new Error("Thread not found.");
@@ -220,7 +220,7 @@ export function useThreadActions({
         setActionError(getMutationErrorMessage(error, "Failed to delete thread."));
       }
     },
-    [activeThreadId, allThreads, deleteMutation, navigateToList],
+    [activeThreadId, threadsById, deleteMutation, navigateToList],
   );
 
   const sendFollowUp = useCallback(

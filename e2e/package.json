@@ -10,7 +10,7 @@
     "@mosoo/runtime-catalog": "workspace:*"
   },
   "devDependencies": {
-    "@playwright/test": "^1.62.0",
+    "@playwright/test": "^1.62.1",
     "@types/bun": "^1.3.14",
     "@types/node": "^25.8.0",
     "typescript": "^6.0.3"
