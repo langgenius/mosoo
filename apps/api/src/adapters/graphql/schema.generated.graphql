@@ -517,13 +517,6 @@ enum AppDeploymentRunStatus {
   success
 }
 
-type AppDeploymentSecret {
-  appId: ULID!
-  createdAt: String!
-  name: String!
-  updatedAt: String!
-}
-
 enum AppDeploymentTargetKind {
   cloudflare_pages
   cloudflare_worker
@@ -886,11 +879,6 @@ input DeleteAgentInput {
 
 input DeleteAppDeploymentInput {
   appId: ULID!
-}
-
-input DeleteAppDeploymentSecretInput {
-  appId: ULID!
-  name: String!
 }
 
 input DeleteEnvironmentInput {
@@ -1278,7 +1266,6 @@ type Mutation {
   deleteAgentChannelBinding(input: DeleteAgentChannelBindingInput!): OperationResult!
   deleteAgentSession(appId: ULID!, sessionId: ULID!): OperationResult!
   deleteAppDeployment(input: DeleteAppDeploymentInput!): OperationResult!
-  deleteAppDeploymentSecret(input: DeleteAppDeploymentSecretInput!): OperationResult!
   deleteEnvironment(input: DeleteEnvironmentInput!): OperationResult!
   deleteMcpServer(appId: ULID!, serverId: ULID!): OperationResult!
   deleteOwnedSkill(appId: ULID!, skillId: ULID!): OperationResult!
@@ -1300,7 +1287,6 @@ type Mutation {
   revokeMcpCredential(appId: ULID!, serverId: ULID!): McpServerWithCredential!
   sendAgentSessionEvents(appId: ULID!, events: [AgentSessionEventInput!]!, sessionId: ULID!): AgentSessionEventBatch!
   setAppDefaultEnvironment(input: SetAppDefaultEnvironmentInput!): EnvironmentSummary!
-  setAppDeploymentSecret(input: SetAppDeploymentSecretInput!): AppDeploymentSecret!
   setDefaultVendorCredential(input: SetDefaultVendorCredentialInput!): VendorCredential!
   setEnvironmentVariableValue(input: SetEnvironmentVariableValueInput!): EnvironmentDetail!
   setMcpServerEnabled(appId: ULID!, enabled: Boolean!, serverId: ULID!): McpServerWithCredential!
@@ -1374,7 +1360,6 @@ type Query {
   agentSessionRetrieve(appId: ULID!, sessionId: ULID!): AgentSessionRetrieve!
   appCostCard(appId: ULID!, range: CostRange!, runPurposes: [CostRunPurpose!]): AppCostCard!
   appDeploymentRunList(appId: ULID!, limit: Int): [AppDeploymentRun!]!
-  appDeploymentSecretList(appId: ULID!): [AppDeploymentSecret!]!
   appDeploymentStatus(appId: ULID!): AppDeploymentRun
   appEnvironmentList(appId: ULID!): [EnvironmentSummary!]!
   appInfo: AppInfo!
@@ -1696,12 +1681,6 @@ enum SessionType {
 input SetAppDefaultEnvironmentInput {
   appId: ULID!
   environmentId: ULID!
-}
-
-input SetAppDeploymentSecretInput {
-  appId: ULID!
-  name: String!
-  value: String!
 }
 
 input SetDefaultVendorCredentialInput {

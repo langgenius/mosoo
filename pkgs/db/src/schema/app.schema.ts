@@ -107,9 +107,12 @@ export const appDeploymentRunsTable = sqliteTable(
 );
 
 /**
- * App-owned values injected as Cloudflare Worker secret bindings during a
- * deployment. The plaintext lives only in vault_secret; this table exposes
- * names and ownership metadata, never a value.
+ * Retired App Secrets storage (GitHub #429 / PR #504). The product surface was
+ * rolled back in favor of the deployment-scoped bound capability, so no runtime
+ * code reads or writes this table. It stays in the schema because the D1
+ * migration chain is append-only: dropping it (and purging the vault rows it
+ * references) is a destructive migration that needs explicit approval plus a
+ * backup and rollback plan.
  */
 export const appDeploymentSecretsTable = sqliteTable(
   "app_deployment_secret",
@@ -129,5 +132,4 @@ export const appDeploymentSecretsTable = sqliteTable(
 
 export type AppDeploymentRow = typeof appDeploymentsTable.$inferSelect;
 export type AppDeploymentRunRow = typeof appDeploymentRunsTable.$inferSelect;
-export type AppDeploymentSecretRow = typeof appDeploymentSecretsTable.$inferSelect;
 export type AppRow = typeof appsTable.$inferSelect;

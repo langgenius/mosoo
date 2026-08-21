@@ -1,8 +1,9 @@
 import { accountsTable } from "@mosoo/db";
-import type { AccountId, PersonalAccessTokenId } from "@mosoo/id";
+import type { AccountId, AppDeploymentId, PersonalAccessTokenId } from "@mosoo/id";
 import { eq } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
+import type { AppAgentCapabilityClaims } from "../../public-api/app-agent-capability";
 import {
   authenticatePersonalAccessToken,
   isPersonalAccessTokenValue,
@@ -12,6 +13,7 @@ import type { PersonalAccessTokenCaller } from "./personal-access-token.service"
 import type { AuthenticatedViewer } from "./viewer-auth.service";
 
 type AccessTokenCredentialSubjectId = `human:${AccountId}`;
+type DeploymentCapabilityCredentialSubjectId = `deployment:${AppDeploymentId}`;
 
 export interface AccessTokenPublicApiCaller {
   credentialSubjectId: AccessTokenCredentialSubjectId;
@@ -21,10 +23,29 @@ export interface AccessTokenPublicApiCaller {
   viewer: AuthenticatedViewer;
 }
 
-export type PublicApiCaller = AccessTokenPublicApiCaller;
+/**
+ * A deployed App calling through its injected bound Agent capability. The
+ * caller acts as the App owner (`viewer`) but only inside the App, Agent
+ * binding, and Deployment named by the verified claims; thread and file
+ * admission narrows every read and write to that scope.
+ */
+export interface DeploymentCapabilityPublicApiCaller {
+  capability: AppAgentCapabilityClaims;
+  credentialSubjectId: DeploymentCapabilityCredentialSubjectId;
+  kind: "deployment_capability";
+  viewer: AuthenticatedViewer;
+}
+
+export type PublicApiCaller = AccessTokenPublicApiCaller | DeploymentCapabilityPublicApiCaller;
 
 function toAccessTokenCredentialSubjectId(accountId: AccountId): AccessTokenCredentialSubjectId {
   return `human:${accountId}`;
+}
+
+export function toDeploymentCapabilityCredentialSubjectId(
+  deploymentId: AppDeploymentId,
+): DeploymentCapabilityCredentialSubjectId {
+  return `deployment:${deploymentId}`;
 }
 
 function toAccessTokenCaller(caller: PersonalAccessTokenCaller): AccessTokenPublicApiCaller {
