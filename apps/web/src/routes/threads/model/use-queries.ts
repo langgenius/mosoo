@@ -78,7 +78,11 @@ export function useThreadQueries({
       )
       .toSorted(compareThreads);
   }, [activeSessionsQuery.data, agentsById, archivedSessionsQuery.data, ui]);
-  const selectedThread = allThreads.find((thread) => thread.id === activeThreadId) ?? null;
+  const threadsById = useMemo(
+    () => new Map<string, ThreadListItem>(allThreads.map((thread) => [thread.id, thread])),
+    [allThreads],
+  );
+  const selectedThread = activeThreadId === null ? null : (threadsById.get(activeThreadId) ?? null);
   const messagesQuery = useQuery({
     enabled: selectedThread !== null,
     queryFn: async () => {
@@ -182,5 +186,6 @@ export function useThreadQueries({
     retrieveQuery,
     selectedThread,
     threadsBySection,
+    threadsById,
   };
 }
