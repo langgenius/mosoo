@@ -7,22 +7,11 @@ import { normalizeRuntimeAdvancedSettings } from "@mosoo/runtime-catalog";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import {
-  recreateSandbox,
-  restartDriver,
-  updateAgentConfig,
-} from "@/domains/agent/api/agent-client";
+import { updateAgentConfig } from "@/domains/agent/api/agent-client";
 import { agentKeys } from "@/domains/agent/query/agent-queries";
-import {
-  toAgentId,
-  toAgentDeploymentVersionId,
-  toEnvironmentId,
-  toMcpServerId,
-  toAppId,
-  toSkillId,
-} from "@/routes/typed-id";
+import { toAgentId, toEnvironmentId, toMcpServerId, toAppId, toSkillId } from "@/routes/typed-id";
 
-import type { Agent, AgentKind, McpServer, RuntimeId, SkillInfo } from "../../agent.types";
+import type { Agent, McpServer, RuntimeId, SkillInfo } from "../../agent.types";
 import {
   createEditorSaveSnapshot,
   createInitialDraft,
@@ -35,20 +24,6 @@ import { applyAgentEditorPatch, withEnvironmentId } from "./patch";
 import type { AgentFormSectionId } from "./section-ids";
 
 export type { AgentEditorDraft } from "./draft";
-
-function toRuntimeOperationTargetVersion(agent: {
-  liveVersion: { id: string; versionNumber: number } | null;
-  status: string;
-}) {
-  if (agent.status !== "published" || agent.liveVersion === null) {
-    return null;
-  }
-
-  return {
-    id: toAgentDeploymentVersionId(agent.liveVersion.id),
-    versionNumber: agent.liveVersion.versionNumber,
-  };
-}
 
 export interface AgentEditorModel {
   draft: AgentEditorDraft;
@@ -64,7 +39,6 @@ export interface AgentEditorModel {
   setBuiltInTools(tools: AgentBuiltInToolConfig[]): void;
   setDescription(description: string): void;
   setEnvironmentId(environmentId: string | null): void;
-  setKind(kind: AgentKind): void;
   setMcpServers(servers: McpServer[]): void;
   setModel(model: string): void;
   setModelSelection(selection: { model: string; provider: string }): void;
@@ -112,33 +86,13 @@ export function useAgentEditorModel({
       ]);
     },
   });
-  const restartDriverMutation = useMutation({
-    mutationFn: restartDriver,
-    onSuccess: async (_data, variables) => {
-      await queryClient.invalidateQueries({
-        queryKey: agentKeys.detail(variables.appId, variables.agentId),
-      });
-    },
-  });
-  const recreateSandboxMutation = useMutation({
-    mutationFn: recreateSandbox,
-    onSuccess: async (_data, variables) => {
-      await queryClient.invalidateQueries({
-        queryKey: agentKeys.detail(variables.appId, variables.agentId),
-      });
-    },
-  });
-
   const dirty = createEditorSaveSnapshot(draft) !== savedSnapshot;
   const changePlan = classifyAgentConfigChanges({
     agentStatus: agent.status,
     current: toAgentConfigChangeSnapshot(draft),
     saved: toAgentConfigChangeSnapshot(savedDraft),
   });
-  const saving =
-    configMutation.isPending ||
-    restartDriverMutation.isPending ||
-    recreateSandboxMutation.isPending;
+  const saving = configMutation.isPending;
 
   function updateDraft(transform: (current: AgentEditorDraft) => AgentEditorDraft) {
     setDraft((current) => transform(current));
@@ -147,7 +101,7 @@ export function useAgentEditorModel({
 
   async function persistDraft(
     draftToSave: AgentEditorDraft,
-    options: { runRuntimeOperations: boolean },
+    _options: { runRuntimeOperations: boolean },
   ): Promise<{ error: string | null; ok: boolean }> {
     if (readOnly) {
       return { error: null, ok: false };
@@ -190,7 +144,7 @@ export function useAgentEditorModel({
     setSaveError(null);
 
     try {
-      const savedAgent = await configMutation.mutateAsync({
+      await configMutation.mutateAsync({
         agentId: typedAgentId,
         builtInTools: normalizeAgentBuiltInTools(draftToSave.builtInTools),
         description: draftToSave.description.trim() || null,
@@ -213,31 +167,6 @@ export function useAgentEditorModel({
           skill.state === "tombstone" ? [] : [toSkillId(skill.id)],
         ),
       });
-      const targetVersion = toRuntimeOperationTargetVersion(savedAgent);
-
-      if (options.runRuntimeOperations && draftChangePlan.requiresRuntimeOperation) {
-        if (draftChangePlan.action === "recreate-preserving-state") {
-          await recreateSandboxMutation.mutateAsync({
-            affectedFields: draftChangePlan.fieldLabels,
-            agentId: typedAgentId,
-            applyActionKind: "recreate-preserving-state",
-            appId: typedAppId,
-            targetVersion,
-          });
-        } else if (
-          draftChangePlan.action === "patch-and-restart" ||
-          draftChangePlan.action === "restart-process"
-        ) {
-          await restartDriverMutation.mutateAsync({
-            affectedFields: draftChangePlan.fieldLabels,
-            agentId: typedAgentId,
-            applyActionKind: draftChangePlan.action,
-            appId: typedAppId,
-            targetVersion,
-          });
-        }
-      }
-
       setSavedDraft(draftToSave);
       setSavedSnapshot(createEditorSaveSnapshot(draftToSave));
       return { error: null, ok: true };
@@ -288,12 +217,6 @@ export function useAgentEditorModel({
     },
     setEnvironmentId(environmentId) {
       updateDraft((current) => withEnvironmentId(current, environmentId));
-    },
-    setKind(kind) {
-      updateDraft((current) => ({
-        ...current,
-        kind,
-      }));
     },
     setMcpServers(servers) {
       updateDraft((current) => ({

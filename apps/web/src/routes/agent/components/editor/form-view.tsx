@@ -28,7 +28,6 @@ export interface AgentFormViewProps {
   highlightedSections?: ReadonlySet<AgentFormSectionId> | null;
   model: AgentEditorModel;
   readOnly?: boolean;
-  showChannels?: boolean;
 }
 
 interface AgentFormViewBodyProps {
@@ -37,7 +36,6 @@ interface AgentFormViewBodyProps {
   highlightedSections: ReadonlySet<AgentFormSectionId> | null;
   model: AgentEditorModel;
   readOnly: boolean;
-  showChannels: boolean;
 }
 
 // Focus and highlight props support external section navigation.
@@ -47,7 +45,6 @@ export function AgentFormView({
   highlightedSections = null,
   model,
   readOnly = false,
-  showChannels = false,
 }: AgentFormViewProps): ReactElement {
   return (
     <AgentFormBody
@@ -56,7 +53,6 @@ export function AgentFormView({
       highlightedSections={highlightedSections}
       model={model}
       readOnly={readOnly}
-      showChannels={showChannels}
     />
   );
 }
@@ -100,7 +96,6 @@ function AgentFormBody({
   highlightedSections,
   model,
   readOnly,
-  showChannels,
 }: AgentFormViewBodyProps): ReactElement {
   const { activeRings, setSectionRef } = useSectionNavigation({
     focusSection,
@@ -142,12 +137,7 @@ function AgentFormBody({
           setSectionRef("environment", node);
         }}
       >
-        <EnvironmentSection
-          agent={agent}
-          model={model}
-          readOnly={readOnly}
-          showChannels={showChannels}
-        />
+        <EnvironmentSection agent={agent} model={model} readOnly={readOnly} />
       </div>
     </div>
   );

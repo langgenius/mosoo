@@ -1,13 +1,13 @@
 import { PUBLIC_THREAD_API_THREADS_MAX_LIMIT } from "@mosoo/contracts/public-api";
 import type { PublicThreadApiListThreadsResponse } from "@mosoo/contracts/public-api";
 import { sessionRunsTable, sessionsTable } from "@mosoo/db";
-import type { AgentId, AppId, PublicThreadId, SessionId } from "@mosoo/id";
+import type { AccountId, AgentId, AppId, PublicThreadId, SessionId } from "@mosoo/id";
 import type { SQL } from "drizzle-orm";
 import { and, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
 
 import { getAppDatabase } from "../../platform/db/drizzle";
 import type { AgentRow } from "../agents/application/agent-types";
-import type { PublicApiCaller } from "../auth/application/public-api-caller.service";
+import type { AuthenticatedViewer } from "../auth/application/viewer-auth.service";
 import {
   buildSessionSummaryFromJoinedRow,
   sessionSummaryWithLastRunColumns,
@@ -36,43 +36,9 @@ interface PublicThreadSessionAdmission {
   session: PublicThreadSessionRow;
 }
 
-/**
- * Row conditions that bound which public Threads a caller can see. An Access
- * Token sees every public-API Thread its account created; a deployment
- * capability only sees Threads created through the same Deployment for the
- * Agent and App its binding declared.
- */
-export function publicThreadCallerScopeConditions(caller: PublicApiCaller): SQL[] {
-  const conditions: SQL[] = [
-    eq(sessionsTable.creatorAccountId, caller.viewer.id),
-    sql`json_extract(${sessionsTable.metadataJson}, '$.public_api.source') = 'public_api'`,
-  ];
-
-  if (caller.kind === "deployment_capability") {
-    conditions.push(
-      eq(sessionsTable.appId, caller.capability.appId),
-      eq(sessionsTable.agentId, caller.capability.agentId),
-      sql`json_extract(${sessionsTable.metadataJson}, '$.public_api.created_by.kind') = 'deployment_capability'`,
-      sql`json_extract(${sessionsTable.metadataJson}, '$.public_api.created_by.deployment_id') = ${caller.capability.deploymentId}`,
-    );
-  }
-
-  return conditions;
-}
-
-/**
- * A deployment capability may only address the Agent its binding declared;
- * any other Agent id reads as missing, exactly like an Agent outside the App.
- */
-function ensurePublicThreadAgentInScope(caller: PublicApiCaller, agentId: AgentId): void {
-  if (caller.kind === "deployment_capability" && caller.capability.agentId !== agentId) {
-    throw publicNotFound("Agent not found.");
-  }
-}
-
 async function getPublicThreadSessionAccess(
   database: D1Database,
-  caller: PublicApiCaller,
+  callerId: AccountId,
   threadId: PublicThreadId,
 ): Promise<PublicThreadSessionAccess> {
   const sessionId = toBackingSessionId(threadId);
@@ -87,7 +53,13 @@ async function getPublicThreadSessionAccess(
         title: sessionsTable.title,
       })
       .from(sessionsTable)
-      .where(and(eq(sessionsTable.id, sessionId), ...publicThreadCallerScopeConditions(caller)))
+      .where(
+        and(
+          eq(sessionsTable.id, sessionId),
+          eq(sessionsTable.creatorAccountId, callerId),
+          sql`json_extract(${sessionsTable.metadataJson}, '$.public_api.source') = 'public_api'`,
+        ),
+      )
       .limit(1)
       .get()) ?? null;
 
@@ -114,11 +86,11 @@ async function getPublicThreadSessionAccess(
 
 export async function admitPublicSessionCaller(
   database: D1Database,
-  caller: PublicApiCaller,
+  caller: AuthenticatedViewer,
   threadId: PublicThreadId,
 ): Promise<PublicThreadSessionAdmission> {
-  const access = await getPublicThreadSessionAccess(database, caller, threadId);
-  const agent = await admitAgentApiEndpointCaller(database, caller.viewer, access.row.agent_id);
+  const access = await getPublicThreadSessionAccess(database, caller.id, threadId);
+  const agent = await admitAgentApiEndpointCaller(database, caller, access.row.agent_id);
 
   if (agent.appId !== access.row.app_id) {
     throw publicNotFound("Thread not found.");
@@ -132,18 +104,18 @@ export async function admitPublicSessionCaller(
 
 export async function listAgentApiEndpointThreads(
   database: D1Database,
-  caller: PublicApiCaller,
+  caller: AuthenticatedViewer,
   input: {
     agentId: AgentId;
     archived: boolean | null;
   },
 ): Promise<PublicThreadApiListThreadsResponse> {
-  ensurePublicThreadAgentInScope(caller, input.agentId);
-  await admitAgentApiEndpointCaller(database, caller.viewer, input.agentId);
+  await admitAgentApiEndpointCaller(database, caller, input.agentId);
 
   const filters: SQL[] = [
     eq(sessionsTable.agentId, input.agentId),
-    ...publicThreadCallerScopeConditions(caller),
+    eq(sessionsTable.creatorAccountId, caller.id),
+    sql`json_extract(${sessionsTable.metadataJson}, '$.public_api.source') = 'public_api'`,
   ];
 
   if (input.archived !== null) {

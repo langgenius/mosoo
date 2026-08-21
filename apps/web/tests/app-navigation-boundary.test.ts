@@ -5,25 +5,27 @@ function readSource(path: string): string {
   return readFileSync(new URL(path, import.meta.url), "utf8");
 }
 
-describe("App navigation boundary", () => {
-  test("puts App Overview before Agent-first surfaces", () => {
+describe("Workspace navigation boundary", () => {
+  test("puts Home and API Keys before Run and optional Agent surfaces", () => {
     const source = readSource("../src/app/navigation.tsx");
-    const overviewIndex = source.indexOf('t("nav.overview")');
+    const homeIndex = source.indexOf('t("nav.home")');
+    const apiKeysIndex = source.indexOf('t("nav.apiKeys")');
     const runsIndex = source.indexOf('t("nav.runs")');
     const agentsIndex = source.indexOf('t("nav.agents")');
-    const filesIndex = source.indexOf('t("nav.files")');
+    const environmentsIndex = source.indexOf('t("nav.environments")');
 
-    expect(overviewIndex).toBeGreaterThan(-1);
+    expect(homeIndex).toBeGreaterThan(-1);
+    expect(apiKeysIndex).toBeGreaterThan(homeIndex);
     expect(runsIndex).toBeGreaterThan(-1);
     expect(agentsIndex).toBeGreaterThan(-1);
-    expect(filesIndex).toBeGreaterThan(agentsIndex);
-    expect(overviewIndex).toBeLessThan(runsIndex);
-    expect(overviewIndex).toBeLessThan(agentsIndex);
+    expect(environmentsIndex).toBeGreaterThan(agentsIndex);
+    expect(apiKeysIndex).toBeLessThan(runsIndex);
+    expect(runsIndex).toBeLessThan(agentsIndex);
     expect(source).toContain('path: "/"');
+    expect(source).toContain('path: "/api-keys"');
     expect(source).not.toContain('label: "Members"');
     expect(source).not.toContain('label: "Install"');
     expect(source).not.toContain('label: "Deployments"');
-    expect(source).toContain('path: "/files"');
   });
 
   test("drops the standalone Channels tab from the primary nav", () => {
@@ -33,23 +35,25 @@ describe("App navigation boundary", () => {
     expect(source).not.toContain('path: "/channels"');
   });
 
-  test("places App Settings directly below Providers in primary App nav", () => {
+  test("ends primary navigation with Usage and Workspace Settings", () => {
     const source = readSource("../src/app/navigation.tsx");
-    const providersIndex = source.indexOf('t("nav.providers")');
-    const settingsIndex = source.indexOf('t("nav.settings")');
+    const usageIndex = source.indexOf('t("nav.usage")');
+    const settingsIndex = source.indexOf('t("nav.workspaceSettings")');
 
-    expect(providersIndex).toBeGreaterThan(-1);
-    expect(settingsIndex).toBeGreaterThan(providersIndex);
-    expect(source).toContain('path: "/app-settings"');
+    expect(usageIndex).toBeGreaterThan(-1);
+    expect(settingsIndex).toBeGreaterThan(usageIndex);
+    expect(source).toContain('path: "/app-settings/usage"');
+    expect(source).toContain('path: "/app-settings/general"');
     expect(source).not.toContain('label: "App usage"');
   });
 
-  test("App shell offers back-to-org, an app switcher, and a New agent action", () => {
+  test("Workspace shell offers switching and a New Run action", () => {
     const source = readSource("../src/app/app-shell.tsx");
 
     expect(source).toContain("BackToOrgLink");
     expect(source).toContain("AppSwitcher");
-    expect(source).toContain('t("agent.create")');
+    expect(source).toContain("NewRunCta");
+    expect(source).toContain('t("harnessMarketplace.newRun")');
     expect(source).not.toContain("Manage apps");
     expect(source).not.toContain("App settings");
     expect(source).not.toContain("OrganizationSwitcher");

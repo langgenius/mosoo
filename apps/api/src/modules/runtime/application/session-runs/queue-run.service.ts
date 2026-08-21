@@ -27,7 +27,6 @@ import type { AuthenticatedViewer } from "../../../auth/application/viewer-auth.
 import { resolveReadyEnvironmentPackageArtifact } from "../../../environments/application/environment-package-artifact.service";
 import { fileStore } from "../../../files/application/file-store";
 import { publishPersistedSessionRuntimeEvents } from "../../../sessions/application/session-event-write.service";
-import type { BoundCapabilityRunProvenance } from "../../domain/bound-capability-run-provenance";
 import { getSupportedRuntimeId } from "../../domain/runtime-config";
 import {
   commitQueuedSessionRunAdmission,
@@ -55,7 +54,6 @@ class SessionActiveRunExistsError extends Error {
 interface QueueSessionRunInput {
   accessViewer?: AuthenticatedViewer;
   attachmentIds: FileId[];
-  boundCapabilityProvenance?: BoundCapabilityRunProvenance;
   clientRequestId: string | null;
   prompt: string;
   runCreationGuard?: SQL;
@@ -187,9 +185,6 @@ export async function queueSessionRun(request: QueueSessionRunRequest): Promise<
     },
     run: {
       agentId: input.session.agent_id,
-      ...(input.boundCapabilityProvenance === undefined
-        ? {}
-        : { boundCapabilityProvenance: input.boundCapabilityProvenance }),
       createdBy: viewerId,
       deploymentVersionId: input.session.deployment_version_id,
       deploymentVersionNumber: input.session.deployment_version_number,

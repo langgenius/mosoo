@@ -125,7 +125,6 @@ export function PendingChangesBanner({
       {dialogEnabled ? (
         <LiveConfigActionDialog
           affectedFields={model.changePlan.fieldLabels}
-          agentName={agent.name}
           busy={model.saving}
           kind={action}
           onCancel={() => {

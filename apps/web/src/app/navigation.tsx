@@ -3,6 +3,7 @@ import ChevronRightIcon from "@hugeicons/core-free-icons/ChevronRightIcon";
 import DashboardSquare01Icon from "@hugeicons/core-free-icons/DashboardSquare01Icon";
 import Files02Icon from "@hugeicons/core-free-icons/Files02Icon";
 import InboxIcon from "@hugeicons/core-free-icons/InboxIcon";
+import Key01Icon from "@hugeicons/core-free-icons/Key01Icon";
 import Settings02Icon from "@hugeicons/core-free-icons/Settings02Icon";
 import SlidersHorizontalIcon from "@hugeicons/core-free-icons/SlidersHorizontalIcon";
 import type { MouseEvent } from "react";
@@ -46,35 +47,43 @@ function useNavSections(): AppNavSection[] {
       items: [
         {
           icon: createHugeicon(DashboardSquare01Icon, "OverviewIcon"),
-          label: t("nav.overview"),
+          label: t("nav.home"),
           path: "/",
+        },
+        {
+          icon: createHugeicon(Key01Icon, "ApiKeysIcon"),
+          label: t("nav.apiKeys"),
+          path: "/api-keys",
         },
         { icon: createHugeicon(InboxIcon, "ThreadsIcon"), label: t("nav.runs"), path: "/threads" },
         { icon: createHugeicon(BotIcon, "AgentsIcon"), label: t("nav.agents"), path: "/agent" },
-        { icon: createHugeicon(Files02Icon, "FilesIcon"), label: t("nav.files"), path: "/files" },
+        {
+          icon: createHugeicon(Files02Icon, "FilesIcon"),
+          label: t("nav.environments"),
+          path: "/environment",
+        },
         {
           children: [
             { label: t("nav.skills"), path: "/integrations/skills" },
             { label: t("nav.mcpServers"), path: "/integrations/mcp" },
             { label: t("nav.providers"), path: "/providers" },
-            { label: t("nav.environments"), path: "/environment" },
           ],
           icon: createHugeicon(SlidersHorizontalIcon, "ConfigIcon"),
-          label: t("nav.config"),
+          label: t("nav.connections"),
           path: "/integrations",
         },
-      ],
-      label: t("nav.app"),
-    },
-    {
-      items: [
         {
-          icon: createHugeicon(Settings02Icon, "AppSettingsIcon"),
-          label: t("nav.settings"),
-          path: "/app-settings",
+          icon: createHugeicon(DashboardSquare01Icon, "UsageIcon"),
+          label: t("nav.usage"),
+          path: "/app-settings/usage",
+        },
+        {
+          icon: createHugeicon(Settings02Icon, "WorkspaceSettingsIcon"),
+          label: t("nav.workspaceSettings"),
+          path: "/app-settings/general",
         },
       ],
-      label: t("nav.account"),
+      label: t("nav.workspace"),
     },
   ];
 }

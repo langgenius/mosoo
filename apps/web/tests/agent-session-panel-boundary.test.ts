@@ -1,18 +1,14 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 
 import type { AgentReadiness } from "@mosoo/contracts/agent";
 
 import {
-  getSessionControlMode,
   selectSessionPanelReadiness,
   shouldSpeculativelyCreateSessionOnTyping,
   shouldWaitForRuntimeReadyOnNewSession,
 } from "../src/routes/agent/components/agent-session-panel-rules";
 import type { SpeculativeSessionCreateInput } from "../src/routes/agent/components/agent-session-panel-rules";
-import {
-  getResetSessionIds,
-  removeSessionConfigurationRevisionKeys,
-} from "../src/routes/agent/components/use-agent-session-panel-model";
 
 function readiness(overrides: Partial<AgentReadiness>): AgentReadiness {
   return {
@@ -21,6 +17,10 @@ function readiness(overrides: Partial<AgentReadiness>): AgentReadiness {
     ready: true,
     ...overrides,
   };
+}
+
+function readSource(path: string): string {
+  return readFileSync(new URL(path, import.meta.url), "utf8");
 }
 
 describe("agent session panel boundary", () => {
@@ -100,38 +100,15 @@ describe("agent session panel boundary", () => {
     ).toBe(false);
   });
 
-  test("uses Reset chat instead of New session in Preview mode", () => {
-    expect(getSessionControlMode("preview")).toBe("reset");
-    expect(getSessionControlMode("consume")).toBe("new_session");
-  });
+  test("starts a new Preview session without exposing reset behavior", () => {
+    const panel = readSource("../src/routes/agent/components/agent-session-panel.tsx");
+    const header = readSource("../src/routes/agent/components/agent-session-panel-header.tsx");
+    const model = readSource("../src/routes/agent/components/use-agent-session-panel-model.ts");
 
-  test("resets all known Preview chat sessions instead of falling back to older history", () => {
-    expect(
-      getResetSessionIds({
-        activeSessionId: "session_active",
-        sessionType: "preview",
-        sessions: [{ id: "session_old" }, { id: "session_active" }],
-      }),
-    ).toEqual(["session_old", "session_active"]);
-    expect(
-      removeSessionConfigurationRevisionKeys(
-        {
-          session_active: "rev-active",
-          session_keep: "rev-keep",
-          session_old: "rev-old",
-        },
-        ["session_old", "session_active"],
-      ),
-    ).toEqual({ session_keep: "rev-keep" });
-  });
-
-  test("resets only the active session outside Preview mode", () => {
-    expect(
-      getResetSessionIds({
-        activeSessionId: "session_active",
-        sessionType: "ui",
-        sessions: [{ id: "session_old" }, { id: "session_active" }],
-      }),
-    ).toEqual(["session_active"]);
+    expect(panel).toContain("model.handleStartNewSession");
+    expect(panel).not.toContain("handleResetSession");
+    expect(header).toContain('t("agent.newSession")');
+    expect(header).not.toContain("resetChat");
+    expect(model).not.toContain("getResetSessionIds");
   });
 });

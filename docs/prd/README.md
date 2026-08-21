@@ -11,6 +11,7 @@ their machine-readable contracts, code, or [Architecture](../architecture.md).
 
 ## Runtime and API
 
+- [Harness Marketplace Experiment](./harness-marketplace-experiment.md)
 - [Agent API Endpoint](./agent-endpoint-mvp.md)
 - [Public Thread API](./public-thread-api-surface.md)
 - [Runtime Sessions](./runtime-session-kernel.md)

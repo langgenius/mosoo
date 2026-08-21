@@ -1,4 +1,5 @@
 export { createAgentSession } from "./session-runs/create-agent-session.service";
+export { createHarnessSession } from "./session-runs/create-harness-session.service";
 export {
   queueSessionRun,
   SessionRunCreationGuardRejectedError,

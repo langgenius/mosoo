@@ -11,20 +11,15 @@ import type { ApiGatewayEnvironment } from "../../platform/cloudflare/worker-typ
 import { requestLoggingMiddleware } from "./request-logging.middleware";
 import { registerAccessTokenRoute } from "./routes/access-token-route";
 import { registerAuthRoute } from "./routes/auth-route";
-import { registerDiscordEventsRoute } from "./routes/discord-events-route";
 import { registerDriverRoute } from "./routes/driver-route";
 import { registerFileRoute } from "./routes/file-route";
 import { registerGraphQLRoute } from "./routes/graphql-route";
 import { registerHealthRoute } from "./routes/health-route";
-import { registerLarkEventsRoute } from "./routes/lark-events-route";
-import { registerLarkGatewayInternalRoute } from "./routes/lark-gateway-internal-route";
 import { registerMcpRoute } from "./routes/mcp-route";
-import { registerOwnerDebugTerminalRoute } from "./routes/owner-debug-terminal-route";
 import { registerPublicApiRoute } from "./routes/public-api-route";
 import { registerRootRoute } from "./routes/root-route";
 import { registerSkillRoute } from "./routes/skill-route";
-import { registerSlackEventsRoute } from "./routes/slack-events-route";
-import { registerTelegramEventsRoute } from "./routes/telegram-events-route";
+import { registerWorkspaceApiKeyRoute } from "./routes/workspace-api-key-route";
 
 export function createHttpApp() {
   const app = new Hono<ApiGatewayEnvironment>();
@@ -42,17 +37,12 @@ export function createHttpApp() {
   registerRootRoute(app);
   registerHealthRoute(publicApi);
   registerAccessTokenRoute(publicApi);
+  registerWorkspaceApiKeyRoute(publicApi);
   registerAuthRoute(publicApi);
   registerFileRoute(publicApi);
   registerMcpRoute(publicApi);
-  registerOwnerDebugTerminalRoute(publicApi);
   registerPublicApiRoute(publicApi);
   registerSkillRoute(publicApi);
-  registerDiscordEventsRoute(publicApi);
-  registerLarkEventsRoute(publicApi);
-  registerLarkGatewayInternalRoute(publicApi);
-  registerSlackEventsRoute(publicApi);
-  registerTelegramEventsRoute(publicApi);
   registerGraphQLRoute(publicApi);
   app.route(PUBLIC_API_PREFIX, publicApi);
 

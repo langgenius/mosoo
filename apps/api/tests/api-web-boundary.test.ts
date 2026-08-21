@@ -151,56 +151,32 @@ describe("API to web boundary", () => {
     expect(fields.ownerCostCard).toBeUndefined();
   });
 
-  test("keeps bound capability Run provenance behind an App-scoped audit query", () => {
+  test("keeps retired Deployment and Channel surfaces out of GraphQL", () => {
     const schema = createGraphQLSchema();
     const query = schema.getQueryType();
+    const mutation = schema.getMutationType();
 
-    if (!query) {
-      throw new Error("Expected Query in the GraphQL schema.");
+    if (!query || !mutation) {
+      throw new Error("Expected Query and Mutation in the GraphQL schema.");
     }
-
-    const provenance = query.getFields().boundCapabilityRunProvenance;
-
-    expect(provenance).toBeDefined();
-    expect(String(provenance?.type)).toBe("BoundCapabilityRunProvenance");
-    expect(String(provenance?.args.find((arg) => arg.name === "appId")?.type)).toBe("ULID!");
-    expect(String(provenance?.args.find((arg) => arg.name === "runId")?.type)).toBe("ULID!");
-  });
-
-  test("keeps Channel GraphQL setup App-scoped with Agent-owned delivery", () => {
-    const schema = createGraphQLSchema();
 
     for (const typeName of [
+      "AppDeployment",
+      "AppDeploymentRun",
+      "BoundCapabilityRunProvenance",
+      "AgentChannelBinding",
       "CreateSlackAgentChannelBindingInput",
       "CreateLarkAgentChannelBindingInput",
-      "StartLarkAgentChannelRegistrationInput",
-      "PollLarkAgentChannelRegistrationInput",
       "CreateTelegramAgentChannelBindingInput",
       "CreateDiscordAgentChannelBindingInput",
-      "StartWeChatAgentChannelPairingInput",
-      "PollWeChatAgentChannelPairingInput",
     ] as const) {
-      const input = schema.getType(typeName);
-
-      if (!isInputObjectType(input)) {
-        throw new Error(`Expected ${typeName} to be a GraphQL input object.`);
-      }
-
-      expect(String(input.getFields().appId?.type)).toBe("ULID!");
-      expect(String(input.getFields().agentId?.type)).toBe("ULID!");
-      expect(input.getFields().organizationId).toBeUndefined();
+      expect(schema.getType(typeName)).toBeUndefined();
     }
 
-    const deleteInput = schema.getType("DeleteAgentChannelBindingInput");
-
-    if (!isInputObjectType(deleteInput)) {
-      throw new Error("Expected DeleteAgentChannelBindingInput to be a GraphQL input object.");
-    }
-
-    expect(String(deleteInput.getFields().appId?.type)).toBe("ULID!");
-    expect(String(deleteInput.getFields().bindingId?.type)).toBe("ULID!");
-    expect(deleteInput.getFields().agentId).toBeUndefined();
-    expect(deleteInput.getFields().organizationId).toBeUndefined();
+    expect(query.getFields().boundCapabilityRunProvenance).toBeUndefined();
+    expect(query.getFields().appDeployment).toBeUndefined();
+    expect(mutation.getFields().deployApp).toBeUndefined();
+    expect(mutation.getFields().createSlackAgentChannelBinding).toBeUndefined();
   });
 
   test("keeps file GraphQL scope details compatible", () => {
@@ -293,16 +269,32 @@ describe("API to web boundary", () => {
 
     expect(document.openapi).toBe("3.1.0");
     expect(document.servers).toEqual([{ url: "https://api.example.com/api/v1" }]);
-    expect(Object.keys(document.components.securitySchemes)).toEqual(["accessToken"]);
+    expect(Object.keys(document.components.securitySchemes)).toEqual([
+      "accessToken",
+      "workspaceApiKey",
+    ]);
     expect(document.security).toEqual([{ accessToken: [] }]);
     for (const pathItem of Object.values(document.paths)) {
       for (const operation of Object.values(pathItem)) {
         if (operation?.security !== undefined) {
-          expect(operation.security).toEqual([{ accessToken: [] }]);
+          expect([
+            JSON.stringify([]),
+            JSON.stringify([{ accessToken: [] }]),
+            JSON.stringify([{ workspaceApiKey: [] }]),
+          ]).toContain(JSON.stringify(operation.security));
         }
       }
     }
+    expect(document.paths["/harnesses"]?.get?.security).toEqual([]);
+    expect(document.paths["/runs"]?.post?.security).toEqual([{ workspaceApiKey: [] }]);
     expectProperties(document.paths, [
+      "/harnesses",
+      "/harnesses/{slug}",
+      "/runs",
+      "/runs/{runId}",
+      "/runs/{runId}/events",
+      "/runs/{runId}/events/stream",
+      "/runs/{runId}/result",
       "/agents/{agentId}/files",
       "/files/{fileId}/content",
       "/files/{fileId}",

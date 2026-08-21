@@ -1,39 +1,13 @@
 import { parsePlatformId } from "@mosoo/id";
-import type { AppDeploymentId, AppDeploymentRunId, PersonalAccessTokenId } from "@mosoo/id";
+import type { PersonalAccessTokenId } from "@mosoo/id";
 
-const ACCESS_TOKEN_CREATED_BY_FIELDS = new Set(["token_id", "token_label"]);
-const DEPLOYMENT_CAPABILITY_CREATED_BY_FIELDS = new Set([
-  "binding_env",
-  "binding_name",
-  "deployment_id",
-  "deployment_run_id",
-  "kind",
-]);
+const CREATED_BY_FIELDS = new Set(["token_id", "token_label"]);
 const PUBLIC_API_FIELDS = new Set(["created_by", "idempotency_key", "source"]);
 
-/** Thread created by an owner Access Token (the original Public Thread API caller). */
-export interface PublicApiThreadAccessTokenCreatedByMetadata {
+export interface PublicApiThreadCreatedByMetadata {
   token_id: PersonalAccessTokenId;
   token_label: string;
 }
-
-/**
- * Thread created by a deployed App through its bound Agent capability. The
- * Deployment is the visibility boundary for that identity: a capability only
- * reads Threads whose `deployment_id` matches its own claims, so one App's
- * deployment can never observe another deployment's or the owner's Threads.
- */
-export interface PublicApiThreadDeploymentCapabilityCreatedByMetadata {
-  binding_env: string;
-  binding_name: string;
-  deployment_id: AppDeploymentId;
-  deployment_run_id: AppDeploymentRunId;
-  kind: "deployment_capability";
-}
-
-export type PublicApiThreadCreatedByMetadata =
-  | PublicApiThreadAccessTokenCreatedByMetadata
-  | PublicApiThreadDeploymentCapabilityCreatedByMetadata;
 
 export interface PublicApiThreadMetadata {
   created_by: PublicApiThreadCreatedByMetadata;
@@ -42,7 +16,10 @@ export interface PublicApiThreadMetadata {
 }
 
 interface PublicApiThreadMetadataInput {
-  createdBy: PublicApiThreadCreatedByMetadata;
+  admission: {
+    tokenId: PersonalAccessTokenId;
+    tokenLabel: string;
+  };
   idempotencyKey: string | null;
 }
 
@@ -54,16 +31,8 @@ function hasOnlyFields(value: Record<string, unknown>, fields: ReadonlySet<strin
   return Object.keys(value).every((field) => fields.has(field));
 }
 
-export function isDeploymentCapabilityCreatedBy(
-  createdBy: PublicApiThreadCreatedByMetadata,
-): createdBy is PublicApiThreadDeploymentCapabilityCreatedByMetadata {
-  return "kind" in createdBy && createdBy.kind === "deployment_capability";
-}
-
-function readAccessTokenCreatedByMetadata(
-  value: Record<string, unknown>,
-): PublicApiThreadAccessTokenCreatedByMetadata | null {
-  if (!hasOnlyFields(value, ACCESS_TOKEN_CREATED_BY_FIELDS)) {
+function readCreatedByMetadata(value: unknown): PublicApiThreadCreatedByMetadata | null {
+  if (!isRecord(value) || !hasOnlyFields(value, CREATED_BY_FIELDS)) {
     return null;
   }
 
@@ -84,62 +53,17 @@ function readAccessTokenCreatedByMetadata(
   }
 }
 
-function readDeploymentCapabilityCreatedByMetadata(
-  value: Record<string, unknown>,
-): PublicApiThreadDeploymentCapabilityCreatedByMetadata | null {
-  if (!hasOnlyFields(value, DEPLOYMENT_CAPABILITY_CREATED_BY_FIELDS)) {
-    return null;
-  }
-
-  const bindingEnv = value["binding_env"];
-  const bindingName = value["binding_name"];
-  const deploymentId = value["deployment_id"];
-  const deploymentRunId = value["deployment_run_id"];
-
-  if (
-    typeof bindingEnv !== "string" ||
-    bindingEnv.length === 0 ||
-    typeof bindingName !== "string" ||
-    bindingName.length === 0 ||
-    typeof deploymentId !== "string" ||
-    typeof deploymentRunId !== "string"
-  ) {
-    return null;
-  }
-
-  try {
-    return {
-      binding_env: bindingEnv,
-      binding_name: bindingName,
-      deployment_id: parsePlatformId<AppDeploymentId>(deploymentId, "Public API deployment ID"),
-      deployment_run_id: parsePlatformId<AppDeploymentRunId>(
-        deploymentRunId,
-        "Public API deployment run ID",
-      ),
-      kind: "deployment_capability",
-    };
-  } catch {
-    return null;
-  }
-}
-
-function readCreatedByMetadata(value: unknown): PublicApiThreadCreatedByMetadata | null {
-  if (!isRecord(value)) {
-    return null;
-  }
-
-  // Access Token threads predate the `kind` discriminator; their shape is
-  // exactly `{ token_id, token_label }` and must keep parsing unchanged.
-  return value["kind"] === "deployment_capability"
-    ? readDeploymentCapabilityCreatedByMetadata(value)
-    : readAccessTokenCreatedByMetadata(value);
-}
-
 export function createPublicApiThreadMetadata(
   input: PublicApiThreadMetadataInput,
 ): PublicApiThreadMetadata {
   return {
-    created_by: input.createdBy,
+    created_by: {
+      token_id: parsePlatformId<PersonalAccessTokenId>(
+        input.admission.tokenId,
+        "Public API token ID",
+      ),
+      token_label: input.admission.tokenLabel,
+    },
     idempotency_key: input.idempotencyKey,
     source: "public_api",
   };

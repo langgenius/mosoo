@@ -11,20 +11,14 @@ import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Label } from "@/shared/ui/label";
 
-import {
-  ASSISTANT_LIMITED_ENVIRONMENT_REASON,
-  getEnvironmentSelectionBlockReason,
-} from "./environment-picker-policy";
 import { describeEnvironment } from "./environment-summary";
 import type { AgentEditorModel } from "./use-model";
 
 function EnvironmentOption({
-  disabled,
   environment,
   selected,
   onSelect,
 }: {
-  disabled: boolean;
   environment: EnvironmentSummary;
   selected: boolean;
   onSelect: () => void;
@@ -35,9 +29,7 @@ function EnvironmentOption({
       className={cn(
         "flex w-full items-start gap-2.5 rounded-lg px-3 py-2 text-left transition-colors",
         selected ? "bg-ink-100 text-fg-1" : "hover:bg-accent/50",
-        disabled ? "cursor-not-allowed opacity-55" : null,
       )}
-      disabled={disabled}
       onClick={onSelect}
       type="button"
     >
@@ -57,11 +49,6 @@ function EnvironmentOption({
         <div className="text-muted-foreground mt-0.5 text-[11px]">
           {describeEnvironment(environment, t)}
         </div>
-        {disabled ? (
-          <div className="text-amber-fg mt-1 text-[11px]">
-            {t(ASSISTANT_LIMITED_ENVIRONMENT_REASON)}
-          </div>
-        ) : null}
       </div>
     </button>
   );
@@ -79,7 +66,6 @@ export function EnvironmentPicker({
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
-  const [selectionNotice, setSelectionNotice] = useState<string | null>(null);
   const activeAppId = appId !== null && appId !== "" ? appId : null;
   const environmentsQuery = useAppEnvironmentsQuery(activeAppId);
   const environments = environmentsQuery.data ?? [];
@@ -92,17 +78,6 @@ export function EnvironmentPicker({
       ? (environments.find((environment) => environment.isDefault) ?? null)
       : (environments.find((environment) => environment.id === explicitEnvironmentId) ?? null);
   const selectedEnvironmentMissing = explicitEnvironmentId !== null && selectedEnvironment === null;
-  const selectedEnvironmentUnsupported =
-    selectedEnvironment === null
-      ? false
-      : getEnvironmentSelectionBlockReason(
-          {
-            kind: model.draft.kind,
-            networkPolicy: selectedEnvironment.networkPolicy,
-          },
-          t,
-        ) !== null;
-
   return (
     <div className="space-y-2">
       <Label className="text-muted-foreground text-[12px]">
@@ -152,11 +127,9 @@ export function EnvironmentPicker({
                 <EnvironmentMenuContent
                   environments={environments}
                   error={environmentsQuery.error}
-                  kind={model.draft.kind}
                   loading={environmentsQuery.isLoading}
                   onSelect={(environmentId) => {
                     model.setEnvironmentId(environmentId);
-                    setSelectionNotice(null);
                     setOpen(false);
                   }}
                   selectedEnvironment={selectedEnvironment}
@@ -193,34 +166,10 @@ export function EnvironmentPicker({
         </Popover.Portal>
       </Popover.Root>
 
-      {selectedEnvironmentUnsupported ? (
-        <div className="text-amber-fg text-[12px]" role="alert">
-          {t("agentEditor.assistantLimitedWarning")}
-        </div>
-      ) : null}
-      {selectionNotice ? (
-        <output className="text-amber-fg block text-[12px]">
-          {selectionNotice} {t("agentEditor.createdButNotSelected")}
-        </output>
-      ) : null}
-
       {activeAppId !== null ? (
         <CreateEnvironmentDialog
           onCreated={(environment) => {
-            const blockReason = getEnvironmentSelectionBlockReason(
-              {
-                kind: model.draft.kind,
-                networkPolicy: environment.networkPolicy,
-              },
-              t,
-            );
-
-            if (blockReason === null) {
-              model.setEnvironmentId(environment.id);
-              setSelectionNotice(null);
-            } else {
-              setSelectionNotice(blockReason);
-            }
+            model.setEnvironmentId(environment.id);
           }}
           onOpenChange={setCreateOpen}
           open={createOpen}
@@ -234,14 +183,12 @@ export function EnvironmentPicker({
 function EnvironmentMenuContent({
   environments,
   error,
-  kind,
   loading,
   onSelect,
   selectedEnvironment,
 }: {
   environments: EnvironmentSummary[];
   error: unknown;
-  kind: AgentEditorModel["draft"]["kind"];
   loading: boolean;
   onSelect(environmentId: string): void;
   selectedEnvironment: EnvironmentSummary | null;
@@ -276,15 +223,6 @@ function EnvironmentMenuContent({
     <>
       {environments.map((environment) => (
         <EnvironmentOption
-          disabled={
-            getEnvironmentSelectionBlockReason(
-              {
-                kind,
-                networkPolicy: environment.networkPolicy,
-              },
-              t,
-            ) !== null
-          }
           environment={environment}
           key={environment.id}
           onSelect={() => {

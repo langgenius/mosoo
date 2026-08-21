@@ -55,18 +55,10 @@ export interface ChannelSessionTriggeredByMetadata {
 
 export interface AgentSessionMetadata {
   public_api?: {
-    created_by:
-      | {
-          token_id: string;
-          token_label: string;
-        }
-      | {
-          binding_env: string;
-          binding_name: string;
-          deployment_id: string;
-          deployment_run_id: string;
-          kind: "deployment_capability";
-        };
+    created_by: {
+      token_id: string;
+      token_label: string;
+    };
     idempotency_key: string | null;
     source: "public_api";
   };
@@ -214,6 +206,12 @@ async function buildSessionExecutionPlan(input: {
       setupScript: environmentSnapshot.setupScript,
     },
     skills,
+    source: {
+      agentId: input.source.agent.id,
+      agentVersionId: input.source.liveVersion?.id ?? null,
+      agentVersionNumber: input.source.liveVersion?.versionNumber ?? null,
+      kind: "agent",
+    },
     tools,
   };
 }

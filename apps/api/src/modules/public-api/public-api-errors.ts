@@ -45,6 +45,8 @@ export function toPublicApiError(error: unknown): PublicApiError | null {
       return publicIdempotencyConflict(error.message);
     case API_ERROR_CODE.unauthorized:
       return publicUnauthenticated(error.message);
+    case API_ERROR_CODE.validationFailed:
+      return publicInvalidRequest(error.message);
     default:
       return null;
   }

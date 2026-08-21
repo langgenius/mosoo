@@ -6,6 +6,8 @@ import {
   normalizeAgentBuiltInTools,
 } from "@mosoo/contracts/agent";
 import type { EnvironmentNetworkPolicy } from "@mosoo/contracts/environment";
+import { HARNESS_SLUGS } from "@mosoo/contracts/harness";
+import type { HarnessSlug, RunSourceSnapshot } from "@mosoo/contracts/harness";
 import type { AgentMcpCredentialMode } from "@mosoo/contracts/mcp";
 import type { SkillResolutionMode } from "@mosoo/contracts/skill";
 import { sessionExecutionSnapshotsTable } from "@mosoo/db";
@@ -247,15 +249,73 @@ function parseBuiltInTools(value: unknown): SessionExecutionPlan["builtInTools"]
   );
 }
 
+function readHarnessSlug(value: unknown, field: string): HarnessSlug {
+  const slug = readString(value, field);
+
+  if ((HARNESS_SLUGS as readonly string[]).includes(slug)) {
+    return slug as HarnessSlug;
+  }
+
+  throw new TypeError(`${field} is not a curated Harness slug.`);
+}
+
+function parseSource(value: unknown, binding: SessionExecutionPlan["binding"]): RunSourceSnapshot {
+  if (value === undefined) {
+    return {
+      agentId: binding.agentId,
+      agentVersionId: binding.deploymentVersionId,
+      agentVersionNumber: binding.deploymentVersionNumber,
+      kind: "agent",
+    };
+  }
+
+  const record = readRecord(value, "sessionExecutionPlan.source");
+
+  if (record["kind"] === "agent") {
+    return {
+      agentId: readPlatformId(record["agentId"], "sessionExecutionPlan.source.agentId") as AgentId,
+      agentVersionId:
+        readNullablePlatformId(
+          record["agentVersionId"],
+          "sessionExecutionPlan.source.agentVersionId",
+        ) ?? null,
+      agentVersionNumber: readNullableNumber(
+        record["agentVersionNumber"],
+        "sessionExecutionPlan.source.agentVersionNumber",
+      ),
+      kind: "agent",
+    };
+  }
+
+  if (record["kind"] === "harness") {
+    const profile = readRecord(record["profile"], "sessionExecutionPlan.source.profile");
+
+    return {
+      harness: readHarnessSlug(record["harness"], "sessionExecutionPlan.source.harness"),
+      kind: "harness",
+      profile: {
+        id: readString(profile["id"], "sessionExecutionPlan.source.profile.id"),
+        revision: readString(profile["revision"], "sessionExecutionPlan.source.profile.revision"),
+        version: readString(profile["version"], "sessionExecutionPlan.source.profile.version"),
+      },
+      version: readString(record["version"], "sessionExecutionPlan.source.version"),
+    };
+  }
+
+  throw new TypeError("sessionExecutionPlan.source.kind must be agent or harness.");
+}
+
 function parseSessionExecutionPlanJson(planJson: string): SessionExecutionPlan {
   const parsed: unknown = JSON.parse(planJson);
   const record = readRecord(parsed, "sessionExecutionPlan");
+  const binding = parseBinding(record["binding"]);
 
   return {
-    binding: parseBinding(record["binding"]),
+    binding,
     builtInTools: parseBuiltInTools(record["builtInTools"]),
     environment: parseEnvironment(record["environment"]),
     skills: readArray(record["skills"], "sessionExecutionPlan.skills").map(parseSkillReference),
+    source: parseSource(record["source"], binding),
     tools: readArray(record["tools"], "sessionExecutionPlan.tools").map(parseToolReference),
   };
 }

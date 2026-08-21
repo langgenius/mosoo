@@ -11,7 +11,7 @@ import type {
   PublicThreadSummary,
 } from "@mosoo/contracts/public-api";
 import type { MosooPublicApiError, MosooPublicApiFetch } from "@mosoo/public-api-client";
-import { MosooPublicThreadClient } from "@mosoo/public-api-client";
+import { MosooClient, MosooPublicThreadClient } from "@mosoo/public-api-client";
 import { MosooPublicThreadTerminalRunError } from "@mosoo/public-api-client";
 import { extractFinalOutput } from "@mosoo/public-api-client";
 
@@ -81,6 +81,78 @@ function jsonResponse(value: unknown, status = 200): Response {
 }
 
 describe("MosooPublicThreadClient", () => {
+  test("starts a Harness Run with a Workspace API key", async () => {
+    const requests: RecordedRequest[] = [];
+    const fetchMock: MosooPublicApiFetch = async (input, init) => {
+      const request = new Request(input, init);
+      requests.push({
+        body: await readRequestBody(request.clone()),
+        headers: request.headers,
+        method: request.method,
+        url: request.url,
+      });
+      return jsonResponse(
+        {
+          environment: {
+            id: "01J00000000000000000000007",
+            name: "Default",
+            revisionId: "01J00000000000000000000008",
+          },
+          id: RUN_ID,
+          links: {
+            approve: `/api/v1/runs/${RUN_ID}/approve`,
+            artifacts: `/api/v1/runs/${RUN_ID}/artifacts`,
+            cancel: `/api/v1/runs/${RUN_ID}/cancel`,
+            events: `/api/v1/runs/${RUN_ID}/events`,
+            result: `/api/v1/runs/${RUN_ID}/result`,
+            stream: `/api/v1/runs/${RUN_ID}/events/stream`,
+          },
+          model: "gpt-5.5",
+          source: {
+            harness: "openai-codex",
+            kind: "harness",
+            profile: {
+              id: "openai-codex/mosoo-baseline",
+              revision: "4e834acc7ef873b4dc884ecea42c7651f808e0c0",
+              version: "2026.08-experiment.2",
+            },
+            version: "2026.08-experiment.2",
+          },
+          status: "queued",
+          threadId: THREAD_ID,
+          workspaceId: "01J0000000000000000000000Q",
+        },
+        201,
+      );
+    };
+    const mosoo = new MosooClient({
+      baseUrl: "https://api.example.com",
+      fetch: fetchMock,
+      token: "msk_workspace_test",
+    });
+
+    const run = await mosoo.run({
+      harness: "openai-codex",
+      input: "Review this repository",
+      profile: "openai-codex/mosoo-baseline@2026.08-experiment.2",
+    });
+
+    expect(run).toMatchObject({
+      id: RUN_ID,
+      source: { harness: "openai-codex", kind: "harness" },
+    });
+    expect(requests[0]).toMatchObject({
+      body: {
+        harness: "openai-codex",
+        input: "Review this repository",
+        profile: "openai-codex/mosoo-baseline@2026.08-experiment.2",
+      },
+      method: "POST",
+      url: "https://api.example.com/api/v1/runs",
+    });
+    expect(requests[0]?.headers.get("Authorization")).toBe("Bearer msk_workspace_test");
+  });
+
   test("maps createThread fileIds to public file resources", async () => {
     const requests: RecordedRequest[] = [];
     const fetchMock: MosooPublicApiFetch = async (input, init) => {

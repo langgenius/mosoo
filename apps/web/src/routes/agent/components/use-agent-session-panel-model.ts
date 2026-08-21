@@ -1,4 +1,3 @@
-import type { SessionType } from "@mosoo/contracts/session";
 import { ignorePromiseRejection } from "@mosoo/effects";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -28,11 +27,7 @@ import {
   shouldSpeculativelyCreateSessionOnTyping,
   shouldWaitForRuntimeReadyOnNewSession,
 } from "./agent-session-panel-rules";
-import {
-  autoTitleSession,
-  createAgentSession,
-  deleteAgentSession,
-} from "./agent-session-panel-session-actions";
+import { autoTitleSession, createAgentSession } from "./agent-session-panel-session-actions";
 import {
   createPendingSendMessage,
   mergePendingSendMessages,
@@ -58,37 +53,6 @@ async function autoTitleSessionAndRefresh(input: {
     ignorePromiseRejection,
   );
   void input.refreshSessions();
-}
-
-export function getResetSessionIds(input: {
-  readonly activeSessionId: string | null;
-  readonly sessions: readonly { readonly id: string }[];
-  readonly sessionType: SessionType;
-}): string[] {
-  if (input.sessionType !== "preview") {
-    return input.activeSessionId === null ? [] : [input.activeSessionId];
-  }
-
-  const sessionIds = new Set(input.sessions.map((session) => session.id));
-
-  if (input.activeSessionId !== null) {
-    sessionIds.add(input.activeSessionId);
-  }
-
-  return [...sessionIds];
-}
-
-export function removeSessionConfigurationRevisionKeys(
-  current: Readonly<Record<string, string>>,
-  sessionIds: readonly string[],
-): Record<string, string> {
-  const next = { ...current };
-
-  for (const sessionId of sessionIds) {
-    delete next[sessionId];
-  }
-
-  return next;
 }
 
 export function useAgentSessionPanelModel(
@@ -277,51 +241,6 @@ export function useAgentSessionPanelModel(
         actionLabel: t("agent.retry"),
         message: error instanceof Error ? error.message : t("agent.sessionSetupFailed"),
         retryable: true,
-      });
-    } finally {
-      setSending(false);
-    }
-  }
-
-  async function handleResetSession(): Promise<void> {
-    if (sending) {
-      return;
-    }
-
-    setSending(true);
-    supersedeInFlightSessionCreate();
-    setInputValue("");
-    setPendingSends([]);
-    clearComposerError();
-
-    try {
-      if (input.appId === null) {
-        throw new Error("App id is required to reset agent sessions.");
-      }
-
-      const appId = toAppId(input.appId);
-      const resetSessionIds = getResetSessionIds({
-        activeSessionId,
-        sessionType: input.sessionType,
-        sessions: agentSessions,
-      });
-
-      for (const sessionId of resetSessionIds) {
-        await deleteAgentSession(appId, toSessionId(sessionId));
-      }
-
-      if (resetSessionIds.length > 0) {
-        setSessionConfigurationRevisions((current) =>
-          removeSessionConfigurationRevisionKeys(current, resetSessionIds),
-        );
-      }
-
-      setSelectedSessionId(null);
-      await refreshSessions();
-    } catch (error) {
-      setComposerError({
-        message: error instanceof Error ? error.message : t("agent.sessionResetFailed"),
-        retryable: false,
       });
     } finally {
       setSending(false);
@@ -600,7 +519,6 @@ export function useAgentSessionPanelModel(
     ensureActiveSession,
     fileInputRef: layout.fileInputRef,
     handleKeyDown,
-    handleResetSession,
     handleSend,
     handleStartNewSession,
     input: inputValue,

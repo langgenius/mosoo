@@ -1,9 +1,7 @@
 import type { AgentConfigChangeAction } from "@mosoo/contracts/agent-config-change-plan";
-import { AlertTriangle, Lock, ShieldCheck } from "lucide-react";
-import { useState } from "react";
+import { Lock, ShieldCheck } from "lucide-react";
 
 import { useTranslation } from "@/shared/i18n";
-import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
 import {
   Dialog,
@@ -13,19 +11,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/shared/ui/dialog";
-import { Input } from "@/shared/ui/input";
 
 /**
- * Five graphical action levels exposed to operators when they save Live-state
+ * Runtime action levels exposed to operators when they save Live-state
  * config edits. The shared classifier in @mosoo/contracts picks the level based
- * on which fields changed; reset-agent-state is opt-in from Settings Danger zone.
- *
- * The cardinal rule: agent-state stays unless the user is explicitly running
- * Reset. Every dialog says so up top.
+ * on which fields changed. Agent state is preserved for every supported action.
  */
-export type LifecycleActionKind =
-  | Exclude<AgentConfigChangeAction, "direct-update">
-  | "reset-agent-state";
+export type LifecycleActionKind = Exclude<AgentConfigChangeAction, "direct-update">;
 
 interface ActionMeta {
   title: string;
@@ -33,7 +25,7 @@ interface ActionMeta {
   primary: string;
   preservesState: boolean;
   stateNotice: string;
-  danger: "low" | "medium" | "high";
+  danger: "low" | "medium";
 }
 
 const META = {
@@ -61,14 +53,6 @@ const META = {
     stateNotice: "agentLifecycle.forkStateNotice",
     title: "agentLifecycle.liveForkTitle",
   },
-  "reset-agent-state": {
-    body: "agentLifecycle.resetStateBody",
-    danger: "high",
-    preservesState: false,
-    primary: "agentLifecycle.resetStatePrimary",
-    stateNotice: "agentLifecycle.resetStateNotice",
-    title: "agentLifecycle.resetStateTitle",
-  },
   "restart-process": {
     body: "agentLifecycle.liveRestartBody",
     danger: "low",
@@ -95,7 +79,6 @@ function resolveMeta(
 }
 
 export function LiveConfigActionDialog({
-  agentName,
   affectedFields,
   busy = false,
   kind,
@@ -103,7 +86,6 @@ export function LiveConfigActionDialog({
   onConfirm,
   open,
 }: {
-  agentName: string;
   affectedFields: string[];
   busy?: boolean;
   kind: LifecycleActionKind;
@@ -113,10 +95,6 @@ export function LiveConfigActionDialog({
 }) {
   const { t } = useTranslation();
   const meta = resolveMeta(t, kind);
-  const requireStrongConfirm = kind === "reset-agent-state";
-  const [typed, setTyped] = useState("");
-
-  const canConfirm = !busy && (!requireStrongConfirm || typed.trim() === agentName);
   const forkBlocked = kind === "fork-agent";
 
   return (
@@ -124,17 +102,13 @@ export function LiveConfigActionDialog({
       open={open}
       onOpenChange={(next) => {
         if (!next) {
-          setTyped("");
           onCancel();
         }
       }}
     >
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-[15px]">
-            {meta.danger === "high" ? <AlertTriangle className="text-destructive size-4" /> : null}
-            {meta.title}
-          </DialogTitle>
+          <DialogTitle className="text-[15px]">{meta.title}</DialogTitle>
           <DialogDescription className="text-fg-2 text-[12.5px] leading-relaxed">
             {meta.body}
           </DialogDescription>
@@ -161,28 +135,12 @@ export function LiveConfigActionDialog({
               {t("agentLifecycle.forkNotWiredNotice")}
             </div>
           ) : null}
-
-          {requireStrongConfirm ? (
-            <div className="space-y-1.5">
-              <div className="text-fg-2 text-[12px]">
-                {t("agentLifecycle.typeToConfirm", { agentName })}
-              </div>
-              <Input
-                onChange={(event) => {
-                  setTyped(event.target.value);
-                }}
-                placeholder={agentName}
-                value={typed}
-              />
-            </div>
-          ) : null}
         </div>
 
         <DialogFooter>
           <Button
             disabled={busy}
             onClick={() => {
-              setTyped("");
               onCancel();
             }}
             size="sm"
@@ -191,14 +149,8 @@ export function LiveConfigActionDialog({
             {t("common.cancel")}
           </Button>
           <Button
-            className={cn(
-              meta.danger === "high"
-                ? "bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-destructive"
-                : null,
-            )}
-            disabled={!canConfirm || forkBlocked}
+            disabled={busy || forkBlocked}
             onClick={() => {
-              setTyped("");
               onConfirm();
             }}
             size="sm"

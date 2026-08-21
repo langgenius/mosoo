@@ -3,9 +3,6 @@ export type {
   AgentDeploymentVersionId,
   AgentId,
   AgentMcpBindingId,
-  AppDeploymentId,
-  AppDeploymentRunId,
-  ChannelBindingId,
   CliOAuthFlowId,
   CredentialId,
   DriverCommandId,
@@ -35,4 +32,5 @@ export type {
   SkillSnapshotId,
   UploadId,
   VendorCredentialId,
+  WorkspaceApiKeyId,
 } from "@mosoo/id";

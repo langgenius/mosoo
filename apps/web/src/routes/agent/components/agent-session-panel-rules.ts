@@ -2,9 +2,6 @@ import type { SessionLiveState } from "@mosoo/ag-ui-session";
 import type { AgentReadiness } from "@mosoo/contracts/agent";
 import type { SessionSummary, SessionType } from "@mosoo/contracts/session";
 
-export type AgentSessionPanelTone = "consume" | "preview";
-export type SessionControlMode = "new_session" | "reset";
-
 export interface SessionConfigurationFreshnessInput {
   activeSession: SessionSummary | null;
   activeSessionRevision: string | null;
@@ -118,7 +115,7 @@ export interface SpeculativeSessionCreateInput {
 }
 
 // Speculatively creating a session on typing is preview-only: preview sessions
-// are reset-scoped and cheap to abandon, while consume ("ui") sessions are
+// are cheap to abandon, while consume ("ui") sessions are
 // user-visible history and must not be created before a real send.
 export function shouldSpeculativelyCreateSessionOnTyping(
   input: SpeculativeSessionCreateInput,
@@ -131,10 +128,6 @@ export function shouldSpeculativelyCreateSessionOnTyping(
     !input.sending &&
     input.readinessBlockMessage === null
   );
-}
-
-export function getSessionControlMode(tone: AgentSessionPanelTone): SessionControlMode {
-  return tone === "preview" ? "reset" : "new_session";
 }
 
 export function createSessionAutoTitle(typedText: string): string {

@@ -19,23 +19,18 @@ import type { VendorCredentialId } from "@mosoo/id";
 import { hashTokenValue } from "../../src/modules/auth/application/personal-access-token.service";
 import { storeVendorCredentialSecret } from "../../src/modules/vendor-credentials/application/vendor-credential.secret-resolution";
 import type { ApiBindings } from "../../src/platform/cloudflare/worker-types";
-import type { ApiCommandQueueStub } from "./channel-final-delivery-queue-fixture";
-import type { ChannelFinalDeliveryQueueStub } from "./channel-final-delivery-queue-fixture";
-import { createApiCommandQueueStub } from "./channel-final-delivery-queue-fixture";
-import { createChannelFinalDeliveryQueueStub } from "./channel-final-delivery-queue-fixture";
+import type { ApiCommandQueueStub } from "./api-command-queue-fixture";
+import { createApiCommandQueueStub } from "./api-command-queue-fixture";
 import { SqliteD1Database } from "./sqlite-d1";
 export { SqliteD1Database } from "./sqlite-d1";
 export {
   createApiCommandQueueStub,
-  createChannelFinalDeliveryQueueStub,
   createRecordedQueueMessage,
   type ApiCommandQueueStub,
   type CapturedApiCommandMessage,
-  type CapturedChannelFinalDeliveryMessage,
-  type ChannelFinalDeliveryQueueStub,
   type RecordedQueueMessage,
   type RecordedQueueMessageAction,
-} from "./channel-final-delivery-queue-fixture";
+} from "./api-command-queue-fixture";
 
 const CONTRACT_SCHEMA_SQL = readFileSync(
   new URL("./public-api-http-core-schema.sql", import.meta.url),
@@ -268,7 +263,6 @@ export function createPublicHttpTestBindings(
   options: {
     apiCommandQueue?: ApiCommandQueueStub;
     fileBucket?: R2Bucket;
-    queue?: ChannelFinalDeliveryQueueStub;
     sessionNamespace?: ApiBindings["Session"];
   } = {},
 ): Record<string, unknown> {
@@ -278,12 +272,10 @@ export function createPublicHttpTestBindings(
     AUTH_EMAIL_FROM: "mosoo AUTH <auth@mosoo.ai>",
     BETTER_AUTH_SECRET: "test-secret",
     API_COMMAND_QUEUE: options.apiCommandQueue ?? createApiCommandQueueStub(),
-    CHANNEL_FINAL_DELIVERY_QUEUE: options.queue ?? createChannelFinalDeliveryQueueStub(),
     CLOUDFLARE_ACCOUNT_ID: "test-account",
     DB: database,
     FILE_BUCKET: options.fileBucket ?? unavailableBinding<R2Bucket>("FILE_BUCKET"),
     FILE_BUCKET_NAME: "mosoo-file",
-    MOSOO_APP_DEPLOYMENT_DOMAIN: "apps.localhost",
     R2_ACCESS_KEY_ID: "test-access-key",
     R2_SECRET_ACCESS_KEY: "test-secret-key",
     RUNTIME_ACTION_TOKEN_SECRET: "test-runtime-action-token",

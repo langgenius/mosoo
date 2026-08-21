@@ -40,16 +40,20 @@ export function AppIdBadge({
       )}
     >
       <span title={appId} className="min-w-0 truncate font-mono">
-        {t("agent.appId")}: {appId}
+        {t("harnessMarketplace.workspaceId")}: {appId}
       </span>
       <Button
-        aria-label={copied ? t("agent.appIdCopied") : t("agent.copyAppId")}
+        aria-label={
+          copied
+            ? t("harnessMarketplace.workspaceIdCopied")
+            : t("harnessMarketplace.copyWorkspaceId")
+        }
         className="text-muted-foreground hover:text-foreground size-5"
         onClick={(event) => {
           void handleCopy(event);
         }}
         size="icon-xs"
-        title={copied ? t("common.copied") : t("agent.copyAppId")}
+        title={copied ? t("common.copied") : t("harnessMarketplace.copyWorkspaceId")}
         type="button"
         variant="ghost"
       >

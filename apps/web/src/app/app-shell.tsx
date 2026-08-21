@@ -144,10 +144,10 @@ function AppSwitcher({
   );
 }
 
-function NewAgentCta({ collapsed, disabled }: { collapsed: boolean; disabled: boolean }) {
+function NewRunCta({ collapsed, disabled }: { collapsed: boolean; disabled: boolean }) {
   const { t } = useTranslation();
   const className = cn("mb-4", collapsed ? "mx-auto size-9 p-0" : "w-full justify-center");
-  const label = t("agent.create");
+  const label = t("harnessMarketplace.newRun");
 
   if (disabled) {
     return (
@@ -160,7 +160,7 @@ function NewAgentCta({ collapsed, disabled }: { collapsed: boolean; disabled: bo
 
   const cta = (
     <Button asChild aria-label={label} className={className}>
-      <Link to="/agent?create=1">
+      <Link to="/">
         <NewAgentIcon className="size-4" />
         {collapsed ? null : <span className="sidebar-label-enter">{label}</span>}
       </Link>
@@ -395,7 +395,7 @@ export function Layout({ children }: { children: ReactNode }) {
             onNavigate?.();
           }}
         />
-        <NewAgentCta collapsed={isCollapsed} disabled={activeApp === null} />
+        <NewRunCta collapsed={isCollapsed} disabled={activeApp === null} />
         <AppNavigation collapsed={isCollapsed} pathname={location.pathname} />
       </>
     );

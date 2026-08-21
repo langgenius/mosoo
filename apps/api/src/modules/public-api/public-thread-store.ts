@@ -6,9 +6,15 @@ import {
   sessionsTable,
 } from "@mosoo/db";
 import { parsePlatformId } from "@mosoo/id";
-import type { AccountId, AgentId, FileId, PublicThreadId, SessionId } from "@mosoo/id";
+import type {
+  AccountId,
+  AgentId,
+  FileId,
+  PersonalAccessTokenId,
+  PublicThreadId,
+  SessionId,
+} from "@mosoo/id";
 import { and, eq, sql } from "drizzle-orm";
-import type { SQL } from "drizzle-orm";
 
 import type { ApiBindings } from "../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../platform/db/drizzle";
@@ -22,14 +28,8 @@ import type { SessionSummaryWithLastRunRow } from "../sessions/application/sessi
 import { deriveSessionTitleFromPrompt } from "../sessions/domain/session-title";
 import { publicNotFound } from "./public-api-errors";
 import { toBackingSessionId } from "./public-thread-ids";
-import {
-  isDeploymentCapabilityCreatedBy,
-  parsePublicApiThreadMetadata,
-} from "./public-thread-metadata";
-import type {
-  PublicApiThreadCreatedByMetadata,
-  PublicApiThreadMetadata,
-} from "./public-thread-metadata";
+import { parsePublicApiThreadMetadata } from "./public-thread-metadata";
+import type { PublicApiThreadMetadata } from "./public-thread-metadata";
 
 export interface ThreadSnapshotRow extends SessionSummaryWithLastRunRow {
   creator_account_id: AccountId;
@@ -118,27 +118,12 @@ export async function getThreadSnapshot(
   };
 }
 
-/**
- * SQL condition selecting Threads stamped with the same creator identity. An
- * Access Token owns its idempotency space; a deployment capability shares one
- * space across the revisions of its Deployment so a retried create after a
- * redeploy still replays instead of duplicating the Thread.
- */
-export function publicThreadCreatedByCondition(createdBy: PublicApiThreadCreatedByMetadata): SQL {
-  if (isDeploymentCapabilityCreatedBy(createdBy)) {
-    return sql`json_extract(${sessionsTable.metadataJson}, '$.public_api.created_by.kind') = 'deployment_capability'
-      AND json_extract(${sessionsTable.metadataJson}, '$.public_api.created_by.deployment_id') = ${createdBy.deployment_id}`;
-  }
-
-  return sql`json_extract(${sessionsTable.metadataJson}, '$.public_api.created_by.token_id') = ${createdBy.token_id}`;
-}
-
 export async function findPublicThreadSnapshotByIdempotencyKey(
   database: D1Database,
   input: {
     agentId: AgentId;
-    createdBy: PublicApiThreadCreatedByMetadata;
     idempotencyKey: string;
+    tokenId: PersonalAccessTokenId;
   },
 ): Promise<ThreadSnapshot | null> {
   const row =
@@ -155,7 +140,7 @@ export async function findPublicThreadSnapshotByIdempotencyKey(
         and(
           eq(sessionsTable.agentId, input.agentId),
           sql`json_extract(${sessionsTable.metadataJson}, '$.public_api.source') = 'public_api'`,
-          publicThreadCreatedByCondition(input.createdBy),
+          sql`json_extract(${sessionsTable.metadataJson}, '$.public_api.created_by.token_id') = ${input.tokenId}`,
           sql`json_extract(${sessionsTable.metadataJson}, '$.public_api.idempotency_key') = ${input.idempotencyKey}`,
         ),
       )

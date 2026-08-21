@@ -11,7 +11,7 @@ import {
 import { createPublicApiOpenApiComponents } from "./public-api-openapi-components";
 
 type HttpMethod = "delete" | "get" | "post" | "put";
-type AccessTokenSecurity = { accessToken: [] };
+type SecurityRequirement = { accessToken?: []; workspaceApiKey?: [] };
 
 interface OpenApiParameter {
   description?: string;
@@ -27,7 +27,7 @@ interface OpenApiOperation {
   parameters?: OpenApiParameter[];
   requestBody?: Record<string, unknown>;
   responses: Record<string, unknown>;
-  security?: AccessTokenSecurity[];
+  security?: SecurityRequirement[];
   summary: string;
 }
 
@@ -42,14 +42,16 @@ interface PublicApiOpenApiDocument {
   };
   openapi: "3.1.0";
   paths: OpenApiPaths;
-  security: AccessTokenSecurity[];
+  security: SecurityRequirement[];
   servers: { url: string }[];
 }
 
 const EXAMPLE_AGENT_ID = "01J00000000000000000000001";
 const EXAMPLE_THREAD_ID = "01J00000000000000000000009";
 const EXAMPLE_FILE_ID = "01J0000000000000000000000J";
-const ACCESS_TOKEN_SECURITY: AccessTokenSecurity[] = [{ accessToken: [] }];
+const EXAMPLE_RUN_ID = "01J0000000000000000000000A";
+const ACCESS_TOKEN_SECURITY: SecurityRequirement[] = [{ accessToken: [] }];
+const WORKSPACE_API_KEY_SECURITY: SecurityRequirement[] = [{ workspaceApiKey: [] }];
 
 const EXAMPLE_SESSION_FILE = {
   committed: true,
@@ -104,6 +106,24 @@ const fileIdParameter = platformIdPathParameter({
   example: EXAMPLE_FILE_ID,
   name: "fileId",
 });
+
+const runIdParameter = platformIdPathParameter({
+  description: "Run ID returned by POST /runs.",
+  example: EXAMPLE_RUN_ID,
+  name: "runId",
+});
+
+const harnessSlugParameter = {
+  description: "Curated Harness slug.",
+  example: "openai-codex",
+  in: "path",
+  name: "slug",
+  required: true,
+  schema: {
+    enum: ["claude-code", "openai-codex", "opencode"],
+    type: "string",
+  },
+} satisfies OpenApiParameter;
 
 const idempotencyKeyParameter = {
   description:
@@ -314,6 +334,172 @@ function operation(
 
 export function createPublicApiOpenApiDocument(origin: string): PublicApiOpenApiDocument {
   const paths = {
+    "/harnesses": {
+      get: operation({
+        description:
+          "Lists curated coding-agent Harnesses and the normalized capabilities each exposes through the Run API.",
+        security: [],
+        success: {
+          "200": jsonResponse("Harness catalog.", {
+            additionalProperties: false,
+            properties: {
+              harnesses: {
+                items: { $ref: "#/components/schemas/HarnessCatalogEntry" },
+                type: "array",
+              },
+            },
+            required: ["harnesses"],
+            type: "object",
+          }),
+        },
+        summary: "List Harnesses",
+      }),
+    },
+    "/harnesses/{slug}": {
+      get: operation({
+        description: "Returns one curated Harness and its normalized capabilities.",
+        parameters: [harnessSlugParameter],
+        security: [],
+        success: {
+          "200": jsonResponse("Harness catalog entry.", {
+            additionalProperties: false,
+            properties: {
+              harness: { $ref: "#/components/schemas/HarnessCatalogEntry" },
+            },
+            required: ["harness"],
+            type: "object",
+          }),
+        },
+        summary: "Retrieve a Harness",
+      }),
+    },
+    "/runs": {
+      post: operation({
+        description:
+          "Creates an isolated Cattle Run from exactly one source: a curated Harness or a published Workspace Agent. Harness Runs do not create Agent records. The selected source, model, and Environment revision are frozen into the Run snapshot.",
+        requestBody: jsonRequestBodyExamples(
+          { $ref: "#/components/schemas/WorkspaceRunRequest" },
+          {
+            harness: {
+              summary: "Run a curated Harness",
+              value: { harness: "openai-codex", input: "Review this repository" },
+            },
+            agent: {
+              summary: "Run a published Workspace Agent",
+              value: { agent: "researcher", input: { query: "Summarize Q2 notes" } },
+            },
+          },
+        ),
+        security: WORKSPACE_API_KEY_SECURITY,
+        success: {
+          "201": jsonResponse("Created Run.", {
+            $ref: "#/components/schemas/WorkspaceRunResponse",
+          }),
+        },
+        summary: "Create a Run",
+      }),
+    },
+    "/runs/{runId}": {
+      get: operation({
+        description: "Returns the Run state and its immutable source and Environment snapshots.",
+        parameters: [runIdParameter],
+        security: WORKSPACE_API_KEY_SECURITY,
+        success: {
+          "200": jsonResponse("Run state.", {
+            $ref: "#/components/schemas/WorkspaceRunResponse",
+          }),
+        },
+        summary: "Retrieve a Run",
+      }),
+    },
+    "/runs/{runId}/approve": {
+      post: operation({
+        description: "Allows or rejects one pending permission request for the Run.",
+        parameters: [runIdParameter],
+        requestBody: jsonRequestBody({
+          additionalProperties: false,
+          properties: {
+            decision: { enum: ["allow_once", "reject_once"] },
+            requestId: { minLength: 1, type: "string" },
+          },
+          required: ["decision", "requestId"],
+          type: "object",
+        }),
+        security: WORKSPACE_API_KEY_SECURITY,
+        success: { "200": okResponse("Permission decision accepted.") },
+        summary: "Approve or reject a Run action",
+      }),
+    },
+    "/runs/{runId}/artifacts": {
+      get: operation({
+        description: "Lists ready artifacts produced in this Run's isolated session.",
+        parameters: [runIdParameter],
+        security: WORKSPACE_API_KEY_SECURITY,
+        success: {
+          "200": jsonResponse("Run artifact list.", {
+            additionalProperties: false,
+            properties: {
+              artifacts: {
+                items: { $ref: "#/components/schemas/PublicFile" },
+                type: "array",
+              },
+            },
+            required: ["artifacts"],
+            type: "object",
+          }),
+        },
+        summary: "List Run artifacts",
+      }),
+    },
+    "/runs/{runId}/cancel": {
+      post: operation({
+        description: "Cancels the Run if it is active and returns its latest state.",
+        parameters: [runIdParameter],
+        security: WORKSPACE_API_KEY_SECURITY,
+        success: {
+          "200": jsonResponse("Cancelled Run.", {
+            $ref: "#/components/schemas/WorkspaceRunResponse",
+          }),
+        },
+        summary: "Cancel a Run",
+      }),
+    },
+    "/runs/{runId}/events": {
+      get: operation({
+        description: "Returns normalized, public-safe Run events in chronological order.",
+        parameters: [runIdParameter, threadEventsLimitParameter],
+        security: WORKSPACE_API_KEY_SECURITY,
+        success: {
+          "200": jsonResponse("Run event list.", {
+            $ref: "#/components/schemas/ThreadEventListResponse",
+          }),
+        },
+        summary: "List Run events",
+      }),
+    },
+    "/runs/{runId}/events/stream": {
+      get: operation({
+        description: "Streams normalized Run events as Server-Sent Events.",
+        parameters: [runIdParameter, threadEventsLimitParameter],
+        security: WORKSPACE_API_KEY_SECURITY,
+        success: { "200": textEventStreamResponse("Run event stream.") },
+        summary: "Stream Run events",
+      }),
+    },
+    "/runs/{runId}/result": {
+      get: operation({
+        description:
+          "Returns the latest Run state and its canonical final assistant output when available.",
+        parameters: [runIdParameter],
+        security: WORKSPACE_API_KEY_SECURITY,
+        success: {
+          "200": jsonResponse("Run result.", {
+            $ref: "#/components/schemas/WorkspaceRunResultResponse",
+          }),
+        },
+        summary: "Retrieve a Run result",
+      }),
+    },
     "/agents/{agentId}/files": {
       post: operation({
         description:
@@ -583,8 +769,8 @@ export function createPublicApiOpenApiDocument(origin: string): PublicApiOpenApi
     components: createPublicApiOpenApiComponents(),
     info: {
       description:
-        "Public HTTPS API for creating and retrieving Threads on mosoo Agent API Endpoints. v1 resource identifiers are bare ULIDs, not prefixed IDs. Access Tokens identify the account caller. Runtime execution resolves the Agent API Endpoint owner's capabilities while the Thread is attributed to the token owner.",
-      title: "mosoo Public Thread API",
+        "Public HTTPS API for starting Workspace-scoped Runs from curated Harnesses or published Agents, plus the legacy Thread surface. v1 resource identifiers are bare ULIDs. Workspace API keys use the msk_ prefix; account Access Tokens use mst_.",
+      title: "mosoo Run API",
       version: PUBLIC_API_VERSION,
     },
     openapi: "3.1.0",

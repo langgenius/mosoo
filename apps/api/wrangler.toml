@@ -22,7 +22,6 @@ FILE_BUCKET_NAME = "mosoo-file"
 BACKUP_BUCKET_NAME = "mosoo-sandbox-state"
 SANDBOX_STATE_BUCKET_NAME = "mosoo-sandbox-state"
 SANDBOX_FILE_BUCKET_LOCAL = "true"
-MOSOO_APP_DEPLOYMENT_DOMAIN = "apps.localhost"
 MOSOO_ACCOUNT_CONCURRENT_SANDBOX_LIMIT = "5"
 MOSOO_DEPLOYMENT_MODE = "cloud"
 MOSOO_ENVIRONMENT = "development"
@@ -53,10 +52,6 @@ class_name = "DriverConnection"
 [[durable_objects.bindings]]
 name = "Session"
 class_name = "Session"
-
-[[durable_objects.bindings]]
-name = "ChannelConnection"
-class_name = "ChannelConnection"
 
 [[durable_objects.bindings]]
 name = "Sandbox"
@@ -94,10 +89,6 @@ queue = "api-command"
 binding = "ENVIRONMENT_ARTIFACT_BUILD_QUEUE"
 queue = "environment-artifact-build"
 
-[[queues.producers]]
-binding = "CHANNEL_FINAL_DELIVERY_QUEUE"
-queue = "channel-final-delivery"
-
 [[queues.consumers]]
 queue = "api-command"
 max_batch_size = 10
@@ -118,13 +109,6 @@ max_batch_timeout = 1
 max_retries = 5
 max_concurrency = 5
 dead_letter_queue = "api-command-dlq"
-
-[[queues.consumers]]
-queue = "channel-final-delivery"
-max_batch_size = 10
-max_batch_timeout = 5
-max_retries = 5
-dead_letter_queue = "channel-final-delivery-dlq"
 
 [env.stage]
 name = "mosoo-api-stage"
@@ -151,7 +135,6 @@ FILE_BUCKET_NAME = "mosoo-stage-file"
 BACKUP_BUCKET_NAME = "mosoo-stage-sandbox-state"
 SANDBOX_STATE_BUCKET_NAME = "mosoo-stage-sandbox-state"
 SANDBOX_FILE_BUCKET_LOCAL = "false"
-MOSOO_APP_DEPLOYMENT_DOMAIN = "apps-stage.mosoo.ai"
 MOSOO_ACCOUNT_CONCURRENT_SANDBOX_LIMIT = "5"
 MOSOO_DEPLOYMENT_MODE = "cloud"
 MOSOO_ENVIRONMENT = "production"
@@ -181,10 +164,6 @@ class_name = "DriverConnection"
 [[env.stage.durable_objects.bindings]]
 name = "Session"
 class_name = "Session"
-
-[[env.stage.durable_objects.bindings]]
-name = "ChannelConnection"
-class_name = "ChannelConnection"
 
 [[env.stage.durable_objects.bindings]]
 name = "Sandbox"
@@ -222,10 +201,6 @@ queue = "mosoo-stage-api-command"
 binding = "ENVIRONMENT_ARTIFACT_BUILD_QUEUE"
 queue = "mosoo-stage-environment-artifact-build"
 
-[[env.stage.queues.producers]]
-binding = "CHANNEL_FINAL_DELIVERY_QUEUE"
-queue = "mosoo-stage-channel-final-delivery"
-
 [[env.stage.queues.consumers]]
 queue = "mosoo-stage-api-command"
 max_batch_size = 10
@@ -246,13 +221,6 @@ max_batch_timeout = 1
 max_retries = 5
 max_concurrency = 5
 dead_letter_queue = "mosoo-stage-api-command-dlq"
-
-[[env.stage.queues.consumers]]
-queue = "mosoo-stage-channel-final-delivery"
-max_batch_size = 10
-max_batch_timeout = 5
-max_retries = 5
-dead_letter_queue = "mosoo-stage-channel-final-delivery-dlq"
 
 [env.prod]
 name = "mosoo-api-prod"
@@ -283,7 +251,6 @@ FILE_BUCKET_NAME = "mosoo-file"
 BACKUP_BUCKET_NAME = "mosoo-sandbox-state"
 SANDBOX_STATE_BUCKET_NAME = "mosoo-sandbox-state"
 SANDBOX_FILE_BUCKET_LOCAL = "false"
-MOSOO_APP_DEPLOYMENT_DOMAIN = "apps.mosoo.ai"
 MOSOO_ACCOUNT_CONCURRENT_SANDBOX_LIMIT = "5"
 MOSOO_DEPLOYMENT_MODE = "cloud"
 MOSOO_ENVIRONMENT = "production"
@@ -323,10 +290,6 @@ name = "Session"
 class_name = "Session"
 
 [[env.prod.durable_objects.bindings]]
-name = "ChannelConnection"
-class_name = "ChannelConnection"
-
-[[env.prod.durable_objects.bindings]]
 name = "Sandbox"
 class_name = "Sandbox"
 
@@ -363,10 +326,6 @@ queue = "api-command"
 binding = "ENVIRONMENT_ARTIFACT_BUILD_QUEUE"
 queue = "environment-artifact-build"
 
-[[env.prod.queues.producers]]
-binding = "CHANNEL_FINAL_DELIVERY_QUEUE"
-queue = "channel-final-delivery"
-
 [[env.prod.queues.consumers]]
 queue = "api-command"
 max_batch_size = 10
@@ -390,13 +349,6 @@ max_batch_timeout = 1
 max_retries = 5
 max_concurrency = 5
 dead_letter_queue = "api-command-dlq"
-
-[[env.prod.queues.consumers]]
-queue = "channel-final-delivery"
-max_batch_size = 10
-max_batch_timeout = 5
-max_retries = 5
-dead_letter_queue = "channel-final-delivery-dlq"
 
 [[migrations]]
 tag = "v1"

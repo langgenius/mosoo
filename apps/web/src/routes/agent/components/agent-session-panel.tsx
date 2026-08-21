@@ -25,7 +25,6 @@ import { Button } from "@/shared/ui/button";
 import { isTruthy } from "../../../shared/lib/truthiness";
 import { AgentReadinessBlockersBanner } from "./agent-readiness-blockers-banner";
 import { AgentSessionPanelHeader } from "./agent-session-panel-header";
-import { getSessionControlMode } from "./agent-session-panel-rules";
 import {
   deriveSessionPill,
   readinessBlockSummary,
@@ -63,8 +62,6 @@ export function AgentSessionPanel({
   });
   const activeTitle = model.activeSession?.title ?? null;
   const pill = deriveSessionPill(model);
-  const sessionControlMode = getSessionControlMode(tone);
-  const previewResetMode = sessionControlMode === "reset";
   const stopped = pill === "Stopped";
   const setupBlocked = pill === "Setup required";
   const setupSummary = readinessBlockSummary(model.readiness, t) ?? model.readinessBlockMessage;
@@ -103,23 +100,7 @@ export function AgentSessionPanel({
       },
     ];
   });
-  const sessionLoadErrorMessage = previewResetMode
-    ? t("agent.failedToLoadPreviewChat")
-    : t("agent.failedToLoadSessions");
-  const configurationRefreshMessage = previewResetMode
-    ? t("agent.resetChatToTestConfig")
-    : t("agent.startNewSessionToTestConfig");
-  const configurationRefreshActionLabel = previewResetMode
-    ? t("agent.resetChat")
-    : t("agent.startNewSession");
-  const stoppedActionLabel = previewResetMode ? t("agent.resetChat") : t("agent.newSession");
-  const handleResetPreviewSession = async (): Promise<void> => {
-    resourceDraft.clearActiveMentions();
-    await model.handleResetSession();
-  };
-  const handleSessionControlClick = previewResetMode
-    ? handleResetPreviewSession
-    : model.handleStartNewSession;
+  const handleSessionControlClick = model.handleStartNewSession;
 
   const handleUploadFiles = async (files: File[]): Promise<void> => {
     if (files.length === 0) {
@@ -200,7 +181,6 @@ export function AgentSessionPanel({
               onSessionControlClick={handleSessionControlClick}
               pill={pill}
               reconnectingSubtitle={reconnectingSubtitle}
-              sessionControlMode={sessionControlMode}
               sending={model.sending}
               sessionCount={model.sessionCount}
               tone={tone}
@@ -208,7 +188,7 @@ export function AgentSessionPanel({
 
             {isTruthy(model.sessionLoadError) ? (
               <div className="border-amber/30 bg-amber-bg text-amber-fg border-b px-4 py-2.5 text-[12px] leading-relaxed">
-                {sessionLoadErrorMessage}
+                {t("agent.failedToLoadSessions")}
               </div>
             ) : null}
 
@@ -216,14 +196,14 @@ export function AgentSessionPanel({
               <div className="border-amber/30 bg-amber-bg border-b px-4 py-2.5">
                 <div className="flex items-center justify-between gap-3">
                   <div className="text-amber-fg min-w-0 text-[12px] font-medium">
-                    {configurationRefreshMessage}
+                    {t("agent.startNewSessionToTestConfig")}
                   </div>
                   <Button
                     onClick={() => void handleSessionControlClick()}
                     size="xs"
                     variant="outline"
                   >
-                    {configurationRefreshActionLabel}
+                    {t("agent.startNewSession")}
                   </Button>
                 </div>
               </div>
@@ -259,7 +239,7 @@ export function AgentSessionPanel({
                       size="sm"
                       variant="outline"
                     >
-                      {stoppedActionLabel}
+                      {t("agent.newSession")}
                     </Button>
                   </div>
                 </div>

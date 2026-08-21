@@ -46,10 +46,6 @@ const DEFAULT_INSTRUCTION_COPY: Record<string, string> = {
     "The create-thread response returns `thread/run`; continue the conversation through the Thread API when the task needs more turns.",
   "agentLifecycle.instructionTokenRead":
     "Read `MOSOO_API_TOKEN` from the environment. Do not hard-code or print the token.",
-  "agentLifecycle.kindHintAssistant":
-    "Conversational chat agent designed for back-and-forth dialogue.",
-  "agentLifecycle.kindHintTask":
-    "Job-style agent designed for one-shot calls that return a structured result.",
   "agentLifecycle.noDescriptionProvided": "No description provided.",
 };
 
@@ -142,8 +138,6 @@ export function buildAgentInstructionPrompt(
   t: Translate = defaultTranslate,
 ): string {
   const description = agent.description.trim() || t("agentLifecycle.noDescriptionProvided");
-  const kindHint =
-    agent.kind === "pet" ? t("agentLifecycle.kindHintAssistant") : t("agentLifecycle.kindHintTask");
 
   return `${t("agentLifecycle.instructionForLlmHeading", { agentName: agent.name })}
 
@@ -154,7 +148,6 @@ ${t("agentLifecycle.instructionGeneratedVariables")}
 \`\`\`text
 MOSOO_AGENT_ID=${agent.id}
 MOSOO_AGENT_NAME=${agent.name}
-MOSOO_AGENT_KIND=${agent.kind}
 MOSOO_CREATE_THREAD_URL=${distribution.apiUrl}
 MOSOO_API_DOCS_URL=${distribution.apiDocsUrl}
 MOSOO_OPENAPI_URL=${distribution.openApiUrl}
@@ -166,8 +159,6 @@ ${t("agentLifecycle.instructionTokenRead")}
 ${t("agentLifecycle.instructionAgentHeading")}
 
 ${description}
-
-> ${kindHint}
 
 ${t("agentLifecycle.instructionProgrammaticControl")}
 

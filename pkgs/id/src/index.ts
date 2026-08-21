@@ -12,9 +12,6 @@ export type AccountId = SemanticPlatformId<"AccountId">;
 export type AgentDeploymentVersionId = SemanticPlatformId<"AgentDeploymentVersionId">;
 export type AgentId = SemanticPlatformId<"AgentId">;
 export type AgentMcpBindingId = SemanticPlatformId<"AgentMcpBindingId">;
-export type AppDeploymentId = SemanticPlatformId<"AppDeploymentId">;
-export type AppDeploymentRunId = SemanticPlatformId<"AppDeploymentRunId">;
-export type ChannelBindingId = SemanticPlatformId<"ChannelBindingId">;
 export type CliOAuthFlowId = SemanticPlatformId<"CliOAuthFlowId">;
 export type CredentialId = SemanticPlatformId<"CredentialId">;
 export type DriverCommandId = SemanticPlatformId<"DriverCommandId">;
@@ -43,6 +40,7 @@ export type SkillId = SemanticPlatformId<"SkillId">;
 export type SkillSnapshotId = SemanticPlatformId<"SkillSnapshotId">;
 export type UploadId = SemanticPlatformId<"UploadId">;
 export type VendorCredentialId = SemanticPlatformId<"VendorCredentialId">;
+export type WorkspaceApiKeyId = SemanticPlatformId<"WorkspaceApiKeyId">;
 
 export const PLATFORM_ID_PATTERN = "^[0-7][0-9A-HJKMNP-TV-Z]{25}$";
 export const PLATFORM_ID_INPUT_PATTERN = "^[0-7][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{25}$";

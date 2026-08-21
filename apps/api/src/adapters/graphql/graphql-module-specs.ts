@@ -1,7 +1,6 @@
 import type { GraphQLModule } from "./graphql-module.ts";
 import { agentSchema } from "./schema/agent-schema.ts";
 import { appSchema } from "./schema/app-schema.ts";
-import { channelSchema } from "./schema/channel-schema.ts";
 import { commonSchema } from "./schema/common-schema.ts";
 import { costSchema } from "./schema/cost-schema.ts";
 import { environmentSchema } from "./schema/environment-schema.ts";
@@ -20,22 +19,6 @@ export const commonGraphQLSpec = {
   typeDefs: commonSchema,
 } satisfies GraphQLModuleSpec;
 
-export const channelGraphQLSpec = {
-  mutationFields: [
-    "createDiscordAgentChannelBinding(input: CreateDiscordAgentChannelBindingInput!): AgentChannelBinding!",
-    "createLarkAgentChannelBinding(input: CreateLarkAgentChannelBindingInput!): AgentChannelBinding!",
-    "createSlackAgentChannelBinding(input: CreateSlackAgentChannelBindingInput!): AgentChannelBinding!",
-    "createTelegramAgentChannelBinding(input: CreateTelegramAgentChannelBindingInput!): AgentChannelBinding!",
-    "pollLarkAgentChannelRegistration(input: PollLarkAgentChannelRegistrationInput!): LarkAgentChannelRegistration!",
-    "pollWeChatAgentChannelPairing(input: PollWeChatAgentChannelPairingInput!): WeChatAgentChannelPairing!",
-    "startLarkAgentChannelRegistration(input: StartLarkAgentChannelRegistrationInput!): LarkAgentChannelRegistration!",
-    "startWeChatAgentChannelPairing(input: StartWeChatAgentChannelPairingInput!): WeChatAgentChannelPairing!",
-    "deleteAgentChannelBinding(input: DeleteAgentChannelBindingInput!): OperationResult!",
-  ],
-  queryFields: ["agentChannelBindingList(appId: ULID!, agentId: ULID!): [AgentChannelBinding!]!"],
-  typeDefs: channelSchema,
-} satisfies GraphQLModuleSpec;
-
 export const costGraphQLSpec = {
   queryFields: [
     "agentCostCard(appId: ULID!, agentId: ULID!, range: CostRange!, runPurposes: [CostRunPurpose!]): AgentCostCard!",
@@ -52,9 +35,6 @@ export const agentGraphQLSpec = {
     "deleteAgent(input: DeleteAgentInput!): OperationResult!",
     "importAgentPackage(input: ImportAgentPackageInput!): AgentPackageImportResult!",
     "publishAgent(input: PublishAgentInput!): Agent!",
-    "recreateSandbox(input: RuntimeStateOperationInput!): RuntimeStateOperationResult!",
-    "resetAgentState(input: RuntimeStateOperationInput!): RuntimeStateOperationResult!",
-    "restartDriver(input: RuntimeStateOperationInput!): RuntimeStateOperationResult!",
     "unpublishAgent(appId: ULID!, agentId: ULID!): Agent!",
     "updateAgentConfig(input: UpdateAgentConfigInput!): Agent!",
   ],
@@ -114,17 +94,9 @@ export const onboardingGraphQLSpec = {
 export const appGraphQLSpec = {
   mutationFields: [
     "createApp(input: CreateAppInput!): App!",
-    "deleteAppDeployment(input: DeleteAppDeploymentInput!): OperationResult!",
-    "deployApp(input: DeployAppInput!): AppDeploymentRun!",
     "renameApp(input: RenameAppInput!): App!",
   ],
-  queryFields: [
-    "appDeploymentRunList(appId: ULID!, limit: Int): [AppDeploymentRun!]!",
-    "appDeploymentStatus(appId: ULID!): AppDeploymentRun",
-    "appList(organizationId: ULID!): [App!]!",
-    "appOverview(appId: ULID!, agentLimit: Int, credentialLimit: Int): AppOverview!",
-    "controlPlaneOverview(appLimit: Int, agentLimit: Int, credentialLimit: Int): ControlPlaneOverview!",
-  ],
+  queryFields: ["appList(organizationId: ULID!): [App!]!"],
   typeDefs: appSchema,
 } satisfies GraphQLModuleSpec;
 
@@ -144,7 +116,6 @@ export const sessionGraphQLSpec = {
   ],
   queryFields: [
     "agentSessionDiagnostics(appId: ULID!, sessionId: ULID!): AgentSessionDiagnostics!",
-    "boundCapabilityRunProvenance(appId: ULID!, runId: ULID!): BoundCapabilityRunProvenance",
     "agentSessionRetrieve(appId: ULID!, sessionId: ULID!): AgentSessionRetrieve!",
     "session(appId: ULID!, sessionId: ULID!): Session!",
     "sessionMessages(appId: ULID!, sessionId: ULID!): [SessionMessage!]!",
@@ -205,7 +176,6 @@ export const organizationGraphQLSpec = {
 export const graphqlModuleSpecs = [
   commonGraphQLSpec,
   agentGraphQLSpec,
-  channelGraphQLSpec,
   costGraphQLSpec,
   environmentGraphQLSpec,
   fileGraphQLSpec,

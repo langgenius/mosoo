@@ -11,6 +11,7 @@ import type { AgentId, AppId, FileId, PublicThreadId, SessionId } from "@mosoo/i
 
 import type { ApiBindings } from "../../platform/cloudflare/worker-types";
 import type { PublicApiCaller } from "../auth/application/public-api-caller.service";
+import type { AuthenticatedViewer } from "../auth/application/viewer-auth.service";
 import { FileControlError } from "../files/application/file-control-errors";
 import { fileStore } from "../files/application/file-store";
 import { publishSessionResourceDelete } from "../sessions/application/session-resource-events.service";
@@ -20,7 +21,7 @@ import { admitPublicSessionCaller } from "./public-thread-session-query.service"
 
 async function admitPublicThreadFileAccess(
   bindings: ApiBindings,
-  caller: PublicApiCaller,
+  caller: AuthenticatedViewer,
   threadId: PublicThreadId,
 ): Promise<{ appId: AppId; sessionId: SessionId }> {
   const admission = await admitPublicSessionCaller(bindings.DB, caller, threadId);
@@ -76,10 +77,10 @@ function toPublicFile(file: FileEntry | FileRecord): PublicFile {
 
 async function admitPublicFileRecord(
   bindings: ApiBindings,
-  caller: PublicApiCaller,
+  caller: AuthenticatedViewer,
   fileId: FileId,
 ): Promise<FileRecord> {
-  const file = await fileStore.getRecord(bindings, caller.viewer, fileId);
+  const file = await fileStore.getRecord(bindings, caller, fileId);
 
   if (file.scope.kind === "session") {
     const threadId = requirePublicThreadFile(file);
@@ -87,10 +88,7 @@ async function admitPublicFileRecord(
     return file;
   }
 
-  // App drafts carry no record of which integration uploaded them. An Access
-  // Token acts for the whole App; a deployment capability only sees a file once
-  // it is attached to one of its own Threads.
-  if (file.scope.kind === "app_draft" && caller.kind === "access_token") {
+  if (file.scope.kind === "app_draft") {
     return file;
   }
 
@@ -99,13 +97,13 @@ async function admitPublicFileRecord(
 
 export async function listPublicThreadFiles(
   bindings: ApiBindings,
-  caller: PublicApiCaller,
+  caller: AuthenticatedViewer,
   threadId: PublicThreadId,
 ): Promise<PublicThreadFileListResponse> {
   const { appId, sessionId } = await admitPublicThreadFileAccess(bindings, caller, threadId);
   return {
     files: (
-      await fileStore.list(bindings, caller.viewer, {
+      await fileStore.list(bindings, caller, {
         appId,
         sessionId,
       })
@@ -162,7 +160,7 @@ export async function createPublicAgentFile(
 
 export async function retrievePublicFile(
   bindings: ApiBindings,
-  caller: PublicApiCaller,
+  caller: AuthenticatedViewer,
   fileId: FileId,
 ): Promise<PublicFileResponse> {
   const file = await admitPublicFileRecord(bindings, caller, fileId);
@@ -173,7 +171,7 @@ export async function retrievePublicFile(
 
 export async function claimPublicThreadFiles(
   bindings: ApiBindings,
-  caller: PublicApiCaller,
+  caller: AuthenticatedViewer,
   input: {
     fileIds: FileId[];
     threadId: PublicThreadId;
@@ -184,24 +182,19 @@ export async function claimPublicThreadFiles(
   }
 
   const { sessionId } = await admitPublicThreadFileAccess(bindings, caller, input.threadId);
-  const claimedFiles = await fileStore.claimToSession(
-    bindings,
-    caller.viewer,
-    sessionId,
-    input.fileIds,
-  );
+  const claimedFiles = await fileStore.claimToSession(bindings, caller, sessionId, input.fileIds);
 
   return claimedFiles.map((file) => parsePlatformId<FileId>(file.id, "File ID"));
 }
 
 export async function deletePublicFile(
   bindings: ApiBindings,
-  caller: PublicApiCaller,
+  caller: AuthenticatedViewer,
   fileId: FileId,
 ): Promise<void> {
   const file = await admitPublicFileRecord(bindings, caller, fileId);
 
-  await fileStore.delete(bindings, caller.viewer, fileId);
+  await fileStore.delete(bindings, caller, fileId);
 
   if (file.scope.kind === "session" && file.scope.id !== null) {
     await publishSessionResourceDelete({
@@ -214,22 +207,17 @@ export async function deletePublicFile(
 
 export async function downloadPublicThreadFileContent(
   bindings: ApiBindings,
-  caller: PublicApiCaller,
+  caller: AuthenticatedViewer,
   input: {
     disposition: "attachment" | "inline";
     fileId: FileId;
   },
 ): Promise<Response> {
-  const file = await fileStore.getRecord(bindings, caller.viewer, input.fileId);
+  const file = await fileStore.getRecord(bindings, caller, input.fileId);
   const threadId = requirePublicThreadFile(file);
 
   await admitPublicSessionCaller(bindings.DB, caller, threadId);
-  const response = await fileStore.streamContent(
-    bindings,
-    caller.viewer,
-    input.fileId,
-    input.disposition,
-  );
+  const response = await fileStore.streamContent(bindings, caller, input.fileId, input.disposition);
   const headers = new Headers(response.headers);
   headers.set("Cache-Control", "no-store");
   return new Response(response.body, {
@@ -241,18 +229,18 @@ export async function downloadPublicThreadFileContent(
 
 export async function deletePublicThreadFile(
   bindings: ApiBindings,
-  caller: PublicApiCaller,
+  caller: AuthenticatedViewer,
   input: {
     fileId: FileId;
     threadId: PublicThreadId;
   },
 ): Promise<void> {
   const { sessionId } = await admitPublicThreadFileAccess(bindings, caller, input.threadId);
-  const file = await fileStore.getRecord(bindings, caller.viewer, input.fileId);
+  const file = await fileStore.getRecord(bindings, caller, input.fileId);
 
   assertPublicThreadFile(file, sessionId);
 
-  await fileStore.delete(bindings, caller.viewer, input.fileId);
+  await fileStore.delete(bindings, caller, input.fileId);
   await publishSessionResourceDelete({
     bindings,
     resourceId: input.fileId,

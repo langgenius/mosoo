@@ -115,7 +115,10 @@ export async function createAgent(
       description: input.description ?? null,
       environmentId,
       id: agentId,
-      kind: input.kind,
+      // The Harness product has one isolation policy: every saved Agent is a
+      // reusable Cattle Run configuration. Keep the legacy input field only as
+      // a compatibility boundary while refusing to create Pet state.
+      kind: "cattle",
       model: input.model,
       name: input.name,
       ownerId: viewer.id,
@@ -136,7 +139,7 @@ export async function createAgent(
     properties: {
       agent_id: agentId,
       app_id: appId,
-      agent_kind: input.kind,
+      agent_kind: "cattle",
       provider: input.provider,
       runtime_id: runtimeId,
     },

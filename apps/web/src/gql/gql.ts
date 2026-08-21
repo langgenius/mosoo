@@ -15,19 +15,6 @@ import * as types from './graphql';
  * Learn more about it here: https://the-guild.dev/graphql/codegen/plugins/presets/preset-client#reducing-bundle-size
  */
 type Documents = {
-    "\n  fragment AgentChannelBindingFields on AgentChannelBinding {\n    activityLastTriggeredAt\n    activitySessionCount7d\n    agentId\n    createdAt\n    displayMetadata\n    externalBotId\n    externalTenantId\n    id\n    lastErrorCode\n    provider\n    status\n    updatedAt\n  }\n": typeof types.AgentChannelBindingFieldsFragmentDoc,
-    "\n  query AgentChannelBindings($appId: ULID!, $agentId: ULID!) {\n    agentChannelBindingList(appId: $appId, agentId: $agentId) {\n      ...AgentChannelBindingFields\n    }\n  }\n": typeof types.AgentChannelBindingsDocument,
-    "\n  mutation CreateSlackAgentChannelBinding($input: CreateSlackAgentChannelBindingInput!) {\n    createSlackAgentChannelBinding(input: $input) {\n      ...AgentChannelBindingFields\n    }\n  }\n": typeof types.CreateSlackAgentChannelBindingDocument,
-    "\n  mutation CreateLarkAgentChannelBinding($input: CreateLarkAgentChannelBindingInput!) {\n    createLarkAgentChannelBinding(input: $input) {\n      ...AgentChannelBindingFields\n    }\n  }\n": typeof types.CreateLarkAgentChannelBindingDocument,
-    "\n  fragment LarkAgentChannelRegistrationFields on LarkAgentChannelRegistration {\n    appId\n    appSecret\n    deviceCode\n    domain\n    expireIn\n    interval\n    lastErrorCode\n    openId\n    qrUrl\n    status\n    userCode\n  }\n": typeof types.LarkAgentChannelRegistrationFieldsFragmentDoc,
-    "\n  mutation StartLarkAgentChannelRegistration($input: StartLarkAgentChannelRegistrationInput!) {\n    startLarkAgentChannelRegistration(input: $input) {\n      ...LarkAgentChannelRegistrationFields\n    }\n  }\n": typeof types.StartLarkAgentChannelRegistrationDocument,
-    "\n  mutation PollLarkAgentChannelRegistration($input: PollLarkAgentChannelRegistrationInput!) {\n    pollLarkAgentChannelRegistration(input: $input) {\n      ...LarkAgentChannelRegistrationFields\n    }\n  }\n": typeof types.PollLarkAgentChannelRegistrationDocument,
-    "\n  mutation CreateTelegramAgentChannelBinding($input: CreateTelegramAgentChannelBindingInput!) {\n    createTelegramAgentChannelBinding(input: $input) {\n      ...AgentChannelBindingFields\n    }\n  }\n": typeof types.CreateTelegramAgentChannelBindingDocument,
-    "\n  mutation CreateDiscordAgentChannelBinding($input: CreateDiscordAgentChannelBindingInput!) {\n    createDiscordAgentChannelBinding(input: $input) {\n      ...AgentChannelBindingFields\n    }\n  }\n": typeof types.CreateDiscordAgentChannelBindingDocument,
-    "\n  fragment WeChatAgentChannelPairingFields on WeChatAgentChannelPairing {\n    binding {\n      ...AgentChannelBindingFields\n    }\n    lastErrorCode\n    qrCodeImageSrc\n    qrToken\n    status\n  }\n": typeof types.WeChatAgentChannelPairingFieldsFragmentDoc,
-    "\n  mutation StartWeChatAgentChannelPairing($input: StartWeChatAgentChannelPairingInput!) {\n    startWeChatAgentChannelPairing(input: $input) {\n      ...WeChatAgentChannelPairingFields\n    }\n  }\n": typeof types.StartWeChatAgentChannelPairingDocument,
-    "\n  mutation PollWeChatAgentChannelPairing($input: PollWeChatAgentChannelPairingInput!) {\n    pollWeChatAgentChannelPairing(input: $input) {\n      ...WeChatAgentChannelPairingFields\n    }\n  }\n": typeof types.PollWeChatAgentChannelPairingDocument,
-    "\n  mutation DeleteAgentChannelBinding($input: DeleteAgentChannelBindingInput!) {\n    deleteAgentChannelBinding(input: $input) {\n      ok\n    }\n  }\n": typeof types.DeleteAgentChannelBindingDocument,
     "\n  fragment AgentFields on Agent {\n    createdAt\n    description\n    id\n    kind\n    liveVersion {\n      ...AgentDeploymentVersionFields\n    }\n    model\n    name\n    appId\n    prompt\n    provider\n    runtimeId\n    skills {\n      ownerName\n      skillId\n      skillName\n      state\n    }\n    status\n    updatedAt\n    visibility\n  }\n": typeof types.AgentFieldsFragmentDoc,
     "\n  fragment AgentToolSummaryFields on AgentToolSummary {\n    enabled\n    iconUrl\n    name\n    serverId\n  }\n": typeof types.AgentToolSummaryFieldsFragmentDoc,
     "\n  fragment AgentDeploymentVersionFields on AgentDeploymentVersion {\n    agentId\n    createdAt\n    createdByAccountId\n    environmentId\n    id\n    isLive\n    kind\n    model\n    provider\n    runtimeId\n    summary\n    versionNumber\n  }\n": typeof types.AgentDeploymentVersionFieldsFragmentDoc,
@@ -44,16 +31,9 @@ type Documents = {
     "\n  mutation CreateAgentFork($input: CreateAgentForkInput!) {\n    createAgentFork(input: $input) {\n      agent {\n        ...AgentFields\n      }\n      resolution {\n        issues {\n          actionLabel\n          code\n          message\n          required\n          severity\n          status\n          targetLabel\n          targetType\n        }\n        summary {\n          boundMcpServerCount\n          boundSkillCount\n          copiedAssetCount\n          createdMcpServerCount\n          reusedMcpServerCount\n        }\n      }\n    }\n  }\n": typeof types.CreateAgentForkDocument,
     "\n  mutation PublishAgent($input: PublishAgentInput!) {\n    publishAgent(input: $input) {\n      ...AgentFields\n    }\n  }\n": typeof types.PublishAgentDocument,
     "\n  mutation UnpublishAgent($agentId: ULID!, $appId: ULID!) {\n    unpublishAgent(agentId: $agentId, appId: $appId) {\n      ...AgentFields\n    }\n  }\n": typeof types.UnpublishAgentDocument,
-    "\n  mutation RestartDriver($input: RuntimeStateOperationInput!) {\n    restartDriver(input: $input) {\n      affectedSessionCount\n      agentId\n      ok\n      operation\n    }\n  }\n": typeof types.RestartDriverDocument,
-    "\n  mutation RecreateSandbox($input: RuntimeStateOperationInput!) {\n    recreateSandbox(input: $input) {\n      affectedSessionCount\n      agentId\n      ok\n      operation\n    }\n  }\n": typeof types.RecreateSandboxDocument,
-    "\n  mutation ResetAgentState($input: RuntimeStateOperationInput!) {\n    resetAgentState(input: $input) {\n      affectedSessionCount\n      agentId\n      ok\n      operation\n    }\n  }\n": typeof types.ResetAgentStateDocument,
     "\n  query AppList($organizationId: ULID!) {\n    appList(organizationId: $organizationId) {\n      createdAt\n      defaultEnvironmentId\n      id\n      name\n      ownerAccountId\n    }\n  }\n": typeof types.AppListDocument,
     "\n  mutation CreateApp($input: CreateAppInput!) {\n    createApp(input: $input) {\n      createdAt\n      defaultEnvironmentId\n      id\n      name\n      ownerAccountId\n    }\n  }\n": typeof types.CreateAppDocument,
     "\n  mutation RenameApp($input: RenameAppInput!) {\n    renameApp(input: $input) {\n      createdAt\n      defaultEnvironmentId\n      id\n      name\n      ownerAccountId\n    }\n  }\n": typeof types.RenameAppDocument,
-    "\n  query AppDeploymentOverview($appId: ULID!) {\n    appOverview(appId: $appId) {\n      app {\n        id\n        name\n      }\n      boundAgents {\n        agentId\n        envVar\n        expose\n        name\n      }\n      deployment {\n        appId\n        createdAt\n        defaultBranch\n        id\n        liveUrl\n        plannedUrl\n        repoName\n        repoOwner\n        repoUrl\n        updatedAt\n        latestRun {\n          appId\n          createdAt\n          deploymentId\n          errorCode\n          errorMessage\n          id\n          liveUrl\n          plannedUrl\n          sourceBranch\n          sourceCommitSha\n          status\n          targetKind\n          updatedAt\n        }\n      }\n    }\n  }\n": typeof types.AppDeploymentOverviewDocument,
-    "\n  query AppDeploymentRunList($appId: ULID!, $limit: Int) {\n    appDeploymentRunList(appId: $appId, limit: $limit) {\n      appId\n      createdAt\n      deploymentId\n      errorCode\n      errorMessage\n      id\n      liveUrl\n      plannedUrl\n      sourceBranch\n      sourceCommitSha\n      status\n      targetKind\n      updatedAt\n    }\n  }\n": typeof types.AppDeploymentRunListDocument,
-    "\n  mutation DeployApp($input: DeployAppInput!) {\n    deployApp(input: $input) {\n      appId\n      createdAt\n      deploymentId\n      errorCode\n      errorMessage\n      id\n      liveUrl\n      plannedUrl\n      sourceBranch\n      sourceCommitSha\n      status\n      targetKind\n      updatedAt\n    }\n  }\n": typeof types.DeployAppDocument,
-    "\n  mutation DeleteAppDeployment($input: DeleteAppDeploymentInput!) {\n    deleteAppDeployment(input: $input) {\n      ok\n    }\n  }\n": typeof types.DeleteAppDeploymentDocument,
     "\n  fragment CostTotalsFields on CostAggregate {\n    activeUsers\n    cacheCreationTokens\n    cacheReadTokens\n    inputTokens\n    outputTokens\n    requestCount\n    totalCostUsd\n    unpricedRequestCount\n  }\n": typeof types.CostTotalsFieldsFragmentDoc,
     "\n  fragment CostDailyFields on CostDailyPoint {\n    activeUsers\n    cacheCreationTokens\n    cacheReadTokens\n    date\n    inputTokens\n    outputTokens\n    requestCount\n    totalCostUsd\n    unpricedRequestCount\n  }\n": typeof types.CostDailyFieldsFragmentDoc,
     "\n  fragment CostAgentFields on CostAgentRow {\n    activeUsers\n    agentId\n    agentName\n    cacheCreationTokens\n    cacheReadTokens\n    debugCostUsd\n    evalCostUsd\n    inputTokens\n    outputTokens\n    ownerEmail\n    ownerId\n    ownerName\n    previousCostUsd\n    previewCostUsd\n    productionCostUsd\n    requestCount\n    scheduledCostUsd\n    totalCostUsd\n    unpricedRequestCount\n  }\n": typeof types.CostAgentFieldsFragmentDoc,
@@ -119,19 +99,6 @@ type Documents = {
     "\n  mutation TestVendorCredential($input: TestVendorCredentialInput!) {\n    testVendorCredential(input: $input) {\n      errorCode\n      latencyMs\n      ok\n    }\n  }\n": typeof types.TestVendorCredentialDocument,
 };
 const documents: Documents = {
-    "\n  fragment AgentChannelBindingFields on AgentChannelBinding {\n    activityLastTriggeredAt\n    activitySessionCount7d\n    agentId\n    createdAt\n    displayMetadata\n    externalBotId\n    externalTenantId\n    id\n    lastErrorCode\n    provider\n    status\n    updatedAt\n  }\n": types.AgentChannelBindingFieldsFragmentDoc,
-    "\n  query AgentChannelBindings($appId: ULID!, $agentId: ULID!) {\n    agentChannelBindingList(appId: $appId, agentId: $agentId) {\n      ...AgentChannelBindingFields\n    }\n  }\n": types.AgentChannelBindingsDocument,
-    "\n  mutation CreateSlackAgentChannelBinding($input: CreateSlackAgentChannelBindingInput!) {\n    createSlackAgentChannelBinding(input: $input) {\n      ...AgentChannelBindingFields\n    }\n  }\n": types.CreateSlackAgentChannelBindingDocument,
-    "\n  mutation CreateLarkAgentChannelBinding($input: CreateLarkAgentChannelBindingInput!) {\n    createLarkAgentChannelBinding(input: $input) {\n      ...AgentChannelBindingFields\n    }\n  }\n": types.CreateLarkAgentChannelBindingDocument,
-    "\n  fragment LarkAgentChannelRegistrationFields on LarkAgentChannelRegistration {\n    appId\n    appSecret\n    deviceCode\n    domain\n    expireIn\n    interval\n    lastErrorCode\n    openId\n    qrUrl\n    status\n    userCode\n  }\n": types.LarkAgentChannelRegistrationFieldsFragmentDoc,
-    "\n  mutation StartLarkAgentChannelRegistration($input: StartLarkAgentChannelRegistrationInput!) {\n    startLarkAgentChannelRegistration(input: $input) {\n      ...LarkAgentChannelRegistrationFields\n    }\n  }\n": types.StartLarkAgentChannelRegistrationDocument,
-    "\n  mutation PollLarkAgentChannelRegistration($input: PollLarkAgentChannelRegistrationInput!) {\n    pollLarkAgentChannelRegistration(input: $input) {\n      ...LarkAgentChannelRegistrationFields\n    }\n  }\n": types.PollLarkAgentChannelRegistrationDocument,
-    "\n  mutation CreateTelegramAgentChannelBinding($input: CreateTelegramAgentChannelBindingInput!) {\n    createTelegramAgentChannelBinding(input: $input) {\n      ...AgentChannelBindingFields\n    }\n  }\n": types.CreateTelegramAgentChannelBindingDocument,
-    "\n  mutation CreateDiscordAgentChannelBinding($input: CreateDiscordAgentChannelBindingInput!) {\n    createDiscordAgentChannelBinding(input: $input) {\n      ...AgentChannelBindingFields\n    }\n  }\n": types.CreateDiscordAgentChannelBindingDocument,
-    "\n  fragment WeChatAgentChannelPairingFields on WeChatAgentChannelPairing {\n    binding {\n      ...AgentChannelBindingFields\n    }\n    lastErrorCode\n    qrCodeImageSrc\n    qrToken\n    status\n  }\n": types.WeChatAgentChannelPairingFieldsFragmentDoc,
-    "\n  mutation StartWeChatAgentChannelPairing($input: StartWeChatAgentChannelPairingInput!) {\n    startWeChatAgentChannelPairing(input: $input) {\n      ...WeChatAgentChannelPairingFields\n    }\n  }\n": types.StartWeChatAgentChannelPairingDocument,
-    "\n  mutation PollWeChatAgentChannelPairing($input: PollWeChatAgentChannelPairingInput!) {\n    pollWeChatAgentChannelPairing(input: $input) {\n      ...WeChatAgentChannelPairingFields\n    }\n  }\n": types.PollWeChatAgentChannelPairingDocument,
-    "\n  mutation DeleteAgentChannelBinding($input: DeleteAgentChannelBindingInput!) {\n    deleteAgentChannelBinding(input: $input) {\n      ok\n    }\n  }\n": types.DeleteAgentChannelBindingDocument,
     "\n  fragment AgentFields on Agent {\n    createdAt\n    description\n    id\n    kind\n    liveVersion {\n      ...AgentDeploymentVersionFields\n    }\n    model\n    name\n    appId\n    prompt\n    provider\n    runtimeId\n    skills {\n      ownerName\n      skillId\n      skillName\n      state\n    }\n    status\n    updatedAt\n    visibility\n  }\n": types.AgentFieldsFragmentDoc,
     "\n  fragment AgentToolSummaryFields on AgentToolSummary {\n    enabled\n    iconUrl\n    name\n    serverId\n  }\n": types.AgentToolSummaryFieldsFragmentDoc,
     "\n  fragment AgentDeploymentVersionFields on AgentDeploymentVersion {\n    agentId\n    createdAt\n    createdByAccountId\n    environmentId\n    id\n    isLive\n    kind\n    model\n    provider\n    runtimeId\n    summary\n    versionNumber\n  }\n": types.AgentDeploymentVersionFieldsFragmentDoc,
@@ -148,16 +115,9 @@ const documents: Documents = {
     "\n  mutation CreateAgentFork($input: CreateAgentForkInput!) {\n    createAgentFork(input: $input) {\n      agent {\n        ...AgentFields\n      }\n      resolution {\n        issues {\n          actionLabel\n          code\n          message\n          required\n          severity\n          status\n          targetLabel\n          targetType\n        }\n        summary {\n          boundMcpServerCount\n          boundSkillCount\n          copiedAssetCount\n          createdMcpServerCount\n          reusedMcpServerCount\n        }\n      }\n    }\n  }\n": types.CreateAgentForkDocument,
     "\n  mutation PublishAgent($input: PublishAgentInput!) {\n    publishAgent(input: $input) {\n      ...AgentFields\n    }\n  }\n": types.PublishAgentDocument,
     "\n  mutation UnpublishAgent($agentId: ULID!, $appId: ULID!) {\n    unpublishAgent(agentId: $agentId, appId: $appId) {\n      ...AgentFields\n    }\n  }\n": types.UnpublishAgentDocument,
-    "\n  mutation RestartDriver($input: RuntimeStateOperationInput!) {\n    restartDriver(input: $input) {\n      affectedSessionCount\n      agentId\n      ok\n      operation\n    }\n  }\n": types.RestartDriverDocument,
-    "\n  mutation RecreateSandbox($input: RuntimeStateOperationInput!) {\n    recreateSandbox(input: $input) {\n      affectedSessionCount\n      agentId\n      ok\n      operation\n    }\n  }\n": types.RecreateSandboxDocument,
-    "\n  mutation ResetAgentState($input: RuntimeStateOperationInput!) {\n    resetAgentState(input: $input) {\n      affectedSessionCount\n      agentId\n      ok\n      operation\n    }\n  }\n": types.ResetAgentStateDocument,
     "\n  query AppList($organizationId: ULID!) {\n    appList(organizationId: $organizationId) {\n      createdAt\n      defaultEnvironmentId\n      id\n      name\n      ownerAccountId\n    }\n  }\n": types.AppListDocument,
     "\n  mutation CreateApp($input: CreateAppInput!) {\n    createApp(input: $input) {\n      createdAt\n      defaultEnvironmentId\n      id\n      name\n      ownerAccountId\n    }\n  }\n": types.CreateAppDocument,
     "\n  mutation RenameApp($input: RenameAppInput!) {\n    renameApp(input: $input) {\n      createdAt\n      defaultEnvironmentId\n      id\n      name\n      ownerAccountId\n    }\n  }\n": types.RenameAppDocument,
-    "\n  query AppDeploymentOverview($appId: ULID!) {\n    appOverview(appId: $appId) {\n      app {\n        id\n        name\n      }\n      boundAgents {\n        agentId\n        envVar\n        expose\n        name\n      }\n      deployment {\n        appId\n        createdAt\n        defaultBranch\n        id\n        liveUrl\n        plannedUrl\n        repoName\n        repoOwner\n        repoUrl\n        updatedAt\n        latestRun {\n          appId\n          createdAt\n          deploymentId\n          errorCode\n          errorMessage\n          id\n          liveUrl\n          plannedUrl\n          sourceBranch\n          sourceCommitSha\n          status\n          targetKind\n          updatedAt\n        }\n      }\n    }\n  }\n": types.AppDeploymentOverviewDocument,
-    "\n  query AppDeploymentRunList($appId: ULID!, $limit: Int) {\n    appDeploymentRunList(appId: $appId, limit: $limit) {\n      appId\n      createdAt\n      deploymentId\n      errorCode\n      errorMessage\n      id\n      liveUrl\n      plannedUrl\n      sourceBranch\n      sourceCommitSha\n      status\n      targetKind\n      updatedAt\n    }\n  }\n": types.AppDeploymentRunListDocument,
-    "\n  mutation DeployApp($input: DeployAppInput!) {\n    deployApp(input: $input) {\n      appId\n      createdAt\n      deploymentId\n      errorCode\n      errorMessage\n      id\n      liveUrl\n      plannedUrl\n      sourceBranch\n      sourceCommitSha\n      status\n      targetKind\n      updatedAt\n    }\n  }\n": types.DeployAppDocument,
-    "\n  mutation DeleteAppDeployment($input: DeleteAppDeploymentInput!) {\n    deleteAppDeployment(input: $input) {\n      ok\n    }\n  }\n": types.DeleteAppDeploymentDocument,
     "\n  fragment CostTotalsFields on CostAggregate {\n    activeUsers\n    cacheCreationTokens\n    cacheReadTokens\n    inputTokens\n    outputTokens\n    requestCount\n    totalCostUsd\n    unpricedRequestCount\n  }\n": types.CostTotalsFieldsFragmentDoc,
     "\n  fragment CostDailyFields on CostDailyPoint {\n    activeUsers\n    cacheCreationTokens\n    cacheReadTokens\n    date\n    inputTokens\n    outputTokens\n    requestCount\n    totalCostUsd\n    unpricedRequestCount\n  }\n": types.CostDailyFieldsFragmentDoc,
     "\n  fragment CostAgentFields on CostAgentRow {\n    activeUsers\n    agentId\n    agentName\n    cacheCreationTokens\n    cacheReadTokens\n    debugCostUsd\n    evalCostUsd\n    inputTokens\n    outputTokens\n    ownerEmail\n    ownerId\n    ownerName\n    previousCostUsd\n    previewCostUsd\n    productionCostUsd\n    requestCount\n    scheduledCostUsd\n    totalCostUsd\n    unpricedRequestCount\n  }\n": types.CostAgentFieldsFragmentDoc,
@@ -226,58 +186,6 @@ const documents: Documents = {
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
-export function graphql(source: "\n  fragment AgentChannelBindingFields on AgentChannelBinding {\n    activityLastTriggeredAt\n    activitySessionCount7d\n    agentId\n    createdAt\n    displayMetadata\n    externalBotId\n    externalTenantId\n    id\n    lastErrorCode\n    provider\n    status\n    updatedAt\n  }\n"): typeof import('./graphql').AgentChannelBindingFieldsFragmentDoc;
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  query AgentChannelBindings($appId: ULID!, $agentId: ULID!) {\n    agentChannelBindingList(appId: $appId, agentId: $agentId) {\n      ...AgentChannelBindingFields\n    }\n  }\n"): typeof import('./graphql').AgentChannelBindingsDocument;
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  mutation CreateSlackAgentChannelBinding($input: CreateSlackAgentChannelBindingInput!) {\n    createSlackAgentChannelBinding(input: $input) {\n      ...AgentChannelBindingFields\n    }\n  }\n"): typeof import('./graphql').CreateSlackAgentChannelBindingDocument;
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  mutation CreateLarkAgentChannelBinding($input: CreateLarkAgentChannelBindingInput!) {\n    createLarkAgentChannelBinding(input: $input) {\n      ...AgentChannelBindingFields\n    }\n  }\n"): typeof import('./graphql').CreateLarkAgentChannelBindingDocument;
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  fragment LarkAgentChannelRegistrationFields on LarkAgentChannelRegistration {\n    appId\n    appSecret\n    deviceCode\n    domain\n    expireIn\n    interval\n    lastErrorCode\n    openId\n    qrUrl\n    status\n    userCode\n  }\n"): typeof import('./graphql').LarkAgentChannelRegistrationFieldsFragmentDoc;
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  mutation StartLarkAgentChannelRegistration($input: StartLarkAgentChannelRegistrationInput!) {\n    startLarkAgentChannelRegistration(input: $input) {\n      ...LarkAgentChannelRegistrationFields\n    }\n  }\n"): typeof import('./graphql').StartLarkAgentChannelRegistrationDocument;
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  mutation PollLarkAgentChannelRegistration($input: PollLarkAgentChannelRegistrationInput!) {\n    pollLarkAgentChannelRegistration(input: $input) {\n      ...LarkAgentChannelRegistrationFields\n    }\n  }\n"): typeof import('./graphql').PollLarkAgentChannelRegistrationDocument;
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  mutation CreateTelegramAgentChannelBinding($input: CreateTelegramAgentChannelBindingInput!) {\n    createTelegramAgentChannelBinding(input: $input) {\n      ...AgentChannelBindingFields\n    }\n  }\n"): typeof import('./graphql').CreateTelegramAgentChannelBindingDocument;
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  mutation CreateDiscordAgentChannelBinding($input: CreateDiscordAgentChannelBindingInput!) {\n    createDiscordAgentChannelBinding(input: $input) {\n      ...AgentChannelBindingFields\n    }\n  }\n"): typeof import('./graphql').CreateDiscordAgentChannelBindingDocument;
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  fragment WeChatAgentChannelPairingFields on WeChatAgentChannelPairing {\n    binding {\n      ...AgentChannelBindingFields\n    }\n    lastErrorCode\n    qrCodeImageSrc\n    qrToken\n    status\n  }\n"): typeof import('./graphql').WeChatAgentChannelPairingFieldsFragmentDoc;
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  mutation StartWeChatAgentChannelPairing($input: StartWeChatAgentChannelPairingInput!) {\n    startWeChatAgentChannelPairing(input: $input) {\n      ...WeChatAgentChannelPairingFields\n    }\n  }\n"): typeof import('./graphql').StartWeChatAgentChannelPairingDocument;
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  mutation PollWeChatAgentChannelPairing($input: PollWeChatAgentChannelPairingInput!) {\n    pollWeChatAgentChannelPairing(input: $input) {\n      ...WeChatAgentChannelPairingFields\n    }\n  }\n"): typeof import('./graphql').PollWeChatAgentChannelPairingDocument;
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  mutation DeleteAgentChannelBinding($input: DeleteAgentChannelBindingInput!) {\n    deleteAgentChannelBinding(input: $input) {\n      ok\n    }\n  }\n"): typeof import('./graphql').DeleteAgentChannelBindingDocument;
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
 export function graphql(source: "\n  fragment AgentFields on Agent {\n    createdAt\n    description\n    id\n    kind\n    liveVersion {\n      ...AgentDeploymentVersionFields\n    }\n    model\n    name\n    appId\n    prompt\n    provider\n    runtimeId\n    skills {\n      ownerName\n      skillId\n      skillName\n      state\n    }\n    status\n    updatedAt\n    visibility\n  }\n"): typeof import('./graphql').AgentFieldsFragmentDoc;
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
@@ -342,18 +250,6 @@ export function graphql(source: "\n  mutation UnpublishAgent($agentId: ULID!, $a
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
-export function graphql(source: "\n  mutation RestartDriver($input: RuntimeStateOperationInput!) {\n    restartDriver(input: $input) {\n      affectedSessionCount\n      agentId\n      ok\n      operation\n    }\n  }\n"): typeof import('./graphql').RestartDriverDocument;
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  mutation RecreateSandbox($input: RuntimeStateOperationInput!) {\n    recreateSandbox(input: $input) {\n      affectedSessionCount\n      agentId\n      ok\n      operation\n    }\n  }\n"): typeof import('./graphql').RecreateSandboxDocument;
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  mutation ResetAgentState($input: RuntimeStateOperationInput!) {\n    resetAgentState(input: $input) {\n      affectedSessionCount\n      agentId\n      ok\n      operation\n    }\n  }\n"): typeof import('./graphql').ResetAgentStateDocument;
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
 export function graphql(source: "\n  query AppList($organizationId: ULID!) {\n    appList(organizationId: $organizationId) {\n      createdAt\n      defaultEnvironmentId\n      id\n      name\n      ownerAccountId\n    }\n  }\n"): typeof import('./graphql').AppListDocument;
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
@@ -363,22 +259,6 @@ export function graphql(source: "\n  mutation CreateApp($input: CreateAppInput!)
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  mutation RenameApp($input: RenameAppInput!) {\n    renameApp(input: $input) {\n      createdAt\n      defaultEnvironmentId\n      id\n      name\n      ownerAccountId\n    }\n  }\n"): typeof import('./graphql').RenameAppDocument;
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  query AppDeploymentOverview($appId: ULID!) {\n    appOverview(appId: $appId) {\n      app {\n        id\n        name\n      }\n      boundAgents {\n        agentId\n        envVar\n        expose\n        name\n      }\n      deployment {\n        appId\n        createdAt\n        defaultBranch\n        id\n        liveUrl\n        plannedUrl\n        repoName\n        repoOwner\n        repoUrl\n        updatedAt\n        latestRun {\n          appId\n          createdAt\n          deploymentId\n          errorCode\n          errorMessage\n          id\n          liveUrl\n          plannedUrl\n          sourceBranch\n          sourceCommitSha\n          status\n          targetKind\n          updatedAt\n        }\n      }\n    }\n  }\n"): typeof import('./graphql').AppDeploymentOverviewDocument;
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  query AppDeploymentRunList($appId: ULID!, $limit: Int) {\n    appDeploymentRunList(appId: $appId, limit: $limit) {\n      appId\n      createdAt\n      deploymentId\n      errorCode\n      errorMessage\n      id\n      liveUrl\n      plannedUrl\n      sourceBranch\n      sourceCommitSha\n      status\n      targetKind\n      updatedAt\n    }\n  }\n"): typeof import('./graphql').AppDeploymentRunListDocument;
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  mutation DeployApp($input: DeployAppInput!) {\n    deployApp(input: $input) {\n      appId\n      createdAt\n      deploymentId\n      errorCode\n      errorMessage\n      id\n      liveUrl\n      plannedUrl\n      sourceBranch\n      sourceCommitSha\n      status\n      targetKind\n      updatedAt\n    }\n  }\n"): typeof import('./graphql').DeployAppDocument;
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  mutation DeleteAppDeployment($input: DeleteAppDeploymentInput!) {\n    deleteAppDeployment(input: $input) {\n      ok\n    }\n  }\n"): typeof import('./graphql').DeleteAppDeploymentDocument;
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

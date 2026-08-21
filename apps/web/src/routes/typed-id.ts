@@ -3,9 +3,6 @@ import type {
   AgentDeploymentVersionId,
   AgentId,
   AgentMcpBindingId,
-  AppDeploymentId,
-  AppDeploymentRunId,
-  ChannelBindingId,
   CredentialId,
   EnvironmentId,
   EnvironmentRevisionId,
@@ -36,18 +33,6 @@ export function toAgentId(id: string): AgentId {
 
 export function toAgentMcpBindingId(id: string): AgentMcpBindingId {
   return parsePlatformId(id, "Agent MCP binding ID") as AgentMcpBindingId;
-}
-
-export function toAppDeploymentId(id: string): AppDeploymentId {
-  return parsePlatformId(id, "App deployment ID") as AppDeploymentId;
-}
-
-export function toAppDeploymentRunId(id: string): AppDeploymentRunId {
-  return parsePlatformId(id, "App deployment run ID") as AppDeploymentRunId;
-}
-
-export function toChannelBindingId(id: string): ChannelBindingId {
-  return parsePlatformId(id, "Channel binding ID") as ChannelBindingId;
 }
 
 export function toCredentialId(id: string): CredentialId {
