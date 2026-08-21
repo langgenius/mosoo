@@ -61,13 +61,6 @@ export const appSchema = /* GraphQL */ `
     updatedAt: String!
   }
 
-  type AppDeploymentSecret {
-    appId: ULID!
-    createdAt: String!
-    name: String!
-    updatedAt: String!
-  }
-
   type AppOverviewAgent {
     appId: ULID!
     description: String
@@ -151,17 +144,6 @@ export const appSchema = /* GraphQL */ `
 
   input DeleteAppDeploymentInput {
     appId: ULID!
-  }
-
-  input DeleteAppDeploymentSecretInput {
-    appId: ULID!
-    name: String!
-  }
-
-  input SetAppDeploymentSecretInput {
-    appId: ULID!
-    name: String!
-    value: String!
   }
 
   input RenameAppInput {
