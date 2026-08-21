@@ -72,7 +72,10 @@ import {
 } from "../infrastructure/file-upload-transfer";
 import { getObjectBody, putObject } from "../infrastructure/r2-s3-client";
 import { normalizeR2Etag } from "../infrastructure/r2-s3-client";
-import { ensureAppSessionFileAccess } from "../infrastructure/session-file-ownership";
+import {
+  ensureAppSessionFileAccess,
+  ensureSessionFileAccess,
+} from "../infrastructure/session-file-ownership";
 
 export type ContentBody = ReadableStream<Uint8Array> | null;
 
@@ -858,24 +861,31 @@ async function ensureSessionAttachments(
     return [];
   }
 
-  const files = await Promise.all(fileIds.map((fileId) => getRecord(bindings, viewer, fileId)));
+  const viewerId = parsePlatformId<AccountId>(viewer.id, "viewer ID");
+  await ensureSessionFileAccess(bindings.DB, viewerId, sessionId);
 
-  return files.map((file, index) => {
-    const requestedFileId = fileIds[index];
+  const rows = await listFileRecordsById(bindings.DB, fileIds);
+  const rowsById = new Map(rows.map((row) => [row.id, row]));
+  const files: FileRecord[] = [];
+
+  for (const fileId of fileIds) {
+    const row = rowsById.get(fileId);
+    const file = row === undefined ? null : toFileRecord(row);
 
     if (
+      file === null ||
       file.scope.kind !== "session" ||
       file.scope.id !== sessionId ||
       file.status !== "ready" ||
       file.sessionKind !== "attachment"
     ) {
-      throw createFileNotFoundError(
-        `Attachment ${requestedFileId ?? file.id} is not available for this session.`,
-      );
+      throw createFileNotFoundError(`Attachment ${fileId} is not available for this session.`);
     }
 
-    return file;
-  });
+    files.push(file);
+  }
+
+  return files;
 }
 
 // Internal runtime read for artifact re-materialization; artifact object keys
