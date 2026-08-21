@@ -42,15 +42,13 @@ export interface FilesViewModel {
   sessionOptions: FilesSessionOption[];
 }
 
-function matchesSearch(file: ListedFileEntry, search: string): boolean {
-  const normalized = search.trim().toLowerCase();
-
-  if (!normalized) {
+function matchesSearch(file: ListedFileEntry, normalizedSearch: string): boolean {
+  if (!normalizedSearch) {
     return true;
   }
 
   return [file.name, file.path, file.id, file.mimeType ?? ""].some((value) =>
-    value.toLowerCase().includes(normalized),
+    value.toLowerCase().includes(normalizedSearch),
   );
 }
 
@@ -104,6 +102,7 @@ export function createFilesViewModel(
     ? selection.sessionId
     : "";
   const sessionById = new Map(sessions.map((session) => [session.id, session]));
+  const normalizedSearch = selection.search.trim().toLowerCase();
   const visibleFiles = files
     .filter((file) => {
       if (selection.sessionKind !== "all" && file.sessionKind !== selection.sessionKind) {
@@ -122,7 +121,7 @@ export function createFilesViewModel(
         }
       }
 
-      return matchesSearch(file, selection.search);
+      return matchesSearch(file, normalizedSearch);
     })
     .map((file) =>
       Object.assign({}, file, {
