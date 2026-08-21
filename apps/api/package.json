@@ -13,8 +13,8 @@
     "test": "vp exec bun test tests"
   },
   "dependencies": {
-    "@cloudflare/sandbox": "0.12.4",
-    "@larksuiteoapi/node-sdk": "^1.66.0",
+    "@cloudflare/sandbox": "0.12.6",
+    "@larksuiteoapi/node-sdk": "^1.73.0",
     "@mosoo/ag-ui-session": "workspace:*",
     "@mosoo/agent-driver": "workspace:*",
     "@mosoo/agent-package": "workspace:*",
@@ -28,23 +28,23 @@
     "@mosoo/runtime-events": "workspace:*",
     "@mosoo/session-policy": "workspace:*",
     "@mosoo/skill-package": "workspace:*",
-    "@orpc/server": "^1.14.3",
+    "@orpc/server": "^1.15.0",
     "arktype": "^2.2.0",
-    "better-auth": "1.6.25",
+    "better-auth": "1.6.28",
     "cloudflare": "7.0.0",
     "drizzle-orm": "^0.45.2",
     "fflate": "^0.8.3",
     "graphql": "^17.0.2",
-    "graphql-yoga": "^5.21.0",
+    "graphql-yoga": "^5.21.3",
     "hono": "^4.12.32",
     "jsonc-parser": "3.3.1",
-    "smol-toml": "1.7.0",
+    "smol-toml": "1.8.0",
     "xstate": "^5.32.0"
   },
   "devDependencies": {
     "@types/node": "^25.8.0",
     "typescript": "^6.0.3",
     "vite-plus": "^0.1.23",
-    "wrangler": "^4.115.0"
+    "wrangler": "^4.123.0"
   }
 }

@@ -1,4 +1,4 @@
-import { ActionBarPrimitive, MessagePrimitive, useMessage } from "@assistant-ui/react";
+import { ActionBarPrimitive, MessagePrimitive, useAuiState } from "@assistant-ui/react";
 import type { ReasoningMessagePartComponent, TextMessagePartComponent } from "@assistant-ui/react";
 import { ChevronRight, Copy } from "lucide-react";
 import type { ReactElement } from "react";
@@ -109,8 +109,8 @@ export function AssistantMessage(): ReactElement {
   // the card. This also reclaims the h-6 slot the bar used to reserve even while
   // hidden — that reserved space was what inflated the gap between consecutive
   // tool cards.
-  const hasCopyableText = useMessage((message) =>
-    message.content.some((part) => part.type === "text" && part.text.trim().length > 0),
+  const hasCopyableText = useAuiState((state) =>
+    state.message.content.some((part) => part.type === "text" && part.text.trim().length > 0),
   );
 
   return (
