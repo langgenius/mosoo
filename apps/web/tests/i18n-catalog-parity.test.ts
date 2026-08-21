@@ -40,4 +40,19 @@ describe("translation catalog parity", () => {
         expect(variables(catalogs[locale].get(key) ?? "")).toEqual(variables(english));
     }
   });
+
+  test("no single-brace placeholders the runtime cannot interpolate", () => {
+    // t() only substitutes {{name}}; a {name} placeholder renders literally (mosoo#501).
+    const singleBrace = /(?<!\{)\{(\w+)\}(?!\})/u;
+    for (const locale of localeFiles) {
+      for (const [key, text] of catalogs[locale]) {
+        const match = singleBrace.exec(text);
+        expect({ key, locale, offender: match?.[0] ?? null }).toEqual({
+          key,
+          locale,
+          offender: null,
+        });
+      }
+    }
+  });
 });
