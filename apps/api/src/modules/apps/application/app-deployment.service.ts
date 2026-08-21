@@ -36,7 +36,6 @@ import type {
   CloudflareDeploymentClient,
 } from "./app-deployment-cloudflare-client";
 import { destroyAppDeploymentRunSandboxesBestEffort } from "./app-deployment-executor.service";
-import { deleteAppDeploymentSecretsForApp } from "./app-deployment-secret.service";
 import { ensureAppOwnership } from "./app.service";
 import { normalizeLimit } from "./normalize-limit";
 
@@ -366,11 +365,6 @@ export async function deleteAppDeployment(
       "Cloudflare deployment cleanup failed. Retry deletion.",
     );
   }
-
-  // The managed Worker is gone, so its App-scoped secret material can no
-  // longer be reached through a live deployment. Keep it until this point so
-  // a failed Cloudflare cleanup remains retryable without data loss.
-  await deleteAppDeploymentSecretsForApp(bindings.DB, input.appId);
 
   await getAppDatabase(bindings.DB)
     .update(appDeploymentsTable)
