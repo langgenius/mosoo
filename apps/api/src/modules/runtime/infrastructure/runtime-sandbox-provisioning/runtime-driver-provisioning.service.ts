@@ -248,7 +248,7 @@ async function provisionDriver(
     }
     // A fresh driver without a native session to resume can only recover
     // conversation context through a bounded platform-history replay. Cattle
-    // policy opts in for every runtime because its native resume is volatile;
+    // keeps that fallback for runtimes that do not emit a native reference;
     // openai-runtime additionally keeps the semantic-recovery fallback for a
     // present-but-unmaterialized rollout.
     const shouldReplayRecoveryMessages =

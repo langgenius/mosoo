@@ -18,8 +18,11 @@ they create or continue work for an end user.
 2. In Preview or live chat, **Stop generating** ends the current attempt. The Thread remains
    available for another message. Stopping cannot undo tool calls or other external side effects
    that already happened.
-3. When an attempt completes or fails, the conversation and saved files remain readable. The
-   user can send a follow-up. Preview offers retry actions for some provider checks and send
+3. When an attempt completes or fails, the conversation and saved files remain readable. A
+   Task Agent also commits its private Thread workspace after a successful turn and before a
+   follow-up or runtime recycle, so a later follow-up resumes the last committed turn instead
+   of an empty workspace. The user can send a follow-up. Preview offers retry actions for some
+   provider checks and send
    failures. After an unexpected runtime loss, mosoo reports the failure but does not
    automatically replay the request; the user must deliberately resend it. If the Run had a
    write-capable external tool call whose final receipt was lost, Mosoo records the effect as

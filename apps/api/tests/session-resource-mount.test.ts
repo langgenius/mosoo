@@ -100,6 +100,9 @@ function createSandbox(input: {
     async terminal() {
       return new Response();
     },
+    async unmountBucket() {
+      throw new Error("unmountBucket is not used in session resource mount tests.");
+    },
     async watch() {
       return new ReadableStream<Uint8Array>();
     },

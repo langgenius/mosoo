@@ -136,6 +136,7 @@ CREATE TABLE session (
   last_message_at integer,
   message_seq_cursor integer DEFAULT 0 NOT NULL,
   runtime_event_seq_cursor integer DEFAULT 0 NOT NULL,
+  workspace_checkpoint_required integer DEFAULT 0 NOT NULL,
   archived_at integer,
   renamed integer DEFAULT 0 NOT NULL,
   status_operation_id text,
@@ -289,6 +290,7 @@ CREATE TABLE sandbox_backup (
   id text PRIMARY KEY NOT NULL,
   keep integer DEFAULT 0 NOT NULL,
   sandbox_id text NOT NULL,
+  session_run_id text,
   status text NOT NULL,
   ttl_seconds integer NOT NULL,
   updated_at integer NOT NULL
@@ -296,6 +298,10 @@ CREATE TABLE sandbox_backup (
 
 CREATE INDEX sandbox_backup_sandbox_status_created_idx
   ON sandbox_backup (sandbox_id, status, created_at);
+
+CREATE UNIQUE INDEX sandbox_backup_terminal_checkpoint_idx
+  ON sandbox_backup (sandbox_id, dir, session_run_id)
+  WHERE session_run_id IS NOT NULL AND status = 'ready';
 
 CREATE TABLE driver_instance (
   id text PRIMARY KEY NOT NULL,

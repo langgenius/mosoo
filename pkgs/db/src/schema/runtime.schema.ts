@@ -126,6 +126,7 @@ export const sandboxBackupsTable = sqliteTable(
     id: platformIdColumn<SandboxBackupId>("id").primaryKey(),
     keep: integer("keep", { mode: "boolean" }).notNull().default(false),
     sandboxId: platformIdColumn<SandboxId>("sandbox_id").notNull(),
+    sessionRunId: platformIdColumn<SessionRunId>("session_run_id"),
     status: text("status").$type<SandboxBackupStatus>().notNull(),
     ttlSeconds: integer("ttl_seconds").notNull(),
     updatedAt: integer("updated_at").notNull(),
@@ -136,6 +137,9 @@ export const sandboxBackupsTable = sqliteTable(
       table.status,
       table.createdAt,
     ),
+    uniqueIndex("sandbox_backup_terminal_checkpoint_idx")
+      .on(table.sandboxId, table.dir, table.sessionRunId)
+      .where(sql`${table.sessionRunId} IS NOT NULL AND ${table.status} = 'ready'`),
   ],
 );
 
@@ -330,6 +334,8 @@ export const driverInstanceMcpGrantsTable = sqliteTable(
 export const nativeResumeRefsTable = sqliteTable(
   "native_resume_ref",
   {
+    committedSessionRunId: platformIdColumn<SessionRunId>("committed_session_run_id"),
+    committedValue: text("committed_value"),
     createdAt: integer("created_at").notNull(),
     kind: text("kind")
       .$type<"acp_session_id" | "claude_session_id" | "openai_thread_id">()

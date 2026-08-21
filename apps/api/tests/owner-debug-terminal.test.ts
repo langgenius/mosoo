@@ -79,6 +79,7 @@ function createTerminalSandboxHandleSpy(): TerminalSpy {
     },
     startProcess: unavailable,
     terminal: async () => sessionResponse,
+    unmountBucket: unavailable,
     watch: unavailable,
     writeFile: unavailable,
     wsConnect: unavailable,

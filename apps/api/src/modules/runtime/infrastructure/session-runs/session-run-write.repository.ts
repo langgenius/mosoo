@@ -1,3 +1,4 @@
+import type { AgentKind } from "@mosoo/contracts/agent";
 import type { SessionStatus, SessionType } from "@mosoo/contracts/session";
 import type {
   RunError,
@@ -102,6 +103,7 @@ interface LoadedSessionRunLifecycleRow {
   provider: string | null;
   runtime_id: string;
   session_id: SessionId;
+  session_kind: AgentKind;
   session_last_run_id: SessionRunId | null;
   session_status: SessionStatus;
   session_type: SessionType;
@@ -177,6 +179,22 @@ function createSessionRunStatusUpdate(input: SessionRunStatusUpdateInput, timest
   };
 }
 
+function createCurrentSessionRunProjectionPatch(input: {
+  readonly sessionKind: AgentKind;
+  readonly status: SessionRunStatus;
+  readonly timestampMs: number;
+}) {
+  return {
+    ...createSessionStatusTransitionPatch({
+      status: toSessionLifecycleStatusForRunStatus(input.status),
+      timestampMs: input.timestampMs,
+    }),
+    ...(input.sessionKind === "cattle" && input.status === "completed"
+      ? { workspaceCheckpointRequired: true }
+      : {}),
+  };
+}
+
 function logTerminalSessionRun(
   current: LoadedSessionRunLifecycleRow,
   input: SessionRunStatusUpdateInput,
@@ -248,6 +266,7 @@ function sessionRunLifecycleColumns() {
     provider: sessionRunsTable.provider,
     runtime_id: sessionsTable.runtimeId,
     session_id: sessionRunsTable.sessionId,
+    session_kind: sessionsTable.kind,
     session_last_run_id: sessionsTable.lastRunId,
     session_status: sessionsTable.status,
     session_type: sessionsTable.type,
@@ -822,8 +841,9 @@ async function transitionSessionRunStatus(
     db
       .update(sessionsTable)
       .set(
-        createSessionStatusTransitionPatch({
-          status: toSessionLifecycleStatusForRunStatus(input.status),
+        createCurrentSessionRunProjectionPatch({
+          sessionKind: current.session_kind,
+          status: input.status,
           timestampMs,
         }),
       )

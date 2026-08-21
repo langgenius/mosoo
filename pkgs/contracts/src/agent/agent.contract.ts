@@ -70,14 +70,14 @@ export const AGENT_KIND_RUNTIME_POLICIES = {
   cattle: {
     copy: {
       description:
-        "Independent sandbox per session. Best for high-concurrency tasks, PR reviews, and webhook triggers.",
+        "Independent, checkpointed workspace per Thread. Best for high-concurrency tasks, PR reviews, and webhook triggers.",
       examples: "e.g. PR auto-review | Linear ticket triage | Batch jobs",
       label: "Task Agent",
       tagline: "On-demand worker",
     },
     kind: "cattle",
     nativeResume: {
-      persistence: "volatile",
+      persistence: "platform",
     },
     operations: {
       ownerTerminal: false,
@@ -86,8 +86,8 @@ export const AGENT_KIND_RUNTIME_POLICIES = {
       restartDriver: true,
     },
     stateRetention: {
-      preservesRuntimeState: false,
-      summary: "Session sandbox state is discarded with the session sandbox.",
+      preservesRuntimeState: true,
+      summary: "Thread workspace and resume state are preserved through Backup/Restore.",
     },
     subject: {
       scope: "session",
@@ -138,7 +138,7 @@ export const AGENT_KIND_RUNTIME_COMPARISON_ROWS = [
     id: "cross_session_memory",
     label: "Cross-session memory",
     values: {
-      cattle: "Only explicit session files",
+      cattle: "None; isolated Thread checkpoint",
       pet: "Stable sandbox continuity",
     },
   },

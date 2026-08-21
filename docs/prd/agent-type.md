@@ -9,7 +9,7 @@ mosoo supports two Agent types because users need different kinds of continuity.
 ## The two choices
 
 - **Assistant Agent** keeps a stable working environment across sessions. It suits daily helpers, knowledge assistants, and copilots that benefit from ongoing context. Sessions may share local working state, so it is not the right choice when every job must be isolated. Continuity is bounded: a rebuild preserves selected memory and workspace content, but may lose local sign-ins, caches, or tool-specific state.
-- **Task Agent** starts with a clean working environment for each run and releases it when the run ends. It suits PR reviews, ticket triage, webhooks, and batch work. When a conversation continues, its recorded output files come back at their original locations and the Agent sees a bounded window of the recent conversation, so follow-up requests can build on earlier results. Temporary working state still does not carry into the next run, and earlier attachments must be attached again to be readable.
+- **Task Agent** gives each Thread an isolated working environment. The live container may stay warm briefly, but mosoo can recycle it while the Thread's last successfully completed turn remains committed. It suits PR reviews, ticket triage, webhooks, and batch work. Continuing the same Thread restores its last committed working directory and provider resume state before the follow-up starts, even after a cold recycle. That state never crosses into another Thread. Earlier attachments must still be selected again because attachment access follows the current message, not the workspace checkpoint.
 
 ## User flow
 
@@ -21,3 +21,5 @@ mosoo supports two Agent types because users need different kinds of continuity.
 ## Current product boundary
 
 Type selection, locking, forking, and type-specific working environments are available today. Owners can open a Terminal and reset working state for Assistant Agents; Task Agents do not show those controls. Both types otherwise use the same Preview, publishing, conversation, logs, and cost surfaces. Agents remain capabilities inside an App, not standalone products.
+
+See [Thread Continuation](./thread-continuation.md) for the Task Agent durability and isolation contract.

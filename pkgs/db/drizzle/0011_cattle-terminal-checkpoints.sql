@@ -1,0 +1,5 @@
+ALTER TABLE `native_resume_ref` ADD `committed_session_run_id` text CHECK ("committed_session_run_id" = upper("committed_session_run_id") AND length("committed_session_run_id") = 26 AND substr("committed_session_run_id", 1, 1) GLOB '[0-7]' AND "committed_session_run_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*');--> statement-breakpoint
+ALTER TABLE `native_resume_ref` ADD `committed_value` text;--> statement-breakpoint
+ALTER TABLE `sandbox_backup` ADD `session_run_id` text CHECK ("session_run_id" = upper("session_run_id") AND length("session_run_id") = 26 AND substr("session_run_id", 1, 1) GLOB '[0-7]' AND "session_run_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*');--> statement-breakpoint
+CREATE UNIQUE INDEX `sandbox_backup_terminal_checkpoint_idx` ON `sandbox_backup` (`sandbox_id`,`dir`,`session_run_id`) WHERE "sandbox_backup"."session_run_id" IS NOT NULL AND "sandbox_backup"."status" = 'ready';--> statement-breakpoint
+ALTER TABLE `session` ADD `workspace_checkpoint_required` integer DEFAULT false NOT NULL;

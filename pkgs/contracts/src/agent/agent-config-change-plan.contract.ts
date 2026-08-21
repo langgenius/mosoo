@@ -6,7 +6,7 @@ import type {
   AgentStatus,
   RuntimeStateApplyActionKind,
 } from "./agent.contract";
-import { agentKindPreservesRuntimeState } from "./agent.contract";
+import { agentKindUsesStableRuntimeSubject } from "./agent.contract";
 
 export type AgentConfigChangeAction = "direct-update" | "fork-agent" | RuntimeStateApplyActionKind;
 
@@ -187,7 +187,7 @@ export function classifyAgentConfigChanges(input: {
     input.agentStatus === "published" && action !== "direct-update" && action !== "fork-agent";
   const requiresRuntimeOperation =
     requiresDeploymentVersion &&
-    agentKindPreservesRuntimeState(input.saved.kind) &&
+    agentKindUsesStableRuntimeSubject(input.saved.kind) &&
     requiresRuntimeAction(action);
   const actionLabel =
     requiresDeploymentVersion && !requiresRuntimeOperation

@@ -560,6 +560,7 @@ function createApiTestSchema(database: SqliteD1Database): void {
       status_operation_id text,
       status_seq integer DEFAULT 0 NOT NULL,
       runtime_event_seq_cursor integer DEFAULT 0 NOT NULL,
+      workspace_checkpoint_required integer DEFAULT 0 NOT NULL,
       title text,
       type text DEFAULT 'preview' NOT NULL,
       updated_at integer NOT NULL
@@ -611,6 +612,7 @@ function createApiTestSchema(database: SqliteD1Database): void {
       id text PRIMARY KEY NOT NULL,
       keep integer DEFAULT 0 NOT NULL,
       sandbox_id text NOT NULL,
+      session_run_id text,
       status text NOT NULL,
       ttl_seconds integer NOT NULL,
       updated_at integer NOT NULL

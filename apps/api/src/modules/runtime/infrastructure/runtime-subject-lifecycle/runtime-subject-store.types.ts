@@ -58,6 +58,7 @@ export interface RuntimeConversationSessionRecord {
   readonly originJson: string;
   readonly sandboxId: SandboxId;
   readonly status: SandboxSessionStatus;
+  readonly workspaceCheckpointRequired: boolean;
 }
 
 export interface RuntimeConversationSessionState {

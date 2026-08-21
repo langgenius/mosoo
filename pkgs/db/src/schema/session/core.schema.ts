@@ -45,6 +45,13 @@ export const sessionsTable = sqliteTable(
     title: text("title"),
     type: text("type").$type<SessionType>().notNull().default("preview"),
     updatedAt: integer("updated_at").notNull(),
+    // Rollout marker: pre-checkpoint Cattle Threads stay false and retain the
+    // artifact fallback until their first successful post-rollout turn.
+    workspaceCheckpointRequired: integer("workspace_checkpoint_required", {
+      mode: "boolean",
+    })
+      .notNull()
+      .default(false),
   },
   (table) => [
     check(

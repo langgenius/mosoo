@@ -7,7 +7,7 @@ import {
   getExpectedDriverNativeRuntimeRefKind,
   parseDriverNativeRuntimeRef,
 } from "@mosoo/agent-driver/runtime";
-import { nativeResumeRefsTable } from "@mosoo/db";
+import { nativeResumeRefsTable, sessionsTable } from "@mosoo/db";
 import type { DriverInstanceId, SessionId, SessionRunId } from "@mosoo/id";
 import { eq, inArray, sql } from "drizzle-orm";
 
@@ -15,8 +15,10 @@ import { getAppDatabase } from "../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../time";
 
 interface NativeResumeRefRow {
+  committed_value: string | null;
   kind: string;
   runtime_id: string;
+  session_kind: string;
   value: string;
 }
 
@@ -41,11 +43,17 @@ function enforceNativeRuntimeRefShape(ref: DriverNativeRuntimeRef): void {
   }
 }
 
-function toNativeRuntimeRef(row: NativeResumeRefRow): DriverNativeRuntimeRef {
+function toNativeRuntimeRef(row: NativeResumeRefRow): DriverNativeRuntimeRef | null {
+  const value = row.session_kind === "cattle" ? row.committed_value : row.value;
+
+  if (value === null) {
+    return null;
+  }
+
   const ref = parseDriverNativeRuntimeRef({
     kind: row.kind,
     runtimeId: row.runtime_id,
-    value: row.value,
+    value,
   });
 
   enforceNativeRuntimeRefShape(ref);
@@ -62,11 +70,14 @@ export async function getNativeResumeRefForRuntime(
   const row =
     (await getAppDatabase(database)
       .select({
+        committed_value: nativeResumeRefsTable.committedValue,
         kind: nativeResumeRefsTable.kind,
         runtime_id: nativeResumeRefsTable.runtimeId,
+        session_kind: sessionsTable.kind,
         value: nativeResumeRefsTable.value,
       })
       .from(nativeResumeRefsTable)
+      .innerJoin(sessionsTable, eq(sessionsTable.id, nativeResumeRefsTable.sessionId))
       .where(eq(nativeResumeRefsTable.sessionId, input.sessionId))
       .limit(1)
       .get()) ?? null;
@@ -77,7 +88,7 @@ export async function getNativeResumeRefForRuntime(
 
   const ref = toNativeRuntimeRef(row);
 
-  return ref.runtimeId === input.runtimeId ? ref : null;
+  return ref?.runtimeId === input.runtimeId ? ref : null;
 }
 
 export async function deleteNativeResumeRefsForSessions(

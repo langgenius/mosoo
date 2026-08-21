@@ -78,6 +78,13 @@
       "when": 1785332217208,
       "tag": "0010_external-tool-effects",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1787207755791,
+      "tag": "0011_cattle-terminal-checkpoints",
+      "breakpoints": true
     }
   ]
 }
