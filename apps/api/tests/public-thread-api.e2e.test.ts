@@ -1,7 +1,14 @@
 import { describe, expect, test } from "bun:test";
 
 import { PUBLIC_THREAD_API_THREADS_MAX_LIMIT } from "@mosoo/contracts/public-api";
-import { sessionExecutionSnapshotsTable, sessionRunsTable, sessionsTable } from "@mosoo/db";
+import {
+  sessionExecutionSnapshotsTable,
+  sessionRunArtifactsTable,
+  sessionRunsTable,
+  sessionsTable,
+} from "@mosoo/db";
+import { parsePlatformId } from "@mosoo/id";
+import type { RuntimeEventId, SessionId, SessionRunId } from "@mosoo/id";
 import { eq } from "drizzle-orm";
 
 import { fileStore } from "../src/modules/files/application/file-store";
@@ -9,6 +16,10 @@ import {
   PUBLIC_API_RATE_LIMIT_REQUESTS_PER_MINUTE,
   enforcePublicApiRateLimit,
 } from "../src/modules/public-api/public-api-rate-limit.service";
+import {
+  appendSessionRuntimeEvents,
+  createSessionRuntimeEvent,
+} from "../src/modules/sessions/application/session-event-write.service";
 import { insertSessionMessage } from "../src/modules/sessions/infrastructure/session-message-store.repository";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import {
@@ -17,6 +28,7 @@ import {
   TOKENS,
   createPublicHttpContractDatabase,
   createPublicHttpTestBindings,
+  createTestExecutionContext,
 } from "./helpers/public-api-http-test-fixture";
 import {
   OWNER_VIEWER,
@@ -34,6 +46,7 @@ import {
 } from "./public-thread-api-fixtures";
 
 const PUBLIC_THREAD_ID_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+const ARTIFACT_EVENT_ID = "01J00000000000000000000018";
 const FINAL_OUTPUT_CANARY_LINE_COUNT = 160;
 const FINAL_OUTPUT_CANARY_LINES = Array.from(
   { length: FINAL_OUTPUT_CANARY_LINE_COUNT },
@@ -383,9 +396,13 @@ describe("Public Thread API e2e", () => {
     const app = createPublicThreadApiTestApp();
 
     await withProviderProbeMock(async () => {
-      const response = await requestPublicApi(
+      const waitUntilTasks: Promise<unknown>[] = [];
+      const executionContext = {
+        ...createTestExecutionContext(),
+        waitUntil: (task: Promise<unknown>) => waitUntilTasks.push(task),
+      };
+      const response = await requestPublicApiWithBindings(
         app,
-        database,
         new Request(`https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`, {
           body: JSON.stringify({
             input: {
@@ -401,7 +418,10 @@ describe("Public Thread API e2e", () => {
           },
           method: "POST",
         }),
+        createPublicHttpTestBindings(database) as ApiBindings,
+        executionContext,
       );
+      await Promise.allSettled(waitUntilTasks);
       expect(response.status).toBe(201);
 
       const body = await readJson(response);
@@ -1311,7 +1331,10 @@ describe("Public Thread API e2e", () => {
         expectArray(expectRecord(await readJson(sendEventResponse))["events"])[0],
       );
       expect(sendEvent["type"]).toBe("user_message");
-      expect(["queued", "running"]).toContain(expectRecord(sendEvent["run"])["status"]);
+      const sentRun = expectRecord(sendEvent["run"]);
+      expect(["queued", "running"]).toContain(sentRun["status"]);
+      const runId = parsePlatformId<SessionRunId>(expectString(sentRun["id"]), "Run ID");
+      const sessionId = parsePlatformId<SessionId>(threadId, "Session ID");
 
       const readyFileRow = await database
         .prepare(
@@ -1405,6 +1428,48 @@ describe("Public Thread API e2e", () => {
           2,
         )
         .run();
+      await database
+        .app()
+        .insert(sessionRunArtifactsTable)
+        .values({
+          committedEventId: parsePlatformId<RuntimeEventId>(ARTIFACT_EVENT_ID, "Artifact event ID"),
+          createdAt: 2,
+          fileId: PUBLIC_API_TEST_IDS.fileAlt,
+          mimeType: "text/markdown",
+          name: "summary.md",
+          sessionRunId: runId,
+          size: 23,
+        })
+        .run();
+      await appendSessionRuntimeEvents({
+        bindings: createPublicHttpTestBindings(database, {
+          fileBucket: bucket as unknown as R2Bucket,
+        }) as ApiBindings,
+        events: [
+          createSessionRuntimeEvent({
+            id: parsePlatformId<RuntimeEventId>(ARTIFACT_EVENT_ID, "Artifact event ID"),
+            kind: "session.files.updated",
+            origin: "file",
+            payload: {
+              change: {
+                change: "upsert",
+                file: {
+                  committed: true,
+                  createdAt: new Date(2).toISOString(),
+                  id: PUBLIC_API_TEST_IDS.fileAlt,
+                  kind: "artifact",
+                  mimeType: "text/markdown",
+                  name: "summary.md",
+                  size: 23,
+                },
+              },
+            },
+            runId,
+            sessionId,
+          }),
+        ],
+        sessionId,
+      });
       await bucket.put(artifactObjectKey, "runtime summary", {
         httpMetadata: {
           contentType: "text/markdown",
@@ -1427,17 +1492,103 @@ describe("Public Thread API e2e", () => {
         }),
       );
       expect(listedFilesById.get(fileId)).toMatchObject({
+        fileId,
         id: fileId,
         kind: "attachment",
         name: "launch-note.txt",
+        runId: null,
         size: 13,
       });
       expect(listedFilesById.get(PUBLIC_API_TEST_IDS.fileAlt)).toMatchObject({
+        fileId: PUBLIC_API_TEST_IDS.fileAlt,
         id: PUBLIC_API_TEST_IDS.fileAlt,
         kind: "artifact",
         name: "summary.md",
+        runId,
         size: 23,
       });
+
+      const listedEventsResponse = await requestThreadApi(
+        new Request(`https://api.example.com/api/v1/threads/${threadId}/events`, {
+          headers: { Authorization: bearer(TOKENS.owner) },
+        }),
+      );
+      expect(listedEventsResponse.status).toBe(200);
+      const listedEvents = expectArray(
+        expectRecord(await readJson(listedEventsResponse))["events"],
+      );
+      const artifactEvent = expectRecord(
+        listedEvents.find((event) => {
+          if (typeof event !== "object" || event === null || Array.isArray(event)) {
+            return false;
+          }
+          const artifact = (event as Record<string, unknown>)["artifact"];
+          return (
+            typeof artifact === "object" &&
+            artifact !== null &&
+            !Array.isArray(artifact) &&
+            (artifact as Record<string, unknown>)["fileId"] === PUBLIC_API_TEST_IDS.fileAlt
+          );
+        }),
+      );
+      expect(artifactEvent).toMatchObject({
+        artifact: {
+          fileId: PUBLIC_API_TEST_IDS.fileAlt,
+          kind: "artifact",
+          mimeType: "text/markdown",
+          name: "summary.md",
+          runId,
+          size: 23,
+        },
+        runId,
+        type: "session_files.updated",
+      });
+
+      const streamResponse = await requestThreadApi(
+        new Request(`https://api.example.com/api/v1/threads/${threadId}/events/stream?limit=100`, {
+          headers: { Authorization: bearer(TOKENS.owner) },
+        }),
+      );
+      const streamReader = streamResponse.body?.getReader();
+      if (!streamReader) {
+        throw new Error("Expected artifact stream response body.");
+      }
+      let streamText = "";
+      while (!streamText.includes(`"fileId":"${PUBLIC_API_TEST_IDS.fileAlt}"`)) {
+        const chunk = await Promise.race([
+          streamReader.read(),
+          Bun.sleep(3_000).then(() => {
+            throw new Error("Timed out waiting for artifact SSE event.");
+          }),
+        ]);
+        if (chunk.done) {
+          throw new Error("Artifact SSE closed before the committed event.");
+        }
+        streamText += new TextDecoder().decode(chunk.value);
+      }
+      await streamReader.cancel();
+      expect(streamText).toContain(`"fileId":"${PUBLIC_API_TEST_IDS.fileAlt}"`);
+      expect(streamText).toContain(`"runId":"${runId}"`);
+
+      await database
+        .app()
+        .update(sessionRunsTable)
+        .set({ completedAt: 3, status: "completed", updatedAt: 3 })
+        .where(eq(sessionRunsTable.id, runId))
+        .run();
+      const terminalThreadResponse = await requestThreadApi(
+        new Request(`https://api.example.com/api/v1/threads/${threadId}`, {
+          headers: { Authorization: bearer(TOKENS.owner) },
+        }),
+      );
+      const terminalRun = expectRecord(expectRecord(await readJson(terminalThreadResponse))["run"]);
+      expect(terminalRun["artifacts"]).toEqual([
+        expect.objectContaining({
+          fileId: PUBLIC_API_TEST_IDS.fileAlt,
+          name: "summary.md",
+          runId,
+        }),
+      ]);
 
       const downloadAttachmentResponse = await requestThreadApi(
         new Request(`https://api.example.com/api/v1/files/${fileId}/content`, {

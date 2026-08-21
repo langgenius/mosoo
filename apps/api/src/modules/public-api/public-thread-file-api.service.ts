@@ -6,10 +6,13 @@ import type {
   PublicThreadFile,
   PublicThreadFileListResponse,
 } from "@mosoo/contracts/public-api";
+import { sessionRunArtifactsTable } from "@mosoo/db";
 import { parsePlatformId } from "@mosoo/id";
-import type { AgentId, AppId, FileId, PublicThreadId, SessionId } from "@mosoo/id";
+import type { AgentId, AppId, FileId, PublicThreadId, SessionId, SessionRunId } from "@mosoo/id";
+import { inArray } from "drizzle-orm";
 
 import type { ApiBindings } from "../../platform/cloudflare/worker-types";
+import { getAppDatabase } from "../../platform/db/drizzle";
 import type { PublicApiCaller } from "../auth/application/public-api-caller.service";
 import { FileControlError } from "../files/application/file-control-errors";
 import { fileStore } from "../files/application/file-store";
@@ -52,14 +55,21 @@ function requirePublicThreadFile(file: FileRecord): PublicThreadId {
   return toPublicThreadId(parsePlatformId<SessionId>(file.scope.id, "File session ID"));
 }
 
-function toPublicThreadFile(file: FileEntry | FileRecord): PublicThreadFile {
+function toPublicThreadFile(
+  file: FileEntry | FileRecord,
+  runId: SessionRunId | null,
+): PublicThreadFile {
+  const fileId = parsePlatformId<FileId>(file.id, "File ID");
+
   return {
     committed: true,
     createdAt: file.createdAt,
-    id: parsePlatformId<FileId>(file.id, "File ID"),
+    fileId,
+    id: fileId,
     kind: file.sessionKind ?? "attachment",
     mimeType: file.mimeType,
     name: file.name,
+    runId,
     size: file.size,
   };
 }
@@ -103,13 +113,28 @@ export async function listPublicThreadFiles(
   threadId: PublicThreadId,
 ): Promise<PublicThreadFileListResponse> {
   const { appId, sessionId } = await admitPublicThreadFileAccess(bindings, caller, threadId);
+  const files = (
+    await fileStore.list(bindings, caller.viewer, {
+      appId,
+      sessionId,
+    })
+  ).files;
+  const fileIds = files.map((file) => parsePlatformId<FileId>(file.id, "File ID"));
+  const artifacts =
+    fileIds.length === 0
+      ? []
+      : await getAppDatabase(bindings.DB)
+          .select({
+            fileId: sessionRunArtifactsTable.fileId,
+            runId: sessionRunArtifactsTable.sessionRunId,
+          })
+          .from(sessionRunArtifactsTable)
+          .where(inArray(sessionRunArtifactsTable.fileId, fileIds))
+          .all();
+  const runIdsByFileId = new Map(artifacts.map((artifact) => [artifact.fileId, artifact.runId]));
+
   return {
-    files: (
-      await fileStore.list(bindings, caller.viewer, {
-        appId,
-        sessionId,
-      })
-    ).files.map(toPublicThreadFile),
+    files: files.map((file) => toPublicThreadFile(file, runIdsByFileId.get(file.id) ?? null)),
   };
 }
 

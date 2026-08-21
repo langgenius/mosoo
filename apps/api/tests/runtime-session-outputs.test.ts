@@ -20,6 +20,7 @@ import {
   createPublicHttpContractDatabase,
   createPublicHttpTestBindings,
   insertOwnerSession,
+  insertRunningSessionRun,
   nowMsForTest,
 } from "./helpers/public-api-http-test-fixture";
 
@@ -136,7 +137,9 @@ async function insertActiveSandboxSession(database: D1Database): Promise<void> {
     .run();
 }
 
-function createRuntimeLink(): RuntimeSessionLink {
+function createRuntimeLink(
+  sessionRunId: RuntimeSessionLink["sessionRunId"] = PUBLIC_API_TEST_IDS.run,
+): RuntimeSessionLink {
   return {
     agentId: PUBLIC_API_TEST_IDS.agent,
     appId: PUBLIC_API_TEST_IDS.app,
@@ -147,7 +150,7 @@ function createRuntimeLink(): RuntimeSessionLink {
     sandboxKind: "cattle",
     sandboxSubjectKind: "session",
     sessionId: PUBLIC_API_TEST_IDS.ownerSession,
-    sessionRunId: PUBLIC_API_TEST_IDS.run,
+    sessionRunId,
     sessionRunStatus: "running",
     sessionType: "ui",
     traceId: "trace-session-outputs",
@@ -173,7 +176,7 @@ function createCompletedRunEvent() {
   });
 }
 
-function createFileChangedEvent(path = "outputs/live.txt") {
+function createFileChangedEvent(path = "outputs/live.txt", runId = PUBLIC_API_TEST_IDS.run) {
   return createRuntimeEvent({
     driverInstanceId: PUBLIC_API_TEST_IDS.driverOwner,
     id: API_DRIVER_BOUNDARY_IDS.runtimeEvent,
@@ -192,7 +195,7 @@ function createFileChangedEvent(path = "outputs/live.txt") {
         },
       ],
     },
-    runId: PUBLIC_API_TEST_IDS.run,
+    runId,
     sessionId: PUBLIC_API_TEST_IDS.ownerSession,
   });
 }
@@ -279,6 +282,7 @@ describe("runtime session outputs", () => {
   test("records files under outputs as session artifacts on run completion", async () => {
     const database = await createPublicHttpContractDatabase();
     await insertOwnerSession(database);
+    await insertRunningSessionRun(database);
     await insertActiveSandboxSession(database);
 
     const { bindings, bucket } = await createBindings({
@@ -341,12 +345,55 @@ describe("runtime session outputs", () => {
         size: 9,
       },
     ]);
+    const artifactReceipts = await database
+      .prepare(
+        `SELECT committed_event_id, file_id, name, session_run_id
+           FROM session_run_artifact
+          ORDER BY name`,
+      )
+      .all<{
+        committed_event_id: string;
+        file_id: string;
+        name: string;
+        session_run_id: string;
+      }>();
+    expect(
+      artifactReceipts.results.map(({ committed_event_id: _eventId, ...receipt }) => receipt),
+    ).toEqual([
+      {
+        file_id: expect.any(String),
+        name: "resume.txt",
+        session_run_id: PUBLIC_API_TEST_IDS.run,
+      },
+      {
+        file_id: expect.any(String),
+        name: "summary.md",
+        session_run_id: PUBLIC_API_TEST_IDS.run,
+      },
+    ]);
+    const receiptEventIds = artifactReceipts.results.map((receipt) => receipt.committed_event_id);
+    const artifactEvents = await database
+      .prepare(
+        `SELECT run_id, source_event_id
+           FROM session_event
+          WHERE event_type = 'session.files.updated'
+          ORDER BY source_event_id`,
+      )
+      .all<{ run_id: string; source_event_id: string }>();
+    expect(artifactEvents.results.map((event) => event.source_event_id).toSorted()).toEqual(
+      receiptEventIds.toSorted(),
+    );
+    expect(artifactEvents.results.map((event) => event.run_id)).toEqual([
+      PUBLIC_API_TEST_IDS.run,
+      PUBLIC_API_TEST_IDS.run,
+    ]);
     expect([...bucket.objects.values()]).toHaveLength(2);
   });
 
   test("deduplicates runtime outputs by source path and content", async () => {
     const database = await createPublicHttpContractDatabase();
     await insertOwnerSession(database);
+    await insertRunningSessionRun(database);
     await insertActiveSandboxSession(database);
 
     const files = new Map([
@@ -393,9 +440,57 @@ describe("runtime session outputs", () => {
     expect(await readReportCount()).toBe(3);
   });
 
+  test("keeps identical artifacts distinct across Runs", async () => {
+    const database = await createPublicHttpContractDatabase();
+    await insertOwnerSession(database);
+    await insertRunningSessionRun(database);
+    await insertActiveSandboxSession(database);
+
+    const { bindings } = await createBindings({
+      database,
+      files: new Map([["/workspace/session/outputs/report.txt", "same output"]]),
+    });
+
+    await dispatchRuntimeEvent({
+      bindings,
+      event: createFileChangedEvent("outputs/report.txt"),
+      link: createRuntimeLink(),
+    });
+
+    await insertRunningSessionRun(database, { runId: PUBLIC_API_TEST_IDS.runAlt });
+    await dispatchRuntimeEvent({
+      bindings,
+      event: createFileChangedEvent("outputs/report.txt", PUBLIC_API_TEST_IDS.runAlt),
+      link: createRuntimeLink(PUBLIC_API_TEST_IDS.runAlt),
+    });
+
+    const receipts = await database
+      .prepare(
+        `SELECT file_id, name, session_run_id
+           FROM session_run_artifact
+          ORDER BY session_run_id`,
+      )
+      .all<{ file_id: string; name: string; session_run_id: string }>();
+
+    expect(receipts.results).toEqual([
+      {
+        file_id: expect.any(String),
+        name: "report.txt",
+        session_run_id: PUBLIC_API_TEST_IDS.run,
+      },
+      {
+        file_id: expect.any(String),
+        name: "report.txt",
+        session_run_id: PUBLIC_API_TEST_IDS.runAlt,
+      },
+    ]);
+    expect(new Set(receipts.results.map((receipt) => receipt.file_id)).size).toBe(2);
+  });
+
   test("records file change events only when the path is under outputs", async () => {
     const database = await createPublicHttpContractDatabase();
     await insertOwnerSession(database);
+    await insertRunningSessionRun(database);
     await insertActiveSandboxSession(database);
 
     const { bindings } = await createBindings({
@@ -428,6 +523,7 @@ describe("runtime session outputs", () => {
   test("skips optional output directory when it has no files", async () => {
     const database = await createPublicHttpContractDatabase();
     await insertOwnerSession(database);
+    await insertRunningSessionRun(database);
     await insertActiveSandboxSession(database);
 
     const { bindings, bucket } = await createBindings({ database });

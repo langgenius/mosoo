@@ -1,21 +1,55 @@
 {
-  "name": "@mosoo/public-api-client",
-  "private": true,
+  "name": "@mosoo/sdk",
+  "version": "0.1.0-beta.0",
+  "private": false,
+  "description": "TypeScript SDK for calling published Mosoo Agents from trusted backends.",
+  "homepage": "https://mosoo.ai/docs",
+  "bugs": {
+    "url": "https://github.com/langgenius/mosoo/issues"
+  },
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/langgenius/mosoo.git",
+    "directory": "pkgs/public-api-client"
+  },
+  "files": [
+    "CHANGELOG.md",
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
   "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/",
+    "tag": "beta"
   },
   "scripts": {
+    "build": "vp pack",
     "lint": "vp lint .",
+    "prepack": "vp run build",
     "tc": "vp exec tsc --noEmit",
     "test": "vp exec bun test tests"
-  },
-  "dependencies": {
-    "@mosoo/contracts": "workspace:*"
   },
   "devDependencies": {
     "@types/bun": "^1.3.14",
     "typescript": "^6.0.3",
-    "vite-plus": "^0.1.23"
+    "vite-plus": "^0.1.23",
+    "wrangler": "^4.120.1"
+  },
+  "engines": {
+    "node": "^22.0.0 || ^24.0.0"
   }
 }

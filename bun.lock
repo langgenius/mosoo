@@ -229,14 +229,13 @@
       },
     },
     "pkgs/public-api-client": {
-      "name": "@mosoo/public-api-client",
-      "dependencies": {
-        "@mosoo/contracts": "workspace:*",
-      },
+      "name": "@mosoo/sdk",
+      "version": "0.1.0-beta.0",
       "devDependencies": {
         "@types/bun": "^1.3.14",
         "typescript": "^6.0.3",
         "vite-plus": "^0.1.23",
+        "wrangler": "^4.120.1",
       },
     },
     "pkgs/runtime-catalog": {
@@ -808,11 +807,11 @@
 
     "@mosoo/observability": ["@mosoo/observability@workspace:pkgs/observability"],
 
-    "@mosoo/public-api-client": ["@mosoo/public-api-client@workspace:pkgs/public-api-client"],
-
     "@mosoo/runtime-catalog": ["@mosoo/runtime-catalog@workspace:pkgs/runtime-catalog"],
 
     "@mosoo/runtime-events": ["@mosoo/runtime-events@workspace:pkgs/runtime-events"],
+
+    "@mosoo/sdk": ["@mosoo/sdk@workspace:pkgs/public-api-client"],
 
     "@mosoo/session-policy": ["@mosoo/session-policy@workspace:pkgs/session-policy"],
 

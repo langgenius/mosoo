@@ -549,6 +549,7 @@ describe("API to web boundary", () => {
 
     const runProperties = openApiSchemaProperties("RunSummary");
     expectProperties(runProperties, [
+      "artifacts",
       "completedAt",
       "createdAt",
       "error",
@@ -577,13 +578,41 @@ describe("API to web boundary", () => {
     ]);
 
     const eventProperties = openApiSchemaProperties("ThreadEventLogEntry");
-    expectProperties(eventProperties, ["content", "id", "occurredAt", "runId", "status", "type"]);
+    expectProperties(eventProperties, [
+      "artifact",
+      "content",
+      "id",
+      "occurredAt",
+      "runId",
+      "status",
+      "type",
+    ]);
+
+    const artifactProperties = openApiSchemaProperties("Artifact");
+    expectProperties(artifactProperties, [
+      "createdAt",
+      "fileId",
+      "kind",
+      "mimeType",
+      "name",
+      "runId",
+      "size",
+    ]);
 
     const sendEventsProperties = openApiSchemaProperties("SendEventsResponse");
     expectProperties(sendEventsProperties, ["acceptedAt", "events", "thread", "warnings"]);
 
     const fileProperties = openApiSchemaProperties("ThreadFile");
-    expectProperties(fileProperties, ["committed", "createdAt", "id", "kind", "name", "size"]);
+    expectProperties(fileProperties, [
+      "committed",
+      "createdAt",
+      "fileId",
+      "id",
+      "kind",
+      "name",
+      "runId",
+      "size",
+    ]);
     expectNoProperties(fileProperties, ["objectKey", "path", "scopeId", "scopeKind"]);
 
     const publicFileProperties = openApiSchemaProperties("PublicFile");

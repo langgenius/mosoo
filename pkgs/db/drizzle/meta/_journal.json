@@ -85,6 +85,13 @@
       "when": 1787207755791,
       "tag": "0011_cattle-terminal-checkpoints",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1787329170583,
+      "tag": "0012_session-run-artifacts",
+      "breakpoints": true
     }
   ]
 }

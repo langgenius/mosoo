@@ -143,6 +143,44 @@ export const PUBLIC_API_OPENAPI_SCHEMAS = {
     required: ["type", "file_id"],
     type: "object",
   },
+  Artifact: {
+    additionalProperties: false,
+    description: "A durable output artifact committed by one Agent Run.",
+    properties: {
+      createdAt: {
+        description: "Timestamp (RFC 3339) at which the artifact was committed.",
+        format: "date-time",
+        type: "string",
+      },
+      fileId: {
+        ...PLATFORM_ID_SCHEMA,
+        description: "Stable file ID used by the existing file download endpoints.",
+      },
+      kind: {
+        const: "artifact",
+        description: "Discriminator for Agent-produced output files.",
+      },
+      mimeType: {
+        description: "Detected MIME type of the artifact, or null when unknown.",
+        type: ["string", "null"],
+      },
+      name: {
+        description: "Artifact file name; names are not unique within a Thread or Run.",
+        type: "string",
+      },
+      runId: {
+        ...PLATFORM_ID_SCHEMA,
+        description: "Stable ID of the Run that committed this artifact.",
+      },
+      size: {
+        description: "Artifact size in bytes.",
+        minimum: 0,
+        type: "integer",
+      },
+    },
+    required: ["createdAt", "fileId", "kind", "mimeType", "name", "runId", "size"],
+    type: "object",
+  },
   PublicFile: {
     additionalProperties: false,
     description: "Public file metadata.",
@@ -241,8 +279,13 @@ export const PUBLIC_API_OPENAPI_SCHEMAS = {
   ThreadEventLogEntry: {
     additionalProperties: false,
     description:
-      "A single public event log entry for a Thread. This is the stable read surface and never exposes raw runtime payloads, transcripts, or diagnostics.",
+      "A single public progress entry for a Thread. Event snapshots may be truncated and are not the canonical final Run output. Raw runtime payloads, transcripts, and diagnostics are never exposed.",
     properties: {
+      artifact: {
+        $ref: "#/components/schemas/Artifact",
+        description:
+          "Committed artifact metadata for this event. Present only when this persisted event committed an Agent output file.",
+      },
       content: {
         description:
           "Public content of the event — typically a reference to the associated payload (such as a message ID) rather than the raw runtime data.",
@@ -457,9 +500,13 @@ export const PUBLIC_API_OPENAPI_SCHEMAS = {
         format: "date-time",
         type: "string",
       },
+      fileId: {
+        ...PLATFORM_ID_SCHEMA,
+        description: "Stable file ID used by file download endpoints.",
+      },
       id: {
         ...PLATFORM_ID_SCHEMA,
-        description: "Unique file ID (bare ULID).",
+        description: "Backward-compatible alias of `fileId`.",
       },
       kind: {
         description:
@@ -473,6 +520,11 @@ export const PUBLIC_API_OPENAPI_SCHEMAS = {
       name: {
         description: "Original file name.",
         type: "string",
+      },
+      runId: {
+        description:
+          "Run that committed this artifact, or null for attachments and artifacts created before Run provenance was recorded.",
+        oneOf: [PLATFORM_ID_SCHEMA, { type: "null" }],
       },
       size: {
         description: "File size in bytes.",
@@ -591,6 +643,12 @@ export const PUBLIC_API_OPENAPI_SCHEMAS = {
     additionalProperties: false,
     description: "Summary of a single Agent Run on a Thread.",
     properties: {
+      artifacts: {
+        description:
+          "Artifacts committed by this Run. Included on retrieved Run snapshots; an empty array means the Run committed none.",
+        items: { $ref: "#/components/schemas/Artifact" },
+        type: "array",
+      },
       completedAt: {
         description:
           "Timestamp (RFC 3339) at which the Run reached a terminal state, or null while it has not finished.",

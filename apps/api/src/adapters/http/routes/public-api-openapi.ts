@@ -54,10 +54,12 @@ const ACCESS_TOKEN_SECURITY: AccessTokenSecurity[] = [{ accessToken: [] }];
 const EXAMPLE_SESSION_FILE = {
   committed: true,
   createdAt: "2026-05-19T00:02:00.000Z",
+  fileId: EXAMPLE_FILE_ID,
   id: EXAMPLE_FILE_ID,
   kind: "attachment",
   mimeType: "text/plain",
   name: "brief.txt",
+  runId: null,
   size: 19,
 };
 
@@ -400,7 +402,7 @@ export function createPublicApiOpenApiDocument(origin: string): PublicApiOpenApi
       }),
       post: operation({
         description:
-          "Creates a Thread and the backing AgentSession for the required application `userId`. If input is present, mosoo also queues the initial Run. If input is omitted, the Thread is immediately visible with IDLE status and no run.",
+          "Creates a Thread and the backing AgentSession for the required application `userId`. If input is present, Mosoo also queues the initial Run. If input is omitted, the Thread is immediately visible with IDLE status and no run.",
         parameters: [exampleAgentIdParameter, idempotencyKeyParameter],
         requestBody: jsonRequestBodyExamples(
           { $ref: "#/components/schemas/CreateThreadRequest" },
@@ -583,8 +585,8 @@ export function createPublicApiOpenApiDocument(origin: string): PublicApiOpenApi
     components: createPublicApiOpenApiComponents(),
     info: {
       description:
-        "Public HTTPS API for creating and retrieving Threads on mosoo Agent API Endpoints. v1 resource identifiers are bare ULIDs, not prefixed IDs. Access Tokens identify the account caller. Runtime execution resolves the Agent API Endpoint owner's capabilities while the Thread is attributed to the token owner.",
-      title: "mosoo Public Thread API",
+        "Public HTTPS API for creating and retrieving Threads on Mosoo Agent API Endpoints. v1 resource identifiers are bare ULIDs, not prefixed IDs. API tokens authenticate the calling Mosoo account. Every Thread also carries a required immutable application `userId` that is delegated during Runs. Runtime execution uses the published Agent configuration.",
+      title: "Mosoo Public Thread API",
       version: PUBLIC_API_VERSION,
     },
     openapi: "3.1.0",

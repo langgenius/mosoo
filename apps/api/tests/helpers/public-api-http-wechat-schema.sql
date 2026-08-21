@@ -400,6 +400,21 @@ CREATE TABLE file_record (
   updated_at integer NOT NULL
 );
 
+CREATE TABLE session_run_artifact (
+  committed_event_id text NOT NULL,
+  created_at integer NOT NULL,
+  file_id text PRIMARY KEY NOT NULL,
+  mime_type text,
+  name text NOT NULL,
+  session_run_id text NOT NULL REFERENCES session_run(id) ON DELETE CASCADE,
+  size integer NOT NULL
+);
+
+CREATE UNIQUE INDEX session_run_artifact_committed_event_idx
+  ON session_run_artifact (committed_event_id);
+CREATE INDEX session_run_artifact_run_created_idx
+  ON session_run_artifact (session_run_id, created_at, file_id);
+
 CREATE TABLE file_upload (
   id text PRIMARY KEY NOT NULL,
   file_id text NOT NULL,
