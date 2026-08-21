@@ -16,17 +16,9 @@ import { parsePlatformId } from "@mosoo/id";
 import type { AccountId, AgentId, AppId, SessionId, SessionRunId } from "@mosoo/id";
 import { and, asc, eq } from "drizzle-orm";
 
-import { createErrorLogContext, logError, logInfo } from "../../platform/cloudflare/logger";
+import { createErrorLogContext, logError } from "../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../platform/db/drizzle";
-import { getAgentRow } from "../agents/application/agent-repository";
-import {
-  createDeploymentAgentCapabilityRunCreationGuard,
-  getDeploymentAgentCapabilityAuthority,
-} from "../apps/application/app-deployment-capability-authority.service";
-import type { DeploymentAgentCapabilityAuthorityRejection } from "../apps/application/app-deployment-capability-authority.service";
-import { getAppRow } from "../apps/application/app.service";
-import { getAccountViewer } from "../auth/application/public-api-caller.service";
 import type { AuthenticatedViewer } from "../auth/application/viewer-auth.service";
 import {
   createAgentSession,
@@ -36,13 +28,7 @@ import {
 import { getActiveSessionRunSummary } from "../runtime/infrastructure/session-runs/session-run-read.repository";
 import { getSessionRunSummary } from "../runtime/infrastructure/session-runs/session-run-store.repository";
 import { getSessionSummaryForCreator } from "../sessions/application/session-summary-query.service";
-import {
-  getBoundAgentServabilityFailure,
-  inspectBoundAgentCapability,
-  selectBoundAgentReply,
-  waitForTerminalRun,
-} from "./app-agent-bound-call";
-import type { BoundAgentServabilityFailure } from "./app-agent-bound-call";
+import { selectBoundAgentReply, waitForTerminalRun } from "./app-agent-bound-call";
 import type { BoundAgentCallInput } from "./app-agent-bound-call";
 import {
   beginBoundAgentCallIdempotency,
@@ -51,7 +37,12 @@ import {
   hashBoundAgentCallIdempotencySubject,
 } from "./app-agent-bound-idempotency.service";
 import type { AppAgentCapabilityClaims } from "./app-agent-capability";
-import { publicAgentNotExposed, publicNotFound, publicUnauthenticated } from "./public-api-errors";
+import {
+  admitDeploymentCapability,
+  createDeploymentCapabilityRunAdmission,
+  deploymentCapabilityRateLimitKey,
+  ensureDeploymentCapabilityAuthorized,
+} from "./deployment-capability-caller.service";
 import { enforcePublicApiRateLimit } from "./public-api-rate-limit.service";
 import { readPublicThreadRunFinalOutput } from "./public-thread-events";
 import { cleanupFailedThreadCreation } from "./public-thread-store";
@@ -73,44 +64,10 @@ export interface BoundAgentCallResponse {
   runId: SessionRunId;
 }
 
-type BoundAgentCapabilityRejectionReason =
-  | BoundAgentServabilityFailure
-  | DeploymentAgentCapabilityAuthorityRejection
-  | "expired";
-
-function logBoundAgentCapabilityRejection(
-  claims: AppAgentCapabilityClaims,
-  reason: BoundAgentCapabilityRejectionReason,
-): void {
-  logInfo("public-api.bound_agent_capability.rejected", {
-    agentId: claims.agentId,
-    appId: claims.appId,
-    bindingEnv: claims.binding.env,
-    bindingName: claims.binding.name,
-    deploymentId: claims.deploymentId,
-    deploymentRunId: claims.deploymentRunId,
-    reason,
-  });
-}
-
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
   });
-}
-
-async function resolveBoundAgentOwnerViewer(
-  bindings: ApiBindings,
-  appId: AppId,
-): Promise<AuthenticatedViewer> {
-  const app = await getAppRow(bindings.DB, appId);
-  const ownerViewer = await getAccountViewer(bindings.DB, app.ownerAccountId);
-
-  if (ownerViewer === null) {
-    throw publicNotFound("App owner account was not found.");
-  }
-
-  return ownerViewer;
 }
 
 async function loadRecoverableBoundSession(input: {
@@ -345,17 +302,9 @@ async function startBoundAgentRun(input: {
         input: {
           accessViewer: input.ownerViewer,
           attachmentIds: [],
-          boundCapabilityProvenance: {
-            agentId: input.capability.agentId,
-            appId: input.capability.appId,
-            bindingEnv: input.capability.binding.env,
-            bindingName: input.capability.binding.name,
-            deploymentId: input.capability.deploymentId,
-            deploymentRunId: input.capability.deploymentRunId,
-          },
+          ...createDeploymentCapabilityRunAdmission(input.capability),
           clientRequestId: input.clientRequestId,
           prompt: input.prompt,
-          runCreationGuard: createDeploymentAgentCapabilityRunCreationGuard(input.capability),
           session: {
             agent_id: session.agentId,
             deployment_version_id: session.deploymentVersionId,
@@ -418,46 +367,13 @@ async function startBoundAgentRun(input: {
 export async function createBoundAgentThreadAndWait(
   request: CreateBoundAgentThreadAndWaitRequest,
 ): Promise<BoundAgentCallResponse> {
-  const verification = await inspectBoundAgentCapability(
-    request.bindings.RUNTIME_ACTION_TOKEN_SECRET,
+  const { agent, claims, ownerViewer } = await admitDeploymentCapability(
+    request.bindings,
     request.token,
     Date.now(),
   );
 
-  if (verification.status !== "valid") {
-    if (verification.status === "expired") {
-      logBoundAgentCapabilityRejection(verification.claims, "expired");
-    }
-
-    throw publicUnauthenticated("The capability URL is invalid or has expired.");
-  }
-
-  const claims = verification.claims;
-
-  const agent = await getAgentRow(request.bindings.DB, claims.agentId);
-  const agentFailure = getBoundAgentServabilityFailure(agent, claims);
-
-  if (agentFailure !== null) {
-    logBoundAgentCapabilityRejection(claims, agentFailure);
-    throw publicAgentNotExposed("This Agent is no longer published for bound calls.");
-  }
-
-  const authority = await getDeploymentAgentCapabilityAuthority(request.bindings.DB, claims);
-
-  if (!authority.authorized) {
-    logBoundAgentCapabilityRejection(claims, authority.reason);
-    throw publicAgentNotExposed(
-      "This capability is no longer authorized for the active deployment.",
-    );
-  }
-
-  // The capability URL is keyless, long-lived, and internet-facing: without a
-  // limit a single leaked URL could launch unbounded owner-billed runs. Reuse
-  // the shared public-API limiter keyed on the capability identity, in a
-  // dedicated `bound:` bucket namespace so it never collides with PAT tokenIds.
-  await enforcePublicApiRateLimit(request.bindings.DB, `bound:${agent.appId}:${agent.id}`);
-
-  const ownerViewer = await resolveBoundAgentOwnerViewer(request.bindings, agent.appId);
+  await enforcePublicApiRateLimit(request.bindings.DB, deploymentCapabilityRateLimitKey(claims));
 
   const idempotency =
     request.idempotencyKey === null || request.idempotencyKey === undefined
@@ -491,26 +407,8 @@ export async function createBoundAgentThreadAndWait(
       throw error;
     }
 
-    const currentAgent = await getAgentRow(request.bindings.DB, claims.agentId);
-    const currentAgentFailure = getBoundAgentServabilityFailure(currentAgent, claims);
-
-    if (currentAgentFailure !== null) {
-      logBoundAgentCapabilityRejection(claims, currentAgentFailure);
-      throw publicAgentNotExposed("This Agent is no longer published for bound calls.");
-    }
-
-    const currentAuthority = await getDeploymentAgentCapabilityAuthority(
-      request.bindings.DB,
-      claims,
-    );
-
-    if (!currentAuthority.authorized) {
-      logBoundAgentCapabilityRejection(claims, currentAuthority.reason);
-      throw publicAgentNotExposed(
-        "This capability is no longer authorized for the active deployment.",
-      );
-    }
-
+    // Surface the current revocation reason when the Run insert lost the race.
+    await ensureDeploymentCapabilityAuthorized(request.bindings.DB, claims);
     throw error;
   }
 
