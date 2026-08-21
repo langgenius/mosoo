@@ -39,6 +39,7 @@ export type { ChannelFinalDeliveryMessage } from "./channel-final-delivery-messa
 export {
   createChannelFinalDeliveryScheduler,
   enqueueChannelFinalDeliveryJob,
+  redriveFailedChannelFinalDeliveryEnqueues,
 } from "./channel-final-delivery-jobs";
 export type {
   ChannelFinalDeliveryScheduler,
