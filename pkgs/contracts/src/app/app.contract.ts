@@ -75,25 +75,6 @@ export interface DeleteAppDeploymentInput {
   appId: AppId;
 }
 
-/** Metadata for a write-only secret owned by one App Deployment. */
-export interface AppDeploymentSecret {
-  appId: AppId;
-  createdAt: string;
-  name: string;
-  updatedAt: string;
-}
-
-export interface SetAppDeploymentSecretInput {
-  appId: AppId;
-  name: string;
-  value: string;
-}
-
-export interface DeleteAppDeploymentSecretInput {
-  appId: AppId;
-  name: string;
-}
-
 export type AppOverviewBoundAgentExposure = "public_thread";
 
 export interface AppOverviewBoundAgent {

@@ -80,10 +80,10 @@ function ThreadsWorkspace({
   const actions = useThreadActions({
     activeAppId,
     activeThreadId: route.activeThreadId,
-    allThreads: threads.allThreads,
     closeComposeDialog: route.closeComposeDialog,
     markThreadReadLocal: ui.markThreadRead,
     navigateToList: route.backToList,
+    threadsById: threads.threadsById,
     togglePinnedThreadLocal: ui.togglePinnedThread,
   });
   const handleReadSyncError = useCallback(

@@ -707,19 +707,6 @@ function createApiTestSchema(database: SqliteD1Database): void {
       wrapped_dek text NOT NULL,
       wrapped_dek_iv text NOT NULL
     );
-
-    CREATE TABLE app_deployment_secret (
-      app_id text NOT NULL,
-      created_at integer NOT NULL,
-      name text NOT NULL,
-      vault_secret_id text NOT NULL
-    );
-
-    CREATE UNIQUE INDEX app_deployment_secret_app_name_idx
-      ON app_deployment_secret (app_id, name);
-
-    CREATE UNIQUE INDEX app_deployment_secret_vault_secret_idx
-      ON app_deployment_secret (vault_secret_id);
   `);
 }
 
