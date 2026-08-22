@@ -1,14 +1,16 @@
+import { loadTranslationCatalog } from "./catalogs";
 import { DEFAULT_LOCALE, resolveLocale } from "./locales";
 import type { SupportedLocale } from "./locales";
 
 /**
- * Prepare the bundled translation resources before the first render.
+ * Prepare only the selected translation resource before the first render.
  */
-export function initI18n(): Promise<void> {
+export async function initI18n(): Promise<void> {
+  const locale = getCurrentLocale();
+  await loadTranslationCatalog(locale);
   if (typeof document !== "undefined") {
-    document.documentElement.lang = getCurrentLocale();
+    document.documentElement.lang = locale;
   }
-  return Promise.resolve();
 }
 
 /**

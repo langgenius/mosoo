@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "benchmark:web-page-loads": "bun benchmarks/web-page-loads.ts",
     "tc": "vp exec tsc --noEmit"
   },
   "dependencies": {

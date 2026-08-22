@@ -67,7 +67,7 @@ export function LocaleSwitcher({
           key={locale}
           className={cn("cursor-pointer rounded-md", locale === current && "font-medium")}
           onClick={() => {
-            i18n.changeLanguage(locale);
+            void i18n.changeLanguage(locale);
           }}
         >
           {LOCALE_DISPLAY_NAMES[locale]}

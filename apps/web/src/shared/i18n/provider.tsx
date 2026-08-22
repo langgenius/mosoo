@@ -1,28 +1,17 @@
-import { createContext, useContext, useMemo, useState } from "react";
+import { createContext, useContext, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 
+import { getTranslationCatalog, loadTranslationCatalog } from "./catalogs";
+import type { TranslationTree, TranslationValue } from "./catalogs";
 import { DEFAULT_LOCALE, resolveLocale } from "./locales";
 import type { SupportedLocale } from "./locales";
-import en from "./translations/en.json";
-import ja from "./translations/ja.json";
-import zhCN from "./translations/zh-CN.json";
-import zhTW from "./translations/zh-TW.json";
-
-type TranslationValue = string | Record<string, unknown>;
-type TranslationTree = Record<string, TranslationValue>;
 
 type I18nContextValue = {
   language: SupportedLocale;
-  changeLanguage: (language: SupportedLocale) => void;
+  changeLanguage: (language: SupportedLocale) => Promise<void>;
   t: (key: string, variables?: Record<string, string>) => string;
 };
 
-const resources: Record<SupportedLocale, TranslationTree> = {
-  en,
-  ja,
-  "zh-CN": zhCN,
-  "zh-TW": zhTW,
-};
 const I18nContext = createContext<I18nContextValue | null>(null);
 
 function lookup(tree: TranslationTree, key: string): string {
@@ -40,17 +29,25 @@ function detectInitialLocale(): SupportedLocale {
 
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [language, setLanguage] = useState<SupportedLocale>(detectInitialLocale);
+  const requestedLanguageRef = useRef(language);
   const value = useMemo<I18nContextValue>(
     () => ({
       language,
-      changeLanguage(next) {
+      async changeLanguage(next) {
+        requestedLanguageRef.current = next;
+        await loadTranslationCatalog(next);
+        if (requestedLanguageRef.current !== next) {
+          return;
+        }
         setLanguage(next);
         localStorage.setItem("mosoo-locale", next);
         document.documentElement.lang = next;
       },
       t(key, variables) {
-        let text = lookup(resources[language], key);
-        if (text === key && language !== DEFAULT_LOCALE) text = lookup(resources.en, key);
+        let text = lookup(getTranslationCatalog(language), key);
+        if (text === key && language !== DEFAULT_LOCALE) {
+          text = lookup(getTranslationCatalog(DEFAULT_LOCALE), key);
+        }
         return Object.entries(variables ?? {}).reduce(
           (result, [name, replacement]) => result.replaceAll(`{{${name}}}`, replacement),
           text,

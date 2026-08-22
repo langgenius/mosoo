@@ -1,4 +1,4 @@
-import { lazy } from "react";
+import { createElement, use } from "react";
 import type { ComponentType, ReactElement, ReactNode } from "react";
 import { Navigate, useParams, useRoutes } from "react-router-dom";
 import type { RouteObject } from "react-router-dom";
@@ -11,10 +11,20 @@ function lazyNamed<TName extends string>(
   load: () => Promise<RouteModule<TName>>,
   exportName: TName,
 ) {
-  return lazy(async () => {
-    const routeModule = await load();
-    return { default: routeModule[exportName] };
-  });
+  let loadedRoute: { default: ComponentType } | undefined;
+  let routePromise: Promise<{ default: ComponentType }> | undefined;
+  const preload = () => {
+    routePromise ??= load().then((routeModule) => {
+      loadedRoute = { default: routeModule[exportName] };
+      return loadedRoute;
+    });
+    return routePromise;
+  };
+  function PreloadableRoute(): ReactElement {
+    const route = loadedRoute ?? use(preload());
+    return createElement(route.default);
+  }
+  return Object.assign(PreloadableRoute, { preload });
 }
 
 function protectedRoute(element: ReactElement): ReactElement {
@@ -103,6 +113,67 @@ const OrgSettings = lazyNamed(
   async () => import("../routes/org/org-settings.route"),
   "OrgSettingsPage",
 );
+
+type PreloadableRoute = { preload(): Promise<unknown> };
+
+// Intent prefetches include both nested layouts and redirect destinations so a
+// subsequent navigation can commit without entering the top-level Suspense
+// fallback. Dynamic parameter routes are resolved immediately below.
+const staticRoutePreloads: Record<string, PreloadableRoute[]> = {
+  "/": [AppOverview],
+  "/agent": [AgentList],
+  "/app-settings": [AppSettingsLayout, AppSettingsGeneral],
+  "/app-settings/cost": [AppSettingsLayout, AppUsage],
+  "/app-settings/general": [AppSettingsLayout, AppSettingsGeneral],
+  "/app-settings/usage": [AppSettingsLayout, AppUsage],
+  "/apps": [AppsList],
+  "/cli-auth": [CliAuth],
+  "/cost": [AppSettingsLayout, AppUsage],
+  "/deployments": [AppOverview],
+  "/environment": [Environments],
+  "/environments": [Environments],
+  "/files": [Files],
+  "/integrations": [SkillsTabRoute],
+  "/integrations/mcp": [McpTabRoute],
+  "/integrations/mcp/oauth-complete": [McpOAuthComplete],
+  "/integrations/skills": [SkillsTabRoute],
+  "/login": [Login],
+  "/mcp": [McpTabRoute],
+  "/onboarding": [Onboarding],
+  "/org/settings": [OrgSettings],
+  "/profile": [SettingsLayout, SettingsProfile],
+  "/providers": [Providers],
+  "/settings": [SettingsLayout, SettingsProfile],
+  "/settings/access-tokens": [SettingsLayout, SettingsAccessTokens],
+  "/settings/app": [SettingsLayout, AppSettingsLayout, AppSettingsGeneral],
+  "/settings/cost": [SettingsLayout, AppSettingsLayout, AppUsage],
+  "/settings/environments": [SettingsLayout, Environments],
+  "/settings/profile": [SettingsLayout, SettingsProfile],
+  "/settings/usage": [SettingsLayout, AppSettingsLayout, AppUsage],
+  "/skill": [SkillsTabRoute],
+  "/skills": [SkillsTabRoute],
+  "/threads": [Threads],
+  "/usage": [AppSettingsLayout, AppUsage],
+  "/v0-deploy-preview": [V0DeployPreview],
+};
+
+function dynamicRoutePreloads(pathname: string): PreloadableRoute[] {
+  if (/^\/environments?\/[^/]+$/.test(pathname)) {
+    return [Environments];
+  }
+  if (/^\/agent\/[^/]+$/.test(pathname)) {
+    return [AgentDetail];
+  }
+  if (/^\/threads\/[^/]+$/.test(pathname)) {
+    return [Threads];
+  }
+  return [];
+}
+
+export async function preloadRoute(pathname: string): Promise<void> {
+  const routes = staticRoutePreloads[pathname] ?? dynamicRoutePreloads(pathname);
+  await Promise.all(routes.map(async (route) => route.preload()));
+}
 
 const appRoutes = [
   {
