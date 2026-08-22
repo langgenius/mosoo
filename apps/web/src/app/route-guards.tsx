@@ -1,10 +1,11 @@
-import { lazy } from "react";
+import { use } from "react";
 import type { ReactElement, ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 
 import { useTranslation } from "@/shared/i18n";
 
 import { UploadRecoveryDialog } from "../features/files/upload-recovery/upload-recovery-dialog";
+import type * as AppShell from "./app-shell";
 import { useAppSession } from "./session-provider";
 
 // The authenticated app shell (sidebar navigation, account/help menus, org
@@ -12,17 +13,32 @@ import { useAppSession } from "./session-provider";
 // it lazily keeps the whole shell subtree out of the entry chunk, so the
 // public /login route — the cold-start page for first-time and
 // logged-out visitors, where the shell never mounts — no longer pays to
-// download it. Both wrappers pull the same "./app-shell" module, so they share
-// one chunk and a signed-in visitor fetches it in parallel with the first route
-// chunk (both are dynamic imports resolved after the same auth check).
-const Layout = lazy(async () => {
-  const appShell = await import("./app-shell");
-  return { default: appShell.Layout };
-});
-const OrgLayout = lazy(async () => {
-  const appShell = await import("./app-shell");
-  return { default: appShell.OrgLayout };
-});
+// download it. Both wrappers share one cached "./app-shell" import, so switching
+// between the App and Org layouts never suspends again after either shell loads.
+type AppShellModule = typeof AppShell;
+
+let loadedAppShell: AppShellModule | undefined;
+let appShellPromise: Promise<AppShellModule> | undefined;
+
+function loadAppShell(): Promise<AppShellModule> {
+  appShellPromise ??= import("./app-shell").then((appShell) => {
+    loadedAppShell = appShell;
+    return appShell;
+  });
+  return appShellPromise;
+}
+
+function Layout({ children }: RouteChildrenProps): ReactElement {
+  const appShell = loadedAppShell ?? use(loadAppShell());
+  const AppLayout = appShell.Layout;
+  return <AppLayout>{children}</AppLayout>;
+}
+
+function OrgLayout({ children }: RouteChildrenProps): ReactElement {
+  const appShell = loadedAppShell ?? use(loadAppShell());
+  const OrganizationLayout = appShell.OrgLayout;
+  return <OrganizationLayout>{children}</OrganizationLayout>;
+}
 
 interface RouteChildrenProps {
   children: ReactNode;

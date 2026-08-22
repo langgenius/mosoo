@@ -1,5 +1,5 @@
 import { FileQuestion } from "lucide-react";
-import { lazy } from "react";
+import { createElement, use } from "react";
 import type { ComponentType, ReactElement, ReactNode } from "react";
 import { Link, Navigate, useParams, useRoutes } from "react-router-dom";
 import type { RouteObject } from "react-router-dom";
@@ -16,10 +16,20 @@ function lazyNamed<TName extends string>(
   load: () => Promise<RouteModule<TName>>,
   exportName: TName,
 ) {
-  return lazy(async () => {
-    const routeModule = await load();
-    return { default: routeModule[exportName] };
-  });
+  let loadedRoute: { default: ComponentType } | undefined;
+  let routePromise: Promise<{ default: ComponentType }> | undefined;
+  const preload = () => {
+    routePromise ??= load().then((routeModule) => {
+      loadedRoute = { default: routeModule[exportName] };
+      return loadedRoute;
+    });
+    return routePromise;
+  };
+  function PreloadableRoute(): ReactElement {
+    const route = loadedRoute ?? use(preload());
+    return createElement(route.default);
+  }
+  return Object.assign(PreloadableRoute, { preload });
 }
 
 function protectedRoute(element: ReactElement): ReactElement {
@@ -126,6 +136,71 @@ const OrgSettings = lazyNamed(
   async () => import("../routes/org/org-settings.route"),
   "OrgSettingsPage",
 );
+
+type PreloadableRoute = { preload(): Promise<unknown> };
+
+// Intent prefetches include both nested layouts and redirect destinations so a
+// subsequent navigation can commit without entering the top-level Suspense
+// fallback. Dynamic parameter routes are resolved immediately below.
+const staticRoutePreloads: Record<string, PreloadableRoute[]> = {
+  "/": [ProjectOverview],
+  "/agent": [AgentList],
+  "/app-settings": [ProjectSettingsLayout, ProjectSettingsGeneral],
+  "/app-settings/cost": [ProjectSettingsLayout, ProjectUsage],
+  "/app-settings/general": [ProjectSettingsLayout, ProjectSettingsGeneral],
+  "/app-settings/usage": [ProjectSettingsLayout, ProjectUsage],
+  "/apps": [ProjectsList],
+  "/cli-auth": [CliAuth],
+  "/cost": [ProjectSettingsLayout, ProjectUsage],
+  "/environment": [Environments],
+  "/environments": [Environments],
+  "/files": [Files],
+  "/integrations": [SkillsTabRoute],
+  "/integrations/mcp": [McpTabRoute],
+  "/integrations/mcp/oauth-complete": [McpOAuthComplete],
+  "/integrations/skills": [SkillsTabRoute],
+  "/login": [Login],
+  "/mcp": [McpTabRoute],
+  "/onboarding": [Onboarding],
+  "/org/settings": [OrgSettings],
+  "/profile": [SettingsLayout, SettingsProfile],
+  "/project-settings": [ProjectSettingsLayout, ProjectSettingsGeneral],
+  "/project-settings/cost": [ProjectSettingsLayout, ProjectUsage],
+  "/project-settings/general": [ProjectSettingsLayout, ProjectSettingsGeneral],
+  "/project-settings/usage": [ProjectSettingsLayout, ProjectUsage],
+  "/projects": [ProjectsList],
+  "/providers": [Providers],
+  "/settings": [SettingsLayout, SettingsProfile],
+  "/settings/access-tokens": [SettingsLayout, SettingsAccessTokens],
+  "/settings/app": [SettingsLayout, ProjectSettingsLayout, ProjectSettingsGeneral],
+  "/settings/cost": [SettingsLayout, ProjectSettingsLayout, ProjectUsage],
+  "/settings/environments": [SettingsLayout, Environments],
+  "/settings/profile": [SettingsLayout, SettingsProfile],
+  "/settings/project": [SettingsLayout, ProjectSettingsLayout, ProjectSettingsGeneral],
+  "/settings/usage": [SettingsLayout, ProjectSettingsLayout, ProjectUsage],
+  "/skill": [SkillsTabRoute],
+  "/skills": [SkillsTabRoute],
+  "/threads": [Threads],
+  "/usage": [ProjectSettingsLayout, ProjectUsage],
+};
+
+function dynamicRoutePreloads(pathname: string): PreloadableRoute[] {
+  if (/^\/environments?\/[^/]+$/.test(pathname)) {
+    return [Environments];
+  }
+  if (/^\/agent\/[^/]+$/.test(pathname)) {
+    return [AgentDetail];
+  }
+  if (/^\/threads\/[^/]+$/.test(pathname)) {
+    return [Threads];
+  }
+  return [];
+}
+
+export async function preloadRoute(pathname: string): Promise<void> {
+  const routes = staticRoutePreloads[pathname] ?? dynamicRoutePreloads(pathname);
+  await Promise.all(routes.map(async (route) => route.preload()));
+}
 
 const appRoutes = [
   {
