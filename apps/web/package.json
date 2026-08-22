@@ -12,9 +12,9 @@
     "test": "vp exec bun test tests"
   },
   "dependencies": {
-    "@assistant-ui/react": "0.15.14",
+    "@assistant-ui/react": "0.15.15",
     "@base-ui/react": "^1.7.0",
-    "@cloudflare/sandbox": "0.12.6",
+    "@cloudflare/sandbox": "0.12.7",
     "@hugeicons/core-free-icons": "^4.2.3",
     "@hugeicons/react": "^1.1.9",
     "@lobehub/icons-static-svg": "^1.90.0",
@@ -29,11 +29,11 @@
     "@tanstack/react-query": "^5.101.4",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",
-    "better-auth": "^1.6.28",
+    "better-auth": "^1.7.1",
     "boring-avatars": "^2.0.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "lucide-react": "^1.31.0",
+    "lucide-react": "^1.32.0",
     "motion": "^12.40.0",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.8",
@@ -57,6 +57,6 @@
     "typescript": "^6.0.3",
     "vite": "^8.2.1",
     "vite-plus": "^0.1.24",
-    "wrangler": "^4.123.0"
+    "wrangler": "^4.124.0"
   }
 }
