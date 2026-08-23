@@ -1,6 +1,6 @@
 import { sessionEventsTable, sessionRunsTable, sessionsTable } from "@mosoo/db";
 import { createPlatformId } from "@mosoo/id";
-import type { RuntimeEventId, SessionId, SessionRunId } from "@mosoo/id";
+import type { AgentId, RuntimeEventId, SessionId, SessionRunId } from "@mosoo/id";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
@@ -37,6 +37,8 @@ export type {
 const MAX_SESSION_RUNTIME_EVENT_INSERT_ATTEMPTS = 5;
 // D1 accepts at most 100 bound parameters; each session_event row binds 21.
 const MAX_SESSION_EVENT_ROWS_PER_INSERT = 4;
+// The terminal allocation query binds four statuses, leaving room for 96 session ids.
+const MAX_SESSION_EVENT_ALLOCATIONS_PER_UPDATE = 96;
 const WRITABLE_SESSION_STATUSES = ["IDLE", "RUNNING", "RESCHEDULING"] as const;
 const TERMINAL_LIFECYCLE_WRITABLE_SESSION_STATUSES = [
   ...WRITABLE_SESSION_STATUSES,
@@ -318,24 +320,39 @@ async function allocateOneRuntimeEventPerSession(
   database: D1Database,
   records: readonly OneRuntimeEventPerSessionInput[],
 ): Promise<Map<SessionId, OneRuntimeEventPerSessionAllocation>> {
-  const sessionIds = [...new Set(records.map((record) => record.sessionId))];
-  const recordsBySessionId = new Map(records.map((record) => [record.sessionId, record]));
-  const allocations = new Map<SessionId, OneRuntimeEventPerSessionAllocation>();
   const appDb = getAppDatabase(database);
+  const ordinarySessionIds: SessionId[] = [];
+  const terminalSessionIds: SessionId[] = [];
 
-  for (const sessionId of sessionIds) {
-    const record = recordsBySessionId.get(sessionId);
-    const allowTerminatedSession =
-      record === undefined ? false : canWriteAfterTerminatedSession([record]);
-    const session =
-      (await appDb
+  for (const record of records) {
+    const sessionIds = canWriteAfterTerminatedSession([record])
+      ? terminalSessionIds
+      : ordinarySessionIds;
+    sessionIds.push(record.sessionId);
+  }
+
+  const statements: D1PreparedStatement[] = [];
+
+  for (const [sessionIds, allowTerminatedSession] of [
+    [ordinarySessionIds, false],
+    [terminalSessionIds, true],
+  ] as const) {
+    for (
+      let index = 0;
+      index < sessionIds.length;
+      index += MAX_SESSION_EVENT_ALLOCATIONS_PER_UPDATE
+    ) {
+      const query = appDb
         .update(sessionsTable)
         .set({
           runtimeEventSeqCursor: sql`${sessionsTable.runtimeEventSeqCursor} + 1`,
         })
         .where(
           and(
-            eq(sessionsTable.id, sessionId),
+            inArray(
+              sessionsTable.id,
+              sessionIds.slice(index, index + MAX_SESSION_EVENT_ALLOCATIONS_PER_UPDATE),
+            ),
             isNull(sessionsTable.archivedAt),
             inArray(sessionsTable.status, sessionWritableStatusValues(allowTerminatedSession)),
           ),
@@ -345,13 +362,25 @@ async function allocateOneRuntimeEventPerSession(
           seq: sessionsTable.runtimeEventSeqCursor,
           sessionId: sessionsTable.id,
         })
-        .get()) ?? null;
+        .toSQL();
 
-    if (session !== null) {
-      allocations.set(session.sessionId, {
-        agentId: session.agentId,
-        seq: session.seq,
-        sessionId: session.sessionId,
+      statements.push(database.prepare(query.sql).bind(...query.params));
+    }
+  }
+
+  const allocations = new Map<SessionId, OneRuntimeEventPerSessionAllocation>();
+  const results = await database.batch<{
+    agent_id: AgentId;
+    id: SessionId;
+    runtime_event_seq_cursor: number;
+  }>(statements);
+
+  for (const result of results) {
+    for (const row of result.results) {
+      allocations.set(row.id, {
+        agentId: row.agent_id,
+        seq: row.runtime_event_seq_cursor,
+        sessionId: row.id,
       });
     }
   }
