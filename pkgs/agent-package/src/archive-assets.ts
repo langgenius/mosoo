@@ -12,6 +12,12 @@ interface PackageAssetReadResult {
   issues: AgentResolutionIssue[];
 }
 
+interface SkillAssetBucket {
+  entries: Array<[path: string, contentBytes: Uint8Array]>;
+  skill: AgentPackage["manifest"]["skills"][number];
+  skillPath: string;
+}
+
 export function readPackageAssets(
   agentPackage: AgentPackage,
   entries: Record<string, Uint8Array>,
@@ -30,12 +36,10 @@ function readSkillAssets(
   assets: AgentPackageAsset[],
   issues: AgentResolutionIssue[],
 ): void {
-  for (const skill of agentPackage.manifest.skills) {
-    const skillPath = skill.skillId.endsWith("/") ? skill.skillId : `${skill.skillId}/`;
-    const skillEntries = Object.entries(entries).filter(
-      ([path, entry]) => path.startsWith(skillPath) && entry.byteLength > 0,
-    );
-
+  for (const { entries: skillEntries, skill, skillPath } of collectSkillAssetBuckets(
+    agentPackage,
+    entries,
+  )) {
     if (skillEntries.length === 0) {
       issues.push(
         createArchiveIssue({
@@ -74,4 +78,68 @@ function readSkillAssets(
       });
     }
   }
+}
+
+function collectSkillAssetBuckets(
+  agentPackage: AgentPackage,
+  entries: Record<string, Uint8Array>,
+): SkillAssetBucket[] {
+  const buckets: SkillAssetBucket[] = agentPackage.manifest.skills.map((skill) => ({
+    entries: [],
+    skill,
+    skillPath: skill.skillId.endsWith("/") ? skill.skillId : `${skill.skillId}/`,
+  }));
+
+  if (buckets.length === 0) {
+    return buckets;
+  }
+
+  const archiveEntries = Object.entries(entries);
+
+  if (buckets.length === 1) {
+    const [bucket] = buckets;
+
+    if (bucket !== undefined) {
+      bucket.entries = archiveEntries.filter(
+        ([path, contentBytes]) => contentBytes.byteLength > 0 && path.startsWith(bucket.skillPath),
+      );
+    }
+
+    return buckets;
+  }
+
+  const entriesBySkillPath = new Map<string, SkillAssetBucket["entries"]>();
+
+  for (const bucket of buckets) {
+    if (!entriesBySkillPath.has(bucket.skillPath)) {
+      entriesBySkillPath.set(bucket.skillPath, []);
+    }
+  }
+
+  for (const [path, contentBytes] of archiveEntries) {
+    if (contentBytes.byteLength === 0) {
+      continue;
+    }
+
+    // Probe directory prefixes once per entry so overlapping and duplicate
+    // skill declarations keep their existing matching behavior.
+    let slashIndex = path.indexOf("/");
+
+    while (slashIndex !== -1) {
+      const candidateRoot = path.slice(0, slashIndex + 1);
+      const matchingEntries = entriesBySkillPath.get(candidateRoot);
+
+      if (matchingEntries !== undefined) {
+        matchingEntries.push([path, contentBytes]);
+      }
+
+      slashIndex = path.indexOf("/", slashIndex + 1);
+    }
+  }
+
+  for (const bucket of buckets) {
+    bucket.entries = entriesBySkillPath.get(bucket.skillPath) ?? [];
+  }
+
+  return buckets;
 }
