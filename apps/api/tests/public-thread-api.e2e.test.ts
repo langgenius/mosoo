@@ -66,6 +66,30 @@ const PROGRESS_OUTPUT_TEXTS = [
 
 type PublicHttpTestDatabase = Awaited<ReturnType<typeof createPublicHttpContractDatabase>>;
 
+async function waitForBackgroundProvisionFailure(
+  database: PublicHttpTestDatabase,
+  runId: string,
+): Promise<void> {
+  const deadline = Date.now() + 2_000;
+
+  for (;;) {
+    const row = await database
+      .prepare("SELECT status FROM session_run WHERE id = ?")
+      .bind(runId)
+      .first<{ status: string }>();
+
+    if (row?.status === "failed") {
+      return;
+    }
+
+    if (Date.now() >= deadline) {
+      throw new Error(`Timed out waiting for background provisioning failure for Run ${runId}.`);
+    }
+
+    await Bun.sleep(5);
+  }
+}
+
 async function createReadyAppDraftFile(input: {
   body: string;
   bucket: PublicApiMemoryFileBucket;
@@ -416,7 +440,7 @@ describe("Public Thread API e2e", () => {
         userId: "customer-123",
       });
       expect(threadId).toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/);
-      expect(run["id"]).toBeString();
+      const runId = expectString(run["id"]);
       expect(run["trigger"]).toBe("user_prompt");
       expect(run["error"]).toBeNull();
       expect(run["finalOutput"]).toBeNull();
@@ -468,6 +492,10 @@ describe("Public Thread API e2e", () => {
         userId: "customer-123",
       });
 
+      // This fixture has no Cloudflare Sandbox binding, so inline provisioning
+      // fails in waitUntil. Let that expected terminal write settle before the
+      // test replaces the runtime history with its simulated completed output.
+      await waitForBackgroundProvisionFailure(database, runId);
       await database.prepare("DELETE FROM session_event WHERE session_id = ?").bind(threadId).run();
 
       const emptyEventsResponse = await requestPublicApi(
@@ -483,7 +511,6 @@ describe("Public Thread API e2e", () => {
         truncated: false,
       });
 
-      const runId = expectString(run["id"]);
       await insertRuntimeEvent(database, {
         kind: "tool.call.updated",
         occurredAt: 900,
