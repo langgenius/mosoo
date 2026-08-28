@@ -1,9 +1,10 @@
 import type { RunError } from "@mosoo/contracts/session-run";
 import { driverInstancesTable, sessionRunsTable } from "@mosoo/db";
-import type { SessionId, SessionRunId } from "@mosoo/id";
+import type { DriverInstanceId, SessionId, SessionRunId } from "@mosoo/id";
 import { and, asc, desc, eq, inArray, isNull, lte, notInArray, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 
+import { logWarn } from "../../../../platform/cloudflare/logger";
 import { getAppDatabase } from "../../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../../time";
 import {
@@ -11,10 +12,12 @@ import {
   RUNTIME_SOCKET_TIMEOUT_MS,
 } from "../../domain/runtime-config";
 import { classifyReclaim } from "../../domain/session-run-reclaim-recovery";
+import { recordRuntimeRunLeaseReleasedOutcome } from "../../infrastructure/runtime-subject-lifecycle/runtime-run-lease-store";
 import { setSessionRunStatus } from "../../infrastructure/session-runs/session-run-store.repository";
 
 export interface ActiveRunDriverRow {
   driver_error_message: string | null;
+  driver_instance_id: DriverInstanceId | null;
   driver_last_heartbeat_at: number | null;
   driver_status: string | null;
   driver_updated_at: number | null;
@@ -71,6 +74,7 @@ const ACTIVE_SESSION_RUN_STATUSES = ["queued", "booting", "running", "waiting_in
 function activeRunDriverColumns() {
   return {
     driver_error_message: runDriverInstancesTable.errorMessage,
+    driver_instance_id: sessionRunsTable.driverInstanceId,
     driver_last_heartbeat_at: runDriverInstancesTable.lastHeartbeatAt,
     driver_status: runDriverInstancesTable.status,
     driver_updated_at: runDriverInstancesTable.updatedAt,
@@ -175,6 +179,7 @@ async function failStaleActiveRun(database: D1Database, staleRun: ActiveRunDrive
   switch (outcome.kind) {
     case "applied":
     case "duplicate": {
+      await releaseStaleRunLease(database, staleRun);
       return true;
     }
     case "repair_needed": {
@@ -186,6 +191,33 @@ async function failStaleActiveRun(database: D1Database, staleRun: ActiveRunDrive
     case "stale": {
       return false;
     }
+  }
+}
+
+// Failing the run ends the lease, but only the release write re-arms the
+// subject inactive deadline; without it a pet sandbox stays active (and
+// billing) with no deadline until the stranded-subject repair catches it.
+async function releaseStaleRunLease(
+  database: D1Database,
+  staleRun: ActiveRunDriverRow,
+): Promise<void> {
+  if (staleRun.driver_instance_id === null) {
+    return;
+  }
+
+  const outcome = await recordRuntimeRunLeaseReleasedOutcome(database, {
+    driverInstanceId: staleRun.driver_instance_id,
+    expectedSessionRunId: staleRun.run_id,
+  });
+
+  if (outcome.status !== "applied") {
+    logWarn("runtime.terminal.lease_release_skipped", {
+      driverInstanceId: staleRun.driver_instance_id,
+      reason: "reason" in outcome ? outcome.reason : outcome.status,
+      sessionRunId: staleRun.run_id,
+      source: "stale_run_reconciliation",
+      status: outcome.status,
+    });
   }
 }
 

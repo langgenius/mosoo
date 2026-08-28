@@ -4,7 +4,7 @@ import { isPlatformId, parsePlatformId } from "@mosoo/id";
 import type { RuntimeOperationId } from "@mosoo/id";
 import { PLATFORM_ID_FIXTURES } from "@mosoo/id/testing";
 
-import { repairStrandedCattleRuntimeSubjectDeadlines } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-maintenance-store";
+import { repairStrandedRuntimeSubjectDeadlines } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-maintenance-store";
 import {
   recycleInactiveRuntimeSubjectNow,
   recycleRuntimeSubject,
@@ -222,9 +222,10 @@ describe("runtime subject recycle", () => {
       VALUES ('/workspace', '${SANDBOX_ID}', 'session-1', 'closed', 1);
     `);
 
-    await expect(repairStrandedCattleRuntimeSubjectDeadlines(database, { now: 10 })).resolves.toBe(
-      1,
-    );
+    await expect(repairStrandedRuntimeSubjectDeadlines(database, { now: 10 })).resolves.toEqual({
+      cattle: 1,
+      pet: 0,
+    });
     await expect(
       listInactiveRuntimeSubjects(database, { limit: 10, now: 300_009 }),
     ).resolves.toEqual([]);
@@ -237,9 +238,10 @@ describe("runtime subject recycle", () => {
       UPDATE sandbox_session SET status = 'active' WHERE session_id = 'session-1';
     `);
 
-    await expect(repairStrandedCattleRuntimeSubjectDeadlines(database, { now: 20 })).resolves.toBe(
-      0,
-    );
+    await expect(repairStrandedRuntimeSubjectDeadlines(database, { now: 20 })).resolves.toEqual({
+      cattle: 0,
+      pet: 0,
+    });
   });
 
   test("uses a generated operation id instead of the maintenance claim owner", async () => {

@@ -28,6 +28,7 @@ export const LIVE_DRIVER_STATUSES = LIVE_DRIVER_INSTANCE_STATUSES;
 
 const activeConversationSessionsTable = alias(sandboxSessionsTable, "active_runtime_session");
 const activeRuntimeSubjectRunsTable = alias(sessionRunsTable, "active_runtime_subject_run");
+const liveSubjectDriversTable = alias(driverInstancesTable, "live_runtime_subject_driver");
 const runLeaseDriversTable = alias(driverInstancesTable, "runtime_run_lease_driver");
 const runLeaseRunsTable = alias(sessionRunsTable, "runtime_run_lease_run");
 export const readyConversationBackupTable = alias(sandboxBackupsTable, "ready_conversation_backup");
@@ -105,6 +106,18 @@ export function activeSessionRunQueryForListedSubject(appDb: AppDatabase) {
             eq(activeRuntimeSubjectRunsTable.agentId, sandboxesTable.subjectId),
           ),
         ),
+      ),
+    );
+}
+
+export function liveDriverInstanceQueryForListedSubject(appDb: AppDatabase) {
+  return appDb
+    .select({ id: liveSubjectDriversTable.id })
+    .from(liveSubjectDriversTable)
+    .where(
+      and(
+        eq(liveSubjectDriversTable.sandboxId, sandboxesTable.id),
+        inArray(liveSubjectDriversTable.status, LIVE_DRIVER_STATUSES),
       ),
     );
 }

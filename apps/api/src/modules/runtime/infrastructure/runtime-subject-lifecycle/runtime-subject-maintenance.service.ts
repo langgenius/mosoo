@@ -21,7 +21,7 @@ import { createSessionStatusTransitionPatch } from "../session-runs/session-life
 import { setSessionRunStatus } from "../session-runs/session-run-store.repository";
 import type { SessionRunTransitionOutcome } from "../session-runs/session-run-store.repository";
 import { listIdleSessionScopedConversationSessions } from "./runtime-conversation-session-store";
-import { repairStrandedCattleRuntimeSubjectDeadlines } from "./runtime-subject-maintenance-store";
+import { repairStrandedRuntimeSubjectDeadlines } from "./runtime-subject-maintenance-store";
 import {
   claimInactiveRuntimeSubject,
   listInactiveRuntimeSubjects,
@@ -313,10 +313,16 @@ export async function runSandboxMaintenance(bindings: ApiBindings): Promise<void
     staleUpdatedAtLte: now - MAINTENANCE_OPERATION_REPAIR_AFTER_MS,
   });
   await closeIdleSessionScopedConversationSessions(bindings, now);
-  const repairedDeadlines = await repairStrandedCattleRuntimeSubjectDeadlines(bindings.DB, { now });
+  const repairedDeadlines = await repairStrandedRuntimeSubjectDeadlines(bindings.DB, { now });
 
-  if (repairedDeadlines > 0) {
-    logWarn("runtime.subject.inactive_deadline_repaired", { count: repairedDeadlines });
+  if (repairedDeadlines.cattle > 0) {
+    logWarn("runtime.subject.inactive_deadline_repaired", { count: repairedDeadlines.cattle });
+  }
+
+  // A repaired pet is an orphan that was billing with no live driver and no
+  // active run — a distinct alert signal from routine resident-cattle repair.
+  if (repairedDeadlines.pet > 0) {
+    logWarn("runtime.subject.orphan_pet_deadline_repaired", { count: repairedDeadlines.pet });
   }
 
   const [candidates, repairCandidates] = await Promise.all([
