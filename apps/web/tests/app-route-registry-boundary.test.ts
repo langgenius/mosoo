@@ -23,17 +23,6 @@ describe("App route registry boundary", () => {
     expect(source).not.toContain('path: "/join/:organizationId"');
   });
 
-  test("drops the standalone Channels route and per-agent channel setup routes", () => {
-    const source = readSource("../src/app/route-registry.tsx");
-
-    expect(source).not.toContain("ChannelsPage");
-    expect(source).not.toContain('path: "/channels"');
-    expect(source).not.toContain("protectedRoute(<Channels />)");
-    expect(source).not.toContain('path: "/agent/:agentId/channels"');
-    expect(source).not.toContain('path: "/agent/:agentId/channels/new"');
-    expect(source).not.toContain("slack-channel-setup");
-  });
-
   test("does not expose the old Organization Provider demo route", () => {
     const source = readSource("../src/app/route-registry.tsx");
 

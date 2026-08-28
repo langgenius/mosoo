@@ -51,7 +51,7 @@ function createDriverStopDatabase(): SqliteD1Database {
       status text NOT NULL,
       status_operation_id text,
       status_seq integer DEFAULT 0 NOT NULL,
-      type text DEFAULT 'api_channel' NOT NULL,
+      type text DEFAULT 'ui' NOT NULL,
       updated_at integer NOT NULL,
       workspace_checkpoint_required integer DEFAULT 0 NOT NULL
     );

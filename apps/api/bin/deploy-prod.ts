@@ -107,11 +107,7 @@ async function assertProdSchemaMatchesMigrations(expectedTables: readonly string
   writeStdout(`  prod schema OK (${expectedTables.length} migration tables present)`);
 }
 
-const REQUIRED_PROD_QUEUES: readonly string[] = [
-  "environment-artifact-build",
-  "channel-final-delivery",
-  "channel-final-delivery-dlq",
-];
+const REQUIRED_PROD_QUEUES: readonly string[] = ["environment-artifact-build"];
 
 function listProdQueues(): string[] {
   const result = Bun.spawnSync([wranglerBin, "queues", "list"], { cwd: apiDir });

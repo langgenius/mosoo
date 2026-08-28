@@ -759,29 +759,6 @@ describe("cost ledger reconciliation", () => {
     expect(await countUsageEvents(database)).toBe(0);
   });
 
-  test("reports malformed channel session metadata instead of failing or inferring purpose", async () => {
-    const database = await createReconciliationDatabase();
-    await database
-      .prepare("UPDATE session SET metadata_json = '{invalid', type = 'api_channel'")
-      .run();
-    await insertModelCall(database, {
-      id: MODEL_CALL_IDS.auditInvalidMetadata,
-      nativeCallId: "invalid-channel-metadata",
-    });
-
-    const result = await reconcileCostLedgerPage(database, {
-      mode: "repair",
-      now: new Date(NOW_MS),
-    });
-
-    expect(result).toMatchObject({
-      indeterminate: 1,
-      indeterminateByReason: { invalid_session_metadata: 1 },
-      repaired: 0,
-    });
-    expect(await countUsageEvents(database)).toBe(0);
-  });
-
   test("preserves a concurrent runtime ledger write instead of replacing it", async () => {
     const database = await createReconciliationDatabase();
     const sourceEventId = `${DRIVER_INSTANCE_ID}:race-call`;

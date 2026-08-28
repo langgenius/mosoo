@@ -1,4 +1,3 @@
-import type { PrimitiveRecord } from "@mosoo/contracts";
 import type { AgentEnvironmentConfig } from "@mosoo/contracts/agent";
 import type {
   CreateAgentSessionInput,
@@ -42,17 +41,6 @@ export interface CreateAgentSessionOptions {
   sessionId?: SessionId | undefined;
 }
 
-export interface ChannelSessionTriggeredByMetadata {
-  binding_id: string;
-  event_id: string;
-  external_actor_id: string;
-  external_message_id: string;
-  external_thread_id: string;
-  external_workspace_id: string;
-  provider: string;
-  provider_metadata: PrimitiveRecord;
-}
-
 export interface AgentSessionMetadata {
   public_api?: {
     created_by:
@@ -70,7 +58,6 @@ export interface AgentSessionMetadata {
     idempotency_key: string | null;
     source: "public_api";
   };
-  triggered_by?: ChannelSessionTriggeredByMetadata;
 }
 
 export interface CreateAgentSessionRequest {

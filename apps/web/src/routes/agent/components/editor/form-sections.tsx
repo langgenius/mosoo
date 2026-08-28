@@ -7,7 +7,6 @@ import { Label } from "@/shared/ui/label";
 
 import type { Agent } from "../../agent.types";
 import { isRuntimeSelectable, listRuntimeOptions } from "../../runtime-catalog";
-import { AgentChannelsField } from "../channels-field";
 import { PackageResolutionIssueCard } from "../package-resolution-issue-card";
 import { RuntimeIcon } from "../runtime-icon";
 import { EnvironmentPicker } from "./environment-picker";
@@ -243,12 +242,10 @@ export function EnvironmentSection({
   agent,
   model,
   readOnly,
-  showChannels,
 }: {
   agent: Agent;
   model: AgentEditorModel;
   readOnly: boolean;
-  showChannels: boolean;
 }) {
   const { t } = useTranslation();
 
@@ -258,13 +255,6 @@ export function EnvironmentSection({
         <SectionHeader>{t("agent.environment")}</SectionHeader>
         <EnvironmentPicker model={model} appId={agent.appId} readOnly={readOnly} />
       </div>
-
-      {showChannels ? (
-        <div>
-          <SectionHeader>{t("agent.channels")}</SectionHeader>
-          <AgentChannelsField agent={agent} />
-        </div>
-      ) : null}
     </div>
   );
 }

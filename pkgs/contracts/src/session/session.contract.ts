@@ -21,7 +21,7 @@ import type { SessionRunSummary, UserWarning } from "./session-run.contract";
 export const SESSION_STATUSES = ["IDLE", "RUNNING", "RESCHEDULING", "TERMINATED"] as const;
 export type SessionStatus = (typeof SESSION_STATUSES)[number];
 
-export const SESSION_TYPES = ["api_channel", "preview", "ui"] as const;
+export const SESSION_TYPES = ["preview", "ui"] as const;
 export type SessionType = (typeof SESSION_TYPES)[number];
 
 export interface SessionSummary {

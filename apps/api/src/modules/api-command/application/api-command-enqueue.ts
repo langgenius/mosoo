@@ -5,7 +5,6 @@ import { admitApiCommand, enqueueApiCommand } from "./api-command-ledger";
 import type { ApiCommandAdmission, EnqueueApiCommandInput } from "./api-command-ledger";
 import type {
   AppDeploymentRunDispatchCommandPayload,
-  ChannelWorkTriggerCommandPayload,
   CostLedgerReconciliationCommandPayload,
   ScheduledMaintenanceCommandPayload,
   SessionRunDispatchCommandPayload,
@@ -24,21 +23,6 @@ export async function enqueueAppDeploymentRunDispatchCommand(
   await enqueueApiCommand(bindings, {
     dedupeKey: createAppDeploymentRunDispatchDedupeKey(payload.appDeploymentRunId),
     kind: "app_deployment_run_dispatch",
-    payload,
-  });
-}
-
-function createChannelWorkTriggerDedupeKey(input: ChannelWorkTriggerCommandPayload): string {
-  return `channel_work_trigger:${input.provider}:${input.bindingId}:${input.trigger.eventId}`;
-}
-
-export async function enqueueChannelWorkTriggerCommand(
-  bindings: Pick<ApiBindings, "API_COMMAND_QUEUE" | "DB">,
-  payload: ChannelWorkTriggerCommandPayload,
-): Promise<void> {
-  await enqueueApiCommand(bindings, {
-    dedupeKey: createChannelWorkTriggerDedupeKey(payload),
-    kind: "channel_work_trigger",
     payload,
   });
 }

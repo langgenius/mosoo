@@ -108,8 +108,6 @@ Acceptance:
 - `api-command` exists.
 - `api-command-dlq` exists.
 - `environment-artifact-build` exists.
-- `channel-final-delivery` exists.
-- `channel-final-delivery-dlq` exists.
 
 ## Step 4 - Build The Driver
 
@@ -126,7 +124,7 @@ Acceptance:
 
 This validates the API Worker bundle without publishing it. It does not run the
 full API deploy script because the real script applies D1 migrations and ensures
-the required artifact and channel-delivery queues.
+the required environment-artifact queue.
 
 ```bash
 cd apps/api
@@ -182,9 +180,8 @@ Acceptance:
 - `apps/api/bin/deploy-prod.ts` still performs, in order: load and validate the
   latest local Drizzle snapshot, apply pending remote D1 migrations (its first
   remote mutation), verify every expected table exists in prod (the
-  DEPLOY-D1-001 missing-table guard), ensure the required artifact and
-  channel-delivery queues, build the Driver, then deploy the API Worker with an
-  immediate Container rollout so the API and Driver protocol cannot split
+  DEPLOY-D1-001 missing-table guard), ensure the required environment-artifact
+  queue, build the Driver, then deploy the API Worker with an immediate Container rollout so the API and Driver protocol cannot split
   across a gradual image rollout.
 - The guard does not compare columns, indexes, constraints, or extra live
   tables. The script performs no clean-worktree check and no dry-run of its own;
@@ -243,8 +240,7 @@ Complete these one-time prerequisites before releasing the domain migration:
 
 Keep the `try.mosoo.ai` Web Custom Domain and API route during the compatibility
 window. Web requests redirect to the new host; `/api/*` continues to execute on
-the API Worker so existing CLI credentials and webhook URLs do not cross a
-redirect boundary.
+the API Worker so existing CLI requests do not cross a redirect boundary.
 
 For a manual release, run the real deploy only after all simulation steps above
 pass.
@@ -267,9 +263,9 @@ Acceptance before running `just deploy`:
 (`apps/api/bin/deploy-prod.ts`) applies pending remote D1 migrations as its
 very first remote action — after loading the local snapshot but before any
 build or bundle validation — then runs the latest-snapshot missing-table guard,
-ensures the required artifact and channel-delivery queues, builds the Driver,
-and deploys the API Worker. The Web deploy then builds and publishes the Web
-Worker. Neither deploy performs its own worktree check or dry-run; that is
+ensures the required environment-artifact queue, builds the Driver, and deploys
+the API Worker. The Web deploy then builds and publishes the Web Worker. Neither
+deploy performs its own worktree check or dry-run; that is
 exactly why the simulation steps above are required.
 
 The preflights prevent deterministic build, bundle, config, and migration-chain

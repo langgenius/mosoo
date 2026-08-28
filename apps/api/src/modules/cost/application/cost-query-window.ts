@@ -103,12 +103,6 @@ export function buildUsageSourceCte(
           usage_event.agent_id,
           usage_event.actor_user_id,
           usage_event.agent_owner_user_id,
-          CASE
-            WHEN session.type = 'api_channel'
-              AND json_extract(session.metadata_json, '$.triggered_by.provider') IS NOT NULL
-              THEN 1
-            ELSE 0
-          END AS is_external_channel,
           date(usage_event.created_at / 1000, 'unixepoch') AS date,
           usage_event.agent_publication_state_at_run,
           usage_event.run_purpose,
@@ -123,7 +117,6 @@ export function buildUsageSourceCte(
           CASE WHEN usage_event.pricing_status = 'unknown' THEN 1 ELSE 0 END
             AS unpriced_request_count
         FROM usage_event
-        LEFT JOIN session ON session.id = usage_event.session_id
         WHERE usage_event.organization_id = ?
           ${detailAppFilter}
           AND usage_event.created_at >= ?
@@ -134,7 +127,6 @@ export function buildUsageSourceCte(
           agent_id,
           actor_user_id,
           agent_owner_user_id,
-          CASE WHEN run_purpose = 'channel' THEN 1 ELSE 0 END AS is_external_channel,
           date,
           agent_publication_state_at_run,
           run_purpose,
@@ -185,10 +177,7 @@ export function aggregateSelect(): string {
     SUM(cache_read_tokens) AS cache_read_tokens,
     SUM(cache_creation_tokens) AS cache_creation_tokens,
     SUM(total_cost_usd) AS total_cost_usd,
-    COUNT(DISTINCT CASE
-      WHEN is_external_channel = 0 THEN actor_user_id
-      ELSE NULL
-    END) AS active_user_count,
+    COUNT(DISTINCT actor_user_id) AS active_user_count,
     SUM(unpriced_request_count) AS unpriced_request_count
   `;
 }

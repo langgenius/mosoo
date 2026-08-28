@@ -19,7 +19,6 @@ export type AgentResolutionStatus =
   | "warning";
 export type AgentResolutionTargetType =
   | "agent"
-  | "channel"
   | "environment"
   | "model"
   | "mcp_server"

@@ -1,81 +1,3 @@
-CREATE TABLE wechat_channel_account (
-  id text PRIMARY KEY NOT NULL,
-  agent_id text NOT NULL,
-  app_id text NOT NULL,
-  owner_account_id text NOT NULL,
-  external_account_id text NOT NULL,
-  external_bot_id text NOT NULL,
-  base_url text NOT NULL,
-  encrypted_creds_secret_id text NOT NULL,
-  cursor text,
-  status text NOT NULL,
-  last_error_code text,
-  last_heartbeat_at integer,
-  last_inbound_at integer,
-  last_poll_at integer,
-  runtime_state_json text DEFAULT '{}' NOT NULL,
-  status_changed_at integer NOT NULL,
-  created_at integer NOT NULL,
-  updated_at integer NOT NULL
-);
-
-CREATE UNIQUE INDEX wechat_channel_account_agent_idx
-  ON wechat_channel_account (agent_id);
-
-CREATE UNIQUE INDEX wechat_channel_account_external_idx
-  ON wechat_channel_account (external_account_id, external_bot_id);
-
-CREATE INDEX wechat_channel_account_status_idx
-  ON wechat_channel_account (status, updated_at);
-
-CREATE INDEX wechat_channel_account_app_status_idx
-  ON wechat_channel_account (app_id, status);
-
-CREATE TABLE wechat_channel_pairing (
-  id text PRIMARY KEY NOT NULL,
-  agent_id text NOT NULL,
-  app_id text NOT NULL,
-  created_by_account_id text NOT NULL,
-  qr_token_hash text NOT NULL,
-  expires_at integer NOT NULL,
-  consumed_at integer,
-  created_at integer NOT NULL,
-  updated_at integer NOT NULL
-);
-
-CREATE UNIQUE INDEX wechat_channel_pairing_qr_token_hash_idx
-  ON wechat_channel_pairing (qr_token_hash);
-
-CREATE INDEX wechat_channel_pairing_agent_creator_idx
-  ON wechat_channel_pairing (agent_id, created_by_account_id, consumed_at);
-
-CREATE INDEX wechat_channel_pairing_app_creator_idx
-  ON wechat_channel_pairing (app_id, created_by_account_id, consumed_at);
-
-CREATE INDEX wechat_channel_pairing_expires_idx
-  ON wechat_channel_pairing (expires_at);
-
-CREATE TABLE wechat_context_token (
-  id text PRIMARY KEY NOT NULL,
-  account_id text NOT NULL,
-  external_account_id text NOT NULL,
-  peer_id text NOT NULL,
-  to_user_id text NOT NULL,
-  context_token_key text NOT NULL,
-  encrypted_context_token_secret_id text NOT NULL,
-  created_at integer NOT NULL,
-  updated_at integer NOT NULL
-);
-
-CREATE UNIQUE INDEX wechat_context_token_key_idx
-  ON wechat_context_token (context_token_key);
-
-CREATE UNIQUE INDEX wechat_context_token_account_peer_idx
-  ON wechat_context_token (account_id, external_account_id, peer_id);
-
-CREATE INDEX wechat_context_token_account_updated_idx
-  ON wechat_context_token (account_id, updated_at);
-
 CREATE TABLE public_api_rate_limit_window (
   bucket_key text NOT NULL,
   request_count integer DEFAULT 0 NOT NULL,
@@ -130,7 +52,7 @@ CREATE TABLE session (
   model text NOT NULL,
   runtime_id text NOT NULL,
   status text NOT NULL,
-  type text DEFAULT 'api_channel' NOT NULL,
+  type text DEFAULT 'ui' NOT NULL,
   metadata_json text DEFAULT '{}' NOT NULL,
   last_run_id text,
   last_message_at integer,

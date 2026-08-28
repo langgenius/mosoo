@@ -24,8 +24,6 @@ interface ArchivePathDeclaration {
 const ARCHIVE_PATH_FORBIDDEN_SEGMENTS = new Set([
   ".env",
   ".state",
-  "channel",
-  "channels",
   "cost",
   "credential",
   "credentials",

@@ -49,7 +49,6 @@ const AGENT_RESOLUTION_STATUSES: AgentResolutionStatus[] = [
 ];
 const AGENT_RESOLUTION_TARGET_TYPES: AgentResolutionTargetType[] = [
   "agent",
-  "channel",
   "environment",
   "model",
   "mcp_server",

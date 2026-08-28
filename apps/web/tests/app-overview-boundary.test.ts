@@ -20,8 +20,6 @@ describe("App overview boundary", () => {
     expect(routeSource).not.toContain("useVisibleAgentsQuery");
     expect(routeSource).not.toContain("fetchAppCost");
     expect(routeSource).not.toContain("listVendorCredentials");
-    expect(routeSource).not.toContain('to="/channels"');
-
     expect(routeSource).not.toContain("Organization");
     expect(routeSource).not.toContain("Members");
     expect(routeSource).not.toContain("Invite");

@@ -26,13 +26,6 @@ describe("App navigation boundary", () => {
     expect(source).toContain('path: "/files"');
   });
 
-  test("drops the standalone Channels tab from the primary nav", () => {
-    const source = readSource("../src/app/navigation.tsx");
-
-    expect(source).not.toContain('label: "Channels"');
-    expect(source).not.toContain('path: "/channels"');
-  });
-
   test("places App Settings directly below Providers in primary App nav", () => {
     const source = readSource("../src/app/navigation.tsx");
     const providersIndex = source.indexOf('t("nav.providers")');

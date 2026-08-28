@@ -10,25 +10,6 @@ import { getAppDatabase } from "../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../time";
 import { dispatchAppDeploymentRun } from "../../apps/application/app-deployment-executor.service";
 import { ACTIVE_APP_DEPLOYMENT_RUN_STATUSES } from "../../apps/domain/app-deployment-lifecycle";
-import { cleanupOrphanChannelBindingCredentialSecrets } from "../../channels/application/agent-channel-binding-maintenance.service";
-import { resolveAgentChannelBindingContextById } from "../../channels/application/channel-binding-context";
-import { createChannelFinalDeliveryScheduler } from "../../channels/application/channel-final-delivery.service";
-import { createChannelSessionClient } from "../../channels/application/channel-session-command-client";
-import { runDiscordGatewayConnectionMaintenance } from "../../channels/application/discord-gateway-connection-maintenance.service";
-import { runLarkLongConnectionMaintenance } from "../../channels/application/lark-long-connection-maintenance.service";
-import {
-  createSlackAdapterConfig,
-  createSlackChannelSessionClient,
-  resolveSlackChannelBindingContextById,
-} from "../../channels/application/slack-channel-session.service";
-import { runWeChatPollingOwnerMaintenance } from "../../channels/application/wechat-polling-owner-maintenance.service";
-import { parseDiscordCredentials } from "../../channels/discord/discord-credentials";
-import { processDiscordWorkTrigger } from "../../channels/discord/discord-first-party-adapter";
-import { parseLarkCredentials } from "../../channels/lark/lark-credentials";
-import { processLarkWorkTrigger } from "../../channels/lark/lark-first-party-adapter";
-import { processSlackWorkTrigger } from "../../channels/slack/slack-first-party-adapter";
-import { parseTelegramCredentials } from "../../channels/telegram/telegram-credentials";
-import { processTelegramWorkTrigger } from "../../channels/telegram/telegram-first-party-adapter";
 import {
   parseCostLedgerReconciliationActivationMode,
   reconcileCostLedgerPage,
@@ -56,7 +37,6 @@ import type { ApiCommandMessage } from "./api-command-message";
 import { ApiCommandPayloadError, parseApiCommandPayload } from "./api-command-payload";
 import type {
   AppDeploymentRunDispatchCommandPayload,
-  ChannelWorkTriggerCommandPayload,
   CostLedgerReconciliationCommandPayload,
   EnvironmentPackageArtifactBuildCommandPayload,
   ScheduledMaintenanceCommandPayload,
@@ -104,13 +84,7 @@ async function processScheduledMaintenanceCommand(
   payload: ScheduledMaintenanceCommandPayload,
 ): Promise<void> {
   const scheduledAt = new Date(payload.scheduledTime);
-  const tasks: Promise<unknown>[] = [
-    runSandboxMaintenance(bindings),
-    runDiscordGatewayConnectionMaintenance(bindings, scheduledAt),
-    cleanupOrphanChannelBindingCredentialSecrets(bindings, scheduledAt),
-    runLarkLongConnectionMaintenance(bindings, scheduledAt),
-    runWeChatPollingOwnerMaintenance(bindings, scheduledAt, { executionContext: null }),
-  ];
+  const tasks: Promise<unknown>[] = [runSandboxMaintenance(bindings)];
 
   if (shouldRunUsageDailyRollup(scheduledAt)) {
     tasks.push(runUsageDailyRollup(bindings, scheduledAt));
@@ -165,221 +139,6 @@ async function processCostLedgerReconciliationCommand(
     mode: payload.mode,
     scheduledTime: payload.scheduledTime,
   });
-}
-
-async function processSlackChannelWorkTrigger(
-  bindings: ApiBindings,
-  payload: Extract<ChannelWorkTriggerCommandPayload, { provider: "slack" }>,
-): Promise<void> {
-  const binding = await resolveSlackChannelBindingContextById(bindings, {
-    bindingId: payload.bindingId,
-  });
-
-  if (!binding) {
-    logInfo("api-command.channel_work_trigger.binding_not_found", {
-      bindingId: payload.bindingId,
-      provider: payload.provider,
-    });
-    return;
-  }
-
-  if (binding.agentStatus !== "published") {
-    logInfo("api-command.channel_work_trigger.agent_unpublished", {
-      agentId: binding.agentId,
-      bindingId: binding.bindingId,
-      eventId: payload.trigger.eventId,
-      provider: payload.provider,
-    });
-    return;
-  }
-
-  await processSlackWorkTrigger({
-    config: createSlackAdapterConfig({
-      binding,
-      sessionLinkBaseUrl: bindings.WEB_ORIGIN,
-    }),
-    finalDeliveryScheduler: createChannelFinalDeliveryScheduler(bindings),
-    sessionClient: createSlackChannelSessionClient({
-      binding,
-      bindings,
-      executionContext: null,
-      requestUrl: payload.requestUrl,
-    }),
-    trigger: payload.trigger,
-  });
-}
-
-async function processTelegramChannelWorkTrigger(
-  bindings: ApiBindings,
-  payload: Extract<ChannelWorkTriggerCommandPayload, { provider: "telegram" }>,
-): Promise<void> {
-  const binding = await resolveAgentChannelBindingContextById(bindings, {
-    bindingId: payload.bindingId,
-    provider: payload.provider,
-  });
-
-  if (!binding) {
-    logInfo("api-command.channel_work_trigger.binding_not_found", {
-      bindingId: payload.bindingId,
-      provider: payload.provider,
-    });
-    return;
-  }
-
-  if (binding.agentStatus !== "published") {
-    logInfo("api-command.channel_work_trigger.agent_unpublished", {
-      agentId: binding.agentId,
-      bindingId: binding.bindingId,
-      eventId: payload.trigger.eventId,
-      provider: payload.provider,
-    });
-    return;
-  }
-
-  const credentials = parseTelegramCredentials(binding.credentialsJson);
-
-  await processTelegramWorkTrigger({
-    config: {
-      agentId: binding.agentId,
-      bindingId: binding.bindingId,
-      botToken: credentials.botToken,
-      sessionLinkBaseUrl: bindings.WEB_ORIGIN,
-    },
-    finalDeliveryScheduler: createChannelFinalDeliveryScheduler(bindings),
-    sessionClient: createChannelSessionClient({
-      binding,
-      bindings,
-      executionContext: null,
-      requestUrl: payload.requestUrl,
-    }),
-    trigger: payload.trigger,
-  });
-}
-
-async function processDiscordChannelWorkTrigger(
-  bindings: ApiBindings,
-  payload: Extract<ChannelWorkTriggerCommandPayload, { provider: "discord" }>,
-): Promise<void> {
-  const binding = await resolveAgentChannelBindingContextById(bindings, {
-    bindingId: payload.bindingId,
-    provider: payload.provider,
-  });
-
-  if (!binding) {
-    logInfo("api-command.channel_work_trigger.binding_not_found", {
-      bindingId: payload.bindingId,
-      provider: payload.provider,
-    });
-    return;
-  }
-
-  if (binding.agentStatus !== "published") {
-    logInfo("api-command.channel_work_trigger.agent_unpublished", {
-      agentId: binding.agentId,
-      bindingId: binding.bindingId,
-      eventId: payload.trigger.eventId,
-      provider: payload.provider,
-    });
-    return;
-  }
-
-  const credentials = parseDiscordCredentials(binding.credentialsJson);
-  const result = await processDiscordWorkTrigger({
-    config: {
-      agentId: binding.agentId,
-      bindingId: binding.bindingId,
-      botToken: credentials.botToken,
-      sessionLinkBaseUrl: bindings.WEB_ORIGIN,
-    },
-    finalDeliveryScheduler: createChannelFinalDeliveryScheduler(bindings),
-    sessionClient: createChannelSessionClient({
-      binding,
-      bindings,
-      executionContext: null,
-      requestUrl: payload.requestUrl,
-    }),
-    trigger: payload.trigger,
-  });
-
-  if (!result.ok) {
-    const error = new Error("Discord work trigger processing failed.");
-    error.name = result.code;
-    throw error;
-  }
-}
-
-async function processLarkChannelWorkTrigger(
-  bindings: ApiBindings,
-  payload: Extract<ChannelWorkTriggerCommandPayload, { provider: "lark" }>,
-): Promise<void> {
-  const binding = await resolveAgentChannelBindingContextById(bindings, {
-    bindingId: payload.bindingId,
-    provider: payload.provider,
-  });
-
-  if (!binding) {
-    logInfo("api-command.channel_work_trigger.binding_not_found", {
-      bindingId: payload.bindingId,
-      provider: payload.provider,
-    });
-    return;
-  }
-
-  if (binding.agentStatus !== "published") {
-    logInfo("api-command.channel_work_trigger.agent_unpublished", {
-      agentId: binding.agentId,
-      bindingId: binding.bindingId,
-      eventId: payload.trigger.eventId,
-      provider: payload.provider,
-    });
-    return;
-  }
-
-  const credentials = parseLarkCredentials(binding.credentialsJson);
-
-  await processLarkWorkTrigger({
-    config: {
-      agentId: binding.agentId,
-      appId: credentials.appId,
-      appSecret: credentials.appSecret,
-      bindingId: binding.bindingId,
-      connectionMode: credentials.connectionMode,
-      domain: credentials.domain,
-      sessionLinkBaseUrl: bindings.WEB_ORIGIN,
-    },
-    finalDeliveryScheduler: createChannelFinalDeliveryScheduler(bindings),
-    sessionClient: createChannelSessionClient({
-      binding,
-      bindings,
-      executionContext: null,
-      requestUrl: payload.requestUrl,
-    }),
-    trigger: payload.trigger,
-  });
-}
-
-async function processChannelWorkTriggerCommand(
-  bindings: ApiBindings,
-  payload: ChannelWorkTriggerCommandPayload,
-): Promise<void> {
-  switch (payload.provider) {
-    case "discord": {
-      await processDiscordChannelWorkTrigger(bindings, payload);
-      return;
-    }
-    case "lark": {
-      await processLarkChannelWorkTrigger(bindings, payload);
-      return;
-    }
-    case "slack": {
-      await processSlackChannelWorkTrigger(bindings, payload);
-      return;
-    }
-    case "telegram": {
-      await processTelegramChannelWorkTrigger(bindings, payload);
-      return;
-    }
-  }
 }
 
 async function processSessionRunDispatchCommand(
@@ -506,10 +265,6 @@ async function processClaimedApiCommand(
   switch (claim.kind) {
     case "app_deployment_run_dispatch": {
       await dispatchAppDeploymentRun(bindings, payload as AppDeploymentRunDispatchCommandPayload);
-      return;
-    }
-    case "channel_work_trigger": {
-      await processChannelWorkTriggerCommand(bindings, payload as ChannelWorkTriggerCommandPayload);
       return;
     }
     case "cost_ledger_reconciliation": {

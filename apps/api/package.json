@@ -14,7 +14,6 @@
   },
   "dependencies": {
     "@cloudflare/sandbox": "0.12.6",
-    "@larksuiteoapi/node-sdk": "^1.73.0",
     "@mosoo/ag-ui-session": "workspace:*",
     "@mosoo/agent-driver": "workspace:*",
     "@mosoo/agent-package": "workspace:*",

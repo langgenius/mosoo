@@ -25,7 +25,7 @@ invokes an Agent, or consumes model tokens.
 - **Service availability** is the share of observed API Worker invocations that
   finish without a severe Worker outcome or HTTP 5xx response.
 - **Runtime Run completion rate** is `completed / (completed + failed +
-expired)` for real `ui` and `api_channel` Runs. Preview Runs and cancellations
+expired)` for real `ui` Runs. Preview Runs and cancellations
   are excluded.
 - The API/control-plane signal becomes `unknown` after five minutes without a
   Tail event. A runtime becomes `unknown` after 24 hours without a real Run;

@@ -19,30 +19,25 @@ import type { VendorCredentialId } from "@mosoo/id";
 import { hashTokenValue } from "../../src/modules/auth/application/personal-access-token.service";
 import { storeVendorCredentialSecret } from "../../src/modules/vendor-credentials/application/vendor-credential.secret-resolution";
 import type { ApiBindings } from "../../src/platform/cloudflare/worker-types";
-import type { ApiCommandQueueStub } from "./channel-final-delivery-queue-fixture";
-import type { ChannelFinalDeliveryQueueStub } from "./channel-final-delivery-queue-fixture";
-import { createApiCommandQueueStub } from "./channel-final-delivery-queue-fixture";
-import { createChannelFinalDeliveryQueueStub } from "./channel-final-delivery-queue-fixture";
+import type { ApiCommandQueueStub } from "./api-command-queue-fixture";
+import { createApiCommandQueueStub } from "./api-command-queue-fixture";
 import { SqliteD1Database } from "./sqlite-d1";
 export { SqliteD1Database } from "./sqlite-d1";
 export {
   createApiCommandQueueStub,
-  createChannelFinalDeliveryQueueStub,
   createRecordedQueueMessage,
   type ApiCommandQueueStub,
   type CapturedApiCommandMessage,
-  type CapturedChannelFinalDeliveryMessage,
-  type ChannelFinalDeliveryQueueStub,
   type RecordedQueueMessage,
   type RecordedQueueMessageAction,
-} from "./channel-final-delivery-queue-fixture";
+} from "./api-command-queue-fixture";
 
 const CONTRACT_SCHEMA_SQL = readFileSync(
   new URL("./public-api-http-core-schema.sql", import.meta.url),
   "utf8",
 )
   .concat("\n")
-  .concat(readFileSync(new URL("./public-api-http-wechat-schema.sql", import.meta.url), "utf8"));
+  .concat(readFileSync(new URL("./public-api-http-runtime-schema.sql", import.meta.url), "utf8"));
 
 const INITIAL_AGENT_CONFIG_JSON = JSON.stringify({
   packageMcpServers: [],
@@ -268,7 +263,6 @@ export function createPublicHttpTestBindings(
   options: {
     apiCommandQueue?: ApiCommandQueueStub;
     fileBucket?: R2Bucket;
-    queue?: ChannelFinalDeliveryQueueStub;
     sessionNamespace?: ApiBindings["Session"];
   } = {},
 ): Record<string, unknown> {
@@ -278,7 +272,6 @@ export function createPublicHttpTestBindings(
     AUTH_EMAIL_FROM: "mosoo AUTH <auth@mosoo.ai>",
     BETTER_AUTH_SECRET: "test-secret",
     API_COMMAND_QUEUE: options.apiCommandQueue ?? createApiCommandQueueStub(),
-    CHANNEL_FINAL_DELIVERY_QUEUE: options.queue ?? createChannelFinalDeliveryQueueStub(),
     CLOUDFLARE_ACCOUNT_ID: "test-account",
     DB: database,
     FILE_BUCKET: options.fileBucket ?? unavailableBinding<R2Bucket>("FILE_BUCKET"),
@@ -570,7 +563,7 @@ async function insertSession(
       runtimeId: "openai-runtime",
       status: "IDLE",
       title: input.title,
-      type: "api_channel",
+      type: "ui",
       updatedAt: nowMsForTest(),
     })
     .run();

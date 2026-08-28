@@ -114,10 +114,8 @@ function createUsageEventInput(): RecordRuntimeUsageEventInput {
       provider: "openai",
       runtimeId: "openai-runtime",
       sessionId: SESSION_ID as RecordRuntimeUsageEventInput["run"]["sessionId"],
-      sessionType: "ui",
       sessionRunId: SESSION_RUN_ID as RecordRuntimeUsageEventInput["run"]["sessionRunId"],
       trigger: "user_prompt",
-      triggerProvider: null,
     },
     usage: {
       cachedReadTokens: 0,

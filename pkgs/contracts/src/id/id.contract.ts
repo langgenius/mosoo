@@ -5,7 +5,6 @@ export type {
   AgentMcpBindingId,
   AppDeploymentId,
   AppDeploymentRunId,
-  ChannelBindingId,
   CliOAuthFlowId,
   CredentialId,
   DriverCommandId,

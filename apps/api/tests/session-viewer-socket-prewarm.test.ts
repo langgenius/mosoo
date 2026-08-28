@@ -39,7 +39,7 @@ const OUTSIDER_VIEWER: AuthenticatedViewer = {
 };
 
 function createSessionViewerSocketPrewarmDatabase(input: {
-  type: "api_channel" | "preview" | "ui";
+  type: "preview" | "ui";
 }): SqliteD1Database {
   const database = new SqliteD1Database();
 
@@ -107,7 +107,7 @@ function createSessionViewerSocketPrewarmDatabase(input: {
   return database;
 }
 
-function createBindings(input: { type: "api_channel" | "preview" | "ui" }): ApiBindings {
+function createBindings(input: { type: "preview" | "ui" }): ApiBindings {
   return createPublicHttpTestBindings(
     createSessionViewerSocketPrewarmDatabase(input),
   ) as ApiBindings;
@@ -123,7 +123,7 @@ function createSocketResponse(status: number): Response {
 
 async function connectForTest(input: {
   responseStatus: number;
-  type: "api_channel" | "preview" | "ui";
+  type: "preview" | "ui";
   viewer?: AuthenticatedViewer;
 }): Promise<{
   connectorCallCount: number;
@@ -196,25 +196,22 @@ describe("session viewer socket runtime prewarm", () => {
     ).toBe(false);
   });
 
-  test.each(["api_channel", "ui"] as const)(
-    "does not schedule prewarm for accepted %s viewer sockets",
-    async (type) => {
-      const { connectorCallCount, response, scheduledRequest } = await connectForTest({
-        responseStatus: 101,
-        type,
-      });
+  test("does not schedule prewarm for an accepted UI viewer socket", async () => {
+    const { connectorCallCount, response, scheduledRequest } = await connectForTest({
+      responseStatus: 101,
+      type: "ui",
+    });
 
-      expect(connectorCallCount).toBe(1);
-      expect(response.status).toBe(101);
-      expect(scheduledRequest).toBeNull();
-      expect(
-        shouldSchedulePreviewRuntimePrewarmForViewerSocket({
-          responseStatus: 101,
-          sessionType: type,
-        }),
-      ).toBe(false);
-    },
-  );
+    expect(connectorCallCount).toBe(1);
+    expect(response.status).toBe(101);
+    expect(scheduledRequest).toBeNull();
+    expect(
+      shouldSchedulePreviewRuntimePrewarmForViewerSocket({
+        responseStatus: 101,
+        sessionType: "ui",
+      }),
+    ).toBe(false);
+  });
 
   test("does not connect or prewarm when the viewer cannot access the session", async () => {
     let scheduledRequest: SessionViewerSocketRuntimePrewarmRequest | null = null;

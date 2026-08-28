@@ -55,10 +55,6 @@ name = "Session"
 class_name = "Session"
 
 [[durable_objects.bindings]]
-name = "ChannelConnection"
-class_name = "ChannelConnection"
-
-[[durable_objects.bindings]]
 name = "Sandbox"
 class_name = "Sandbox"
 
@@ -94,10 +90,6 @@ queue = "api-command"
 binding = "ENVIRONMENT_ARTIFACT_BUILD_QUEUE"
 queue = "environment-artifact-build"
 
-[[queues.producers]]
-binding = "CHANNEL_FINAL_DELIVERY_QUEUE"
-queue = "channel-final-delivery"
-
 [[queues.consumers]]
 queue = "api-command"
 max_batch_size = 10
@@ -118,13 +110,6 @@ max_batch_timeout = 1
 max_retries = 5
 max_concurrency = 5
 dead_letter_queue = "api-command-dlq"
-
-[[queues.consumers]]
-queue = "channel-final-delivery"
-max_batch_size = 10
-max_batch_timeout = 5
-max_retries = 5
-dead_letter_queue = "channel-final-delivery-dlq"
 
 [env.stage]
 name = "mosoo-api-stage"
@@ -183,10 +168,6 @@ name = "Session"
 class_name = "Session"
 
 [[env.stage.durable_objects.bindings]]
-name = "ChannelConnection"
-class_name = "ChannelConnection"
-
-[[env.stage.durable_objects.bindings]]
 name = "Sandbox"
 class_name = "Sandbox"
 
@@ -222,10 +203,6 @@ queue = "mosoo-stage-api-command"
 binding = "ENVIRONMENT_ARTIFACT_BUILD_QUEUE"
 queue = "mosoo-stage-environment-artifact-build"
 
-[[env.stage.queues.producers]]
-binding = "CHANNEL_FINAL_DELIVERY_QUEUE"
-queue = "mosoo-stage-channel-final-delivery"
-
 [[env.stage.queues.consumers]]
 queue = "mosoo-stage-api-command"
 max_batch_size = 10
@@ -246,13 +223,6 @@ max_batch_timeout = 1
 max_retries = 5
 max_concurrency = 5
 dead_letter_queue = "mosoo-stage-api-command-dlq"
-
-[[env.stage.queues.consumers]]
-queue = "mosoo-stage-channel-final-delivery"
-max_batch_size = 10
-max_batch_timeout = 5
-max_retries = 5
-dead_letter_queue = "mosoo-stage-channel-final-delivery-dlq"
 
 [env.prod]
 name = "mosoo-api-prod"
@@ -323,10 +293,6 @@ name = "Session"
 class_name = "Session"
 
 [[env.prod.durable_objects.bindings]]
-name = "ChannelConnection"
-class_name = "ChannelConnection"
-
-[[env.prod.durable_objects.bindings]]
 name = "Sandbox"
 class_name = "Sandbox"
 
@@ -363,10 +329,6 @@ queue = "api-command"
 binding = "ENVIRONMENT_ARTIFACT_BUILD_QUEUE"
 queue = "environment-artifact-build"
 
-[[env.prod.queues.producers]]
-binding = "CHANNEL_FINAL_DELIVERY_QUEUE"
-queue = "channel-final-delivery"
-
 [[env.prod.queues.consumers]]
 queue = "api-command"
 max_batch_size = 10
@@ -391,21 +353,26 @@ max_retries = 5
 max_concurrency = 5
 dead_letter_queue = "api-command-dlq"
 
-[[env.prod.queues.consumers]]
-queue = "channel-final-delivery"
-max_batch_size = 10
-max_batch_timeout = 5
-max_retries = 5
-dead_letter_queue = "channel-final-delivery-dlq"
-
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["DriverConnection", "Sandbox", "Session", "ChannelConnection"]
+
+[[migrations]]
+tag = "v2"
+deleted_classes = ["ChannelConnection"]
 
 [[env.prod.migrations]]
 tag = "v1"
 new_sqlite_classes = ["DriverConnection", "Sandbox", "Session", "ChannelConnection"]
 
+[[env.prod.migrations]]
+tag = "v2"
+deleted_classes = ["ChannelConnection"]
+
 [[env.stage.migrations]]
 tag = "v1"
 new_sqlite_classes = ["DriverConnection", "Sandbox", "Session", "ChannelConnection"]
+
+[[env.stage.migrations]]
+tag = "v2"
+deleted_classes = ["ChannelConnection"]

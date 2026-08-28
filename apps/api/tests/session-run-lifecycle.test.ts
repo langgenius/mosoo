@@ -168,7 +168,7 @@ describe("session run lifecycle", () => {
         errorCode: null,
         runId: "run-terminal-log",
         runtimeId: "openai-runtime",
-        sessionType: "api_channel",
+        sessionType: "ui",
         source: "driver",
         status: "completed",
         traceId: "trace-run-terminal-log",

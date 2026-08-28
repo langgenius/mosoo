@@ -62,27 +62,6 @@ enum AgentBuiltInToolName {
   write
 }
 
-type AgentChannelBinding {
-  activityLastTriggeredAt: String
-  activitySessionCount7d: Int!
-  agentId: ULID!
-  appId: ULID!
-  createdAt: String!
-  displayMetadata: PrimitiveRecord!
-  externalBotId: String!
-  externalTenantId: String!
-  id: ULID!
-  lastErrorCode: String
-  provider: ChannelProvider!
-  status: AgentChannelBindingStatus!
-  updatedAt: String!
-}
-
-enum AgentChannelBindingStatus {
-  active
-  error
-}
-
 type AgentCostCard {
   agentId: ULID!
   agentName: String!
@@ -275,7 +254,6 @@ enum AgentResolutionStatus {
 
 enum AgentResolutionTargetType {
   agent
-  channel
   environment
   mcp_server
   model
@@ -620,14 +598,6 @@ type BoundCapabilityRunProvenance {
   runId: ULID!
 }
 
-enum ChannelProvider {
-  discord
-  lark
-  slack
-  telegram
-  wechat
-}
-
 input ConnectMcpBearerInput {
   appId: ULID!
   serverId: ULID!
@@ -800,14 +770,6 @@ input CreateAppMcpServerInput {
   url: String!
 }
 
-input CreateDiscordAgentChannelBindingInput {
-  agentId: ULID!
-  appId: ULID!
-  applicationId: String!
-  botToken: String!
-  relaySecret: String!
-}
-
 input CreateEnvironmentForkInput {
   appId: ULID!
   environmentId: ULID!
@@ -826,36 +788,9 @@ input CreateEnvironmentInput {
   setupScript: String!
 }
 
-input CreateLarkAgentChannelBindingInput {
-  agentId: ULID!
-  appId: ULID!
-  appSecret: String!
-  connectionMode: LarkConnectionMode!
-  domain: LarkDomain!
-  encryptKey: String
-  larkAppId: String!
-  verificationToken: String
-}
-
 input CreateSkillForkInput {
   appId: ULID!
   skillId: ULID!
-}
-
-input CreateSlackAgentChannelBindingInput {
-  agentId: ULID!
-  appId: ULID!
-  appLevelToken: String
-  botToken: String!
-  signingSecret: String!
-  threadRepliesRequireMention: Boolean
-}
-
-input CreateTelegramAgentChannelBindingInput {
-  agentId: ULID!
-  appId: ULID!
-  botToken: String!
-  webhookSecret: String!
 }
 
 input CreateVendorCredentialInput {
@@ -865,11 +800,6 @@ input CreateVendorCredentialInput {
   models: [String!]
   name: String!
   vendorId: String!
-}
-
-input DeleteAgentChannelBindingInput {
-  appId: ULID!
-  bindingId: ULID!
 }
 
 input DeleteAgentInput {
@@ -1098,39 +1028,6 @@ input ImportAgentPackageInput {
 
 scalar JsonObject
 
-type LarkAgentChannelRegistration {
-  appId: String
-  appSecret: String
-  deviceCode: String
-  domain: LarkDomain!
-  expireIn: Int
-  interval: Int
-  lastErrorCode: String
-  openId: String
-  qrUrl: String
-  status: LarkAppRegistrationStatus!
-  userCode: String
-}
-
-enum LarkAppRegistrationStatus {
-  access_denied
-  confirmed
-  expired
-  failed
-  qr_pending
-  slow_down
-}
-
-enum LarkConnectionMode {
-  webhook
-  websocket
-}
-
-enum LarkDomain {
-  feishu
-  lark
-}
-
 enum McpAuthType {
   bearer
   oauth
@@ -1254,16 +1151,11 @@ type Mutation {
   createAgentSession(input: CreateAgentSessionInput!): Session!
   createApp(input: CreateAppInput!): App!
   createAppMcpServer(input: CreateAppMcpServerInput!): McpServerWithCredential!
-  createDiscordAgentChannelBinding(input: CreateDiscordAgentChannelBindingInput!): AgentChannelBinding!
   createEnvironment(input: CreateEnvironmentInput!): EnvironmentSummary!
   createEnvironmentFork(input: CreateEnvironmentForkInput!): EnvironmentSummary!
-  createLarkAgentChannelBinding(input: CreateLarkAgentChannelBindingInput!): AgentChannelBinding!
   createSkillFork(input: CreateSkillForkInput!): SkillSummary!
-  createSlackAgentChannelBinding(input: CreateSlackAgentChannelBindingInput!): AgentChannelBinding!
-  createTelegramAgentChannelBinding(input: CreateTelegramAgentChannelBindingInput!): AgentChannelBinding!
   createVendorCredential(input: CreateVendorCredentialInput!): VendorCredential!
   deleteAgent(input: DeleteAgentInput!): OperationResult!
-  deleteAgentChannelBinding(input: DeleteAgentChannelBindingInput!): OperationResult!
   deleteAgentSession(appId: ULID!, sessionId: ULID!): OperationResult!
   deleteAppDeployment(input: DeleteAppDeploymentInput!): OperationResult!
   deleteEnvironment(input: DeleteEnvironmentInput!): OperationResult!
@@ -1273,8 +1165,6 @@ type Mutation {
   deployApp(input: DeployAppInput!): AppDeploymentRun!
   importAgentPackage(input: ImportAgentPackageInput!): AgentPackageImportResult!
   onboardingBootstrap(input: BootstrapOnboardingInput!): OnboardingStatus!
-  pollLarkAgentChannelRegistration(input: PollLarkAgentChannelRegistrationInput!): LarkAgentChannelRegistration!
-  pollWeChatAgentChannelPairing(input: PollWeChatAgentChannelPairingInput!): WeChatAgentChannelPairing!
   prewarmAgentSession(appId: ULID!, sessionId: ULID!): SessionRuntimePrewarmAck!
   publishAgent(input: PublishAgentInput!): Agent!
   recreateSandbox(input: RuntimeStateOperationInput!): RuntimeStateOperationResult!
@@ -1292,9 +1182,7 @@ type Mutation {
   setMcpServerEnabled(appId: ULID!, enabled: Boolean!, serverId: ULID!): McpServerWithCredential!
   setSystemAgentModel(input: SetSystemAgentModelInput!): Account!
   startAgentRun(input: StartAgentRunInput!): AgentRunWorkflow!
-  startLarkAgentChannelRegistration(input: StartLarkAgentChannelRegistrationInput!): LarkAgentChannelRegistration!
   startMcpOAuth(input: StartMcpOAuthInput!): StartMcpOAuthPayload!
-  startWeChatAgentChannelPairing(input: StartWeChatAgentChannelPairingInput!): WeChatAgentChannelPairing!
   testVendorCredential(input: TestVendorCredentialInput!): TestVendorCredentialResult!
   unarchiveAgentSession(appId: ULID!, sessionId: ULID!): OperationResult!
   unpublishAgent(agentId: ULID!, appId: ULID!): Agent!
@@ -1328,19 +1216,6 @@ type OrganizationBillingCostCard {
   totals: CostTotals!
 }
 
-input PollLarkAgentChannelRegistrationInput {
-  agentId: ULID!
-  appId: ULID!
-  deviceCode: String!
-  domain: LarkDomain!
-}
-
-input PollWeChatAgentChannelPairingInput {
-  agentId: ULID!
-  appId: ULID!
-  qrToken: String!
-}
-
 scalar PrimitiveRecord
 
 input PublishAgentInput {
@@ -1351,7 +1226,6 @@ input PublishAgentInput {
 type Query {
   accessibleAgentList(appId: ULID!): [AgentSummary!]!
   agent(agentId: ULID!, appId: ULID!): AgentDetail!
-  agentChannelBindingList(agentId: ULID!, appId: ULID!): [AgentChannelBinding!]!
   agentCostCard(agentId: ULID!, appId: ULID!, range: CostRange!, runPurposes: [CostRunPurpose!]): AgentCostCard!
   agentEditorState(agentId: ULID!, appId: ULID!): AgentEditorState!
   agentManifest(agentId: ULID!, appId: ULID!): AgentManifestExport!
@@ -1673,7 +1547,6 @@ enum SessionStatus {
 }
 
 enum SessionType {
-  api_channel
   preview
   ui
 }
@@ -1785,12 +1658,6 @@ input StartAgentRunInput {
   waitForRuntimeReady: Boolean
 }
 
-input StartLarkAgentChannelRegistrationInput {
-  agentId: ULID!
-  appId: ULID!
-  domain: LarkDomain!
-}
-
 input StartMcpOAuthInput {
   appId: ULID!
   returnUrl: String
@@ -1800,11 +1667,6 @@ input StartMcpOAuthInput {
 type StartMcpOAuthPayload {
   authorizationUrl: String!
   flowId: ULID!
-}
-
-input StartWeChatAgentChannelPairingInput {
-  agentId: ULID!
-  appId: ULID!
 }
 
 type SystemAgentModelSetting {
@@ -1908,21 +1770,4 @@ type Viewer {
 type ViewerAuth {
   currentSecurityLevel: AuthSecurityLevel!
   methods: [AuthMethod!]!
-}
-
-type WeChatAgentChannelPairing {
-  binding: AgentChannelBinding
-  lastErrorCode: String
-  qrCodeImageSrc: String
-  qrToken: String
-  status: WeChatQrPairingStatus!
-}
-
-enum WeChatQrPairingStatus {
-  confirmed
-  expired
-  failed
-  idle
-  qr_pending
-  scanned
 }

@@ -103,7 +103,7 @@ export const AGENT_KIND_RUNTIME_POLICIES = {
     copy: {
       description:
         "Stable sandbox per agent with Backup/Restore continuity. Best for daily helpers, knowledge agents, and personal copilots.",
-      examples: "e.g. Slack helper | Knowledge butler | Personal copilot",
+      examples: "e.g. Research helper | Knowledge butler | Personal copilot",
       label: "Assistant Agent",
       tagline: "Always-on teammate",
     },

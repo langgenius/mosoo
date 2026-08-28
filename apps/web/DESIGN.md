@@ -75,7 +75,7 @@ uniform across list pages.
 
 - **Sentence case** for all UI strings: page titles, dialog titles, buttons, tabs,
   labels. Capitalize only the first word and proper nouns / acronyms (API, CSV, MCP,
-  URL, OpenAI, GitHub, Slack). "Create agent", not "Create Agent"; "Access settings",
+  URL, OpenAI, GitHub). "Create agent", not "Create Agent"; "Access settings",
   not "Access Settings".
 - Buttons are verb + object ("Save changes", "Delete app").
 - No em dashes in user-facing copy. No marketing buzzwords. Avoid staccato slogan

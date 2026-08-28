@@ -381,7 +381,7 @@ describe("runtime final output ingestion", () => {
             sandbox_id: PUBLIC_API_TEST_IDS.sandbox,
             sandbox_kind: "pet",
             sandbox_subject_kind: "agent",
-            session_type: "api_channel",
+            session_type: "ui",
           }),
         }),
       ]);
