@@ -19,8 +19,10 @@ import { ACTIVE_SESSION_RUN_STATUSES } from "../../domain/session-run-lifecycle.
 import {
   activeConversationSessionQuery,
   activeConversationSessionQueryForListedSubject,
+  activeSessionRunQueryForListedSubject,
   getRuntimeSubjectInactiveDeadlineSql,
   LIVE_DRIVER_STATUSES,
+  liveDriverInstanceQueryForListedSubject,
   runLeaseQuery,
   runLeaseQueryForListedSubject,
 } from "./runtime-subject-store-queries";
@@ -154,12 +156,17 @@ export async function listInactiveRuntimeSubjects(
     .all();
 }
 
-export async function repairStrandedCattleRuntimeSubjectDeadlines(
+export interface StrandedRuntimeSubjectDeadlineRepairResult {
+  readonly cattle: number;
+  readonly pet: number;
+}
+
+export async function repairStrandedRuntimeSubjectDeadlines(
   database: D1Database,
   input: { readonly now: number },
-): Promise<number> {
+): Promise<StrandedRuntimeSubjectDeadlineRepairResult> {
   const appDb = getAppDatabase(database);
-  const result = await appDb
+  const cattle = await appDb
     .update(sandboxesTable)
     .set({
       inactiveDeadlineAt: getRuntimeSubjectInactiveDeadlineSql(input.now),
@@ -176,7 +183,34 @@ export async function repairStrandedCattleRuntimeSubjectDeadlines(
     )
     .run();
 
-  return getD1ChangeCount(result);
+  // Pets re-arm the idle deadline on run-lease release, but a maintenance
+  // failure path that never released — or a driver row already deleted by the
+  // 24h retention sweep — leaves the pet active with a NULL deadline forever,
+  // invisible to the recycle sweep while its container keeps billing. Repair
+  // only clearly reclaimable pets: no live driver, no active subject run, no
+  // run lease.
+  const pet = await appDb
+    .update(sandboxesTable)
+    .set({
+      inactiveDeadlineAt: getRuntimeSubjectInactiveDeadlineSql(input.now),
+      updatedAt: input.now,
+    })
+    .where(
+      and(
+        eq(sandboxesTable.status, "active"),
+        eq(sandboxesTable.kind, "pet"),
+        isNull(sandboxesTable.inactiveDeadlineAt),
+        notExists(liveDriverInstanceQueryForListedSubject(appDb)),
+        notExists(activeSessionRunQueryForListedSubject(appDb)),
+        notExists(runLeaseQueryForListedSubject(appDb)),
+      ),
+    )
+    .run();
+
+  return {
+    cattle: getD1ChangeCount(cattle),
+    pet: getD1ChangeCount(pet),
+  };
 }
 
 export async function listStaleRuntimeSubjectOperations(
