@@ -107,7 +107,10 @@ export class DriverInstanceRpcEventIngestionController {
       const cachedLink = state.runtimeSessionLink;
       const eventSessionRunId = resolveEventSessionRunId(input.events);
       const shouldRefreshLink =
-        input.events.some((envelope) => envelope.event.kind === "run.started") ||
+        input.events.some(
+          (envelope) =>
+            envelope.event.kind === "run.started" || envelope.event.kind === "agent.tasks.replaced",
+        ) ||
         runtimeSessionLinkNeedsRefresh(cachedLink) ||
         (eventSessionRunId !== undefined && cachedLink?.sessionRunId !== eventSessionRunId);
       const link = await this.#getRuntimeSessionLink({

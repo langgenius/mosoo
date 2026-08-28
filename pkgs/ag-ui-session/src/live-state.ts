@@ -1,3 +1,5 @@
+import type { AgentTaskSnapshot } from "@mosoo/contracts/session";
+
 export interface SessionViewPlanEntry {
   content: string;
   priority: "high" | "medium" | "low";
@@ -74,6 +76,7 @@ export interface SessionReadinessSnapshotView {
 }
 
 export interface SessionInfraState {
+  driverInstanceId: string | null;
   lastFailureReason: string | null;
   lastFailureMessage: string | null;
   lastSeen: string | null;
@@ -173,6 +176,7 @@ export interface SessionLiveState {
   run: SessionRunView;
   sessionId: string;
   title: string | null;
+  taskSnapshot: AgentTaskSnapshot | null;
   updatedAt: string | null;
   usage: SessionUsageSummary | null;
   viewerId: string;

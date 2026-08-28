@@ -59,17 +59,27 @@ function createAgentSessionRetrieveDatabase(): SqliteD1Database {
       created_at integer,
       deployment_version_id text,
       deployment_version_number integer,
+      driver_instance_id text,
       error_code text,
       error_details_json text,
       error_message text,
       id text PRIMARY KEY NOT NULL,
       model text,
       provider text,
+      session_id text,
       started_at integer,
       status text,
       trace_id text,
       trigger text,
       updated_at integer
+    );
+
+    CREATE TABLE session_agent_task_snapshot (
+      driver_instance_id text NOT NULL,
+      run_id text NOT NULL,
+      seq integer NOT NULL,
+      session_id text PRIMARY KEY NOT NULL,
+      tasks_json text NOT NULL
     );
 
     INSERT INTO session (
@@ -149,6 +159,108 @@ describe("agent session retrieve", () => {
     });
 
     expect(result.session.id).toBe("session-1");
+  });
+
+  test("returns the current schema-validated task snapshot", async () => {
+    const database = createAgentSessionRetrieveDatabase();
+    database.execute(`
+      UPDATE session
+      SET last_run_id = 'run-1', status = 'RUNNING'
+      WHERE id = 'session-1';
+
+      INSERT INTO session_run (
+        created_at,
+        driver_instance_id,
+        id,
+        session_id,
+        status,
+        trace_id,
+        trigger,
+        updated_at
+      )
+      VALUES (
+        2,
+        'driver-1',
+        'run-1',
+        'session-1',
+        'running',
+        'trace-1',
+        'user_message',
+        2
+      );
+
+      INSERT INTO session_agent_task_snapshot (
+        driver_instance_id,
+        run_id,
+        seq,
+        session_id,
+        tasks_json
+      )
+      VALUES (
+        'driver-1',
+        'run-1',
+        3,
+        'session-1',
+        '{"tasks":[{"taskId":"task-1","taskType":"review"}]}'
+      );
+    `);
+
+    const result = await retrieveAgentSession(database, VIEWER, {
+      projectId: PROJECT_ID,
+      sessionId: "session-1",
+    });
+
+    expect(result.taskSnapshot).toEqual({
+      driverInstanceId: "driver-1",
+      runId: "run-1",
+      tasks: [{ taskId: "task-1", taskType: "review" }],
+    });
+  });
+
+  test.each([
+    ["terminal run", null, "completed", '{"tasks":[{"taskId":"stale"}]}'],
+    ["malformed state", null, "running", '{"tasks":"invalid"}'],
+    ["archived running session", 3, "running", '{"tasks":[{"taskId":"stale"}]}'],
+  ])("fails closed for %s task snapshots", async (_label, archivedAt, runStatus, tasksJson) => {
+    const database = createAgentSessionRetrieveDatabase();
+    await database
+      .prepare("UPDATE session SET archived_at = ?, last_run_id = ?, status = ? WHERE id = ?")
+      .bind(archivedAt, "run-1", "RUNNING", "session-1")
+      .run();
+    await database
+      .prepare(
+        `INSERT INTO session_run (
+          created_at,
+          driver_instance_id,
+          id,
+          session_id,
+          status,
+          trace_id,
+          trigger,
+          updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(2, "driver-1", "run-1", "session-1", runStatus, "trace-1", "user_message", 2)
+      .run();
+    await database
+      .prepare(
+        `INSERT INTO session_agent_task_snapshot (
+          driver_instance_id,
+          run_id,
+          seq,
+          session_id,
+          tasks_json
+        ) VALUES (?, ?, ?, ?, ?)`,
+      )
+      .bind("driver-1", "run-1", 3, "session-1", tasksJson)
+      .run();
+
+    const result = await retrieveAgentSession(database, VIEWER, {
+      projectId: PROJECT_ID,
+      sessionId: "session-1",
+    });
+
+    expect(result.taskSnapshot).toBeNull();
   });
 
   test("projects terminal cleanup rows as not recoverable even with archive marker", async () => {

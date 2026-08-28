@@ -810,6 +810,36 @@ describe("API to driver boundary", () => {
     ).not.toThrow();
   });
 
+  test("rejects non-empty task snapshots after run terminal but permits an explicit clear", () => {
+    const event = (tasks: { taskId: string }[]) =>
+      createRuntimeEvent({
+        driverInstanceId: API_DRIVER_BOUNDARY_IDS.driverInstance,
+        id: API_DRIVER_BOUNDARY_IDS.runtimeEvent,
+        kind: "agent.tasks.replaced",
+        occurredAt: "1970-01-01T00:00:00.010Z",
+        payload: { tasks },
+        runId: API_DRIVER_BOUNDARY_IDS.sessionRun,
+        sessionId: API_DRIVER_BOUNDARY_IDS.session,
+      });
+    const terminalLink = {
+      ...createRuntimeSessionLink(),
+      sessionRunStatus: "completed" as const,
+    };
+
+    expect(() =>
+      assertRuntimeEventMatchesDriverLink(event([{ taskId: "stale" }]), {
+        driverInstanceId: API_DRIVER_BOUNDARY_IDS.driverInstance,
+        link: terminalLink,
+      }),
+    ).toThrow("requires an active session run");
+    expect(() =>
+      assertRuntimeEventMatchesDriverLink(event([]), {
+        driverInstanceId: API_DRIVER_BOUNDARY_IDS.driverInstance,
+        link: terminalLink,
+      }),
+    ).not.toThrow();
+  });
+
   test("rejects canonical driver events whose source id disagrees with the envelope", () => {
     expect(() =>
       assertRuntimeEventMatchesDriverEnvelope(

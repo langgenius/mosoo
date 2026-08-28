@@ -1,3 +1,4 @@
+import { AgentTaskSnapshot } from "@mosoo/contracts/session";
 import { type } from "arktype";
 
 import {
@@ -152,6 +153,7 @@ export const SessionRunViewSchema = type({
 });
 
 export const SessionInfraStateSchema = type({
+  driverInstanceId: NullableString,
   lastFailureMessage: NullableString,
   lastFailureReason: NullableString,
   lastSeen: NullableString,
@@ -172,6 +174,7 @@ export const SessionLiveStateSchema = type({
   run: SessionRunViewSchema,
   sessionId: "string",
   title: NullableString,
+  taskSnapshot: type("null").or(AgentTaskSnapshot),
   updatedAt: NullableString,
   usage: type("null").or(SessionUsageSummarySchema),
   viewerId: "string",

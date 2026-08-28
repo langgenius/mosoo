@@ -1,3 +1,5 @@
+import { type } from "arktype";
+
 import type { AgentBuiltInToolConfig, AgentKind } from "../agent/agent.contract";
 import type { FileUploadSummary } from "../file/file.contract";
 import type {
@@ -491,10 +493,110 @@ export interface AgentSessionActionCapability {
   status: AgentSessionActionCapabilityStatus;
 }
 
+const AGENT_TASK_SNAPSHOT_MAX_TASKS = 256;
+const AGENT_TASK_ID_MAX_UTF8_BYTES = 256;
+const AGENT_TASK_TEXT_MAX_CODE_UNITS = 4096;
+const AGENT_TASK_PAYLOAD_MAX_UTF8_BYTES = 1020 * 1024;
+
+function getUtf8ByteLength(value: string): number {
+  let bytes = 0;
+
+  for (let index = 0; index < value.length; index += 1) {
+    const codePoint = value.codePointAt(index) ?? 0;
+    bytes += codePoint <= 0x7f ? 1 : codePoint <= 0x7ff ? 2 : codePoint <= 0xffff ? 3 : 4;
+
+    if (codePoint > 0xffff) {
+      index += 1;
+    }
+  }
+
+  return bytes;
+}
+
+export const AgentTask = type({
+  taskId: "string > 0",
+  "taskType?": "string > 0",
+  "title?": "string > 0",
+})
+  .onUndeclaredKey("reject")
+  .narrow((task, context) => {
+    if (getUtf8ByteLength(task.taskId) > AGENT_TASK_ID_MAX_UTF8_BYTES) {
+      return context.reject({
+        actual: task.taskId,
+        expected: `a taskId of at most ${AGENT_TASK_ID_MAX_UTF8_BYTES} UTF-8 bytes`,
+      });
+    }
+
+    for (const value of [task.taskType, task.title]) {
+      if (value !== undefined && value.length > AGENT_TASK_TEXT_MAX_CODE_UNITS) {
+        return context.reject({
+          actual: value,
+          expected: `task metadata of at most ${AGENT_TASK_TEXT_MAX_CODE_UNITS} UTF-16 code units`,
+        });
+      }
+    }
+
+    return true;
+  });
+export type AgentTask = typeof AgentTask.infer;
+
+const AgentTaskList = AgentTask.array().narrow((tasks, context) => {
+  if (tasks.length > AGENT_TASK_SNAPSHOT_MAX_TASKS) {
+    return context.reject({
+      actual: String(tasks.length),
+      expected: `at most ${AGENT_TASK_SNAPSHOT_MAX_TASKS} tasks`,
+    });
+  }
+
+  if (new Set(tasks.map((task) => task.taskId)).size !== tasks.length) {
+    return context.reject({
+      actual: tasks.map((task) => task.taskId).join(", "),
+      expected: "unique taskId values",
+    });
+  }
+
+  return true;
+});
+
+export const AgentTasksReplacedPayload = type({
+  tasks: AgentTaskList,
+})
+  .onUndeclaredKey("reject")
+  .narrow((payload, context) => {
+    const byteLength = getUtf8ByteLength(JSON.stringify(payload));
+
+    return byteLength <= AGENT_TASK_PAYLOAD_MAX_UTF8_BYTES
+      ? true
+      : context.reject({
+          actual: `${byteLength} UTF-8 bytes`,
+          expected: `at most ${AGENT_TASK_PAYLOAD_MAX_UTF8_BYTES} UTF-8 bytes`,
+        });
+  });
+export type AgentTasksReplacedPayload = typeof AgentTasksReplacedPayload.infer;
+
+export const AgentTaskSnapshot = type({
+  driverInstanceId: "string > 0",
+  runId: "string > 0",
+  tasks: AgentTaskList,
+})
+  .onUndeclaredKey("reject")
+  .narrow((snapshot, context) => {
+    const byteLength = getUtf8ByteLength(JSON.stringify({ tasks: snapshot.tasks }));
+
+    return byteLength <= AGENT_TASK_PAYLOAD_MAX_UTF8_BYTES
+      ? true
+      : context.reject({
+          actual: `${byteLength} UTF-8 bytes`,
+          expected: `at most ${AGENT_TASK_PAYLOAD_MAX_UTF8_BYTES} UTF-8 bytes of tasks`,
+        });
+  });
+export type AgentTaskSnapshot = typeof AgentTaskSnapshot.infer;
+
 export interface AgentSessionRetrieveResult {
   capabilities: AgentSessionActionCapability[];
   recoverability: AgentSessionRecoverability;
   session: SessionSummary;
+  taskSnapshot: AgentTaskSnapshot | null;
 }
 
 export interface AgentSessionRetrieveConnection {

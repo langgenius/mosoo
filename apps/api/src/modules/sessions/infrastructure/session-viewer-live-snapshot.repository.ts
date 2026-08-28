@@ -18,18 +18,20 @@ import {
   parseSchemaValue,
 } from "@mosoo/contracts/validation";
 import {
+  sessionAgentTaskSnapshotsTable,
   sessionPermissionRequestsTable,
   sessionReadinessSnapshotsTable,
   sessionRunsTable,
   sessionsTable,
 } from "@mosoo/db";
 import type { AgentDeploymentVersionId, PlatformId, SessionId, SessionRunId } from "@mosoo/id";
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq, isNull } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { isTruthy } from "../../../shared/truthiness";
 import { toIsoString } from "../../../time";
 import { fileStore } from "../../files/application/file-store";
+import { parseStoredAgentTaskSnapshot } from "./session-agent-task-snapshot.repository";
 import { createInitialSessionLiveState } from "./session-live-state.reducer";
 import { loadStoredSessionMessages } from "./session-message-snapshot.repository";
 
@@ -45,6 +47,7 @@ interface SessionViewerStateJoinedRow extends SessionViewerStateSessionRow {
   run_created_at: number | null;
   run_deployment_version_id: AgentDeploymentVersionId | null;
   run_deployment_version_number: number | null;
+  run_driver_instance_id: string | null;
   run_error_code: string | null;
   run_error_details_json: string | null;
   run_error_message: string | null;
@@ -56,6 +59,9 @@ interface SessionViewerStateJoinedRow extends SessionViewerStateSessionRow {
   run_trace_id: string | null;
   run_trigger: SessionRunTrigger | null;
   run_updated_at: number | null;
+  task_driver_instance_id: string | null;
+  task_run_id: string | null;
+  task_tasks_json: string | null;
 }
 
 interface SessionViewerStateSnapshotRow {
@@ -108,6 +114,7 @@ async function listSessionViewerStateSnapshotRows(
         run_created_at: sessionRunsTable.createdAt,
         run_deployment_version_id: sessionRunsTable.deploymentVersionId,
         run_deployment_version_number: sessionRunsTable.deploymentVersionNumber,
+        run_driver_instance_id: sessionRunsTable.driverInstanceId,
         run_error_code: sessionRunsTable.errorCode,
         run_error_details_json: sessionRunsTable.errorDetailsJson,
         run_error_message: sessionRunsTable.errorMessage,
@@ -120,12 +127,24 @@ async function listSessionViewerStateSnapshotRows(
         run_trigger: sessionRunsTable.trigger,
         run_updated_at: sessionRunsTable.updatedAt,
         status: sessionsTable.status,
+        task_driver_instance_id: sessionAgentTaskSnapshotsTable.driverInstanceId,
+        task_run_id: sessionAgentTaskSnapshotsTable.runId,
+        task_tasks_json: sessionAgentTaskSnapshotsTable.tasksJson,
         title: sessionsTable.title,
         updated_at: sessionsTable.updatedAt,
       },
     })
     .from(sessionsTable)
     .leftJoin(sessionRunsTable, eq(sessionRunsTable.id, sessionsTable.lastRunId))
+    .leftJoin(
+      sessionAgentTaskSnapshotsTable,
+      and(
+        eq(sessionAgentTaskSnapshotsTable.sessionId, sessionsTable.id),
+        eq(sessionAgentTaskSnapshotsTable.runId, sessionRunsTable.id),
+        eq(sessionAgentTaskSnapshotsTable.driverInstanceId, sessionRunsTable.driverInstanceId),
+        isNull(sessionsTable.archivedAt),
+      ),
+    )
     .where(eq(sessionsTable.id, sessionId))
     .limit(1)
     .all();
@@ -313,6 +332,28 @@ function isTerminalRunStatus(status: SessionRunView["status"]): boolean {
   );
 }
 
+function toJoinedAgentTaskSnapshot(
+  row: SessionViewerStateJoinedRow,
+): SessionLiveState["taskSnapshot"] {
+  if (
+    row.status !== "RUNNING" ||
+    row.run_status === null ||
+    isTerminalRunStatus(row.run_status) ||
+    row.task_driver_instance_id === null ||
+    row.task_run_id === null ||
+    row.task_tasks_json === null
+  ) {
+    return null;
+  }
+
+  return parseStoredAgentTaskSnapshot({
+    driverInstanceId: row.task_driver_instance_id,
+    runId: row.task_run_id,
+    sessionId: row.id,
+    tasksJson: row.task_tasks_json,
+  });
+}
+
 function toCanonicalLifecycleStatus(
   sessionStatus: SessionStatus,
   runStatus: SessionRunView["status"],
@@ -334,6 +375,7 @@ function applyCanonicalSessionState(
   input: {
     files: SessionViewFile[];
     latestRun: SessionRunSummary | null;
+    runDriverInstanceId: string | null;
     session: SessionViewerStateSessionRow;
     viewerId: PlatformId;
   },
@@ -347,6 +389,13 @@ function applyCanonicalSessionState(
   return {
     ...state,
     files: input.files,
+    infra: {
+      ...state.infra,
+      driverInstanceId:
+        input.session.status === "RUNNING" && !isTerminalRunStatus(run.status)
+          ? input.runDriverInstanceId
+          : null,
+    },
     lifecycle: toCanonicalLifecycleStatus(input.session.status, run.status),
     permissionRequests,
     run,
@@ -375,6 +424,7 @@ export async function loadSessionViewerState(
   ]);
   const session = getFirstSnapshotRow(snapshotRows).session;
   const latestRun = toJoinedSessionRunSummary(session);
+  const taskSnapshot = toJoinedAgentTaskSnapshot(session);
   const baseState = createInitialSessionLiveState({
     sessionId: input.sessionId,
     title: session.title,
@@ -385,10 +435,12 @@ export async function loadSessionViewerState(
     messages,
     permissionRequests,
     readiness,
+    taskSnapshot,
   };
   const state = applyCanonicalSessionState(stateWithMessages, {
     files: sessionFiles,
     latestRun,
+    runDriverInstanceId: session.run_driver_instance_id,
     session,
     viewerId: input.viewerId,
   });

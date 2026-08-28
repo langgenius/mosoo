@@ -1,3 +1,5 @@
+import type { AgentTaskSnapshot } from "@mosoo/contracts/session";
+
 import type {
   SessionCommandOption,
   SessionConfigOption,
@@ -12,9 +14,12 @@ import type {
 } from "./live-state";
 
 export interface MosooSessionRunUpdatedValue {
+  driverInstanceId: string | null;
   lifecycle: SessionLifecycleStatus;
   run: SessionRunView;
 }
+
+export type MosooSessionTasksReplacedValue = AgentTaskSnapshot;
 
 export interface MosooSessionSyncRequestValue {
   reason: "manual" | "reconnect";

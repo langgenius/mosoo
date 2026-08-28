@@ -1,11 +1,14 @@
 import { sessionEventsTable, sessionRunsTable, sessionsTable } from "@mosoo/db";
 import { createPlatformId } from "@mosoo/id";
 import type { RuntimeEventId, SessionId, SessionRunId } from "@mosoo/id";
+import { readRuntimeAgentTaskSnapshot } from "@mosoo/runtime-events";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
+import type { AppDatabase } from "../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../time";
 import { createSessionRuntimeEventProjection } from "../domain/session-runtime-event-projection";
+import { prepareSessionAgentTaskSnapshotUpsert } from "./session-agent-task-snapshot.repository";
 import type {
   InsertSessionEventResult,
   OneRuntimeEventPerSessionAllocation,
@@ -35,7 +38,7 @@ export type {
 } from "./session-runtime-event-store.types";
 
 const MAX_SESSION_RUNTIME_EVENT_INSERT_ATTEMPTS = 5;
-// D1 accepts at most 100 bound parameters; each session_event row binds 21.
+// D1 accepts at most 100 bound parameters; each fenced session_event row binds 22.
 const MAX_SESSION_EVENT_ROWS_PER_INSERT = 4;
 const WRITABLE_SESSION_STATUSES = ["IDLE", "RUNNING", "RESCHEDULING"] as const;
 const TERMINAL_LIFECYCLE_WRITABLE_SESSION_STATUSES = [
@@ -107,6 +110,10 @@ function isSessionRuntimeEventSeqConflict(error: unknown): boolean {
 function readRuntimeEventEndedAt(event: SessionRuntimeEventRecord, fallbackMs: number): number {
   const endedAt = Date.parse(event.occurredAt);
   return Number.isFinite(endedAt) && endedAt >= fallbackMs ? endedAt : fallbackMs;
+}
+
+function selectedValue<T>(value: T, alias: string) {
+  return sql<T>`${value}`.as(alias);
 }
 
 async function allocateSessionRuntimeEventBatch(
@@ -423,11 +430,25 @@ async function insertSessionEventRows(
 
   const appDatabase = getAppDatabase(database);
   const statements: D1PreparedStatement[] = [];
+  const receiptStatementIndexes: number[] = [];
 
   for (let index = 0; index < values.length; index += MAX_SESSION_EVENT_ROWS_PER_INSERT) {
+    const chunk = values.slice(index, index + MAX_SESSION_EVENT_ROWS_PER_INSERT);
+    const firstValue = chunk[0];
+
+    if (firstValue === undefined) {
+      continue;
+    }
+
+    const selection = createSessionEventInsertSelect(appDatabase, firstValue);
+
+    for (const value of chunk.slice(1)) {
+      selection.unionAll(createSessionEventInsertSelect(appDatabase, value));
+    }
+
     const query = appDatabase
       .insert(sessionEventsTable)
-      .values(values.slice(index, index + MAX_SESSION_EVENT_ROWS_PER_INSERT))
+      .select(selection)
       .onConflictDoNothing({
         target: [sessionEventsTable.sessionId, sessionEventsTable.sourceEventId],
       })
@@ -437,18 +458,32 @@ async function insertSessionEventRows(
       })
       .toSQL();
 
+    receiptStatementIndexes.push(statements.length);
     statements.push(database.prepare(query.sql).bind(...query.params));
+
+    for (const value of chunk) {
+      if (value.agentTaskSnapshot !== null) {
+        statements.push(
+          prepareSessionAgentTaskSnapshotUpsert(database, {
+            eventId: value.id,
+            snapshot: value.agentTaskSnapshot,
+          }),
+        );
+      }
+    }
   }
 
   const results = await database.batch<{ session_id: SessionId; source_event_id: string }>(
     statements,
   );
-  const insertedRows = results.flatMap((result) =>
-    result.results.map((row) => ({
+  const insertedRows = receiptStatementIndexes.flatMap((resultIndex) => {
+    const result = results[resultIndex];
+
+    return (result?.results ?? []).map((row) => ({
       sessionId: row.session_id,
       sourceEventId: row.source_event_id,
-    })),
-  );
+    }));
+  });
 
   return {
     insertedCount: insertedRows.length,
@@ -548,6 +583,10 @@ function toSessionRuntimeEventInsertValue(input: {
   const occurredAt = input.row.occurredAt ?? input.timestampMs + input.sourceIndex;
 
   return {
+    agentTaskSnapshot:
+      input.row.event.kind === "agent.tasks.replaced"
+        ? readRuntimeAgentTaskSnapshot(input.row.event)
+        : null,
     agentId: input.allocation.agentId,
     contentText: input.row.projection.contentText,
     createdAt: input.timestampMs + input.sourceIndex,
@@ -570,6 +609,36 @@ function toSessionRuntimeEventInsertValue(input: {
     traceId: input.row.projection.traceId,
     visibility: input.row.projection.visibility,
   };
+}
+
+function createSessionEventInsertSelect(database: AppDatabase, value: SessionEventInsertValue) {
+  return database
+    .select({
+      agentId: selectedValue(value.agentId, "agent_id"),
+      contentText: selectedValue(value.contentText, "content_text"),
+      createdAt: selectedValue(value.createdAt, "created_at"),
+      endedAt: selectedValue(value.endedAt, "ended_at"),
+      eventType: selectedValue(value.eventType, "event_type"),
+      family: selectedValue(value.family, "family"),
+      id: selectedValue(value.id, "id"),
+      occurredAt: selectedValue(value.occurredAt, "occurred_at"),
+      processStatus: selectedValue(value.processStatus, "process_status"),
+      processType: selectedValue(value.processType, "process_type"),
+      runId: selectedValue(value.runId, "run_id"),
+      seq: selectedValue(value.seq, "seq"),
+      sessionId: selectedValue(value.sessionId, "session_id"),
+      sourceEventId: selectedValue(value.sourceEventId, "source_event_id"),
+      source: selectedValue(value.source, "source"),
+      toolCallId: selectedValue(value.toolCallId, "tool_call_id"),
+      toolInputJson: selectedValue(value.toolInputJson, "tool_input_json"),
+      toolName: selectedValue(value.toolName, "tool_name"),
+      tokens: selectedValue(value.tokens, "tokens"),
+      traceId: selectedValue(value.traceId, "trace_id"),
+      visibility: selectedValue(value.visibility, "visibility"),
+    })
+    .from(sessionsTable)
+    .where(and(eq(sessionsTable.id, value.sessionId), isNull(sessionsTable.archivedAt)))
+    .$dynamic();
 }
 
 function toSessionRuntimeEventInsertValues(input: {

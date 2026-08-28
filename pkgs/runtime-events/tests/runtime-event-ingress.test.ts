@@ -175,6 +175,84 @@ describe("runtime event ingress", () => {
     });
   });
 
+  test("admits strict bounded agent task snapshots", () => {
+    const outcome = ingestRuntimeEventInput(
+      {
+        ...createContext(),
+        driverInstanceId: PLATFORM_ID_FIXTURES.driverInstance,
+      },
+      {
+        kind: "agent.tasks.replaced",
+        payload: {
+          tasks: [
+            {
+              taskId: "🦄".repeat(64),
+              taskType: "review",
+              title: "Review the repository",
+            },
+          ],
+        },
+      },
+    );
+
+    expect(outcome).toMatchObject({
+      event: {
+        delivery: "lossless",
+        driverInstanceId: PLATFORM_ID_FIXTURES.driverInstance,
+        kind: "agent.tasks.replaced",
+        runId: PLATFORM_ID_FIXTURES.sessionRun,
+        visibility: "participant",
+      },
+      status: "accepted",
+    });
+  });
+
+  test.each([
+    ["missing driver", { tasks: [] }, { driverInstanceId: undefined }],
+    [
+      "too many tasks",
+      { tasks: Array.from({ length: 257 }, (_, index) => ({ taskId: `${index}` })) },
+      {},
+    ],
+    ["duplicate IDs", { tasks: [{ taskId: "same" }, { taskId: "same" }] }, {}],
+    ["oversized ID", { tasks: [{ taskId: "🦄".repeat(65) }] }, {}],
+    ["empty metadata", { tasks: [{ taskId: "task-1", title: "" }] }, {}],
+    ["oversized metadata", { tasks: [{ taskId: "task-1", title: "x".repeat(4097) }] }, {}],
+    ["unknown payload field", { extra: true, tasks: [] }, {}],
+    ["unknown task field", { tasks: [{ extra: true, taskId: "task-1" }] }, {}],
+    [
+      "oversized aggregate",
+      {
+        tasks: Array.from({ length: 256 }, (_, index) => ({
+          taskId: `${index}`,
+          taskType: "x".repeat(4096),
+          title: "x".repeat(4096),
+        })),
+      },
+      {},
+    ],
+  ])("rejects %s in agent task snapshots", (_label, payload, contextOverrides) => {
+    const outcome = ingestRuntimeEventInput(
+      {
+        ...createContext(),
+        driverInstanceId: PLATFORM_ID_FIXTURES.driverInstance,
+        ...contextOverrides,
+      },
+      {
+        kind: "agent.tasks.replaced",
+        payload,
+      },
+    );
+
+    expect(outcome).toMatchObject({
+      rejection: {
+        code: "malformed_event",
+        kind: "agent.tasks.replaced",
+      },
+      status: "rejected",
+    });
+  });
+
   test("owns canonical permission request payload projection", () => {
     const event = first(
       toRuntimeEventInput(

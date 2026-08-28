@@ -136,6 +136,16 @@ CREATE TABLE session_event (
   created_at integer NOT NULL
 );
 
+CREATE TABLE session_agent_task_snapshot (
+  driver_instance_id text NOT NULL,
+  run_id text NOT NULL,
+  seq integer NOT NULL,
+  session_id text PRIMARY KEY NOT NULL,
+  tasks_json text NOT NULL,
+  FOREIGN KEY (run_id) REFERENCES session_run (id) ON DELETE CASCADE,
+  FOREIGN KEY (session_id) REFERENCES session (id) ON DELETE CASCADE
+);
+
 CREATE TABLE session_permission_request (
   created_at integer NOT NULL,
   driver_instance_id text NOT NULL,

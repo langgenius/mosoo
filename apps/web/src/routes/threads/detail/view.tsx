@@ -36,6 +36,7 @@ import {
 import { EmptyState } from "@/shared/ui/empty-state";
 import { Markdown } from "@/shared/ui/markdown";
 import type { MarkdownLinkResolver } from "@/shared/ui/markdown";
+import type { AgentTaskView } from "@/shared/ui/session-events";
 import { Textarea } from "@/shared/ui/textarea";
 
 import { AgentAvatar } from "../agent-avatar";
@@ -382,6 +383,7 @@ function ThreadReplyComposer({
 
 export function ThreadDetail({
   actionError,
+  activeTasks,
   agent,
   artifacts,
   messages,
@@ -401,6 +403,7 @@ export function ThreadDetail({
   viewer,
 }: {
   actionError: string | null;
+  activeTasks: readonly AgentTaskView[];
   agent: AgentSummary | null;
   artifacts: readonly ListedFileEntry[];
   messages: SessionMessage[];
@@ -561,6 +564,7 @@ export function ThreadDetail({
       />
 
       <ThreadProcessModal
+        activeTasks={activeTasks}
         agent={agent}
         agentName={t(thread.agentName)}
         errorMessage={processEventsError?.message ?? null}

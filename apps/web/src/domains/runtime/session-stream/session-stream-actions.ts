@@ -4,6 +4,7 @@ import type {
   SessionPermissionRequestView,
   SessionRunView,
 } from "@mosoo/ag-ui-session";
+import type { AgentTask } from "@mosoo/contracts/session";
 import { useCallback, useMemo } from "react";
 import type { MutableRefObject } from "react";
 
@@ -42,6 +43,7 @@ interface UseSessionStreamActionsInput {
 }
 
 export function useSessionStreamActions(input: UseSessionStreamActionsInput): {
+  activeTasks: AgentTask[];
   messages: SessionLiveState["messages"];
   lifecycle: SessionLiveState["lifecycle"];
   permissionRequests: SessionPermissionRequestView[];
@@ -155,6 +157,7 @@ export function useSessionStreamActions(input: UseSessionStreamActionsInput): {
   const streaming = useMemo(() => isSessionStreamStreaming(input.liveState), [input.liveState]);
 
   return {
+    activeTasks: input.liveState?.taskSnapshot?.tasks ?? [],
     lifecycle: input.liveState?.lifecycle ?? "IDLE",
     messages,
     permissionRequests,

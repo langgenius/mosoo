@@ -1,3 +1,9 @@
+import { AgentTasksReplacedPayload } from "@mosoo/contracts/session";
+import type {
+  AgentTaskSnapshot,
+  AgentTasksReplacedPayload as AgentTasksReplacedPayloadValue,
+} from "@mosoo/contracts/session";
+import { parseSchemaValue } from "@mosoo/contracts/validation";
 import type { DriverInstanceId, SessionId, SessionRunId } from "@mosoo/id";
 
 import type { RuntimeEventEnvelope, RuntimeEventKind } from "./runtime-event";
@@ -40,6 +46,8 @@ export interface RuntimeEventPermissionRequest {
   readonly toolCallId: string | null;
   readonly toolKind: string | null;
 }
+
+export type RuntimeAgentTasksReplacedPayload = AgentTasksReplacedPayloadValue;
 
 export interface RuntimeEventToolCallUpdate {
   readonly content: string | null;
@@ -157,6 +165,9 @@ export function admitRuntimeEventPayload(
   const kind = context.kind;
 
   switch (kind) {
+    case "agent.tasks.replaced": {
+      return readStrictRuntimeAgentTasksReplacedPayload(context, payload);
+    }
     case "diagnostic.reported": {
       const record = requireRuntimeEventPayloadRecord(kind, payload);
       requireOptionalString(record, "code", kind);
@@ -269,6 +280,28 @@ export function admitRuntimeEventPayload(
       return isRuntimeEventRecord(payload) ? omitRuntimeEventPayloadIdentity(payload) : payload;
     }
   }
+}
+
+export function readRuntimeAgentTaskSnapshot(event: RuntimeEventEnvelope): AgentTaskSnapshot {
+  if (event.kind !== "agent.tasks.replaced") {
+    throw new Error("Runtime agent task snapshot can only be read from agent.tasks.replaced.");
+  }
+
+  const payload = readStrictRuntimeAgentTasksReplacedPayload(
+    {
+      ...(event.driverInstanceId === undefined ? {} : { driverInstanceId: event.driverInstanceId }),
+      kind: event.kind,
+      ...(event.runId === undefined ? {} : { runId: event.runId }),
+      sessionId: event.sessionId,
+    },
+    event.payload,
+  );
+
+  return {
+    driverInstanceId: event.driverInstanceId!,
+    runId: event.runId!,
+    tasks: [...payload.tasks],
+  };
 }
 
 export function readRuntimeEventPayload(event: RuntimeEventEnvelope): RuntimeEventRecord {
@@ -515,6 +548,22 @@ function readStrictRuntimeToolCallUpdatePayload(payload: unknown): RuntimeEventT
     title: readOptionalRuntimeEventNullableString(record, "title", kind),
     toolCallId: requireRuntimeEventString(record, "toolCallId", kind),
   };
+}
+
+function readStrictRuntimeAgentTasksReplacedPayload(
+  context: RuntimeEventPayloadAdmissionContext,
+  payload: unknown,
+): RuntimeAgentTasksReplacedPayload {
+  const kind = "agent.tasks.replaced";
+
+  if (context.driverInstanceId === undefined) {
+    throw new Error(`Runtime event ${kind} requires a driver instance ID.`);
+  }
+  if (context.runId === undefined) {
+    throw new Error(`Runtime event ${kind} requires a run ID.`);
+  }
+
+  return parseSchemaValue(AgentTasksReplacedPayload, payload);
 }
 
 export function readRuntimeEventFileChangePath(payload: RuntimeEventRecord): string | null {

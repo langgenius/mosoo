@@ -9,6 +9,7 @@ import type { AgUiSessionEvent } from "@mosoo/ag-ui-session";
 
 import type { RuntimeEventEnvelope } from "./runtime-event";
 import {
+  readRuntimeAgentTaskSnapshot,
   readRuntimeEventPermissionRequest,
   readRuntimeEventMessageDelta,
   readRuntimeEventMessageKey,
@@ -79,6 +80,7 @@ function projectSessionRunUpdated(event: RuntimeEventEnvelope): AgUiSessionEvent
 
   return [
     createServerCustomEvent(MOSOO_CUSTOM_EVENT.sessionRunUpdated.name, {
+      driverInstanceId: event.driverInstanceId ?? null,
       lifecycle: payload.lifecycle ?? toRuntimeRunLifecycleStatus(run.status),
       run,
     }),
@@ -381,6 +383,14 @@ export function projectRuntimeEventToAgUiSessionEvents(
     }
     case "agent.task.updated": {
       return projectAgentTaskUpdated(event);
+    }
+    case "agent.tasks.replaced": {
+      return [
+        createServerCustomEvent(
+          MOSOO_CUSTOM_EVENT.sessionTasksReplaced.name,
+          readRuntimeAgentTaskSnapshot(event),
+        ),
+      ];
     }
     case "runtime.config.updated":
     case "runtime.driver.updated":

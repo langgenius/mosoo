@@ -1,3 +1,4 @@
+import { AgentTaskSnapshot } from "@mosoo/contracts/session";
 import { type } from "arktype";
 
 import { NullableString, OptionalNullableString } from "./ag-ui-session-schema-primitives";
@@ -204,6 +205,7 @@ export const MosooServerCustomEventSchema = type.or(
     name: eventNameLiteral(MOSOO_CUSTOM_EVENT.sessionRunUpdated.name),
     type: '"CUSTOM"',
     value: {
+      driverInstanceId: NullableString,
       lifecycle: '"IDLE" | "RUNNING" | "RESCHEDULING" | "TERMINATED"',
       run: SessionRunViewSchema,
     },
@@ -217,6 +219,11 @@ export const MosooServerCustomEventSchema = type.or(
       "message?": OptionalNullableString,
       reason: "string",
     },
+  }),
+  type({
+    name: eventNameLiteral(MOSOO_CUSTOM_EVENT.sessionTasksReplaced.name),
+    type: '"CUSTOM"',
+    value: AgentTaskSnapshot,
   }),
   type({
     name: eventNameLiteral(MOSOO_CUSTOM_EVENT.sessionUsageUpdated.name),

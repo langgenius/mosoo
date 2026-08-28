@@ -47,6 +47,7 @@ export class SessionViewerSocketHub {
   readonly #getSessionId: () => string | null;
   #liveStateCache: SessionLiveState | null = null;
   readonly #rememberSessionId: (sessionId: string) => void;
+  #stateOperationTail: Promise<void> = Promise.resolve();
   readonly #withSessionLogContext: <T>(fn: () => T) => T;
 
   constructor(options: SessionViewerSocketHubOptions) {
@@ -62,50 +63,54 @@ export class SessionViewerSocketHub {
       return;
     }
 
-    const broadcast = buildViewerBroadcastFrames({
-      cachedState: this.#liveStateCache,
-      events,
-    });
+    await this.#runStateOperation(async () => {
+      const broadcast = buildViewerBroadcastFrames({
+        cachedState: this.#liveStateCache,
+        events,
+      });
 
-    if (!broadcast) {
-      return;
-    }
-
-    if (broadcast.state) {
-      this.#liveStateCache = broadcast.state;
-    }
-
-    for (const socket of this.#getViewerSockets()) {
-      const attachment = getSocketAttachment(socket);
-
-      if (!attachment || socket.readyState !== WebSocket.OPEN) {
-        continue;
+      if (!broadcast) {
+        return;
       }
 
-      sendFrames(socket, broadcast.frames);
-    }
+      if (broadcast.state) {
+        this.#liveStateCache = broadcast.state;
+      }
+
+      for (const socket of this.#getViewerSockets()) {
+        const attachment = getSocketAttachment(socket);
+
+        if (!attachment || socket.readyState !== WebSocket.OPEN) {
+          continue;
+        }
+
+        sendFrames(socket, broadcast.frames);
+      }
+    });
   }
 
   async broadcastStateSync(): Promise<void> {
-    const sockets = this.#getViewerSockets()
-      .map((socket) => ({ attachment: getSocketAttachment(socket), socket }))
-      .filter(
-        (
-          candidate,
-        ): candidate is {
-          attachment: ViewerSocketAttachment;
-          socket: WebSocket;
-        } => candidate.attachment !== null,
-      );
+    await this.#runStateOperation(async () => {
+      const sockets = this.#getViewerSockets()
+        .map((socket) => ({ attachment: getSocketAttachment(socket), socket }))
+        .filter(
+          (
+            candidate,
+          ): candidate is {
+            attachment: ViewerSocketAttachment;
+            socket: WebSocket;
+          } => candidate.attachment !== null,
+        );
 
-    await sendViewerSocketStateSyncBatch({
-      cachedState: this.#liveStateCache,
-      database: this.#env.DB,
-      getLatestCachedState: () => this.#liveStateCache,
-      sockets,
-      updateLiveStateCache: (state) => {
-        this.#rememberLoadedLiveState(state);
-      },
+      await sendViewerSocketStateSyncBatch({
+        cachedState: this.#liveStateCache,
+        database: this.#env.DB,
+        getLatestCachedState: () => this.#liveStateCache,
+        sockets,
+        updateLiveStateCache: (state) => {
+          this.#rememberLoadedLiveState(state);
+        },
+      });
     });
   }
 
@@ -213,28 +218,41 @@ export class SessionViewerSocketHub {
   }
 
   async handleAlarm(): Promise<void> {
-    await runViewerPermissionCleanupAlarm({
-      cachedState: this.#liveStateCache,
-      env: this.#env,
-      hasOpenViewer: (sessionId) => this.#hasOpenViewer(sessionId),
-      storage: this.#ctx.storage,
-      updateLiveStateCache: (state) => {
-        this.#rememberLoadedLiveState(state);
-      },
+    await this.#runStateOperation(async () => {
+      await runViewerPermissionCleanupAlarm({
+        cachedState: this.#liveStateCache,
+        env: this.#env,
+        hasOpenViewer: (sessionId) => this.#hasOpenViewer(sessionId),
+        storage: this.#ctx.storage,
+        updateLiveStateCache: (state) => {
+          this.#rememberLoadedLiveState(state);
+        },
+      });
     });
   }
 
   async #sendViewerStateSync(ws: WebSocket, attachment: ViewerSocketAttachment): Promise<void> {
-    await sendViewerSocketStateSync({
-      attachment,
-      cachedState: this.#liveStateCache,
-      database: this.#env.DB,
-      getLatestCachedState: () => this.#liveStateCache,
-      updateLiveStateCache: (state) => {
-        this.#rememberLoadedLiveState(state);
-      },
-      ws,
+    await this.#runStateOperation(async () => {
+      await sendViewerSocketStateSync({
+        attachment,
+        cachedState: this.#liveStateCache,
+        database: this.#env.DB,
+        getLatestCachedState: () => this.#liveStateCache,
+        updateLiveStateCache: (state) => {
+          this.#rememberLoadedLiveState(state);
+        },
+        ws,
+      });
     });
+  }
+
+  #runStateOperation(operation: () => Promise<void>): Promise<void> {
+    const result = this.#stateOperationTail.then(operation);
+    this.#stateOperationTail = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    return result;
   }
 
   #rememberLoadedLiveState(state: SessionLiveState | null): void {

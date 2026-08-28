@@ -10,6 +10,7 @@ import type {
 
 import type { RuntimeEventEnvelope } from "./runtime-event";
 import {
+  readRuntimeAgentTaskSnapshot,
   readRuntimeEventFileChangePath,
   readRuntimeEventMessageDelta,
   readRuntimeEventMessageRole,
@@ -88,6 +89,13 @@ export function createProcessDraftFromRuntimeEvent(event: RuntimeEventEnvelope):
   const payload = readRuntimeEventPayload(event);
 
   switch (event.kind) {
+    case "agent.tasks.replaced": {
+      const count = readRuntimeAgentTaskSnapshot(event).tasks.length;
+      return {
+        content: `${count} background ${count === 1 ? "task" : "tasks"} active.`,
+        type: "session.status",
+      };
+    }
     case "message.added":
     case "message.delta":
     case "message.completed":

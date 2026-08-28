@@ -1114,6 +1114,8 @@
     "instructionTokenRead": "設定のアクセストークンを使用します。"
   },
   "sessionEvents": {
+    "activeBackgroundTaskCount": "{{count}} 件実行中",
+    "activeBackgroundTasks": "実行中のバックグラウンドタスク",
     "events": "件のイベント",
     "tokens": "トークン",
     "errorsOnly": "エラーのみ",

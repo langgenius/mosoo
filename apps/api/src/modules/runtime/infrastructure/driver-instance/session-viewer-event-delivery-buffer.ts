@@ -5,7 +5,6 @@ import {
   isAgUiSessionRunStartedEvent,
   isAgUiSessionRunTerminalEvent,
 } from "@mosoo/ag-ui-session";
-import { discardPromiseResult, ignorePromiseRejection } from "@mosoo/effects";
 import type { DriverInstanceId, SessionId } from "@mosoo/id";
 
 import { createErrorLogContext, logError } from "../../../../platform/cloudflare/logger";
@@ -16,6 +15,8 @@ import { publishSessionViewerEvents } from "../../../sessions/application/sessio
 const SESSION_VIEWER_EVENT_DELIVERY_FLUSH_MS = 150;
 const SESSION_VIEWER_EVENT_DELIVERY_MAX_DELTA_BYTES = 4 * 1024;
 const SESSION_VIEWER_EVENT_DELIVERY_MAX_EVENTS = 64;
+const SESSION_VIEWER_EVENT_DELIVERY_MAX_SERIALIZED_BYTES = 1_536 * 1024;
+const sessionViewerEventEncoder = new TextEncoder();
 
 interface BufferedSessionViewerEvents {
   deltaBytes: number;
@@ -42,16 +43,17 @@ function hasDeltaEvent(events: SessionDeliveryEvent[]): boolean {
   return events.some((event) => getAgUiSessionEventDeltaLength(event) > 0);
 }
 
-function estimateDeltaBytes(events: SessionDeliveryEvent[]): number {
-  return events.reduce((bytes, event) => bytes + getAgUiSessionEventDeltaLength(event), 0);
+function measureSerializedBytes(events: SessionDeliveryEvent[]): number {
+  return sessionViewerEventEncoder.encode(JSON.stringify(events)).byteLength;
 }
 
 export class SessionViewerEventDeliveryBuffer {
   #buffer: BufferedSessionViewerEvents | null = null;
+  #delivery: Promise<void> | null = null;
   #pendingFirstDelta = false;
+  readonly #pendingBatches: BufferedSessionViewerEvents[] = [];
   readonly #ctx: DurableObjectState;
   readonly #env: ApiBindings;
-  #gate: Promise<void> = Promise.resolve();
   readonly #getDriverInstanceId: () => DriverInstanceId | null;
   #timer: ReturnType<typeof setTimeout> | null = null;
   readonly #withRuntimeLogContext: <T>(fn: () => T) => T;
@@ -70,18 +72,9 @@ export class SessionViewerEventDeliveryBuffer {
       return;
     }
 
-    const buffered = this.#buffer;
-    const incomingDeltaBytes = estimateDeltaBytes(compactedEvents);
-    const nextEvents = buffered
-      ? appendCompactedAgUiSessionEvents(buffered.events, compactedEvents)
-      : compactedEvents;
-    const nextDeltaBytes = (buffered?.deltaBytes ?? 0) + incomingDeltaBytes;
-
-    this.#buffer = {
-      deltaBytes: nextDeltaBytes,
-      events: nextEvents,
-      sessionId: buffered?.sessionId ?? sessionId,
-    };
+    for (const event of compactedEvents) {
+      this.#appendEvent(sessionId, event);
+    }
 
     // O2: cut first-token latency. Arm on RUN_STARTED, then flush the first
     // delta of the run immediately instead of waiting out the 150ms timer.
@@ -95,71 +88,41 @@ export class SessionViewerEventDeliveryBuffer {
       this.#pendingFirstDelta = false;
     }
 
-    if (
-      nextEvents.length >= SESSION_VIEWER_EVENT_DELIVERY_MAX_EVENTS ||
-      nextDeltaBytes >= SESSION_VIEWER_EVENT_DELIVERY_MAX_DELTA_BYTES ||
-      isFirstDeltaOfRun ||
-      hasTerminalEvent(compactedEvents)
-    ) {
+    if (isFirstDeltaOfRun || hasTerminalEvent(compactedEvents)) {
       this.#startFlush();
       return;
     }
 
-    this.#scheduleFlush();
+    if (this.#buffer) {
+      this.#scheduleFlush();
+    }
   }
 
   async flush(): Promise<void> {
-    if (this.#timer !== null) {
-      clearTimeout(this.#timer);
-      this.#timer = null;
-    }
-
-    const buffered = this.#buffer;
-
-    if (!buffered) {
-      await this.#gate;
-      return;
-    }
-
-    this.#buffer = null;
-
-    const task = this.#deliverAfterGate(buffered);
-
-    this.#gate = SessionViewerEventDeliveryBuffer.#discardDeliveryResult(task);
-
-    try {
-      await task;
-    } catch (error) {
-      const currentBuffer = this.#getBuffer();
-      this.#buffer = {
-        deltaBytes: buffered.deltaBytes + (currentBuffer?.deltaBytes ?? 0),
-        events: currentBuffer
-          ? appendCompactedAgUiSessionEvents(buffered.events, currentBuffer.events)
-          : buffered.events,
-        sessionId: buffered.sessionId ?? currentBuffer?.sessionId ?? null,
-      };
-      throw error;
-    }
+    this.#clearTimer();
+    this.#queueBuffer();
+    await this.#getOrStartDelivery();
   }
 
-  async #deliverAfterGate(buffered: BufferedSessionViewerEvents): Promise<void> {
+  async #deliverPendingBatches(): Promise<void> {
     try {
-      await this.#gate;
-    } catch (error) {
-      ignorePromiseRejection(error);
+      while (this.#pendingBatches.length > 0) {
+        const batch = this.#pendingBatches.shift();
+
+        if (!batch) {
+          return;
+        }
+
+        try {
+          await publishSessionViewerEvents(this.#env, batch.sessionId, batch.events);
+        } catch (error) {
+          this.#pendingBatches.unshift(batch);
+          throw error;
+        }
+      }
+    } finally {
+      this.#delivery = null;
     }
-
-    await publishSessionViewerEvents(this.#env, buffered.sessionId, buffered.events);
-  }
-
-  static async #discardDeliveryResult(task: Promise<void>): Promise<void> {
-    try {
-      await task;
-    } catch (error) {
-      ignorePromiseRejection(error);
-    }
-
-    discardPromiseResult();
   }
 
   async flushSafely(): Promise<void> {
@@ -168,7 +131,7 @@ export class SessionViewerEventDeliveryBuffer {
     } catch (error) {
       this.#reportDeliveryError(error);
 
-      if (this.#buffer && this.#timer === null) {
+      if (this.#hasBufferedEvents() && this.#timer === null) {
         this.#scheduleFlush();
       }
     }
@@ -177,16 +140,122 @@ export class SessionViewerEventDeliveryBuffer {
   resetAfterFlush(): void {
     this.#buffer = null;
     this.#pendingFirstDelta = false;
-    this.#gate = Promise.resolve();
+    this.#pendingBatches.length = 0;
 
+    this.#clearTimer();
+  }
+
+  #appendEvent(sessionId: SessionId | null, event: SessionDeliveryEvent): void {
+    let buffered = this.#buffer;
+    let events = buffered ? appendCompactedAgUiSessionEvents(buffered.events, [event]) : [event];
+    let serializedBytes = measureSerializedBytes(events);
+
+    if (buffered && serializedBytes > SESSION_VIEWER_EVENT_DELIVERY_MAX_SERIALIZED_BYTES) {
+      this.#startFlush();
+      buffered = null;
+      events = [event];
+      serializedBytes = measureSerializedBytes(events);
+    }
+
+    this.#buffer = {
+      deltaBytes: (buffered?.deltaBytes ?? 0) + getAgUiSessionEventDeltaLength(event),
+      events,
+      sessionId: buffered?.sessionId ?? sessionId,
+    };
+
+    if (
+      events.length >= SESSION_VIEWER_EVENT_DELIVERY_MAX_EVENTS ||
+      this.#buffer.deltaBytes >= SESSION_VIEWER_EVENT_DELIVERY_MAX_DELTA_BYTES ||
+      serializedBytes >= SESSION_VIEWER_EVENT_DELIVERY_MAX_SERIALIZED_BYTES
+    ) {
+      this.#startFlush();
+    }
+  }
+
+  #clearTimer(): void {
     if (this.#timer !== null) {
       clearTimeout(this.#timer);
       this.#timer = null;
     }
   }
 
-  #getBuffer(): BufferedSessionViewerEvents | null {
-    return this.#buffer;
+  #getOrStartDelivery(): Promise<void> {
+    if (this.#delivery) {
+      this.#compactPendingBatches();
+      return this.#delivery;
+    }
+
+    if (this.#pendingBatches.length === 0) {
+      return Promise.resolve();
+    }
+
+    this.#compactPendingBatches();
+    const delivery = this.#deliverPendingBatches();
+    this.#delivery = delivery;
+    return delivery;
+  }
+
+  #compactPendingBatches(): void {
+    if (this.#pendingBatches.length < 2) {
+      return;
+    }
+
+    const queued = this.#pendingBatches.splice(0);
+    let events: SessionDeliveryEvent[] = [];
+    let sessionId = queued[0]?.sessionId ?? null;
+
+    for (const batch of queued) {
+      if (batch.sessionId !== sessionId) {
+        this.#queueCompactedEvents(sessionId, events);
+        events = [];
+        sessionId = batch.sessionId;
+      }
+
+      events = appendCompactedAgUiSessionEvents(events, batch.events);
+    }
+
+    this.#queueCompactedEvents(sessionId, events);
+  }
+
+  #queueCompactedEvents(sessionId: SessionId | null, events: SessionDeliveryEvent[]): void {
+    for (const event of events) {
+      const previous = this.#pendingBatches.at(-1);
+      const nextEvents = previous
+        ? appendCompactedAgUiSessionEvents(previous.events, [event])
+        : [event];
+      const nextDeltaBytes = (previous?.deltaBytes ?? 0) + getAgUiSessionEventDeltaLength(event);
+
+      if (
+        previous &&
+        previous.sessionId === sessionId &&
+        nextEvents.length <= SESSION_VIEWER_EVENT_DELIVERY_MAX_EVENTS &&
+        nextDeltaBytes <= SESSION_VIEWER_EVENT_DELIVERY_MAX_DELTA_BYTES &&
+        measureSerializedBytes(nextEvents) <= SESSION_VIEWER_EVENT_DELIVERY_MAX_SERIALIZED_BYTES
+      ) {
+        previous.deltaBytes = nextDeltaBytes;
+        previous.events = nextEvents;
+        continue;
+      }
+
+      this.#pendingBatches.push({
+        deltaBytes: getAgUiSessionEventDeltaLength(event),
+        events: [event],
+        sessionId,
+      });
+    }
+  }
+
+  #hasBufferedEvents(): boolean {
+    return this.#buffer !== null || this.#pendingBatches.length > 0;
+  }
+
+  #queueBuffer(): void {
+    if (!this.#buffer) {
+      return;
+    }
+
+    this.#pendingBatches.push(this.#buffer);
+    this.#buffer = null;
   }
 
   #scheduleFlush(): void {
@@ -201,6 +270,18 @@ export class SessionViewerEventDeliveryBuffer {
   }
 
   #startFlush(): void {
+    this.#clearTimer();
+    this.#queueBuffer();
+
+    if (this.#delivery) {
+      this.#compactPendingBatches();
+      return;
+    }
+
+    if (this.#pendingBatches.length === 0) {
+      return;
+    }
+
     const task = this.#flushAndReportDeliveryErrors();
 
     this.#ctx.waitUntil(task);
@@ -212,7 +293,7 @@ export class SessionViewerEventDeliveryBuffer {
     } catch (error) {
       this.#reportDeliveryError(error);
 
-      if (this.#buffer && this.#timer === null) {
+      if (this.#hasBufferedEvents() && this.#timer === null) {
         this.#scheduleFlush();
       }
     }

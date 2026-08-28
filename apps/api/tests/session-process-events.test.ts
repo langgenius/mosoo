@@ -547,10 +547,19 @@ describe("session process event projection", () => {
       visibility: "owner_debug",
     });
     await insertSessionProcessEvent(innerDatabase, {
+      content: "1 background task active.",
+      eventType: "agent.tasks.replaced",
+      id: "event-task-state",
+      occurredAt: 950,
+      processType: "session.status",
+      seq: 2,
+      visibility: "owner_debug",
+    });
+    await insertSessionProcessEvent(innerDatabase, {
       content: "run-1",
       id: "event-public",
       occurredAt: 1000,
-      seq: 2,
+      seq: 3,
     });
 
     const events = await getThreadSessionProcessEvents(

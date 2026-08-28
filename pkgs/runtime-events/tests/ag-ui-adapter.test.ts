@@ -53,6 +53,48 @@ describe("runtime event AG-UI adapter", () => {
     expect(event.schemaVersion).toBe("2026-05-26");
   });
 
+  test("projects task snapshots as one participant state replacement", () => {
+    const event = createRuntimeEvent({
+      driverInstanceId: PLATFORM_ID_FIXTURES.driverInstance,
+      id: createPlatformId(),
+      kind: "agent.tasks.replaced",
+      occurredAt: OCCURRED_AT,
+      payload: {
+        tasks: [
+          { taskId: "task-1", title: "Inspect" },
+          { taskId: "task-2", taskType: "review" },
+        ],
+      },
+      runId: PLATFORM_ID_FIXTURES.sessionRun,
+      sessionId: PLATFORM_ID_FIXTURES.session,
+    });
+
+    expect(projectRuntimeEventToAgUiSessionEvents(event)).toEqual([
+      {
+        name: MOSOO_CUSTOM_EVENT.sessionTasksReplaced.name,
+        type: EventType.CUSTOM,
+        value: {
+          driverInstanceId: PLATFORM_ID_FIXTURES.driverInstance,
+          runId: PLATFORM_ID_FIXTURES.sessionRun,
+          tasks: [
+            { taskId: "task-1", title: "Inspect" },
+            { taskId: "task-2", taskType: "review" },
+          ],
+        },
+      },
+    ]);
+    expect(createProcessDraftFromRuntimeEvent(event)).toEqual({
+      content: "2 background tasks active.",
+      type: "session.status",
+    });
+    expect(parseRuntimeEventEnvelope(event)).toMatchObject({
+      delivery: "lossless",
+      visibility: "participant",
+    });
+    expect(() => parseRuntimeEventEnvelope({ ...event, delivery: "best_effort" })).toThrow();
+    expect(() => parseRuntimeEventEnvelope({ ...event, visibility: "owner_debug" })).toThrow();
+  });
+
   test("uses the build context run id as the canonical runtime run id", () => {
     const event = first(
       toRuntimeEventInput(
@@ -77,6 +119,7 @@ describe("runtime event AG-UI adapter", () => {
     const started = first(
       projectRuntimeEventToAgUiSessionEvents(
         createRuntimeEvent({
+          driverInstanceId: PLATFORM_ID_FIXTURES.driverInstance,
           id: createPlatformId(),
           kind: "run.started",
           occurredAt: OCCURRED_AT,
@@ -93,6 +136,7 @@ describe("runtime event AG-UI adapter", () => {
     const failed = first(
       projectRuntimeEventToAgUiSessionEvents(
         createRuntimeEvent({
+          driverInstanceId: PLATFORM_ID_FIXTURES.driverInstance,
           id: createPlatformId(),
           kind: "run.failed",
           occurredAt: failedAt,
@@ -113,6 +157,7 @@ describe("runtime event AG-UI adapter", () => {
       name: MOSOO_CUSTOM_EVENT.sessionRunUpdated.name,
       type: EventType.CUSTOM,
       value: {
+        driverInstanceId: PLATFORM_ID_FIXTURES.driverInstance,
         lifecycle: "RUNNING",
         run: {
           id: PLATFORM_ID_FIXTURES.sessionRun,
@@ -126,6 +171,7 @@ describe("runtime event AG-UI adapter", () => {
       name: MOSOO_CUSTOM_EVENT.sessionRunUpdated.name,
       type: EventType.CUSTOM,
       value: {
+        driverInstanceId: PLATFORM_ID_FIXTURES.driverInstance,
         lifecycle: "IDLE",
         run: {
           completedAt: failedAt,
@@ -171,6 +217,7 @@ describe("runtime event AG-UI adapter", () => {
       name: MOSOO_CUSTOM_EVENT.sessionRunUpdated.name,
       type: EventType.CUSTOM,
       value: {
+        driverInstanceId: null,
         lifecycle: "TERMINATED",
         run: {
           completedAt,

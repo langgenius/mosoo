@@ -85,6 +85,13 @@ function normalizeSessionLiveStateShape(state: SessionLiveState): SessionLiveSta
     lifecycle: terminalState.lifecycle,
     permissionRequests: isTerminalRunStatus(run.status) ? [] : terminalState.permissionRequests,
     readiness: terminalState.readiness ?? null,
+    taskSnapshot:
+      terminalState.lifecycle !== "RUNNING" ||
+      isTerminalRunStatus(terminalState.run.status) ||
+      terminalState.taskSnapshot?.runId !== terminalState.run.id ||
+      terminalState.taskSnapshot?.driverInstanceId !== terminalState.infra.driverInstanceId
+        ? null
+        : terminalState.taskSnapshot,
   };
 }
 
@@ -211,12 +218,15 @@ function applyEvent(state: SessionLiveState, event: AgUiEvent): SessionLiveState
         ...currentState,
         infra: {
           ...currentState.infra,
+          driverInstanceId:
+            currentState.run.id === event.runId ? currentState.infra.driverInstanceId : null,
           lastFailureMessage: null,
           lastFailureReason: null,
           reconnecting: false,
         },
         lifecycle: "RUNNING",
         permissionRequests: [],
+        taskSnapshot: state.run.id === event.runId ? state.taskSnapshot : null,
         run: {
           ...state.run,
           completedAt: null,
@@ -237,12 +247,14 @@ function applyEvent(state: SessionLiveState, event: AgUiEvent): SessionLiveState
         ...finishedState,
         infra: {
           ...finishedState.infra,
+          driverInstanceId: null,
           lastFailureMessage: null,
           lastFailureReason: null,
           reconnecting: false,
         },
         lifecycle: "IDLE",
         permissionRequests: [],
+        taskSnapshot: null,
         run: {
           ...finishedState.run,
           completedAt: currentIsoTimestamp(),
@@ -262,12 +274,14 @@ function applyEvent(state: SessionLiveState, event: AgUiEvent): SessionLiveState
         ...failedState,
         infra: {
           ...failedState.infra,
+          driverInstanceId: null,
           lastFailureMessage: event.message,
           lastFailureReason: event.code ?? "runtime.error",
           reconnecting: false,
         },
         lifecycle: "IDLE",
         permissionRequests: [],
+        taskSnapshot: null,
         run: {
           ...failedState.run,
           completedAt: currentIsoTimestamp(),
@@ -343,6 +357,7 @@ export function createInitialSessionLiveState(input: {
     },
     sessionId: input.sessionId,
     title: input.title,
+    taskSnapshot: null,
     updatedAt: now,
     usage: null,
     viewerId: input.viewerId,

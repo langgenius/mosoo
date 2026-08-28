@@ -20,6 +20,14 @@ const THREAD_AGENT_SESSION_RETRIEVE_QUERY = graphql(/* GraphQL */ `
         reason
         status
       }
+      taskSnapshot {
+        runId
+        tasks {
+          taskId
+          taskType
+          title
+        }
+      }
       session {
         agentId
         archivedAt

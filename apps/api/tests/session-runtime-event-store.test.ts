@@ -8,6 +8,7 @@ import type {
 } from "@mosoo/runtime-events";
 
 import { RuntimeEventPersistenceCompactor } from "../src/modules/runtime/infrastructure/driver-instance/runtime-event-persistence-compactor";
+import { loadSessionAgentTaskSnapshot } from "../src/modules/sessions/infrastructure/session-agent-task-snapshot.repository";
 import {
   persistOneRuntimeEventPerSession,
   persistSessionRuntimeEvents,
@@ -39,6 +40,37 @@ function runtimeEvent(input: {
   });
 }
 
+function agentTasksEvent(input: {
+  driverInstanceId: string;
+  id: string;
+  occurredAtMs: number;
+  runId: string;
+  taskId?: string;
+}): RuntimeEventEnvelope {
+  return runtimeEvent({
+    driverInstanceId: input.driverInstanceId,
+    id: input.id,
+    kind: "agent.tasks.replaced",
+    occurredAtMs: input.occurredAtMs,
+    payload: { tasks: input.taskId === undefined ? [] : [{ taskId: input.taskId }] },
+    runId: input.runId,
+  });
+}
+
+function activateRun(
+  database: SqliteD1Database,
+  input: { driverInstanceId: string; runId: string },
+): void {
+  database
+    .prepare("UPDATE session SET last_run_id = ?, status = 'RUNNING' WHERE id = 'session-1'")
+    .bind(input.runId)
+    .run();
+  database
+    .prepare("UPDATE session_run SET driver_instance_id = ?, status = 'running' WHERE id = ?")
+    .bind(input.driverInstanceId, input.runId)
+    .run();
+}
+
 function createRuntimeEventStoreDatabase(
   input: { maxBoundParams?: number } = {},
 ): SqliteD1Database {
@@ -52,13 +84,24 @@ function createRuntimeEventStoreDatabase(
       id text PRIMARY KEY NOT NULL,
       agent_id text NOT NULL,
       archived_at integer,
+      last_run_id text,
       status text NOT NULL,
       runtime_event_seq_cursor integer DEFAULT 0 NOT NULL
     );
 
     CREATE TABLE session_run (
       id text PRIMARY KEY NOT NULL,
-      session_id text NOT NULL
+      driver_instance_id text,
+      session_id text NOT NULL,
+      status text DEFAULT 'running' NOT NULL
+    );
+
+    CREATE TABLE session_agent_task_snapshot (
+      driver_instance_id text NOT NULL,
+      run_id text NOT NULL,
+      seq integer NOT NULL,
+      session_id text PRIMARY KEY NOT NULL,
+      tasks_json text NOT NULL
     );
 
     CREATE TABLE session_event (
@@ -147,6 +190,276 @@ function createRuntimeEventStoreDatabase(
 }
 
 describe("session runtime event store", () => {
+  test("atomically persists only the latest current-run task snapshot", async () => {
+    const database = createRuntimeEventStoreDatabase();
+    activateRun(database, { driverInstanceId: "driver-1", runId: "run-1" });
+
+    const result = await persistSessionRuntimeEvents(database, {
+      records: [
+        {
+          event: agentTasksEvent({
+            driverInstanceId: "driver-1",
+            id: "tasks-1",
+            occurredAtMs: 1_000,
+            runId: "run-1",
+            taskId: "first",
+          }),
+          occurredAt: 1_000,
+          sourceEventId: "source-tasks-1",
+        },
+        {
+          event: agentTasksEvent({
+            driverInstanceId: "driver-1",
+            id: "tasks-2",
+            occurredAtMs: 1_001,
+            runId: "run-1",
+            taskId: "latest",
+          }),
+          occurredAt: 1_001,
+          sourceEventId: "source-tasks-2",
+        },
+      ],
+      sessionId: "session-1",
+    });
+    const snapshot = await database
+      .prepare(
+        "SELECT driver_instance_id, run_id, seq, tasks_json FROM session_agent_task_snapshot",
+      )
+      .first<{
+        driver_instance_id: string;
+        run_id: string;
+        seq: number;
+        tasks_json: string;
+      }>();
+    const eventRows = await database
+      .prepare("SELECT content_text, visibility FROM session_event ORDER BY seq")
+      .all<{ content_text: string; visibility: string }>();
+
+    expect(result.persistedCount).toBe(2);
+    expect(snapshot).toEqual({
+      driver_instance_id: "driver-1",
+      run_id: "run-1",
+      seq: 2,
+      tasks_json: JSON.stringify({ tasks: [{ taskId: "latest" }] }),
+    });
+    expect(eventRows.results).toEqual([
+      { content_text: "1 background task active.", visibility: "owner_debug" },
+      { content_text: "1 background task active.", visibility: "owner_debug" },
+    ]);
+  });
+
+  test("rolls back the task event receipt when snapshot persistence fails", async () => {
+    const database = createRuntimeEventStoreDatabase();
+    activateRun(database, { driverInstanceId: "driver-1", runId: "run-1" });
+    database.execute(`
+      CREATE TRIGGER reject_agent_task_snapshot
+      BEFORE INSERT ON session_agent_task_snapshot
+      BEGIN
+        SELECT RAISE(ABORT, 'forced snapshot failure');
+      END;
+    `);
+
+    await expect(
+      persistSessionRuntimeEvents(database, {
+        records: [
+          {
+            event: agentTasksEvent({
+              driverInstanceId: "driver-1",
+              id: "tasks-1",
+              occurredAtMs: 1_000,
+              runId: "run-1",
+              taskId: "task-1",
+            }),
+            occurredAt: 1_000,
+            sourceEventId: "source-tasks-1",
+          },
+        ],
+        sessionId: "session-1",
+      }),
+    ).rejects.toThrow("forced snapshot failure");
+
+    expect(await database.prepare("SELECT COUNT(*) AS count FROM session_event").first()).toEqual({
+      count: 0,
+    });
+  });
+
+  test("rejects the receipt and snapshot when archive wins after sequence allocation", async () => {
+    const database = createRuntimeEventStoreDatabase();
+    activateRun(database, { driverInstanceId: "driver-1", runId: "run-1" });
+    const persistBatch = database.batch.bind(database) as D1Database["batch"];
+    let archivedBeforeBatch = false;
+
+    database.batch = async <T = unknown>(statements: D1PreparedStatement[]) => {
+      if (!archivedBeforeBatch) {
+        archivedBeforeBatch = true;
+        database.execute("UPDATE session SET archived_at = 2 WHERE id = 'session-1'");
+      }
+
+      return persistBatch<T>(statements);
+    };
+
+    const result = await persistSessionRuntimeEvents(database, {
+      records: [
+        {
+          event: agentTasksEvent({
+            driverInstanceId: "driver-1",
+            id: "tasks-after-archive",
+            occurredAtMs: 1_000,
+            runId: "run-1",
+            taskId: "must-not-land",
+          }),
+          occurredAt: 1_000,
+          sourceEventId: "source-after-archive",
+        },
+      ],
+      sessionId: "session-1",
+    });
+    const session = await database
+      .prepare("SELECT archived_at, runtime_event_seq_cursor FROM session WHERE id = 'session-1'")
+      .first<{ archived_at: number | null; runtime_event_seq_cursor: number }>();
+
+    expect(archivedBeforeBatch).toBe(true);
+    expect(session).toEqual({ archived_at: 2, runtime_event_seq_cursor: 1 });
+    expect(result.persistedCount).toBe(0);
+    expect(await database.prepare("SELECT COUNT(*) AS count FROM session_event").first()).toEqual({
+      count: 0,
+    });
+    expect(
+      await database.prepare("SELECT COUNT(*) AS count FROM session_agent_task_snapshot").first(),
+    ).toEqual({ count: 0 });
+    expect(await loadSessionAgentTaskSnapshot(database, "session-1")).toBeNull();
+  });
+
+  test("persists an explicit empty snapshot and hides it after archive", async () => {
+    const database = createRuntimeEventStoreDatabase();
+    activateRun(database, { driverInstanceId: "driver-1", runId: "run-1" });
+
+    for (const [index, taskId] of ["task-1", undefined].entries()) {
+      await persistSessionRuntimeEvents(database, {
+        records: [
+          {
+            event: agentTasksEvent({
+              driverInstanceId: "driver-1",
+              id: `tasks-${index + 1}`,
+              occurredAtMs: 1_000 + index,
+              runId: "run-1",
+              ...(taskId === undefined ? {} : { taskId }),
+            }),
+            occurredAt: 1_000 + index,
+            sourceEventId: `source-tasks-${index + 1}`,
+          },
+        ],
+        sessionId: "session-1",
+      });
+    }
+
+    expect(
+      await database
+        .prepare("SELECT tasks_json FROM session_agent_task_snapshot WHERE session_id = ?")
+        .bind("session-1")
+        .first<{ tasks_json: string }>(),
+    ).toEqual({ tasks_json: JSON.stringify({ tasks: [] }) });
+    expect(await loadSessionAgentTaskSnapshot(database, "session-1")).toEqual({
+      driverInstanceId: "driver-1",
+      runId: "run-1",
+      tasks: [],
+    });
+
+    database.execute("UPDATE session SET archived_at = 2 WHERE id = 'session-1'");
+    expect(await loadSessionAgentTaskSnapshot(database, "session-1")).toBeNull();
+  });
+
+  test("does not let duplicate receipts or stale run and driver snapshots replace current state", async () => {
+    const database = createRuntimeEventStoreDatabase();
+    activateRun(database, { driverInstanceId: "driver-1", runId: "run-1" });
+
+    await persistSessionRuntimeEvents(database, {
+      records: [
+        {
+          event: agentTasksEvent({
+            driverInstanceId: "driver-1",
+            id: "tasks-1",
+            occurredAtMs: 1_000,
+            runId: "run-1",
+            taskId: "first",
+          }),
+          occurredAt: 1_000,
+          sourceEventId: "source-tasks-1",
+        },
+      ],
+      sessionId: "session-1",
+    });
+    await persistSessionRuntimeEvents(database, {
+      records: [
+        {
+          event: agentTasksEvent({
+            driverInstanceId: "driver-1",
+            id: "tasks-replay",
+            occurredAtMs: 1_001,
+            runId: "run-1",
+            taskId: "duplicate-must-not-win",
+          }),
+          occurredAt: 1_001,
+          sourceEventId: "source-tasks-1",
+        },
+      ],
+      sessionId: "session-1",
+    });
+
+    database.execute(
+      "INSERT INTO session_run (id, driver_instance_id, session_id, status) VALUES ('run-3', 'driver-2', 'session-1', 'running')",
+    );
+    activateRun(database, { driverInstanceId: "driver-2", runId: "run-3" });
+    await persistSessionRuntimeEvents(database, {
+      records: [
+        {
+          event: agentTasksEvent({
+            driverInstanceId: "driver-2",
+            id: "tasks-current",
+            occurredAtMs: 1_002,
+            runId: "run-3",
+            taskId: "current",
+          }),
+          occurredAt: 1_002,
+          sourceEventId: "source-current",
+        },
+        {
+          event: agentTasksEvent({
+            driverInstanceId: "driver-1",
+            id: "tasks-old-run",
+            occurredAtMs: 1_003,
+            runId: "run-1",
+            taskId: "old-run",
+          }),
+          occurredAt: 1_003,
+          sourceEventId: "source-old-run",
+        },
+        {
+          event: agentTasksEvent({
+            driverInstanceId: "driver-1",
+            id: "tasks-old-driver",
+            occurredAtMs: 1_004,
+            runId: "run-3",
+            taskId: "old-driver",
+          }),
+          occurredAt: 1_004,
+          sourceEventId: "source-old-driver",
+        },
+      ],
+      sessionId: "session-1",
+    });
+
+    expect(
+      await database
+        .prepare("SELECT driver_instance_id, run_id, tasks_json FROM session_agent_task_snapshot")
+        .first(),
+    ).toEqual({
+      driver_instance_id: "driver-2",
+      run_id: "run-3",
+      tasks_json: JSON.stringify({ tasks: [{ taskId: "current" }] }),
+    });
+  });
+
   test("keeps runtime event inserts within D1's bound parameter limit", async () => {
     const database = createRuntimeEventStoreDatabase({ maxBoundParams: 100 });
     const records = Array.from({ length: 6 }, (_, index) => {

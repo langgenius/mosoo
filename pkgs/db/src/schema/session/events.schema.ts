@@ -110,5 +110,18 @@ export const sessionEventsTable = sqliteTable(
   ],
 );
 
+export const sessionAgentTaskSnapshotsTable = sqliteTable("session_agent_task_snapshot", {
+  driverInstanceId: platformIdColumn<DriverInstanceId>("driver_instance_id").notNull(),
+  runId: platformIdColumn<SessionRunId>("run_id")
+    .notNull()
+    .references(() => sessionRunsTable.id, { onDelete: "cascade" }),
+  seq: integer("seq").notNull(),
+  sessionId: platformIdColumn<SessionId>("session_id")
+    .primaryKey()
+    .references(() => sessionsTable.id, { onDelete: "cascade" }),
+  tasksJson: text("tasks_json").notNull(),
+});
+
 export type SessionEventRow = typeof sessionEventsTable.$inferSelect;
+export type SessionAgentTaskSnapshotRow = typeof sessionAgentTaskSnapshotsTable.$inferSelect;
 export type SessionModelCallRow = typeof sessionModelCallsTable.$inferSelect;

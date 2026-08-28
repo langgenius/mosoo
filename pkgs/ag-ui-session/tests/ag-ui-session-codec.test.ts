@@ -12,6 +12,10 @@ function validStateSnapshot(): SessionLiveState {
 
   return {
     ...state,
+    infra: {
+      ...state.infra,
+      driverInstanceId: "driver-1",
+    },
     lifecycle: "RUNNING",
     run: {
       ...state.run,
@@ -56,6 +60,20 @@ describe("AG-UI session codec boundary", () => {
     expect(() => parseAgUiSessionEventJson(JSON.stringify(event))).toThrow();
   });
 
+  test("requires the expected driver fence in state snapshots", () => {
+    const { driverInstanceId: _driverInstanceId, ...infraWithoutDriver } =
+      validStateSnapshot().infra;
+    const event = {
+      snapshot: {
+        ...validStateSnapshot(),
+        infra: infraWithoutDriver,
+      },
+      type: "STATE_SNAPSHOT",
+    };
+
+    expect(() => parseAgUiSessionEventJson(JSON.stringify(event))).toThrow();
+  });
+
   test("parses standard AG-UI text content events", () => {
     expect(
       parseAgUiSessionEventJson(
@@ -87,6 +105,31 @@ describe("AG-UI session codec boundary", () => {
     };
 
     expect(() => parseAgUiSessionEventJson(JSON.stringify(event))).toThrow();
+  });
+
+  test("enforces the canonical task snapshot bounds at the AG-UI boundary", () => {
+    const event = {
+      name: "mosoo.session.tasks.replaced",
+      type: "CUSTOM",
+      value: {
+        driverInstanceId: "driver-1",
+        runId: "run-1",
+        tasks: Array.from({ length: 257 }, (_, index) => ({ taskId: `task-${index}` })),
+      },
+    };
+
+    expect(() => parseAgUiSessionEventJson(JSON.stringify(event))).toThrow();
+    expect(() =>
+      parseAgUiSessionEventJson(
+        JSON.stringify({
+          ...event,
+          value: {
+            ...event.value,
+            tasks: [{ taskId: "🙂".repeat(65) }],
+          },
+        }),
+      ),
+    ).toThrow();
   });
 
   test("rejects nullable numeric fields when the custom contract requires numbers", () => {

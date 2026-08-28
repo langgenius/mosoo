@@ -1,5 +1,8 @@
 import type { AgUiSessionEvent } from "./ag-ui-session-events";
-import { REPLACEABLE_CUSTOM_EVENT_NAMES } from "./custom-event-registry";
+import {
+  GENERATION_REPLACEABLE_CUSTOM_EVENT_NAMES,
+  REPLACEABLE_CUSTOM_EVENT_NAMES,
+} from "./custom-event-registry";
 
 interface CompactAgUiSessionEventsOptions {
   skipToolCallArgs?: boolean;
@@ -8,6 +11,9 @@ interface CompactAgUiSessionEventsOptions {
 type ReplaceableCustomEvent = Extract<AgUiSessionEvent, { type: "CUSTOM" }>;
 
 const replaceableCustomEventNames = new Set<string>(REPLACEABLE_CUSTOM_EVENT_NAMES);
+const generationReplaceableCustomEventNames = new Set<string>(
+  GENERATION_REPLACEABLE_CUSTOM_EVENT_NAMES,
+);
 
 function isReplaceableCustomEvent(event: AgUiSessionEvent): event is ReplaceableCustomEvent {
   return (
@@ -15,6 +21,17 @@ function isReplaceableCustomEvent(event: AgUiSessionEvent): event is Replaceable
     typeof event.name === "string" &&
     replaceableCustomEventNames.has(event.name)
   );
+}
+
+function getReplaceableCustomEventKey(event: ReplaceableCustomEvent): string {
+  if (
+    generationReplaceableCustomEventNames.has(event.name) &&
+    event.name === "mosoo.session.tasks.replaced"
+  ) {
+    return JSON.stringify([event.name, event.value.runId, event.value.driverInstanceId]);
+  }
+
+  return event.name;
 }
 
 export function isAgUiSessionEventBufferable(event: AgUiSessionEvent): boolean {
@@ -175,15 +192,15 @@ function appendEventToCompactedEvents(
 }
 
 function findLatestReplaceableEventIndexes(events: AgUiSessionEvent[]): Set<number> {
-  const indexesByName = new Map<string, number>();
+  const indexesByKey = new Map<string, number>();
 
   events.forEach((event, index) => {
     if (isReplaceableCustomEvent(event)) {
-      indexesByName.set(event.name, index);
+      indexesByKey.set(getReplaceableCustomEventKey(event), index);
     }
   });
 
-  return new Set(indexesByName.values());
+  return new Set(indexesByKey.values());
 }
 
 export function compactAgUiSessionEvents(

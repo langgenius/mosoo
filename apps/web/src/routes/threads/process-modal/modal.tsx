@@ -13,7 +13,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/shared/ui/dialog";
-import { SessionEventDrawerCore } from "@/shared/ui/session-events";
+import { ActiveAgentTasks, SessionEventDrawerCore } from "@/shared/ui/session-events";
+import type { AgentTaskView } from "@/shared/ui/session-events";
 
 import { AgentAvatar } from "../agent-avatar";
 import { createProcessCopyText } from "../model/process";
@@ -22,6 +23,7 @@ import { ProcessEventRow, ProcessLegend, ProcessTimeline } from "./events";
 import { formatTokens, formatTotalDuration } from "./format";
 
 interface ThreadProcessModalProps {
+  activeTasks: readonly AgentTaskView[];
   agent: AgentSummary | null;
   agentName: string;
   errorMessage: string | null;
@@ -33,6 +35,7 @@ interface ThreadProcessModalProps {
 }
 
 export function ThreadProcessModal({
+  activeTasks,
   agent,
   agentName,
   errorMessage,
@@ -109,6 +112,8 @@ export function ThreadProcessModal({
             </Button>
           </div>
         </DialogHeader>
+
+        <ActiveAgentTasks className="mx-7 mt-3 shrink-0" tasks={activeTasks} />
 
         <SessionEventDrawerCore
           key={`${open}:${events[0]?.id ?? "none"}`}

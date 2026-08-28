@@ -21,6 +21,7 @@ import { uploadSessionResource } from "@/features/session-files/session-resource
 import { toProjectId, toSessionId } from "@/routes/typed-id";
 import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
+import { ActiveAgentTasks } from "@/shared/ui/session-events";
 
 import { isTruthy } from "../../../shared/lib/truthiness";
 import { AgentReadinessBlockersBanner } from "./agent-readiness-blockers-banner";
@@ -231,6 +232,8 @@ export function AgentSessionPanel({
                 </div>
               </div>
             ) : null}
+
+            <ActiveAgentTasks className="mx-4 mt-3 shrink-0" tasks={model.activeTasks} />
 
             <div className="relative min-h-0 flex-1 overflow-hidden">
               {model.isConversationLoading ? (

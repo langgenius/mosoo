@@ -19,6 +19,7 @@ export const RUNTIME_EVENT_KINDS = [
   "account.limits.updated",
   "account.updated",
   "agent.task.updated",
+  "agent.tasks.replaced",
   "auth.methods.updated",
   "auth.session.updated",
   "catalog.updated",
@@ -445,6 +446,17 @@ export function parseRuntimeEventEnvelope(value: unknown): RuntimeEventEnvelope 
   const seq = readOptionalNumber(value, "seq");
   const sourceEventId = readOptionalString(value, "sourceEventId");
   const traceId = readOptionalString(value, "traceId");
+
+  if (kind === "agent.tasks.replaced") {
+    if (driverInstanceId === undefined || runId === undefined) {
+      throw new Error("Runtime event agent.tasks.replaced requires driver instance and run IDs.");
+    }
+    if (delivery !== "lossless" || visibility !== "participant") {
+      throw new Error(
+        "Runtime event agent.tasks.replaced must be lossless and participant-visible.",
+      );
+    }
+  }
 
   if (receivedAt !== undefined) {
     assertRuntimeEventTimestamp(receivedAt, "received time");

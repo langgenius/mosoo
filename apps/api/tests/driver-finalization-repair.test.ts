@@ -9,7 +9,7 @@ import { DriverCommandDispatcher } from "../../driver/src/core/driver-command-di
 import { DriverPermissionBroker } from "../../driver/src/core/driver-permission-broker";
 import type { DriverRuntimeIo } from "../../driver/src/core/driver-runtime-io";
 import { DriverRuntimeStateMachine } from "../../driver/src/core/driver-runtime-state";
-import type { AgentDriverMcpPort } from "../../driver/src/host-ports";
+import type { AgentDriverMcpExecution } from "../../driver/src/host-ports";
 import { createBufferedSinkLogger } from "../../driver/src/observability";
 import { createDriverStartInputFromBootPayload } from "../../driver/src/protocol/start";
 import type { RuntimeCommand as DriverRuntimeCommand } from "../../driver/src/runtime-command";
@@ -181,7 +181,7 @@ class PersistentEffectDriverIo implements DriverRuntimeIo {
 
 function createPersistentEffectDispatcher(input: {
   io: PersistentEffectDriverIo;
-  mcpExecute: AgentDriverMcpPort["execute"];
+  mcpExecute: AgentDriverMcpExecution["execute"];
 }): { dispatcher: DriverCommandDispatcher; logger: ReturnType<typeof createBufferedSinkLogger> } {
   const logger = createBufferedSinkLogger({
     level: "debug",
@@ -210,7 +210,12 @@ function createPersistentEffectDispatcher(input: {
         permission: { request: async () => "reject_once" },
         ports: {
           commandSource: { nextCommand: (signal) => socket.nextCommand(signal) },
-          mcp: { execute: input.mcpExecute },
+          mcp: {
+            prepare: async () => ({
+              [Symbol.asyncDispose]: async () => {},
+              execute: input.mcpExecute,
+            }),
+          },
         },
       }),
     runtimeState: new DriverRuntimeStateMachine("ready"),
@@ -813,14 +818,14 @@ describe("driver finalization repair", () => {
     });
     const first = createPersistentEffectDispatcher({
       io: firstIo,
-      mcpExecute: async (request) => {
+      mcpExecute: async () => {
         providerCalls += 1;
         return {
           outputText: "created issue A-1",
           providerReceiptJson: '{"orderId":"A-1"}',
-          requestId: request.requestId,
-          serverId: request.serverId,
-          toolName: request.toolName,
+          requestId: command.requestId,
+          serverId: command.serverId,
+          toolName: command.toolName,
         };
       },
     });

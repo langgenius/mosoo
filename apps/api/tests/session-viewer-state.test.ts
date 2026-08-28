@@ -8,6 +8,7 @@ function createSessionViewerStateDatabase(): SqliteD1Database {
 
   database.execute(`
     CREATE TABLE session (
+      archived_at integer,
       id text PRIMARY KEY NOT NULL,
       last_run_id text,
       status text NOT NULL,
@@ -20,6 +21,7 @@ function createSessionViewerStateDatabase(): SqliteD1Database {
       created_at integer NOT NULL,
       deployment_version_id text,
       deployment_version_number integer,
+      driver_instance_id text,
       error_code text,
       error_details_json text,
       error_message text,
@@ -32,6 +34,14 @@ function createSessionViewerStateDatabase(): SqliteD1Database {
       trace_id text NOT NULL,
       trigger text NOT NULL,
       updated_at integer NOT NULL
+    );
+
+    CREATE TABLE session_agent_task_snapshot (
+      driver_instance_id text NOT NULL,
+      run_id text NOT NULL,
+      seq integer NOT NULL,
+      session_id text PRIMARY KEY NOT NULL,
+      tasks_json text NOT NULL
     );
 
     CREATE TABLE session_message (
@@ -101,6 +111,7 @@ function createSessionViewerStateDatabase(): SqliteD1Database {
     INSERT INTO session_run (
       completed_at,
       created_at,
+      driver_instance_id,
       id,
       model,
       provider,
@@ -114,6 +125,7 @@ function createSessionViewerStateDatabase(): SqliteD1Database {
     VALUES (
       NULL,
       10,
+      'driver-1',
       'run-1',
       'gpt-5.4',
       'openai',
@@ -199,6 +211,7 @@ describe("session viewer state", () => {
 
     expect(state.run.id).toBe("run-1");
     expect(state.run.status).toBe("running");
+    expect(state.infra.driverInstanceId).toBe("driver-1");
     expect(state.files).toHaveLength(1);
     expect(state.messages).toHaveLength(1);
     expect(state.title).toBe("Investigate issue");
@@ -215,6 +228,89 @@ describe("session viewer state", () => {
 
     expect(state.files).toEqual([]);
     expect(state.messages).toHaveLength(1);
+  });
+
+  test("loads the schema-validated current task snapshot from the same canonical read", async () => {
+    const database = createSessionViewerStateDatabase();
+    database.execute(`
+      INSERT INTO session_agent_task_snapshot (
+        driver_instance_id,
+        run_id,
+        seq,
+        session_id,
+        tasks_json
+      )
+      VALUES (
+        'driver-1',
+        'run-1',
+        7,
+        'session-1',
+        '{"tasks":[{"taskId":"task-1","title":"Inspect"}]}'
+      );
+    `);
+
+    const state = await loadSessionViewerState(database, {
+      sessionId: "session-1",
+      viewerId: "viewer-1",
+    });
+
+    expect(state.taskSnapshot).toEqual({
+      driverInstanceId: "driver-1",
+      runId: "run-1",
+      tasks: [{ taskId: "task-1", title: "Inspect" }],
+    });
+  });
+
+  test.each([
+    ["terminal run", "UPDATE session_run SET status = 'completed' WHERE id = 'run-1'"],
+    ["rescheduling session", "UPDATE session SET status = 'RESCHEDULING' WHERE id = 'session-1'"],
+    ["archived running session", "UPDATE session SET archived_at = 9 WHERE id = 'session-1'"],
+    ["new run", "UPDATE session SET last_run_id = 'run-2' WHERE id = 'session-1'"],
+    [
+      "new driver generation",
+      "UPDATE session_run SET driver_instance_id = 'driver-2' WHERE id = 'run-1'",
+    ],
+  ])("does not leak task history across a %s boundary", async (_label, boundarySql) => {
+    const database = createSessionViewerStateDatabase();
+    database.execute(`
+      INSERT INTO session_agent_task_snapshot (
+        driver_instance_id,
+        run_id,
+        seq,
+        session_id,
+        tasks_json
+      )
+      VALUES ('driver-1', 'run-1', 7, 'session-1', '{"tasks":[{"taskId":"stale"}]}');
+      ${boundarySql};
+    `);
+
+    const state = await loadSessionViewerState(database, {
+      sessionId: "session-1",
+      viewerId: "viewer-1",
+    });
+
+    expect(state.taskSnapshot).toBeNull();
+  });
+
+  test("fails closed when persisted task JSON is malformed", async () => {
+    const database = createSessionViewerStateDatabase();
+    database.execute(`
+      INSERT INTO session_agent_task_snapshot (
+        driver_instance_id,
+        run_id,
+        seq,
+        session_id,
+        tasks_json
+      )
+      VALUES ('driver-1', 'run-1', 7, 'session-1', '{"tasks":"invalid"}');
+    `);
+
+    const state = await loadSessionViewerState(database, {
+      sessionId: "session-1",
+      viewerId: "viewer-1",
+    });
+
+    expect(state.taskSnapshot).toBeNull();
   });
 
   test("loads active permissions and readiness projections", async () => {

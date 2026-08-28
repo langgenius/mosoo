@@ -20,9 +20,10 @@ import {
 } from "./list/view";
 import { useThreadCompletionNotifications } from "./model/completion-notifications";
 import { getMutationErrorMessage } from "./model/format";
+import { selectCurrentAgentTasks } from "./model/process";
 import { useSelectedThreadReadSync } from "./model/read-sync";
 import { useThreadRouteState } from "./model/route-state";
-import { SECTION_ORDER } from "./model/thread";
+import { isThreadWorking, SECTION_ORDER } from "./model/thread";
 import { useThreadUiState } from "./model/ui-state";
 import { useThreadActions } from "./model/use-actions";
 import { useThreadQueries } from "./model/use-queries";
@@ -99,6 +100,14 @@ function ThreadsWorkspace({
     onError: handleReadSyncError,
     selectedThread: threads.selectedThread,
   });
+  const activeTasks =
+    threads.selectedThread === null
+      ? []
+      : selectCurrentAgentTasks({
+          currentRunId: threads.selectedThread.session.lastRun?.id ?? null,
+          snapshot: threads.retrieveQuery.data?.agentSessionRetrieve.taskSnapshot ?? null,
+          threadWorking: isThreadWorking(threads.selectedThread.session),
+        });
 
   if (route.activeThreadId !== null) {
     return (
@@ -106,6 +115,7 @@ function ThreadsWorkspace({
         {threads.selectedThread ? (
           <ThreadDetail
             actionError={actions.actionError}
+            activeTasks={activeTasks}
             agent={threads.selectedThread.agent}
             artifacts={threads.artifactsQuery.data?.files ?? EMPTY_ARTIFACTS}
             messages={threads.messagesQuery.data ?? []}

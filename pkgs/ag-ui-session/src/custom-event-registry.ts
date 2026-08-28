@@ -4,7 +4,7 @@ interface MosooCustomEventRegistration<
   TName extends string,
   TDirection extends MosooCustomEventDirection,
 > {
-  readonly coalescing?: "replace";
+  readonly coalescing?: "replace" | "replace_generation";
   readonly direction: TDirection;
   readonly name: TName;
   readonly visibility?: "all_consumers" | "owner_debug";
@@ -88,6 +88,11 @@ export const MOSOO_CUSTOM_EVENT = {
     direction: "server",
     name: "mosoo.session.stopped",
   },
+  sessionTasksReplaced: {
+    coalescing: "replace_generation",
+    direction: "server",
+    name: "mosoo.session.tasks.replaced",
+  },
   sessionSyncRequest: {
     direction: "viewer",
     name: "mosoo.session.sync.request",
@@ -116,7 +121,7 @@ export type MosooViewerEventName = Extract<
 >["name"];
 export type ReplaceableCustomEventName = Extract<
   MosooCustomEventRegistrationValue,
-  { coalescing: "replace" }
+  { coalescing: "replace" | "replace_generation" }
 >["name"];
 export type OwnerDebugCustomEventName = Extract<
   MosooCustomEventRegistrationValue,
@@ -128,7 +133,10 @@ const customEventName = (event: MosooCustomEventRegistrationValue): MosooCustomE
   event.name;
 
 export const REPLACEABLE_CUSTOM_EVENT_NAMES = customEventRegistrations
-  .filter((event) => "coalescing" in event && event.coalescing === "replace")
+  .filter((event) => "coalescing" in event)
+  .map(customEventName);
+export const GENERATION_REPLACEABLE_CUSTOM_EVENT_NAMES = customEventRegistrations
+  .filter((event) => "coalescing" in event && event.coalescing === "replace_generation")
   .map(customEventName);
 export const OWNER_DEBUG_CUSTOM_EVENT_NAMES = customEventRegistrations
   .filter((event) => "visibility" in event && event.visibility === "owner_debug")

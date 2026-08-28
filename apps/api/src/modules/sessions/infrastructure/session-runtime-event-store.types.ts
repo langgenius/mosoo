@@ -1,3 +1,4 @@
+import type { AgentTaskSnapshot } from "@mosoo/contracts/session";
 import type { AgentId, RuntimeEventId, SessionId, SessionRunId } from "@mosoo/id";
 import type { RuntimeEventEnvelope } from "@mosoo/runtime-events";
 
@@ -73,6 +74,7 @@ export interface SessionRuntimeEventSourceReceipt {
 }
 
 export interface SessionEventInsertValue {
+  readonly agentTaskSnapshot: AgentTaskSnapshot | null;
   readonly agentId: AgentId;
   readonly contentText: string;
   readonly createdAt: number;

@@ -25,6 +25,7 @@ import type {
   MosooSessionRuntimeTimelineValue,
   MosooSessionRunUpdatedValue,
   MosooSessionStoppedValue,
+  MosooSessionTasksReplacedValue,
   MosooSessionSyncRequestValue,
   MosooSessionUsageUpdatedValue,
 } from "./custom-event-values";
@@ -145,6 +146,7 @@ export interface MosooCustomEventValueByName {
   [CUSTOM_EVENT_REGISTRY.sessionRuntimeTimelineUpdated.name]: MosooSessionRuntimeTimelineValue;
   [CUSTOM_EVENT_REGISTRY.sessionRunUpdated.name]: MosooSessionRunUpdatedValue;
   [CUSTOM_EVENT_REGISTRY.sessionStopped.name]: MosooSessionStoppedValue;
+  [CUSTOM_EVENT_REGISTRY.sessionTasksReplaced.name]: MosooSessionTasksReplacedValue;
   [CUSTOM_EVENT_REGISTRY.sessionSyncRequest.name]: MosooSessionSyncRequestValue;
   [CUSTOM_EVENT_REGISTRY.sessionUsageUpdated.name]: MosooSessionUsageUpdatedValue;
 }

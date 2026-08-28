@@ -594,6 +594,7 @@ export function useAgentSessionPanelModel(
   );
 
   return {
+    activeTasks: stream.activeTasks,
     activeSession,
     activeSessionId,
     cancel,

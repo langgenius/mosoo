@@ -142,6 +142,14 @@ function readProjectedProcessStatus(
   return draft.status ?? "available";
 }
 
+function readProjectedVisibility(event: RuntimeEventEnvelope): SessionRuntimeEventVisibility {
+  // The canonical participant event still drives live AG-UI delivery. Its
+  // durable row is a state receipt, not a historical Process timeline entry.
+  return event.kind === "agent.tasks.replaced"
+    ? "owner_debug"
+    : getRuntimeEventParticipantVisibility(event);
+}
+
 export function createSessionRuntimeEventProjection(
   event: RuntimeEventEnvelope,
 ): SessionRuntimeEventProjection {
@@ -152,7 +160,7 @@ export function createSessionRuntimeEventProjection(
   return {
     contentText: readProjectedContentText(event, draft),
     eventType: event.kind,
-    family: getRuntimeEventSessionFamily(event),
+    family: event.kind === "agent.tasks.replaced" ? "state" : getRuntimeEventSessionFamily(event),
     processStatus: readProjectedProcessStatus(event, draft),
     processType: draft.type,
     runId: event.runId ?? null,
@@ -160,6 +168,6 @@ export function createSessionRuntimeEventProjection(
     ...toolCall,
     traceId: event.traceId ?? null,
     tokens: draft.tokens ?? null,
-    visibility: getRuntimeEventParticipantVisibility(event),
+    visibility: readProjectedVisibility(event),
   };
 }

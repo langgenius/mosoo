@@ -1,7 +1,10 @@
-import type { RuntimeEventEnvelope } from "@mosoo/runtime-events";
-import type { RuntimeEventKind } from "@mosoo/runtime-events";
+import { readRuntimeAgentTaskSnapshot } from "@mosoo/runtime-events";
+import type { RuntimeEventEnvelope, RuntimeEventKind } from "@mosoo/runtime-events";
 
+import { ACTIVE_SESSION_RUN_STATUSES } from "../../domain/session-run-lifecycle.machine";
 import type { RuntimeSessionLink } from "./event-types";
+
+const activeSessionRunStatuses = new Set<string>(ACTIVE_SESSION_RUN_STATUSES);
 
 const runBoundRuntimeEventDomains = new Set<string>([
   "image",
@@ -16,6 +19,7 @@ const runBoundRuntimeEventDomains = new Set<string>([
 ]);
 
 const runBoundRuntimeEventKinds = new Set<RuntimeEventKind>([
+  "agent.tasks.replaced",
   "file.change.updated",
   "mcp.tool.updated",
   "permission.requested",
@@ -55,6 +59,14 @@ export function assertRuntimeEventMatchesDriverLink(
 
   if (event.runId !== input.link.sessionRunId) {
     throw new Error("Runtime driver event run id does not match the driver session link.");
+  }
+
+  if (
+    event.kind === "agent.tasks.replaced" &&
+    !activeSessionRunStatuses.has(input.link.sessionRunStatus ?? "") &&
+    readRuntimeAgentTaskSnapshot(event).tasks.length > 0
+  ) {
+    throw new Error("Runtime agent task snapshot requires an active session run.");
   }
 }
 

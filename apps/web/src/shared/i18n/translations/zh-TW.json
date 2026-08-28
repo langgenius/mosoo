@@ -1114,6 +1114,8 @@
     "instructionTokenRead": "使用設定中的存取權杖。"
   },
   "sessionEvents": {
+    "activeBackgroundTaskCount": "{{count}} 個執行中",
+    "activeBackgroundTasks": "執行中的背景任務",
     "events": "個事件",
     "tokens": "個詞元",
     "errorsOnly": "僅錯誤",

@@ -92,6 +92,13 @@
       "when": 1788283473351,
       "tag": "0012_rename_app_to_project",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1788366257284,
+      "tag": "0013_agent-task-snapshot-state",
+      "breakpoints": true
     }
   ]
 }

@@ -29,6 +29,18 @@ function runView(
   };
 }
 
+function runningRunUpdatedEvent(runId: string, driverInstanceId: string): AgUiEvent {
+  return {
+    name: MOSOO_CUSTOM_EVENT.sessionRunUpdated.name,
+    type: "CUSTOM",
+    value: {
+      driverInstanceId,
+      lifecycle: "RUNNING",
+      run: runView({ id: runId, status: "running" }),
+    },
+  };
+}
+
 describe("session live-state transcript reducer", () => {
   test("replaces live state when a state snapshot arrives", () => {
     const userMessage = createSessionLiveStateMessage({
@@ -408,6 +420,7 @@ describe("session live-state transcript reducer", () => {
         name: "mosoo.session.run.completed",
         type: "CUSTOM",
         value: {
+          driverInstanceId: null,
           lifecycle: "IDLE",
           run: runView({
             completedAt: "2026-04-30T00:00:03.000Z",
@@ -438,6 +451,7 @@ describe("session live-state transcript reducer", () => {
         name: MOSOO_CUSTOM_EVENT.sessionRunUpdated.name,
         type: "CUSTOM",
         value: {
+          driverInstanceId: null,
           lifecycle: "IDLE",
           run: runView({
             completedAt: "2026-04-30T00:00:03.000Z",
@@ -484,6 +498,7 @@ describe("session live-state transcript reducer", () => {
         name: MOSOO_CUSTOM_EVENT.sessionRunUpdated.name,
         type: "CUSTOM",
         value: {
+          driverInstanceId: null,
           lifecycle: "IDLE",
           run: runView({
             completedAt: "2026-04-30T00:00:03.000Z",
@@ -596,6 +611,323 @@ describe("session live-state transcript reducer", () => {
     });
     expect(nextState.lifecycle).toBe("RUNNING");
     expect(nextState.permissionRequests).toEqual([]);
+  });
+
+  test("atomically replaces and explicitly empties the current run task snapshot", () => {
+    const nextState = applyAgUiEventsToSessionLiveState(baseState(), [
+      runningRunUpdatedEvent("run-1", "driver-1"),
+      {
+        name: MOSOO_CUSTOM_EVENT.sessionTasksReplaced.name,
+        type: "CUSTOM",
+        value: {
+          driverInstanceId: "driver-1",
+          runId: "run-1",
+          tasks: [{ taskId: "task-1", title: "First" }],
+        },
+      },
+      {
+        name: MOSOO_CUSTOM_EVENT.sessionTasksReplaced.name,
+        type: "CUSTOM",
+        value: {
+          driverInstanceId: "driver-1",
+          runId: "run-1",
+          tasks: [{ taskId: "task-2", taskType: "review" }],
+        },
+      },
+      {
+        name: MOSOO_CUSTOM_EVENT.sessionTasksReplaced.name,
+        type: "CUSTOM",
+        value: {
+          driverInstanceId: "driver-1",
+          runId: "run-1",
+          tasks: [],
+        },
+      },
+    ]);
+
+    expect(nextState.taskSnapshot).toEqual({
+      driverInstanceId: "driver-1",
+      runId: "run-1",
+      tasks: [],
+    });
+  });
+
+  test("rejects stale run and driver task snapshots", () => {
+    const nextState = applyAgUiEventsToSessionLiveState(baseState(), [
+      runningRunUpdatedEvent("run-2", "driver-2"),
+      {
+        name: MOSOO_CUSTOM_EVENT.sessionTasksReplaced.name,
+        type: "CUSTOM",
+        value: {
+          driverInstanceId: "driver-2",
+          runId: "run-2",
+          tasks: [{ taskId: "current" }],
+        },
+      },
+      {
+        name: MOSOO_CUSTOM_EVENT.sessionTasksReplaced.name,
+        type: "CUSTOM",
+        value: {
+          driverInstanceId: "driver-1",
+          runId: "run-1",
+          tasks: [{ taskId: "old-run" }],
+        },
+      },
+      {
+        name: MOSOO_CUSTOM_EVENT.sessionTasksReplaced.name,
+        type: "CUSTOM",
+        value: {
+          driverInstanceId: "driver-1",
+          runId: "run-2",
+          tasks: [{ taskId: "old-driver" }],
+        },
+      },
+    ]);
+
+    expect(nextState.taskSnapshot?.tasks).toEqual([{ taskId: "current" }]);
+  });
+
+  test("does not restore a delayed task snapshot after agent replacement starts", () => {
+    const nextState = applyAgUiEventsToSessionLiveState(baseState(), [
+      runningRunUpdatedEvent("run-1", "driver-1"),
+      {
+        name: MOSOO_CUSTOM_EVENT.sessionTasksReplaced.name,
+        type: "CUSTOM",
+        value: {
+          driverInstanceId: "driver-1",
+          runId: "run-1",
+          tasks: [{ taskId: "before-reschedule" }],
+        },
+      },
+      {
+        name: MOSOO_CUSTOM_EVENT.agentUpdating.name,
+        type: "CUSTOM",
+        value: {
+          agentId: "agent-1",
+          operation: "restartDriver",
+          startedAt: "2026-05-26T00:00:01.000Z",
+        },
+      },
+      {
+        name: MOSOO_CUSTOM_EVENT.sessionTasksReplaced.name,
+        type: "CUSTOM",
+        value: {
+          driverInstanceId: "driver-1",
+          runId: "run-1",
+          tasks: [{ taskId: "delayed-old-driver" }],
+        },
+      },
+    ]);
+
+    expect(nextState.lifecycle).toBe("RESCHEDULING");
+    expect(nextState.taskSnapshot).toBeNull();
+  });
+
+  test("normalizes state snapshots to hide tasks outside the running lifecycle", () => {
+    const snapshot: SessionLiveState = {
+      ...baseState(),
+      infra: {
+        ...baseState().infra,
+        driverInstanceId: "driver-1",
+      },
+      lifecycle: "RESCHEDULING",
+      run: {
+        ...baseState().run,
+        id: "run-1",
+        status: "running",
+      },
+      taskSnapshot: {
+        driverInstanceId: "driver-1",
+        runId: "run-1",
+        tasks: [{ taskId: "stale" }],
+      },
+    };
+
+    const nextState = applyAgUiEventsToSessionLiveState(baseState(), [
+      { snapshot, type: "STATE_SNAPSHOT" },
+    ]);
+
+    expect(nextState.taskSnapshot).toBeNull();
+  });
+
+  test.each([
+    ["old first", ["driver-1", "driver-2"]],
+    ["new first", ["driver-2", "driver-1"]],
+  ] as const)("fences replacement driver snapshots when %s", (_label, arrivalOrder) => {
+    const stateBeforeReplacement = applyAgUiEventsToSessionLiveState(baseState(), [
+      runningRunUpdatedEvent("run-1", "driver-1"),
+      {
+        name: MOSOO_CUSTOM_EVENT.sessionTasksReplaced.name,
+        type: "CUSTOM",
+        value: {
+          driverInstanceId: "driver-1",
+          runId: "run-1",
+          tasks: [{ taskId: "before-reschedule" }],
+        },
+      },
+    ]);
+    const replacementEvents: AgUiEvent[] = [
+      runningRunUpdatedEvent("run-1", "driver-2"),
+      ...arrivalOrder.map(
+        (driverInstanceId) =>
+          ({
+            name: MOSOO_CUSTOM_EVENT.sessionTasksReplaced.name,
+            type: "CUSTOM",
+            value: {
+              driverInstanceId,
+              runId: "run-1",
+              tasks: [
+                {
+                  taskId:
+                    driverInstanceId === "driver-2" ? "replacement-driver" : "delayed-old-driver",
+                },
+              ],
+            },
+          }) satisfies AgUiEvent,
+      ),
+    ];
+    const nextState = applyAgUiEventsToSessionLiveState(stateBeforeReplacement, replacementEvents);
+
+    expect(nextState.taskSnapshot).toEqual({
+      driverInstanceId: "driver-2",
+      runId: "run-1",
+      tasks: [{ taskId: "replacement-driver" }],
+    });
+  });
+
+  test("keeps the expected driver across a same-run API lifecycle update", () => {
+    const nextState = applyAgUiEventsToSessionLiveState(baseState(), [
+      runningRunUpdatedEvent("run-1", "driver-1"),
+      {
+        name: MOSOO_CUSTOM_EVENT.sessionTasksReplaced.name,
+        type: "CUSTOM",
+        value: {
+          driverInstanceId: "driver-1",
+          runId: "run-1",
+          tasks: [{ taskId: "task-1" }],
+        },
+      },
+      {
+        name: MOSOO_CUSTOM_EVENT.sessionRunUpdated.name,
+        type: "CUSTOM",
+        value: {
+          driverInstanceId: null,
+          lifecycle: "RUNNING",
+          run: runView({ id: "run-1", status: "running" }),
+        },
+      },
+    ]);
+
+    expect(nextState.infra.driverInstanceId).toBe("driver-1");
+    expect(nextState.taskSnapshot?.tasks).toEqual([{ taskId: "task-1" }]);
+  });
+
+  test("accepts the same driver again after a websocket reconnect", () => {
+    const nextState = applyAgUiEventsToSessionLiveState(baseState(), [
+      runningRunUpdatedEvent("run-1", "driver-1"),
+      {
+        name: MOSOO_CUSTOM_EVENT.sessionTasksReplaced.name,
+        type: "CUSTOM",
+        value: {
+          driverInstanceId: "driver-1",
+          runId: "run-1",
+          tasks: [{ taskId: "before-reconnect" }],
+        },
+      },
+      {
+        name: MOSOO_CUSTOM_EVENT.sessionInfraRescheduling.name,
+        type: "CUSTOM",
+        value: {
+          lastSeen: "2026-05-26T00:00:01.000Z",
+          reason: "websocket.closed",
+          rescheduleStartedAt: "2026-05-26T00:00:01.000Z",
+        },
+      },
+      {
+        name: MOSOO_CUSTOM_EVENT.sessionInfraRunning.name,
+        type: "CUSTOM",
+        value: { resumedAt: "2026-05-26T00:00:02.000Z" },
+      },
+      {
+        name: MOSOO_CUSTOM_EVENT.sessionTasksReplaced.name,
+        type: "CUSTOM",
+        value: {
+          driverInstanceId: "driver-1",
+          runId: "run-1",
+          tasks: [{ taskId: "after-reconnect" }],
+        },
+      },
+    ]);
+
+    expect(nextState.taskSnapshot?.tasks).toEqual([{ taskId: "after-reconnect" }]);
+  });
+
+  test.each([
+    ["run terminal", { runId: "run-1", threadId: "session-1", type: "RUN_FINISHED" } as const],
+    [
+      "rescheduling",
+      {
+        name: MOSOO_CUSTOM_EVENT.sessionInfraRescheduling.name,
+        type: "CUSTOM",
+        value: {
+          lastSeen: "2026-05-26T00:00:01.000Z",
+          reason: "websocket.closed",
+          rescheduleStartedAt: "2026-05-26T00:00:01.000Z",
+        },
+      } as const,
+    ],
+    [
+      "agent replacement",
+      {
+        name: MOSOO_CUSTOM_EVENT.agentUpdating.name,
+        type: "CUSTOM",
+        value: {
+          agentId: "agent-1",
+          operation: "restartDriver",
+          startedAt: "2026-05-26T00:00:01.000Z",
+        },
+      } as const,
+    ],
+    [
+      "agent ready",
+      {
+        name: MOSOO_CUSTOM_EVENT.agentReady.name,
+        type: "CUSTOM",
+        value: {
+          agentId: "agent-1",
+          operation: "restartDriver",
+          readyAt: "2026-05-26T00:00:01.000Z",
+        },
+      } as const,
+    ],
+    [
+      "session stop",
+      {
+        name: MOSOO_CUSTOM_EVENT.sessionStopped.name,
+        type: "CUSTOM",
+        value: { reason: "session.stopped" },
+      } as const,
+    ],
+  ])("clears task snapshots on %s", (label, boundaryEvent) => {
+    const stateWithTasks = applyAgUiEventsToSessionLiveState(baseState(), [
+      runningRunUpdatedEvent("run-1", "driver-1"),
+      {
+        name: MOSOO_CUSTOM_EVENT.sessionTasksReplaced.name,
+        type: "CUSTOM",
+        value: {
+          driverInstanceId: "driver-1",
+          runId: "run-1",
+          tasks: [{ taskId: "task-1" }],
+        },
+      },
+    ]);
+
+    const nextState = applyAgUiEventsToSessionLiveState(stateWithTasks, [boundaryEvent]);
+
+    expect(nextState.taskSnapshot).toBeNull();
+    if (label === "agent ready") {
+      expect(nextState.infra.driverInstanceId).toBeNull();
+    }
   });
 
   test("permission resolution clears pending approvals and returns the run to running", () => {
