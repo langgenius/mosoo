@@ -109,10 +109,8 @@ const RUN_CONTEXT: RuntimeUsageRunContext = {
   provider: "run-provider",
   runtimeId: "custom-runtime",
   sessionId: SESSION_ID,
-  sessionType: "ui",
   sessionRunId: SESSION_RUN_ID,
   trigger: "user_prompt",
-  triggerProvider: null,
 };
 
 describe("cost usage event", () => {
@@ -330,48 +328,6 @@ describe("cost usage event", () => {
       model: "kimi-k2.6",
       outputUsdPerMillion: 4,
       provider: "kimi",
-    });
-  });
-
-  test("apps channel session usage into channel run purpose", async () => {
-    const database = createUsageEventDatabase();
-    const usage = {
-      cachedReadTokens: 0,
-      cachedWriteTokens: 0,
-      inputTokens: 10,
-      outputTokens: 4,
-      source: "prompt_response",
-      usageContract: "openai_total_with_cached_breakdown",
-    } satisfies SessionUsageSummary;
-
-    await recordRuntimeUsageEvent(database, {
-      callKey: "telegram-channel-call",
-      driverInstanceId: DRIVER_INSTANCE_ID,
-      nativeCallId: null,
-      run: {
-        ...RUN_CONTEXT,
-        agentRevisionId: parsePlatformId<AgentDeploymentVersionId>(
-          "01J00000000000000000000008",
-          "deployment ID",
-        ),
-        agentStatus: "published",
-        sessionType: "api_channel",
-        triggerProvider: "telegram",
-      },
-      usage,
-    });
-
-    const row = await database
-      .prepare(
-        `
-          SELECT run_purpose
-          FROM usage_event
-        `,
-      )
-      .first<Pick<UsageEventProjection, "run_purpose">>();
-
-    expect(row).toEqual({
-      run_purpose: "channel",
     });
   });
 

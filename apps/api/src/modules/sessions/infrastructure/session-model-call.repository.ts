@@ -1,4 +1,3 @@
-import type { SessionType } from "@mosoo/contracts/session";
 import {
   agentsTable,
   appsTable,
@@ -41,10 +40,8 @@ interface SessionModelCallRunRow {
   session_model: string;
   session_provider: string;
   session_runtime_id: string;
-  session_type: SessionType;
   started_at: number | null;
   trigger: "resume" | "retry" | "system" | "user_prompt";
-  trigger_provider: string | null;
 }
 
 export type SessionModelCallStatus = "completed" | "failed" | "started";
@@ -119,12 +116,8 @@ async function getSessionModelCallRunRow(
         session_runtime_id: sql`${sessionsTable.runtimeId}`
           .mapWith(sessionsTable.runtimeId)
           .as("session_runtime_id"),
-        session_type: sql<SessionType>`${sessionsTable.type}`,
         started_at: sessionRunsTable.startedAt,
         trigger: sessionRunsTable.trigger,
-        trigger_provider: sql<
-          string | null
-        >`json_extract(${sessionsTable.metadataJson}, '$.triggered_by.provider')`,
       })
       .from(sessionRunsTable)
       .innerJoin(sessionsTable, eq(sessionsTable.id, sessionRunsTable.sessionId))
@@ -184,10 +177,8 @@ export async function upsertSessionModelCallUsage(
       provider,
       runtimeId: run.runtime_id ?? run.session_runtime_id,
       sessionId: run.session_id,
-      sessionType: run.session_type,
       sessionRunId: input.sessionRunId,
       trigger: run.trigger,
-      triggerProvider: run.trigger_provider,
     },
     usage,
   } satisfies Parameters<typeof createRuntimeUsageEventUpsert>[1];

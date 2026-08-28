@@ -11,7 +11,7 @@ export type AgentPublicationStateAtRun =
 
 export type PricingStatus = "priced" | "unknown";
 
-export type RunPurpose = "channel" | "debug" | "eval" | "preview" | "production" | "scheduled";
+export type RunPurpose = "debug" | "eval" | "preview" | "production" | "scheduled";
 
 export interface UsageTokenInput {
   cacheCreationTokens: number;

@@ -4,7 +4,7 @@ Status: available in the current mosoo web console as the human-facing view of m
 
 ## Product value
 
-Runs is mosoo's built-in task inbox. It lets an App owner send meaningful work to an Agent, leave while it runs, then return to review or continue it without connecting another channel.
+Runs is mosoo's built-in task inbox. It lets an App owner send meaningful work to an Agent, leave while it runs, then return later to review or continue it.
 
 The sidebar entry is **Runs**. Inside that surface, each task is a **Thread**: the page title is **Threads**, creation says **New thread**, and detail views keep the Thread name. A Thread can contain another execution when the user follows up.
 

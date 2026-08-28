@@ -25,4 +25,4 @@ The current console still calls this history a **Thread** in several screens whi
 
 Each record belongs to one App and one Agent. The Agent version and settings selected when it starts remain attached to that history. Recorded messages and managed files are durable; temporary processes and unrecorded files are not.
 
-These paths exist in the current repository and have automated coverage, but mosoo remains in Alpha. Production reliability and external adoption have not yet been proven. Channel delivery exists in code but is not currently a reachable end-to-end user feature; see [Channels](./channels.md).
+These paths exist in the current repository and have automated coverage, but mosoo remains in Alpha. Production reliability and external adoption have not yet been proven.

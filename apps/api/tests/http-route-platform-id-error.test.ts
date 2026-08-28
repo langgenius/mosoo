@@ -7,7 +7,6 @@ import {
   platformIdRouteErrorMessage,
   platformIdRouteErrorResponse,
 } from "../src/adapters/http/routes/platform-id-route-error";
-import { registerTelegramEventsRoute } from "../src/adapters/http/routes/telegram-events-route";
 import { createRuntimeActionToken } from "../src/modules/runtime/infrastructure/runtime-boot-token";
 import type { ApiBindings, ApiGatewayEnvironment } from "../src/platform/cloudflare/worker-types";
 import {
@@ -20,14 +19,6 @@ import {
 function createDriverRouteTestApp(): Hono<ApiGatewayEnvironment> {
   const app = new Hono<ApiGatewayEnvironment>();
   registerDriverRoute(app);
-  return app;
-}
-
-function createTelegramRouteTestApp(): Hono<ApiGatewayEnvironment> {
-  const app = new Hono<ApiGatewayEnvironment>();
-  const publicApi = new Hono<ApiGatewayEnvironment>();
-  registerTelegramEventsRoute(publicApi);
-  app.route("/api", publicApi);
   return app;
 }
 
@@ -65,27 +56,6 @@ describe("HTTP route platform ID errors", () => {
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual({
       error: "Skill snapshot ID must be a valid ULID.",
-    });
-  });
-
-  test("maps malformed channel route IDs to 400", async () => {
-    const database = await createPublicHttpContractDatabase();
-    const bindings = createPublicHttpTestBindings(database) as ApiBindings;
-    const response = await createTelegramRouteTestApp().request(
-      new Request("https://api.example.com/api/v1/channels/telegram/events/not-a-ulid", {
-        body: "{}",
-        method: "POST",
-      }),
-      undefined,
-      bindings,
-      createTestExecutionContext(),
-    );
-
-    expect(response.status).toBe(400);
-    expect(await response.json()).toEqual({
-      code: "invalid_request",
-      error: "Channel binding ID must be a valid ULID.",
-      ok: false,
     });
   });
 });

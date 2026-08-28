@@ -1,7 +1,6 @@
 import type { GraphQLModule } from "./graphql-module.ts";
 import { agentSchema } from "./schema/agent-schema.ts";
 import { appSchema } from "./schema/app-schema.ts";
-import { channelSchema } from "./schema/channel-schema.ts";
 import { commonSchema } from "./schema/common-schema.ts";
 import { costSchema } from "./schema/cost-schema.ts";
 import { environmentSchema } from "./schema/environment-schema.ts";
@@ -18,22 +17,6 @@ type GraphQLModuleSpec = Pick<GraphQLModule, "mutationFields" | "queryFields" | 
 export const commonGraphQLSpec = {
   queryFields: ["appInfo: AppInfo!"],
   typeDefs: commonSchema,
-} satisfies GraphQLModuleSpec;
-
-export const channelGraphQLSpec = {
-  mutationFields: [
-    "createDiscordAgentChannelBinding(input: CreateDiscordAgentChannelBindingInput!): AgentChannelBinding!",
-    "createLarkAgentChannelBinding(input: CreateLarkAgentChannelBindingInput!): AgentChannelBinding!",
-    "createSlackAgentChannelBinding(input: CreateSlackAgentChannelBindingInput!): AgentChannelBinding!",
-    "createTelegramAgentChannelBinding(input: CreateTelegramAgentChannelBindingInput!): AgentChannelBinding!",
-    "pollLarkAgentChannelRegistration(input: PollLarkAgentChannelRegistrationInput!): LarkAgentChannelRegistration!",
-    "pollWeChatAgentChannelPairing(input: PollWeChatAgentChannelPairingInput!): WeChatAgentChannelPairing!",
-    "startLarkAgentChannelRegistration(input: StartLarkAgentChannelRegistrationInput!): LarkAgentChannelRegistration!",
-    "startWeChatAgentChannelPairing(input: StartWeChatAgentChannelPairingInput!): WeChatAgentChannelPairing!",
-    "deleteAgentChannelBinding(input: DeleteAgentChannelBindingInput!): OperationResult!",
-  ],
-  queryFields: ["agentChannelBindingList(appId: ULID!, agentId: ULID!): [AgentChannelBinding!]!"],
-  typeDefs: channelSchema,
 } satisfies GraphQLModuleSpec;
 
 export const costGraphQLSpec = {
@@ -205,7 +188,6 @@ export const organizationGraphQLSpec = {
 export const graphqlModuleSpecs = [
   commonGraphQLSpec,
   agentGraphQLSpec,
-  channelGraphQLSpec,
   costGraphQLSpec,
   environmentGraphQLSpec,
   fileGraphQLSpec,

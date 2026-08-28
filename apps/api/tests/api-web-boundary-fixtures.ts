@@ -22,7 +22,7 @@ export function createSessionSummary(): SessionSummary {
     runtimeId: "openai-runtime",
     status: "RUNNING",
     title: "Customer triage",
-    type: "api_channel",
+    type: "ui",
     updatedAt: "2026-05-19T00:01:00.000Z",
   };
 }

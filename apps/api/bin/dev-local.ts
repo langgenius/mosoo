@@ -17,14 +17,8 @@ const DOCKER_HOST_ENV_KEY = "DOCKER_HOST";
 const DEV_DOCKER_HOST_ENV_KEY = "MOSOO_API_DEV_DOCKER_HOST";
 const DEV_RUNTIME_PROXY_HOST_ENV_KEY = "MOSOO_API_DEV_RUNTIME_PROXY_HOST";
 const RUNTIME_CONTROL_ORIGIN_ENV_KEY = "MOSOO_RUNTIME_CONTROL_ORIGIN";
-const LARK_SIDECAR_DISABLED_ENV_KEY = "MOSOO_LARK_SIDECAR_DISABLED";
-const LARK_SIDECAR_SECRET_ENV_KEY = "MOSOO_LARK_SIDECAR_SECRET";
 const SCRUB_HOST_PROXY_ENV_KEY = "MOSOO_API_DEV_SCRUB_HOST_PROXY";
 const USE_DEFAULT_DOCKER_ENV_KEY = "MOSOO_API_DEV_USE_DEFAULT_DOCKER";
-const SCHEDULED_HANDLER_PUMP_INTERVAL_ENV_KEY = "MOSOO_API_DEV_SCHEDULED_PUMP_INTERVAL_MS";
-const SCHEDULED_HANDLER_PUMP_DEFAULT_INTERVAL_MS = 60_000;
-const SCHEDULED_HANDLER_PUMP_BOOT_DELAY_MS = 5_000;
-const SCHEDULED_HANDLER_PUMP_MIN_INTERVAL_MS = 1_000;
 const HOST_PROXY_ENV_KEYS = ["http_proxy", "https_proxy", "all_proxy", "no_proxy"] as const;
 const RUNTIME_NO_PROXY_DEFAULTS = ["localhost", "127.0.0.1", "::1", "host.docker.internal"];
 
@@ -232,50 +226,6 @@ function createRuntimeControlOriginVarArgs(env: NodeJS.ProcessEnv): string[] {
     : ["--var", `${RUNTIME_CONTROL_ORIGIN_ENV_KEY}:${value}`];
 }
 
-function unquoteDevVarValue(value: string): string {
-  const trimmed = value.trim();
-
-  if (
-    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
-    (trimmed.startsWith("'") && trimmed.endsWith("'"))
-  ) {
-    return trimmed.slice(1, -1);
-  }
-
-  return trimmed;
-}
-
-async function readLocalDevVars(): Promise<Record<string, string>> {
-  const devVarsPath = `${apiDir}/.dev.vars`;
-
-  if (!(await Bun.file(devVarsPath).exists())) {
-    return {};
-  }
-
-  const entries: Record<string, string> = {};
-  const content = await Bun.file(devVarsPath).text();
-
-  for (const rawLine of content.split(/\r?\n/u)) {
-    const line = rawLine.trim();
-
-    if (line.length === 0 || line.startsWith("#")) {
-      continue;
-    }
-
-    const separatorIndex = line.indexOf("=");
-
-    if (separatorIndex <= 0) {
-      continue;
-    }
-
-    const key = line.slice(0, separatorIndex).trim();
-    const value = unquoteDevVarValue(line.slice(separatorIndex + 1));
-    entries[key] = value;
-  }
-
-  return entries;
-}
-
 function readNonEmptyEnvValue(env: NodeJS.ProcessEnv, keys: readonly string[]): string | undefined {
   for (const key of keys) {
     const value = env[key]?.trim();
@@ -286,111 +236,6 @@ function readNonEmptyEnvValue(env: NodeJS.ProcessEnv, keys: readonly string[]): 
   }
 
   return undefined;
-}
-
-async function createWeChatIlinkBaseUrlVarArgs(env: NodeJS.ProcessEnv): Promise<string[]> {
-  const devVars = await readLocalDevVars();
-  const value =
-    readNonEmptyEnvValue(env, ["WECHAT_ILINK_BASE_URL"]) ??
-    readNonEmptyEnvValue(devVars, ["WECHAT_ILINK_BASE_URL"]);
-
-  return typeof value === "string" && value.trim().length > 0
-    ? ["--var", `WECHAT_ILINK_BASE_URL:${value.trim()}`]
-    : [];
-}
-
-// Wrangler dev does not fire `[triggers] crons` automatically; cron-driven flows like
-// channel_final_delivery_job stay queued until something POSTs `/cdn-cgi/handler/scheduled`.
-// This pump mirrors the prod `* * * * *` cron locally so Slack/Discord/Lark/Telegram/WeChat
-// replies drain without manual curls. Returns null when explicitly disabled.
-function parseScheduledHandlerPumpIntervalMs(env: NodeJS.ProcessEnv): number | null {
-  const raw = env[SCHEDULED_HANDLER_PUMP_INTERVAL_ENV_KEY]?.trim();
-  if (raw === undefined || raw.length === 0) {
-    return SCHEDULED_HANDLER_PUMP_DEFAULT_INTERVAL_MS;
-  }
-  if (raw === "0" || raw.toLowerCase() === "off") {
-    return null;
-  }
-  const parsed = Number.parseInt(raw, 10);
-  if (!Number.isFinite(parsed) || parsed < SCHEDULED_HANDLER_PUMP_MIN_INTERVAL_MS) {
-    return SCHEDULED_HANDLER_PUMP_DEFAULT_INTERVAL_MS;
-  }
-  return parsed;
-}
-
-function startScheduledHandlerPump(port: string, intervalMs: number): void {
-  const url = `http://127.0.0.1:${port}/cdn-cgi/handler/scheduled`;
-  let announced = false;
-
-  const fire = async (): Promise<void> => {
-    try {
-      const response = await fetch(url, { method: "POST" });
-      if (response.ok && !announced) {
-        announced = true;
-        writeStderr(
-          `[mosoo/api] Local scheduled-handler pump active at ${url} every ${Math.round(intervalMs / 1000)}s. ` +
-            `Mirrors the prod * * * * * cron so cron-picked channel queues drain locally. ` +
-            `Set ${SCHEDULED_HANDLER_PUMP_INTERVAL_ENV_KEY}=off to disable.`,
-        );
-      }
-    } catch {
-      // wrangler is not listening yet; retry on the next tick
-    }
-  };
-
-  setTimeout(() => {
-    void fire();
-    setInterval(() => void fire(), intervalMs);
-  }, SCHEDULED_HANDLER_PUMP_BOOT_DELAY_MS);
-}
-
-// The official Lark long-connection SDK is Node-only, so local dev runs it in a
-// sidecar process and authenticates loopback callbacks with a boot secret.
-function shouldStartLarkSidecar(env: NodeJS.ProcessEnv): boolean {
-  const raw = env[LARK_SIDECAR_DISABLED_ENV_KEY]?.trim().toLowerCase();
-  return raw !== "1" && raw !== "true" && raw !== "yes";
-}
-
-function createLarkSidecarVarArgs(secret: string): string[] {
-  return ["--var", `${LARK_SIDECAR_SECRET_ENV_KEY}:${secret}`];
-}
-
-function startLarkSidecar(input: {
-  apiDir: string;
-  env: NodeJS.ProcessEnv;
-  secret: string;
-  workerUrl: string;
-}): void {
-  const child = Bun.spawn([vpBin, "exec", "bun", "bin/lark-ws-sidecar.ts"], {
-    cwd: input.apiDir,
-    env: {
-      ...input.env,
-      MOSOO_API_BASE_URL: input.workerUrl,
-      [LARK_SIDECAR_SECRET_ENV_KEY]: input.secret,
-    },
-    stderr: "inherit",
-    stdin: "inherit",
-    stdout: "inherit",
-  });
-
-  void child.exited.then((code) => {
-    if (code !== 0 && code !== 130 && code !== 143) {
-      writeStderr(`[mosoo/api] Lark WebSocket sidecar exited unexpectedly (code=${code})`);
-    }
-  });
-
-  process.on("exit", () => {
-    try {
-      child.kill();
-    } catch {
-      // best effort
-    }
-  });
-
-  writeStderr(
-    `[mosoo/api] Lark WebSocket sidecar started (pid=${child.pid ?? "?"}, worker=${input.workerUrl}). ` +
-      `Set ${LARK_SIDECAR_DISABLED_ENV_KEY}=1 to disable.`,
-  );
 }
 
 function resolveDevWebOrigin(env: NodeJS.ProcessEnv): string {
@@ -450,20 +295,6 @@ if (usingDefaultPorts) {
       "port collisions and CORS mismatches.",
   );
 }
-const scheduledPumpIntervalMs = parseScheduledHandlerPumpIntervalMs(wranglerEnv);
-if (scheduledPumpIntervalMs !== null) {
-  startScheduledHandlerPump(wranglerPort, scheduledPumpIntervalMs);
-}
-const larkSidecarEnabled = shouldStartLarkSidecar(wranglerEnv);
-const larkSidecarSecret = larkSidecarEnabled ? crypto.randomUUID() : null;
-if (larkSidecarEnabled && larkSidecarSecret) {
-  startLarkSidecar({
-    apiDir,
-    env: wranglerEnv,
-    secret: larkSidecarSecret,
-    workerUrl: `http://127.0.0.1:${wranglerPort}`,
-  });
-}
 const wranglerResult = await run(
   wranglerBin,
   [
@@ -478,8 +309,6 @@ const wranglerResult = await run(
     ...createProviderFetchProxyVarArgs(providerFetchProxy),
     ...createRuntimeControlOriginVarArgs(wranglerEnv),
     ...createRuntimeProxyVarArgs(wranglerEnv),
-    ...(await createWeChatIlinkBaseUrlVarArgs(wranglerEnv)),
-    ...(larkSidecarSecret ? createLarkSidecarVarArgs(larkSidecarSecret) : []),
   ],
   {
     cwd: apiDir,

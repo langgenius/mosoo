@@ -32,7 +32,7 @@ describe("validateCommitSubject", () => {
 
   test("rejects long subjects", () => {
     const violations = validateCommitSubject(
-      "docs(roadmap): drop version control/subscription/system log/file browser; add Telegram; defer cross-session memory; schedule multi-vendor for July",
+      "docs(roadmap): drop version control/subscription/system log/file browser; add exports; defer cross-session memory; schedule multi-vendor for July",
     );
     expect(violations.some((violation) => violation.rule === "subject-length")).toBe(true);
   });

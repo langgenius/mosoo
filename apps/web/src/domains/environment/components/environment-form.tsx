@@ -172,7 +172,7 @@ function EnvironmentVariablesSection({
                   ),
                 }));
               }}
-              placeholder="SLACK_TOKEN"
+              placeholder="API_TOKEN"
               value={envVar.key}
             />
             <Input

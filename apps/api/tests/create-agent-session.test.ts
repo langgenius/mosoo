@@ -114,36 +114,33 @@ describe("createAgentSession", () => {
     expect(versionCount?.count).toBe(1);
   });
 
-  test.each(["ui", "api_channel"] as const)(
-    "rejects runtime readiness wait for %s session creation",
-    async (type) => {
-      const database = await createPublicHttpContractDatabase();
+  test("rejects runtime readiness wait for UI session creation", async () => {
+    const database = await createPublicHttpContractDatabase();
 
-      await expect(
-        withProviderProbeMock(() =>
-          createAgentSession({
-            bindings: createPublicHttpTestBindings(database) as ApiBindings,
-            input: {
-              agentId: PUBLIC_API_TEST_IDS.agent,
-              appId: PUBLIC_API_TEST_IDS.app,
-              type,
-              waitForRuntimeReady: true,
-            },
-            requestUrl: "https://api.example.com/graphql",
-            viewer: OWNER_VIEWER,
-          }),
-        ),
-      ).rejects.toMatchObject({
-        code: "RUNTIME_READY_WAIT_UNSUPPORTED",
-        status: 400,
-      });
+    await expect(
+      withProviderProbeMock(() =>
+        createAgentSession({
+          bindings: createPublicHttpTestBindings(database) as ApiBindings,
+          input: {
+            agentId: PUBLIC_API_TEST_IDS.agent,
+            appId: PUBLIC_API_TEST_IDS.app,
+            type: "ui",
+            waitForRuntimeReady: true,
+          },
+          requestUrl: "https://api.example.com/graphql",
+          viewer: OWNER_VIEWER,
+        }),
+      ),
+    ).rejects.toMatchObject({
+      code: "RUNTIME_READY_WAIT_UNSUPPORTED",
+      status: 400,
+    });
 
-      const row = await database
-        .prepare('SELECT COUNT(*) AS count FROM "session"')
-        .first<{ count: number }>();
-      expect(row?.count).toBe(0);
-    },
-  );
+    const row = await database
+      .prepare('SELECT COUNT(*) AS count FROM "session"')
+      .first<{ count: number }>();
+    expect(row?.count).toBe(0);
+  });
 
   test("returns a validation error when readiness blocks session creation", async () => {
     const database = await createPublicHttpContractDatabase();

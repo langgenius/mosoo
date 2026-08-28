@@ -50,7 +50,7 @@ export function CostOverviewPanel({
               percent: String(Math.round((totals ? cacheHitRate(totals) : 0) * 100)),
             }),
           ],
-          [t("cost.activeActors"), String(totals?.activeUsers ?? 0), t("cost.nonChannelUsage")],
+          [t("cost.activeActors"), String(totals?.activeUsers ?? 0), t(rangeLabel(range))],
         ].map(([label, value, detail], index) => (
           <div
             key={label}

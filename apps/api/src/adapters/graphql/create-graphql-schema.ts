@@ -3,7 +3,6 @@ import { createSchema } from "graphql-yoga";
 
 import { agentGraphQLModule } from "../../modules/agents/graphql/agent-graphql";
 import { appGraphQLModule } from "../../modules/apps/graphql/app-graphql";
-import { channelGraphQLModule } from "../../modules/channels/graphql/channel-graphql";
 import { costGraphQLModule } from "../../modules/cost/graphql/cost-graphql";
 import { environmentGraphQLModule } from "../../modules/environments/graphql/environment-graphql";
 import { fileGraphQLModule } from "../../modules/files/graphql/file-graphql";
@@ -24,7 +23,6 @@ import { ulidScalar } from "./scalars/ulid-scalar";
 const composedGraphQLModules = composeGraphQLModules([
   commonGraphQLModule,
   agentGraphQLModule,
-  channelGraphQLModule,
   costGraphQLModule,
   environmentGraphQLModule,
   fileGraphQLModule,

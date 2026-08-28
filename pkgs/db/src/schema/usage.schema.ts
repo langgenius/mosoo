@@ -42,7 +42,7 @@ export const usageEventsTable = sqliteTable(
     pricingStatus: text("pricing_status").$type<"priced" | "unknown">().notNull(),
     provider: text("provider").notNull(),
     runPurpose: text("run_purpose")
-      .$type<"channel" | "debug" | "eval" | "preview" | "production" | "scheduled">()
+      .$type<"debug" | "eval" | "preview" | "production" | "scheduled">()
       .notNull(),
     runtimeId: text("runtime_id"),
     sessionId: platformIdColumn<SessionId>("session_id"),
@@ -89,7 +89,7 @@ export const usageDailyRollupsTable = sqliteTable(
     provider: text("provider").notNull(),
     requestCount: integer("request_count").notNull(),
     runPurpose: text("run_purpose")
-      .$type<"channel" | "debug" | "eval" | "preview" | "production" | "scheduled">()
+      .$type<"debug" | "eval" | "preview" | "production" | "scheduled">()
       .notNull(),
     totalCostUsdMicros: integer("total_cost_usd_micros").notNull(),
     unpricedRequestCount: integer("unpriced_request_count").notNull(),

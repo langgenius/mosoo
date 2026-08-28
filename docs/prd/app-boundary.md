@@ -20,7 +20,7 @@ The Builder can create or switch Apps from the Apps page. Inside an App, they ca
 
 From Overview, the Builder can deploy a public GitHub repository, follow deployment status and history, open the live site, retry or redeploy, and delete the deployment.
 
-Agent conversations and channel delivery remain managed through individual Agents inside the App.
+Agent conversations remain managed through individual Agents inside the App.
 
 ## Current Availability
 

@@ -1,17 +1,9 @@
 import type { ApiCommandMessage } from "../../src/modules/api-command/application/api-command-message";
-import type { ChannelFinalDeliveryMessage } from "../../src/modules/channels/application/channel-final-delivery-message";
 
 const TEST_MESSAGE_TIME_MS = Date.parse("2026-05-08T00:00:00.000Z");
 
 export interface CapturedApiCommandMessage {
   body: ApiCommandMessage;
-  contentType: string;
-  delaySeconds: number | null;
-  id: string;
-}
-
-export interface CapturedChannelFinalDeliveryMessage {
-  body: ChannelFinalDeliveryMessage;
   contentType: string;
   delaySeconds: number | null;
   id: string;
@@ -25,32 +17,8 @@ export interface ApiCommandQueueStub {
   ): Promise<void>;
 }
 
-export interface ChannelFinalDeliveryQueueStub {
-  readonly sent: CapturedChannelFinalDeliveryMessage[];
-  send(
-    body: ChannelFinalDeliveryMessage,
-    options?: { contentType?: string; delaySeconds?: number },
-  ): Promise<void>;
-}
-
 export function createApiCommandQueueStub(): ApiCommandQueueStub {
   const sent: CapturedApiCommandMessage[] = [];
-
-  return {
-    sent,
-    async send(body, options): Promise<void> {
-      sent.push({
-        body,
-        contentType: options?.contentType ?? "json",
-        delaySeconds: options?.delaySeconds ?? null,
-        id: `queued-${sent.length + 1}`,
-      });
-    },
-  };
-}
-
-export function createChannelFinalDeliveryQueueStub(): ChannelFinalDeliveryQueueStub {
-  const sent: CapturedChannelFinalDeliveryMessage[] = [];
 
   return {
     sent,

@@ -19,8 +19,8 @@ This repository is a monorepo:
 
 | Path                   | Description                                                                                                                     |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/api`             | Cloudflare Worker API with GraphQL, auth, sessions, channels, runtime control plane, and D1/R2/DO bindings.                     |
-| `apps/web`             | React console app built with Vite Plus and deployed as Cloudflare Worker assets on `cloud.mosoo.ai`.                              |
+| `apps/api`             | Cloudflare Worker API with GraphQL, auth, sessions, runtime control plane, and D1/R2/DO bindings.                               |
+| `apps/web`             | React console app built with Vite Plus and deployed as Cloudflare Worker assets on `cloud.mosoo.ai`.                            |
 | `apps/driver`          | Agent Driver bundle used by API Worker / Sandbox paths.                                                                         |
 | `pkgs/contracts`       | Cross-boundary TypeScript contracts and parser surfaces; cross app / package DTOs should go here first.                         |
 | `pkgs/db`              | Drizzle schema and its append-only D1 migration chain.                                                                          |
@@ -194,7 +194,7 @@ Production D1 is not reset during deploy. `just deploy-api` runs
 `apps/api/bin/deploy-prod.ts`, whose first remote action is applying pending D1
 migrations. It then verifies that every table in the latest Drizzle snapshot
 exists in production — the DEPLOY-D1-001 missing-table guard — ensures the
-channel-final-delivery queues, builds the Driver, and deploys the API Worker.
+environment-artifact queue, builds the Driver, and deploys the API Worker.
 The guard does not compare columns, indexes, constraints, or extra live tables.
 No other automated migration gate exists today: there is no trusted-Git-range
 check, no clean-worktree check, and no dry-run inside the deploy script. Run
@@ -302,7 +302,7 @@ type(scope): subject
 Examples:
 
 ```text
-feat(channels): add telegram binding validation
+feat(runtime): add session cancellation guard
 fix(auth): reject invalid local backdoor email
 chore(dev): move contribution guide to root
 ```

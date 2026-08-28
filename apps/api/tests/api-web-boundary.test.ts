@@ -167,42 +167,6 @@ describe("API to web boundary", () => {
     expect(String(provenance?.args.find((arg) => arg.name === "runId")?.type)).toBe("ULID!");
   });
 
-  test("keeps Channel GraphQL setup App-scoped with Agent-owned delivery", () => {
-    const schema = createGraphQLSchema();
-
-    for (const typeName of [
-      "CreateSlackAgentChannelBindingInput",
-      "CreateLarkAgentChannelBindingInput",
-      "StartLarkAgentChannelRegistrationInput",
-      "PollLarkAgentChannelRegistrationInput",
-      "CreateTelegramAgentChannelBindingInput",
-      "CreateDiscordAgentChannelBindingInput",
-      "StartWeChatAgentChannelPairingInput",
-      "PollWeChatAgentChannelPairingInput",
-    ] as const) {
-      const input = schema.getType(typeName);
-
-      if (!isInputObjectType(input)) {
-        throw new Error(`Expected ${typeName} to be a GraphQL input object.`);
-      }
-
-      expect(String(input.getFields().appId?.type)).toBe("ULID!");
-      expect(String(input.getFields().agentId?.type)).toBe("ULID!");
-      expect(input.getFields().organizationId).toBeUndefined();
-    }
-
-    const deleteInput = schema.getType("DeleteAgentChannelBindingInput");
-
-    if (!isInputObjectType(deleteInput)) {
-      throw new Error("Expected DeleteAgentChannelBindingInput to be a GraphQL input object.");
-    }
-
-    expect(String(deleteInput.getFields().appId?.type)).toBe("ULID!");
-    expect(String(deleteInput.getFields().bindingId?.type)).toBe("ULID!");
-    expect(deleteInput.getFields().agentId).toBeUndefined();
-    expect(deleteInput.getFields().organizationId).toBeUndefined();
-  });
-
   test("keeps file GraphQL scope details compatible", () => {
     const schema = createGraphQLSchema();
     const fileRecord = schema.getType("FileRecord");

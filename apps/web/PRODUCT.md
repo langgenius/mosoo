@@ -18,7 +18,7 @@ mosoo is an open-source Agent Cloud. It lets developers deploy, configure, run,
 and debug agents through OpenAI runtime, Claude Agent SDK, and OpenCode/DeepSeek
 via ACP in isolated sandboxes, then ship them to users. The current Web console is organized as
 App Overview / Runs / Agents / Config, plus account Settings; App Usage lives in App
-Settings. Environment, Skills, MCP, Channels, and Providers are configuration
+Settings. Environment, Skills, MCP, and Providers are configuration
 surfaces. Organization Usage/Billing governance remains a visible `Soon` surface,
 not a shipped console capability. Public landing and blog content live in
 `langgenius/mosoo-website`.

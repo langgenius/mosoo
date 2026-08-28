@@ -26,7 +26,7 @@ Authoritative API events:
 - `app_created` when a user manually creates an additional App
 - `agent_created`
 - `integration_connected` after a model-provider credential probe succeeds
-- `task_succeeded` after a runtime run first transitions to completed; `session_type` identifies `ui`, `preview`, or `api_channel` traffic
+- `task_succeeded` after a runtime run first transitions to completed; `session_type` identifies `ui` or `preview` traffic
 
 Common properties include `environment`, `deployment_mode`, and the relevant `organization_id`, `app_id`, `agent_id`, integration type, or runtime identifiers. Person identity is the stable account ID.
 
@@ -61,7 +61,6 @@ Also create:
 
 - a path insight starting from `page_viewed`;
 - an onboarding funnel `onboarding_started -> onboarding_completed`;
-- an external API adoption insight filtered to `task_succeeded` where `session_type = api_channel`; events without `session_type` predate channel attribution and must not be counted as proven API adoption;
 - a manual App-creation insight from `app_created` where `source = manual`;
 - a breakdown of `integration_connected` by `vendor_id`;
 - a breakdown of all funnels by `environment` and `deployment_mode`.

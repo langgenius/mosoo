@@ -351,60 +351,6 @@ describe("session model call identity", () => {
     });
   });
 
-  test("apps Telegram channel session usage into external run purpose", async () => {
-    const database = createSessionModelCallDatabase();
-    await seedRunIdentity(database, {
-      createdByAccountId: OWNER_ID,
-      deploymentVersionId: DEPLOYMENT_ID,
-      sessionMetadataJson: JSON.stringify({
-        triggered_by: {
-          binding_id: "telegram-binding-1",
-          event_id: "telegram:update:1",
-          external_actor_id: "telegram:user:42",
-          external_message_id: "42:77",
-          external_thread_id: "42:main",
-          external_workspace_id: "42",
-          provider: "telegram",
-        },
-      }),
-      sessionType: "api_channel",
-    });
-    const usage = {
-      cachedReadTokens: 0,
-      cachedWriteTokens: 0,
-      callId: "telegram-call-1",
-      inputTokens: 50,
-      outputTokens: 20,
-      source: "prompt_response",
-      usageContract: "openai_total_with_cached_breakdown",
-    } satisfies SessionUsageSummary;
-
-    await upsertSessionModelCallUsage(database, {
-      driverInstanceId: DRIVER_INSTANCE_ID,
-      sessionId: SESSION_ID,
-      sessionRunId: SESSION_RUN_ID,
-      status: "completed",
-      traceId: "trace-telegram",
-      usage,
-    });
-
-    const usageEvent = await database
-      .prepare(
-        `
-          SELECT
-            actor_user_id,
-            run_purpose
-          FROM usage_event
-        `,
-      )
-      .first<Pick<UsageEventProjection, "actor_user_id" | "run_purpose">>();
-
-    expect(usageEvent).toEqual({
-      actor_user_id: OWNER_ID,
-      run_purpose: "channel",
-    });
-  });
-
   test("fails closed when a usage run cannot prove Agent and Session App equality", async () => {
     const database = createSessionModelCallDatabase();
     await seedRunIdentity(database);

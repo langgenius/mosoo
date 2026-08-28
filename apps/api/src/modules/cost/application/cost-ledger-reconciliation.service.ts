@@ -37,7 +37,6 @@ export type CostLedgerIndeterminateReason =
   | "ambiguous_existing_ledger_event"
   | "invalid_platform_identity"
   | "invalid_run_trigger"
-  | "invalid_session_metadata"
   | "invalid_session_type"
   | "invalid_usage_timestamp"
   | "invalid_usage_metadata"
@@ -98,10 +97,8 @@ interface CostLedgerCandidateRow {
   resolved_run_id: string | null;
   session_run_id: string;
   session_runtime_id: string | null;
-  session_metadata_valid: number | null;
   session_type: string | null;
   total_cost_usd_micros: number | null;
-  trigger_provider: string | null;
   usage_event_id: string | null;
 }
 
@@ -142,14 +139,8 @@ const LIST_USAGE_CANDIDATES_SQL = `
       session_run.runtime_id AS run_runtime_id,
       session_run.trigger AS run_trigger,
       agent_deployment_version.id AS resolved_revision_id,
-      json_valid(session.metadata_json) AS session_metadata_valid,
       session.type AS session_type,
       session.runtime_id AS session_runtime_id,
-      CASE
-        WHEN json_valid(session.metadata_json)
-          THEN json_extract(session.metadata_json, '$.triggered_by.provider')
-        ELSE NULL
-      END AS trigger_provider,
       agent.owner_account_id AS agent_owner_user_id,
       app.id AS app_id,
       app.organization_id,
@@ -401,10 +392,6 @@ function classifyCandidate(
     return { kind: "indeterminate", reason: "invalid_session_type" };
   }
 
-  if (row.session_type === "api_channel" && row.session_metadata_valid !== 1) {
-    return { kind: "indeterminate", reason: "invalid_session_metadata" };
-  }
-
   if (!isSessionRunTrigger(row.run_trigger)) {
     return { kind: "indeterminate", reason: "invalid_run_trigger" };
   }
@@ -438,10 +425,8 @@ function classifyCandidate(
         provider: row.provider,
         runtimeId: row.run_runtime_id ?? row.session_runtime_id,
         sessionId: parsePlatformId<SessionId>(row.session_id, "session ID"),
-        sessionType: row.session_type,
         sessionRunId,
         trigger: row.run_trigger,
-        triggerProvider: row.trigger_provider,
       },
       usage,
     };

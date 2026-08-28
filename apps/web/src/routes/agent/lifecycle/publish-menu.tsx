@@ -1,4 +1,4 @@
-import { Check, ChevronDown, Code, Copy, Inbox, MessageSquare, Upload } from "lucide-react";
+import { Check, ChevronDown, Code, Copy, Inbox, Upload } from "lucide-react";
 import type { ReactElement } from "react";
 import { useMemo, useState } from "react";
 
@@ -23,9 +23,7 @@ export interface PublishMenuProps {
   disabled: boolean;
   errorMessage: string | null;
   onApiAccessClick: () => void;
-  onChannelClick?: () => void;
   onPublish: () => void;
-  showChannelSetup?: boolean;
 }
 
 export function PublishMenu({
@@ -34,9 +32,7 @@ export function PublishMenu({
   disabled,
   errorMessage,
   onApiAccessClick,
-  onChannelClick,
   onPublish,
-  showChannelSetup = false,
 }: PublishMenuProps): ReactElement {
   const { t } = useTranslation();
   const isLive = agent.status === "published";
@@ -157,25 +153,6 @@ export function PublishMenu({
             </span>
           </div>
         </DropdownMenuItem>
-        {showChannelSetup ? (
-          <DropdownMenuItem
-            className="items-start gap-2.5 py-2"
-            disabled={!isLive}
-            onSelect={(event) => {
-              event.preventDefault();
-              onChannelClick?.();
-            }}
-          >
-            <MessageSquare className="mt-0.5 size-4" />
-            <div className="flex min-w-0 flex-col">
-              <span className="text-[13px] font-medium">{t("agentLifecycle.channel")}</span>
-              <span className="text-muted-foreground text-[11.5px] leading-snug">
-                {t("channelNames.slack")} · {t("channelNames.lark")} · {t("channelNames.discord")} ·{" "}
-                {t("channelNames.telegram")} · {t("channelNames.wechat")}
-              </span>
-            </div>
-          </DropdownMenuItem>
-        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );

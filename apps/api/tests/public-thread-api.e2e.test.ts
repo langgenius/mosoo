@@ -305,7 +305,7 @@ async function insertPublicThread(
       runtimeId: "openai-runtime",
       status: "IDLE",
       title: input.title,
-      type: "api_channel",
+      type: "ui",
       updatedAt: input.updatedAt,
     })
     .run();

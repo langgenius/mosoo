@@ -33,10 +33,6 @@ export type AgentBuiltInToolName =
   | 'web_search'
   | 'write';
 
-export type AgentChannelBindingStatus =
-  | 'active'
-  | 'error';
-
 export type AgentEnvironmentConfigInput = {
   environmentId?: PlatformId | null | undefined;
 };
@@ -73,7 +69,6 @@ export type AgentResolutionStatus =
 
 export type AgentResolutionTargetType =
   | 'agent'
-  | 'channel'
   | 'environment'
   | 'mcp_server'
   | 'model'
@@ -169,13 +164,6 @@ export type BootstrapOnboardingInput = {
   name?: string | null | undefined;
 };
 
-export type ChannelProvider =
-  | 'discord'
-  | 'lark'
-  | 'slack'
-  | 'telegram'
-  | 'wechat';
-
 export type ConnectMcpBearerInput = {
   appId: PlatformId;
   serverId: PlatformId;
@@ -237,14 +225,6 @@ export type CreateAppMcpServerInput = {
   url: string;
 };
 
-export type CreateDiscordAgentChannelBindingInput = {
-  agentId: PlatformId;
-  appId: PlatformId;
-  applicationId: string;
-  botToken: string;
-  relaySecret: string;
-};
-
 export type CreateEnvironmentInput = {
   allowMcpServers: boolean;
   allowPackageManagers: boolean;
@@ -258,36 +238,9 @@ export type CreateEnvironmentInput = {
   setupScript: string;
 };
 
-export type CreateLarkAgentChannelBindingInput = {
-  agentId: PlatformId;
-  appId: PlatformId;
-  appSecret: string;
-  connectionMode: LarkConnectionMode;
-  domain: LarkDomain;
-  encryptKey?: string | null | undefined;
-  larkAppId: string;
-  verificationToken?: string | null | undefined;
-};
-
 export type CreateSkillForkInput = {
   appId: PlatformId;
   skillId: PlatformId;
-};
-
-export type CreateSlackAgentChannelBindingInput = {
-  agentId: PlatformId;
-  appId: PlatformId;
-  appLevelToken?: string | null | undefined;
-  botToken: string;
-  signingSecret: string;
-  threadRepliesRequireMention?: boolean | null | undefined;
-};
-
-export type CreateTelegramAgentChannelBindingInput = {
-  agentId: PlatformId;
-  appId: PlatformId;
-  botToken: string;
-  webhookSecret: string;
 };
 
 export type CreateVendorCredentialInput = {
@@ -297,11 +250,6 @@ export type CreateVendorCredentialInput = {
   models?: Array<string> | null | undefined;
   name: string;
   vendorId: string;
-};
-
-export type DeleteAgentChannelBindingInput = {
-  appId: PlatformId;
-  bindingId: PlatformId;
 };
 
 export type DeleteAgentInput = {
@@ -395,22 +343,6 @@ export type ImportAgentPackageInput = {
   fileId: PlatformId;
 };
 
-export type LarkAppRegistrationStatus =
-  | 'access_denied'
-  | 'confirmed'
-  | 'expired'
-  | 'failed'
-  | 'qr_pending'
-  | 'slow_down';
-
-export type LarkConnectionMode =
-  | 'webhook'
-  | 'websocket';
-
-export type LarkDomain =
-  | 'feishu'
-  | 'lark';
-
 export type McpAuthType =
   | 'bearer'
   | 'oauth';
@@ -447,19 +379,6 @@ export type McpServerSource =
 export type ModelCatalogSource =
   | 'custom'
   | 'preset';
-
-export type PollLarkAgentChannelRegistrationInput = {
-  agentId: PlatformId;
-  appId: PlatformId;
-  deviceCode: string;
-  domain: LarkDomain;
-};
-
-export type PollWeChatAgentChannelPairingInput = {
-  agentId: PlatformId;
-  appId: PlatformId;
-  qrToken: string;
-};
 
 export type PublishAgentInput = {
   agentId: PlatformId;
@@ -562,7 +481,6 @@ export type SessionStatus =
   | 'TERMINATED';
 
 export type SessionType =
-  | 'api_channel'
   | 'preview'
   | 'ui';
 
@@ -584,21 +502,10 @@ export type SkillSourceKind =
   | 'official'
   | 'user';
 
-export type StartLarkAgentChannelRegistrationInput = {
-  agentId: PlatformId;
-  appId: PlatformId;
-  domain: LarkDomain;
-};
-
 export type StartMcpOAuthInput = {
   appId: PlatformId;
   returnUrl?: string | null | undefined;
   serverId: PlatformId;
-};
-
-export type StartWeChatAgentChannelPairingInput = {
-  agentId: PlatformId;
-  appId: PlatformId;
 };
 
 export type TestVendorCredentialInput = {
@@ -662,91 +569,6 @@ export type UpdateVendorCredentialInput = {
   models?: Array<string> | null | undefined;
   name?: string | null | undefined;
 };
-
-export type WeChatQrPairingStatus =
-  | 'confirmed'
-  | 'expired'
-  | 'failed'
-  | 'idle'
-  | 'qr_pending'
-  | 'scanned';
-
-export type AgentChannelBindingFieldsFragment = { activityLastTriggeredAt: string | null, activitySessionCount7d: number, agentId: PlatformId, createdAt: string, displayMetadata: PrimitiveRecord, externalBotId: string, externalTenantId: string, id: PlatformId, lastErrorCode: string | null, provider: ChannelProvider, status: AgentChannelBindingStatus, updatedAt: string };
-
-export type AgentChannelBindingsQueryVariables = Exact<{
-  appId: PlatformId;
-  agentId: PlatformId;
-}>;
-
-
-export type AgentChannelBindingsQuery = { agentChannelBindingList: Array<{ activityLastTriggeredAt: string | null, activitySessionCount7d: number, agentId: PlatformId, createdAt: string, displayMetadata: PrimitiveRecord, externalBotId: string, externalTenantId: string, id: PlatformId, lastErrorCode: string | null, provider: ChannelProvider, status: AgentChannelBindingStatus, updatedAt: string }> };
-
-export type CreateSlackAgentChannelBindingMutationVariables = Exact<{
-  input: CreateSlackAgentChannelBindingInput;
-}>;
-
-
-export type CreateSlackAgentChannelBindingMutation = { createSlackAgentChannelBinding: { activityLastTriggeredAt: string | null, activitySessionCount7d: number, agentId: PlatformId, createdAt: string, displayMetadata: PrimitiveRecord, externalBotId: string, externalTenantId: string, id: PlatformId, lastErrorCode: string | null, provider: ChannelProvider, status: AgentChannelBindingStatus, updatedAt: string } };
-
-export type CreateLarkAgentChannelBindingMutationVariables = Exact<{
-  input: CreateLarkAgentChannelBindingInput;
-}>;
-
-
-export type CreateLarkAgentChannelBindingMutation = { createLarkAgentChannelBinding: { activityLastTriggeredAt: string | null, activitySessionCount7d: number, agentId: PlatformId, createdAt: string, displayMetadata: PrimitiveRecord, externalBotId: string, externalTenantId: string, id: PlatformId, lastErrorCode: string | null, provider: ChannelProvider, status: AgentChannelBindingStatus, updatedAt: string } };
-
-export type LarkAgentChannelRegistrationFieldsFragment = { appId: string | null, appSecret: string | null, deviceCode: string | null, domain: LarkDomain, expireIn: number | null, interval: number | null, lastErrorCode: string | null, openId: string | null, qrUrl: string | null, status: LarkAppRegistrationStatus, userCode: string | null };
-
-export type StartLarkAgentChannelRegistrationMutationVariables = Exact<{
-  input: StartLarkAgentChannelRegistrationInput;
-}>;
-
-
-export type StartLarkAgentChannelRegistrationMutation = { startLarkAgentChannelRegistration: { appId: string | null, appSecret: string | null, deviceCode: string | null, domain: LarkDomain, expireIn: number | null, interval: number | null, lastErrorCode: string | null, openId: string | null, qrUrl: string | null, status: LarkAppRegistrationStatus, userCode: string | null } };
-
-export type PollLarkAgentChannelRegistrationMutationVariables = Exact<{
-  input: PollLarkAgentChannelRegistrationInput;
-}>;
-
-
-export type PollLarkAgentChannelRegistrationMutation = { pollLarkAgentChannelRegistration: { appId: string | null, appSecret: string | null, deviceCode: string | null, domain: LarkDomain, expireIn: number | null, interval: number | null, lastErrorCode: string | null, openId: string | null, qrUrl: string | null, status: LarkAppRegistrationStatus, userCode: string | null } };
-
-export type CreateTelegramAgentChannelBindingMutationVariables = Exact<{
-  input: CreateTelegramAgentChannelBindingInput;
-}>;
-
-
-export type CreateTelegramAgentChannelBindingMutation = { createTelegramAgentChannelBinding: { activityLastTriggeredAt: string | null, activitySessionCount7d: number, agentId: PlatformId, createdAt: string, displayMetadata: PrimitiveRecord, externalBotId: string, externalTenantId: string, id: PlatformId, lastErrorCode: string | null, provider: ChannelProvider, status: AgentChannelBindingStatus, updatedAt: string } };
-
-export type CreateDiscordAgentChannelBindingMutationVariables = Exact<{
-  input: CreateDiscordAgentChannelBindingInput;
-}>;
-
-
-export type CreateDiscordAgentChannelBindingMutation = { createDiscordAgentChannelBinding: { activityLastTriggeredAt: string | null, activitySessionCount7d: number, agentId: PlatformId, createdAt: string, displayMetadata: PrimitiveRecord, externalBotId: string, externalTenantId: string, id: PlatformId, lastErrorCode: string | null, provider: ChannelProvider, status: AgentChannelBindingStatus, updatedAt: string } };
-
-export type WeChatAgentChannelPairingFieldsFragment = { lastErrorCode: string | null, qrCodeImageSrc: string | null, qrToken: string | null, status: WeChatQrPairingStatus, binding: { activityLastTriggeredAt: string | null, activitySessionCount7d: number, agentId: PlatformId, createdAt: string, displayMetadata: PrimitiveRecord, externalBotId: string, externalTenantId: string, id: PlatformId, lastErrorCode: string | null, provider: ChannelProvider, status: AgentChannelBindingStatus, updatedAt: string } | null };
-
-export type StartWeChatAgentChannelPairingMutationVariables = Exact<{
-  input: StartWeChatAgentChannelPairingInput;
-}>;
-
-
-export type StartWeChatAgentChannelPairingMutation = { startWeChatAgentChannelPairing: { lastErrorCode: string | null, qrCodeImageSrc: string | null, qrToken: string | null, status: WeChatQrPairingStatus, binding: { activityLastTriggeredAt: string | null, activitySessionCount7d: number, agentId: PlatformId, createdAt: string, displayMetadata: PrimitiveRecord, externalBotId: string, externalTenantId: string, id: PlatformId, lastErrorCode: string | null, provider: ChannelProvider, status: AgentChannelBindingStatus, updatedAt: string } | null } };
-
-export type PollWeChatAgentChannelPairingMutationVariables = Exact<{
-  input: PollWeChatAgentChannelPairingInput;
-}>;
-
-
-export type PollWeChatAgentChannelPairingMutation = { pollWeChatAgentChannelPairing: { lastErrorCode: string | null, qrCodeImageSrc: string | null, qrToken: string | null, status: WeChatQrPairingStatus, binding: { activityLastTriggeredAt: string | null, activitySessionCount7d: number, agentId: PlatformId, createdAt: string, displayMetadata: PrimitiveRecord, externalBotId: string, externalTenantId: string, id: PlatformId, lastErrorCode: string | null, provider: ChannelProvider, status: AgentChannelBindingStatus, updatedAt: string } | null } };
-
-export type DeleteAgentChannelBindingMutationVariables = Exact<{
-  input: DeleteAgentChannelBindingInput;
-}>;
-
-
-export type DeleteAgentChannelBindingMutation = { deleteAgentChannelBinding: { ok: boolean } };
 
 export type AgentFieldsFragment = { createdAt: string, description: string | null, id: PlatformId, kind: AgentKind, model: string, name: string, appId: PlatformId, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, visibility: AgentVisibility, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }> };
 
@@ -1346,61 +1168,6 @@ export class TypedDocumentString<TResult, TVariables>
     return this.value;
   }
 }
-export const LarkAgentChannelRegistrationFieldsFragmentDoc = /*#__PURE__*/ new TypedDocumentString(`
-    fragment LarkAgentChannelRegistrationFields on LarkAgentChannelRegistration {
-  appId
-  appSecret
-  deviceCode
-  domain
-  expireIn
-  interval
-  lastErrorCode
-  openId
-  qrUrl
-  status
-  userCode
-}
-    `, {"fragmentName":"LarkAgentChannelRegistrationFields"}) as unknown as TypedDocumentString<LarkAgentChannelRegistrationFieldsFragment, unknown>;
-export const AgentChannelBindingFieldsFragmentDoc = /*#__PURE__*/ new TypedDocumentString(`
-    fragment AgentChannelBindingFields on AgentChannelBinding {
-  activityLastTriggeredAt
-  activitySessionCount7d
-  agentId
-  createdAt
-  displayMetadata
-  externalBotId
-  externalTenantId
-  id
-  lastErrorCode
-  provider
-  status
-  updatedAt
-}
-    `, {"fragmentName":"AgentChannelBindingFields"}) as unknown as TypedDocumentString<AgentChannelBindingFieldsFragment, unknown>;
-export const WeChatAgentChannelPairingFieldsFragmentDoc = /*#__PURE__*/ new TypedDocumentString(`
-    fragment WeChatAgentChannelPairingFields on WeChatAgentChannelPairing {
-  binding {
-    ...AgentChannelBindingFields
-  }
-  lastErrorCode
-  qrCodeImageSrc
-  qrToken
-  status
-}
-    fragment AgentChannelBindingFields on AgentChannelBinding {
-  activityLastTriggeredAt
-  activitySessionCount7d
-  agentId
-  createdAt
-  displayMetadata
-  externalBotId
-  externalTenantId
-  id
-  lastErrorCode
-  provider
-  status
-  updatedAt
-}`, {"fragmentName":"WeChatAgentChannelPairingFields"}) as unknown as TypedDocumentString<WeChatAgentChannelPairingFieldsFragment, unknown>;
 export const AgentDeploymentVersionFieldsFragmentDoc = /*#__PURE__*/ new TypedDocumentString(`
     fragment AgentDeploymentVersionFields on AgentDeploymentVersion {
   agentId
@@ -1879,209 +1646,6 @@ export const SkillDetailFieldsFragmentDoc = /*#__PURE__*/ new TypedDocumentStrin
   }
 }
     `, {"fragmentName":"SkillDetailFields"}) as unknown as TypedDocumentString<SkillDetailFieldsFragment, unknown>;
-export const AgentChannelBindingsDocument = /*#__PURE__*/ new TypedDocumentString(`
-    query AgentChannelBindings($appId: ULID!, $agentId: ULID!) {
-  agentChannelBindingList(appId: $appId, agentId: $agentId) {
-    ...AgentChannelBindingFields
-  }
-}
-    fragment AgentChannelBindingFields on AgentChannelBinding {
-  activityLastTriggeredAt
-  activitySessionCount7d
-  agentId
-  createdAt
-  displayMetadata
-  externalBotId
-  externalTenantId
-  id
-  lastErrorCode
-  provider
-  status
-  updatedAt
-}`) as unknown as TypedDocumentString<AgentChannelBindingsQuery, AgentChannelBindingsQueryVariables>;
-export const CreateSlackAgentChannelBindingDocument = /*#__PURE__*/ new TypedDocumentString(`
-    mutation CreateSlackAgentChannelBinding($input: CreateSlackAgentChannelBindingInput!) {
-  createSlackAgentChannelBinding(input: $input) {
-    ...AgentChannelBindingFields
-  }
-}
-    fragment AgentChannelBindingFields on AgentChannelBinding {
-  activityLastTriggeredAt
-  activitySessionCount7d
-  agentId
-  createdAt
-  displayMetadata
-  externalBotId
-  externalTenantId
-  id
-  lastErrorCode
-  provider
-  status
-  updatedAt
-}`) as unknown as TypedDocumentString<CreateSlackAgentChannelBindingMutation, CreateSlackAgentChannelBindingMutationVariables>;
-export const CreateLarkAgentChannelBindingDocument = /*#__PURE__*/ new TypedDocumentString(`
-    mutation CreateLarkAgentChannelBinding($input: CreateLarkAgentChannelBindingInput!) {
-  createLarkAgentChannelBinding(input: $input) {
-    ...AgentChannelBindingFields
-  }
-}
-    fragment AgentChannelBindingFields on AgentChannelBinding {
-  activityLastTriggeredAt
-  activitySessionCount7d
-  agentId
-  createdAt
-  displayMetadata
-  externalBotId
-  externalTenantId
-  id
-  lastErrorCode
-  provider
-  status
-  updatedAt
-}`) as unknown as TypedDocumentString<CreateLarkAgentChannelBindingMutation, CreateLarkAgentChannelBindingMutationVariables>;
-export const StartLarkAgentChannelRegistrationDocument = /*#__PURE__*/ new TypedDocumentString(`
-    mutation StartLarkAgentChannelRegistration($input: StartLarkAgentChannelRegistrationInput!) {
-  startLarkAgentChannelRegistration(input: $input) {
-    ...LarkAgentChannelRegistrationFields
-  }
-}
-    fragment LarkAgentChannelRegistrationFields on LarkAgentChannelRegistration {
-  appId
-  appSecret
-  deviceCode
-  domain
-  expireIn
-  interval
-  lastErrorCode
-  openId
-  qrUrl
-  status
-  userCode
-}`) as unknown as TypedDocumentString<StartLarkAgentChannelRegistrationMutation, StartLarkAgentChannelRegistrationMutationVariables>;
-export const PollLarkAgentChannelRegistrationDocument = /*#__PURE__*/ new TypedDocumentString(`
-    mutation PollLarkAgentChannelRegistration($input: PollLarkAgentChannelRegistrationInput!) {
-  pollLarkAgentChannelRegistration(input: $input) {
-    ...LarkAgentChannelRegistrationFields
-  }
-}
-    fragment LarkAgentChannelRegistrationFields on LarkAgentChannelRegistration {
-  appId
-  appSecret
-  deviceCode
-  domain
-  expireIn
-  interval
-  lastErrorCode
-  openId
-  qrUrl
-  status
-  userCode
-}`) as unknown as TypedDocumentString<PollLarkAgentChannelRegistrationMutation, PollLarkAgentChannelRegistrationMutationVariables>;
-export const CreateTelegramAgentChannelBindingDocument = /*#__PURE__*/ new TypedDocumentString(`
-    mutation CreateTelegramAgentChannelBinding($input: CreateTelegramAgentChannelBindingInput!) {
-  createTelegramAgentChannelBinding(input: $input) {
-    ...AgentChannelBindingFields
-  }
-}
-    fragment AgentChannelBindingFields on AgentChannelBinding {
-  activityLastTriggeredAt
-  activitySessionCount7d
-  agentId
-  createdAt
-  displayMetadata
-  externalBotId
-  externalTenantId
-  id
-  lastErrorCode
-  provider
-  status
-  updatedAt
-}`) as unknown as TypedDocumentString<CreateTelegramAgentChannelBindingMutation, CreateTelegramAgentChannelBindingMutationVariables>;
-export const CreateDiscordAgentChannelBindingDocument = /*#__PURE__*/ new TypedDocumentString(`
-    mutation CreateDiscordAgentChannelBinding($input: CreateDiscordAgentChannelBindingInput!) {
-  createDiscordAgentChannelBinding(input: $input) {
-    ...AgentChannelBindingFields
-  }
-}
-    fragment AgentChannelBindingFields on AgentChannelBinding {
-  activityLastTriggeredAt
-  activitySessionCount7d
-  agentId
-  createdAt
-  displayMetadata
-  externalBotId
-  externalTenantId
-  id
-  lastErrorCode
-  provider
-  status
-  updatedAt
-}`) as unknown as TypedDocumentString<CreateDiscordAgentChannelBindingMutation, CreateDiscordAgentChannelBindingMutationVariables>;
-export const StartWeChatAgentChannelPairingDocument = /*#__PURE__*/ new TypedDocumentString(`
-    mutation StartWeChatAgentChannelPairing($input: StartWeChatAgentChannelPairingInput!) {
-  startWeChatAgentChannelPairing(input: $input) {
-    ...WeChatAgentChannelPairingFields
-  }
-}
-    fragment AgentChannelBindingFields on AgentChannelBinding {
-  activityLastTriggeredAt
-  activitySessionCount7d
-  agentId
-  createdAt
-  displayMetadata
-  externalBotId
-  externalTenantId
-  id
-  lastErrorCode
-  provider
-  status
-  updatedAt
-}
-fragment WeChatAgentChannelPairingFields on WeChatAgentChannelPairing {
-  binding {
-    ...AgentChannelBindingFields
-  }
-  lastErrorCode
-  qrCodeImageSrc
-  qrToken
-  status
-}`) as unknown as TypedDocumentString<StartWeChatAgentChannelPairingMutation, StartWeChatAgentChannelPairingMutationVariables>;
-export const PollWeChatAgentChannelPairingDocument = /*#__PURE__*/ new TypedDocumentString(`
-    mutation PollWeChatAgentChannelPairing($input: PollWeChatAgentChannelPairingInput!) {
-  pollWeChatAgentChannelPairing(input: $input) {
-    ...WeChatAgentChannelPairingFields
-  }
-}
-    fragment AgentChannelBindingFields on AgentChannelBinding {
-  activityLastTriggeredAt
-  activitySessionCount7d
-  agentId
-  createdAt
-  displayMetadata
-  externalBotId
-  externalTenantId
-  id
-  lastErrorCode
-  provider
-  status
-  updatedAt
-}
-fragment WeChatAgentChannelPairingFields on WeChatAgentChannelPairing {
-  binding {
-    ...AgentChannelBindingFields
-  }
-  lastErrorCode
-  qrCodeImageSrc
-  qrToken
-  status
-}`) as unknown as TypedDocumentString<PollWeChatAgentChannelPairingMutation, PollWeChatAgentChannelPairingMutationVariables>;
-export const DeleteAgentChannelBindingDocument = /*#__PURE__*/ new TypedDocumentString(`
-    mutation DeleteAgentChannelBinding($input: DeleteAgentChannelBindingInput!) {
-  deleteAgentChannelBinding(input: $input) {
-    ok
-  }
-}
-    `) as unknown as TypedDocumentString<DeleteAgentChannelBindingMutation, DeleteAgentChannelBindingMutationVariables>;
 export const CreateAgentDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation CreateAgent($input: CreateAgentInput!) {
   createAgent(input: $input) {

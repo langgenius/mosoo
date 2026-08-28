@@ -14,11 +14,9 @@ import { PendingChangesBanner } from "../lifecycle/pending-changes-banner";
 import { PublishMenu } from "../lifecycle/publish-menu";
 import { PublishSuccessModal } from "../lifecycle/publish-success-modal";
 import { AgentKindSection } from "./agent-kind-section";
-import { ChannelsConfigDialog } from "./channels-config-dialog";
 import { AgentFormView } from "./editor/form-view";
 import { useAgentEditorAutoSave } from "./editor/use-auto-save";
 import { useAgentEditorModel } from "./editor/use-model";
-import type { ChannelId } from "./settings-dialog-model";
 
 const AgentSessionPanel = lazy(async () => {
   const mod = await import("./agent-session-panel");
@@ -35,7 +33,6 @@ interface PublishStatusMessage {
 interface PreviewModeState {
   apiAccessDialogOpen: boolean;
   appliedKind: AppliedToastKind | null;
-  channelsDialogOpen: boolean;
   discardCounter: number;
   showAppliedToast: boolean;
   showSuccessModal: boolean;
@@ -46,14 +43,11 @@ type PreviewModeAction =
   | { type: "discarded" }
   | { type: "setApiAccessDialogOpen"; open: boolean }
   | { type: "setAppliedToast"; open: boolean }
-  | { type: "setChannelsDialogOpen"; open: boolean }
   | { type: "setSuccessModalOpen"; open: boolean };
 
-const DEFAULT_CHANNEL_ID: ChannelId = "slack";
 const PREVIEW_MODE_INITIAL_STATE: PreviewModeState = {
   apiAccessDialogOpen: false,
   appliedKind: null,
-  channelsDialogOpen: false,
   discardCounter: 0,
   showAppliedToast: false,
   showSuccessModal: false,
@@ -102,8 +96,6 @@ function previewModeReducer(state: PreviewModeState, action: PreviewModeAction):
       return { ...state, apiAccessDialogOpen: action.open };
     case "setAppliedToast":
       return { ...state, showAppliedToast: action.open };
-    case "setChannelsDialogOpen":
-      return { ...state, channelsDialogOpen: action.open };
     case "setSuccessModalOpen":
       return { ...state, showSuccessModal: action.open };
   }
@@ -116,14 +108,8 @@ export function PreviewMode({ agent, headerActionTarget }: PreviewModeProps): Re
   const model = useAgentEditorModel({ agent });
   useAgentEditorAutoSave(model);
   const [state, dispatch] = useReducer(previewModeReducer, PREVIEW_MODE_INITIAL_STATE);
-  const {
-    apiAccessDialogOpen,
-    appliedKind,
-    channelsDialogOpen,
-    discardCounter,
-    showAppliedToast,
-    showSuccessModal,
-  } = state;
+  const { apiAccessDialogOpen, appliedKind, discardCounter, showAppliedToast, showSuccessModal } =
+    state;
 
   useEffect(() => {
     let timer: ReturnType<typeof globalThis.setTimeout> | null = null;
@@ -188,9 +174,6 @@ export function PreviewMode({ agent, headerActionTarget }: PreviewModeProps): Re
               errorMessage={publishError?.message ?? null}
               onApiAccessClick={() => {
                 dispatch({ open: true, type: "setApiAccessDialogOpen" });
-              }}
-              onChannelClick={() => {
-                dispatch({ open: true, type: "setChannelsDialogOpen" });
               }}
               onPublish={() => {
                 publishMutation.mutate();
@@ -262,16 +245,6 @@ export function PreviewMode({ agent, headerActionTarget }: PreviewModeProps): Re
             dispatch({ open, type: "setApiAccessDialogOpen" });
           }}
           open={apiAccessDialogOpen}
-        />
-      ) : null}
-      {channelsDialogOpen ? (
-        <ChannelsConfigDialog
-          agent={agent}
-          initialChannelId={DEFAULT_CHANNEL_ID}
-          onOpenChange={(open) => {
-            dispatch({ open, type: "setChannelsDialogOpen" });
-          }}
-          open={channelsDialogOpen}
         />
       ) : null}
 

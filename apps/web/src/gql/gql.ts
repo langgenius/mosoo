@@ -15,19 +15,6 @@ import * as types from './graphql';
  * Learn more about it here: https://the-guild.dev/graphql/codegen/plugins/presets/preset-client#reducing-bundle-size
  */
 type Documents = {
-    "\n  fragment AgentChannelBindingFields on AgentChannelBinding {\n    activityLastTriggeredAt\n    activitySessionCount7d\n    agentId\n    createdAt\n    displayMetadata\n    externalBotId\n    externalTenantId\n    id\n    lastErrorCode\n    provider\n    status\n    updatedAt\n  }\n": typeof types.AgentChannelBindingFieldsFragmentDoc,
-    "\n  query AgentChannelBindings($appId: ULID!, $agentId: ULID!) {\n    agentChannelBindingList(appId: $appId, agentId: $agentId) {\n      ...AgentChannelBindingFields\n    }\n  }\n": typeof types.AgentChannelBindingsDocument,
-    "\n  mutation CreateSlackAgentChannelBinding($input: CreateSlackAgentChannelBindingInput!) {\n    createSlackAgentChannelBinding(input: $input) {\n      ...AgentChannelBindingFields\n    }\n  }\n": typeof types.CreateSlackAgentChannelBindingDocument,
-    "\n  mutation CreateLarkAgentChannelBinding($input: CreateLarkAgentChannelBindingInput!) {\n    createLarkAgentChannelBinding(input: $input) {\n      ...AgentChannelBindingFields\n    }\n  }\n": typeof types.CreateLarkAgentChannelBindingDocument,
-    "\n  fragment LarkAgentChannelRegistrationFields on LarkAgentChannelRegistration {\n    appId\n    appSecret\n    deviceCode\n    domain\n    expireIn\n    interval\n    lastErrorCode\n    openId\n    qrUrl\n    status\n    userCode\n  }\n": typeof types.LarkAgentChannelRegistrationFieldsFragmentDoc,
-    "\n  mutation StartLarkAgentChannelRegistration($input: StartLarkAgentChannelRegistrationInput!) {\n    startLarkAgentChannelRegistration(input: $input) {\n      ...LarkAgentChannelRegistrationFields\n    }\n  }\n": typeof types.StartLarkAgentChannelRegistrationDocument,
-    "\n  mutation PollLarkAgentChannelRegistration($input: PollLarkAgentChannelRegistrationInput!) {\n    pollLarkAgentChannelRegistration(input: $input) {\n      ...LarkAgentChannelRegistrationFields\n    }\n  }\n": typeof types.PollLarkAgentChannelRegistrationDocument,
-    "\n  mutation CreateTelegramAgentChannelBinding($input: CreateTelegramAgentChannelBindingInput!) {\n    createTelegramAgentChannelBinding(input: $input) {\n      ...AgentChannelBindingFields\n    }\n  }\n": typeof types.CreateTelegramAgentChannelBindingDocument,
-    "\n  mutation CreateDiscordAgentChannelBinding($input: CreateDiscordAgentChannelBindingInput!) {\n    createDiscordAgentChannelBinding(input: $input) {\n      ...AgentChannelBindingFields\n    }\n  }\n": typeof types.CreateDiscordAgentChannelBindingDocument,
-    "\n  fragment WeChatAgentChannelPairingFields on WeChatAgentChannelPairing {\n    binding {\n      ...AgentChannelBindingFields\n    }\n    lastErrorCode\n    qrCodeImageSrc\n    qrToken\n    status\n  }\n": typeof types.WeChatAgentChannelPairingFieldsFragmentDoc,
-    "\n  mutation StartWeChatAgentChannelPairing($input: StartWeChatAgentChannelPairingInput!) {\n    startWeChatAgentChannelPairing(input: $input) {\n      ...WeChatAgentChannelPairingFields\n    }\n  }\n": typeof types.StartWeChatAgentChannelPairingDocument,
-    "\n  mutation PollWeChatAgentChannelPairing($input: PollWeChatAgentChannelPairingInput!) {\n    pollWeChatAgentChannelPairing(input: $input) {\n      ...WeChatAgentChannelPairingFields\n    }\n  }\n": typeof types.PollWeChatAgentChannelPairingDocument,
-    "\n  mutation DeleteAgentChannelBinding($input: DeleteAgentChannelBindingInput!) {\n    deleteAgentChannelBinding(input: $input) {\n      ok\n    }\n  }\n": typeof types.DeleteAgentChannelBindingDocument,
     "\n  fragment AgentFields on Agent {\n    createdAt\n    description\n    id\n    kind\n    liveVersion {\n      ...AgentDeploymentVersionFields\n    }\n    model\n    name\n    appId\n    prompt\n    provider\n    runtimeId\n    skills {\n      ownerName\n      skillId\n      skillName\n      state\n    }\n    status\n    updatedAt\n    visibility\n  }\n": typeof types.AgentFieldsFragmentDoc,
     "\n  fragment AgentToolSummaryFields on AgentToolSummary {\n    enabled\n    iconUrl\n    name\n    serverId\n  }\n": typeof types.AgentToolSummaryFieldsFragmentDoc,
     "\n  fragment AgentDeploymentVersionFields on AgentDeploymentVersion {\n    agentId\n    createdAt\n    createdByAccountId\n    environmentId\n    id\n    isLive\n    kind\n    model\n    provider\n    runtimeId\n    summary\n    versionNumber\n  }\n": typeof types.AgentDeploymentVersionFieldsFragmentDoc,
@@ -119,19 +106,6 @@ type Documents = {
     "\n  mutation TestVendorCredential($input: TestVendorCredentialInput!) {\n    testVendorCredential(input: $input) {\n      errorCode\n      latencyMs\n      ok\n    }\n  }\n": typeof types.TestVendorCredentialDocument,
 };
 const documents: Documents = {
-    "\n  fragment AgentChannelBindingFields on AgentChannelBinding {\n    activityLastTriggeredAt\n    activitySessionCount7d\n    agentId\n    createdAt\n    displayMetadata\n    externalBotId\n    externalTenantId\n    id\n    lastErrorCode\n    provider\n    status\n    updatedAt\n  }\n": types.AgentChannelBindingFieldsFragmentDoc,
-    "\n  query AgentChannelBindings($appId: ULID!, $agentId: ULID!) {\n    agentChannelBindingList(appId: $appId, agentId: $agentId) {\n      ...AgentChannelBindingFields\n    }\n  }\n": types.AgentChannelBindingsDocument,
-    "\n  mutation CreateSlackAgentChannelBinding($input: CreateSlackAgentChannelBindingInput!) {\n    createSlackAgentChannelBinding(input: $input) {\n      ...AgentChannelBindingFields\n    }\n  }\n": types.CreateSlackAgentChannelBindingDocument,
-    "\n  mutation CreateLarkAgentChannelBinding($input: CreateLarkAgentChannelBindingInput!) {\n    createLarkAgentChannelBinding(input: $input) {\n      ...AgentChannelBindingFields\n    }\n  }\n": types.CreateLarkAgentChannelBindingDocument,
-    "\n  fragment LarkAgentChannelRegistrationFields on LarkAgentChannelRegistration {\n    appId\n    appSecret\n    deviceCode\n    domain\n    expireIn\n    interval\n    lastErrorCode\n    openId\n    qrUrl\n    status\n    userCode\n  }\n": types.LarkAgentChannelRegistrationFieldsFragmentDoc,
-    "\n  mutation StartLarkAgentChannelRegistration($input: StartLarkAgentChannelRegistrationInput!) {\n    startLarkAgentChannelRegistration(input: $input) {\n      ...LarkAgentChannelRegistrationFields\n    }\n  }\n": types.StartLarkAgentChannelRegistrationDocument,
-    "\n  mutation PollLarkAgentChannelRegistration($input: PollLarkAgentChannelRegistrationInput!) {\n    pollLarkAgentChannelRegistration(input: $input) {\n      ...LarkAgentChannelRegistrationFields\n    }\n  }\n": types.PollLarkAgentChannelRegistrationDocument,
-    "\n  mutation CreateTelegramAgentChannelBinding($input: CreateTelegramAgentChannelBindingInput!) {\n    createTelegramAgentChannelBinding(input: $input) {\n      ...AgentChannelBindingFields\n    }\n  }\n": types.CreateTelegramAgentChannelBindingDocument,
-    "\n  mutation CreateDiscordAgentChannelBinding($input: CreateDiscordAgentChannelBindingInput!) {\n    createDiscordAgentChannelBinding(input: $input) {\n      ...AgentChannelBindingFields\n    }\n  }\n": types.CreateDiscordAgentChannelBindingDocument,
-    "\n  fragment WeChatAgentChannelPairingFields on WeChatAgentChannelPairing {\n    binding {\n      ...AgentChannelBindingFields\n    }\n    lastErrorCode\n    qrCodeImageSrc\n    qrToken\n    status\n  }\n": types.WeChatAgentChannelPairingFieldsFragmentDoc,
-    "\n  mutation StartWeChatAgentChannelPairing($input: StartWeChatAgentChannelPairingInput!) {\n    startWeChatAgentChannelPairing(input: $input) {\n      ...WeChatAgentChannelPairingFields\n    }\n  }\n": types.StartWeChatAgentChannelPairingDocument,
-    "\n  mutation PollWeChatAgentChannelPairing($input: PollWeChatAgentChannelPairingInput!) {\n    pollWeChatAgentChannelPairing(input: $input) {\n      ...WeChatAgentChannelPairingFields\n    }\n  }\n": types.PollWeChatAgentChannelPairingDocument,
-    "\n  mutation DeleteAgentChannelBinding($input: DeleteAgentChannelBindingInput!) {\n    deleteAgentChannelBinding(input: $input) {\n      ok\n    }\n  }\n": types.DeleteAgentChannelBindingDocument,
     "\n  fragment AgentFields on Agent {\n    createdAt\n    description\n    id\n    kind\n    liveVersion {\n      ...AgentDeploymentVersionFields\n    }\n    model\n    name\n    appId\n    prompt\n    provider\n    runtimeId\n    skills {\n      ownerName\n      skillId\n      skillName\n      state\n    }\n    status\n    updatedAt\n    visibility\n  }\n": types.AgentFieldsFragmentDoc,
     "\n  fragment AgentToolSummaryFields on AgentToolSummary {\n    enabled\n    iconUrl\n    name\n    serverId\n  }\n": types.AgentToolSummaryFieldsFragmentDoc,
     "\n  fragment AgentDeploymentVersionFields on AgentDeploymentVersion {\n    agentId\n    createdAt\n    createdByAccountId\n    environmentId\n    id\n    isLive\n    kind\n    model\n    provider\n    runtimeId\n    summary\n    versionNumber\n  }\n": types.AgentDeploymentVersionFieldsFragmentDoc,
@@ -223,58 +197,6 @@ const documents: Documents = {
     "\n  mutation TestVendorCredential($input: TestVendorCredentialInput!) {\n    testVendorCredential(input: $input) {\n      errorCode\n      latencyMs\n      ok\n    }\n  }\n": types.TestVendorCredentialDocument,
 };
 
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  fragment AgentChannelBindingFields on AgentChannelBinding {\n    activityLastTriggeredAt\n    activitySessionCount7d\n    agentId\n    createdAt\n    displayMetadata\n    externalBotId\n    externalTenantId\n    id\n    lastErrorCode\n    provider\n    status\n    updatedAt\n  }\n"): typeof import('./graphql').AgentChannelBindingFieldsFragmentDoc;
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  query AgentChannelBindings($appId: ULID!, $agentId: ULID!) {\n    agentChannelBindingList(appId: $appId, agentId: $agentId) {\n      ...AgentChannelBindingFields\n    }\n  }\n"): typeof import('./graphql').AgentChannelBindingsDocument;
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  mutation CreateSlackAgentChannelBinding($input: CreateSlackAgentChannelBindingInput!) {\n    createSlackAgentChannelBinding(input: $input) {\n      ...AgentChannelBindingFields\n    }\n  }\n"): typeof import('./graphql').CreateSlackAgentChannelBindingDocument;
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  mutation CreateLarkAgentChannelBinding($input: CreateLarkAgentChannelBindingInput!) {\n    createLarkAgentChannelBinding(input: $input) {\n      ...AgentChannelBindingFields\n    }\n  }\n"): typeof import('./graphql').CreateLarkAgentChannelBindingDocument;
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  fragment LarkAgentChannelRegistrationFields on LarkAgentChannelRegistration {\n    appId\n    appSecret\n    deviceCode\n    domain\n    expireIn\n    interval\n    lastErrorCode\n    openId\n    qrUrl\n    status\n    userCode\n  }\n"): typeof import('./graphql').LarkAgentChannelRegistrationFieldsFragmentDoc;
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  mutation StartLarkAgentChannelRegistration($input: StartLarkAgentChannelRegistrationInput!) {\n    startLarkAgentChannelRegistration(input: $input) {\n      ...LarkAgentChannelRegistrationFields\n    }\n  }\n"): typeof import('./graphql').StartLarkAgentChannelRegistrationDocument;
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  mutation PollLarkAgentChannelRegistration($input: PollLarkAgentChannelRegistrationInput!) {\n    pollLarkAgentChannelRegistration(input: $input) {\n      ...LarkAgentChannelRegistrationFields\n    }\n  }\n"): typeof import('./graphql').PollLarkAgentChannelRegistrationDocument;
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  mutation CreateTelegramAgentChannelBinding($input: CreateTelegramAgentChannelBindingInput!) {\n    createTelegramAgentChannelBinding(input: $input) {\n      ...AgentChannelBindingFields\n    }\n  }\n"): typeof import('./graphql').CreateTelegramAgentChannelBindingDocument;
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  mutation CreateDiscordAgentChannelBinding($input: CreateDiscordAgentChannelBindingInput!) {\n    createDiscordAgentChannelBinding(input: $input) {\n      ...AgentChannelBindingFields\n    }\n  }\n"): typeof import('./graphql').CreateDiscordAgentChannelBindingDocument;
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  fragment WeChatAgentChannelPairingFields on WeChatAgentChannelPairing {\n    binding {\n      ...AgentChannelBindingFields\n    }\n    lastErrorCode\n    qrCodeImageSrc\n    qrToken\n    status\n  }\n"): typeof import('./graphql').WeChatAgentChannelPairingFieldsFragmentDoc;
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  mutation StartWeChatAgentChannelPairing($input: StartWeChatAgentChannelPairingInput!) {\n    startWeChatAgentChannelPairing(input: $input) {\n      ...WeChatAgentChannelPairingFields\n    }\n  }\n"): typeof import('./graphql').StartWeChatAgentChannelPairingDocument;
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  mutation PollWeChatAgentChannelPairing($input: PollWeChatAgentChannelPairingInput!) {\n    pollWeChatAgentChannelPairing(input: $input) {\n      ...WeChatAgentChannelPairingFields\n    }\n  }\n"): typeof import('./graphql').PollWeChatAgentChannelPairingDocument;
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  mutation DeleteAgentChannelBinding($input: DeleteAgentChannelBindingInput!) {\n    deleteAgentChannelBinding(input: $input) {\n      ok\n    }\n  }\n"): typeof import('./graphql').DeleteAgentChannelBindingDocument;
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

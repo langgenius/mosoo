@@ -166,9 +166,9 @@ describe("skills.sh catalog", () => {
             },
             {
               installs: 9,
-              name: "Lark Approval",
-              skillId: "lark-approval",
-              source: "open.feishu.cn",
+              name: "Private Entry",
+              skillId: "private-entry",
+              source: "private.example",
             },
           ],
           2,

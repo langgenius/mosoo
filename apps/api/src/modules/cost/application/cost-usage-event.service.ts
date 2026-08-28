@@ -1,5 +1,4 @@
 import type { SessionUsageSummary } from "@mosoo/ag-ui-session";
-import type { SessionType } from "@mosoo/contracts/session";
 import type { SessionRunTrigger } from "@mosoo/contracts/session-run";
 import { usageEventRollupReceiptsTable, usageEventsTable } from "@mosoo/db";
 import { createPlatformId } from "@mosoo/id";
@@ -38,10 +37,8 @@ export interface RuntimeUsageRunContext {
   provider: string;
   runtimeId: string | null;
   sessionId: SessionId;
-  sessionType: SessionType;
   sessionRunId: SessionRunId;
   trigger: SessionRunTrigger;
-  triggerProvider: string | null;
 }
 
 export interface RecordRuntimeUsageEventInput {
@@ -85,10 +82,6 @@ function resolvePublicationState(input: RuntimeUsageRunContext): AgentPublicatio
 }
 
 function resolveRunPurpose(input: RuntimeUsageRunContext): RunPurpose {
-  if (input.sessionType === "api_channel" && isTruthy(input.triggerProvider)) {
-    return "channel";
-  }
-
   if (input.trigger === "system") {
     return "scheduled";
   }

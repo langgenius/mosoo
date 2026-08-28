@@ -31,7 +31,7 @@ import { currentTimestampMs } from "../src/time";
 import {
   createApiCommandQueueStub,
   createRecordedQueueMessage,
-} from "./helpers/channel-final-delivery-queue-fixture";
+} from "./helpers/api-command-queue-fixture";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
 const OWNER_ID = "01J00000000000000000000001";

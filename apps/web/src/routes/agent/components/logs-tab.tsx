@@ -121,9 +121,6 @@ function getSessionTypeLabel(type: SessionSummary["type"]): string {
     case "ui": {
       return "UI";
     }
-    case "api_channel": {
-      return "API / Channel";
-    }
     default: {
       return unreachableCase(type, "Unsupported session type.");
     }
@@ -139,9 +136,6 @@ function getSessionTypeVariant(
     }
     case "ui": {
       return "primary";
-    }
-    case "api_channel": {
-      return "outline";
     }
     default: {
       return unreachableCase(type, "Unsupported session type.");

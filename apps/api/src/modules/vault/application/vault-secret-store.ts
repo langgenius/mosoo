@@ -1,7 +1,7 @@
 import { vaultSecretsTable } from "@mosoo/db";
 import { createPlatformId, parsePlatformId } from "@mosoo/id";
 import type { PlatformId } from "@mosoo/id";
-import { eq, inArray } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
@@ -175,24 +175,5 @@ export async function deleteSecret(
   await getAppDatabase(database)
     .delete(vaultSecretsTable)
     .where(eq(vaultSecretsTable.id, readVaultSecretId(secretId)))
-    .run();
-}
-
-export async function deleteSecretsById(
-  database: D1Database,
-  secretIds: readonly (string | null | undefined)[],
-): Promise<void> {
-  const uniqueSecretIds = [
-    ...new Set(secretIds.filter((secretId): secretId is string => isTruthy(secretId))),
-  ];
-
-  if (uniqueSecretIds.length === 0) {
-    return;
-  }
-
-  const vaultSecretIds = uniqueSecretIds.map(readVaultSecretId);
-  await getAppDatabase(database)
-    .delete(vaultSecretsTable)
-    .where(inArray(vaultSecretsTable.id, vaultSecretIds))
     .run();
 }

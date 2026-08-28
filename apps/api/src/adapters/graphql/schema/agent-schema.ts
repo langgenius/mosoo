@@ -57,7 +57,6 @@ export const agentSchema = /* GraphQL */ `
 
   enum AgentResolutionTargetType {
     agent
-    channel
     environment
     model
     mcp_server

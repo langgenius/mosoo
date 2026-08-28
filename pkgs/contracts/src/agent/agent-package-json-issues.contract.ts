@@ -35,7 +35,6 @@ const PACKAGE_MANIFEST_TOP_LEVEL_FIELDS = new Set([
 ]);
 
 const PACKAGE_MANIFEST_FORBIDDEN_FIELDS = new Set([
-  "channels",
   "cost",
   "credentials",
   "dependencies",
