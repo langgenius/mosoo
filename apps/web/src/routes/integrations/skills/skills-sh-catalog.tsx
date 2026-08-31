@@ -10,7 +10,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { useEffect, useMemo, useReducer, useState } from "react";
+import { useMemo, useReducer, useState } from "react";
 
 import { useSkillsShCatalogQuery } from "@/domains/skill/query/skill-queries";
 import { useTranslation } from "@/shared/i18n";
@@ -97,8 +97,10 @@ export function SkillsShCatalog({
   const { t } = useTranslation();
   const [state, dispatch] = useReducer(skillsShCatalogReducer, SKILLS_SH_CATALOG_INITIAL_STATE);
   const [confirmingSkill, setConfirmingSkill] = useState<SkillsShCatalogSkill | null>(null);
-  const { availableOnly, error, installingId, page, view } = state;
   const trimmedSearch = search.trim();
+  const [previousSearch, setPreviousSearch] = useState(trimmedSearch);
+  const { availableOnly, error, installingId, page: storedPage, view } = state;
+  const page = previousSearch === trimmedSearch ? storedPage : 0;
   const catalogQuery = useSkillsShCatalogQuery({
     availableOnly,
     enabled: isTruthy(registry.projectId),
@@ -108,14 +110,15 @@ export function SkillsShCatalog({
     view,
   });
 
-  useEffect(() => {
-    dispatch({ type: "resetPage" });
-  }, [trimmedSearch]);
-
   const installedNames = useMemo(
     () => new Set(registry.personal.map((skill) => skill.name.trim().toLowerCase())),
     [registry.personal],
   );
+
+  if (previousSearch !== trimmedSearch) {
+    setPreviousSearch(trimmedSearch);
+    dispatch({ type: "resetPage" });
+  }
 
   async function handleInstall(skill: SkillsShCatalogSkill) {
     if (installingId !== null) {

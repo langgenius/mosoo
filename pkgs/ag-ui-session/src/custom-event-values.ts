@@ -21,6 +21,18 @@ export interface MosooSessionRunUpdatedValue {
 
 export type MosooSessionTasksReplacedValue = AgentTaskSnapshot;
 
+export interface MosooSessionToolUpdatedValue {
+  inputDelta: string | null;
+  inputSnapshot: string | null;
+  outputDelta: string | null;
+  outputSnapshot: string | null;
+  parentMessageId: string | null;
+  resultMessageId: string;
+  runId: string | null;
+  toolCallId: string;
+  toolName: string;
+}
+
 export interface MosooSessionSyncRequestValue {
   reason: "manual" | "reconnect";
 }
@@ -46,6 +58,9 @@ export interface MosooSessionFilesUpdatedValue {
 
 export interface MosooSessionPermissionsUpdatedValue {
   permissionRequests: SessionPermissionRequestView[];
+  permissionRequest?: SessionPermissionRequestView;
+  resolvedRequestId?: string;
+  runId?: string;
 }
 
 export interface MosooSessionReadinessValue {

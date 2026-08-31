@@ -1,5 +1,5 @@
 import { parsePlatformId } from "@mosoo/id";
-import type { DriverInstanceId, ProjectId, SessionId } from "@mosoo/id";
+import type { DriverInstanceId, ProjectId, SessionId, SessionRunId } from "@mosoo/id";
 import type { RuntimeEventEnvelope } from "@mosoo/runtime-events";
 
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
@@ -17,7 +17,7 @@ import { resolvePermissionRequest } from "./resolve-permission-request.service";
 type PermissionDecision = "allow_once" | "reject_once";
 
 export interface SessionPermissionStateUpdate {
-  event: RuntimeEventEnvelope;
+  events: RuntimeEventEnvelope[];
   state: SessionLiveState;
 }
 
@@ -68,27 +68,31 @@ function requirePermissionRequestDriverInstanceId(
 
 async function createPermissionStateUpdate(input: {
   currentState: SessionLiveState;
-  outcome?: PermissionDecision;
-  permissionRequests: SessionLiveState["permissionRequests"];
-  requestId?: string;
-  sessionId: SessionId;
+  events: RuntimeEventEnvelope[];
 }): Promise<SessionPermissionStateUpdate> {
-  const event = createSessionRuntimeEvent({
+  return {
+    events: input.events,
+    state: input.events.reduce(applyRuntimeEventToSessionLiveState, input.currentState),
+  };
+}
+
+async function createPermissionResolvedEvent(input: {
+  outcome?: PermissionDecision;
+  requestId: string;
+  runId: SessionRunId;
+  sessionId: SessionId;
+}): Promise<RuntimeEventEnvelope> {
+  return createSessionRuntimeEvent({
     actor: "user",
     kind: "permission.resolved",
     origin: "viewer",
     payload: {
       ...(input.outcome === undefined ? {} : { outcome: input.outcome }),
-      permissionRequests: input.permissionRequests,
-      ...(input.requestId === undefined ? {} : { requestId: input.requestId }),
+      requestId: input.requestId,
     },
+    runId: input.runId,
     sessionId: input.sessionId,
   });
-
-  return {
-    event,
-    state: applyRuntimeEventToSessionLiveState(input.currentState, event),
-  };
 }
 
 export async function resolveSessionPermissionDecision(
@@ -112,19 +116,22 @@ export async function resolveSessionPermissionDecision(
     driverInstanceId: requirePermissionRequestDriverInstanceId(request),
     projectId: input.projectId,
     requestId: input.requestId,
+    runId: parsePlatformId<SessionRunId>(request.runId, "permission request run id"),
     sessionId: input.sessionId,
   });
 
-  const permissionRequests = currentState.permissionRequests.filter(
-    (candidate) => candidate.requestId !== input.requestId,
-  );
+  const runId = parsePlatformId<SessionRunId>(request.runId, "permission request run id");
 
   return createPermissionStateUpdate({
     currentState,
-    outcome: input.decision,
-    permissionRequests,
-    requestId: input.requestId,
-    sessionId: input.sessionId,
+    events: [
+      await createPermissionResolvedEvent({
+        outcome: input.decision,
+        requestId: input.requestId,
+        runId,
+        sessionId: input.sessionId,
+      }),
+    ],
   });
 }
 
@@ -141,8 +148,6 @@ export async function rejectSessionPermissionRequests(
     return null;
   }
 
-  const remainingRequests: SessionLiveState["permissionRequests"] = [];
-
   const cleanupResults = await runOrderedAsyncTasks(
     currentState.permissionRequests.map((request) => async () => {
       try {
@@ -151,6 +156,7 @@ export async function rejectSessionPermissionRequests(
           driverInstanceId: requirePermissionRequestDriverInstanceId(request),
           projectId: input.projectId,
           requestId: request.requestId,
+          runId: parsePlatformId<SessionRunId>(request.runId, "permission request run id"),
           sessionId: input.sessionId,
         });
         return { rejected: true, request };
@@ -161,19 +167,25 @@ export async function rejectSessionPermissionRequests(
     }),
   );
 
-  for (const result of cleanupResults) {
-    if (!result.rejected) {
-      remainingRequests.push(result.request);
-    }
-  }
+  const rejectedRequests = cleanupResults.flatMap((result) =>
+    result.rejected ? [result.request] : [],
+  );
 
-  if (remainingRequests.length === currentState.permissionRequests.length) {
+  if (rejectedRequests.length === 0) {
     return null;
   }
 
   return createPermissionStateUpdate({
     currentState,
-    permissionRequests: remainingRequests,
-    sessionId: input.sessionId,
+    events: await Promise.all(
+      rejectedRequests.map((request) =>
+        createPermissionResolvedEvent({
+          outcome: "reject_once",
+          requestId: request.requestId,
+          runId: parsePlatformId<SessionRunId>(request.runId, "permission request run id"),
+          sessionId: input.sessionId,
+        }),
+      ),
+    ),
   });
 }

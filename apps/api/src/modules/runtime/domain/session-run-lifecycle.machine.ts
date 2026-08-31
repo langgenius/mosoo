@@ -1,5 +1,4 @@
 import type { SessionRunStatus } from "@mosoo/contracts/session-run";
-import { createMachine, transition } from "xstate";
 
 const TERMINAL_SESSION_RUN_STATUSES = [
   "cancelled",
@@ -27,17 +26,6 @@ export type SessionRunLifecycleEvent =
   | { type: "run.start" }
   | { type: "run.wait_for_input" };
 
-const SESSION_RUN_STATUS_BY_EVENT = {
-  "run.boot": "booting",
-  "run.cancel": "cancelled",
-  "run.complete": "completed",
-  "run.expire": "expired",
-  "run.fail": "failed",
-  "run.queue": "queued",
-  "run.start": "running",
-  "run.wait_for_input": "waiting_input",
-} as const satisfies Record<SessionRunLifecycleEvent["type"], SessionRunStatus>;
-
 const SESSION_RUN_EVENT_BY_STATUS = {
   booting: { type: "run.boot" },
   cancelled: { type: "run.cancel" },
@@ -49,56 +37,16 @@ const SESSION_RUN_EVENT_BY_STATUS = {
   waiting_input: { type: "run.wait_for_input" },
 } as const satisfies Record<SessionRunStatus, SessionRunLifecycleEvent>;
 
-const sessionRunLifecycleMachine = createMachine({
-  id: "sessionRunLifecycle",
-  initial: "queued",
-  states: {
-    booting: {
-      on: {
-        "run.cancel": "cancelled",
-        "run.complete": "completed",
-        "run.expire": "expired",
-        "run.fail": "failed",
-        "run.start": "running",
-        "run.wait_for_input": "waiting_input",
-      },
-    },
-    cancelled: {},
-    completed: {},
-    expired: {},
-    failed: {},
-    queued: {
-      on: {
-        "run.boot": "booting",
-        "run.cancel": "cancelled",
-        "run.expire": "expired",
-        "run.fail": "failed",
-        "run.start": "running",
-      },
-    },
-    running: {
-      on: {
-        "run.cancel": "cancelled",
-        "run.complete": "completed",
-        "run.expire": "expired",
-        "run.fail": "failed",
-        "run.wait_for_input": "waiting_input",
-      },
-    },
-    waiting_input: {
-      on: {
-        "run.cancel": "cancelled",
-        "run.complete": "completed",
-        "run.expire": "expired",
-        "run.fail": "failed",
-        "run.start": "running",
-      },
-    },
-  },
-  types: {} as {
-    events: SessionRunLifecycleEvent;
-  },
-});
+const previousStatusesByTarget: Readonly<Record<SessionRunStatus, readonly SessionRunStatus[]>> = {
+  booting: ["queued"],
+  cancelled: ["booting", "queued", "running", "waiting_input"],
+  completed: ["booting", "running", "waiting_input"],
+  expired: ["booting", "queued", "running", "waiting_input"],
+  failed: ["booting", "queued", "running", "waiting_input"],
+  queued: [],
+  running: ["booting", "queued", "waiting_input"],
+  waiting_input: ["booting", "running"],
+};
 
 export type SessionRunTransitionDecision =
   | {
@@ -167,11 +115,7 @@ export function decideSessionRunTransition(input: {
     };
   }
 
-  const snapshot = sessionRunLifecycleMachine.resolveState({ value: input.currentStatus });
-  const [nextSnapshot] = transition(sessionRunLifecycleMachine, snapshot, event);
-  const nextStatus = readSessionRunSnapshotValue(nextSnapshot.value);
-
-  if (nextStatus === input.currentStatus) {
+  if (!previousStatusesByTarget[input.targetStatus].includes(input.currentStatus)) {
     return {
       currentStatus: input.currentStatus,
       event,
@@ -184,15 +128,7 @@ export function decideSessionRunTransition(input: {
   return {
     event,
     kind: "accepted",
-    nextStatus,
+    nextStatus: input.targetStatus,
     previousStatus: input.currentStatus,
   };
-}
-
-function readSessionRunSnapshotValue(value: unknown): SessionRunStatus {
-  if (typeof value !== "string" || !(value in SESSION_RUN_EVENT_BY_STATUS)) {
-    throw new Error("Session run lifecycle machine returned an unknown state.");
-  }
-
-  return SESSION_RUN_STATUS_BY_EVENT[toSessionRunLifecycleEvent(value as SessionRunStatus).type];
 }

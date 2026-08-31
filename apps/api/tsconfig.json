@@ -6,7 +6,7 @@
       "agent-driver": ["../driver/src/index.ts"],
       "agent-driver/*": ["../driver/src/*"]
     },
-    "types": ["./.tmp/types/worker-configuration.d.ts"]
+    "types": ["./.tmp/types/worker-configuration.d.ts", "node"]
   },
   "include": ["src/**/*.ts"]
 }

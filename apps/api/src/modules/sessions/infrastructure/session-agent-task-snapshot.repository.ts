@@ -1,7 +1,8 @@
-import { AgentTaskSnapshot, AgentTasksReplacedPayload } from "@mosoo/contracts/session";
+import { AgentTaskSnapshot } from "@mosoo/contracts/session";
+import type { SessionRunStatus } from "@mosoo/contracts/session-run";
 import { parseSchemaValue } from "@mosoo/contracts/validation";
 import { sessionAgentTaskSnapshotsTable, sessionRunsTable, sessionsTable } from "@mosoo/db";
-import type { RuntimeEventId, SessionId } from "@mosoo/id";
+import type { RuntimeEventId, SessionId, SessionRunId } from "@mosoo/id";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 
 import { createErrorLogContext, logWarn } from "../../../platform/cloudflare/logger";
@@ -66,12 +67,10 @@ export function parseStoredAgentTaskSnapshot(input: {
   tasksJson: string;
 }): AgentTaskSnapshot | null {
   try {
-    const payload = parseSchemaValue(AgentTasksReplacedPayload, JSON.parse(input.tasksJson));
-
     return parseSchemaValue(AgentTaskSnapshot, {
+      ...JSON.parse(input.tasksJson),
       driverInstanceId: input.driverInstanceId,
       runId: input.runId,
-      tasks: payload.tasks,
     });
   } catch (error) {
     logWarn("session.agent_task_snapshot.invalid", {
@@ -83,36 +82,46 @@ export function parseStoredAgentTaskSnapshot(input: {
   }
 }
 
-export async function loadSessionAgentTaskSnapshot(
+export interface SessionAgentTaskState {
+  driverInstanceId: string | null;
+  runId: SessionRunId;
+  runStatus: SessionRunStatus;
+  snapshot: AgentTaskSnapshot | null;
+}
+
+export async function loadSessionAgentTaskState(
   database: D1Database,
   sessionId: SessionId,
-): Promise<AgentTaskSnapshot | null> {
+): Promise<SessionAgentTaskState | null> {
   const row =
     (await getAppDatabase(database)
       .select({
-        driverInstanceId: sessionAgentTaskSnapshotsTable.driverInstanceId,
-        runId: sessionAgentTaskSnapshotsTable.runId,
+        runDriverInstanceId: sessionRunsTable.driverInstanceId,
+        runId: sessionRunsTable.id,
+        runStatus: sessionRunsTable.status,
+        taskDriverInstanceId: sessionAgentTaskSnapshotsTable.driverInstanceId,
+        taskRunId: sessionAgentTaskSnapshotsTable.runId,
         tasksJson: sessionAgentTaskSnapshotsTable.tasksJson,
       })
-      .from(sessionAgentTaskSnapshotsTable)
-      .innerJoin(
-        sessionsTable,
-        and(
-          eq(sessionsTable.id, sessionAgentTaskSnapshotsTable.sessionId),
-          eq(sessionsTable.lastRunId, sessionAgentTaskSnapshotsTable.runId),
-        ),
-      )
+      .from(sessionsTable)
       .innerJoin(
         sessionRunsTable,
         and(
-          eq(sessionRunsTable.id, sessionAgentTaskSnapshotsTable.runId),
-          eq(sessionRunsTable.sessionId, sessionAgentTaskSnapshotsTable.sessionId),
-          eq(sessionRunsTable.driverInstanceId, sessionAgentTaskSnapshotsTable.driverInstanceId),
+          eq(sessionRunsTable.id, sessionsTable.lastRunId),
+          eq(sessionRunsTable.sessionId, sessionsTable.id),
+        ),
+      )
+      .leftJoin(
+        sessionAgentTaskSnapshotsTable,
+        and(
+          eq(sessionAgentTaskSnapshotsTable.sessionId, sessionsTable.id),
+          eq(sessionAgentTaskSnapshotsTable.runId, sessionRunsTable.id),
+          eq(sessionAgentTaskSnapshotsTable.driverInstanceId, sessionRunsTable.driverInstanceId),
         ),
       )
       .where(
         and(
-          eq(sessionAgentTaskSnapshotsTable.sessionId, sessionId),
+          eq(sessionsTable.id, sessionId),
           isNull(sessionsTable.archivedAt),
           eq(sessionsTable.status, "RUNNING"),
           inArray(sessionRunsTable.status, ACTIVE_SESSION_RUN_STATUSES),
@@ -125,10 +134,27 @@ export async function loadSessionAgentTaskSnapshot(
     return null;
   }
 
-  return parseStoredAgentTaskSnapshot({
-    driverInstanceId: row.driverInstanceId,
+  const snapshot =
+    row.taskDriverInstanceId === null || row.taskRunId === null || row.tasksJson === null
+      ? null
+      : parseStoredAgentTaskSnapshot({
+          driverInstanceId: row.taskDriverInstanceId,
+          runId: row.taskRunId,
+          sessionId,
+          tasksJson: row.tasksJson,
+        });
+
+  return {
+    driverInstanceId: row.runDriverInstanceId,
     runId: row.runId,
-    sessionId,
-    tasksJson: row.tasksJson,
-  });
+    runStatus: row.runStatus,
+    snapshot,
+  };
+}
+
+export async function loadSessionAgentTaskSnapshot(
+  database: D1Database,
+  sessionId: SessionId,
+): Promise<AgentTaskSnapshot | null> {
+  return (await loadSessionAgentTaskState(database, sessionId))?.snapshot ?? null;
 }

@@ -2,6 +2,7 @@ import type { PtyOptions } from "@cloudflare/sandbox";
 import { parsePlatformId } from "@mosoo/id";
 import type { AccountId, AgentId } from "@mosoo/id";
 
+import { withDisposedRpcResource } from "../../../platform/cloudflare/rpc-disposal";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { API_ERROR_CODE, ApiError, createApiError } from "../../../platform/errors";
 import { ensureAgentOwner } from "../../agents/application/agent-access.service";
@@ -88,9 +89,11 @@ export async function connectOwnerDebugTerminalWebSocket(
     networkConstraints: { allowedHosts: [], networkPolicy: "full" },
   });
 
-  return connectPreparedSandboxTerminal(activation.subject, {
-    options,
-    request: input.request,
-    terminalSessionId: target.terminalSessionId,
-  });
+  return withDisposedRpcResource(activation.subject, (subject) =>
+    connectPreparedSandboxTerminal(subject, {
+      options,
+      request: input.request,
+      terminalSessionId: target.terminalSessionId,
+    }),
+  );
 }

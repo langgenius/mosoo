@@ -11,27 +11,56 @@ import {
 } from "../../../../platform/cloudflare/rpc-disposal";
 import { requireCloudflareSandboxBinding } from "../../../../platform/cloudflare/sandbox-binding";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
+import { quoteShellArg } from "../../../../shared/shell";
 import type { RuntimeStateClearRule } from "../../domain/runtime-kind-policy";
 import type { SandboxNetworkConstraints } from "../../domain/sandbox-network-constraints";
 import { withRuntimeProvisionTimeout } from "../runtime-provision-timeout";
 import { decodeSandboxBackupIdForPlatform } from "../sandbox-backup-id";
-import { toSandboxHandle } from "../sandbox-handles";
+import { toRuntimeSubjectIncarnationHandle, toSandboxHandle } from "../sandbox-handles";
 import type { SandboxHandle } from "../sandbox-handles";
 import type { ReadyRuntimeSubjectBackupRecord } from "./runtime-subject-store";
-
-function quoteShellArg(value: string): string {
-  return `'${value.replaceAll("'", `'"'"'`)}'`;
-}
 
 export function getRuntimeSubjectKeepAliveHandle(
   bindings: ApiBindings,
   runtimeSubjectId: string,
+  incarnation: number,
 ): Promise<SandboxHandle> {
+  const physicalId =
+    incarnation === 0 ? runtimeSubjectId : `${runtimeSubjectId}-i${incarnation.toString(36)}`;
   if (bindings.runtimeSubjectHandleFactory) {
-    return Promise.resolve(toSandboxHandle(bindings.runtimeSubjectHandleFactory(runtimeSubjectId)));
+    return Promise.resolve(toSandboxHandle(bindings.runtimeSubjectHandleFactory(physicalId)));
   }
 
-  return getCloudflareRuntimeSubjectKeepAliveHandle(bindings, runtimeSubjectId);
+  return getCloudflareRuntimeSubjectKeepAliveHandle(bindings, physicalId);
+}
+
+function getUnversionedSandboxHandle(
+  bindings: ApiBindings,
+  sandboxId: string,
+): Promise<SandboxHandle> {
+  if (bindings.runtimeSubjectHandleFactory) {
+    return Promise.resolve(toSandboxHandle(bindings.runtimeSubjectHandleFactory(sandboxId)));
+  }
+  return getCloudflareRuntimeSubjectKeepAliveHandle(bindings, sandboxId);
+}
+
+export function getEphemeralUnversionedSandboxHandle(
+  bindings: ApiBindings,
+  sandboxId: string,
+  sleepAfter: string | number,
+): Promise<SandboxHandle> {
+  if (bindings.runtimeSubjectHandleFactory) {
+    return Promise.resolve(toSandboxHandle(bindings.runtimeSubjectHandleFactory(sandboxId)));
+  }
+  return getCloudflareEphemeralSandboxHandle(bindings, sandboxId, sleepAfter);
+}
+
+export function createEphemeralSandboxOptions(sleepAfter: string | number): {
+  readonly keepAlive: false;
+  readonly normalizeId: true;
+  readonly sleepAfter: string | number;
+} {
+  return { keepAlive: false, normalizeId: true, sleepAfter };
 }
 
 async function getCloudflareRuntimeSubjectKeepAliveHandle(
@@ -44,6 +73,21 @@ async function getCloudflareRuntimeSubjectKeepAliveHandle(
     normalizeId: true,
   });
   return toSandboxHandle(sandbox);
+}
+
+async function getCloudflareEphemeralSandboxHandle(
+  bindings: ApiBindings,
+  sandboxId: string,
+  sleepAfter: string | number,
+): Promise<SandboxHandle> {
+  const { getSandbox } = await import("@cloudflare/sandbox");
+  return toSandboxHandle(
+    getSandbox(
+      requireCloudflareSandboxBinding(bindings),
+      sandboxId,
+      createEphemeralSandboxOptions(sleepAfter),
+    ),
+  );
 }
 
 /**
@@ -83,6 +127,48 @@ export async function prepareRuntimeSubjectFilesystem(subject: SandboxHandle): P
   );
 }
 
+export async function activateRuntimeSubjectIncarnation(
+  subject: SandboxHandle,
+  incarnation: number,
+  networkConstraintsHash: string,
+): Promise<void> {
+  await withRuntimeProvisionTimeout(
+    toRuntimeSubjectIncarnationHandle(subject).activateRuntimeSubjectIncarnation(
+      incarnation,
+      networkConstraintsHash,
+    ),
+    `Runtime subject incarnation ${incarnation} activation`,
+  );
+}
+
+export async function inspectRuntimeSubjectIncarnation(
+  subject: SandboxHandle,
+  incarnation: number,
+  networkConstraintsHash: string,
+): Promise<{ kind: "healthy" | "missing" | "retired" | "stale" | "unknown" }> {
+  return withRuntimeProvisionTimeout(
+    toRuntimeSubjectIncarnationHandle(subject).inspectRuntimeSubjectIncarnation(
+      incarnation,
+      networkConstraintsHash,
+    ),
+    `Runtime subject incarnation ${incarnation} inspection`,
+  );
+}
+
+export async function markRuntimeSubjectIncarnationReady(
+  subject: SandboxHandle,
+  incarnation: number,
+  networkConstraintsHash: string,
+): Promise<void> {
+  await withRuntimeProvisionTimeout(
+    toRuntimeSubjectIncarnationHandle(subject).markRuntimeSubjectIncarnationReady(
+      incarnation,
+      networkConstraintsHash,
+    ),
+    `Runtime subject incarnation ${incarnation} readiness`,
+  );
+}
+
 export async function restoreRuntimeSubjectBackup(
   subject: SandboxHandle,
   input: {
@@ -105,18 +191,42 @@ export async function restoreRuntimeSubjectBackup(
 export async function destroyRuntimeSubjectContainer(
   bindings: ApiBindings,
   runtimeSubjectId: string,
+  incarnation: number,
   timeoutMs?: number,
 ): Promise<void> {
   await withRuntimeProvisionTimeout(
     (async () =>
       withDisposedRpcResource(
-        await getRuntimeSubjectKeepAliveHandle(bindings, runtimeSubjectId),
+        await getRuntimeSubjectKeepAliveHandle(bindings, runtimeSubjectId, incarnation),
         async (subject) => {
-          await subject.setKeepAlive(false);
-          await subject.destroy();
+          const outcome =
+            await toRuntimeSubjectIncarnationHandle(subject).destroyRuntimeSubjectIncarnation(
+              incarnation,
+            );
+          if (outcome.kind === "stale") {
+            throw new Error("Runtime subject destroy targeted a stale incarnation.");
+          }
         },
       ))(),
     `Runtime subject destroy for ${runtimeSubjectId}`,
+    timeoutMs,
+  );
+}
+
+export async function destroyUnversionedSandboxContainer(
+  bindings: ApiBindings,
+  sandboxId: string,
+  timeoutMs?: number,
+): Promise<void> {
+  await withRuntimeProvisionTimeout(
+    withDisposedRpcResource(
+      await getUnversionedSandboxHandle(bindings, sandboxId),
+      async (sandbox) => {
+        await sandbox.setKeepAlive(false);
+        await sandbox.destroy();
+      },
+    ),
+    `Sandbox destroy for ${sandboxId}`,
     timeoutMs,
   );
 }
@@ -125,12 +235,13 @@ export async function clearRuntimeSubjectAgentState(
   bindings: ApiBindings,
   input: {
     readonly rules: readonly RuntimeStateClearRule[];
+    readonly incarnation: number;
     readonly runtimeSubjectId: string;
     readonly stateTargets: readonly string[];
   },
 ): Promise<void> {
   await withDisposedRpcResource(
-    await getRuntimeSubjectKeepAliveHandle(bindings, input.runtimeSubjectId),
+    await getRuntimeSubjectKeepAliveHandle(bindings, input.runtimeSubjectId, input.incarnation),
     async (subject) => {
       const commands = input.rules.flatMap((rule) => {
         switch (rule.type) {

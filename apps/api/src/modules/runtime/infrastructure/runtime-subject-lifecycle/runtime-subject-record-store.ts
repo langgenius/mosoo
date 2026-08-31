@@ -1,6 +1,17 @@
 import type { AgentKind } from "@mosoo/contracts/agent";
-import type { RuntimeSubjectErrorCode, SandboxSubjectKind } from "@mosoo/contracts/sandbox";
-import { sandboxesTable } from "@mosoo/db";
+import type {
+  RuntimeSubjectErrorCode,
+  SandboxOperationKind,
+  SandboxSubjectKind,
+} from "@mosoo/contracts/sandbox";
+import {
+  driverInstancesTable,
+  nativeResumeRefsTable,
+  sandboxesTable,
+  sandboxSessionsTable,
+  sessionRunsTable,
+  sessionsTable,
+} from "@mosoo/db";
 import { createPlatformId } from "@mosoo/id";
 import type {
   AccountId,
@@ -10,11 +21,30 @@ import type {
   RuntimeOperationId,
   SandboxBackupId,
   SandboxId,
+  SessionId,
+  SessionRunId,
 } from "@mosoo/id";
-import { and, eq, inArray, isNull, lte, notExists, or, sql } from "drizzle-orm";
+import {
+  and,
+  eq,
+  exists,
+  inArray,
+  isNotNull,
+  isNull,
+  lte,
+  ne,
+  notExists,
+  or,
+  sql,
+} from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
+import { alias } from "drizzle-orm/sqlite-core";
 
-import { getAppDatabase, getD1ChangeCount } from "../../../../platform/db/drizzle";
+import {
+  getAppDatabase,
+  getD1ChangeCount,
+  runAppDatabaseBatch,
+} from "../../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../../time";
 import {
   getRuntimeKindPolicy,
@@ -25,6 +55,7 @@ import {
   toRuntimeSubjectStatusLifecycleEventName,
 } from "../../domain/runtime-subject-lifecycle.machine";
 import type { RuntimeSubjectOperationStatus } from "../../domain/runtime-subject-lifecycle.machine";
+import { ACTIVE_SESSION_RUN_STATUSES } from "../../domain/session-run-lifecycle.machine";
 import {
   activeSessionRunQueryForListedSubject,
   lastBackupTable,
@@ -32,9 +63,11 @@ import {
   mapReadyRuntimeSubjectBackup,
   readyLastBackupTable,
   runLeaseQuery,
+  runtimeProvisioningQuery,
 } from "./runtime-subject-store-queries";
 import type {
   RuntimeSubjectActivationRecord,
+  RuntimeSubjectOperationLease,
   RuntimeSubjectRecord,
   RuntimeSubjectStatus,
 } from "./runtime-subject-store.types";
@@ -68,6 +101,7 @@ function runtimeSubjectAccountCapacityPredicate(input: {
 
 function runtimeSubjectStatusPatch(input: {
   readonly now: number;
+  readonly operationKind: SandboxOperationKind | null;
   readonly operationId: RuntimeOperationId | null;
   readonly source: "api" | "maintenance" | "runtime";
   readonly status: RuntimeSubjectStatus;
@@ -77,22 +111,11 @@ function runtimeSubjectStatusPatch(input: {
     statusChangedAt: input.now,
     statusEvent: toRuntimeSubjectStatusLifecycleEventName(input.status),
     statusOperationId: input.operationId ?? null,
+    operationKind: input.operationKind,
     statusSeq: sql`${sandboxesTable.statusSeq} + 1`,
     statusSource: input.source,
     updatedAt: input.now,
   } as const;
-}
-
-function runtimeSubjectStatusOperationCondition(
-  operationId: RuntimeOperationId | null | undefined,
-): SQL[] {
-  if (operationId === undefined) {
-    return [];
-  }
-
-  return operationId === null
-    ? [isNull(sandboxesTable.statusOperationId)]
-    : [eq(sandboxesTable.statusOperationId, operationId)];
 }
 
 export async function getRuntimeSubject(
@@ -102,9 +125,15 @@ export async function getRuntimeSubject(
   const row =
     (await getAppDatabase(database)
       .select({
+        agentId: sandboxesTable.agentId,
+        projectId: sandboxesTable.projectId,
         id: sandboxesTable.id,
+        incarnation: sandboxesTable.incarnation,
         kind: sandboxesTable.kind,
+        networkConstraintsHash: sandboxesTable.networkConstraintsHash,
+        ownerAccountId: sandboxesTable.ownerAccountId,
         status: sandboxesTable.status,
+        subjectId: sandboxesTable.subjectId,
         subjectKind: sandboxesTable.subjectKind,
       })
       .from(sandboxesTable)
@@ -156,6 +185,16 @@ export async function ensureRuntimeSubjectId(
   const existing = await getRuntimeSubjectIdByTuple(database, input);
 
   if (existing !== null) {
+    const record = await getRuntimeSubject(database, existing);
+    if (
+      record === null ||
+      (input.runtimeSubjectId !== undefined && record.id !== input.runtimeSubjectId) ||
+      record.agentId !== input.agentId ||
+      record.projectId !== input.projectId ||
+      record.ownerAccountId !== input.executionOwnerUserId
+    ) {
+      throw new Error("Runtime subject identity does not match the allocation request.");
+    }
     return existing;
   }
 
@@ -173,8 +212,11 @@ export async function ensureRuntimeSubjectId(
       globalMountsJson: "[]",
       id: runtimeSubjectId,
       inactiveDeadlineAt: getRuntimeSubjectInactiveDeadline(getRuntimeKindPolicy(input.kind), now),
+      incarnation: 0,
       kind: input.kind,
       ownerAccountId: input.executionOwnerUserId,
+      networkConstraintsHash: null,
+      operationKind: null,
       status: "cold",
       statusChangedAt: now,
       statusEvent: toRuntimeSubjectStatusLifecycleEventName("cold"),
@@ -198,6 +240,17 @@ export async function ensureRuntimeSubjectId(
     throw new Error("Runtime subject could not be allocated.");
   }
 
+  const concurrentRecord = await getRuntimeSubject(database, createdByConcurrentRequest);
+  if (
+    concurrentRecord === null ||
+    (input.runtimeSubjectId !== undefined && concurrentRecord.id !== input.runtimeSubjectId) ||
+    concurrentRecord.agentId !== input.agentId ||
+    concurrentRecord.projectId !== input.projectId ||
+    concurrentRecord.ownerAccountId !== input.executionOwnerUserId
+  ) {
+    throw new Error("Runtime subject identity does not match the allocation request.");
+  }
+
   return createdByConcurrentRequest;
 }
 
@@ -208,9 +261,12 @@ export async function getRuntimeSubjectActivationRecord(
   const row =
     (await getAppDatabase(database)
       .select({
+        agentId: sandboxesTable.agentId,
+        projectId: sandboxesTable.projectId,
         claimExpiresAt: sandboxesTable.claimExpiresAt,
         claimOwner: sandboxesTable.claimOwner,
         id: sandboxesTable.id,
+        incarnation: sandboxesTable.incarnation,
         kind: sandboxesTable.kind,
         lastError: sandboxesTable.lastError,
         lastErrorCode: sandboxesTable.lastErrorCode,
@@ -219,7 +275,13 @@ export async function getRuntimeSubjectActivationRecord(
         lastBackupStatus: lastBackupTable.status,
         lastReadyBackupDir: readyLastBackupTable.dir,
         lastReadyBackupId: readyLastBackupTable.id,
+        networkConstraintsHash: sandboxesTable.networkConstraintsHash,
+        ownerAccountId: sandboxesTable.ownerAccountId,
+        operationId: sandboxesTable.statusOperationId,
+        operationKind: sandboxesTable.operationKind,
         status: sandboxesTable.status,
+        subjectId: sandboxesTable.subjectId,
+        subjectKind: sandboxesTable.subjectKind,
       })
       .from(sandboxesTable)
       .leftJoin(
@@ -246,9 +308,12 @@ export async function getRuntimeSubjectActivationRecord(
   }
 
   return {
+    agentId: row.agentId,
+    projectId: row.projectId,
     claimExpiresAt: row.claimExpiresAt,
     claimOwner: row.claimOwner,
     id: row.id,
+    incarnation: row.incarnation,
     kind: row.kind,
     lastError: row.lastError,
     lastErrorCode: row.lastErrorCode,
@@ -261,7 +326,13 @@ export async function getRuntimeSubjectActivationRecord(
       dir: row.lastReadyBackupDir,
       id: row.lastReadyBackupId,
     }),
+    networkConstraintsHash: row.networkConstraintsHash,
+    ownerAccountId: row.ownerAccountId,
+    operationId: row.operationId,
+    operationKind: row.operationKind,
     status: row.status,
+    subjectId: row.subjectId,
+    subjectKind: row.subjectKind,
   };
 }
 
@@ -280,16 +351,16 @@ export async function claimRuntimeSubjectActivation(
     (await getAppDatabase(database)
       .update(sandboxesTable)
       .set({
-        agentId: input.agentId,
-        projectId: input.projectId,
         claimExpiresAt: input.claimExpiresAt,
         claimOwner: input.claimOwner,
-        ownerAccountId: input.executionOwnerUserId,
         updatedAt: input.now,
       })
       .where(
         and(
           eq(sandboxesTable.id, input.runtimeSubjectId),
+          eq(sandboxesTable.agentId, input.agentId),
+          eq(sandboxesTable.projectId, input.projectId),
+          eq(sandboxesTable.ownerAccountId, input.executionOwnerUserId),
           eq(sandboxesTable.status, input.expectedStatus),
           inArray(sandboxesTable.status, RUNTIME_SUBJECT_CLAIMABLE_STATUSES),
           or(
@@ -347,18 +418,25 @@ export async function markRuntimeSubjectRestoring(
   database: D1Database,
   input: {
     readonly claimOwner: string;
+    readonly expectedIncarnation: number;
+    readonly expectedStatus: "active" | "cold";
+    readonly networkConstraintsHash: string;
+    readonly operationId: RuntimeOperationId;
     readonly runtimeSubjectId: SandboxId;
   },
-): Promise<boolean> {
+): Promise<RuntimeSubjectOperationLease | null> {
   const now = currentTimestampMs();
-  const result = await getAppDatabase(database)
+  const row = await getAppDatabase(database)
     .update(sandboxesTable)
     .set({
+      incarnation: sql`${sandboxesTable.incarnation} + 1`,
       lastError: null,
       lastErrorCode: null,
+      networkConstraintsHash: input.networkConstraintsHash,
       ...runtimeSubjectStatusPatch({
         now,
-        operationId: null,
+        operationId: input.operationId,
+        operationKind: "activate",
         source: "api",
         status: "restoring",
       }),
@@ -367,23 +445,145 @@ export async function markRuntimeSubjectRestoring(
       and(
         eq(sandboxesTable.id, input.runtimeSubjectId),
         eq(sandboxesTable.claimOwner, input.claimOwner),
-        eq(sandboxesTable.status, "cold"),
+        eq(sandboxesTable.incarnation, input.expectedIncarnation),
+        isNotNull(sandboxesTable.claimExpiresAt),
+        eq(sandboxesTable.status, input.expectedStatus),
+        isNull(sandboxesTable.operationKind),
+        isNull(sandboxesTable.statusOperationId),
       ),
     )
-    .run();
+    .returning({
+      claimExpiresAt: sandboxesTable.claimExpiresAt,
+      claimOwner: sandboxesTable.claimOwner,
+      incarnation: sandboxesTable.incarnation,
+      operationId: sandboxesTable.statusOperationId,
+    })
+    .get();
 
-  return getD1ChangeCount(result) > 0;
+  return row?.claimExpiresAt === null || row?.claimOwner === null || row?.operationId === null
+    ? null
+    : {
+        claimExpiresAt: row.claimExpiresAt,
+        claimOwner: row.claimOwner,
+        incarnation: row.incarnation,
+        kind: "activate",
+        operationId: row.operationId,
+        status: "restoring",
+      };
+}
+
+export async function markRuntimeSubjectActiveDestroying(
+  database: D1Database,
+  input: {
+    readonly claimOwner: string;
+    readonly errorCode: RuntimeSubjectErrorCode;
+    readonly expectedIncarnation: number;
+    readonly message: string;
+    readonly operationId: RuntimeOperationId;
+    readonly provisioningOperationId: RuntimeOperationId;
+    readonly provisioningRunId: SessionRunId;
+    readonly provisioningSessionId: SessionId;
+    readonly runtimeSubjectId: SandboxId;
+  },
+): Promise<RuntimeSubjectOperationLease | null> {
+  const now = currentTimestampMs();
+  const db = getAppDatabase(database);
+  const retirementRuns = alias(sessionRunsTable, "runtime_subject_retirement_run");
+  const retirementDrivers = alias(driverInstancesTable, "runtime_subject_retirement_driver");
+  const retirementProvisioning = alias(sessionsTable, "runtime_subject_retirement_provisioning");
+  const ownedProvisioning = db
+    .select({ id: sessionsTable.id })
+    .from(sessionsTable)
+    .where(
+      and(
+        eq(sessionsTable.id, input.provisioningSessionId),
+        eq(sessionsTable.runtimeProvisioningOperationId, input.provisioningOperationId),
+        eq(sessionsTable.runtimeProvisioningRunId, input.provisioningRunId),
+        eq(sessionsTable.runtimeProvisioningSandboxId, input.runtimeSubjectId),
+        or(
+          isNull(sessionsTable.runtimeProvisioningSandboxIncarnation),
+          eq(sessionsTable.runtimeProvisioningSandboxIncarnation, input.expectedIncarnation),
+        ),
+      ),
+    );
+  const otherProvisioning = db
+    .select({ id: retirementProvisioning.id })
+    .from(retirementProvisioning)
+    .where(
+      and(
+        eq(retirementProvisioning.runtimeProvisioningSandboxId, input.runtimeSubjectId),
+        isNotNull(retirementProvisioning.runtimeProvisioningOperationId),
+        ne(retirementProvisioning.runtimeProvisioningOperationId, input.provisioningOperationId),
+      ),
+    );
+  const otherRun = db
+    .select({ id: retirementRuns.id })
+    .from(retirementRuns)
+    .innerJoin(retirementDrivers, eq(retirementDrivers.id, retirementRuns.driverInstanceId))
+    .where(
+      and(
+        ne(retirementRuns.id, input.provisioningRunId),
+        eq(retirementDrivers.sandboxId, input.runtimeSubjectId),
+        eq(retirementDrivers.sandboxIncarnation, input.expectedIncarnation),
+        inArray(retirementRuns.status, ACTIVE_SESSION_RUN_STATUSES),
+      ),
+    );
+  const row = await db
+    .update(sandboxesTable)
+    .set({
+      lastError: input.message,
+      lastErrorCode: input.errorCode,
+      ...runtimeSubjectStatusPatch({
+        now,
+        operationId: input.operationId,
+        operationKind: "activate",
+        source: "api",
+        status: "destroying",
+      }),
+    })
+    .where(
+      and(
+        eq(sandboxesTable.id, input.runtimeSubjectId),
+        eq(sandboxesTable.claimOwner, input.claimOwner),
+        eq(sandboxesTable.incarnation, input.expectedIncarnation),
+        isNotNull(sandboxesTable.claimExpiresAt),
+        eq(sandboxesTable.status, "active"),
+        isNull(sandboxesTable.operationKind),
+        isNull(sandboxesTable.statusOperationId),
+        exists(ownedProvisioning),
+        notExists(otherProvisioning),
+        notExists(otherRun),
+      ),
+    )
+    .returning({
+      claimExpiresAt: sandboxesTable.claimExpiresAt,
+      claimOwner: sandboxesTable.claimOwner,
+      incarnation: sandboxesTable.incarnation,
+      operationId: sandboxesTable.statusOperationId,
+    })
+    .get();
+
+  return row?.claimExpiresAt === null || row?.claimOwner === null || row?.operationId === null
+    ? null
+    : {
+        claimExpiresAt: row.claimExpiresAt,
+        claimOwner: row.claimOwner,
+        incarnation: row.incarnation,
+        kind: "activate",
+        operationId: row.operationId,
+        status: "destroying",
+      };
 }
 
 export async function markRuntimeSubjectRestoreApplied(
   database: D1Database,
   input: {
     readonly backupId: SandboxBackupId;
-    readonly claimOwner: string;
+    readonly lease: RuntimeSubjectOperationLease;
     readonly runtimeSubjectId: SandboxId;
   },
-): Promise<void> {
-  await getAppDatabase(database)
+): Promise<boolean> {
+  const result = await getAppDatabase(database)
     .update(sandboxesTable)
     .set({
       lastRestoreBackupId: input.backupId,
@@ -392,17 +592,26 @@ export async function markRuntimeSubjectRestoreApplied(
     .where(
       and(
         eq(sandboxesTable.id, input.runtimeSubjectId),
-        eq(sandboxesTable.claimOwner, input.claimOwner),
+        eq(sandboxesTable.claimOwner, input.lease.claimOwner),
+        eq(sandboxesTable.incarnation, input.lease.incarnation),
+        eq(sandboxesTable.operationKind, "activate"),
+        eq(sandboxesTable.status, "restoring"),
+        eq(sandboxesTable.statusOperationId, input.lease.operationId),
       ),
     )
     .run();
+
+  return getD1ChangeCount(result) === 1;
 }
 
 export async function markRuntimeSubjectActive(
   database: D1Database,
   input: {
     readonly claimOwner: string;
+    readonly incarnation: number;
     readonly kind: AgentKind;
+    readonly networkConstraintsHash: string;
+    readonly operationId: RuntimeOperationId | null;
     readonly runtimeSubjectId: SandboxId;
   },
 ): Promise<boolean> {
@@ -417,6 +626,7 @@ export async function markRuntimeSubjectActive(
       inactiveDeadlineAt: getRuntimeSubjectInactiveDeadline(getRuntimeKindPolicy(input.kind), now),
       lastError: null,
       lastErrorCode: null,
+      operationKind: null,
       status: "active",
       statusChangedAt: sql`
 	        CASE
@@ -449,7 +659,15 @@ export async function markRuntimeSubjectActive(
       and(
         eq(sandboxesTable.id, input.runtimeSubjectId),
         eq(sandboxesTable.claimOwner, input.claimOwner),
-        inArray(sandboxesTable.status, ["restoring", "active"]),
+        eq(sandboxesTable.incarnation, input.incarnation),
+        eq(sandboxesTable.networkConstraintsHash, input.networkConstraintsHash),
+        ...(input.operationId === null
+          ? [eq(sandboxesTable.status, "active"), isNull(sandboxesTable.statusOperationId)]
+          : [
+              eq(sandboxesTable.status, "restoring"),
+              eq(sandboxesTable.operationKind, "activate"),
+              eq(sandboxesTable.statusOperationId, input.operationId),
+            ]),
       ),
     )
     .run();
@@ -460,10 +678,9 @@ export async function markRuntimeSubjectActive(
 export async function markRuntimeSubjectActivationDestroying(
   database: D1Database,
   input: {
-    readonly claimOwner: string;
     readonly message: string;
     readonly errorCode: RuntimeSubjectErrorCode;
-    readonly operationId: RuntimeOperationId;
+    readonly lease: RuntimeSubjectOperationLease;
     readonly runtimeSubjectId: SandboxId;
   },
 ): Promise<boolean> {
@@ -472,13 +689,12 @@ export async function markRuntimeSubjectActivationDestroying(
   const result = await getAppDatabase(database)
     .update(sandboxesTable)
     .set({
-      claimExpiresAt: null,
-      claimOwner: null,
       lastError: input.message,
       lastErrorCode: input.errorCode,
       ...runtimeSubjectStatusPatch({
         now,
-        operationId: input.operationId,
+        operationId: input.lease.operationId,
+        operationKind: "activate",
         source: "api",
         status: "destroying",
       }),
@@ -486,10 +702,11 @@ export async function markRuntimeSubjectActivationDestroying(
     .where(
       and(
         eq(sandboxesTable.id, input.runtimeSubjectId),
-        eq(sandboxesTable.claimOwner, input.claimOwner),
-        // Activation can fail at any point after the claim: still cold (during
-        // prepareFilesystem), restoring (during restore), or active.
-        inArray(sandboxesTable.status, ["cold", "restoring", "active"]),
+        eq(sandboxesTable.claimOwner, input.lease.claimOwner),
+        eq(sandboxesTable.incarnation, input.lease.incarnation),
+        eq(sandboxesTable.operationKind, "activate"),
+        eq(sandboxesTable.status, "restoring"),
+        eq(sandboxesTable.statusOperationId, input.lease.operationId),
       ),
     )
     .run();
@@ -502,7 +719,7 @@ export async function markRuntimeSubjectActivationFailed(
   input: {
     readonly message: string;
     readonly errorCode: RuntimeSubjectErrorCode;
-    readonly operationId: RuntimeOperationId;
+    readonly lease: RuntimeSubjectOperationLease;
     readonly runtimeSubjectId: SandboxId;
   },
 ): Promise<boolean> {
@@ -520,6 +737,7 @@ export async function markRuntimeSubjectActivationFailed(
       ...runtimeSubjectStatusPatch({
         now,
         operationId: null,
+        operationKind: null,
         source: "api",
         status: "cold",
       }),
@@ -527,8 +745,11 @@ export async function markRuntimeSubjectActivationFailed(
     .where(
       and(
         eq(sandboxesTable.id, input.runtimeSubjectId),
+        eq(sandboxesTable.claimOwner, input.lease.claimOwner),
+        eq(sandboxesTable.incarnation, input.lease.incarnation),
+        eq(sandboxesTable.operationKind, "activate"),
         eq(sandboxesTable.status, "destroying"),
-        eq(sandboxesTable.statusOperationId, input.operationId),
+        eq(sandboxesTable.statusOperationId, input.lease.operationId),
       ),
     )
     .run();
@@ -539,62 +760,72 @@ export async function markRuntimeSubjectActivationFailed(
 export async function markRuntimeSubjectOperationStarted(
   database: D1Database,
   input: {
-    readonly claimOwner?: string;
+    readonly claimExpiresAt: number;
+    readonly claimOwner: string;
     readonly now?: number;
-    readonly operationId?: RuntimeOperationId | null;
+    readonly operationId: RuntimeOperationId;
+    readonly operationKind: Exclude<SandboxOperationKind, "activate">;
     readonly runtimeSubjectId: SandboxId;
     readonly source?: "api" | "maintenance" | "runtime";
-    readonly status: RuntimeSubjectOperationStatus;
+    readonly status?: "backing_up";
   },
-): Promise<boolean> {
+): Promise<RuntimeSubjectOperationLease | null> {
   const now = input.now ?? currentTimestampMs();
   const appDb = getAppDatabase(database);
-  const claimPredicate =
-    input.claimOwner === undefined
-      ? or(
-          isNull(sandboxesTable.claimOwner),
-          isNull(sandboxesTable.claimExpiresAt),
-          lte(sandboxesTable.claimExpiresAt, now),
-        )
-      : eq(sandboxesTable.claimOwner, input.claimOwner);
-  const result = await appDb
+  const claimPredicate = or(
+    eq(sandboxesTable.claimOwner, input.claimOwner),
+    isNull(sandboxesTable.claimOwner),
+    isNull(sandboxesTable.claimExpiresAt),
+    lte(sandboxesTable.claimExpiresAt, now),
+  );
+  const row = await appDb
     .update(sandboxesTable)
     .set({
-      claimExpiresAt: null,
-      claimOwner: null,
+      claimExpiresAt: input.claimExpiresAt,
+      claimOwner: input.claimOwner,
       inactiveDeadlineAt: null,
       lastError: null,
       lastErrorCode: null,
       ...runtimeSubjectStatusPatch({
         now,
-        operationId: input.operationId ?? null,
+        operationId: input.operationId,
+        operationKind: input.operationKind,
         source: input.source ?? "api",
-        status: input.status,
+        status: "backing_up",
       }),
     })
     .where(
       and(
         eq(sandboxesTable.id, input.runtimeSubjectId),
-        inArray(sandboxesTable.status, RUNTIME_SUBJECT_CLAIMABLE_STATUSES),
+        eq(sandboxesTable.status, "active"),
+        isNull(sandboxesTable.operationKind),
+        isNull(sandboxesTable.statusOperationId),
         claimPredicate,
-        ...(input.source === "maintenance"
-          ? [
-              notExists(activeSessionRunQueryForListedSubject(appDb)),
-              notExists(runLeaseQuery(appDb, input.runtimeSubjectId)),
-            ]
-          : []),
+        notExists(runtimeProvisioningQuery(appDb, input.runtimeSubjectId)),
+        notExists(activeSessionRunQueryForListedSubject(appDb)),
+        notExists(runLeaseQuery(appDb, input.runtimeSubjectId)),
       ),
     )
-    .run();
+    .returning({ incarnation: sandboxesTable.incarnation })
+    .get();
 
-  return getD1ChangeCount(result) > 0;
+  return row === undefined
+    ? null
+    : {
+        claimExpiresAt: input.claimExpiresAt,
+        claimOwner: input.claimOwner,
+        incarnation: row.incarnation,
+        kind: input.operationKind,
+        operationId: input.operationId,
+        status: "backing_up",
+      };
 }
 
 export async function advanceRuntimeSubjectOperationStatus(
   database: D1Database,
   input: {
-    readonly expectedStatus: RuntimeSubjectOperationStatus;
-    readonly operationId?: RuntimeOperationId | null;
+    readonly expectedStatus: RuntimeSubjectOperationLease["status"];
+    readonly lease: RuntimeSubjectOperationLease;
     readonly runtimeSubjectId: SandboxId;
     readonly source?: "api" | "maintenance" | "runtime";
     readonly status: RuntimeSubjectOperationStatus;
@@ -606,7 +837,8 @@ export async function advanceRuntimeSubjectOperationStatus(
     .set({
       ...runtimeSubjectStatusPatch({
         now,
-        operationId: input.operationId ?? null,
+        operationId: input.lease.operationId,
+        operationKind: input.lease.kind,
         source: input.source ?? "api",
         status: input.status,
       }),
@@ -615,7 +847,10 @@ export async function advanceRuntimeSubjectOperationStatus(
       and(
         eq(sandboxesTable.id, input.runtimeSubjectId),
         eq(sandboxesTable.status, input.expectedStatus),
-        ...runtimeSubjectStatusOperationCondition(input.operationId),
+        eq(sandboxesTable.claimOwner, input.lease.claimOwner),
+        eq(sandboxesTable.incarnation, input.lease.incarnation),
+        eq(sandboxesTable.operationKind, input.lease.kind),
+        eq(sandboxesTable.statusOperationId, input.lease.operationId),
       ),
     )
     .run();
@@ -627,8 +862,11 @@ export async function markRuntimeSubjectCold(
   database: D1Database,
   input: {
     readonly clearBackups: boolean;
-    readonly expectedStatus: RuntimeSubjectOperationStatus;
-    readonly operationId?: RuntimeOperationId | null;
+    readonly clearNativeResumeRefs?: boolean;
+    readonly errorCode?: RuntimeSubjectErrorCode;
+    readonly errorMessage?: string;
+    readonly expectedStatus: "destroying";
+    readonly lease: RuntimeSubjectOperationLease;
     readonly runtimeSubjectId: SandboxId;
     readonly source?: "api" | "maintenance" | "runtime";
   },
@@ -641,32 +879,71 @@ export async function markRuntimeSubjectCold(
       }
     : {};
 
-  const result = await getAppDatabase(database)
-    .update(sandboxesTable)
-    .set({
-      ...backupFields,
-      claimExpiresAt: null,
-      claimOwner: null,
-      inactiveDeadlineAt: null,
-      lastError: null,
-      lastErrorCode: null,
-      ...runtimeSubjectStatusPatch({
-        now,
-        operationId: input.operationId ?? null,
-        source: input.source ?? "api",
-        status: "cold",
-      }),
-    })
-    .where(
-      and(
-        eq(sandboxesTable.id, input.runtimeSubjectId),
-        eq(sandboxesTable.status, input.expectedStatus),
-        ...runtimeSubjectStatusOperationCondition(input.operationId),
-      ),
-    )
-    .run();
+  const results = await runAppDatabaseBatch(database, (appDb) => {
+    const ownedOperation = and(
+      eq(sandboxesTable.id, input.runtimeSubjectId),
+      eq(sandboxesTable.status, input.expectedStatus),
+      eq(sandboxesTable.claimOwner, input.lease.claimOwner),
+      eq(sandboxesTable.incarnation, input.lease.incarnation),
+      eq(sandboxesTable.operationKind, input.lease.kind),
+      eq(sandboxesTable.statusOperationId, input.lease.operationId),
+    );
+    const stillOwned = exists(
+      appDb.select({ id: sandboxesTable.id }).from(sandboxesTable).where(ownedOperation),
+    );
 
-  return getD1ChangeCount(result) > 0;
+    return [
+      appDb.delete(nativeResumeRefsTable).where(
+        and(
+          input.clearNativeResumeRefs ? sql`TRUE` : sql`FALSE`,
+          stillOwned,
+          exists(
+            appDb
+              .select({ sessionId: sandboxSessionsTable.sessionId })
+              .from(sandboxSessionsTable)
+              .where(
+                and(
+                  eq(sandboxSessionsTable.sessionId, nativeResumeRefsTable.sessionId),
+                  eq(sandboxSessionsTable.sandboxId, input.runtimeSubjectId),
+                  eq(sandboxSessionsTable.sandboxIncarnation, input.lease.incarnation),
+                ),
+              ),
+          ),
+        ),
+      ),
+      appDb
+        .update(sandboxSessionsTable)
+        .set({ cleanupOperationId: null, status: "closed", updatedAt: now })
+        .where(
+          and(
+            eq(sandboxSessionsTable.sandboxId, input.runtimeSubjectId),
+            eq(sandboxSessionsTable.sandboxIncarnation, input.lease.incarnation),
+            inArray(sandboxSessionsTable.status, ["active", "cleanup_pending", "error"]),
+            stillOwned,
+          ),
+        ),
+      appDb
+        .update(sandboxesTable)
+        .set({
+          ...backupFields,
+          claimExpiresAt: null,
+          claimOwner: null,
+          inactiveDeadlineAt: null,
+          lastError: input.errorMessage ?? null,
+          lastErrorCode: input.errorCode ?? null,
+          ...runtimeSubjectStatusPatch({
+            now,
+            operationId: null,
+            operationKind: null,
+            source: input.source ?? "api",
+            status: "cold",
+          }),
+        })
+        .where(ownedOperation),
+    ];
+  });
+
+  return getD1ChangeCount(results[2]) > 0;
 }
 
 export async function markRuntimeSubjectOperationRepairNeeded(
@@ -674,8 +951,8 @@ export async function markRuntimeSubjectOperationRepairNeeded(
   input: {
     readonly errorMessage: string;
     readonly errorCode: RuntimeSubjectErrorCode;
-    readonly expectedStatus: RuntimeSubjectOperationStatus;
-    readonly operationId: RuntimeOperationId;
+    readonly expectedStatus: RuntimeSubjectOperationLease["status"];
+    readonly lease: RuntimeSubjectOperationLease;
     readonly runtimeSubjectId: SandboxId;
     readonly source?: "api" | "maintenance" | "runtime";
   },
@@ -684,22 +961,19 @@ export async function markRuntimeSubjectOperationRepairNeeded(
   const result = await getAppDatabase(database)
     .update(sandboxesTable)
     .set({
-      claimExpiresAt: null,
-      claimOwner: null,
+      claimExpiresAt: now,
       lastError: input.errorMessage,
       lastErrorCode: input.errorCode,
-      ...runtimeSubjectStatusPatch({
-        now,
-        operationId: input.operationId,
-        source: input.source ?? "maintenance",
-        status: input.expectedStatus,
-      }),
+      updatedAt: now,
     })
     .where(
       and(
         eq(sandboxesTable.id, input.runtimeSubjectId),
         eq(sandboxesTable.status, input.expectedStatus),
-        eq(sandboxesTable.statusOperationId, input.operationId),
+        eq(sandboxesTable.claimOwner, input.lease.claimOwner),
+        eq(sandboxesTable.incarnation, input.lease.incarnation),
+        eq(sandboxesTable.operationKind, input.lease.kind),
+        eq(sandboxesTable.statusOperationId, input.lease.operationId),
       ),
     )
     .run();
@@ -707,29 +981,45 @@ export async function markRuntimeSubjectOperationRepairNeeded(
   return getD1ChangeCount(result) > 0;
 }
 
-export async function markRuntimeSubjectFailed(
+export async function renewRuntimeSubjectOperationLease(
   database: D1Database,
   input: {
-    readonly errorMessage: string;
-    readonly errorCode: RuntimeSubjectErrorCode;
-    readonly expectedStatus?: RuntimeSubjectStatus;
-    readonly operationId?: RuntimeOperationId | null;
+    readonly claimExpiresAt: number;
+    readonly lease: RuntimeSubjectOperationLease;
     readonly runtimeSubjectId: SandboxId;
-    readonly source?: "api" | "maintenance" | "runtime";
-    readonly status: RuntimeSubjectStatus;
   },
 ): Promise<boolean> {
   const now = currentTimestampMs();
-  const conditions: SQL[] = [eq(sandboxesTable.id, input.runtimeSubjectId)];
+  const result = await getAppDatabase(database)
+    .update(sandboxesTable)
+    .set({
+      claimExpiresAt: input.claimExpiresAt,
+      updatedAt: now,
+    })
+    .where(
+      and(
+        eq(sandboxesTable.id, input.runtimeSubjectId),
+        eq(sandboxesTable.claimOwner, input.lease.claimOwner),
+        eq(sandboxesTable.incarnation, input.lease.incarnation),
+        eq(sandboxesTable.operationKind, input.lease.kind),
+        eq(sandboxesTable.statusOperationId, input.lease.operationId),
+      ),
+    )
+    .run();
 
-  if (input.expectedStatus !== undefined) {
-    conditions.push(eq(sandboxesTable.status, input.expectedStatus));
-  }
+  return getD1ChangeCount(result) > 0;
+}
 
-  if (input.operationId !== undefined) {
-    conditions.push(...runtimeSubjectStatusOperationCondition(input.operationId));
-  }
-
+export async function releaseRuntimeSubjectActivationClaim(
+  database: D1Database,
+  input: {
+    readonly claimOwner: string;
+    readonly errorCode: RuntimeSubjectErrorCode;
+    readonly errorMessage: string;
+    readonly incarnation: number;
+    readonly runtimeSubjectId: SandboxId;
+  },
+): Promise<boolean> {
   const result = await getAppDatabase(database)
     .update(sandboxesTable)
     .set({
@@ -737,14 +1027,18 @@ export async function markRuntimeSubjectFailed(
       claimOwner: null,
       lastError: input.errorMessage,
       lastErrorCode: input.errorCode,
-      ...runtimeSubjectStatusPatch({
-        now,
-        operationId: input.operationId ?? null,
-        source: input.source ?? "api",
-        status: input.status,
-      }),
+      updatedAt: currentTimestampMs(),
     })
-    .where(and(...conditions))
+    .where(
+      and(
+        eq(sandboxesTable.id, input.runtimeSubjectId),
+        eq(sandboxesTable.claimOwner, input.claimOwner),
+        eq(sandboxesTable.incarnation, input.incarnation),
+        inArray(sandboxesTable.status, ["active", "cold"]),
+        isNull(sandboxesTable.operationKind),
+        isNull(sandboxesTable.statusOperationId),
+      ),
+    )
     .run();
 
   return getD1ChangeCount(result) > 0;

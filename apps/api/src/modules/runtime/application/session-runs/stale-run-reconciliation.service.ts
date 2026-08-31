@@ -1,10 +1,11 @@
 import type { RunError } from "@mosoo/contracts/session-run";
-import { driverInstancesTable, sessionRunsTable } from "@mosoo/db";
+import { driverInstancesTable, sessionRunsTable, sessionsTable } from "@mosoo/db";
 import type { DriverInstanceId, SessionId, SessionRunId } from "@mosoo/id";
 import { and, asc, desc, eq, inArray, isNull, lte, notInArray, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 
 import { logWarn } from "../../../../platform/cloudflare/logger";
+import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../../time";
 import {
@@ -13,15 +14,17 @@ import {
 } from "../../domain/runtime-config";
 import { classifyReclaim } from "../../domain/session-run-reclaim-recovery";
 import { recordRuntimeRunLeaseReleasedOutcome } from "../../infrastructure/runtime-subject-lifecycle/runtime-run-lease-store";
-import { setSessionRunStatus } from "../../infrastructure/session-runs/session-run-store.repository";
+import { recordCanonicalSessionRunTerminal } from "./session-run-terminal-failure.service";
 
 export interface ActiveRunDriverRow {
   driver_error_message: string | null;
+  driver_generation: number | null;
   driver_instance_id: DriverInstanceId | null;
   driver_last_heartbeat_at: number | null;
   driver_status: string | null;
   driver_updated_at: number | null;
   run_id: SessionRunId;
+  run_status: "queued" | "booting" | "running" | "waiting_input";
   session_id: SessionId;
   run_trace_id: string | null;
   run_updated_at: number;
@@ -74,11 +77,13 @@ const ACTIVE_SESSION_RUN_STATUSES = ["queued", "booting", "running", "waiting_in
 function activeRunDriverColumns() {
   return {
     driver_error_message: runDriverInstancesTable.errorMessage,
+    driver_generation: runDriverInstancesTable.generation,
     driver_instance_id: sessionRunsTable.driverInstanceId,
     driver_last_heartbeat_at: runDriverInstancesTable.lastHeartbeatAt,
     driver_status: runDriverInstancesTable.status,
     driver_updated_at: runDriverInstancesTable.updatedAt,
     run_id: sessionRunsTable.id,
+    run_status: sql<ActiveRunDriverRow["run_status"]>`${sessionRunsTable.status}`,
     run_trace_id: sessionRunsTable.traceId,
     run_updated_at: sessionRunsTable.updatedAt,
     session_id: sessionRunsTable.sessionId,
@@ -118,6 +123,7 @@ async function findStaleActiveRun(
     (await getAppDatabase(database)
       .select(activeRunDriverColumns())
       .from(sessionRunsTable)
+      .innerJoin(sessionsTable, eq(sessionsTable.id, sessionRunsTable.sessionId))
       .leftJoin(
         runDriverInstancesTable,
         eq(runDriverInstancesTable.id, sessionRunsTable.driverInstanceId),
@@ -125,6 +131,7 @@ async function findStaleActiveRun(
       .where(
         and(
           eq(sessionRunsTable.sessionId, sessionId),
+          isNull(sessionsTable.archivedAt),
           inArray(sessionRunsTable.status, ACTIVE_SESSION_RUN_STATUSES),
         ),
       )
@@ -152,6 +159,7 @@ async function findStaleActiveRuns(
   return getAppDatabase(database)
     .select(activeRunDriverColumns())
     .from(sessionRunsTable)
+    .innerJoin(sessionsTable, eq(sessionsTable.id, sessionRunsTable.sessionId))
     .leftJoin(
       runDriverInstancesTable,
       eq(runDriverInstancesTable.id, sessionRunsTable.driverInstanceId),
@@ -159,6 +167,7 @@ async function findStaleActiveRuns(
     .where(
       and(
         inArray(sessionRunsTable.status, ACTIVE_SESSION_RUN_STATUSES),
+        isNull(sessionsTable.archivedAt),
         staleActiveRunPredicate(input.nowMs),
       ),
     )
@@ -169,29 +178,29 @@ async function findStaleActiveRuns(
 
 async function failStaleActiveRun(database: D1Database, staleRun: ActiveRunDriverRow) {
   const error = staleRunError(staleRun);
-  const outcome = await setSessionRunStatus(database, {
+  const outcome = await recordCanonicalSessionRunTerminal({ DB: database } as ApiBindings, {
+    assistantMessage: null,
+    deliver: false,
     error,
+    expectedDriverObservation: {
+      driverInstanceId: staleRun.driver_instance_id,
+      lastHeartbeatAt: staleRun.driver_last_heartbeat_at,
+      status: staleRun.driver_status,
+      updatedAt: staleRun.driver_updated_at,
+    },
+    expectedRunStatus: staleRun.run_status,
     runId: staleRun.run_id,
+    sessionId: staleRun.session_id,
     source: "maintenance",
     status: "failed",
   });
 
-  switch (outcome.kind) {
-    case "applied":
-    case "duplicate": {
-      await releaseStaleRunLease(database, staleRun);
-      return true;
-    }
-    case "repair_needed": {
-      throw new Error(
-        "Stale session run reconciliation left the session lifecycle projection stale.",
-      );
-    }
-    case "rejected":
-    case "stale": {
-      return false;
-    }
+  if (outcome.kind === "stale") {
+    return false;
   }
+
+  await releaseStaleRunLease(database, staleRun);
+  return true;
 }
 
 // Failing the run ends the lease, but only the release write re-arms the
@@ -201,12 +210,13 @@ async function releaseStaleRunLease(
   database: D1Database,
   staleRun: ActiveRunDriverRow,
 ): Promise<void> {
-  if (staleRun.driver_instance_id === null) {
+  if (staleRun.driver_instance_id === null || staleRun.driver_generation === null) {
     return;
   }
 
   const outcome = await recordRuntimeRunLeaseReleasedOutcome(database, {
     driverInstanceId: staleRun.driver_instance_id,
+    expectedDriverGeneration: staleRun.driver_generation,
     expectedSessionRunId: staleRun.run_id,
   });
 

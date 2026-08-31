@@ -1,8 +1,9 @@
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
-import { admitApiCommand, enqueueApiCommand } from "./api-command-ledger";
-import type { ApiCommandAdmission, EnqueueApiCommandInput } from "./api-command-ledger";
+import { enqueueApiCommand } from "./api-command-ledger";
+import type { EnqueueApiCommandInput } from "./api-command-ledger";
 import type {
   CostLedgerReconciliationCommandPayload,
+  SandboxBackupReconciliationCommandPayload,
   ScheduledMaintenanceCommandPayload,
   SessionRunDispatchCommandPayload,
 } from "./api-command-payload";
@@ -34,11 +35,20 @@ export async function enqueueScheduledMaintenanceCommand(
   });
 }
 
-export async function admitSessionRunDispatchCommand(
+export async function enqueueSandboxBackupReconciliationCommand(
   bindings: Pick<ApiBindings, "API_COMMAND_QUEUE" | "DB">,
-  payload: SessionRunDispatchCommandPayload,
-): Promise<ApiCommandAdmission> {
-  return admitApiCommand(bindings, createSessionRunDispatchApiCommandInput(payload));
+  payload: SandboxBackupReconciliationCommandPayload,
+): Promise<void> {
+  await enqueueApiCommand(bindings, {
+    dedupeKey: [
+      "sandbox_backup_reconciliation",
+      payload.scheduledTime,
+      payload.databasePage,
+      payload.cursor ?? "start",
+    ].join(":"),
+    kind: "sandbox_backup_reconciliation",
+    payload,
+  });
 }
 
 export function createSessionRunDispatchApiCommandInput(

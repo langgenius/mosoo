@@ -1,18 +1,18 @@
 import { describe, expect, test } from "bun:test";
 
-import { createRuntimeEvent } from "@mosoo/runtime-events";
+import { createRuntimeEvent, createRuntimeEventSemanticHash } from "@mosoo/runtime-events";
 import type {
   RuntimeEventEnvelope,
   RuntimeEventKind,
   RuntimeEventOrigin,
 } from "@mosoo/runtime-events";
 
-import { RuntimeEventPersistenceCompactor } from "../src/modules/runtime/infrastructure/driver-instance/runtime-event-persistence-compactor";
 import { loadSessionAgentTaskSnapshot } from "../src/modules/sessions/infrastructure/session-agent-task-snapshot.repository";
 import {
   persistOneRuntimeEventPerSession,
   persistSessionRuntimeEvents,
 } from "../src/modules/sessions/infrastructure/session-runtime-event-store.repository";
+import { applyDrizzleMigration } from "./helpers/drizzle-migrations";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
 function runtimeEvent(input: {
@@ -71,6 +71,32 @@ function activateRun(
     .run();
 }
 
+async function insertConcurrentMessageReceipt(
+  database: SqliteD1Database,
+  input: { event: RuntimeEventEnvelope; sourceEventId: string },
+): Promise<void> {
+  const semanticHash = await createRuntimeEventSemanticHash(input.event);
+  database.execute("UPDATE session SET runtime_event_seq_cursor = 1 WHERE id = 'session-1'");
+  await database
+    .prepare(
+      `INSERT INTO session_event (
+         agent_id, content_text, created_at, ended_at, event_type, family, id,
+         occurred_at, process_status, process_type, run_id, semantic_hash, seq,
+         session_id, source_event_id, source, stream_id, visibility
+       ) VALUES (?, ?, 1000, 1000, 'message.delta', 'message', ?, 1000,
+                 'available', 'agent.message.delta', 'run-1', ?, 1, 'session-1',
+                 ?, 'driver', 'message-1', 'all_consumers')`,
+    )
+    .bind(
+      "01J00000000000000000000009",
+      (input.event.payload as { contentDelta: string }).contentDelta,
+      `winner:${input.sourceEventId}`,
+      semanticHash,
+      input.sourceEventId,
+    )
+    .run();
+}
+
 function createRuntimeEventStoreDatabase(
   input: { maxBoundParams?: number } = {},
 ): SqliteD1Database {
@@ -90,10 +116,22 @@ function createRuntimeEventStoreDatabase(
     );
 
     CREATE TABLE session_run (
+      completed_at integer,
       id text PRIMARY KEY NOT NULL,
       driver_instance_id text,
+      error_code text,
+      error_details_json text,
+      error_message text,
+      error_retryable integer,
       session_id text NOT NULL,
-      status text DEFAULT 'running' NOT NULL
+      status text DEFAULT 'running' NOT NULL,
+      status_changed_at integer NOT NULL DEFAULT 0,
+      status_event text NOT NULL DEFAULT 'run.start',
+      status_operation_id text,
+      status_seq integer NOT NULL DEFAULT 0,
+      status_source text NOT NULL DEFAULT 'driver',
+      started_at integer,
+      updated_at integer NOT NULL DEFAULT 0
     );
 
     CREATE TABLE session_agent_task_snapshot (
@@ -106,26 +144,86 @@ function createRuntimeEventStoreDatabase(
 
     CREATE TABLE session_event (
       agent_id text NOT NULL,
+      artifact_attempt_id text,
+      artifact_manifest_json text,
+      artifact_manifest_sha256 text,
       content_text text NOT NULL,
       created_at integer NOT NULL,
       ended_at integer NOT NULL,
       event_type text NOT NULL,
       family text NOT NULL,
       id text PRIMARY KEY NOT NULL,
+      mcp_command_id text,
       occurred_at integer NOT NULL,
       process_status text NOT NULL,
       process_type text NOT NULL,
       run_id text,
+      semantic_hash text CHECK (
+        semantic_hash IS NULL OR (
+          length(semantic_hash) = 64
+          AND semantic_hash = lower(semantic_hash)
+          AND semantic_hash NOT GLOB '*[^0-9a-f]*'
+        )
+      ),
       seq integer NOT NULL,
       session_id text NOT NULL,
       source_event_id text NOT NULL,
       source text NOT NULL,
+      stream_id text,
+      terminal_event_json text,
       tool_call_id text,
+      tool_input_delta_json text,
       tool_input_json text,
       tool_name text,
+      tool_output_delta_text text,
+      tool_output_text text,
+      tool_parent_message_id text,
+      tool_result_message_id text,
+      tool_status text,
       tokens integer,
       trace_id text,
-      visibility text NOT NULL
+      visibility text NOT NULL,
+      CHECK (tool_input_delta_json IS NULL OR tool_input_json IS NULL),
+      CHECK (tool_output_delta_text IS NULL OR tool_output_text IS NULL),
+      CHECK (
+        (terminal_event_json IS NULL AND NOT (semantic_hash IS NOT NULL AND event_type IN ('run.cancelled', 'run.completed', 'run.failed')))
+        OR (terminal_event_json IS NOT NULL AND json_valid(terminal_event_json) = 1 AND semantic_hash IS NOT NULL AND event_type IN ('run.cancelled', 'run.completed', 'run.failed'))
+      ),
+      CHECK (
+        (artifact_attempt_id IS NULL AND artifact_manifest_json IS NULL AND artifact_manifest_sha256 IS NULL)
+        OR (
+          artifact_attempt_id IS NOT NULL
+          AND artifact_manifest_json IS NOT NULL
+          AND json_valid(artifact_manifest_json) = 1
+          AND json_extract(artifact_manifest_json, '$.version') IS 1
+          AND json_type(artifact_manifest_json, '$.captureStatus') IS 'text'
+          AND json_extract(artifact_manifest_json, '$.captureStatus') IN ('complete', 'omitted_file_limit', 'omitted_runtime_unavailable', 'omitted_size_limit', 'omitted_source_changed', 'omitted_source_missing')
+          AND json_type(artifact_manifest_json, '$.mode') IS 'text'
+          AND json_extract(artifact_manifest_json, '$.mode') IN ('delta', 'snapshot')
+          AND (json_extract(artifact_manifest_json, '$.captureStatus') = 'complete' OR json_array_length(artifact_manifest_json, '$.files') = 0)
+          AND json_extract(artifact_manifest_json, '$.sourceEventId') IS source_event_id
+          AND json_extract(artifact_manifest_json, '$.semanticHash') IS semantic_hash
+          AND json_type(artifact_manifest_json, '$.files') IS 'array'
+          AND artifact_manifest_sha256 IS NOT NULL
+          AND length(artifact_manifest_sha256) = 64
+          AND artifact_manifest_sha256 = lower(artifact_manifest_sha256)
+          AND artifact_manifest_sha256 NOT GLOB '*[^0-9a-f]*'
+          AND semantic_hash IS NOT NULL
+          AND event_type IN ('file.change.updated', 'file.changed', 'run.completed')
+        )
+      ),
+      CHECK (tool_status IS NULL OR tool_status IN ('running', 'completed', 'failed', 'cancelled')),
+      CHECK (
+        mcp_command_id IS NULL OR (
+          mcp_command_id = upper(mcp_command_id)
+          AND length(mcp_command_id) = 26
+          AND substr(mcp_command_id, 1, 1) GLOB '[0-7]'
+          AND mcp_command_id NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'
+          AND event_type = 'tool.call.updated'
+          AND tool_status IS NOT NULL
+          AND tool_status IN ('completed', 'failed', 'cancelled')
+        )
+      )
     );
 
     CREATE UNIQUE INDEX session_event_session_seq_idx
@@ -134,29 +232,25 @@ function createRuntimeEventStoreDatabase(
     CREATE UNIQUE INDEX session_event_session_source_idx
       ON session_event (session_id, source_event_id);
 
-    CREATE TRIGGER session_event_tool_identity_consistency
-    BEFORE INSERT ON session_event
-    WHEN NEW.tool_call_id IS NOT NULL AND EXISTS (
-      SELECT 1
-      FROM session_event AS existing
-      WHERE existing.session_id = NEW.session_id
-        AND existing.tool_call_id = NEW.tool_call_id
-        AND (
-          (
-            NEW.tool_name IS NOT NULL
-            AND existing.tool_name IS NOT NULL
-            AND NEW.tool_name <> existing.tool_name
-          )
-          OR (
-            NEW.tool_input_json IS NOT NULL
-            AND existing.tool_input_json IS NOT NULL
-            AND NEW.tool_input_json <> existing.tool_input_json
-          )
-        )
-    )
-    BEGIN
-      SELECT RAISE(ABORT, 'session_event tool identity conflict');
-    END;
+    CREATE UNIQUE INDEX session_event_artifact_attempt_idx
+      ON session_event (artifact_attempt_id)
+      WHERE artifact_attempt_id IS NOT NULL;
+
+    CREATE UNIQUE INDEX session_event_mcp_terminal_winner_idx
+      ON session_event (session_id, mcp_command_id)
+      WHERE mcp_command_id IS NOT NULL;
+
+    CREATE UNIQUE INDEX session_event_run_terminal_winner_idx
+      ON session_event (session_id, run_id)
+      WHERE semantic_hash IS NOT NULL
+        AND run_id IS NOT NULL
+        AND event_type IN ('run.cancelled', 'run.completed', 'run.failed');
+
+    CREATE INDEX session_event_run_stream_process_seq_idx
+      ON session_event (run_id, stream_id, process_type, seq);
+
+    CREATE INDEX session_event_run_tool_call_seq_idx
+      ON session_event (run_id, tool_call_id, seq);
 
     CREATE TABLE session_permission_request (
       created_at integer NOT NULL,
@@ -185,6 +279,7 @@ function createRuntimeEventStoreDatabase(
       ('run-1', 'session-1'),
       ('run-2', 'session-2');
   `);
+  applyDrizzleMigration(database, "0019_runtime-operation-ready-authority");
 
   return database;
 }
@@ -281,9 +376,67 @@ describe("session runtime event store", () => {
     expect(await database.prepare("SELECT COUNT(*) AS count FROM session_event").first()).toEqual({
       count: 0,
     });
+    expect(
+      await database
+        .prepare("SELECT runtime_event_seq_cursor FROM session WHERE id = 'session-1'")
+        .first(),
+    ).toEqual({ runtime_event_seq_cursor: 0 });
   });
 
-  test("rejects the receipt and snapshot when archive wins after sequence allocation", async () => {
+  test("rolls back a permission receipt when its viewer projection fails", async () => {
+    const database = createRuntimeEventStoreDatabase();
+    const event = runtimeEvent({
+      driverInstanceId: "driver-1",
+      id: "permission-atomic-event",
+      kind: "permission.requested",
+      occurredAtMs: 1_100,
+      payload: {
+        requestId: "permission-atomic",
+        targetItemId: "tool-call-1",
+        title: "Approve command",
+        toolCall: { kind: "shell", toolCallId: "tool-call-1" },
+      },
+      runId: "run-1",
+    });
+    const persist = () =>
+      persistSessionRuntimeEvents(database, {
+        records: [{ event, occurredAt: 1_100, sourceEventId: "permission-atomic-source" }],
+        sessionId: "session-1",
+      });
+    database.execute(`
+      CREATE TRIGGER reject_permission_projection
+      BEFORE INSERT ON session_permission_request
+      BEGIN
+        SELECT RAISE(ABORT, 'forced permission projection failure');
+      END;
+    `);
+
+    await expect(persist()).rejects.toThrow("forced permission projection failure");
+    expect(await database.prepare("SELECT COUNT(*) AS count FROM session_event").first()).toEqual({
+      count: 0,
+    });
+    expect(
+      await database
+        .prepare("SELECT runtime_event_seq_cursor FROM session WHERE id = 'session-1'")
+        .first(),
+    ).toEqual({ runtime_event_seq_cursor: 0 });
+
+    database.execute("DROP TRIGGER reject_permission_projection");
+    await expect(persist()).resolves.toMatchObject({ persistedCount: 1 });
+    await expect(persist()).resolves.toMatchObject({ persistedCount: 0 });
+    expect(
+      await database
+        .prepare("SELECT request_id FROM session_permission_request")
+        .all<{ request_id: string }>(),
+    ).toMatchObject({ results: [{ request_id: "permission-atomic" }] });
+    expect(
+      await database
+        .prepare("SELECT runtime_event_seq_cursor FROM session WHERE id = 'session-1'")
+        .first(),
+    ).toEqual({ runtime_event_seq_cursor: 1 });
+  });
+
+  test("atomically rejects the cursor, receipt, and snapshot when archive wins", async () => {
     const database = createRuntimeEventStoreDatabase();
     activateRun(database, { driverInstanceId: "driver-1", runId: "run-1" });
     const persistBatch = database.batch.bind(database) as D1Database["batch"];
@@ -298,29 +451,30 @@ describe("session runtime event store", () => {
       return persistBatch<T>(statements);
     };
 
-    const result = await persistSessionRuntimeEvents(database, {
-      records: [
-        {
-          event: agentTasksEvent({
-            driverInstanceId: "driver-1",
-            id: "tasks-after-archive",
-            occurredAtMs: 1_000,
-            runId: "run-1",
-            taskId: "must-not-land",
-          }),
-          occurredAt: 1_000,
-          sourceEventId: "source-after-archive",
-        },
-      ],
-      sessionId: "session-1",
-    });
+    await expect(
+      persistSessionRuntimeEvents(database, {
+        records: [
+          {
+            event: agentTasksEvent({
+              driverInstanceId: "driver-1",
+              id: "tasks-after-archive",
+              occurredAtMs: 1_000,
+              runId: "run-1",
+              taskId: "must-not-land",
+            }),
+            occurredAt: 1_000,
+            sourceEventId: "source-after-archive",
+          },
+        ],
+        sessionId: "session-1",
+      }),
+    ).rejects.toThrow("not writable for runtime events");
     const session = await database
       .prepare("SELECT archived_at, runtime_event_seq_cursor FROM session WHERE id = 'session-1'")
       .first<{ archived_at: number | null; runtime_event_seq_cursor: number }>();
 
     expect(archivedBeforeBatch).toBe(true);
-    expect(session).toEqual({ archived_at: 2, runtime_event_seq_cursor: 1 });
-    expect(result.persistedCount).toBe(0);
+    expect(session).toEqual({ archived_at: 2, runtime_event_seq_cursor: 0 });
     expect(await database.prepare("SELECT COUNT(*) AS count FROM session_event").first()).toEqual({
       count: 0,
     });
@@ -369,7 +523,7 @@ describe("session runtime event store", () => {
     expect(await loadSessionAgentTaskSnapshot(database, "session-1")).toBeNull();
   });
 
-  test("does not let duplicate receipts or stale run and driver snapshots replace current state", async () => {
+  test("does not let exact replay receipts or stale run and driver snapshots replace current state", async () => {
     const database = createRuntimeEventStoreDatabase();
     activateRun(database, { driverInstanceId: "driver-1", runId: "run-1" });
 
@@ -397,7 +551,7 @@ describe("session runtime event store", () => {
             id: "tasks-replay",
             occurredAtMs: 1_001,
             runId: "run-1",
-            taskId: "duplicate-must-not-win",
+            taskId: "first",
           }),
           occurredAt: 1_001,
           sourceEventId: "source-tasks-1",
@@ -519,6 +673,11 @@ describe("session runtime event store", () => {
       .first<{ count: number }>();
 
     expect(count?.count).toBe(0);
+    expect(
+      await failingDatabase
+        .prepare("SELECT runtime_event_seq_cursor FROM session WHERE id = 'session-1'")
+        .first(),
+    ).toEqual({ runtime_event_seq_cursor: 0 });
   });
 
   test("persists mixed source ids and skips source replays before allocating sequence", async () => {
@@ -600,7 +759,7 @@ describe("session runtime event store", () => {
         {
           event: runtimeEvent({
             id: "event-3",
-            kind: "run.completed",
+            kind: "run.waiting",
             occurredAtMs: 1_200,
             origin: "driver",
             runId: "run-1",
@@ -632,7 +791,7 @@ describe("session runtime event store", () => {
     expect(rows.results.map((row) => row.event_type)).toEqual([
       "run.started",
       "runtime.timing.recorded",
-      "run.completed",
+      "run.waiting",
     ]);
     expect(rows.results.map((row) => row.seq)).toEqual([1, 2, 3]);
     expect(rows.results.map((row) => row.source_event_id)).toEqual([
@@ -702,7 +861,95 @@ describe("session runtime event store", () => {
     });
   });
 
-  test("persists compacted semantic columns", async () => {
+  test.each([
+    ["adopts an exact", false],
+    ["rejects a changed", true],
+  ] as const)("%s source winner that races the atomic batch", async (_name, changed) => {
+    const database = createRuntimeEventStoreDatabase();
+    const candidate = runtimeEvent({
+      id: "candidate",
+      kind: "message.delta",
+      occurredAtMs: 1_000,
+      payload: { contentDelta: changed ? "changed" : "winner", messageId: "message-1" },
+      runId: "run-1",
+    });
+    const winner = runtimeEvent({
+      id: "winner",
+      kind: "message.delta",
+      occurredAtMs: 999,
+      payload: { contentDelta: "winner", messageId: "message-1" },
+      runId: "run-1",
+    });
+    const sourceEventId = "source-race";
+    const originalBatch = database.batch.bind(database) as D1Database["batch"];
+    let injected = false;
+    database.batch = async <T = unknown>(statements: D1PreparedStatement[]) => {
+      if (!injected) {
+        injected = true;
+        await insertConcurrentMessageReceipt(database, { event: winner, sourceEventId });
+      }
+      return originalBatch<T>(statements);
+    };
+
+    const persistence = persistSessionRuntimeEvents(database, {
+      records: [{ event: candidate, occurredAt: 1_000, sourceEventId }],
+      sessionId: "session-1",
+    });
+    if (changed) {
+      await expect(persistence).rejects.toThrow("conflicts with its durable receipt");
+    } else {
+      await expect(persistence).resolves.toMatchObject({ persistedCount: 0 });
+    }
+
+    expect(
+      await database
+        .prepare("SELECT runtime_event_seq_cursor FROM session WHERE id = 'session-1'")
+        .first(),
+    ).toEqual({ runtime_event_seq_cursor: 1 });
+    expect(await database.prepare("SELECT COUNT(*) AS count FROM session_event").first()).toEqual({
+      count: 1,
+    });
+  });
+
+  test("adopts an exact receipt after commit succeeds but its ACK is lost", async () => {
+    const database = createRuntimeEventStoreDatabase();
+    const event = runtimeEvent({
+      id: "commit-before-ack",
+      kind: "message.delta",
+      occurredAtMs: 1_000,
+      payload: { contentDelta: "durable", messageId: "message-1" },
+      runId: "run-1",
+    });
+    const input = {
+      records: [{ event, occurredAt: 1_000, sourceEventId: "source-commit-before-ack" }],
+      sessionId: "session-1" as const,
+    };
+    const originalBatch = database.batch.bind(database) as D1Database["batch"];
+    let disconnected = false;
+    database.batch = async <T = unknown>(statements: D1PreparedStatement[]) => {
+      const result = await originalBatch<T>(statements);
+      if (!disconnected) {
+        disconnected = true;
+        throw new Error("injected ACK loss");
+      }
+      return result;
+    };
+
+    await expect(persistSessionRuntimeEvents(database, input)).rejects.toThrow("injected ACK loss");
+    await expect(persistSessionRuntimeEvents(database, input)).resolves.toMatchObject({
+      persistedCount: 0,
+    });
+    expect(
+      await database
+        .prepare("SELECT runtime_event_seq_cursor FROM session WHERE id = 'session-1'")
+        .first(),
+    ).toEqual({ runtime_event_seq_cursor: 1 });
+    expect(await database.prepare("SELECT COUNT(*) AS count FROM session_event").first()).toEqual({
+      count: 1,
+    });
+  });
+
+  test("persists terminal tool semantic columns", async () => {
     const database = createRuntimeEventStoreDatabase();
 
     await persistSessionRuntimeEvents(database, {
@@ -724,6 +971,21 @@ describe("session runtime event store", () => {
           occurredAt: 2_000,
           sourceEventId: "source-tool-completed",
         },
+        {
+          event: runtimeEvent({
+            id: "tool-cancelled",
+            kind: "tool.call.updated",
+            occurredAtMs: 2_100,
+            payload: {
+              status: "cancelled",
+              title: "Search",
+              toolCallId: "tool-2",
+            },
+            runId: "run-1",
+          }),
+          occurredAt: 2_100,
+          sourceEventId: "source-tool-cancelled",
+        },
       ],
       sessionId: "session-1",
     });
@@ -740,6 +1002,7 @@ describe("session runtime event store", () => {
             e.tool_input_json,
             e.tool_name
           FROM session_event e
+          ORDER BY e.seq
         `,
       )
       .all<{
@@ -752,19 +1015,98 @@ describe("session runtime event store", () => {
         tool_name: string | null;
       }>();
 
-    expect(rows.results).toHaveLength(1);
+    expect(rows.results).toHaveLength(2);
     expect(rows.results[0]).toMatchObject({
-      content_text: "Search result: ok",
+      content_text: "ok",
       event_type: "tool.call.updated",
       process_status: "available",
       process_type: "tool.use.completed",
       tool_call_id: "tool-1",
       tool_input_json: '{"query":"mosoo"}',
-      tool_name: null,
+      tool_name: "Search",
+    });
+    expect(rows.results[1]).toMatchObject({
+      content_text: "",
+      event_type: "tool.call.updated",
+      process_status: "available",
+      process_type: "tool.use.completed",
+      tool_call_id: "tool-2",
+      tool_input_json: null,
+      tool_name: "Search",
     });
   });
 
-  test("accepts streamed arguments but rejects terminal tool input reuse", async () => {
+  test.each([
+    [
+      "message.cancelled",
+      { messageId: "message-1", role: "agent" },
+      "Message updated.",
+      "available",
+      "agent.message.delta",
+      "message-1",
+    ],
+    [
+      "message.failed",
+      {
+        error: { code: "runtime.failed", message: "Runtime failed." },
+        messageId: "message-1",
+        role: "agent",
+      },
+      "Message updated.",
+      "error",
+      "agent.message.delta",
+      "message-1",
+    ],
+    [
+      "thought.cancelled",
+      { thoughtId: "thought-1" },
+      "Agent thinking updated.",
+      "available",
+      "agent.thinking.delta",
+      "thought-1",
+    ],
+  ] as const)(
+    "persists %s as a terminal semantic row",
+    async (kind, payload, contentText, processStatus, processType, streamId) => {
+      const database = createRuntimeEventStoreDatabase();
+
+      await persistSessionRuntimeEvents(database, {
+        records: [
+          {
+            event: runtimeEvent({
+              id: "terminal-event",
+              kind,
+              occurredAtMs: 2_000,
+              payload,
+              runId: "run-1",
+            }),
+            occurredAt: 2_000,
+            sourceEventId: "source-terminal-event",
+          },
+        ],
+        sessionId: "session-1",
+      });
+
+      expect(
+        await database
+          .prepare(
+            `
+              SELECT content_text, event_type, process_status, process_type, stream_id
+              FROM session_event
+            `,
+          )
+          .first(),
+      ).toMatchObject({
+        content_text: contentText,
+        event_type: kind,
+        process_status: processStatus,
+        process_type: processType,
+        stream_id: streamId,
+      });
+    },
+  );
+
+  test("persists replacement tool input snapshots through terminal enrichment", async () => {
     const database = createRuntimeEventStoreDatabase();
     const persistToolEvent = (input: {
       id: string;
@@ -817,20 +1159,18 @@ describe("session runtime event store", () => {
       title: "Command exited 0",
     });
 
-    await expect(
-      persistToolEvent({
-        id: "tool-conflict",
-        rawInput: '{"command":"python other.py","cwd":"/workspace"}',
-        sourceEventId: "source-tool-conflict",
-        status: "completed",
-        title: "Command exited 0",
-      }),
-    ).rejects.toThrow("session_event tool identity conflict");
+    await persistToolEvent({
+      id: "tool-late-enrichment",
+      rawInput: '{"command":"python other.py","cwd":"/workspace"}',
+      sourceEventId: "source-tool-late-enrichment",
+      status: "completed",
+      title: "Command exited 0",
+    });
 
     const count = await database
       .prepare("SELECT COUNT(*) AS count FROM session_event")
       .first<{ count: number }>();
-    expect(count?.count).toBe(3);
+    expect(count?.count).toBe(4);
   });
 
   test("rejects runtime event batches for a different envelope session", async () => {
@@ -883,73 +1223,6 @@ describe("session runtime event store", () => {
         sessionId: "session-1",
       }),
     ).rejects.toThrow();
-  });
-
-  test("persists compacted stream fragments as semantic rows", async () => {
-    const database = createRuntimeEventStoreDatabase();
-    const compactor = new RuntimeEventPersistenceCompactor();
-    const fragments = [
-      runtimeEvent({
-        id: "message-start",
-        kind: "message.started",
-        occurredAtMs: 3_000,
-        payload: { messageId: "message-1", role: "agent" },
-        runId: "run-1",
-      }),
-      runtimeEvent({
-        id: "message-delta-1",
-        kind: "message.delta",
-        occurredAtMs: 3_010,
-        payload: { contentDelta: "Hello ", messageId: "message-1", role: "agent" },
-        runId: "run-1",
-      }),
-      runtimeEvent({
-        id: "message-delta-2",
-        kind: "message.delta",
-        occurredAtMs: 3_020,
-        payload: { contentDelta: "world", messageId: "message-1", role: "agent" },
-        runId: "run-1",
-      }),
-      runtimeEvent({
-        id: "message-end",
-        kind: "message.completed",
-        occurredAtMs: 3_030,
-        payload: { messageId: "message-1", role: "agent" },
-        runId: "run-1",
-      }),
-    ];
-    const compacted = compactor.compact(
-      fragments.map((event) => ({
-        event,
-        occurredAt: Date.parse(event.occurredAt),
-        sourceEventId: `source-${event.id}`,
-      })),
-    );
-
-    await persistSessionRuntimeEvents(database, {
-      records: compacted,
-      sessionId: "session-1",
-    });
-
-    const rows = await database
-      .prepare(
-        `
-          SELECT content_text, event_type, process_type
-          FROM session_event
-        `,
-      )
-      .all<{
-        content_text: string;
-        event_type: string;
-        process_type: string;
-      }>();
-
-    expect(rows.results).toHaveLength(1);
-    expect(rows.results[0]).toMatchObject({
-      content_text: "Hello world",
-      event_type: "message.added",
-      process_type: "agent.message.delta",
-    });
   });
 
   test("updates viewer projections only for inserted runtime events", async () => {
@@ -1033,6 +1306,11 @@ describe("session runtime event store", () => {
         title: "Approve command",
       },
     ]);
+    expect(
+      await database
+        .prepare("SELECT status, status_seq FROM session_run WHERE id = 'run-1'")
+        .first(),
+    ).toEqual({ status: "waiting_input", status_seq: 1 });
     expect(readiness === null ? null : JSON.parse(readiness.readiness_json)).toEqual({
       checkedAt: "2026-05-08T00:00:04.010Z",
       issues: [],
@@ -1049,6 +1327,7 @@ describe("session runtime event store", () => {
             payload: {
               requestId: "permission-1",
             },
+            runId: "run-1",
           }),
           occurredAt: 4_020,
           sourceEventId: "permission-resolved-source",
@@ -1062,6 +1341,11 @@ describe("session runtime event store", () => {
       .all<{ request_id: string }>();
 
     expect(remainingPermissions.results).toEqual([]);
+    expect(
+      await database
+        .prepare("SELECT status, status_seq FROM session_run WHERE id = 'run-1'")
+        .first(),
+    ).toEqual({ status: "running", status_seq: 2 });
   });
 
   test("rejects late event batches for archived sessions without allocating sequence", async () => {
@@ -1202,6 +1486,42 @@ describe("session runtime event store", () => {
     expect(replayResult).toMatchObject({
       persistedCount: 0,
       skippedSessionIds: ["session-1"],
+    });
+    expect(
+      await database
+        .prepare("SELECT runtime_event_seq_cursor FROM session WHERE id = 'session-1'")
+        .first(),
+    ).toEqual({ runtime_event_seq_cursor: 1 });
+  });
+
+  test("does not consume one-event sequence numbers when the active-run fence rejects", async () => {
+    const database = createRuntimeEventStoreDatabase();
+    database.execute("UPDATE session_run SET status = 'failed' WHERE id = 'run-1'");
+
+    await expect(
+      persistOneRuntimeEventPerSession(database, {
+        records: [
+          {
+            event: runtimeEvent({
+              id: "late-one-event",
+              kind: "agent.task.updated",
+              occurredAtMs: 4_050,
+              payload: { status: "completed" },
+              runId: "run-1",
+            }),
+            occurredAt: 4_050,
+            sessionId: "session-1",
+          },
+        ],
+      }),
+    ).rejects.toThrow("atomic session or active-run fence");
+    expect(
+      await database
+        .prepare("SELECT runtime_event_seq_cursor FROM session WHERE id = 'session-1'")
+        .first(),
+    ).toEqual({ runtime_event_seq_cursor: 0 });
+    expect(await database.prepare("SELECT COUNT(*) AS count FROM session_event").first()).toEqual({
+      count: 0,
     });
   });
 

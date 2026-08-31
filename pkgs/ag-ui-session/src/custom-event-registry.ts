@@ -66,7 +66,6 @@ export const MOSOO_CUSTOM_EVENT = {
     name: "mosoo.session.mode.updated",
   },
   sessionPermissionsUpdated: {
-    coalescing: "replace",
     direction: "server",
     name: "mosoo.session.permissions.updated",
   },
@@ -92,6 +91,10 @@ export const MOSOO_CUSTOM_EVENT = {
     coalescing: "replace_generation",
     direction: "server",
     name: "mosoo.session.tasks.replaced",
+  },
+  sessionToolUpdated: {
+    direction: "server",
+    name: "mosoo.session.tool.updated",
   },
   sessionSyncRequest: {
     direction: "viewer",

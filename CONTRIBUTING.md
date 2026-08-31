@@ -52,7 +52,7 @@ Minimum generated-file rules:
 
 Required tools:
 
-- `bun >= 1.4.0-canary.1` with text `bun.lock` support.
+- `bun >= 1.4.0` with text `bun.lock` support.
 - `just >= 1.51`
 
 The repository already pins Vite Plus and Git hook tooling dependencies. Human-facing repository operations use `just`; the `justfile` delegates to `bun run`, which resolves the pinned local Vite Plus binary after `bun install`. A global Vite Plus install is optional for direct shell use: `curl -fsSL https://vite.plus | bash`.
@@ -164,6 +164,12 @@ just test-file apps/api/tests/session-run-cancel.test.ts
 mosoo uses generated Drizzle migrations for local and production D1:
 
 - The schema source of truth is `pkgs/db/src/schema/**`.
+- `just check` generates that schema in memory with `drizzle-kit/api` and
+  requires it to match the latest checked-in snapshot without writing temp
+  migration output.
+- The production schema test also applies the complete migration chain to an
+  in-memory SQLite database and requires its managed catalog to match that same
+  snapshot.
 - The chain is append-only. Once a migration SQL file, Drizzle snapshot, or
   journal entry is merged or applied, do not modify, delete, rename, or
   regenerate it.
@@ -191,14 +197,41 @@ D1 state and reapplies the chain. Never delete or regenerate established files
 under `pkgs/db/drizzle`.
 
 Production D1 is not reset during deploy. `just deploy-api` runs
-`apps/api/bin/deploy-prod.ts`, whose first remote action is applying pending D1
-migrations. It then verifies that every table in the latest Drizzle snapshot
-exists in production — the DEPLOY-D1-001 missing-table guard — ensures the
-environment-artifact queue, builds the Driver, and deploys the API Worker.
-The guard does not compare columns, indexes, constraints, or extra live tables.
+`apps/api/bin/deploy-prod.ts`, which builds the Driver and dry-runs the API
+Worker before its first remote mutation. It then acquires the durable D1 deploy
+lease before it ensures production queues or applies ordinary pending
+migrations. Every D1, Queue, API Worker, or smoke mutation renews and verifies
+that exact owner before and after the mutation through an independent final D1
+read; the canonical lease table may have no triggers. The protocol v3 breaking migrations
+use the one-shot paused-queue, D1 admission-gate, drain, legacy terminal
+integrity preflight, Time Travel bookmark, deploy, live Driver handshake smoke,
+durable queue-resume phase, and Queue API readback sequence documented in the
+production runbook.
+Migration `0014` is allowed to proceed only when its read-only inventory reports zero historical loss or conflict candidates, and the migration repeats that guard before its first rewrite.
+Run `bun apps/api/bin/deploy-prod.ts --protocol-v3-lossy-migration-inventory` before scheduling a release with `0014` pending.
+The legacy preflight requires a provably collision-free terminal identity and
+fully committed Run, Session, assistant, cursor, and permission state; migration
+`0015` normalizes only that proven identity and never guesses ambiguous history.
+The migration itself repeats those fail-closed checks and requires a short-lived
+authorization bound to the bookmark, exact candidate manifest, and current
+deploy lease owner, so applying `0015` directly cannot bypass the cutover.
+Run `bun apps/api/bin/deploy-prod.ts --protocol-v3-legacy-inventory` as the
+read-only human gate before scheduling this one-shot production cutover.
+After the breaking migration is recorded, deployment recovery is roll-forward
+only with the exact same v3 release.
+The bookmark is an emergency destructive backup, not a routine rollback: a D1
+Time Travel restore loses every later D1 write and does not restore Durable
+Object storage.
+After migration, the script compares every managed table's columns, primary key,
+defaults, nullability, named indexes and partial predicates, foreign keys, CHECK
+expressions, autoincrement state, and exact migration-owned trigger definitions
+with the latest migration contract before it deploys the API Worker.
+Unknown extra application tables fail closed. Twelve retained Channels,
+WeChat, and App Deployment tables are explicitly unmanaged legacy data because
+#577 and #591 removed those runtime subsystems without approved destructive data
+migrations.
 No other automated migration gate exists today: there is no trusted-Git-range
-check, no clean-worktree check, and no dry-run inside the deploy script. Run
-`just check` and the
+or clean-worktree check. Run `just check` and the
 [Production Deploy Verification](./docs/production-deploy-verification.md)
 runbook before deploying.
 
@@ -407,7 +440,7 @@ just deploy-web   # Web only — runs no gate; does not touch D1
 
 Only `just deploy` runs the repository gate before publishing; `just deploy-api`
 and `just deploy-web` publish directly. The API deploy applies pending remote D1
-migrations as its first remote action (see
+migrations only after its local Driver build and API dry-run (see
 [Database And Migrations](#database-and-migrations)).
 
 API production config lives in `apps/api/wrangler.toml`; web production config lives in `apps/web/wrangler.toml`. Cloudflare routes send `cloud.mosoo.ai/api/*` to the API Worker and `cloud.mosoo.ai/*` to the console Web Worker. The legacy console host redirects Web traffic to `cloud.mosoo.ai` but keeps `try.mosoo.ai/api/*` as a direct compatibility route. The public landing page and blog on `mosoo.ai/*` are owned by `langgenius/mosoo-website`.

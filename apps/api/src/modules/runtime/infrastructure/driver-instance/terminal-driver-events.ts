@@ -1,218 +1,233 @@
 import type { DriverFailureInput } from "@mosoo/agent-driver/orpc";
+import type { RunError, SessionRunSummary } from "@mosoo/contracts/session-run";
 import { createPlatformId } from "@mosoo/id";
 import type { DriverInstanceId, RuntimeEventId, SessionId, SessionRunId } from "@mosoo/id";
-import { createRuntimeEvent } from "@mosoo/runtime-events";
-import type { RuntimeEventEnvelope } from "@mosoo/runtime-events";
 
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
-import { appendSessionRuntimeEvents } from "../../../sessions/application/session-event-write.service";
-import { projectRuntimeEventToSessionDeliveryEvents } from "../../../sessions/application/session-live-state.service";
-import { recordCanonicalSessionRunFailure } from "../../application/session-runs/session-run-terminal-failure.service";
-import { isTerminalSessionRunStatus } from "../../domain/session-run-status";
-import { setSessionRunStatus } from "../session-runs/session-run-store.repository";
-import type { SessionRunTransitionOutcome } from "../session-runs/session-run-store.repository";
+import { currentTimestampMs, toIsoString } from "../../../../time";
+import { createSessionRunTerminalSourceId } from "../../domain/session-run-terminal-event-id";
+import { getSessionRunSummary } from "../session-runs/session-run-store.repository";
+import {
+  adoptTerminalRunProjection,
+  commitTerminalRunProjection,
+} from "./completed-run-commit.repository";
+import type { DriverTerminalRunStatus } from "./completed-run-commit.repository";
+import { createCanonicalDriverRunFailedEvent } from "./driver-event-canonicalization";
 import type { RuntimeSessionLink } from "./event-types";
+import { getDriverInstanceLifecycleIdentity } from "./lifecycle";
 import { getRuntimeSessionLink } from "./session-link.repository";
 import { releaseTerminalDriverInstanceSessionRun } from "./terminal-run-release";
 
-function assertTerminalDriverSessionRunTransition(outcome: SessionRunTransitionOutcome): void {
-  switch (outcome.kind) {
-    case "applied":
-    case "duplicate": {
-      return;
-    }
-    case "stale": {
-      if (outcome.reason === "terminal_run") {
-        return;
-      }
-      throw new Error("Terminal driver event lost a concurrent run transition.");
-    }
-    case "repair_needed": {
-      throw new Error("Terminal driver event left the session lifecycle projection stale.");
-    }
-    case "rejected": {
-      throw new Error(`Terminal driver event run transition was rejected: ${outcome.reason}.`);
-    }
+function terminalTargetFromRun(
+  status: SessionRunSummary["status"],
+): DriverTerminalRunStatus | null {
+  switch (status) {
+    case "cancelled":
+      return "cancelled";
+    case "completed":
+      return "completed";
+    case "failed":
+      return "failed";
+    case "expired":
+      return "cancelled";
+    case "booting":
+    case "queued":
+    case "running":
+    case "waiting_input":
+      return null;
   }
 }
 
-function isStaleTerminalRunTransition(outcome: SessionRunTransitionOutcome): boolean {
-  return outcome.kind === "stale" && outcome.reason === "terminal_run";
+async function commitOrAdoptTerminalRun(
+  bindings: ApiBindings,
+  input: {
+    driverConnectionId?: string;
+    driverGeneration?: number;
+    driverInstanceId: DriverInstanceId;
+    error: RunError | null;
+    requestedStatus: "completed" | "failed";
+    runtimeId: string;
+    sessionId: SessionId;
+    sessionRunId: SessionRunId;
+  },
+): Promise<void> {
+  const current = await getSessionRunSummary(bindings.DB, input.sessionRunId);
+  if (current === null) {
+    throw new Error("Terminal Driver Session Run was not found.");
+  }
+
+  const currentTarget = terminalTargetFromRun(current.status);
+  const targetStatus = currentTarget ?? input.requestedStatus;
+  const expectedDriverObservation =
+    input.driverConnectionId === undefined || input.driverGeneration === undefined
+      ? undefined
+      : {
+          connectionId: input.driverConnectionId,
+          driverInstanceId: input.driverInstanceId,
+          generation: input.driverGeneration,
+        };
+  const adopted = await adoptTerminalRunProjection(bindings.DB, {
+    ...(expectedDriverObservation === undefined ? {} : { expectedDriverObservation }),
+    expectedTargetStatus: targetStatus,
+    runId: input.sessionRunId,
+    sessionId: input.sessionId,
+  });
+  if (adopted.kind !== "missing") {
+    if (adopted.kind === "stale") {
+      throw new Error(
+        `Terminal Driver Session Run lost a concurrent ${adopted.currentStatus} race.`,
+      );
+    }
+    return;
+  }
+
+  if (targetStatus !== "failed") {
+    throw new Error(
+      `${targetStatus === "completed" ? "Completed" : "Cancelled"} Session Run is missing its canonical terminal event.`,
+    );
+  }
+
+  const runError = currentTarget === "failed" ? current.error : input.error;
+  if (runError === null) {
+    throw new Error("Failed Session Run is missing its authoritative durable error.");
+  }
+  const timestampMs = currentTimestampMs();
+  const timestamp = toIsoString(timestampMs);
+  const sourceEventId = createSessionRunTerminalSourceId(input.sessionRunId, "run.failed");
+  const event = createCanonicalDriverRunFailedEvent({
+    driverInstanceId: input.driverInstanceId,
+    error: runError,
+    id: createPlatformId<RuntimeEventId>(),
+    occurredAt: timestamp,
+    runId: input.sessionRunId,
+    runtimeId: input.runtimeId,
+    sessionId: input.sessionId,
+    traceId: current.traceId,
+  });
+
+  const outcome = await commitTerminalRunProjection(bindings.DB, {
+    assistantMessage: null,
+    error: runError,
+    ...(expectedDriverObservation === undefined ? {} : { expectedDriverObservation }),
+    runId: input.sessionRunId,
+    sessionId: input.sessionId,
+    source: "driver",
+    targetStatus: "failed",
+    terminalEvent: { event, occurredAt: timestampMs, sourceEventId },
+    timestampMs,
+  });
+  if (outcome.kind === "stale") {
+    throw new Error(`Terminal Driver Session Run lost a concurrent ${outcome.currentStatus} race.`);
+  }
 }
 
-function isStaleTerminalRunStatus(
-  outcome: SessionRunTransitionOutcome,
-  status: "completed" | "failed",
-): boolean {
-  return (
-    outcome.kind === "stale" &&
-    outcome.reason === "terminal_run" &&
-    outcome.currentStatus === status
-  );
+function hasLinkedSessionRun(link: RuntimeSessionLink): link is RuntimeSessionLink & {
+  runtimeId: string;
+  sessionId: SessionId;
+  sessionRunId: SessionRunId;
+} {
+  return link.runtimeId !== null && link.sessionId !== null && link.sessionRunId !== null;
 }
 
-function createTerminalDriverEventId(input: {
-  readonly driverInstanceId: DriverInstanceId;
-  readonly kind: "run.completed" | "run.failed";
-  readonly sessionRunId: SessionRunId;
-}): string {
-  return `driver-terminal:${input.driverInstanceId}:${input.sessionRunId}:${input.kind}`;
+async function finishTerminalDriverRun(
+  bindings: ApiBindings,
+  input: {
+    driverConnectionId?: string;
+    driverGeneration?: number;
+    driverInstanceId: DriverInstanceId;
+    error: RunError | null;
+    link?: RuntimeSessionLink;
+    requestedStatus: "completed" | "failed";
+    sessionRunId: SessionRunId;
+  },
+): Promise<void> {
+  if ((input.driverConnectionId === undefined) !== (input.driverGeneration === undefined)) {
+    throw new Error("Terminal Driver connection identity must be provided together.");
+  }
+
+  const link =
+    input.link ??
+    (await getRuntimeSessionLink(bindings.DB, input.driverInstanceId, {
+      sessionRunId: input.sessionRunId,
+    }));
+
+  if (link.sessionRunId !== input.sessionRunId) {
+    throw new Error("Terminal Driver Session Run identity does not match the request.");
+  }
+  if (!hasLinkedSessionRun(link)) {
+    throw new Error("Terminal Driver Session Run is missing its durable session identity.");
+  }
+
+  const driverGeneration =
+    input.driverGeneration ??
+    (await getDriverInstanceLifecycleIdentity(bindings, input.driverInstanceId))?.generation;
+  if (driverGeneration === undefined) {
+    throw new Error("Terminal Driver instance identity was not found.");
+  }
+
+  await commitOrAdoptTerminalRun(bindings, {
+    ...(input.driverConnectionId === undefined
+      ? {}
+      : { driverConnectionId: input.driverConnectionId }),
+    ...(input.driverGeneration === undefined ? {} : { driverGeneration: input.driverGeneration }),
+    driverInstanceId: input.driverInstanceId,
+    error: input.error,
+    requestedStatus: input.requestedStatus,
+    runtimeId: link.runtimeId,
+    sessionId: link.sessionId,
+    sessionRunId: input.sessionRunId,
+  });
+  await releaseTerminalDriverInstanceSessionRun(bindings, {
+    ...(input.driverConnectionId === undefined
+      ? {}
+      : { expectedDriverConnectionId: input.driverConnectionId }),
+    driverGeneration,
+    driverInstanceId: input.driverInstanceId,
+    sessionRunId: input.sessionRunId,
+  });
 }
 
 export async function recordDriverInstanceCompletion(
   bindings: ApiBindings,
   input: {
-    driverReady: boolean;
+    driverConnectionId?: string;
+    driverGeneration?: number;
     driverInstanceId: DriverInstanceId;
+    sessionRunId: SessionRunId;
   },
 ): Promise<void> {
-  void input.driverReady;
-  const database = bindings.DB;
-  const link = await getRuntimeSessionLink(database, input.driverInstanceId);
-
-  if (
-    hasLinkedSessionRun(link) &&
-    link.sessionRunStatus !== null &&
-    (!isTerminalSessionRunStatus(link.sessionRunStatus) || link.sessionRunStatus === "completed")
-  ) {
-    await synthesizeDriverRunFinished(database, {
-      bindings,
-      driverInstanceId: input.driverInstanceId,
-      link,
-    });
-  }
-
-  await releaseLinkedRunLease(bindings, {
+  await finishTerminalDriverRun(bindings, {
+    ...(input.driverConnectionId === undefined
+      ? {}
+      : { driverConnectionId: input.driverConnectionId }),
+    ...(input.driverGeneration === undefined ? {} : { driverGeneration: input.driverGeneration }),
     driverInstanceId: input.driverInstanceId,
-    sessionRunId: link.sessionRunId,
+    error: null,
+    requestedStatus: "completed",
+    sessionRunId: input.sessionRunId,
   });
 }
 
 export async function recordDriverInstanceFailure(
   bindings: ApiBindings,
   input: {
+    driverConnectionId?: string;
+    driverGeneration?: number;
     error: DriverFailureInput["error"];
     driverInstanceId: DriverInstanceId;
     link?: RuntimeSessionLink;
+    sessionRunId: SessionRunId;
   },
 ): Promise<void> {
-  const database = bindings.DB;
-  const link = input.link ?? (await getRuntimeSessionLink(database, input.driverInstanceId));
-
-  if (hasLinkedSessionRun(link)) {
-    const outcome = await recordCanonicalSessionRunFailure(bindings, {
-      error: input.error,
-      runId: link.sessionRunId,
-      sessionId: link.sessionId,
-      source: "driver",
-    });
-    if (outcome.kind !== "failed") {
-      assertTerminalDriverSessionRunTransition(outcome.transition);
-    }
-  } else if (link.sessionRunId !== null) {
-    const outcome = await setSessionRunStatus(database, {
-      error: input.error,
-      runId: link.sessionRunId,
-      source: "driver",
-      status: "failed",
-    });
-    assertTerminalDriverSessionRunTransition(outcome);
-  }
-
-  await releaseLinkedRunLease(bindings, {
+  await finishTerminalDriverRun(bindings, {
+    ...(input.driverConnectionId === undefined
+      ? {}
+      : { driverConnectionId: input.driverConnectionId }),
+    ...(input.driverGeneration === undefined ? {} : { driverGeneration: input.driverGeneration }),
     driverInstanceId: input.driverInstanceId,
-    sessionRunId: link.sessionRunId,
-  });
-}
-
-async function synthesizeDriverRunFinished(
-  database: D1Database,
-  input: {
-    bindings: ApiBindings;
-    driverInstanceId: DriverInstanceId;
-    link: RuntimeSessionLink & {
-      sessionId: SessionId;
-      sessionRunId: SessionRunId;
-    };
-  },
-): Promise<void> {
-  const eventId = createTerminalDriverEventId({
-    driverInstanceId: input.driverInstanceId,
-    kind: "run.completed",
-    sessionRunId: input.link.sessionRunId,
-  });
-  const runCompletedEvent = createRuntimeEvent({
-    driverInstanceId: input.driverInstanceId,
-    id: createPlatformId<RuntimeEventId>(),
-    kind: "run.completed",
-    occurredAt: new Date().toISOString(),
-    payload: {
-      stopReason: "end_turn",
-    },
-    runId: input.link.sessionRunId,
-    sessionId: input.link.sessionId,
-    sourceEventId: eventId,
-  });
-  const [runFinishedEvent] = projectRuntimeEventToSessionDeliveryEvents(runCompletedEvent);
-
-  if (runFinishedEvent === undefined) {
-    throw new Error("Run completion event did not project to session delivery.");
-  }
-
-  // The terminal RPC proves only that execution ended; it carries no final
-  // assistant item identity. Never guess from the session's last assistant
-  // message, which may be progress or belong to an earlier run. The canonical
-  // projection is written only by an ordered runtime run.completed event that
-  // names finalMessageId.
-  const outcome = await setSessionRunStatus(database, {
-    runId: input.link.sessionRunId,
-    source: "driver",
-    status: "completed",
-  });
-  assertTerminalDriverSessionRunTransition(outcome);
-  if (isStaleTerminalRunTransition(outcome) && !isStaleTerminalRunStatus(outcome, "completed")) {
-    return;
-  }
-  await appendCanonicalTerminalDriverEvent({
-    bindings: input.bindings,
-    event: runCompletedEvent,
-  });
-}
-
-async function appendCanonicalTerminalDriverEvent(input: {
-  bindings: ApiBindings;
-  event: RuntimeEventEnvelope;
-}): Promise<void> {
-  await appendSessionRuntimeEvents({
-    bindings: input.bindings,
-    events: [input.event],
-    sessionId: input.event.sessionId,
-    sourceEventId: input.event.sourceEventId ?? input.event.id,
-  });
-}
-
-function hasLinkedSessionRun(link: RuntimeSessionLink): link is RuntimeSessionLink & {
-  sessionId: SessionId;
-  sessionRunId: SessionRunId;
-} {
-  return link.sessionId !== null && link.sessionRunId !== null;
-}
-
-async function releaseLinkedRunLease(
-  bindings: ApiBindings,
-  input: {
-    readonly driverInstanceId: DriverInstanceId;
-    readonly sessionRunId: SessionRunId | null;
-  },
-): Promise<boolean> {
-  if (input.sessionRunId === null) {
-    return false;
-  }
-
-  const outcome = await releaseTerminalDriverInstanceSessionRun(bindings, {
-    driverInstanceId: input.driverInstanceId,
+    error: input.error,
+    ...(input.link === undefined ? {} : { link: input.link }),
+    requestedStatus: "failed",
     sessionRunId: input.sessionRunId,
   });
-
-  return outcome.released;
 }

@@ -26,6 +26,7 @@ async function createDriverStartupExitError(
   bindings: ApiBindings,
   input: {
     driverInstanceId: DriverInstanceId;
+    driverGeneration: number;
     eventContext?: DriverRuntimeStartupEventContext;
     exitCode: number;
     logContext: Record<string, unknown>;
@@ -63,7 +64,7 @@ async function createDriverStartupExitError(
     task: () =>
       input.markStartupFailed
         ? input.markStartupFailed(message)
-        : failDriverInstance(bindings, input.driverInstanceId, message),
+        : failDriverInstance(bindings, input.driverInstanceId, input.driverGeneration, message),
   });
 
   return new Error(message);
@@ -73,6 +74,7 @@ export async function waitForDriverReady(
   bindings: ApiBindings,
   input: {
     driverInstanceId: DriverInstanceId;
+    driverGeneration: number;
     eventContext: DriverRuntimeStartupEventContext;
     getStaleStartupError?: () => Promise<Error | null>;
     logContext: Record<string, unknown>;
@@ -85,6 +87,7 @@ export async function waitForDriverReady(
   const readyPromise = waitForDriverInstanceReady(
     bindings,
     input.driverInstanceId,
+    input.driverGeneration,
     DRIVER_COLD_READY_TIMEOUT_MS,
   ).then(() => {
     ready = true;
@@ -102,6 +105,7 @@ export async function waitForDriverReady(
 
     throw await createDriverStartupExitError(bindings, {
       driverInstanceId: input.driverInstanceId,
+      driverGeneration: input.driverGeneration,
       eventContext: input.eventContext,
       exitCode: exit.exitCode,
       logContext: input.logContext,

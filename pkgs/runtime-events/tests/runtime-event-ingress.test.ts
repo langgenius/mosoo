@@ -4,16 +4,39 @@ import { createPlatformId } from "@mosoo/id";
 import { PLATFORM_ID_FIXTURES } from "@mosoo/id/testing";
 import {
   createRuntimeEvent,
+  createRuntimeEventSemanticHash,
   getRuntimeEventSessionFamily,
   ingestRuntimeDiagnosticEvent,
   ingestRuntimeEventInput,
   isRuntimeEventRecord,
+  parseRuntimeEventEnvelope,
+  readRuntimeEventPayload,
   readRuntimeEventPermissionRequest,
+  readRuntimeEventToolCallId,
+  readRuntimeEventToolCallUpdate,
   toRuntimeEventInput,
 } from "@mosoo/runtime-events";
 import type { RuntimeEventBuildContext } from "@mosoo/runtime-events";
 
 const OCCURRED_AT = "2026-05-26T00:00:00.000Z";
+
+declare const foreignRuntimeEventIdBrand: unique symbol;
+interface ForeignRuntimeEvent {
+  readonly id: string & { readonly [foreignRuntimeEventIdBrand]: "foreign" };
+  readonly kind: "tool.call.updated";
+  readonly payload: unknown;
+}
+
+const payloadReaderAcceptsForeignEvent: ForeignRuntimeEvent extends Parameters<
+  typeof readRuntimeEventPayload
+>[0]
+  ? true
+  : false = true;
+const toolCallReaderAcceptsForeignEvent: ForeignRuntimeEvent extends Parameters<
+  typeof readRuntimeEventToolCallId
+>[0]
+  ? true
+  : false = true;
 
 function createContext(): RuntimeEventBuildContext {
   return {
@@ -37,6 +60,67 @@ function first<T>(values: readonly T[]): T {
 }
 
 describe("runtime event ingress", () => {
+  test("keeps foreign ID brands out of pure event readers", () => {
+    const event = {
+      id: "foreign-event-1",
+      kind: "tool.call.updated",
+      payload: { toolCallId: "tool-1" },
+    };
+
+    expect(payloadReaderAcceptsForeignEvent).toBeTrue();
+    expect(toolCallReaderAcceptsForeignEvent).toBeTrue();
+    expect(readRuntimeEventPayload(event)).toEqual({ toolCallId: "tool-1" });
+    expect(readRuntimeEventToolCallId(event)).toBe("tool-1");
+  });
+
+  test("rejects the previous runtime event schema", () => {
+    expect(() =>
+      parseRuntimeEventEnvelope({
+        ...createRuntimeEvent({
+          actor: "driver",
+          id: PLATFORM_ID_FIXTURES.runtimeEvent,
+          kind: "diagnostic.reported",
+          occurredAt: OCCURRED_AT,
+          origin: "driver",
+          payload: { message: "ok" },
+          sessionId: PLATFORM_ID_FIXTURES.session,
+        }),
+        schemaVersion: "2026-05-26",
+      }),
+    ).toThrow("Runtime event schema version is unsupported");
+  });
+
+  test.each([
+    ["envelope", { extra: true }],
+    ["context", { context: { extra: true } }],
+    ["surface", { context: { surface: { extra: true, type: "web" } } }],
+    ["native", { native: { extra: true, provider: "openai" } }],
+  ] as const)("rejects undeclared canonical %s fields", (_label, override) => {
+    const event = createRuntimeEvent({
+      id: PLATFORM_ID_FIXTURES.runtimeEvent,
+      kind: "diagnostic.reported",
+      occurredAt: OCCURRED_AT,
+      payload: { message: "ok" },
+      sessionId: PLATFORM_ID_FIXTURES.session,
+    });
+
+    expect(() => parseRuntimeEventEnvelope({ ...event, ...override })).toThrow("unsupported");
+  });
+
+  test("preserves extension payload fields while parsing the exact envelope", () => {
+    const event = parseRuntimeEventEnvelope(
+      createRuntimeEvent({
+        id: PLATFORM_ID_FIXTURES.runtimeEvent,
+        kind: "diagnostic.reported",
+        occurredAt: OCCURRED_AT,
+        payload: { extension: { enabled: true }, message: "ok" },
+        sessionId: PLATFORM_ID_FIXTURES.session,
+      }),
+    );
+
+    expect(event.payload).toEqual({ extension: { enabled: true }, message: "ok" });
+  });
+
   test("owns session family classification for projected runtime events", () => {
     expect(
       getRuntimeEventSessionFamily(
@@ -64,6 +148,21 @@ describe("runtime event ingress", () => {
         }),
       ),
     ).toBe("tool");
+    expect(
+      getRuntimeEventSessionFamily(
+        createRuntimeEvent({
+          actor: "driver",
+          driverInstanceId: PLATFORM_ID_FIXTURES.driverInstance,
+          id: PLATFORM_ID_FIXTURES.runtimeEvent,
+          kind: "agent.tasks.replaced",
+          occurredAt: OCCURRED_AT,
+          origin: "driver",
+          payload: { tasks: [] },
+          runId: PLATFORM_ID_FIXTURES.sessionRun,
+          sessionId: PLATFORM_ID_FIXTURES.session,
+        }),
+      ),
+    ).toBe("state");
   });
 
   test("returns typed rejections for unsupported event kinds", () => {
@@ -98,6 +197,117 @@ describe("runtime event ingress", () => {
 
     expect(outcome.rejection.code).toBe("malformed_event");
     expect(outcome.rejection.kind).toBe("tool.call.updated");
+  });
+
+  test.each([
+    ["input snapshot", { rawInput: "" }, { rawInput: "", rawInputDelta: null }],
+    ["input delta", { rawInputDelta: "" }, { rawInput: null, rawInputDelta: "" }],
+    ["output snapshot", { rawOutput: "" }, { rawOutput: "", rawOutputDelta: null }],
+    ["output delta", { rawOutputDelta: "" }, { rawOutput: null, rawOutputDelta: "" }],
+  ] as const)("preserves an explicit empty tool %s", (_label, fields, expected) => {
+    const outcome = ingestRuntimeEventInput(createContext(), {
+      kind: "tool.call.updated",
+      payload: { ...fields, status: "running", toolCallId: "tool-1" },
+    });
+
+    if (outcome.status !== "accepted") {
+      throw new Error("Expected a canonical tool event.");
+    }
+
+    expect(readRuntimeEventToolCallUpdate(outcome.event)).toMatchObject(expected);
+  });
+
+  test.each([
+    [{ rawInput: "{}", rawInputDelta: "{" }, "rawInput"],
+    [{ rawOutput: "done", rawOutputDelta: "d" }, "rawOutput"],
+  ] as const)("rejects mixed tool %s snapshot and delta fields", (fields, field) => {
+    expect(
+      ingestRuntimeEventInput(createContext(), {
+        kind: "tool.call.updated",
+        payload: { ...fields, status: "running", toolCallId: "tool-1" },
+      }),
+    ).toMatchObject({
+      rejection: { code: "malformed_event", message: expect.stringContaining(field) },
+    });
+  });
+
+  test.each([
+    ["message.cancelled", { messageId: "message-1", role: "agent" }],
+    [
+      "message.failed",
+      {
+        error: { code: "runtime.failed", message: "Runtime failed." },
+        messageId: "message-1",
+        role: "agent",
+      },
+    ],
+    ["thought.cancelled", { thoughtId: "thought-1" }],
+    ["tool.call.updated", { status: "cancelled", toolCallId: "tool-1" }],
+  ])("admits canonical terminal payloads for %s", (kind, payload) => {
+    expect(ingestRuntimeEventInput(createContext(), { kind, payload })).toMatchObject({
+      event: { kind },
+      status: "accepted",
+    });
+  });
+
+  test.each([
+    "message.added",
+    "message.cancelled",
+    "message.completed",
+    "message.delta",
+    "message.failed",
+    "message.started",
+  ])("rejects %s without messageId", (kind) => {
+    expect(
+      ingestRuntimeEventInput(createContext(), {
+        kind,
+        payload:
+          kind === "message.failed"
+            ? { error: { code: "runtime.failed", message: "Runtime failed." } }
+            : kind === "message.added" || kind === "message.delta"
+              ? { content: "text" }
+              : {},
+      }),
+    ).toMatchObject({
+      rejection: { code: "malformed_event", kind },
+      status: "rejected",
+    });
+  });
+
+  test.each(["thought.cancelled", "thought.completed", "thought.delta", "thought.started"])(
+    "rejects %s without thoughtId",
+    (kind) => {
+      expect(
+        ingestRuntimeEventInput(createContext(), {
+          kind,
+          payload: kind === "thought.delta" ? { content: "text" } : {},
+        }),
+      ).toMatchObject({
+        rejection: { code: "malformed_event", kind },
+        status: "rejected",
+      });
+    },
+  );
+
+  test.each([
+    {},
+    { error: { code: "runtime.failed", message: "Runtime failed." } },
+    { messageId: "message-1" },
+    { error: { code: "runtime.failed" }, messageId: "message-1" },
+    { error: { message: "Runtime failed." }, messageId: "message-1" },
+  ])("rejects malformed message.failed payload %#", (payload) => {
+    expect(
+      ingestRuntimeEventInput(createContext(), {
+        kind: "message.failed",
+        payload,
+      }),
+    ).toMatchObject({
+      rejection: {
+        code: "malformed_event",
+        kind: "message.failed",
+      },
+      status: "rejected",
+    });
   });
 
   test("rejects malformed run lifecycle payloads before projection can repair them", () => {
@@ -148,6 +358,94 @@ describe("runtime event ingress", () => {
       },
       status: "rejected",
     });
+  });
+
+  test.each([
+    ["run.completed", { status: "running" }],
+    [
+      "run.failed",
+      {
+        error: { code: "failed", message: "failed", retryable: false },
+        recoverable: false,
+        status: "running",
+      },
+    ],
+    ["run.started", { startedAt: OCCURRED_AT, status: "completed" }],
+    ["run.queued", { status: "failed" }],
+  ] as const)("rejects a status owned by another run event kind for %s", (kind, payload) => {
+    expect(ingestRuntimeEventInput(createContext(), { kind, payload })).toMatchObject({
+      rejection: { code: "malformed_event", kind },
+      status: "rejected",
+    });
+  });
+
+  test.each([
+    ["run.completed", { status: "completed" }],
+    [
+      "run.failed",
+      {
+        error: { code: "failed", message: "failed", retryable: false },
+        recoverable: false,
+        status: "failed",
+      },
+    ],
+    ["run.started", { startedAt: OCCURRED_AT, status: "running" }],
+    ["run.queued", { status: "queued" }],
+  ] as const)("accepts the canonical top-level status for %s", (kind, payload) => {
+    expect(ingestRuntimeEventInput(createContext(), { kind, payload })).toMatchObject({
+      event: { kind },
+      status: "accepted",
+    });
+  });
+
+  test.each([
+    [false, false, "accepted"],
+    [true, true, "accepted"],
+    [false, true, "rejected"],
+    [true, false, "rejected"],
+  ] as const)(
+    "requires run.failed recoverable=%s to match error.retryable=%s",
+    (recoverable, retryable, status) => {
+      expect(
+        ingestRuntimeEventInput(createContext(), {
+          kind: "run.failed",
+          payload: {
+            error: { code: "runtime.failed", message: "Runtime failed.", retryable },
+            recoverable,
+          },
+        }).status,
+      ).toBe(status);
+    },
+  );
+
+  test("owns the completed-run final message reference schema at the Mosoo ingress", () => {
+    expect(
+      ingestRuntimeEventInput(createContext(), {
+        kind: "run.completed",
+        payload: { finalMessageId: "message-1", stopReason: "end_turn" },
+      }).status,
+    ).toBe("accepted");
+    expect(
+      ingestRuntimeEventInput(createContext(), {
+        kind: "run.completed",
+        payload: { stopReason: "end_turn" },
+      }).status,
+    ).toBe("accepted");
+
+    for (const payload of [
+      { finalMessageId: "" },
+      { finalMessageId: null },
+      { finalMessageId: 1 },
+      { finalMessageId: "message-1", finalMessageText: "answer" },
+      { finalMessageText: "answer" },
+    ]) {
+      expect(
+        ingestRuntimeEventInput(createContext(), { kind: "run.completed", payload }),
+      ).toMatchObject({
+        rejection: { code: "malformed_event", kind: "run.completed" },
+        status: "rejected",
+      });
+    }
   });
 
   test("rejects permission requests without a canonical run owner", () => {
@@ -376,7 +674,7 @@ describe("runtime event ingress", () => {
     });
   });
 
-  test("admits Driver Contract v2 timing payloads with ISO timestamps", () => {
+  test("admits Driver Contract v3 timing payloads with ISO timestamps", () => {
     const event = first(
       toRuntimeEventInput(createContext(), {
         kind: "runtime.timing.recorded",
@@ -465,7 +763,7 @@ describe("runtime event ingress", () => {
       payload: {
         message: "ok",
       },
-      schemaVersion: "2026-05-26",
+      schemaVersion: "2026-08-29",
       sessionId: PLATFORM_ID_FIXTURES.session,
       visibility: "participant",
     });
@@ -510,5 +808,36 @@ describe("runtime event ingress", () => {
       phase: "credential",
       status: "failed",
     });
+  });
+
+  test("hashes replay semantics independently of transport metadata and object key order", async () => {
+    const firstEvent = createRuntimeEvent({
+      driverInstanceId: PLATFORM_ID_FIXTURES.driverInstance,
+      id: createPlatformId(),
+      kind: "diagnostic.reported",
+      occurredAt: "2026-08-29T00:00:00.000Z",
+      payload: { nested: { a: 1, b: 2 }, z: true },
+      runtimeId: "runtime-1",
+      sessionId: PLATFORM_ID_FIXTURES.session,
+      sourceEventId: "source-1",
+    });
+    const replay = createRuntimeEvent({
+      driverInstanceId: PLATFORM_ID_FIXTURES.driverInstance,
+      id: createPlatformId(),
+      kind: "diagnostic.reported",
+      occurredAt: "2026-08-30T00:00:00.000Z",
+      payload: { z: true, nested: { b: 2, a: 1 } },
+      runtimeId: "runtime-1",
+      sessionId: PLATFORM_ID_FIXTURES.session,
+      sourceEventId: "source-1",
+    });
+    const changedRuntime = { ...replay, runtimeId: "runtime-2" };
+
+    expect(await createRuntimeEventSemanticHash(firstEvent)).toBe(
+      await createRuntimeEventSemanticHash(replay),
+    );
+    expect(await createRuntimeEventSemanticHash(firstEvent)).not.toBe(
+      await createRuntimeEventSemanticHash(changedRuntime),
+    );
   });
 });

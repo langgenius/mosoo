@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 
+import { DRIVER_PROTOCOL_VERSION } from "@mosoo/agent-driver/boot";
 import { driverInstancesTable, vendorCredentialsTable } from "@mosoo/db";
 import { parsePlatformId } from "@mosoo/id";
 import type { DriverInstanceId, ProjectId, VendorCredentialId } from "@mosoo/id";
@@ -61,7 +62,7 @@ function createDriverRouteTestApp(): Hono<ApiGatewayEnvironment> {
 function captureUpstreamFetch(response?: () => Response): CapturedUpstreamRequest[] {
   const captured: CapturedUpstreamRequest[] = [];
 
-  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+  globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const request = new Request(input, init);
     captured.push({
       body: request.method === "GET" || request.method === "HEAD" ? null : await request.text(),
@@ -83,7 +84,7 @@ function captureUpstreamFetch(response?: () => Response): CapturedUpstreamReques
         status: 200,
       })
     );
-  }) as typeof fetch;
+  };
 
   return captured;
 }
@@ -93,9 +94,11 @@ async function insertDriverInstance(
   status: "provisioning" | "connecting" | "ready" | "failed",
   input: {
     bootTokenExpiresAt?: number;
+    bootTokenHash?: Uint8Array;
     driverInstanceId?: DriverInstanceId;
     generation?: number;
     lastHeartbeatAt?: number | null;
+    sandboxIncarnation?: number;
     updatedAt?: number;
   } = {},
 ) {
@@ -105,7 +108,7 @@ async function insertDriverInstance(
     .insert(driverInstancesTable)
     .values({
       bootTokenExpiresAt: input.bootTokenExpiresAt ?? nowMs + 60_000,
-      bootTokenHash: new Uint8Array([1, 2, 3]),
+      bootTokenHash: input.bootTokenHash ?? new Uint8Array([1, 2, 3]),
       bootTokenUsedAt: null,
       closeCode: null,
       closeReason: null,
@@ -122,9 +125,10 @@ async function insertDriverInstance(
       lastHeartbeatAt: input.lastHeartbeatAt ?? null,
       processId: null,
       protocol: "orpc-ws",
-      protocolVersion: 2,
+      protocolVersion: DRIVER_PROTOCOL_VERSION,
       runtime: "claude-agent-sdk",
       sandboxId: PUBLIC_API_TEST_IDS.sandbox,
+      sandboxIncarnation: input.sandboxIncarnation ?? 1,
       sandboxSessionId: PUBLIC_API_TEST_IDS.ownerSession,
       status,
       statusChangedAt: nowMs,
@@ -580,7 +584,9 @@ describe("driver LLM proxy route", () => {
     const { bindings, database } = await setupFixture();
     await insertDriverInstance(database, "provisioning", {
       bootTokenExpiresAt: Date.now() - 1,
+      bootTokenHash: new Uint8Array([4, 5, 6]),
       driverInstanceId: OTHER_DRIVER_INSTANCE_ID,
+      sandboxIncarnation: 2,
     });
 
     const response = await dispatch(bindings, llmProxyRequest("/v1/messages", { method: "POST" }));
@@ -856,9 +862,9 @@ describe("driver LLM proxy route", () => {
 
   test("maps upstream failures to 502", async () => {
     const { bindings } = await setupFixture();
-    globalThis.fetch = (async () => {
+    globalThis.fetch = async () => {
       throw new Error("boom");
-    }) as typeof fetch;
+    };
     const grant = await createLlmProxyGrant(bindings);
 
     const response = await dispatch(

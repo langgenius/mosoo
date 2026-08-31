@@ -1,10 +1,5 @@
-import { apiCommandsTable } from "@mosoo/db";
-import type { ApiCommandId } from "@mosoo/db";
-import { eq } from "drizzle-orm";
-
 import { createErrorLogContext, logError, logInfo } from "../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
-import { getAppDatabase } from "../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../time";
 import {
   parseCostLedgerReconciliationActivationMode,
@@ -13,9 +8,15 @@ import {
 import { runUsageDailyRollup } from "../../cost/application/cost-rollup.service";
 import { buildEnvironmentPackageArtifact } from "../../environments/application/environment-package-artifact-build.service";
 import { dispatchQueuedSessionRun } from "../../runtime/application/session-runs/dispatch-queued-run.service";
+import { createLeaseOwnershipRenewal } from "../../runtime/infrastructure/runtime-subject-lifecycle/lease-ownership-renewal";
 import { runSandboxMaintenance } from "../../runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-maintenance.service";
-import { enqueueCostLedgerReconciliationCommand } from "./api-command-enqueue";
+import { reconcileSandboxBackupPage } from "../../runtime/infrastructure/sandbox-backup-reconciliation.service";
 import {
+  enqueueCostLedgerReconciliationCommand,
+  enqueueSandboxBackupReconciliationCommand,
+} from "./api-command-enqueue";
+import {
+  API_COMMAND_LEASE_MS,
   API_COMMAND_LEASE_RENEWAL_INTERVAL_MS,
   claimApiCommand,
   completeApiCommand,
@@ -31,15 +32,25 @@ import { ApiCommandPayloadError, parseApiCommandPayload } from "./api-command-pa
 import type {
   CostLedgerReconciliationCommandPayload,
   EnvironmentPackageArtifactBuildCommandPayload,
+  SandboxBackupReconciliationCommandPayload,
   ScheduledMaintenanceCommandPayload,
   SessionRunDispatchCommandPayload,
 } from "./api-command-payload";
 
 const API_COMMAND_RETRY_DELAY_SECONDS = 30;
 
-function createClaimOwnerId(message: Message<ApiCommandMessage>): string {
-  const normalized = message.id.replaceAll(":", "_").trim();
-  return normalized || "api-command-worker";
+export type ApiCommandDeliveryDisposition =
+  | { readonly kind: "finished" }
+  | { readonly delaySeconds: number; readonly kind: "retry" };
+
+const FINISHED_DISPOSITION = { kind: "finished" } as const;
+
+function retryDisposition(delaySeconds = API_COMMAND_RETRY_DELAY_SECONDS) {
+  return { delaySeconds, kind: "retry" } as const;
+}
+
+function createClaimOwnerId(): string {
+  return crypto.randomUUID();
 }
 
 function getErrorMessage(error: unknown): string {
@@ -64,6 +75,10 @@ function shouldRunUsageDailyRollup(now: Date): boolean {
 
 function shouldStartCostLedgerReconciliation(now: Date): boolean {
   return now.getUTCHours() === 1 && now.getUTCMinutes() === 0;
+}
+
+function shouldStartSandboxBackupReconciliation(now: Date): boolean {
+  return now.getUTCHours() === 3 && now.getUTCMinutes() === 0;
 }
 
 async function processScheduledMaintenanceCommand(
@@ -93,7 +108,43 @@ async function processScheduledMaintenanceCommand(
     }
   }
 
+  if (shouldStartSandboxBackupReconciliation(scheduledAt)) {
+    tasks.push(
+      enqueueSandboxBackupReconciliationCommand(bindings, {
+        cursor: null,
+        databasePage: 0,
+        scheduledTime: payload.scheduledTime,
+      }),
+    );
+  }
+
   await Promise.all(tasks);
+}
+
+async function processSandboxBackupReconciliationCommand(
+  bindings: ApiBindings,
+  payload: SandboxBackupReconciliationCommandPayload,
+  processedAtMs: number,
+): Promise<void> {
+  const result = await reconcileSandboxBackupPage(bindings, {
+    cursor: payload.cursor,
+  });
+  logInfo("runtime.sandbox_backup.reconciliation_page_completed", {
+    ...result,
+    processedAtMs,
+    scheduledTime: payload.scheduledTime,
+  });
+  if (!result.hasMore) {
+    return;
+  }
+  if (payload.databasePage === Number.MAX_SAFE_INTEGER) {
+    throw new Error("Sandbox backup reconciliation exhausted its database page identity.");
+  }
+  await enqueueSandboxBackupReconciliationCommand(bindings, {
+    cursor: result.nextCursor,
+    databasePage: payload.databasePage + 1,
+    scheduledTime: payload.scheduledTime,
+  });
 }
 
 async function processCostLedgerReconciliationCommand(
@@ -153,8 +204,18 @@ async function processClaimedApiCommand(
   bindings: ApiBindings,
   claim: ApiCommandClaim,
   processedAtMs: number,
+  requireOwnership: () => Promise<void>,
 ): Promise<void> {
   const payload = parseApiCommandPayload(claim.kind, claim.payloadJson);
+  const authority = {
+    attemptCount: claim.attemptCount,
+    claimOwner: claim.claimOwner,
+    commandId: claim.commandId,
+    deliveryGeneration: claim.deliveryGeneration,
+    requireOwnership,
+  };
+
+  await requireOwnership();
 
   switch (claim.kind) {
     case "cost_ledger_reconciliation": {
@@ -163,77 +224,222 @@ async function processClaimedApiCommand(
         payload as CostLedgerReconciliationCommandPayload,
         processedAtMs,
       );
-      return;
+      break;
     }
     case "environment_package_artifact_build": {
       await buildEnvironmentPackageArtifact(
         bindings,
         payload as EnvironmentPackageArtifactBuildCommandPayload,
+        authority,
       );
-      return;
+      break;
+    }
+    case "sandbox_backup_reconciliation": {
+      await processSandboxBackupReconciliationCommand(
+        bindings,
+        payload as SandboxBackupReconciliationCommandPayload,
+        processedAtMs,
+      );
+      break;
     }
     case "scheduled_maintenance": {
       await processScheduledMaintenanceCommand(
         bindings,
         payload as ScheduledMaintenanceCommandPayload,
       );
-      return;
+      break;
     }
     case "session_run_dispatch": {
       await processSessionRunDispatchCommand(bindings, payload as SessionRunDispatchCommandPayload);
-      return;
+      break;
     }
   }
+
+  await requireOwnership();
 }
 
 async function processClaimedApiCommandWithLeaseRenewal(
   bindings: ApiBindings,
   claim: ApiCommandClaim,
-  ownerId: string,
-  processedAtMs: number,
+  nowMs: () => number,
 ): Promise<void> {
   let stopped = false;
-  let renewal = Promise.resolve();
+  let lossEvent: "api-command.claim_lost" | "api-command.claim_renew_failed" | null = null;
+  let lossLogged = false;
+  let pendingHeartbeat = Promise.resolve();
+  const requireOwnership = createLeaseOwnershipRenewal(async () => {
+    try {
+      const renewed = await renewApiCommandClaim({
+        claim,
+        database: bindings.DB,
+        nowMs: nowMs(),
+      });
+      if (!renewed) {
+        lossEvent ??= "api-command.claim_lost";
+      }
+      return renewed;
+    } catch (error) {
+      lossEvent ??= "api-command.claim_renew_failed";
+      throw error;
+    }
+  }, "API command lease ownership was lost.");
+  const logOwnershipLoss = (error: unknown): void => {
+    if (lossLogged || lossEvent === null) {
+      return;
+    }
+    lossLogged = true;
+    logError(lossEvent, {
+      ...createErrorLogContext(error),
+      attemptCount: claim.attemptCount,
+      commandId: claim.commandId,
+      deliveryGeneration: claim.deliveryGeneration,
+      kind: claim.kind,
+    });
+  };
   const timer = setInterval(() => {
     if (stopped) {
       return;
     }
 
-    renewal = renewal
-      .then(() =>
-        renewApiCommandClaim({
-          commandId: claim.commandId,
-          database: bindings.DB,
-          ownerId,
-        }),
-      )
-      .then((renewed) => {
-        if (renewed) {
-          return;
-        }
-
-        stopped = true;
-        logError("api-command.claim_lost", {
-          commandId: claim.commandId,
-          kind: claim.kind,
-        });
-      })
-      .catch((error: unknown) => {
-        logError("api-command.claim_renew_failed", {
-          ...createErrorLogContext(error),
-          commandId: claim.commandId,
-          kind: claim.kind,
-        });
-      });
+    pendingHeartbeat = requireOwnership().catch(logOwnershipLoss);
   }, API_COMMAND_LEASE_RENEWAL_INTERVAL_MS);
 
   try {
-    await processClaimedApiCommand(bindings, claim, processedAtMs);
-    stopped = true;
-    await renewal;
+    await requireOwnership();
+    await processClaimedApiCommand(bindings, claim, nowMs(), requireOwnership);
+    await requireOwnership();
+  } catch (error) {
+    logOwnershipLoss(error);
+    throw error;
   } finally {
     stopped = true;
     clearInterval(timer);
+    await pendingHeartbeat;
+  }
+}
+
+function busyRetryDelaySeconds(claimExpiresAt: number | null, nowMs: number): number {
+  if (claimExpiresAt === null) {
+    return API_COMMAND_RETRY_DELAY_SECONDS;
+  }
+  return Math.min(
+    API_COMMAND_LEASE_MS / 1_000,
+    Math.max(1, Math.ceil((claimExpiresAt - nowMs) / 1_000)),
+  );
+}
+
+function retryMessage(message: Message<ApiCommandMessage>, delaySeconds: number): void {
+  message.retry({ delaySeconds });
+}
+
+async function handleClaimedCommandFailure(
+  bindings: ApiBindings,
+  claim: ApiCommandClaim,
+  error: unknown,
+  nowMs: () => number,
+): Promise<ApiCommandDeliveryDisposition> {
+  const errorCode = getErrorCode(error);
+  const errorMessage = getErrorMessage(error);
+
+  logError("api-command.failed", {
+    ...createErrorLogContext(error),
+    attemptCount: claim.attemptCount,
+    commandId: claim.commandId,
+    deliveryGeneration: claim.deliveryGeneration,
+    errorCode,
+    kind: claim.kind,
+  });
+
+  try {
+    if (error instanceof ApiCommandPayloadError) {
+      const terminalized = await markApiCommandFailed({
+        claim,
+        database: bindings.DB,
+        errorCode,
+        errorMessage,
+        nowMs: nowMs(),
+      });
+      return terminalized ? FINISHED_DISPOSITION : retryDisposition();
+    }
+
+    await releaseApiCommandForRetry({
+      claim,
+      database: bindings.DB,
+      errorCode,
+      errorMessage,
+      nowMs: nowMs(),
+    });
+  } catch (persistenceError) {
+    logError("api-command.failure_persist_failed", {
+      ...createErrorLogContext(persistenceError),
+      commandId: claim.commandId,
+      deliveryGeneration: claim.deliveryGeneration,
+    });
+  }
+
+  return retryDisposition();
+}
+
+export async function processApiCommandDelivery(
+  bindings: ApiBindings,
+  body: unknown,
+  nowMs: () => number = currentTimestampMs,
+): Promise<ApiCommandDeliveryDisposition> {
+  let queueMessage: ApiCommandMessage;
+
+  try {
+    queueMessage = parseApiCommandMessage(body);
+  } catch (error) {
+    logError("api-command.message_invalid", {
+      ...createErrorLogContext(error),
+      errorCode: getErrorCode(error),
+    });
+    return FINISHED_DISPOSITION;
+  }
+
+  const claimStartedAtMs = nowMs();
+  let claimResult: Awaited<ReturnType<typeof claimApiCommand>>;
+  try {
+    claimResult = await claimApiCommand({
+      claimOwner: createClaimOwnerId(),
+      commandId: queueMessage.commandId,
+      database: bindings.DB,
+      deliveryGeneration: queueMessage.deliveryGeneration,
+      nowMs: claimStartedAtMs,
+    });
+  } catch (error) {
+    logError("api-command.claim_failed", {
+      ...createErrorLogContext(error),
+      commandId: queueMessage.commandId,
+      deliveryGeneration: queueMessage.deliveryGeneration,
+    });
+    return retryDisposition();
+  }
+
+  if (claimResult.kind === "busy") {
+    return retryDisposition(busyRetryDelaySeconds(claimResult.claimExpiresAt, claimStartedAtMs));
+  }
+  if (claimResult.kind !== "claimed") {
+    return FINISHED_DISPOSITION;
+  }
+
+  const claim = claimResult.claim;
+  try {
+    await processClaimedApiCommandWithLeaseRenewal(bindings, claim, nowMs);
+  } catch (error) {
+    return handleClaimedCommandFailure(bindings, claim, error, nowMs);
+  }
+
+  try {
+    const finalized = await completeApiCommand({ claim, database: bindings.DB, nowMs: nowMs() });
+    return finalized ? FINISHED_DISPOSITION : retryDisposition();
+  } catch (error) {
+    logError("api-command.completion_failed", {
+      ...createErrorLogContext(error),
+      commandId: claim.commandId,
+      deliveryGeneration: claim.deliveryGeneration,
+    });
+    return retryDisposition();
   }
 }
 
@@ -242,10 +448,9 @@ export async function processApiCommandMessage(
   message: Message<ApiCommandMessage>,
   nowMs: () => number = currentTimestampMs,
 ): Promise<void> {
-  let commandId: ApiCommandId;
-
+  let queueMessage: ApiCommandMessage;
   try {
-    commandId = parseApiCommandMessage(message.body).commandId;
+    queueMessage = parseApiCommandMessage(message.body);
   } catch (error) {
     logError("api-command.message_invalid", {
       ...createErrorLogContext(error),
@@ -254,65 +459,12 @@ export async function processApiCommandMessage(
     message.ack();
     return;
   }
-
-  const ownerId = createClaimOwnerId(message);
-  const startMs = nowMs();
-  const claim = await claimApiCommand({
-    commandId,
-    database: bindings.DB,
-    nowMs: startMs,
-    ownerId,
-  });
-
-  if (!claim) {
+  const disposition = await processApiCommandDelivery(bindings, queueMessage, nowMs);
+  if (disposition.kind === "finished") {
     message.ack();
     return;
   }
-
-  try {
-    await processClaimedApiCommandWithLeaseRenewal(bindings, claim, ownerId, nowMs());
-    await completeApiCommand({
-      commandId,
-      database: bindings.DB,
-      nowMs: nowMs(),
-      ownerId,
-    });
-    message.ack();
-  } catch (error) {
-    const errorCode = getErrorCode(error);
-    const errorMessage = getErrorMessage(error);
-
-    logError("api-command.failed", {
-      ...createErrorLogContext(error),
-      attemptCount: claim.attemptCount,
-      commandId,
-      errorCode,
-      kind: claim.kind,
-    });
-
-    if (error instanceof ApiCommandPayloadError) {
-      await markApiCommandFailed({
-        commandId,
-        database: bindings.DB,
-        errorCode,
-        errorMessage,
-        nowMs: nowMs(),
-        ownerId,
-      });
-      message.ack();
-      return;
-    }
-
-    await releaseApiCommandForRetry({
-      commandId,
-      database: bindings.DB,
-      errorCode,
-      errorMessage,
-      nowMs: nowMs(),
-      ownerId,
-    });
-    message.retry({ delaySeconds: API_COMMAND_RETRY_DELAY_SECONDS });
-  }
+  retryMessage(message, disposition.delaySeconds);
 }
 
 export async function processApiCommandDeadLetterMessage(
@@ -320,42 +472,65 @@ export async function processApiCommandDeadLetterMessage(
   message: Message<ApiCommandMessage>,
   nowMs: () => number = currentTimestampMs,
 ): Promise<void> {
+  let queueMessage: ApiCommandMessage;
   try {
-    const { commandId } = parseApiCommandMessage(message.body);
-    const deadLetteredAtMs = nowMs();
-    const command =
-      (await getAppDatabase(bindings.DB)
-        .select({
-          kind: apiCommandsTable.kind,
-          lastErrorCode: apiCommandsTable.lastErrorCode,
-          lastErrorMessage: apiCommandsTable.lastErrorMessage,
-        })
-        .from(apiCommandsTable)
-        .where(eq(apiCommandsTable.id, commandId))
-        .limit(1)
-        .get()) ?? null;
-
-    const preserveArtifactFailure = command?.kind === "environment_package_artifact_build";
-
-    await markApiCommandDeadLettered({
-      commandId,
-      database: bindings.DB,
-      errorCode:
-        preserveArtifactFailure && command.lastErrorCode
-          ? command.lastErrorCode
-          : "queue_dead_lettered",
-      errorMessage:
-        preserveArtifactFailure && command.lastErrorMessage
-          ? command.lastErrorMessage
-          : "API command reached the queue dead-letter consumer.",
-      nowMs: deadLetteredAtMs,
-    });
+    queueMessage = parseApiCommandMessage(message.body);
   } catch (error) {
     logError("api-command.dead_letter_invalid", {
       ...createErrorLogContext(error),
       errorCode: getErrorCode(error),
     });
+    message.ack();
+    return;
   }
 
-  message.ack();
+  const claimStartedAtMs = nowMs();
+  try {
+    const claimResult = await claimApiCommand({
+      claimOwner: createClaimOwnerId(),
+      commandId: queueMessage.commandId,
+      database: bindings.DB,
+      deliveryGeneration: queueMessage.deliveryGeneration,
+      nowMs: claimStartedAtMs,
+    });
+    if (claimResult.kind === "busy") {
+      retryMessage(message, busyRetryDelaySeconds(claimResult.claimExpiresAt, claimStartedAtMs));
+      return;
+    }
+    if (claimResult.kind !== "claimed") {
+      message.ack();
+      return;
+    }
+
+    const claim = claimResult.claim;
+    const preserveArtifactFailure = claim.kind === "environment_package_artifact_build";
+    const errorCode =
+      preserveArtifactFailure && claimResult.claim.lastErrorCode
+        ? claimResult.claim.lastErrorCode
+        : "queue_dead_lettered";
+    const errorMessage =
+      preserveArtifactFailure && claimResult.claim.lastErrorMessage
+        ? claimResult.claim.lastErrorMessage
+        : "API command reached the queue dead-letter consumer.";
+    const deadLettered = await markApiCommandDeadLettered({
+      claim,
+      database: bindings.DB,
+      errorCode,
+      errorMessage,
+      nowMs: nowMs(),
+    });
+
+    if (deadLettered) {
+      message.ack();
+    } else {
+      retryMessage(message, API_COMMAND_RETRY_DELAY_SECONDS);
+    }
+  } catch (error) {
+    logError("api-command.dead_letter_failed", {
+      ...createErrorLogContext(error),
+      commandId: queueMessage.commandId,
+      deliveryGeneration: queueMessage.deliveryGeneration,
+    });
+    retryMessage(message, API_COMMAND_RETRY_DELAY_SECONDS);
+  }
 }

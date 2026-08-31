@@ -14,6 +14,8 @@ interface Deferred<T> {
 
 interface PublishedRequest {
   events: AgUiSessionEvent[];
+  previousRuntimeEventSeqCursor?: number;
+  runtimeEventSeqCursor?: number;
   sessionId: string;
 }
 
@@ -71,10 +73,12 @@ function createDeferred<T>(): Deferred<T> {
 }
 
 function createBufferHarness(): {
+  batchPublishCount: () => number;
   buffer: SessionViewerEventDeliveryBuffer;
   published: PublishedRequest[];
   pushAfterResponse: (callback: () => void) => void;
   pushResponse: (response: Promise<Response> | Response) => void;
+  stateSyncCount: () => number;
   waitForPublish: () => Promise<void>;
   waitForWaitUntil: () => Promise<void>;
 } {
@@ -83,10 +87,47 @@ function createBufferHarness(): {
   const afterResponseCallbacks: Array<() => void> = [];
   const responses: Array<Promise<Response> | Response> = [];
   const waitUntilTasks: Promise<void>[] = [];
+  let batchPublishCount = 0;
+  let stateSyncCount = 0;
   const sessionStub = {
-    async publishEvents(sessionId: string, events: AgUiSessionEvent[]): Promise<void> {
+    async publishEventBatches(
+      sessionId: string,
+      batches: Array<{
+        events: AgUiSessionEvent[];
+        previousRuntimeEventSeqCursor: number | null;
+        runtimeEventSeqCursor: number | null;
+      }>,
+    ): Promise<void> {
+      batchPublishCount += 1;
+      for (const batch of batches) {
+        published.push({
+          events: batch.events,
+          ...(batch.previousRuntimeEventSeqCursor === null
+            ? {}
+            : { previousRuntimeEventSeqCursor: batch.previousRuntimeEventSeqCursor }),
+          ...(batch.runtimeEventSeqCursor === null
+            ? {}
+            : { runtimeEventSeqCursor: batch.runtimeEventSeqCursor }),
+          sessionId,
+        });
+      }
+      publishWaiters.shift()?.();
+      const response = await (responses.shift() ?? new Response(null, { status: 204 }));
+      if (!response.ok) {
+        throw new Error(`Session event publish failed with status ${response.status}.`);
+      }
+      afterResponseCallbacks.shift()?.();
+    },
+    async publishEvents(
+      sessionId: string,
+      events: AgUiSessionEvent[],
+      runtimeEventSeqCursor: number | null,
+      previousRuntimeEventSeqCursor: number | null,
+    ): Promise<void> {
       published.push({
         events,
+        ...(previousRuntimeEventSeqCursor === null ? {} : { previousRuntimeEventSeqCursor }),
+        ...(runtimeEventSeqCursor === null ? {} : { runtimeEventSeqCursor }),
         sessionId,
       });
       publishWaiters.shift()?.();
@@ -98,6 +139,9 @@ function createBufferHarness(): {
       }
 
       afterResponseCallbacks.shift()?.();
+    },
+    async syncViewers(): Promise<void> {
+      stateSyncCount += 1;
     },
   };
   const env = {
@@ -119,6 +163,7 @@ function createBufferHarness(): {
   });
 
   return {
+    batchPublishCount: () => batchPublishCount,
     buffer,
     published,
     pushAfterResponse: (callback) => {
@@ -127,6 +172,7 @@ function createBufferHarness(): {
     pushResponse: (response) => {
       responses.push(response);
     },
+    stateSyncCount: () => stateSyncCount,
     waitForPublish: () =>
       new Promise((resolve) => {
         publishWaiters.push(resolve);
@@ -198,6 +244,95 @@ describe("SessionViewerEventDeliveryBuffer", () => {
     ]);
   });
 
+  test("keeps a delayed flush alive until the buffered events are published", async () => {
+    const { buffer, published, waitForWaitUntil } = createBufferHarness();
+
+    buffer.enqueue("session-1", [
+      { delta: "batched", messageId: "assistant-1", type: "TEXT_MESSAGE_CONTENT" },
+    ]);
+    await waitForWaitUntil();
+
+    expect(published).toEqual([
+      {
+        events: [{ delta: "batched", messageId: "assistant-1", type: "TEXT_MESSAGE_CONTENT" }],
+        sessionId: "session-1",
+      },
+    ]);
+  });
+
+  test("keeps different durable cursor generations in separate deliveries", async () => {
+    const { batchPublishCount, buffer, published } = createBufferHarness();
+
+    buffer.enqueue(
+      "session-1",
+      [{ delta: "one", messageId: "assistant-1", type: "TEXT_MESSAGE_CONTENT" }],
+      1,
+      0,
+    );
+    buffer.enqueue(
+      "session-1",
+      [{ delta: "two", messageId: "assistant-1", type: "TEXT_MESSAGE_CONTENT" }],
+      2,
+      1,
+    );
+    await buffer.flush();
+
+    expect(batchPublishCount()).toBe(1);
+    expect(
+      published.map(({ events, previousRuntimeEventSeqCursor, runtimeEventSeqCursor }) => ({
+        events,
+        previousRuntimeEventSeqCursor,
+        runtimeEventSeqCursor,
+      })),
+    ).toEqual([
+      {
+        events: [{ delta: "one", messageId: "assistant-1", type: "TEXT_MESSAGE_CONTENT" }],
+        previousRuntimeEventSeqCursor: 0,
+        runtimeEventSeqCursor: 1,
+      },
+      {
+        events: [{ delta: "two", messageId: "assistant-1", type: "TEXT_MESSAGE_CONTENT" }],
+        previousRuntimeEventSeqCursor: 1,
+        runtimeEventSeqCursor: 2,
+      },
+    ]);
+  });
+
+  test("keeps one durable cursor generation in one atomic delivery", async () => {
+    const { batchPublishCount, buffer, published } = createBufferHarness();
+    const events: AgUiSessionEvent[] = Array.from({ length: 128 }, (_, index) => ({
+      delta: [{ op: "replace", path: `/commands/${index}`, value: index }],
+      type: "STATE_DELTA",
+    }));
+
+    buffer.enqueue("session-1", events, 128, 0);
+    await buffer.flush();
+
+    expect(batchPublishCount()).toBe(1);
+    expect(published).toHaveLength(1);
+    expect(published[0]).toMatchObject({
+      events,
+      previousRuntimeEventSeqCursor: 0,
+      runtimeEventSeqCursor: 128,
+    });
+  });
+
+  test("falls back to an authoritative state sync for an oversized durable generation", async () => {
+    const { batchPublishCount, buffer, published, stateSyncCount } = createBufferHarness();
+    const oversized = createServerCustomEvent(MOSOO_CUSTOM_EVENT.sessionTasksReplaced.name, {
+      driverInstanceId: "driver-1",
+      runId: "run-1",
+      tasks: [{ taskId: "oversized", title: "x".repeat(maxSerializedBatchBytes + 1) }],
+    });
+
+    buffer.enqueue("session-1", [oversized], 1, 0);
+    await buffer.flush();
+
+    expect(batchPublishCount()).toBe(0);
+    expect(published).toEqual([]);
+    expect(stateSyncCount()).toBe(1);
+  });
+
   test("flushes the first delta of a run immediately, then batches the rest", async () => {
     const { buffer, published, waitForWaitUntil } = createBufferHarness();
     const runStarted = {
@@ -228,7 +363,6 @@ describe("SessionViewerEventDeliveryBuffer", () => {
     buffer.enqueue("session-1", [
       { delta: "there", messageId: "assistant-1", type: "TEXT_MESSAGE_CONTENT" },
     ]);
-    await waitForWaitUntil();
     expect(published).toHaveLength(1);
 
     await buffer.flush();
@@ -320,8 +454,8 @@ describe("SessionViewerEventDeliveryBuffer", () => {
     expect(deliveredSnapshots).toEqual([inFlightSnapshot, pendingSnapshots.at(-1)]);
   });
 
-  test("splits cross-generation task snapshots into byte-bounded batches", async () => {
-    const { buffer, published } = createBufferHarness();
+  test("bounds a cross-generation backlog behind one authoritative state sync", async () => {
+    const { buffer, published, stateSyncCount } = createBufferHarness();
     const snapshots = Array.from({ length: 3 }, (_, index) =>
       createLargeTaskSnapshot({
         driverInstanceId: `driver-${index}`,
@@ -337,15 +471,17 @@ describe("SessionViewerEventDeliveryBuffer", () => {
     buffer.enqueue("session-1", [snapshots[2]]);
     await buffer.flush();
 
-    expect(published).toHaveLength(3);
-    expect(published.map((request) => request.events.length)).toEqual([1, 1, 1]);
+    expect(published).toHaveLength(1);
+    expect(published.map((request) => request.events.length)).toEqual([1]);
     expect(
       published.every((request) => serializedEventBytes(request.events) <= maxSerializedBatchBytes),
     ).toBe(true);
+    expect(stateSyncCount()).toBe(1);
   });
 
   test("retries failed bounded batches before events enqueued during the failed publish", async () => {
-    const { buffer, published, pushResponse, waitForPublish } = createBufferHarness();
+    const { buffer, published, pushResponse, stateSyncCount, waitForPublish } =
+      createBufferHarness();
     const failedResponse = createDeferred<Response>();
     const failedSnapshot = createLargeTaskSnapshot({
       driverInstanceId: "driver-1",
@@ -378,14 +514,14 @@ describe("SessionViewerEventDeliveryBuffer", () => {
     expect(published.map((request) => request.events)).toEqual([
       [failedSnapshot],
       [failedSnapshot],
-      [nextSnapshot],
     ]);
+    expect(stateSyncCount()).toBe(1);
     expect(
       published.every((request) => serializedEventBytes(request.events) <= maxSerializedBatchBytes),
     ).toBe(true);
   });
 
-  test("keeps only the latest same-generation snapshot across repeated delivery failures", async () => {
+  test("drops derived payloads after delivery failure instead of hot-looping", async () => {
     const { buffer, published, pushResponse } = createBufferHarness();
     const snapshots = Array.from({ length: 5 }, (_, index) =>
       createLargeTaskSnapshot({
@@ -407,7 +543,6 @@ describe("SessionViewerEventDeliveryBuffer", () => {
       [snapshots[1]],
       [snapshots[2]],
       [snapshots[3]],
-      [snapshots[4]],
       [snapshots[4]],
     ]);
     expect(

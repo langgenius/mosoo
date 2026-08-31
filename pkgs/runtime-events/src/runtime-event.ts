@@ -13,7 +13,7 @@ import type {
 
 import { admitRuntimeEventPayload } from "./runtime-event-payload";
 
-export const RUNTIME_EVENT_SCHEMA_VERSION = "2026-05-26" as const;
+export const RUNTIME_EVENT_SCHEMA_VERSION = "2026-08-29" as const;
 
 export const RUNTIME_EVENT_KINDS = [
   "account.limits.updated",
@@ -37,7 +37,6 @@ export const RUNTIME_EVENT_KINDS = [
   "file.indexed",
   "hook.completed",
   "hook.started",
-  "image.updated",
   "item.completed",
   "item.started",
   "item.updated",
@@ -45,8 +44,10 @@ export const RUNTIME_EVENT_KINDS = [
   "mcp.server.updated",
   "mcp.tool.updated",
   "message.added",
+  "message.cancelled",
   "message.completed",
   "message.delta",
+  "message.failed",
   "message.started",
   "model.routing.updated",
   "model.verification.updated",
@@ -108,6 +109,7 @@ export const RUNTIME_EVENT_KINDS = [
   "terminal.output.delta",
   "terminal.released",
   "thought.completed",
+  "thought.cancelled",
   "thought.delta",
   "thought.started",
   "tool.call.updated",
@@ -120,6 +122,18 @@ export const RUNTIME_EVENT_KINDS = [
 ] as const;
 
 export type RuntimeEventKind = (typeof RUNTIME_EVENT_KINDS)[number];
+
+type TerminalSessionRunEventKind = Extract<
+  RuntimeEventKind,
+  "run.cancelled" | "run.completed" | "run.failed"
+>;
+
+export function createSessionRunTerminalSourceId(
+  runId: SessionRunId,
+  kind: TerminalSessionRunEventKind,
+): string {
+  return `session-run-terminal:${runId}:${kind}`;
+}
 export type RuntimeEventActor = "agent" | "api" | "driver" | "system" | "tool" | "user";
 export type RuntimeEventOrigin = "api" | "driver" | "file" | "runtime" | "system" | "viewer";
 export type RuntimeEventVisibility = "owner_debug" | "participant" | "public" | "system_internal";
@@ -200,6 +214,70 @@ export interface RuntimeEventDraft<TPayload = unknown> {
   readonly visibility?: RuntimeEventVisibility | undefined;
 }
 
+function sortRuntimeEventSemanticValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(sortRuntimeEventSemanticValue);
+  }
+
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([, entry]) => entry !== undefined)
+        .toSorted(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+        .map(([key, entry]) => [key, sortRuntimeEventSemanticValue(entry)]),
+    );
+  }
+
+  return value;
+}
+
+/** Stable JSON for durable runtime semantics, independent of object insertion order. */
+export function stringifyRuntimeEventSemanticValue(value: unknown): string {
+  const serialized = JSON.stringify(sortRuntimeEventSemanticValue(value));
+
+  if (serialized === undefined) {
+    throw new TypeError("Runtime semantic value is not JSON serializable.");
+  }
+
+  return serialized;
+}
+
+/** Stable v3 replay identity; transport-generated ids, timestamps, and seq are intentionally absent. */
+export async function createRuntimeEventSemanticHash(event: RuntimeEventEnvelope): Promise<string> {
+  const semanticEvent = {
+    actor: event.actor,
+    context: event.context ?? null,
+    correlationId: event.correlationId ?? null,
+    delivery: event.delivery,
+    driverInstanceId: event.driverInstanceId ?? null,
+    kind: event.kind,
+    native: event.native ?? null,
+    origin: event.origin,
+    payload: event.payload,
+    runId: event.runId ?? null,
+    runtimeId: event.runtimeId ?? null,
+    schemaVersion: event.schemaVersion,
+    sessionId: event.sessionId,
+    sourceEventId: event.sourceEventId ?? null,
+    traceId: event.traceId ?? null,
+    visibility: event.visibility,
+  };
+  const platform = globalThis as unknown as {
+    crypto: {
+      subtle: {
+        digest(algorithm: "SHA-256", data: Uint8Array): Promise<ArrayBuffer>;
+      };
+    };
+    TextEncoder: new () => { encode(value: string): Uint8Array };
+  };
+  const bytes = new platform.TextEncoder().encode(
+    stringifyRuntimeEventSemanticValue(semanticEvent),
+  );
+  const digest = new Uint8Array(await platform.crypto.subtle.digest("SHA-256", bytes));
+
+  return digest.toHex();
+}
+
 const runtimeEventKindSet = new Set<string>(RUNTIME_EVENT_KINDS);
 const runtimeEventActors = new Set<string>(["agent", "api", "driver", "system", "tool", "user"]);
 const runtimeEventOrigins = new Set<string>([
@@ -239,6 +317,20 @@ const usageRuntimeEventKinds = new Set<RuntimeEventKind>(["usage.updated"]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function assertExactKeys(
+  value: Record<string, unknown>,
+  allowedKeys: readonly string[],
+  label: string,
+): void {
+  const allowed = new Set(allowedKeys);
+
+  for (const key of Object.keys(value)) {
+    if (!allowed.has(key)) {
+      throw new Error(`${label} field ${key} is unsupported.`);
+    }
+  }
 }
 
 function readString(value: Record<string, unknown>, field: string): string | undefined {
@@ -388,6 +480,33 @@ export function parseRuntimeEventEnvelope(value: unknown): RuntimeEventEnvelope 
     throw new Error("Runtime event must be an object.");
   }
 
+  assertExactKeys(
+    value,
+    [
+      "actor",
+      "context",
+      "correlationId",
+      "delivery",
+      "driverInstanceId",
+      "id",
+      "kind",
+      "native",
+      "occurredAt",
+      "origin",
+      "payload",
+      "receivedAt",
+      "runId",
+      "runtimeId",
+      "schemaVersion",
+      "seq",
+      "sessionId",
+      "sourceEventId",
+      "traceId",
+      "visibility",
+    ],
+    "Runtime event",
+  );
+
   if (value["schemaVersion"] !== RUNTIME_EVENT_SCHEMA_VERSION) {
     throw new Error("Runtime event schema version is unsupported.");
   }
@@ -503,9 +622,18 @@ function parseRuntimeEventContext(value: unknown): RuntimeEventContext {
     throw new Error("Runtime event context must be an object when provided.");
   }
 
-  if ("organizationId" in value) {
-    throw new Error("Runtime event context organizationId is not supported.");
-  }
+  assertExactKeys(
+    value,
+    [
+      "agentId",
+      "callerId",
+      "deploymentVersionId",
+      "environmentRevisionId",
+      "executionActorId",
+      "surface",
+    ],
+    "Runtime event context",
+  );
 
   const surface =
     value["surface"] === undefined ? null : parseRuntimeEventSurfaceContext(value["surface"]);
@@ -538,6 +666,8 @@ function parseRuntimeEventSurfaceContext(
     throw new Error("Runtime event context surface must be an object when provided.");
   }
 
+  assertExactKeys(value, ["id", "triggerId", "type"], "Runtime event context surface");
+
   const type = value["type"];
 
   if (!isRuntimeEventSurfaceType(type)) {
@@ -557,6 +687,21 @@ function parseRuntimeEventNativeRef(value: unknown): RuntimeEventNativeRef {
   if (!isRecord(value)) {
     throw new Error("Runtime event native reference must be an object when provided.");
   }
+
+  assertExactKeys(
+    value,
+    [
+      "eventName",
+      "itemId",
+      "protocolVersion",
+      "provider",
+      "requestId",
+      "sequence",
+      "threadId",
+      "turnId",
+    ],
+    "Runtime event native reference",
+  );
 
   const provider = readString(value, "provider");
 

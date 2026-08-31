@@ -1,7 +1,7 @@
 import type { SessionType } from "@mosoo/contracts/session";
 import { ignorePromiseRejection } from "@mosoo/effects";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
 
 import { useSessionStream } from "@/domains/runtime/use-session-stream";
@@ -152,53 +152,50 @@ export function useAgentSessionPanelModel(
   );
   const layout = useSessionChatLayoutState(stream.messages, permissionScrollSignal);
 
-  // Fresh messages for the sweep interval without keying the effect on
-  // stream.messages — that identity changes every animation frame during
-  // streaming and would tear the interval down per frame.
-  const streamMessagesRef = useRef(stream.messages);
-  streamMessagesRef.current = stream.messages;
-
   // Reconcile the optimistic overlay against server truth at render time, so
   // the frame that first contains the echoed message never also paints the
   // pending bubble (a post-commit effect alone leaves a duplicate frame). The
   // session filter runs here too so a pending entry bound to another session
-  // can never ghost into the newly selected session's thread mid-switch.
-  const reconciledPendingSends = useMemo(
-    () =>
+  // can never ghost into the newly selected session's thread mid-switch. TTL
+  // expiry belongs to the external timer below; the send timestamp keeps this
+  // render-time pass pure while still reconciling echoes immediately.
+  const reconciledPendingSends = useMemo(() => {
+    const sessionPendingSends = prunePendingSendsForSession(pendingSends, activeSessionId);
+
+    return prunePendingSends(
+      sessionPendingSends,
+      stream.messages,
+      sessionPendingSends.at(-1)?.createdAtMs ?? 0,
+    );
+  }, [activeSessionId, pendingSends, stream.messages]);
+
+  const sweepPendingSends = useEffectEvent(() => {
+    setPendingSends((current) =>
       prunePendingSends(
-        prunePendingSendsForSession(pendingSends, activeSessionId),
+        prunePendingSendsForSession(current, activeSessionId),
         stream.messages,
         Date.now(),
       ),
-    [activeSessionId, pendingSends, stream.messages],
-  );
-
-  useEffect(() => {
-    setPendingSends((current) => prunePendingSendsForSession(current, activeSessionId));
-  }, [activeSessionId]);
+    );
+  });
 
   // State GC + TTL sweep: gates and visuals read the render-time reconciled
-  // value, so state only needs to catch up eventually — eagerly when the
-  // overlay changes, then every sweep tick so a stuck entry expires even when
-  // no further events arrive and the composer can never stay blocked forever.
+  // value, so state only needs to catch up on each sweep tick. This expires a
+  // stuck entry even when no further events arrive, so the composer cannot
+  // stay blocked forever.
   useEffect(() => {
     if (pendingSends.length === 0) {
       return;
     }
 
-    const sweep = (): void => {
-      setPendingSends((current) =>
-        prunePendingSends(current, streamMessagesRef.current, Date.now()),
-      );
-    };
-
-    sweep();
-    const interval = globalThis.setInterval(sweep, PENDING_SEND_SWEEP_INTERVAL_MS);
+    const interval = globalThis.setInterval(() => {
+      sweepPendingSends();
+    }, PENDING_SEND_SWEEP_INTERVAL_MS);
 
     return () => {
       globalThis.clearInterval(interval);
     };
-  }, [pendingSends]);
+  }, [pendingSends.length]);
 
   async function refreshSessions(): Promise<void> {
     if (input.projectId === null) {
@@ -497,10 +494,6 @@ export function useAgentSessionPanelModel(
         text: payload.text,
       });
       setInputValue("");
-
-      if (layout.inputRef.current) {
-        layout.inputRef.current.style.height = "auto";
-      }
 
       if (shouldAutoTitle) {
         const title = createSessionAutoTitle(typedText);

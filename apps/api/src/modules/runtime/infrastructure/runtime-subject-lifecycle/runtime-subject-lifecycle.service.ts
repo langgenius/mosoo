@@ -21,6 +21,7 @@ import {
   SERVER_PRODUCT_ANALYTICS_EVENTS,
 } from "../../../../platform/analytics/product-analytics";
 import { createErrorLogContext, logWarn } from "../../../../platform/cloudflare/logger";
+import { disposeRpcResource } from "../../../../platform/cloudflare/rpc-disposal";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { currentTimestampMs } from "../../../../time";
 import {
@@ -32,17 +33,17 @@ import type { RuntimeDiagnosticContext } from "../../application/runtime-diagnos
 import type { RuntimeTimingRecorder } from "../../application/session-runs/session-runtime-timing";
 import {
   getRuntimeKindPolicy,
-  getRuntimeSubjectInactiveDeadline,
   runtimeCheckpointRulesInclude,
 } from "../../domain/runtime-kind-policy";
 import type { SandboxNetworkConstraints } from "../../domain/sandbox-network-constraints";
+import { hashSandboxNetworkConstraints } from "../../domain/sandbox-network-constraints";
 import type { SandboxHandle } from "../sandbox-handles";
-import { deleteActiveSandboxConversationSession } from "../sandbox-session/sandbox-conversation-session-delete";
 import {
   recordRuntimeRunLeaseAcquiredOutcome,
   recordRuntimeRunLeaseReleased,
 } from "./runtime-run-lease-store";
 import type { RuntimeRunLeaseTransitionOutcome } from "./runtime-run-lease-store";
+import { stopRuntimeSubjectDrivers } from "./runtime-subject-driver-stop";
 import {
   getRuntimeSubjectErrorCode,
   RuntimeSubjectBackupNotReadyError,
@@ -51,27 +52,34 @@ import {
 import { assertRuntimeSubjectNetworkPolicySupported } from "./runtime-subject-network";
 import {
   configureRuntimeSubjectNetwork,
+  activateRuntimeSubjectIncarnation,
   destroyRuntimeSubjectContainer,
   getRuntimeSubjectKeepAliveHandle,
+  inspectRuntimeSubjectIncarnation,
+  markRuntimeSubjectIncarnationReady,
   prepareRuntimeSubjectFilesystem,
   restoreRuntimeSubjectBackup,
 } from "./runtime-subject-platform";
 import {
   claimRuntimeSubjectActivation,
+  claimRuntimeSubjectOperationForRepair,
   ensureRuntimeSubjectId,
-  getRuntimeConversationSessionState,
   getRuntimeSubjectActivationRecord,
   markRuntimeSubjectActivationDestroying,
   markRuntimeSubjectActivationFailed,
+  markRuntimeSubjectActiveDestroying,
   markRuntimeSubjectActive,
+  markRuntimeSubjectOperationRepairNeeded,
   markRuntimeSubjectRestoreApplied,
   markRuntimeSubjectRestoring,
   preemptRuntimeSubjectActivationClaim,
   recordRuntimeConversationSessionActive,
-  recordRuntimeConversationSessionClosed,
   recordRuntimeConversationSessionError,
+  releaseRuntimeSubjectActivationClaim,
+  retireRuntimeConversationSessionsForIncarnation,
 } from "./runtime-subject-store";
 import type { RuntimeSubjectActivationRecord } from "./runtime-subject-store";
+import type { RuntimeSubjectOperationLease } from "./runtime-subject-store";
 import type { ReadyRuntimeSubjectBackupRecord } from "./runtime-subject-store";
 
 const RUNTIME_SUBJECT_ACTIVATION_CLAIM_TTL_MS = 10 * 60_000;
@@ -90,6 +98,11 @@ export interface ActivateRuntimeSubjectInput {
   readonly diagnosticContext?: RuntimeDiagnosticContext;
   readonly networkConstraints: SandboxNetworkConstraints;
   readonly purpose?: RuntimeSubjectActivationPurpose;
+  readonly provisioningAuthority?: {
+    readonly operationId: RuntimeOperationId;
+    readonly runId: SessionRunId;
+    readonly sessionId: SessionId;
+  };
   readonly runtimeSubjectId: SandboxId;
   readonly projectId: ProjectId;
   readonly subjectId: PlatformId;
@@ -98,6 +111,7 @@ export interface ActivateRuntimeSubjectInput {
 }
 
 export interface ActiveRuntimeSubject {
+  readonly incarnation: number;
   readonly subject: SandboxHandle;
 }
 
@@ -193,8 +207,8 @@ export class RuntimeSubjectLifecycleService {
     this.#bindings = bindings;
   }
 
-  async getHandle(runtimeSubjectId: SandboxId): Promise<SandboxHandle> {
-    return getRuntimeSubjectKeepAliveHandle(this.#bindings, runtimeSubjectId);
+  async getHandle(runtimeSubjectId: SandboxId, incarnation: number): Promise<SandboxHandle> {
+    return getRuntimeSubjectKeepAliveHandle(this.#bindings, runtimeSubjectId, incarnation);
   }
 
   async activate(input: ActivateRuntimeSubjectInput): Promise<ActiveRuntimeSubject> {
@@ -206,55 +220,122 @@ export class RuntimeSubjectLifecycleService {
 
     const purpose = input.purpose ?? "interactive";
     const claimOwner = createRuntimeSubjectActivationClaimOwner(purpose);
+    const networkConstraintsHash = await hashSandboxNetworkConstraints(input.networkConstraints);
     const record = await measureOptional(input.timing, "runtimeSubject.admitLifecycle", () =>
       this.#admitActivation(input, claimOwner, purpose),
     );
-    const subject = await this.getHandle(input.runtimeSubjectId);
     const isCold = record === null || record.status === "cold";
+    let activationLease: RuntimeSubjectOperationLease | null = null;
+    let subject: SandboxHandle | null = null;
+    let subjectTransferred = false;
+    let reusedHealthyIncarnation = false;
 
     try {
-      // Network constraints must land before the first container-starting RPC
-      // below; a limited policy that cannot be applied fails the activation
-      // (and the catch path destroys the container) instead of running open.
-      // Stable Pet subjects support Full only and keep their existing runtime
-      // path unchanged. Cattle records Full as well as Limited so the
-      // session-scoped subject can never switch policy after admission.
-      if (input.kind === "cattle") {
-        await measureOptional(input.timing, "runtimeSubject.configureNetwork", () =>
-          configureRuntimeSubjectNetwork(subject, input.networkConstraints),
-        );
-      }
-      await measureOptional(input.timing, "runtimeSubject.prepareFilesystem", () =>
-        prepareRuntimeSubjectFilesystem(subject),
-      );
-
       if (isCold) {
-        const restoring = await measureOptional(input.timing, "runtimeSubject.markRestoring", () =>
+        activationLease = await measureOptional(input.timing, "runtimeSubject.markRestoring", () =>
           markRuntimeSubjectRestoring(this.#bindings.DB, {
             claimOwner,
+            expectedIncarnation: record?.incarnation ?? 0,
+            expectedStatus: "cold",
+            networkConstraintsHash,
+            operationId: createPlatformId<RuntimeOperationId>(),
             runtimeSubjectId: input.runtimeSubjectId,
           }),
         );
 
-        if (!restoring) {
+        if (activationLease === null) {
           throw new Error("Runtime subject activation claim expired before restore.");
         }
-
-        await measureOptional(input.timing, "runtimeSubject.restoreBackup", () =>
-          this.#restoreLastBackup({
+      } else if (record !== null) {
+        if (record.networkConstraintsHash !== networkConstraintsHash) {
+          const retired = await this.#retireActiveIncarnation({
             claimOwner,
-            kind: input.kind,
+            errorCode: "runtime.subject_activation_failed",
+            message: "Runtime subject network constraints changed.",
             record,
             runtimeSubjectId: input.runtimeSubjectId,
-            subject,
+            provisioningAuthority: input.provisioningAuthority,
+          });
+          if (!retired) {
+            throw new Error("Runtime subject activation claim expired before network retirement.");
+          }
+          throw new Error("Runtime subject network constraints changed; retry activation.");
+        }
+        subject = await this.getHandle(input.runtimeSubjectId, record.incarnation);
+        const health = await inspectRuntimeSubjectIncarnation(
+          subject,
+          record.incarnation,
+          networkConstraintsHash,
+        );
+
+        if (health.kind === "healthy") {
+          reusedHealthyIncarnation = true;
+        } else if (health.kind === "unknown") {
+          throw new Error("Runtime subject active-container health is unknown.");
+        } else {
+          const retired = await this.#retireActiveIncarnation({
+            claimOwner,
+            errorCode: "runtime.subject_activation_failed",
+            message: `Runtime subject active container is ${health.kind}.`,
+            record,
+            runtimeSubjectId: input.runtimeSubjectId,
+            provisioningAuthority: input.provisioningAuthority,
+          });
+          if (!retired) {
+            throw new Error("Runtime subject activation claim expired before recovery.");
+          }
+          throw new Error("Runtime subject active container was retired; retry activation.");
+        }
+      }
+
+      const incarnation = activationLease?.incarnation ?? record?.incarnation ?? 0;
+      subject ??= await this.getHandle(input.runtimeSubjectId, incarnation);
+      const activeSubject = subject;
+      if (activationLease !== null) {
+        await activateRuntimeSubjectIncarnation(activeSubject, incarnation, networkConstraintsHash);
+      }
+
+      // A healthy active incarnation is already prepared. Re-running global
+      // container mutations during reuse is both redundant and unsafe: one
+      // caller timing out must never poison a Pet container used by another
+      // Run. Fresh incarnations still establish network policy before their
+      // first container-starting filesystem RPC.
+      if (!reusedHealthyIncarnation) {
+        if (input.kind === "cattle") {
+          await measureOptional(input.timing, "runtimeSubject.configureNetwork", () =>
+            configureRuntimeSubjectNetwork(activeSubject, input.networkConstraints),
+          );
+        }
+        await measureOptional(input.timing, "runtimeSubject.prepareFilesystem", () =>
+          prepareRuntimeSubjectFilesystem(activeSubject),
+        );
+      }
+
+      if (activationLease !== null) {
+        const lease = activationLease;
+        await measureOptional(input.timing, "runtimeSubject.restoreBackup", () =>
+          this.#restoreLastBackup({
+            kind: input.kind,
+            lease,
+            record,
+            runtimeSubjectId: input.runtimeSubjectId,
+            subject: activeSubject,
           }),
+        );
+        await markRuntimeSubjectIncarnationReady(
+          activeSubject,
+          incarnation,
+          networkConstraintsHash,
         );
       }
 
       const activated = await measureOptional(input.timing, "runtimeSubject.markActive", () =>
         markRuntimeSubjectActive(this.#bindings.DB, {
           claimOwner,
+          incarnation: activationLease?.incarnation ?? record?.incarnation ?? 0,
           kind: input.kind,
+          networkConstraintsHash,
+          operationId: activationLease?.operationId ?? null,
           runtimeSubjectId: input.runtimeSubjectId,
         }),
       );
@@ -283,25 +364,44 @@ export class RuntimeSubjectLifecycleService {
           },
         });
       }
+
+      if (subject === null) {
+        throw new Error("Runtime subject activation completed without a Sandbox handle.");
+      }
+
+      subjectTransferred = true;
+      return {
+        incarnation: activationLease?.incarnation ?? record?.incarnation ?? 0,
+        subject,
+      };
     } catch (error) {
       const message = error instanceof Error ? error.message : "Runtime subject activation failed.";
       const errorCode = getRuntimeSubjectErrorCode(error);
-      const operationId = createPlatformId<RuntimeOperationId>();
+
       let destroyingRecorded = false;
 
-      try {
-        destroyingRecorded = await markRuntimeSubjectActivationDestroying(this.#bindings.DB, {
+      if (activationLease === null) {
+        await releaseRuntimeSubjectActivationClaim(this.#bindings.DB, {
           claimOwner,
           errorCode,
-          message,
-          operationId,
+          errorMessage: message,
+          incarnation: record?.incarnation ?? 0,
           runtimeSubjectId: input.runtimeSubjectId,
         });
-      } catch (recordError) {
-        logWarn("runtime.subject.activation_failure.destroy_record_failed", {
-          ...createErrorLogContext(recordError),
-          runtimeSubjectId: input.runtimeSubjectId,
-        });
+      } else {
+        try {
+          destroyingRecorded = await markRuntimeSubjectActivationDestroying(this.#bindings.DB, {
+            errorCode,
+            lease: activationLease,
+            message,
+            runtimeSubjectId: input.runtimeSubjectId,
+          });
+        } catch (recordError) {
+          logWarn("runtime.subject.activation_failure.destroy_record_failed", {
+            ...createErrorLogContext(recordError),
+            runtimeSubjectId: input.runtimeSubjectId,
+          });
+        }
       }
 
       // Teardown is bounded by the provision timeout. Only confirmed teardown
@@ -311,7 +411,11 @@ export class RuntimeSubjectLifecycleService {
 
       if (destroyingRecorded) {
         try {
-          await destroyRuntimeSubjectContainer(this.#bindings, input.runtimeSubjectId);
+          await destroyRuntimeSubjectContainer(
+            this.#bindings,
+            input.runtimeSubjectId,
+            activationLease?.incarnation ?? 0,
+          );
           destroyed = true;
         } catch (destroyError) {
           logWarn("runtime.subject.activation_failure.destroy_failed", {
@@ -321,12 +425,12 @@ export class RuntimeSubjectLifecycleService {
         }
       }
 
-      if (destroyingRecorded && destroyed) {
+      if (activationLease !== null && destroyingRecorded && destroyed) {
         try {
           await markRuntimeSubjectActivationFailed(this.#bindings.DB, {
             errorCode,
+            lease: activationLease,
             message,
-            operationId,
             runtimeSubjectId: input.runtimeSubjectId,
           });
         } catch (finalizeError) {
@@ -346,13 +450,16 @@ export class RuntimeSubjectLifecycleService {
       });
 
       throw new Error(message, { cause: error });
+    } finally {
+      if (!subjectTransferred) {
+        disposeRpcResource(subject);
+      }
     }
-
-    return { subject };
   }
 
   async activateConversationSession(input: {
     readonly sandboxSessionId: SandboxSessionId;
+    readonly sandboxIncarnation: number;
     readonly cwd: string;
     readonly now: number;
     readonly originJson: string;
@@ -364,6 +471,7 @@ export class RuntimeSubjectLifecycleService {
 
   async failConversationSession(input: {
     readonly sandboxSessionId: SandboxSessionId;
+    readonly sandboxIncarnation: number;
     readonly cwd: string;
     readonly errorCode: RuntimeSubjectErrorCode;
     readonly message: string;
@@ -379,45 +487,18 @@ export class RuntimeSubjectLifecycleService {
     readonly runtimeSubjectId: SandboxId;
     readonly sessionId: SessionId;
   }): Promise<void> {
-    const state = await getRuntimeConversationSessionState(this.#bindings.DB, input);
-
-    if (!state || state.status !== "active") {
-      return;
-    }
-
-    const now = currentTimestampMs();
-
-    await deleteActiveSandboxConversationSession(this.#bindings, {
-      sandboxSessionId: state.sandboxSessionId,
+    const { closeSandboxConversationSession } = await import("../sandbox-session.service");
+    await closeSandboxConversationSession(this.#bindings, {
       sandboxId: input.runtimeSubjectId,
-    });
-
-    if (state.agentId) {
-      await appendRuntimeDiagnosticEvent(this.#bindings, {
-        eventName: RUNTIME_DIAGNOSTIC_EVENT.sandboxSessionDestroyed.name,
-        sessionId: input.sessionId,
-        value: {
-          ...toRuntimeDiagnosticBaseValue({
-            agentId: state.agentId,
-            sessionId: input.sessionId,
-          }),
-          reason: "runtime_subject_session_closed",
-          sandboxId: input.runtimeSubjectId,
-        },
-      });
-    }
-
-    await recordRuntimeConversationSessionClosed(this.#bindings.DB, {
-      inactiveDeadlineAt: getRuntimeSubjectInactiveDeadline(getRuntimeKindPolicy(state.kind), now),
-      now,
-      runtimeSubjectId: input.runtimeSubjectId,
       sessionId: input.sessionId,
     });
   }
 
   async acquireRunLease(input: {
+    readonly driverGeneration: number;
     readonly driverInstanceId: DriverInstanceId;
     readonly runtimeSubjectId: SandboxId;
+    readonly runtimeSubjectIncarnation: number;
     readonly sessionId: SessionId;
     readonly sessionRunId: SessionRunId;
   }): Promise<RuntimeRunLeaseTransitionOutcome> {
@@ -426,6 +507,7 @@ export class RuntimeSubjectLifecycleService {
 
   async releaseRunLease(input: {
     readonly driverInstanceId: DriverInstanceId;
+    readonly expectedDriverGeneration: number;
     readonly expectedSessionRunId: SessionRunId;
   }): Promise<boolean> {
     return recordRuntimeRunLeaseReleased(this.#bindings.DB, input);
@@ -498,8 +580,19 @@ export class RuntimeSubjectLifecycleService {
   }): Promise<RuntimeSubjectActivationRecord> {
     let record = input.record;
 
-    if (record.kind !== input.activation.kind) {
-      throw new Error("Runtime subject kind does not match the requested runtime kind.");
+    if (
+      record.kind !== input.activation.kind ||
+      record.subjectKind !== input.activation.subjectKind ||
+      record.subjectId !== input.activation.subjectId
+    ) {
+      throw new Error("Runtime subject identity does not match the activation request.");
+    }
+    if (
+      record.agentId !== input.activation.agentId ||
+      record.projectId !== input.activation.projectId ||
+      record.ownerAccountId !== input.activation.executionOwnerUserId
+    ) {
+      throw new Error("Runtime subject ownership does not match the activation request.");
     }
 
     if (record.status === "backing_up" || record.status === "destroying") {
@@ -543,8 +636,12 @@ export class RuntimeSubjectLifecycleService {
         throw new Error("Runtime subject activation could not refresh the lifecycle record.");
       }
       record = refreshed;
-      if (record.kind !== input.activation.kind) {
-        throw new Error("Runtime subject kind does not match the requested runtime kind.");
+      if (
+        record.kind !== input.activation.kind ||
+        record.subjectKind !== input.activation.subjectKind ||
+        record.subjectId !== input.activation.subjectId
+      ) {
+        throw new Error("Runtime subject identity changed during activation.");
       }
       if (record.status === "backing_up" || record.status === "destroying") {
         throw new Error("Runtime subject is busy with lifecycle maintenance.");
@@ -552,6 +649,43 @@ export class RuntimeSubjectLifecycleService {
     }
 
     if (record.status === "restoring") {
+      if (
+        !hasActiveRuntimeSubjectClaim(record, currentTimestampMs()) &&
+        record.operationId !== null &&
+        record.operationKind === "activate"
+      ) {
+        const repairNow = currentTimestampMs();
+        const lease = await claimRuntimeSubjectOperationForRepair(this.#bindings.DB, {
+          candidate: {
+            claimExpiresAt: record.claimExpiresAt,
+            claimOwner: record.claimOwner,
+            id: record.id,
+            incarnation: record.incarnation,
+            kind: record.kind,
+            operationId: record.operationId,
+            operationKind: "activate",
+            status: "restoring",
+          },
+          claimExpiresAt: repairNow + RUNTIME_SUBJECT_ACTIVATION_CLAIM_TTL_MS,
+          claimOwner: `activation-repair-${crypto.randomUUID()}`,
+          now: repairNow,
+        });
+        if (lease !== null) {
+          const { runRuntimeSubjectOperation } =
+            await import("./runtime-subject-operations.service");
+          await runRuntimeSubjectOperation(this.#bindings, {
+            kind: record.kind,
+            lease,
+            reason: "runtime_subject.activation_takeover",
+            runtimeSubjectId: record.id,
+          });
+          const repaired = await getRuntimeSubjectActivationRecord(this.#bindings.DB, record.id);
+          if (repaired === null) {
+            throw new Error("Runtime subject activation repair lost its lifecycle record.");
+          }
+          return this.#claimExistingActivation({ ...input, record: repaired });
+        }
+      }
       throw new Error("Runtime subject is busy with lifecycle maintenance.");
     }
 
@@ -635,9 +769,87 @@ export class RuntimeSubjectLifecycleService {
     });
   }
 
-  async #restoreLastBackup(input: {
+  async #retireActiveIncarnation(input: {
     readonly claimOwner: string;
+    readonly errorCode: RuntimeSubjectErrorCode;
+    readonly message: string;
+    readonly provisioningAuthority: ActivateRuntimeSubjectInput["provisioningAuthority"];
+    readonly record: RuntimeSubjectActivationRecord;
+    readonly runtimeSubjectId: SandboxId;
+  }): Promise<boolean> {
+    if (input.provisioningAuthority === undefined) {
+      return false;
+    }
+    const lease = await markRuntimeSubjectActiveDestroying(this.#bindings.DB, {
+      claimOwner: input.claimOwner,
+      errorCode: input.errorCode,
+      expectedIncarnation: input.record.incarnation,
+      message: input.message,
+      operationId: createPlatformId<RuntimeOperationId>(),
+      provisioningOperationId: input.provisioningAuthority.operationId,
+      provisioningRunId: input.provisioningAuthority.runId,
+      provisioningSessionId: input.provisioningAuthority.sessionId,
+      runtimeSubjectId: input.runtimeSubjectId,
+    });
+    if (lease === null) {
+      return false;
+    }
+
+    try {
+      await stopRuntimeSubjectDrivers(this.#bindings, {
+        operationId: lease.operationId,
+        reason: "runtime_subject.active_incarnation_retired",
+        runtimeSubjectId: input.runtimeSubjectId,
+        sandboxIncarnation: lease.incarnation,
+      });
+      await destroyRuntimeSubjectContainer(
+        this.#bindings,
+        input.runtimeSubjectId,
+        lease.incarnation,
+      );
+      await retireRuntimeConversationSessionsForIncarnation(this.#bindings.DB, {
+        now: currentTimestampMs(),
+        runtimeSubjectId: input.runtimeSubjectId,
+        sandboxIncarnation: lease.incarnation,
+      });
+      if (
+        !(await markRuntimeSubjectActivationFailed(this.#bindings.DB, {
+          errorCode: input.errorCode,
+          lease,
+          message: input.message,
+          runtimeSubjectId: input.runtimeSubjectId,
+        }))
+      ) {
+        throw new Error("Runtime subject active-incarnation retirement lost ownership.");
+      }
+    } catch (error) {
+      try {
+        await markRuntimeSubjectOperationRepairNeeded(this.#bindings.DB, {
+          errorCode: getRuntimeSubjectErrorCode(error),
+          errorMessage: error instanceof Error ? error.message : input.message,
+          expectedStatus: "destroying",
+          lease,
+          runtimeSubjectId: input.runtimeSubjectId,
+          source: "api",
+        });
+      } catch (recordError) {
+        logWarn("runtime.subject.active_retire.repair_record_failed", {
+          ...createErrorLogContext(recordError),
+          runtimeSubjectId: input.runtimeSubjectId,
+        });
+      }
+      logWarn("runtime.subject.active_retire.failed", {
+        ...createErrorLogContext(error),
+        runtimeSubjectId: input.runtimeSubjectId,
+      });
+    }
+
+    return true;
+  }
+
+  async #restoreLastBackup(input: {
     readonly kind: AgentKind;
+    readonly lease: RuntimeSubjectOperationLease;
     readonly record: RuntimeSubjectActivationRecord | null;
     readonly runtimeSubjectId: SandboxId;
     readonly subject: SandboxHandle;
@@ -664,11 +876,14 @@ export class RuntimeSubjectLifecycleService {
         runtimeSubjectId: input.runtimeSubjectId,
       });
     }
-    await markRuntimeSubjectRestoreApplied(this.#bindings.DB, {
+    const recorded = await markRuntimeSubjectRestoreApplied(this.#bindings.DB, {
       backupId: readyBackup.id,
-      claimOwner: input.claimOwner,
+      lease: input.lease,
       runtimeSubjectId: input.runtimeSubjectId,
     });
+    if (!recorded) {
+      throw new Error("Runtime subject restore lost lifecycle ownership.");
+    }
   }
 
   async #appendRestoreFailureDiagnostic(input: {
@@ -712,7 +927,4 @@ export function createRuntimeSubjectLifecycleService(
   return new RuntimeSubjectLifecycleService(bindings);
 }
 
-export {
-  getRuntimeSubjectKeepAliveHandle,
-  prepareRuntimeSubjectFilesystem,
-} from "./runtime-subject-platform";
+export { getRuntimeSubjectKeepAliveHandle } from "./runtime-subject-platform";

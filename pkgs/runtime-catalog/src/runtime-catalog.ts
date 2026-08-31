@@ -7,7 +7,6 @@ import {
 import type {
   ModelId,
   PresetModelEntry,
-  PresetModelProtocol,
   RuntimeModelIdentity,
   RuntimeModelProviderRef,
 } from "@mosoo/contracts/models";
@@ -167,7 +166,7 @@ function presetModel(input: (typeof GENERATED_PRESET_MODEL_CATALOG)[number]): Pr
   return {
     displayName: input.displayName,
     modelId: admitModelId(input.modelId),
-    protocol: input.protocol as PresetModelProtocol,
+    protocol: input.protocol,
     vendorId: admitProviderId(input.vendorId),
     vendorLabel: input.vendorLabel,
   };

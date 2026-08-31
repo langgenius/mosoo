@@ -1,7 +1,8 @@
 import type { DriverCompletionInput, DriverFailureInput } from "@mosoo/agent-driver/orpc";
+import { parsePlatformId } from "@mosoo/id";
+import type { SessionRunId } from "@mosoo/id";
 
 import { logError, logInfo } from "../../../../platform/cloudflare/logger";
-import { syncSessionViewerState } from "../../../sessions/application/session-viewer-events.service";
 import { runtimeSessionLinkNeedsRefresh } from "./event-types";
 import {
   getRuntimeSessionLink,
@@ -36,14 +37,23 @@ export class DriverInstanceRpcRunTerminalController {
       throw new Error("Driver instance id mismatch.");
     }
     const driverInstanceId = state.requireDriverInstanceId();
+    const sessionRunId = readTerminalRunId(input);
     context.assertActiveConnection();
 
-    await viewerEventDelivery.flushSafely();
-    context.assertActiveConnection();
     await recordDriverInstanceCompletion(env, {
+      driverConnectionId: context.connectionId,
+      driverGeneration: context.epoch.generation,
       driverInstanceId,
-      driverReady: state.hello !== null,
+      sessionRunId,
     });
+
+    await state.setTerminalSessionRunId(sessionRunId, context.epoch);
+
+    const link = await this.#getRuntimeSessionLink(context, {
+      refresh: runtimeSessionLinkNeedsRefresh(state.runtimeSessionLink),
+      sessionRunId,
+    });
+    viewerEventDelivery.requestStateSync(link.sessionId);
     context.assertActiveConnection();
 
     withRuntimeLogContext(() => {
@@ -54,23 +64,21 @@ export class DriverInstanceRpcRunTerminalController {
       });
     });
 
-    const socket = sockets.getDriverSocket();
+    const socket = sockets.getDriverSocket(context.epoch);
 
     if (socket && socket.readyState === WebSocket.OPEN) {
-      sockets.scheduleDriverSocketClose(1000, "runtime.completed");
+      sockets.scheduleDriverSocketClose(context.epoch, 1000, "runtime.completed");
     } else {
-      await state.persistClose({
-        at: new Date().toISOString(),
-        code: 1000,
-        reason: "runtime.completed",
-      });
-      await finalizeTerminalState();
+      await state.persistClose(
+        {
+          at: new Date().toISOString(),
+          code: 1000,
+          reason: "runtime.completed",
+        },
+        context.epoch,
+      );
+      await finalizeTerminalState(context.epoch);
     }
-
-    const link = await this.#getRuntimeSessionLink({
-      refresh: runtimeSessionLinkNeedsRefresh(state.runtimeSessionLink),
-    });
-    await syncSessionViewerState(env, link.sessionId);
 
     return { ok: true };
   }
@@ -92,18 +100,25 @@ export class DriverInstanceRpcRunTerminalController {
       throw new Error("Driver instance id mismatch.");
     }
     const driverInstanceId = state.requireDriverInstanceId();
+    const sessionRunId = readTerminalRunId(input);
     context.assertActiveConnection();
 
-    await viewerEventDelivery.flushSafely();
-    context.assertActiveConnection();
-    const link = await this.#getRuntimeSessionLink({
+    const link = await this.#getRuntimeSessionLink(context, {
       refresh: runtimeSessionLinkNeedsRefresh(state.runtimeSessionLink),
+      sessionRunId,
     });
     await recordDriverInstanceFailure(env, {
+      driverConnectionId: context.connectionId,
+      driverGeneration: context.epoch.generation,
       driverInstanceId,
       error: input.error,
       link,
+      sessionRunId,
     });
+
+    await state.setTerminalSessionRunId(sessionRunId, context.epoch);
+
+    viewerEventDelivery.requestStateSync(link.sessionId);
     context.assertActiveConnection();
 
     withRuntimeLogContext(() => {
@@ -117,30 +132,47 @@ export class DriverInstanceRpcRunTerminalController {
       });
     });
 
-    await state.setErrorMessage(input.error.message);
+    await state.setConnectionErrorMessage(context.epoch, input.error.message);
+    context.assertActiveConnection();
 
-    const socket = sockets.getDriverSocket();
+    const socket = sockets.getDriverSocket(context.epoch);
 
     if (socket && socket.readyState === WebSocket.OPEN) {
-      sockets.scheduleDriverSocketClose(1011, "runtime.failed");
+      sockets.scheduleDriverSocketClose(context.epoch, 1011, "runtime.failed");
     } else {
-      await finalizeTerminalState();
+      await finalizeTerminalState(context.epoch);
     }
-
-    await syncSessionViewerState(env, link.sessionId);
 
     return { ok: true };
   }
 
-  async #getRuntimeSessionLink(options: { refresh?: boolean } = {}): Promise<RuntimeSessionLink> {
+  async #getRuntimeSessionLink(
+    context: DriverInstanceRpcOperationContext,
+    options: { refresh?: boolean; sessionRunId: SessionRunId },
+  ): Promise<RuntimeSessionLink> {
     const { env, state } = this.#dependencies;
 
-    if (options.refresh !== true && state.runtimeSessionLink !== null) {
+    if (
+      options.refresh !== true &&
+      state.runtimeSessionLink?.sessionRunId === options.sessionRunId
+    ) {
       return state.runtimeSessionLink;
     }
 
-    const link = await getRuntimeSessionLink(env.DB, state.requireDriverInstanceId());
+    const link = await getRuntimeSessionLink(env.DB, state.requireDriverInstanceId(), {
+      sessionRunId: options.sessionRunId,
+    });
+    context.assertActiveConnection();
+
+    if (link.sessionRunId !== options.sessionRunId) {
+      throw new Error("Terminal Driver Session Run identity does not match the request.");
+    }
+
     state.setRuntimeSessionLink(link);
     return link;
   }
+}
+
+function readTerminalRunId(input: DriverCompletionInput | DriverFailureInput): SessionRunId {
+  return parsePlatformId<SessionRunId>(input.runId, "terminal Driver Session Run id");
 }

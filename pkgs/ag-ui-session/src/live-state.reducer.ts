@@ -7,6 +7,7 @@ import type { SessionLiveState, SessionViewMessage } from "./live-state";
 import { updateCustomState } from "./live-state-custom.reducer";
 import { applyJsonPatch } from "./live-state-json-patch.reducer";
 import {
+  agUiEventTimestampToIso,
   appendReasoningDelta,
   appendTextDelta,
   appendToolArgs,
@@ -15,8 +16,8 @@ import {
   completePendingToolUses,
   completeToolUse,
   createSessionLiveStateMessage,
+  replaceMessageText,
   startReasoning,
-  upsertMessage,
 } from "./live-state-message.reducer";
 import {
   currentIsoTimestamp,
@@ -132,17 +133,22 @@ function applyEvent(state: SessionLiveState, event: AgUiEvent): SessionLiveState
         return currentState;
       }
 
-      return upsertMessage(
-        currentState,
-        createSessionLiveStateMessage({
-          content: "",
-          id: event.messageId,
-          role: event.role,
-        }),
-      );
+      return replaceMessageText(currentState, {
+        content: "",
+        ...(event.timestamp === undefined
+          ? {}
+          : { createdAt: agUiEventTimestampToIso(event.timestamp) }),
+        id: event.messageId,
+        role: event.role,
+      });
     }
     case EventType.TEXT_MESSAGE_CONTENT: {
-      return appendTextDelta(currentState, event.messageId, event.delta);
+      return appendTextDelta(
+        currentState,
+        event.messageId,
+        event.delta,
+        agUiEventTimestampToIso(event.timestamp),
+      );
     }
     case EventType.TEXT_MESSAGE_CHUNK: {
       if (!event.messageId) {
@@ -151,23 +157,33 @@ function applyEvent(state: SessionLiveState, event: AgUiEvent): SessionLiveState
 
       const withMessage =
         event.role && isVisibleMessageRole(event.role)
-          ? upsertMessage(
-              currentState,
-              createSessionLiveStateMessage({
-                content: "",
-                id: event.messageId,
-                role: event.role,
-              }),
-            )
+          ? replaceMessageText(currentState, {
+              content: "",
+              ...(event.timestamp === undefined
+                ? {}
+                : { createdAt: agUiEventTimestampToIso(event.timestamp) }),
+              id: event.messageId,
+              role: event.role,
+            })
           : currentState;
 
-      return event.delta ? appendTextDelta(withMessage, event.messageId, event.delta) : withMessage;
+      return event.delta
+        ? appendTextDelta(
+            withMessage,
+            event.messageId,
+            event.delta,
+            agUiEventTimestampToIso(event.timestamp),
+          )
+        : withMessage;
     }
     case EventType.TEXT_MESSAGE_END: {
       return currentState;
     }
     case EventType.TOOL_CALL_START: {
       return appendToolUse(currentState, {
+        ...(event.timestamp === undefined
+          ? {}
+          : { createdAt: agUiEventTimestampToIso(event.timestamp) }),
         parentMessageId: event.parentMessageId ?? null,
         toolCallId: event.toolCallId,
         toolCallName: event.toolCallName,
@@ -186,6 +202,9 @@ function applyEvent(state: SessionLiveState, event: AgUiEvent): SessionLiveState
 
       const withTool = event.toolCallName
         ? appendToolUse(currentState, {
+            ...(event.timestamp === undefined
+              ? {}
+              : { createdAt: agUiEventTimestampToIso(event.timestamp) }),
             parentMessageId: event.parentMessageId ?? null,
             toolCallId: event.toolCallId,
             toolCallName: event.toolCallName,
@@ -205,6 +224,9 @@ function applyEvent(state: SessionLiveState, event: AgUiEvent): SessionLiveState
     case EventType.TOOL_CALL_RESULT: {
       return appendToolResult(currentState, {
         content: event.content,
+        ...(event.timestamp === undefined
+          ? {}
+          : { createdAt: agUiEventTimestampToIso(event.timestamp) }),
         messageId: event.messageId,
         toolCallId: event.toolCallId,
       });

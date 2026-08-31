@@ -78,7 +78,7 @@ export async function hashPublicApiIdempotencyBody(value: unknown): Promise<stri
 
   const encoded = new TextEncoder().encode(JSON.stringify(value));
   const digest = await crypto.subtle.digest("SHA-256", encoded);
-  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  return new Uint8Array(digest).toHex();
 }
 
 function enforceSameIdempotentRequest(

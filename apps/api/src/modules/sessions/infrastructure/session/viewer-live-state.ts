@@ -2,6 +2,7 @@ import type { SessionId } from "@mosoo/id";
 
 import type { AuthenticatedViewer } from "../../../auth/application/viewer-auth.service";
 import { reconcileStaleActiveSessionRun } from "../../../runtime/application/session-runs/stale-run-reconciliation.service";
+import { loadSessionAgentTaskState } from "../session-agent-task-snapshot.repository";
 import type { SessionLiveState } from "../session-live-state.types";
 import { loadSessionViewerState } from "../session-viewer-live-snapshot.repository";
 
@@ -21,7 +22,20 @@ export async function loadViewerLiveState(
     (await reconcileStaleActiveSessionRun(input.database, input.sessionId));
 
   if (input.cachedState && !reconciledStaleRun) {
-    return normalizeViewerLiveState(input.cachedState, input);
+    const taskState = await loadSessionAgentTaskState(input.database, input.sessionId);
+    const cacheGenerationIsCurrent =
+      taskState !== null &&
+      input.cachedState.lifecycle === "RUNNING" &&
+      taskState.runId === input.cachedState.run.id &&
+      taskState.runStatus === input.cachedState.run.status &&
+      taskState.driverInstanceId === input.cachedState.infra.driverInstanceId;
+
+    if (cacheGenerationIsCurrent) {
+      return normalizeViewerLiveState(
+        { ...input.cachedState, taskSnapshot: taskState.snapshot },
+        input,
+      );
+    }
   }
 
   return loadSessionViewerState(input.database, {

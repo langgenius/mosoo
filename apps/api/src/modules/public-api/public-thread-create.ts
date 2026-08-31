@@ -154,7 +154,6 @@ export async function createPublicThread(
     if (createdSessionId !== null) {
       await cleanupFailedThreadCreation({
         bindings: request.bindings,
-        fileIds: request.input.fileIds,
         sessionId: createdSessionId,
       }).catch((cleanupError: unknown) => {
         logError("public-api.thread.cleanup_failed", {

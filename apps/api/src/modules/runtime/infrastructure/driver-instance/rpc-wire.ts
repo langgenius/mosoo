@@ -1,13 +1,12 @@
-import { parseDriverEventEnvelope } from "@mosoo/agent-driver/events";
 import type {
   DriverCommandUpdateInput,
   DriverCompletionInput,
-  DriverEventBatchInput,
   DriverEventBatchOutput,
   DriverExternalToolEffectClaimInput,
   DriverExternalToolEffectClaimOutput,
-  DriverExternalToolEffectCompleteInput,
-  DriverExternalToolEffectUnknownInput,
+  DriverExternalToolEffectObserveInput,
+  DriverExternalToolEffectSettleInput,
+  DriverExternalToolEffectState,
   DriverFailureInput,
   DriverHeartbeatInput,
   DriverHeartbeatOutput,
@@ -20,156 +19,235 @@ import type {
   DriverReadyInput,
 } from "@mosoo/agent-driver/orpc";
 import { DriverCapability } from "@mosoo/contracts/driver-instance";
-import { ExternalToolEffectClaim } from "@mosoo/contracts/external-tool-effect";
 import {
-  RuntimeCommand,
+  ExternalToolEffectClaim,
+  ExternalToolEffectClaimToken,
+  ExternalToolEffectSettlement,
+  ExternalToolEffectState,
+} from "@mosoo/contracts/external-tool-effect";
+import {
+  InputStartCommandResult,
   McpExecuteCommandResult,
-  RuntimeCommandResult,
-  RuntimeCommandStatus,
+  RuntimeCommand,
 } from "@mosoo/contracts/runtime-command";
-import { RunError } from "@mosoo/contracts/session-run";
+import { DurableRunError } from "@mosoo/contracts/session-run";
 import { NonEmptyString, PrimitiveRecord, parseSchemaValue } from "@mosoo/contracts/validation";
+import {
+  RUNTIME_EVENT_KINDS,
+  RUNTIME_EVENT_SCHEMA_VERSION,
+  parseRuntimeEventEnvelope,
+} from "@mosoo/runtime-events";
 import { eventIterator, os } from "@orpc/server";
 import { type } from "arktype";
 
+import { EVENT_BATCH_MAX_SIZE, LOG_BATCH_MAX_SIZE } from "./connections";
+import type { HostDriverEventBatchInput } from "./event-types";
+
+const PositiveSafeInteger = type("number.integer >= 1 & number.safe");
+const NonNegativeSafeInteger = type("number.integer >= 0 & number.safe");
+const DriverEventBatchMaxSizeWire = PositiveSafeInteger.narrow((size, context) =>
+  size <= EVENT_BATCH_MAX_SIZE
+    ? true
+    : context.reject({ expected: `at most ${EVENT_BATCH_MAX_SIZE}` }),
+);
+const DriverCapabilitiesWire = DriverCapability.array().narrow((capabilities, context) =>
+  new Set(capabilities.map(({ id }) => id)).size === capabilities.length
+    ? true
+    : context.reject({ expected: "unique capability ids" }),
+);
+
 const DriverHelloInputWire = type({
-  capabilities: DriverCapability.array(),
+  capabilities: DriverCapabilitiesWire,
   driverVersion: NonEmptyString,
-  pid: "number",
-  protocolVersion: "2",
+  pid: PositiveSafeInteger,
+  protocolVersion: "3",
   runtime: '"openai-runtime" | "claude-agent-sdk" | "acp-fallback"',
-  startedAt: "string",
-});
+  startedAt: NonEmptyString,
+}).onUndeclaredKey("reject");
+
+const DriverRunConfigWire = type({
+  commandLeaseMs: NonNegativeSafeInteger,
+  envPolicy: '"strict"',
+  eventBatchMaxSize: DriverEventBatchMaxSizeWire,
+  organizationPath: NonEmptyString,
+}).onUndeclaredKey("reject");
 
 const DriverHelloOutputWire = type({
-  acceptedCapabilities: DriverCapability.array(),
+  acceptedCapabilities: DriverCapabilitiesWire,
   connectionId: NonEmptyString,
   driverInstanceId: NonEmptyString,
-  heartbeatIntervalMs: "number >= 250",
-  runConfig: {
-    commandLeaseMs: "number >= 0",
-    envPolicy: '"strict"',
-    eventBatchMaxSize: "number >= 0",
-    organizationPath: NonEmptyString,
-  },
-  runId: "string | null",
-});
+  heartbeatIntervalMs: "number.integer >= 250 & number.safe",
+  runConfig: DriverRunConfigWire,
+  runId: type("null").or(NonEmptyString),
+}).onUndeclaredKey("reject");
 
 const DriverHeartbeatInputWire = type({
-  at: "string",
-  pid: "number",
+  at: NonEmptyString,
+  pid: PositiveSafeInteger,
   reason: '"interval" | "ping"',
-});
+}).onUndeclaredKey("reject");
 
 const DriverHeartbeatOutputWire = type({
-  heartbeatCount: "number >= 0",
+  heartbeatCount: NonNegativeSafeInteger,
   ok: "true",
-});
+}).onUndeclaredKey("reject");
 
 const DriverReadyInputWire = type({
   at: NonEmptyString,
   driverInstanceId: NonEmptyString,
-  pid: "number",
-});
+  pid: PositiveSafeInteger,
+}).onUndeclaredKey("reject");
+
+const RuntimeEventKindWire = type.enumerated(...RUNTIME_EVENT_KINDS);
+const DriverRuntimeEventWire = type({
+  actor: '"agent" | "api" | "driver" | "system" | "tool" | "user"',
+  "correlationId?": "string",
+  delivery: '"best_effort" | "lossless"',
+  "driverInstanceId?": "string",
+  id: NonEmptyString,
+  kind: RuntimeEventKindWire,
+  "native?": "unknown",
+  occurredAt: NonEmptyString,
+  origin: '"api" | "driver" | "file" | "runtime" | "system" | "viewer"',
+  payload: "unknown",
+  "receivedAt?": "string",
+  "runId?": "string",
+  "runtimeId?": "string",
+  schemaVersion: `'${RUNTIME_EVENT_SCHEMA_VERSION}'`,
+  sessionId: NonEmptyString,
+  "sourceEventId?": "string",
+  "traceId?": "string",
+  visibility: '"owner_debug" | "participant" | "public" | "system_internal"',
+}).onUndeclaredKey("reject");
 
 const DriverEventEnvelopeWire = type({
-  event: "unknown",
+  event: DriverRuntimeEventWire,
   eventId: NonEmptyString,
   "occurredAt?": "string | null | undefined",
-});
+}).onUndeclaredKey("reject");
 
 const DriverEventReceiptWire = type({
-  "eventId?": "string | undefined",
-  seq: "number >= 0",
-  type: NonEmptyString,
-});
+  eventId: NonEmptyString,
+  seq: NonNegativeSafeInteger,
+  type: RuntimeEventKindWire,
+}).onUndeclaredKey("reject");
 
 const DriverEventBatchInputWire = type({
   driverInstanceId: NonEmptyString,
-  events: DriverEventEnvelopeWire.array(),
-});
+  events: DriverEventEnvelopeWire.array().atMostLength(EVENT_BATCH_MAX_SIZE),
+}).onUndeclaredKey("reject");
 
 const DriverEventBatchOutputWire = type({
   accepted: DriverEventReceiptWire.array(),
-});
+}).onUndeclaredKey("reject");
 
 const DriverLogContextWire = type({
   "parentSpanId?": "string",
   "requestId?": "string",
   "sandboxId?": "string",
   "sessionId?": "string",
-  "spanId?": NonEmptyString,
-  "traceId?": NonEmptyString,
-});
+  "spanId?": "string",
+  "traceId?": "string",
+}).onUndeclaredKey("reject");
 
 const DriverLogErrorWire = type({
   "code?": "string | number",
-  message: NonEmptyString,
-  name: NonEmptyString,
+  message: "string",
+  name: "string",
   "stack?": "string | null",
-});
+}).onUndeclaredKey("reject");
 
 const DriverLogEntryWire = type({
   "context?": DriverLogContextWire,
   "error?": DriverLogErrorWire,
   "fields?": PrimitiveRecord,
   level: '"debug" | "error" | "info" | "trace" | "warn"',
-  message: NonEmptyString,
+  message: "string",
   "namespace?": "string | null",
-  seq: "number >= 0",
+  seq: NonNegativeSafeInteger,
   timestamp: NonEmptyString,
-});
+}).onUndeclaredKey("reject");
 
 const DriverLogBatchInputWire = type({
   driverInstanceId: NonEmptyString,
-  logs: DriverLogEntryWire.array(),
-});
+  logs: DriverLogEntryWire.array().atMostLength(LOG_BATCH_MAX_SIZE),
+}).onUndeclaredKey("reject");
 
 const DriverLogBatchOutputWire = type({
   ok: "true",
-});
+}).onUndeclaredKey("reject");
 
-const DriverCommandUpdateInputWire = type({
+const OkOutputWire = type({ ok: "true" }).onUndeclaredKey("reject");
+
+const DriverCommandAcceptedInputWire = type({
   commandId: NonEmptyString,
   driverInstanceId: NonEmptyString,
-  "error?": RunError,
-  "result?": RuntimeCommandResult,
-  status: RuntimeCommandStatus,
-});
+  status: '"accepted"',
+}).onUndeclaredKey("reject");
+
+const DriverCommandCancelledInputWire = type({
+  commandId: NonEmptyString,
+  driverInstanceId: NonEmptyString,
+  status: '"cancelled"',
+}).onUndeclaredKey("reject");
+
+const DriverCommandCompletedInputWire = type({
+  commandId: NonEmptyString,
+  driverInstanceId: NonEmptyString,
+  "result?": InputStartCommandResult.or(McpExecuteCommandResult),
+  status: '"completed"',
+}).onUndeclaredKey("reject");
+
+const DriverCommandFailedInputWire = type({
+  commandId: NonEmptyString,
+  driverInstanceId: NonEmptyString,
+  error: DurableRunError,
+  status: '"failed"',
+}).onUndeclaredKey("reject");
+
+const DriverCommandUpdateInputWire = DriverCommandAcceptedInputWire.or(
+  DriverCommandCancelledInputWire,
+)
+  .or(DriverCommandCompletedInputWire)
+  .or(DriverCommandFailedInputWire);
 
 const DriverExternalToolEffectClaimInputWire = type({
+  claimToken: ExternalToolEffectClaimToken,
   commandId: NonEmptyString,
   driverInstanceId: NonEmptyString,
-});
+}).onUndeclaredKey("reject");
 
-const DriverExternalToolEffectCompleteInputWire = type({
+const DriverExternalToolEffectObserveInputWire = type({
   commandId: NonEmptyString,
   driverInstanceId: NonEmptyString,
-  "providerReceiptJson?": "string | null | undefined",
-  result: McpExecuteCommandResult,
-});
+}).onUndeclaredKey("reject");
 
-const DriverExternalToolEffectUnknownInputWire = type({
+const DriverExternalToolEffectSettleInputWire = type({
+  claimToken: ExternalToolEffectClaimToken,
   commandId: NonEmptyString,
   driverInstanceId: NonEmptyString,
-});
+  effectId: NonEmptyString,
+  settlement: ExternalToolEffectSettlement,
+}).onUndeclaredKey("reject");
 
 const DriverNextCommandInputWire = type({
   driverInstanceId: NonEmptyString,
-});
+}).onUndeclaredKey("reject");
 
 const DriverNextCommandOutputWire = type({
   command: type("null").or(RuntimeCommand),
-});
+}).onUndeclaredKey("reject");
 
 const DriverCompletionInputWire = type({
   driverInstanceId: NonEmptyString,
-});
+  runId: NonEmptyString,
+}).onUndeclaredKey("reject");
 
 const DriverFailureInputWire = type({
   driverInstanceId: NonEmptyString,
-  error: RunError,
-});
+  error: DurableRunError,
+  runId: NonEmptyString,
+}).onUndeclaredKey("reject");
 
 type DriverEventBatchOutputWireValue = typeof DriverEventBatchOutputWire.infer;
 type DriverHelloOutputWireValue = typeof DriverHelloOutputWire.infer;
@@ -180,65 +258,87 @@ export interface RuntimeOrpcContext {
   onClaimExternalToolEffect(
     input: DriverExternalToolEffectClaimInput,
   ): Promise<DriverExternalToolEffectClaimOutput>;
-  onCompleteExternalToolEffect(input: DriverExternalToolEffectCompleteInput): Promise<{ ok: true }>;
   onCompleteRun(input: DriverCompletionInput): Promise<{ ok: true }>;
   onFailRun(input: DriverFailureInput): Promise<{ ok: true }>;
   onHeartbeat(input: DriverHeartbeatInput): Promise<DriverHeartbeatOutput>;
   onHello(input: DriverHelloInput): Promise<DriverHelloOutput>;
   onNextCommand(input: DriverNextCommandInput): Promise<DriverNextCommandOutput>;
-  onPushEvents(input: DriverEventBatchInput): Promise<DriverEventBatchOutput>;
+  onObserveExternalToolEffect(
+    input: DriverExternalToolEffectObserveInput,
+  ): Promise<DriverExternalToolEffectState>;
+  onPushEvents(input: HostDriverEventBatchInput): Promise<DriverEventBatchOutput>;
   onPushLogs(input: DriverLogBatchInput): Promise<DriverLogBatchOutput>;
-  onMarkExternalToolEffectUnknown(
-    input: DriverExternalToolEffectUnknownInput,
-  ): Promise<{ ok: true }>;
   onReady(input: DriverReadyInput): Promise<{ ok: true }>;
+  onSettleExternalToolEffect(
+    input: DriverExternalToolEffectSettleInput,
+  ): Promise<DriverExternalToolEffectState>;
   onWatchCommands(): AsyncIteratorObject<RuntimeCommand>;
 }
 
-function parseDriverCommandUpdateInput(input: unknown): DriverCommandUpdateInput {
+export function parseDriverCommandUpdateInput(input: unknown): DriverCommandUpdateInput {
   return parseSchemaValue(DriverCommandUpdateInputWire, input);
 }
 
-function parseDriverExternalToolEffectClaimInput(
+export function parseDriverExternalToolEffectClaimInput(
   input: unknown,
 ): DriverExternalToolEffectClaimInput {
   return parseSchemaValue(DriverExternalToolEffectClaimInputWire, input);
 }
 
-function parseDriverExternalToolEffectCompleteInput(
+export function parseDriverExternalToolEffectObserveInput(
   input: unknown,
-): DriverExternalToolEffectCompleteInput {
-  return parseSchemaValue(DriverExternalToolEffectCompleteInputWire, input);
+): DriverExternalToolEffectObserveInput {
+  return parseSchemaValue(DriverExternalToolEffectObserveInputWire, input);
 }
 
-function parseDriverExternalToolEffectUnknownInput(
+export function parseDriverExternalToolEffectSettleInput(
   input: unknown,
-): DriverExternalToolEffectUnknownInput {
-  return parseSchemaValue(DriverExternalToolEffectUnknownInputWire, input);
+): DriverExternalToolEffectSettleInput {
+  return parseSchemaValue(DriverExternalToolEffectSettleInputWire, input);
 }
 
-function parseDriverCompletionInput(input: unknown): DriverCompletionInput {
+export function parseDriverCompletionInput(input: unknown): DriverCompletionInput {
   return parseSchemaValue(DriverCompletionInputWire, input);
 }
 
-export function parseDriverEventBatchInput(input: unknown): DriverEventBatchInput {
+export function parseDriverEventBatchInput(input: unknown): HostDriverEventBatchInput {
   const batch = parseSchemaValue(DriverEventBatchInputWire, input);
 
   return {
     driverInstanceId: batch.driverInstanceId,
-    events: batch.events.map(parseDriverEventEnvelope),
+    events: batch.events.map((envelope) => ({
+      event: parseRuntimeEventEnvelope(envelope.event),
+      eventId: envelope.eventId,
+      occurredAt: envelope.occurredAt,
+    })),
   };
 }
 
-function parseDriverFailureInput(input: unknown): DriverFailureInput {
+export function parseDriverFailureInput(input: unknown): DriverFailureInput {
   return parseSchemaValue(DriverFailureInputWire, input);
 }
 
-function parseDriverLogBatchInput(input: unknown): DriverLogBatchInput {
+export function parseDriverHeartbeatInput(input: unknown): DriverHeartbeatInput {
+  return parseSchemaValue(DriverHeartbeatInputWire, input);
+}
+
+export function parseDriverHeartbeatOutput(input: unknown): DriverHeartbeatOutput {
+  return parseSchemaValue(DriverHeartbeatOutputWire, input);
+}
+
+export function parseDriverHelloInput(input: unknown): DriverHelloInput {
+  return parseSchemaValue(DriverHelloInputWire, input);
+}
+
+export function parseDriverLogBatchInput(input: unknown): DriverLogBatchInput {
   return parseSchemaValue(DriverLogBatchInputWire, input);
 }
 
-function parseDriverNextCommandInput(input: unknown): DriverNextCommandInput {
+export function parseDriverLogBatchOutput(input: unknown): DriverLogBatchOutput {
+  return parseSchemaValue(DriverLogBatchOutputWire, input);
+}
+
+export function parseDriverNextCommandInput(input: unknown): DriverNextCommandInput {
   return parseSchemaValue(DriverNextCommandInputWire, input);
 }
 
@@ -246,20 +346,22 @@ export function parseDriverReadyInput(input: unknown): DriverReadyInput {
   return parseSchemaValue(DriverReadyInputWire, input);
 }
 
-function toDriverEventBatchOutputWire(
-  output: DriverEventBatchOutput,
-): DriverEventBatchOutputWireValue {
-  return parseSchemaValue(DriverEventBatchOutputWire, output);
+export function parseDriverEventBatchOutput(input: unknown): DriverEventBatchOutputWireValue {
+  return parseSchemaValue(DriverEventBatchOutputWire, input);
 }
 
-function toDriverHelloOutputWire(output: DriverHelloOutput): DriverHelloOutputWireValue {
-  return parseSchemaValue(DriverHelloOutputWire, output);
+export function parseDriverHelloOutput(input: unknown): DriverHelloOutputWireValue {
+  return parseSchemaValue(DriverHelloOutputWire, input);
+}
+
+export function parseDriverNextCommandOutput(input: unknown): DriverNextCommandOutputWireValue {
+  return parseSchemaValue(DriverNextCommandOutputWire, input);
 }
 
 function toDriverNextCommandOutputWire(
   output: DriverNextCommandOutput,
 ): DriverNextCommandOutputWireValue {
-  return parseSchemaValue(DriverNextCommandOutputWire, output);
+  return parseDriverNextCommandOutput(output);
 }
 
 const base = os.$context<RuntimeOrpcContext>();
@@ -270,43 +372,55 @@ export const runtimeOrpcRouter = {
       .input(DriverExternalToolEffectClaimInputWire)
       .output(ExternalToolEffectClaim)
       .handler(async ({ context, input }) =>
-        context.onClaimExternalToolEffect(parseDriverExternalToolEffectClaimInput(input)),
+        parseSchemaValue(
+          ExternalToolEffectClaim,
+          await context.onClaimExternalToolEffect(parseDriverExternalToolEffectClaimInput(input)),
+        ),
       ),
     commandUpdate: base
       .input(DriverCommandUpdateInputWire)
-      .output(type({ ok: "true" }))
+      .output(OkOutputWire)
       .handler(async ({ context, input }) =>
         context.onCommandUpdate(parseDriverCommandUpdateInput(input)),
       ),
-    completeExternalToolEffect: base
-      .input(DriverExternalToolEffectCompleteInputWire)
-      .output(type({ ok: "true" }))
-      .handler(async ({ context, input }) =>
-        context.onCompleteExternalToolEffect(parseDriverExternalToolEffectCompleteInput(input)),
-      ),
     completeRun: base
       .input(DriverCompletionInputWire)
-      .output(type({ ok: "true" }))
+      .output(OkOutputWire)
       .handler(async ({ context, input }) =>
         context.onCompleteRun(parseDriverCompletionInput(input)),
       ),
     failRun: base
       .input(DriverFailureInputWire)
-      .output(type({ ok: "true" }))
+      .output(OkOutputWire)
       .handler(async ({ context, input }) => context.onFailRun(parseDriverFailureInput(input))),
     heartbeat: base
       .input(DriverHeartbeatInputWire)
       .output(DriverHeartbeatOutputWire)
-      .handler(async ({ context, input }) => context.onHeartbeat(input)),
+      .handler(async ({ context, input }) =>
+        parseDriverHeartbeatOutput(await context.onHeartbeat(parseDriverHeartbeatInput(input))),
+      ),
     hello: base
       .input(DriverHelloInputWire)
       .output(DriverHelloOutputWire)
-      .handler(async ({ context, input }) => toDriverHelloOutputWire(await context.onHello(input))),
+      .handler(async ({ context, input }) =>
+        parseDriverHelloOutput(await context.onHello(parseDriverHelloInput(input))),
+      ),
+    observeExternalToolEffect: base
+      .input(DriverExternalToolEffectObserveInputWire)
+      .output(ExternalToolEffectState)
+      .handler(async ({ context, input }) =>
+        parseSchemaValue(
+          ExternalToolEffectState,
+          await context.onObserveExternalToolEffect(
+            parseDriverExternalToolEffectObserveInput(input),
+          ),
+        ),
+      ),
     pushEvents: base
       .input(DriverEventBatchInputWire)
       .output(DriverEventBatchOutputWire)
       .handler(async ({ context, input }) =>
-        toDriverEventBatchOutputWire(await context.onPushEvents(parseDriverEventBatchInput(input))),
+        parseDriverEventBatchOutput(await context.onPushEvents(parseDriverEventBatchInput(input))),
       ),
     pushLogs: base
       .input(DriverLogBatchInputWire)
@@ -314,13 +428,16 @@ export const runtimeOrpcRouter = {
       .handler(async ({ context, input }) => context.onPushLogs(parseDriverLogBatchInput(input))),
     ready: base
       .input(DriverReadyInputWire)
-      .output(type({ ok: "true" }))
+      .output(OkOutputWire)
       .handler(async ({ context, input }) => context.onReady(parseDriverReadyInput(input))),
-    markExternalToolEffectUnknown: base
-      .input(DriverExternalToolEffectUnknownInputWire)
-      .output(type({ ok: "true" }))
+    settleExternalToolEffect: base
+      .input(DriverExternalToolEffectSettleInputWire)
+      .output(ExternalToolEffectState)
       .handler(async ({ context, input }) =>
-        context.onMarkExternalToolEffectUnknown(parseDriverExternalToolEffectUnknownInput(input)),
+        parseSchemaValue(
+          ExternalToolEffectState,
+          await context.onSettleExternalToolEffect(parseDriverExternalToolEffectSettleInput(input)),
+        ),
       ),
   },
   driverInstance: {

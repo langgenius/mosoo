@@ -1,12 +1,21 @@
 import { describe, expect, test } from "bun:test";
 
-import { parsePlatformId } from "@mosoo/id";
-import type { AgentDeploymentVersionId, SessionId, SessionRunId } from "@mosoo/id";
+import { createPlatformId, parsePlatformId } from "@mosoo/id";
+import type {
+  AgentDeploymentVersionId,
+  SessionId,
+  SessionMessageId,
+  SessionRunId,
+} from "@mosoo/id";
+import { createRuntimeEventSemanticHash } from "@mosoo/runtime-events";
 
 import { API_COMMAND_QUEUE_SEND_FAILED_CODE } from "../src/modules/api-command/application/api-command-ledger";
 import { getAccountViewer } from "../src/modules/auth/application/viewer-auth.service";
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
 import { queueSessionRun } from "../src/modules/runtime/application/session-run.service";
+import { recordCanonicalSessionRunTerminal } from "../src/modules/runtime/application/session-runs/session-run-terminal-failure.service";
+import { createQueuedSessionRunRuntimeEvents } from "../src/modules/runtime/application/session-runs/session-run-view-events.service";
+import { prepareAssistantMessageProjection } from "../src/modules/runtime/infrastructure/driver-instance/assistant-message-projection";
 import { setSessionRunStatus } from "../src/modules/runtime/infrastructure/session-runs/session-run-store.repository";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import { API_ERROR_CODE } from "../src/platform/errors";
@@ -18,6 +27,7 @@ import {
   insertOwnerSession,
 } from "./helpers/public-api-http-test-fixture";
 import type { ApiCommandQueueStub, SqliteD1Database } from "./helpers/public-api-http-test-fixture";
+import { insertRuntimeEvent } from "./public-thread-api-fixtures";
 
 interface AdmissionCounts {
   apiCommand: number;
@@ -186,8 +196,12 @@ async function createFixture() {
   return { database, viewer };
 }
 
-async function completeRun(database: D1Database, runId: SessionRunId): Promise<void> {
-  for (const status of ["booting", "running", "completed"] as const) {
+async function completeRun(
+  bindings: ApiBindings,
+  database: SqliteD1Database,
+  runId: SessionRunId,
+): Promise<void> {
+  for (const status of ["booting", "running"] as const) {
     const outcome = await setSessionRunStatus(database, {
       runId,
       source: "driver",
@@ -195,74 +209,200 @@ async function completeRun(database: D1Database, runId: SessionRunId): Promise<v
     });
     expect(outcome.kind).toBe("applied");
   }
+  const finalMessageId = createPlatformId<SessionMessageId>();
+  await insertRuntimeEvent(database, {
+    kind: "message.added",
+    occurredAt: 3,
+    payload: { content: "done", messageId: finalMessageId, role: "agent" },
+    runId,
+    seq: 3,
+    sessionId: PUBLIC_API_TEST_IDS.ownerSession,
+  });
+  await insertRuntimeEvent(database, {
+    kind: "message.completed",
+    occurredAt: 4,
+    payload: { messageId: finalMessageId, role: "agent" },
+    runId,
+    seq: 4,
+    sessionId: PUBLIC_API_TEST_IDS.ownerSession,
+  });
+  await database
+    .prepare("UPDATE session SET runtime_event_seq_cursor = 4 WHERE id = ?")
+    .bind(PUBLIC_API_TEST_IDS.ownerSession)
+    .run();
+  await recordCanonicalSessionRunTerminal(bindings, {
+    assistantMessage: prepareAssistantMessageProjection({
+      createdByAccountId: PUBLIC_API_TEST_IDS.ownerAccount,
+      messageId: finalMessageId,
+      sessionId: PUBLIC_API_TEST_IDS.ownerSession,
+      sessionRunId: runId,
+    }),
+    error: null,
+    runId,
+    sessionId: PUBLIC_API_TEST_IDS.ownerSession,
+    source: "driver",
+    status: "completed",
+    timestampMs: 5,
+  });
 }
 
 describe("Session Run atomic admission", () => {
-  test("blocks a cattle follow-up until the previous completed Run has a ready checkpoint", async () => {
+  test("hashes the exact sourced admission events and keeps replay cursors stable", async () => {
     const { database, viewer } = await createFixture();
-    const apiCommandQueue = createApiCommandQueueStub();
-    const bindings = createPublicHttpTestBindings(database, { apiCommandQueue }) as ApiBindings;
-    await database
-      .prepare("UPDATE session SET kind = 'cattle' WHERE id = ?")
-      .bind(PUBLIC_API_TEST_IDS.ownerSession)
-      .run();
-    const first = await queueOwnerRun({
-      bindings,
-      clientRequestId: "checkpoint-run-a",
-      viewer,
+    const bindings = createPublicHttpTestBindings(database, {
+      apiCommandQueue: createApiCommandQueueStub(),
+    }) as ApiBindings;
+    const clientRequestId = "semantic-admission-request";
+    const prompt = "Admit this request atomically.";
+    const admitted = await queueOwnerRun({ bindings, clientRequestId, viewer });
+    const messageId = await database
+      .prepare("SELECT id FROM session_message WHERE session_run_id = ?")
+      .bind(admitted.run.id)
+      .first<string>("id");
+    const storedEvents = await database
+      .prepare(
+        `SELECT id, occurred_at, semantic_hash, source_event_id
+         FROM session_event
+         WHERE run_id = ?
+         ORDER BY seq`,
+      )
+      .bind(admitted.run.id)
+      .all<{
+        id: string;
+        occurred_at: number;
+        semantic_hash: string;
+        source_event_id: string;
+      }>();
+
+    if (messageId === null || storedEvents.results.length !== 2) {
+      throw new Error("Admission did not persist its canonical message and events.");
+    }
+
+    const expectedEvents = createQueuedSessionRunRuntimeEvents({
+      prompt,
+      run: admitted.run,
+      sessionId: parsePlatformId<SessionId>(PUBLIC_API_TEST_IDS.ownerSession, "fixture session"),
+      sessionMessageId: parsePlatformId(messageId, "fixture message"),
     });
-    await completeRun(database, first.run.id);
+    const expectedHashes = await Promise.all(
+      expectedEvents.map((event, index) => {
+        const stored = storedEvents.results[index];
+        if (stored === undefined) {
+          throw new Error("Admission event identity is missing.");
+        }
+        return createRuntimeEventSemanticHash({
+          ...event,
+          id: parsePlatformId(stored.id, "fixture runtime event"),
+          occurredAt: new Date(stored.occurred_at).toISOString(),
+          sourceEventId: stored.source_event_id,
+        });
+      }),
+    );
 
-    await expect(
-      database
-        .prepare("SELECT workspace_checkpoint_required FROM session WHERE id = ?")
-        .bind(PUBLIC_API_TEST_IDS.ownerSession)
-        .first<number>("workspace_checkpoint_required"),
-    ).resolves.toBe(1);
+    expect(storedEvents.results.map((event) => event.semantic_hash)).toEqual(expectedHashes);
+    expect(storedEvents.results.map((event) => event.source_event_id)).toEqual([
+      clientRequestId,
+      storedEvents.results[1]?.id,
+    ]);
+    const beforeReplay = await readSessionState(database);
 
-    await expect(
-      queueOwnerRun({ bindings, clientRequestId: "checkpoint-run-b", viewer }),
-    ).rejects.toMatchObject({
-      code: API_ERROR_CODE.sessionRunCheckpointPending,
-      message: expect.stringContaining("still committing its previous workspace checkpoint"),
+    await expect(queueOwnerRun({ bindings, clientRequestId, viewer })).rejects.toMatchObject({
+      code: API_ERROR_CODE.sessionRunClientRequestDuplicate,
       status: 409,
     });
+    await expect(readSessionState(database)).resolves.toEqual(beforeReplay);
+    await expect(readAdmissionCounts(database)).resolves.toEqual({
+      apiCommand: 1,
+      event: 2,
+      message: 1,
+      run: 1,
+    });
+  });
 
-    database.execute(`
+  test.each([
+    ["rejects a checkpoint owned by another workspace", PUBLIC_API_TEST_IDS.nonOwnerSession, false],
+    ["accepts its ready checkpoint", PUBLIC_API_TEST_IDS.ownerSession, true],
+  ] as const)(
+    "%s before admitting a cattle follow-up",
+    async (_name, workspaceSessionId, ready) => {
+      const { database, viewer } = await createFixture();
+      const apiCommandQueue = createApiCommandQueueStub();
+      const bindings = createPublicHttpTestBindings(database, { apiCommandQueue }) as ApiBindings;
+      await database
+        .prepare("UPDATE session SET kind = 'cattle' WHERE id = ?")
+        .bind(PUBLIC_API_TEST_IDS.ownerSession)
+        .run();
+      const first = await queueOwnerRun({
+        bindings,
+        clientRequestId: "checkpoint-run-a",
+        viewer,
+      });
+      await completeRun(bindings, database, first.run.id);
+
+      await expect(
+        database
+          .prepare("SELECT workspace_checkpoint_required FROM session WHERE id = ?")
+          .bind(PUBLIC_API_TEST_IDS.ownerSession)
+          .first<number>("workspace_checkpoint_required"),
+      ).resolves.toBe(1);
+
+      await expect(
+        queueOwnerRun({ bindings, clientRequestId: "checkpoint-run-b", viewer }),
+      ).rejects.toMatchObject({
+        code: API_ERROR_CODE.sessionRunCheckpointPending,
+        message: expect.stringContaining("still committing its previous workspace checkpoint"),
+        status: 409,
+      });
+
+      database.execute(`
       INSERT INTO sandbox (
-        id, kind, subject_kind, subject_id, status, bind_mount_ready,
+        agent_id, project_id, id, incarnation, kind, network_constraints_hash,
+        owner_account_id, subject_kind, subject_id, status, bind_mount_ready,
         global_mounts_json, created_at, updated_at
       )
       VALUES (
-        '${PUBLIC_API_TEST_IDS.sandbox}', 'cattle', 'session', '${PUBLIC_API_TEST_IDS.ownerSession}',
+        '${PUBLIC_API_TEST_IDS.agent}', '${PUBLIC_API_TEST_IDS.project}',
+        '${PUBLIC_API_TEST_IDS.sandbox}', 1, 'cattle', '${"0".repeat(64)}',
+        '${PUBLIC_API_TEST_IDS.ownerAccount}', 'session', '${PUBLIC_API_TEST_IDS.ownerSession}',
         'active', 1, '[]', 1, 1
       );
 
       INSERT INTO sandbox_session (
         cloudflare_session_id, created_at, cwd, origin_json, sandbox_id,
-        session_id, status, updated_at
+        sandbox_incarnation, session_id, status, updated_at
       )
       VALUES (
         '01J0000000000000000000000Z', 1, '/workspace/se/${PUBLIC_API_TEST_IDS.ownerSession}', '{}',
-        '${PUBLIC_API_TEST_IDS.sandbox}', '${PUBLIC_API_TEST_IDS.ownerSession}', 'active', 1
+        '${PUBLIC_API_TEST_IDS.sandbox}', 1, '${PUBLIC_API_TEST_IDS.ownerSession}', 'active', 1
       );
 
       INSERT INTO sandbox_backup (
-        created_at, dir, id, keep, sandbox_id, session_run_id, status, ttl_seconds, updated_at
+        created_at, dir, id, keep, sandbox_id, sandbox_incarnation, session_run_id,
+        staging_id, status, ttl_seconds, updated_at, workspace_session_id
       )
       VALUES (
         1, '/workspace/se/${PUBLIC_API_TEST_IDS.ownerSession}', '${PUBLIC_API_TEST_IDS.operation}',
-        0, '${PUBLIC_API_TEST_IDS.sandbox}', '${first.run.id}', 'ready', 315360000, 1
+        0, '${PUBLIC_API_TEST_IDS.sandbox}', 1, '${first.run.id}',
+        '${PUBLIC_API_TEST_IDS.operation}', 'ready', 315360000, 1,
+        '${workspaceSessionId}'
       );
     `);
 
-    const second = await queueOwnerRun({
-      bindings,
-      clientRequestId: "checkpoint-run-b",
-      viewer,
-    });
-    expect(second.run.status).toBe("queued");
-  });
+      const followUp = queueOwnerRun({
+        bindings,
+        clientRequestId: "checkpoint-run-b",
+        viewer,
+      });
+      if (!ready) {
+        await expect(followUp).rejects.toMatchObject({
+          code: API_ERROR_CODE.sessionRunCheckpointPending,
+        });
+        return;
+      }
+
+      await expect(followUp).resolves.toMatchObject({ run: { status: "queued" } });
+    },
+  );
 
   test("grandfathers a completed cattle Run from before the checkpoint rollout", async () => {
     const { database, viewer } = await createFixture();
@@ -377,6 +517,44 @@ describe("Session Run atomic admission", () => {
       status: "RUNNING",
     });
     expect(apiCommandQueue.sent).toHaveLength(1);
+  });
+
+  test("does not admit a Run while provisioning owns the Session", async () => {
+    const { database, viewer } = await createFixture();
+    const apiCommandQueue = createApiCommandQueueStub();
+    const bindings = createPublicHttpTestBindings(database, { apiCommandQueue }) as ApiBindings;
+
+    await database
+      .prepare(
+        `UPDATE session
+         SET runtime_provisioning_heartbeat_at = ?,
+             runtime_provisioning_operation_id = ?,
+             runtime_provisioning_sandbox_id = ?
+         WHERE id = ?`,
+      )
+      .bind(
+        1,
+        PUBLIC_API_TEST_IDS.operation,
+        PUBLIC_API_TEST_IDS.sandbox,
+        PUBLIC_API_TEST_IDS.ownerSession,
+      )
+      .run();
+
+    await expect(queueOwnerRun({ bindings, viewer })).rejects.toThrow();
+    await expect(readAdmissionCounts(database)).resolves.toEqual({
+      apiCommand: 0,
+      event: 0,
+      message: 0,
+      run: 0,
+    });
+    await expect(readSessionState(database)).resolves.toEqual({
+      lastMessageAt: null,
+      lastRunId: null,
+      messageSeqCursor: 0,
+      runtimeEventSeqCursor: 0,
+      status: "IDLE",
+    });
+    expect(apiCommandQueue.sent).toHaveLength(0);
   });
 
   test("classifies a completed client request replay without creating a second Run", async () => {

@@ -36,6 +36,7 @@ export function defineSessionRunsTable<
       errorCode: text("error_code"),
       errorDetailsJson: text("error_details_json"),
       errorMessage: text("error_message"),
+      errorRetryable: integer("error_retryable", { mode: "boolean" }),
       id: platformIdColumn<SessionRunId>("id").primaryKey(),
       model: text("model"),
       provider: text("provider"),
@@ -50,16 +51,25 @@ export function defineSessionRunsTable<
       statusOperationId: platformIdColumn<RuntimeOperationId>("status_operation_id"),
       statusSeq: integer("status_seq").notNull().default(0),
       statusSource: text("status_source").notNull().default("system"),
+      terminalReconciliationAttemptedAt: integer("terminal_reconciliation_attempted_at"),
       traceId: text("trace_id").notNull(),
       trigger: text("trigger").$type<SessionRunTrigger>().notNull(),
       updatedAt: integer("updated_at").notNull(),
     },
     (table) => [
       check(
+        "session_run_error_retryable_check",
+        sql`${table.errorRetryable} IS NULL OR (${table.errorRetryable} IN (false, true) AND ${table.errorCode} IS NOT NULL AND ${table.errorDetailsJson} IS NOT NULL AND ${table.errorMessage} IS NOT NULL)`,
+      ),
+      check(
         "session_run_status_check",
         sql`${table.status} IN ('queued', 'booting', 'running', 'waiting_input', 'completed', 'failed', 'cancelled', 'expired')`,
       ),
       check("session_run_status_seq_check", sql`${table.statusSeq} >= 0`),
+      check(
+        "session_run_terminal_reconciliation_attempted_at_check",
+        sql`${table.terminalReconciliationAttemptedAt} IS NULL OR ${table.terminalReconciliationAttemptedAt} >= 0`,
+      ),
       index("session_run_driver_instance_idx").on(table.driverInstanceId, table.createdAt),
       uniqueIndex("session_run_active_driver_lease_idx")
         .on(table.driverInstanceId)
@@ -68,6 +78,10 @@ export function defineSessionRunsTable<
         ),
       index("session_run_session_created_at_idx").on(table.sessionId, table.createdAt),
       index("session_run_session_status_idx").on(table.sessionId, table.status),
+      index("session_run_terminal_reconciliation_attempt_idx").on(
+        sql`coalesce(${table.terminalReconciliationAttemptedAt}, ${table.updatedAt})`,
+        table.id,
+      ),
     ],
   );
 }

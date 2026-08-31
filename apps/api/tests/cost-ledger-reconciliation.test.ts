@@ -147,6 +147,7 @@ async function createReconciliationDatabase(): Promise<SqliteD1Database> {
       native_call_id text,
       output_tokens integer,
       provider text NOT NULL,
+      source_event_seq integer DEFAULT 0 NOT NULL,
       session_id text NOT NULL,
       session_run_id text NOT NULL,
       started_at integer,
@@ -155,6 +156,14 @@ async function createReconciliationDatabase(): Promise<SqliteD1Database> {
       trace_id text NOT NULL,
       updated_at integer NOT NULL,
       UNIQUE (session_run_id, call_key)
+    );
+
+    CREATE TABLE session_event (
+      content_text text NOT NULL,
+      event_type text NOT NULL,
+      run_id text,
+      seq integer NOT NULL,
+      session_id text NOT NULL
     );
 
     CREATE TABLE usage_event (
@@ -181,6 +190,7 @@ async function createReconciliationDatabase(): Promise<SqliteD1Database> {
       session_run_id text,
       source text NOT NULL,
       source_event_id text NOT NULL,
+      source_event_seq integer DEFAULT 0 NOT NULL,
       total_cost_usd_micros integer NOT NULL,
       usage_contract text NOT NULL,
       UNIQUE (source, source_event_id)
@@ -232,13 +242,17 @@ async function createReconciliationDatabase(): Promise<SqliteD1Database> {
       payload_json text NOT NULL,
       status text NOT NULL,
       attempt_count integer DEFAULT 0 NOT NULL,
+      delivery_generation integer DEFAULT 1 NOT NULL,
       claim_owner text,
       claim_expires_at integer,
       last_error_code text,
       last_error_message text,
       completed_at integer,
       created_at integer NOT NULL,
-      updated_at integer NOT NULL
+      updated_at integer NOT NULL,
+      CONSTRAINT api_command_delivery_generation_check
+        CHECK (typeof(delivery_generation) = 'integer'
+          AND delivery_generation BETWEEN 1 AND 9007199254740991)
     );
 
     CREATE UNIQUE INDEX api_command_dedupe_idx ON api_command (dedupe_key);
@@ -663,6 +677,13 @@ describe("cost ledger reconciliation", () => {
       id: "01J00000000000000000000203",
       sourceEventId,
     });
+    await database
+      .prepare(
+        `INSERT INTO session_event (content_text, event_type, run_id, seq, session_id)
+         VALUES (?, 'usage.updated', ?, 0, ?)`,
+      )
+      .bind(JSON.stringify({ callId: "rolled-history" }), RUN_ID, SESSION_ID)
+      .run();
     const bindings = createPublicHttpTestBindings(database) as ApiBindings;
 
     await runUsageDailyRollup(bindings, new Date(NOW_MS));

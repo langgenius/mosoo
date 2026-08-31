@@ -15,6 +15,7 @@ function createConversationSessionDatabase(): SqliteD1Database {
       cwd text NOT NULL,
       origin_json text NOT NULL,
       sandbox_id text NOT NULL,
+      sandbox_incarnation integer DEFAULT 0 NOT NULL,
       session_id text PRIMARY KEY NOT NULL,
       status text NOT NULL
     );
@@ -25,7 +26,8 @@ function createConversationSessionDatabase(): SqliteD1Database {
       id text PRIMARY KEY NOT NULL,
       sandbox_id text NOT NULL,
       session_run_id text,
-      status text NOT NULL
+      status text NOT NULL,
+      workspace_session_id text
     );
 
     CREATE TABLE session (
@@ -71,13 +73,21 @@ async function insertBackup(
     readonly dir: string;
     readonly id: string;
     readonly status: string;
+    readonly workspaceSessionId?: string | null;
   },
 ): Promise<void> {
   await database
     .prepare(
-      "INSERT INTO sandbox_backup (created_at, dir, id, sandbox_id, status) VALUES (?, ?, ?, ?, ?)",
+      "INSERT INTO sandbox_backup (created_at, dir, id, sandbox_id, status, workspace_session_id) VALUES (?, ?, ?, ?, ?, ?)",
     )
-    .bind(input.createdAt, input.dir, input.id, "01J0000000000000000000000D", input.status)
+    .bind(
+      input.createdAt,
+      input.dir,
+      input.id,
+      "01J0000000000000000000000D",
+      input.status,
+      input.workspaceSessionId === undefined ? "session-1" : input.workspaceSessionId,
+    )
     .run();
 }
 
@@ -105,6 +115,20 @@ describe("runtime conversation session record", () => {
     });
     await insertBackup(database, {
       createdAt: 4,
+      dir: SESSION_CWD,
+      id: "backup-other-owner",
+      status: "ready",
+      workspaceSessionId: "session-2",
+    });
+    await insertBackup(database, {
+      createdAt: 5,
+      dir: SESSION_CWD,
+      id: "backup-legacy-unowned",
+      status: "ready",
+      workspaceSessionId: null,
+    });
+    await insertBackup(database, {
+      createdAt: 6,
       dir: OTHER_CWD,
       id: "backup-other",
       status: "ready",

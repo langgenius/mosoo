@@ -33,10 +33,12 @@ import { toIsoString } from "../../../time";
 import { fileStore } from "../../files/application/file-store";
 import { parseStoredAgentTaskSnapshot } from "./session-agent-task-snapshot.repository";
 import { createInitialSessionLiveState } from "./session-live-state.reducer";
+import { applyStoredSessionArtifacts } from "./session-message-reference.repository";
 import { loadStoredSessionMessages } from "./session-message-snapshot.repository";
 
 interface SessionViewerStateSessionRow {
   id: SessionId;
+  runtime_event_seq_cursor: number;
   status: SessionStatus;
   title: string | null;
   updated_at: number;
@@ -51,6 +53,7 @@ interface SessionViewerStateJoinedRow extends SessionViewerStateSessionRow {
   run_error_code: string | null;
   run_error_details_json: string | null;
   run_error_message: string | null;
+  run_error_retryable: boolean | null;
   run_id: SessionRunId | null;
   run_model: string | null;
   run_provider: string | null;
@@ -76,6 +79,7 @@ interface SessionViewerStateRunRow {
   error_code: string | null;
   error_details_json: string | null;
   error_message: string | null;
+  error_retryable: boolean | null;
   id: SessionRunId;
   model: string | null;
   provider: string | null;
@@ -102,6 +106,13 @@ export interface LoadSessionViewerStateInput {
   viewerId: PlatformId;
 }
 
+export interface LoadedSessionViewerState {
+  runtimeEventSeqCursor: number;
+  state: SessionLiveState;
+}
+
+const MAX_CONSISTENT_SNAPSHOT_ATTEMPTS = 5;
+
 async function listSessionViewerStateSnapshotRows(
   database: D1Database,
   sessionId: SessionId,
@@ -118,6 +129,7 @@ async function listSessionViewerStateSnapshotRows(
         run_error_code: sessionRunsTable.errorCode,
         run_error_details_json: sessionRunsTable.errorDetailsJson,
         run_error_message: sessionRunsTable.errorMessage,
+        run_error_retryable: sessionRunsTable.errorRetryable,
         run_id: sessionRunsTable.id,
         run_model: sessionRunsTable.model,
         run_provider: sessionRunsTable.provider,
@@ -126,6 +138,7 @@ async function listSessionViewerStateSnapshotRows(
         run_trace_id: sessionRunsTable.traceId,
         run_trigger: sessionRunsTable.trigger,
         run_updated_at: sessionRunsTable.updatedAt,
+        runtime_event_seq_cursor: sessionsTable.runtimeEventSeqCursor,
         status: sessionsTable.status,
         task_driver_instance_id: sessionAgentTaskSnapshotsTable.driverInstanceId,
         task_run_id: sessionAgentTaskSnapshotsTable.runId,
@@ -245,7 +258,7 @@ function toRunError(row: SessionViewerStateRunRow): RunError | null {
     code: row.error_code,
     details: parseJsonRecord(row.error_details_json),
     message: row.error_message,
-    retryable: false,
+    retryable: row.error_retryable ?? false,
   };
 }
 
@@ -288,6 +301,7 @@ function toJoinedSessionRunSummary(row: SessionViewerStateJoinedRow): SessionRun
     error_code: row.run_error_code,
     error_details_json: row.run_error_details_json,
     error_message: row.run_error_message,
+    error_retryable: row.run_error_retryable,
     id: row.run_id,
     model: row.run_model,
     provider: row.run_provider,
@@ -406,23 +420,22 @@ function applyCanonicalSessionState(
   };
 }
 
-export async function loadSessionViewerState(
+async function loadSessionViewerStateSnapshotOnce(
   database: D1Database,
   input: LoadSessionViewerStateInput,
-): Promise<SessionLiveState> {
-  const snapshotRowsPromise = listSessionViewerStateSnapshotRows(database, input.sessionId);
+): Promise<LoadedSessionViewerState> {
+  const snapshotRows = await listSessionViewerStateSnapshotRows(database, input.sessionId);
+  const session = getFirstSnapshotRow(snapshotRows).session;
   const messagesPromise = loadStoredSessionMessages(database, input.sessionId);
   const permissionRequestsPromise = listActivePermissionRequests(database, input.sessionId);
   const readinessPromise = getLatestReadinessSnapshot(database, input.sessionId);
   const sessionFilesPromise = fileStore.listReadySessionFiles(database, input.sessionId);
-  const [snapshotRows, messages, permissionRequests, readiness, sessionFiles] = await Promise.all([
-    snapshotRowsPromise,
+  const [messages, permissionRequests, readiness, sessionFiles] = await Promise.all([
     messagesPromise,
     permissionRequestsPromise,
     readinessPromise,
     sessionFilesPromise,
   ]);
-  const session = getFirstSnapshotRow(snapshotRows).session;
   const latestRun = toJoinedSessionRunSummary(session);
   const taskSnapshot = toJoinedAgentTaskSnapshot(session);
   const baseState = createInitialSessionLiveState({
@@ -445,5 +458,50 @@ export async function loadSessionViewerState(
     viewerId: input.viewerId,
   });
 
-  return state;
+  const resolvedState =
+    session.runtime_event_seq_cursor === 0
+      ? state
+      : await applyStoredSessionArtifacts(database, {
+          endSeq: session.runtime_event_seq_cursor,
+          includeActiveRunArtifacts: latestRun !== null && !isTerminalRunStatus(latestRun.status),
+          runId: latestRun?.id ?? null,
+          sessionId: input.sessionId,
+          state,
+        });
+
+  return {
+    runtimeEventSeqCursor: session.runtime_event_seq_cursor,
+    state: resolvedState,
+  };
+}
+
+export async function loadSessionViewerStateSnapshot(
+  database: D1Database,
+  input: LoadSessionViewerStateInput,
+): Promise<LoadedSessionViewerState> {
+  for (let attempt = 0; attempt < MAX_CONSISTENT_SNAPSHOT_ATTEMPTS; attempt += 1) {
+    const snapshot = await loadSessionViewerStateSnapshotOnce(database, input);
+    const current = await getAppDatabase(database)
+      .select({ runtimeEventSeqCursor: sessionsTable.runtimeEventSeqCursor })
+      .from(sessionsTable)
+      .where(eq(sessionsTable.id, input.sessionId))
+      .limit(1)
+      .get();
+
+    if (current === undefined) {
+      throw new Error("Session not found.");
+    }
+    if (current.runtimeEventSeqCursor === snapshot.runtimeEventSeqCursor) {
+      return snapshot;
+    }
+  }
+
+  throw new Error("Session changed while its viewer state snapshot was loading.");
+}
+
+export async function loadSessionViewerState(
+  database: D1Database,
+  input: LoadSessionViewerStateInput,
+): Promise<SessionLiveState> {
+  return (await loadSessionViewerStateSnapshot(database, input)).state;
 }

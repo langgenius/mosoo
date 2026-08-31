@@ -23,6 +23,7 @@ function sessionRunSummaryColumns() {
     error_code: sessionRunsTable.errorCode,
     error_details_json: sessionRunsTable.errorDetailsJson,
     error_message: sessionRunsTable.errorMessage,
+    error_retryable: sessionRunsTable.errorRetryable,
     id: sessionRunsTable.id,
     model: sessionRunsTable.model,
     provider: sessionRunsTable.provider,

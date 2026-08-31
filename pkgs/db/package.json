@@ -3,11 +3,13 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./deploy-schema-guard": "./src/deploy-schema-guard.ts"
   },
   "scripts": {
     "db:generate": "vp exec drizzle-kit generate --config drizzle.config.ts",
     "lint": "vp lint .",
+    "schema:check": "vp exec bun scripts/check-schema.ts",
     "tc": "vp exec tsc --noEmit",
     "test": "vp exec bun test tests"
   },
@@ -17,9 +19,10 @@
     "drizzle-orm": "^0.45.2"
   },
   "devDependencies": {
+    "@types/bun": "1.4.0",
     "@types/node": "^25.8.0",
     "drizzle-kit": "^0.31.10",
     "typescript": "^6.0.3",
-    "vite-plus": "^0.1.23"
+    "vite-plus": "^0.3.0"
   }
 }

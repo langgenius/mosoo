@@ -8,7 +8,9 @@ import type {
   SessionId,
   SessionRunId,
 } from "@mosoo/id";
+import { sql } from "drizzle-orm";
 import {
+  check,
   index,
   integer,
   primaryKey,
@@ -49,6 +51,7 @@ export const usageEventsTable = sqliteTable(
     sessionRunId: platformIdColumn<SessionRunId>("session_run_id"),
     source: text("source").notNull(),
     sourceEventId: text("source_event_id").notNull(),
+    sourceEventSeq: integer("source_event_seq").notNull().default(0),
     totalCostUsdMicros: integer("total_cost_usd_micros").notNull(),
     usageContract: text("usage_contract")
       .$type<
@@ -59,6 +62,7 @@ export const usageEventsTable = sqliteTable(
       .notNull(),
   },
   (table) => [
+    check("usage_event_source_event_seq_check", sql`${table.sourceEventSeq} >= 0`),
     index("usage_event_project_created_idx").on(table.projectId, table.createdAt),
     index("usage_event_organization_created_idx").on(table.organizationId, table.createdAt),
     index("usage_event_agent_created_idx").on(table.agentId, table.createdAt),

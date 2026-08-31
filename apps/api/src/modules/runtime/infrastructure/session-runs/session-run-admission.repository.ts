@@ -18,8 +18,10 @@ import type {
   SessionMessageId,
   SessionRunId,
 } from "@mosoo/id";
+import { createRuntimeEventSemanticHash } from "@mosoo/runtime-events";
 import type { RuntimeEventEnvelope } from "@mosoo/runtime-events";
 import { and, eq, exists, inArray, isNull, ne, notExists, or, sql } from "drizzle-orm";
+import type { SQL } from "drizzle-orm";
 
 import {
   getAppDatabase,
@@ -54,6 +56,10 @@ interface QueuedMessageAdmissionRecord {
   timestampMs: number;
 }
 
+type SourcedRuntimeEventEnvelope = RuntimeEventEnvelope & {
+  readonly sourceEventId: string;
+};
+
 export interface CommitQueuedSessionRunAdmissionInput {
   apiCommand: PreparedApiCommand;
   clientRequestId: string | null;
@@ -78,7 +84,48 @@ function admissionSessionPredicate(input: CommitQueuedSessionRunAdmissionInput) 
     eq(sessionsTable.projectId, input.session.projectId),
     eq(sessionsTable.lastRunId, input.run.id),
     eq(sessionsTable.status, "RUNNING"),
+    isNull(sessionsTable.runtimeProvisioningOperationId),
   );
+}
+
+export function cattleTerminalCheckpointReadyPredicate(db: AppDatabase): SQL {
+  return or(
+    ne(sessionsTable.kind, "cattle"),
+    eq(sessionsTable.workspaceCheckpointRequired, false),
+    isNull(sessionsTable.lastRunId),
+    notExists(
+      db
+        .select({ id: sessionRunsTable.id })
+        .from(sessionRunsTable)
+        .where(
+          and(
+            eq(sessionRunsTable.id, sessionsTable.lastRunId),
+            eq(sessionRunsTable.status, "completed"),
+          ),
+        ),
+    ),
+    exists(
+      db
+        .select({ id: sandboxBackupsTable.id })
+        .from(sandboxBackupsTable)
+        .innerJoin(
+          sandboxSessionsTable,
+          and(
+            eq(sandboxSessionsTable.sessionId, sessionsTable.id),
+            eq(sandboxSessionsTable.sandboxId, sandboxBackupsTable.sandboxId),
+            eq(sandboxSessionsTable.sandboxIncarnation, sandboxBackupsTable.sandboxIncarnation),
+            eq(sandboxSessionsTable.cwd, sandboxBackupsTable.dir),
+            eq(sandboxBackupsTable.workspaceSessionId, sandboxSessionsTable.sessionId),
+          ),
+        )
+        .where(
+          and(
+            eq(sandboxBackupsTable.sessionRunId, sessionsTable.lastRunId),
+            eq(sandboxBackupsTable.status, "ready"),
+          ),
+        ),
+    ),
+  )!;
 }
 
 function claimableSessionPredicate(db: AppDatabase, input: CommitQueuedSessionRunAdmissionInput) {
@@ -89,41 +136,8 @@ function claimableSessionPredicate(db: AppDatabase, input: CommitQueuedSessionRu
     isNull(sessionsTable.archivedAt),
     eq(sessionsTable.status, "IDLE"),
     isNull(sessionsTable.statusOperationId),
-    or(
-      ne(sessionsTable.kind, "cattle"),
-      eq(sessionsTable.workspaceCheckpointRequired, false),
-      isNull(sessionsTable.lastRunId),
-      notExists(
-        db
-          .select({ id: sessionRunsTable.id })
-          .from(sessionRunsTable)
-          .where(
-            and(
-              eq(sessionRunsTable.id, sessionsTable.lastRunId),
-              eq(sessionRunsTable.status, "completed"),
-            ),
-          ),
-      ),
-      exists(
-        db
-          .select({ id: sandboxBackupsTable.id })
-          .from(sandboxBackupsTable)
-          .innerJoin(
-            sandboxSessionsTable,
-            and(
-              eq(sandboxSessionsTable.sessionId, sessionsTable.id),
-              eq(sandboxSessionsTable.sandboxId, sandboxBackupsTable.sandboxId),
-              eq(sandboxSessionsTable.cwd, sandboxBackupsTable.dir),
-            ),
-          )
-          .where(
-            and(
-              eq(sandboxBackupsTable.sessionRunId, sessionsTable.lastRunId),
-              eq(sandboxBackupsTable.status, "ready"),
-            ),
-          ),
-      ),
-    ),
+    isNull(sessionsTable.runtimeProvisioningOperationId),
+    cattleTerminalCheckpointReadyPredicate(db),
     notExists(
       db
         .select({ id: sessionRunsTable.id })
@@ -156,52 +170,21 @@ export async function isCattleTerminalCheckpointReadyForNextRun(
   sessionId: SessionId,
 ): Promise<boolean> {
   const appDb = getAppDatabase(database);
-  const session =
-    (await appDb
-      .select({
-        kind: sessionsTable.kind,
-        lastRunId: sessionsTable.lastRunId,
-        lastRunStatus: sessionRunsTable.status,
-        workspaceCheckpointRequired: sessionsTable.workspaceCheckpointRequired,
-      })
+  const [session, ready] = await Promise.all([
+    appDb
+      .select({ id: sessionsTable.id })
       .from(sessionsTable)
-      .leftJoin(sessionRunsTable, eq(sessionRunsTable.id, sessionsTable.lastRunId))
       .where(eq(sessionsTable.id, sessionId))
       .limit(1)
-      .get()) ?? null;
-
-  if (
-    session === null ||
-    session.kind !== "cattle" ||
-    !session.workspaceCheckpointRequired ||
-    session.lastRunId === null ||
-    session.lastRunStatus !== "completed"
-  ) {
-    return true;
-  }
-
-  const checkpoint =
-    (await appDb
-      .select({ id: sandboxBackupsTable.id })
-      .from(sandboxBackupsTable)
-      .innerJoin(
-        sandboxSessionsTable,
-        and(
-          eq(sandboxSessionsTable.sessionId, sessionId),
-          eq(sandboxSessionsTable.sandboxId, sandboxBackupsTable.sandboxId),
-          eq(sandboxSessionsTable.cwd, sandboxBackupsTable.dir),
-        ),
-      )
-      .where(
-        and(
-          eq(sandboxBackupsTable.sessionRunId, session.lastRunId),
-          eq(sandboxBackupsTable.status, "ready"),
-        ),
-      )
+      .get(),
+    appDb
+      .select({ id: sessionsTable.id })
+      .from(sessionsTable)
+      .where(and(eq(sessionsTable.id, sessionId), cattleTerminalCheckpointReadyPredicate(appDb)))
       .limit(1)
-      .get()) ?? null;
-
-  return checkpoint !== null;
+      .get(),
+  ]);
+  return session === undefined || ready !== undefined;
 }
 
 export async function hasSessionRunAdmissionClientRequestReceipt(
@@ -245,6 +228,7 @@ function createRunInsertQuery(db: AppDatabase, input: CommitQueuedSessionRunAdmi
         errorCode: selectedValue(null, "error_code"),
         errorDetailsJson: selectedValue(null, "error_details_json"),
         errorMessage: selectedValue(null, "error_message"),
+        errorRetryable: selectedValue(null, "error_retryable"),
         id: selectedValue(input.run.id, "id"),
         model: selectedValue(input.run.model, "model"),
         provider: selectedValue(input.run.provider, "provider"),
@@ -257,6 +241,10 @@ function createRunInsertQuery(db: AppDatabase, input: CommitQueuedSessionRunAdmi
         statusOperationId: selectedValue(null, "status_operation_id"),
         statusSeq: selectedValue(0, "status_seq"),
         statusSource: selectedValue("api", "status_source"),
+        terminalReconciliationAttemptedAt: selectedValue(
+          null,
+          "terminal_reconciliation_attempted_at",
+        ),
         traceId: selectedValue(input.run.traceId, "trace_id"),
         trigger: selectedValue(input.run.trigger, "trigger"),
         updatedAt: selectedValue(input.run.timestampMs, "updated_at"),
@@ -278,6 +266,7 @@ function createMessageInsertQuery(db: AppDatabase, input: CommitQueuedSessionRun
         ),
         id: selectedValue(input.message.id, "id"),
         planJson: selectedValue(null, "plan_json"),
+        projectionFormat: selectedValue("materialized" as const, "projection_format"),
         role: selectedValue("user" as const, "role"),
         segmentsJson: selectedValue(null, "segments_json"),
         seq: sessionsTable.messageSeqCursor,
@@ -304,41 +293,74 @@ function runtimeEventOccurredAt(event: RuntimeEventEnvelope, fallbackMs: number)
   return Number.isFinite(occurredAt) ? occurredAt : fallbackMs;
 }
 
+function sourceAdmissionEvent(
+  event: RuntimeEventEnvelope,
+  index: number,
+  clientRequestId: string | null,
+): SourcedRuntimeEventEnvelope {
+  return {
+    ...event,
+    sourceEventId: event.sourceEventId ?? (index === 0 ? clientRequestId : null) ?? event.id,
+  };
+}
+
 function createEventInsertQuery(
   db: AppDatabase,
   input: CommitQueuedSessionRunAdmissionInput,
-  event: RuntimeEventEnvelope,
+  event: SourcedRuntimeEventEnvelope,
   index: number,
+  semanticHash: string,
 ) {
   const projection = createSessionRuntimeEventProjection(event);
   const timestampMs = input.run.timestampMs + index;
   const occurredAt = runtimeEventOccurredAt(event, timestampMs);
-  const sourceEventId =
-    event.sourceEventId ?? (index === 0 ? input.clientRequestId : null) ?? event.id;
 
   return db.insert(sessionEventsTable).select(
     db
       .select({
         agentId: sessionsTable.agentId,
+        artifactAttemptId: selectedValue(null, "artifact_attempt_id"),
+        artifactManifestJson: selectedValue(null, "artifact_manifest_json"),
+        artifactManifestSha256: selectedValue(null, "artifact_manifest_sha256"),
         contentText: selectedValue(projection.contentText, "content_text"),
         createdAt: selectedValue(timestampMs, "created_at"),
         endedAt: selectedValue(Math.max(occurredAt, timestampMs), "ended_at"),
         eventType: selectedValue(projection.eventType, "event_type"),
         family: selectedValue(projection.family, "family"),
         id: selectedValue(event.id, "id"),
+        mcpCommandId: selectedValue(projection.mcpCommandId, "mcp_command_id"),
         occurredAt: selectedValue(occurredAt, "occurred_at"),
         processStatus: selectedValue(projection.processStatus, "process_status"),
         processType: selectedValue(projection.processType, "process_type"),
         runId: selectedValue(projection.runId, "run_id"),
+        runtimeOperationEventJson: selectedValue(null, "runtime_operation_event_json"),
+        semanticHash: selectedValue(semanticHash, "semantic_hash"),
         seq: sql<number>`${sessionsTable.runtimeEventSeqCursor} - ${input.events.length - index - 1}`.as(
           "seq",
         ),
         sessionId: sessionsTable.id,
-        sourceEventId: selectedValue(sourceEventId, "source_event_id"),
+        sourceEventId: selectedValue(event.sourceEventId, "source_event_id"),
         source: selectedValue(projection.source, "source"),
+        streamId: selectedValue(projection.streamId, "stream_id"),
+        terminalEventJson: selectedValue(null, "terminal_event_json"),
         toolCallId: selectedValue(projection.toolCallId, "tool_call_id"),
+        toolInputDeltaJson: selectedValue(projection.toolInputDeltaJson, "tool_input_delta_json"),
         toolInputJson: selectedValue(projection.toolInputJson, "tool_input_json"),
         toolName: selectedValue(projection.toolName, "tool_name"),
+        toolOutputDeltaText: selectedValue(
+          projection.toolOutputDeltaText,
+          "tool_output_delta_text",
+        ),
+        toolOutputText: selectedValue(projection.toolOutputText, "tool_output_text"),
+        toolParentMessageId: selectedValue(
+          projection.toolParentMessageId,
+          "tool_parent_message_id",
+        ),
+        toolResultMessageId: selectedValue(
+          projection.toolResultMessageId,
+          "tool_result_message_id",
+        ),
+        toolStatus: selectedValue(projection.toolStatus, "tool_status"),
         tokens: selectedValue(projection.tokens, "tokens"),
         traceId: selectedValue(projection.traceId, "trace_id"),
         visibility: selectedValue(projection.visibility, "visibility"),
@@ -370,6 +392,7 @@ function createApiCommandInsertQuery(db: AppDatabase, input: CommitQueuedSession
         completedAt: selectedValue(record.completedAt, "completed_at"),
         createdAt: selectedValue(record.createdAt, "created_at"),
         dedupeKey: selectedValue(record.dedupeKey, "dedupe_key"),
+        deliveryGeneration: selectedValue(record.deliveryGeneration, "delivery_generation"),
         id: selectedValue(record.id, "id"),
         kind: selectedValue(record.kind, "kind"),
         lastErrorCode: selectedValue(record.lastErrorCode, "last_error_code"),
@@ -407,42 +430,58 @@ export async function commitQueuedSessionRunAdmission(
     }
   }
 
-  const results = await runAppDatabaseBatch(database, (db) => [
-    createRunInsertQuery(db, input),
-    db
-      .update(sessionsTable)
-      .set({
-        lastMessageAt: input.message.timestampMs,
-        lastRunId: input.run.id,
-        messageSeqCursor: sql`${sessionsTable.messageSeqCursor} + 1`,
-        model: sql`COALESCE(${input.run.model}, ${sessionsTable.model})`,
-        provider: sql`COALESCE(${input.run.provider}, ${sessionsTable.provider})`,
-        runtimeEventSeqCursor: sql`${sessionsTable.runtimeEventSeqCursor} + ${input.events.length}`,
-        ...createSessionStatusTransitionPatch({
-          status: "RUNNING",
-          timestampMs: input.run.timestampMs,
-        }),
-      })
-      .where(
-        and(
-          eq(sessionsTable.id, input.session.id),
-          eq(sessionsTable.agentId, input.session.agentId),
-          eq(sessionsTable.projectId, input.session.projectId),
-          isNull(sessionsTable.archivedAt),
-          eq(sessionsTable.status, "IDLE"),
-          isNull(sessionsTable.statusOperationId),
-          exists(
-            db
-              .select({ id: sessionRunsTable.id })
-              .from(sessionRunsTable)
-              .where(eq(sessionRunsTable.id, input.run.id)),
+  const events = input.events.map((event, index) =>
+    sourceAdmissionEvent(event, index, input.clientRequestId),
+  );
+  const semanticHashes = await Promise.all(events.map(createRuntimeEventSemanticHash));
+
+  const results = await runAppDatabaseBatch(database, (db) => {
+    const eventInserts = events.map((event, index) => {
+      const semanticHash = semanticHashes[index];
+      if (semanticHash === undefined) {
+        throw new Error("Queued Session Run admission event hash is missing.");
+      }
+      return createEventInsertQuery(db, input, event, index, semanticHash);
+    });
+
+    return [
+      createRunInsertQuery(db, input),
+      db
+        .update(sessionsTable)
+        .set({
+          lastMessageAt: input.message.timestampMs,
+          lastRunId: input.run.id,
+          messageSeqCursor: sql`${sessionsTable.messageSeqCursor} + 1`,
+          model: sql`COALESCE(${input.run.model}, ${sessionsTable.model})`,
+          provider: sql`COALESCE(${input.run.provider}, ${sessionsTable.provider})`,
+          runtimeEventSeqCursor: sql`${sessionsTable.runtimeEventSeqCursor} + ${input.events.length}`,
+          ...createSessionStatusTransitionPatch({
+            status: "RUNNING",
+            timestampMs: input.run.timestampMs,
+          }),
+        })
+        .where(
+          and(
+            eq(sessionsTable.id, input.session.id),
+            eq(sessionsTable.agentId, input.session.agentId),
+            eq(sessionsTable.projectId, input.session.projectId),
+            isNull(sessionsTable.archivedAt),
+            eq(sessionsTable.status, "IDLE"),
+            isNull(sessionsTable.statusOperationId),
+            isNull(sessionsTable.runtimeProvisioningOperationId),
+            exists(
+              db
+                .select({ id: sessionRunsTable.id })
+                .from(sessionRunsTable)
+                .where(eq(sessionRunsTable.id, input.run.id)),
+            ),
           ),
         ),
-      ),
-    createMessageInsertQuery(db, input),
-    ...input.events.map((event, index) => createEventInsertQuery(db, input, event, index)),
-    createApiCommandInsertQuery(db, input),
-  ]);
+      createMessageInsertQuery(db, input),
+      ...eventInserts,
+      createApiCommandInsertQuery(db, input),
+    ];
+  });
 
   return getD1ChangeCount((results as readonly unknown[])[0]) > 0;
 }

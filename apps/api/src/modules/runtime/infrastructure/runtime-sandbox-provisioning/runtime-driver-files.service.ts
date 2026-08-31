@@ -1,6 +1,7 @@
 import { SANDBOX_CACHE_PATH, SANDBOX_MEMORY_PATH } from "@mosoo/agent-driver/paths";
 
 import { disposeRpcResource } from "../../../../platform/cloudflare/rpc-disposal";
+import { quoteShellArg } from "../../../../shared/shell";
 import type { DriverProfileConfig } from "../../domain/driver-snapshot";
 import type { ExecutionSessionHandle } from "../sandbox-handles";
 import {
@@ -32,13 +33,9 @@ const RUNTIME_MEMORY_MOUNTS: RuntimeMemoryMountsByRuntime = {
   ],
 };
 
-function quoteShellArg(value: string): string {
-  return `'${value.replaceAll("'", `'"'"'`)}'`;
-}
-
 async function sha256(value: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
-  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  return new Uint8Array(digest).toHex();
 }
 
 async function readJsonFile<T>(

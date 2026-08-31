@@ -5,21 +5,6 @@ import { recycleInactiveRuntimeSubjectNow } from "../runtime-subject-lifecycle/r
 import { closeSandboxConversationSession } from "../sandbox-session.service";
 import type { RuntimeSessionLink } from "./event-types";
 
-export async function closeReleasedTerminalRuntimeLeaseIfNeeded(
-  bindings: ApiBindings,
-  input: {
-    readonly link: RuntimeSessionLink | null;
-    readonly released: boolean;
-  },
-): Promise<void> {
-  if (!input.released || input.link === null) {
-    return;
-  }
-
-  await closeTerminalRuntimeConversationIfNeeded(bindings, input.link);
-  await recycleReleasedTerminalRuntimeLeaseIfNeeded(bindings, input);
-}
-
 export async function closeTerminalRuntimeConversationIfNeeded(
   bindings: ApiBindings,
   link: RuntimeSessionLink,
@@ -40,19 +25,10 @@ export async function closeTerminalRuntimeConversationIfNeeded(
   });
 }
 
-export async function recycleReleasedTerminalRuntimeLeaseIfNeeded(
+export async function recycleTerminalRuntimeLeaseIfNeeded(
   bindings: ApiBindings,
-  input: {
-    readonly link: RuntimeSessionLink | null;
-    readonly released: boolean;
-  },
+  link: RuntimeSessionLink,
 ): Promise<void> {
-  if (!input.released || input.link === null) {
-    return;
-  }
-
-  const link = input.link;
-
   if (link.sandboxKind === null || link.sandboxId === null || link.sessionId === null) {
     return;
   }

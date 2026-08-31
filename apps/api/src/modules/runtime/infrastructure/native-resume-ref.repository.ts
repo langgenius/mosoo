@@ -8,11 +8,12 @@ import {
   parseDriverNativeRuntimeRef,
 } from "@mosoo/agent-driver/runtime";
 import { nativeResumeRefsTable, sessionsTable } from "@mosoo/db";
-import type { DriverInstanceId, SessionId, SessionRunId } from "@mosoo/id";
+import type { DriverInstanceId, RuntimeEventId, SessionId, SessionRunId } from "@mosoo/id";
 import { eq, inArray, sql } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../time";
+import { RUNTIME_KIND_POLICIES } from "../domain/runtime-kind-policy";
 
 interface NativeResumeRefRow {
   committed_value: string | null;
@@ -22,11 +23,139 @@ interface NativeResumeRefRow {
   value: string;
 }
 
+interface ObservedNativeResumeRefRow {
+  kind: string;
+  observed_driver_instance_id: string | null;
+  observed_event_seq: number;
+  observed_session_run_id: string | null;
+  runtime_id: string;
+  value: string;
+}
+
 export interface NativeResumeRefObservation {
   driverInstanceId: DriverInstanceId;
   nativeResumeRef: DriverNativeRuntimeRef;
+  observedEventSeq: number;
   sessionId: SessionId;
   sessionRunId: SessionRunId;
+}
+
+const PLATFORM_NATIVE_RESUME_KINDS = Object.values(RUNTIME_KIND_POLICIES)
+  .filter((policy) => policy.nativeResume.persistence === "platform")
+  .map((policy) => policy.kind);
+
+export function prepareNativeResumeRefProjection(
+  database: D1Database,
+  input: NativeResumeRefObservation & {
+    createdAt: number;
+    eventId: RuntimeEventId;
+    semanticHash: string;
+  },
+): D1PreparedStatement[] {
+  enforceNativeRuntimeRefShape(input.nativeResumeRef);
+
+  if (!Number.isSafeInteger(input.observedEventSeq) || input.observedEventSeq < 0) {
+    throw new Error("Native resume ref event seq must be a non-negative safe integer.");
+  }
+
+  const platformKinds = PLATFORM_NATIVE_RESUME_KINDS.map(() => "?").join(", ");
+  const eligibleReceipt = `EXISTS (
+    SELECT 1
+      FROM session_event AS receipt
+      JOIN session_run AS run
+        ON run.id = ?
+       AND run.session_id = receipt.session_id
+       AND run.driver_instance_id = ?
+      JOIN driver_instance AS driver
+        ON driver.id = ?
+       AND driver.sandbox_session_id = receipt.session_id
+      JOIN sandbox AS runtime_sandbox
+        ON runtime_sandbox.id = driver.sandbox_id
+       AND runtime_sandbox.kind IN (${platformKinds})
+     WHERE receipt.id = ?
+       AND receipt.session_id = ?
+       AND receipt.event_type = 'runtime.resume.updated'
+       AND receipt.run_id = ?
+       AND receipt.semantic_hash = ?
+       AND receipt.seq = ?
+  )`;
+  const eligibilityBindings = [
+    input.sessionRunId,
+    input.driverInstanceId,
+    input.driverInstanceId,
+    ...PLATFORM_NATIVE_RESUME_KINDS,
+    input.eventId,
+    input.sessionId,
+    input.sessionRunId,
+    input.semanticHash,
+    input.observedEventSeq,
+  ];
+  const upsert = database
+    .prepare(
+      `INSERT INTO native_resume_ref (
+         created_at, kind, observed_driver_instance_id, observed_event_seq,
+         observed_session_run_id, runtime_id, session_id, updated_at, value
+       )
+       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?
+        WHERE ${eligibleReceipt}
+       ON CONFLICT (session_id) DO UPDATE SET
+         kind = excluded.kind,
+         observed_driver_instance_id = excluded.observed_driver_instance_id,
+         observed_event_seq = excluded.observed_event_seq,
+         observed_session_run_id = excluded.observed_session_run_id,
+         runtime_id = excluded.runtime_id,
+         updated_at = excluded.updated_at,
+         value = excluded.value
+       WHERE native_resume_ref.observed_event_seq < excluded.observed_event_seq`,
+    )
+    .bind(
+      input.createdAt,
+      input.nativeResumeRef.kind,
+      input.driverInstanceId,
+      input.observedEventSeq,
+      input.sessionRunId,
+      input.nativeResumeRef.runtimeId,
+      input.sessionId,
+      input.createdAt,
+      input.nativeResumeRef.value,
+      ...eligibilityBindings,
+    );
+  const guard = database
+    .prepare(
+      `INSERT INTO session_event (id)
+       SELECT ?
+        WHERE ${eligibleReceipt}
+          AND NOT EXISTS (
+            SELECT 1
+              FROM native_resume_ref AS stored
+             WHERE stored.session_id = ?
+               AND (
+                 stored.observed_event_seq > ?
+                 OR (
+                   stored.observed_event_seq = ?
+                   AND stored.kind = ?
+                   AND stored.observed_driver_instance_id = ?
+                   AND stored.observed_session_run_id = ?
+                   AND stored.runtime_id = ?
+                   AND stored.value = ?
+                 )
+               )
+          )`,
+    )
+    .bind(
+      input.eventId,
+      ...eligibilityBindings,
+      input.sessionId,
+      input.observedEventSeq,
+      input.observedEventSeq,
+      input.nativeResumeRef.kind,
+      input.driverInstanceId,
+      input.sessionRunId,
+      input.nativeResumeRef.runtimeId,
+      input.nativeResumeRef.value,
+    );
+
+  return [upsert, guard];
 }
 
 function expectedNativeRuntimeRefKind(
@@ -113,14 +242,20 @@ export async function upsertNativeResumeRef(
 ): Promise<void> {
   enforceNativeRuntimeRefShape(observation.nativeResumeRef);
 
-  const timestampMs = currentTimestampMs();
+  if (!Number.isSafeInteger(observation.observedEventSeq) || observation.observedEventSeq < 0) {
+    throw new Error("Native resume ref event seq must be a non-negative safe integer.");
+  }
 
-  await getAppDatabase(database)
+  const timestampMs = currentTimestampMs();
+  const appDatabase = getAppDatabase(database);
+
+  await appDatabase
     .insert(nativeResumeRefsTable)
     .values({
       createdAt: timestampMs,
       kind: observation.nativeResumeRef.kind,
       observedDriverInstanceId: observation.driverInstanceId,
+      observedEventSeq: observation.observedEventSeq,
       observedSessionRunId: observation.sessionRunId,
       runtimeId: observation.nativeResumeRef.runtimeId,
       sessionId: observation.sessionId,
@@ -131,12 +266,54 @@ export async function upsertNativeResumeRef(
       set: {
         kind: sql`excluded.kind`,
         observedDriverInstanceId: sql`excluded.observed_driver_instance_id`,
+        observedEventSeq: sql`excluded.observed_event_seq`,
         observedSessionRunId: sql`excluded.observed_session_run_id`,
         runtimeId: sql`excluded.runtime_id`,
         updatedAt: sql`excluded.updated_at`,
         value: sql`excluded.value`,
       },
+      setWhere: sql`${nativeResumeRefsTable.observedEventSeq} < excluded.observed_event_seq`,
       target: nativeResumeRefsTable.sessionId,
     })
     .run();
+
+  const stored =
+    (await appDatabase
+      .select({
+        kind: nativeResumeRefsTable.kind,
+        observed_driver_instance_id: nativeResumeRefsTable.observedDriverInstanceId,
+        observed_event_seq: nativeResumeRefsTable.observedEventSeq,
+        observed_session_run_id: nativeResumeRefsTable.observedSessionRunId,
+        runtime_id: nativeResumeRefsTable.runtimeId,
+        value: nativeResumeRefsTable.value,
+      })
+      .from(nativeResumeRefsTable)
+      .where(eq(nativeResumeRefsTable.sessionId, observation.sessionId))
+      .limit(1)
+      .get()) ?? null;
+
+  assertNativeResumeRefConverged(stored, observation);
+}
+
+function assertNativeResumeRefConverged(
+  stored: ObservedNativeResumeRefRow | null,
+  observation: NativeResumeRefObservation,
+): void {
+  if (stored === null || stored.observed_event_seq < observation.observedEventSeq) {
+    throw new Error("Native resume ref CAS did not persist the durable event.");
+  }
+
+  if (stored.observed_event_seq > observation.observedEventSeq) {
+    return;
+  }
+
+  if (
+    stored.kind !== observation.nativeResumeRef.kind ||
+    stored.observed_driver_instance_id !== observation.driverInstanceId ||
+    stored.observed_session_run_id !== observation.sessionRunId ||
+    stored.runtime_id !== observation.nativeResumeRef.runtimeId ||
+    stored.value !== observation.nativeResumeRef.value
+  ) {
+    throw new Error("Native resume ref event seq was replayed with conflicting content.");
+  }
 }

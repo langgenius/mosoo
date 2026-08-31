@@ -148,13 +148,14 @@ function ModelDonut({ models, totalCost }: { models: CostModelRow[]; totalCost: 
   }
 
   let cursor = 0;
-  const slices = models.map((model, index) => {
+  const slices: string[] = [];
+
+  for (const [index, model] of models.entries()) {
     const start = cursor;
     const span = (model.totalCostUsd / totalCost) * 100;
     cursor += span;
-
-    return `${vendorColor(index)} ${start}% ${cursor}%`;
-  });
+    slices.push(`${vendorColor(index)} ${start}% ${cursor}%`);
+  }
 
   return (
     <div className="flex items-center gap-5">

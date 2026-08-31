@@ -120,46 +120,16 @@ export function createQueuedSessionRunRuntimeEvents(input: {
   ];
 }
 
-export function createCancelledSessionRunRuntimeEvent(input: {
+export function createFailedSessionRunRuntimeEvent(input: {
   eventId?: RuntimeEventId;
   lifecycle?: Extract<SessionLifecycleStatus, "IDLE" | "TERMINATED">;
-  run: SessionRunSummary;
-  runError?: RunError | null;
-  sessionId: SessionId;
-  sourceEventId?: string;
-}): RuntimeEventEnvelope {
-  const run: SessionRunView = {
-    ...toSessionRunView(input.run),
-    error: input.runError
-      ? {
-          ...input.runError,
-          details: toPrimitiveRecord(input.runError.details),
-        }
-      : input.run.error,
-    status: "cancelled",
-  };
-
-  return createSessionRuntimeEvent({
-    ...(input.eventId === undefined ? {} : { id: input.eventId }),
-    ...(input.sourceEventId === undefined ? {} : { sourceEventId: input.sourceEventId }),
-    kind: "run.cancelled",
-    payload: {
-      lifecycle: input.lifecycle ?? "IDLE",
-      run,
-    },
-    runId: input.run.id,
-    sessionId: input.sessionId,
-    traceId: input.run.traceId,
-  });
-}
-
-export function createFailedSessionRunRuntimeEvent(input: {
   run: SessionRunSummary;
   runError: RunError;
   sessionId: SessionId;
   sourceEventId?: string;
 }): RuntimeEventEnvelope {
   return createSessionRuntimeEvent({
+    ...(input.eventId === undefined ? {} : { id: input.eventId }),
     kind: "run.failed",
     payload: {
       error: {
@@ -168,7 +138,8 @@ export function createFailedSessionRunRuntimeEvent(input: {
         message: input.runError.message,
         retryable: input.runError.retryable,
       },
-      lifecycle: "IDLE",
+      recoverable: input.runError.retryable,
+      lifecycle: input.lifecycle ?? "IDLE",
       run: toSessionRunView(input.run),
     },
     runId: input.run.id,
@@ -178,16 +149,41 @@ export function createFailedSessionRunRuntimeEvent(input: {
   });
 }
 
+export function createCompletedSessionRunRuntimeEvent(input: {
+  eventId?: RuntimeEventId;
+  finalMessageId: SessionMessageId;
+  lifecycle?: Extract<SessionLifecycleStatus, "IDLE" | "TERMINATED">;
+  run: SessionRunSummary;
+  sessionId: SessionId;
+  sourceEventId?: string;
+}): RuntimeEventEnvelope {
+  return createSessionRuntimeEvent({
+    ...(input.eventId === undefined ? {} : { id: input.eventId }),
+    ...(input.sourceEventId === undefined ? {} : { sourceEventId: input.sourceEventId }),
+    kind: "run.completed",
+    payload: {
+      finalMessageId: input.finalMessageId,
+      lifecycle: input.lifecycle ?? "IDLE",
+      run: toSessionRunView(input.run),
+    },
+    runId: input.run.id,
+    sessionId: input.sessionId,
+    traceId: input.run.traceId,
+  });
+}
+
 export function createSessionLifecycleTerminatedEvent(input: {
   eventId?: RuntimeEventId;
   lastSeen: string;
   message: string;
+  occurredAtMs?: number;
   reason: string;
   sessionId: SessionId;
   sourceEventId?: string;
 }): RuntimeEventEnvelope {
   return createSessionRuntimeEvent({
     ...(input.eventId === undefined ? {} : { id: input.eventId }),
+    ...(input.occurredAtMs === undefined ? {} : { occurredAtMs: input.occurredAtMs }),
     ...(input.sourceEventId === undefined ? {} : { sourceEventId: input.sourceEventId }),
     kind: "session.lifecycle.updated",
     payload: {

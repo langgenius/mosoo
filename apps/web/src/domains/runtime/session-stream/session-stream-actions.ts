@@ -68,22 +68,23 @@ export function useSessionStreamActions(input: UseSessionStreamActionsInput): {
   streaming: boolean;
   syncSession: () => Promise<void>;
 } {
+  const { activeSessionIdRef, sendViewerEvent } = input;
   const syncSession = useCallback(async (): Promise<void> => {
-    const activeSessionId = input.activeSessionIdRef.current;
+    const activeSessionId = activeSessionIdRef.current;
 
     if (!isTruthy(activeSessionId)) {
       return;
     }
 
     const options: SendViewerEventOptions = { maxAttempts: 2 };
-    await input.sendViewerEvent(
+    await sendViewerEvent(
       activeSessionId,
       createViewerCustomEvent("mosoo.session.sync.request", {
         reason: "manual",
       }),
       options,
     );
-  }, [input.activeSessionIdRef, input.sendViewerEvent]);
+  }, [activeSessionIdRef, sendViewerEvent]);
   const sendUserMessage = useCallback(
     async (message: {
       attachmentIds?: string[];

@@ -110,6 +110,10 @@ async function insertQueuedRunFixture(
       input.nowMs,
     )
     .run();
+  await database
+    .prepare("UPDATE session SET last_run_id = ?, status = ? WHERE id = ?")
+    .bind(input.runId, "RUNNING", PUBLIC_API_TEST_IDS.ownerSession)
+    .run();
 }
 
 async function insertSessionFileRecord(
@@ -530,6 +534,10 @@ describe("send agent session events", () => {
         nowMs,
         nowMs,
       )
+      .run();
+    await database
+      .prepare("UPDATE session SET last_run_id = ?, status = ? WHERE id = ?")
+      .bind(PUBLIC_API_TEST_IDS.run, "RUNNING", PUBLIC_API_TEST_IDS.ownerSession)
       .run();
     await database
       .prepare(

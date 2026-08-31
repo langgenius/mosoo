@@ -1,5 +1,5 @@
-import { driverInstancesTable, externalToolEffectsTable } from "@mosoo/db";
-import { and, eq, inArray, isNull, lte, notExists, sql } from "drizzle-orm";
+import { driverInstancesTable, externalToolEffectsTable, sessionsTable } from "@mosoo/db";
+import { and, eq, inArray, isNotNull, isNull, lte, notExists, sql } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../../platform/db/drizzle";
@@ -9,7 +9,9 @@ import {
   DRIVER_COLD_READY_TIMEOUT_MS,
   RUNTIME_SOCKET_TIMEOUT_MS,
 } from "../../domain/runtime-config";
+import { repairClaimedDriverStopsGlobally } from "../driver-session-stop.service";
 import { driverInstanceExpiresAt } from "./status";
+import { repairTerminalDriverRuntimeCommandsGlobally } from "./terminal-run-release";
 
 export async function cleanupDriverInstances(bindings: ApiBindings): Promise<void> {
   const database = getAppDatabase(bindings.DB);
@@ -77,11 +79,33 @@ export async function cleanupDriverInstances(bindings: ApiBindings): Promise<voi
     )
     .run();
 
+  try {
+    await repairTerminalDriverRuntimeCommandsGlobally(bindings);
+  } catch {
+    // A Driver-owned stop can temporarily fence terminal cleanup. The stop
+    // pass below owns convergence; the final terminal pass reports anything
+    // that remains unresolved.
+  }
+  let stopRepairError: unknown;
+  try {
+    await repairClaimedDriverStopsGlobally(bindings);
+  } catch (error) {
+    stopRepairError = error;
+  }
+  // A Driver-owned stop may be the fence that kept the first terminal pass
+  // from claiming its Run. Run terminal convergence again against the now
+  // non-assignable Driver.
+  await repairTerminalDriverRuntimeCommandsGlobally(bindings);
+  if (stopRepairError !== undefined) {
+    throw stopRepairError;
+  }
+
   await database
     .delete(driverInstancesTable)
     .where(
       and(
         inArray(driverInstancesTable.status, ["stopped", "failed"]),
+        isNull(driverInstancesTable.statusOperationId),
         lte(driverInstancesTable.expiresAt, now),
         notExists(
           database
@@ -90,7 +114,19 @@ export async function cleanupDriverInstances(bindings: ApiBindings): Promise<voi
             .where(
               and(
                 eq(externalToolEffectsTable.driverInstanceId, driverInstancesTable.id),
-                inArray(externalToolEffectsTable.status, ["executing", "unknown"]),
+                inArray(externalToolEffectsTable.status, ["claimed", "unknown"]),
+              ),
+            ),
+        ),
+        notExists(
+          database
+            .select({ id: sessionsTable.id })
+            .from(sessionsTable)
+            .where(
+              and(
+                eq(sessionsTable.id, driverInstancesTable.sandboxSessionId),
+                eq(sessionsTable.runtimeProvisioningSandboxId, driverInstancesTable.sandboxId),
+                isNotNull(sessionsTable.runtimeProvisioningOperationId),
               ),
             ),
         ),

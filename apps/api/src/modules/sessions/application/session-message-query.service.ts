@@ -6,6 +6,7 @@ import { asc, eq } from "drizzle-orm";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { ensureProjectSessionParticipantAccess } from "../domain/session-access.policy";
+import { resolveStoredSessionMessageReferences } from "../infrastructure/session-message-reference.repository";
 import { toSessionMessage } from "./session-message-mappers";
 import { getSessionReadAccess } from "./session-read-access.service";
 
@@ -46,13 +47,17 @@ async function listSessionMessages(
       created_by_account_id: sessionMessagesTable.createdByAccountId,
       id: sessionMessagesTable.id,
       plan_json: sessionMessagesTable.planJson,
+      projection_format: sessionMessagesTable.projectionFormat,
       role: sessionMessagesTable.role,
       segments_json: sessionMessagesTable.segmentsJson,
+      session_run_id: sessionMessagesTable.sessionRunId,
     })
     .from(sessionMessagesTable)
     .where(eq(sessionMessagesTable.sessionId, sessionId))
     .orderBy(asc(sessionMessagesTable.seq))
     .all();
 
-  return results.map((row) => toSessionMessage(row));
+  const resolved = await resolveStoredSessionMessageReferences(database, sessionId, results);
+
+  return resolved.map((row) => toSessionMessage(row));
 }

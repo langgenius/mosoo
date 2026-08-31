@@ -19,12 +19,14 @@ export type SessionViewSegment =
       argsText: string;
       kind: "tool_use";
       path: string | null;
+      runId?: string | null;
       tool: string;
       toolCallId: string;
     }
   | {
       kind: "tool_result";
       output: string;
+      runId?: string | null;
       tool: string;
       toolCallId: string;
     };

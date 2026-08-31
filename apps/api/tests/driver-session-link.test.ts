@@ -27,12 +27,15 @@ function createDriverSessionLinkDatabase(): SqliteD1Database {
     );
 
     CREATE TABLE session_run (
+      created_at integer DEFAULT 0 NOT NULL,
       created_by_account_id text,
       driver_instance_id text,
       id text PRIMARY KEY NOT NULL,
+      runtime_id text,
       session_id text NOT NULL,
       status text NOT NULL,
-      trace_id text
+      trace_id text,
+      updated_at integer DEFAULT 0 NOT NULL
     );
 
     CREATE TABLE session (
@@ -40,6 +43,7 @@ function createDriverSessionLinkDatabase(): SqliteD1Database {
       project_id text,
       creator_account_id text NOT NULL,
       id text PRIMARY KEY NOT NULL,
+      runtime_id text,
       type text DEFAULT 'preview' NOT NULL
     );
 
@@ -101,12 +105,14 @@ describe("driver runtime session link", () => {
     expect(
       runtimeSessionLinkNeedsRefresh({
         agentId: AGENT_ID,
+        appId: null,
         callerId: CALLER_FROM_ORIGIN_ID,
         creatorId: CREATOR_ID,
         executionOwnerId: EXECUTION_OWNER_FROM_ORIGIN_ID,
         sandboxId: SANDBOX_ID,
         sandboxKind: "cattle",
         sandboxSubjectKind: "session",
+        runtimeId: null,
         sessionId: SESSION_ID,
         sessionRunId: null,
         sessionRunStatus: null,

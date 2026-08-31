@@ -16,6 +16,7 @@ export type RuntimeCommandTransitionOutcome =
         | "command_not_found"
         | "illegal_transition"
         | "inactive_delivery_connection"
+        | "inactive_session_run"
         | "stale_delivery_connection";
       targetStatus: RuntimeCommandStatus;
     };
@@ -32,7 +33,7 @@ const previousStatusesByTarget = {
   completed: ["delivered", "accepted"],
   delivered: ["queued"],
   expired: ["queued", "delivered", "accepted"],
-  failed: ["delivered", "accepted"],
+  failed: ["queued", "delivered", "accepted"],
   queued: ["delivered"],
 } as const satisfies Record<RuntimeCommandStatus, readonly RuntimeCommandStatus[]>;
 

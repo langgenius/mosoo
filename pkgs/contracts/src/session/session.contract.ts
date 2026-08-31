@@ -20,6 +20,8 @@ import type {
 import type { AgentMcpCredentialMode } from "../mcp/mcp.contract";
 import type { SessionRunSummary, UserWarning } from "./session-run.contract";
 
+declare const TextEncoder: new () => { encode(input?: string): Uint8Array };
+
 export const SESSION_STATUSES = ["IDLE", "RUNNING", "RESCHEDULING", "TERMINATED"] as const;
 export type SessionStatus = (typeof SESSION_STATUSES)[number];
 
@@ -99,10 +101,17 @@ export type SessionMessageSegment =
       argsText: string;
       kind: "tool_use";
       path: string | null;
+      runId?: SessionRunId | null;
       tool: string;
       toolCallId: string;
     }
-  | { kind: "tool_result"; output: string; tool: string; toolCallId: string };
+  | {
+      kind: "tool_result";
+      output: string;
+      runId?: SessionRunId | null;
+      tool: string;
+      toolCallId: string;
+    };
 
 /**
  * The agent's current understanding of its work-to-do for this assistant
@@ -497,21 +506,7 @@ const AGENT_TASK_SNAPSHOT_MAX_TASKS = 256;
 const AGENT_TASK_ID_MAX_UTF8_BYTES = 256;
 const AGENT_TASK_TEXT_MAX_CODE_UNITS = 4096;
 const AGENT_TASK_PAYLOAD_MAX_UTF8_BYTES = 1020 * 1024;
-
-function getUtf8ByteLength(value: string): number {
-  let bytes = 0;
-
-  for (let index = 0; index < value.length; index += 1) {
-    const codePoint = value.codePointAt(index) ?? 0;
-    bytes += codePoint <= 0x7f ? 1 : codePoint <= 0x7ff ? 2 : codePoint <= 0xffff ? 3 : 4;
-
-    if (codePoint > 0xffff) {
-      index += 1;
-    }
-  }
-
-  return bytes;
-}
+const agentTaskTextEncoder = new TextEncoder();
 
 export const AgentTask = type({
   taskId: "string > 0",
@@ -520,7 +515,7 @@ export const AgentTask = type({
 })
   .onUndeclaredKey("reject")
   .narrow((task, context) => {
-    if (getUtf8ByteLength(task.taskId) > AGENT_TASK_ID_MAX_UTF8_BYTES) {
+    if (agentTaskTextEncoder.encode(task.taskId).byteLength > AGENT_TASK_ID_MAX_UTF8_BYTES) {
       return context.reject({
         actual: task.taskId,
         expected: `a taskId of at most ${AGENT_TASK_ID_MAX_UTF8_BYTES} UTF-8 bytes`,
@@ -563,7 +558,7 @@ export const AgentTasksReplacedPayload = type({
 })
   .onUndeclaredKey("reject")
   .narrow((payload, context) => {
-    const byteLength = getUtf8ByteLength(JSON.stringify(payload));
+    const byteLength = agentTaskTextEncoder.encode(JSON.stringify(payload)).byteLength;
 
     return byteLength <= AGENT_TASK_PAYLOAD_MAX_UTF8_BYTES
       ? true
@@ -581,7 +576,9 @@ export const AgentTaskSnapshot = type({
 })
   .onUndeclaredKey("reject")
   .narrow((snapshot, context) => {
-    const byteLength = getUtf8ByteLength(JSON.stringify({ tasks: snapshot.tasks }));
+    const byteLength = agentTaskTextEncoder.encode(
+      JSON.stringify({ tasks: snapshot.tasks }),
+    ).byteLength;
 
     return byteLength <= AGENT_TASK_PAYLOAD_MAX_UTF8_BYTES
       ? true

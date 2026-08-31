@@ -1,4 +1,9 @@
-import { usageDailyRollupsTable, usageEventRollupReceiptsTable, usageEventsTable } from "@mosoo/db";
+import {
+  sessionModelCallsTable,
+  usageDailyRollupsTable,
+  usageEventRollupReceiptsTable,
+  usageEventsTable,
+} from "@mosoo/db";
 import { lt, sql } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
@@ -55,6 +60,26 @@ export async function runUsageDailyRollup(env: ApiBindings, now = new Date()): P
   // Drizzle's D1 batch cannot prepare parameterized db.run(sql) queries.
   const cutoffSql = sql.raw(String(cutoffMs));
   const rolledUpAtSql = sql.raw(String(rolledUpAtMs));
+  const eligibleUsage = sql`
+    ${usageEventsTable.createdAt} < ${cutoffSql}
+    AND (
+      ${usageEventsTable.source} <> 'runtime_driver'
+      OR EXISTS (
+        SELECT 1
+        FROM ${sessionModelCallsTable} AS rollup_model_call
+        WHERE rollup_model_call.session_id = ${usageEventsTable.sessionId}
+          AND rollup_model_call.session_run_id = ${usageEventsTable.sessionRunId}
+          AND ${usageEventsTable.sourceEventId} =
+            rollup_model_call.driver_instance_id || ':' ||
+            CASE
+              WHEN trim(COALESCE(rollup_model_call.native_call_id, '')) <> ''
+                THEN trim(rollup_model_call.native_call_id)
+              ELSE rollup_model_call.session_run_id || ':' || rollup_model_call.call_key
+            END
+          AND rollup_model_call.source_event_seq >= ${usageEventsTable.sourceEventSeq}
+      )
+    )
+  `;
 
   await runAppDatabaseBatch(env.DB, (db) => [
     db.run(sql`
@@ -98,7 +123,7 @@ export async function runUsageDailyRollup(env: ApiBindings, now = new Date()): P
           SUM(CASE WHEN ${usageEventsTable.pricingStatus} = 'unknown' THEN 1 ELSE 0 END)
             AS unpriced_request_count
         FROM ${usageEventsTable}
-        WHERE ${usageEventsTable.createdAt} < ${cutoffSql}
+        WHERE ${eligibleUsage}
         GROUP BY
           ${usageEventsTable.organizationId},
           ${usageEventsTable.projectId},
@@ -140,10 +165,10 @@ export async function runUsageDailyRollup(env: ApiBindings, now = new Date()): P
           ${usageEventsTable.sourceEventId},
           ${rolledUpAtSql}
         FROM ${usageEventsTable}
-        WHERE ${usageEventsTable.createdAt} < ${cutoffSql}
+        WHERE ${eligibleUsage}
         ON CONFLICT(source, source_event_id) DO NOTHING
       `),
-    db.delete(usageEventsTable).where(lt(usageEventsTable.createdAt, cutoffMs)),
+    db.delete(usageEventsTable).where(eligibleUsage),
     db.delete(usageDailyRollupsTable).where(createDailyRollupRetentionPredicate(now)),
     db
       .delete(usageEventRollupReceiptsTable)

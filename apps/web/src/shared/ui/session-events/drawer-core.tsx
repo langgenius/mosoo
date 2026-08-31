@@ -92,9 +92,8 @@ export function SessionEventDrawerCore<TEvent extends SessionEventDrawerCoreEven
   const [expandedEventIds, setExpandedEventIds] = useState<Set<string>>(() => new Set());
   const [expansionTouched, setExpansionTouched] = useState(false);
   const [scrollTop, setScrollTop] = useState(0);
-  const eventRefs = useRef<Map<string, HTMLDivElement> | null>(null);
-  eventRefs.current ??= new Map<string, HTMLDivElement>();
-  const eventRefMap = eventRefs.current;
+  const [viewportHeight, setViewportHeight] = useState(420);
+  const eventRefs = useRef(new Map<string, HTMLDivElement>());
   const listRef = useRef<HTMLDivElement | null>(null);
   const initialScrollCompletedRef = useRef(false);
   const selectedId = selectedEventId ?? focusEventId ?? events[0]?.id ?? null;
@@ -119,7 +118,6 @@ export function SessionEventDrawerCore<TEvent extends SessionEventDrawerCoreEven
     }
 
     const start = findVirtualizedStartIndex(offsets, scrollTop, SESSION_EVENT_DRAWER_OVERSCAN);
-    const viewportHeight = listRef.current?.clientHeight ?? 420;
     const end = Math.min(
       events.length,
       start +
@@ -128,7 +126,7 @@ export function SessionEventDrawerCore<TEvent extends SessionEventDrawerCoreEven
     );
 
     return { end, start };
-  }, [events.length, offsets, scrollTop, virtualized]);
+  }, [events.length, offsets, scrollTop, viewportHeight, virtualized]);
 
   function scrollInitialSelection(): void {
     if (initialScrollCompletedRef.current || selectedId === null) {
@@ -142,7 +140,7 @@ export function SessionEventDrawerCore<TEvent extends SessionEventDrawerCoreEven
       initialScrollCompletedRef.current = true;
       globalThis.requestAnimationFrame(() => {
         listRef.current?.scrollTo({ top: offset });
-        eventRefMap.get(selectedId)?.scrollIntoView({ block: "nearest" });
+        eventRefs.current.get(selectedId)?.scrollIntoView({ block: "nearest" });
       });
     }
   }
@@ -161,7 +159,7 @@ export function SessionEventDrawerCore<TEvent extends SessionEventDrawerCoreEven
       return;
     }
 
-    eventRefMap.get(eventId)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    eventRefs.current.get(eventId)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }
 
   function toggleExpanded(eventId: string): void {
@@ -195,11 +193,13 @@ export function SessionEventDrawerCore<TEvent extends SessionEventDrawerCoreEven
         ref={(node) => {
           listRef.current = node;
           if (node !== null) {
+            setViewportHeight(node.clientHeight);
             scrollInitialSelection();
           }
         }}
         onScroll={(event) => {
           setScrollTop(event.currentTarget.scrollTop);
+          setViewportHeight(event.currentTarget.clientHeight);
         }}
         className="min-h-0 flex-1 overflow-y-auto pr-1"
       >
@@ -235,12 +235,12 @@ export function SessionEventDrawerCore<TEvent extends SessionEventDrawerCoreEven
                 key={event.id}
                 ref={(node) => {
                   if (node) {
-                    eventRefMap.set(event.id, node);
+                    eventRefs.current.set(event.id, node);
                     if (event.id === selectedId) {
                       scrollInitialSelection();
                     }
                   } else {
-                    eventRefMap.delete(event.id);
+                    eventRefs.current.delete(event.id);
                   }
                 }}
               >

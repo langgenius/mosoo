@@ -8,7 +8,9 @@ import { repairStrandedRuntimeSubjectDeadlines } from "../src/modules/runtime/in
 import { listInactiveRuntimeSubjects } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-store";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import {
+  PUBLIC_API_TEST_IDS,
   createPublicHttpContractDatabase,
+  insertActiveSandboxSessionFixture,
   insertNonOwnerSession,
 } from "./helpers/public-api-http-test-fixture";
 import type { SqliteD1Database } from "./helpers/sqlite-d1";
@@ -26,36 +28,21 @@ function createBindings(database: D1Database): ApiBindings {
 
 async function insertSandbox(
   database: SqliteD1Database,
-  input: {
-    readonly id?: string;
-    readonly kind?: "cattle" | "pet";
-    readonly subjectId?: string;
-    readonly subjectKind?: "agent" | "session";
-  } = {},
+  kind: "cattle" | "pet" = "pet",
 ): Promise<void> {
-  await database
-    .prepare(
-      `
-        INSERT INTO sandbox (id, kind, subject_kind, subject_id, status, inactive_deadline_at, created_at, updated_at)
-        VALUES (?, ?, ?, ?, 'active', NULL, 1, 1)
-      `,
-    )
-    .bind(
-      input.id ?? SANDBOX_ID,
-      input.kind ?? "pet",
-      input.subjectKind ?? "agent",
-      input.subjectId ?? AGENT_ID,
-    )
-    .run();
+  await insertActiveSandboxSessionFixture(database, {
+    kind,
+    ownerAccountId: PUBLIC_API_TEST_IDS.nonOwnerAccount,
+    sandboxId: SANDBOX_ID,
+    sessionId: SESSION_ID,
+    timestampMs: 1,
+  });
 }
 
 async function insertDriver(
   database: SqliteD1Database,
   input: {
-    readonly id?: string;
     readonly lastHeartbeatAt: number;
-    readonly sandboxId?: string;
-    readonly status?: string;
   },
 ): Promise<void> {
   await database
@@ -64,6 +51,7 @@ async function insertDriver(
         INSERT INTO driver_instance (
           id,
           sandbox_id,
+          sandbox_incarnation,
           sandbox_session_id,
           runtime,
           protocol,
@@ -79,17 +67,18 @@ async function insertDriver(
           created_at,
           updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
     )
     .bind(
-      input.id ?? DRIVER_ID,
-      input.sandboxId ?? SANDBOX_ID,
+      DRIVER_ID,
+      SANDBOX_ID,
+      1,
       SESSION_ID,
       "cloudflare-container",
       "driver-ws",
       1,
-      input.status ?? "ready",
+      "ready",
       new Uint8Array([1]),
       Date.now() + 10_000,
       Date.now(),
@@ -107,8 +96,6 @@ async function insertRun(
   database: SqliteD1Database,
   input: {
     readonly driverInstanceId?: string | null;
-    readonly id?: string;
-    readonly sessionId?: string;
     readonly status?: string;
   } = {},
 ): Promise<void> {
@@ -134,8 +121,8 @@ async function insertRun(
       `,
     )
     .bind(
-      input.id ?? RUN_ID,
-      input.sessionId ?? SESSION_ID,
+      RUN_ID,
+      SESSION_ID,
       AGENT_ID,
       "01J00000000000000000000002",
       "user_prompt",
@@ -237,43 +224,46 @@ describe("pet stranded recycle", () => {
     ).resolves.toEqual([{ id: SANDBOX_ID, kind: "pet" }]);
   });
 
-  test("leaves live, busy, and resident subjects alone", async () => {
+  test("leaves a pet with a live Driver alone", async () => {
     const database = await createPublicHttpContractDatabase();
     await insertNonOwnerSession(database);
     const nowMs = Date.now();
-    // A pet with a live driver is not reclaimable.
-    await insertSandbox(database, { id: "01J0000000000000000000000V" });
+    await insertSandbox(database);
     await insertDriver(database, {
-      id: "01J0000000000000000000000W",
       lastHeartbeatAt: nowMs,
-      sandboxId: "01J0000000000000000000000V",
     });
-    // A pet whose subject still has an active run is not reclaimable, even
-    // when no driver row links the run to the sandbox yet.
-    await insertSandbox(database, {
-      id: "01J0000000000000000000000X",
-      subjectId: SESSION_ID,
-      subjectKind: "session",
-    });
-    await insertRun(database, { driverInstanceId: null, status: "queued" });
-    // A cattle subject with an active conversation stays resident.
-    await insertSandbox(database, { id: "01J0000000000000000000000Y", kind: "cattle" });
-    await database
-      .prepare(
-        `
-          INSERT INTO sandbox_session (cloudflare_session_id, created_at, cwd, origin_json, sandbox_id, session_id, status, updated_at)
-          VALUES ('cf-session-1', 1, '/workspace', '{}', '01J0000000000000000000000Y', '01J0000000000000000000000C', 'active', 1)
-        `,
-      )
-      .run();
 
     await expect(repairStrandedRuntimeSubjectDeadlines(database, { now: nowMs })).resolves.toEqual({
       cattle: 0,
       pet: 0,
     });
+    await expect(readSandboxDeadline(database)).resolves.toBeNull();
+  });
 
-    await expect(readSandboxDeadline(database, "01J0000000000000000000000V")).resolves.toBeNull();
-    await expect(readSandboxDeadline(database, "01J0000000000000000000000X")).resolves.toBeNull();
-    await expect(readSandboxDeadline(database, "01J0000000000000000000000Y")).resolves.toBeNull();
+  test("leaves a pet with an active subject Run alone", async () => {
+    const database = await createPublicHttpContractDatabase();
+    await insertNonOwnerSession(database);
+    const nowMs = Date.now();
+    await insertSandbox(database);
+    await insertRun(database, { driverInstanceId: null, status: "queued" });
+
+    await expect(repairStrandedRuntimeSubjectDeadlines(database, { now: nowMs })).resolves.toEqual({
+      cattle: 0,
+      pet: 0,
+    });
+    await expect(readSandboxDeadline(database)).resolves.toBeNull();
+  });
+
+  test("leaves cattle with an active conversation resident", async () => {
+    const database = await createPublicHttpContractDatabase();
+    await insertNonOwnerSession(database);
+    const nowMs = Date.now();
+    await insertSandbox(database, "cattle");
+
+    await expect(repairStrandedRuntimeSubjectDeadlines(database, { now: nowMs })).resolves.toEqual({
+      cattle: 0,
+      pet: 0,
+    });
+    await expect(readSandboxDeadline(database)).resolves.toBeNull();
   });
 });

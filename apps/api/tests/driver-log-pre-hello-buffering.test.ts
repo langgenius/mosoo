@@ -41,7 +41,7 @@ function createBatch(message: string): DriverLogBatchInput {
         timestamp: new Date(0).toISOString(),
       },
     ],
-  } as DriverLogBatchInput;
+  };
 }
 
 const activeContext = {

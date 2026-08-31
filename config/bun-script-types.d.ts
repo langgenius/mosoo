@@ -42,6 +42,7 @@ interface BunProcessOptions {
   readonly stderr?: "inherit" | "pipe";
   readonly stdin?: "inherit" | "pipe";
   readonly stdout?: "inherit" | "pipe";
+  readonly timeout?: number;
 }
 
 export interface BunRuntime {

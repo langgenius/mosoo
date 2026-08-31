@@ -21,7 +21,7 @@ import type {
   SessionRunId,
 } from "@mosoo/id";
 import { parsePlatformId } from "@mosoo/id";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../../platform/db/drizzle";
 import { ACTIVE_SESSION_RUN_STATUSES } from "../../domain/session-run-lifecycle.machine";
@@ -35,6 +35,7 @@ interface RuntimeSessionLinkRow {
   caller_account_id: AccountId | null;
   creator_account_id: PlatformId | null;
   origin_json: string | null;
+  runtime_id: string | null;
   sandbox_id: SandboxId | null;
   sandbox_kind: AgentKind | null;
   sandbox_subject_kind: SandboxSubjectKind | null;
@@ -46,6 +47,7 @@ interface RuntimeSessionLinkRow {
 }
 
 export interface GetRuntimeSessionLinkOptions {
+  latestTerminalRun?: boolean;
   sessionRunId?: SessionRunId;
 }
 
@@ -82,14 +84,19 @@ export async function getRuntimeSessionLink(
 ): Promise<RuntimeSessionLink> {
   const linkedSessionId = sql<SessionId | null>`coalesce(${sessionRunsTable.sessionId}, ${sandboxSessionsTable.sessionId})`;
   const linkedSessionRun =
-    options.sessionRunId === undefined
+    options.sessionRunId !== undefined
       ? and(
           eq(sessionRunsTable.driverInstanceId, driverInstancesTable.id),
-          inArray(sessionRunsTable.status, ACTIVE_SESSION_RUN_STATUSES),
+          eq(sessionRunsTable.id, options.sessionRunId),
         )
       : and(
           eq(sessionRunsTable.driverInstanceId, driverInstancesTable.id),
-          eq(sessionRunsTable.id, options.sessionRunId),
+          inArray(
+            sessionRunsTable.status,
+            options.latestTerminalRun === true
+              ? ["cancelled", "completed", "expired", "failed"]
+              : ACTIVE_SESSION_RUN_STATUSES,
+          ),
         );
   const row =
     (await getAppDatabase(database)
@@ -100,6 +107,9 @@ export async function getRuntimeSessionLink(
         caller_account_id: sessionRunsTable.createdByAccountId,
         creator_account_id: sessionsTable.creatorAccountId,
         origin_json: sandboxSessionsTable.originJson,
+        runtime_id: sql<
+          string | null
+        >`coalesce(${sessionRunsTable.runtimeId}, ${sessionsTable.runtimeId})`,
         sandbox_id: driverInstancesTable.sandboxId,
         sandbox_kind: sandboxesTable.kind,
         sandbox_subject_kind: sandboxesTable.subjectKind,
@@ -119,6 +129,11 @@ export async function getRuntimeSessionLink(
       .leftJoin(agentsTable, eq(agentsTable.id, sessionsTable.agentId))
       .leftJoin(sandboxesTable, eq(sandboxesTable.id, driverInstancesTable.sandboxId))
       .where(eq(driverInstancesTable.id, driverInstanceId))
+      .orderBy(
+        desc(sessionRunsTable.updatedAt),
+        desc(sessionRunsTable.createdAt),
+        desc(sessionRunsTable.id),
+      )
       .limit(1)
       .get()) ?? null;
   const principals = resolveRuntimeSessionPrincipalIds(row ?? null);
@@ -132,10 +147,39 @@ export async function getRuntimeSessionLink(
     sandboxId: row?.sandbox_id ?? null,
     sandboxKind: row?.sandbox_kind ?? null,
     sandboxSubjectKind: row?.sandbox_subject_kind ?? null,
+    runtimeId: row?.runtime_id ?? null,
     sessionId: row?.session_id ?? null,
     sessionRunId: row?.session_run_id ?? null,
     sessionRunStatus: row?.session_run_status ?? null,
     sessionType: row?.session_type ?? null,
     traceId: row?.trace_id ?? null,
   };
+}
+
+export async function assertActiveRuntimeSessionRun(
+  database: D1Database,
+  input: {
+    driverInstanceId: DriverInstanceId;
+    sessionId: SessionId;
+    sessionRunId: SessionRunId;
+  },
+): Promise<void> {
+  const row =
+    (await getAppDatabase(database)
+      .select({ id: sessionRunsTable.id })
+      .from(sessionRunsTable)
+      .where(
+        and(
+          eq(sessionRunsTable.id, input.sessionRunId),
+          eq(sessionRunsTable.sessionId, input.sessionId),
+          eq(sessionRunsTable.driverInstanceId, input.driverInstanceId),
+          inArray(sessionRunsTable.status, ACTIVE_SESSION_RUN_STATUSES),
+        ),
+      )
+      .limit(1)
+      .get()) ?? null;
+
+  if (row === null) {
+    throw new Error("Fresh runtime driver event requires its exact active Session Run.");
+  }
 }

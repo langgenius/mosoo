@@ -21,11 +21,23 @@ function createSessionMessageStoreDatabase(): SqliteD1Database {
       created_by_account_id text NOT NULL,
       id text PRIMARY KEY NOT NULL,
       plan_json text,
+      projection_format text DEFAULT 'materialized' NOT NULL,
       role text NOT NULL,
       segments_json text,
       seq integer NOT NULL,
       session_id text NOT NULL,
-      session_run_id text
+      session_run_id text,
+      CHECK (projection_format IN ('materialized', 'event_stream_v3')),
+      CHECK (
+        projection_format <> 'event_stream_v3'
+        OR (
+          role = 'assistant'
+          AND session_run_id IS NOT NULL
+          AND content_text = ''
+          AND plan_json IS NULL
+          AND segments_json IS NULL
+        )
+      )
     );
 
     CREATE UNIQUE INDEX session_message_session_seq_idx

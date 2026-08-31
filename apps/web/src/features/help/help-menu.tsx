@@ -1,5 +1,5 @@
 import { HelpCircle } from "lucide-react";
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 
 import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
@@ -37,10 +37,10 @@ export function HelpMenu({
   // fetched on a normal page load.
   const [hasOpened, setHasOpened] = useState(false);
 
-  function openHelp(): void {
+  const openHelp = useCallback((): void => {
     setHasOpened(true);
     setOpen(true);
-  }
+  }, []);
 
   function handleOpenChange(nextOpen: boolean): void {
     if (nextOpen) {
@@ -72,7 +72,7 @@ export function HelpMenu({
     return () => {
       globalThis.removeEventListener("keydown", handleKeyDown);
     };
-  }, [shortcutEnabled]);
+  }, [openHelp, shortcutEnabled]);
 
   const button = (
     <button

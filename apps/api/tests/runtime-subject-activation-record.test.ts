@@ -10,15 +10,24 @@ function createRuntimeSubjectDatabase(): SqliteD1Database {
 
   database.execute(`
     CREATE TABLE sandbox (
+      agent_id text NOT NULL DEFAULT '01J00000000000000000000009',
+      project_id text NOT NULL DEFAULT '01J0000000000000000000000A',
       claim_expires_at integer,
       claim_owner text,
       global_mounts_json text NOT NULL,
       id text PRIMARY KEY NOT NULL,
+      incarnation integer NOT NULL DEFAULT 0,
       kind text NOT NULL,
       last_backup_id text,
       last_error text,
       last_error_code text,
-      status text NOT NULL
+      network_constraints_hash text,
+      operation_kind text,
+      owner_account_id text NOT NULL DEFAULT '01J00000000000000000000008',
+      status_operation_id text,
+      status text NOT NULL,
+      subject_id text NOT NULL DEFAULT '01J00000000000000000000009',
+      subject_kind text NOT NULL DEFAULT 'agent'
     );
 
     CREATE TABLE sandbox_backup (

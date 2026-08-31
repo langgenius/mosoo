@@ -20,13 +20,13 @@ import type {
   SessionResource,
 } from "@mosoo/contracts/session";
 import { fileRecordsTable, sessionsTable } from "@mosoo/db";
-import { createPlatformId, parsePlatformId } from "@mosoo/id";
+import { parsePlatformId } from "@mosoo/id";
 import type { AccountId, ProjectId, FileId, SessionId } from "@mosoo/id";
-import { and, asc, desc, eq, inArray, or } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, or, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
-import { getAppDatabase } from "../../../platform/db/drizzle";
+import { getAppDatabase, parameterizedSql } from "../../../platform/db/drizzle";
 import { toArrayBuffer } from "../../../shared/bytes";
 import { currentTimestampMs } from "../../../time";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
@@ -45,23 +45,19 @@ import {
   createFileNotFoundError,
   createUnexpectedFileError,
   FileControlError,
+  isRetryableFileControlError,
 } from "../infrastructure/file-errors";
-import {
-  createFinalObjectKey,
-  createSessionArtifactPath,
-  normalizeContentType,
-  normalizeFileName,
-} from "../infrastructure/file-paths";
+import { normalizeFileName } from "../infrastructure/file-paths";
 import {
   ensureFileAccess,
   fileRecordRowColumns,
   listFileRecords,
   listFileRecordsById,
-  parseRuntimeOutputSourcePath,
   toFileEntry,
   toFileRecord,
   toSessionFile,
 } from "../infrastructure/file-record-store";
+import type { FileRecordRow } from "../infrastructure/file-record-store";
 import { updateFile } from "../infrastructure/file-update";
 import { completeFileUpload as completeFileUploadRecord } from "../infrastructure/file-upload-complete";
 import { createFileUpload, getFileUpload } from "../infrastructure/file-upload-create";
@@ -70,7 +66,7 @@ import {
   uploadFileContent,
   uploadFilePart,
 } from "../infrastructure/file-upload-transfer";
-import { getObjectBody, putObject } from "../infrastructure/r2-s3-client";
+import { deleteObject, getObjectBody, putObject } from "../infrastructure/r2-s3-client";
 import { normalizeR2Etag } from "../infrastructure/r2-s3-client";
 import {
   ensureProjectSessionFileAccess,
@@ -86,16 +82,6 @@ export interface CompleteFileUploadCommand {
   fileId: FileId;
   input: CompleteFileUploadRequest;
   viewer: AuthenticatedViewer;
-}
-
-export interface RuntimeOutputFileInput {
-  bindings: ApiBindings;
-  body: Uint8Array;
-  contentSha256?: string;
-  contentType?: string | null;
-  createdBy: AccountId;
-  path: string;
-  sessionId: SessionId;
 }
 
 export interface AgentPackageFileAdmissionInput {
@@ -193,7 +179,6 @@ export interface FileStore {
     database: D1Database,
     sessionId: SessionId,
   ): Promise<SessionArtifactSource[]>;
-  listReadySessionArtifactKeys(database: D1Database, sessionId: SessionId): Promise<string[]>;
   listReadySessionFiles(database: D1Database, sessionId: SessionId): Promise<SessionFile[]>;
   listSessionResourcePathEntries(
     database: D1Database,
@@ -215,7 +200,6 @@ export interface FileStore {
     body: ContentBody,
   ): Promise<UploadFilePartResponse>;
   readSessionArtifactBytes(bindings: ApiBindings, objectKey: string): Promise<Uint8Array | null>;
-  recordRuntimeOutput(input: RuntimeOutputFileInput): Promise<FileRecord>;
   streamContent(
     bindings: ApiBindings,
     viewer: AuthenticatedViewer,
@@ -263,11 +247,48 @@ export function getRuntimeOutputName(path: string): string {
 
 export async function createRuntimeOutputContentSha256(body: Uint8Array): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", toArrayBuffer(body));
-  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  return new Uint8Array(digest).toHex();
 }
 
 export function createRuntimeOutputParentPath(path: string, contentSha256: string): string {
   return ["runtime-output", ...readRuntimeOutputPathSegments(path), contentSha256].join("/");
+}
+
+export async function putRuntimeArtifactObject(input: {
+  bindings: ApiBindings;
+  body: Uint8Array;
+  contentSha256: string;
+  contentType: string;
+  objectKey: string;
+  sourcePath: string;
+  attemptId: string;
+}): Promise<{ contentLength: number; contentType: string | null; etag: string } | null> {
+  try {
+    return await putObject({
+      bindings: input.bindings,
+      body: input.body,
+      contentType: input.contentType,
+      customMetadata: {
+        attemptId: input.attemptId,
+        contentSha256: input.contentSha256,
+        sourcePath: input.sourcePath,
+      },
+      objectKey: input.objectKey,
+      options: { ifNoneMatch: "*" },
+    });
+  } catch (error) {
+    if (isRetryableFileControlError(error)) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+export async function deleteRuntimeArtifactObject(
+  bindings: ApiBindings,
+  objectKey: string,
+): Promise<void> {
+  await deleteObject(bindings, objectKey);
 }
 
 function toSessionResource(file: FileRecord): SessionResource {
@@ -616,93 +637,116 @@ async function listVisibleFileRecords(
     .all();
 }
 
+type CurrentSessionArtifactFileRow = Pick<
+  FileRecordRow,
+  "committed" | "created_at" | "id" | "mime_type" | "name" | "session_kind" | "size"
+>;
+
+interface CurrentSessionArtifactSourceRow {
+  readonly authority_source_path: string;
+  readonly object_key: string;
+  readonly size: number;
+}
+
+const CURRENT_SESSION_ARTIFACT_AUTHORITY_CTE = `
+WITH input(session_id) AS (
+  VALUES (?)
+),
+artifact_authority AS (
+  SELECT artifact_head.source_path, artifact_head.file_id
+  FROM session_artifact_head AS artifact_head
+  INNER JOIN input ON input.session_id = artifact_head.session_id
+)`;
+
+const CURRENT_SESSION_ARTIFACT_FILES_SQL = `${CURRENT_SESSION_ARTIFACT_AUTHORITY_CTE}
+SELECT
+  file_record.committed,
+  file_record.created_at,
+  file_record.id,
+  file_record.mime_type,
+  file_record.name,
+  file_record.session_kind,
+  file_record.size,
+  artifact_authority.source_path
+FROM artifact_authority
+INNER JOIN file_record ON file_record.id = artifact_authority.file_id
+INNER JOIN input ON input.session_id = file_record.scope_id
+WHERE file_record.scope_kind = 'session'
+  AND file_record.session_kind = 'artifact'
+  AND file_record.status = 'ready'
+ORDER BY file_record.created_at DESC, file_record.id DESC`;
+
+const CURRENT_SESSION_ARTIFACT_SOURCES_SQL = `${CURRENT_SESSION_ARTIFACT_AUTHORITY_CTE}
+SELECT
+  file_record.object_key,
+  file_record.size,
+  artifact_authority.source_path AS authority_source_path
+FROM artifact_authority
+INNER JOIN file_record ON file_record.id = artifact_authority.file_id
+INNER JOIN input ON input.session_id = file_record.scope_id
+WHERE file_record.scope_kind = 'session'
+  AND file_record.session_kind = 'artifact'
+  AND file_record.status = 'ready'
+ORDER BY artifact_authority.source_path`;
+
+async function listCurrentSessionArtifactFiles(
+  database: D1Database,
+  sessionId: SessionId,
+): Promise<CurrentSessionArtifactFileRow[]> {
+  return getAppDatabase(database).all<CurrentSessionArtifactFileRow>(
+    parameterizedSql(CURRENT_SESSION_ARTIFACT_FILES_SQL, [sessionId]),
+  );
+}
+
+async function listCurrentSessionArtifactSources(
+  database: D1Database,
+  sessionId: SessionId,
+): Promise<CurrentSessionArtifactSourceRow[]> {
+  return getAppDatabase(database).all<CurrentSessionArtifactSourceRow>(
+    parameterizedSql(CURRENT_SESSION_ARTIFACT_SOURCES_SQL, [sessionId]),
+  );
+}
+
 async function listReadySessionFiles(
   database: D1Database,
   sessionId: SessionId,
 ): Promise<SessionFile[]> {
-  const rows = await getAppDatabase(database)
-    .select(fileRecordRowColumns)
-    .from(fileRecordsTable)
-    .where(
-      and(
-        eq(fileRecordsTable.scopeKind, "session"),
-        eq(fileRecordsTable.scopeId, sessionId),
-        eq(fileRecordsTable.status, "ready"),
-      ),
+  const db = getAppDatabase(database);
+  const [rows, artifacts] = await Promise.all([
+    db
+      .select(fileRecordRowColumns)
+      .from(fileRecordsTable)
+      .where(
+        and(
+          eq(fileRecordsTable.scopeKind, "session"),
+          eq(fileRecordsTable.scopeId, sessionId),
+          eq(fileRecordsTable.status, "ready"),
+          sql`${fileRecordsTable.sessionKind} IS NOT 'artifact'`,
+        ),
+      )
+      .all(),
+    listCurrentSessionArtifactFiles(database, sessionId),
+  ]);
+
+  return [...rows, ...artifacts]
+    .toSorted(
+      (left, right) => right.created_at - left.created_at || right.id.localeCompare(left.id),
     )
-    .orderBy(desc(fileRecordsTable.createdAt))
-    .all();
-
-  return rows.map(toSessionFile);
-}
-
-async function listReadySessionArtifactKeys(
-  database: D1Database,
-  sessionId: SessionId,
-): Promise<string[]> {
-  const rows = await getAppDatabase(database)
-    .select({
-      parentPath: fileRecordsTable.parentPath,
-    })
-    .from(fileRecordsTable)
-    .where(
-      and(
-        eq(fileRecordsTable.scopeKind, "session"),
-        eq(fileRecordsTable.scopeId, sessionId),
-        eq(fileRecordsTable.status, "ready"),
-        eq(fileRecordsTable.sessionKind, "artifact"),
-      ),
-    )
-    .all();
-
-  return rows.map((row) => row.parentPath);
+    .map(toSessionFile);
 }
 
 async function listLatestReadySessionArtifactSources(
   database: D1Database,
   sessionId: SessionId,
 ): Promise<SessionArtifactSource[]> {
-  const rows = await getAppDatabase(database)
-    .select({
-      id: fileRecordsTable.id,
-      createdAt: fileRecordsTable.createdAt,
-      objectKey: fileRecordsTable.objectKey,
-      parentPath: fileRecordsTable.parentPath,
-      size: fileRecordsTable.size,
-    })
-    .from(fileRecordsTable)
-    .where(
-      and(
-        eq(fileRecordsTable.scopeKind, "session"),
-        eq(fileRecordsTable.scopeId, sessionId),
-        eq(fileRecordsTable.status, "ready"),
-        eq(fileRecordsTable.sessionKind, "artifact"),
-      ),
-    )
-    .orderBy(asc(fileRecordsTable.createdAt), asc(fileRecordsTable.id))
-    .all();
-
-  // Ascending scan + map overwrite keeps the newest record per source path
-  // (ULID ids break created-at ties in creation order).
-  const latestBySourcePath = new Map<string, SessionArtifactSource>();
-
-  for (const row of rows) {
-    const sourcePath = parseRuntimeOutputSourcePath(row.parentPath);
-
-    if (sourcePath === null) {
-      continue;
-    }
-
-    latestBySourcePath.set(sourcePath, {
-      objectKey: row.objectKey,
+  const rows = await listCurrentSessionArtifactSources(database, sessionId);
+  return rows
+    .map((row) => ({
+      objectKey: row.object_key,
       size: row.size,
-      sourcePath,
-    });
-  }
-
-  return [...latestBySourcePath.values()].toSorted((left, right) =>
-    left.sourcePath.localeCompare(right.sourcePath),
-  );
+      sourcePath: row.authority_source_path,
+    }))
+    .toSorted((left, right) => left.sourcePath.localeCompare(right.sourcePath));
 }
 
 async function listSessionResources(
@@ -906,68 +950,6 @@ async function readSessionArtifactBytes(
   return body === null ? null : new Uint8Array(await body.arrayBuffer());
 }
 
-async function recordRuntimeOutput(input: RuntimeOutputFileInput): Promise<FileRecord> {
-  const fileId = createPlatformId<FileId>();
-  const name = getRuntimeOutputName(input.path);
-  const contentType = normalizeContentType(input.contentType ?? "application/octet-stream");
-  const contentSha256 = input.contentSha256 ?? (await createRuntimeOutputContentSha256(input.body));
-  const path = createSessionArtifactPath(fileId, name);
-  const timestampMs = currentTimestampMs();
-  const objectKey = createFinalObjectKey({
-    created_by_account_id: input.createdBy,
-    id: fileId,
-    name,
-    path,
-    scope_id: input.sessionId,
-    scope_kind: "session",
-    session_kind: "artifact",
-  });
-  const object = await putObject({
-    bindings: input.bindings,
-    body: input.body,
-    contentType,
-    objectKey,
-  });
-
-  await getAppDatabase(input.bindings.DB)
-    .insert(fileRecordsTable)
-    .values({
-      committed: true,
-      createdAt: timestampMs,
-      createdByAccountId: input.createdBy,
-      etag: object.etag,
-      expiresAt: null,
-      id: fileId,
-      mimeType: object.contentType ?? contentType,
-      name,
-      objectKey,
-      ownerId: input.sessionId,
-      ownerKind: "session",
-      parentPath: createRuntimeOutputParentPath(input.path, contentSha256),
-      path,
-      purpose: "session_artifact",
-      scopeId: input.sessionId,
-      scopeKind: "session",
-      sessionKind: "artifact",
-      size: object.contentLength,
-      status: "ready",
-      updatedAt: timestampMs,
-      version: 1,
-    })
-    .run();
-
-  const createdRows = await listFileRecordsById(input.bindings.DB, [fileId]);
-  const createdRow = createdRows[0];
-
-  if (createdRow === undefined) {
-    throw createFileNotFoundError("Runtime output file was not created.");
-  }
-
-  const file = toFileRecord(createdRow);
-  await publishSessionResourceUpsert(input.bindings, file);
-  return file;
-}
-
 export {
   createFileErrorResponse,
   createUnexpectedFileError,
@@ -993,14 +975,12 @@ export const fileStore: FileStore = {
   getUpload,
   list,
   listLatestReadySessionArtifactSources,
-  listReadySessionArtifactKeys,
   listReadySessionFiles,
   listSessionResourcePathEntries,
   listSessionResources,
   putContent,
   putPart,
   readSessionArtifactBytes,
-  recordRuntimeOutput,
   streamContent,
   update,
 };

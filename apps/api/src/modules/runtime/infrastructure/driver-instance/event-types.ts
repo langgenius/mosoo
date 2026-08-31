@@ -1,4 +1,3 @@
-import type { SessionUsageSummary } from "@mosoo/ag-ui-session";
 import type { AgentKind } from "@mosoo/contracts/agent";
 import type { SandboxSubjectKind } from "@mosoo/contracts/sandbox";
 import type { SessionType } from "@mosoo/contracts/session";
@@ -7,6 +6,7 @@ import type {
   AccountId,
   AgentId,
   ProjectId,
+  DriverCommandId,
   PlatformId,
   SandboxId,
   SessionId,
@@ -21,6 +21,17 @@ import type {
 
 export type { SessionLiveState };
 
+export interface CanonicalDriverEventEnvelope {
+  readonly event: RuntimeEventEnvelope;
+  readonly eventId: string;
+  readonly occurredAt?: string | null | undefined;
+}
+
+export interface HostDriverEventBatchInput {
+  readonly driverInstanceId: string;
+  readonly events: readonly CanonicalDriverEventEnvelope[];
+}
+
 export interface RuntimeSessionLink {
   agentId: AgentId | null;
   projectId: ProjectId | null;
@@ -29,6 +40,7 @@ export interface RuntimeSessionLink {
   executionOwnerId: AccountId | null;
   sandboxId: SandboxId | null;
   sandboxKind: AgentKind | null;
+  runtimeId: string | null;
   sessionId: SessionId | null;
   sessionRunId: SessionRunId | null;
   sessionRunStatus: SessionRunStatus | null;
@@ -42,8 +54,12 @@ export function runtimeSessionLinkNeedsRefresh(link: RuntimeSessionLink | null):
 }
 
 export interface ProjectedRuntimeEventRecord {
+  artifactAttemptId?: string | null;
+  artifactManifestJson?: string | null;
+  artifactManifestSha256?: string | null;
   event: RuntimeEventEnvelope;
   occurredAt: number | null;
+  provenMcpCommandId?: DriverCommandId | null;
   sourceEventId: string | null;
 }
 
@@ -64,13 +80,11 @@ export interface RuntimeDriverRunTransition {
 }
 
 export interface ProjectRuntimeDriverEventsResult {
-  finalAssistantMessage: { id: string; text: string } | null;
+  finalAssistantMessageId: string | null;
   link: RuntimeSessionLink;
   liveStateChanged: boolean;
   nextLiveState: SessionLiveState | null;
-  sessionTitle: string | null;
   transitions: RuntimeDriverRunTransition[];
-  usage: SessionUsageSummary | null;
   runtimeEvents: ProjectedRuntimeEventRecord[];
   sessionDeliveryEvents: ProjectedSessionDeliveryEvent[];
 }

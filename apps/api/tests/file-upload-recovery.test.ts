@@ -207,6 +207,7 @@ function createUploadRecoveryDatabase(): SqliteD1Database {
       parent_path text NOT NULL,
       path text NOT NULL,
       purpose text NOT NULL,
+      runtime_event_seq integer,
       size integer NOT NULL,
       updated_at integer NOT NULL,
       version integer NOT NULL

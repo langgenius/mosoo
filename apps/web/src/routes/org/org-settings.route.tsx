@@ -1,5 +1,5 @@
 import { Check, Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { useAppSession } from "@/app/session-provider";
 import { renameOrganization } from "@/domains/organization/api/organization-client";
@@ -13,14 +13,17 @@ export function OrgSettingsPage() {
   const { t } = useTranslation();
   const { activeOrganization, organizationsLoading, refreshOrganizations } = useAppSession();
 
-  const [name, setName] = useState(activeOrganization?.name ?? "");
+  const organizationName = activeOrganization?.name ?? "";
+  const [name, setName] = useState(organizationName);
+  const [previousOrganizationName, setPreviousOrganizationName] = useState(organizationName);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    setName(activeOrganization?.name ?? "");
-  }, [activeOrganization?.name]);
+  if (previousOrganizationName !== organizationName) {
+    setPreviousOrganizationName(organizationName);
+    setName(organizationName);
+  }
 
   const trimmedName = name.trim();
   const dirty = activeOrganization !== null && trimmedName !== activeOrganization.name;

@@ -206,7 +206,7 @@ export function normalizeLogMetadata(metadata: Record<string, unknown> = {}): Lo
 }
 
 export function normalizeLogContext(context: Record<string, unknown> = {}): LogContext {
-  return normalizeLogMetadata(context) as LogContext;
+  return normalizeLogMetadata(context);
 }
 
 export function toPrimitiveLogRecord(metadata: Record<string, unknown> = {}): PrimitiveLogRecord {

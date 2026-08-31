@@ -5,6 +5,7 @@ import { and, desc, eq, isNull, ne, or } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { sanitizeProviderPrivateMarkup } from "../domain/provider-private-markup";
+import { resolveStoredSessionMessageContentReferences } from "../infrastructure/session-message-reference.repository";
 
 const MAX_RUNTIME_RECOVERY_MESSAGES = 100;
 // Replayed history rides the driver boot payload and, for prompt-replay
@@ -22,8 +23,11 @@ export async function getSessionRuntimeRecoveryMessages(
 ): Promise<DriverRecoveryMessage[]> {
   const rows = await getAppDatabase(database)
     .select({
-      content: sessionMessagesTable.contentText,
+      content_text: sessionMessagesTable.contentText,
+      id: sessionMessagesTable.id,
+      projection_format: sessionMessagesTable.projectionFormat,
       role: sessionMessagesTable.role,
+      session_run_id: sessionMessagesTable.sessionRunId,
     })
     .from(sessionMessagesTable)
     .where(
@@ -40,31 +44,42 @@ export async function getSessionRuntimeRecoveryMessages(
     .orderBy(desc(sessionMessagesTable.seq))
     .limit(MAX_RUNTIME_RECOVERY_MESSAGES)
     .all();
-
   const newestFirst: DriverRecoveryMessage[] = [];
   let remainingChars = MAX_RUNTIME_RECOVERY_CONTENT_CHARS;
 
   for (const row of rows) {
+    const resolvedRows = await resolveStoredSessionMessageContentReferences(
+      database,
+      input.sessionId,
+      [row],
+      remainingChars + 1,
+    );
+
+    const [resolved] = resolvedRows;
+    if (resolved === undefined) {
+      continue;
+    }
     const content =
-      row.role === "assistant" ? sanitizeProviderPrivateMarkup(row.content).text : row.content;
+      resolved.role === "assistant"
+        ? sanitizeProviderPrivateMarkup(resolved.content_text).text
+        : resolved.content_text;
 
     if (content.trim().length === 0) {
       continue;
     }
 
     if (content.length > remainingChars) {
-      // Keep the window contiguous: stop at the first message that no longer
-      // fits instead of skipping past it. The newest message alone is kept
-      // truncated so an oversized latest exchange cannot erase all context.
       if (newestFirst.length === 0) {
-        newestFirst.push({ content: content.slice(0, remainingChars), role: row.role });
+        newestFirst.push({ content: content.slice(0, remainingChars), role: resolved.role });
       }
-
-      break;
+      return newestFirst.toReversed();
     }
 
-    newestFirst.push({ content, role: row.role });
+    newestFirst.push({ content, role: resolved.role });
     remainingChars -= content.length;
+    if (remainingChars === 0) {
+      return newestFirst.toReversed();
+    }
   }
 
   return newestFirst.toReversed();

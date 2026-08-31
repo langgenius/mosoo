@@ -21,7 +21,10 @@ export type SandboxSubjectKind = typeof SandboxSubjectKind.infer;
 export const SandboxStatus = type('"cold" | "restoring" | "active" | "backing_up" | "destroying"');
 export type SandboxStatus = typeof SandboxStatus.infer;
 
-export const SandboxSessionStatus = type('"active" | "closed" | "error"');
+export const SandboxOperationKind = type('"activate" | "hibernate" | "recreate" | "reset"');
+export type SandboxOperationKind = typeof SandboxOperationKind.infer;
+
+export const SandboxSessionStatus = type('"active" | "cleanup_pending" | "closed" | "error"');
 export type SandboxSessionStatus = typeof SandboxSessionStatus.infer;
 
 export const SandboxBackupStatus = type('"creating" | "ready" | "restoring" | "failed" | "pruned"');

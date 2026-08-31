@@ -185,6 +185,9 @@ export const MosooServerCustomEventSchema = type.or(
     type: '"CUSTOM"',
     value: {
       permissionRequests: SessionPermissionRequestViewSchema.array(),
+      "permissionRequest?": SessionPermissionRequestViewSchema,
+      "resolvedRequestId?": "string",
+      "runId?": "string",
     },
   }),
   type({
@@ -224,6 +227,21 @@ export const MosooServerCustomEventSchema = type.or(
     name: eventNameLiteral(MOSOO_CUSTOM_EVENT.sessionTasksReplaced.name),
     type: '"CUSTOM"',
     value: AgentTaskSnapshot,
+  }),
+  type({
+    name: eventNameLiteral(MOSOO_CUSTOM_EVENT.sessionToolUpdated.name),
+    type: '"CUSTOM"',
+    value: {
+      inputDelta: NullableString,
+      inputSnapshot: NullableString,
+      outputDelta: NullableString,
+      outputSnapshot: NullableString,
+      parentMessageId: NullableString,
+      resultMessageId: "string",
+      runId: NullableString,
+      toolCallId: "string",
+      toolName: "string",
+    },
   }),
   type({
     name: eventNameLiteral(MOSOO_CUSTOM_EVENT.sessionUsageUpdated.name),

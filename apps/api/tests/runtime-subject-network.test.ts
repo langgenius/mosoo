@@ -4,7 +4,7 @@ import { resolveRuntimeSubjectNetworkConstraints } from "../src/modules/runtime/
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 
 function createBindings(overrides: Record<string, string> = {}): ApiBindings {
-  return overrides as unknown as ApiBindings;
+  return overrides;
 }
 
 const LIMITED_NETWORK = {

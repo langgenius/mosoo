@@ -77,6 +77,7 @@ function createFileUploadAccessDatabase(): SqliteD1Database {
       parent_path text NOT NULL,
       path text NOT NULL,
       purpose text NOT NULL,
+      runtime_event_seq integer,
       scope_id text NOT NULL,
       scope_kind text NOT NULL,
       session_kind text,

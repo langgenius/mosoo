@@ -37,6 +37,7 @@ const DRIVER_INSTANCE_ID = parsePlatformId<DriverInstanceId>(
   "01J00000000000000000000017",
   "driver instance ID",
 );
+const USAGE_CREATED_AT_MS = 1_500;
 
 interface IdentityProjection {
   metadata_json: string | null;
@@ -86,6 +87,7 @@ function createSessionModelCallDatabase(): SqliteD1Database {
     CREATE TABLE session_run (
       agent_id text NOT NULL,
       completed_at integer,
+      created_at integer NOT NULL,
       created_by_account_id text NOT NULL,
       deployment_version_id text,
       id text PRIMARY KEY NOT NULL,
@@ -94,6 +96,7 @@ function createSessionModelCallDatabase(): SqliteD1Database {
       runtime_id text,
       session_id text NOT NULL,
       started_at integer,
+      status text NOT NULL,
       trigger text NOT NULL
     );
 
@@ -114,6 +117,7 @@ function createSessionModelCallDatabase(): SqliteD1Database {
       native_call_id text,
       output_tokens integer,
       provider text NOT NULL,
+      source_event_seq integer DEFAULT 0 NOT NULL,
       session_id text NOT NULL,
       session_run_id text NOT NULL,
       started_at integer,
@@ -148,9 +152,17 @@ function createSessionModelCallDatabase(): SqliteD1Database {
       session_run_id text,
       source text NOT NULL,
       source_event_id text NOT NULL,
+      source_event_seq integer DEFAULT 0 NOT NULL,
       total_cost_usd_micros integer NOT NULL,
       usage_contract text NOT NULL,
       UNIQUE (source, source_event_id)
+    );
+
+    CREATE TABLE usage_event_rollup_receipt (
+      rolled_up_at integer NOT NULL,
+      source text NOT NULL,
+      source_event_id text NOT NULL,
+      PRIMARY KEY (source, source_event_id)
     );
   `);
 
@@ -257,6 +269,7 @@ async function seedRunIdentity(
         INSERT INTO session_run (
           agent_id,
           completed_at,
+          created_at,
           created_by_account_id,
           deployment_version_id,
           id,
@@ -265,9 +278,10 @@ async function seedRunIdentity(
           runtime_id,
           session_id,
           started_at,
+          status,
           trigger
         )
-        VALUES (?, 1800, ?, ?, ?, 'gpt-5.4', 'openai', 'openai-runtime', ?, 1200, 'user_prompt')
+        VALUES (?, 1800, 1000, ?, ?, ?, 'gpt-5.4', 'openai', 'openai-runtime', ?, 1200, 'completed', 'user_prompt')
       `,
     )
     .bind(AGENT_ID, createdByAccountId, deploymentVersionId, SESSION_RUN_ID, SESSION_ID)
@@ -293,10 +307,11 @@ describe("session model call identity", () => {
     } satisfies SessionUsageSummary;
 
     await upsertSessionModelCallUsage(database, {
+      createdAtMs: USAGE_CREATED_AT_MS,
       driverInstanceId: DRIVER_INSTANCE_ID,
       sessionId: SESSION_ID,
       sessionRunId: SESSION_RUN_ID,
-      status: "completed",
+      sourceEventSeq: 5,
       traceId: "trace-1",
       usage,
     });
@@ -377,10 +392,11 @@ describe("session model call identity", () => {
 
     await expect(
       upsertSessionModelCallUsage(database, {
+        createdAtMs: USAGE_CREATED_AT_MS,
         driverInstanceId: DRIVER_INSTANCE_ID,
         sessionId: SESSION_ID,
         sessionRunId: SESSION_RUN_ID,
-        status: "completed",
+        sourceEventSeq: 5,
         traceId: "trace-wrong-project",
         usage,
       }),
@@ -398,10 +414,11 @@ describe("session model call identity", () => {
       usageContract: "openai_total_with_cached_breakdown",
     } satisfies SessionUsageSummary;
     const input = {
+      createdAtMs: USAGE_CREATED_AT_MS,
       driverInstanceId: DRIVER_INSTANCE_ID,
       sessionId: SESSION_ID,
       sessionRunId: SESSION_RUN_ID,
-      status: "completed" as const,
+      sourceEventSeq: 5,
       traceId: "trace-atomic-ledger",
       usage,
     };
@@ -434,5 +451,248 @@ describe("session model call identity", () => {
         .prepare("SELECT COUNT(*) AS count FROM usage_event")
         .first<{ count: number }>(),
     ).toEqual({ count: 1 });
+  });
+
+  test.each([
+    ["running", null, "started"],
+    ["waiting_input", null, "started"],
+    ["completed", 1_800, "completed"],
+    ["failed", 1_800, "failed"],
+    ["cancelled", 1_800, "failed"],
+    ["expired", 1_800, "failed"],
+  ] as const)(
+    "derives model-call status from durable Run status %s",
+    async (runStatus, completedAt, expectedStatus) => {
+      const database = createSessionModelCallDatabase();
+      await seedRunIdentity(database);
+      await database
+        .prepare("UPDATE session_run SET completed_at = ?, status = ? WHERE id = ?")
+        .bind(completedAt, runStatus, SESSION_RUN_ID)
+        .run();
+
+      await upsertSessionModelCallUsage(database, {
+        createdAtMs: USAGE_CREATED_AT_MS,
+        driverInstanceId: DRIVER_INSTANCE_ID,
+        sessionId: SESSION_ID,
+        sessionRunId: SESSION_RUN_ID,
+        sourceEventSeq: 5,
+        traceId: "trace-status",
+        usage: {
+          callId: "status-call",
+          inputTokens: 10,
+          source: "prompt_response",
+          usageContract: "openai_total_with_cached_breakdown",
+        },
+      });
+
+      expect(
+        await database
+          .prepare("SELECT completed_at, status FROM session_model_call")
+          .first<{ completed_at: number | null; status: string }>(),
+      ).toEqual({ completed_at: completedAt, status: expectedStatus });
+    },
+  );
+
+  test("converges model-call and usage rows by durable event seq", async () => {
+    const database = createSessionModelCallDatabase();
+    await seedRunIdentity(database);
+    const input = {
+      createdAtMs: USAGE_CREATED_AT_MS,
+      driverInstanceId: DRIVER_INSTANCE_ID,
+      sessionId: SESSION_ID,
+      sessionRunId: SESSION_RUN_ID,
+      sourceEventSeq: 5,
+      traceId: "trace-sequenced",
+      usage: {
+        callId: "sequenced-call",
+        inputTokens: 10,
+        outputTokens: 5,
+        source: "prompt_response" as const,
+        usageContract: "openai_total_with_cached_breakdown" as const,
+      },
+    };
+
+    await upsertSessionModelCallUsage(database, input);
+    await upsertSessionModelCallUsage(database, {
+      ...input,
+      sourceEventSeq: 4,
+      usage: { ...input.usage, inputTokens: 1 },
+    });
+    await upsertSessionModelCallUsage(database, input);
+    await expect(
+      upsertSessionModelCallUsage(database, {
+        ...input,
+        usage: { ...input.usage, inputTokens: 20 },
+      }),
+    ).rejects.toThrow("replayed with conflicting content");
+    await upsertSessionModelCallUsage(database, {
+      ...input,
+      sourceEventSeq: 6,
+      usage: { ...input.usage, inputTokens: 30 },
+    });
+
+    expect(
+      await database
+        .prepare(
+          "SELECT input_tokens, source_event_seq, status FROM session_model_call WHERE call_key = ?",
+        )
+        .bind("model_call:sequenced-call")
+        .first<{ input_tokens: number; source_event_seq: number; status: string }>(),
+    ).toEqual({ input_tokens: 30, source_event_seq: 6, status: "completed" });
+    expect(
+      await database
+        .prepare("SELECT input_tokens, source_event_seq FROM usage_event WHERE source_event_id = ?")
+        .bind(`${DRIVER_INSTANCE_ID}:sequenced-call`)
+        .first<{ input_tokens: number; source_event_seq: number }>(),
+    ).toEqual({ input_tokens: 30, source_event_seq: 6 });
+  });
+
+  test("merges higher partial usage identically into the model call and ledger", async () => {
+    const database = createSessionModelCallDatabase();
+    await seedRunIdentity(database);
+    const input = {
+      createdAtMs: USAGE_CREATED_AT_MS,
+      driverInstanceId: DRIVER_INSTANCE_ID,
+      sessionId: SESSION_ID,
+      sessionRunId: SESSION_RUN_ID,
+      sourceEventSeq: 5,
+      traceId: "trace-partial",
+      usage: {
+        callId: "partial-call",
+        inputTokens: 10,
+        outputTokens: 5,
+        source: "prompt_response" as const,
+        usageContract: "openai_total_with_cached_breakdown" as const,
+      },
+    };
+
+    const partialInput = {
+      ...input,
+      createdAtMs: USAGE_CREATED_AT_MS + 100,
+      sourceEventSeq: 6,
+      usage: {
+        callId: "partial-call",
+        outputTokens: 7,
+        source: "prompt_response",
+        usageContract: "openai_total_with_cached_breakdown",
+      },
+    };
+
+    await upsertSessionModelCallUsage(database, input);
+    await upsertSessionModelCallUsage(database, partialInput);
+    await upsertSessionModelCallUsage(database, partialInput);
+
+    expect(
+      await database
+        .prepare(
+          `SELECT created_at, input_tokens, output_tokens, source_event_seq
+             FROM session_model_call WHERE call_key = ?`,
+        )
+        .bind("model_call:partial-call")
+        .first(),
+    ).toEqual({
+      created_at: USAGE_CREATED_AT_MS,
+      input_tokens: 10,
+      output_tokens: 7,
+      source_event_seq: 6,
+    });
+    expect(
+      await database
+        .prepare(
+          `SELECT created_at, input_tokens, output_tokens, source_event_seq
+             FROM usage_event WHERE source_event_id = ?`,
+        )
+        .bind(`${DRIVER_INSTANCE_ID}:partial-call`)
+        .first(),
+    ).toEqual({
+      created_at: USAGE_CREATED_AT_MS,
+      input_tokens: 10,
+      output_tokens: 7,
+      source_event_seq: 6,
+    });
+
+    await database
+      .prepare("UPDATE session_run SET model = 'gpt-5.5' WHERE id = ?")
+      .bind(SESSION_RUN_ID)
+      .run();
+    await expect(
+      upsertSessionModelCallUsage(database, {
+        ...partialInput,
+        sourceEventSeq: 7,
+        usage: { ...partialInput.usage, outputTokens: 9 },
+      }),
+    ).rejects.toThrow();
+
+    expect(
+      await database
+        .prepare(
+          `SELECT model, output_tokens, source_event_seq
+             FROM session_model_call WHERE call_key = ?`,
+        )
+        .bind("model_call:partial-call")
+        .first(),
+    ).toEqual({ model: "gpt-5.4", output_tokens: 7, source_event_seq: 6 });
+    expect(
+      await database
+        .prepare(
+          `SELECT model, output_tokens, source_event_seq
+             FROM usage_event WHERE source_event_id = ?`,
+        )
+        .bind(`${DRIVER_INSTANCE_ID}:partial-call`)
+        .first(),
+    ).toEqual({ model: "gpt-5.4", output_tokens: 7, source_event_seq: 6 });
+  });
+
+  test("never replaces raw usage after its durable call was rolled up", async () => {
+    const database = createSessionModelCallDatabase();
+    await seedRunIdentity(database);
+    const input = {
+      createdAtMs: USAGE_CREATED_AT_MS,
+      driverInstanceId: DRIVER_INSTANCE_ID,
+      sessionId: SESSION_ID,
+      sessionRunId: SESSION_RUN_ID,
+      sourceEventSeq: 5,
+      traceId: "trace-rolled",
+      usage: {
+        callId: "rolled-call",
+        inputTokens: 10,
+        outputTokens: 5,
+        source: "prompt_response" as const,
+        usageContract: "openai_total_with_cached_breakdown" as const,
+      },
+    };
+
+    await upsertSessionModelCallUsage(database, input);
+    await database
+      .prepare(
+        "INSERT INTO usage_event_rollup_receipt (source, source_event_id, rolled_up_at) VALUES (?, ?, ?)",
+      )
+      .bind("runtime_driver", `${DRIVER_INSTANCE_ID}:rolled-call`, 2_000)
+      .run();
+    await database
+      .prepare("DELETE FROM usage_event WHERE source_event_id = ?")
+      .bind(`${DRIVER_INSTANCE_ID}:rolled-call`)
+      .run();
+
+    await upsertSessionModelCallUsage(database, input);
+    await expect(
+      upsertSessionModelCallUsage(database, {
+        ...input,
+        sourceEventSeq: 6,
+        usage: { ...input.usage, inputTokens: 20 },
+      }),
+    ).rejects.toThrow("already rolled up");
+
+    expect(
+      await database
+        .prepare("SELECT source_event_seq FROM session_model_call WHERE call_key = ?")
+        .bind("model_call:rolled-call")
+        .first<{ source_event_seq: number }>(),
+    ).toEqual({ source_event_seq: 5 });
+    expect(
+      await database
+        .prepare("SELECT COUNT(*) AS count FROM usage_event")
+        .first<{ count: number }>(),
+    ).toEqual({ count: 0 });
   });
 });

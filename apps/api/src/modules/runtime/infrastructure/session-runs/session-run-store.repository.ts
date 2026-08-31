@@ -5,7 +5,6 @@ export {
   hasActiveSessionRun,
 } from "./session-run-read.repository";
 export {
-  cancelActiveSessionRunsForRuntimeOperation,
   createSessionRunRecordIfSessionIdle,
   setSessionRunStatus,
 } from "./session-run-write.repository";

@@ -11,6 +11,7 @@ import type {
   DriverRuntime,
   DriverSkillCatalogEntry,
 } from "../../domain/driver-snapshot";
+import type { RuntimeRunProvisioningLease } from "../runtime-subject-lifecycle/runtime-provisioning-lease-store";
 import type {
   ExecutionSessionHandle,
   RuntimeProcessHandle,
@@ -40,7 +41,9 @@ export interface ProvisionDriverInput {
   resolvedSkillCatalog: DriverSkillCatalogEntry[];
   resolvedSkills: Omit<DriverResolvedSkill, "downloadUrl">[];
   runtime: DriverRuntime;
+  runtimeProvisioningLease?: RuntimeRunProvisioningLease;
   sandbox: SandboxHandle;
+  sandboxIncarnation: number;
   sandboxSessionId: SessionId;
   sessionRunId?: SessionRunId | null;
   traceId?: string | null;

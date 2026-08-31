@@ -105,9 +105,14 @@ async function createContinuationFixture(): Promise<{
     .app()
     .insert(sandboxesTable)
     .values({
+      agentId: PUBLIC_API_TEST_IDS.agent,
+      projectId: PUBLIC_API_TEST_IDS.project,
       createdAt: now,
       id: PUBLIC_API_TEST_IDS.sandbox,
+      incarnation: 1,
       kind: "cattle",
+      networkConstraintsHash: "0".repeat(64),
+      ownerAccountId: PUBLIC_API_TEST_IDS.ownerAccount,
       status: "active",
       subjectId: PUBLIC_API_TEST_IDS.ownerSession,
       subjectKind: "session",
@@ -122,6 +127,7 @@ async function createContinuationFixture(): Promise<{
       cwd: SESSION_CWD,
       originJson: JSON.stringify(ORIGIN),
       sandboxId: PUBLIC_API_TEST_IDS.sandbox,
+      sandboxIncarnation: 1,
       sandboxSessionId: PRIOR_SANDBOX_SESSION_ID,
       sessionId: PUBLIC_API_TEST_IDS.ownerSession,
       status: "closed",
@@ -136,10 +142,14 @@ async function createContinuationFixture(): Promise<{
       dir: SESSION_CWD,
       id: STORED_BACKUP_ID,
       keep: false,
+      operationId: PUBLIC_API_TEST_IDS.operation,
       sandboxId: PUBLIC_API_TEST_IDS.sandbox,
+      sandboxIncarnation: 1,
+      stagingId: STORED_BACKUP_ID,
       status: "ready",
       ttlSeconds: 10 * 365 * 24 * 60 * 60,
       updatedAt: now,
+      workspaceSessionId: PUBLIC_API_TEST_IDS.ownerSession,
     })
     .run();
 
@@ -154,6 +164,7 @@ function createInput(sandbox: SandboxHandle) {
     origin: ORIGIN,
     sandbox,
     sandboxId: PUBLIC_API_TEST_IDS.sandbox,
+    sandboxIncarnation: 1,
     sessionId: PUBLIC_API_TEST_IDS.ownerSession,
   };
 }

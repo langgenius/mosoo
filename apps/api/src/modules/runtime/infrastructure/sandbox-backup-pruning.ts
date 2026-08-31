@@ -1,13 +1,15 @@
+import type { SandboxBackupId } from "@mosoo/id";
+
 import type { ReadySandboxBackupForPruning } from "./sandbox-backup-store";
 
 export function selectSandboxBackupPruneIds(
   backups: readonly ReadySandboxBackupForPruning[],
-): string[] {
+): SandboxBackupId[] {
   const keepIds = new Set<string>();
   const readyCountsByDir = new Map<string, number>();
 
   for (const backup of backups) {
-    if (backup.keep) {
+    if (backup.keep || backup.protected) {
       keepIds.add(backup.id);
       continue;
     }

@@ -96,6 +96,7 @@ function createProcessEventQueryDatabase(): SqliteD1Database {
       run_id text,
       seq integer NOT NULL,
       session_id text NOT NULL,
+      stream_id text,
       tokens integer,
       visibility text NOT NULL
     );
@@ -200,12 +201,18 @@ async function insertSessionProcessEvent(
     runId?: string | null;
     seq: number;
     sessionId?: string;
+    streamId?: string | null;
     tokens?: number | null;
     visibility?: SessionRuntimeEventVisibility;
   },
 ): Promise<void> {
   const occurredAt = input.occurredAt ?? input.seq * 1000;
   const processType = input.processType ?? "run.started";
+  const eventType = input.eventType ?? processType;
+  const streamId =
+    input.streamId === undefined && /^(?:message|thought)\./u.test(eventType)
+      ? "stream-1"
+      : (input.streamId ?? null);
 
   await database
     .prepare(
@@ -221,22 +228,24 @@ async function insertSessionProcessEvent(
           run_id,
           seq,
           session_id,
+          stream_id,
           tokens,
           visibility
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
     )
     .bind(
       input.id,
       input.content ?? `run-${input.seq}`,
       input.endedAt ?? occurredAt,
-      input.eventType ?? processType,
+      eventType,
       occurredAt,
       input.processStatus ?? "available",
       processType,
       input.runId ?? null,
       input.seq,
       input.sessionId ?? SESSION_ID,
+      streamId,
       input.tokens ?? null,
       input.visibility ?? "all_consumers",
     )
@@ -496,6 +505,464 @@ describe("session process event projection", () => {
       content: "你好，世界。",
       id: "event-message-completed",
     });
+  });
+
+  test("pages raw stream rows until the latest logical events are complete", async () => {
+    const database = createProcessEventQueryDatabase();
+    const fragmentCount = 1_005;
+    await insertSessionProcessEvent(database, {
+      content: "run-1",
+      eventType: "run.started",
+      id: "event-run-started",
+      runId: "run-1",
+      seq: 1,
+    });
+
+    for (let index = 0; index < fragmentCount; index += 1) {
+      await insertSessionProcessEvent(database, {
+        content: "x",
+        eventType: "message.delta",
+        id: `event-message-delta-${index}`,
+        processType: "agent.message.delta",
+        runId: "run-1",
+        seq: index + 2,
+      });
+    }
+
+    await insertSessionProcessEvent(database, {
+      content: "Message updated.",
+      eventType: "message.completed",
+      id: "event-message-completed",
+      processType: "agent.message.delta",
+      runId: "run-1",
+      seq: fragmentCount + 2,
+    });
+    await insertSessionProcessEvent(database, {
+      content: "run-1",
+      eventType: "run.completed",
+      id: "event-run-completed",
+      processType: "run.completed",
+      runId: "run-1",
+      seq: fragmentCount + 3,
+    });
+
+    const events = await getThreadSessionProcessEvents(
+      database,
+      VIEWER,
+      { projectId: PROJECT_ID, sessionId: SESSION_ID },
+      { limit: 2 },
+    );
+
+    expect(events.map((event) => event.type)).toEqual([
+      "session.status",
+      "agent.message.delta",
+      "run.completed",
+    ]);
+    expect(events[1]).toMatchObject({
+      content: "x".repeat(fragmentCount),
+      id: "event-message-completed",
+    });
+  });
+
+  test("does not cut a retained stream at a page boundary", async () => {
+    const database = createProcessEventQueryDatabase();
+    const fragmentCount = 550;
+    await insertSessionProcessEvent(database, {
+      content: "run-1",
+      eventType: "run.started",
+      id: "event-run-started",
+      runId: "run-1",
+      seq: 1,
+    });
+    await insertSessionProcessEvent(database, {
+      content: "Agent thinking updated.",
+      eventType: "thought.started",
+      id: "event-thought-a-started",
+      processType: "agent.thinking.delta",
+      runId: "run-1",
+      seq: 2,
+      streamId: "thought-a",
+    });
+    await insertSessionProcessEvent(database, {
+      content: "Agent thinking updated.",
+      eventType: "thought.started",
+      id: "event-thought-b-started",
+      processType: "agent.thinking.delta",
+      runId: "run-1",
+      seq: 3,
+      streamId: "thought-b",
+    });
+
+    for (let index = 0; index < fragmentCount; index += 1) {
+      await insertSessionProcessEvent(database, {
+        content: "a",
+        eventType: "thought.delta",
+        id: `event-thought-a-delta-${index}`,
+        processType: "agent.thinking.delta",
+        runId: "run-1",
+        seq: index * 2 + 4,
+        streamId: "thought-a",
+      });
+      await insertSessionProcessEvent(database, {
+        content: "b",
+        eventType: "thought.delta",
+        id: `event-thought-b-delta-${index}`,
+        processType: "agent.thinking.delta",
+        runId: "run-1",
+        seq: index * 2 + 5,
+        streamId: "thought-b",
+      });
+    }
+
+    const firstTerminalSeq = fragmentCount * 2 + 4;
+    await insertSessionProcessEvent(database, {
+      content: "Agent thinking updated.",
+      eventType: "thought.completed",
+      id: "event-thought-a-completed",
+      processType: "agent.thinking.delta",
+      runId: "run-1",
+      seq: firstTerminalSeq,
+      streamId: "thought-a",
+    });
+    await insertSessionProcessEvent(database, {
+      content: "Agent thinking updated.",
+      eventType: "thought.completed",
+      id: "event-thought-b-completed",
+      processType: "agent.thinking.delta",
+      runId: "run-1",
+      seq: firstTerminalSeq + 1,
+      streamId: "thought-b",
+    });
+    await insertSessionProcessEvent(database, {
+      content: "run-1",
+      eventType: "run.completed",
+      id: "event-run-completed",
+      processType: "run.completed",
+      runId: "run-1",
+      seq: firstTerminalSeq + 2,
+    });
+
+    const events = await getThreadSessionProcessEvents(
+      database,
+      VIEWER,
+      { projectId: PROJECT_ID, sessionId: SESSION_ID },
+      { limit: 2 },
+    );
+
+    expect(events.map((event) => event.type)).toEqual([
+      "session.status",
+      "agent.thinking.delta",
+      "run.completed",
+    ]);
+    expect(events[1]).toMatchObject({
+      content: "b".repeat(fragmentCount),
+      id: "event-thought-b-completed",
+    });
+  });
+
+  test("does not expose an incomplete stream when the raw scan ceiling is reached", async () => {
+    const database = createProcessEventQueryDatabase();
+    const fragmentCount = 20_001;
+    await insertSessionProcessEvent(database, {
+      content: "Agent thinking updated.",
+      eventType: "thought.started",
+      id: "event-thought-started",
+      processType: "agent.thinking.delta",
+      runId: "run-1",
+      seq: 1,
+      streamId: "ceiling-thought",
+    });
+
+    for (let index = 0; index < fragmentCount; index += 1) {
+      await insertSessionProcessEvent(database, {
+        content: "x",
+        eventType: "thought.delta",
+        id: `event-thought-delta-${index}`,
+        processType: "agent.thinking.delta",
+        runId: "run-1",
+        seq: index + 2,
+        streamId: "ceiling-thought",
+      });
+    }
+
+    await insertSessionProcessEvent(database, {
+      content: "Agent thinking updated.",
+      eventType: "thought.completed",
+      id: "event-thought-completed",
+      processType: "agent.thinking.delta",
+      runId: "run-1",
+      seq: fragmentCount + 2,
+      streamId: "ceiling-thought",
+    });
+    await insertSessionProcessEvent(database, {
+      content: "Complete final answer",
+      eventType: "message.added",
+      id: "event-final-message",
+      processType: "agent.message.delta",
+      runId: "run-1",
+      seq: fragmentCount + 3,
+      streamId: "complete-final-message",
+    });
+    await insertSessionProcessEvent(database, {
+      content: "run-1",
+      eventType: "run.completed",
+      id: "event-run-completed",
+      processType: "run.completed",
+      runId: "run-1",
+      seq: fragmentCount + 4,
+    });
+
+    const events = await getThreadSessionProcessEvents(
+      database,
+      VIEWER,
+      { projectId: PROJECT_ID, sessionId: SESSION_ID },
+      { limit: 2 },
+    );
+
+    expect(events.map((event) => event.type)).toEqual([
+      "session.status",
+      "agent.message.delta",
+      "run.completed",
+    ]);
+    expect(events[0]?.content).toContain("Earlier runtime events are hidden");
+    expect(events[1]?.content).toBe("Complete final answer");
+  }, 15_000);
+
+  test("recognizes the database start at the exact raw scan ceiling", async () => {
+    const database = createProcessEventQueryDatabase();
+    const fillerCount = 19_997;
+
+    for (let seq = 1; seq <= fillerCount; seq += 1) {
+      await insertSessionProcessEvent(database, {
+        content: `filler-${seq}`,
+        id: `exact-ceiling-filler-${seq}`,
+        processType: "usage.updated",
+        seq,
+      });
+    }
+
+    await insertSessionProcessEvent(database, {
+      content: "retained",
+      eventType: "message.delta",
+      id: "exact-ceiling-message-delta",
+      processType: "agent.message.delta",
+      runId: null,
+      seq: fillerCount + 1,
+      streamId: "exact-ceiling-message",
+    });
+    await insertSessionProcessEvent(database, {
+      content: "Message updated.",
+      eventType: "message.completed",
+      id: "exact-ceiling-message-completed",
+      processType: "agent.message.delta",
+      runId: null,
+      seq: fillerCount + 2,
+      streamId: "exact-ceiling-message",
+    });
+    await insertSessionProcessEvent(database, {
+      content: "run-1",
+      eventType: "run.completed",
+      id: "exact-ceiling-run-completed",
+      processType: "run.completed",
+      runId: "run-1",
+      seq: fillerCount + 3,
+    });
+
+    const events = await getThreadSessionProcessEvents(
+      database,
+      VIEWER,
+      { projectId: PROJECT_ID, sessionId: SESSION_ID },
+      { limit: 2 },
+    );
+
+    expect(events.map((event) => event.type)).toEqual([
+      "session.status",
+      "agent.message.delta",
+      "run.completed",
+    ]);
+    expect(events[1]?.content).toBe("retained");
+  }, 15_000);
+
+  test("orders paged events by durable sequence rather than driver time", async () => {
+    const database = createProcessEventQueryDatabase();
+    const fragmentCount = 1_002;
+    await insertSessionProcessEvent(database, {
+      content: "run-1",
+      eventType: "run.started",
+      id: "out-of-order-run-started",
+      occurredAt: 1_000,
+      processType: "run.started",
+      runId: "run-1",
+      seq: 1,
+    });
+    await insertSessionProcessEvent(database, {
+      content: "Message updated.",
+      eventType: "message.started",
+      id: "out-of-order-message-started",
+      occurredAt: 100_000,
+      processType: "agent.message.delta",
+      runId: "run-1",
+      seq: 2,
+      streamId: "out-of-order-message",
+    });
+
+    for (let index = 0; index < fragmentCount; index += 1) {
+      await insertSessionProcessEvent(database, {
+        content: "x",
+        eventType: "message.delta",
+        id: `out-of-order-message-delta-${index}`,
+        occurredAt: 101_000 + index,
+        processType: "agent.message.delta",
+        runId: "run-1",
+        seq: index + 3,
+        streamId: "out-of-order-message",
+      });
+    }
+
+    await insertSessionProcessEvent(database, {
+      content: "Read file",
+      eventType: "tool.call.updated",
+      id: "out-of-order-tool",
+      occurredAt: 2_000,
+      processType: "tool.use.started",
+      runId: "run-1",
+      seq: fragmentCount + 3,
+    });
+    await insertSessionProcessEvent(database, {
+      content: "run-1",
+      eventType: "run.completed",
+      id: "out-of-order-run-completed",
+      occurredAt: 3_000,
+      processType: "run.completed",
+      runId: "run-1",
+      seq: fragmentCount + 4,
+    });
+
+    const events = await getThreadSessionProcessEvents(
+      database,
+      VIEWER,
+      { projectId: PROJECT_ID, sessionId: SESSION_ID },
+      { limit: 2 },
+    );
+
+    expect(events.map((event) => event.type)).toEqual([
+      "session.status",
+      "tool.use.started",
+      "run.completed",
+    ]);
+    expect(events[1]?.id).toBe("out-of-order-tool");
+  });
+
+  test.each([
+    ["message.cancelled", "available"],
+    ["message.failed", "error"],
+  ] as const)("folds persisted streams closed by %s", async (eventType, processStatus) => {
+    const database = createProcessEventQueryDatabase();
+    await insertSessionProcessEvent(database, {
+      content: "Partial answer",
+      eventType: "message.delta",
+      id: "event-message-delta",
+      processType: "agent.message.delta",
+      runId: "run-1",
+      seq: 1,
+    });
+    await insertSessionProcessEvent(database, {
+      content: "Message updated.",
+      eventType,
+      id: "event-message-end",
+      processStatus,
+      processType: "agent.message.delta",
+      runId: "run-1",
+      seq: 2,
+    });
+
+    const events = await getThreadSessionProcessEvents(
+      database,
+      VIEWER,
+      { projectId: PROJECT_ID, sessionId: SESSION_ID },
+      { limit: 100 },
+    );
+
+    expect(events).toEqual([
+      expect.objectContaining({
+        content: "Partial answer",
+        id: "event-message-end",
+        status: processStatus,
+        type: "agent.message.delta",
+      }),
+    ]);
+  });
+
+  test("keeps a terminal message without deltas", async () => {
+    const database = createProcessEventQueryDatabase();
+    await insertSessionProcessEvent(database, {
+      content: "Message updated.",
+      eventType: "message.completed",
+      id: "event-message-completed",
+      processType: "agent.message.delta",
+      runId: "run-1",
+      seq: 1,
+    });
+
+    const events = await getThreadSessionProcessEvents(
+      database,
+      VIEWER,
+      { projectId: PROJECT_ID, sessionId: SESSION_ID },
+      { limit: 100 },
+    );
+
+    expect(events).toEqual([
+      expect.objectContaining({
+        content: "",
+        id: "event-message-completed",
+        type: "agent.message.delta",
+      }),
+    ]);
+  });
+
+  test("folds interleaved messages by stream identity", async () => {
+    const database = createProcessEventQueryDatabase();
+
+    for (const event of [
+      { content: "A1", id: "a-1", seq: 1, streamId: "message-a" },
+      { content: "B1", id: "b-1", seq: 2, streamId: "message-b" },
+      { content: "A2", id: "a-2", seq: 3, streamId: "message-a" },
+    ]) {
+      await insertSessionProcessEvent(database, {
+        ...event,
+        eventType: "message.delta",
+        processType: "agent.message.delta",
+        runId: "run-1",
+      });
+    }
+
+    await insertSessionProcessEvent(database, {
+      content: "Message updated.",
+      eventType: "message.completed",
+      id: "b-end",
+      processType: "agent.message.delta",
+      runId: "run-1",
+      seq: 4,
+      streamId: "message-b",
+    });
+    await insertSessionProcessEvent(database, {
+      content: "Message updated.",
+      eventType: "message.completed",
+      id: "a-end",
+      processType: "agent.message.delta",
+      runId: "run-1",
+      seq: 5,
+      streamId: "message-a",
+    });
+
+    const events = await getThreadSessionProcessEvents(
+      database,
+      VIEWER,
+      { projectId: PROJECT_ID, sessionId: SESSION_ID },
+      { limit: 100 },
+    );
+
+    expect(events.map((event) => event.content)).toEqual(["A1A2", "B1"]);
   });
 
   test("shows an in-flight streamed message as a single folded process event", async () => {

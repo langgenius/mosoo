@@ -71,7 +71,9 @@ export interface SandboxHandle extends ExecutionSessionHandle {
   configureNetworkConstraints(constraints: SandboxNetworkConstraints): Promise<void>;
   createBackup(options: {
     dir: string;
+    excludes?: string[];
     localBucket?: boolean;
+    name?: string;
     ttl?: number;
   }): Promise<{ dir: string; id: string }>;
   createSession(options?: {
@@ -98,6 +100,33 @@ export interface SandboxHandle extends ExecutionSessionHandle {
   terminal(request: Request, options?: PtyOptions): Promise<Response>;
   unmountBucket(mountPath: string): Promise<void>;
   wsConnect(request: Request, port: number): Promise<Response>;
+}
+
+export interface RuntimeSubjectIncarnationHandle {
+  activateRuntimeSubjectIncarnation(
+    incarnation: number,
+    networkConstraintsHash: string,
+  ): Promise<void>;
+  createRuntimeSubjectBackup(
+    incarnation: number,
+    options: {
+      dir: string;
+      excludes?: string[];
+      forbiddenPaths?: string[];
+      localBucket?: boolean;
+      name: string;
+      ttl?: number;
+    },
+  ): Promise<{ dir: string; id: string }>;
+  destroyRuntimeSubjectIncarnation(incarnation: number): Promise<{ kind: "destroyed" | "stale" }>;
+  inspectRuntimeSubjectIncarnation(
+    incarnation: number,
+    networkConstraintsHash: string,
+  ): Promise<{ kind: "healthy" | "missing" | "retired" | "stale" | "unknown" }>;
+  markRuntimeSubjectIncarnationReady(
+    incarnation: number,
+    networkConstraintsHash: string,
+  ): Promise<void>;
 }
 
 const SANDBOX_HANDLE_METHODS = [
@@ -133,4 +162,24 @@ export function toSandboxHandle(value: unknown): SandboxHandle {
   }
 
   return value as SandboxHandle;
+}
+
+export function toRuntimeSubjectIncarnationHandle(value: unknown): RuntimeSubjectIncarnationHandle {
+  if (typeof value !== "object" || value === null) {
+    throw new Error("Cloudflare Sandbox incarnation handle is not an object.");
+  }
+
+  for (const method of [
+    "activateRuntimeSubjectIncarnation",
+    "createRuntimeSubjectBackup",
+    "destroyRuntimeSubjectIncarnation",
+    "inspectRuntimeSubjectIncarnation",
+    "markRuntimeSubjectIncarnationReady",
+  ] as const) {
+    if (typeof Reflect.get(value, method) !== "function") {
+      throw new TypeError(`Cloudflare Sandbox incarnation handle is missing ${method}.`);
+    }
+  }
+
+  return value as RuntimeSubjectIncarnationHandle;
 }

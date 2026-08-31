@@ -6,7 +6,6 @@ import type {
   SessionLiveState,
   SessionPermissionRequestView,
 } from "../../../sessions/application/session-live-state.service";
-import { normalizeSessionTitle } from "../../../sessions/domain/session-title";
 import type { RuntimeDriverRunTransition, RuntimeSessionLink } from "./event-types";
 
 export function compactRuntimeDriverRunTransitions(
@@ -90,23 +89,6 @@ export function createBaseLiveState(
     title: null,
     viewerId: input.callerId ?? input.creatorId ?? input.driverInstanceId,
   });
-}
-
-export function normalizeRuntimeSessionInfoTitle(title: string | null | undefined): string | null {
-  if (typeof title !== "string" || title.trim().length === 0) {
-    return null;
-  }
-
-  return normalizeSessionTitle(title);
-}
-
-export function upsertPermissionRequest(
-  current: SessionPermissionRequestView[],
-  next: SessionPermissionRequestView,
-): SessionPermissionRequestView[] {
-  const requests = current.filter((request) => request.requestId !== next.requestId);
-  requests.push(next);
-  return requests;
 }
 
 export function removePermissionRequest(

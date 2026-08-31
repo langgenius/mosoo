@@ -1,13 +1,13 @@
 import { describe, expect, test } from "bun:test";
 
-import {
-  acquireSessionRunDispatch,
-  updateSessionRunStatusIfActive,
-} from "../src/modules/runtime/application/session-runs/session-run-state.repository";
+import { acquireSessionRunDispatch } from "../src/modules/runtime/application/session-runs/session-run-state.repository";
 import {
   createPublicHttpContractDatabase,
   insertNonOwnerSession,
+  PUBLIC_API_TEST_IDS,
 } from "./helpers/public-api-http-test-fixture";
+
+const RUN_ID = PUBLIC_API_TEST_IDS.run;
 
 async function insertQueuedSessionRun(database: D1Database): Promise<void> {
   await database
@@ -31,7 +31,7 @@ async function insertQueuedSessionRun(database: D1Database): Promise<void> {
       `,
     )
     .bind(
-      "run-active-transition",
+      RUN_ID,
       "01J0000000000000000000000B",
       "01J00000000000000000000009",
       "01J00000000000000000000002",
@@ -47,46 +47,26 @@ async function insertQueuedSessionRun(database: D1Database): Promise<void> {
     .run();
   await database
     .prepare("UPDATE session SET last_run_id = ?, status = ?, updated_at = ? WHERE id = ?")
-    .bind("run-active-transition", "RUNNING", 1, "01J0000000000000000000000B")
+    .bind(RUN_ID, "RUNNING", 1, "01J0000000000000000000000B")
     .run();
 }
 
 describe("session run state", () => {
-  test("returns active status transitions", async () => {
-    const database = await createPublicHttpContractDatabase();
-    await insertNonOwnerSession(database);
-    await insertQueuedSessionRun(database);
-
-    const run = await updateSessionRunStatusIfActive(database, {
-      runId: "run-active-transition",
-      status: "booting",
-    });
-
-    expect(run?.id).toBe("run-active-transition");
-    expect(run?.status).toBe("booting");
-
-    const stored = await database
-      .prepare("SELECT status FROM session_run WHERE id = ?")
-      .bind("run-active-transition")
-      .first<{ status: string }>();
-    expect(stored).toEqual({ status: "booting" });
-  });
-
   test("only the first dispatch acquire can continue a run", async () => {
     const database = await createPublicHttpContractDatabase();
     await insertNonOwnerSession(database);
     await insertQueuedSessionRun(database);
 
-    const first = await acquireSessionRunDispatch(database, "run-active-transition");
-    const second = await acquireSessionRunDispatch(database, "run-active-transition");
+    const first = await acquireSessionRunDispatch(database, RUN_ID);
+    const second = await acquireSessionRunDispatch(database, RUN_ID);
 
-    expect(first?.id).toBe("run-active-transition");
+    expect(first?.id).toBe(RUN_ID);
     expect(first?.status).toBe("booting");
     expect(second).toBeNull();
 
     const stored = await database
       .prepare("SELECT status FROM session_run WHERE id = ?")
-      .bind("run-active-transition")
+      .bind(RUN_ID)
       .first<{ status: string }>();
     expect(stored).toEqual({ status: "booting" });
   });

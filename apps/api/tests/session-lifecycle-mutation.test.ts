@@ -3,6 +3,8 @@ import { describe, expect, test } from "bun:test";
 import type { RuntimeOperationId } from "@mosoo/id";
 
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
+import type { SandboxHandle } from "../src/modules/runtime/infrastructure/sandbox-handles";
+import { setSessionRunStatus } from "../src/modules/runtime/infrastructure/session-runs/session-run-store.repository";
 import {
   deleteSessionCascade,
   repairStaleSessionDeleteCleanups,
@@ -10,16 +12,20 @@ import {
 import {
   archiveAgentSession,
   deleteAgentSession,
+  repairStaleSessionArchiveCleanups,
   unarchiveAgentSession,
 } from "../src/modules/sessions/application/session-lifecycle-mutation.service";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
+import { applyDrizzleMigration } from "./helpers/drizzle-migrations";
 import {
   PUBLIC_API_TEST_IDS,
   createPublicHttpContractDatabase,
   createPublicHttpTestBindings,
+  insertActiveSandboxSessionFixture,
   insertOwnerSession,
   insertNonOwnerSession,
 } from "./helpers/public-api-http-test-fixture";
+import { SqliteD1Database } from "./helpers/sqlite-d1";
 
 const OWNER_VIEWER: AuthenticatedViewer = {
   email: "owner@example.com",
@@ -64,11 +70,17 @@ function withDriverConnection(bindings: ApiBindings, paths: string[]): ApiBindin
   };
 }
 
-function createSessionLifecycleBinding(paths: string[], options: { destroyError?: Error } = {}) {
+function createSessionLifecycleBinding(
+  paths: string[],
+  options: { closeError?: Error; destroyError?: Error } = {},
+) {
   return {
     get: () => ({
       closeViewers: async (_sessionId: string, reason: string) => {
         paths.push(`close:${reason}`);
+        if (options.closeError !== undefined) {
+          throw options.closeError;
+        }
       },
       destroy: async (_sessionId: string, reason: string) => {
         paths.push(`destroy:${reason}`);
@@ -87,108 +99,65 @@ function createSessionLifecycleBinding(paths: string[], options: { destroyError?
 function withSessionLifecycleBinding(
   bindings: ApiBindings,
   paths: string[] = [],
-  options: { destroyError?: Error } = {},
+  options: { closeError?: Error; destroyError?: Error } = {},
 ): ApiBindings {
   return {
     ...bindings,
+    runtimeSubjectHandleFactory: () => createCleanupSandboxHandle(),
     Session: createSessionLifecycleBinding(paths, options) as ApiBindings["Session"],
   };
 }
 
-async function ensureRuntimeLifecycleTables(database: D1Database): Promise<void> {
-  await database
-    .prepare(
-      `
-        CREATE TABLE IF NOT EXISTS sandbox (
-          id text PRIMARY KEY NOT NULL,
-          inactive_deadline_at integer,
-          kind text NOT NULL,
-          status text DEFAULT 'active' NOT NULL,
-          updated_at integer DEFAULT 1 NOT NULL
-        )
-      `,
-    )
-    .run();
-  await database
-    .prepare(
-      `
-        CREATE TABLE IF NOT EXISTS sandbox_session (
-          cloudflare_session_id text NOT NULL,
-          created_at integer NOT NULL,
-          cwd text NOT NULL,
-          origin_json text NOT NULL,
-          sandbox_id text NOT NULL,
-          session_id text PRIMARY KEY NOT NULL,
-          status text NOT NULL,
-          updated_at integer NOT NULL
-        )
-      `,
-    )
-    .run();
-  await database
-    .prepare(
-      `
-        CREATE TABLE IF NOT EXISTS sandbox_backup (
-          id text PRIMARY KEY NOT NULL,
-          dir text NOT NULL,
-          sandbox_id text NOT NULL,
-          status text NOT NULL,
-          created_at integer NOT NULL,
-          updated_at integer NOT NULL
-        )
-      `,
-    )
-    .run();
+function createCleanupSandboxHandle(): SandboxHandle {
+  const unavailable = async (): Promise<never> => {
+    throw new Error("Unexpected sandbox test method call.");
+  };
+
+  return {
+    configureNetworkConstraints: unavailable,
+    createBackup: unavailable,
+    createSession: unavailable,
+    deleteSession: async (sessionId) => ({
+      sessionId,
+      success: true,
+      timestamp: new Date(0).toISOString(),
+    }),
+    destroy: unavailable,
+    exec: unavailable,
+    getSession: unavailable,
+    mkdir: unavailable,
+    mountBucket: unavailable,
+    readFile: unavailable,
+    restoreBackup: unavailable,
+    setKeepAlive: unavailable,
+    startProcess: unavailable,
+    terminal: unavailable,
+    unmountBucket: unavailable,
+    watch: unavailable,
+    writeFile: unavailable,
+    wsConnect: unavailable,
+  };
 }
 
 async function insertSandboxSession(
-  database: D1Database,
+  database: SqliteD1Database,
   sessionId: string = PUBLIC_API_TEST_IDS.nonOwnerSession,
 ): Promise<void> {
-  await ensureRuntimeLifecycleTables(database);
+  const ownerAccountId =
+    sessionId === PUBLIC_API_TEST_IDS.ownerSession
+      ? PUBLIC_API_TEST_IDS.ownerAccount
+      : PUBLIC_API_TEST_IDS.nonOwnerAccount;
+  await insertActiveSandboxSessionFixture(database, {
+    cwd: "/workspace/session-cwd",
+    ownerAccountId,
+    sandboxId: PUBLIC_API_TEST_IDS.sandbox,
+    sandboxSessionId: "01J0000000000000000000000S",
+    sessionId,
+    timestampMs: 1,
+  });
   await database
-    .prepare(
-      `
-        INSERT INTO sandbox (
-          id,
-          kind,
-          subject_kind,
-          subject_id,
-          status,
-          created_at,
-          updated_at
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `,
-    )
-    .bind(PUBLIC_API_TEST_IDS.sandbox, "pet", "agent", PUBLIC_API_TEST_IDS.agent, "active", 1, 1)
-    .run();
-  await database
-    .prepare(
-      `
-        INSERT INTO sandbox_session (
-          cloudflare_session_id,
-          created_at,
-          cwd,
-          origin_json,
-          sandbox_id,
-          session_id,
-          status,
-          updated_at
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `,
-    )
-    .bind(
-      "01J0000000000000000000000S",
-      1,
-      "session-cwd",
-      "{}",
-      PUBLIC_API_TEST_IDS.sandbox,
-      sessionId,
-      "closed",
-      1,
-    )
+    .prepare("UPDATE sandbox_session SET status = 'closed' WHERE session_id = ?")
+    .bind(sessionId)
     .run();
 }
 
@@ -260,6 +229,7 @@ async function insertDriverInstance(
         INSERT INTO driver_instance (
           id,
           sandbox_id,
+          sandbox_incarnation,
           sandbox_session_id,
           runtime,
           protocol,
@@ -272,12 +242,13 @@ async function insertDriverInstance(
           created_at,
           updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
     )
     .bind(
       input.driverId,
       PUBLIC_API_TEST_IDS.sandbox,
+      1,
       input.sandboxSessionId,
       "cloudflare-container",
       "driver-ws",
@@ -357,15 +328,286 @@ async function insertSessionFileForCleanup(database: D1Database): Promise<void> 
 }
 
 describe("session lifecycle mutations", () => {
+  test("cleanup migration preserves data without enqueueing external cleanup", async () => {
+    const database = new SqliteD1Database();
+    database.execute(`
+      CREATE TABLE session (
+        id text PRIMARY KEY,
+        archived_at integer,
+        status text NOT NULL,
+        status_operation_id text,
+        status_seq integer NOT NULL,
+        updated_at integer NOT NULL
+      );
+      CREATE TABLE child (
+        session_id text REFERENCES session(id) ON DELETE CASCADE
+      );
+      INSERT INTO session VALUES ('session-1', NULL, 'IDLE', NULL, 0, 1);
+      INSERT INTO session VALUES ('legacy-delete', 2, 'TERMINATED', 'delete-op', 4, 2);
+      INSERT INTO session VALUES ('legacy-archive', 3, 'IDLE', NULL, 7, 3);
+      INSERT INTO child VALUES ('session-1');
+    `);
+    applyDrizzleMigration(database, "0016_session-cleanup-operation");
+
+    expect(await database.prepare("SELECT COUNT(*) AS count FROM child").first()).toEqual({
+      count: 1,
+    });
+    expect(
+      await database
+        .prepare(
+          "SELECT cleanup_operation_kind, status, status_operation_id, status_seq FROM session WHERE id = 'legacy-delete'",
+        )
+        .first(),
+    ).toEqual({
+      cleanup_operation_kind: null,
+      status: "TERMINATED",
+      status_operation_id: "delete-op",
+      status_seq: 4,
+    });
+    expect(
+      await database
+        .prepare(
+          "SELECT cleanup_operation_kind, status, status_operation_id, status_seq FROM session WHERE id = 'legacy-archive'",
+        )
+        .first(),
+    ).toEqual({
+      cleanup_operation_kind: null,
+      status: "IDLE",
+      status_operation_id: null,
+      status_seq: 7,
+    });
+    await expect(
+      database
+        .prepare("UPDATE session SET cleanup_operation_kind = 'archive' WHERE id = 'session-1'")
+        .run(),
+    ).rejects.toThrow("session_cleanup_operation_kind_check");
+    await expect(
+      database
+        .prepare(
+          `UPDATE session
+              SET runtime_provisioning_operation_id = '01J0000000000000000000000R',
+                  runtime_provisioning_sandbox_id = '01J0000000000000000000000S'
+            WHERE id = 'session-1'`,
+        )
+        .run(),
+    ).rejects.toThrow("session_runtime_provisioning_lease_check");
+    await expect(
+      database
+        .prepare(
+          `UPDATE session
+              SET runtime_provisioning_operation_id = '01J0000000000000000000000R',
+                  runtime_provisioning_sandbox_id = '01J0000000000000000000000S',
+                  runtime_provisioning_heartbeat_at = 'not-a-timestamp'
+            WHERE id = 'session-1'`,
+        )
+        .run(),
+    ).rejects.toThrow("session_runtime_provisioning_lease_check");
+    await database
+      .prepare(
+        `UPDATE session
+            SET archived_at = 1,
+                cleanup_operation_kind = 'archive',
+                status = 'RESCHEDULING',
+                status_operation_id = 'operation-1'
+          WHERE id = 'session-1'`,
+      )
+      .run();
+    await database
+      .prepare(
+        `UPDATE session
+            SET cleanup_operation_kind = 'archive',
+                status = 'IDLE',
+                status_operation_id = NULL
+          WHERE id = 'session-1'`,
+      )
+      .run();
+  });
+
+  test("maintenance adopts cleanup claims written by an old worker after migration", async () => {
+    const archiveDatabase = await createPublicHttpContractDatabase();
+    await insertOwnerSession(archiveDatabase);
+    await archiveDatabase
+      .prepare(
+        `UPDATE session
+            SET archived_at = 1,
+                cleanup_operation_kind = NULL,
+                status = 'RESCHEDULING',
+                status_operation_id = ?,
+                updated_at = 1
+          WHERE id = ?`,
+      )
+      .bind(PUBLIC_API_TEST_IDS.operation, PUBLIC_API_TEST_IDS.ownerSession)
+      .run();
+
+    expect(
+      await repairStaleSessionArchiveCleanups(
+        withSessionLifecycleBinding(createPublicHttpTestBindings(archiveDatabase) as ApiBindings),
+        { limit: 10, staleUpdatedAtLte: 1 },
+      ),
+    ).toBe(1);
+    expect(
+      await archiveDatabase
+        .prepare(
+          "SELECT cleanup_operation_kind, status, status_operation_id FROM session WHERE id = ?",
+        )
+        .bind(PUBLIC_API_TEST_IDS.ownerSession)
+        .first(),
+    ).toEqual({
+      cleanup_operation_kind: "archive",
+      status: "IDLE",
+      status_operation_id: null,
+    });
+
+    const deleteDatabase = await createPublicHttpContractDatabase();
+    await insertNonOwnerSession(deleteDatabase);
+    await deleteDatabase
+      .prepare(
+        `UPDATE session
+            SET archived_at = 1,
+                cleanup_operation_kind = NULL,
+                status = 'TERMINATED',
+                status_operation_id = ?,
+                updated_at = 1
+          WHERE id = ?`,
+      )
+      .bind(PUBLIC_API_TEST_IDS.operation, PUBLIC_API_TEST_IDS.nonOwnerSession)
+      .run();
+
+    expect(
+      await repairStaleSessionDeleteCleanups(
+        withSessionLifecycleBinding(createPublicHttpTestBindings(deleteDatabase) as ApiBindings),
+        { limit: 10, staleUpdatedAtLte: 1 },
+      ),
+    ).toBe(1);
+    expect(
+      await deleteDatabase
+        .prepare("SELECT id FROM session WHERE id = ?")
+        .bind(PUBLIC_API_TEST_IDS.nonOwnerSession)
+        .first(),
+    ).toBeNull();
+  });
+
+  test("archive and delete cannot pass an active runtime provisioning fence", async () => {
+    for (const action of ["archive", "delete"] as const) {
+      const database = await createPublicHttpContractDatabase();
+      await insertOwnerSession(database);
+      await database
+        .prepare(
+          `UPDATE session
+              SET runtime_provisioning_heartbeat_at = 1,
+                  runtime_provisioning_operation_id = ?,
+                  runtime_provisioning_sandbox_id = ?
+            WHERE id = ?`,
+        )
+        .bind(
+          PUBLIC_API_TEST_IDS.operation,
+          PUBLIC_API_TEST_IDS.sandbox,
+          PUBLIC_API_TEST_IDS.ownerSession,
+        )
+        .run();
+      const bindings = withSessionLifecycleBinding(
+        createPublicHttpTestBindings(database) as ApiBindings,
+      );
+
+      const mutation =
+        action === "archive"
+          ? archiveAgentSession({
+              bindings,
+              projectId: PUBLIC_API_TEST_IDS.project,
+              sessionId: PUBLIC_API_TEST_IDS.ownerSession,
+              viewer: OWNER_VIEWER,
+            })
+          : deleteSessionCascade(bindings, PUBLIC_API_TEST_IDS.ownerSession);
+      await expect(mutation).rejects.toThrow();
+      expect(
+        await database
+          .prepare(
+            "SELECT archived_at, cleanup_operation_kind, runtime_provisioning_operation_id FROM session WHERE id = ?",
+          )
+          .bind(PUBLIC_API_TEST_IDS.ownerSession)
+          .first(),
+      ).toEqual({
+        archived_at: null,
+        cleanup_operation_kind: null,
+        runtime_provisioning_operation_id: PUBLIC_API_TEST_IDS.operation,
+      });
+    }
+  });
+
+  test("failed archive repairs move behind older pending work", async () => {
+    const database = await createPublicHttpContractDatabase();
+    await insertNonOwnerSession(database);
+    await insertOwnerSession(database);
+    await database
+      .prepare(
+        `UPDATE session
+            SET archived_at = 1,
+                cleanup_operation_kind = 'archive',
+                status = 'RESCHEDULING',
+                status_operation_id = ?,
+                updated_at = 1
+          WHERE id = ?`,
+      )
+      .bind(PUBLIC_API_TEST_IDS.operation, PUBLIC_API_TEST_IDS.nonOwnerSession)
+      .run();
+    await database
+      .prepare(
+        `UPDATE session
+            SET archived_at = 2,
+                cleanup_operation_kind = 'archive',
+                status = 'RESCHEDULING',
+                status_operation_id = ?,
+                updated_at = 2
+          WHERE id = ?`,
+      )
+      .bind(PUBLIC_API_TEST_IDS.operation, PUBLIC_API_TEST_IDS.ownerSession)
+      .run();
+    const bindings = withSessionLifecycleBinding(
+      createPublicHttpTestBindings(database) as ApiBindings,
+      [],
+      { closeError: new Error("viewer cleanup interrupted") },
+    );
+
+    expect(
+      await repairStaleSessionArchiveCleanups(bindings, {
+        limit: 1,
+        staleUpdatedAtLte: 2,
+      }),
+    ).toBe(1);
+    const firstAttempt = await database
+      .prepare("SELECT updated_at FROM session WHERE id = ?")
+      .bind(PUBLIC_API_TEST_IDS.nonOwnerSession)
+      .first<{ updated_at: number }>();
+    expect(firstAttempt?.updated_at).toBeGreaterThan(2);
+    expect(
+      await database
+        .prepare("SELECT updated_at FROM session WHERE id = ?")
+        .bind(PUBLIC_API_TEST_IDS.ownerSession)
+        .first(),
+    ).toEqual({ updated_at: 2 });
+
+    expect(
+      await repairStaleSessionArchiveCleanups(bindings, {
+        limit: 1,
+        staleUpdatedAtLte: 2,
+      }),
+    ).toBe(1);
+    const secondAttempt = await database
+      .prepare("SELECT updated_at FROM session WHERE id = ?")
+      .bind(PUBLIC_API_TEST_IDS.ownerSession)
+      .first<{ updated_at: number }>();
+    expect(secondAttempt?.updated_at).toBeGreaterThan(2);
+  });
+
   test("delete cascade removes live and terminal driver instances associated with the session", async () => {
     const database = await createPublicHttpContractDatabase();
     await insertNonOwnerSession(database);
     await insertSandboxSession(database);
-    await insertSessionRun(database, { runId: PUBLIC_API_TEST_IDS.run });
     await insertSessionRun(database, {
       runId: PUBLIC_API_TEST_IDS.runAlt,
       status: "completed",
     });
+    await insertSessionRun(database, { runId: PUBLIC_API_TEST_IDS.run });
     await insertDriverInstance(database, {
       driverId: PUBLIC_API_TEST_IDS.driverNonOwner,
       sandboxSessionId: PUBLIC_API_TEST_IDS.nonOwnerSession,
@@ -466,7 +708,7 @@ describe("session lifecycle mutations", () => {
 
     expect(anchoredSession?.archived_at).toBeNumber();
     expect(anchoredSession).toMatchObject({
-      status: "TERMINATED",
+      status: "IDLE",
       status_operation_id: operationId,
     });
 
@@ -493,7 +735,7 @@ describe("session lifecycle mutations", () => {
     const bucket = new RetriableSessionFileBucket();
     const bindings = withSessionLifecycleBinding(
       createPublicHttpTestBindings(database, {
-        fileBucket: bucket as unknown as R2Bucket,
+        fileBucket: bucket as R2Bucket,
       }) as ApiBindings,
     );
 
@@ -513,7 +755,7 @@ describe("session lifecycle mutations", () => {
       .first<{ status: string }>();
 
     expect(bucket.deletedKeys).toEqual([`session-files/${SESSION_FILE_ID}/notes.txt`]);
-    expect(anchoredSession).toEqual({ status: "TERMINATED" });
+    expect(anchoredSession).toEqual({ status: "IDLE" });
     expect(retainedFile).toEqual({ status: "deleting" });
 
     bucket.failDelete = false;
@@ -542,7 +784,6 @@ describe("session lifecycle mutations", () => {
   test("archive cancels active runs and exposes an idle archived session", async () => {
     const database = await createPublicHttpContractDatabase();
     await insertOwnerSession(database);
-    await ensureRuntimeLifecycleTables(database);
     await insertSandboxSession(database, PUBLIC_API_TEST_IDS.ownerSession);
     await insertSessionRun(database, {
       createdByAccountId: PUBLIC_API_TEST_IDS.ownerAccount,
@@ -586,7 +827,120 @@ describe("session lifecycle mutations", () => {
     expect(outcomes.every((outcome) => outcome.status !== "failed")).toBe(true);
   });
 
-  test("unarchive normalizes stale rescheduling state before exposing the session", async () => {
+  test("maintenance resumes an admitted archive after external cleanup fails", async () => {
+    const database = await createPublicHttpContractDatabase();
+    await insertOwnerSession(database);
+    const baseBindings = createPublicHttpTestBindings(database) as ApiBindings;
+    const failingBindings = withSessionLifecycleBinding(baseBindings, [], {
+      closeError: new Error("viewer cleanup interrupted"),
+    });
+
+    await expect(
+      archiveAgentSession({
+        bindings: failingBindings,
+        projectId: PUBLIC_API_TEST_IDS.project,
+        sessionId: PUBLIC_API_TEST_IDS.ownerSession,
+        viewer: OWNER_VIEWER,
+      }),
+    ).rejects.toThrow("viewer cleanup interrupted");
+
+    const admitted = await database
+      .prepare(
+        "SELECT archived_at, cleanup_operation_kind, status, status_operation_id FROM session WHERE id = ?",
+      )
+      .bind(PUBLIC_API_TEST_IDS.ownerSession)
+      .first<{
+        archived_at: number | null;
+        cleanup_operation_kind: string | null;
+        status: string;
+        status_operation_id: string | null;
+      }>();
+    expect(admitted?.archived_at).toBeNumber();
+    expect(admitted).toMatchObject({
+      cleanup_operation_kind: "archive",
+      status: "RESCHEDULING",
+    });
+    expect(admitted?.status_operation_id).toBeString();
+
+    const repaired = await repairStaleSessionArchiveCleanups(
+      withSessionLifecycleBinding(baseBindings),
+      { limit: 10, staleUpdatedAtLte: Date.now() },
+    );
+    const archived = await database
+      .prepare(
+        "SELECT archived_at, cleanup_operation_kind, status, status_operation_id FROM session WHERE id = ?",
+      )
+      .bind(PUBLIC_API_TEST_IDS.ownerSession)
+      .first<{
+        archived_at: number | null;
+        cleanup_operation_kind: string | null;
+        status: string;
+        status_operation_id: string | null;
+      }>();
+
+    expect(repaired).toBe(1);
+    expect(archived?.archived_at).toBeNumber();
+    expect(archived).toMatchObject({
+      cleanup_operation_kind: "archive",
+      status: "IDLE",
+      status_operation_id: null,
+    });
+  });
+
+  for (const cleanupOperationKind of ["archive", "delete"] as const) {
+    test(`${cleanupOperationKind} ownership rejects duplicate and advancing active Run projections`, async () => {
+      for (const initialRunStatus of ["booting", "queued"] as const) {
+        const database = await createPublicHttpContractDatabase();
+        await insertOwnerSession(database);
+        await insertSessionRun(database, {
+          createdByAccountId: PUBLIC_API_TEST_IDS.ownerAccount,
+          runId: PUBLIC_API_TEST_IDS.run,
+          sessionId: PUBLIC_API_TEST_IDS.ownerSession,
+          status: initialRunStatus,
+        });
+        const racingDatabase = claimCleanupAfterLifecycleRead(database, cleanupOperationKind);
+
+        const outcome = await setSessionRunStatus(racingDatabase, {
+          runId: PUBLIC_API_TEST_IDS.run,
+          status: "booting",
+        });
+
+        expect(outcome.kind).toBe(initialRunStatus === "booting" ? "duplicate" : "stale");
+        expect(await readCleanupOwnedRunProjection(database)).toEqual({
+          archived_at: 2,
+          cleanup_operation_kind: cleanupOperationKind,
+          run_status: initialRunStatus,
+          run_status_seq: 0,
+          session_status: "RESCHEDULING",
+          session_status_operation_id: PUBLIC_API_TEST_IDS.operation,
+          session_status_seq: 1,
+        });
+      }
+    });
+
+    test(`${cleanupOperationKind} ownership rejects a duplicate active projection repair`, async () => {
+      const database = await createPublicHttpContractDatabase();
+      await insertOwnerSession(database);
+      await insertSessionRun(database, {
+        createdByAccountId: PUBLIC_API_TEST_IDS.ownerAccount,
+        runId: PUBLIC_API_TEST_IDS.run,
+        sessionId: PUBLIC_API_TEST_IDS.ownerSession,
+        status: "booting",
+      });
+      await claimCleanup(database, cleanupOperationKind);
+      const before = await readCleanupOwnedRunProjection(database);
+
+      const outcome = await setSessionRunStatus(database, {
+        runId: PUBLIC_API_TEST_IDS.run,
+        status: "booting",
+      });
+
+      expect(outcome.kind).toBe("repair_needed");
+      expect(await readCleanupOwnedRunProjection(database)).toEqual(before);
+    });
+  }
+
+  test("unarchive refuses to clear an in-progress cleanup fence", async () => {
     const database = await createPublicHttpContractDatabase();
     await insertOwnerSession(database);
     await insertSessionRun(database, {
@@ -599,25 +953,35 @@ describe("session lifecycle mutations", () => {
         `
           UPDATE session
              SET archived_at = ?,
+                 cleanup_operation_kind = ?,
                  status = ?,
                  status_operation_id = ?
            WHERE id = ?
         `,
       )
-      .bind(1, "RESCHEDULING", PUBLIC_API_TEST_IDS.operation, PUBLIC_API_TEST_IDS.ownerSession)
+      .bind(
+        1,
+        "delete",
+        "RESCHEDULING",
+        PUBLIC_API_TEST_IDS.operation,
+        PUBLIC_API_TEST_IDS.ownerSession,
+      )
       .run();
 
-    await unarchiveAgentSession({
-      database,
-      projectId: PUBLIC_API_TEST_IDS.project,
-      sessionId: PUBLIC_API_TEST_IDS.ownerSession,
-      viewer: OWNER_VIEWER,
-    });
+    await expect(
+      unarchiveAgentSession({
+        database,
+        projectId: PUBLIC_API_TEST_IDS.project,
+        sessionId: PUBLIC_API_TEST_IDS.ownerSession,
+        viewer: OWNER_VIEWER,
+      }),
+    ).rejects.toThrow("cleanup is still in progress");
 
     const row = await database
       .prepare(
         `
           SELECT session.archived_at,
+                 session.cleanup_operation_kind,
                  session.status AS session_status,
                  session.status_operation_id,
                  session_run.status AS run_status
@@ -629,17 +993,44 @@ describe("session lifecycle mutations", () => {
       .bind(PUBLIC_API_TEST_IDS.ownerSession)
       .first<{
         archived_at: number | null;
+        cleanup_operation_kind: string | null;
         run_status: string;
         session_status: string;
         status_operation_id: string | null;
       }>();
 
     expect(row).toEqual({
-      archived_at: null,
-      run_status: "cancelled",
-      session_status: "IDLE",
-      status_operation_id: null,
+      archived_at: 1,
+      cleanup_operation_kind: "delete",
+      run_status: "running",
+      session_status: "RESCHEDULING",
+      status_operation_id: PUBLIC_API_TEST_IDS.operation,
     });
+  });
+
+  test("unarchive exposes a stable archived Session with no cleanup owner", async () => {
+    const database = await createPublicHttpContractDatabase();
+    await insertOwnerSession(database);
+    await database
+      .prepare(
+        "UPDATE session SET archived_at = 1, cleanup_operation_kind = 'archive' WHERE id = ?",
+      )
+      .bind(PUBLIC_API_TEST_IDS.ownerSession)
+      .run();
+
+    await unarchiveAgentSession({
+      database,
+      projectId: PUBLIC_API_TEST_IDS.project,
+      sessionId: PUBLIC_API_TEST_IDS.ownerSession,
+      viewer: OWNER_VIEWER,
+    });
+
+    expect(
+      await database
+        .prepare("SELECT archived_at FROM session WHERE id = ?")
+        .bind(PUBLIC_API_TEST_IDS.ownerSession)
+        .first(),
+    ).toEqual({ archived_at: null });
   });
 
   test("lifecycle mutations reject attributed participants who are not session creators", async () => {
@@ -690,3 +1081,95 @@ describe("session lifecycle mutations", () => {
     ).rejects.toThrow();
   });
 });
+
+async function readCleanupOwnedRunProjection(database: D1Database) {
+  return database
+    .prepare(
+      `SELECT session.archived_at,
+              session.cleanup_operation_kind,
+              session.status AS session_status,
+              session.status_operation_id AS session_status_operation_id,
+              session.status_seq AS session_status_seq,
+              session_run.status AS run_status,
+              session_run.status_seq AS run_status_seq
+         FROM session
+         JOIN session_run ON session_run.id = session.last_run_id
+        WHERE session.id = ?`,
+    )
+    .bind(PUBLIC_API_TEST_IDS.ownerSession)
+    .first();
+}
+
+function claimCleanupAfterLifecycleRead(
+  database: D1Database,
+  cleanupOperationKind: "archive" | "delete",
+): D1Database {
+  let claimed = false;
+  let interceptedLifecycleRead = false;
+
+  async function claim(): Promise<void> {
+    if (claimed) {
+      return;
+    }
+    claimed = true;
+    await claimCleanup(database, cleanupOperationKind);
+  }
+
+  function injectAfterRead(statement: D1PreparedStatement): D1PreparedStatement {
+    return new Proxy(statement, {
+      get(target, property, receiver) {
+        if (property === "bind") {
+          return (...values: unknown[]) => injectAfterRead(target.bind(...values));
+        }
+        if (property === "all" || property === "first" || property === "raw") {
+          return async (...args: unknown[]) => {
+            const method = Reflect.get(target, property, receiver) as (
+              ...values: unknown[]
+            ) => unknown;
+            const result = await method.apply(target, args);
+            await claim();
+            return result;
+          };
+        }
+        const value = Reflect.get(target, property, receiver);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+  }
+
+  return new Proxy(database, {
+    get(target, property, receiver) {
+      if (property === "prepare") {
+        return (query: string) => {
+          const statement = target.prepare(query);
+          if (interceptedLifecycleRead) {
+            return statement;
+          }
+          interceptedLifecycleRead = true;
+          return injectAfterRead(statement);
+        };
+      }
+      const value = Reflect.get(target, property, receiver);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
+}
+
+async function claimCleanup(
+  database: D1Database,
+  cleanupOperationKind: "archive" | "delete",
+): Promise<void> {
+  await database
+    .prepare(
+      `UPDATE session
+          SET archived_at = 2,
+              cleanup_operation_kind = ?,
+              status = 'RESCHEDULING',
+              status_operation_id = ?,
+              status_seq = status_seq + 1,
+              updated_at = 2
+        WHERE id = ?`,
+    )
+    .bind(cleanupOperationKind, PUBLIC_API_TEST_IDS.operation, PUBLIC_API_TEST_IDS.ownerSession)
+    .run();
+}

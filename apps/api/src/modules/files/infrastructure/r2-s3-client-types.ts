@@ -55,6 +55,7 @@ export interface PutObjectInput {
   bindings: ApiBindings;
   body: ReadableStream<Uint8Array> | ArrayBuffer | ArrayBufferView | string | Blob | null;
   contentType: string;
+  customMetadata?: Record<string, string> | undefined;
   objectKey: string;
   options?: PutObjectOptions | undefined;
 }

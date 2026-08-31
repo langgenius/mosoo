@@ -16,7 +16,9 @@ export function parseSchemaValue<Output>(schema: SchemaParser<Output>, value: un
 export const NonEmptyString = type("string > 0");
 export type NonEmptyString = typeof NonEmptyString.infer;
 
-export const PrimitiveValue = type("string | number | boolean | null");
+const FiniteNumber = type("number").narrow((value) => Number.isFinite(value));
+
+export const PrimitiveValue = type("string | boolean | null").or(FiniteNumber);
 export type PrimitiveValue = typeof PrimitiveValue.infer;
 
 export const PrimitiveRecord = type({

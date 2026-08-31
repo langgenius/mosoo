@@ -34,7 +34,7 @@ export async function rejectDisconnectedViewerPermissionRequests(
   await appendSessionRuntimeEvents({
     bindings: input.env,
     deliver: false,
-    events: [result.event],
+    events: result.events,
     sessionId: input.attachment.sessionId,
   });
 

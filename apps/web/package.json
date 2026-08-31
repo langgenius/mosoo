@@ -6,15 +6,15 @@
     "dev": "vp dev",
     "build": "vp build",
     "preview": "vp preview",
-    "deploy": "vp run build && vp exec wrangler deploy --env prod",
+    "deploy": "vp run build && vp exec wrangler deploy --env prod --experimental-provision=false",
     "lint": "vp lint .",
     "tc": "vp exec tsc --noEmit",
-    "test": "vp exec bun test tests"
+    "test": "vp exec bun test tests --isolate"
   },
   "dependencies": {
     "@assistant-ui/react": "0.15.14",
     "@base-ui/react": "^1.7.0",
-    "@cloudflare/sandbox": "0.12.6",
+    "@cloudflare/sandbox": "0.12.9",
     "@hugeicons/core-free-icons": "^4.2.3",
     "@hugeicons/react": "^1.1.9",
     "@lobehub/icons-static-svg": "^1.90.0",
@@ -30,11 +30,9 @@
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",
     "better-auth": "^1.6.28",
-    "boring-avatars": "^2.0.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.31.0",
-    "motion": "^12.40.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-markdown": "^10.1.0",
@@ -55,7 +53,7 @@
     "jsdom": "^29.1.1",
     "typescript": "^6.0.3",
     "vite": "^8.2.1",
-    "vite-plus": "^0.1.24",
-    "wrangler": "^4.123.0"
+    "vite-plus": "^0.3.0",
+    "wrangler": "^4.127.1"
   }
 }

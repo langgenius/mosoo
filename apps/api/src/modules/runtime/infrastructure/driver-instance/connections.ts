@@ -17,6 +17,7 @@ function isDriverInstanceConflictMessage(message: string): boolean {
     message === "Driver hello is required before pushLogs." ||
     message === "Driver instance id does not match the active Durable Object." ||
     message === "Driver instance id mismatch." ||
+    message === "Driver generation is no longer current." ||
     message.includes("already closed.") ||
     message.includes("closed before hello.")
   );

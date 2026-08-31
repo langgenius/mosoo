@@ -5,14 +5,21 @@ import {
 import type { SessionProcessEvent } from "@mosoo/contracts/session";
 import { sessionEventsTable } from "@mosoo/db";
 import type { AccountId, ProjectId, RuntimeEventId, SessionId, SessionRunId } from "@mosoo/id";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, lt } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { validationError } from "../../../platform/errors";
 import { toIsoString } from "../../../time";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { getProjectSessionParticipantTimelineAccess } from "../domain/session-access.policy";
-import { foldStreamedSessionEventRows } from "../domain/session-event-stream-fold";
+import {
+  excludeSessionEventStreams,
+  findLeftIncompleteSessionEventStreamKeys,
+  foldStreamedSessionEventRows,
+  getSessionEventStreamKey,
+} from "../domain/session-event-stream-fold";
+import { formatStoredSessionEventContent } from "../domain/session-event-tool-content";
+import type { StoredToolStatus } from "../domain/session-event-tool-content";
 
 export interface SessionEventProcessRow {
   content_text: string;
@@ -24,11 +31,16 @@ export interface SessionEventProcessRow {
   process_type: SessionProcessEvent["type"];
   run_id: SessionRunId | null;
   seq: number;
+  stream_id: string | null;
+  tool_name?: string | null;
+  tool_status?: StoredToolStatus | null;
   tokens: number | null;
 }
 
 const DEFAULT_PROCESS_EVENT_LIMIT = 500;
 const MAX_PROCESS_EVENT_LIMIT = 1000;
+const PROCESS_EVENT_ROW_PAGE_SIZE = MAX_PROCESS_EVENT_LIMIT + 1;
+const PROCESS_EVENT_RAW_ROW_SCAN_LIMIT = MAX_PROCESS_EVENT_LIMIT * 20;
 // Longer gaps may be permission or user waits, not continuous execution.
 const MAX_INFERRED_PROCESS_EVENT_DURATION_MS = 5 * 60 * 1000;
 
@@ -43,6 +55,12 @@ interface ProcessEventProjection {
 interface SessionProcessEventAccess {
   id: SessionId;
   updatedAt: string;
+}
+
+interface SessionProcessEventWindow {
+  events: SessionProcessEvent[];
+  recorded: boolean;
+  truncated: boolean;
 }
 
 function normalizeProcessEventLimit(limit: number | null | undefined): number {
@@ -60,9 +78,7 @@ function normalizeProcessEventLimit(limit: number | null | undefined): number {
 function finalizeProcessEventDurations(
   projections: ProcessEventProjection[],
 ): SessionProcessEvent[] {
-  const sortedProjections = projections.toSorted(
-    (a, b) => a.startMs - b.startMs || a.order - b.order,
-  );
+  const sortedProjections = projections.toSorted((a, b) => a.order - b.order);
 
   return sortedProjections.map((projection, index) => {
     const next = sortedProjections[index + 1] ?? null;
@@ -91,13 +107,19 @@ function finalizeProcessEventDurations(
   });
 }
 
-function toProcessEventProjectionFromSessionEventRow(
-  row: SessionEventProcessRow,
-): ProcessEventProjection {
-  return {
+export function createSessionProcessEventsFromSessionEventRows(
+  rows: SessionEventProcessRow[],
+): SessionProcessEvent[] {
+  const foldedRows = foldStreamedSessionEventRows(rows);
+  const projections = foldedRows.map((row) => ({
     endMs: row.ended_at,
     event: {
-      content: row.content_text,
+      content: formatStoredSessionEventContent({
+        contentText: row.content_text,
+        eventType: row.event_type,
+        toolName: row.tool_name ?? null,
+        toolStatus: row.tool_status ?? null,
+      }),
       durationMs: 0,
       id: row.id,
       occurredAt: toIsoString(row.occurred_at),
@@ -108,18 +130,7 @@ function toProcessEventProjectionFromSessionEventRow(
     order: row.seq,
     runId: row.run_id,
     startMs: row.occurred_at,
-  };
-}
-
-export function createSessionProcessEventsFromSessionEventRows(
-  rows: SessionEventProcessRow[],
-  options: { foldStreamedRows?: boolean } = {},
-): SessionProcessEvent[] {
-  const foldedRows =
-    options.foldStreamedRows === false
-      ? rows
-      : foldStreamedSessionEventRows(rows, { flushOpenStreams: true }).rows;
-  const projections = foldedRows.map(toProcessEventProjectionFromSessionEventRow);
+  }));
 
   return finalizeProcessEventDurations(projections);
 }
@@ -170,6 +181,107 @@ async function getThreadSessionProcessEventAccess(
   };
 }
 
+async function readSessionProcessEventWindow(input: {
+  database: D1Database;
+  limit: number;
+  sessionId: SessionId;
+}): Promise<SessionProcessEventWindow> {
+  const scannedRows: SessionEventProcessRow[] = [];
+  let beforeSeq: number | null = null;
+  let reachedStart = false;
+
+  while (scannedRows.length < PROCESS_EVENT_RAW_ROW_SCAN_LIMIT) {
+    const rowCapacity = Math.min(
+      PROCESS_EVENT_ROW_PAGE_SIZE,
+      PROCESS_EVENT_RAW_ROW_SCAN_LIMIT - scannedRows.length,
+    );
+    const querySize = rowCapacity + 1;
+    const filters = [
+      eq(sessionEventsTable.sessionId, input.sessionId),
+      eq(sessionEventsTable.visibility, "all_consumers"),
+    ];
+
+    if (beforeSeq !== null) {
+      filters.push(lt(sessionEventsTable.seq, beforeSeq));
+    }
+
+    const page = await getAppDatabase(input.database)
+      .select({
+        content_text: sessionEventsTable.contentText,
+        ended_at: sessionEventsTable.endedAt,
+        event_type: sessionEventsTable.eventType,
+        id: sessionEventsTable.id,
+        occurred_at: sessionEventsTable.occurredAt,
+        process_status: sessionEventsTable.processStatus,
+        process_type: sessionEventsTable.processType,
+        run_id: sessionEventsTable.runId,
+        seq: sessionEventsTable.seq,
+        stream_id: sessionEventsTable.streamId,
+        tool_name: sessionEventsTable.toolName,
+        tool_status: sessionEventsTable.toolStatus,
+        tokens: sessionEventsTable.tokens,
+      })
+      .from(sessionEventsTable)
+      .where(and(...filters))
+      .orderBy(desc(sessionEventsTable.seq))
+      .limit(querySize)
+      .all();
+
+    if (page.length === 0) {
+      reachedStart = true;
+      break;
+    }
+
+    const scannedPage = page.slice(0, rowCapacity);
+    scannedRows.push(...scannedPage);
+    beforeSeq = scannedPage[scannedPage.length - 1]?.seq ?? beforeSeq;
+    const chronologicalRows = scannedRows.toReversed();
+    const foldedRows = foldStreamedSessionEventRows(chronologicalRows);
+    const events = createSessionProcessEventsFromSessionEventRows(chronologicalRows);
+
+    if (events.length > input.limit) {
+      const reachedDatabaseStart = page.length <= rowCapacity;
+      const incompleteStreams = reachedDatabaseStart
+        ? new Set<string>()
+        : findLeftIncompleteSessionEventStreamKeys(chronologicalRows);
+      const rowsByEventId = new Map(foldedRows.map((row) => [row.id, row]));
+      const retainedStreamsAreComplete = events.slice(-input.limit).every((event) => {
+        const row = rowsByEventId.get(event.id);
+        const key = row === undefined ? null : getSessionEventStreamKey(row);
+        return key === null || !incompleteStreams.has(key);
+      });
+
+      if (!retainedStreamsAreComplete) {
+        continue;
+      }
+
+      return {
+        events: events.slice(-input.limit),
+        recorded: true,
+        truncated: true,
+      };
+    }
+
+    if (page.length <= rowCapacity) {
+      reachedStart = true;
+      break;
+    }
+  }
+
+  const chronologicalRows = scannedRows.toReversed();
+  const incompleteStreams = reachedStart
+    ? new Set<string>()
+    : findLeftIncompleteSessionEventStreamKeys(chronologicalRows);
+  const completeRows = excludeSessionEventStreams(chronologicalRows, incompleteStreams);
+  const events = createSessionProcessEventsFromSessionEventRows(completeRows);
+
+  return {
+    events: events.slice(-input.limit),
+    recorded: scannedRows.length > 0,
+    truncated: !reachedStart || events.length > input.limit,
+  };
+}
+
 async function listSessionProcessEvents(
   database: D1Database,
   viewer: AuthenticatedViewer,
@@ -184,56 +296,29 @@ async function listSessionProcessEvents(
     projectId: input.projectId,
     sessionId: input.sessionId,
   });
-  const rows = await getAppDatabase(database)
-    .select({
-      content_text: sessionEventsTable.contentText,
-      ended_at: sessionEventsTable.endedAt,
-      event_type: sessionEventsTable.eventType,
-      id: sessionEventsTable.id,
-      occurred_at: sessionEventsTable.occurredAt,
-      process_status: sessionEventsTable.processStatus,
-      process_type: sessionEventsTable.processType,
-      run_id: sessionEventsTable.runId,
-      seq: sessionEventsTable.seq,
-      tokens: sessionEventsTable.tokens,
-    })
-    .from(sessionEventsTable)
-    .where(
-      and(
-        eq(sessionEventsTable.sessionId, input.sessionId),
-        eq(sessionEventsTable.visibility, "all_consumers"),
-      ),
-    )
-    .orderBy(desc(sessionEventsTable.seq))
-    .limit(limit + 1)
-    .all();
+  const window = await readSessionProcessEventWindow({
+    database,
+    limit,
+    sessionId: input.sessionId,
+  });
 
-  if (rows.length === 0) {
+  if (!window.recorded) {
     return [createNoRuntimeEventsRecordedEvent(session)];
   }
 
-  const hasMore = rows.length > limit;
-  const processEvents = createSessionProcessEventsFromSessionEventRows(
-    rows.slice(0, limit).toReversed(),
-  );
-
-  if (!hasMore) {
-    return processEvents;
+  if (!window.truncated) {
+    return window.events;
   }
 
-  const firstEvent = processEvents[0] ?? null;
-
-  if (firstEvent === null) {
-    return processEvents;
-  }
+  const firstEvent = window.events[0] ?? null;
 
   return [
     createProcessEventsTruncatedEvent({
       limit,
-      occurredAt: firstEvent.occurredAt,
+      occurredAt: firstEvent?.occurredAt ?? session.updatedAt,
       sessionId: session.id,
     }),
-    ...processEvents,
+    ...window.events,
   ];
 }
 

@@ -35,7 +35,7 @@ export async function sha256Hex(bytes: Uint8Array): Promise<string> {
       ? bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
       : Uint8Array.from(bytes).buffer;
   const digest = await crypto.subtle.digest("SHA-256", buffer);
-  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  return new Uint8Array(digest).toHex();
 }
 
 export function inferMimeType(path: string): string | null {

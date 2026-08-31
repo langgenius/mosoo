@@ -10,6 +10,7 @@ import type { AgUiSessionEvent } from "@mosoo/ag-ui-session";
 import type { RuntimeEventEnvelope } from "./runtime-event";
 import {
   readRuntimeAgentTaskSnapshot,
+  readRuntimeEventMessageContent,
   readRuntimeEventPermissionRequest,
   readRuntimeEventMessageDelta,
   readRuntimeEventMessageKey,
@@ -18,16 +19,36 @@ import {
   readRuntimeRunPayload,
   readRuntimeEventString,
   readRuntimeEventToolCallUpdate,
+  readRuntimeEventToolOutputSnapshot,
   toRuntimeRunLifecycleStatus,
 } from "./runtime-event-payload";
 import { projectRuntimeStatus, projectRuntimeTimingRecorded } from "./session-runtime-timing";
 
-function createValidatedSessionCustomEvent(name: string, value: unknown): AgUiSessionEvent {
+function runtimeEventTimestamp(event: RuntimeEventEnvelope): number {
+  return Date.parse(event.occurredAt);
+}
+
+function createValidatedSessionCustomEvent(
+  name: string,
+  value: unknown,
+  timestamp?: number,
+): AgUiSessionEvent {
   return parseAgUiSessionEvent({
     name,
+    ...(timestamp === undefined ? {} : { timestamp }),
     type: EventType.CUSTOM,
     value,
   });
+}
+
+function requireRuntimeEventMessageKey(event: RuntimeEventEnvelope): string {
+  const messageKey = readRuntimeEventMessageKey(event);
+
+  if (messageKey === null) {
+    throw new Error(`Runtime event ${event.kind} projection requires a stream ID.`);
+  }
+
+  return messageKey;
 }
 
 function projectPermissionRequest(event: RuntimeEventEnvelope): AgUiSessionEvent {
@@ -37,24 +58,23 @@ function projectPermissionRequest(event: RuntimeEventEnvelope): AgUiSessionEvent
     throw new Error("Runtime event permission projection requires a permission request event.");
   }
 
+  const permissionRequest = {
+    driverInstanceId: request.driverInstanceId,
+    rawInput: request.rawInput,
+    requestId: request.requestId,
+    runId: request.runId,
+    title: request.title,
+    toolCallId: request.toolCallId,
+    toolKind: request.toolKind,
+  };
   return createValidatedSessionCustomEvent(MOSOO_CUSTOM_EVENT.sessionPermissionsUpdated.name, {
-    permissionRequests: [
-      {
-        driverInstanceId: request.driverInstanceId,
-        rawInput: request.rawInput,
-        requestId: request.requestId,
-        runId: request.runId,
-        title: request.title,
-        toolCallId: request.toolCallId,
-        toolKind: request.toolKind,
-      },
-    ],
+    permissionRequest,
+    permissionRequests: [],
   });
 }
 
 function projectMessageAdded(event: RuntimeEventEnvelope): AgUiSessionEvent[] {
-  const payload = readRuntimeEventPayload(event);
-  const content = readRuntimeEventString(payload, "content");
+  const content = readRuntimeEventMessageContent(event);
 
   if (content === null) {
     return [];
@@ -63,8 +83,9 @@ function projectMessageAdded(event: RuntimeEventEnvelope): AgUiSessionEvent[] {
   return [
     {
       delta: content,
-      messageId: readRuntimeEventString(payload, "messageId") ?? event.id,
+      messageId: requireRuntimeEventMessageKey(event),
       role: readRuntimeEventMessageRole(event) === "user" ? "user" : "assistant",
+      timestamp: runtimeEventTimestamp(event),
       type: EventType.TEXT_MESSAGE_CHUNK,
     },
   ];
@@ -153,50 +174,25 @@ function projectAgentTaskUpdated(event: RuntimeEventEnvelope): AgUiSessionEvent[
 
 function projectPermissionResolved(event: RuntimeEventEnvelope): AgUiSessionEvent[] {
   const payload = readRuntimeEventPayload(event);
-  const permissionRequests = payload["permissionRequests"];
+  const requestId = readRuntimeEventString(payload, "requestId");
+  if (requestId === null || event.runId === undefined) {
+    throw new Error("A permission resolution requires exact request and run identities.");
+  }
 
   return [
     createValidatedSessionCustomEvent(MOSOO_CUSTOM_EVENT.sessionPermissionsUpdated.name, {
-      permissionRequests: Array.isArray(permissionRequests) ? permissionRequests : [],
+      permissionRequests: [],
+      resolvedRequestId: requestId,
+      runId: event.runId,
     }),
   ];
 }
 
-function toolCallStartEvent(
-  toolCall: ReturnType<typeof readRuntimeEventToolCallUpdate>,
-): AgUiSessionEvent | null {
-  const parentMessageId = toolCall.parentMessageId ?? toolCall.messageId;
-
-  if (parentMessageId === null) {
-    return null;
-  }
-
-  return {
-    parentMessageId,
-    toolCallId: toolCall.toolCallId,
-    toolCallName: toolCall.title ?? toolCall.kind ?? "Tool",
-    type: EventType.TOOL_CALL_START,
-  };
-}
-
-function toolCallArgsEvent(
-  toolCall: ReturnType<typeof readRuntimeEventToolCallUpdate>,
-): AgUiSessionEvent | null {
-  if (toolCall.rawInput === null || toolCall.rawInput.length === 0) {
-    return null;
-  }
-
-  return {
-    delta: toolCall.rawInput,
-    toolCallId: toolCall.toolCallId,
-    type: EventType.TOOL_CALL_ARGS,
-  };
-}
-
-function appendIfPresent<T>(target: T[], value: T | null): void {
-  if (value !== null) {
-    target.push(value);
-  }
+export function createRuntimeToolResultMessageId(input: {
+  runId: string | null;
+  toolCallId: string;
+}): string {
+  return input.runId ?? `tool-result:${JSON.stringify([null, input.toolCallId])}`;
 }
 
 export function projectRuntimeEventToAgUiSessionEvents(
@@ -228,8 +224,9 @@ export function projectRuntimeEventToAgUiSessionEvents(
     case "message.started": {
       return [
         {
-          messageId: readRuntimeEventMessageKey(event) ?? event.id,
+          messageId: requireRuntimeEventMessageKey(event),
           role: readRuntimeEventMessageRole(event) === "user" ? "user" : "assistant",
+          timestamp: runtimeEventTimestamp(event),
           type: EventType.TEXT_MESSAGE_START,
         },
       ];
@@ -238,15 +235,18 @@ export function projectRuntimeEventToAgUiSessionEvents(
       return [
         {
           delta: readRuntimeEventMessageDelta(event),
-          messageId: readRuntimeEventMessageKey(event) ?? event.id,
+          messageId: requireRuntimeEventMessageKey(event),
+          timestamp: runtimeEventTimestamp(event),
           type: EventType.TEXT_MESSAGE_CONTENT,
         },
       ];
     }
-    case "message.completed": {
+    case "message.cancelled":
+    case "message.completed":
+    case "message.failed": {
       return [
         {
-          messageId: readRuntimeEventMessageKey(event) ?? event.id,
+          messageId: requireRuntimeEventMessageKey(event),
           type: EventType.TEXT_MESSAGE_END,
         },
       ];
@@ -254,7 +254,7 @@ export function projectRuntimeEventToAgUiSessionEvents(
     case "thought.started": {
       return [
         {
-          messageId: readRuntimeEventMessageKey(event) ?? event.id,
+          messageId: requireRuntimeEventMessageKey(event),
           role: "reasoning",
           type: EventType.REASONING_MESSAGE_START,
         },
@@ -264,49 +264,42 @@ export function projectRuntimeEventToAgUiSessionEvents(
       return [
         {
           delta: readRuntimeEventMessageDelta(event),
-          messageId: readRuntimeEventMessageKey(event) ?? event.id,
+          messageId: requireRuntimeEventMessageKey(event),
           type: EventType.REASONING_MESSAGE_CONTENT,
         },
       ];
     }
+    case "thought.cancelled":
     case "thought.completed": {
       return [
         {
-          messageId: readRuntimeEventMessageKey(event) ?? event.id,
+          messageId: requireRuntimeEventMessageKey(event),
           type: EventType.REASONING_MESSAGE_END,
         },
       ];
     }
     case "tool.call.updated": {
       const toolCall = readRuntimeEventToolCallUpdate(event);
-      const projected: AgUiSessionEvent[] = [];
-
-      appendIfPresent(projected, toolCallStartEvent(toolCall));
-      appendIfPresent(projected, toolCallArgsEvent(toolCall));
-
-      if (toolCall.status === "completed" || toolCall.status === "failed") {
-        const rawOutput = toolCall.rawOutput ?? toolCall.content;
-        const result =
-          rawOutput ??
-          (toolCall.status === "failed"
-            ? `${toolCall.title ?? toolCall.kind ?? "Tool"} failed.`
-            : null);
-
-        return result === null
-          ? [...projected, { toolCallId: toolCall.toolCallId, type: EventType.TOOL_CALL_END }]
-          : [
-              ...projected,
-              {
-                content: result,
-                messageId: toolCall.messageId ?? event.id,
-                toolCallId: toolCall.toolCallId,
-                type: EventType.TOOL_CALL_RESULT,
-              },
-              { toolCallId: toolCall.toolCallId, type: EventType.TOOL_CALL_END },
-            ];
-      }
-
-      return projected;
+      return [
+        createValidatedSessionCustomEvent(
+          MOSOO_CUSTOM_EVENT.sessionToolUpdated.name,
+          {
+            inputDelta: toolCall.rawInputDelta,
+            inputSnapshot: toolCall.rawInput,
+            outputDelta: toolCall.rawOutputDelta,
+            outputSnapshot: readRuntimeEventToolOutputSnapshot(toolCall),
+            parentMessageId: toolCall.parentMessageId ?? toolCall.messageId,
+            resultMessageId: createRuntimeToolResultMessageId({
+              runId: event.runId ?? null,
+              toolCallId: toolCall.toolCallId,
+            }),
+            runId: event.runId ?? null,
+            toolCallId: toolCall.toolCallId,
+            toolName: toolCall.title ?? toolCall.kind ?? "Tool",
+          },
+          runtimeEventTimestamp(event),
+        ),
+      ];
     }
     case "plan.updated": {
       const payload = readRuntimeEventPayload(event);

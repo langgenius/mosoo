@@ -81,14 +81,15 @@ export function SkillDetailDialog({ onOpenChange, registry, skill }: Props) {
   const { t } = useTranslation();
   const [state, dispatch] = useReducer(skillDetailDialogReducer, SKILL_DETAIL_DIALOG_INITIAL_STATE);
   const { actionError, content, contentError, contentLoading, detail, forking, showDelete } = state;
+  const { getSkillDetail, getSkillSource } = registry;
 
   useEffect(() => {
     const abortController = new AbortController();
     void (async () => {
       try {
         const [nextDetail, text] = await Promise.all([
-          registry.getSkillDetail(skill.id),
-          registry.getSkillSource(skill.id),
+          getSkillDetail(skill.id),
+          getSkillSource(skill.id),
         ]);
         if (abortController.signal.aborted) {
           return;
@@ -106,7 +107,7 @@ export function SkillDetailDialog({ onOpenChange, registry, skill }: Props) {
     return () => {
       abortController.abort();
     };
-  }, [registry.getSkillDetail, registry.getSkillSource, skill.id]);
+  }, [getSkillDetail, getSkillSource, skill.id]);
 
   const body = useMemo(() => stripSkillFrontmatter(content), [content]);
 

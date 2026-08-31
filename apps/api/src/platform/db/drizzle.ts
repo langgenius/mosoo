@@ -138,10 +138,10 @@ async function readAllRows<T = unknown>(statement: D1PreparedStatement): Promise
       const row = await statement.first<T>();
       return row === null
         ? result
-        : ({
+        : {
             ...result,
             results: [row],
-          } as D1Result<T>);
+          };
     } catch (error) {
       if (!isCompatMethodNotImplementedError(error) || typeof statement.first !== "function") {
         throw error;

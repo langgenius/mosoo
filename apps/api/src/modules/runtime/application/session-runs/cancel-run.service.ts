@@ -1,13 +1,13 @@
 import type { RuntimeCommand } from "@mosoo/contracts/runtime-command";
 import type { SessionRunSummary } from "@mosoo/contracts/session-run";
-import { sessionRunsTable, sessionsTable } from "@mosoo/db";
+import { driverInstancesTable, sessionRunsTable, sessionsTable } from "@mosoo/db";
+import { sleepPromise } from "@mosoo/effects";
 import { createPlatformId, parsePlatformId } from "@mosoo/id";
 import type {
   AccountId,
   DriverCommandId,
   DriverInstanceId,
   ProjectId,
-  RuntimeEventId,
   SessionId,
   SessionRunId,
 } from "@mosoo/id";
@@ -19,18 +19,18 @@ import { getAppDatabase } from "../../../../platform/db/drizzle";
 import { isTruthy } from "../../../../shared/truthiness";
 import type { AuthenticatedViewer } from "../../../auth/application/viewer-auth.service";
 import { ensureProjectOwnership } from "../../../projects/application/project.service";
-import { appendSessionRuntimeEvents } from "../../../sessions/application/session-event-write.service";
 import { sessionParticipantCondition } from "../../../sessions/domain/session-access.policy";
+import { RUNTIME_SOCKET_TIMEOUT_MS } from "../../domain/runtime-config";
 import { sendDriverInstanceCommand } from "../../infrastructure/driver-instance/client";
 import { isDriverControlSocketMissingError } from "../../infrastructure/driver-session-stop-errors";
+import { stopDriverSession } from "../../infrastructure/driver-session-stop.service";
 import { expireUndeliveredInputStartCommandsForRun } from "../../infrastructure/session-runs/runtime-command-store.repository";
 import { toSessionRunSummary } from "../../infrastructure/session-runs/session-run-row.mapper";
 import type { SessionRunRow } from "../../infrastructure/session-runs/session-run-row.mapper";
-import {
-  getSessionRunSummary,
-  setSessionRunStatus,
-} from "../../infrastructure/session-runs/session-run-store.repository";
-import { createCancelledSessionRunRuntimeEvent } from "./session-run-view-events.service";
+import { getSessionRunSummary } from "../../infrastructure/session-runs/session-run-store.repository";
+import { recordCanonicalSessionRunTerminal } from "./session-run-terminal-failure.service";
+
+const RUN_CANCEL_POLL_MS = 100;
 interface CancelSessionRunInput {
   projectId: ProjectId;
   runId: SessionRunId;
@@ -42,7 +42,12 @@ async function getOwnedSessionRun(
   viewerId: AccountId,
   input: CancelSessionRunInput,
 ): Promise<{
+  driverConnectionId: string | null;
+  driverGeneration: number | null;
   driverInstanceId: DriverInstanceId | null;
+  driverLastHeartbeatAt: number | null;
+  driverStatus: string | null;
+  driverUpdatedAt: number | null;
   run: SessionRunSummary;
   sessionId: SessionId;
 } | null> {
@@ -53,10 +58,16 @@ async function getOwnedSessionRun(
         created_at: sessionRunsTable.createdAt,
         deployment_version_id: sessionRunsTable.deploymentVersionId,
         deployment_version_number: sessionRunsTable.deploymentVersionNumber,
+        driver_connection_id: driverInstancesTable.connectionId,
+        driver_generation: driverInstancesTable.generation,
         driver_instance_id: sessionRunsTable.driverInstanceId,
+        driver_last_heartbeat_at: driverInstancesTable.lastHeartbeatAt,
+        driver_status: driverInstancesTable.status,
+        driver_updated_at: driverInstancesTable.updatedAt,
         error_code: sessionRunsTable.errorCode,
         error_details_json: sessionRunsTable.errorDetailsJson,
         error_message: sessionRunsTable.errorMessage,
+        error_retryable: sessionRunsTable.errorRetryable,
         id: sessionRunsTable.id,
         model: sessionRunsTable.model,
         provider: sessionRunsTable.provider,
@@ -68,6 +79,10 @@ async function getOwnedSessionRun(
         updated_at: sessionRunsTable.updatedAt,
       })
       .from(sessionRunsTable)
+      .leftJoin(
+        driverInstancesTable,
+        eq(driverInstancesTable.id, sessionRunsTable.driverInstanceId),
+      )
       .innerJoin(sessionsTable, eq(sessionsTable.id, sessionRunsTable.sessionId))
       .where(
         and(
@@ -85,10 +100,41 @@ async function getOwnedSessionRun(
   }
 
   return {
+    driverConnectionId: row.driver_connection_id,
+    driverGeneration: row.driver_generation,
     driverInstanceId: row.driver_instance_id,
+    driverLastHeartbeatAt: row.driver_last_heartbeat_at,
+    driverStatus: row.driver_status,
+    driverUpdatedAt: row.driver_updated_at,
     run: toSessionRunSummary(row satisfies SessionRunRow),
     sessionId: row.session_id,
   };
+}
+
+async function waitForDriverTerminalRun(
+  database: D1Database,
+  runId: SessionRunId,
+): Promise<SessionRunSummary> {
+  const deadline = Date.now() + RUNTIME_SOCKET_TIMEOUT_MS;
+
+  while (true) {
+    const run = await getSessionRunSummary(database, runId);
+    if (run === null) {
+      throw new Error("Session run disappeared while waiting for cancellation.");
+    }
+    if (
+      run.status === "cancelled" ||
+      run.status === "completed" ||
+      run.status === "expired" ||
+      run.status === "failed"
+    ) {
+      return run;
+    }
+    if (Date.now() >= deadline) {
+      throw new Error("Driver did not settle the run cancellation before the control timeout.");
+    }
+    await sleepPromise(RUN_CANCEL_POLL_MS);
+  }
 }
 
 export async function cancelRun(
@@ -137,54 +183,69 @@ export async function cancelRun(
     };
   }
 
-  if (isTruthy(run.driverInstanceId)) {
+  let driverTerminalRun: SessionRunSummary | null = null;
+  let requiresSyntheticCancellation =
+    !isTruthy(run.driverInstanceId) || run.driverGeneration === null;
+
+  if (!requiresSyntheticCancellation && run.driverInstanceId && run.driverGeneration !== null) {
     const command: RuntimeCommand = {
       commandId: createPlatformId<DriverCommandId>(),
       kind: "turn.cancel",
       reason: "viewer.cancelled",
+      runId,
     };
 
     try {
-      await sendDriverInstanceCommand(bindings, run.driverInstanceId, command);
+      await sendDriverInstanceCommand(
+        bindings,
+        run.driverInstanceId,
+        run.driverGeneration,
+        command,
+      );
+      driverTerminalRun = await waitForDriverTerminalRun(database, runId);
     } catch (error) {
       if (!isDriverControlSocketMissingError(error)) {
         throw error;
       }
+      requiresSyntheticCancellation = true;
     }
   }
 
-  const outcome = await setSessionRunStatus(database, {
-    runId,
-    source: "viewer",
-    status: "cancelled",
-  });
-
-  if (outcome.kind === "repair_needed") {
-    throw new Error("Session lifecycle projection needs repair.");
-  }
-
-  if (outcome.kind === "duplicate") {
-    if (isTruthy(run.driverInstanceId)) {
-      await expireUndeliveredInputStartCommandsForRun(database, {
-        driverInstanceId: run.driverInstanceId,
+  const outcome = requiresSyntheticCancellation
+    ? await recordCanonicalSessionRunTerminal(bindings, {
+        assistantMessage: null,
+        error: null,
+        ...(run.driverGeneration === null || run.driverInstanceId === null
+          ? {}
+          : {
+              expectedDriverObservation: {
+                connectionId: run.driverConnectionId,
+                driverInstanceId: run.driverInstanceId,
+                generation: run.driverGeneration,
+                lastHeartbeatAt: run.driverLastHeartbeatAt,
+                status: run.driverStatus,
+                updatedAt: run.driverUpdatedAt,
+              },
+            }),
         runId,
-      });
-    }
+        sessionId: run.sessionId,
+        source: "viewer",
+        status: "cancelled",
+      })
+    : null;
 
-    return {
-      run: outcome.run,
-    };
+  if (
+    outcome?.kind === "committed" &&
+    run.driverInstanceId !== null &&
+    run.driverGeneration !== null
+  ) {
+    await stopDriverSession(bindings, {
+      driverInstanceId: run.driverInstanceId,
+      expectedDriverGeneration: run.driverGeneration,
+      expectedSessionRunId: runId,
+      reason: "viewer.cancelled",
+    });
   }
-
-  if (outcome.kind === "rejected" || outcome.kind === "stale") {
-    const latestRun = await getSessionRunSummary(database, runId);
-
-    return {
-      run: latestRun ?? currentRun,
-    };
-  }
-
-  const updatedRun = outcome.run;
 
   if (isTruthy(run.driverInstanceId)) {
     await expireUndeliveredInputStartCommandsForRun(database, {
@@ -193,17 +254,9 @@ export async function cancelRun(
     });
   }
 
-  const cancelledEvent = createCancelledSessionRunRuntimeEvent({
-    eventId: createPlatformId<RuntimeEventId>(),
-    run: updatedRun,
-    sessionId: run.sessionId,
-    sourceEventId: `viewer-cancel:${runId}:cancelled`,
-  });
-  await appendSessionRuntimeEvents({
-    bindings,
-    events: [cancelledEvent],
-    sessionId: run.sessionId,
-  });
+  if (outcome?.kind === "stale") {
+    return { run: outcome.run };
+  }
 
   logInfo("session.turn.cancelled", {
     driverInstanceId: run.driverInstanceId,
@@ -214,6 +267,6 @@ export async function cancelRun(
   });
 
   return {
-    run: updatedRun,
+    run: outcome?.run ?? driverTerminalRun ?? currentRun,
   };
 }

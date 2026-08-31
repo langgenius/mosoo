@@ -26,6 +26,8 @@ const runBoundRuntimeEventKinds = new Set<RuntimeEventKind>([
   "permission.resolved",
   "permission.review.completed",
   "permission.review.started",
+  "runtime.resume.updated",
+  "usage.updated",
 ]);
 
 function runtimeEventRequiresRunLink(kind: RuntimeEventKind): boolean {
@@ -53,6 +55,14 @@ export function assertRuntimeEventMatchesDriverLink(
     throw new Error("Runtime driver event driver instance id does not match the request.");
   }
 
+  if ((event.runtimeId ?? null) !== input.link.runtimeId) {
+    throw new Error("Runtime driver event runtime id does not match the driver session link.");
+  }
+
+  if (event.runId !== undefined && (event.traceId ?? null) !== input.link.traceId) {
+    throw new Error("Runtime driver event trace id does not match the driver session link.");
+  }
+
   if (event.runId === undefined && !runtimeEventRequiresRunLink(event.kind)) {
     return;
   }
@@ -67,16 +77,5 @@ export function assertRuntimeEventMatchesDriverLink(
     readRuntimeAgentTaskSnapshot(event).tasks.length > 0
   ) {
     throw new Error("Runtime agent task snapshot requires an active session run.");
-  }
-}
-
-export function assertRuntimeEventMatchesDriverEnvelope(
-  event: RuntimeEventEnvelope,
-  input: {
-    eventId: string;
-  },
-): void {
-  if (event.sourceEventId !== undefined && event.sourceEventId !== input.eventId) {
-    throw new Error("Runtime driver event source id does not match the driver envelope.");
   }
 }

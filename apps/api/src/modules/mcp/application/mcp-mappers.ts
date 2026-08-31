@@ -120,7 +120,7 @@ function toCredentialSummary(row: CredentialRow): McpCredentialSummary {
     id: row.id,
     scope: row.scope,
     scopeValues: decodeJsonArray(row.scopeValuesJson),
-    status: getCredentialStatus(row) as Exclude<McpCredentialStatus, "none">,
+    status: getCredentialStatus(row),
     subjectLabel: row.subjectLabel,
     updatedAt: toIsoString(row.updatedAt),
   };
@@ -192,9 +192,7 @@ export function toAgentBinding(
 export function toOAuthFlowState(flow: OAuthFlowRow, server: ServerRow): McpOAuthFlowState {
   return {
     authorizationState:
-      flow.status === "succeeded"
-        ? ((server.enabled === 1 ? "active" : "disabled") as McpAuthorizationState)
-        : null,
+      flow.status === "succeeded" ? (server.enabled === 1 ? "active" : "disabled") : null,
     errorMessage: flow.errorMessage,
     flowId: flow.id,
     serverId: flow.serverId,

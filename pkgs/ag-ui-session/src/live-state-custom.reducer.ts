@@ -2,7 +2,12 @@ import type { MosooCustomEvent, MosooSessionFileChange } from "./ag-ui-session-e
 import { MOSOO_CUSTOM_EVENT as CUSTOM_EVENT_REGISTRY } from "./custom-event-registry";
 import type { SessionLiveState } from "./live-state";
 import { updateSessionMetadataState } from "./live-state-custom-metadata.reducer";
-import { completePendingToolUses, normalizeMessagePlan } from "./live-state-message.reducer";
+import {
+  agUiEventTimestampToIso,
+  applyToolCallUpdateToSessionLiveState,
+  completePendingToolUses,
+  normalizeMessagePlan,
+} from "./live-state-message.reducer";
 import {
   currentIsoTimestamp,
   isTerminalRunStatus,
@@ -83,9 +88,27 @@ function updatePermissionRequests(
   state: SessionLiveState,
   event: CustomEventByName<typeof CUSTOM_EVENT_REGISTRY.sessionPermissionsUpdated.name>,
 ): SessionLiveState {
-  const permissionRequests = isTerminalRunStatus(state.run.status)
-    ? []
-    : filterPermissionRequestsForCurrentRun(state, event.value.permissionRequests);
+  const permissionRequests = (() => {
+    if (isTerminalRunStatus(state.run.status)) {
+      return [];
+    }
+    if (event.value.permissionRequest !== undefined) {
+      return filterPermissionRequestsForCurrentRun(state, [
+        ...state.permissionRequests.filter(
+          (request) => request.requestId !== event.value.permissionRequest?.requestId,
+        ),
+        event.value.permissionRequest,
+      ]);
+    }
+    if (event.value.resolvedRequestId !== undefined) {
+      return state.permissionRequests.filter(
+        (request) =>
+          request.requestId !== event.value.resolvedRequestId ||
+          (event.value.runId !== undefined && request.runId !== event.value.runId),
+      );
+    }
+    return filterPermissionRequestsForCurrentRun(state, event.value.permissionRequests);
+  })();
 
   return touchSessionLiveState({
     ...state,
@@ -359,6 +382,14 @@ function updateRuntimeCustomState(
 
     case CUSTOM_EVENT_REGISTRY.sessionTasksReplaced.name: {
       return replaceAgentTasks(state, event);
+    }
+
+    case CUSTOM_EVENT_REGISTRY.sessionToolUpdated.name: {
+      const timestamp = event["timestamp"];
+      return applyToolCallUpdateToSessionLiveState(state, {
+        ...event.value,
+        ...(typeof timestamp !== "number" ? {} : { createdAt: agUiEventTimestampToIso(timestamp) }),
+      });
     }
 
     case CUSTOM_EVENT_REGISTRY.sessionInfraRescheduling.name: {

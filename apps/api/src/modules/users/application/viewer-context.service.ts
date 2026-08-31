@@ -111,19 +111,8 @@ async function getViewerAccountState(
 
 function getViewerAuth(bindings: ApiBindings, viewer: AuthenticatedViewer | null): ViewerAuth {
   const methods: AuthMethod[] = ["email_otp"];
-  const authBindings = bindings as ApiBindings & {
-    GOOGLE_OAUTH_CLIENT_ID?: string;
-    GOOGLE_OAUTH_CLIENT_SECRET?: string;
-  };
 
-  if (
-    authBindings.GOOGLE_OAUTH_CLIENT_ID?.trim() !== null &&
-    authBindings.GOOGLE_OAUTH_CLIENT_ID?.trim() !== undefined &&
-    authBindings.GOOGLE_OAUTH_CLIENT_ID?.trim() !== "" &&
-    authBindings.GOOGLE_OAUTH_CLIENT_SECRET?.trim() !== null &&
-    authBindings.GOOGLE_OAUTH_CLIENT_SECRET?.trim() !== undefined &&
-    authBindings.GOOGLE_OAUTH_CLIENT_SECRET?.trim() !== ""
-  ) {
+  if (bindings.GOOGLE_OAUTH_CLIENT_ID?.trim() && bindings.GOOGLE_OAUTH_CLIENT_SECRET?.trim()) {
     methods.push("google_oauth");
   }
 

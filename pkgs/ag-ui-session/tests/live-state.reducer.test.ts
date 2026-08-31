@@ -41,6 +41,18 @@ function runningRunUpdatedEvent(runId: string, driverInstanceId: string): AgUiEv
   };
 }
 
+function tasksReplacedEvent(
+  runId: string,
+  driverInstanceId: string,
+  tasks: NonNullable<SessionLiveState["taskSnapshot"]>["tasks"],
+): AgUiEvent {
+  return {
+    name: MOSOO_CUSTOM_EVENT.sessionTasksReplaced.name,
+    type: "CUSTOM",
+    value: { driverInstanceId, runId, tasks },
+  };
+}
+
 describe("session live-state transcript reducer", () => {
   test("replaces live state when a state snapshot arrives", () => {
     const userMessage = createSessionLiveStateMessage({
@@ -192,6 +204,32 @@ describe("session live-state transcript reducer", () => {
     ]);
   });
 
+  test("replaces authoritative text without discarding tool segments", () => {
+    const nextState = applyAgUiEventsToSessionLiveState(baseState(), [
+      { messageId: "assistant-1", role: "assistant", type: "TEXT_MESSAGE_START" },
+      { delta: "obsolete", messageId: "assistant-1", type: "TEXT_MESSAGE_CONTENT" },
+      {
+        parentMessageId: "assistant-1",
+        toolCallId: "tool-1",
+        toolCallName: "Shell",
+        type: "TOOL_CALL_START",
+      },
+      {
+        delta: "replacement",
+        messageId: "assistant-1",
+        role: "assistant",
+        type: "TEXT_MESSAGE_CHUNK",
+      },
+      { delta: " final", messageId: "assistant-1", type: "TEXT_MESSAGE_CONTENT" },
+    ]);
+
+    expect(nextState.messages[0]?.content).toBe("replacement final");
+    expect(nextState.messages[0]?.segments).toEqual([
+      { argsText: "", kind: "tool_use", path: null, tool: "Shell", toolCallId: "tool-1" },
+      { kind: "text", text: "replacement final" },
+    ]);
+  });
+
   test("normalizes tool result before tool start into one ordered tool call", () => {
     const nextState = applyAgUiEventsToSessionLiveState(baseState(), [
       {
@@ -239,6 +277,126 @@ describe("session live-state transcript reducer", () => {
         path: null,
         tool: "Shell",
         toolCallId: "tool-1",
+      },
+    ]);
+  });
+
+  test("applies tool input and output snapshots as replacements and deltas as appends", () => {
+    const toolUpdate = (
+      value: Partial<
+        Extract<AgUiEvent, { name: typeof MOSOO_CUSTOM_EVENT.sessionToolUpdated.name }>["value"]
+      >,
+    ): AgUiEvent => ({
+      name: MOSOO_CUSTOM_EVENT.sessionToolUpdated.name,
+      type: "CUSTOM",
+      value: {
+        inputDelta: null,
+        inputSnapshot: null,
+        outputDelta: null,
+        outputSnapshot: null,
+        parentMessageId: null,
+        resultMessageId: "assistant-1",
+        runId: "run-1",
+        toolCallId: "tool-1",
+        toolName: "Shell",
+        ...value,
+      },
+    });
+    const nextState = applyAgUiEventsToSessionLiveState(baseState(), [
+      toolUpdate({
+        inputDelta: '{"cmd":',
+        outputDelta: "partial",
+        parentMessageId: "assistant-1",
+      }),
+      toolUpdate({ inputSnapshot: '{"cmd":"ls"', outputSnapshot: "snapshot" }),
+      toolUpdate({ inputDelta: ',"tail":true}', outputDelta: " tail" }),
+    ]);
+
+    expect(nextState.messages[0]?.segments).toEqual([
+      {
+        argsText: '{"cmd":"ls","tail":true}',
+        kind: "tool_use",
+        path: null,
+        runId: "run-1",
+        tool: "Shell",
+        toolCallId: "tool-1",
+      },
+      {
+        kind: "tool_result",
+        output: "snapshot tail",
+        runId: "run-1",
+        tool: "Shell",
+        toolCallId: "tool-1",
+      },
+    ]);
+  });
+
+  test("scopes exact tool updates by run when tool call ids are reused", () => {
+    const toolUpdate = (
+      runId: string,
+      messageId: string,
+      inputSnapshot: string,
+      outputSnapshot: string,
+    ): AgUiEvent => ({
+      name: MOSOO_CUSTOM_EVENT.sessionToolUpdated.name,
+      type: "CUSTOM",
+      value: {
+        inputDelta: null,
+        inputSnapshot,
+        outputDelta: null,
+        outputSnapshot,
+        parentMessageId: messageId,
+        resultMessageId: messageId,
+        runId,
+        toolCallId: "shared-tool-call",
+        toolName: "Shell",
+      },
+    });
+    const nextState = applyAgUiEventsToSessionLiveState(baseState(), [
+      toolUpdate("run-old", "assistant-old", '{"cmd":"old"}', "old output"),
+      toolUpdate("run-new", "assistant-new", '{"cmd":"new"}', "new output"),
+    ]);
+
+    expect(nextState.messages.map(({ id, segments }) => ({ id, segments }))).toEqual([
+      {
+        id: "assistant-old",
+        segments: [
+          {
+            argsText: '{"cmd":"old"}',
+            kind: "tool_use",
+            path: null,
+            runId: "run-old",
+            tool: "Shell",
+            toolCallId: "shared-tool-call",
+          },
+          {
+            kind: "tool_result",
+            output: "old output",
+            runId: "run-old",
+            tool: "Shell",
+            toolCallId: "shared-tool-call",
+          },
+        ],
+      },
+      {
+        id: "assistant-new",
+        segments: [
+          {
+            argsText: '{"cmd":"new"}',
+            kind: "tool_use",
+            path: null,
+            runId: "run-new",
+            tool: "Shell",
+            toolCallId: "shared-tool-call",
+          },
+          {
+            kind: "tool_result",
+            output: "new output",
+            runId: "run-new",
+            tool: "Shell",
+            toolCallId: "shared-tool-call",
+          },
+        ],
       },
     ]);
   });
@@ -616,33 +774,9 @@ describe("session live-state transcript reducer", () => {
   test("atomically replaces and explicitly empties the current run task snapshot", () => {
     const nextState = applyAgUiEventsToSessionLiveState(baseState(), [
       runningRunUpdatedEvent("run-1", "driver-1"),
-      {
-        name: MOSOO_CUSTOM_EVENT.sessionTasksReplaced.name,
-        type: "CUSTOM",
-        value: {
-          driverInstanceId: "driver-1",
-          runId: "run-1",
-          tasks: [{ taskId: "task-1", title: "First" }],
-        },
-      },
-      {
-        name: MOSOO_CUSTOM_EVENT.sessionTasksReplaced.name,
-        type: "CUSTOM",
-        value: {
-          driverInstanceId: "driver-1",
-          runId: "run-1",
-          tasks: [{ taskId: "task-2", taskType: "review" }],
-        },
-      },
-      {
-        name: MOSOO_CUSTOM_EVENT.sessionTasksReplaced.name,
-        type: "CUSTOM",
-        value: {
-          driverInstanceId: "driver-1",
-          runId: "run-1",
-          tasks: [],
-        },
-      },
+      tasksReplacedEvent("run-1", "driver-1", [{ taskId: "task-1", title: "First" }]),
+      tasksReplacedEvent("run-1", "driver-1", [{ taskId: "task-2", taskType: "review" }]),
+      tasksReplacedEvent("run-1", "driver-1", []),
     ]);
 
     expect(nextState.taskSnapshot).toEqual({
@@ -655,33 +789,9 @@ describe("session live-state transcript reducer", () => {
   test("rejects stale run and driver task snapshots", () => {
     const nextState = applyAgUiEventsToSessionLiveState(baseState(), [
       runningRunUpdatedEvent("run-2", "driver-2"),
-      {
-        name: MOSOO_CUSTOM_EVENT.sessionTasksReplaced.name,
-        type: "CUSTOM",
-        value: {
-          driverInstanceId: "driver-2",
-          runId: "run-2",
-          tasks: [{ taskId: "current" }],
-        },
-      },
-      {
-        name: MOSOO_CUSTOM_EVENT.sessionTasksReplaced.name,
-        type: "CUSTOM",
-        value: {
-          driverInstanceId: "driver-1",
-          runId: "run-1",
-          tasks: [{ taskId: "old-run" }],
-        },
-      },
-      {
-        name: MOSOO_CUSTOM_EVENT.sessionTasksReplaced.name,
-        type: "CUSTOM",
-        value: {
-          driverInstanceId: "driver-1",
-          runId: "run-2",
-          tasks: [{ taskId: "old-driver" }],
-        },
-      },
+      tasksReplacedEvent("run-2", "driver-2", [{ taskId: "current" }]),
+      tasksReplacedEvent("run-1", "driver-1", [{ taskId: "old-run" }]),
+      tasksReplacedEvent("run-2", "driver-1", [{ taskId: "old-driver" }]),
     ]);
 
     expect(nextState.taskSnapshot?.tasks).toEqual([{ taskId: "current" }]);
@@ -690,15 +800,7 @@ describe("session live-state transcript reducer", () => {
   test("does not restore a delayed task snapshot after agent replacement starts", () => {
     const nextState = applyAgUiEventsToSessionLiveState(baseState(), [
       runningRunUpdatedEvent("run-1", "driver-1"),
-      {
-        name: MOSOO_CUSTOM_EVENT.sessionTasksReplaced.name,
-        type: "CUSTOM",
-        value: {
-          driverInstanceId: "driver-1",
-          runId: "run-1",
-          tasks: [{ taskId: "before-reschedule" }],
-        },
-      },
+      tasksReplacedEvent("run-1", "driver-1", [{ taskId: "before-reschedule" }]),
       {
         name: MOSOO_CUSTOM_EVENT.agentUpdating.name,
         type: "CUSTOM",
@@ -708,15 +810,7 @@ describe("session live-state transcript reducer", () => {
           startedAt: "2026-05-26T00:00:01.000Z",
         },
       },
-      {
-        name: MOSOO_CUSTOM_EVENT.sessionTasksReplaced.name,
-        type: "CUSTOM",
-        value: {
-          driverInstanceId: "driver-1",
-          runId: "run-1",
-          tasks: [{ taskId: "delayed-old-driver" }],
-        },
-      },
+      tasksReplacedEvent("run-1", "driver-1", [{ taskId: "delayed-old-driver" }]),
     ]);
 
     expect(nextState.lifecycle).toBe("RESCHEDULING");
@@ -756,34 +850,16 @@ describe("session live-state transcript reducer", () => {
   ] as const)("fences replacement driver snapshots when %s", (_label, arrivalOrder) => {
     const stateBeforeReplacement = applyAgUiEventsToSessionLiveState(baseState(), [
       runningRunUpdatedEvent("run-1", "driver-1"),
-      {
-        name: MOSOO_CUSTOM_EVENT.sessionTasksReplaced.name,
-        type: "CUSTOM",
-        value: {
-          driverInstanceId: "driver-1",
-          runId: "run-1",
-          tasks: [{ taskId: "before-reschedule" }],
-        },
-      },
+      tasksReplacedEvent("run-1", "driver-1", [{ taskId: "before-reschedule" }]),
     ]);
     const replacementEvents: AgUiEvent[] = [
       runningRunUpdatedEvent("run-1", "driver-2"),
-      ...arrivalOrder.map(
-        (driverInstanceId) =>
-          ({
-            name: MOSOO_CUSTOM_EVENT.sessionTasksReplaced.name,
-            type: "CUSTOM",
-            value: {
-              driverInstanceId,
-              runId: "run-1",
-              tasks: [
-                {
-                  taskId:
-                    driverInstanceId === "driver-2" ? "replacement-driver" : "delayed-old-driver",
-                },
-              ],
-            },
-          }) satisfies AgUiEvent,
+      ...arrivalOrder.map((driverInstanceId) =>
+        tasksReplacedEvent("run-1", driverInstanceId, [
+          {
+            taskId: driverInstanceId === "driver-2" ? "replacement-driver" : "delayed-old-driver",
+          },
+        ]),
       ),
     ];
     const nextState = applyAgUiEventsToSessionLiveState(stateBeforeReplacement, replacementEvents);
@@ -798,15 +874,7 @@ describe("session live-state transcript reducer", () => {
   test("keeps the expected driver across a same-run API lifecycle update", () => {
     const nextState = applyAgUiEventsToSessionLiveState(baseState(), [
       runningRunUpdatedEvent("run-1", "driver-1"),
-      {
-        name: MOSOO_CUSTOM_EVENT.sessionTasksReplaced.name,
-        type: "CUSTOM",
-        value: {
-          driverInstanceId: "driver-1",
-          runId: "run-1",
-          tasks: [{ taskId: "task-1" }],
-        },
-      },
+      tasksReplacedEvent("run-1", "driver-1", [{ taskId: "task-1" }]),
       {
         name: MOSOO_CUSTOM_EVENT.sessionRunUpdated.name,
         type: "CUSTOM",
@@ -825,15 +893,7 @@ describe("session live-state transcript reducer", () => {
   test("accepts the same driver again after a websocket reconnect", () => {
     const nextState = applyAgUiEventsToSessionLiveState(baseState(), [
       runningRunUpdatedEvent("run-1", "driver-1"),
-      {
-        name: MOSOO_CUSTOM_EVENT.sessionTasksReplaced.name,
-        type: "CUSTOM",
-        value: {
-          driverInstanceId: "driver-1",
-          runId: "run-1",
-          tasks: [{ taskId: "before-reconnect" }],
-        },
-      },
+      tasksReplacedEvent("run-1", "driver-1", [{ taskId: "before-reconnect" }]),
       {
         name: MOSOO_CUSTOM_EVENT.sessionInfraRescheduling.name,
         type: "CUSTOM",
@@ -848,15 +908,7 @@ describe("session live-state transcript reducer", () => {
         type: "CUSTOM",
         value: { resumedAt: "2026-05-26T00:00:02.000Z" },
       },
-      {
-        name: MOSOO_CUSTOM_EVENT.sessionTasksReplaced.name,
-        type: "CUSTOM",
-        value: {
-          driverInstanceId: "driver-1",
-          runId: "run-1",
-          tasks: [{ taskId: "after-reconnect" }],
-        },
-      },
+      tasksReplacedEvent("run-1", "driver-1", [{ taskId: "after-reconnect" }]),
     ]);
 
     expect(nextState.taskSnapshot?.tasks).toEqual([{ taskId: "after-reconnect" }]);
@@ -911,15 +963,7 @@ describe("session live-state transcript reducer", () => {
   ])("clears task snapshots on %s", (label, boundaryEvent) => {
     const stateWithTasks = applyAgUiEventsToSessionLiveState(baseState(), [
       runningRunUpdatedEvent("run-1", "driver-1"),
-      {
-        name: MOSOO_CUSTOM_EVENT.sessionTasksReplaced.name,
-        type: "CUSTOM",
-        value: {
-          driverInstanceId: "driver-1",
-          runId: "run-1",
-          tasks: [{ taskId: "task-1" }],
-        },
-      },
+      tasksReplacedEvent("run-1", "driver-1", [{ taskId: "task-1" }]),
     ]);
 
     const nextState = applyAgUiEventsToSessionLiveState(stateWithTasks, [boundaryEvent]);
@@ -963,6 +1007,59 @@ describe("session live-state transcript reducer", () => {
 
     expect(nextState.run.status).toBe("running");
     expect(nextState.permissionRequests).toEqual([]);
+  });
+
+  test("permission events upsert and resolve one request without replacing its siblings", () => {
+    const runningState: SessionLiveState = {
+      ...baseState(),
+      run: { ...baseState().run, id: "run-1", status: "running" },
+    };
+    const request = (requestId: string) => ({
+      driverInstanceId: "driver-1",
+      rawInput: requestId,
+      requestId,
+      runId: "run-1",
+      title: requestId,
+      toolCallId: requestId,
+      toolKind: "bash",
+    });
+    const waitingState = applyAgUiEventsToSessionLiveState(runningState, [
+      {
+        name: MOSOO_CUSTOM_EVENT.sessionPermissionsUpdated.name,
+        type: "CUSTOM",
+        value: { permissionRequest: request("permission-1"), permissionRequests: [] },
+      },
+      {
+        name: MOSOO_CUSTOM_EVENT.sessionPermissionsUpdated.name,
+        type: "CUSTOM",
+        value: { permissionRequest: request("permission-2"), permissionRequests: [] },
+      },
+      {
+        name: MOSOO_CUSTOM_EVENT.sessionPermissionsUpdated.name,
+        type: "CUSTOM",
+        value: {
+          permissionRequests: [],
+          resolvedRequestId: "permission-1",
+          runId: "run-1",
+        },
+      },
+    ]);
+
+    expect(waitingState.run.status).toBe("waiting_input");
+    expect(waitingState.permissionRequests).toEqual([request("permission-2")]);
+    const resolvedState = applyAgUiEventsToSessionLiveState(waitingState, [
+      {
+        name: MOSOO_CUSTOM_EVENT.sessionPermissionsUpdated.name,
+        type: "CUSTOM",
+        value: {
+          permissionRequests: [],
+          resolvedRequestId: "permission-2",
+          runId: "run-1",
+        },
+      },
+    ]);
+    expect(resolvedState.run.status).toBe("running");
+    expect(resolvedState.permissionRequests).toEqual([]);
   });
 
   test("stopped custom event terminates the session and clears pending approvals", () => {

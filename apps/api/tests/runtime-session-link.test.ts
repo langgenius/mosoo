@@ -18,8 +18,11 @@ function createRuntimeSessionLinkDatabase(): SqliteD1Database {
       id text PRIMARY KEY NOT NULL,
       session_id text NOT NULL,
       created_by_account_id text NOT NULL,
+      created_at integer NOT NULL,
+      runtime_id text,
       trace_id text,
-      status text NOT NULL
+      status text NOT NULL,
+      updated_at integer NOT NULL
     );
 
     CREATE TABLE session (
@@ -27,6 +30,7 @@ function createRuntimeSessionLinkDatabase(): SqliteD1Database {
       agent_id text NOT NULL,
       project_id text,
       creator_account_id text NOT NULL,
+      runtime_id text NOT NULL,
       type text DEFAULT 'preview' NOT NULL
 );
 
@@ -49,11 +53,20 @@ function createRuntimeSessionLinkDatabase(): SqliteD1Database {
     INSERT INTO agent (id, owner_account_id)
     VALUES ('01J00000000000000000000009', '01J00000000000000000000001');
 
-    INSERT INTO session (id, agent_id, creator_account_id)
-    VALUES ('session-1', '01J00000000000000000000009', 'creator-1');
+    INSERT INTO session (id, agent_id, creator_account_id, runtime_id)
+    VALUES ('session-1', '01J00000000000000000000009', 'creator-1', 'runtime-1');
 
-    INSERT INTO session_run (driver_instance_id, id, session_id, created_by_account_id, trace_id, status)
-    VALUES ('driver-1', 'run-1', 'session-1', 'caller-1', 'trace-1', 'running');
+    INSERT INTO session_run (
+      driver_instance_id,
+      id,
+      session_id,
+      created_by_account_id,
+      created_at,
+      trace_id,
+      status,
+      updated_at
+    )
+    VALUES ('driver-1', 'run-1', 'session-1', 'caller-1', 1, 'trace-1', 'running', 1);
 
     INSERT INTO sandbox (id, kind, subject_kind)
     VALUES ('01J0000000000000000000000D', 'pet', 'agent');

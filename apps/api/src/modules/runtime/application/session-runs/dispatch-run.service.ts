@@ -118,6 +118,7 @@ export async function dispatchSessionRun(
   },
 ): Promise<void> {
   const sandboxId = input.profile.sandbox.id;
+  let driverGeneration: number | null = null;
   let driverInstanceId: DriverInstanceId | null = null;
   let prepareTimingEventPromise: Promise<void> = Promise.resolve();
   // Boot-payload config traces are owner-debug telemetry; they persist off the
@@ -208,6 +209,7 @@ export async function dispatchSessionRun(
         traceId: input.traceId,
       });
       runLease = preparedRunLease;
+      driverGeneration = preparedRunLease.driverGeneration;
       driverInstanceId = preparedRunLease.driverInstanceId;
       const preparedDriverInstanceId = preparedRunLease.driverInstanceId;
       logInfo("session.run.prepared", {
@@ -232,6 +234,7 @@ export async function dispatchSessionRun(
       await dispatchTiming.measure("dispatchDriverTurn", () =>
         executionPlane.dispatchTurn(bindings, {
           attachmentIds: input.attachmentIds,
+          driverGeneration: preparedRunLease.driverGeneration,
           driverInstanceId: preparedDriverInstanceId,
           prompt: input.prompt,
           sessionRunId: input.sessionRunId,
@@ -273,8 +276,9 @@ export async function dispatchSessionRun(
         traceId: input.traceId,
       });
 
-      if (isTruthy(driverInstanceId)) {
+      if (isTruthy(driverInstanceId) && driverGeneration !== null) {
         await cleanupDispatchedDriver(bindings, {
+          driverGeneration,
           driverInstanceId,
           reason: "session.run.pre-ready-retry",
           runId: input.sessionRunId,
@@ -285,6 +289,7 @@ export async function dispatchSessionRun(
 
       runLease?.release();
       runLease = null;
+      driverGeneration = null;
       driverInstanceId = null;
 
       // Stop retrying if the run was cancelled or failed elsewhere while
@@ -310,8 +315,9 @@ export async function dispatchSessionRun(
     await pendingBootPayloadEvents;
 
     if (error instanceof SessionRunNoLongerActiveError) {
-      if (isTruthy(driverInstanceId)) {
+      if (isTruthy(driverInstanceId) && driverGeneration !== null) {
         await cleanupDispatchedDriver(bindings, {
+          driverGeneration,
           driverInstanceId,
           reason: `session.run.${error.status}`,
           runId: input.sessionRunId,
@@ -340,8 +346,9 @@ export async function dispatchSessionRun(
       retryable: false,
     } as const;
 
-    if (isTruthy(driverInstanceId)) {
+    if (isTruthy(driverInstanceId) && driverGeneration !== null) {
       await cleanupDispatchedDriver(bindings, {
+        driverGeneration,
         driverInstanceId,
         reason: "session.run.provision-failed",
         runId: input.sessionRunId,
@@ -356,12 +363,6 @@ export async function dispatchSessionRun(
       sessionId: input.sessionId,
       source: "api",
     });
-    if (failureOutcome.kind === "repair_needed") {
-      throw new Error("Session lifecycle projection needs repair.", {
-        cause: error,
-      });
-    }
-
     if (failureOutcome.kind === "not_failed") {
       const state = await getSessionRunState(bindings.DB, input.sessionRunId);
 

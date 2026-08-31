@@ -70,6 +70,7 @@ const sessionFamilyByDomain: Readonly<Record<string, SessionRuntimeEventFamily |
 };
 
 const sessionFamilyByKind: Readonly<Record<string, SessionRuntimeEventFamily | undefined>> = {
+  "agent.tasks.replaced": "state",
   "runtime.config.updated": "diagnostics",
   "runtime.provisioning.updated": "provisioning",
   "runtime.sandbox.released": "sandbox",
@@ -97,6 +98,7 @@ export function createProcessDraftFromRuntimeEvent(event: RuntimeEventEnvelope):
       };
     }
     case "message.added":
+    case "message.cancelled":
     case "message.delta":
     case "message.completed":
     case "message.started": {
@@ -107,7 +109,16 @@ export function createProcessDraftFromRuntimeEvent(event: RuntimeEventEnvelope):
           readRuntimeEventMessageRole(event) === "user" ? "user.message" : "agent.message.delta",
       };
     }
+    case "message.failed": {
+      return {
+        content: "Message updated.",
+        status: "error",
+        type:
+          readRuntimeEventMessageRole(event) === "user" ? "user.message" : "agent.message.delta",
+      };
+    }
     case "thought.delta":
+    case "thought.cancelled":
     case "thought.completed":
     case "thought.started":
     case "plan.updated": {
@@ -149,16 +160,12 @@ export function createProcessDraftFromRuntimeEvent(event: RuntimeEventEnvelope):
       const toolCall = readRuntimeEventToolCallUpdate(event);
       return {
         content: toolCall.title ?? toolCall.kind ?? "Tool updated.",
-        type:
-          toolCall.status === "completed" || toolCall.status === "failed"
-            ? "tool.use.completed"
-            : "tool.use.started",
+        type: toolCall.status === "running" ? "tool.use.started" : "tool.use.completed",
       };
     }
     case "mcp.tool.updated":
     case "tool.dynamic.updated":
     case "web.search.updated":
-    case "image.updated":
     case "agent.task.updated":
     case "review.updated":
     case "shell.command.updated": {
@@ -168,8 +175,7 @@ export function createProcessDraftFromRuntimeEvent(event: RuntimeEventEnvelope):
           readRuntimeEventString(payload, "title") ??
           readRuntimeEventString(payload, "kind") ??
           "Tool updated.",
-        type:
-          status === "completed" || status === "failed" ? "tool.use.completed" : "tool.use.started",
+        type: status === "running" ? "tool.use.started" : "tool.use.completed",
       };
     }
     case "file.changed":

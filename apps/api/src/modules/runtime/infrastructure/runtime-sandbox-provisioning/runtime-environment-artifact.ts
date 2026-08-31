@@ -2,14 +2,11 @@ import { discardPromiseResult } from "@mosoo/effects";
 
 import { withDisposedRpcResult } from "../../../../platform/cloudflare/rpc-disposal";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
+import { quoteShellArg } from "../../../../shared/shell";
 import type { DriverEnvironmentArtifactProfile } from "../../domain/driver-snapshot";
 import { isRuntimeSandboxLocalBucketEnabled } from "../runtime-sandbox-bucket-mount";
 import type { ExecutionSessionHandle, SandboxHandle } from "../sandbox-handles";
 import { getParentDirectory } from "./runtime-sandbox-provisioning.paths";
-
-function quoteShellArg(value: string): string {
-  return `'${value.replaceAll("'", `'"'"'`)}'`;
-}
 
 export async function exposeEnvironmentNodeModules(
   session: Pick<ExecutionSessionHandle, "exec">,

@@ -1,5 +1,3 @@
-import { readFileSync } from "node:fs";
-
 import type { SessionSummary } from "@mosoo/contracts/session";
 import {
   accountsTable,
@@ -9,18 +7,34 @@ import {
   environmentsTable,
   organizationsTable,
   personalAccessTokensTable,
+  sandboxSessionsTable,
+  sandboxesTable,
   projectsTable,
   sessionExecutionSnapshotsTable,
   sessionsTable,
   vendorCredentialsTable,
 } from "@mosoo/db";
-import type { VendorCredentialId } from "@mosoo/id";
+import { parsePlatformId } from "@mosoo/id";
+import type {
+  AccountId,
+  AgentId,
+  ProjectId,
+  SandboxId,
+  SandboxSessionId,
+  SessionId,
+  VendorCredentialId,
+} from "@mosoo/id";
 
 import { hashTokenValue } from "../../src/modules/auth/application/personal-access-token.service";
 import { storeVendorCredentialSecret } from "../../src/modules/vendor-credentials/application/vendor-credential.secret-resolution";
 import type { ApiBindings } from "../../src/platform/cloudflare/worker-types";
 import type { ApiCommandQueueStub } from "./api-command-queue-fixture";
 import { createApiCommandQueueStub } from "./api-command-queue-fixture";
+import {
+  applyDrizzleMigrations,
+  applyDrizzleMigrationsFrom,
+  applyDrizzleMigrationsThrough,
+} from "./drizzle-migrations";
 import { SqliteD1Database } from "./sqlite-d1";
 export { SqliteD1Database } from "./sqlite-d1";
 export {
@@ -31,13 +45,6 @@ export {
   type RecordedQueueMessage,
   type RecordedQueueMessageAction,
 } from "./api-command-queue-fixture";
-
-const CONTRACT_SCHEMA_SQL = readFileSync(
-  new URL("./public-api-http-core-schema.sql", import.meta.url),
-  "utf8",
-)
-  .concat("\n")
-  .concat(readFileSync(new URL("./public-api-http-runtime-schema.sql", import.meta.url), "utf8"));
 
 const INITIAL_AGENT_CONFIG_JSON = JSON.stringify({
   packageMcpServers: [],
@@ -75,7 +82,7 @@ export const PUBLIC_API_TEST_IDS = {
   driverOwner: "01J0000000000000000000000F",
 } as const;
 
-const PUBLIC_API_VENDOR_CREDENTIAL_ID = "vendor-openai-project" as VendorCredentialId;
+const PUBLIC_API_VENDOR_CREDENTIAL_ID = "01J0000000000000000000000S" as VendorCredentialId;
 
 export function createTestExecutionContext(): ExecutionContext {
   return {
@@ -100,8 +107,9 @@ export function nowMsForTest(): number {
 }
 
 interface StoredObject {
-  body: string;
+  body: Uint8Array;
   contentType: string;
+  customMetadata: Record<string, string>;
   etag: string;
   key: string;
 }
@@ -129,6 +137,7 @@ export class PublicApiMemoryFileBucket {
     body: ReadableStream<Uint8Array> | ArrayBuffer | ArrayBufferView | string | Blob | null,
     options?: R2PutOptions,
   ): Promise<R2Object | null> {
+    const bytes = await this.#readBody(body);
     const existing = this.objects.get(key);
     const ifNoneMatch = this.#readOnlyIfHeader(options?.onlyIf, "If-None-Match");
     const ifMatch = this.#readOnlyIfHeader(options?.onlyIf, "If-Match");
@@ -142,8 +151,9 @@ export class PublicApiMemoryFileBucket {
     }
 
     const stored: StoredObject = {
-      body: await this.#readBody(body),
+      body: bytes,
       contentType: options?.httpMetadata?.contentType ?? "application/octet-stream",
+      customMetadata: { ...options?.customMetadata },
       etag: this.#createEtag(),
       key,
     };
@@ -160,27 +170,25 @@ export class PublicApiMemoryFileBucket {
 
   async #readBody(
     body: ReadableStream<Uint8Array> | ArrayBuffer | ArrayBufferView | string | Blob | null,
-  ): Promise<string> {
+  ): Promise<Uint8Array> {
     if (body === null) {
-      return "";
+      return new Uint8Array();
     }
 
     if (typeof body === "string") {
-      return body;
+      return new TextEncoder().encode(body);
     }
 
     if (body instanceof Blob) {
-      return body.text();
+      return new Uint8Array(await body.arrayBuffer());
     }
 
     if (body instanceof ArrayBuffer) {
-      return new TextDecoder().decode(body);
+      return new Uint8Array(body).slice();
     }
 
     if (ArrayBuffer.isView(body)) {
-      return new TextDecoder().decode(
-        new Uint8Array(body.buffer, body.byteOffset, body.byteLength),
-      );
+      return new Uint8Array(body.buffer, body.byteOffset, body.byteLength).slice();
     }
 
     const chunks: Uint8Array[] = [];
@@ -205,7 +213,7 @@ export class PublicApiMemoryFileBucket {
       offset += chunk.byteLength;
     }
 
-    return new TextDecoder().decode(bytes);
+    return bytes;
   }
 
   #readOnlyIfHeader(onlyIf: R2PutOptions["onlyIf"] | undefined, name: string): string | null {
@@ -214,14 +222,14 @@ export class PublicApiMemoryFileBucket {
 
   #toObject(stored: StoredObject): R2Object {
     return {
-      customMetadata: {},
+      customMetadata: { ...stored.customMetadata },
       etag: stored.etag,
       httpEtag: `"${stored.etag}"`,
       httpMetadata: {
         contentType: stored.contentType,
       },
       key: stored.key,
-      size: new TextEncoder().encode(stored.body).byteLength,
+      size: stored.body.byteLength,
       uploaded: new Date(0),
       version: "",
       writeHttpMetadata(headers: Headers) {
@@ -231,7 +239,7 @@ export class PublicApiMemoryFileBucket {
   }
 
   #toObjectBody(stored: StoredObject): R2ObjectBody {
-    const bytes = new TextEncoder().encode(stored.body);
+    const bytes = stored.body.slice();
 
     return {
       ...this.#toObject(stored),
@@ -249,10 +257,10 @@ export class PublicApiMemoryFileBucket {
       }),
       bodyUsed: false,
       async json<T>() {
-        return JSON.parse(stored.body) as T;
+        return JSON.parse(new TextDecoder().decode(bytes)) as T;
       },
       async text() {
-        return stored.body;
+        return new TextDecoder().decode(bytes);
       },
     } as R2ObjectBody;
   }
@@ -288,11 +296,14 @@ export function createPublicHttpTestBindings(
   };
 }
 
-export async function createPublicHttpContractDatabase(): Promise<SqliteD1Database> {
-  const database = new SqliteD1Database();
-  const nowMs = nowMsForTest();
+export function migratePre0015PublicHttpContractDatabase(database: SqliteD1Database): void {
+  applyDrizzleMigrationsFrom(database, "0015_session-event-stream-identity");
+}
 
-  database.execute(CONTRACT_SCHEMA_SQL);
+async function seedPublicHttpContractDatabase(
+  database: SqliteD1Database,
+): Promise<SqliteD1Database> {
+  const nowMs = nowMsForTest();
 
   const db = database.app();
   await db
@@ -489,6 +500,97 @@ export async function createPublicHttpContractDatabase(): Promise<SqliteD1Databa
   return database;
 }
 
+const publicHttpContractDatabaseTemplate = (async () => {
+  const database = new SqliteD1Database();
+  applyDrizzleMigrations(database);
+  await seedPublicHttpContractDatabase(database);
+  return database.serialize();
+})();
+
+export async function createPublicHttpContractDatabase(): Promise<SqliteD1Database> {
+  return new SqliteD1Database({ serialized: await publicHttpContractDatabaseTemplate });
+}
+
+export async function createPre0015PublicHttpContractDatabase(): Promise<SqliteD1Database> {
+  const database = new SqliteD1Database();
+  applyDrizzleMigrationsThrough(database, "0014_durable-mcp-effect-v3");
+  return seedPublicHttpContractDatabase(database);
+}
+
+export async function insertActiveSandboxSessionFixture(
+  database: SqliteD1Database,
+  input: {
+    agentId?: string;
+    projectId?: string;
+    cwd?: string;
+    inactiveDeadlineAt?: number | null;
+    kind?: "cattle" | "pet";
+    ownerAccountId: string;
+    sandboxId: string;
+    sandboxSessionId?: string;
+    sessionId: string;
+    timestampMs?: number;
+  },
+): Promise<void> {
+  const agentId = parsePlatformId<AgentId>(
+    input.agentId ?? PUBLIC_API_TEST_IDS.agent,
+    "fixture agent id",
+  );
+  const projectId = parsePlatformId<ProjectId>(
+    input.projectId ?? PUBLIC_API_TEST_IDS.project,
+    "fixture project id",
+  );
+  const ownerAccountId = parsePlatformId<AccountId>(input.ownerAccountId, "fixture account id");
+  const sandboxId = parsePlatformId<SandboxId>(input.sandboxId, "fixture sandbox id");
+  const sandboxSessionId = parsePlatformId<SandboxSessionId>(
+    input.sandboxSessionId ?? input.sandboxId,
+    "fixture sandbox session id",
+  );
+  const sessionId = parsePlatformId<SessionId>(input.sessionId, "fixture session id");
+  const kind = input.kind ?? "pet";
+  const timestampMs = input.timestampMs ?? nowMsForTest();
+
+  await database
+    .app()
+    .insert(sandboxesTable)
+    .values({
+      agentId,
+      projectId,
+      createdAt: timestampMs,
+      id: sandboxId,
+      inactiveDeadlineAt: input.inactiveDeadlineAt ?? null,
+      incarnation: 1,
+      kind,
+      networkConstraintsHash: "0".repeat(64),
+      ownerAccountId,
+      status: "active",
+      subjectId: kind === "pet" ? agentId : sessionId,
+      subjectKind: kind === "pet" ? "agent" : "session",
+      updatedAt: timestampMs,
+    })
+    .run();
+  await database
+    .app()
+    .insert(sandboxSessionsTable)
+    .values({
+      createdAt: timestampMs,
+      cwd: input.cwd ?? `/workspace/se/${sessionId}`,
+      originJson: JSON.stringify({
+        callerUserId: ownerAccountId,
+        entrypoint: "api",
+        executionOwnerUserId: ownerAccountId,
+        type: "agent",
+      }),
+      sandboxId,
+      sandboxIncarnation: 1,
+      sandboxSessionId,
+      sessionId,
+      status: "active",
+      updatedAt: timestampMs,
+    })
+    .run();
+}
+
 export async function insertNonOwnerSession(database: SqliteD1Database): Promise<void> {
   await insertSession(database, {
     creatorAccountId: PUBLIC_API_TEST_IDS.nonOwnerAccount,
@@ -621,6 +723,7 @@ function createOkDurableObjectNamespace() {
       destroy: async () => {},
       fetch: async () => new Response(null, { status: 204 }),
       publishEvents: async () => {},
+      syncViewers: async () => {},
     }),
     idFromName: (name: string) => name,
   };

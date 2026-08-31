@@ -3,7 +3,6 @@ import type { RuntimeOperationId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import type { RuntimeExecutionPlaneAdapter } from "./execution-plane/execution-plane-adapter";
-import { RUNTIME_STATE_OPERATION_INTERRUPTED_ERROR } from "./runtime-state-operation-errors";
 import type { RuntimeOperationSubject } from "./runtime-state-operation-subjects";
 
 export type RuntimeStateOperationExecutionPlane = Pick<
@@ -19,10 +18,6 @@ function operationInput(input: RuntimeOperationSubject & { operationId: RuntimeO
     runtimeSubjectId: input.runtimeSubjectId,
     reason: "agent.runtime_state_operation",
     targets: input.targets,
-    terminalRun: {
-      error: RUNTIME_STATE_OPERATION_INTERRUPTED_ERROR,
-      status: "cancelled" as const,
-    },
   };
 }
 
@@ -36,10 +31,7 @@ async function executeRuntimeStateOperationSubject(
 ): Promise<void> {
   switch (input.operation) {
     case "restartDriver": {
-      await executionPlane.stopSubjectDrivers(bindings, {
-        ...operationInput(input),
-        preserveSessionLifecycle: true,
-      });
+      await executionPlane.stopSubjectDrivers(bindings, operationInput(input));
       return;
     }
     case "recreateSandbox": {
@@ -70,7 +62,7 @@ export async function executeRuntimeStateOperationSubjects(
     index < input.subjects.length;
     index += RUNTIME_OPERATION_SUBJECT_CONCURRENCY
   ) {
-    await Promise.all(
+    const outcomes = await Promise.allSettled(
       input.subjects.slice(index, index + RUNTIME_OPERATION_SUBJECT_CONCURRENCY).map((subject) =>
         executeRuntimeStateOperationSubject(input.executionPlane, bindings, {
           operationId: input.operationId,
@@ -80,5 +72,11 @@ export async function executeRuntimeStateOperationSubjects(
         }),
       ),
     );
+    const failure = outcomes.find(
+      (outcome): outcome is PromiseRejectedResult => outcome.status === "rejected",
+    );
+    if (failure !== undefined) {
+      throw failure.reason;
+    }
   }
 }

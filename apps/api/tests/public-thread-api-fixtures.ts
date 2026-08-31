@@ -3,7 +3,12 @@ import { expect } from "bun:test";
 import { PUBLIC_API_PREFIX } from "@mosoo/contracts/public-api";
 import type { SessionRuntimeEventVisibility } from "@mosoo/contracts/session";
 import { sessionEventsTable } from "@mosoo/db";
-import { createRuntimeEvent } from "@mosoo/runtime-events";
+import {
+  createRuntimeEvent,
+  createRuntimeEventSemanticHash,
+  createSessionRunTerminalSourceId,
+  stringifyRuntimeEventSemanticValue,
+} from "@mosoo/runtime-events";
 import type { RuntimeEventKind, RuntimeEventVisibility } from "@mosoo/runtime-events";
 import { Hono } from "hono";
 
@@ -119,6 +124,18 @@ const RUNTIME_EVENT_IDS_BY_SEQ = [
   "01J00000000000000000000015",
   "01J00000000000000000000016",
   "01J00000000000000000000017",
+  "01J00000000000000000000018",
+  "01J00000000000000000000019",
+  "01J0000000000000000000001A",
+  "01J0000000000000000000001B",
+  "01J0000000000000000000001C",
+  "01J0000000000000000000001D",
+  "01J0000000000000000000001E",
+  "01J0000000000000000000001F",
+  "01J0000000000000000000001G",
+  "01J0000000000000000000001H",
+  "01J0000000000000000000001J",
+  "01J0000000000000000000001K",
 ];
 
 function runtimeEventIdForSeq(seq: number): string {
@@ -134,6 +151,7 @@ function runtimeEventIdForSeq(seq: number): string {
 export async function insertRuntimeEvent(
   database: SqliteD1Database,
   input: {
+    eventId?: string;
     kind: RuntimeEventKind;
     occurredAt: number;
     payload: unknown;
@@ -147,19 +165,34 @@ export async function insertRuntimeEvent(
   const visibility = input.visibility ?? "participant";
   const databaseVisibility: SessionRuntimeEventVisibility =
     visibility === "public" || visibility === "participant" ? "all_consumers" : "owner_debug";
-  const eventId = runtimeEventIdForSeq(input.seq);
+  const eventId = input.eventId ?? runtimeEventIdForSeq(input.seq);
+  const sourceEventId =
+    runId !== null &&
+    (input.kind === "run.cancelled" ||
+      input.kind === "run.completed" ||
+      input.kind === "run.failed")
+      ? createSessionRunTerminalSourceId(runId, input.kind)
+      : eventId;
+  const terminal =
+    input.kind === "run.cancelled" || input.kind === "run.completed" || input.kind === "run.failed";
+  if (terminal && !isRecord(input.payload)) {
+    throw new Error("Terminal runtime event fixture payload must be an object.");
+  }
   const event = createRuntimeEvent({
     actor: "driver",
     id: eventId,
     kind: input.kind,
     occurredAt: new Date(input.occurredAt).toISOString(),
     origin: "driver",
-    payload: input.payload,
+    payload: terminal ? { ...input.payload, lifecycle: "IDLE" } : input.payload,
     ...(runId === null ? {} : { runId }),
     sessionId: input.sessionId,
+    sourceEventId,
     visibility,
   });
   const projection = createSessionRuntimeEventProjection(event);
+  const semanticHash = await createRuntimeEventSemanticHash(event);
+  const terminalEventJson = terminal ? stringifyRuntimeEventSemanticValue(event) : null;
 
   await database
     .app()
@@ -172,17 +205,28 @@ export async function insertRuntimeEvent(
       eventType: input.kind,
       family: projection.family,
       id: eventId,
+      mcpCommandId: projection.mcpCommandId,
       occurredAt: input.occurredAt,
       processStatus: projection.processStatus,
       processType: projection.processType,
       runId,
+      runtimeOperationEventJson: null,
+      semanticHash,
       seq: input.seq,
       sessionId: input.sessionId,
       source: "driver",
-      sourceEventId: eventId,
+      sourceEventId,
+      streamId: projection.streamId,
+      terminalEventJson,
       toolCallId: projection.toolCallId,
+      toolInputDeltaJson: projection.toolInputDeltaJson,
       toolInputJson: projection.toolInputJson,
       toolName: projection.toolName,
+      toolOutputDeltaText: projection.toolOutputDeltaText,
+      toolOutputText: projection.toolOutputText,
+      toolParentMessageId: projection.toolParentMessageId,
+      toolResultMessageId: projection.toolResultMessageId,
+      toolStatus: projection.toolStatus,
       tokens: projection.tokens,
       traceId: null,
       visibility: databaseVisibility,
@@ -223,7 +267,10 @@ export function createPublicEventSessionNamespace(): {
     fetch: async () => {
       const socket = new PublicEventTestSocket();
       sockets.add(socket);
-      return { status: 101, webSocket: socket as unknown as WebSocket } as Response;
+      return {
+        status: 101,
+        webSocket: socket as unknown as WebSocket,
+      } as Response;
     },
     publishEvents: async () => {
       for (const socket of sockets) {
@@ -236,7 +283,7 @@ export function createPublicEventSessionNamespace(): {
     binding: {
       get: () => stub,
       idFromName: (name: string) => name,
-    } as unknown as ApiBindings["Session"],
+    },
     close: () => {
       for (const socket of sockets) {
         socket.close();

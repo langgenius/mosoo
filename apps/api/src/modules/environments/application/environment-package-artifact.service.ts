@@ -10,7 +10,6 @@ import {
 import {
   createEnvironmentPackageArtifactKey,
   environmentPackageArtifactDir,
-  environmentPackageArtifactMetadataKey,
   ENVIRONMENT_PACKAGE_ARTIFACT_ABI,
 } from "../domain/environment-package-artifact";
 import type {
@@ -18,33 +17,13 @@ import type {
   EnvironmentPackageArtifactMetadata,
 } from "../domain/environment-package-artifact";
 import { normalizePackages, parsePackagesJson } from "./environment-config";
+import { resolveEnvironmentPackageArtifactBackup } from "./environment-package-artifact-backup";
+import { getEnvironmentPackageArtifactBackupManifest } from "./environment-package-artifact-backup-store";
 
 type ArtifactBindings = Pick<
   ApiBindings,
   "API_COMMAND_QUEUE" | "DB" | "ENVIRONMENT_ARTIFACT_BUILD_QUEUE" | "SANDBOX_STATE_BUCKET"
 >;
-
-export async function readEnvironmentPackageArtifactMetadata(
-  bindings: Pick<ApiBindings, "SANDBOX_STATE_BUCKET">,
-  key: EnvironmentPackageArtifactKey,
-): Promise<EnvironmentPackageArtifactMetadata | null> {
-  const object = await bindings.SANDBOX_STATE_BUCKET.get(
-    environmentPackageArtifactMetadataKey(key),
-  );
-  if (object === null) {
-    return null;
-  }
-  const metadata = JSON.parse(await object.text()) as Partial<EnvironmentPackageArtifactMetadata>;
-  const paths = metadata.paths;
-  if (
-    typeof metadata.backupId !== "string" ||
-    paths === undefined ||
-    ![paths.executable, paths.node, paths.python].every(Array.isArray)
-  ) {
-    throw new Error("Environment package artifact metadata is invalid.");
-  }
-  return { backupId: metadata.backupId, paths };
-}
 
 export async function resolveEnvironmentPackageArtifact(
   bindings: ArtifactBindings,
@@ -64,13 +43,19 @@ export async function resolveEnvironmentPackageArtifact(
     artifactAbi: ENVIRONMENT_PACKAGE_ARTIFACT_ABI,
     packages: normalized,
   });
-  const metadata = await readEnvironmentPackageArtifactMetadata(bindings, key);
+  const metadata = await resolveEnvironmentPackageArtifactBackup(bindings, key);
   if (metadata === null) {
+    const refreshCurrentManifest =
+      (await getEnvironmentPackageArtifactBackupManifest(bindings.DB, key)) !== null;
     const dedupeKey = `environment_package_artifact_build:${key.projectId}:${key.inputDigest}`;
+    const existingCommand = await findApiCommandByDedupeKey(bindings.DB, dedupeKey);
     await enqueueApiCommand(bindings, {
       dedupeKey,
       kind: "environment_package_artifact_build",
-      retryTerminal: options.retryFailed === true,
+      retryTerminal:
+        refreshCurrentManifest ||
+        existingCommand?.status === "succeeded" ||
+        options.retryFailed === true,
       payload: {
         ...key,
         artifactAbi: ENVIRONMENT_PACKAGE_ARTIFACT_ABI,
@@ -80,7 +65,7 @@ export async function resolveEnvironmentPackageArtifact(
     if (options.retryFailed !== true) {
       const command = await findApiCommandByDedupeKey(bindings.DB, dedupeKey);
       if (command !== null && command.status !== "queued" && command.status !== "running") {
-        const completedMetadata = await readEnvironmentPackageArtifactMetadata(bindings, key);
+        const completedMetadata = await resolveEnvironmentPackageArtifactBackup(bindings, key);
         if (completedMetadata !== null) {
           return { key, metadata: completedMetadata };
         }

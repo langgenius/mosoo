@@ -8,13 +8,9 @@ import {
 import type { DriverInstanceId, SandboxId, SessionId } from "@mosoo/id";
 import { and, asc, eq, exists, inArray, isNotNull, isNull, lte, notExists, or } from "drizzle-orm";
 
-import {
-  getAppDatabase,
-  getD1ChangeCount,
-  runAppDatabaseBatch,
-} from "../../../../platform/db/drizzle";
+import { getAppDatabase, getD1ChangeCount } from "../../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../../time";
-import { RUNTIME_SUBJECT_OPERATION_STATUSES } from "../../domain/runtime-subject-lifecycle.machine";
+import { RUNTIME_SUBJECT_RECOVERABLE_OPERATION_STATUSES } from "../../domain/runtime-subject-lifecycle.machine";
 import { ACTIVE_SESSION_RUN_STATUSES } from "../../domain/session-run-lifecycle.machine";
 import {
   activeConversationSessionQuery,
@@ -25,52 +21,28 @@ import {
   liveDriverInstanceQueryForListedSubject,
   runLeaseQuery,
   runLeaseQueryForListedSubject,
+  runtimeProvisioningQuery,
+  runtimeProvisioningQueryForListedSubject,
 } from "./runtime-subject-store-queries";
 import type {
   RuntimeSubjectMaintenanceCandidate,
   RuntimeSubjectOperationRepairCandidate,
+  RuntimeSubjectOperationLease,
   RuntimeSubjectStatus,
 } from "./runtime-subject-store.types";
 
 function isRuntimeSubjectOperationStatus(
   status: RuntimeSubjectStatus,
 ): status is RuntimeSubjectOperationRepairCandidate["status"] {
-  return RUNTIME_SUBJECT_OPERATION_STATUSES.includes(
+  return RUNTIME_SUBJECT_RECOVERABLE_OPERATION_STATUSES.includes(
     status as RuntimeSubjectOperationRepairCandidate["status"],
   );
-}
-
-export async function closeRuntimeSubjectSessionsForRecycle(
-  database: D1Database,
-  runtimeSubjectId: SandboxId,
-): Promise<void> {
-  const now = currentTimestampMs();
-
-  await runAppDatabaseBatch(database, (appDb) => [
-    appDb
-      .update(sandboxSessionsTable)
-      .set({
-        status: "closed",
-        updatedAt: now,
-      })
-      .where(
-        and(
-          eq(sandboxSessionsTable.sandboxId, runtimeSubjectId),
-          eq(sandboxSessionsTable.status, "active"),
-        ),
-      ),
-    appDb
-      .update(sandboxesTable)
-      .set({
-        updatedAt: now,
-      })
-      .where(eq(sandboxesTable.id, runtimeSubjectId)),
-  ]);
 }
 
 export async function listRuntimeSubjectDriverIds(
   database: D1Database,
   runtimeSubjectId: SandboxId,
+  sandboxIncarnation?: number,
 ): Promise<DriverInstanceId[]> {
   const appDb = getAppDatabase(database);
   const activeRunLeaseQuery = appDb
@@ -88,6 +60,9 @@ export async function listRuntimeSubjectDriverIds(
     .where(
       and(
         eq(driverInstancesTable.sandboxId, runtimeSubjectId),
+        ...(sandboxIncarnation === undefined
+          ? []
+          : [eq(driverInstancesTable.sandboxIncarnation, sandboxIncarnation)]),
         or(inArray(driverInstancesTable.status, LIVE_DRIVER_STATUSES), exists(activeRunLeaseQuery)),
       ),
     )
@@ -147,6 +122,7 @@ export async function listInactiveRuntimeSubjects(
           notExists(activeConversationSessionQueryForListedSubject(appDb)),
         ),
         notExists(runLeaseQueryForListedSubject(appDb)),
+        notExists(runtimeProvisioningQueryForListedSubject(appDb)),
         isNotNull(sandboxesTable.inactiveDeadlineAt),
         lte(sandboxesTable.inactiveDeadlineAt, input.now),
       ),
@@ -179,6 +155,7 @@ export async function repairStrandedRuntimeSubjectDeadlines(
         isNull(sandboxesTable.inactiveDeadlineAt),
         notExists(activeConversationSessionQueryForListedSubject(appDb)),
         notExists(runLeaseQueryForListedSubject(appDb)),
+        notExists(runtimeProvisioningQueryForListedSubject(appDb)),
       ),
     )
     .run();
@@ -203,6 +180,7 @@ export async function repairStrandedRuntimeSubjectDeadlines(
         notExists(liveDriverInstanceQueryForListedSubject(appDb)),
         notExists(activeSessionRunQueryForListedSubject(appDb)),
         notExists(runLeaseQueryForListedSubject(appDb)),
+        notExists(runtimeProvisioningQueryForListedSubject(appDb)),
       ),
     )
     .run();
@@ -225,14 +203,23 @@ export async function listStaleRuntimeSubjectOperations(
       id: sandboxesTable.id,
       kind: sandboxesTable.kind,
       operationId: sandboxesTable.statusOperationId,
+      claimExpiresAt: sandboxesTable.claimExpiresAt,
+      claimOwner: sandboxesTable.claimOwner,
+      incarnation: sandboxesTable.incarnation,
+      operationKind: sandboxesTable.operationKind,
       status: sandboxesTable.status,
     })
     .from(sandboxesTable)
     .where(
       and(
-        inArray(sandboxesTable.status, RUNTIME_SUBJECT_OPERATION_STATUSES),
+        inArray(sandboxesTable.status, RUNTIME_SUBJECT_RECOVERABLE_OPERATION_STATUSES),
         isNotNull(sandboxesTable.statusOperationId),
-        lte(sandboxesTable.statusChangedAt, input.staleChangedAtLte),
+        isNotNull(sandboxesTable.operationKind),
+        or(
+          isNull(sandboxesTable.claimOwner),
+          isNull(sandboxesTable.claimExpiresAt),
+          lte(sandboxesTable.claimExpiresAt, input.staleChangedAtLte),
+        ),
       ),
     )
     .orderBy(asc(sandboxesTable.statusChangedAt), asc(sandboxesTable.id))
@@ -240,17 +227,74 @@ export async function listStaleRuntimeSubjectOperations(
     .all();
 
   return rows.flatMap((row) =>
-    row.operationId === null || !isRuntimeSubjectOperationStatus(row.status)
+    row.operationId === null ||
+    row.operationKind === null ||
+    !isRuntimeSubjectOperationStatus(row.status)
       ? []
       : [
           {
+            claimExpiresAt: row.claimExpiresAt,
+            claimOwner: row.claimOwner,
             id: row.id,
+            incarnation: row.incarnation,
             kind: row.kind,
+            operationKind: row.operationKind,
             operationId: row.operationId,
             status: row.status,
           },
         ],
   );
+}
+
+export async function claimRuntimeSubjectOperationForRepair(
+  database: D1Database,
+  input: {
+    readonly candidate: RuntimeSubjectOperationRepairCandidate;
+    readonly claimExpiresAt: number;
+    readonly claimOwner: string;
+    readonly now: number;
+  },
+): Promise<RuntimeSubjectOperationLease | null> {
+  const row = await getAppDatabase(database)
+    .update(sandboxesTable)
+    .set({
+      claimExpiresAt: input.claimExpiresAt,
+      claimOwner: input.claimOwner,
+      updatedAt: input.now,
+    })
+    .where(
+      and(
+        eq(sandboxesTable.id, input.candidate.id),
+        eq(sandboxesTable.incarnation, input.candidate.incarnation),
+        eq(sandboxesTable.operationKind, input.candidate.operationKind),
+        eq(sandboxesTable.status, input.candidate.status),
+        eq(sandboxesTable.statusOperationId, input.candidate.operationId),
+        ...(input.candidate.claimOwner === null
+          ? [isNull(sandboxesTable.claimOwner)]
+          : [eq(sandboxesTable.claimOwner, input.candidate.claimOwner)]),
+        ...(input.candidate.claimExpiresAt === null
+          ? [isNull(sandboxesTable.claimExpiresAt)]
+          : [eq(sandboxesTable.claimExpiresAt, input.candidate.claimExpiresAt)]),
+        or(
+          isNull(sandboxesTable.claimOwner),
+          isNull(sandboxesTable.claimExpiresAt),
+          lte(sandboxesTable.claimExpiresAt, input.now),
+        ),
+      ),
+    )
+    .returning({ id: sandboxesTable.id })
+    .get();
+
+  return row === undefined
+    ? null
+    : {
+        claimExpiresAt: input.claimExpiresAt,
+        claimOwner: input.claimOwner,
+        incarnation: input.candidate.incarnation,
+        kind: input.candidate.operationKind,
+        operationId: input.candidate.operationId,
+        status: input.candidate.status,
+      };
 }
 
 export async function claimInactiveRuntimeSubject(
@@ -280,6 +324,7 @@ export async function claimInactiveRuntimeSubject(
             notExists(activeConversationSessionQuery(appDb, input.runtimeSubjectId)),
           ),
           notExists(runLeaseQuery(appDb, input.runtimeSubjectId)),
+          notExists(runtimeProvisioningQuery(appDb, input.runtimeSubjectId)),
           isNotNull(sandboxesTable.inactiveDeadlineAt),
           lte(sandboxesTable.inactiveDeadlineAt, input.now),
           or(
