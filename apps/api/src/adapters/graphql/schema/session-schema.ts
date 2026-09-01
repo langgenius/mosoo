@@ -138,16 +138,6 @@ export const sessionSchema = /* GraphQL */ `
     updatedAt: String!
   }
 
-  type BoundCapabilityRunProvenance {
-    agentId: ULID!
-    appId: ULID!
-    bindingEnv: String!
-    bindingName: String!
-    deploymentId: ULID!
-    deploymentRunId: ULID!
-    runId: ULID!
-  }
-
   enum AgentSessionEventType {
     ${graphQLEnumValues(AGENT_SESSION_EVENT_TYPES)}
   }

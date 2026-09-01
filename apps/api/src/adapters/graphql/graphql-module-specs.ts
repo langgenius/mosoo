@@ -97,13 +97,9 @@ export const onboardingGraphQLSpec = {
 export const appGraphQLSpec = {
   mutationFields: [
     "createApp(input: CreateAppInput!): App!",
-    "deleteAppDeployment(input: DeleteAppDeploymentInput!): OperationResult!",
-    "deployApp(input: DeployAppInput!): AppDeploymentRun!",
     "renameApp(input: RenameAppInput!): App!",
   ],
   queryFields: [
-    "appDeploymentRunList(appId: ULID!, limit: Int): [AppDeploymentRun!]!",
-    "appDeploymentStatus(appId: ULID!): AppDeploymentRun",
     "appList(organizationId: ULID!): [App!]!",
     "appOverview(appId: ULID!, agentLimit: Int, credentialLimit: Int): AppOverview!",
     "controlPlaneOverview(appLimit: Int, agentLimit: Int, credentialLimit: Int): ControlPlaneOverview!",
@@ -127,7 +123,6 @@ export const sessionGraphQLSpec = {
   ],
   queryFields: [
     "agentSessionDiagnostics(appId: ULID!, sessionId: ULID!): AgentSessionDiagnostics!",
-    "boundCapabilityRunProvenance(appId: ULID!, runId: ULID!): BoundCapabilityRunProvenance",
     "agentSessionRetrieve(appId: ULID!, sessionId: ULID!): AgentSessionRetrieve!",
     "session(appId: ULID!, sessionId: ULID!): Session!",
     "sessionMessages(appId: ULID!, sessionId: ULID!): [SessionMessage!]!",

@@ -4,14 +4,10 @@ import type {
   PublicThreadApiSendEventsResponse,
 } from "@mosoo/contracts/public-api";
 import type { AgentSessionEventInput } from "@mosoo/contracts/session";
-import { accountsTable } from "@mosoo/db";
-import { parsePlatformId } from "@mosoo/id";
-import type { AccountId, PublicThreadId } from "@mosoo/id";
-import { eq } from "drizzle-orm";
+import type { PublicThreadId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../platform/cloudflare/worker-types";
-import { getAppDatabase } from "../../platform/db/drizzle";
-import type { PublicApiCaller } from "../auth/application/public-api-caller.service";
+import { getAccountViewer } from "../auth/application/viewer-auth.service";
 import type { AuthenticatedViewer } from "../auth/application/viewer-auth.service";
 import { sendAgentSessionEvents } from "../runtime/application/session-run.service";
 import {
@@ -19,7 +15,6 @@ import {
   deleteAgentSession,
   unarchiveAgentSession,
 } from "../sessions/application/session-lifecycle-mutation.service";
-import { createDeploymentCapabilityRunAdmission } from "./deployment-capability-caller.service";
 import { publicNotFound } from "./public-api-errors";
 import {
   toPublicThreadEventBatch,
@@ -30,40 +25,9 @@ import { toBackingSessionId } from "./public-thread-ids";
 import { toPublicThreadSummary } from "./public-thread-presenter";
 import { admitPublicSessionCaller } from "./public-thread-session-query.service";
 
-async function getAccountViewer(
-  database: D1Database,
-  accountId: AccountId,
-): Promise<AuthenticatedViewer> {
-  const row =
-    (await getAppDatabase(database)
-      .select({
-        email: accountsTable.email,
-        email_verified: accountsTable.emailVerified,
-        id: accountsTable.id,
-        image_url: accountsTable.image,
-        name: accountsTable.name,
-      })
-      .from(accountsTable)
-      .where(eq(accountsTable.id, accountId))
-      .limit(1)
-      .get()) ?? null;
-
-  if (!row) {
-    throw publicNotFound("Agent owner account was not found.");
-  }
-
-  return {
-    email: row.email,
-    emailVerified: row.email_verified,
-    id: parsePlatformId(row.id, "Account ID") as AccountId,
-    imageUrl: row.image_url,
-    name: row.name,
-  };
-}
-
 export interface SendPublicThreadSessionEventsRequest {
   bindings: ApiBindings;
-  caller: PublicApiCaller;
+  caller: AuthenticatedViewer;
   executionContext: Pick<ExecutionContext, "waitUntil"> | null;
   input: PublicThreadApiSendEventsRequest;
   requestUrl: string;
@@ -72,19 +36,19 @@ export interface SendPublicThreadSessionEventsRequest {
 
 export interface PublicThreadSessionMutationRequest {
   bindings: ApiBindings;
-  caller: PublicApiCaller;
+  caller: AuthenticatedViewer;
   threadId: PublicThreadId;
 }
 
 export interface UnarchivePublicThreadSessionRequest {
-  caller: PublicApiCaller;
+  caller: AuthenticatedViewer;
   database: D1Database;
   threadId: PublicThreadId;
 }
 
 async function toAgentSessionEventInput(input: {
   bindings: ApiBindings;
-  caller: PublicApiCaller;
+  caller: AuthenticatedViewer;
   event: PublicThreadEventInput;
   threadId: PublicThreadId;
 }): Promise<AgentSessionEventInput> {
@@ -116,6 +80,10 @@ export async function sendPublicThreadSessionEvents(
     request.threadId,
   );
   const accessViewer = await getAccountViewer(request.bindings.DB, admission.agent.ownerId);
+
+  if (!accessViewer) {
+    throw publicNotFound("Agent owner account was not found.");
+  }
   const events = await Promise.all(
     request.input.events.map((event) =>
       toAgentSessionEventInput({
@@ -137,14 +105,9 @@ export async function sendPublicThreadSessionEvents(
     options: {
       accessViewer,
       actionAuthorization: "admitted",
-      // Follow-up Runs started through a deployment capability carry the same
-      // provenance and D1 revocation fence as the Thread's first Run.
-      ...(request.caller.kind === "deployment_capability"
-        ? { boundCapability: createDeploymentCapabilityRunAdmission(request.caller.capability) }
-        : {}),
     },
     requestUrl: request.requestUrl,
-    viewer: request.caller.viewer,
+    viewer: request.caller,
   });
   return toPublicThreadEventBatch({
     batch,
@@ -169,7 +132,7 @@ export async function archivePublicThreadSession(
     bindings: request.bindings,
     appId: admission.session.app_id,
     sessionId,
-    viewer: request.caller.viewer,
+    viewer: request.caller,
   });
 }
 
@@ -187,7 +150,7 @@ export async function unarchivePublicThreadSession(
     database: request.database,
     appId: admission.session.app_id,
     sessionId,
-    viewer: request.caller.viewer,
+    viewer: request.caller,
   });
 }
 
@@ -205,6 +168,6 @@ export async function deletePublicThreadSession(
     bindings: request.bindings,
     appId: admission.session.app_id,
     sessionId,
-    viewer: request.caller.viewer,
+    viewer: request.caller,
   });
 }

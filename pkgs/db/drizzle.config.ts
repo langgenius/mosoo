@@ -6,7 +6,7 @@ export default defineConfig({
     prefix: "index",
   },
   out: "./drizzle",
-  schema: "./src/index.ts",
+  schema: "./src/migration-schema.ts",
   strict: true,
   verbose: true,
 });

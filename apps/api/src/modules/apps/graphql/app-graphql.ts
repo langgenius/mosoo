@@ -1,25 +1,14 @@
-import type { DeployAppInput } from "@mosoo/contracts/app";
 import { parsePlatformId } from "@mosoo/id";
 import type { OrganizationId, AppId } from "@mosoo/id";
 
 import type { GraphQLModule } from "../../../adapters/graphql/graphql-module";
 import { appGraphQLSpec } from "../../../adapters/graphql/graphql-module-specs";
-import {
-  deleteAppDeployment,
-  getAppDeploymentStatus,
-  listAppDeploymentRuns,
-} from "../application/app-deployment.service";
 import { getAppOverview, getControlPlaneOverview } from "../application/app-overview.service";
 import { createApp } from "../application/app-provisioning.service";
 import { listOrganizationApps, renameApp } from "../application/app.service";
 
 interface OrganizationIdArgs {
   organizationId: OrganizationId;
-}
-
-interface AppDeploymentRunListArgs {
-  appId: string;
-  limit?: number | null;
 }
 
 interface AppOverviewArgs {
@@ -41,14 +30,6 @@ interface CreateAppArgs {
   };
 }
 
-interface DeployAppArgs {
-  input: DeployAppInput;
-}
-
-interface DeleteAppDeploymentArgs {
-  input: Parameters<typeof deleteAppDeployment>[2];
-}
-
 interface RenameAppArgs {
   input: Parameters<typeof renameApp>[2];
 }
@@ -62,29 +43,20 @@ export const appGraphQLModule = {
   authenticatedMutationResolvers: {
     createApp: async (_parent, args: CreateAppArgs, context) =>
       createApp(context.bindings, context.viewer, args.input),
-    deleteAppDeployment: async (_parent, args: DeleteAppDeploymentArgs, context) =>
-      deleteAppDeployment(context.bindings, context.viewer, args.input),
-    deployApp: async (_parent, _args: DeployAppArgs, _context) => {
-      throw new Error("App deployment creation is frozen for product retirement.");
-    },
     renameApp: async (_parent, args: RenameAppArgs, context) =>
       renameApp(context.bindings.DB, context.viewer, args.input),
   },
   authenticatedQueryResolvers: {
-    appDeploymentRunList: async (_parent, args: AppDeploymentRunListArgs, context) =>
-      listAppDeploymentRuns(context.bindings, context.viewer, parseAppId(args.appId), args.limit),
-    appDeploymentStatus: async (_parent, args: { appId: string }, context) =>
-      getAppDeploymentStatus(context.bindings, context.viewer, parseAppId(args.appId)),
     appList: async (_parent, args: OrganizationIdArgs, context) =>
       listOrganizationApps(context.bindings.DB, context.viewer, args.organizationId),
     appOverview: async (_parent, args: AppOverviewArgs, context) =>
-      getAppOverview(context.bindings, context.viewer, {
+      getAppOverview(context.bindings.DB, context.viewer, {
         ...(args.agentLimit === undefined ? {} : { agentLimit: args.agentLimit }),
         appId: parseAppId(args.appId),
         ...(args.credentialLimit === undefined ? {} : { credentialLimit: args.credentialLimit }),
       }),
     controlPlaneOverview: async (_parent, args: ControlPlaneOverviewArgs, context) =>
-      getControlPlaneOverview(context.bindings, context.viewer, {
+      getControlPlaneOverview(context.bindings.DB, context.viewer, {
         ...(args.agentLimit === undefined ? {} : { agentLimit: args.agentLimit }),
         ...(args.appLimit === undefined ? {} : { appLimit: args.appLimit }),
         ...(args.credentialLimit === undefined ? {} : { credentialLimit: args.credentialLimit }),

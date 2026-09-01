@@ -189,6 +189,7 @@ export async function runPublicApiCreateThreadLatency(
             ],
             type: "user.message",
           },
+          userId: `e2e-${label}`,
         }),
         headers: {
           Authorization: `Bearer ${pat}`,

@@ -36,8 +36,6 @@
     "graphql": "^17.0.2",
     "graphql-yoga": "^5.21.3",
     "hono": "^4.12.32",
-    "jsonc-parser": "3.3.1",
-    "smol-toml": "1.8.0",
     "xstate": "^5.32.0"
   },
   "devDependencies": {

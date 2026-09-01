@@ -4,7 +4,7 @@ import { parsePlatformId } from "@mosoo/id";
 import type { AgentDeploymentVersionId, SessionId, SessionRunId } from "@mosoo/id";
 
 import { API_COMMAND_QUEUE_SEND_FAILED_CODE } from "../src/modules/api-command/application/api-command-ledger";
-import { getAccountViewer } from "../src/modules/auth/application/public-api-caller.service";
+import { getAccountViewer } from "../src/modules/auth/application/viewer-auth.service";
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
 import { queueSessionRun } from "../src/modules/runtime/application/session-run.service";
 import { setSessionRunStatus } from "../src/modules/runtime/infrastructure/session-runs/session-run-store.repository";

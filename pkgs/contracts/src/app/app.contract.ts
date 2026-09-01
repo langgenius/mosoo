@@ -2,8 +2,6 @@ import type { AgentKind, AgentStatus } from "../agent/agent.contract";
 import type {
   AccountId,
   AgentId,
-  AppDeploymentId,
-  AppDeploymentRunId,
   EnvironmentId,
   AppId,
   VendorCredentialId,
@@ -20,67 +18,6 @@ export interface AppSummary {
 
 export interface RenameAppInput {
   appId: AppId;
-  name: string;
-}
-
-export type AppDeploymentRunStatus =
-  | "activating"
-  | "building"
-  | "failed"
-  | "preparing"
-  | "queued"
-  | "submitted"
-  | "submitting"
-  | "success";
-
-export type AppDeploymentTargetKind = "cloudflare_pages" | "cloudflare_worker";
-
-export interface AppDeploymentRun {
-  appId: AppId;
-  createdAt: string;
-  deploymentId: AppDeploymentId;
-  errorCode: string | null;
-  errorMessage: string | null;
-  id: AppDeploymentRunId;
-  liveUrl: string | null;
-  plannedUrl: string;
-  sourceBranch: string;
-  sourceCommitSha: string;
-  status: AppDeploymentRunStatus;
-  targetKind: AppDeploymentTargetKind | null;
-  updatedAt: string;
-}
-
-export interface AppDeployment {
-  appId: AppId;
-  createdAt: string;
-  defaultBranch: string;
-  id: AppDeploymentId;
-  latestRun: AppDeploymentRun | null;
-  liveUrl: string | null;
-  plannedUrl: string;
-  repoName: string;
-  repoOwner: string;
-  repoUrl: string;
-  updatedAt: string;
-}
-
-export interface DeployAppInput {
-  appId: AppId;
-  configPath?: string | null;
-  repoUrl: string;
-}
-
-export interface DeleteAppDeploymentInput {
-  appId: AppId;
-}
-
-export type AppOverviewBoundAgentExposure = "public_thread";
-
-export interface AppOverviewBoundAgent {
-  agentId: AgentId;
-  envVar: string;
-  expose: AppOverviewBoundAgentExposure;
   name: string;
 }
 
@@ -133,8 +70,6 @@ export interface AppOverviewProviderCredentialList {
 export interface AppOverview {
   agents: AppOverviewAgentList;
   app: AppSummary;
-  boundAgents: AppOverviewBoundAgent[];
-  deployment: AppDeployment | null;
   providerCredentials: AppOverviewProviderCredentialList;
 }
 

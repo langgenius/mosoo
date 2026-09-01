@@ -41,10 +41,6 @@ their machine-readable contracts, code, or [Architecture](../architecture.md).
 - [Environment](./environment.md)
 - [App Usage](./cost-dashboard.md)
 
-## Secondary Alpha surface
-
-- [App Deployment](./app-deployment.md)
-
 ## Legacy aliases
 
 - [Files API](./files-api-contract.md)

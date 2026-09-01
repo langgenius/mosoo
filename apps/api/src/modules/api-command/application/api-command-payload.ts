@@ -1,13 +1,6 @@
 import type { ApiCommandKind } from "@mosoo/db";
 import { parsePlatformId } from "@mosoo/id";
-import type {
-  AccountId,
-  AppDeploymentRunId,
-  FileId,
-  AppId,
-  SessionId,
-  SessionRunId,
-} from "@mosoo/id";
+import type { AccountId, FileId, AppId, SessionId, SessionRunId } from "@mosoo/id";
 
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import type {
@@ -16,7 +9,6 @@ import type {
 } from "../../cost/application/cost-ledger-reconciliation.service";
 
 type ApiCommandPayload =
-  | AppDeploymentRunDispatchCommandPayload
   | CostLedgerReconciliationCommandPayload
   | EnvironmentPackageArtifactBuildCommandPayload
   | ScheduledMaintenanceCommandPayload
@@ -32,10 +24,6 @@ export interface CostLedgerReconciliationCommandPayload {
   cursor: CostLedgerReconciliationCursor | null;
   mode: CostLedgerReconciliationMode;
   scheduledTime: number;
-}
-
-export interface AppDeploymentRunDispatchCommandPayload {
-  appDeploymentRunId: AppDeploymentRunId;
 }
 
 export interface EnvironmentPackageArtifactBuildCommandPayload {
@@ -228,19 +216,6 @@ function parseCostLedgerReconciliationPayload(
   };
 }
 
-function parseAppDeploymentRunDispatchPayload(
-  value: unknown,
-): AppDeploymentRunDispatchCommandPayload {
-  const record = requireRecord(value, "app_deployment_run_dispatch payload");
-
-  return {
-    appDeploymentRunId: parsePlatformId<AppDeploymentRunId>(
-      record["appDeploymentRunId"],
-      "app_deployment_run_dispatch payload.appDeploymentRunId",
-    ),
-  };
-}
-
 function parseEnvironmentPackageArtifactBuildPayload(
   value: unknown,
 ): EnvironmentPackageArtifactBuildCommandPayload {
@@ -288,9 +263,6 @@ export function parseApiCommandPayload(
   const parsed = parsePayloadJson(payloadJson);
 
   switch (kind) {
-    case "app_deployment_run_dispatch": {
-      return parseAppDeploymentRunDispatchPayload(parsed);
-    }
     case "cost_ledger_reconciliation": {
       return parseCostLedgerReconciliationPayload(parsed);
     }

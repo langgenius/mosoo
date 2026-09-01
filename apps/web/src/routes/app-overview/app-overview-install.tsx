@@ -136,7 +136,7 @@ function ConsoleLane(): ReactElement {
 }
 
 /**
- * The pre-deploy Overview hero, split into two explicit setup lanes: "In your
+ * The Overview onboarding hero, split into two explicit setup lanes: "In your
  * coding agent" (install command, auto-minted CLI token, copyable setup
  * prompt) and "In the console" (the three-step checklist). Both lanes read
  * the same account state, so progress counts once wherever a step happens.

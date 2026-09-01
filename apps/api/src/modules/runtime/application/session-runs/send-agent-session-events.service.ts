@@ -23,7 +23,6 @@ import type { SessionActionAuthorization } from "../../../sessions/domain/sessio
 import { resolveSessionActionCreatorFlag } from "../../../sessions/domain/session-access.policy";
 import { toSessionLifecycleStatusForRunStatus } from "../../../sessions/domain/session-lifecycle";
 import { deriveSessionTitleFromPrompt } from "../../../sessions/domain/session-title";
-import type { BoundCapabilityRunAdmission } from "../../domain/bound-capability-run-provenance";
 import { getActiveSessionRunId } from "../../infrastructure/session-runs/session-run-store.repository";
 import { cancelRun } from "./cancel-run.service";
 import type { QueuedSessionRunState } from "./queue-run.service";
@@ -39,7 +38,6 @@ interface SendAgentSessionEventsInput {
 interface AgentSessionEventsOptions {
   accessViewer?: AuthenticatedViewer;
   actionAuthorization?: SessionActionAuthorization;
-  boundCapability?: BoundCapabilityRunAdmission;
   cachedState?: SessionLiveState | null;
 }
 

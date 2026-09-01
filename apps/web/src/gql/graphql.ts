@@ -134,23 +134,6 @@ export type AgentViewerRole =
 export type AgentVisibility =
   | 'private';
 
-export type AppDeploymentRunStatus =
-  | 'activating'
-  | 'building'
-  | 'failed'
-  | 'preparing'
-  | 'queued'
-  | 'submitted'
-  | 'submitting'
-  | 'success';
-
-export type AppDeploymentTargetKind =
-  | 'cloudflare_pages'
-  | 'cloudflare_worker';
-
-export type AppOverviewBoundAgentExposure =
-  | 'public_thread';
-
 export type AuthMethod =
   | 'email_otp'
   | 'google_oauth';
@@ -257,10 +240,6 @@ export type DeleteAgentInput = {
   appId: PlatformId;
 };
 
-export type DeleteAppDeploymentInput = {
-  appId: PlatformId;
-};
-
 export type DeleteEnvironmentInput = {
   appId: PlatformId;
   environmentId: PlatformId;
@@ -269,12 +248,6 @@ export type DeleteEnvironmentInput = {
 export type DeleteVendorCredentialInput = {
   appId: PlatformId;
   id: PlatformId;
-};
-
-export type DeployAppInput = {
-  appId: PlatformId;
-  configPath?: string | null | undefined;
-  repoUrl: string;
 };
 
 export type EnvironmentNetworkPolicy =
@@ -708,35 +681,6 @@ export type RenameAppMutationVariables = Exact<{
 
 
 export type RenameAppMutation = { renameApp: { createdAt: string, defaultEnvironmentId: PlatformId | null, id: PlatformId, name: string, ownerAccountId: PlatformId } };
-
-export type AppDeploymentOverviewQueryVariables = Exact<{
-  appId: PlatformId;
-}>;
-
-
-export type AppDeploymentOverviewQuery = { appOverview: { app: { id: PlatformId, name: string }, boundAgents: Array<{ agentId: PlatformId, envVar: string, expose: AppOverviewBoundAgentExposure, name: string }>, deployment: { appId: PlatformId, createdAt: string, defaultBranch: string, id: PlatformId, liveUrl: string | null, plannedUrl: string, repoName: string, repoOwner: string, repoUrl: string, updatedAt: string, latestRun: { appId: PlatformId, createdAt: string, deploymentId: PlatformId, errorCode: string | null, errorMessage: string | null, id: PlatformId, liveUrl: string | null, plannedUrl: string, sourceBranch: string, sourceCommitSha: string, status: AppDeploymentRunStatus, targetKind: AppDeploymentTargetKind | null, updatedAt: string } | null } | null } };
-
-export type AppDeploymentRunListQueryVariables = Exact<{
-  appId: PlatformId;
-  limit?: number | null | undefined;
-}>;
-
-
-export type AppDeploymentRunListQuery = { appDeploymentRunList: Array<{ appId: PlatformId, createdAt: string, deploymentId: PlatformId, errorCode: string | null, errorMessage: string | null, id: PlatformId, liveUrl: string | null, plannedUrl: string, sourceBranch: string, sourceCommitSha: string, status: AppDeploymentRunStatus, targetKind: AppDeploymentTargetKind | null, updatedAt: string }> };
-
-export type DeployAppMutationVariables = Exact<{
-  input: DeployAppInput;
-}>;
-
-
-export type DeployAppMutation = { deployApp: { appId: PlatformId, createdAt: string, deploymentId: PlatformId, errorCode: string | null, errorMessage: string | null, id: PlatformId, liveUrl: string | null, plannedUrl: string, sourceBranch: string, sourceCommitSha: string, status: AppDeploymentRunStatus, targetKind: AppDeploymentTargetKind | null, updatedAt: string } };
-
-export type DeleteAppDeploymentMutationVariables = Exact<{
-  input: DeleteAppDeploymentInput;
-}>;
-
-
-export type DeleteAppDeploymentMutation = { deleteAppDeployment: { ok: boolean } };
 
 type CostTotalsFields_CostAgentRow_Fragment = { activeUsers: number, cacheCreationTokens: number, cacheReadTokens: number, inputTokens: number, outputTokens: number, requestCount: number, totalCostUsd: number, unpricedRequestCount: number };
 
@@ -2203,94 +2147,6 @@ export const RenameAppDocument = /*#__PURE__*/ new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<RenameAppMutation, RenameAppMutationVariables>;
-export const AppDeploymentOverviewDocument = /*#__PURE__*/ new TypedDocumentString(`
-    query AppDeploymentOverview($appId: ULID!) {
-  appOverview(appId: $appId) {
-    app {
-      id
-      name
-    }
-    boundAgents {
-      agentId
-      envVar
-      expose
-      name
-    }
-    deployment {
-      appId
-      createdAt
-      defaultBranch
-      id
-      liveUrl
-      plannedUrl
-      repoName
-      repoOwner
-      repoUrl
-      updatedAt
-      latestRun {
-        appId
-        createdAt
-        deploymentId
-        errorCode
-        errorMessage
-        id
-        liveUrl
-        plannedUrl
-        sourceBranch
-        sourceCommitSha
-        status
-        targetKind
-        updatedAt
-      }
-    }
-  }
-}
-    `) as unknown as TypedDocumentString<AppDeploymentOverviewQuery, AppDeploymentOverviewQueryVariables>;
-export const AppDeploymentRunListDocument = /*#__PURE__*/ new TypedDocumentString(`
-    query AppDeploymentRunList($appId: ULID!, $limit: Int) {
-  appDeploymentRunList(appId: $appId, limit: $limit) {
-    appId
-    createdAt
-    deploymentId
-    errorCode
-    errorMessage
-    id
-    liveUrl
-    plannedUrl
-    sourceBranch
-    sourceCommitSha
-    status
-    targetKind
-    updatedAt
-  }
-}
-    `) as unknown as TypedDocumentString<AppDeploymentRunListQuery, AppDeploymentRunListQueryVariables>;
-export const DeployAppDocument = /*#__PURE__*/ new TypedDocumentString(`
-    mutation DeployApp($input: DeployAppInput!) {
-  deployApp(input: $input) {
-    appId
-    createdAt
-    deploymentId
-    errorCode
-    errorMessage
-    id
-    liveUrl
-    plannedUrl
-    sourceBranch
-    sourceCommitSha
-    status
-    targetKind
-    updatedAt
-  }
-}
-    `) as unknown as TypedDocumentString<DeployAppMutation, DeployAppMutationVariables>;
-export const DeleteAppDeploymentDocument = /*#__PURE__*/ new TypedDocumentString(`
-    mutation DeleteAppDeployment($input: DeleteAppDeploymentInput!) {
-  deleteAppDeployment(input: $input) {
-    ok
-  }
-}
-    `) as unknown as TypedDocumentString<DeleteAppDeploymentMutation, DeleteAppDeploymentMutationVariables>;
 export const AppCostCardDocument = /*#__PURE__*/ new TypedDocumentString(`
     query AppCostCard($appId: ULID!, $range: CostRange!, $runPurposes: [CostRunPurpose!]) {
   appCostCard(appId: $appId, range: $range, runPurposes: $runPurposes) {

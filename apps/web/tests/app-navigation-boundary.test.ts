@@ -6,6 +6,13 @@ function readSource(path: string): string {
 }
 
 describe("App navigation boundary", () => {
+  test("renders a generic not-found page for unknown routes", () => {
+    const source = readSource("../src/app/route-registry.tsx");
+
+    expect(source).toContain("<NotFoundPage />");
+    expect(source).toContain('path: "*"');
+  });
+
   test("puts App Overview before Agent-first surfaces", () => {
     const source = readSource("../src/app/navigation.tsx");
     const overviewIndex = source.indexOf('t("nav.overview")');
@@ -22,7 +29,6 @@ describe("App navigation boundary", () => {
     expect(source).toContain('path: "/"');
     expect(source).not.toContain('label: "Members"');
     expect(source).not.toContain('label: "Install"');
-    expect(source).not.toContain('label: "Deployments"');
     expect(source).toContain('path: "/files"');
   });
 

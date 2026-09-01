@@ -1,8 +1,33 @@
+import { accountsTable } from "@mosoo/db";
+import type { AccountId } from "@mosoo/id";
+import { eq } from "drizzle-orm";
+
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
+import { getAppDatabase } from "../../../platform/db/drizzle";
 import type { AuthenticatedViewer } from "../domain/authenticated-viewer";
 import { authenticatePersonalAccessToken, readBearerToken } from "./personal-access-token.service";
 
 export type { AuthenticatedViewer };
+
+export async function getAccountViewer(
+  database: D1Database,
+  accountId: AccountId,
+): Promise<AuthenticatedViewer | null> {
+  return (
+    (await getAppDatabase(database)
+      .select({
+        email: accountsTable.email,
+        emailVerified: accountsTable.emailVerified,
+        id: accountsTable.id,
+        imageUrl: accountsTable.image,
+        name: accountsTable.name,
+      })
+      .from(accountsTable)
+      .where(eq(accountsTable.id, accountId))
+      .limit(1)
+      .get()) ?? null
+  );
+}
 
 function isSessionAuthConfigured(bindings: Pick<ApiBindings, "BETTER_AUTH_SECRET">): boolean {
   return Boolean(bindings.BETTER_AUTH_SECRET?.trim());

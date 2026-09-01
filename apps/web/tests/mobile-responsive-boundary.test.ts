@@ -34,10 +34,6 @@ const ACCESS_TOKENS_SOURCE = readFileSync(
   new URL("../src/routes/settings/access-tokens-tab.tsx", import.meta.url),
   "utf8",
 );
-const DEPLOYMENT_HISTORY_SOURCE = readFileSync(
-  new URL("../src/routes/app-overview/deploy/components/deployments-history.tsx", import.meta.url),
-  "utf8",
-);
 const HELP_MENU_SOURCE = readFileSync(
   new URL("../src/features/help/help-menu.tsx", import.meta.url),
   "utf8",
@@ -103,12 +99,8 @@ describe("mobile console boundaries", () => {
     expect(EMPTY_STATE_SOURCE).toContain("min-h-[320px] flex-1");
   });
 
-  test("wide data tables switch to mobile cards instead of clipping", () => {
+  test("wide data table switches to mobile cards instead of clipping", () => {
     expect(ACCESS_TOKENS_SOURCE).toContain('className="xl:hidden"');
     expect(ACCESS_TOKENS_SOURCE).toContain("hidden min-w-[560px] xl:block");
-    expect(DEPLOYMENT_HISTORY_SOURCE).toContain("space-y-2 md:hidden");
-    expect(DEPLOYMENT_HISTORY_SOURCE).toContain(
-      "hidden overflow-hidden rounded-xl border md:block",
-    );
   });
 });
