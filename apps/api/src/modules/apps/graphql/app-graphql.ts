@@ -1,3 +1,4 @@
+import type { DeployAppInput } from "@mosoo/contracts/app";
 import { parsePlatformId } from "@mosoo/id";
 import type { OrganizationId, AppId } from "@mosoo/id";
 
@@ -5,7 +6,6 @@ import type { GraphQLModule } from "../../../adapters/graphql/graphql-module";
 import { appGraphQLSpec } from "../../../adapters/graphql/graphql-module-specs";
 import {
   deleteAppDeployment,
-  deployApp,
   getAppDeploymentStatus,
   listAppDeploymentRuns,
 } from "../application/app-deployment.service";
@@ -42,7 +42,7 @@ interface CreateAppArgs {
 }
 
 interface DeployAppArgs {
-  input: Parameters<typeof deployApp>[2];
+  input: DeployAppInput;
 }
 
 interface DeleteAppDeploymentArgs {
@@ -64,8 +64,9 @@ export const appGraphQLModule = {
       createApp(context.bindings, context.viewer, args.input),
     deleteAppDeployment: async (_parent, args: DeleteAppDeploymentArgs, context) =>
       deleteAppDeployment(context.bindings, context.viewer, args.input),
-    deployApp: async (_parent, args: DeployAppArgs, context) =>
-      deployApp(context.bindings, context.viewer, args.input),
+    deployApp: async (_parent, _args: DeployAppArgs, _context) => {
+      throw new Error("App deployment creation is frozen for product retirement.");
+    },
     renameApp: async (_parent, args: RenameAppArgs, context) =>
       renameApp(context.bindings.DB, context.viewer, args.input),
   },
