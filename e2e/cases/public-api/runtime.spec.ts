@@ -461,6 +461,7 @@ async function createThreadViaPublicApi(
         ],
         type: "user.message",
       },
+      userId: `e2e-${input.label}`,
     },
     headers: {
       Authorization: `Bearer ${input.pat}`,

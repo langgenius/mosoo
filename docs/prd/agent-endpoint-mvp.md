@@ -31,6 +31,6 @@ Thread keeps the configuration it started with.
 
 - Only a published, ready Agent can be called. Unpublishing stops API access.
 - Only the Agent's App owner can call it with the current token model.
-- This is a backend integration surface, not anonymous access, App User
-  authentication, or App deployment.
+- This is a backend integration surface, not anonymous access or App User
+  authentication.
 - Exact request and response details belong in the API reference, not this PRD.

@@ -11,7 +11,6 @@ import type {
   SessionRunId,
 } from "@mosoo/id";
 import { generateTraceId } from "@mosoo/observability";
-import type { SQL } from "drizzle-orm";
 
 import { logError, logInfo } from "../../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
@@ -27,7 +26,6 @@ import type { AuthenticatedViewer } from "../../../auth/application/viewer-auth.
 import { resolveReadyEnvironmentPackageArtifact } from "../../../environments/application/environment-package-artifact.service";
 import { fileStore } from "../../../files/application/file-store";
 import { publishPersistedSessionRuntimeEvents } from "../../../sessions/application/session-event-write.service";
-import type { BoundCapabilityRunProvenance } from "../../domain/bound-capability-run-provenance";
 import { getSupportedRuntimeId } from "../../domain/runtime-config";
 import {
   commitQueuedSessionRunAdmission,
@@ -35,7 +33,6 @@ import {
   isCattleTerminalCheckpointReadyForNextRun,
 } from "../../infrastructure/session-runs/session-run-admission.repository";
 import { getActiveSessionRunSummary } from "../../infrastructure/session-runs/session-run-read.repository";
-import { SessionRunCreationGuardRejectedError } from "../../infrastructure/session-runs/session-run-store.repository";
 import { createInsertedSessionRunSummary } from "../../infrastructure/session-runs/session-run-write.repository";
 import { getSessionExecutionPlan } from "../session-definition/session-execution.repository";
 import { dispatchQueuedSessionRun } from "./dispatch-queued-run.service";
@@ -55,10 +52,8 @@ class SessionActiveRunExistsError extends Error {
 interface QueueSessionRunInput {
   accessViewer?: AuthenticatedViewer;
   attachmentIds: FileId[];
-  boundCapabilityProvenance?: BoundCapabilityRunProvenance;
   clientRequestId: string | null;
   prompt: string;
-  runCreationGuard?: SQL;
   session: {
     agent_id: AgentId;
     deployment_version_id: AgentDeploymentVersionId | null;
@@ -85,8 +80,6 @@ export interface QueuedSessionRunState {
   status: "RUNNING";
   updatedAt: string;
 }
-
-export { SessionRunCreationGuardRejectedError };
 
 function createCheckpointPendingError(sessionId: SessionId) {
   return createApiError(
@@ -187,9 +180,6 @@ export async function queueSessionRun(request: QueueSessionRunRequest): Promise<
     },
     run: {
       agentId: input.session.agent_id,
-      ...(input.boundCapabilityProvenance === undefined
-        ? {}
-        : { boundCapabilityProvenance: input.boundCapabilityProvenance }),
       createdBy: viewerId,
       deploymentVersionId: input.session.deployment_version_id,
       deploymentVersionNumber: input.session.deployment_version_number,
@@ -202,7 +192,6 @@ export async function queueSessionRun(request: QueueSessionRunRequest): Promise<
       traceId: createdRun.traceId,
       trigger: "user_prompt",
     },
-    ...(input.runCreationGuard === undefined ? {} : { runCreationGuard: input.runCreationGuard }),
     session: {
       agentId: input.session.agent_id,
       appId: input.session.app_id,
@@ -231,10 +220,6 @@ export async function queueSessionRun(request: QueueSessionRunRequest): Promise<
 
     if (!(await isCattleTerminalCheckpointReadyForNextRun(bindings.DB, input.session.id))) {
       throw createCheckpointPendingError(input.session.id);
-    }
-
-    if (input.runCreationGuard !== undefined) {
-      throw new SessionRunCreationGuardRejectedError();
     }
 
     throw new Error("Session cannot accept a new run.");

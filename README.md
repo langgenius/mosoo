@@ -25,7 +25,7 @@
 
 mosoo provides a Cloudflare-native control plane to stream tool activity, inspect Run history, and keep Threads and files across executions. It is self-hostable in your own account.
 
-Your application remains yours. Its backend owns product behavior and end-user access. mosoo focuses on Agent execution and lifecycle; App Deployment is a separate Alpha surface, not the core product contract.
+Your application remains yours. Its backend owns product behavior and end-user access. mosoo focuses on Agent execution and lifecycle.
 
 ## How It Works
 

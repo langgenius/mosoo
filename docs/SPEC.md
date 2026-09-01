@@ -2,7 +2,7 @@
 
 Status: canonical product contract for the current mosoo Alpha direction.
 
-This document defines what mosoo is building and the boundaries it guarantees. It supersedes older App-hosting, Deployable Repo, Release, Workspace, and Organization-governance language whenever they disagree. Current product notes and code remain the authority for what is shipped today.
+This document defines what mosoo is building and the boundaries it guarantees. It supersedes older Workspace and Organization-governance language whenever they disagree. Current product notes and code remain the authority for what is shipped today.
 
 This Spec is deliberately narrower than a general-purpose application platform. Exact API schemas, manifest fields, quotas, and internal topology belong in implementation contracts.
 
@@ -63,4 +63,4 @@ A mosoo Account authenticates the Builder to the mosoo control plane. It is neve
 7. **The public API is backend-to-backend.** App-owner tokens stay on trusted servers; the backend supplies `userId`, while mosoo does not claim App User authentication.
 8. **High-impact side effects are mediated.** Permission requests and confirmation gates are enforceable runtime boundaries, not prompt conventions.
 9. **Usage is observable, not billing truth.** Recorded model usage supports operational decisions without pretending to replace provider invoices.
-10. **Do not broaden the product to hide missing proof.** App hosting, broad provider matrices, governance, and recovery become promises only after their user-visible paths are proven.
+10. **Do not broaden the product to hide missing proof.** Broad provider matrices, governance, and recovery become promises only after their user-visible paths are proven.

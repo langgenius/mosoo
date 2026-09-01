@@ -38,7 +38,6 @@ export interface PreparedApiCommand {
 export interface ApiCommandClaim {
   attemptCount: number;
   commandId: ApiCommandId;
-  dedupeKey: string;
   kind: ApiCommandKind;
   payloadJson: string;
 }
@@ -327,7 +326,6 @@ export async function claimApiCommand(input: {
       .returning({
         attemptCount: apiCommandsTable.attemptCount,
         commandId: apiCommandsTable.id,
-        dedupeKey: apiCommandsTable.dedupeKey,
         kind: apiCommandsTable.kind,
         payloadJson: apiCommandsTable.payloadJson,
       })

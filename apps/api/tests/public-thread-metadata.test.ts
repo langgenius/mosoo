@@ -1,11 +1,10 @@
 import { describe, expect, test } from "bun:test";
 
-import type { AppDeploymentId, AppDeploymentRunId, PersonalAccessTokenId } from "@mosoo/id";
+import type { PersonalAccessTokenId } from "@mosoo/id";
 
 import {
   createPublicApiThreadMetadata,
-  isDeploymentCapabilityCreatedBy,
-  parsePublicApiThreadMetadata,
+  parsePublicApiThreadRecordMetadata,
 } from "../src/modules/public-api/public-thread-metadata";
 
 describe("Public Thread metadata", () => {
@@ -18,51 +17,35 @@ describe("Public Thread metadata", () => {
       idempotencyKey: "idem-1",
     });
 
-    expect(parsePublicApiThreadMetadata(JSON.stringify({ public_api: metadata }))).toEqual(
-      metadata,
-    );
-    expect(isDeploymentCapabilityCreatedBy(metadata.created_by)).toBe(false);
-  });
-
-  test("round-trips deployment capability audit metadata", () => {
-    const metadata = createPublicApiThreadMetadata({
-      createdBy: {
-        binding_env: "MOSOO_AGENT_URL",
-        binding_name: "Codex Pet",
-        deployment_id: "01J0000000000000000000000D" as AppDeploymentId,
-        deployment_run_id: "01J0000000000000000000000R" as AppDeploymentRunId,
-        kind: "deployment_capability",
-      },
-      idempotencyKey: null,
+    expect(parsePublicApiThreadRecordMetadata(JSON.stringify({ public_api: metadata }))).toEqual({
+      idempotency_key: "idem-1",
+      source: "public_api",
     });
-
-    expect(parsePublicApiThreadMetadata(JSON.stringify({ public_api: metadata }))).toEqual(
-      metadata,
-    );
-    expect(isDeploymentCapabilityCreatedBy(metadata.created_by)).toBe(true);
   });
 
-  test("rejects deployment capability metadata with unknown or malformed fields", () => {
-    const base = {
-      binding_env: "MOSOO_AGENT_URL",
-      binding_name: "Codex Pet",
-      deployment_id: "01J0000000000000000000000D",
-      deployment_run_id: "01J0000000000000000000000R",
-      kind: "deployment_capability",
-    };
+  test("keeps stored Public Threads readable without interpreting creator history", () => {
+    expect(
+      parsePublicApiThreadRecordMetadata(
+        JSON.stringify({
+          public_api: {
+            created_by: { historical_caller: "retired" },
+            idempotency_key: null,
+            source: "public_api",
+          },
+        }),
+      ),
+    ).toEqual({ idempotency_key: null, source: "public_api" });
+  });
 
-    for (const createdBy of [
-      { ...base, token_id: "01J00000000000000000000061" },
-      { ...base, deployment_id: "not-a-ulid" },
-      { ...base, binding_env: "" },
-      { kind: "deployment_capability" },
+  test("rejects malformed Public Thread envelopes", () => {
+    for (const publicApi of [
+      { created_by: null, idempotency_key: null, source: "public_api" },
+      { created_by: {}, idempotency_key: 1, source: "public_api" },
+      { created_by: {}, idempotency_key: null, source: "other" },
+      { created_by: {}, idempotency_key: null, source: "public_api", unknown: true },
     ]) {
       expect(
-        parsePublicApiThreadMetadata(
-          JSON.stringify({
-            public_api: { created_by: createdBy, idempotency_key: null, source: "public_api" },
-          }),
-        ),
+        parsePublicApiThreadRecordMetadata(JSON.stringify({ public_api: publicApi })),
       ).toBeNull();
     }
   });

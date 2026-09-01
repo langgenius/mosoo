@@ -20,23 +20,6 @@ CREATE TABLE public_api_idempotency_key (
   updated_at integer NOT NULL
 );
 
-CREATE TABLE bound_agent_call_idempotency_key (
-  id text PRIMARY KEY NOT NULL,
-  subject_hash text NOT NULL,
-  idempotency_key text NOT NULL,
-  body_hash text NOT NULL,
-  session_id text NOT NULL,
-  run_id text,
-  created_at integer NOT NULL,
-  updated_at integer NOT NULL
-);
-
-CREATE UNIQUE INDEX bound_agent_call_idempotency_subject_key_idx
-  ON bound_agent_call_idempotency_key (subject_hash, idempotency_key);
-
-CREATE INDEX bound_agent_call_idempotency_updated_idx
-  ON bound_agent_call_idempotency_key (updated_at);
-
 CREATE TABLE session (
   id text PRIMARY KEY NOT NULL,
   app_id text NOT NULL,
@@ -71,12 +54,6 @@ CREATE TABLE session_run (
   id text PRIMARY KEY NOT NULL,
   session_id text NOT NULL,
   agent_id text NOT NULL,
-  bound_capability_agent_id text,
-  bound_capability_app_id text,
-  bound_capability_binding_env text,
-  bound_capability_binding_name text,
-  bound_capability_deployment_id text,
-  bound_capability_deployment_run_id text,
   created_by_account_id text NOT NULL,
   deployment_version_id text,
   deployment_version_number integer,

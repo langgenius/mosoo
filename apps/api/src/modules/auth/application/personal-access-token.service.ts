@@ -53,7 +53,7 @@ function createTokenValue(): string {
   return `${TOKEN_VALUE_PREFIX}${toBase64Url(bytes)}`;
 }
 
-export function isPersonalAccessTokenValue(tokenValue: string): boolean {
+function isPersonalAccessTokenValue(tokenValue: string): boolean {
   return (
     tokenValue.startsWith(TOKEN_VALUE_PREFIX) || tokenValue.startsWith(LEGACY_TOKEN_VALUE_PREFIX)
   );

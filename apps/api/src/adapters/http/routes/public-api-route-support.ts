@@ -1,24 +1,14 @@
 import type { AgentId, PlatformId, PublicThreadId } from "@mosoo/id";
 import type { Context } from "hono";
 
-import { readBearerToken } from "../../../modules/auth/application/personal-access-token.service";
 import {
-  authenticatePublicApiCaller,
-  readPublicApiBearerToken,
-} from "../../../modules/auth/application/public-api-caller.service";
-import type {
-  DeploymentCapabilityPublicApiCaller,
-  PublicApiCaller,
-} from "../../../modules/auth/application/public-api-caller.service";
+  authenticatePersonalAccessToken,
+  readBearerToken,
+} from "../../../modules/auth/application/personal-access-token.service";
+import type { PersonalAccessTokenCaller } from "../../../modules/auth/application/personal-access-token.service";
+import type { AuthenticatedViewer } from "../../../modules/auth/application/viewer-auth.service";
 import { FileControlError } from "../../../modules/files/application/file-control-errors";
 import {
-  admitDeploymentCapability,
-  DEPLOYMENT_CAPABILITY_REVOKED_MESSAGE,
-  deploymentCapabilityRateLimitKey,
-  toDeploymentCapabilityCaller,
-} from "../../../modules/public-api/deployment-capability-caller.service";
-import {
-  publicAgentNotExposed,
   publicInternalError,
   publicIdempotencyConflict,
   publicInvalidJson,
@@ -35,7 +25,6 @@ import {
   readPublicApiIdempotencyKey,
 } from "../../../modules/public-api/public-api-idempotency.service";
 import { enforcePublicApiRateLimit } from "../../../modules/public-api/public-api-rate-limit.service";
-import { SessionRunCreationGuardRejectedError } from "../../../modules/runtime/application/session-run.service";
 import { createErrorLogContext, logError } from "../../../platform/cloudflare/logger";
 import type { ApiGatewayEnvironment } from "../../../platform/cloudflare/worker-types";
 import { API_ERROR_CODE, isApiError } from "../../../platform/errors";
@@ -46,23 +35,14 @@ import { mapFileControlErrorToPublicApiError } from "./public-api-file-error-map
 type PublicApiRouteContext = Context<ApiGatewayEnvironment>;
 
 interface PublicApiThreadOperation {
-  caller: PublicApiCaller;
+  caller: AuthenticatedViewer;
+}
+
+interface PublicApiTokenOperation {
+  caller: PersonalAccessTokenCaller;
 }
 
 type RouteValue<T> = T | (() => T);
-
-/**
- * How a route resolves its caller. The default reads the owner Access Token
- * bearer header; bound capability routes resolve the deployment identity from
- * the capability token in their path instead.
- */
-export type PublicApiCallerResolver = (c: PublicApiRouteContext) => Promise<PublicApiCaller>;
-
-export interface PublicApiCallerOptions {
-  /** Normalized idempotency route; defaults to the request pathname. */
-  idempotencyRoute?: string | undefined;
-  resolveCaller?: PublicApiCallerResolver | undefined;
-}
 
 interface PublicApiJsonErrorResponse {
   body: {
@@ -79,29 +59,16 @@ function resolveRequiredRouteValue<T>(value: RouteValue<T>): T {
   return typeof value === "function" ? (value as () => T)() : value;
 }
 
-/** Rate-limit bucket for a caller: Access Tokens by token id, capabilities by App + Agent. */
-function publicApiRateLimitKey(caller: PublicApiCaller): string {
-  return caller.kind === "access_token"
-    ? caller.tokenId
-    : deploymentCapabilityRateLimitKey(caller.capability);
-}
-
-/**
- * Idempotency subject for a caller. A deployment capability shares one subject
- * across the revisions of its Deployment, so a retry after a redeploy replays.
- */
-function publicApiIdempotencySubjectId(caller: PublicApiCaller): PlatformId {
-  return caller.kind === "access_token" ? caller.tokenId : caller.capability.deploymentId;
-}
-
-async function requireAccessTokenCaller(c: PublicApiRouteContext): Promise<PublicApiCaller> {
+async function requireAccessTokenCaller(
+  c: PublicApiRouteContext,
+): Promise<PersonalAccessTokenCaller> {
   const token = readBearerToken(c.req.raw);
 
   if (!isTruthy(token)) {
     throw publicUnauthenticated();
   }
 
-  const caller = await authenticatePublicApiCaller(c.env.DB, token);
+  const caller = await authenticatePersonalAccessToken(c.env.DB, token);
 
   if (!caller) {
     throw publicUnauthenticated("Access Token is invalid or revoked.");
@@ -110,55 +77,12 @@ async function requireAccessTokenCaller(c: PublicApiRouteContext): Promise<Publi
   return caller;
 }
 
-async function requirePublicApiCaller(c: PublicApiRouteContext): Promise<PublicApiCaller> {
-  const token = readPublicApiBearerToken(c.req.raw);
-
-  if (!isTruthy(token)) {
-    throw publicUnauthenticated("A valid Access Token is required.");
-  }
-
-  const caller = await authenticatePublicApiCaller(c.env.DB, token);
-
-  if (!caller) {
-    throw publicUnauthenticated("Access Token is invalid or revoked.");
-  }
-
-  return caller;
-}
-
-async function requireRateLimitedCaller(
+async function requireRateLimitedAccessTokenCaller(
   c: PublicApiRouteContext,
-  resolveCaller: PublicApiCallerResolver,
-): Promise<PublicApiCaller> {
-  const caller = await resolveCaller(c);
-  await enforcePublicApiRateLimit(c.env.DB, publicApiRateLimitKey(caller));
+): Promise<PersonalAccessTokenCaller> {
+  const caller = await requireAccessTokenCaller(c);
+  await enforcePublicApiRateLimit(c.env.DB, caller.tokenId);
   return caller;
-}
-
-/**
- * Resolve the deployment-scoped identity carried by a bound capability URL
- * (`/bound/:token/...`). Verification, Agent servability, Deployment authority,
- * and owner resolution all happen before any route logic runs.
- */
-export async function requireDeploymentCapabilityCaller(
-  c: PublicApiRouteContext,
-): Promise<DeploymentCapabilityPublicApiCaller> {
-  const admission = await admitDeploymentCapability(c.env, c.req.param("token") ?? "", Date.now());
-
-  return toDeploymentCapabilityCaller(admission);
-}
-
-/**
- * Idempotency reservations are keyed by route. A bound capability URL embeds
- * the per-revision token in its path, so normalize it away: the same
- * Idempotency-Key from a redeployed Worker must replay the original response
- * instead of failing as a different request.
- */
-export function deploymentCapabilityIdempotencyRoute(c: PublicApiRouteContext): string {
-  const token = c.req.param("token") ?? "";
-  const pathname = new URL(c.req.url).pathname;
-
-  return token.length === 0 ? pathname : pathname.replace(`/bound/${token}`, "/bound/:token");
 }
 
 function errorHeaders(error: PublicApiError): HeadersInit {
@@ -210,12 +134,6 @@ function toErrorResponseDetails(error: unknown): PublicApiJsonErrorResponse {
 
   if (error instanceof Error && error.message.startsWith("Agent is not ready to run:")) {
     return toErrorResponseDetails(publicReadinessBlocked(error.message));
-  }
-
-  // A deployment capability's Run insert repeats the Deployment authority
-  // condition; losing that race means the capability was revoked mid-request.
-  if (error instanceof SessionRunCreationGuardRejectedError) {
-    return toErrorResponseDetails(publicAgentNotExposed(DEPLOYMENT_CAPABILITY_REVOKED_MESSAGE));
   }
 
   if (error instanceof SyntaxError) {
@@ -280,7 +198,6 @@ async function runPublicApiIdempotentJson<T>(
   c: PublicApiRouteContext,
   input: {
     bodyHash: string | null;
-    idempotencyRoute?: string | undefined;
     idempotencySubjectId: PlatformId;
     beforeOperation?: (() => Promise<void>) | undefined;
     operation: (idempotencyKey: string | null) => Promise<T>;
@@ -296,7 +213,7 @@ async function runPublicApiIdempotentJson<T>(
     return Response.json(await input.operation(null), { status: input.status });
   }
 
-  const route = input.idempotencyRoute ?? new URL(c.req.url).pathname;
+  const route = new URL(c.req.url).pathname;
   let reservation = await beginPublicApiIdempotency(c.env.DB, {
     bodyHash: input.bodyHash,
     idempotencyKey,
@@ -420,16 +337,12 @@ async function runPublicApiIdempotentJson<T>(
 
 export async function runPublicApiAuthenticatedJson<T>(
   c: PublicApiRouteContext,
-  operation: (caller: PublicApiCaller) => Promise<T>,
+  operation: (caller: AuthenticatedViewer) => Promise<T>,
   status = 200,
-  options: PublicApiCallerOptions = {},
 ): Promise<Response> {
   try {
-    const caller = await requireRateLimitedCaller(
-      c,
-      options.resolveCaller ?? requireAccessTokenCaller,
-    );
-    return Response.json(await operation(caller), { status });
+    const caller = await requireRateLimitedAccessTokenCaller(c);
+    return Response.json(await operation(caller.viewer), { status });
   } catch (error) {
     return toErrorResponse(error);
   }
@@ -437,15 +350,11 @@ export async function runPublicApiAuthenticatedJson<T>(
 
 export async function runPublicApiAuthenticatedResponse(
   c: PublicApiRouteContext,
-  operation: (caller: PublicApiCaller) => Promise<Response>,
-  options: PublicApiCallerOptions = {},
+  operation: (caller: AuthenticatedViewer) => Promise<Response>,
 ): Promise<Response> {
   try {
-    const caller = await requireRateLimitedCaller(
-      c,
-      options.resolveCaller ?? requireAccessTokenCaller,
-    );
-    return await operation(caller);
+    const caller = await requireRateLimitedAccessTokenCaller(c);
+    return await operation(caller.viewer);
   } catch (error) {
     return toErrorResponse(error);
   }
@@ -453,7 +362,7 @@ export async function runPublicApiAuthenticatedResponse(
 
 export async function runPublicApiSessionMutation<T, Prepared = undefined>(
   c: PublicApiRouteContext,
-  input: PublicApiCallerOptions & {
+  input: {
     bodyHash?: (prepared: Prepared) => string | null;
     operation: (
       input: PublicApiThreadOperation & {
@@ -467,22 +376,20 @@ export async function runPublicApiSessionMutation<T, Prepared = undefined>(
   },
 ): Promise<Response> {
   try {
-    const caller = await (input.resolveCaller ?? requireAccessTokenCaller)(c);
+    const caller = await requireAccessTokenCaller(c);
     const threadId = resolveRequiredRouteValue(input.threadId);
-    const operationInput: PublicApiThreadOperation = { caller };
+    const operationInput: PublicApiThreadOperation = { caller: caller.viewer };
     const prepared = input.prepare ? await input.prepare(operationInput) : (undefined as Prepared);
     const status = input.status ?? 200;
     const operation = async (_idempotencyKey: string | null) =>
       input.operation({ ...operationInput, prepared, threadId });
-    const beforeOperation = () =>
-      enforcePublicApiRateLimit(c.env.DB, publicApiRateLimitKey(caller));
+    const beforeOperation = () => enforcePublicApiRateLimit(c.env.DB, caller.tokenId);
 
     if (input.bodyHash) {
       return await runPublicApiIdempotentJson(c, {
         bodyHash: input.bodyHash(prepared),
         beforeOperation,
-        idempotencyRoute: input.idempotencyRoute,
-        idempotencySubjectId: publicApiIdempotencySubjectId(caller),
+        idempotencySubjectId: caller.tokenId,
         operation,
         status,
       });
@@ -497,18 +404,18 @@ export async function runPublicApiSessionMutation<T, Prepared = undefined>(
 
 export async function runPublicApiThreadReadJson<T>(
   c: PublicApiRouteContext,
-  input: PublicApiCallerOptions & {
+  input: {
     operation: (input: PublicApiThreadOperation & { threadId: PublicThreadId }) => Promise<T>;
     status?: number | undefined;
     threadId: RouteValue<PublicThreadId>;
   },
 ): Promise<Response> {
   try {
-    const caller = await requireRateLimitedCaller(c, input.resolveCaller ?? requirePublicApiCaller);
+    const caller = await requireRateLimitedAccessTokenCaller(c);
     const threadId = resolveRequiredRouteValue(input.threadId);
     const status = input.status ?? 200;
 
-    return Response.json(await input.operation({ caller, threadId }), { status });
+    return Response.json(await input.operation({ caller: caller.viewer, threadId }), { status });
   } catch (error) {
     return toErrorResponse(error);
   }
@@ -516,7 +423,7 @@ export async function runPublicApiThreadReadJson<T>(
 
 export async function runPublicApiThreadReadResponse(
   c: PublicApiRouteContext,
-  input: PublicApiCallerOptions & {
+  input: {
     operation: (
       input: PublicApiThreadOperation & { threadId: PublicThreadId },
     ) => Promise<Response>;
@@ -524,10 +431,10 @@ export async function runPublicApiThreadReadResponse(
   },
 ): Promise<Response> {
   try {
-    const caller = await requireRateLimitedCaller(c, input.resolveCaller ?? requirePublicApiCaller);
+    const caller = await requireRateLimitedAccessTokenCaller(c);
     const threadId = resolveRequiredRouteValue(input.threadId);
 
-    return await input.operation({ caller, threadId });
+    return await input.operation({ caller: caller.viewer, threadId });
   } catch (error) {
     return toErrorResponse(error);
   }
@@ -535,20 +442,19 @@ export async function runPublicApiThreadReadResponse(
 
 export async function runPublicApiThreadMutation<T, Prepared = undefined>(
   c: PublicApiRouteContext,
-  input: PublicApiCallerOptions & {
-    /** The target Agent; a resolver may derive it from the admitted caller (bound capability). */
-    agentId: AgentId | ((caller: PublicApiCaller) => AgentId);
+  input: {
+    agentId: RouteValue<AgentId>;
     bodyHash?: (prepared: Prepared) => string | null;
     operation: (
-      input: PublicApiThreadOperation & {
+      input: PublicApiTokenOperation & {
         agentId: AgentId;
         idempotencyKey: string | null;
         prepared: Prepared;
       },
     ) => Promise<T>;
-    prepare?: (input: PublicApiThreadOperation) => Promise<Prepared>;
+    prepare?: (input: PublicApiTokenOperation) => Promise<Prepared>;
     recover?: (
-      input: PublicApiThreadOperation & {
+      input: PublicApiTokenOperation & {
         agentId: AgentId;
         idempotencyKey: string;
         prepared: Prepared;
@@ -558,9 +464,9 @@ export async function runPublicApiThreadMutation<T, Prepared = undefined>(
   },
 ): Promise<Response> {
   try {
-    const caller = await (input.resolveCaller ?? requirePublicApiCaller)(c);
-    const agentId = typeof input.agentId === "function" ? input.agentId(caller) : input.agentId;
-    const operationInput: PublicApiThreadOperation = { caller };
+    const caller = await requireAccessTokenCaller(c);
+    const agentId = resolveRequiredRouteValue(input.agentId);
+    const operationInput: PublicApiTokenOperation = { caller };
     const prepared = input.prepare ? await input.prepare(operationInput) : (undefined as Prepared);
     const status = input.status ?? 200;
     const operation = async (idempotencyKey: string | null) =>
@@ -569,15 +475,13 @@ export async function runPublicApiThreadMutation<T, Prepared = undefined>(
       ? async (idempotencyKey: string) =>
           input.recover?.({ ...operationInput, agentId, idempotencyKey, prepared }) ?? null
       : undefined;
-    const beforeOperation = () =>
-      enforcePublicApiRateLimit(c.env.DB, publicApiRateLimitKey(caller));
+    const beforeOperation = () => enforcePublicApiRateLimit(c.env.DB, caller.tokenId);
 
     if (input.bodyHash) {
       return await runPublicApiIdempotentJson(c, {
         bodyHash: input.bodyHash(prepared),
         beforeOperation,
-        idempotencyRoute: input.idempotencyRoute,
-        idempotencySubjectId: publicApiIdempotencySubjectId(caller),
+        idempotencySubjectId: caller.tokenId,
         operation,
         persistOperationErrors: true,
         recover,

@@ -28,6 +28,6 @@ The version list and live-version label are available today. The list is display
 cannot open a complete historical configuration, compare two versions, see who published one, or
 restore an earlier version from this surface.
 
-Agent version history covers published Agent configuration. It is not the App's deployment
-history, a session log, or a backup of runtime files, Agent state, or App data. Those records and
-assets are not changed by viewing version history.
+Agent version history covers published Agent configuration. It is not a session log or a backup
+of runtime files, Agent state, or App data. Those records and assets are not changed by viewing
+version history.

@@ -292,6 +292,7 @@ function failFirstPublicApiIdempotencyCompletion(database: D1Database): D1Databa
 async function insertPublicThread(
   database: PublicHttpTestDatabase,
   input: {
+    createdBy?: Record<string, unknown>;
     id: string;
     title: string;
     updatedAt: number;
@@ -314,7 +315,7 @@ async function insertPublicThread(
       lastRunId: null,
       metadataJson: JSON.stringify({
         public_api: {
-          created_by: {
+          created_by: input.createdBy ?? {
             token_id: PUBLIC_API_TEST_IDS.patOwner,
             token_label: PUBLIC_API_TEST_IDS.patOwner,
           },
@@ -818,6 +819,44 @@ describe("Public Thread API e2e", () => {
         message: "Caller is not the App owner for this Agent.",
       });
     });
+  });
+
+  test("keeps owner-visible Thread history readable with an opaque retired creator", async () => {
+    const database = await createPublicHttpContractDatabase();
+    const app = createPublicThreadApiTestApp();
+    const threadId = generatedPublicThreadId(0);
+
+    await insertPublicThread(database, {
+      createdBy: {
+        historical_caller_id: "01J0000000000000000000000H",
+        historical_caller_kind: "retired",
+      },
+      id: threadId,
+      title: "Historical Thread",
+      updatedAt: 1,
+    });
+
+    const retrieveResponse = await requestPublicApi(
+      app,
+      database,
+      new Request(`https://api.example.com/api/v1/threads/${threadId}`, {
+        headers: { Authorization: bearer(TOKENS.owner) },
+      }),
+    );
+    expect(retrieveResponse.status).toBe(200);
+    expect(expectRecord((await readJson(retrieveResponse))["thread"])["id"]).toBe(threadId);
+
+    const listResponse = await requestPublicApi(
+      app,
+      database,
+      new Request(`https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`, {
+        headers: { Authorization: bearer(TOKENS.owner) },
+      }),
+    );
+    expect(listResponse.status).toBe(200);
+    expect(expectArray(expectRecord(await readJson(listResponse))["threads"])).toEqual([
+      expect.objectContaining({ id: threadId }),
+    ]);
   });
 
   test("exposes failed run status without internal error details", async () => {

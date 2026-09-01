@@ -4,7 +4,7 @@
 
 mosoo provides an App-scoped control plane for configuring, publishing, running, and observing coding Agents through the console and Public Thread API.
 
-The product boundary is managed Agent execution. Builders keep ownership of their application and end-user authentication; a trusted backend supplies an opaque `userId`, and mosoo carries that immutable `(App, userId)` context across the public Thread, Runs, files, and delegated MCP calls. mosoo owns runtime adaptation, Sandbox lifecycle, durable Thread and Run records, managed files, credentials, events, and usage visibility. App Deployment is a separate Alpha surface and does not define the runtime or API contract. In the current construction phase, assume one human owns one Organization: Organization is the account / billing / tenant shell, and App is the code, data, product, and console boundary. App owns concrete resources directly; it does not introduce a generic Service entity, `services` table, or polymorphic `service.kind`. Additional operational controls are extension paths for the same architecture, not default complexity for the current community edition.
+The product boundary is managed Agent execution. Builders keep ownership of their application and end-user authentication; a trusted backend supplies an opaque `userId`, and mosoo carries that immutable `(App, userId)` context across the public Thread, Runs, files, and delegated MCP calls. mosoo owns runtime adaptation, Sandbox lifecycle, durable Thread and Run records, managed files, credentials, events, and usage visibility. In the current construction phase, assume one human owns one Organization: Organization is the account / billing / tenant shell, and App is the code, data, product, and console boundary. App owns concrete resources directly; it does not introduce a generic Service entity, `services` table, or polymorphic `service.kind`. Additional operational controls are extension paths for the same architecture, not default complexity for the current community edition.
 
 To support lightweight deployment, fast iteration, and future governance expansion, the architecture embraces Serverless and edge computing and follows these baseline principles:
 
@@ -22,14 +22,13 @@ The architecture is built on the Cloudflare platform and uses a Serverless shape
 - **Frontend and ingress: Cloudflare Workers**. The Web Worker serves Vite-built console assets. The API Worker handles stateless GraphQL / Web API requests and WebSocket handshakes, then hands upgraded session connections to the corresponding Session Durable Object. `mosoo.ai` is the marketing / landing / blog origin owned by `langgenius/mosoo-website`. Authenticated console traffic uses `cloud.mosoo.ai`, with Cloudflare routing `cloud.mosoo.ai/api/*` to the API Worker and console paths to the Web Worker. During the domain migration, console requests on `try.mosoo.ai` redirect permanently to the new host while `try.mosoo.ai/api/*` remains a direct API route for existing CLI requests.
 - **State and connection management: Cloudflare Durable Objects**. Durable Objects hold upgraded WebSocket connections, high-frequency Session state, and distributed coordination points that need single-instance concurrency.
 - **Primary database: Cloudflare D1**. D1 stores Account records, Organization shell records, App records, core entity configuration, and metadata.
-- **Message queues: Cloudflare Queues**. Queues decouple the control plane from offline tasks. They provide ACK semantics, dead-letter queues, and at-least-once delivery for API commands, including deployment and scheduled maintenance. Cost usage is written from normalized runtime events, not ingested through a queue.
+- **Message queues: Cloudflare Queues**. Queues decouple the control plane from offline tasks. They provide ACK semantics, dead-letter queues, and at-least-once delivery for API commands such as scheduled maintenance. Cost usage is written from normalized runtime events, not ingested through a queue.
 - **Object storage: Cloudflare R2**. R2 stores session-level file objects,
   internal configuration/package uploads, any records using the reserved
   library scope, and sandbox state backups. Runtime-produced files are recorded
   as session artifacts. Sandbox private state backups use a separate backup
   bucket and must not be mixed with user-visible file prefixes.
 - **Execution sandbox: Cloudflare Sandbox / Containers**. Heterogeneous Agents run in container-image-backed isolated environments, with Sandbox APIs and Durable Object boundaries controlling runtime lifecycle.
-- **Secondary App deployment: mosoo-managed Cloudflare Pages / Workers**. App Deployment clones and builds a public GitHub repository in an isolated Sandbox, then publishes the resulting Web artifact with mosoo platform credentials. D1 stores the App-owned Deployment and DeploymentRun records, while the successful artifact receives a mosoo-owned URL. This is an independent Alpha capability, not App runtime or part of the core Agent API promise.
 - **Configuration editing**. Owner-side Agent configuration is currently edited through Preview, which combines the writable configuration form with in-context test chat. There is no dedicated `AgentBuilderSystemAgent` topology in the current codebase. Future configuration assistance must remain a control-plane feature and must not enter the full Sandbox / Driver runtime path.
 
 ---
@@ -57,7 +56,6 @@ graph TD
         File[File Service<br/>File records & Session artifacts]
         Env[Environment Service<br/>Runtime Templates & Revisions]
         Cost[Cost / Billing Service]
-        Deployment[App Deployment<br/>Build / Publish]
 
         subgraph Agent_Plane [Agent Plane]
             Profile[Profile Management]
@@ -65,12 +63,12 @@ graph TD
             Runtime[Runtime Scheduler]
         end
 
-        Ingress --> |GraphQL Resolver / In-Process Calls| Identity & Auth & App & Vault & File & Env & Agent_Plane & Cost & Deployment
+        Ingress --> |GraphQL Resolver / In-Process Calls| Identity & Auth & App & Vault & File & Env & Agent_Plane & Cost
         Ingress --> |Client WS Upgrade Handoff| Session
         Ingress --> |Driver WS Upgrade Handoff| DriverConnection
         Runtime <--> |Commands / Readiness / Lifecycle| DriverConnection
         DriverConnection --> |Persist / Publish Driver Events| Session
-        App --> |Owns App-local resources| Agent_Plane & Vault & File & Env & Cost & Deployment
+        App --> |Owns App-local resources| Agent_Plane & Vault & File & Env & Cost
         File & Agent_Plane --> |Push Events / Session RPC| Session
         Env --> |Resolve frozen EnvironmentRevision| Runtime
         Agent_Plane --> |Usage / Runtime Metrics| Cost
@@ -91,7 +89,6 @@ graph TD
 
     FileBucket[(R2 FILE_BUCKET<br/>Session & internal file objects)]
     SandboxStateBucket[(R2 SANDBOX_STATE_BUCKET<br/>Sandbox State Objects)]
-    DeployedApp[Cloudflare Pages / Workers<br/>mosoo-owned App URL]
 
     Client <==> |HTTPS: App Shell / Assets| WebWorker
     Client <==> |HTTPS: Same-Origin /api/*| Ingress
@@ -100,8 +97,6 @@ graph TD
     AgentDriver --> |Outbound ORPC WebSocket<br/>/api/driver/socket| Ingress
     Runtime --> |Checkpoint / Restore selected Pet paths| SandboxStateBucket
     File --> |Session Snapshots / File Objects| FileBucket
-    Deployment --> |Build public repository| CF_Sandbox
-    Deployment --> |Publish with mosoo credentials| DeployedApp
 
     classDef web fill:#e3f2fd,stroke:#1565c0,stroke-width:2px;
     classDef api fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px;
@@ -135,11 +130,10 @@ Except for runtime boundaries such as Session Durable Objects and Sandbox instan
    - WebSocket requests always enter the Worker first. Client session upgrades are handed to the corresponding Session Durable Object. An Agent Driver dials `/api/driver/socket` with its Driver instance id, one-time boot token, and trace context; the Worker validates and hands that upgrade to the `DriverConnection` binding backed by the matching `DriverInstance` Durable Object.
 
 2. **App Domain**
-   App Domain owns the business, resource, operations, and deployment boundary for the current pivot. App is the canonical product and engineering noun. An App belongs to an Organization and is owned by the Organization owner during the single-owner phase. App has no runtime; Agents own Agent runtime, API endpoint exposure, and Threads / Sessions. App Deployment owns an external Web artifact rather than an App runtime.
+   App Domain owns the business, resource, and operations boundary for the current pivot. App is the canonical product and engineering noun. An App belongs to an Organization and is owned by the Organization owner during the single-owner phase. App has no runtime; Agents own Agent runtime, API endpoint exposure, and Threads / Sessions.
    - **Default App provisioning**: Onboarding / Organization provisioning creates a default App. If the Organization has exactly one App, the console routes directly into that App instead of forcing an App picker.
-   - **Agent and resource ownership**: Agents, Threads / Sessions, Environments, Skills, MCP servers, Provider credentials, file records, Agent exposure state, App Deployments and DeploymentRuns, Agent runtime logs/state, and app-scoped cost are App-owned resources. The current UI keeps Agent logs/runtime operations on Agent detail and App Usage under App Settings; it does not expose a generic App health/log console.
+   - **Agent and resource ownership**: Agents, Threads / Sessions, Environments, Skills, MCP servers, Provider credentials, file records, Agent exposure state, Agent runtime logs/state, and app-scoped cost are App-owned resources. The current UI keeps Agent logs/runtime operations on Agent detail and App Usage under App Settings; it does not expose a generic App health/log console.
    - **No generic Service entity**: Do not add a unified `services` table, polymorphic `service.kind`, or generic Service CRUD for concrete App resources. If a future Web/API runtime, database service, worker process, or scheduled job is needed, model it with an explicit noun and lifecycle.
-   - **App Deployment**: One active Deployment per App records the public GitHub source and its DeploymentRuns. Build and publish work is asynchronous. Successful runs expose a mosoo-owned Cloudflare Pages or Workers URL under the configured App deployment domain. Users do not bring their own Cloudflare account in the current flow. A deployed Worker reaches its declared Agents only through injected bound capability URLs — signed, deployment-scoped identities that carry the Public Thread and file workflow and are revoked with the Deployment or binding — never through an owner Access Token or any owner-managed secret.
    - **Access boundary**: App access maps to the single Organization owner for this phase. No secondary principal model is part of the first cut.
 
 3. **Agent Plane**

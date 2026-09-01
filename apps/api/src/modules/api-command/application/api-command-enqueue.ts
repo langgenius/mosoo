@@ -1,31 +1,11 @@
-import type { AppDeploymentRunId } from "@mosoo/id";
-
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { admitApiCommand, enqueueApiCommand } from "./api-command-ledger";
 import type { ApiCommandAdmission, EnqueueApiCommandInput } from "./api-command-ledger";
 import type {
-  AppDeploymentRunDispatchCommandPayload,
   CostLedgerReconciliationCommandPayload,
   ScheduledMaintenanceCommandPayload,
   SessionRunDispatchCommandPayload,
 } from "./api-command-payload";
-
-export const APP_DEPLOYMENT_RUN_DISPATCH_DEDUPE_PREFIX = "app_deployment_run_dispatch:" as const;
-
-export function createAppDeploymentRunDispatchDedupeKey(runId: AppDeploymentRunId): string {
-  return `${APP_DEPLOYMENT_RUN_DISPATCH_DEDUPE_PREFIX}${runId}`;
-}
-
-export async function enqueueAppDeploymentRunDispatchCommand(
-  bindings: Pick<ApiBindings, "API_COMMAND_QUEUE" | "DB">,
-  payload: AppDeploymentRunDispatchCommandPayload,
-): Promise<void> {
-  await enqueueApiCommand(bindings, {
-    dedupeKey: createAppDeploymentRunDispatchDedupeKey(payload.appDeploymentRunId),
-    kind: "app_deployment_run_dispatch",
-    payload,
-  });
-}
 
 export async function enqueueCostLedgerReconciliationCommand(
   bindings: Pick<ApiBindings, "API_COMMAND_QUEUE" | "DB">,

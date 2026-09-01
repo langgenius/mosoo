@@ -3,8 +3,6 @@ export type {
   AgentDeploymentVersionId,
   AgentId,
   AgentMcpBindingId,
-  AppDeploymentId,
-  AppDeploymentRunId,
   CliOAuthFlowId,
   CredentialId,
   DriverCommandId,

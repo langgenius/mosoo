@@ -6,7 +6,7 @@ Status: shipped resource and ownership boundary. [mosoo Spec](../SPEC.md) define
 
 Builders previously had to understand mosoo through separate Agents and scattered resources. The App boundary gives them one place to see and operate the product they are building.
 
-Runs, Agents, files, configuration, usage, and deployment stay attached to that App, so switching Apps does not blur ownership or context.
+Runs, Agents, files, configuration, and usage stay attached to that App, so switching Apps does not blur ownership or context.
 
 ## Users
 
@@ -18,18 +18,14 @@ After first sign-in, mosoo creates a default App and opens it.
 
 The Builder can create or switch Apps from the Apps page. Inside an App, they can review activity, manage Agents and files, configure supporting resources, and view App settings and usage.
 
-From Overview, the Builder can deploy a public GitHub repository, follow deployment status and history, open the live site, retry or redeploy, and delete the deployment.
-
 Agent conversations remain managed through individual Agents inside the App.
 
 ## Current Availability
 
-The App-centered console and managed Agent resources are implemented in the current Alpha. App Deployment is also implemented as a separate public-repository publishing surface, but the repository does not prove a successful production deployment or recovery exercise.
-
-The current deployment publishes a website while Agent operations remain a separate part of the App experience. It is not part of the core runtime and Agent API contract.
+The App-centered console and managed Agent resources are implemented in the current Alpha.
 
 ## User-Visible Boundary
 
-An App is the Builder's product container in mosoo. Its resources, activity, settings, usage, and deployed site are kept separate from other Apps.
+An App is the Builder's product container in mosoo. Its resources, activity, settings, and usage are kept separate from other Apps.
 
 The baseline is single-owner and does not offer organization-wide catalogs or collaboration. Use the Spec for new runtime and integration promises.

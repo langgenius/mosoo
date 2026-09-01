@@ -1,22 +1,15 @@
 import { PUBLIC_API_VERSION_PREFIX } from "@mosoo/contracts/public-api";
-import type { AgentId, PublicThreadId } from "@mosoo/id";
+import type { PublicThreadId } from "@mosoo/id";
 import { Hono } from "hono";
 import type { Context } from "hono";
 
-import type { PublicApiCaller } from "../../../modules/auth/application/public-api-caller.service";
-import { parseBoundAgentCallBody } from "../../../modules/public-api/app-agent-bound-call";
-import { renderBoundAgentCallError } from "../../../modules/public-api/app-agent-bound-errors";
+import type { AuthenticatedViewer } from "../../../modules/auth/application/viewer-auth.service";
 import { publicInvalidRequest } from "../../../modules/public-api/public-api-errors";
-import {
-  hashPublicApiIdempotencyBody,
-  readPublicApiIdempotencyKey,
-} from "../../../modules/public-api/public-api-idempotency.service";
+import { hashPublicApiIdempotencyBody } from "../../../modules/public-api/public-api-idempotency.service";
 import { listAgentApiEndpointThreads } from "../../../modules/public-api/public-thread-session-query.service";
 import type { ApiGatewayEnvironment } from "../../../platform/cloudflare/worker-types";
 import { createPublicApiOpenApiDocument } from "./public-api-openapi";
 import {
-  deploymentCapabilityIdempotencyRoute,
-  requireDeploymentCapabilityCaller,
   runPublicApiAuthenticatedJson,
   runPublicApiAuthenticatedResponse,
   runPublicApiSessionMutation,
@@ -24,7 +17,6 @@ import {
   runPublicApiThreadReadJson,
   runPublicApiThreadReadResponse,
 } from "./public-api-route-support";
-import type { PublicApiCallerOptions } from "./public-api-route-support";
 import {
   parseFileContentDisposition,
   parseOptionalBoolean,
@@ -32,7 +24,6 @@ import {
   parseFileIdParam,
   parseThreadIdParam,
   parseThreadEventsLimit,
-  readBoundAgentCallRequestBody,
   readCreateThreadRequest,
   readSendEventsRequest,
 } from "./public-thread-api-request";
@@ -43,54 +34,6 @@ interface PublicAgentFileUploadRequest {
   file: File;
 }
 type PublicThreadFileService = Awaited<ReturnType<typeof loadPublicThreadFileService>>;
-
-/**
- * The injected capability URL path within `/api/v1`; the full public prefix is
- * `APP_AGENT_BOUND_PATH_PREFIX` in `app-agent-capability.ts`.
- */
-const BOUND_CAPABILITY_ROUTE_BASE = "/bound/:token";
-
-/**
- * One Public Thread surface, two ways to address it. Access Token routes take
- * the Agent from the path and the caller from the bearer header; bound
- * capability routes mount the same operations under the injected capability
- * URL, take the Agent from the verified claims, and resolve the deployment-
- * scoped caller from the token in the path.
- */
-interface PublicThreadRouteScope {
-  /** Path prefix for Agent-addressed operations (create thread, upload file, list threads). */
-  agentBase: string;
-  /** Resolves the target Agent after the caller is admitted (path param or capability claim). */
-  agentId: (c: PublicApiRouteContext) => (caller: PublicApiCaller) => AgentId;
-  /** Path prefix for Thread- and file-addressed operations. */
-  base: string;
-  options: (c: PublicApiRouteContext) => PublicApiCallerOptions;
-}
-
-function deploymentCapabilityAgentId(caller: PublicApiCaller): AgentId {
-  if (caller.kind !== "deployment_capability") {
-    throw new Error("Bound capability routes require a deployment capability caller.");
-  }
-
-  return caller.capability.agentId;
-}
-
-const ACCESS_TOKEN_SCOPE: PublicThreadRouteScope = {
-  agentBase: "/agents/:agentId",
-  agentId: (c) => () => parseAgentIdParam(c.req.param("agentId") ?? ""),
-  base: "",
-  options: () => ({}),
-};
-
-const BOUND_CAPABILITY_SCOPE: PublicThreadRouteScope = {
-  agentBase: BOUND_CAPABILITY_ROUTE_BASE,
-  agentId: () => deploymentCapabilityAgentId,
-  base: BOUND_CAPABILITY_ROUTE_BASE,
-  options: (c) => ({
-    idempotencyRoute: deploymentCapabilityIdempotencyRoute(c),
-    resolveCaller: requireDeploymentCapabilityCaller,
-  }),
-};
 
 async function loadPublicThreadCommandService() {
   return import("../../../modules/public-api/public-thread-api-command.service");
@@ -104,15 +47,10 @@ async function loadPublicThreadFileService() {
   return import("../../../modules/public-api/public-thread-file-api.service");
 }
 
-async function loadBoundAgentAskService() {
-  return import("../../../modules/public-api/app-agent-bound-ask.service");
-}
-
 async function runPublicThreadFileRoute<T>(
   c: PublicApiRouteContext,
-  scope: PublicThreadRouteScope,
   operation: (input: {
-    caller: PublicApiCaller;
+    caller: AuthenticatedViewer;
     service: PublicThreadFileService;
     threadId: PublicThreadId;
   }) => Promise<T>,
@@ -127,7 +65,6 @@ async function runPublicThreadFileRoute<T>(
         threadId: parseThreadIdParam(c.req.param("threadId") ?? ""),
       }),
     status,
-    scope.options(c),
   );
 }
 
@@ -154,19 +91,10 @@ async function readPublicAgentFileUploadRequest(
   return { file };
 }
 
-/**
- * Thread lifecycle, observation, and file routes shared by both scopes. The
- * destructive owner operations (archive, unarchive, delete) stay Access Token
- * only — see `registerAccessTokenOnlyRoutes`.
- */
-function registerPublicThreadRoutes(
-  v1: Hono<ApiGatewayEnvironment>,
-  scope: PublicThreadRouteScope,
-): void {
-  v1.post(`${scope.agentBase}/threads`, async (c) => {
+function registerPublicThreadRoutes(v1: Hono<ApiGatewayEnvironment>): void {
+  v1.post("/agents/:agentId/threads", async (c) => {
     return runPublicApiThreadMutation(c, {
-      ...scope.options(c),
-      agentId: scope.agentId(c),
+      agentId: () => parseAgentIdParam(c.req.param("agentId") ?? ""),
       bodyHash: (prepared) => prepared.bodyHash,
       operation: async ({ agentId, caller, idempotencyKey, prepared }) => {
         const { createPublicThread } = await loadPublicThreadService();
@@ -203,38 +131,32 @@ function registerPublicThreadRoutes(
     });
   });
 
-  v1.post(`${scope.agentBase}/files`, async (c) =>
-    runPublicApiThreadMutation(c, {
-      ...scope.options(c),
-      agentId: scope.agentId(c),
-      operation: async ({ agentId, caller, prepared }) => {
+  v1.post("/agents/:agentId/files", async (c) =>
+    runPublicApiAuthenticatedJson(
+      c,
+      async (caller) => {
         const service = await loadPublicThreadFileService();
+        const prepared = await readPublicAgentFileUploadRequest(c);
         return service.createPublicAgentFile(c.env, caller, {
-          agentId,
+          agentId: parseAgentIdParam(c.req.param("agentId") ?? ""),
           file: prepared.file,
         });
       },
-      prepare: async () => readPublicAgentFileUploadRequest(c),
-      status: 201,
-    }),
-  );
-
-  v1.get(`${scope.agentBase}/threads`, async (c) =>
-    runPublicApiAuthenticatedJson(
-      c,
-      async (caller) =>
-        listAgentApiEndpointThreads(c.env.DB, caller, {
-          agentId: scope.agentId(c)(caller),
-          archived: parseOptionalBoolean(c.req.query("archived")),
-        }),
-      200,
-      scope.options(c),
+      201,
     ),
   );
 
-  v1.get(`${scope.base}/threads/:threadId`, async (c) =>
+  v1.get("/agents/:agentId/threads", async (c) =>
+    runPublicApiAuthenticatedJson(c, async (caller) =>
+      listAgentApiEndpointThreads(c.env.DB, caller, {
+        agentId: parseAgentIdParam(c.req.param("agentId") ?? ""),
+        archived: parseOptionalBoolean(c.req.query("archived")),
+      }),
+    ),
+  );
+
+  v1.get("/threads/:threadId", async (c) =>
     runPublicApiThreadReadJson(c, {
-      ...scope.options(c),
       operation: async ({ caller, threadId }) => {
         const { retrievePublicThread } = await loadPublicThreadService();
         return retrievePublicThread({
@@ -247,9 +169,8 @@ function registerPublicThreadRoutes(
     }),
   );
 
-  v1.get(`${scope.base}/threads/:threadId/events`, async (c) =>
+  v1.get("/threads/:threadId/events", async (c) =>
     runPublicApiThreadReadJson(c, {
-      ...scope.options(c),
       operation: async ({ caller, threadId }) => {
         const { listPublicThreadEvents } = await loadPublicThreadService();
         return listPublicThreadEvents({
@@ -263,9 +184,8 @@ function registerPublicThreadRoutes(
     }),
   );
 
-  v1.get(`${scope.base}/threads/:threadId/events/stream`, async (c) =>
+  v1.get("/threads/:threadId/events/stream", async (c) =>
     runPublicApiThreadReadResponse(c, {
-      ...scope.options(c),
       operation: async ({ caller, threadId }) => {
         const { createPublicThreadEventStream } = await loadPublicThreadService();
         const stream = await createPublicThreadEventStream({
@@ -289,9 +209,8 @@ function registerPublicThreadRoutes(
     }),
   );
 
-  v1.post(`${scope.base}/threads/:threadId/events`, async (c) => {
+  v1.post("/threads/:threadId/events", async (c) => {
     return runPublicApiSessionMutation(c, {
-      ...scope.options(c),
       bodyHash: (prepared) => prepared.bodyHash,
       operation: async ({ caller, prepared, threadId }) => {
         const { sendPublicThreadSessionEvents } = await loadPublicThreadCommandService();
@@ -315,40 +234,29 @@ function registerPublicThreadRoutes(
     });
   });
 
-  v1.get(`${scope.base}/threads/:threadId/files`, async (c) =>
-    runPublicThreadFileRoute(c, scope, async ({ caller, service, threadId }) =>
+  v1.get("/threads/:threadId/files", async (c) =>
+    runPublicThreadFileRoute(c, async ({ caller, service, threadId }) =>
       service.listPublicThreadFiles(c.env, caller, threadId),
     ),
   );
 
-  v1.get(`${scope.base}/files/:fileId/content`, async (c) =>
-    runPublicApiAuthenticatedResponse(
-      c,
-      async (caller) => {
-        const service = await loadPublicThreadFileService();
-        return service.downloadPublicThreadFileContent(c.env, caller, {
-          disposition: parseFileContentDisposition(c.req.query("disposition")),
-          fileId: parseFileIdParam(c.req.param("fileId")),
-        });
-      },
-      scope.options(c),
-    ),
+  v1.get("/files/:fileId/content", async (c) =>
+    runPublicApiAuthenticatedResponse(c, async (caller) => {
+      const service = await loadPublicThreadFileService();
+      return service.downloadPublicThreadFileContent(c.env, caller, {
+        disposition: parseFileContentDisposition(c.req.query("disposition")),
+        fileId: parseFileIdParam(c.req.param("fileId")),
+      });
+    }),
   );
 
-  v1.get(`${scope.base}/files/:fileId`, async (c) =>
-    runPublicApiAuthenticatedJson(
-      c,
-      async (caller) => {
-        const service = await loadPublicThreadFileService();
-        return service.retrievePublicFile(c.env, caller, parseFileIdParam(c.req.param("fileId")));
-      },
-      200,
-      scope.options(c),
-    ),
+  v1.get("/files/:fileId", async (c) =>
+    runPublicApiAuthenticatedJson(c, async (caller) => {
+      const service = await loadPublicThreadFileService();
+      return service.retrievePublicFile(c.env, caller, parseFileIdParam(c.req.param("fileId")));
+    }),
   );
-}
 
-function registerAccessTokenOnlyRoutes(v1: Hono<ApiGatewayEnvironment>): void {
   v1.delete("/files/:fileId", async (c) =>
     runPublicApiAuthenticatedJson(c, async (caller) => {
       const service = await loadPublicThreadFileService();
@@ -403,7 +311,7 @@ function registerAccessTokenOnlyRoutes(v1: Hono<ApiGatewayEnvironment>): void {
   });
 
   v1.delete("/threads/:threadId/files/:fileId", async (c) =>
-    runPublicThreadFileRoute(c, ACCESS_TOKEN_SCOPE, async ({ caller, service, threadId }) => {
+    runPublicThreadFileRoute(c, async ({ caller, service, threadId }) => {
       await service.deletePublicThreadFile(c.env, caller, {
         fileId: parseFileIdParam(c.req.param("fileId")),
         threadId,
@@ -418,35 +326,7 @@ export function registerPublicApiRoute(app: Hono<ApiGatewayEnvironment>) {
 
   v1.get("/openapi.json", (c) => c.json(createPublicApiOpenApiDocument(new URL(c.req.url).origin)));
 
-  // The blocking bound-agent ask: POST the injected capability URL itself.
-  v1.post(BOUND_CAPABILITY_ROUTE_BASE, async (c) => {
-    try {
-      const body = await readBoundAgentCallRequestBody(c);
-      const { createBoundAgentThreadAndWait } = await loadBoundAgentAskService();
-      const result = await createBoundAgentThreadAndWait({
-        bindings: c.env,
-        executionContext: c.executionCtx,
-        idempotencyKey: readPublicApiIdempotencyKey(c.req.raw),
-        input: parseBoundAgentCallBody(body),
-        requestUrl: c.req.url,
-        token: c.req.param("token") ?? "",
-      });
-
-      return Response.json(result, { status: 200 });
-    } catch (error) {
-      const rendered = renderBoundAgentCallError(error);
-      return Response.json(rendered.body, { status: rendered.status });
-    }
-  });
-
-  // The Public Thread and file workflow, addressed by the same capability URL:
-  // upload attachments, create and continue Threads, observe Runs, and download
-  // artifacts — all scoped to the App, Agent binding, and Deployment that
-  // minted the capability, without any owner Access Token.
-  registerPublicThreadRoutes(v1, BOUND_CAPABILITY_SCOPE);
-
-  registerPublicThreadRoutes(v1, ACCESS_TOKEN_SCOPE);
-  registerAccessTokenOnlyRoutes(v1);
+  registerPublicThreadRoutes(v1);
 
   app.route(PUBLIC_API_VERSION_PREFIX, v1);
 }

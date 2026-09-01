@@ -1,7 +1,12 @@
+import { FileQuestion } from "lucide-react";
 import { lazy } from "react";
 import type { ComponentType, ReactElement, ReactNode } from "react";
-import { Navigate, useParams, useRoutes } from "react-router-dom";
+import { Link, Navigate, useParams, useRoutes } from "react-router-dom";
 import type { RouteObject } from "react-router-dom";
+
+import { useTranslation } from "@/shared/i18n";
+import { Button } from "@/shared/ui/button";
+import { EmptyState } from "@/shared/ui/empty-state";
 
 import { GuestRoute, OnboardingRoute, ProtectedRoute } from "./route-guards";
 
@@ -33,6 +38,22 @@ function NavigateToEnvironmentAlias(): ReactElement {
       replace
       to={environmentId === undefined ? "/environment" : `/environment/${environmentId}`}
     />
+  );
+}
+
+function NotFoundPage(): ReactElement {
+  const { t } = useTranslation();
+
+  return (
+    <EmptyState
+      icon={FileQuestion}
+      title={t("notFound.title")}
+      description={t("notFound.description")}
+    >
+      <Button asChild size="sm">
+        <Link to="/">{t("notFound.backToOverview")}</Link>
+      </Button>
+    </EmptyState>
   );
 }
 
@@ -95,10 +116,6 @@ const AppOverview = lazyNamed(
   "AppOverviewPage",
 );
 const AppsList = lazyNamed(async () => import("../routes/apps/apps-list.route"), "AppsListPage");
-const V0DeployPreview = lazyNamed(
-  async () => import("../routes/app-overview/deploy/v0-deploy-preview.route"),
-  "V0DeployPreviewPage",
-);
 const OrgSettings = lazyNamed(
   async () => import("../routes/org/org-settings.route"),
   "OrgSettingsPage",
@@ -143,8 +160,6 @@ const appRoutes = [
   { element: protectedRoute(<Navigate to="/integrations/mcp" replace />), path: "/mcp" },
   { element: protectedRoute(<SkillsTabRoute />), path: "/integrations/skills" },
   { element: protectedRoute(<McpTabRoute />), path: "/integrations/mcp" },
-  { element: protectedRoute(<Navigate to="/" replace />), path: "/deployments" },
-  { element: <V0DeployPreview />, path: "/v0-deploy-preview" },
   { element: protectedRoute(<AgentList />), path: "/agent" },
   { element: protectedRoute(<AgentDetail />), path: "/agent/:agentId" },
   { element: protectedRoute(<Threads />), path: "/threads" },
@@ -176,6 +191,7 @@ const appRoutes = [
   { element: protectedRoute(<Navigate to="/app-settings/usage" replace />), path: "/usage" },
   { element: protectedRoute(<Providers />), path: "/providers" },
   { element: protectedRoute(<Navigate to="/app-settings/usage" replace />), path: "/cost" },
+  { element: protectedRoute(<NotFoundPage />), path: "*" },
 ] satisfies RouteObject[];
 
 export function AppRoutes(): ReactNode {

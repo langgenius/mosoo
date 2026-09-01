@@ -29,16 +29,13 @@ describe("App overview boundary", () => {
 
   test("hands the App to a coding agent with the installer command on the console root", () => {
     const routeSource = readSource("../src/routes/app-overview/app-overview.route.tsx");
-    // The header/body composition lives in the shared DeploySurface, rendered
-    // verbatim by both "/" and the /v0-deploy-preview acceptance route.
-    const surfaceSource = readSource("../src/routes/app-overview/deploy/deploy-surface.tsx");
     const installSource = readSource("../src/routes/app-overview/app-overview-install.tsx");
     const promptSource = readSource("../src/routes/app-overview/onboarding-setup-prompt.ts");
     const appIdBadgeSource = readSource("../src/shared/ui/app-id-badge.tsx");
     const runtimeIconSource = readSource("../src/shared/ui/brand-icons/runtime-icon-data.ts");
 
     expect(routeSource).toContain("AppOverviewInstallGuide");
-    expect(surfaceSource).toContain("AppIdBadge");
+    expect(routeSource).toContain("AppIdBadge");
     expect(installSource).toContain('t("onboarding.title")');
     expect(installSource).toContain("coding");
     expect(installSource).toContain("bg-[rgb(111_211_4)]");
@@ -58,7 +55,6 @@ describe("App overview boundary", () => {
     expect(installSource).not.toContain("createPersonalAccessToken");
     expect(installSource).not.toContain("MASKED_TOKEN");
     expect(installSource).not.toContain("Signs the CLI in");
-    expect(installSource).not.toContain("Ready to deploy");
     expect(installSource).not.toContain("No global config");
     expect(installSource).not.toContain("Using another agent");
     expect(installSource).not.toContain("Copy or download");
@@ -135,12 +131,12 @@ describe("App overview boundary", () => {
   });
 
   test("keeps the install guide responsive and accessible", () => {
-    const surfaceSource = readSource("../src/routes/app-overview/deploy/deploy-surface.tsx");
+    const routeSource = readSource("../src/routes/app-overview/app-overview.route.tsx");
     const installSource = readSource("../src/routes/app-overview/app-overview-install.tsx");
     const stepsSource = readSource("../src/routes/app-overview/onboarding-steps.tsx");
 
-    expect(surfaceSource).toContain("max-w-4xl");
-    expect(surfaceSource).toContain("lg:flex-row");
+    expect(routeSource).toContain("max-w-4xl");
+    expect(routeSource).toContain("lg:flex-row");
     expect(installSource).toContain("max-w-3xl");
     expect(installSource).toContain("sm:flex-row");
     expect(stepsSource).toContain("text-sm leading-6");
