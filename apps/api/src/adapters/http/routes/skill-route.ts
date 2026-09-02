@@ -57,8 +57,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-export function registerSkillRoute(project: Hono<ApiGatewayEnvironment>) {
-  project.post("/skill/inspect", async (c) => {
+export function registerSkillRoute(app: Hono<ApiGatewayEnvironment>) {
+  app.post("/skill/inspect", async (c) => {
     try {
       const viewer = await getAuthenticatedViewerFromRequest(c.env, c.req.raw);
       if (!viewer) {
@@ -86,7 +86,7 @@ export function registerSkillRoute(project: Hono<ApiGatewayEnvironment>) {
     }
   });
 
-  project.get("/skill/skills-sh/catalog", async (c) => {
+  app.get("/skill/skills-sh/catalog", async (c) => {
     try {
       const viewer = await getAuthenticatedViewerFromRequest(c.env, c.req.raw);
       if (!viewer) {
@@ -113,7 +113,7 @@ export function registerSkillRoute(project: Hono<ApiGatewayEnvironment>) {
     }
   });
 
-  project.post("/skill/skills-sh/install", async (c) => {
+  app.post("/skill/skills-sh/install", async (c) => {
     try {
       const viewer = await getAuthenticatedViewerFromRequest(c.env, c.req.raw);
       if (!viewer) {
@@ -166,7 +166,7 @@ export function registerSkillRoute(project: Hono<ApiGatewayEnvironment>) {
     }
   });
 
-  project.post("/skill/package", async (c) => {
+  app.post("/skill/package", async (c) => {
     try {
       const viewer = await getAuthenticatedViewerFromRequest(c.env, c.req.raw);
       if (!viewer) {
@@ -230,7 +230,7 @@ export function registerSkillRoute(project: Hono<ApiGatewayEnvironment>) {
     }
   });
 
-  project.get("/skill/:skillId/source", async (c) => {
+  app.get("/skill/:skillId/source", async (c) => {
     try {
       const viewer = await getAuthenticatedViewerFromRequest(c.env, c.req.raw);
       if (!viewer) {
@@ -255,7 +255,7 @@ export function registerSkillRoute(project: Hono<ApiGatewayEnvironment>) {
     }
   });
 
-  project.get("/skill/:skillId/package", async (c) => {
+  app.get("/skill/:skillId/package", async (c) => {
     try {
       const viewer = await getAuthenticatedViewerFromRequest(c.env, c.req.raw);
       if (!viewer) {

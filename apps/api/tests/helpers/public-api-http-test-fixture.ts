@@ -294,7 +294,7 @@ export async function createPublicHttpContractDatabase(): Promise<SqliteD1Databa
 
   database.execute(CONTRACT_SCHEMA_SQL);
 
-  const db = database.project();
+  const db = database.app();
   await db
     .insert(accountsTable)
     .values(
@@ -514,7 +514,7 @@ async function insertPat(input: {
 }): Promise<void> {
   const nowMs = nowMsForTest();
   await input.database
-    .project()
+    .app()
     .insert(personalAccessTokensTable)
     .values({
       accountId: input.accountId,
@@ -541,7 +541,7 @@ async function insertSession(
   },
 ): Promise<void> {
   await database
-    .project()
+    .app()
     .insert(sessionsTable)
     .values({
       agentId: PUBLIC_API_TEST_IDS.agent,
@@ -568,7 +568,7 @@ async function insertSession(
     .run();
 
   await database
-    .project()
+    .app()
     .insert(sessionExecutionSnapshotsTable)
     .values({
       createdAt: nowMsForTest(),

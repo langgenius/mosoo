@@ -29,7 +29,7 @@ had not been activated. A user report first confirmed impact at 17:46 UTC.
 - 17:46 — A user report confirmed OpenAI Runtime Runs were failing.
 - 19:02 — HTTPS interception was limited to restricted-network sandboxes;
   runtime startup recovered.
-- 19:37 — Codex project-server was configured to send OpenAI traffic through the
+- 19:37 — Codex app-server was configured to send OpenAI traffic through the
   mosoo LLM proxy.
 - 20:06 — Safe upstream failure logging reached production.
 - 20:08 — Production logs identified a Cloudflare-incompatible Fetch redirect
@@ -48,7 +48,7 @@ The incident combined four gaps along one production-only path:
 1. HTTPS interception was enabled for full-network sandboxes even though those
    sandboxes did not receive an interception certificate, so the container
    refused to start.
-2. Codex project-server requires `openai_base_url` configuration and does not use
+2. Codex app-server requires `openai_base_url` configuration and does not use
    the provisioned environment variable, so the mosoo proxy grant was sent to
    OpenAI as if it were an OpenAI key.
 3. The proxy used `redirect: "error"`. Bun accepted that mode, but Cloudflare
@@ -59,7 +59,7 @@ The incident combined four gaps along one production-only path:
 
 Unit and repository checks covered each component in isolation, but no active
 production canary exercised the complete OpenAI path through container startup,
-Codex project-server configuration, the Worker proxy, and sandbox recycling.
+Codex app-server configuration, the Worker proxy, and sandbox recycling.
 
 ## Detection And Response
 
@@ -74,7 +74,7 @@ on manual evidence.
 
 - [x] Runtime team — enable HTTPS interception only for limited-network
       sandboxes — 2026-07-29
-- [x] Runtime team — configure Codex project-server with the mosoo OpenAI proxy —
+- [x] Runtime team — configure Codex app-server with the mosoo OpenAI proxy —
       2026-07-29
 - [x] Runtime team — use the Cloudflare-supported manual redirect mode and keep
       sanitized upstream failure logging — 2026-07-29

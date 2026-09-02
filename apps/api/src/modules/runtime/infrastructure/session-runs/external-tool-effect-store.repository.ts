@@ -163,8 +163,8 @@ export async function claimExternalToolEffect(
 
   const attempt = effect.attemptCount + 1;
   const nowMs = currentTimestampMs();
-  const [update] = await runAppDatabaseBatch(database, (projectDatabase) => [
-    projectDatabase
+  const [update] = await runAppDatabaseBatch(database, (appDatabase) => [
+    appDatabase
       .update(externalToolEffectsTable)
       .set({
         attemptCount: attempt,
@@ -178,7 +178,7 @@ export async function claimExternalToolEffect(
           eq(externalToolEffectsTable.status, "intent"),
         ),
       ),
-    projectDatabase
+    appDatabase
       .insert(externalToolEffectAttemptsTable)
       .values({
         attempt,
@@ -230,8 +230,8 @@ export async function completeExternalToolEffect(
 
   const nowMs = currentTimestampMs();
   const resultJson = JSON.stringify(input.result);
-  const [update] = await runAppDatabaseBatch(database, (projectDatabase) => [
-    projectDatabase
+  const [update] = await runAppDatabaseBatch(database, (appDatabase) => [
+    appDatabase
       .update(externalToolEffectsTable)
       .set({
         providerReceiptJson: input.providerReceiptJson ?? null,
@@ -245,7 +245,7 @@ export async function completeExternalToolEffect(
           eq(externalToolEffectsTable.status, "executing"),
         ),
       ),
-    projectDatabase
+    appDatabase
       .update(externalToolEffectAttemptsTable)
       .set({
         completedAt: nowMs,
@@ -286,8 +286,8 @@ export async function markExternalToolEffectUnknown(
   }
 
   const nowMs = currentTimestampMs();
-  const [update] = await runAppDatabaseBatch(database, (projectDatabase) => [
-    projectDatabase
+  const [update] = await runAppDatabaseBatch(database, (appDatabase) => [
+    appDatabase
       .update(externalToolEffectsTable)
       .set({
         status: "unknown",
@@ -299,7 +299,7 @@ export async function markExternalToolEffectUnknown(
           eq(externalToolEffectsTable.status, "executing"),
         ),
       ),
-    projectDatabase
+    appDatabase
       .update(externalToolEffectAttemptsTable)
       .set({
         completedAt: nowMs,
@@ -344,8 +344,8 @@ export async function markExecutingExternalToolEffectsUnknownForDriver(
 
   const effectIds = effects.map((effect) => effect.id);
   const nowMs = currentTimestampMs();
-  await runAppDatabaseBatch(database, (projectDatabase) => [
-    projectDatabase
+  await runAppDatabaseBatch(database, (appDatabase) => [
+    appDatabase
       .update(externalToolEffectsTable)
       .set({ status: "unknown", updatedAt: nowMs })
       .where(
@@ -355,7 +355,7 @@ export async function markExecutingExternalToolEffectsUnknownForDriver(
           inArray(externalToolEffectsTable.id, effectIds),
         ),
       ),
-    projectDatabase
+    appDatabase
       .update(externalToolEffectAttemptsTable)
       .set({ completedAt: nowMs, status: "unknown" })
       .where(

@@ -10,6 +10,7 @@ const VIEWER_ID_HEADER = "x-viewer-id";
 const VIEWER_IMAGE_URL_HEADER = "x-viewer-image-url";
 const VIEWER_NAME_HEADER = "x-viewer-name";
 const VIEWER_ORIGIN_HEADER = "x-viewer-origin";
+const VIEWER_LEGACY_APP_ID_HEADER = "x-viewer-app-id";
 const VIEWER_PROJECT_ID_HEADER = "x-viewer-project-id";
 const VIEWER_SESSION_ID_HEADER = "x-viewer-session-id";
 
@@ -37,7 +38,8 @@ export function writeSessionViewerSocketHeaders(
 
 export function readSessionViewerSocketHeaders(headers: Headers): SessionViewerSocketContext {
   const viewerId = headers.get(VIEWER_ID_HEADER);
-  const projectId = headers.get(VIEWER_PROJECT_ID_HEADER);
+  const projectId =
+    headers.get(VIEWER_PROJECT_ID_HEADER) ?? headers.get(VIEWER_LEGACY_APP_ID_HEADER);
   const sessionId = headers.get(VIEWER_SESSION_ID_HEADER);
   const publicOrigin = headers.get(VIEWER_ORIGIN_HEADER);
 

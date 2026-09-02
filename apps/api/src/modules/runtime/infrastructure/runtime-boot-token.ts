@@ -193,11 +193,14 @@ function parseRuntimeActionTokenPayload(encodedPayload: string): RuntimeActionTo
   );
 
   if (action === "llm_proxy") {
-    const { projectId, driverGeneration, imageModelId, modelId, modelProtocol } = parsed;
+    const { appId, projectId, driverGeneration, imageModelId, modelId, modelProtocol } = parsed;
+    // Runtime grants can live for 24 hours. Accept the pre-Project claim during
+    // rolling deploys, but normalize every verified payload to projectId.
+    const ownerProjectId = projectId ?? appId;
 
     if (
-      typeof projectId !== "string" ||
-      projectId === "" ||
+      typeof ownerProjectId !== "string" ||
+      ownerProjectId === "" ||
       typeof driverGeneration !== "number" ||
       !Number.isSafeInteger(driverGeneration) ||
       driverGeneration < 0 ||
@@ -216,7 +219,7 @@ function parseRuntimeActionTokenPayload(encodedPayload: string): RuntimeActionTo
 
     return {
       action,
-      projectId: parsePlatformId<ProjectId>(projectId, "Runtime action token project ID"),
+      projectId: parsePlatformId<ProjectId>(ownerProjectId, "Runtime action token project ID"),
       driverGeneration,
       driverInstanceId: parsedDriverInstanceId,
       expiresAt,

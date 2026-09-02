@@ -88,8 +88,8 @@ function createMcpServerAccessDatabase(): SqliteD1Database {
       url
     )
     VALUES
-      ('bearer', 1, 'app', 1, '${PROJECT_MCP_SERVER_ID}', 'Project MCP', '${OWNER_ID}', '${PROJECT_ID}', 'app', 1, 'https://mcp.example.com/project'),
-      ('bearer', 1, 'app', 1, '${OTHER_PROJECT_MCP_SERVER_ID}', 'Other Project MCP', '${MEMBER_ID}', '${OTHER_PROJECT_ID}', 'app', 1, 'https://mcp.example.com/other-project');
+      ('bearer', 1, 'app', 1, '${PROJECT_MCP_SERVER_ID}', 'Project MCP', '${OWNER_ID}', '${PROJECT_ID}', 'app', 1, 'https://mcp.example.com/app'),
+      ('bearer', 1, 'app', 1, '${OTHER_PROJECT_MCP_SERVER_ID}', 'Other Project MCP', '${MEMBER_ID}', '${OTHER_PROJECT_ID}', 'app', 1, 'https://mcp.example.com/other-app');
   `);
 
   return database;

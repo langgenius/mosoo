@@ -22,8 +22,8 @@ function installBrowserLocation(pathname = "/projects", search = "?source=test")
     configurable: true,
     value: {
       location: {
-        href: `https://project.mosoo.ai${pathname}${search}`,
-        host: "project.mosoo.ai",
+        href: `https://app.mosoo.ai${pathname}${search}`,
+        host: "app.mosoo.ai",
         pathname,
         search,
       },
@@ -84,7 +84,7 @@ describe("product analytics", () => {
     expect(properties["deployment_mode"]).toBe("cloud");
     expect(properties["environment"]).toBe("test");
     expect(properties["step"]).toBe("welcome");
-    expect(properties["$host"]).toBe("project.mosoo.ai");
+    expect(properties["$host"]).toBe("app.mosoo.ai");
     expect(properties["$pathname"]).toBe("/projects");
     expect(JSON.stringify(requests[0]?.body)).not.toContain("source=test");
     expect(JSON.stringify(requests[0]?.body)).not.toContain("referrer-secret");

@@ -132,7 +132,7 @@ describe("publishSkillSnapshot", () => {
     );
 
     const rows = await sqlite
-      .project()
+      .app()
       .select({ path: skillSnapshotEntriesTable.path })
       .from(skillSnapshotEntriesTable)
       .all();

@@ -33,7 +33,7 @@ export interface AuthBindings extends AuthEmailBindings {
   readonly WEB_ORIGIN: string;
 }
 
-const authCache = new WeakMap<D1Database, ReturnType<typeof createProjectAuth>>();
+const authCache = new WeakMap<D1Database, ReturnType<typeof createAppAuth>>();
 
 function toAccountTimestamp(value: unknown): unknown {
   return value instanceof Date ? value.getTime() : value;
@@ -70,7 +70,7 @@ export function isBetterAuthConfigured(
   return Boolean(bindings.BETTER_AUTH_SECRET?.trim());
 }
 
-function createProjectAuth(bindings: AuthBindings) {
+function createAppAuth(bindings: AuthBindings) {
   const googleClientId = bindings.GOOGLE_OAUTH_CLIENT_ID?.trim() ?? "";
   const googleClientSecret = bindings.GOOGLE_OAUTH_CLIENT_SECRET?.trim() ?? "";
   const authPlugins: BetterAuthPlugin[] = [
@@ -169,7 +169,7 @@ export function getBetterAuth(bindings: AuthBindings) {
     return cached;
   }
 
-  const auth = createProjectAuth(bindings);
+  const auth = createAppAuth(bindings);
   authCache.set(bindings.DB, auth);
   logInfo("auth.initialized", {
     googleOAuthConfigured: Boolean(

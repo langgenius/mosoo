@@ -22,7 +22,7 @@ Agent Manifest + Skills + MCP + provider credential
   -> durable Thread, files, outcomes, and usage records
 ```
 
-mosoo's wedge is the managed coding-agent runtime and Agent API. It is not an AI project builder, a general workflow builder, an end-user identity service, or a promise to host an application's ordinary frontend and backend.
+mosoo's wedge is the managed coding-agent runtime and Agent API. It is not an AI app builder, a general workflow builder, an end-user identity service, or a promise to host an application's ordinary frontend and backend.
 
 ### Evidence status
 

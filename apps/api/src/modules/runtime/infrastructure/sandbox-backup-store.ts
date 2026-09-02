@@ -186,9 +186,9 @@ export async function recordCreatedSandboxBackups(
     }
   }
 
-  const results = await runAppDatabaseBatch(database, (projectDb) => {
+  const results = await runAppDatabaseBatch(database, (appDb) => {
     const queries: [AppDatabaseBatchItem, ...AppDatabaseBatchItem[]] = [
-      projectDb
+      appDb
         .insert(sandboxBackupsTable)
         .values(backupRows.slice(0, SANDBOX_BACKUP_INSERT_BATCH_SIZE)),
     ];
@@ -199,7 +199,7 @@ export async function recordCreatedSandboxBackups(
       index += SANDBOX_BACKUP_INSERT_BATCH_SIZE
     ) {
       queries.push(
-        projectDb
+        appDb
           .insert(sandboxBackupsTable)
           .values(backupRows.slice(index, index + SANDBOX_BACKUP_INSERT_BATCH_SIZE)),
       );
@@ -207,7 +207,7 @@ export async function recordCreatedSandboxBackups(
 
     if (checkpointSessionId !== null && sessionRunId !== null) {
       queries.push(
-        projectDb
+        appDb
           .update(nativeResumeRefsTable)
           .set({
             committedSessionRunId: sessionRunId,
@@ -224,7 +224,7 @@ export async function recordCreatedSandboxBackups(
 
     if (subjectCheckpointBackup) {
       queries.push(
-        projectDb
+        appDb
           .update(sandboxesTable)
           .set({
             lastBackupId: parsePlatformId<SandboxBackupId>(

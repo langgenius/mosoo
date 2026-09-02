@@ -19,6 +19,6 @@ Importing an Agent can also add Skills bundled with it to the destination Projec
 ## Current availability and boundaries
 
 - Each Skill belongs to one Project. Only that Project's owner can view, download, fork, uninstall, or attach it. There is no sharing or cross-Project catalog.
-- There is no in-project editor and no user-facing update action. The detail view currently offers only **Download**, **Fork**, and **Uninstall**. Revising a Skill means editing it locally, adding it as a new Skill, and updating Agent attachments manually.
+- There is no in-app editor and no user-facing update action. The detail view currently offers only **Download**, **Fork**, and **Uninstall**. Revising a Skill means editing it locally, adding it as a new Skill, and updating Agent attachments manually.
 - Fork creates an independent Project-local copy. It does not stay in sync with its source, and deleting the source does not delete the copy.
 - Uninstall does not list affected Agents. The Skill disappears from the registry, while affected Agents show it as **Missing**. New Sessions skip it with a warning; existing Sessions keep the configuration they started with. Saving an affected Agent removes the missing attachment.

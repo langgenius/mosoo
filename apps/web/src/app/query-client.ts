@@ -10,19 +10,19 @@ function handleAuthError(error: unknown) {
   }
   // Force viewer to null. ProtectedRoute then redirects to /login?redirect=...
   // And stays there until the user signs in again.
-  projectQueryClient.setQueryData(VIEWER_QUERY_KEY, null);
+  appQueryClient.setQueryData(VIEWER_QUERY_KEY, null);
   void cancelQueriesAfterAuthError();
 }
 
 async function cancelQueriesAfterAuthError() {
   try {
-    await projectQueryClient.cancelQueries();
+    await appQueryClient.cancelQueries();
   } catch {
     // Best-effort; ignore cancel errors
   }
 }
 
-export const projectQueryClient = new QueryClient({
+export const appQueryClient = new QueryClient({
   defaultOptions: {
     queries: {
       gcTime: 10 * 60 * 1000,

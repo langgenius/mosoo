@@ -123,7 +123,7 @@ describe("DB migration schema boundary", () => {
           .get<{ sql: string }>()?.sql,
       ).toContain('CHECK("project_deployment"."source_kind"');
       expect(database.query("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
-      expect(database.query("PRAGMA legacy_alter_table").get()).toEqual({ legacy_alter_table: 1 });
+      expect(database.query("PRAGMA legacy_alter_table").get()).toEqual({ legacy_alter_table: 0 });
     } finally {
       database.close();
     }

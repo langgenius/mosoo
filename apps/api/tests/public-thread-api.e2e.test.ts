@@ -22,7 +22,7 @@ import {
   OWNER_VIEWER,
   bearer,
   createPublicEventSessionNamespace,
-  createPublicThreadApiTestProject,
+  createPublicThreadApiTestApp,
   expectArray,
   expectRecord,
   expectString,
@@ -299,7 +299,7 @@ async function insertPublicThread(
   },
 ): Promise<void> {
   await database
-    .project()
+    .app()
     .insert(sessionsTable)
     .values({
       agentId: PUBLIC_API_TEST_IDS.agent,
@@ -336,7 +336,7 @@ async function insertPublicThread(
     .run();
 
   await database
-    .project()
+    .app()
     .insert(sessionExecutionSnapshotsTable)
     .values({
       createdAt: input.updatedAt,
@@ -405,11 +405,11 @@ async function expectCreateThreadFileClaimRejected(input: {
 describe("Public Thread API e2e", () => {
   test("creates, retrieves, and lists a Thread without a Task wrapper", async () => {
     const database = await createPublicHttpContractDatabase();
-    const project = createPublicThreadApiTestProject();
+    const app = createPublicThreadApiTestApp();
 
     await withProviderProbeMock(async () => {
       const response = await requestPublicApi(
-        project,
+        app,
         database,
         new Request(`https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`, {
           body: JSON.stringify({
@@ -481,7 +481,7 @@ describe("Public Thread API e2e", () => {
       });
 
       const retrieveResponse = await requestPublicApi(
-        project,
+        app,
         database,
         new Request(`https://api.example.com/api/v1/threads/${threadId}`, {
           headers: { Authorization: bearer(TOKENS.owner) },
@@ -500,7 +500,7 @@ describe("Public Thread API e2e", () => {
       await database.prepare("DELETE FROM session_event WHERE session_id = ?").bind(threadId).run();
 
       const emptyEventsResponse = await requestPublicApi(
-        project,
+        app,
         database,
         new Request(`https://api.example.com/api/v1/threads/${threadId}/events`, {
           headers: { Authorization: bearer(TOKENS.owner) },
@@ -540,7 +540,7 @@ describe("Public Thread API e2e", () => {
       });
 
       const toolEventsResponse = await requestPublicApi(
-        project,
+        app,
         database,
         new Request(`https://api.example.com/api/v1/threads/${threadId}/events`, {
           headers: { Authorization: bearer(TOKENS.owner) },
@@ -621,7 +621,7 @@ describe("Public Thread API e2e", () => {
       });
 
       const eventsResponse = await requestPublicApi(
-        project,
+        app,
         database,
         new Request(`https://api.example.com/api/v1/threads/${threadId}/events?limit=2`, {
           headers: { Authorization: bearer(TOKENS.owner) },
@@ -662,7 +662,7 @@ describe("Public Thread API e2e", () => {
       });
 
       await database
-        .project()
+        .app()
         .update(sessionRunsTable)
         .set({
           completedAt: 1_150,
@@ -681,7 +681,7 @@ describe("Public Thread API e2e", () => {
         .run();
 
       const completedRetrieveResponse = await requestPublicApi(
-        project,
+        app,
         database,
         new Request(`https://api.example.com/api/v1/threads/${threadId}`, {
           headers: { Authorization: bearer(TOKENS.owner) },
@@ -711,7 +711,7 @@ describe("Public Thread API e2e", () => {
       }
 
       const repeatedRetrieveResponse = await requestPublicApi(
-        project,
+        app,
         database,
         new Request(`https://api.example.com/api/v1/threads/${threadId}`, {
           headers: { Authorization: bearer(TOKENS.owner) },
@@ -723,7 +723,7 @@ describe("Public Thread API e2e", () => {
       expect(repeatedRun["finalOutput"]).toEqual({ text: FINAL_OUTPUT_TEXT });
 
       const listResponse = await requestPublicApi(
-        project,
+        app,
         database,
         new Request(`https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`, {
           headers: { Authorization: bearer(TOKENS.owner) },
@@ -735,7 +735,7 @@ describe("Public Thread API e2e", () => {
       expect(expectRecord(listedThreads[0])["userId"]).toBe("customer-123");
 
       const taskRouteResponse = await requestPublicApi(
-        project,
+        app,
         database,
         new Request(`https://api.example.com/api/v1/tasks/${threadId}`, {
           headers: { Authorization: bearer(TOKENS.owner) },
@@ -744,7 +744,7 @@ describe("Public Thread API e2e", () => {
       expect(taskRouteResponse.status).toBe(404);
 
       const taskCreateRouteResponse = await requestPublicApi(
-        project,
+        app,
         database,
         new Request(`https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/tasks`, {
           body: JSON.stringify({
@@ -763,7 +763,7 @@ describe("Public Thread API e2e", () => {
       expect(taskCreateRouteResponse.status).toBe(404);
 
       const ownerEventsResponse = await requestPublicApi(
-        project,
+        app,
         database,
         new Request(`https://api.example.com/api/v1/threads/${threadId}/events`, {
           headers: { Authorization: bearer(TOKENS.owner) },
@@ -772,7 +772,7 @@ describe("Public Thread API e2e", () => {
       expect(ownerEventsResponse.status).toBe(200);
 
       const nonOwnerCreateResponse = await requestPublicApi(
-        project,
+        app,
         database,
         new Request(`https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`, {
           body: JSON.stringify({
@@ -796,7 +796,7 @@ describe("Public Thread API e2e", () => {
       });
 
       const staleAclCreateResponse = await requestPublicApi(
-        project,
+        app,
         database,
         new Request(`https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`, {
           body: JSON.stringify({
@@ -823,7 +823,7 @@ describe("Public Thread API e2e", () => {
 
   test("keeps owner-visible Thread history readable with an opaque retired creator", async () => {
     const database = await createPublicHttpContractDatabase();
-    const project = createPublicThreadApiTestProject();
+    const app = createPublicThreadApiTestApp();
     const threadId = generatedPublicThreadId(0);
 
     await insertPublicThread(database, {
@@ -837,7 +837,7 @@ describe("Public Thread API e2e", () => {
     });
 
     const retrieveResponse = await requestPublicApi(
-      project,
+      app,
       database,
       new Request(`https://api.example.com/api/v1/threads/${threadId}`, {
         headers: { Authorization: bearer(TOKENS.owner) },
@@ -847,7 +847,7 @@ describe("Public Thread API e2e", () => {
     expect(expectRecord((await readJson(retrieveResponse))["thread"])["id"]).toBe(threadId);
 
     const listResponse = await requestPublicApi(
-      project,
+      app,
       database,
       new Request(`https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`, {
         headers: { Authorization: bearer(TOKENS.owner) },
@@ -861,11 +861,11 @@ describe("Public Thread API e2e", () => {
 
   test("exposes failed run status without internal error details", async () => {
     const database = await createPublicHttpContractDatabase();
-    const project = createPublicThreadApiTestProject();
+    const app = createPublicThreadApiTestApp();
 
     await withProviderProbeMock(async () => {
       const response = await requestPublicApi(
-        project,
+        app,
         database,
         new Request(`https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`, {
           body: JSON.stringify({
@@ -888,7 +888,7 @@ describe("Public Thread API e2e", () => {
       const runId = expectString(expectRecord(body["run"])["id"]);
 
       await database
-        .project()
+        .app()
         .update(sessionRunsTable)
         .set({
           completedAt: 2_000,
@@ -908,7 +908,7 @@ describe("Public Thread API e2e", () => {
         .run();
 
       const retrieveResponse = await requestPublicApi(
-        project,
+        app,
         database,
         new Request(`https://api.example.com/api/v1/threads/${threadId}`, {
           headers: { Authorization: bearer(TOKENS.owner) },
@@ -941,7 +941,7 @@ describe("Public Thread API e2e", () => {
 
   test("creates an empty Thread and starts its first run from a user message event", async () => {
     const database = await createPublicHttpContractDatabase();
-    const project = createPublicThreadApiTestProject();
+    const app = createPublicThreadApiTestApp();
     const createEmptyThreadRequest = () =>
       new Request(`https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`, {
         body: JSON.stringify({
@@ -956,7 +956,7 @@ describe("Public Thread API e2e", () => {
       });
 
     await withProviderProbeMock(async () => {
-      const response = await requestPublicApi(project, database, createEmptyThreadRequest());
+      const response = await requestPublicApi(app, database, createEmptyThreadRequest());
       expect(response.status).toBe(201);
 
       const body = await readJson(response);
@@ -1000,13 +1000,13 @@ describe("Public Thread API e2e", () => {
         .first<{ row_count: number }>();
       expect(runCount?.row_count).toBe(0);
 
-      const replayResponse = await requestPublicApi(project, database, createEmptyThreadRequest());
+      const replayResponse = await requestPublicApi(app, database, createEmptyThreadRequest());
       expect(replayResponse.status).toBe(201);
       expect(replayResponse.headers.get("Idempotency-Replayed")).toBe("true");
       expect(await readJson(replayResponse)).toEqual(body);
 
       const retrieveResponse = await requestPublicApi(
-        project,
+        app,
         database,
         new Request(`https://api.example.com/api/v1/threads/${threadId}`, {
           headers: { Authorization: bearer(TOKENS.owner) },
@@ -1023,7 +1023,7 @@ describe("Public Thread API e2e", () => {
       });
 
       const firstMessageResponse = await requestPublicApi(
-        project,
+        app,
         database,
         new Request(`https://api.example.com/api/v1/threads/${threadId}/events`, {
           body: JSON.stringify({
@@ -1049,7 +1049,7 @@ describe("Public Thread API e2e", () => {
       expect(expectRecord(firstEvent["run"])["trigger"]).toBe("user_prompt");
 
       const missingUserResponse = await requestPublicApi(
-        project,
+        app,
         database,
         new Request(`https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`, {
           headers: { Authorization: bearer(TOKENS.owner) },
@@ -1066,12 +1066,12 @@ describe("Public Thread API e2e", () => {
 
   test("streams Thread events as public SSE entries", async () => {
     const database = await createPublicHttpContractDatabase();
-    const project = createPublicThreadApiTestProject();
+    const app = createPublicThreadApiTestApp();
     const liveEvents = createPublicEventSessionNamespace();
 
     await withProviderProbeMock(async () => {
       const response = await requestPublicApi(
-        project,
+        app,
         database,
         new Request(`https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`, {
           body: JSON.stringify({ userId: "customer-123" }),
@@ -1115,7 +1115,7 @@ describe("Public Thread API e2e", () => {
       });
 
       const streamResponse = await requestPublicApi(
-        project,
+        app,
         database,
         new Request(`https://api.example.com/api/v1/threads/${threadId}/events/stream?limit=1`, {
           headers: { Authorization: bearer(TOKENS.owner) },
@@ -1264,7 +1264,7 @@ describe("Public Thread API e2e", () => {
 
   test("bounds public Thread lists on stable latest ordering", async () => {
     const database = await createPublicHttpContractDatabase();
-    const project = createPublicThreadApiTestProject();
+    const app = createPublicThreadApiTestApp();
 
     for (let index = 0; index < PUBLIC_THREAD_API_THREADS_MAX_LIMIT + 5; index += 1) {
       const suffix = String(index).padStart(3, "0");
@@ -1277,7 +1277,7 @@ describe("Public Thread API e2e", () => {
     }
 
     const response = await requestPublicApi(
-      project,
+      app,
       database,
       new Request(`https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`, {
         headers: { Authorization: bearer(TOKENS.owner) },
@@ -1297,10 +1297,10 @@ describe("Public Thread API e2e", () => {
 
   test("archives, unarchives, and manages Thread files through the public routes", async () => {
     const database = await createPublicHttpContractDatabase();
-    const project = createPublicThreadApiTestProject();
+    const app = createPublicThreadApiTestApp();
     const bucket = new PublicApiMemoryFileBucket();
     const requestThreadApi = (request: Request) =>
-      requestPublicApi(project, database, request, { fileBucket: bucket as unknown as R2Bucket });
+      requestPublicApi(app, database, request, { fileBucket: bucket as unknown as R2Bucket });
 
     await withProviderProbeMock(async () => {
       const createThreadResponse = await requestThreadApi(
@@ -1621,10 +1621,10 @@ describe("Public Thread API e2e", () => {
 
   test("uploads an Agent file and attaches it to the first Thread message", async () => {
     const database = await createPublicHttpContractDatabase();
-    const project = createPublicThreadApiTestProject();
+    const app = createPublicThreadApiTestApp();
     const bucket = new PublicApiMemoryFileBucket();
     const requestThreadApi = (request: Request) =>
-      requestPublicApi(project, database, request, { fileBucket: bucket as unknown as R2Bucket });
+      requestPublicApi(app, database, request, { fileBucket: bucket as unknown as R2Bucket });
 
     await withProviderProbeMock(async () => {
       const fileBody = "Launch note.\n";
@@ -1841,10 +1841,10 @@ describe("Public Thread API e2e", () => {
 
   test("rejects public Thread file claims that are not claimable owner drafts", async () => {
     const database = await createPublicHttpContractDatabase();
-    const project = createPublicThreadApiTestProject();
+    const app = createPublicThreadApiTestApp();
     const bucket = new PublicApiMemoryFileBucket();
     const requestThreadApi = (request: Request) =>
-      requestPublicApi(project, database, request, { fileBucket: bucket as unknown as R2Bucket });
+      requestPublicApi(app, database, request, { fileBucket: bucket as unknown as R2Bucket });
     const threadId = generatedPublicThreadId(130);
 
     await insertPublicThread(database, {
@@ -1952,7 +1952,7 @@ describe("Public Thread API e2e", () => {
   });
 
   test("deletes a public Thread only after caller and Project admission", async () => {
-    const project = createPublicThreadApiTestProject();
+    const app = createPublicThreadApiTestApp();
 
     const successDatabase = await createPublicHttpContractDatabase();
     const deletableThreadId = generatedPublicThreadId(120);
@@ -1963,7 +1963,7 @@ describe("Public Thread API e2e", () => {
     });
 
     const deleteResponse = await requestPublicApi(
-      project,
+      app,
       successDatabase,
       new Request(`https://api.example.com/api/v1/threads/${deletableThreadId}`, {
         headers: { Authorization: bearer(TOKENS.owner) },
@@ -1988,7 +1988,7 @@ describe("Public Thread API e2e", () => {
     });
 
     const nonOwnerDeleteResponse = await requestPublicApi(
-      project,
+      app,
       ownerThreadDatabase,
       new Request(`https://api.example.com/api/v1/threads/${ownerThreadId}`, {
         headers: { Authorization: bearer(TOKENS.nonOwner) },
@@ -2020,7 +2020,7 @@ describe("Public Thread API e2e", () => {
       .run();
 
     const mismatchedProjectDeleteResponse = await requestPublicApi(
-      project,
+      app,
       mismatchedAppDatabase,
       new Request(`https://api.example.com/api/v1/threads/${mismatchedProjectThreadId}`, {
         headers: { Authorization: bearer(TOKENS.owner) },
@@ -2045,10 +2045,10 @@ describe("Public Thread API e2e", () => {
 
   test("rejects invalid Thread event path inputs", async () => {
     const database = await createPublicHttpContractDatabase();
-    const project = createPublicThreadApiTestProject();
+    const app = createPublicThreadApiTestApp();
 
     const response = await requestPublicApi(
-      project,
+      app,
       database,
       new Request("https://api.example.com/api/v1/threads/missing/events?limit=0", {
         headers: { Authorization: bearer(TOKENS.owner) },
@@ -2061,7 +2061,7 @@ describe("Public Thread API e2e", () => {
     });
 
     const threadIdResponse = await requestPublicApi(
-      project,
+      app,
       database,
       new Request("https://api.example.com/api/v1/threads/not-a-ulid/events", {
         headers: { Authorization: bearer(TOKENS.owner) },
@@ -2076,7 +2076,7 @@ describe("Public Thread API e2e", () => {
 
   test("maps malformed public platform IDs to invalid request responses", async () => {
     const database = await createPublicHttpContractDatabase();
-    const project = createPublicThreadApiTestProject();
+    const app = createPublicThreadApiTestApp();
     const invalidId = "not-a-ulid";
     const cases = [
       {
@@ -2114,7 +2114,7 @@ describe("Public Thread API e2e", () => {
     ] as const;
 
     for (const testCase of cases) {
-      const response = await requestPublicApi(project, database, testCase.request);
+      const response = await requestPublicApi(app, database, testCase.request);
       expect(response.status).toBe(400);
       expect(await readJson(response)).toEqual({
         error: {
@@ -2127,7 +2127,7 @@ describe("Public Thread API e2e", () => {
 
   test("replays create Thread responses by Idempotency-Key", async () => {
     const database = await createPublicHttpContractDatabase();
-    const project = createPublicThreadApiTestProject();
+    const app = createPublicThreadApiTestApp();
     const createRequest = (userId: string) => ({
       body: JSON.stringify({
         input: {
@@ -2146,7 +2146,7 @@ describe("Public Thread API e2e", () => {
 
     await withProviderProbeMock(async () => {
       const first = await requestPublicApi(
-        project,
+        app,
         database,
         new Request(
           `https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`,
@@ -2157,7 +2157,7 @@ describe("Public Thread API e2e", () => {
       const firstBody = await readJson(first);
 
       const replay = await requestPublicApi(
-        project,
+        app,
         database,
         new Request(
           `https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`,
@@ -2175,7 +2175,7 @@ describe("Public Thread API e2e", () => {
 
   test("recovers a completed Thread creation after its idempotency completion write fails", async () => {
     const database = await createPublicHttpContractDatabase();
-    const project = createPublicThreadApiTestProject();
+    const app = createPublicThreadApiTestApp();
     const idempotencyKey = "thread-create-completion-failure";
     const createRequest = (key = idempotencyKey) =>
       new Request(`https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`, {
@@ -2196,7 +2196,7 @@ describe("Public Thread API e2e", () => {
 
     await withProviderProbeMock(async () => {
       const first = await requestPublicApiWithBindings(
-        project,
+        app,
         createRequest(),
         createPublicHttpTestBindings(
           failFirstPublicApiIdempotencyCompletion(database),
@@ -2218,14 +2218,14 @@ describe("Public Thread API e2e", () => {
         .run();
 
       const unrelated = await requestPublicApi(
-        project,
+        app,
         database,
         createRequest("other-idempotency-key"),
       );
       expect(unrelated.status).toBe(201);
       await expect(countPublicThreadsForAgent(database)).resolves.toBe(2);
 
-      const retry = await requestPublicApi(project, database, createRequest());
+      const retry = await requestPublicApi(app, database, createRequest());
       expect(retry.status).toBe(201);
       expect(retry.headers.get("Idempotency-Replayed")).toBe("true");
       const retryBody = await readJson(retry);
@@ -2240,7 +2240,7 @@ describe("Public Thread API e2e", () => {
 
   test("does not re-execute a stale public Thread event after its idempotency completion write fails", async () => {
     const database = await createPublicHttpContractDatabase();
-    const project = createPublicThreadApiTestProject();
+    const app = createPublicThreadApiTestApp();
     const threadId = generatedPublicThreadId(240);
     const idempotencyKey = "thread-event-completion-failure";
     const sendEventRequest = () =>
@@ -2264,7 +2264,7 @@ describe("Public Thread API e2e", () => {
 
     await withProviderProbeMock(async () => {
       const first = await requestPublicApiWithBindings(
-        project,
+        app,
         sendEventRequest(),
         createPublicHttpTestBindings(
           failFirstPublicApiIdempotencyCompletion(database),
@@ -2281,7 +2281,7 @@ describe("Public Thread API e2e", () => {
         .bind(Date.now() - 11 * 60 * 1000, PUBLIC_API_TEST_IDS.patOwner, idempotencyKey)
         .run();
 
-      const retry = await requestPublicApi(project, database, sendEventRequest());
+      const retry = await requestPublicApi(app, database, sendEventRequest());
       expect(retry.status).toBe(409);
       expect(Number(retry.headers.get("Retry-After"))).toBeGreaterThan(60 * 60);
       expect(expectRecord(await readJson(retry))["error"]).toMatchObject({
@@ -2297,7 +2297,7 @@ describe("Public Thread API e2e", () => {
 
   test("does not persist idempotency state for rate-limited create Thread attempts", async () => {
     const database = await createPublicHttpContractDatabase();
-    const project = createPublicThreadApiTestProject();
+    const app = createPublicThreadApiTestApp();
     const idempotencyKey = "thread-create-rate-limited";
     const createRequest = {
       body: JSON.stringify({
@@ -2321,7 +2321,7 @@ describe("Public Thread API e2e", () => {
 
     await withProviderProbeMock(async () => {
       const limited = await requestPublicApi(
-        project,
+        app,
         database,
         new Request(
           `https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`,
@@ -2337,7 +2337,7 @@ describe("Public Thread API e2e", () => {
       await database.prepare("DELETE FROM public_api_rate_limit_window").run();
 
       const retry = await requestPublicApi(
-        project,
+        app,
         database,
         new Request(
           `https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`,
@@ -2352,9 +2352,9 @@ describe("Public Thread API e2e", () => {
 
   test("requires a non-empty userId when creating a Thread", async () => {
     const database = await createPublicHttpContractDatabase();
-    const project = createPublicThreadApiTestProject();
+    const app = createPublicThreadApiTestApp();
     const response = await requestPublicApi(
-      project,
+      app,
       database,
       new Request(`https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`, {
         body: JSON.stringify({}),
@@ -2375,7 +2375,7 @@ describe("Public Thread API e2e", () => {
 
   test("treats userId as part of create Thread idempotency identity", async () => {
     const database = await createPublicHttpContractDatabase();
-    const project = createPublicThreadApiTestProject();
+    const app = createPublicThreadApiTestApp();
     const createRequest = (userId: string) =>
       new Request(`https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`, {
         body: JSON.stringify({ userId }),
@@ -2388,10 +2388,10 @@ describe("Public Thread API e2e", () => {
       });
 
     await withProviderProbeMock(async () => {
-      const first = await requestPublicApi(project, database, createRequest("customer-1"));
+      const first = await requestPublicApi(app, database, createRequest("customer-1"));
       expect(first.status).toBe(201);
 
-      const conflict = await requestPublicApi(project, database, createRequest("customer-2"));
+      const conflict = await requestPublicApi(app, database, createRequest("customer-2"));
       expect(conflict.status).toBe(409);
       expect(expectRecord(await readJson(conflict))["error"]).toMatchObject({
         code: "idempotency_conflict",

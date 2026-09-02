@@ -46,7 +46,7 @@ describe("provider fetch proxy", () => {
       resolveProviderFetchProxy({
         MOSOO_PROVIDER_FETCH_PROXY_TOKEN: "proxy-token",
         MOSOO_PROVIDER_FETCH_PROXY_URL: "http://127.0.0.1:3456/fetch",
-        WEB_ORIGIN: "https://project.example.com",
+        WEB_ORIGIN: "https://app.example.com",
       }),
     ).toBeNull();
   });

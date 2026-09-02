@@ -758,7 +758,7 @@ describe("runtime event AG-UI adapter", () => {
         changes: [
           {
             change: "upsert",
-            path: "src/project.ts",
+            path: "src/app.ts",
           },
         ],
         status: "completed",
@@ -767,7 +767,7 @@ describe("runtime event AG-UI adapter", () => {
     });
 
     expect(createProcessDraftFromRuntimeEvent(event)).toEqual({
-      content: "src/project.ts",
+      content: "src/app.ts",
       type: "file.changed",
     });
   });

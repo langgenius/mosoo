@@ -24,7 +24,7 @@ async function insertSessionAttachment(
   const path = `${parentPath}/${input.name}`;
 
   await database
-    .project()
+    .app()
     .insert(fileRecordsTable)
     .values({
       committed: 1,

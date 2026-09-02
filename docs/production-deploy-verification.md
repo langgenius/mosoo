@@ -8,7 +8,7 @@ production D1. It is the required preflight before a production deploy.
 - Do not put Cloudflare account IDs, API tokens, secret values, or private keys
   in tracked files.
 - Set `CLOUDFLARE_ACCOUNT_ID` only in the shell that runs the check.
-- Remove project-local `.env*` files that Wrangler or Vite would load implicitly,
+- Remove app-local `.env*` files that Wrangler or Vite would load implicitly,
   and unset every `VITE_*` process variable before a production build.
 - Export the production account id in the current shell:
 

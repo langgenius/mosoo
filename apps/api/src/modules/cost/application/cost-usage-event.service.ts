@@ -270,13 +270,13 @@ export async function recordRuntimeUsageEvent(
     return;
   }
 
-  const projectDatabase = getAppDatabase(database);
+  const appDatabase = getAppDatabase(database);
 
-  if (await isUsageEventAlreadyRolledUp(projectDatabase, resolveUsageEventIdentity(input))) {
+  if (await isUsageEventAlreadyRolledUp(appDatabase, resolveUsageEventIdentity(input))) {
     return;
   }
 
-  const query = createRuntimeUsageEventUpsert(projectDatabase, input);
+  const query = createRuntimeUsageEventUpsert(appDatabase, input);
 
   if (query === null) {
     return;

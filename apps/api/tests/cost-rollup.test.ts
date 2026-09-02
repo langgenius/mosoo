@@ -131,7 +131,7 @@ describe("cost daily rollup retention", () => {
 
     const dailyRollupRetentionCutoffDate = getDailyRollupRetentionCutoffDate(ROLLUP_TIME);
     await database
-      .project()
+      .app()
       .delete(usageDailyRollupsTable)
       .where(createDailyRollupRetentionPredicate(ROLLUP_TIME))
       .run();

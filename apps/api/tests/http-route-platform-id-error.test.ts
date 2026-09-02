@@ -16,10 +16,10 @@ import {
   createTestExecutionContext,
 } from "./helpers/public-api-http-test-fixture";
 
-function createDriverRouteTestProject(): Hono<ApiGatewayEnvironment> {
-  const project = new Hono<ApiGatewayEnvironment>();
-  registerDriverRoute(project);
-  return project;
+function createDriverRouteTestApp(): Hono<ApiGatewayEnvironment> {
+  const app = new Hono<ApiGatewayEnvironment>();
+  registerDriverRoute(app);
+  return app;
 }
 
 describe("HTTP route platform ID errors", () => {
@@ -46,7 +46,7 @@ describe("HTTP route platform ID errors", () => {
       expiresAt: Date.now() + 60_000,
       resourceId: PUBLIC_API_TEST_IDS.file,
     });
-    const response = await createDriverRouteTestProject().request(
+    const response = await createDriverRouteTestApp().request(
       new Request(`https://api.example.com/api/driver/skill/not-a-ulid/package?grant=${grant}`),
       undefined,
       bindings,

@@ -52,10 +52,10 @@ afterEach(() => {
   globalThis.fetch = originalFetch;
 });
 
-function createDriverRouteTestProject(): Hono<ApiGatewayEnvironment> {
-  const project = new Hono<ApiGatewayEnvironment>();
-  registerDriverRoute(project);
-  return project;
+function createDriverRouteTestApp(): Hono<ApiGatewayEnvironment> {
+  const app = new Hono<ApiGatewayEnvironment>();
+  registerDriverRoute(app);
+  return app;
 }
 
 function captureUpstreamFetch(response?: () => Response): CapturedUpstreamRequest[] {
@@ -101,7 +101,7 @@ async function insertDriverInstance(
 ) {
   const nowMs = input.updatedAt ?? Date.now();
   await database
-    .project()
+    .app()
     .insert(driverInstancesTable)
     .values({
       bootTokenExpiresAt: input.bootTokenExpiresAt ?? nowMs + 60_000,
@@ -154,7 +154,7 @@ async function insertVendorCredential(
   const nowMs = Date.now();
 
   await database
-    .project()
+    .app()
     .insert(vendorCredentialsTable)
     .values({
       apiBase: input.apiBase ?? null,
@@ -225,7 +225,7 @@ async function setupFixture(input?: {
 }
 
 async function dispatch(bindings: ApiBindings, request: Request): Promise<Response> {
-  return createDriverRouteTestProject().request(
+  return createDriverRouteTestApp().request(
     request,
     undefined,
     bindings,
@@ -585,7 +585,7 @@ describe("driver LLM proxy route", () => {
 
     const response = await dispatch(bindings, llmProxyRequest("/v1/messages", { method: "POST" }));
     const unrelatedDriver = await database
-      .project()
+      .app()
       .select({ status: driverInstancesTable.status })
       .from(driverInstancesTable)
       .where(eq(driverInstancesTable.id, OTHER_DRIVER_INSTANCE_ID))

@@ -161,7 +161,7 @@ Harness-neutral does not mean that every Harness has identical capabilities. It 
 
 This is especially valuable for application developers. They should be able to change the reasoning engine without rewriting the CRM, billing, fitness, or project-management integrations that make their application useful.
 
-## 4. A Web-Project-Oriented Event Stream
+## 4. A Web-App-Oriented Event Stream
 
 Web applications should not need to understand every low-level model event.
 
@@ -220,7 +220,7 @@ The positioning can be stated in one sentence:
 
 > **mosoo is the backend that lets applications safely embed AI agents.**
 
-The important word is **applications**. mosoo is not asking users to move their entire product into an Agent console. It lets a normal Web Project invoke an Agent as naturally as it invokes a database, a payment service, or a background job, while mosoo encapsulates execution, identity delegation, Harness adaptation, and runtime events.
+The important word is **applications**. mosoo is not asking users to move their entire product into an Agent console. It lets a normal Web App invoke an Agent as naturally as it invokes a database, a payment service, or a background job, while mosoo encapsulates execution, identity delegation, Harness adaptation, and runtime events.
 
 ## What mosoo Should Not Own
 
@@ -254,7 +254,7 @@ GoGym still had to write a meaningful amount of mosoo-specific integration code 
 | Pairing Tool start and completion events without a stable call ID                        | mosoo event contract     | Applications should not infer identity from FIFO order or Tool names.                |
 | Replacing a missing Thread and uploading attachments again                               | Neither                  | This workaround hides data loss and can duplicate work; recovery must be explicit.   |
 
-This produces a narrower conclusion than "mosoo should own all Agent Project glue." mosoo should own the code whose correctness depends on mosoo's protocol, identity, event, and recovery guarantees. The application should continue to own its users, permissions, data, Tools, and interface.
+This produces a narrower conclusion than "mosoo should own all Agent App glue." mosoo should own the code whose correctness depends on mosoo's protocol, identity, event, and recovery guarantees. The application should continue to own its users, permissions, data, Tools, and interface.
 
 ## A Thin Integration Kit, Not Another Framework
 

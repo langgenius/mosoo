@@ -76,7 +76,7 @@ export const sandboxesTable = sqliteTable(
     updatedAt: integer("updated_at").notNull(),
   },
   (table) => [
-    // 'error' is a retired status: the project no longer writes it (a failed
+    // 'error' is a retired status: the app no longer writes it (a failed
     // activation returns the subject to 'cold' with the diagnostic in
     // last_error). It stays in this CHECK as a dead-but-allowed value so we
     // avoid a full SQLite table rebuild; migration 0003 converges any existing

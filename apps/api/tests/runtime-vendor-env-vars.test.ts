@@ -16,6 +16,7 @@ import type { DriverVendorCredentialProfile } from "../src/modules/runtime/domai
 import { verifyRuntimeActionToken } from "../src/modules/runtime/infrastructure/runtime-boot-token";
 import { sanitizeRuntimeVendorEnvVars } from "../src/modules/runtime/infrastructure/runtime-sandbox-provisioning/runtime-vendor-env-policy";
 import { buildVendorProxyEnvVars } from "../src/modules/runtime/infrastructure/runtime-sandbox-provisioning/runtime-vendor-proxy-env.builder";
+import { toArrayBuffer, toBase64Url } from "../src/shared/bytes";
 
 const BINDINGS = { RUNTIME_ACTION_TOKEN_SECRET: "test-runtime-action-token" };
 const DRIVER_GENERATION = 3;
@@ -30,6 +31,34 @@ const CREDENTIAL_ID = parsePlatformId<VendorCredentialId>(
 );
 const REQUEST_URL = "https://api.example.com/api/agents/run?probe=1";
 const PROXY_URL = `https://api.example.com/api/driver/llm/proxy/${CREDENTIAL_ID}`;
+
+async function createLegacyLlmProxyGrant(): Promise<string> {
+  const encoder = new TextEncoder();
+  const payload = toBase64Url(
+    encoder.encode(
+      JSON.stringify({
+        action: "llm_proxy",
+        appId: PROJECT_ID,
+        driverGeneration: DRIVER_GENERATION,
+        driverInstanceId: DRIVER_INSTANCE_ID,
+        expiresAt: Date.now() + 60_000,
+        modelId: "gpt-5.1",
+        modelProtocol: "openai-responses",
+        resourceId: CREDENTIAL_ID,
+      }),
+    ),
+  );
+  const key = await crypto.subtle.importKey(
+    "raw",
+    toArrayBuffer(encoder.encode(BINDINGS.RUNTIME_ACTION_TOKEN_SECRET)),
+    { hash: "SHA-256", name: "HMAC" },
+    false,
+    ["sign"],
+  );
+  const signature = await crypto.subtle.sign("HMAC", key, toArrayBuffer(encoder.encode(payload)));
+
+  return `${payload}.${toBase64Url(new Uint8Array(signature))}`;
+}
 
 function vendorCredential(
   overrides: Partial<DriverVendorCredentialProfile> & { vendorId: string },
@@ -72,6 +101,15 @@ function parseOpenCodeConfig(envVars: Record<string, string>): Record<string, un
 }
 
 describe("runtime vendor proxy env vars", () => {
+  test("accepts an unexpired pre-Project LLM proxy grant during rolling deploys", async () => {
+    const grant = await createLegacyLlmProxyGrant();
+
+    await expect(verifyRuntimeActionToken(BINDINGS, grant)).resolves.toMatchObject({
+      action: "llm_proxy",
+      projectId: PROJECT_ID,
+    });
+  });
+
   test("removes every runtime-managed provider variable before sandbox setup", () => {
     expect(
       sanitizeRuntimeVendorEnvVars({

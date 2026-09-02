@@ -8,6 +8,7 @@ import type { AuthenticatedViewer } from "../../../auth/application/viewer-auth.
 import { getActiveProjectSessionParticipantAccess } from "../../domain/session-access.policy";
 import type { PermissionStateUpdateResult } from "./viewer-permissions";
 import { rejectDisconnectedViewerPermissionRequests } from "./viewer-permissions";
+import { normalizeViewerSocketAttachment } from "./viewer-socket";
 import type { ViewerSocketAttachment } from "./viewer-socket";
 
 const VIEWER_PERMISSION_CLEANUP_STORAGE_KEY = "viewer_permission_cleanup";
@@ -27,6 +28,29 @@ interface PendingViewerPermissionCleanup {
   scheduledAtMs: number;
   sessionId: SessionId;
   viewer: AuthenticatedViewer;
+}
+
+function parsePendingViewerPermissionCleanup(
+  value: unknown,
+): PendingViewerPermissionCleanup | null {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+  const attachment = normalizeViewerSocketAttachment({ ...record, role: "viewer" });
+
+  if (!attachment || typeof record["scheduledAtMs"] !== "number") {
+    return null;
+  }
+
+  return {
+    publicOrigin: attachment.publicOrigin,
+    projectId: attachment.projectId,
+    scheduledAtMs: record["scheduledAtMs"],
+    sessionId: attachment.sessionId,
+    viewer: attachment.viewer,
+  };
 }
 
 type RejectDisconnectedViewerPermissions = (
@@ -97,13 +121,12 @@ export async function runViewerPermissionCleanupAlarm(input: {
   storage: ViewerPermissionCleanupStorage;
   updateLiveStateCache: (state: SessionLiveState | null) => void;
 }): Promise<void> {
-  const pending =
-    (await input.storage.get<PendingViewerPermissionCleanup>(
-      VIEWER_PERMISSION_CLEANUP_STORAGE_KEY,
-    )) ?? null;
+  const pending = parsePendingViewerPermissionCleanup(
+    await input.storage.get<unknown>(VIEWER_PERMISSION_CLEANUP_STORAGE_KEY),
+  );
 
   if (pending === null) {
-    await input.storage.deleteAlarm();
+    await clearViewerPermissionCleanupAlarm({ storage: input.storage });
     return;
   }
 

@@ -111,7 +111,7 @@ function createMcpServerUpdateDatabase(): SqliteD1Database {
       url
     )
     VALUES
-      ('${PROJECT_MCP_SERVER_ID}', 'bearer', 1, 'app', 'Old description', 1, 'https://icons.example.com/old.png', 'Project MCP', '{"cached":true}', '${OWNER_ID}', '${PROJECT_ID}', 'app', 1, 'https://project.example.com/mcp');
+      ('${PROJECT_MCP_SERVER_ID}', 'bearer', 1, 'app', 'Old description', 1, 'https://icons.example.com/old.png', 'Project MCP', '{"cached":true}', '${OWNER_ID}', '${PROJECT_ID}', 'app', 1, 'https://app.example.com/mcp');
 
     INSERT INTO mcp_credential (
       id,
@@ -157,13 +157,13 @@ describe("MCP server update", () => {
       iconUrl: "https://icons.example.com/new.png",
       name: "Renamed MCP",
       serverId: PROJECT_MCP_SERVER_ID,
-      url: "https://project.example.com/mcp",
+      url: "https://app.example.com/mcp",
     });
 
     expect(server.name).toBe("Renamed MCP");
     expect(server.description).toBe("New description");
     expect(server.iconUrl).toBe("https://icons.example.com/new.png");
-    expect(server.url).toBe("https://project.example.com/mcp");
+    expect(server.url).toBe("https://app.example.com/mcp");
     expect(server.credentialStatus).toBe("active");
     expect(server.hasCredential).toBe(true);
   });
@@ -175,7 +175,7 @@ describe("MCP server update", () => {
       projectId: PROJECT_ID,
       name: "Project MCP",
       serverId: PROJECT_MCP_SERVER_ID,
-      url: "https://project.example.com/mcp",
+      url: "https://app.example.com/mcp",
     });
 
     expect(server.description).toBeNull();
@@ -218,7 +218,7 @@ describe("MCP server update", () => {
         projectId: PROJECT_ID,
         name: "Project MCP",
         serverId: PROJECT_MCP_SERVER_ID,
-        url: "http://project.example.com/mcp",
+        url: "http://app.example.com/mcp",
       }),
     ).rejects.toThrow();
   });
@@ -231,7 +231,7 @@ describe("MCP server update", () => {
         projectId: PROJECT_ID,
         name: "Hijacked MCP",
         serverId: PROJECT_MCP_SERVER_ID,
-        url: "https://project.example.com/mcp",
+        url: "https://app.example.com/mcp",
       }),
     ).rejects.toThrow();
   });

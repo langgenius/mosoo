@@ -15,9 +15,9 @@ export async function getDriverUsage(
   sessionRunId: SessionRunId | null;
   status: DriverInstanceStatus;
 } | null> {
-  const projectDb = getAppDatabase(database);
+  const appDb = getAppDatabase(database);
   const row =
-    (await projectDb
+    (await appDb
       .select({
         status: driverInstancesTable.status,
       })
@@ -31,7 +31,7 @@ export async function getDriverUsage(
   }
 
   const activeRun =
-    (await projectDb
+    (await appDb
       .select({ id: sessionRunsTable.id })
       .from(sessionRunsTable)
       .where(

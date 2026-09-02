@@ -29,3 +29,18 @@ export function isViewerSocketAttachment(value: unknown): value is ViewerSocketA
     typeof viewer["name"] === "string"
   );
 }
+
+export function normalizeViewerSocketAttachment(value: unknown): ViewerSocketAttachment | null {
+  if (isViewerSocketAttachment(value)) {
+    return value;
+  }
+
+  if (!isRecord(value) || typeof value["appId"] !== "string") {
+    return null;
+  }
+
+  // Durable Objects persist hibernating socket attachments across releases.
+  // Normalize the pre-Project shape when an older socket wakes up.
+  const normalized: unknown = { ...value, projectId: value["appId"] };
+  return isViewerSocketAttachment(normalized) ? normalized : null;
+}

@@ -7,8 +7,8 @@
 -- The retired channel/wechat tables removed from the schema by #577 are
 -- deliberately NOT dropped here: physically dropping them is a destructive
 -- migration that needs its own approval, backup, and rollback plan.
--- Wrangler's local D1 SQLite runs with legacy_alter_table enabled. Disable it
--- while renaming so SQLite rewrites self-qualified CHECK constraints such as
+-- Keep D1's default legacy_alter_table behavior disabled while renaming so
+-- SQLite rewrites self-qualified CHECK constraints such as
 -- app_deployment.source_kind to their new Project table names.
 PRAGMA legacy_alter_table = OFF;--> statement-breakpoint
 ALTER TABLE `app` RENAME TO `project`;--> statement-breakpoint
@@ -87,4 +87,4 @@ CREATE INDEX `usage_daily_rollup_project_date_idx` ON `usage_daily_rollup` (`pro
 CREATE INDEX `usage_event_project_created_idx` ON `usage_event` (`project_id`,`created_at`);--> statement-breakpoint
 CREATE INDEX `vendor_credential_project_vendor_idx` ON `vendor_credential` (`project_id`,`vendor_id`);--> statement-breakpoint
 CREATE UNIQUE INDEX `vendor_credential_project_vendor_name_idx` ON `vendor_credential` (`project_id`,`vendor_id`,`name`);--> statement-breakpoint
-PRAGMA legacy_alter_table = ON;
+PRAGMA legacy_alter_table = OFF;

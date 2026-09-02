@@ -486,11 +486,8 @@ async function repairCandidates(
 
   const remainingCandidates = candidates.slice(1);
 
-  function createRepairQuery(
-    projectDatabase: AppDatabase,
-    candidate: RepairableCostLedgerCandidate,
-  ) {
-    const query = createRuntimeUsageEventInsertIfMissing(projectDatabase, candidate.input);
+  function createRepairQuery(appDatabase: AppDatabase, candidate: RepairableCostLedgerCandidate) {
+    const query = createRuntimeUsageEventInsertIfMissing(appDatabase, candidate.input);
 
     if (query === null) {
       throw new Error("Repairable cost ledger candidate produced no usage event write.");

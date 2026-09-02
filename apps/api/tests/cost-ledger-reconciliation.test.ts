@@ -909,7 +909,7 @@ describe("cost ledger reconciliation", () => {
     await processApiCommandMessage(bindings, recorded.message, () => NOW_MS);
 
     const command = await database
-      .project()
+      .app()
       .select({ kind: apiCommandsTable.kind, status: apiCommandsTable.status })
       .from(apiCommandsTable)
       .where(eq(apiCommandsTable.id, queued.commandId))

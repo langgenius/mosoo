@@ -4,7 +4,7 @@ import { PLANNED_RUNTIME_DISPLAY_CATALOG, RUNTIME_CATALOG } from "@mosoo/runtime
 import { getRuntimeIconKey } from "@mosoo/runtime-catalog/icons";
 
 // The /icons entry point resolves icon keys from a generated map instead of
-// the full catalog so the web project can render RuntimeIcon without shipping
+// the full catalog so the web app can render RuntimeIcon without shipping
 // @mosoo/contracts on every page. These tests pin the map to the catalog: if
 // they diverge, the generated file is stale or the generator drifted.
 describe("getRuntimeIconKey (lean /icons entry point)", () => {

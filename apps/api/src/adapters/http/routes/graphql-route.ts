@@ -13,8 +13,8 @@ async function getGraphQLGateway(): Promise<ReturnType<typeof createGraphQLGatew
   return gatewayPromise;
 }
 
-export function registerGraphQLRoute(project: Hono<ApiGatewayEnvironment>) {
-  project.all("/graphql", async (c) => {
+export function registerGraphQLRoute(app: Hono<ApiGatewayEnvironment>) {
+  app.all("/graphql", async (c) => {
     const graphqlGateway = await getGraphQLGateway();
 
     // @ts-expect-error -- Cloudflare Request<unknown, CfProperties> vs whatwg-node Request

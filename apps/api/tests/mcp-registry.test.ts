@@ -113,7 +113,7 @@ function createMcpRegistryDatabase(input: { includeServers?: boolean } = {}): Sq
       url
     )
     VALUES
-      ('${PROJECT_MCP_SERVER_ID}', 'bearer', 1, 'app', NULL, 1, 'Project MCP', '${VIEWER_ID}', '${PROJECT_ID}', 'app', 1, 'https://project.example.com/mcp'),
+      ('${PROJECT_MCP_SERVER_ID}', 'bearer', 1, 'app', NULL, 1, 'Project MCP', '${VIEWER_ID}', '${PROJECT_ID}', 'app', 1, 'https://app.example.com/mcp'),
       ('${PROJECT_MCP_SERVER_WITHOUT_CREDENTIAL_ID}', 'bearer', 2, 'app', NULL, 1, 'Unconfigured MCP', '${VIEWER_ID}', '${PROJECT_ID}', 'app', 2, 'https://unconfigured.example.com/mcp'),
       ('${OTHER_OWNER_MCP_SERVER_ID}', 'bearer', 3, 'app', NULL, 1, 'Other Owner MCP', '01J00000000000000000000001', '${PROJECT_ID}', 'app', 3, 'https://other-owner.example.com/mcp');
 

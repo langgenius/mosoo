@@ -96,7 +96,7 @@ describe("API command queue", () => {
       },
     ]);
 
-    const rows = await database.project().select().from(apiCommandsTable).all();
+    const rows = await database.app().select().from(apiCommandsTable).all();
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
       id: firstId,
@@ -121,7 +121,7 @@ describe("API command queue", () => {
     expect(queue.sent).toEqual([]);
     await expect(
       database
-        .project()
+        .app()
         .select()
         .from(apiCommandsTable)
         .where(eq(apiCommandsTable.id, admission.commandId))
@@ -158,7 +158,7 @@ describe("API command queue", () => {
     await processApiCommandMessage(bindings, recorded.message, nowMsForTest);
 
     const row = await database
-      .project()
+      .app()
       .select({
         lastErrorCode: apiCommandsTable.lastErrorCode,
         status: apiCommandsTable.status,
@@ -200,7 +200,7 @@ describe("API command queue", () => {
     }
 
     const row = await database
-      .project()
+      .app()
       .select({
         lastErrorCode: apiCommandsTable.lastErrorCode,
         status: apiCommandsTable.status,
@@ -251,7 +251,7 @@ describe("API command queue", () => {
 
     expect(sent).toHaveLength(1);
     const row = await database
-      .project()
+      .app()
       .select({
         lastErrorCode: apiCommandsTable.lastErrorCode,
         lastErrorMessage: apiCommandsTable.lastErrorMessage,
@@ -276,7 +276,7 @@ describe("API command queue", () => {
     const commandId = "01J0000000000000000000000C";
 
     await database
-      .project()
+      .app()
       .insert(apiCommandsTable)
       .values({
         attemptCount: 0,
@@ -298,7 +298,7 @@ describe("API command queue", () => {
     await redriveFailedApiCommandEnqueues(bindings);
 
     const row = await database
-      .project()
+      .app()
       .select({
         lastErrorCode: apiCommandsTable.lastErrorCode,
         lastErrorMessage: apiCommandsTable.lastErrorMessage,
@@ -341,7 +341,7 @@ describe("API command queue", () => {
     ).resolves.toBe(true);
 
     const row = await database
-      .project()
+      .app()
       .select({
         claimExpiresAt: apiCommandsTable.claimExpiresAt,
       })

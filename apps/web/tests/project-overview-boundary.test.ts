@@ -179,4 +179,17 @@ describe("Project overview boundary", () => {
     const cjk = /[一-鿿]/u;
     expect(cjk.test(en)).toBe(false);
   });
+
+  test("does not advertise the retired Project Deployment flow", () => {
+    const localePaths = ["en.json", "ja.json", "zh-CN.json", "zh-TW.json"];
+    const retiredDeploymentCopy = /Deploy a Project|プロジェクトをデプロイ|部署项目|部署專案/u;
+
+    for (const localePath of localePaths) {
+      const translations = JSON.parse(
+        readSource(`../src/shared/i18n/translations/${localePath}`),
+      ) as { projectOverview: { setupPrompt: string } };
+
+      expect(translations.projectOverview.setupPrompt).not.toMatch(retiredDeploymentCopy);
+    }
+  });
 });

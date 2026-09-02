@@ -166,9 +166,9 @@ async function createRuntimeCommandRecordAttempt(
     if (externalToolEffectIntent === null) {
       await getAppDatabase(database).insert(driverCommandsTable).values(commandValues).run();
     } else {
-      await runAppDatabaseBatch(database, (projectDatabase) => [
-        projectDatabase.insert(driverCommandsTable).values(commandValues),
-        projectDatabase.insert(externalToolEffectsTable).values(externalToolEffectIntent),
+      await runAppDatabaseBatch(database, (appDatabase) => [
+        appDatabase.insert(driverCommandsTable).values(commandValues),
+        appDatabase.insert(externalToolEffectsTable).values(externalToolEffectIntent),
       ]);
     }
 

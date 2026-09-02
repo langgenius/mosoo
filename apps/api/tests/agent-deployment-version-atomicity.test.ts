@@ -50,7 +50,7 @@ describe("agent deployment version atomicity", () => {
     const nowMs = nowMsForTest();
 
     await database
-      .project()
+      .app()
       .insert(agentsTable)
       .values({
         configJson: INITIAL_CONFIG_JSON,

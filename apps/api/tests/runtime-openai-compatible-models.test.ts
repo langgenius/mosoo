@@ -91,7 +91,7 @@ function createAvailableModelsDatabase(): D1Database {
 }
 
 describe("OpenAI-compatible runtime model support", () => {
-  test("makes current custom models available for OpenAI project-server runtime", async () => {
+  test("makes current custom models available for OpenAI app-server runtime", async () => {
     const entries = await resolveAvailableModels(createAvailableModelsDatabase(), {
       currentModelId: "qwen-coder",
       currentVendorId: VENDOR_OPENAI_COMPATIBLE.vendorId,

@@ -23,8 +23,8 @@ function errorResponse(error: unknown): Response {
   return Response.json({ error: "Owner debug terminal request failed." }, { status: 500 });
 }
 
-export function registerOwnerDebugTerminalRoute(project: Hono<ApiGatewayEnvironment>): void {
-  project.get("/agent/:agentId/owner-debug-terminal/ws", async (c) => {
+export function registerOwnerDebugTerminalRoute(app: Hono<ApiGatewayEnvironment>): void {
+  app.get("/agent/:agentId/owner-debug-terminal/ws", async (c) => {
     try {
       const viewer = await getViewerFromRequest(c.env, c.req.raw);
       if (!viewer) {

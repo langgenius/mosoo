@@ -29,5 +29,5 @@ Credentials are encrypted, are never shown again after entry, and stay inside th
 For Driver-managed custom tool execution, the signed `X-Mosoo-Delegation` JWT
 includes the same `tool_call_id` exposed by Public Thread events. Business MCP
 servers should verify the JWT, enforce a uniqueness boundary such as
-`(project_id, tool_call_id)`, and return the stored result on duplicate delivery.
+`(app_id, tool_call_id)`, and return the stored result on duplicate delivery.
 This is an idempotency key, not an exactly-once guarantee.

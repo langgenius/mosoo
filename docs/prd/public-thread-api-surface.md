@@ -52,7 +52,7 @@ Agent's API Access panel shows its identifier, token creation, and API reference
   listing, replay, and SSE reconnects instead of pairing human-readable text.
 - `toolCallId` is an idempotency key, not an exactly-once guarantee. A
   write-capable integration should enforce a uniqueness boundary such as
-  `(project_id, tool_call_id)` and return its stored result when the call is
+  `(app_id, tool_call_id)` and return its stored result when the call is
   delivered again.
 - Thread files include explicit attachments and recorded Agent artifacts, not a
   complete runtime workspace. Thread history also does not guarantee that every

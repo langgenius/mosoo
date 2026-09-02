@@ -119,9 +119,9 @@ export async function listIdleSessionScopedConversationSessions(
     readonly limit: number;
   },
 ): Promise<Array<{ sandboxId: SandboxId; sessionId: SessionId }>> {
-  const projectDb = getAppDatabase(database);
+  const appDb = getAppDatabase(database);
 
-  return projectDb
+  return appDb
     .select({
       sandboxId: sandboxSessionsTable.sandboxId,
       sessionId: sandboxSessionsTable.sessionId,
@@ -134,12 +134,12 @@ export async function listIdleSessionScopedConversationSessions(
         eq(sandboxSessionsTable.status, "active"),
         eq(sandboxesTable.kind, "cattle"),
         sql`${sandboxSessionsTable.updatedAt} <= ${input.idleSinceLte}`,
-        notExists(runLeaseQueryForListedSubject(projectDb)),
+        notExists(runLeaseQueryForListedSubject(appDb)),
         or(
           eq(sessionsTable.workspaceCheckpointRequired, false),
           isNull(sessionsTable.lastRunId),
           notExists(
-            projectDb
+            appDb
               .select({ id: sessionRunsTable.id })
               .from(sessionRunsTable)
               .where(
@@ -150,7 +150,7 @@ export async function listIdleSessionScopedConversationSessions(
               ),
           ),
           exists(
-            projectDb
+            appDb
               .select({ id: sandboxBackupsTable.id })
               .from(sandboxBackupsTable)
               .where(
@@ -193,8 +193,8 @@ export async function claimIdleSessionScopedConversationForClose(
     return false;
   }
 
-  const projectDb = getAppDatabase(database);
-  const claimed = await projectDb
+  const appDb = getAppDatabase(database);
+  const claimed = await appDb
     .update(sandboxSessionsTable)
     .set({ status: "closed", updatedAt: input.now })
     .where(
@@ -204,7 +204,7 @@ export async function claimIdleSessionScopedConversationForClose(
         eq(sandboxSessionsTable.sandboxSessionId, input.sandboxSessionId),
         eq(sandboxSessionsTable.status, "active"),
         lte(sandboxSessionsTable.updatedAt, input.idleSinceLte),
-        notExists(runLeaseQuery(projectDb, input.runtimeSubjectId)),
+        notExists(runLeaseQuery(appDb, input.runtimeSubjectId)),
       ),
     )
     .returning({ sessionId: sandboxSessionsTable.sessionId })
@@ -274,8 +274,8 @@ export async function recordRuntimeConversationSessionError(
     readonly sessionId: SessionId;
   },
 ): Promise<void> {
-  await runAppDatabaseBatch(database, (projectDb) => [
-    projectDb
+  await runAppDatabaseBatch(database, (appDb) => [
+    appDb
       .insert(sandboxSessionsTable)
       .values({
         sandboxSessionId: input.sandboxSessionId,
@@ -294,7 +294,7 @@ export async function recordRuntimeConversationSessionError(
         },
         target: sandboxSessionsTable.sessionId,
       }),
-    projectDb
+    appDb
       .update(sandboxesTable)
       .set({
         lastError: input.message,
@@ -332,8 +332,8 @@ export async function recordRuntimeConversationSessionActive(
     input.now,
   );
 
-  await runAppDatabaseBatch(database, (projectDb) => [
-    projectDb
+  await runAppDatabaseBatch(database, (appDb) => [
+    appDb
       .insert(sandboxSessionsTable)
       .values({
         sandboxSessionId: input.sandboxSessionId,
@@ -354,7 +354,7 @@ export async function recordRuntimeConversationSessionActive(
         },
         target: sandboxSessionsTable.sessionId,
       }),
-    projectDb
+    appDb
       .update(sandboxesTable)
       .set({
         inactiveDeadlineAt: sql`
@@ -379,15 +379,15 @@ export async function recordRuntimeConversationSessionClosed(
     readonly sessionId: SessionId;
   },
 ): Promise<void> {
-  await runAppDatabaseBatch(database, (projectDb) => [
-    projectDb
+  await runAppDatabaseBatch(database, (appDb) => [
+    appDb
       .update(sandboxSessionsTable)
       .set({
         status: "closed",
         updatedAt: input.now,
       })
       .where(eq(sandboxSessionsTable.sessionId, input.sessionId)),
-    projectDb
+    appDb
       .update(sandboxesTable)
       .set({
         inactiveDeadlineAt: input.inactiveDeadlineAt,
@@ -396,8 +396,8 @@ export async function recordRuntimeConversationSessionClosed(
       .where(
         and(
           eq(sandboxesTable.id, input.runtimeSubjectId),
-          notExists(activeConversationSessionQuery(projectDb, input.runtimeSubjectId)),
-          notExists(runLeaseQuery(projectDb, input.runtimeSubjectId)),
+          notExists(activeConversationSessionQuery(appDb, input.runtimeSubjectId)),
+          notExists(runLeaseQuery(appDb, input.runtimeSubjectId)),
         ),
       ),
   ]);

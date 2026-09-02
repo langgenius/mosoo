@@ -5,10 +5,10 @@ import { getViewerFromRequest } from "../../../modules/auth/application/viewer-a
 import { connectAuthenticatedSessionViewerWebSocket } from "../../../modules/sessions/application/session-viewer-socket.service";
 import type { ApiGatewayEnvironment } from "../../../platform/cloudflare/worker-types";
 
-export function registerRootRoute(project: Hono<ApiGatewayEnvironment>) {
-  project.get("/", (c) => c.redirect(`${PUBLIC_API_PREFIX}/graphql`));
+export function registerRootRoute(app: Hono<ApiGatewayEnvironment>) {
+  app.get("/", (c) => c.redirect(`${PUBLIC_API_PREFIX}/graphql`));
 
-  project.get(`${PUBLIC_API_PREFIX}/ag-ui/session/:sessionId/ws`, async (c) => {
+  app.get(`${PUBLIC_API_PREFIX}/ag-ui/session/:sessionId/ws`, async (c) => {
     const viewer = await getViewerFromRequest(c.env, c.req.raw);
 
     if (!viewer) {
@@ -20,7 +20,8 @@ export function registerRootRoute(project: Hono<ApiGatewayEnvironment>) {
       );
     }
 
-    const projectId = c.req.query("projectId");
+    // Old browser tabs can reconnect during the rolling API/Web release.
+    const projectId = c.req.query("projectId") ?? c.req.query("appId");
     const sessionId = c.req.param("sessionId");
 
     try {

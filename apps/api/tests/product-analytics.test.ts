@@ -31,7 +31,7 @@ describe("server product analytics", () => {
     await captureServerProductEvent(bindings, {
       distinctId: "acct_123",
       event: "project_created",
-      properties: { project_id: "project_123" },
+      properties: { project_id: "app_123" },
     });
     expect(requests).toHaveLength(0);
   });
@@ -54,7 +54,7 @@ describe("server product analytics", () => {
         distinctId: "acct_123",
         event: "project_created",
         properties: {
-          project_id: "project_123",
+          project_id: "app_123",
           organization_id: "org_123",
         },
       },
@@ -66,7 +66,7 @@ describe("server product analytics", () => {
     expect(requests[0]?.body["event"]).toBe("project_created");
     const properties = requests[0]?.body["properties"] as Record<string, unknown>;
     expect(properties).toEqual({
-      project_id: "project_123",
+      project_id: "app_123",
       deployment_mode: "cloud",
       distinct_id: "acct_123",
       environment: "test",

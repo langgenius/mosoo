@@ -138,8 +138,8 @@ function toFileEntry(file: FileRecord): FileEntry {
   };
 }
 
-export function registerFileRoute(project: Hono<ApiGatewayEnvironment>) {
-  project.get("/files", async (c) => {
+export function registerFileRoute(app: Hono<ApiGatewayEnvironment>) {
+  app.get("/files", async (c) => {
     try {
       const viewer = await getAuthenticatedViewerFromRequest(c.env, c.req.raw);
 
@@ -161,7 +161,7 @@ export function registerFileRoute(project: Hono<ApiGatewayEnvironment>) {
     }
   });
 
-  project.post("/files", async (c) => {
+  app.post("/files", async (c) => {
     try {
       const viewer = await getAuthenticatedViewerFromRequest(c.env, c.req.raw);
 
@@ -177,7 +177,7 @@ export function registerFileRoute(project: Hono<ApiGatewayEnvironment>) {
     }
   });
 
-  project.get("/files/:fileId/upload", async (c) => {
+  app.get("/files/:fileId/upload", async (c) => {
     try {
       const viewer = await getAuthenticatedViewerFromRequest(c.env, c.req.raw);
 
@@ -197,7 +197,7 @@ export function registerFileRoute(project: Hono<ApiGatewayEnvironment>) {
     }
   });
 
-  project.put("/files/:fileId/content", async (c) => {
+  app.put("/files/:fileId/content", async (c) => {
     try {
       const viewer = await getAuthenticatedViewerFromRequest(c.env, c.req.raw);
 
@@ -217,7 +217,7 @@ export function registerFileRoute(project: Hono<ApiGatewayEnvironment>) {
     }
   });
 
-  project.put("/files/:fileId/parts/:partNumber", async (c) => {
+  app.put("/files/:fileId/parts/:partNumber", async (c) => {
     try {
       const viewer = await getAuthenticatedViewerFromRequest(c.env, c.req.raw);
 
@@ -239,7 +239,7 @@ export function registerFileRoute(project: Hono<ApiGatewayEnvironment>) {
     }
   });
 
-  project.post("/files/:fileId/complete", async (c) => {
+  app.post("/files/:fileId/complete", async (c) => {
     try {
       const viewer = await getAuthenticatedViewerFromRequest(c.env, c.req.raw);
 
@@ -261,7 +261,7 @@ export function registerFileRoute(project: Hono<ApiGatewayEnvironment>) {
     }
   });
 
-  project.delete("/files/:fileId/upload", async (c) => {
+  app.delete("/files/:fileId/upload", async (c) => {
     try {
       const viewer = await getAuthenticatedViewerFromRequest(c.env, c.req.raw);
 
@@ -280,7 +280,7 @@ export function registerFileRoute(project: Hono<ApiGatewayEnvironment>) {
     }
   });
 
-  project.get("/files/:fileId/content", async (c) => {
+  app.get("/files/:fileId/content", async (c) => {
     try {
       const viewer = await getAuthenticatedViewerFromRequest(c.env, c.req.raw);
 
@@ -305,7 +305,7 @@ export function registerFileRoute(project: Hono<ApiGatewayEnvironment>) {
     }
   });
 
-  project.patch("/files/:fileId", async (c) => {
+  app.patch("/files/:fileId", async (c) => {
     try {
       const viewer = await getAuthenticatedViewerFromRequest(c.env, c.req.raw);
 
@@ -327,7 +327,7 @@ export function registerFileRoute(project: Hono<ApiGatewayEnvironment>) {
     }
   });
 
-  project.delete("/files/:fileId", async (c) => {
+  app.delete("/files/:fileId", async (c) => {
     try {
       const viewer = await getAuthenticatedViewerFromRequest(c.env, c.req.raw);
 

@@ -20,9 +20,9 @@ This repository is a monorepo:
 | Path                   | Description                                                                                                                     |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | `apps/api`             | Cloudflare Worker API with GraphQL, auth, sessions, runtime control plane, and D1/R2/DO bindings.                               |
-| `apps/web`             | React console project built with Vite Plus and deployed as Cloudflare Worker assets on `cloud.mosoo.ai`.                            |
+| `apps/web`             | React console app built with Vite Plus and deployed as Cloudflare Worker assets on `cloud.mosoo.ai`.                            |
 | `apps/driver`          | Agent Driver bundle used by API Worker / Sandbox paths.                                                                         |
-| `pkgs/contracts`       | Cross-boundary TypeScript contracts and parser surfaces; cross project / package DTOs should go here first.                         |
+| `pkgs/contracts`       | Cross-boundary TypeScript contracts and parser surfaces; cross app / package DTOs should go here first.                         |
 | `pkgs/db`              | Drizzle schema and its append-only D1 migration chain.                                                                          |
 | `pkgs/*`               | Runtime-neutral shared packages for events, policy, package format, observability, dev auth, effects, and related capabilities. |
 | `e2e`                  | Playwright local acceptance scripts and runtime signal contract checks.                                                         |
@@ -99,7 +99,7 @@ Start the regular local stack:
 just dev
 ```
 
-This command runs local D1 migration first, then starts the driver build, API Worker, and web project.
+This command runs local D1 migration first, then starts the driver build, API Worker, and web app.
 
 Default local URLs:
 
@@ -256,7 +256,7 @@ Keep changes small, direct, and aligned with existing boundaries.
 - Prefer existing repository patterns over new abstractions.
 - Separate pure transformation logic from I/O, framework lifecycle, and platform APIs.
 - Put shared contracts, cross-package payloads, and public schemas in shared packages only when they truly cross boundaries.
-- Keep project-local types, view models, and implementation details inside their owning module.
+- Keep app-local types, view models, and implementation details inside their owning module.
 - Keep TypeScript strict and do not introduce `any`.
 - Prefer semantically clear named types for exported APIs, avoiding complex inline types that pollute interfaces.
 - Put platform-specific implementation only at platform boundaries; shared packages must stay runtime-neutral.

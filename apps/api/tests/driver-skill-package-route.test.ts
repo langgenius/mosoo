@@ -56,17 +56,17 @@ function ensureSkillRouteTables(
   `);
 }
 
-function createDriverRouteTestProject(): Hono<ApiGatewayEnvironment> {
-  const project = new Hono<ApiGatewayEnvironment>();
-  registerDriverRoute(project);
-  return project;
+function createDriverRouteTestApp(): Hono<ApiGatewayEnvironment> {
+  const app = new Hono<ApiGatewayEnvironment>();
+  registerDriverRoute(app);
+  return app;
 }
 
 async function insertSkillSnapshot(
   database: Awaited<ReturnType<typeof createPublicHttpContractDatabase>>,
 ) {
   await database
-    .project()
+    .app()
     .insert(skillSnapshotsTable)
     .values({
       projectId: PUBLIC_API_TEST_IDS.project,
@@ -91,7 +91,7 @@ async function insertDriverInstance(
 ) {
   const nowMs = Date.now();
   await database
-    .project()
+    .app()
     .insert(driverInstancesTable)
     .values({
       bootTokenExpiresAt: nowMs + 60_000,
@@ -152,7 +152,7 @@ describe("driver skill package route", () => {
     await insertDriverInstance(database, "provisioning");
     await bucket.put(SKILL_BLOB_KEY, "skill-zip");
 
-    const response = await createDriverRouteTestProject().request(
+    const response = await createDriverRouteTestApp().request(
       await createSkillDownloadRequest(bindings),
       undefined,
       bindings,
@@ -176,7 +176,7 @@ describe("driver skill package route", () => {
     await insertDriverInstance(database, "ready");
     await bucket.put(SKILL_BLOB_KEY, "skill-zip");
 
-    const response = await createDriverRouteTestProject().request(
+    const response = await createDriverRouteTestApp().request(
       await createSkillDownloadRequest(bindings),
       undefined,
       bindings,
@@ -196,7 +196,7 @@ describe("driver skill package route", () => {
     ensureSkillRouteTables(database);
     await insertDriverInstance(database, "provisioning");
 
-    const response = await createDriverRouteTestProject().request(
+    const response = await createDriverRouteTestApp().request(
       await createSkillDownloadRequest(bindings, SKILL_SNAPSHOT_ID, OTHER_SKILL_SNAPSHOT_ID),
       undefined,
       bindings,

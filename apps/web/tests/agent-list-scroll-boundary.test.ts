@@ -7,7 +7,7 @@ function readSource(path: string): string {
 
 describe("Agent list scroll boundaries", () => {
   test("agent list page fills the shell content box so the list can scroll", () => {
-    const projectShellSource = readSource("../src/app/app-shell.tsx");
+    const appShellSource = readSource("../src/app/app-shell.tsx");
     const agentListSource = readSource("../src/routes/agent/agent-list.route.tsx");
     const listPageSource = readSource("../src/shared/ui/list-page.tsx");
 
@@ -15,7 +15,7 @@ describe("Agent list scroll boundaries", () => {
     // A page root only inherits that bound through an explicit height; `flex-1`
     // alone lets it grow with its rows, so `overflow-hidden` clipped the tail of
     // the Agents table instead of `ListPageContent` scrolling it.
-    expect(projectShellSource).toContain(
+    expect(appShellSource).toContain(
       '<div className="min-h-0 flex-1 overflow-hidden">{children}</div>',
     );
     expect(agentListSource).toContain('<div className="flex h-full flex-col overflow-hidden">');

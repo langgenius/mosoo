@@ -6,7 +6,7 @@ import { cn } from "@/shared/lib/class-names";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 
 // Loaded on demand the first time Help is opened. The dialog drags in the Radix
-// dialog primitive and the help-docs search index, none of which the project shell
+// dialog primitive and the help-docs search index, none of which the app shell
 // needs for its initial render, so it stays out of the entry bundle that loads
 // on every page.
 const HelpDocsDialog = lazy(async () => {
@@ -50,7 +50,7 @@ export function HelpMenu({
   }
 
   // Press "?" anywhere outside a text field to open help, matching the common
-  // shortcut used by other projects.
+  // shortcut used by other apps.
   useEffect(() => {
     if (!shortcutEnabled) {
       return;

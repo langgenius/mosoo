@@ -183,8 +183,8 @@ export async function upsertSessionModelCallUsage(
     usage,
   } satisfies Parameters<typeof createRuntimeUsageEventUpsert>[1];
 
-  await runAppDatabaseBatch(database, (projectDatabase) => {
-    const modelCallUpsert = projectDatabase
+  await runAppDatabaseBatch(database, (appDatabase) => {
+    const modelCallUpsert = appDatabase
       .insert(sessionModelCallsTable)
       .values({
         cacheCreationTokens: toTokenCount(usage.cachedWriteTokens),
@@ -236,7 +236,7 @@ export async function upsertSessionModelCallUsage(
         },
         target: [sessionModelCallsTable.sessionRunId, sessionModelCallsTable.callKey],
       });
-    const usageEventUpsert = createRuntimeUsageEventUpsert(projectDatabase, usageEventInput);
+    const usageEventUpsert = createRuntimeUsageEventUpsert(appDatabase, usageEventInput);
 
     return usageEventUpsert === null ? [modelCallUpsert] : [modelCallUpsert, usageEventUpsert];
   });

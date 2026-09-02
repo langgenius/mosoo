@@ -476,7 +476,7 @@ async function proxyRuntimeMcpRequest(
   });
 }
 
-export function registerDriverRoute(project: Hono<ApiGatewayEnvironment>) {
+export function registerDriverRoute(app: Hono<ApiGatewayEnvironment>) {
   const driver = new Hono<ApiGatewayEnvironment>();
 
   driver.get("/socket", async (c) => {
@@ -859,5 +859,5 @@ export function registerDriverRoute(project: Hono<ApiGatewayEnvironment>) {
     }
   });
 
-  project.route(getRuntimeDriverRoutePrefix(), driver);
+  app.route(getRuntimeDriverRoutePrefix(), driver);
 }

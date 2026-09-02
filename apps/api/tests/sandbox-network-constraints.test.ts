@@ -22,12 +22,12 @@ describe("sandbox network constraints", () => {
   test("limited policy merges system and environment hosts, deduped and sorted", () => {
     expect(
       resolveSandboxNetworkConstraints({
-        environmentAllowedHosts: ["API.Example.com", "mcp.linear.project"],
+        environmentAllowedHosts: ["API.Example.com", "mcp.linear.app"],
         networkPolicy: "limited",
         systemHosts: ["api.anthropic.com", "api.example.com"],
       }),
     ).toEqual({
-      allowedHosts: ["api.anthropic.com", "api.example.com", "mcp.linear.project"],
+      allowedHosts: ["api.anthropic.com", "api.example.com", "mcp.linear.app"],
       networkPolicy: "limited",
     });
   });

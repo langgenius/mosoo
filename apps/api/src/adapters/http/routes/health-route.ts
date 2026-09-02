@@ -2,8 +2,8 @@ import type { Hono } from "hono";
 
 import type { ApiGatewayEnvironment } from "../../../platform/cloudflare/worker-types";
 
-export function registerHealthRoute(project: Hono<ApiGatewayEnvironment>) {
-  project.get("/health", async (c) => {
+export function registerHealthRoute(app: Hono<ApiGatewayEnvironment>) {
+  app.get("/health", async (c) => {
     if (c.req.query("deep") !== "1") {
       return c.json({
         name: c.env.APP_NAME,

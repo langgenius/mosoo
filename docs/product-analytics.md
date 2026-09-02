@@ -4,7 +4,7 @@ mosoo sends explicit, low-volume product events to one PostHog Cloud project. Br
 
 ## Identity and privacy
 
-- Before login, the web project uses a persistent random `mosoo_anon_*` ID.
+- Before login, the web app uses a persistent random `mosoo_anon_*` ID.
 - After login, `$identify` joins that anonymous history to the stable mosoo account ID.
 - `$identify` sets `$internal_or_test_user` for `@dify.ai` accounts so PostHog can exclude internal traffic without receiving the email address.
 - Logout creates a fresh anonymous ID so two accounts on one browser are not mixed.
@@ -30,11 +30,13 @@ Authoritative API events:
 
 Common properties include `environment`, `deployment_mode`, and the relevant `organization_id`, `project_id`, `agent_id`, integration type, or runtime identifiers. Person identity is the stable account ID.
 
+The App-to-Project release starts the `project_created` event and `project_id` property. Insights spanning that release must include legacy `app_created` events and coalesce the legacy `app_id` property with `project_id`; historical PostHog events are not rewritten.
+
 ## Configuration
 
 Create one PostHog Cloud project and copy its **Project API key** (the public `phc_...` ingestion key) and regional ingestion host.
 
-Configure the GitHub `try` environment secret `POSTHOG_PROJECT_KEY`. The deploy workflow injects it as `VITE_POSTHOG_PROJECT_KEY` while building the web project.
+Configure the GitHub `try` environment secret `POSTHOG_PROJECT_KEY`. The deploy workflow injects it as `VITE_POSTHOG_PROJECT_KEY` while building the web app.
 
 Set the same key on the API Worker:
 

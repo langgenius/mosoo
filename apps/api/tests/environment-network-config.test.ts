@@ -15,9 +15,9 @@ function normalizeLimitedHosts(allowedHosts: string[]): string[] {
 
 describe("environment network configuration", () => {
   test("accepts canonical domains and rejects IP literals or invalid DNS labels", () => {
-    expect(normalizeLimitedHosts([" API.Example.com ", "mcp.linear.project"])).toEqual([
+    expect(normalizeLimitedHosts([" API.Example.com ", "mcp.linear.app"])).toEqual([
       "api.example.com",
-      "mcp.linear.project",
+      "mcp.linear.app",
     ]);
 
     for (const host of [

@@ -321,14 +321,14 @@ async function allocateOneRuntimeEventPerSession(
   const sessionIds = [...new Set(records.map((record) => record.sessionId))];
   const recordsBySessionId = new Map(records.map((record) => [record.sessionId, record]));
   const allocations = new Map<SessionId, OneRuntimeEventPerSessionAllocation>();
-  const projectDb = getAppDatabase(database);
+  const appDb = getAppDatabase(database);
 
   for (const sessionId of sessionIds) {
     const record = recordsBySessionId.get(sessionId);
     const allowTerminatedSession =
       record === undefined ? false : canWriteAfterTerminatedSession([record]);
     const session =
-      (await projectDb
+      (await appDb
         .update(sessionsTable)
         .set({
           runtimeEventSeqCursor: sql`${sessionsTable.runtimeEventSeqCursor} + 1`,
@@ -421,11 +421,11 @@ async function insertSessionEventRows(
     };
   }
 
-  const projectDatabase = getAppDatabase(database);
+  const appDatabase = getAppDatabase(database);
   const statements: D1PreparedStatement[] = [];
 
   for (let index = 0; index < values.length; index += MAX_SESSION_EVENT_ROWS_PER_INSERT) {
-    const query = projectDatabase
+    const query = appDatabase
       .insert(sessionEventsTable)
       .values(values.slice(index, index + MAX_SESSION_EVENT_ROWS_PER_INSERT))
       .onConflictDoNothing({

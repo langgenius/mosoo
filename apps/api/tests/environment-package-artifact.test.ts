@@ -87,12 +87,12 @@ describe("Environment package artifacts", () => {
     await expect(
       resolveReadyEnvironmentPackageArtifact(bindings, PROJECT_ID, JSON.stringify(packages)),
     ).rejects.toMatchObject({ code: "ENVIRONMENT_ARTIFACT_PREPARING" });
-    const [command] = await database.project().select().from(apiCommandsTable).all();
+    const [command] = await database.app().select().from(apiCommandsTable).all();
     if (!command) {
       throw new Error("Expected artifact command.");
     }
     await database
-      .project()
+      .app()
       .update(apiCommandsTable)
       .set({
         lastErrorCode: "package_install_failed",
@@ -121,7 +121,7 @@ describe("Environment package artifacts", () => {
     expect(artifactQueue.sent).toHaveLength(2);
     await expect(
       database
-        .project()
+        .app()
         .select()
         .from(apiCommandsTable)
         .where(eq(apiCommandsTable.id, command.id))

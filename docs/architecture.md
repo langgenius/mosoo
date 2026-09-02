@@ -90,7 +90,7 @@ graph TD
     FileBucket[(R2 FILE_BUCKET<br/>Session & internal file objects)]
     SandboxStateBucket[(R2 SANDBOX_STATE_BUCKET<br/>Sandbox State Objects)]
 
-    Client <==> |HTTPS: Project Shell / Assets| WebWorker
+    Client <==> |HTTPS: App Shell / Assets| WebWorker
     Client <==> |HTTPS: Same-Origin /api/*| Ingress
     Client <==> |AG-UI WebSocket Session<br/>after Worker handoff| Session
     Runtime --> |Provision & Lifecycle| CF_Sandbox
@@ -148,7 +148,7 @@ Except for runtime boundaries such as Session Durable Objects and Sandbox instan
 
 4. **File Service**
    The File Service is the storage boundary for shipped Session attachments/artifacts and internal file scopes. `library` exists as a Project-scoped record type, but no current user-facing create/upload path makes it a shipped Files Library product:
-   - **Abstraction and permission control**: Session, account, Agent-package, and Public API draft records are scoped implementation records. The reserved library scope is not a Project source tree and does not revive the retired Project Builder concept.
+   - **Abstraction and permission control**: Session, account, Agent-package, and Public API draft records are scoped implementation records. The reserved library scope is not an App source tree and does not revive the retired App Builder concept.
    - **Upload/download data plane**: Browser-side large uploads and downloads may use presigned URLs to avoid API memory pressure. Current user upload targets reject `library`; the Files page lists/downloads accessible records and runtime gets no shared writable library mount.
    - **Dormant library versioning**: Copy-on-write and `file_version` primitives exist for a future library write path, but no production UI/API currently reaches destructive library overwrite or move-overwrite. They are plumbing, not a shipped recovery guarantee.
    - **Session file resources**: Session File / Session Resource is the explicit attachment layer for files uploaded by a user or added through the Public API. The File Service stores them as `file_record(scope_kind=session, session_kind=attachment)` plus an R2 object, then injects a readable path manifest into the next Agent input. Session Files are not an automatic snapshot of the entire Session working directory, and Sandbox temporary files are not promoted into long-lived assets by default.
@@ -274,7 +274,7 @@ sequenceDiagram
     participant Driver as Driver: Agent Driver
     participant AgentProc as Agent Process
 
-    Client->>Web: Request project shell / assets
+    Client->>Web: Request app shell / assets
     Web-->>Client: HTML / assets
 
     Client->>Ingress: GraphQL: createAgentSession(agentId, type?, waitForRuntimeReady?)

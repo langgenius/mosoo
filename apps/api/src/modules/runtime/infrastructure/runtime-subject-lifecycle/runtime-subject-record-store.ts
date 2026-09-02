@@ -548,7 +548,7 @@ export async function markRuntimeSubjectOperationStarted(
   },
 ): Promise<boolean> {
   const now = input.now ?? currentTimestampMs();
-  const projectDb = getAppDatabase(database);
+  const appDb = getAppDatabase(database);
   const claimPredicate =
     input.claimOwner === undefined
       ? or(
@@ -557,7 +557,7 @@ export async function markRuntimeSubjectOperationStarted(
           lte(sandboxesTable.claimExpiresAt, now),
         )
       : eq(sandboxesTable.claimOwner, input.claimOwner);
-  const result = await projectDb
+  const result = await appDb
     .update(sandboxesTable)
     .set({
       claimExpiresAt: null,
@@ -579,8 +579,8 @@ export async function markRuntimeSubjectOperationStarted(
         claimPredicate,
         ...(input.source === "maintenance"
           ? [
-              notExists(activeSessionRunQueryForListedSubject(projectDb)),
-              notExists(runLeaseQuery(projectDb, input.runtimeSubjectId)),
+              notExists(activeSessionRunQueryForListedSubject(appDb)),
+              notExists(runLeaseQuery(appDb, input.runtimeSubjectId)),
             ]
           : []),
       ),

@@ -33,7 +33,9 @@ export const retiredProjectDeploymentsStorage = sqliteTable(
     updatedAt: integer("updated_at").notNull(),
   },
   (table) => [
-    check("project_deployment_source_kind_check", sql`${table.sourceKind} IN ('github_public')`),
+    // SQLite's metadata-only table rename keeps CHECK constraint names intact.
+    // Freeze these legacy physical names so the schema matches production D1.
+    check("app_deployment_source_kind_check", sql`${table.sourceKind} IN ('github_public')`),
     uniqueIndex("project_deployment_active_project_idx")
       .on(table.projectId)
       .where(sql`${table.deletedAt} IS NULL`),
@@ -69,11 +71,11 @@ export const retiredProjectDeploymentRunsStorage = sqliteTable(
   },
   (table) => [
     check(
-      "project_deployment_run_status_check",
+      "app_deployment_run_status_check",
       sql`${table.status} IN ('queued', 'preparing', 'building', 'submitting', 'submitted', 'activating', 'success', 'failed')`,
     ),
     check(
-      "project_deployment_run_target_kind_check",
+      "app_deployment_run_target_kind_check",
       sql`${table.targetKind} IS NULL OR ${table.targetKind} IN ('cloudflare_pages', 'cloudflare_worker')`,
     ),
     index("project_deployment_run_project_id_idx").on(table.projectId, table.id),
