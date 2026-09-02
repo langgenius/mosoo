@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import type { AccountId, McpOAuthFlowId, McpServerId, AppId } from "@mosoo/id";
+import type { AccountId, McpOAuthFlowId, McpServerId, ProjectId } from "@mosoo/id";
 
 import {
   deleteMcpOAuthFlowClientSecret,
@@ -14,8 +14,8 @@ import type { OAuthFlowRow, ServerRow } from "../src/modules/mcp/application/mcp
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
-const APP_ID = "01J00000000000000000000002" as AppId;
-const OTHER_APP_ID = "01J00000000000000000000009" as AppId;
+const PROJECT_ID = "01J00000000000000000000002" as ProjectId;
+const OTHER_PROJECT_ID = "01J00000000000000000000009" as ProjectId;
 const OWNER_ID = "01J00000000000000000000003" as AccountId;
 const OTHER_ACCOUNT_ID = "01J00000000000000000000004" as AccountId;
 const SERVER_ID = "01J00000000000000000000005" as McpServerId;
@@ -72,7 +72,7 @@ function createServer(input: Partial<ServerRow> = {}): ServerRow {
     oauthMetadataJson: null,
     ownerId: OWNER_ID,
     ownerName: "Owner",
-    appId: APP_ID,
+    projectId: PROJECT_ID,
     source: "app",
     updatedAt: 1,
     url: "https://mcp.example.com",
@@ -90,7 +90,7 @@ function createFlow(input: Partial<OAuthFlowRow> = {}): OAuthFlowRow {
     initiatorUserId: OWNER_ID,
     oauthClientId: "client",
     oauthClientSecretSecretId: MISSING_SECRET_ID,
-    appId: APP_ID,
+    projectId: PROJECT_ID,
     returnUrl: null,
     scopeValuesJson: "[]",
     serverId: SERVER_ID,
@@ -110,7 +110,7 @@ describe("MCP OAuth secret resolution", () => {
     const serverSecretId = await storeMcpOAuthServerClientSecret(bindings as ApiBindings, {
       actor: createActor(),
       purpose: "oauth_server_create_client_secret",
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       secretKind: "server_client_secret",
       server,
       value: "server-client-secret",
@@ -119,7 +119,7 @@ describe("MCP OAuth secret resolution", () => {
       actor: createActor(),
       flow,
       purpose: "oauth_flow_start_client_secret",
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       secretKind: "flow_client_secret",
       value: "flow-client-secret",
     });
@@ -128,7 +128,7 @@ describe("MCP OAuth secret resolution", () => {
       readMcpOAuthServerClientSecret(bindings, {
         actor: createActor(),
         purpose: "oauth_authorization_client_secret",
-        appId: APP_ID,
+        projectId: PROJECT_ID,
         secretKind: "server_client_secret",
         server: createServer({ byoClientSecretSecretId: serverSecretId }),
       }),
@@ -142,7 +142,7 @@ describe("MCP OAuth secret resolution", () => {
         actor: createActor(),
         flow: createFlow({ oauthClientSecretSecretId: flowSecretId }),
         purpose: "oauth_callback_client_secret",
-        appId: APP_ID,
+        projectId: PROJECT_ID,
         secretKind: "flow_client_secret",
         server: createServer(),
       }),
@@ -159,20 +159,20 @@ describe("MCP OAuth secret resolution", () => {
       actor: createActor(),
       flow: createFlow(),
       purpose: "oauth_flow_start_client_secret",
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       secretKind: "flow_client_secret",
       value: "wrong-kind",
     });
 
     const cases: {
       actorAccountId?: AccountId;
-      appId?: AppId;
+      projectId?: ProjectId;
       reason: McpOAuthSecretReadDenialReason;
       server?: Partial<ServerRow>;
     }[] = [
       {
-        appId: OTHER_APP_ID,
-        reason: "server_app_mismatch",
+        projectId: OTHER_PROJECT_ID,
+        reason: "server_project_mismatch",
       },
       {
         reason: "server_auth_type_mismatch",
@@ -199,7 +199,7 @@ describe("MCP OAuth secret resolution", () => {
       const outcome = await readMcpOAuthServerClientSecret(bindings, {
         actor: createActor(testCase.actorAccountId ?? OWNER_ID),
         purpose: "oauth_authorization_client_secret",
-        appId: testCase.appId ?? APP_ID,
+        projectId: testCase.projectId ?? PROJECT_ID,
         secretKind: "server_client_secret",
         server: createServer(testCase.server),
       });
@@ -217,7 +217,7 @@ describe("MCP OAuth secret resolution", () => {
     const wrongKindSecretId = await storeMcpOAuthServerClientSecret(bindings as ApiBindings, {
       actor: createActor(),
       purpose: "oauth_server_create_client_secret",
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       secretKind: "server_client_secret",
       server: createServer(),
       value: "wrong-kind",
@@ -226,13 +226,13 @@ describe("MCP OAuth secret resolution", () => {
     const cases: {
       actorAccountId?: AccountId;
       flow?: Partial<OAuthFlowRow>;
-      appId?: AppId;
+      projectId?: ProjectId;
       reason: McpOAuthSecretReadDenialReason;
       server?: Partial<ServerRow>;
     }[] = [
       {
-        flow: { appId: OTHER_APP_ID },
-        reason: "flow_app_mismatch",
+        flow: { projectId: OTHER_PROJECT_ID },
+        reason: "flow_project_mismatch",
       },
       {
         flow: { serverId: OTHER_SERVER_ID },
@@ -264,7 +264,7 @@ describe("MCP OAuth secret resolution", () => {
         actor: createActor(testCase.actorAccountId ?? OWNER_ID),
         flow: createFlow(testCase.flow),
         purpose: "oauth_callback_client_secret",
-        appId: testCase.appId ?? APP_ID,
+        projectId: testCase.projectId ?? PROJECT_ID,
         secretKind: "flow_client_secret",
         server: createServer(testCase.server),
       });
@@ -284,14 +284,14 @@ describe("MCP OAuth secret resolution", () => {
       actor: createActor(),
       flow,
       purpose: "oauth_flow_start_client_secret",
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       secretKind: "flow_client_secret",
       value: "flow-client-secret",
     });
     const wrongKindSecretId = await storeMcpOAuthServerClientSecret(bindings as ApiBindings, {
       actor: createActor(),
       purpose: "oauth_server_create_client_secret",
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       secretKind: "server_client_secret",
       server: createServer(),
       value: "server-client-secret",
@@ -305,7 +305,7 @@ describe("MCP OAuth secret resolution", () => {
         },
         flow,
         purpose: "oauth_flow_terminal_cleanup",
-        appId: APP_ID,
+        projectId: PROJECT_ID,
         secretId: wrongKindSecretId,
         secretKind: "flow_client_secret",
       }),
@@ -322,7 +322,7 @@ describe("MCP OAuth secret resolution", () => {
         },
         flow,
         purpose: "oauth_flow_terminal_cleanup",
-        appId: APP_ID,
+        projectId: PROJECT_ID,
         secretId: flowSecretId,
         secretKind: "flow_client_secret",
       }),
@@ -333,7 +333,7 @@ describe("MCP OAuth secret resolution", () => {
         actor: createActor(),
         flow: createFlow({ oauthClientSecretSecretId: flowSecretId }),
         purpose: "oauth_callback_client_secret",
-        appId: APP_ID,
+        projectId: PROJECT_ID,
         secretKind: "flow_client_secret",
         server: createServer(),
       }),

@@ -41,9 +41,9 @@ interface SessionStreamSnapshot {
   readonly sessionId: string | null;
 }
 
-function buildSessionSocketUrl(appId: string, sessionId: string): string {
+function buildSessionSocketUrl(projectId: string, sessionId: string): string {
   const url = new URL(`/api/ag-ui/session/${sessionId}/ws`, globalThis.location.origin);
-  url.searchParams.set("appId", appId);
+  url.searchParams.set("projectId", projectId);
   url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
   return url.toString();
 }
@@ -65,7 +65,7 @@ function createSessionStreamSnapshot(sessionId: string | null): SessionStreamSna
 }
 
 export function useSessionStreamSocket(
-  appId: string | null,
+  projectId: string | null,
   sessionId: string | null,
 ): {
   activeSessionIdRef: MutableRefObject<string | null>;
@@ -154,8 +154,8 @@ export function useSessionStreamSocket(
 
   const connectToSession = useCallback(
     async (targetSessionId: string): Promise<WebSocket> => {
-      if (!isTruthy(appId)) {
-        throw new Error("App id is required to open a session stream.");
+      if (!isTruthy(projectId)) {
+        throw new Error("Project id is required to open a session stream.");
       }
 
       const { current } = socketRef;
@@ -171,7 +171,7 @@ export function useSessionStreamSocket(
       closeSocket("session.changed");
 
       const openDeferred = createPromiseDeferred<WebSocket>();
-      const socket = new WebSocket(buildSessionSocketUrl(appId, targetSessionId));
+      const socket = new WebSocket(buildSessionSocketUrl(projectId, targetSessionId));
 
       const controller: SocketController = {
         manuallyClosed: false,
@@ -260,7 +260,7 @@ export function useSessionStreamSocket(
 
       return controller.openPromise;
     },
-    [closeSocket, appId, queueSocketEvents],
+    [closeSocket, projectId, queueSocketEvents],
   );
 
   const sendViewerEvent = useCallback<SessionStreamEventSender>(
@@ -305,7 +305,7 @@ export function useSessionStreamSocket(
   );
 
   useEffect(() => {
-    if (!isTruthy(appId) || !isTruthy(sessionId)) {
+    if (!isTruthy(projectId) || !isTruthy(sessionId)) {
       closeSocket("session.cleared");
       return;
     }
@@ -315,7 +315,7 @@ export function useSessionStreamSocket(
     return () => {
       closeSocket("session.effect.cleanup");
     };
-  }, [closeSocket, connectToSession, appId, sessionId]);
+  }, [closeSocket, connectToSession, projectId, sessionId]);
 
   useEffect(() => {
     liveStateRef.current = scopedSnapshot.liveState;

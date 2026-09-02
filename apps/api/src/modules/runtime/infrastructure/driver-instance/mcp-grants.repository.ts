@@ -4,7 +4,7 @@ import type {
   CredentialId,
   DriverInstanceId,
   McpServerId,
-  AppId,
+  ProjectId,
   SkillSnapshotId,
 } from "@mosoo/id";
 import { and, eq, inArray } from "drizzle-orm";
@@ -18,7 +18,7 @@ export interface DriverInstanceMcpGrantRecord {
   canInvalidate: boolean;
   canRefresh: boolean;
   credentialId: CredentialId | null;
-  appId: AppId;
+  projectId: ProjectId;
   serverId: McpServerId;
 }
 
@@ -55,7 +55,7 @@ async function readDriverInstanceMcpProxyGrant(
         canRefresh: driverInstanceMcpGrantsTable.canRefresh,
         credentialId: driverInstanceMcpGrantsTable.credentialId,
         driverInstanceId: driverInstanceMcpGrantsTable.driverInstanceId,
-        appId: driverInstanceMcpGrantsTable.appId,
+        projectId: driverInstanceMcpGrantsTable.projectId,
         serverId: driverInstanceMcpGrantsTable.serverId,
       })
       .from(driverInstanceMcpGrantsTable)
@@ -78,7 +78,7 @@ async function readDriverInstanceMcpProxyGrant(
     canInvalidate: grant.canInvalidate,
     canRefresh: grant.canRefresh,
     credentialId: grant.credentialId,
-    appId: grant.appId,
+    projectId: grant.projectId,
     serverId: grant.serverId,
   };
 }
@@ -130,7 +130,7 @@ export async function requireDriverInstanceGrant(
         canRefresh: driverInstanceMcpGrantsTable.canRefresh,
         credentialId: driverInstanceMcpGrantsTable.credentialId,
         driverInstanceId: driverInstanceMcpGrantsTable.driverInstanceId,
-        appId: driverInstanceMcpGrantsTable.appId,
+        projectId: driverInstanceMcpGrantsTable.projectId,
         serverId: driverInstanceMcpGrantsTable.serverId,
       })
       .from(driverInstanceMcpGrantsTable)
@@ -191,7 +191,7 @@ async function requireDriverInstanceMcpProxyGrant(
     canInvalidate: grant.canInvalidate,
     canRefresh: grant.canRefresh,
     credentialId: grant.credentialId,
-    appId: grant.appId,
+    projectId: grant.projectId,
     serverId: grant.serverId,
   };
 }

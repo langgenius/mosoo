@@ -2,16 +2,16 @@ import { describe, expect, test } from "bun:test";
 
 import { createDefaultAgentBuiltInTools } from "@mosoo/contracts/agent";
 
-import { ensureAppAgentOwner } from "../src/modules/agents/application/agent-access.service";
+import { ensureProjectAgentOwner } from "../src/modules/agents/application/agent-access.service";
 import { getAgentRow } from "../src/modules/agents/application/agent-repository";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
 const AGENT_ACCESS_IDS = {
   organization: "01J00000000000000000000006",
-  otherApp: "01J0000000000000000000000R",
+  otherProject: "01J0000000000000000000000R",
   ownerAccount: "01J00000000000000000000001",
   ownerAgent: "01J00000000000000000000021",
-  app: "01J0000000000000000000000Q",
+  project: "01J0000000000000000000000Q",
   viewerAccount: "01J00000000000000000000011",
 } as const;
 
@@ -25,7 +25,7 @@ function createAgentAccessDatabase(): SqliteD1Database {
       name text
     );
 
-    CREATE TABLE app (
+    CREATE TABLE project (
       id text PRIMARY KEY NOT NULL,
       organization_id text NOT NULL,
       owner_account_id text NOT NULL,
@@ -46,7 +46,7 @@ function createAgentAccessDatabase(): SqliteD1Database {
       model text NOT NULL,
       name text NOT NULL,
       owner_account_id text NOT NULL,
-      app_id text NOT NULL,
+      project_id text NOT NULL,
       prompt text NOT NULL,
       provider text NOT NULL,
       runtime_id text NOT NULL,
@@ -60,7 +60,7 @@ function createAgentAccessDatabase(): SqliteD1Database {
       ('${AGENT_ACCESS_IDS.ownerAccount}', NULL, 'Owner'),
       ('${AGENT_ACCESS_IDS.viewerAccount}', NULL, 'Viewer');
 
-    INSERT INTO app (
+    INSERT INTO project (
       id,
       organization_id,
       owner_account_id,
@@ -70,18 +70,18 @@ function createAgentAccessDatabase(): SqliteD1Database {
     )
     VALUES
       (
-        '${AGENT_ACCESS_IDS.app}',
+        '${AGENT_ACCESS_IDS.project}',
         '${AGENT_ACCESS_IDS.organization}',
         '${AGENT_ACCESS_IDS.ownerAccount}',
-        'Default App',
+        'Default Project',
         1,
         1
       ),
       (
-        '${AGENT_ACCESS_IDS.otherApp}',
+        '${AGENT_ACCESS_IDS.otherProject}',
         '${AGENT_ACCESS_IDS.organization}',
         '${AGENT_ACCESS_IDS.ownerAccount}',
-        'Other App',
+        'Other Project',
         1,
         1
       );
@@ -94,7 +94,7 @@ function createAgentAccessDatabase(): SqliteD1Database {
       model,
       name,
       owner_account_id,
-      app_id,
+      project_id,
       prompt,
       provider,
       runtime_id,
@@ -110,7 +110,7 @@ function createAgentAccessDatabase(): SqliteD1Database {
       'gpt-5.4',
       'Owner Agent',
       '${AGENT_ACCESS_IDS.ownerAccount}',
-      '${AGENT_ACCESS_IDS.app}',
+      '${AGENT_ACCESS_IDS.project}',
       'Help',
       'openai',
       'openai-runtime',
@@ -123,17 +123,17 @@ function createAgentAccessDatabase(): SqliteD1Database {
   return database;
 }
 
-describe("app agent access", () => {
-  test("resolves owner access with explicit App proof", async () => {
+describe("project agent access", () => {
+  test("resolves owner access with explicit Project proof", async () => {
     const database = createAgentAccessDatabase();
 
-    const access = await ensureAppAgentOwner(database, AGENT_ACCESS_IDS.ownerAccount, {
+    const access = await ensureProjectAgentOwner(database, AGENT_ACCESS_IDS.ownerAccount, {
       agentId: AGENT_ACCESS_IDS.ownerAgent,
-      appId: AGENT_ACCESS_IDS.app,
+      projectId: AGENT_ACCESS_IDS.project,
     });
 
     expect(access.agent.id).toBe(AGENT_ACCESS_IDS.ownerAgent);
-    expect(access.agent.appId).toBe(AGENT_ACCESS_IDS.app);
+    expect(access.agent.projectId).toBe(AGENT_ACCESS_IDS.project);
     expect(access.owner).toMatchObject({
       id: AGENT_ACCESS_IDS.ownerAccount,
       name: "Owner",
@@ -145,20 +145,20 @@ describe("app agent access", () => {
     const database = createAgentAccessDatabase();
 
     await expect(
-      ensureAppAgentOwner(database, AGENT_ACCESS_IDS.viewerAccount, {
+      ensureProjectAgentOwner(database, AGENT_ACCESS_IDS.viewerAccount, {
         agentId: AGENT_ACCESS_IDS.ownerAgent,
-        appId: AGENT_ACCESS_IDS.app,
+        projectId: AGENT_ACCESS_IDS.project,
       }),
     ).rejects.toThrow();
   });
 
-  test("fails closed when the App proof does not match the Agent", async () => {
+  test("fails closed when the Project proof does not match the Agent", async () => {
     const database = createAgentAccessDatabase();
 
     await expect(
-      ensureAppAgentOwner(database, AGENT_ACCESS_IDS.ownerAccount, {
+      ensureProjectAgentOwner(database, AGENT_ACCESS_IDS.ownerAccount, {
         agentId: AGENT_ACCESS_IDS.ownerAgent,
-        appId: AGENT_ACCESS_IDS.otherApp,
+        projectId: AGENT_ACCESS_IDS.otherProject,
       }),
     ).rejects.toThrow();
   });
@@ -166,7 +166,7 @@ describe("app agent access", () => {
   test("normalizes legacy empty stored config when reading Agent rows", async () => {
     const agent = await getAgentRow(createAgentAccessDatabase(), AGENT_ACCESS_IDS.ownerAgent);
 
-    expect(agent.appId).toBe(AGENT_ACCESS_IDS.app);
+    expect(agent.projectId).toBe(AGENT_ACCESS_IDS.project);
     expect(JSON.parse(agent.configJson)).toEqual({
       builtInTools: createDefaultAgentBuiltInTools(),
       packageMcpServers: [],

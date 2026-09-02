@@ -1,5 +1,11 @@
 import type { Agent } from "@mosoo/contracts/agent";
-import type { AccountId, AgentDeploymentVersionId, AgentId, EnvironmentId, AppId } from "@mosoo/id";
+import type {
+  AccountId,
+  AgentDeploymentVersionId,
+  AgentId,
+  EnvironmentId,
+  ProjectId,
+} from "@mosoo/id";
 
 export interface AgentRow {
   configJson: string;
@@ -12,7 +18,7 @@ export interface AgentRow {
   model: string;
   name: string;
   ownerId: AccountId;
-  appId: AppId;
+  projectId: ProjectId;
   prompt: string;
   provider: string;
   runtimeId: string;

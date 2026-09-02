@@ -20,13 +20,14 @@ export function registerRootRoute(app: Hono<ApiGatewayEnvironment>) {
       );
     }
 
-    const appId = c.req.query("appId");
+    // Old browser tabs can reconnect during the rolling API/Web release.
+    const projectId = c.req.query("projectId") ?? c.req.query("appId");
     const sessionId = c.req.param("sessionId");
 
     try {
       return await connectAuthenticatedSessionViewerWebSocket(c.env, {
         executionContext: c.executionCtx,
-        appId: appId ?? "",
+        projectId: projectId ?? "",
         request: c.req.raw,
         sessionId,
         viewer,

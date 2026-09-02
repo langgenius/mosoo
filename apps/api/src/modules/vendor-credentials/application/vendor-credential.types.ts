@@ -1,4 +1,4 @@
-import type { PlatformId, AppId, VendorCredentialId } from "@mosoo/id";
+import type { PlatformId, ProjectId, VendorCredentialId } from "@mosoo/id";
 
 export interface VendorCredentialRow {
   apiBase: string | null;
@@ -7,7 +7,7 @@ export interface VendorCredentialRow {
   isDefault: boolean;
   modelsJson: string[] | null;
   name: string;
-  appId: AppId;
+  projectId: ProjectId;
   vendorId: string;
 }
 
@@ -26,7 +26,7 @@ export interface ResolvedVendorCredential {
  */
 export interface ResolvedVendorCredentialRef {
   apiBase: string | null;
-  appId: AppId;
+  projectId: ProjectId;
   credentialId: VendorCredentialId;
   models: string[] | null;
   vendorId: string;

@@ -5,7 +5,7 @@ import { createDefaultAgentBuiltInTools } from "@mosoo/contracts/agent";
 import type { AgentManifest } from "@mosoo/contracts/agent-manifest";
 import { AGENT_MANIFEST_VERSION } from "@mosoo/contracts/agent-manifest";
 import { parsePlatformId } from "@mosoo/id";
-import type { AccountId, OrganizationId, AppId, SkillId } from "@mosoo/id";
+import type { AccountId, OrganizationId, ProjectId, SkillId } from "@mosoo/id";
 
 import { createDraftAgent } from "../src/modules/agents/application/agent-package-draft.service";
 import { resolvePackageSkills } from "../src/modules/agents/application/agent-package-resolution.service";
@@ -14,7 +14,7 @@ import { SqliteD1Database } from "./helpers/sqlite-d1";
 const DRAFT_IDS = {
   organization: parsePlatformId<OrganizationId>("01J00000000000000000000006"),
   owner: parsePlatformId<AccountId>("01J00000000000000000000001"),
-  app: parsePlatformId<AppId>("01J00000000000000000000002"),
+  project: parsePlatformId<ProjectId>("01J00000000000000000000002"),
   skill: parsePlatformId<SkillId>("01J00000000000000000000003"),
 } as const;
 
@@ -22,7 +22,7 @@ function createAgentPackageDraftDatabase(): SqliteD1Database {
   const database = new SqliteD1Database({ foreignKeys: false });
 
   database.execute(`
-    CREATE TABLE app (
+    CREATE TABLE project (
       created_at integer NOT NULL,
       default_environment_id text,
       id text PRIMARY KEY NOT NULL,
@@ -43,7 +43,7 @@ function createAgentPackageDraftDatabase(): SqliteD1Database {
       model text NOT NULL,
       name text NOT NULL,
       owner_account_id text NOT NULL,
-      app_id text NOT NULL,
+      project_id text NOT NULL,
       prompt text NOT NULL,
       provider text NOT NULL,
       runtime_id text NOT NULL,
@@ -60,7 +60,7 @@ function createAgentPackageDraftDatabase(): SqliteD1Database {
       PRIMARY KEY (agent_id, skill_id)
     );
 
-    INSERT INTO app (
+    INSERT INTO project (
       created_at,
       default_environment_id,
       id,
@@ -69,7 +69,7 @@ function createAgentPackageDraftDatabase(): SqliteD1Database {
       owner_account_id,
       updated_at
     )
-    VALUES (1, NULL, '${DRAFT_IDS.app}', 'Draft App', '${DRAFT_IDS.organization}', '${DRAFT_IDS.owner}', 1);
+    VALUES (1, NULL, '${DRAFT_IDS.project}', 'Draft Project', '${DRAFT_IDS.organization}', '${DRAFT_IDS.owner}', 1);
   `);
 
   return database;
@@ -84,7 +84,7 @@ function createPackageResolutionDatabase(): SqliteD1Database {
       name text
     );
 
-    CREATE TABLE app (
+    CREATE TABLE project (
       id text PRIMARY KEY NOT NULL,
       created_at integer NOT NULL,
       default_environment_id text,
@@ -109,7 +109,7 @@ function createPackageResolutionDatabase(): SqliteD1Database {
       id text PRIMARY KEY NOT NULL,
       name text NOT NULL,
       owner_account_id text NOT NULL,
-      app_id text NOT NULL,
+      project_id text NOT NULL,
       source_kind text NOT NULL,
       updated_at integer NOT NULL,
       version text
@@ -129,7 +129,7 @@ function createPackageResolutionDatabase(): SqliteD1Database {
 	    INSERT INTO organization (id)
 	    VALUES ('${DRAFT_IDS.organization}');
 
-    INSERT INTO app (
+    INSERT INTO project (
       id,
       created_at,
       default_environment_id,
@@ -138,7 +138,7 @@ function createPackageResolutionDatabase(): SqliteD1Database {
       owner_account_id,
       updated_at
     )
-    VALUES ('${DRAFT_IDS.app}', 1, NULL, 'Draft App', '${DRAFT_IDS.organization}', '${DRAFT_IDS.owner}', 1);
+    VALUES ('${DRAFT_IDS.project}', 1, NULL, 'Draft Project', '${DRAFT_IDS.organization}', '${DRAFT_IDS.owner}', 1);
   `);
 
   return database;
@@ -161,7 +161,7 @@ describe("agent package draft", () => {
       prompt: "Help",
       provider: "openai",
       providerOptions: {},
-      appId: DRAFT_IDS.app,
+      projectId: DRAFT_IDS.project,
       runtimeId: "openai-runtime",
       skillIds: [DRAFT_IDS.skill, DRAFT_IDS.skill],
     });
@@ -174,7 +174,7 @@ describe("agent package draft", () => {
       model: "gpt-5.4",
       name: "Imported Agent",
       ownerId: DRAFT_IDS.owner,
-      appId: DRAFT_IDS.app,
+      projectId: DRAFT_IDS.project,
       prompt: "Help",
       provider: "openai",
       runtimeId: "openai-runtime",
@@ -214,7 +214,7 @@ describe("agent package draft", () => {
         prompt: "Help",
         provider: "openai",
         providerOptions: {},
-        appId: DRAFT_IDS.app,
+        projectId: DRAFT_IDS.project,
         runtimeId: "openai-runtime",
         skillIds: ["package:docs" as SkillId],
       }),
@@ -268,7 +268,7 @@ describe("agent package draft", () => {
       database: createPackageResolutionDatabase(),
       issues,
       manifest,
-      appId: DRAFT_IDS.app,
+      projectId: DRAFT_IDS.project,
       summary,
       viewerId: DRAFT_IDS.owner,
     });

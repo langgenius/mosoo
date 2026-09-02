@@ -26,7 +26,7 @@ export function readAgentPackageFromRecord(
   manifest: AgentManifest,
 ): AgentPackage {
   return {
-    app: {
+    project: {
       avatarAssetKey: readNullableStringFromUnknown(input["avatar"]),
       description: readNullableString(input, "description"),
       name: readString(input, "name") ?? manifest.metadata.name,

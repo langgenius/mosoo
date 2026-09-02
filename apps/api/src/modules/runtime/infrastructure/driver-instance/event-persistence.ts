@@ -17,7 +17,7 @@ import type { SessionRunTransitionOutcome } from "../session-runs/session-run-st
 import { persistAssistantMessageProjection } from "./assistant-message-projection";
 import { compactRuntimeDriverRunTransitions } from "./event-projection";
 import type {
-  AppRuntimeDriverEventsResult,
+  ProjectRuntimeDriverEventsResult,
   RuntimeDriverRunTransition,
   RuntimeSessionLink,
   SessionLiveState,
@@ -139,7 +139,7 @@ export async function persistProjectedRuntimeDriverEvents(
   bindings: ApiBindings,
   input: {
     driverInstanceId: DriverInstanceId;
-    projection: AppRuntimeDriverEventsResult;
+    projection: ProjectRuntimeDriverEventsResult;
   },
 ): Promise<PersistProjectedRuntimeDriverEventsResult> {
   const database = bindings.DB;
@@ -380,7 +380,7 @@ export async function persistProjectedRuntimeDriverEvents(
       event: SERVER_PRODUCT_ANALYTICS_EVENTS.taskSucceeded,
       properties: {
         agent_id: link.agentId,
-        app_id: link.appId,
+        project_id: link.projectId,
         run_id: link.sessionRunId,
         run_duration_ms: runDurationMs,
         sandbox_id: link.sandboxId,

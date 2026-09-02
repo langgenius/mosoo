@@ -1,7 +1,10 @@
 import { parsePlatformId } from "@mosoo/id";
 
-import type { AccountId, FileId, AppId, SessionId } from "../id/id.contract";
+import type { AccountId, FileId, ProjectId, SessionId } from "../id/id.contract";
 
+// These discriminator values predate the Project rename and are persisted in
+// D1 / public file payloads. Keep them as wire compatibility tokens; ProjectId
+// is the canonical owner identity in every active contract.
 export const FILE_SCOPE_KINDS = [
   "account",
   "agent_package",
@@ -242,8 +245,8 @@ export function choosePartSize(size: number): number {
   return Math.max(basePartSize, MIN_MULTIPART_PART_SIZE_BYTES);
 }
 
-export type FileScopeId = AccountId | AppId | SessionId | null;
-export type FileOwnerId = AccountId | AppId | SessionId;
+export type FileScopeId = AccountId | ProjectId | SessionId | null;
+export type FileOwnerId = AccountId | ProjectId | SessionId;
 
 export function createScope(scopeKind: FileScopeKind, scopeId: FileScopeId): FileScope {
   return {
@@ -364,7 +367,7 @@ export function createFileObjectKey(file: FileObjectKeyInput): string {
   }
 
   if (file.scope.kind === "app_draft") {
-    return `app-draft/${file.scope.id}/attachment/${file.id}/${fileName}`;
+    return `project-draft/${file.scope.id}/attachment/${file.id}/${fileName}`;
   }
 
   if (file.scope.kind === "agent_package") {
@@ -471,7 +474,7 @@ export interface FileEntry {
 }
 
 export interface FileListQuery {
-  appId: AppId;
+  projectId: ProjectId;
   scopeId?: FileScopeId;
   scopeKind?: FileScopeKind;
   sessionId?: SessionId;
@@ -494,7 +497,7 @@ export interface CreateAccountAvatarUploadTarget {
 }
 
 export interface CreateLibraryFileUploadTarget {
-  id: AppId;
+  id: ProjectId;
   kind: "library";
   path: string;
 }
@@ -503,17 +506,17 @@ export interface CreateSessionFileUploadTarget {
   id: SessionId;
   kind: "session";
   name: string;
-  appId: AppId;
+  projectId: ProjectId;
 }
 
-export interface CreateAppDraftFileUploadTarget {
-  id: AppId;
+export interface CreateProjectDraftFileUploadTarget {
+  id: ProjectId;
   kind: "app_draft";
   name: string;
 }
 
 export interface CreateAgentPackageFileUploadTarget {
-  id: AppId;
+  id: ProjectId;
   kind: "agent_package";
   name: string;
 }
@@ -523,7 +526,7 @@ export type CreateFileUploadTarget =
   | CreateSessionFileUploadTarget
   | CreateLibraryFileUploadTarget
   | CreateAgentPackageFileUploadTarget
-  | CreateAppDraftFileUploadTarget;
+  | CreateProjectDraftFileUploadTarget;
 
 export interface CreateFileUploadRequest {
   file: {

@@ -68,7 +68,7 @@ export async function buildEnvironmentPackageArtifact(
 ): Promise<void> {
   const packages = normalizePackages(payload.packages);
   const key = await createEnvironmentPackageArtifactKey({
-    appId: payload.appId,
+    projectId: payload.projectId,
     artifactAbi: payload.artifactAbi,
     packages,
   });

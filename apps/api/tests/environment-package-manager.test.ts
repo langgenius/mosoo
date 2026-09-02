@@ -5,7 +5,7 @@ import type {
   EnvironmentPackageManager,
 } from "@mosoo/contracts/environment";
 import { createPlatformId } from "@mosoo/id";
-import type { EnvironmentId, AppId } from "@mosoo/id";
+import type { EnvironmentId, ProjectId } from "@mosoo/id";
 
 import {
   normalizeEnvironmentConfigInput,
@@ -54,7 +54,7 @@ function createEnvironmentWriteDatabase(): SqliteD1Database {
       id text PRIMARY KEY NOT NULL,
       name text NOT NULL,
       description text NOT NULL,
-      app_id text NOT NULL,
+      project_id text NOT NULL,
       owner_account_id text,
       current_revision_id text NOT NULL,
       forked_from_environment_id text,
@@ -67,7 +67,7 @@ function createEnvironmentWriteDatabase(): SqliteD1Database {
     CREATE TABLE environment_revision (
       id text PRIMARY KEY NOT NULL,
       environment_id text NOT NULL,
-      app_id text NOT NULL,
+      project_id text NOT NULL,
       network_policy text NOT NULL,
       allow_mcp_servers integer NOT NULL,
       allow_package_managers integer NOT NULL,
@@ -112,7 +112,7 @@ describe("Environment package managers", () => {
       await expect(
         resolveReadyEnvironmentPackageArtifact(
           bindings,
-          createPlatformId<AppId>(),
+          createPlatformId<ProjectId>(),
           JSON.stringify([{ manager, packages: ["legacy"] }]),
         ),
       ).rejects.toThrow(
@@ -125,7 +125,7 @@ describe("Environment package managers", () => {
   test("guards both revision persistence boundaries against bypass writes", async () => {
     const database = createEnvironmentWriteDatabase();
     const environmentId = createPlatformId<EnvironmentId>();
-    const appId = createPlatformId<AppId>();
+    const projectId = createPlatformId<ProjectId>();
     const config = storedConfigWithPackage("cargo");
     const expected =
       "Package manager cargo is not supported by the current Driver runtime. Remove it or replace it with npm or pip before saving.";
@@ -137,7 +137,7 @@ describe("Environment package managers", () => {
           actorId: null,
           config,
           environmentId,
-          appId,
+          projectId,
           timestampMs: 1,
         },
       ),
@@ -152,7 +152,7 @@ describe("Environment package managers", () => {
           environmentId,
           name: "legacy",
           ownerId: null,
-          appId,
+          projectId,
           timestampMs: 1,
         },
       ),

@@ -6,7 +6,7 @@ import type {
   AgentId,
   EnvironmentId,
   McpServerId,
-  AppId,
+  ProjectId,
   SkillId,
 } from "../id/id.contract";
 import type { AgentMcpBinding } from "../mcp/mcp.contract";
@@ -309,7 +309,7 @@ export interface AgentSummary {
   updatedAt: string;
   viewerRole: AgentViewerRole;
   visibility: AgentVisibility;
-  appId: AppId;
+  projectId: ProjectId;
 }
 
 export interface Agent {
@@ -327,7 +327,7 @@ export interface Agent {
   status: AgentStatus;
   updatedAt: string;
   visibility: AgentVisibility;
-  appId: AppId;
+  projectId: ProjectId;
 }
 
 export interface AgentDetail {
@@ -349,7 +349,7 @@ export interface AgentDetail {
   versions: AgentDeploymentVersion[];
   viewerRole: AgentViewerRole;
   visibility: AgentVisibility;
-  appId: AppId;
+  projectId: ProjectId;
 }
 
 export interface AgentReadinessIssue {
@@ -383,7 +383,7 @@ export interface CreateAgentInput {
   provider: string;
   runtimeId: string;
   skillIds: SkillId[];
-  appId: AppId;
+  projectId: ProjectId;
 }
 
 export interface UpdateAgentConfigInput {
@@ -400,17 +400,17 @@ export interface UpdateAgentConfigInput {
   providerOptions: JsonObject;
   runtimeId: string;
   skillIds: SkillId[];
-  appId: AppId;
+  projectId: ProjectId;
 }
 
 export interface DeleteAgentInput {
   agentId: AgentId;
-  appId: AppId;
+  projectId: ProjectId;
 }
 
 export interface PublishAgentInput {
   agentId: AgentId;
-  appId: AppId;
+  projectId: ProjectId;
 }
 
 export type RuntimeStateOperationName = "restartDriver" | "recreateSandbox" | "resetAgentState";
@@ -428,7 +428,7 @@ export interface RuntimeStateOperationInput {
   affectedFields?: string[] | null;
   agentId: AgentId;
   applyActionKind?: RuntimeStateApplyActionKind | null;
-  appId: AppId;
+  projectId: ProjectId;
   targetVersion?: RuntimeStateTargetVersionInput | null;
 }
 

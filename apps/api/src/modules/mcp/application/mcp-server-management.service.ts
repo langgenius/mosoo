@@ -1,21 +1,21 @@
 import type {
-  CreateAppMcpServerInput,
+  CreateProjectMcpServerInput,
   McpServerWithCredential,
-  UpdateAppMcpServerInput,
+  UpdateProjectMcpServerInput,
 } from "@mosoo/contracts/mcp";
 import { agentMcpBindingsTable, mcpServersTable } from "@mosoo/db";
-import type { McpServerId, AppId } from "@mosoo/id";
+import type { McpServerId, ProjectId } from "@mosoo/id";
 import { eq } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../time";
-import { ensureAppOwnership } from "../../apps/application/app.service";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
+import { ensureProjectOwnership } from "../../projects/application/project.service";
 import {
   deleteCredentialArtifactsBatch,
-  getAppCredentialRow,
-  hasAppCredential,
+  getProjectCredentialRow,
+  hasProjectCredential,
   listCredentialRowsByServerId,
   resolveRegistryCredential,
   revokeCredential,
@@ -32,13 +32,13 @@ import {
 } from "./mcp-oauth-secret-resolution";
 import { createMcpServerId, readAccountId } from "./mcp-platform-ids";
 import { ensureServerManageAccess, getServerRow } from "./mcp-server.repository";
-export async function createAppMcpServer(
+export async function createProjectMcpServer(
   bindings: ApiBindings,
   viewer: AuthenticatedViewer,
-  input: CreateAppMcpServerInput,
+  input: CreateProjectMcpServerInput,
 ): Promise<McpServerWithCredential> {
   const viewerId = readAccountId(viewer.id);
-  await ensureAppOwnership(bindings.DB, viewerId, input.appId);
+  await ensureProjectOwnership(bindings.DB, viewerId, input.projectId);
   const now = currentTimestampMs();
   const serverId = createMcpServerId();
   const serverOwner = {
@@ -46,7 +46,7 @@ export async function createAppMcpServer(
     credentialScope: "app" as const,
     id: serverId,
     ownerId: viewerId,
-    appId: input.appId,
+    projectId: input.projectId,
     source: "app" as const,
   };
   const actor = {
@@ -60,7 +60,7 @@ export async function createAppMcpServer(
       ? await storeMcpOAuthServerClientSecret(bindings, {
           actor,
           purpose: "oauth_server_create_client_secret",
-          appId: input.appId,
+          projectId: input.projectId,
           secretKind: "server_client_secret",
           server: serverOwner,
           value: input.oauthClientSecret,
@@ -82,7 +82,7 @@ export async function createAppMcpServer(
         id: serverId,
         name: input.name,
         ownerId: viewerId,
-        appId: input.appId,
+        projectId: input.projectId,
         source: "app",
         updatedAt: now,
         url: parseHttpsUrl(input.url),
@@ -93,7 +93,7 @@ export async function createAppMcpServer(
       command: {
         actor,
         purpose: "oauth_server_create_cleanup",
-        appId: input.appId,
+        projectId: input.projectId,
         secretId: byoClientSecretSecretId,
         secretKind: "server_client_secret",
         server: serverOwner,
@@ -107,15 +107,15 @@ export async function createAppMcpServer(
   return toServerWithCredential(server, null, false);
 }
 
-export async function updateAppMcpServer(
+export async function updateProjectMcpServer(
   database: D1Database,
   viewer: AuthenticatedViewer,
-  input: UpdateAppMcpServerInput,
+  input: UpdateProjectMcpServerInput,
 ): Promise<McpServerWithCredential> {
   const { server: existing } = await ensureServerManageAccess(
     database,
     viewer,
-    input.appId,
+    input.projectId,
     input.serverId,
   );
   const nextUrl = parseHttpsUrl(input.url);
@@ -124,7 +124,7 @@ export async function updateAppMcpServer(
   const urlChanged = nextUrl !== existing.url;
 
   if (urlChanged) {
-    await revokeCredential(database, await getAppCredentialRow(database, existing.id));
+    await revokeCredential(database, await getProjectCredentialRow(database, existing.id));
   }
 
   await getAppDatabase(database)
@@ -143,7 +143,7 @@ export async function updateAppMcpServer(
   const server = await getServerRow(database, input.serverId);
   const [credential, hasCredential] = await Promise.all([
     resolveRegistryCredential(database, server),
-    hasAppCredential(database, server.id),
+    hasProjectCredential(database, server.id),
   ]);
 
   return toServerWithCredential(server, credential, hasCredential);
@@ -152,11 +152,11 @@ export async function updateAppMcpServer(
 export async function setMcpServerEnabled(
   database: D1Database,
   viewer: AuthenticatedViewer,
-  appId: AppId,
+  projectId: ProjectId,
   serverId: McpServerId,
   enabled: boolean,
 ): Promise<McpServerWithCredential> {
-  await ensureServerManageAccess(database, viewer, appId, serverId);
+  await ensureServerManageAccess(database, viewer, projectId, serverId);
   await getAppDatabase(database)
     .update(mcpServersTable)
     .set({ enabled, updatedAt: currentTimestampMs() })
@@ -166,7 +166,7 @@ export async function setMcpServerEnabled(
   const server = await getServerRow(database, serverId);
   const [credential, hasCredential] = await Promise.all([
     resolveRegistryCredential(database, server),
-    hasAppCredential(database, server.id),
+    hasProjectCredential(database, server.id),
   ]);
 
   return toServerWithCredential(server, credential, hasCredential);
@@ -175,10 +175,10 @@ export async function setMcpServerEnabled(
 export async function deleteMcpServer(
   database: D1Database,
   viewer: AuthenticatedViewer,
-  appId: AppId,
+  projectId: ProjectId,
   serverId: McpServerId,
 ): Promise<void> {
-  const { server } = await ensureServerManageAccess(database, viewer, appId, serverId);
+  const { server } = await ensureServerManageAccess(database, viewer, projectId, serverId);
   const [credentialRows, oauthFlowRows] = await Promise.all([
     listCredentialRowsByServerId(database, serverId),
     listOAuthFlowRowsByServerId(database, serverId),
@@ -191,7 +191,7 @@ export async function deleteMcpServer(
       type: "user",
     },
     purpose: "oauth_server_delete_cleanup",
-    appId,
+    projectId,
     secretId: server.byoClientSecretSecretId,
     secretKind: "server_client_secret",
     server,

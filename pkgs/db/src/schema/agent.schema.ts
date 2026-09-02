@@ -8,7 +8,7 @@ import type {
   CredentialId,
   EnvironmentId,
   McpServerId,
-  AppId,
+  ProjectId,
   SkillId,
 } from "@mosoo/id";
 import { sql } from "drizzle-orm";
@@ -39,7 +39,7 @@ export const agentsTable = sqliteTable(
     model: text("model").notNull(),
     name: text("name").notNull(),
     ownerId: platformIdColumn<AccountId>("owner_account_id").notNull(),
-    appId: platformIdColumn<AppId>("app_id").notNull(),
+    projectId: platformIdColumn<ProjectId>("project_id").notNull(),
     prompt: text("prompt").notNull(),
     provider: text("provider").notNull(),
     runtimeId: text("runtime_id").notNull(),
@@ -52,8 +52,8 @@ export const agentsTable = sqliteTable(
       "agent_published_live_deployment_version_check",
       sql`${table.status} <> 'published' OR ${table.liveDeploymentVersionId} IS NOT NULL`,
     ),
-    index("agent_app_owner_account_idx").on(table.appId, table.ownerId),
-    index("agent_app_status_idx").on(table.appId, table.status),
+    index("agent_project_owner_account_idx").on(table.projectId, table.ownerId),
+    index("agent_project_status_idx").on(table.projectId, table.status),
     index("agent_environment_idx").on(table.environmentId),
   ],
 );

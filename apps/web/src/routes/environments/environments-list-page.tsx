@@ -5,15 +5,15 @@ import { useMemo, useState } from "react";
 import { useAppSession } from "@/app/session-provider";
 import {
   deleteEnvironment,
-  setAppDefaultEnvironment,
+  setProjectDefaultEnvironment,
 } from "@/domains/environment/api/environment-client";
 import { CreateEnvironmentDialog } from "@/domains/environment/components/create-environment-dialog";
 import { EnvironmentCliCallout } from "@/domains/environment/components/environment-cli-callout";
 import {
   environmentKeys,
-  useAppEnvironmentsQuery,
+  useProjectEnvironmentsQuery,
 } from "@/domains/environment/query/environment-queries";
-import { toEnvironmentId, toAppId } from "@/routes/typed-id";
+import { toEnvironmentId, toProjectId } from "@/routes/typed-id";
 import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import { EmptyState } from "@/shared/ui/empty-state";
@@ -26,35 +26,35 @@ import { filterEnvironments } from "./environments-list-model";
 
 export function EnvironmentsListPage() {
   const { t } = useTranslation();
-  const { activeAppId } = useAppSession();
-  const appId = activeAppId;
-  const environmentsQuery = useAppEnvironmentsQuery(appId);
+  const { activeProjectId } = useAppSession();
+  const projectId = activeProjectId;
+  const environmentsQuery = useProjectEnvironmentsQuery(projectId);
   const queryClient = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
 
   const defaultMutation = useMutation({
-    mutationFn: setAppDefaultEnvironment,
+    mutationFn: setProjectDefaultEnvironment,
     onSuccess: async () => {
-      if (!isTruthy(appId)) {
+      if (!isTruthy(projectId)) {
         return;
       }
 
       await queryClient.invalidateQueries({
-        queryKey: environmentKeys.list(appId),
+        queryKey: environmentKeys.list(projectId),
       });
     },
   });
   const deleteMutation = useMutation({
     mutationFn: deleteEnvironment,
     onSuccess: async () => {
-      if (!isTruthy(appId)) {
+      if (!isTruthy(projectId)) {
         return;
       }
 
       await queryClient.invalidateQueries({
-        queryKey: environmentKeys.list(appId),
+        queryKey: environmentKeys.list(projectId),
       });
     },
   });
@@ -65,14 +65,14 @@ export function EnvironmentsListPage() {
   );
 
   async function handleSetDefault(environmentId: string) {
-    if (!isTruthy(appId)) {
+    if (!isTruthy(projectId)) {
       return;
     }
     setError(null);
     try {
       await defaultMutation.mutateAsync({
         environmentId: toEnvironmentId(environmentId),
-        appId: toAppId(appId),
+        projectId: toProjectId(projectId),
       });
     } catch (caughtError) {
       setError(
@@ -82,21 +82,21 @@ export function EnvironmentsListPage() {
   }
 
   async function handleDelete(environmentId: string) {
-    if (!isTruthy(appId)) {
+    if (!isTruthy(projectId)) {
       return;
     }
     setError(null);
     try {
       await deleteMutation.mutateAsync({
         environmentId: toEnvironmentId(environmentId),
-        appId: toAppId(appId),
+        projectId: toProjectId(projectId),
       });
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : t("environments.deleteFailed"));
     }
   }
 
-  if (!isTruthy(appId)) {
+  if (!isTruthy(projectId)) {
     return null;
   }
 
@@ -171,17 +171,17 @@ export function EnvironmentsListPage() {
 
       <CreateEnvironmentDialog
         onCreated={() => {
-          if (!isTruthy(appId)) {
+          if (!isTruthy(projectId)) {
             return;
           }
 
           void queryClient.invalidateQueries({
-            queryKey: environmentKeys.list(appId),
+            queryKey: environmentKeys.list(projectId),
           });
         }}
         onOpenChange={setCreateOpen}
         open={createOpen}
-        appId={appId}
+        projectId={projectId}
       />
     </div>
   );

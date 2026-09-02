@@ -4,7 +4,7 @@ import {
   agentMcpBindingsTable,
   agentSkillsTable,
   agentsTable,
-  appsTable,
+  projectsTable,
   mcpServersTable,
 } from "@mosoo/db";
 import type {
@@ -12,7 +12,7 @@ import type {
   AgentDeploymentVersionId,
   AgentId,
   EnvironmentId,
-  AppId,
+  ProjectId,
   SkillId,
 } from "@mosoo/id";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
@@ -25,7 +25,7 @@ import {
   readAgentId,
   readEnvironmentId,
   readMcpServerId,
-  readAppId,
+  readProjectId,
 } from "./agent-platform-ids";
 import { normalizeAgentSkillIds } from "./agent-skill-resolution.service";
 import { normalizeAgentStoredConfigJson } from "./agent-stored-config.service";
@@ -42,7 +42,7 @@ const agentRowColumns = {
   model: agentsTable.model,
   name: agentsTable.name,
   ownerId: agentsTable.ownerId,
-  appId: agentsTable.appId,
+  projectId: agentsTable.projectId,
   prompt: agentsTable.prompt,
   provider: agentsTable.provider,
   runtimeId: agentsTable.runtimeId,
@@ -62,7 +62,7 @@ type RawAgentRow = {
   model: string;
   name: string;
   ownerId: AccountId;
-  appId: AppId;
+  projectId: ProjectId;
   prompt: string;
   provider: string;
   runtimeId: string;
@@ -76,7 +76,7 @@ function readAgentVisibility(value: string): AgentVisibility {
     return value;
   }
 
-  throw new Error("Agent visibility must be private for App-scoped Agents.");
+  throw new Error("Agent visibility must be private for Project-scoped Agents.");
 }
 
 function toAgentRow(row: RawAgentRow): AgentRow {
@@ -96,7 +96,7 @@ function toAgentRow(row: RawAgentRow): AgentRow {
             "Agent live deployment version ID",
           ),
     ownerId: readAccountId(row.ownerId, "Agent owner ID"),
-    appId: readAppId(row.appId, "Agent app ID"),
+    projectId: readProjectId(row.projectId, "Agent project ID"),
     visibility: readAgentVisibility(row.visibility),
   };
 }
@@ -106,7 +106,7 @@ export async function getAgentRow(database: D1Database, agentId: string): Promis
   const row = await getAppDatabase(database)
     .select(agentRowColumns)
     .from(agentsTable)
-    .innerJoin(appsTable, eq(appsTable.id, agentsTable.appId))
+    .innerJoin(projectsTable, eq(projectsTable.id, agentsTable.projectId))
     .where(eq(agentsTable.id, normalizedAgentId))
     .limit(1)
     .get();
@@ -118,47 +118,47 @@ export async function getAgentRow(database: D1Database, agentId: string): Promis
   return toAgentRow(row);
 }
 
-export async function getAppAgentRow(
+export async function getProjectAgentRow(
   database: D1Database,
   input: {
     agentId: AgentId;
-    appId: AppId;
+    projectId: ProjectId;
   },
 ): Promise<AgentRow | null> {
   const row =
     (await getAppDatabase(database)
       .select(agentRowColumns)
       .from(agentsTable)
-      .innerJoin(appsTable, eq(appsTable.id, agentsTable.appId))
-      .where(and(eq(agentsTable.id, input.agentId), eq(agentsTable.appId, input.appId)))
+      .innerJoin(projectsTable, eq(projectsTable.id, agentsTable.projectId))
+      .where(and(eq(agentsTable.id, input.agentId), eq(agentsTable.projectId, input.projectId)))
       .limit(1)
       .get()) ?? null;
 
   return row === null ? null : toAgentRow(row);
 }
 
-export async function listAppOwnerAgentRows(
+export async function listProjectOwnerAgentRows(
   database: D1Database,
   input: {
-    appId: AppId;
+    projectId: ProjectId;
     viewerId: AccountId;
   },
 ): Promise<AgentRow[]> {
   const rows = await getAppDatabase(database)
     .select(agentRowColumns)
     .from(agentsTable)
-    .innerJoin(appsTable, eq(appsTable.id, agentsTable.appId))
-    .where(and(eq(agentsTable.appId, input.appId), eq(agentsTable.ownerId, input.viewerId)))
+    .innerJoin(projectsTable, eq(projectsTable.id, agentsTable.projectId))
+    .where(and(eq(agentsTable.projectId, input.projectId), eq(agentsTable.ownerId, input.viewerId)))
     .orderBy(desc(agentsTable.updatedAt))
     .all();
 
   return rows.map(toAgentRow);
 }
 
-export async function listAppOwnerAgentRowsPage(
+export async function listProjectOwnerAgentRowsPage(
   database: D1Database,
   input: {
-    appId: AppId;
+    projectId: ProjectId;
     limit: number;
     viewerId: AccountId;
   },
@@ -166,8 +166,8 @@ export async function listAppOwnerAgentRowsPage(
   const rows = await getAppDatabase(database)
     .select(agentRowColumns)
     .from(agentsTable)
-    .innerJoin(appsTable, eq(appsTable.id, agentsTable.appId))
-    .where(and(eq(agentsTable.appId, input.appId), eq(agentsTable.ownerId, input.viewerId)))
+    .innerJoin(projectsTable, eq(projectsTable.id, agentsTable.projectId))
+    .where(and(eq(agentsTable.projectId, input.projectId), eq(agentsTable.ownerId, input.viewerId)))
     .orderBy(desc(agentsTable.updatedAt), asc(agentsTable.id))
     .limit(input.limit)
     .all();

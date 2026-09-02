@@ -38,9 +38,9 @@ Delegation  Harness-neutral  Agent Execution   Event Stream
 
 The four capabilities below are not implementation details. Together, they define the product mosoo can become.
 
-## 1. App User Delegation
+## 1. Project User Delegation
 
-App User Delegation may be the most defensible part of the product.
+Project User Delegation may be the most defensible part of the product.
 
 Imagine that Alice opens GoGym and asks the Agent to record a meal. The Agent appears to call:
 
@@ -54,7 +54,7 @@ The real execution context is closer to:
 record_meal(
   acting_for = "alice",
   thread = "thread-123",
-  app = "gogym"
+  project = "gogym"
 )
 ```
 
@@ -69,7 +69,7 @@ This is not a replacement for application authentication or business authorizati
 ```text
 Application authentication
         ↓
-Trusted app user identity
+Trusted project user identity
         ↓
 mosoo Thread
         ↓
@@ -211,7 +211,7 @@ A traditional application backend commonly provides:
 
 mosoo provides a complementary Agent backend layer:
 
-- **Agent Identity** through App User Delegation;
+- **Agent Identity** through Project User Delegation;
 - **Agent Execution** through Thread and Run APIs;
 - **Agent Integration** through Harness-neutral MCP;
 - **Agent UX Infrastructure** through normalized application event streams.

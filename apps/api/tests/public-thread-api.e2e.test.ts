@@ -90,7 +90,7 @@ async function waitForBackgroundProvisionFailure(
   }
 }
 
-async function createReadyAppDraftFile(input: {
+async function createReadyProjectDraftFile(input: {
   body: string;
   bucket: PublicApiMemoryFileBucket;
   database: PublicHttpTestDatabase;
@@ -108,7 +108,7 @@ async function createReadyAppDraftFile(input: {
     },
     purpose: "app_draft",
     target: {
-      id: PUBLIC_API_TEST_IDS.app,
+      id: PUBLIC_API_TEST_IDS.project,
       kind: "app_draft",
       name: input.name,
     },
@@ -129,7 +129,7 @@ async function createReadyAppDraftFile(input: {
   return upload.fileId;
 }
 
-async function createPendingAppDraftFile(input: {
+async function createPendingProjectDraftFile(input: {
   body: string;
   bucket: PublicApiMemoryFileBucket;
   database: PublicHttpTestDatabase;
@@ -147,7 +147,7 @@ async function createPendingAppDraftFile(input: {
     },
     purpose: "app_draft",
     target: {
-      id: PUBLIC_API_TEST_IDS.app,
+      id: PUBLIC_API_TEST_IDS.project,
       kind: "app_draft",
       name: input.name,
     },
@@ -324,7 +324,7 @@ async function insertPublicThread(
         },
       }),
       model: "gpt-5.4",
-      appId: PUBLIC_API_TEST_IDS.app,
+      projectId: PUBLIC_API_TEST_IDS.project,
       provider: "openai",
       renamed: false,
       runtimeId: "openai-runtime",
@@ -792,7 +792,7 @@ describe("Public Thread API e2e", () => {
       expect(nonOwnerCreateResponse.status).toBe(403);
       expect(expectRecord(await readJson(nonOwnerCreateResponse))["error"]).toMatchObject({
         code: "forbidden",
-        message: "Caller is not the App owner for this Agent.",
+        message: "Caller is not the Project owner for this Agent.",
       });
 
       const staleAclCreateResponse = await requestPublicApi(
@@ -816,7 +816,7 @@ describe("Public Thread API e2e", () => {
       expect(staleAclCreateResponse.status).toBe(403);
       expect(expectRecord(await readJson(staleAclCreateResponse))["error"]).toMatchObject({
         code: "forbidden",
-        message: "Caller is not the App owner for this Agent.",
+        message: "Caller is not the Project owner for this Agent.",
       });
     });
   });
@@ -1346,11 +1346,11 @@ describe("Public Thread API e2e", () => {
       const fileId = expectString(
         expectRecord(expectRecord(await readJson(uploadFileResponse))["file"])["id"],
       );
-      const appDraftFileRow = await database
+      const projectDraftFileRow = await database
         .prepare("SELECT object_key FROM file_record WHERE id = ?")
         .bind(fileId)
         .first<{ object_key: string }>();
-      if (!appDraftFileRow) {
+      if (!projectDraftFileRow) {
         throw new Error("Expected Agent draft file row.");
       }
 
@@ -1414,7 +1414,7 @@ describe("Public Thread API e2e", () => {
       expectString(readyFileRow.object_key);
       expectString(readyFileRow.path);
       expect(bucket.objects.has(readyFileRow.object_key)).toBe(true);
-      expect(bucket.objects.has(appDraftFileRow.object_key)).toBe(false);
+      expect(bucket.objects.has(projectDraftFileRow.object_key)).toBe(false);
 
       const artifactObjectKey = `session/${threadId}/artifact/${PUBLIC_API_TEST_IDS.fileAlt}/summary.md`;
 
@@ -1663,7 +1663,7 @@ describe("Public Thread API e2e", () => {
         "version",
       ]);
 
-      const appDraftFileRow = await database
+      const projectDraftFileRow = await database
         .prepare(
           `SELECT committed, object_key, owner_id, owner_kind, purpose, scope_id, scope_kind, session_kind, status
              FROM file_record
@@ -1681,22 +1681,22 @@ describe("Public Thread API e2e", () => {
           session_kind: string | null;
           status: string;
         }>();
-      expect(appDraftFileRow).toMatchObject({
+      expect(projectDraftFileRow).toMatchObject({
         committed: 0,
-        owner_id: PUBLIC_API_TEST_IDS.app,
+        owner_id: PUBLIC_API_TEST_IDS.project,
         owner_kind: "app",
         purpose: "app_draft",
-        scope_id: PUBLIC_API_TEST_IDS.app,
+        scope_id: PUBLIC_API_TEST_IDS.project,
         scope_kind: "app_draft",
         session_kind: "attachment",
         status: "ready",
       });
-      if (!appDraftFileRow) {
+      if (!projectDraftFileRow) {
         throw new Error("Expected ready Agent draft file row.");
       }
-      expect(await bucket.get(appDraftFileRow.object_key).then((object) => object?.text())).toBe(
-        fileBody,
-      );
+      expect(
+        await bucket.get(projectDraftFileRow.object_key).then((object) => object?.text()),
+      ).toBe(fileBody);
 
       const retrieveDraftResponse = await requestThreadApi(
         new Request(`https://api.example.com/api/v1/files/${fileId}`, {
@@ -1782,7 +1782,7 @@ describe("Public Thread API e2e", () => {
       }
       expectString(claimedFileRow.object_key);
       expectString(claimedFileRow.path);
-      expect(bucket.objects.has(appDraftFileRow.object_key)).toBe(false);
+      expect(bucket.objects.has(projectDraftFileRow.object_key)).toBe(false);
       expect(await bucket.get(claimedFileRow.object_key).then((object) => object?.text())).toBe(
         fileBody,
       );
@@ -1853,7 +1853,7 @@ describe("Public Thread API e2e", () => {
       updatedAt: 2_100,
     });
 
-    const wrongCreatorFileId = await createReadyAppDraftFile({
+    const wrongCreatorFileId = await createReadyProjectDraftFile({
       body: "Wrong creator draft.\n",
       bucket,
       database,
@@ -1870,25 +1870,25 @@ describe("Public Thread API e2e", () => {
       threadId,
     });
 
-    const wrongAppFileId = await createReadyAppDraftFile({
-      body: "Wrong app draft.\n",
+    const wrongProjectFileId = await createReadyProjectDraftFile({
+      body: "Wrong project draft.\n",
       bucket,
       database,
-      name: "wrong-app.txt",
+      name: "wrong-project.txt",
     });
-    const wrongAppId = "01J0000000000000000000BAD2";
+    const wrongProjectId = "01J0000000000000000000BAD2";
     await database
       .prepare("UPDATE file_record SET owner_id = ?, scope_id = ? WHERE id = ?")
-      .bind(wrongAppId, wrongAppId, wrongAppFileId)
+      .bind(wrongProjectId, wrongProjectId, wrongProjectFileId)
       .run();
     await expectCreateThreadFileClaimRejected({
-      fileId: wrongAppFileId,
-      message: `Attachment ${wrongAppFileId} is not a draft attachment.`,
+      fileId: wrongProjectFileId,
+      message: `Attachment ${wrongProjectFileId} is not a draft attachment.`,
       requestThreadApi,
       threadId,
     });
 
-    const nonDraftFileId = await createReadyAppDraftFile({
+    const nonDraftFileId = await createReadyProjectDraftFile({
       body: "Claimed draft.\n",
       bucket,
       database,
@@ -1915,7 +1915,7 @@ describe("Public Thread API e2e", () => {
       threadId,
     });
 
-    const notReadyFileId = await createPendingAppDraftFile({
+    const notReadyFileId = await createPendingProjectDraftFile({
       body: "Pending draft.\n",
       bucket,
       database,
@@ -1934,14 +1934,14 @@ describe("Public Thread API e2e", () => {
            FROM file_record
           WHERE id IN (?, ?, ?)`,
       )
-      .bind(wrongCreatorFileId, wrongAppFileId, notReadyFileId)
+      .bind(wrongCreatorFileId, wrongProjectFileId, notReadyFileId)
       .all<{ id: string; scope_kind: string; status: string }>();
     const rejectedRowsById = new Map(rejectedRows.results.map((row) => [row.id, row]));
     expect(rejectedRowsById.get(wrongCreatorFileId)).toMatchObject({
       scope_kind: "app_draft",
       status: "ready",
     });
-    expect(rejectedRowsById.get(wrongAppFileId)).toMatchObject({
+    expect(rejectedRowsById.get(wrongProjectFileId)).toMatchObject({
       scope_kind: "app_draft",
       status: "ready",
     });
@@ -1951,7 +1951,7 @@ describe("Public Thread API e2e", () => {
     });
   });
 
-  test("deletes a public Thread only after caller and App admission", async () => {
+  test("deletes a public Thread only after caller and Project admission", async () => {
     const app = createPublicThreadApiTestApp();
 
     const successDatabase = await createPublicHttpContractDatabase();
@@ -2008,38 +2008,38 @@ describe("Public Thread API e2e", () => {
     expect(ownerThreadStillExists).toEqual({ id: ownerThreadId });
 
     const mismatchedAppDatabase = await createPublicHttpContractDatabase();
-    const mismatchedAppThreadId = generatedPublicThreadId(122);
+    const mismatchedProjectThreadId = generatedPublicThreadId(122);
     await insertPublicThread(mismatchedAppDatabase, {
-      id: mismatchedAppThreadId,
-      title: "Mismatched App public Thread",
+      id: mismatchedProjectThreadId,
+      title: "Mismatched Project public Thread",
       updatedAt: 2_002,
     });
     await mismatchedAppDatabase
-      .prepare("UPDATE session SET app_id = ? WHERE id = ?")
-      .bind("01J0000000000000000000BAD1", mismatchedAppThreadId)
+      .prepare("UPDATE session SET project_id = ? WHERE id = ?")
+      .bind("01J0000000000000000000BAD1", mismatchedProjectThreadId)
       .run();
 
-    const mismatchedAppDeleteResponse = await requestPublicApi(
+    const mismatchedProjectDeleteResponse = await requestPublicApi(
       app,
       mismatchedAppDatabase,
-      new Request(`https://api.example.com/api/v1/threads/${mismatchedAppThreadId}`, {
+      new Request(`https://api.example.com/api/v1/threads/${mismatchedProjectThreadId}`, {
         headers: { Authorization: bearer(TOKENS.owner) },
         method: "DELETE",
       }),
     );
-    expect(mismatchedAppDeleteResponse.status).toBe(404);
-    expect(expectRecord(await readJson(mismatchedAppDeleteResponse))["error"]).toMatchObject({
+    expect(mismatchedProjectDeleteResponse.status).toBe(404);
+    expect(expectRecord(await readJson(mismatchedProjectDeleteResponse))["error"]).toMatchObject({
       code: "not_found",
       message: "Thread not found.",
     });
 
-    const mismatchedAppThreadStillExists = await mismatchedAppDatabase
-      .prepare("SELECT id, app_id FROM session WHERE id = ?")
-      .bind(mismatchedAppThreadId)
-      .first<{ id: string; app_id: string }>();
-    expect(mismatchedAppThreadStillExists).toEqual({
-      id: mismatchedAppThreadId,
-      app_id: "01J0000000000000000000BAD1",
+    const mismatchedProjectThreadStillExists = await mismatchedAppDatabase
+      .prepare("SELECT id, project_id FROM session WHERE id = ?")
+      .bind(mismatchedProjectThreadId)
+      .first<{ id: string; project_id: string }>();
+    expect(mismatchedProjectThreadStillExists).toEqual({
+      id: mismatchedProjectThreadId,
+      project_id: "01J0000000000000000000BAD1",
     });
   });
 

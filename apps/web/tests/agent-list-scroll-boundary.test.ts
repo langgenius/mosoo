@@ -11,7 +11,7 @@ describe("Agent list scroll boundaries", () => {
     const agentListSource = readSource("../src/routes/agent/agent-list.route.tsx");
     const listPageSource = readSource("../src/shared/ui/list-page.tsx");
 
-    // The App shell mounts every route inside a block-level, height-bounded box.
+    // The Project shell mounts every route inside a block-level, height-bounded box.
     // A page root only inherits that bound through an explicit height; `flex-1`
     // alone lets it grow with its rows, so `overflow-hidden` clipped the tail of
     // the Agents table instead of `ListPageContent` scrolling it.

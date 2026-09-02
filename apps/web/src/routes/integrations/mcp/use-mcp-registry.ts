@@ -1,27 +1,27 @@
 import type {
   ConnectMcpBearerInput,
-  CreateAppMcpServerInput,
+  CreateProjectMcpServerInput,
   McpRegistry,
   McpServerWithCredential,
   StartMcpOAuthPayload,
-  UpdateAppMcpServerInput,
+  UpdateProjectMcpServerInput,
 } from "@mosoo/contracts/mcp";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { useAppSession } from "@/app/session-provider";
 import {
   connectMcpBearer,
-  createAppMcpServer,
+  createProjectMcpServer,
   deleteMcpServer,
   getMcpOAuthFlowState,
   getMcpRegistry,
   revokeMcpCredential,
   setMcpServerEnabled,
   startMcpOAuth,
-  updateAppMcpServer,
+  updateProjectMcpServer,
 } from "@/domains/mcp/api/mcp-client";
 import { mcpKeys, useMcpRegistryQuery } from "@/domains/mcp/query/mcp-queries";
-import { toMcpOAuthFlowId, toMcpServerId, toAppId } from "@/routes/typed-id";
+import { toMcpOAuthFlowId, toMcpServerId, toProjectId } from "@/routes/typed-id";
 import { useTranslation } from "@/shared/i18n";
 
 import { isTruthy } from "../../../shared/lib/truthiness";
@@ -33,86 +33,86 @@ async function getOAuthFlowState(flowId: string) {
 export function useMcpRegistry() {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
-  const { activeAppId, appsLoading } = useAppSession();
-  const appId = activeAppId;
-  const registryQuery = useMcpRegistryQuery(appId);
+  const { activeProjectId, projectsLoading } = useAppSession();
+  const projectId = activeProjectId;
+  const registryQuery = useMcpRegistryQuery(projectId);
   const registry = registryQuery.data;
 
   async function refresh(): Promise<McpRegistry> {
-    if (!isTruthy(appId)) {
-      throw new Error(t("mcp.appNotReady"));
+    if (!isTruthy(projectId)) {
+      throw new Error(t("mcp.projectNotReady"));
     }
 
     await queryClient.invalidateQueries({
-      queryKey: mcpKeys.registry(appId),
+      queryKey: mcpKeys.registry(projectId),
     });
     return queryClient.fetchQuery({
-      queryFn: async () => getMcpRegistry(toAppId(appId)),
-      queryKey: mcpKeys.registry(appId),
+      queryFn: async () => getMcpRegistry(toProjectId(projectId)),
+      queryKey: mcpKeys.registry(projectId),
     });
   }
 
   async function addServer(
-    input: Omit<CreateAppMcpServerInput, "appId">,
+    input: Omit<CreateProjectMcpServerInput, "projectId">,
   ): Promise<McpServerWithCredential> {
-    if (!isTruthy(appId)) {
+    if (!isTruthy(projectId)) {
       throw new Error(t("mcp.registryNotReady"));
     }
 
-    const created = await createAppMcpServer({
+    const created = await createProjectMcpServer({
       ...input,
-      appId: toAppId(appId),
+      projectId: toProjectId(projectId),
     });
     await refresh();
     return created;
   }
 
   async function updateServer(
-    input: Omit<UpdateAppMcpServerInput, "appId">,
+    input: Omit<UpdateProjectMcpServerInput, "projectId">,
   ): Promise<McpServerWithCredential> {
-    if (!isTruthy(appId)) {
+    if (!isTruthy(projectId)) {
       throw new Error(t("mcp.registryNotReady"));
     }
 
-    const updated = await updateAppMcpServer({
+    const updated = await updateProjectMcpServer({
       ...input,
-      appId: toAppId(appId),
+      projectId: toProjectId(projectId),
     });
     await refresh();
     return updated;
   }
 
   async function connectBearerCredential(
-    input: Omit<ConnectMcpBearerInput, "appId">,
+    input: Omit<ConnectMcpBearerInput, "projectId">,
   ): Promise<McpServerWithCredential> {
-    if (!isTruthy(appId)) {
+    if (!isTruthy(projectId)) {
       throw new Error(t("mcp.registryNotReady"));
     }
 
     const nextServer = await connectMcpBearer({
       ...input,
-      appId: toAppId(appId),
+      projectId: toProjectId(projectId),
     });
     await refresh();
     return nextServer;
   }
 
   async function revokeCredential(serverId: string): Promise<McpServerWithCredential> {
-    if (!isTruthy(appId)) {
+    if (!isTruthy(projectId)) {
       throw new Error(t("mcp.registryNotReady"));
     }
 
-    const nextServer = await revokeMcpCredential(toAppId(appId), toMcpServerId(serverId));
+    const nextServer = await revokeMcpCredential(toProjectId(projectId), toMcpServerId(serverId));
     await refresh();
     return nextServer;
   }
 
   async function removeServerById(serverId: string): Promise<void> {
-    if (!isTruthy(appId)) {
+    if (!isTruthy(projectId)) {
       throw new Error(t("mcp.registryNotReady"));
     }
 
-    await deleteMcpServer(toAppId(appId), toMcpServerId(serverId));
+    await deleteMcpServer(toProjectId(projectId), toMcpServerId(serverId));
     await refresh();
   }
 
@@ -120,22 +120,26 @@ export function useMcpRegistry() {
     serverId: string,
     enabled: boolean,
   ): Promise<McpServerWithCredential> {
-    if (!isTruthy(appId)) {
+    if (!isTruthy(projectId)) {
       throw new Error(t("mcp.registryNotReady"));
     }
 
-    const nextServer = await setMcpServerEnabled(toAppId(appId), toMcpServerId(serverId), enabled);
+    const nextServer = await setMcpServerEnabled(
+      toProjectId(projectId),
+      toMcpServerId(serverId),
+      enabled,
+    );
     await refresh();
     return nextServer;
   }
 
   async function startOAuthFlow(serverId: string): Promise<StartMcpOAuthPayload> {
-    if (!isTruthy(appId)) {
+    if (!isTruthy(projectId)) {
       throw new Error(t("mcp.registryNotReady"));
     }
 
     return startMcpOAuth({
-      appId: toAppId(appId),
+      projectId: toProjectId(projectId),
       serverId: toMcpServerId(serverId),
     });
   }
@@ -153,8 +157,8 @@ export function useMcpRegistry() {
           ? t("mcp.failedToLoad")
           : null,
     getOAuthFlowState,
-    loading: isTruthy(appId) ? registryQuery.isLoading : appsLoading,
-    appId: registry?.appId ?? "",
+    loading: isTruthy(projectId) ? registryQuery.isLoading : projectsLoading,
+    projectId: registry?.projectId ?? "",
     refresh,
     revokeCredential,
     servers: registry?.servers ?? [],

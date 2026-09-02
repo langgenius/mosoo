@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { parsePlatformId } from "@mosoo/id";
-import type { AccountId, OrganizationId, AppId, VendorCredentialId } from "@mosoo/id";
+import type { AccountId, OrganizationId, ProjectId, VendorCredentialId } from "@mosoo/id";
 import { VENDOR_DEEPSEEK, VENDOR_OPENAI, VENDOR_OPENAI_COMPATIBLE } from "@mosoo/runtime-catalog";
 
 import { collectRuntimeCapabilityIssues } from "../src/modules/agents/application/agent-runtime-capability-resolution.service";
@@ -16,10 +16,10 @@ const ORGANIZATION_ID = parsePlatformId<OrganizationId>(
   "01J00000000000000000000002",
   "organization ID",
 );
-const APP_ID = parsePlatformId<AppId>("01J00000000000000000000009", "app ID");
-const APP_OWNER_ID = parsePlatformId<AccountId>(
+const PROJECT_ID = parsePlatformId<ProjectId>("01J00000000000000000000009", "project ID");
+const PROJECT_OWNER_ID = parsePlatformId<AccountId>(
   "01J00000000000000000000001",
-  "app owner account ID",
+  "project owner account ID",
 );
 const OTHER_ACCOUNT_ID = parsePlatformId<AccountId>(
   "01J00000000000000000000008",
@@ -50,7 +50,7 @@ function createCredentialRuntimeDatabase(): SqliteD1Database {
       id text PRIMARY KEY NOT NULL
     );
 
-    CREATE TABLE app (
+    CREATE TABLE project (
       id text PRIMARY KEY NOT NULL,
       organization_id text NOT NULL,
       owner_account_id text NOT NULL,
@@ -68,7 +68,7 @@ function createCredentialRuntimeDatabase(): SqliteD1Database {
       is_default integer DEFAULT false NOT NULL,
       models text,
       name text NOT NULL,
-      app_id text NOT NULL,
+      project_id text NOT NULL,
       updated_at integer NOT NULL,
       vendor_id text NOT NULL
     );
@@ -91,7 +91,7 @@ function createCredentialRuntimeDatabase(): SqliteD1Database {
   database
     .prepare(
       `
-        INSERT INTO app (
+        INSERT INTO project (
           id,
           organization_id,
           owner_account_id,
@@ -100,10 +100,10 @@ function createCredentialRuntimeDatabase(): SqliteD1Database {
           created_at,
           updated_at
         )
-        VALUES (?, ?, ?, 'Default App', NULL, 1, 1)
+        VALUES (?, ?, ?, 'Default Project', NULL, 1, 1)
       `,
     )
-    .bind(APP_ID, ORGANIZATION_ID, APP_OWNER_ID)
+    .bind(PROJECT_ID, ORGANIZATION_ID, PROJECT_OWNER_ID)
     .run();
 
   return database;
@@ -130,7 +130,7 @@ async function insertVendorCredential(
           id,
           models,
           name,
-          app_id,
+          project_id,
           updated_at,
           vendor_id
         )
@@ -143,7 +143,7 @@ async function insertVendorCredential(
       input.credentialId,
       input.models === null ? null : JSON.stringify(input.models),
       input.name,
-      APP_ID,
+      PROJECT_ID,
       input.vendorId,
     )
     .run();
@@ -162,7 +162,7 @@ function readFetchRequestUrl(input: Parameters<typeof fetch>[0]): string {
 }
 
 describe("vendor credential runtime selection", () => {
-  test("resolves the first App custom credential that declares the requested model", async () => {
+  test("resolves the first Project custom credential that declares the requested model", async () => {
     const database = createCredentialRuntimeDatabase();
     const bindings = {
       DB: database,
@@ -171,21 +171,21 @@ describe("vendor credential runtime selection", () => {
     const openAiSecretId = await storeVendorCredentialSecret(bindings, {
       apiKey: "openai-key",
       credentialId: OPENAI_CREDENTIAL_ID,
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       providerId: "openai",
       purpose: "credential_create_api_key",
     });
     const primaryCustomSecretId = await storeVendorCredentialSecret(bindings, {
       apiKey: "custom-primary-key",
       credentialId: CUSTOM_PRIMARY_CREDENTIAL_ID,
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       providerId: VENDOR_OPENAI_COMPATIBLE.vendorId,
       purpose: "credential_create_api_key",
     });
     const secondaryCustomSecretId = await storeVendorCredentialSecret(bindings, {
       apiKey: "custom-secondary-key",
       credentialId: CUSTOM_SECONDARY_CREDENTIAL_ID,
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       providerId: VENDOR_OPENAI_COMPATIBLE.vendorId,
       purpose: "credential_create_api_key",
     });
@@ -217,9 +217,9 @@ describe("vendor credential runtime selection", () => {
 
     const credential = await resolveVendorApiKey({
       bindings,
-      executionOwnerUserId: APP_OWNER_ID,
+      executionOwnerUserId: PROJECT_OWNER_ID,
       options: { modelId: "deepseek-v4-flash" },
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       vendorId: VENDOR_OPENAI_COMPATIBLE.vendorId,
     });
 
@@ -235,13 +235,13 @@ describe("vendor credential runtime selection", () => {
         bindings,
         executionOwnerUserId: OTHER_ACCOUNT_ID,
         options: { modelId: "deepseek-v4-flash" },
-        appId: APP_ID,
+        projectId: PROJECT_ID,
         vendorId: VENDOR_OPENAI_COMPATIBLE.vendorId,
       }),
     ).resolves.toBeNull();
   });
 
-  test("does not resolve App provider keys for a non-owner execution actor", async () => {
+  test("does not resolve Project provider keys for a non-owner execution actor", async () => {
     const database = createCredentialRuntimeDatabase();
     const bindings = {
       DB: database,
@@ -250,7 +250,7 @@ describe("vendor credential runtime selection", () => {
     const openAiSecretId = await storeVendorCredentialSecret(bindings, {
       apiKey: "openai-key",
       credentialId: OPENAI_CREDENTIAL_ID,
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       providerId: VENDOR_OPENAI.vendorId,
       purpose: "credential_create_api_key",
     });
@@ -269,7 +269,7 @@ describe("vendor credential runtime selection", () => {
         bindings,
         executionOwnerUserId: OTHER_ACCOUNT_ID,
         options: { modelId: "gpt-4o-mini" },
-        appId: APP_ID,
+        projectId: PROJECT_ID,
         vendorId: VENDOR_OPENAI.vendorId,
       }),
     ).resolves.toBeNull();
@@ -277,9 +277,9 @@ describe("vendor credential runtime selection", () => {
     await expect(
       resolveVendorApiKey({
         bindings,
-        executionOwnerUserId: APP_OWNER_ID,
+        executionOwnerUserId: PROJECT_OWNER_ID,
         options: { modelId: "gpt-4o-mini" },
-        appId: APP_ID,
+        projectId: PROJECT_ID,
         vendorId: VENDOR_OPENAI.vendorId,
       }),
     ).resolves.toEqual({
@@ -290,7 +290,7 @@ describe("vendor credential runtime selection", () => {
     });
   });
 
-  test("reports provider credentials missing when readiness actor does not own the App", async () => {
+  test("reports provider credentials missing when readiness actor does not own the Project", async () => {
     const database = createCredentialRuntimeDatabase();
 
     await insertVendorCredential(database, {
@@ -306,7 +306,7 @@ describe("vendor credential runtime selection", () => {
       actorAccountId: OTHER_ACCOUNT_ID,
       codePrefix: "agent.readiness",
       database,
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       selection: {
         model: "gpt-5.4",
         provider: VENDOR_OPENAI.vendorId,
@@ -331,7 +331,7 @@ describe("vendor credential runtime selection", () => {
     const deepSeekSecretId = await storeVendorCredentialSecret(bindings, {
       apiKey: "deepseek-key",
       credentialId: DEEPSEEK_CREDENTIAL_ID,
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       providerId: VENDOR_DEEPSEEK.vendorId,
       purpose: "credential_create_api_key",
     });
@@ -364,11 +364,11 @@ describe("vendor credential runtime selection", () => {
 
     try {
       const issues = await collectRuntimeCapabilityIssues({
-        actorAccountId: APP_OWNER_ID,
+        actorAccountId: PROJECT_OWNER_ID,
         bindings,
         codePrefix: "agent.readiness",
         database,
-        appId: APP_ID,
+        projectId: PROJECT_ID,
         selection: {
           model: "deepseek-v4-pro",
           provider: VENDOR_DEEPSEEK.vendorId,

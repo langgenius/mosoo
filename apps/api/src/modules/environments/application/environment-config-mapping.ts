@@ -75,7 +75,7 @@ export function toEnvironmentSummary(row: EnvironmentRecordRow): EnvironmentSumm
       imageUrl: row.ownerImageUrl,
       name: row.ownerName,
     },
-    appId: row.appId,
+    projectId: row.projectId,
     role: "owner",
     updatedAt: toIsoString(row.updatedAt),
     usedByAgentCount: row.usedByAgentCount ?? 0,

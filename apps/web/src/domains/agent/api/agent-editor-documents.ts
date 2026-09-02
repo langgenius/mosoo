@@ -1,8 +1,8 @@
 import { graphql } from "@/gql";
 
 export const GET_AGENT_EDITOR_STATE_QUERY = graphql(/* GraphQL */ `
-  query AgentEditorState($agentId: ULID!, $appId: ULID!) {
-    agentEditorState(agentId: $agentId, appId: $appId) {
+  query AgentEditorState($agentId: ULID!, $projectId: ULID!) {
+    agentEditorState(agentId: $agentId, projectId: $projectId) {
       id
       builtInTools {
         enabled

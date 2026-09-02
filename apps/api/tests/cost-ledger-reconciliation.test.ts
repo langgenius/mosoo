@@ -27,7 +27,7 @@ const BEFORE_RETENTION_MS = Date.parse("2026-06-02T23:59:59.999Z");
 const ACTOR_ID = "01J00000000000000000000001";
 const OWNER_ID = "01J00000000000000000000002";
 const ORGANIZATION_ID = "01J00000000000000000000003";
-const APP_ID = "01J00000000000000000000004";
+const PROJECT_ID = "01J00000000000000000000004";
 const AGENT_ID = "01J00000000000000000000005";
 const SESSION_ID = "01J00000000000000000000006";
 const RUN_ID = "01J00000000000000000000007";
@@ -89,7 +89,7 @@ async function createReconciliationDatabase(): Promise<SqliteD1Database> {
   const database = new SqliteD1Database({ foreignKeys: false });
 
   database.execute(`
-    CREATE TABLE app (
+    CREATE TABLE project (
       id text PRIMARY KEY NOT NULL,
       organization_id text NOT NULL
     );
@@ -97,7 +97,7 @@ async function createReconciliationDatabase(): Promise<SqliteD1Database> {
     CREATE TABLE agent (
       id text PRIMARY KEY NOT NULL,
       owner_account_id text NOT NULL,
-      app_id text NOT NULL,
+      project_id text NOT NULL,
       status text NOT NULL
     );
 
@@ -110,7 +110,7 @@ async function createReconciliationDatabase(): Promise<SqliteD1Database> {
       id text PRIMARY KEY NOT NULL,
       metadata_json text DEFAULT '{}' NOT NULL,
       model text NOT NULL,
-      app_id text NOT NULL,
+      project_id text NOT NULL,
       provider text NOT NULL,
       runtime_id text NOT NULL,
       type text NOT NULL
@@ -170,7 +170,7 @@ async function createReconciliationDatabase(): Promise<SqliteD1Database> {
       input_tokens integer NOT NULL,
       model text NOT NULL,
       organization_id text NOT NULL,
-      app_id text NOT NULL,
+      project_id text NOT NULL,
       output_tokens integer NOT NULL,
       price_snapshot_json text,
       pricing_status text NOT NULL,
@@ -188,7 +188,7 @@ async function createReconciliationDatabase(): Promise<SqliteD1Database> {
 
     CREATE TABLE usage_daily_rollup (
       organization_id text NOT NULL,
-      app_id text NOT NULL,
+      project_id text NOT NULL,
       agent_id text NOT NULL,
       actor_user_id text NOT NULL,
       agent_owner_user_id text NOT NULL,
@@ -206,7 +206,7 @@ async function createReconciliationDatabase(): Promise<SqliteD1Database> {
       unpriced_request_count integer NOT NULL,
       PRIMARY KEY (
         organization_id,
-        app_id,
+        project_id,
         agent_id,
         actor_user_id,
         agent_owner_user_id,
@@ -245,21 +245,21 @@ async function createReconciliationDatabase(): Promise<SqliteD1Database> {
   `);
 
   database.execute(`
-    INSERT INTO app (id, organization_id)
-    VALUES ('${APP_ID}', '${ORGANIZATION_ID}');
+    INSERT INTO project (id, organization_id)
+    VALUES ('${PROJECT_ID}', '${ORGANIZATION_ID}');
 
-    INSERT INTO agent (id, owner_account_id, app_id, status)
-    VALUES ('${AGENT_ID}', '${OWNER_ID}', '${APP_ID}', 'published');
+    INSERT INTO agent (id, owner_account_id, project_id, status)
+    VALUES ('${AGENT_ID}', '${OWNER_ID}', '${PROJECT_ID}', 'published');
 
     INSERT INTO agent_deployment_version (id, agent_id)
     VALUES ('${DEPLOYMENT_ID}', '${AGENT_ID}');
 
-    INSERT INTO session (id, metadata_json, model, app_id, provider, runtime_id, type)
+    INSERT INTO session (id, metadata_json, model, project_id, provider, runtime_id, type)
     VALUES (
       '${SESSION_ID}',
       '{}',
       'custom-model',
-      '${APP_ID}',
+      '${PROJECT_ID}',
       'custom-provider',
       'session-runtime',
       'ui'
@@ -386,7 +386,7 @@ async function insertUsageEvent(
           input_tokens,
           model,
           organization_id,
-          app_id,
+          project_id,
           output_tokens,
           price_snapshot_json,
           pricing_status,
@@ -411,7 +411,7 @@ async function insertUsageEvent(
       input.createdAt ?? RECENT_MS,
       input.id,
       ORGANIZATION_ID,
-      APP_ID,
+      PROJECT_ID,
       SESSION_ID,
       RUN_ID,
       input.sourceEventId,

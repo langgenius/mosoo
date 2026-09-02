@@ -35,7 +35,7 @@ export function toSkillSummary(row: SkillRegistryRow): SkillSummary {
     name: row.name,
     ownerId: row.ownerId,
     ownerName: row.ownerName ?? row.author,
-    appId: row.appId,
+    projectId: row.projectId,
     snapshotId: row.currentSnapshotId,
     sourceKind: row.sourceKind,
     updatedAt: toTimestampIsoString(row.updatedAt),

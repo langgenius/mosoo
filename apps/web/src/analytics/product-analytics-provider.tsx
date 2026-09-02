@@ -20,7 +20,7 @@ configureProductAnalytics({
 
 export function ProductAnalyticsProvider({ children }: { children: ReactNode }) {
   const location = useLocation();
-  const { activeAppId, activeOrganizationId, user } = useAppSession();
+  const { activeProjectId, activeOrganizationId, user } = useAppSession();
   const lastPageKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -36,11 +36,11 @@ export function ProductAnalyticsProvider({ children }: { children: ReactNode }) 
     }
     lastPageKeyRef.current = pageKey;
     captureProductEvent(PRODUCT_ANALYTICS_EVENTS.pageViewed, {
-      app_id: activeAppId,
+      project_id: activeProjectId,
       organization_id: activeOrganizationId,
       route: location.pathname,
     });
-  }, [activeAppId, activeOrganizationId, location.pathname, location.search]);
+  }, [activeProjectId, activeOrganizationId, location.pathname, location.search]);
 
   return children;
 }

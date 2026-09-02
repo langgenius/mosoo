@@ -1,24 +1,24 @@
-import { appsTable } from "@mosoo/db";
+import { projectsTable } from "@mosoo/db";
 import { createPlatformId } from "@mosoo/id";
-import type { AccountId, EnvironmentId, AppId } from "@mosoo/id";
+import type { AccountId, EnvironmentId, ProjectId } from "@mosoo/id";
 import { eq } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../time";
-import { getAppRow } from "../../apps/application/app.service";
+import { getProjectRow } from "../../projects/application/project.service";
 import { SYSTEM_DEFAULT_NAME } from "./environment-config-mapping";
 import { createEnvironmentFromConfig } from "./environment-write.service";
 
-interface CreateAppEnvironmentDefaultsInput {
+interface CreateProjectEnvironmentDefaultsInput {
   actorId: AccountId | null;
-  appId: AppId;
+  projectId: ProjectId;
   timestampMs?: number;
 }
 
 async function createBuiltInEnvironment(
   bindings: Pick<ApiBindings, "DB">,
-  input: Required<CreateAppEnvironmentDefaultsInput>,
+  input: Required<CreateProjectEnvironmentDefaultsInput>,
 ): Promise<EnvironmentId> {
   const environmentId = createPlatformId<EnvironmentId>();
 
@@ -37,45 +37,45 @@ async function createBuiltInEnvironment(
     environmentId,
     name: SYSTEM_DEFAULT_NAME,
     ownerId: null,
-    appId: input.appId,
+    projectId: input.projectId,
     timestampMs: input.timestampMs,
   });
 
   return environmentId;
 }
 
-export async function createAppEnvironmentDefaults(
+export async function createProjectEnvironmentDefaults(
   bindings: Pick<ApiBindings, "DB">,
-  input: CreateAppEnvironmentDefaultsInput,
+  input: CreateProjectEnvironmentDefaultsInput,
 ): Promise<EnvironmentId> {
   const timestampMs = input.timestampMs ?? currentTimestampMs();
   const environmentId = await createBuiltInEnvironment(bindings, {
     actorId: input.actorId,
-    appId: input.appId,
+    projectId: input.projectId,
     timestampMs,
   });
 
   await getAppDatabase(bindings.DB)
-    .update(appsTable)
+    .update(projectsTable)
     .set({
       defaultEnvironmentId: environmentId,
       updatedAt: timestampMs,
     })
-    .where(eq(appsTable.id, input.appId))
+    .where(eq(projectsTable.id, input.projectId))
     .run();
 
   return environmentId;
 }
 
-export async function getAppDefaultEnvironmentId(
+export async function getProjectDefaultEnvironmentId(
   database: D1Database,
-  appId: AppId,
+  projectId: ProjectId,
 ): Promise<EnvironmentId> {
-  const app = await getAppRow(database, appId);
+  const project = await getProjectRow(database, projectId);
 
-  if (app.defaultEnvironmentId === null) {
-    throw new Error("App default Environment is not configured.");
+  if (project.defaultEnvironmentId === null) {
+    throw new Error("Project default Environment is not configured.");
   }
 
-  return app.defaultEnvironmentId;
+  return project.defaultEnvironmentId;
 }

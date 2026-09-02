@@ -22,7 +22,7 @@ CREATE TABLE public_api_idempotency_key (
 
 CREATE TABLE session (
   id text PRIMARY KEY NOT NULL,
-  app_id text NOT NULL,
+  project_id text NOT NULL,
   creator_account_id text NOT NULL,
   attributed_user_id text,
   end_user_id text,

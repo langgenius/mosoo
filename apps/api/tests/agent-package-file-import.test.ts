@@ -6,7 +6,7 @@ import {
 } from "@mosoo/agent-package";
 import type { AgentPackage } from "@mosoo/contracts/agent-manifest";
 import { AGENT_MANIFEST_VERSION, AGENT_PACKAGE_VERSION } from "@mosoo/contracts/agent-manifest";
-import type { AccountId, FileId, OrganizationId, AppId } from "@mosoo/id";
+import type { AccountId, FileId, OrganizationId, ProjectId } from "@mosoo/id";
 import { zipSync } from "fflate";
 
 import { createAgentPackageFile } from "../src/modules/agents/application/agent-package-file.service";
@@ -36,7 +36,7 @@ const OWNER_VIEWER: AuthenticatedViewer = {
   name: "Owner",
 };
 const ORGANIZATION_ID = PUBLIC_API_TEST_IDS.organization as OrganizationId;
-const APP_ID = PUBLIC_API_TEST_IDS.app as AppId;
+const PROJECT_ID = PUBLIC_API_TEST_IDS.project as ProjectId;
 
 class MemoryByteBucket {
   readonly objects = new Map<string, StoredObject>();
@@ -182,7 +182,7 @@ class MemoryByteBucket {
 
 function createPackageFixture(): AgentPackage {
   return {
-    app: {
+    project: {
       avatarAssetKey: null,
       description: "Imported from a file",
       name: "Imported Package Agent",
@@ -237,7 +237,7 @@ async function createFixture(input: { archiveBytes?: Uint8Array } = {}) {
       id text PRIMARY KEY NOT NULL,
       name text NOT NULL,
       owner_account_id text NOT NULL,
-      app_id text NOT NULL,
+      project_id text NOT NULL,
       source_kind text NOT NULL,
       updated_at integer NOT NULL,
       version text
@@ -272,7 +272,7 @@ async function createFixture(input: { archiveBytes?: Uint8Array } = {}) {
     archiveBytes,
     bindings,
     fileName: "portable.agent",
-    appId: APP_ID,
+    projectId: PROJECT_ID,
     viewer: OWNER_VIEWER,
   });
   const row = await readFileRow(database, file.fileId);
@@ -317,7 +317,7 @@ async function expectImportRejected(input: {
   await expect(
     importAgentPackage(input.bindings, OWNER_VIEWER, {
       fileId: input.fileId,
-      appId: APP_ID,
+      projectId: PROJECT_ID,
     }),
   ).rejects.toThrow(input.message);
 }
@@ -345,12 +345,12 @@ describe("agent package file import", () => {
       updateSql: `UPDATE file_record SET created_by_account_id = '${PUBLIC_API_TEST_IDS.nonOwnerAccount}' WHERE id = ?`,
     },
     {
-      message: "Agent package file does not belong to the target App.",
-      name: "rejects cross-app files",
+      message: "Agent package file does not belong to the target Project.",
+      name: "rejects cross-project files",
       updateSql: "UPDATE file_record SET scope_id = '01J0000000000000000000000Z' WHERE id = ?",
     },
     {
-      message: "Agent package file does not belong to the target App.",
+      message: "Agent package file does not belong to the target Project.",
       name: "rejects legacy org-owned package files",
       updateSql: `UPDATE file_record SET owner_kind = 'organization', owner_id = '${ORGANIZATION_ID}', scope_id = '${ORGANIZATION_ID}' WHERE id = ?`,
     },
@@ -404,7 +404,7 @@ describe("agent package file import", () => {
 
     const imported = await importAgentPackage(bindings, OWNER_VIEWER, {
       fileId,
-      appId: APP_ID,
+      projectId: PROJECT_ID,
     });
 
     expect(imported.agent.name).toBe("Imported Package Agent");
@@ -429,8 +429,8 @@ describe("agent package file import", () => {
     });
   });
 
-  test("does not resolve imported Environment IDs outside the target App", async () => {
-    const otherAppId = "01J000000000000000000000B2";
+  test("does not resolve imported Environment IDs outside the target Project", async () => {
+    const otherProjectId = "01J000000000000000000000B2";
     const otherEnvironmentId = "01J000000000000000000000B3";
     const packageFixture = createPackageFixture();
 
@@ -441,7 +441,7 @@ describe("agent package file import", () => {
     });
 
     database.execute(`
-      INSERT INTO app (
+      INSERT INTO project (
         created_at,
         default_environment_id,
         id,
@@ -453,8 +453,8 @@ describe("agent package file import", () => {
       VALUES (
         1,
         NULL,
-        '${otherAppId}',
-        'Other App',
+        '${otherProjectId}',
+        'Other Project',
         '${ORGANIZATION_ID}',
         '${OWNER_VIEWER.id}',
         1
@@ -470,7 +470,7 @@ describe("agent package file import", () => {
         id,
         name,
         owner_account_id,
-        app_id,
+        project_id,
         updated_at
       )
       VALUES
@@ -484,14 +484,14 @@ describe("agent package file import", () => {
           '${otherEnvironmentId}',
           'Portable',
           '${OWNER_VIEWER.id}',
-          '${otherAppId}',
+          '${otherProjectId}',
           1
         );
     `);
 
     const imported = await importAgentPackage(bindings, OWNER_VIEWER, {
       fileId,
-      appId: APP_ID,
+      projectId: PROJECT_ID,
     });
     const row = await database
       .prepare("SELECT environment_id FROM agent WHERE id = ?")
@@ -513,7 +513,7 @@ describe("agent package file import", () => {
 
     const imported = await importAgentPackage(bindings, OWNER_VIEWER, {
       fileId,
-      appId: APP_ID,
+      projectId: PROJECT_ID,
     });
     const row = await database
       .prepare("SELECT environment_id FROM agent WHERE id = ?")

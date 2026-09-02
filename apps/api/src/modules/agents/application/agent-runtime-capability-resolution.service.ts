@@ -4,7 +4,7 @@ import type {
   AgentResolutionTargetType,
 } from "@mosoo/contracts/agent-manifest";
 import { vendorCredentialsTable } from "@mosoo/db";
-import type { AccountId, AppId } from "@mosoo/id";
+import type { AccountId, ProjectId } from "@mosoo/id";
 import {
   VENDOR_DEEPSEEK,
   VENDOR_OPENAI,
@@ -19,7 +19,7 @@ import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { isApiError } from "../../../platform/errors";
 import { isTruthy } from "../../../shared/truthiness";
-import { ensureAppOwnership } from "../../apps/application/app.service";
+import { ensureProjectOwnership } from "../../projects/application/project.service";
 import { resolveAvailableModels } from "../../vendor-credentials/application/available-models";
 import type { ResolvedModelEntry } from "../../vendor-credentials/application/available-models";
 import {
@@ -39,7 +39,7 @@ interface RuntimeCapabilityIssueInput {
   bindings?: ApiBindings;
   codePrefix: "agent.fork" | "agent.import" | "agent.readiness";
   database: D1Database;
-  appId: AppId;
+  projectId: ProjectId;
   selection: RuntimeCapabilitySelection;
 }
 
@@ -60,14 +60,14 @@ function allowsOpenAiChatCompletionProbe(providerId: string): boolean {
   return getVendor(providerId)?.openCodeProvider?.npmPackage === OPENAI_COMPATIBLE_AI_SDK_PACKAGE;
 }
 
-async function hasAppCredential(
+async function hasProjectCredential(
   database: D1Database,
   actorAccountId: AccountId,
-  appId: AppId,
+  projectId: ProjectId,
   provider: string,
 ): Promise<boolean> {
   try {
-    await ensureAppOwnership(database, actorAccountId, appId);
+    await ensureProjectOwnership(database, actorAccountId, projectId);
   } catch (error) {
     if (isApiError(error)) {
       return false;
@@ -80,7 +80,10 @@ async function hasAppCredential(
     .select({ id: vendorCredentialsTable.id })
     .from(vendorCredentialsTable)
     .where(
-      and(eq(vendorCredentialsTable.appId, appId), eq(vendorCredentialsTable.vendorId, provider)),
+      and(
+        eq(vendorCredentialsTable.projectId, projectId),
+        eq(vendorCredentialsTable.vendorId, provider),
+      ),
     )
     .orderBy(asc(vendorCredentialsTable.name), asc(vendorCredentialsTable.id))
     .limit(1)
@@ -114,14 +117,14 @@ async function collectCredentialIssues(
 ): Promise<AgentResolutionIssue[]> {
   const { provider } = input.selection;
   const required = true;
-  const appCredentialAvailable = await hasAppCredential(
+  const projectCredentialAvailable = await hasProjectCredential(
     input.database,
     input.actorAccountId,
-    input.appId,
+    input.projectId,
     provider,
   );
 
-  if (appCredentialAvailable) {
+  if (projectCredentialAvailable) {
     return [];
   }
 
@@ -129,7 +132,7 @@ async function collectCredentialIssues(
     createCapabilityIssue({
       actionLabel: "Configure key",
       code: `${input.codePrefix}.provider_credential.missing`,
-      message: `Provider ${provider} needs a key in this App.`,
+      message: `Provider ${provider} needs a key in this Project.`,
       required,
       status: "needs_reconnect",
       targetLabel: provider,
@@ -159,7 +162,7 @@ async function collectProviderProbeIssues(
     bindings,
     executionOwnerUserId: input.actorAccountId,
     options: { modelId: input.selection.model },
-    appId: input.appId,
+    projectId: input.projectId,
     vendorId: input.selection.provider,
   });
 
@@ -251,7 +254,7 @@ export async function collectRuntimeCapabilityIssues(
         await resolveAvailableModels(input.database, {
           currentModelId: model,
           currentVendorId: provider,
-          appId: input.appId,
+          projectId: input.projectId,
           runtimeId,
         })
       ).find((entry) => entry.vendorId === provider && entry.modelId === model) ?? null;

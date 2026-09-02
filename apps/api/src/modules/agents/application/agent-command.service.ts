@@ -18,18 +18,18 @@ import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase, runAppDatabaseBatch } from "../../../platform/db/drizzle";
 import { forbiddenError } from "../../../platform/errors";
 import { currentTimestampMs } from "../../../time";
-import { ensureAppOwnership } from "../../apps/application/app.service";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import {
   canUseEnvironment,
-  getAppDefaultEnvironmentId,
+  getProjectDefaultEnvironmentId,
 } from "../../environments/application/environment.service";
 import {
   listAgentMcpServerIds,
   deletePreparedAgentMcpBindingCredentials,
   prepareAgentMcpBindingsForConfig,
 } from "../../mcp/application/mcp-agent-binding.service";
-import { ensureAppAgentOwner } from "./agent-access.service";
+import { ensureProjectOwnership } from "../../projects/application/project.service";
+import { ensureProjectAgentOwner } from "./agent-access.service";
 import { prepareAgentDeploymentVersionCandidate } from "./agent-deployment-version.service";
 import {
   loadAgentEnvironmentConfig,
@@ -37,7 +37,12 @@ import {
 } from "./agent-environment.service";
 import { enforceAgentKindChangeAllowed } from "./agent-kind-policy.service";
 import { toAgentModel } from "./agent-models";
-import { readAgentId, readEnvironmentId, readMcpServerId, readAppId } from "./agent-platform-ids";
+import {
+  readAgentId,
+  readEnvironmentId,
+  readMcpServerId,
+  readProjectId,
+} from "./agent-platform-ids";
 import { getAgentRow, replaceAgentSkills } from "./agent-repository";
 import {
   ensureAgentSkillSelectionAccess,
@@ -85,9 +90,11 @@ export async function createAgent(
   input: CreateAgentInput,
 ): Promise<Agent> {
   const database = bindings.DB;
-  const appId = readAppId(input.appId);
-  await ensureAppOwnership(database, viewer.id, appId);
-  const environmentId = readEnvironmentId(await getAppDefaultEnvironmentId(database, appId));
+  const projectId = readProjectId(input.projectId);
+  await ensureProjectOwnership(database, viewer.id, projectId);
+  const environmentId = readEnvironmentId(
+    await getProjectDefaultEnvironmentId(database, projectId),
+  );
   const runtimeSelection = evaluateAgentRuntimeSelection(input);
 
   if (!runtimeSelection.ok) {
@@ -99,7 +106,7 @@ export async function createAgent(
   const timestampMs = currentTimestampMs();
   const agentId = createPlatformId<AgentId>();
 
-  await ensureAgentSkillSelectionAccess(database, viewer, appId, skillIds);
+  await ensureAgentSkillSelectionAccess(database, viewer, projectId, skillIds);
 
   await getAppDatabase(database)
     .insert(agentsTable)
@@ -119,7 +126,7 @@ export async function createAgent(
       model: input.model,
       name: input.name,
       ownerId: viewer.id,
-      appId,
+      projectId,
       prompt: input.prompt,
       provider: input.provider,
       runtimeId,
@@ -135,7 +142,7 @@ export async function createAgent(
     event: SERVER_PRODUCT_ANALYTICS_EVENTS.agentCreated,
     properties: {
       agent_id: agentId,
-      app_id: appId,
+      project_id: projectId,
       agent_kind: input.kind,
       provider: input.provider,
       runtime_id: runtimeId,
@@ -151,9 +158,9 @@ export async function updateAgentConfig(
   input: UpdateAgentConfigInput,
 ): Promise<Agent> {
   const agentId = readAgentId(input.agentId);
-  const editable = await ensureAppAgentOwner(database, viewer.id, {
+  const editable = await ensureProjectAgentOwner(database, viewer.id, {
     agentId,
-    appId: readAppId(input.appId),
+    projectId: readProjectId(input.projectId),
   });
   const runtimeSelection = evaluateAgentRuntimeSelection(input);
 
@@ -231,13 +238,13 @@ export async function updateAgentConfig(
   const { environmentId } = input.environment;
 
   enforcePublishedRuntimeStability(editable.agent, runtimeId);
-  await ensureAgentSkillSelectionAccess(database, viewer, editable.agent.appId, skillIds);
+  await ensureAgentSkillSelectionAccess(database, viewer, editable.agent.projectId, skillIds);
   if (
     environmentId !== null &&
     environmentId !== "" &&
     !(await canUseEnvironment(database, editable.agent.ownerId, {
       environmentId,
-      appId: editable.agent.appId,
+      projectId: editable.agent.projectId,
     }))
   ) {
     throw forbiddenError("Selected Environment is not available to the agent owner.");

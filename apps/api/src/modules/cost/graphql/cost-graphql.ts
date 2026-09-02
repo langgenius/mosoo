@@ -1,12 +1,12 @@
 import { parsePlatformId } from "@mosoo/id";
-import type { AgentId, OrganizationId, AppId } from "@mosoo/id";
+import type { AgentId, OrganizationId, ProjectId } from "@mosoo/id";
 
 import type { GraphQLModule } from "../../../adapters/graphql/graphql-module";
 import { costGraphQLSpec } from "../../../adapters/graphql/graphql-module-specs";
 import {
   getAgentCostCard,
   getOrganizationBillingCostCard,
-  getAppCostCard,
+  getProjectCostCard,
 } from "../application/cost-query.service";
 import type { CostRange } from "../application/cost-query.service";
 
@@ -16,15 +16,15 @@ interface OrganizationBillingCostCardArgs {
   runPurposes?: string[] | null;
 }
 
-interface AppCostCardArgs {
-  appId: string;
+interface ProjectCostCardArgs {
+  projectId: string;
   range: CostRange;
   runPurposes?: string[] | null;
 }
 
 interface AgentCostCardArgs {
   agentId: string;
-  appId: string;
+  projectId: string;
   range: CostRange;
   runPurposes?: string[] | null;
 }
@@ -37,8 +37,8 @@ function readOrganizationId(value: string, label: string): OrganizationId {
   return parsePlatformId<OrganizationId>(value, label);
 }
 
-function readAppId(value: string, label: string): AppId {
-  return parsePlatformId<AppId>(value, label);
+function readProjectId(value: string, label: string): ProjectId {
+  return parsePlatformId<ProjectId>(value, label);
 }
 
 export const costGraphQLModule = {
@@ -48,7 +48,7 @@ export const costGraphQLModule = {
       getAgentCostCard({
         agentId: readAgentId(args.agentId, "agent ID"),
         database: context.bindings.DB,
-        appId: readAppId(args.appId, "app ID"),
+        projectId: readProjectId(args.projectId, "project ID"),
         range: args.range,
         runPurposes: args.runPurposes ?? [],
         viewer: context.viewer,
@@ -61,10 +61,10 @@ export const costGraphQLModule = {
         runPurposes: args.runPurposes ?? [],
         viewer: context.viewer,
       }),
-    appCostCard: async (_parent, args: AppCostCardArgs, context) =>
-      getAppCostCard({
+    projectCostCard: async (_parent, args: ProjectCostCardArgs, context) =>
+      getProjectCostCard({
         database: context.bindings.DB,
-        appId: readAppId(args.appId, "app ID"),
+        projectId: readProjectId(args.projectId, "project ID"),
         range: args.range,
         runPurposes: args.runPurposes ?? [],
         viewer: context.viewer,

@@ -6,7 +6,7 @@ import type { ReactElement } from "react";
 import { Link } from "react-router-dom";
 
 import { CreateEnvironmentDialog } from "@/domains/environment/components/create-environment-dialog";
-import { useAppEnvironmentsQuery } from "@/domains/environment/query/environment-queries";
+import { useProjectEnvironmentsQuery } from "@/domains/environment/query/environment-queries";
 import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Label } from "@/shared/ui/label";
@@ -69,19 +69,19 @@ function EnvironmentOption({
 
 export function EnvironmentPicker({
   model,
-  appId,
+  projectId,
   readOnly = false,
 }: {
   model: AgentEditorModel;
-  appId: string | null;
+  projectId: string | null;
   readOnly?: boolean;
 }): ReactElement {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [selectionNotice, setSelectionNotice] = useState<string | null>(null);
-  const activeAppId = appId !== null && appId !== "" ? appId : null;
-  const environmentsQuery = useAppEnvironmentsQuery(activeAppId);
+  const activeProjectId = projectId !== null && projectId !== "" ? projectId : null;
+  const environmentsQuery = useProjectEnvironmentsQuery(activeProjectId);
   const environments = environmentsQuery.data ?? [];
   const explicitEnvironmentId =
     model.draft.environmentId !== null && model.draft.environmentId !== ""
@@ -115,7 +115,7 @@ export function EnvironmentPicker({
             readOnly ? "cursor-default opacity-80" : "cursor-pointer hover:border-brand/30",
             open ? "border-brand/30 ring-2 ring-brand-ring" : null,
           )}
-          disabled={readOnly || activeAppId === null}
+          disabled={readOnly || activeProjectId === null}
           type="button"
         >
           <div className="flex min-w-0 items-center gap-2.5">
@@ -127,7 +127,7 @@ export function EnvironmentPicker({
                 <span className="text-foreground truncate text-[13px] font-semibold">
                   {selectedEnvironmentMissing
                     ? t("agentEditor.loadingSelectedEnvironment")
-                    : (selectedEnvironment?.name ?? t("agentEditor.appDefault"))}
+                    : (selectedEnvironment?.name ?? t("agentEditor.projectDefault"))}
                 </span>
                 {selectedEnvironment?.isDefault === true ? (
                   <Star className="text-brand size-3" />
@@ -165,7 +165,7 @@ export function EnvironmentPicker({
               <div className="border-border-subtle mt-1 grid shrink-0 gap-1 border-t pt-1">
                 <button
                   className="text-brand hover:bg-brand-light/60 flex items-center gap-2 rounded-lg px-3 py-2 text-[13px] transition-colors disabled:cursor-not-allowed disabled:opacity-60"
-                  disabled={activeAppId === null}
+                  disabled={activeProjectId === null}
                   onClick={() => {
                     setOpen(false);
                     setCreateOpen(true);
@@ -204,7 +204,7 @@ export function EnvironmentPicker({
         </output>
       ) : null}
 
-      {activeAppId !== null ? (
+      {activeProjectId !== null ? (
         <CreateEnvironmentDialog
           onCreated={(environment) => {
             const blockReason = getEnvironmentSelectionBlockReason(
@@ -224,7 +224,7 @@ export function EnvironmentPicker({
           }}
           onOpenChange={setCreateOpen}
           open={createOpen}
-          appId={activeAppId}
+          projectId={activeProjectId}
         />
       ) : null}
     </div>

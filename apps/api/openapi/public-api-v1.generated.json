@@ -895,7 +895,7 @@
   "paths": {
     "/agents/{agentId}/files": {
       "post": {
-        "description": "Uploads a file into the Agent API Endpoint's App draft scope before a Thread exists. Use the returned file ID in create-thread or send-events resources.",
+        "description": "Uploads a file into the Agent API Endpoint's Project draft scope before a Thread exists. Use the returned file ID in create-thread or send-events resources.",
         "parameters": [
           {
             "description": "Agent API Endpoint ID from the Agent's API Access panel. v1 IDs are bare ULIDs.",

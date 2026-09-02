@@ -5,7 +5,7 @@ import type {
   FileSessionKind,
 } from "@mosoo/contracts/file";
 import { parsePlatformId } from "@mosoo/id";
-import type { AppId, SessionId } from "@mosoo/id";
+import type { ProjectId, SessionId } from "@mosoo/id";
 
 import type { GraphQLModule } from "../../../adapters/graphql/graphql-module";
 import { fileGraphQLSpec } from "../../../adapters/graphql/graphql-module-specs";
@@ -13,7 +13,7 @@ import { fileStore } from "../application/file-store";
 
 interface FileListArgs {
   input: {
-    appId: string;
+    projectId: string;
     scopeId?: string | null;
     scopeKind?: FileScopeKind | null;
     sessionId?: string | null;
@@ -23,7 +23,7 @@ interface FileListArgs {
 
 function toFileListQuery(input: FileListArgs["input"]): FileListQuery {
   return {
-    appId: parsePlatformId<AppId>(input.appId, "file list app ID"),
+    projectId: parsePlatformId<ProjectId>(input.projectId, "file list project ID"),
     ...(input.scopeId === undefined || input.scopeId === null
       ? {}
       : {

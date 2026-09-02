@@ -32,7 +32,7 @@ const credentialColumns = {
   lastRefreshedAt: mcpCredentialsTable.lastRefreshedAt,
   oauthClientId: mcpCredentialsTable.oauthClientId,
   oauthClientSecretSecretId: mcpCredentialsTable.oauthClientSecretSecretId,
-  appId: mcpCredentialsTable.appId,
+  projectId: mcpCredentialsTable.projectId,
   refreshSecretId: mcpCredentialsTable.refreshSecretId,
   scope: mcpCredentialsTable.scope,
   scopeValuesJson: mcpCredentialsTable.scopeValuesJson,
@@ -47,7 +47,7 @@ const credentialColumns = {
 const credentialSecretServerColumns = {
   credentialScope: mcpServersTable.credentialScope,
   id: mcpServersTable.id,
-  appId: mcpServersTable.appId,
+  projectId: mcpServersTable.projectId,
 };
 
 function scopedCredentialKey(input: { agentId: AgentId | null; serverId: McpServerId }): string {
@@ -67,7 +67,7 @@ function credentialMatchesExplicitAgentBinding(
   );
 }
 
-export async function getAppCredentialRow(
+export async function getProjectCredentialRow(
   database: D1Database,
   serverId: McpServerId,
 ): Promise<CredentialRow | null> {
@@ -119,14 +119,14 @@ export async function listCredentialRowsByServerId(
     .all();
 }
 
-export async function hasAppCredential(
+export async function hasProjectCredential(
   database: D1Database,
   serverId: McpServerId,
 ): Promise<boolean> {
-  return (await listServerIdsWithAppCredentials(database, [serverId])).has(serverId);
+  return (await listServerIdsWithProjectCredentials(database, [serverId])).has(serverId);
 }
 
-export async function listServerIdsWithAppCredentials(
+export async function listServerIdsWithProjectCredentials(
   database: D1Database,
   serverIds: McpServerId[],
 ): Promise<Set<McpServerId>> {
@@ -155,7 +155,7 @@ export async function resolveRegistryCredential(
   database: D1Database,
   server: ServerRow,
 ): Promise<CredentialRow | null> {
-  return getAppCredentialRow(database, server.id);
+  return getProjectCredentialRow(database, server.id);
 }
 
 export async function listCredentialsForAgentBindings(
@@ -184,7 +184,7 @@ export async function resolveCredentialsForMcpBindings(
   const agentScopedBindings = bindings.filter(
     (binding) => binding.credentialMode === "agent_bound" && !isTruthy(binding.agentCredentialId),
   );
-  const appCredentialServerIds = [
+  const projectCredentialServerIds = [
     ...new Set(
       bindings
         .filter(
@@ -214,10 +214,10 @@ export async function resolveCredentialsForMcpBindings(
     }
   }
 
-  if (appCredentialServerIds.length > 0) {
+  if (projectCredentialServerIds.length > 0) {
     const condition = and(
       eq(mcpCredentialsTable.scope, "app"),
-      inArray(mcpCredentialsTable.serverId, appCredentialServerIds),
+      inArray(mcpCredentialsTable.serverId, projectCredentialServerIds),
     );
 
     if (condition) {
@@ -242,7 +242,7 @@ export async function resolveCredentialsForMcpBindings(
       .filter((credential) => credential.scope === "agent")
       .map((credential) => [scopedCredentialKey(credential), credential]),
   );
-  const appCredentialsByServerId = new Map(
+  const projectCredentialsByServerId = new Map(
     credentials
       .filter((credential) => credential.scope === "app")
       .map((credential) => [credential.serverId, credential]),
@@ -262,7 +262,7 @@ export async function resolveCredentialsForMcpBindings(
       return;
     }
 
-    resolvedCredentials[index] = appCredentialsByServerId.get(binding.serverId) ?? null;
+    resolvedCredentials[index] = projectCredentialsByServerId.get(binding.serverId) ?? null;
   });
 
   return resolvedCredentials;
@@ -282,7 +282,7 @@ export async function writeCredential(
     refreshToken?: string | null;
     scope: McpCredentialRecordScope;
     scopeValues: string[];
-    server: Pick<ServerRow, "credentialScope" | "id" | "appId">;
+    server: Pick<ServerRow, "credentialScope" | "id" | "projectId">;
     subjectLabel?: string | null;
     tokenExpiresAt?: number | null;
     userId?: AccountId | null;
@@ -346,7 +346,7 @@ export async function writeCredential(
     lastRefreshedAt: input.authType === "oauth" ? updatedAt : null,
     oauthClientId: input.oauthClientId ?? existing?.oauthClientId ?? null,
     oauthClientSecretSecretId,
-    appId: input.server.appId,
+    projectId: input.server.projectId,
     refreshSecretId,
     scope: input.scope,
     scopeValuesJson: JSON.stringify(input.scopeValues),

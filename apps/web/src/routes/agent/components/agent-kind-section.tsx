@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 
 import { createAgentFork } from "@/domains/agent/api/agent-client";
 import { agentKeys } from "@/domains/agent/query/agent-queries";
-import { toAgentId, toAppId } from "@/routes/typed-id";
+import { toAgentId, toProjectId } from "@/routes/typed-id";
 
 import type { Agent, AgentKind } from "../agent.types";
 import { KindForkDialog } from "../lifecycle/kind-fork-dialog";
@@ -64,7 +64,7 @@ export function AgentKindSection({
     const result = await forkMutation.mutateAsync({
       agentId: toAgentId(agent.id),
       kind: forkDialog.target,
-      appId: toAppId(agent.appId),
+      projectId: toProjectId(agent.projectId),
     });
 
     setForkDialog(null);
@@ -73,7 +73,7 @@ export function AgentKindSection({
         ? `/demo/agent/${result.agent.id}`
         : `/agent/${result.agent.id}`,
     );
-  }, [agent.appId, agent.id, forkDialog, forkMutation, navigate]);
+  }, [agent.projectId, agent.id, forkDialog, forkMutation, navigate]);
 
   return (
     <>

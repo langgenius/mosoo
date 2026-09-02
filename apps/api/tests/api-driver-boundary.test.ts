@@ -22,7 +22,7 @@ import {
   readPermissionRequestViews,
   removePermissionRequest,
 } from "../src/modules/runtime/infrastructure/driver-instance/event-projection";
-import { appRuntimeDriverEvents } from "../src/modules/runtime/infrastructure/driver-instance/events";
+import { projectRuntimeDriverEvents } from "../src/modules/runtime/infrastructure/driver-instance/events";
 import { readNativeResumeRef } from "../src/modules/runtime/infrastructure/driver-instance/native-resume-ref-event";
 import { parseDriverEventBatchInput } from "../src/modules/runtime/infrastructure/driver-instance/rpc-wire";
 import {
@@ -325,7 +325,7 @@ describe("API to driver boundary", () => {
     });
     await expect(verifyRuntimeActionToken(bindings, llmProxyGrant)).resolves.toMatchObject({
       action: "llm_proxy",
-      appId: API_DRIVER_BOUNDARY_IDS.app,
+      projectId: API_DRIVER_BOUNDARY_IDS.project,
       driverGeneration: 7,
       driverInstanceId: API_DRIVER_BOUNDARY_IDS.driverInstance,
       modelId: "gpt-5.1",
@@ -510,7 +510,7 @@ describe("API to driver boundary", () => {
     expect(envelope.occurredAt).toBe("1970-01-01T00:00:00.010Z");
   });
 
-  test("apps admitted driver wire events into API runtime and viewer events", async () => {
+  test("projects admitted driver wire events into API runtime and viewer events", async () => {
     const link = createRuntimeSessionLink();
     const permissionRequested = createDriverEvent({
       kind: "permission.requested",
@@ -538,17 +538,20 @@ describe("API to driver boundary", () => {
       ],
     });
 
-    const projection = await appRuntimeDriverEvents({ DB: new SqliteD1Database() } as ApiBindings, {
-      currentLiveState: createBaseLiveState({
-        callerId: link.callerId,
-        creatorId: link.creatorId,
+    const projection = await projectRuntimeDriverEvents(
+      { DB: new SqliteD1Database() } as ApiBindings,
+      {
+        currentLiveState: createBaseLiveState({
+          callerId: link.callerId,
+          creatorId: link.creatorId,
+          driverInstanceId: API_DRIVER_BOUNDARY_IDS.driverInstance,
+          sessionId: link.sessionId,
+        }),
         driverInstanceId: API_DRIVER_BOUNDARY_IDS.driverInstance,
-        sessionId: link.sessionId,
-      }),
-      driverInstanceId: API_DRIVER_BOUNDARY_IDS.driverInstance,
-      events: batch.events,
-      link,
-    });
+        events: batch.events,
+        link,
+      },
+    );
 
     expect(projection.runtimeEvents).toHaveLength(1);
     expect(projection.runtimeEvents[0]).toMatchObject({
@@ -609,38 +612,41 @@ describe("API to driver boundary", () => {
       ],
     });
 
-    const projection = await appRuntimeDriverEvents({ DB: new SqliteD1Database() } as ApiBindings, {
-      currentLiveState: {
-        ...baseLiveState,
-        lifecycle: "RUNNING",
-        messages: [
-          {
-            content: "",
-            createdAt: "2026-05-26T00:00:00.000Z",
-            id: "assistant-1",
-            plan: [],
-            role: "assistant",
-            segments: [
-              {
-                argsText: '{"cmd":"pwd"}',
-                kind: "tool_use",
-                path: null,
-                tool: "Shell",
-                toolCallId: "tool-1",
-              },
-            ],
+    const projection = await projectRuntimeDriverEvents(
+      { DB: new SqliteD1Database() } as ApiBindings,
+      {
+        currentLiveState: {
+          ...baseLiveState,
+          lifecycle: "RUNNING",
+          messages: [
+            {
+              content: "",
+              createdAt: "2026-05-26T00:00:00.000Z",
+              id: "assistant-1",
+              plan: [],
+              role: "assistant",
+              segments: [
+                {
+                  argsText: '{"cmd":"pwd"}',
+                  kind: "tool_use",
+                  path: null,
+                  tool: "Shell",
+                  toolCallId: "tool-1",
+                },
+              ],
+            },
+          ],
+          run: {
+            ...baseLiveState.run,
+            id: API_DRIVER_BOUNDARY_IDS.sessionRun,
+            status: "running",
           },
-        ],
-        run: {
-          ...baseLiveState.run,
-          id: API_DRIVER_BOUNDARY_IDS.sessionRun,
-          status: "running",
         },
+        driverInstanceId: API_DRIVER_BOUNDARY_IDS.driverInstance,
+        events: batch.events,
+        link,
       },
-      driverInstanceId: API_DRIVER_BOUNDARY_IDS.driverInstance,
-      events: batch.events,
-      link,
-    });
+    );
     const canonicalFailureSourceId = `session-run-terminal:${API_DRIVER_BOUNDARY_IDS.sessionRun}:run.failed`;
 
     expect(projection.runtimeEvents).toMatchObject([{ sourceEventId: canonicalFailureSourceId }]);

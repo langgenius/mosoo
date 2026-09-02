@@ -18,13 +18,12 @@ input AddSessionResourceFileInput {
 }
 
 input AddSessionResourceInput {
-  appId: ULID!
   file: AddSessionResourceFileInput!
+  projectId: ULID!
   sessionId: ULID!
 }
 
 type Agent {
-  appId: ULID!
   createdAt: String!
   description: String
   id: ULID!
@@ -32,6 +31,7 @@ type Agent {
   liveVersion: AgentDeploymentVersion
   model: String!
   name: String!
+  projectId: ULID!
   prompt: String!
   provider: String!
   runtimeId: String!
@@ -90,7 +90,6 @@ type AgentDeploymentVersion {
 }
 
 type AgentDetail {
-  appId: ULID!
   createdAt: String!
   description: String
   id: ULID!
@@ -99,6 +98,7 @@ type AgentDetail {
   model: String!
   name: String!
   owner: AgentOwnerSummary!
+  projectId: ULID!
   prompt: String!
   provider: String!
   runtimeId: String!
@@ -263,10 +263,10 @@ enum AgentResolutionTargetType {
 }
 
 type AgentRunEventSurface {
-  appId: ULID!
   graphqlUrl: String!
   messagesOperation: String!
   processEventsOperation: String!
+  projectId: ULID!
   retrieveOperation: String!
   sessionId: ULID!
   streamUrl: String
@@ -404,13 +404,13 @@ enum AgentStatus {
 }
 
 type AgentSummary {
-  appId: ULID!
   createdAt: String!
   description: String
   id: ULID!
   kind: AgentKind!
   name: String!
   owner: AgentOwnerSummary!
+  projectId: ULID!
   runtimeId: String!
   status: AgentStatus!
   tools: [AgentToolSummary!]!
@@ -435,83 +435,10 @@ enum AgentVisibility {
   private
 }
 
-type App {
-  createdAt: String!
-  defaultEnvironmentId: ULID
-  id: ULID!
-  name: String!
-  ownerAccountId: ULID!
-}
-
-type AppCostCard {
-  agents: [CostAgentRow!]!
-  appId: ULID!
-  appName: String!
-  daily: [CostDailyPoint!]!
-  models: [CostModelRow!]!
-  previousTotals: CostTotals!
-  recentSessions: [CostRecentSession!]!
-  totals: CostTotals!
-}
-
 type AppInfo {
   api: String!
   name: String!
   runtime: String!
-}
-
-type AppOverview {
-  agents: AppOverviewAgentList!
-  app: App!
-  providerCredentials: AppOverviewProviderCredentialList!
-}
-
-type AppOverviewAgent {
-  appId: ULID!
-  description: String
-  id: ULID!
-  kind: AgentKind!
-  model: String!
-  name: String!
-  provider: String!
-  runtimeId: String!
-  status: AgentStatus!
-  updatedAt: String!
-}
-
-type AppOverviewAgentList {
-  hasMore: Boolean!
-  items: [AppOverviewAgent!]!
-  limit: Int!
-}
-
-type AppOverviewProviderCredential {
-  appId: ULID!
-  hasCustomApiBase: Boolean!
-  id: ULID!
-  isDefault: Boolean!
-  modelCount: Int!
-  name: String!
-  status: AppOverviewProviderCredentialStatus!
-  vendorId: String!
-}
-
-type AppOverviewProviderCredentialList {
-  byVendor: [AppOverviewProviderCredentialVendorCount!]!
-  configuredCount: Int!
-  hasMore: Boolean!
-  items: [AppOverviewProviderCredential!]!
-  limit: Int!
-}
-
-enum AppOverviewProviderCredentialStatus {
-  configured
-}
-
-type AppOverviewProviderCredentialVendorCount {
-  count: Int!
-  defaultCredentialId: ULID
-  vendorId: String!
 }
 
 enum AuthMethod {
@@ -530,7 +457,7 @@ input BootstrapOnboardingInput {
 }
 
 input ConnectMcpBearerInput {
-  appId: ULID!
+  projectId: ULID!
   serverId: ULID!
   subjectLabel: String
   token: String!
@@ -538,12 +465,12 @@ input ConnectMcpBearerInput {
 
 type ControlPlaneOverview {
   activeOrganization: Organization
-  apps: ControlPlaneOverviewAppList!
+  projects: ControlPlaneOverviewProjectList!
 }
 
-type ControlPlaneOverviewAppList {
+type ControlPlaneOverviewProjectList {
   hasMore: Boolean!
-  items: [AppOverview!]!
+  items: [ProjectOverview!]!
   limit: Int!
 }
 
@@ -662,16 +589,16 @@ type CostTotals implements CostAggregate {
 
 input CreateAgentForkInput {
   agentId: ULID!
-  appId: ULID!
   kind: AgentKind
+  projectId: ULID!
 }
 
 input CreateAgentInput {
-  appId: ULID!
   description: String
   kind: AgentKind!
   model: String!
   name: String!
+  projectId: ULID!
   prompt: String!
   provider: String!
   runtimeId: String!
@@ -680,79 +607,78 @@ input CreateAgentInput {
 
 input CreateAgentSessionInput {
   agentId: ULID!
-  appId: ULID!
+  projectId: ULID!
   type: SessionType
   waitForRuntimeReady: Boolean
 }
 
-input CreateAppInput {
-  name: String!
-  organizationId: ULID!
-}
-
-input CreateAppMcpServerInput {
-  appId: ULID!
-  authType: McpAuthType!
-  description: String
-  iconUrl: String
-  name: String!
-  oauthClientId: String
-  oauthClientSecret: String
-  url: String!
-}
-
 input CreateEnvironmentForkInput {
-  appId: ULID!
   environmentId: ULID!
+  projectId: ULID!
 }
 
 input CreateEnvironmentInput {
   allowMcpServers: Boolean!
   allowPackageManagers: Boolean!
   allowedHosts: [String!]!
-  appId: ULID!
   description: String
   envVars: [EnvironmentVariableInput!]!
   name: String!
   networkPolicy: EnvironmentNetworkPolicy!
   packages: [EnvironmentPackageSpecInput!]!
+  projectId: ULID!
   setupScript: String!
 }
 
+input CreateProjectInput {
+  name: String!
+  organizationId: ULID!
+}
+
+input CreateProjectMcpServerInput {
+  authType: McpAuthType!
+  description: String
+  iconUrl: String
+  name: String!
+  oauthClientId: String
+  oauthClientSecret: String
+  projectId: ULID!
+  url: String!
+}
+
 input CreateSkillForkInput {
-  appId: ULID!
+  projectId: ULID!
   skillId: ULID!
 }
 
 input CreateVendorCredentialInput {
   apiBase: String
   apiKey: String!
-  appId: ULID!
   models: [String!]
   name: String!
+  projectId: ULID!
   vendorId: String!
 }
 
 input DeleteAgentInput {
   agentId: ULID!
-  appId: ULID!
+  projectId: ULID!
 }
 
 input DeleteEnvironmentInput {
-  appId: ULID!
   environmentId: ULID!
+  projectId: ULID!
 }
 
 input DeleteVendorCredentialInput {
-  appId: ULID!
   id: ULID!
+  projectId: ULID!
 }
 
 type EnvironmentDetail {
   allowMcpServers: Boolean!
   allowPackageManagers: Boolean!
   allowedHosts: [String!]!
-  appId: ULID!
   canDelete: Boolean!
   canEdit: Boolean!
   createdAt: String!
@@ -768,6 +694,7 @@ type EnvironmentDetail {
   networkPolicy: EnvironmentNetworkPolicy!
   owner: EnvironmentOwnerSummary!
   packages: [EnvironmentPackageSpec!]!
+  projectId: ULID!
   role: EnvironmentRegistryRole!
   setupScript: String!
   updatedAt: String!
@@ -818,7 +745,6 @@ type EnvironmentSummary {
   allowMcpServers: Boolean!
   allowPackageManagers: Boolean!
   allowedHosts: [String!]!
-  appId: ULID!
   canDelete: Boolean!
   canEdit: Boolean!
   createdAt: String!
@@ -834,6 +760,7 @@ type EnvironmentSummary {
   networkPolicy: EnvironmentNetworkPolicy!
   owner: EnvironmentOwnerSummary!
   packages: [EnvironmentPackageSpec!]!
+  projectId: ULID!
   role: EnvironmentRegistryRole!
   setupScript: String!
   updatedAt: String!
@@ -857,7 +784,7 @@ enum EnvironmentVariableStatus {
 }
 
 input FileListInput {
-  appId: ULID!
+  projectId: ULID!
   scopeId: ULID
   scopeKind: FileScopeKind
   sessionId: ULID
@@ -943,8 +870,8 @@ enum FileUploadStrategy {
 }
 
 input ImportAgentPackageInput {
-  appId: ULID!
   fileId: ULID!
+  projectId: ULID!
 }
 
 scalar JsonObject
@@ -1007,15 +934,14 @@ enum McpOAuthFlowStatus {
 }
 
 type McpRegistry {
-  appId: ULID!
   currentUserEmail: String!
   currentUserId: ULID!
   currentUserName: String!
+  projectId: ULID!
   servers: [McpServerWithCredential!]!
 }
 
 type McpServer {
-  appId: ULID!
   authType: McpAuthType!
   createdAt: String!
   credentialScope: McpCredentialScope!
@@ -1027,6 +953,7 @@ type McpServer {
   name: String!
   ownerId: ULID!
   ownerName: String!
+  projectId: ULID!
   source: McpServerSource!
   updatedAt: String!
   url: String!
@@ -1037,7 +964,6 @@ enum McpServerSource {
 }
 
 type McpServerWithCredential {
-  appId: ULID!
   authType: McpAuthType!
   authorizationState: McpAuthorizationState!
   createdAt: String!
@@ -1052,6 +978,7 @@ type McpServerWithCredential {
   name: String!
   ownerId: ULID!
   ownerName: String!
+  projectId: ULID!
   source: McpServerSource!
   updatedAt: String!
   url: String!
@@ -1064,51 +991,51 @@ enum ModelCatalogSource {
 
 type Mutation {
   addSessionResource(input: AddSessionResourceInput!): SessionResourceUpload!
-  archiveAgentSession(appId: ULID!, sessionId: ULID!): OperationResult!
+  archiveAgentSession(projectId: ULID!, sessionId: ULID!): OperationResult!
   autoTitleSession(input: RenameSessionInput!): Session!
   connectMcpBearer(input: ConnectMcpBearerInput!): McpServerWithCredential!
   createAgent(input: CreateAgentInput!): Agent!
   createAgentFork(input: CreateAgentForkInput!): AgentPackageImportResult!
   createAgentSession(input: CreateAgentSessionInput!): Session!
-  createApp(input: CreateAppInput!): App!
-  createAppMcpServer(input: CreateAppMcpServerInput!): McpServerWithCredential!
   createEnvironment(input: CreateEnvironmentInput!): EnvironmentSummary!
   createEnvironmentFork(input: CreateEnvironmentForkInput!): EnvironmentSummary!
+  createProject(input: CreateProjectInput!): Project!
+  createProjectMcpServer(input: CreateProjectMcpServerInput!): McpServerWithCredential!
   createSkillFork(input: CreateSkillForkInput!): SkillSummary!
   createVendorCredential(input: CreateVendorCredentialInput!): VendorCredential!
   deleteAgent(input: DeleteAgentInput!): OperationResult!
-  deleteAgentSession(appId: ULID!, sessionId: ULID!): OperationResult!
+  deleteAgentSession(projectId: ULID!, sessionId: ULID!): OperationResult!
   deleteEnvironment(input: DeleteEnvironmentInput!): OperationResult!
-  deleteMcpServer(appId: ULID!, serverId: ULID!): OperationResult!
-  deleteOwnedSkill(appId: ULID!, skillId: ULID!): OperationResult!
+  deleteMcpServer(projectId: ULID!, serverId: ULID!): OperationResult!
+  deleteOwnedSkill(projectId: ULID!, skillId: ULID!): OperationResult!
   deleteVendorCredential(input: DeleteVendorCredentialInput!): OperationResult!
   importAgentPackage(input: ImportAgentPackageInput!): AgentPackageImportResult!
   onboardingBootstrap(input: BootstrapOnboardingInput!): OnboardingStatus!
-  prewarmAgentSession(appId: ULID!, sessionId: ULID!): SessionRuntimePrewarmAck!
+  prewarmAgentSession(projectId: ULID!, sessionId: ULID!): SessionRuntimePrewarmAck!
   publishAgent(input: PublishAgentInput!): Agent!
   recreateSandbox(input: RuntimeStateOperationInput!): RuntimeStateOperationResult!
   removeSessionResource(input: RemoveSessionResourceInput!): OperationResult!
-  renameApp(input: RenameAppInput!): App!
   renameOrganization(input: RenameOrganizationInput!): Organization!
+  renameProject(input: RenameProjectInput!): Project!
   renameSession(input: RenameSessionInput!): Session!
   resetAgentState(input: RuntimeStateOperationInput!): RuntimeStateOperationResult!
   restartDriver(input: RuntimeStateOperationInput!): RuntimeStateOperationResult!
-  revokeMcpCredential(appId: ULID!, serverId: ULID!): McpServerWithCredential!
-  sendAgentSessionEvents(appId: ULID!, events: [AgentSessionEventInput!]!, sessionId: ULID!): AgentSessionEventBatch!
-  setAppDefaultEnvironment(input: SetAppDefaultEnvironmentInput!): EnvironmentSummary!
+  revokeMcpCredential(projectId: ULID!, serverId: ULID!): McpServerWithCredential!
+  sendAgentSessionEvents(events: [AgentSessionEventInput!]!, projectId: ULID!, sessionId: ULID!): AgentSessionEventBatch!
   setDefaultVendorCredential(input: SetDefaultVendorCredentialInput!): VendorCredential!
   setEnvironmentVariableValue(input: SetEnvironmentVariableValueInput!): EnvironmentDetail!
-  setMcpServerEnabled(appId: ULID!, enabled: Boolean!, serverId: ULID!): McpServerWithCredential!
+  setMcpServerEnabled(enabled: Boolean!, projectId: ULID!, serverId: ULID!): McpServerWithCredential!
+  setProjectDefaultEnvironment(input: SetProjectDefaultEnvironmentInput!): EnvironmentSummary!
   setSystemAgentModel(input: SetSystemAgentModelInput!): Account!
   startAgentRun(input: StartAgentRunInput!): AgentRunWorkflow!
   startMcpOAuth(input: StartMcpOAuthInput!): StartMcpOAuthPayload!
   testVendorCredential(input: TestVendorCredentialInput!): TestVendorCredentialResult!
-  unarchiveAgentSession(appId: ULID!, sessionId: ULID!): OperationResult!
-  unpublishAgent(agentId: ULID!, appId: ULID!): Agent!
+  unarchiveAgentSession(projectId: ULID!, sessionId: ULID!): OperationResult!
+  unpublishAgent(agentId: ULID!, projectId: ULID!): Agent!
   updateAgentConfig(input: UpdateAgentConfigInput!): Agent!
-  updateAppMcpServer(input: UpdateAppMcpServerInput!): McpServerWithCredential!
   updateEnvironment(input: UpdateEnvironmentInput!): EnvironmentDetail!
   updateProfile(input: UpdateAccountProfileInput!): Account!
+  updateProjectMcpServer(input: UpdateProjectMcpServerInput!): McpServerWithCredential!
   updateVendorCredential(input: UpdateVendorCredentialInput!): VendorCredential!
 }
 
@@ -1137,57 +1064,125 @@ type OrganizationBillingCostCard {
 
 scalar PrimitiveRecord
 
+type Project {
+  createdAt: String!
+  defaultEnvironmentId: ULID
+  id: ULID!
+  name: String!
+  ownerAccountId: ULID!
+}
+
+type ProjectCostCard {
+  agents: [CostAgentRow!]!
+  daily: [CostDailyPoint!]!
+  models: [CostModelRow!]!
+  previousTotals: CostTotals!
+  projectId: ULID!
+  projectName: String!
+  recentSessions: [CostRecentSession!]!
+  totals: CostTotals!
+}
+
+type ProjectOverview {
+  agents: ProjectOverviewAgentList!
+  project: Project!
+  providerCredentials: ProjectOverviewProviderCredentialList!
+}
+
+type ProjectOverviewAgent {
+  description: String
+  id: ULID!
+  kind: AgentKind!
+  model: String!
+  name: String!
+  projectId: ULID!
+  provider: String!
+  runtimeId: String!
+  status: AgentStatus!
+  updatedAt: String!
+}
+
+type ProjectOverviewAgentList {
+  hasMore: Boolean!
+  items: [ProjectOverviewAgent!]!
+  limit: Int!
+}
+
+type ProjectOverviewProviderCredential {
+  hasCustomApiBase: Boolean!
+  id: ULID!
+  isDefault: Boolean!
+  modelCount: Int!
+  name: String!
+  projectId: ULID!
+  status: ProjectOverviewProviderCredentialStatus!
+  vendorId: String!
+}
+
+type ProjectOverviewProviderCredentialList {
+  byVendor: [ProjectOverviewProviderCredentialVendorCount!]!
+  configuredCount: Int!
+  hasMore: Boolean!
+  items: [ProjectOverviewProviderCredential!]!
+  limit: Int!
+}
+
+enum ProjectOverviewProviderCredentialStatus {
+  configured
+}
+
+type ProjectOverviewProviderCredentialVendorCount {
+  count: Int!
+  defaultCredentialId: ULID
+  vendorId: String!
+}
+
 input PublishAgentInput {
   agentId: ULID!
-  appId: ULID!
+  projectId: ULID!
 }
 
 type Query {
-  accessibleAgentList(appId: ULID!): [AgentSummary!]!
-  agent(agentId: ULID!, appId: ULID!): AgentDetail!
-  agentCostCard(agentId: ULID!, appId: ULID!, range: CostRange!, runPurposes: [CostRunPurpose!]): AgentCostCard!
-  agentEditorState(agentId: ULID!, appId: ULID!): AgentEditorState!
-  agentManifest(agentId: ULID!, appId: ULID!): AgentManifestExport!
-  agentSessionDiagnostics(appId: ULID!, sessionId: ULID!): AgentSessionDiagnostics!
-  agentSessionList(agentId: ULID!, appId: ULID!, archived: Boolean, beforeCursor: String, limit: Int, participantOnly: Boolean, type: SessionType): SessionConnection!
-  agentSessionRetrieve(appId: ULID!, sessionId: ULID!): AgentSessionRetrieve!
-  appCostCard(appId: ULID!, range: CostRange!, runPurposes: [CostRunPurpose!]): AppCostCard!
-  appEnvironmentList(appId: ULID!): [EnvironmentSummary!]!
+  accessibleAgentList(projectId: ULID!): [AgentSummary!]!
+  agent(agentId: ULID!, projectId: ULID!): AgentDetail!
+  agentCostCard(agentId: ULID!, projectId: ULID!, range: CostRange!, runPurposes: [CostRunPurpose!]): AgentCostCard!
+  agentEditorState(agentId: ULID!, projectId: ULID!): AgentEditorState!
+  agentManifest(agentId: ULID!, projectId: ULID!): AgentManifestExport!
+  agentSessionDiagnostics(projectId: ULID!, sessionId: ULID!): AgentSessionDiagnostics!
+  agentSessionList(agentId: ULID!, archived: Boolean, beforeCursor: String, limit: Int, participantOnly: Boolean, projectId: ULID!, type: SessionType): SessionConnection!
+  agentSessionRetrieve(projectId: ULID!, sessionId: ULID!): AgentSessionRetrieve!
   appInfo: AppInfo!
-  appList(organizationId: ULID!): [App!]!
-  appOverview(agentLimit: Int, appId: ULID!, credentialLimit: Int): AppOverview!
-  appSkillList(appId: ULID!): [SkillSummary!]!
-  availableAgentModels(appId: ULID!, currentModelId: String, currentVendorId: String, runtimeId: String!): [ResolvedModelEntry!]!
-  controlPlaneOverview(agentLimit: Int, appLimit: Int, credentialLimit: Int): ControlPlaneOverview!
-  environment(appId: ULID!, environmentId: ULID!): EnvironmentDetail!
-  exportAgentPackage(agentId: ULID!, appId: ULID!): AgentPackageExport!
+  availableAgentModels(currentModelId: String, currentVendorId: String, projectId: ULID!, runtimeId: String!): [ResolvedModelEntry!]!
+  controlPlaneOverview(agentLimit: Int, credentialLimit: Int, projectLimit: Int): ControlPlaneOverview!
+  environment(environmentId: ULID!, projectId: ULID!): EnvironmentDetail!
+  exportAgentPackage(agentId: ULID!, projectId: ULID!): AgentPackageExport!
   fileList(input: FileListInput!): FileListing!
-  listSessionResources(appId: ULID!, sessionId: ULID!): [SessionResource!]!
+  listSessionResources(projectId: ULID!, sessionId: ULID!): [SessionResource!]!
   mcpOAuthFlowStatus(flowId: ULID!): McpOAuthFlowState!
-  mcpRegistry(appId: ULID!): McpRegistry!
+  mcpRegistry(projectId: ULID!): McpRegistry!
   organizationBillingCostCard(organizationId: ULID!, range: CostRange!, runPurposes: [CostRunPurpose!]): OrganizationBillingCostCard!
-  session(appId: ULID!, sessionId: ULID!): Session!
-  sessionList(appId: ULID!, archived: Boolean, beforeCursor: String, limit: Int, type: SessionType): SessionConnection!
-  sessionMessages(appId: ULID!, sessionId: ULID!): [SessionMessage!]!
-  sessionProcessEvents(appId: ULID!, limit: Int, sessionId: ULID!): [SessionProcessEvent!]!
-  skillDetail(appId: ULID!, skillId: ULID!): SkillDetail!
-  threadAgentSessionList(appId: ULID!, archived: Boolean, beforeCursor: String, limit: Int, type: SessionType): AgentSessionRetrieveConnection!
-  threadAgentSessionRetrieve(appId: ULID!, sessionId: ULID!): AgentSessionRetrieve!
-  threadSessionMessages(appId: ULID!, sessionId: ULID!): [SessionMessage!]!
-  threadSessionProcessEvents(appId: ULID!, limit: Int, sessionId: ULID!): [SessionProcessEvent!]!
-  vendorCredentialList(appId: ULID!): [VendorCredential!]!
+  projectCostCard(projectId: ULID!, range: CostRange!, runPurposes: [CostRunPurpose!]): ProjectCostCard!
+  projectEnvironmentList(projectId: ULID!): [EnvironmentSummary!]!
+  projectList(organizationId: ULID!): [Project!]!
+  projectOverview(agentLimit: Int, credentialLimit: Int, projectId: ULID!): ProjectOverview!
+  projectSkillList(projectId: ULID!): [SkillSummary!]!
+  session(projectId: ULID!, sessionId: ULID!): Session!
+  sessionList(archived: Boolean, beforeCursor: String, limit: Int, projectId: ULID!, type: SessionType): SessionConnection!
+  sessionMessages(projectId: ULID!, sessionId: ULID!): [SessionMessage!]!
+  sessionProcessEvents(limit: Int, projectId: ULID!, sessionId: ULID!): [SessionProcessEvent!]!
+  skillDetail(projectId: ULID!, skillId: ULID!): SkillDetail!
+  threadAgentSessionList(archived: Boolean, beforeCursor: String, limit: Int, projectId: ULID!, type: SessionType): AgentSessionRetrieveConnection!
+  threadAgentSessionRetrieve(projectId: ULID!, sessionId: ULID!): AgentSessionRetrieve!
+  threadSessionMessages(projectId: ULID!, sessionId: ULID!): [SessionMessage!]!
+  threadSessionProcessEvents(limit: Int, projectId: ULID!, sessionId: ULID!): [SessionProcessEvent!]!
+  vendorCredentialList(projectId: ULID!): [VendorCredential!]!
   viewer: Viewer!
 }
 
 input RemoveSessionResourceInput {
-  appId: ULID!
+  projectId: ULID!
   resourceId: ULID!
   sessionId: ULID!
-}
-
-input RenameAppInput {
-  appId: ULID!
-  name: String!
 }
 
 input RenameOrganizationInput {
@@ -1195,8 +1190,13 @@ input RenameOrganizationInput {
   organizationId: ULID!
 }
 
+input RenameProjectInput {
+  name: String!
+  projectId: ULID!
+}
+
 input RenameSessionInput {
-  appId: ULID!
+  projectId: ULID!
   sessionId: ULID!
   title: String!
 }
@@ -1240,8 +1240,8 @@ enum RuntimeStateOperation {
 input RuntimeStateOperationInput {
   affectedFields: [String!]
   agentId: ULID!
-  appId: ULID!
   applyActionKind: String
+  projectId: ULID!
   targetVersion: RuntimeStateTargetVersionInput
 }
 
@@ -1259,7 +1259,6 @@ input RuntimeStateTargetVersionInput {
 
 type Session {
   agentId: ULID!
-  appId: ULID!
   archivedAt: String
   createdAt: String!
   deploymentVersionId: ULID
@@ -1269,6 +1268,7 @@ type Session {
   lastMessageAt: String
   lastRun: SessionRun
   model: String!
+  projectId: ULID!
   provider: String!
   runtimeId: String!
   status: SessionStatus!
@@ -1467,21 +1467,21 @@ enum SessionType {
   ui
 }
 
-input SetAppDefaultEnvironmentInput {
-  appId: ULID!
-  environmentId: ULID!
-}
-
 input SetDefaultVendorCredentialInput {
-  appId: ULID!
   id: ULID!
+  projectId: ULID!
 }
 
 input SetEnvironmentVariableValueInput {
-  appId: ULID!
   environmentId: ULID!
   key: String!
+  projectId: ULID!
   value: String!
+}
+
+input SetProjectDefaultEnvironmentInput {
+  environmentId: ULID!
+  projectId: ULID!
 }
 
 input SetSystemAgentModelInput {
@@ -1490,7 +1490,6 @@ input SetSystemAgentModelInput {
 }
 
 type SkillDetail {
-  appId: ULID!
   author: String!
   createdAt: String!
   currentSnapshot: SkillSnapshotRecord!
@@ -1502,6 +1501,7 @@ type SkillDetail {
   name: String!
   ownerId: ULID!
   ownerName: String!
+  projectId: ULID!
   snapshotId: ULID!
   sourceKind: SkillSourceKind!
   updatedAt: String!
@@ -1549,7 +1549,6 @@ enum SkillSourceKind {
 }
 
 type SkillSummary {
-  appId: ULID!
   author: String!
   createdAt: String!
   description: String!
@@ -1559,6 +1558,7 @@ type SkillSummary {
   name: String!
   ownerId: ULID!
   ownerName: String!
+  projectId: ULID!
   snapshotId: ULID!
   sourceKind: SkillSourceKind!
   updatedAt: String!
@@ -1566,8 +1566,8 @@ type SkillSummary {
 
 input StartAgentRunInput {
   agentId: ULID
-  appId: ULID!
   clientRequestId: String
+  projectId: ULID!
   prompt: String!
   sessionId: ULID
   type: SessionType
@@ -1575,7 +1575,7 @@ input StartAgentRunInput {
 }
 
 input StartMcpOAuthInput {
-  appId: ULID!
+  projectId: ULID!
   returnUrl: String
   serverId: ULID!
 }
@@ -1593,8 +1593,8 @@ type SystemAgentModelSetting {
 input TestVendorCredentialInput {
   apiBase: String
   apiKey: String!
-  appId: ULID!
   modelId: String
+  projectId: ULID!
   vendorId: String!
 }
 
@@ -1613,7 +1613,6 @@ input UpdateAccountProfileInput {
 
 input UpdateAgentConfigInput {
   agentId: ULID!
-  appId: ULID!
   builtInTools: [AgentBuiltInToolConfigInput!]
   description: String
   environment: AgentEnvironmentConfigInput!
@@ -1621,6 +1620,7 @@ input UpdateAgentConfigInput {
   mcpServerIds: [ULID!]!
   model: String!
   name: String!
+  projectId: ULID!
   prompt: String!
   provider: String!
   providerOptions: JsonObject!
@@ -1628,36 +1628,36 @@ input UpdateAgentConfigInput {
   skillIds: [ULID!]!
 }
 
-input UpdateAppMcpServerInput {
-  appId: ULID!
-  description: String
-  iconUrl: String
-  name: String!
-  serverId: ULID!
-  url: String!
-}
-
 input UpdateEnvironmentInput {
   allowMcpServers: Boolean!
   allowPackageManagers: Boolean!
   allowedHosts: [String!]!
-  appId: ULID!
   description: String
   envVars: [EnvironmentVariableInput!]!
   environmentId: ULID!
   name: String!
   networkPolicy: EnvironmentNetworkPolicy!
   packages: [EnvironmentPackageSpecInput!]!
+  projectId: ULID!
   setupScript: String!
+}
+
+input UpdateProjectMcpServerInput {
+  description: String
+  iconUrl: String
+  name: String!
+  projectId: ULID!
+  serverId: ULID!
+  url: String!
 }
 
 input UpdateVendorCredentialInput {
   apiBase: String
   apiKey: String
-  appId: ULID!
   id: ULID!
   models: [String!]
   name: String
+  projectId: ULID!
 }
 
 type UserWarning {
@@ -1667,12 +1667,12 @@ type UserWarning {
 
 type VendorCredential {
   apiBase: String
-  appId: ULID!
   id: ULID!
   isDefault: Boolean!
   maskedApiKey: String!
   models: [String!]
   name: String!
+  projectId: ULID!
   vendorId: String!
 }
 

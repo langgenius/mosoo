@@ -9,7 +9,7 @@ import type { PermissionRequest } from "@/domains/runtime/use-session-stream";
 import { listAgentSessions, triggerAgentSessionPrewarm } from "@/domains/session/api/agent-session";
 import { createSessionResourceMentionMessagePayload } from "@/features/session-chat/session-resource-mentions";
 import { useSessionChatLayoutState } from "@/features/session-chat/use-session-chat-layout-state";
-import { toAgentId, toAppId, toSessionId } from "@/routes/typed-id";
+import { toAgentId, toProjectId, toSessionId } from "@/routes/typed-id";
 import { useTranslation } from "@/shared/i18n";
 
 import type {
@@ -45,18 +45,20 @@ import type { PendingSend } from "./agent-session-pending-sends";
 const SPECULATIVE_CREATE_FAILURE_COOLDOWN_MS = 30_000;
 
 async function autoTitleSessionAndRefresh(input: {
-  appId: string | null;
+  projectId: string | null;
   refreshSessions: () => Promise<void>;
   sessionId: string;
   title: string;
 }): Promise<void> {
-  if (input.appId === null) {
+  if (input.projectId === null) {
     return;
   }
 
-  await autoTitleSession(toAppId(input.appId), toSessionId(input.sessionId), input.title).catch(
-    ignorePromiseRejection,
-  );
+  await autoTitleSession(
+    toProjectId(input.projectId),
+    toSessionId(input.sessionId),
+    input.title,
+  ).catch(ignorePromiseRejection);
   void input.refreshSessions();
 }
 
@@ -110,11 +112,11 @@ export function useAgentSessionPanelModel(
   const speculativeCreateFailedAtMsRef = useRef(0);
 
   const sessionsQuery = useQuery({
-    enabled: input.appId !== null,
+    enabled: input.projectId !== null,
     queryFn: async () =>
-      input.appId === null
+      input.projectId === null
         ? []
-        : listAgentSessions(toAppId(input.appId), toAgentId(input.agentId), {
+        : listAgentSessions(toProjectId(input.projectId), toAgentId(input.agentId), {
             archived: false,
             participantOnly: true,
             type: input.sessionType,
@@ -138,7 +140,7 @@ export function useAgentSessionPanelModel(
     configurationRevisionKey: input.configurationRevisionKey,
     requireFreshConfiguration: input.requireFreshConfiguration,
   });
-  const stream = useSessionStream(input.appId, activeSessionId);
+  const stream = useSessionStream(input.projectId, activeSessionId);
   const readiness = selectSessionPanelReadiness({
     agentReadiness: input.readiness,
     streamReadiness: stream.readiness,
@@ -199,7 +201,7 @@ export function useAgentSessionPanelModel(
   }, [pendingSends]);
 
   async function refreshSessions(): Promise<void> {
-    if (input.appId === null) {
+    if (input.projectId === null) {
       return;
     }
 
@@ -222,13 +224,13 @@ export function useAgentSessionPanelModel(
   async function createSessionAndSelect(
     options: { waitForRuntimeReady?: boolean } = {},
   ): Promise<string> {
-    if (input.appId === null) {
-      throw new Error("App id is required to create an agent session.");
+    if (input.projectId === null) {
+      throw new Error("Project id is required to create an agent session.");
     }
 
     const epoch = sessionEpochRef.current;
     const createdSession = await createAgentSession(
-      toAppId(input.appId),
+      toProjectId(input.projectId),
       toAgentId(input.agentId),
       input.sessionType,
       {
@@ -295,11 +297,11 @@ export function useAgentSessionPanelModel(
     clearComposerError();
 
     try {
-      if (input.appId === null) {
-        throw new Error("App id is required to reset agent sessions.");
+      if (input.projectId === null) {
+        throw new Error("Project id is required to reset agent sessions.");
       }
 
-      const appId = toAppId(input.appId);
+      const projectId = toProjectId(input.projectId);
       const resetSessionIds = getResetSessionIds({
         activeSessionId,
         sessionType: input.sessionType,
@@ -307,7 +309,7 @@ export function useAgentSessionPanelModel(
       });
 
       for (const sessionId of resetSessionIds) {
-        await deleteAgentSession(appId, toSessionId(sessionId));
+        await deleteAgentSession(projectId, toSessionId(sessionId));
       }
 
       if (resetSessionIds.length > 0) {
@@ -355,7 +357,7 @@ export function useAgentSessionPanelModel(
   }
 
   function notifyComposerTyping(): void {
-    if (input.appId === null) {
+    if (input.projectId === null) {
       return;
     }
 
@@ -368,7 +370,7 @@ export function useAgentSessionPanelModel(
         return;
       }
 
-      triggerAgentSessionPrewarm(toAppId(input.appId), toSessionId(activeSessionId));
+      triggerAgentSessionPrewarm(toProjectId(input.projectId), toSessionId(activeSessionId));
       return;
     }
 
@@ -384,7 +386,7 @@ export function useAgentSessionPanelModel(
     if (
       shouldSpeculativelyCreateSessionOnTyping({
         activeSessionId,
-        appId: input.appId,
+        projectId: input.projectId,
         readinessBlockMessage,
         sending,
         // isSuccess, not isFetched: a failed list query must not spawn
@@ -506,7 +508,7 @@ export function useAgentSessionPanelModel(
 
         globalThis.setTimeout(() => {
           void autoTitleSessionAndRefresh({
-            appId: input.appId,
+            projectId: input.projectId,
             refreshSessions,
             sessionId: titledSessionId,
             title,

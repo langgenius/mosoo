@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { parsePlatformId } from "@mosoo/id";
-import type { AccountId, FileVersionId, FileId, AppId, UploadId } from "@mosoo/id";
+import type { AccountId, FileVersionId, FileId, ProjectId, UploadId } from "@mosoo/id";
 
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
 import type { FileUploadContext } from "../src/modules/files/infrastructure/file-record-store";
@@ -14,7 +14,7 @@ import { SqliteD1Database } from "./helpers/sqlite-d1";
 const OWNER_ID = parsePlatformId<AccountId>("01J00000000000000000000001", "owner ID");
 const STALE_FILE_ID = parsePlatformId<FileId>("01J00000000000000000000003", "stale file ID");
 const STALE_UPLOAD_ID = parsePlatformId<UploadId>("01J00000000000000000000004", "stale upload ID");
-const APP_ID = parsePlatformId<AppId>("01J00000000000000000000006", "app ID");
+const PROJECT_ID = parsePlatformId<ProjectId>("01J00000000000000000000006", "project ID");
 const READY_FILE_ID = parsePlatformId<FileId>("01J00000000000000000000007", "ready file ID");
 const READY_UPLOAD_ID = parsePlatformId<UploadId>("01J00000000000000000000008", "ready upload ID");
 const PENDING_VERSION_ID = parsePlatformId<FileVersionId>(
@@ -170,7 +170,7 @@ function createUploadRecoveryDatabase(): SqliteD1Database {
   const database = new SqliteD1Database({ foreignKeys: false });
 
   database.execute(`
-    CREATE TABLE app (
+    CREATE TABLE project (
       id text PRIMARY KEY NOT NULL,
       organization_id text NOT NULL,
       owner_account_id text NOT NULL,
@@ -250,7 +250,7 @@ function createUploadRecoveryDatabase(): SqliteD1Database {
       version integer NOT NULL
     );
 
-    INSERT INTO app (
+    INSERT INTO project (
       id,
       name,
       organization_id,
@@ -260,8 +260,8 @@ function createUploadRecoveryDatabase(): SqliteD1Database {
       updated_at
     )
     VALUES (
-      '${APP_ID}',
-      'Default App',
+      '${PROJECT_ID}',
+      'Default Project',
       '01J0000000000000000000000A',
       '${OWNER_ID}',
       NULL,
@@ -295,7 +295,7 @@ function createUploadRecoveryDatabase(): SqliteD1Database {
     VALUES (
 	      '${STALE_FILE_ID}',
 	      'library',
-	      '${APP_ID}',
+	      '${PROJECT_ID}',
 	      NULL,
 	      'pending',
       0,
@@ -305,8 +305,8 @@ function createUploadRecoveryDatabase(): SqliteD1Database {
       1,
       'text/csv',
 	      'report.csv',
-	      'staging/library/${APP_ID}/${STALE_FILE_ID}',
-	      '${APP_ID}',
+	      'staging/library/${PROJECT_ID}/${STALE_FILE_ID}',
+	      '${PROJECT_ID}',
 	      'app',
       '',
       'report.csv',
@@ -346,7 +346,7 @@ function createUploadRecoveryDatabase(): SqliteD1Database {
       'multipart-stale',
       0,
 	      16777216,
-	      '${APP_ID}',
+	      '${PROJECT_ID}',
 	      'library',
       'completing',
       'multipart',
@@ -367,7 +367,7 @@ function createBindings(database: D1Database, bucket: MemoryFileBucket): ApiBind
 describe("file upload recovery", () => {
   test("lets completing multipart retries continue when the staged object already exists", async () => {
     const bucket = new MemoryFileBucket();
-    const objectKey = `staging/library/${APP_ID}/${STALE_FILE_ID}`;
+    const objectKey = `staging/library/${PROJECT_ID}/${STALE_FILE_ID}`;
     bucket.putHead(objectKey, {
       contentLength: 42,
       contentType: "text/csv",
@@ -385,12 +385,12 @@ describe("file upload recovery", () => {
         mime_type: "text/csv",
         name: "report.csv",
         object_key: objectKey,
-        owner_id: APP_ID,
+        owner_id: PROJECT_ID,
         owner_kind: "app",
         parent_path: "",
         path: "report.csv",
         purpose: "library_file",
-        scope_id: APP_ID,
+        scope_id: PROJECT_ID,
         scope_kind: "library",
         session_kind: null,
         size: 42,
@@ -410,7 +410,7 @@ describe("file upload recovery", () => {
         multipart_upload_id: "multipart-stale",
         overwrite: 0,
         part_size: 16777216,
-        scope_id: APP_ID,
+        scope_id: PROJECT_ID,
         scope_kind: "library",
         status: "completing",
         strategy: "multipart",
@@ -440,7 +440,7 @@ describe("file upload recovery", () => {
       },
       purpose: "library_file",
       target: {
-        id: APP_ID,
+        id: PROJECT_ID,
         kind: "library",
         path: "report.csv",
       },
@@ -460,7 +460,7 @@ describe("file upload recovery", () => {
     expect(staleFile?.status).toBe("failed");
   });
 
-  test("keeps completed App draft uploads expiring until they are claimed", async () => {
+  test("keeps completed Project draft uploads expiring until they are claimed", async () => {
     const database = createUploadRecoveryDatabase();
     const bucket = new MemoryFileBucket();
 
@@ -472,18 +472,18 @@ describe("file upload recovery", () => {
       },
       purpose: "app_draft",
       target: {
-        id: APP_ID,
+        id: PROJECT_ID,
         kind: "app_draft",
         name: "launch-note.txt",
       },
     });
-    const stagingObjectKey = `staging/app_draft/${APP_ID}/${upload.fileId}`;
+    const stagingObjectKey = `staging/app_draft/${PROJECT_ID}/${upload.fileId}`;
 
     bucket.putHead(stagingObjectKey, {
       body: "draft bytes!",
       contentLength: 12,
       contentType: "text/plain",
-      etag: "app-draft-etag",
+      etag: "project-draft-etag",
     });
 
     const result = await completeFileUpload({
@@ -512,21 +512,21 @@ describe("file upload recovery", () => {
       }>();
 
     expect(result.file.scope).toEqual({
-      id: APP_ID,
+      id: PROJECT_ID,
       kind: "app_draft",
     });
     expect(file).toMatchObject({
       committed: 0,
-      owner_id: APP_ID,
+      owner_id: PROJECT_ID,
       owner_kind: "app",
       purpose: "app_draft",
-      scope_id: APP_ID,
+      scope_id: PROJECT_ID,
       scope_kind: "app_draft",
       status: "ready",
     });
     expect(file?.expires_at).toBeNumber();
     expect(file?.object_key).toBe(
-      `app-draft/${APP_ID}/attachment/${upload.fileId}/launch-note.txt`,
+      `project-draft/${PROJECT_ID}/attachment/${upload.fileId}/launch-note.txt`,
     );
     expect(bucket.has(stagingObjectKey)).toBe(false);
     expect(bucket.has(file?.object_key ?? "")).toBe(true);
@@ -535,7 +535,7 @@ describe("file upload recovery", () => {
   test("recovers when final object copy succeeded before the file row was finalized", async () => {
     const database = createUploadRecoveryDatabase();
     const bucket = new MemoryFileBucket();
-    const stagingObjectKey = `staging/library/${APP_ID}/${STALE_FILE_ID}`;
+    const stagingObjectKey = `staging/library/${PROJECT_ID}/${STALE_FILE_ID}`;
     const finalObjectKey = `library/${STALE_FILE_ID}/report.csv`;
 
     await database
@@ -595,9 +595,9 @@ describe("file upload recovery", () => {
   test("recovers an overwrite retry after the version row and final object were written", async () => {
     const database = createUploadRecoveryDatabase();
     const bucket = new MemoryFileBucket();
-    const stagingObjectKey = `staging/library/${APP_ID}/${STALE_FILE_ID}`;
+    const stagingObjectKey = `staging/library/${PROJECT_ID}/${STALE_FILE_ID}`;
     const finalObjectKey = `library/${STALE_FILE_ID}/report.csv`;
-    const versionObjectKey = `file_versions/library/${APP_ID}/${PENDING_VERSION_ID}/report.csv`;
+    const versionObjectKey = `file_versions/library/${PROJECT_ID}/${PENDING_VERSION_ID}/report.csv`;
     const oldBody = "old report bytes";
     const newBody = "new report bytes after retry";
 
@@ -630,7 +630,7 @@ describe("file upload recovery", () => {
         VALUES (?, 'library', ?, NULL, 'ready', 1, 2, ?, 'old-etag', NULL, 'text/csv', 'report.csv', ?, ?, 'app', '', 'report.csv', 'library_file', ?, 2, 7)
       `,
       )
-      .bind(READY_FILE_ID, APP_ID, OWNER_ID, finalObjectKey, APP_ID, oldBody.length)
+      .bind(READY_FILE_ID, PROJECT_ID, OWNER_ID, finalObjectKey, PROJECT_ID, oldBody.length)
       .run();
 
     await database
@@ -657,7 +657,14 @@ describe("file upload recovery", () => {
         VALUES ('text/csv', 2, ?, ?, ?, ?, ?, NULL, NULL, 0, NULL, ?, 'library', 'completed', 'single', 2)
       `,
       )
-      .bind(OWNER_ID, oldBody.length, Date.now() + 60_000, READY_FILE_ID, READY_UPLOAD_ID, APP_ID)
+      .bind(
+        OWNER_ID,
+        oldBody.length,
+        Date.now() + 60_000,
+        READY_FILE_ID,
+        READY_UPLOAD_ID,
+        PROJECT_ID,
+      )
       .run();
 
     await database
@@ -689,7 +696,7 @@ describe("file upload recovery", () => {
         READY_FILE_ID,
         PENDING_VERSION_ID,
         versionObjectKey,
-        APP_ID,
+        PROJECT_ID,
         oldBody.length,
         finalObjectKey,
       )

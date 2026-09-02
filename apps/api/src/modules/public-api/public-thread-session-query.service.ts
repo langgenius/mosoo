@@ -1,7 +1,7 @@
 import { PUBLIC_THREAD_API_THREADS_MAX_LIMIT } from "@mosoo/contracts/public-api";
 import type { PublicThreadApiListThreadsResponse } from "@mosoo/contracts/public-api";
 import { sessionRunsTable, sessionsTable } from "@mosoo/db";
-import type { AgentId, AppId, PublicThreadId, SessionId } from "@mosoo/id";
+import type { AgentId, ProjectId, PublicThreadId, SessionId } from "@mosoo/id";
 import type { SQL } from "drizzle-orm";
 import { and, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
 
@@ -23,7 +23,7 @@ interface PublicThreadSessionRow {
   agent_id: AgentId;
   end_user_id: string;
   id: SessionId;
-  app_id: AppId;
+  project_id: ProjectId;
   title: string | null;
 }
 
@@ -56,7 +56,7 @@ async function getPublicThreadSessionAccess(
         end_user_id: sessionsTable.endUserId,
         id: sessionsTable.id,
         metadata_json: sessionsTable.metadataJson,
-        app_id: sessionsTable.appId,
+        project_id: sessionsTable.projectId,
         title: sessionsTable.title,
       })
       .from(sessionsTable)
@@ -79,7 +79,7 @@ async function getPublicThreadSessionAccess(
       agent_id: row.agent_id,
       end_user_id: row.end_user_id,
       id: row.id,
-      app_id: row.app_id,
+      project_id: row.project_id,
       title: row.title,
     },
   };
@@ -93,7 +93,7 @@ export async function admitPublicSessionCaller(
   const access = await getPublicThreadSessionAccess(database, caller, threadId);
   const agent = await admitAgentApiEndpointCaller(database, caller, access.row.agent_id);
 
-  if (agent.appId !== access.row.app_id) {
+  if (agent.projectId !== access.row.project_id) {
     throw publicNotFound("Thread not found.");
   }
 

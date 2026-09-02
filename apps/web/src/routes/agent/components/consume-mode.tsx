@@ -68,7 +68,7 @@ export function ConsumeMode({
           agentName={agent.name}
           readiness={agent.readiness}
           tone="consume"
-          appId={agent.appId}
+          projectId={agent.projectId}
         />
       </div>
     </div>

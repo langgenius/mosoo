@@ -71,7 +71,7 @@ export async function createPublicThread(
       executionContext: request.executionContext,
       input: {
         agentId: request.agentId,
-        appId: admission.appId,
+        projectId: admission.projectId,
         type: "ui",
       },
       options: {
@@ -121,7 +121,7 @@ export async function createPublicThread(
           deployment_version_number: session.deploymentVersionNumber,
           id: sessionId,
           model: session.model,
-          app_id: session.appId,
+          project_id: session.projectId,
           provider: session.provider,
           runtime_id: session.runtimeId,
         },

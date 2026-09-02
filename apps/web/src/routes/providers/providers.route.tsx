@@ -6,20 +6,20 @@ import { useAppSession } from "../../app/session-provider";
 import { ProvidersTab } from "./providers-tab";
 
 export function ProvidersPage(): ReactElement {
-  const { activeAppId, appsLoading } = useAppSession();
+  const { activeProjectId, projectsLoading } = useAppSession();
   const { t } = useTranslation();
 
-  if (activeAppId === null) {
+  if (activeProjectId === null) {
     return (
       <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
-        {appsLoading ? t("common.loadingApp") : t("common.noApp")}
+        {projectsLoading ? t("common.loadingProject") : t("common.noProject")}
       </div>
     );
   }
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <ProvidersTab appId={activeAppId} />
+      <ProvidersTab projectId={activeProjectId} />
     </div>
   );
 }

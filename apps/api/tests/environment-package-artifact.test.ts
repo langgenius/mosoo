@@ -6,7 +6,7 @@ import { join } from "node:path";
 
 import { apiCommandsTable } from "@mosoo/db";
 import { parsePlatformId } from "@mosoo/id";
-import type { AppId } from "@mosoo/id";
+import type { ProjectId } from "@mosoo/id";
 import { eq } from "drizzle-orm";
 
 import { parseApiCommandPayload } from "../src/modules/api-command/application/api-command-payload";
@@ -30,7 +30,7 @@ import {
   PUBLIC_API_TEST_IDS,
 } from "./helpers/public-api-http-test-fixture";
 
-const APP_ID = parsePlatformId<AppId>("01J0000000000000000000000A", "app id");
+const PROJECT_ID = parsePlatformId<ProjectId>("01J0000000000000000000000A", "project id");
 
 describe("Environment package artifacts", () => {
   test("configures the Sandbox SDK backup bucket in local, stage, and production", () => {
@@ -47,7 +47,7 @@ describe("Environment package artifacts", () => {
       { manager: "npm", packages: ["zod@4.3.6", "zod@4.3.6"] },
     ]);
     const key = await createEnvironmentPackageArtifactKey({
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       artifactAbi: "environment-artifact-v1",
       packages,
     });
@@ -85,7 +85,7 @@ describe("Environment package artifacts", () => {
     const packages = [{ manager: "pip", packages: ["missing-package==1.0.0"] }] as const;
 
     await expect(
-      resolveReadyEnvironmentPackageArtifact(bindings, APP_ID, JSON.stringify(packages)),
+      resolveReadyEnvironmentPackageArtifact(bindings, PROJECT_ID, JSON.stringify(packages)),
     ).rejects.toMatchObject({ code: "ENVIRONMENT_ARTIFACT_PREPARING" });
     const [command] = await database.app().select().from(apiCommandsTable).all();
     if (!command) {
@@ -110,14 +110,14 @@ describe("Environment package artifacts", () => {
     );
 
     await expect(
-      resolveReadyEnvironmentPackageArtifact(bindings, APP_ID, JSON.stringify(packages)),
+      resolveReadyEnvironmentPackageArtifact(bindings, PROJECT_ID, JSON.stringify(packages)),
     ).rejects.toMatchObject({
       code: "ENVIRONMENT_ARTIFACT_FAILED",
       message: "Package installation failed.",
     });
     expect(artifactQueue.sent).toHaveLength(1);
 
-    await resolveEnvironmentPackageArtifact(bindings, APP_ID, packages, { retryFailed: true });
+    await resolveEnvironmentPackageArtifact(bindings, PROJECT_ID, packages, { retryFailed: true });
     expect(artifactQueue.sent).toHaveLength(2);
     await expect(
       database

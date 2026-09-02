@@ -1,8 +1,8 @@
 import type { SkillDetail, SkillSummary } from "@mosoo/contracts/skill";
-import type { AppId, SkillId } from "@mosoo/id";
+import type { ProjectId, SkillId } from "@mosoo/id";
 
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import { ensureSkillAccess, listAppSkillRows } from "./skill-access.service";
+import { ensureSkillAccess, listProjectSkillRows } from "./skill-access.service";
 import { toSkillSummary } from "./skill-mapper";
 import {
   getSkillSnapshot,
@@ -10,25 +10,25 @@ import {
   toSkillSnapshotRecord,
 } from "./skill-package-snapshot.service";
 
-export async function listAppSkills(
+export async function listProjectSkills(
   database: D1Database,
   viewer: AuthenticatedViewer,
-  appId: AppId,
+  projectId: ProjectId,
 ): Promise<SkillSummary[]> {
-  const rows = await listAppSkillRows(database, viewer.id, appId);
+  const rows = await listProjectSkillRows(database, viewer.id, projectId);
   return rows.map(toSkillSummary);
 }
 
 export async function getSkillDetail(
   database: D1Database,
   viewer: AuthenticatedViewer,
-  appId: AppId,
+  projectId: ProjectId,
   skillId: SkillId,
 ): Promise<SkillDetail> {
-  const row = await ensureSkillAccess(database, viewer.id, appId, skillId);
+  const row = await ensureSkillAccess(database, viewer.id, projectId, skillId);
   const snapshot = await getSkillSnapshot(database, row.currentSnapshotId);
 
-  if (snapshot === null || snapshot.appId !== appId) {
+  if (snapshot === null || snapshot.projectId !== projectId) {
     throw new Error("Skill snapshot not found.");
   }
 
@@ -42,8 +42,8 @@ export async function getSkillDetail(
 export async function getSkillSummary(
   database: D1Database,
   viewer: AuthenticatedViewer,
-  appId: AppId,
+  projectId: ProjectId,
   skillId: SkillId,
 ): Promise<SkillSummary> {
-  return toSkillSummary(await ensureSkillAccess(database, viewer.id, appId, skillId));
+  return toSkillSummary(await ensureSkillAccess(database, viewer.id, projectId, skillId));
 }

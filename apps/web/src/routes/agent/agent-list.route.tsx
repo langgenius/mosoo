@@ -64,12 +64,12 @@ export function AgentListPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { activeApp } = useAppSession();
+  const { activeProject } = useAppSession();
   const [searchParams, setSearchParams] = useSearchParams();
   const [state, dispatch] = useReducer(agentListPageReducer, AGENT_LIST_PAGE_INITIAL_STATE);
   const { search, showCreate, showImport, view } = state;
-  const appId = activeApp?.id ?? null;
-  const agentsQuery = useVisibleAgentsQuery(appId);
+  const projectId = activeProject?.id ?? null;
+  const agentsQuery = useVisibleAgentsQuery(projectId);
 
   useEffect(() => {
     if (searchParams.get("create") !== "1") return;
@@ -92,7 +92,7 @@ export function AgentListPage() {
     <div className="flex h-full flex-col overflow-hidden">
       <PageHeader title={t("agent.title")} description={t("agent.description")}>
         <Button
-          disabled={appId === null}
+          disabled={projectId === null}
           onClick={() => {
             dispatch({ open: true, type: "setShowCreate" });
           }}
@@ -116,7 +116,7 @@ export function AgentListPage() {
 
         <Button
           variant="outline"
-          disabled={appId === null}
+          disabled={projectId === null}
           onClick={() => {
             dispatch({ open: true, type: "setShowImport" });
           }}
@@ -150,7 +150,7 @@ export function AgentListPage() {
             description={t("agent.noAgentsDescription")}
           >
             <Button
-              disabled={appId === null}
+              disabled={projectId === null}
               onClick={() => {
                 dispatch({ open: true, type: "setShowCreate" });
               }}
@@ -193,7 +193,7 @@ export function AgentListPage() {
           dispatch({ open, type: "setShowImport" });
         }}
         open={showImport}
-        appId={appId}
+        projectId={projectId}
       />
     </div>
   );

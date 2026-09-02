@@ -1,9 +1,9 @@
 import type { AgentOwnerSummary } from "@mosoo/contracts/agent";
-import type { AccountId, AgentId, AppId } from "@mosoo/id";
+import type { AccountId, AgentId, ProjectId } from "@mosoo/id";
 
 import { forbiddenError } from "../../../platform/errors";
-import { ensureAppOwnership } from "../../apps/application/app.service";
-import { getAgentRow, getAppAgentRow, listAgentOwnerSummaries } from "./agent-repository";
+import { ensureProjectOwnership } from "../../projects/application/project.service";
+import { getAgentRow, getProjectAgentRow, listAgentOwnerSummaries } from "./agent-repository";
 import type { AgentRow } from "./agent-types";
 
 interface AgentPrivilegedAccess {
@@ -11,7 +11,7 @@ interface AgentPrivilegedAccess {
   viewerRole: "owner";
 }
 
-interface AppAgentOwnerAccess {
+interface ProjectAgentOwnerAccess {
   agent: AgentRow;
   owner: AgentOwnerSummary;
   viewerRole: "owner";
@@ -37,7 +37,7 @@ async function ensureOwnedAgentRow(
   agentId: AgentId,
 ): Promise<AgentRow> {
   const agent = await getAgentRow(database, agentId);
-  await ensureAppOwnership(database, viewerId, agent.appId);
+  await ensureProjectOwnership(database, viewerId, agent.projectId);
 
   if (agent.ownerId !== viewerId) {
     throw forbiddenError();
@@ -46,16 +46,16 @@ async function ensureOwnedAgentRow(
   return agent;
 }
 
-export async function ensureAppAgentOwner(
+export async function ensureProjectAgentOwner(
   database: D1Database,
   viewerId: AccountId,
   input: {
     agentId: AgentId;
-    appId: AppId;
+    projectId: ProjectId;
   },
-): Promise<AppAgentOwnerAccess> {
-  await ensureAppOwnership(database, viewerId, input.appId);
-  const agent = await getAppAgentRow(database, input);
+): Promise<ProjectAgentOwnerAccess> {
+  await ensureProjectOwnership(database, viewerId, input.projectId);
+  const agent = await getProjectAgentRow(database, input);
 
   if (agent === null || agent.ownerId !== viewerId) {
     throw forbiddenError();

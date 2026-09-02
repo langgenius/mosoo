@@ -73,7 +73,7 @@ describe("agent session panel boundary", () => {
   test("speculatively creates a session on typing only for a ready, empty Preview panel", () => {
     const readyInput: SpeculativeSessionCreateInput = {
       activeSessionId: null,
-      appId: "app_1",
+      projectId: "project_1",
       readinessBlockMessage: null,
       sending: false,
       sessionListLoaded: true,
@@ -84,7 +84,9 @@ describe("agent session panel boundary", () => {
     expect(shouldSpeculativelyCreateSessionOnTyping({ ...readyInput, sessionType: "ui" })).toBe(
       false,
     );
-    expect(shouldSpeculativelyCreateSessionOnTyping({ ...readyInput, appId: null })).toBe(false);
+    expect(shouldSpeculativelyCreateSessionOnTyping({ ...readyInput, projectId: null })).toBe(
+      false,
+    );
     expect(
       shouldSpeculativelyCreateSessionOnTyping({ ...readyInput, activeSessionId: "session_1" }),
     ).toBe(false);

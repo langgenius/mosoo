@@ -8,7 +8,7 @@ import type {
   AgentId,
   DriverInstanceId,
   OrganizationId,
-  AppId,
+  ProjectId,
   SessionId,
   SessionRunId,
 } from "@mosoo/id";
@@ -33,7 +33,7 @@ export interface RuntimeUsageRunContext {
   createdAtMs: number;
   model: string;
   organizationId: OrganizationId;
-  appId: AppId;
+  projectId: ProjectId;
   provider: string;
   runtimeId: string | null;
   sessionId: SessionId;
@@ -204,7 +204,7 @@ function createRuntimeUsageEventInsert(database: AppDatabase, input: RecordRunti
     inputTokens: tokens.inputTokens,
     model,
     organizationId: input.run.organizationId,
-    appId: input.run.appId,
+    projectId: input.run.projectId,
     outputTokens: tokens.outputTokens,
     priceSnapshotJson: cost.priceSnapshotJson,
     pricingStatus: cost.pricingStatus,

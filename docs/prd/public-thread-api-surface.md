@@ -1,6 +1,6 @@
 # Public Thread API
 
-Status: Available for App-owner integrations with an application-user identity. The
+Status: Available for Project-owner integrations with an application-user identity. The
 exact HTTP contract is the
 [OpenAPI document](https://cloud.mosoo.ai/api/v1/openapi.json).
 
@@ -12,8 +12,8 @@ that an integration can start, follow, continue, and recover.
 
 ## Who uses it
 
-- An App owner connects an exposed Agent to a server-side integration.
-- An App user may trigger that integration, but authenticates with the Builder's
+- A Project owner connects an exposed Agent to a server-side integration.
+- A Project user may trigger that integration, but authenticates with the Builder's
   product rather than directly with mosoo.
 
 ## User flow
@@ -34,11 +34,11 @@ Agent's API Access panel shows its identifier, token creation, and API reference
 
 ## User-visible boundaries
 
-- Access Tokens belong to the App owner. The Agent must be exposed, owned by
-  that same owner, and remain inside the same App.
+- Access Tokens belong to the Project owner. The Agent must be exposed, owned by
+  that same owner, and remain inside the same Project.
 - `userId` is supplied only by the trusted backend, is immutable after Thread
   creation, and scopes the Thread, its Runs, files, and delegated MCP calls.
-- The identity boundary is `(App, userId)`. A user may own multiple Threads;
+- The identity boundary is `(Project, userId)`. A user may own multiple Threads;
   `userId` is not a unique Thread key.
 - mosoo records this opaque identifier but does not authenticate the End User.
   The Builder's product remains responsible for login and authorization.

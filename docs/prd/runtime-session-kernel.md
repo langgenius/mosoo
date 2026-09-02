@@ -8,7 +8,7 @@ An Agent configuration is useful only when a Builder can prove that it works. mo
 
 ## Who uses it
 
-Builders and App Owners are the primary users. They configure and test an App's Agent before other people depend on it. App Users benefit from the result but should not need to know which runtime or provider powers the experience.
+Builders and Project Owners are the primary users. They configure and test a Project's Agent before other people depend on it. Project Users benefit from the result but should not need to know which runtime or provider powers the experience.
 
 ## User flow
 

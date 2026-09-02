@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
 import { deleteAgentSession } from "../src/modules/sessions/application/session-lifecycle-mutation.service";
-import { lookupAppSessionParticipantCapabilityAccess } from "../src/modules/sessions/domain/session-access.policy";
+import { lookupProjectSessionParticipantCapabilityAccess } from "../src/modules/sessions/domain/session-access.policy";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import {
   PUBLIC_API_TEST_IDS,
@@ -24,7 +24,7 @@ describe("session delete idempotency", () => {
     await expect(
       deleteAgentSession({
         bindings: { DB: database } as ApiBindings,
-        appId: PUBLIC_API_TEST_IDS.app,
+        projectId: PUBLIC_API_TEST_IDS.project,
         sessionId: GHOST_SESSION_ID,
         viewer: ownerViewer(),
       }),
@@ -38,7 +38,7 @@ describe("session delete idempotency", () => {
     await expect(
       deleteAgentSession({
         bindings: { DB: database } as ApiBindings,
-        appId: PUBLIC_API_TEST_IDS.app,
+        projectId: PUBLIC_API_TEST_IDS.project,
         sessionId: PUBLIC_API_TEST_IDS.nonOwnerSession,
         viewer: ownerViewer(),
       }),
@@ -46,30 +46,30 @@ describe("session delete idempotency", () => {
   });
 });
 
-describe("lookupAppSessionParticipantCapabilityAccess", () => {
+describe("lookupProjectSessionParticipantCapabilityAccess", () => {
   test("distinguishes missing, not_participant, and found", async () => {
     const database = await createPublicHttpContractDatabase();
     await insertOwnerSession(database);
     await insertNonOwnerSession(database);
 
-    const missing = await lookupAppSessionParticipantCapabilityAccess(
+    const missing = await lookupProjectSessionParticipantCapabilityAccess(
       database,
       PUBLIC_API_TEST_IDS.ownerAccount,
-      { appId: PUBLIC_API_TEST_IDS.app, sessionId: GHOST_SESSION_ID },
+      { projectId: PUBLIC_API_TEST_IDS.project, sessionId: GHOST_SESSION_ID },
     );
     expect(missing).toEqual({ kind: "missing" });
 
-    const notParticipant = await lookupAppSessionParticipantCapabilityAccess(
+    const notParticipant = await lookupProjectSessionParticipantCapabilityAccess(
       database,
       PUBLIC_API_TEST_IDS.ownerAccount,
-      { appId: PUBLIC_API_TEST_IDS.app, sessionId: PUBLIC_API_TEST_IDS.nonOwnerSession },
+      { projectId: PUBLIC_API_TEST_IDS.project, sessionId: PUBLIC_API_TEST_IDS.nonOwnerSession },
     );
     expect(notParticipant).toEqual({ kind: "not_participant" });
 
-    const found = await lookupAppSessionParticipantCapabilityAccess(
+    const found = await lookupProjectSessionParticipantCapabilityAccess(
       database,
       PUBLIC_API_TEST_IDS.ownerAccount,
-      { appId: PUBLIC_API_TEST_IDS.app, sessionId: PUBLIC_API_TEST_IDS.ownerSession },
+      { projectId: PUBLIC_API_TEST_IDS.project, sessionId: PUBLIC_API_TEST_IDS.ownerSession },
     );
     expect(found.kind).toBe("found");
     if (found.kind === "found") {

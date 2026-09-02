@@ -1,4 +1,4 @@
-import type { AccountId, AgentId, AppId, PlatformId } from "@mosoo/id";
+import type { AccountId, AgentId, ProjectId, PlatformId } from "@mosoo/id";
 
 import type { PersonalAccessTokenCaller } from "../auth/application/personal-access-token.service";
 import { getAccountViewer } from "../auth/application/viewer-auth.service";
@@ -11,7 +11,7 @@ export interface ThreadCreationAdmission {
   accessViewer: AuthenticatedViewer;
   creatorViewer: AuthenticatedViewer;
   fileViewer: AuthenticatedViewer;
-  appId: AppId;
+  projectId: ProjectId;
   createdBy: PublicApiThreadCreatedByMetadata;
 }
 
@@ -21,7 +21,7 @@ interface ThreadReadSnapshot {
   };
   session: {
     agentId: AgentId;
-    appId: AppId;
+    projectId: ProjectId;
   };
 }
 
@@ -80,7 +80,7 @@ export async function admitPublicThreadCreator(
     accessViewer: await getOwnerViewer(database, agent.ownerId),
     creatorViewer: caller.viewer,
     fileViewer: caller.viewer,
-    appId: agent.appId,
+    projectId: agent.projectId,
     createdBy: toPublicApiThreadCreatedBy(caller),
   };
 }

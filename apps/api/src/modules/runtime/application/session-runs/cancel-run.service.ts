@@ -6,7 +6,7 @@ import type {
   AccountId,
   DriverCommandId,
   DriverInstanceId,
-  AppId,
+  ProjectId,
   RuntimeEventId,
   SessionId,
   SessionRunId,
@@ -17,8 +17,8 @@ import { logInfo } from "../../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../../platform/db/drizzle";
 import { isTruthy } from "../../../../shared/truthiness";
-import { ensureAppOwnership } from "../../../apps/application/app.service";
 import type { AuthenticatedViewer } from "../../../auth/application/viewer-auth.service";
+import { ensureProjectOwnership } from "../../../projects/application/project.service";
 import { appendSessionRuntimeEvents } from "../../../sessions/application/session-event-write.service";
 import { sessionParticipantCondition } from "../../../sessions/domain/session-access.policy";
 import { sendDriverInstanceCommand } from "../../infrastructure/driver-instance/client";
@@ -32,7 +32,7 @@ import {
 } from "../../infrastructure/session-runs/session-run-store.repository";
 import { createCancelledSessionRunRuntimeEvent } from "./session-run-view-events.service";
 interface CancelSessionRunInput {
-  appId: AppId;
+  projectId: ProjectId;
   runId: SessionRunId;
   sessionId: SessionId;
 }
@@ -73,7 +73,7 @@ async function getOwnedSessionRun(
         and(
           eq(sessionRunsTable.id, input.runId),
           eq(sessionRunsTable.sessionId, input.sessionId),
-          eq(sessionsTable.appId, input.appId),
+          eq(sessionsTable.projectId, input.projectId),
           sessionParticipantCondition(viewerId),
         ),
       )
@@ -99,10 +99,10 @@ export async function cancelRun(
   const database = bindings.DB;
   const runId = parsePlatformId<SessionRunId>(input.runId, "run id");
   const sessionId = parsePlatformId<SessionId>(input.sessionId, "session id");
-  const appId = parsePlatformId<AppId>(input.appId, "app id");
+  const projectId = parsePlatformId<ProjectId>(input.projectId, "project id");
   const viewerId = parsePlatformId<AccountId>(viewer.id, "viewer id");
-  await ensureAppOwnership(database, viewerId, appId);
-  const run = await getOwnedSessionRun(database, viewerId, { appId, runId, sessionId });
+  await ensureProjectOwnership(database, viewerId, projectId);
+  const run = await getOwnedSessionRun(database, viewerId, { projectId, runId, sessionId });
 
   if (run === null) {
     throw new Error("Session run not found.");

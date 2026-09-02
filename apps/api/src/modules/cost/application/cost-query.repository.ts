@@ -1,5 +1,12 @@
 import { parsePlatformId } from "@mosoo/id";
-import type { AccountId, AgentId, OrganizationId, AppId, SessionId, SessionRunId } from "@mosoo/id";
+import type {
+  AccountId,
+  AgentId,
+  OrganizationId,
+  ProjectId,
+  SessionId,
+  SessionRunId,
+} from "@mosoo/id";
 
 import { getAppDatabase, parameterizedSql } from "../../../platform/db/drizzle";
 import { isTruthy } from "../../../shared/truthiness";
@@ -63,7 +70,7 @@ function readSessionRunId(value: unknown, label: string): SessionRunId | null {
 interface ScopedCostQuery {
   agentId?: AgentId;
   organizationId: OrganizationId;
-  appId?: AppId;
+  projectId?: ProjectId;
   runPurposes?: readonly string[];
 }
 
@@ -224,9 +231,9 @@ export async function queryRecentSessions(
   const filters = ["usage_event.organization_id = ?"];
   const bindings: string[] = [input.organizationId];
 
-  if (isTruthy(input.appId)) {
-    filters.push("usage_event.app_id = ?");
-    bindings.push(input.appId);
+  if (isTruthy(input.projectId)) {
+    filters.push("usage_event.project_id = ?");
+    bindings.push(input.projectId);
   }
 
   if (isTruthy(input.agentId)) {

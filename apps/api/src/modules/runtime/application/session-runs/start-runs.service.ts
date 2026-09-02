@@ -1,10 +1,10 @@
 import type { SessionRunSummary, UserWarning } from "@mosoo/contracts/session-run";
 import { parsePlatformId } from "@mosoo/id";
-import type { AccountId, FileId, AppId, SessionId } from "@mosoo/id";
+import type { AccountId, FileId, ProjectId, SessionId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import type { AuthenticatedViewer } from "../../../auth/application/viewer-auth.service";
-import { getActiveAppSessionQueueAccess } from "../../../sessions/domain/session-access.policy";
+import { getActiveProjectSessionQueueAccess } from "../../../sessions/domain/session-access.policy";
 import { queueSessionRun } from "./queue-run.service";
 import type { QueuedSessionRunState } from "./queue-run.service";
 
@@ -14,7 +14,7 @@ interface StartRunRequest {
   prompt: {
     content: string;
   };
-  appId: string | AppId;
+  projectId: string | ProjectId;
   sessionId: string | SessionId;
 }
 
@@ -71,10 +71,10 @@ async function queueRunRequest(
   }
 
   const sessionId = parsePlatformId<SessionId>(runRequest.sessionId, "session id");
-  const appId = parsePlatformId<AppId>(runRequest.appId, "app id");
+  const projectId = parsePlatformId<ProjectId>(runRequest.projectId, "project id");
   const viewerId = parsePlatformId<AccountId>(context.viewer.id, "viewer id");
-  const session = await getActiveAppSessionQueueAccess(context.bindings.DB, viewerId, {
-    appId,
+  const session = await getActiveProjectSessionQueueAccess(context.bindings.DB, viewerId, {
+    projectId,
     sessionId,
   });
   const queuedRun = await queueSessionRun({

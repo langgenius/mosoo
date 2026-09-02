@@ -10,7 +10,7 @@ import {
   listAgentSessions,
 } from "@/domains/session/api/agent-session";
 import { getAgentSessionDiagnostics } from "@/domains/session/api/agent-session-retrieve";
-import { toAgentId, toAppId } from "@/routes/typed-id";
+import { toAgentId, toProjectId } from "@/routes/typed-id";
 import { getCurrentLocale, useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Badge } from "@/shared/ui/badge";
@@ -256,14 +256,14 @@ function SessionDetailView({
     error: processEventsError,
     isLoading: processEventsLoading,
   } = useQuery({
-    queryFn: async () => getAgentSessionProcessEvents(selected.appId, selected.id),
+    queryFn: async () => getAgentSessionProcessEvents(selected.projectId, selected.id),
     queryKey: ["session-process-events", selected.id],
     refetchInterval: sessionLive ? SESSION_EVENTS_REFRESH_MS : false,
   });
   const { data: sessionDiagnostics, isLoading: sessionDiagnosticsLoading } = useQuery({
     queryFn: async () =>
       getAgentSessionDiagnostics({
-        appId: selected.appId,
+        projectId: selected.projectId,
         sessionId: selected.id,
       }),
     queryKey: ["agent-session-diagnostics", selected.id],
@@ -357,12 +357,18 @@ function SessionDetailView({
   );
 }
 
-export function LogsTab({ agentId, appId }: { agentId: string; appId: string }): ReactElement {
+export function LogsTab({
+  agentId,
+  projectId,
+}: {
+  agentId: string;
+  projectId: string;
+}): ReactElement {
   const [searchParams, setSearchParams] = useSearchParams();
   const sessionParam = searchParams.get(SESSION_QUERY_PARAM);
   const { data: agentSessions = [], isLoading } = useQuery({
-    queryFn: async () => listAgentSessions(toAppId(appId), toAgentId(agentId)),
-    queryKey: ["agent-session-list", appId, agentId, "all"],
+    queryFn: async () => listAgentSessions(toProjectId(projectId), toAgentId(agentId)),
+    queryKey: ["agent-session-list", projectId, agentId, "all"],
     refetchInterval: SESSION_LIST_REFRESH_MS,
   });
   const selected =

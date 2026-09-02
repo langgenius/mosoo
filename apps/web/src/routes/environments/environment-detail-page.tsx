@@ -6,7 +6,7 @@ import { Link } from "react-router-dom";
 import { useAppSession } from "@/app/session-provider";
 import {
   deleteEnvironment,
-  setAppDefaultEnvironment,
+  setProjectDefaultEnvironment,
   updateEnvironment,
 } from "@/domains/environment/api/environment-client";
 import { EnvironmentForm } from "@/domains/environment/components/environment-form";
@@ -19,7 +19,7 @@ import {
   environmentKeys,
   useEnvironmentDetailQuery,
 } from "@/domains/environment/query/environment-queries";
-import { toEnvironmentId, toAppId } from "@/routes/typed-id";
+import { toEnvironmentId, toProjectId } from "@/routes/typed-id";
 import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 
@@ -71,10 +71,10 @@ function EnvironmentDetailHeader({
 
 export function EnvironmentDetailPage({ environmentId }: { environmentId: string }) {
   const { t } = useTranslation();
-  const { activeAppId } = useAppSession();
-  const appId = activeAppId;
+  const { activeProjectId } = useAppSession();
+  const projectId = activeProjectId;
   const typedEnvironmentId = toEnvironmentId(environmentId);
-  const environmentQuery = useEnvironmentDetailQuery(appId, environmentId);
+  const environmentQuery = useEnvironmentDetailQuery(projectId, environmentId);
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
   const environment = environmentQuery.data ?? null;
@@ -84,28 +84,28 @@ export function EnvironmentDetailPage({ environmentId }: { environmentId: string
     mutationFn: updateEnvironment,
     onSuccess: async () => {
       await Promise.all([
-        appId !== null
+        projectId !== null
           ? queryClient.invalidateQueries({
-              queryKey: environmentKeys.detail(appId, environmentId),
+              queryKey: environmentKeys.detail(projectId, environmentId),
             })
           : Promise.resolve(),
-        appId !== null
-          ? queryClient.invalidateQueries({ queryKey: environmentKeys.list(appId) })
+        projectId !== null
+          ? queryClient.invalidateQueries({ queryKey: environmentKeys.list(projectId) })
           : Promise.resolve(),
       ]);
     },
   });
   const defaultMutation = useMutation({
-    mutationFn: setAppDefaultEnvironment,
+    mutationFn: setProjectDefaultEnvironment,
     onSuccess: async () => {
       await Promise.all([
-        appId !== null
+        projectId !== null
           ? queryClient.invalidateQueries({
-              queryKey: environmentKeys.detail(appId, environmentId),
+              queryKey: environmentKeys.detail(projectId, environmentId),
             })
           : Promise.resolve(),
-        appId !== null
-          ? queryClient.invalidateQueries({ queryKey: environmentKeys.list(appId) })
+        projectId !== null
+          ? queryClient.invalidateQueries({ queryKey: environmentKeys.list(projectId) })
           : Promise.resolve(),
       ]);
     },
@@ -114,13 +114,13 @@ export function EnvironmentDetailPage({ environmentId }: { environmentId: string
     mutationFn: deleteEnvironment,
     onSuccess: async () => {
       await Promise.all([
-        appId !== null
+        projectId !== null
           ? queryClient.invalidateQueries({
-              queryKey: environmentKeys.detail(appId, environmentId),
+              queryKey: environmentKeys.detail(projectId, environmentId),
             })
           : Promise.resolve(),
-        appId !== null
-          ? queryClient.invalidateQueries({ queryKey: environmentKeys.list(appId) })
+        projectId !== null
+          ? queryClient.invalidateQueries({ queryKey: environmentKeys.list(projectId) })
           : Promise.resolve(),
       ]);
     },
@@ -135,7 +135,7 @@ export function EnvironmentDetailPage({ environmentId }: { environmentId: string
     setError(null);
     try {
       const updated = await updateMutation.mutateAsync(
-        toUpdateEnvironmentInput(environment.appId, environment.id, effectiveDraft, t),
+        toUpdateEnvironmentInput(environment.projectId, environment.id, effectiveDraft, t),
       );
       setDraftOverride(createEnvironmentDraft(updated));
     } catch (caughtError) {
@@ -144,14 +144,14 @@ export function EnvironmentDetailPage({ environmentId }: { environmentId: string
   }
 
   async function handleSetDefault() {
-    if (!environment || !isTruthy(appId)) {
+    if (!environment || !isTruthy(projectId)) {
       return;
     }
     setError(null);
     try {
       await defaultMutation.mutateAsync({
         environmentId: typedEnvironmentId,
-        appId: toAppId(appId),
+        projectId: toProjectId(projectId),
       });
     } catch (caughtError) {
       setError(
@@ -168,7 +168,7 @@ export function EnvironmentDetailPage({ environmentId }: { environmentId: string
     try {
       await deleteMutation.mutateAsync({
         environmentId: typedEnvironmentId,
-        appId: environment.appId,
+        projectId: environment.projectId,
       });
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : t("environments.deleteFailed"));

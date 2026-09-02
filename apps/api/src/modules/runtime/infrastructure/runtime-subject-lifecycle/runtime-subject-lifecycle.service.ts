@@ -6,7 +6,7 @@ import type {
   AgentId,
   DriverInstanceId,
   PlatformId,
-  AppId,
+  ProjectId,
   RuntimeOperationId,
   SandboxId,
   SandboxSessionId,
@@ -91,7 +91,7 @@ export interface ActivateRuntimeSubjectInput {
   readonly networkConstraints: SandboxNetworkConstraints;
   readonly purpose?: RuntimeSubjectActivationPurpose;
   readonly runtimeSubjectId: SandboxId;
-  readonly appId: AppId;
+  readonly projectId: ProjectId;
   readonly subjectId: PlatformId;
   readonly subjectKind: SandboxSubjectKind;
   readonly timing?: RuntimeTimingRecorder;
@@ -446,7 +446,7 @@ export class RuntimeSubjectLifecycleService {
     if (!record) {
       const runtimeSubjectId = await ensureRuntimeSubjectId(this.#bindings.DB, {
         agentId: input.agentId,
-        appId: input.appId,
+        projectId: input.projectId,
         executionOwnerUserId: input.executionOwnerUserId,
         kind: input.kind,
         now,
@@ -570,7 +570,7 @@ export class RuntimeSubjectLifecycleService {
     const claimed = await claimRuntimeSubjectActivation(this.#bindings.DB, {
       accountConcurrentSandboxLimit: this.#accountConcurrentSandboxLimit,
       agentId: input.activation.agentId,
-      appId: input.activation.appId,
+      projectId: input.activation.projectId,
       claimExpiresAt: input.claimExpiresAt,
       claimOwner: input.claimOwner,
       executionOwnerUserId: input.activation.executionOwnerUserId,

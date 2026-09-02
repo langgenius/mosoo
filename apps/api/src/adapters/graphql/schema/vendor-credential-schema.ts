@@ -6,7 +6,7 @@ export const vendorCredentialSchema = /* GraphQL */ `
     maskedApiKey: String!
     models: [String!]
     name: String!
-    appId: ULID!
+    projectId: ULID!
     vendorId: String!
   }
 
@@ -15,7 +15,7 @@ export const vendorCredentialSchema = /* GraphQL */ `
     apiKey: String!
     models: [String!]
     name: String!
-    appId: ULID!
+    projectId: ULID!
     vendorId: String!
   }
 
@@ -25,17 +25,17 @@ export const vendorCredentialSchema = /* GraphQL */ `
     id: ULID!
     models: [String!]
     name: String
-    appId: ULID!
+    projectId: ULID!
   }
 
   input DeleteVendorCredentialInput {
     id: ULID!
-    appId: ULID!
+    projectId: ULID!
   }
 
   input SetDefaultVendorCredentialInput {
     id: ULID!
-    appId: ULID!
+    projectId: ULID!
   }
 
   type ResolvedModelEntry {
@@ -59,7 +59,7 @@ export const vendorCredentialSchema = /* GraphQL */ `
     apiBase: String
     apiKey: String!
     modelId: String
-    appId: ULID!
+    projectId: ULID!
     vendorId: String!
   }
 

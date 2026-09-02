@@ -75,8 +75,8 @@ export function OnboardingRoute({ children }: RouteChildrenProps): ReactNode {
 
 export function ProtectedRoute({
   children,
-  shell = "app",
-}: RouteChildrenProps & { shell?: "app" | "org" }): ReactNode {
+  shell = "project",
+}: RouteChildrenProps & { shell?: "project" | "org" }): ReactNode {
   const location = useLocation();
   const { onboardingState, user, userLoading } = useAppSession();
   const redirectTarget = `${location.pathname}${location.search}${location.hash}`;

@@ -39,7 +39,7 @@ function session(id: string): SessionSummary {
     lastRun: null,
     model: "gpt-5.4",
     provider: "openai",
-    appId: "app-1",
+    projectId: "project-1",
     runtimeId: "openai-runtime",
     status: "IDLE",
     title: "Thread",

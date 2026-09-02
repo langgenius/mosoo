@@ -23,4 +23,4 @@ export type * from "./skill/skill.contract";
 export * from "./validation/primitives.contract";
 export type * from "./vendor-credential/vendor-credential.contract";
 export type * from "./organization/organization.contract";
-export type * from "./app/app.contract";
+export type * from "./project/project.contract";

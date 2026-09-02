@@ -8,7 +8,7 @@ A Builder can improve an Agent after people have started using it. Without a sta
 
 ## Who uses it
 
-The App Owner publishes and updates the Agent. App Users and authorized integrations use it without needing to follow every configuration change.
+The Project Owner publishes and updates the Agent. Project Users and authorized integrations use it without needing to follow every configuration change.
 
 ## How it works
 

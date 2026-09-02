@@ -110,7 +110,7 @@ export function shouldWaitForRuntimeReadyOnNewSession(input: RuntimeReadyWaitInp
 
 export interface SpeculativeSessionCreateInput {
   activeSessionId: string | null;
-  appId: string | null;
+  projectId: string | null;
   readinessBlockMessage: string | null;
   sending: boolean;
   sessionListLoaded: boolean;
@@ -125,7 +125,7 @@ export function shouldSpeculativelyCreateSessionOnTyping(
 ): boolean {
   return (
     input.sessionType === "preview" &&
-    input.appId !== null &&
+    input.projectId !== null &&
     input.activeSessionId === null &&
     input.sessionListLoaded &&
     !input.sending &&

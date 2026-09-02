@@ -170,7 +170,7 @@ class SandboxExecutionPlaneAdapter implements RuntimeExecutionPlaneAdapter {
             subjectKind: input.profile.sandbox.subjectKind,
           }),
           runtimeSubjectId: sandboxId,
-          appId: input.profile.vendorCredential.appId,
+          projectId: input.profile.vendorCredential.projectId,
           subjectId: input.profile.sandbox.subjectId,
           subjectKind: input.profile.sandbox.subjectKind,
           timing,

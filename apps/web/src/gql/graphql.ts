@@ -13,8 +13,8 @@ export type AddSessionResourceFileInput = {
 };
 
 export type AddSessionResourceInput = {
-  appId: PlatformId;
   file: AddSessionResourceFileInput;
+  projectId: PlatformId;
   sessionId: PlatformId;
 };
 
@@ -148,7 +148,7 @@ export type BootstrapOnboardingInput = {
 };
 
 export type ConnectMcpBearerInput = {
-  appId: PlatformId;
+  projectId: PlatformId;
   serverId: PlatformId;
   subjectLabel?: string | null | undefined;
   token: string;
@@ -169,16 +169,16 @@ export type CostRunPurpose =
 
 export type CreateAgentForkInput = {
   agentId: PlatformId;
-  appId: PlatformId;
   kind?: AgentKind | null | undefined;
+  projectId: PlatformId;
 };
 
 export type CreateAgentInput = {
-  appId: PlatformId;
   description?: string | null | undefined;
   kind: AgentKind;
   model: string;
   name: string;
+  projectId: PlatformId;
   prompt: string;
   provider: string;
   runtimeId: string;
@@ -187,67 +187,67 @@ export type CreateAgentInput = {
 
 export type CreateAgentSessionInput = {
   agentId: PlatformId;
-  appId: PlatformId;
+  projectId: PlatformId;
   type?: SessionType | null | undefined;
   waitForRuntimeReady?: boolean | null | undefined;
-};
-
-export type CreateAppInput = {
-  name: string;
-  organizationId: PlatformId;
-};
-
-export type CreateAppMcpServerInput = {
-  appId: PlatformId;
-  authType: McpAuthType;
-  description?: string | null | undefined;
-  iconUrl?: string | null | undefined;
-  name: string;
-  oauthClientId?: string | null | undefined;
-  oauthClientSecret?: string | null | undefined;
-  url: string;
 };
 
 export type CreateEnvironmentInput = {
   allowMcpServers: boolean;
   allowPackageManagers: boolean;
   allowedHosts: Array<string>;
-  appId: PlatformId;
   description?: string | null | undefined;
   envVars: Array<EnvironmentVariableInput>;
   name: string;
   networkPolicy: EnvironmentNetworkPolicy;
   packages: Array<EnvironmentPackageSpecInput>;
+  projectId: PlatformId;
   setupScript: string;
 };
 
+export type CreateProjectInput = {
+  name: string;
+  organizationId: PlatformId;
+};
+
+export type CreateProjectMcpServerInput = {
+  authType: McpAuthType;
+  description?: string | null | undefined;
+  iconUrl?: string | null | undefined;
+  name: string;
+  oauthClientId?: string | null | undefined;
+  oauthClientSecret?: string | null | undefined;
+  projectId: PlatformId;
+  url: string;
+};
+
 export type CreateSkillForkInput = {
-  appId: PlatformId;
+  projectId: PlatformId;
   skillId: PlatformId;
 };
 
 export type CreateVendorCredentialInput = {
   apiBase?: string | null | undefined;
   apiKey: string;
-  appId: PlatformId;
   models?: Array<string> | null | undefined;
   name: string;
+  projectId: PlatformId;
   vendorId: string;
 };
 
 export type DeleteAgentInput = {
   agentId: PlatformId;
-  appId: PlatformId;
+  projectId: PlatformId;
 };
 
 export type DeleteEnvironmentInput = {
-  appId: PlatformId;
   environmentId: PlatformId;
+  projectId: PlatformId;
 };
 
 export type DeleteVendorCredentialInput = {
-  appId: PlatformId;
   id: PlatformId;
+  projectId: PlatformId;
 };
 
 export type EnvironmentNetworkPolicy =
@@ -280,7 +280,7 @@ export type EnvironmentVariableStatus =
   | 'pending';
 
 export type FileListInput = {
-  appId: PlatformId;
+  projectId: PlatformId;
   scopeId?: PlatformId | null | undefined;
   scopeKind?: FileScopeKind | null | undefined;
   sessionId?: PlatformId | null | undefined;
@@ -312,8 +312,8 @@ export type FileUploadStrategy =
   | 'single_put';
 
 export type ImportAgentPackageInput = {
-  appId: PlatformId;
   fileId: PlatformId;
+  projectId: PlatformId;
 };
 
 export type McpAuthType =
@@ -355,12 +355,7 @@ export type ModelCatalogSource =
 
 export type PublishAgentInput = {
   agentId: PlatformId;
-  appId: PlatformId;
-};
-
-export type RenameAppInput = {
-  appId: PlatformId;
-  name: string;
+  projectId: PlatformId;
 };
 
 export type RenameOrganizationInput = {
@@ -368,8 +363,13 @@ export type RenameOrganizationInput = {
   organizationId: PlatformId;
 };
 
+export type RenameProjectInput = {
+  name: string;
+  projectId: PlatformId;
+};
+
 export type RenameSessionInput = {
-  appId: PlatformId;
+  projectId: PlatformId;
   sessionId: PlatformId;
   title: string;
 };
@@ -392,8 +392,8 @@ export type RuntimeStateOperation =
 export type RuntimeStateOperationInput = {
   affectedFields?: Array<string> | null | undefined;
   agentId: PlatformId;
-  appId: PlatformId;
   applyActionKind?: string | null | undefined;
+  projectId: PlatformId;
   targetVersion?: RuntimeStateTargetVersionInput | null | undefined;
 };
 
@@ -457,14 +457,14 @@ export type SessionType =
   | 'preview'
   | 'ui';
 
-export type SetAppDefaultEnvironmentInput = {
-  appId: PlatformId;
-  environmentId: PlatformId;
+export type SetDefaultVendorCredentialInput = {
+  id: PlatformId;
+  projectId: PlatformId;
 };
 
-export type SetDefaultVendorCredentialInput = {
-  appId: PlatformId;
-  id: PlatformId;
+export type SetProjectDefaultEnvironmentInput = {
+  environmentId: PlatformId;
+  projectId: PlatformId;
 };
 
 export type SkillSnapshotEntryKind =
@@ -476,7 +476,7 @@ export type SkillSourceKind =
   | 'user';
 
 export type StartMcpOAuthInput = {
-  appId: PlatformId;
+  projectId: PlatformId;
   returnUrl?: string | null | undefined;
   serverId: PlatformId;
 };
@@ -484,8 +484,8 @@ export type StartMcpOAuthInput = {
 export type TestVendorCredentialInput = {
   apiBase?: string | null | undefined;
   apiKey: string;
-  appId: PlatformId;
   modelId?: string | null | undefined;
+  projectId: PlatformId;
   vendorId: string;
 };
 
@@ -496,7 +496,6 @@ export type UpdateAccountProfileInput = {
 
 export type UpdateAgentConfigInput = {
   agentId: PlatformId;
-  appId: PlatformId;
   builtInTools?: Array<AgentBuiltInToolConfigInput> | null | undefined;
   description?: string | null | undefined;
   environment: AgentEnvironmentConfigInput;
@@ -504,6 +503,7 @@ export type UpdateAgentConfigInput = {
   mcpServerIds: Array<PlatformId>;
   model: string;
   name: string;
+  projectId: PlatformId;
   prompt: string;
   provider: string;
   providerOptions: JsonObject;
@@ -511,39 +511,39 @@ export type UpdateAgentConfigInput = {
   skillIds: Array<PlatformId>;
 };
 
-export type UpdateAppMcpServerInput = {
-  appId: PlatformId;
-  description?: string | null | undefined;
-  iconUrl?: string | null | undefined;
-  name: string;
-  serverId: PlatformId;
-  url: string;
-};
-
 export type UpdateEnvironmentInput = {
   allowMcpServers: boolean;
   allowPackageManagers: boolean;
   allowedHosts: Array<string>;
-  appId: PlatformId;
   description?: string | null | undefined;
   envVars: Array<EnvironmentVariableInput>;
   environmentId: PlatformId;
   name: string;
   networkPolicy: EnvironmentNetworkPolicy;
   packages: Array<EnvironmentPackageSpecInput>;
+  projectId: PlatformId;
   setupScript: string;
+};
+
+export type UpdateProjectMcpServerInput = {
+  description?: string | null | undefined;
+  iconUrl?: string | null | undefined;
+  name: string;
+  projectId: PlatformId;
+  serverId: PlatformId;
+  url: string;
 };
 
 export type UpdateVendorCredentialInput = {
   apiBase?: string | null | undefined;
   apiKey?: string | null | undefined;
-  appId: PlatformId;
   id: PlatformId;
   models?: Array<string> | null | undefined;
   name?: string | null | undefined;
+  projectId: PlatformId;
 };
 
-export type AgentFieldsFragment = { createdAt: string, description: string | null, id: PlatformId, kind: AgentKind, model: string, name: string, appId: PlatformId, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, visibility: AgentVisibility, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }> };
+export type AgentFieldsFragment = { createdAt: string, description: string | null, id: PlatformId, kind: AgentKind, model: string, name: string, projectId: PlatformId, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, visibility: AgentVisibility, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }> };
 
 export type AgentToolSummaryFieldsFragment = { enabled: boolean, iconUrl: string | null, name: string, serverId: PlatformId };
 
@@ -556,7 +556,7 @@ export type CreateAgentMutationVariables = Exact<{
 }>;
 
 
-export type CreateAgentMutation = { createAgent: { createdAt: string, description: string | null, id: PlatformId, kind: AgentKind, model: string, name: string, appId: PlatformId, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, visibility: AgentVisibility, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }> } };
+export type CreateAgentMutation = { createAgent: { createdAt: string, description: string | null, id: PlatformId, kind: AgentKind, model: string, name: string, projectId: PlatformId, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, visibility: AgentVisibility, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }> } };
 
 export type DeleteAgentMutationVariables = Exact<{
   input: DeleteAgentInput;
@@ -566,23 +566,23 @@ export type DeleteAgentMutationVariables = Exact<{
 export type DeleteAgentMutation = { deleteAgent: { ok: boolean } };
 
 export type AccessibleAgentsQueryVariables = Exact<{
-  appId: PlatformId;
+  projectId: PlatformId;
 }>;
 
 
-export type AccessibleAgentsQuery = { accessibleAgentList: Array<{ createdAt: string, description: string | null, id: PlatformId, kind: AgentKind, name: string, appId: PlatformId, runtimeId: string, status: AgentStatus, updatedAt: string, viewerRole: AgentViewerRole, visibility: AgentVisibility, owner: { id: PlatformId, imageUrl: string | null, name: string | null }, tools: Array<{ enabled: boolean, iconUrl: string | null, name: string, serverId: PlatformId }> }> };
+export type AccessibleAgentsQuery = { accessibleAgentList: Array<{ createdAt: string, description: string | null, id: PlatformId, kind: AgentKind, name: string, projectId: PlatformId, runtimeId: string, status: AgentStatus, updatedAt: string, viewerRole: AgentViewerRole, visibility: AgentVisibility, owner: { id: PlatformId, imageUrl: string | null, name: string | null }, tools: Array<{ enabled: boolean, iconUrl: string | null, name: string, serverId: PlatformId }> }> };
 
 export type AgentQueryVariables = Exact<{
   agentId: PlatformId;
-  appId: PlatformId;
+  projectId: PlatformId;
 }>;
 
 
-export type AgentQuery = { agent: { createdAt: string, description: string | null, id: PlatformId, kind: AgentKind, model: string, name: string, appId: PlatformId, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, viewerRole: AgentViewerRole, visibility: AgentVisibility, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, owner: { id: PlatformId, imageUrl: string | null, name: string | null }, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }>, tools: Array<{ enabled: boolean, iconUrl: string | null, name: string, serverId: PlatformId }>, versions: Array<{ agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number }> } };
+export type AgentQuery = { agent: { createdAt: string, description: string | null, id: PlatformId, kind: AgentKind, model: string, name: string, projectId: PlatformId, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, viewerRole: AgentViewerRole, visibility: AgentVisibility, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, owner: { id: PlatformId, imageUrl: string | null, name: string | null }, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }>, tools: Array<{ enabled: boolean, iconUrl: string | null, name: string, serverId: PlatformId }>, versions: Array<{ agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number }> } };
 
 export type AgentEditorStateQueryVariables = Exact<{
   agentId: PlatformId;
-  appId: PlatformId;
+  projectId: PlatformId;
 }>;
 
 
@@ -593,11 +593,11 @@ export type UpdateAgentConfigMutationVariables = Exact<{
 }>;
 
 
-export type UpdateAgentConfigMutation = { updateAgentConfig: { createdAt: string, description: string | null, id: PlatformId, kind: AgentKind, model: string, name: string, appId: PlatformId, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, visibility: AgentVisibility, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }> } };
+export type UpdateAgentConfigMutation = { updateAgentConfig: { createdAt: string, description: string | null, id: PlatformId, kind: AgentKind, model: string, name: string, projectId: PlatformId, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, visibility: AgentVisibility, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }> } };
 
 export type AgentManifestQueryVariables = Exact<{
   agentId: PlatformId;
-  appId: PlatformId;
+  projectId: PlatformId;
 }>;
 
 
@@ -605,7 +605,7 @@ export type AgentManifestQuery = { agentManifest: { agentId: PlatformId, json: s
 
 export type ExportAgentPackageQueryVariables = Exact<{
   agentId: PlatformId;
-  appId: PlatformId;
+  projectId: PlatformId;
 }>;
 
 
@@ -616,29 +616,29 @@ export type ImportAgentPackageMutationVariables = Exact<{
 }>;
 
 
-export type ImportAgentPackageMutation = { importAgentPackage: { agent: { createdAt: string, description: string | null, id: PlatformId, kind: AgentKind, model: string, name: string, appId: PlatformId, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, visibility: AgentVisibility, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }> }, resolution: { issues: Array<{ actionLabel: string | null, code: string, message: string, required: boolean, severity: AgentResolutionSeverity, status: AgentResolutionStatus, targetLabel: string | null, targetType: AgentResolutionTargetType }>, summary: { boundMcpServerCount: number, boundSkillCount: number, copiedAssetCount: number, createdMcpServerCount: number, reusedMcpServerCount: number } } } };
+export type ImportAgentPackageMutation = { importAgentPackage: { agent: { createdAt: string, description: string | null, id: PlatformId, kind: AgentKind, model: string, name: string, projectId: PlatformId, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, visibility: AgentVisibility, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }> }, resolution: { issues: Array<{ actionLabel: string | null, code: string, message: string, required: boolean, severity: AgentResolutionSeverity, status: AgentResolutionStatus, targetLabel: string | null, targetType: AgentResolutionTargetType }>, summary: { boundMcpServerCount: number, boundSkillCount: number, copiedAssetCount: number, createdMcpServerCount: number, reusedMcpServerCount: number } } } };
 
 export type CreateAgentForkMutationVariables = Exact<{
   input: CreateAgentForkInput;
 }>;
 
 
-export type CreateAgentForkMutation = { createAgentFork: { agent: { createdAt: string, description: string | null, id: PlatformId, kind: AgentKind, model: string, name: string, appId: PlatformId, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, visibility: AgentVisibility, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }> }, resolution: { issues: Array<{ actionLabel: string | null, code: string, message: string, required: boolean, severity: AgentResolutionSeverity, status: AgentResolutionStatus, targetLabel: string | null, targetType: AgentResolutionTargetType }>, summary: { boundMcpServerCount: number, boundSkillCount: number, copiedAssetCount: number, createdMcpServerCount: number, reusedMcpServerCount: number } } } };
+export type CreateAgentForkMutation = { createAgentFork: { agent: { createdAt: string, description: string | null, id: PlatformId, kind: AgentKind, model: string, name: string, projectId: PlatformId, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, visibility: AgentVisibility, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }> }, resolution: { issues: Array<{ actionLabel: string | null, code: string, message: string, required: boolean, severity: AgentResolutionSeverity, status: AgentResolutionStatus, targetLabel: string | null, targetType: AgentResolutionTargetType }>, summary: { boundMcpServerCount: number, boundSkillCount: number, copiedAssetCount: number, createdMcpServerCount: number, reusedMcpServerCount: number } } } };
 
 export type PublishAgentMutationVariables = Exact<{
   input: PublishAgentInput;
 }>;
 
 
-export type PublishAgentMutation = { publishAgent: { createdAt: string, description: string | null, id: PlatformId, kind: AgentKind, model: string, name: string, appId: PlatformId, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, visibility: AgentVisibility, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }> } };
+export type PublishAgentMutation = { publishAgent: { createdAt: string, description: string | null, id: PlatformId, kind: AgentKind, model: string, name: string, projectId: PlatformId, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, visibility: AgentVisibility, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }> } };
 
 export type UnpublishAgentMutationVariables = Exact<{
   agentId: PlatformId;
-  appId: PlatformId;
+  projectId: PlatformId;
 }>;
 
 
-export type UnpublishAgentMutation = { unpublishAgent: { createdAt: string, description: string | null, id: PlatformId, kind: AgentKind, model: string, name: string, appId: PlatformId, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, visibility: AgentVisibility, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }> } };
+export type UnpublishAgentMutation = { unpublishAgent: { createdAt: string, description: string | null, id: PlatformId, kind: AgentKind, model: string, name: string, projectId: PlatformId, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, visibility: AgentVisibility, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }> } };
 
 export type RestartDriverMutationVariables = Exact<{
   input: RuntimeStateOperationInput;
@@ -660,27 +660,6 @@ export type ResetAgentStateMutationVariables = Exact<{
 
 
 export type ResetAgentStateMutation = { resetAgentState: { affectedSessionCount: number, agentId: PlatformId, ok: boolean, operation: RuntimeStateOperation } };
-
-export type AppListQueryVariables = Exact<{
-  organizationId: PlatformId;
-}>;
-
-
-export type AppListQuery = { appList: Array<{ createdAt: string, defaultEnvironmentId: PlatformId | null, id: PlatformId, name: string, ownerAccountId: PlatformId }> };
-
-export type CreateAppMutationVariables = Exact<{
-  input: CreateAppInput;
-}>;
-
-
-export type CreateAppMutation = { createApp: { createdAt: string, defaultEnvironmentId: PlatformId | null, id: PlatformId, name: string, ownerAccountId: PlatformId } };
-
-export type RenameAppMutationVariables = Exact<{
-  input: RenameAppInput;
-}>;
-
-
-export type RenameAppMutation = { renameApp: { createdAt: string, defaultEnvironmentId: PlatformId | null, id: PlatformId, name: string, ownerAccountId: PlatformId } };
 
 type CostTotalsFields_CostAgentRow_Fragment = { activeUsers: number, cacheCreationTokens: number, cacheReadTokens: number, inputTokens: number, outputTokens: number, requestCount: number, totalCostUsd: number, unpricedRequestCount: number };
 
@@ -707,17 +686,17 @@ export type CostRecentSessionFieldsFragment = { actorEmail: string | null, actor
 
 export type CostAttributionFieldsFragment = { agents: Array<{ activeUsers: number, agentId: PlatformId, agentName: string, cacheCreationTokens: number, cacheReadTokens: number, debugCostUsd: number, evalCostUsd: number, inputTokens: number, outputTokens: number, ownerEmail: string | null, ownerId: PlatformId, ownerName: string, previousCostUsd: number | null, previewCostUsd: number, productionCostUsd: number, requestCount: number, scheduledCostUsd: number, totalCostUsd: number, unpricedRequestCount: number }>, daily: Array<{ activeUsers: number, cacheCreationTokens: number, cacheReadTokens: number, date: string, inputTokens: number, outputTokens: number, requestCount: number, totalCostUsd: number, unpricedRequestCount: number }>, models: Array<{ activeUsers: number, cacheCreationTokens: number, cacheReadTokens: number, cacheReadUsdPerMillion: number | null, cacheWriteUsdPerMillion: number | null, inputTokens: number, inputUsdPerMillion: number | null, model: string, outputTokens: number, outputUsdPerMillion: number | null, provider: string, requestCount: number, totalCostUsd: number, unpricedRequestCount: number, vendor: string }>, recentSessions: Array<{ actorEmail: string | null, actorName: string, cacheCreationTokens: number, cacheReadTokens: number, createdAt: string, inputTokens: number, model: string, outputTokens: number, provider: string, runPurpose: string, sessionId: PlatformId | null, sessionRunId: PlatformId | null, totalCostUsd: number }>, totals: { activeUsers: number, cacheCreationTokens: number, cacheReadTokens: number, inputTokens: number, outputTokens: number, requestCount: number, totalCostUsd: number, unpricedRequestCount: number } };
 
-export type AppCostCardQueryVariables = Exact<{
-  appId: PlatformId;
+export type ProjectCostCardQueryVariables = Exact<{
+  projectId: PlatformId;
   range: CostRange;
   runPurposes?: Array<CostRunPurpose> | null | undefined;
 }>;
 
 
-export type AppCostCardQuery = { appCostCard: { appId: PlatformId, appName: string, agents: Array<{ activeUsers: number, agentId: PlatformId, agentName: string, cacheCreationTokens: number, cacheReadTokens: number, debugCostUsd: number, evalCostUsd: number, inputTokens: number, outputTokens: number, ownerEmail: string | null, ownerId: PlatformId, ownerName: string, previousCostUsd: number | null, previewCostUsd: number, productionCostUsd: number, requestCount: number, scheduledCostUsd: number, totalCostUsd: number, unpricedRequestCount: number }>, daily: Array<{ activeUsers: number, cacheCreationTokens: number, cacheReadTokens: number, date: string, inputTokens: number, outputTokens: number, requestCount: number, totalCostUsd: number, unpricedRequestCount: number }>, models: Array<{ activeUsers: number, cacheCreationTokens: number, cacheReadTokens: number, cacheReadUsdPerMillion: number | null, cacheWriteUsdPerMillion: number | null, inputTokens: number, inputUsdPerMillion: number | null, model: string, outputTokens: number, outputUsdPerMillion: number | null, provider: string, requestCount: number, totalCostUsd: number, unpricedRequestCount: number, vendor: string }>, previousTotals: { activeUsers: number, cacheCreationTokens: number, cacheReadTokens: number, inputTokens: number, outputTokens: number, requestCount: number, totalCostUsd: number, unpricedRequestCount: number }, recentSessions: Array<{ actorEmail: string | null, actorName: string, cacheCreationTokens: number, cacheReadTokens: number, createdAt: string, inputTokens: number, model: string, outputTokens: number, provider: string, runPurpose: string, sessionId: PlatformId | null, sessionRunId: PlatformId | null, totalCostUsd: number }>, totals: { activeUsers: number, cacheCreationTokens: number, cacheReadTokens: number, inputTokens: number, outputTokens: number, requestCount: number, totalCostUsd: number, unpricedRequestCount: number } } };
+export type ProjectCostCardQuery = { projectCostCard: { projectId: PlatformId, projectName: string, agents: Array<{ activeUsers: number, agentId: PlatformId, agentName: string, cacheCreationTokens: number, cacheReadTokens: number, debugCostUsd: number, evalCostUsd: number, inputTokens: number, outputTokens: number, ownerEmail: string | null, ownerId: PlatformId, ownerName: string, previousCostUsd: number | null, previewCostUsd: number, productionCostUsd: number, requestCount: number, scheduledCostUsd: number, totalCostUsd: number, unpricedRequestCount: number }>, daily: Array<{ activeUsers: number, cacheCreationTokens: number, cacheReadTokens: number, date: string, inputTokens: number, outputTokens: number, requestCount: number, totalCostUsd: number, unpricedRequestCount: number }>, models: Array<{ activeUsers: number, cacheCreationTokens: number, cacheReadTokens: number, cacheReadUsdPerMillion: number | null, cacheWriteUsdPerMillion: number | null, inputTokens: number, inputUsdPerMillion: number | null, model: string, outputTokens: number, outputUsdPerMillion: number | null, provider: string, requestCount: number, totalCostUsd: number, unpricedRequestCount: number, vendor: string }>, previousTotals: { activeUsers: number, cacheCreationTokens: number, cacheReadTokens: number, inputTokens: number, outputTokens: number, requestCount: number, totalCostUsd: number, unpricedRequestCount: number }, recentSessions: Array<{ actorEmail: string | null, actorName: string, cacheCreationTokens: number, cacheReadTokens: number, createdAt: string, inputTokens: number, model: string, outputTokens: number, provider: string, runPurpose: string, sessionId: PlatformId | null, sessionRunId: PlatformId | null, totalCostUsd: number }>, totals: { activeUsers: number, cacheCreationTokens: number, cacheReadTokens: number, inputTokens: number, outputTokens: number, requestCount: number, totalCostUsd: number, unpricedRequestCount: number } } };
 
 export type AgentCostCardQueryVariables = Exact<{
-  appId: PlatformId;
+  projectId: PlatformId;
   agentId: PlatformId;
   range: CostRange;
   runPurposes?: Array<CostRunPurpose> | null | undefined;
@@ -732,38 +711,38 @@ export type EnvironmentVariableFieldsFragment = { key: string, preview: string, 
 
 export type EnvironmentOwnerFieldsFragment = { id: PlatformId | null, imageUrl: string | null, name: string | null };
 
-export type EnvironmentSummaryFieldsFragment = { allowMcpServers: boolean, allowPackageManagers: boolean, allowedHosts: Array<string>, canDelete: boolean, canEdit: boolean, createdAt: string, currentRevisionId: PlatformId, description: string, id: PlatformId, isBuiltIn: boolean, isDefault: boolean, isEditable: boolean, name: string, networkPolicy: EnvironmentNetworkPolicy, role: EnvironmentRegistryRole, setupScript: string, updatedAt: string, usedByAgentCount: number, appId: PlatformId, envVars: Array<{ key: string, preview: string, status: EnvironmentVariableStatus }>, forkOrigin: { environmentId: PlatformId, name: string, ownerName: string } | null, owner: { id: PlatformId | null, imageUrl: string | null, name: string | null }, packages: Array<{ manager: EnvironmentPackageManager, packages: Array<string> }> };
+export type EnvironmentSummaryFieldsFragment = { allowMcpServers: boolean, allowPackageManagers: boolean, allowedHosts: Array<string>, canDelete: boolean, canEdit: boolean, createdAt: string, currentRevisionId: PlatformId, description: string, id: PlatformId, isBuiltIn: boolean, isDefault: boolean, isEditable: boolean, name: string, networkPolicy: EnvironmentNetworkPolicy, role: EnvironmentRegistryRole, setupScript: string, updatedAt: string, usedByAgentCount: number, projectId: PlatformId, envVars: Array<{ key: string, preview: string, status: EnvironmentVariableStatus }>, forkOrigin: { environmentId: PlatformId, name: string, ownerName: string } | null, owner: { id: PlatformId | null, imageUrl: string | null, name: string | null }, packages: Array<{ manager: EnvironmentPackageManager, packages: Array<string> }> };
 
-export type EnvironmentDetailFieldsFragment = { allowMcpServers: boolean, allowPackageManagers: boolean, allowedHosts: Array<string>, canDelete: boolean, canEdit: boolean, createdAt: string, currentRevisionId: PlatformId, description: string, id: PlatformId, isBuiltIn: boolean, isDefault: boolean, isEditable: boolean, name: string, networkPolicy: EnvironmentNetworkPolicy, role: EnvironmentRegistryRole, setupScript: string, updatedAt: string, usedByAgentCount: number, appId: PlatformId, envVars: Array<{ key: string, preview: string, status: EnvironmentVariableStatus }>, forkOrigin: { environmentId: PlatformId, name: string, ownerName: string } | null, owner: { id: PlatformId | null, imageUrl: string | null, name: string | null }, packages: Array<{ manager: EnvironmentPackageManager, packages: Array<string> }> };
+export type EnvironmentDetailFieldsFragment = { allowMcpServers: boolean, allowPackageManagers: boolean, allowedHosts: Array<string>, canDelete: boolean, canEdit: boolean, createdAt: string, currentRevisionId: PlatformId, description: string, id: PlatformId, isBuiltIn: boolean, isDefault: boolean, isEditable: boolean, name: string, networkPolicy: EnvironmentNetworkPolicy, role: EnvironmentRegistryRole, setupScript: string, updatedAt: string, usedByAgentCount: number, projectId: PlatformId, envVars: Array<{ key: string, preview: string, status: EnvironmentVariableStatus }>, forkOrigin: { environmentId: PlatformId, name: string, ownerName: string } | null, owner: { id: PlatformId | null, imageUrl: string | null, name: string | null }, packages: Array<{ manager: EnvironmentPackageManager, packages: Array<string> }> };
 
-export type AppEnvironmentsQueryVariables = Exact<{
-  appId: PlatformId;
+export type ProjectEnvironmentsQueryVariables = Exact<{
+  projectId: PlatformId;
 }>;
 
 
-export type AppEnvironmentsQuery = { appEnvironmentList: Array<{ allowMcpServers: boolean, allowPackageManagers: boolean, allowedHosts: Array<string>, canDelete: boolean, canEdit: boolean, createdAt: string, currentRevisionId: PlatformId, description: string, id: PlatformId, isBuiltIn: boolean, isDefault: boolean, isEditable: boolean, name: string, networkPolicy: EnvironmentNetworkPolicy, role: EnvironmentRegistryRole, setupScript: string, updatedAt: string, usedByAgentCount: number, appId: PlatformId, envVars: Array<{ key: string, preview: string, status: EnvironmentVariableStatus }>, forkOrigin: { environmentId: PlatformId, name: string, ownerName: string } | null, owner: { id: PlatformId | null, imageUrl: string | null, name: string | null }, packages: Array<{ manager: EnvironmentPackageManager, packages: Array<string> }> }> };
+export type ProjectEnvironmentsQuery = { projectEnvironmentList: Array<{ allowMcpServers: boolean, allowPackageManagers: boolean, allowedHosts: Array<string>, canDelete: boolean, canEdit: boolean, createdAt: string, currentRevisionId: PlatformId, description: string, id: PlatformId, isBuiltIn: boolean, isDefault: boolean, isEditable: boolean, name: string, networkPolicy: EnvironmentNetworkPolicy, role: EnvironmentRegistryRole, setupScript: string, updatedAt: string, usedByAgentCount: number, projectId: PlatformId, envVars: Array<{ key: string, preview: string, status: EnvironmentVariableStatus }>, forkOrigin: { environmentId: PlatformId, name: string, ownerName: string } | null, owner: { id: PlatformId | null, imageUrl: string | null, name: string | null }, packages: Array<{ manager: EnvironmentPackageManager, packages: Array<string> }> }> };
 
 export type EnvironmentDetailQueryVariables = Exact<{
-  appId: PlatformId;
+  projectId: PlatformId;
   environmentId: PlatformId;
 }>;
 
 
-export type EnvironmentDetailQuery = { environment: { allowMcpServers: boolean, allowPackageManagers: boolean, allowedHosts: Array<string>, canDelete: boolean, canEdit: boolean, createdAt: string, currentRevisionId: PlatformId, description: string, id: PlatformId, isBuiltIn: boolean, isDefault: boolean, isEditable: boolean, name: string, networkPolicy: EnvironmentNetworkPolicy, role: EnvironmentRegistryRole, setupScript: string, updatedAt: string, usedByAgentCount: number, appId: PlatformId, envVars: Array<{ key: string, preview: string, status: EnvironmentVariableStatus }>, forkOrigin: { environmentId: PlatformId, name: string, ownerName: string } | null, owner: { id: PlatformId | null, imageUrl: string | null, name: string | null }, packages: Array<{ manager: EnvironmentPackageManager, packages: Array<string> }> } };
+export type EnvironmentDetailQuery = { environment: { allowMcpServers: boolean, allowPackageManagers: boolean, allowedHosts: Array<string>, canDelete: boolean, canEdit: boolean, createdAt: string, currentRevisionId: PlatformId, description: string, id: PlatformId, isBuiltIn: boolean, isDefault: boolean, isEditable: boolean, name: string, networkPolicy: EnvironmentNetworkPolicy, role: EnvironmentRegistryRole, setupScript: string, updatedAt: string, usedByAgentCount: number, projectId: PlatformId, envVars: Array<{ key: string, preview: string, status: EnvironmentVariableStatus }>, forkOrigin: { environmentId: PlatformId, name: string, ownerName: string } | null, owner: { id: PlatformId | null, imageUrl: string | null, name: string | null }, packages: Array<{ manager: EnvironmentPackageManager, packages: Array<string> }> } };
 
 export type CreateEnvironmentMutationVariables = Exact<{
   input: CreateEnvironmentInput;
 }>;
 
 
-export type CreateEnvironmentMutation = { createEnvironment: { allowMcpServers: boolean, allowPackageManagers: boolean, allowedHosts: Array<string>, canDelete: boolean, canEdit: boolean, createdAt: string, currentRevisionId: PlatformId, description: string, id: PlatformId, isBuiltIn: boolean, isDefault: boolean, isEditable: boolean, name: string, networkPolicy: EnvironmentNetworkPolicy, role: EnvironmentRegistryRole, setupScript: string, updatedAt: string, usedByAgentCount: number, appId: PlatformId, envVars: Array<{ key: string, preview: string, status: EnvironmentVariableStatus }>, forkOrigin: { environmentId: PlatformId, name: string, ownerName: string } | null, owner: { id: PlatformId | null, imageUrl: string | null, name: string | null }, packages: Array<{ manager: EnvironmentPackageManager, packages: Array<string> }> } };
+export type CreateEnvironmentMutation = { createEnvironment: { allowMcpServers: boolean, allowPackageManagers: boolean, allowedHosts: Array<string>, canDelete: boolean, canEdit: boolean, createdAt: string, currentRevisionId: PlatformId, description: string, id: PlatformId, isBuiltIn: boolean, isDefault: boolean, isEditable: boolean, name: string, networkPolicy: EnvironmentNetworkPolicy, role: EnvironmentRegistryRole, setupScript: string, updatedAt: string, usedByAgentCount: number, projectId: PlatformId, envVars: Array<{ key: string, preview: string, status: EnvironmentVariableStatus }>, forkOrigin: { environmentId: PlatformId, name: string, ownerName: string } | null, owner: { id: PlatformId | null, imageUrl: string | null, name: string | null }, packages: Array<{ manager: EnvironmentPackageManager, packages: Array<string> }> } };
 
 export type UpdateEnvironmentMutationVariables = Exact<{
   input: UpdateEnvironmentInput;
 }>;
 
 
-export type UpdateEnvironmentMutation = { updateEnvironment: { allowMcpServers: boolean, allowPackageManagers: boolean, allowedHosts: Array<string>, canDelete: boolean, canEdit: boolean, createdAt: string, currentRevisionId: PlatformId, description: string, id: PlatformId, isBuiltIn: boolean, isDefault: boolean, isEditable: boolean, name: string, networkPolicy: EnvironmentNetworkPolicy, role: EnvironmentRegistryRole, setupScript: string, updatedAt: string, usedByAgentCount: number, appId: PlatformId, envVars: Array<{ key: string, preview: string, status: EnvironmentVariableStatus }>, forkOrigin: { environmentId: PlatformId, name: string, ownerName: string } | null, owner: { id: PlatformId | null, imageUrl: string | null, name: string | null }, packages: Array<{ manager: EnvironmentPackageManager, packages: Array<string> }> } };
+export type UpdateEnvironmentMutation = { updateEnvironment: { allowMcpServers: boolean, allowPackageManagers: boolean, allowedHosts: Array<string>, canDelete: boolean, canEdit: boolean, createdAt: string, currentRevisionId: PlatformId, description: string, id: PlatformId, isBuiltIn: boolean, isDefault: boolean, isEditable: boolean, name: string, networkPolicy: EnvironmentNetworkPolicy, role: EnvironmentRegistryRole, setupScript: string, updatedAt: string, usedByAgentCount: number, projectId: PlatformId, envVars: Array<{ key: string, preview: string, status: EnvironmentVariableStatus }>, forkOrigin: { environmentId: PlatformId, name: string, ownerName: string } | null, owner: { id: PlatformId | null, imageUrl: string | null, name: string | null }, packages: Array<{ manager: EnvironmentPackageManager, packages: Array<string> }> } };
 
 export type DeleteEnvironmentMutationVariables = Exact<{
   input: DeleteEnvironmentInput;
@@ -772,12 +751,12 @@ export type DeleteEnvironmentMutationVariables = Exact<{
 
 export type DeleteEnvironmentMutation = { deleteEnvironment: { ok: boolean } };
 
-export type SetAppDefaultEnvironmentMutationVariables = Exact<{
-  input: SetAppDefaultEnvironmentInput;
+export type SetProjectDefaultEnvironmentMutationVariables = Exact<{
+  input: SetProjectDefaultEnvironmentInput;
 }>;
 
 
-export type SetAppDefaultEnvironmentMutation = { setAppDefaultEnvironment: { allowMcpServers: boolean, allowPackageManagers: boolean, allowedHosts: Array<string>, canDelete: boolean, canEdit: boolean, createdAt: string, currentRevisionId: PlatformId, description: string, id: PlatformId, isBuiltIn: boolean, isDefault: boolean, isEditable: boolean, name: string, networkPolicy: EnvironmentNetworkPolicy, role: EnvironmentRegistryRole, setupScript: string, updatedAt: string, usedByAgentCount: number, appId: PlatformId, envVars: Array<{ key: string, preview: string, status: EnvironmentVariableStatus }>, forkOrigin: { environmentId: PlatformId, name: string, ownerName: string } | null, owner: { id: PlatformId | null, imageUrl: string | null, name: string | null }, packages: Array<{ manager: EnvironmentPackageManager, packages: Array<string> }> } };
+export type SetProjectDefaultEnvironmentMutation = { setProjectDefaultEnvironment: { allowMcpServers: boolean, allowPackageManagers: boolean, allowedHosts: Array<string>, canDelete: boolean, canEdit: boolean, createdAt: string, currentRevisionId: PlatformId, description: string, id: PlatformId, isBuiltIn: boolean, isDefault: boolean, isEditable: boolean, name: string, networkPolicy: EnvironmentNetworkPolicy, role: EnvironmentRegistryRole, setupScript: string, updatedAt: string, usedByAgentCount: number, projectId: PlatformId, envVars: Array<{ key: string, preview: string, status: EnvironmentVariableStatus }>, forkOrigin: { environmentId: PlatformId, name: string, ownerName: string } | null, owner: { id: PlatformId | null, imageUrl: string | null, name: string | null }, packages: Array<{ manager: EnvironmentPackageManager, packages: Array<string> }> } };
 
 export type FileListQueryVariables = Exact<{
   input: FileListInput;
@@ -788,55 +767,55 @@ export type FileListQuery = { fileList: { files: Array<{ createdAt: string, crea
 
 export type McpCredentialFieldsFragment = { authType: McpAuthType, createdAt: string, expiresAt: string | null, id: PlatformId, scope: McpCredentialRecordScope, scopeValues: Array<string>, status: McpCredentialStatus, subjectLabel: string | null, updatedAt: string };
 
-export type McpServerFieldsFragment = { authType: McpAuthType, authorizationState: McpAuthorizationState, createdAt: string, credentialScope: McpCredentialScope, credentialStatus: McpCredentialStatus, description: string | null, enabled: boolean, hasCredential: boolean, iconUrl: string | null, id: PlatformId, name: string, ownerId: PlatformId, ownerName: string, appId: PlatformId, source: McpServerSource, updatedAt: string, url: string, credential: { authType: McpAuthType, createdAt: string, expiresAt: string | null, id: PlatformId, scope: McpCredentialRecordScope, scopeValues: Array<string>, status: McpCredentialStatus, subjectLabel: string | null, updatedAt: string } | null };
+export type McpServerFieldsFragment = { authType: McpAuthType, authorizationState: McpAuthorizationState, createdAt: string, credentialScope: McpCredentialScope, credentialStatus: McpCredentialStatus, description: string | null, enabled: boolean, hasCredential: boolean, iconUrl: string | null, id: PlatformId, name: string, ownerId: PlatformId, ownerName: string, projectId: PlatformId, source: McpServerSource, updatedAt: string, url: string, credential: { authType: McpAuthType, createdAt: string, expiresAt: string | null, id: PlatformId, scope: McpCredentialRecordScope, scopeValues: Array<string>, status: McpCredentialStatus, subjectLabel: string | null, updatedAt: string } | null };
 
 export type McpRegistryQueryVariables = Exact<{
-  appId: PlatformId;
+  projectId: PlatformId;
 }>;
 
 
-export type McpRegistryQuery = { mcpRegistry: { currentUserEmail: string, currentUserId: PlatformId, currentUserName: string, appId: PlatformId, servers: Array<{ authType: McpAuthType, authorizationState: McpAuthorizationState, createdAt: string, credentialScope: McpCredentialScope, credentialStatus: McpCredentialStatus, description: string | null, enabled: boolean, hasCredential: boolean, iconUrl: string | null, id: PlatformId, name: string, ownerId: PlatformId, ownerName: string, appId: PlatformId, source: McpServerSource, updatedAt: string, url: string, credential: { authType: McpAuthType, createdAt: string, expiresAt: string | null, id: PlatformId, scope: McpCredentialRecordScope, scopeValues: Array<string>, status: McpCredentialStatus, subjectLabel: string | null, updatedAt: string } | null }> } };
+export type McpRegistryQuery = { mcpRegistry: { currentUserEmail: string, currentUserId: PlatformId, currentUserName: string, projectId: PlatformId, servers: Array<{ authType: McpAuthType, authorizationState: McpAuthorizationState, createdAt: string, credentialScope: McpCredentialScope, credentialStatus: McpCredentialStatus, description: string | null, enabled: boolean, hasCredential: boolean, iconUrl: string | null, id: PlatformId, name: string, ownerId: PlatformId, ownerName: string, projectId: PlatformId, source: McpServerSource, updatedAt: string, url: string, credential: { authType: McpAuthType, createdAt: string, expiresAt: string | null, id: PlatformId, scope: McpCredentialRecordScope, scopeValues: Array<string>, status: McpCredentialStatus, subjectLabel: string | null, updatedAt: string } | null }> } };
 
-export type CreateAppMcpServerMutationVariables = Exact<{
-  input: CreateAppMcpServerInput;
+export type CreateProjectMcpServerMutationVariables = Exact<{
+  input: CreateProjectMcpServerInput;
 }>;
 
 
-export type CreateAppMcpServerMutation = { createAppMcpServer: { authType: McpAuthType, authorizationState: McpAuthorizationState, createdAt: string, credentialScope: McpCredentialScope, credentialStatus: McpCredentialStatus, description: string | null, enabled: boolean, hasCredential: boolean, iconUrl: string | null, id: PlatformId, name: string, ownerId: PlatformId, ownerName: string, appId: PlatformId, source: McpServerSource, updatedAt: string, url: string, credential: { authType: McpAuthType, createdAt: string, expiresAt: string | null, id: PlatformId, scope: McpCredentialRecordScope, scopeValues: Array<string>, status: McpCredentialStatus, subjectLabel: string | null, updatedAt: string } | null } };
+export type CreateProjectMcpServerMutation = { createProjectMcpServer: { authType: McpAuthType, authorizationState: McpAuthorizationState, createdAt: string, credentialScope: McpCredentialScope, credentialStatus: McpCredentialStatus, description: string | null, enabled: boolean, hasCredential: boolean, iconUrl: string | null, id: PlatformId, name: string, ownerId: PlatformId, ownerName: string, projectId: PlatformId, source: McpServerSource, updatedAt: string, url: string, credential: { authType: McpAuthType, createdAt: string, expiresAt: string | null, id: PlatformId, scope: McpCredentialRecordScope, scopeValues: Array<string>, status: McpCredentialStatus, subjectLabel: string | null, updatedAt: string } | null } };
 
 export type ConnectMcpBearerMutationVariables = Exact<{
   input: ConnectMcpBearerInput;
 }>;
 
 
-export type ConnectMcpBearerMutation = { connectMcpBearer: { authType: McpAuthType, authorizationState: McpAuthorizationState, createdAt: string, credentialScope: McpCredentialScope, credentialStatus: McpCredentialStatus, description: string | null, enabled: boolean, hasCredential: boolean, iconUrl: string | null, id: PlatformId, name: string, ownerId: PlatformId, ownerName: string, appId: PlatformId, source: McpServerSource, updatedAt: string, url: string, credential: { authType: McpAuthType, createdAt: string, expiresAt: string | null, id: PlatformId, scope: McpCredentialRecordScope, scopeValues: Array<string>, status: McpCredentialStatus, subjectLabel: string | null, updatedAt: string } | null } };
+export type ConnectMcpBearerMutation = { connectMcpBearer: { authType: McpAuthType, authorizationState: McpAuthorizationState, createdAt: string, credentialScope: McpCredentialScope, credentialStatus: McpCredentialStatus, description: string | null, enabled: boolean, hasCredential: boolean, iconUrl: string | null, id: PlatformId, name: string, ownerId: PlatformId, ownerName: string, projectId: PlatformId, source: McpServerSource, updatedAt: string, url: string, credential: { authType: McpAuthType, createdAt: string, expiresAt: string | null, id: PlatformId, scope: McpCredentialRecordScope, scopeValues: Array<string>, status: McpCredentialStatus, subjectLabel: string | null, updatedAt: string } | null } };
 
 export type RevokeMcpCredentialMutationVariables = Exact<{
-  appId: PlatformId;
+  projectId: PlatformId;
   serverId: PlatformId;
 }>;
 
 
-export type RevokeMcpCredentialMutation = { revokeMcpCredential: { authType: McpAuthType, authorizationState: McpAuthorizationState, createdAt: string, credentialScope: McpCredentialScope, credentialStatus: McpCredentialStatus, description: string | null, enabled: boolean, hasCredential: boolean, iconUrl: string | null, id: PlatformId, name: string, ownerId: PlatformId, ownerName: string, appId: PlatformId, source: McpServerSource, updatedAt: string, url: string, credential: { authType: McpAuthType, createdAt: string, expiresAt: string | null, id: PlatformId, scope: McpCredentialRecordScope, scopeValues: Array<string>, status: McpCredentialStatus, subjectLabel: string | null, updatedAt: string } | null } };
+export type RevokeMcpCredentialMutation = { revokeMcpCredential: { authType: McpAuthType, authorizationState: McpAuthorizationState, createdAt: string, credentialScope: McpCredentialScope, credentialStatus: McpCredentialStatus, description: string | null, enabled: boolean, hasCredential: boolean, iconUrl: string | null, id: PlatformId, name: string, ownerId: PlatformId, ownerName: string, projectId: PlatformId, source: McpServerSource, updatedAt: string, url: string, credential: { authType: McpAuthType, createdAt: string, expiresAt: string | null, id: PlatformId, scope: McpCredentialRecordScope, scopeValues: Array<string>, status: McpCredentialStatus, subjectLabel: string | null, updatedAt: string } | null } };
 
 export type SetMcpServerEnabledMutationVariables = Exact<{
-  appId: PlatformId;
+  projectId: PlatformId;
   serverId: PlatformId;
   enabled: boolean;
 }>;
 
 
-export type SetMcpServerEnabledMutation = { setMcpServerEnabled: { authType: McpAuthType, authorizationState: McpAuthorizationState, createdAt: string, credentialScope: McpCredentialScope, credentialStatus: McpCredentialStatus, description: string | null, enabled: boolean, hasCredential: boolean, iconUrl: string | null, id: PlatformId, name: string, ownerId: PlatformId, ownerName: string, appId: PlatformId, source: McpServerSource, updatedAt: string, url: string, credential: { authType: McpAuthType, createdAt: string, expiresAt: string | null, id: PlatformId, scope: McpCredentialRecordScope, scopeValues: Array<string>, status: McpCredentialStatus, subjectLabel: string | null, updatedAt: string } | null } };
+export type SetMcpServerEnabledMutation = { setMcpServerEnabled: { authType: McpAuthType, authorizationState: McpAuthorizationState, createdAt: string, credentialScope: McpCredentialScope, credentialStatus: McpCredentialStatus, description: string | null, enabled: boolean, hasCredential: boolean, iconUrl: string | null, id: PlatformId, name: string, ownerId: PlatformId, ownerName: string, projectId: PlatformId, source: McpServerSource, updatedAt: string, url: string, credential: { authType: McpAuthType, createdAt: string, expiresAt: string | null, id: PlatformId, scope: McpCredentialRecordScope, scopeValues: Array<string>, status: McpCredentialStatus, subjectLabel: string | null, updatedAt: string } | null } };
 
-export type UpdateAppMcpServerMutationVariables = Exact<{
-  input: UpdateAppMcpServerInput;
+export type UpdateProjectMcpServerMutationVariables = Exact<{
+  input: UpdateProjectMcpServerInput;
 }>;
 
 
-export type UpdateAppMcpServerMutation = { updateAppMcpServer: { authType: McpAuthType, authorizationState: McpAuthorizationState, createdAt: string, credentialScope: McpCredentialScope, credentialStatus: McpCredentialStatus, description: string | null, enabled: boolean, hasCredential: boolean, iconUrl: string | null, id: PlatformId, name: string, ownerId: PlatformId, ownerName: string, appId: PlatformId, source: McpServerSource, updatedAt: string, url: string, credential: { authType: McpAuthType, createdAt: string, expiresAt: string | null, id: PlatformId, scope: McpCredentialRecordScope, scopeValues: Array<string>, status: McpCredentialStatus, subjectLabel: string | null, updatedAt: string } | null } };
+export type UpdateProjectMcpServerMutation = { updateProjectMcpServer: { authType: McpAuthType, authorizationState: McpAuthorizationState, createdAt: string, credentialScope: McpCredentialScope, credentialStatus: McpCredentialStatus, description: string | null, enabled: boolean, hasCredential: boolean, iconUrl: string | null, id: PlatformId, name: string, ownerId: PlatformId, ownerName: string, projectId: PlatformId, source: McpServerSource, updatedAt: string, url: string, credential: { authType: McpAuthType, createdAt: string, expiresAt: string | null, id: PlatformId, scope: McpCredentialRecordScope, scopeValues: Array<string>, status: McpCredentialStatus, subjectLabel: string | null, updatedAt: string } | null } };
 
 export type DeleteMcpServerMutationVariables = Exact<{
-  appId: PlatformId;
+  projectId: PlatformId;
   serverId: PlatformId;
 }>;
 
@@ -871,16 +850,37 @@ export type RenameOrganizationMutationVariables = Exact<{
 
 export type RenameOrganizationMutation = { renameOrganization: { avatarUrl: string | null, createdAt: string, id: PlatformId, name: string } };
 
+export type ProjectListQueryVariables = Exact<{
+  organizationId: PlatformId;
+}>;
+
+
+export type ProjectListQuery = { projectList: Array<{ createdAt: string, defaultEnvironmentId: PlatformId | null, id: PlatformId, name: string, ownerAccountId: PlatformId }> };
+
+export type CreateProjectMutationVariables = Exact<{
+  input: CreateProjectInput;
+}>;
+
+
+export type CreateProjectMutation = { createProject: { createdAt: string, defaultEnvironmentId: PlatformId | null, id: PlatformId, name: string, ownerAccountId: PlatformId } };
+
+export type RenameProjectMutationVariables = Exact<{
+  input: RenameProjectInput;
+}>;
+
+
+export type RenameProjectMutation = { renameProject: { createdAt: string, defaultEnvironmentId: PlatformId | null, id: PlatformId, name: string, ownerAccountId: PlatformId } };
+
 export type ThreadAgentSessionRetrieveQueryVariables = Exact<{
-  appId: PlatformId;
+  projectId: PlatformId;
   sessionId: PlatformId;
 }>;
 
 
-export type ThreadAgentSessionRetrieveQuery = { threadAgentSessionRetrieve: { capabilities: Array<{ action: AgentSessionActionCapabilityName, reason: string | null, status: AgentSessionActionCapabilityStatus }>, recoverability: { reason: string | null, status: AgentSessionRecoverabilityStatus }, session: { agentId: PlatformId, archivedAt: string | null, createdAt: string, deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, kind: AgentKind, lastMessageAt: string | null, model: string, provider: string, appId: PlatformId, runtimeId: string, status: SessionStatus, title: string | null, updatedAt: string, lastRun: { completedAt: string | null, createdAt: string, deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, model: string | null, provider: string | null, startedAt: string | null, status: RunStatus, traceId: string, trigger: SessionRunTrigger, updatedAt: string, error: { code: string, details: PrimitiveRecord, message: string, retryable: boolean } | null } | null } } };
+export type ThreadAgentSessionRetrieveQuery = { threadAgentSessionRetrieve: { capabilities: Array<{ action: AgentSessionActionCapabilityName, reason: string | null, status: AgentSessionActionCapabilityStatus }>, recoverability: { reason: string | null, status: AgentSessionRecoverabilityStatus }, session: { agentId: PlatformId, archivedAt: string | null, createdAt: string, deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, kind: AgentKind, lastMessageAt: string | null, model: string, provider: string, projectId: PlatformId, runtimeId: string, status: SessionStatus, title: string | null, updatedAt: string, lastRun: { completedAt: string | null, createdAt: string, deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, model: string | null, provider: string | null, startedAt: string | null, status: RunStatus, traceId: string, trigger: SessionRunTrigger, updatedAt: string, error: { code: string, details: PrimitiveRecord, message: string, retryable: boolean } | null } | null } } };
 
 export type AgentSessionDiagnosticsQueryVariables = Exact<{
-  appId: PlatformId;
+  projectId: PlatformId;
   sessionId: PlatformId;
 }>;
 
@@ -892,22 +892,22 @@ export type CreateAgentSessionMutationVariables = Exact<{
 }>;
 
 
-export type CreateAgentSessionMutation = { createAgentSession: { agentId: PlatformId, archivedAt: string | null, createdAt: string, deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, kind: AgentKind, lastMessageAt: string | null, model: string, provider: string, appId: PlatformId, runtimeId: string, status: SessionStatus, title: string | null, type: SessionType, updatedAt: string, lastRun: { completedAt: string | null, createdAt: string, deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, model: string | null, provider: string | null, startedAt: string | null, status: RunStatus, traceId: string, trigger: SessionRunTrigger, updatedAt: string, error: { code: string, details: PrimitiveRecord, message: string, retryable: boolean } | null } | null } };
+export type CreateAgentSessionMutation = { createAgentSession: { agentId: PlatformId, archivedAt: string | null, createdAt: string, deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, kind: AgentKind, lastMessageAt: string | null, model: string, provider: string, projectId: PlatformId, runtimeId: string, status: SessionStatus, title: string | null, type: SessionType, updatedAt: string, lastRun: { completedAt: string | null, createdAt: string, deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, model: string | null, provider: string | null, startedAt: string | null, status: RunStatus, traceId: string, trigger: SessionRunTrigger, updatedAt: string, error: { code: string, details: PrimitiveRecord, message: string, retryable: boolean } | null } | null } };
 
 export type AgentSessionListQueryVariables = Exact<{
   agentId: PlatformId;
   archived?: boolean | null | undefined;
   participantOnly?: boolean | null | undefined;
-  appId: PlatformId;
+  projectId: PlatformId;
   type?: SessionType | null | undefined;
 }>;
 
 
-export type AgentSessionListQuery = { agentSessionList: { nodes: Array<{ agentId: PlatformId, archivedAt: string | null, createdAt: string, deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, kind: AgentKind, lastMessageAt: string | null, model: string, provider: string, appId: PlatformId, runtimeId: string, status: SessionStatus, title: string | null, type: SessionType, updatedAt: string, lastRun: { completedAt: string | null, createdAt: string, deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, model: string | null, provider: string | null, startedAt: string | null, status: RunStatus, traceId: string, trigger: SessionRunTrigger, updatedAt: string, error: { code: string, details: PrimitiveRecord, message: string, retryable: boolean } | null } | null }> } };
+export type AgentSessionListQuery = { agentSessionList: { nodes: Array<{ agentId: PlatformId, archivedAt: string | null, createdAt: string, deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, kind: AgentKind, lastMessageAt: string | null, model: string, provider: string, projectId: PlatformId, runtimeId: string, status: SessionStatus, title: string | null, type: SessionType, updatedAt: string, lastRun: { completedAt: string | null, createdAt: string, deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, model: string | null, provider: string | null, startedAt: string | null, status: RunStatus, traceId: string, trigger: SessionRunTrigger, updatedAt: string, error: { code: string, details: PrimitiveRecord, message: string, retryable: boolean } | null } | null }> } };
 
 export type AgentSessionProcessEventsQueryVariables = Exact<{
   limit: number;
-  appId: PlatformId;
+  projectId: PlatformId;
   sessionId: PlatformId;
 }>;
 
@@ -915,7 +915,7 @@ export type AgentSessionProcessEventsQueryVariables = Exact<{
 export type AgentSessionProcessEventsQuery = { sessionProcessEvents: Array<{ content: string, durationMs: number | null, id: PlatformId, occurredAt: string, status: SessionProcessEventStatus, tokens: number | null, type: SessionProcessEventType }> };
 
 export type ThreadSessionMessagesQueryVariables = Exact<{
-  appId: PlatformId;
+  projectId: PlatformId;
   sessionId: PlatformId;
 }>;
 
@@ -923,7 +923,7 @@ export type ThreadSessionMessagesQueryVariables = Exact<{
 export type ThreadSessionMessagesQuery = { threadSessionMessages: Array<{ content: string, createdAt: string, createdBy: PlatformId, id: PlatformId, role: SessionMessageRole, plan: Array<{ content: string, priority: SessionMessagePlanPriority, status: SessionMessagePlanStatus }>, segments: Array<{ argsText: string | null, kind: SessionMessageSegmentKind, output: string | null, path: string | null, text: string | null, tool: string | null, toolCallId: string | null }> }> };
 
 export type SendAgentSessionEventsMutationVariables = Exact<{
-  appId: PlatformId;
+  projectId: PlatformId;
   sessionId: PlatformId;
   events: Array<AgentSessionEventInput>;
 }>;
@@ -932,7 +932,7 @@ export type SendAgentSessionEventsMutationVariables = Exact<{
 export type SendAgentSessionEventsMutation = { sendAgentSessionEvents: { acceptedAt: string, warnings: Array<{ code: string, message: string }> } };
 
 export type PrewarmAgentSessionMutationVariables = Exact<{
-  appId: PlatformId;
+  projectId: PlatformId;
   sessionId: PlatformId;
 }>;
 
@@ -940,14 +940,14 @@ export type PrewarmAgentSessionMutationVariables = Exact<{
 export type PrewarmAgentSessionMutation = { prewarmAgentSession: { scheduledAt: string, sessionId: PlatformId } };
 
 export type ThreadAgentSessionListQueryVariables = Exact<{
-  appId: PlatformId;
+  projectId: PlatformId;
   archived?: boolean | null | undefined;
   beforeCursor?: string | null | undefined;
   type?: SessionType | null | undefined;
 }>;
 
 
-export type ThreadAgentSessionListQuery = { threadAgentSessionList: { nodes: Array<{ capabilities: Array<{ action: AgentSessionActionCapabilityName, reason: string | null, status: AgentSessionActionCapabilityStatus }>, session: { agentId: PlatformId, archivedAt: string | null, createdAt: string, deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, kind: AgentKind, lastMessageAt: string | null, model: string, provider: string, appId: PlatformId, runtimeId: string, status: SessionStatus, title: string | null, type: SessionType, updatedAt: string, lastRun: { completedAt: string | null, createdAt: string, deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, model: string | null, provider: string | null, startedAt: string | null, status: RunStatus, traceId: string, trigger: SessionRunTrigger, updatedAt: string, error: { code: string, details: PrimitiveRecord, message: string, retryable: boolean } | null } | null } }>, pageInfo: { endCursor: string | null, hasMore: boolean } } };
+export type ThreadAgentSessionListQuery = { threadAgentSessionList: { nodes: Array<{ capabilities: Array<{ action: AgentSessionActionCapabilityName, reason: string | null, status: AgentSessionActionCapabilityStatus }>, session: { agentId: PlatformId, archivedAt: string | null, createdAt: string, deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, kind: AgentKind, lastMessageAt: string | null, model: string, provider: string, projectId: PlatformId, runtimeId: string, status: SessionStatus, title: string | null, type: SessionType, updatedAt: string, lastRun: { completedAt: string | null, createdAt: string, deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, model: string | null, provider: string | null, startedAt: string | null, status: RunStatus, traceId: string, trigger: SessionRunTrigger, updatedAt: string, error: { code: string, details: PrimitiveRecord, message: string, retryable: boolean } | null } | null } }>, pageInfo: { endCursor: string | null, hasMore: boolean } } };
 
 export type AutoTitleSessionMutationVariables = Exact<{
   input: RenameSessionInput;
@@ -957,7 +957,7 @@ export type AutoTitleSessionMutationVariables = Exact<{
 export type AutoTitleSessionMutation = { autoTitleSession: { id: PlatformId } };
 
 export type ArchiveSessionMutationVariables = Exact<{
-  appId: PlatformId;
+  projectId: PlatformId;
   sessionId: PlatformId;
 }>;
 
@@ -965,7 +965,7 @@ export type ArchiveSessionMutationVariables = Exact<{
 export type ArchiveSessionMutation = { archiveAgentSession: { ok: boolean } };
 
 export type RestoreSessionMutationVariables = Exact<{
-  appId: PlatformId;
+  projectId: PlatformId;
   sessionId: PlatformId;
 }>;
 
@@ -973,7 +973,7 @@ export type RestoreSessionMutationVariables = Exact<{
 export type RestoreSessionMutation = { unarchiveAgentSession: { ok: boolean } };
 
 export type DeleteAgentSessionMutationVariables = Exact<{
-  appId: PlatformId;
+  projectId: PlatformId;
   sessionId: PlatformId;
 }>;
 
@@ -989,41 +989,41 @@ export type AddSessionResourceMutation = { addSessionResource: { contentType: st
 
 export type SessionProcessEventsQueryVariables = Exact<{
   limit: number;
-  appId: PlatformId;
+  projectId: PlatformId;
   sessionId: PlatformId;
 }>;
 
 
 export type SessionProcessEventsQuery = { threadSessionProcessEvents: Array<{ content: string, durationMs: number | null, id: PlatformId, occurredAt: string, status: SessionProcessEventStatus, tokens: number | null, type: SessionProcessEventType }> };
 
-export type SkillSummaryFieldsFragment = { author: string, createdAt: string, description: string, fileCount: number, id: PlatformId, name: string, ownerId: PlatformId, ownerName: string, appId: PlatformId, snapshotId: PlatformId, sourceKind: SkillSourceKind, updatedAt: string, forkOrigin: { name: string, ownerName: string, skillId: PlatformId } | null };
+export type SkillSummaryFieldsFragment = { author: string, createdAt: string, description: string, fileCount: number, id: PlatformId, name: string, ownerId: PlatformId, ownerName: string, projectId: PlatformId, snapshotId: PlatformId, sourceKind: SkillSourceKind, updatedAt: string, forkOrigin: { name: string, ownerName: string, skillId: PlatformId } | null };
 
-export type SkillDetailFieldsFragment = { author: string, createdAt: string, description: string, fileCount: number, id: PlatformId, name: string, ownerId: PlatformId, ownerName: string, appId: PlatformId, snapshotId: PlatformId, sourceKind: SkillSourceKind, updatedAt: string, forkOrigin: { name: string, ownerName: string, skillId: PlatformId } | null, currentSnapshot: { archiveFormat: string, author: string, blobKey: string, blobSha256: string, blobSize: number, compression: string, createdAt: string, description: string, id: PlatformId, name: string, skillMarkdownPath: string, uncompressedSize: number, version: string | null }, entries: Array<{ entryKind: SkillSnapshotEntryKind, isExecutable: boolean, mimeType: string | null, path: string, sha256: string | null, size: number }> };
+export type SkillDetailFieldsFragment = { author: string, createdAt: string, description: string, fileCount: number, id: PlatformId, name: string, ownerId: PlatformId, ownerName: string, projectId: PlatformId, snapshotId: PlatformId, sourceKind: SkillSourceKind, updatedAt: string, forkOrigin: { name: string, ownerName: string, skillId: PlatformId } | null, currentSnapshot: { archiveFormat: string, author: string, blobKey: string, blobSha256: string, blobSize: number, compression: string, createdAt: string, description: string, id: PlatformId, name: string, skillMarkdownPath: string, uncompressedSize: number, version: string | null }, entries: Array<{ entryKind: SkillSnapshotEntryKind, isExecutable: boolean, mimeType: string | null, path: string, sha256: string | null, size: number }> };
 
 export type SkillDetailQueryVariables = Exact<{
-  appId: PlatformId;
+  projectId: PlatformId;
   skillId: PlatformId;
 }>;
 
 
-export type SkillDetailQuery = { skillDetail: { author: string, createdAt: string, description: string, fileCount: number, id: PlatformId, name: string, ownerId: PlatformId, ownerName: string, appId: PlatformId, snapshotId: PlatformId, sourceKind: SkillSourceKind, updatedAt: string, forkOrigin: { name: string, ownerName: string, skillId: PlatformId } | null, currentSnapshot: { archiveFormat: string, author: string, blobKey: string, blobSha256: string, blobSize: number, compression: string, createdAt: string, description: string, id: PlatformId, name: string, skillMarkdownPath: string, uncompressedSize: number, version: string | null }, entries: Array<{ entryKind: SkillSnapshotEntryKind, isExecutable: boolean, mimeType: string | null, path: string, sha256: string | null, size: number }> } };
+export type SkillDetailQuery = { skillDetail: { author: string, createdAt: string, description: string, fileCount: number, id: PlatformId, name: string, ownerId: PlatformId, ownerName: string, projectId: PlatformId, snapshotId: PlatformId, sourceKind: SkillSourceKind, updatedAt: string, forkOrigin: { name: string, ownerName: string, skillId: PlatformId } | null, currentSnapshot: { archiveFormat: string, author: string, blobKey: string, blobSha256: string, blobSize: number, compression: string, createdAt: string, description: string, id: PlatformId, name: string, skillMarkdownPath: string, uncompressedSize: number, version: string | null }, entries: Array<{ entryKind: SkillSnapshotEntryKind, isExecutable: boolean, mimeType: string | null, path: string, sha256: string | null, size: number }> } };
 
-export type AppSkillsQueryVariables = Exact<{
-  appId: PlatformId;
+export type ProjectSkillsQueryVariables = Exact<{
+  projectId: PlatformId;
 }>;
 
 
-export type AppSkillsQuery = { appSkillList: Array<{ author: string, createdAt: string, description: string, fileCount: number, id: PlatformId, name: string, ownerId: PlatformId, ownerName: string, appId: PlatformId, snapshotId: PlatformId, sourceKind: SkillSourceKind, updatedAt: string, forkOrigin: { name: string, ownerName: string, skillId: PlatformId } | null }> };
+export type ProjectSkillsQuery = { projectSkillList: Array<{ author: string, createdAt: string, description: string, fileCount: number, id: PlatformId, name: string, ownerId: PlatformId, ownerName: string, projectId: PlatformId, snapshotId: PlatformId, sourceKind: SkillSourceKind, updatedAt: string, forkOrigin: { name: string, ownerName: string, skillId: PlatformId } | null }> };
 
 export type CreateSkillForkMutationVariables = Exact<{
   input: CreateSkillForkInput;
 }>;
 
 
-export type CreateSkillForkMutation = { createSkillFork: { author: string, createdAt: string, description: string, fileCount: number, id: PlatformId, name: string, ownerId: PlatformId, ownerName: string, appId: PlatformId, snapshotId: PlatformId, sourceKind: SkillSourceKind, updatedAt: string, forkOrigin: { name: string, ownerName: string, skillId: PlatformId } | null } };
+export type CreateSkillForkMutation = { createSkillFork: { author: string, createdAt: string, description: string, fileCount: number, id: PlatformId, name: string, ownerId: PlatformId, ownerName: string, projectId: PlatformId, snapshotId: PlatformId, sourceKind: SkillSourceKind, updatedAt: string, forkOrigin: { name: string, ownerName: string, skillId: PlatformId } | null } };
 
 export type DeleteOwnedSkillMutationVariables = Exact<{
-  appId: PlatformId;
+  projectId: PlatformId;
   skillId: PlatformId;
 }>;
 
@@ -1043,25 +1043,25 @@ export type UpdateProfileMutationVariables = Exact<{
 export type UpdateProfileMutation = { updateProfile: { imageUrl: string | null, name: string } };
 
 export type VendorCredentialListQueryVariables = Exact<{
-  appId: PlatformId;
+  projectId: PlatformId;
 }>;
 
 
-export type VendorCredentialListQuery = { vendorCredentialList: Array<{ apiBase: string | null, id: PlatformId, isDefault: boolean, maskedApiKey: string, models: Array<string> | null, name: string, appId: PlatformId, vendorId: string }> };
+export type VendorCredentialListQuery = { vendorCredentialList: Array<{ apiBase: string | null, id: PlatformId, isDefault: boolean, maskedApiKey: string, models: Array<string> | null, name: string, projectId: PlatformId, vendorId: string }> };
 
 export type CreateVendorCredentialMutationVariables = Exact<{
   input: CreateVendorCredentialInput;
 }>;
 
 
-export type CreateVendorCredentialMutation = { createVendorCredential: { apiBase: string | null, id: PlatformId, isDefault: boolean, maskedApiKey: string, models: Array<string> | null, name: string, appId: PlatformId, vendorId: string } };
+export type CreateVendorCredentialMutation = { createVendorCredential: { apiBase: string | null, id: PlatformId, isDefault: boolean, maskedApiKey: string, models: Array<string> | null, name: string, projectId: PlatformId, vendorId: string } };
 
 export type UpdateVendorCredentialMutationVariables = Exact<{
   input: UpdateVendorCredentialInput;
 }>;
 
 
-export type UpdateVendorCredentialMutation = { updateVendorCredential: { apiBase: string | null, id: PlatformId, isDefault: boolean, maskedApiKey: string, models: Array<string> | null, name: string, appId: PlatformId, vendorId: string } };
+export type UpdateVendorCredentialMutation = { updateVendorCredential: { apiBase: string | null, id: PlatformId, isDefault: boolean, maskedApiKey: string, models: Array<string> | null, name: string, projectId: PlatformId, vendorId: string } };
 
 export type DeleteVendorCredentialMutationVariables = Exact<{
   input: DeleteVendorCredentialInput;
@@ -1075,10 +1075,10 @@ export type SetDefaultVendorCredentialMutationVariables = Exact<{
 }>;
 
 
-export type SetDefaultVendorCredentialMutation = { setDefaultVendorCredential: { apiBase: string | null, id: PlatformId, isDefault: boolean, maskedApiKey: string, models: Array<string> | null, name: string, appId: PlatformId, vendorId: string } };
+export type SetDefaultVendorCredentialMutation = { setDefaultVendorCredential: { apiBase: string | null, id: PlatformId, isDefault: boolean, maskedApiKey: string, models: Array<string> | null, name: string, projectId: PlatformId, vendorId: string } };
 
 export type AvailableAgentModelsQueryVariables = Exact<{
-  appId: PlatformId;
+  projectId: PlatformId;
   runtimeId: string;
   currentModelId?: string | null | undefined;
   currentVendorId?: string | null | undefined;
@@ -1139,7 +1139,7 @@ export const AgentFieldsFragmentDoc = /*#__PURE__*/ new TypedDocumentString(`
   }
   model
   name
-  appId
+  projectId
   prompt
   provider
   runtimeId
@@ -1412,7 +1412,7 @@ export const EnvironmentSummaryFieldsFragmentDoc = /*#__PURE__*/ new TypedDocume
   setupScript
   updatedAt
   usedByAgentCount
-  appId
+  projectId
 }
     fragment EnvironmentPackageFields on EnvironmentPackageSpec {
   manager
@@ -1462,7 +1462,7 @@ export const EnvironmentDetailFieldsFragmentDoc = /*#__PURE__*/ new TypedDocumen
   setupScript
   updatedAt
   usedByAgentCount
-  appId
+  projectId
 }
     fragment EnvironmentPackageFields on EnvironmentPackageSpec {
   manager
@@ -1506,7 +1506,7 @@ export const McpServerFieldsFragmentDoc = /*#__PURE__*/ new TypedDocumentString(
   name
   ownerId
   ownerName
-  appId
+  projectId
   source
   updatedAt
   url
@@ -1540,7 +1540,7 @@ export const SkillSummaryFieldsFragmentDoc = /*#__PURE__*/ new TypedDocumentStri
   name
   ownerId
   ownerName
-  appId
+  projectId
   snapshotId
   sourceKind
   updatedAt
@@ -1561,7 +1561,7 @@ export const SkillDetailFieldsFragmentDoc = /*#__PURE__*/ new TypedDocumentStrin
   name
   ownerId
   ownerName
-  appId
+  projectId
   snapshotId
   sourceKind
   updatedAt
@@ -1606,7 +1606,7 @@ export const CreateAgentDocument = /*#__PURE__*/ new TypedDocumentString(`
   }
   model
   name
-  appId
+  projectId
   prompt
   provider
   runtimeId
@@ -1642,14 +1642,14 @@ export const DeleteAgentDocument = /*#__PURE__*/ new TypedDocumentString(`
 }
     `) as unknown as TypedDocumentString<DeleteAgentMutation, DeleteAgentMutationVariables>;
 export const AccessibleAgentsDocument = /*#__PURE__*/ new TypedDocumentString(`
-    query AccessibleAgents($appId: ULID!) {
-  accessibleAgentList(appId: $appId) {
+    query AccessibleAgents($projectId: ULID!) {
+  accessibleAgentList(projectId: $projectId) {
     createdAt
     description
     id
     kind
     name
-    appId
+    projectId
     owner {
       ...AgentOwnerFields
     }
@@ -1675,8 +1675,8 @@ fragment AgentOwnerFields on AgentOwnerSummary {
   name
 }`) as unknown as TypedDocumentString<AccessibleAgentsQuery, AccessibleAgentsQueryVariables>;
 export const AgentDocument = /*#__PURE__*/ new TypedDocumentString(`
-    query Agent($agentId: ULID!, $appId: ULID!) {
-  agent(agentId: $agentId, appId: $appId) {
+    query Agent($agentId: ULID!, $projectId: ULID!) {
+  agent(agentId: $agentId, projectId: $projectId) {
     createdAt
     description
     id
@@ -1686,7 +1686,7 @@ export const AgentDocument = /*#__PURE__*/ new TypedDocumentString(`
     }
     model
     name
-    appId
+    projectId
     owner {
       ...AgentOwnerFields
     }
@@ -1737,8 +1737,8 @@ fragment AgentOwnerFields on AgentOwnerSummary {
   name
 }`) as unknown as TypedDocumentString<AgentQuery, AgentQueryVariables>;
 export const AgentEditorStateDocument = /*#__PURE__*/ new TypedDocumentString(`
-    query AgentEditorState($agentId: ULID!, $appId: ULID!) {
-  agentEditorState(agentId: $agentId, appId: $appId) {
+    query AgentEditorState($agentId: ULID!, $projectId: ULID!) {
+  agentEditorState(agentId: $agentId, projectId: $projectId) {
     id
     builtInTools {
       enabled
@@ -1817,7 +1817,7 @@ export const UpdateAgentConfigDocument = /*#__PURE__*/ new TypedDocumentString(`
   }
   model
   name
-  appId
+  projectId
   prompt
   provider
   runtimeId
@@ -1846,8 +1846,8 @@ fragment AgentDeploymentVersionFields on AgentDeploymentVersion {
   versionNumber
 }`) as unknown as TypedDocumentString<UpdateAgentConfigMutation, UpdateAgentConfigMutationVariables>;
 export const AgentManifestDocument = /*#__PURE__*/ new TypedDocumentString(`
-    query AgentManifest($agentId: ULID!, $appId: ULID!) {
-  agentManifest(agentId: $agentId, appId: $appId) {
+    query AgentManifest($agentId: ULID!, $projectId: ULID!) {
+  agentManifest(agentId: $agentId, projectId: $projectId) {
     agentId
     json
     yaml
@@ -1855,8 +1855,8 @@ export const AgentManifestDocument = /*#__PURE__*/ new TypedDocumentString(`
 }
     `) as unknown as TypedDocumentString<AgentManifestQuery, AgentManifestQueryVariables>;
 export const ExportAgentPackageDocument = /*#__PURE__*/ new TypedDocumentString(`
-    query ExportAgentPackage($agentId: ULID!, $appId: ULID!) {
-  exportAgentPackage(agentId: $agentId, appId: $appId) {
+    query ExportAgentPackage($agentId: ULID!, $projectId: ULID!) {
+  exportAgentPackage(agentId: $agentId, projectId: $projectId) {
     agentId
     contentType
     fileId
@@ -1903,7 +1903,7 @@ export const ImportAgentPackageDocument = /*#__PURE__*/ new TypedDocumentString(
   }
   model
   name
-  appId
+  projectId
   prompt
   provider
   runtimeId
@@ -1968,7 +1968,7 @@ export const CreateAgentForkDocument = /*#__PURE__*/ new TypedDocumentString(`
   }
   model
   name
-  appId
+  projectId
   prompt
   provider
   runtimeId
@@ -2012,7 +2012,7 @@ export const PublishAgentDocument = /*#__PURE__*/ new TypedDocumentString(`
   }
   model
   name
-  appId
+  projectId
   prompt
   provider
   runtimeId
@@ -2041,8 +2041,8 @@ fragment AgentDeploymentVersionFields on AgentDeploymentVersion {
   versionNumber
 }`) as unknown as TypedDocumentString<PublishAgentMutation, PublishAgentMutationVariables>;
 export const UnpublishAgentDocument = /*#__PURE__*/ new TypedDocumentString(`
-    mutation UnpublishAgent($agentId: ULID!, $appId: ULID!) {
-  unpublishAgent(agentId: $agentId, appId: $appId) {
+    mutation UnpublishAgent($agentId: ULID!, $projectId: ULID!) {
+  unpublishAgent(agentId: $agentId, projectId: $projectId) {
     ...AgentFields
   }
 }
@@ -2056,7 +2056,7 @@ export const UnpublishAgentDocument = /*#__PURE__*/ new TypedDocumentString(`
   }
   model
   name
-  appId
+  projectId
   prompt
   provider
   runtimeId
@@ -2114,44 +2114,11 @@ export const ResetAgentStateDocument = /*#__PURE__*/ new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<ResetAgentStateMutation, ResetAgentStateMutationVariables>;
-export const AppListDocument = /*#__PURE__*/ new TypedDocumentString(`
-    query AppList($organizationId: ULID!) {
-  appList(organizationId: $organizationId) {
-    createdAt
-    defaultEnvironmentId
-    id
-    name
-    ownerAccountId
-  }
-}
-    `) as unknown as TypedDocumentString<AppListQuery, AppListQueryVariables>;
-export const CreateAppDocument = /*#__PURE__*/ new TypedDocumentString(`
-    mutation CreateApp($input: CreateAppInput!) {
-  createApp(input: $input) {
-    createdAt
-    defaultEnvironmentId
-    id
-    name
-    ownerAccountId
-  }
-}
-    `) as unknown as TypedDocumentString<CreateAppMutation, CreateAppMutationVariables>;
-export const RenameAppDocument = /*#__PURE__*/ new TypedDocumentString(`
-    mutation RenameApp($input: RenameAppInput!) {
-  renameApp(input: $input) {
-    createdAt
-    defaultEnvironmentId
-    id
-    name
-    ownerAccountId
-  }
-}
-    `) as unknown as TypedDocumentString<RenameAppMutation, RenameAppMutationVariables>;
-export const AppCostCardDocument = /*#__PURE__*/ new TypedDocumentString(`
-    query AppCostCard($appId: ULID!, $range: CostRange!, $runPurposes: [CostRunPurpose!]) {
-  appCostCard(appId: $appId, range: $range, runPurposes: $runPurposes) {
-    appId
-    appName
+export const ProjectCostCardDocument = /*#__PURE__*/ new TypedDocumentString(`
+    query ProjectCostCard($projectId: ULID!, $range: CostRange!, $runPurposes: [CostRunPurpose!]) {
+  projectCostCard(projectId: $projectId, range: $range, runPurposes: $runPurposes) {
+    projectId
+    projectName
     agents {
       ...CostAgentFields
     }
@@ -2245,11 +2212,11 @@ fragment CostRecentSessionFields on CostRecentSession {
   sessionId
   sessionRunId
   totalCostUsd
-}`) as unknown as TypedDocumentString<AppCostCardQuery, AppCostCardQueryVariables>;
+}`) as unknown as TypedDocumentString<ProjectCostCardQuery, ProjectCostCardQueryVariables>;
 export const AgentCostCardDocument = /*#__PURE__*/ new TypedDocumentString(`
-    query AgentCostCard($appId: ULID!, $agentId: ULID!, $range: CostRange!, $runPurposes: [CostRunPurpose!]) {
+    query AgentCostCard($projectId: ULID!, $agentId: ULID!, $range: CostRange!, $runPurposes: [CostRunPurpose!]) {
   agentCostCard(
-    appId: $appId
+    projectId: $projectId
     agentId: $agentId
     range: $range
     runPurposes: $runPurposes
@@ -2349,9 +2316,9 @@ fragment CostRecentSessionFields on CostRecentSession {
   sessionRunId
   totalCostUsd
 }`) as unknown as TypedDocumentString<AgentCostCardQuery, AgentCostCardQueryVariables>;
-export const AppEnvironmentsDocument = /*#__PURE__*/ new TypedDocumentString(`
-    query AppEnvironments($appId: ULID!) {
-  appEnvironmentList(appId: $appId) {
+export const ProjectEnvironmentsDocument = /*#__PURE__*/ new TypedDocumentString(`
+    query ProjectEnvironments($projectId: ULID!) {
+  projectEnvironmentList(projectId: $projectId) {
     ...EnvironmentSummaryFields
   }
 }
@@ -2402,11 +2369,11 @@ fragment EnvironmentSummaryFields on EnvironmentSummary {
   setupScript
   updatedAt
   usedByAgentCount
-  appId
-}`) as unknown as TypedDocumentString<AppEnvironmentsQuery, AppEnvironmentsQueryVariables>;
+  projectId
+}`) as unknown as TypedDocumentString<ProjectEnvironmentsQuery, ProjectEnvironmentsQueryVariables>;
 export const EnvironmentDetailDocument = /*#__PURE__*/ new TypedDocumentString(`
-    query EnvironmentDetail($appId: ULID!, $environmentId: ULID!) {
-  environment(appId: $appId, environmentId: $environmentId) {
+    query EnvironmentDetail($projectId: ULID!, $environmentId: ULID!) {
+  environment(projectId: $projectId, environmentId: $environmentId) {
     ...EnvironmentDetailFields
   }
 }
@@ -2457,7 +2424,7 @@ fragment EnvironmentDetailFields on EnvironmentDetail {
   setupScript
   updatedAt
   usedByAgentCount
-  appId
+  projectId
 }`) as unknown as TypedDocumentString<EnvironmentDetailQuery, EnvironmentDetailQueryVariables>;
 export const CreateEnvironmentDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation CreateEnvironment($input: CreateEnvironmentInput!) {
@@ -2512,7 +2479,7 @@ fragment EnvironmentSummaryFields on EnvironmentSummary {
   setupScript
   updatedAt
   usedByAgentCount
-  appId
+  projectId
 }`) as unknown as TypedDocumentString<CreateEnvironmentMutation, CreateEnvironmentMutationVariables>;
 export const UpdateEnvironmentDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation UpdateEnvironment($input: UpdateEnvironmentInput!) {
@@ -2567,7 +2534,7 @@ fragment EnvironmentDetailFields on EnvironmentDetail {
   setupScript
   updatedAt
   usedByAgentCount
-  appId
+  projectId
 }`) as unknown as TypedDocumentString<UpdateEnvironmentMutation, UpdateEnvironmentMutationVariables>;
 export const DeleteEnvironmentDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation DeleteEnvironment($input: DeleteEnvironmentInput!) {
@@ -2576,9 +2543,9 @@ export const DeleteEnvironmentDocument = /*#__PURE__*/ new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<DeleteEnvironmentMutation, DeleteEnvironmentMutationVariables>;
-export const SetAppDefaultEnvironmentDocument = /*#__PURE__*/ new TypedDocumentString(`
-    mutation SetAppDefaultEnvironment($input: SetAppDefaultEnvironmentInput!) {
-  setAppDefaultEnvironment(input: $input) {
+export const SetProjectDefaultEnvironmentDocument = /*#__PURE__*/ new TypedDocumentString(`
+    mutation SetProjectDefaultEnvironment($input: SetProjectDefaultEnvironmentInput!) {
+  setProjectDefaultEnvironment(input: $input) {
     ...EnvironmentSummaryFields
   }
 }
@@ -2629,8 +2596,8 @@ fragment EnvironmentSummaryFields on EnvironmentSummary {
   setupScript
   updatedAt
   usedByAgentCount
-  appId
-}`) as unknown as TypedDocumentString<SetAppDefaultEnvironmentMutation, SetAppDefaultEnvironmentMutationVariables>;
+  projectId
+}`) as unknown as TypedDocumentString<SetProjectDefaultEnvironmentMutation, SetProjectDefaultEnvironmentMutationVariables>;
 export const FileListDocument = /*#__PURE__*/ new TypedDocumentString(`
     query FileList($input: FileListInput!) {
   fileList(input: $input) {
@@ -2658,12 +2625,12 @@ export const FileListDocument = /*#__PURE__*/ new TypedDocumentString(`
 }
     `) as unknown as TypedDocumentString<FileListQuery, FileListQueryVariables>;
 export const McpRegistryDocument = /*#__PURE__*/ new TypedDocumentString(`
-    query McpRegistry($appId: ULID!) {
-  mcpRegistry(appId: $appId) {
+    query McpRegistry($projectId: ULID!) {
+  mcpRegistry(projectId: $projectId) {
     currentUserEmail
     currentUserId
     currentUserName
-    appId
+    projectId
     servers {
       ...McpServerFields
     }
@@ -2694,7 +2661,7 @@ fragment McpServerFields on McpServerWithCredential {
   name
   ownerId
   ownerName
-  appId
+  projectId
   source
   updatedAt
   url
@@ -2702,9 +2669,9 @@ fragment McpServerFields on McpServerWithCredential {
     ...McpCredentialFields
   }
 }`) as unknown as TypedDocumentString<McpRegistryQuery, McpRegistryQueryVariables>;
-export const CreateAppMcpServerDocument = /*#__PURE__*/ new TypedDocumentString(`
-    mutation CreateAppMcpServer($input: CreateAppMcpServerInput!) {
-  createAppMcpServer(input: $input) {
+export const CreateProjectMcpServerDocument = /*#__PURE__*/ new TypedDocumentString(`
+    mutation CreateProjectMcpServer($input: CreateProjectMcpServerInput!) {
+  createProjectMcpServer(input: $input) {
     ...McpServerFields
   }
 }
@@ -2733,14 +2700,14 @@ fragment McpServerFields on McpServerWithCredential {
   name
   ownerId
   ownerName
-  appId
+  projectId
   source
   updatedAt
   url
   credential {
     ...McpCredentialFields
   }
-}`) as unknown as TypedDocumentString<CreateAppMcpServerMutation, CreateAppMcpServerMutationVariables>;
+}`) as unknown as TypedDocumentString<CreateProjectMcpServerMutation, CreateProjectMcpServerMutationVariables>;
 export const ConnectMcpBearerDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation ConnectMcpBearer($input: ConnectMcpBearerInput!) {
   connectMcpBearer(input: $input) {
@@ -2772,7 +2739,7 @@ fragment McpServerFields on McpServerWithCredential {
   name
   ownerId
   ownerName
-  appId
+  projectId
   source
   updatedAt
   url
@@ -2781,8 +2748,8 @@ fragment McpServerFields on McpServerWithCredential {
   }
 }`) as unknown as TypedDocumentString<ConnectMcpBearerMutation, ConnectMcpBearerMutationVariables>;
 export const RevokeMcpCredentialDocument = /*#__PURE__*/ new TypedDocumentString(`
-    mutation RevokeMcpCredential($appId: ULID!, $serverId: ULID!) {
-  revokeMcpCredential(appId: $appId, serverId: $serverId) {
+    mutation RevokeMcpCredential($projectId: ULID!, $serverId: ULID!) {
+  revokeMcpCredential(projectId: $projectId, serverId: $serverId) {
     ...McpServerFields
   }
 }
@@ -2811,7 +2778,7 @@ fragment McpServerFields on McpServerWithCredential {
   name
   ownerId
   ownerName
-  appId
+  projectId
   source
   updatedAt
   url
@@ -2820,8 +2787,12 @@ fragment McpServerFields on McpServerWithCredential {
   }
 }`) as unknown as TypedDocumentString<RevokeMcpCredentialMutation, RevokeMcpCredentialMutationVariables>;
 export const SetMcpServerEnabledDocument = /*#__PURE__*/ new TypedDocumentString(`
-    mutation SetMcpServerEnabled($appId: ULID!, $serverId: ULID!, $enabled: Boolean!) {
-  setMcpServerEnabled(appId: $appId, serverId: $serverId, enabled: $enabled) {
+    mutation SetMcpServerEnabled($projectId: ULID!, $serverId: ULID!, $enabled: Boolean!) {
+  setMcpServerEnabled(
+    projectId: $projectId
+    serverId: $serverId
+    enabled: $enabled
+  ) {
     ...McpServerFields
   }
 }
@@ -2850,7 +2821,7 @@ fragment McpServerFields on McpServerWithCredential {
   name
   ownerId
   ownerName
-  appId
+  projectId
   source
   updatedAt
   url
@@ -2858,9 +2829,9 @@ fragment McpServerFields on McpServerWithCredential {
     ...McpCredentialFields
   }
 }`) as unknown as TypedDocumentString<SetMcpServerEnabledMutation, SetMcpServerEnabledMutationVariables>;
-export const UpdateAppMcpServerDocument = /*#__PURE__*/ new TypedDocumentString(`
-    mutation UpdateAppMcpServer($input: UpdateAppMcpServerInput!) {
-  updateAppMcpServer(input: $input) {
+export const UpdateProjectMcpServerDocument = /*#__PURE__*/ new TypedDocumentString(`
+    mutation UpdateProjectMcpServer($input: UpdateProjectMcpServerInput!) {
+  updateProjectMcpServer(input: $input) {
     ...McpServerFields
   }
 }
@@ -2889,17 +2860,17 @@ fragment McpServerFields on McpServerWithCredential {
   name
   ownerId
   ownerName
-  appId
+  projectId
   source
   updatedAt
   url
   credential {
     ...McpCredentialFields
   }
-}`) as unknown as TypedDocumentString<UpdateAppMcpServerMutation, UpdateAppMcpServerMutationVariables>;
+}`) as unknown as TypedDocumentString<UpdateProjectMcpServerMutation, UpdateProjectMcpServerMutationVariables>;
 export const DeleteMcpServerDocument = /*#__PURE__*/ new TypedDocumentString(`
-    mutation DeleteMcpServer($appId: ULID!, $serverId: ULID!) {
-  deleteMcpServer(appId: $appId, serverId: $serverId) {
+    mutation DeleteMcpServer($projectId: ULID!, $serverId: ULID!) {
+  deleteMcpServer(projectId: $projectId, serverId: $serverId) {
     ok
   }
 }
@@ -2947,9 +2918,42 @@ export const RenameOrganizationDocument = /*#__PURE__*/ new TypedDocumentString(
   }
 }
     `) as unknown as TypedDocumentString<RenameOrganizationMutation, RenameOrganizationMutationVariables>;
+export const ProjectListDocument = /*#__PURE__*/ new TypedDocumentString(`
+    query ProjectList($organizationId: ULID!) {
+  projectList(organizationId: $organizationId) {
+    createdAt
+    defaultEnvironmentId
+    id
+    name
+    ownerAccountId
+  }
+}
+    `) as unknown as TypedDocumentString<ProjectListQuery, ProjectListQueryVariables>;
+export const CreateProjectDocument = /*#__PURE__*/ new TypedDocumentString(`
+    mutation CreateProject($input: CreateProjectInput!) {
+  createProject(input: $input) {
+    createdAt
+    defaultEnvironmentId
+    id
+    name
+    ownerAccountId
+  }
+}
+    `) as unknown as TypedDocumentString<CreateProjectMutation, CreateProjectMutationVariables>;
+export const RenameProjectDocument = /*#__PURE__*/ new TypedDocumentString(`
+    mutation RenameProject($input: RenameProjectInput!) {
+  renameProject(input: $input) {
+    createdAt
+    defaultEnvironmentId
+    id
+    name
+    ownerAccountId
+  }
+}
+    `) as unknown as TypedDocumentString<RenameProjectMutation, RenameProjectMutationVariables>;
 export const ThreadAgentSessionRetrieveDocument = /*#__PURE__*/ new TypedDocumentString(`
-    query ThreadAgentSessionRetrieve($appId: ULID!, $sessionId: ULID!) {
-  threadAgentSessionRetrieve(appId: $appId, sessionId: $sessionId) {
+    query ThreadAgentSessionRetrieve($projectId: ULID!, $sessionId: ULID!) {
+  threadAgentSessionRetrieve(projectId: $projectId, sessionId: $sessionId) {
     capabilities {
       action
       reason
@@ -2990,7 +2994,7 @@ export const ThreadAgentSessionRetrieveDocument = /*#__PURE__*/ new TypedDocumen
       }
       model
       provider
-      appId
+      projectId
       runtimeId
       status
       title
@@ -3000,8 +3004,8 @@ export const ThreadAgentSessionRetrieveDocument = /*#__PURE__*/ new TypedDocumen
 }
     `) as unknown as TypedDocumentString<ThreadAgentSessionRetrieveQuery, ThreadAgentSessionRetrieveQueryVariables>;
 export const AgentSessionDiagnosticsDocument = /*#__PURE__*/ new TypedDocumentString(`
-    query AgentSessionDiagnostics($appId: ULID!, $sessionId: ULID!) {
-  agentSessionDiagnostics(appId: $appId, sessionId: $sessionId) {
+    query AgentSessionDiagnostics($projectId: ULID!, $sessionId: ULID!) {
+  agentSessionDiagnostics(projectId: $projectId, sessionId: $sessionId) {
     execution {
       binding {
         deploymentVersionId
@@ -3085,7 +3089,7 @@ export const CreateAgentSessionDocument = /*#__PURE__*/ new TypedDocumentString(
     }
     model
     provider
-    appId
+    projectId
     runtimeId
     status
     title
@@ -3095,12 +3099,12 @@ export const CreateAgentSessionDocument = /*#__PURE__*/ new TypedDocumentString(
 }
     `) as unknown as TypedDocumentString<CreateAgentSessionMutation, CreateAgentSessionMutationVariables>;
 export const AgentSessionListDocument = /*#__PURE__*/ new TypedDocumentString(`
-    query AgentSessionList($agentId: ULID!, $archived: Boolean, $participantOnly: Boolean, $appId: ULID!, $type: SessionType) {
+    query AgentSessionList($agentId: ULID!, $archived: Boolean, $participantOnly: Boolean, $projectId: ULID!, $type: SessionType) {
   agentSessionList(
     agentId: $agentId
     archived: $archived
     participantOnly: $participantOnly
-    appId: $appId
+    projectId: $projectId
     type: $type
   ) {
     nodes {
@@ -3134,7 +3138,7 @@ export const AgentSessionListDocument = /*#__PURE__*/ new TypedDocumentString(`
       }
       model
       provider
-      appId
+      projectId
       runtimeId
       status
       title
@@ -3145,8 +3149,12 @@ export const AgentSessionListDocument = /*#__PURE__*/ new TypedDocumentString(`
 }
     `) as unknown as TypedDocumentString<AgentSessionListQuery, AgentSessionListQueryVariables>;
 export const AgentSessionProcessEventsDocument = /*#__PURE__*/ new TypedDocumentString(`
-    query AgentSessionProcessEvents($limit: Int!, $appId: ULID!, $sessionId: ULID!) {
-  sessionProcessEvents(limit: $limit, appId: $appId, sessionId: $sessionId) {
+    query AgentSessionProcessEvents($limit: Int!, $projectId: ULID!, $sessionId: ULID!) {
+  sessionProcessEvents(
+    limit: $limit
+    projectId: $projectId
+    sessionId: $sessionId
+  ) {
     content
     durationMs
     id
@@ -3158,8 +3166,8 @@ export const AgentSessionProcessEventsDocument = /*#__PURE__*/ new TypedDocument
 }
     `) as unknown as TypedDocumentString<AgentSessionProcessEventsQuery, AgentSessionProcessEventsQueryVariables>;
 export const ThreadSessionMessagesDocument = /*#__PURE__*/ new TypedDocumentString(`
-    query ThreadSessionMessages($appId: ULID!, $sessionId: ULID!) {
-  threadSessionMessages(appId: $appId, sessionId: $sessionId) {
+    query ThreadSessionMessages($projectId: ULID!, $sessionId: ULID!) {
+  threadSessionMessages(projectId: $projectId, sessionId: $sessionId) {
     content
     createdAt
     createdBy
@@ -3183,8 +3191,12 @@ export const ThreadSessionMessagesDocument = /*#__PURE__*/ new TypedDocumentStri
 }
     `) as unknown as TypedDocumentString<ThreadSessionMessagesQuery, ThreadSessionMessagesQueryVariables>;
 export const SendAgentSessionEventsDocument = /*#__PURE__*/ new TypedDocumentString(`
-    mutation SendAgentSessionEvents($appId: ULID!, $sessionId: ULID!, $events: [AgentSessionEventInput!]!) {
-  sendAgentSessionEvents(appId: $appId, sessionId: $sessionId, events: $events) {
+    mutation SendAgentSessionEvents($projectId: ULID!, $sessionId: ULID!, $events: [AgentSessionEventInput!]!) {
+  sendAgentSessionEvents(
+    projectId: $projectId
+    sessionId: $sessionId
+    events: $events
+  ) {
     acceptedAt
     warnings {
       code
@@ -3194,17 +3206,17 @@ export const SendAgentSessionEventsDocument = /*#__PURE__*/ new TypedDocumentStr
 }
     `) as unknown as TypedDocumentString<SendAgentSessionEventsMutation, SendAgentSessionEventsMutationVariables>;
 export const PrewarmAgentSessionDocument = /*#__PURE__*/ new TypedDocumentString(`
-    mutation PrewarmAgentSession($appId: ULID!, $sessionId: ULID!) {
-  prewarmAgentSession(appId: $appId, sessionId: $sessionId) {
+    mutation PrewarmAgentSession($projectId: ULID!, $sessionId: ULID!) {
+  prewarmAgentSession(projectId: $projectId, sessionId: $sessionId) {
     scheduledAt
     sessionId
   }
 }
     `) as unknown as TypedDocumentString<PrewarmAgentSessionMutation, PrewarmAgentSessionMutationVariables>;
 export const ThreadAgentSessionListDocument = /*#__PURE__*/ new TypedDocumentString(`
-    query ThreadAgentSessionList($appId: ULID!, $archived: Boolean, $beforeCursor: String, $type: SessionType) {
+    query ThreadAgentSessionList($projectId: ULID!, $archived: Boolean, $beforeCursor: String, $type: SessionType) {
   threadAgentSessionList(
-    appId: $appId
+    projectId: $projectId
     archived: $archived
     beforeCursor: $beforeCursor
     type: $type
@@ -3246,7 +3258,7 @@ export const ThreadAgentSessionListDocument = /*#__PURE__*/ new TypedDocumentStr
         }
         model
         provider
-        appId
+        projectId
         runtimeId
         status
         title
@@ -3269,22 +3281,22 @@ export const AutoTitleSessionDocument = /*#__PURE__*/ new TypedDocumentString(`
 }
     `) as unknown as TypedDocumentString<AutoTitleSessionMutation, AutoTitleSessionMutationVariables>;
 export const ArchiveSessionDocument = /*#__PURE__*/ new TypedDocumentString(`
-    mutation ArchiveSession($appId: ULID!, $sessionId: ULID!) {
-  archiveAgentSession(appId: $appId, sessionId: $sessionId) {
+    mutation ArchiveSession($projectId: ULID!, $sessionId: ULID!) {
+  archiveAgentSession(projectId: $projectId, sessionId: $sessionId) {
     ok
   }
 }
     `) as unknown as TypedDocumentString<ArchiveSessionMutation, ArchiveSessionMutationVariables>;
 export const RestoreSessionDocument = /*#__PURE__*/ new TypedDocumentString(`
-    mutation RestoreSession($appId: ULID!, $sessionId: ULID!) {
-  unarchiveAgentSession(appId: $appId, sessionId: $sessionId) {
+    mutation RestoreSession($projectId: ULID!, $sessionId: ULID!) {
+  unarchiveAgentSession(projectId: $projectId, sessionId: $sessionId) {
     ok
   }
 }
     `) as unknown as TypedDocumentString<RestoreSessionMutation, RestoreSessionMutationVariables>;
 export const DeleteAgentSessionDocument = /*#__PURE__*/ new TypedDocumentString(`
-    mutation DeleteAgentSession($appId: ULID!, $sessionId: ULID!) {
-  deleteAgentSession(appId: $appId, sessionId: $sessionId) {
+    mutation DeleteAgentSession($projectId: ULID!, $sessionId: ULID!) {
+  deleteAgentSession(projectId: $projectId, sessionId: $sessionId) {
     ok
   }
 }
@@ -3304,8 +3316,12 @@ export const AddSessionResourceDocument = /*#__PURE__*/ new TypedDocumentString(
 }
     `) as unknown as TypedDocumentString<AddSessionResourceMutation, AddSessionResourceMutationVariables>;
 export const SessionProcessEventsDocument = /*#__PURE__*/ new TypedDocumentString(`
-    query SessionProcessEvents($limit: Int!, $appId: ULID!, $sessionId: ULID!) {
-  threadSessionProcessEvents(limit: $limit, appId: $appId, sessionId: $sessionId) {
+    query SessionProcessEvents($limit: Int!, $projectId: ULID!, $sessionId: ULID!) {
+  threadSessionProcessEvents(
+    limit: $limit
+    projectId: $projectId
+    sessionId: $sessionId
+  ) {
     content
     durationMs
     id
@@ -3317,8 +3333,8 @@ export const SessionProcessEventsDocument = /*#__PURE__*/ new TypedDocumentStrin
 }
     `) as unknown as TypedDocumentString<SessionProcessEventsQuery, SessionProcessEventsQueryVariables>;
 export const SkillDetailDocument = /*#__PURE__*/ new TypedDocumentString(`
-    query SkillDetail($appId: ULID!, $skillId: ULID!) {
-  skillDetail(appId: $appId, skillId: $skillId) {
+    query SkillDetail($projectId: ULID!, $skillId: ULID!) {
+  skillDetail(projectId: $projectId, skillId: $skillId) {
     ...SkillDetailFields
   }
 }
@@ -3336,7 +3352,7 @@ export const SkillDetailDocument = /*#__PURE__*/ new TypedDocumentString(`
   name
   ownerId
   ownerName
-  appId
+  projectId
   snapshotId
   sourceKind
   updatedAt
@@ -3364,9 +3380,9 @@ export const SkillDetailDocument = /*#__PURE__*/ new TypedDocumentString(`
     size
   }
 }`) as unknown as TypedDocumentString<SkillDetailQuery, SkillDetailQueryVariables>;
-export const AppSkillsDocument = /*#__PURE__*/ new TypedDocumentString(`
-    query AppSkills($appId: ULID!) {
-  appSkillList(appId: $appId) {
+export const ProjectSkillsDocument = /*#__PURE__*/ new TypedDocumentString(`
+    query ProjectSkills($projectId: ULID!) {
+  projectSkillList(projectId: $projectId) {
     ...SkillSummaryFields
   }
 }
@@ -3384,11 +3400,11 @@ export const AppSkillsDocument = /*#__PURE__*/ new TypedDocumentString(`
   name
   ownerId
   ownerName
-  appId
+  projectId
   snapshotId
   sourceKind
   updatedAt
-}`) as unknown as TypedDocumentString<AppSkillsQuery, AppSkillsQueryVariables>;
+}`) as unknown as TypedDocumentString<ProjectSkillsQuery, ProjectSkillsQueryVariables>;
 export const CreateSkillForkDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation CreateSkillFork($input: CreateSkillForkInput!) {
   createSkillFork(input: $input) {
@@ -3409,14 +3425,14 @@ export const CreateSkillForkDocument = /*#__PURE__*/ new TypedDocumentString(`
   name
   ownerId
   ownerName
-  appId
+  projectId
   snapshotId
   sourceKind
   updatedAt
 }`) as unknown as TypedDocumentString<CreateSkillForkMutation, CreateSkillForkMutationVariables>;
 export const DeleteOwnedSkillDocument = /*#__PURE__*/ new TypedDocumentString(`
-    mutation DeleteOwnedSkill($appId: ULID!, $skillId: ULID!) {
-  deleteOwnedSkill(appId: $appId, skillId: $skillId) {
+    mutation DeleteOwnedSkill($projectId: ULID!, $skillId: ULID!) {
+  deleteOwnedSkill(projectId: $projectId, skillId: $skillId) {
     ok
   }
 }
@@ -3462,15 +3478,15 @@ export const UpdateProfileDocument = /*#__PURE__*/ new TypedDocumentString(`
 }
     `) as unknown as TypedDocumentString<UpdateProfileMutation, UpdateProfileMutationVariables>;
 export const VendorCredentialListDocument = /*#__PURE__*/ new TypedDocumentString(`
-    query VendorCredentialList($appId: ULID!) {
-  vendorCredentialList(appId: $appId) {
+    query VendorCredentialList($projectId: ULID!) {
+  vendorCredentialList(projectId: $projectId) {
     apiBase
     id
     isDefault
     maskedApiKey
     models
     name
-    appId
+    projectId
     vendorId
   }
 }
@@ -3484,7 +3500,7 @@ export const CreateVendorCredentialDocument = /*#__PURE__*/ new TypedDocumentStr
     maskedApiKey
     models
     name
-    appId
+    projectId
     vendorId
   }
 }
@@ -3498,7 +3514,7 @@ export const UpdateVendorCredentialDocument = /*#__PURE__*/ new TypedDocumentStr
     maskedApiKey
     models
     name
-    appId
+    projectId
     vendorId
   }
 }
@@ -3519,15 +3535,15 @@ export const SetDefaultVendorCredentialDocument = /*#__PURE__*/ new TypedDocumen
     maskedApiKey
     models
     name
-    appId
+    projectId
     vendorId
   }
 }
     `) as unknown as TypedDocumentString<SetDefaultVendorCredentialMutation, SetDefaultVendorCredentialMutationVariables>;
 export const AvailableAgentModelsDocument = /*#__PURE__*/ new TypedDocumentString(`
-    query AvailableAgentModels($appId: ULID!, $runtimeId: String!, $currentModelId: String, $currentVendorId: String) {
+    query AvailableAgentModels($projectId: ULID!, $runtimeId: String!, $currentModelId: String, $currentVendorId: String) {
   availableAgentModels(
-    appId: $appId
+    projectId: $projectId
     runtimeId: $runtimeId
     currentModelId: $currentModelId
     currentVendorId: $currentVendorId

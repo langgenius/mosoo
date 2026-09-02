@@ -26,7 +26,7 @@ mosoo's wedge is the managed coding-agent runtime and Agent API. It is not an AI
 
 ### Evidence status
 
-- The current repository implements normalized runtime adapters, isolated Sandbox execution, durable Threads, Runs, events, files, Agent versions, and an App-owner API.
+- The current repository implements normalized runtime adapters, isolated Sandbox execution, durable Threads, Runs, events, files, Agent versions, and a Project-owner API.
 - Existing coding-agent tools solve local execution but leave product developers responsible for runtime integration and lifecycle infrastructure.
 - mosoo has not yet proved production reliability, external adoption, or willingness to pay. Alpha validates the product hypothesis; it is not evidence of product-market fit.
 
@@ -40,13 +40,13 @@ The Builder's job is:
 
 > Make a coding Agent callable and operable from a product backend without owning its Sandbox, runtime adapters, durable work history, file pipeline, event stream, or usage instrumentation.
 
-### App Owner
+### Project Owner
 
-The App Owner is the Builder responsible for the mosoo App and its Agents. In Alpha, one mosoo Account owns an App. Team ownership, roles, invitations, and transfer are later extensions.
+The Project Owner is the Builder responsible for the mosoo Project and its Agents. In Alpha, one mosoo Account owns a Project. Team ownership, roles, invitations, and transfer are later extensions.
 
 ### End User
 
-An End User may trigger Agent work through the Builder's product. The Builder's trusted backend authenticates that person and supplies an opaque `userId` when creating a public Thread. mosoo does not authenticate the End User; it carries the immutable `(App, userId)` context across the Thread, its Runs, files, and delegated MCP calls.
+An End User may trigger Agent work through the Builder's product. The Builder's trusted backend authenticates that person and supplies an opaque `userId` when creating a public Thread. mosoo does not authenticate the End User; it carries the immutable `(Project, userId)` context across the Thread, its Runs, files, and delegated MCP calls.
 
 ### mosoo Account
 
@@ -60,7 +60,7 @@ A mosoo Account authenticates the Builder to the mosoo control plane. It is neve
 4. **A Thread is the durable work boundary.** Messages, Runs, public events, and managed files remain addressable across individual executions.
 5. **A Run is one observable execution.** Console and API entry points produce the same lifecycle records.
 6. **Sandbox state is explicit.** Temporary execution state is not confused with durable Threads, files, Agent configuration, or bounded Assistant continuity.
-7. **The public API is backend-to-backend.** App-owner tokens stay on trusted servers; the backend supplies `userId`, while mosoo does not claim App User authentication.
+7. **The public API is backend-to-backend.** Project-owner tokens stay on trusted servers; the backend supplies `userId`, while mosoo does not claim Project User authentication.
 8. **High-impact side effects are mediated.** Permission requests and confirmation gates are enforceable runtime boundaries, not prompt conventions.
 9. **Usage is observable, not billing truth.** Recorded model usage supports operational decisions without pretending to replace provider invoices.
 10. **Do not broaden the product to hide missing proof.** Broad provider matrices, governance, and recovery become promises only after their user-visible paths are proven.

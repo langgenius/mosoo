@@ -15,7 +15,7 @@ import {
   runViewerPermissionCleanupAlarm,
   scheduleViewerPermissionCleanupAlarm,
 } from "./viewer-permission-cleanup";
-import { isViewerSocketAttachment } from "./viewer-socket";
+import { normalizeViewerSocketAttachment } from "./viewer-socket";
 import type { SessionSocketAttachment, ViewerSocketAttachment } from "./viewer-socket";
 import { buildViewerBroadcastFrames } from "./viewer-socket-broadcast";
 import {
@@ -38,7 +38,7 @@ interface SessionViewerSocketHubOptions {
 
 function getSocketAttachment(ws: WebSocket): SessionSocketAttachment | null {
   const attachment: unknown = ws.deserializeAttachment();
-  return isViewerSocketAttachment(attachment) ? attachment : null;
+  return normalizeViewerSocketAttachment(attachment);
 }
 
 export class SessionViewerSocketHub {

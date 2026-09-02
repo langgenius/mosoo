@@ -2,9 +2,9 @@ import { useQuery } from "@tanstack/react-query";
 import { BarChart3 } from "lucide-react";
 import { useState } from "react";
 
-import { fetchAppCost } from "@/domains/cost/api/cost-client";
+import { fetchProjectCost } from "@/domains/cost/api/cost-client";
 import type { CostRunPurpose } from "@/domains/cost/api/cost-client";
-import { toAppId } from "@/routes/typed-id";
+import { toProjectId } from "@/routes/typed-id";
 import { useTranslation } from "@/shared/i18n";
 
 import { useAppSession } from "../../app/session-provider";
@@ -18,22 +18,23 @@ import { CostTabBar } from "./cost-tab-bar";
 
 export function CostPage() {
   const { t } = useTranslation();
-  const { activeApp, appsLoading } = useAppSession();
+  const { activeProject, projectsLoading } = useAppSession();
   const [range, setRange] = useState<CostRange>("30d");
   const [activeTab, setActiveTab] = useState<CostTab>("overview");
   const [agentSort, setAgentSort] = useState<AgentCostSort>("cost_desc");
   const [runPurpose, setRunPurpose] = useState<CostRunPurpose | "all">("all");
   const runPurposes = runPurposeToQuery(runPurpose);
   const { data: card, isLoading } = useQuery({
-    enabled: activeApp !== null,
-    queryFn: async () => fetchAppCost(toAppId(activeApp!.id), rangeToInput(range), runPurposes),
-    queryKey: ["cost", "app-card", activeApp?.id, range, runPurpose],
+    enabled: activeProject !== null,
+    queryFn: async () =>
+      fetchProjectCost(toProjectId(activeProject!.id), rangeToInput(range), runPurposes),
+    queryKey: ["cost", "project-card", activeProject?.id, range, runPurpose],
   });
 
-  if (!activeApp) {
+  if (!activeProject) {
     return (
       <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
-        {appsLoading ? t("common.loadingApp") : t("common.noApp")}
+        {projectsLoading ? t("common.loadingProject") : t("common.noProject")}
       </div>
     );
   }

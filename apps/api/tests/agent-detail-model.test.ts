@@ -30,7 +30,7 @@ const AGENT_ROW: AgentRow = {
   model: "gpt-5.4",
   name: "Agent",
   ownerId: "01J00000000000000000000001",
-  appId: "01J0000000000000000000000P",
+  projectId: "01J0000000000000000000000P",
   prompt: "Private prompt",
   provider: "openai",
   runtimeId: "openai-runtime",
@@ -70,7 +70,7 @@ function createAgentDetailModelDatabase(
 
     CREATE TABLE agent (
       id text PRIMARY KEY NOT NULL,
-      app_id text NOT NULL
+      project_id text NOT NULL
     );
 
     CREATE TABLE agent_deployment_version (
@@ -101,7 +101,7 @@ function createAgentDetailModelDatabase(
       id text PRIMARY KEY NOT NULL,
       name text NOT NULL,
       owner_account_id text NOT NULL,
-      app_id text NOT NULL
+      project_id text NOT NULL
     );
 
     CREATE TABLE agent_mcp_binding (
@@ -116,13 +116,13 @@ function createAgentDetailModelDatabase(
       id text PRIMARY KEY NOT NULL,
       icon_url text,
       name text NOT NULL,
-      app_id text NOT NULL
+      project_id text NOT NULL
     );
 
     INSERT INTO account (id, image_url, name)
     VALUES ('01J00000000000000000000001', NULL, 'Owner');
 
-    INSERT INTO agent (id, app_id)
+    INSERT INTO agent (id, project_id)
     VALUES ('01J00000000000000000000009', '01J0000000000000000000000P');
 
     INSERT INTO agent_deployment_version (
@@ -176,7 +176,7 @@ describe("agent detail model", () => {
     expect(detail.model).toBe("gpt-5.4");
   });
 
-  test("apps runtime model fields from admitted identity values", async () => {
+  test("projects runtime model fields from admitted identity values", async () => {
     const database = createAgentDetailModelDatabase({
       deploymentModel: " gpt-5.4 ",
       deploymentProvider: " openai ",

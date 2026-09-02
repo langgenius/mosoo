@@ -7,6 +7,7 @@ const ISSUER = "mosoo";
 const LIFETIME_SECONDS = 60;
 
 export interface RuntimeMcpDelegationClaims {
+  // app_id is a frozen v1 wire claim consumed by external MCP servers.
   act: { agent_id: string; app_id: string };
   aud: string;
   exp: number;
@@ -24,7 +25,7 @@ interface DelegationInput {
   audience: string;
   claims: {
     agentId: string;
-    appId: string;
+    projectId: string;
     runId: string | null;
     threadId: string;
     endUserId: string;
@@ -45,7 +46,7 @@ async function signingKey(accessToken: string, usage: KeyUsage): Promise<CryptoK
 export async function createRuntimeMcpDelegationToken(input: DelegationInput): Promise<string> {
   const now = Math.floor((input.nowMs ?? Date.now()) / 1000);
   const claims: RuntimeMcpDelegationClaims = {
-    act: { agent_id: input.claims.agentId, app_id: input.claims.appId },
+    act: { agent_id: input.claims.agentId, app_id: input.claims.projectId },
     aud: input.audience,
     exp: now + LIFETIME_SECONDS,
     iat: now,

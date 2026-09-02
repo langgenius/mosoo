@@ -1,14 +1,14 @@
 import type { SkillSummary } from "@mosoo/contracts/skill";
 import { skillsTable } from "@mosoo/db";
 import { createPlatformId } from "@mosoo/id";
-import type { AppId, SkillId } from "@mosoo/id";
+import type { ProjectId, SkillId } from "@mosoo/id";
 import { eq } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../time";
-import { ensureAppOwnership } from "../../apps/application/app.service";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
+import { ensureProjectOwnership } from "../../projects/application/project.service";
 import { ensureSkillEditor } from "./skill-access.service";
 import { publishSkillSnapshot } from "./skill-package-snapshot.service";
 import type { InspectSkillInput } from "./skill-package.shared";
@@ -17,12 +17,12 @@ import { getSkillSummary } from "./skill-query.service";
 export async function createSkillFromUpload(
   bindings: ApiBindings,
   viewer: AuthenticatedViewer,
-  appId: AppId,
+  projectId: ProjectId,
   input: InspectSkillInput,
 ): Promise<SkillSummary> {
   const viewerId = viewer.id;
-  await ensureAppOwnership(bindings.DB, viewerId, appId);
-  const published = await publishSkillSnapshot(bindings, { appId }, input);
+  await ensureProjectOwnership(bindings.DB, viewerId, projectId);
+  const published = await publishSkillSnapshot(bindings, { projectId }, input);
   const timestampMs = currentTimestampMs();
   const skillId = createPlatformId<SkillId>();
 
@@ -36,26 +36,26 @@ export async function createSkillFromUpload(
       id: skillId,
       name: published.snapshot.name,
       ownerAccountId: viewerId,
-      appId,
+      projectId,
       sourceKind: "user",
       updatedAt: timestampMs,
       version: published.snapshot.version,
     })
     .run();
 
-  return getSkillSummary(bindings.DB, viewer, appId, skillId);
+  return getSkillSummary(bindings.DB, viewer, projectId, skillId);
 }
 
 export async function updateOwnedSkillPackage(
   bindings: ApiBindings,
   viewer: AuthenticatedViewer,
-  appId: AppId,
+  projectId: ProjectId,
   skillId: SkillId,
   input: InspectSkillInput,
 ): Promise<SkillSummary> {
   const viewerId = viewer.id;
-  await ensureSkillEditor(bindings.DB, viewerId, appId, skillId);
-  const published = await publishSkillSnapshot(bindings, { appId }, input);
+  await ensureSkillEditor(bindings.DB, viewerId, projectId, skillId);
+  const published = await publishSkillSnapshot(bindings, { projectId }, input);
   const timestampMs = currentTimestampMs();
 
   await getAppDatabase(bindings.DB)
@@ -71,5 +71,5 @@ export async function updateOwnedSkillPackage(
     .where(eq(skillsTable.id, skillId))
     .run();
 
-  return getSkillSummary(bindings.DB, viewer, appId, skillId);
+  return getSkillSummary(bindings.DB, viewer, projectId, skillId);
 }

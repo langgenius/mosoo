@@ -58,7 +58,7 @@ export function toDriverInstanceMcpGrantRecord(
       "credentialId" in server
         ? parsePlatformId<CredentialId>(server.credentialId, "MCP credential id")
         : null,
-    appId: server.appId,
+    projectId: server.projectId,
     serverId: parsePlatformId<McpServerId>(server.serverId, "MCP server id"),
   };
 }
@@ -83,7 +83,7 @@ async function withRuntimeMcpProxy(
       credentialScope: server.credentialScope,
       credentialStatus: server.credentialStatus,
       name: server.name,
-      appId: server.appId,
+      projectId: server.projectId,
       serverId,
       subjectLabel: server.subjectLabel ?? null,
     };
@@ -98,7 +98,7 @@ async function withRuntimeMcpProxy(
     credentialScope: server.credentialScope,
     credentialStatus: "active",
     name: server.name,
-    appId: server.appId,
+    projectId: server.projectId,
     proxyGrantId: await createRuntimeActionToken(context.bindings, {
       action: "mcp_proxy",
       driverInstanceId: context.driverInstanceId,

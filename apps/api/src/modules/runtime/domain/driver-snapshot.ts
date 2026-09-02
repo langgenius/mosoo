@@ -22,7 +22,7 @@ import type {
   EnvironmentRevisionId,
   McpServerId,
   PlatformId,
-  AppId,
+  ProjectId,
   SandboxId,
   SandboxSessionId,
   SessionId,
@@ -77,14 +77,14 @@ export type DriverPermissionPolicy = "full_access" | "supervised";
 export const DEFAULT_DRIVER_PERMISSION_POLICY = "full_access" satisfies DriverPermissionPolicy;
 
 /**
- * Reference to the app-scoped vendor credential that powers the runtime.
+ * Reference to the project-scoped vendor credential that powers the runtime.
  * Deliberately excludes the API key itself: raw provider secrets stay in the
  * Worker control plane and reach the upstream vendor only through the
  * driver-bound LLM proxy route, never through sandbox env vars or files.
  */
 export interface DriverVendorCredentialProfile {
   readonly apiBase: string | null;
-  readonly appId: AppId;
+  readonly projectId: ProjectId;
   readonly credentialId: VendorCredentialId;
   readonly models: readonly string[] | null;
   readonly vendorId: string;
@@ -166,7 +166,7 @@ export interface AuthorizedDriverResolvedMcpServer {
   readonly credentialScope: McpCredentialScope;
   readonly credentialStatus: ActiveMcpCredentialStatus;
   readonly name: string;
-  readonly appId: AppId;
+  readonly projectId: ProjectId;
   readonly serverId: McpServerId;
   readonly subjectLabel?: string | null | undefined;
 }
@@ -177,7 +177,7 @@ export interface UnavailableDriverResolvedMcpServer {
   readonly credentialScope: McpCredentialScope;
   readonly credentialStatus: UnavailableMcpCredentialStatus;
   readonly name: string;
-  readonly appId: AppId;
+  readonly projectId: ProjectId;
   readonly serverId: McpServerId;
   readonly subjectLabel?: string | null | undefined;
 }

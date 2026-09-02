@@ -9,11 +9,11 @@ import type {
   FileSessionKind,
 } from "@mosoo/contracts/file";
 import { parsePlatformId } from "@mosoo/id";
-import type { AccountId, AppId, FileId } from "@mosoo/id";
+import type { AccountId, ProjectId, FileId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
-import { ensureAppOwnership } from "../../apps/application/app.service";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
+import { ensureProjectOwnership } from "../../projects/application/project.service";
 import { createFileInvalidRequestError } from "./file-errors";
 import {
   createAccountAvatarPath,
@@ -22,7 +22,7 @@ import {
   normalizeFileName,
   normalizeLibraryFilePath,
 } from "./file-paths";
-import { ensureAppSessionFileAccess } from "./session-file-ownership";
+import { ensureProjectSessionFileAccess } from "./session-file-ownership";
 
 type FileUploadTarget = CreateFileUploadRequest["target"];
 type FileUploadTargetKind = FileUploadTarget["kind"];
@@ -149,8 +149,8 @@ const libraryDescriptor = defineFileScopeDescriptor({
   uploadPurpose: "library_file",
   async resolveUploadTargetContext({ bindings, target, viewer }) {
     const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
-    const scopeId: AppId = parsePlatformId(target.id, "upload library app ID");
-    await ensureAppOwnership(bindings.DB, viewerId, scopeId);
+    const scopeId: ProjectId = parsePlatformId(target.id, "upload library project ID");
+    await ensureProjectOwnership(bindings.DB, viewerId, scopeId);
 
     const logicalPath = normalizeLibraryFilePath(target.path);
     const fileName = logicalPath.split("/").pop() ?? logicalPath;
@@ -180,9 +180,9 @@ const sessionDescriptor = defineFileScopeDescriptor({
   uploadPurpose: "session_attachment",
   async resolveUploadTargetContext({ bindings, fileId, target, viewer }) {
     const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
-    const appId: AppId = parsePlatformId(target.appId, "upload session app ID");
-    await ensureAppSessionFileAccess(bindings.DB, viewerId, {
-      appId,
+    const projectId: ProjectId = parsePlatformId(target.projectId, "upload session project ID");
+    await ensureProjectSessionFileAccess(bindings.DB, viewerId, {
+      projectId,
       sessionId: target.id,
     });
 
@@ -214,8 +214,8 @@ const agentPackageDescriptor = defineFileScopeDescriptor({
   uploadPurpose: "agent_package",
   async resolveUploadTargetContext({ bindings, fileId, target, viewer }) {
     const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
-    const scopeId: AppId = parsePlatformId(target.id, "upload agent package app ID");
-    await ensureAppOwnership(bindings.DB, viewerId, scopeId);
+    const scopeId: ProjectId = parsePlatformId(target.id, "upload agent package project ID");
+    await ensureProjectOwnership(bindings.DB, viewerId, scopeId);
 
     const name = normalizeFileName(target.name);
     const logicalPath = createAttachmentPath(fileId, name);
@@ -233,7 +233,7 @@ const agentPackageDescriptor = defineFileScopeDescriptor({
   },
 });
 
-const appDraftDescriptor = defineFileScopeDescriptor({
+const projectDraftDescriptor = defineFileScopeDescriptor({
   capabilities: {
     moveRename: {
       enabled: false,
@@ -245,8 +245,8 @@ const appDraftDescriptor = defineFileScopeDescriptor({
   uploadPurpose: "app_draft",
   async resolveUploadTargetContext({ bindings, fileId, target, viewer }) {
     const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
-    const scopeId: AppId = parsePlatformId(target.id, "upload app draft app ID");
-    await ensureAppOwnership(bindings.DB, viewerId, scopeId);
+    const scopeId: ProjectId = parsePlatformId(target.id, "upload project draft project ID");
+    await ensureProjectOwnership(bindings.DB, viewerId, scopeId);
 
     const name = normalizeFileName(target.name);
     const logicalPath = createAttachmentPath(fileId, name);
@@ -267,7 +267,7 @@ const appDraftDescriptor = defineFileScopeDescriptor({
 const fileScopeDescriptors = {
   account: accountDescriptor,
   agent_package: agentPackageDescriptor,
-  app_draft: appDraftDescriptor,
+  app_draft: projectDraftDescriptor,
   library: libraryDescriptor,
   session: sessionDescriptor,
 } satisfies Record<FileScopeKind, FileScopeDescriptor>;

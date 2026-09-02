@@ -1,29 +1,36 @@
 import type { AccountProfile } from "@mosoo/contracts/account";
-import type { AppSummary } from "@mosoo/contracts/app";
 import type { OrganizationSummary } from "@mosoo/contracts/organization";
+import type { ProjectSummary } from "@mosoo/contracts/project";
 import { createContext, useCallback, useMemo, useState, use } from "react";
 import type { ReactNode } from "react";
 
-import { useOrganizationAppsQuery } from "@/domains/app/query/app-queries";
+import { useOrganizationProjectsQuery } from "@/domains/project/query/project-queries";
 import { useViewerQuery } from "@/domains/user/query/user-queries";
 
-import { resolveActiveApp } from "./active-app";
+import { resolveActiveProject } from "./active-project";
 
 export type OnboardingState = "complete" | "loading" | "pending";
 
-const SELECTED_APP_STORAGE_KEY = "mosoo:selected-app";
+const SELECTED_PROJECT_STORAGE_KEY = "mosoo:selected-project";
+// Key written before the App -> Project rename; read-only fallback so an
+// existing selection survives the rename.
+const LEGACY_SELECTED_APP_STORAGE_KEY = "mosoo:selected-app";
 
-function readSelectedAppId(): string | null {
+function readSelectedProjectId(): string | null {
   try {
-    return globalThis.localStorage?.getItem(SELECTED_APP_STORAGE_KEY) ?? null;
+    return (
+      globalThis.localStorage?.getItem(SELECTED_PROJECT_STORAGE_KEY) ??
+      globalThis.localStorage?.getItem(LEGACY_SELECTED_APP_STORAGE_KEY) ??
+      null
+    );
   } catch {
     return null;
   }
 }
 
-function writeSelectedAppId(appId: string): void {
+function writeSelectedProjectId(projectId: string): void {
   try {
-    globalThis.localStorage?.setItem(SELECTED_APP_STORAGE_KEY, appId);
+    globalThis.localStorage?.setItem(SELECTED_PROJECT_STORAGE_KEY, projectId);
   } catch {
     // ignore storage failures (private mode, quota, etc.)
   }
@@ -39,22 +46,22 @@ interface SessionUser {
 interface AppSessionContextValue {
   activeOrganization: OrganizationSummary | null;
   activeOrganizationId: string | null;
-  activeApp: AppSummary | null;
-  activeAppId: string | null;
+  activeProject: ProjectSummary | null;
+  activeProjectId: string | null;
   onboardingState: OnboardingState | null;
   organizations: OrganizationSummary[];
   organizationsLoading: boolean;
-  apps: AppSummary[];
-  appsLoading: boolean;
+  projects: ProjectSummary[];
+  projectsLoading: boolean;
   refreshOnboardingState(): Promise<boolean>;
   refreshOrganizations(): Promise<OrganizationSummary[]>;
-  setActiveApp(appId: string): void;
+  setActiveProject(projectId: string): void;
   user: SessionUser | null;
   userLoading: boolean;
 }
 
 const AppSessionContext = createContext<AppSessionContextValue | null>(null);
-const EMPTY_APPS: AppSummary[] = [];
+const EMPTY_PROJECTS: ProjectSummary[] = [];
 const EMPTY_ORGANIZATIONS: OrganizationSummary[] = [];
 
 function toSessionUser(account: AccountProfile | null): SessionUser | null {
@@ -92,13 +99,14 @@ export function AppSessionProvider({ children }: { children: ReactNode }) {
   const user = toSessionUser(viewer?.account ?? null);
   const organizations = useMemo(() => viewer?.organizations ?? EMPTY_ORGANIZATIONS, [viewer]);
   const activeOrganization = viewer?.activeOrganization ?? null;
-  const appsQuery = useOrganizationAppsQuery(activeOrganization?.id ?? null);
-  const apps = activeOrganization === null ? EMPTY_APPS : (appsQuery.data ?? EMPTY_APPS);
-  const [selectedAppId, setSelectedAppId] = useState<string | null>(readSelectedAppId);
-  const activeApp = resolveActiveApp(apps, selectedAppId);
-  const setActiveApp = useCallback((appId: string) => {
-    setSelectedAppId(appId);
-    writeSelectedAppId(appId);
+  const projectsQuery = useOrganizationProjectsQuery(activeOrganization?.id ?? null);
+  const projects =
+    activeOrganization === null ? EMPTY_PROJECTS : (projectsQuery.data ?? EMPTY_PROJECTS);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(readSelectedProjectId);
+  const activeProject = resolveActiveProject(projects, selectedProjectId);
+  const setActiveProject = useCallback((projectId: string) => {
+    setSelectedProjectId(projectId);
+    writeSelectedProjectId(projectId);
   }, []);
   const onboardingState = resolveOnboardingState({
     hasOrganizations: organizations.length > 0,
@@ -121,30 +129,30 @@ export function AppSessionProvider({ children }: { children: ReactNode }) {
     () => ({
       activeOrganization,
       activeOrganizationId: activeOrganization?.id ?? null,
-      activeApp,
-      activeAppId: activeApp?.id ?? null,
+      activeProject,
+      activeProjectId: activeProject?.id ?? null,
       onboardingState,
       organizations,
       organizationsLoading: viewerQuery.isLoading,
-      apps,
-      appsLoading: appsQuery.isLoading,
+      projects,
+      projectsLoading: projectsQuery.isLoading,
       refreshOnboardingState,
       refreshOrganizations: refreshViewer,
-      setActiveApp,
+      setActiveProject,
       user,
       userLoading: viewerQuery.isLoading,
     }),
     [
       activeOrganization,
-      activeApp,
+      activeProject,
       onboardingState,
       organizations,
       refreshOnboardingState,
       refreshViewer,
-      setActiveApp,
+      setActiveProject,
       user,
-      apps,
-      appsQuery.isLoading,
+      projects,
+      projectsQuery.isLoading,
       viewerQuery.isLoading,
     ],
   );

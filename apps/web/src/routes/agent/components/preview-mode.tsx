@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 
 import { publishAgent } from "@/domains/agent/api/agent-client";
 import { agentKeys } from "@/domains/agent/query/agent-queries";
-import { toAgentId, toAppId } from "@/routes/typed-id";
+import { toAgentId, toProjectId } from "@/routes/typed-id";
 
 import type { Agent } from "../agent.types";
 import { AgentApiAccessDialog } from "../lifecycle/api-access-panel";
@@ -137,13 +137,13 @@ export function PreviewMode({ agent, headerActionTarget }: PreviewModeProps): Re
     mutationFn: async () =>
       publishAgent({
         agentId: toAgentId(agent.id),
-        appId: toAppId(agent.appId),
+        projectId: toProjectId(agent.projectId),
       }),
     onSuccess: async () => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: agentKeys.detail(agent.appId, agent.id) }),
+        queryClient.invalidateQueries({ queryKey: agentKeys.detail(agent.projectId, agent.id) }),
         queryClient.invalidateQueries({
-          queryKey: agentKeys.editorState(agent.appId, agent.id),
+          queryKey: agentKeys.editorState(agent.projectId, agent.id),
         }),
         queryClient.invalidateQueries({ queryKey: agentKeys.lists() }),
       ]);
@@ -191,7 +191,7 @@ export function PreviewMode({ agent, headerActionTarget }: PreviewModeProps): Re
               configurationChangedAt={agent.updatedAt}
               configurationRevisionKey={`${agent.updatedAt}:${agent.liveVersion?.id ?? "draft"}`}
               key={agent.id}
-              appId={agent.appId}
+              projectId={agent.projectId}
               readiness={agent.readiness}
               tone="preview"
             />

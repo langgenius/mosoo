@@ -5,7 +5,7 @@ import type {
   AgentDeploymentVersionId,
   AgentId,
   FileId,
-  AppId,
+  ProjectId,
   SessionId,
   SessionMessageId,
   SessionRunId,
@@ -60,7 +60,7 @@ interface QueueSessionRunInput {
     deployment_version_number: number | null;
     id: SessionId;
     model: string;
-    app_id: AppId;
+    project_id: ProjectId;
     provider: string;
     runtime_id: string;
   };
@@ -115,7 +115,7 @@ export async function queueSessionRun(request: QueueSessionRunRequest): Promise<
     getSessionExecutionPlan(bindings.DB, input.session.id).then((executionPlan) =>
       resolveReadyEnvironmentPackageArtifact(
         bindings,
-        input.session.app_id,
+        input.session.project_id,
         executionPlan.environment.packagesJson,
       ),
     ),
@@ -158,7 +158,7 @@ export async function queueSessionRun(request: QueueSessionRunRequest): Promise<
     requestUrl,
     session: {
       id: input.session.id,
-      app_id: input.session.app_id,
+      project_id: input.session.project_id,
     },
     sessionRunId: createdRun.id,
     traceId: createdRun.traceId,
@@ -194,7 +194,7 @@ export async function queueSessionRun(request: QueueSessionRunRequest): Promise<
     },
     session: {
       agentId: input.session.agent_id,
-      appId: input.session.app_id,
+      projectId: input.session.project_id,
       id: input.session.id,
     },
   });
@@ -268,7 +268,7 @@ export async function queueSessionRun(request: QueueSessionRunRequest): Promise<
         dispatchSource: "inline",
         prompt: input.prompt,
         queuedAtMs,
-        session: { id: input.session.id, app_id: input.session.app_id },
+        session: { id: input.session.id, project_id: input.session.project_id },
         sessionRunId: createdRun.id,
         traceId: createdRun.traceId,
         ...(input.accessViewer ? { accessViewer: input.accessViewer } : {}),

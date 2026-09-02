@@ -12,7 +12,7 @@ import type {
   McpOAuthFlowId,
   McpServerId,
   PlatformId,
-  AppId,
+  ProjectId,
 } from "@mosoo/id";
 import { sql } from "drizzle-orm";
 import { check, index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
@@ -50,7 +50,7 @@ export const mcpServersTable = sqliteTable(
     name: text("name").notNull(),
     oauthMetadataJson: text("oauth_metadata_json"),
     ownerId: platformIdColumn<AccountId>("owner_account_id").notNull(),
-    appId: platformIdColumn<AppId>("app_id").notNull(),
+    projectId: platformIdColumn<ProjectId>("project_id").notNull(),
     source: text("source").$type<McpServerSource>().notNull(),
     updatedAt: integer("updated_at").notNull(),
     url: text("url").notNull(),
@@ -60,9 +60,9 @@ export const mcpServersTable = sqliteTable(
       "mcp_server_source_scope_check",
       sql`${table.source} = 'app' AND ${table.credentialScope} = 'app'`,
     ),
-    index("mcp_server_app_enabled_idx").on(table.appId, table.enabled),
-    index("mcp_server_owner_app_idx").on(table.ownerId, table.appId),
-    uniqueIndex("mcp_server_app_url_idx").on(table.appId, table.url),
+    index("mcp_server_project_enabled_idx").on(table.projectId, table.enabled),
+    index("mcp_server_owner_project_idx").on(table.ownerId, table.projectId),
+    uniqueIndex("mcp_server_project_url_idx").on(table.projectId, table.url),
   ],
 );
 
@@ -78,7 +78,7 @@ export const mcpCredentialsTable = sqliteTable(
     lastRefreshedAt: integer("last_refreshed_at"),
     oauthClientId: text("oauth_client_id"),
     oauthClientSecretSecretId: text("oauth_client_secret_secret_id"),
-    appId: platformIdColumn<AppId>("app_id").notNull(),
+    projectId: platformIdColumn<ProjectId>("project_id").notNull(),
     refreshSecretId: text("refresh_secret_id"),
     scope: text("scope").$type<McpCredentialRecordScope>().notNull(),
     scopeValuesJson: text("scope_values_json"),
@@ -104,8 +104,8 @@ export const mcpCredentialsTable = sqliteTable(
       `,
     ),
     index("mcp_credential_server_scope_status_idx").on(table.serverId, table.scope, table.status),
-    index("mcp_credential_app_scope_status_idx").on(table.appId, table.scope, table.status),
-    uniqueIndex("mcp_credential_app_scope_idx")
+    index("mcp_credential_project_scope_status_idx").on(table.projectId, table.scope, table.status),
+    uniqueIndex("mcp_credential_project_scope_idx")
       .on(table.serverId, table.scope)
       .where(sql`${table.scope} = 'app'`),
     uniqueIndex("mcp_credential_agent_scope_idx")
@@ -139,7 +139,7 @@ export const mcpOauthFlowsTable = sqliteTable(
     initiatorUserId: platformIdColumn<AccountId>("initiator_account_id").notNull(),
     oauthClientId: text("oauth_client_id").notNull(),
     oauthClientSecretSecretId: text("oauth_client_secret_secret_id"),
-    appId: platformIdColumn<AppId>("app_id").notNull(),
+    projectId: platformIdColumn<ProjectId>("project_id").notNull(),
     registrationEndpoint: text("registration_endpoint"),
     returnUrl: text("return_url"),
     scopeValuesJson: text("scope_values_json"),
@@ -160,8 +160,8 @@ export const mcpOauthFlowsTable = sqliteTable(
     index("mcp_oauth_flow_status_cleanup_after_idx").on(table.status, table.cleanupAfter),
     index("mcp_oauth_flow_expires_at_idx").on(table.expiresAt),
     index("mcp_oauth_flow_server_account_idx").on(table.serverId, table.initiatorUserId),
-    index("mcp_oauth_flow_app_server_account_idx").on(
-      table.appId,
+    index("mcp_oauth_flow_project_server_account_idx").on(
+      table.projectId,
       table.serverId,
       table.initiatorUserId,
     ),

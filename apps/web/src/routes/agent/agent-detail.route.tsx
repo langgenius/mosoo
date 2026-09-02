@@ -227,16 +227,16 @@ export function AgentDetailPage() {
   const { agentId } = useParams<{ agentId: string }>();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { activeAppId } = useAppSession();
+  const { activeProjectId } = useAppSession();
   const { user } = useAuth();
   const [selectedMode, setSelectedMode] = useState<DetailMode | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showVersions, setShowVersions] = useState(false);
   const [headerActionTarget, setHeaderActionTarget] = useState<HTMLDivElement | null>(null);
 
-  const detailQuery = useAgentDetailQuery(activeAppId, agentId ?? null);
+  const detailQuery = useAgentDetailQuery(activeProjectId, agentId ?? null);
   const canEdit = detailQuery.data ? detailQuery.data.viewerRole === "owner" : false;
-  const editorStateQuery = useAgentEditorStateQuery(activeAppId, agentId ?? null, canEdit);
+  const editorStateQuery = useAgentEditorStateQuery(activeProjectId, agentId ?? null, canEdit);
 
   const agent = useMemo<Agent | null>(() => {
     if (!detailQuery.data) {
@@ -392,12 +392,12 @@ export function AgentDetailPage() {
         )}
         {mode === "logs" && (
           <Suspense fallback={<PanelLoading />}>
-            <LogsTab agentId={agent.id} appId={agent.appId} />
+            <LogsTab agentId={agent.id} projectId={agent.projectId} />
           </Suspense>
         )}
         {mode === "cost" && (
           <Suspense fallback={<PanelLoading />}>
-            <AgentCostTab agentId={agent.id} appId={agent.appId} />
+            <AgentCostTab agentId={agent.id} projectId={agent.projectId} />
           </Suspense>
         )}
         {mode === "terminal" && (

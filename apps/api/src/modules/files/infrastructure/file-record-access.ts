@@ -1,7 +1,7 @@
 import { parsePlatformId } from "@mosoo/id";
-import type { AccountId, AppId } from "@mosoo/id";
+import type { AccountId, ProjectId } from "@mosoo/id";
 
-import { ensureAppOwnership } from "../../apps/application/app.service";
+import { ensureProjectOwnership } from "../../projects/application/project.service";
 import { createFileNotFoundError } from "./file-errors";
 import type {
   FileAccessRequest,
@@ -16,11 +16,11 @@ import { ensureSessionFileAccess } from "./session-file-ownership";
 async function ensureAgentPackageFileAccess(
   database: D1Database,
   viewerId: AccountId,
-  appId: AppId,
+  projectId: ProjectId,
   createdBy: AccountId,
   resourceKind: "file" | "upload",
 ): Promise<void> {
-  await ensureAppOwnership(database, viewerId, appId);
+  await ensureProjectOwnership(database, viewerId, projectId);
 
   if (createdBy !== viewerId) {
     throw createFileNotFoundError(
@@ -43,18 +43,18 @@ async function ensureLibraryFileAccess(
   file: FileRecordRow,
   resourceKind: "file" | "upload",
 ): Promise<void> {
-  const appId = parsePlatformId<AppId>(
+  const projectId = parsePlatformId<ProjectId>(
     requireScopeId(file.scope_id, "Library file"),
-    "file app ID",
+    "file project ID",
   );
 
-  if (file.owner_kind !== "app" || file.owner_id !== appId) {
+  if (file.owner_kind !== "app" || file.owner_id !== projectId) {
     throw createFileNotFoundError(
       resourceKind === "file" ? "File not found." : "Upload not found.",
     );
   }
 
-  await ensureAppOwnership(database, viewerId, appId);
+  await ensureProjectOwnership(database, viewerId, projectId);
 }
 
 function ensureAccountFileAccess(
@@ -96,7 +96,10 @@ export async function ensureUploadAccess({
     await ensureAgentPackageFileAccess(
       database,
       viewerId,
-      parsePlatformId<AppId>(requireScopeId(context.upload.scope_id, "Upload"), "upload app ID"),
+      parsePlatformId<ProjectId>(
+        requireScopeId(context.upload.scope_id, "Upload"),
+        "upload project ID",
+      ),
       context.upload.created_by_account_id,
       "upload",
     );
@@ -133,7 +136,7 @@ export async function ensureFileAccess({
     await ensureAgentPackageFileAccess(
       database,
       viewerId,
-      parsePlatformId<AppId>(requireScopeId(file.scope_id, "File"), "file app ID"),
+      parsePlatformId<ProjectId>(requireScopeId(file.scope_id, "File"), "file project ID"),
       file.created_by_account_id,
       "file",
     );

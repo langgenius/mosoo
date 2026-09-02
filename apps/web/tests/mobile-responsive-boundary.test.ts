@@ -2,8 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 
 const APP_SHELL_SOURCE = readFileSync(new URL("../src/app/app-shell.tsx", import.meta.url), "utf8");
-const APP_SETTINGS_LAYOUT_SOURCE = readFileSync(
-  new URL("../src/routes/app-settings/app-settings.route.tsx", import.meta.url),
+const PROJECT_SETTINGS_LAYOUT_SOURCE = readFileSync(
+  new URL("../src/routes/project-settings/project-settings.route.tsx", import.meta.url),
   "utf8",
 );
 const SETTINGS_LAYOUT_SOURCE = readFileSync(
@@ -40,8 +40,8 @@ const HELP_MENU_SOURCE = readFileSync(
 );
 
 describe("mobile console boundaries", () => {
-  test("App and Org shells expose a discoverable mobile navigation drawer", () => {
-    expect(APP_SHELL_SOURCE).toContain('aria-label={t("apps.openNavigation")}');
+  test("Project and Org shells expose a discoverable mobile navigation drawer", () => {
+    expect(APP_SHELL_SOURCE).toContain('aria-label={t("projects.openNavigation")}');
     expect(APP_SHELL_SOURCE).toContain("mobileSidebar");
     expect(APP_SHELL_SOURCE).toContain('className="md:hidden"');
     expect(APP_SHELL_SOURCE).toContain("left-0");
@@ -50,7 +50,7 @@ describe("mobile console boundaries", () => {
     expect(APP_SHELL_SOURCE).toContain("md:flex");
   });
 
-  test("mobile navigation closes for app switches, route changes, and desktop breakpoints", () => {
+  test("mobile navigation closes for Project switches, route changes, and desktop breakpoints", () => {
     expect(APP_SHELL_SOURCE).toContain("renderNavigation(closeNavigation)");
     expect(APP_SHELL_SOURCE).toContain('globalThis.matchMedia("(min-width: 768px)")');
     expect(APP_SHELL_SOURCE).toContain("location.pathname");
@@ -67,7 +67,7 @@ describe("mobile console boundaries", () => {
   });
 
   test("nested settings navigation becomes a horizontal mobile tab strip", () => {
-    expect(APP_SETTINGS_LAYOUT_SOURCE).toContain(
+    expect(PROJECT_SETTINGS_LAYOUT_SOURCE).toContain(
       "flex h-full flex-col overflow-hidden md:flex-row",
     );
     expect(SETTINGS_LAYOUT_SOURCE).toContain("flex h-full flex-col overflow-hidden md:flex-row");

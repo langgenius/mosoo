@@ -157,7 +157,7 @@ function queueOwnerRun(input: {
       prompt: "Admit this request atomically.",
       session: {
         agent_id: PUBLIC_API_TEST_IDS.agent,
-        app_id: PUBLIC_API_TEST_IDS.app,
+        project_id: PUBLIC_API_TEST_IDS.project,
         deployment_version_id: parsePlatformId<AgentDeploymentVersionId>(
           PUBLIC_API_TEST_IDS.deployment,
           "fixture deployment version",

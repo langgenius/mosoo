@@ -272,7 +272,7 @@ function createAgentPackageFixture(
   } = {},
 ): AgentPackage {
   return {
-    app: {
+    project: {
       avatarAssetKey: input.avatarAssetKey ?? null,
       description: "Test package",
       name: "Test Agent",

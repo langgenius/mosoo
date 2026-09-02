@@ -3,10 +3,10 @@ import type {
   DeleteEnvironmentInput,
   EnvironmentDetail,
   EnvironmentSummary,
-  SetAppDefaultEnvironmentInput,
+  SetProjectDefaultEnvironmentInput,
   UpdateEnvironmentInput,
 } from "@mosoo/contracts/environment";
-import type { EnvironmentId, AppId } from "@mosoo/contracts/id";
+import type { EnvironmentId, ProjectId } from "@mosoo/contracts/id";
 
 import { graphql } from "@/gql";
 import type {
@@ -14,7 +14,12 @@ import type {
   EnvironmentSummaryFieldsFragment,
 } from "@/gql/graphql";
 import { requestGraphQL } from "@/platform/http/graphql-client";
-import { toAccountId, toEnvironmentId, toEnvironmentRevisionId, toAppId } from "@/routes/typed-id";
+import {
+  toAccountId,
+  toEnvironmentId,
+  toEnvironmentRevisionId,
+  toProjectId,
+} from "@/routes/typed-id";
 
 const ENVIRONMENT_PACKAGE_FIELDS = graphql(/* GraphQL */ `
   fragment EnvironmentPackageFields on EnvironmentPackageSpec {
@@ -73,7 +78,7 @@ const ENVIRONMENT_SUMMARY_FIELDS = graphql(/* GraphQL */ `
     setupScript
     updatedAt
     usedByAgentCount
-    appId
+    projectId
   }
 `);
 
@@ -111,7 +116,7 @@ const ENVIRONMENT_DETAIL_FIELDS = graphql(/* GraphQL */ `
     setupScript
     updatedAt
     usedByAgentCount
-    appId
+    projectId
   }
 `);
 
@@ -141,7 +146,7 @@ function toEnvironmentSummary(environment: EnvironmentSummaryFieldsFragment): En
       ...environment.owner,
       id: environment.owner.id === null ? null : toAccountId(environment.owner.id),
     },
-    appId: toAppId(environment.appId),
+    projectId: toProjectId(environment.projectId),
   };
 }
 
@@ -150,16 +155,16 @@ function toEnvironmentDetail(environment: EnvironmentDetailFieldsFragment): Envi
 }
 
 const LIST_ENVIRONMENTS_QUERY = graphql(/* GraphQL */ `
-  query AppEnvironments($appId: ULID!) {
-    appEnvironmentList(appId: $appId) {
+  query ProjectEnvironments($projectId: ULID!) {
+    projectEnvironmentList(projectId: $projectId) {
       ...EnvironmentSummaryFields
     }
   }
 `);
 
 const GET_ENVIRONMENT_QUERY = graphql(/* GraphQL */ `
-  query EnvironmentDetail($appId: ULID!, $environmentId: ULID!) {
-    environment(appId: $appId, environmentId: $environmentId) {
+  query EnvironmentDetail($projectId: ULID!, $environmentId: ULID!) {
+    environment(projectId: $projectId, environmentId: $environmentId) {
       ...EnvironmentDetailFields
     }
   }
@@ -189,24 +194,24 @@ const DELETE_ENVIRONMENT_MUTATION = graphql(/* GraphQL */ `
   }
 `);
 
-const SET_APP_DEFAULT_ENVIRONMENT_MUTATION = graphql(/* GraphQL */ `
-  mutation SetAppDefaultEnvironment($input: SetAppDefaultEnvironmentInput!) {
-    setAppDefaultEnvironment(input: $input) {
+const SET_PROJECT_DEFAULT_ENVIRONMENT_MUTATION = graphql(/* GraphQL */ `
+  mutation SetProjectDefaultEnvironment($input: SetProjectDefaultEnvironmentInput!) {
+    setProjectDefaultEnvironment(input: $input) {
       ...EnvironmentSummaryFields
     }
   }
 `);
 
-export async function listAppEnvironments(appId: AppId): Promise<EnvironmentSummary[]> {
-  const payload = await requestGraphQL(LIST_ENVIRONMENTS_QUERY, { appId });
-  return payload.appEnvironmentList.map(toEnvironmentSummary);
+export async function listProjectEnvironments(projectId: ProjectId): Promise<EnvironmentSummary[]> {
+  const payload = await requestGraphQL(LIST_ENVIRONMENTS_QUERY, { projectId });
+  return payload.projectEnvironmentList.map(toEnvironmentSummary);
 }
 
 export async function getEnvironment(
-  appId: AppId,
+  projectId: ProjectId,
   environmentId: EnvironmentId,
 ): Promise<EnvironmentDetail> {
-  const payload = await requestGraphQL(GET_ENVIRONMENT_QUERY, { environmentId, appId });
+  const payload = await requestGraphQL(GET_ENVIRONMENT_QUERY, { environmentId, projectId });
   return toEnvironmentDetail(payload.environment);
 }
 
@@ -226,9 +231,9 @@ export async function deleteEnvironment(input: DeleteEnvironmentInput): Promise<
   await requestGraphQL(DELETE_ENVIRONMENT_MUTATION, { input });
 }
 
-export async function setAppDefaultEnvironment(
-  input: SetAppDefaultEnvironmentInput,
+export async function setProjectDefaultEnvironment(
+  input: SetProjectDefaultEnvironmentInput,
 ): Promise<EnvironmentSummary> {
-  const payload = await requestGraphQL(SET_APP_DEFAULT_ENVIRONMENT_MUTATION, { input });
-  return toEnvironmentSummary(payload.setAppDefaultEnvironment);
+  const payload = await requestGraphQL(SET_PROJECT_DEFAULT_ENVIRONMENT_MUTATION, { input });
+  return toEnvironmentSummary(payload.setProjectDefaultEnvironment);
 }

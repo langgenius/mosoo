@@ -1,12 +1,12 @@
 import type { GraphQLModule } from "./graphql-module.ts";
 import { agentSchema } from "./schema/agent-schema.ts";
-import { appSchema } from "./schema/app-schema.ts";
 import { commonSchema } from "./schema/common-schema.ts";
 import { costSchema } from "./schema/cost-schema.ts";
 import { environmentSchema } from "./schema/environment-schema.ts";
 import { fileSchema } from "./schema/file-schema.ts";
 import { mcpSchema } from "./schema/mcp-schema.ts";
 import { organizationSchema } from "./schema/organization-schema.ts";
+import { projectSchema } from "./schema/project-schema.ts";
 import { sessionSchema } from "./schema/session-schema.ts";
 import { skillSchema } from "./schema/skill-schema.ts";
 import { userSchema } from "./schema/user-schema.ts";
@@ -21,9 +21,9 @@ export const commonGraphQLSpec = {
 
 export const costGraphQLSpec = {
   queryFields: [
-    "agentCostCard(appId: ULID!, agentId: ULID!, range: CostRange!, runPurposes: [CostRunPurpose!]): AgentCostCard!",
+    "agentCostCard(projectId: ULID!, agentId: ULID!, range: CostRange!, runPurposes: [CostRunPurpose!]): AgentCostCard!",
     "organizationBillingCostCard(organizationId: ULID!, range: CostRange!, runPurposes: [CostRunPurpose!]): OrganizationBillingCostCard!",
-    "appCostCard(appId: ULID!, range: CostRange!, runPurposes: [CostRunPurpose!]): AppCostCard!",
+    "projectCostCard(projectId: ULID!, range: CostRange!, runPurposes: [CostRunPurpose!]): ProjectCostCard!",
   ],
   typeDefs: costSchema,
 } satisfies GraphQLModuleSpec;
@@ -38,15 +38,15 @@ export const agentGraphQLSpec = {
     "recreateSandbox(input: RuntimeStateOperationInput!): RuntimeStateOperationResult!",
     "resetAgentState(input: RuntimeStateOperationInput!): RuntimeStateOperationResult!",
     "restartDriver(input: RuntimeStateOperationInput!): RuntimeStateOperationResult!",
-    "unpublishAgent(appId: ULID!, agentId: ULID!): Agent!",
+    "unpublishAgent(projectId: ULID!, agentId: ULID!): Agent!",
     "updateAgentConfig(input: UpdateAgentConfigInput!): Agent!",
   ],
   queryFields: [
-    "accessibleAgentList(appId: ULID!): [AgentSummary!]!",
-    "agent(appId: ULID!, agentId: ULID!): AgentDetail!",
-    "agentEditorState(appId: ULID!, agentId: ULID!): AgentEditorState!",
-    "agentManifest(appId: ULID!, agentId: ULID!): AgentManifestExport!",
-    "exportAgentPackage(appId: ULID!, agentId: ULID!): AgentPackageExport!",
+    "accessibleAgentList(projectId: ULID!): [AgentSummary!]!",
+    "agent(projectId: ULID!, agentId: ULID!): AgentDetail!",
+    "agentEditorState(projectId: ULID!, agentId: ULID!): AgentEditorState!",
+    "agentManifest(projectId: ULID!, agentId: ULID!): AgentManifestExport!",
+    "exportAgentPackage(projectId: ULID!, agentId: ULID!): AgentPackageExport!",
   ],
   typeDefs: agentSchema,
 } satisfies GraphQLModuleSpec;
@@ -57,12 +57,12 @@ export const environmentGraphQLSpec = {
     "createEnvironmentFork(input: CreateEnvironmentForkInput!): EnvironmentSummary!",
     "deleteEnvironment(input: DeleteEnvironmentInput!): OperationResult!",
     "setEnvironmentVariableValue(input: SetEnvironmentVariableValueInput!): EnvironmentDetail!",
-    "setAppDefaultEnvironment(input: SetAppDefaultEnvironmentInput!): EnvironmentSummary!",
+    "setProjectDefaultEnvironment(input: SetProjectDefaultEnvironmentInput!): EnvironmentSummary!",
     "updateEnvironment(input: UpdateEnvironmentInput!): EnvironmentDetail!",
   ],
   queryFields: [
-    "environment(appId: ULID!, environmentId: ULID!): EnvironmentDetail!",
-    "appEnvironmentList(appId: ULID!): [EnvironmentSummary!]!",
+    "environment(projectId: ULID!, environmentId: ULID!): EnvironmentDetail!",
+    "projectEnvironmentList(projectId: ULID!): [EnvironmentSummary!]!",
   ],
   typeDefs: environmentSchema,
 } satisfies GraphQLModuleSpec;
@@ -75,16 +75,16 @@ export const fileGraphQLSpec = {
 export const mcpGraphQLSpec = {
   mutationFields: [
     "connectMcpBearer(input: ConnectMcpBearerInput!): McpServerWithCredential!",
-    "createAppMcpServer(input: CreateAppMcpServerInput!): McpServerWithCredential!",
-    "deleteMcpServer(appId: ULID!, serverId: ULID!): OperationResult!",
-    "revokeMcpCredential(appId: ULID!, serverId: ULID!): McpServerWithCredential!",
-    "setMcpServerEnabled(appId: ULID!, serverId: ULID!, enabled: Boolean!): McpServerWithCredential!",
+    "createProjectMcpServer(input: CreateProjectMcpServerInput!): McpServerWithCredential!",
+    "deleteMcpServer(projectId: ULID!, serverId: ULID!): OperationResult!",
+    "revokeMcpCredential(projectId: ULID!, serverId: ULID!): McpServerWithCredential!",
+    "setMcpServerEnabled(projectId: ULID!, serverId: ULID!, enabled: Boolean!): McpServerWithCredential!",
     "startMcpOAuth(input: StartMcpOAuthInput!): StartMcpOAuthPayload!",
-    "updateAppMcpServer(input: UpdateAppMcpServerInput!): McpServerWithCredential!",
+    "updateProjectMcpServer(input: UpdateProjectMcpServerInput!): McpServerWithCredential!",
   ],
   queryFields: [
     "mcpOAuthFlowStatus(flowId: ULID!): McpOAuthFlowState!",
-    "mcpRegistry(appId: ULID!): McpRegistry!",
+    "mcpRegistry(projectId: ULID!): McpRegistry!",
   ],
   typeDefs: mcpSchema,
 } satisfies GraphQLModuleSpec;
@@ -94,46 +94,46 @@ export const onboardingGraphQLSpec = {
   queryFields: [],
 } satisfies GraphQLModuleSpec;
 
-export const appGraphQLSpec = {
+export const projectGraphQLSpec = {
   mutationFields: [
-    "createApp(input: CreateAppInput!): App!",
-    "renameApp(input: RenameAppInput!): App!",
+    "createProject(input: CreateProjectInput!): Project!",
+    "renameProject(input: RenameProjectInput!): Project!",
   ],
   queryFields: [
-    "appList(organizationId: ULID!): [App!]!",
-    "appOverview(appId: ULID!, agentLimit: Int, credentialLimit: Int): AppOverview!",
-    "controlPlaneOverview(appLimit: Int, agentLimit: Int, credentialLimit: Int): ControlPlaneOverview!",
+    "projectList(organizationId: ULID!): [Project!]!",
+    "projectOverview(projectId: ULID!, agentLimit: Int, credentialLimit: Int): ProjectOverview!",
+    "controlPlaneOverview(projectLimit: Int, agentLimit: Int, credentialLimit: Int): ControlPlaneOverview!",
   ],
-  typeDefs: appSchema,
+  typeDefs: projectSchema,
 } satisfies GraphQLModuleSpec;
 
 export const sessionGraphQLSpec = {
   mutationFields: [
     "addSessionResource(input: AddSessionResourceInput!): SessionResourceUpload!",
     "createAgentSession(input: CreateAgentSessionInput!): Session!",
-    "prewarmAgentSession(appId: ULID!, sessionId: ULID!): SessionRuntimePrewarmAck!",
-    "sendAgentSessionEvents(appId: ULID!, sessionId: ULID!, events: [AgentSessionEventInput!]!): AgentSessionEventBatch!",
+    "prewarmAgentSession(projectId: ULID!, sessionId: ULID!): SessionRuntimePrewarmAck!",
+    "sendAgentSessionEvents(projectId: ULID!, sessionId: ULID!, events: [AgentSessionEventInput!]!): AgentSessionEventBatch!",
     "startAgentRun(input: StartAgentRunInput!): AgentRunWorkflow!",
-    "archiveAgentSession(appId: ULID!, sessionId: ULID!): OperationResult!",
+    "archiveAgentSession(projectId: ULID!, sessionId: ULID!): OperationResult!",
     "autoTitleSession(input: RenameSessionInput!): Session!",
-    "deleteAgentSession(appId: ULID!, sessionId: ULID!): OperationResult!",
+    "deleteAgentSession(projectId: ULID!, sessionId: ULID!): OperationResult!",
     "renameSession(input: RenameSessionInput!): Session!",
     "removeSessionResource(input: RemoveSessionResourceInput!): OperationResult!",
-    "unarchiveAgentSession(appId: ULID!, sessionId: ULID!): OperationResult!",
+    "unarchiveAgentSession(projectId: ULID!, sessionId: ULID!): OperationResult!",
   ],
   queryFields: [
-    "agentSessionDiagnostics(appId: ULID!, sessionId: ULID!): AgentSessionDiagnostics!",
-    "agentSessionRetrieve(appId: ULID!, sessionId: ULID!): AgentSessionRetrieve!",
-    "session(appId: ULID!, sessionId: ULID!): Session!",
-    "sessionMessages(appId: ULID!, sessionId: ULID!): [SessionMessage!]!",
-    "sessionProcessEvents(appId: ULID!, limit: Int, sessionId: ULID!): [SessionProcessEvent!]!",
-    "threadAgentSessionList(archived: Boolean, beforeCursor: String, limit: Int, appId: ULID!, type: SessionType): AgentSessionRetrieveConnection!",
-    "threadAgentSessionRetrieve(appId: ULID!, sessionId: ULID!): AgentSessionRetrieve!",
-    "threadSessionMessages(appId: ULID!, sessionId: ULID!): [SessionMessage!]!",
-    "threadSessionProcessEvents(appId: ULID!, limit: Int, sessionId: ULID!): [SessionProcessEvent!]!",
-    "listSessionResources(appId: ULID!, sessionId: ULID!): [SessionResource!]!",
-    "sessionList(archived: Boolean, beforeCursor: String, limit: Int, appId: ULID!, type: SessionType): SessionConnection!",
-    "agentSessionList(appId: ULID!, agentId: ULID!, archived: Boolean, beforeCursor: String, limit: Int, participantOnly: Boolean, type: SessionType): SessionConnection!",
+    "agentSessionDiagnostics(projectId: ULID!, sessionId: ULID!): AgentSessionDiagnostics!",
+    "agentSessionRetrieve(projectId: ULID!, sessionId: ULID!): AgentSessionRetrieve!",
+    "session(projectId: ULID!, sessionId: ULID!): Session!",
+    "sessionMessages(projectId: ULID!, sessionId: ULID!): [SessionMessage!]!",
+    "sessionProcessEvents(projectId: ULID!, limit: Int, sessionId: ULID!): [SessionProcessEvent!]!",
+    "threadAgentSessionList(archived: Boolean, beforeCursor: String, limit: Int, projectId: ULID!, type: SessionType): AgentSessionRetrieveConnection!",
+    "threadAgentSessionRetrieve(projectId: ULID!, sessionId: ULID!): AgentSessionRetrieve!",
+    "threadSessionMessages(projectId: ULID!, sessionId: ULID!): [SessionMessage!]!",
+    "threadSessionProcessEvents(projectId: ULID!, limit: Int, sessionId: ULID!): [SessionProcessEvent!]!",
+    "listSessionResources(projectId: ULID!, sessionId: ULID!): [SessionResource!]!",
+    "sessionList(archived: Boolean, beforeCursor: String, limit: Int, projectId: ULID!, type: SessionType): SessionConnection!",
+    "agentSessionList(projectId: ULID!, agentId: ULID!, archived: Boolean, beforeCursor: String, limit: Int, participantOnly: Boolean, type: SessionType): SessionConnection!",
   ],
   typeDefs: sessionSchema,
 } satisfies GraphQLModuleSpec;
@@ -141,11 +141,11 @@ export const sessionGraphQLSpec = {
 export const skillGraphQLSpec = {
   mutationFields: [
     "createSkillFork(input: CreateSkillForkInput!): SkillSummary!",
-    "deleteOwnedSkill(appId: ULID!, skillId: ULID!): OperationResult!",
+    "deleteOwnedSkill(projectId: ULID!, skillId: ULID!): OperationResult!",
   ],
   queryFields: [
-    "appSkillList(appId: ULID!): [SkillSummary!]!",
-    "skillDetail(appId: ULID!, skillId: ULID!): SkillDetail!",
+    "projectSkillList(projectId: ULID!): [SkillSummary!]!",
+    "skillDetail(projectId: ULID!, skillId: ULID!): SkillDetail!",
   ],
   typeDefs: skillSchema,
 } satisfies GraphQLModuleSpec;
@@ -168,8 +168,8 @@ export const vendorCredentialGraphQLSpec = {
     "updateVendorCredential(input: UpdateVendorCredentialInput!): VendorCredential!",
   ],
   queryFields: [
-    "availableAgentModels(appId: ULID!, runtimeId: String!, currentModelId: String, currentVendorId: String): [ResolvedModelEntry!]!",
-    "vendorCredentialList(appId: ULID!): [VendorCredential!]!",
+    "availableAgentModels(projectId: ULID!, runtimeId: String!, currentModelId: String, currentVendorId: String): [ResolvedModelEntry!]!",
+    "vendorCredentialList(projectId: ULID!): [VendorCredential!]!",
   ],
   typeDefs: vendorCredentialSchema,
 } satisfies GraphQLModuleSpec;
@@ -188,7 +188,7 @@ export const graphqlModuleSpecs = [
   fileGraphQLSpec,
   mcpGraphQLSpec,
   onboardingGraphQLSpec,
-  appGraphQLSpec,
+  projectGraphQLSpec,
   sessionGraphQLSpec,
   skillGraphQLSpec,
   userGraphQLSpec,

@@ -1,18 +1,18 @@
 import { parsePlatformId } from "@mosoo/id";
-import type { AppId, SkillId } from "@mosoo/id";
+import type { ProjectId, SkillId } from "@mosoo/id";
 
 import type { GraphQLModule } from "../../../adapters/graphql/graphql-module";
 import { skillGraphQLSpec } from "../../../adapters/graphql/graphql-module-specs";
 import { createSkillFork, deleteOwnedSkill } from "../application/skill-lifecycle.service";
-import { getSkillDetail, listAppSkills } from "../application/skill-query.service";
+import { getSkillDetail, listProjectSkills } from "../application/skill-query.service";
 
-interface AppSkillArgs {
-  appId: string;
+interface ProjectSkillArgs {
+  projectId: string;
   skillId: string;
 }
 
-interface AppIdArgs {
-  appId: string;
+interface ProjectIdArgs {
+  projectId: string;
 }
 
 interface CreateSkillForkArgs {
@@ -24,22 +24,22 @@ export const skillGraphQLModule = {
   authenticatedMutationResolvers: {
     createSkillFork: async (_parent, args: CreateSkillForkArgs, context) =>
       createSkillFork(context.bindings.DB, context.viewer, args.input),
-    deleteOwnedSkill: async (_parent, args: AppSkillArgs, context) => {
-      const appId = parsePlatformId<AppId>(args.appId, "app ID");
+    deleteOwnedSkill: async (_parent, args: ProjectSkillArgs, context) => {
+      const projectId = parsePlatformId<ProjectId>(args.projectId, "project ID");
       const skillId = parsePlatformId<SkillId>(args.skillId, "skill ID");
-      await deleteOwnedSkill(context.bindings.DB, context.viewer, appId, skillId);
+      await deleteOwnedSkill(context.bindings.DB, context.viewer, projectId, skillId);
       return { ok: true } as const;
     },
   },
   authenticatedQueryResolvers: {
-    appSkillList: async (_parent, args: AppIdArgs, context) => {
-      const appId = parsePlatformId<AppId>(args.appId, "app ID");
-      return listAppSkills(context.bindings.DB, context.viewer, appId);
+    projectSkillList: async (_parent, args: ProjectIdArgs, context) => {
+      const projectId = parsePlatformId<ProjectId>(args.projectId, "project ID");
+      return listProjectSkills(context.bindings.DB, context.viewer, projectId);
     },
-    skillDetail: async (_parent, args: AppSkillArgs, context) => {
-      const appId = parsePlatformId<AppId>(args.appId, "app ID");
+    skillDetail: async (_parent, args: ProjectSkillArgs, context) => {
+      const projectId = parsePlatformId<ProjectId>(args.projectId, "project ID");
       const skillId = parsePlatformId<SkillId>(args.skillId, "skill ID");
-      return getSkillDetail(context.bindings.DB, context.viewer, appId, skillId);
+      return getSkillDetail(context.bindings.DB, context.viewer, projectId, skillId);
     },
   },
 } satisfies GraphQLModule;

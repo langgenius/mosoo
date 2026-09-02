@@ -51,8 +51,8 @@ function RuntimeRow({
   );
 }
 
-// Shows which agent runtimes can launch given the keys configured in this App.
-// A runtime is ready when the active App has a key for the vendor it resolves.
+// Shows which agent runtimes can launch given the keys configured in this Project.
+// A runtime is ready when the active Project has a key for the vendor it resolves.
 export function RuntimeAvailabilitySection({
   credentials,
 }: {

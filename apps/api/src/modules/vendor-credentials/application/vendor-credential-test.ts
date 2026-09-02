@@ -11,8 +11,8 @@ import {
 } from "../../../platform/analytics/product-analytics";
 import { createApiWideEvent, emitApiWideEvent } from "../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
-import { ensureAppOwnership } from "../../apps/application/app.service";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
+import { ensureProjectOwnership } from "../../projects/application/project.service";
 import type { ProviderFetchProxyConfig } from "./provider-fetch-proxy";
 import { resolveProviderFetchProxy } from "./provider-fetch-proxy";
 import {
@@ -110,7 +110,7 @@ async function ensureCredentialTestAccess(
   viewer: AuthenticatedViewer,
   input: TestVendorCredentialInput,
 ): Promise<void> {
-  await ensureAppOwnership(database, viewer.id, input.appId);
+  await ensureProjectOwnership(database, viewer.id, input.projectId);
 }
 
 export async function testVendorCredential(
@@ -139,7 +139,7 @@ export async function testVendorCredential(
       distinctId: viewer.id,
       event: SERVER_PRODUCT_ANALYTICS_EVENTS.integrationConnected,
       properties: {
-        app_id: input.appId,
+        project_id: input.projectId,
         integration_type: "model_provider",
         vendor_id: input.vendorId,
       },

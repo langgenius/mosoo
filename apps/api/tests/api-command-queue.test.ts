@@ -15,6 +15,7 @@ import {
   renewApiCommandClaim,
 } from "../src/modules/api-command/application/api-command-ledger";
 import type { ApiCommandMessage } from "../src/modules/api-command/application/api-command-message";
+import { parseApiCommandPayload } from "../src/modules/api-command/application/api-command-payload";
 import { processApiCommandMessage } from "../src/modules/api-command/application/api-command-processor";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import {
@@ -26,6 +27,47 @@ import {
 } from "./helpers/public-api-http-test-fixture";
 
 describe("API command queue", () => {
+  test("normalizes durable payloads written before the Project rename", () => {
+    const projectId = "01J0000000000000000000000E";
+    const sessionId = "01J0000000000000000000000K";
+    const sessionRunId = "01J0000000000000000000000N";
+    const viewer = {
+      email: "owner@example.com",
+      emailVerified: true,
+      id: "01J00000000000000000000001",
+      imageUrl: null,
+      name: "Owner",
+    };
+
+    expect(
+      parseApiCommandPayload(
+        "session_run_dispatch",
+        JSON.stringify({
+          attachmentIds: [],
+          prompt: "continue",
+          queuedAtMs: nowMsForTest(),
+          requestUrl: "https://cloud.mosoo.ai/graphql",
+          session: { app_id: projectId, id: sessionId },
+          sessionRunId,
+          traceId: "trace-1",
+          viewer,
+        }),
+      ),
+    ).toMatchObject({ session: { id: sessionId, project_id: projectId } });
+
+    expect(
+      parseApiCommandPayload(
+        "environment_package_artifact_build",
+        JSON.stringify({
+          appId: projectId,
+          artifactAbi: "abi-1",
+          inputDigest: "digest-1",
+          packages: [],
+        }),
+      ),
+    ).toMatchObject({ projectId });
+  });
+
   test("dedupes producer-side and sends only the command id", async () => {
     const database = await createPublicHttpContractDatabase();
     const queue = createApiCommandQueueStub();

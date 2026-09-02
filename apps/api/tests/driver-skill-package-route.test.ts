@@ -18,7 +18,7 @@ import {
 
 const SKILL_SNAPSHOT_ID = "01J0000000000000000000000S";
 const OTHER_SKILL_SNAPSHOT_ID = "01J0000000000000000000000T";
-const SKILL_BLOB_KEY = "app/01J0000000000000000000000Q/skill-blob/test.skill";
+const SKILL_BLOB_KEY = "project/01J0000000000000000000000Q/skill-blob/test.skill";
 
 function ensureSkillRouteTables(
   database: Awaited<ReturnType<typeof createPublicHttpContractDatabase>>,
@@ -33,7 +33,7 @@ function ensureSkillRouteTables(
       description text NOT NULL,
       id text PRIMARY KEY NOT NULL,
       name text NOT NULL,
-      app_id text NOT NULL,
+      project_id text NOT NULL,
       skill_markdown_path text NOT NULL,
       uncompressed_size integer NOT NULL,
       version text
@@ -69,7 +69,7 @@ async function insertSkillSnapshot(
     .app()
     .insert(skillSnapshotsTable)
     .values({
-      appId: PUBLIC_API_TEST_IDS.app,
+      projectId: PUBLIC_API_TEST_IDS.project,
       author: "Skill Author",
       blobKey: SKILL_BLOB_KEY,
       blobSha256: "sha-skill",

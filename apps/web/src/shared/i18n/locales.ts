@@ -1,5 +1,5 @@
 /**
- * Supported locales for the mosoo App Console.
+ * Supported locales for the mosoo Project Console.
  *
  * The default locale is en-US. All date/number formatting should use the
  * current locale rather than hardcoded "en-US" — use the `useLocale()` hook

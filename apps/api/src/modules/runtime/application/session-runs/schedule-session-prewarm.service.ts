@@ -1,5 +1,5 @@
 import { parsePlatformId } from "@mosoo/id";
-import type { AccountId, AppId, SessionId } from "@mosoo/id";
+import type { AccountId, ProjectId, SessionId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import type { AuthenticatedViewer } from "../../../auth/application/viewer-auth.service";
@@ -10,7 +10,7 @@ export interface ScheduleSessionPrewarmRequest {
   bindings: ApiBindings;
   executionContext: Pick<ExecutionContext, "waitUntil"> | null;
   input: {
-    appId: string;
+    projectId: string;
     sessionId: string;
   };
   requestUrl: string;
@@ -41,10 +41,10 @@ export async function scheduleSessionPrewarm(
   request: ScheduleSessionPrewarmRequest,
 ): Promise<SessionRuntimePrewarmAck> {
   const sessionId = parsePlatformId<SessionId>(request.input.sessionId, "session id");
-  const appId = parsePlatformId<AppId>(request.input.appId, "app id");
+  const projectId = parsePlatformId<ProjectId>(request.input.projectId, "project id");
   const viewerId = parsePlatformId<AccountId>(request.viewer.id, "viewer id");
   const session = await getParticipantSessionSummaryById(request.bindings.DB, viewerId, {
-    appId,
+    projectId,
     sessionId,
   });
 
@@ -54,7 +54,7 @@ export async function scheduleSessionPrewarm(
     requestUrl: request.requestUrl,
     session: {
       id: session.id,
-      appId: session.appId,
+      projectId: session.projectId,
     },
     viewer: request.viewer,
   });

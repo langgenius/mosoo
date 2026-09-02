@@ -331,7 +331,7 @@ function ThreadReplyComposer({
                 nextValue.length > 0 &&
                 threadActionCapabilities.followUp.available
               ) {
-                triggerAgentSessionPrewarm(thread.session.appId, toSessionId(thread.id));
+                triggerAgentSessionPrewarm(thread.session.projectId, toSessionId(thread.id));
               }
             }}
             onKeyDown={(event) => {

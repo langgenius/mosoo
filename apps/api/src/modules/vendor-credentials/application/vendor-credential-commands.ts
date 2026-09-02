@@ -15,8 +15,8 @@ import { and, eq } from "drizzle-orm";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase, runAppDatabaseBatch } from "../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../time";
-import { ensureAppOwnership } from "../../apps/application/app.service";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
+import { ensureProjectOwnership } from "../../projects/application/project.service";
 import {
   enforceApiBaseAllowed,
   enforceCredentialModelShape,
@@ -27,8 +27,8 @@ import {
 import { parseCredentialModels, toVendorCredentialWithSecret } from "./vendor-credential.mapper";
 import {
   getCredentialRow,
-  getAppCredentialRow,
-  getAppVendorCredentialRow,
+  getProjectCredentialRow,
+  getProjectVendorCredentialRow,
 } from "./vendor-credential.repository";
 import {
   deleteVendorCredentialSecret,
@@ -40,7 +40,7 @@ import type { VendorCredentialRow } from "./vendor-credential.types";
 function toSecretOwnerCommand(row: VendorCredentialRow) {
   return {
     credentialId: row.id,
-    appId: row.appId,
+    projectId: row.projectId,
     providerId: row.vendorId,
   };
 }
@@ -59,7 +59,7 @@ async function toVisibleVendorCredential(
 ): Promise<VendorCredential> {
   const secret = await readVendorCredentialSecret(bindings, {
     credential: row,
-    appId: row.appId,
+    projectId: row.projectId,
     providerId: row.vendorId,
     purpose: "credential_display_api_key",
   });
@@ -76,7 +76,7 @@ export async function createVendorCredential(
   viewer: AuthenticatedViewer,
   input: CreateVendorCredentialInput,
 ): Promise<VendorCredential> {
-  await ensureAppOwnership(bindings.DB, viewer.id, input.appId);
+  await ensureProjectOwnership(bindings.DB, viewer.id, input.projectId);
   const name = normalizeCredentialName(input.name);
   const apiKey = input.apiKey.trim();
   const apiBase = normalizeApiBase(input.apiBase);
@@ -95,13 +95,13 @@ export async function createVendorCredential(
   // The first credential added for a vendor becomes its default, so the runtime
   // always has exactly one credential to resolve until the user picks another.
   const isFirstForVendor =
-    (await getAppVendorCredentialRow(bindings.DB, input.appId, input.vendorId)) === null;
+    (await getProjectVendorCredentialRow(bindings.DB, input.projectId, input.vendorId)) === null;
   const id = createPlatformId<VendorCredentialId>();
   const timestampMs = currentTimestampMs();
   const secretId = await storeVendorCredentialSecret(bindings, {
     apiKey,
     credentialId: id,
-    appId: input.appId,
+    projectId: input.projectId,
     providerId: input.vendorId,
     purpose: "credential_create_api_key",
   });
@@ -117,7 +117,7 @@ export async function createVendorCredential(
         isDefault: isFirstForVendor,
         models,
         name,
-        appId: input.appId,
+        projectId: input.projectId,
         updatedAt: timestampMs,
         vendorId: input.vendorId,
       })
@@ -125,7 +125,7 @@ export async function createVendorCredential(
   } catch (error) {
     await deleteVendorCredentialSecret(bindings.DB, {
       credentialId: id,
-      appId: input.appId,
+      projectId: input.projectId,
       providerId: input.vendorId,
       purpose: "credential_create_rollback",
       secretId,
@@ -147,8 +147,8 @@ export async function updateVendorCredential(
   viewer: AuthenticatedViewer,
   input: UpdateVendorCredentialInput,
 ): Promise<VendorCredential> {
-  await ensureAppOwnership(bindings.DB, viewer.id, input.appId);
-  const row = await getAppCredentialRow(bindings.DB, input.appId, input.id);
+  await ensureProjectOwnership(bindings.DB, viewer.id, input.projectId);
+  const row = await getProjectCredentialRow(bindings.DB, input.projectId, input.id);
 
   if (!row) {
     throw new Error("Vendor credential not found.");
@@ -184,7 +184,10 @@ export async function updateVendorCredential(
         updatedAt: currentTimestampMs(),
       })
       .where(
-        and(eq(vendorCredentialsTable.id, input.id), eq(vendorCredentialsTable.appId, input.appId)),
+        and(
+          eq(vendorCredentialsTable.id, input.id),
+          eq(vendorCredentialsTable.projectId, input.projectId),
+        ),
       )
       .run();
   } catch (error) {
@@ -208,7 +211,7 @@ export async function updateVendorCredential(
     );
   }
 
-  const updated = await getAppCredentialRow(bindings.DB, input.appId, input.id);
+  const updated = await getProjectCredentialRow(bindings.DB, input.projectId, input.id);
 
   if (!updated) {
     throw new Error("Vendor credential could not be loaded.");
@@ -222,8 +225,8 @@ export async function setDefaultVendorCredential(
   viewer: AuthenticatedViewer,
   input: SetDefaultVendorCredentialInput,
 ): Promise<VendorCredential> {
-  await ensureAppOwnership(bindings.DB, viewer.id, input.appId);
-  const row = await getAppCredentialRow(bindings.DB, input.appId, input.id);
+  await ensureProjectOwnership(bindings.DB, viewer.id, input.projectId);
+  const row = await getProjectCredentialRow(bindings.DB, input.projectId, input.id);
 
   if (!row) {
     throw new Error("Vendor credential not found.");
@@ -238,7 +241,7 @@ export async function setDefaultVendorCredential(
       .set({ isDefault: false, updatedAt: timestampMs })
       .where(
         and(
-          eq(vendorCredentialsTable.appId, input.appId),
+          eq(vendorCredentialsTable.projectId, input.projectId),
           eq(vendorCredentialsTable.vendorId, row.vendorId),
         ),
       ),
@@ -246,11 +249,14 @@ export async function setDefaultVendorCredential(
       .update(vendorCredentialsTable)
       .set({ isDefault: true, updatedAt: timestampMs })
       .where(
-        and(eq(vendorCredentialsTable.id, input.id), eq(vendorCredentialsTable.appId, input.appId)),
+        and(
+          eq(vendorCredentialsTable.id, input.id),
+          eq(vendorCredentialsTable.projectId, input.projectId),
+        ),
       ),
   ]);
 
-  const updated = await getAppCredentialRow(bindings.DB, input.appId, input.id);
+  const updated = await getProjectCredentialRow(bindings.DB, input.projectId, input.id);
 
   if (!updated) {
     throw new Error("Vendor credential could not be loaded.");
@@ -264,8 +270,8 @@ export async function deleteVendorCredential(
   viewer: AuthenticatedViewer,
   input: DeleteVendorCredentialInput,
 ): Promise<void> {
-  await ensureAppOwnership(bindings.DB, viewer.id, input.appId);
-  const row = await getAppCredentialRow(bindings.DB, input.appId, input.id);
+  await ensureProjectOwnership(bindings.DB, viewer.id, input.projectId);
+  const row = await getProjectCredentialRow(bindings.DB, input.projectId, input.id);
 
   if (!row) {
     throw new Error("Vendor credential not found.");
@@ -274,7 +280,10 @@ export async function deleteVendorCredential(
   await getAppDatabase(bindings.DB)
     .delete(vendorCredentialsTable)
     .where(
-      and(eq(vendorCredentialsTable.id, input.id), eq(vendorCredentialsTable.appId, input.appId)),
+      and(
+        eq(vendorCredentialsTable.id, input.id),
+        eq(vendorCredentialsTable.projectId, input.projectId),
+      ),
     )
     .run();
   ensureVendorCredentialSecretDeleted(
@@ -288,7 +297,11 @@ export async function deleteVendorCredential(
   // Deleting the default leaves the vendor with no default; promote the next
   // remaining credential so resolution stays deterministic.
   if (row.isDefault) {
-    const nextDefault = await getAppVendorCredentialRow(bindings.DB, input.appId, row.vendorId);
+    const nextDefault = await getProjectVendorCredentialRow(
+      bindings.DB,
+      input.projectId,
+      row.vendorId,
+    );
 
     if (nextDefault) {
       await getAppDatabase(bindings.DB)
@@ -297,7 +310,7 @@ export async function deleteVendorCredential(
         .where(
           and(
             eq(vendorCredentialsTable.id, nextDefault.id),
-            eq(vendorCredentialsTable.appId, input.appId),
+            eq(vendorCredentialsTable.projectId, input.projectId),
           ),
         )
         .run();

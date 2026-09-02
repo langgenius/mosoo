@@ -1,11 +1,11 @@
 import type { SessionMessage } from "@mosoo/contracts/session";
 import { sessionMessagesTable } from "@mosoo/db";
-import type { AppId, SessionId } from "@mosoo/id";
+import type { ProjectId, SessionId } from "@mosoo/id";
 import { asc, eq } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import { ensureAppSessionParticipantAccess } from "../domain/session-access.policy";
+import { ensureProjectSessionParticipantAccess } from "../domain/session-access.policy";
 import { toSessionMessage } from "./session-message-mappers";
 import { getSessionReadAccess } from "./session-read-access.service";
 
@@ -13,7 +13,7 @@ export async function getSessionMessages(
   database: D1Database,
   viewer: AuthenticatedViewer,
   input: {
-    appId: AppId;
+    projectId: ProjectId;
     sessionId: SessionId;
   },
 ): Promise<SessionMessage[]> {
@@ -26,11 +26,11 @@ export async function getThreadSessionMessages(
   database: D1Database,
   viewer: AuthenticatedViewer,
   input: {
-    appId: AppId;
+    projectId: ProjectId;
     sessionId: SessionId;
   },
 ): Promise<SessionMessage[]> {
-  await ensureAppSessionParticipantAccess(database, viewer.id, input);
+  await ensureProjectSessionParticipantAccess(database, viewer.id, input);
 
   return listSessionMessages(database, input.sessionId);
 }

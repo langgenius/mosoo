@@ -19,7 +19,7 @@ import {
   readRuntimeEventToolCallUpdate,
   toRuntimeRunLifecycleStatus,
 } from "./runtime-event-payload";
-import { appRuntimeStatus, appRuntimeTimingRecorded } from "./session-runtime-timing";
+import { projectRuntimeStatus, projectRuntimeTimingRecorded } from "./session-runtime-timing";
 
 function createValidatedSessionCustomEvent(name: string, value: unknown): AgUiSessionEvent {
   return parseAgUiSessionEvent({
@@ -29,7 +29,7 @@ function createValidatedSessionCustomEvent(name: string, value: unknown): AgUiSe
   });
 }
 
-function appPermissionRequest(event: RuntimeEventEnvelope): AgUiSessionEvent {
+function projectPermissionRequest(event: RuntimeEventEnvelope): AgUiSessionEvent {
   const request = readRuntimeEventPermissionRequest(event);
 
   if (request === null) {
@@ -51,7 +51,7 @@ function appPermissionRequest(event: RuntimeEventEnvelope): AgUiSessionEvent {
   });
 }
 
-function appMessageAdded(event: RuntimeEventEnvelope): AgUiSessionEvent[] {
+function projectMessageAdded(event: RuntimeEventEnvelope): AgUiSessionEvent[] {
   const payload = readRuntimeEventPayload(event);
   const content = readRuntimeEventString(payload, "content");
 
@@ -69,7 +69,7 @@ function appMessageAdded(event: RuntimeEventEnvelope): AgUiSessionEvent[] {
   ];
 }
 
-function appSessionRunUpdated(event: RuntimeEventEnvelope): AgUiSessionEvent[] {
+function projectSessionRunUpdated(event: RuntimeEventEnvelope): AgUiSessionEvent[] {
   const payload = readRuntimeRunPayload(event);
   const run = payload.run;
 
@@ -100,7 +100,7 @@ function toRuntimeStateOperationName(value: string | null): RuntimeStateOperatio
   }
 }
 
-function appSessionLifecycleUpdated(event: RuntimeEventEnvelope): AgUiSessionEvent[] {
+function projectSessionLifecycleUpdated(event: RuntimeEventEnvelope): AgUiSessionEvent[] {
   const payload = readRuntimeEventPayload(event);
 
   if (readRuntimeEventString(payload, "status") !== "TERMINATED") {
@@ -116,7 +116,7 @@ function appSessionLifecycleUpdated(event: RuntimeEventEnvelope): AgUiSessionEve
   ];
 }
 
-function appAgentTaskUpdated(event: RuntimeEventEnvelope): AgUiSessionEvent[] {
+function projectAgentTaskUpdated(event: RuntimeEventEnvelope): AgUiSessionEvent[] {
   const payload = readRuntimeEventPayload(event);
   const operation = toRuntimeStateOperationName(readRuntimeEventString(payload, "operation"));
   const status = readRuntimeEventString(payload, "status");
@@ -149,7 +149,7 @@ function appAgentTaskUpdated(event: RuntimeEventEnvelope): AgUiSessionEvent[] {
   return [];
 }
 
-function appPermissionResolved(event: RuntimeEventEnvelope): AgUiSessionEvent[] {
+function projectPermissionResolved(event: RuntimeEventEnvelope): AgUiSessionEvent[] {
   const payload = readRuntimeEventPayload(event);
   const permissionRequests = payload["permissionRequests"];
 
@@ -197,7 +197,7 @@ function appendIfPresent<T>(target: T[], value: T | null): void {
   }
 }
 
-export function appRuntimeEventToAgUiSessionEvents(
+export function projectRuntimeEventToAgUiSessionEvents(
   event: RuntimeEventEnvelope,
 ): AgUiSessionEvent[] {
   if (event.visibility === "owner_debug" || event.visibility === "system_internal") {
@@ -206,22 +206,22 @@ export function appRuntimeEventToAgUiSessionEvents(
 
   switch (event.kind) {
     case "run.started": {
-      return appSessionRunUpdated(event);
+      return projectSessionRunUpdated(event);
     }
     case "run.queued":
     case "run.dispatched":
     case "run.cancel.requested": {
-      return appSessionRunUpdated(event);
+      return projectSessionRunUpdated(event);
     }
     case "run.completed":
     case "run.cancelled": {
-      return appSessionRunUpdated(event);
+      return projectSessionRunUpdated(event);
     }
     case "run.failed": {
-      return appSessionRunUpdated(event);
+      return projectSessionRunUpdated(event);
     }
     case "message.added": {
-      return appMessageAdded(event);
+      return projectMessageAdded(event);
     }
     case "message.started": {
       return [
@@ -323,10 +323,10 @@ export function appRuntimeEventToAgUiSessionEvents(
       ];
     }
     case "permission.requested": {
-      return [appPermissionRequest(event)];
+      return [projectPermissionRequest(event)];
     }
     case "permission.resolved": {
-      return appPermissionResolved(event);
+      return projectPermissionResolved(event);
     }
     case "session.files.updated": {
       return [
@@ -377,10 +377,10 @@ export function appRuntimeEventToAgUiSessionEvents(
       ];
     }
     case "session.lifecycle.updated": {
-      return appSessionLifecycleUpdated(event);
+      return projectSessionLifecycleUpdated(event);
     }
     case "agent.task.updated": {
-      return appAgentTaskUpdated(event);
+      return projectAgentTaskUpdated(event);
     }
     case "runtime.config.updated":
     case "runtime.driver.updated":
@@ -388,10 +388,10 @@ export function appRuntimeEventToAgUiSessionEvents(
     case "runtime.sandbox.updated":
     case "runtime.transport.updated":
     case "diagnostic.reported": {
-      return [appRuntimeStatus(event)];
+      return [projectRuntimeStatus(event)];
     }
     case "runtime.timing.recorded": {
-      return appRuntimeTimingRecorded(event);
+      return projectRuntimeTimingRecorded(event);
     }
     default: {
       return [];

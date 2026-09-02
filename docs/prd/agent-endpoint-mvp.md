@@ -11,7 +11,7 @@ build and operate the Agent's execution system.
 
 ## Who it is for
 
-This surface is for a mosoo App owner integrating their own backend. Current
+This surface is for a mosoo Project owner integrating their own backend. Current
 calls use an API token tied to the owner's mosoo account. They cannot represent
 individual people using the Builder's product.
 
@@ -30,7 +30,7 @@ Thread keeps the configuration it started with.
 ## Current boundaries
 
 - Only a published, ready Agent can be called. Unpublishing stops API access.
-- Only the Agent's App owner can call it with the current token model.
-- This is a backend integration surface, not anonymous access or App User
+- Only the Agent's Project owner can call it with the current token model.
+- This is a backend integration surface, not anonymous access or Project User
   authentication.
 - Exact request and response details belong in the API reference, not this PRD.

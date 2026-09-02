@@ -48,13 +48,13 @@ async function resolveOwnerDebugTerminalTarget(
 
   return {
     agentId: agent.id,
-    appId: agent.appId,
+    projectId: agent.projectId,
     executionOwnerUserId: agent.ownerId,
     kind: agent.kind,
     runtimeSubjectId: await ensureRuntimeSubjectId(database, {
       ...subject,
       agentId: agent.id,
-      appId: agent.appId,
+      projectId: agent.projectId,
       executionOwnerUserId: agent.ownerId,
     }),
     subjectId: subject.subjectId,

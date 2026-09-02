@@ -16,7 +16,7 @@ export type {
   OrganizationId,
   PersonalAccessTokenId,
   PlatformId,
-  AppId,
+  ProjectId,
   PublicThreadId,
   RuntimeEventId,
   RuntimeOperationId,

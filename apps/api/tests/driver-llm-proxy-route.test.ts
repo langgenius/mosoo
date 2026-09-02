@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 
 import { driverInstancesTable, vendorCredentialsTable } from "@mosoo/db";
 import { parsePlatformId } from "@mosoo/id";
-import type { DriverInstanceId, AppId, VendorCredentialId } from "@mosoo/id";
+import type { DriverInstanceId, ProjectId, VendorCredentialId } from "@mosoo/id";
 import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 
@@ -27,7 +27,7 @@ const OTHER_CREDENTIAL_ID = parsePlatformId<VendorCredentialId>(
   "01J0000000000000000000000E",
   "other credential ID",
 );
-const APP_ID = PUBLIC_API_TEST_IDS.app as AppId;
+const PROJECT_ID = PUBLIC_API_TEST_IDS.project as ProjectId;
 const DRIVER_INSTANCE_ID = PUBLIC_API_TEST_IDS.driverOwner as DriverInstanceId;
 const OTHER_DRIVER_INSTANCE_ID = parsePlatformId<DriverInstanceId>(
   "01J0000000000000000000000G",
@@ -147,7 +147,7 @@ async function insertVendorCredential(
   const secretId = await storeVendorCredentialSecret(bindings, {
     apiKey: UPSTREAM_API_KEY,
     credentialId,
-    appId: APP_ID,
+    projectId: PROJECT_ID,
     providerId: input.vendorId,
     purpose: "credential_create_api_key",
   });
@@ -164,7 +164,7 @@ async function insertVendorCredential(
       isDefault: true,
       models: null,
       name: `${input.vendorId} credential`,
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       updatedAt: nowMs,
       vendorId: input.vendorId,
     })
@@ -177,7 +177,7 @@ async function createLlmProxyGrant(
 ): Promise<string> {
   return createRuntimeActionToken(bindings, {
     action: "llm_proxy",
-    appId: APP_ID,
+    projectId: PROJECT_ID,
     driverGeneration: 0,
     driverInstanceId: DRIVER_INSTANCE_ID,
     expiresAt: Date.now() + 60_000,
@@ -722,11 +722,11 @@ describe("driver LLM proxy route", () => {
     expect(captured).toHaveLength(0);
   });
 
-  test("rejects grants whose app does not own the credential", async () => {
+  test("rejects grants whose project does not own the credential", async () => {
     const { bindings } = await setupFixture();
     const captured = captureUpstreamFetch();
     const grant = await createLlmProxyGrant(bindings, {
-      appId: parsePlatformId<AppId>("01J0000000000000000000000Z", "other app id"),
+      projectId: parsePlatformId<ProjectId>("01J0000000000000000000000Z", "other project id"),
     });
 
     const response = await dispatch(

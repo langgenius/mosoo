@@ -1,11 +1,11 @@
 import type { AgentSessionRetrieveConnection, SessionType } from "@mosoo/contracts/session";
 import { sessionsTable } from "@mosoo/db";
-import type { AppId } from "@mosoo/id";
+import type { ProjectId } from "@mosoo/id";
 import type { SQL } from "drizzle-orm";
 import { eq, isNotNull, isNull } from "drizzle-orm";
 
-import { ensureAppOwnership } from "../../apps/application/app.service";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
+import { ensureProjectOwnership } from "../../projects/application/project.service";
 import { sessionParticipantCondition } from "../domain/session-access.policy";
 import { toAgentSessionRetrieveResult } from "./agent-session-retrieve.service";
 import type { SessionSummaryListOptions } from "./session-summary-query.service";
@@ -16,15 +16,15 @@ export async function listThreadAgentSessions(
   viewer: AuthenticatedViewer,
   input: SessionSummaryListOptions & {
     archived?: boolean | null;
-    appId: AppId;
+    projectId: ProjectId;
     type?: SessionType | null;
   },
 ): Promise<AgentSessionRetrieveConnection> {
   const archived = input.archived ?? false;
-  await ensureAppOwnership(database, viewer.id, input.appId);
+  await ensureProjectOwnership(database, viewer.id, input.projectId);
 
   const filters: SQL[] = [
-    eq(sessionsTable.appId, input.appId),
+    eq(sessionsTable.projectId, input.projectId),
     sessionParticipantCondition(viewer.id),
     archived ? isNotNull(sessionsTable.archivedAt) : isNull(sessionsTable.archivedAt),
   ];

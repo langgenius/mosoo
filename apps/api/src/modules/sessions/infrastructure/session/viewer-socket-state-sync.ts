@@ -6,7 +6,7 @@ import {
   sendFrames,
 } from "../../../../platform/cloudflare/durable-object-support";
 import { reconcileStaleActiveSessionRun } from "../../../runtime/application/session-runs/stale-run-reconciliation.service";
-import { getActiveAppSessionParticipantAccess } from "../../domain/session-access.policy";
+import { getActiveProjectSessionParticipantAccess } from "../../domain/session-access.policy";
 import type { SessionLiveState } from "../session-live-state.types";
 import { loadViewerLiveState } from "./viewer-live-state";
 import type { ViewerSocketAttachment } from "./viewer-socket";
@@ -37,8 +37,8 @@ export async function ensureViewerSocketSessionActive(
   database: D1Database,
   attachment: ViewerSocketAttachment,
 ): Promise<void> {
-  await getActiveAppSessionParticipantAccess(database, attachment.viewer.id, {
-    appId: attachment.appId,
+  await getActiveProjectSessionParticipantAccess(database, attachment.viewer.id, {
+    projectId: attachment.projectId,
     sessionId: attachment.sessionId,
   });
 }

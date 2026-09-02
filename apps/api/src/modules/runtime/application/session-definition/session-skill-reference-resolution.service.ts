@@ -1,6 +1,6 @@
 import type { UserWarning } from "@mosoo/contracts/session-run";
 import type { ResolvedRunSkill } from "@mosoo/contracts/skill";
-import type { AppId, SkillSnapshotId } from "@mosoo/id";
+import type { ProjectId, SkillSnapshotId } from "@mosoo/id";
 
 import { isPackageSkillRuntimeId } from "../../../agents/application/agent-stored-config.service";
 import { listSkillSnapshotsByIds } from "../../../skills/application/skill-package-snapshot.service";
@@ -99,7 +99,7 @@ function getResolvableSnapshotIds(
 
 export async function resolveSessionSkillReferences(input: {
   database: D1Database;
-  sessionAppId: AppId;
+  sessionProjectId: ProjectId;
   skillMountRoot: string;
   skillReferences: readonly SessionSkillReference[];
 }): Promise<ResolvedSessionSkillReference[]> {
@@ -135,12 +135,12 @@ export async function resolveSessionSkillReferences(input: {
       throw new Error("Skill snapshot not found.");
     }
 
-    if (snapshot.appId !== input.sessionAppId) {
+    if (snapshot.projectId !== input.sessionProjectId) {
       if (isPackageSkill) {
-        throw new Error("Package-owned skill snapshot belongs to another App.");
+        throw new Error("Package-owned skill snapshot belongs to another Project.");
       }
 
-      throw new Error("Skill snapshot belongs to another App.");
+      throw new Error("Skill snapshot belongs to another Project.");
     }
 
     return createResolvedSessionSkillReference({

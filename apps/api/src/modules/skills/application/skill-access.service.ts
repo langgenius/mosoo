@@ -1,10 +1,10 @@
 import { accountsTable, skillSnapshotEntriesTable, skillsTable } from "@mosoo/db";
-import type { AccountId, AppId, SkillId, SkillSnapshotId } from "@mosoo/id";
+import type { AccountId, ProjectId, SkillId, SkillSnapshotId } from "@mosoo/id";
 import { and, desc, eq, sql } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { notFoundError } from "../../../platform/errors";
-import { ensureAppOwnership } from "../../apps/application/app.service";
+import { ensureProjectOwnership } from "../../projects/application/project.service";
 import type { SkillRegistryRow } from "./skill-types";
 
 function skillRegistryColumns() {
@@ -32,19 +32,19 @@ function skillRegistryColumns() {
     name: skillsTable.name,
     ownerId: sql<AccountId>`${skillsTable.ownerAccountId}`.as("ownerId"),
     ownerName: sql<string | null>`${accountsTable.name}`.as("ownerName"),
-    appId: skillsTable.appId,
+    projectId: skillsTable.projectId,
     sourceKind: sql<SkillRegistryRow["sourceKind"]>`${skillsTable.sourceKind}`.as("sourceKind"),
     updatedAt: sql<number>`${skillsTable.updatedAt}`.as("updatedAt"),
   };
 }
 
-async function getAppOwnedSkillRow(
+async function getProjectOwnedSkillRow(
   database: D1Database,
   viewerId: AccountId,
-  appId: AppId,
+  projectId: ProjectId,
   skillId: SkillId,
 ): Promise<SkillRegistryRow | null> {
-  await ensureAppOwnership(database, viewerId, appId);
+  await ensureProjectOwnership(database, viewerId, projectId);
 
   return (
     (await getAppDatabase(database)
@@ -54,7 +54,7 @@ async function getAppOwnedSkillRow(
       .where(
         and(
           eq(skillsTable.id, skillId),
-          eq(skillsTable.appId, appId),
+          eq(skillsTable.projectId, projectId),
           eq(skillsTable.ownerAccountId, viewerId),
         ),
       )
@@ -66,10 +66,10 @@ async function getAppOwnedSkillRow(
 export async function ensureSkillAccess(
   database: D1Database,
   viewerId: AccountId,
-  appId: AppId,
+  projectId: ProjectId,
   skillId: SkillId,
 ): Promise<SkillRegistryRow> {
-  const row = await getAppOwnedSkillRow(database, viewerId, appId, skillId);
+  const row = await getProjectOwnedSkillRow(database, viewerId, projectId, skillId);
 
   if (row === null) {
     throw notFoundError("Skill not found.");
@@ -81,33 +81,33 @@ export async function ensureSkillAccess(
 export async function ensureSkillEditor(
   database: D1Database,
   viewerId: AccountId,
-  appId: AppId,
+  projectId: ProjectId,
   skillId: SkillId,
 ): Promise<SkillRegistryRow> {
-  return ensureSkillAccess(database, viewerId, appId, skillId);
+  return ensureSkillAccess(database, viewerId, projectId, skillId);
 }
 
 export async function ensureSkillDestructiveManager(
   database: D1Database,
   viewerId: AccountId,
-  appId: AppId,
+  projectId: ProjectId,
   skillId: SkillId,
 ): Promise<SkillRegistryRow> {
-  return ensureSkillAccess(database, viewerId, appId, skillId);
+  return ensureSkillAccess(database, viewerId, projectId, skillId);
 }
 
-export async function listAppSkillRows(
+export async function listProjectSkillRows(
   database: D1Database,
   viewerId: AccountId,
-  appId: AppId,
+  projectId: ProjectId,
 ): Promise<SkillRegistryRow[]> {
-  await ensureAppOwnership(database, viewerId, appId);
+  await ensureProjectOwnership(database, viewerId, projectId);
 
   return getAppDatabase(database)
     .select(skillRegistryColumns())
     .from(skillsTable)
     .leftJoin(accountsTable, eq(accountsTable.id, skillsTable.ownerAccountId))
-    .where(and(eq(skillsTable.appId, appId), eq(skillsTable.ownerAccountId, viewerId)))
+    .where(and(eq(skillsTable.projectId, projectId), eq(skillsTable.ownerAccountId, viewerId)))
     .orderBy(desc(skillsTable.updatedAt))
     .all();
 }

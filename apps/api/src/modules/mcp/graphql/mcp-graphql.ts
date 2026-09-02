@@ -1,19 +1,23 @@
 import type { GraphQLModule } from "../../../adapters/graphql/graphql-module";
 import { mcpGraphQLSpec } from "../../../adapters/graphql/graphql-module-specs";
 import { getMcpOAuthFlowState, startMcpOAuth } from "../application/mcp-oauth.service";
-import { readMcpOAuthFlowId, readMcpServerId, readAppId } from "../application/mcp-platform-ids";
+import {
+  readMcpOAuthFlowId,
+  readMcpServerId,
+  readProjectId,
+} from "../application/mcp-platform-ids";
 import {
   connectMcpBearer,
-  createAppMcpServer,
+  createProjectMcpServer,
   deleteMcpServer,
   getMcpRegistry,
   revokeMcpCredential,
   setMcpServerEnabled,
-  updateAppMcpServer,
+  updateProjectMcpServer,
 } from "../application/mcp-server.service";
 
-interface AppIdArgs {
-  appId: string;
+interface ProjectIdArgs {
+  projectId: string;
 }
 
 interface FlowIdArgs {
@@ -21,18 +25,18 @@ interface FlowIdArgs {
 }
 
 interface ServerIdArgs {
-  appId: string;
+  projectId: string;
   serverId: string;
 }
 
 interface SetMcpServerEnabledArgs {
   enabled: boolean;
-  appId: string;
+  projectId: string;
   serverId: string;
 }
 
-interface CreateAppMcpServerArgs {
-  input: Parameters<typeof createAppMcpServer>[2];
+interface CreateProjectMcpServerArgs {
+  input: Parameters<typeof createProjectMcpServer>[2];
 }
 
 interface ConnectMcpBearerArgs {
@@ -43,8 +47,8 @@ interface StartMcpOAuthArgs {
   input: Parameters<typeof startMcpOAuth>[3];
 }
 
-interface UpdateAppMcpServerArgs {
-  input: Parameters<typeof updateAppMcpServer>[2];
+interface UpdateProjectMcpServerArgs {
+  input: Parameters<typeof updateProjectMcpServer>[2];
 }
 
 export const mcpGraphQLModule = {
@@ -53,19 +57,19 @@ export const mcpGraphQLModule = {
     connectMcpBearer: async (_parent, args: ConnectMcpBearerArgs, context) =>
       connectMcpBearer(context.bindings, context.viewer, {
         ...args.input,
-        appId: readAppId(args.input.appId),
+        projectId: readProjectId(args.input.projectId),
         serverId: readMcpServerId(args.input.serverId),
       }),
-    createAppMcpServer: async (_parent, args: CreateAppMcpServerArgs, context) =>
-      createAppMcpServer(context.bindings, context.viewer, {
+    createProjectMcpServer: async (_parent, args: CreateProjectMcpServerArgs, context) =>
+      createProjectMcpServer(context.bindings, context.viewer, {
         ...args.input,
-        appId: readAppId(args.input.appId),
+        projectId: readProjectId(args.input.projectId),
       }),
     deleteMcpServer: async (_parent, args: ServerIdArgs, context) => {
       await deleteMcpServer(
         context.bindings.DB,
         context.viewer,
-        readAppId(args.appId),
+        readProjectId(args.projectId),
         readMcpServerId(args.serverId),
       );
       return { ok: true } as const;
@@ -74,34 +78,34 @@ export const mcpGraphQLModule = {
       revokeMcpCredential(
         context.bindings.DB,
         context.viewer,
-        readAppId(args.appId),
+        readProjectId(args.projectId),
         readMcpServerId(args.serverId),
       ),
     setMcpServerEnabled: async (_parent, args: SetMcpServerEnabledArgs, context) =>
       setMcpServerEnabled(
         context.bindings.DB,
         context.viewer,
-        readAppId(args.appId),
+        readProjectId(args.projectId),
         readMcpServerId(args.serverId),
         args.enabled,
       ),
     startMcpOAuth: async (_parent, args: StartMcpOAuthArgs, context) =>
       startMcpOAuth(context.bindings, context.request.url, context.viewer, {
         ...args.input,
-        appId: readAppId(args.input.appId),
+        projectId: readProjectId(args.input.projectId),
         serverId: readMcpServerId(args.input.serverId),
       }),
-    updateAppMcpServer: async (_parent, args: UpdateAppMcpServerArgs, context) =>
-      updateAppMcpServer(context.bindings.DB, context.viewer, {
+    updateProjectMcpServer: async (_parent, args: UpdateProjectMcpServerArgs, context) =>
+      updateProjectMcpServer(context.bindings.DB, context.viewer, {
         ...args.input,
-        appId: readAppId(args.input.appId),
+        projectId: readProjectId(args.input.projectId),
         serverId: readMcpServerId(args.input.serverId),
       }),
   },
   authenticatedQueryResolvers: {
     mcpOAuthFlowStatus: async (_parent, args: FlowIdArgs, context) =>
       getMcpOAuthFlowState(context.bindings, context.viewer, readMcpOAuthFlowId(args.flowId)),
-    mcpRegistry: async (_parent, args: AppIdArgs, context) =>
-      getMcpRegistry(context.bindings.DB, context.viewer, readAppId(args.appId)),
+    mcpRegistry: async (_parent, args: ProjectIdArgs, context) =>
+      getMcpRegistry(context.bindings.DB, context.viewer, readProjectId(args.projectId)),
   },
 } satisfies GraphQLModule;

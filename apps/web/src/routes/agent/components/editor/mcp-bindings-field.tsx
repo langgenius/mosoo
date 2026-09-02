@@ -85,7 +85,7 @@ function McpAddDropdown({
         ) : (
           <>
             <DropdownMenuLabel className="text-muted-foreground text-[10px] tracking-wider uppercase">
-              {t("agentEditor.appMcp")}
+              {t("agentEditor.projectMcp")}
             </DropdownMenuLabel>
             {availableServers.map((server) => (
               <McpPickerItem key={server.id} server={server} onPick={() => onPick(server)} />
@@ -125,18 +125,18 @@ function McpPickerItem({ server, onPick }: { server: PoolServer; onPick(): void 
 
 export function AgentMcpBindingsField({
   readOnly = false,
-  appId,
+  projectId,
   selectedServers,
   setServers,
 }: {
   readOnly?: boolean;
-  appId: string | null;
+  projectId: string | null;
   selectedServers: McpServer[];
   setServers: (servers: McpServer[]) => void;
 }) {
   const { t } = useTranslation();
   const [addOpen, setAddOpen] = useState(false);
-  const registryQuery = useMcpRegistryQuery(appId);
+  const registryQuery = useMcpRegistryQuery(projectId);
 
   const poolServers = registryQuery.data?.servers ?? [];
   const poolServerById = useMemo(() => createPoolServerById(poolServers), [poolServers]);
@@ -158,10 +158,10 @@ export function AgentMcpBindingsField({
     setServers(selectedServers.filter((server) => server.id !== serverId));
   }
 
-  if (!isTruthy(appId)) {
+  if (!isTruthy(projectId)) {
     return (
       <div className="border-border text-muted-foreground rounded-lg border p-3 text-[12px]">
-        {t("agentEditor.selectAppFirst")}
+        {t("agentEditor.selectProjectFirst")}
       </div>
     );
   }
@@ -184,7 +184,7 @@ export function AgentMcpBindingsField({
     <div className="border-border divide-border-subtle divide-y overflow-hidden rounded-lg border">
       {selectedServers.map((server) => {
         const pool = poolServerById.get(server.id);
-        const sourceLabel = `${t("nav.app")} · ${pool?.ownerName ?? t("agentEditor.owner")}`;
+        const sourceLabel = `${t("nav.project")} · ${pool?.ownerName ?? t("agentEditor.owner")}`;
 
         return (
           <div

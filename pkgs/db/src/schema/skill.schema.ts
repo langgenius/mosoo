@@ -1,5 +1,5 @@
 import type { SkillSnapshotEntryKind, SkillSourceKind } from "@mosoo/contracts/skill";
-import type { AccountId, AppId, SkillId, SkillSnapshotId } from "@mosoo/id";
+import type { AccountId, ProjectId, SkillId, SkillSnapshotId } from "@mosoo/id";
 import {
   index,
   integer,
@@ -24,13 +24,13 @@ export const skillsTable = sqliteTable(
     id: platformIdColumn<SkillId>("id").primaryKey(),
     name: text("name").notNull(),
     ownerAccountId: platformIdColumn<AccountId>("owner_account_id").notNull(),
-    appId: platformIdColumn<AppId>("app_id").notNull(),
+    projectId: platformIdColumn<ProjectId>("project_id").notNull(),
     sourceKind: text("source_kind").$type<SkillSourceKind>().notNull(),
     updatedAt: integer("updated_at").notNull(),
     version: text("version"),
   },
   (table) => [
-    index("skill_app_updated_at_idx").on(table.appId, table.updatedAt),
+    index("skill_project_updated_at_idx").on(table.projectId, table.updatedAt),
     index("skill_owner_account_updated_at_idx").on(table.ownerAccountId, table.updatedAt),
   ],
 );
@@ -46,14 +46,14 @@ export const skillSnapshotsTable = sqliteTable(
     description: text("description").notNull(),
     id: platformIdColumn<SkillSnapshotId>("id").primaryKey(),
     name: text("name").notNull(),
-    appId: platformIdColumn<AppId>("app_id").notNull(),
+    projectId: platformIdColumn<ProjectId>("project_id").notNull(),
     skillMarkdownPath: text("skill_markdown_path").notNull(),
     uncompressedSize: integer("uncompressed_size").notNull(),
     version: text("version"),
   },
   (table) => [
-    index("skill_snapshot_app_created_at_idx").on(table.appId, table.createdAt),
-    uniqueIndex("skill_snapshot_blob_sha256_idx").on(table.appId, table.blobSha256),
+    index("skill_snapshot_project_created_at_idx").on(table.projectId, table.createdAt),
+    uniqueIndex("skill_snapshot_blob_sha256_idx").on(table.projectId, table.blobSha256),
   ],
 );
 

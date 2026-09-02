@@ -12,7 +12,7 @@ import type {
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import { ensureAppAgentOwner } from "./agent-access.service";
+import { ensureProjectAgentOwner } from "./agent-access.service";
 import { buildAgentManifest } from "./agent-manifest.service";
 import { toAgentModel } from "./agent-models";
 import { bindDraftAgentMcpServers, createDraftAgent } from "./agent-package-draft.service";
@@ -25,9 +25,9 @@ export async function createAgentFork(
   viewer: AuthenticatedViewer,
   input: CreateAgentForkInput,
 ): Promise<AgentPackageImportResult<Agent>> {
-  const { agent: sourceAgent } = await ensureAppAgentOwner(bindings.DB, viewer.id, {
+  const { agent: sourceAgent } = await ensureProjectAgentOwner(bindings.DB, viewer.id, {
     agentId: input.agentId,
-    appId: input.appId,
+    projectId: input.projectId,
   });
   const forkKind = input.kind ?? sourceAgent.kind;
   const manifest = await buildAgentManifest(bindings.DB, sourceAgent);
@@ -40,7 +40,7 @@ export async function createAgentFork(
       actorAccountId: viewer.id,
       codePrefix: "agent.fork",
       database: bindings.DB,
-      appId: sourceAgent.appId,
+      projectId: sourceAgent.projectId,
       selection: {
         model: manifest.runtime.model,
         provider: manifest.runtime.provider,
@@ -55,7 +55,7 @@ export async function createAgentFork(
       database: bindings.DB,
       issues,
       manifest,
-      appId: sourceAgent.appId,
+      projectId: sourceAgent.projectId,
       summary,
       viewerId: viewer.id,
     }),
@@ -82,7 +82,7 @@ export async function createAgentFork(
     prompt: sourceAgent.prompt,
     provider: sourceAgent.provider,
     providerOptions: sourceStoredConfig.providerOptions,
-    appId: sourceAgent.appId,
+    projectId: sourceAgent.projectId,
     runtimeId: sourceAgent.runtimeId,
     skillIds: skillResolution.skillIds,
   });

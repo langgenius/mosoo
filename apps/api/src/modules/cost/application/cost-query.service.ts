@@ -1,13 +1,13 @@
 import { accountsTable, agentsTable } from "@mosoo/db";
-import type { AccountId, AgentId, OrganizationId, AppId } from "@mosoo/id";
+import type { AccountId, AgentId, OrganizationId, ProjectId } from "@mosoo/id";
 import { eq, sql } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { forbiddenError } from "../../../platform/errors";
-import { ensureAppAgentOwner } from "../../agents/application/agent-access.service";
-import { ensureAppOwnership } from "../../apps/application/app.service";
+import { ensureProjectAgentOwner } from "../../agents/application/agent-access.service";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { ensureOrganizationOwnership } from "../../organizations/domain/organization-ownership.policy";
+import { ensureProjectOwnership } from "../../projects/application/project.service";
 import { resolveCostWindow } from "./cost-query-window";
 import {
   queryAgents,
@@ -21,7 +21,7 @@ import type {
   CostAttributionCardView,
   CostRange,
   OrganizationBillingCostCardView,
-  AppCostCardView,
+  ProjectCostCardView,
 } from "./cost-query.types";
 
 export type { CostRange } from "./cost-query.types";
@@ -37,15 +37,15 @@ export interface OrganizationBillingCostCardInput extends CostCardAccessInput {
   runPurposes?: readonly string[];
 }
 
-export interface AppCostCardInput extends CostCardAccessInput {
-  appId: AppId;
+export interface ProjectCostCardInput extends CostCardAccessInput {
+  projectId: ProjectId;
   range: CostRange;
   runPurposes?: readonly string[];
 }
 
 export interface AgentCostCardInput extends CostCardAccessInput {
   agentId: AgentId;
-  appId: AppId;
+  projectId: ProjectId;
   range: CostRange;
   runPurposes?: readonly string[];
 }
@@ -55,7 +55,7 @@ async function buildAttributionCard(
   input: {
     agentId?: AgentId;
     organizationId: OrganizationId;
-    appId?: AppId;
+    projectId?: ProjectId;
     range: CostRange;
     runPurposes?: readonly string[];
   },
@@ -149,26 +149,26 @@ export async function getOrganizationBillingCostCard({
   };
 }
 
-export async function getAppCostCard({
+export async function getProjectCostCard({
   database,
-  appId,
+  projectId,
   range,
   runPurposes = [],
   viewer,
-}: AppCostCardInput): Promise<AppCostCardView> {
-  const app = await ensureAppOwnership(database, viewer.id, appId);
+}: ProjectCostCardInput): Promise<ProjectCostCardView> {
+  const project = await ensureProjectOwnership(database, viewer.id, projectId);
   const window = resolveCostWindow(range);
   const previousWindow = resolveCostWindow(previousRange(range), new Date(window.sinceMs - 1));
   const [card, previousTotals] = await Promise.all([
     buildAttributionCard(database, {
-      organizationId: app.organizationId,
-      appId: app.id,
+      organizationId: project.organizationId,
+      projectId: project.id,
       range,
       runPurposes,
     }),
     queryTotals(database, {
-      organizationId: app.organizationId,
-      appId: app.id,
+      organizationId: project.organizationId,
+      projectId: project.id,
       runPurposes,
       window: previousWindow,
     }),
@@ -177,27 +177,27 @@ export async function getAppCostCard({
   return {
     ...card,
     previousTotals,
-    appId: app.id,
-    appName: app.name,
+    projectId: project.id,
+    projectName: project.name,
   };
 }
 
 export async function getAgentCostCard({
   agentId,
   database,
-  appId,
+  projectId,
   range,
   runPurposes = [],
   viewer,
 }: AgentCostCardInput): Promise<AgentCostCardView> {
-  const app = await ensureAppOwnership(database, viewer.id, appId);
-  const { agent } = await ensureAppAgentOwner(database, viewer.id, { agentId, appId });
+  const project = await ensureProjectOwnership(database, viewer.id, projectId);
+  const { agent } = await ensureProjectAgentOwner(database, viewer.id, { agentId, projectId });
   const [header, card] = await Promise.all([
     getAgentHeader(database, agentId),
     buildAttributionCard(database, {
       agentId,
-      organizationId: app.organizationId,
-      appId: agent.appId,
+      organizationId: project.organizationId,
+      projectId: agent.projectId,
       range,
       runPurposes,
     }),

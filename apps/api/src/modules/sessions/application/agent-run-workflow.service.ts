@@ -5,7 +5,7 @@ import type {
   StartAgentRunInput,
 } from "@mosoo/contracts/session";
 import { parsePlatformId } from "@mosoo/id";
-import type { AccountId, AgentId, AppId, SessionId } from "@mosoo/id";
+import type { AccountId, AgentId, ProjectId, SessionId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { validationError } from "../../../platform/errors";
@@ -49,14 +49,14 @@ function toGraphQLUrl(requestUrl: string): string {
 
 async function getExistingRunSession(input: {
   agentId: AgentId | null;
-  appId: AppId;
+  projectId: ProjectId;
   bindings: ApiBindings;
   sessionId: SessionId;
   viewer: AuthenticatedViewer;
 }): Promise<SessionSummary> {
   const viewerId = parsePlatformId<AccountId>(input.viewer.id, "viewer id");
   const access = await getParticipantSessionSummaryAccessById(input.bindings.DB, viewerId, {
-    appId: input.appId,
+    projectId: input.projectId,
     sessionId: input.sessionId,
   });
 
@@ -70,17 +70,17 @@ async function getExistingRunSession(input: {
 type RunSessionInput =
   | {
       agentId: AgentId;
-      appId: AppId;
+      projectId: ProjectId;
       sessionId: null;
     }
   | {
       agentId: AgentId | null;
-      appId: AppId;
+      projectId: ProjectId;
       sessionId: SessionId;
     };
 
 function getRunSessionInput(input: StartAgentRunInput): RunSessionInput {
-  const appId = parsePlatformId<AppId>(input.appId, "app id");
+  const projectId = parsePlatformId<ProjectId>(input.projectId, "project id");
   const sessionId =
     input.sessionId === null || input.sessionId === undefined
       ? null
@@ -97,14 +97,14 @@ function getRunSessionInput(input: StartAgentRunInput): RunSessionInput {
 
     return {
       agentId,
-      appId,
+      projectId,
       sessionId,
     };
   }
 
   return {
     agentId,
-    appId,
+    projectId,
     sessionId,
   };
 }
@@ -121,7 +121,7 @@ export async function startAgentRun(request: StartAgentRunRequest): Promise<Agen
       executionContext: request.executionContext,
       input: {
         agentId: ids.agentId,
-        appId: ids.appId,
+        projectId: ids.projectId,
         type: request.input.type ?? "ui",
         waitForRuntimeReady: request.input.waitForRuntimeReady ?? null,
       },
@@ -132,7 +132,7 @@ export async function startAgentRun(request: StartAgentRunRequest): Promise<Agen
   } else {
     session = await getExistingRunSession({
       agentId: ids.agentId,
-      appId: ids.appId,
+      projectId: ids.projectId,
       bindings: request.bindings,
       sessionId: ids.sessionId,
       viewer: request.viewer,
@@ -152,7 +152,7 @@ export async function startAgentRun(request: StartAgentRunRequest): Promise<Agen
           type: "user_message",
         },
       ],
-      appId: session.appId,
+      projectId: session.projectId,
       sessionId: session.id,
     },
     requestUrl: request.requestUrl,
@@ -165,7 +165,7 @@ export async function startAgentRun(request: StartAgentRunRequest): Promise<Agen
     createdSession,
     eventBatch,
     eventSurface: {
-      appId: session.appId,
+      projectId: session.projectId,
       graphqlUrl: toGraphQLUrl(request.requestUrl),
       messagesOperation: MESSAGES_OPERATION,
       processEventsOperation: PROCESS_EVENTS_OPERATION,

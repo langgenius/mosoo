@@ -1,6 +1,6 @@
 import type { AgentSessionActionCapabilityName } from "@mosoo/contracts/session";
 import { sandboxSessionsTable, sessionRunsTable, sessionsTable } from "@mosoo/db";
-import type { AppId, SessionId, SessionRunId } from "@mosoo/id";
+import type { ProjectId, SessionId, SessionRunId } from "@mosoo/id";
 import { getAvailableAgentSessionActionCapability } from "@mosoo/session-policy";
 import { and, eq, inArray } from "drizzle-orm";
 
@@ -22,8 +22,8 @@ import type {
   SessionParticipantCapabilityAccessRow,
 } from "../domain/session-access.policy";
 import {
-  getAppSessionParticipantCapabilityAccess,
-  lookupAppSessionParticipantCapabilityAccess,
+  getProjectSessionParticipantCapabilityAccess,
+  lookupProjectSessionParticipantCapabilityAccess,
   resolveSessionActionCreatorFlag,
 } from "../domain/session-access.policy";
 import {
@@ -43,7 +43,7 @@ import { deleteSessionCascade } from "./session-cleanup.service";
 export interface ArchiveAgentSessionRequest {
   authorization?: SessionActionAuthorization | undefined;
   bindings: ApiBindings;
-  appId: AppId;
+  projectId: ProjectId;
   sessionId: SessionId;
   viewer: AuthenticatedViewer;
 }
@@ -51,7 +51,7 @@ export interface ArchiveAgentSessionRequest {
 export interface UnarchiveAgentSessionRequest {
   authorization?: SessionActionAuthorization | undefined;
   database: D1Database;
-  appId: AppId;
+  projectId: ProjectId;
   sessionId: SessionId;
   viewer: AuthenticatedViewer;
 }
@@ -59,7 +59,7 @@ export interface UnarchiveAgentSessionRequest {
 export interface DeleteAgentSessionRequest {
   authorization?: SessionActionAuthorization | undefined;
   bindings: ApiBindings;
-  appId: AppId;
+  projectId: ProjectId;
   sessionId: SessionId;
   viewer: AuthenticatedViewer;
 }
@@ -151,12 +151,12 @@ async function normalizeSessionRuntimeLifecycle(
 export async function archiveAgentSession({
   authorization,
   bindings,
-  appId,
+  projectId,
   sessionId,
   viewer,
 }: ArchiveAgentSessionRequest): Promise<SessionArchiveCleanupStepOutcome[]> {
-  const session = await getAppSessionParticipantCapabilityAccess(bindings.DB, viewer.id, {
-    appId,
+  const session = await getProjectSessionParticipantCapabilityAccess(bindings.DB, viewer.id, {
+    projectId,
     sessionId,
   });
   ensureLifecycleActionCapability({
@@ -197,7 +197,7 @@ export async function archiveAgentSession({
             archivedAt: timestampMs,
             updatedAt: timestampMs,
           })
-          .where(and(eq(sessionsTable.id, sessionId), eq(sessionsTable.appId, appId)))
+          .where(and(eq(sessionsTable.id, sessionId), eq(sessionsTable.projectId, projectId)))
           .run();
         return;
       }
@@ -278,12 +278,12 @@ function requireArchiveCleanupTargets(
 export async function unarchiveAgentSession({
   authorization,
   database,
-  appId,
+  projectId,
   sessionId,
   viewer,
 }: UnarchiveAgentSessionRequest): Promise<void> {
-  const session = await getAppSessionParticipantCapabilityAccess(database, viewer.id, {
-    appId,
+  const session = await getProjectSessionParticipantCapabilityAccess(database, viewer.id, {
+    projectId,
     sessionId,
   });
   ensureLifecycleActionCapability({
@@ -300,19 +300,19 @@ export async function unarchiveAgentSession({
       archivedAt: null,
       updatedAt: currentTimestampMs(),
     })
-    .where(and(eq(sessionsTable.id, sessionId), eq(sessionsTable.appId, appId)))
+    .where(and(eq(sessionsTable.id, sessionId), eq(sessionsTable.projectId, projectId)))
     .run();
 }
 
 export async function deleteAgentSession({
   authorization,
   bindings,
-  appId,
+  projectId,
   sessionId,
   viewer,
 }: DeleteAgentSessionRequest): Promise<void> {
-  const lookup = await lookupAppSessionParticipantCapabilityAccess(bindings.DB, viewer.id, {
-    appId,
+  const lookup = await lookupProjectSessionParticipantCapabilityAccess(bindings.DB, viewer.id, {
+    projectId,
     sessionId,
   });
 

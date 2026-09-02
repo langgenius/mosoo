@@ -10,7 +10,7 @@ import {
   createAgentPackageSkillPath,
   serializeAgentManifestToYaml,
 } from "@mosoo/contracts/agent-manifest-serializer";
-import type { AgentId, AppId } from "@mosoo/id";
+import type { AgentId, ProjectId } from "@mosoo/id";
 import { unzipSync } from "fflate";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
@@ -18,7 +18,7 @@ import { isTruthy } from "../../../shared/truthiness";
 import { toIsoString } from "../../../time";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { readSkillPackageBytesFromSnapshot } from "../../skills/application/skill-package-snapshot.service";
-import { ensureAppAgentOwner } from "./agent-access.service";
+import { ensureProjectAgentOwner } from "./agent-access.service";
 import { createAgentPackageFile } from "./agent-package-file.service";
 import { buildAgentSpec, toAgentManifest } from "./agent-spec.service";
 import type { AgentSpecSkill } from "./agent-spec.service";
@@ -89,10 +89,10 @@ export async function exportAgentPackage(
   viewer: AuthenticatedViewer,
   input: {
     agentId: AgentId;
-    appId: AppId;
+    projectId: ProjectId;
   },
 ): Promise<AgentPackageExport> {
-  const packageAccess = await ensureAppAgentOwner(bindings.DB, viewer.id, input);
+  const packageAccess = await ensureProjectAgentOwner(bindings.DB, viewer.id, input);
   const sourceSpec = await buildAgentSpec(bindings.DB, packageAccess.agent);
   const sourceManifest = toAgentManifest(sourceSpec);
   const manifest = createPortableAgentPackageManifest(sourceManifest);
@@ -106,7 +106,7 @@ export async function exportAgentPackage(
 
   const agentPackage: AgentPackage = {
     author: null,
-    app: {
+    project: {
       avatarAssetKey: null,
       description: packageAccess.agent.description,
       name: packageAccess.agent.name,
@@ -125,7 +125,7 @@ export async function exportAgentPackage(
     archiveBytes,
     bindings,
     fileName,
-    appId: packageAccess.agent.appId,
+    projectId: packageAccess.agent.projectId,
     viewer,
   });
 

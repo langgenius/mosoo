@@ -1,6 +1,6 @@
 import type { ApiCommandKind } from "@mosoo/db";
 import { parsePlatformId } from "@mosoo/id";
-import type { AccountId, FileId, AppId, SessionId, SessionRunId } from "@mosoo/id";
+import type { AccountId, FileId, ProjectId, SessionId, SessionRunId } from "@mosoo/id";
 
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import type {
@@ -27,7 +27,7 @@ export interface CostLedgerReconciliationCommandPayload {
 }
 
 export interface EnvironmentPackageArtifactBuildCommandPayload {
-  appId: AppId;
+  projectId: ProjectId;
   artifactAbi: string;
   inputDigest: string;
   packages: { manager: "npm" | "pip"; packages: string[] }[];
@@ -41,7 +41,7 @@ export interface SessionRunDispatchCommandPayload {
   requestUrl: string;
   session: {
     id: SessionId;
-    app_id: AppId;
+    project_id: ProjectId;
   };
   sessionRunId: SessionRunId;
   traceId: string;
@@ -165,9 +165,9 @@ function parseSessionRunDispatchPayload(value: unknown): SessionRunDispatchComma
     requestUrl: readNonEmptyString(record, "requestUrl", "session_run_dispatch payload"),
     session: {
       id: parsePlatformId<SessionId>(session["id"], "session_run_dispatch payload.session.id"),
-      app_id: parsePlatformId<AppId>(
-        session["app_id"],
-        "session_run_dispatch payload.session.app_id",
+      project_id: parsePlatformId<ProjectId>(
+        session["project_id"] ?? session["app_id"],
+        "session_run_dispatch payload.session.project_id",
       ),
     },
     sessionRunId: parsePlatformId<SessionRunId>(
@@ -241,7 +241,10 @@ function parseEnvironmentPackageArtifactBuildPayload(
   );
 
   return {
-    appId: parsePlatformId<AppId>(record["appId"], `${label}.appId`),
+    projectId: parsePlatformId<ProjectId>(
+      record["projectId"] ?? record["appId"],
+      `${label}.projectId`,
+    ),
     artifactAbi: readNonEmptyString(record, "artifactAbi", label),
     inputDigest,
     packages,

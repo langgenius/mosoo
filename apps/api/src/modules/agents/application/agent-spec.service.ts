@@ -23,7 +23,7 @@ import type {
   EnvironmentId,
   AgentId,
   McpServerId,
-  AppId,
+  ProjectId,
   SkillId,
   SkillSnapshotId,
 } from "@mosoo/id";
@@ -47,7 +47,7 @@ import { parseAgentStoredConfig, serializeAgentStoredConfig } from "./agent-stor
 import type { AgentRow } from "./agent-types";
 
 interface EnvironmentNameRow {
-  appId: AppId;
+  projectId: ProjectId;
   id: EnvironmentId;
   name: string;
   packagesJson: string;
@@ -119,7 +119,7 @@ export async function getAgentEnvironmentName(
   return (
     (await getAppDatabase(database)
       .select({
-        appId: environmentsTable.appId,
+        projectId: environmentsTable.projectId,
         id: environmentsTable.id,
         name: environmentsTable.name,
         packagesJson: environmentRevisionsTable.packagesJson,

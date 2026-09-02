@@ -215,11 +215,11 @@ function collectArchiveDeclarationIssues(agentPackage: AgentPackage): AgentResol
 function collectArchivePathDeclarations(agentPackage: AgentPackage): ArchivePathDeclaration[] {
   const declarations: ArchivePathDeclaration[] = [];
 
-  if (agentPackage.app.avatarAssetKey !== null) {
+  if (agentPackage.project.avatarAssetKey !== null) {
     declarations.push({
       entryKind: "file",
-      path: agentPackage.app.avatarAssetKey,
-      targetLabel: agentPackage.app.avatarAssetKey,
+      path: agentPackage.project.avatarAssetKey,
+      targetLabel: agentPackage.project.avatarAssetKey,
       targetType: "agent",
     });
   }
@@ -248,8 +248,8 @@ export function createAllowedArchivePaths(
     allowedPaths.add(ENVIRONMENT_DEFINITION_PATH);
   }
 
-  if (agentPackage.app.avatarAssetKey !== null) {
-    allowedPaths.add(agentPackage.app.avatarAssetKey);
+  if (agentPackage.project.avatarAssetKey !== null) {
+    allowedPaths.add(agentPackage.project.avatarAssetKey);
   }
 
   if (catalog.mcpServerNames.size > 0) {

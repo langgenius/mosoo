@@ -9,7 +9,7 @@ import type {
   UpdateFileRequest,
 } from "@mosoo/contracts/file";
 import type { FileListQuery, FileSessionKind } from "@mosoo/contracts/file";
-import type { AppId, FileId, SessionId } from "@mosoo/id";
+import type { ProjectId, FileId, SessionId } from "@mosoo/id";
 import type { Hono } from "hono";
 
 import { getAuthenticatedViewerFromRequest } from "../../../modules/auth/application/viewer-auth.service";
@@ -84,15 +84,19 @@ function readFileSessionKind(value: string | undefined): FileSessionKind | null 
 }
 
 function readFileListQuery(
-  appIdValue: string | undefined,
+  projectIdValue: string | undefined,
   sessionIdValue: string | undefined,
   c: { req: { query: (name: string) => string | undefined } },
 ): FileListQuery {
-  if (appIdValue === undefined || appIdValue.trim().length === 0) {
-    throw new FileControlError(400, "file_invalid_request", "App ID is required to list files.");
+  if (projectIdValue === undefined || projectIdValue.trim().length === 0) {
+    throw new FileControlError(
+      400,
+      "file_invalid_request",
+      "Project ID is required to list files.",
+    );
   }
 
-  const appId = toPlatformId<AppId>(appIdValue, "App ID");
+  const projectId = toPlatformId<ProjectId>(projectIdValue, "Project ID");
   const sessionId =
     sessionIdValue === undefined || sessionIdValue.trim().length === 0
       ? undefined
@@ -100,7 +104,7 @@ function readFileListQuery(
   const sessionKind = readFileSessionKind(c.req.query("sessionKind"));
 
   return {
-    appId,
+    projectId,
     ...(sessionId === undefined ? {} : { sessionId }),
     ...(sessionKind === undefined ? {} : { sessionKind }),
   };
@@ -111,7 +115,7 @@ function assertUserFileUploadTarget(request: CreateFileUploadRequest): void {
     throw new FileControlError(
       400,
       "file_invalid_request",
-      "App file library uploads are not supported in this version.",
+      "Project file library uploads are not supported in this version.",
     );
   }
 }
@@ -146,7 +150,7 @@ export function registerFileRoute(app: Hono<ApiGatewayEnvironment>) {
       const listing = await fileStore.list(
         c.env,
         viewer,
-        readFileListQuery(c.req.query("appId"), c.req.query("sessionId"), c),
+        readFileListQuery(c.req.query("projectId"), c.req.query("sessionId"), c),
       );
       const response: FileEntryListing = {
         files: listing.files.map(toFileEntry),

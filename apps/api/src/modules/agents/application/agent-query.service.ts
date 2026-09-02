@@ -1,14 +1,14 @@
 import type { AgentDetail, AgentEditorState, AgentSummary } from "@mosoo/contracts/agent";
-import type { AgentId, AppId } from "@mosoo/id";
+import type { AgentId, ProjectId } from "@mosoo/id";
 
-import { ensureAppOwnership } from "../../apps/application/app.service";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { listAgentMcpBindings } from "../../mcp/application/mcp-agent-binding.service";
-import { ensureAppAgentOwner } from "./agent-access.service";
+import { ensureProjectOwnership } from "../../projects/application/project.service";
+import { ensureProjectAgentOwner } from "./agent-access.service";
 import { loadAgentEnvironmentConfig } from "./agent-environment.service";
 import { toAgentDetailModel, toAgentSummaryModels } from "./agent-models";
 import { computeAgentReadiness } from "./agent-readiness.service";
-import { listAppOwnerAgentRows } from "./agent-repository";
+import { listProjectOwnerAgentRows } from "./agent-repository";
 import { parseAgentStoredConfig } from "./agent-stored-config.service";
 
 export async function getAgent(
@@ -16,10 +16,10 @@ export async function getAgent(
   viewer: AuthenticatedViewer,
   input: {
     agentId: AgentId;
-    appId: AppId;
+    projectId: ProjectId;
   },
 ): Promise<AgentDetail> {
-  const agent = await ensureAppAgentOwner(database, viewer.id, input);
+  const agent = await ensureProjectAgentOwner(database, viewer.id, input);
   return toAgentDetailModel(database, viewer, agent.agent, agent.owner, agent.viewerRole);
 }
 
@@ -28,10 +28,10 @@ export async function getAgentEditorState(
   viewer: AuthenticatedViewer,
   input: {
     agentId: AgentId;
-    appId: AppId;
+    projectId: ProjectId;
   },
 ): Promise<AgentEditorState> {
-  const editable = await ensureAppAgentOwner(database, viewer.id, input);
+  const editable = await ensureProjectAgentOwner(database, viewer.id, input);
   const environment = await loadAgentEnvironmentConfig(
     database,
     editable.agent.id,
@@ -52,7 +52,7 @@ export async function getAgentEditorState(
       kind: editable.agent.kind,
       model: editable.agent.model,
       packageResolution: storedConfig.packageResolution,
-      appId: editable.agent.appId,
+      projectId: editable.agent.projectId,
       provider: editable.agent.provider,
       runtimeId: editable.agent.runtimeId,
     }),
@@ -62,11 +62,11 @@ export async function getAgentEditorState(
 export async function listVisibleAgents(
   database: D1Database,
   viewer: AuthenticatedViewer,
-  appId: AppId,
+  projectId: ProjectId,
 ): Promise<AgentSummary[]> {
-  await ensureAppOwnership(database, viewer.id, appId);
-  const agents = await listAppOwnerAgentRows(database, {
-    appId,
+  await ensureProjectOwnership(database, viewer.id, projectId);
+  const agents = await listProjectOwnerAgentRows(database, {
+    projectId,
     viewerId: viewer.id,
   });
 

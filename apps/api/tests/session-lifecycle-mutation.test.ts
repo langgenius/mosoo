@@ -555,7 +555,7 @@ describe("session lifecycle mutations", () => {
 
     const outcomes = await archiveAgentSession({
       bindings,
-      appId: PUBLIC_API_TEST_IDS.app,
+      projectId: PUBLIC_API_TEST_IDS.project,
       sessionId: PUBLIC_API_TEST_IDS.ownerSession,
       viewer: OWNER_VIEWER,
     });
@@ -609,7 +609,7 @@ describe("session lifecycle mutations", () => {
 
     await unarchiveAgentSession({
       database,
-      appId: PUBLIC_API_TEST_IDS.app,
+      projectId: PUBLIC_API_TEST_IDS.project,
       sessionId: PUBLIC_API_TEST_IDS.ownerSession,
       viewer: OWNER_VIEWER,
     });
@@ -660,7 +660,7 @@ describe("session lifecycle mutations", () => {
     await expect(
       archiveAgentSession({
         bindings,
-        appId: PUBLIC_API_TEST_IDS.app,
+        projectId: PUBLIC_API_TEST_IDS.project,
         sessionId: PUBLIC_API_TEST_IDS.ownerSession,
         viewer: OWNER_VIEWER,
       }),
@@ -674,7 +674,7 @@ describe("session lifecycle mutations", () => {
     await expect(
       unarchiveAgentSession({
         database,
-        appId: PUBLIC_API_TEST_IDS.app,
+        projectId: PUBLIC_API_TEST_IDS.project,
         sessionId: PUBLIC_API_TEST_IDS.ownerSession,
         viewer: OWNER_VIEWER,
       }),
@@ -683,7 +683,7 @@ describe("session lifecycle mutations", () => {
     await expect(
       deleteAgentSession({
         bindings,
-        appId: PUBLIC_API_TEST_IDS.app,
+        projectId: PUBLIC_API_TEST_IDS.project,
         sessionId: PUBLIC_API_TEST_IDS.ownerSession,
         viewer: OWNER_VIEWER,
       }),

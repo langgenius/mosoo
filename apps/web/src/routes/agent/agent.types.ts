@@ -51,6 +51,7 @@ export interface McpServer {
   authorizationState?: McpAuthorizationState;
   iconUrl?: string; // Connector icon
   type?: "web" | "custom";
+  // "app" is the frozen manifest/storage token for Project-provided servers.
   source?: "app";
   /**
    * Credential resolution mode for this Agent × Server binding.
@@ -85,7 +86,7 @@ export interface UserInfo {
 
 export interface Agent {
   id: string;
-  appId: string;
+  projectId: string;
   kind: AgentKind;
   liveVersion: AgentDeploymentVersion | null;
   name: string;

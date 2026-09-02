@@ -99,7 +99,7 @@ export async function sendPublicThreadSessionEvents(
     executionContext: request.executionContext,
     input: {
       events,
-      appId: admission.session.app_id,
+      projectId: admission.session.project_id,
       sessionId,
     },
     options: {
@@ -130,7 +130,7 @@ export async function archivePublicThreadSession(
   await archiveAgentSession({
     authorization: "admitted",
     bindings: request.bindings,
-    appId: admission.session.app_id,
+    projectId: admission.session.project_id,
     sessionId,
     viewer: request.caller,
   });
@@ -148,7 +148,7 @@ export async function unarchivePublicThreadSession(
   await unarchiveAgentSession({
     authorization: "admitted",
     database: request.database,
-    appId: admission.session.app_id,
+    projectId: admission.session.project_id,
     sessionId,
     viewer: request.caller,
   });
@@ -166,7 +166,7 @@ export async function deletePublicThreadSession(
   await deleteAgentSession({
     authorization: "admitted",
     bindings: request.bindings,
-    appId: admission.session.app_id,
+    projectId: admission.session.project_id,
     sessionId,
     viewer: request.caller,
   });

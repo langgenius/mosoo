@@ -1,5 +1,5 @@
-import { accountsTable, mcpCredentialsTable, mcpServersTable, appsTable } from "@mosoo/db";
-import type { AccountId, AgentId, CredentialId, McpServerId, AppId } from "@mosoo/id";
+import { accountsTable, mcpCredentialsTable, mcpServersTable, projectsTable } from "@mosoo/db";
+import type { AccountId, AgentId, CredentialId, McpServerId, ProjectId } from "@mosoo/id";
 import { and, desc, eq } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 
@@ -18,7 +18,7 @@ export interface McpRegistryServerSnapshot {
 export interface McpRegistrySnapshot {
   currentUserEmail: string | null;
   currentUserName: string | null;
-  appId: AppId;
+  projectId: ProjectId;
   servers: McpRegistryServerSnapshot[];
 }
 
@@ -31,7 +31,7 @@ interface McpRegistrySnapshotRow {
   credentialLastRefreshedAt: number | null;
   credentialOauthClientId: string | null;
   credentialOauthClientSecretSecretId: string | null;
-  credentialAppId: AppId | null;
+  credentialProjectId: ProjectId | null;
   credentialRefreshSecretId: string | null;
   credentialScope: CredentialRow["scope"] | null;
   credentialScopeValuesJson: string | null;
@@ -41,7 +41,7 @@ interface McpRegistrySnapshotRow {
   credentialSubjectLabel: string | null;
   credentialUpdatedAt: number | null;
   credentialUserId: AccountId | null;
-  appId: AppId;
+  projectId: ProjectId;
   serverAuthType: ServerRow["authType"] | null;
   serverByoClientId: string | null;
   serverByoClientSecretSecretId: string | null;
@@ -55,7 +55,7 @@ interface McpRegistrySnapshotRow {
   serverOauthMetadataJson: string | null;
   serverOwnerId: AccountId | null;
   serverOwnerName: string | null;
-  serverAppId: AppId | null;
+  serverProjectId: ProjectId | null;
   serverSource: ServerRow["source"] | null;
   serverUpdatedAt: number | null;
   serverUrl: string | null;
@@ -91,7 +91,7 @@ function toRegistryServerRow(row: McpRegistrySnapshotRow): ServerRow | null {
     oauthMetadataJson: row.serverOauthMetadataJson,
     ownerId: requireRegistryValue(row.serverOwnerId, "server_owner_id"),
     ownerName: row.serverOwnerName,
-    appId: requireRegistryValue(row.serverAppId, "server_app_id"),
+    projectId: requireRegistryValue(row.serverProjectId, "server_project_id"),
     source: requireRegistryValue(row.serverSource, "server_source"),
     updatedAt: requireRegistryValue(row.serverUpdatedAt, "server_updated_at"),
     url: requireRegistryValue(row.serverUrl, "server_url"),
@@ -112,7 +112,7 @@ function toRegistryCredentialRow(row: McpRegistrySnapshotRow): CredentialRow | n
     lastRefreshedAt: row.credentialLastRefreshedAt,
     oauthClientId: row.credentialOauthClientId,
     oauthClientSecretSecretId: row.credentialOauthClientSecretSecretId,
-    appId: requireRegistryValue(row.credentialAppId, "credential_app_id"),
+    projectId: requireRegistryValue(row.credentialProjectId, "credential_project_id"),
     refreshSecretId: row.credentialRefreshSecretId,
     scope: requireRegistryValue(row.credentialScope, "credential_scope"),
     scopeValuesJson: row.credentialScopeValuesJson,
@@ -125,7 +125,7 @@ function toRegistryCredentialRow(row: McpRegistrySnapshotRow): CredentialRow | n
   };
 }
 
-function hasActiveAppCredential(credential: CredentialRow | null): boolean {
+function hasActiveProjectCredential(credential: CredentialRow | null): boolean {
   return credential?.scope === "app" && credential.status === "active";
 }
 
@@ -133,7 +133,7 @@ function toMcpRegistrySnapshot(rows: McpRegistrySnapshotRow[]): McpRegistrySnaps
   const firstRow = rows[0] ?? null;
 
   if (firstRow === null) {
-    throw new Error("App not found.");
+    throw new Error("Project not found.");
   }
 
   const servers: McpRegistryServerSnapshot[] = [];
@@ -149,7 +149,7 @@ function toMcpRegistrySnapshot(rows: McpRegistrySnapshotRow[]): McpRegistrySnaps
 
     servers.push({
       credential,
-      hasCredential: hasActiveAppCredential(credential),
+      hasCredential: hasActiveProjectCredential(credential),
       server,
     });
   }
@@ -157,7 +157,7 @@ function toMcpRegistrySnapshot(rows: McpRegistrySnapshotRow[]): McpRegistrySnaps
   return {
     currentUserEmail: firstRow.viewerEmail,
     currentUserName: firstRow.viewerName,
-    appId: firstRow.appId,
+    projectId: firstRow.projectId,
     servers,
   };
 }
@@ -165,7 +165,7 @@ function toMcpRegistrySnapshot(rows: McpRegistrySnapshotRow[]): McpRegistrySnaps
 export async function loadMcpRegistrySnapshot(
   database: D1Database,
   viewerId: AccountId,
-  appId: AppId,
+  projectId: ProjectId,
 ): Promise<McpRegistrySnapshot> {
   const rows = await getAppDatabase(database)
     .select({
@@ -177,7 +177,7 @@ export async function loadMcpRegistrySnapshot(
       credentialLastRefreshedAt: mcpCredentialsTable.lastRefreshedAt,
       credentialOauthClientId: mcpCredentialsTable.oauthClientId,
       credentialOauthClientSecretSecretId: mcpCredentialsTable.oauthClientSecretSecretId,
-      credentialAppId: mcpCredentialsTable.appId,
+      credentialProjectId: mcpCredentialsTable.projectId,
       credentialRefreshSecretId: mcpCredentialsTable.refreshSecretId,
       credentialScope: mcpCredentialsTable.scope,
       credentialScopeValuesJson: mcpCredentialsTable.scopeValuesJson,
@@ -187,7 +187,7 @@ export async function loadMcpRegistrySnapshot(
       credentialSubjectLabel: mcpCredentialsTable.subjectLabel,
       credentialUpdatedAt: mcpCredentialsTable.updatedAt,
       credentialUserId: mcpCredentialsTable.accountId,
-      appId: appsTable.id,
+      projectId: projectsTable.id,
       serverAuthType: mcpServersTable.authType,
       serverByoClientId: mcpServersTable.byoClientId,
       serverByoClientSecretSecretId: mcpServersTable.byoClientSecretSecretId,
@@ -201,18 +201,18 @@ export async function loadMcpRegistrySnapshot(
       serverOauthMetadataJson: mcpServersTable.oauthMetadataJson,
       serverOwnerId: mcpServersTable.ownerId,
       serverOwnerName: registryOwnerAccountsTable.name,
-      serverAppId: mcpServersTable.appId,
+      serverProjectId: mcpServersTable.projectId,
       serverSource: mcpServersTable.source,
       serverUpdatedAt: mcpServersTable.updatedAt,
       serverUrl: mcpServersTable.url,
       viewerEmail: registryViewerAccountsTable.email,
       viewerName: registryViewerAccountsTable.name,
     })
-    .from(appsTable)
+    .from(projectsTable)
     .leftJoin(registryViewerAccountsTable, eq(registryViewerAccountsTable.id, viewerId))
     .leftJoin(
       mcpServersTable,
-      and(eq(mcpServersTable.appId, appsTable.id), eq(mcpServersTable.ownerId, viewerId)),
+      and(eq(mcpServersTable.projectId, projectsTable.id), eq(mcpServersTable.ownerId, viewerId)),
     )
     .leftJoin(
       registryOwnerAccountsTable,
@@ -222,11 +222,11 @@ export async function loadMcpRegistrySnapshot(
       mcpCredentialsTable,
       and(
         eq(mcpCredentialsTable.serverId, mcpServersTable.id),
-        eq(mcpCredentialsTable.appId, appsTable.id),
+        eq(mcpCredentialsTable.projectId, projectsTable.id),
         eq(mcpCredentialsTable.scope, "app"),
       ),
     )
-    .where(and(eq(appsTable.id, appId), eq(appsTable.ownerAccountId, viewerId)))
+    .where(and(eq(projectsTable.id, projectId), eq(projectsTable.ownerAccountId, viewerId)))
     .orderBy(desc(mcpServersTable.updatedAt))
     .all();
 

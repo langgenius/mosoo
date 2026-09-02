@@ -31,7 +31,7 @@ async function computeReadiness(
       : { environmentNetworkPolicy: input.environmentNetworkPolicy }),
     kind: "pet",
     model: "gpt-5.4",
-    appId: PUBLIC_API_TEST_IDS.app,
+    projectId: PUBLIC_API_TEST_IDS.project,
     provider: "openai",
     runtimeId: "openai-runtime",
   });
@@ -57,7 +57,7 @@ describe("Agent Environment network readiness", () => {
     );
   });
 
-  test("resolves a null Environment id through the App default", async () => {
+  test("resolves a null Environment id through the Project default", async () => {
     const database = await createPublicHttpContractDatabase();
     await setCurrentEnvironmentPolicy(database, "limited");
 

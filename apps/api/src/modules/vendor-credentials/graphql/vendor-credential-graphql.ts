@@ -1,5 +1,5 @@
 import { parsePlatformId } from "@mosoo/id";
-import type { AppId } from "@mosoo/id";
+import type { ProjectId } from "@mosoo/id";
 
 import type { GraphQLModule } from "../../../adapters/graphql/graphql-module";
 import { vendorCredentialGraphQLSpec } from "../../../adapters/graphql/graphql-module-specs";
@@ -15,7 +15,7 @@ import {
 } from "../application/vendor-credential.service";
 
 interface VendorCredentialsArgs {
-  appId: string;
+  projectId: string;
 }
 
 interface CreateVendorCredentialArgs {
@@ -37,7 +37,7 @@ interface SetDefaultVendorCredentialArgs {
 interface AvailableAgentModelsArgs {
   currentModelId?: string | null;
   currentVendorId?: string | null;
-  appId: string;
+  projectId: string;
   runtimeId: string;
 }
 
@@ -45,8 +45,8 @@ interface TestVendorCredentialArgs {
   input: Parameters<typeof testVendorCredential>[2];
 }
 
-function parseAppId(value: string): AppId {
-  return parsePlatformId<AppId>(value, "App ID");
+function parseProjectId(value: string): ProjectId {
+  return parsePlatformId<ProjectId>(value, "Project ID");
 }
 
 export const vendorCredentialGraphQLModule = {
@@ -70,10 +70,10 @@ export const vendorCredentialGraphQLModule = {
       resolveAvailableModelsForViewer(context.bindings.DB, context.viewer, {
         ...(isTruthy(args.currentModelId) ? { currentModelId: args.currentModelId } : {}),
         ...(isTruthy(args.currentVendorId) ? { currentVendorId: args.currentVendorId } : {}),
-        appId: parseAppId(args.appId),
+        projectId: parseProjectId(args.projectId),
         runtimeId: args.runtimeId,
       }),
     vendorCredentialList: async (_parent, args: VendorCredentialsArgs, context) =>
-      listVendorCredentials(context.bindings, context.viewer, parseAppId(args.appId)),
+      listVendorCredentials(context.bindings, context.viewer, parseProjectId(args.projectId)),
   },
 } satisfies GraphQLModule;

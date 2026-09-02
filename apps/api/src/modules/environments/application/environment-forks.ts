@@ -33,7 +33,7 @@ export async function createEnvironmentFork(
   const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
   const access = await ensureEnvironmentAccess(bindings.DB, viewerId, {
     environmentId: input.environmentId,
-    appId: input.appId,
+    projectId: input.projectId,
   });
   const sourceConfig = toConfig(access.row);
 
@@ -45,7 +45,12 @@ export async function createEnvironmentFork(
     environmentId,
   });
   const timestampMs = currentTimestampMs();
-  const forkName = await allocateCopyName(bindings.DB, access.row.appId, viewerId, access.row.name);
+  const forkName = await allocateCopyName(
+    bindings.DB,
+    access.row.projectId,
+    viewerId,
+    access.row.name,
+  );
   const forkId = await createEnvironmentFromConfig(bindings, {
     actorId: viewerId,
     config,
@@ -56,7 +61,7 @@ export async function createEnvironmentFork(
     forkedFromOwnerName: access.row.ownerName ?? "Organization",
     name: forkName,
     ownerId: viewerId,
-    appId: access.row.appId,
+    projectId: access.row.projectId,
     timestampMs,
   });
 
@@ -77,7 +82,7 @@ export async function deleteEnvironment(
   const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
   const access = await ensureEnvironmentEditor(bindings.DB, viewerId, {
     environmentId: input.environmentId,
-    appId: input.appId,
+    projectId: input.projectId,
   });
 
   if (access.row.ownerId === null) {
@@ -85,7 +90,7 @@ export async function deleteEnvironment(
   }
 
   if (access.row.defaultEnvironmentId === access.row.id) {
-    throw new Error("This environment is the App default.");
+    throw new Error("This environment is the Project default.");
   }
 
   const ownerId = access.row.ownerId;

@@ -12,7 +12,7 @@ function createRuntimeCustomEvent(name: string, value: unknown): AgUiSessionEven
   });
 }
 
-export function appRuntimeStatus(event: RuntimeEventEnvelope): AgUiSessionEvent {
+export function projectRuntimeStatus(event: RuntimeEventEnvelope): AgUiSessionEvent {
   return createRuntimeCustomEvent(MOSOO_CUSTOM_EVENT.sessionRuntimeTimelineUpdated.name, {
     completedAtMs: Date.parse(event.occurredAt),
     durationMs: readRuntimeEventNumber(event.payload, "durationMs") ?? 0,
@@ -26,7 +26,7 @@ export function appRuntimeStatus(event: RuntimeEventEnvelope): AgUiSessionEvent 
   });
 }
 
-export function appRuntimeTimingRecorded(event: RuntimeEventEnvelope): AgUiSessionEvent[] {
+export function projectRuntimeTimingRecorded(event: RuntimeEventEnvelope): AgUiSessionEvent[] {
   const timing = readRuntimeTimingPayload(event);
 
   return [

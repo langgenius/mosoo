@@ -1,6 +1,6 @@
 import { vaultSecretsTable } from "@mosoo/db";
 import { parsePlatformId } from "@mosoo/id";
-import type { AccountId, AgentId, CredentialId, McpServerId, AppId } from "@mosoo/id";
+import type { AccountId, AgentId, CredentialId, McpServerId, ProjectId } from "@mosoo/id";
 import { eq } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
@@ -26,7 +26,7 @@ export type McpCredentialSecretReadDenialReason =
   | "credential_server_mismatch"
   | "secret_kind_mismatch"
   | "secret_not_found"
-  | "server_app_mismatch";
+  | "server_project_mismatch";
 
 export type McpCredentialSecretStorageKind =
   | "access_token"
@@ -43,7 +43,7 @@ export type McpCredentialSecretDeletePurpose =
   | "credential_replace"
   | "credential_revoke";
 
-type McpCredentialSecretOwnerServer = Pick<ServerRow, "credentialScope" | "id" | "appId">;
+type McpCredentialSecretOwnerServer = Pick<ServerRow, "credentialScope" | "id" | "projectId">;
 
 interface McpCredentialSecretOwner {
   agentId: AgentId | null;
@@ -86,7 +86,7 @@ export type McpCredentialSecretDeleteOutcome =
 export interface ReadMcpCredentialSecretCommand {
   credential: CredentialRow;
   purpose: McpCredentialSecretReadPurpose;
-  appId: AppId;
+  projectId: ProjectId;
   server: ServerRow;
 }
 
@@ -163,7 +163,7 @@ function toMcpCredentialSecretStorageKind(input: {
 
   return [
     "mcp_credential",
-    input.owner.server.appId,
+    input.owner.server.projectId,
     input.owner.server.id,
     input.owner.scope,
     getMcpCredentialOwnerKey(input.owner),
@@ -186,8 +186,8 @@ async function readVaultSecretKind(database: D1Database, secretId: string): Prom
 function getMcpCredentialSecretReadDenial(
   command: ReadMcpCredentialSecretCommand,
 ): McpCredentialSecretReadDenialReason | null {
-  if (command.server.appId !== command.appId) {
-    return "server_app_mismatch";
+  if (command.server.projectId !== command.projectId) {
+    return "server_project_mismatch";
   }
 
   if (command.credential.serverId !== command.server.id) {

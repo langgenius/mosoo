@@ -1,5 +1,5 @@
 import type { EnvironmentPackageSpec } from "@mosoo/contracts/environment";
-import type { AppId } from "@mosoo/id";
+import type { ProjectId } from "@mosoo/id";
 
 export const ENVIRONMENT_PACKAGE_ARTIFACT_ROOT = "/workspace/.mosoo/environment-artifacts";
 export const ENVIRONMENT_PACKAGE_ARTIFACT_ABI = "environment-artifact-v1";
@@ -13,7 +13,7 @@ export interface EnvironmentPackageArtifactPaths {
 }
 
 export interface EnvironmentPackageArtifactKey {
-  appId: AppId;
+  projectId: ProjectId;
   inputDigest: string;
 }
 
@@ -27,7 +27,7 @@ function bytesToHex(bytes: Uint8Array): string {
 }
 
 export async function createEnvironmentPackageArtifactKey(input: {
-  appId: AppId;
+  projectId: ProjectId;
   artifactAbi: string;
   packages: readonly EnvironmentPackageSpec[];
 }): Promise<EnvironmentPackageArtifactKey> {
@@ -39,7 +39,7 @@ export async function createEnvironmentPackageArtifactKey(input: {
     "SHA-256",
     new TextEncoder().encode(JSON.stringify({ artifactAbi, packages: input.packages })),
   );
-  return { appId: input.appId, inputDigest: bytesToHex(new Uint8Array(digest)) };
+  return { projectId: input.projectId, inputDigest: bytesToHex(new Uint8Array(digest)) };
 }
 
 export function environmentPackageArtifactDir(key: EnvironmentPackageArtifactKey): string {
@@ -47,9 +47,9 @@ export function environmentPackageArtifactDir(key: EnvironmentPackageArtifactKey
 }
 
 export function environmentPackageArtifactMetadataKey(key: EnvironmentPackageArtifactKey): string {
-  return `environment-artifacts/${key.appId}/${key.inputDigest}.json`;
+  return `environment-artifacts/${key.projectId}/${key.inputDigest}.json`;
 }
 
 export function environmentPackageArtifactSandboxId(key: EnvironmentPackageArtifactKey): string {
-  return `envpkg-${key.appId}-${key.inputDigest}`.toLowerCase().slice(0, 63);
+  return `envpkg-${key.projectId}-${key.inputDigest}`.toLowerCase().slice(0, 63);
 }

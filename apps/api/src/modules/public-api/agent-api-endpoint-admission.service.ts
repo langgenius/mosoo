@@ -4,8 +4,8 @@ import { isApiError } from "../../platform/errors";
 import { isTruthy } from "../../shared/truthiness";
 import { getAgentRow } from "../agents/application/agent-repository";
 import type { AgentRow } from "../agents/application/agent-types";
-import { ensureAppOwnership } from "../apps/application/app.service";
 import type { AuthenticatedViewer } from "../auth/application/viewer-auth.service";
+import { ensureProjectOwnership } from "../projects/application/project.service";
 import {
   publicAgentNotExposed,
   publicForbidden,
@@ -36,7 +36,7 @@ export async function ensureAgentApiEndpointCallerAccess(
   agent: AgentRow,
 ): Promise<void> {
   ensureAgentApiEndpointReady(agent);
-  await ensureCallerOwnsAgentApp(database, caller, agent);
+  await ensureCallerOwnsAgentProject(database, caller, agent);
 }
 
 function ensureAgentApiEndpointReady(agent: AgentRow): void {
@@ -49,24 +49,26 @@ function ensureAgentApiEndpointReady(agent: AgentRow): void {
   }
 }
 
-async function ensureCallerOwnsAgentApp(
+async function ensureCallerOwnsAgentProject(
   database: D1Database,
   caller: AuthenticatedViewer,
   agent: AgentRow,
 ): Promise<void> {
-  const app = await ensureAppOwnership(database, caller.id, agent.appId).catch((error: unknown) => {
-    if (isApiError(error) && error.status === 404) {
-      throw publicNotFound("Agent not found.");
-    }
+  const project = await ensureProjectOwnership(database, caller.id, agent.projectId).catch(
+    (error: unknown) => {
+      if (isApiError(error) && error.status === 404) {
+        throw publicNotFound("Agent not found.");
+      }
 
-    if (isApiError(error) && error.status === 403) {
-      throw publicForbidden("Caller is not the App owner for this Agent.");
-    }
+      if (isApiError(error) && error.status === 403) {
+        throw publicForbidden("Caller is not the Project owner for this Agent.");
+      }
 
-    throw error;
-  });
+      throw error;
+    },
+  );
 
-  if (agent.ownerId !== app.ownerAccountId) {
-    throw publicForbidden("Agent owner does not match the App owner.");
+  if (agent.ownerId !== project.ownerAccountId) {
+    throw publicForbidden("Agent owner does not match the Project owner.");
   }
 }

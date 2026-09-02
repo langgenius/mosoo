@@ -23,7 +23,7 @@ export const API_TEST_IDS = {
   environmentId: "01J00000000000000000000055",
   environmentRevisionId: "01J00000000000000000000056",
   organizationId: "01J00000000000000000000052",
-  appId: "01J00000000000000000000054",
+  projectId: "01J00000000000000000000054",
 } as const;
 
 export interface ApiTestFixture {
@@ -214,16 +214,16 @@ export async function insertTestVendorCredential(
     readonly credentialId?: string;
     readonly models?: readonly string[] | null;
     readonly name?: string;
-    readonly appId?: string;
+    readonly projectId?: string;
     readonly vendorId: string;
   },
 ): Promise<void> {
   const credentialId = input.credentialId ?? "01J000000000000000000000C1";
-  const appId = input.appId ?? fixture.ids.appId;
+  const projectId = input.projectId ?? fixture.ids.projectId;
   const apiKeySecretId = await storeVendorCredentialSecret(fixture.bindings, {
     apiKey: input.apiKey ?? "sk-test",
     credentialId,
-    appId,
+    projectId,
     providerId: input.vendorId,
     purpose: "credential_create_api_key",
   });
@@ -236,7 +236,7 @@ export async function insertTestVendorCredential(
       id,
       models,
       name,
-      app_id,
+      project_id,
       updated_at,
       vendor_id
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -248,7 +248,7 @@ export async function insertTestVendorCredential(
       credentialId,
       input.models === undefined || input.models === null ? null : JSON.stringify(input.models),
       input.name ?? `${input.vendorId} test`,
-      appId,
+      projectId,
       1,
       input.vendorId,
     )
@@ -316,7 +316,7 @@ function createApiTestSchema(database: SqliteD1Database): void {
       updated_at integer NOT NULL
     );
 
-    CREATE TABLE app (
+    CREATE TABLE project (
       created_at integer NOT NULL,
       default_environment_id text,
       id text PRIMARY KEY NOT NULL,
@@ -354,7 +354,7 @@ function createApiTestSchema(database: SqliteD1Database): void {
       model text NOT NULL,
       name text NOT NULL,
       owner_account_id text NOT NULL,
-      app_id text NOT NULL,
+      project_id text NOT NULL,
       prompt text NOT NULL,
       provider text NOT NULL,
       runtime_id text NOT NULL,
@@ -373,7 +373,7 @@ function createApiTestSchema(database: SqliteD1Database): void {
       id text PRIMARY KEY NOT NULL,
       name text NOT NULL,
       owner_account_id text,
-      app_id text NOT NULL,
+      project_id text NOT NULL,
       updated_at integer NOT NULL
     );
 
@@ -388,7 +388,7 @@ function createApiTestSchema(database: SqliteD1Database): void {
       id text PRIMARY KEY NOT NULL,
       network_policy text NOT NULL,
       packages_json text NOT NULL,
-      app_id text NOT NULL,
+      project_id text NOT NULL,
       setup_script text NOT NULL
     );
 
@@ -405,7 +405,7 @@ function createApiTestSchema(database: SqliteD1Database): void {
       name text NOT NULL,
       oauth_metadata_json text,
       owner_account_id text NOT NULL,
-      app_id text NOT NULL,
+      project_id text NOT NULL,
       source text NOT NULL,
       updated_at integer NOT NULL,
       url text NOT NULL
@@ -422,7 +422,7 @@ function createApiTestSchema(database: SqliteD1Database): void {
       id text PRIMARY KEY NOT NULL,
       name text NOT NULL,
       owner_account_id text NOT NULL,
-      app_id text NOT NULL,
+      project_id text NOT NULL,
       source_kind text NOT NULL,
       updated_at integer NOT NULL,
       version text
@@ -512,7 +512,7 @@ function createApiTestSchema(database: SqliteD1Database): void {
       message_seq_cursor integer DEFAULT 0 NOT NULL,
       metadata_json text DEFAULT '{}' NOT NULL,
       model text NOT NULL,
-      app_id text NOT NULL,
+      project_id text NOT NULL,
       provider text NOT NULL,
       renamed integer NOT NULL,
       runtime_id text NOT NULL,
@@ -634,7 +634,7 @@ function createApiTestSchema(database: SqliteD1Database): void {
       last_refreshed_at integer,
       oauth_client_id text,
       oauth_client_secret_secret_id text,
-      app_id text NOT NULL,
+      project_id text NOT NULL,
       refresh_secret_id text,
       scope text NOT NULL,
       scope_values_json text,
@@ -653,7 +653,7 @@ function createApiTestSchema(database: SqliteD1Database): void {
       is_default integer DEFAULT false NOT NULL,
       models text,
       name text NOT NULL,
-      app_id text NOT NULL,
+      project_id text NOT NULL,
       updated_at integer NOT NULL,
       vendor_id text NOT NULL
     );
@@ -715,7 +715,7 @@ async function seedApiTestFixture(database: D1Database): Promise<void> {
 
   await database
     .prepare(
-      `INSERT INTO app (
+      `INSERT INTO project (
         created_at,
         id,
         name,
@@ -724,7 +724,14 @@ async function seedApiTestFixture(database: D1Database): Promise<void> {
         updated_at
       ) VALUES (?, ?, ?, ?, ?, ?)`,
     )
-    .bind(1, API_TEST_IDS.appId, "Default App", API_TEST_IDS.organizationId, API_TEST_VIEWER.id, 1)
+    .bind(
+      1,
+      API_TEST_IDS.projectId,
+      "Default Project",
+      API_TEST_IDS.organizationId,
+      API_TEST_VIEWER.id,
+      1,
+    )
     .run();
 
   await database
@@ -739,7 +746,7 @@ async function seedApiTestFixture(database: D1Database): Promise<void> {
         id,
         name,
         owner_account_id,
-        app_id,
+        project_id,
         updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
@@ -753,7 +760,7 @@ async function seedApiTestFixture(database: D1Database): Promise<void> {
       API_TEST_IDS.environmentId,
       "API Test Environment",
       API_TEST_VIEWER.id,
-      API_TEST_IDS.appId,
+      API_TEST_IDS.projectId,
       1,
     )
     .run();
@@ -771,7 +778,7 @@ async function seedApiTestFixture(database: D1Database): Promise<void> {
         id,
         network_policy,
         packages_json,
-        app_id,
+        project_id,
         setup_script
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
@@ -786,7 +793,7 @@ async function seedApiTestFixture(database: D1Database): Promise<void> {
       API_TEST_IDS.environmentRevisionId,
       "sandbox",
       "[]",
-      API_TEST_IDS.appId,
+      API_TEST_IDS.projectId,
       "",
     )
     .run();
@@ -802,7 +809,7 @@ async function seedApiTestFixture(database: D1Database): Promise<void> {
         model,
         name,
         owner_account_id,
-        app_id,
+        project_id,
         prompt,
         provider,
         runtime_id,
@@ -825,7 +832,7 @@ async function seedApiTestFixture(database: D1Database): Promise<void> {
       "gpt-5.4",
       "API Fixture Agent",
       API_TEST_VIEWER.id,
-      API_TEST_IDS.appId,
+      API_TEST_IDS.projectId,
       "Help the user test API behavior.",
       "openai",
       "openai-runtime",

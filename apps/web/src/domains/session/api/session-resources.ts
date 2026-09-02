@@ -1,5 +1,5 @@
 import type { FileUploadSummary } from "@mosoo/contracts/file";
-import type { AppId, SessionId } from "@mosoo/contracts/id";
+import type { ProjectId, SessionId } from "@mosoo/contracts/id";
 
 import { graphql } from "@/gql";
 import type { AddSessionResourceMutation } from "@/gql/graphql";
@@ -22,10 +22,10 @@ const ADD_SESSION_RESOURCE_MUTATION = graphql(/* GraphQL */ `
 `);
 
 export function sessionResourcesQueryKey(
-  appId: AppId | null,
+  projectId: ProjectId | null,
   sessionId: SessionId | null,
 ): readonly unknown[] {
-  return ["session-resources", appId, sessionId];
+  return ["session-resources", projectId, sessionId];
 }
 
 function toFileUploadSummary(
@@ -44,7 +44,7 @@ function toFileUploadSummary(
 }
 
 export async function addSessionResourceUpload(
-  appId: AppId,
+  projectId: ProjectId,
   sessionId: SessionId,
   file: File,
 ): Promise<FileUploadSummary> {
@@ -55,7 +55,7 @@ export async function addSessionResourceUpload(
         name: file.name,
         size: file.size,
       },
-      appId,
+      projectId,
       sessionId,
     },
   });

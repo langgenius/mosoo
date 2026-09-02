@@ -77,6 +77,6 @@ uniform across list pages.
   labels. Capitalize only the first word and proper nouns / acronyms (API, CSV, MCP,
   URL, OpenAI, GitHub). "Create agent", not "Create Agent"; "Access settings",
   not "Access Settings".
-- Buttons are verb + object ("Save changes", "Delete app").
+- Buttons are verb + object ("Save changes", "Delete project").
 - No em dashes in user-facing copy. No marketing buzzwords. Avoid staccato slogan
   cadence (three+ short fragments in a row).

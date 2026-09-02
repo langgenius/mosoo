@@ -1,6 +1,6 @@
 import type { UserWarning } from "@mosoo/contracts/session-run";
 import { parsePlatformId } from "@mosoo/id";
-import type { FileId, AppId, SessionId, SessionRunId } from "@mosoo/id";
+import type { FileId, ProjectId, SessionId, SessionRunId } from "@mosoo/id";
 
 import { logError, logInfo, logWarn } from "../../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
@@ -87,7 +87,7 @@ interface DispatchQueuedSessionRunInput {
   queuedAtMs: number;
   session: {
     id: SessionId;
-    app_id: AppId;
+    project_id: ProjectId;
   };
   sessionRunId: SessionRunId;
   traceId: string;
@@ -148,7 +148,7 @@ export async function dispatchQueuedSessionRun(
       const hydrated = await hydrationTiming.measure("hydrateRunContext", () =>
         hydrateCachedRunContextFromSession(bindings, viewer, {
           id: input.session.id,
-          appId: input.session.app_id,
+          projectId: input.session.project_id,
           ...(input.accessViewer ? { accessViewer: input.accessViewer } : {}),
         }),
       );

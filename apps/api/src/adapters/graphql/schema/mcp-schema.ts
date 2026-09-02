@@ -17,6 +17,9 @@ export const mcpSchema = /* GraphQL */ `
     agent_bound
   }
 
+  # "app" is the frozen storage token for Project-scoped MCP rows: production
+  # rows and the append-only migration chain already carry it, so the wire enum
+  # mirrors the stored value instead of forcing a data rewrite.
   enum McpCredentialScope {
     app
   }
@@ -40,6 +43,8 @@ export const mcpSchema = /* GraphQL */ `
     expired
   }
 
+  # "app" is the frozen storage token for Project-provided servers (see the
+  # McpCredentialScope note above).
   enum McpServerSource {
     app
   }
@@ -68,7 +73,7 @@ export const mcpSchema = /* GraphQL */ `
     name: String!
     ownerId: ULID!
     ownerName: String!
-    appId: ULID!
+    projectId: ULID!
     source: McpServerSource!
     updatedAt: String!
     url: String!
@@ -89,7 +94,7 @@ export const mcpSchema = /* GraphQL */ `
     name: String!
     ownerId: ULID!
     ownerName: String!
-    appId: ULID!
+    projectId: ULID!
     source: McpServerSource!
     updatedAt: String!
     url: String!
@@ -99,7 +104,7 @@ export const mcpSchema = /* GraphQL */ `
     currentUserEmail: String!
     currentUserId: ULID!
     currentUserName: String!
-    appId: ULID!
+    projectId: ULID!
     servers: [McpServerWithCredential!]!
   }
 
@@ -136,19 +141,19 @@ export const mcpSchema = /* GraphQL */ `
     subjectLabel: String
   }
 
-  input CreateAppMcpServerInput {
+  input CreateProjectMcpServerInput {
     authType: McpAuthType!
     description: String
     iconUrl: String
     name: String!
     oauthClientId: String
     oauthClientSecret: String
-    appId: ULID!
+    projectId: ULID!
     url: String!
   }
 
-  input UpdateAppMcpServerInput {
-    appId: ULID!
+  input UpdateProjectMcpServerInput {
+    projectId: ULID!
     description: String
     iconUrl: String
     name: String!
@@ -157,14 +162,14 @@ export const mcpSchema = /* GraphQL */ `
   }
 
   input ConnectMcpBearerInput {
-    appId: ULID!
+    projectId: ULID!
     serverId: ULID!
     subjectLabel: String
     token: String!
   }
 
   input StartMcpOAuthInput {
-    appId: ULID!
+    projectId: ULID!
     returnUrl: String
     serverId: ULID!
   }

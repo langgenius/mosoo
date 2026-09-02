@@ -10,7 +10,7 @@ import {
 } from "../src/modules/cost/application/cost-rollup.service";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
-const APP_ID = "01J0000000000000000000000Q";
+const PROJECT_ID = "01J0000000000000000000000Q";
 const AGENT_ID = "01J0000000000000000000000A";
 const ACTOR_ID = "01J00000000000000000000001";
 const OWNER_ID = "01J00000000000000000000002";
@@ -29,7 +29,7 @@ function createCostRollupDatabase(): SqliteD1Database {
 
     CREATE TABLE usage_event (
       organization_id text NOT NULL,
-      app_id text NOT NULL,
+      project_id text NOT NULL,
       agent_id text NOT NULL,
       actor_user_id text NOT NULL,
       agent_owner_user_id text NOT NULL,
@@ -49,7 +49,7 @@ function createCostRollupDatabase(): SqliteD1Database {
 
     CREATE TABLE usage_daily_rollup (
       organization_id text NOT NULL,
-      app_id text NOT NULL,
+      project_id text NOT NULL,
       agent_id text NOT NULL,
       actor_user_id text NOT NULL,
       agent_owner_user_id text NOT NULL,
@@ -67,7 +67,7 @@ function createCostRollupDatabase(): SqliteD1Database {
       unpriced_request_count integer NOT NULL,
       PRIMARY KEY (
         organization_id,
-        app_id,
+        project_id,
         agent_id,
         actor_user_id,
         agent_owner_user_id,
@@ -92,7 +92,7 @@ async function insertDailyRollup(
       `
         INSERT INTO usage_daily_rollup (
           organization_id,
-          app_id,
+          project_id,
           agent_id,
           actor_user_id,
           agent_owner_user_id,
@@ -113,7 +113,7 @@ async function insertDailyRollup(
     )
     .bind(
       ORGANIZATION_ID,
-      APP_ID,
+      PROJECT_ID,
       AGENT_ID,
       ACTOR_ID,
       OWNER_ID,
@@ -142,7 +142,7 @@ describe("cost daily rollup retention", () => {
     const currentWindow = resolveCostWindow("LAST_90_DAYS", ROLLUP_TIME);
     const previousWindow = resolveCostWindow("LAST_90_DAYS", new Date(currentWindow.sinceMs - 1));
     const previousTotals = await queryTotals(database, {
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       organizationId: ORGANIZATION_ID,
       window: previousWindow,
     });

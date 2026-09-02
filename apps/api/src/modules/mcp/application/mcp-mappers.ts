@@ -139,7 +139,7 @@ function toServer(row: ServerRow, hasCredential: boolean): McpServer {
     name: row.name,
     ownerId: row.ownerId,
     ownerName: row.ownerName ?? "Unknown",
-    appId: row.appId,
+    projectId: row.projectId,
     source: row.source,
     updatedAt: toIsoString(row.updatedAt),
     url: row.url,

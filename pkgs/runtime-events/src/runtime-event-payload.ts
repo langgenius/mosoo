@@ -383,7 +383,7 @@ export function readRuntimeRunPayload(event: RuntimeEventEnvelope): RuntimeRunPa
     },
     event.payload,
   );
-  const run = readAdmittedRuntimeRunView(payload["run"]) ?? appRuntimeRunView(event, payload);
+  const run = readAdmittedRuntimeRunView(payload["run"]) ?? projectRuntimeRunView(event, payload);
 
   return {
     lifecycle: readRuntimeRunLifecycleStatus(payload["lifecycle"]),
@@ -971,7 +971,7 @@ function readAdmittedRuntimeRunView(value: unknown): RuntimeRunView | null {
   };
 }
 
-function appRuntimeRunStatus(kind: RuntimeEventKind): RuntimeRunStatus | null {
+function projectRuntimeRunStatus(kind: RuntimeEventKind): RuntimeRunStatus | null {
   switch (kind) {
     case "run.started": {
       return "running";
@@ -997,11 +997,11 @@ function isTerminalRuntimeRunStatus(status: RuntimeRunStatus): boolean {
   );
 }
 
-function appRuntimeRunView(
+function projectRuntimeRunView(
   event: RuntimeEventEnvelope,
   payload: RuntimeEventRecord,
 ): RuntimeRunView | null {
-  const status = appRuntimeRunStatus(event.kind);
+  const status = projectRuntimeRunStatus(event.kind);
 
   if (status === null || event.runId === undefined) {
     return null;

@@ -1,4 +1,4 @@
-import type { AccountId, AgentId, AppId, SessionId, SessionRunId } from "@mosoo/contracts/id";
+import type { AccountId, AgentId, ProjectId, SessionId, SessionRunId } from "@mosoo/contracts/id";
 
 export type CostRangeInput = "LAST_7_DAYS" | "LAST_30_DAYS" | "MONTH_TO_DATE" | "LAST_90_DAYS";
 export type CostRunPurpose = "debug" | "eval" | "preview" | "production" | "scheduled";
@@ -73,10 +73,10 @@ export interface OrganizationBillingCostCard {
   totals: CostTotals;
 }
 
-export interface AppCostCard extends CostAttributionCard {
+export interface ProjectCostCard extends CostAttributionCard {
   previousTotals: CostTotals;
-  appId: AppId;
-  appName: string;
+  projectId: ProjectId;
+  projectName: string;
 }
 
 export interface AgentCostCard extends CostAttributionCard {

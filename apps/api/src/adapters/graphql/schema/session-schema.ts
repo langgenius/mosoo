@@ -119,7 +119,7 @@ export const sessionSchema = /* GraphQL */ `
     title: String
     type: SessionType!
     updatedAt: String!
-    appId: ULID!
+    projectId: ULID!
   }
 
   type SessionRun {
@@ -171,7 +171,7 @@ export const sessionSchema = /* GraphQL */ `
 
   input StartAgentRunInput {
     agentId: ULID
-    appId: ULID!
+    projectId: ULID!
     clientRequestId: String
     prompt: String!
     sessionId: ULID
@@ -180,7 +180,7 @@ export const sessionSchema = /* GraphQL */ `
   }
 
   type AgentRunEventSurface {
-    appId: ULID!
+    projectId: ULID!
     graphqlUrl: String!
     messagesOperation: String!
     processEventsOperation: String!
@@ -293,14 +293,14 @@ export const sessionSchema = /* GraphQL */ `
   }
 
   input RenameSessionInput {
-    appId: ULID!
+    projectId: ULID!
     sessionId: ULID!
     title: String!
   }
 
   input CreateAgentSessionInput {
     agentId: ULID!
-    appId: ULID!
+    projectId: ULID!
     type: SessionType
     waitForRuntimeReady: Boolean
   }
@@ -353,12 +353,12 @@ export const sessionSchema = /* GraphQL */ `
 
   input AddSessionResourceInput {
     file: AddSessionResourceFileInput!
-    appId: ULID!
+    projectId: ULID!
     sessionId: ULID!
   }
 
   input RemoveSessionResourceInput {
-    appId: ULID!
+    projectId: ULID!
     resourceId: ULID!
     sessionId: ULID!
   }

@@ -5,7 +5,7 @@ import { useState } from "react";
 
 import { resetAgentState, unpublishAgent } from "@/domains/agent/api/agent-client";
 import { agentKeys } from "@/domains/agent/query/agent-queries";
-import { toAgentDeploymentVersionId, toAgentId, toAppId } from "@/routes/typed-id";
+import { toAgentDeploymentVersionId, toAgentId, toProjectId } from "@/routes/typed-id";
 import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import {
@@ -38,21 +38,21 @@ export function AgentSettingsDangerZone({ agent }: { agent: Agent }) {
   const [confirmUnpublish, setConfirmUnpublish] = useState(false);
   const [resetConfirmValue, setResetConfirmValue] = useState("");
   const typedAgentId = toAgentId(agent.id);
-  const typedAppId = toAppId(agent.appId);
+  const typedProjectId = toProjectId(agent.projectId);
   const resetAgentStateMutation = useMutation({
     mutationFn: resetAgentState,
     onSuccess: async (_data, variables) => {
       await queryClient.invalidateQueries({
-        queryKey: agentKeys.detail(variables.appId, variables.agentId),
+        queryKey: agentKeys.detail(variables.projectId, variables.agentId),
       });
     },
   });
   const unpublishMutation = useMutation({
-    mutationFn: async () => unpublishAgent(typedAppId, typedAgentId),
+    mutationFn: async () => unpublishAgent(typedProjectId, typedAgentId),
     onSuccess: async () => {
       setConfirmUnpublish(false);
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: agentKeys.detail(agent.appId, agent.id) }),
+        queryClient.invalidateQueries({ queryKey: agentKeys.detail(agent.projectId, agent.id) }),
         queryClient.invalidateQueries({ queryKey: agentKeys.lists() }),
       ]);
     },
@@ -63,7 +63,7 @@ export function AgentSettingsDangerZone({ agent }: { agent: Agent }) {
   async function handleResetAgentState() {
     await resetAgentStateMutation.mutateAsync({
       agentId: typedAgentId,
-      appId: typedAppId,
+      projectId: typedProjectId,
       targetVersion: toRuntimeOperationTargetVersion(agent),
     });
     setResetConfirmValue("");

@@ -7,7 +7,7 @@ import { useNavigate } from "react-router-dom";
 import { createAgentFork, exportAgentPackage } from "@/domains/agent/api/agent-client";
 import { agentKeys } from "@/domains/agent/query/agent-queries";
 import { createFileDownload } from "@/domains/file/api/file-download-client";
-import { toAgentId, toAppId } from "@/routes/typed-id";
+import { toAgentId, toProjectId } from "@/routes/typed-id";
 import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 
@@ -35,13 +35,13 @@ export function AgentSettingsPackageActions({
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const typedAgentId = toAgentId(agent.id);
-  const typedAppId = toAppId(agent.appId);
+  const typedProjectId = toProjectId(agent.projectId);
   const [showImportPackage, setShowImportPackage] = useState(false);
   const exportPackageMutation = useMutation({
-    mutationFn: async () => exportAgentPackage(typedAppId, typedAgentId),
+    mutationFn: async () => exportAgentPackage(typedProjectId, typedAgentId),
     onSuccess: async () => {
       await queryClient.invalidateQueries({
-        queryKey: agentKeys.manifest(agent.appId, agent.id),
+        queryKey: agentKeys.manifest(agent.projectId, agent.id),
       });
     },
   });
@@ -64,7 +64,7 @@ export function AgentSettingsPackageActions({
   async function handleForkAgent(): Promise<void> {
     const result = await forkMutation.mutateAsync({
       agentId: typedAgentId,
-      appId: typedAppId,
+      projectId: typedProjectId,
     });
     onSettingsOpenChange(false);
     void navigate(`${currentAgentBasePath()}/${result.agent.id}`);
@@ -119,7 +119,7 @@ export function AgentSettingsPackageActions({
         onImportedAgentOpen={handleImportedAgentOpen}
         onOpenChange={setShowImportPackage}
         open={showImportPackage}
-        appId={agent.appId}
+        projectId={agent.projectId}
       />
     </>
   );

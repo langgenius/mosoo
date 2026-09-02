@@ -6,7 +6,7 @@ import type {
   AccountId,
   AgentId,
   PlatformId,
-  AppId,
+  ProjectId,
   RuntimeOperationId,
   SandboxBackupId,
   SandboxId,
@@ -41,7 +41,7 @@ import type {
 
 interface RuntimeSubjectQuotaScope {
   readonly agentId: AgentId;
-  readonly appId: AppId;
+  readonly projectId: ProjectId;
   readonly executionOwnerUserId: AccountId;
 }
 
@@ -144,7 +144,7 @@ export async function ensureRuntimeSubjectId(
   database: D1Database,
   input: {
     readonly agentId: AgentId;
-    readonly appId: AppId;
+    readonly projectId: ProjectId;
     readonly executionOwnerUserId: AccountId;
     readonly kind: AgentKind;
     readonly now?: number;
@@ -165,7 +165,7 @@ export async function ensureRuntimeSubjectId(
     .insert(sandboxesTable)
     .values({
       agentId: input.agentId,
-      appId: input.appId,
+      projectId: input.projectId,
       bindMountReady: false,
       claimExpiresAt: null,
       claimOwner: null,
@@ -281,7 +281,7 @@ export async function claimRuntimeSubjectActivation(
       .update(sandboxesTable)
       .set({
         agentId: input.agentId,
-        appId: input.appId,
+        projectId: input.projectId,
         claimExpiresAt: input.claimExpiresAt,
         claimOwner: input.claimOwner,
         ownerAccountId: input.executionOwnerUserId,

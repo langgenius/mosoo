@@ -1,4 +1,4 @@
-import type { AgentId, OrganizationId, AppId } from "@mosoo/id";
+import type { AgentId, OrganizationId, ProjectId } from "@mosoo/id";
 
 import { isTruthy } from "../../../shared/truthiness";
 import type { AggregateRow, CostRange, CostTotalsView, CostWindow } from "./cost-query.types";
@@ -76,22 +76,22 @@ export function buildUsageSourceCte(
   window: CostWindow,
   scope: {
     organizationId: OrganizationId;
-    appId?: AppId;
+    projectId?: ProjectId;
   },
 ): {
   bindings: (number | string)[];
   sql: string;
 } {
-  const detailAppFilter = isTruthy(scope.appId) ? "AND usage_event.app_id = ?" : "";
-  const rollupAppFilter = isTruthy(scope.appId) ? "AND app_id = ?" : "";
+  const detailProjectFilter = isTruthy(scope.projectId) ? "AND usage_event.project_id = ?" : "";
+  const rollupProjectFilter = isTruthy(scope.projectId) ? "AND project_id = ?" : "";
 
   return {
     bindings: [
       scope.organizationId,
-      ...(isTruthy(scope.appId) ? [scope.appId] : []),
+      ...(isTruthy(scope.projectId) ? [scope.projectId] : []),
       window.detailSinceMs,
       scope.organizationId,
-      ...(isTruthy(scope.appId) ? [scope.appId] : []),
+      ...(isTruthy(scope.projectId) ? [scope.projectId] : []),
       window.sinceDate,
       window.dailyBeforeDate,
     ],
@@ -99,7 +99,7 @@ export function buildUsageSourceCte(
       WITH usage_source AS (
         SELECT
           usage_event.organization_id,
-          usage_event.app_id,
+          usage_event.project_id,
           usage_event.agent_id,
           usage_event.actor_user_id,
           usage_event.agent_owner_user_id,
@@ -118,12 +118,12 @@ export function buildUsageSourceCte(
             AS unpriced_request_count
         FROM usage_event
         WHERE usage_event.organization_id = ?
-          ${detailAppFilter}
+          ${detailProjectFilter}
           AND usage_event.created_at >= ?
         UNION ALL
         SELECT
           organization_id,
-          app_id,
+          project_id,
           agent_id,
           actor_user_id,
           agent_owner_user_id,
@@ -141,7 +141,7 @@ export function buildUsageSourceCte(
           unpriced_request_count
         FROM usage_daily_rollup
         WHERE organization_id = ?
-          ${rollupAppFilter}
+          ${rollupProjectFilter}
           AND date >= ?
           AND date < ?
       )

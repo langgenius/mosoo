@@ -5,7 +5,7 @@ import ChevronsDownUpIcon from "@hugeicons/core-free-icons/ChevronsDownUpIcon";
 import PanelLeftCloseIcon from "@hugeicons/core-free-icons/PanelLeftCloseIcon";
 import PanelLeftOpenIcon from "@hugeicons/core-free-icons/PanelLeftOpenIcon";
 import PlusSignIcon from "@hugeicons/core-free-icons/PlusSignIcon";
-import type { AppSummary } from "@mosoo/contracts/app";
+import type { ProjectSummary } from "@mosoo/contracts/project";
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -28,12 +28,12 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/shar
 
 import { AccountMenu } from "./account-menu";
 import { createHugeicon } from "./hugeicon";
-import { AppNavigation } from "./navigation";
+import { ProjectNavigation } from "./navigation";
 import { OrgNavigation } from "./org-navigation";
 import { useAppSession } from "./session-provider";
 import { useSidebarCollapsed } from "./use-sidebar-collapsed";
 
-const AppSwitcherIcon = createHugeicon(AppWindowIcon, "AppSwitcherIcon");
+const ProjectSwitcherIcon = createHugeicon(AppWindowIcon, "ProjectSwitcherIcon");
 const BackIcon = createHugeicon(ChevronLeftIcon, "BackIcon");
 const CheckmarkIcon = createHugeicon(CheckIcon, "CheckmarkIcon");
 const CollapseSidebarIcon = createHugeicon(PanelLeftCloseIcon, "CollapseSidebarIcon");
@@ -41,14 +41,14 @@ const ExpandSidebarIcon = createHugeicon(PanelLeftOpenIcon, "ExpandSidebarIcon")
 const NewAgentIcon = createHugeicon(PlusSignIcon, "NewAgentIcon");
 const SwitcherChevronIcon = createHugeicon(ChevronsDownUpIcon, "SwitcherChevronIcon");
 
-// One-click return to the parent Org layer (the Apps list).
+// One-click return to the parent Org layer (the Projects list).
 function BackToOrgLink({ collapsed, orgName }: { collapsed: boolean; orgName: string | null }) {
   const { t } = useTranslation();
-  const label = orgName ?? t("pageTitle.apps");
+  const label = orgName ?? t("pageTitle.projects");
   const backToLabel = t("nav.backTo", { label });
   const link = (
     <Link
-      to="/apps"
+      to="/projects"
       aria-label={backToLabel}
       className={cn(
         "text-fg-3 hover:text-fg-1 flex items-center gap-1 rounded-md transition-colors",
@@ -74,38 +74,39 @@ function BackToOrgLink({ collapsed, orgName }: { collapsed: boolean; orgName: st
   );
 }
 
-// App switcher: shows the active App and switches Apps inline via a dropdown.
-function AppSwitcher({
-  activeApp,
-  apps,
+// Project switcher: shows the active Project and switches Projects inline via a dropdown.
+function ProjectSwitcher({
+  activeProject,
+  projects,
   collapsed,
   loading,
   onSwitch,
 }: {
-  activeApp: AppSummary | null;
-  apps: AppSummary[];
+  activeProject: ProjectSummary | null;
+  projects: ProjectSummary[];
   collapsed: boolean;
   loading: boolean;
-  onSwitch: (appId: string) => void;
+  onSwitch: (projectId: string) => void;
 }) {
   const { t } = useTranslation();
-  const displayLabel = activeApp?.name ?? (loading ? t("common.loadingApp") : t("common.noApp"));
+  const displayLabel =
+    activeProject?.name ?? (loading ? t("common.loadingProject") : t("common.noProject"));
 
   const trigger = (
     <button
       type="button"
-      aria-label={t("apps.switchApp")}
+      aria-label={t("projects.switchProject")}
       className={cn(
         "border-border bg-background text-foreground hover:border-border-strong flex items-center rounded-md border text-[13px] font-semibold transition-colors",
         collapsed ? "mx-auto mb-3 size-9 justify-center" : "mx-0.5 mb-4 gap-2 px-2.5 py-2",
       )}
     >
-      <AppSwitcherIcon className="size-4 shrink-0" />
+      <ProjectSwitcherIcon className="size-4 shrink-0" />
       {collapsed ? null : (
         <>
           <div className="sidebar-label-enter min-w-0 flex-1 text-left">
             <div className="text-muted-foreground text-[10.5px] leading-3 font-semibold uppercase">
-              {t("nav.app")}
+              {t("nav.project")}
             </div>
             <div className="truncate">{displayLabel}</div>
           </div>
@@ -124,17 +125,17 @@ function AppSwitcher({
         className="w-[224px] rounded-lg p-1"
       >
         <DropdownMenuLabel className="text-fg-3 px-2 py-1 text-[10.5px] font-semibold tracking-wider uppercase">
-          {t("pageTitle.apps")}
+          {t("pageTitle.projects")}
         </DropdownMenuLabel>
-        {apps.map((app) => (
+        {projects.map((project) => (
           <DropdownMenuItem
-            key={app.id}
+            key={project.id}
             className="cursor-pointer gap-2 rounded-md"
-            onSelect={() => onSwitch(app.id)}
+            onSelect={() => onSwitch(project.id)}
           >
-            <AppSwitcherIcon className="text-fg-3 size-4 shrink-0" />
-            <span className="min-w-0 flex-1 truncate">{app.name}</span>
-            {activeApp !== null && app.id === activeApp.id ? (
+            <ProjectSwitcherIcon className="text-fg-3 size-4 shrink-0" />
+            <span className="min-w-0 flex-1 truncate">{project.name}</span>
+            {activeProject !== null && project.id === activeProject.id ? (
               <CheckmarkIcon className="text-fg-1 size-4 shrink-0" />
             ) : null}
           </DropdownMenuItem>
@@ -240,7 +241,7 @@ function MobileNavigation({
     <div className="md:hidden">
       <header className="border-border-soft bg-background flex h-14 shrink-0 items-center gap-3 border-b px-4">
         <button
-          aria-label={t("apps.openNavigation")}
+          aria-label={t("projects.openNavigation")}
           className="text-fg-2 hover:bg-ink-900/[0.04] hover:text-fg-1 flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-md px-2 transition-colors"
           onClick={() => {
             setOpenedAtLocation(navigationLocation);
@@ -286,7 +287,7 @@ function MobileNavigation({
 }
 
 const ORG_HEADER_TITLES = [
-  { path: "/apps", titleKey: "pageTitle.apps" },
+  { path: "/projects", titleKey: "pageTitle.projects" },
   { path: "/org/settings", titleKey: "pageTitle.orgSettings" },
 ] as const;
 
@@ -298,7 +299,7 @@ function getOrgHeaderTitle(pathname: string): string | null {
 }
 
 // Shared console chrome (brand, collapse toggle, help, account, content area).
-// The middle `sidebar` slot is what differs between the App and Org layers.
+// The middle `sidebar` slot is what differs between the Project and Org layers.
 function ConsoleShell({
   children,
   collapsed,
@@ -369,34 +370,35 @@ function ConsoleShell({
   );
 }
 
-// App-layer shell: scoped to the active App's resources.
+// Project-layer shell: scoped to the active Project's resources.
 export function Layout({ children }: { children: ReactNode }) {
-  const { activeApp, activeOrganization, apps, appsLoading, setActiveApp } = useAppSession();
+  const { activeProject, activeOrganization, projects, projectsLoading, setActiveProject } =
+    useAppSession();
   const location = useLocation();
   const navigate = useNavigate();
   const { collapsed, toggleCollapsed } = useSidebarCollapsed();
 
-  function switchApp(appId: string) {
-    setActiveApp(appId);
+  function switchProject(projectId: string) {
+    setActiveProject(projectId);
     void navigate("/");
   }
 
-  function appSidebar(isCollapsed: boolean, onNavigate?: () => void): ReactNode {
+  function projectSidebar(isCollapsed: boolean, onNavigate?: () => void): ReactNode {
     return (
       <>
         <BackToOrgLink collapsed={isCollapsed} orgName={activeOrganization?.name ?? null} />
-        <AppSwitcher
-          activeApp={activeApp}
-          apps={apps}
+        <ProjectSwitcher
+          activeProject={activeProject}
+          projects={projects}
           collapsed={isCollapsed}
-          loading={appsLoading}
-          onSwitch={(appId) => {
-            switchApp(appId);
+          loading={projectsLoading}
+          onSwitch={(projectId) => {
+            switchProject(projectId);
             onNavigate?.();
           }}
         />
-        <NewAgentCta collapsed={isCollapsed} disabled={activeApp === null} />
-        <AppNavigation collapsed={isCollapsed} pathname={location.pathname} />
+        <NewAgentCta collapsed={isCollapsed} disabled={activeProject === null} />
+        <ProjectNavigation collapsed={isCollapsed} pathname={location.pathname} />
       </>
     );
   }
@@ -405,9 +407,9 @@ export function Layout({ children }: { children: ReactNode }) {
     <TooltipProvider>
       <ConsoleShell
         collapsed={collapsed}
-        mobileSidebar={(closeNavigation) => appSidebar(false, closeNavigation)}
+        mobileSidebar={(closeNavigation) => projectSidebar(false, closeNavigation)}
         onToggleCollapsed={toggleCollapsed}
-        sidebar={appSidebar(collapsed)}
+        sidebar={projectSidebar(collapsed)}
       >
         {children}
       </ConsoleShell>
@@ -416,8 +418,8 @@ export function Layout({ children }: { children: ReactNode }) {
 }
 
 // Org-layer shell: a horizontal top bar (logo + org name) over a
-// dedicated Org sidebar. Deliberately distinct from the App shell so the Apps
-// list / pre-App console reads as the account layer, not an App detail page.
+// dedicated Org sidebar. Deliberately distinct from the Project shell so the Projects
+// list / pre-Project console reads as the account layer, not a Project detail page.
 export function OrgLayout({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
   const { activeOrganization } = useAppSession();
@@ -430,7 +432,7 @@ export function OrgLayout({ children }: { children: ReactNode }) {
       <div className="bg-background flex h-dvh flex-col">
         <header className="border-border-soft hidden shrink-0 border-b md:flex">
           <div className="flex min-h-[76px] w-[224px] shrink-0 items-center gap-2 px-4">
-            <Link to="/apps" aria-label={t("pageTitle.apps")} className="flex items-center">
+            <Link to="/projects" aria-label={t("pageTitle.projects")} className="flex items-center">
               <img src="/brand/logo-mark.svg" alt="mosoo" className="block size-6" />
             </Link>
             {activeOrganization === null ? null : (

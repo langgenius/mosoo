@@ -1,4 +1,4 @@
-import type { AgentId, AppId, SessionId } from "@mosoo/contracts/id";
+import type { AgentId, ProjectId, SessionId } from "@mosoo/contracts/id";
 import type {
   AgentSessionEventInput,
   SessionMessage,
@@ -47,7 +47,7 @@ const CREATE_AGENT_SESSION_MUTATION = graphql(/* GraphQL */ `
       }
       model
       provider
-      appId
+      projectId
       runtimeId
       status
       title
@@ -62,14 +62,14 @@ const AGENT_SESSION_LIST_QUERY = graphql(/* GraphQL */ `
     $agentId: ULID!
     $archived: Boolean
     $participantOnly: Boolean
-    $appId: ULID!
+    $projectId: ULID!
     $type: SessionType
   ) {
     agentSessionList(
       agentId: $agentId
       archived: $archived
       participantOnly: $participantOnly
-      appId: $appId
+      projectId: $projectId
       type: $type
     ) {
       nodes {
@@ -103,7 +103,7 @@ const AGENT_SESSION_LIST_QUERY = graphql(/* GraphQL */ `
         }
         model
         provider
-        appId
+        projectId
         runtimeId
         status
         title
@@ -115,8 +115,8 @@ const AGENT_SESSION_LIST_QUERY = graphql(/* GraphQL */ `
 `);
 
 const AGENT_SESSION_PROCESS_EVENTS_QUERY = graphql(/* GraphQL */ `
-  query AgentSessionProcessEvents($limit: Int!, $appId: ULID!, $sessionId: ULID!) {
-    sessionProcessEvents(limit: $limit, appId: $appId, sessionId: $sessionId) {
+  query AgentSessionProcessEvents($limit: Int!, $projectId: ULID!, $sessionId: ULID!) {
+    sessionProcessEvents(limit: $limit, projectId: $projectId, sessionId: $sessionId) {
       content
       durationMs
       id
@@ -129,8 +129,8 @@ const AGENT_SESSION_PROCESS_EVENTS_QUERY = graphql(/* GraphQL */ `
 `);
 
 const THREAD_SESSION_MESSAGES_QUERY = graphql(/* GraphQL */ `
-  query ThreadSessionMessages($appId: ULID!, $sessionId: ULID!) {
-    threadSessionMessages(appId: $appId, sessionId: $sessionId) {
+  query ThreadSessionMessages($projectId: ULID!, $sessionId: ULID!) {
+    threadSessionMessages(projectId: $projectId, sessionId: $sessionId) {
       content
       createdAt
       createdBy
@@ -156,11 +156,11 @@ const THREAD_SESSION_MESSAGES_QUERY = graphql(/* GraphQL */ `
 
 const SEND_AGENT_SESSION_EVENTS_MUTATION = graphql(/* GraphQL */ `
   mutation SendAgentSessionEvents(
-    $appId: ULID!
+    $projectId: ULID!
     $sessionId: ULID!
     $events: [AgentSessionEventInput!]!
   ) {
-    sendAgentSessionEvents(appId: $appId, sessionId: $sessionId, events: $events) {
+    sendAgentSessionEvents(projectId: $projectId, sessionId: $sessionId, events: $events) {
       acceptedAt
       warnings {
         code
@@ -171,8 +171,8 @@ const SEND_AGENT_SESSION_EVENTS_MUTATION = graphql(/* GraphQL */ `
 `);
 
 const PREWARM_AGENT_SESSION_MUTATION = graphql(/* GraphQL */ `
-  mutation PrewarmAgentSession($appId: ULID!, $sessionId: ULID!) {
-    prewarmAgentSession(appId: $appId, sessionId: $sessionId) {
+  mutation PrewarmAgentSession($projectId: ULID!, $sessionId: ULID!) {
+    prewarmAgentSession(projectId: $projectId, sessionId: $sessionId) {
       scheduledAt
       sessionId
     }
@@ -197,7 +197,7 @@ const lastPrewarmAtBySessionId = new Map<SessionId, number>();
  * Failures are swallowed on purpose — the worst case is a slightly slower next
  * message, which would have happened anyway without the prewarm.
  */
-export function triggerAgentSessionPrewarm(appId: AppId, sessionId: SessionId): void {
+export function triggerAgentSessionPrewarm(projectId: ProjectId, sessionId: SessionId): void {
   const now = Date.now();
   const lastAt = lastPrewarmAtBySessionId.get(sessionId);
   if (lastAt !== undefined && now - lastAt < PREWARM_THROTTLE_MS) {
@@ -205,7 +205,7 @@ export function triggerAgentSessionPrewarm(appId: AppId, sessionId: SessionId): 
   }
   lastPrewarmAtBySessionId.set(sessionId, now);
 
-  void requestGraphQL(PREWARM_AGENT_SESSION_MUTATION, { appId, sessionId }).catch(() => {
+  void requestGraphQL(PREWARM_AGENT_SESSION_MUTATION, { projectId, sessionId }).catch(() => {
     // Best-effort. Drop the throttle stamp on failure so a real retry path
     // (e.g. the next keystroke 30s later) can still fire.
     lastPrewarmAtBySessionId.delete(sessionId);
@@ -266,7 +266,7 @@ function toSessionMessageSegment(
 }
 
 export async function createAgentSession(
-  appId: AppId,
+  projectId: ProjectId,
   agentId: AgentId,
   type?: SessionType | null,
   options: {
@@ -277,7 +277,7 @@ export async function createAgentSession(
   const payload = await requestGraphQL(CREATE_AGENT_SESSION_MUTATION, {
     input: {
       agentId,
-      appId,
+      projectId,
       type: type ?? null,
       ...(waitForRuntimeReady ? { waitForRuntimeReady } : {}),
     },
@@ -287,7 +287,7 @@ export async function createAgentSession(
 }
 
 export async function listAgentSessions(
-  appId: AppId,
+  projectId: ProjectId,
   agentId: AgentId,
   options: {
     archived?: boolean | null;
@@ -299,7 +299,7 @@ export async function listAgentSessions(
     agentId,
     archived: options.archived ?? null,
     participantOnly: options.participantOnly ?? null,
-    appId,
+    projectId,
     type: options.type ?? null,
   });
 
@@ -307,12 +307,12 @@ export async function listAgentSessions(
 }
 
 export async function getAgentSessionProcessEvents(
-  appId: AppId,
+  projectId: ProjectId,
   sessionId: SessionId,
 ): Promise<SessionProcessEvent[]> {
   const payload = await requestGraphQL(AGENT_SESSION_PROCESS_EVENTS_QUERY, {
     limit: SESSION_PROCESS_EVENT_QUERY_LIMIT,
-    appId,
+    projectId,
     sessionId,
   });
 
@@ -320,11 +320,11 @@ export async function getAgentSessionProcessEvents(
 }
 
 export async function getThreadSessionMessages(
-  appId: AppId,
+  projectId: ProjectId,
   sessionId: SessionId,
 ): Promise<SessionMessage[]> {
   const payload = await requestGraphQL(THREAD_SESSION_MESSAGES_QUERY, {
-    appId,
+    projectId,
     sessionId,
   });
 
@@ -351,12 +351,12 @@ function toClientSessionMessage(
 
 export async function sendAgentSessionEvents(input: {
   events: AgentSessionEventInput[];
-  appId: AppId;
+  projectId: ProjectId;
   sessionId: SessionId;
 }): Promise<void> {
   await requestGraphQL(SEND_AGENT_SESSION_EVENTS_MUTATION, {
     events: input.events,
-    appId: input.appId,
+    projectId: input.projectId,
     sessionId: input.sessionId,
   });
 }

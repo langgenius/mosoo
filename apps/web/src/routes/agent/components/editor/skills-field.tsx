@@ -20,7 +20,7 @@ import { MarkdownPreviewDialog } from "./markdown-preview-dialog";
 import { useAgentSkillsFieldModel } from "./use-skills-field-model";
 
 interface AgentSkillsFieldProps {
-  appId: string | null;
+  projectId: string | null;
   readOnly?: boolean;
   selectedSkills: SkillInfo[];
   setSkills(skills: SkillInfo[]): void;
@@ -39,11 +39,11 @@ export function AgentSkillsField({
   readOnly = false,
   selectedSkills,
   setSkills,
-  appId,
+  projectId,
 }: AgentSkillsFieldProps): ReactElement {
   const { t } = useTranslation();
   const model = useAgentSkillsFieldModel({
-    appId,
+    projectId,
     selectedSkills,
     setSkills,
   });
@@ -197,7 +197,7 @@ function renderSkillsDropdownContent({
   return (
     <>
       <SkillPickerGroup
-        label={t("agent.appSkills")}
+        label={t("agent.projectSkills")}
         onAdd={onAdd}
         skills={model.availablePersonalSkills}
       />

@@ -6,7 +6,7 @@ import type { RuntimeEventEnvelope } from "@mosoo/runtime-events";
 
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { appendSessionRuntimeEvents } from "../../../sessions/application/session-event-write.service";
-import { appRuntimeEventToSessionDeliveryEvents } from "../../../sessions/application/session-live-state.service";
+import { projectRuntimeEventToSessionDeliveryEvents } from "../../../sessions/application/session-live-state.service";
 import { recordCanonicalSessionRunFailure } from "../../application/session-runs/session-run-terminal-failure.service";
 import { isTerminalSessionRunStatus } from "../../domain/session-run-status";
 import { setSessionRunStatus } from "../session-runs/session-run-store.repository";
@@ -153,10 +153,10 @@ async function synthesizeDriverRunFinished(
     sessionId: input.link.sessionId,
     sourceEventId: eventId,
   });
-  const [runFinishedEvent] = appRuntimeEventToSessionDeliveryEvents(runCompletedEvent);
+  const [runFinishedEvent] = projectRuntimeEventToSessionDeliveryEvents(runCompletedEvent);
 
   if (runFinishedEvent === undefined) {
-    throw new Error("Run completion event did not app to session delivery.");
+    throw new Error("Run completion event did not project to session delivery.");
   }
 
   // The terminal RPC proves only that execution ended; it carries no final

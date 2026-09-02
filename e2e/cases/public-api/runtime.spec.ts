@@ -254,7 +254,7 @@ async function ensureOnboarding(request: APIRequestContext): Promise<void> {
   );
 }
 
-async function getActiveAppId(request: APIRequestContext): Promise<string> {
+async function getActiveProjectId(request: APIRequestContext): Promise<string> {
   const viewer = await requestGraphQL<{
     viewer: {
       activeOrganization: {
@@ -279,34 +279,34 @@ async function getActiveAppId(request: APIRequestContext): Promise<string> {
     throw new Error("Onboarding did not create an active organization.");
   }
 
-  const apps = await requestGraphQL<{
-    appList: Array<{
+  const projects = await requestGraphQL<{
+    projectList: Array<{
       id: string;
     }>;
   }>(
     request,
     `
-      query E2EAppList($organizationId: ULID!) {
-        appList(organizationId: $organizationId) {
+      query E2EProjectList($organizationId: ULID!) {
+        projectList(organizationId: $organizationId) {
           id
         }
       }
     `,
     { organizationId },
   );
-  const appId = apps.appList[0]?.id;
+  const projectId = projects.projectList[0]?.id;
 
-  if (!appId) {
-    throw new Error("Onboarding did not create an App.");
+  if (!projectId) {
+    throw new Error("Onboarding did not create a Project.");
   }
 
-  return appId;
+  return projectId;
 }
 
 async function createAgent(
   request: APIRequestContext,
   input: {
-    appId: string;
+    projectId: string;
     name: string;
     runtime: RuntimeSelection;
   },
@@ -330,7 +330,7 @@ async function createAgent(
         kind: "cattle",
         model: input.runtime.model,
         name: input.name,
-        appId: input.appId,
+        projectId: input.projectId,
         prompt: "Reply concisely. Do not use tools.",
         provider: input.runtime.credentialVendorId,
         runtimeId: input.runtime.runtimeId,
@@ -347,7 +347,7 @@ async function configureProviderCredential(
   input: {
     apiKey: string;
     apiBase: string | null;
-    appId: string;
+    projectId: string;
     label: string;
     providerId: RuntimeCredentialVendorId;
     providerModelIds: readonly string[];
@@ -372,7 +372,7 @@ async function configureProviderCredential(
         apiKey: input.apiKey,
         models: input.providerModelIds,
         name: input.label,
-        appId: input.appId,
+        projectId: input.projectId,
         vendorId: input.providerId,
       },
     },
@@ -390,7 +390,7 @@ async function configureProviderCredential(
     {
       input: {
         id: created.createVendorCredential.id,
-        appId: input.appId,
+        projectId: input.projectId,
       },
     },
   );
@@ -400,7 +400,7 @@ async function publishAgent(
   request: APIRequestContext,
   input: {
     agentId: string;
-    appId: string;
+    projectId: string;
   },
 ): Promise<void> {
   await requestGraphQL(
@@ -575,10 +575,10 @@ test("Public API creates a real runtime thread and receives runtime events", asy
   await login(request, email);
   signals.checkpoint("api.auth.done", { email });
   await ensureOnboarding(request);
-  const appId = await getActiveAppId(request);
-  signals.checkpoint("api.app.ready", { appId });
+  const projectId = await getActiveProjectId(request);
+  signals.checkpoint("api.project.ready", { projectId });
   const agentId = await createAgent(request, {
-    appId,
+    projectId,
     name: `Public API runtime ${label}`,
     runtime,
   });
@@ -590,7 +590,7 @@ test("Public API creates a real runtime thread and receives runtime events", asy
   await configureProviderCredential(request, {
     apiKey,
     apiBase: runtime.apiBase,
-    appId,
+    projectId,
     label: `Public API runtime ${label}`,
     providerId: runtime.credentialVendorId,
     providerModelIds: runtime.providerModelIds,
@@ -599,7 +599,7 @@ test("Public API creates a real runtime thread and receives runtime events", asy
     provider: providerId,
     runtimeProvider: runtime.credentialVendorId,
   });
-  await publishAgent(request, { agentId, appId });
+  await publishAgent(request, { agentId, projectId });
   signals.checkpoint("api.agent.published", { agentId });
   const pat = await createPersonalAccessToken(request, `Public API runtime ${label}`);
   signals.checkpoint("public-api.token.created");

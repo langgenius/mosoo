@@ -8,7 +8,7 @@ import type {
   CostRunPurpose,
   CostTotals,
   OrganizationBillingCostCard,
-  AppCostCard,
+  ProjectCostCard,
 } from "@/domains/cost/api/cost-client";
 import { getCurrentLocale } from "@/shared/i18n";
 import type { SupportedLocale } from "@/shared/i18n/locales";
@@ -268,5 +268,5 @@ export type {
   CostRecentSession,
   CostTotals,
   OrganizationBillingCostCard,
-  AppCostCard,
+  ProjectCostCard,
 };

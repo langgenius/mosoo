@@ -1,6 +1,6 @@
 import { environmentRevisionsTable, environmentsTable } from "@mosoo/db";
 import { createPlatformId } from "@mosoo/id";
-import type { AccountId, EnvironmentId, EnvironmentRevisionId, AppId } from "@mosoo/id";
+import type { AccountId, EnvironmentId, EnvironmentRevisionId, ProjectId } from "@mosoo/id";
 import { and, eq, inArray } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
@@ -19,7 +19,7 @@ export async function createRevision(
     actorId: AccountId | null;
     config: EnvironmentMutableConfig;
     environmentId: EnvironmentId;
-    appId: AppId;
+    projectId: ProjectId;
     timestampMs: number;
   },
 ): Promise<EnvironmentRevisionId> {
@@ -41,7 +41,7 @@ export async function createRevision(
       id: revisionId,
       networkPolicy: input.config.networkPolicy,
       packagesJson: serialized.packagesJson,
-      appId: input.appId,
+      projectId: input.projectId,
       setupScript: input.config.setupScript,
     })
     .run();
@@ -61,7 +61,7 @@ export async function createEnvironmentFromConfig(
     environmentId?: EnvironmentId;
     name: string;
     ownerId: AccountId | null;
-    appId: AppId;
+    projectId: ProjectId;
     timestampMs: number;
   },
 ): Promise<EnvironmentId> {
@@ -82,7 +82,7 @@ export async function createEnvironmentFromConfig(
       id: environmentId,
       name: input.name,
       ownerAccountId: input.ownerId,
-      appId: input.appId,
+      projectId: input.projectId,
       updatedAt: input.timestampMs,
     }),
     db.insert(environmentRevisionsTable).values({
@@ -96,7 +96,7 @@ export async function createEnvironmentFromConfig(
       id: revisionId,
       networkPolicy: input.config.networkPolicy,
       packagesJson: serialized.packagesJson,
-      appId: input.appId,
+      projectId: input.projectId,
       setupScript: input.config.setupScript,
     }),
   ]);
@@ -122,14 +122,19 @@ function allocateCopyNameFromTaken(taken: ReadonlySet<string>, sourceName: strin
 
 export async function allocateCopyName(
   database: D1Database,
-  appId: AppId,
+  projectId: ProjectId,
   ownerId: AccountId,
   sourceName: string,
 ): Promise<string> {
   const results = await getAppDatabase(database)
     .select({ name: environmentsTable.name })
     .from(environmentsTable)
-    .where(and(eq(environmentsTable.appId, appId), eq(environmentsTable.ownerAccountId, ownerId)))
+    .where(
+      and(
+        eq(environmentsTable.projectId, projectId),
+        eq(environmentsTable.ownerAccountId, ownerId),
+      ),
+    )
     .all();
   const taken = new Set(results.map((row) => row.name));
   return allocateCopyNameFromTaken(taken, sourceName);
@@ -137,7 +142,7 @@ export async function allocateCopyName(
 
 export async function allocateCopyNamesByOwner(
   database: D1Database,
-  appId: AppId,
+  projectId: ProjectId,
   ownerIds: readonly AccountId[],
   sourceName: string,
 ): Promise<Map<AccountId, string>> {
@@ -158,7 +163,7 @@ export async function allocateCopyNamesByOwner(
     .from(environmentsTable)
     .where(
       and(
-        eq(environmentsTable.appId, appId),
+        eq(environmentsTable.projectId, projectId),
         inArray(environmentsTable.ownerAccountId, uniqueOwnerIds),
       ),
     )

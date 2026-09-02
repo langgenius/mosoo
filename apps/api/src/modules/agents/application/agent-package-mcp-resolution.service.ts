@@ -30,7 +30,7 @@ function recordReconnectRequired(input: {
   input.summary.boundMcpServerCount += 1;
   input.issues.push(
     createPackageMcpNeedsReconnectIssue({
-      message: `MCP server ${input.server.name} must be connected inside the target App before runtime use.`,
+      message: `MCP server ${input.server.name} must be connected inside the target Project before runtime use.`,
       serverName: input.server.name,
     }),
   );

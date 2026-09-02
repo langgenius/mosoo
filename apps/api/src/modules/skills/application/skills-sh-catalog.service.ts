@@ -6,7 +6,7 @@ import type {
   SkillsShCatalogView,
   SkillsShSourceType,
 } from "@mosoo/contracts/skill";
-import type { AppId } from "@mosoo/id";
+import type { ProjectId } from "@mosoo/id";
 import { createZipArchive, normalizeSkillEntries, SkillPackageError } from "@mosoo/skill-package";
 import type { NormalizedSkillPackage } from "@mosoo/skill-package";
 
@@ -108,13 +108,13 @@ export async function listSkillsShCatalog(
 export async function createSkillFromSkillsSh(
   bindings: ApiBindings,
   viewer: AuthenticatedViewer,
-  appId: AppId,
+  projectId: ProjectId,
   input: InstallSkillsShSkillInput,
 ): Promise<SkillSummary> {
   const normalized = await loadSkillPackageFromSkillsSh(bindings, input);
   const bytes = createZipArchive(normalized.entries);
 
-  return createSkillFromUpload(bindings, viewer, appId, {
+  return createSkillFromUpload(bindings, viewer, projectId, {
     file: {
       bytes,
       name: `${slugifyFileStem(normalized.frontmatter.name)}.skill`,

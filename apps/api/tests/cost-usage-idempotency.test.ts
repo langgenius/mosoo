@@ -6,7 +6,7 @@ import type { RecordRuntimeUsageEventInput } from "../src/modules/cost/applicati
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
-const APP_ID = "01J0000000000000000000000Q";
+const PROJECT_ID = "01J0000000000000000000000Q";
 const AGENT_ID = "01J0000000000000000000000A";
 const ACTOR_ID = "01J00000000000000000000001";
 const OWNER_ID = "01J00000000000000000000002";
@@ -36,7 +36,7 @@ function createUsageDatabase(): SqliteD1Database {
       input_tokens integer NOT NULL,
       model text NOT NULL,
       organization_id text NOT NULL,
-      app_id text NOT NULL,
+      project_id text NOT NULL,
       output_tokens integer NOT NULL,
       price_snapshot_json text,
       pricing_status text NOT NULL,
@@ -55,7 +55,7 @@ function createUsageDatabase(): SqliteD1Database {
 
     CREATE TABLE usage_daily_rollup (
       organization_id text NOT NULL,
-      app_id text NOT NULL,
+      project_id text NOT NULL,
       agent_id text NOT NULL,
       actor_user_id text NOT NULL,
       agent_owner_user_id text NOT NULL,
@@ -73,7 +73,7 @@ function createUsageDatabase(): SqliteD1Database {
       unpriced_request_count integer NOT NULL,
       PRIMARY KEY (
         organization_id,
-        app_id,
+        project_id,
         agent_id,
         actor_user_id,
         agent_owner_user_id,
@@ -110,7 +110,7 @@ function createUsageEventInput(): RecordRuntimeUsageEventInput {
       createdAtMs: EVENT_TIME_MS,
       model: "gpt-test",
       organizationId: ORGANIZATION_ID as RecordRuntimeUsageEventInput["run"]["organizationId"],
-      appId: APP_ID as RecordRuntimeUsageEventInput["run"]["appId"],
+      projectId: PROJECT_ID as RecordRuntimeUsageEventInput["run"]["projectId"],
       provider: "openai",
       runtimeId: "openai-runtime",
       sessionId: SESSION_ID as RecordRuntimeUsageEventInput["run"]["sessionId"],

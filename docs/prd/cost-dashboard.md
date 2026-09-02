@@ -1,18 +1,18 @@
-# App Usage
+# Project Usage
 
 Status: active usage view; not a bill.
 
 ## Problem and value
 
-Builders need to understand where an App's model usage is growing before it becomes an expensive surprise. App Usage turns recorded model calls into trends that help an App owner identify costly Agents, models, and run types. It is decision support, not a source of financial truth.
+Builders need to understand where a Project's model usage is growing before it becomes an expensive surprise. Project Usage turns recorded model calls into trends that help a Project owner identify costly Agents, models, and run types. It is decision support, not a source of financial truth.
 
 ## Users
 
-The current user is the single owner of the selected App. App Users cannot see this view, and there are no team roles, shared budgets, or per-person controls.
+The current user is the single owner of the selected Project. Project Users cannot see this view, and there are no team roles, shared budgets, or per-person controls.
 
 ## User flow
 
-1. Open **App Settings -> App usage**.
+1. Open **Project Settings -> Project usage**.
 2. Choose **All**, **Production**, or **Debug**, then select 7 days, 30 days, month to date, or 90 days.
 3. Use **Overview** to review estimated spend, model calls, tokens, active actors, daily spend, top Agents, and model mix.
 4. Use **By Agent** to compare usage and spend, then open an Agent's **Cost** tab for its model mix and latest usage events.

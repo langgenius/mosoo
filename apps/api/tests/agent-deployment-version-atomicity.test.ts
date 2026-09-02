@@ -63,7 +63,7 @@ describe("agent deployment version atomicity", () => {
         model: "gpt-5.4",
         name: "Draft Agent",
         ownerId: PUBLIC_API_TEST_IDS.ownerAccount,
-        appId: PUBLIC_API_TEST_IDS.app,
+        projectId: PUBLIC_API_TEST_IDS.project,
         prompt: "Draft help.",
         provider: "openai",
         runtimeId: "openai-runtime",
@@ -76,7 +76,7 @@ describe("agent deployment version atomicity", () => {
     const published = await withProviderProbeMock(() =>
       publishAgent(createPublicHttpTestBindings(database) as ApiBindings, OWNER_VIEWER, {
         agentId: DRAFT_AGENT_ID,
-        appId: PUBLIC_API_TEST_IDS.app,
+        projectId: PUBLIC_API_TEST_IDS.project,
       }),
     );
 
@@ -136,7 +136,7 @@ describe("agent deployment version atomicity", () => {
       model: "gpt-5.4",
       name: "Public API Agent",
       prompt: "Help more.",
-      appId: PUBLIC_API_TEST_IDS.app,
+      projectId: PUBLIC_API_TEST_IDS.project,
       provider: "openai",
       runtimeId: "openai-runtime",
       skillIds: [],

@@ -1,13 +1,13 @@
 import { describe, expect, test } from "bun:test";
 
 import { parsePlatformId } from "@mosoo/id";
-import type { AppId } from "@mosoo/id";
+import type { ProjectId } from "@mosoo/id";
 import { VENDOR_OPENAI_COMPATIBLE } from "@mosoo/runtime-catalog";
 
 import { resolveAvailableModels } from "../src/modules/vendor-credentials/application/available-models";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
-const APP_ID = parsePlatformId<AppId>("01J00000000000000000000009", "app ID");
+const PROJECT_ID = parsePlatformId<ProjectId>("01J00000000000000000000009", "project ID");
 
 function createAvailableModelsDatabase(): D1Database {
   const database = new SqliteD1Database();
@@ -17,7 +17,7 @@ function createAvailableModelsDatabase(): D1Database {
       id TEXT PRIMARY KEY
     );
 
-    CREATE TABLE app (
+    CREATE TABLE project (
       id TEXT PRIMARY KEY NOT NULL,
       organization_id TEXT NOT NULL,
       owner_account_id TEXT NOT NULL,
@@ -35,14 +35,14 @@ function createAvailableModelsDatabase(): D1Database {
       is_default INTEGER DEFAULT false NOT NULL,
       models TEXT,
       name TEXT NOT NULL,
-      app_id TEXT NOT NULL,
+      project_id TEXT NOT NULL,
       updated_at INTEGER NOT NULL,
       vendor_id TEXT NOT NULL
     );
 
     INSERT INTO organization (id) VALUES ('01J00000000000000000000006');
 
-    INSERT INTO app (
+    INSERT INTO project (
       id,
       organization_id,
       owner_account_id,
@@ -52,10 +52,10 @@ function createAvailableModelsDatabase(): D1Database {
       updated_at
     )
     VALUES (
-      '${APP_ID}',
+      '${PROJECT_ID}',
       '01J00000000000000000000006',
       'account-1',
-      'Default App',
+      'Default Project',
       NULL,
       1,
       1
@@ -69,7 +69,7 @@ function createAvailableModelsDatabase(): D1Database {
       is_default,
       models,
       name,
-      app_id,
+      project_id,
       updated_at,
       vendor_id
     )
@@ -81,7 +81,7 @@ function createAvailableModelsDatabase(): D1Database {
       true,
       '["qwen-coder"]',
       'Custom default',
-      '${APP_ID}',
+      '${PROJECT_ID}',
       1,
       '${VENDOR_OPENAI_COMPATIBLE.vendorId}'
     );
@@ -95,7 +95,7 @@ describe("OpenAI-compatible runtime model support", () => {
     const entries = await resolveAvailableModels(createAvailableModelsDatabase(), {
       currentModelId: "qwen-coder",
       currentVendorId: VENDOR_OPENAI_COMPATIBLE.vendorId,
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       runtimeId: "openai-runtime",
     });
     const currentCustomEntry = entries.find(
@@ -115,7 +115,7 @@ describe("OpenAI-compatible runtime model support", () => {
     const entries = await resolveAvailableModels(createAvailableModelsDatabase(), {
       currentModelId: "qwen-coder",
       currentVendorId: VENDOR_OPENAI_COMPATIBLE.vendorId,
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       runtimeId: "claude-agent-sdk",
     });
     const currentCustomEntry = entries.find(
@@ -131,7 +131,7 @@ describe("OpenAI-compatible runtime model support", () => {
 
   test("keeps unsupported preset models visible with wrong-runtime reason", async () => {
     const entries = await resolveAvailableModels(createAvailableModelsDatabase(), {
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       runtimeId: "openai-runtime",
     });
     const claudeEntry = entries.find(

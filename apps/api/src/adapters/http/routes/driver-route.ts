@@ -760,7 +760,7 @@ export function registerDriverRoute(app: Hono<ApiGatewayEnvironment>) {
     try {
       target = await resolveRuntimeLlmProxyTarget(c.env, {
         credentialId,
-        appId: grant.appId,
+        projectId: grant.projectId,
       });
     } catch (error) {
       if (error instanceof RuntimeLlmProxyError) {

@@ -1,5 +1,5 @@
 import type { EnvironmentPackageSpec } from "../environment/environment.contract";
-import type { AgentId, FileId, AppId } from "../id/id.contract";
+import type { AgentId, FileId, ProjectId } from "../id/id.contract";
 import type { JsonObject } from "../validation/primitives.contract";
 import { AGENT_MANIFEST_VERSION, AGENT_PACKAGE_VERSION } from "./agent-manifest-version.contract";
 import type { AgentBuiltInToolConfig, AgentKind } from "./agent.contract";
@@ -120,7 +120,7 @@ export interface AgentPackage {
     email: string | null;
     name: string;
   } | null;
-  app: {
+  project: {
     avatarAssetKey: string | null;
     description: string | null;
     name: string;
@@ -172,13 +172,13 @@ export interface AgentPackageExport {
 
 export interface ImportAgentPackageInput {
   fileId: FileId;
-  appId: AppId;
+  projectId: ProjectId;
 }
 
 export interface CreateAgentForkInput {
   agentId: AgentId;
   kind?: AgentKind;
-  appId: AppId;
+  projectId: ProjectId;
 }
 
 export interface AgentPackageImportResult<AgentModel = unknown> {

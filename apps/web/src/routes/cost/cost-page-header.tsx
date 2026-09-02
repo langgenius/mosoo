@@ -13,7 +13,7 @@ import {
   rangeLabel,
   rangeLabelKey,
 } from "./cost-model";
-import type { CostRange, CostRunPurpose, CostTab, AppCostCard } from "./cost-model";
+import type { CostRange, CostRunPurpose, CostTab, ProjectCostCard } from "./cost-model";
 
 export function CostPageHeader({
   card,
@@ -23,7 +23,7 @@ export function CostPageHeader({
   setRange,
   setRunPurpose,
 }: {
-  card: AppCostCard | undefined;
+  card: ProjectCostCard | undefined;
   effectiveTab: CostTab;
   range: CostRange;
   runPurpose: CostRunPurpose | "all";
@@ -35,9 +35,9 @@ export function CostPageHeader({
   return (
     <header className="border-border-subtle flex min-h-12 shrink-0 flex-col items-stretch gap-2 border-b px-4 py-3 sm:px-6 lg:h-12 lg:flex-row lg:items-center lg:justify-between lg:py-0">
       <div className="flex min-w-0 items-baseline gap-2">
-        <span className="text-sm font-medium">{t("cost.appUsage")}</span>
+        <span className="text-sm font-medium">{t("cost.projectUsage")}</span>
         <span className="text-fg-3 hidden truncate text-xs sm:inline">
-          {`${card?.appName ?? t("nav.app")} · ${t(rangeLabel(range))} · ${formatCurrency(card?.totals.totalCostUsd ?? 0)}`}
+          {`${card?.projectName ?? t("nav.project")} · ${t(rangeLabel(range))} · ${formatCurrency(card?.totals.totalCostUsd ?? 0)}`}
         </span>
       </div>
       <div className="flex w-full flex-wrap items-center gap-2 lg:w-auto lg:flex-nowrap">
@@ -93,7 +93,7 @@ export function CostPageHeader({
 
 function exportCostCsv(
   effectiveTab: CostTab,
-  card: AppCostCard | undefined,
+  card: ProjectCostCard | undefined,
   t: (key: string, variables?: Record<string, string>) => string,
 ) {
   if (!card) {

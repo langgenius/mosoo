@@ -6,7 +6,7 @@ export * from "./environment.schema";
 export * from "./file.schema";
 export * from "./mcp.schema";
 export * from "./organization.schema";
-export * from "./app.schema";
+export * from "./project.schema";
 export * from "./public-api.schema";
 export * from "./runtime.schema";
 export * from "./skill.schema";

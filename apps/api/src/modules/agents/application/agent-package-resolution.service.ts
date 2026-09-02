@@ -7,7 +7,7 @@ import type {
   AgentResolutionIssue,
 } from "@mosoo/contracts/agent-manifest";
 import { environmentRevisionsTable, environmentsTable } from "@mosoo/db";
-import type { AccountId, EnvironmentId, AppId, SkillId } from "@mosoo/id";
+import type { AccountId, EnvironmentId, ProjectId, SkillId } from "@mosoo/id";
 import { and, eq, sql } from "drizzle-orm";
 import { zipSync } from "fflate";
 
@@ -19,7 +19,7 @@ import {
   normalizePackages,
   parsePackagesJson,
 } from "../../environments/application/environment-config";
-import { listAppSkillRows } from "../../skills/application/skill-access.service";
+import { listProjectSkillRows } from "../../skills/application/skill-access.service";
 import { createSkillFromUpload } from "../../skills/application/skill-package-write.service";
 import { readEnvironmentId, readSkillId, readSkillSnapshotId } from "./agent-platform-ids";
 import { collectRuntimeCapabilityIssues } from "./agent-runtime-capability-resolution.service";
@@ -47,7 +47,7 @@ export function collectPackageDeclarationIssues(
       createResolutionIssue({
         actionLabel: "Fill secret",
         code: "agent.import.environment_secret.missing",
-        message: `Environment variable ${envVarKey} must be re-entered in the target App.`,
+        message: `Environment variable ${envVarKey} must be re-entered in the target Project.`,
         targetLabel: envVarKey,
         targetType: "environment",
       }),
@@ -64,14 +64,18 @@ export async function resolvePackageSkills(input: {
   issues: AgentResolutionIssue[];
   manifest: AgentManifest;
   packageAssets?: AgentPackageAsset[];
-  appId: AppId;
+  projectId: ProjectId;
   summary: AgentPackageResolutionSummary;
   viewer?: AuthenticatedViewer;
   viewerId: AccountId;
 }): Promise<PackageSkillResolution> {
   const skillIds: SkillId[] = [];
   const packageSkills: AgentStoredPackageSkill[] = [];
-  const accessibleSkills = await listAppSkillRows(input.database, input.viewerId, input.appId);
+  const accessibleSkills = await listProjectSkillRows(
+    input.database,
+    input.viewerId,
+    input.projectId,
+  );
   const accessibleSkillsByName = new Map<string, (typeof accessibleSkills)[number]>();
   const accessibleSkillsById = new Map<string, (typeof accessibleSkills)[number]>();
 
@@ -169,7 +173,7 @@ async function createPackageOwnedSkillIfPresent(
     bindings?: ApiBindings;
     manifest: AgentManifest;
     packageAssets?: AgentPackageAsset[];
-    appId: AppId;
+    projectId: ProjectId;
     viewer?: AuthenticatedViewer;
   },
   skill: AgentManifest["skills"][number],
@@ -206,7 +210,7 @@ async function createPackageOwnedSkillIfPresent(
   }
 
   const packagePath = skillPath;
-  const created = await createSkillFromUpload(input.bindings, input.viewer, input.appId, {
+  const created = await createSkillFromUpload(input.bindings, input.viewer, input.projectId, {
     file: {
       bytes: zipSync(files),
       name: `${skill.skillName}.skill`,
@@ -225,7 +229,7 @@ async function createPackageOwnedSkillIfPresent(
 
 async function findEnvironmentByName(
   database: D1Database,
-  appId: AppId,
+  projectId: ProjectId,
   name: string | null,
 ): Promise<{ id: EnvironmentId; packagesJson: string } | null> {
   if (!isTruthy(name)) {
@@ -245,7 +249,7 @@ async function findEnvironmentByName(
       )
       .where(
         and(
-          eq(environmentsTable.appId, appId),
+          eq(environmentsTable.projectId, projectId),
           sql`lower(${environmentsTable.name}) = lower(${name})`,
         ),
       )
@@ -292,7 +296,7 @@ export async function resolvePackageEnvironment(input: {
   database: D1Database;
   issues: AgentResolutionIssue[];
   manifest: AgentManifest;
-  appId: AppId;
+  projectId: ProjectId;
 }): Promise<EnvironmentId | null> {
   const manifestEnvironment = input.manifest.environment;
 
@@ -302,7 +306,7 @@ export async function resolvePackageEnvironment(input: {
       readEnvironmentId(manifestEnvironment.environmentId),
     );
 
-    if (row?.appId === input.appId) {
+    if (row?.projectId === input.projectId) {
       return resolveMatchedEnvironment(input, row);
     }
   }
@@ -310,7 +314,7 @@ export async function resolvePackageEnvironment(input: {
   if (input.allowTargetNameMatch !== false) {
     const matched = await findEnvironmentByName(
       input.database,
-      input.appId,
+      input.projectId,
       manifestEnvironment.expectedName,
     );
 
@@ -352,14 +356,14 @@ export async function resolvePackageEnvironment(input: {
 export async function collectRuntimeResolutionIssues(
   database: D1Database,
   actorAccountId: AccountId,
-  appId: AppId,
+  projectId: ProjectId,
   manifest: AgentManifest,
 ): Promise<AgentResolutionIssue[]> {
   return collectRuntimeCapabilityIssues({
     actorAccountId,
     codePrefix: "agent.import",
     database,
-    appId,
+    projectId,
     selection: {
       model: manifest.runtime.model,
       provider: manifest.runtime.provider,

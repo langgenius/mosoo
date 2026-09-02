@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import type { PlatformId, AppId, VendorCredentialId } from "@mosoo/id";
+import type { PlatformId, ProjectId, VendorCredentialId } from "@mosoo/id";
 
 import {
   findCustomCredentialRowForModel,
@@ -20,7 +20,7 @@ function credentialRow(input: {
     isDefault: false,
     modelsJson: input.modelsJson,
     name: input.name,
-    appId: "app-1" as AppId,
+    projectId: "project-1" as ProjectId,
     vendorId: "openai-compatible",
   };
 }

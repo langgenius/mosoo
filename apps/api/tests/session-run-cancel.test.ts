@@ -219,7 +219,7 @@ describe("session run cancel", () => {
     const bindings = createPublicHttpTestBindings(database) as ApiBindings;
 
     const result = await cancelRun(bindings, ownerViewer, {
-      appId: PUBLIC_API_TEST_IDS.app,
+      projectId: PUBLIC_API_TEST_IDS.project,
       runId: RUN_ID,
       sessionId: OWNER_SESSION_ID,
     });
@@ -318,7 +318,7 @@ describe("session run cancel", () => {
     );
 
     const result = await cancelRun(bindings, ownerViewer, {
-      appId: PUBLIC_API_TEST_IDS.app,
+      projectId: PUBLIC_API_TEST_IDS.project,
       runId: RUN_ID,
       sessionId: OWNER_SESSION_ID,
     });
@@ -327,7 +327,7 @@ describe("session run cancel", () => {
     expect(driverRequests).toHaveLength(1);
   });
 
-  test("resolves permission requests for the App owner through App ownership", async () => {
+  test("resolves permission requests for the Project owner through Project ownership", async () => {
     const database = await createPublicHttpContractDatabase();
     await insertOwnerSession(database);
     await insertRunningSessionRun(database, {
@@ -348,7 +348,7 @@ describe("session run cancel", () => {
       resolvePermissionRequest(bindings, ownerViewer, {
         decision: "allow_once",
         driverInstanceId: DRIVER_INSTANCE_ID,
-        appId: PUBLIC_API_TEST_IDS.app,
+        projectId: PUBLIC_API_TEST_IDS.project,
         requestId: "permission-1",
         sessionId: OWNER_SESSION_ID,
       }),

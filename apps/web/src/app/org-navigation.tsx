@@ -21,7 +21,11 @@ interface OrgNavItem {
 // Org layer = the account/billing shell. Usage and Billing are not built yet, so
 // they render as inert "coming soon" entries.
 const ORG_NAV_ITEMS: OrgNavItem[] = [
-  { icon: createHugeicon(GridViewIcon, "AppsIcon"), labelKey: "pageTitle.apps", path: "/apps" },
+  {
+    icon: createHugeicon(GridViewIcon, "ProjectsIcon"),
+    labelKey: "pageTitle.projects",
+    path: "/projects",
+  },
   {
     icon: createHugeicon(ChartLineData01Icon, "UsageIcon"),
     labelKey: "pageTitle.usage",

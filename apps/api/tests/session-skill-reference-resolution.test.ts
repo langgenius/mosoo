@@ -7,8 +7,8 @@ import { SqliteD1Database } from "./helpers/sqlite-d1";
 type SessionSkillReference = SessionExecutionPlan["skills"][number];
 
 const IDS = {
-  app: "01J00000000000000000000002",
-  otherApp: "01J00000000000000000000003",
+  project: "01J00000000000000000000002",
+  otherProject: "01J00000000000000000000003",
 } as const;
 
 function createSessionSkillReferenceDatabase(): SqliteD1Database {
@@ -24,7 +24,7 @@ function createSessionSkillReferenceDatabase(): SqliteD1Database {
       description text NOT NULL,
       id text PRIMARY KEY NOT NULL,
       name text NOT NULL,
-      app_id text NOT NULL,
+      project_id text NOT NULL,
       skill_markdown_path text NOT NULL,
       uncompressed_size integer NOT NULL,
       version text
@@ -39,16 +39,16 @@ function createSessionSkillReferenceDatabase(): SqliteD1Database {
       description,
       id,
       name,
-      app_id,
+      project_id,
       skill_markdown_path,
       uncompressed_size,
       version
     )
     VALUES
-      ('Owner One', 'blob-owned', 'sha-owned', 100, 1, 'Owned', 'snapshot-owned', 'Owned Skill', '${IDS.app}', 'SKILL.md', 200, '1.0.0'),
-      ('Owner One', 'blob-explicit', 'sha-explicit', 110, 1, 'Explicit', 'snapshot-explicit', 'Explicit Skill', '${IDS.app}', 'SKILL.md', 210, '1.1.0'),
-      ('Package', 'blob-package', 'sha-package', 120, 1, 'Package', 'snapshot-package', 'Package Skill', '${IDS.app}', 'SKILL.md', 220, '2.0.0'),
-      ('Package', 'blob-other-app', 'sha-other-app', 130, 1, 'Other', 'snapshot-other-app', 'Other Skill', '${IDS.otherApp}', 'SKILL.md', 230, NULL);
+      ('Owner One', 'blob-owned', 'sha-owned', 100, 1, 'Owned', 'snapshot-owned', 'Owned Skill', '${IDS.project}', 'SKILL.md', 200, '1.0.0'),
+      ('Owner One', 'blob-explicit', 'sha-explicit', 110, 1, 'Explicit', 'snapshot-explicit', 'Explicit Skill', '${IDS.project}', 'SKILL.md', 210, '1.1.0'),
+      ('Package', 'blob-package', 'sha-package', 120, 1, 'Package', 'snapshot-package', 'Package Skill', '${IDS.project}', 'SKILL.md', 220, '2.0.0'),
+      ('Package', 'blob-other-project', 'sha-other-project', 130, 1, 'Other', 'snapshot-other-project', 'Other Skill', '${IDS.otherProject}', 'SKILL.md', 230, NULL);
   `);
 
   return database;
@@ -71,7 +71,7 @@ function createSkillReference(input: {
 }
 
 describe("session skill reference resolution", () => {
-  test("resolves frozen skill snapshots in the session App", async () => {
+  test("resolves frozen skill snapshots in the session Project", async () => {
     const database = createSessionSkillReferenceDatabase();
     const skillMountRoot = "skill-root";
 
@@ -105,7 +105,7 @@ describe("session skill reference resolution", () => {
 
     const resolved = await resolveSessionSkillReferences({
       database,
-      sessionAppId: IDS.app,
+      sessionProjectId: IDS.project,
       skillMountRoot,
       skillReferences: references,
     });
@@ -143,7 +143,7 @@ describe("session skill reference resolution", () => {
     await expect(
       resolveSessionSkillReferences({
         database,
-        sessionAppId: IDS.app,
+        sessionProjectId: IDS.project,
         skillMountRoot: "skill-root",
         skillReferences: [
           createSkillReference({
@@ -157,39 +157,39 @@ describe("session skill reference resolution", () => {
     ).rejects.toThrow("Skill snapshot not found.");
   });
 
-  test("rejects explicit snapshots from another App", async () => {
+  test("rejects explicit snapshots from another Project", async () => {
     await expect(
       resolveSessionSkillReferences({
         database: createSessionSkillReferenceDatabase(),
-        sessionAppId: IDS.app,
+        sessionProjectId: IDS.project,
         skillMountRoot: "skill-root",
         skillReferences: [
           createSkillReference({
             skillId: "skill-other",
-            skillName: "Other App Skill",
-            snapshotId: "snapshot-other-app",
+            skillName: "Other Project Skill",
+            snapshotId: "snapshot-other-project",
             sortOrder: 0,
           }),
         ],
       }),
-    ).rejects.toThrow("Skill snapshot belongs to another App.");
+    ).rejects.toThrow("Skill snapshot belongs to another Project.");
   });
 
-  test("rejects package snapshots from another App", async () => {
+  test("rejects package snapshots from another Project", async () => {
     await expect(
       resolveSessionSkillReferences({
         database: createSessionSkillReferenceDatabase(),
-        sessionAppId: IDS.app,
+        sessionProjectId: IDS.project,
         skillMountRoot: "skill-root",
         skillReferences: [
           createSkillReference({
             skillId: "package:other",
             skillName: "Other Package",
-            snapshotId: "snapshot-other-app",
+            snapshotId: "snapshot-other-project",
             sortOrder: 0,
           }),
         ],
       }),
-    ).rejects.toThrow("Package-owned skill snapshot belongs to another App.");
+    ).rejects.toThrow("Package-owned skill snapshot belongs to another Project.");
   });
 });

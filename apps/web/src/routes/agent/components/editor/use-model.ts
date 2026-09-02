@@ -18,7 +18,7 @@ import {
   toAgentDeploymentVersionId,
   toEnvironmentId,
   toMcpServerId,
-  toAppId,
+  toProjectId,
   toSkillId,
 } from "@/routes/typed-id";
 
@@ -97,16 +97,16 @@ export function useAgentEditorModel({
   const [savedSnapshot, setSavedSnapshot] = useState(() => createEditorSaveSnapshot(initialDraft));
   const [saveError, setSaveError] = useState<string | null>(null);
   const typedAgentId = toAgentId(agent.id);
-  const typedAppId = toAppId(agent.appId);
+  const typedProjectId = toProjectId(agent.projectId);
   const configMutation = useMutation({
     mutationFn: updateAgentConfig,
     onSuccess: async (_data, variables) => {
       await Promise.all([
         queryClient.invalidateQueries({
-          queryKey: agentKeys.detail(variables.appId, variables.agentId),
+          queryKey: agentKeys.detail(variables.projectId, variables.agentId),
         }),
         queryClient.invalidateQueries({
-          queryKey: agentKeys.editorState(variables.appId, variables.agentId),
+          queryKey: agentKeys.editorState(variables.projectId, variables.agentId),
         }),
         queryClient.invalidateQueries({ queryKey: agentKeys.lists() }),
       ]);
@@ -116,7 +116,7 @@ export function useAgentEditorModel({
     mutationFn: restartDriver,
     onSuccess: async (_data, variables) => {
       await queryClient.invalidateQueries({
-        queryKey: agentKeys.detail(variables.appId, variables.agentId),
+        queryKey: agentKeys.detail(variables.projectId, variables.agentId),
       });
     },
   });
@@ -124,7 +124,7 @@ export function useAgentEditorModel({
     mutationFn: recreateSandbox,
     onSuccess: async (_data, variables) => {
       await queryClient.invalidateQueries({
-        queryKey: agentKeys.detail(variables.appId, variables.agentId),
+        queryKey: agentKeys.detail(variables.projectId, variables.agentId),
       });
     },
   });
@@ -207,7 +207,7 @@ export function useAgentEditorModel({
         prompt: draftToSave.prompt,
         provider,
         providerOptions: draftToSave.providerOptions,
-        appId: typedAppId,
+        projectId: typedProjectId,
         runtimeId: draftToSave.runtime,
         skillIds: draftToSave.skills.flatMap((skill) =>
           skill.state === "tombstone" ? [] : [toSkillId(skill.id)],
@@ -221,7 +221,7 @@ export function useAgentEditorModel({
             affectedFields: draftChangePlan.fieldLabels,
             agentId: typedAgentId,
             applyActionKind: "recreate-preserving-state",
-            appId: typedAppId,
+            projectId: typedProjectId,
             targetVersion,
           });
         } else if (
@@ -232,7 +232,7 @@ export function useAgentEditorModel({
             affectedFields: draftChangePlan.fieldLabels,
             agentId: typedAgentId,
             applyActionKind: draftChangePlan.action,
-            appId: typedAppId,
+            projectId: typedProjectId,
             targetVersion,
           });
         }

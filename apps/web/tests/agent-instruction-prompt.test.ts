@@ -25,7 +25,7 @@ const distribution: AgentDistribution = {
 
 function agent(overrides: Partial<Agent> = {}): Agent {
   return {
-    appId: "app_123",
+    projectId: "project_123",
     config: {
       builtInTools: [],
       environmentId: null,

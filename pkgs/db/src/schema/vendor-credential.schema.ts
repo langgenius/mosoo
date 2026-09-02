@@ -1,12 +1,12 @@
-import type { PlatformId, AppId, VendorCredentialId } from "@mosoo/id";
+import type { PlatformId, ProjectId, VendorCredentialId } from "@mosoo/id";
 import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 import { platformIdColumn } from "./id-column";
 
 /**
- * Stores App-owned vendor API credentials.
+ * Stores Project-owned vendor API credentials.
  *
- * Each row represents one named credential for a vendor within an App.
+ * Each row represents one named credential for a vendor within a Project.
  * Secret material is stored in vault_secret and only referenced here.
  */
 export const vendorCredentialsTable = sqliteTable(
@@ -19,14 +19,14 @@ export const vendorCredentialsTable = sqliteTable(
     isDefault: integer("is_default", { mode: "boolean" }).notNull().default(false),
     models: text("models", { mode: "json" }).$type<string[]>(),
     name: text("name").notNull(),
-    appId: platformIdColumn<AppId>("app_id").notNull(),
+    projectId: platformIdColumn<ProjectId>("project_id").notNull(),
     updatedAt: integer("updated_at").notNull(),
     vendorId: text("vendor_id").notNull(),
   },
   (table) => [
-    index("vendor_credential_app_vendor_idx").on(table.appId, table.vendorId),
-    uniqueIndex("vendor_credential_app_vendor_name_idx").on(
-      table.appId,
+    index("vendor_credential_project_vendor_idx").on(table.projectId, table.vendorId),
+    uniqueIndex("vendor_credential_project_vendor_name_idx").on(
+      table.projectId,
       table.vendorId,
       table.name,
     ),

@@ -171,7 +171,7 @@ export function BasicsSection({
             </div>
           </div>
 
-          <ModelPickerField model={model} appId={agent.appId} readOnly={readOnly} />
+          <ModelPickerField model={model} projectId={agent.projectId} readOnly={readOnly} />
           <RuntimeAdvancedSettingsField
             builtInTools={model.draft.builtInTools}
             modelId={model.draft.model}
@@ -204,11 +204,11 @@ export function BasicsSection({
 
 export function IntegrationsSection({
   model,
-  appId,
+  projectId,
   readOnly,
 }: {
   model: AgentEditorModel;
-  appId: string | null;
+  projectId: string | null;
   readOnly: boolean;
 }) {
   const { t } = useTranslation();
@@ -218,7 +218,7 @@ export function IntegrationsSection({
       <div>
         <SectionHeader>{t("agent.skills")}</SectionHeader>
         <AgentSkillsField
-          appId={appId}
+          projectId={projectId}
           readOnly={readOnly}
           selectedSkills={model.draft.skills}
           setSkills={model.setSkills}
@@ -228,7 +228,7 @@ export function IntegrationsSection({
       <div className="scroll-mt-24" id="agent-mcp-bindings">
         <SectionHeader>{t("agent.mcpServers")}</SectionHeader>
         <AgentMcpBindingsField
-          appId={appId}
+          projectId={projectId}
           readOnly={readOnly}
           selectedServers={model.draft.mcpServers}
           setServers={model.setMcpServers}
@@ -253,7 +253,7 @@ export function EnvironmentSection({
     <div className="space-y-5">
       <div>
         <SectionHeader>{t("agent.environment")}</SectionHeader>
-        <EnvironmentPicker model={model} appId={agent.appId} readOnly={readOnly} />
+        <EnvironmentPicker model={model} projectId={agent.projectId} readOnly={readOnly} />
       </div>
     </div>
   );

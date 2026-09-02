@@ -2,20 +2,22 @@ import type { AgentDetail, AgentEditorState, AgentSummary } from "@mosoo/contrac
 import { useQuery } from "@tanstack/react-query";
 import type { UseQueryResult } from "@tanstack/react-query";
 
-import { toAgentId, toAppId } from "@/routes/typed-id";
+import { toAgentId, toProjectId } from "@/routes/typed-id";
 
 import { getAgent, getAgentEditorState, listVisibleAgents } from "../api/agent-client";
 
 export const agentKeys = {
   all: ["agent"] as const,
-  detail: (appId: string, agentId: string) => [...agentKeys.details(), appId, agentId] as const,
+  detail: (projectId: string, agentId: string) =>
+    [...agentKeys.details(), projectId, agentId] as const,
   details: () => [...agentKeys.all, "detail"] as const,
-  editorState: (appId: string, agentId: string) =>
-    [...agentKeys.editorStates(), appId, agentId] as const,
+  editorState: (projectId: string, agentId: string) =>
+    [...agentKeys.editorStates(), projectId, agentId] as const,
   editorStates: () => [...agentKeys.all, "editor-state"] as const,
-  list: (appId: string) => [...agentKeys.lists(), appId] as const,
+  list: (projectId: string) => [...agentKeys.lists(), projectId] as const,
   lists: () => [...agentKeys.all, "list"] as const,
-  manifest: (appId: string, agentId: string) => [...agentKeys.manifests(), appId, agentId] as const,
+  manifest: (projectId: string, agentId: string) =>
+    [...agentKeys.manifests(), projectId, agentId] as const,
   manifests: () => [...agentKeys.all, "manifest"] as const,
 };
 
@@ -23,65 +25,65 @@ export type VisibleAgentsQueryResult = UseQueryResult<AgentSummary[]>;
 export type AgentDetailQueryResult = UseQueryResult<AgentDetail>;
 export type AgentEditorStateQueryResult = UseQueryResult<AgentEditorState>;
 
-export function useVisibleAgentsQuery(appId: string | null): VisibleAgentsQueryResult {
+export function useVisibleAgentsQuery(projectId: string | null): VisibleAgentsQueryResult {
   return useQuery({
-    enabled: appId !== null,
+    enabled: projectId !== null,
     queryFn: async () => {
-      if (appId === null) {
-        throw new Error("App id is required to list visible agents.");
+      if (projectId === null) {
+        throw new Error("Project id is required to list visible agents.");
       }
 
-      return listVisibleAgents(toAppId(appId));
+      return listVisibleAgents(toProjectId(projectId));
     },
-    queryKey: appId === null ? [...agentKeys.lists(), "missing"] : agentKeys.list(appId),
+    queryKey: projectId === null ? [...agentKeys.lists(), "missing"] : agentKeys.list(projectId),
   });
 }
 
 export function useAgentDetailQuery(
-  appId: string | null,
+  projectId: string | null,
   agentId: string | null,
 ): AgentDetailQueryResult {
   return useQuery({
-    enabled: appId !== null && agentId !== null,
+    enabled: projectId !== null && agentId !== null,
     queryFn: async () => {
-      if (appId === null) {
-        throw new Error("App id is required to load agent details.");
+      if (projectId === null) {
+        throw new Error("Project id is required to load agent details.");
       }
 
       if (agentId === null) {
         throw new Error("Agent id is required to load agent details.");
       }
 
-      return getAgent(toAppId(appId), toAgentId(agentId));
+      return getAgent(toProjectId(projectId), toAgentId(agentId));
     },
     queryKey:
-      appId === null || agentId === null
+      projectId === null || agentId === null
         ? [...agentKeys.details(), "missing"]
-        : agentKeys.detail(appId, agentId),
+        : agentKeys.detail(projectId, agentId),
   });
 }
 
 export function useAgentEditorStateQuery(
-  appId: string | null,
+  projectId: string | null,
   agentId: string | null,
   enabled = true,
 ): AgentEditorStateQueryResult {
   return useQuery({
-    enabled: enabled && appId !== null && agentId !== null,
+    enabled: enabled && projectId !== null && agentId !== null,
     queryFn: async () => {
-      if (appId === null) {
-        throw new Error("App id is required to load editor state.");
+      if (projectId === null) {
+        throw new Error("Project id is required to load editor state.");
       }
 
       if (agentId === null) {
         throw new Error("Agent id is required to load editor state.");
       }
 
-      return getAgentEditorState(toAppId(appId), toAgentId(agentId));
+      return getAgentEditorState(toProjectId(projectId), toAgentId(agentId));
     },
     queryKey:
-      appId === null || agentId === null
+      projectId === null || agentId === null
         ? [...agentKeys.editorStates(), "missing"]
-        : agentKeys.editorState(appId, agentId),
+        : agentKeys.editorState(projectId, agentId),
   });
 }

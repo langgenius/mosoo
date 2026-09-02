@@ -11,12 +11,12 @@ import type {
 import type { EnvironmentNetworkPolicy } from "@mosoo/contracts/environment";
 import {
   agentMcpBindingsTable,
-  appsTable,
+  projectsTable,
   environmentRevisionsTable,
   environmentsTable,
   mcpServersTable,
 } from "@mosoo/db";
-import type { AccountId, AgentId, EnvironmentId, McpServerId, AppId } from "@mosoo/id";
+import type { AccountId, AgentId, EnvironmentId, McpServerId, ProjectId } from "@mosoo/id";
 import { and, eq, inArray, sql } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
@@ -326,7 +326,7 @@ function dedupeReadinessIssues(issues: AgentReadinessIssue[]): AgentReadinessIss
 async function resolveEffectiveEnvironmentNetworkPolicy(
   database: D1Database,
   input: {
-    appId: AppId;
+    projectId: ProjectId;
     environmentId: EnvironmentId | null;
   },
 ): Promise<EnvironmentNetworkPolicy | null> {
@@ -334,9 +334,9 @@ async function resolveEffectiveEnvironmentNetworkPolicy(
     input.environmentId ??
     (
       await getAppDatabase(database)
-        .select({ environmentId: appsTable.defaultEnvironmentId })
-        .from(appsTable)
-        .where(eq(appsTable.id, input.appId))
+        .select({ environmentId: projectsTable.defaultEnvironmentId })
+        .from(projectsTable)
+        .where(eq(projectsTable.id, input.projectId))
         .limit(1)
         .get()
     )?.environmentId ??
@@ -353,7 +353,12 @@ async function resolveEffectiveEnvironmentNetworkPolicy(
       environmentRevisionsTable,
       eq(environmentRevisionsTable.id, environmentsTable.currentRevisionId),
     )
-    .where(and(eq(environmentsTable.id, environmentId), eq(environmentsTable.appId, input.appId)))
+    .where(
+      and(
+        eq(environmentsTable.id, environmentId),
+        eq(environmentsTable.projectId, input.projectId),
+      ),
+    )
     .limit(1)
     .get();
 
@@ -383,7 +388,7 @@ export async function computeAgentReadiness(
     packageResolution?: AgentPackageResolutionState | null;
     bindings?: ApiBindings;
     mcpServerIds?: readonly McpServerId[];
-    appId: AppId;
+    projectId: ProjectId;
     provider: string;
     runtimeId: string;
   },
@@ -392,7 +397,7 @@ export async function computeAgentReadiness(
   const effectiveEnvironmentNetworkPolicy =
     input.environmentNetworkPolicy ??
     (await resolveEffectiveEnvironmentNetworkPolicy(database, {
-      appId: input.appId,
+      projectId: input.projectId,
       environmentId: input.environment.environmentId,
     }));
 
@@ -419,7 +424,7 @@ export async function computeAgentReadiness(
     ...(input.bindings === undefined ? {} : { bindings: input.bindings }),
     codePrefix: "agent.readiness",
     database,
-    appId: input.appId,
+    projectId: input.projectId,
     selection: {
       model: input.model,
       provider: input.provider,

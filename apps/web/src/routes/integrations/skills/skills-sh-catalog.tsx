@@ -101,7 +101,7 @@ export function SkillsShCatalog({
   const trimmedSearch = search.trim();
   const catalogQuery = useSkillsShCatalogQuery({
     availableOnly,
-    enabled: isTruthy(registry.appId),
+    enabled: isTruthy(registry.projectId),
     page,
     perPage: CATALOG_PER_PAGE,
     query: trimmedSearch,

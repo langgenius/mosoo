@@ -3,7 +3,7 @@ import type { Page, Route } from "@playwright/test";
 
 import { formatHarnessError } from "../../lib/env-preflight";
 
-const appId = "01J00000000000000000000100";
+const projectId = "01J00000000000000000000100";
 const organizationId = "01J00000000000000000000101";
 const sessionId = "01J00000000000000000000102";
 const accountId = "01J00000000000000000000103";
@@ -127,7 +127,7 @@ async function fulfillAuthSessionFixture(route: Route): Promise<void> {
 function createSessionSummary() {
   return {
     agentId,
-    appId,
+    projectId,
     archivedAt: null,
     createdAt: now,
     deploymentVersionId,
@@ -179,7 +179,9 @@ function createFileRecord(input: {
     sourcePath: input.sessionKind === "artifact" ? `outputs/${input.name}` : null,
     size: 42,
     scope:
-      input.sessionKind === null ? { id: appId, kind: "app" } : { id: sessionId, kind: "session" },
+      input.sessionKind === null
+        ? { id: projectId, kind: "project" }
+        : { id: sessionId, kind: "session" },
     status: "ready",
     updatedAt: now,
     version: 1,
@@ -269,14 +271,14 @@ async function installFilesPageFixtures(
         });
         return;
       }
-      case "AppList": {
+      case "ProjectList": {
         await fulfillJson(route, {
-          appList: [
+          projectList: [
             {
               createdAt: now,
               defaultEnvironmentId: null,
-              id: appId,
-              name: "Files Page E2E App",
+              id: projectId,
+              name: "Files Page E2E Project",
               ownerAccountId: accountId,
             },
           ],
