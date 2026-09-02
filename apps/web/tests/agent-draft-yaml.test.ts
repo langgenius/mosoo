@@ -26,7 +26,7 @@ function draft(): AgentEditorDraft {
         name: "Linear MCP",
         source: "app",
         type: "web",
-        url: "https://mcp.linear.app",
+        url: "https://mcp.linear.project",
       },
     ],
     model: "gpt-5.4",

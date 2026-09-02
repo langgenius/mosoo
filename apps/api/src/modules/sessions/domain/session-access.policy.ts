@@ -1,12 +1,12 @@
 import type { SessionStatus, SessionType } from "@mosoo/contracts/session";
 import { sessionsTable } from "@mosoo/db";
-import type { AccountId, AgentDeploymentVersionId, AgentId, AppId, SessionId } from "@mosoo/id";
+import type { AccountId, AgentDeploymentVersionId, AgentId, ProjectId, SessionId } from "@mosoo/id";
 import type { SQL } from "drizzle-orm";
 import { and, eq, or, sql } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { forbiddenError } from "../../../platform/errors";
-import { ensureAppOwnership } from "../../apps/application/app.service";
+import { ensureProjectOwnership } from "../../projects/application/project.service";
 import { enforceSessionCanAcceptEvents } from "./session-lifecycle";
 
 export interface SessionParticipantTimelineAccessRow {
@@ -23,7 +23,7 @@ export interface SessionParticipantCapabilityAccessRow {
 
 export interface ActiveSessionParticipantAccessRow {
   archived_at: number | null;
-  app_id: AppId;
+  project_id: ProjectId;
   status: SessionStatus;
   type: SessionType;
 }
@@ -34,7 +34,7 @@ export interface SessionQueueAccessRow {
   deployment_version_number: number | null;
   id: SessionId;
   model: string;
-  app_id: AppId;
+  project_id: ProjectId;
   provider: string;
   runtime_id: string;
 }
@@ -71,15 +71,15 @@ export function sessionParticipantFlag(viewerId: AccountId): SQL<number> {
   return sql<number>`CASE WHEN ${sessionParticipantCondition(viewerId)} THEN 1 ELSE 0 END`;
 }
 
-export async function ensureAppSessionParticipantAccess(
+export async function ensureProjectSessionParticipantAccess(
   database: D1Database,
   viewerId: AccountId,
   input: {
-    appId: AppId;
+    projectId: ProjectId;
     sessionId: SessionId;
   },
 ): Promise<void> {
-  await ensureAppOwnership(database, viewerId, input.appId);
+  await ensureProjectOwnership(database, viewerId, input.projectId);
   const row =
     (await getAppDatabase(database)
       .select({ id: sessionsTable.id })
@@ -87,7 +87,7 @@ export async function ensureAppSessionParticipantAccess(
       .where(
         and(
           eq(sessionsTable.id, input.sessionId),
-          eq(sessionsTable.appId, input.appId),
+          eq(sessionsTable.projectId, input.projectId),
           sessionParticipantCondition(viewerId),
         ),
       )
@@ -99,15 +99,15 @@ export async function ensureAppSessionParticipantAccess(
   }
 }
 
-export async function getAppSessionParticipantTimelineAccess(
+export async function getProjectSessionParticipantTimelineAccess(
   database: D1Database,
   viewerId: AccountId,
   input: {
-    appId: AppId;
+    projectId: ProjectId;
     sessionId: SessionId;
   },
 ): Promise<SessionParticipantTimelineAccessRow> {
-  await ensureAppOwnership(database, viewerId, input.appId);
+  await ensureProjectOwnership(database, viewerId, input.projectId);
   const row =
     (await getAppDatabase(database)
       .select({
@@ -118,7 +118,7 @@ export async function getAppSessionParticipantTimelineAccess(
       .where(
         and(
           eq(sessionsTable.id, input.sessionId),
-          eq(sessionsTable.appId, input.appId),
+          eq(sessionsTable.projectId, input.projectId),
           sessionParticipantCondition(viewerId),
         ),
       )
@@ -132,20 +132,20 @@ export async function getAppSessionParticipantTimelineAccess(
   return row;
 }
 
-export type AppSessionParticipantCapabilityAccessLookup =
+export type ProjectSessionParticipantCapabilityAccessLookup =
   | { kind: "found"; row: SessionParticipantCapabilityAccessRow }
   | { kind: "missing" }
   | { kind: "not_participant" };
 
-export async function lookupAppSessionParticipantCapabilityAccess(
+export async function lookupProjectSessionParticipantCapabilityAccess(
   database: D1Database,
   viewerId: AccountId,
   input: {
-    appId: AppId;
+    projectId: ProjectId;
     sessionId: SessionId;
   },
-): Promise<AppSessionParticipantCapabilityAccessLookup> {
-  await ensureAppOwnership(database, viewerId, input.appId);
+): Promise<ProjectSessionParticipantCapabilityAccessLookup> {
+  await ensureProjectOwnership(database, viewerId, input.projectId);
   const row =
     (await getAppDatabase(database)
       .select({
@@ -156,7 +156,9 @@ export async function lookupAppSessionParticipantCapabilityAccess(
         status: sessionsTable.status,
       })
       .from(sessionsTable)
-      .where(and(eq(sessionsTable.id, input.sessionId), eq(sessionsTable.appId, input.appId)))
+      .where(
+        and(eq(sessionsTable.id, input.sessionId), eq(sessionsTable.projectId, input.projectId)),
+      )
       .limit(1)
       .get()) ?? null;
 
@@ -179,15 +181,15 @@ export async function lookupAppSessionParticipantCapabilityAccess(
   };
 }
 
-export async function getAppSessionParticipantCapabilityAccess(
+export async function getProjectSessionParticipantCapabilityAccess(
   database: D1Database,
   viewerId: AccountId,
   input: {
-    appId: AppId;
+    projectId: ProjectId;
     sessionId: SessionId;
   },
 ): Promise<SessionParticipantCapabilityAccessRow> {
-  const lookup = await lookupAppSessionParticipantCapabilityAccess(database, viewerId, input);
+  const lookup = await lookupProjectSessionParticipantCapabilityAccess(database, viewerId, input);
 
   if (lookup.kind !== "found") {
     throw forbiddenError();
@@ -196,20 +198,20 @@ export async function getAppSessionParticipantCapabilityAccess(
   return lookup.row;
 }
 
-export async function getActiveAppSessionParticipantAccess(
+export async function getActiveProjectSessionParticipantAccess(
   database: D1Database,
   viewerId: AccountId,
   input: {
-    appId: AppId;
+    projectId: ProjectId;
     sessionId: SessionId;
   },
 ): Promise<ActiveSessionParticipantAccessRow> {
-  await ensureAppOwnership(database, viewerId, input.appId);
+  await ensureProjectOwnership(database, viewerId, input.projectId);
   const row =
     (await getAppDatabase(database)
       .select({
         archived_at: sessionsTable.archivedAt,
-        app_id: sessionsTable.appId,
+        project_id: sessionsTable.projectId,
         status: sessionsTable.status,
         type: sessionsTable.type,
       })
@@ -217,7 +219,7 @@ export async function getActiveAppSessionParticipantAccess(
       .where(
         and(
           eq(sessionsTable.id, input.sessionId),
-          eq(sessionsTable.appId, input.appId),
+          eq(sessionsTable.projectId, input.projectId),
           sessionParticipantCondition(viewerId),
         ),
       )
@@ -236,15 +238,15 @@ export async function getActiveAppSessionParticipantAccess(
   return row;
 }
 
-export async function getActiveAppSessionQueueAccess(
+export async function getActiveProjectSessionQueueAccess(
   database: D1Database,
   viewerId: AccountId,
   input: {
-    appId: AppId;
+    projectId: ProjectId;
     sessionId: SessionId;
   },
 ): Promise<SessionQueueAccessRow> {
-  await ensureAppOwnership(database, viewerId, input.appId);
+  await ensureProjectOwnership(database, viewerId, input.projectId);
   const row =
     (await getAppDatabase(database)
       .select({
@@ -254,7 +256,7 @@ export async function getActiveAppSessionQueueAccess(
         deployment_version_number: sessionsTable.deploymentVersionNumber,
         id: sessionsTable.id,
         model: sessionsTable.model,
-        app_id: sessionsTable.appId,
+        project_id: sessionsTable.projectId,
         provider: sessionsTable.provider,
         runtime_id: sessionsTable.runtimeId,
         status: sessionsTable.status,
@@ -263,7 +265,7 @@ export async function getActiveAppSessionQueueAccess(
       .where(
         and(
           eq(sessionsTable.id, input.sessionId),
-          eq(sessionsTable.appId, input.appId),
+          eq(sessionsTable.projectId, input.projectId),
           sessionParticipantCondition(viewerId),
         ),
       )
@@ -285,7 +287,7 @@ export async function getActiveAppSessionQueueAccess(
     deployment_version_number: row.deployment_version_number,
     id: row.id,
     model: row.model,
-    app_id: row.app_id,
+    project_id: row.project_id,
     provider: row.provider,
     runtime_id: row.runtime_id,
   };

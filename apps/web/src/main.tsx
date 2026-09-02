@@ -2,7 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
 import { AppProviders } from "./app/providers";
-import { App } from "./app/router";
+import { Project } from "./app/router";
 import { initI18n } from "./shared/i18n";
 
 import "./shared/styles/app.css";
@@ -20,7 +20,7 @@ void initI18n().then(() => {
   createRoot(container).render(
     <StrictMode>
       <AppProviders>
-        <App />
+        <Project />
       </AppProviders>
     </StrictMode>,
   );

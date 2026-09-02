@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { parsePlatformId } from "@mosoo/id";
-import type { AppId } from "@mosoo/id";
+import type { ProjectId } from "@mosoo/id";
 import {
   VENDOR_ANTHROPIC,
   VENDOR_DEEPSEEK,
@@ -17,16 +17,19 @@ import {
 } from "../src/modules/vendor-credentials/application/vendor-credential-commands";
 import { createApiTestFixture, insertTestVendorCredential } from "./helpers/api-test-fixture";
 
-const OTHER_APP_ID = parsePlatformId<AppId>("01J000000000000000000000C9", "other app ID");
+const OTHER_PROJECT_ID = parsePlatformId<ProjectId>(
+  "01J000000000000000000000C9",
+  "other project ID",
+);
 const OTHER_ACCOUNT_ID = "01J000000000000000000000CA";
 
-async function insertOtherApp(
+async function insertOtherProject(
   fixture: Awaited<ReturnType<typeof createApiTestFixture>>,
   input: { ownerAccountId?: string } = {},
 ) {
   await fixture.database
     .prepare(
-      `INSERT INTO app (
+      `INSERT INTO project (
         created_at,
         id,
         name,
@@ -37,8 +40,8 @@ async function insertOtherApp(
     )
     .bind(
       1,
-      OTHER_APP_ID,
-      "Other App",
+      OTHER_PROJECT_ID,
+      "Other Project",
       fixture.ids.organizationId,
       input.ownerAccountId ?? fixture.viewer.id,
       1,
@@ -56,7 +59,7 @@ describe("vendor credential commands", () => {
         apiKey: "sk-create",
         models: ["custom-model"],
         name: "Unsafe custom provider",
-        appId: fixture.ids.appId,
+        projectId: fixture.ids.projectId,
         vendorId: VENDOR_OPENAI_COMPATIBLE.vendorId,
       }),
     ).rejects.toThrow("Custom endpoint must use HTTPS.");
@@ -79,7 +82,7 @@ describe("vendor credential commands", () => {
         apiBase: VENDOR_ANTHROPIC.defaultApiBase,
         apiKey: "sk-create",
         name: "OpenAI pointed at Anthropic",
-        appId: fixture.ids.appId,
+        projectId: fixture.ids.projectId,
         vendorId: VENDOR_OPENAI.vendorId,
       }),
     ).rejects.toThrow("Custom endpoint for openai cannot target Anthropic.");
@@ -98,7 +101,7 @@ describe("vendor credential commands", () => {
         apiBase: VENDOR_DEEPSEEK.defaultApiBase,
         apiKey: "sk-create",
         name: "OpenAI pointed at DeepSeek",
-        appId: fixture.ids.appId,
+        projectId: fixture.ids.projectId,
         vendorId: VENDOR_OPENAI.vendorId,
       }),
     ).rejects.toThrow("Custom endpoint for openai cannot target DeepSeek.");
@@ -121,7 +124,7 @@ describe("vendor credential commands", () => {
       apiKey: "sk-create",
       models: ["deepseek-chat"],
       name: "DeepSeek custom gateway",
-      appId: fixture.ids.appId,
+      projectId: fixture.ids.projectId,
       vendorId: VENDOR_OPENAI_COMPATIBLE.vendorId,
     });
 
@@ -131,7 +134,7 @@ describe("vendor credential commands", () => {
       maskedApiKey: expect.any(String),
       models: ["deepseek-chat"],
       name: "DeepSeek custom gateway",
-      appId: fixture.ids.appId,
+      projectId: fixture.ids.projectId,
       vendorId: VENDOR_OPENAI_COMPATIBLE.vendorId,
     });
 
@@ -162,7 +165,7 @@ describe("vendor credential commands", () => {
         apiKey: "sk-create",
         models: ["custom-model"],
         name: "Unsafe custom provider",
-        appId: fixture.ids.appId,
+        projectId: fixture.ids.projectId,
         vendorId: VENDOR_OPENAI_COMPATIBLE.vendorId,
       }),
     ).rejects.toThrow(
@@ -193,7 +196,7 @@ describe("vendor credential commands", () => {
       updateVendorCredential(fixture.bindings, fixture.viewer, {
         apiBase: "http://10.0.0.2/v1",
         id: credentialId,
-        appId: fixture.ids.appId,
+        projectId: fixture.ids.projectId,
       }),
     ).rejects.toThrow(
       "Custom endpoint cannot target local, private, metadata, or credential-bearing URLs.",
@@ -222,7 +225,7 @@ describe("vendor credential commands", () => {
       updateVendorCredential(fixture.bindings, fixture.viewer, {
         apiBase: VENDOR_ANTHROPIC.defaultApiBase,
         id: credentialId,
-        appId: fixture.ids.appId,
+        projectId: fixture.ids.projectId,
       }),
     ).rejects.toThrow("Custom endpoint for openai cannot target Anthropic.");
 
@@ -233,9 +236,9 @@ describe("vendor credential commands", () => {
     expect(row?.apiBase).toBeNull();
   });
 
-  test("rejects update when the credential is not in the requested App", async () => {
+  test("rejects update when the credential is not in the requested Project", async () => {
     const fixture = await createApiTestFixture();
-    await insertOtherApp(fixture);
+    await insertOtherProject(fixture);
     const credentialId = "01J000000000000000000000C4";
     await insertTestVendorCredential(fixture, {
       credentialId,
@@ -246,7 +249,7 @@ describe("vendor credential commands", () => {
       updateVendorCredential(fixture.bindings, fixture.viewer, {
         id: credentialId,
         name: "Should not update",
-        appId: OTHER_APP_ID,
+        projectId: OTHER_PROJECT_ID,
       }),
     ).rejects.toThrow("Vendor credential not found.");
 
@@ -257,9 +260,9 @@ describe("vendor credential commands", () => {
     expect(row?.name).not.toBe("Should not update");
   });
 
-  test("rejects delete when the credential is not in the requested App", async () => {
+  test("rejects delete when the credential is not in the requested Project", async () => {
     const fixture = await createApiTestFixture();
-    await insertOtherApp(fixture);
+    await insertOtherProject(fixture);
     const credentialId = "01J000000000000000000000C5";
     await insertTestVendorCredential(fixture, {
       credentialId,
@@ -269,7 +272,7 @@ describe("vendor credential commands", () => {
     await expect(
       deleteVendorCredential(fixture.bindings, fixture.viewer, {
         id: credentialId,
-        appId: OTHER_APP_ID,
+        projectId: OTHER_PROJECT_ID,
       }),
     ).rejects.toThrow("Vendor credential not found.");
 
@@ -284,9 +287,9 @@ describe("vendor credential commands", () => {
     expect(secretCount?.count).toBe(1);
   });
 
-  test("rejects update before row lookup when the requested App is not owned", async () => {
+  test("rejects update before row lookup when the requested Project is not owned", async () => {
     const fixture = await createApiTestFixture();
-    await insertOtherApp(fixture, { ownerAccountId: OTHER_ACCOUNT_ID });
+    await insertOtherProject(fixture, { ownerAccountId: OTHER_ACCOUNT_ID });
     const credentialId = "01J000000000000000000000C6";
     await insertTestVendorCredential(fixture, {
       credentialId,
@@ -297,7 +300,7 @@ describe("vendor credential commands", () => {
       updateVendorCredential(fixture.bindings, fixture.viewer, {
         id: credentialId,
         name: "Should not update",
-        appId: OTHER_APP_ID,
+        projectId: OTHER_PROJECT_ID,
       }),
     ).rejects.toThrow("permission");
 
@@ -308,9 +311,9 @@ describe("vendor credential commands", () => {
     expect(row?.name).not.toBe("Should not update");
   });
 
-  test("rejects delete before row lookup when the requested App is not owned", async () => {
+  test("rejects delete before row lookup when the requested Project is not owned", async () => {
     const fixture = await createApiTestFixture();
-    await insertOtherApp(fixture, { ownerAccountId: OTHER_ACCOUNT_ID });
+    await insertOtherProject(fixture, { ownerAccountId: OTHER_ACCOUNT_ID });
     const credentialId = "01J000000000000000000000C7";
     await insertTestVendorCredential(fixture, {
       credentialId,
@@ -320,7 +323,7 @@ describe("vendor credential commands", () => {
     await expect(
       deleteVendorCredential(fixture.bindings, fixture.viewer, {
         id: credentialId,
-        appId: OTHER_APP_ID,
+        projectId: OTHER_PROJECT_ID,
       }),
     ).rejects.toThrow("permission");
 
@@ -356,7 +359,7 @@ describe("vendor credential default selection", () => {
     return createVendorCredential(fixture.bindings, fixture.viewer, {
       apiKey: `sk-${name}`,
       name,
-      appId: fixture.ids.appId,
+      projectId: fixture.ids.projectId,
       vendorId: VENDOR_ANTHROPIC.vendorId,
     });
   }
@@ -377,7 +380,7 @@ describe("vendor credential default selection", () => {
 
     const promoted = await setDefaultVendorCredential(fixture.bindings, fixture.viewer, {
       id: second.id,
-      appId: fixture.ids.appId,
+      projectId: fixture.ids.projectId,
     });
 
     expect(promoted.isDefault).toBe(true);
@@ -392,7 +395,7 @@ describe("vendor credential default selection", () => {
 
     await deleteVendorCredential(fixture.bindings, fixture.viewer, {
       id: first.id,
-      appId: fixture.ids.appId,
+      projectId: fixture.ids.projectId,
     });
 
     expect(await readIsDefault(fixture, second.id)).toBe(1);
@@ -405,7 +408,7 @@ describe("vendor credential default selection", () => {
 
     await deleteVendorCredential(fixture.bindings, fixture.viewer, {
       id: second.id,
-      appId: fixture.ids.appId,
+      projectId: fixture.ids.projectId,
     });
 
     expect(await readIsDefault(fixture, first.id)).toBe(1);

@@ -113,7 +113,7 @@ export const agentSchema = /* GraphQL */ `
     status: AgentStatus!
     updatedAt: String!
     visibility: AgentVisibility!
-    appId: ULID!
+    projectId: ULID!
   }
 
   type AgentEnvironmentConfig {
@@ -199,7 +199,7 @@ export const agentSchema = /* GraphQL */ `
     agentId: ULID!
     applyActionKind: String
     targetVersion: RuntimeStateTargetVersionInput
-    appId: ULID!
+    projectId: ULID!
   }
 
   input RuntimeStateTargetVersionInput {
@@ -233,7 +233,7 @@ export const agentSchema = /* GraphQL */ `
     updatedAt: String!
     viewerRole: AgentViewerRole!
     visibility: AgentVisibility!
-    appId: ULID!
+    projectId: ULID!
   }
 
   type AgentDetail {
@@ -255,7 +255,7 @@ export const agentSchema = /* GraphQL */ `
     versions: [AgentDeploymentVersion!]!
     viewerRole: AgentViewerRole!
     visibility: AgentVisibility!
-    appId: ULID!
+    projectId: ULID!
   }
 
   type AgentEditorState {
@@ -277,7 +277,7 @@ export const agentSchema = /* GraphQL */ `
     provider: String!
     runtimeId: String!
     skillIds: [ULID!]!
-    appId: ULID!
+    projectId: ULID!
   }
 
   input UpdateAgentConfigInput {
@@ -294,17 +294,17 @@ export const agentSchema = /* GraphQL */ `
     providerOptions: JsonObject!
     runtimeId: String!
     skillIds: [ULID!]!
-    appId: ULID!
+    projectId: ULID!
   }
 
   input DeleteAgentInput {
     agentId: ULID!
-    appId: ULID!
+    projectId: ULID!
   }
 
   input PublishAgentInput {
     agentId: ULID!
-    appId: ULID!
+    projectId: ULID!
   }
 
   input AgentEnvironmentConfigInput {
@@ -318,12 +318,12 @@ export const agentSchema = /* GraphQL */ `
 
   input ImportAgentPackageInput {
     fileId: ULID!
-    appId: ULID!
+    projectId: ULID!
   }
 
   input CreateAgentForkInput {
     agentId: ULID!
     kind: AgentKind
-    appId: ULID!
+    projectId: ULID!
   }
 `;

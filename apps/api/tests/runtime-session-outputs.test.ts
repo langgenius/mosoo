@@ -4,7 +4,7 @@ import { createRuntimeEvent } from "@mosoo/runtime-events";
 
 import { createBaseLiveState } from "../src/modules/runtime/infrastructure/driver-instance/event-projection";
 import type { RuntimeSessionLink } from "../src/modules/runtime/infrastructure/driver-instance/event-types";
-import { appRuntimeDriverEvents } from "../src/modules/runtime/infrastructure/driver-instance/events";
+import { projectRuntimeDriverEvents } from "../src/modules/runtime/infrastructure/driver-instance/events";
 import {
   getRuntimeSessionOutputDirectory,
   normalizeRuntimeSessionOutputRelativePath,
@@ -139,7 +139,7 @@ async function insertActiveSandboxSession(database: D1Database): Promise<void> {
 function createRuntimeLink(): RuntimeSessionLink {
   return {
     agentId: PUBLIC_API_TEST_IDS.agent,
-    appId: PUBLIC_API_TEST_IDS.app,
+    projectId: PUBLIC_API_TEST_IDS.project,
     callerId: PUBLIC_API_TEST_IDS.ownerAccount,
     creatorId: PUBLIC_API_TEST_IDS.ownerAccount,
     executionOwnerId: PUBLIC_API_TEST_IDS.ownerAccount,
@@ -220,7 +220,7 @@ async function dispatchRuntimeEvent(input: {
   event: ReturnType<typeof createRuntimeEvent>;
   link: RuntimeSessionLink;
 }): Promise<void> {
-  await appRuntimeDriverEvents(input.bindings, {
+  await projectRuntimeDriverEvents(input.bindings, {
     currentLiveState: createBaseLiveState({
       callerId: input.link.callerId,
       creatorId: input.link.creatorId,

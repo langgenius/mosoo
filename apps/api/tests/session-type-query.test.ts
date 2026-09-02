@@ -19,7 +19,7 @@ const VIEWER: AuthenticatedViewer = {
 };
 
 const ORGANIZATION_ID = "01J00000000000000000000006";
-const APP_ID = "01J0000000000000000000000Q";
+const PROJECT_ID = "01J0000000000000000000000Q";
 const PREVIEW_SESSION_ID = "01J0000000000000000000A900";
 const UI_SESSION_ID = "01J0000000000000000000A901";
 const ATTRIBUTED_SESSION_ID = "01J0000000000000000000A902";
@@ -40,7 +40,7 @@ function createSessionTypeDatabase(): SqliteD1Database {
       updated_at integer NOT NULL
     );
 
-    CREATE TABLE app (
+    CREATE TABLE project (
       id text PRIMARY KEY NOT NULL,
       organization_id text NOT NULL,
       owner_account_id text NOT NULL,
@@ -52,7 +52,7 @@ function createSessionTypeDatabase(): SqliteD1Database {
 
     CREATE TABLE session (
       id text PRIMARY KEY NOT NULL,
-      app_id text NOT NULL,
+      project_id text NOT NULL,
       creator_account_id text NOT NULL,
       attributed_user_id text,
       agent_id text NOT NULL,
@@ -107,7 +107,7 @@ function createSessionTypeDatabase(): SqliteD1Database {
       1
     );
 
-    INSERT INTO app (
+    INSERT INTO project (
       id,
       organization_id,
       owner_account_id,
@@ -115,10 +115,10 @@ function createSessionTypeDatabase(): SqliteD1Database {
       created_at,
       updated_at
     ) VALUES (
-      '${APP_ID}',
+      '${PROJECT_ID}',
       '${ORGANIZATION_ID}',
       'account-1',
-      'Default App',
+      'Default Project',
       1,
       1
     );
@@ -152,7 +152,7 @@ function insertSession(
   database.execute(`
     INSERT INTO session (
       id,
-      app_id,
+      project_id,
       creator_account_id,
       agent_id,
       kind,
@@ -167,7 +167,7 @@ function insertSession(
       updated_at
     ) VALUES (
       '${input.id}',
-      '${APP_ID}',
+      '${PROJECT_ID}',
       'account-1',
       '01J00000000000000000000009',
       'pet',
@@ -195,7 +195,7 @@ describe("session type queries", () => {
   test("lists only sessions with the requested type", async () => {
     const sessions = await listSessions(createSessionTypeDatabase(), VIEWER, {
       archived: false,
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       type: "preview",
     });
 
@@ -207,7 +207,7 @@ describe("session type queries", () => {
   test("lists all visible session summaries", async () => {
     const sessions = await listSessions(createSessionTypeDatabase(), VIEWER, {
       archived: false,
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       type: null,
     });
 
@@ -234,7 +234,7 @@ describe("session type queries", () => {
 
     const sessions = await listThreadAgentSessions(database, VIEWER, {
       archived: false,
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       type: "ui",
     });
     const attributed = sessions.nodes.find((node) => node.session.id === ATTRIBUTED_SESSION_ID);
@@ -260,7 +260,7 @@ describe("session type queries", () => {
     });
   });
 
-  test("bounds app session summaries on stable updated ordering", async () => {
+  test("bounds project session summaries on stable updated ordering", async () => {
     const database = createSessionTypeDatabase();
 
     for (let index = 0; index < SESSION_SUMMARY_LIST_LIMIT + 5; index += 1) {
@@ -276,7 +276,7 @@ describe("session type queries", () => {
 
     const sessions = await listSessions(database, VIEWER, {
       archived: false,
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       type: null,
     });
 
@@ -290,7 +290,7 @@ describe("session type queries", () => {
     });
   });
 
-  test("pages app session summaries from the returned cursor", async () => {
+  test("pages project session summaries from the returned cursor", async () => {
     const database = createSessionTypeDatabase();
 
     for (let index = 0; index < 5; index += 1) {
@@ -307,14 +307,14 @@ describe("session type queries", () => {
     const firstPage = await listSessions(database, VIEWER, {
       archived: false,
       limit: 2,
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       type: null,
     });
     const secondPage = await listSessions(database, VIEWER, {
       archived: false,
       beforeCursor: firstPage.pageInfo.endCursor,
       limit: 2,
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       type: null,
     });
 
@@ -342,7 +342,7 @@ describe("session type queries", () => {
     await expect(
       listSessions(createSessionTypeDatabase(), VIEWER, {
         limit: 0,
-        appId: APP_ID,
+        projectId: PROJECT_ID,
         type: null,
       }),
     ).rejects.toThrow("Session list limit must be a positive integer.");
@@ -350,7 +350,7 @@ describe("session type queries", () => {
     await expect(
       listSessions(createSessionTypeDatabase(), VIEWER, {
         beforeCursor: "10:not-a-ulid",
-        appId: APP_ID,
+        projectId: PROJECT_ID,
         type: null,
       }),
     ).rejects.toThrow("Session list cursor ID must be a valid ULID.");

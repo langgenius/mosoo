@@ -1,4 +1,4 @@
-import type { AppId, SessionId } from "@mosoo/contracts/id";
+import type { ProjectId, SessionId } from "@mosoo/contracts/id";
 import type { SessionProcessEvent } from "@mosoo/contracts/session";
 
 import { graphql } from "@/gql";
@@ -7,8 +7,8 @@ import { requestGraphQL } from "@/platform/http/graphql-client";
 import { SESSION_PROCESS_EVENT_QUERY_LIMIT, toSessionProcessEvent } from "./session-process-events";
 
 const SESSION_PROCESS_EVENTS_QUERY = graphql(/* GraphQL */ `
-  query SessionProcessEvents($limit: Int!, $appId: ULID!, $sessionId: ULID!) {
-    threadSessionProcessEvents(limit: $limit, appId: $appId, sessionId: $sessionId) {
+  query SessionProcessEvents($limit: Int!, $projectId: ULID!, $sessionId: ULID!) {
+    threadSessionProcessEvents(limit: $limit, projectId: $projectId, sessionId: $sessionId) {
       content
       durationMs
       id
@@ -21,12 +21,12 @@ const SESSION_PROCESS_EVENTS_QUERY = graphql(/* GraphQL */ `
 `);
 
 export async function getSessionProcessEvents(
-  appId: AppId,
+  projectId: ProjectId,
   sessionId: SessionId,
 ): Promise<SessionProcessEvent[]> {
   const payload = await requestGraphQL(SESSION_PROCESS_EVENTS_QUERY, {
     limit: SESSION_PROCESS_EVENT_QUERY_LIMIT,
-    appId,
+    projectId,
     sessionId,
   });
 

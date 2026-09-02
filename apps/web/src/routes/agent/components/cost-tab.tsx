@@ -18,7 +18,7 @@ import {
   tokensTotal,
 } from "@/routes/cost/cost-model";
 import type { CostRange, CostRunPurpose } from "@/routes/cost/cost-model";
-import { toAgentId, toAppId } from "@/routes/typed-id";
+import { toAgentId, toProjectId } from "@/routes/typed-id";
 import { getCurrentLocale, useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 
@@ -29,7 +29,13 @@ const COST_RANGE_KEYS = {
   "90d": "cost.range90d",
 } as const satisfies Record<CostRange, string>;
 
-export function AgentCostTab({ agentId, appId }: { agentId: string; appId: string }): ReactElement {
+export function AgentCostTab({
+  agentId,
+  projectId,
+}: {
+  agentId: string;
+  projectId: string;
+}): ReactElement {
   const { t } = useTranslation();
   const [range, setRange] = useState<CostRange>("30d");
   const [purpose, setPurpose] = useState<CostRunPurpose | "all">("all");
@@ -38,11 +44,11 @@ export function AgentCostTab({ agentId, appId }: { agentId: string; appId: strin
     queryFn: async () =>
       fetchAgentCost({
         agentId: toAgentId(agentId),
-        appId: toAppId(appId),
+        projectId: toProjectId(projectId),
         range: rangeToInput(range),
         runPurposes,
       }),
-    queryKey: ["cost", "agent-card", appId, agentId, range, purpose],
+    queryKey: ["cost", "agent-card", projectId, agentId, range, purpose],
   });
   const totals = card?.totals;
 
@@ -77,7 +83,7 @@ export function AgentCostTab({ agentId, appId }: { agentId: string; appId: strin
               className="border-border hover:bg-muted inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-sm font-semibold"
             >
               <ExternalLink className="size-3.5" />
-              {t("cost.openAppUsage")}
+              {t("cost.openProjectUsage")}
             </Link>
             <button
               type="button"

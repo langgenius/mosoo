@@ -30,7 +30,7 @@ CREATE TABLE organization (
   updated_at integer NOT NULL
 );
 
-CREATE TABLE app (
+CREATE TABLE project (
   id text PRIMARY KEY NOT NULL,
   organization_id text NOT NULL,
   owner_account_id text NOT NULL,
@@ -42,7 +42,7 @@ CREATE TABLE app (
 
 CREATE TABLE agent (
   id text PRIMARY KEY NOT NULL,
-  app_id text NOT NULL,
+  project_id text NOT NULL,
   owner_account_id text NOT NULL,
   name text NOT NULL,
   description text,
@@ -89,7 +89,7 @@ CREATE TABLE skill (
   id text PRIMARY KEY NOT NULL,
   name text NOT NULL,
   owner_account_id text NOT NULL,
-  app_id text NOT NULL,
+  project_id text NOT NULL,
   source_kind text NOT NULL,
   updated_at integer NOT NULL,
   version text
@@ -115,7 +115,7 @@ CREATE TABLE mcp_server (
   byo_client_id text,
   byo_client_secret_secret_id text,
   oauth_metadata_json text,
-  app_id text NOT NULL,
+  project_id text NOT NULL,
   url text NOT NULL,
   enabled integer DEFAULT 1 NOT NULL,
   created_at integer NOT NULL,
@@ -136,7 +136,7 @@ CREATE TABLE agent_mcp_binding (
 
 CREATE TABLE environment (
   id text PRIMARY KEY NOT NULL,
-  app_id text NOT NULL,
+  project_id text NOT NULL,
   owner_account_id text,
   current_revision_id text NOT NULL,
   name text NOT NULL,
@@ -151,7 +151,7 @@ CREATE TABLE environment (
 CREATE TABLE environment_revision (
   id text PRIMARY KEY NOT NULL,
   environment_id text NOT NULL,
-  app_id text NOT NULL,
+  project_id text NOT NULL,
   created_by_account_id text,
   setup_script text NOT NULL,
   packages_json text NOT NULL,
@@ -165,7 +165,7 @@ CREATE TABLE environment_revision (
 
 CREATE TABLE vendor_credential (
   id text PRIMARY KEY NOT NULL,
-  app_id text NOT NULL,
+  project_id text NOT NULL,
   vendor_id text NOT NULL,
   name text NOT NULL,
   api_key_secret_id text NOT NULL,
@@ -179,7 +179,7 @@ CREATE TABLE vendor_credential (
 CREATE TABLE sandbox (
   id text PRIMARY KEY NOT NULL,
   agent_id text,
-  app_id text,
+  project_id text,
   kind text NOT NULL,
   subject_kind text NOT NULL,
   subject_id text NOT NULL,

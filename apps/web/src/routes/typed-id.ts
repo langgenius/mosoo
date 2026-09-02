@@ -10,7 +10,7 @@ import type {
   McpOAuthFlowId,
   McpServerId,
   OrganizationId,
-  AppId,
+  ProjectId,
   SessionRunId,
   SessionId,
   SkillId,
@@ -67,8 +67,8 @@ export function toOrganizationId(id: string): OrganizationId {
   return parsePlatformId(id, "Organization ID") as OrganizationId;
 }
 
-export function toAppId(id: string): AppId {
-  return parsePlatformId(id, "App ID") as AppId;
+export function toProjectId(id: string): ProjectId {
+  return parsePlatformId(id, "Project ID") as ProjectId;
 }
 
 export function toSessionId(id: string): SessionId {

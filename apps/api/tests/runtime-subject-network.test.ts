@@ -8,7 +8,7 @@ function createBindings(overrides: Record<string, string> = {}): ApiBindings {
 }
 
 const LIMITED_NETWORK = {
-  environmentAllowedHosts: ["mcp.linear.app", "api.example.com"],
+  environmentAllowedHosts: ["mcp.linear.project", "api.example.com"],
   networkPolicy: "limited",
 } as const;
 
@@ -38,7 +38,7 @@ describe("runtime subject network constraints", () => {
         subjectKind: "session",
       }),
     ).toEqual({
-      allowedHosts: ["api.example.com", "cloud.mosoo.ai", "mcp.linear.app"],
+      allowedHosts: ["api.example.com", "cloud.mosoo.ai", "mcp.linear.project"],
       networkPolicy: "limited",
     });
   });
@@ -62,7 +62,7 @@ describe("runtime subject network constraints", () => {
       "abc123.r2.cloudflarestorage.com",
       "api.example.com",
       "cloud.mosoo.ai",
-      "mcp.linear.app",
+      "mcp.linear.project",
     ]);
   });
 

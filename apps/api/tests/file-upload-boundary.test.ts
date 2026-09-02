@@ -4,7 +4,7 @@ import { basename, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { parsePlatformId } from "@mosoo/id";
-import type { AccountId, FileId, AppId, SessionId } from "@mosoo/id";
+import type { AccountId, FileId, ProjectId, SessionId } from "@mosoo/id";
 
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
 import {
@@ -23,7 +23,7 @@ import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 const VIEWER_ID = parsePlatformId<AccountId>("01J00000000000000000000001", "viewer ID");
 const SESSION_ID = parsePlatformId<SessionId>("01J00000000000000000000002", "session ID");
 const FILE_ID = parsePlatformId<FileId>("01J00000000000000000000003", "file ID");
-const APP_ID = parsePlatformId<AppId>("01J00000000000000000000005", "app ID");
+const PROJECT_ID = parsePlatformId<ProjectId>("01J00000000000000000000005", "project ID");
 const API_SRC_ROOT = fileURLToPath(new URL("../src/", import.meta.url));
 const FILES_MODULE_PREFIX = "modules/files/";
 const FILES_INFRASTRUCTURE_IMPORT_PATTERN = /from\s+["'][^"']*files\/infrastructure\//;
@@ -87,7 +87,7 @@ describe("file upload boundary", () => {
           id: SESSION_ID,
           kind: "session",
           name: "notes.txt",
-          appId: APP_ID,
+          projectId: PROJECT_ID,
         },
       }),
     ).rejects.toMatchObject({
@@ -106,7 +106,7 @@ describe("file upload boundary", () => {
           id: SESSION_ID,
           kind: "session",
           name: "notes.txt",
-          appId: APP_ID,
+          projectId: PROJECT_ID,
         },
       }),
     ).rejects.toMatchObject({
@@ -125,7 +125,7 @@ describe("file upload boundary", () => {
         },
         purpose: "organization_draft",
         target: {
-          id: APP_ID,
+          id: PROJECT_ID,
           kind: "organization_draft",
           name: "notes.txt",
         },
@@ -186,7 +186,7 @@ describe("file upload boundary", () => {
         id: FILE_ID,
         name: "notes.txt",
         path: "docs/notes.txt ",
-        scope_id: APP_ID,
+        scope_id: PROJECT_ID,
         scope_kind: "library",
       }),
     ).toThrow(

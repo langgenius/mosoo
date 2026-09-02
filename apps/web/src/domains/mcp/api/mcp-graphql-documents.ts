@@ -29,7 +29,7 @@ const MCP_SERVER_FIELDS = graphql(/* GraphQL */ `
     name
     ownerId
     ownerName
-    appId
+    projectId
     source
     updatedAt
     url
@@ -44,12 +44,12 @@ const retainGraphQLFragments = (documents: readonly unknown[]): number => docume
 retainGraphQLFragments([MCP_CREDENTIAL_FIELDS, MCP_SERVER_FIELDS]);
 
 export const MCP_REGISTRY_QUERY = graphql(/* GraphQL */ `
-  query McpRegistry($appId: ULID!) {
-    mcpRegistry(appId: $appId) {
+  query McpRegistry($projectId: ULID!) {
+    mcpRegistry(projectId: $projectId) {
       currentUserEmail
       currentUserId
       currentUserName
-      appId
+      projectId
       servers {
         ...McpServerFields
       }
@@ -57,9 +57,9 @@ export const MCP_REGISTRY_QUERY = graphql(/* GraphQL */ `
   }
 `);
 
-export const CREATE_APP_MCP_SERVER_MUTATION = graphql(/* GraphQL */ `
-  mutation CreateAppMcpServer($input: CreateAppMcpServerInput!) {
-    createAppMcpServer(input: $input) {
+export const CREATE_PROJECT_MCP_SERVER_MUTATION = graphql(/* GraphQL */ `
+  mutation CreateProjectMcpServer($input: CreateProjectMcpServerInput!) {
+    createProjectMcpServer(input: $input) {
       ...McpServerFields
     }
   }
@@ -74,32 +74,32 @@ export const CONNECT_MCP_BEARER_MUTATION = graphql(/* GraphQL */ `
 `);
 
 export const REVOKE_MCP_CREDENTIAL_MUTATION = graphql(/* GraphQL */ `
-  mutation RevokeMcpCredential($appId: ULID!, $serverId: ULID!) {
-    revokeMcpCredential(appId: $appId, serverId: $serverId) {
+  mutation RevokeMcpCredential($projectId: ULID!, $serverId: ULID!) {
+    revokeMcpCredential(projectId: $projectId, serverId: $serverId) {
       ...McpServerFields
     }
   }
 `);
 
 export const SET_MCP_SERVER_ENABLED_MUTATION = graphql(/* GraphQL */ `
-  mutation SetMcpServerEnabled($appId: ULID!, $serverId: ULID!, $enabled: Boolean!) {
-    setMcpServerEnabled(appId: $appId, serverId: $serverId, enabled: $enabled) {
+  mutation SetMcpServerEnabled($projectId: ULID!, $serverId: ULID!, $enabled: Boolean!) {
+    setMcpServerEnabled(projectId: $projectId, serverId: $serverId, enabled: $enabled) {
       ...McpServerFields
     }
   }
 `);
 
-export const UPDATE_APP_MCP_SERVER_MUTATION = graphql(/* GraphQL */ `
-  mutation UpdateAppMcpServer($input: UpdateAppMcpServerInput!) {
-    updateAppMcpServer(input: $input) {
+export const UPDATE_PROJECT_MCP_SERVER_MUTATION = graphql(/* GraphQL */ `
+  mutation UpdateProjectMcpServer($input: UpdateProjectMcpServerInput!) {
+    updateProjectMcpServer(input: $input) {
       ...McpServerFields
     }
   }
 `);
 
 export const DELETE_MCP_SERVER_MUTATION = graphql(/* GraphQL */ `
-  mutation DeleteMcpServer($appId: ULID!, $serverId: ULID!) {
-    deleteMcpServer(appId: $appId, serverId: $serverId) {
+  mutation DeleteMcpServer($projectId: ULID!, $serverId: ULID!) {
+    deleteMcpServer(projectId: $projectId, serverId: $serverId) {
       ok
     }
   }

@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test";
 
 import { allThreadSessions } from "../src/domains/session/api/list";
-import { toAppId } from "../src/routes/typed-id";
+import { toProjectId } from "../src/routes/typed-id";
 
-const APP_ID = "01J000000000000000000000P1";
+const PROJECT_ID = "01J000000000000000000000P1";
 const AGENT_ID = "01J000000000000000000000A1";
 const FIRST_SESSION_ID = "01J000000000000000000000S1";
 const SECOND_SESSION_ID = "01J000000000000000000000S2";
@@ -11,7 +11,7 @@ const originalFetch = globalThis.fetch;
 
 interface GraphQLRequestBody {
   variables: {
-    appId: string;
+    projectId: string;
     archived: boolean;
     beforeCursor: string | null;
     type: string | null;
@@ -33,7 +33,7 @@ function sessionNode(id: string) {
       lastRun: null,
       model: "gpt-5",
       provider: "openai",
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       runtimeId: "openai-runtime",
       status: "IDLE",
       title: id,
@@ -84,7 +84,7 @@ describe("all Thread sessions", () => {
       });
     };
 
-    const sessions = await allThreadSessions(toAppId(APP_ID));
+    const sessions = await allThreadSessions(toProjectId(PROJECT_ID));
 
     expect(sessions.map((entry) => entry.session.id)).toEqual([
       FIRST_SESSION_ID,
@@ -94,13 +94,13 @@ describe("all Thread sessions", () => {
       archived: true,
       beforeCursor: null,
       type: null,
-      appId: APP_ID,
+      projectId: PROJECT_ID,
     });
     expect(requests).toContainEqual({
       archived: false,
       beforeCursor: "page-1",
       type: null,
-      appId: APP_ID,
+      projectId: PROJECT_ID,
     });
   });
 });

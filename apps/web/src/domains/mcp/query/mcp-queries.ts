@@ -2,7 +2,7 @@ import type { McpRegistry } from "@mosoo/contracts/mcp";
 import { useQuery } from "@tanstack/react-query";
 import type { UseQueryResult } from "@tanstack/react-query";
 
-import { toAppId } from "@/routes/typed-id";
+import { toProjectId } from "@/routes/typed-id";
 
 import { getMcpRegistry } from "../api/mcp-client";
 
@@ -13,7 +13,7 @@ export const mcpKeys = {
   missingAgentBinding: () => [...mcpKeys.agentBindings(), "missing"] as const,
   missingRegistry: () => [...mcpKeys.registries(), "missing"] as const,
   registries: () => [...mcpKeys.all, "registry"] as const,
-  registry: (appId: string) => [...mcpKeys.registries(), appId] as const,
+  registry: (projectId: string) => [...mcpKeys.registries(), projectId] as const,
 };
 
 function requireQueryId(value: string | null, label: string): string {
@@ -24,11 +24,13 @@ function requireQueryId(value: string | null, label: string): string {
   return value;
 }
 
-export function useMcpRegistryQuery(appId: string | null): UseQueryResult<McpRegistry> {
+export function useMcpRegistryQuery(projectId: string | null): UseQueryResult<McpRegistry> {
   return useQuery({
-    enabled: appId !== null,
-    queryFn: async () => getMcpRegistry(toAppId(requireQueryId(appId, "App id"))),
+    enabled: projectId !== null,
+    queryFn: async () => getMcpRegistry(toProjectId(requireQueryId(projectId, "Project id"))),
     queryKey:
-      appId !== null && appId.length > 0 ? mcpKeys.registry(appId) : mcpKeys.missingRegistry(),
+      projectId !== null && projectId.length > 0
+        ? mcpKeys.registry(projectId)
+        : mcpKeys.missingRegistry(),
   });
 }

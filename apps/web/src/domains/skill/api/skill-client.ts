@@ -1,4 +1,4 @@
-import type { AppId, SkillId } from "@mosoo/contracts/id";
+import type { ProjectId, SkillId } from "@mosoo/contracts/id";
 import type {
   CreateSkillForkInput,
   InstallSkillsShSkillInput,
@@ -13,7 +13,7 @@ import { graphql } from "@/gql";
 import type { SkillDetailFieldsFragment, SkillSummaryFieldsFragment } from "@/gql/graphql";
 import { requestGraphQL } from "@/platform/http/graphql-client";
 import { apiFetch } from "@/platform/http/public-api";
-import { toAccountId, toAppId, toSkillId, toSkillSnapshotId } from "@/routes/typed-id";
+import { toAccountId, toProjectId, toSkillId, toSkillSnapshotId } from "@/routes/typed-id";
 
 const SKILL_SUMMARY_FIELDS = graphql(/* GraphQL */ `
   fragment SkillSummaryFields on SkillSummary {
@@ -30,7 +30,7 @@ const SKILL_SUMMARY_FIELDS = graphql(/* GraphQL */ `
     name
     ownerId
     ownerName
-    appId
+    projectId
     snapshotId
     sourceKind
     updatedAt
@@ -52,7 +52,7 @@ const SKILL_DETAIL_FIELDS = graphql(/* GraphQL */ `
     name
     ownerId
     ownerName
-    appId
+    projectId
     snapshotId
     sourceKind
     updatedAt
@@ -98,7 +98,7 @@ function toSkillSummary(skill: SkillSummaryFieldsFragment): SkillSummary {
           },
     id: toSkillId(skill.id),
     ownerId: toAccountId(skill.ownerId),
-    appId: toAppId(skill.appId),
+    projectId: toProjectId(skill.projectId),
     snapshotId: toSkillSnapshotId(skill.snapshotId),
   };
 }
@@ -115,16 +115,16 @@ function toSkillDetail(skill: SkillDetailFieldsFragment): SkillDetail {
 }
 
 const SKILL_DETAIL_QUERY = graphql(/* GraphQL */ `
-  query SkillDetail($appId: ULID!, $skillId: ULID!) {
-    skillDetail(appId: $appId, skillId: $skillId) {
+  query SkillDetail($projectId: ULID!, $skillId: ULID!) {
+    skillDetail(projectId: $projectId, skillId: $skillId) {
       ...SkillDetailFields
     }
   }
 `);
 
-const APP_SKILLS_QUERY = graphql(/* GraphQL */ `
-  query AppSkills($appId: ULID!) {
-    appSkillList(appId: $appId) {
+const PROJECT_SKILLS_QUERY = graphql(/* GraphQL */ `
+  query ProjectSkills($projectId: ULID!) {
+    projectSkillList(projectId: $projectId) {
       ...SkillSummaryFields
     }
   }
@@ -139,21 +139,21 @@ const CREATE_FORK_MUTATION = graphql(/* GraphQL */ `
 `);
 
 const DELETE_OWNED_SKILL_MUTATION = graphql(/* GraphQL */ `
-  mutation DeleteOwnedSkill($appId: ULID!, $skillId: ULID!) {
-    deleteOwnedSkill(appId: $appId, skillId: $skillId) {
+  mutation DeleteOwnedSkill($projectId: ULID!, $skillId: ULID!) {
+    deleteOwnedSkill(projectId: $projectId, skillId: $skillId) {
       ok
     }
   }
 `);
 
-export async function listAppSkills(appId: AppId): Promise<SkillSummary[]> {
-  const payload = await requestGraphQL(APP_SKILLS_QUERY, { appId });
+export async function listProjectSkills(projectId: ProjectId): Promise<SkillSummary[]> {
+  const payload = await requestGraphQL(PROJECT_SKILLS_QUERY, { projectId });
 
-  return payload.appSkillList.map(toSkillSummary);
+  return payload.projectSkillList.map(toSkillSummary);
 }
 
-export async function getSkillDetail(appId: AppId, skillId: SkillId): Promise<SkillDetail> {
-  const payload = await requestGraphQL(SKILL_DETAIL_QUERY, { appId, skillId });
+export async function getSkillDetail(projectId: ProjectId, skillId: SkillId): Promise<SkillDetail> {
+  const payload = await requestGraphQL(SKILL_DETAIL_QUERY, { projectId, skillId });
 
   return toSkillDetail(payload.skillDetail);
 }
@@ -164,8 +164,8 @@ export async function createSkillFork(input: CreateSkillForkInput): Promise<Skil
   return toSkillSummary(payload.createSkillFork);
 }
 
-export async function deleteOwnedSkill(appId: AppId, skillId: SkillId): Promise<void> {
-  await requestGraphQL(DELETE_OWNED_SKILL_MUTATION, { appId, skillId });
+export async function deleteOwnedSkill(projectId: ProjectId, skillId: SkillId): Promise<void> {
+  await requestGraphQL(DELETE_OWNED_SKILL_MUTATION, { projectId, skillId });
 }
 
 export async function inspectSkillUpload(input: {
@@ -201,10 +201,10 @@ export async function publishSkillPackage(input: {
   file?: File;
   githubUrl?: string;
   skillId?: SkillId;
-  appId: AppId;
+  projectId: ProjectId;
 }): Promise<SkillSummary> {
   const form = new FormData();
-  form.append("appId", input.appId);
+  form.append("projectId", input.projectId);
 
   if (input.skillId !== undefined && input.skillId.length > 0) {
     form.append("skillId", input.skillId);
@@ -286,9 +286,9 @@ export async function installSkillsShSkill(
   return body as SkillSummary;
 }
 
-export async function fetchSkillSource(appId: AppId, skillId: SkillId): Promise<string> {
+export async function fetchSkillSource(projectId: ProjectId, skillId: SkillId): Promise<string> {
   const response = await apiFetch(
-    `/skill/${encodeURIComponent(skillId)}/source?appId=${encodeURIComponent(appId)}`,
+    `/skill/${encodeURIComponent(skillId)}/source?projectId=${encodeURIComponent(projectId)}`,
     {
       credentials: "include",
     },
@@ -301,8 +301,8 @@ export async function fetchSkillSource(appId: AppId, skillId: SkillId): Promise<
   return response.text();
 }
 
-export function skillPackageUrl(appId: AppId, skillId: SkillId): string {
-  return `/api/skill/${encodeURIComponent(skillId)}/package?appId=${encodeURIComponent(appId)}`;
+export function skillPackageUrl(projectId: ProjectId, skillId: SkillId): string {
+  return `/api/skill/${encodeURIComponent(skillId)}/package?projectId=${encodeURIComponent(projectId)}`;
 }
 
 async function safeJson(response: Response): Promise<{ error?: string } | null> {

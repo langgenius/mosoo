@@ -12,27 +12,27 @@ import {
   inspectSkillUpload,
   publishSkillPackage,
 } from "../../../domains/skill/api/skill-client";
-import { skillKeys, useAppSkillsQuery } from "../../../domains/skill/query/skill-queries";
+import { skillKeys, useProjectSkillsQuery } from "../../../domains/skill/query/skill-queries";
 import { useTranslation } from "../../../shared/i18n";
 import { isTruthy } from "../../../shared/lib/truthiness";
-import { toAppId, toSkillId } from "../../typed-id";
+import { toProjectId, toSkillId } from "../../typed-id";
 export function useSkillRegistry() {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
-  const { activeAppId, appsLoading } = useAppSession();
-  const appId = activeAppId;
-  const skillsQuery = useAppSkillsQuery(appId);
+  const { activeProjectId, projectsLoading } = useAppSession();
+  const projectId = activeProjectId;
+  const skillsQuery = useProjectSkillsQuery(projectId);
   const skills = useMemo(() => skillsQuery.data ?? [], [skillsQuery.data]);
 
   const refresh = useCallback(async () => {
-    if (!isTruthy(appId)) {
+    if (!isTruthy(projectId)) {
       return;
     }
 
     await queryClient.invalidateQueries({
-      queryKey: skillKeys.list(toAppId(appId)),
+      queryKey: skillKeys.list(toProjectId(projectId)),
     });
-  }, [queryClient, appId]);
+  }, [queryClient, projectId]);
 
   const personal = skills;
 
@@ -43,56 +43,56 @@ export function useSkillRegistry() {
 
   const getSkillDetail = useCallback(
     async (skillId: string): Promise<SkillDetail> => {
-      if (!isTruthy(appId)) {
-        throw new Error(t("skills.appRequired"));
+      if (!isTruthy(projectId)) {
+        throw new Error(t("skills.projectRequired"));
       }
 
-      return getSkillDetailRemote(toAppId(appId), toSkillId(skillId));
+      return getSkillDetailRemote(toProjectId(projectId), toSkillId(skillId));
     },
-    [appId, t],
+    [projectId, t],
   );
 
   const getSkillSource = useCallback(
     async (skillId: string): Promise<string> => {
-      if (!isTruthy(appId)) {
-        throw new Error(t("skills.appRequired"));
+      if (!isTruthy(projectId)) {
+        throw new Error(t("skills.projectRequired"));
       }
 
-      return fetchSkillSource(toAppId(appId), toSkillId(skillId));
+      return fetchSkillSource(toProjectId(projectId), toSkillId(skillId));
     },
-    [appId, t],
+    [projectId, t],
   );
 
   const publishFromFile = useCallback(
     async (file: File): Promise<SkillSummary | null> => {
-      if (!isTruthy(appId)) {
+      if (!isTruthy(projectId)) {
         return null;
       }
 
       const created = await publishSkillPackage({
         file,
-        appId: toAppId(appId),
+        projectId: toProjectId(projectId),
       });
       await refresh();
       return created;
     },
-    [refresh, appId],
+    [refresh, projectId],
   );
 
   const publishFromGithub = useCallback(
     async (githubUrl: string): Promise<SkillSummary | null> => {
-      if (!isTruthy(appId)) {
+      if (!isTruthy(projectId)) {
         return null;
       }
 
       const created = await publishSkillPackage({
         githubUrl,
-        appId: toAppId(appId),
+        projectId: toProjectId(projectId),
       });
       await refresh();
       return created;
     },
-    [refresh, appId],
+    [refresh, projectId],
   );
 
   const inspectFile = useCallback(
@@ -107,18 +107,18 @@ export function useSkillRegistry() {
 
   const createSkillFork = useCallback(
     async (skillId: string): Promise<SkillSummary> => {
-      if (!isTruthy(appId)) {
-        throw new Error(t("skills.appRequired"));
+      if (!isTruthy(projectId)) {
+        throw new Error(t("skills.projectRequired"));
       }
 
       const created = await createSkillForkRemote({
-        appId: toAppId(appId),
+        projectId: toProjectId(projectId),
         skillId: toSkillId(skillId),
       });
       await refresh();
       return created;
     },
-    [refresh, appId, t],
+    [refresh, projectId, t],
   );
 
   const installSkillsShSkill = useCallback(
@@ -127,12 +127,12 @@ export function useSkillRegistry() {
       installUrl: string | null;
       slug: string;
     }): Promise<SkillSummary> => {
-      if (!isTruthy(appId)) {
-        throw new Error(t("skills.appRequired"));
+      if (!isTruthy(projectId)) {
+        throw new Error(t("skills.projectRequired"));
       }
 
       const created = await installSkillsShSkillRemote({
-        appId: toAppId(appId),
+        projectId: toProjectId(projectId),
         id: input.id,
         installUrl: input.installUrl,
         slug: input.slug,
@@ -140,19 +140,19 @@ export function useSkillRegistry() {
       await refresh();
       return created;
     },
-    [refresh, appId, t],
+    [refresh, projectId, t],
   );
 
   const deleteOwnedSkill = useCallback(
     async (skillId: string) => {
-      if (!isTruthy(appId)) {
-        throw new Error(t("skills.appRequired"));
+      if (!isTruthy(projectId)) {
+        throw new Error(t("skills.projectRequired"));
       }
 
-      await deleteOwnedSkillRemote(toAppId(appId), toSkillId(skillId));
+      await deleteOwnedSkillRemote(toProjectId(projectId), toSkillId(skillId));
       await refresh();
     },
-    [refresh, appId, t],
+    [refresh, projectId, t],
   );
 
   return {
@@ -164,9 +164,9 @@ export function useSkillRegistry() {
     inspectFile,
     inspectGithub,
     installSkillsShSkill,
-    loading: isTruthy(appId) ? skillsQuery.isLoading : appsLoading,
+    loading: isTruthy(projectId) ? skillsQuery.isLoading : projectsLoading,
     personal,
-    appId,
+    projectId,
     publishFromFile,
     publishFromGithub,
     refresh,

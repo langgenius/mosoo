@@ -50,7 +50,7 @@ export const skillSchema = /* GraphQL */ `
     name: String!
     ownerId: ULID!
     ownerName: String!
-    appId: ULID!
+    projectId: ULID!
     snapshotId: ULID!
     sourceKind: SkillSourceKind!
     updatedAt: String!
@@ -68,14 +68,14 @@ export const skillSchema = /* GraphQL */ `
     name: String!
     ownerId: ULID!
     ownerName: String!
-    appId: ULID!
+    projectId: ULID!
     snapshotId: ULID!
     sourceKind: SkillSourceKind!
     updatedAt: String!
   }
 
   input CreateSkillForkInput {
-    appId: ULID!
+    projectId: ULID!
     skillId: ULID!
   }
 `;

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { skillSnapshotEntriesTable } from "@mosoo/db";
-import type { AppId } from "@mosoo/id";
+import type { ProjectId } from "@mosoo/id";
 import { createZipArchive } from "@mosoo/skill-package";
 
 import { publishSkillSnapshot } from "../src/modules/skills/application/skill-package-snapshot.service";
@@ -12,7 +12,7 @@ import {
 } from "./helpers/public-api-http-test-fixture";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
-const APP_ID = "01J00000000000000000000002" as AppId;
+const PROJECT_ID = "01J00000000000000000000002" as ProjectId;
 const textEncoder = new TextEncoder();
 
 class BindLimitedD1Database implements D1Database {
@@ -70,14 +70,14 @@ function createSkillSnapshotDatabase(): SqliteD1Database {
       created_at integer NOT NULL,
       description text NOT NULL,
       name text NOT NULL,
-      app_id text NOT NULL,
+      project_id text NOT NULL,
       skill_markdown_path text NOT NULL,
       uncompressed_size integer NOT NULL,
       version text
     );
 
     CREATE UNIQUE INDEX skill_snapshot_blob_sha256_idx
-      ON skill_snapshot (app_id, blob_sha256);
+      ON skill_snapshot (project_id, blob_sha256);
 
     CREATE TABLE skill_snapshot_entry (
       entry_kind text NOT NULL,
@@ -122,7 +122,7 @@ describe("publishSkillSnapshot", () => {
 
     const published = await publishSkillSnapshot(
       bindings,
-      { appId: APP_ID },
+      { projectId: PROJECT_ID },
       {
         file: {
           bytes: createLargeWrappedSkillArchive(),
@@ -132,7 +132,7 @@ describe("publishSkillSnapshot", () => {
     );
 
     const rows = await sqlite
-      .app()
+      .project()
       .select({ path: skillSnapshotEntriesTable.path })
       .from(skillSnapshotEntriesTable)
       .all();

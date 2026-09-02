@@ -12,7 +12,7 @@ import type {
   AccountId,
   AgentDeploymentVersionId,
   AgentId,
-  AppId,
+  ProjectId,
   PlatformId,
   SessionId,
   SessionMessageId,
@@ -62,7 +62,7 @@ export interface CommitQueuedSessionRunAdmissionInput {
   run: QueuedRunAdmissionRecord;
   session: {
     agentId: AgentId;
-    appId: AppId;
+    projectId: ProjectId;
     id: SessionId;
   };
 }
@@ -75,7 +75,7 @@ function admissionSessionPredicate(input: CommitQueuedSessionRunAdmissionInput) 
   return and(
     eq(sessionsTable.id, input.session.id),
     eq(sessionsTable.agentId, input.session.agentId),
-    eq(sessionsTable.appId, input.session.appId),
+    eq(sessionsTable.projectId, input.session.projectId),
     eq(sessionsTable.lastRunId, input.run.id),
     eq(sessionsTable.status, "RUNNING"),
   );
@@ -85,7 +85,7 @@ function claimableSessionPredicate(db: AppDatabase, input: CommitQueuedSessionRu
   return and(
     eq(sessionsTable.id, input.session.id),
     eq(sessionsTable.agentId, input.session.agentId),
-    eq(sessionsTable.appId, input.session.appId),
+    eq(sessionsTable.projectId, input.session.projectId),
     isNull(sessionsTable.archivedAt),
     eq(sessionsTable.status, "IDLE"),
     isNull(sessionsTable.statusOperationId),
@@ -427,7 +427,7 @@ export async function commitQueuedSessionRunAdmission(
         and(
           eq(sessionsTable.id, input.session.id),
           eq(sessionsTable.agentId, input.session.agentId),
-          eq(sessionsTable.appId, input.session.appId),
+          eq(sessionsTable.projectId, input.session.projectId),
           isNull(sessionsTable.archivedAt),
           eq(sessionsTable.status, "IDLE"),
           isNull(sessionsTable.statusOperationId),

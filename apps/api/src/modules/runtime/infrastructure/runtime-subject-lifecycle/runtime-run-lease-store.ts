@@ -89,8 +89,8 @@ export async function recordRuntimeRunLeaseAcquiredOutcome(
   input: RuntimeRunLeaseInput,
 ): Promise<RuntimeRunLeaseTransitionOutcome> {
   const now = currentTimestampMs();
-  const appDb = getAppDatabase(database);
-  const snapshot = await readRuntimeRunLeaseAcquireSnapshot(appDb, input);
+  const projectDb = getAppDatabase(database);
+  const snapshot = await readRuntimeRunLeaseAcquireSnapshot(projectDb, input);
 
   if (!snapshot) {
     return {
@@ -106,7 +106,7 @@ export async function recordRuntimeRunLeaseAcquiredOutcome(
     return admission;
   }
 
-  const linked = await recordRuntimeRunLeaseLinked(appDb, {
+  const linked = await recordRuntimeRunLeaseLinked(projectDb, {
     ...input,
     now,
     sandboxId: snapshot.sandboxId,
@@ -141,11 +141,11 @@ export async function recordRuntimeRunLeaseAcquiredOutcome(
 }
 
 async function readRuntimeRunLeaseAcquireSnapshot(
-  appDb: AppDatabase,
+  projectDb: AppDatabase,
   input: RuntimeRunLeaseInput,
 ): Promise<RuntimeRunLeaseAcquireSnapshot | null> {
   const row =
-    (await appDb
+    (await projectDb
       .select({
         driverSandboxId: driverInstancesTable.sandboxId,
         driverSandboxSessionId: driverInstancesTable.sandboxSessionId,
@@ -176,7 +176,7 @@ async function readRuntimeRunLeaseAcquireSnapshot(
   }
 
   const activeDriverLease =
-    (await appDb
+    (await projectDb
       .select({ id: sessionRunsTable.id })
       .from(sessionRunsTable)
       .where(
@@ -294,7 +294,7 @@ function decideRuntimeRunLeaseAcquire(
 }
 
 async function recordRuntimeRunLeaseLinked(
-  appDb: AppDatabase,
+  projectDb: AppDatabase,
   input: RuntimeRunLeaseInput & {
     readonly now: number;
     readonly sandboxId: SandboxId;
@@ -306,7 +306,7 @@ async function recordRuntimeRunLeaseLinked(
   }
 
   const linked =
-    (await appDb
+    (await projectDb
       .update(sessionRunsTable)
       .set({
         driverInstanceId: input.driverInstanceId,
@@ -328,7 +328,7 @@ async function recordRuntimeRunLeaseLinked(
             eq(sessionRunsTable.driverInstanceId, input.driverInstanceId),
           ),
           notExists(
-            appDb
+            projectDb
               .select({ id: activeDriverLeaseRunsTable.id })
               .from(activeDriverLeaseRunsTable)
               .where(
@@ -346,7 +346,7 @@ async function recordRuntimeRunLeaseLinked(
 
   if (linked === null) {
     const current =
-      (await appDb
+      (await projectDb
         .select({
           driverInstanceId: sessionRunsTable.driverInstanceId,
           status: sessionRunsTable.status,
@@ -370,7 +370,7 @@ async function recordRuntimeRunLeaseLinked(
     return "run_link_conflict";
   }
 
-  await appDb
+  await projectDb
     .update(sandboxesTable)
     .set({
       inactiveDeadlineAt: null,
@@ -406,9 +406,9 @@ export async function recordRuntimeRunLeaseReleasedOutcome(
   },
 ): Promise<RuntimeRunLeaseTransitionOutcome> {
   const now = currentTimestampMs();
-  const appDb = getAppDatabase(database);
+  const projectDb = getAppDatabase(database);
   const driver =
-    (await appDb
+    (await projectDb
       .select({
         sandboxId: driverInstancesTable.sandboxId,
       })
@@ -426,7 +426,7 @@ export async function recordRuntimeRunLeaseReleasedOutcome(
   }
 
   const currentRun =
-    (await appDb
+    (await projectDb
       .select({
         driverInstanceId: sessionRunsTable.driverInstanceId,
         status: sessionRunsTable.status,
@@ -437,7 +437,7 @@ export async function recordRuntimeRunLeaseReleasedOutcome(
       .get()) ?? null;
 
   const activeDriverRun =
-    (await appDb
+    (await projectDb
       .select({ id: sessionRunsTable.id })
       .from(sessionRunsTable)
       .where(
@@ -479,7 +479,7 @@ export async function recordRuntimeRunLeaseReleasedOutcome(
     )
   ) {
     const released =
-      (await appDb
+      (await projectDb
         .update(sessionRunsTable)
         .set({
           driverInstanceId: null,
@@ -506,7 +506,7 @@ export async function recordRuntimeRunLeaseReleasedOutcome(
     }
   }
 
-  await appDb
+  await projectDb
     .update(sandboxesTable)
     .set({
       inactiveDeadlineAt: getRuntimeSubjectInactiveDeadlineSql(now),
@@ -517,9 +517,9 @@ export async function recordRuntimeRunLeaseReleasedOutcome(
         eq(sandboxesTable.id, driver.sandboxId),
         or(
           eq(sandboxesTable.kind, "pet"),
-          notExists(activeConversationSessionQuery(appDb, driver.sandboxId)),
+          notExists(activeConversationSessionQuery(projectDb, driver.sandboxId)),
         ),
-        notExists(runLeaseQuery(appDb, driver.sandboxId)),
+        notExists(runLeaseQuery(projectDb, driver.sandboxId)),
       ),
     )
     .run();

@@ -30,7 +30,7 @@ export interface UseAgentSessionPanelModelInput {
   agentId: string;
   configurationChangedAt: string | null;
   configurationRevisionKey: string | null;
-  appId: string | null;
+  projectId: string | null;
   readiness: AgentReadiness | null;
   requireFreshConfiguration: boolean;
   sessionType: SessionType;

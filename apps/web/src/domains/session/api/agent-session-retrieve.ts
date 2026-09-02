@@ -1,4 +1,4 @@
-import type { AppId, SessionId } from "@mosoo/contracts/id";
+import type { ProjectId, SessionId } from "@mosoo/contracts/id";
 
 import { graphql } from "@/gql";
 import type { AgentSessionDiagnosticsQuery, ThreadAgentSessionRetrieveQuery } from "@/gql/graphql";
@@ -9,8 +9,8 @@ export interface ThreadAgentSessionRetrieveResult {
 }
 
 const THREAD_AGENT_SESSION_RETRIEVE_QUERY = graphql(/* GraphQL */ `
-  query ThreadAgentSessionRetrieve($appId: ULID!, $sessionId: ULID!) {
-    threadAgentSessionRetrieve(appId: $appId, sessionId: $sessionId) {
+  query ThreadAgentSessionRetrieve($projectId: ULID!, $sessionId: ULID!) {
+    threadAgentSessionRetrieve(projectId: $projectId, sessionId: $sessionId) {
       capabilities {
         action
         reason
@@ -51,7 +51,7 @@ const THREAD_AGENT_SESSION_RETRIEVE_QUERY = graphql(/* GraphQL */ `
         }
         model
         provider
-        appId
+        projectId
         runtimeId
         status
         title
@@ -62,8 +62,8 @@ const THREAD_AGENT_SESSION_RETRIEVE_QUERY = graphql(/* GraphQL */ `
 `);
 
 const AGENT_SESSION_DIAGNOSTICS_QUERY = graphql(/* GraphQL */ `
-  query AgentSessionDiagnostics($appId: ULID!, $sessionId: ULID!) {
-    agentSessionDiagnostics(appId: $appId, sessionId: $sessionId) {
+  query AgentSessionDiagnostics($projectId: ULID!, $sessionId: ULID!) {
+    agentSessionDiagnostics(projectId: $projectId, sessionId: $sessionId) {
       execution {
         binding {
           deploymentVersionId
@@ -116,11 +116,11 @@ const AGENT_SESSION_DIAGNOSTICS_QUERY = graphql(/* GraphQL */ `
 `);
 
 export async function retrieveThreadAgentSession(input: {
-  appId: AppId;
+  projectId: ProjectId;
   sessionId: SessionId;
 }): Promise<ThreadAgentSessionRetrieveResult> {
   const payload = await requestGraphQL(THREAD_AGENT_SESSION_RETRIEVE_QUERY, {
-    appId: input.appId,
+    projectId: input.projectId,
     sessionId: input.sessionId,
   });
 
@@ -130,11 +130,11 @@ export async function retrieveThreadAgentSession(input: {
 }
 
 export async function getAgentSessionDiagnostics(input: {
-  appId: AppId;
+  projectId: ProjectId;
   sessionId: SessionId;
 }): Promise<AgentSessionDiagnosticsQuery> {
   return requestGraphQL(AGENT_SESSION_DIAGNOSTICS_QUERY, {
-    appId: input.appId,
+    projectId: input.projectId,
     sessionId: input.sessionId,
   });
 }

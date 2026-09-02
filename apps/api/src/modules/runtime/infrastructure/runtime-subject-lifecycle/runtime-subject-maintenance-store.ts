@@ -46,8 +46,8 @@ export async function closeRuntimeSubjectSessionsForRecycle(
 ): Promise<void> {
   const now = currentTimestampMs();
 
-  await runAppDatabaseBatch(database, (appDb) => [
-    appDb
+  await runAppDatabaseBatch(database, (projectDb) => [
+    projectDb
       .update(sandboxSessionsTable)
       .set({
         status: "closed",
@@ -59,7 +59,7 @@ export async function closeRuntimeSubjectSessionsForRecycle(
           eq(sandboxSessionsTable.status, "active"),
         ),
       ),
-    appDb
+    projectDb
       .update(sandboxesTable)
       .set({
         updatedAt: now,
@@ -72,8 +72,8 @@ export async function listRuntimeSubjectDriverIds(
   database: D1Database,
   runtimeSubjectId: SandboxId,
 ): Promise<DriverInstanceId[]> {
-  const appDb = getAppDatabase(database);
-  const activeRunLeaseQuery = appDb
+  const projectDb = getAppDatabase(database);
+  const activeRunLeaseQuery = projectDb
     .select({ id: sessionRunsTable.id })
     .from(sessionRunsTable)
     .where(
@@ -82,7 +82,7 @@ export async function listRuntimeSubjectDriverIds(
         inArray(sessionRunsTable.status, ACTIVE_SESSION_RUN_STATUSES),
       ),
     );
-  const results = await appDb
+  const results = await projectDb
     .select({ id: driverInstancesTable.id })
     .from(driverInstancesTable)
     .where(
@@ -131,9 +131,9 @@ export async function listInactiveRuntimeSubjects(
     readonly now: number;
   },
 ): Promise<RuntimeSubjectMaintenanceCandidate[]> {
-  const appDb = getAppDatabase(database);
+  const projectDb = getAppDatabase(database);
 
-  return appDb
+  return projectDb
     .select({
       id: sandboxesTable.id,
       kind: sandboxesTable.kind,
@@ -144,9 +144,9 @@ export async function listInactiveRuntimeSubjects(
         eq(sandboxesTable.status, "active"),
         or(
           eq(sandboxesTable.kind, "pet"),
-          notExists(activeConversationSessionQueryForListedSubject(appDb)),
+          notExists(activeConversationSessionQueryForListedSubject(projectDb)),
         ),
-        notExists(runLeaseQueryForListedSubject(appDb)),
+        notExists(runLeaseQueryForListedSubject(projectDb)),
         isNotNull(sandboxesTable.inactiveDeadlineAt),
         lte(sandboxesTable.inactiveDeadlineAt, input.now),
       ),
@@ -165,8 +165,8 @@ export async function repairStrandedRuntimeSubjectDeadlines(
   database: D1Database,
   input: { readonly now: number },
 ): Promise<StrandedRuntimeSubjectDeadlineRepairResult> {
-  const appDb = getAppDatabase(database);
-  const cattle = await appDb
+  const projectDb = getAppDatabase(database);
+  const cattle = await projectDb
     .update(sandboxesTable)
     .set({
       inactiveDeadlineAt: getRuntimeSubjectInactiveDeadlineSql(input.now),
@@ -177,8 +177,8 @@ export async function repairStrandedRuntimeSubjectDeadlines(
         eq(sandboxesTable.status, "active"),
         eq(sandboxesTable.kind, "cattle"),
         isNull(sandboxesTable.inactiveDeadlineAt),
-        notExists(activeConversationSessionQueryForListedSubject(appDb)),
-        notExists(runLeaseQueryForListedSubject(appDb)),
+        notExists(activeConversationSessionQueryForListedSubject(projectDb)),
+        notExists(runLeaseQueryForListedSubject(projectDb)),
       ),
     )
     .run();
@@ -189,7 +189,7 @@ export async function repairStrandedRuntimeSubjectDeadlines(
   // invisible to the recycle sweep while its container keeps billing. Repair
   // only clearly reclaimable pets: no live driver, no active subject run, no
   // run lease.
-  const pet = await appDb
+  const pet = await projectDb
     .update(sandboxesTable)
     .set({
       inactiveDeadlineAt: getRuntimeSubjectInactiveDeadlineSql(input.now),
@@ -200,9 +200,9 @@ export async function repairStrandedRuntimeSubjectDeadlines(
         eq(sandboxesTable.status, "active"),
         eq(sandboxesTable.kind, "pet"),
         isNull(sandboxesTable.inactiveDeadlineAt),
-        notExists(liveDriverInstanceQueryForListedSubject(appDb)),
-        notExists(activeSessionRunQueryForListedSubject(appDb)),
-        notExists(runLeaseQueryForListedSubject(appDb)),
+        notExists(liveDriverInstanceQueryForListedSubject(projectDb)),
+        notExists(activeSessionRunQueryForListedSubject(projectDb)),
+        notExists(runLeaseQueryForListedSubject(projectDb)),
       ),
     )
     .run();
@@ -262,9 +262,9 @@ export async function claimInactiveRuntimeSubject(
     readonly runtimeSubjectId: SandboxId;
   },
 ): Promise<boolean> {
-  const appDb = getAppDatabase(database);
+  const projectDb = getAppDatabase(database);
   const claimed =
-    (await appDb
+    (await projectDb
       .update(sandboxesTable)
       .set({
         claimExpiresAt: input.claimExpiresAt,
@@ -277,9 +277,9 @@ export async function claimInactiveRuntimeSubject(
           eq(sandboxesTable.status, "active"),
           or(
             eq(sandboxesTable.kind, "pet"),
-            notExists(activeConversationSessionQuery(appDb, input.runtimeSubjectId)),
+            notExists(activeConversationSessionQuery(projectDb, input.runtimeSubjectId)),
           ),
-          notExists(runLeaseQuery(appDb, input.runtimeSubjectId)),
+          notExists(runLeaseQuery(projectDb, input.runtimeSubjectId)),
           isNotNull(sandboxesTable.inactiveDeadlineAt),
           lte(sandboxesTable.inactiveDeadlineAt, input.now),
           or(

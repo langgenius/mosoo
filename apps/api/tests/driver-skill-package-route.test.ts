@@ -18,7 +18,7 @@ import {
 
 const SKILL_SNAPSHOT_ID = "01J0000000000000000000000S";
 const OTHER_SKILL_SNAPSHOT_ID = "01J0000000000000000000000T";
-const SKILL_BLOB_KEY = "app/01J0000000000000000000000Q/skill-blob/test.skill";
+const SKILL_BLOB_KEY = "project/01J0000000000000000000000Q/skill-blob/test.skill";
 
 function ensureSkillRouteTables(
   database: Awaited<ReturnType<typeof createPublicHttpContractDatabase>>,
@@ -33,7 +33,7 @@ function ensureSkillRouteTables(
       description text NOT NULL,
       id text PRIMARY KEY NOT NULL,
       name text NOT NULL,
-      app_id text NOT NULL,
+      project_id text NOT NULL,
       skill_markdown_path text NOT NULL,
       uncompressed_size integer NOT NULL,
       version text
@@ -56,20 +56,20 @@ function ensureSkillRouteTables(
   `);
 }
 
-function createDriverRouteTestApp(): Hono<ApiGatewayEnvironment> {
-  const app = new Hono<ApiGatewayEnvironment>();
-  registerDriverRoute(app);
-  return app;
+function createDriverRouteTestProject(): Hono<ApiGatewayEnvironment> {
+  const project = new Hono<ApiGatewayEnvironment>();
+  registerDriverRoute(project);
+  return project;
 }
 
 async function insertSkillSnapshot(
   database: Awaited<ReturnType<typeof createPublicHttpContractDatabase>>,
 ) {
   await database
-    .app()
+    .project()
     .insert(skillSnapshotsTable)
     .values({
-      appId: PUBLIC_API_TEST_IDS.app,
+      projectId: PUBLIC_API_TEST_IDS.project,
       author: "Skill Author",
       blobKey: SKILL_BLOB_KEY,
       blobSha256: "sha-skill",
@@ -91,7 +91,7 @@ async function insertDriverInstance(
 ) {
   const nowMs = Date.now();
   await database
-    .app()
+    .project()
     .insert(driverInstancesTable)
     .values({
       bootTokenExpiresAt: nowMs + 60_000,
@@ -152,7 +152,7 @@ describe("driver skill package route", () => {
     await insertDriverInstance(database, "provisioning");
     await bucket.put(SKILL_BLOB_KEY, "skill-zip");
 
-    const response = await createDriverRouteTestApp().request(
+    const response = await createDriverRouteTestProject().request(
       await createSkillDownloadRequest(bindings),
       undefined,
       bindings,
@@ -176,7 +176,7 @@ describe("driver skill package route", () => {
     await insertDriverInstance(database, "ready");
     await bucket.put(SKILL_BLOB_KEY, "skill-zip");
 
-    const response = await createDriverRouteTestApp().request(
+    const response = await createDriverRouteTestProject().request(
       await createSkillDownloadRequest(bindings),
       undefined,
       bindings,
@@ -196,7 +196,7 @@ describe("driver skill package route", () => {
     ensureSkillRouteTables(database);
     await insertDriverInstance(database, "provisioning");
 
-    const response = await createDriverRouteTestApp().request(
+    const response = await createDriverRouteTestProject().request(
       await createSkillDownloadRequest(bindings, SKILL_SNAPSHOT_ID, OTHER_SKILL_SNAPSHOT_ID),
       undefined,
       bindings,

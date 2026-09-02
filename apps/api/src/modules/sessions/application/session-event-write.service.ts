@@ -19,7 +19,7 @@ import {
   persistSessionRuntimeEvents,
 } from "../infrastructure/session-runtime-event-store.repository";
 import type { PersistSessionRuntimeEventsResult } from "../infrastructure/session-runtime-event-store.repository";
-import { appRuntimeEventsToSessionDeliveryEvents } from "./session-live-state.service";
+import { projectRuntimeEventsToSessionDeliveryEvents } from "./session-live-state.service";
 import { publishSessionViewerEvents } from "./session-viewer-events.service";
 
 export interface AppendOneSessionEventPerSessionResult {
@@ -63,7 +63,7 @@ export async function publishPersistedSessionRuntimeEvents(input: {
   events: readonly RuntimeEventEnvelope[];
   sessionId: SessionId;
 }): Promise<void> {
-  const deliveryEvents = appRuntimeEventsToSessionDeliveryEvents(input.events);
+  const deliveryEvents = projectRuntimeEventsToSessionDeliveryEvents(input.events);
 
   if (deliveryEvents.length > 0) {
     await publishSessionViewerEventsSafely(input.bindings, input.sessionId, deliveryEvents);
@@ -174,7 +174,7 @@ export async function appendOneSessionRuntimeEventPerSession(input: {
         return [];
       }
 
-      const deliveryEvents = appRuntimeEventsToSessionDeliveryEvents([record.event]);
+      const deliveryEvents = projectRuntimeEventsToSessionDeliveryEvents([record.event]);
 
       return deliveryEvents.length === 0
         ? []

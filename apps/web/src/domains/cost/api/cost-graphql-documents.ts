@@ -116,11 +116,11 @@ void MODEL_FRAGMENT;
 void RECENT_SESSION_FRAGMENT;
 void ATTRIBUTION_FRAGMENT;
 
-export const APP_COST_QUERY = graphql(/* GraphQL */ `
-  query AppCostCard($appId: ULID!, $range: CostRange!, $runPurposes: [CostRunPurpose!]) {
-    appCostCard(appId: $appId, range: $range, runPurposes: $runPurposes) {
-      appId
-      appName
+export const PROJECT_COST_QUERY = graphql(/* GraphQL */ `
+  query ProjectCostCard($projectId: ULID!, $range: CostRange!, $runPurposes: [CostRunPurpose!]) {
+    projectCostCard(projectId: $projectId, range: $range, runPurposes: $runPurposes) {
+      projectId
+      projectName
       agents {
         ...CostAgentFields
       }
@@ -145,12 +145,17 @@ export const APP_COST_QUERY = graphql(/* GraphQL */ `
 
 export const AGENT_COST_QUERY = graphql(/* GraphQL */ `
   query AgentCostCard(
-    $appId: ULID!
+    $projectId: ULID!
     $agentId: ULID!
     $range: CostRange!
     $runPurposes: [CostRunPurpose!]
   ) {
-    agentCostCard(appId: $appId, agentId: $agentId, range: $range, runPurposes: $runPurposes) {
+    agentCostCard(
+      projectId: $projectId
+      agentId: $agentId
+      range: $range
+      runPurposes: $runPurposes
+    ) {
       agentId
       agentName
       agents {

@@ -15,6 +15,7 @@ import {
   renewApiCommandClaim,
 } from "../src/modules/api-command/application/api-command-ledger";
 import type { ApiCommandMessage } from "../src/modules/api-command/application/api-command-message";
+import { parseApiCommandPayload } from "../src/modules/api-command/application/api-command-payload";
 import { processApiCommandMessage } from "../src/modules/api-command/application/api-command-processor";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import {
@@ -26,6 +27,47 @@ import {
 } from "./helpers/public-api-http-test-fixture";
 
 describe("API command queue", () => {
+  test("normalizes durable payloads written before the Project rename", () => {
+    const projectId = "01J0000000000000000000000E";
+    const sessionId = "01J0000000000000000000000K";
+    const sessionRunId = "01J0000000000000000000000N";
+    const viewer = {
+      email: "owner@example.com",
+      emailVerified: true,
+      id: "01J00000000000000000000001",
+      imageUrl: null,
+      name: "Owner",
+    };
+
+    expect(
+      parseApiCommandPayload(
+        "session_run_dispatch",
+        JSON.stringify({
+          attachmentIds: [],
+          prompt: "continue",
+          queuedAtMs: nowMsForTest(),
+          requestUrl: "https://cloud.mosoo.ai/graphql",
+          session: { app_id: projectId, id: sessionId },
+          sessionRunId,
+          traceId: "trace-1",
+          viewer,
+        }),
+      ),
+    ).toMatchObject({ session: { id: sessionId, project_id: projectId } });
+
+    expect(
+      parseApiCommandPayload(
+        "environment_package_artifact_build",
+        JSON.stringify({
+          appId: projectId,
+          artifactAbi: "abi-1",
+          inputDigest: "digest-1",
+          packages: [],
+        }),
+      ),
+    ).toMatchObject({ projectId });
+  });
+
   test("dedupes producer-side and sends only the command id", async () => {
     const database = await createPublicHttpContractDatabase();
     const queue = createApiCommandQueueStub();
@@ -54,7 +96,7 @@ describe("API command queue", () => {
       },
     ]);
 
-    const rows = await database.app().select().from(apiCommandsTable).all();
+    const rows = await database.project().select().from(apiCommandsTable).all();
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
       id: firstId,
@@ -79,7 +121,7 @@ describe("API command queue", () => {
     expect(queue.sent).toEqual([]);
     await expect(
       database
-        .app()
+        .project()
         .select()
         .from(apiCommandsTable)
         .where(eq(apiCommandsTable.id, admission.commandId))
@@ -116,7 +158,7 @@ describe("API command queue", () => {
     await processApiCommandMessage(bindings, recorded.message, nowMsForTest);
 
     const row = await database
-      .app()
+      .project()
       .select({
         lastErrorCode: apiCommandsTable.lastErrorCode,
         status: apiCommandsTable.status,
@@ -158,7 +200,7 @@ describe("API command queue", () => {
     }
 
     const row = await database
-      .app()
+      .project()
       .select({
         lastErrorCode: apiCommandsTable.lastErrorCode,
         status: apiCommandsTable.status,
@@ -209,7 +251,7 @@ describe("API command queue", () => {
 
     expect(sent).toHaveLength(1);
     const row = await database
-      .app()
+      .project()
       .select({
         lastErrorCode: apiCommandsTable.lastErrorCode,
         lastErrorMessage: apiCommandsTable.lastErrorMessage,
@@ -234,7 +276,7 @@ describe("API command queue", () => {
     const commandId = "01J0000000000000000000000C";
 
     await database
-      .app()
+      .project()
       .insert(apiCommandsTable)
       .values({
         attemptCount: 0,
@@ -256,7 +298,7 @@ describe("API command queue", () => {
     await redriveFailedApiCommandEnqueues(bindings);
 
     const row = await database
-      .app()
+      .project()
       .select({
         lastErrorCode: apiCommandsTable.lastErrorCode,
         lastErrorMessage: apiCommandsTable.lastErrorMessage,
@@ -299,7 +341,7 @@ describe("API command queue", () => {
     ).resolves.toBe(true);
 
     const row = await database
-      .app()
+      .project()
       .select({
         claimExpiresAt: apiCommandsTable.claimExpiresAt,
       })

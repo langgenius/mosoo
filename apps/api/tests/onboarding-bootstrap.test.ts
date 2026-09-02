@@ -38,7 +38,7 @@ function createOnboardingDatabase(): SqliteD1Database {
       updated_at integer NOT NULL
     );
 
-    CREATE TABLE app (
+    CREATE TABLE project (
       id text PRIMARY KEY NOT NULL,
       organization_id text NOT NULL,
       owner_account_id text NOT NULL,
@@ -53,7 +53,7 @@ function createOnboardingDatabase(): SqliteD1Database {
       name text NOT NULL,
       description text NOT NULL,
       owner_account_id text,
-      app_id text NOT NULL,
+      project_id text NOT NULL,
       current_revision_id text NOT NULL,
       forked_from_environment_id text,
       forked_from_environment_name text,
@@ -65,7 +65,7 @@ function createOnboardingDatabase(): SqliteD1Database {
     CREATE TABLE environment_revision (
       id text PRIMARY KEY NOT NULL,
       environment_id text NOT NULL,
-      app_id text NOT NULL,
+      project_id text NOT NULL,
       network_policy text NOT NULL,
       allow_mcp_servers integer NOT NULL,
       allow_package_managers integer NOT NULL,
@@ -125,8 +125,10 @@ describe("onboarding bootstrap", () => {
 
     expect(account?.last_active_organization_id).toBe(status.organization?.id);
 
-    const app = await database
-      .prepare("SELECT name, organization_id, owner_account_id FROM app WHERE organization_id = ?")
+    const project = await database
+      .prepare(
+        "SELECT name, organization_id, owner_account_id FROM project WHERE organization_id = ?",
+      )
       .bind(status.organization?.id)
       .first<{
         name: string;
@@ -134,8 +136,8 @@ describe("onboarding bootstrap", () => {
         owner_account_id: string;
       }>();
 
-    expect(app).toEqual({
-      name: "Default App",
+    expect(project).toEqual({
+      name: "Default Project",
       organization_id: status.organization?.id,
       owner_account_id: VIEWER.id,
     });

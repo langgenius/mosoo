@@ -22,13 +22,13 @@ import { SqliteD1Database } from "./helpers/sqlite-d1";
 const RUNTIME_SUBJECT_ID = "01J0000000000000000000000D";
 const ACCOUNT_ID = "01J00000000000000000000002";
 const AGENT_ID = "01J00000000000000000000001";
-const APP_ID = "01J00000000000000000000003";
+const PROJECT_ID = "01J00000000000000000000003";
 const SESSION_ID = "01J00000000000000000000009";
 const CLOUDFLARE_BACKUP_ID = "550e8400-e29b-41d4-a716-446655440000";
 const STORED_BACKUP_ID = encodeSandboxBackupIdForStorage(CLOUDFLARE_BACKUP_ID);
 const RUNTIME_SUBJECT_QUOTA_SCOPE = {
   agentId: AGENT_ID,
-  appId: APP_ID,
+  projectId: PROJECT_ID,
   executionOwnerUserId: ACCOUNT_ID,
 } as const;
 
@@ -42,7 +42,7 @@ function createRuntimeSubjectLifecycleDatabase(): SqliteD1Database {
   database.execute(`
     CREATE TABLE sandbox (
       agent_id text,
-      app_id text,
+      project_id text,
       bind_mount_ready integer DEFAULT false NOT NULL,
       claim_expires_at integer,
       claim_owner text,
@@ -324,7 +324,7 @@ describe("runtime subject lifecycle machine", () => {
 
       return {
         agentId: AGENT_ID,
-        appId: APP_ID,
+        projectId: PROJECT_ID,
         executionOwnerUserId: ACCOUNT_ID,
         kind: "cattle",
         networkConstraints: { allowedHosts: [], networkPolicy: "full" },
@@ -357,7 +357,7 @@ describe("runtime subject lifecycle machine", () => {
       lifecycle.activate({
         ...inputs[0],
         agentId: createPlatformId(),
-        appId: createPlatformId(),
+        projectId: createPlatformId(),
         runtimeSubjectId: createPlatformId<SandboxId>(),
         subjectId: createPlatformId<SessionId>(),
       }),

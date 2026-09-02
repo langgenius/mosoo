@@ -8,7 +8,7 @@ import type {
   AgentId,
   DriverInstanceId,
   OrganizationId,
-  AppId,
+  ProjectId,
   SessionId,
   SessionRunId,
 } from "@mosoo/id";
@@ -24,7 +24,7 @@ const ORGANIZATION_ID = parsePlatformId<OrganizationId>(
   "01J00000000000000000000004",
   "organization ID",
 );
-const APP_ID = parsePlatformId<AppId>("01J00000000000000000000008", "app ID");
+const PROJECT_ID = parsePlatformId<ProjectId>("01J00000000000000000000008", "project ID");
 const SESSION_ID = parsePlatformId<SessionId>("01J00000000000000000000005", "session ID");
 const SESSION_RUN_ID = parsePlatformId<SessionRunId>(
   "01J00000000000000000000006",
@@ -44,7 +44,7 @@ interface UsageEventProjection {
   output_tokens: number;
   price_snapshot_json: string | null;
   pricing_status: string;
-  app_id: string;
+  project_id: string;
   provider: string;
   run_purpose: string;
   runtime_id: string | null;
@@ -69,7 +69,7 @@ function createUsageEventDatabase(): SqliteD1Database {
       input_tokens integer NOT NULL,
       model text NOT NULL,
       organization_id text NOT NULL,
-      app_id text NOT NULL,
+      project_id text NOT NULL,
       output_tokens integer NOT NULL,
       price_snapshot_json text,
       pricing_status text NOT NULL,
@@ -105,7 +105,7 @@ const RUN_CONTEXT: RuntimeUsageRunContext = {
   createdAtMs: Date.UTC(2026, 5, 1, 12),
   model: "run-model",
   organizationId: ORGANIZATION_ID,
-  appId: APP_ID,
+  projectId: PROJECT_ID,
   provider: "run-provider",
   runtimeId: "custom-runtime",
   sessionId: SESSION_ID,
@@ -149,7 +149,7 @@ describe("cost usage event", () => {
             output_tokens,
             price_snapshot_json,
             pricing_status,
-            app_id,
+            project_id,
             provider,
             run_purpose,
             runtime_id,
@@ -169,7 +169,7 @@ describe("cost usage event", () => {
       output_tokens: 4,
       price_snapshot_json: null,
       pricing_status: "unknown",
-      app_id: APP_ID,
+      project_id: PROJECT_ID,
       provider: "run-provider",
       run_purpose: "debug",
       runtime_id: "custom-runtime",

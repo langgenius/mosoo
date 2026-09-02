@@ -119,13 +119,13 @@ export const costSchema = /* GraphQL */ `
     totals: CostTotals!
   }
 
-  type AppCostCard {
+  type ProjectCostCard {
     agents: [CostAgentRow!]!
     daily: [CostDailyPoint!]!
     models: [CostModelRow!]!
     previousTotals: CostTotals!
-    appId: ULID!
-    appName: String!
+    projectId: ULID!
+    projectName: String!
     recentSessions: [CostRecentSession!]!
     totals: CostTotals!
   }

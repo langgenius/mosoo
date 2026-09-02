@@ -1,11 +1,11 @@
 import type { SessionLiveState } from "@mosoo/ag-ui-session";
-import type { AccountId, AppId, SessionId } from "@mosoo/id";
+import type { AccountId, ProjectId, SessionId } from "@mosoo/id";
 
 import { createErrorLogContext, logWarn } from "../../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { currentTimestampMs } from "../../../../time";
 import type { AuthenticatedViewer } from "../../../auth/application/viewer-auth.service";
-import { getActiveAppSessionParticipantAccess } from "../../domain/session-access.policy";
+import { getActiveProjectSessionParticipantAccess } from "../../domain/session-access.policy";
 import type { PermissionStateUpdateResult } from "./viewer-permissions";
 import { rejectDisconnectedViewerPermissionRequests } from "./viewer-permissions";
 import type { ViewerSocketAttachment } from "./viewer-socket";
@@ -23,7 +23,7 @@ export interface ViewerPermissionCleanupStorage {
 
 interface PendingViewerPermissionCleanup {
   publicOrigin: string;
-  appId: AppId;
+  projectId: ProjectId;
   scheduledAtMs: number;
   sessionId: SessionId;
   viewer: AuthenticatedViewer;
@@ -37,20 +37,20 @@ type EnsureSessionActive = (
   database: D1Database,
   viewerId: AccountId,
   input: {
-    appId: AppId;
+    projectId: ProjectId;
     sessionId: SessionId;
   },
 ) => Promise<void>;
 
-async function ensureActiveAppSessionParticipantAccess(
+async function ensureActiveProjectSessionParticipantAccess(
   database: D1Database,
   viewerId: AccountId,
   input: {
-    appId: AppId;
+    projectId: ProjectId;
     sessionId: SessionId;
   },
 ): Promise<void> {
-  await getActiveAppSessionParticipantAccess(database, viewerId, input);
+  await getActiveProjectSessionParticipantAccess(database, viewerId, input);
 }
 
 export async function clearViewerPermissionCleanupAlarm(input: {
@@ -68,7 +68,7 @@ export async function scheduleViewerPermissionCleanupAlarm(input: {
   const nowMs = input.nowMs?.() ?? currentTimestampMs();
   const pending: PendingViewerPermissionCleanup = {
     publicOrigin: input.attachment.publicOrigin,
-    appId: input.attachment.appId,
+    projectId: input.attachment.projectId,
     scheduledAtMs: nowMs,
     sessionId: input.attachment.sessionId,
     viewer: input.attachment.viewer,
@@ -81,7 +81,7 @@ export async function scheduleViewerPermissionCleanupAlarm(input: {
 function toViewerSocketAttachment(pending: PendingViewerPermissionCleanup): ViewerSocketAttachment {
   return {
     publicOrigin: pending.publicOrigin,
-    appId: pending.appId,
+    projectId: pending.projectId,
     role: "viewer",
     sessionId: pending.sessionId,
     viewer: pending.viewer,
@@ -112,11 +112,12 @@ export async function runViewerPermissionCleanupAlarm(input: {
     return;
   }
 
-  const ensureSessionActive = input.ensureSessionActive ?? ensureActiveAppSessionParticipantAccess;
+  const ensureSessionActive =
+    input.ensureSessionActive ?? ensureActiveProjectSessionParticipantAccess;
 
   try {
     await ensureSessionActive(input.env.DB, pending.viewer.id, {
-      appId: pending.appId,
+      projectId: pending.projectId,
       sessionId: pending.sessionId,
     });
   } catch (error) {

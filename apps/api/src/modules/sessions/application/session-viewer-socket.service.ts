@@ -1,15 +1,15 @@
 import type { SessionType } from "@mosoo/contracts/session";
 import { parsePlatformId } from "@mosoo/id";
-import type { AppId, SessionId } from "@mosoo/id";
+import type { ProjectId, SessionId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import { getActiveAppSessionParticipantAccess } from "../domain/session-access.policy";
+import { getActiveProjectSessionParticipantAccess } from "../domain/session-access.policy";
 import { connectSessionViewerWebSocket } from "../infrastructure/session/client";
 
 interface ActiveViewerSocketSession {
   id: SessionId;
-  appId: AppId;
+  projectId: ProjectId;
   type: SessionType;
 }
 
@@ -19,7 +19,7 @@ export interface SessionViewerSocketRuntimePrewarmRequest {
   requestUrl: string;
   session: {
     id: SessionId;
-    appId: AppId;
+    projectId: ProjectId;
   };
   viewer: AuthenticatedViewer;
 }
@@ -32,7 +32,7 @@ export type SessionViewerSocketConnector = (
   bindings: ApiBindings,
   input: {
     request: Request;
-    appId: AppId;
+    projectId: ProjectId;
     sessionId: SessionId;
     viewer: AuthenticatedViewer;
   },
@@ -93,7 +93,7 @@ function schedulePreviewRuntimePrewarmForViewerSocket(input: {
     requestUrl: input.requestUrl,
     session: {
       id: input.session.id,
-      appId: input.session.appId,
+      projectId: input.session.projectId,
     },
     viewer: input.viewer,
   });
@@ -103,7 +103,7 @@ export async function connectAuthenticatedSessionViewerWebSocket(
   bindings: ApiBindings,
   input: {
     executionContext?: Pick<ExecutionContext, "waitUntil"> | null;
-    appId: string;
+    projectId: string;
     request: Request;
     runtimePrewarmScheduler?: SessionViewerSocketRuntimePrewarmScheduler | null;
     sessionViewerSocketConnector?: SessionViewerSocketConnector | null;
@@ -112,17 +112,17 @@ export async function connectAuthenticatedSessionViewerWebSocket(
   },
 ): Promise<Response> {
   const sessionId = parsePlatformId<SessionId>(input.sessionId, "Session viewer socket session ID");
-  const appId = parsePlatformId<AppId>(input.appId, "Session viewer socket app ID");
+  const projectId = parsePlatformId<ProjectId>(input.projectId, "Session viewer socket project ID");
   const viewer = input.viewer;
   const viewerId = viewer.id;
-  const access = await getActiveAppSessionParticipantAccess(bindings.DB, viewerId, {
-    appId,
+  const access = await getActiveProjectSessionParticipantAccess(bindings.DB, viewerId, {
+    projectId,
     sessionId,
   });
   const sessionViewerSocketConnector =
     input.sessionViewerSocketConnector ?? connectSessionViewerWebSocket;
   const response = await sessionViewerSocketConnector(bindings, {
-    appId,
+    projectId,
     request: input.request,
     sessionId,
     viewer,
@@ -136,7 +136,7 @@ export async function connectAuthenticatedSessionViewerWebSocket(
     runtimePrewarmScheduler: input.runtimePrewarmScheduler ?? null,
     session: {
       id: sessionId,
-      appId: access.app_id,
+      projectId: access.project_id,
       type: access.type,
     },
     viewer,

@@ -5,10 +5,10 @@ import { getViewerFromRequest } from "../../../modules/auth/application/viewer-a
 import { connectAuthenticatedSessionViewerWebSocket } from "../../../modules/sessions/application/session-viewer-socket.service";
 import type { ApiGatewayEnvironment } from "../../../platform/cloudflare/worker-types";
 
-export function registerRootRoute(app: Hono<ApiGatewayEnvironment>) {
-  app.get("/", (c) => c.redirect(`${PUBLIC_API_PREFIX}/graphql`));
+export function registerRootRoute(project: Hono<ApiGatewayEnvironment>) {
+  project.get("/", (c) => c.redirect(`${PUBLIC_API_PREFIX}/graphql`));
 
-  app.get(`${PUBLIC_API_PREFIX}/ag-ui/session/:sessionId/ws`, async (c) => {
+  project.get(`${PUBLIC_API_PREFIX}/ag-ui/session/:sessionId/ws`, async (c) => {
     const viewer = await getViewerFromRequest(c.env, c.req.raw);
 
     if (!viewer) {
@@ -20,13 +20,13 @@ export function registerRootRoute(app: Hono<ApiGatewayEnvironment>) {
       );
     }
 
-    const appId = c.req.query("appId");
+    const projectId = c.req.query("projectId");
     const sessionId = c.req.param("sessionId");
 
     try {
       return await connectAuthenticatedSessionViewerWebSocket(c.env, {
         executionContext: c.executionCtx,
-        appId: appId ?? "",
+        projectId: projectId ?? "",
         request: c.req.raw,
         sessionId,
         viewer,

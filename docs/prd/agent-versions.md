@@ -4,18 +4,18 @@ Status: Available as read-only history. Restoring an earlier version is not ship
 
 ## Why it matters
 
-Publishing an Agent can change how it behaves for people using the App. An App Owner needs to
+Publishing an Agent can change how it behaves for people using the Project. A Project Owner needs to
 know which configuration is live, recognize what changed, and understand whether an existing
 session is affected. Version history provides that context without interrupting active work.
 
 ## Who uses it
 
-This surface is for the App Owner who configures and publishes an Agent. App Users do not manage
+This surface is for the Project Owner who configures and publishes an Agent. Project Users do not manage
 Agent versions or need to understand them.
 
 ## Current user flow
 
-1. Open an Agent from the App and select its draft or live-version badge.
+1. Open an Agent from the Project and select its draft or live-version badge.
 2. Review the Versions sheet, ordered from newest to oldest.
 3. Identify the live version and scan each entry's change summary, runtime, model, and publish
    time.
@@ -29,5 +29,5 @@ cannot open a complete historical configuration, compare two versions, see who p
 restore an earlier version from this surface.
 
 Agent version history covers published Agent configuration. It is not a session log or a backup
-of runtime files, Agent state, or App data. Those records and assets are not changed by viewing
+of runtime files, Agent state, or Project data. Those records and assets are not changed by viewing
 version history.

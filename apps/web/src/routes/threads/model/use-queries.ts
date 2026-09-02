@@ -8,7 +8,7 @@ import { getThreadSessionMessages } from "@/domains/session/api/agent-session";
 import { retrieveThreadAgentSession } from "@/domains/session/api/agent-session-retrieve";
 import { archivedThreadSessions, threadSessions } from "@/domains/session/api/list";
 import { getSessionProcessEvents } from "@/domains/session/api/thread-projections";
-import { toAppId, toSessionId } from "@/routes/typed-id";
+import { toProjectId, toSessionId } from "@/routes/typed-id";
 
 import { threadKeys } from "./query-keys";
 import {
@@ -22,39 +22,39 @@ import {
 import type { ThreadFilter, ThreadListItem, ThreadSection, ThreadUiSnapshot } from "./thread";
 
 export function useThreadQueries({
-  activeAppId,
+  activeProjectId,
   activeThreadId,
   filter,
   ui,
 }: {
-  activeAppId: string | null;
+  activeProjectId: string | null;
   activeThreadId: string | null;
   filter: ThreadFilter;
   ui: ThreadUiSnapshot;
 }) {
-  const agentsQuery = useVisibleAgentsQuery(activeAppId);
+  const agentsQuery = useVisibleAgentsQuery(activeProjectId);
   const activeSessionsQuery = useQuery({
-    enabled: activeAppId !== null,
+    enabled: activeProjectId !== null,
     queryFn: async () => {
-      if (activeAppId === null) {
-        throw new Error("App id is required to list threads.");
+      if (activeProjectId === null) {
+        throw new Error("Project id is required to list threads.");
       }
 
-      return threadSessions(toAppId(activeAppId), "ui");
+      return threadSessions(toProjectId(activeProjectId), "ui");
     },
-    queryKey: threadKeys.list(activeAppId),
+    queryKey: threadKeys.list(activeProjectId),
     refetchInterval: 10_000,
   });
   const archivedSessionsQuery = useQuery({
-    enabled: activeAppId !== null,
+    enabled: activeProjectId !== null,
     queryFn: async () => {
-      if (activeAppId === null) {
-        throw new Error("App id is required to list archived threads.");
+      if (activeProjectId === null) {
+        throw new Error("Project id is required to list archived threads.");
       }
 
-      return archivedThreadSessions(toAppId(activeAppId), "ui");
+      return archivedThreadSessions(toProjectId(activeProjectId), "ui");
     },
-    queryKey: threadKeys.archivedList(activeAppId),
+    queryKey: threadKeys.archivedList(activeProjectId),
     refetchInterval: 10_000,
   });
   const agentsById = useMemo(
@@ -90,7 +90,10 @@ export function useThreadQueries({
         throw new Error("Thread id is required to load messages.");
       }
 
-      return getThreadSessionMessages(selectedThread.session.appId, toSessionId(selectedThread.id));
+      return getThreadSessionMessages(
+        selectedThread.session.projectId,
+        toSessionId(selectedThread.id),
+      );
     },
     queryKey: threadKeys.detailMessages(activeThreadId),
     refetchInterval:
@@ -103,7 +106,10 @@ export function useThreadQueries({
         throw new Error("Thread id is required to load process events.");
       }
 
-      return getSessionProcessEvents(selectedThread.session.appId, toSessionId(selectedThread.id));
+      return getSessionProcessEvents(
+        selectedThread.session.projectId,
+        toSessionId(selectedThread.id),
+      );
     },
     queryKey: threadKeys.processEvents(activeThreadId),
     refetchInterval:
@@ -117,7 +123,7 @@ export function useThreadQueries({
       }
 
       return listFiles({
-        appId: selectedThread.session.appId,
+        projectId: selectedThread.session.projectId,
         sessionId: toSessionId(selectedThread.id),
         sessionKind: "artifact",
       });
@@ -126,7 +132,7 @@ export function useThreadQueries({
       selectedThread === null
         ? [...fileKeys.lists(), "thread-artifacts", "missing"]
         : fileKeys.list({
-            appId: selectedThread.session.appId,
+            projectId: selectedThread.session.projectId,
             sessionId: toSessionId(selectedThread.id),
             sessionKind: "artifact",
           }),
@@ -141,7 +147,7 @@ export function useThreadQueries({
       }
 
       return retrieveThreadAgentSession({
-        appId: selectedThread.session.appId,
+        projectId: selectedThread.session.projectId,
         sessionId: toSessionId(selectedThread.id),
       });
     },

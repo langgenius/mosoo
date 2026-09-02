@@ -22,7 +22,7 @@ import { registerRootRoute } from "./routes/root-route";
 import { registerSkillRoute } from "./routes/skill-route";
 
 export function createHttpApp() {
-  const app = new Hono<ApiGatewayEnvironment>();
+  const project = new Hono<ApiGatewayEnvironment>();
   const publicApi = new Hono<ApiGatewayEnvironment>();
   const graphQLCorsMiddleware = cors({
     allowHeaders: ["Content-Type"],
@@ -30,11 +30,11 @@ export function createHttpApp() {
     origin: (_origin, c) => c.env.WEB_ORIGIN,
   });
 
-  app.use("*", requestLoggingMiddleware());
+  project.use("*", requestLoggingMiddleware());
   publicApi.use("/graphql", graphQLCorsMiddleware);
 
-  registerDriverRoute(app);
-  registerRootRoute(app);
+  registerDriverRoute(project);
+  registerRootRoute(project);
   registerHealthRoute(publicApi);
   registerAccessTokenRoute(publicApi);
   registerAuthRoute(publicApi);
@@ -44,9 +44,9 @@ export function createHttpApp() {
   registerPublicApiRoute(publicApi);
   registerSkillRoute(publicApi);
   registerGraphQLRoute(publicApi);
-  app.route(PUBLIC_API_PREFIX, publicApi);
+  project.route(PUBLIC_API_PREFIX, publicApi);
 
-  app.notFound((c) =>
+  project.notFound((c) =>
     c.json(
       {
         error: "Not Found",
@@ -55,7 +55,7 @@ export function createHttpApp() {
     ),
   );
 
-  app.onError((error, c) => {
+  project.onError((error, c) => {
     const url = new URL(c.req.url);
 
     logError("request.failed", {
@@ -72,5 +72,5 @@ export function createHttpApp() {
     );
   });
 
-  return app;
+  return project;
 }

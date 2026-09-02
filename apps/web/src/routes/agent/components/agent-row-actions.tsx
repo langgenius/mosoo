@@ -6,7 +6,7 @@ import { useNavigate } from "react-router-dom";
 
 import { createAgentFork, deleteAgent, getAgentManifest } from "@/domains/agent/api/agent-client";
 import { agentKeys } from "@/domains/agent/query/agent-queries";
-import { toAgentId, toAppId } from "@/routes/typed-id";
+import { toAgentId, toProjectId } from "@/routes/typed-id";
 import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import {
@@ -65,26 +65,26 @@ export function AgentRowActions({ agent }: { agent: Agent }): ReactElement {
   const isEditor = agent.role === "owner";
   const canDelete = agent.role === "owner";
   const typedAgentId = toAgentId(agent.id);
-  const typedAppId = toAppId(agent.appId);
+  const typedProjectId = toProjectId(agent.projectId);
 
   const forkMutation = useMutation({
     mutationFn: createAgentFork,
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: agentKeys.list(agent.appId) });
+      await queryClient.invalidateQueries({ queryKey: agentKeys.list(agent.projectId) });
     },
   });
   const exportMutation = useMutation({
-    mutationFn: async () => getAgentManifest(typedAppId, typedAgentId),
+    mutationFn: async () => getAgentManifest(typedProjectId, typedAgentId),
     onSuccess: async () => {
       await queryClient.invalidateQueries({
-        queryKey: agentKeys.manifest(agent.appId, agent.id),
+        queryKey: agentKeys.manifest(agent.projectId, agent.id),
       });
     },
   });
   const deleteMutation = useMutation({
     mutationFn: deleteAgent,
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: agentKeys.list(agent.appId) });
+      await queryClient.invalidateQueries({ queryKey: agentKeys.list(agent.projectId) });
     },
   });
 
@@ -101,7 +101,7 @@ export function AgentRowActions({ agent }: { agent: Agent }): ReactElement {
       setActionError(null);
       const result = await forkMutation.mutateAsync({
         agentId: typedAgentId,
-        appId: typedAppId,
+        projectId: typedProjectId,
       });
 
       void navigate(`${getBasePath()}/${result.agent.id}`);
@@ -125,7 +125,7 @@ export function AgentRowActions({ agent }: { agent: Agent }): ReactElement {
   }
 
   async function handleConfirmDelete(): Promise<void> {
-    await deleteMutation.mutateAsync({ agentId: typedAgentId, appId: typedAppId });
+    await deleteMutation.mutateAsync({ agentId: typedAgentId, projectId: typedProjectId });
     setConfirmDelete(false);
   }
 

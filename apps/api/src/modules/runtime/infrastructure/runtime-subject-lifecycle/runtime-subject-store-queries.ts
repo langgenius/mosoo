@@ -65,8 +65,11 @@ export function mapReadyRuntimeSubjectBackup(input: {
   };
 }
 
-export function activeConversationSessionQuery(appDb: AppDatabase, runtimeSubjectId: SandboxId) {
-  return appDb
+export function activeConversationSessionQuery(
+  projectDb: AppDatabase,
+  runtimeSubjectId: SandboxId,
+) {
+  return projectDb
     .select({ id: activeConversationSessionsTable.sessionId })
     .from(activeConversationSessionsTable)
     .where(
@@ -77,8 +80,8 @@ export function activeConversationSessionQuery(appDb: AppDatabase, runtimeSubjec
     );
 }
 
-export function activeConversationSessionQueryForListedSubject(appDb: AppDatabase) {
-  return appDb
+export function activeConversationSessionQueryForListedSubject(projectDb: AppDatabase) {
+  return projectDb
     .select({ id: activeConversationSessionsTable.sessionId })
     .from(activeConversationSessionsTable)
     .where(
@@ -89,8 +92,8 @@ export function activeConversationSessionQueryForListedSubject(appDb: AppDatabas
     );
 }
 
-export function activeSessionRunQueryForListedSubject(appDb: AppDatabase) {
-  return appDb
+export function activeSessionRunQueryForListedSubject(projectDb: AppDatabase) {
+  return projectDb
     .select({ id: activeRuntimeSubjectRunsTable.id })
     .from(activeRuntimeSubjectRunsTable)
     .where(
@@ -110,8 +113,8 @@ export function activeSessionRunQueryForListedSubject(appDb: AppDatabase) {
     );
 }
 
-export function liveDriverInstanceQueryForListedSubject(appDb: AppDatabase) {
-  return appDb
+export function liveDriverInstanceQueryForListedSubject(projectDb: AppDatabase) {
+  return projectDb
     .select({ id: liveSubjectDriversTable.id })
     .from(liveSubjectDriversTable)
     .where(
@@ -122,8 +125,8 @@ export function liveDriverInstanceQueryForListedSubject(appDb: AppDatabase) {
     );
 }
 
-export function runLeaseQuery(appDb: AppDatabase, runtimeSubjectId: SandboxId) {
-  return appDb
+export function runLeaseQuery(projectDb: AppDatabase, runtimeSubjectId: SandboxId) {
+  return projectDb
     .select({ id: runLeaseRunsTable.id })
     .from(runLeaseRunsTable)
     .innerJoin(
@@ -138,8 +141,8 @@ export function runLeaseQuery(appDb: AppDatabase, runtimeSubjectId: SandboxId) {
     );
 }
 
-export function runLeaseQueryForListedSubject(appDb: AppDatabase) {
-  return appDb
+export function runLeaseQueryForListedSubject(projectDb: AppDatabase) {
+  return projectDb
     .select({ id: runLeaseRunsTable.id })
     .from(runLeaseRunsTable)
     .innerJoin(

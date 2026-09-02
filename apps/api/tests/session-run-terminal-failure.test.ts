@@ -22,7 +22,7 @@ const CANONICAL_FAILURE_SOURCE_ID = `session-run-terminal:${RUN_ID}:run.failed`;
 const DRIVER_ERROR = {
   code: "driver.command_failed",
   details: {},
-  message: "OpenAi app-server exited with code 1.",
+  message: "OpenAi project-server exited with code 1.",
   retryable: false,
 } as const;
 const PROVISION_ERROR = {

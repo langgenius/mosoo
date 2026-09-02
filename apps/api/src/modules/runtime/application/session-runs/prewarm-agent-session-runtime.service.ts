@@ -1,4 +1,4 @@
-import type { AppId, SessionId } from "@mosoo/id";
+import type { ProjectId, SessionId } from "@mosoo/id";
 
 import { logError, logInfo } from "../../../../platform/cloudflare/logger";
 import { disposeRpcResource } from "../../../../platform/cloudflare/rpc-disposal";
@@ -25,7 +25,7 @@ interface AgentSessionRuntimePrewarmRequest {
   requestUrl: string;
   session: {
     id: SessionId;
-    appId: AppId;
+    projectId: ProjectId;
   };
   viewer: AuthenticatedViewer;
 }
@@ -62,7 +62,7 @@ export async function prewarmAgentSessionRuntime(
     const hydrated = await timing.measure("hydrateRunContext", () =>
       hydrateCachedRunContextFromSession(bindings, viewer, {
         id: session.id,
-        appId: session.appId,
+        projectId: session.projectId,
         ...(accessViewer ? { accessViewer } : {}),
       }),
     );
@@ -86,7 +86,7 @@ export async function prewarmAgentSessionRuntime(
           subjectKind: hydrated.value.profile.sandbox.subjectKind,
         }),
         runtimeSubjectId: sandboxId,
-        appId: session.appId,
+        projectId: session.projectId,
         purpose: "prewarm",
         subjectId: hydrated.value.profile.sandbox.subjectId,
         subjectKind: hydrated.value.profile.sandbox.subjectKind,

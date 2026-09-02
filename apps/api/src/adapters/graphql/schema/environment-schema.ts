@@ -68,7 +68,7 @@ export const environmentSchema = /* GraphQL */ `
     setupScript: String!
     updatedAt: String!
     usedByAgentCount: Int!
-    appId: ULID!
+    projectId: ULID!
   }
 
   type EnvironmentDetail {
@@ -94,7 +94,7 @@ export const environmentSchema = /* GraphQL */ `
     setupScript: String!
     updatedAt: String!
     usedByAgentCount: Int!
-    appId: ULID!
+    projectId: ULID!
   }
 
   input EnvironmentPackageSpecInput {
@@ -115,7 +115,7 @@ export const environmentSchema = /* GraphQL */ `
     envVars: [EnvironmentVariableInput!]!
     name: String!
     networkPolicy: EnvironmentNetworkPolicy!
-    appId: ULID!
+    projectId: ULID!
     packages: [EnvironmentPackageSpecInput!]!
     setupScript: String!
   }
@@ -130,29 +130,29 @@ export const environmentSchema = /* GraphQL */ `
     name: String!
     networkPolicy: EnvironmentNetworkPolicy!
     packages: [EnvironmentPackageSpecInput!]!
-    appId: ULID!
+    projectId: ULID!
     setupScript: String!
   }
 
   input CreateEnvironmentForkInput {
     environmentId: ULID!
-    appId: ULID!
+    projectId: ULID!
   }
 
   input DeleteEnvironmentInput {
     environmentId: ULID!
-    appId: ULID!
+    projectId: ULID!
   }
 
-  input SetAppDefaultEnvironmentInput {
+  input SetProjectDefaultEnvironmentInput {
     environmentId: ULID!
-    appId: ULID!
+    projectId: ULID!
   }
 
   input SetEnvironmentVariableValueInput {
     environmentId: ULID!
     key: String!
-    appId: ULID!
+    projectId: ULID!
     value: String!
   }
 `;

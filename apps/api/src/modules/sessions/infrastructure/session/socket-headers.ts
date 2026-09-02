@@ -1,5 +1,5 @@
 import { parsePlatformId } from "@mosoo/id";
-import type { AccountId, AppId, SessionId } from "@mosoo/id";
+import type { AccountId, ProjectId, SessionId } from "@mosoo/id";
 
 import { isTruthy } from "../../../../shared/truthiness";
 import type { AuthenticatedViewer } from "../../../auth/application/viewer-auth.service";
@@ -10,12 +10,12 @@ const VIEWER_ID_HEADER = "x-viewer-id";
 const VIEWER_IMAGE_URL_HEADER = "x-viewer-image-url";
 const VIEWER_NAME_HEADER = "x-viewer-name";
 const VIEWER_ORIGIN_HEADER = "x-viewer-origin";
-const VIEWER_APP_ID_HEADER = "x-viewer-app-id";
+const VIEWER_PROJECT_ID_HEADER = "x-viewer-project-id";
 const VIEWER_SESSION_ID_HEADER = "x-viewer-session-id";
 
 export interface SessionViewerSocketContext {
   publicOrigin: string;
-  appId: AppId;
+  projectId: ProjectId;
   sessionId: SessionId;
   viewer: AuthenticatedViewer;
 }
@@ -31,17 +31,22 @@ export function writeSessionViewerSocketHeaders(
   headers.set(VIEWER_IMAGE_URL_HEADER, encodeURIComponent(input.viewer.imageUrl ?? ""));
   headers.set(VIEWER_NAME_HEADER, encodeURIComponent(input.viewer.name));
   headers.set(VIEWER_ORIGIN_HEADER, input.publicOrigin);
-  headers.set(VIEWER_APP_ID_HEADER, input.appId);
+  headers.set(VIEWER_PROJECT_ID_HEADER, input.projectId);
   headers.set(VIEWER_SESSION_ID_HEADER, input.sessionId);
 }
 
 export function readSessionViewerSocketHeaders(headers: Headers): SessionViewerSocketContext {
   const viewerId = headers.get(VIEWER_ID_HEADER);
-  const appId = headers.get(VIEWER_APP_ID_HEADER);
+  const projectId = headers.get(VIEWER_PROJECT_ID_HEADER);
   const sessionId = headers.get(VIEWER_SESSION_ID_HEADER);
   const publicOrigin = headers.get(VIEWER_ORIGIN_HEADER);
 
-  if (!isTruthy(viewerId) || !isTruthy(appId) || !isTruthy(sessionId) || !isTruthy(publicOrigin)) {
+  if (
+    !isTruthy(viewerId) ||
+    !isTruthy(projectId) ||
+    !isTruthy(sessionId) ||
+    !isTruthy(publicOrigin)
+  ) {
     throw new Error("Viewer websocket headers are incomplete.");
   }
 
@@ -49,7 +54,7 @@ export function readSessionViewerSocketHeaders(headers: Headers): SessionViewerS
 
   return {
     publicOrigin,
-    appId: parsePlatformId<AppId>(appId, "Viewer socket app ID"),
+    projectId: parsePlatformId<ProjectId>(projectId, "Viewer socket project ID"),
     sessionId: parsePlatformId<SessionId>(sessionId, "Viewer socket session ID"),
     viewer: {
       email: decodeURIComponent(headers.get(VIEWER_EMAIL_HEADER) ?? ""),

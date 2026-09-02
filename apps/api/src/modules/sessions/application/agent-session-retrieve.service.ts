@@ -10,7 +10,7 @@ import type {
 } from "@mosoo/contracts/session";
 import { getAgentSessionUserLifecycleProjection } from "@mosoo/contracts/session";
 import { nativeResumeRefsTable } from "@mosoo/db";
-import type { AppId, SessionId } from "@mosoo/id";
+import type { ProjectId, SessionId } from "@mosoo/id";
 import { getAgentSessionActionCapabilities } from "@mosoo/session-policy";
 import { eq } from "drizzle-orm";
 
@@ -25,7 +25,7 @@ import {
 } from "./session-summary-query.service";
 
 interface AgentSessionLookupInput {
-  appId: AppId;
+  projectId: ProjectId;
   sessionId: SessionId;
 }
 

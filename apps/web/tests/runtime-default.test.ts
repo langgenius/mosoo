@@ -11,7 +11,7 @@ function credential(vendorId: string, models: readonly string[] | null = null): 
     maskedApiKey: "sk-***",
     models,
     name: "Default",
-    appId: "01J00000000000000000000009",
+    projectId: "01J00000000000000000000009",
     vendorId,
   };
 }

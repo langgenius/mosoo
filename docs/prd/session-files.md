@@ -43,7 +43,7 @@ The new-Thread composer and Agent session chat support attachments. The main
 Thread detail reply composer does not yet support them. The Files page has no
 create, rename, move, delete, or shared-library controls.
 
-Access follows the App and Thread: knowing a file identifier does not grant
+Access follows the Project and Thread: knowing a file identifier does not grant
 access or enable cross-Thread sharing. Deleting a file through an authorized
 integration, or deleting its Thread, is permanent from the user's perspective;
 there is no trash or restore flow. This is not a certified secure-erasure

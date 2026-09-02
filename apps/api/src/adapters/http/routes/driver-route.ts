@@ -476,7 +476,7 @@ async function proxyRuntimeMcpRequest(
   });
 }
 
-export function registerDriverRoute(app: Hono<ApiGatewayEnvironment>) {
+export function registerDriverRoute(project: Hono<ApiGatewayEnvironment>) {
   const driver = new Hono<ApiGatewayEnvironment>();
 
   driver.get("/socket", async (c) => {
@@ -760,7 +760,7 @@ export function registerDriverRoute(app: Hono<ApiGatewayEnvironment>) {
     try {
       target = await resolveRuntimeLlmProxyTarget(c.env, {
         credentialId,
-        appId: grant.appId,
+        projectId: grant.projectId,
       });
     } catch (error) {
       if (error instanceof RuntimeLlmProxyError) {
@@ -859,5 +859,5 @@ export function registerDriverRoute(app: Hono<ApiGatewayEnvironment>) {
     }
   });
 
-  app.route(getRuntimeDriverRoutePrefix(), driver);
+  project.route(getRuntimeDriverRoutePrefix(), driver);
 }

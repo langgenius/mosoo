@@ -1,11 +1,11 @@
 import type { AgentSkillReference } from "@mosoo/contracts/agent";
 import { accountsTable, agentsTable, agentSkillsTable, skillsTable } from "@mosoo/db";
-import type { AgentId, AppId, SkillId } from "@mosoo/id";
+import type { AgentId, ProjectId, SkillId } from "@mosoo/id";
 import { and, eq, inArray, sql } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
-import { ensureAppOwnership } from "../../apps/application/app.service";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
+import { ensureProjectOwnership } from "../../projects/application/project.service";
 import { readSkillId } from "./agent-platform-ids";
 
 export function normalizeAgentSkillIds(skillIds: readonly SkillId[]): SkillId[] {
@@ -15,7 +15,7 @@ export function normalizeAgentSkillIds(skillIds: readonly SkillId[]): SkillId[] 
 export async function ensureAgentSkillSelectionAccess(
   database: D1Database,
   viewer: AuthenticatedViewer,
-  appId: AppId,
+  projectId: ProjectId,
   skillIds: readonly SkillId[],
 ): Promise<void> {
   const uniqueSkillIds = normalizeAgentSkillIds(skillIds);
@@ -24,12 +24,12 @@ export async function ensureAgentSkillSelectionAccess(
     return;
   }
 
-  await ensureAppOwnership(database, viewer.id, appId);
+  await ensureProjectOwnership(database, viewer.id, projectId);
 
   const rows = await getAppDatabase(database)
     .select({
       ownerId: skillsTable.ownerAccountId,
-      appId: skillsTable.appId,
+      projectId: skillsTable.projectId,
       skillId: skillsTable.id,
     })
     .from(skillsTable)
@@ -40,7 +40,7 @@ export async function ensureAgentSkillSelectionAccess(
   for (const skillId of uniqueSkillIds) {
     const row = rowsBySkillId.get(skillId);
 
-    if (row === undefined || row.appId !== appId || row.ownerId !== viewer.id) {
+    if (row === undefined || row.projectId !== projectId || row.ownerId !== viewer.id) {
       throw new Error("Skill not found.");
     }
   }
@@ -74,7 +74,7 @@ async function listResolvedAgentSkillsByAgentIds(
       hasAccess: sql<number>`
         CASE
           WHEN ${skillsTable.id} IS NULL THEN 0
-          WHEN ${skillsTable.appId} = ${agentsTable.appId}
+          WHEN ${skillsTable.projectId} = ${agentsTable.projectId}
             AND ${skillsTable.ownerAccountId} = ${viewer.id}
           THEN 1
           ELSE 0

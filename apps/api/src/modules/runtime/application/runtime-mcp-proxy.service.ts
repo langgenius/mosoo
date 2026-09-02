@@ -40,7 +40,7 @@ async function createDelegationToken(
     .get();
   if (!row) return null;
   if (row.endUserId === null) return null;
-  if (link.agentId === null || link.appId === null) {
+  if (link.agentId === null || link.projectId === null) {
     throw createRuntimeMcpProxyError({
       code: "mcp_proxy_forbidden",
       message: "MCP end-user delegation context is unavailable.",
@@ -52,7 +52,7 @@ async function createDelegationToken(
     audience: input.url,
     claims: {
       agentId: link.agentId,
-      appId: link.appId,
+      projectId: link.projectId,
       endUserId: row.endUserId,
       runId: link.sessionRunId,
       threadId: link.sessionId,
@@ -125,10 +125,10 @@ export async function resolveRuntimeMcpProxyTarget(
     });
   }
 
-  if (server.appId !== grant.appId || credential.appId !== grant.appId) {
+  if (server.projectId !== grant.projectId || credential.projectId !== grant.projectId) {
     throw createRuntimeMcpProxyError({
       code: "mcp_proxy_forbidden",
-      message: "MCP proxy grant is not allowed for this app.",
+      message: "MCP proxy grant is not allowed for this project.",
       status: 403,
     });
   }
@@ -154,7 +154,7 @@ export async function resolveRuntimeMcpProxyTarget(
   const accessToken = await readMcpCredentialSecret(bindings, {
     credential,
     purpose: "runtime_access_token",
-    appId: grant.appId,
+    projectId: grant.projectId,
     server,
   });
 

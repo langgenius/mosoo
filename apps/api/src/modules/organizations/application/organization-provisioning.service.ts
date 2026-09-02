@@ -1,13 +1,13 @@
 import type { OrganizationSummary } from "@mosoo/contracts/organization";
-import { organizationsTable, appsTable } from "@mosoo/db";
+import { organizationsTable, projectsTable } from "@mosoo/db";
 import { createPlatformId } from "@mosoo/id";
-import type { AccountId, OrganizationId, AppId } from "@mosoo/id";
+import type { AccountId, OrganizationId, ProjectId } from "@mosoo/id";
 
 import { runAppDatabaseBatch } from "../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../time";
-import { DEFAULT_APP_NAME } from "../../apps/application/app-defaults";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import { createAppEnvironmentDefaults } from "../../environments/application/environment.service";
+import { createProjectEnvironmentDefaults } from "../../environments/application/environment.service";
+import { DEFAULT_PROJECT_NAME } from "../../projects/application/project-defaults";
 import { recordLastActiveOrganization } from "../../users/application/account-organization-context.service";
 import { toOrganizationSummary } from "../domain/organization-ownership.policy";
 
@@ -18,7 +18,7 @@ interface ProvisionOrganizationWithOwnerInput {
 
 interface ProvisionOrganizationWriteInput {
   name: string;
-  defaultAppId: AppId;
+  defaultProjectId: ProjectId;
   organizationId: OrganizationId;
   ownerId: AccountId;
   timestampMs: number;
@@ -36,10 +36,10 @@ async function writeOrganizationWithOwner(
       name: input.name,
       updatedAt: input.timestampMs,
     }),
-    db.insert(appsTable).values({
+    db.insert(projectsTable).values({
       createdAt: input.timestampMs,
-      id: input.defaultAppId,
-      name: DEFAULT_APP_NAME,
+      id: input.defaultProjectId,
+      name: DEFAULT_PROJECT_NAME,
       organizationId: input.organizationId,
       ownerAccountId: input.ownerId,
       updatedAt: input.timestampMs,
@@ -54,21 +54,21 @@ export async function provisionOrganizationWithOwner(
 ): Promise<OrganizationSummary> {
   const timestampMs = currentTimestampMs();
   const organizationId: OrganizationId = createPlatformId();
-  const defaultAppId: AppId = createPlatformId();
+  const defaultProjectId: ProjectId = createPlatformId();
 
   await writeOrganizationWithOwner(database, {
     name: input.name,
-    defaultAppId,
+    defaultProjectId,
     organizationId,
     ownerId: owner.id,
     timestampMs,
   });
 
-  await createAppEnvironmentDefaults(
+  await createProjectEnvironmentDefaults(
     { DB: database },
     {
       actorId: owner.id,
-      appId: defaultAppId,
+      projectId: defaultProjectId,
       timestampMs,
     },
   );

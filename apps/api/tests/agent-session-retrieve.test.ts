@@ -15,7 +15,7 @@ const VIEWER: AuthenticatedViewer = {
   name: "Viewer",
 };
 
-const APP_ID = "01J0000000000000000000000Q";
+const PROJECT_ID = "01J0000000000000000000000Q";
 
 function createAgentSessionRetrieveDatabase(): SqliteD1Database {
   const database = new SqliteD1Database({ foreignKeys: false });
@@ -35,7 +35,7 @@ function createAgentSessionRetrieveDatabase(): SqliteD1Database {
       last_run_id text,
       metadata_json text DEFAULT '{}' NOT NULL,
       model text NOT NULL,
-      app_id text NOT NULL,
+      project_id text NOT NULL,
       provider text NOT NULL,
       runtime_id text NOT NULL,
       status text NOT NULL,
@@ -44,7 +44,7 @@ function createAgentSessionRetrieveDatabase(): SqliteD1Database {
       updated_at integer NOT NULL
     );
 
-    CREATE TABLE app (
+    CREATE TABLE project (
       id text PRIMARY KEY NOT NULL,
       organization_id text NOT NULL,
       owner_account_id text NOT NULL,
@@ -80,7 +80,7 @@ function createAgentSessionRetrieveDatabase(): SqliteD1Database {
       kind,
       metadata_json,
       model,
-      app_id,
+      project_id,
       provider,
       runtime_id,
       status,
@@ -96,7 +96,7 @@ function createAgentSessionRetrieveDatabase(): SqliteD1Database {
       'pet',
       '{}',
       'gpt-5.4',
-      '${APP_ID}',
+      '${PROJECT_ID}',
       'openai',
       'openai-runtime',
       'IDLE',
@@ -105,7 +105,7 @@ function createAgentSessionRetrieveDatabase(): SqliteD1Database {
       1
     );
 
-    INSERT INTO app (
+    INSERT INTO project (
       id,
       organization_id,
       owner_account_id,
@@ -113,10 +113,10 @@ function createAgentSessionRetrieveDatabase(): SqliteD1Database {
       created_at,
       updated_at
     ) VALUES (
-      '${APP_ID}',
+      '${PROJECT_ID}',
       '01J00000000000000000000006',
       'viewer-1',
-      'Default App',
+      'Default Project',
       1,
       1
     );
@@ -130,7 +130,7 @@ describe("agent session retrieve", () => {
     const database = createAgentSessionRetrieveDatabase();
 
     const result = await retrieveAgentSession(database, VIEWER, {
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       sessionId: "session-1",
     });
 
@@ -144,14 +144,14 @@ describe("agent session retrieve", () => {
     const database = createAgentSessionRetrieveDatabase();
 
     const result = await retrieveThreadAgentSession(database, VIEWER, {
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       sessionId: "session-1",
     });
 
     expect(result.session.id).toBe("session-1");
   });
 
-  test("apps terminal cleanup rows as not recoverable even with archive marker", async () => {
+  test("projects terminal cleanup rows as not recoverable even with archive marker", async () => {
     const database = createAgentSessionRetrieveDatabase();
 
     await database
@@ -160,7 +160,7 @@ describe("agent session retrieve", () => {
       .run();
 
     const result = await retrieveAgentSession(database, VIEWER, {
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       sessionId: "session-1",
     });
     const capabilities = new Map(
@@ -203,7 +203,7 @@ describe("agent session retrieve", () => {
       .run();
 
     const result = await retrieveThreadAgentSession(database, VIEWER, {
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       sessionId: "session-1",
     });
 

@@ -16,8 +16,8 @@ interface SettingsNavSection {
   labelKey: string;
 }
 
-// Settings keeps account-global controls. App-scoped settings live in the
-// primary App sidebar.
+// Settings keeps account-global controls. Project-scoped settings live in the
+// primary Project sidebar.
 const SETTINGS_NAV_SECTIONS: SettingsNavSection[] = [
   {
     items: [

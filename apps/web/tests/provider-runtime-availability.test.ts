@@ -13,7 +13,7 @@ function credential(vendorId: string): VendorCredential {
     maskedApiKey: "sk-***",
     models: null,
     name: "Default",
-    appId: "01J00000000000000000000009",
+    projectId: "01J00000000000000000000009",
     vendorId,
   };
 }

@@ -9,7 +9,7 @@ import { createFileDownload } from "@/domains/file/api/file-download-client";
 import { fileKeys, listFiles } from "@/domains/file/api/files";
 import type { ListedFileEntry } from "@/domains/file/api/files";
 import { allThreadSessions } from "@/domains/session/api/list";
-import { toAppId } from "@/routes/typed-id";
+import { toProjectId } from "@/routes/typed-id";
 import { getCurrentLocale, useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Badge } from "@/shared/ui/badge";
@@ -206,7 +206,7 @@ function FileTable({
 }
 
 export function FilesPage(): ReactElement {
-  const { activeAppId } = useAppSession();
+  const { activeProjectId } = useAppSession();
   const { t } = useTranslation();
   const [agentId, setAgentId] = useState("");
   const [sessionId, setSessionId] = useState("");
@@ -217,7 +217,7 @@ export function FilesPage(): ReactElement {
     data: agents = [],
     isFetching: agentsFetching,
     refetch: refetchAgents,
-  } = useVisibleAgentsQuery(activeAppId);
+  } = useVisibleAgentsQuery(activeProjectId);
   const {
     data: sessionOptions = [],
     error: sessionOptionsError,
@@ -225,15 +225,15 @@ export function FilesPage(): ReactElement {
     isLoading: sessionOptionsLoading,
     refetch: refetchSessionOptions,
   } = useQuery({
-    enabled: activeAppId !== null,
+    enabled: activeProjectId !== null,
     queryFn: async () => {
-      if (activeAppId === null) {
-        throw new Error("App id is required to list sessions.");
+      if (activeProjectId === null) {
+        throw new Error("Project id is required to list sessions.");
       }
 
-      return allThreadSessions(toAppId(activeAppId));
+      return allThreadSessions(toProjectId(activeProjectId));
     },
-    queryKey: [...fileKeys.all, "session-options", activeAppId],
+    queryKey: [...fileKeys.all, "session-options", activeProjectId],
   });
   const {
     data: fileList,
@@ -242,18 +242,18 @@ export function FilesPage(): ReactElement {
     isLoading: filesLoading,
     refetch: refetchFiles,
   } = useQuery({
-    enabled: activeAppId !== null,
+    enabled: activeProjectId !== null,
     queryFn: async () => {
-      if (activeAppId === null) {
-        throw new Error("App id is required to list files.");
+      if (activeProjectId === null) {
+        throw new Error("Project id is required to list files.");
       }
 
-      return listFiles({ appId: toAppId(activeAppId) });
+      return listFiles({ projectId: toProjectId(activeProjectId) });
     },
     queryKey:
-      activeAppId === null
+      activeProjectId === null
         ? [...fileKeys.lists(), "missing"]
-        : fileKeys.list({ appId: toAppId(activeAppId) }),
+        : fileKeys.list({ projectId: toProjectId(activeProjectId) }),
   });
   const files = fileList?.files ?? EMPTY_FILES;
   const sessionKindOptions: { label: string; value: SessionKindFilter }[] = useMemo(

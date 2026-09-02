@@ -1,4 +1,4 @@
-import type { AppId } from "@mosoo/contracts/id";
+import type { ProjectId } from "@mosoo/contracts/id";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -29,17 +29,17 @@ export function CreateAgentLauncherDialog({
   onOpenChange: (open: boolean) => void;
 }): ReactElement {
   const { t } = useTranslation();
-  const { activeOrganization, activeApp } = useAppSession();
+  const { activeOrganization, activeProject } = useAppSession();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent showCloseButton className="gap-0 overflow-hidden rounded-lg sm:max-w-[460px]">
         {activeOrganization === null ? (
           <LauncherStatus message={t("agent.finishSetup")} />
-        ) : activeApp === null ? (
-          <LauncherStatus message={t("agent.createAppFirst")} />
+        ) : activeProject === null ? (
+          <LauncherStatus message={t("agent.createProjectFirst")} />
         ) : (
-          <CreateAgentLauncherBody onOpenChange={onOpenChange} appId={activeApp.id} />
+          <CreateAgentLauncherBody onOpenChange={onOpenChange} projectId={activeProject.id} />
         )}
       </DialogContent>
     </Dialog>
@@ -48,15 +48,15 @@ export function CreateAgentLauncherDialog({
 
 function CreateAgentLauncherBody({
   onOpenChange,
-  appId,
+  projectId,
 }: {
   onOpenChange: (open: boolean) => void;
-  appId: AppId;
+  projectId: ProjectId;
 }): ReactElement {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { credentials, loading: credentialsLoading } = useVendorCredentialsQuery(appId);
+  const { credentials, loading: credentialsLoading } = useVendorCredentialsQuery(projectId);
 
   const [name, setName] = useState("");
   const [selectedRuntimeId, setSelectedRuntimeId] = useState<string | null>(null);
@@ -104,7 +104,7 @@ function CreateAgentLauncherBody({
         kind: "pet",
         model: runtimeConfig.model,
         name: trimmedName,
-        appId,
+        projectId,
         prompt: "",
         provider: runtimeConfig.provider,
         runtimeId: runtimeConfig.runtimeId,

@@ -1,4 +1,4 @@
-import type { AppId, SkillId } from "@mosoo/id";
+import type { ProjectId, SkillId } from "@mosoo/id";
 import type { Hono } from "hono";
 
 import { getAuthenticatedViewerFromRequest } from "../../../modules/auth/application/viewer-auth.service";
@@ -57,8 +57,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-export function registerSkillRoute(app: Hono<ApiGatewayEnvironment>) {
-  app.post("/skill/inspect", async (c) => {
+export function registerSkillRoute(project: Hono<ApiGatewayEnvironment>) {
+  project.post("/skill/inspect", async (c) => {
     try {
       const viewer = await getAuthenticatedViewerFromRequest(c.env, c.req.raw);
       if (!viewer) {
@@ -86,7 +86,7 @@ export function registerSkillRoute(app: Hono<ApiGatewayEnvironment>) {
     }
   });
 
-  app.get("/skill/skills-sh/catalog", async (c) => {
+  project.get("/skill/skills-sh/catalog", async (c) => {
     try {
       const viewer = await getAuthenticatedViewerFromRequest(c.env, c.req.raw);
       if (!viewer) {
@@ -113,7 +113,7 @@ export function registerSkillRoute(app: Hono<ApiGatewayEnvironment>) {
     }
   });
 
-  app.post("/skill/skills-sh/install", async (c) => {
+  project.post("/skill/skills-sh/install", async (c) => {
     try {
       const viewer = await getAuthenticatedViewerFromRequest(c.env, c.req.raw);
       if (!viewer) {
@@ -126,10 +126,10 @@ export function registerSkillRoute(app: Hono<ApiGatewayEnvironment>) {
         throw new SkillRequestError("A JSON body is required.");
       }
 
-      const { appId, id, installUrl, slug } = body;
+      const { projectId, id, installUrl, slug } = body;
 
-      if (typeof appId !== "string" || !appId) {
-        throw new SkillRequestError("appId is required.");
+      if (typeof projectId !== "string" || !projectId) {
+        throw new SkillRequestError("projectId is required.");
       }
 
       if (typeof id !== "string" || !id) {
@@ -149,19 +149,24 @@ export function registerSkillRoute(app: Hono<ApiGatewayEnvironment>) {
       }
 
       return c.json(
-        await createSkillFromSkillsSh(c.env, viewer, toPlatformId<AppId>(appId, "App ID"), {
-          appId: toPlatformId<AppId>(appId, "App ID"),
-          id,
-          ...(installUrl !== undefined ? { installUrl } : {}),
-          slug,
-        }),
+        await createSkillFromSkillsSh(
+          c.env,
+          viewer,
+          toPlatformId<ProjectId>(projectId, "Project ID"),
+          {
+            projectId: toPlatformId<ProjectId>(projectId, "Project ID"),
+            id,
+            ...(installUrl !== undefined ? { installUrl } : {}),
+            slug,
+          },
+        ),
       );
     } catch (error) {
       return errorResponse(error);
     }
   });
 
-  app.post("/skill/package", async (c) => {
+  project.post("/skill/package", async (c) => {
     try {
       const viewer = await getAuthenticatedViewerFromRequest(c.env, c.req.raw);
       if (!viewer) {
@@ -169,13 +174,13 @@ export function registerSkillRoute(app: Hono<ApiGatewayEnvironment>) {
       }
 
       const form = await c.req.raw.formData();
-      const appId = form.get("appId");
+      const projectId = form.get("projectId");
       const skillId = form.get("skillId");
       const file = form.get("file");
       const githubUrl = form.get("githubUrl");
 
-      if (typeof appId !== "string" || !appId) {
-        throw new SkillRequestError("appId is required.");
+      if (typeof projectId !== "string" || !projectId) {
+        throw new SkillRequestError("projectId is required.");
       }
       if (!(file instanceof File) && typeof githubUrl !== "string") {
         throw new SkillRequestError("Either file or githubUrl must be provided.");
@@ -205,7 +210,7 @@ export function registerSkillRoute(app: Hono<ApiGatewayEnvironment>) {
           await updateOwnedSkillPackage(
             c.env,
             viewer,
-            toPlatformId<AppId>(appId, "App ID"),
+            toPlatformId<ProjectId>(projectId, "Project ID"),
             toPlatformId<SkillId>(skillId, "Skill ID"),
             uploadInput,
           ),
@@ -216,7 +221,7 @@ export function registerSkillRoute(app: Hono<ApiGatewayEnvironment>) {
         await createSkillFromUpload(
           c.env,
           viewer,
-          toPlatformId<AppId>(appId, "App ID"),
+          toPlatformId<ProjectId>(projectId, "Project ID"),
           uploadInput,
         ),
       );
@@ -225,21 +230,21 @@ export function registerSkillRoute(app: Hono<ApiGatewayEnvironment>) {
     }
   });
 
-  app.get("/skill/:skillId/source", async (c) => {
+  project.get("/skill/:skillId/source", async (c) => {
     try {
       const viewer = await getAuthenticatedViewerFromRequest(c.env, c.req.raw);
       if (!viewer) {
         return unauthorized();
       }
-      const appId = c.req.query("appId");
+      const projectId = c.req.query("projectId");
 
-      if (typeof appId !== "string" || !appId) {
-        throw new SkillRequestError("appId is required.");
+      if (typeof projectId !== "string" || !projectId) {
+        throw new SkillRequestError("projectId is required.");
       }
       const content = await readSkillSource(
         c.env,
         viewer,
-        toPlatformId<AppId>(appId, "App ID"),
+        toPlatformId<ProjectId>(projectId, "Project ID"),
         toPlatformId<SkillId>(c.req.param("skillId"), "Skill ID"),
       );
       return new Response(content, {
@@ -250,21 +255,21 @@ export function registerSkillRoute(app: Hono<ApiGatewayEnvironment>) {
     }
   });
 
-  app.get("/skill/:skillId/package", async (c) => {
+  project.get("/skill/:skillId/package", async (c) => {
     try {
       const viewer = await getAuthenticatedViewerFromRequest(c.env, c.req.raw);
       if (!viewer) {
         return unauthorized();
       }
-      const appId = c.req.query("appId");
+      const projectId = c.req.query("projectId");
 
-      if (typeof appId !== "string" || !appId) {
-        throw new SkillRequestError("appId is required.");
+      if (typeof projectId !== "string" || !projectId) {
+        throw new SkillRequestError("projectId is required.");
       }
       const { bytes, fileName } = await downloadSkillPackage(
         c.env,
         viewer,
-        toPlatformId<AppId>(appId, "App ID"),
+        toPlatformId<ProjectId>(projectId, "Project ID"),
         c.req.param("skillId"),
       );
       return new Response(toArrayBuffer(bytes), {

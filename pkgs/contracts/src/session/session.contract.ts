@@ -7,7 +7,7 @@ import type {
   FileId,
   McpServerId,
   PlatformId,
-  AppId,
+  ProjectId,
   RuntimeEventId,
   SessionId,
   SessionMessageId,
@@ -41,7 +41,7 @@ export interface SessionSummary {
   title: string | null;
   type: SessionType;
   updatedAt: string;
-  appId: AppId;
+  projectId: ProjectId;
 }
 
 export interface SessionListPageInfo {
@@ -274,12 +274,12 @@ export interface AddSessionResourceInput {
     name: string;
     size: number;
   };
-  appId: AppId;
+  projectId: ProjectId;
   sessionId: SessionId;
 }
 
 export interface RemoveSessionResourceInput {
-  appId: AppId;
+  projectId: ProjectId;
   resourceId: FileId;
   sessionId: SessionId;
 }
@@ -288,7 +288,7 @@ export type AddSessionResourceResult = FileUploadSummary;
 
 export interface CreateAgentSessionInput {
   agentId: AgentId;
-  appId: AppId;
+  projectId: ProjectId;
   type?: SessionType | null;
   waitForRuntimeReady?: boolean | null;
 }
@@ -335,7 +335,7 @@ export interface AgentSessionEventBatch {
 
 export interface StartAgentRunInput {
   agentId?: AgentId | null;
-  appId: AppId;
+  projectId: ProjectId;
   clientRequestId?: string | null;
   prompt: string;
   sessionId?: SessionId | null;
@@ -344,7 +344,7 @@ export interface StartAgentRunInput {
 }
 
 export interface AgentRunEventSurface {
-  appId: AppId;
+  projectId: ProjectId;
   graphqlUrl: string;
   messagesOperation: "threadSessionMessages";
   processEventsOperation: "threadSessionProcessEvents";
@@ -503,7 +503,7 @@ export interface AgentSessionRetrieveConnection {
 }
 
 export interface RenameSessionInput {
-  appId: AppId;
+  projectId: ProjectId;
   sessionId: SessionId;
   title: string;
 }

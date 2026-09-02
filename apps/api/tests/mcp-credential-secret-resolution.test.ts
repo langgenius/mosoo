@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import type { AccountId, AgentId, CredentialId, McpServerId, AppId } from "@mosoo/id";
+import type { AccountId, AgentId, CredentialId, McpServerId, ProjectId } from "@mosoo/id";
 
 import {
   deleteMcpCredentialSecret,
@@ -13,8 +13,8 @@ import { readSecretOutcome } from "../src/modules/vault/application/vault-secret
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
-const APP_ID = "01J00000000000000000000002" as AppId;
-const OTHER_APP_ID = "01J0000000000000000000000A" as AppId;
+const PROJECT_ID = "01J00000000000000000000002" as ProjectId;
+const OTHER_PROJECT_ID = "01J0000000000000000000000A" as ProjectId;
 const OWNER_ID = "01J00000000000000000000003" as AccountId;
 const AGENT_ID = "01J00000000000000000000004" as AgentId;
 const SERVER_ID = "01J00000000000000000000005" as McpServerId;
@@ -65,7 +65,7 @@ function createServer(input: Partial<ServerRow> = {}): ServerRow {
     oauthMetadataJson: null,
     ownerId: OWNER_ID,
     ownerName: "Owner",
-    appId: APP_ID,
+    projectId: PROJECT_ID,
     source: "app",
     updatedAt: 1,
     url: "https://mcp.example.com",
@@ -83,7 +83,7 @@ function createCredential(input: Partial<CredentialRow> = {}): CredentialRow {
     lastRefreshedAt: null,
     oauthClientId: "client",
     oauthClientSecretSecretId: null,
-    appId: APP_ID,
+    projectId: PROJECT_ID,
     refreshSecretId: MISSING_SECRET_ID,
     scope: "app",
     scopeValuesJson: "[]",
@@ -117,7 +117,7 @@ describe("MCP credential secret resolution", () => {
     const outcome = await readMcpCredentialSecret(bindings, {
       credential,
       purpose: "runtime_refresh_token",
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       server,
     });
 
@@ -134,14 +134,14 @@ describe("MCP credential secret resolution", () => {
     const cases: {
       credential?: Partial<CredentialRow>;
       purpose: McpCredentialSecretReadPurpose;
-      appId?: AppId;
+      projectId?: ProjectId;
       reason: string;
       server?: Partial<ServerRow>;
     }[] = [
       {
         purpose: "runtime_access_token",
-        appId: OTHER_APP_ID,
-        reason: "server_app_mismatch",
+        projectId: OTHER_PROJECT_ID,
+        reason: "server_project_mismatch",
       },
       {
         credential: { serverId: OTHER_SERVER_ID },
@@ -178,7 +178,7 @@ describe("MCP credential secret resolution", () => {
       const outcome = await readMcpCredentialSecret(bindings, {
         credential: createCredential(testCase.credential),
         purpose: testCase.purpose,
-        appId: testCase.appId ?? APP_ID,
+        projectId: testCase.projectId ?? PROJECT_ID,
         server: createServer(testCase.server),
       });
 
@@ -207,7 +207,7 @@ describe("MCP credential secret resolution", () => {
     const outcome = await readMcpCredentialSecret(bindings, {
       credential: createCredential({ refreshSecretId }),
       purpose: "runtime_refresh_token",
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       server: createServer(),
     });
 

@@ -14,14 +14,14 @@ import {
   rangeLabel,
   tokensTotal,
 } from "./cost-model";
-import type { CostRange, CostTab, AppCostCard } from "./cost-model";
+import type { CostRange, CostTab, ProjectCostCard } from "./cost-model";
 
 export function CostOverviewPanel({
   card,
   range,
   setActiveTab,
 }: {
-  card: AppCostCard | undefined;
+  card: ProjectCostCard | undefined;
   range: CostRange;
   setActiveTab: (tab: CostTab) => void;
 }) {

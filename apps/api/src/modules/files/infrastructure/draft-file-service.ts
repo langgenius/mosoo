@@ -1,6 +1,6 @@
 import { fileRecordsTable, fileUploadsTable } from "@mosoo/db";
 import { parsePlatformId } from "@mosoo/id";
-import type { AccountId, FileId, AppId, SessionId } from "@mosoo/id";
+import type { AccountId, FileId, ProjectId, SessionId } from "@mosoo/id";
 import { and, eq, sql } from "drizzle-orm";
 
 import { createErrorLogContext, logError } from "../../../platform/cloudflare/logger";
@@ -8,13 +8,13 @@ import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { runAppDatabaseBatch } from "../../../platform/db/drizzle";
 import { isTruthy } from "../../../shared/truthiness";
 import { currentTimestampMs } from "../../../time";
-import { ensureAppOwnership } from "../../apps/application/app.service";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
+import { ensureProjectOwnership } from "../../projects/application/project.service";
 import { createFinalObjectKey } from "./file-paths";
 import { listFileRecordsById } from "./file-record-store";
 import type { FileRecordRow } from "./file-record-store";
 import { copyObject, deleteObject } from "./r2-s3-client";
-import { ensureAppSessionFileAccess } from "./session-file-ownership";
+import { ensureProjectSessionFileAccess } from "./session-file-ownership";
 interface ClaimedDraftFile {
   etag: string;
   file: FileRecordRow;
@@ -38,11 +38,11 @@ function toSessionAttachmentRecord(file: FileRecordRow, sessionId: SessionId): F
 async function loadClaimableDraftFiles(
   database: D1Database,
   viewer: AuthenticatedViewer,
-  appId: AppId,
+  projectId: ProjectId,
   fileIds: readonly FileId[],
 ): Promise<FileRecordRow[]> {
   const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
-  await ensureAppOwnership(database, viewerId, appId);
+  await ensureProjectOwnership(database, viewerId, projectId);
 
   const files = await listFileRecordsById(database, fileIds);
   const filesById = new Map(files.map((file) => [file.id, file]));
@@ -61,15 +61,15 @@ async function loadClaimableDraftFiles(
 
     if (
       file.owner_kind !== "app" ||
-      file.owner_id !== appId ||
+      file.owner_id !== projectId ||
       file.purpose !== "app_draft" ||
       file.scope_kind !== "app_draft"
     ) {
       throw new Error(`Attachment ${fileId} is not a draft attachment.`);
     }
 
-    if (file.scope_id !== appId) {
-      throw new Error(`Attachment ${fileId} does not belong to app ${appId}.`);
+    if (file.scope_id !== projectId) {
+      throw new Error(`Attachment ${fileId} does not belong to project ${projectId}.`);
     }
 
     if (file.status !== "ready") {
@@ -82,27 +82,27 @@ async function loadClaimableDraftFiles(
   return orderedFiles;
 }
 
-export async function ensureAppDraftFilesClaimable(
+export async function ensureProjectDraftFilesClaimable(
   bindings: ApiBindings,
   viewer: AuthenticatedViewer,
   input: {
     attachmentIds: FileId[];
-    appId: AppId;
+    projectId: ProjectId;
   },
 ): Promise<void> {
   if (input.attachmentIds.length === 0) {
     return;
   }
 
-  await loadClaimableDraftFiles(bindings.DB, viewer, input.appId, input.attachmentIds);
+  await loadClaimableDraftFiles(bindings.DB, viewer, input.projectId, input.attachmentIds);
 }
 
-export async function claimAppDraftFilesToSession(
+export async function claimProjectDraftFilesToSession(
   bindings: ApiBindings,
   viewer: AuthenticatedViewer,
   input: {
     attachmentIds: FileId[];
-    appId: AppId;
+    projectId: ProjectId;
     sessionId: SessionId;
   },
 ): Promise<void> {
@@ -111,15 +111,15 @@ export async function claimAppDraftFilesToSession(
   }
 
   const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
-  await ensureAppSessionFileAccess(bindings.DB, viewerId, {
-    appId: input.appId,
+  await ensureProjectSessionFileAccess(bindings.DB, viewerId, {
+    projectId: input.projectId,
     sessionId: input.sessionId,
   });
 
   const files = await loadClaimableDraftFiles(
     bindings.DB,
     viewer,
-    input.appId,
+    input.projectId,
     input.attachmentIds,
   );
   const claimedFiles: ClaimedDraftFile[] = [];
@@ -166,7 +166,7 @@ export async function claimAppDraftFilesToSession(
             and(
               eq(fileRecordsTable.id, file.id),
               eq(fileRecordsTable.scopeKind, "app_draft"),
-              eq(fileRecordsTable.scopeId, input.appId),
+              eq(fileRecordsTable.scopeId, input.projectId),
             ),
           ),
         database
@@ -180,7 +180,7 @@ export async function claimAppDraftFilesToSession(
             and(
               eq(fileUploadsTable.fileId, file.id),
               eq(fileUploadsTable.scopeKind, "app_draft"),
-              eq(fileUploadsTable.scopeId, input.appId),
+              eq(fileUploadsTable.scopeId, input.projectId),
             ),
           ),
       ]);
@@ -199,7 +199,7 @@ export async function claimAppDraftFilesToSession(
           logError("file.draft-claim.cleanup.failed", {
             ...createErrorLogContext(cleanupError),
             nextObjectKey,
-            appId: input.appId,
+            projectId: input.projectId,
             sessionId: input.sessionId,
           });
         }),
@@ -216,7 +216,7 @@ export async function claimAppDraftFilesToSession(
           ...createErrorLogContext(error),
           fileId: file.id,
           objectKey: file.object_key,
-          appId: input.appId,
+          projectId: input.projectId,
           sessionId: input.sessionId,
         });
       }),

@@ -1,11 +1,11 @@
-import type { DriverInstanceId, AppId, VendorCredentialId } from "@mosoo/id";
+import type { DriverInstanceId, ProjectId, VendorCredentialId } from "@mosoo/id";
 import { getVendor } from "@mosoo/runtime-catalog";
 import type { RuntimeCatalogVendor } from "@mosoo/runtime-catalog";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { isTruthy } from "../../../shared/truthiness";
 import { enforceSafeApiBase } from "../../vendor-credentials/application/vendor-credential-validation";
-import { getAppCredentialRow } from "../../vendor-credentials/application/vendor-credential.repository";
+import { getProjectCredentialRow } from "../../vendor-credentials/application/vendor-credential.repository";
 import { readVendorCredentialSecret } from "../../vendor-credentials/application/vendor-credential.secret-resolution";
 import { enforceCanonicalRuntimeLlmProxyBaseUrl } from "../domain/runtime-llm-proxy-base-url";
 import { isDriverInstanceGenerationActive } from "../infrastructure/driver-instance/driver-instance-record.repository";
@@ -52,10 +52,14 @@ export async function resolveRuntimeLlmProxyTarget(
   bindings: ApiBindings,
   input: {
     credentialId: VendorCredentialId;
-    appId: AppId;
+    projectId: ProjectId;
   },
 ): Promise<RuntimeLlmProxyTarget> {
-  const credential = await getAppCredentialRow(bindings.DB, input.appId, input.credentialId);
+  const credential = await getProjectCredentialRow(
+    bindings.DB,
+    input.projectId,
+    input.credentialId,
+  );
 
   if (credential === null) {
     throw new RuntimeLlmProxyError("Vendor credential is unavailable.", 401);
@@ -69,7 +73,7 @@ export async function resolveRuntimeLlmProxyTarget(
 
   const secret = await readVendorCredentialSecret(bindings, {
     credential,
-    appId: input.appId,
+    projectId: input.projectId,
     providerId: credential.vendorId,
     purpose: "llm_proxy_api_key",
   });

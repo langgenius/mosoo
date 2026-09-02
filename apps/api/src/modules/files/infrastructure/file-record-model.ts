@@ -14,7 +14,7 @@ import { toSessionResourceMaterializedPath } from "@mosoo/contracts/file";
 import type { SessionFile } from "@mosoo/contracts/session";
 import { fileRecordsTable } from "@mosoo/db";
 import { parsePlatformId } from "@mosoo/id";
-import type { AccountId, FileId, PlatformId, AppId, SessionId, UploadId } from "@mosoo/id";
+import type { AccountId, FileId, PlatformId, ProjectId, SessionId, UploadId } from "@mosoo/id";
 import { sql } from "drizzle-orm";
 
 import { toIsoString } from "../../../time";
@@ -168,7 +168,7 @@ function toFileScopeId(scopeKind: FileScopeKind, scopeId: PlatformId | null): Fi
   }
 
   if (scopeKind === "agent_package" || scopeKind === "app_draft" || scopeKind === "library") {
-    return parsePlatformId<AppId>(scopeId, "file app ID");
+    return parsePlatformId<ProjectId>(scopeId, "file project ID");
   }
 
   if (scopeKind === "session") {
@@ -186,7 +186,7 @@ function toFileOwnerId(ownerKind: FileOwnerKind, ownerId: PlatformId): FileOwner
   }
 
   if (ownerKind === "app") {
-    return parsePlatformId<AppId>(ownerId, "file owner app ID");
+    return parsePlatformId<ProjectId>(ownerId, "file owner project ID");
   }
 
   if (ownerKind === "session") {

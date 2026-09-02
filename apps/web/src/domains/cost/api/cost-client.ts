@@ -1,11 +1,11 @@
-import type { AgentId, AppId } from "@mosoo/contracts/id";
+import type { AgentId, ProjectId } from "@mosoo/contracts/id";
 
 import type {
   AgentCostCardQuery,
   CostAgentFieldsFragment,
   CostAttributionFieldsFragment,
   CostRecentSessionFieldsFragment,
-  AppCostCardQuery,
+  ProjectCostCardQuery,
 } from "@/gql/graphql";
 import { requestGraphQL } from "@/platform/http/graphql-client";
 import {
@@ -13,10 +13,10 @@ import {
   toAgentId,
   toNullableSessionId,
   toNullableSessionRunId,
-  toAppId,
+  toProjectId,
 } from "@/routes/typed-id";
 
-import { AGENT_COST_QUERY, APP_COST_QUERY } from "./cost-graphql-documents";
+import { AGENT_COST_QUERY, PROJECT_COST_QUERY } from "./cost-graphql-documents";
 import type {
   AgentCostCard,
   CostAgentRow,
@@ -24,7 +24,7 @@ import type {
   CostRangeInput,
   CostRecentSession,
   CostRunPurpose,
-  AppCostCard,
+  ProjectCostCard,
 } from "./cost-model";
 
 export type {
@@ -38,7 +38,7 @@ export type {
   CostRunPurpose,
   CostTotals,
   OrganizationBillingCostCard,
-  AppCostCard,
+  ProjectCostCard,
 } from "./cost-model";
 
 function toCostAgentRow(agent: CostAgentFieldsFragment): CostAgentRow {
@@ -65,12 +65,12 @@ function toCostAttributionCard(card: CostAttributionFieldsFragment): CostAttribu
   };
 }
 
-function toAppCostCard(card: AppCostCardQuery["appCostCard"]): AppCostCard {
+function toProjectCostCard(card: ProjectCostCardQuery["projectCostCard"]): ProjectCostCard {
   return {
     ...toCostAttributionCard(card),
     previousTotals: card.previousTotals,
-    appId: toAppId(card.appId),
-    appName: card.appName,
+    projectId: toProjectId(card.projectId),
+    projectName: card.projectName,
   };
 }
 
@@ -84,22 +84,22 @@ function toAgentCostCard(card: AgentCostCardQuery["agentCostCard"]): AgentCostCa
   };
 }
 
-export async function fetchAppCost(
-  appId: AppId,
+export async function fetchProjectCost(
+  projectId: ProjectId,
   range: CostRangeInput,
   runPurposes: CostRunPurpose[] = [],
-): Promise<AppCostCard> {
-  const payload = await requestGraphQL(APP_COST_QUERY, {
-    appId,
+): Promise<ProjectCostCard> {
+  const payload = await requestGraphQL(PROJECT_COST_QUERY, {
+    projectId,
     range,
     runPurposes: runPurposes.length > 0 ? runPurposes : null,
   });
-  return toAppCostCard(payload.appCostCard);
+  return toProjectCostCard(payload.projectCostCard);
 }
 
 export async function fetchAgentCost(input: {
   agentId: AgentId;
-  appId: AppId;
+  projectId: ProjectId;
   range: CostRangeInput;
   runPurposes?: CostRunPurpose[];
 }): Promise<AgentCostCard> {

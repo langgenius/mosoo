@@ -1,5 +1,5 @@
 export const PRODUCT_ANALYTICS_EVENTS = {
-  appCreated: "app_created",
+  projectCreated: "project_created",
   integrationConnected: "integration_connected",
   loginStarted: "login_started",
   onboardingCompleted: "onboarding_completed",

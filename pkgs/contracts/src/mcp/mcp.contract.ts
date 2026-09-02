@@ -6,9 +6,11 @@ import type {
   CredentialId,
   McpOAuthFlowId,
   McpServerId,
-  AppId,
+  ProjectId,
 } from "../id/id.contract";
 
+// "app" is a frozen manifest / D1 discriminator. ProjectId is the canonical
+// scope identifier; changing this token requires a versioned manifest rollout.
 export const MCP_SERVER_SOURCES = ["app"] as const;
 export const McpServerSource = type.enumerated(...MCP_SERVER_SOURCES);
 export type McpServerSource = typeof McpServerSource.infer;
@@ -106,7 +108,7 @@ export interface McpServer {
   name: string;
   ownerId: AccountId;
   ownerName: string;
-  appId: AppId;
+  projectId: ProjectId;
   source: McpServerSource;
   updatedAt: string;
   url: string;
@@ -122,7 +124,7 @@ export interface McpRegistry {
   currentUserEmail: string;
   currentUserId: AccountId;
   currentUserName: string;
-  appId: AppId;
+  projectId: ProjectId;
   servers: McpServerWithCredential[];
 }
 
@@ -145,19 +147,19 @@ export interface AgentMcpBinding {
   url: string;
 }
 
-export interface CreateAppMcpServerInput {
+export interface CreateProjectMcpServerInput {
   authType: McpAuthType;
   description?: string | null;
   iconUrl?: string | null;
   name: string;
   oauthClientId?: string | null;
   oauthClientSecret?: string | null;
-  appId: AppId;
+  projectId: ProjectId;
   url: string;
 }
 
-export interface UpdateAppMcpServerInput {
-  appId: AppId;
+export interface UpdateProjectMcpServerInput {
+  projectId: ProjectId;
   description?: string | null;
   iconUrl?: string | null;
   name: string;
@@ -166,14 +168,14 @@ export interface UpdateAppMcpServerInput {
 }
 
 export interface ConnectMcpBearerInput {
-  appId: AppId;
+  projectId: ProjectId;
   serverId: McpServerId;
   subjectLabel?: string | null;
   token: string;
 }
 
 export interface StartMcpOAuthInput {
-  appId: AppId;
+  projectId: ProjectId;
   returnUrl?: string | null;
   serverId: McpServerId;
 }

@@ -1,12 +1,12 @@
 import { describe, expect, test } from "bun:test";
 
 import { parsePlatformId } from "@mosoo/id";
-import type { AppId } from "@mosoo/id";
+import type { ProjectId } from "@mosoo/id";
 
 import { resolveAvailableModels } from "../src/modules/vendor-credentials/application/available-models";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
-const APP_ID = parsePlatformId<AppId>("01J00000000000000000000009", "app ID");
+const PROJECT_ID = parsePlatformId<ProjectId>("01J00000000000000000000009", "project ID");
 
 function createAvailableModelsDatabase(): SqliteD1Database {
   const database = new SqliteD1Database();
@@ -16,7 +16,7 @@ function createAvailableModelsDatabase(): SqliteD1Database {
       id text PRIMARY KEY NOT NULL
     );
 
-    CREATE TABLE app (
+    CREATE TABLE project (
       id text PRIMARY KEY NOT NULL,
       organization_id text NOT NULL,
       owner_account_id text NOT NULL,
@@ -28,7 +28,7 @@ function createAvailableModelsDatabase(): SqliteD1Database {
 
     CREATE TABLE vendor_credential (
       id text PRIMARY KEY NOT NULL,
-      app_id text NOT NULL,
+      project_id text NOT NULL,
       vendor_id text NOT NULL,
       name text NOT NULL,
       api_key_secret_id text NOT NULL,
@@ -39,7 +39,7 @@ function createAvailableModelsDatabase(): SqliteD1Database {
 
     INSERT INTO organization (id) VALUES ('01J00000000000000000000006');
 
-    INSERT INTO app (
+    INSERT INTO project (
       id,
       organization_id,
       owner_account_id,
@@ -49,10 +49,10 @@ function createAvailableModelsDatabase(): SqliteD1Database {
       updated_at
     )
     VALUES (
-      '${APP_ID}',
+      '${PROJECT_ID}',
       '01J00000000000000000000006',
       'account-1',
-      'Default App',
+      'Default Project',
       NULL,
       1,
       1
@@ -60,7 +60,7 @@ function createAvailableModelsDatabase(): SqliteD1Database {
 
     INSERT INTO vendor_credential (
       id,
-      app_id,
+      project_id,
       vendor_id,
       name,
       api_key_secret_id,
@@ -69,7 +69,7 @@ function createAvailableModelsDatabase(): SqliteD1Database {
     )
     VALUES (
       'credential-1',
-      '${APP_ID}',
+      '${PROJECT_ID}',
       'openai',
       'OpenAI default',
       'secret-1',
@@ -78,7 +78,7 @@ function createAvailableModelsDatabase(): SqliteD1Database {
     ),
     (
       'credential-opencode',
-      '${APP_ID}',
+      '${PROJECT_ID}',
       'opencode',
       'OpenCode Zen default',
       'secret-opencode',
@@ -87,7 +87,7 @@ function createAvailableModelsDatabase(): SqliteD1Database {
     ),
     (
       'credential-deepseek',
-      '${APP_ID}',
+      '${PROJECT_ID}',
       'deepseek',
       'DeepSeek default',
       'secret-deepseek',
@@ -96,7 +96,7 @@ function createAvailableModelsDatabase(): SqliteD1Database {
     ),
     (
       'credential-gemini',
-      '${APP_ID}',
+      '${PROJECT_ID}',
       'gemini',
       'Gemini default',
       'secret-gemini',
@@ -105,7 +105,7 @@ function createAvailableModelsDatabase(): SqliteD1Database {
     ),
     (
       'credential-zhipu',
-      '${APP_ID}',
+      '${PROJECT_ID}',
       'zhipu',
       'Zhipu default',
       'secret-zhipu',
@@ -114,7 +114,7 @@ function createAvailableModelsDatabase(): SqliteD1Database {
     ),
     (
       'credential-custom',
-      '${APP_ID}',
+      '${PROJECT_ID}',
       'openai-compatible',
       'Custom default',
       'secret-custom',
@@ -129,7 +129,7 @@ function createAvailableModelsDatabase(): SqliteD1Database {
 describe("available models", () => {
   test("makes custom models available for OpenAI runtime", async () => {
     const entries = await resolveAvailableModels(createAvailableModelsDatabase(), {
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       runtimeId: "openai-runtime",
     });
 
@@ -156,7 +156,7 @@ describe("available models", () => {
 
   test("makes OpenAI preset models available for the internal System Agent runtime", async () => {
     const entries = await resolveAvailableModels(createAvailableModelsDatabase(), {
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       runtimeId: "system-agent",
     });
 
@@ -177,7 +177,7 @@ describe("available models", () => {
 
   test("makes OpenCode runtime models available through their owning providers", async () => {
     const entries = await resolveAvailableModels(createAvailableModelsDatabase(), {
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       runtimeId: "acp-fallback",
     });
 
@@ -266,11 +266,11 @@ describe("available models", () => {
     });
   });
 
-  test("apps a missing current preset model as unavailable catalog state", async () => {
+  test("projects a missing current preset model as unavailable catalog state", async () => {
     const entries = await resolveAvailableModels(createAvailableModelsDatabase(), {
       currentModelId: "legacy-gpt",
       currentVendorId: "openai",
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       runtimeId: "openai-runtime",
     });
 
@@ -291,7 +291,7 @@ describe("available models", () => {
     const entries = await resolveAvailableModels(createAvailableModelsDatabase(), {
       currentModelId: "removed-custom-model",
       currentVendorId: "openai-compatible",
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       runtimeId: "openai-runtime",
     });
 

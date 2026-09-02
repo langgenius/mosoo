@@ -23,7 +23,7 @@ import type {
   ExternalToolEffectId,
   McpServerId,
   PlatformId,
-  AppId,
+  ProjectId,
   RuntimeOperationId,
   SandboxBackupId,
   SandboxId,
@@ -51,7 +51,7 @@ export const sandboxesTable = sqliteTable(
   "sandbox",
   {
     agentId: platformIdColumn<AgentId>("agent_id"),
-    appId: platformIdColumn<AppId>("app_id"),
+    projectId: platformIdColumn<ProjectId>("project_id"),
     bindMountReady: integer("bind_mount_ready", { mode: "boolean" }).notNull().default(false),
     claimExpiresAt: integer("claim_expires_at"),
     claimOwner: text("claim_owner"),
@@ -76,7 +76,7 @@ export const sandboxesTable = sqliteTable(
     updatedAt: integer("updated_at").notNull(),
   },
   (table) => [
-    // 'error' is a retired status: the app no longer writes it (a failed
+    // 'error' is a retired status: the project no longer writes it (a failed
     // activation returns the subject to 'cold' with the diagnostic in
     // last_error). It stays in this CHECK as a dead-but-allowed value so we
     // avoid a full SQLite table rebuild; migration 0003 converges any existing
@@ -315,7 +315,7 @@ export const driverInstanceMcpGrantsTable = sqliteTable(
     driverInstanceId: platformIdColumn<DriverInstanceId>("driver_instance_id")
       .notNull()
       .references(() => driverInstancesTable.id, { onDelete: "cascade" }),
-    appId: platformIdColumn<AppId>("app_id").notNull(),
+    projectId: platformIdColumn<ProjectId>("project_id").notNull(),
     serverId: platformIdColumn<McpServerId>("server_id").notNull(),
     updatedAt: integer("updated_at").notNull(),
   },

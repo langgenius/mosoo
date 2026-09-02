@@ -113,7 +113,7 @@ function toOwner(
   return {
     email: "",
     id: profile.owner.id,
-    name: profile.owner.name ?? "App owner",
+    name: profile.owner.name ?? "Project owner",
     ...(typeof profile.owner.imageUrl === "string" && profile.owner.imageUrl.length > 0
       ? { avatar: profile.owner.imageUrl }
       : {}),
@@ -141,7 +141,7 @@ export function mapAgentSummaryToListView(
     createdAt: profile.createdAt,
     description: profile.description ?? "",
     id: profile.id,
-    appId: profile.appId,
+    projectId: profile.projectId,
     kind: profile.kind,
     liveVersion: null,
     name: profile.name,
@@ -179,7 +179,7 @@ export function mapAgentDetailToView(
     createdAt: profile.createdAt,
     description: profile.description ?? "",
     id: profile.id,
-    appId: profile.appId,
+    projectId: profile.projectId,
     kind: profile.kind,
     liveVersion: profile.liveVersion,
     name: profile.name,

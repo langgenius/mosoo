@@ -58,7 +58,7 @@ function cliOAuthError(error: unknown): Response {
   throw error;
 }
 
-export function registerAuthRoute(app: Hono<ApiGatewayEnvironment>) {
+export function registerAuthRoute(project: Hono<ApiGatewayEnvironment>) {
   const auth = new Hono<ApiGatewayEnvironment>();
 
   auth.post("/cli/start", async (c) => {
@@ -126,5 +126,5 @@ export function registerAuthRoute(app: Hono<ApiGatewayEnvironment>) {
     return getBetterAuth(c.env).handler(c.req.raw);
   });
 
-  app.route("/auth", auth);
+  project.route("/auth", auth);
 }

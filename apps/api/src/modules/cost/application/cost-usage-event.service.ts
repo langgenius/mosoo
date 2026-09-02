@@ -8,7 +8,7 @@ import type {
   AgentId,
   DriverInstanceId,
   OrganizationId,
-  AppId,
+  ProjectId,
   SessionId,
   SessionRunId,
 } from "@mosoo/id";
@@ -33,7 +33,7 @@ export interface RuntimeUsageRunContext {
   createdAtMs: number;
   model: string;
   organizationId: OrganizationId;
-  appId: AppId;
+  projectId: ProjectId;
   provider: string;
   runtimeId: string | null;
   sessionId: SessionId;
@@ -204,7 +204,7 @@ function createRuntimeUsageEventInsert(database: AppDatabase, input: RecordRunti
     inputTokens: tokens.inputTokens,
     model,
     organizationId: input.run.organizationId,
-    appId: input.run.appId,
+    projectId: input.run.projectId,
     outputTokens: tokens.outputTokens,
     priceSnapshotJson: cost.priceSnapshotJson,
     pricingStatus: cost.pricingStatus,
@@ -270,13 +270,13 @@ export async function recordRuntimeUsageEvent(
     return;
   }
 
-  const appDatabase = getAppDatabase(database);
+  const projectDatabase = getAppDatabase(database);
 
-  if (await isUsageEventAlreadyRolledUp(appDatabase, resolveUsageEventIdentity(input))) {
+  if (await isUsageEventAlreadyRolledUp(projectDatabase, resolveUsageEventIdentity(input))) {
     return;
   }
 
-  const query = createRuntimeUsageEventUpsert(appDatabase, input);
+  const query = createRuntimeUsageEventUpsert(projectDatabase, input);
 
   if (query === null) {
     return;

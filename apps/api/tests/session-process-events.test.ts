@@ -16,7 +16,7 @@ import { getThreadSessionProcessEvents } from "../src/modules/sessions/applicati
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
 const ORGANIZATION_ID = "01J00000000000000000000006";
-const APP_ID = "01J0000000000000000000000Q";
+const PROJECT_ID = "01J0000000000000000000000Q";
 const SESSION_ID = "01J0000000000000000000000B";
 const ATTRIBUTED_SESSION_ID = "01J0000000000000000000000C";
 const VIEWER_ID = "01J00000000000000000000001";
@@ -36,7 +36,7 @@ function createProcessEventQueryDatabase(): SqliteD1Database {
   database.execute(`
     CREATE TABLE session (
       id text PRIMARY KEY NOT NULL,
-      app_id text NOT NULL,
+      project_id text NOT NULL,
       creator_account_id text NOT NULL,
       attributed_user_id text,
       agent_id text NOT NULL,
@@ -57,7 +57,7 @@ function createProcessEventQueryDatabase(): SqliteD1Database {
       archived_at integer
     );
 
-    CREATE TABLE app (
+    CREATE TABLE project (
       id text PRIMARY KEY NOT NULL,
       organization_id text NOT NULL,
       owner_account_id text NOT NULL,
@@ -102,7 +102,7 @@ function createProcessEventQueryDatabase(): SqliteD1Database {
 
     INSERT INTO session (
       id,
-      app_id,
+      project_id,
       creator_account_id,
       attributed_user_id,
       agent_id,
@@ -123,7 +123,7 @@ function createProcessEventQueryDatabase(): SqliteD1Database {
       archived_at
     ) VALUES (
       '${SESSION_ID}',
-      '${APP_ID}',
+      '${PROJECT_ID}',
       '${VIEWER_ID}',
       NULL,
       '01J00000000000000000000009',
@@ -144,7 +144,7 @@ function createProcessEventQueryDatabase(): SqliteD1Database {
       NULL
     ), (
       '${ATTRIBUTED_SESSION_ID}',
-      '${APP_ID}',
+      '${PROJECT_ID}',
       '${CREATOR_ID}',
       '${VIEWER_ID}',
       '01J00000000000000000000009',
@@ -165,7 +165,7 @@ function createProcessEventQueryDatabase(): SqliteD1Database {
       NULL
     );
 
-    INSERT INTO app (
+    INSERT INTO project (
       id,
       organization_id,
       owner_account_id,
@@ -174,10 +174,10 @@ function createProcessEventQueryDatabase(): SqliteD1Database {
       created_at,
       updated_at
     ) VALUES (
-      '${APP_ID}',
+      '${PROJECT_ID}',
       '${ORGANIZATION_ID}',
       '${VIEWER_ID}',
-      'Default App',
+      'Default Project',
       NULL,
       1,
       1
@@ -250,7 +250,7 @@ describe("session process event projection", () => {
         createProcessEventQueryDatabase(),
         VIEWER,
         {
-          appId: APP_ID,
+          projectId: PROJECT_ID,
           sessionId: SESSION_ID,
         },
         {
@@ -273,7 +273,7 @@ describe("session process event projection", () => {
       database,
       VIEWER,
       {
-        appId: APP_ID,
+        projectId: PROJECT_ID,
         sessionId: SESSION_ID,
       },
       {
@@ -301,7 +301,7 @@ describe("session process event projection", () => {
     });
 
     const events = await getThreadSessionProcessEvents(database, VIEWER, {
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       sessionId: SESSION_ID,
     });
 
@@ -324,7 +324,7 @@ describe("session process event projection", () => {
     });
 
     const events = await getThreadSessionProcessEvents(database, VIEWER, {
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       sessionId: SESSION_ID,
     });
 
@@ -347,7 +347,7 @@ describe("session process event projection", () => {
     });
 
     const events = await getThreadSessionProcessEvents(database, VIEWER, {
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       sessionId: SESSION_ID,
     });
 
@@ -370,7 +370,7 @@ describe("session process event projection", () => {
     });
 
     const events = await getThreadSessionProcessEvents(database, VIEWER, {
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       sessionId: SESSION_ID,
     });
 
@@ -409,7 +409,7 @@ describe("session process event projection", () => {
     });
 
     const events = await getThreadSessionProcessEvents(database, VIEWER, {
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       sessionId: SESSION_ID,
     });
 
@@ -479,7 +479,7 @@ describe("session process event projection", () => {
       database,
       VIEWER,
       {
-        appId: APP_ID,
+        projectId: PROJECT_ID,
         sessionId: SESSION_ID,
       },
       {
@@ -521,7 +521,7 @@ describe("session process event projection", () => {
       database,
       VIEWER,
       {
-        appId: APP_ID,
+        projectId: PROJECT_ID,
         sessionId: SESSION_ID,
       },
       {
@@ -557,7 +557,7 @@ describe("session process event projection", () => {
       innerDatabase,
       VIEWER,
       {
-        appId: APP_ID,
+        projectId: PROJECT_ID,
         sessionId: SESSION_ID,
       },
       {
@@ -592,7 +592,7 @@ describe("session process event projection", () => {
       innerDatabase,
       VIEWER,
       {
-        appId: APP_ID,
+        projectId: PROJECT_ID,
         sessionId: SESSION_ID,
       },
       {
@@ -628,7 +628,7 @@ describe("session process event projection", () => {
       innerDatabase,
       VIEWER,
       {
-        appId: APP_ID,
+        projectId: PROJECT_ID,
         sessionId: SESSION_ID,
       },
       {
@@ -665,7 +665,7 @@ describe("session process event projection", () => {
         innerDatabase,
         VIEWER,
         {
-          appId: APP_ID,
+          projectId: PROJECT_ID,
           sessionId: SESSION_ID,
         },
         {
@@ -677,7 +677,7 @@ describe("session process event projection", () => {
         innerDatabase,
         VIEWER,
         {
-          appId: APP_ID,
+          projectId: PROJECT_ID,
           sessionId: ATTRIBUTED_SESSION_ID,
         },
         {
@@ -705,7 +705,7 @@ describe("session process event projection", () => {
       createProcessEventQueryDatabase(),
       VIEWER,
       {
-        appId: APP_ID,
+        projectId: PROJECT_ID,
         sessionId: ATTRIBUTED_SESSION_ID,
       },
       {

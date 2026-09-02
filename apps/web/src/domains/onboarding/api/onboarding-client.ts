@@ -27,7 +27,7 @@ export async function onboardingBootstrap(input?: {
   });
 
   if (!payload.onboardingBootstrap.organization) {
-    throw new Error("App provisioning failed.");
+    throw new Error("Project provisioning failed.");
   }
 
   return {

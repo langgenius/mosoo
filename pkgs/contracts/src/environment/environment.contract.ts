@@ -1,4 +1,4 @@
-import type { AccountId, EnvironmentId, EnvironmentRevisionId, AppId } from "../id/id.contract";
+import type { AccountId, EnvironmentId, EnvironmentRevisionId, ProjectId } from "../id/id.contract";
 
 export type EnvironmentNetworkPolicy = "full" | "limited";
 
@@ -75,7 +75,7 @@ export interface EnvironmentSummary extends EnvironmentRevisionConfig {
   role: EnvironmentRegistryRole;
   updatedAt: string;
   usedByAgentCount: number;
-  appId: AppId;
+  projectId: ProjectId;
 }
 
 export interface EnvironmentDetail extends EnvironmentSummary {}
@@ -88,7 +88,7 @@ export interface EnvironmentVariableInput {
 export interface SetEnvironmentVariableValueInput {
   environmentId: EnvironmentId;
   key: string;
-  appId: AppId;
+  projectId: ProjectId;
   value: string;
 }
 
@@ -105,29 +105,29 @@ export interface EnvironmentConfigInput {
 export interface CreateEnvironmentInput extends EnvironmentConfigInput {
   description?: string | null;
   name: string;
-  appId: AppId;
+  projectId: ProjectId;
 }
 
 export interface UpdateEnvironmentInput extends EnvironmentConfigInput {
   description?: string | null;
   environmentId: EnvironmentId;
   name: string;
-  appId: AppId;
+  projectId: ProjectId;
 }
 
 export interface CreateEnvironmentForkInput {
   environmentId: EnvironmentId;
-  appId: AppId;
+  projectId: ProjectId;
 }
 
 export interface DeleteEnvironmentInput {
   environmentId: EnvironmentId;
-  appId: AppId;
+  projectId: ProjectId;
 }
 
-export interface SetAppDefaultEnvironmentInput {
+export interface SetProjectDefaultEnvironmentInput {
   environmentId: EnvironmentId;
-  appId: AppId;
+  projectId: ProjectId;
 }
 
 export interface SessionEnvironmentSnapshot extends EnvironmentRevisionConfig {

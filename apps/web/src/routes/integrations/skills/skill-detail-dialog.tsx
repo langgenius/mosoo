@@ -130,7 +130,7 @@ export function SkillDetailDialog({ onOpenChange, registry, skill }: Props) {
   }
 
   function handleDownload() {
-    globalThis.location.href = skillPackageUrl(skill.appId, skill.id);
+    globalThis.location.href = skillPackageUrl(skill.projectId, skill.id);
   }
 
   const canManageSkill = true;

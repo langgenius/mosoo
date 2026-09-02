@@ -72,9 +72,9 @@ describe("parseExpectedTableNames", () => {
 
 describe("findMissingProdTables", () => {
   test("returns expected tables absent from the live database", () => {
-    expect(findMissingProdTables(["agent", "session_run", "app"], ["agent", "app"])).toEqual([
-      "session_run",
-    ]);
+    expect(
+      findMissingProdTables(["agent", "session_run", "project"], ["agent", "project"]),
+    ).toEqual(["session_run"]);
   });
 
   test("returns empty when every expected table is present (extra live tables are ignored)", () => {

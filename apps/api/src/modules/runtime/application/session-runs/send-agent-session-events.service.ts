@@ -8,7 +8,7 @@ import type {
 import type { UserWarning } from "@mosoo/contracts/session-run";
 import { sessionsTable } from "@mosoo/db";
 import { parsePlatformId } from "@mosoo/id";
-import type { AccountId, AppId, SessionId, SessionRunId } from "@mosoo/id";
+import type { AccountId, ProjectId, SessionId, SessionRunId } from "@mosoo/id";
 import { getAvailableAgentSessionActionCapability } from "@mosoo/session-policy";
 import { and, eq, isNull } from "drizzle-orm";
 
@@ -31,7 +31,7 @@ import { parseAttachmentIds, startRuns } from "./start-runs.service";
 
 interface SendAgentSessionEventsInput {
   events: AgentSessionEventInput[];
-  appId: string;
+  projectId: string;
   sessionId: string;
 }
 
@@ -189,7 +189,7 @@ async function handleAgentSessionEvent(input: {
   executionContext: Pick<ExecutionContext, "waitUntil"> | null;
   options: AgentSessionEventsOptions;
   requestUrl: string;
-  appId: AppId;
+  projectId: ProjectId;
   sessionId: SessionId;
   viewer: AuthenticatedViewer;
 }): Promise<{
@@ -216,7 +216,7 @@ async function handleAgentSessionEvent(input: {
               prompt: {
                 content: text,
               },
-              appId: input.appId,
+              projectId: input.projectId,
               sessionId: input.sessionId,
               ...(input.event.clientRequestId !== null && input.event.clientRequestId !== undefined
                 ? { clientRequestId: input.event.clientRequestId }
@@ -249,7 +249,7 @@ async function handleAgentSessionEvent(input: {
         cachedState: input.options.cachedState ?? null,
         decision,
         requestId,
-        appId: input.appId,
+        projectId: input.projectId,
         sessionId: input.sessionId,
         viewer: input.viewer,
       });
@@ -279,7 +279,7 @@ async function handleAgentSessionEvent(input: {
         sessionId: input.sessionId,
       });
       const cancelled = await cancelRun(input.bindings, input.viewer, {
-        appId: input.appId,
+        projectId: input.projectId,
         runId,
         sessionId: input.sessionId,
       });
@@ -306,7 +306,7 @@ export async function sendAgentSessionEvents(
 ): Promise<AgentSessionEventBatch> {
   const options = request.options ?? {};
   const sessionId = parsePlatformId<SessionId>(request.input.sessionId, "session id");
-  const appId = parsePlatformId<AppId>(request.input.appId, "app id");
+  const projectId = parsePlatformId<ProjectId>(request.input.projectId, "project id");
   const viewerId = parsePlatformId<AccountId>(request.viewer.id, "viewer id");
 
   if (request.input.events.length === 0) {
@@ -314,7 +314,7 @@ export async function sendAgentSessionEvents(
   }
 
   const access = await getParticipantSessionSummaryAccessById(request.bindings.DB, viewerId, {
-    appId,
+    projectId,
     sessionId,
   });
   const session = access.session;
@@ -348,7 +348,7 @@ export async function sendAgentSessionEvents(
         event,
         executionContext: request.executionContext,
         options,
-        appId,
+        projectId,
         requestUrl: request.requestUrl,
         sessionId,
         viewer: request.viewer,

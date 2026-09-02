@@ -55,7 +55,7 @@ describe("createAgentSession", () => {
         bindings: createPublicHttpTestBindings(database) as ApiBindings,
         input: {
           agentId: PUBLIC_API_TEST_IDS.agent,
-          appId: PUBLIC_API_TEST_IDS.app,
+          projectId: PUBLIC_API_TEST_IDS.project,
           type: "preview",
         },
         viewer: OWNER_VIEWER,
@@ -70,7 +70,7 @@ describe("createAgentSession", () => {
       lastRun: null,
       model: "gpt-5.4",
       provider: "openai",
-      appId: PUBLIC_API_TEST_IDS.app,
+      projectId: PUBLIC_API_TEST_IDS.project,
       runtimeId: "openai-runtime",
       status: "IDLE",
       title: null,
@@ -94,7 +94,7 @@ describe("createAgentSession", () => {
         bindings: createPublicHttpTestBindings(database) as ApiBindings,
         input: {
           agentId: PUBLIC_API_TEST_IDS.agent,
-          appId: PUBLIC_API_TEST_IDS.app,
+          projectId: PUBLIC_API_TEST_IDS.project,
           type: "preview",
         },
         viewer: OWNER_VIEWER,
@@ -123,7 +123,7 @@ describe("createAgentSession", () => {
           bindings: createPublicHttpTestBindings(database) as ApiBindings,
           input: {
             agentId: PUBLIC_API_TEST_IDS.agent,
-            appId: PUBLIC_API_TEST_IDS.app,
+            projectId: PUBLIC_API_TEST_IDS.project,
             type: "ui",
             waitForRuntimeReady: true,
           },
@@ -151,7 +151,7 @@ describe("createAgentSession", () => {
           bindings: createPublicHttpTestBindings(database) as ApiBindings,
           input: {
             agentId: PUBLIC_API_TEST_IDS.agent,
-            appId: PUBLIC_API_TEST_IDS.app,
+            projectId: PUBLIC_API_TEST_IDS.project,
             type: "preview",
           },
           viewer: OWNER_VIEWER,
@@ -189,7 +189,7 @@ describe("createAgentSession", () => {
           bindings,
           input: {
             agentId: PUBLIC_API_TEST_IDS.agent,
-            appId: PUBLIC_API_TEST_IDS.app,
+            projectId: PUBLIC_API_TEST_IDS.project,
             type: "preview",
           },
           viewer: OWNER_VIEWER,

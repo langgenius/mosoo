@@ -22,24 +22,24 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 import type { AppIcon } from "./hugeicon";
 import { createHugeicon } from "./hugeicon";
 
-interface AppNavChild {
+interface ProjectNavChild {
   label: string;
   path: string;
 }
 
-interface AppNavItem {
-  children?: AppNavChild[];
+interface ProjectNavItem {
+  children?: ProjectNavChild[];
   icon: AppIcon;
   label: string;
   path: string;
 }
 
-interface AppNavSection {
+interface ProjectNavSection {
   label?: string;
-  items: AppNavItem[];
+  items: ProjectNavItem[];
 }
 
-function useNavSections(): AppNavSection[] {
+function useNavSections(): ProjectNavSection[] {
   const { t } = useTranslation();
   return [
     {
@@ -64,14 +64,14 @@ function useNavSections(): AppNavSection[] {
           path: "/integrations",
         },
       ],
-      label: t("nav.app"),
+      label: t("nav.project"),
     },
     {
       items: [
         {
-          icon: createHugeicon(Settings02Icon, "AppSettingsIcon"),
+          icon: createHugeicon(Settings02Icon, "ProjectSettingsIcon"),
           label: t("nav.settings"),
-          path: "/app-settings",
+          path: "/project-settings",
         },
       ],
       label: t("nav.account"),
@@ -131,7 +131,7 @@ function NavGroup({
   pathname,
 }: {
   collapsed: boolean;
-  item: AppNavItem;
+  item: ProjectNavItem;
   pathname: string;
 }) {
   const { t } = useTranslation();
@@ -273,7 +273,7 @@ function NavSection({
 }: {
   collapsed: boolean;
   pathname: string;
-  section: AppNavSection;
+  section: ProjectNavSection;
 }) {
   return (
     <div className={cn("flex flex-col", collapsed ? "gap-1" : "gap-0.5")}>
@@ -300,7 +300,13 @@ function NavSection({
   );
 }
 
-export function AppNavigation({ collapsed, pathname }: { collapsed: boolean; pathname: string }) {
+export function ProjectNavigation({
+  collapsed,
+  pathname,
+}: {
+  collapsed: boolean;
+  pathname: string;
+}) {
   const sections = useNavSections();
   return (
     <div className={cn("flex flex-col", collapsed ? "gap-1" : "gap-0")}>

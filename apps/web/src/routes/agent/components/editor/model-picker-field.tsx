@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ChevronDown } from "lucide-react";
 import type { ReactElement } from "react";
 
-import { toAppId } from "@/routes/typed-id";
+import { toProjectId } from "@/routes/typed-id";
 import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import {
@@ -26,11 +26,11 @@ import type { AgentEditorModel } from "./use-model";
 
 export function ModelPickerField({
   model,
-  appId,
+  projectId,
   readOnly,
 }: {
   model: AgentEditorModel;
-  appId: string;
+  projectId: string;
   readOnly: boolean;
 }): ReactElement {
   const { t } = useTranslation();
@@ -42,10 +42,10 @@ export function ModelPickerField({
       listAvailableAgentModels({
         currentModelId,
         currentVendorId,
-        appId: toAppId(appId),
+        projectId: toProjectId(projectId),
         runtimeId,
       }),
-    queryKey: ["available-agent-models", appId, runtimeId, currentModelId, currentVendorId],
+    queryKey: ["available-agent-models", projectId, runtimeId, currentModelId, currentVendorId],
   });
   const pickerEntries = listModelPickerEntries(entries, currentModelId, currentVendorId);
   const currentEntry = findCurrentModelEntry(entries, currentModelId, currentVendorId);

@@ -60,13 +60,13 @@ export async function insertSessionMessageRecord(
 
   for (let attempt = 0; attempt < MAX_SESSION_MESSAGE_INSERT_ATTEMPTS; attempt += 1) {
     try {
-      const appDb = getAppDatabase(database);
+      const projectDb = getAppDatabase(database);
       const seq = await allocateSessionMessageSeq(database, {
         sessionId: input.sessionId,
         timestampMs,
       });
 
-      await appDb
+      await projectDb
         .insert(sessionMessagesTable)
         .values({
           contentText: input.content,
@@ -117,9 +117,9 @@ async function allocateSessionMessageSeq(
     timestampMs: number;
   },
 ): Promise<number> {
-  const appDb = getAppDatabase(database);
+  const projectDb = getAppDatabase(database);
   const session =
-    (await appDb
+    (await projectDb
       .update(sessionsTable)
       .set({
         lastMessageAt: input.timestampMs,

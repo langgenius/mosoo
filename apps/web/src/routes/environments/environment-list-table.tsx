@@ -119,7 +119,7 @@ export function EnvironmentListTable({
                     onSetDefault(environment.id);
                   }}
                 >
-                  {t("environments.setAsAppDefault")}
+                  {t("environments.setAsProjectDefault")}
                 </DropdownMenuItem>
               ) : null}
               {environment.canDelete ? (

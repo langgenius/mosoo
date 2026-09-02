@@ -1,6 +1,6 @@
 import {
   agentsTable,
-  appsTable,
+  projectsTable,
   sessionModelCallsTable,
   sessionRunsTable,
   sessionsTable,
@@ -12,7 +12,7 @@ import type {
   AgentId,
   DriverInstanceId,
   OrganizationId,
-  AppId,
+  ProjectId,
   SessionId,
   SessionModelCallId,
   SessionRunId,
@@ -32,8 +32,8 @@ interface SessionModelCallRunRow {
   actor_user_id: AccountId;
   completed_at: number | null;
   model: string | null;
-  app_organization_id: OrganizationId;
-  app_id: AppId;
+  project_organization_id: OrganizationId;
+  project_id: ProjectId;
   provider: string | null;
   runtime_id: string | null;
   session_id: SessionId;
@@ -100,8 +100,8 @@ async function getSessionModelCallRunRow(
         agent_status: sql<"draft" | "published">`${agentsTable.status}`,
         completed_at: sessionRunsTable.completedAt,
         model: sql`${sessionRunsTable.model}`.mapWith(sessionRunsTable.model).as("model"),
-        app_organization_id: appsTable.organizationId,
-        app_id: sessionsTable.appId,
+        project_organization_id: projectsTable.organizationId,
+        project_id: sessionsTable.projectId,
         provider: sql`${sessionRunsTable.provider}`
           .mapWith(sessionRunsTable.provider)
           .as("provider"),
@@ -125,10 +125,10 @@ async function getSessionModelCallRunRow(
         agentsTable,
         and(
           eq(agentsTable.id, sessionRunsTable.agentId),
-          eq(agentsTable.appId, sessionsTable.appId),
+          eq(agentsTable.projectId, sessionsTable.projectId),
         ),
       )
-      .innerJoin(appsTable, eq(appsTable.id, sessionsTable.appId))
+      .innerJoin(projectsTable, eq(projectsTable.id, sessionsTable.projectId))
       .where(eq(sessionRunsTable.id, sessionRunId))
       .limit(1)
       .get()) ?? null
@@ -172,8 +172,8 @@ export async function upsertSessionModelCallUsage(
       agentStatus: run.agent_status,
       createdAtMs: completedAt ?? timestampMs,
       model,
-      organizationId: run.app_organization_id,
-      appId: run.app_id,
+      organizationId: run.project_organization_id,
+      projectId: run.project_id,
       provider,
       runtimeId: run.runtime_id ?? run.session_runtime_id,
       sessionId: run.session_id,
@@ -183,8 +183,8 @@ export async function upsertSessionModelCallUsage(
     usage,
   } satisfies Parameters<typeof createRuntimeUsageEventUpsert>[1];
 
-  await runAppDatabaseBatch(database, (appDatabase) => {
-    const modelCallUpsert = appDatabase
+  await runAppDatabaseBatch(database, (projectDatabase) => {
+    const modelCallUpsert = projectDatabase
       .insert(sessionModelCallsTable)
       .values({
         cacheCreationTokens: toTokenCount(usage.cachedWriteTokens),
@@ -236,7 +236,7 @@ export async function upsertSessionModelCallUsage(
         },
         target: [sessionModelCallsTable.sessionRunId, sessionModelCallsTable.callKey],
       });
-    const usageEventUpsert = createRuntimeUsageEventUpsert(appDatabase, usageEventInput);
+    const usageEventUpsert = createRuntimeUsageEventUpsert(projectDatabase, usageEventInput);
 
     return usageEventUpsert === null ? [modelCallUpsert] : [modelCallUpsert, usageEventUpsert];
   });

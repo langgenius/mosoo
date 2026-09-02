@@ -102,7 +102,7 @@ async function createContinuationFixture(): Promise<{
   const now = nowMsForTest();
 
   await database
-    .app()
+    .project()
     .insert(sandboxesTable)
     .values({
       createdAt: now,
@@ -115,7 +115,7 @@ async function createContinuationFixture(): Promise<{
     })
     .run();
   await database
-    .app()
+    .project()
     .insert(sandboxSessionsTable)
     .values({
       createdAt: now,
@@ -129,7 +129,7 @@ async function createContinuationFixture(): Promise<{
     })
     .run();
   await database
-    .app()
+    .project()
     .insert(sandboxBackupsTable)
     .values({
       createdAt: now - 20 * 24 * 60 * 60 * 1000,
@@ -186,7 +186,7 @@ describe("recycled cattle sandbox continuation", () => {
     ).rejects.toThrow("workspace checkpoint could not be restored");
 
     const rowAfterFailure = await database
-      .app()
+      .project()
       .select({ status: sandboxSessionsTable.status })
       .from(sandboxSessionsTable)
       .get();

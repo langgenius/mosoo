@@ -692,7 +692,7 @@ function arrayLiteral(items: readonly unknown[], depth: number): string {
   return `[\n${items.map((item) => `${childIndent}${literal(item, depth + 1)},`).join("\n")}\n${indent}]`;
 }
 
-// The icon-key map ships in its own generated module so the web app's
+// The icon-key map ships in its own generated module so the web project's
 // RuntimeIcon (rendered on nearly every page) can resolve icons without
 // importing the full catalog, which pulls @mosoo/contracts and its arktype
 // runtime onto every page's critical path. Runtime catalog entries win over

@@ -1,4 +1,4 @@
-import type { AppId, VendorCredentialId } from "../id/id.contract";
+import type { ProjectId, VendorCredentialId } from "../id/id.contract";
 
 export interface VendorCredential {
   apiBase: string | null;
@@ -7,7 +7,7 @@ export interface VendorCredential {
   maskedApiKey: string;
   models: string[] | null;
   name: string;
-  appId: AppId;
+  projectId: ProjectId;
   vendorId: string;
 }
 
@@ -22,7 +22,7 @@ export interface CreateVendorCredentialInput {
   apiKey: string;
   models?: string[] | null;
   name: string;
-  appId: AppId;
+  projectId: ProjectId;
   vendorId: string;
 }
 
@@ -32,14 +32,14 @@ export interface UpdateVendorCredentialInput {
   id: VendorCredentialId;
   models?: string[] | null;
   name?: string;
-  appId: AppId;
+  projectId: ProjectId;
 }
 
 export interface TestVendorCredentialInput {
   apiBase?: string | null;
   apiKey: string;
   modelId?: string | null;
-  appId: AppId;
+  projectId: ProjectId;
   vendorId: string;
 }
 
@@ -51,10 +51,10 @@ export interface TestVendorCredentialResult {
 
 export interface DeleteVendorCredentialInput {
   id: VendorCredentialId;
-  appId: AppId;
+  projectId: ProjectId;
 }
 
 export interface SetDefaultVendorCredentialInput {
   id: VendorCredentialId;
-  appId: AppId;
+  projectId: ProjectId;
 }

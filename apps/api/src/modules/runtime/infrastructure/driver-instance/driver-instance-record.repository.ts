@@ -57,7 +57,7 @@ export async function createDriverInstanceRecord(
     createdAt: now,
     credentialId: grant.credentialId,
     driverInstanceId: input.driverInstanceId,
-    appId: grant.appId,
+    projectId: grant.projectId,
     serverId: grant.serverId,
     updatedAt: now,
   }));

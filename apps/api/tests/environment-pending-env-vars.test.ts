@@ -33,7 +33,7 @@ describe("Environment pending env vars", () => {
       toPublicRevisionConfig({
         allowMcpServers: false,
         allowPackageManagers: true,
-        allowedHosts: ["api.linear.app"],
+        allowedHosts: ["api.linear.project"],
         envVars,
         networkPolicy: "limited",
         packages: [],
@@ -89,7 +89,11 @@ describe("Environment pending env vars", () => {
       }),
     ).rejects.toThrow();
 
-    await database.app().delete(vaultSecretsTable).where(eq(vaultSecretsTable.id, secretId)).run();
+    await database
+      .project()
+      .delete(vaultSecretsTable)
+      .where(eq(vaultSecretsTable.id, secretId))
+      .run();
 
     await expect(
       decryptEnvironmentVariables(bindings, {

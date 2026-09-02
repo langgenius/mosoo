@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 
-import { hasRunUiThread } from "../src/routes/app-overview/use-onboarding-progress";
+import { hasRunUiThread } from "../src/routes/project-overview/use-onboarding-progress";
 
-describe("App Overview onboarding progress", () => {
+describe("Project Overview onboarding progress", () => {
   test("keeps Preview sessions and unrun UI Threads incomplete", () => {
     expect(
       hasRunUiThread([

@@ -6,7 +6,7 @@ import type { SessionRunStatus } from "@mosoo/contracts/session-run";
 import type {
   AccountId,
   AgentId,
-  AppId,
+  ProjectId,
   PlatformId,
   SandboxId,
   SessionId,
@@ -23,7 +23,7 @@ export type { SessionLiveState };
 
 export interface RuntimeSessionLink {
   agentId: AgentId | null;
-  appId: AppId | null;
+  projectId: ProjectId | null;
   callerId: PlatformId | null;
   creatorId: PlatformId | null;
   executionOwnerId: AccountId | null;
@@ -63,7 +63,7 @@ export interface RuntimeDriverRunTransition {
   status: "cancelled" | "completed" | "failed" | "running";
 }
 
-export interface AppRuntimeDriverEventsResult {
+export interface ProjectRuntimeDriverEventsResult {
   finalAssistantMessage: { id: string; text: string } | null;
   link: RuntimeSessionLink;
   liveStateChanged: boolean;

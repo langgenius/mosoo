@@ -6,11 +6,11 @@ Status: implemented foundation in Alpha and part of the managed runtime contract
 
 Agent work can begin in the mosoo console or through a developer integration. Without one durable history, requests, follow-ups, results, and failures would be scattered across those entry points.
 
-mosoo keeps each interaction as a record of work. This lets an App owner understand what happened, return later, and continue when appropriate without needing to understand the temporary execution environment behind the Agent.
+mosoo keeps each interaction as a record of work. This lets a Project owner understand what happened, return later, and continue when appropriate without needing to understand the temporary execution environment behind the Agent.
 
 ## Who It Is For
 
-Builders and App owners use this history directly to start, monitor, and revisit Agent work. Developer integrations benefit from the same continuity without needing a mosoo console account for every interaction.
+Builders and Project owners use this history directly to start, monitor, and revisit Agent work. Developer integrations benefit from the same continuity without needing a mosoo console account for every interaction.
 
 ## Experience Today
 
@@ -23,6 +23,6 @@ Builders and App owners use this history directly to start, monitor, and revisit
 
 The current console still calls this history a **Thread** in several screens while the main navigation is moving toward **Runs**. Treat these as views of Agent work, not separate products.
 
-Each record belongs to one App and one Agent. The Agent version and settings selected when it starts remain attached to that history. Recorded messages and managed files are durable; temporary processes and unrecorded files are not.
+Each record belongs to one Project and one Agent. The Agent version and settings selected when it starts remain attached to that history. Recorded messages and managed files are durable; temporary processes and unrecorded files are not.
 
 These paths exist in the current repository and have automated coverage, but mosoo remains in Alpha. Production reliability and external adoption have not yet been proven.

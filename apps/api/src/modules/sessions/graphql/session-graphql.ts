@@ -1,5 +1,5 @@
 import { parsePlatformId } from "@mosoo/id";
-import type { AgentId, AppId, SessionId } from "@mosoo/id";
+import type { AgentId, ProjectId, SessionId } from "@mosoo/id";
 
 import type { GraphQLModule } from "../../../adapters/graphql/graphql-module";
 import { sessionGraphQLSpec } from "../../../adapters/graphql/graphql-module-specs";
@@ -34,7 +34,7 @@ import { autoTitleSession, renameSession } from "../application/session-title.se
 import { listThreadAgentSessions } from "../application/thread-agent-session-list.service";
 
 interface SessionArgs {
-  appId: string;
+  projectId: string;
   sessionId: string;
 }
 
@@ -46,7 +46,7 @@ interface SessionsArgs {
   archived?: Parameters<typeof listSessions>[2]["archived"];
   beforeCursor?: string | null;
   limit?: number | null;
-  appId: string;
+  projectId: string;
   type?: Parameters<typeof listSessions>[2]["type"];
 }
 
@@ -68,7 +68,7 @@ interface RemoveSessionResourceArgs {
 
 interface SendAgentSessionEventsArgs {
   events: Parameters<typeof sendAgentSessionEvents>[0]["input"]["events"];
-  appId: string;
+  projectId: string;
   sessionId: string;
 }
 
@@ -82,12 +82,12 @@ interface AgentSessionListArgs {
   beforeCursor?: string | null;
   limit?: number | null;
   participantOnly?: Parameters<typeof listAgentSessions>[2]["participantOnly"];
-  appId: string;
+  projectId: string;
   type?: Parameters<typeof listAgentSessions>[2]["type"];
 }
 
 interface AgentSessionRetrieveArgs {
-  appId: string;
+  projectId: string;
   sessionId: string;
 }
 
@@ -95,8 +95,8 @@ function readAgentId(value: string): AgentId {
   return parsePlatformId<AgentId>(value, "Agent ID");
 }
 
-function readAppId(value: string): AppId {
-  return parsePlatformId<AppId>(value, "App ID");
+function readProjectId(value: string): ProjectId {
+  return parsePlatformId<ProjectId>(value, "Project ID");
 }
 
 function readSessionId(value: string): SessionId {
@@ -112,7 +112,7 @@ export const sessionGraphQLModule = {
       const sessionId = readSessionId(args.sessionId);
       await archiveAgentSession({
         bindings: context.bindings,
-        appId: readAppId(args.appId),
+        projectId: readProjectId(args.projectId),
         sessionId,
         viewer: context.viewer,
       });
@@ -132,7 +132,7 @@ export const sessionGraphQLModule = {
       const sessionId = readSessionId(args.sessionId);
       await deleteAgentSession({
         bindings: context.bindings,
-        appId: readAppId(args.appId),
+        projectId: readProjectId(args.projectId),
         sessionId,
         viewer: context.viewer,
       });
@@ -153,7 +153,7 @@ export const sessionGraphQLModule = {
         bindings: context.bindings,
         executionContext: context.executionContext,
         input: {
-          appId: readAppId(args.appId),
+          projectId: readProjectId(args.projectId),
           sessionId: readSessionId(args.sessionId),
         },
         requestUrl: context.request.url,
@@ -165,7 +165,7 @@ export const sessionGraphQLModule = {
         executionContext: context.executionContext,
         input: {
           events: args.events,
-          appId: readAppId(args.appId),
+          projectId: readProjectId(args.projectId),
           sessionId: readSessionId(args.sessionId),
         },
         requestUrl: context.request.url,
@@ -183,7 +183,7 @@ export const sessionGraphQLModule = {
       const sessionId = readSessionId(args.sessionId);
       await unarchiveAgentSession({
         database: context.bindings.DB,
-        appId: readAppId(args.appId),
+        projectId: readProjectId(args.projectId),
         sessionId,
         viewer: context.viewer,
       });
@@ -193,7 +193,7 @@ export const sessionGraphQLModule = {
   authenticatedQueryResolvers: {
     agentSessionDiagnostics: async (_parent, args: AgentSessionRetrieveArgs, context) =>
       getAgentSessionDiagnostics(context.bindings.DB, context.viewer, {
-        appId: readAppId(args.appId),
+        projectId: readProjectId(args.projectId),
         sessionId: readSessionId(args.sessionId),
       }),
     agentSessionList: async (_parent, args: AgentSessionListArgs, context) =>
@@ -203,22 +203,22 @@ export const sessionGraphQLModule = {
         beforeCursor: args.beforeCursor ?? null,
         limit: args.limit ?? null,
         participantOnly: args.participantOnly ?? null,
-        appId: readAppId(args.appId),
+        projectId: readProjectId(args.projectId),
         type: args.type ?? null,
       }),
     agentSessionRetrieve: async (_parent, args: AgentSessionRetrieveArgs, context) =>
       retrieveAgentSession(context.bindings.DB, context.viewer, {
-        appId: readAppId(args.appId),
+        projectId: readProjectId(args.projectId),
         sessionId: readSessionId(args.sessionId),
       }),
     listSessionResources: async (_parent, args: SessionArgs, context) =>
       listSessionResources(context.bindings.DB, context.viewer, {
-        appId: readAppId(args.appId),
+        projectId: readProjectId(args.projectId),
         sessionId: readSessionId(args.sessionId),
       }),
     session: async (_parent, args: SessionArgs, context) =>
       getSession(context.bindings.DB, context.viewer, {
-        appId: readAppId(args.appId),
+        projectId: readProjectId(args.projectId),
         sessionId: readSessionId(args.sessionId),
       }),
     sessionList: async (_parent, args: SessionsArgs, context) =>
@@ -226,12 +226,12 @@ export const sessionGraphQLModule = {
         archived: args.archived ?? null,
         beforeCursor: args.beforeCursor ?? null,
         limit: args.limit ?? null,
-        appId: readAppId(args.appId),
+        projectId: readProjectId(args.projectId),
         type: args.type ?? null,
       }),
     sessionMessages: async (_parent, args: SessionArgs, context) =>
       getSessionMessages(context.bindings.DB, context.viewer, {
-        appId: readAppId(args.appId),
+        projectId: readProjectId(args.projectId),
         sessionId: readSessionId(args.sessionId),
       }),
     sessionProcessEvents: async (_parent, args: SessionProcessEventsArgs, context) =>
@@ -239,7 +239,7 @@ export const sessionGraphQLModule = {
         context.bindings.DB,
         context.viewer,
         {
-          appId: readAppId(args.appId),
+          projectId: readProjectId(args.projectId),
           sessionId: readSessionId(args.sessionId),
         },
         {
@@ -251,17 +251,17 @@ export const sessionGraphQLModule = {
         archived: args.archived ?? null,
         beforeCursor: args.beforeCursor ?? null,
         limit: args.limit ?? null,
-        appId: readAppId(args.appId),
+        projectId: readProjectId(args.projectId),
         type: args.type ?? null,
       }),
     threadAgentSessionRetrieve: async (_parent, args: AgentSessionRetrieveArgs, context) =>
       retrieveThreadAgentSession(context.bindings.DB, context.viewer, {
-        appId: readAppId(args.appId),
+        projectId: readProjectId(args.projectId),
         sessionId: readSessionId(args.sessionId),
       }),
     threadSessionMessages: async (_parent, args: SessionArgs, context) =>
       getThreadSessionMessages(context.bindings.DB, context.viewer, {
-        appId: readAppId(args.appId),
+        projectId: readProjectId(args.projectId),
         sessionId: readSessionId(args.sessionId),
       }),
     threadSessionProcessEvents: async (_parent, args: SessionProcessEventsArgs, context) =>
@@ -269,7 +269,7 @@ export const sessionGraphQLModule = {
         context.bindings.DB,
         context.viewer,
         {
-          appId: readAppId(args.appId),
+          projectId: readProjectId(args.projectId),
           sessionId: readSessionId(args.sessionId),
         },
         {

@@ -25,7 +25,7 @@ function createRuntimeSessionLinkDatabase(): SqliteD1Database {
     CREATE TABLE session (
       id text PRIMARY KEY NOT NULL,
       agent_id text NOT NULL,
-      app_id text,
+      project_id text,
       creator_account_id text NOT NULL,
       type text DEFAULT 'preview' NOT NULL
 );

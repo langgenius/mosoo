@@ -1,11 +1,11 @@
 import { accountsTable, mcpServersTable } from "@mosoo/db";
-import type { AccountId, McpServerId, AppId } from "@mosoo/id";
+import type { AccountId, McpServerId, ProjectId } from "@mosoo/id";
 import { and, eq, inArray, sql } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { forbiddenError } from "../../../platform/errors";
-import { ensureAppOwnership } from "../../apps/application/app.service";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
+import { ensureProjectOwnership } from "../../projects/application/project.service";
 import { readAccountId } from "./mcp-platform-ids";
 import type { ServerRow, ViewerRow } from "./mcp-types";
 
@@ -29,7 +29,7 @@ const serverColumns = {
   ),
   ownerId: mcpServersTable.ownerId,
   ownerName: sql<string | null>`${accountsTable.name}`.as("ownerName"),
-  appId: mcpServersTable.appId,
+  projectId: mcpServersTable.projectId,
   source: sql<ServerRow["source"]>`${mcpServersTable.source}`.as("source"),
   updatedAt: sql<number>`${mcpServersTable.updatedAt}`.as("updatedAt"),
   url: mcpServersTable.url,
@@ -114,19 +114,19 @@ export async function listServerRowsById(
 export async function ensureServerAccess(
   database: D1Database,
   viewer: AuthenticatedViewer,
-  appId: AppId,
+  projectId: ProjectId,
   serverId: McpServerId,
 ): Promise<{
   server: ServerRow;
 }> {
   const viewerId = readAccountId(viewer.id);
-  await ensureAppOwnership(database, viewerId, appId);
+  await ensureProjectOwnership(database, viewerId, projectId);
   const row =
     (await getAppDatabase(database)
       .select(serverColumns)
       .from(mcpServersTable)
       .leftJoin(accountsTable, eq(accountsTable.id, mcpServersTable.ownerId))
-      .where(and(eq(mcpServersTable.id, serverId), eq(mcpServersTable.appId, appId)))
+      .where(and(eq(mcpServersTable.id, serverId), eq(mcpServersTable.projectId, projectId)))
       .limit(1)
       .get()) ?? null;
 
@@ -146,10 +146,10 @@ export async function ensureServerAccess(
 export async function ensureServerManageAccess(
   database: D1Database,
   viewer: AuthenticatedViewer,
-  appId: AppId,
+  projectId: ProjectId,
   serverId: McpServerId,
 ): Promise<{
   server: ServerRow;
 }> {
-  return ensureServerAccess(database, viewer, appId, serverId);
+  return ensureServerAccess(database, viewer, projectId, serverId);
 }

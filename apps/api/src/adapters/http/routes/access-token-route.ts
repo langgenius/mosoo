@@ -66,8 +66,8 @@ async function readCreatePersonalAccessTokenRequest(
   };
 }
 
-export function registerAccessTokenRoute(app: Hono<ApiGatewayEnvironment>) {
-  app.get("/access-tokens", async (c) => {
+export function registerAccessTokenRoute(project: Hono<ApiGatewayEnvironment>) {
+  project.get("/access-tokens", async (c) => {
     try {
       const viewer = await getAuthenticatedViewerFromRequest(c.env, c.req.raw);
       if (!viewer) {
@@ -80,7 +80,7 @@ export function registerAccessTokenRoute(app: Hono<ApiGatewayEnvironment>) {
     }
   });
 
-  app.post("/access-tokens", async (c) => {
+  project.post("/access-tokens", async (c) => {
     try {
       const viewer = await getAuthenticatedViewerFromRequest(c.env, c.req.raw);
       if (!viewer) {
@@ -98,7 +98,7 @@ export function registerAccessTokenRoute(app: Hono<ApiGatewayEnvironment>) {
     }
   });
 
-  app.delete("/access-tokens/:tokenId", async (c) => {
+  project.delete("/access-tokens/:tokenId", async (c) => {
     try {
       const viewer = await getAuthenticatedViewerFromRequest(c.env, c.req.raw);
       if (!viewer) {

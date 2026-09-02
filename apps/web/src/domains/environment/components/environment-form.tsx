@@ -391,7 +391,7 @@ export function EnvironmentForm({
                       allowedHostsText: event.target.value,
                     }));
                   }}
-                  placeholder="api.githubcopilot.com, mcp.linear.app"
+                  placeholder="api.githubcopilot.com, mcp.linear.project"
                   value={draft.allowedHostsText}
                 />
               </div>

@@ -11,9 +11,9 @@ problematic turn and inspect it without recreating the run.
 
 ## Who it serves
 
-The primary user is the App owner or Builder operating an Agent in Preview or
+The primary user is the Project owner or Builder operating an Agent in Preview or
 after it has handled real work. It is designed for troubleshooting individual
-Sessions, not for App Users or finance and compliance teams.
+Sessions, not for Project Users or finance and compliance teams.
 
 ## Current user flow
 
@@ -34,6 +34,6 @@ record. It does not promise every internal system action, and usage updates are
 not shown as activity rows. Lists and replays show a recent subset and warn when
 older activity is hidden. There is no cross-Session search, pagination, or
 full-Session export today. Token figures are diagnostic hints, not priced
-spend; use App Usage for cost review.
+spend; use Project Usage for cost review.
 Deleting a Session also removes this replay, so it must not be used for
 compliance retention.

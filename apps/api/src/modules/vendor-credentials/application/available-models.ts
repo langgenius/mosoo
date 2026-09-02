@@ -1,5 +1,5 @@
 import type { PresetModelEntry } from "@mosoo/contracts/models";
-import type { AppId } from "@mosoo/id";
+import type { ProjectId } from "@mosoo/id";
 import {
   PRESET_MODEL_CATALOG,
   VENDOR_OPENAI_COMPATIBLE,
@@ -7,16 +7,16 @@ import {
 } from "@mosoo/runtime-catalog";
 
 import { isTruthy } from "../../../shared/truthiness";
-import { ensureAppOwnership } from "../../apps/application/app.service";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
+import { ensureProjectOwnership } from "../../projects/application/project.service";
 import { listEffectiveCustomCredentialModelRows } from "./vendor-credential-custom-models";
-import { listAppVendorCredentialRows } from "./vendor-credential.repository";
+import { listProjectVendorCredentialRows } from "./vendor-credential.repository";
 import { collectAvailableVendorIds } from "./vendor-credential.secret-resolution";
 import type { VendorCredentialRow } from "./vendor-credential.types";
 export interface AvailableModelsInput {
   currentModelId?: string;
   currentVendorId?: string;
-  appId: AppId;
+  projectId: ProjectId;
   runtimeId: string;
 }
 
@@ -257,7 +257,7 @@ export async function resolveAvailableModels(
   input: AvailableModelsInput,
 ): Promise<ResolvedModelEntry[]> {
   const scope = runtimeModelScope(input.runtimeId);
-  const credentialRows = await listAppVendorCredentialRows(database, input.appId);
+  const credentialRows = await listProjectVendorCredentialRows(database, input.projectId);
   const availableVendorIds = collectAvailableVendorIds(credentialRows);
   const customEntries = resolveCustomEntries(
     scope.acceptsCustomProvider,
@@ -303,16 +303,16 @@ export async function resolveAvailableModelsForViewer(
   input: {
     currentModelId?: string;
     currentVendorId?: string;
-    appId: AppId;
+    projectId: ProjectId;
     runtimeId: string;
   },
 ): Promise<ResolvedModelEntry[]> {
-  await ensureAppOwnership(database, viewer.id, input.appId);
+  await ensureProjectOwnership(database, viewer.id, input.projectId);
 
   return resolveAvailableModels(database, {
     ...(isTruthy(input.currentModelId) ? { currentModelId: input.currentModelId } : {}),
     ...(isTruthy(input.currentVendorId) ? { currentVendorId: input.currentVendorId } : {}),
-    appId: input.appId,
+    projectId: input.projectId,
     runtimeId: input.runtimeId,
   });
 }

@@ -25,7 +25,7 @@ export class SqliteD1Database implements D1Database {
     return createSqliteD1Statement(this.#database, query, [], this.#maxBoundParams);
   }
 
-  app(): AppDatabase {
+  project(): AppDatabase {
     return getAppDatabase(this);
   }
 

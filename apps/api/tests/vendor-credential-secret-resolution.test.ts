@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { parsePlatformId } from "@mosoo/id";
-import type { OrganizationId, PlatformId, AppId, VendorCredentialId } from "@mosoo/id";
+import type { OrganizationId, PlatformId, ProjectId, VendorCredentialId } from "@mosoo/id";
 
 import { readSecretOutcome } from "../src/modules/vault/application/vault-secret-store";
 import {
@@ -19,8 +19,11 @@ const ORGANIZATION_ID = parsePlatformId<OrganizationId>(
   "01J00000000000000000000006",
   "organization ID",
 );
-const APP_ID = parsePlatformId<AppId>("01J00000000000000000000009", "app ID");
-const OTHER_APP_ID = parsePlatformId<AppId>("01J0000000000000000000000A", "other app ID");
+const PROJECT_ID = parsePlatformId<ProjectId>("01J00000000000000000000009", "project ID");
+const OTHER_PROJECT_ID = parsePlatformId<ProjectId>(
+  "01J0000000000000000000000A",
+  "other project ID",
+);
 const CREDENTIAL_ID = parsePlatformId<VendorCredentialId>(
   "01J0000000000000000000000B",
   "credential ID",
@@ -60,7 +63,7 @@ function createBindings(database: D1Database): ApiBindings {
 function createCredentialRow(input: {
   credentialId?: VendorCredentialId;
   onReadVendorId?: () => void;
-  appId?: AppId;
+  projectId?: ProjectId;
   secretId?: PlatformId;
   vendorId: string;
 }): VendorCredentialRow {
@@ -71,7 +74,7 @@ function createCredentialRow(input: {
     modelsJson: null,
     name: `${input.vendorId} credential`,
     organizationId: ORGANIZATION_ID,
-    appId: input.appId ?? APP_ID,
+    projectId: input.projectId ?? PROJECT_ID,
   } as VendorCredentialRow;
 
   Object.defineProperty(row, "vendorId", {
@@ -86,9 +89,9 @@ function createCredentialRow(input: {
 }
 
 describe("vendor credential secret resolution", () => {
-  test("returns typed App denial outcomes before reading storage", async () => {
+  test("returns typed Project denial outcomes before reading storage", async () => {
     const row = createCredentialRow({
-      appId: OTHER_APP_ID,
+      projectId: OTHER_PROJECT_ID,
       vendorId: "openai",
     });
 
@@ -99,7 +102,7 @@ describe("vendor credential secret resolution", () => {
       },
       {
         credential: row,
-        appId: APP_ID,
+        projectId: PROJECT_ID,
         providerId: "openai",
         purpose: "runtime_api_key",
       },
@@ -109,18 +112,18 @@ describe("vendor credential secret resolution", () => {
       credentialId: row.id,
       providerId: "openai",
       purpose: "runtime_api_key",
-      reason: "credential_app_mismatch",
+      reason: "credential_project_mismatch",
       status: "denied",
     });
   });
 
-  test("stores and reads credential secrets through the expected App kind", async () => {
+  test("stores and reads credential secrets through the expected Project kind", async () => {
     const database = createSecretDatabase();
     const bindings = createBindings(database);
     const secretId = await storeVendorCredentialSecret(bindings, {
-      apiKey: "sk-app",
+      apiKey: "sk-project",
       credentialId: CREDENTIAL_ID,
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       providerId: "openai",
       purpose: "credential_create_api_key",
     });
@@ -132,21 +135,21 @@ describe("vendor credential secret resolution", () => {
 
     const outcome = await readVendorCredentialSecret(bindings, {
       credential: row,
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       providerId: "openai",
       purpose: "runtime_api_key",
     });
 
-    expect(outcome).toEqual({ apiKey: "sk-app", status: "allowed" });
+    expect(outcome).toEqual({ apiKey: "sk-project", status: "allowed" });
   });
 
-  test("denies credential reads when the storage kind belongs to another App credential", async () => {
+  test("denies credential reads when the storage kind belongs to another Project credential", async () => {
     const database = createSecretDatabase();
     const bindings = createBindings(database);
     const secretId = await storeVendorCredentialSecret(bindings, {
-      apiKey: "sk-wrong-app",
+      apiKey: "sk-wrong-project",
       credentialId: OTHER_CREDENTIAL_ID,
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       providerId: "openai",
       purpose: "credential_create_api_key",
     });
@@ -158,7 +161,7 @@ describe("vendor credential secret resolution", () => {
 
     const outcome = await readVendorCredentialSecret(bindings, {
       credential: row,
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       providerId: "openai",
       purpose: "runtime_api_key",
     });
@@ -172,20 +175,20 @@ describe("vendor credential secret resolution", () => {
     });
   });
 
-  test("deletes credential secrets only through the expected App kind", async () => {
+  test("deletes credential secrets only through the expected Project kind", async () => {
     const database = createSecretDatabase();
     const bindings = createBindings(database);
     const secretId = await storeVendorCredentialSecret(bindings, {
       apiKey: "sk-delete",
       credentialId: CREDENTIAL_ID,
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       providerId: "openai",
       purpose: "credential_create_api_key",
     });
 
     const outcome = await deleteVendorCredentialSecret(database, {
       credentialId: CREDENTIAL_ID,
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       providerId: "openai",
       purpose: "credential_delete",
       secretId,
@@ -198,20 +201,20 @@ describe("vendor credential secret resolution", () => {
     });
   });
 
-  test("denies scoped secret reads when the credential belongs to another App", () => {
+  test("denies scoped secret reads when the credential belongs to another Project", () => {
     const row = createCredentialRow({
-      appId: OTHER_APP_ID,
+      projectId: OTHER_PROJECT_ID,
       vendorId: "openai",
     });
 
     const denial = getVendorCredentialSecretReadDenial({
       credential: row,
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       providerId: "openai",
       purpose: "runtime_api_key",
     });
 
-    expect(denial).toBe("credential_app_mismatch");
+    expect(denial).toBe("credential_project_mismatch");
   });
 
   test("denies scoped secret reads when the credential belongs to another provider", () => {
@@ -219,7 +222,7 @@ describe("vendor credential secret resolution", () => {
 
     const denial = getVendorCredentialSecretReadDenial({
       credential: row,
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       providerId: "anthropic",
       purpose: "runtime_api_key",
     });
@@ -227,12 +230,12 @@ describe("vendor credential secret resolution", () => {
     expect(denial).toBe("credential_provider_mismatch");
   });
 
-  test("allows scoped secret reads for credentials in the requested App and provider", () => {
+  test("allows scoped secret reads for credentials in the requested Project and provider", () => {
     const row = createCredentialRow({ vendorId: "openai" });
 
     const denial = getVendorCredentialSecretReadDenial({
       credential: row,
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       providerId: "openai",
       purpose: "runtime_api_key",
     });
@@ -240,23 +243,23 @@ describe("vendor credential secret resolution", () => {
     expect(denial).toBeNull();
   });
 
-  test("uses the same App checks for credential display secrets", () => {
+  test("uses the same Project checks for credential display secrets", () => {
     const row = createCredentialRow({
-      appId: OTHER_APP_ID,
+      projectId: OTHER_PROJECT_ID,
       vendorId: "openai",
     });
 
     const denial = getVendorCredentialSecretReadDenial({
       credential: row,
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       providerId: "openai",
       purpose: "credential_display_api_key",
     });
 
-    expect(denial).toBe("credential_app_mismatch");
+    expect(denial).toBe("credential_project_mismatch");
   });
 
-  test("collects available vendor IDs from App credentials", () => {
+  test("collects available vendor IDs from Project credentials", () => {
     const rows = [
       createCredentialRow({ vendorId: "openai" }),
       createCredentialRow({ vendorId: "anthropic" }),
@@ -267,7 +270,7 @@ describe("vendor credential secret resolution", () => {
     expect(availableVendorIds).toEqual(new Set(["openai", "anthropic"]));
   });
 
-  test("collects available vendor IDs from large App credential lists", () => {
+  test("collects available vendor IDs from large Project credential lists", () => {
     const rows = Array.from({ length: 120 }, (_, index) =>
       createCredentialRow({
         vendorId: `provider-${index.toString().padStart(3, "0")}`,

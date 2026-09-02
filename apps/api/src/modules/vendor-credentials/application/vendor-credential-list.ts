@@ -1,26 +1,26 @@
 import type { VendorCredential } from "@mosoo/contracts/vendor-credential";
-import type { AppId } from "@mosoo/id";
+import type { ProjectId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
-import { ensureAppOwnership } from "../../apps/application/app.service";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
+import { ensureProjectOwnership } from "../../projects/application/project.service";
 import { toVendorCredentialWithSecret } from "./vendor-credential.mapper";
-import { listAppVendorCredentialRows } from "./vendor-credential.repository";
+import { listProjectVendorCredentialRows } from "./vendor-credential.repository";
 import { readVendorCredentialSecret } from "./vendor-credential.secret-resolution";
 
 export async function listVendorCredentials(
   bindings: ApiBindings,
   viewer: AuthenticatedViewer,
-  appId: AppId,
+  projectId: ProjectId,
 ): Promise<VendorCredential[]> {
-  await ensureAppOwnership(bindings.DB, viewer.id, appId);
-  const rows = await listAppVendorCredentialRows(bindings.DB, appId);
+  await ensureProjectOwnership(bindings.DB, viewer.id, projectId);
+  const rows = await listProjectVendorCredentialRows(bindings.DB, projectId);
 
   return Promise.all(
     rows.map(async (row) => {
       const secret = await readVendorCredentialSecret(bindings, {
         credential: row,
-        appId,
+        projectId,
         providerId: row.vendorId,
         purpose: "credential_display_api_key",
       });

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { parsePlatformId } from "@mosoo/id";
-import type { AccountId, FileId, OrganizationId, AppId, SessionId } from "@mosoo/id";
+import type { AccountId, FileId, OrganizationId, ProjectId, SessionId } from "@mosoo/id";
 
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
 import { fileStore } from "../src/modules/files/application/file-store";
@@ -42,7 +42,7 @@ const ORGANIZATION_ID = parsePlatformId<OrganizationId>(
   "01J00000000000000000000006",
   "organization ID",
 );
-const APP_ID = parsePlatformId<AppId>("01J0000000000000000000000Q", "app ID");
+const PROJECT_ID = parsePlatformId<ProjectId>("01J0000000000000000000000Q", "project ID");
 
 const VIEWER: AuthenticatedViewer = {
   email: "owner@example.com",
@@ -63,14 +63,14 @@ function createSessionResourceDatabase(input: { includeFile?: boolean } = {}): S
       attributed_user_id text,
       archived_at integer,
       metadata_json text DEFAULT '{}' NOT NULL,
-      app_id text NOT NULL,
+      project_id text NOT NULL,
       provider text NOT NULL,
       runtime_id text NOT NULL,
       status text NOT NULL,
       title text
     );
 
-    CREATE TABLE app (
+    CREATE TABLE project (
       id text PRIMARY KEY NOT NULL,
       organization_id text NOT NULL,
       owner_account_id text NOT NULL,
@@ -129,7 +129,7 @@ function createSessionResourceDatabase(input: { includeFile?: boolean } = {}): S
       attributed_user_id,
       archived_at,
       metadata_json,
-      app_id,
+      project_id,
       provider,
       runtime_id,
       status,
@@ -141,14 +141,14 @@ function createSessionResourceDatabase(input: { includeFile?: boolean } = {}): S
       NULL,
       NULL,
       '{}',
-      '${APP_ID}',
+      '${PROJECT_ID}',
       'openai',
       'openai-runtime',
       'IDLE',
       'Session'
     );
 
-    INSERT INTO app (
+    INSERT INTO project (
       id,
       organization_id,
       owner_account_id,
@@ -157,10 +157,10 @@ function createSessionResourceDatabase(input: { includeFile?: boolean } = {}): S
       created_at,
       updated_at
     ) VALUES (
-      '${APP_ID}',
+      '${PROJECT_ID}',
       '${ORGANIZATION_ID}',
       '${OWNER_ID}',
-      'Default App',
+      'Default Project',
       NULL,
       1,
       1
@@ -309,7 +309,7 @@ function insertLibraryFile(database: SqliteD1Database): void {
     VALUES (
 	      '${LIBRARY_FILE_ID}',
 	      'library',
-	      '${APP_ID}',
+	      '${PROJECT_ID}',
 	      NULL,
       'ready',
       1,
@@ -320,7 +320,7 @@ function insertLibraryFile(database: SqliteD1Database): void {
       'text/csv',
 	      'seed.csv',
 	      'objects/${LIBRARY_FILE_ID}',
-	      '${APP_ID}',
+	      '${PROJECT_ID}',
 	      'app',
       '',
       'seed.csv',
@@ -340,7 +340,7 @@ function insertInaccessibleSessionFile(database: SqliteD1Database): void {
       attributed_user_id,
       archived_at,
       metadata_json,
-      app_id,
+      project_id,
       provider,
       runtime_id,
       status,
@@ -352,7 +352,7 @@ function insertInaccessibleSessionFile(database: SqliteD1Database): void {
       NULL,
       NULL,
       '{}',
-      '${APP_ID}',
+      '${PROJECT_ID}',
       'openai',
       'openai-runtime',
       'IDLE',
@@ -442,7 +442,7 @@ describe("session resource files", () => {
           name: "notes.txt",
           size: 12,
         },
-        appId: APP_ID,
+        projectId: PROJECT_ID,
         sessionId: SESSION_ID,
       },
     );
@@ -516,7 +516,7 @@ describe("session resource files", () => {
     const database = createSessionResourceDatabase();
 
     const resources = await listSessionResources(database, VIEWER, {
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       sessionId: SESSION_ID,
     });
 
@@ -537,7 +537,7 @@ describe("session resource files", () => {
     const database = createSessionResourceDatabase({ includeFile: false });
 
     const resources = await listSessionResources(database, VIEWER, {
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       sessionId: SESSION_ID,
     });
 
@@ -551,13 +551,13 @@ describe("session resource files", () => {
     insertInaccessibleSessionFile(database);
     const bindings = { DB: database } as ApiBindings;
 
-    const allFiles = await fileStore.list(bindings, VIEWER, { appId: APP_ID });
+    const allFiles = await fileStore.list(bindings, VIEWER, { projectId: PROJECT_ID });
     const allFileIds = allFiles.files.map((file) => file.id).toSorted();
 
     expect(allFileIds).toEqual([ARTIFACT_FILE_ID, FILE_ID, LIBRARY_FILE_ID].toSorted());
 
     const sessionFiles = await fileStore.list(bindings, VIEWER, {
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       sessionId: SESSION_ID,
     });
 
@@ -566,7 +566,7 @@ describe("session resource files", () => {
     );
 
     const artifacts = await fileStore.list(bindings, VIEWER, {
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       sessionKind: "artifact",
     });
 
@@ -608,7 +608,7 @@ describe("session resource files", () => {
     expect(file.sourcePath).toBe("outputs/reports/summary.md");
 
     const resources = await listSessionResources(database, ownerViewer, {
-      appId: PUBLIC_API_TEST_IDS.app,
+      projectId: PUBLIC_API_TEST_IDS.project,
       sessionId: PUBLIC_API_TEST_IDS.ownerSession,
     });
 
@@ -629,7 +629,7 @@ describe("session resource files", () => {
     const bindings = createFileBindings(database, bucket);
 
     const resources = await listSessionResources(database, VIEWER, {
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       sessionId: SESSION_ID,
     });
 
@@ -656,7 +656,7 @@ describe("session resource files", () => {
 
     await expect(
       removeSessionResource(bindings, VIEWER, {
-        appId: APP_ID,
+        projectId: PROJECT_ID,
         resourceId: ARTIFACT_FILE_ID,
         sessionId: SESSION_ID,
       }),
@@ -711,14 +711,14 @@ describe("session resource files", () => {
           name: "notes.txt",
           size: 12,
         },
-        appId: APP_ID,
+        projectId: PROJECT_ID,
         sessionId: SESSION_ID,
       }),
     ).rejects.toThrow();
 
     await expect(
       removeSessionResource(bindings, VIEWER, {
-        appId: APP_ID,
+        projectId: PROJECT_ID,
         resourceId: FILE_ID,
         sessionId: SESSION_ID,
       }),

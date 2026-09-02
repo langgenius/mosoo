@@ -97,12 +97,12 @@ function readStringRecord(value: unknown): Record<string, string> {
   return result;
 }
 
-function toStorageKey(input: { appId: string | null; userId: string | null }): string | null {
-  if (input.appId === null || input.userId === null) {
+function toStorageKey(input: { projectId: string | null; userId: string | null }): string | null {
+  if (input.projectId === null || input.userId === null) {
     return null;
   }
 
-  return `mosoo.threads.ui.v2:${input.userId}:${input.appId}`;
+  return `mosoo.threads.ui.v2:${input.userId}:${input.projectId}`;
 }
 
 function loadThreadUiState(storageKey: string | null): ThreadUiState {
@@ -146,11 +146,11 @@ function persistThreadUiState(storageKey: string | null, state: ThreadUiState): 
 }
 
 export function useThreadUiState(input: {
-  appId: string | null;
+  projectId: string | null;
   userId: string | null;
 }): ThreadUiStateController {
-  const { appId, userId } = input;
-  const storageKey = useMemo(() => toStorageKey({ appId, userId }), [appId, userId]);
+  const { projectId, userId } = input;
+  const storageKey = useMemo(() => toStorageKey({ projectId, userId }), [projectId, userId]);
   const [state, setState] = useState<ThreadUiState>(() => loadThreadUiState(storageKey));
 
   const updateState = useCallback(

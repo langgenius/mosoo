@@ -7,7 +7,7 @@ import {
   createProcessDraftFromRuntimeEvent,
   createRuntimeEvent,
   parseRuntimeEventEnvelope,
-  appRuntimeEventToAgUiSessionEvents,
+  projectRuntimeEventToAgUiSessionEvents,
   toRuntimeEventInput,
 } from "@mosoo/runtime-events";
 import type { RuntimeEventBuildContext } from "@mosoo/runtime-events";
@@ -73,9 +73,9 @@ describe("runtime event AG-UI adapter", () => {
     expect(event.runId).toBe(PLATFORM_ID_FIXTURES.sessionRun);
   });
 
-  test("apps runtime run events through session run updates", () => {
+  test("projects runtime run events through session run updates", () => {
     const started = first(
-      appRuntimeEventToAgUiSessionEvents(
+      projectRuntimeEventToAgUiSessionEvents(
         createRuntimeEvent({
           id: createPlatformId(),
           kind: "run.started",
@@ -91,7 +91,7 @@ describe("runtime event AG-UI adapter", () => {
     );
     const failedAt = "2026-05-26T00:00:02.000Z";
     const failed = first(
-      appRuntimeEventToAgUiSessionEvents(
+      projectRuntimeEventToAgUiSessionEvents(
         createRuntimeEvent({
           id: createPlatformId(),
           kind: "run.failed",
@@ -141,10 +141,10 @@ describe("runtime event AG-UI adapter", () => {
     });
   });
 
-  test("apps nested run lifecycle payloads with envelope-owned identity", () => {
+  test("projects nested run lifecycle payloads with envelope-owned identity", () => {
     const completedAt = "2026-05-26T00:00:03.000Z";
     const completed = first(
-      appRuntimeEventToAgUiSessionEvents(
+      projectRuntimeEventToAgUiSessionEvents(
         createRuntimeEvent({
           id: createPlatformId(),
           kind: "run.completed",
@@ -197,7 +197,7 @@ describe("runtime event AG-UI adapter", () => {
       sessionId: PLATFORM_ID_FIXTURES.session,
     });
 
-    expect(() => appRuntimeEventToAgUiSessionEvents(failed)).toThrow();
+    expect(() => projectRuntimeEventToAgUiSessionEvents(failed)).toThrow();
     expect(() => createProcessDraftFromRuntimeEvent(failed)).toThrow();
   });
 
@@ -409,7 +409,7 @@ describe("runtime event AG-UI adapter", () => {
       traceId: "envelope-trace",
     });
 
-    const deliveryEvents = appRuntimeEventToAgUiSessionEvents(event);
+    const deliveryEvents = projectRuntimeEventToAgUiSessionEvents(event);
 
     expect(deliveryEvents[0]).toMatchObject({
       value: {
@@ -450,7 +450,7 @@ describe("runtime event AG-UI adapter", () => {
       },
     });
 
-    const deliveryEvent = first(appRuntimeEventToAgUiSessionEvents(event));
+    const deliveryEvent = first(projectRuntimeEventToAgUiSessionEvents(event));
 
     if (deliveryEvent.type !== EventType.CUSTOM) {
       throw new Error("Expected a custom delivery event.");
@@ -484,7 +484,7 @@ describe("runtime event AG-UI adapter", () => {
       sessionId: PLATFORM_ID_FIXTURES.session,
     });
 
-    expect(appRuntimeEventToAgUiSessionEvents(event)).toEqual([
+    expect(projectRuntimeEventToAgUiSessionEvents(event)).toEqual([
       {
         content:
           "Tool failed before returning a result: Runtime driver control socket is not connected.",
@@ -512,7 +512,7 @@ describe("runtime event AG-UI adapter", () => {
       sessionId: PLATFORM_ID_FIXTURES.session,
     });
 
-    expect(appRuntimeEventToAgUiSessionEvents(event)).toEqual([
+    expect(projectRuntimeEventToAgUiSessionEvents(event)).toEqual([
       {
         delta: '{"command":"pwd"}',
         toolCallId: "tool-1",
@@ -536,7 +536,7 @@ describe("runtime event AG-UI adapter", () => {
       sessionId: PLATFORM_ID_FIXTURES.session,
     });
 
-    expect(appRuntimeEventToAgUiSessionEvents(event)).toEqual([
+    expect(projectRuntimeEventToAgUiSessionEvents(event)).toEqual([
       {
         parentMessageId: "assistant-1",
         toolCallId: "tool-1",
@@ -551,7 +551,7 @@ describe("runtime event AG-UI adapter", () => {
     ]);
   });
 
-  test("apps permission resolution through the same session permission event", () => {
+  test("projects permission resolution through the same session permission event", () => {
     const event = createRuntimeEvent({
       id: createPlatformId(),
       kind: "permission.resolved",
@@ -563,7 +563,7 @@ describe("runtime event AG-UI adapter", () => {
       sessionId: PLATFORM_ID_FIXTURES.session,
     });
 
-    const [deliveryEvent] = appRuntimeEventToAgUiSessionEvents(event);
+    const [deliveryEvent] = projectRuntimeEventToAgUiSessionEvents(event);
 
     expect(deliveryEvent).toMatchObject({
       name: MOSOO_CUSTOM_EVENT.sessionPermissionsUpdated.name,
@@ -585,10 +585,10 @@ describe("runtime event AG-UI adapter", () => {
       sessionId: PLATFORM_ID_FIXTURES.session,
     });
 
-    expect(() => appRuntimeEventToAgUiSessionEvents(event)).toThrow();
+    expect(() => projectRuntimeEventToAgUiSessionEvents(event)).toThrow();
   });
 
-  test("does not app owner diagnostics into participant delivery by default", () => {
+  test("does not project owner diagnostics into participant delivery by default", () => {
     const defaultDiagnostic = createRuntimeEvent({
       id: createPlatformId(),
       kind: "diagnostic.reported",
@@ -611,11 +611,11 @@ describe("runtime event AG-UI adapter", () => {
       visibility: "owner_debug",
     });
 
-    expect(appRuntimeEventToAgUiSessionEvents(defaultDiagnostic)).toEqual([]);
-    expect(appRuntimeEventToAgUiSessionEvents(ownerDebugDiagnostic)).toEqual([]);
+    expect(projectRuntimeEventToAgUiSessionEvents(defaultDiagnostic)).toEqual([]);
+    expect(projectRuntimeEventToAgUiSessionEvents(ownerDebugDiagnostic)).toEqual([]);
   });
 
-  test("does not app system internal events into participant run success", () => {
+  test("does not project system internal events into participant run success", () => {
     const event = createRuntimeEvent({
       id: createPlatformId(),
       kind: "driver.heartbeat",
@@ -635,10 +635,10 @@ describe("runtime event AG-UI adapter", () => {
       sessionId: PLATFORM_ID_FIXTURES.session,
     });
 
-    expect(appRuntimeEventToAgUiSessionEvents(event)).toEqual([]);
+    expect(projectRuntimeEventToAgUiSessionEvents(event)).toEqual([]);
   });
 
-  test("apps diagnostics only when the event explicitly opts into participant delivery", () => {
+  test("projects diagnostics only when the event explicitly opts into participant delivery", () => {
     const event = createRuntimeEvent({
       id: createPlatformId(),
       kind: "diagnostic.reported",
@@ -651,10 +651,10 @@ describe("runtime event AG-UI adapter", () => {
       visibility: "participant",
     });
 
-    expect(appRuntimeEventToAgUiSessionEvents(event)).toHaveLength(1);
+    expect(projectRuntimeEventToAgUiSessionEvents(event)).toHaveLength(1);
   });
 
-  test("apps runtime timing payloads without losing detailed timing fields", () => {
+  test("projects runtime timing payloads without losing detailed timing fields", () => {
     const event = createRuntimeEvent({
       id: createPlatformId(),
       kind: "runtime.timing.recorded",
@@ -679,7 +679,7 @@ describe("runtime event AG-UI adapter", () => {
       sessionId: PLATFORM_ID_FIXTURES.session,
     });
 
-    const deliveryEvents = appRuntimeEventToAgUiSessionEvents(event);
+    const deliveryEvents = projectRuntimeEventToAgUiSessionEvents(event);
     const [timelineEvent, timingEvent] = deliveryEvents;
 
     expect(timelineEvent).toMatchObject({
@@ -722,7 +722,7 @@ describe("runtime event AG-UI adapter", () => {
       sessionId: PLATFORM_ID_FIXTURES.session,
     });
 
-    expect(() => appRuntimeEventToAgUiSessionEvents(event)).toThrow();
+    expect(() => projectRuntimeEventToAgUiSessionEvents(event)).toThrow();
   });
 
   test("creates process drafts directly from canonical runtime timing payloads", () => {
@@ -758,7 +758,7 @@ describe("runtime event AG-UI adapter", () => {
         changes: [
           {
             change: "upsert",
-            path: "src/app.ts",
+            path: "src/project.ts",
           },
         ],
         status: "completed",
@@ -767,7 +767,7 @@ describe("runtime event AG-UI adapter", () => {
     });
 
     expect(createProcessDraftFromRuntimeEvent(event)).toEqual({
-      content: "src/app.ts",
+      content: "src/project.ts",
       type: "file.changed",
     });
   });

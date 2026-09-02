@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { parsePlatformId } from "@mosoo/id";
-import type { AccountId, EnvironmentId, OrganizationId, AppId } from "@mosoo/id";
+import type { AccountId, EnvironmentId, OrganizationId, ProjectId } from "@mosoo/id";
 
 import { ensureEnvironmentAccess } from "../src/modules/environments/application/environment-access.service";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
@@ -15,11 +15,14 @@ const ORGANIZATION_ID = parsePlatformId<OrganizationId>(
   "01J00000000000000000000006",
   "organization ID",
 );
-const APP_ID = parsePlatformId<AppId>("01J00000000000000000000009", "app ID");
-const OTHER_APP_ID = parsePlatformId<AppId>("01J0000000000000000000000A", "other app ID");
-const APP_ENVIRONMENT_ID = parsePlatformId<EnvironmentId>(
+const PROJECT_ID = parsePlatformId<ProjectId>("01J00000000000000000000009", "project ID");
+const OTHER_PROJECT_ID = parsePlatformId<ProjectId>(
+  "01J0000000000000000000000A",
+  "other project ID",
+);
+const PROJECT_ENVIRONMENT_ID = parsePlatformId<EnvironmentId>(
   "01J0000000000000000000000B",
-  "App environment ID",
+  "Project environment ID",
 );
 const BUILT_IN_ENVIRONMENT_ID = parsePlatformId<EnvironmentId>(
   "01J0000000000000000000000C",
@@ -40,7 +43,7 @@ function createEnvironmentAccessDatabase(): SqliteD1Database {
       id text PRIMARY KEY NOT NULL
     );
 
-    CREATE TABLE app (
+    CREATE TABLE project (
       id text PRIMARY KEY NOT NULL,
       organization_id text NOT NULL,
       owner_account_id text NOT NULL,
@@ -54,7 +57,7 @@ function createEnvironmentAccessDatabase(): SqliteD1Database {
       id text PRIMARY KEY NOT NULL,
       name text NOT NULL,
       description text NOT NULL,
-      app_id text NOT NULL,
+      project_id text NOT NULL,
       owner_account_id text,
       current_revision_id text NOT NULL,
       forked_from_environment_id text,
@@ -67,7 +70,7 @@ function createEnvironmentAccessDatabase(): SqliteD1Database {
     CREATE TABLE environment_revision (
       id text PRIMARY KEY NOT NULL,
       environment_id text NOT NULL,
-      app_id text NOT NULL,
+      project_id text NOT NULL,
       network_policy text NOT NULL,
       allow_mcp_servers integer NOT NULL,
       allow_package_managers integer NOT NULL,
@@ -81,7 +84,7 @@ function createEnvironmentAccessDatabase(): SqliteD1Database {
 
     CREATE TABLE agent (
       environment_id text,
-      app_id text
+      project_id text
     );
   `);
 
@@ -100,7 +103,7 @@ function createEnvironmentAccessDatabase(): SqliteD1Database {
   database
     .prepare(
       `
-        INSERT INTO app (
+        INSERT INTO project (
           id,
           organization_id,
           owner_account_id,
@@ -109,10 +112,10 @@ function createEnvironmentAccessDatabase(): SqliteD1Database {
           created_at,
           updated_at
         )
-        VALUES (?, ?, ?, 'Default App', ?, 1, 1)
+        VALUES (?, ?, ?, 'Default Project', ?, 1, 1)
       `,
     )
-    .bind(APP_ID, ORGANIZATION_ID, OWNER_ID, BUILT_IN_ENVIRONMENT_ID)
+    .bind(PROJECT_ID, ORGANIZATION_ID, OWNER_ID, BUILT_IN_ENVIRONMENT_ID)
     .run();
 
   database
@@ -122,7 +125,7 @@ function createEnvironmentAccessDatabase(): SqliteD1Database {
           id,
           name,
           description,
-          app_id,
+          project_id,
           owner_account_id,
           current_revision_id,
           forked_from_environment_id,
@@ -132,11 +135,11 @@ function createEnvironmentAccessDatabase(): SqliteD1Database {
           updated_at
         )
         VALUES
-          (?, 'App Local', '', ?, ?, 'rev-app', NULL, NULL, NULL, 1, 1),
+          (?, 'Project Local', '', ?, ?, 'rev-project', NULL, NULL, NULL, 1, 1),
           (?, 'System Default', '', ?, NULL, 'rev-built-in', NULL, NULL, NULL, 1, 1)
       `,
     )
-    .bind(APP_ENVIRONMENT_ID, APP_ID, OWNER_ID, BUILT_IN_ENVIRONMENT_ID, APP_ID)
+    .bind(PROJECT_ENVIRONMENT_ID, PROJECT_ID, OWNER_ID, BUILT_IN_ENVIRONMENT_ID, PROJECT_ID)
     .run();
 
   database
@@ -145,7 +148,7 @@ function createEnvironmentAccessDatabase(): SqliteD1Database {
         INSERT INTO environment_revision (
           id,
           environment_id,
-          app_id,
+          project_id,
           network_policy,
           allow_mcp_servers,
           allow_package_managers,
@@ -157,59 +160,59 @@ function createEnvironmentAccessDatabase(): SqliteD1Database {
           created_at
         )
         VALUES
-          ('rev-app', ?, ?, 'full', 1, 1, '[]', '[]', '', '[]', ?, 1),
+          ('rev-project', ?, ?, 'full', 1, 1, '[]', '[]', '', '[]', ?, 1),
           ('rev-built-in', ?, ?, 'full', 1, 1, '[]', '[]', '', '[]', NULL, 1)
       `,
     )
-    .bind(APP_ENVIRONMENT_ID, APP_ID, OWNER_ID, BUILT_IN_ENVIRONMENT_ID, APP_ID)
+    .bind(PROJECT_ENVIRONMENT_ID, PROJECT_ID, OWNER_ID, BUILT_IN_ENVIRONMENT_ID, PROJECT_ID)
     .run();
 
   return database;
 }
 
 describe("environment access", () => {
-  test("allows the App owner to read App-local environments", async () => {
+  test("allows the Project owner to read Project-local environments", async () => {
     const database = createEnvironmentAccessDatabase();
 
     const access = await ensureEnvironmentAccess(database, OWNER_ID, {
-      environmentId: APP_ENVIRONMENT_ID,
-      appId: APP_ID,
+      environmentId: PROJECT_ENVIRONMENT_ID,
+      projectId: PROJECT_ID,
     });
 
-    expect(access.row.id).toBe(APP_ENVIRONMENT_ID);
-    expect(access.row.appId).toBe(APP_ID);
+    expect(access.row.id).toBe(PROJECT_ENVIRONMENT_ID);
+    expect(access.row.projectId).toBe(PROJECT_ID);
   });
 
-  test("allows the App owner to read the App default built-in environment", async () => {
+  test("allows the Project owner to read the Project default built-in environment", async () => {
     const database = createEnvironmentAccessDatabase();
 
     const access = await ensureEnvironmentAccess(database, OWNER_ID, {
       environmentId: BUILT_IN_ENVIRONMENT_ID,
-      appId: APP_ID,
+      projectId: PROJECT_ID,
     });
 
     expect(access.row.ownerId).toBeNull();
     expect(access.row.defaultEnvironmentId).toBe(BUILT_IN_ENVIRONMENT_ID);
   });
 
-  test("fails closed when the viewer is not the App owner", async () => {
+  test("fails closed when the viewer is not the Project owner", async () => {
     const database = createEnvironmentAccessDatabase();
 
     await expect(
       ensureEnvironmentAccess(database, OTHER_ACCOUNT_ID, {
-        environmentId: APP_ENVIRONMENT_ID,
-        appId: APP_ID,
+        environmentId: PROJECT_ENVIRONMENT_ID,
+        projectId: PROJECT_ID,
       }),
     ).rejects.toThrow("Environment not found.");
   });
 
-  test("fails closed when the environment is requested through another App", async () => {
+  test("fails closed when the environment is requested through another Project", async () => {
     const database = createEnvironmentAccessDatabase();
 
     await expect(
       ensureEnvironmentAccess(database, OWNER_ID, {
-        environmentId: APP_ENVIRONMENT_ID,
-        appId: OTHER_APP_ID,
+        environmentId: PROJECT_ENVIRONMENT_ID,
+        projectId: OTHER_PROJECT_ID,
       }),
     ).rejects.toThrow("Environment not found.");
   });

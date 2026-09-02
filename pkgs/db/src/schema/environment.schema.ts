@@ -1,5 +1,5 @@
 import type { EnvironmentNetworkPolicy } from "@mosoo/contracts/environment";
-import type { AccountId, EnvironmentId, EnvironmentRevisionId, AppId } from "@mosoo/id";
+import type { AccountId, EnvironmentId, EnvironmentRevisionId, ProjectId } from "@mosoo/id";
 import { sql } from "drizzle-orm";
 import { check, index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
@@ -17,17 +17,17 @@ export const environmentsTable = sqliteTable(
     id: platformIdColumn<EnvironmentId>("id").primaryKey(),
     name: text("name").notNull(),
     ownerAccountId: platformIdColumn<AccountId>("owner_account_id"),
-    appId: platformIdColumn<AppId>("app_id").notNull(),
+    projectId: platformIdColumn<ProjectId>("project_id").notNull(),
     updatedAt: integer("updated_at").notNull(),
   },
   (table) => [
-    index("environment_app_updated_at_idx").on(table.appId, table.updatedAt),
+    index("environment_project_updated_at_idx").on(table.projectId, table.updatedAt),
     index("environment_owner_updated_at_idx").on(table.ownerAccountId, table.updatedAt),
     uniqueIndex("environment_owner_name_idx")
-      .on(table.appId, table.ownerAccountId, table.name)
+      .on(table.projectId, table.ownerAccountId, table.name)
       .where(sql`${table.ownerAccountId} IS NOT NULL`),
     uniqueIndex("environment_system_default_idx")
-      .on(table.appId)
+      .on(table.projectId)
       .where(sql`${table.ownerAccountId} IS NULL`),
   ],
 );
@@ -45,7 +45,7 @@ export const environmentRevisionsTable = sqliteTable(
     id: platformIdColumn<EnvironmentRevisionId>("id").primaryKey(),
     networkPolicy: text("network_policy").$type<EnvironmentNetworkPolicy>().notNull(),
     packagesJson: text("packages_json").notNull(),
-    appId: platformIdColumn<AppId>("app_id").notNull(),
+    projectId: platformIdColumn<ProjectId>("project_id").notNull(),
     setupScript: text("setup_script").notNull(),
   },
   (table) => [
@@ -57,7 +57,7 @@ export const environmentRevisionsTable = sqliteTable(
       table.environmentId,
       table.createdAt,
     ),
-    index("environment_revision_app_created_at_idx").on(table.appId, table.createdAt),
+    index("environment_revision_project_created_at_idx").on(table.projectId, table.createdAt),
   ],
 );
 

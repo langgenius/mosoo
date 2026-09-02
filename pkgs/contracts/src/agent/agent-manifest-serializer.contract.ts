@@ -238,9 +238,9 @@ export function toAgentPackageManifestJson(agentPackage: AgentPackage): Record<s
   const builtInTools = normalizeAgentBuiltInTools(manifest.builtInTools ?? []);
 
   return {
-    name: agentPackage.app.name,
+    name: agentPackage.project.name,
     version: agentPackage.version,
-    description: agentPackage.app.description,
+    description: agentPackage.project.description,
     author: agentPackage.author,
     license: agentPackage.license,
     sourceAgentId: agentPackage.sourceAgentId,
@@ -253,7 +253,7 @@ export function toAgentPackageManifestJson(agentPackage: AgentPackage): Record<s
     provider: manifest.runtime.provider,
     settings: manifest.runtime.providerOptions,
     prompts: manifest.prompts,
-    avatar: agentPackage.app.avatarAssetKey,
+    avatar: agentPackage.project.avatarAssetKey,
     builtInTools: builtInTools.map((tool) => ({
       enabled: tool.enabled,
       name: tool.name,

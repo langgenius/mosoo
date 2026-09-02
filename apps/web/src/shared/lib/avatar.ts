@@ -3,7 +3,7 @@
 // avatar, while different accounts get some variety. These are literal hex values
 // (not theme tokens) so the fill always renders regardless of which stylesheets are
 // loaded — earlier the palette referenced CSS variables that were undefined in the
-// web app, leaving the avatar with no background color at all. All colors are dark
+// web project, leaving the avatar with no background color at all. All colors are dark
 // enough to keep white initials legible.
 const AVATAR_BACKGROUNDS = [
   "#2563eb", // blue

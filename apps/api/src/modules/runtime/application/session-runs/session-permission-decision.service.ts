@@ -1,5 +1,5 @@
 import { parsePlatformId } from "@mosoo/id";
-import type { DriverInstanceId, AppId, SessionId } from "@mosoo/id";
+import type { DriverInstanceId, ProjectId, SessionId } from "@mosoo/id";
 import type { RuntimeEventEnvelope } from "@mosoo/runtime-events";
 
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
@@ -12,7 +12,7 @@ import {
   loadSessionViewerState,
 } from "../../../sessions/application/session-live-state.service";
 import type { SessionLiveState } from "../../../sessions/application/session-live-state.service";
-import { ensureAppSessionParticipantAccess } from "../../../sessions/domain/session-access.policy";
+import { ensureProjectSessionParticipantAccess } from "../../../sessions/domain/session-access.policy";
 import { resolvePermissionRequest } from "./resolve-permission-request.service";
 type PermissionDecision = "allow_once" | "reject_once";
 
@@ -25,7 +25,7 @@ interface ResolveSessionPermissionDecisionInput {
   bindings: ApiBindings;
   cachedState?: SessionLiveState | null;
   decision: PermissionDecision;
-  appId: AppId;
+  projectId: ProjectId;
   requestId: string;
   sessionId: SessionId;
   viewer: AuthenticatedViewer;
@@ -35,7 +35,7 @@ interface RejectSessionPermissionRequestsInput {
   bindings: ApiBindings;
   cachedState?: SessionLiveState | null;
   onPermissionCleanupError: (error: unknown, requestId: string) => void;
-  appId: AppId;
+  projectId: ProjectId;
   sessionId: SessionId;
   viewer: AuthenticatedViewer;
 }
@@ -94,8 +94,8 @@ async function createPermissionStateUpdate(input: {
 export async function resolveSessionPermissionDecision(
   input: ResolveSessionPermissionDecisionInput,
 ): Promise<SessionPermissionStateUpdate | null> {
-  await ensureAppSessionParticipantAccess(input.bindings.DB, input.viewer.id, {
-    appId: input.appId,
+  await ensureProjectSessionParticipantAccess(input.bindings.DB, input.viewer.id, {
+    projectId: input.projectId,
     sessionId: input.sessionId,
   });
   const currentState = await loadCurrentPermissionState(input);
@@ -110,7 +110,7 @@ export async function resolveSessionPermissionDecision(
   await resolvePermissionRequest(input.bindings, input.viewer, {
     decision: input.decision,
     driverInstanceId: requirePermissionRequestDriverInstanceId(request),
-    appId: input.appId,
+    projectId: input.projectId,
     requestId: input.requestId,
     sessionId: input.sessionId,
   });
@@ -131,8 +131,8 @@ export async function resolveSessionPermissionDecision(
 export async function rejectSessionPermissionRequests(
   input: RejectSessionPermissionRequestsInput,
 ): Promise<SessionPermissionStateUpdate | null> {
-  await ensureAppSessionParticipantAccess(input.bindings.DB, input.viewer.id, {
-    appId: input.appId,
+  await ensureProjectSessionParticipantAccess(input.bindings.DB, input.viewer.id, {
+    projectId: input.projectId,
     sessionId: input.sessionId,
   });
   const currentState = await loadCurrentPermissionState(input);
@@ -149,7 +149,7 @@ export async function rejectSessionPermissionRequests(
         await resolvePermissionRequest(input.bindings, input.viewer, {
           decision: "reject_once",
           driverInstanceId: requirePermissionRequestDriverInstanceId(request),
-          appId: input.appId,
+          projectId: input.projectId,
           requestId: request.requestId,
           sessionId: input.sessionId,
         });

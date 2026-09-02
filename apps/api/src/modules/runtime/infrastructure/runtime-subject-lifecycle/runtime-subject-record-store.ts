@@ -6,7 +6,7 @@ import type {
   AccountId,
   AgentId,
   PlatformId,
-  AppId,
+  ProjectId,
   RuntimeOperationId,
   SandboxBackupId,
   SandboxId,
@@ -41,7 +41,7 @@ import type {
 
 interface RuntimeSubjectQuotaScope {
   readonly agentId: AgentId;
-  readonly appId: AppId;
+  readonly projectId: ProjectId;
   readonly executionOwnerUserId: AccountId;
 }
 
@@ -144,7 +144,7 @@ export async function ensureRuntimeSubjectId(
   database: D1Database,
   input: {
     readonly agentId: AgentId;
-    readonly appId: AppId;
+    readonly projectId: ProjectId;
     readonly executionOwnerUserId: AccountId;
     readonly kind: AgentKind;
     readonly now?: number;
@@ -165,7 +165,7 @@ export async function ensureRuntimeSubjectId(
     .insert(sandboxesTable)
     .values({
       agentId: input.agentId,
-      appId: input.appId,
+      projectId: input.projectId,
       bindMountReady: false,
       claimExpiresAt: null,
       claimOwner: null,
@@ -281,7 +281,7 @@ export async function claimRuntimeSubjectActivation(
       .update(sandboxesTable)
       .set({
         agentId: input.agentId,
-        appId: input.appId,
+        projectId: input.projectId,
         claimExpiresAt: input.claimExpiresAt,
         claimOwner: input.claimOwner,
         ownerAccountId: input.executionOwnerUserId,
@@ -548,7 +548,7 @@ export async function markRuntimeSubjectOperationStarted(
   },
 ): Promise<boolean> {
   const now = input.now ?? currentTimestampMs();
-  const appDb = getAppDatabase(database);
+  const projectDb = getAppDatabase(database);
   const claimPredicate =
     input.claimOwner === undefined
       ? or(
@@ -557,7 +557,7 @@ export async function markRuntimeSubjectOperationStarted(
           lte(sandboxesTable.claimExpiresAt, now),
         )
       : eq(sandboxesTable.claimOwner, input.claimOwner);
-  const result = await appDb
+  const result = await projectDb
     .update(sandboxesTable)
     .set({
       claimExpiresAt: null,
@@ -579,8 +579,8 @@ export async function markRuntimeSubjectOperationStarted(
         claimPredicate,
         ...(input.source === "maintenance"
           ? [
-              notExists(activeSessionRunQueryForListedSubject(appDb)),
-              notExists(runLeaseQuery(appDb, input.runtimeSubjectId)),
+              notExists(activeSessionRunQueryForListedSubject(projectDb)),
+              notExists(runLeaseQuery(projectDb, input.runtimeSubjectId)),
             ]
           : []),
       ),

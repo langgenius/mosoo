@@ -1,34 +1,34 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { toEnvironmentId, toAppId } from "../../../routes/typed-id";
+import { toEnvironmentId, toProjectId } from "../../../routes/typed-id";
 import { isTruthy } from "../../../shared/lib/truthiness";
-import { getEnvironment, listAppEnvironments } from "../api/environment-client";
+import { getEnvironment, listProjectEnvironments } from "../api/environment-client";
 export const environmentKeys = {
   all: ["environment"] as const,
-  detail: (appId: string, environmentId: string) =>
-    [...environmentKeys.details(), appId, environmentId] as const,
+  detail: (projectId: string, environmentId: string) =>
+    [...environmentKeys.details(), projectId, environmentId] as const,
   details: () => [...environmentKeys.all, "detail"] as const,
-  list: (appId: string) => [...environmentKeys.lists(), appId] as const,
+  list: (projectId: string) => [...environmentKeys.lists(), projectId] as const,
   lists: () => [...environmentKeys.all, "list"] as const,
 };
 
-export function useAppEnvironmentsQuery(appId: string | null) {
+export function useProjectEnvironmentsQuery(projectId: string | null) {
   return useQuery({
-    enabled: appId !== null,
-    queryFn: async () => listAppEnvironments(toAppId(appId!)),
-    queryKey: isTruthy(appId)
-      ? environmentKeys.list(appId)
+    enabled: projectId !== null,
+    queryFn: async () => listProjectEnvironments(toProjectId(projectId!)),
+    queryKey: isTruthy(projectId)
+      ? environmentKeys.list(projectId)
       : [...environmentKeys.lists(), "missing"],
   });
 }
 
-export function useEnvironmentDetailQuery(appId: string | null, environmentId: string | null) {
+export function useEnvironmentDetailQuery(projectId: string | null, environmentId: string | null) {
   return useQuery({
-    enabled: appId !== null && environmentId !== null,
-    queryFn: async () => getEnvironment(toAppId(appId!), toEnvironmentId(environmentId!)),
+    enabled: projectId !== null && environmentId !== null,
+    queryFn: async () => getEnvironment(toProjectId(projectId!), toEnvironmentId(environmentId!)),
     queryKey:
-      isTruthy(appId) && isTruthy(environmentId)
-        ? environmentKeys.detail(appId, environmentId)
+      isTruthy(projectId) && isTruthy(environmentId)
+        ? environmentKeys.detail(projectId, environmentId)
         : [...environmentKeys.details(), "missing"],
   });
 }

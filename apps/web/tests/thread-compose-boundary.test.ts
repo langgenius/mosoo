@@ -6,7 +6,7 @@ function readSource(path: string): string {
 }
 
 describe("Thread compose boundary", () => {
-  test("keeps the composer scoped to one Agent in the active App", () => {
+  test("keeps the composer scoped to one Agent in the active Project", () => {
     const source = readSource("../src/routes/threads/compose/new-dialog.tsx");
 
     expect(source).toContain('t("threads.description")');

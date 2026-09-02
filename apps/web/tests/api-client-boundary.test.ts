@@ -8,12 +8,12 @@ import {
 } from "../src/domains/vendor-credential/api/vendor-credential-client";
 import { requestGraphQL, UnauthorizedError } from "../src/platform/http/graphql-client";
 import { apiPath } from "../src/platform/http/public-api";
-import { toAppId, toVendorCredentialId } from "../src/routes/typed-id";
+import { toProjectId, toVendorCredentialId } from "../src/routes/typed-id";
 
 const originalFetch = globalThis.fetch;
 const AGENT_ID = "01J000000000000000000000C1";
 const SESSION_ID = "01J000000000000000000000C3";
-const APP_ID = "01J000000000000000000000C4";
+const PROJECT_ID = "01J000000000000000000000C4";
 const VENDOR_CREDENTIAL_ID = "01J000000000000000000000C5";
 const createSessionResponse = {
   data: {
@@ -28,7 +28,7 @@ const createSessionResponse = {
       lastMessageAt: null,
       lastRun: null,
       model: "gpt-5.4",
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       provider: "openai",
       runtimeId: "openai-runtime",
       status: "IDLE",
@@ -64,16 +64,16 @@ describe("web API client boundary", () => {
     expect(apiPath("/v1/openapi.json")).toBe("/api/v1/openapi.json");
   });
 
-  test("keeps draft file uploads App-scoped in the Web client", () => {
+  test("keeps draft file uploads Project-scoped in the Web client", () => {
     const source = readFileSync(
-      new URL("../src/domains/file/api/app-draft-file-client.ts", import.meta.url),
+      new URL("../src/domains/file/api/project-draft-file-client.ts", import.meta.url),
       "utf8",
     );
 
-    expect(source).toContain("uploadAppDraftFiles");
+    expect(source).toContain("uploadProjectDraftFiles");
     expect(source).toContain('purpose: "app_draft"');
     expect(source).toContain('kind: "app_draft"');
-    expect(source).toContain("id: appId");
+    expect(source).toContain("id: projectId");
     expect(source).not.toContain("organization_draft");
     expect(source).not.toContain("organizationId");
   });
@@ -132,8 +132,8 @@ describe("web API client boundary", () => {
       return Response.json(createSessionResponse);
     };
 
-    await createAgentSession(APP_ID, AGENT_ID, "ui");
-    await createAgentSession(APP_ID, AGENT_ID, "preview", { waitForRuntimeReady: true });
+    await createAgentSession(PROJECT_ID, AGENT_ID, "ui");
+    await createAgentSession(PROJECT_ID, AGENT_ID, "preview", { waitForRuntimeReady: true });
 
     expect(capturedBodies).toEqual([
       {
@@ -141,7 +141,7 @@ describe("web API client boundary", () => {
         variables: {
           input: {
             agentId: AGENT_ID,
-            appId: APP_ID,
+            projectId: PROJECT_ID,
             type: "ui",
           },
         },
@@ -151,7 +151,7 @@ describe("web API client boundary", () => {
         variables: {
           input: {
             agentId: AGENT_ID,
-            appId: APP_ID,
+            projectId: PROJECT_ID,
             type: "preview",
             waitForRuntimeReady: true,
           },
@@ -160,9 +160,9 @@ describe("web API client boundary", () => {
     ]);
   });
 
-  test("sends Provider credential update and delete with explicit App scope", async () => {
+  test("sends Provider credential update and delete with explicit Project scope", async () => {
     const capturedBodies: unknown[] = [];
-    const appId = toAppId(APP_ID);
+    const projectId = toProjectId(PROJECT_ID);
     const credentialId = toVendorCredentialId(VENDOR_CREDENTIAL_ID);
 
     globalThis.fetch = async (_input, init) => {
@@ -188,7 +188,7 @@ describe("web API client boundary", () => {
               maskedApiKey: "sk-...",
               models: null,
               name: "Updated",
-              appId: APP_ID,
+              projectId: PROJECT_ID,
               vendorId: "openai",
             },
           },
@@ -207,11 +207,11 @@ describe("web API client boundary", () => {
     await updateVendorCredential({
       id: credentialId,
       name: "Updated",
-      appId,
+      projectId,
     });
     await deleteVendorCredential({
       id: credentialId,
-      appId,
+      projectId,
     });
 
     expect(capturedBodies).toEqual([
@@ -221,7 +221,7 @@ describe("web API client boundary", () => {
           input: {
             id: VENDOR_CREDENTIAL_ID,
             name: "Updated",
-            appId: APP_ID,
+            projectId: PROJECT_ID,
           },
         },
       },
@@ -230,7 +230,7 @@ describe("web API client boundary", () => {
         variables: {
           input: {
             id: VENDOR_CREDENTIAL_ID,
-            appId: APP_ID,
+            projectId: PROJECT_ID,
           },
         },
       },

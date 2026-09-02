@@ -7,9 +7,9 @@ import { useAppSession } from "./session-provider";
 
 const PRODUCT_NAME = "mosoo";
 const DEFAULT_TITLE_TRANSLATIONS: Record<string, string> = {
-  "pageTitle.apps": "Apps",
+  "pageTitle.projects": "Projects",
   "pageTitle.mcpAuth": "MCP authorization",
-  "pageTitle.appSettings": "App settings",
+  "pageTitle.projectSettings": "Project settings",
   "pageTitle.usage": "Usage",
   "pageTitle.accessTokens": "Access tokens",
   "pageTitle.profile": "Profile",
@@ -30,7 +30,7 @@ const DEFAULT_TITLE_TRANSLATIONS: Record<string, string> = {
   "pageTitle.overview": "Overview",
 };
 
-type DocumentTitleScope = "app" | "global" | "org";
+type DocumentTitleScope = "project" | "global" | "org";
 
 interface DocumentTitleRule {
   path: string;
@@ -39,29 +39,29 @@ interface DocumentTitleRule {
 }
 
 const DOCUMENT_TITLE_RULES: DocumentTitleRule[] = [
-  { path: "/integrations/mcp/oauth-complete", scope: "app", titleKey: "pageTitle.mcpAuth" },
-  { path: "/app-settings/general", scope: "app", titleKey: "pageTitle.appSettings" },
-  { path: "/app-settings/usage", scope: "app", titleKey: "pageTitle.usage" },
-  { path: "/app-settings", scope: "app", titleKey: "pageTitle.appSettings" },
+  { path: "/integrations/mcp/oauth-complete", scope: "project", titleKey: "pageTitle.mcpAuth" },
+  { path: "/project-settings/general", scope: "project", titleKey: "pageTitle.projectSettings" },
+  { path: "/project-settings/usage", scope: "project", titleKey: "pageTitle.usage" },
+  { path: "/project-settings", scope: "project", titleKey: "pageTitle.projectSettings" },
   { path: "/settings/access-tokens", scope: "global", titleKey: "pageTitle.accessTokens" },
   { path: "/settings/profile", scope: "global", titleKey: "pageTitle.profile" },
   { path: "/settings", scope: "global", titleKey: "pageTitle.settings" },
-  { path: "/environment/:environmentId", scope: "app", titleKey: "pageTitle.environments" },
-  { path: "/environment", scope: "app", titleKey: "pageTitle.environments" },
-  { path: "/integrations/skills", scope: "app", titleKey: "pageTitle.skills" },
-  { path: "/integrations/mcp", scope: "app", titleKey: "pageTitle.mcpServers" },
-  { path: "/providers", scope: "app", titleKey: "pageTitle.providers" },
-  { path: "/threads/:threadId", scope: "app", titleKey: "pageTitle.thread" },
-  { path: "/threads", scope: "app", titleKey: "pageTitle.threads" },
-  { path: "/agent/:agentId", scope: "app", titleKey: "pageTitle.agent" },
-  { path: "/agent", scope: "app", titleKey: "pageTitle.agents" },
-  { path: "/files", scope: "app", titleKey: "pageTitle.files" },
+  { path: "/environment/:environmentId", scope: "project", titleKey: "pageTitle.environments" },
+  { path: "/environment", scope: "project", titleKey: "pageTitle.environments" },
+  { path: "/integrations/skills", scope: "project", titleKey: "pageTitle.skills" },
+  { path: "/integrations/mcp", scope: "project", titleKey: "pageTitle.mcpServers" },
+  { path: "/providers", scope: "project", titleKey: "pageTitle.providers" },
+  { path: "/threads/:threadId", scope: "project", titleKey: "pageTitle.thread" },
+  { path: "/threads", scope: "project", titleKey: "pageTitle.threads" },
+  { path: "/agent/:agentId", scope: "project", titleKey: "pageTitle.agent" },
+  { path: "/agent", scope: "project", titleKey: "pageTitle.agents" },
+  { path: "/files", scope: "project", titleKey: "pageTitle.files" },
   { path: "/cli-auth", scope: "global", titleKey: "pageTitle.cliAuth" },
   { path: "/onboarding", scope: "global", titleKey: "pageTitle.onboarding" },
   { path: "/login", scope: "global", titleKey: "pageTitle.signIn" },
   { path: "/org/settings", scope: "org", titleKey: "pageTitle.orgSettings" },
-  { path: "/apps", scope: "org", titleKey: "pageTitle.apps" },
-  { path: "/", scope: "app", titleKey: "pageTitle.overview" },
+  { path: "/projects", scope: "org", titleKey: "pageTitle.projects" },
+  { path: "/", scope: "project", titleKey: "pageTitle.overview" },
 ];
 
 function findDocumentTitleRule(pathname: string): DocumentTitleRule | null {
@@ -89,7 +89,7 @@ function joinDocumentTitle(parts: Array<string | null | undefined>): string {
 }
 
 export function resolveDocumentTitle(input: {
-  activeAppName: string | null;
+  activeProjectName: string | null;
   activeOrganizationName: string | null;
   pathname: string;
   t?: (key: string) => string;
@@ -97,14 +97,14 @@ export function resolveDocumentTitle(input: {
   const rule = findDocumentTitleRule(input.pathname);
 
   if (rule === null) {
-    return joinDocumentTitle([input.activeAppName]);
+    return joinDocumentTitle([input.activeProjectName]);
   }
 
   const title =
     input.t?.(rule.titleKey) ?? DEFAULT_TITLE_TRANSLATIONS[rule.titleKey] ?? rule.titleKey;
 
-  if (rule.scope === "app") {
-    return joinDocumentTitle([title, input.activeAppName]);
+  if (rule.scope === "project") {
+    return joinDocumentTitle([title, input.activeProjectName]);
   }
 
   if (rule.scope === "org") {
@@ -116,10 +116,10 @@ export function resolveDocumentTitle(input: {
 
 export function DocumentTitle() {
   const location = useLocation();
-  const { activeApp, activeOrganization } = useAppSession();
+  const { activeProject, activeOrganization } = useAppSession();
   const { t } = useTranslation();
   const title = resolveDocumentTitle({
-    activeAppName: activeApp?.name ?? null,
+    activeProjectName: activeProject?.name ?? null,
     activeOrganizationName: activeOrganization?.name ?? null,
     pathname: location.pathname,
     t,

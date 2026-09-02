@@ -4,13 +4,13 @@ import { DocumentTitle } from "./document-title";
 import { AppLoading } from "./route-guards";
 import { AppRoutes } from "./route-registry";
 
-const appLoadingFallback = <AppLoading />;
+const projectLoadingFallback = <AppLoading />;
 
-export function App() {
+export function Project() {
   return (
     <>
       <DocumentTitle />
-      <Suspense fallback={appLoadingFallback}>
+      <Suspense fallback={projectLoadingFallback}>
         <AppRoutes />
       </Suspense>
     </>

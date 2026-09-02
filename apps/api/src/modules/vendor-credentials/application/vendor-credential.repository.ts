@@ -1,5 +1,5 @@
 import { vendorCredentialsTable } from "@mosoo/db";
-import type { AppId, VendorCredentialId } from "@mosoo/id";
+import type { ProjectId, VendorCredentialId } from "@mosoo/id";
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
@@ -20,20 +20,20 @@ function selectVendorCredentialRows(database: D1Database) {
       isDefault: vendorCredentialsTable.isDefault,
       modelsJson: vendorCredentialsTable.models,
       name: vendorCredentialsTable.name,
-      appId: vendorCredentialsTable.appId,
+      projectId: vendorCredentialsTable.projectId,
       vendorId: vendorCredentialsTable.vendorId,
     })
     .from(vendorCredentialsTable);
 }
 
-export async function listAppCustomCredentialRows(
+export async function listProjectCustomCredentialRows(
   database: D1Database,
-  appId: AppId,
+  projectId: ProjectId,
 ): Promise<VendorCredentialRow[]> {
   return selectVendorCredentialRows(database)
     .where(
       and(
-        eq(vendorCredentialsTable.appId, appId),
+        eq(vendorCredentialsTable.projectId, projectId),
         eq(vendorCredentialsTable.vendorId, "openai-compatible"),
       ),
     )
@@ -41,12 +41,12 @@ export async function listAppCustomCredentialRows(
     .all();
 }
 
-export async function listAppVendorCredentialRows(
+export async function listProjectVendorCredentialRows(
   database: D1Database,
-  appId: AppId,
+  projectId: ProjectId,
 ): Promise<VendorCredentialRow[]> {
   return selectVendorCredentialRows(database)
-    .where(eq(vendorCredentialsTable.appId, appId))
+    .where(eq(vendorCredentialsTable.projectId, projectId))
     .orderBy(
       asc(vendorCredentialsTable.vendorId),
       asc(vendorCredentialsTable.name),
@@ -55,13 +55,13 @@ export async function listAppVendorCredentialRows(
     .all();
 }
 
-export async function listAppVendorCredentialRowsPage(
+export async function listProjectVendorCredentialRowsPage(
   database: D1Database,
-  appId: AppId,
+  projectId: ProjectId,
   limit: number,
 ): Promise<VendorCredentialRow[]> {
   return selectVendorCredentialRows(database)
-    .where(eq(vendorCredentialsTable.appId, appId))
+    .where(eq(vendorCredentialsTable.projectId, projectId))
     .orderBy(
       asc(vendorCredentialsTable.vendorId),
       desc(vendorCredentialsTable.isDefault),
@@ -72,9 +72,9 @@ export async function listAppVendorCredentialRowsPage(
     .all();
 }
 
-export async function listAppVendorCredentialCountsByVendor(
+export async function listProjectVendorCredentialCountsByVendor(
   database: D1Database,
-  appId: AppId,
+  projectId: ProjectId,
 ): Promise<VendorCredentialVendorCountRow[]> {
   const rows = await getAppDatabase(database)
     .select({
@@ -83,7 +83,7 @@ export async function listAppVendorCredentialCountsByVendor(
       vendorId: vendorCredentialsTable.vendorId,
     })
     .from(vendorCredentialsTable)
-    .where(eq(vendorCredentialsTable.appId, appId))
+    .where(eq(vendorCredentialsTable.projectId, projectId))
     .groupBy(vendorCredentialsTable.vendorId)
     .orderBy(asc(vendorCredentialsTable.vendorId))
     .all();
@@ -107,28 +107,33 @@ export async function getCredentialRow(
   );
 }
 
-export async function getAppCredentialRow(
+export async function getProjectCredentialRow(
   database: D1Database,
-  appId: AppId,
+  projectId: ProjectId,
   id: VendorCredentialId,
 ): Promise<VendorCredentialRow | null> {
   return (
     (await selectVendorCredentialRows(database)
-      .where(and(eq(vendorCredentialsTable.id, id), eq(vendorCredentialsTable.appId, appId)))
+      .where(
+        and(eq(vendorCredentialsTable.id, id), eq(vendorCredentialsTable.projectId, projectId)),
+      )
       .limit(1)
       .get()) ?? null
   );
 }
 
-export async function getAppVendorCredentialRow(
+export async function getProjectVendorCredentialRow(
   database: D1Database,
-  appId: AppId,
+  projectId: ProjectId,
   vendorId: string,
 ): Promise<VendorCredentialRow | null> {
   return (
     (await selectVendorCredentialRows(database)
       .where(
-        and(eq(vendorCredentialsTable.appId, appId), eq(vendorCredentialsTable.vendorId, vendorId)),
+        and(
+          eq(vendorCredentialsTable.projectId, projectId),
+          eq(vendorCredentialsTable.vendorId, vendorId),
+        ),
       )
       .orderBy(
         desc(vendorCredentialsTable.isDefault),

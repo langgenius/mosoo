@@ -1,5 +1,5 @@
 import type { EnvironmentPackageSpec } from "@mosoo/contracts/environment";
-import type { AppId } from "@mosoo/id";
+import type { ProjectId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { validationError } from "../../../platform/errors";
@@ -48,7 +48,7 @@ export async function readEnvironmentPackageArtifactMetadata(
 
 export async function resolveEnvironmentPackageArtifact(
   bindings: ArtifactBindings,
-  appId: AppId,
+  projectId: ProjectId,
   packages: readonly EnvironmentPackageSpec[],
   options: { retryFailed?: boolean } = {},
 ): Promise<{
@@ -60,13 +60,13 @@ export async function resolveEnvironmentPackageArtifact(
   }
   const normalized = normalizePackages(packages);
   const key = await createEnvironmentPackageArtifactKey({
-    appId,
+    projectId,
     artifactAbi: ENVIRONMENT_PACKAGE_ARTIFACT_ABI,
     packages: normalized,
   });
   const metadata = await readEnvironmentPackageArtifactMetadata(bindings, key);
   if (metadata === null) {
-    const dedupeKey = `environment_package_artifact_build:${key.appId}:${key.inputDigest}`;
+    const dedupeKey = `environment_package_artifact_build:${key.projectId}:${key.inputDigest}`;
     await enqueueApiCommand(bindings, {
       dedupeKey,
       kind: "environment_package_artifact_build",
@@ -97,7 +97,7 @@ export async function resolveEnvironmentPackageArtifact(
 
 export async function resolveReadyEnvironmentPackageArtifact(
   bindings: ArtifactBindings,
-  appId: AppId,
+  projectId: ProjectId,
   packagesJson: string,
 ): Promise<
   | (EnvironmentPackageArtifactMetadata & {
@@ -107,7 +107,7 @@ export async function resolveReadyEnvironmentPackageArtifact(
 > {
   const artifact = await resolveEnvironmentPackageArtifact(
     bindings,
-    appId,
+    projectId,
     parsePackagesJson(packagesJson),
   );
   if (artifact === null) {

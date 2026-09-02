@@ -8,7 +8,7 @@ import type {
 } from "@mosoo/contracts/file";
 import { PUBLIC_API_PREFIX } from "@mosoo/contracts/public-api";
 import { parsePlatformId } from "@mosoo/id";
-import type { AccountId, FileId, OrganizationId, AppId, SessionId, UploadId } from "@mosoo/id";
+import type { AccountId, FileId, OrganizationId, ProjectId, SessionId, UploadId } from "@mosoo/id";
 
 import { createHttpApp } from "../src/adapters/http/create-http-app";
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
@@ -35,8 +35,11 @@ const ORGANIZATION_ID = parsePlatformId<OrganizationId>(
   "01J00000000000000000000006",
   "organization ID",
 );
-const APP_ID = parsePlatformId<AppId>("01J00000000000000000000007", "app ID");
-const OTHER_APP_ID = parsePlatformId<AppId>("01J00000000000000000000008", "other app ID");
+const PROJECT_ID = parsePlatformId<ProjectId>("01J00000000000000000000007", "project ID");
+const OTHER_PROJECT_ID = parsePlatformId<ProjectId>(
+  "01J00000000000000000000008",
+  "other project ID",
+);
 
 const VIEWER: AuthenticatedViewer = {
   email: "viewer@example.com",
@@ -54,7 +57,7 @@ function createFileUploadAccessDatabase(): SqliteD1Database {
       attributed_user_id text,
       creator_account_id text NOT NULL,
       id text PRIMARY KEY NOT NULL,
-      app_id text NOT NULL,
+      project_id text NOT NULL,
       provider text NOT NULL,
       title text
     );
@@ -102,7 +105,7 @@ function createFileUploadAccessDatabase(): SqliteD1Database {
       updated_at integer NOT NULL
     );
 
-    CREATE TABLE app (
+    CREATE TABLE project (
       created_at integer NOT NULL,
       default_environment_id text,
       id text PRIMARY KEY NOT NULL,
@@ -112,7 +115,7 @@ function createFileUploadAccessDatabase(): SqliteD1Database {
       updated_at integer NOT NULL
     );
 
-    INSERT INTO app (
+    INSERT INTO project (
       created_at,
       default_environment_id,
       id,
@@ -124,8 +127,8 @@ function createFileUploadAccessDatabase(): SqliteD1Database {
     VALUES (
       1,
       NULL,
-      '${APP_ID}',
-      'Main App',
+      '${PROJECT_ID}',
+      'Main Project',
       '${ORGANIZATION_ID}',
       '${VIEWER_ID}',
       1
@@ -135,7 +138,7 @@ function createFileUploadAccessDatabase(): SqliteD1Database {
       attributed_user_id,
       creator_account_id,
       id,
-      app_id,
+      project_id,
       provider,
       title
     )
@@ -143,7 +146,7 @@ function createFileUploadAccessDatabase(): SqliteD1Database {
       NULL,
       '${VIEWER_ID}',
       '${SESSION_ID}',
-      '${APP_ID}',
+      '${PROJECT_ID}',
       'openai',
       'Session'
     );
@@ -241,15 +244,15 @@ async function insertRawFileRouteSessionFixture(
   input: {
     agentId: string;
     organizationId: string;
-    otherAppId: AppId;
-    appId: string;
+    otherProjectId: ProjectId;
+    projectId: string;
     sessionId: SessionId;
     viewerId: string;
   },
 ): Promise<void> {
   await database
     .prepare(
-      `INSERT INTO app (
+      `INSERT INTO project (
         created_at,
         id,
         name,
@@ -258,7 +261,7 @@ async function insertRawFileRouteSessionFixture(
         updated_at
       ) VALUES (?, ?, ?, ?, ?, ?)`,
     )
-    .bind(1, input.otherAppId, "Other App", input.organizationId, input.viewerId, 1)
+    .bind(1, input.otherProjectId, "Other Project", input.organizationId, input.viewerId, 1)
     .run();
 
   await database
@@ -277,7 +280,7 @@ async function insertRawFileRouteSessionFixture(
         last_run_id,
         metadata_json,
         model,
-        app_id,
+        project_id,
         provider,
         renamed,
         runtime_id,
@@ -302,7 +305,7 @@ async function insertRawFileRouteSessionFixture(
       null,
       "{}",
       "gpt-5.4",
-      input.appId,
+      input.projectId,
       "openai",
       0,
       "openai-runtime",
@@ -450,7 +453,7 @@ describe("file upload access", () => {
     ).rejects.toThrow();
   });
 
-  test("creates agent package uploads as app-owned files", async () => {
+  test("creates agent package uploads as project-owned files", async () => {
     const database = createFileUploadAccessDatabase();
     const bindings = { DB: database } as ApiBindings;
 
@@ -462,7 +465,7 @@ describe("file upload access", () => {
       },
       purpose: "agent_package",
       target: {
-        id: APP_ID,
+        id: PROJECT_ID,
         kind: "agent_package",
         name: "portable.agent",
       },
@@ -478,7 +481,7 @@ describe("file upload access", () => {
     ).rejects.toThrow();
   });
 
-  test("creates App draft uploads as app-owned draft files", async () => {
+  test("creates Project draft uploads as project-owned draft files", async () => {
     const database = createFileUploadAccessDatabase();
     const bindings = { DB: database } as ApiBindings;
 
@@ -490,7 +493,7 @@ describe("file upload access", () => {
       },
       purpose: "app_draft",
       target: {
-        id: APP_ID,
+        id: PROJECT_ID,
         kind: "app_draft",
         name: "launch-note.txt",
       },
@@ -516,11 +519,11 @@ describe("file upload access", () => {
       }>();
 
     expect(row).toEqual({
-      object_key: `staging/app_draft/${APP_ID}/${upload.fileId}`,
-      owner_id: APP_ID,
+      object_key: `staging/app_draft/${PROJECT_ID}/${upload.fileId}`,
+      owner_id: PROJECT_ID,
       owner_kind: "app",
       purpose: "app_draft",
-      scope_id: APP_ID,
+      scope_id: PROJECT_ID,
       scope_kind: "app_draft",
       session_kind: "attachment",
     });
@@ -638,14 +641,14 @@ describe("file upload access", () => {
     ).rejects.toThrow();
   });
 
-  test("requires matching App proof for raw session upload targets", async () => {
+  test("requires matching Project proof for raw session upload targets", async () => {
     const fixture = await createApiTestFixture();
     await fixture.client.loginAsMosooAiTestAccount();
     await insertRawFileRouteSessionFixture(fixture.database, {
       agentId: fixture.ids.agentId,
       organizationId: fixture.ids.organizationId,
-      otherAppId: OTHER_APP_ID,
-      appId: fixture.ids.appId,
+      otherProjectId: OTHER_PROJECT_ID,
+      projectId: fixture.ids.projectId,
       sessionId: SESSION_ID,
       viewerId: fixture.viewer.id,
     });
@@ -654,10 +657,10 @@ describe("file upload access", () => {
       id: SESSION_ID,
       kind: "session",
       name: "notes.txt",
-      appId: fixture.ids.appId,
+      projectId: fixture.ids.projectId,
     } satisfies CreateFileUploadRequest["target"];
 
-    const missingAppResponse = await postRawSessionFileUpload({
+    const missingProjectResponse = await postRawSessionFileUpload({
       bindings: fixture.bindings,
       headers: fixture.client.sessionHeaders({ "content-type": "application/json" }),
       target: {
@@ -666,28 +669,28 @@ describe("file upload access", () => {
         name: "notes.txt",
       },
     });
-    const missingAppBody = (await missingAppResponse.json()) as FileErrorResponse;
+    const missingProjectBody = (await missingProjectResponse.json()) as FileErrorResponse;
 
-    expect(missingAppResponse.status).toBe(400);
-    expect(missingAppBody.error).toMatchObject({
+    expect(missingProjectResponse.status).toBe(400);
+    expect(missingProjectBody.error).toMatchObject({
       code: "file_invalid_request",
-      message: "upload session app ID must be a ULID string.",
+      message: "upload session project ID must be a ULID string.",
       status: 400,
     });
     expect(await countSessionFileRecords(fixture.database, SESSION_ID)).toBe(0);
 
-    const mismatchedAppResponse = await postRawSessionFileUpload({
+    const mismatchedProjectResponse = await postRawSessionFileUpload({
       bindings: fixture.bindings,
       headers: fixture.client.sessionHeaders({ "content-type": "application/json" }),
       target: {
         ...sessionTarget,
-        appId: OTHER_APP_ID,
+        projectId: OTHER_PROJECT_ID,
       },
     });
-    const mismatchedAppBody = (await mismatchedAppResponse.json()) as FileErrorResponse;
+    const mismatchedProjectBody = (await mismatchedProjectResponse.json()) as FileErrorResponse;
 
-    expect(mismatchedAppResponse.status).toBe(404);
-    expect(mismatchedAppBody.error).toMatchObject({
+    expect(mismatchedProjectResponse.status).toBe(404);
+    expect(mismatchedProjectBody.error).toMatchObject({
       code: "file_not_found",
       message: "Session not found.",
       status: 404,
@@ -713,8 +716,8 @@ describe("file upload access", () => {
     await insertRawFileRouteSessionFixture(fixture.database, {
       agentId: fixture.ids.agentId,
       organizationId: fixture.ids.organizationId,
-      otherAppId: OTHER_APP_ID,
-      appId: fixture.ids.appId,
+      otherProjectId: OTHER_PROJECT_ID,
+      projectId: fixture.ids.projectId,
       sessionId: SESSION_ID,
       viewerId: fixture.viewer.id,
     });
@@ -723,11 +726,11 @@ describe("file upload access", () => {
       createdBy: fixture.viewer.id,
       fileId: LIBRARY_FILE_ID,
       name: "seed.csv",
-      ownerId: fixture.ids.appId,
+      ownerId: fixture.ids.projectId,
       ownerKind: "app",
       path: "seed.csv",
       purpose: "library_file",
-      scopeId: fixture.ids.appId,
+      scopeId: fixture.ids.projectId,
       scopeKind: "library",
       sessionKind: null,
     });
@@ -756,7 +759,7 @@ describe("file upload access", () => {
       sessionKind: "attachment",
     });
 
-    const missingAppResponse = await createHttpApp().request(
+    const missingProjectResponse = await createHttpApp().request(
       `${PUBLIC_API_PREFIX}/files`,
       {
         headers: fixture.client.sessionHeaders(),
@@ -764,17 +767,17 @@ describe("file upload access", () => {
       },
       fixture.bindings,
     );
-    const missingAppBody = (await missingAppResponse.json()) as FileErrorResponse;
+    const missingProjectBody = (await missingProjectResponse.json()) as FileErrorResponse;
 
-    expect(missingAppResponse.status).toBe(400);
-    expect(missingAppBody.error).toMatchObject({
+    expect(missingProjectResponse.status).toBe(400);
+    expect(missingProjectBody.error).toMatchObject({
       code: "file_invalid_request",
-      message: "App ID is required to list files.",
+      message: "Project ID is required to list files.",
       status: 400,
     });
 
     const allResponse = await createHttpApp().request(
-      `${PUBLIC_API_PREFIX}/files?appId=${fixture.ids.appId}`,
+      `${PUBLIC_API_PREFIX}/files?projectId=${fixture.ids.projectId}`,
       {
         headers: fixture.client.sessionHeaders(),
         method: "GET",
@@ -789,7 +792,7 @@ describe("file upload access", () => {
     );
 
     const sessionResponse = await createHttpApp().request(
-      `${PUBLIC_API_PREFIX}/files?appId=${fixture.ids.appId}&sessionId=${SESSION_ID}`,
+      `${PUBLIC_API_PREFIX}/files?projectId=${fixture.ids.projectId}&sessionId=${SESSION_ID}`,
       {
         headers: fixture.client.sessionHeaders(),
         method: "GET",

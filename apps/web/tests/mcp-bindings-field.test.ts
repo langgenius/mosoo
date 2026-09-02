@@ -6,12 +6,12 @@ import { createPoolServerById } from "../src/routes/agent/components/editor/mcp-
 
 function poolServer(id: string, ownerName: string): McpServerWithCredential {
   return {
-    appId: "01J000000000000000000000A1" as McpServerWithCredential["appId"],
+    projectId: "01J000000000000000000000A1" as McpServerWithCredential["projectId"],
     authType: "bearer",
     authorizationState: "active",
     createdAt: "2026-07-16T00:00:00.000Z",
     credential: null,
-    credentialScope: "app",
+    credentialScope: "project",
     credentialStatus: "none",
     description: null,
     enabled: true,
@@ -21,7 +21,7 @@ function poolServer(id: string, ownerName: string): McpServerWithCredential {
     name: "Server",
     ownerId: "01J000000000000000000000B1" as McpServerWithCredential["ownerId"],
     ownerName,
-    source: "app",
+    source: "project",
     updatedAt: "2026-07-16T00:00:00.000Z",
     url: "https://mcp.example.com",
   };

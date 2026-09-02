@@ -134,7 +134,7 @@ export async function buildVendorProxyEnvVars(
   const modelBinding = resolveLlmProxyModelBinding(input.profile, vendor);
   const proxyGrant = await createRuntimeActionToken(input.bindings, {
     action: "llm_proxy",
-    appId: credential.appId,
+    projectId: credential.projectId,
     driverGeneration: input.driverGeneration,
     driverInstanceId: input.driverInstanceId,
     expiresAt: Date.now() + RUNTIME_RUN_RETENTION_MS,

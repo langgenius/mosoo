@@ -10,7 +10,7 @@ import type {
   AgentId,
   DriverInstanceId,
   OrganizationId,
-  AppId,
+  ProjectId,
   SessionId,
   SessionModelCallId,
   SessionRunId,
@@ -73,7 +73,7 @@ interface CostLedgerCandidateRow {
   agent_id: string | null;
   agent_owner_user_id: string | null;
   agent_revision_id: string | null;
-  app_id: string | null;
+  project_id: string | null;
   cache_creation_tokens: number | null;
   cache_read_tokens: number | null;
   call_key: string;
@@ -142,8 +142,8 @@ const LIST_USAGE_CANDIDATES_SQL = `
       session.type AS session_type,
       session.runtime_id AS session_runtime_id,
       agent.owner_account_id AS agent_owner_user_id,
-      app.id AS app_id,
-      app.organization_id,
+      project.id AS project_id,
+      project.organization_id,
       CASE
         WHEN session_model_call.driver_instance_id IS NULL THEN NULL
         WHEN session_model_call.native_call_id IS NOT NULL
@@ -165,12 +165,12 @@ const LIST_USAGE_CANDIDATES_SQL = `
       AND session.id = session_run.session_id
     LEFT JOIN agent
       ON agent.id = session_run.agent_id
-      AND agent.app_id = session.app_id
+      AND agent.project_id = session.project_id
     LEFT JOIN agent_deployment_version
       ON agent_deployment_version.id = session_run.deployment_version_id
       AND agent_deployment_version.agent_id = session_run.agent_id
-    LEFT JOIN app
-      ON app.id = session.app_id
+    LEFT JOIN project
+      ON project.id = session.project_id
     WHERE session_model_call.id < ?
       AND COALESCE(session_model_call.completed_at, session_model_call.created_at) >= ?
   )
@@ -377,7 +377,7 @@ function classifyCandidate(
     row.actor_user_id === null ||
     row.agent_id === null ||
     row.agent_owner_user_id === null ||
-    row.app_id === null ||
+    row.project_id === null ||
     row.organization_id === null ||
     (row.run_runtime_id === null && row.session_runtime_id === null)
   ) {
@@ -421,7 +421,7 @@ function classifyCandidate(
         createdAtMs: row.completed_at ?? row.created_at,
         model: row.model,
         organizationId: parsePlatformId<OrganizationId>(row.organization_id, "organization ID"),
-        appId: parsePlatformId<AppId>(row.app_id, "app ID"),
+        projectId: parsePlatformId<ProjectId>(row.project_id, "project ID"),
         provider: row.provider,
         runtimeId: row.run_runtime_id ?? row.session_runtime_id,
         sessionId: parsePlatformId<SessionId>(row.session_id, "session ID"),
@@ -486,8 +486,11 @@ async function repairCandidates(
 
   const remainingCandidates = candidates.slice(1);
 
-  function createRepairQuery(appDatabase: AppDatabase, candidate: RepairableCostLedgerCandidate) {
-    const query = createRuntimeUsageEventInsertIfMissing(appDatabase, candidate.input);
+  function createRepairQuery(
+    projectDatabase: AppDatabase,
+    candidate: RepairableCostLedgerCandidate,
+  ) {
+    const query = createRuntimeUsageEventInsertIfMissing(projectDatabase, candidate.input);
 
     if (query === null) {
       throw new Error("Repairable cost ledger candidate produced no usage event write.");

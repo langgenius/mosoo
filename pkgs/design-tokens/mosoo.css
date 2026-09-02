@@ -7,9 +7,9 @@
    Primary: Hanken Grotesk (neo-grotesque). Mono: JetBrains Mono.
    ========================================================================== */
 
-/* Consumer apps load the Google Fonts stylesheet via a <link rel="stylesheet">
+/* Consumer projects load the Google Fonts stylesheet via a <link rel="stylesheet">
    in their <head> so the @import-must-be-first rule never bites when this
-   file is composed with @import "tailwindcss". See apps/blog/BaseLayout. */
+   file is composed with @import "tailwindcss". See projects/blog/BaseLayout. */
 
 :root {
   /* ---------------------------------------------------------------------------
@@ -43,7 +43,7 @@
   --ink-150: #dfe3e8; /* divider */
   --ink-100: #e9ecf0; /* hairline border */
   --ink-50: #f4f6f8; /* subtle fill / row hover */
-  --paper: #fbfbfc; /* app / page background */
+  --paper: #fbfbfc; /* project / page background */
   --surface: #ffffff; /* cards, panels, sheets */
 
   /* ---------------------------------------------------------------------------

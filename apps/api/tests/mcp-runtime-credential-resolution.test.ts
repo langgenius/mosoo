@@ -1,11 +1,11 @@
 import { describe, expect, test } from "bun:test";
 
-import type { AgentId, CredentialId, McpServerId, AppId } from "@mosoo/id";
+import type { AgentId, CredentialId, McpServerId, ProjectId } from "@mosoo/id";
 
 import { resolveCredentialsForMcpBindings } from "../src/modules/mcp/application/mcp-credential.repository";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
-const APP_ID = "01J00000000000000000000001" as AppId;
+const PROJECT_ID = "01J00000000000000000000001" as ProjectId;
 const AGENT_ID = "01J00000000000000000000002" as AgentId;
 const OTHER_AGENT_ID = "01J00000000000000000000003" as AgentId;
 const SERVER_ID = "01J00000000000000000000004" as McpServerId;
@@ -13,7 +13,7 @@ const OTHER_SERVER_ID = "01J00000000000000000000005" as McpServerId;
 const MATCHING_CREDENTIAL_ID = "01J00000000000000000000006" as CredentialId;
 const WRONG_AGENT_CREDENTIAL_ID = "01J00000000000000000000007" as CredentialId;
 const WRONG_SERVER_CREDENTIAL_ID = "01J00000000000000000000008" as CredentialId;
-const APP_CREDENTIAL_ID = "01J00000000000000000000009" as CredentialId;
+const PROJECT_CREDENTIAL_ID = "01J00000000000000000000009" as CredentialId;
 
 function createCredentialResolutionDatabase(): SqliteD1Database {
   const database = new SqliteD1Database({ foreignKeys: false });
@@ -29,7 +29,7 @@ function createCredentialResolutionDatabase(): SqliteD1Database {
       last_refreshed_at integer,
       oauth_client_id text,
       oauth_client_secret_secret_id text,
-      app_id text NOT NULL,
+      project_id text NOT NULL,
       refresh_secret_id text,
       scope text NOT NULL,
       scope_values_json text,
@@ -66,7 +66,7 @@ async function insertCredential(
           last_refreshed_at,
           oauth_client_id,
           oauth_client_secret_secret_id,
-          app_id,
+          project_id,
           refresh_secret_id,
           scope,
           scope_values_json,
@@ -82,7 +82,7 @@ async function insertCredential(
     .bind(
       input.agentId ?? null,
       input.credentialId,
-      APP_ID,
+      PROJECT_ID,
       input.scope,
       `${input.credentialId}:secret`,
       input.serverId,
@@ -113,7 +113,7 @@ describe("MCP runtime credential resolution", () => {
       serverId: OTHER_SERVER_ID,
     });
     await insertCredential(database, {
-      credentialId: APP_CREDENTIAL_ID,
+      credentialId: PROJECT_CREDENTIAL_ID,
       scope: "app",
       serverId: SERVER_ID,
     });
@@ -141,7 +141,7 @@ describe("MCP runtime credential resolution", () => {
         serverId: SERVER_ID,
       },
       {
-        agentCredentialId: APP_CREDENTIAL_ID,
+        agentCredentialId: PROJECT_CREDENTIAL_ID,
         agentId: AGENT_ID,
         credentialMode: "agent_bound",
         credentialScope: "app",

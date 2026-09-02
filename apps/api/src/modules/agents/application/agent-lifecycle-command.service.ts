@@ -1,6 +1,6 @@
 import type { Agent, DeleteAgentInput, PublishAgentInput } from "@mosoo/contracts/agent";
 import { agentDeploymentVersionsTable, agentSkillsTable, agentsTable } from "@mosoo/db";
-import type { AgentId, AppId } from "@mosoo/id";
+import type { AgentId, ProjectId } from "@mosoo/id";
 import { eq } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
@@ -10,11 +10,11 @@ import { isTruthy } from "../../../shared/truthiness";
 import { currentTimestampMs } from "../../../time";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { removeAllAgentMcpBindings } from "../../mcp/application/mcp-agent-binding.service";
-import { ensureAppAgentOwner } from "./agent-access.service";
+import { ensureProjectAgentOwner } from "./agent-access.service";
 import { prepareAgentDeploymentVersionCandidate } from "./agent-deployment-version.service";
 import { loadAgentEnvironmentConfig } from "./agent-environment.service";
 import { toAgentModel } from "./agent-models";
-import { readAgentId, readAppId } from "./agent-platform-ids";
+import { readAgentId, readProjectId } from "./agent-platform-ids";
 import { computeAgentReadiness } from "./agent-readiness.service";
 import { getAgentRow } from "./agent-repository";
 import { buildAgentSpec } from "./agent-spec.service";
@@ -24,9 +24,9 @@ export async function deleteAgent(
   viewer: AuthenticatedViewer,
   input: DeleteAgentInput,
 ): Promise<void> {
-  const { agent } = await ensureAppAgentOwner(database, viewer.id, {
+  const { agent } = await ensureProjectAgentOwner(database, viewer.id, {
     agentId: readAgentId(input.agentId),
-    appId: readAppId(input.appId),
+    projectId: readProjectId(input.projectId),
   });
 
   await removeAllAgentMcpBindings(database, agent.id);
@@ -43,9 +43,9 @@ export async function publishAgent(
   input: PublishAgentInput,
 ): Promise<Agent> {
   const database = bindings.DB;
-  const { agent } = await ensureAppAgentOwner(database, viewer.id, {
+  const { agent } = await ensureProjectAgentOwner(database, viewer.id, {
     agentId: readAgentId(input.agentId),
-    appId: readAppId(input.appId),
+    projectId: readProjectId(input.projectId),
   });
   const environment = await loadAgentEnvironmentConfig(database, agent.id, agent.environmentId);
   const { packageResolution } = parseAgentStoredConfig(agent.configJson);
@@ -56,7 +56,7 @@ export async function publishAgent(
     kind: agent.kind,
     model: agent.model,
     packageResolution,
-    appId: agent.appId,
+    projectId: agent.projectId,
     provider: agent.provider,
     runtimeId: agent.runtimeId,
   });
@@ -98,10 +98,10 @@ export async function unpublishAgent(
   viewer: AuthenticatedViewer,
   input: {
     agentId: AgentId;
-    appId: AppId;
+    projectId: ProjectId;
   },
 ): Promise<Agent> {
-  const { agent } = await ensureAppAgentOwner(database, viewer.id, input);
+  const { agent } = await ensureProjectAgentOwner(database, viewer.id, input);
   const timestampMs = currentTimestampMs();
 
   await getAppDatabase(database)

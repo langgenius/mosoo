@@ -20,7 +20,7 @@ import { runtimeSessionLinkNeedsRefresh } from "./event-types";
 import {
   getRuntimeSessionLink,
   persistProjectedRuntimeDriverEvents,
-  appRuntimeDriverEvents,
+  projectRuntimeDriverEvents,
 } from "./events";
 import type { RuntimeSessionLink } from "./events";
 import type { DriverInstanceRpcOperationContext } from "./rpc";
@@ -134,7 +134,7 @@ export class DriverInstanceRpcEventIngestionController {
 
       const projection = await (async () => {
         try {
-          return await appRuntimeDriverEvents(env, {
+          return await projectRuntimeDriverEvents(env, {
             assertCurrentConnection: () => context.assertActiveConnection(),
             currentLiveState: viewCache.currentState,
             driverInstanceId,

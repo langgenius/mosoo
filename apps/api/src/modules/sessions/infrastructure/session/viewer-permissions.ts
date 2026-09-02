@@ -22,7 +22,7 @@ export async function rejectDisconnectedViewerPermissionRequests(
     bindings: input.env,
     cachedState: input.cachedState,
     onPermissionCleanupError: input.onPermissionCleanupError,
-    appId: input.attachment.appId,
+    projectId: input.attachment.projectId,
     sessionId: input.attachment.sessionId,
     viewer: input.attachment.viewer,
   });

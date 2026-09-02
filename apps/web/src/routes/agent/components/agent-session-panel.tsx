@@ -18,7 +18,7 @@ import {
   useSessionFilesStore,
 } from "@/features/session-files/session-files-store";
 import { uploadSessionResource } from "@/features/session-files/session-resource-upload";
-import { toAppId, toSessionId } from "@/routes/typed-id";
+import { toProjectId, toSessionId } from "@/routes/typed-id";
 import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 
@@ -39,7 +39,7 @@ export function AgentSessionPanel({
   configurationChangedAt,
   configurationRevisionKey,
   tone,
-  appId,
+  projectId,
   readiness,
 }: {
   agentId: string;
@@ -48,14 +48,14 @@ export function AgentSessionPanel({
   configurationRevisionKey?: string | null;
   readiness: AgentReadiness | null;
   tone: "preview" | "consume";
-  appId: string | null;
+  projectId: string | null;
 }) {
   const { t } = useTranslation();
   const model = useAgentSessionPanelModel({
     agentId,
     configurationChangedAt: configurationChangedAt ?? null,
     configurationRevisionKey: configurationRevisionKey ?? null,
-    appId,
+    projectId,
     readiness,
     requireFreshConfiguration: tone === "preview",
     sessionType: tone === "preview" ? "preview" : "ui",
@@ -134,12 +134,15 @@ export function AgentSessionPanel({
 
         try {
           markSessionFileUploadProgress(sessionId, pendingId, 35);
-          const uploadedResource = await uploadSessionResource(appId, sessionId, file);
+          const uploadedResource = await uploadSessionResource(projectId, sessionId, file);
           markSessionFileUploadProgress(sessionId, pendingId, 95);
           completeSessionFileUpload(sessionId, pendingId);
           resourceDraft.appendMention(sessionId, uploadedResource);
           await queryClient.invalidateQueries({
-            queryKey: sessionResourcesQueryKey(appId === null ? null : toAppId(appId), sessionId),
+            queryKey: sessionResourcesQueryKey(
+              projectId === null ? null : toProjectId(projectId),
+              sessionId,
+            ),
           });
         } catch {
           failSessionFileUpload(sessionId, pendingId);

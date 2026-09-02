@@ -1,7 +1,7 @@
 import type { SkillSummary } from "@mosoo/contracts/skill";
 import { useMemo, useState } from "react";
 
-import { useAppSkillsQuery, useSkillSourceQuery } from "@/domains/skill/query/skill-queries";
+import { useProjectSkillsQuery, useSkillSourceQuery } from "@/domains/skill/query/skill-queries";
 
 import type { SkillInfo } from "../../agent.types";
 
@@ -31,16 +31,16 @@ function toSkillInfo(skill: SkillSummary): SkillInfo {
 export function useAgentSkillsFieldModel({
   selectedSkills,
   setSkills,
-  appId,
+  projectId,
 }: {
   selectedSkills: SkillInfo[];
   setSkills: (skills: SkillInfo[]) => void;
-  appId: string | null;
+  projectId: string | null;
 }): AgentSkillsFieldModel {
   const [previewSkill, setPreviewSkill] = useState<SkillInfo | null>(null);
-  const skillsQuery = useAppSkillsQuery(appId);
+  const skillsQuery = useProjectSkillsQuery(projectId);
   const previewQuery = useSkillSourceQuery(
-    appId,
+    projectId,
     previewSkill?.state === "tombstone" ? null : (previewSkill?.id ?? null),
     previewSkill !== null && previewSkill.state !== "tombstone",
   );

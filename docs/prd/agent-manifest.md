@@ -10,13 +10,13 @@ The Agent Manifest is that saved description. It gives mosoo one user-readable s
 
 ## Who uses it and how
 
-An App owner configures an Agent in Preview while testing it in the adjacent chat. The form covers identity and behavior—name, description, runtime, model, and system prompt—plus capabilities such as built-in tools, Skills, MCP servers, and an Environment. mosoo shows setup problems; missing required dependencies prevent Preview or Publish until repaired.
+A Project owner configures an Agent in Preview while testing it in the adjacent chat. The form covers identity and behavior—name, description, runtime, model, and system prompt—plus capabilities such as built-in tools, Skills, MCP servers, and an Environment. mosoo shows setup problems; missing required dependencies prevent Preview or Publish until repaired.
 
 Owners can also:
 
-- fork an Agent into a new draft within the same App;
+- fork an Agent into a new draft within the same Project;
 - export a portable `.agent` file;
-- import a `.agent` file as a new draft in another App.
+- import a `.agent` file as a new draft in another Project.
 
 ## Current boundaries
 

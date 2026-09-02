@@ -8,7 +8,7 @@ import type {
   FileId,
   McpServerId,
   OrganizationId,
-  AppId,
+  ProjectId,
   SkillId,
   SkillSnapshotId,
 } from "@mosoo/id";
@@ -44,8 +44,8 @@ export function readOrganizationId(value: unknown, label = "Organization ID"): O
   return parsePlatformId<OrganizationId>(value, label);
 }
 
-export function readAppId(value: unknown, label = "App ID"): AppId {
-  return parsePlatformId<AppId>(value, label);
+export function readProjectId(value: unknown, label = "Project ID"): ProjectId {
+  return parsePlatformId<ProjectId>(value, label);
 }
 
 export function readSkillId(value: unknown, label = "Skill ID"): SkillId {

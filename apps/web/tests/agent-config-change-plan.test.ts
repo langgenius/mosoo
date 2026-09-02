@@ -84,7 +84,7 @@ describe("agent config change plan", () => {
               id: MCP_SERVER_ID,
               name: "Linear MCP",
               type: "web",
-              url: "https://mcp.linear.app",
+              url: "https://mcp.linear.project",
             },
           ],
         }),

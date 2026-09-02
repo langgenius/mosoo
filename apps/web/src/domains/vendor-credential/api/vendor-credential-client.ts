@@ -1,21 +1,21 @@
-import type { AppId, VendorCredentialId } from "@mosoo/contracts/id";
+import type { ProjectId, VendorCredentialId } from "@mosoo/contracts/id";
 
 import { graphql } from "@/gql";
 import { requestGraphQL } from "@/platform/http/graphql-client";
-import { toAppId, toVendorCredentialId } from "@/routes/typed-id";
+import { toProjectId, toVendorCredentialId } from "@/routes/typed-id";
 
 import { parseAvailableModelReason, parseModelCatalogSource } from "./model-catalog-parsers";
 
 const VENDOR_CREDENTIAL_LIST_QUERY = graphql(/* GraphQL */ `
-  query VendorCredentialList($appId: ULID!) {
-    vendorCredentialList(appId: $appId) {
+  query VendorCredentialList($projectId: ULID!) {
+    vendorCredentialList(projectId: $projectId) {
       apiBase
       id
       isDefault
       maskedApiKey
       models
       name
-      appId
+      projectId
       vendorId
     }
   }
@@ -30,7 +30,7 @@ const CREATE_VENDOR_CREDENTIAL_MUTATION = graphql(/* GraphQL */ `
       maskedApiKey
       models
       name
-      appId
+      projectId
       vendorId
     }
   }
@@ -45,7 +45,7 @@ const UPDATE_VENDOR_CREDENTIAL_MUTATION = graphql(/* GraphQL */ `
       maskedApiKey
       models
       name
-      appId
+      projectId
       vendorId
     }
   }
@@ -68,7 +68,7 @@ const SET_DEFAULT_VENDOR_CREDENTIAL_MUTATION = graphql(/* GraphQL */ `
       maskedApiKey
       models
       name
-      appId
+      projectId
       vendorId
     }
   }
@@ -76,13 +76,13 @@ const SET_DEFAULT_VENDOR_CREDENTIAL_MUTATION = graphql(/* GraphQL */ `
 
 const AVAILABLE_AGENT_MODELS_QUERY = graphql(/* GraphQL */ `
   query AvailableAgentModels(
-    $appId: ULID!
+    $projectId: ULID!
     $runtimeId: String!
     $currentModelId: String
     $currentVendorId: String
   ) {
     availableAgentModels(
-      appId: $appId
+      projectId: $projectId
       runtimeId: $runtimeId
       currentModelId: $currentModelId
       currentVendorId: $currentVendorId
@@ -117,25 +117,25 @@ export interface VendorCredential {
   maskedApiKey: string;
   models: string[] | null;
   name: string;
-  appId: AppId;
+  projectId: ProjectId;
   vendorId: string;
 }
 
-type GraphQLVendorCredential = Omit<VendorCredential, "id" | "appId"> & {
+type GraphQLVendorCredential = Omit<VendorCredential, "id" | "projectId"> & {
   id: string;
-  appId: string;
+  projectId: string;
 };
 
 function toVendorCredential(credential: GraphQLVendorCredential): VendorCredential {
   return {
     ...credential,
     id: toVendorCredentialId(credential.id),
-    appId: toAppId(credential.appId),
+    projectId: toProjectId(credential.projectId),
   };
 }
 
-export async function listVendorCredentials(appId: AppId): Promise<VendorCredential[]> {
-  const payload = await requestGraphQL(VENDOR_CREDENTIAL_LIST_QUERY, { appId });
+export async function listVendorCredentials(projectId: ProjectId): Promise<VendorCredential[]> {
+  const payload = await requestGraphQL(VENDOR_CREDENTIAL_LIST_QUERY, { projectId });
   return payload.vendorCredentialList.map(toVendorCredential);
 }
 
@@ -144,7 +144,7 @@ export async function createVendorCredential(input: {
   apiKey: string;
   models?: string[];
   name: string;
-  appId: AppId;
+  projectId: ProjectId;
   vendorId: string;
 }): Promise<VendorCredential> {
   const payload = await requestGraphQL(CREATE_VENDOR_CREDENTIAL_MUTATION, { input });
@@ -157,7 +157,7 @@ export async function updateVendorCredential(input: {
   id: VendorCredentialId;
   models?: string[];
   name?: string;
-  appId: AppId;
+  projectId: ProjectId;
 }): Promise<VendorCredential> {
   const payload = await requestGraphQL(UPDATE_VENDOR_CREDENTIAL_MUTATION, { input });
   return toVendorCredential(payload.updateVendorCredential);
@@ -165,14 +165,14 @@ export async function updateVendorCredential(input: {
 
 export async function deleteVendorCredential(input: {
   id: VendorCredentialId;
-  appId: AppId;
+  projectId: ProjectId;
 }): Promise<void> {
   await requestGraphQL(DELETE_VENDOR_CREDENTIAL_MUTATION, { input });
 }
 
 export async function setDefaultVendorCredential(input: {
   id: VendorCredentialId;
-  appId: AppId;
+  projectId: ProjectId;
 }): Promise<VendorCredential> {
   const payload = await requestGraphQL(SET_DEFAULT_VENDOR_CREDENTIAL_MUTATION, { input });
   return toVendorCredential(payload.setDefaultVendorCredential);
@@ -198,7 +198,7 @@ export interface ResolvedModelEntry {
 }
 
 export async function listAvailableAgentModels(input: {
-  appId: AppId;
+  projectId: ProjectId;
   runtimeId: string;
   currentModelId?: string | null;
   currentVendorId?: string | null;
@@ -206,7 +206,7 @@ export async function listAvailableAgentModels(input: {
   const payload = await requestGraphQL(AVAILABLE_AGENT_MODELS_QUERY, {
     currentModelId: input.currentModelId ?? null,
     currentVendorId: input.currentVendorId ?? null,
-    appId: input.appId,
+    projectId: input.projectId,
     runtimeId: input.runtimeId,
   });
   return payload.availableAgentModels.map((entry) => ({
@@ -226,7 +226,7 @@ export async function testVendorCredential(input: {
   apiBase?: string | null;
   apiKey: string;
   modelId?: string | null;
-  appId: AppId;
+  projectId: ProjectId;
   vendorId: string;
 }): Promise<{ errorCode: string | null; latencyMs: number; ok: boolean }> {
   const payload = await requestGraphQL(TEST_VENDOR_CREDENTIAL_MUTATION, { input });

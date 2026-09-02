@@ -25,7 +25,7 @@ their machine-readable contracts, code, or [Architecture](../architecture.md).
 
 ## Agent configuration
 
-- [App Boundary](./app-boundary.md)
+- [Project Boundary](./project-boundary.md)
 - [Agent Type](./agent-type.md)
 - [Agent Manifest](./agent-manifest.md)
 - [Agent Publishing and Versions](./agent-service-identity.md)
@@ -39,7 +39,7 @@ their machine-readable contracts, code, or [Architecture](../architecture.md).
 - [MCP Connections](./mcp-interaction.md)
 - [Credentials](./credentials.md)
 - [Environment](./environment.md)
-- [App Usage](./cost-dashboard.md)
+- [Project Usage](./cost-dashboard.md)
 
 ## Legacy aliases
 

@@ -125,9 +125,9 @@ const webConfig = {
     rollupOptions: {
       output: {
         // Pull the stable framework runtime (React, React DOM, the router, and
-        // TanStack Query) out of the app entry chunk into its own long-lived
+        // TanStack Query) out of the project entry chunk into its own long-lived
         // vendor chunk. These packages change only on dependency bumps, so a
-        // returning visitor keeps them in cache across every app deploy instead
+        // returning visitor keeps them in cache across every project deploy instead
         // of re-downloading ~150 KB of unchanged framework code baked into the
         // entry. The framework and its peers share one chunk so React stays a
         // single instance and there is no cross-chunk import waterfall.

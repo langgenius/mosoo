@@ -7,7 +7,7 @@ import { useTranslation } from "@/shared/i18n";
 import { UploadRecoveryDialog } from "../features/files/upload-recovery/upload-recovery-dialog";
 import { useAppSession } from "./session-provider";
 
-// The authenticated app shell (sidebar navigation, account/help menus, org
+// The authenticated project shell (sidebar navigation, account/help menus, org
 // chrome) only renders once a signed-in user clears the guards below. Loading
 // it lazily keeps the whole shell subtree out of the entry chunk, so the
 // public /login route — the cold-start page for first-time and
@@ -16,12 +16,12 @@ import { useAppSession } from "./session-provider";
 // one chunk and a signed-in visitor fetches it in parallel with the first route
 // chunk (both are dynamic imports resolved after the same auth check).
 const Layout = lazy(async () => {
-  const appShell = await import("./app-shell");
-  return { default: appShell.Layout };
+  const projectShell = await import("./app-shell");
+  return { default: projectShell.Layout };
 });
 const OrgLayout = lazy(async () => {
-  const appShell = await import("./app-shell");
-  return { default: appShell.OrgLayout };
+  const projectShell = await import("./app-shell");
+  return { default: projectShell.OrgLayout };
 });
 
 interface RouteChildrenProps {
@@ -75,8 +75,8 @@ export function OnboardingRoute({ children }: RouteChildrenProps): ReactNode {
 
 export function ProtectedRoute({
   children,
-  shell = "app",
-}: RouteChildrenProps & { shell?: "app" | "org" }): ReactNode {
+  shell = "project",
+}: RouteChildrenProps & { shell?: "project" | "org" }): ReactNode {
   const location = useLocation();
   const { onboardingState, user, userLoading } = useAppSession();
   const redirectTarget = `${location.pathname}${location.search}${location.hash}`;

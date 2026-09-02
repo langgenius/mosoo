@@ -10,7 +10,7 @@ const MESSAGE_ID_1 = "01J000000000000000000000G1";
 const MESSAGE_ID_2 = "01J000000000000000000000G2";
 const CURRENT_MESSAGE_ID = "01J000000000000000000000G6";
 const ORGANIZATION_ID = "01J00000000000000000000006";
-const APP_ID = "01J0000000000000000000000Q";
+const PROJECT_ID = "01J0000000000000000000000Q";
 const RUN_ID = "01J000000000000000000000G3";
 const SESSION_ID = "01J000000000000000000000G4";
 const VIEWER_ID = "01J000000000000000000000G5";
@@ -37,14 +37,14 @@ function createSessionMessageQueryDatabase(): SqliteD1Database {
       deployment_version_number integer,
       metadata_json text DEFAULT '{}' NOT NULL,
       model text NOT NULL,
-      app_id text NOT NULL,
+      project_id text NOT NULL,
       provider text NOT NULL,
       runtime_id text NOT NULL,
       status text NOT NULL,
       title text
     );
 
-    CREATE TABLE app (
+    CREATE TABLE project (
       id text PRIMARY KEY NOT NULL,
       organization_id text NOT NULL,
       owner_account_id text NOT NULL,
@@ -77,7 +77,7 @@ function createSessionMessageQueryDatabase(): SqliteD1Database {
       deployment_version_number,
       metadata_json,
       model,
-      app_id,
+      project_id,
       provider,
       runtime_id,
       status,
@@ -92,14 +92,14 @@ function createSessionMessageQueryDatabase(): SqliteD1Database {
       NULL,
       '{}',
       'model-1',
-      '${APP_ID}',
+      '${PROJECT_ID}',
       'openai',
       'openai-runtime',
       'IDLE',
       'Thread session'
     );
 
-    INSERT INTO app (
+    INSERT INTO project (
       id,
       organization_id,
       owner_account_id,
@@ -108,10 +108,10 @@ function createSessionMessageQueryDatabase(): SqliteD1Database {
       created_at,
       updated_at
     ) VALUES (
-      '${APP_ID}',
+      '${PROJECT_ID}',
       '${ORGANIZATION_ID}',
       '${VIEWER_ID}',
-      'Default App',
+      'Default Project',
       NULL,
       1,
       1
@@ -161,7 +161,7 @@ describe("session message query", () => {
     const database = createSessionMessageQueryDatabase();
 
     const messages = await getThreadSessionMessages(database, VIEWER, {
-      appId: APP_ID,
+      projectId: PROJECT_ID,
       sessionId: SESSION_ID,
     });
 
@@ -359,7 +359,7 @@ describe("session message query", () => {
 
     const [queryMessages, snapshotMessages] = await Promise.all([
       getThreadSessionMessages(database, VIEWER, {
-        appId: APP_ID,
+        projectId: PROJECT_ID,
         sessionId: SESSION_ID,
       }),
       loadStoredSessionMessages(database, SESSION_ID),

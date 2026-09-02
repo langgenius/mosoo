@@ -2,11 +2,11 @@ import type {
   CreateEnvironmentInput,
   EnvironmentDetail,
   EnvironmentSummary,
-  SetAppDefaultEnvironmentInput,
+  SetProjectDefaultEnvironmentInput,
   SetEnvironmentVariableValueInput,
   UpdateEnvironmentInput,
 } from "@mosoo/contracts/environment";
-import { environmentsTable, appsTable } from "@mosoo/db";
+import { environmentsTable, projectsTable } from "@mosoo/db";
 import { createPlatformId, parsePlatformId } from "@mosoo/id";
 import type { AccountId, EnvironmentId } from "@mosoo/id";
 import { eq } from "drizzle-orm";
@@ -15,8 +15,8 @@ import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { forbiddenError } from "../../../platform/errors";
 import { currentTimestampMs } from "../../../time";
-import { ensureAppOwnership } from "../../apps/application/app.service";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
+import { ensureProjectOwnership } from "../../projects/application/project.service";
 import {
   ensureEnvironmentAccess,
   ensureEnvironmentEditor,
@@ -43,7 +43,7 @@ export async function createEnvironment(
   input: CreateEnvironmentInput,
 ): Promise<EnvironmentSummary> {
   const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
-  const app = await ensureAppOwnership(bindings.DB, viewerId, input.appId);
+  const project = await ensureProjectOwnership(bindings.DB, viewerId, input.projectId);
 
   const metadata = normalizeEnvironmentMetadata(input);
   const environmentId = createPlatformId<EnvironmentId>();
@@ -51,7 +51,7 @@ export async function createEnvironment(
   const timestampMs = currentTimestampMs();
   const [envVars] = await Promise.all([
     buildStoredEnvVars(bindings, { envVars: input.envVars, environmentId }),
-    resolveEnvironmentPackageArtifact(bindings, app.id, normalized.packages, {
+    resolveEnvironmentPackageArtifact(bindings, project.id, normalized.packages, {
       retryFailed: true,
     }),
   ]);
@@ -66,7 +66,7 @@ export async function createEnvironment(
     environmentId,
     name: metadata.name,
     ownerId: viewerId,
-    appId: app.id,
+    projectId: project.id,
     timestampMs,
   });
 
@@ -87,7 +87,7 @@ export async function updateEnvironment(
   const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
   const access = await ensureEnvironmentEditor(bindings.DB, viewerId, {
     environmentId: input.environmentId,
-    appId: input.appId,
+    projectId: input.projectId,
   });
   const beforeConfig = toConfig(access.row);
   const metadata = normalizeEnvironmentMetadata(input);
@@ -99,7 +99,7 @@ export async function updateEnvironment(
       environmentId: access.row.id,
       previousEnvVars: beforeConfig.envVars,
     }),
-    resolveEnvironmentPackageArtifact(bindings, access.row.appId, normalized.packages, {
+    resolveEnvironmentPackageArtifact(bindings, access.row.projectId, normalized.packages, {
       retryFailed: true,
     }),
   ]);
@@ -111,7 +111,7 @@ export async function updateEnvironment(
     actorId: viewerId,
     config,
     environmentId: access.row.id,
-    appId: access.row.appId,
+    projectId: access.row.projectId,
     timestampMs,
   });
 
@@ -128,7 +128,7 @@ export async function updateEnvironment(
 
   return getEnvironmentDetail(bindings, viewer, {
     environmentId: access.row.id,
-    appId: access.row.appId,
+    projectId: access.row.projectId,
   });
 }
 
@@ -140,7 +140,7 @@ export async function setEnvironmentVariableValue(
   const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
   const access = await ensureEnvironmentEditor(bindings.DB, viewerId, {
     environmentId: input.environmentId,
-    appId: input.appId,
+    projectId: input.projectId,
   });
   const beforeConfig = toConfig(access.row);
   const key = input.key.trim();
@@ -176,7 +176,7 @@ export async function setEnvironmentVariableValue(
       envVars,
     },
     environmentId: access.row.id,
-    appId: access.row.appId,
+    projectId: access.row.projectId,
     timestampMs,
   });
 
@@ -191,34 +191,34 @@ export async function setEnvironmentVariableValue(
 
   return getEnvironmentDetail(bindings, viewer, {
     environmentId: access.row.id,
-    appId: access.row.appId,
+    projectId: access.row.projectId,
   });
 }
 
-export async function setAppDefaultEnvironment(
+export async function setProjectDefaultEnvironment(
   bindings: ApiBindings,
   viewer: AuthenticatedViewer,
-  input: SetAppDefaultEnvironmentInput,
+  input: SetProjectDefaultEnvironmentInput,
 ): Promise<EnvironmentSummary> {
   const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
-  await ensureAppOwnership(bindings.DB, viewerId, input.appId);
+  await ensureProjectOwnership(bindings.DB, viewerId, input.projectId);
 
   const access = await ensureEnvironmentAccess(bindings.DB, viewerId, {
     environmentId: input.environmentId,
-    appId: input.appId,
+    projectId: input.projectId,
   });
 
-  if (access.row.appId !== input.appId) {
-    throw forbiddenError("Environment belongs to another App.");
+  if (access.row.projectId !== input.projectId) {
+    throw forbiddenError("Environment belongs to another Project.");
   }
 
   await getAppDatabase(bindings.DB)
-    .update(appsTable)
+    .update(projectsTable)
     .set({
       defaultEnvironmentId: access.row.id,
       updatedAt: currentTimestampMs(),
     })
-    .where(eq(appsTable.id, input.appId))
+    .where(eq(projectsTable.id, input.projectId))
     .run();
 
   const row = await getEnvironmentRecordRow(bindings.DB, access.row.id);

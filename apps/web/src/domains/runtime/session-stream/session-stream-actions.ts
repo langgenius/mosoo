@@ -7,7 +7,12 @@ import type {
 import { useCallback, useMemo } from "react";
 import type { MutableRefObject } from "react";
 
-import { toFileIds, toNullableSessionRunId, toAppId, toSessionId } from "../../../routes/typed-id";
+import {
+  toFileIds,
+  toNullableSessionRunId,
+  toProjectId,
+  toSessionId,
+} from "../../../routes/typed-id";
 import { isTruthy } from "../../../shared/lib/truthiness";
 import { sendAgentSessionEvents } from "../../session/api/agent-session";
 import type { SendViewerEventOptions, SessionStreamEventSender } from "./session-stream-socket";
@@ -32,7 +37,7 @@ export function isSessionStreamStreaming(
 interface UseSessionStreamActionsInput {
   activeSessionIdRef: MutableRefObject<string | null>;
   liveState: SessionLiveState | null;
-  appId: string | null;
+  projectId: string | null;
   sendViewerEvent: SessionStreamEventSender;
 }
 
@@ -93,11 +98,11 @@ export function useSessionStreamActions(input: UseSessionStreamActionsInput): {
             type: "user_message",
           },
         ],
-        appId: toAppId(input.appId ?? ""),
+        projectId: toProjectId(input.projectId ?? ""),
         sessionId: toSessionId(message.sessionId),
       });
     },
-    [input.appId],
+    [input.projectId],
   );
   const sendPermissionDecision = useCallback(
     async (decision: {
@@ -113,11 +118,11 @@ export function useSessionStreamActions(input: UseSessionStreamActionsInput): {
             type: "permission_decision",
           },
         ],
-        appId: toAppId(input.appId ?? ""),
+        projectId: toProjectId(input.projectId ?? ""),
         sessionId: toSessionId(decision.sessionId),
       });
     },
-    [input.appId],
+    [input.projectId],
   );
   const sendUserInterrupt = useCallback(
     async (interrupt: { runId?: string | null; sessionId: string }): Promise<void> => {
@@ -128,11 +133,11 @@ export function useSessionStreamActions(input: UseSessionStreamActionsInput): {
             type: "user_interrupt",
           },
         ],
-        appId: toAppId(input.appId ?? ""),
+        projectId: toProjectId(input.projectId ?? ""),
         sessionId: toSessionId(interrupt.sessionId),
       });
     },
-    [input.appId],
+    [input.projectId],
   );
 
   const messages = useMemo(() => input.liveState?.messages ?? [], [input.liveState]);

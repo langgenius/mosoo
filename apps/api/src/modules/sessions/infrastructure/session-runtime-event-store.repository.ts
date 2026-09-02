@@ -23,7 +23,7 @@ import type {
   SessionRuntimeEventRecord,
   SessionRuntimeEventSourceReceipt,
 } from "./session-runtime-event-store.types";
-import { appSessionViewerRuntimeEvents } from "./session-viewer-event-projection.repository";
+import { projectSessionViewerRuntimeEvents } from "./session-viewer-event-projection.repository";
 
 export type {
   OneRuntimeEventPerSessionInput,
@@ -321,14 +321,14 @@ async function allocateOneRuntimeEventPerSession(
   const sessionIds = [...new Set(records.map((record) => record.sessionId))];
   const recordsBySessionId = new Map(records.map((record) => [record.sessionId, record]));
   const allocations = new Map<SessionId, OneRuntimeEventPerSessionAllocation>();
-  const appDb = getAppDatabase(database);
+  const projectDb = getAppDatabase(database);
 
   for (const sessionId of sessionIds) {
     const record = recordsBySessionId.get(sessionId);
     const allowTerminatedSession =
       record === undefined ? false : canWriteAfterTerminatedSession([record]);
     const session =
-      (await appDb
+      (await projectDb
         .update(sessionsTable)
         .set({
           runtimeEventSeqCursor: sql`${sessionsTable.runtimeEventSeqCursor} + 1`,
@@ -421,11 +421,11 @@ async function insertSessionEventRows(
     };
   }
 
-  const appDatabase = getAppDatabase(database);
+  const projectDatabase = getAppDatabase(database);
   const statements: D1PreparedStatement[] = [];
 
   for (let index = 0; index < values.length; index += MAX_SESSION_EVENT_ROWS_PER_INSERT) {
-    const query = appDatabase
+    const query = projectDatabase
       .insert(sessionEventsTable)
       .values(values.slice(index, index + MAX_SESSION_EVENT_ROWS_PER_INSERT))
       .onConflictDoNothing({
@@ -491,7 +491,7 @@ export async function persistOneRuntimeEventPerSession(
       const insertedSessionIds = new Set(insertResult.insertedSessionIds);
       const insertedKeys = new Set(insertResult.insertedRows.map(sessionSourceEventKey));
 
-      await appSessionViewerRuntimeEvents(
+      await projectSessionViewerRuntimeEvents(
         database,
         rows.flatMap((row) =>
           insertedKeys.has(
@@ -673,7 +673,7 @@ export async function persistSessionRuntimeEvents(
   });
   const insertedSourceEventIds = new Set(result.insertedSourceEventIds);
 
-  await appSessionViewerRuntimeEvents(
+  await projectSessionViewerRuntimeEvents(
     database,
     rows.flatMap((row) =>
       insertedSourceEventIds.has(row.sourceEventId)

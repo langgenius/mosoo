@@ -1,6 +1,6 @@
 import { runUploadSession } from "@/domains/file/api/file-upload-client";
 import { addSessionResourceUpload } from "@/domains/session/api/session-resources";
-import { toAppId, toSessionId } from "@/routes/typed-id";
+import { toProjectId, toSessionId } from "@/routes/typed-id";
 
 export interface UploadedSessionResource {
   id: string;
@@ -9,15 +9,19 @@ export interface UploadedSessionResource {
 }
 
 export async function uploadSessionResource(
-  appId: string | null,
+  projectId: string | null,
   sessionId: string,
   file: File,
 ): Promise<UploadedSessionResource> {
-  if (appId === null) {
-    throw new Error("App id is required to upload session resources.");
+  if (projectId === null) {
+    throw new Error("Project id is required to upload session resources.");
   }
 
-  const upload = await addSessionResourceUpload(toAppId(appId), toSessionId(sessionId), file);
+  const upload = await addSessionResourceUpload(
+    toProjectId(projectId),
+    toSessionId(sessionId),
+    file,
+  );
 
   await runUploadSession(upload, file);
   return {

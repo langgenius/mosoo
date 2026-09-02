@@ -1,5 +1,5 @@
 import { parsePlatformId } from "@mosoo/id";
-import type { AgentId, AppId } from "@mosoo/id";
+import type { AgentId, ProjectId } from "@mosoo/id";
 
 import type { GraphQLModule } from "../../../adapters/graphql/graphql-module";
 import { agentGraphQLSpec } from "../../../adapters/graphql/graphql-module-specs";
@@ -25,13 +25,13 @@ import {
   listVisibleAgents,
 } from "../application/agent-query.service";
 
-interface AppIdArgs {
-  appId: string;
+interface ProjectIdArgs {
+  projectId: string;
 }
 
-interface AppAgentIdArgs {
+interface ProjectAgentIdArgs {
   agentId: string;
-  appId: string;
+  projectId: string;
 }
 
 interface CreateAgentArgs {
@@ -66,8 +66,8 @@ function parseAgentId(value: string): AgentId {
   return parsePlatformId<AgentId>(value, "Agent ID");
 }
 
-function parseAppId(value: string): AppId {
-  return parsePlatformId<AppId>(value, "App ID");
+function parseProjectId(value: string): ProjectId {
+  return parsePlatformId<ProjectId>(value, "Project ID");
 }
 
 export const agentGraphQLModule = {
@@ -91,36 +91,36 @@ export const agentGraphQLModule = {
       resetAgentState(context.bindings, context.viewer, args.input),
     restartDriver: async (_parent, args: RuntimeStateOperationArgs, context) =>
       restartDriver(context.bindings, context.viewer, args.input),
-    unpublishAgent: async (_parent, args: AppAgentIdArgs, context) =>
+    unpublishAgent: async (_parent, args: ProjectAgentIdArgs, context) =>
       unpublishAgent(context.bindings.DB, context.viewer, {
         agentId: parseAgentId(args.agentId),
-        appId: parseAppId(args.appId),
+        projectId: parseProjectId(args.projectId),
       }),
     updateAgentConfig: async (_parent, args: UpdateAgentConfigArgs, context) =>
       updateAgentConfig(context.bindings.DB, context.viewer, args.input),
   },
   authenticatedQueryResolvers: {
-    accessibleAgentList: async (_parent, args: AppIdArgs, context) =>
-      listVisibleAgents(context.bindings.DB, context.viewer, parseAppId(args.appId)),
-    agent: async (_parent, args: AppAgentIdArgs, context) =>
+    accessibleAgentList: async (_parent, args: ProjectIdArgs, context) =>
+      listVisibleAgents(context.bindings.DB, context.viewer, parseProjectId(args.projectId)),
+    agent: async (_parent, args: ProjectAgentIdArgs, context) =>
       getAgent(context.bindings.DB, context.viewer, {
         agentId: parseAgentId(args.agentId),
-        appId: parseAppId(args.appId),
+        projectId: parseProjectId(args.projectId),
       }),
-    agentEditorState: async (_parent, args: AppAgentIdArgs, context) =>
+    agentEditorState: async (_parent, args: ProjectAgentIdArgs, context) =>
       getAgentEditorState(context.bindings.DB, context.viewer, {
         agentId: parseAgentId(args.agentId),
-        appId: parseAppId(args.appId),
+        projectId: parseProjectId(args.projectId),
       }),
-    agentManifest: async (_parent, args: AppAgentIdArgs, context) =>
+    agentManifest: async (_parent, args: ProjectAgentIdArgs, context) =>
       exportAgentManifest(context.bindings.DB, context.viewer, {
         agentId: parseAgentId(args.agentId),
-        appId: parseAppId(args.appId),
+        projectId: parseProjectId(args.projectId),
       }),
-    exportAgentPackage: async (_parent, args: AppAgentIdArgs, context) =>
+    exportAgentPackage: async (_parent, args: ProjectAgentIdArgs, context) =>
       exportAgentPackage(context.bindings, context.viewer, {
         agentId: parseAgentId(args.agentId),
-        appId: parseAppId(args.appId),
+        projectId: parseProjectId(args.projectId),
       }),
   },
 } satisfies GraphQLModule;

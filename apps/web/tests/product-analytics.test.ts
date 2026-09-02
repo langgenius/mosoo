@@ -17,13 +17,13 @@ interface RecordedRequest {
 const originalWindow = globalThis.window;
 const originalDocument = globalThis.document;
 
-function installBrowserLocation(pathname = "/apps", search = "?source=test"): void {
+function installBrowserLocation(pathname = "/projects", search = "?source=test"): void {
   Object.defineProperty(globalThis, "window", {
     configurable: true,
     value: {
       location: {
-        href: `https://app.mosoo.ai${pathname}${search}`,
-        host: "app.mosoo.ai",
+        href: `https://project.mosoo.ai${pathname}${search}`,
+        host: "project.mosoo.ai",
         pathname,
         search,
       },
@@ -84,8 +84,8 @@ describe("product analytics", () => {
     expect(properties["deployment_mode"]).toBe("cloud");
     expect(properties["environment"]).toBe("test");
     expect(properties["step"]).toBe("welcome");
-    expect(properties["$host"]).toBe("app.mosoo.ai");
-    expect(properties["$pathname"]).toBe("/apps");
+    expect(properties["$host"]).toBe("project.mosoo.ai");
+    expect(properties["$pathname"]).toBe("/projects");
     expect(JSON.stringify(requests[0]?.body)).not.toContain("source=test");
     expect(JSON.stringify(requests[0]?.body)).not.toContain("referrer-secret");
   });
@@ -101,7 +101,7 @@ describe("product analytics", () => {
 
     const anonymousId = getProductAnalyticsState().distinctId;
     identifyProductUser({ accountId: "acct_123", email: "rock@dify.ai", name: "Rock" });
-    captureProductEvent("page_viewed", { route: "/apps" });
+    captureProductEvent("page_viewed", { route: "/projects" });
     await Promise.resolve();
 
     expect(requests.map((request) => request.body["event"])).toEqual(["$identify", "page_viewed"]);

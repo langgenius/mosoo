@@ -4,14 +4,14 @@ import {
 } from "@mosoo/contracts/session";
 import type { SessionProcessEvent } from "@mosoo/contracts/session";
 import { sessionEventsTable } from "@mosoo/db";
-import type { AccountId, AppId, RuntimeEventId, SessionId, SessionRunId } from "@mosoo/id";
+import type { AccountId, ProjectId, RuntimeEventId, SessionId, SessionRunId } from "@mosoo/id";
 import { and, desc, eq } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { validationError } from "../../../platform/errors";
 import { toIsoString } from "../../../time";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import { getAppSessionParticipantTimelineAccess } from "../domain/session-access.policy";
+import { getProjectSessionParticipantTimelineAccess } from "../domain/session-access.policy";
 import { foldStreamedSessionEventRows } from "../domain/session-event-stream-fold";
 
 export interface SessionEventProcessRow {
@@ -158,11 +158,11 @@ async function getThreadSessionProcessEventAccess(
   database: D1Database,
   viewerId: AccountId,
   input: {
-    appId: AppId;
+    projectId: ProjectId;
     sessionId: SessionId;
   },
 ): Promise<SessionProcessEventAccess> {
-  const row = await getAppSessionParticipantTimelineAccess(database, viewerId, input);
+  const row = await getProjectSessionParticipantTimelineAccess(database, viewerId, input);
 
   return {
     id: row.id,
@@ -175,13 +175,13 @@ async function listSessionProcessEvents(
   viewer: AuthenticatedViewer,
   input: {
     limit?: number | null;
-    appId: AppId;
+    projectId: ProjectId;
     sessionId: SessionId;
   },
 ): Promise<SessionProcessEvent[]> {
   const limit = normalizeProcessEventLimit(input.limit);
   const session = await getThreadSessionProcessEventAccess(database, viewer.id, {
-    appId: input.appId,
+    projectId: input.projectId,
     sessionId: input.sessionId,
   });
   const rows = await getAppDatabase(database)
@@ -241,7 +241,7 @@ export async function getSessionProcessEvents(
   database: D1Database,
   viewer: AuthenticatedViewer,
   session: {
-    appId: AppId;
+    projectId: ProjectId;
     sessionId: SessionId;
   },
   options: {
@@ -250,7 +250,7 @@ export async function getSessionProcessEvents(
 ): Promise<SessionProcessEvent[]> {
   return listSessionProcessEvents(database, viewer, {
     ...(options.limit === undefined ? {} : { limit: options.limit }),
-    appId: session.appId,
+    projectId: session.projectId,
     sessionId: session.sessionId,
   });
 }
@@ -259,7 +259,7 @@ export async function getThreadSessionProcessEvents(
   database: D1Database,
   viewer: AuthenticatedViewer,
   session: {
-    appId: AppId;
+    projectId: ProjectId;
     sessionId: SessionId;
   },
   options: {
@@ -268,7 +268,7 @@ export async function getThreadSessionProcessEvents(
 ): Promise<SessionProcessEvent[]> {
   return listSessionProcessEvents(database, viewer, {
     ...(options.limit === undefined ? {} : { limit: options.limit }),
-    appId: session.appId,
+    projectId: session.projectId,
     sessionId: session.sessionId,
   });
 }

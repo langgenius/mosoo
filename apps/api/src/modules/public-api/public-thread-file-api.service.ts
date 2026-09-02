@@ -7,7 +7,7 @@ import type {
   PublicThreadFileListResponse,
 } from "@mosoo/contracts/public-api";
 import { parsePlatformId } from "@mosoo/id";
-import type { AgentId, AppId, FileId, PublicThreadId, SessionId } from "@mosoo/id";
+import type { AgentId, ProjectId, FileId, PublicThreadId, SessionId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../platform/cloudflare/worker-types";
 import type { AuthenticatedViewer } from "../auth/application/viewer-auth.service";
@@ -22,10 +22,10 @@ async function admitPublicThreadFileAccess(
   bindings: ApiBindings,
   caller: AuthenticatedViewer,
   threadId: PublicThreadId,
-): Promise<{ appId: AppId; sessionId: SessionId }> {
+): Promise<{ projectId: ProjectId; sessionId: SessionId }> {
   const admission = await admitPublicSessionCaller(bindings.DB, caller, threadId);
   return {
-    appId: admission.session.app_id,
+    projectId: admission.session.project_id,
     sessionId: toBackingSessionId(threadId),
   };
 }
@@ -99,11 +99,11 @@ export async function listPublicThreadFiles(
   caller: AuthenticatedViewer,
   threadId: PublicThreadId,
 ): Promise<PublicThreadFileListResponse> {
-  const { appId, sessionId } = await admitPublicThreadFileAccess(bindings, caller, threadId);
+  const { projectId, sessionId } = await admitPublicThreadFileAccess(bindings, caller, threadId);
   return {
     files: (
       await fileStore.list(bindings, caller, {
-        appId,
+        projectId,
         sessionId,
       })
     ).files.map(toPublicThreadFile),
@@ -136,7 +136,7 @@ export async function createPublicAgentFile(
     overwrite: false,
     purpose: "app_draft",
     target: {
-      id: agent.appId,
+      id: agent.projectId,
       kind: "app_draft",
       name: input.file.name,
     },

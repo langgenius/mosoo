@@ -1,7 +1,12 @@
 import type { EnvironmentDetail, EnvironmentSummary } from "@mosoo/contracts/environment";
-import { accountsTable, environmentRevisionsTable, environmentsTable, appsTable } from "@mosoo/db";
+import {
+  accountsTable,
+  environmentRevisionsTable,
+  environmentsTable,
+  projectsTable,
+} from "@mosoo/db";
 import { parsePlatformId } from "@mosoo/id";
-import type { AccountId, EnvironmentId, AppId } from "@mosoo/id";
+import type { AccountId, EnvironmentId, ProjectId } from "@mosoo/id";
 import { and, desc, eq, sql } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
@@ -10,10 +15,10 @@ import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.ser
 import { ensureEnvironmentAccess, environmentRecordColumns } from "./environment-access.service";
 import { toEnvironmentSummary } from "./environment-config-mapping";
 
-export async function listAppEnvironments(
+export async function listProjectEnvironments(
   bindings: ApiBindings,
   viewer: AuthenticatedViewer,
-  appId: AppId,
+  projectId: ProjectId,
 ): Promise<EnvironmentSummary[]> {
   const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
   const results = await getAppDatabase(bindings.DB)
@@ -23,9 +28,11 @@ export async function listAppEnvironments(
       environmentRevisionsTable,
       eq(environmentRevisionsTable.id, environmentsTable.currentRevisionId),
     )
-    .innerJoin(appsTable, eq(appsTable.id, environmentsTable.appId))
+    .innerJoin(projectsTable, eq(projectsTable.id, environmentsTable.projectId))
     .leftJoin(accountsTable, eq(accountsTable.id, environmentsTable.ownerAccountId))
-    .where(and(eq(environmentsTable.appId, appId), eq(appsTable.ownerAccountId, viewerId)))
+    .where(
+      and(eq(environmentsTable.projectId, projectId), eq(projectsTable.ownerAccountId, viewerId)),
+    )
     .orderBy(
       desc(sql`CASE WHEN ${environmentsTable.ownerAccountId} IS NULL THEN 1 ELSE 0 END`),
       desc(environmentsTable.updatedAt),
@@ -40,7 +47,7 @@ export async function getEnvironmentDetail(
   viewer: AuthenticatedViewer,
   input: {
     environmentId: EnvironmentId;
-    appId: AppId;
+    projectId: ProjectId;
   },
 ): Promise<EnvironmentDetail> {
   const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
@@ -53,7 +60,7 @@ export async function canUseEnvironment(
   viewerId: AccountId,
   input: {
     environmentId: EnvironmentId;
-    appId: AppId;
+    projectId: ProjectId;
   },
 ): Promise<boolean> {
   try {

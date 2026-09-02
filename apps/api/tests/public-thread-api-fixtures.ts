@@ -30,12 +30,12 @@ export function bearer(token: string): string {
   return `Bearer ${token}`;
 }
 
-export function createPublicThreadApiTestApp(): Hono {
-  const app = new Hono();
+export function createPublicThreadApiTestProject(): Hono {
+  const project = new Hono();
   const publicApi = new Hono();
   registerPublicApiRoute(publicApi);
-  app.route(PUBLIC_API_PREFIX, publicApi);
-  return app;
+  project.route(PUBLIC_API_PREFIX, publicApi);
+  return project;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -74,25 +74,25 @@ export async function readJson(response: Response): Promise<Record<string, unkno
 }
 
 export async function requestPublicApi(
-  app: Hono,
+  project: Hono,
   database: SqliteD1Database,
   request: Request,
   options: Parameters<typeof createPublicHttpTestBindings>[1] = {},
 ): Promise<Response> {
   return requestPublicApiWithBindings(
-    app,
+    project,
     request,
     createPublicHttpTestBindings(database, options) as ApiBindings,
   );
 }
 
 export async function requestPublicApiWithBindings(
-  app: Hono,
+  project: Hono,
   request: Request,
   bindings: ApiBindings,
 ): Promise<Response> {
   return runWithRequestLogContext(request, () =>
-    app.request(request, undefined, bindings, createTestExecutionContext()),
+    project.request(request, undefined, bindings, createTestExecutionContext()),
   );
 }
 
@@ -162,7 +162,7 @@ export async function insertRuntimeEvent(
   const projection = createSessionRuntimeEventProjection(event);
 
   await database
-    .app()
+    .project()
     .insert(sessionEventsTable)
     .values({
       agentId: PUBLIC_API_TEST_IDS.agent,

@@ -1,6 +1,6 @@
 # Design
 
-Visual system for the mosoo web app. Tokens are the source of truth and live in
+Visual system for the mosoo web project. Tokens are the source of truth and live in
 `src/shared/styles/app.css` (`:root`, `.dark`, and the `@theme inline` Tailwind bridge).
 This document describes them; the CSS implements them.
 
@@ -9,7 +9,7 @@ This document describes them; the CSS implements them.
 Light, neutral-first, GitHub-like. Cool grays carry the surface; a bright Moso-bamboo
 green is a disciplined accent only. Primary actions are black (`--ink-900`) in the
 shipped light UI. Dark selector tokens (`.dark` / `[data-theme="dark"]`) are authored
-as a future-ready palette, but the app does not currently activate or expose a dark
+as a future-ready palette, but the project does not currently activate or expose a dark
 theme. The public landing page and blog are owned by the private
 `langgenius/mosoo-website` repository.
 
@@ -77,6 +77,6 @@ uniform across list pages.
   labels. Capitalize only the first word and proper nouns / acronyms (API, CSV, MCP,
   URL, OpenAI, GitHub). "Create agent", not "Create Agent"; "Access settings",
   not "Access Settings".
-- Buttons are verb + object ("Save changes", "Delete app").
+- Buttons are verb + object ("Save changes", "Delete project").
 - No em dashes in user-facing copy. No marketing buzzwords. Avoid staccato slogan
   cadence (three+ short fragments in a row).

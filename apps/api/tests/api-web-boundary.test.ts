@@ -114,12 +114,12 @@ describe("API to web boundary", () => {
       throw new Error("Expected Session and Mutation in the GraphQL schema.");
     }
 
-    expect(String(session.getFields().appId?.type)).toBe("ULID!");
+    expect(String(session.getFields().projectId?.type)).toBe("ULID!");
     expect(String(mutation.getFields().prewarmAgentSession?.args[0]?.type)).toBe("ULID!");
     expect(String(mutation.getFields().archiveAgentSession?.args[0]?.type)).toBe("ULID!");
   });
 
-  test("keeps Provider credential mutations explicitly App-scoped", () => {
+  test("keeps Provider credential mutations explicitly Project-scoped", () => {
     const schema = createGraphQLSchema();
     const updateInput = schema.getType("UpdateVendorCredentialInput");
     const deleteInput = schema.getType("DeleteVendorCredentialInput");
@@ -128,11 +128,11 @@ describe("API to web boundary", () => {
       throw new Error("Expected Provider credential mutation inputs in the GraphQL schema.");
     }
 
-    expect(String(updateInput.getFields().appId?.type)).toBe("ULID!");
-    expect(String(deleteInput.getFields().appId?.type)).toBe("ULID!");
+    expect(String(updateInput.getFields().projectId?.type)).toBe("ULID!");
+    expect(String(deleteInput.getFields().projectId?.type)).toBe("ULID!");
   });
 
-  test("keeps cost GraphQL App-scoped and Organization billing-only", () => {
+  test("keeps cost GraphQL Project-scoped and Organization billing-only", () => {
     const schema = createGraphQLSchema();
     const query = schema.getQueryType();
 
@@ -143,9 +143,9 @@ describe("API to web boundary", () => {
     const fields = query.getFields();
     const agentCostCard = fields.agentCostCard;
 
-    expect(fields.appCostCard).toBeDefined();
+    expect(fields.projectCostCard).toBeDefined();
     expect(fields.organizationBillingCostCard).toBeDefined();
-    expect(String(agentCostCard?.args.find((arg) => arg.name === "appId")?.type)).toBe("ULID!");
+    expect(String(agentCostCard?.args.find((arg) => arg.name === "projectId")?.type)).toBe("ULID!");
     expect(fields.memberCostCard).toBeUndefined();
     expect(fields.organizationCostCard).toBeUndefined();
     expect(fields.ownerCostCard).toBeUndefined();
@@ -175,7 +175,7 @@ describe("API to web boundary", () => {
     expect(purposeValues).toContain("app_draft");
     expect(purposeValues).not.toContain("organization_draft");
     expect(isObjectType(schema.getType("FileOwner"))).toBe(true);
-    expect(String(fileListInput.getFields().appId?.type)).toBe("ULID!");
+    expect(String(fileListInput.getFields().projectId?.type)).toBe("ULID!");
     expect(String(fileListInput.getFields().sessionId?.type)).toBe("ULID");
     expect(String(fileListInput.getFields().sessionKind?.type)).toBe("FileSessionKind");
     expect(String(fileListInput.getFields().scopeId?.type)).toBe("ULID");

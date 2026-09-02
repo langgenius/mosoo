@@ -36,8 +36,8 @@ export function createApiWorker(): ExportedHandler<ApiBindings> {
         return Response.redirect(url.toString(), 308);
       }
 
-      const app = await getHttpApp();
-      const response = await app.fetch(request, env, ctx);
+      const project = await getHttpApp();
+      const response = await project.fetch(request, env, ctx);
 
       return response;
     },

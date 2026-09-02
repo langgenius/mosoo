@@ -50,7 +50,7 @@ data.
 
 ## Security and isolation boundaries
 
-The checkpoint belongs to exactly one App, Agent, and Thread. It is never searched
+The checkpoint belongs to exactly one Project, Agent, and Thread. It is never searched
 or restored by path alone and is never shared with another Thread or tenant.
 Checkpoint creation and restoration remain auditable runtime operations.
 

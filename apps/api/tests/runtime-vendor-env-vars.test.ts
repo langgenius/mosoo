@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { parsePlatformId } from "@mosoo/id";
-import type { DriverInstanceId, AppId, VendorCredentialId } from "@mosoo/id";
+import type { DriverInstanceId, ProjectId, VendorCredentialId } from "@mosoo/id";
 import {
   VENDOR_ANTHROPIC,
   VENDOR_GEMINI,
@@ -23,7 +23,7 @@ const DRIVER_INSTANCE_ID = parsePlatformId<DriverInstanceId>(
   "01J0000000000000000000000F",
   "driver instance ID",
 );
-const APP_ID = parsePlatformId<AppId>("01J0000000000000000000000Q", "app ID");
+const PROJECT_ID = parsePlatformId<ProjectId>("01J0000000000000000000000Q", "project ID");
 const CREDENTIAL_ID = parsePlatformId<VendorCredentialId>(
   "01J0000000000000000000000B",
   "credential ID",
@@ -36,7 +36,7 @@ function vendorCredential(
 ): DriverVendorCredentialProfile {
   return {
     apiBase: null,
-    appId: APP_ID,
+    projectId: PROJECT_ID,
     credentialId: CREDENTIAL_ID,
     models: null,
     ...overrides,
@@ -59,7 +59,7 @@ async function expectLlmProxyGrant(
   const payload = await verifyRuntimeActionToken(BINDINGS, grant ?? "");
   expect(payload).toMatchObject({
     action: "llm_proxy",
-    appId: APP_ID,
+    projectId: PROJECT_ID,
     driverGeneration: DRIVER_GENERATION,
     driverInstanceId: DRIVER_INSTANCE_ID,
     ...modelBinding,

@@ -9,10 +9,10 @@ import { SqliteD1Database } from "./helpers/sqlite-d1";
 
 const OWNER_ID = "01J00000000000000000000001";
 const MEMBER_ID = "01J00000000000000000000002";
-const APP_ID = "01J0000000000000000000000A";
-const OTHER_APP_ID = "01J0000000000000000000000B";
-const APP_MCP_SERVER_ID = "01J0000000000000000000000C";
-const OTHER_APP_MCP_SERVER_ID = "01J0000000000000000000000D";
+const PROJECT_ID = "01J0000000000000000000000A";
+const OTHER_PROJECT_ID = "01J0000000000000000000000B";
+const PROJECT_MCP_SERVER_ID = "01J0000000000000000000000C";
+const OTHER_PROJECT_MCP_SERVER_ID = "01J0000000000000000000000D";
 
 function createMcpServerAccessDatabase(): SqliteD1Database {
   const database = new SqliteD1Database({ foreignKeys: false });
@@ -22,7 +22,7 @@ function createMcpServerAccessDatabase(): SqliteD1Database {
 	      id text PRIMARY KEY NOT NULL
 	    );
 
-    CREATE TABLE app (
+    CREATE TABLE project (
       id text PRIMARY KEY NOT NULL,
       organization_id text NOT NULL,
       owner_account_id text NOT NULL,
@@ -50,7 +50,7 @@ function createMcpServerAccessDatabase(): SqliteD1Database {
       name text NOT NULL,
       oauth_metadata_json text,
       owner_account_id text NOT NULL,
-      app_id text NOT NULL,
+      project_id text NOT NULL,
       source text NOT NULL,
       updated_at integer NOT NULL,
       url text NOT NULL
@@ -59,7 +59,7 @@ function createMcpServerAccessDatabase(): SqliteD1Database {
 	    INSERT INTO organization (id)
 	    VALUES ('01J00000000000000000000006');
 
-    INSERT INTO app (
+    INSERT INTO project (
       id,
       organization_id,
       owner_account_id,
@@ -68,8 +68,8 @@ function createMcpServerAccessDatabase(): SqliteD1Database {
       updated_at
     )
     VALUES
-      ('${APP_ID}', '01J00000000000000000000006', '${OWNER_ID}', 'App', 1, 1),
-      ('${OTHER_APP_ID}', '01J00000000000000000000006', '${MEMBER_ID}', 'Other App', 1, 1);
+      ('${PROJECT_ID}', '01J00000000000000000000006', '${OWNER_ID}', 'Project', 1, 1),
+      ('${OTHER_PROJECT_ID}', '01J00000000000000000000006', '${MEMBER_ID}', 'Other Project', 1, 1);
 
     INSERT INTO account (id, name)
     VALUES ('${OWNER_ID}', 'Owner'), ('${MEMBER_ID}', 'Member');
@@ -82,14 +82,14 @@ function createMcpServerAccessDatabase(): SqliteD1Database {
       id,
       name,
       owner_account_id,
-      app_id,
+      project_id,
       source,
       updated_at,
       url
     )
     VALUES
-      ('bearer', 1, 'app', 1, '${APP_MCP_SERVER_ID}', 'App MCP', '${OWNER_ID}', '${APP_ID}', 'app', 1, 'https://mcp.example.com/app'),
-      ('bearer', 1, 'app', 1, '${OTHER_APP_MCP_SERVER_ID}', 'Other App MCP', '${MEMBER_ID}', '${OTHER_APP_ID}', 'app', 1, 'https://mcp.example.com/other-app');
+      ('bearer', 1, 'app', 1, '${PROJECT_MCP_SERVER_ID}', 'Project MCP', '${OWNER_ID}', '${PROJECT_ID}', 'app', 1, 'https://mcp.example.com/project'),
+      ('bearer', 1, 'app', 1, '${OTHER_PROJECT_MCP_SERVER_ID}', 'Other Project MCP', '${MEMBER_ID}', '${OTHER_PROJECT_ID}', 'app', 1, 'https://mcp.example.com/other-project');
   `);
 
   return database;
@@ -106,32 +106,37 @@ function createViewer(id: string): AuthenticatedViewer {
 }
 
 describe("MCP server access", () => {
-  test("resolves app owner access", async () => {
+  test("resolves project owner access", async () => {
     const database = createMcpServerAccessDatabase();
 
     const access = await ensureServerAccess(
       database,
       createViewer(OWNER_ID),
-      APP_ID,
-      APP_MCP_SERVER_ID,
+      PROJECT_ID,
+      PROJECT_MCP_SERVER_ID,
     );
 
-    expect(access.server.id).toBe(APP_MCP_SERVER_ID);
+    expect(access.server.id).toBe(PROJECT_MCP_SERVER_ID);
   });
 
-  test("denies non-owner app access", async () => {
+  test("denies non-owner project access", async () => {
     const database = createMcpServerAccessDatabase();
 
     await expect(
-      ensureServerAccess(database, createViewer(MEMBER_ID), APP_ID, APP_MCP_SERVER_ID),
+      ensureServerAccess(database, createViewer(MEMBER_ID), PROJECT_ID, PROJECT_MCP_SERVER_ID),
     ).rejects.toThrow();
   });
 
-  test("denies wrong-app server access", async () => {
+  test("denies wrong-project server access", async () => {
     const database = createMcpServerAccessDatabase();
 
     await expect(
-      ensureServerManageAccess(database, createViewer(OWNER_ID), APP_ID, OTHER_APP_MCP_SERVER_ID),
+      ensureServerManageAccess(
+        database,
+        createViewer(OWNER_ID),
+        PROJECT_ID,
+        OTHER_PROJECT_MCP_SERVER_ID,
+      ),
     ).rejects.toThrow();
   });
 });

@@ -17,7 +17,7 @@ import {
 } from "./helpers/public-api-http-test-fixture";
 
 const ORGANIZATION_ID = "01J00000000000000000000006";
-const APP_ID = "01J0000000000000000000000Q";
+const PROJECT_ID = "01J0000000000000000000000Q";
 const SESSION_ID = "01J000000000000000000000M1";
 const SESSION_VIEWER_SOCKET_URL = `https://api.example.com/api/ag-ui/session/${SESSION_ID}/ws`;
 const VIEWER_ID = "01J000000000000000000000M2";
@@ -50,12 +50,12 @@ function createSessionViewerSocketPrewarmDatabase(input: {
       attributed_user_id text,
       creator_account_id text NOT NULL,
       metadata_json text DEFAULT '{}' NOT NULL,
-      app_id text NOT NULL,
+      project_id text NOT NULL,
       status text NOT NULL,
       type text NOT NULL
     );
 
-    CREATE TABLE app (
+    CREATE TABLE project (
       id text PRIMARY KEY NOT NULL,
       organization_id text NOT NULL,
       owner_account_id text NOT NULL,
@@ -71,7 +71,7 @@ function createSessionViewerSocketPrewarmDatabase(input: {
       attributed_user_id,
       creator_account_id,
       metadata_json,
-      app_id,
+      project_id,
       status,
       type
     ) VALUES (
@@ -80,12 +80,12 @@ function createSessionViewerSocketPrewarmDatabase(input: {
       NULL,
       '${VIEWER_ID}',
       '{}',
-      '${APP_ID}',
+      '${PROJECT_ID}',
       'IDLE',
       '${input.type}'
     );
 
-    INSERT INTO app (
+    INSERT INTO project (
       id,
       organization_id,
       owner_account_id,
@@ -94,10 +94,10 @@ function createSessionViewerSocketPrewarmDatabase(input: {
       created_at,
       updated_at
     ) VALUES (
-      '${APP_ID}',
+      '${PROJECT_ID}',
       '${ORGANIZATION_ID}',
       '${VIEWER_ID}',
-      'Default App',
+      'Default Project',
       NULL,
       1,
       1
@@ -144,7 +144,7 @@ async function connectForTest(input: {
     runtimePrewarmScheduler: (request) => {
       scheduledRequest = request;
     },
-    appId: APP_ID,
+    projectId: PROJECT_ID,
     sessionId: SESSION_ID,
     sessionViewerSocketConnector,
     viewer: input.viewer ?? VIEWER,
@@ -174,7 +174,7 @@ describe("session viewer socket runtime prewarm", () => {
     expect(scheduledRequest.requestUrl).toBe(SESSION_VIEWER_SOCKET_URL);
     expect(scheduledRequest.session).toEqual({
       id: SESSION_ID,
-      appId: APP_ID,
+      projectId: PROJECT_ID,
     });
     expect(scheduledRequest.viewer).toBe(VIEWER);
   });
@@ -228,7 +228,7 @@ describe("session viewer socket runtime prewarm", () => {
         runtimePrewarmScheduler: (request) => {
           scheduledRequest = request;
         },
-        appId: APP_ID,
+        projectId: PROJECT_ID,
         sessionId: SESSION_ID,
         sessionViewerSocketConnector,
         viewer: OUTSIDER_VIEWER,

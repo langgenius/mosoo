@@ -59,7 +59,7 @@ describe("Agent run workflow", () => {
     expect(String(startAgentRunField.args.find((arg) => arg.name === "input")?.type)).toBe(
       "StartAgentRunInput!",
     );
-    expect(String(input.getFields().appId.type)).toBe("ULID!");
+    expect(String(input.getFields().projectId.type)).toBe("ULID!");
     expect(String(input.getFields().agentId.type)).toBe("ULID");
     expect(String(input.getFields().sessionId.type)).toBe("ULID");
     expect(String(input.getFields().prompt.type)).toBe("String!");
@@ -77,7 +77,7 @@ describe("Agent run workflow", () => {
         executionContext: createTestExecutionContext(),
         input: {
           agentId: PUBLIC_API_TEST_IDS.agent,
-          appId: PUBLIC_API_TEST_IDS.app,
+          projectId: PUBLIC_API_TEST_IDS.project,
           clientRequestId: "cli-run-1",
           prompt: "Run the checklist.",
         },
@@ -95,7 +95,7 @@ describe("Agent run workflow", () => {
       type: "user_message",
     });
     expect(response.eventSurface).toMatchObject({
-      appId: PUBLIC_API_TEST_IDS.app,
+      projectId: PUBLIC_API_TEST_IDS.project,
       graphqlUrl: "https://api.example.com/api/graphql",
       messagesOperation: "threadSessionMessages",
       processEventsOperation: "threadSessionProcessEvents",
@@ -131,7 +131,7 @@ describe("Agent run workflow", () => {
       bindings: createPublicHttpTestBindings(database) as ApiBindings,
       executionContext: createTestExecutionContext(),
       input: {
-        appId: PUBLIC_API_TEST_IDS.app,
+        projectId: PUBLIC_API_TEST_IDS.project,
         prompt: "Continue the existing work.",
         sessionId: PUBLIC_API_TEST_IDS.ownerSession,
       },
@@ -170,7 +170,7 @@ describe("Agent run workflow", () => {
         executionContext: createTestExecutionContext(),
         input: {
           agentId: PUBLIC_API_TEST_IDS.file,
-          appId: PUBLIC_API_TEST_IDS.app,
+          projectId: PUBLIC_API_TEST_IDS.project,
           prompt: "This should not queue.",
           sessionId: PUBLIC_API_TEST_IDS.ownerSession,
         },

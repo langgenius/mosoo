@@ -5,7 +5,7 @@ import { JSDOM } from "jsdom";
 import { act } from "react";
 import type { Root } from "react-dom/client";
 
-const APP_ID = "01J00000000000000000000009";
+const PROJECT_ID = "01J00000000000000000000009";
 const CUSTOM_CREDENTIAL_ID = "01J000000000000000000000AA";
 const MINIMAX_CREDENTIAL_ID = "01J000000000000000000000MM";
 const originalFetch = globalThis.fetch;
@@ -157,7 +157,7 @@ function createdCustomCredentialResponse(): Response {
         maskedApiKey: "sk-***",
         models: ["custom-large", "custom-small"],
         name: "Custom gateway",
-        appId: APP_ID,
+        projectId: PROJECT_ID,
         vendorId: "openai-compatible",
       },
     },
@@ -174,7 +174,7 @@ function updatedMinimaxCredentialResponse(): Response {
         maskedApiKey: "eyJh••••OSmA",
         models: null,
         name: "mm",
-        appId: APP_ID,
+        projectId: PROJECT_ID,
         vendorId: "minimax",
       },
     },
@@ -224,7 +224,7 @@ async function renderProviders(): Promise<void> {
     root?.render(
       <QueryClientProvider client={queryClient}>
         <I18nProvider>
-          <ProvidersTab appId={APP_ID} />
+          <ProvidersTab projectId={PROJECT_ID} />
         </I18nProvider>
       </QueryClientProvider>,
     );
@@ -399,7 +399,7 @@ describe("ProvidersTab custom model dialog", () => {
         apiKey: "sk-test",
         models: ["custom-large", "custom-small"],
         name: "Custom gateway",
-        appId: APP_ID,
+        projectId: PROJECT_ID,
         vendorId: "openai-compatible",
       },
     });
@@ -414,7 +414,7 @@ describe("ProvidersTab custom model dialog", () => {
         maskedApiKey: "eyJh••••OSmA",
         models: null,
         name: "mm",
-        appId: APP_ID,
+        projectId: PROJECT_ID,
         vendorId: "minimax",
       },
     ]);
@@ -445,7 +445,7 @@ describe("ProvidersTab custom model dialog", () => {
         apiBase: "https://api.minimax.io/anthropic/v1",
         id: MINIMAX_CREDENTIAL_ID,
         name: "mm",
-        appId: APP_ID,
+        projectId: PROJECT_ID,
       },
     });
   });

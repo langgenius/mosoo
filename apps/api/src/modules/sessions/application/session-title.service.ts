@@ -5,7 +5,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../time";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import { ensureAppSessionParticipantAccess } from "../domain/session-access.policy";
+import { ensureProjectSessionParticipantAccess } from "../domain/session-access.policy";
 import { normalizeSessionTitle } from "../domain/session-title";
 import {
   getSessionSummaryById,
@@ -38,8 +38,8 @@ export async function renameSession({
   input,
   viewer,
 }: RenameSessionRequest): Promise<SessionSummary> {
-  await ensureAppSessionParticipantAccess(database, viewer.id, {
-    appId: input.appId,
+  await ensureProjectSessionParticipantAccess(database, viewer.id, {
+    projectId: input.projectId,
     sessionId: input.sessionId,
   });
   const normalizedTitle = normalizeSessionTitle(input.title);
@@ -53,7 +53,9 @@ export async function renameSession({
         title: normalizedTitle,
         updatedAt: timestampMs,
       })
-      .where(and(eq(sessionsTable.id, input.sessionId), eq(sessionsTable.appId, input.appId)))
+      .where(
+        and(eq(sessionsTable.id, input.sessionId), eq(sessionsTable.projectId, input.projectId)),
+      )
       .returning(sessionSummaryColumns())
       .get()) ?? null;
 
@@ -69,8 +71,8 @@ export async function autoTitleSession(
   viewer: AuthenticatedViewer,
   input: RenameSessionInput,
 ): Promise<SessionSummary> {
-  await ensureAppSessionParticipantAccess(database, viewer.id, {
-    appId: input.appId,
+  await ensureProjectSessionParticipantAccess(database, viewer.id, {
+    projectId: input.projectId,
     sessionId: input.sessionId,
   });
   const normalizedTitle = normalizeSessionTitle(input.title);
@@ -85,7 +87,7 @@ export async function autoTitleSession(
       .where(
         and(
           eq(sessionsTable.id, input.sessionId),
-          eq(sessionsTable.appId, input.appId),
+          eq(sessionsTable.projectId, input.projectId),
           isNull(sessionsTable.title),
           eq(sessionsTable.renamed, false),
         ),
@@ -95,7 +97,7 @@ export async function autoTitleSession(
 
   if (!updated) {
     return getSessionSummaryById(database, viewer.id, {
-      appId: input.appId,
+      projectId: input.projectId,
       sessionId: input.sessionId,
     });
   }

@@ -142,7 +142,7 @@ function OnboardingProvisioningScreen() {
     <div className="bg-background fixed inset-0 flex items-center justify-center">
       <div className="flex flex-col items-center gap-4">
         <Loader2 className="text-primary size-8 animate-spin" />
-        <p className="text-muted-foreground text-sm">{t("onboarding.creatingDefaultApp")}</p>
+        <p className="text-muted-foreground text-sm">{t("onboarding.creatingDefaultProject")}</p>
       </div>
     </div>
   );
@@ -150,7 +150,7 @@ function OnboardingProvisioningScreen() {
 
 function OnboardingErrorScreen({ error, onRetry }: { error: string | null; onRetry: () => void }) {
   const { t } = useTranslation();
-  const errorText = isTruthy(error) ? error : t("onboarding.createDefaultAppFailed");
+  const errorText = isTruthy(error) ? error : t("onboarding.createDefaultProjectFailed");
   const resolvedError =
     errorText.startsWith("login.") || errorText.startsWith("common.") ? t(errorText) : errorText;
 

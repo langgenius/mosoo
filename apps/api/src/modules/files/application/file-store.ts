@@ -21,7 +21,7 @@ import type {
 } from "@mosoo/contracts/session";
 import { fileRecordsTable, sessionsTable } from "@mosoo/db";
 import { createPlatformId, parsePlatformId } from "@mosoo/id";
-import type { AccountId, AppId, FileId, SessionId } from "@mosoo/id";
+import type { AccountId, ProjectId, FileId, SessionId } from "@mosoo/id";
 import { and, asc, desc, eq, inArray, or } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 
@@ -29,12 +29,12 @@ import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { toArrayBuffer } from "../../../shared/bytes";
 import { currentTimestampMs } from "../../../time";
-import { ensureAppOwnership } from "../../apps/application/app.service";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
+import { ensureProjectOwnership } from "../../projects/application/project.service";
 import { publishSessionResourceUpsert as publishSessionResourceUpsertEvent } from "../../sessions/application/session-resource-events.service";
 import {
-  claimAppDraftFilesToSession,
-  ensureAppDraftFilesClaimable,
+  claimProjectDraftFilesToSession,
+  ensureProjectDraftFilesClaimable,
 } from "../infrastructure/draft-file-service";
 import { streamFileContent } from "../infrastructure/file-content-service";
 import { deleteAccessibleFile, deleteFileScope } from "../infrastructure/file-delete";
@@ -73,7 +73,7 @@ import {
 import { getObjectBody, putObject } from "../infrastructure/r2-s3-client";
 import { normalizeR2Etag } from "../infrastructure/r2-s3-client";
 import {
-  ensureAppSessionFileAccess,
+  ensureProjectSessionFileAccess,
   ensureSessionFileAccess,
 } from "../infrastructure/session-file-ownership";
 
@@ -99,7 +99,7 @@ export interface RuntimeOutputFileInput {
 }
 
 export interface AgentPackageFileAdmissionInput {
-  appId: AppId;
+  projectId: ProjectId;
   fileId: FileId;
 }
 
@@ -306,10 +306,10 @@ async function hasReachedSessionResourceLimit(
   return row !== null;
 }
 
-async function getSessionAppId(database: D1Database, sessionId: SessionId): Promise<AppId> {
+async function getSessionProjectId(database: D1Database, sessionId: SessionId): Promise<ProjectId> {
   const row =
     (await getAppDatabase(database)
-      .select({ appId: sessionsTable.appId })
+      .select({ projectId: sessionsTable.projectId })
       .from(sessionsTable)
       .where(eq(sessionsTable.id, sessionId))
       .limit(1)
@@ -319,23 +319,23 @@ async function getSessionAppId(database: D1Database, sessionId: SessionId): Prom
     throw createFileNotFoundError("Session not found.");
   }
 
-  return parsePlatformId<AppId>(row.appId, "session app ID");
+  return parsePlatformId<ProjectId>(row.projectId, "session project ID");
 }
 
 async function loadClaimContext(
   bindings: ApiBindings,
   viewer: AuthenticatedViewer,
   sessionId: SessionId,
-): Promise<{ appId: AppId; viewerId: AccountId }> {
+): Promise<{ projectId: ProjectId; viewerId: AccountId }> {
   const viewerId = parsePlatformId<AccountId>(viewer.id, "viewer ID");
-  const appId = await getSessionAppId(bindings.DB, sessionId);
+  const projectId = await getSessionProjectId(bindings.DB, sessionId);
 
-  await ensureAppSessionFileAccess(bindings.DB, viewerId, {
-    appId,
+  await ensureProjectSessionFileAccess(bindings.DB, viewerId, {
+    projectId,
     sessionId,
   });
 
-  return { appId, viewerId };
+  return { projectId, viewerId };
 }
 
 async function createUpload(
@@ -363,7 +363,7 @@ async function createSessionResourceUpload(
       id: input.sessionId,
       kind: "session",
       name: input.file.name,
-      appId: input.appId,
+      projectId: input.projectId,
     },
   });
 }
@@ -456,7 +456,7 @@ async function admitAgentPackageFile(
   viewer: AuthenticatedViewer,
   input: AgentPackageFileAdmissionInput,
 ): Promise<AdmittedAgentPackageFile> {
-  await ensureAppOwnership(bindings.DB, viewer.id, input.appId);
+  await ensureProjectOwnership(bindings.DB, viewer.id, input.projectId);
 
   const file =
     (await getAppDatabase(bindings.DB)
@@ -490,8 +490,12 @@ async function admitAgentPackageFile(
     throw new Error("Agent package file must use the agent_package scope.");
   }
 
-  if (file.scopeId !== input.appId || file.ownerKind !== "app" || file.ownerId !== input.appId) {
-    throw new Error("Agent package file does not belong to the target App.");
+  if (
+    file.scopeId !== input.projectId ||
+    file.ownerKind !== "app" ||
+    file.ownerId !== input.projectId
+  ) {
+    throw new Error("Agent package file does not belong to the target Project.");
   }
 
   if (file.createdBy !== viewer.id) {
@@ -519,34 +523,34 @@ async function list(
   query: FileListQuery,
 ): Promise<FileListing> {
   const viewerId = parsePlatformId<AccountId>(viewer.id, "viewer ID");
-  const appId = parsePlatformId<AppId>(query.appId, "file list app ID");
+  const projectId = parsePlatformId<ProjectId>(query.projectId, "file list project ID");
   const sessionId =
     query.sessionId === undefined
       ? undefined
       : parsePlatformId<SessionId>(query.sessionId, "file list session ID");
 
-  await ensureAppOwnership(bindings.DB, viewerId, appId);
+  await ensureProjectOwnership(bindings.DB, viewerId, projectId);
 
   if (sessionId !== undefined) {
-    await ensureAppSessionFileAccess(bindings.DB, viewerId, {
-      appId,
+    await ensureProjectSessionFileAccess(bindings.DB, viewerId, {
+      projectId,
       sessionId,
     });
   }
 
-  const rows = await listVisibleFileRecords(bindings.DB, viewerId, appId, query, sessionId);
+  const rows = await listVisibleFileRecords(bindings.DB, viewerId, projectId, query, sessionId);
   return { files: rows.map(toFileRecord) };
 }
 
 function visibleSessionFilesCondition(
   viewerId: AccountId,
-  appId: AppId,
+  projectId: ProjectId,
   sessionId?: SessionId,
 ): SQL {
   const conditions: SQL[] = [
     eq(fileRecordsTable.scopeKind, "session"),
     eq(fileRecordsTable.scopeId, sessionsTable.id),
-    eq(sessionsTable.appId, appId),
+    eq(sessionsTable.projectId, projectId),
     or(
       eq(sessionsTable.creatorAccountId, viewerId),
       eq(sessionsTable.participantAccountId, viewerId),
@@ -560,19 +564,19 @@ function visibleSessionFilesCondition(
   return and(...conditions)!;
 }
 
-function visibleLibraryFilesCondition(appId: AppId): SQL {
+function visibleLibraryFilesCondition(projectId: ProjectId): SQL {
   return and(
     eq(fileRecordsTable.scopeKind, "library"),
-    eq(fileRecordsTable.scopeId, appId),
+    eq(fileRecordsTable.scopeId, projectId),
     eq(fileRecordsTable.ownerKind, "app"),
-    eq(fileRecordsTable.ownerId, appId),
+    eq(fileRecordsTable.ownerId, projectId),
   )!;
 }
 
 async function listVisibleFileRecords(
   database: D1Database,
   viewerId: AccountId,
-  appId: AppId,
+  projectId: ProjectId,
   query: FileListQuery,
   sessionId?: SessionId,
 ) {
@@ -591,12 +595,15 @@ async function listVisibleFileRecords(
   }
 
   if (query.scopeKind === "library") {
-    conditions.push(visibleLibraryFilesCondition(appId));
+    conditions.push(visibleLibraryFilesCondition(projectId));
   } else if (query.scopeKind === "session" || sessionId !== undefined) {
-    conditions.push(visibleSessionFilesCondition(viewerId, appId, sessionId));
+    conditions.push(visibleSessionFilesCondition(viewerId, projectId, sessionId));
   } else {
     conditions.push(
-      or(visibleLibraryFilesCondition(appId), visibleSessionFilesCondition(viewerId, appId))!,
+      or(
+        visibleLibraryFilesCondition(projectId),
+        visibleSessionFilesCondition(viewerId, projectId),
+      )!,
     );
   }
 
@@ -820,9 +827,9 @@ async function ensureClaimable(
     return;
   }
 
-  const { appId } = await loadClaimContext(bindings, viewer, sessionId);
-  await ensureAppDraftFilesClaimable(bindings, viewer, {
-    appId,
+  const { projectId } = await loadClaimContext(bindings, viewer, sessionId);
+  await ensureProjectDraftFilesClaimable(bindings, viewer, {
+    projectId,
     attachmentIds: fileIds,
   });
 }
@@ -837,9 +844,9 @@ async function claimToSession(
     return [];
   }
 
-  const { appId } = await loadClaimContext(bindings, viewer, sessionId);
-  await claimAppDraftFilesToSession(bindings, viewer, {
-    appId,
+  const { projectId } = await loadClaimContext(bindings, viewer, sessionId);
+  await claimProjectDraftFilesToSession(bindings, viewer, {
+    projectId,
     attachmentIds: fileIds,
     sessionId,
   });

@@ -7,7 +7,7 @@ const ISSUER = "mosoo";
 const LIFETIME_SECONDS = 60;
 
 export interface RuntimeMcpDelegationClaims {
-  act: { agent_id: string; app_id: string };
+  act: { agent_id: string; project_id: string };
   aud: string;
   exp: number;
   iat: number;
@@ -24,7 +24,7 @@ interface DelegationInput {
   audience: string;
   claims: {
     agentId: string;
-    appId: string;
+    projectId: string;
     runId: string | null;
     threadId: string;
     endUserId: string;
@@ -45,7 +45,7 @@ async function signingKey(accessToken: string, usage: KeyUsage): Promise<CryptoK
 export async function createRuntimeMcpDelegationToken(input: DelegationInput): Promise<string> {
   const now = Math.floor((input.nowMs ?? Date.now()) / 1000);
   const claims: RuntimeMcpDelegationClaims = {
-    act: { agent_id: input.claims.agentId, app_id: input.claims.appId },
+    act: { agent_id: input.claims.agentId, project_id: input.claims.projectId },
     aud: input.audience,
     exp: now + LIFETIME_SECONDS,
     iat: now,
@@ -112,7 +112,7 @@ export async function verifyRuntimeMcpDelegationToken(input: {
       (typeof claims.tool_call_id !== "string" || claims.tool_call_id === "")) ||
     (claims.run_id !== null && (typeof claims.run_id !== "string" || claims.run_id === "")) ||
     typeof claims.act?.agent_id !== "string" ||
-    typeof claims.act?.app_id !== "string"
+    typeof claims.act?.project_id !== "string"
   )
     throw new Error("MCP delegation token claims are invalid.");
   return claims;

@@ -1,4 +1,4 @@
-import type { AccountId, AppId, SkillId, SkillSnapshotId } from "../id/id.contract";
+import type { AccountId, ProjectId, SkillId, SkillSnapshotId } from "../id/id.contract";
 
 export type SkillSourceKind = "official" | "user";
 export type SkillSnapshotEntryKind = "directory" | "file";
@@ -48,7 +48,7 @@ export interface SkillSummary {
   name: string;
   ownerId: AccountId;
   ownerName: string;
-  appId: AppId;
+  projectId: ProjectId;
   snapshotId: SkillSnapshotId;
   sourceKind: SkillSourceKind;
   updatedAt: string;
@@ -87,7 +87,7 @@ export interface ResolvedRunSkill {
 }
 
 export interface CreateSkillForkInput {
-  appId: AppId;
+  projectId: ProjectId;
   skillId: SkillId;
 }
 
@@ -118,7 +118,7 @@ export interface SkillsShCatalogResult {
 }
 
 export interface InstallSkillsShSkillInput {
-  appId: AppId;
+  projectId: ProjectId;
   id: string;
   installUrl?: string | null;
   slug: string;

@@ -317,7 +317,7 @@ export function createPublicApiOpenApiDocument(origin: string): PublicApiOpenApi
     "/agents/{agentId}/files": {
       post: operation({
         description:
-          "Uploads a file into the Agent API Endpoint's App draft scope before a Thread exists. Use the returned file ID in create-thread or send-events resources.",
+          "Uploads a file into the Agent API Endpoint's Project draft scope before a Thread exists. Use the returned file ID in create-thread or send-events resources.",
         parameters: [exampleAgentIdParameter],
         requestBody: multipartFileRequestBody(),
         security: ACCESS_TOKEN_SECURITY,

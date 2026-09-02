@@ -1,4 +1,4 @@
-import type { EnvironmentId, AppId } from "@mosoo/id";
+import type { EnvironmentId, ProjectId } from "@mosoo/id";
 
 import type { GraphQLModule } from "../../../adapters/graphql/graphql-module";
 import { environmentGraphQLSpec } from "../../../adapters/graphql/graphql-module-specs";
@@ -7,19 +7,19 @@ import {
   createEnvironmentFork,
   deleteEnvironment,
   getEnvironmentDetail,
-  listAppEnvironments,
+  listProjectEnvironments,
   setEnvironmentVariableValue,
-  setAppDefaultEnvironment,
+  setProjectDefaultEnvironment,
   updateEnvironment,
 } from "../application/environment.service";
 
 interface EnvironmentIdArgs {
   environmentId: EnvironmentId;
-  appId: AppId;
+  projectId: ProjectId;
 }
 
-interface AppIdArgs {
-  appId: AppId;
+interface ProjectIdArgs {
+  projectId: ProjectId;
 }
 
 interface CreateEnvironmentArgs {
@@ -38,8 +38,8 @@ interface DeleteEnvironmentArgs {
   input: Parameters<typeof deleteEnvironment>[2];
 }
 
-interface SetAppDefaultEnvironmentArgs {
-  input: Parameters<typeof setAppDefaultEnvironment>[2];
+interface SetProjectDefaultEnvironmentArgs {
+  input: Parameters<typeof setProjectDefaultEnvironment>[2];
 }
 
 interface SetEnvironmentVariableValueArgs {
@@ -59,8 +59,11 @@ export const environmentGraphQLModule = {
     },
     setEnvironmentVariableValue: async (_parent, args: SetEnvironmentVariableValueArgs, context) =>
       setEnvironmentVariableValue(context.bindings, context.viewer, args.input),
-    setAppDefaultEnvironment: async (_parent, args: SetAppDefaultEnvironmentArgs, context) =>
-      setAppDefaultEnvironment(context.bindings, context.viewer, args.input),
+    setProjectDefaultEnvironment: async (
+      _parent,
+      args: SetProjectDefaultEnvironmentArgs,
+      context,
+    ) => setProjectDefaultEnvironment(context.bindings, context.viewer, args.input),
     updateEnvironment: async (_parent, args: UpdateEnvironmentArgs, context) =>
       updateEnvironment(context.bindings, context.viewer, args.input),
   },
@@ -68,9 +71,9 @@ export const environmentGraphQLModule = {
     environment: async (_parent, args: EnvironmentIdArgs, context) =>
       getEnvironmentDetail(context.bindings, context.viewer, {
         environmentId: args.environmentId,
-        appId: args.appId,
+        projectId: args.projectId,
       }),
-    appEnvironmentList: async (_parent, args: AppIdArgs, context) =>
-      listAppEnvironments(context.bindings, context.viewer, args.appId),
+    projectEnvironmentList: async (_parent, args: ProjectIdArgs, context) =>
+      listProjectEnvironments(context.bindings, context.viewer, args.projectId),
   },
 } satisfies GraphQLModule;

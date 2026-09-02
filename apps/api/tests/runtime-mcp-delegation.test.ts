@@ -10,7 +10,7 @@ import {
 
 const claims = {
   agentId: "01J00000000000000000000009",
-  appId: "01J0000000000000000000000Q",
+  projectId: "01J0000000000000000000000Q",
   runId: "01J0000000000000000000000N",
   threadId: "01J0000000000000000000000B",
   endUserId: "customer-123",
@@ -34,7 +34,7 @@ describe("runtime MCP end-user delegation", () => {
         token,
       }),
     ).resolves.toMatchObject({
-      act: { agent_id: claims.agentId, app_id: claims.appId },
+      act: { agent_id: claims.agentId, project_id: claims.projectId },
       aud: "https://tools.example.com/mcp",
       exp: 1_800_000_060,
       run_id: claims.runId,
@@ -96,7 +96,7 @@ describe("runtime MCP end-user delegation", () => {
         nowMs: 1_800_000_030_000,
         token,
       });
-      const key = `${verified.act.app_id}:${verified.tool_call_id}`;
+      const key = `${verified.act.project_id}:${verified.tool_call_id}`;
       const stored = storedResults.get(key);
 
       if (stored !== undefined) {

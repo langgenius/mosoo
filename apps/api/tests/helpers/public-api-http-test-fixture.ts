@@ -9,7 +9,7 @@ import {
   environmentsTable,
   organizationsTable,
   personalAccessTokensTable,
-  appsTable,
+  projectsTable,
   sessionExecutionSnapshotsTable,
   sessionsTable,
   vendorCredentialsTable,
@@ -67,7 +67,7 @@ export const PUBLIC_API_TEST_IDS = {
   patOutsider: "01J00000000000000000000065",
   patOwner: "01J00000000000000000000061",
   patRevoked: "01J00000000000000000000066",
-  app: "01J0000000000000000000000Q",
+  project: "01J0000000000000000000000Q",
   run: "01J0000000000000000000000N",
   runAlt: "01J0000000000000000000000P",
   sandbox: "01J0000000000000000000000D",
@@ -75,7 +75,7 @@ export const PUBLIC_API_TEST_IDS = {
   driverOwner: "01J0000000000000000000000F",
 } as const;
 
-const PUBLIC_API_VENDOR_CREDENTIAL_ID = "vendor-openai-app" as VendorCredentialId;
+const PUBLIC_API_VENDOR_CREDENTIAL_ID = "vendor-openai-project" as VendorCredentialId;
 
 export function createTestExecutionContext(): ExecutionContext {
   return {
@@ -294,7 +294,7 @@ export async function createPublicHttpContractDatabase(): Promise<SqliteD1Databa
 
   database.execute(CONTRACT_SCHEMA_SQL);
 
-  const db = database.app();
+  const db = database.project();
   await db
     .insert(accountsTable)
     .values(
@@ -331,12 +331,12 @@ export async function createPublicHttpContractDatabase(): Promise<SqliteD1Databa
     .run();
 
   await db
-    .insert(appsTable)
+    .insert(projectsTable)
     .values({
       createdAt: nowMs,
       defaultEnvironmentId: PUBLIC_API_TEST_IDS.environment,
-      id: PUBLIC_API_TEST_IDS.app,
-      name: "Default App",
+      id: PUBLIC_API_TEST_IDS.project,
+      name: "Default Project",
       organizationId: PUBLIC_API_TEST_IDS.organization,
       ownerAccountId: PUBLIC_API_TEST_IDS.ownerAccount,
       updatedAt: nowMs,
@@ -356,7 +356,7 @@ export async function createPublicHttpContractDatabase(): Promise<SqliteD1Databa
       id: PUBLIC_API_TEST_IDS.environmentRevision,
       networkPolicy: "full",
       packagesJson: "[]",
-      appId: PUBLIC_API_TEST_IDS.app,
+      projectId: PUBLIC_API_TEST_IDS.project,
       setupScript: "",
     })
     .run();
@@ -373,7 +373,7 @@ export async function createPublicHttpContractDatabase(): Promise<SqliteD1Databa
       id: PUBLIC_API_TEST_IDS.environment,
       name: "Default",
       ownerAccountId: null,
-      appId: PUBLIC_API_TEST_IDS.app,
+      projectId: PUBLIC_API_TEST_IDS.project,
       updatedAt: nowMs,
     })
     .run();
@@ -383,7 +383,7 @@ export async function createPublicHttpContractDatabase(): Promise<SqliteD1Databa
     {
       apiKey: "sk-test",
       credentialId: PUBLIC_API_VENDOR_CREDENTIAL_ID,
-      appId: PUBLIC_API_TEST_IDS.app,
+      projectId: PUBLIC_API_TEST_IDS.project,
       providerId: "openai",
       purpose: "credential_create_api_key",
     },
@@ -397,8 +397,8 @@ export async function createPublicHttpContractDatabase(): Promise<SqliteD1Databa
       createdAt: nowMs,
       id: PUBLIC_API_VENDOR_CREDENTIAL_ID,
       models: null,
-      name: "App OpenAI",
-      appId: PUBLIC_API_TEST_IDS.app,
+      name: "Project OpenAI",
+      projectId: PUBLIC_API_TEST_IDS.project,
       updatedAt: nowMs,
       vendorId: "openai",
     })
@@ -419,7 +419,7 @@ export async function createPublicHttpContractDatabase(): Promise<SqliteD1Databa
       ownerId: PUBLIC_API_TEST_IDS.ownerAccount,
       prompt: "Help.",
       provider: "openai",
-      appId: PUBLIC_API_TEST_IDS.app,
+      projectId: PUBLIC_API_TEST_IDS.project,
       runtimeId: "openai-runtime",
       status: "published",
       updatedAt: nowMs,
@@ -514,7 +514,7 @@ async function insertPat(input: {
 }): Promise<void> {
   const nowMs = nowMsForTest();
   await input.database
-    .app()
+    .project()
     .insert(personalAccessTokensTable)
     .values({
       accountId: input.accountId,
@@ -541,7 +541,7 @@ async function insertSession(
   },
 ): Promise<void> {
   await database
-    .app()
+    .project()
     .insert(sessionsTable)
     .values({
       agentId: PUBLIC_API_TEST_IDS.agent,
@@ -556,7 +556,7 @@ async function insertSession(
       lastMessageAt: null,
       lastRunId: null,
       model: "gpt-5.4",
-      appId: PUBLIC_API_TEST_IDS.app,
+      projectId: PUBLIC_API_TEST_IDS.project,
       provider: "openai",
       renamed: false,
       runtimeId: "openai-runtime",
@@ -568,7 +568,7 @@ async function insertSession(
     .run();
 
   await database
-    .app()
+    .project()
     .insert(sessionExecutionSnapshotsTable)
     .values({
       createdAt: nowMsForTest(),

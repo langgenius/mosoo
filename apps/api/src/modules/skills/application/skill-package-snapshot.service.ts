@@ -1,7 +1,7 @@
 import type { SkillSnapshotEntry, SkillSnapshotRecord } from "@mosoo/contracts/skill";
 import { skillSnapshotEntriesTable, skillSnapshotsTable } from "@mosoo/db";
 import { createPlatformId } from "@mosoo/id";
-import type { AppId, SkillSnapshotId } from "@mosoo/id";
+import type { ProjectId, SkillSnapshotId } from "@mosoo/id";
 import { createZipArchive, extractZipArchive, normalizeSkillEntries } from "@mosoo/skill-package";
 import type { NormalizedSkillPackage, SkillPackageEntry } from "@mosoo/skill-package";
 import { and, asc, eq, inArray } from "drizzle-orm";
@@ -33,13 +33,13 @@ export interface LoadedSkillSnapshotRow {
   skillMarkdownPath: string;
   uncompressedSize: number;
   version: string | null;
-  appId: AppId;
+  projectId: ProjectId;
 }
 
 export async function publishSkillSnapshot(
   bindings: ApiBindings,
   owner: {
-    appId: AppId;
+    projectId: ProjectId;
   },
   input: InspectSkillInput,
 ): Promise<PublishedSkillSnapshot> {
@@ -53,7 +53,7 @@ export async function publishSkillSnapshot(
       .from(skillSnapshotsTable)
       .where(
         and(
-          eq(skillSnapshotsTable.appId, owner.appId),
+          eq(skillSnapshotsTable.projectId, owner.projectId),
           eq(skillSnapshotsTable.blobSha256, blobSha256),
         ),
       )
@@ -71,7 +71,7 @@ export async function publishSkillSnapshot(
 
   const timestampMs = currentTimestampMs();
   const snapshotId = createPlatformId<SkillSnapshotId>();
-  const blobKey = buildSkillBlobKey(owner.appId, blobSha256);
+  const blobKey = buildSkillBlobKey(owner.projectId, blobSha256);
   const snapshotAuthor = normalized.frontmatter.author ?? normalized.frontmatter.name;
   const uncompressedSize = calculateUncompressedSize(normalized);
 
@@ -90,7 +90,7 @@ export async function publishSkillSnapshot(
       description: normalized.frontmatter.description,
       id: snapshotId,
       name: normalized.frontmatter.name,
-      appId: owner.appId,
+      projectId: owner.projectId,
       skillMarkdownPath: normalized.skillMarkdownPath,
       uncompressedSize,
       version: normalized.frontmatter.version ?? null,
@@ -265,7 +265,7 @@ function skillSnapshotColumns() {
     description: skillSnapshotsTable.description,
     id: skillSnapshotsTable.id,
     name: skillSnapshotsTable.name,
-    appId: skillSnapshotsTable.appId,
+    projectId: skillSnapshotsTable.projectId,
     skillMarkdownPath: skillSnapshotsTable.skillMarkdownPath,
     uncompressedSize: skillSnapshotsTable.uncompressedSize,
     version: skillSnapshotsTable.version,

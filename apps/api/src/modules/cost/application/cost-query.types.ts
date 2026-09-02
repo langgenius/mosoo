@@ -1,4 +1,4 @@
-import type { AccountId, AgentId, AppId, SessionId, SessionRunId } from "@mosoo/id";
+import type { AccountId, AgentId, ProjectId, SessionId, SessionRunId } from "@mosoo/id";
 
 export type CostRange = "LAST_7_DAYS" | "LAST_30_DAYS" | "MONTH_TO_DATE" | "LAST_90_DAYS";
 
@@ -130,10 +130,10 @@ export interface OrganizationBillingCostCardView {
   totals: CostTotalsView;
 }
 
-export interface AppCostCardView extends CostAttributionCardView {
+export interface ProjectCostCardView extends CostAttributionCardView {
   previousTotals: CostTotalsView;
-  appId: AppId;
-  appName: string;
+  projectId: ProjectId;
+  projectName: string;
 }
 
 export interface AgentCostCardView extends CostAttributionCardView {

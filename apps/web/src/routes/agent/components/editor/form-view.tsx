@@ -125,7 +125,7 @@ function AgentFormBody({
           setSectionRef("integrations", node);
         }}
       >
-        <IntegrationsSection model={model} appId={agent.appId} readOnly={readOnly} />
+        <IntegrationsSection model={model} projectId={agent.projectId} readOnly={readOnly} />
       </div>
 
       <div

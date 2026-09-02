@@ -5,7 +5,7 @@ import type {
   AgentDeploymentVersionId,
   AgentId,
   PlatformId,
-  AppId,
+  ProjectId,
   RuntimeOperationId,
   SessionId,
   SessionMessageId,
@@ -34,7 +34,7 @@ export const sessionsTable = sqliteTable(
     messageSeqCursor: integer("message_seq_cursor").notNull().default(0),
     metadataJson: text("metadata_json").notNull().default("{}"),
     model: text("model").notNull(),
-    appId: platformIdColumn<AppId>("app_id").notNull(),
+    projectId: platformIdColumn<ProjectId>("project_id").notNull(),
     provider: text("provider").notNull(),
     renamed: integer("renamed", { mode: "boolean" }).notNull(),
     runtimeId: text("runtime_id").notNull(),
@@ -60,30 +60,30 @@ export const sessionsTable = sqliteTable(
     ),
     check("session_status_seq_check", sql`${table.statusSeq} >= 0`),
     index("session_agent_updated_idx").on(table.agentId, table.updatedAt, table.id),
-    index("session_app_creator_archived_updated_idx").on(
-      table.appId,
+    index("session_project_creator_archived_updated_idx").on(
+      table.projectId,
       table.creatorAccountId,
       table.archivedAt,
       table.updatedAt,
       table.id,
     ),
-    index("session_app_attributed_archived_updated_idx").on(
-      table.appId,
+    index("session_project_attributed_archived_updated_idx").on(
+      table.projectId,
       table.participantAccountId,
       table.archivedAt,
       table.updatedAt,
       table.id,
     ),
-    index("session_app_creator_type_archived_updated_idx").on(
-      table.appId,
+    index("session_project_creator_type_archived_updated_idx").on(
+      table.projectId,
       table.creatorAccountId,
       table.type,
       table.archivedAt,
       table.updatedAt,
       table.id,
     ),
-    index("session_app_attributed_type_archived_updated_idx").on(
-      table.appId,
+    index("session_project_attributed_type_archived_updated_idx").on(
+      table.projectId,
       table.participantAccountId,
       table.type,
       table.archivedAt,

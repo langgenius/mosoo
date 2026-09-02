@@ -13,7 +13,7 @@ import type {
   AgentId,
   EnvironmentId,
   McpServerId,
-  AppId,
+  ProjectId,
   SkillId,
 } from "@mosoo/id";
 
@@ -40,7 +40,7 @@ export interface CreateDraftAgentInput {
   prompt: string;
   provider: string;
   providerOptions: JsonObject;
-  appId: AppId;
+  projectId: ProjectId;
   runtimeId: string;
   skillIds: SkillId[];
 }
@@ -89,7 +89,7 @@ export async function createDraftAgentBatch(
       ownerId: input.ownerId,
       prompt: input.prompt,
       provider: input.provider,
-      appId: input.appId,
+      projectId: input.projectId,
       runtimeId: input.runtimeId,
       status: "draft",
       updatedAt: timestampMs,

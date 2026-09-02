@@ -24,7 +24,7 @@ describe("runtime state operation target version", () => {
     await expect(
       restartDriver(createPublicHttpTestBindings(database) as ApiBindings, OWNER_VIEWER, {
         agentId: PUBLIC_API_TEST_IDS.agent,
-        appId: PUBLIC_API_TEST_IDS.app,
+        projectId: PUBLIC_API_TEST_IDS.project,
       }),
     ).rejects.toMatchObject({
       code: "AGENT_LIVE_VERSION_REQUIRED",
@@ -38,7 +38,7 @@ describe("runtime state operation target version", () => {
     await expect(
       restartDriver(createPublicHttpTestBindings(database) as ApiBindings, OWNER_VIEWER, {
         agentId: PUBLIC_API_TEST_IDS.agent,
-        appId: PUBLIC_API_TEST_IDS.app,
+        projectId: PUBLIC_API_TEST_IDS.project,
         targetVersion: {
           id: PUBLIC_API_TEST_IDS.deployment,
           versionNumber: 0,
@@ -58,7 +58,7 @@ describe("runtime state operation target version", () => {
       OWNER_VIEWER,
       {
         agentId: PUBLIC_API_TEST_IDS.agent,
-        appId: PUBLIC_API_TEST_IDS.app,
+        projectId: PUBLIC_API_TEST_IDS.project,
         targetVersion: {
           id: PUBLIC_API_TEST_IDS.deployment,
           versionNumber: 1,

@@ -7,7 +7,7 @@ import type {
   AccountId,
   AgentId,
   PlatformId,
-  AppId,
+  ProjectId,
   SandboxId,
   SandboxSessionId,
   SessionId,
@@ -18,7 +18,7 @@ import { RUNTIME_DIAGNOSTIC_EVENT } from "@mosoo/runtime-events";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { validationError } from "../../../../platform/errors";
 import { isTruthy } from "../../../../shared/truthiness";
-import { ensureAppAgentOwner } from "../../../agents/application/agent-access.service";
+import { ensureProjectAgentOwner } from "../../../agents/application/agent-access.service";
 import { getAgentDeploymentVersionRecord } from "../../../agents/application/agent-deployment-version.service";
 import {
   computeAgentReadiness,
@@ -69,7 +69,7 @@ async function resolveRuntimeProfileIds(
   bindings: ApiBindings,
   input: {
     agentId: AgentId;
-    appId: AppId;
+    projectId: ProjectId;
     executionOwnerUserId: AccountId;
     kind: DriverProfileConfig["kind"];
     sessionId: SessionId;
@@ -83,7 +83,7 @@ async function resolveRuntimeProfileIds(
     ensureRuntimeSubjectId(bindings.DB, {
       ...sandboxSubject,
       agentId: input.agentId,
-      appId: input.appId,
+      projectId: input.projectId,
       executionOwnerUserId: input.executionOwnerUserId,
     }),
     getRuntimeConversationSession(bindings.DB, input.sessionId),
@@ -160,7 +160,7 @@ async function hydrateRunContextFromSession(
   viewer: AuthenticatedViewer,
   session: Pick<SessionSummary, "id"> & {
     accessViewer?: AuthenticatedViewer;
-    appId: AppId;
+    projectId: ProjectId;
   },
 ): Promise<HydratedSessionRunContext> {
   const executionPlan = await getSessionExecutionPlan(bindings.DB, session.id);
@@ -181,9 +181,9 @@ async function hydrateRunContextFromSession(
   }
 
   const [agent, deploymentVersion] = await Promise.all([
-    ensureAppAgentOwner(bindings.DB, session.accessViewer?.id ?? viewer.id, {
+    ensureProjectAgentOwner(bindings.DB, session.accessViewer?.id ?? viewer.id, {
       agentId: binding.agentId,
-      appId: session.appId,
+      projectId: session.projectId,
     }).then((access) => access.agent),
     isTruthy(binding.deploymentVersionId)
       ? getAgentDeploymentVersionRecord(bindings.DB, binding.deploymentVersionId)
@@ -210,7 +210,7 @@ async function hydrateRunContextFromSession(
     mcpServerIds: toolReferences.map((reference) => reference.serverId),
     model: binding.model,
     packageResolution: storedConfig.packageResolution,
-    appId: agent.appId,
+    projectId: agent.projectId,
     provider: binding.provider,
     runtimeId,
   });
@@ -226,7 +226,7 @@ async function hydrateRunContextFromSession(
 
   const resolvedSkillReferences = await resolveSessionSkillReferences({
     database: bindings.DB,
-    sessionAppId: session.appId,
+    sessionProjectId: session.projectId,
     skillMountRoot,
     skillReferences,
   });
@@ -254,7 +254,7 @@ async function hydrateRunContextFromSession(
       bindings,
       executionOwnerUserId: agent.ownerId,
       options: { modelId: binding.model },
-      appId: session.appId,
+      projectId: session.projectId,
       vendorId: vendor.vendorId,
     }),
     decryptEnvironmentVariables(bindings, {
@@ -263,7 +263,7 @@ async function hydrateRunContextFromSession(
     }),
     resolveReadyEnvironmentPackageArtifact(
       bindings,
-      session.appId,
+      session.projectId,
       environmentSnapshot.packagesJson,
     ),
     resolveEnvironmentSetupScriptForExecution(bindings.DB, environmentSnapshot),
@@ -288,7 +288,7 @@ async function hydrateRunContextFromSession(
   let profile: DriverProfileConfig;
   const runtimeProfileIds = await resolveRuntimeProfileIds(bindings, {
     agentId: agent.id,
-    appId: session.appId,
+    projectId: session.projectId,
     executionOwnerUserId: agent.ownerId,
     kind: binding.kind,
     sessionId: session.id,
@@ -369,7 +369,7 @@ async function refreshCachedRunContextVolatileFields(
   viewer: AuthenticatedViewer,
   session: Pick<SessionSummary, "id"> & {
     accessViewer?: AuthenticatedViewer;
-    appId: AppId;
+    projectId: ProjectId;
   },
   cached: HydratedSessionRunContext,
 ): Promise<HydratedSessionRunContext> {
@@ -385,9 +385,9 @@ async function refreshCachedRunContextVolatileFields(
   }
 
   const [agent, deploymentVersion] = await Promise.all([
-    ensureAppAgentOwner(bindings.DB, session.accessViewer?.id ?? viewer.id, {
+    ensureProjectAgentOwner(bindings.DB, session.accessViewer?.id ?? viewer.id, {
       agentId: binding.agentId,
-      appId: session.appId,
+      projectId: session.projectId,
     }).then((access) => access.agent),
     isTruthy(binding.deploymentVersionId)
       ? getAgentDeploymentVersionRecord(bindings.DB, binding.deploymentVersionId)
@@ -415,7 +415,7 @@ async function refreshCachedRunContextVolatileFields(
       bindings,
       executionOwnerUserId: agent.ownerId,
       options: { modelId: binding.model },
-      appId: session.appId,
+      projectId: session.projectId,
       vendorId: vendor.vendorId,
     }),
     decryptEnvironmentVariables(bindings, {
@@ -444,7 +444,7 @@ async function refreshCachedRunContextVolatileFields(
 
   const runtimeProfileIds = await resolveRuntimeProfileIds(bindings, {
     agentId: agent.id,
-    appId: session.appId,
+    projectId: session.projectId,
     executionOwnerUserId: agent.ownerId,
     kind: binding.kind,
     sessionId: session.id,
@@ -494,7 +494,7 @@ export async function hydrateCachedRunContextFromSession(
   viewer: AuthenticatedViewer,
   session: Pick<SessionSummary, "id"> & {
     accessViewer?: AuthenticatedViewer;
-    appId: AppId;
+    projectId: ProjectId;
   },
 ): Promise<{ cacheHit: boolean; value: HydratedSessionRunContext }> {
   const nowMs = Date.now();

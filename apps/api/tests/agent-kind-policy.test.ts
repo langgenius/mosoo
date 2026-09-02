@@ -17,7 +17,7 @@ const baseAgent: AgentRow = {
   name: "Agent",
   organizationId: PLATFORM_ID_FIXTURES.organization,
   ownerId: PLATFORM_ID_FIXTURES.account,
-  appId: PLATFORM_ID_FIXTURES.app,
+  projectId: PLATFORM_ID_FIXTURES.project,
   prompt: "Help",
   provider: "openai",
   runtimeId: "openai-runtime",

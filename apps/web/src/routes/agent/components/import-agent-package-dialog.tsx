@@ -7,7 +7,7 @@ import type { ChangeEvent, ReactElement } from "react";
 import { importAgentPackage } from "@/domains/agent/api/agent-client";
 import { agentKeys } from "@/domains/agent/query/agent-queries";
 import { uploadAgentPackageFile } from "@/domains/file/api/agent-package-file-client";
-import { toAppId } from "@/routes/typed-id";
+import { toProjectId } from "@/routes/typed-id";
 import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import {
@@ -26,12 +26,12 @@ export function ImportAgentPackageDialog({
   onImportedAgentOpen,
   onOpenChange,
   open,
-  appId,
+  projectId,
 }: {
   onImportedAgentOpen: (agentId: string) => void;
   onOpenChange: (open: boolean) => void;
   open: boolean;
-  appId: string | null;
+  projectId: string | null;
 }): ReactElement {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -44,7 +44,7 @@ export function ImportAgentPackageDialog({
     mutationFn: importAgentPackage,
     onSuccess: async (_data, variables) => {
       await queryClient.invalidateQueries({
-        queryKey: agentKeys.list(variables.appId),
+        queryKey: agentKeys.list(variables.projectId),
       });
     },
   });
@@ -72,8 +72,8 @@ export function ImportAgentPackageDialog({
 
     importMutation.reset();
 
-    if (appId === null) {
-      setUploadError("Select an App before uploading a package.");
+    if (projectId === null) {
+      setUploadError("Select a Project before uploading a package.");
       return;
     }
 
@@ -83,7 +83,7 @@ export function ImportAgentPackageDialog({
     setPackageFileId(null);
 
     try {
-      const uploaded = await uploadAgentPackageFile(toAppId(appId), file);
+      const uploaded = await uploadAgentPackageFile(toProjectId(projectId), file);
       setPackageFileId(uploaded.fileId);
     } catch (error) {
       setUploadError(error instanceof Error ? error.message : "Failed to upload package.");
@@ -93,13 +93,13 @@ export function ImportAgentPackageDialog({
   }
 
   async function handleImport(): Promise<void> {
-    if (appId === null || packageFileId === null) {
+    if (projectId === null || packageFileId === null) {
       return;
     }
 
     await importMutation.mutateAsync({
       fileId: packageFileId,
-      appId: toAppId(appId),
+      projectId: toProjectId(projectId),
     });
   }
 
@@ -116,7 +116,7 @@ export function ImportAgentPackageDialog({
         <DialogHeader className="px-6 pt-6">
           <DialogTitle>{t("agent.importAgent")}</DialogTitle>
           <DialogDescription>
-            Upload a portable .agent file to create a new draft in this App.
+            Upload a portable .agent file to create a new draft in this Project.
           </DialogDescription>
         </DialogHeader>
 
@@ -190,7 +190,10 @@ export function ImportAgentPackageDialog({
           ) : (
             <Button
               disabled={
-                appId === null || packageFileId === null || uploading || importMutation.isPending
+                projectId === null ||
+                packageFileId === null ||
+                uploading ||
+                importMutation.isPending
               }
               onClick={() => void handleImport()}
             >

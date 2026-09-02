@@ -1,12 +1,12 @@
 import { MAX_AGENT_PACKAGE_ARCHIVE_BYTES } from "@mosoo/agent-package";
-import type { FileId, AppId } from "@mosoo/id";
+import type { FileId, ProjectId } from "@mosoo/id";
 
 import { createErrorLogContext, logError } from "../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
-import { ensureAppOwnership } from "../../apps/application/app.service";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import type { AdmittedAgentPackageFile } from "../../files/application/file-store";
 import { fileStore, normalizeFileName } from "../../files/application/file-store";
+import { ensureProjectOwnership } from "../../projects/application/project.service";
 
 export const AGENT_PACKAGE_CONTENT_TYPE = "application/zip";
 
@@ -65,10 +65,10 @@ export async function createAgentPackageFile(input: {
   archiveBytes: Uint8Array;
   bindings: ApiBindings;
   fileName: string;
-  appId: AppId;
+  projectId: ProjectId;
   viewer: AuthenticatedViewer;
 }): Promise<CreatedAgentPackageFile> {
-  await ensureAppOwnership(input.bindings.DB, input.viewer.id, input.appId);
+  await ensureProjectOwnership(input.bindings.DB, input.viewer.id, input.projectId);
   assertAgentPackageFileSize(input.archiveBytes.byteLength);
 
   const fileName = assertAgentPackageFileName(input.fileName);
@@ -80,7 +80,7 @@ export async function createAgentPackageFile(input: {
     },
     purpose: "agent_package",
     target: {
-      id: input.appId,
+      id: input.projectId,
       kind: "agent_package",
       name: fileName,
     },
@@ -127,11 +127,11 @@ function assertPackageFileArchiveShape(file: AdmittedAgentPackageFile): void {
 export async function readAgentPackageArchiveFile(input: {
   bindings: ApiBindings;
   fileId: FileId;
-  appId: AppId;
+  projectId: ProjectId;
   viewer: AuthenticatedViewer;
 }): Promise<{ archiveBytes: Uint8Array; file: AdmittedAgentPackageFile }> {
   const file = await fileStore.admitAgentPackageFile(input.bindings, input.viewer, {
-    appId: input.appId,
+    projectId: input.projectId,
     fileId: input.fileId,
   });
   assertPackageFileArchiveShape(file);

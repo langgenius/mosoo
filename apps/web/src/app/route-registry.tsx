@@ -93,15 +93,18 @@ const SettingsAccessTokens = lazyNamed(
   async () => import("../routes/settings/access-tokens-tab"),
   "AccessTokensTab",
 );
-const AppSettingsLayout = lazyNamed(
-  async () => import("../routes/app-settings/app-settings.route"),
-  "AppSettingsLayout",
+const ProjectSettingsLayout = lazyNamed(
+  async () => import("../routes/project-settings/project-settings.route"),
+  "ProjectSettingsLayout",
 );
-const AppSettingsGeneral = lazyNamed(
-  async () => import("../routes/app-settings/general-tab"),
+const ProjectSettingsGeneral = lazyNamed(
+  async () => import("../routes/project-settings/general-tab"),
   "GeneralTab",
 );
-const AppUsage = lazyNamed(async () => import("../routes/app-settings/usage-tab"), "AppUsageTab");
+const ProjectUsage = lazyNamed(
+  async () => import("../routes/project-settings/usage-tab"),
+  "ProjectUsageTab",
+);
 const AgentList = lazyNamed(
   async () => import("../routes/agent/agent-list.route"),
   "AgentListPage",
@@ -111,11 +114,14 @@ const AgentDetail = lazyNamed(
   "AgentDetailPage",
 );
 const Threads = lazyNamed(async () => import("../routes/threads/route"), "ThreadsPage");
-const AppOverview = lazyNamed(
-  async () => import("../routes/app-overview/app-overview.route"),
-  "AppOverviewPage",
+const ProjectOverview = lazyNamed(
+  async () => import("../routes/project-overview/project-overview.route"),
+  "ProjectOverviewPage",
 );
-const AppsList = lazyNamed(async () => import("../routes/apps/apps-list.route"), "AppsListPage");
+const ProjectsList = lazyNamed(
+  async () => import("../routes/projects/projects-list.route"),
+  "ProjectsListPage",
+);
 const OrgSettings = lazyNamed(
   async () => import("../routes/org/org-settings.route"),
   "OrgSettingsPage",
@@ -140,8 +146,10 @@ const appRoutes = [
   },
   { element: <McpOAuthComplete />, path: "/integrations/mcp/oauth-complete" },
   { element: protectedRoute(<CliAuth />), path: "/cli-auth" },
-  { element: protectedRoute(<AppOverview />), path: "/" },
-  { element: orgProtectedRoute(<AppsList />), path: "/apps" },
+  { element: protectedRoute(<ProjectOverview />), path: "/" },
+  { element: orgProtectedRoute(<ProjectsList />), path: "/projects" },
+  // Read-only redirects preserve bookmarks written before the Project rename.
+  { element: orgProtectedRoute(<Navigate to="/projects" replace />), path: "/apps" },
   { element: orgProtectedRoute(<OrgSettings />), path: "/org/settings" },
   { element: protectedRoute(<Files />), path: "/files" },
   { element: protectedRoute(<Environments />), path: "/environment" },
@@ -166,31 +174,48 @@ const appRoutes = [
   { element: protectedRoute(<Threads />), path: "/threads/:threadId" },
   {
     children: [
-      { element: <Navigate to="/app-settings/general" replace />, index: true },
-      { element: <AppSettingsGeneral />, path: "general" },
-      { element: <AppUsage />, path: "usage" },
-      { element: <Navigate to="/app-settings/usage" replace />, path: "cost" },
+      { element: <Navigate to="/project-settings/general" replace />, index: true },
+      { element: <ProjectSettingsGeneral />, path: "general" },
+      { element: <ProjectUsage />, path: "usage" },
+      { element: <Navigate to="/project-settings/usage" replace />, path: "cost" },
     ],
-    element: protectedRoute(<AppSettingsLayout />),
+    element: protectedRoute(<ProjectSettingsLayout />),
+    path: "/project-settings",
+  },
+  {
+    element: protectedRoute(<Navigate to="/project-settings/general" replace />),
     path: "/app-settings",
+  },
+  {
+    element: protectedRoute(<Navigate to="/project-settings/general" replace />),
+    path: "/app-settings/general",
+  },
+  {
+    element: protectedRoute(<Navigate to="/project-settings/usage" replace />),
+    path: "/app-settings/usage",
+  },
+  {
+    element: protectedRoute(<Navigate to="/project-settings/usage" replace />),
+    path: "/app-settings/cost",
   },
   {
     children: [
       { element: <Navigate to="/settings/profile" replace />, index: true },
       { element: <SettingsProfile />, path: "profile" },
       { element: <SettingsAccessTokens />, path: "access-tokens" },
-      { element: <Navigate to="/app-settings/general" replace />, path: "app" },
-      { element: <Navigate to="/app-settings/usage" replace />, path: "usage" },
+      { element: <Navigate to="/project-settings/general" replace />, path: "project" },
+      { element: <Navigate to="/project-settings/general" replace />, path: "app" },
+      { element: <Navigate to="/project-settings/usage" replace />, path: "usage" },
       { element: <Navigate to="/environment" replace />, path: "environments" },
-      { element: <Navigate to="/app-settings/usage" replace />, path: "cost" },
+      { element: <Navigate to="/project-settings/usage" replace />, path: "cost" },
     ],
     element: protectedRoute(<SettingsLayout />),
     path: "/settings",
   },
   { element: protectedRoute(<Navigate to="/settings/profile" replace />), path: "/profile" },
-  { element: protectedRoute(<Navigate to="/app-settings/usage" replace />), path: "/usage" },
+  { element: protectedRoute(<Navigate to="/project-settings/usage" replace />), path: "/usage" },
   { element: protectedRoute(<Providers />), path: "/providers" },
-  { element: protectedRoute(<Navigate to="/app-settings/usage" replace />), path: "/cost" },
+  { element: protectedRoute(<Navigate to="/project-settings/usage" replace />), path: "/cost" },
   { element: protectedRoute(<NotFoundPage />), path: "*" },
 ] satisfies RouteObject[];
 

@@ -1,4 +1,4 @@
-import type { AppId } from "@mosoo/contracts/id";
+import type { ProjectId } from "@mosoo/contracts/id";
 import type {
   AgentSessionActionCapability,
   SessionSummary,
@@ -18,13 +18,13 @@ export interface ThreadSessionListItem {
 
 const THREAD_AGENT_SESSION_LIST_QUERY = graphql(/* GraphQL */ `
   query ThreadAgentSessionList(
-    $appId: ULID!
+    $projectId: ULID!
     $archived: Boolean
     $beforeCursor: String
     $type: SessionType
   ) {
     threadAgentSessionList(
-      appId: $appId
+      projectId: $projectId
       archived: $archived
       beforeCursor: $beforeCursor
       type: $type
@@ -66,7 +66,7 @@ const THREAD_AGENT_SESSION_LIST_QUERY = graphql(/* GraphQL */ `
           }
           model
           provider
-          appId
+          projectId
           runtimeId
           status
           title
@@ -98,14 +98,14 @@ function toThreadSessionListItem(
 }
 
 async function fetchThreadSessionsPage(
-  appId: AppId,
+  projectId: ProjectId,
   archived: boolean,
   beforeCursor: string | null,
   type?: SessionType | null,
 ): Promise<ThreadSessionsPage> {
   const payload = await requestGraphQL(THREAD_AGENT_SESSION_LIST_QUERY, {
     archived,
-    appId,
+    projectId,
     beforeCursor,
     type: type ?? null,
   });
@@ -118,7 +118,7 @@ async function fetchThreadSessionsPage(
 }
 
 async function fetchAllThreadSessions(
-  appId: AppId,
+  projectId: ProjectId,
   archived: boolean,
   type?: SessionType | null,
 ): Promise<ThreadSessionListItem[]> {
@@ -126,7 +126,7 @@ async function fetchAllThreadSessions(
   let beforeCursor: string | null = null;
 
   while (true) {
-    const page = await fetchThreadSessionsPage(appId, archived, beforeCursor, type);
+    const page = await fetchThreadSessionsPage(projectId, archived, beforeCursor, type);
     items.push(...page.items);
 
     if (!page.hasMore) {
@@ -142,26 +142,26 @@ async function fetchAllThreadSessions(
 }
 
 export async function threadSessions(
-  appId: AppId,
+  projectId: ProjectId,
   type?: SessionType | null,
 ): Promise<ThreadSessionListItem[]> {
-  return (await fetchThreadSessionsPage(appId, false, null, type)).items;
+  return (await fetchThreadSessionsPage(projectId, false, null, type)).items;
 }
 
 export async function archivedThreadSessions(
-  appId: AppId,
+  projectId: ProjectId,
   type?: SessionType | null,
 ): Promise<ThreadSessionListItem[]> {
-  return (await fetchThreadSessionsPage(appId, true, null, type)).items;
+  return (await fetchThreadSessionsPage(projectId, true, null, type)).items;
 }
 
 export async function allThreadSessions(
-  appId: AppId,
+  projectId: ProjectId,
   type?: SessionType | null,
 ): Promise<ThreadSessionListItem[]> {
   const [activeSessions, archivedSessions] = await Promise.all([
-    fetchAllThreadSessions(appId, false, type),
-    fetchAllThreadSessions(appId, true, type),
+    fetchAllThreadSessions(projectId, false, type),
+    fetchAllThreadSessions(projectId, true, type),
   ]);
 
   return [...activeSessions, ...archivedSessions];

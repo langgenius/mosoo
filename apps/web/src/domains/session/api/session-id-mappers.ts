@@ -3,7 +3,7 @@ import type { SessionSummary } from "@mosoo/contracts/session";
 import type { SessionRunSummary } from "@mosoo/contracts/session-run";
 import { parsePlatformId } from "@mosoo/id";
 
-import { toAgentId, toAppId, toSessionId } from "@/routes/typed-id";
+import { toAgentId, toProjectId, toSessionId } from "@/routes/typed-id";
 
 interface SessionRunSummaryLike {
   completedAt: string | null;
@@ -33,7 +33,7 @@ interface SessionSummaryLike {
   lastRun: SessionRunSummaryLike | null;
   model: string;
   provider: string;
-  appId: string;
+  projectId: string;
   runtimeId: string;
   status: SessionSummary["status"];
   title: string | null;
@@ -89,7 +89,7 @@ export function toSessionSummary(session: SessionSummaryLike): SessionSummary {
     lastRun: toSessionRunSummary(session.lastRun),
     model: session.model,
     provider: session.provider,
-    appId: toAppId(session.appId),
+    projectId: toProjectId(session.projectId),
     runtimeId: session.runtimeId,
     status: session.status,
     title: session.title,

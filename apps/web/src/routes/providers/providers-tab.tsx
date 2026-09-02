@@ -17,7 +17,7 @@ import {
 import { canUseCustomEndpoint } from "@/domains/vendor-credential/model/provider-credential-endpoint";
 import { getErrorMessage } from "@/domains/vendor-credential/model/provider-credential-error";
 import { formatProviderErrorMessage } from "@/domains/vendor-credential/model/provider-readiness-copy";
-import { toAppId, toVendorCredentialId } from "@/routes/typed-id";
+import { toProjectId, toVendorCredentialId } from "@/routes/typed-id";
 import { useTranslation } from "@/shared/i18n";
 import { VendorIcon, hasVendorIcon } from "@/shared/ui/brand-icons";
 import { Button } from "@/shared/ui/button";
@@ -76,7 +76,7 @@ interface ProviderFormControls {
 }
 
 const providerCredentialKeys = {
-  list: (appId: string) => ["vendor-credentials", appId] as const,
+  list: (projectId: string) => ["vendor-credentials", projectId] as const,
 };
 
 // Preset providers can carry a default endpoint; pre-fill it so the user does
@@ -138,17 +138,17 @@ function credentialsByVendor(
   return grouped;
 }
 
-export function ProvidersTab({ appId }: { appId: string }): ReactElement {
+export function ProvidersTab({ projectId }: { projectId: string }): ReactElement {
   const { t } = useTranslation();
-  const typedAppId = toAppId(appId);
+  const typedProjectId = toProjectId(projectId);
   const queryClient = useQueryClient();
   const [form, setForm] = useState<CredentialForm>(EMPTY_FORM);
   const [formError, setFormError] = useState<string | null>(null);
   const [pageError, setPageError] = useState<string | null>(null);
   const [testState, setTestState] = useState<TestState>("idle");
   const { data: credentials = [], isLoading: credentialsLoading } = useQuery({
-    queryFn: async () => listVendorCredentials(typedAppId),
-    queryKey: providerCredentialKeys.list(appId),
+    queryFn: async () => listVendorCredentials(typedProjectId),
+    queryKey: providerCredentialKeys.list(projectId),
   });
   const groupedCredentials = useMemo(() => credentialsByVendor(credentials), [credentials]);
 
@@ -177,7 +177,7 @@ export function ProvidersTab({ appId }: { appId: string }): ReactElement {
           apiBase,
           apiKey,
           name,
-          appId: typedAppId,
+          projectId: typedProjectId,
           vendorId: nextForm.vendorId,
           ...(models === undefined ? {} : { models }),
         });
@@ -188,7 +188,7 @@ export function ProvidersTab({ appId }: { appId: string }): ReactElement {
         ...(apiKey.length > 0 ? { apiKey } : {}),
         id: toVendorCredentialId(nextForm.id),
         name,
-        appId: typedAppId,
+        projectId: typedProjectId,
         ...(models === undefined ? {} : { models }),
       });
     },
@@ -196,23 +196,23 @@ export function ProvidersTab({ appId }: { appId: string }): ReactElement {
       setForm(EMPTY_FORM);
       setFormError(null);
       setTestState("idle");
-      await queryClient.invalidateQueries({ queryKey: providerCredentialKeys.list(appId) });
+      await queryClient.invalidateQueries({ queryKey: providerCredentialKeys.list(projectId) });
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: async (credential: VendorCredential) =>
-      deleteVendorCredential({ id: credential.id, appId: typedAppId }),
+      deleteVendorCredential({ id: credential.id, projectId: typedProjectId }),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: providerCredentialKeys.list(appId) });
+      await queryClient.invalidateQueries({ queryKey: providerCredentialKeys.list(projectId) });
     },
   });
 
   const setDefaultMutation = useMutation({
     mutationFn: async (credential: VendorCredential) =>
-      setDefaultVendorCredential({ id: credential.id, appId: typedAppId }),
+      setDefaultVendorCredential({ id: credential.id, projectId: typedProjectId }),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: providerCredentialKeys.list(appId) });
+      await queryClient.invalidateQueries({ queryKey: providerCredentialKeys.list(projectId) });
     },
   });
 
@@ -242,7 +242,7 @@ export function ProvidersTab({ appId }: { appId: string }): ReactElement {
         apiBase: canUseCustomEndpoint(form.vendorId) ? form.apiBase.trim() || null : null,
         apiKey,
         modelId: firstModel,
-        appId: typedAppId,
+        projectId: typedProjectId,
         vendorId: form.vendorId,
       });
       setTestState(result.ok ? "success" : "failure");
@@ -542,7 +542,7 @@ function ProviderCredentialSection({
           ) : null}
           <div className="min-w-0">
             <h2 className="text-fg-1 truncate text-[15px] font-semibold">{t(vendor.label)}</h2>
-            <p className="text-muted-foreground text-[12px]">{t("providers.appLevelKeys")}</p>
+            <p className="text-muted-foreground text-[12px]">{t("providers.projectLevelKeys")}</p>
           </div>
         </div>
         <Button onClick={onCreate} size="sm" variant="outline">

@@ -12,7 +12,7 @@ const environmentId = "01J00000000000000000000005";
 const deploymentVersionId = "01J00000000000000000000006";
 const sessionRunId = "01J00000000000000000000007";
 const shellServerId = "01J00000000000000000000008";
-const appId = "01J00000000000000000000009";
+const projectId = "01J00000000000000000000009";
 const viewerEmail = "harness-e2e@mosoo.ai";
 const now = "2026-05-18T08:00:00.000Z";
 const liveVersion = {
@@ -57,7 +57,7 @@ const sessionSummary = {
   model: liveVersion.model,
   organizationId,
   provider: liveVersion.provider,
-  appId,
+  projectId,
   runtimeId: liveVersion.runtimeId,
   status: "IDLE",
   title: "Harness contract acceptance replay",
@@ -80,7 +80,7 @@ const organization = {
   viewerRole: "owner",
 };
 const agentDetail = {
-  appId,
+  projectId,
   createdAt: now,
   description: "Fixture-backed agent for deterministic session log coverage.",
   id: agentId,
@@ -366,14 +366,14 @@ async function fulfillGraphQLFixture(route: Route): Promise<void> {
       });
       return;
     }
-    case "AppList": {
+    case "ProjectList": {
       await fulfillJson(route, {
-        appList: [
+        projectList: [
           {
             createdAt: now,
             defaultEnvironmentId: environmentId,
-            id: appId,
-            name: "Harness E2E App",
+            id: projectId,
+            name: "Harness E2E Project",
             ownerAccountId,
           },
         ],
@@ -383,7 +383,7 @@ async function fulfillGraphQLFixture(route: Route): Promise<void> {
     case "McpRegistry": {
       await fulfillJson(route, {
         mcpRegistry: {
-          appId,
+          projectId,
           currentUserEmail: viewerEmail,
           currentUserId: ownerAccountId,
           currentUserName: owner.name,

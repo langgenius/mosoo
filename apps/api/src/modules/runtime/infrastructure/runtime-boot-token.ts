@@ -10,7 +10,7 @@ import type {
   CredentialId,
   DriverInstanceId,
   McpServerId,
-  AppId,
+  ProjectId,
   SandboxId,
   SkillSnapshotId,
   VendorCredentialId,
@@ -51,7 +51,7 @@ export type RuntimeActionTokenPayload =
     })
   | (RuntimeActionTokenPayloadBase & {
       action: "llm_proxy";
-      appId: AppId;
+      projectId: ProjectId;
       driverGeneration: number;
       imageModelId?: string;
       modelId: string;
@@ -193,11 +193,11 @@ function parseRuntimeActionTokenPayload(encodedPayload: string): RuntimeActionTo
   );
 
   if (action === "llm_proxy") {
-    const { appId, driverGeneration, imageModelId, modelId, modelProtocol } = parsed;
+    const { projectId, driverGeneration, imageModelId, modelId, modelProtocol } = parsed;
 
     if (
-      typeof appId !== "string" ||
-      appId === "" ||
+      typeof projectId !== "string" ||
+      projectId === "" ||
       typeof driverGeneration !== "number" ||
       !Number.isSafeInteger(driverGeneration) ||
       driverGeneration < 0 ||
@@ -216,7 +216,7 @@ function parseRuntimeActionTokenPayload(encodedPayload: string): RuntimeActionTo
 
     return {
       action,
-      appId: parsePlatformId<AppId>(appId, "Runtime action token app ID"),
+      projectId: parsePlatformId<ProjectId>(projectId, "Runtime action token project ID"),
       driverGeneration,
       driverInstanceId: parsedDriverInstanceId,
       expiresAt,

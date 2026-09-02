@@ -28,7 +28,7 @@ import { useThreadActions } from "./model/use-actions";
 import { useThreadQueries } from "./model/use-queries";
 
 interface ThreadsWorkspaceProps {
-  activeAppId: string | null;
+  activeProjectId: string | null;
   userId: string | null;
   viewerImage: string | null;
   viewerName: string;
@@ -37,14 +37,14 @@ interface ThreadsWorkspaceProps {
 const EMPTY_ARTIFACTS: ListedFileEntry[] = [];
 
 export function ThreadsController(): ReactElement {
-  const { activeAppId, user } = useAppSession();
+  const { activeProjectId, user } = useAppSession();
   const { t } = useTranslation();
-  const scopeKey = `${user?.id ?? "guest"}:${activeAppId ?? "none"}`;
+  const scopeKey = `${user?.id ?? "guest"}:${activeProjectId ?? "none"}`;
 
   return (
     <ThreadsWorkspace
       key={scopeKey}
-      activeAppId={activeAppId}
+      activeProjectId={activeProjectId}
       userId={user?.id ?? null}
       viewerImage={user?.image ?? null}
       viewerName={user?.name ?? t("threads.you")}
@@ -53,7 +53,7 @@ export function ThreadsController(): ReactElement {
 }
 
 function ThreadsWorkspace({
-  activeAppId,
+  activeProjectId,
   userId,
   viewerImage,
   viewerName,
@@ -61,7 +61,7 @@ function ThreadsWorkspace({
   const { t } = useTranslation();
   const route = useThreadRouteState();
   const ui = useThreadUiState({
-    appId: activeAppId,
+    projectId: activeProjectId,
     userId,
   });
   const threadUiSnapshot = useMemo(
@@ -72,13 +72,13 @@ function ThreadsWorkspace({
     [ui.state.pinnedThreadIds, ui.state.readAtByThreadId],
   );
   const threads = useThreadQueries({
-    activeAppId,
+    activeProjectId,
     activeThreadId: route.activeThreadId,
     filter: ui.state.filter,
     ui: threadUiSnapshot,
   });
   const actions = useThreadActions({
-    activeAppId,
+    activeProjectId,
     activeThreadId: route.activeThreadId,
     closeComposeDialog: route.closeComposeDialog,
     markThreadReadLocal: ui.markThreadRead,

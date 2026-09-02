@@ -18,7 +18,7 @@ export function createSessionSummary(): SessionSummary {
     lastRun: createRunSummary(),
     model: "gpt-5.1",
     provider: "openai",
-    appId: PUBLIC_API_TEST_IDS.app,
+    projectId: PUBLIC_API_TEST_IDS.project,
     runtimeId: "openai-runtime",
     status: "RUNNING",
     title: "Customer triage",

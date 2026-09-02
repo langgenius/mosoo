@@ -8,7 +8,7 @@ continued, and when data will disappear.
 
 ## Who it serves
 
-Builders use Threads in Preview and the Console. App integrations use the same lifecycle when
+Builders use Threads in Preview and the Console. Project integrations use the same lifecycle when
 they create or continue work for an end user.
 
 ## User flow

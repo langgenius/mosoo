@@ -3,9 +3,9 @@ import {
   agentsTable,
   environmentRevisionsTable,
   environmentsTable,
-  appsTable,
+  projectsTable,
 } from "@mosoo/db";
-import type { AccountId, EnvironmentId, EnvironmentRevisionId, AppId } from "@mosoo/id";
+import type { AccountId, EnvironmentId, EnvironmentRevisionId, ProjectId } from "@mosoo/id";
 import { and, eq, sql } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
@@ -31,7 +31,7 @@ export function environmentRecordColumns() {
     currentRevisionId: sql<EnvironmentRevisionId>`${environmentsTable.currentRevisionId}`.as(
       "currentRevisionId",
     ),
-    defaultEnvironmentId: sql<EnvironmentId | null>`${appsTable.defaultEnvironmentId}`.as(
+    defaultEnvironmentId: sql<EnvironmentId | null>`${projectsTable.defaultEnvironmentId}`.as(
       "defaultEnvironmentId",
     ),
     description: sql<string>`${environmentsTable.description}`.as("description"),
@@ -55,14 +55,14 @@ export function environmentRecordColumns() {
     ownerImageUrl: sql<string | null>`${accountsTable.image}`.as("ownerImageUrl"),
     ownerName: sql<string | null>`${accountsTable.name}`.as("ownerName"),
     packagesJson: sql<string>`${environmentRevisionsTable.packagesJson}`.as("packagesJson"),
-    appId: sql<AppId>`${environmentsTable.appId}`.as("appId"),
+    projectId: sql<ProjectId>`${environmentsTable.projectId}`.as("projectId"),
     setupScript: sql<string>`${environmentRevisionsTable.setupScript}`.as("setupScript"),
     updatedAt: sql<number>`${environmentsTable.updatedAt}`.as("updatedAt"),
     usedByAgentCount: sql<number>`(
       SELECT COUNT(*)
       FROM ${agentsTable}
       WHERE ${agentsTable.environmentId} = ${environmentsTable.id}
-        AND ${agentsTable.appId} = ${environmentsTable.appId}
+        AND ${agentsTable.projectId} = ${environmentsTable.projectId}
     )`.as("usedByAgentCount"),
   };
 }
@@ -71,14 +71,14 @@ function selectEnvironmentRecord(database: D1Database) {
   return getAppDatabase(database)
     .select({
       ...environmentRecordColumns(),
-      appOwnerAccountId: appsTable.ownerAccountId,
+      projectOwnerAccountId: projectsTable.ownerAccountId,
     })
     .from(environmentsTable)
     .innerJoin(
       environmentRevisionsTable,
       eq(environmentRevisionsTable.id, environmentsTable.currentRevisionId),
     )
-    .innerJoin(appsTable, eq(appsTable.id, environmentsTable.appId))
+    .innerJoin(projectsTable, eq(projectsTable.id, environmentsTable.projectId))
     .leftJoin(accountsTable, eq(accountsTable.id, environmentsTable.ownerAccountId));
 }
 
@@ -96,7 +96,7 @@ export async function getEnvironmentRecordRow(
     return null;
   }
 
-  const { appOwnerAccountId: _appOwnerAccountId, ...environmentRow } = row;
+  const { projectOwnerAccountId: _projectOwnerAccountId, ...environmentRow } = row;
   return environmentRow;
 }
 
@@ -105,7 +105,7 @@ export async function ensureEnvironmentAccess(
   viewerId: AccountId,
   input: {
     environmentId: EnvironmentId;
-    appId: AppId;
+    projectId: ProjectId;
   },
 ): Promise<EnvironmentAccessResult> {
   const row =
@@ -113,17 +113,17 @@ export async function ensureEnvironmentAccess(
       .where(
         and(
           eq(environmentsTable.id, input.environmentId),
-          eq(environmentsTable.appId, input.appId),
+          eq(environmentsTable.projectId, input.projectId),
         ),
       )
       .limit(1)
       .get()) ?? null;
 
-  if (row === null || row.appOwnerAccountId !== viewerId) {
+  if (row === null || row.projectOwnerAccountId !== viewerId) {
     throw new Error("Environment not found.");
   }
 
-  const { appOwnerAccountId: _appOwnerAccountId, ...environmentRow } = row;
+  const { projectOwnerAccountId: _projectOwnerAccountId, ...environmentRow } = row;
 
   return {
     row: environmentRow,
@@ -135,7 +135,7 @@ export async function ensureEnvironmentEditor(
   viewerId: AccountId,
   input: {
     environmentId: EnvironmentId;
-    appId: AppId;
+    projectId: ProjectId;
   },
 ): Promise<EnvironmentAccessResult> {
   const access = await ensureEnvironmentAccess(database, viewerId, input);

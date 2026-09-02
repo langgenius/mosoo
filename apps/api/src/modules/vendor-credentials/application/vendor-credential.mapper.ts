@@ -28,7 +28,7 @@ export function toVendorCredentialWithSecret(
     maskedApiKey: maskApiKey(apiKey),
     models: parseCredentialModels(row.modelsJson),
     name: row.name,
-    appId: row.appId,
+    projectId: row.projectId,
     vendorId: row.vendorId,
   };
 }

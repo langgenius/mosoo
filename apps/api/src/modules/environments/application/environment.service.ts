@@ -1,14 +1,17 @@
 export {
   createEnvironment,
   setEnvironmentVariableValue,
-  setAppDefaultEnvironment,
+  setProjectDefaultEnvironment,
   updateEnvironment,
 } from "./environment-commands";
-export { createAppEnvironmentDefaults, getAppDefaultEnvironmentId } from "./environment-defaults";
+export {
+  createProjectEnvironmentDefaults,
+  getProjectDefaultEnvironmentId,
+} from "./environment-defaults";
 export { createEnvironmentFork, deleteEnvironment } from "./environment-forks";
 export {
   canUseEnvironment,
   getEnvironmentDetail,
-  listAppEnvironments,
+  listProjectEnvironments,
 } from "./environment-queries";
 export { resolveAgentEnvironmentSnapshot } from "./environment-runtime-snapshot";
