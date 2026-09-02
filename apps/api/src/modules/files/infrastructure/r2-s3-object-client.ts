@@ -233,6 +233,7 @@ export async function copyObject(input: CopyObjectInput): Promise<CopyObjectResu
 export async function putObject(input: PutObjectInput): Promise<HeadObjectResult> {
   const options = input.options ?? {};
   const putOptions: R2PutOptions = {
+    ...(input.customMetadata === undefined ? {} : { customMetadata: input.customMetadata }),
     httpMetadata: {
       contentType: input.contentType,
     },

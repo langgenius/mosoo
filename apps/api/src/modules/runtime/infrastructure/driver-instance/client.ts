@@ -3,7 +3,6 @@ import type { DriverInstanceId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import type {
-  DriverInstanceHelloResult,
   DriverInstanceReadyResult,
   DriverInstanceSnapshot,
   DriverInstanceWaitForCloseResult,
@@ -87,26 +86,18 @@ export async function upgradeDriverInstanceSocket(
   );
 }
 
-export async function waitForDriverInstanceHello(
-  env: ApiBindings,
-  driverInstanceId: DriverInstanceId,
-  timeoutMs: number,
-): Promise<DriverInstanceHelloResult> {
-  return expectJson<DriverInstanceHelloResult>(
-    await getDriverConnectionStub(env, driverInstanceId).fetch(
-      createDoRequest(driverInstanceId, `/wait/hello?timeoutMs=${timeoutMs}`),
-    ),
-  );
-}
-
 export async function waitForDriverInstanceReady(
   env: ApiBindings,
   driverInstanceId: DriverInstanceId,
+  generation: number,
   timeoutMs: number,
 ): Promise<DriverInstanceReadyResult> {
   return expectJson<DriverInstanceReadyResult>(
     await getDriverConnectionStub(env, driverInstanceId).fetch(
-      createDoRequest(driverInstanceId, `/wait/ready?timeoutMs=${timeoutMs}`),
+      createDoRequest(
+        driverInstanceId,
+        `/wait/ready?generation=${generation}&timeoutMs=${timeoutMs}`,
+      ),
     ),
   );
 }
@@ -114,11 +105,15 @@ export async function waitForDriverInstanceReady(
 export async function waitForDriverInstanceClose(
   env: ApiBindings,
   driverInstanceId: DriverInstanceId,
+  generation: number,
   timeoutMs: number,
 ): Promise<DriverInstanceWaitForCloseResult> {
   return expectJson<DriverInstanceWaitForCloseResult>(
     await getDriverConnectionStub(env, driverInstanceId).fetch(
-      createDoRequest(driverInstanceId, `/wait/close?timeoutMs=${timeoutMs}`),
+      createDoRequest(
+        driverInstanceId,
+        `/wait/close?generation=${generation}&timeoutMs=${timeoutMs}`,
+      ),
     ),
   );
 }
@@ -137,12 +132,13 @@ export async function getDriverInstanceSnapshot(
 export async function sendDriverInstanceCommand(
   env: ApiBindings,
   driverInstanceId: DriverInstanceId,
+  generation: number,
   command: RuntimeCommand,
 ): Promise<void> {
   await expectJson<{ ok: true }>(
     await getDriverConnectionStub(env, driverInstanceId).fetch(
       createDoRequest(driverInstanceId, "/control/send", {
-        body: JSON.stringify(command),
+        body: JSON.stringify({ command, generation }),
         headers: {
           "content-type": "application/json",
         },
@@ -155,12 +151,13 @@ export async function sendDriverInstanceCommand(
 export async function failDriverInstance(
   env: ApiBindings,
   driverInstanceId: DriverInstanceId,
+  generation: number,
   message: string,
 ): Promise<void> {
   await expectJson<{ ok: true }>(
     await getDriverConnectionStub(env, driverInstanceId).fetch(
       createDoRequest(driverInstanceId, "/control/fail", {
-        body: JSON.stringify({ message }),
+        body: JSON.stringify({ generation, message }),
         headers: {
           "content-type": "application/json",
         },
@@ -173,12 +170,13 @@ export async function failDriverInstance(
 export async function destroyDriverInstanceDurableObject(
   env: ApiBindings,
   driverInstanceId: DriverInstanceId,
+  generation: number,
   reason: string,
 ): Promise<void> {
   await expectJson<{ ok: true }>(
     await getDriverConnectionStub(env, driverInstanceId).fetch(
       createDoRequest(driverInstanceId, "/control/destroy", {
-        body: JSON.stringify({ reason }),
+        body: JSON.stringify({ generation, reason }),
         headers: {
           "content-type": "application/json",
         },

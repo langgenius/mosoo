@@ -10,7 +10,7 @@ export const DriverCapability = type({
   id: DriverCapabilityId,
   status: '"supported" | "unsupported"',
   version: "1",
-});
+}).onUndeclaredKey("reject");
 export type DriverCapability = typeof DriverCapability.infer;
 
 export const DriverInstanceProtocol = type('"orpc-ws"');

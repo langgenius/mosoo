@@ -97,7 +97,7 @@ const SHA256_PATTERN = /^[a-f0-9]{64}$/;
 // path an artifact was recorded from. Path segments the writer could never
 // produce (empty, ".", "..") mark the record malformed, which keeps the value
 // safe to use as a workspace-relative write target.
-export function parseRuntimeOutputSourcePath(parentPath: string): string | null {
+function parseRuntimeOutputSourcePath(parentPath: string): string | null {
   const segments = parentPath.split("/");
   const contentSha256 = segments.at(-1);
 
@@ -114,8 +114,9 @@ export function parseRuntimeOutputSourcePath(parentPath: string): string | null 
   const hasUnsafeSegment = pathSegments.some(
     (segment) => segment.length === 0 || segment === "." || segment === "..",
   );
+  const sourcePath = pathSegments.join("/");
 
-  return hasUnsafeSegment ? null : pathSegments.join("/");
+  return hasUnsafeSegment || !sourcePath.startsWith("outputs/") ? null : sourcePath;
 }
 
 function toRuntimeOutputSourcePath(row: FileRecordRow): string | null {
@@ -255,7 +256,12 @@ export function toUploadSummary(upload: FileUploadRow, file: FileRecordRow): Fil
   };
 }
 
-export function toSessionFile(row: FileRecordRow): SessionFile {
+type SessionFileRow = Pick<
+  FileRecordRow,
+  "committed" | "created_at" | "id" | "mime_type" | "name" | "session_kind" | "size"
+>;
+
+export function toSessionFile(row: SessionFileRow): SessionFile {
   return {
     committed: row.committed === 1,
     createdAt: toIsoString(row.created_at),

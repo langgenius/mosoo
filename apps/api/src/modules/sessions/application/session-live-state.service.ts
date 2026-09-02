@@ -27,12 +27,6 @@ export function projectRuntimeEventToSessionDeliveryEvents(
   return projectRuntimeEventToAgUiSessionEvents(event);
 }
 
-export function projectRuntimeEventsToSessionDeliveryEvents(
-  events: readonly RuntimeEventEnvelope[],
-): SessionDeliveryEvent[] {
-  return events.flatMap((event) => projectRuntimeEventToSessionDeliveryEvents(event));
-}
-
 export function applyRuntimeEventToSessionLiveState(
   state: SessionLiveState,
   event: RuntimeEventEnvelope,
@@ -44,8 +38,14 @@ function applyRuntimeEventsToSessionLiveState(
   state: SessionLiveState,
   events: readonly RuntimeEventEnvelope[],
 ): SessionLiveState {
-  return applyAgUiEventsToSessionLiveState(
-    state,
-    projectRuntimeEventsToSessionDeliveryEvents(events),
-  );
+  let next = state;
+
+  for (const event of events) {
+    next = applyAgUiEventsToSessionLiveState(
+      next,
+      projectRuntimeEventToSessionDeliveryEvents(event),
+    );
+  }
+
+  return next;
 }

@@ -10,10 +10,10 @@
     "db:migrate:local": "vp exec wrangler d1 migrations apply DB --local",
     "lint": "vp lint .",
     "tc": "vp run cf:types && vp exec tsc --noEmit",
-    "test": "vp exec bun test tests"
+    "test": "vp exec bun test tests --isolate"
   },
   "dependencies": {
-    "@cloudflare/sandbox": "0.12.6",
+    "@cloudflare/sandbox": "0.12.9",
     "@mosoo/ag-ui-session": "workspace:*",
     "@mosoo/agent-driver": "workspace:*",
     "@mosoo/agent-package": "workspace:*",
@@ -30,18 +30,21 @@
     "@orpc/server": "^1.15.0",
     "arktype": "^2.2.0",
     "better-auth": "1.6.28",
-    "cloudflare": "7.0.0",
+    "cloudflare": "7.1.0",
     "drizzle-orm": "^0.45.2",
     "fflate": "^0.8.3",
     "graphql": "^17.0.2",
     "graphql-yoga": "^5.21.3",
     "hono": "^4.12.32",
+    "ignore": "7.0.7",
+    "jsonc-parser": "3.3.1",
+    "smol-toml": "1.8.0",
     "xstate": "^5.32.0"
   },
   "devDependencies": {
     "@types/node": "^25.8.0",
     "typescript": "^6.0.3",
-    "vite-plus": "^0.1.23",
-    "wrangler": "^4.123.0"
+    "vite-plus": "^0.3.0",
+    "wrangler": "^4.127.1"
   }
 }

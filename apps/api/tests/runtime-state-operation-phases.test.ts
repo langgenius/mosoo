@@ -1,28 +1,42 @@
 import { describe, expect, test } from "bun:test";
 
+import { createSessionRunTerminalSourceId } from "@mosoo/runtime-events";
+
 import {
   completeRuntimeStateOperationPhase,
   failRuntimeStateOperationPhase,
   startRuntimeStateOperationPhase,
 } from "../src/modules/runtime/application/runtime-state-operation-phases";
 import type { RuntimeSessionTarget } from "../src/modules/runtime/application/runtime-state-operation-target-store";
+import { recordCanonicalSessionRunTerminal } from "../src/modules/runtime/application/session-runs/session-run-terminal-failure.service";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import {
   createPublicHttpContractDatabase,
   createPublicHttpTestBindings,
   insertNonOwnerSession,
+  nowMsForTest,
 } from "./helpers/public-api-http-test-fixture";
 
 function createRuntimeTarget(
-  input: Omit<RuntimeSessionTarget, "sessionStatusOperationId" | "sessionStatusSeq"> & {
+  input: Omit<
+    RuntimeSessionTarget,
+    | "sessionRuntimeEventSeqCursor"
+    | "sessionStatusOperationId"
+    | "sessionStatusSeq"
+    | "sessionUpdatedAt"
+  > & {
+    readonly sessionRuntimeEventSeqCursor?: number;
     readonly sessionStatusOperationId?: string | null;
     readonly sessionStatusSeq?: number;
+    readonly sessionUpdatedAt?: number;
   },
 ): RuntimeSessionTarget {
   return {
     ...input,
+    sessionRuntimeEventSeqCursor: input.sessionRuntimeEventSeqCursor ?? 0,
     sessionStatusOperationId: input.sessionStatusOperationId ?? null,
     sessionStatusSeq: input.sessionStatusSeq ?? 0,
+    sessionUpdatedAt: input.sessionUpdatedAt ?? nowMsForTest(),
   };
 }
 
@@ -124,7 +138,7 @@ describe("runtime state operation phases", () => {
       run_status: "cancelled",
       session_status: "IDLE",
       session_status_operation_id: null,
-      session_status_seq: 2,
+      session_status_seq: 3,
     });
   });
 
@@ -150,10 +164,15 @@ describe("runtime state operation phases", () => {
       ],
     });
 
-    await database
-      .prepare("UPDATE session_run SET status = ?, status_operation_id = ? WHERE id = ?")
-      .bind("cancelled", phase.operationId, "01J0000000000000000000000N")
-      .run();
+    await recordCanonicalSessionRunTerminal(bindings, {
+      assistantMessage: null,
+      error: null,
+      expectedSessionOperationId: phase.operationId,
+      runId: "01J0000000000000000000000N",
+      sessionId: "01J0000000000000000000000B",
+      source: "driver",
+      status: "cancelled",
+    });
 
     await completeRuntimeStateOperationPhase(bindings, {
       agentId: "01J00000000000000000000009",
@@ -171,12 +190,12 @@ describe("runtime state operation phases", () => {
       )
       .bind(
         "01J0000000000000000000000B",
-        `runtime-operation:${phase.operationId}:01J0000000000000000000000N:interrupted`,
+        createSessionRunTerminalSourceId("01J0000000000000000000000N", "run.cancelled"),
       )
       .first<{ source_event_id: string }>();
 
     expect(event?.source_event_id).toBe(
-      `runtime-operation:${phase.operationId}:01J0000000000000000000000N:interrupted`,
+      createSessionRunTerminalSourceId("01J0000000000000000000000N", "run.cancelled"),
     );
 
     const row = await database
@@ -226,10 +245,15 @@ describe("runtime state operation phases", () => {
       ],
     });
 
-    await database
-      .prepare("UPDATE session_run SET status = ?, status_operation_id = ? WHERE id = ?")
-      .bind("cancelled", phase.operationId, "01J0000000000000000000000N")
-      .run();
+    await recordCanonicalSessionRunTerminal(bindings, {
+      assistantMessage: null,
+      error: null,
+      expectedSessionOperationId: phase.operationId,
+      runId: "01J0000000000000000000000N",
+      sessionId: "01J0000000000000000000000B",
+      source: "driver",
+      status: "cancelled",
+    });
 
     await failRuntimeStateOperationPhase(bindings, {
       agentId: "01J00000000000000000000009",
@@ -247,16 +271,16 @@ describe("runtime state operation phases", () => {
       )
       .bind(
         "01J0000000000000000000000B",
-        `runtime-operation:${phase.operationId}:01J0000000000000000000000N:interrupted`,
+        createSessionRunTerminalSourceId("01J0000000000000000000000N", "run.cancelled"),
       )
       .first<{ source_event_id: string }>();
 
     expect(event?.source_event_id).toBe(
-      `runtime-operation:${phase.operationId}:01J0000000000000000000000N:interrupted`,
+      createSessionRunTerminalSourceId("01J0000000000000000000000N", "run.cancelled"),
     );
   });
 
-  test("complete does not project terminal runs from another outcome as cancelled", async () => {
+  test("complete adopts a canonical Driver failure without rewriting its outcome", async () => {
     const database = await createPublicHttpContractDatabase();
     await insertNonOwnerSession(database);
     await insertRunningSessionRun(database);
@@ -278,10 +302,20 @@ describe("runtime state operation phases", () => {
       ],
     });
 
-    await database
-      .prepare("UPDATE session_run SET status = ?, status_operation_id = ? WHERE id = ?")
-      .bind("completed", phase.operationId, "01J0000000000000000000000N")
-      .run();
+    await recordCanonicalSessionRunTerminal(bindings, {
+      assistantMessage: null,
+      error: {
+        code: "driver.failed",
+        details: {},
+        message: "Driver failed while stopping.",
+        retryable: true,
+      },
+      expectedSessionOperationId: phase.operationId,
+      runId: "01J0000000000000000000000N",
+      sessionId: "01J0000000000000000000000B",
+      source: "driver",
+      status: "failed",
+    });
 
     await completeRuntimeStateOperationPhase(bindings, {
       agentId: "01J00000000000000000000009",
@@ -299,11 +333,16 @@ describe("runtime state operation phases", () => {
       )
       .bind(
         "01J0000000000000000000000B",
-        `runtime-operation:${phase.operationId}:01J0000000000000000000000N:interrupted`,
+        createSessionRunTerminalSourceId("01J0000000000000000000000N", "run.cancelled"),
       )
       .first<{ source_event_id: string }>();
 
     expect(event).toBeNull();
+    const run = await database
+      .prepare("SELECT error_code, status FROM session_run WHERE id = ?")
+      .bind("01J0000000000000000000000N")
+      .first<{ error_code: string | null; status: string }>();
+    expect(run).toEqual({ error_code: "driver.failed", status: "failed" });
   });
 
   test("start ignores stale targets that changed after scope resolution", async () => {
@@ -318,7 +357,7 @@ describe("runtime state operation phases", () => {
           WHERE id = ?
         `,
       )
-      .bind("run-new", "RUNNING", 1, "01J0000000000000000000000B")
+      .bind("01J0000000000000000000000Q", "RUNNING", 1, "01J0000000000000000000000B")
       .run();
 
     const bindings = createPublicHttpTestBindings(database) as ApiBindings;
@@ -352,7 +391,7 @@ describe("runtime state operation phases", () => {
       }>();
 
     expect(row).toEqual({
-      last_run_id: "run-new",
+      last_run_id: "01J0000000000000000000000Q",
       status: "RUNNING",
       status_operation_id: null,
       status_seq: 1,

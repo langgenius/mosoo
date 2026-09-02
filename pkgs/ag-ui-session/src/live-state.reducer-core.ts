@@ -15,6 +15,7 @@ export function touchSessionLiveState(state: SessionLiveState): SessionLiveState
 
 export function defaultInfraState(): SessionLiveState["infra"] {
   return {
+    driverInstanceId: null,
     lastFailureMessage: null,
     lastFailureReason: null,
     lastSeen: null,

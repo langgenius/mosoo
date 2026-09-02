@@ -1,9 +1,8 @@
+import { parseRuntimeCommand } from "@mosoo/contracts/runtime-command";
 import type { RuntimeCommand } from "@mosoo/contracts/runtime-command";
 
 import { json, readPositiveTimeout, toErrorMessage } from "./driver-instance-support";
 import type {
-  DriverInstanceHeartbeatResult,
-  DriverInstanceHelloResult,
   DriverInstanceReadyResult,
   DriverInstanceSnapshot,
   DriverInstanceWaitForCloseResult,
@@ -11,22 +10,27 @@ import type {
 
 export interface DriverInstanceHttpHandler {
   acceptDriverSocket(request: Request): Promise<Response>;
-  destroy(reason: string): Promise<void>;
-  fail(message: string): Promise<void>;
-  sendControlCommand(command: RuntimeCommand): Promise<void>;
+  destroy(generation: number, reason: string): Promise<void>;
+  fail(generation: number, message: string): Promise<void>;
+  sendControlCommand(generation: number, command: RuntimeCommand): Promise<void>;
   snapshot(): DriverInstanceSnapshot;
-  waitForClose(timeoutMs: number): Promise<DriverInstanceWaitForCloseResult>;
-  waitForHeartbeat(afterCount: number, timeoutMs: number): Promise<DriverInstanceHeartbeatResult>;
-  waitForHello(timeoutMs: number): Promise<DriverInstanceHelloResult>;
-  waitForReady(timeoutMs: number): Promise<DriverInstanceReadyResult>;
+  waitForClose(generation: number, timeoutMs: number): Promise<DriverInstanceWaitForCloseResult>;
+  waitForReady(generation: number, timeoutMs: number): Promise<DriverInstanceReadyResult>;
 }
 
 interface RuntimeFailRequest {
+  generation: number;
   message?: string;
 }
 
 interface RuntimeCloseRequest {
+  generation: number;
   reason?: string;
+}
+
+interface RuntimeSendRequest {
+  command: RuntimeCommand;
+  generation: number;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -62,30 +66,62 @@ function readOptionalString(
 function parseFailRequest(value: unknown): RuntimeFailRequest {
   const requestName = "RuntimeFailRequest";
   const record = readObject(value, requestName);
+  const generation = record["generation"];
   const message = readOptionalString(record, "message", requestName);
 
-  return message === undefined ? {} : { message };
+  if (!Number.isSafeInteger(generation) || (generation as number) < 0) {
+    throw new TypeError(`${requestName}.generation must be a non-negative safe integer.`);
+  }
+
+  return message === undefined
+    ? { generation: generation as number }
+    : { generation: generation as number, message };
 }
 
 function parseCloseRequest(value: unknown): RuntimeCloseRequest {
   const requestName = "RuntimeCloseRequest";
   const record = readObject(value, requestName);
+  const generation = record["generation"];
   const reason = readOptionalString(record, "reason", requestName);
 
-  return reason === undefined ? {} : { reason };
-}
-
-function parseRuntimeCommand(value: unknown): RuntimeCommand {
-  if (!isRecord(value) || typeof value["kind"] !== "string") {
-    throw new TypeError("Runtime command must be an object with a string kind.");
+  if (!Number.isSafeInteger(generation) || (generation as number) < 0) {
+    throw new TypeError(`${requestName}.generation must be a non-negative safe integer.`);
   }
 
-  return value as RuntimeCommand;
+  return reason === undefined
+    ? { generation: generation as number }
+    : { generation: generation as number, reason };
+}
+
+function parseSendRequest(value: unknown): RuntimeSendRequest {
+  const requestName = "RuntimeSendRequest";
+  const record = readObject(value, requestName);
+  const generation = record["generation"];
+
+  if (!Number.isSafeInteger(generation) || (generation as number) < 0) {
+    throw new TypeError(`${requestName}.generation must be a non-negative safe integer.`);
+  }
+
+  return {
+    command: parseRuntimeCommand(record["command"]),
+    generation: generation as number,
+  };
 }
 
 async function readOptionalJsonBody(request: Request): Promise<unknown> {
   const text = await request.text();
   return text.trim().length === 0 ? {} : JSON.parse(text);
+}
+
+function readGeneration(url: URL): number {
+  const value = url.searchParams.get("generation");
+  const generation = value === null || value.trim().length === 0 ? Number.NaN : Number(value);
+
+  if (!Number.isSafeInteger(generation) || generation < 0) {
+    throw new TypeError("generation must be a non-negative safe integer.");
+  }
+
+  return generation;
 }
 
 export async function handleDriverInstanceRequest(
@@ -98,27 +134,12 @@ export async function handleDriverInstanceRequest(
     return handler.acceptDriverSocket(request);
   }
 
-  if (request.method === "GET" && url.pathname === "/wait/hello") {
-    return json(await handler.waitForHello(readPositiveTimeout(url, "hello")));
-  }
-
   if (request.method === "GET" && url.pathname === "/wait/ready") {
-    return json(await handler.waitForReady(readPositiveTimeout(url, "ready")));
-  }
-
-  if (request.method === "GET" && url.pathname === "/wait/heartbeat") {
-    const timeoutMs = readPositiveTimeout(url, "heartbeat");
-    const afterCount = Number(url.searchParams.get("afterCount") ?? "0");
-
-    if (!Number.isInteger(afterCount) || afterCount < 0) {
-      return json({ error: "afterCount must be a non-negative integer." }, { status: 400 });
-    }
-
-    return json(await handler.waitForHeartbeat(afterCount, timeoutMs));
+    return json(await handler.waitForReady(readGeneration(url), readPositiveTimeout(url, "ready")));
   }
 
   if (request.method === "GET" && url.pathname === "/wait/close") {
-    return json(await handler.waitForClose(readPositiveTimeout(url, "close")));
+    return json(await handler.waitForClose(readGeneration(url), readPositiveTimeout(url, "close")));
   }
 
   if (request.method === "GET" && url.pathname === "/snapshot") {
@@ -126,10 +147,10 @@ export async function handleDriverInstanceRequest(
   }
 
   if (request.method === "POST" && url.pathname === "/control/send") {
-    let command: RuntimeCommand;
+    let body: RuntimeSendRequest;
 
     try {
-      command = parseRuntimeCommand(await request.json());
+      body = parseSendRequest(await request.json());
     } catch (error) {
       return json(
         {
@@ -139,7 +160,7 @@ export async function handleDriverInstanceRequest(
       );
     }
 
-    await handler.sendControlCommand(command);
+    await handler.sendControlCommand(body.generation, body.command);
     return json({ ok: true });
   }
 
@@ -162,7 +183,7 @@ export async function handleDriverInstanceRequest(
         ? body.message
         : "Driver instance failed.";
 
-    await handler.fail(message);
+    await handler.fail(body.generation, message);
     return json({ ok: true });
   }
 
@@ -181,6 +202,7 @@ export async function handleDriverInstanceRequest(
     }
 
     await handler.destroy(
+      body.generation,
       typeof body.reason === "string" && body.reason.trim().length > 0
         ? body.reason
         : "runtime.driver_instance.destroyed",

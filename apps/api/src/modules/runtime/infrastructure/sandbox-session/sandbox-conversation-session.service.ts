@@ -1,6 +1,6 @@
 import { getSessionOrganizationPath } from "@mosoo/agent-driver/paths";
 import { createPlatformId } from "@mosoo/id";
-import type { SandboxId, SandboxSessionId, SessionId } from "@mosoo/id";
+import type { RuntimeOperationId, SandboxId, SandboxSessionId, SessionId } from "@mosoo/id";
 import { RUNTIME_DIAGNOSTIC_EVENT } from "@mosoo/runtime-events";
 
 import { disposeRpcResource } from "../../../../platform/cloudflare/rpc-disposal";
@@ -15,12 +15,18 @@ import {
   getRuntimeSubjectInactiveDeadline,
   runtimeCheckpointRulesInclude,
 } from "../../domain/runtime-kind-policy";
+import {
+  heartbeatRuntimeRunProvisioningLease,
+  recordRuntimeProvisioningConversationTarget,
+} from "../runtime-subject-lifecycle/runtime-provisioning-lease-store";
 import type { RuntimeConversationSessionRecord } from "../runtime-subject-lifecycle/runtime-subject-store";
 import {
+  claimRuntimeConversationSessionCleanup,
   claimIdleSessionScopedConversationForClose,
   ensureRuntimeConversationSessionRecord,
   getRuntimeConversationSession,
   getRuntimeConversationSessionState,
+  listPendingRuntimeConversationSessionCleanups,
   recordRuntimeConversationSessionActive,
   recordRuntimeConversationSessionClosed,
   recordRuntimeConversationSessionError,
@@ -52,6 +58,7 @@ function measureOptional<T>(
 function resolveConversationContinuationPlan(input: {
   existingSession: RuntimeConversationSessionRecord | null;
   kind: EnsureSandboxConversationSessionInput["kind"];
+  replaceClosedExecutionSession: boolean;
 }): {
   sandboxSessionId?: SandboxSessionId;
   requireCwdCheckpoint: boolean;
@@ -93,12 +100,17 @@ function resolveConversationContinuationPlan(input: {
     };
   }
 
+  if (input.existingSession.status === "cleanup_pending") {
+    throw new Error("Sandbox conversation cleanup is still pending; retry after maintenance.");
+  }
+
   const shouldRestoreCwd = runtimeCheckpointRulesInclude(
     policy.checkpoint.restoreOnActivate,
     "session_workspaces",
   );
   const shouldUseNewCloudflareSession =
-    input.existingSession.status === "closed" && policy.subject.scope === "session";
+    input.existingSession.status === "closed" &&
+    (policy.subject.scope === "session" || input.replaceClosedExecutionSession);
 
   return {
     ...(shouldUseNewCloudflareSession
@@ -160,11 +172,19 @@ export async function ensureSandboxConversationSession(
   const continuation = resolveConversationContinuationPlan({
     existingSession,
     kind: input.kind,
+    replaceClosedExecutionSession: input.replaceClosedExecutionSession ?? false,
   });
   const cwd = existingSession?.cwd ?? getSessionOrganizationPath(input.sessionId);
 
   if (existingSession && existingSession.sandboxId !== input.sandboxId) {
     throw new Error("Sandbox session is already bound to a different sandbox.");
+  }
+  if (
+    existingSession &&
+    existingSession.status !== "closed" &&
+    existingSession.sandboxIncarnation !== input.sandboxIncarnation
+  ) {
+    throw new Error("Sandbox session belongs to a retired sandbox incarnation.");
   }
 
   const frozenOrigin = existingSession
@@ -181,13 +201,44 @@ export async function ensureSandboxConversationSession(
         now,
         originJson: JSON.stringify(frozenOrigin),
         runtimeSubjectId: input.sandboxId,
+        sandboxIncarnation: input.sandboxIncarnation,
         sessionId: input.sessionId,
       }),
     ));
   const sandboxSessionId = continuation.sandboxSessionId ?? sessionRecord.sandboxSessionId;
+  let provisioningLease = input.provisioningLease;
+
+  if (provisioningLease !== undefined) {
+    const recordedLease = await recordRuntimeProvisioningConversationTarget(bindings.DB, {
+      lease: provisioningLease,
+      sandboxIncarnation: input.sandboxIncarnation,
+      sandboxSessionId,
+    });
+    if (recordedLease === null) {
+      throw new Error("Sandbox conversation provisioning lost lifecycle ownership.");
+    }
+    provisioningLease = recordedLease;
+  }
+
+  const measureProvisioning = async <T>(name: string, task: () => Promise<T>): Promise<T> => {
+    if (
+      provisioningLease !== undefined &&
+      !(await heartbeatRuntimeRunProvisioningLease(bindings.DB, provisioningLease))
+    ) {
+      throw new Error("Sandbox conversation provisioning lost lifecycle ownership.");
+    }
+    const result = await measureOptional(input.timing, name, task);
+    if (
+      provisioningLease !== undefined &&
+      !(await heartbeatRuntimeRunProvisioningLease(bindings.DB, provisioningLease))
+    ) {
+      throw new Error("Sandbox conversation provisioning lost lifecycle ownership.");
+    }
+    return result;
+  };
 
   if (continuation.shouldRestoreCwd && existingSession) {
-    await measureOptional(input.timing, "conversation.restoreCwd", () =>
+    await measureProvisioning("conversation.restoreCwd", () =>
       restoreSandboxSessionCwdIfMissing({
         cwd,
         latestReadyBackup: existingSession.latestReadyBackup,
@@ -199,7 +250,7 @@ export async function ensureSandboxConversationSession(
   }
 
   if (continuation.shouldCreateCloudflareSession) {
-    await measureOptional(input.timing, "conversation.prepareDirectories", () =>
+    await measureProvisioning("conversation.prepareDirectories", () =>
       prepareSandboxConversationDirectories({
         cwd,
         sandbox: input.sandbox,
@@ -207,7 +258,7 @@ export async function ensureSandboxConversationSession(
     );
 
     if (continuation.shouldRestoreSessionArtifacts) {
-      await measureOptional(input.timing, "conversation.restoreSessionArtifacts", () =>
+      await measureProvisioning("conversation.restoreSessionArtifacts", () =>
         restoreSessionArtifactsToWorkspace(bindings, {
           agentId: input.agentId,
           cwd,
@@ -220,7 +271,7 @@ export async function ensureSandboxConversationSession(
   }
 
   if (input.mountSessionResources) {
-    await measureOptional(input.timing, "conversation.mountResources", () =>
+    await measureProvisioning("conversation.mountResources", () =>
       ensureSessionResourcesMounted({
         bindings,
         sandbox: input.sandbox,
@@ -230,7 +281,7 @@ export async function ensureSandboxConversationSession(
   }
 
   if (continuation.shouldDeleteErrorSession) {
-    await measureOptional(input.timing, "conversation.deleteErrorSession", () =>
+    await measureProvisioning("conversation.deleteErrorSession", () =>
       deleteSandboxConversationSessionBestEffort({
         sandboxSessionId: sessionRecord.sandboxSessionId,
         sandbox: input.sandbox,
@@ -238,46 +289,61 @@ export async function ensureSandboxConversationSession(
     );
   }
 
-  const openedCloudflareSession = await measureOptional(
-    input.timing,
-    "conversation.openSession",
-    () =>
-      openSandboxConversationSession({
-        sandboxSessionId,
-        cwd,
-        sandbox: input.sandbox,
-        shouldCreate: continuation.shouldCreateCloudflareSession,
-      }),
+  const openedCloudflareSession = await measureProvisioning("conversation.openSession", () =>
+    openSandboxConversationSession({
+      sandboxSessionId,
+      cwd,
+      sandbox: input.sandbox,
+      shouldCreate: continuation.shouldCreateCloudflareSession,
+    }),
   );
   const cloudflareSession = openedCloudflareSession.session;
+  const activatedAt = currentTimestampMs();
 
   try {
-    await measureOptional(input.timing, "conversation.activateRecord", () =>
+    const activated = await measureProvisioning("conversation.activateRecord", () =>
       recordRuntimeConversationSessionActive(bindings.DB, {
         sandboxSessionId,
         cwd,
-        now,
+        ...(provisioningLease === undefined
+          ? {}
+          : { expectedProvisioningOperationId: provisioningLease.operationId }),
+        now: activatedAt,
         originJson: JSON.stringify(frozenOrigin),
         runtimeSubjectId: input.sandboxId,
+        sandboxIncarnation: input.sandboxIncarnation,
         sessionId: input.sessionId,
       }),
     );
+    if (!activated) {
+      throw new Error("Sandbox conversation activation lost lifecycle ownership.");
+    }
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Sandbox conversation session activation failed.";
 
-    await recordRuntimeConversationSessionError(bindings.DB, {
+    const recordedError = await recordRuntimeConversationSessionError(bindings.DB, {
       sandboxSessionId,
+      sandboxIncarnation: input.sandboxIncarnation,
       cwd,
       errorCode: "runtime.conversation_mount_failed",
+      ...(provisioningLease === undefined
+        ? {}
+        : { expectedProvisioningOperationId: provisioningLease.operationId }),
       message,
-      now,
+      now: activatedAt,
       originJson: JSON.stringify(frozenOrigin),
       runtimeSubjectId: input.sandboxId,
       sessionId: input.sessionId,
     });
 
     disposeRpcResource(cloudflareSession);
+    if (!recordedError) {
+      await deleteSandboxConversationSessionBestEffort({
+        sandbox: input.sandbox,
+        sandboxSessionId,
+      });
+    }
     throw new Error(message, { cause: error });
   }
 
@@ -286,29 +352,68 @@ export async function ensureSandboxConversationSession(
     sandboxSessionId,
     cwd,
     origin: frozenOrigin,
+    ...(provisioningLease === undefined ? {} : { provisioningLease }),
   };
 }
 
 export async function closeSandboxConversationSession(
   bindings: ApiBindings,
   input: {
+    expectedProvisioningOperationId?: RuntimeOperationId;
+    expectedSandboxSessionId?: SandboxSessionId;
     sandboxId: SandboxId;
     sessionId: SessionId;
   },
 ): Promise<void> {
   const state = await getRuntimeConversationSessionState(bindings.DB, {
+    ...(input.expectedProvisioningOperationId === undefined
+      ? {}
+      : { expectedProvisioningOperationId: input.expectedProvisioningOperationId }),
+    ...(input.expectedSandboxSessionId === undefined
+      ? {}
+      : { expectedSandboxSessionId: input.expectedSandboxSessionId }),
     runtimeSubjectId: input.sandboxId,
     sessionId: input.sessionId,
   });
 
-  if (!state || state.status !== "active") {
+  if (!state) {
     return;
+  }
+
+  let cleanupOperationId =
+    state.status === "cleanup_pending"
+      ? state.cleanupOperationId
+      : await claimRuntimeConversationSessionCleanup(bindings.DB, {
+          ...(input.expectedProvisioningOperationId === undefined
+            ? {}
+            : { expectedProvisioningOperationId: input.expectedProvisioningOperationId }),
+          now: currentTimestampMs(),
+          runtimeSubjectId: input.sandboxId,
+          sandboxIncarnation: state.sandboxIncarnation,
+          sandboxSessionId: state.sandboxSessionId,
+          sessionId: input.sessionId,
+        });
+  if (cleanupOperationId === null) {
+    const adopted = await getRuntimeConversationSessionState(bindings.DB, {
+      expectedSandboxIncarnation: state.sandboxIncarnation,
+      expectedSandboxSessionId: state.sandboxSessionId,
+      runtimeSubjectId: input.sandboxId,
+      sessionId: input.sessionId,
+    });
+    if (adopted?.status !== "cleanup_pending" || adopted.cleanupOperationId === null) {
+      throw new Error("Sandbox conversation cleanup lost lifecycle ownership.");
+    }
+    cleanupOperationId = adopted.cleanupOperationId;
   }
 
   // Force-close: session-end / cleanup callers must tear down regardless of
   // idleness. The idle sweep uses closeIdleCattleConversationSession instead.
   await finalizeSandboxConversationClose(bindings, {
     sandboxId: input.sandboxId,
+    cleanupOperationId,
+    ...(input.expectedProvisioningOperationId === undefined
+      ? {}
+      : { expectedProvisioningOperationId: input.expectedProvisioningOperationId }),
     sessionId: input.sessionId,
     state,
   });
@@ -337,20 +442,22 @@ export async function closeIdleCattleConversationSession(
     return false;
   }
 
-  const claimed = await claimIdleSessionScopedConversationForClose(bindings.DB, {
+  const cleanupOperationId = await claimIdleSessionScopedConversationForClose(bindings.DB, {
     idleSinceLte: input.idleSinceLte,
     now: currentTimestampMs(),
     runtimeSubjectId: input.sandboxId,
+    sandboxIncarnation: state.sandboxIncarnation,
     sandboxSessionId: state.sandboxSessionId,
     sessionId: input.sessionId,
   });
 
-  if (!claimed) {
+  if (cleanupOperationId === null) {
     return false;
   }
 
   await finalizeSandboxConversationClose(bindings, {
     sandboxId: input.sandboxId,
+    cleanupOperationId,
     sessionId: input.sessionId,
     state,
   });
@@ -358,10 +465,32 @@ export async function closeIdleCattleConversationSession(
   return true;
 }
 
+export async function repairPendingSandboxConversationSessionCleanups(
+  bindings: ApiBindings,
+  limit: number,
+): Promise<number> {
+  const pending = await listPendingRuntimeConversationSessionCleanups(bindings.DB, limit);
+
+  await Promise.allSettled(
+    pending.map((cleanup) =>
+      finalizeSandboxConversationClose(bindings, {
+        cleanupOperationId: cleanup.cleanupOperationId,
+        sandboxId: cleanup.sandboxId,
+        sessionId: cleanup.sessionId,
+        state: cleanup,
+      }),
+    ),
+  );
+
+  return pending.length;
+}
+
 async function finalizeSandboxConversationClose(
   bindings: ApiBindings,
   input: {
     sandboxId: SandboxId;
+    cleanupOperationId: RuntimeOperationId;
+    expectedProvisioningOperationId?: RuntimeOperationId;
     sessionId: SessionId;
     state: RuntimeConversationSessionState;
   },
@@ -370,36 +499,43 @@ async function finalizeSandboxConversationClose(
   const { deleteActiveSandboxConversationSession } =
     await import("./sandbox-conversation-session-delete");
 
-  try {
-    await deleteActiveSandboxConversationSession(bindings, {
-      sandboxSessionId: input.state.sandboxSessionId,
-      sandboxId: input.sandboxId,
-    });
+  await deleteActiveSandboxConversationSession(bindings, {
+    sandboxSessionId: input.state.sandboxSessionId,
+    sandboxId: input.sandboxId,
+    sandboxIncarnation: input.state.sandboxIncarnation,
+  });
 
-    if (input.state.agentId) {
-      await appendRuntimeDiagnosticEvent(bindings, {
-        eventName: RUNTIME_DIAGNOSTIC_EVENT.sandboxSessionDestroyed.name,
-        sessionId: input.sessionId,
-        value: {
-          ...toRuntimeDiagnosticBaseValue({
-            agentId: input.state.agentId,
-            sessionId: input.sessionId,
-          }),
-          reason: "runtime_subject_session_closed",
-          sandboxId: input.sandboxId,
-        },
-      });
-    }
-  } finally {
-    // Remote cleanup must not strand the local subject outside reclamation.
-    await recordRuntimeConversationSessionClosed(bindings.DB, {
-      inactiveDeadlineAt: getRuntimeSubjectInactiveDeadline(
-        getRuntimeKindPolicy(input.state.kind),
-        now,
-      ),
+  const recorded = await recordRuntimeConversationSessionClosed(bindings.DB, {
+    cleanupOperationId: input.cleanupOperationId,
+    ...(input.expectedProvisioningOperationId === undefined
+      ? {}
+      : { expectedProvisioningOperationId: input.expectedProvisioningOperationId }),
+    inactiveDeadlineAt: getRuntimeSubjectInactiveDeadline(
+      getRuntimeKindPolicy(input.state.kind),
       now,
-      runtimeSubjectId: input.sandboxId,
+    ),
+    now,
+    runtimeSubjectId: input.sandboxId,
+    sandboxIncarnation: input.state.sandboxIncarnation,
+    sandboxSessionId: input.state.sandboxSessionId,
+    sessionId: input.sessionId,
+  });
+  if (!recorded) {
+    throw new Error("Sandbox conversation cleanup lost lifecycle ownership.");
+  }
+
+  if (input.state.agentId) {
+    await appendRuntimeDiagnosticEvent(bindings, {
+      eventName: RUNTIME_DIAGNOSTIC_EVENT.sandboxSessionDestroyed.name,
       sessionId: input.sessionId,
+      value: {
+        ...toRuntimeDiagnosticBaseValue({
+          agentId: input.state.agentId,
+          sessionId: input.sessionId,
+        }),
+        reason: "runtime_subject_session_closed",
+        sandboxId: input.sandboxId,
+      },
     });
   }
 }

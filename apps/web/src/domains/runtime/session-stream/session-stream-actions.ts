@@ -4,6 +4,7 @@ import type {
   SessionPermissionRequestView,
   SessionRunView,
 } from "@mosoo/ag-ui-session";
+import type { AgentTask } from "@mosoo/contracts/session";
 import { useCallback, useMemo } from "react";
 import type { MutableRefObject } from "react";
 
@@ -42,6 +43,7 @@ interface UseSessionStreamActionsInput {
 }
 
 export function useSessionStreamActions(input: UseSessionStreamActionsInput): {
+  activeTasks: AgentTask[];
   messages: SessionLiveState["messages"];
   lifecycle: SessionLiveState["lifecycle"];
   permissionRequests: SessionPermissionRequestView[];
@@ -66,22 +68,23 @@ export function useSessionStreamActions(input: UseSessionStreamActionsInput): {
   streaming: boolean;
   syncSession: () => Promise<void>;
 } {
+  const { activeSessionIdRef, sendViewerEvent } = input;
   const syncSession = useCallback(async (): Promise<void> => {
-    const activeSessionId = input.activeSessionIdRef.current;
+    const activeSessionId = activeSessionIdRef.current;
 
     if (!isTruthy(activeSessionId)) {
       return;
     }
 
     const options: SendViewerEventOptions = { maxAttempts: 2 };
-    await input.sendViewerEvent(
+    await sendViewerEvent(
       activeSessionId,
       createViewerCustomEvent("mosoo.session.sync.request", {
         reason: "manual",
       }),
       options,
     );
-  }, [input.activeSessionIdRef, input.sendViewerEvent]);
+  }, [activeSessionIdRef, sendViewerEvent]);
   const sendUserMessage = useCallback(
     async (message: {
       attachmentIds?: string[];
@@ -155,6 +158,7 @@ export function useSessionStreamActions(input: UseSessionStreamActionsInput): {
   const streaming = useMemo(() => isSessionStreamStreaming(input.liveState), [input.liveState]);
 
   return {
+    activeTasks: input.liveState?.taskSnapshot?.tasks ?? [],
     lifecycle: input.liveState?.lifecycle ?? "IDLE",
     messages,
     permissionRequests,

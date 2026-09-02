@@ -37,24 +37,33 @@ interface TerminalSpy {
   createSessionCalls: { cwd?: string; id?: string }[];
   handle: SandboxHandle;
   mkdirCalls: string[];
+  sessionDisposeCalls: number;
   setKeepAliveCalls: boolean[];
+  subjectDisposeCalls: number;
 }
 
 function createTerminalSandboxHandleSpy(): TerminalSpy {
   const mkdirCalls: string[] = [];
   const setKeepAliveCalls: boolean[] = [];
   const createSessionCalls: { cwd?: string; id?: string }[] = [];
+  let sessionDisposeCalls = 0;
+  let subjectDisposeCalls = 0;
   const unavailable = async () => {
     throw new Error("Unexpected sandbox test method call.");
   };
   const sessionResponse = new Response("ok", { status: 200 });
 
   const handle = {
+    activateRuntimeSubjectIncarnation: async () => {},
     configureNetworkConstraints: async () => {},
     createBackup: unavailable,
+    createRuntimeSubjectBackup: unavailable,
     createSession: async (options) => {
       createSessionCalls.push({ cwd: options?.cwd, id: options?.id });
       return {
+        [Symbol.dispose]: () => {
+          sessionDisposeCalls++;
+        },
         exec: unavailable,
         mkdir: unavailable,
         readFile: unavailable,
@@ -66,12 +75,15 @@ function createTerminalSandboxHandleSpy(): TerminalSpy {
     },
     deleteSession: unavailable,
     destroy: unavailable,
+    destroyRuntimeSubjectIncarnation: unavailable,
     exec: unavailable,
     getSession: unavailable,
+    inspectRuntimeSubjectIncarnation: unavailable,
     mkdir: async (path) => {
       mkdirCalls.push(path);
     },
     mountBucket: unavailable,
+    markRuntimeSubjectIncarnationReady: async () => {},
     readFile: unavailable,
     restoreBackup: unavailable,
     setKeepAlive: async (value) => {
@@ -83,9 +95,23 @@ function createTerminalSandboxHandleSpy(): TerminalSpy {
     watch: unavailable,
     writeFile: unavailable,
     wsConnect: unavailable,
+    [Symbol.dispose]: () => {
+      subjectDisposeCalls++;
+    },
   } as unknown as SandboxHandle;
 
-  return { createSessionCalls, handle, mkdirCalls, setKeepAliveCalls };
+  return {
+    createSessionCalls,
+    handle,
+    mkdirCalls,
+    get sessionDisposeCalls() {
+      return sessionDisposeCalls;
+    },
+    setKeepAliveCalls,
+    get subjectDisposeCalls() {
+      return subjectDisposeCalls;
+    },
+  };
 }
 
 describe("owner debug terminal", () => {
@@ -137,5 +163,7 @@ describe("owner debug terminal", () => {
     );
     expect(spy.createSessionCalls).toHaveLength(1);
     expect(spy.createSessionCalls[0]?.cwd).toBe("/workspace");
+    expect(spy.sessionDisposeCalls).toBe(1);
+    expect(spy.subjectDisposeCalls).toBe(1);
   });
 });

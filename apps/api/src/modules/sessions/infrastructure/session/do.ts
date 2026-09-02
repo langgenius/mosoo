@@ -139,16 +139,41 @@ export class Session extends DurableObject {
     return normalizedSessionId;
   }
 
-  async publishEvents(sessionId: string, events: AgUiSessionEvent[]): Promise<void> {
+  async publishEvents(
+    sessionId: string,
+    events: AgUiSessionEvent[],
+    runtimeEventSeqCursor: number | null = null,
+    previousRuntimeEventSeqCursor: number | null = null,
+  ): Promise<void> {
     this.#ensureActiveRpcSession(sessionId);
     if (events.length > 0) {
       this.#publicEventSockets.notifyEventsAvailable();
     }
-    await this.#viewerSockets.broadcastEvents(events);
+    await this.#viewerSockets.broadcastEvents(
+      events,
+      runtimeEventSeqCursor,
+      previousRuntimeEventSeqCursor,
+    );
+  }
+
+  async publishEventBatches(
+    sessionId: string,
+    batches: Array<{
+      events: AgUiSessionEvent[];
+      previousRuntimeEventSeqCursor: number | null;
+      runtimeEventSeqCursor: number | null;
+    }>,
+  ): Promise<void> {
+    this.#ensureActiveRpcSession(sessionId);
+    if (batches.some((batch) => batch.events.length > 0)) {
+      this.#publicEventSockets.notifyEventsAvailable();
+    }
+    await this.#viewerSockets.broadcastEventBatches(batches);
   }
 
   async syncViewers(sessionId: string): Promise<void> {
     this.#ensureActiveRpcSession(sessionId);
+    this.#publicEventSockets.notifyEventsAvailable();
     await this.#viewerSockets.broadcastStateSync();
   }
 

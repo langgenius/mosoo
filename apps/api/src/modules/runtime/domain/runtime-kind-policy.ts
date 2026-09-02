@@ -16,7 +16,6 @@ export type RuntimeCheckpointRule =
       readonly updateSubjectCheckpoint: true;
     }
   | {
-      readonly sanitizeTransientState: boolean;
       readonly type: "session_workspaces";
       readonly updateSubjectCheckpoint: false;
     };
@@ -89,14 +88,8 @@ const SUBJECT_MEMORY_CHECKPOINT = {
 } as const satisfies RuntimeCheckpointRule;
 
 const SESSION_WORKSPACES_CHECKPOINT = {
-  sanitizeTransientState: false,
   type: "session_workspaces",
   updateSubjectCheckpoint: false,
-} as const satisfies RuntimeCheckpointRule;
-
-const CATTLE_SESSION_WORKSPACE_CHECKPOINT = {
-  ...SESSION_WORKSPACES_CHECKPOINT,
-  sanitizeTransientState: true,
 } as const satisfies RuntimeCheckpointRule;
 
 const SUBJECT_MEMORY_CLEAR = {
@@ -115,8 +108,8 @@ export const RUNTIME_KIND_POLICIES = {
       createOnHibernate: [],
       createOnRecreate: [],
       createOnReset: [],
-      createOnTerminal: [CATTLE_SESSION_WORKSPACE_CHECKPOINT],
-      restoreOnActivate: [CATTLE_SESSION_WORKSPACE_CHECKPOINT],
+      createOnTerminal: [SESSION_WORKSPACES_CHECKPOINT],
+      restoreOnActivate: [SESSION_WORKSPACES_CHECKPOINT],
     },
     // Cattle commits the complete session workspace, including provider-native
     // state, before terminal lease release. Platform history remains the

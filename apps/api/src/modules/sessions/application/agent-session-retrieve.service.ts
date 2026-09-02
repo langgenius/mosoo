@@ -4,6 +4,7 @@ import type {
   AgentSessionNativeRuntimeRefDiagnostics,
   AgentSessionRecoverability,
   AgentSessionRetrieveResult,
+  AgentTaskSnapshot,
   SessionExecutionSkillReference,
   SessionExecutionToolReference,
   SessionSummary,
@@ -17,6 +18,7 @@ import { eq } from "drizzle-orm";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { findSessionExecutionPlan } from "../../runtime/application/session-definition/session-execution.repository";
+import { loadSessionAgentTaskSnapshot } from "../infrastructure/session-agent-task-snapshot.repository";
 import { loadSessionViewerState } from "./session-live-state.service";
 import {
   getSessionSummaryAccessById,
@@ -68,8 +70,12 @@ export async function retrieveAgentSession(
   input: AgentSessionLookupInput,
 ): Promise<AgentSessionRetrieveResult> {
   const access = await getSessionSummaryAccessById(database, viewer.id, input);
+  const taskSnapshot = selectCurrentAgentTaskSnapshot(
+    access.session,
+    await loadSessionAgentTaskSnapshot(database, input.sessionId),
+  );
 
-  return toAgentSessionRetrieveResult(access);
+  return toAgentSessionRetrieveResult({ ...access, taskSnapshot });
 }
 
 export async function retrieveThreadAgentSession(
@@ -78,16 +84,42 @@ export async function retrieveThreadAgentSession(
   input: AgentSessionLookupInput,
 ): Promise<AgentSessionRetrieveResult> {
   const session = await getSessionSummaryForCreator(database, viewer.id, input);
+  const taskSnapshot = selectCurrentAgentTaskSnapshot(
+    session,
+    await loadSessionAgentTaskSnapshot(database, input.sessionId),
+  );
 
   return toAgentSessionRetrieveResult({
     isSessionCreator: true,
     session,
+    taskSnapshot,
   });
+}
+
+function selectCurrentAgentTaskSnapshot(
+  session: SessionSummary,
+  snapshot: AgentTaskSnapshot | null,
+): AgentTaskSnapshot | null {
+  if (
+    snapshot === null ||
+    session.archivedAt !== null ||
+    session.status !== "RUNNING" ||
+    session.lastRun?.id !== snapshot.runId ||
+    session.lastRun.status === "cancelled" ||
+    session.lastRun.status === "completed" ||
+    session.lastRun.status === "expired" ||
+    session.lastRun.status === "failed"
+  ) {
+    return null;
+  }
+
+  return snapshot;
 }
 
 export function toAgentSessionRetrieveResult(input: {
   isSessionCreator: boolean;
   session: SessionSummary;
+  taskSnapshot?: AgentTaskSnapshot | null;
 }): AgentSessionRetrieveResult {
   return {
     capabilities: getAgentSessionActionCapabilities({
@@ -96,6 +128,7 @@ export function toAgentSessionRetrieveResult(input: {
     }),
     recoverability: getAgentSessionRecoverability(input.session),
     session: input.session,
+    taskSnapshot: input.taskSnapshot ?? null,
   };
 }
 

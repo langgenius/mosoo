@@ -277,10 +277,23 @@ export const sessionSchema = /* GraphQL */ `
     status: AgentSessionActionCapabilityStatus!
   }
 
+  type AgentTask {
+    taskId: String!
+    taskType: String
+    title: String
+  }
+
+  type AgentTaskSnapshot {
+    driverInstanceId: ULID!
+    runId: ULID!
+    tasks: [AgentTask!]!
+  }
+
   type AgentSessionRetrieve {
     capabilities: [AgentSessionActionCapability!]!
     recoverability: AgentSessionRecoverability!
     session: Session!
+    taskSnapshot: AgentTaskSnapshot
   }
 
   type AgentSessionRetrieveConnection {

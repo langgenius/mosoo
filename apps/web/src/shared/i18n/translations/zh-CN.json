@@ -1114,6 +1114,8 @@
     "instructionTokenRead": "使用设置中的访问令牌。"
   },
   "sessionEvents": {
+    "activeBackgroundTaskCount": "{{count}} 个正在运行",
+    "activeBackgroundTasks": "正在运行的后台任务",
     "events": "个事件",
     "tokens": "个词元",
     "errorsOnly": "仅错误",

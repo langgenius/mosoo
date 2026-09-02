@@ -7,6 +7,7 @@ import {
 import {
   createPublicHttpContractDatabase,
   insertNonOwnerSession,
+  PUBLIC_API_TEST_IDS,
 } from "./helpers/public-api-http-test-fixture";
 
 async function insertQueuedSessionRun(
@@ -16,7 +17,7 @@ async function insertQueuedSessionRun(
     id?: string;
   } = {},
 ): Promise<void> {
-  const id = input.id ?? "run-active-probe";
+  const id = input.id ?? PUBLIC_API_TEST_IDS.run;
   const createdAt = input.createdAt ?? 1;
 
   await database
@@ -68,11 +69,11 @@ describe("session run reads", () => {
   test("loads the latest active run id", async () => {
     const database = await createPublicHttpContractDatabase();
     await insertNonOwnerSession(database);
-    await insertQueuedSessionRun(database, { createdAt: 1, id: "run-active-probe-old" });
-    await insertQueuedSessionRun(database, { createdAt: 2, id: "run-active-probe-latest" });
+    await insertQueuedSessionRun(database, { createdAt: 1, id: PUBLIC_API_TEST_IDS.run });
+    await insertQueuedSessionRun(database, { createdAt: 2, id: PUBLIC_API_TEST_IDS.runAlt });
 
     await expect(getActiveSessionRunId(database, "01J0000000000000000000000B")).resolves.toBe(
-      "run-active-probe-latest",
+      PUBLIC_API_TEST_IDS.runAlt,
     );
   });
 });

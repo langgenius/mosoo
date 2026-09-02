@@ -15,6 +15,18 @@ export interface SandboxNetworkConstraints {
   readonly networkPolicy: EnvironmentNetworkPolicy;
 }
 
+export async function hashSandboxNetworkConstraints(input: unknown): Promise<string> {
+  const constraints = parseSandboxNetworkConstraints(input);
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(
+      JSON.stringify([constraints.networkPolicy, ...constraints.allowedHosts]),
+    ),
+  );
+
+  return new Uint8Array(digest).toHex();
+}
+
 export function normalizeSandboxNetworkHost(host: string): string {
   const normalized = host.trim().toLowerCase().replace(/\.$/u, "");
 

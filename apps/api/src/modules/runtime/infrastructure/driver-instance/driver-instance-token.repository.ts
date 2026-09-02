@@ -11,19 +11,32 @@ import type { DriverInstanceStatus } from "./status";
 interface DriverInstanceTokenRow {
   boot_token_expires_at: number;
   boot_token_used_at: number | null;
+  connection_id: string | null;
   generation: number;
   id: DriverInstanceId;
   status: DriverInstanceStatus;
 }
 
-export async function claimDriverInstanceByBootTokenHash(
-  bindings: ApiBindings,
-  bootTokenHash: Uint8Array,
-): Promise<{
+interface DriverInstanceTokenValidation {
   driverInstanceId: DriverInstanceId | null;
   error: string | null;
   generation: number | null;
-}> {
+}
+
+export async function validateDriverInstanceBootTokenHash(
+  bindings: ApiBindings,
+  bootTokenHash: Uint8Array,
+): Promise<DriverInstanceTokenValidation> {
+  return validateDriverInstanceTokenRow(
+    await readDriverInstanceTokenRow(bindings, bootTokenHash),
+    currentTimestampMs(),
+  );
+}
+
+export async function claimDriverInstanceByBootTokenHash(
+  bindings: ApiBindings,
+  bootTokenHash: Uint8Array,
+): Promise<DriverInstanceTokenValidation> {
   const now = currentTimestampMs();
   const claimed =
     (await getAppDatabase(bindings.DB)
@@ -59,8 +72,16 @@ export async function claimDriverInstanceByBootTokenHash(
     };
   }
 
-  const row = await readDriverInstanceTokenRow(bindings, bootTokenHash);
+  return validateDriverInstanceTokenRow(
+    await readDriverInstanceTokenRow(bindings, bootTokenHash),
+    now,
+  );
+}
 
+function validateDriverInstanceTokenRow(
+  row: DriverInstanceTokenRow | null,
+  now: number,
+): DriverInstanceTokenValidation {
   if (!row) {
     return {
       driverInstanceId: null,
@@ -77,6 +98,14 @@ export async function claimDriverInstanceByBootTokenHash(
     };
   }
 
+  if (row.status === "connecting" && row.boot_token_used_at !== null) {
+    return {
+      driverInstanceId: row.id,
+      error: null,
+      generation: row.generation,
+    };
+  }
+
   if (row.boot_token_used_at !== null || row.status !== "provisioning") {
     return {
       driverInstanceId: null,
@@ -86,9 +115,9 @@ export async function claimDriverInstanceByBootTokenHash(
   }
 
   return {
-    driverInstanceId: null,
-    error: "Boot token is invalid.",
-    generation: null,
+    driverInstanceId: row.id,
+    error: null,
+    generation: row.generation,
   };
 }
 
@@ -109,6 +138,7 @@ async function readDriverInstanceTokenRow(
       .select({
         bootTokenExpiresAt: driverInstancesTable.bootTokenExpiresAt,
         bootTokenUsedAt: driverInstancesTable.bootTokenUsedAt,
+        connectionId: driverInstancesTable.connectionId,
         generation: driverInstancesTable.generation,
         id: driverInstancesTable.id,
         status: driverInstancesTable.status,
@@ -125,6 +155,7 @@ async function readDriverInstanceTokenRow(
   return {
     boot_token_expires_at: row.bootTokenExpiresAt,
     boot_token_used_at: row.bootTokenUsedAt,
+    connection_id: row.connectionId,
     generation: row.generation,
     id: row.id,
     status: row.status,

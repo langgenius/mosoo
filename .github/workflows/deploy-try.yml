@@ -78,19 +78,21 @@ jobs:
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: ../../node_modules/.bin/vp exec wrangler deploy --env prod --minify --dry-run
+        run: ../../node_modules/.bin/vp exec wrangler deploy --env prod --minify --dry-run --experimental-provision=false
 
       - name: Dry-run Web Worker
         working-directory: apps/web
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: ../../node_modules/.bin/vp exec wrangler deploy --env prod --dry-run
+        run: ../../node_modules/.bin/vp exec wrangler deploy --env prod --dry-run --experimental-provision=false
 
       - name: Deploy
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          MOSOO_PROTOCOL_V3_SMOKE_AGENT_ID: ${{ vars.MOSOO_PROTOCOL_V3_SMOKE_AGENT_ID }}
+          MOSOO_PROTOCOL_V3_SMOKE_TOKEN: ${{ secrets.MOSOO_PROTOCOL_V3_SMOKE_TOKEN }}
           VITE_MOSOO_DEPLOYMENT_MODE: cloud
           VITE_MOSOO_ENVIRONMENT: production
           VITE_POSTHOG_API_HOST: https://us.i.posthog.com

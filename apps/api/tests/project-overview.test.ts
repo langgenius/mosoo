@@ -36,6 +36,7 @@ async function insertOverviewAgent(
         description,
         id,
         kind,
+        live_deployment_version_id,
         model,
         name,
         owner_account_id,
@@ -46,7 +47,7 @@ async function insertOverviewAgent(
         status,
         updated_at,
         visibility
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       JSON.stringify({
@@ -59,6 +60,7 @@ async function insertOverviewAgent(
       "Extra overview fixture.",
       input.id,
       "cattle",
+      "01J000000000000000000000F5",
       "gpt-5.4",
       input.name,
       fixture.viewer.id,

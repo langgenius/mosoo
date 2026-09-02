@@ -1,4 +1,6 @@
 import type { SessionMessagePlanEntry, SessionMessageSegment } from "@mosoo/contracts/session";
+import { parsePlatformId } from "@mosoo/id";
+import type { SessionRunId } from "@mosoo/id";
 
 export interface StoredSessionMessageProjectionInput {
   planJson: string | null;
@@ -50,6 +52,10 @@ function readNullableString(value: unknown, fieldName: string): string | null {
   return value;
 }
 
+function readOptionalNullableString(value: unknown, fieldName: string): string | null | undefined {
+  return value === undefined ? undefined : readNullableString(value, fieldName);
+}
+
 function readPlanPriority(value: unknown): SessionMessagePlanEntry["priority"] {
   if (value === "high" || value === "medium" || value === "low") {
     return value;
@@ -91,12 +97,18 @@ function parseMessageSegment(raw: unknown): SessionMessageSegment {
 
   const tool = readString(raw["tool"], "tool segment tool");
   const toolCallId = readString(raw["toolCallId"], "tool segment toolCallId");
+  const rawRunId = readOptionalNullableString(raw["runId"], "tool segment runId");
+  const runId =
+    rawRunId === undefined || rawRunId === null
+      ? rawRunId
+      : parsePlatformId<SessionRunId>(rawRunId, "tool segment runId");
 
   if (kind === "tool_use") {
     return {
       argsText: readString(raw["argsText"], "tool_use argsText"),
       kind: "tool_use",
       path: readNullableString(raw["path"], "tool_use path"),
+      ...(runId === undefined ? {} : { runId }),
       tool,
       toolCallId,
     };
@@ -106,6 +118,7 @@ function parseMessageSegment(raw: unknown): SessionMessageSegment {
     return {
       kind: "tool_result",
       output: readString(raw["output"], "tool_result output"),
+      ...(runId === undefined ? {} : { runId }),
       tool,
       toolCallId,
     };

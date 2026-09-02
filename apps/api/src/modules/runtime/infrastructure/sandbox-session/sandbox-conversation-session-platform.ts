@@ -2,6 +2,7 @@ import { discardPromiseResult } from "@mosoo/effects";
 import type { SandboxBackupId, SandboxSessionId } from "@mosoo/id";
 
 import { withDisposedRpcResult } from "../../../../platform/cloudflare/rpc-disposal";
+import { quoteShellArg } from "../../../../shared/shell";
 import { getRuntimeSessionOutputDirectory } from "../driver-instance/runtime-session-outputs";
 import { withRuntimeProvisionTimeout } from "../runtime-provision-timeout";
 import { decodeSandboxBackupIdForPlatform } from "../sandbox-backup-id";
@@ -10,10 +11,6 @@ import type { ExecutionSessionHandle, SandboxHandle } from "../sandbox-handles";
 interface SandboxConversationDirectoryBackup {
   readonly dir: string;
   readonly id: SandboxBackupId;
-}
-
-function quoteShellArg(value: string): string {
-  return `'${value.replaceAll("'", `'"'"'`)}'`;
 }
 
 function isSessionAlreadyExistsError(error: unknown): boolean {
@@ -63,8 +60,14 @@ export async function prepareSandboxConversationDirectories(input: {
   readonly cwd: string;
   readonly sandbox: SandboxHandle;
 }): Promise<void> {
-  await input.sandbox.mkdir(input.cwd, { recursive: true });
-  await input.sandbox.mkdir(getRuntimeSessionOutputDirectory(input.cwd), { recursive: true });
+  await withRuntimeProvisionTimeout(
+    input.sandbox.mkdir(input.cwd, { recursive: true }),
+    `Sandbox session cwd creation for ${input.cwd}`,
+  );
+  await withRuntimeProvisionTimeout(
+    input.sandbox.mkdir(getRuntimeSessionOutputDirectory(input.cwd), { recursive: true }),
+    `Sandbox session output directory creation for ${input.cwd}`,
+  );
 }
 
 export async function deleteSandboxConversationSessionBestEffort(input: {
@@ -72,7 +75,10 @@ export async function deleteSandboxConversationSessionBestEffort(input: {
   readonly sandbox: SandboxHandle;
 }): Promise<void> {
   try {
-    await input.sandbox.deleteSession(input.sandboxSessionId);
+    await withRuntimeProvisionTimeout(
+      input.sandbox.deleteSession(input.sandboxSessionId),
+      `Sandbox session deletion for ${input.sandboxSessionId}`,
+    );
   } catch {
     // Best-effort cleanup for a partially configured session.
   }
@@ -88,10 +94,13 @@ export async function openSandboxConversationSession(input: {
     try {
       return {
         created: true,
-        session: await input.sandbox.createSession({
-          cwd: input.cwd,
-          id: input.sandboxSessionId,
-        }),
+        session: await withRuntimeProvisionTimeout(
+          input.sandbox.createSession({
+            cwd: input.cwd,
+            id: input.sandboxSessionId,
+          }),
+          `Sandbox session creation for ${input.sandboxSessionId}`,
+        ),
       };
     } catch (error) {
       if (!isSessionAlreadyExistsError(error)) {
@@ -100,13 +109,19 @@ export async function openSandboxConversationSession(input: {
 
       return {
         created: false,
-        session: await input.sandbox.getSession(input.sandboxSessionId),
+        session: await withRuntimeProvisionTimeout(
+          input.sandbox.getSession(input.sandboxSessionId),
+          `Sandbox session lookup for ${input.sandboxSessionId}`,
+        ),
       };
     }
   }
 
   return {
     created: false,
-    session: await input.sandbox.getSession(input.sandboxSessionId),
+    session: await withRuntimeProvisionTimeout(
+      input.sandbox.getSession(input.sandboxSessionId),
+      `Sandbox session lookup for ${input.sandboxSessionId}`,
+    ),
   };
 }

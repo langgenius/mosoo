@@ -2,7 +2,12 @@ import type { MosooCustomEvent, MosooSessionFileChange } from "./ag-ui-session-e
 import { MOSOO_CUSTOM_EVENT as CUSTOM_EVENT_REGISTRY } from "./custom-event-registry";
 import type { SessionLiveState } from "./live-state";
 import { updateSessionMetadataState } from "./live-state-custom-metadata.reducer";
-import { completePendingToolUses, normalizeMessagePlan } from "./live-state-message.reducer";
+import {
+  agUiEventTimestampToIso,
+  applyToolCallUpdateToSessionLiveState,
+  completePendingToolUses,
+  normalizeMessagePlan,
+} from "./live-state-message.reducer";
 import {
   currentIsoTimestamp,
   isTerminalRunStatus,
@@ -83,9 +88,27 @@ function updatePermissionRequests(
   state: SessionLiveState,
   event: CustomEventByName<typeof CUSTOM_EVENT_REGISTRY.sessionPermissionsUpdated.name>,
 ): SessionLiveState {
-  const permissionRequests = isTerminalRunStatus(state.run.status)
-    ? []
-    : filterPermissionRequestsForCurrentRun(state, event.value.permissionRequests);
+  const permissionRequests = (() => {
+    if (isTerminalRunStatus(state.run.status)) {
+      return [];
+    }
+    if (event.value.permissionRequest !== undefined) {
+      return filterPermissionRequestsForCurrentRun(state, [
+        ...state.permissionRequests.filter(
+          (request) => request.requestId !== event.value.permissionRequest?.requestId,
+        ),
+        event.value.permissionRequest,
+      ]);
+    }
+    if (event.value.resolvedRequestId !== undefined) {
+      return state.permissionRequests.filter(
+        (request) =>
+          request.requestId !== event.value.resolvedRequestId ||
+          (event.value.runId !== undefined && request.runId !== event.value.runId),
+      );
+    }
+    return filterPermissionRequestsForCurrentRun(state, event.value.permissionRequests);
+  })();
 
   return touchSessionLiveState({
     ...state,
@@ -163,13 +186,47 @@ function updateRunState(
   }
 
   const run = mergeSessionRunUpdate(state.run, event.value.run);
+  const driverInstanceId =
+    event.value.lifecycle !== "RUNNING" || isTerminalRunStatus(run.status)
+      ? null
+      : (event.value.driverInstanceId ??
+        (state.run.id === run.id ? state.infra.driverInstanceId : null));
 
   return touchSessionLiveState({
     ...state,
-    infra: updateInfraForRun(state, run),
+    infra: {
+      ...updateInfraForRun(state, run),
+      driverInstanceId,
+    },
     lifecycle: event.value.lifecycle,
     permissionRequests: isTerminalRunStatus(run.status) ? [] : state.permissionRequests,
     run,
+    taskSnapshot:
+      event.value.lifecycle !== "RUNNING" ||
+      isTerminalRunStatus(run.status) ||
+      state.taskSnapshot?.runId !== run.id ||
+      state.taskSnapshot.driverInstanceId !== driverInstanceId
+        ? null
+        : state.taskSnapshot,
+  });
+}
+
+function replaceAgentTasks(
+  state: SessionLiveState,
+  event: CustomEventByName<typeof CUSTOM_EVENT_REGISTRY.sessionTasksReplaced.name>,
+): SessionLiveState {
+  if (
+    state.lifecycle !== "RUNNING" ||
+    isTerminalRunStatus(state.run.status) ||
+    state.run.id !== event.value.runId ||
+    state.infra.driverInstanceId !== event.value.driverInstanceId
+  ) {
+    return state;
+  }
+
+  return touchSessionLiveState({
+    ...state,
+    taskSnapshot: event.value,
   });
 }
 
@@ -187,6 +244,7 @@ function updateInfraForRescheduling(
       reconnecting: true,
     },
     lifecycle: "RESCHEDULING",
+    taskSnapshot: null,
   });
 }
 
@@ -198,12 +256,14 @@ function updateInfraForAgentChange(
     ...state,
     infra: {
       ...state.infra,
+      driverInstanceId: null,
       lastFailureMessage: null,
       lastFailureReason: `agent.${event.value.operation}`,
       lastSeen: currentIsoTimestamp(),
       reconnecting: true,
     },
     lifecycle: "RESCHEDULING",
+    taskSnapshot: null,
   });
 }
 
@@ -232,12 +292,14 @@ function updateInfraForReady(
     ...state,
     infra: {
       ...state.infra,
+      driverInstanceId: null,
       lastFailureMessage: null,
       lastFailureReason: null,
       lastSeen: event.value.readyAt,
       reconnecting: false,
     },
     lifecycle: "IDLE",
+    taskSnapshot: null,
   });
 }
 
@@ -253,6 +315,7 @@ function stopSession(
     ...terminalState,
     infra: {
       ...terminalState.infra,
+      driverInstanceId: null,
       lastFailureMessage: message,
       lastFailureReason: event.value.reason,
       lastSeen,
@@ -260,6 +323,7 @@ function stopSession(
     },
     lifecycle: "TERMINATED",
     permissionRequests: [],
+    taskSnapshot: null,
     run: {
       ...terminalState.run,
       completedAt: terminalState.run.completedAt ?? currentIsoTimestamp(),
@@ -314,6 +378,18 @@ function updateRuntimeCustomState(
 
     case CUSTOM_EVENT_REGISTRY.sessionRunUpdated.name: {
       return updateRunState(state, event);
+    }
+
+    case CUSTOM_EVENT_REGISTRY.sessionTasksReplaced.name: {
+      return replaceAgentTasks(state, event);
+    }
+
+    case CUSTOM_EVENT_REGISTRY.sessionToolUpdated.name: {
+      const timestamp = event["timestamp"];
+      return applyToolCallUpdateToSessionLiveState(state, {
+        ...event.value,
+        ...(typeof timestamp !== "number" ? {} : { createdAt: agUiEventTimestampToIso(timestamp) }),
+      });
     }
 
     case CUSTOM_EVENT_REGISTRY.sessionInfraRescheduling.name: {

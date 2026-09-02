@@ -1,6 +1,5 @@
-import type { AgUiSessionEvent } from "@mosoo/ag-ui-session";
 import { createPlatformId } from "@mosoo/id";
-import type { RuntimeEventId, SessionId, SessionRunId } from "@mosoo/id";
+import type { DriverCommandId, RuntimeEventId, SessionId, SessionRunId } from "@mosoo/id";
 import { createRuntimeEvent } from "@mosoo/runtime-events";
 import type {
   RuntimeEventActor,
@@ -19,8 +18,7 @@ import {
   persistSessionRuntimeEvents,
 } from "../infrastructure/session-runtime-event-store.repository";
 import type { PersistSessionRuntimeEventsResult } from "../infrastructure/session-runtime-event-store.repository";
-import { projectRuntimeEventsToSessionDeliveryEvents } from "./session-live-state.service";
-import { publishSessionViewerEvents } from "./session-viewer-events.service";
+import { syncSessionViewerState } from "./session-viewer-events.service";
 
 export interface AppendOneSessionEventPerSessionResult {
   readonly persistedCount: number;
@@ -42,17 +40,15 @@ export interface CreateSessionRuntimeEventInput {
   visibility?: RuntimeEventVisibility;
 }
 
-async function publishSessionViewerEventsSafely(
+async function syncSessionViewerStateSafely(
   bindings: ApiBindings,
   sessionId: SessionId,
-  events: AgUiSessionEvent[],
 ): Promise<void> {
   try {
-    await publishSessionViewerEvents(bindings, sessionId, events);
+    await syncSessionViewerState(bindings, sessionId);
   } catch (error) {
-    logWarn("session.runtime_event.live_delivery_failed", {
+    logWarn("session.runtime_event.live_sync_failed", {
       ...createErrorLogContext(error),
-      eventCount: events.length,
       sessionId,
     });
   }
@@ -63,10 +59,8 @@ export async function publishPersistedSessionRuntimeEvents(input: {
   events: readonly RuntimeEventEnvelope[];
   sessionId: SessionId;
 }): Promise<void> {
-  const deliveryEvents = projectRuntimeEventsToSessionDeliveryEvents(input.events);
-
-  if (deliveryEvents.length > 0) {
-    await publishSessionViewerEventsSafely(input.bindings, input.sessionId, deliveryEvents);
+  if (input.events.length > 0) {
+    await syncSessionViewerStateSafely(input.bindings, input.sessionId);
   }
 }
 
@@ -74,6 +68,7 @@ export interface AppendSessionRuntimeEventsInput {
   bindings: ApiBindings;
   deliver?: boolean;
   events: RuntimeEventEnvelope[];
+  provenMcpCommandId?: DriverCommandId | null;
   sessionId: SessionId;
   sourceEventId?: string | null;
 }
@@ -122,11 +117,15 @@ export async function appendSessionRuntimeEvents(
       persistedSourceEventIds: [],
     };
   }
+  if (input.provenMcpCommandId != null && input.events.length !== 1) {
+    throw new Error("Proven MCP command provenance requires exactly one runtime event.");
+  }
 
   const result = await persistSessionRuntimeEvents(input.bindings.DB, {
     records: input.events.map((event, index) => ({
       event,
       occurredAt: toRuntimeEventOccurredAtMs(event),
+      provenMcpCommandId: index === 0 ? (input.provenMcpCommandId ?? null) : null,
       sourceEventId: event.sourceEventId ?? (index === 0 ? (input.sourceEventId ?? null) : null),
     })),
     sessionId: input.sessionId,
@@ -135,7 +134,7 @@ export async function appendSessionRuntimeEvents(
   if (input.deliver !== false) {
     await publishPersistedSessionRuntimeEvents({
       bindings: input.bindings,
-      events: result.persistedEvents,
+      events: input.events,
       sessionId: input.sessionId,
     });
   }
@@ -167,19 +166,10 @@ export async function appendOneSessionRuntimeEventPerSession(input: {
     return result;
   }
 
-  const skippedSessionIds = new Set(result.skippedSessionIds);
   await Promise.all(
-    input.records.flatMap((record) => {
-      if (skippedSessionIds.has(record.sessionId)) {
-        return [];
-      }
-
-      const deliveryEvents = projectRuntimeEventsToSessionDeliveryEvents([record.event]);
-
-      return deliveryEvents.length === 0
-        ? []
-        : [publishSessionViewerEventsSafely(input.bindings, record.sessionId, deliveryEvents)];
-    }),
+    [...new Set(input.records.map((record) => record.sessionId))].map((sessionId) =>
+      syncSessionViewerStateSafely(input.bindings, sessionId),
+    ),
   );
 
   return result;

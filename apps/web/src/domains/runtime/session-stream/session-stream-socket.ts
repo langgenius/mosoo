@@ -11,7 +11,7 @@ import type {
   MosooViewerCustomEvent,
 } from "@mosoo/ag-ui-session";
 import { createPromiseDeferred, ignorePromiseRejection } from "@mosoo/effects";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { MutableRefObject } from "react";
 
 import { isTruthy } from "../../../shared/lib/truthiness";
@@ -78,16 +78,22 @@ export function useSessionStreamSocket(
   );
   const activeSessionIdRef = useRef<string | null>(sessionId);
   const liveStateRef = useRef<SessionLiveState | null>(snapshot.liveState);
+  const reconnectTimeoutRef = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
   const renderSchedulerRef = useRef<SessionStreamRenderScheduler | null>(null);
   const socketRef = useRef<SocketController | null>(null);
 
-  activeSessionIdRef.current = sessionId;
+  useLayoutEffect(() => {
+    activeSessionIdRef.current = sessionId;
+
+    return () => {
+      activeSessionIdRef.current = null;
+    };
+  }, [sessionId]);
 
   let scopedSnapshot = snapshot;
 
   if (snapshot.sessionId !== sessionId) {
     scopedSnapshot = createSessionStreamSnapshot(sessionId);
-    liveStateRef.current = scopedSnapshot.liveState;
     setSnapshot(scopedSnapshot);
   }
 
@@ -115,19 +121,21 @@ export function useSessionStreamSocket(
     [],
   );
 
-  const queueSocketEvents = useCallback(
-    (targetSessionId: string, events: AgUiSessionEvent[]) => {
-      if (events.length === 0) {
-        return;
-      }
+  const queueSocketEvents = useCallback((targetSessionId: string, events: AgUiSessionEvent[]) => {
+    if (events.length === 0) {
+      return;
+    }
 
-      renderSchedulerRef.current ??= new SessionStreamRenderScheduler(applyScheduledEvents);
-      renderSchedulerRef.current.enqueueMany(targetSessionId, events);
-    },
-    [applyScheduledEvents],
-  );
+    renderSchedulerRef.current ??= new SessionStreamRenderScheduler(applyScheduledEvents);
+    renderSchedulerRef.current.enqueueMany(targetSessionId, events);
+  }, []);
 
   const closeSocket = useCallback((reason: string) => {
+    if (reconnectTimeoutRef.current !== null) {
+      globalThis.clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+
     const { current } = socketRef;
 
     if (!current) {
@@ -153,7 +161,7 @@ export function useSessionStreamSocket(
   }, []);
 
   const connectToSession = useCallback(
-    async (targetSessionId: string): Promise<WebSocket> => {
+    async function connectToSession(targetSessionId: string): Promise<WebSocket> {
       if (!isTruthy(projectId)) {
         throw new Error("Project id is required to open a session stream.");
       }
@@ -232,20 +240,24 @@ export function useSessionStreamSocket(
               rescheduleStartedAt: new Date().toISOString(),
             }),
           ]);
-          globalThis.setTimeout(() => {
+          reconnectTimeoutRef.current = globalThis.setTimeout(() => {
+            reconnectTimeoutRef.current = null;
+
             if (activeSessionIdRef.current !== targetSessionId) {
               return;
             }
 
-            void connectToSession(targetSessionId).then((nextSocket) => {
-              nextSocket.send(
-                JSON.stringify(
-                  createViewerCustomEvent("mosoo.session.sync.request", {
-                    reason: "reconnect",
-                  }),
-                ),
-              );
-            });
+            void connectToSession(targetSessionId)
+              .then((nextSocket) => {
+                nextSocket.send(
+                  JSON.stringify(
+                    createViewerCustomEvent("mosoo.session.sync.request", {
+                      reason: "reconnect",
+                    }),
+                  ),
+                );
+              })
+              .catch(ignorePromiseRejection);
           }, 350);
         }
       });
@@ -313,6 +325,7 @@ export function useSessionStreamSocket(
     void connectToSession(sessionId).catch(ignorePromiseRejection);
 
     return () => {
+      renderSchedulerRef.current?.clear();
       closeSocket("session.effect.cleanup");
     };
   }, [closeSocket, connectToSession, projectId, sessionId]);

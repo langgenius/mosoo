@@ -71,9 +71,11 @@ async function resolveLeaseScopedRuntimeOperationScope(
       runtimeSubjectId: sandboxesTable.id,
       sandboxId: sandboxSessionsTable.sandboxId,
       sessionId: sessionsTable.id,
+      sessionRuntimeEventSeqCursor: sessionsTable.runtimeEventSeqCursor,
       sessionStatusOperationId: sessionsTable.statusOperationId,
       sessionStatusSeq: sessionsTable.statusSeq,
       sessionStatus: sql<RuntimeSessionTarget["sessionStatus"]>`${sessionsTable.status}`,
+      sessionUpdatedAt: sessionsTable.updatedAt,
     })
     .from(sessionsTable)
     .innerJoin(sandboxSessionsTable, eq(sandboxSessionsTable.sessionId, sessionsTable.id))
@@ -97,9 +99,11 @@ async function resolveLeaseScopedRuntimeOperationScope(
       lastRunId: row.lastRunId,
       sandboxId: row.sandboxId,
       sessionId: row.sessionId,
+      sessionRuntimeEventSeqCursor: row.sessionRuntimeEventSeqCursor,
       sessionStatusOperationId: row.sessionStatusOperationId,
       sessionStatusSeq: row.sessionStatusSeq,
       sessionStatus: row.sessionStatus,
+      sessionUpdatedAt: row.sessionUpdatedAt,
     })),
   };
 }

@@ -24,6 +24,19 @@ import {
 import { createRuntimeTimingRecorder } from "../../application/session-runs/session-runtime-timing";
 import { dispatchDriverTurn, ensureDriverSessionReady } from "../driver-session.service";
 import {
+  cleanupRuntimeProvisioningResources,
+  retireRuntimeProvisioningIncarnation,
+} from "../runtime-subject-lifecycle/runtime-provisioning-cleanup.service";
+import {
+  claimRuntimeRunProvisioningLease,
+  heartbeatRuntimeRunProvisioningLease,
+  recordRuntimeProvisioningSandboxIncarnation,
+  releaseAbortedRuntimeProvisioningLease,
+  releaseReadyRuntimeRunProvisioningLease,
+  renewRuntimeProvisioningLeaseOwnership,
+} from "../runtime-subject-lifecycle/runtime-provisioning-lease-store";
+import type { RuntimeRunProvisioningLease } from "../runtime-subject-lifecycle/runtime-provisioning-lease-store";
+import {
   createRuntimeSubjectLifecycleService,
   getRuntimeSubjectKeepAliveHandle,
 } from "../runtime-subject-lifecycle/runtime-subject-lifecycle.service";
@@ -33,7 +46,10 @@ import {
   resetRuntimeSubjectAgentState,
   stopRuntimeSubjectDrivers,
 } from "../runtime-subject-lifecycle/runtime-subject-operations.service";
-import { getRuntimeConversationSession } from "../runtime-subject-lifecycle/runtime-subject-store";
+import {
+  ensureRuntimeSubjectId,
+  getRuntimeConversationSession,
+} from "../runtime-subject-lifecycle/runtime-subject-store";
 import type { ExecutionSessionHandle, SandboxHandle } from "../sandbox-handles";
 import { ensureSandboxConversationSession } from "../sandbox-session.service";
 import { ensureSessionResourcesMounted } from "../session-resources/session-resource-mount.service";
@@ -51,6 +67,8 @@ function releaseRunResources(handles: {
 type TerminalSessionHandle = ExecutionSessionHandle & {
   terminal(request: Request, options?: PtyOptions): Promise<Response>;
 };
+
+const RUNTIME_PROVISIONING_HEARTBEAT_MS = 60_000;
 
 function isSessionAlreadyExistsError(error: unknown): boolean {
   if (!(error instanceof Error)) {
@@ -103,7 +121,9 @@ export async function connectPreparedSandboxTerminal(
 ): Promise<Response> {
   if (input.terminalSessionId) {
     const terminalSession = await ensureTerminalSession(subject, input.terminalSessionId);
-    return terminalSession.terminal(input.request, input.options);
+    return withDisposedRpcResource(terminalSession, (session) =>
+      session.terminal(input.request, input.options),
+    );
   }
 
   return subject.terminal(input.request, input.options);
@@ -123,6 +143,9 @@ class SandboxExecutionPlaneAdapter implements RuntimeExecutionPlaneAdapter {
     });
     const sandboxProvisioningTimer = createStopwatch();
     let sandboxProvisioned = false;
+    let provisioningLease: RuntimeRunProvisioningLease | null = null;
+    let provisioningLeaseReleased = false;
+    let provisioningHeartbeat: ReturnType<typeof setInterval> | null = null;
     const handles: {
       executionSession: ExecutionSessionHandle | null;
       subject: SandboxHandle | null;
@@ -144,6 +167,43 @@ class SandboxExecutionPlaneAdapter implements RuntimeExecutionPlaneAdapter {
         traceId: input.traceId,
       });
       const runtimeSubjectLifecycle = createRuntimeSubjectLifecycleService(bindings);
+      const ensuredSandboxId = await ensureRuntimeSubjectId(bindings.DB, {
+        agentId: input.profile.agentId,
+        projectId: input.profile.vendorCredential.projectId,
+        executionOwnerUserId: input.profile.session.origin.executionOwnerUserId,
+        kind: input.profile.kind,
+        runtimeSubjectId: sandboxId,
+        subjectId: input.profile.sandbox.subjectId,
+        subjectKind: input.profile.sandbox.subjectKind,
+      });
+      if (ensuredSandboxId !== sandboxId) {
+        throw new Error("Session Run provisioning resolved a different runtime subject.");
+      }
+      provisioningLease = await claimRuntimeRunProvisioningLease(bindings.DB, {
+        runId: input.sessionRunId,
+        sandboxId,
+        sessionId: input.sessionId,
+      });
+      if (provisioningLease === null) {
+        throw new Error("Session Run provisioning could not acquire lifecycle ownership.");
+      }
+      const activationProvisioningLease = provisioningLease;
+      provisioningHeartbeat = setInterval(() => {
+        if (provisioningLease === null || provisioningLeaseReleased) {
+          return;
+        }
+        void heartbeatRuntimeRunProvisioningLease(bindings.DB, provisioningLease).catch(
+          () => undefined,
+        );
+      }, RUNTIME_PROVISIONING_HEARTBEAT_MS);
+      const heartbeatProvisioning = async (): Promise<void> => {
+        if (
+          provisioningLease === null ||
+          !(await heartbeatRuntimeRunProvisioningLease(bindings.DB, provisioningLease))
+        ) {
+          throw new Error("Session Run provisioning lost lifecycle ownership.");
+        }
+      };
       pendingDiagnostics = appendRuntimeDiagnosticEvent(bindings, {
         eventName: RUNTIME_DIAGNOSTIC_EVENT.sandboxProvisioningStarted.name,
         sessionId: input.sessionId,
@@ -152,31 +212,46 @@ class SandboxExecutionPlaneAdapter implements RuntimeExecutionPlaneAdapter {
           sandboxId,
         },
       });
-      const { subject: sandbox } = await timing.measure("activateRuntimeSubject", () =>
-        runtimeSubjectLifecycle.activate({
-          agentId: input.profile.agentId,
-          diagnosticContext: {
-            agentId: input.profile.configRevision.agentId,
-            sessionId: input.sessionId,
-            traceId: input.traceId,
-          },
-          executionOwnerUserId: input.profile.session.origin.executionOwnerUserId,
-          kind: input.profile.kind,
-          networkConstraints: resolveRuntimeSubjectNetworkConstraints(bindings, {
-            envVars: input.profile.envVars,
+      const { incarnation: sandboxIncarnation, subject: sandbox } = await timing.measure(
+        "activateRuntimeSubject",
+        () =>
+          runtimeSubjectLifecycle.activate({
+            agentId: input.profile.agentId,
+            diagnosticContext: {
+              agentId: input.profile.configRevision.agentId,
+              sessionId: input.sessionId,
+              traceId: input.traceId,
+            },
+            executionOwnerUserId: input.profile.session.origin.executionOwnerUserId,
             kind: input.profile.kind,
-            network: input.profile.network,
-            requestUrl,
+            networkConstraints: resolveRuntimeSubjectNetworkConstraints(bindings, {
+              envVars: input.profile.envVars,
+              kind: input.profile.kind,
+              network: input.profile.network,
+              requestUrl,
+              subjectKind: input.profile.sandbox.subjectKind,
+            }),
+            runtimeSubjectId: sandboxId,
+            projectId: input.profile.vendorCredential.projectId,
+            subjectId: input.profile.sandbox.subjectId,
             subjectKind: input.profile.sandbox.subjectKind,
+            timing,
+            provisioningAuthority: {
+              operationId: activationProvisioningLease.operationId,
+              runId: activationProvisioningLease.runId,
+              sessionId: activationProvisioningLease.sessionId,
+            },
           }),
-          runtimeSubjectId: sandboxId,
-          projectId: input.profile.vendorCredential.projectId,
-          subjectId: input.profile.sandbox.subjectId,
-          subjectKind: input.profile.sandbox.subjectKind,
-          timing,
-        }),
       );
       handles.subject = sandbox;
+      provisioningLease = await recordRuntimeProvisioningSandboxIncarnation(bindings.DB, {
+        lease: provisioningLease,
+        sandboxIncarnation,
+      });
+      if (provisioningLease === null) {
+        throw new Error("Session Run provisioning lost ownership before sandbox handoff.");
+      }
+      await heartbeatProvisioning();
       const provisioningCompletedValue = {
         ...runtimeBase,
         coldStartMs: sandboxProvisioningTimer.elapsedMs(),
@@ -198,13 +273,22 @@ class SandboxExecutionPlaneAdapter implements RuntimeExecutionPlaneAdapter {
           kind: input.profile.kind,
           mountSessionResources: input.attachmentIds.length > 0,
           origin: input.profile.session.origin,
+          ...(provisioningLease === null ? {} : { provisioningLease }),
+          replaceClosedExecutionSession: true,
           sandbox,
           sandboxId,
+          sandboxIncarnation,
           sessionId: input.sessionId,
           timing,
         }),
       );
       handles.executionSession = executionSession.cloudflareSession;
+      provisioningLease = executionSession.provisioningLease ?? provisioningLease;
+      await heartbeatProvisioning();
+      const driverProvisioningLease = provisioningLease;
+      if (driverProvisioningLease === null) {
+        throw new Error("Session Run provisioning lost ownership before Driver handoff.");
+      }
 
       const driverProfile = {
         ...input.profile,
@@ -227,7 +311,9 @@ class SandboxExecutionPlaneAdapter implements RuntimeExecutionPlaneAdapter {
           resolvedMcpServers: input.resolvedMcpServers,
           resolvedSkillCatalog: input.resolvedSkillCatalog,
           resolvedSkills: input.resolvedSkills,
+          runtimeProvisioningLease: driverProvisioningLease,
           sandbox,
+          sandboxIncarnation,
           sandboxSessionId: input.sessionId,
           sessionId: input.sessionId,
           sessionRunId: input.sessionRunId,
@@ -238,10 +324,19 @@ class SandboxExecutionPlaneAdapter implements RuntimeExecutionPlaneAdapter {
         timing.addPhase(phase.name, phase.durationMs);
       }
       const initialDriverPhaseCount = driver.timing.phases.length;
+      provisioningLeaseReleased = await releaseReadyRuntimeRunProvisioningLease(bindings.DB, {
+        driverGeneration: driver.driverGeneration,
+        driverInstanceId: driver.driverInstanceId,
+        lease: provisioningLease,
+      });
+      if (!provisioningLeaseReleased) {
+        throw new Error("Session Run provisioning could not complete its durable handoff.");
+      }
 
       await pendingDiagnostics;
 
       return {
+        driverGeneration: driver.driverGeneration,
         driverInstanceId: driver.driverInstanceId,
         readiness: async () => {
           const driverTiming = await driver.readiness();
@@ -271,7 +366,29 @@ class SandboxExecutionPlaneAdapter implements RuntimeExecutionPlaneAdapter {
         });
       }
       releaseRunResources(handles);
+      if (provisioningLease !== null && !provisioningLeaseReleased) {
+        const stillOwnsLease = await renewRuntimeProvisioningLeaseOwnership(
+          bindings.DB,
+          provisioningLease,
+        );
+        if (stillOwnsLease) {
+          try {
+            if (provisioningLease.sandboxIncarnation === null) {
+              await cleanupRuntimeProvisioningResources(bindings, provisioningLease, "api");
+              await releaseAbortedRuntimeProvisioningLease(bindings.DB, provisioningLease);
+            } else {
+              await retireRuntimeProvisioningIncarnation(bindings, provisioningLease, "api");
+            }
+          } catch {
+            // Keep the durable lease so maintenance retries before cleanup can proceed.
+          }
+        }
+      }
       throw error;
+    } finally {
+      if (provisioningHeartbeat !== null) {
+        clearInterval(provisioningHeartbeat);
+      }
     }
   }
 
@@ -290,7 +407,11 @@ class SandboxExecutionPlaneAdapter implements RuntimeExecutionPlaneAdapter {
     }
 
     await withDisposedRpcResource(
-      await getRuntimeSubjectKeepAliveHandle(bindings, sandboxSession.sandboxId),
+      await getRuntimeSubjectKeepAliveHandle(
+        bindings,
+        sandboxSession.sandboxId,
+        sandboxSession.sandboxIncarnation,
+      ),
       async (sandbox) => {
         await ensureSessionResourcesMounted({
           bindings,

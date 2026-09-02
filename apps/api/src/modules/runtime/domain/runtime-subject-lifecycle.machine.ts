@@ -1,5 +1,4 @@
 import type { SandboxStatus } from "@mosoo/contracts/sandbox";
-import { createMachine, transition } from "xstate";
 
 export const RUNTIME_SUBJECT_CLAIMABLE_STATUSES = [
   "active",
@@ -11,7 +10,14 @@ export const RUNTIME_SUBJECT_OPERATION_STATUSES = [
   "destroying",
 ] as const satisfies readonly SandboxStatus[];
 
+export const RUNTIME_SUBJECT_RECOVERABLE_OPERATION_STATUSES = [
+  "restoring",
+  ...RUNTIME_SUBJECT_OPERATION_STATUSES,
+] as const satisfies readonly SandboxStatus[];
+
 export type RuntimeSubjectOperationStatus = (typeof RUNTIME_SUBJECT_OPERATION_STATUSES)[number];
+export type RuntimeSubjectRecoverableOperationStatus =
+  (typeof RUNTIME_SUBJECT_RECOVERABLE_OPERATION_STATUSES)[number];
 
 // There is no dedicated failure state. A failed lifecycle step makes the
 // container untrustworthy, so activation first enters `destroying`. Successful
@@ -24,14 +30,6 @@ export type RuntimeSubjectLifecycleEvent =
   | { type: "runtime_subject.cold" }
   | { type: "runtime_subject.destroy" };
 
-const RUNTIME_SUBJECT_STATUS_BY_EVENT = {
-  "runtime_subject.activate": "restoring",
-  "runtime_subject.active": "active",
-  "runtime_subject.back_up": "backing_up",
-  "runtime_subject.cold": "cold",
-  "runtime_subject.destroy": "destroying",
-} as const satisfies Record<RuntimeSubjectLifecycleEvent["type"], SandboxStatus>;
-
 const RUNTIME_SUBJECT_EVENT_BY_STATUS = {
   active: { type: "runtime_subject.active" },
   backing_up: { type: "runtime_subject.back_up" },
@@ -40,49 +38,13 @@ const RUNTIME_SUBJECT_EVENT_BY_STATUS = {
   restoring: { type: "runtime_subject.activate" },
 } as const satisfies Record<SandboxStatus, RuntimeSubjectLifecycleEvent>;
 
-const runtimeSubjectLifecycleMachine = createMachine({
-  id: "runtimeSubjectLifecycle",
-  initial: "cold",
-  states: {
-    active: {
-      on: {
-        "runtime_subject.active": "active",
-        "runtime_subject.back_up": "backing_up",
-        "runtime_subject.cold": "cold",
-        "runtime_subject.destroy": "destroying",
-      },
-    },
-    backing_up: {
-      on: {
-        "runtime_subject.active": "active",
-        "runtime_subject.cold": "cold",
-        "runtime_subject.destroy": "destroying",
-      },
-    },
-    cold: {
-      on: {
-        "runtime_subject.activate": "restoring",
-        "runtime_subject.back_up": "backing_up",
-        "runtime_subject.destroy": "destroying",
-      },
-    },
-    destroying: {
-      on: {
-        "runtime_subject.cold": "cold",
-      },
-    },
-    restoring: {
-      on: {
-        "runtime_subject.active": "active",
-        "runtime_subject.cold": "cold",
-        "runtime_subject.destroy": "destroying",
-      },
-    },
-  },
-  types: {} as {
-    events: RuntimeSubjectLifecycleEvent;
-  },
-});
+const RUNTIME_SUBJECT_TRANSITIONS: Record<SandboxStatus, readonly SandboxStatus[]> = {
+  active: ["backing_up", "cold", "destroying"],
+  backing_up: ["active", "cold", "destroying"],
+  cold: ["restoring", "backing_up", "destroying"],
+  destroying: ["cold"],
+  restoring: ["active", "cold", "destroying"],
+};
 
 export type RuntimeSubjectTransitionDecision =
   | {
@@ -126,11 +88,7 @@ export function decideRuntimeSubjectTransition(input: {
     };
   }
 
-  const snapshot = runtimeSubjectLifecycleMachine.resolveState({ value: input.currentStatus });
-  const [nextSnapshot] = transition(runtimeSubjectLifecycleMachine, snapshot, event);
-  const nextStatus = readRuntimeSubjectSnapshotValue(nextSnapshot.value);
-
-  if (nextStatus === input.currentStatus) {
+  if (!RUNTIME_SUBJECT_TRANSITIONS[input.currentStatus].includes(input.targetStatus)) {
     return {
       currentStatus: input.currentStatus,
       event,
@@ -143,17 +101,7 @@ export function decideRuntimeSubjectTransition(input: {
   return {
     event,
     kind: "accepted",
-    nextStatus,
+    nextStatus: input.targetStatus,
     previousStatus: input.currentStatus,
   };
-}
-
-function readRuntimeSubjectSnapshotValue(value: unknown): SandboxStatus {
-  if (typeof value !== "string" || !(value in RUNTIME_SUBJECT_EVENT_BY_STATUS)) {
-    throw new Error("Runtime subject lifecycle machine returned an unknown state.");
-  }
-
-  return RUNTIME_SUBJECT_STATUS_BY_EVENT[
-    toRuntimeSubjectLifecycleEvent(value as SandboxStatus).type
-  ];
 }

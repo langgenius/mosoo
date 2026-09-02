@@ -57,6 +57,15 @@ export class RuntimeSubjectRestoreFailedError extends Error {
   }
 }
 
+export class RuntimeSubjectPhysicalStateLostError extends Error {
+  constructor(runtimeSubjectId: string) {
+    super(
+      `Runtime subject ${runtimeSubjectId} physical incarnation was lost before its checkpoint completed.`,
+    );
+    this.name = "RuntimeSubjectPhysicalStateLostError";
+  }
+}
+
 export class RuntimeBucketMountConflictError extends Error {
   readonly bucket: string | null;
   readonly mountPath: string;

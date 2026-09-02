@@ -11,6 +11,7 @@ import type {
 type ApiCommandPayload =
   | CostLedgerReconciliationCommandPayload
   | EnvironmentPackageArtifactBuildCommandPayload
+  | SandboxBackupReconciliationCommandPayload
   | ScheduledMaintenanceCommandPayload
   | SessionRunDispatchCommandPayload;
 
@@ -26,6 +27,11 @@ export interface CostLedgerReconciliationCommandPayload {
   scheduledTime: number;
 }
 
+export interface SandboxBackupReconciliationCommandPayload {
+  cursor: string | null;
+  databasePage: number;
+  scheduledTime: number;
+}
 export interface EnvironmentPackageArtifactBuildCommandPayload {
   projectId: ProjectId;
   artifactAbi: string;
@@ -216,6 +222,25 @@ function parseCostLedgerReconciliationPayload(
   };
 }
 
+function parseSandboxBackupReconciliationPayload(
+  value: unknown,
+): SandboxBackupReconciliationCommandPayload {
+  const label = "sandbox_backup_reconciliation payload";
+  const record = requireRecord(value, label);
+  const cursor = readOptionalString(record, "cursor", label);
+  if (cursor !== null && cursor.length === 0) {
+    throw new ApiCommandPayloadError(`${label}.cursor must not be empty.`);
+  }
+  const databasePage = readInteger(record, "databasePage", label);
+  if (databasePage < 0) {
+    throw new ApiCommandPayloadError(`${label}.databasePage must not be negative.`);
+  }
+  const scheduledTime = readInteger(record, "scheduledTime", label);
+  if (scheduledTime < 0 || !Number.isFinite(new Date(scheduledTime).getTime())) {
+    throw new ApiCommandPayloadError(`${label}.scheduledTime must be a valid timestamp.`);
+  }
+  return { cursor, databasePage, scheduledTime };
+}
 function parseEnvironmentPackageArtifactBuildPayload(
   value: unknown,
 ): EnvironmentPackageArtifactBuildCommandPayload {
@@ -271,6 +296,9 @@ export function parseApiCommandPayload(
     }
     case "environment_package_artifact_build": {
       return parseEnvironmentPackageArtifactBuildPayload(parsed);
+    }
+    case "sandbox_backup_reconciliation": {
+      return parseSandboxBackupReconciliationPayload(parsed);
     }
     case "scheduled_maintenance": {
       return parseScheduledMaintenancePayload(parsed);

@@ -1,3 +1,5 @@
+import type { AgentTaskSnapshot } from "@mosoo/contracts/session";
+
 import type {
   SessionCommandOption,
   SessionConfigOption,
@@ -12,8 +14,23 @@ import type {
 } from "./live-state";
 
 export interface MosooSessionRunUpdatedValue {
+  driverInstanceId: string | null;
   lifecycle: SessionLifecycleStatus;
   run: SessionRunView;
+}
+
+export type MosooSessionTasksReplacedValue = AgentTaskSnapshot;
+
+export interface MosooSessionToolUpdatedValue {
+  inputDelta: string | null;
+  inputSnapshot: string | null;
+  outputDelta: string | null;
+  outputSnapshot: string | null;
+  parentMessageId: string | null;
+  resultMessageId: string;
+  runId: string | null;
+  toolCallId: string;
+  toolName: string;
 }
 
 export interface MosooSessionSyncRequestValue {
@@ -41,6 +58,9 @@ export interface MosooSessionFilesUpdatedValue {
 
 export interface MosooSessionPermissionsUpdatedValue {
   permissionRequests: SessionPermissionRequestView[];
+  permissionRequest?: SessionPermissionRequestView;
+  resolvedRequestId?: string;
+  runId?: string;
 }
 
 export interface MosooSessionReadinessValue {

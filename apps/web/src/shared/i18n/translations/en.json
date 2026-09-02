@@ -1114,6 +1114,8 @@
     "instructionTokenRead": "Use an Access Token from Settings."
   },
   "sessionEvents": {
+    "activeBackgroundTaskCount": "{{count}} active",
+    "activeBackgroundTasks": "Active background tasks",
     "events": "events",
     "tokens": "tokens",
     "errorsOnly": "Errors only",

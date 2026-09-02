@@ -4,9 +4,10 @@ import { persistSessionRunSkills } from "../src/modules/runtime/application/sess
 import {
   createPublicHttpContractDatabase,
   insertNonOwnerSession,
+  PUBLIC_API_TEST_IDS,
 } from "./helpers/public-api-http-test-fixture";
 
-const RUN_ID = "run-skill-persistence";
+const RUN_ID = PUBLIC_API_TEST_IDS.run;
 
 async function insertQueuedSessionRun(database: D1Database): Promise<void> {
   await database

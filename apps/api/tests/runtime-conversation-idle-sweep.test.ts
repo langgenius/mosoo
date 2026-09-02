@@ -15,10 +15,12 @@ function createDatabase(): SqliteD1Database {
   database.execute(`
     CREATE TABLE sandbox_session (
       cloudflare_session_id text NOT NULL,
+      cleanup_operation_id text,
       created_at integer NOT NULL,
       cwd text NOT NULL,
       origin_json text NOT NULL,
       sandbox_id text NOT NULL,
+      sandbox_incarnation integer DEFAULT 0 NOT NULL,
       session_id text PRIMARY KEY NOT NULL,
       status text NOT NULL,
       updated_at integer NOT NULL
@@ -37,6 +39,7 @@ function createDatabase(): SqliteD1Database {
     CREATE TABLE session_run (
       id text PRIMARY KEY NOT NULL,
       driver_instance_id text,
+      session_id text NOT NULL,
       status text NOT NULL
     );
 
@@ -44,6 +47,7 @@ function createDatabase(): SqliteD1Database {
       id text PRIMARY KEY NOT NULL,
       kind text NOT NULL,
       last_run_id text,
+      runtime_provisioning_operation_id text,
       workspace_checkpoint_required integer DEFAULT 0 NOT NULL
     );
 
@@ -51,8 +55,10 @@ function createDatabase(): SqliteD1Database {
       dir text NOT NULL,
       id text PRIMARY KEY NOT NULL,
       sandbox_id text NOT NULL,
+      sandbox_incarnation integer NOT NULL,
       session_run_id text,
-      status text NOT NULL
+      status text NOT NULL,
+      workspace_session_id text
     );
   `);
 
@@ -86,8 +92,9 @@ async function insertConversation(
   await database
     .prepare(
       `INSERT INTO sandbox_session (
-        cloudflare_session_id, created_at, cwd, origin_json, sandbox_id, session_id, status, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        cloudflare_session_id, created_at, cwd, origin_json, sandbox_id, sandbox_incarnation,
+        session_id, status, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       `cf-${input.sessionId}`,
@@ -95,6 +102,7 @@ async function insertConversation(
       "cwd",
       "{}",
       input.sandboxId,
+      1,
       input.sessionId,
       input.status,
       input.updatedAt,
@@ -104,15 +112,17 @@ async function insertConversation(
 
 async function insertActiveRunLease(
   database: D1Database,
-  input: { readonly runId: string; readonly sandboxId: string },
+  input: { readonly runId: string; readonly sandboxId: string; readonly sessionId: string },
 ): Promise<void> {
   await database
     .prepare("INSERT INTO driver_instance (id, sandbox_id) VALUES (?, ?)")
     .bind(`driver-${input.runId}`, input.sandboxId)
     .run();
   await database
-    .prepare("INSERT INTO session_run (id, driver_instance_id, status) VALUES (?, ?, ?)")
-    .bind(input.runId, `driver-${input.runId}`, "running")
+    .prepare(
+      "INSERT INTO session_run (id, driver_instance_id, session_id, status) VALUES (?, ?, ?, ?)",
+    )
+    .bind(input.runId, `driver-${input.runId}`, input.sessionId, "running")
     .run();
 }
 
@@ -127,8 +137,10 @@ describe("idle session-scoped conversation sweep", () => {
       updatedAt: NOW - GRACE_MS - 1,
     });
     await database
-      .prepare("INSERT INTO session_run (id, driver_instance_id, status) VALUES (?, NULL, ?)")
-      .bind("run-checkpoint", "completed")
+      .prepare(
+        "INSERT INTO session_run (id, driver_instance_id, session_id, status) VALUES (?, NULL, ?, ?)",
+      )
+      .bind("run-checkpoint", "session-checkpoint", "completed")
       .run();
     await database
       .prepare("UPDATE session SET last_run_id = ?, workspace_checkpoint_required = 1 WHERE id = ?")
@@ -146,16 +158,27 @@ describe("idle session-scoped conversation sweep", () => {
         idleSinceLte: NOW - GRACE_MS,
         now: NOW,
         runtimeSubjectId: "sb-checkpoint" as never,
+        sandboxIncarnation: 1,
         sandboxSessionId: "cf-session-checkpoint" as never,
         sessionId: "session-checkpoint" as never,
       }),
-    ).resolves.toBe(false);
+    ).resolves.toBeNull();
 
     await database
       .prepare(
-        "INSERT INTO sandbox_backup (dir, id, sandbox_id, session_run_id, status) VALUES (?, ?, ?, ?, ?)",
+        `INSERT INTO sandbox_backup (
+          dir, id, sandbox_id, sandbox_incarnation, session_run_id, status, workspace_session_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
       )
-      .bind("cwd", "backup-checkpoint", "sb-checkpoint", "run-checkpoint", "ready")
+      .bind(
+        "cwd",
+        "backup-checkpoint",
+        "sb-checkpoint",
+        1,
+        "run-checkpoint",
+        "ready",
+        "session-checkpoint",
+      )
       .run();
 
     await expect(
@@ -176,8 +199,10 @@ describe("idle session-scoped conversation sweep", () => {
       updatedAt: NOW - GRACE_MS - 1,
     });
     await database
-      .prepare("INSERT INTO session_run (id, driver_instance_id, status) VALUES (?, NULL, ?)")
-      .bind("run-legacy", "completed")
+      .prepare(
+        "INSERT INTO session_run (id, driver_instance_id, session_id, status) VALUES (?, NULL, ?, ?)",
+      )
+      .bind("run-legacy", "session-legacy", "completed")
       .run();
     await database
       .prepare("UPDATE session SET last_run_id = ? WHERE id = ?")
@@ -195,10 +220,11 @@ describe("idle session-scoped conversation sweep", () => {
         idleSinceLte: NOW - GRACE_MS,
         now: NOW,
         runtimeSubjectId: "sb-legacy" as never,
+        sandboxIncarnation: 1,
         sandboxSessionId: "cf-session-legacy" as never,
         sessionId: "session-legacy" as never,
       }),
-    ).resolves.toBe(true);
+    ).resolves.not.toBeNull();
   });
 
   test("lists only idle active cattle conversations without a run lease", async () => {
@@ -238,7 +264,11 @@ describe("idle session-scoped conversation sweep", () => {
       status: "active",
       updatedAt: NOW - GRACE_MS - 1,
     });
-    await insertActiveRunLease(database, { runId: "run-busy", sandboxId: "sb-busy" });
+    await insertActiveRunLease(database, {
+      runId: "run-busy",
+      sandboxId: "sb-busy",
+      sessionId: "session-busy",
+    });
 
     const idle = await listIdleSessionScopedConversationSessions(database, {
       idleSinceLte: NOW - GRACE_MS,
@@ -248,7 +278,7 @@ describe("idle session-scoped conversation sweep", () => {
     expect(idle).toEqual([{ sandboxId: "sb-idle", sessionId: "session-idle" }]);
   });
 
-  test("atomic claim closes an idle conversation but loses to any re-activation", async () => {
+  test("atomic claim schedules an idle conversation cleanup but loses to any re-activation", async () => {
     const database = createDatabase();
     const idleSinceLte = NOW - GRACE_MS;
     const claim = (sandboxId: string, sessionId: string, sandboxSessionId: string) =>
@@ -256,6 +286,7 @@ describe("idle session-scoped conversation sweep", () => {
         idleSinceLte,
         now: NOW,
         runtimeSubjectId: sandboxId as never,
+        sandboxIncarnation: 1,
         sandboxSessionId: sandboxSessionId as never,
         sessionId: sessionId as never,
       });
@@ -267,7 +298,7 @@ describe("idle session-scoped conversation sweep", () => {
           .first<{ status: string }>()
       )?.status;
 
-    // (1) still-idle, same session instance, no lease → claim wins, row closed.
+    // (1) still-idle, same session instance, no lease → claim wins.
     await insertConversation(database, {
       kind: "cattle",
       sandboxId: "sb-a",
@@ -275,8 +306,8 @@ describe("idle session-scoped conversation sweep", () => {
       status: "active",
       updatedAt: NOW - GRACE_MS - 1,
     });
-    expect(await claim("sb-a", "sess-a", "cf-sess-a")).toBe(true);
-    expect(await statusOf("sess-a")).toBe("closed");
+    expect(await claim("sb-a", "sess-a", "cf-sess-a")).not.toBeNull();
+    expect(await statusOf("sess-a")).toBe("cleanup_pending");
 
     // (2) a follow-up refreshed updated_at past the grace → claim loses, untouched.
     await insertConversation(database, {
@@ -286,7 +317,7 @@ describe("idle session-scoped conversation sweep", () => {
       status: "active",
       updatedAt: NOW, // refreshed by ensureSandboxConversationSession
     });
-    expect(await claim("sb-b", "sess-b", "cf-sess-b")).toBe(false);
+    expect(await claim("sb-b", "sess-b", "cf-sess-b")).toBeNull();
     expect(await statusOf("sess-b")).toBe("active");
 
     // (3) the session was rebuilt (new cloudflare_session_id) → claim loses.
@@ -297,7 +328,7 @@ describe("idle session-scoped conversation sweep", () => {
       status: "active",
       updatedAt: NOW - GRACE_MS - 1,
     });
-    expect(await claim("sb-c", "sess-c", "cf-STALE")).toBe(false);
+    expect(await claim("sb-c", "sess-c", "cf-STALE")).toBeNull();
     expect(await statusOf("sess-c")).toBe("active");
 
     // (4) an active run lease appeared → claim loses.
@@ -308,8 +339,12 @@ describe("idle session-scoped conversation sweep", () => {
       status: "active",
       updatedAt: NOW - GRACE_MS - 1,
     });
-    await insertActiveRunLease(database, { runId: "run-d", sandboxId: "sb-d" });
-    expect(await claim("sb-d", "sess-d", "cf-sess-d")).toBe(false);
+    await insertActiveRunLease(database, {
+      runId: "run-d",
+      sandboxId: "sb-d",
+      sessionId: "sess-d",
+    });
+    expect(await claim("sb-d", "sess-d", "cf-sess-d")).toBeNull();
     expect(await statusOf("sess-d")).toBe("active");
   });
 });

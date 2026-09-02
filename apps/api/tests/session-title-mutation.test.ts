@@ -4,6 +4,7 @@ import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer
 import type { SessionSummaryRow } from "../src/modules/sessions/application/session-summary-query.service";
 import { hydrateSessionSummariesFromRows } from "../src/modules/sessions/application/session-summary-query.service";
 import {
+  applyDurableSessionAutoTitle,
   autoTitleSession,
   renameSession,
 } from "../src/modules/sessions/application/session-title.service";
@@ -29,6 +30,7 @@ function createSessionTitleMutationDatabase(): SqliteD1Database {
       id text PRIMARY KEY NOT NULL,
       agent_id text NOT NULL,
       archived_at integer,
+      auto_title_event_seq integer,
       attributed_user_id text,
       created_at integer NOT NULL,
       creator_account_id text NOT NULL,
@@ -189,6 +191,62 @@ describe("session title mutations", () => {
     });
 
     expect(session.title).toBe("Auto title");
+  });
+
+  test("applies durable auto-titles by monotonic event seq", async () => {
+    const database = createSessionTitleMutationDatabase();
+    const input = {
+      creatorAccountId: VIEWER.id,
+      eventSeq: 5,
+      sessionId: SESSION_ID,
+      title: "Title five",
+    };
+
+    await applyDurableSessionAutoTitle(database, input);
+    await applyDurableSessionAutoTitle(database, {
+      ...input,
+      eventSeq: 4,
+      title: "Stale title",
+    });
+    await applyDurableSessionAutoTitle(database, input);
+    await expect(
+      applyDurableSessionAutoTitle(database, { ...input, title: "Conflicting title" }),
+    ).rejects.toThrow("replayed with conflicting content");
+    await applyDurableSessionAutoTitle(database, {
+      ...input,
+      eventSeq: 6,
+      title: "Title six",
+    });
+
+    expect(
+      await database
+        .prepare("SELECT auto_title_event_seq, title FROM session WHERE id = ?")
+        .bind(SESSION_ID)
+        .first<{ auto_title_event_seq: number; title: string }>(),
+    ).toEqual({ auto_title_event_seq: 6, title: "Title six" });
+  });
+
+  test("does not replace a title chosen outside the durable Driver stream", async () => {
+    const database = createSessionTitleMutationDatabase();
+
+    await autoTitleSession(database, VIEWER, {
+      projectId: PROJECT_ID,
+      sessionId: SESSION_ID,
+      title: "Prompt title",
+    });
+    await applyDurableSessionAutoTitle(database, {
+      creatorAccountId: VIEWER.id,
+      eventSeq: 10,
+      sessionId: SESSION_ID,
+      title: "Driver title",
+    });
+
+    expect(
+      await database
+        .prepare("SELECT auto_title_event_seq, title FROM session WHERE id = ?")
+        .bind(SESSION_ID)
+        .first<{ auto_title_event_seq: number | null; title: string }>(),
+    ).toEqual({ auto_title_event_seq: null, title: "Prompt title" });
   });
 
   test("hydrates updated summary rows with their last runs", async () => {

@@ -1,5 +1,5 @@
 import { driverInstancesTable, sessionRunsTable } from "@mosoo/db";
-import type { DriverInstanceId, SessionRunId } from "@mosoo/id";
+import type { DriverInstanceId, SandboxId, SessionId, SessionRunId } from "@mosoo/id";
 import { and, eq, inArray } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
@@ -11,7 +11,13 @@ import type { DriverInstanceStatus } from "./driver-instance/status";
 export async function getDriverUsage(
   database: D1Database,
   driverInstanceId: DriverInstanceId,
+  scope: {
+    readonly sandboxId: SandboxId;
+    readonly sandboxIncarnation: number;
+    readonly sandboxSessionId: SessionId;
+  },
 ): Promise<{
+  generation: number;
   sessionRunId: SessionRunId | null;
   status: DriverInstanceStatus;
 } | null> {
@@ -19,10 +25,18 @@ export async function getDriverUsage(
   const row =
     (await appDb
       .select({
+        generation: driverInstancesTable.generation,
         status: driverInstancesTable.status,
       })
       .from(driverInstancesTable)
-      .where(eq(driverInstancesTable.id, driverInstanceId))
+      .where(
+        and(
+          eq(driverInstancesTable.id, driverInstanceId),
+          eq(driverInstancesTable.sandboxId, scope.sandboxId),
+          eq(driverInstancesTable.sandboxIncarnation, scope.sandboxIncarnation),
+          eq(driverInstancesTable.sandboxSessionId, scope.sandboxSessionId),
+        ),
+      )
       .limit(1)
       .get()) ?? null;
 
@@ -44,6 +58,7 @@ export async function getDriverUsage(
       .get()) ?? null;
 
   return {
+    generation: row.generation,
     sessionRunId: activeRun?.id ?? null,
     status: row.status,
   };

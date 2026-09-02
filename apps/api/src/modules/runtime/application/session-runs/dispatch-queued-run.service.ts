@@ -6,14 +6,13 @@ import { logError, logInfo, logWarn } from "../../../../platform/cloudflare/logg
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import type { AuthenticatedViewer } from "../../../auth/application/viewer-auth.service";
 import { fileStore } from "../../../files/application/file-store";
-import { appendSessionRuntimeEvents } from "../../../sessions/application/session-event-write.service";
 import { getSupportedRuntimeId } from "../../domain/runtime-config";
 import { hydrateCachedRunContextFromSession } from "../session-definition/hydrate-run-context.service";
 import { appendSessionResourceContextToPrompt } from "../session-resources/session-resource-prompt.service";
 import { dispatchSessionRun } from "./dispatch-run.service";
 import { describeRunError } from "./run-error-message";
-import { getSessionRunState, updateSessionRunStatusIfActive } from "./session-run-state.repository";
-import { createFailedSessionRunRuntimeEvent } from "./session-run-view-events.service";
+import { getSessionRunState } from "./session-run-state.repository";
+import { recordCanonicalSessionRunTerminal } from "./session-run-terminal-failure.service";
 import {
   appendSessionRuntimeTimingEventBestEffort,
   createRuntimeTimingRecorder,
@@ -35,41 +34,27 @@ async function failQueuedSessionRunBeforeDispatch(
     message,
     retryable: false,
   } as const;
-  // Only fail the run while it is still queued. Once another dispatcher CASed
-  // it to booting, this path is a losing contender and its hydration error
-  // must not tear down the run the winner is provisioning.
-  const failedRun = await updateSessionRunStatusIfActive(bindings.DB, {
+  const outcome = await recordCanonicalSessionRunTerminal(bindings, {
+    assistantMessage: null,
     error: runError,
-    expectedCurrentStatus: "queued",
+    expectedRunStatus: "queued",
     runId: input.sessionRunId,
+    sessionId: input.sessionId,
+    source: "api",
     status: "failed",
   });
 
-  if (!failedRun) {
-    const state = await getSessionRunState(bindings.DB, input.sessionRunId);
-
+  if (outcome.kind === "stale") {
     logWarn("session.run.context_hydration.failed.run-not-queued", {
       message,
       runId: input.sessionRunId,
       sessionId: input.sessionId,
-      status: state?.status ?? null,
+      status: outcome.run.status,
       traceId: input.traceId,
     });
 
     return;
   }
-
-  await appendSessionRuntimeEvents({
-    bindings,
-    events: [
-      createFailedSessionRunRuntimeEvent({
-        run: failedRun,
-        runError,
-        sessionId: input.sessionId,
-      }),
-    ],
-    sessionId: input.sessionId,
-  });
 
   logError("session.run.context_hydration.failed", {
     message,

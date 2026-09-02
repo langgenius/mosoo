@@ -9,6 +9,7 @@ import { expireUndeliveredInputStartCommandsForRun } from "../../infrastructure/
 export async function cleanupDispatchedDriver(
   bindings: ApiBindings,
   input: {
+    driverGeneration: number;
     driverInstanceId: DriverInstanceId;
     reason: string;
     runId: SessionRunId;
@@ -23,6 +24,8 @@ export async function cleanupDispatchedDriver(
     });
     await stopDriverSession(bindings, {
       driverInstanceId: input.driverInstanceId,
+      expectedDriverGeneration: input.driverGeneration,
+      expectedSessionRunId: input.runId,
       reason: input.reason,
     });
   } catch (error) {
@@ -32,6 +35,7 @@ export async function cleanupDispatchedDriver(
     try {
       await createRuntimeSubjectLifecycleService(bindings).releaseRunLease({
         driverInstanceId: input.driverInstanceId,
+        expectedDriverGeneration: input.driverGeneration,
         expectedSessionRunId: input.runId,
       });
     } catch (releaseError) {

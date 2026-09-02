@@ -1,6 +1,5 @@
 import { spawnSync } from "node:child_process";
 import {
-  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -12,19 +11,6 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-
-const driverEntries = [
-  ".containerignore",
-  ".github",
-  ".gitignore",
-  "Containerfile",
-  "README.md",
-  "package.json",
-  "src",
-  "tests",
-  "tsconfig.json",
-  "tsconfig.types.json",
-] as const;
 
 const expectedDriverRepoUrl = "https://github.com/langgenius/mosoo-agent-driver.git";
 
@@ -46,28 +32,6 @@ function run(command: string, args: readonly string[], cwd: string): string {
   }
 
   return result.stdout;
-}
-
-function copyDriverTree(sourceRoot: string, destinationRoot: string): void {
-  mkdirSync(destinationRoot, { recursive: true });
-
-  for (const entry of driverEntries) {
-    const source = join(sourceRoot, entry);
-
-    if (!existsSync(source)) {
-      fail(`driver tree is missing ${entry}.`);
-    }
-
-    cpSync(source, join(destinationRoot, entry), { recursive: true });
-  }
-}
-
-function initializeRepository(path: string): void {
-  run("git", ["init"], path);
-  run("git", ["config", "user.email", "driver-submodule-smoke@example.invalid"], path);
-  run("git", ["config", "user.name", "Driver Submodule Smoke"], path);
-  run("git", ["add", "."], path);
-  run("git", ["commit", "-m", "chore(driver): seed standalone smoke repo"], path);
 }
 
 function readPackageName(packageRoot: string): string {
@@ -121,8 +85,12 @@ try {
 
   verifyCurrentMainRepoPin(repoRoot);
   readPackageName(driverSourceRoot);
-  copyDriverTree(driverSourceRoot, driverRepo);
-  initializeRepository(driverRepo);
+  run("bun", ["install", "--frozen-lockfile"], repoRoot);
+  run("bun", ["run", "--cwd", "apps/driver", "tc"], repoRoot);
+  run("git", ["clone", "--no-hardlinks", driverSourceRoot, driverRepo], tempRoot);
+  run("git", ["switch", "-c", "chore/submodule-smoke"], driverRepo);
+  run("git", ["config", "user.email", "driver-submodule-smoke@example.invalid"], driverRepo);
+  run("git", ["config", "user.name", "Driver Submodule Smoke"], driverRepo);
 
   mkdirSync(mainRepo, { recursive: true });
   run("git", ["init"], mainRepo);
@@ -133,11 +101,8 @@ try {
     JSON.stringify(
       {
         name: "mosoo-submodule-smoke",
-        packageManager: "bun@1.3.14",
+        packageManager: "bun@1.4.0",
         private: true,
-        scripts: {
-          "driver:checkout-smoke": "bun --cwd apps/driver run tc",
-        },
         type: "module",
         workspaces: ["apps/*"],
       },
@@ -196,7 +161,7 @@ try {
   const clonedSubmodulePath = join(clonedMainRepo, "apps/driver");
 
   symlinkSync(nodeModules, join(clonedSubmodulePath, "node_modules"), "dir");
-  run("bun", ["run", "driver:checkout-smoke"], clonedMainRepo);
+  run("bun", ["run", "--cwd", clonedSubmodulePath, "tc"], clonedMainRepo);
 
   writeFileSync(join(driverRepo, ".submodule-smoke-version"), "2\n", "utf8");
   run("git", ["add", ".submodule-smoke-version"], driverRepo);

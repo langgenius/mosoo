@@ -6,6 +6,7 @@ export function appendTextDelta(
   state: SessionLiveState,
   messageId: string,
   delta: string,
+  createdAt?: string,
 ): SessionLiveState {
   const messages = [...state.messages];
   const index = messages.findIndex((message) => message.id === messageId);
@@ -14,6 +15,7 @@ export function appendTextDelta(
     messages.push(
       createLiveStateMessage({
         content: delta,
+        ...(createdAt === undefined ? {} : { createdAt }),
         id: messageId,
         role: "assistant",
         segments: [{ kind: "text", text: delta }],
@@ -32,6 +34,7 @@ export function appendTextDelta(
     messages.push(
       createLiveStateMessage({
         content: delta,
+        ...(createdAt === undefined ? {} : { createdAt }),
         id: messageId,
         role: "assistant",
         segments: [{ kind: "text", text: delta }],

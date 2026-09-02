@@ -1,5 +1,5 @@
+import { DurableRunError } from "@mosoo/contracts/session-run";
 import type {
-  RunError,
   SessionRunStatus,
   SessionRunSummary,
   SessionRunTrigger,
@@ -27,6 +27,7 @@ export interface SessionRunRow {
   error_code: string | null;
   error_details_json: string | null;
   error_message: string | null;
+  error_retryable?: boolean | null;
   id: SessionRunId;
   model: string | null;
   provider: string | null;
@@ -86,7 +87,7 @@ function parseRunErrorDetailsJson(raw: string): unknown {
   }
 }
 
-function toRunError(row: SessionRunRow): RunError | null {
+function toRunError(row: SessionRunRow): DurableRunError | null {
   if (
     row.error_code === null ||
     row.error_code === "" ||
@@ -96,10 +97,10 @@ function toRunError(row: SessionRunRow): RunError | null {
     return null;
   }
 
-  return {
+  return parseSchemaValue(DurableRunError, {
     code: row.error_code,
     details: parseJsonRecord(row.error_details_json),
     message: row.error_message,
-    retryable: false,
-  };
+    retryable: row.error_retryable ?? false,
+  });
 }

@@ -1,4 +1,3 @@
-import type { RunError, SessionRunStatus } from "@mosoo/contracts/session-run";
 import type {
   AgentId,
   DriverInstanceId,
@@ -16,6 +15,7 @@ import type { RuntimeTimingSnapshot } from "../session-runs/session-runtime-timi
 import type { DriverBootPayloadPreparedHandler } from "./driver-boot-payload-prepared";
 
 export interface RuntimeExecutionPlaneRunLease {
+  driverGeneration: number;
   driverInstanceId: DriverInstanceId;
   timing: RuntimeTimingSnapshot;
   readiness(): Promise<RuntimeTimingSnapshot>;
@@ -39,6 +39,7 @@ export interface PrepareRuntimeRunInput {
 
 export interface DispatchRuntimeTurnInput {
   attachmentIds: FileId[];
+  driverGeneration: number;
   driverInstanceId: DriverInstanceId;
   prompt: string;
   sessionRunId: SessionRunId;
@@ -47,13 +48,9 @@ export interface DispatchRuntimeTurnInput {
 export interface StopRuntimeSubjectDriversInput {
   operationId?: RuntimeOperationId;
   runtimeSubjectId: SandboxId;
-  preserveSessionLifecycle?: boolean;
+  sandboxIncarnation?: number;
   reason: string;
   targets?: readonly RuntimeSubjectOperationSessionTarget[];
-  terminalRun?: {
-    error?: RunError | null;
-    status: Extract<SessionRunStatus, "cancelled" | "failed">;
-  };
 }
 
 export interface RuntimeSubjectOperationInput {
@@ -61,10 +58,6 @@ export interface RuntimeSubjectOperationInput {
   runtimeSubjectId: SandboxId;
   reason: string;
   targets: readonly RuntimeSubjectOperationSessionTarget[];
-  terminalRun: {
-    error?: RunError | null;
-    status: Extract<SessionRunStatus, "cancelled" | "failed">;
-  };
 }
 
 export interface RuntimeSubjectOperationSessionTarget {

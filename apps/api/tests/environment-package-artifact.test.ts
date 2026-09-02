@@ -17,9 +17,15 @@ import {
   resolveReadyEnvironmentPackageArtifact,
 } from "../src/modules/environments/application/environment-package-artifact.service";
 import { resolveEnvironmentSetupScriptForExecution } from "../src/modules/environments/application/environment-runtime-snapshot";
-import { createEnvironmentPackageArtifactKey } from "../src/modules/environments/domain/environment-package-artifact";
-import { environmentPackageArtifactSandboxId } from "../src/modules/environments/domain/environment-package-artifact";
+import {
+  createEnvironmentPackageArtifactKey,
+  environmentPackageArtifactBuildSandboxId,
+} from "../src/modules/environments/domain/environment-package-artifact";
 import { exposeEnvironmentNodeModules } from "../src/modules/runtime/infrastructure/runtime-sandbox-provisioning/runtime-environment-artifact";
+import {
+  createEphemeralSandboxOptions,
+  getEphemeralUnversionedSandboxHandle,
+} from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-platform";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import {
   createApiCommandQueueStub,
@@ -57,7 +63,9 @@ describe("Environment package artifacts", () => {
       { manager: "pip", packages: ["jsonschema==4.25.1", "requests==2.32.4"] },
     ]);
     expect(key.inputDigest).toMatch(/^[0-9a-f]{64}$/u);
-    expect(environmentPackageArtifactSandboxId(key).length).toBeLessThanOrEqual(63);
+    expect(environmentPackageArtifactBuildSandboxId("01J0000000000000000000000B", 2, 3)).toBe(
+      "envpkg-01j0000000000000000000000b-2-3",
+    );
     expect(
       parseApiCommandPayload(
         "environment_package_artifact_build",
@@ -104,10 +112,26 @@ describe("Environment package artifacts", () => {
     if (!queued) {
       throw new Error("Expected queued artifact command.");
     }
-    await processApiCommandDeadLetterMessage(
-      bindings,
-      createRecordedQueueMessage({ body: queued.body }).message,
-    );
+    const deadLetter = createRecordedQueueMessage({ body: queued.body });
+    await processApiCommandDeadLetterMessage(bindings, deadLetter.message);
+
+    expect(deadLetter.recorded).toEqual([{ type: "ack" }]);
+    await expect(
+      database
+        .app()
+        .select({
+          lastErrorCode: apiCommandsTable.lastErrorCode,
+          lastErrorMessage: apiCommandsTable.lastErrorMessage,
+          status: apiCommandsTable.status,
+        })
+        .from(apiCommandsTable)
+        .where(eq(apiCommandsTable.id, command.id))
+        .get(),
+    ).resolves.toEqual({
+      lastErrorCode: "package_install_failed",
+      lastErrorMessage: "Package installation failed.",
+      status: "dead_lettered",
+    });
 
     await expect(
       resolveReadyEnvironmentPackageArtifact(bindings, PROJECT_ID, JSON.stringify(packages)),
@@ -178,5 +202,44 @@ describe("Environment package artifacts", () => {
     } finally {
       rmSync(root, { force: true, recursive: true });
     }
+  });
+
+  test("isolates attempt cleanup and lets abandoned build sandboxes expire", async () => {
+    const created: string[] = [];
+    const destroyed: string[] = [];
+    const bindings = {
+      runtimeSubjectHandleFactory: (id: string) => {
+        created.push(id);
+        return new Proxy(
+          {},
+          {
+            get: (_target, property) => {
+              if (property === "then") {
+                return undefined;
+              }
+              return property === "destroy"
+                ? async () => {
+                    destroyed.push(id);
+                  }
+                : async () => {};
+            },
+          },
+        );
+      },
+    } as ApiBindings;
+    const attemptAId = environmentPackageArtifactBuildSandboxId("01J0000000000000000000000B", 1, 1);
+    const attemptBId = environmentPackageArtifactBuildSandboxId("01J0000000000000000000000B", 1, 2);
+
+    const attemptA = await getEphemeralUnversionedSandboxHandle(bindings, attemptAId, 15 * 60);
+    await getEphemeralUnversionedSandboxHandle(bindings, attemptBId, 15 * 60);
+    await attemptA.destroy();
+
+    expect(createEphemeralSandboxOptions(15 * 60)).toEqual({
+      keepAlive: false,
+      normalizeId: true,
+      sleepAfter: 15 * 60,
+    });
+    expect(created).toEqual([attemptAId, attemptBId]);
+    expect(destroyed).toEqual([attemptAId]);
   });
 });

@@ -173,7 +173,9 @@ export function createDriverEvent(value: object): DriverEvent {
       createId: () => API_DRIVER_BOUNDARY_IDS.runtimeEvent,
       driverInstanceId: API_DRIVER_BOUNDARY_IDS.driverInstance,
       occurredAt: "1970-01-01T00:00:00.010Z",
+      runtimeId: "openai-runtime",
       sessionId: API_DRIVER_BOUNDARY_IDS.session,
+      traceId: "trace-1",
     },
     value,
   );
@@ -195,6 +197,7 @@ export function createRuntimeSessionLink(): RuntimeSessionLink {
     sandboxId: API_DRIVER_BOUNDARY_IDS.sandbox,
     sandboxKind: "cattle",
     sandboxSubjectKind: "session",
+    runtimeId: "openai-runtime",
     sessionId: API_DRIVER_BOUNDARY_IDS.session,
     sessionRunId: API_DRIVER_BOUNDARY_IDS.sessionRun,
     sessionRunStatus: "running",

@@ -12,6 +12,16 @@ export type ThreadProcessVariant =
 
 type Translate = (key: string, variables?: Record<string, string>) => string;
 
+export function selectCurrentAgentTasks<T>(input: {
+  currentRunId: string | null;
+  snapshot: { runId: string; tasks: readonly T[] } | null;
+  threadWorking: boolean;
+}): readonly T[] {
+  return input.threadWorking && input.snapshot?.runId === input.currentRunId
+    ? input.snapshot.tasks
+    : [];
+}
+
 function formatProcessValue(
   value: number | null,
   unit: "ms" | "tokens",

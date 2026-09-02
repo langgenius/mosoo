@@ -1,7 +1,12 @@
 import { describe, expect, test } from "bun:test";
 
 import { PUBLIC_THREAD_API_THREADS_MAX_LIMIT } from "@mosoo/contracts/public-api";
-import { sessionExecutionSnapshotsTable, sessionRunsTable, sessionsTable } from "@mosoo/db";
+import {
+  sessionExecutionSnapshotsTable,
+  sessionMessagesTable,
+  sessionRunsTable,
+  sessionsTable,
+} from "@mosoo/db";
 import { eq } from "drizzle-orm";
 
 import { fileStore } from "../src/modules/files/application/file-store";
@@ -9,14 +14,18 @@ import {
   PUBLIC_API_RATE_LIMIT_REQUESTS_PER_MINUTE,
   enforcePublicApiRateLimit,
 } from "../src/modules/public-api/public-api-rate-limit.service";
+import { createSessionProcessEventsFromSessionEventRows } from "../src/modules/sessions/application/session-process-events.service";
+import type { SessionEventProcessRow } from "../src/modules/sessions/application/session-process-events.service";
 import { insertSessionMessage } from "../src/modules/sessions/infrastructure/session-message-store.repository";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import {
   PublicApiMemoryFileBucket,
   PUBLIC_API_TEST_IDS,
   TOKENS,
+  createPre0015PublicHttpContractDatabase,
   createPublicHttpContractDatabase,
   createPublicHttpTestBindings,
+  migratePre0015PublicHttpContractDatabase,
 } from "./helpers/public-api-http-test-fixture";
 import {
   OWNER_VIEWER,
@@ -63,6 +72,7 @@ const PROGRESS_OUTPUT_TEXTS = [
   "进度 2：已调用工具校验表格，不能进入最终回答。",
   "进度 3：artifact 已创建，不能进入最终回答。",
 ] as const;
+const FINAL_MESSAGE_ID = "01J0000000000000000000001M";
 
 type PublicHttpTestDatabase = Awaited<ReturnType<typeof createPublicHttpContractDatabase>>;
 
@@ -97,7 +107,7 @@ async function createReadyProjectDraftFile(input: {
   name: string;
 }): Promise<string> {
   const bindings = createPublicHttpTestBindings(input.database, {
-    fileBucket: input.bucket as unknown as R2Bucket,
+    fileBucket: input.bucket,
   }) as ApiBindings;
   const fileBytes = new TextEncoder().encode(input.body);
   const upload = await fileStore.createUpload(bindings, OWNER_VIEWER, {
@@ -136,7 +146,7 @@ async function createPendingProjectDraftFile(input: {
   name: string;
 }): Promise<string> {
   const bindings = createPublicHttpTestBindings(input.database, {
-    fileBucket: input.bucket as unknown as R2Bucket,
+    fileBucket: input.bucket,
   }) as ApiBindings;
   const fileBytes = new TextEncoder().encode(input.body);
   const upload = await fileStore.createUpload(bindings, OWNER_VIEWER, {
@@ -538,6 +548,18 @@ describe("Public Thread API e2e", () => {
         seq: 2,
         sessionId: threadId,
       });
+      await insertRuntimeEvent(database, {
+        kind: "tool.call.updated",
+        occurredAt: 975,
+        payload: {
+          status: "cancelled",
+          title: "record_meal",
+          toolCallId: "tool-call-2",
+        },
+        runId,
+        seq: 3,
+        sessionId: threadId,
+      });
 
       const toolEventsResponse = await requestPublicApi(
         app,
@@ -553,16 +575,23 @@ describe("Public Thread API e2e", () => {
       expect(toolEvents.map((event) => event["toolCallId"])).toEqual([
         "tool-call-1",
         "tool-call-1",
+        "tool-call-2",
       ]);
       expect(toolEvents[0]).toMatchObject({
+        toolInput: { calories: 420, mealId: "meal-1" },
         toolName: "record_meal",
         type: "tool.use.started",
       });
-      expectNoProperties(toolEvents[0], ["toolInput"]);
       expect(toolEvents[1]).toMatchObject({
         toolInput: { calories: 420, mealId: "meal-1" },
         type: "tool.use.completed",
       });
+      expect(toolEvents[2]).toMatchObject({
+        content: "record_meal",
+        toolName: "record_meal",
+        type: "tool.use.completed",
+      });
+      expectNoProperties(toolEvents[2], ["toolInput"]);
 
       await database.prepare("DELETE FROM session_event WHERE session_id = ?").bind(threadId).run();
 
@@ -595,7 +624,7 @@ describe("Public Thread API e2e", () => {
         occurredAt: 1_085,
         payload: {
           content: FINAL_OUTPUT_TEXT,
-          messageId: "assistant-final",
+          messageId: FINAL_MESSAGE_ID,
           role: "agent",
         },
         runId,
@@ -603,20 +632,28 @@ describe("Public Thread API e2e", () => {
         sessionId: threadId,
       });
       await insertRuntimeEvent(database, {
-        kind: "run.completed",
-        occurredAt: 1_125,
-        payload: { stopReason: "debug" },
+        kind: "message.completed",
+        occurredAt: 1_100,
+        payload: { messageId: FINAL_MESSAGE_ID, role: "agent" },
         runId,
         seq: 6,
+        sessionId: threadId,
+      });
+      await insertRuntimeEvent(database, {
+        kind: "run.started",
+        occurredAt: 1_125,
+        payload: { startedAt: "1970-01-01T00:00:01.125Z" },
+        runId,
+        seq: 7,
         sessionId: threadId,
         visibility: "owner_debug",
       });
       await insertRuntimeEvent(database, {
         kind: "run.completed",
         occurredAt: 1_150,
-        payload: { stopReason: "end_turn" },
+        payload: { finalMessageId: FINAL_MESSAGE_ID, stopReason: "end_turn" },
         runId,
-        seq: 7,
+        seq: 8,
         sessionId: threadId,
       });
 
@@ -653,13 +690,19 @@ describe("Public Thread API e2e", () => {
         });
       }
       await insertSessionMessage(database, {
-        content: FINAL_OUTPUT_TEXT,
+        content: "",
         createdByAccountId: PUBLIC_API_TEST_IDS.ownerAccount,
+        id: FINAL_MESSAGE_ID,
         role: "assistant",
-        segments: [{ kind: "text", text: FINAL_OUTPUT_TEXT }],
         sessionId: threadId,
         sessionRunId: runId,
       });
+      await database
+        .app()
+        .update(sessionMessagesTable)
+        .set({ projectionFormat: "event_stream_v3" })
+        .where(eq(sessionMessagesTable.id, FINAL_MESSAGE_ID))
+        .run();
 
       await database
         .app()
@@ -674,6 +717,7 @@ describe("Public Thread API e2e", () => {
           errorCode: null,
           errorDetailsJson: null,
           errorMessage: null,
+          errorRetryable: null,
           status: "completed",
           updatedAt: 1_150,
         })
@@ -1204,39 +1248,138 @@ describe("Public Thread API e2e", () => {
       liveEvents.close();
 
       await insertRuntimeEvent(database, {
-        kind: "message.completed",
-        occurredAt: 3_250,
-        payload: { messageId: "assistant-stream-live-1", role: "agent" },
-        runId,
-        seq: 6,
-        sessionId: threadId,
-      });
-      await insertRuntimeEvent(database, {
         kind: "message.added",
-        occurredAt: 3_300,
+        occurredAt: 3_250,
         payload: {
           content: "Live stream \uE200cite\uE202hidden\uE201delta A",
           messageId: "assistant-stream-live-1",
           role: "agent",
         },
         runId,
+        seq: 6,
+        sessionId: threadId,
+      });
+      await insertRuntimeEvent(database, {
+        kind: "message.completed",
+        occurredAt: 3_300,
+        payload: { messageId: "assistant-stream-live-1", role: "agent" },
+        runId,
         seq: 7,
         sessionId: threadId,
       });
       await insertRuntimeEvent(database, {
-        kind: "message.added",
+        kind: "message.delta",
         occurredAt: 3_350,
         payload: {
-          content: "Tail marker",
-          messageId: "tail-message",
+          contentDelta: "Same poll ",
+          messageId: "assistant-stream-same-poll",
           role: "agent",
         },
         runId,
         seq: 8,
         sessionId: threadId,
       });
+      await insertRuntimeEvent(database, {
+        kind: "message.added",
+        occurredAt: 3_400,
+        payload: {
+          content: "Same poll suffix",
+          messageId: "assistant-stream-same-poll",
+          role: "agent",
+        },
+        runId,
+        seq: 9,
+        sessionId: threadId,
+      });
+      await insertRuntimeEvent(database, {
+        kind: "message.completed",
+        occurredAt: 3_450,
+        payload: { messageId: "assistant-stream-same-poll", role: "agent" },
+        runId,
+        seq: 10,
+        sessionId: threadId,
+      });
+      const noDeltaTerminals = [
+        ["message.completed", { messageId: "no-delta-completed", role: "agent" }],
+        ["message.cancelled", { messageId: "no-delta-cancelled", role: "agent" }],
+        [
+          "message.failed",
+          {
+            error: { code: "runtime.failed", message: "Runtime failed." },
+            messageId: "no-delta-failed",
+            role: "agent",
+          },
+        ],
+      ] as const;
 
-      const text = `${openDeltaText}${await readUntil("id: 01J00000000000000000000017")}`;
+      for (const [index, [kind, payload]] of noDeltaTerminals.entries()) {
+        await insertRuntimeEvent(database, {
+          kind,
+          occurredAt: 3_550 + index * 50,
+          payload,
+          runId,
+          seq: 12 + index,
+          sessionId: threadId,
+        });
+      }
+      const streamedTerminals = [
+        [
+          "message.cancelled",
+          "Cancelled stream \uE200cite\uE202hidden-cancelled\uE201",
+          { messageId: "assistant-stream-cancelled", role: "agent" },
+        ],
+        [
+          "message.failed",
+          "Failed stream \uE200cite\uE202hidden-failed\uE201",
+          {
+            error: { code: "runtime.failed", message: "Runtime failed." },
+            messageId: "assistant-stream-failed",
+            role: "agent",
+          },
+        ],
+      ] as const;
+
+      for (const [index, [kind, contentDelta, payload]] of streamedTerminals.entries()) {
+        const seq = 15 + index * 2;
+        await insertRuntimeEvent(database, {
+          kind: "message.delta",
+          occurredAt: 3_700 + index * 100,
+          payload: { contentDelta, messageId: payload.messageId, role: "agent" },
+          runId,
+          seq,
+          sessionId: threadId,
+        });
+        await insertRuntimeEvent(database, {
+          kind,
+          occurredAt: 3_750 + index * 100,
+          payload,
+          runId,
+          seq: seq + 1,
+          sessionId: threadId,
+        });
+      }
+      await insertRuntimeEvent(database, {
+        kind: "message.added",
+        occurredAt: 3_900,
+        payload: {
+          content: "Tail marker",
+          messageId: "tail-message",
+          role: "agent",
+        },
+        runId,
+        seq: 19,
+        sessionId: threadId,
+      });
+      await insertRuntimeEvent(database, {
+        kind: "message.completed",
+        occurredAt: 3_950,
+        payload: { messageId: "tail-message", role: "agent" },
+        runId,
+        seq: 20,
+        sessionId: threadId,
+      });
+
+      const text = `${openDeltaText}${await readUntil("id: 01J0000000000000000000001K")}`;
       await reader.cancel();
       expect(text).toContain("event: thread.event");
       expect(text).toContain("id: 01J00000000000000000000011");
@@ -1244,13 +1387,35 @@ describe("Public Thread API e2e", () => {
       expect(text).not.toContain("id: 01J00000000000000000000013");
       expect(text).toContain("id: 01J00000000000000000000014");
       expect(text).not.toContain("id: 01J00000000000000000000015");
-      expect(text).not.toContain("id: 01J00000000000000000000016");
+      expect(text).toContain("id: 01J00000000000000000000016");
       expect(text).toContain("id: 01J00000000000000000000017");
+      expect(text).not.toContain("id: 01J00000000000000000000018");
+      expect(text).toContain("id: 01J00000000000000000000019");
+      expect(text).not.toContain("id: 01J0000000000000000000001A");
+      expect(text).toContain("id: 01J0000000000000000000001B");
+      expect(text).toContain("id: 01J0000000000000000000001C");
+      expect(text).toContain("id: 01J0000000000000000000001D");
+      expect(text).not.toContain("id: 01J0000000000000000000001E");
+      expect(text).toContain("id: 01J0000000000000000000001F");
+      expect(text).not.toContain("id: 01J0000000000000000000001G");
+      expect(text).toContain("id: 01J0000000000000000000001H");
+      expect(text).not.toContain("id: 01J0000000000000000000001J");
+      expect(text).toContain("id: 01J0000000000000000000001K");
       expect(text.match(/Live stream /gu)).toHaveLength(1);
       expect(text.match(/delta A/gu)).toHaveLength(1);
+      expect(text.match(/Same poll /gu)).toHaveLength(1);
+      expect(text.match(/suffix/gu)).toHaveLength(1);
+      expect(text.match(/Cancelled stream /gu)).toHaveLength(1);
+      expect(text.match(/Failed stream /gu)).toHaveLength(1);
+      expect(text).not.toContain("hidden-cancelled");
+      expect(text).not.toContain("hidden-failed");
+      expect(text).not.toContain("Message updated.");
+      expect(text).not.toContain("Runtime failed.");
       expect(text).toContain('"type":"agent.message.delta"');
+      expect(text).toContain('"status":"error"');
+      expect(text).toMatch(/id: 01J0000000000000000000001H\ndata: [^\n]*"status":"error"/u);
       expect(text).toContain('"toolCallId":"tool-call-stream-1"');
-      expect(text).not.toContain('"toolInput"');
+      expect(text).toContain('"toolInput":{"calories":420,"mealId":"meal-1"}');
       expect(text).toContain('"toolName":"record_meal"');
       expect(text).toContain('"runId":null');
       expect(text).toContain('"content":"');
@@ -1259,8 +1424,2203 @@ describe("Public Thread API e2e", () => {
       expect(text).not.toContain("private-diagnostic");
       expect(text).not.toContain("traceId");
       expect(text).not.toContain("event: thread.error");
+
+      const replayResponse = await requestPublicApi(
+        app,
+        database,
+        new Request(`https://api.example.com/api/v1/threads/${threadId}/events?limit=100`, {
+          headers: { Authorization: bearer(TOKENS.owner) },
+        }),
+      );
+      const replayEvents = expectArray((await readJson(replayResponse))["events"]).map(
+        expectRecord,
+      );
+
+      for (const id of [
+        "01J00000000000000000000016",
+        "01J00000000000000000000019",
+        "01J0000000000000000000001B",
+        "01J0000000000000000000001C",
+        "01J0000000000000000000001D",
+        "01J0000000000000000000001F",
+        "01J0000000000000000000001H",
+        "01J0000000000000000000001K",
+      ]) {
+        expect(replayEvents.some((event) => event["id"] === id)).toBe(true);
+      }
+      for (const id of ["01J0000000000000000000001D", "01J0000000000000000000001H"]) {
+        expect(replayEvents.find((event) => event["id"] === id)).toMatchObject({
+          status: "error",
+        });
+      }
     });
   }, 10_000);
+
+  test.each([
+    {
+      canonicalText: "Hello world",
+      liveText: "Hello ",
+      provider: "OpenAI",
+      snapshotContent: "Hello ",
+      threadIndex: 250,
+    },
+    {
+      canonicalText: "Hello world",
+      liveText: "Hello ",
+      provider: "ACP",
+      snapshotContent: "Hello ",
+      threadIndex: 251,
+    },
+    {
+      canonicalText: "Hello world",
+      liveText: "Hello ",
+      provider: "Claude",
+      snapshotContent: [{ text: "Hello ", type: "text" }],
+      threadIndex: 252,
+    },
+    {
+      canonicalText: "Final world",
+      liveText: "Draft ",
+      provider: "divergent",
+      snapshotContent: "Final ",
+      threadIndex: 253,
+    },
+  ] as const)(
+    "projects $provider snapshot-before-terminal order without replaying live text",
+    async ({ canonicalText, liveText, provider, snapshotContent, threadIndex }) => {
+      const database = await createPublicHttpContractDatabase();
+      const app = createPublicThreadApiTestApp();
+      const liveEvents = createPublicEventSessionNamespace();
+      const threadId = generatedPublicThreadId(threadIndex);
+      const messageId = `snapshot-before-terminal-${provider.toLowerCase()}`;
+
+      await insertPublicThread(database, {
+        id: threadId,
+        title: `${provider} snapshot order`,
+        updatedAt: 1_000,
+      });
+      await insertRuntimeEvent(database, {
+        kind: "message.started",
+        occurredAt: 1_100,
+        payload: { messageId, role: "agent" },
+        seq: 1,
+        sessionId: threadId,
+      });
+      await insertRuntimeEvent(database, {
+        kind: "message.delta",
+        occurredAt: 1_200,
+        payload: { contentDelta: liveText, messageId, role: "agent" },
+        seq: 2,
+        sessionId: threadId,
+      });
+
+      const response = await requestPublicApi(
+        app,
+        database,
+        new Request(`https://api.example.com/api/v1/threads/${threadId}/events/stream`, {
+          headers: { Authorization: bearer(TOKENS.owner) },
+        }),
+        { sessionNamespace: liveEvents.binding },
+      );
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error("Expected stream response body.");
+      }
+
+      const decoder = new TextDecoder();
+      let sseText = "";
+      const readUntil = async (marker: string): Promise<void> => {
+        while (!sseText.includes(marker)) {
+          const chunk = await Promise.race([
+            reader.read(),
+            Bun.sleep(3_000).then(() => {
+              throw new Error(`Timed out waiting for ${marker}.`);
+            }),
+          ]);
+
+          if (chunk.done) {
+            throw new Error(`SSE closed before ${marker}.`);
+          }
+          sseText += decoder.decode(chunk.value, { stream: true });
+        }
+      };
+
+      await readUntil("id: 01J00000000000000000000011");
+      await insertRuntimeEvent(database, {
+        kind: "message.added",
+        occurredAt: 1_300,
+        payload: { content: snapshotContent, messageId, role: "agent" },
+        seq: 3,
+        sessionId: threadId,
+      });
+      await insertRuntimeEvent(database, {
+        kind: "message.delta",
+        occurredAt: 1_400,
+        payload: { contentDelta: "world", messageId, role: "agent" },
+        seq: 4,
+        sessionId: threadId,
+      });
+      await insertRuntimeEvent(database, {
+        kind: "message.completed",
+        occurredAt: 1_500,
+        payload: { messageId, role: "agent" },
+        seq: 5,
+        sessionId: threadId,
+      });
+      liveEvents.emit();
+      await readUntil("id: 01J00000000000000000000014");
+      await reader.cancel();
+      liveEvents.close();
+
+      const liveContent = sseText
+        .split("\n")
+        .filter((line) => line.startsWith("data: "))
+        .map((line) => expectRecord(JSON.parse(line.slice("data: ".length)))["content"])
+        .filter((content): content is string => typeof content === "string")
+        .join("");
+      const replayResponse = await requestPublicApi(
+        app,
+        database,
+        new Request(`https://api.example.com/api/v1/threads/${threadId}/events`, {
+          headers: { Authorization: bearer(TOKENS.owner) },
+        }),
+      );
+      const replayContent = expectArray((await readJson(replayResponse))["events"])
+        .map((event) => expectRecord(event)["content"])
+        .filter((content): content is string => typeof content === "string")
+        .join("");
+
+      expect(replayContent).toBe(canonicalText);
+      expect(liveContent).toBe(provider === "divergent" ? liveText : canonicalText);
+    },
+    10_000,
+  );
+
+  test("reconciles a paginated authoritative snapshot above the former payload limit", async () => {
+    const database = await createPublicHttpContractDatabase();
+    const app = createPublicThreadApiTestApp();
+    const liveEvents = createPublicEventSessionNamespace();
+    const threadId = generatedPublicThreadId(270);
+    const messageId = "paginated-authoritative-snapshot";
+    const eventId = (seq: number) => generatedPublicThreadId(18_000 + seq);
+    const fragments = Array.from({ length: 1_001 }, (_, index) =>
+      index === 1_000 ? "🙂终" : "x".repeat(400),
+    );
+
+    await insertPublicThread(database, {
+      id: threadId,
+      title: "Paginated authoritative snapshot",
+      updatedAt: 1_000,
+    });
+    const response = await requestPublicApi(
+      app,
+      database,
+      new Request(`https://api.example.com/api/v1/threads/${threadId}/events/stream`, {
+        headers: { Authorization: bearer(TOKENS.owner) },
+      }),
+      { sessionNamespace: liveEvents.binding },
+    );
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error("Expected stream response body.");
+    }
+    await reader.read();
+
+    await insertRuntimeEvent(database, {
+      eventId: eventId(1),
+      kind: "message.started",
+      occurredAt: 1_000,
+      payload: { messageId, role: "agent" },
+      seq: 1,
+      sessionId: threadId,
+    });
+    for (const [index, content] of fragments.entries()) {
+      const seq = index + 2;
+      await insertRuntimeEvent(database, {
+        eventId: eventId(seq),
+        kind: index === 0 ? "message.added" : "message.delta",
+        occurredAt: seq * 1_000,
+        payload:
+          index === 0
+            ? { content, messageId, role: "agent" }
+            : { contentDelta: content, messageId, role: "agent" },
+        seq,
+        sessionId: threadId,
+      });
+    }
+    const terminalSeq = fragments.length + 2;
+    const terminalEventId = eventId(terminalSeq);
+    await insertRuntimeEvent(database, {
+      eventId: terminalEventId,
+      kind: "message.completed",
+      occurredAt: terminalSeq * 1_000,
+      payload: { messageId, role: "agent" },
+      seq: terminalSeq,
+      sessionId: threadId,
+    });
+    liveEvents.emit();
+
+    const decoder = new TextDecoder();
+    let sseText = "";
+    while (!sseText.includes(`id: ${terminalEventId}`)) {
+      const chunk = await Promise.race([
+        reader.read(),
+        Bun.sleep(8_000).then(() => {
+          throw new Error("Timed out waiting for the paginated authoritative snapshot.");
+        }),
+      ]);
+      if (chunk.done) {
+        throw new Error("SSE closed before the paginated authoritative snapshot.");
+      }
+      sseText += decoder.decode(chunk.value, { stream: true });
+    }
+    await reader.cancel();
+    liveEvents.close();
+
+    const liveMessages = sseText
+      .split("\n")
+      .filter((line) => line.startsWith("data: "))
+      .map((line) => expectRecord(JSON.parse(line.slice("data: ".length))))
+      .filter((event) => event["type"] === "agent.message.delta");
+    const replayResponse = await requestPublicApi(
+      app,
+      database,
+      new Request(`https://api.example.com/api/v1/threads/${threadId}/events`, {
+        headers: { Authorization: bearer(TOKENS.owner) },
+      }),
+    );
+    const replayMessages = expectArray((await readJson(replayResponse))["events"])
+      .map(expectRecord)
+      .filter((event) => event["type"] === "agent.message.delta");
+
+    expect(fragments.join("").length).toBeGreaterThan(384 * 1024);
+    expect(liveMessages).toEqual(replayMessages);
+    expect(liveMessages).toEqual([
+      expect.objectContaining({ content: fragments.join(""), id: terminalEventId }),
+    ]);
+  }, 15_000);
+
+  test("retains exact prefix metadata for more than one public event page of messages", async () => {
+    const database = await createPublicHttpContractDatabase();
+    const app = createPublicThreadApiTestApp();
+    const liveEvents = createPublicEventSessionNamespace();
+    const threadId = generatedPublicThreadId(271);
+    const runId = PUBLIC_API_TEST_IDS.run;
+    const messageId = "message-before-full-state-page";
+    const eventId = (seq: number) => generatedPublicThreadId(20_000 + seq);
+
+    await insertPublicThread(database, {
+      id: threadId,
+      title: "Unbounded active message metadata",
+      updatedAt: 1_000,
+    });
+    const response = await requestPublicApi(
+      app,
+      database,
+      new Request(`https://api.example.com/api/v1/threads/${threadId}/events/stream`, {
+        headers: { Authorization: bearer(TOKENS.owner) },
+      }),
+      { sessionNamespace: liveEvents.binding },
+    );
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error("Expected stream response body.");
+    }
+    const decoder = new TextDecoder();
+    let sseText = "";
+    const readUntil = async (marker: string): Promise<void> => {
+      while (!sseText.includes(marker)) {
+        const chunk = await Promise.race([
+          reader.read(),
+          Bun.sleep(5_000).then(() => {
+            throw new Error(`Timed out waiting for ${marker}.`);
+          }),
+        ]);
+        if (chunk.done) {
+          throw new Error(`SSE closed before ${marker}.`);
+        }
+        sseText += decoder.decode(chunk.value, { stream: true });
+      }
+    };
+
+    await readUntil(": connected");
+    await insertRuntimeEvent(database, {
+      eventId: eventId(1),
+      kind: "run.started",
+      occurredAt: 1_000,
+      payload: { startedAt: "1970-01-01T00:00:01.000Z" },
+      runId,
+      seq: 1,
+      sessionId: threadId,
+    });
+    await insertRuntimeEvent(database, {
+      eventId: eventId(2),
+      kind: "message.started",
+      occurredAt: 2_000,
+      payload: { messageId, role: "agent" },
+      runId,
+      seq: 2,
+      sessionId: threadId,
+    });
+    await insertRuntimeEvent(database, {
+      eventId: eventId(3),
+      kind: "message.delta",
+      occurredAt: 3_000,
+      payload: { contentDelta: "prefix", messageId, role: "agent" },
+      runId,
+      seq: 3,
+      sessionId: threadId,
+    });
+    liveEvents.emit();
+    await readUntil(`id: ${eventId(3)}`);
+
+    for (let seq = 4; seq <= 1_004; seq += 1) {
+      await insertRuntimeEvent(database, {
+        eventId: eventId(seq),
+        kind: "message.started",
+        occurredAt: seq * 1_000,
+        payload: { messageId: `parallel-message-${seq}`, role: "agent" },
+        runId,
+        seq,
+        sessionId: threadId,
+      });
+    }
+    await insertRuntimeEvent(database, {
+      eventId: eventId(1_005),
+      kind: "tool.call.updated",
+      occurredAt: 1_005_000,
+      payload: {
+        rawInput: "{}",
+        status: "running",
+        title: "state_page_marker",
+        toolCallId: "state-page-marker",
+      },
+      runId,
+      seq: 1_005,
+      sessionId: threadId,
+    });
+    liveEvents.emit();
+    await readUntil(`id: ${eventId(1_005)}`);
+
+    await insertRuntimeEvent(database, {
+      eventId: eventId(1_006),
+      kind: "message.added",
+      occurredAt: 1_006_000,
+      payload: { content: "prefix", messageId, role: "agent" },
+      runId,
+      seq: 1_006,
+      sessionId: threadId,
+    });
+    await insertRuntimeEvent(database, {
+      eventId: eventId(1_007),
+      kind: "message.delta",
+      occurredAt: 1_007_000,
+      payload: { contentDelta: " suffix", messageId, role: "agent" },
+      runId,
+      seq: 1_007,
+      sessionId: threadId,
+    });
+    await insertRuntimeEvent(database, {
+      eventId: eventId(1_008),
+      kind: "message.completed",
+      occurredAt: 1_008_000,
+      payload: { messageId, role: "agent" },
+      runId,
+      seq: 1_008,
+      sessionId: threadId,
+    });
+    liveEvents.emit();
+    await readUntil(`id: ${eventId(1_008)}`);
+    await reader.cancel();
+    liveEvents.close();
+
+    const liveContent = sseText
+      .split("\n")
+      .filter((line) => line.startsWith("data: "))
+      .map((line) => expectRecord(JSON.parse(line.slice("data: ".length))))
+      .filter((event) => event["type"] === "agent.message.delta")
+      .map((event) => event["content"])
+      .filter((content): content is string => typeof content === "string")
+      .join("");
+
+    expect(liveContent).toBe("prefix suffix");
+  }, 15_000);
+
+  test("replaces standalone assistant snapshots before publishing the terminal text", async () => {
+    const database = await createPublicHttpContractDatabase();
+    const app = createPublicThreadApiTestApp();
+    const liveEvents = createPublicEventSessionNamespace();
+    const threadId = generatedPublicThreadId(258);
+    const messageId = "standalone-authoritative-snapshot";
+    const eventId = (seq: number) => generatedPublicThreadId(9_000 + seq);
+
+    await insertPublicThread(database, {
+      id: threadId,
+      title: "Standalone authoritative snapshot",
+      updatedAt: 1_000,
+    });
+
+    const response = await requestPublicApi(
+      app,
+      database,
+      new Request(`https://api.example.com/api/v1/threads/${threadId}/events/stream`, {
+        headers: { Authorization: bearer(TOKENS.owner) },
+      }),
+      { sessionNamespace: liveEvents.binding },
+    );
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error("Expected stream response body.");
+    }
+
+    await insertRuntimeEvent(database, {
+      eventId: eventId(1),
+      kind: "message.added",
+      occurredAt: 1_100,
+      payload: { content: "Obsolete snapshot", messageId, role: "agent" },
+      seq: 1,
+      sessionId: threadId,
+    });
+    await insertRuntimeEvent(database, {
+      eventId: eventId(2),
+      kind: "message.added",
+      occurredAt: 1_200,
+      payload: { content: "Final \uE200ci", messageId, role: "agent" },
+      seq: 2,
+      sessionId: threadId,
+    });
+    await insertRuntimeEvent(database, {
+      eventId: eventId(3),
+      kind: "message.delta",
+      occurredAt: 1_300,
+      payload: { contentDelta: "te\uE202private\uE201world", messageId, role: "agent" },
+      seq: 3,
+      sessionId: threadId,
+    });
+    const terminalEventId = eventId(4);
+    await insertRuntimeEvent(database, {
+      eventId: terminalEventId,
+      kind: "message.completed",
+      occurredAt: 1_400,
+      payload: { messageId, role: "agent" },
+      seq: 4,
+      sessionId: threadId,
+    });
+    liveEvents.emit();
+
+    const decoder = new TextDecoder();
+    let sseText = "";
+
+    while (!sseText.includes(`id: ${terminalEventId}`)) {
+      const chunk = await Promise.race([
+        reader.read(),
+        Bun.sleep(3_000).then(() => {
+          throw new Error("Timed out waiting for the terminal assistant snapshot.");
+        }),
+      ]);
+
+      if (chunk.done) {
+        throw new Error("SSE closed before the terminal assistant snapshot.");
+      }
+      sseText += decoder.decode(chunk.value, { stream: true });
+    }
+
+    await reader.cancel();
+    liveEvents.close();
+    const liveContent = sseText
+      .split("\n")
+      .filter((line) => line.startsWith("data: "))
+      .map((line) => expectRecord(JSON.parse(line.slice("data: ".length)))["content"])
+      .filter((content): content is string => typeof content === "string")
+      .join("");
+    const replayResponse = await requestPublicApi(
+      app,
+      database,
+      new Request(`https://api.example.com/api/v1/threads/${threadId}/events`, {
+        headers: { Authorization: bearer(TOKENS.owner) },
+      }),
+    );
+    const replayContent = expectArray((await readJson(replayResponse))["events"])
+      .map((event) => expectRecord(event)["content"])
+      .filter((content): content is string => typeof content === "string")
+      .join("");
+
+    expect(liveContent).toBe("Final world");
+    expect(replayContent).toBe(liveContent);
+    expect(sseText).not.toContain("Obsolete snapshot");
+    expect(sseText).not.toContain("private");
+  }, 10_000);
+
+  test.each([
+    {
+      deltaContent: "world",
+      snapshotContent: "Final ",
+      terminalKind: "message.completed",
+      terminalBeforeConnect: true,
+      threadIndex: 254,
+      timing: "after the terminal",
+    },
+    {
+      deltaContent: "world",
+      snapshotContent: "Final ",
+      terminalKind: "message.completed",
+      terminalBeforeConnect: false,
+      threadIndex: 255,
+      timing: "between the snapshot and terminal",
+    },
+    {
+      deltaContent: "world",
+      snapshotContent: "Final ",
+      terminalKind: "run.failed",
+      terminalBeforeConnect: false,
+      threadIndex: 259,
+      timing: "before a repaired run terminal",
+    },
+    {
+      deltaContent: "te\uE202private\uE201world",
+      snapshotContent: "Final \uE200ci",
+      terminalKind: "message.completed",
+      terminalBeforeConnect: false,
+      threadIndex: 260,
+      timing: "across a private citation chunk boundary",
+    },
+  ] as const)(
+    "hydrates canonical snapshot text when connecting $timing",
+    async ({ deltaContent, snapshotContent, terminalBeforeConnect, terminalKind, threadIndex }) => {
+      const database = await createPublicHttpContractDatabase();
+      const app = createPublicThreadApiTestApp();
+      const liveEvents = createPublicEventSessionNamespace();
+      const threadId = generatedPublicThreadId(threadIndex);
+      const messageId = `initial-canonical-${String(threadIndex)}`;
+      const runId = terminalKind === "run.failed" ? PUBLIC_API_TEST_IDS.run : null;
+
+      await insertPublicThread(database, {
+        id: threadId,
+        title: "Initial canonical snapshot",
+        updatedAt: 1_000,
+      });
+      await insertRuntimeEvent(database, {
+        kind: "message.started",
+        occurredAt: 1_100,
+        payload: { messageId, role: "agent" },
+        runId,
+        seq: 1,
+        sessionId: threadId,
+      });
+      await insertRuntimeEvent(database, {
+        kind: "message.delta",
+        occurredAt: 1_200,
+        payload: { contentDelta: "Draft ", messageId, role: "agent" },
+        runId,
+        seq: 2,
+        sessionId: threadId,
+      });
+      await insertRuntimeEvent(database, {
+        kind: "message.added",
+        occurredAt: 1_300,
+        payload: { content: snapshotContent, messageId, role: "agent" },
+        runId,
+        seq: 3,
+        sessionId: threadId,
+      });
+
+      const completeSnapshot = async () => {
+        await insertRuntimeEvent(database, {
+          kind: "message.delta",
+          occurredAt: 1_400,
+          payload: { contentDelta: deltaContent, messageId, role: "agent" },
+          runId,
+          seq: 4,
+          sessionId: threadId,
+        });
+        await insertRuntimeEvent(database, {
+          kind: terminalKind,
+          occurredAt: 1_500,
+          payload:
+            terminalKind === "message.completed"
+              ? { messageId, role: "agent" }
+              : {
+                  error: {
+                    code: "runtime.driver_terminal",
+                    details: {},
+                    message: "Driver disconnected.",
+                    retryable: true,
+                  },
+                  recoverable: true,
+                },
+          runId,
+          seq: 5,
+          sessionId: threadId,
+        });
+      };
+
+      if (terminalBeforeConnect) {
+        await completeSnapshot();
+      }
+
+      const response = await requestPublicApi(
+        app,
+        database,
+        new Request(`https://api.example.com/api/v1/threads/${threadId}/events/stream`, {
+          headers: { Authorization: bearer(TOKENS.owner) },
+        }),
+        { sessionNamespace: liveEvents.binding },
+      );
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error("Expected stream response body.");
+      }
+
+      const decoder = new TextDecoder();
+      let sseText = "";
+      const readUntil = async (marker: string): Promise<void> => {
+        while (!sseText.includes(marker)) {
+          const chunk = await Promise.race([
+            reader.read(),
+            Bun.sleep(3_000).then(() => {
+              throw new Error(`Timed out waiting for ${marker}.`);
+            }),
+          ]);
+
+          if (chunk.done) {
+            throw new Error(`SSE closed before ${marker}.`);
+          }
+          sseText += decoder.decode(chunk.value, { stream: true });
+        }
+      };
+
+      await readUntil(
+        terminalBeforeConnect ? "id: 01J00000000000000000000014" : "id: 01J00000000000000000000012",
+      );
+      if (!terminalBeforeConnect) {
+        await completeSnapshot();
+        liveEvents.emit();
+        await readUntil("id: 01J00000000000000000000014");
+      }
+      await reader.cancel();
+      liveEvents.close();
+
+      const liveContent = sseText
+        .split("\n")
+        .filter((line) => line.startsWith("data: "))
+        .map((line) => expectRecord(JSON.parse(line.slice("data: ".length))))
+        .filter((event) => event["type"] === "agent.message.delta")
+        .map((event) => event["content"])
+        .filter((content): content is string => typeof content === "string")
+        .join("");
+      const replayResponse = await requestPublicApi(
+        app,
+        database,
+        new Request(`https://api.example.com/api/v1/threads/${threadId}/events`, {
+          headers: { Authorization: bearer(TOKENS.owner) },
+        }),
+      );
+      const replayContent = expectArray((await readJson(replayResponse))["events"])
+        .map(expectRecord)
+        .filter((event) => event["type"] === "agent.message.delta")
+        .map((event) => event["content"])
+        .filter((content): content is string => typeof content === "string")
+        .join("");
+
+      expect(liveContent).toBe("Final world");
+      expect(replayContent).toBe(liveContent);
+      expect(liveContent).not.toContain("Draft");
+      expect(sseText).not.toContain("private");
+      expect(sseText).not.toContain("\uE200");
+    },
+    10_000,
+  );
+
+  test("keeps a citation parser alive across a repaired run terminal", async () => {
+    const database = await createPublicHttpContractDatabase();
+    const app = createPublicThreadApiTestApp();
+    const liveEvents = createPublicEventSessionNamespace();
+    const threadId = generatedPublicThreadId(262);
+    const messageId = "terminal-citation-recovery";
+    const runId = PUBLIC_API_TEST_IDS.run;
+    const eventId = (seq: number) => generatedPublicThreadId(12_000 + seq);
+
+    await insertPublicThread(database, {
+      id: threadId,
+      title: "Terminal citation recovery",
+      updatedAt: 1_000,
+    });
+    const response = await requestPublicApi(
+      app,
+      database,
+      new Request(`https://api.example.com/api/v1/threads/${threadId}/events/stream`, {
+        headers: { Authorization: bearer(TOKENS.owner) },
+      }),
+      { sessionNamespace: liveEvents.binding },
+    );
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error("Expected stream response body.");
+    }
+
+    const decoder = new TextDecoder();
+    let sseText = "";
+    const readUntil = async (marker: string): Promise<void> => {
+      while (!sseText.includes(marker)) {
+        const chunk = await Promise.race([
+          reader.read(),
+          Bun.sleep(3_000).then(() => {
+            throw new Error(`Timed out waiting for ${marker}.`);
+          }),
+        ]);
+        if (chunk.done) {
+          throw new Error(`SSE closed before ${marker}.`);
+        }
+        sseText += decoder.decode(chunk.value, { stream: true });
+      }
+    };
+
+    await readUntil(": connected");
+    await insertRuntimeEvent(database, {
+      eventId: eventId(1),
+      kind: "message.started",
+      occurredAt: 1_100,
+      payload: { messageId, role: "agent" },
+      runId,
+      seq: 1,
+      sessionId: threadId,
+    });
+    await insertRuntimeEvent(database, {
+      eventId: eventId(2),
+      kind: "message.delta",
+      occurredAt: 1_200,
+      payload: { contentDelta: "before\uE200ci", messageId, role: "agent" },
+      runId,
+      seq: 2,
+      sessionId: threadId,
+    });
+    liveEvents.emit();
+    await readUntil(`id: ${eventId(2)}`);
+    await insertRuntimeEvent(database, {
+      eventId: eventId(3),
+      kind: "run.failed",
+      occurredAt: 1_300,
+      payload: {
+        error: {
+          code: "runtime.driver_terminal",
+          details: {},
+          message: "Driver disconnected.",
+          retryable: true,
+        },
+        recoverable: true,
+      },
+      runId,
+      seq: 3,
+      sessionId: threadId,
+    });
+    liveEvents.emit();
+    await readUntil(`id: ${eventId(3)}`);
+    await insertRuntimeEvent(database, {
+      eventId: eventId(4),
+      kind: "message.delta",
+      occurredAt: 1_250,
+      payload: {
+        contentDelta: "te\uE202SECRET\uE201after",
+        messageId,
+        role: "agent",
+      },
+      runId,
+      seq: 4,
+      sessionId: threadId,
+    });
+    liveEvents.emit();
+    await readUntil(`id: ${eventId(4)}`);
+    await reader.cancel();
+    liveEvents.close();
+
+    const liveMessageContent = sseText
+      .split("\n")
+      .filter((line) => line.startsWith("data: "))
+      .map((line) => expectRecord(JSON.parse(line.slice("data: ".length))))
+      .filter((event) => event["type"] === "agent.message.delta")
+      .map((event) => event["content"])
+      .filter((content): content is string => typeof content === "string")
+      .join("");
+    const replayResponse = await requestPublicApi(
+      app,
+      database,
+      new Request(`https://api.example.com/api/v1/threads/${threadId}/events`, {
+        headers: { Authorization: bearer(TOKENS.owner) },
+      }),
+    );
+    const replayEvents = expectArray((await readJson(replayResponse))["events"]).map(expectRecord);
+    const replayMessages = replayEvents.filter((event) => event["type"] === "agent.message.delta");
+
+    expect(liveMessageContent).toBe("beforeafter");
+    expect(replayMessages).toHaveLength(1);
+    expect(replayMessages[0]?.["content"]).toBe(liveMessageContent);
+    expect(sseText).not.toContain("SECRET");
+    expect(sseText).not.toContain("\uE200");
+  }, 10_000);
+
+  test("keeps one canonical stream when an authoritative snapshot arrives after repair", async () => {
+    const database = await createPublicHttpContractDatabase();
+    const app = createPublicThreadApiTestApp();
+    const liveEvents = createPublicEventSessionNamespace();
+    const threadId = generatedPublicThreadId(263);
+    const messageId = "terminal-snapshot-recovery";
+    const runId = PUBLIC_API_TEST_IDS.run;
+    const eventId = (seq: number) => generatedPublicThreadId(12_100 + seq);
+
+    await insertPublicThread(database, {
+      id: threadId,
+      title: "Terminal snapshot recovery",
+      updatedAt: 1_000,
+    });
+    const response = await requestPublicApi(
+      app,
+      database,
+      new Request(`https://api.example.com/api/v1/threads/${threadId}/events/stream`, {
+        headers: { Authorization: bearer(TOKENS.owner) },
+      }),
+      { sessionNamespace: liveEvents.binding },
+    );
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error("Expected stream response body.");
+    }
+
+    const decoder = new TextDecoder();
+    let sseText = "";
+    const readUntil = async (marker: string): Promise<void> => {
+      while (!sseText.includes(marker)) {
+        const chunk = await Promise.race([
+          reader.read(),
+          Bun.sleep(3_000).then(() => {
+            throw new Error(`Timed out waiting for ${marker}.`);
+          }),
+        ]);
+        if (chunk.done) {
+          throw new Error(`SSE closed before ${marker}.`);
+        }
+        sseText += decoder.decode(chunk.value, { stream: true });
+      }
+    };
+
+    await readUntil(": connected");
+    await insertRuntimeEvent(database, {
+      eventId: eventId(1),
+      kind: "message.started",
+      occurredAt: 1_100,
+      payload: { messageId, role: "agent" },
+      runId,
+      seq: 1,
+      sessionId: threadId,
+    });
+    await insertRuntimeEvent(database, {
+      eventId: eventId(2),
+      kind: "message.delta",
+      occurredAt: 1_200,
+      payload: { contentDelta: "Draft", messageId, role: "agent" },
+      runId,
+      seq: 2,
+      sessionId: threadId,
+    });
+    liveEvents.emit();
+    await readUntil(`id: ${eventId(2)}`);
+    await insertRuntimeEvent(database, {
+      eventId: eventId(3),
+      kind: "run.failed",
+      occurredAt: 1_500,
+      payload: {
+        error: {
+          code: "runtime.driver_terminal",
+          details: {},
+          message: "Driver disconnected.",
+          retryable: true,
+        },
+        recoverable: true,
+      },
+      runId,
+      seq: 3,
+      sessionId: threadId,
+    });
+    liveEvents.emit();
+    await readUntil(`id: ${eventId(3)}`);
+    await insertRuntimeEvent(database, {
+      eventId: eventId(4),
+      kind: "message.started",
+      occurredAt: 1_250,
+      payload: { messageId, role: "agent" },
+      runId,
+      seq: 4,
+      sessionId: threadId,
+    });
+    await insertRuntimeEvent(database, {
+      eventId: eventId(5),
+      kind: "message.added",
+      occurredAt: 1_300,
+      payload: { content: "Obsolete", messageId, role: "agent" },
+      runId,
+      seq: 5,
+      sessionId: threadId,
+    });
+    await insertRuntimeEvent(database, {
+      eventId: eventId(6),
+      kind: "message.added",
+      occurredAt: 1_350,
+      payload: { content: "Final ", messageId, role: "agent" },
+      runId,
+      seq: 6,
+      sessionId: threadId,
+    });
+    await insertRuntimeEvent(database, {
+      eventId: eventId(7),
+      kind: "message.delta",
+      occurredAt: 1_400,
+      payload: { contentDelta: "world", messageId, role: "agent" },
+      runId,
+      seq: 7,
+      sessionId: threadId,
+    });
+    await insertRuntimeEvent(database, {
+      eventId: eventId(8),
+      kind: "tool.call.updated",
+      occurredAt: 1_600,
+      payload: {
+        rawInput: "{}",
+        status: "running",
+        title: "recovery_marker",
+        toolCallId: "terminal-snapshot-marker",
+      },
+      runId,
+      seq: 8,
+      sessionId: threadId,
+    });
+    liveEvents.emit();
+    await readUntil(`id: ${eventId(8)}`);
+    await reader.cancel();
+    liveEvents.close();
+
+    const liveMessages = sseText
+      .split("\n")
+      .filter((line) => line.startsWith("data: "))
+      .map((line) => expectRecord(JSON.parse(line.slice("data: ".length))))
+      .filter((event) => event["type"] === "agent.message.delta");
+    const replayResponse = await requestPublicApi(
+      app,
+      database,
+      new Request(`https://api.example.com/api/v1/threads/${threadId}/events`, {
+        headers: { Authorization: bearer(TOKENS.owner) },
+      }),
+    );
+    const replayMessages = expectArray((await readJson(replayResponse))["events"])
+      .map(expectRecord)
+      .filter((event) => event["type"] === "agent.message.delta");
+
+    expect(liveMessages.map((event) => event["content"]).join("")).toBe("Draft");
+    expect(replayMessages).toHaveLength(1);
+    expect(replayMessages[0]?.["content"]).toBe("Final world");
+    expect(sseText).not.toContain("Obsolete");
+  }, 10_000);
+
+  test("keeps final stream identity stable when its message terminal arrives after repair", async () => {
+    const database = await createPublicHttpContractDatabase();
+    const app = createPublicThreadApiTestApp();
+    const liveEvents = createPublicEventSessionNamespace();
+    const threadId = generatedPublicThreadId(268);
+    const messageId = "late-message-terminal";
+    const runId = PUBLIC_API_TEST_IDS.run;
+    const eventId = (seq: number) => generatedPublicThreadId(16_000 + seq);
+
+    await insertPublicThread(database, {
+      id: threadId,
+      title: "Late message terminal identity",
+      updatedAt: 1_000,
+    });
+    const response = await requestPublicApi(
+      app,
+      database,
+      new Request(`https://api.example.com/api/v1/threads/${threadId}/events/stream`, {
+        headers: { Authorization: bearer(TOKENS.owner) },
+      }),
+      { sessionNamespace: liveEvents.binding },
+    );
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error("Expected stream response body.");
+    }
+    const decoder = new TextDecoder();
+    let sseText = "";
+    const readUntil = async (marker: string): Promise<void> => {
+      while (!sseText.includes(marker)) {
+        const chunk = await Promise.race([
+          reader.read(),
+          Bun.sleep(3_000).then(() => {
+            throw new Error(`Timed out waiting for ${marker}.`);
+          }),
+        ]);
+        if (chunk.done) {
+          throw new Error(`SSE closed before ${marker}.`);
+        }
+        sseText += decoder.decode(chunk.value, { stream: true });
+      }
+    };
+
+    await readUntil(": connected");
+    await insertRuntimeEvent(database, {
+      eventId: eventId(1),
+      kind: "message.started",
+      occurredAt: 1_100,
+      payload: { messageId, role: "agent" },
+      runId,
+      seq: 1,
+      sessionId: threadId,
+    });
+    await insertRuntimeEvent(database, {
+      eventId: eventId(2),
+      kind: "message.added",
+      occurredAt: 1_200,
+      payload: { content: "Final ", messageId, role: "agent" },
+      runId,
+      seq: 2,
+      sessionId: threadId,
+    });
+    await insertRuntimeEvent(database, {
+      eventId: eventId(3),
+      kind: "message.delta",
+      occurredAt: 1_300,
+      payload: { contentDelta: "world", messageId, role: "agent" },
+      runId,
+      seq: 3,
+      sessionId: threadId,
+    });
+    await insertRuntimeEvent(database, {
+      eventId: eventId(4),
+      kind: "run.failed",
+      occurredAt: 1_400,
+      payload: {
+        error: {
+          code: "runtime.driver_terminal",
+          details: {},
+          message: "Driver disconnected.",
+          retryable: true,
+        },
+        recoverable: true,
+      },
+      runId,
+      seq: 4,
+      sessionId: threadId,
+    });
+    liveEvents.emit();
+    await readUntil(`id: ${eventId(4)}`);
+    await insertRuntimeEvent(database, {
+      eventId: eventId(5),
+      kind: "message.completed",
+      occurredAt: 1_350,
+      payload: { messageId, role: "agent" },
+      runId,
+      seq: 5,
+      sessionId: threadId,
+    });
+    await insertRuntimeEvent(database, {
+      eventId: eventId(6),
+      kind: "tool.call.updated",
+      occurredAt: 1_500,
+      payload: {
+        rawInput: "{}",
+        status: "running",
+        title: "late_terminal_marker",
+        toolCallId: "late-terminal-marker",
+      },
+      runId,
+      seq: 6,
+      sessionId: threadId,
+    });
+    liveEvents.emit();
+    await readUntil(`id: ${eventId(6)}`);
+    await reader.cancel();
+    liveEvents.close();
+
+    const liveEventsBody = sseText
+      .split("\n")
+      .filter((line) => line.startsWith("data: "))
+      .map((line) => expectRecord(JSON.parse(line.slice("data: ".length))));
+    const replayResponse = await requestPublicApi(
+      app,
+      database,
+      new Request(`https://api.example.com/api/v1/threads/${threadId}/events`, {
+        headers: { Authorization: bearer(TOKENS.owner) },
+      }),
+    );
+    const replayEvents = expectArray((await readJson(replayResponse))["events"]).map(expectRecord);
+    const liveMessage = liveEventsBody.filter((event) => event["type"] === "agent.message.delta");
+    const replayMessage = replayEvents.filter((event) => event["type"] === "agent.message.delta");
+
+    expect(liveMessage).toEqual(replayMessage);
+    expect(liveMessage).toEqual([
+      expect.objectContaining({ content: "Final world", id: eventId(2) }),
+    ]);
+    expect(sseText).not.toContain(`id: ${eventId(5)}`);
+  }, 10_000);
+
+  test("retains an undisplayed stream parser across the initial event limit", async () => {
+    const database = await createPublicHttpContractDatabase();
+    const app = createPublicThreadApiTestApp();
+    const liveEvents = createPublicEventSessionNamespace();
+    const threadId = generatedPublicThreadId(264);
+    const messageId = "limited-citation-stream";
+    const eventId = (seq: number) => generatedPublicThreadId(12_200 + seq);
+
+    await insertPublicThread(database, {
+      id: threadId,
+      title: "Limited citation stream",
+      updatedAt: 1_000,
+    });
+    await insertRuntimeEvent(database, {
+      eventId: eventId(1),
+      kind: "message.started",
+      occurredAt: 1_100,
+      payload: { messageId, role: "agent" },
+      seq: 1,
+      sessionId: threadId,
+    });
+    await insertRuntimeEvent(database, {
+      eventId: eventId(2),
+      kind: "message.delta",
+      occurredAt: 1_200,
+      payload: { contentDelta: "before\uE200ci", messageId, role: "agent" },
+      seq: 2,
+      sessionId: threadId,
+    });
+    await insertRuntimeEvent(database, {
+      eventId: eventId(3),
+      kind: "tool.call.updated",
+      occurredAt: 1_300,
+      payload: {
+        rawInput: "{}",
+        status: "running",
+        title: "limit_marker",
+        toolCallId: "limited-citation-marker",
+      },
+      seq: 3,
+      sessionId: threadId,
+    });
+
+    const response = await requestPublicApi(
+      app,
+      database,
+      new Request(`https://api.example.com/api/v1/threads/${threadId}/events/stream?limit=1`, {
+        headers: { Authorization: bearer(TOKENS.owner) },
+      }),
+      { sessionNamespace: liveEvents.binding },
+    );
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error("Expected stream response body.");
+    }
+
+    const decoder = new TextDecoder();
+    let sseText = "";
+    const readUntil = async (marker: string): Promise<void> => {
+      while (!sseText.includes(marker)) {
+        const chunk = await Promise.race([
+          reader.read(),
+          Bun.sleep(3_000).then(() => {
+            throw new Error(`Timed out waiting for ${marker}.`);
+          }),
+        ]);
+        if (chunk.done) {
+          throw new Error(`SSE closed before ${marker}.`);
+        }
+        sseText += decoder.decode(chunk.value, { stream: true });
+      }
+    };
+
+    await readUntil(`id: ${eventId(3)}`);
+    await insertRuntimeEvent(database, {
+      eventId: eventId(4),
+      kind: "message.delta",
+      occurredAt: 1_400,
+      payload: {
+        contentDelta: "te\uE202SECRET\uE201after",
+        messageId,
+        role: "agent",
+      },
+      seq: 4,
+      sessionId: threadId,
+    });
+    liveEvents.emit();
+    await readUntil(`id: ${eventId(4)}`);
+    await reader.cancel();
+    liveEvents.close();
+
+    expect(sseText).toContain('"content":"after"');
+    expect(sseText).not.toContain("SECRET");
+    expect(sseText).not.toContain("\uE200");
+  }, 10_000);
+
+  test("fails closed for an old stream outside the initial scan", async () => {
+    const database = await createPublicHttpContractDatabase();
+    const app = createPublicThreadApiTestApp();
+    const liveEvents = createPublicEventSessionNamespace();
+    const threadId = generatedPublicThreadId(265);
+    const messageId = "unscanned-citation-stream";
+    const eventId = (seq: number) => generatedPublicThreadId(14_000 + seq);
+
+    await insertPublicThread(database, {
+      id: threadId,
+      title: "Unscanned citation stream",
+      updatedAt: 1_000,
+    });
+    await insertRuntimeEvent(database, {
+      eventId: eventId(1),
+      kind: "message.started",
+      occurredAt: 1_000,
+      payload: { messageId, role: "agent" },
+      seq: 1,
+      sessionId: threadId,
+    });
+    await insertRuntimeEvent(database, {
+      eventId: eventId(2),
+      kind: "message.delta",
+      occurredAt: 2_000,
+      payload: { contentDelta: "before\uE200ci", messageId, role: "agent" },
+      seq: 2,
+      sessionId: threadId,
+    });
+
+    for (let seq = 3; seq <= 1_003; seq += 1) {
+      await insertRuntimeEvent(database, {
+        eventId: eventId(seq),
+        kind: "tool.call.updated",
+        occurredAt: seq * 1_000,
+        payload: {
+          rawInput: "{}",
+          status: "running",
+          title: "scan_filler",
+          toolCallId: `scan-filler-${seq}`,
+        },
+        seq,
+        sessionId: threadId,
+      });
+    }
+
+    const response = await requestPublicApi(
+      app,
+      database,
+      new Request(`https://api.example.com/api/v1/threads/${threadId}/events/stream?limit=1`, {
+        headers: { Authorization: bearer(TOKENS.owner) },
+      }),
+      { sessionNamespace: liveEvents.binding },
+    );
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error("Expected stream response body.");
+    }
+    const decoder = new TextDecoder();
+    let sseText = "";
+    const readUntil = async (marker: string): Promise<void> => {
+      while (!sseText.includes(marker)) {
+        const chunk = await Promise.race([
+          reader.read(),
+          Bun.sleep(3_000).then(() => {
+            throw new Error(`Timed out waiting for ${marker}.`);
+          }),
+        ]);
+        if (chunk.done) {
+          throw new Error(`SSE closed before ${marker}.`);
+        }
+        sseText += decoder.decode(chunk.value, { stream: true });
+      }
+    };
+
+    await readUntil(`id: ${eventId(1_003)}`);
+    await insertRuntimeEvent(database, {
+      eventId: eventId(1_004),
+      kind: "message.delta",
+      occurredAt: 1_004_000,
+      payload: {
+        contentDelta: "te\uE202SECRET\uE201after",
+        messageId,
+        role: "agent",
+      },
+      seq: 1_004,
+      sessionId: threadId,
+    });
+    await insertRuntimeEvent(database, {
+      eventId: eventId(1_005),
+      kind: "tool.call.updated",
+      occurredAt: 1_005_000,
+      payload: {
+        rawInput: "{}",
+        status: "running",
+        title: "post_scan_marker",
+        toolCallId: "post-scan-marker",
+      },
+      seq: 1_005,
+      sessionId: threadId,
+    });
+    liveEvents.emit();
+    await readUntil(`id: ${eventId(1_005)}`);
+    await reader.cancel();
+    liveEvents.close();
+
+    expect(sseText).not.toContain("SECRET");
+    expect(sseText).not.toContain("\uE200");
+    expect(sseText).not.toContain(`id: ${eventId(1_004)}`);
+  }, 10_000);
+
+  test("trusts a delta parser when an exact full page reaches the database start", async () => {
+    const database = await createPublicHttpContractDatabase();
+    const app = createPublicThreadApiTestApp();
+    const liveEvents = createPublicEventSessionNamespace();
+    const threadId = generatedPublicThreadId(269);
+    const messageId = "exact-page-citation-stream";
+    const eventId = (seq: number) => generatedPublicThreadId(17_000 + seq);
+
+    await insertPublicThread(database, {
+      id: threadId,
+      title: "Exact page citation stream",
+      updatedAt: 1_000,
+    });
+    await insertRuntimeEvent(database, {
+      eventId: eventId(1),
+      kind: "message.delta",
+      occurredAt: 1_000,
+      payload: { contentDelta: "before\uE200ci", messageId, role: "agent" },
+      seq: 1,
+      sessionId: threadId,
+    });
+
+    for (let seq = 2; seq <= 1_000; seq += 1) {
+      await insertRuntimeEvent(database, {
+        eventId: eventId(seq),
+        kind: "tool.call.updated",
+        occurredAt: seq * 1_000,
+        payload: {
+          rawInput: "{}",
+          status: "running",
+          title: "page_filler",
+          toolCallId: `page-filler-${seq}`,
+        },
+        seq,
+        sessionId: threadId,
+      });
+    }
+
+    const response = await requestPublicApi(
+      app,
+      database,
+      new Request(`https://api.example.com/api/v1/threads/${threadId}/events/stream?limit=1`, {
+        headers: { Authorization: bearer(TOKENS.owner) },
+      }),
+      { sessionNamespace: liveEvents.binding },
+    );
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error("Expected stream response body.");
+    }
+    const decoder = new TextDecoder();
+    let sseText = "";
+    const readUntil = async (marker: string): Promise<void> => {
+      while (!sseText.includes(marker)) {
+        const chunk = await Promise.race([
+          reader.read(),
+          Bun.sleep(3_000).then(() => {
+            throw new Error(`Timed out waiting for ${marker}.`);
+          }),
+        ]);
+        if (chunk.done) {
+          throw new Error(`SSE closed before ${marker}.`);
+        }
+        sseText += decoder.decode(chunk.value, { stream: true });
+      }
+    };
+
+    await readUntil(`id: ${eventId(1_000)}`);
+    await insertRuntimeEvent(database, {
+      eventId: eventId(1_001),
+      kind: "message.delta",
+      occurredAt: 1_001_000,
+      payload: {
+        contentDelta: "te\uE202SECRET\uE201after",
+        messageId,
+        role: "agent",
+      },
+      seq: 1_001,
+      sessionId: threadId,
+    });
+    liveEvents.emit();
+    await readUntil(`id: ${eventId(1_001)}`);
+    await reader.cancel();
+    liveEvents.close();
+
+    expect(sseText).toContain('"content":"after"');
+    expect(sseText).not.toContain("SECRET");
+    expect(sseText).not.toContain("\uE200");
+  }, 10_000);
+
+  test("does not revive an omitted terminal snapshot on a later event", async () => {
+    const database = await createPublicHttpContractDatabase();
+    const app = createPublicThreadApiTestApp();
+    const liveEvents = createPublicEventSessionNamespace();
+    const threadId = generatedPublicThreadId(266);
+    const messageId = "omitted-terminal-snapshot";
+    const runId = PUBLIC_API_TEST_IDS.run;
+    const eventId = (seq: number) => generatedPublicThreadId(15_100 + seq);
+    const failure = {
+      error: {
+        code: "runtime.driver_terminal",
+        details: {},
+        message: "Driver disconnected.",
+        retryable: true,
+      },
+      recoverable: true,
+    };
+
+    await insertPublicThread(database, {
+      id: threadId,
+      title: "Omitted terminal snapshot",
+      updatedAt: 1_000,
+    });
+    await insertRuntimeEvent(database, {
+      eventId: eventId(1),
+      kind: "message.started",
+      occurredAt: 1_100,
+      payload: { messageId, role: "agent" },
+      runId,
+      seq: 1,
+      sessionId: threadId,
+    });
+    await insertRuntimeEvent(database, {
+      eventId: eventId(2),
+      kind: "message.added",
+      occurredAt: 1_200,
+      payload: { content: "OLD OMITTED", messageId, role: "agent" },
+      runId,
+      seq: 2,
+      sessionId: threadId,
+    });
+    await insertRuntimeEvent(database, {
+      eventId: eventId(3),
+      kind: "message.completed",
+      occurredAt: 1_300,
+      payload: { messageId, role: "agent" },
+      runId,
+      seq: 3,
+      sessionId: threadId,
+    });
+    await insertRuntimeEvent(database, {
+      eventId: eventId(4),
+      kind: "run.failed",
+      occurredAt: 1_400,
+      payload: failure,
+      runId,
+      seq: 4,
+      sessionId: threadId,
+    });
+    await insertRuntimeEvent(database, {
+      eventId: eventId(5),
+      kind: "tool.call.updated",
+      occurredAt: 1_500,
+      payload: {
+        rawInput: "{}",
+        status: "running",
+        title: "initial_marker",
+        toolCallId: "initial-terminal-marker",
+      },
+      runId,
+      seq: 5,
+      sessionId: threadId,
+    });
+
+    const response = await requestPublicApi(
+      app,
+      database,
+      new Request(`https://api.example.com/api/v1/threads/${threadId}/events/stream?limit=1`, {
+        headers: { Authorization: bearer(TOKENS.owner) },
+      }),
+      { sessionNamespace: liveEvents.binding },
+    );
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error("Expected stream response body.");
+    }
+    const decoder = new TextDecoder();
+    let sseText = "";
+    const readUntil = async (marker: string): Promise<void> => {
+      while (!sseText.includes(marker)) {
+        const chunk = await Promise.race([
+          reader.read(),
+          Bun.sleep(3_000).then(() => {
+            throw new Error(`Timed out waiting for ${marker}.`);
+          }),
+        ]);
+        if (chunk.done) {
+          throw new Error(`SSE closed before ${marker}.`);
+        }
+        sseText += decoder.decode(chunk.value, { stream: true });
+      }
+    };
+
+    await readUntil(`id: ${eventId(5)}`);
+    await insertRuntimeEvent(database, {
+      eventId: eventId(6),
+      kind: "tool.call.updated",
+      occurredAt: 1_600,
+      payload: {
+        rawInput: "{}",
+        status: "running",
+        title: "later_marker",
+        toolCallId: "later-terminal-marker",
+      },
+      runId,
+      seq: 6,
+      sessionId: threadId,
+    });
+    liveEvents.emit();
+    await readUntil(`id: ${eventId(6)}`);
+    await reader.cancel();
+    liveEvents.close();
+
+    expect(sseText).not.toContain("OLD OMITTED");
+    expect(sseText).not.toContain(`id: ${eventId(2)}`);
+  }, 10_000);
+
+  test("releases completed run state and rejects late fragments after the next run", async () => {
+    const database = await createPublicHttpContractDatabase();
+    const app = createPublicThreadApiTestApp();
+    const liveEvents = createPublicEventSessionNamespace();
+    const threadId = generatedPublicThreadId(267);
+    const firstRunId = PUBLIC_API_TEST_IDS.run;
+    const secondRunId = generatedPublicThreadId(15_250);
+    const messageId = "released-run-citation";
+    const eventId = (seq: number) => generatedPublicThreadId(15_300 + seq);
+
+    await insertPublicThread(database, {
+      id: threadId,
+      title: "Released run state",
+      updatedAt: 1_000,
+    });
+    const response = await requestPublicApi(
+      app,
+      database,
+      new Request(`https://api.example.com/api/v1/threads/${threadId}/events/stream`, {
+        headers: { Authorization: bearer(TOKENS.owner) },
+      }),
+      { sessionNamespace: liveEvents.binding },
+    );
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error("Expected stream response body.");
+    }
+    const decoder = new TextDecoder();
+    let sseText = "";
+    const readUntil = async (marker: string): Promise<void> => {
+      while (!sseText.includes(marker)) {
+        const chunk = await Promise.race([
+          reader.read(),
+          Bun.sleep(3_000).then(() => {
+            throw new Error(`Timed out waiting for ${marker}.`);
+          }),
+        ]);
+        if (chunk.done) {
+          throw new Error(`SSE closed before ${marker}.`);
+        }
+        sseText += decoder.decode(chunk.value, { stream: true });
+      }
+    };
+
+    await readUntil(": connected");
+    await insertRuntimeEvent(database, {
+      eventId: eventId(1),
+      kind: "message.started",
+      occurredAt: 1_100,
+      payload: { messageId, role: "agent" },
+      runId: firstRunId,
+      seq: 1,
+      sessionId: threadId,
+    });
+    await insertRuntimeEvent(database, {
+      eventId: eventId(2),
+      kind: "message.delta",
+      occurredAt: 1_200,
+      payload: { contentDelta: "before\uE200ci", messageId, role: "agent" },
+      runId: firstRunId,
+      seq: 2,
+      sessionId: threadId,
+    });
+    await insertRuntimeEvent(database, {
+      eventId: eventId(3),
+      kind: "run.failed",
+      occurredAt: 1_300,
+      payload: {
+        error: {
+          code: "runtime.driver_terminal",
+          details: {},
+          message: "Driver disconnected.",
+          retryable: true,
+        },
+        recoverable: true,
+      },
+      runId: firstRunId,
+      seq: 3,
+      sessionId: threadId,
+    });
+    liveEvents.emit();
+    await readUntil(`id: ${eventId(3)}`);
+    await insertRuntimeEvent(database, {
+      eventId: eventId(4),
+      kind: "run.started",
+      occurredAt: 1_400,
+      payload: { startedAt: "1970-01-01T00:00:01.400Z" },
+      runId: secondRunId,
+      seq: 4,
+      sessionId: threadId,
+    });
+    await insertRuntimeEvent(database, {
+      eventId: eventId(5),
+      kind: "message.delta",
+      occurredAt: 1_250,
+      payload: {
+        contentDelta: "te\uE202SECRET\uE201after",
+        messageId,
+        role: "agent",
+      },
+      runId: firstRunId,
+      seq: 5,
+      sessionId: threadId,
+    });
+    await insertRuntimeEvent(database, {
+      eventId: eventId(6),
+      kind: "tool.call.updated",
+      occurredAt: 1_500,
+      payload: {
+        rawInput: "{}",
+        status: "running",
+        title: "next_run_marker",
+        toolCallId: "next-run-marker",
+      },
+      runId: secondRunId,
+      seq: 6,
+      sessionId: threadId,
+    });
+    liveEvents.emit();
+    await readUntil(`id: ${eventId(6)}`);
+    await reader.cancel();
+    liveEvents.close();
+
+    expect(sseText).toContain('"content":"before"');
+    expect(sseText).not.toContain("SECRET");
+    expect(sseText).not.toContain(`id: ${eventId(5)}`);
+  }, 10_000);
+
+  test("reads a complete retained stream across public event pages", async () => {
+    const database = await createPublicHttpContractDatabase();
+    const app = createPublicThreadApiTestApp();
+    const threadId = generatedPublicThreadId(256);
+    const runId = PUBLIC_API_TEST_IDS.run;
+    const fragmentCount = 520;
+    const eventId = (seq: number) => generatedPublicThreadId(4_000 + seq);
+
+    await insertPublicThread(database, {
+      id: threadId,
+      title: "Paged public streams",
+      updatedAt: 1_000,
+    });
+    await insertRuntimeEvent(database, {
+      eventId: eventId(1),
+      kind: "run.started",
+      occurredAt: 1_000,
+      payload: { startedAt: "1970-01-01T00:00:01.000Z" },
+      runId,
+      seq: 1,
+      sessionId: threadId,
+    });
+    await insertRuntimeEvent(database, {
+      eventId: eventId(2),
+      kind: "thought.started",
+      occurredAt: 2_000,
+      payload: { thoughtId: "thought-a" },
+      runId,
+      seq: 2,
+      sessionId: threadId,
+    });
+    await insertRuntimeEvent(database, {
+      eventId: eventId(3),
+      kind: "thought.started",
+      occurredAt: 3_000,
+      payload: { thoughtId: "thought-b" },
+      runId,
+      seq: 3,
+      sessionId: threadId,
+    });
+
+    for (let index = 0; index < fragmentCount; index += 1) {
+      const seq = index * 2 + 4;
+      await insertRuntimeEvent(database, {
+        eventId: eventId(seq),
+        kind: "thought.delta",
+        occurredAt: seq * 1_000,
+        payload: { contentDelta: "a", thoughtId: "thought-a" },
+        runId,
+        seq,
+        sessionId: threadId,
+      });
+      await insertRuntimeEvent(database, {
+        eventId: eventId(seq + 1),
+        kind: "thought.delta",
+        occurredAt: (seq + 1) * 1_000,
+        payload: { contentDelta: "b", thoughtId: "thought-b" },
+        runId,
+        seq: seq + 1,
+        sessionId: threadId,
+      });
+    }
+
+    const firstTerminalSeq = fragmentCount * 2 + 4;
+    for (const [offset, thoughtId] of ["thought-a", "thought-b"].entries()) {
+      const seq = firstTerminalSeq + offset;
+      await insertRuntimeEvent(database, {
+        eventId: eventId(seq),
+        kind: "thought.completed",
+        occurredAt: seq * 1_000,
+        payload: { thoughtId },
+        runId,
+        seq,
+        sessionId: threadId,
+      });
+    }
+    await insertRuntimeEvent(database, {
+      eventId: eventId(firstTerminalSeq + 2),
+      kind: "run.completed",
+      occurredAt: (firstTerminalSeq + 2) * 1_000,
+      payload: { stopReason: "end_turn" },
+      runId,
+      seq: firstTerminalSeq + 2,
+      sessionId: threadId,
+    });
+
+    const response = await requestPublicApi(
+      app,
+      database,
+      new Request(`https://api.example.com/api/v1/threads/${threadId}/events?limit=2`, {
+        headers: { Authorization: bearer(TOKENS.owner) },
+      }),
+    );
+    const body = await readJson(response);
+    const events = expectArray(body["events"]).map(expectRecord);
+
+    expect(body["truncated"]).toBe(true);
+    expect(events.map((event) => event["type"])).toEqual(["agent.thinking.delta", "run.completed"]);
+    expect(events[0]?.["content"]).toBe("b".repeat(fragmentCount));
+  });
+
+  test("orders public pages by durable sequence rather than driver time", async () => {
+    const database = await createPublicHttpContractDatabase();
+    const app = createPublicThreadApiTestApp();
+    const threadId = generatedPublicThreadId(261);
+    const runId = PUBLIC_API_TEST_IDS.run;
+    const fragmentCount = 1_002;
+    const eventId = (seq: number) => generatedPublicThreadId(10_000 + seq);
+
+    await insertPublicThread(database, {
+      id: threadId,
+      title: "Occurrence-ordered public stream",
+      updatedAt: 1_000,
+    });
+    await insertRuntimeEvent(database, {
+      eventId: eventId(1),
+      kind: "run.started",
+      occurredAt: 1_000,
+      payload: { startedAt: "1970-01-01T00:00:01.000Z" },
+      runId,
+      seq: 1,
+      sessionId: threadId,
+    });
+    await insertRuntimeEvent(database, {
+      eventId: eventId(2),
+      kind: "message.started",
+      occurredAt: 100_000,
+      payload: { messageId: "out-of-order-public-message", role: "agent" },
+      runId,
+      seq: 2,
+      sessionId: threadId,
+    });
+
+    for (let index = 0; index < fragmentCount; index += 1) {
+      const seq = index + 3;
+      await insertRuntimeEvent(database, {
+        eventId: eventId(seq),
+        kind: "message.delta",
+        occurredAt: 101_000 + index,
+        payload: {
+          contentDelta: "x",
+          messageId: "out-of-order-public-message",
+          role: "agent",
+        },
+        runId,
+        seq,
+        sessionId: threadId,
+      });
+    }
+
+    const toolSeq = fragmentCount + 3;
+    await insertRuntimeEvent(database, {
+      eventId: eventId(toolSeq),
+      kind: "tool.call.updated",
+      occurredAt: 2_000,
+      payload: {
+        rawInput: "{}",
+        status: "running",
+        title: "read_file",
+        toolCallId: "out-of-order-tool",
+      },
+      runId,
+      seq: toolSeq,
+      sessionId: threadId,
+    });
+    const runTerminalSeq = toolSeq + 1;
+    await insertRuntimeEvent(database, {
+      eventId: eventId(runTerminalSeq),
+      kind: "run.completed",
+      occurredAt: 3_000,
+      payload: { stopReason: "end_turn" },
+      runId,
+      seq: runTerminalSeq,
+      sessionId: threadId,
+    });
+
+    const response = await requestPublicApi(
+      app,
+      database,
+      new Request(`https://api.example.com/api/v1/threads/${threadId}/events?limit=2`, {
+        headers: { Authorization: bearer(TOKENS.owner) },
+      }),
+    );
+    const body = await readJson(response);
+    const events = expectArray(body["events"]).map(expectRecord);
+
+    expect(body["truncated"]).toBe(true);
+    expect(events.map((event) => event["type"])).toEqual(["tool.use.started", "run.completed"]);
+    expect(events[0]?.["toolCallId"]).toBe("out-of-order-tool");
+  });
+
+  test("fails closed for a public message cut by the raw scan ceiling", async () => {
+    const database = await createPublicHttpContractDatabase();
+    const app = createPublicThreadApiTestApp();
+    const liveEvents = createPublicEventSessionNamespace();
+    const threadId = generatedPublicThreadId(257);
+    const runId = PUBLIC_API_TEST_IDS.run;
+    const fragmentCount = 20_001;
+    const eventId = (seq: number) => generatedPublicThreadId(7_000 + seq);
+
+    await insertPublicThread(database, {
+      id: threadId,
+      title: "Ceiling-bounded public stream",
+      updatedAt: 1_000,
+    });
+    await insertRuntimeEvent(database, {
+      eventId: eventId(1),
+      kind: "message.started",
+      occurredAt: 1_000,
+      payload: { messageId: "ceiling-message", role: "agent" },
+      runId,
+      seq: 1,
+      sessionId: threadId,
+    });
+
+    for (let index = 0; index < fragmentCount; index += 1) {
+      const seq = index + 2;
+      await insertRuntimeEvent(database, {
+        eventId: eventId(seq),
+        kind: "message.delta",
+        occurredAt: seq * 1_000,
+        payload: {
+          contentDelta: index === 0 ? "before\uE200ci" : index === 1 ? "te\uE202SECRET" : "SECRET",
+          messageId: "ceiling-message",
+          role: "agent",
+        },
+        runId,
+        seq,
+        sessionId: threadId,
+      });
+    }
+
+    const messageTerminalSeq = fragmentCount + 2;
+    await insertRuntimeEvent(database, {
+      eventId: eventId(messageTerminalSeq),
+      kind: "message.completed",
+      occurredAt: messageTerminalSeq * 1_000,
+      payload: { messageId: "ceiling-message", role: "agent" },
+      runId,
+      seq: messageTerminalSeq,
+      sessionId: threadId,
+    });
+    const finalMessageSeq = messageTerminalSeq + 1;
+    await insertRuntimeEvent(database, {
+      eventId: eventId(finalMessageSeq),
+      kind: "message.added",
+      occurredAt: finalMessageSeq * 1_000,
+      payload: {
+        content: "Complete final answer",
+        messageId: "complete-final-message",
+        role: "agent",
+      },
+      runId,
+      seq: finalMessageSeq,
+      sessionId: threadId,
+    });
+    const runTerminalSeq = finalMessageSeq + 1;
+    const runTerminalEventId = eventId(runTerminalSeq);
+    await insertRuntimeEvent(database, {
+      eventId: runTerminalEventId,
+      kind: "run.completed",
+      occurredAt: runTerminalSeq * 1_000,
+      payload: { stopReason: "end_turn" },
+      runId,
+      seq: runTerminalSeq,
+      sessionId: threadId,
+    });
+
+    const listResponse = await requestPublicApi(
+      app,
+      database,
+      new Request(`https://api.example.com/api/v1/threads/${threadId}/events?limit=2`, {
+        headers: { Authorization: bearer(TOKENS.owner) },
+      }),
+    );
+    const listBody = await readJson(listResponse);
+    const listEvents = expectArray(listBody["events"]).map(expectRecord);
+    expect(listBody["truncated"]).toBe(true);
+    expect(listEvents.map((event) => event["type"])).toEqual([
+      "agent.message.delta",
+      "run.completed",
+    ]);
+    expect(listEvents[0]?.["content"]).toBe("Complete final answer");
+
+    const streamResponse = await requestPublicApi(
+      app,
+      database,
+      new Request(`https://api.example.com/api/v1/threads/${threadId}/events/stream?limit=2`, {
+        headers: { Authorization: bearer(TOKENS.owner) },
+      }),
+      { sessionNamespace: liveEvents.binding },
+    );
+    const reader = streamResponse.body?.getReader();
+    if (!reader) {
+      throw new Error("Expected stream response body.");
+    }
+    const decoder = new TextDecoder();
+    let sseText = "";
+
+    while (!sseText.includes(`id: ${runTerminalEventId}`)) {
+      const chunk = await reader.read();
+      if (chunk.done) {
+        throw new Error("SSE closed before the initial canonical event.");
+      }
+      sseText += decoder.decode(chunk.value, { stream: true });
+    }
+
+    const lateDeltaSeq = runTerminalSeq + 1;
+    await insertRuntimeEvent(database, {
+      eventId: eventId(lateDeltaSeq),
+      kind: "message.delta",
+      occurredAt: lateDeltaSeq * 1_000,
+      payload: {
+        contentDelta: "SECRET\uE201after",
+        messageId: "ceiling-message",
+        role: "agent",
+      },
+      runId,
+      seq: lateDeltaSeq,
+      sessionId: threadId,
+    });
+    const markerSeq = lateDeltaSeq + 1;
+    const markerEventId = eventId(markerSeq);
+    await insertRuntimeEvent(database, {
+      eventId: markerEventId,
+      kind: "tool.call.updated",
+      occurredAt: markerSeq * 1_000,
+      payload: {
+        rawInput: "{}",
+        status: "running",
+        title: "ceiling_marker",
+        toolCallId: "ceiling-marker",
+      },
+      runId,
+      seq: markerSeq,
+      sessionId: threadId,
+    });
+    liveEvents.emit();
+
+    while (!sseText.includes(`id: ${markerEventId}`)) {
+      const chunk = await reader.read();
+      if (chunk.done) {
+        throw new Error("SSE closed before the post-ceiling marker.");
+      }
+      sseText += decoder.decode(chunk.value, { stream: true });
+    }
+
+    await reader.cancel();
+    liveEvents.close();
+    const liveEventsBody = sseText
+      .split("\n")
+      .filter((line) => line.startsWith("data: "))
+      .map((line) => expectRecord(JSON.parse(line.slice("data: ".length))));
+
+    expect(liveEventsBody.slice(0, listEvents.length)).toEqual(listEvents);
+    expect(liveEventsBody.at(-1)?.["id"]).toBe(markerEventId);
+    expect(sseText).not.toContain("SECRET");
+    expect(sseText).not.toContain("\uE200");
+  }, 30_000);
+
+  test("reads row-scoped pre-0015 stream identities after migration", async () => {
+    const database = await createPre0015PublicHttpContractDatabase();
+    const app = createPublicThreadApiTestApp();
+    const threadId = generatedPublicThreadId(999);
+    const eventIds = ["01J0000000000000000000001F", "01J0000000000000000000001G"];
+
+    await database
+      .prepare(
+        `INSERT INTO session (
+           agent_id, archived_at, end_user_id, created_at, creator_account_id,
+           deployment_version_id, deployment_version_number, id, kind,
+           metadata_json, model, project_id, provider, renamed, runtime_id, status,
+           title, type, updated_at
+         ) VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        PUBLIC_API_TEST_IDS.agent,
+        "customer-123",
+        1_000,
+        PUBLIC_API_TEST_IDS.ownerAccount,
+        PUBLIC_API_TEST_IDS.deployment,
+        1,
+        threadId,
+        "pet",
+        JSON.stringify({
+          public_api: {
+            created_by: {
+              token_id: PUBLIC_API_TEST_IDS.patOwner,
+              token_label: PUBLIC_API_TEST_IDS.patOwner,
+            },
+            idempotency_key: null,
+            source: "public_api",
+          },
+        }),
+        "gpt-5.4",
+        PUBLIC_API_TEST_IDS.project,
+        "openai",
+        false,
+        "openai-runtime",
+        "IDLE",
+        "Pre-0015 stream fixture",
+        "ui",
+        1_000,
+      )
+      .run();
+    for (const [index, eventId] of eventIds.entries()) {
+      await database
+        .prepare(
+          `INSERT INTO session_event (
+             id, session_id, agent_id, seq, content_text, ended_at, event_type,
+             family, process_status, process_type, source, source_event_id,
+             visibility, occurred_at, created_at
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(
+          eventId,
+          threadId,
+          PUBLIC_API_TEST_IDS.agent,
+          index + 1,
+          `Legacy row ${index + 1}`,
+          1_100 + index,
+          "message.delta",
+          "process",
+          "available",
+          "agent.message.delta",
+          "driver",
+          eventId,
+          "all_consumers",
+          1_100 + index,
+          1_100 + index,
+        )
+        .run();
+    }
+
+    migratePre0015PublicHttpContractDatabase(database);
+
+    const rows = await database
+      .prepare(
+        `SELECT content_text, ended_at, event_type, id, occurred_at,
+                process_status, process_type, run_id, seq, stream_id, tokens
+           FROM session_event
+          WHERE session_id = ?
+          ORDER BY seq`,
+      )
+      .bind(threadId)
+      .all<SessionEventProcessRow>();
+    expect(rows.results.map((row) => row.stream_id)).toEqual(eventIds);
+    await expect(
+      database
+        .prepare(
+          "SELECT semantic_hash, tool_parent_message_id, tool_result_message_id, tool_status FROM session_event WHERE session_id = ? ORDER BY seq",
+        )
+        .bind(threadId)
+        .all(),
+    ).resolves.toMatchObject({
+      results: eventIds.map(() => ({
+        semantic_hash: null,
+        tool_parent_message_id: null,
+        tool_result_message_id: null,
+        tool_status: null,
+      })),
+      success: true,
+    });
+    await expect(
+      database
+        .prepare("UPDATE session_event SET semantic_hash = 'not-a-sha256' WHERE id = ?")
+        .bind(eventIds[0])
+        .run(),
+    ).rejects.toThrow();
+    expect(
+      createSessionProcessEventsFromSessionEventRows(rows.results).map((event) => event.content),
+    ).toEqual(["Legacy row 1", "Legacy row 2"]);
+
+    const response = await requestPublicApi(
+      app,
+      database,
+      new Request(`https://api.example.com/api/v1/threads/${threadId}/events`, {
+        headers: { Authorization: bearer(TOKENS.owner) },
+      }),
+    );
+    expect(response.status).toBe(200);
+    expect(
+      expectArray((await readJson(response))["events"]).map(
+        (event) => expectRecord(event)["content"],
+      ),
+    ).toEqual(["Legacy row 1", "Legacy row 2"]);
+
+    await database
+      .prepare(
+        "UPDATE session_event SET event_type = 'tool.call.updated', run_id = ?, tool_call_id = 'tool-1', tool_status = 'completed', mcp_command_id = '01J0000000000000000000001J' WHERE id = ?",
+      )
+      .bind(PUBLIC_API_TEST_IDS.run, eventIds[0])
+      .run();
+    await expect(
+      database
+        .prepare(
+          "UPDATE session_event SET event_type = 'tool.call.updated', run_id = ?, tool_call_id = 'tool-1', tool_status = 'running' WHERE id = ?",
+        )
+        .bind(PUBLIC_API_TEST_IDS.run, eventIds[1])
+        .run(),
+    ).resolves.toBeDefined();
+    await expect(
+      database
+        .prepare(
+          "UPDATE session_event SET tool_status = 'failed', mcp_command_id = '01J0000000000000000000001J' WHERE id = ?",
+        )
+        .bind(eventIds[1])
+        .run(),
+    ).rejects.toThrow("UNIQUE constraint failed");
+  });
 
   test("bounds public Thread lists on stable latest ordering", async () => {
     const database = await createPublicHttpContractDatabase();
@@ -1300,7 +3660,7 @@ describe("Public Thread API e2e", () => {
     const app = createPublicThreadApiTestApp();
     const bucket = new PublicApiMemoryFileBucket();
     const requestThreadApi = (request: Request) =>
-      requestPublicApi(app, database, request, { fileBucket: bucket as unknown as R2Bucket });
+      requestPublicApi(app, database, request, { fileBucket: bucket });
 
     await withProviderProbeMock(async () => {
       const createThreadResponse = await requestThreadApi(
@@ -1624,7 +3984,7 @@ describe("Public Thread API e2e", () => {
     const app = createPublicThreadApiTestApp();
     const bucket = new PublicApiMemoryFileBucket();
     const requestThreadApi = (request: Request) =>
-      requestPublicApi(app, database, request, { fileBucket: bucket as unknown as R2Bucket });
+      requestPublicApi(app, database, request, { fileBucket: bucket });
 
     await withProviderProbeMock(async () => {
       const fileBody = "Launch note.\n";
@@ -1844,7 +4204,7 @@ describe("Public Thread API e2e", () => {
     const app = createPublicThreadApiTestApp();
     const bucket = new PublicApiMemoryFileBucket();
     const requestThreadApi = (request: Request) =>
-      requestPublicApi(app, database, request, { fileBucket: bucket as unknown as R2Bucket });
+      requestPublicApi(app, database, request, { fileBucket: bucket });
     const threadId = generatedPublicThreadId(130);
 
     await insertPublicThread(database, {

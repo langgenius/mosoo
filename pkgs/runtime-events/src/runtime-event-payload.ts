@@ -1,9 +1,15 @@
+import { AgentTasksReplacedPayload } from "@mosoo/contracts/session";
+import type {
+  AgentTaskSnapshot,
+  AgentTasksReplacedPayload as AgentTasksReplacedPayloadValue,
+} from "@mosoo/contracts/session";
+import { parseSchemaValue } from "@mosoo/contracts/validation";
 import type { DriverInstanceId, SessionId, SessionRunId } from "@mosoo/id";
 
 import type { RuntimeEventEnvelope, RuntimeEventKind } from "./runtime-event";
 
 export type RuntimeEventRecord = Record<string, unknown>;
-export type RuntimeEventToolStatus = "completed" | "failed" | "running";
+export type RuntimeEventToolStatus = "cancelled" | "completed" | "failed" | "running";
 export type RuntimeEventMessageRole = "agent" | "user";
 export type RuntimeRunLifecycleStatus = "IDLE" | "RESCHEDULING" | "RUNNING" | "TERMINATED";
 export type RuntimeRunStatus =
@@ -41,13 +47,17 @@ export interface RuntimeEventPermissionRequest {
   readonly toolKind: string | null;
 }
 
+export type RuntimeAgentTasksReplacedPayload = AgentTasksReplacedPayloadValue;
+
 export interface RuntimeEventToolCallUpdate {
   readonly content: string | null;
   readonly kind: string | null;
   readonly messageId: string | null;
   readonly parentMessageId: string | null;
   readonly rawInput: string | null;
+  readonly rawInputDelta: string | null;
   readonly rawOutput: string | null;
+  readonly rawOutputDelta: string | null;
   readonly status: RuntimeEventToolStatus;
   readonly title: string | null;
   readonly toolCallId: string;
@@ -101,6 +111,15 @@ export interface RuntimeEventPayloadAdmissionContext {
   readonly traceId?: string | undefined;
 }
 
+interface RuntimeEventPayloadSource {
+  readonly payload: unknown;
+}
+
+interface RuntimeEventToolCallSource extends RuntimeEventPayloadSource {
+  readonly id: string;
+  readonly kind: string;
+}
+
 const runtimeTimingPaths = new Set<string>(["cold", "prewarm", "unknown", "warm"]);
 const runtimeTimingSources = new Set<string>(["api", "driver"]);
 const runtimeTimingStages = new Set<string>([
@@ -124,7 +143,7 @@ const runStatuses = new Set<string>([
   "running",
   "waiting_input",
 ]);
-const toolStatuses = new Set<string>(["completed", "failed", "running"]);
+const toolStatuses = new Set<string>(["cancelled", "completed", "failed", "running"]);
 const payloadIdentityFields = new Set<string>([
   "occurredAt",
   "receivedAt",
@@ -157,6 +176,9 @@ export function admitRuntimeEventPayload(
   const kind = context.kind;
 
   switch (kind) {
+    case "agent.tasks.replaced": {
+      return readStrictRuntimeAgentTasksReplacedPayload(context, payload);
+    }
     case "diagnostic.reported": {
       const record = requireRuntimeEventPayloadRecord(kind, payload);
       requireOptionalString(record, "code", kind);
@@ -174,20 +196,33 @@ export function admitRuntimeEventPayload(
       return omitRuntimeEventPayloadIdentity(requireRuntimeEventPayloadRecord(kind, payload));
     }
     case "message.added":
+    case "message.cancelled":
     case "message.completed":
-    case "message.started":
-    case "thought.completed":
-    case "thought.started": {
+    case "message.started": {
       const record = requireRuntimeEventPayloadRecord(kind, payload);
       requireOptionalMessageRole(record, kind);
-      requireOptionalString(record, "messageId", kind);
-      requireOptionalString(record, "thoughtId", kind);
+      requireRuntimeEventString(record, "messageId", kind);
 
       if (kind === "message.added" && !hasRuntimeEventTextContent(record)) {
         throw new Error("Runtime event message.added payload must include text content.");
       }
 
       return omitRuntimeEventPayloadIdentity(record);
+    }
+    case "thought.cancelled":
+    case "thought.completed":
+    case "thought.started": {
+      const record = requireRuntimeEventPayloadRecord(kind, payload);
+      requireRuntimeEventString(record, "thoughtId", kind);
+      return omitRuntimeEventPayloadIdentity(record);
+    }
+    case "message.failed": {
+      const record = requireRuntimeEventPayloadRecord(kind, payload);
+      requireRuntimeEventString(record, "messageId", kind);
+      requireOptionalMessageRole(record, kind);
+      const admitted = omitRuntimeEventPayloadIdentity(record);
+      admitted["error"] = readStrictRuntimeRunError(kind, record["error"], "error");
+      return admitted;
     }
     case "message.delta": {
       const record = requireRuntimeEventPayloadRecord(kind, payload);
@@ -196,7 +231,7 @@ export function admitRuntimeEventPayload(
         throw new Error("Runtime event message.delta payload must include text content.");
       }
       requireOptionalMessageRole(record, kind);
-      requireOptionalString(record, "messageId", kind);
+      requireRuntimeEventString(record, "messageId", kind);
       return omitRuntimeEventPayloadIdentity(record);
     }
     case "thought.delta": {
@@ -205,7 +240,7 @@ export function admitRuntimeEventPayload(
       if (!hasRuntimeEventTextContent(record)) {
         throw new Error("Runtime event thought.delta payload must include text content.");
       }
-      requireOptionalString(record, "thoughtId", kind);
+      requireRuntimeEventString(record, "thoughtId", kind);
       return omitRuntimeEventPayloadIdentity(record);
     }
     case "tool.call.updated": {
@@ -271,7 +306,29 @@ export function admitRuntimeEventPayload(
   }
 }
 
-export function readRuntimeEventPayload(event: RuntimeEventEnvelope): RuntimeEventRecord {
+export function readRuntimeAgentTaskSnapshot(event: RuntimeEventEnvelope): AgentTaskSnapshot {
+  if (event.kind !== "agent.tasks.replaced") {
+    throw new Error("Runtime agent task snapshot can only be read from agent.tasks.replaced.");
+  }
+
+  const payload = readStrictRuntimeAgentTasksReplacedPayload(
+    {
+      ...(event.driverInstanceId === undefined ? {} : { driverInstanceId: event.driverInstanceId }),
+      kind: event.kind,
+      ...(event.runId === undefined ? {} : { runId: event.runId }),
+      sessionId: event.sessionId,
+    },
+    event.payload,
+  );
+
+  return {
+    driverInstanceId: event.driverInstanceId!,
+    runId: event.runId!,
+    tasks: [...payload.tasks],
+  };
+}
+
+export function readRuntimeEventPayload(event: RuntimeEventPayloadSource): RuntimeEventRecord {
   return isRuntimeEventRecord(event.payload) ? event.payload : {};
 }
 
@@ -348,7 +405,13 @@ export function readRuntimeEventPrimitiveRecord(
 }
 
 export function readRuntimeEventToolStatus(status: unknown): RuntimeEventToolStatus {
-  return status === "failed" ? "failed" : status === "completed" ? "completed" : "running";
+  return status === "cancelled"
+    ? "cancelled"
+    : status === "failed"
+      ? "failed"
+      : status === "completed"
+        ? "completed"
+        : "running";
 }
 
 export function readRuntimeEventToolStatusFromEvent(
@@ -365,6 +428,20 @@ export function readRuntimeEventToolCallUpdate(
   }
 
   return readStrictRuntimeToolCallUpdatePayload(event.payload);
+}
+
+export function readRuntimeEventToolOutputSnapshot(
+  toolCall: RuntimeEventToolCallUpdate,
+): string | null {
+  if (toolCall.rawOutputDelta !== null) {
+    return null;
+  }
+
+  return (
+    toolCall.rawOutput ??
+    toolCall.content ??
+    (toolCall.status === "failed" ? `${toolCall.title ?? toolCall.kind ?? "Tool"} failed.` : null)
+  );
 }
 
 export function readRuntimeRunPayload(event: RuntimeEventEnvelope): RuntimeRunPayload {
@@ -414,15 +491,18 @@ export function readRuntimeEventMessageKey(event: RuntimeEventEnvelope): string 
 
   switch (event.kind) {
     case "message.added":
+    case "message.cancelled":
     case "message.completed":
     case "message.delta":
+    case "message.failed":
     case "message.started": {
-      return readRuntimeEventString(payload, "messageId") ?? event.id;
+      return requireRuntimeEventString(payload, "messageId", event.kind);
     }
+    case "thought.cancelled":
     case "thought.completed":
     case "thought.delta":
     case "thought.started": {
-      return readRuntimeEventString(payload, "thoughtId") ?? event.id;
+      return requireRuntimeEventString(payload, "thoughtId", event.kind);
     }
     default: {
       return null;
@@ -479,7 +559,7 @@ export function readRuntimeEventMessageDelta(event: RuntimeEventEnvelope): strin
   );
 }
 
-export function readRuntimeEventToolCallId(event: RuntimeEventEnvelope): string | null {
+export function readRuntimeEventToolCallId(event: RuntimeEventToolCallSource): string | null {
   if (event.kind !== "tool.call.updated") {
     return null;
   }
@@ -503,18 +583,52 @@ function readStrictRuntimeToolCallUpdatePayload(payload: unknown): RuntimeEventT
   const kind = "tool.call.updated";
   const record = requireRuntimeEventPayloadRecord(kind, payload);
   const status = requireEnumValue(record, "status", toolStatuses, kind);
+  const rawInput = readOptionalRuntimeEventText(record, "rawInput", kind);
+  const rawInputDelta = readOptionalRuntimeEventText(record, "rawInputDelta", kind);
+  const rawOutput = readOptionalRuntimeEventText(record, "rawOutput", kind);
+  const rawOutputDelta = readOptionalRuntimeEventText(record, "rawOutputDelta", kind);
+
+  if (rawInput !== null && rawInputDelta !== null) {
+    throw new Error(
+      "Runtime event tool.call.updated payload cannot contain both rawInput and rawInputDelta.",
+    );
+  }
+
+  if (rawOutput !== null && rawOutputDelta !== null) {
+    throw new Error(
+      "Runtime event tool.call.updated payload cannot contain both rawOutput and rawOutputDelta.",
+    );
+  }
 
   return {
     content: readOptionalRuntimeEventContentString(record, "content", kind),
     kind: readOptionalRuntimeEventString(record, "kind", kind),
     messageId: readOptionalRuntimeEventString(record, "messageId", kind),
     parentMessageId: readOptionalRuntimeEventString(record, "parentMessageId", kind),
-    rawInput: readOptionalRuntimeEventString(record, "rawInput", kind),
-    rawOutput: readOptionalRuntimeEventString(record, "rawOutput", kind),
+    rawInput,
+    rawInputDelta,
+    rawOutput,
+    rawOutputDelta,
     status: status as RuntimeEventToolStatus,
     title: readOptionalRuntimeEventNullableString(record, "title", kind),
     toolCallId: requireRuntimeEventString(record, "toolCallId", kind),
   };
+}
+
+function readStrictRuntimeAgentTasksReplacedPayload(
+  context: RuntimeEventPayloadAdmissionContext,
+  payload: unknown,
+): RuntimeAgentTasksReplacedPayload {
+  const kind = "agent.tasks.replaced";
+
+  if (context.driverInstanceId === undefined) {
+    throw new Error(`Runtime event ${kind} requires a driver instance ID.`);
+  }
+  if (context.runId === undefined) {
+    throw new Error(`Runtime event ${kind} requires a run ID.`);
+  }
+
+  return parseSchemaValue(AgentTasksReplacedPayload, payload);
 }
 
 export function readRuntimeEventFileChangePath(payload: RuntimeEventRecord): string | null {
@@ -746,6 +860,11 @@ function readStrictRuntimeRunPayload(
 
   requireOptionalEnumValue(record, "lifecycle", runLifecycleStatuses, kind);
   requireOptionalEnumValue(record, "status", runStatuses, kind);
+  const status = record["status"];
+
+  if (status !== undefined && !isRuntimeRunStatusAllowedForKind(kind, status as string)) {
+    throw new Error(`Runtime event ${kind} payload status is inconsistent.`);
+  }
   requireOptionalString(record, "inputSummary", kind);
   requireOptionalString(record, "reason", kind);
   requireOptionalString(record, "requestedBy", kind);
@@ -755,6 +874,16 @@ function readStrictRuntimeRunPayload(
   requireOptionalStringArray(record, "inputItemIds", kind);
   requireOptionalTimestampString(record, "completedAt", kind);
   requireOptionalTimestampString(record, "startedAt", kind);
+
+  if (kind === "run.completed") {
+    if ("finalMessageId" in record) {
+      requireRuntimeEventString(record, "finalMessageId", kind);
+    }
+
+    if ("finalMessageText" in record) {
+      throw new Error("Runtime event run.completed payload finalMessageText is unsupported.");
+    }
+  }
 
   const admitted = omitRuntimeEventPayloadIdentity(record);
 
@@ -772,6 +901,22 @@ function readStrictRuntimeRunPayload(
 
   if (kind === "run.failed" && !isRuntimeEventRecord(admitted["error"])) {
     throw new Error("Runtime event run.failed payload must include an error.");
+  }
+
+  if (kind === "run.failed") {
+    const error = requireRuntimeEventPayloadRecord(kind, record["error"], "error");
+    const recoverable = record["recoverable"];
+    const retryable = error["retryable"];
+
+    if (typeof recoverable !== "boolean" || typeof retryable !== "boolean") {
+      throw new Error(
+        "Runtime event run.failed payload recoverable and error.retryable must be booleans.",
+      );
+    }
+
+    if (recoverable !== retryable) {
+      throw new Error("Runtime event run.failed payload recoverable must match error.retryable.");
+    }
   }
 
   return admitted;
@@ -1103,6 +1248,17 @@ function readOptionalRuntimeEventString(
   return requireRuntimeEventString(record, field, kind);
 }
 
+function readOptionalRuntimeEventText(
+  record: RuntimeEventRecord,
+  field: string,
+  kind: RuntimeEventKind,
+): string | null {
+  requireOptionalNullableString(record, field, kind);
+
+  const value = record[field];
+  return typeof value === "string" ? value : null;
+}
+
 function requireOptionalNullableString(
   record: RuntimeEventRecord,
   field: string,
@@ -1193,7 +1349,7 @@ function requireNonNegativeNumber(record: RuntimeEventRecord, field: string): nu
   return value;
 }
 
-// Driver Contract v2 emits timing timestamps as ISO 8601 strings (completedAt/
+// Driver Contract v3 emits timing timestamps as ISO 8601 strings (completedAt/
 // startedAt) while API-produced timing snapshots still carry epoch-ms fields
 // (completedAtMs/startedAtMs). Accept either and normalize to epoch ms.
 function requireTimingTimestampMs(

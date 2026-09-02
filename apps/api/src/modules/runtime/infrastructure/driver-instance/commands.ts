@@ -12,7 +12,7 @@ export interface DriverInstanceCommandState {
 }
 
 interface CommandOptions {
-  markCommandDelivered: (command: RuntimeCommand) => Promise<boolean>;
+  markCommandDelivered: (command: RuntimeCommand) => Promise<"delivered" | "discarded" | "retry">;
   persistCommandQueue: () => Promise<void>;
 }
 
@@ -37,17 +37,17 @@ async function dispatchQueuedRuntimeCommands(
     try {
       waiter.assertActiveConnection();
       await options.persistCommandQueue();
-      const delivered = await waiter.markCommandDelivered(command);
+      const delivery = await waiter.markCommandDelivered(command);
       waiter.assertActiveConnection();
 
-      if (!delivered) {
+      if (delivery === "retry") {
         state.commandQueue.unshift(command);
         await options.persistCommandQueue();
         waiter.deferred.resolve(null);
         continue;
       }
 
-      waiter.deferred.resolve(command);
+      waiter.deferred.resolve(delivery === "delivered" ? command : null);
     } catch {
       state.commandQueue.unshift(command);
       await options.persistCommandQueue();
@@ -89,16 +89,16 @@ export async function nextRuntimeCommand(
     }
 
     options.assertActiveConnection();
-    const delivered = await options.markCommandDelivered(command);
+    const delivery = await options.markCommandDelivered(command);
     options.assertActiveConnection();
 
-    if (!delivered) {
+    if (delivery === "retry") {
       state.commandQueue.unshift(command);
       await options.persistCommandQueue();
       return null;
     }
 
-    return command;
+    return delivery === "delivered" ? command : null;
   }
 
   if (state.terminalized) {

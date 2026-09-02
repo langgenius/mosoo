@@ -3,6 +3,7 @@ import { parsePlatformId } from "@mosoo/id";
 
 export interface ApiCommandMessage {
   commandId: ApiCommandId;
+  deliveryGeneration: number;
 }
 
 export function parseApiCommandMessage(value: unknown): ApiCommandMessage {
@@ -11,8 +12,20 @@ export function parseApiCommandMessage(value: unknown): ApiCommandMessage {
   }
 
   const commandId = (value as Record<string, unknown>)["commandId"];
+  const deliveryGeneration = (value as Record<string, unknown>)["deliveryGeneration"];
+
+  if (
+    typeof deliveryGeneration !== "number" ||
+    !Number.isSafeInteger(deliveryGeneration) ||
+    deliveryGeneration <= 0
+  ) {
+    throw new Error(
+      "API command queue message deliveryGeneration must be a positive safe integer.",
+    );
+  }
 
   return {
     commandId: parsePlatformId<ApiCommandId>(commandId, "API command queue message commandId"),
+    deliveryGeneration,
   };
 }

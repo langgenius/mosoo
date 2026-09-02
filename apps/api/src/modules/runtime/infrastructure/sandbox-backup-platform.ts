@@ -1,8 +1,5 @@
-import {
-  getSessionResourceRootPath,
-  getSessionRuntimeStatePath,
-  getSessionStateRootPath,
-} from "@mosoo/agent-driver/paths";
+import { getSessionRuntimeStatePath } from "@mosoo/agent-driver/paths";
+import type { SandboxBackupId } from "@mosoo/id";
 
 import {
   withDisposedRpcResource,
@@ -13,100 +10,124 @@ import {
   decodeSandboxBackupIdForPlatform,
   encodeSandboxBackupIdForStorage,
 } from "./sandbox-backup-id";
-import type { SandboxHandle } from "./sandbox-handles";
+import {
+  beginSandboxBackupDeletionAttempt,
+  completeSandboxBackupDeletion,
+  isSandboxBackupDeletionAuthorized,
+} from "./sandbox-backup-store";
+import { toRuntimeSubjectIncarnationHandle } from "./sandbox-handles";
 
-interface SandboxBackupObject {
+const RUNTIME_SANDBOX_BACKUP_NAME_PREFIX = "mosoo:runtime-backup:v1:";
+
+export interface SandboxBackupObject {
+  readonly dir: string;
+  readonly id: SandboxBackupId;
+}
+
+export interface SandboxBackupMetadata {
   readonly dir: string;
   readonly id: string;
+  readonly name: string | null;
 }
 
-function isMissingRuntimeBucketMountError(error: unknown): boolean {
-  return error instanceof Error && error.message.includes("No active mount found at path:");
+export function createRuntimeSandboxBackupName(stagingId: SandboxBackupId): string {
+  return `${RUNTIME_SANDBOX_BACKUP_NAME_PREFIX}${stagingId}`;
 }
 
-function quoteShellArg(value: string): string {
-  return `'${value.replaceAll("'", `'"'"'`)}'`;
-}
-
-async function prepareRuntimeSessionWorkspaceCheckpoint(
-  sandbox: SandboxHandle,
-  input: {
-    readonly cwd: string;
-    readonly sessionId: string;
-  },
-): Promise<void> {
-  const resourceRoot = getSessionResourceRootPath(input.sessionId);
-  const stateRoot = getSessionStateRootPath(input.sessionId);
-  const openAiAuthPath = `${getSessionRuntimeStatePath(input.sessionId, "openai-runtime")}/auth.json`;
-
-  if (!resourceRoot.startsWith(`${input.cwd}/`) || !stateRoot.startsWith(`${input.cwd}/`)) {
-    throw new Error("Session checkpoint exclusions must stay inside the session workspace.");
+export function parseRuntimeSandboxBackupName(value: string | null): SandboxBackupId | null {
+  if (value === null || !value.startsWith(RUNTIME_SANDBOX_BACKUP_NAME_PREFIX)) {
+    return null;
   }
-
+  const stagingId = value.slice(RUNTIME_SANDBOX_BACKUP_NAME_PREFIX.length);
   try {
-    await sandbox.unmountBucket(resourceRoot);
-  } catch (error) {
-    if (!isMissingRuntimeBucketMountError(error)) {
-      throw error;
-    }
+    return encodeSandboxBackupIdForStorage(stagingId);
+  } catch {
+    return null;
   }
-
-  const command = [
-    "set -eu",
-    `cwd=${quoteShellArg(input.cwd)}`,
-    'test -d "$cwd"',
-    `resource_root=${quoteShellArg(resourceRoot)}`,
-    'if [ -L "$resource_root" ]; then unlink "$resource_root"; elif mountpoint -q "$resource_root"; then fusermount -u "$resource_root"; fi',
-    'if [ -e "$resource_root" ]; then rm -rf "$resource_root"; fi',
-    `state_root=${quoteShellArg(stateRoot)}`,
-    'if [ -d "$state_root" ]; then find "$state_root" -type f -name "driver-boot-payload-*.json" -delete; fi',
-    `rm -f ${quoteShellArg(openAiAuthPath)}`,
-    "sync",
-  ].join("; ");
-
-  await withDisposedRpcResult(sandbox.exec(`sh -lc ${quoteShellArg(command)}`), (result) => {
-    if (!result.success || result.exitCode !== 0) {
-      const detail = result.stderr.trim();
-      throw new Error(
-        `Session workspace could not be prepared for a credential-safe checkpoint${detail ? `: ${detail}` : "."}`,
-      );
-    }
-  });
 }
 
-function getSandboxBackupObjectKeys(backupId: string): string[] {
-  const platformBackupId = decodeSandboxBackupIdForPlatform(backupId);
+export function parseSandboxBackupMetadata(value: unknown): SandboxBackupMetadata | null {
+  if (typeof value !== "object" || value === null) {
+    return null;
+  }
+  const dir = Reflect.get(value, "dir");
+  const id = Reflect.get(value, "id");
+  const name = Reflect.get(value, "name");
+  return typeof dir === "string" &&
+    dir.length > 0 &&
+    typeof id === "string" &&
+    (name === null || typeof name === "string")
+    ? { dir, id, name }
+    : null;
+}
 
-  return [`backups/${platformBackupId}/data.sqsh`, `backups/${platformBackupId}/meta.json`];
+export function getSandboxBackupObjectKeys(backupId: string): readonly [string, string] {
+  const platformId = decodeSandboxBackupIdForPlatform(backupId);
+  return [`backups/${platformId}/data.sqsh`, `backups/${platformId}/meta.json`];
+}
+
+async function readSandboxBackupMetadata(
+  bindings: Pick<ApiBindings, "SANDBOX_STATE_BUCKET">,
+  backupId: SandboxBackupId,
+): Promise<SandboxBackupMetadata | null> {
+  const [, metadataKey] = getSandboxBackupObjectKeys(backupId);
+  const stored = await bindings.SANDBOX_STATE_BUCKET.get(metadataKey);
+  if (stored === null) {
+    return null;
+  }
+  try {
+    return parseSandboxBackupMetadata(JSON.parse(await stored.text()));
+  } catch {
+    return null;
+  }
+}
+
+export async function isRuntimeSandboxBackupObjectReady(
+  bindings: Pick<ApiBindings, "SANDBOX_STATE_BUCKET">,
+  input: {
+    readonly backupId: SandboxBackupId;
+    readonly dir: string;
+    readonly stagingId: SandboxBackupId;
+  },
+): Promise<boolean> {
+  const [dataKey] = getSandboxBackupObjectKeys(input.backupId);
+  const [data, metadata] = await Promise.all([
+    bindings.SANDBOX_STATE_BUCKET.head(dataKey),
+    readSandboxBackupMetadata(bindings, input.backupId),
+  ]);
+  return (
+    data !== null &&
+    metadata?.id === decodeSandboxBackupIdForPlatform(input.backupId) &&
+    metadata.dir === input.dir &&
+    parseRuntimeSandboxBackupName(metadata.name) === input.stagingId
+  );
 }
 
 export async function createRuntimeSandboxBackup(
   bindings: ApiBindings,
   input: {
     readonly dir: string;
+    readonly incarnation: number;
     readonly sandboxId: string;
     readonly sessionId: string | null;
+    readonly stagingId: SandboxBackupId;
     readonly ttlSeconds: number;
   },
 ): Promise<SandboxBackupObject> {
   const { getRuntimeSubjectKeepAliveHandle } =
     await import("./runtime-subject-lifecycle/runtime-subject-lifecycle.service");
-
   return withDisposedRpcResource(
-    await getRuntimeSubjectKeepAliveHandle(bindings, input.sandboxId),
+    await getRuntimeSubjectKeepAliveHandle(bindings, input.sandboxId, input.incarnation),
     async (sandbox) => {
-      if (input.sessionId !== null) {
-        await prepareRuntimeSessionWorkspaceCheckpoint(sandbox, {
-          cwd: input.dir,
-          sessionId: input.sessionId,
-        });
-      } else {
-        await sandbox.mkdir(input.dir, { recursive: true });
-      }
-
+      const forbiddenPaths =
+        input.sessionId === null
+          ? undefined
+          : [`${getSessionRuntimeStatePath(input.sessionId, "openai-runtime")}/auth.json`];
       return withDisposedRpcResult(
-        sandbox.createBackup({
+        toRuntimeSubjectIncarnationHandle(sandbox).createRuntimeSubjectBackup(input.incarnation, {
           dir: input.dir,
+          ...(forbiddenPaths === undefined ? {} : { forbiddenPaths }),
+          name: createRuntimeSandboxBackupName(input.stagingId),
           ttl: input.ttlSeconds,
         }),
         (result) => ({
@@ -118,15 +139,16 @@ export async function createRuntimeSandboxBackup(
   );
 }
 
-export async function deleteSandboxBackupObjects(
-  bindings: ApiBindings,
-  backupIds: readonly string[],
+export async function deleteAuthorizedSandboxBackupObjects(
+  bindings: Pick<ApiBindings, "DB" | "SANDBOX_STATE_BUCKET">,
+  backupIds: readonly SandboxBackupId[],
 ): Promise<void> {
-  if (backupIds.length === 0) {
-    return;
+  for (const backupId of new Set(backupIds)) {
+    if (!(await isSandboxBackupDeletionAuthorized(bindings.DB, backupId))) {
+      throw new Error("Sandbox backup object deletion lacks a durable D1 intent.");
+    }
+    await beginSandboxBackupDeletionAttempt(bindings.DB, backupId);
+    await bindings.SANDBOX_STATE_BUCKET.delete([...getSandboxBackupObjectKeys(backupId)]);
+    await completeSandboxBackupDeletion(bindings.DB, backupId);
   }
-
-  const objectKeys = backupIds.flatMap((backupId) => getSandboxBackupObjectKeys(backupId));
-
-  await bindings.SANDBOX_STATE_BUCKET.delete(objectKeys);
 }

@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import type { ReactElement } from "react";
 
 import { cn } from "@/shared/lib/class-names";
@@ -66,23 +66,18 @@ function useSectionNavigation(input: {
     environment: null,
     integrations: null,
   });
-  const scrolledFocusRef = useRef<AgentFormSectionId | null>(null);
 
-  if (input.focusSection === null) {
-    scrolledFocusRef.current = null;
-  }
+  useEffect(() => {
+    if (input.focusSection !== null) {
+      sectionRefs.current[input.focusSection]?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }
+  }, [input.focusSection]);
 
   function setSectionRef(sectionId: AgentFormSectionId, node: HTMLDivElement | null): void {
     sectionRefs.current[sectionId] = node;
-
-    if (
-      node !== null &&
-      input.focusSection === sectionId &&
-      scrolledFocusRef.current !== sectionId
-    ) {
-      scrolledFocusRef.current = sectionId;
-      node.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
   }
 
   const activeRings = input.highlightedSections ?? new Set<AgentFormSectionId>();

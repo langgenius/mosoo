@@ -4,6 +4,7 @@ import {
   sandboxesTable,
   sandboxSessionsTable,
   sessionRunsTable,
+  sessionsTable,
 } from "@mosoo/db";
 import type { SandboxBackupId, SandboxId } from "@mosoo/id";
 import { and, eq, inArray, or, sql } from "drizzle-orm";
@@ -31,6 +32,7 @@ const activeRuntimeSubjectRunsTable = alias(sessionRunsTable, "active_runtime_su
 const liveSubjectDriversTable = alias(driverInstancesTable, "live_runtime_subject_driver");
 const runLeaseDriversTable = alias(driverInstancesTable, "runtime_run_lease_driver");
 const runLeaseRunsTable = alias(sessionRunsTable, "runtime_run_lease_run");
+const provisioningSessionsTable = alias(sessionsTable, "runtime_provisioning_session");
 export const readyConversationBackupTable = alias(sandboxBackupsTable, "ready_conversation_backup");
 export const lastBackupTable = alias(sandboxBackupsTable, "last_backup");
 export const readyLastBackupTable = alias(sandboxBackupsTable, "ready_last_backup");
@@ -72,7 +74,7 @@ export function activeConversationSessionQuery(appDb: AppDatabase, runtimeSubjec
     .where(
       and(
         eq(activeConversationSessionsTable.sandboxId, runtimeSubjectId),
-        eq(activeConversationSessionsTable.status, "active"),
+        inArray(activeConversationSessionsTable.status, ["active", "cleanup_pending"]),
       ),
     );
 }
@@ -84,7 +86,7 @@ export function activeConversationSessionQueryForListedSubject(appDb: AppDatabas
     .where(
       and(
         eq(activeConversationSessionsTable.sandboxId, sandboxesTable.id),
-        eq(activeConversationSessionsTable.status, "active"),
+        inArray(activeConversationSessionsTable.status, ["active", "cleanup_pending"]),
       ),
     );
 }
@@ -152,6 +154,20 @@ export function runLeaseQueryForListedSubject(appDb: AppDatabase) {
         inArray(runLeaseRunsTable.status, ACTIVE_SESSION_RUN_STATUSES),
       ),
     );
+}
+
+export function runtimeProvisioningQuery(appDb: AppDatabase, runtimeSubjectId: SandboxId) {
+  return appDb
+    .select({ id: provisioningSessionsTable.id })
+    .from(provisioningSessionsTable)
+    .where(eq(provisioningSessionsTable.runtimeProvisioningSandboxId, runtimeSubjectId));
+}
+
+export function runtimeProvisioningQueryForListedSubject(appDb: AppDatabase) {
+  return appDb
+    .select({ id: provisioningSessionsTable.id })
+    .from(provisioningSessionsTable)
+    .where(eq(provisioningSessionsTable.runtimeProvisioningSandboxId, sandboxesTable.id));
 }
 
 export function getRuntimeSubjectInactiveDeadlineSql(now: number) {

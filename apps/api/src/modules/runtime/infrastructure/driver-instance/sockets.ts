@@ -1,68 +1,102 @@
 import { sleepPromise } from "@mosoo/effects";
 
+import type { DriverInstanceConnectionEpoch } from "./state";
+
 const DRIVER_SOCKET_TAG = "driver";
+
+function parseDriverSocketEpoch(socket: WebSocket): DriverInstanceConnectionEpoch | null {
+  const attachment: unknown = socket.deserializeAttachment();
+
+  if (
+    typeof attachment !== "object" ||
+    attachment === null ||
+    !("connectionId" in attachment) ||
+    !("generation" in attachment) ||
+    typeof attachment.connectionId !== "string" ||
+    attachment.connectionId.length === 0 ||
+    !Number.isSafeInteger(attachment.generation) ||
+    (attachment.generation as number) < 0
+  ) {
+    return null;
+  }
+
+  return {
+    connectionId: attachment.connectionId,
+    generation: attachment.generation as number,
+  };
+}
+
+function epochsMatch(
+  left: DriverInstanceConnectionEpoch,
+  right: DriverInstanceConnectionEpoch,
+): boolean {
+  return left.connectionId === right.connectionId && left.generation === right.generation;
+}
 
 export class DriverInstanceSocketRegistry {
   readonly #ctx: DurableObjectState;
-  #activeDriverSocket: WebSocket | null = null;
 
   constructor(ctx: DurableObjectState) {
     this.#ctx = ctx;
   }
 
-  acceptDriverSocket(socket: WebSocket): void {
-    // Hibernation accept: the socket survives Durable Object eviction, and
-    // driver messages re-instantiate this object. Command delivery does not
-    // depend on in-memory waiters — the driver polls nextCommand, which
-    // claims from D1 — so waking into a fresh instance is safe.
+  acceptDriverSocket(socket: WebSocket, epoch: DriverInstanceConnectionEpoch): void {
     this.#ctx.acceptWebSocket(socket, [DRIVER_SOCKET_TAG]);
-    this.#activeDriverSocket = socket;
+    socket.serializeAttachment(epoch);
   }
 
-  getDriverSocket(): WebSocket | null {
-    if (this.#activeDriverSocket && this.#activeDriverSocket.readyState !== WebSocket.CLOSED) {
-      return this.#activeDriverSocket;
+  getSocketEpoch(socket: WebSocket): DriverInstanceConnectionEpoch | null {
+    return parseDriverSocketEpoch(socket);
+  }
+
+  socketMatchesEpoch(socket: WebSocket, epoch: DriverInstanceConnectionEpoch): boolean {
+    const socketEpoch = parseDriverSocketEpoch(socket);
+    return socketEpoch !== null && epochsMatch(socketEpoch, epoch);
+  }
+
+  isCurrentDriverSocket(
+    socket: WebSocket,
+    capturedEpoch: DriverInstanceConnectionEpoch,
+    currentEpoch: DriverInstanceConnectionEpoch | null,
+  ): boolean {
+    return (
+      currentEpoch !== null &&
+      epochsMatch(capturedEpoch, currentEpoch) &&
+      this.socketMatchesEpoch(socket, capturedEpoch)
+    );
+  }
+
+  getDriverSocket(epoch: DriverInstanceConnectionEpoch | null): WebSocket | null {
+    if (epoch === null) {
+      return null;
     }
 
-    const [socket] = this.#ctx.getWebSockets(DRIVER_SOCKET_TAG);
-    return socket ?? null;
-  }
-
-  isActiveDriverSocket(socket: WebSocket): boolean {
-    return this.getDriverSocket() === socket;
-  }
-
-  /**
-   * True when a different, still-open driver socket has superseded this one.
-   * Close/error events from superseded sockets must not finalize the state
-   * that now belongs to the successor connection.
-   */
-  isSupersededDriverSocket(socket: WebSocket): boolean {
-    const current = this.getDriverSocket();
-    return current !== null && current !== socket;
-  }
-
-  releaseDriverSocket(socket: WebSocket): void {
-    if (this.#activeDriverSocket === socket) {
-      this.#activeDriverSocket = null;
-    }
+    return (
+      this.#ctx
+        .getWebSockets(DRIVER_SOCKET_TAG)
+        .find(
+          (socket) =>
+            socket.readyState === WebSocket.OPEN && this.socketMatchesEpoch(socket, epoch),
+        ) ?? null
+    );
   }
 
   replaceDriverSockets(): void {
-    if (this.#activeDriverSocket && this.#activeDriverSocket.readyState !== WebSocket.CLOSED) {
-      this.#activeDriverSocket.close(1012, "runtime.socket.replaced");
-      this.#activeDriverSocket = null;
-    }
-
-    for (const existingSocket of this.#ctx.getWebSockets(DRIVER_SOCKET_TAG)) {
-      existingSocket.close(1012, "runtime.socket.replaced");
+    for (const socket of this.#ctx.getWebSockets(DRIVER_SOCKET_TAG)) {
+      if (socket.readyState === WebSocket.OPEN) {
+        socket.close(1012, "runtime.socket.replaced");
+      }
     }
   }
 
-  scheduleDriverSocketClose(code: number, reason: string): void {
-    const socket = this.getDriverSocket();
+  scheduleDriverSocketClose(
+    epoch: DriverInstanceConnectionEpoch,
+    code: number,
+    reason: string,
+  ): void {
+    const socket = this.getDriverSocket(epoch);
 
-    if (!socket || socket.readyState !== WebSocket.OPEN) {
+    if (socket === null) {
       return;
     }
 

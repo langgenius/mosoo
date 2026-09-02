@@ -24,11 +24,14 @@ import {
 import { decodeAndHashBootToken } from "../runtime-boot-token";
 import { toDriverInstanceRequestErrorStatus } from "./connections";
 import { json, toErrorMessage } from "./driver-instance-support";
-import { claimDriverInstanceByBootTokenHash } from "./driver-instance-token.repository";
+import {
+  claimDriverInstanceByBootTokenHash,
+  validateDriverInstanceBootTokenHash,
+} from "./driver-instance-token.repository";
 import { runtimeSessionLinkNeedsRefresh } from "./event-types";
 import { handleDriverInstanceRequest } from "./http";
 import type { DriverInstanceHttpHandler } from "./http";
-import { getDriverInstanceStatus, markDriverInstanceConnected } from "./lifecycle";
+import { getDriverInstanceLifecycleIdentity, markDriverInstanceConnected } from "./lifecycle";
 import { createDriverInstanceRpcContext } from "./rpc";
 import type { DriverInstanceRpcContext } from "./rpc";
 import { DriverInstanceRpcController } from "./rpc-controller";
@@ -39,8 +42,7 @@ import { SessionViewerEventDeliveryBuffer } from "./session-viewer-event-deliver
 import { DriverInstanceSocketRegistry } from "./sockets";
 import type {
   DriverInstanceCloseSnapshot,
-  DriverInstanceHeartbeatResult,
-  DriverInstanceHelloResult,
+  DriverInstanceConnectionEpoch,
   DriverInstanceReadyResult,
   DriverInstanceSnapshot,
   DriverInstanceWaitForCloseResult,
@@ -48,7 +50,8 @@ import type {
 import { DriverInstanceTerminalStateCoordinator } from "./terminal-state-coordinator";
 
 export class DriverInstance extends DurableObject implements DriverInstanceHttpHandler {
-  #destroyed = false;
+  #destroyedGeneration: number | null = null;
+  #destroyTask: Promise<void> | null = null;
   readonly #identity = new DurableObjectIdentity({
     mismatchMessage: "Driver instance id does not match the active Durable Object.",
     requiredMessage: "Driver instance id is required.",
@@ -87,7 +90,7 @@ export class DriverInstance extends DurableObject implements DriverInstanceHttpH
     });
     this.#rpcController = new DriverInstanceRpcController({
       env,
-      finalizeTerminalState: async () => this.#terminalState.finalize(),
+      finalizeTerminalState: async (epoch) => this.#terminalState.finalize(epoch),
       sockets: this.#sockets,
       state: this.#state,
       viewCache: this.#viewCache,
@@ -95,16 +98,40 @@ export class DriverInstance extends DurableObject implements DriverInstanceHttpH
       waitUntil: (task) => this.ctx.waitUntil(task),
       withRuntimeLogContext: (fn) => this.#withRuntimeLogContext(fn),
     });
-    void this.ctx.blockConcurrencyWhile(async () => this.#state.load());
+    void this.ctx.blockConcurrencyWhile(async () => {
+      await this.#state.load();
+
+      if (this.#state.driverInstanceId !== null && this.#state.driverGeneration === null) {
+        const identity = await getDriverInstanceLifecycleIdentity(
+          this.env,
+          this.#state.driverInstanceId,
+        );
+
+        if (identity !== null) {
+          await this.#state.setDriverGeneration(identity.generation);
+        }
+      }
+
+      if (
+        (this.#state.terminalized || this.#state.errorMessage !== null) &&
+        !this.#state.terminalCleanupComplete
+      ) {
+        const epoch = this.#state.connectionEpoch();
+
+        if (epoch !== null) {
+          await this.#finalizeTerminalState(epoch);
+        }
+      }
+    });
   }
 
   override async fetch(request: Request): Promise<Response> {
     try {
       const url = new URL(request.url);
 
-      if (this.#destroyed) {
+      if (this.#destroyedGeneration !== null) {
         if (request.method === "POST" && url.pathname === "/control/destroy") {
-          return json({ ok: true });
+          return handleDriverInstanceRequest(this, request);
         }
 
         return json({ error: "Driver instance Durable Object was destroyed." }, { status: 410 });
@@ -127,20 +154,16 @@ export class DriverInstance extends DurableObject implements DriverInstanceHttpH
   }
 
   override async webSocketClose(ws: WebSocket, code: number, reason: string): Promise<void> {
-    if (this.#destroyed) {
+    if (this.#destroyedGeneration !== null) {
       return;
     }
 
     this.#rpcHandler?.close(ws);
+    const epoch = this.#sockets.getSocketEpoch(ws);
 
-    // A socket replaced by a newer accepted connection must not finalize the
-    // state that now belongs to its successor.
-    if (this.#sockets.isSupersededDriverSocket(ws)) {
-      this.#sockets.releaseDriverSocket(ws);
+    if (epoch === null || !this.#isCurrentSocketEpoch(ws, epoch)) {
       return;
     }
-
-    this.#sockets.releaseDriverSocket(ws);
 
     const close: DriverInstanceCloseSnapshot = {
       at: new Date().toISOString(),
@@ -148,7 +171,11 @@ export class DriverInstance extends DurableObject implements DriverInstanceHttpH
       reason,
     };
 
-    await this.#state.persistClose(close);
+    await this.#state.persistClose(close, epoch);
+
+    if (!this.#isCurrentSocketEpoch(ws, epoch)) {
+      return;
+    }
 
     this.#withRuntimeLogContext(() => {
       logInfo("runtime.socket.closed", {
@@ -157,48 +184,54 @@ export class DriverInstance extends DurableObject implements DriverInstanceHttpH
         driverInstanceId: this.#state.driverInstanceId,
       });
     });
-    await this.#appendTransportWsDisconnectedEvent(close);
+    await this.#appendTransportWsDisconnectedEvent(close, epoch);
 
-    if (!this.#state.hello) {
-      this.#state.rejectHelloWaiters(
-        new Error(`Driver instance socket closed before hello: ${reason || code}.`),
-      );
-    }
-
-    await this.#terminalState.finalize();
-  }
-
-  override async webSocketMessage(ws: WebSocket, message: ArrayBuffer | string): Promise<void> {
-    if (this.#destroyed) {
+    if (!this.#isCurrentSocketEpoch(ws, epoch)) {
       return;
     }
 
-    if (!this.#sockets.isActiveDriverSocket(ws)) {
+    await this.#finalizeTerminalState(epoch);
+  }
+
+  override async webSocketMessage(ws: WebSocket, message: ArrayBuffer | string): Promise<void> {
+    if (this.#destroyedGeneration !== null) {
+      return;
+    }
+
+    const epoch = this.#sockets.getSocketEpoch(ws);
+
+    if (epoch === null || !this.#isCurrentSocketEpoch(ws, epoch)) {
       return;
     }
 
     try {
       const rpcHandler = await this.#getRpcHandler();
 
-      if (!this.#sockets.isActiveDriverSocket(ws)) {
+      if (!this.#isCurrentSocketEpoch(ws, epoch)) {
         return;
       }
-      const connectionId = this.#state.requireConnectionId();
 
       await rpcHandler.message(ws, message, {
         context: createDriverInstanceRpcContext(this.#rpcController, {
           assertActiveConnection: () => {
-            if (
-              this.#state.connectionId !== connectionId ||
-              !this.#sockets.isActiveDriverSocket(ws)
-            ) {
+            if (!this.#isCurrentSocketEpoch(ws, epoch)) {
               throw new Error("Driver connection is no longer current.");
             }
           },
-          connectionId,
+          connectionId: epoch.connectionId,
+          epoch,
         }),
       });
+
+      if (!this.#isCurrentSocketEpoch(ws, epoch)) {
+        this.#closeSocket(ws, 1000, "runtime.socket.superseded");
+      }
     } catch (error) {
+      if (!this.#isCurrentSocketEpoch(ws, epoch)) {
+        this.#closeSocket(ws, 1000, "runtime.socket.superseded");
+        return;
+      }
+
       this.#withRuntimeLogContext(() => {
         logError("runtime.socket.message.failed", {
           ...createErrorLogContext(error),
@@ -206,15 +239,27 @@ export class DriverInstance extends DurableObject implements DriverInstanceHttpH
         });
       });
 
-      await this.#state.setErrorMessage(
+      await this.#state.setConnectionErrorMessage(
+        epoch,
         toErrorMessage(error, "Driver instance WebSocket message failed."),
       );
-      await this.#appendTransportRpcErrorEvent(error);
+
+      if (!this.#isCurrentSocketEpoch(ws, epoch)) {
+        this.#closeSocket(ws, 1000, "runtime.socket.superseded");
+        return;
+      }
+
+      await this.#appendTransportRpcErrorEvent(error, epoch);
+
+      if (!this.#isCurrentSocketEpoch(ws, epoch)) {
+        this.#closeSocket(ws, 1000, "runtime.socket.superseded");
+        return;
+      }
 
       if (ws.readyState === WebSocket.OPEN) {
         ws.close(1003, "runtime.invalid-message");
       } else {
-        await this.#terminalState.finalize();
+        await this.#finalizeTerminalState(epoch);
       }
     }
   }
@@ -236,11 +281,14 @@ export class DriverInstance extends DurableObject implements DriverInstanceHttpH
   }
 
   override async webSocketError(ws: WebSocket, _error: unknown): Promise<void> {
-    if (this.#destroyed) {
+    if (this.#destroyedGeneration !== null) {
       return;
     }
 
-    if (this.#sockets.isSupersededDriverSocket(ws)) {
+    const epoch = this.#sockets.getSocketEpoch(ws);
+
+    if (epoch === null || !this.#isCurrentSocketEpoch(ws, epoch)) {
+      this.#closeSocket(ws, 1000, "runtime.socket.superseded");
       return;
     }
 
@@ -250,15 +298,24 @@ export class DriverInstance extends DurableObject implements DriverInstanceHttpH
       });
     });
 
-    await this.#state.setErrorMessage("Driver instance WebSocket error.");
-    await this.#appendTransportRpcErrorEvent("Driver instance WebSocket error.");
+    await this.#state.setConnectionErrorMessage(epoch, "Driver instance WebSocket error.");
 
-    const socket = this.#sockets.getDriverSocket();
+    if (!this.#isCurrentSocketEpoch(ws, epoch)) {
+      this.#closeSocket(ws, 1000, "runtime.socket.superseded");
+      return;
+    }
 
-    if (socket && socket.readyState === WebSocket.OPEN) {
-      socket.close(1011, "runtime.socket.error");
+    await this.#appendTransportRpcErrorEvent("Driver instance WebSocket error.", epoch);
+
+    if (!this.#isCurrentSocketEpoch(ws, epoch)) {
+      this.#closeSocket(ws, 1000, "runtime.socket.superseded");
+      return;
+    }
+
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.close(1011, "runtime.socket.error");
     } else {
-      await this.#terminalState.finalize();
+      await this.#finalizeTerminalState(epoch);
     }
   }
 
@@ -282,59 +339,97 @@ export class DriverInstance extends DurableObject implements DriverInstanceHttpH
       return json({ error: "Boot token is invalid." }, { status: 401 });
     }
 
-    if (this.#state.terminalized) {
-      await this.#terminalState.resetForReuse();
-    }
+    return this.ctx.blockConcurrencyWhile(async () => {
+      const validation = await validateDriverInstanceBootTokenHash(this.env, bootTokenHash);
+      const driverInstanceId = this.#state.requireDriverInstanceId();
 
-    const claim = await claimDriverInstanceByBootTokenHash(this.env, bootTokenHash);
+      if (
+        validation.driverInstanceId === null ||
+        validation.generation === null ||
+        validation.driverInstanceId !== driverInstanceId
+      ) {
+        return json({ error: validation.error ?? "Boot token is invalid." }, { status: 401 });
+      }
 
-    if (
-      claim.driverInstanceId === null ||
-      claim.generation === null ||
-      claim.driverInstanceId !== this.#state.requireDriverInstanceId()
-    ) {
-      return json({ error: claim.error ?? "Boot token is invalid." }, { status: 401 });
-    }
+      let shouldReset = this.#state.terminalized;
 
-    const connectedAt = Date.now();
-    const connectionId = createPlatformId();
-    const connected = await markDriverInstanceConnected(this.env, {
-      bootTokenHash,
-      connectedAt,
-      connectionId,
-      driverInstanceId: this.#state.requireDriverInstanceId(),
-      generation: claim.generation,
-    });
+      if (shouldReset) {
+        if (!this.#state.terminalCleanupComplete) {
+          const epoch = this.#state.connectionEpoch();
 
-    if (!connected) {
-      return json({ error: "Driver connection is no longer current." }, { status: 409 });
-    }
+          if (epoch !== null) {
+            await this.#finalizeTerminalState(epoch);
+          }
+        }
 
-    const traceparent = url.searchParams.get("traceparent");
-    const parsedTraceparent = isTruthy(traceparent) ? parseTraceparent(traceparent) : null;
-    const pair = new WebSocketPair();
-    const [clientSocket, serverSocket] = [pair[0], pair[1]];
+        if (validation.generation <= this.#state.requireDriverGeneration()) {
+          return json({ error: "Driver generation is no longer current." }, { status: 409 });
+        }
 
-    this.#sockets.replaceDriverSockets();
-    this.#sockets.acceptDriverSocket(serverSocket);
+        await this.#terminalState.prepareForReuse();
+      } else if (this.#state.requireDriverGeneration() !== validation.generation) {
+        if (this.#state.connectionId !== null) {
+          return json({ error: "Driver generation is no longer current." }, { status: 409 });
+        }
 
-    await this.#state.recordAcceptedConnection({
-      connectedAt,
-      connectionId,
-      driverGeneration: claim.generation,
-      traceId: parsedTraceparent?.traceId ?? null,
-    });
+        shouldReset = true;
+        await this.#terminalState.prepareForReuse();
+      }
 
-    this.#withRuntimeLogContext(() => {
-      logInfo("runtime.socket.accepted", {
+      const claim = await claimDriverInstanceByBootTokenHash(this.env, bootTokenHash);
+
+      if (
+        claim.driverInstanceId !== driverInstanceId ||
+        claim.generation !== validation.generation
+      ) {
+        return json({ error: claim.error ?? "Boot token is invalid." }, { status: 401 });
+      }
+
+      if (shouldReset) {
+        await this.#terminalState.resetForReuse(validation.generation);
+      }
+
+      const connectedAt = Date.now();
+      const connectionId = createPlatformId();
+      const connected = await markDriverInstanceConnected(this.env, {
+        bootTokenHash,
+        connectedAt,
         connectionId,
-        driverInstanceId: this.#state.requireDriverInstanceId(),
+        driverInstanceId,
+        generation: validation.generation,
       });
-    });
 
-    return new Response(null, {
-      status: 101,
-      webSocket: clientSocket,
+      if (!connected) {
+        return json({ error: "Driver connection is no longer current." }, { status: 409 });
+      }
+
+      const traceparent = url.searchParams.get("traceparent");
+      const parsedTraceparent = isTruthy(traceparent) ? parseTraceparent(traceparent) : null;
+      const pair = new WebSocketPair();
+      const [clientSocket, serverSocket] = [pair[0], pair[1]];
+      const epoch = { connectionId, generation: validation.generation };
+
+      this.#sockets.replaceDriverSockets();
+      this.#sockets.acceptDriverSocket(serverSocket, epoch);
+
+      await this.#state.recordAcceptedConnection({
+        connectedAt,
+        connectionId,
+        driverGeneration: validation.generation,
+        traceId: parsedTraceparent?.traceId ?? null,
+      });
+
+      this.#withRuntimeLogContext(() => {
+        logInfo("runtime.socket.accepted", {
+          connectionId,
+          driverInstanceId,
+        });
+      });
+
+      return new Response(null, {
+        status: 101,
+        webSocket: clientSocket,
+      });
     });
   }
 
@@ -346,12 +441,17 @@ export class DriverInstance extends DurableObject implements DriverInstanceHttpH
         this.#identity.ensure(candidate);
       }
 
-      if (this.#state.terminalized) {
-        const status = await getDriverInstanceStatus(this.env, this.#state.driverInstanceId);
+      if (this.#state.driverGeneration === null) {
+        const identity = await getDriverInstanceLifecycleIdentity(
+          this.env,
+          this.#state.driverInstanceId,
+        );
 
-        if (status === "provisioning" || status === "connecting" || status === "ready") {
-          await this.#terminalState.resetForReuse();
+        if (identity === null) {
+          throw new Error("Driver instance record was not found.");
         }
+
+        await this.#state.setDriverGeneration(identity.generation);
       }
 
       return this.#state.driverInstanceId;
@@ -361,77 +461,117 @@ export class DriverInstance extends DurableObject implements DriverInstanceHttpH
       this.#identity.ensure(candidate),
       "driver instance id",
     );
-    await this.#state.setDriverInstanceId(driverInstanceId);
+    const identity = await getDriverInstanceLifecycleIdentity(this.env, driverInstanceId);
+
+    if (identity === null) {
+      throw new Error("Driver instance record was not found.");
+    }
+
+    await this.#state.initializeDriverInstance(driverInstanceId, identity.generation);
     return driverInstanceId;
   }
 
-  async sendControlCommand(command: RuntimeCommand): Promise<void> {
-    const socket = this.#sockets.getDriverSocket();
+  async sendControlCommand(generation: number, command: RuntimeCommand): Promise<void> {
+    return this.ctx.blockConcurrencyWhile(async () => {
+      await this.#assertCurrentGeneration(generation);
+      const epoch = this.#state.requireConnectionEpoch();
+      const socket = this.#sockets.getDriverSocket(epoch);
 
-    if (!socket || socket.readyState !== WebSocket.OPEN) {
-      const message = "Runtime driver control socket is not connected.";
-      await this.#state.setErrorMessage(message);
-      await this.#terminalState.finalize();
-      throw new Error(message);
-    }
+      if (!socket || socket.readyState !== WebSocket.OPEN) {
+        const message = "Runtime driver control socket is not connected.";
+        await this.#state.setConnectionErrorMessage(epoch, message);
+        await this.#finalizeTerminalState(epoch);
+        throw new Error(message);
+      }
 
-    await this.#rpcController.enqueueCommand(command);
+      await this.#rpcController.enqueueCommand(generation, command);
+    });
   }
 
-  async destroy(reason: string): Promise<void> {
-    if (this.#destroyed) {
-      return;
-    }
+  async destroy(generation: number, reason: string): Promise<void> {
+    return this.ctx.blockConcurrencyWhile(async () => {
+      if (this.#destroyedGeneration !== null) {
+        if (this.#destroyedGeneration !== generation) {
+          throw new Error("Driver generation is no longer current.");
+        }
 
-    this.#destroyed = true;
-    this.#identity.clear();
-    const socket = this.#sockets.getDriverSocket();
+        return;
+      }
+
+      await this.#assertCurrentGeneration(generation);
+
+      return (this.#destroyTask ??= this.#destroy(generation, reason).finally(() => {
+        if (this.#destroyedGeneration === null) {
+          this.#destroyTask = null;
+        }
+      }));
+    });
+  }
+
+  async #destroy(generation: number, reason: string): Promise<void> {
+    const socket = this.#sockets.getDriverSocket(this.#state.connectionEpoch());
 
     if (socket?.readyState === WebSocket.OPEN) {
       socket.close(1000, reason);
     }
 
-    await this.#terminalState.destroy(reason);
+    await this.#rpcController.runAfterPendingEvents(() => this.#terminalState.destroy(reason));
+    this.#identity.clear();
+    this.#destroyedGeneration = generation;
   }
 
-  async fail(message: string): Promise<void> {
-    await this.#state.setErrorMessage(message);
+  async fail(generation: number, message: string): Promise<void> {
+    return this.ctx.blockConcurrencyWhile(async () => {
+      await this.#assertCurrentGeneration(generation);
+      const epoch = this.#state.requireConnectionEpoch();
+      await this.#state.setConnectionErrorMessage(epoch, message);
 
-    const socket = this.#sockets.getDriverSocket();
+      const socket = this.#sockets.getDriverSocket(epoch);
 
-    if (socket && socket.readyState === WebSocket.OPEN) {
-      socket.close(1011, "runtime.failed");
-      return;
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.close(1011, "runtime.failed");
+        return;
+      }
+
+      await this.#finalizeTerminalState(epoch);
+    });
+  }
+
+  async #finalizeTerminalState(epoch: DriverInstanceConnectionEpoch): Promise<void> {
+    await this.#rpcController.runAfterPendingEvents(() => this.#terminalState.finalize(epoch));
+  }
+
+  async #assertCurrentGeneration(generation: number): Promise<void> {
+    if (this.#state.requireDriverGeneration() !== generation) {
+      throw new Error("Driver generation is no longer current.");
     }
 
-    await this.#terminalState.finalize();
+    const driverInstanceId = this.#state.requireDriverInstanceId();
+    const identity = await getDriverInstanceLifecycleIdentity(this.env, driverInstanceId);
+
+    if (identity === null || identity.generation !== generation) {
+      throw new Error("Driver generation is no longer current.");
+    }
   }
 
   snapshot(): DriverInstanceSnapshot {
-    const socket = this.#sockets.getDriverSocket();
+    const socket = this.#sockets.getDriverSocket(this.#state.connectionEpoch());
     return this.#state.snapshot(Boolean(socket && socket.readyState === WebSocket.OPEN));
   }
 
-  async waitForClose(timeoutMs: number): Promise<DriverInstanceWaitForCloseResult> {
-    return this.#state.waitForClose(timeoutMs);
-  }
-
-  async waitForHeartbeat(
-    afterCount: number,
+  async waitForClose(
+    generation: number,
     timeoutMs: number,
-  ): Promise<DriverInstanceHeartbeatResult> {
-    return this.#state.waitForHeartbeat(afterCount, timeoutMs);
+  ): Promise<DriverInstanceWaitForCloseResult> {
+    return this.#state.waitForClose(generation, timeoutMs);
   }
 
-  async waitForHello(timeoutMs: number): Promise<DriverInstanceHelloResult> {
-    return this.#state.waitForHello(timeoutMs);
+  async waitForReady(generation: number, timeoutMs: number): Promise<DriverInstanceReadyResult> {
+    return this.#state.waitForReady(generation, timeoutMs);
   }
 
-  async waitForReady(timeoutMs: number): Promise<DriverInstanceReadyResult> {
-    return this.#state.waitForReady(timeoutMs);
-  }
-
-  async #getRuntimeSessionLink() {
+  async #getRuntimeSessionLink(epoch: DriverInstanceConnectionEpoch) {
+    this.#state.assertConnectionEpoch(epoch);
     const existing = this.#state.runtimeSessionLink;
 
     if (existing !== null && !runtimeSessionLinkNeedsRefresh(existing)) {
@@ -439,13 +579,18 @@ export class DriverInstance extends DurableObject implements DriverInstanceHttpH
     }
 
     const link = await getRuntimeSessionLink(this.env.DB, this.#state.requireDriverInstanceId());
+    this.#state.assertConnectionEpoch(epoch);
     this.#state.setRuntimeSessionLink(link);
     return link;
   }
 
-  async #appendTransportRpcErrorEvent(error: unknown): Promise<void> {
+  async #appendTransportRpcErrorEvent(
+    error: unknown,
+    epoch: DriverInstanceConnectionEpoch,
+  ): Promise<void> {
     try {
-      const link = await this.#getRuntimeSessionLink();
+      const link = await this.#getRuntimeSessionLink(epoch);
+      this.#state.assertConnectionEpoch(epoch);
 
       if (!isTruthy(link.agentId) || !isTruthy(link.sessionId)) {
         return;
@@ -475,9 +620,13 @@ export class DriverInstance extends DurableObject implements DriverInstanceHttpH
     }
   }
 
-  async #appendTransportWsDisconnectedEvent(close: DriverInstanceCloseSnapshot): Promise<void> {
+  async #appendTransportWsDisconnectedEvent(
+    close: DriverInstanceCloseSnapshot,
+    epoch: DriverInstanceConnectionEpoch,
+  ): Promise<void> {
     try {
-      const link = await this.#getRuntimeSessionLink();
+      const link = await this.#getRuntimeSessionLink(epoch);
+      this.#state.assertConnectionEpoch(epoch);
 
       if (!isTruthy(link.agentId) || !isTruthy(link.sessionId)) {
         return;
@@ -504,6 +653,16 @@ export class DriverInstance extends DurableObject implements DriverInstanceHttpH
           driverInstanceId: this.#state.driverInstanceId,
         });
       });
+    }
+  }
+
+  #isCurrentSocketEpoch(ws: WebSocket, epoch: DriverInstanceConnectionEpoch): boolean {
+    return this.#sockets.isCurrentDriverSocket(ws, epoch, this.#state.connectionEpoch());
+  }
+
+  #closeSocket(ws: WebSocket, code: number, reason: string): void {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.close(code, reason);
     }
   }
 

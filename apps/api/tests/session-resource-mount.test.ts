@@ -75,7 +75,7 @@ function createSandbox(input: {
     async destroy() {},
     async exec(command) {
       calls.exec.push(command);
-      return commandResult(input.pathExists);
+      return commandResult(command.includes("readlink") || input.pathExists);
     },
     async getSession() {
       throw new Error("getSession is not used in session resource mount tests.");
@@ -123,7 +123,8 @@ describe("ensureSessionResourcesMounted", () => {
       sessionId: "session-local",
     });
 
-    expect(sandbox.calls.exec).toHaveLength(1);
+    expect(sandbox.calls.exec).toHaveLength(2);
+    expect(sandbox.calls.exec[1]).toContain("../../.mosoo/session-files/session-local");
     expect(sandbox.calls.mkdir).toEqual([]);
     expect(sandbox.calls.mountBucket).toEqual([]);
   });
@@ -137,7 +138,8 @@ describe("ensureSessionResourcesMounted", () => {
       sessionId: "session-remote",
     });
 
-    expect(sandbox.calls.exec).toHaveLength(1);
+    expect(sandbox.calls.exec).toHaveLength(2);
+    expect(sandbox.calls.exec[1]).toContain("../../.mosoo/session-files/session-remote");
     expect(sandbox.calls.mkdir).toHaveLength(1);
     expect(sandbox.calls.mountBucket).toHaveLength(1);
     expect(sandbox.calls.mountBucket[0]).toEqual({
@@ -170,7 +172,8 @@ describe("ensureSessionResourcesMounted", () => {
       sessionId: "session-remote",
     });
 
-    expect(sandbox.calls.exec).toHaveLength(2);
+    expect(sandbox.calls.exec).toHaveLength(3);
+    expect(sandbox.calls.exec[2]).toContain("../../.mosoo/session-files/session-remote");
     expect(sandbox.calls.mkdir).toHaveLength(1);
     expect(sandbox.calls.mountBucket.map((call) => call.mountPath)).toEqual(sandbox.calls.mkdir);
   });

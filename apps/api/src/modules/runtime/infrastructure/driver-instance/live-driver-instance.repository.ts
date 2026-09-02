@@ -10,6 +10,7 @@ export async function listLiveDriverInstanceRefsForSandboxSessions(
   sandboxSessionIds: readonly SessionId[],
 ): Promise<
   {
+    generation: number;
     id: DriverInstanceId;
     sandboxSessionId: SessionId;
   }[]
@@ -22,6 +23,7 @@ export async function listLiveDriverInstanceRefsForSandboxSessions(
 
   return getAppDatabase(database)
     .select({
+      generation: driverInstancesTable.generation,
       id: driverInstancesTable.id,
       sandboxSessionId: driverInstancesTable.sandboxSessionId,
     })
@@ -33,12 +35,4 @@ export async function listLiveDriverInstanceRefsForSandboxSessions(
       ),
     )
     .all();
-}
-
-export async function listLiveDriverInstanceIdsForSandboxSessions(
-  database: D1Database,
-  sandboxSessionIds: readonly SessionId[],
-): Promise<DriverInstanceId[]> {
-  const rows = await listLiveDriverInstanceRefsForSandboxSessions(database, sandboxSessionIds);
-  return rows.map((row) => row.id);
 }

@@ -1,216 +1,183 @@
 import { describe, expect, test } from "bun:test";
 
+import { createPlatformId } from "@mosoo/id";
+import type { RuntimeOperationId, SandboxBackupId } from "@mosoo/id";
+
 import { selectSandboxBackupPruneIds } from "../src/modules/runtime/infrastructure/sandbox-backup-pruning";
 import {
   listReadySandboxBackupsForPruning,
   markSandboxBackupsPruned,
-  recordCreatedSandboxBackups,
 } from "../src/modules/runtime/infrastructure/sandbox-backup-store";
+import { applyDrizzleMigrationsThrough } from "./helpers/drizzle-migrations";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
-const BACKUP_ID_1 = "01J000000000000000000000H1";
-const BACKUP_ID_2 = "01J000000000000000000000H2";
-const BACKUP_ID_3 = "01J000000000000000000000H3";
-const BACKUP_ID_4 = "01J000000000000000000000H4";
-const BACKUP_ID_5 = "01J000000000000000000000H5";
-const KEEP_BACKUP_ID = "01J000000000000000000000HZ";
-const MEMORY_NEW_BACKUP_ID = "01J000000000000000000000H6";
-const MEMORY_OLD_BACKUP_ID = "01J000000000000000000000H7";
-const SESSION_BACKUP_ID = "01J000000000000000000000H8";
+const SANDBOX_ID = "01J0000000000000000000000D";
+const BACKUP_IDS = [..."12345Z"].map((suffix) => `01J000000000000000000000H${suffix}`);
 
-function createSandboxBackupDatabase(input: { maxBoundParams?: number } = {}): SqliteD1Database {
-  const database = new SqliteD1Database(input);
-
-  database.execute(`
-    CREATE TABLE sandbox (
-      id text PRIMARY KEY NOT NULL,
-      last_backup_id text,
-      status text NOT NULL,
-      status_changed_at integer DEFAULT 0 NOT NULL,
-      status_event text DEFAULT 'runtime_subject.cold' NOT NULL,
-      status_operation_id text,
-      status_seq integer DEFAULT 0 NOT NULL,
-      status_source text DEFAULT 'system' NOT NULL,
-      updated_at integer NOT NULL
-    );
-
-    CREATE TABLE sandbox_backup (
-      created_at integer NOT NULL,
-      dir text NOT NULL,
-      error_message text,
-      id text PRIMARY KEY NOT NULL,
-      keep integer DEFAULT 0 NOT NULL,
-      sandbox_id text NOT NULL,
-      session_run_id text,
-      status text NOT NULL,
-      ttl_seconds integer NOT NULL,
-      updated_at integer NOT NULL
-    );
-  `);
-
+function createDatabase(): SqliteD1Database {
+  const database = new SqliteD1Database();
+  applyDrizzleMigrationsThrough(database, "0021_sandbox-backup-object-authority");
   return database;
 }
 
-async function insertSandbox(database: D1Database): Promise<void> {
+async function insertActiveSandbox(database: D1Database): Promise<void> {
   await database
-    .prepare("INSERT INTO sandbox (id, last_backup_id, status, updated_at) VALUES (?, ?, ?, ?)")
-    .bind("01J0000000000000000000000D", null, "backing_up", 1)
+    .prepare(
+      `INSERT INTO sandbox (
+         agent_id, project_id, created_at, id, incarnation, kind, network_constraints_hash,
+         owner_account_id, status, subject_id, subject_kind, updated_at
+       ) VALUES (?, ?, 1, ?, 1, 'pet', ?, ?, 'active', ?, 'agent', 1)`,
+    )
+    .bind(
+      "01J0000000000000000000000E",
+      "01J0000000000000000000000F",
+      SANDBOX_ID,
+      "0".repeat(64),
+      "01J0000000000000000000000G",
+      "01J0000000000000000000000E",
+    )
+    .run();
+}
+
+async function insertWorkspaceSession(database: D1Database, sessionId: string): Promise<void> {
+  await database
+    .prepare(
+      `INSERT INTO session (
+         agent_id, project_id, created_at, creator_account_id, id, kind, model,
+         provider, renamed, runtime_id, status, updated_at
+       ) VALUES (?, ?, 1, ?, ?, 'pet', 'gpt-5.4', 'openai', 0, 'openai-runtime', 'IDLE', 1)`,
+    )
+    .bind(
+      "01J0000000000000000000000E",
+      "01J0000000000000000000000F",
+      "01J0000000000000000000000G",
+      sessionId,
+    )
     .run();
 }
 
 async function insertBackup(
   database: D1Database,
-  input: {
-    createdAt: number;
-    id: string;
-    keep?: boolean;
-  },
+  input: { createdAt: number; id: string; keep?: boolean; workspaceSessionId?: string },
 ): Promise<void> {
   await database
     .prepare(
-      `
-        INSERT INTO sandbox_backup (
-          created_at,
-          dir,
-          error_message,
-          id,
-          keep,
-          sandbox_id,
-          status,
-          ttl_seconds,
-          updated_at
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `,
+      `INSERT INTO sandbox_backup (
+        created_at, dir, id, keep, operation_id, sandbox_id, sandbox_incarnation,
+        session_run_id, staging_id, status, ttl_seconds, updated_at, workspace_session_id
+      ) VALUES (?, '/workspace', ?, ?, ?, ?, 1, NULL, ?, 'ready', 100, ?, ?)`,
     )
     .bind(
       input.createdAt,
-      "/workspace",
-      null,
       input.id,
       input.keep === true ? 1 : 0,
-      "01J0000000000000000000000D",
-      "ready",
-      100,
+      createPlatformId<RuntimeOperationId>(),
+      SANDBOX_ID,
+      createPlatformId<SandboxBackupId>(),
       input.createdAt,
+      input.workspaceSessionId ?? null,
     )
     .run();
 }
 
 describe("sandbox backup pruning", () => {
-  test("selects pruned backup ids and marks records", async () => {
-    const database = createSandboxBackupDatabase();
+  test("marks only stable overflow after D1 protection is rechecked", async () => {
+    const database = createDatabase();
+    await insertActiveSandbox(database);
+    for (const [index, id] of BACKUP_IDS.entries()) {
+      await insertBackup(database, {
+        createdAt: index + 1,
+        id,
+        keep: index === BACKUP_IDS.length - 1,
+      });
+    }
+    await database
+      .prepare("UPDATE sandbox SET last_backup_id = ? WHERE id = ?")
+      .bind(BACKUP_IDS[0], SANDBOX_ID)
+      .run();
 
-    await insertBackup(database, { createdAt: 1, id: BACKUP_ID_1 });
-    await insertBackup(database, { createdAt: 2, id: BACKUP_ID_2 });
-    await insertBackup(database, { createdAt: 3, id: BACKUP_ID_3 });
-    await insertBackup(database, { createdAt: 4, id: BACKUP_ID_4 });
-    await insertBackup(database, { createdAt: 5, id: BACKUP_ID_5 });
-    await insertBackup(database, { createdAt: 0, id: KEEP_BACKUP_ID, keep: true });
+    const backups = await listReadySandboxBackupsForPruning(database, SANDBOX_ID);
+    const candidates = selectSandboxBackupPruneIds(backups);
+    const pruned = await markSandboxBackupsPruned(database, candidates);
 
-    const backups = await listReadySandboxBackupsForPruning(database, "01J0000000000000000000000D");
-    const pruneIds = selectSandboxBackupPruneIds(backups);
-
-    await markSandboxBackupsPruned(database, pruneIds);
-
-    expect(pruneIds).toEqual([BACKUP_ID_2, BACKUP_ID_1]);
+    expect(candidates).toEqual([BACKUP_IDS[1]]);
+    expect(pruned).toEqual([BACKUP_IDS[1]]);
     const rows = await database
-      .prepare("SELECT id, status FROM sandbox_backup ORDER BY id")
+      .prepare("SELECT id, status FROM sandbox_backup ORDER BY created_at")
       .all<{ id: string; status: string }>();
-    expect(rows.results).toEqual([
-      { id: BACKUP_ID_1, status: "pruned" },
-      { id: BACKUP_ID_2, status: "pruned" },
-      { id: BACKUP_ID_3, status: "ready" },
-      { id: BACKUP_ID_4, status: "ready" },
-      { id: BACKUP_ID_5, status: "ready" },
-      { id: KEEP_BACKUP_ID, status: "ready" },
+    expect(rows.results.map((row) => row.status)).toEqual([
+      "ready",
+      "pruned",
+      "ready",
+      "ready",
+      "ready",
+      "ready",
     ]);
   });
 
-  test("records checkpoint backup batch and stores latest subject checkpoint", async () => {
-    const database = createSandboxBackupDatabase();
-    await insertSandbox(database);
+  for (const protection of ["last_backup", "restoring", "provisioning"] as const) {
+    test(`rechecks ${protection} protection after pruning candidates were listed`, async () => {
+      const database = createDatabase();
+      const sessionId = "01J0000000000000000000000S";
+      await insertActiveSandbox(database);
+      if (protection === "provisioning") {
+        await insertWorkspaceSession(database, sessionId);
+      }
+      for (const [index, id] of BACKUP_IDS.slice(0, 5).entries()) {
+        await insertBackup(database, {
+          createdAt: index + 1,
+          id,
+          workspaceSessionId: protection === "provisioning" && index === 1 ? sessionId : undefined,
+        });
+      }
 
-    await recordCreatedSandboxBackups(database, {
-      backups: [
-        {
-          backup: { dir: "/workspace/one", id: SESSION_BACKUP_ID },
-          updateSandboxLastBackup: false,
-        },
-        {
-          backup: { dir: "/memory", id: MEMORY_OLD_BACKUP_ID },
-          updateSandboxLastBackup: true,
-        },
-        {
-          backup: { dir: "/memory", id: MEMORY_NEW_BACKUP_ID },
-          updateSandboxLastBackup: true,
-        },
-      ],
-      sandboxId: "01J0000000000000000000000D",
-      ttlSeconds: 100,
+      const listed = await listReadySandboxBackupsForPruning(database, SANDBOX_ID);
+      const candidates = selectSandboxBackupPruneIds(listed);
+      expect(candidates).toEqual([BACKUP_IDS[1], BACKUP_IDS[0]]);
+      const protectedId = candidates[0];
+      switch (protection) {
+        case "last_backup": {
+          await database
+            .prepare("UPDATE sandbox SET last_backup_id = ? WHERE id = ?")
+            .bind(protectedId, SANDBOX_ID)
+            .run();
+          break;
+        }
+        case "restoring": {
+          await database
+            .prepare(
+              `UPDATE sandbox
+               SET claim_expires_at = ?, claim_owner = 'restore-owner',
+                   last_restore_backup_id = ?, operation_kind = 'activate',
+                   status = 'restoring', status_operation_id = ?
+               WHERE id = ?`,
+            )
+            .bind(Date.now() + 60_000, protectedId, "01J0000000000000000000000A", SANDBOX_ID)
+            .run();
+          break;
+        }
+        case "provisioning": {
+          await database
+            .prepare(
+              `UPDATE session
+               SET runtime_provisioning_heartbeat_at = 1,
+                   runtime_provisioning_operation_id = ?,
+                   runtime_provisioning_sandbox_id = ?
+               WHERE id = ?`,
+            )
+            .bind("01J0000000000000000000000A", SANDBOX_ID, sessionId)
+            .run();
+          break;
+        }
+      }
+
+      expect(await markSandboxBackupsPruned(database, candidates)).toEqual([candidates[1]]);
+      await expect(
+        database
+          .prepare("SELECT status FROM sandbox_backup WHERE id = ?")
+          .bind(protectedId)
+          .first(),
+      ).resolves.toEqual({ status: "ready" });
     });
-
-    const backupRows = await database
-      .prepare("SELECT id, dir, status, ttl_seconds FROM sandbox_backup ORDER BY id")
-      .all<{ dir: string; id: string; status: string; ttl_seconds: number }>();
-    expect(backupRows.results).toEqual([
-      {
-        dir: "/memory",
-        id: MEMORY_NEW_BACKUP_ID,
-        status: "ready",
-        ttl_seconds: 100,
-      },
-      {
-        dir: "/memory",
-        id: MEMORY_OLD_BACKUP_ID,
-        status: "ready",
-        ttl_seconds: 100,
-      },
-      {
-        dir: "/workspace/one",
-        id: SESSION_BACKUP_ID,
-        status: "ready",
-        ttl_seconds: 100,
-      },
-    ]);
-
-    const sandbox = await database
-      .prepare("SELECT last_backup_id, status, status_seq FROM sandbox WHERE id = ?")
-      .bind("01J0000000000000000000000D")
-      .first<{ last_backup_id: string; status: string; status_seq: number }>();
-    expect(sandbox).toEqual({
-      last_backup_id: MEMORY_NEW_BACKUP_ID,
-      status: "backing_up",
-      status_seq: 0,
-    });
-  });
-
-  test("records more backups than fit in one D1 statement", async () => {
-    const database = createSandboxBackupDatabase({ maxBoundParams: 100 });
-    await insertSandbox(database);
-    const suffixes = [..."123456789ABCDEFG"];
-
-    await recordCreatedSandboxBackups(database, {
-      backups: suffixes.map((suffix, index) => ({
-        backup: {
-          dir: index === suffixes.length - 1 ? "/memory" : `/workspace/${index}`,
-          id: `01J000000000000000000000H${suffix}`,
-        },
-        updateSandboxLastBackup: index === suffixes.length - 1,
-      })),
-      sandboxId: "01J0000000000000000000000D",
-      ttlSeconds: 100,
-    });
-
-    const backupCount = await database
-      .prepare("SELECT COUNT(*) AS count FROM sandbox_backup")
-      .first<{ count: number }>();
-    const sandbox = await database
-      .prepare("SELECT last_backup_id FROM sandbox WHERE id = ?")
-      .bind("01J0000000000000000000000D")
-      .first<{ last_backup_id: string }>();
-
-    expect(backupCount?.count).toBe(16);
-    expect(sandbox?.last_backup_id).toBe("01J000000000000000000000HG");
-  });
+  }
 });

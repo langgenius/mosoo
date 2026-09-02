@@ -5,7 +5,7 @@ import type {
 } from "@mosoo/agent-driver/orpc";
 import { driverInstancesTable } from "@mosoo/db";
 import type { DriverInstanceId } from "@mosoo/id";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../../platform/db/drizzle";
@@ -16,6 +16,8 @@ import {
 } from "../../domain/driver-instance-lifecycle.machine";
 import { parseDriverTimestampMs, driverInstanceExpiresAt } from "./status";
 import type { DriverInstanceStatus } from "./status";
+
+export type DriverInstanceProjectionOutcome = "applied" | "replay" | "conflict";
 
 export async function markDriverInstanceConnected(
   bindings: ApiBindings,
@@ -58,7 +60,7 @@ export async function recordDriverInstanceHello(
     generation: number;
     hello: DriverHelloInput;
   },
-): Promise<boolean> {
+): Promise<DriverInstanceProjectionOutcome> {
   const now = currentTimestampMs();
 
   if (input.hello === undefined) {
@@ -81,12 +83,40 @@ export async function recordDriverInstanceHello(
           eq(driverInstancesTable.connectionId, input.connectionId),
           eq(driverInstancesTable.generation, input.generation),
           eq(driverInstancesTable.status, "connecting"),
+          isNull(driverInstancesTable.driverPid),
+          isNull(driverInstancesTable.driverStartedAt),
+          isNull(driverInstancesTable.driverVersion),
         ),
       )
       .returning({ id: driverInstancesTable.id })
       .get()) ?? null;
 
-  return row !== null;
+  if (row !== null) {
+    return "applied";
+  }
+
+  const startedAt = parseDriverTimestampMs(input.hello.startedAt, "Driver hello startedAt");
+  const existing =
+    (await getAppDatabase(bindings.DB)
+      .select({ id: driverInstancesTable.id })
+      .from(driverInstancesTable)
+      .where(
+        and(
+          eq(driverInstancesTable.id, input.driverInstanceId),
+          eq(driverInstancesTable.connectionId, input.connectionId),
+          eq(driverInstancesTable.generation, input.generation),
+          inArray(driverInstancesTable.status, ["connecting", "ready"]),
+          eq(driverInstancesTable.driverPid, input.hello.pid),
+          eq(driverInstancesTable.driverStartedAt, startedAt),
+          eq(driverInstancesTable.driverVersion, input.hello.driverVersion),
+          eq(driverInstancesTable.protocolVersion, input.hello.protocolVersion),
+          eq(driverInstancesTable.runtime, input.hello.runtime),
+        ),
+      )
+      .limit(1)
+      .get()) ?? null;
+
+  return existing === null ? "conflict" : "replay";
 }
 
 export async function markDriverInstanceReady(
@@ -96,7 +126,7 @@ export async function markDriverInstanceReady(
     driverInstanceId: DriverInstanceId;
     generation: number;
   },
-): Promise<boolean> {
+): Promise<DriverInstanceProjectionOutcome> {
   const now = currentTimestampMs();
 
   const row =
@@ -122,7 +152,27 @@ export async function markDriverInstanceReady(
       .returning({ id: driverInstancesTable.id })
       .get()) ?? null;
 
-  return row !== null;
+  if (row !== null) {
+    return "applied";
+  }
+
+  const existing =
+    (await getAppDatabase(bindings.DB)
+      .select({ id: driverInstancesTable.id })
+      .from(driverInstancesTable)
+      .where(
+        and(
+          eq(driverInstancesTable.id, input.driverInstanceId),
+          eq(driverInstancesTable.connectionId, input.connectionId),
+          eq(driverInstancesTable.generation, input.generation),
+          eq(driverInstancesTable.status, "ready"),
+          eq(driverInstancesTable.driverPid, input.pid),
+        ),
+      )
+      .limit(1)
+      .get()) ?? null;
+
+  return existing === null ? "conflict" : "replay";
 }
 
 export async function recordDriverInstanceHeartbeat(
@@ -165,7 +215,7 @@ export async function finalizeDriverInstance(
   input: {
     closeCode?: number | null;
     closeReason?: string | null;
-    connectionId: string;
+    connectionId: string | null;
     connectedAt?: number | null;
     driverPid?: number | null;
     driverStartedAt?: string | null;
@@ -175,8 +225,10 @@ export async function finalizeDriverInstance(
     lastHeartbeatAt?: string | null;
     status: Extract<DriverInstanceStatus, "stopped" | "failed">;
   },
-): Promise<boolean> {
+): Promise<Extract<DriverInstanceStatus, "stopped" | "failed"> | null> {
   const completedAt = currentTimestampMs();
+  const connectionMatches =
+    input.connectionId === null ? [] : [eq(driverInstancesTable.connectionId, input.connectionId)];
 
   const driverStartedAt =
     typeof input.driverStartedAt === "string" && input.driverStartedAt.length > 0
@@ -209,7 +261,7 @@ export async function finalizeDriverInstance(
       .where(
         and(
           eq(driverInstancesTable.id, driverInstanceId),
-          eq(driverInstancesTable.connectionId, input.connectionId),
+          ...connectionMatches,
           eq(driverInstancesTable.generation, input.generation),
           inArray(driverInstancesTable.status, LIVE_DRIVER_INSTANCE_STATUSES),
         ),
@@ -217,20 +269,42 @@ export async function finalizeDriverInstance(
       .returning({ id: driverInstancesTable.id })
       .get()) ?? null;
 
-  return row !== null;
-}
+  if (row !== null) {
+    return input.status;
+  }
 
-export async function getDriverInstanceStatus(
-  bindings: ApiBindings,
-  driverInstanceId: DriverInstanceId,
-): Promise<DriverInstanceStatus | null> {
-  const row =
+  const existing =
     (await getAppDatabase(bindings.DB)
       .select({ status: driverInstancesTable.status })
+      .from(driverInstancesTable)
+      .where(
+        and(
+          eq(driverInstancesTable.id, driverInstanceId),
+          ...connectionMatches,
+          eq(driverInstancesTable.generation, input.generation),
+          inArray(driverInstancesTable.status, ["stopped", "failed"]),
+        ),
+      )
+      .limit(1)
+      .get()) ?? null;
+
+  return existing?.status === "stopped" || existing?.status === "failed" ? existing.status : null;
+}
+
+export async function getDriverInstanceLifecycleIdentity(
+  bindings: ApiBindings,
+  driverInstanceId: DriverInstanceId,
+): Promise<{ generation: number; status: DriverInstanceStatus } | null> {
+  const row =
+    (await getAppDatabase(bindings.DB)
+      .select({
+        generation: driverInstancesTable.generation,
+        status: driverInstancesTable.status,
+      })
       .from(driverInstancesTable)
       .where(eq(driverInstancesTable.id, driverInstanceId))
       .limit(1)
       .get()) ?? null;
 
-  return row?.status ?? null;
+  return row;
 }

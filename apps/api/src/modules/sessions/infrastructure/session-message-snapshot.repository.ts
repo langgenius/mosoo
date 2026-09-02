@@ -1,5 +1,5 @@
 import { sessionMessagesTable } from "@mosoo/db";
-import type { SessionId, SessionMessageId } from "@mosoo/id";
+import type { SessionId, SessionMessageId, SessionRunId } from "@mosoo/id";
 import { asc, eq } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
@@ -10,6 +10,7 @@ import {
 } from "../domain/provider-private-markup";
 import { parseStoredSessionMessageProjection } from "../domain/session-message-projection-parser";
 import type { SessionLiveStateMessage } from "./session-live-state.types";
+import { resolveStoredSessionMessageSnapshotReferences } from "./session-message-reference.repository";
 
 export interface StoredSessionMessageRow {
   content_text: string;
@@ -19,6 +20,7 @@ export interface StoredSessionMessageRow {
   role: "assistant" | "user";
   segments_json: string | null;
   seq: number;
+  session_run_id: SessionRunId | null;
 }
 
 function compareStoredSessionMessageRows(
@@ -50,7 +52,7 @@ function toLiveStateMessage(row: StoredSessionMessageRow): SessionLiveStateMessa
 function storedSessionMessageRowsToLiveMessages(
   rows: StoredSessionMessageRow[],
 ): SessionLiveStateMessage[] {
-  return [...rows].toSorted(compareStoredSessionMessageRows).map((row) => toLiveStateMessage(row));
+  return [...rows].toSorted(compareStoredSessionMessageRows).map(toLiveStateMessage);
 }
 
 export async function loadStoredSessionMessages(
@@ -63,14 +65,22 @@ export async function loadStoredSessionMessages(
       created_at: sessionMessagesTable.createdAt,
       id: sessionMessagesTable.id,
       plan_json: sessionMessagesTable.planJson,
+      projection_format: sessionMessagesTable.projectionFormat,
       role: sessionMessagesTable.role,
       segments_json: sessionMessagesTable.segmentsJson,
       seq: sessionMessagesTable.seq,
+      session_run_id: sessionMessagesTable.sessionRunId,
     })
     .from(sessionMessagesTable)
     .where(eq(sessionMessagesTable.sessionId, sessionId))
     .orderBy(asc(sessionMessagesTable.seq))
     .all();
 
-  return storedSessionMessageRowsToLiveMessages(results);
+  const resolved = await resolveStoredSessionMessageSnapshotReferences(
+    database,
+    sessionId,
+    results,
+  );
+
+  return storedSessionMessageRowsToLiveMessages(resolved);
 }

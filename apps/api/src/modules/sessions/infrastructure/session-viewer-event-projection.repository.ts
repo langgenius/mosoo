@@ -2,246 +2,331 @@ import type {
   SessionPermissionRequestView,
   SessionReadinessSnapshotView,
 } from "@mosoo/ag-ui-session";
-import {
-  SessionPermissionRequestViewSchema,
-  SessionReadinessSnapshotViewSchema,
-} from "@mosoo/ag-ui-session";
+import { SessionReadinessSnapshotViewSchema } from "@mosoo/ag-ui-session";
 import { parseSchemaValue } from "@mosoo/contracts/validation";
-import { sessionPermissionRequestsTable, sessionReadinessSnapshotsTable } from "@mosoo/db";
-import type { DriverInstanceId, SessionId, SessionRunId } from "@mosoo/id";
+import { createPlatformId } from "@mosoo/id";
+import type { RuntimeEventId, SessionId, SessionRunId } from "@mosoo/id";
 import {
   readRuntimeEventPayload,
   readRuntimeEventPermissionRequest,
+  readRuntimeRunPayload,
   readRuntimeEventString,
 } from "@mosoo/runtime-events";
 import type { RuntimeEventEnvelope } from "@mosoo/runtime-events";
-import { and, eq } from "drizzle-orm";
-
-import { getAppDatabase } from "../../../platform/db/drizzle";
-import { currentTimestampMs } from "../../../time";
 
 export interface SessionViewerProjectionRuntimeEvent {
+  readonly createdAt: number;
   readonly event: RuntimeEventEnvelope;
-  readonly occurredAt: number | null;
+  readonly eventId: RuntimeEventId;
   readonly sessionId: SessionId;
 }
 
-function toProjectionTimestamp(record: SessionViewerProjectionRuntimeEvent): number {
-  if (record.occurredAt !== null) {
-    return record.occurredAt;
-  }
+const INSERTED_EVENT_FENCE = `EXISTS (
+  SELECT 1
+    FROM session_event AS receipt
+   WHERE receipt.id = ?
+     AND receipt.session_id = ?
+     AND receipt.event_type = ?
+)`;
 
-  const occurredAt = Date.parse(record.event.occurredAt);
-  return Number.isFinite(occurredAt) ? occurredAt : currentTimestampMs();
-}
-
-function parsePermissionRequestViews(value: unknown): SessionPermissionRequestView[] | null {
-  if (!Array.isArray(value)) {
-    return null;
-  }
-
-  const requests: SessionPermissionRequestView[] = [];
-
-  for (const entry of value) {
-    requests.push(parseSchemaValue(SessionPermissionRequestViewSchema, entry));
-  }
-
-  return requests;
-}
-
-async function upsertPermissionRequest(
+function preparePermissionRequestUpsert(
   database: D1Database,
   record: SessionViewerProjectionRuntimeEvent,
-): Promise<void> {
+  request: SessionPermissionRequestView,
+): D1PreparedStatement {
+  return database
+    .prepare(
+      `INSERT INTO session_permission_request (
+         created_at, driver_instance_id, raw_input, request_id, run_id,
+         session_id, title, tool_call_id, tool_kind, updated_at
+       )
+       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        WHERE ${INSERTED_EVENT_FENCE}
+       ON CONFLICT (session_id, request_id) DO UPDATE SET
+         driver_instance_id = excluded.driver_instance_id,
+         raw_input = excluded.raw_input,
+         run_id = excluded.run_id,
+         title = excluded.title,
+         tool_call_id = excluded.tool_call_id,
+         tool_kind = excluded.tool_kind,
+         updated_at = excluded.updated_at`,
+    )
+    .bind(
+      record.createdAt,
+      request.driverInstanceId,
+      request.rawInput,
+      request.requestId,
+      request.runId,
+      record.sessionId,
+      request.title,
+      request.toolCallId,
+      request.toolKind,
+      record.createdAt,
+      record.eventId,
+      record.sessionId,
+      record.event.kind,
+    );
+}
+
+function preparePermissionRequestDelete(
+  database: D1Database,
+  record: SessionViewerProjectionRuntimeEvent,
+  runId: SessionRunId,
+  requestId: string,
+): D1PreparedStatement {
+  return database
+    .prepare(
+      `DELETE FROM session_permission_request
+        WHERE session_id = ?
+          AND run_id = ?
+          AND request_id = ?
+          AND ${INSERTED_EVENT_FENCE}`,
+    )
+    .bind(record.sessionId, runId, requestId, record.eventId, record.sessionId, record.event.kind);
+}
+
+function requirePermissionRunId(record: SessionViewerProjectionRuntimeEvent): SessionRunId {
+  if (record.event.runId === undefined) {
+    throw new Error(`Runtime event ${record.event.kind} requires an exact Session Run identity.`);
+  }
+  return record.event.runId;
+}
+
+function preparePermissionRunStatusUpdate(
+  database: D1Database,
+  record: SessionViewerProjectionRuntimeEvent,
+  runId: SessionRunId,
+): D1PreparedStatement {
+  return database
+    .prepare(
+      `WITH desired AS (
+         SELECT CASE WHEN EXISTS (
+           SELECT 1 FROM session_permission_request AS permission
+           WHERE permission.session_id = ? AND permission.run_id = ?
+         ) THEN 'waiting_input' ELSE 'running' END AS next_status
+       )
+       UPDATE session_run
+       SET status = (SELECT next_status FROM desired),
+           status_changed_at = CASE
+             WHEN status <> (SELECT next_status FROM desired) THEN ? ELSE status_changed_at END,
+           status_event = CASE
+             WHEN status <> (SELECT next_status FROM desired)
+               THEN CASE (SELECT next_status FROM desired)
+                 WHEN 'waiting_input' THEN 'run.wait_for_input' ELSE 'run.start' END
+             ELSE status_event END,
+           status_operation_id = CASE
+             WHEN status <> (SELECT next_status FROM desired) THEN NULL ELSE status_operation_id END,
+           status_seq = status_seq + CASE
+             WHEN status <> (SELECT next_status FROM desired) THEN 1 ELSE 0 END,
+           status_source = CASE
+             WHEN status <> (SELECT next_status FROM desired) THEN ? ELSE status_source END,
+           updated_at = CASE
+             WHEN status <> (SELECT next_status FROM desired) THEN ? ELSE updated_at END
+       WHERE id = ?
+         AND session_id = ?
+         AND status IN ('running', 'waiting_input')
+         AND ${INSERTED_EVENT_FENCE}`,
+    )
+    .bind(
+      record.sessionId,
+      runId,
+      record.createdAt,
+      record.event.origin,
+      record.createdAt,
+      runId,
+      record.sessionId,
+      record.eventId,
+      record.sessionId,
+      record.event.kind,
+    );
+}
+
+function preparePermissionProjectionGuard(
+  database: D1Database,
+  record: SessionViewerProjectionRuntimeEvent,
+  runId: SessionRunId,
+): D1PreparedStatement {
+  return database
+    .prepare(
+      `INSERT INTO session_event (id)
+       SELECT ?
+       WHERE NOT EXISTS (
+         SELECT 1
+         FROM session_event AS receipt
+         INNER JOIN session_run AS run
+           ON run.id = ? AND run.session_id = receipt.session_id
+         WHERE receipt.id = ?
+           AND receipt.session_id = ?
+           AND receipt.event_type = ?
+           AND run.status = CASE WHEN EXISTS (
+             SELECT 1 FROM session_permission_request AS permission
+             WHERE permission.session_id = receipt.session_id AND permission.run_id = run.id
+           ) THEN 'waiting_input' ELSE 'running' END
+       )`,
+    )
+    .bind(
+      createPlatformId<RuntimeEventId>(),
+      runId,
+      record.eventId,
+      record.sessionId,
+      record.event.kind,
+    );
+}
+
+function preparePermissionRequested(
+  database: D1Database,
+  record: SessionViewerProjectionRuntimeEvent,
+): D1PreparedStatement[] {
   const request = readRuntimeEventPermissionRequest(record.event);
-
   if (request === null) {
-    return;
+    return [];
   }
-
-  const timestamp = toProjectionTimestamp(record);
-
-  await getAppDatabase(database)
-    .insert(sessionPermissionRequestsTable)
-    .values({
-      createdAt: timestamp,
-      driverInstanceId: request.driverInstanceId,
-      rawInput: request.rawInput,
-      requestId: request.requestId,
-      runId: request.runId,
-      sessionId: record.sessionId,
-      title: request.title,
-      toolCallId: request.toolCallId,
-      toolKind: request.toolKind,
-      updatedAt: timestamp,
-    })
-    .onConflictDoUpdate({
-      set: {
-        driverInstanceId: request.driverInstanceId,
-        rawInput: request.rawInput,
-        runId: request.runId,
-        title: request.title,
-        toolCallId: request.toolCallId,
-        toolKind: request.toolKind,
-        updatedAt: timestamp,
-      },
-      target: [sessionPermissionRequestsTable.sessionId, sessionPermissionRequestsTable.requestId],
-    })
-    .run();
+  const runId = requirePermissionRunId(record);
+  if (request.runId !== runId) {
+    throw new Error("Permission request payload conflicts with its event Run identity.");
+  }
+  return [
+    preparePermissionRequestUpsert(database, record, request),
+    preparePermissionRunStatusUpdate(database, record, runId),
+    preparePermissionProjectionGuard(database, record, runId),
+  ];
 }
 
-async function replacePermissionRequests(
+function preparePermissionResolved(
   database: D1Database,
   record: SessionViewerProjectionRuntimeEvent,
-  permissionRequests: readonly SessionPermissionRequestView[],
-): Promise<void> {
-  const timestamp = toProjectionTimestamp(record);
-  const db = getAppDatabase(database);
-
-  await db
-    .delete(sessionPermissionRequestsTable)
-    .where(eq(sessionPermissionRequestsTable.sessionId, record.sessionId))
-    .run();
-
-  if (permissionRequests.length === 0) {
-    return;
-  }
-
-  await db
-    .insert(sessionPermissionRequestsTable)
-    .values(
-      permissionRequests.map((request) => ({
-        createdAt: timestamp,
-        driverInstanceId: request.driverInstanceId as DriverInstanceId,
-        rawInput: request.rawInput,
-        requestId: request.requestId,
-        runId: request.runId as SessionRunId,
-        sessionId: record.sessionId,
-        title: request.title,
-        toolCallId: request.toolCallId,
-        toolKind: request.toolKind,
-        updatedAt: timestamp,
-      })),
-    )
-    .run();
-}
-
-async function removePermissionRequestById(
-  database: D1Database,
-  input: {
-    readonly requestId: string;
-    readonly sessionId: SessionId;
-  },
-): Promise<void> {
-  await getAppDatabase(database)
-    .delete(sessionPermissionRequestsTable)
-    .where(
-      and(
-        eq(sessionPermissionRequestsTable.sessionId, input.sessionId),
-        eq(sessionPermissionRequestsTable.requestId, input.requestId),
-      ),
-    )
-    .run();
-}
-
-async function clearRunPermissionRequests(
-  database: D1Database,
-  record: SessionViewerProjectionRuntimeEvent,
-): Promise<void> {
-  const runId = record.event.runId;
-
-  if (runId === undefined) {
-    return;
-  }
-
-  await getAppDatabase(database)
-    .delete(sessionPermissionRequestsTable)
-    .where(
-      and(
-        eq(sessionPermissionRequestsTable.sessionId, record.sessionId),
-        eq(sessionPermissionRequestsTable.runId, runId),
-      ),
-    )
-    .run();
-}
-
-async function projectPermissionResolution(
-  database: D1Database,
-  record: SessionViewerProjectionRuntimeEvent,
-): Promise<void> {
+): D1PreparedStatement[] {
   const payload = readRuntimeEventPayload(record.event);
-  const permissionRequests = parsePermissionRequestViews(payload["permissionRequests"]);
-
-  if (permissionRequests !== null) {
-    await replacePermissionRequests(database, record, permissionRequests);
-    return;
-  }
-
   const requestId = readRuntimeEventString(payload, "requestId");
-
-  if (requestId !== null) {
-    await removePermissionRequestById(database, {
-      requestId,
-      sessionId: record.sessionId,
-    });
+  if (requestId === null) {
+    return [];
   }
+  const runId = requirePermissionRunId(record);
+  return [
+    preparePermissionRequestDelete(database, record, runId, requestId),
+    preparePermissionRunStatusUpdate(database, record, runId),
+    preparePermissionProjectionGuard(database, record, runId),
+  ];
 }
 
-async function upsertReadinessSnapshot(
+function prepareReadinessUpsert(
   database: D1Database,
   record: SessionViewerProjectionRuntimeEvent,
-): Promise<void> {
+): D1PreparedStatement {
   const readiness = parseSchemaValue(
     SessionReadinessSnapshotViewSchema,
     record.event.payload,
   ) satisfies SessionReadinessSnapshotView;
-  const timestamp = toProjectionTimestamp(record);
-  const readinessJson = JSON.stringify(readiness);
 
-  await getAppDatabase(database)
-    .insert(sessionReadinessSnapshotsTable)
-    .values({
-      readinessJson,
-      sessionId: record.sessionId,
-      updatedAt: timestamp,
-    })
-    .onConflictDoUpdate({
-      set: {
-        readinessJson,
-        updatedAt: timestamp,
-      },
-      target: sessionReadinessSnapshotsTable.sessionId,
-    })
-    .run();
+  return database
+    .prepare(
+      `INSERT INTO session_readiness_snapshot (readiness_json, session_id, updated_at)
+       SELECT ?, ?, ?
+        WHERE ${INSERTED_EVENT_FENCE}
+       ON CONFLICT (session_id) DO UPDATE SET
+         readiness_json = excluded.readiness_json,
+         updated_at = excluded.updated_at`,
+    )
+    .bind(
+      JSON.stringify(readiness),
+      record.sessionId,
+      record.createdAt,
+      record.eventId,
+      record.sessionId,
+      record.event.kind,
+    );
 }
 
-export async function projectSessionViewerRuntimeEvents(
+function prepareRunStarted(
   database: D1Database,
-  records: readonly SessionViewerProjectionRuntimeEvent[],
-): Promise<void> {
-  for (const record of records) {
-    switch (record.event.kind) {
-      case "permission.requested": {
-        await upsertPermissionRequest(database, record);
-        break;
-      }
-      case "permission.resolved": {
-        await projectPermissionResolution(database, record);
-        break;
-      }
-      case "run.cancelled":
-      case "run.completed":
-      case "run.failed": {
-        await clearRunPermissionRequests(database, record);
-        break;
-      }
-      case "session.readiness.updated": {
-        await upsertReadinessSnapshot(database, record);
-        break;
-      }
-      default: {
-        break;
-      }
+  record: SessionViewerProjectionRuntimeEvent,
+): D1PreparedStatement[] {
+  const runId = requirePermissionRunId(record);
+  const run = readRuntimeRunPayload(record.event).run;
+  const startedAt =
+    run?.startedAt === null || run?.startedAt === undefined
+      ? Number.NaN
+      : Date.parse(run.startedAt);
+  if (run === null || run.id !== runId || run.status !== "running" || !Number.isFinite(startedAt)) {
+    throw new Error("Runtime run.started projection requires one exact running Run view.");
+  }
+
+  const update = database
+    .prepare(
+      `UPDATE session_run
+       SET error_code = NULL,
+           error_details_json = NULL,
+           error_message = NULL,
+           error_retryable = NULL,
+           started_at = COALESCE(started_at, ?),
+           status = CASE WHEN status IN ('queued', 'booting') THEN 'running' ELSE status END,
+           status_changed_at = CASE
+             WHEN status IN ('queued', 'booting') THEN ? ELSE status_changed_at END,
+           status_event = CASE
+             WHEN status IN ('queued', 'booting') THEN 'run.start' ELSE status_event END,
+           status_operation_id = CASE
+             WHEN status IN ('queued', 'booting') THEN NULL ELSE status_operation_id END,
+           status_seq = status_seq + CASE WHEN status IN ('queued', 'booting') THEN 1 ELSE 0 END,
+           status_source = CASE
+             WHEN status IN ('queued', 'booting') THEN ? ELSE status_source END,
+           updated_at = CASE
+             WHEN status IN ('queued', 'booting') THEN ? ELSE updated_at END
+       WHERE id = ?
+         AND session_id = ?
+         AND status IN ('queued', 'booting', 'running', 'waiting_input')
+         AND ${INSERTED_EVENT_FENCE}`,
+    )
+    .bind(
+      startedAt,
+      record.createdAt,
+      record.event.origin,
+      record.createdAt,
+      runId,
+      record.sessionId,
+      record.eventId,
+      record.sessionId,
+      record.event.kind,
+    );
+  const guard = database
+    .prepare(
+      `INSERT INTO session_event (id)
+       SELECT ?
+       WHERE NOT EXISTS (
+         SELECT 1
+         FROM session_event AS receipt
+         INNER JOIN session_run AS run
+           ON run.id = ? AND run.session_id = receipt.session_id
+         WHERE receipt.id = ?
+           AND receipt.session_id = ?
+           AND receipt.event_type = 'run.started'
+           AND run.status IN ('running', 'waiting_input')
+           AND run.started_at IS NOT NULL
+       )`,
+    )
+    .bind(createPlatformId<RuntimeEventId>(), runId, record.eventId, record.sessionId);
+
+  return [update, guard];
+}
+
+export function prepareSessionViewerRuntimeEventProjection(
+  database: D1Database,
+  record: SessionViewerProjectionRuntimeEvent,
+): D1PreparedStatement[] {
+  switch (record.event.kind) {
+    case "permission.requested": {
+      return preparePermissionRequested(database, record);
+    }
+    case "permission.resolved": {
+      return preparePermissionResolved(database, record);
+    }
+    case "run.started": {
+      return prepareRunStarted(database, record);
+    }
+    case "session.readiness.updated": {
+      return [prepareReadinessUpsert(database, record)];
+    }
+    default: {
+      return [];
     }
   }
 }

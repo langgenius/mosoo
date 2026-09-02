@@ -10,16 +10,21 @@ import {
 } from "../../application/runtime-diagnostic-events";
 import { resolvePendingRuntimeCommands } from "./commands";
 import { runtimeSessionLinkNeedsRefresh } from "./event-types";
+import type { RuntimeSessionLink } from "./event-types";
 import { finalizeDriverInstance } from "./lifecycle";
 import type { RuntimeSessionViewCache } from "./runtime-session-view-cache";
 import type { DriverInstanceRuntimeState } from "./runtime-state";
 import { getRuntimeSessionLink } from "./session-link.repository";
 import type { SessionViewerEventDeliveryBuffer } from "./session-viewer-event-delivery-buffer";
-import type { DriverInstanceCloseSnapshot } from "./state";
+import type { DriverInstanceCloseSnapshot, DriverInstanceConnectionEpoch } from "./state";
 import { repairFinalizedTerminalDriverRunState } from "./terminal-run-release";
+
 interface DriverInstanceTerminalStateCoordinatorOptions {
+  appendDiagnosticEvent?: typeof appendRuntimeDiagnosticEvent;
   clearStorage: () => Promise<void>;
   env: ApiBindings;
+  finalizeDriver?: typeof finalizeDriverInstance;
+  repairFinalizedRunState?: typeof repairFinalizedTerminalDriverRunState;
   state: DriverInstanceRuntimeState;
   viewCache: RuntimeSessionViewCache;
   viewerEventDelivery: SessionViewerEventDeliveryBuffer;
@@ -27,115 +32,198 @@ interface DriverInstanceTerminalStateCoordinatorOptions {
 }
 
 export class DriverInstanceTerminalStateCoordinator {
+  readonly #appendDiagnosticEvent: typeof appendRuntimeDiagnosticEvent;
   readonly #clearStorage: () => Promise<void>;
   readonly #env: ApiBindings;
+  readonly #finalizeDriver: typeof finalizeDriverInstance;
+  #finalizationTask: { epoch: DriverInstanceConnectionEpoch; task: Promise<void> } | null = null;
+  readonly #repairFinalizedRunState: typeof repairFinalizedTerminalDriverRunState;
   readonly #state: DriverInstanceRuntimeState;
+  #resetTask: Promise<void> | null = null;
   readonly #viewCache: RuntimeSessionViewCache;
   readonly #viewerEventDelivery: SessionViewerEventDeliveryBuffer;
   readonly #withRuntimeLogContext: <T>(fn: () => T) => T;
 
   constructor(options: DriverInstanceTerminalStateCoordinatorOptions) {
+    this.#appendDiagnosticEvent = options.appendDiagnosticEvent ?? appendRuntimeDiagnosticEvent;
     this.#clearStorage = options.clearStorage;
     this.#env = options.env;
+    this.#finalizeDriver = options.finalizeDriver ?? finalizeDriverInstance;
+    this.#repairFinalizedRunState =
+      options.repairFinalizedRunState ?? repairFinalizedTerminalDriverRunState;
     this.#state = options.state;
     this.#viewCache = options.viewCache;
     this.#viewerEventDelivery = options.viewerEventDelivery;
     this.#withRuntimeLogContext = options.withRuntimeLogContext;
   }
 
-  async finalize(): Promise<void> {
-    if (this.#state.terminalized) {
+  async finalize(epoch: DriverInstanceConnectionEpoch): Promise<void> {
+    if (!this.#state.matchesConnectionEpoch(epoch)) {
       return;
     }
 
-    this.#state.terminalized = true;
-    await this.#viewerEventDelivery.flushSafely();
+    if (this.#finalizationTask !== null && this.#epochsMatch(this.#finalizationTask.epoch, epoch)) {
+      return this.#finalizationTask.task;
+    }
+
+    if (this.#state.terminalCleanupComplete) {
+      return;
+    }
+
+    const task = this.#finalize(epoch).finally(() => {
+      if (this.#finalizationTask?.task === task) {
+        this.#finalizationTask = null;
+      }
+    });
+    this.#finalizationTask = { epoch, task };
+    return task;
+  }
+
+  async #finalize(epoch: DriverInstanceConnectionEpoch): Promise<void> {
+    if (!this.#state.matchesConnectionEpoch(epoch)) {
+      return;
+    }
 
     const driverInstanceId = this.#state.requireDriverInstanceId();
-    const close = await this.#ensureCloseSnapshot();
-    const status = getDriverInstanceTerminalStatus(this.#state.errorMessage, close.code);
+    const close = await this.#ensureCloseSnapshot(epoch);
+
+    if (!this.#state.matchesConnectionEpoch(epoch)) {
+      return;
+    }
+
+    const terminalSessionLink = await this.#captureTerminalSessionLink(driverInstanceId, epoch);
+
+    if (!this.#state.matchesConnectionEpoch(epoch)) {
+      return;
+    }
+
+    this.#viewerEventDelivery.requestStateSync(terminalSessionLink.sessionId);
+    const desiredStatus = getDriverInstanceTerminalStatus(this.#state.errorMessage, close.code);
     const closeResult = this.#state.closeResult();
-    const connectionId = this.#state.connectionId;
-    const finalized = isTruthy(connectionId)
-      ? await finalizeDriverInstance(this.#env, driverInstanceId, {
-          closeCode: close.code,
-          closeReason: close.reason || null,
-          connectionId,
-          connectedAt: this.#state.connectedAt,
-          driverPid: this.#state.hello?.pid ?? null,
-          driverStartedAt: this.#state.hello?.startedAt ?? null,
-          errorMessage: this.#state.errorMessage,
-          generation: this.#state.requireDriverGeneration(),
-          heartbeatCount: this.#state.heartbeatCount,
-          lastHeartbeatAt: this.#state.lastHeartbeat?.at ?? null,
-          status,
-        })
-      : false;
+    const snapshot = {
+      connectedAt: this.#state.connectedAt,
+      driverPid: this.#state.hello?.pid ?? null,
+      driverStartedAt: this.#state.hello?.startedAt ?? null,
+      errorMessage: this.#state.errorMessage,
+      heartbeatCount: this.#state.heartbeatCount,
+      lastHeartbeatAt: this.#state.lastHeartbeat?.at ?? null,
+      terminalSessionRunId: this.#state.terminalSessionRunId,
+      traceId: this.#state.traceId,
+    };
+    const terminalStatus = await this.#finalizeDriver(this.#env, driverInstanceId, {
+      closeCode: close.code,
+      closeReason: close.reason || null,
+      connectionId: epoch.connectionId,
+      connectedAt: snapshot.connectedAt,
+      driverPid: snapshot.driverPid,
+      driverStartedAt: snapshot.driverStartedAt,
+      errorMessage: snapshot.errorMessage,
+      generation: epoch.generation,
+      heartbeatCount: snapshot.heartbeatCount,
+      lastHeartbeatAt: snapshot.lastHeartbeatAt,
+      status: desiredStatus,
+    });
 
-    if (finalized) {
-      await this.#repairFinalizedRunState({
-        driverInstanceId,
-        status,
-      });
-      await this.#appendDriverCrashedEventIfNeeded({
-        close,
-        driverInstanceId,
-        status,
-      });
-
-      this.#withRuntimeLogContext(() => {
-        logInfo("runtime.run.finalized", {
-          closeCode: close.code,
-          closeReason: close.reason || null,
-          connectedAt: this.#state.connectedAt,
-          connectionId,
-          driverInstanceId,
-          driverPid: this.#state.hello?.pid ?? null,
-          errorMessage: this.#state.errorMessage,
-          heartbeatCount: this.#state.heartbeatCount,
-          status,
-        });
-      });
+    if (terminalStatus === null || !this.#state.matchesConnectionEpoch(epoch)) {
+      return;
     }
 
-    this.#state.resolveCloseWaiters(closeResult);
-    this.#state.rejectHeartbeatWaiters(new Error(`Driver instance ${driverInstanceId} is closed.`));
+    await this.#repairFinalizedRunState(this.#env, {
+      driverGeneration: epoch.generation,
+      driverInstanceId,
+      sessionRunId: snapshot.terminalSessionRunId,
+      status: terminalStatus,
+    });
 
-    if (!this.#state.hello) {
-      this.#state.rejectHelloWaiters(
-        new Error(`Driver instance ${driverInstanceId} closed before hello.`),
-      );
+    if (!this.#state.matchesConnectionEpoch(epoch)) {
+      return;
     }
+
+    await this.#appendDriverCrashedEventIfNeeded({
+      close,
+      driverGeneration: epoch.generation,
+      driverInstanceId,
+      link: terminalSessionLink,
+      status: terminalStatus,
+      traceId: snapshot.traceId,
+    });
+
+    if (!this.#state.matchesConnectionEpoch(epoch)) {
+      return;
+    }
+
+    this.#withRuntimeLogContext(() => {
+      logInfo("runtime.run.finalized", {
+        closeCode: close.code,
+        closeReason: close.reason || null,
+        connectedAt: snapshot.connectedAt,
+        connectionId: epoch.connectionId,
+        driverInstanceId,
+        driverPid: snapshot.driverPid,
+        errorMessage: snapshot.errorMessage,
+        heartbeatCount: snapshot.heartbeatCount,
+        status: terminalStatus,
+      });
+    });
+
+    this.#state.resolveCloseWaiters(closeResult, epoch.generation);
 
     if (!this.#state.ready) {
       this.#state.rejectReadyWaiters(
         new Error(`Driver instance ${driverInstanceId} closed before ready.`),
+        epoch.generation,
       );
     }
 
     resolvePendingRuntimeCommands(this.#state.commandWaiters);
-    await this.#state.persistTerminalSnapshot();
+    await this.#state.persistTerminalSnapshot(epoch);
   }
 
-  async resetForReuse(): Promise<void> {
+  async resetForReuse(driverGeneration: number): Promise<void> {
+    await this.prepareForReuse();
+
+    return (this.#resetTask ??= this.#resetForReuse(driverGeneration).finally(() => {
+      this.#resetTask = null;
+    }));
+  }
+
+  async prepareForReuse(): Promise<void> {
+    if (this.#finalizationTask !== null) {
+      await this.#finalizationTask.task;
+    }
+
+    this.#viewerEventDelivery.resetAfterFlush();
+  }
+
+  async #resetForReuse(driverGeneration: number): Promise<void> {
     await this.#state.resetForReuse({
       beforeReset: async () => {
-        await this.#viewerEventDelivery.flushSafely();
         this.#viewerEventDelivery.resetAfterFlush();
         this.#viewCache.reset();
       },
+      driverGeneration,
     });
   }
 
   async destroy(reason: string): Promise<void> {
-    await this.#viewerEventDelivery.flushSafely();
+    if (this.#finalizationTask !== null) {
+      await this.#finalizationTask.task;
+    }
+
+    if (this.#resetTask !== null) {
+      await this.#resetTask;
+    }
+
     this.#viewerEventDelivery.resetAfterFlush();
     this.#viewCache.reset();
     await this.#clearStorage();
     this.#state.resetAfterDestroy(reason);
   }
 
-  async #ensureCloseSnapshot(): Promise<DriverInstanceCloseSnapshot> {
+  async #ensureCloseSnapshot(
+    epoch: DriverInstanceConnectionEpoch,
+  ): Promise<DriverInstanceCloseSnapshot> {
+    this.#state.assertConnectionEpoch(epoch);
     const close =
       this.#state.close ??
       ({
@@ -145,7 +233,7 @@ export class DriverInstanceTerminalStateCoordinator {
       } satisfies DriverInstanceCloseSnapshot);
 
     if (!this.#state.close) {
-      await this.#state.persistClose(close);
+      await this.#state.persistClose(close, epoch);
     }
 
     return close;
@@ -153,33 +241,32 @@ export class DriverInstanceTerminalStateCoordinator {
 
   async #appendDriverCrashedEventIfNeeded(input: {
     close: DriverInstanceCloseSnapshot;
+    driverGeneration: number;
     driverInstanceId: DriverInstanceId;
+    link: RuntimeSessionLink;
     status: "failed" | "stopped";
+    traceId: string | null;
   }): Promise<void> {
     if (input.status !== "failed") {
       return;
     }
 
     try {
-      const cachedLink = this.#state.runtimeSessionLink;
-      const link =
-        cachedLink !== null && !runtimeSessionLinkNeedsRefresh(cachedLink)
-          ? cachedLink
-          : await getRuntimeSessionLink(this.#env.DB, input.driverInstanceId);
-      this.#state.setRuntimeSessionLink(link);
+      const { link } = input;
 
       if (!isTruthy(link.agentId) || !isTruthy(link.sessionId)) {
         return;
       }
 
-      await appendRuntimeDiagnosticEvent(this.#env, {
+      await this.#appendDiagnosticEvent(this.#env, {
         eventName: RUNTIME_DIAGNOSTIC_EVENT.driverCrashed.name,
         sessionId: link.sessionId,
+        sourceEventId: `driver-terminal:${input.driverInstanceId}:${String(input.driverGeneration)}:crashed`,
         value: {
           ...toRuntimeDiagnosticBaseValue({
             agentId: link.agentId,
             sessionId: link.sessionId,
-            traceId: this.#state.traceId,
+            traceId: input.traceId,
           }),
           driverInstanceId: input.driverInstanceId,
           status: input.close.reason || "failed",
@@ -195,21 +282,39 @@ export class DriverInstanceTerminalStateCoordinator {
     }
   }
 
-  async #repairFinalizedRunState(input: {
-    driverInstanceId: DriverInstanceId;
-    status: "failed" | "stopped";
-  }): Promise<void> {
-    try {
-      await repairFinalizedTerminalDriverRunState(this.#env, input);
-    } catch (error) {
-      this.#withRuntimeLogContext(() => {
-        logWarn("runtime.driver.finalize_repair.failed", {
-          ...createErrorLogContext(error),
-          driverInstanceId: input.driverInstanceId,
-          status: input.status,
-        });
-      });
+  async #captureTerminalSessionLink(
+    driverInstanceId: DriverInstanceId,
+    epoch: DriverInstanceConnectionEpoch,
+  ): Promise<RuntimeSessionLink> {
+    this.#state.assertConnectionEpoch(epoch);
+    const sessionRunId = this.#state.terminalSessionRunId;
+    const cachedLink = this.#state.runtimeSessionLink;
+    const link =
+      sessionRunId !== null
+        ? cachedLink?.sessionRunId === sessionRunId && !runtimeSessionLinkNeedsRefresh(cachedLink)
+          ? cachedLink
+          : await getRuntimeSessionLink(this.#env.DB, driverInstanceId, { sessionRunId })
+        : cachedLink !== null && !runtimeSessionLinkNeedsRefresh(cachedLink)
+          ? cachedLink
+          : await getRuntimeSessionLink(this.#env.DB, driverInstanceId);
+
+    this.#state.assertConnectionEpoch(epoch);
+
+    if (sessionRunId !== null && link.sessionRunId !== sessionRunId) {
+      throw new Error("Terminal Session Run ownership was lost.");
     }
+
+    if (sessionRunId === null && link.sessionRunId !== null) {
+      await this.#state.setTerminalSessionRunId(link.sessionRunId, epoch);
+    }
+
+    this.#state.assertConnectionEpoch(epoch);
+    this.#state.setRuntimeSessionLink(link);
+    return link;
+  }
+
+  #epochsMatch(left: DriverInstanceConnectionEpoch, right: DriverInstanceConnectionEpoch): boolean {
+    return left.connectionId === right.connectionId && left.generation === right.generation;
   }
 }
 

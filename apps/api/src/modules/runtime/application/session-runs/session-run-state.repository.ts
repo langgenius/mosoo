@@ -1,4 +1,4 @@
-import type { RunError, SessionRunSummary } from "@mosoo/contracts/session-run";
+import type { SessionRunSummary } from "@mosoo/contracts/session-run";
 import { sessionRunsTable } from "@mosoo/db";
 import type { DriverInstanceId, SessionRunId } from "@mosoo/id";
 import { eq } from "drizzle-orm";
@@ -57,40 +57,6 @@ export async function getSessionRunState(
   }
 
   return row;
-}
-
-export async function updateSessionRunStatusIfActive(
-  database: D1Database,
-  input: {
-    error?: RunError | null;
-    expectedCurrentStatus?: SessionRunSummary["status"];
-    runId: SessionRunId;
-    status: SessionRunSummary["status"];
-  },
-): Promise<SessionRunSummary | null> {
-  const outcome = await setSessionRunStatus(database, {
-    ...(input.error !== undefined ? { error: input.error } : {}),
-    ...(input.expectedCurrentStatus !== undefined
-      ? { expectedCurrentStatus: input.expectedCurrentStatus }
-      : {}),
-    runId: input.runId,
-    source: "api",
-    status: input.status,
-  });
-
-  switch (outcome.kind) {
-    case "applied":
-    case "duplicate": {
-      return outcome.run;
-    }
-    case "repair_needed": {
-      throw new Error("Session lifecycle projection needs repair.");
-    }
-    case "rejected":
-    case "stale": {
-      return null;
-    }
-  }
 }
 
 export async function acquireSessionRunDispatch(

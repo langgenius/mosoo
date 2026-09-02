@@ -82,6 +82,45 @@ describe("AG-UI session event compaction", () => {
     ]);
   });
 
+  test("replaces task snapshots only within the same run and driver generation", () => {
+    const first = createServerCustomEvent("mosoo.session.tasks.replaced", {
+      driverInstanceId: "driver-2",
+      runId: "run-2",
+      tasks: [{ taskId: "first" }],
+    });
+    const latest = createServerCustomEvent("mosoo.session.tasks.replaced", {
+      driverInstanceId: "driver-2",
+      runId: "run-2",
+      tasks: [{ taskId: "latest" }],
+    });
+
+    expect(compactAgUiSessionEvents([first, latest])).toEqual([latest]);
+  });
+
+  test("preserves task snapshots across run and driver generations", () => {
+    const oldRun = createServerCustomEvent("mosoo.session.tasks.replaced", {
+      driverInstanceId: "driver-1",
+      runId: "run-1",
+      tasks: [{ taskId: "old-run" }],
+    });
+    const oldDriver = createServerCustomEvent("mosoo.session.tasks.replaced", {
+      driverInstanceId: "driver-1",
+      runId: "run-2",
+      tasks: [{ taskId: "old-driver" }],
+    });
+    const current = createServerCustomEvent("mosoo.session.tasks.replaced", {
+      driverInstanceId: "driver-2",
+      runId: "run-2",
+      tasks: [{ taskId: "current" }],
+    });
+
+    expect(compactAgUiSessionEvents([oldRun, oldDriver, current])).toEqual([
+      oldRun,
+      oldDriver,
+      current,
+    ]);
+  });
+
   test("appends compacted batches using full compaction semantics", () => {
     const first = createServerCustomEvent("mosoo.session.info.updated", {
       title: "Draft",
@@ -129,6 +168,15 @@ describe("AG-UI session event compaction", () => {
         type: EventType.RUN_STARTED,
       }),
     ).toBe(false);
+    expect(
+      isAgUiSessionEventBufferable(
+        createServerCustomEvent("mosoo.session.tasks.replaced", {
+          driverInstanceId: "driver-1",
+          runId: "run-1",
+          tasks: [],
+        }),
+      ),
+    ).toBe(true);
     expect(
       getAgUiSessionEventDeltaLength({
         runId: "run-1",

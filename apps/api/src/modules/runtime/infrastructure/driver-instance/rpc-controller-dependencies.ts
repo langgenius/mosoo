@@ -3,10 +3,11 @@ import type { RuntimeSessionViewCache } from "./runtime-session-view-cache";
 import type { DriverInstanceRuntimeState } from "./runtime-state";
 import type { SessionViewerEventDeliveryBuffer } from "./session-viewer-event-delivery-buffer";
 import type { DriverInstanceSocketRegistry } from "./sockets";
+import type { DriverInstanceConnectionEpoch } from "./state";
 
 export interface DriverInstanceRpcControllerDependencies {
   env: ApiBindings;
-  finalizeTerminalState: () => Promise<void>;
+  finalizeTerminalState: (epoch: DriverInstanceConnectionEpoch) => Promise<void>;
   sockets: DriverInstanceSocketRegistry;
   state: DriverInstanceRuntimeState;
   viewCache: RuntimeSessionViewCache;

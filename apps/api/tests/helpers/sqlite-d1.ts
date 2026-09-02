@@ -8,11 +8,17 @@ type RawOptions = { columnNames?: boolean } | undefined;
 const statementQueries = new WeakMap<D1PreparedStatement, string>();
 
 export class SqliteD1Database implements D1Database {
-  readonly #database = new Database(":memory:");
+  readonly #database: Database;
   readonly #maxBoundParams: number | undefined;
   #batchTail: Promise<void> = Promise.resolve();
 
-  constructor(input: { foreignKeys?: boolean; maxBoundParams?: number } = {}) {
+  constructor(
+    input: { foreignKeys?: boolean; maxBoundParams?: number; serialized?: Uint8Array } = {},
+  ) {
+    this.#database =
+      input.serialized === undefined
+        ? new Database(":memory:")
+        : Database.deserialize(input.serialized);
     this.#maxBoundParams = input.maxBoundParams;
     this.#database.run(`PRAGMA foreign_keys = ${input.foreignKeys === false ? "OFF" : "ON"}`);
   }
@@ -23,6 +29,10 @@ export class SqliteD1Database implements D1Database {
 
   prepare(query: string): D1PreparedStatement {
     return createSqliteD1Statement(this.#database, query, [], this.#maxBoundParams);
+  }
+
+  serialize(): Uint8Array {
+    return this.#database.serialize();
   }
 
   app(): AppDatabase {

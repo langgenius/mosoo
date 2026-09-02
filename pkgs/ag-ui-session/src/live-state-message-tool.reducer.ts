@@ -17,6 +17,13 @@ interface ToolSegmentLocations {
   toolUse: SegmentLocation<ToolUseSegment> | null;
 }
 
+function matchesToolRun(
+  segment: ToolResultSegment | ToolUseSegment,
+  runId: string | null | undefined,
+): boolean {
+  return runId === undefined || segment.runId === runId;
+}
+
 function isGenericToolName(value: string): boolean {
   return value.trim().toLowerCase() === "tool";
 }
@@ -34,6 +41,7 @@ function findToolSegmentLocations(
   input: {
     messageId?: string;
     primaryKind: ToolUseSegment["kind"] | ToolResultSegment["kind"];
+    runId?: string | null;
     toolCallId: string;
   },
 ): ToolSegmentLocations {
@@ -47,7 +55,11 @@ function findToolSegmentLocations(
     }
 
     for (const [segmentIndex, segment] of message.segments.entries()) {
-      if (segment.kind === "tool_use" && segment.toolCallId === input.toolCallId) {
+      if (
+        segment.kind === "tool_use" &&
+        segment.toolCallId === input.toolCallId &&
+        matchesToolRun(segment, input.runId)
+      ) {
         const location = { messageIndex: currentMessageIndex, segment, segmentIndex };
 
         if (input.primaryKind === "tool_use") {
@@ -57,7 +69,11 @@ function findToolSegmentLocations(
         toolUse ??= location;
       }
 
-      if (segment.kind === "tool_result" && segment.toolCallId === input.toolCallId) {
+      if (
+        segment.kind === "tool_result" &&
+        segment.toolCallId === input.toolCallId &&
+        matchesToolRun(segment, input.runId)
+      ) {
         const location = { messageIndex: currentMessageIndex, segment, segmentIndex };
 
         if (input.primaryKind === "tool_result") {
@@ -75,7 +91,9 @@ function findToolSegmentLocations(
 export function appendToolUse(
   state: SessionLiveState,
   input: {
+    createdAt?: string;
     parentMessageId: string | null;
+    runId?: string | null;
     toolCallId: string;
     toolCallName: string;
   },
@@ -85,6 +103,7 @@ export function appendToolUse(
   const locations = findToolSegmentLocations(messages, {
     ...(parentMessageId ? { messageId: parentMessageId } : {}),
     primaryKind: "tool_use",
+    ...(input.runId === undefined ? {} : { runId: input.runId }),
     toolCallId: input.toolCallId,
   });
   const existingUse = locations.toolUse;
@@ -131,6 +150,7 @@ export function appendToolUse(
       argsText: "",
       kind: "tool_use",
       path: null,
+      ...(input.runId === undefined ? {} : { runId: input.runId }),
       tool: toolName,
       toolCallId: input.toolCallId,
     });
@@ -154,6 +174,7 @@ export function appendToolUse(
     argsText: "",
     kind: "tool_use",
     path: null,
+    ...(input.runId === undefined ? {} : { runId: input.runId }),
     tool: input.toolCallName,
     toolCallId: input.toolCallId,
   };
@@ -162,6 +183,7 @@ export function appendToolUse(
     messages.push(
       createLiveStateMessage({
         content: "",
+        ...(input.createdAt === undefined ? {} : { createdAt: input.createdAt }),
         id: input.parentMessageId,
         role: "assistant",
         segments: [toolSegment],
@@ -180,6 +202,7 @@ export function appendToolUse(
     messages.push(
       createLiveStateMessage({
         content: "",
+        ...(input.createdAt === undefined ? {} : { createdAt: input.createdAt }),
         id: input.parentMessageId,
         role: "assistant",
         segments: [toolSegment],
@@ -205,12 +228,20 @@ export function appendToolUse(
 
 export function appendToolResult(
   state: SessionLiveState,
-  input: { content: string; messageId: string; toolCallId: string },
+  input: {
+    content: string;
+    createdAt?: string;
+    messageId: string;
+    runId?: string | null;
+    toolCallId: string;
+    toolName?: string;
+  },
 ): SessionLiveState {
   const messages = [...state.messages];
   const locations = findToolSegmentLocations(messages, {
     messageId: input.messageId,
     primaryKind: "tool_result",
+    ...(input.runId === undefined ? {} : { runId: input.runId }),
     toolCallId: input.toolCallId,
   });
   const existingResult = locations.toolResult;
@@ -226,6 +257,7 @@ export function appendToolResult(
     segments[existingResult.segmentIndex] = {
       ...existingResult.segment,
       output: input.content,
+      tool: mergeToolName(existingResult.segment.tool, input.toolName ?? "tool"),
     };
     messages[existingResult.messageIndex] = {
       ...current,
@@ -254,6 +286,7 @@ export function appendToolResult(
         {
           kind: "tool_result",
           output: input.content,
+          ...(input.runId === undefined ? {} : { runId: input.runId }),
           tool: existingUse.segment.tool,
           toolCallId: input.toolCallId,
         },
@@ -272,7 +305,8 @@ export function appendToolResult(
   const toolSegment: SessionViewSegment = {
     kind: "tool_result",
     output: input.content,
-    tool: "tool",
+    ...(input.runId === undefined ? {} : { runId: input.runId }),
+    tool: input.toolName ?? "tool",
     toolCallId: input.toolCallId,
   };
 
@@ -280,6 +314,7 @@ export function appendToolResult(
     messages.push(
       createLiveStateMessage({
         content: "",
+        ...(input.createdAt === undefined ? {} : { createdAt: input.createdAt }),
         id: input.messageId,
         role: "assistant",
         segments: [toolSegment],
@@ -296,6 +331,7 @@ export function appendToolResult(
     messages.push(
       createLiveStateMessage({
         content: "",
+        ...(input.createdAt === undefined ? {} : { createdAt: input.createdAt }),
         id: input.messageId,
         role: "assistant",
         segments: [toolSegment],
@@ -321,7 +357,7 @@ export function appendToolResult(
 
 export function appendToolArgs(
   state: SessionLiveState,
-  input: { delta: string; toolCallId: string },
+  input: { delta: string; runId?: string | null; toolCallId: string },
 ): SessionLiveState {
   if (input.delta.length === 0) {
     return state;
@@ -330,6 +366,7 @@ export function appendToolArgs(
   const messages = [...state.messages];
   const existingUse = findToolSegmentLocations(messages, {
     primaryKind: "tool_use",
+    ...(input.runId === undefined ? {} : { runId: input.runId }),
     toolCallId: input.toolCallId,
   }).toolUse;
 
@@ -344,7 +381,9 @@ export function appendToolArgs(
   }
 
   const segments = message.segments.map((segment) =>
-    segment.kind === "tool_use" && segment.toolCallId === input.toolCallId
+    segment.kind === "tool_use" &&
+    segment.toolCallId === input.toolCallId &&
+    matchesToolRun(segment, input.runId)
       ? {
           ...segment,
           argsText: `${segment.argsText}${input.delta}`,
@@ -361,4 +400,142 @@ export function appendToolArgs(
     ...state,
     messages,
   });
+}
+
+function replaceToolArgs(
+  state: SessionLiveState,
+  input: { content: string; runId?: string | null; toolCallId: string },
+): SessionLiveState {
+  const messages = [...state.messages];
+  const existingUse = findToolSegmentLocations(messages, {
+    primaryKind: "tool_use",
+    ...(input.runId === undefined ? {} : { runId: input.runId }),
+    toolCallId: input.toolCallId,
+  }).toolUse;
+  if (existingUse === null) {
+    return state;
+  }
+  const message = messages[existingUse.messageIndex];
+  if (message === undefined) {
+    return state;
+  }
+
+  messages[existingUse.messageIndex] = {
+    ...message,
+    segments: message.segments.map((segment) =>
+      segment.kind === "tool_use" &&
+      segment.toolCallId === input.toolCallId &&
+      matchesToolRun(segment, input.runId)
+        ? Object.assign({}, segment, { argsText: input.content })
+        : segment,
+    ),
+  };
+  return touchSessionLiveState({ ...state, messages });
+}
+
+function appendToolResultDelta(
+  state: SessionLiveState,
+  input: {
+    createdAt?: string;
+    delta: string;
+    messageId: string;
+    runId?: string | null;
+    toolCallId: string;
+    toolName?: string;
+  },
+): SessionLiveState {
+  const messages = [...state.messages];
+  const existingResult = findToolSegmentLocations(messages, {
+    messageId: input.messageId,
+    primaryKind: "tool_result",
+    ...(input.runId === undefined ? {} : { runId: input.runId }),
+    toolCallId: input.toolCallId,
+  }).toolResult;
+  if (existingResult === null) {
+    return appendToolResult(state, {
+      content: input.delta,
+      ...(input.createdAt === undefined ? {} : { createdAt: input.createdAt }),
+      messageId: input.messageId,
+      ...(input.runId === undefined ? {} : { runId: input.runId }),
+      toolCallId: input.toolCallId,
+      ...(input.toolName === undefined ? {} : { toolName: input.toolName }),
+    });
+  }
+  const message = messages[existingResult.messageIndex];
+  if (message === undefined) {
+    return state;
+  }
+
+  messages[existingResult.messageIndex] = {
+    ...message,
+    segments: message.segments.map((segment) =>
+      segment.kind === "tool_result" &&
+      segment.toolCallId === input.toolCallId &&
+      matchesToolRun(segment, input.runId)
+        ? Object.assign({}, segment, {
+            output: segment.output + input.delta,
+            tool: mergeToolName(segment.tool, input.toolName ?? "tool"),
+          })
+        : segment,
+    ),
+  };
+  return touchSessionLiveState({ ...state, messages });
+}
+
+export function applyToolCallUpdateToSessionLiveState(
+  state: SessionLiveState,
+  input: {
+    createdAt?: string;
+    inputDelta: string | null;
+    inputSnapshot: string | null;
+    outputDelta: string | null;
+    outputSnapshot: string | null;
+    parentMessageId: string | null;
+    resultMessageId: string;
+    runId: string | null;
+    toolCallId: string;
+    toolName: string;
+  },
+): SessionLiveState {
+  let next = appendToolUse(state, {
+    ...(input.createdAt === undefined ? {} : { createdAt: input.createdAt }),
+    parentMessageId: input.parentMessageId,
+    runId: input.runId,
+    toolCallId: input.toolCallId,
+    toolCallName: input.toolName,
+  });
+  if (input.inputDelta !== null) {
+    next = appendToolArgs(next, {
+      delta: input.inputDelta,
+      runId: input.runId,
+      toolCallId: input.toolCallId,
+    });
+  } else if (input.inputSnapshot !== null) {
+    next = replaceToolArgs(next, {
+      content: input.inputSnapshot,
+      runId: input.runId,
+      toolCallId: input.toolCallId,
+    });
+  }
+  if (input.outputDelta !== null) {
+    next = appendToolResultDelta(next, {
+      delta: input.outputDelta,
+      ...(input.createdAt === undefined ? {} : { createdAt: input.createdAt }),
+      messageId: input.resultMessageId,
+      runId: input.runId,
+      toolCallId: input.toolCallId,
+      toolName: input.toolName,
+    });
+  } else if (input.outputSnapshot !== null) {
+    next = appendToolResult(next, {
+      content: input.outputSnapshot,
+      ...(input.createdAt === undefined ? {} : { createdAt: input.createdAt }),
+      messageId: input.resultMessageId,
+      runId: input.runId,
+      toolCallId: input.toolCallId,
+      toolName: input.toolName,
+    });
+  }
+
+  return next;
 }

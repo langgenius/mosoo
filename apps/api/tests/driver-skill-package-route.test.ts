@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
+import { DRIVER_PROTOCOL_VERSION } from "@mosoo/agent-driver/boot";
 import { driverInstancesTable, skillSnapshotsTable } from "@mosoo/db";
 import { Hono } from "hono";
 
@@ -111,9 +112,10 @@ async function insertDriverInstance(
       lastHeartbeatAt: null,
       processId: null,
       protocol: "orpc-ws",
-      protocolVersion: 2,
+      protocolVersion: DRIVER_PROTOCOL_VERSION,
       runtime: "openai-runtime",
       sandboxId: PUBLIC_API_TEST_IDS.sandbox,
+      sandboxIncarnation: 1,
       sandboxSessionId: PUBLIC_API_TEST_IDS.ownerSession,
       status,
       statusChangedAt: nowMs,
@@ -144,7 +146,7 @@ describe("driver skill package route", () => {
     const database = await createPublicHttpContractDatabase();
     const bucket = new PublicApiMemoryFileBucket();
     const bindings = createPublicHttpTestBindings(database, {
-      fileBucket: bucket as unknown as R2Bucket,
+      fileBucket: bucket,
     }) as ApiBindings;
 
     ensureSkillRouteTables(database);
@@ -168,7 +170,7 @@ describe("driver skill package route", () => {
     const database = await createPublicHttpContractDatabase();
     const bucket = new PublicApiMemoryFileBucket();
     const bindings = createPublicHttpTestBindings(database, {
-      fileBucket: bucket as unknown as R2Bucket,
+      fileBucket: bucket,
     }) as ApiBindings;
 
     ensureSkillRouteTables(database);

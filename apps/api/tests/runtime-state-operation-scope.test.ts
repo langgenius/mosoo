@@ -16,10 +16,12 @@ function createRuntimeOperationScopeDatabase(): SqliteD1Database {
       agent_id text NOT NULL,
       creator_account_id text NOT NULL,
       last_run_id text,
+      runtime_event_seq_cursor integer DEFAULT 0 NOT NULL,
       status text NOT NULL,
       status_operation_id text,
       status_seq integer DEFAULT 0 NOT NULL,
-      archived_at integer
+      archived_at integer,
+      updated_at integer DEFAULT 0 NOT NULL
     );
 
     CREATE TABLE sandbox (
@@ -134,8 +136,10 @@ function createRuntimeTarget(input: {
     lastRunId: null,
     sandboxId: input.sandboxId,
     sessionId: input.sessionId,
+    sessionRuntimeEventSeqCursor: 0,
     sessionStatus: "IDLE",
     sessionStatusOperationId: null,
     sessionStatusSeq: 0,
+    sessionUpdatedAt: 0,
   };
 }

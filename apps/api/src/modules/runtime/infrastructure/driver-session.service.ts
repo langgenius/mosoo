@@ -38,6 +38,7 @@ import {
   provisionSessionDriver,
 } from "./runtime-sandbox-provisioner";
 import { stopProvisionProcess } from "./runtime-sandbox-provisioning/runtime-driver-process-cleanup";
+import type { RuntimeRunProvisioningLease } from "./runtime-subject-lifecycle/runtime-provisioning-lease-store";
 import type { RuntimeRunLeaseTransitionOutcome } from "./runtime-subject-lifecycle/runtime-run-lease-store";
 import { createRuntimeSubjectLifecycleService } from "./runtime-subject-lifecycle/runtime-subject-lifecycle.service";
 import type {
@@ -53,6 +54,7 @@ async function allocateDriverInstanceId(
   database: D1Database,
   input: {
     sandboxId: SandboxId;
+    sandboxIncarnation: number;
     sandboxSessionId: SessionId;
   },
 ): Promise<DriverInstanceId> {
@@ -97,6 +99,7 @@ async function waitForRetryableRunLeaseOutcome(
 }
 
 async function releasePreparedRunLeaseAfterFailure(input: {
+  driverGeneration: number;
   driverInstanceId: DriverInstanceId;
   runtimeSubjectLifecycle: ReturnType<typeof createRuntimeSubjectLifecycleService>;
   sessionId: SessionId;
@@ -106,6 +109,7 @@ async function releasePreparedRunLeaseAfterFailure(input: {
   try {
     const released = await input.runtimeSubjectLifecycle.releaseRunLease({
       driverInstanceId: input.driverInstanceId,
+      expectedDriverGeneration: input.driverGeneration,
       expectedSessionRunId: input.sessionRunId,
     });
 
@@ -138,7 +142,9 @@ export async function ensureDriverSessionReady(
     resolvedMcpServers: DriverResolvedMcpServer[];
     resolvedSkillCatalog: DriverSkillCatalogEntry[];
     resolvedSkills: Omit<DriverResolvedSkill, "downloadUrl">[];
+    runtimeProvisioningLease: RuntimeRunProvisioningLease;
     sandbox: SandboxHandle;
+    sandboxIncarnation: number;
     sandboxSessionId: SessionId;
     sessionId: SessionId;
     sessionRunId: SessionRunId;
@@ -146,12 +152,14 @@ export async function ensureDriverSessionReady(
     onBootPayloadPrepared?: DriverBootPayloadPreparedHandler;
   },
 ): Promise<{
+  driverGeneration: number;
   driverInstanceId: DriverInstanceId;
   readiness(): Promise<RuntimeTimingSnapshot>;
   timing: RuntimeTimingSnapshot;
 }> {
   let driverInstanceId = await allocateDriverInstanceId(bindings.DB, {
     sandboxId: input.profile.sandbox.id,
+    sandboxIncarnation: input.sandboxIncarnation,
     sandboxSessionId: input.sandboxSessionId,
   });
   const timing = createRuntimeTimingRecorder({
@@ -173,7 +181,11 @@ export async function ensureDriverSessionReady(
       traceId: input.traceId,
     };
     const usage = await timing.measure("driver.getUsage", () =>
-      getDriverUsage(bindings.DB, driverInstanceId),
+      getDriverUsage(bindings.DB, driverInstanceId, {
+        sandboxId: input.profile.sandbox.id,
+        sandboxIncarnation: input.sandboxIncarnation,
+        sandboxSessionId: input.sandboxSessionId,
+      }),
     );
     const usageSessionRunId = usage?.sessionRunId ?? null;
 
@@ -200,9 +212,15 @@ export async function ensureDriverSessionReady(
         });
 
         try {
-          await failDriverInstance(bindings, driverInstanceId, DRIVER_SOCKET_MISSING_MESSAGE);
+          await failDriverInstance(
+            bindings,
+            driverInstanceId,
+            usage.generation,
+            DRIVER_SOCKET_MISSING_MESSAGE,
+          );
           await runtimeSubjectLifecycle.releaseRunLease({
             driverInstanceId,
+            expectedDriverGeneration: usage.generation,
             expectedSessionRunId: input.sessionRunId,
           });
         } catch (error) {
@@ -219,8 +237,10 @@ export async function ensureDriverSessionReady(
 
       const runLeaseOutcome = await timing.measure("driver.bindRun", () =>
         runtimeSubjectLifecycle.acquireRunLease({
+          driverGeneration: usage.generation,
           driverInstanceId,
           runtimeSubjectId: input.profile.sandbox.id,
+          runtimeSubjectIncarnation: input.sandboxIncarnation,
           sessionId: input.sessionId,
           sessionRunId: input.sessionRunId,
         }),
@@ -239,6 +259,7 @@ export async function ensureDriverSessionReady(
       const readyTiming = timing.snapshot({ path: "warm" });
 
       return {
+        driverGeneration: usage.generation,
         driverInstanceId,
         readiness: async () => readyTiming,
         timing: readyTiming,
@@ -248,8 +269,10 @@ export async function ensureDriverSessionReady(
     if (usage && (usage.status === "provisioning" || usage.status === "connecting")) {
       const runLeaseOutcome = await timing.measure("driver.bindProvisioningRun", () =>
         runtimeSubjectLifecycle.acquireRunLease({
+          driverGeneration: usage.generation,
           driverInstanceId,
           runtimeSubjectId: input.profile.sandbox.id,
+          runtimeSubjectIncarnation: input.sandboxIncarnation,
           sessionId: input.sessionId,
           sessionRunId: input.sessionRunId,
         }),
@@ -261,12 +284,14 @@ export async function ensureDriverSessionReady(
       }
 
       return {
+        driverGeneration: usage.generation,
         driverInstanceId,
         readiness: async () => {
           try {
             await timing.measure("driver.waitProvisioningReady", () =>
               waitForDriverReady(bindings, {
                 driverInstanceId,
+                driverGeneration: usage.generation,
                 eventContext,
                 logContext: {
                   driverInstanceId,
@@ -284,6 +309,7 @@ export async function ensureDriverSessionReady(
               eventContext,
             });
             await releasePreparedRunLeaseAfterFailure({
+              driverGeneration: usage.generation,
               driverInstanceId,
               runtimeSubjectLifecycle,
               sessionId: input.sessionId,
@@ -314,13 +340,16 @@ export async function ensureDriverSessionReady(
       resolvedSkillCatalog: input.resolvedSkillCatalog,
       resolvedSkills: input.resolvedSkills,
       runtime: input.profile.runtimeId,
+      runtimeProvisioningLease: input.runtimeProvisioningLease,
       sandbox: input.sandbox,
+      sandboxIncarnation: input.sandboxIncarnation,
       sandboxSessionId: input.sandboxSessionId,
       sessionRunId: input.sessionRunId,
       traceId: input.traceId,
     };
     const { onBootPayloadPrepared } = input;
     let provisionProcess: RuntimeProcessHandle | null = null;
+    let provisionDriverGeneration: number | null = null;
     let reconnectFailureEventContext = eventContext;
 
     try {
@@ -339,6 +368,7 @@ export async function ensureDriverSessionReady(
         timing.addPhase(`driver.provision.${phase.name}`, phase.durationMs);
       }
       provisionProcess = provision.process;
+      provisionDriverGeneration = provision.driverGeneration;
       const provisionEventContext = {
         ...eventContext,
         driverInstanceId: provision.driverInstanceId,
@@ -347,8 +377,10 @@ export async function ensureDriverSessionReady(
 
       const provisioningRunLeaseOutcome = await timing.measure("driver.bindProvisioningRun", () =>
         runtimeSubjectLifecycle.acquireRunLease({
+          driverGeneration: provision.driverGeneration,
           driverInstanceId: provision.driverInstanceId,
           runtimeSubjectId: input.profile.sandbox.id,
+          runtimeSubjectIncarnation: input.sandboxIncarnation,
           sessionId: input.sessionId,
           sessionRunId: input.sessionRunId,
         }),
@@ -363,12 +395,14 @@ export async function ensureDriverSessionReady(
       provisionProcess = null;
 
       return {
+        driverGeneration: provision.driverGeneration,
         driverInstanceId: provision.driverInstanceId,
         readiness: async () => {
           try {
             await timing.measure("driver.waitForReady", () =>
               waitForDriverReady(bindings, {
                 driverInstanceId: provision.driverInstanceId,
+                driverGeneration: provision.driverGeneration,
                 eventContext: provisionEventContext,
                 logContext: {
                   driverInstanceId: provision.driverInstanceId,
@@ -382,6 +416,7 @@ export async function ensureDriverSessionReady(
             );
           } catch (error) {
             await releasePreparedRunLeaseAfterFailure({
+              driverGeneration: provision.driverGeneration,
               driverInstanceId: provision.driverInstanceId,
               runtimeSubjectLifecycle,
               sessionId: input.sessionId,
@@ -421,18 +456,22 @@ export async function ensureDriverSessionReady(
         });
         driverInstanceId = await allocateDriverInstanceId(bindings.DB, {
           sandboxId: input.profile.sandbox.id,
+          sandboxIncarnation: input.sandboxIncarnation,
           sandboxSessionId: input.sandboxSessionId,
         });
         reconnectAttempt = null;
         continue;
       }
-      await releasePreparedRunLeaseAfterFailure({
-        driverInstanceId,
-        runtimeSubjectLifecycle,
-        sessionId: input.sessionId,
-        sessionRunId: input.sessionRunId,
-        traceId: input.traceId,
-      });
+      if (provisionDriverGeneration !== null) {
+        await releasePreparedRunLeaseAfterFailure({
+          driverGeneration: provisionDriverGeneration,
+          driverInstanceId,
+          runtimeSubjectLifecycle,
+          sessionId: input.sessionId,
+          sessionRunId: input.sessionRunId,
+          traceId: input.traceId,
+        });
+      }
       await appendDriverSocketReconnectFailedIfNeeded(bindings, {
         attempt: reconnectAttempt,
         error,
@@ -456,6 +495,7 @@ export async function prewarmDriverSession(
     resolvedSkillCatalog: DriverSkillCatalogEntry[];
     resolvedSkills: Omit<DriverResolvedSkill, "downloadUrl">[];
     sandbox: SandboxHandle;
+    sandboxIncarnation: number;
     sandboxSessionId: SessionId;
     sessionId: SessionId;
   },
@@ -465,6 +505,7 @@ export async function prewarmDriverSession(
 } | null> {
   let driverInstanceId = await allocateDriverInstanceId(bindings.DB, {
     sandboxId: input.profile.sandbox.id,
+    sandboxIncarnation: input.sandboxIncarnation,
     sandboxSessionId: input.sandboxSessionId,
   });
   const timing = createRuntimeTimingRecorder({
@@ -485,7 +526,11 @@ export async function prewarmDriverSession(
       traceId: null,
     };
     const usage = await timing.measure("driver.getUsage", () =>
-      getDriverUsage(bindings.DB, driverInstanceId),
+      getDriverUsage(bindings.DB, driverInstanceId, {
+        sandboxId: input.profile.sandbox.id,
+        sandboxIncarnation: input.sandboxIncarnation,
+        sandboxSessionId: input.sandboxSessionId,
+      }),
     );
 
     if ((usage?.sessionRunId ?? null) !== null) {
@@ -506,7 +551,12 @@ export async function prewarmDriverSession(
         return { driverInstanceId, timing: timing.snapshot({ path: "warm" }) };
       }
 
-      await failDriverInstance(bindings, driverInstanceId, DRIVER_SOCKET_MISSING_MESSAGE);
+      await failDriverInstance(
+        bindings,
+        driverInstanceId,
+        usage.generation,
+        DRIVER_SOCKET_MISSING_MESSAGE,
+      );
       continue;
     }
 
@@ -514,6 +564,7 @@ export async function prewarmDriverSession(
       await timing.measure("driver.waitProvisioningReady", () =>
         waitForDriverReady(bindings, {
           driverInstanceId,
+          driverGeneration: usage.generation,
           eventContext,
           logContext: {
             driverInstanceId,
@@ -539,6 +590,7 @@ export async function prewarmDriverSession(
       resolvedSkills: input.resolvedSkills,
       runtime: input.profile.runtimeId,
       sandbox: input.sandbox,
+      sandboxIncarnation: input.sandboxIncarnation,
       sandboxSessionId: input.sandboxSessionId,
       sessionRunId: null,
       traceId: null,
@@ -557,6 +609,7 @@ export async function prewarmDriverSession(
       await timing.measure("driver.waitForReady", () =>
         waitForDriverReady(bindings, {
           driverInstanceId: provision.driverInstanceId,
+          driverGeneration: provision.driverGeneration,
           eventContext: {
             ...eventContext,
             driverInstanceId: provision.driverInstanceId,
@@ -631,6 +684,7 @@ export async function dispatchDriverTurn(
   bindings: ApiBindings,
   input: {
     attachmentIds: FileId[];
+    driverGeneration: number;
     driverInstanceId: DriverInstanceId;
     prompt: string;
     sessionRunId: SessionRunId;
@@ -647,6 +701,7 @@ export async function dispatchDriverTurn(
       requestId: createPlatformId(),
       runId: input.sessionRunId,
     },
+    driverGeneration: input.driverGeneration,
     driverInstanceId: input.driverInstanceId,
     expiresAt: currentTimestampPlus(DRIVER_COLD_READY_TIMEOUT_MS),
   });

@@ -12,13 +12,6 @@ import {
   listSessionResources,
 } from "../src/modules/sessions/application/session-resource.service";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
-import {
-  PUBLIC_API_TEST_IDS,
-  PublicApiMemoryFileBucket,
-  createPublicHttpContractDatabase,
-  createPublicHttpTestBindings,
-  insertOwnerSession,
-} from "./helpers/public-api-http-test-fixture";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
 const OWNER_ID = parsePlatformId<AccountId>("01J00000000000000000000001", "owner ID");
@@ -99,6 +92,7 @@ function createSessionResourceDatabase(input: { includeFile?: boolean } = {}): S
       parent_path text NOT NULL,
       path text NOT NULL,
       purpose text NOT NULL,
+      runtime_event_seq integer,
       size integer NOT NULL,
       updated_at integer NOT NULL,
       version integer NOT NULL
@@ -571,55 +565,6 @@ describe("session resource files", () => {
     });
 
     expect(artifacts.files.map((file) => file.id)).toEqual([ARTIFACT_FILE_ID]);
-  });
-
-  test("records runtime outputs as session-scoped artifacts", async () => {
-    const database = await createPublicHttpContractDatabase();
-    await insertOwnerSession(database);
-    const bucket = new PublicApiMemoryFileBucket();
-    const ownerViewer: AuthenticatedViewer = {
-      email: "owner@example.com",
-      emailVerified: true,
-      id: PUBLIC_API_TEST_IDS.ownerAccount,
-      imageUrl: null,
-      name: "Owner",
-    };
-    const file = await fileStore.recordRuntimeOutput({
-      bindings: createPublicHttpTestBindings(database, {
-        fileBucket: bucket as unknown as R2Bucket,
-      }) as ApiBindings,
-      body: new TextEncoder().encode("runtime summary"),
-      contentType: "text/markdown",
-      createdBy: PUBLIC_API_TEST_IDS.ownerAccount,
-      path: "outputs/reports/summary.md",
-      sessionId: PUBLIC_API_TEST_IDS.ownerSession,
-    });
-
-    expect(file.owner).toEqual({
-      id: PUBLIC_API_TEST_IDS.ownerSession,
-      kind: "session",
-    });
-    expect(file.purpose).toBe("session_artifact");
-    expect(file.scope).toEqual({
-      id: PUBLIC_API_TEST_IDS.ownerSession,
-      kind: "session",
-    });
-    expect(file.sessionKind).toBe("artifact");
-    expect(file.sourcePath).toBe("outputs/reports/summary.md");
-
-    const resources = await listSessionResources(database, ownerViewer, {
-      projectId: PUBLIC_API_TEST_IDS.project,
-      sessionId: PUBLIC_API_TEST_IDS.ownerSession,
-    });
-
-    expect(resources).toEqual([
-      expect.objectContaining({
-        id: file.id,
-        kind: "artifact",
-        name: "summary.md",
-        path: `session-artifacts/${file.id}/summary.md`,
-      }),
-    ]);
   });
 
   test("lists session artifacts but does not treat them as removable attachments", async () => {

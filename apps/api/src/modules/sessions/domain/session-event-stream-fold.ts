@@ -3,18 +3,9 @@ import type { RuntimeEventId, SessionRunId } from "@mosoo/id";
 // Streamed text events (message.delta / thought.delta) are persisted one row
 // per fragment so every accepted source identity stays durable (#274). Reading
 // them back verbatim renders each fragment as its own timeline entry, so read
-// paths fold a fragment stream into a single row before projecting process
-// events. The merge rules mirror the pre-persistence compactor
-// (runtime-event-compaction.ts): deltas append, snapshots prefer the longer
-// prefix-matching text.
-//
-// Rows carry no message identity, so a stream whose driver-side identity
-// fractured (a dropped message_start splits one reply across several
-// started/delta groups, YEF-884) still folds into several fragment rows, and
-// the trailing message.added snapshot lands after its stream already closed.
-// To heal both shapes, closed fragment rows are kept as supersede candidates:
-// a snapshot whose text prefix-matches the concatenated fragments replaces
-// them with a single row instead of rendering a duplicate.
+// paths fold each identified stream into one row before projecting process
+// events. message.added starts an authoritative snapshot, and later deltas
+// append to it.
 
 export interface StreamFoldableSessionEventRow {
   content_text: string;
@@ -25,20 +16,32 @@ export interface StreamFoldableSessionEventRow {
   process_type: string;
   run_id: SessionRunId | null;
   seq: number;
+  stream_id: string | null;
   tokens: number | null;
 }
 
-export interface FoldedStreamedSessionEventRows<R> {
-  /**
-   * Raw rows of streams that have not seen their closing event yet, in seq
-   * order. Only populated when `flushOpenStreams` is false; callers carry them
-   * into the next fold so a stream spanning reads still emits exactly once.
-   */
-  openStreamRows: R[];
-  rows: R[];
-}
-
 type StreamRowPhase = "added" | "completed" | "delta" | "started";
+
+const MESSAGE_STREAM_AUTHORITY_RESET_EVENT_TYPES = [
+  "message.cancelled",
+  "message.failed",
+  "message.started",
+] as const;
+
+export const MESSAGE_STREAM_AUTHORITY_BOUNDARY_EVENT_TYPES = [
+  "message.added",
+  ...MESSAGE_STREAM_AUTHORITY_RESET_EVENT_TYPES,
+] as const;
+
+export const MESSAGE_STREAM_EVENT_TYPES = [
+  ...MESSAGE_STREAM_AUTHORITY_BOUNDARY_EVENT_TYPES,
+  "message.completed",
+  "message.delta",
+] as const;
+
+const messageStreamAuthorityResetEventTypes: ReadonlySet<string> = new Set(
+  MESSAGE_STREAM_AUTHORITY_RESET_EVENT_TYPES,
+);
 
 interface StreamRowClassification {
   phase: StreamRowPhase;
@@ -50,9 +53,12 @@ const THOUGHT_PLACEHOLDER = "Agent thinking updated.";
 
 const streamRowClassifications: Readonly<Record<string, StreamRowClassification>> = {
   "message.added": { phase: "added", placeholder: MESSAGE_PLACEHOLDER },
+  "message.cancelled": { phase: "completed", placeholder: MESSAGE_PLACEHOLDER },
   "message.completed": { phase: "completed", placeholder: MESSAGE_PLACEHOLDER },
   "message.delta": { phase: "delta", placeholder: MESSAGE_PLACEHOLDER },
+  "message.failed": { phase: "completed", placeholder: MESSAGE_PLACEHOLDER },
   "message.started": { phase: "started", placeholder: MESSAGE_PLACEHOLDER },
+  "thought.cancelled": { phase: "completed", placeholder: THOUGHT_PLACEHOLDER },
   "thought.completed": { phase: "completed", placeholder: THOUGHT_PLACEHOLDER },
   "thought.delta": { phase: "delta", placeholder: THOUGHT_PLACEHOLDER },
   "thought.started": { phase: "started", placeholder: THOUGHT_PLACEHOLDER },
@@ -60,162 +66,303 @@ const streamRowClassifications: Readonly<Record<string, StreamRowClassification>
 
 const terminalRunEventTypes = new Set(["run.cancelled", "run.completed", "run.failed"]);
 
-interface OpenStreamGroup<R extends StreamFoldableSessionEventRow> {
-  contentText: string;
-  placeholder: string;
-  rows: R[];
-  runId: SessionRunId | null;
+export interface MessageStreamTextFragment {
+  kind: "append" | "reset";
+  text: string;
 }
 
-interface ClosedFragmentSegment {
-  content: string;
-  outputIndex: number;
-}
+export function getMessageStreamTextFragment(
+  row: StreamFoldableSessionEventRow,
+): MessageStreamTextFragment | null {
+  const classification = streamRowClassifications[row.event_type];
 
-function appendStreamText(current: string, next: string): string {
-  if (next.length === 0) {
-    return current;
-  }
-
-  return current.length === 0 ? next : `${current}${next}`;
-}
-
-function mergeSnapshotText(current: string, next: string): string {
-  if (next.length === 0) {
-    return current;
-  }
-
-  if (current.length === 0) {
-    return next;
-  }
-
-  if (next.length > current.length && next.startsWith(current)) {
-    return next;
-  }
-
-  if (current.length >= next.length && current.startsWith(next)) {
-    return current;
-  }
-
-  return `${current}${next}`;
-}
-
-function isSnapshotOfFragments(fragments: string, snapshot: string): boolean {
-  if (fragments.length === 0 || snapshot.length === 0) {
-    return false;
-  }
-
-  return snapshot.startsWith(fragments) || fragments.startsWith(snapshot);
-}
-
-function createOpenStreamGroup<R extends StreamFoldableSessionEventRow>(
-  row: R,
-  classification: StreamRowClassification,
-): OpenStreamGroup<R> {
-  return {
-    contentText: "",
-    placeholder: classification.placeholder,
-    rows: [],
-    runId: row.run_id,
-  };
-}
-
-function mergeStreamRow<R extends StreamFoldableSessionEventRow>(
-  group: OpenStreamGroup<R>,
-  row: R,
-  classification: StreamRowClassification,
-): void {
-  group.rows.push(row);
-
-  // Fragments that carried no text are persisted with the process-draft
-  // placeholder; they mark stream boundaries and must not leak into the text.
-  if (row.content_text === group.placeholder) {
-    return;
-  }
-
-  group.contentText =
-    classification.phase === "delta"
-      ? appendStreamText(group.contentText, row.content_text)
-      : mergeSnapshotText(group.contentText, row.content_text);
-}
-
-function createFoldedStreamRow<R extends StreamFoldableSessionEventRow>(
-  group: OpenStreamGroup<R>,
-): R | null {
-  const firstRow = group.rows[0];
-  const lastRow = group.rows[group.rows.length - 1];
-
-  if (firstRow === undefined || lastRow === undefined || group.contentText.length === 0) {
+  if (
+    classification === undefined ||
+    !row.event_type.startsWith("message.") ||
+    (classification.phase !== "added" && classification.phase !== "delta")
+  ) {
     return null;
   }
 
   return {
+    kind: classification.phase === "added" ? "reset" : "append",
+    text: row.content_text,
+  };
+}
+
+interface StreamGroup<R extends StreamFoldableSessionEventRow> {
+  contentText: string;
+  firstRow: R;
+  latestRow: R;
+  outputIndex: number | null;
+  placeholder: string;
+  representative: R | null;
+  runId: SessionRunId | null;
+  terminal: boolean;
+}
+
+interface ScannedStreamState {
+  leftBoundarySeen: boolean;
+  runId: SessionRunId | null;
+}
+
+function createStreamGroup<R extends StreamFoldableSessionEventRow>(
+  row: R,
+  classification: StreamRowClassification,
+): StreamGroup<R> {
+  return {
+    contentText: "",
+    firstRow: row,
+    latestRow: row,
+    outputIndex: null,
+    placeholder: classification.placeholder,
+    representative: null,
+    runId: row.run_id,
+    terminal: false,
+  };
+}
+
+export function getSessionEventStreamKey(row: StreamFoldableSessionEventRow): string | null {
+  if (streamRowClassifications[row.event_type] === undefined) {
+    return null;
+  }
+
+  if (row.stream_id === null) {
+    throw new Error(`Streamed session event ${row.id} has no stream identity.`);
+  }
+
+  return JSON.stringify([row.run_id, row.process_type, row.stream_id]);
+}
+
+// Reverse window scans must cross a stream's left boundary before treating
+// its folded content and first sequence as complete. Migration identities
+// that equal their row ID are deliberately row-scoped and already complete.
+export function findLeftIncompleteSessionEventStreamKeys(
+  rows: readonly StreamFoldableSessionEventRow[],
+): Set<string> {
+  const runStarts = new Set<SessionRunId>();
+  const streams = new Map<string, ScannedStreamState>();
+
+  for (const row of rows) {
+    if (row.event_type === "run.started" && row.run_id !== null) {
+      runStarts.add(row.run_id);
+    }
+
+    const key = getSessionEventStreamKey(row);
+
+    if (key === null) {
+      continue;
+    }
+
+    const stream = streams.get(key) ?? {
+      leftBoundarySeen: false,
+      runId: row.run_id,
+    };
+    stream.leftBoundarySeen ||=
+      row.event_type === "message.added" ||
+      row.event_type === "message.started" ||
+      row.event_type === "thought.started" ||
+      row.stream_id === row.id;
+    streams.set(key, stream);
+  }
+
+  return new Set(
+    [...streams]
+      .filter(
+        ([, stream]) =>
+          !stream.leftBoundarySeen && (stream.runId === null || !runStarts.has(stream.runId)),
+      )
+      .map(([key]) => key),
+  );
+}
+
+export function excludeSessionEventStreams<R extends StreamFoldableSessionEventRow>(
+  rows: readonly R[],
+  excludedKeys: ReadonlySet<string>,
+): R[] {
+  return rows.filter((row) => {
+    const key = getSessionEventStreamKey(row);
+    return key === null || !excludedKeys.has(key);
+  });
+}
+
+function mergeStreamRow<R extends StreamFoldableSessionEventRow>(
+  group: StreamGroup<R>,
+  row: R,
+  classification: StreamRowClassification,
+): void {
+  group.latestRow = row;
+  group.contentText = mergeStreamText(
+    group.contentText,
+    row.content_text,
+    classification,
+    group.placeholder,
+  );
+
+  if (classification.phase === "added") {
+    if (!group.terminal) {
+      group.representative = row;
+    }
+  } else if (classification.phase === "completed") {
+    if (group.outputIndex === null) {
+      group.representative = row;
+    }
+    group.terminal = true;
+  }
+}
+
+function mergeStreamText(
+  currentText: string,
+  rowText: string,
+  classification: StreamRowClassification,
+  placeholder: string,
+): string {
+  const text =
+    classification.phase === "added" || classification.phase === "delta"
+      ? rowText
+      : rowText === placeholder
+        ? ""
+        : rowText;
+
+  if (classification.phase === "added") {
+    return text;
+  }
+  if (classification.phase === "delta") {
+    return currentText + text;
+  }
+  if (classification.phase === "completed") {
+    return currentText || text;
+  }
+  return currentText;
+}
+
+/**
+ * Resolves one already-ordered assistant message stream only when its latest
+ * lifecycle is sealed by message.completed. A later start, delta, or
+ * authoritative snapshot opens the stream again, so an old terminal receipt
+ * cannot make an incomplete replacement look final.
+ */
+interface AuthoritativeMessageStream {
+  sealed: boolean;
+  text: string;
+}
+
+export interface MessageStreamLifecycle {
+  authoritative: boolean;
+  sealed: boolean;
+}
+
+export interface MessageStreamReducerState
+  extends AuthoritativeMessageStream, MessageStreamLifecycle {}
+
+export function createMessageStreamLifecycle(): MessageStreamLifecycle {
+  return { authoritative: false, sealed: false };
+}
+
+export function reduceMessageStreamLifecycle(
+  state: MessageStreamLifecycle,
+  eventType: string,
+): MessageStreamLifecycle {
+  if (eventType === "message.added") {
+    return { authoritative: true, sealed: false };
+  }
+  if (messageStreamAuthorityResetEventTypes.has(eventType)) {
+    return { authoritative: false, sealed: false };
+  }
+  if (eventType === "message.completed") {
+    return { authoritative: state.authoritative, sealed: state.authoritative };
+  }
+  if (eventType === "message.delta") {
+    return { authoritative: state.authoritative, sealed: false };
+  }
+  return state;
+}
+
+export function createMessageStreamReducerState(): MessageStreamReducerState {
+  return { ...createMessageStreamLifecycle(), text: "" };
+}
+
+export function reduceMessageStreamRow(
+  state: MessageStreamReducerState,
+  row: StreamFoldableSessionEventRow,
+  options?: { maxTextLength: number },
+): void {
+  const classification = streamRowClassifications[row.event_type];
+
+  if (classification === undefined || !row.event_type.startsWith("message.")) {
+    return;
+  }
+
+  state.text = mergeStreamText(state.text, row.content_text, classification, MESSAGE_PLACEHOLDER);
+  if (options !== undefined && state.text.length > options.maxTextLength) {
+    state.text = state.text.slice(0, options.maxTextLength);
+  }
+  const lifecycle = reduceMessageStreamLifecycle(state, row.event_type);
+  state.authoritative = lifecycle.authoritative;
+  state.sealed = lifecycle.sealed;
+}
+
+function resolveAuthoritativeMessageStream(
+  rows: readonly StreamFoldableSessionEventRow[],
+): AuthoritativeMessageStream | null {
+  const state = createMessageStreamReducerState();
+
+  for (const row of rows) {
+    reduceMessageStreamRow(state, row);
+  }
+
+  return state.authoritative ? { sealed: state.sealed, text: state.text } : null;
+}
+
+export function resolveSealedMessageStream(
+  rows: readonly StreamFoldableSessionEventRow[],
+): { text: string } | null {
+  const stream = resolveAuthoritativeMessageStream(rows);
+  return stream?.sealed === true ? { text: stream.text } : null;
+}
+
+function createFoldedStreamRow<R extends StreamFoldableSessionEventRow>(
+  group: StreamGroup<R>,
+  keepEmpty: boolean,
+): R | null {
+  if (!keepEmpty && group.contentText.length === 0) {
+    return null;
+  }
+
+  const lastRow = group.representative ?? group.latestRow;
+
+  return {
     ...lastRow,
     content_text: group.contentText,
-    occurred_at: firstRow.occurred_at,
-    seq: firstRow.seq,
+    occurred_at: group.firstRow.occurred_at,
+    seq: group.firstRow.seq,
   };
+}
+
+function emitStreamGroup<R extends StreamFoldableSessionEventRow>(
+  output: R[],
+  group: StreamGroup<R>,
+  keepEmpty: boolean,
+): void {
+  const folded = createFoldedStreamRow(group, keepEmpty);
+
+  if (folded === null) {
+    return;
+  }
+
+  if (group.outputIndex === null) {
+    group.outputIndex = output.length;
+    output.push(folded);
+  } else {
+    output[group.outputIndex] = folded;
+  }
 }
 
 export function foldStreamedSessionEventRows<R extends StreamFoldableSessionEventRow>(
   rows: readonly R[],
-  options: { flushOpenStreams: boolean },
-): FoldedStreamedSessionEventRows<R> {
-  const output: (R | null)[] = [];
-  const openGroups = new Map<string, OpenStreamGroup<R>>();
-  const fragmentSegments = new Map<string, ClosedFragmentSegment[]>();
-
-  function closeGroupAsFragment(key: string, group: OpenStreamGroup<R>): void {
-    const folded = createFoldedStreamRow(group);
-
-    if (folded === null) {
-      return;
-    }
-
-    output.push(folded);
-    const segments = fragmentSegments.get(key) ?? [];
-    segments.push({ content: folded.content_text, outputIndex: output.length - 1 });
-    fragmentSegments.set(key, segments);
-  }
-
-  // A snapshot row is the authoritative text of the message it closes. When
-  // its text extends (or repeats) the fragment rows already emitted for the
-  // same stream key, those fragments were partial views of this snapshot:
-  // collapse them into one row at the first fragment's timeline position.
-  function closeGroupWithSnapshot(key: string, folded: R | null): void {
-    if (folded === null) {
-      return;
-    }
-
-    const segments = fragmentSegments.get(key) ?? [];
-    fragmentSegments.delete(key);
-    const fragments = segments.map((segment) => segment.content).join("");
-
-    if (!isSnapshotOfFragments(fragments, folded.content_text)) {
-      output.push(folded);
-      return;
-    }
-
-    const firstSegment = segments[0];
-    const anchorRow = firstSegment === undefined ? null : output[firstSegment.outputIndex];
-
-    if (firstSegment === undefined || anchorRow === null || anchorRow === undefined) {
-      output.push(folded);
-      return;
-    }
-
-    for (const segment of segments) {
-      output[segment.outputIndex] = null;
-    }
-
-    output[firstSegment.outputIndex] = {
-      ...folded,
-      content_text:
-        folded.content_text.length >= fragments.length ? folded.content_text : fragments,
-      occurred_at: anchorRow.occurred_at,
-      seq: anchorRow.seq,
-    };
-  }
+): R[] {
+  const output: R[] = [];
+  const groups = new Map<string, StreamGroup<R>>();
 
   for (const row of rows) {
     const classification = streamRowClassifications[row.event_type];
@@ -225,10 +372,9 @@ export function foldStreamedSessionEventRows<R extends StreamFoldableSessionEven
       // like the pre-persistence compactor did, so a failed run still shows
       // the text it managed to stream.
       if (terminalRunEventTypes.has(row.event_type)) {
-        for (const [key, group] of openGroups) {
-          if (group.runId === row.run_id) {
-            openGroups.delete(key);
-            closeGroupAsFragment(key, group);
+        for (const group of groups.values()) {
+          if (group.runId === row.run_id && group.outputIndex === null) {
+            emitStreamGroup(output, group, false);
           }
         }
       }
@@ -237,60 +383,25 @@ export function foldStreamedSessionEventRows<R extends StreamFoldableSessionEven
       continue;
     }
 
-    const key = `${row.run_id ?? ""}:${row.process_type}`;
-    const existing = openGroups.get(key) ?? null;
+    const key = getSessionEventStreamKey(row);
 
-    if (classification.phase === "started") {
-      if (existing !== null) {
-        openGroups.delete(key);
-        closeGroupAsFragment(key, existing);
-      }
-
-      const group = createOpenStreamGroup(row, classification);
-      mergeStreamRow(group, row, classification);
-      openGroups.set(key, group);
-      continue;
+    if (key === null) {
+      throw new Error(`Streamed session event ${row.id} has no stream classification.`);
     }
-
-    if (classification.phase === "added" && existing === null) {
-      // A snapshot with no open stream is either a complete standalone
-      // message (legacy compacted rows and non-streamed messages) or the
-      // authoritative copy of fragments that already closed; the supersede
-      // check keeps the first case verbatim.
-      closeGroupWithSnapshot(key, row.content_text === classification.placeholder ? null : row);
-
-      if (row.content_text === classification.placeholder) {
-        output.push(row);
-      }
-      continue;
-    }
-
-    const group = existing ?? createOpenStreamGroup(row, classification);
+    const group = groups.get(key) ?? createStreamGroup(row, classification);
+    groups.set(key, group);
     mergeStreamRow(group, row, classification);
 
-    if (classification.phase === "added") {
-      openGroups.delete(key);
-      closeGroupWithSnapshot(key, createFoldedStreamRow(group));
-    } else if (classification.phase === "completed") {
-      openGroups.delete(key);
-      closeGroupAsFragment(key, group);
-    } else if (existing === null) {
-      openGroups.set(key, group);
+    if (classification.phase === "completed" || group.outputIndex !== null) {
+      emitStreamGroup(output, group, true);
     }
   }
 
-  if (options.flushOpenStreams) {
-    for (const [key, group] of openGroups) {
-      closeGroupAsFragment(key, group);
+  for (const group of groups.values()) {
+    if (group.outputIndex === null) {
+      emitStreamGroup(output, group, group.representative !== null);
     }
-
-    return { openStreamRows: [], rows: output.filter((row): row is R => row !== null) };
   }
 
-  return {
-    openStreamRows: [...openGroups.values()]
-      .flatMap((group) => group.rows)
-      .toSorted((a, b) => a.seq - b.seq),
-    rows: output.filter((row): row is R => row !== null),
-  };
+  return output.toSorted((a, b) => a.seq - b.seq);
 }

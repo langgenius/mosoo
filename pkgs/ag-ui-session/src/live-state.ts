@@ -1,3 +1,5 @@
+import type { AgentTaskSnapshot } from "@mosoo/contracts/session";
+
 export interface SessionViewPlanEntry {
   content: string;
   priority: "high" | "medium" | "low";
@@ -17,12 +19,14 @@ export type SessionViewSegment =
       argsText: string;
       kind: "tool_use";
       path: string | null;
+      runId?: string | null;
       tool: string;
       toolCallId: string;
     }
   | {
       kind: "tool_result";
       output: string;
+      runId?: string | null;
       tool: string;
       toolCallId: string;
     };
@@ -74,6 +78,7 @@ export interface SessionReadinessSnapshotView {
 }
 
 export interface SessionInfraState {
+  driverInstanceId: string | null;
   lastFailureReason: string | null;
   lastFailureMessage: string | null;
   lastSeen: string | null;
@@ -173,6 +178,7 @@ export interface SessionLiveState {
   run: SessionRunView;
   sessionId: string;
   title: string | null;
+  taskSnapshot: AgentTaskSnapshot | null;
   updatedAt: string | null;
   usage: SessionUsageSummary | null;
   viewerId: string;

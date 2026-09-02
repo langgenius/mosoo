@@ -2,6 +2,7 @@ import type { SessionViewerSocketContext } from "./socket-headers";
 
 export interface ViewerSocketAttachment extends SessionViewerSocketContext {
   role: "viewer";
+  runtimeEventSeqCursor?: number;
 }
 
 export type SessionSocketAttachment = ViewerSocketAttachment;
@@ -21,6 +22,10 @@ export function isViewerSocketAttachment(value: unknown): value is ViewerSocketA
     typeof value["publicOrigin"] === "string" &&
     typeof value["projectId"] === "string" &&
     typeof value["sessionId"] === "string" &&
+    (value["runtimeEventSeqCursor"] === undefined ||
+      (typeof value["runtimeEventSeqCursor"] === "number" &&
+        Number.isSafeInteger(value["runtimeEventSeqCursor"]) &&
+        value["runtimeEventSeqCursor"] >= 0)) &&
     isRecord(viewer) &&
     typeof viewer["email"] === "string" &&
     typeof viewer["emailVerified"] === "boolean" &&

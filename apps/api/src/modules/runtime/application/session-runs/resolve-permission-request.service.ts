@@ -1,6 +1,6 @@
 import { driverInstancesTable, sessionRunsTable, sessionsTable } from "@mosoo/db";
 import { createPlatformId, parsePlatformId } from "@mosoo/id";
-import type { AccountId, DriverInstanceId, ProjectId, SessionId } from "@mosoo/id";
+import type { AccountId, DriverInstanceId, ProjectId, SessionId, SessionRunId } from "@mosoo/id";
 import { and, eq, inArray } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
@@ -16,6 +16,7 @@ interface ResolveDriverPermissionInput {
   driverInstanceId: DriverInstanceId;
   projectId: ProjectId;
   requestId: string;
+  runId: SessionRunId;
   sessionId: SessionId;
 }
 
@@ -29,6 +30,8 @@ export async function resolvePermissionRequest(
   const row =
     (await getAppDatabase(bindings.DB)
       .select({
+        driverGeneration: driverInstancesTable.generation,
+        runId: sessionRunsTable.id,
         sessionId: sessionsTable.id,
       })
       .from(driverInstancesTable)
@@ -43,6 +46,7 @@ export async function resolvePermissionRequest(
       .where(
         and(
           eq(driverInstancesTable.id, input.driverInstanceId),
+          eq(sessionRunsTable.id, input.runId),
           eq(sessionsTable.id, input.sessionId),
           eq(sessionsTable.projectId, input.projectId),
           sessionParticipantCondition(viewerId),
@@ -55,10 +59,11 @@ export async function resolvePermissionRequest(
     throw new Error("Driver instance not found.");
   }
 
-  await sendDriverInstanceCommand(bindings, input.driverInstanceId, {
+  await sendDriverInstanceCommand(bindings, input.driverInstanceId, row.driverGeneration, {
     commandId: createPlatformId(),
     decision: input.decision,
     kind: "permission.resolve",
     requestId: input.requestId,
+    runId: row.runId,
   });
 }

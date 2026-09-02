@@ -256,7 +256,7 @@ async function handleAgentSessionEvent(input: {
       if (updated) {
         await appendSessionRuntimeEvents({
           bindings: input.bindings,
-          events: [updated.event],
+          events: updated.events,
           sessionId: input.sessionId,
         });
       }

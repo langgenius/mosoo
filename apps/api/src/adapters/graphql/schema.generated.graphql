@@ -379,6 +379,7 @@ type AgentSessionRetrieve {
   capabilities: [AgentSessionActionCapability!]!
   recoverability: AgentSessionRecoverability!
   session: Session!
+  taskSnapshot: AgentTaskSnapshot
 }
 
 type AgentSessionRetrieveConnection {
@@ -417,6 +418,18 @@ type AgentSummary {
   updatedAt: String!
   viewerRole: AgentViewerRole!
   visibility: AgentVisibility!
+}
+
+type AgentTask {
+  taskId: String!
+  taskType: String
+  title: String
+}
+
+type AgentTaskSnapshot {
+  driverInstanceId: ULID!
+  runId: ULID!
+  tasks: [AgentTask!]!
 }
 
 type AgentToolSummary {

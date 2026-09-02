@@ -11,11 +11,16 @@ import {
   resumeRuntimeSubjectRecycleOperation,
 } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-recycle.service";
 import {
+  claimRuntimeSubjectOperationForRepair,
   listInactiveRuntimeSubjects,
   listStaleRuntimeSubjectOperations,
 } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-store";
+import type { RuntimeSubjectOperationLease } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-store";
 import { encodeSandboxBackupIdForStorage } from "../src/modules/runtime/infrastructure/sandbox-backup-id";
-import type { SandboxHandle } from "../src/modules/runtime/infrastructure/sandbox-handles";
+import type {
+  RuntimeSubjectIncarnationHandle,
+  SandboxHandle,
+} from "../src/modules/runtime/infrastructure/sandbox-handles";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
@@ -27,10 +32,15 @@ const CLOUDFLARE_BACKUP_IDS = [
 ] as const;
 const BACKUP_ID = encodeSandboxBackupIdForStorage(CLOUDFLARE_BACKUP_ID);
 const CLAIM_OWNER = "scheduled-maintenance-owner";
-const OPERATION_ID = "01J0000000000000000000000R";
+const OPERATION_ID = parsePlatformId<RuntimeOperationId>(
+  "01J0000000000000000000000R",
+  "operation id",
+);
 const SANDBOX_ID = PLATFORM_ID_FIXTURES.sandbox;
 
-let currentSandbox: SandboxHandle | null = null;
+type RuntimeSubjectTestHandle = RuntimeSubjectIncarnationHandle & SandboxHandle;
+
+let currentSandbox: RuntimeSubjectTestHandle | null = null;
 
 function createRuntimeSubjectRecycleDatabase(): SqliteD1Database {
   const database = new SqliteD1Database({ foreignKeys: false });
@@ -39,19 +49,29 @@ function createRuntimeSubjectRecycleDatabase(): SqliteD1Database {
     CREATE TABLE driver_instance (
       id text PRIMARY KEY NOT NULL,
       sandbox_id text NOT NULL,
+      sandbox_incarnation integer DEFAULT 1 NOT NULL,
+      sandbox_session_id text,
       generation integer DEFAULT 0 NOT NULL,
-      status text NOT NULL
+      status text NOT NULL,
+      status_operation_id text
     );
 
     CREATE TABLE sandbox (
+      agent_id text NOT NULL DEFAULT '01J00000000000000000000009',
+      project_id text NOT NULL DEFAULT '01J0000000000000000000000A',
       claim_expires_at integer,
       claim_owner text,
       id text PRIMARY KEY NOT NULL,
       inactive_deadline_at integer,
+      incarnation integer NOT NULL,
       kind text NOT NULL,
       last_backup_id text,
       last_error text,
       last_error_code text,
+      last_restore_backup_id text,
+      network_constraints_hash text,
+      operation_kind text,
+      owner_account_id text NOT NULL DEFAULT '01J00000000000000000000008',
       status text NOT NULL,
       status_changed_at integer DEFAULT 0 NOT NULL,
       status_event text DEFAULT 'runtime_subject.active' NOT NULL,
@@ -66,27 +86,78 @@ function createRuntimeSubjectRecycleDatabase(): SqliteD1Database {
     CREATE TABLE sandbox_backup (
       created_at integer NOT NULL,
       dir text NOT NULL,
-      error_message text,
       id text PRIMARY KEY NOT NULL,
       keep integer NOT NULL,
+      operation_id text,
       sandbox_id text NOT NULL,
+      sandbox_incarnation integer DEFAULT 1 NOT NULL,
       session_run_id text,
+      staging_id text NOT NULL,
       status text NOT NULL,
       ttl_seconds integer NOT NULL,
-      updated_at integer NOT NULL
+      updated_at integer NOT NULL,
+      workspace_session_id text
+    );
+
+    CREATE TABLE sandbox_backup_staging (
+      actual_backup_id text,
+      claim_owner text,
+      created_at integer NOT NULL,
+      dir text NOT NULL,
+      driver_generation integer,
+      driver_instance_id text,
+      id text PRIMARY KEY NOT NULL,
+      operation_id text,
+      sandbox_id text NOT NULL,
+      sandbox_incarnation integer NOT NULL,
+      session_run_id text,
+      ttl_seconds integer NOT NULL,
+      updated_at integer NOT NULL,
+      updates_subject_backup integer NOT NULL,
+      workspace_session_id text
+    );
+
+    CREATE TABLE sandbox_backup_delete_intent (
+      attempted_at integer,
+      backup_id text PRIMARY KEY NOT NULL,
+      created_at integer NOT NULL,
+      delete_after integer NOT NULL,
+      deleted_at integer
+    );
+
+    CREATE TABLE environment_package_artifact_backup (
+      backup_id text PRIMARY KEY NOT NULL
+    );
+
+    CREATE TABLE environment_package_artifact_backup_staging (
+      actual_backup_id text
+    );
+
+    CREATE TABLE native_resume_ref (
+      committed_session_run_id text,
+      committed_value text,
+      observed_session_run_id text,
+      session_id text PRIMARY KEY NOT NULL,
+      value text NOT NULL
     );
 
     CREATE TABLE sandbox_session (
+      cleanup_operation_id text,
       cwd text NOT NULL,
       sandbox_id text NOT NULL,
+      sandbox_incarnation integer DEFAULT 1 NOT NULL,
       session_id text PRIMARY KEY NOT NULL,
       status text NOT NULL,
       updated_at integer
     );
 
     CREATE TABLE session (
+      archived_at integer,
+      cleanup_operation_kind text,
       id text PRIMARY KEY NOT NULL,
       last_message_at integer,
+      runtime_provisioning_operation_id text,
+      runtime_provisioning_sandbox_id text,
       status text NOT NULL
     );
 
@@ -103,10 +174,13 @@ function createRuntimeSubjectRecycleDatabase(): SqliteD1Database {
       claim_owner,
       id,
       inactive_deadline_at,
+      incarnation,
       kind,
       last_backup_id,
       last_error,
       last_error_code,
+      network_constraints_hash,
+      operation_kind,
       status,
       status_operation_id,
       status_seq,
@@ -115,7 +189,11 @@ function createRuntimeSubjectRecycleDatabase(): SqliteD1Database {
       subject_kind,
       updated_at
     )
-    VALUES (9999999999999, '${CLAIM_OWNER}', '${SANDBOX_ID}', 1, 'pet', NULL, NULL, NULL, 'active', NULL, 0, 'test', '01J00000000000000000000009', 'session', 1);
+    VALUES (
+      9999999999999, '${CLAIM_OWNER}', '${SANDBOX_ID}', 1, 1, 'pet', NULL, NULL, NULL,
+      '${"0".repeat(64)}', NULL, 'active', NULL, 0, 'test',
+      '01J00000000000000000000009', 'agent', 1
+    );
   `);
 
   return database;
@@ -135,7 +213,7 @@ function createBindings(database: D1Database): ApiBindings {
       delete: async () => {},
     },
     Sandbox: {},
-  } as unknown as ApiBindings;
+  };
 }
 
 function requireRuntimeOperationId(value: string | null | undefined): RuntimeOperationId {
@@ -144,6 +222,56 @@ function requireRuntimeOperationId(value: string | null | undefined): RuntimeOpe
   }
 
   return parsePlatformId<RuntimeOperationId>(value, "runtime operation id");
+}
+
+function operationLease(
+  operationId: RuntimeOperationId,
+  status: RuntimeSubjectOperationLease["status"],
+): RuntimeSubjectOperationLease {
+  return {
+    claimExpiresAt: Number.MAX_SAFE_INTEGER,
+    claimOwner: CLAIM_OWNER,
+    incarnation: 1,
+    kind: "hibernate",
+    operationId,
+    status,
+  };
+}
+
+async function claimStaleOperation(
+  database: D1Database,
+  operationId: RuntimeOperationId,
+  status: RuntimeSubjectOperationLease["status"],
+): Promise<RuntimeSubjectOperationLease> {
+  const candidates = await listStaleRuntimeSubjectOperations(database, {
+    limit: 10,
+    staleChangedAtLte: Number.MAX_SAFE_INTEGER,
+  });
+  expect(candidates).toHaveLength(1);
+  const candidate = candidates[0];
+  if (!candidate) {
+    throw new Error("Runtime subject repair candidate was not found.");
+  }
+  expect(candidate).toMatchObject({
+    claimOwner: CLAIM_OWNER,
+    id: SANDBOX_ID,
+    incarnation: 1,
+    kind: "pet",
+    operationId,
+    operationKind: "hibernate",
+    status,
+  });
+  const now = Date.now();
+  const lease = await claimRuntimeSubjectOperationForRepair(database, {
+    candidate,
+    claimExpiresAt: now + 60_000,
+    claimOwner: "repair-owner",
+    now,
+  });
+  if (lease === null) {
+    throw new Error("Runtime subject repair candidate could not be claimed.");
+  }
+  return lease;
 }
 
 async function readRuntimeSubjectRecycleRow(database: D1Database): Promise<{
@@ -177,22 +305,30 @@ async function readRuntimeSubjectRecycleRow(database: D1Database): Promise<{
   return row;
 }
 
-function createSandboxHandle(): SandboxHandle {
+function createSandboxHandle(): RuntimeSubjectTestHandle {
   const unavailable = async () => {
     throw new Error("Unexpected sandbox test method call.");
   };
 
   return {
+    activateRuntimeSubjectIncarnation: async () => {},
     configureNetworkConstraints: async () => {},
     createBackup: async (options) => ({
+      dir: options.dir,
+      id: CLOUDFLARE_BACKUP_ID,
+    }),
+    createRuntimeSubjectBackup: async (_incarnation, options) => ({
       dir: options.dir,
       id: CLOUDFLARE_BACKUP_ID,
     }),
     createSession: unavailable,
     deleteSession: unavailable,
     destroy: async () => {},
+    destroyRuntimeSubjectIncarnation: async () => ({ kind: "destroyed" }),
     exec: unavailable,
     getSession: unavailable,
+    inspectRuntimeSubjectIncarnation: async () => ({ kind: "healthy" }),
+    markRuntimeSubjectIncarnationReady: async () => {},
     mkdir: async () => {},
     mountBucket: unavailable,
     readFile: unavailable,
@@ -204,7 +340,7 @@ function createSandboxHandle(): SandboxHandle {
     watch: unavailable,
     writeFile: unavailable,
     wsConnect: unavailable,
-  } as SandboxHandle;
+  };
 }
 
 describe("runtime subject recycle", () => {
@@ -215,7 +351,9 @@ describe("runtime subject recycle", () => {
       SET claim_expires_at = NULL,
           claim_owner = NULL,
           inactive_deadline_at = NULL,
-          kind = 'cattle'
+          kind = 'cattle',
+          subject_id = 'session-1',
+          subject_kind = 'session'
       WHERE id = '${SANDBOX_ID}';
 
       INSERT INTO sandbox_session (cwd, sandbox_id, session_id, status, updated_at)
@@ -246,7 +384,17 @@ describe("runtime subject recycle", () => {
 
   test("uses a generated operation id instead of the maintenance claim owner", async () => {
     const database = createRuntimeSubjectRecycleDatabase();
-    currentSandbox = createSandboxHandle();
+    let observedOperationId: string | null = null;
+    currentSandbox = {
+      ...createSandboxHandle(),
+      createRuntimeSubjectBackup: async (_incarnation, options) => {
+        observedOperationId = await database
+          .prepare("SELECT status_operation_id FROM sandbox WHERE id = ?")
+          .bind(SANDBOX_ID)
+          .first<string>("status_operation_id");
+        return { dir: options.dir, id: CLOUDFLARE_BACKUP_ID };
+      },
+    };
 
     await expect(
       recycleRuntimeSubject(createBindings(database), {
@@ -275,8 +423,9 @@ describe("runtime subject recycle", () => {
 
     expect(subject?.status).toBe("cold");
     expect(subject?.last_backup_id).toBe(BACKUP_ID);
-    expect(subject?.status_operation_id).not.toBe(CLAIM_OWNER);
-    expect(isPlatformId(subject?.status_operation_id)).toBe(true);
+    expect(observedOperationId).not.toBe(CLAIM_OWNER);
+    expect(isPlatformId(observedOperationId)).toBe(true);
+    expect(subject?.status_operation_id).toBeNull();
   });
 
   test("hibernates one idle pet subject across sessions after checkpointing durable state", async () => {
@@ -308,12 +457,11 @@ describe("runtime subject recycle", () => {
         ('01J0000000000000000000000U', 1, 'TERMINATED');
     `);
     const checkpointDirs: string[] = [];
-    const preparedDirs: string[] = [];
     const lifecycleCalls: string[] = [];
     let backupIndex = 0;
     currentSandbox = {
       ...createSandboxHandle(),
-      createBackup: async (options) => {
+      createRuntimeSubjectBackup: async (_incarnation, options) => {
         checkpointDirs.push(options.dir);
         const id = CLOUDFLARE_BACKUP_IDS[backupIndex];
         backupIndex += 1;
@@ -322,11 +470,9 @@ describe("runtime subject recycle", () => {
         }
         return { dir: options.dir, id };
       },
-      mkdir: async (path) => {
-        preparedDirs.push(path);
-      },
-      destroy: async () => {
+      destroyRuntimeSubjectIncarnation: async () => {
         lifecycleCalls.push("destroy");
+        return { kind: "destroyed" };
       },
       setKeepAlive: async (keepAlive) => {
         lifecycleCalls.push(`keepAlive:${keepAlive}`);
@@ -362,8 +508,7 @@ describe("runtime subject recycle", () => {
       "/workspace/se/session-1",
       "/workspace/se/session-2",
     ]);
-    expect(preparedDirs.toSorted()).toEqual(checkpointDirs.toSorted());
-    expect(lifecycleCalls).toEqual(["keepAlive:false", "destroy"]);
+    expect(lifecycleCalls).toEqual(["destroy"]);
     await expect(readRuntimeSubjectRecycleRow(database)).resolves.toMatchObject({
       last_error: null,
       last_error_code: null,
@@ -389,17 +534,17 @@ describe("runtime subject recycle", () => {
     const database = createRuntimeSubjectRecycleDatabase();
     currentSandbox = {
       ...createSandboxHandle(),
-      destroy: async () => {},
+      destroyRuntimeSubjectIncarnation: async () => ({ kind: "destroyed" }),
     };
     await database
       .prepare(
         `
           UPDATE sandbox
-          SET status = ?, status_operation_id = ?, status_changed_at = ?, status_source = ?
+          SET operation_kind = ?, status = ?, status_operation_id = ?, status_changed_at = ?, status_source = ?
           WHERE id = ?
         `,
       )
-      .bind("destroying", OPERATION_ID, 1, "maintenance", SANDBOX_ID)
+      .bind("hibernate", "destroying", OPERATION_ID, 1, "maintenance", SANDBOX_ID)
       .run();
     await database
       .prepare(
@@ -414,10 +559,9 @@ describe("runtime subject recycle", () => {
     await expect(
       resumeRuntimeSubjectRecycleOperation(createBindings(database), {
         kind: "pet",
-        operationId: OPERATION_ID,
+        lease: operationLease(OPERATION_ID, "destroying"),
         reason: "test.repair",
         runtimeSubjectId: SANDBOX_ID,
-        status: "destroying",
       }),
     ).resolves.toBe(true);
 
@@ -441,7 +585,7 @@ describe("runtime subject recycle", () => {
 
     expect(subject).toEqual({
       status: "cold",
-      status_operation_id: OPERATION_ID,
+      status_operation_id: null,
     });
     expect(session).toEqual({ status: "closed" });
   });
@@ -461,7 +605,7 @@ describe("runtime subject recycle", () => {
       .run();
     currentSandbox = {
       ...createSandboxHandle(),
-      createBackup: async (options) => {
+      createRuntimeSubjectBackup: async (_incarnation, options) => {
         if (!backupAvailable) {
           backupAvailable = true;
           throw new Error("backup service unavailable");
@@ -472,8 +616,9 @@ describe("runtime subject recycle", () => {
           id: CLOUDFLARE_BACKUP_ID,
         };
       },
-      destroy: async () => {
+      destroyRuntimeSubjectIncarnation: async () => {
         lifecycleCalls.push("destroy");
+        return { kind: "destroyed" };
       },
       setKeepAlive: async (keepAlive) => {
         lifecycleCalls.push(`keepAlive:${keepAlive}`);
@@ -507,27 +652,14 @@ describe("runtime subject recycle", () => {
         .bind("01J0000000000000000000000S")
         .first("status"),
     ).resolves.toBe("active");
-    await expect(
-      listStaleRuntimeSubjectOperations(database, {
-        limit: 10,
-        staleChangedAtLte: Number.MAX_SAFE_INTEGER,
-      }),
-    ).resolves.toEqual([
-      {
-        id: SANDBOX_ID,
-        kind: "pet",
-        operationId,
-        status: "backing_up",
-      },
-    ]);
+    const repairLease = await claimStaleOperation(database, operationId, "backing_up");
 
     await expect(
       resumeRuntimeSubjectRecycleOperation(createBindings(database), {
         kind: "pet",
-        operationId,
+        lease: repairLease,
         reason: "test.repair",
         runtimeSubjectId: SANDBOX_ID,
-        status: "backing_up",
       }),
     ).resolves.toBe(true);
 
@@ -536,9 +668,9 @@ describe("runtime subject recycle", () => {
       last_error: null,
       last_error_code: null,
       status: "cold",
-      status_operation_id: operationId,
+      status_operation_id: null,
     });
-    expect(lifecycleCalls).toEqual(["keepAlive:false", "destroy"]);
+    expect(lifecycleCalls).toEqual(["destroy"]);
   });
 
   test("keeps destroy failures as stale repair candidates with the recorded backup", async () => {
@@ -546,17 +678,18 @@ describe("runtime subject recycle", () => {
     let destroyAvailable = false;
     currentSandbox = {
       ...createSandboxHandle(),
-      createBackup: async (options) => {
+      createRuntimeSubjectBackup: async (_incarnation, options) => {
         return {
           dir: options.dir,
           id: CLOUDFLARE_BACKUP_ID,
         };
       },
-      destroy: async () => {
+      destroyRuntimeSubjectIncarnation: async () => {
         if (!destroyAvailable) {
           destroyAvailable = true;
           throw new Error("destroy service unavailable");
         }
+        return { kind: "destroyed" };
       },
     };
 
@@ -580,27 +713,14 @@ describe("runtime subject recycle", () => {
       status: "destroying",
       status_operation_id: operationId,
     });
-    await expect(
-      listStaleRuntimeSubjectOperations(database, {
-        limit: 10,
-        staleChangedAtLte: Number.MAX_SAFE_INTEGER,
-      }),
-    ).resolves.toEqual([
-      {
-        id: SANDBOX_ID,
-        kind: "pet",
-        operationId,
-        status: "destroying",
-      },
-    ]);
+    const repairLease = await claimStaleOperation(database, operationId, "destroying");
 
     await expect(
       resumeRuntimeSubjectRecycleOperation(createBindings(database), {
         kind: "pet",
-        operationId,
+        lease: repairLease,
         reason: "test.repair",
         runtimeSubjectId: SANDBOX_ID,
-        status: "destroying",
       }),
     ).resolves.toBe(true);
 
@@ -609,7 +729,7 @@ describe("runtime subject recycle", () => {
       last_error: null,
       last_error_code: null,
       status: "cold",
-      status_operation_id: operationId,
+      status_operation_id: null,
     });
   });
 
@@ -619,11 +739,11 @@ describe("runtime subject recycle", () => {
       .prepare(
         `
           UPDATE sandbox
-          SET status = ?, status_operation_id = ?, status_changed_at = ?, status_source = ?
+          SET claim_expires_at = ?, operation_kind = ?, status = ?, status_operation_id = ?, status_changed_at = ?, status_source = ?
           WHERE id = ?
         `,
       )
-      .bind("destroying", OPERATION_ID, 10, "maintenance", SANDBOX_ID)
+      .bind(10, "hibernate", "destroying", OPERATION_ID, 10, "maintenance", SANDBOX_ID)
       .run();
 
     await expect(
@@ -639,9 +759,13 @@ describe("runtime subject recycle", () => {
       }),
     ).resolves.toEqual([
       {
+        claimExpiresAt: 10,
+        claimOwner: CLAIM_OWNER,
         id: SANDBOX_ID,
+        incarnation: 1,
         kind: "pet",
         operationId: OPERATION_ID,
+        operationKind: "hibernate",
         status: "destroying",
       },
     ]);

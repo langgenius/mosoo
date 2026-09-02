@@ -92,6 +92,69 @@
       "when": 1788283473351,
       "tag": "0012_rename_app_to_project",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1788366257284,
+      "tag": "0013_agent-task-snapshot-state",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1788015369618,
+      "tag": "0014_durable-mcp-effect-v3",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "6",
+      "when": 1788018895233,
+      "tag": "0015_session-event-stream-identity",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "6",
+      "when": 1788043914090,
+      "tag": "0016_session-cleanup-operation",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1788053277514,
+      "tag": "0017_durable-event-side-effects",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1788069417581,
+      "tag": "0018_terminal-reconciliation-scheduling",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1788081629455,
+      "tag": "0019_runtime-operation-ready-authority",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1788124070926,
+      "tag": "0020_runtime-subject-operation-authority",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "6",
+      "when": 1788154612356,
+      "tag": "0021_sandbox-backup-object-authority",
+      "breakpoints": true
     }
   ]
 }

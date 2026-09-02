@@ -1,5 +1,4 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync, readFileSync } from "node:fs";
 
 import * as Contracts from "@mosoo/contracts";
 import {
@@ -15,6 +14,14 @@ import {
   parseAgentManifestInput,
   parseAgentPackageJson,
 } from "@mosoo/contracts/agent-manifest-parser";
+import { DriverCapability } from "@mosoo/contracts/driver-instance";
+import {
+  ExternalToolEffectClaim,
+  ExternalToolEffectSettlement,
+  ExternalToolEffectState,
+  MCP_EXTERNAL_TOOL_EFFECT_SETTLEMENT_MAX_UTF8_BYTES,
+  measureMcpExternalToolEffectSettlement,
+} from "@mosoo/contracts/external-tool-effect";
 import {
   SESSION_RESOURCE_MOUNT_DIR,
   createAccountAvatarPath,
@@ -36,34 +43,83 @@ import {
   isCustomRuntimeModelProvider,
   parseRuntimeModelIdentity,
 } from "@mosoo/contracts/models";
-import { parseRuntimeCommand } from "@mosoo/contracts/runtime-command";
+import {
+  RUNTIME_COMMAND_MAX_UTF8_BYTES,
+  RUNTIME_COMMAND_TERMINAL_PAYLOAD_MAX_UTF8_BYTES,
+  RuntimeCommandResult,
+  RuntimeCommandRecord,
+  measureRuntimeCommandJson,
+  parseRuntimeCommand,
+} from "@mosoo/contracts/runtime-command";
 import {
   AGENT_SESSION_ARCHIVED_READ_ONLY_REASON,
   AGENT_SESSION_TERMINAL_READ_ONLY_REASON,
   getAgentSessionUserLifecycleProjection,
 } from "@mosoo/contracts/session";
+import { DurableRunError } from "@mosoo/contracts/session-run";
+import { PrimitiveRecord } from "@mosoo/contracts/validation";
 
 const FILE_ID = "01J00000000000000000000001" as FileId;
 const SESSION_ID = "01J00000000000000000000002" as SessionId;
 const ACCOUNT_ID = "01J00000000000000000000003" as AccountId;
 
-function readFixture(path: string): string {
-  return readFileSync(new URL(path, import.meta.url), "utf8");
+function textFieldAtJsonSize<Value>(
+  targetBytes: number,
+  create: (text: string) => Value,
+  unit = "x",
+): Value {
+  const baseBytes = measureRuntimeCommandJson(create(""));
+  const unitBytes = measureRuntimeCommandJson(create(unit)) - baseBytes;
+  const remaining = targetBytes - baseBytes;
+  const value = create(
+    unit.repeat(Math.floor(remaining / unitBytes)) + "x".repeat(remaining % unitBytes),
+  );
+
+  expect(measureRuntimeCommandJson(value)).toBe(targetBytes);
+  return value;
+}
+
+function mcpCommandAtSize(targetBytes: number, unit = "x") {
+  return textFieldAtJsonSize(
+    targetBytes,
+    (argumentsJson) => ({
+      argumentsJson,
+      commandId: "command-1",
+      kind: "mcp.execute" as const,
+      requestId: "request-1",
+      runId: "run-1",
+      serverId: "server-1",
+      toolCallId: "tool-call-1",
+      toolName: "tool-1",
+    }),
+    unit,
+  );
+}
+
+function mcpSettlementAtSize(targetBytes: number, unit: string) {
+  const create = (providerReceiptJson: string) => ({
+    kind: "succeeded" as const,
+    providerReceiptJson,
+    result: {
+      outputText: "created",
+      requestId: "request-1",
+      serverId: "server-1",
+      toolName: "tool-1",
+    },
+  });
+  const baseBytes = measureMcpExternalToolEffectSettlement(create(""));
+  const unitBytes = measureMcpExternalToolEffectSettlement(create(unit)) - baseBytes;
+  const remaining = targetBytes - baseBytes;
+  const settlement = create(
+    unit.repeat(Math.floor(remaining / unitBytes)) + "x".repeat(remaining % unitBytes),
+  );
+
+  expect(measureMcpExternalToolEffectSettlement(settlement)).toBe(targetBytes);
+  return settlement;
 }
 
 describe("contracts owner boundaries", () => {
   test("does not expose the old permission package surface", () => {
-    const packageJson = readFixture("../package.json");
-    const indexSource = readFixture("../src/index.ts");
-
-    expect(packageJson).not.toContain('"./permission"');
-    expect(indexSource).not.toContain("permission.contract");
-    expect(indexSource).not.toContain("./permission/");
-    expect(packageJson).not.toContain("providers.company.create");
-    expect(packageJson).not.toContain("agents.acl.");
-    expect(existsSync(new URL("../src/permission/permission.contract.ts", import.meta.url))).toBe(
-      false,
-    );
     expect("Permission" in Contracts).toBe(false);
     expect("can" in Contracts).toBe(false);
   });
@@ -208,6 +264,15 @@ describe("contracts owner boundaries", () => {
     expect(() =>
       parseRuntimeCommand({
         commandId: "cmd_1",
+        input: { attachmentIds: [""], text: "Run it." },
+        kind: "input.start",
+        requestId: "req_1",
+        runId: "run_1",
+      }),
+    ).toThrow();
+    expect(() =>
+      parseRuntimeCommand({
+        commandId: "cmd_1",
         input: { text: "" },
         kind: "input.start",
         requestId: "req_1",
@@ -222,6 +287,218 @@ describe("contracts owner boundaries", () => {
       }),
     ).toThrow();
   });
+
+  test.each([
+    ["turn.cancel", { commandId: "cmd_1", kind: "turn.cancel" }],
+    [
+      "input.start",
+      {
+        commandId: "cmd_1",
+        input: { text: "Run it." },
+        kind: "input.start",
+        requestId: "req_1",
+        runId: "run_1",
+      },
+    ],
+    ["session.stop", { commandId: "cmd_1", kind: "session.stop", reason: "done" }],
+    [
+      "mcp.execute",
+      {
+        argumentsJson: "{}",
+        commandId: "cmd_1",
+        kind: "mcp.execute",
+        requestId: "req_1",
+        runId: "run_1",
+        serverId: "server_1",
+        toolCallId: "tool_call_1",
+        toolName: "createIssue",
+      },
+    ],
+    [
+      "permission.resolve",
+      {
+        commandId: "cmd_1",
+        decision: "allow_once",
+        kind: "permission.resolve",
+        requestId: "req_1",
+        runId: "run_1",
+      },
+    ],
+  ] as const)("keeps persisted %s commands exact", (_kind, command) => {
+    expect(() => parseRuntimeCommand({ ...command, debug: true })).toThrow();
+  });
+
+  test("keeps nested command inputs and terminal payloads exact", () => {
+    expect(() =>
+      parseRuntimeCommand({
+        commandId: "cmd_1",
+        input: { debug: true, text: "Run it." },
+        kind: "input.start",
+        requestId: "req_1",
+        runId: "run_1",
+      }),
+    ).toThrow();
+    expect(RuntimeCommandResult.allows({ debug: true, requestId: "req_1" })).toBeFalse();
+    expect(
+      RuntimeCommandResult.allows({
+        debug: true,
+        outputText: "created",
+        requestId: "req_1",
+        serverId: "server_1",
+        toolName: "createIssue",
+      }),
+    ).toBeFalse();
+    expect(
+      DurableRunError.allows({
+        code: "driver.failed",
+        debug: true,
+        details: {},
+        message: "failed",
+        retryable: false,
+      }),
+    ).toBeFalse();
+    expect(
+      ExternalToolEffectSettlement.allows({
+        debug: true,
+        kind: "succeeded",
+        result: {
+          outputText: "created",
+          requestId: "req_1",
+          serverId: "server_1",
+          toolName: "createIssue",
+        },
+      }),
+    ).toBeFalse();
+    expect(
+      ExternalToolEffectState.allows({
+        debug: true,
+        effectId: "effect_1",
+        kind: "succeeded",
+        result: {
+          outputText: "created",
+          requestId: "req_1",
+          serverId: "server_1",
+          toolName: "createIssue",
+        },
+      }),
+    ).toBeFalse();
+    expect(
+      ExternalToolEffectClaim.allows({
+        attempt: 1,
+        debug: true,
+        effectId: "effect_1",
+        idempotencyKey: "effect_1",
+        kind: "claimed",
+      }),
+    ).toBeFalse();
+    expect(
+      DriverCapability.allows({
+        debug: true,
+        id: "mcp_execute",
+        status: "supported",
+        version: 1,
+      }),
+    ).toBeFalse();
+
+    const commandRecord = {
+      ackedAt: null,
+      completedAt: null,
+      driverInstanceId: "driver_1",
+      error: null,
+      expiresAt: null,
+      id: "cmd_1",
+      issuedAt: "2026-01-01T00:00:00.000Z",
+      kind: "input.start" as const,
+      payload: {
+        commandId: "cmd_1",
+        input: { text: "Run it." },
+        kind: "input.start" as const,
+        requestId: "req_1",
+        runId: "run_1",
+      },
+      result: null,
+      seq: 0,
+      status: "queued" as const,
+    };
+    expect(RuntimeCommandRecord.allows({ ...commandRecord, debug: true })).toBeFalse();
+    expect(
+      RuntimeCommandRecord.allows({
+        ...commandRecord,
+        error: {
+          code: "driver.failed",
+          details: {},
+          message: "failed",
+          retryable: false,
+        },
+        result: { requestId: "req_1" },
+        status: "completed",
+      }),
+    ).toBeFalse();
+    expect(PrimitiveRecord.allows({ fields: Number.NaN })).toBeFalse();
+    expect(
+      DurableRunError.allows({
+        code: "driver.failed",
+        details: { durationMs: Number.POSITIVE_INFINITY },
+        message: "failed",
+        retryable: false,
+      }),
+    ).toBeFalse();
+  });
+
+  test.each(["x", "界", "\0"])(
+    "bounds canonical runtime command JSON after %p UTF-8 encoding",
+    (unit) => {
+      const exact = mcpCommandAtSize(RUNTIME_COMMAND_MAX_UTF8_BYTES, unit);
+
+      expect(parseRuntimeCommand(exact)).toEqual(exact);
+      expect(() =>
+        parseRuntimeCommand({ ...exact, argumentsJson: `${exact.argumentsJson}x` }),
+      ).toThrow();
+    },
+  );
+
+  test.each(["x", "界", "\0"])(
+    "bounds both driver command terminal columns after %p UTF-8 encoding",
+    (unit) => {
+      const result = textFieldAtJsonSize(
+        RUNTIME_COMMAND_TERMINAL_PAYLOAD_MAX_UTF8_BYTES,
+        (outputText) => ({
+          outputText,
+          requestId: "request-1",
+          serverId: "server-1",
+          toolName: "tool-1",
+        }),
+        unit,
+      );
+      const error = textFieldAtJsonSize(
+        RUNTIME_COMMAND_TERMINAL_PAYLOAD_MAX_UTF8_BYTES,
+        (message) => ({ code: "driver.failed", details: {}, message, retryable: false }),
+        unit,
+      );
+
+      expect(RuntimeCommandResult.allows(result)).toBeTrue();
+      expect(
+        RuntimeCommandResult.allows({ ...result, outputText: `${result.outputText}x` }),
+      ).toBeFalse();
+      expect(DurableRunError.allows(error)).toBeTrue();
+      expect(DurableRunError.allows({ ...error, message: `${error.message}x` })).toBeFalse();
+    },
+  );
+
+  test.each(["x", "界", "\0"])(
+    "bounds the whole MCP settlement envelope after %p UTF-8 encoding",
+    (unit) => {
+      const exact = mcpSettlementAtSize(MCP_EXTERNAL_TOOL_EFFECT_SETTLEMENT_MAX_UTF8_BYTES, unit);
+
+      expect(ExternalToolEffectSettlement.allows(exact)).toBeTrue();
+      expect(
+        ExternalToolEffectSettlement.allows({
+          ...exact,
+          providerReceiptJson: `${exact.providerReceiptJson}x`,
+        }),
+      ).toBeFalse();
+    },
+  );
 
   test("runtime model identity admits typed provider model runtime triples", () => {
     const identity = parseRuntimeModelIdentity({

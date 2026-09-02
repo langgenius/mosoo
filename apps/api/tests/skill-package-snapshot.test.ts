@@ -117,7 +117,7 @@ describe("publishSkillSnapshot", () => {
     const limitedDatabase = new BindLimitedD1Database(sqlite, 100);
     const bucket = new PublicApiMemoryFileBucket();
     const bindings = createPublicHttpTestBindings(limitedDatabase, {
-      fileBucket: bucket as unknown as R2Bucket,
+      fileBucket: bucket,
     }) as ApiBindings;
 
     const published = await publishSkillSnapshot(

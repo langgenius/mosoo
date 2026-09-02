@@ -80,6 +80,7 @@ function createUsageEventDatabase(): SqliteD1Database {
       session_run_id text,
       source text NOT NULL,
       source_event_id text NOT NULL,
+      source_event_seq integer DEFAULT 0 NOT NULL,
       total_cost_usd_micros integer NOT NULL,
       usage_contract text NOT NULL,
       UNIQUE (source, source_event_id)
@@ -394,7 +395,7 @@ describe("cost usage event", () => {
     });
   });
 
-  test("uses reported USD cost for a known model when token counters are unavailable", async () => {
+  test("preserves reported USD cost across explicit zero token corrections", async () => {
     const database = createUsageEventDatabase();
     const usage = {
       costAmount: 0.42,
@@ -403,7 +404,7 @@ describe("cost usage event", () => {
       usageContract: "openai_total_with_cached_breakdown",
     } satisfies SessionUsageSummary;
 
-    await recordRuntimeUsageEvent(database, {
+    const input = {
       callKey: "known-cost-only-call",
       driverInstanceId: DRIVER_INSTANCE_ID,
       nativeCallId: "known-cost-only-native-call",
@@ -412,24 +413,39 @@ describe("cost usage event", () => {
         model: "gpt-5.4",
         provider: "openai",
       },
+      sourceEventSeq: 1,
       usage,
+    };
+
+    await recordRuntimeUsageEvent(database, input);
+    await recordRuntimeUsageEvent(database, {
+      ...input,
+      sourceEventSeq: 2,
+      usage: {
+        inputTokens: 0,
+        outputTokens: 0,
+        source: "session_update",
+        usageContract: "openai_total_with_cached_breakdown",
+      },
     });
 
     const row = await database
       .prepare(
         `
-          SELECT price_snapshot_json, pricing_status, total_cost_usd_micros
+          SELECT price_snapshot_json, pricing_status, source_event_seq, total_cost_usd_micros
           FROM usage_event
         `,
       )
       .first<{
         price_snapshot_json: string | null;
         pricing_status: string;
+        source_event_seq: number;
         total_cost_usd_micros: number;
       }>();
 
     expect(row).toMatchObject({
       pricing_status: "priced",
+      source_event_seq: 2,
       total_cost_usd_micros: 420_000,
     });
     expect(JSON.parse(row?.price_snapshot_json ?? "{}")).toEqual({
@@ -438,6 +454,154 @@ describe("cost usage event", () => {
       reportedCostUsd: 0.42,
       source: "runtime_reported_usd",
       tokenCountersUnavailable: true,
+    });
+  });
+
+  test("updates durable usage only from a higher source event seq", async () => {
+    const database = createUsageEventDatabase();
+    const input = {
+      callKey: "sequenced-usage",
+      driverInstanceId: DRIVER_INSTANCE_ID,
+      nativeCallId: "sequenced-native-call",
+      run: RUN_CONTEXT,
+      sourceEventSeq: 5,
+      usage: {
+        inputTokens: 10,
+        outputTokens: 5,
+        source: "prompt_response" as const,
+        usageContract: "openai_total_with_cached_breakdown" as const,
+      },
+    };
+
+    await recordRuntimeUsageEvent(database, input);
+    await recordRuntimeUsageEvent(database, {
+      ...input,
+      sourceEventSeq: 4,
+      usage: { ...input.usage, inputTokens: 1 },
+    });
+    await recordRuntimeUsageEvent(database, input);
+    await expect(
+      recordRuntimeUsageEvent(database, {
+        ...input,
+        usage: { ...input.usage, inputTokens: 20 },
+      }),
+    ).rejects.toThrow("replayed with conflicting content");
+    await recordRuntimeUsageEvent(database, {
+      ...input,
+      sourceEventSeq: 6,
+      usage: { ...input.usage, inputTokens: 30 },
+    });
+
+    expect(
+      await database
+        .prepare("SELECT input_tokens, source_event_seq FROM usage_event")
+        .first<{ input_tokens: number; source_event_seq: number }>(),
+    ).toEqual({ input_tokens: 30, source_event_seq: 6 });
+  });
+
+  test("merges partial Anthropic cache buckets without losing prior counters", async () => {
+    const database = createUsageEventDatabase();
+    const input = {
+      callKey: "partial-anthropic",
+      driverInstanceId: DRIVER_INSTANCE_ID,
+      nativeCallId: "partial-anthropic",
+      run: {
+        ...RUN_CONTEXT,
+        createdAtMs: Date.UTC(2026, 7, 31),
+        model: "claude-sonnet-5",
+        provider: "anthropic",
+      },
+      sourceEventSeq: 5,
+      usage: {
+        cachedReadTokens: 2,
+        inputTokens: 10,
+        outputTokens: 5,
+        source: "prompt_response" as const,
+        usageContract: "anthropic_bucketed" as const,
+      },
+    };
+    const partialInput = {
+      ...input,
+      run: { ...input.run, createdAtMs: Date.UTC(2026, 8, 1) },
+      sourceEventSeq: 6,
+      usage: {
+        cachedReadTokens: 3,
+        source: "prompt_response" as const,
+        usageContract: "anthropic_bucketed" as const,
+      },
+    };
+
+    await recordRuntimeUsageEvent(database, input);
+    await recordRuntimeUsageEvent(database, partialInput);
+    await recordRuntimeUsageEvent(database, partialInput);
+
+    expect(
+      await database
+        .prepare(
+          `SELECT cache_read_tokens, input_tokens, output_tokens, price_snapshot_json,
+                  source_event_seq, total_cost_usd_micros
+             FROM usage_event`,
+        )
+        .first(),
+    ).toEqual({
+      cache_read_tokens: 3,
+      input_tokens: 13,
+      output_tokens: 5,
+      price_snapshot_json: JSON.stringify({
+        billableInputTokens: 10,
+        cacheReadUsdPerMillion: 0.2,
+        cacheWriteUsdPerMillion: 2.5,
+        inputUsdPerMillion: 2,
+        longContextApplied: false,
+        model: "claude-sonnet-5",
+        outputUsdPerMillion: 10,
+        provider: "anthropic",
+        source: "mosoo_seed_2026_07_10",
+      }),
+      source_event_seq: 6,
+      total_cost_usd_micros: 71,
+    });
+  });
+
+  test("applies explicit zero corrections without creating empty ledger rows", async () => {
+    const database = createUsageEventDatabase();
+    const input = {
+      callKey: "zero-correction",
+      driverInstanceId: DRIVER_INSTANCE_ID,
+      nativeCallId: "zero-correction",
+      run: { ...RUN_CONTEXT, model: "gpt-5.4", provider: "openai" },
+      sourceEventSeq: 1,
+      usage: {
+        inputTokens: 0,
+        outputTokens: 0,
+        source: "prompt_response" as const,
+        usageContract: "openai_total_with_cached_breakdown" as const,
+      },
+    };
+
+    await recordRuntimeUsageEvent(database, input);
+    expect(await database.prepare("SELECT COUNT(*) AS count FROM usage_event").first()).toEqual({
+      count: 0,
+    });
+
+    await recordRuntimeUsageEvent(database, {
+      ...input,
+      usage: { ...input.usage, inputTokens: 10, outputTokens: 5 },
+    });
+    await recordRuntimeUsageEvent(database, { ...input, sourceEventSeq: 2 });
+
+    expect(
+      await database
+        .prepare(
+          `SELECT input_tokens, output_tokens, source_event_seq, total_cost_usd_micros
+           FROM usage_event`,
+        )
+        .first(),
+    ).toEqual({
+      input_tokens: 0,
+      output_tokens: 0,
+      source_event_seq: 2,
+      total_cost_usd_micros: 0,
     });
   });
 });

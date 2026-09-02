@@ -12,11 +12,11 @@ export function useSelectedThreadReadSync({
   selectedThread: ThreadListItem | null;
 }): void {
   const pendingReadMarkerRef = useRef<string | null>(null);
-  const completedReadMarkersRef = useRef<Set<string> | null>(null);
-  completedReadMarkersRef.current ??= new Set<string>();
-  const completedReadMarkers = completedReadMarkersRef.current;
+  const completedReadMarkersRef = useRef(new Set<string>());
 
   useEffect(() => {
+    const completedReadMarkers = completedReadMarkersRef.current;
+
     if (selectedThread === null || selectedThread.read) {
       return;
     }
@@ -47,5 +47,5 @@ export function useSelectedThreadReadSync({
     }
 
     void markSelectedThreadRead();
-  }, [completedReadMarkers, markRead, onError, selectedThread]);
+  }, [markRead, onError, selectedThread]);
 }

@@ -25,6 +25,7 @@ type ProvisionSessionDriverInput = {
 };
 
 type ProvisionSessionDriverResult = {
+  driverGeneration: number;
   driverInstanceId: string;
   process: RuntimeProcessHandle;
   sandboxId: string;
@@ -60,6 +61,17 @@ const SANDBOX_ID = PLATFORM_ID_FIXTURES.sandbox;
 const SESSION_ID = PLATFORM_ID_FIXTURES.session;
 const SESSION_RUN_ID = PLATFORM_ID_FIXTURES.sessionRun;
 const SANDBOX_SESSION_ID = SESSION_ID as unknown as SandboxSessionId;
+const SANDBOX_INCARNATION = 1;
+
+const RUNTIME_PROVISIONING_LEASE = {
+  heartbeatAt: 1,
+  operationId: PLATFORM_ID_FIXTURES.runtimeOperation,
+  runId: SESSION_RUN_ID,
+  sandboxId: SANDBOX_ID,
+  sandboxIncarnation: SANDBOX_INCARNATION,
+  sandboxSessionId: SANDBOX_SESSION_ID,
+  sessionId: SESSION_ID,
+} as const;
 
 const PROFILE: DriverProfileConfig = {
   agentId: AGENT_ID,
@@ -112,10 +124,13 @@ function createDriverSessionDatabase(): SqliteD1Database {
   database.execute(`
     CREATE TABLE driver_instance (
       command_seq_cursor integer DEFAULT 0 NOT NULL,
+      generation integer DEFAULT 0 NOT NULL,
       id text PRIMARY KEY NOT NULL,
       sandbox_id text NOT NULL,
+      sandbox_incarnation integer NOT NULL,
       sandbox_session_id text NOT NULL,
       status text NOT NULL,
+      status_operation_id text,
       updated_at integer NOT NULL
     );
 
@@ -123,6 +138,7 @@ function createDriverSessionDatabase(): SqliteD1Database {
       acked_at integer,
       completed_at integer,
       delivery_connection_id text,
+      driver_generation integer,
       driver_instance_id text NOT NULL,
       error_json text,
       expires_at integer,
@@ -136,14 +152,20 @@ function createDriverSessionDatabase(): SqliteD1Database {
     );
 
     CREATE TABLE sandbox (
+      claim_owner text,
       id text PRIMARY KEY NOT NULL,
       inactive_deadline_at integer,
+      incarnation integer NOT NULL,
       kind text NOT NULL,
+      operation_kind text,
+      status text NOT NULL,
+      status_operation_id text,
       updated_at integer NOT NULL
     );
 
     CREATE TABLE sandbox_session (
       sandbox_id text NOT NULL,
+      sandbox_incarnation integer NOT NULL,
       session_id text PRIMARY KEY NOT NULL,
       status text NOT NULL
     );
@@ -157,20 +179,28 @@ function createDriverSessionDatabase(): SqliteD1Database {
       updated_at integer NOT NULL
     );
 
-    INSERT INTO sandbox (id, inactive_deadline_at, kind, updated_at)
-    VALUES ('${SANDBOX_ID}', 1, 'pet', 1);
+    INSERT INTO sandbox (id, inactive_deadline_at, incarnation, kind, status, updated_at)
+    VALUES ('${SANDBOX_ID}', 1, ${SANDBOX_INCARNATION}, 'pet', 'active', 1);
 
-    INSERT INTO sandbox_session (sandbox_id, session_id, status)
-    VALUES ('${SANDBOX_ID}', '${SESSION_ID}', 'active');
+    INSERT INTO sandbox_session (sandbox_id, sandbox_incarnation, session_id, status)
+    VALUES ('${SANDBOX_ID}', ${SANDBOX_INCARNATION}, '${SESSION_ID}', 'active');
 
     INSERT INTO driver_instance (
       id,
       sandbox_id,
+      sandbox_incarnation,
       sandbox_session_id,
       status,
       updated_at
     )
-    VALUES ('${DRIVER_INSTANCE_ID}', '${SANDBOX_ID}', '${SESSION_ID}', 'provisioning', 1);
+    VALUES (
+      '${DRIVER_INSTANCE_ID}',
+      '${SANDBOX_ID}',
+      ${SANDBOX_INCARNATION},
+      '${SESSION_ID}',
+      'provisioning',
+      1
+    );
 
     INSERT INTO session_run (id, session_id, status, status_seq, updated_at)
     VALUES ('${SESSION_RUN_ID}', '${SESSION_ID}', 'running', 0, 1);
@@ -228,12 +258,15 @@ describe("driver session readiness", () => {
     const bindings = createBindings(database, requests);
 
     const driver = await ensureDriverSessionReady(bindings, "https://api.test/runtime", {
+      builtInTools: [],
       cloudflareSession: {} as ExecutionSessionHandle,
       profile: PROFILE,
       resolvedMcpServers: [],
       resolvedSkillCatalog: [],
       resolvedSkills: [],
+      runtimeProvisioningLease: RUNTIME_PROVISIONING_LEASE,
       sandbox: {} as SandboxHandle,
+      sandboxIncarnation: SANDBOX_INCARNATION,
       sandboxSessionId: SESSION_ID,
       sessionId: SESSION_ID,
       sessionRunId: SESSION_RUN_ID,
@@ -271,17 +304,24 @@ describe("driver session readiness", () => {
           INSERT INTO driver_instance (
             id,
             sandbox_id,
+            sandbox_incarnation,
             sandbox_session_id,
             status,
             updated_at
           )
-          VALUES (?, ?, ?, 'connecting', 2)
+          VALUES (?, ?, ?, ?, 'connecting', 2)
         `,
       )
-        .bind(input.driverInstanceId, input.profile.sandbox.id, input.sandboxSessionId)
+        .bind(
+          input.driverInstanceId,
+          input.profile.sandbox.id,
+          SANDBOX_INCARNATION,
+          input.sandboxSessionId,
+        )
         .run();
 
       return {
+        driverGeneration: 0,
         driverInstanceId: input.driverInstanceId,
         process: createHangingProcess(),
         sandboxId: input.profile.sandbox.id,
@@ -299,12 +339,15 @@ describe("driver session readiness", () => {
     });
 
     const driver = await ensureDriverSessionReady(bindings, "https://api.test/runtime", {
+      builtInTools: [],
       cloudflareSession: {} as ExecutionSessionHandle,
       profile: PROFILE,
       resolvedMcpServers: [],
       resolvedSkillCatalog: [],
       resolvedSkills: [],
+      runtimeProvisioningLease: RUNTIME_PROVISIONING_LEASE,
       sandbox: {} as SandboxHandle,
+      sandboxIncarnation: SANDBOX_INCARNATION,
       sandboxSessionId: SESSION_ID,
       sessionId: SESSION_ID,
       sessionRunId: SESSION_RUN_ID,
@@ -335,12 +378,15 @@ describe("driver session readiness", () => {
     const requests = { count: 0 };
     const bindings = createBindings(database, requests);
     const driver = await ensureDriverSessionReady(bindings, "https://api.test/runtime", {
+      builtInTools: [],
       cloudflareSession: {} as ExecutionSessionHandle,
       profile: PROFILE,
       resolvedMcpServers: [],
       resolvedSkillCatalog: [],
       resolvedSkills: [],
+      runtimeProvisioningLease: RUNTIME_PROVISIONING_LEASE,
       sandbox: {} as SandboxHandle,
+      sandboxIncarnation: SANDBOX_INCARNATION,
       sandboxSessionId: SESSION_ID,
       sessionId: SESSION_ID,
       sessionRunId: SESSION_RUN_ID,
@@ -349,6 +395,7 @@ describe("driver session readiness", () => {
 
     await dispatchDriverTurn(bindings, {
       attachmentIds: [],
+      driverGeneration: driver.driverGeneration,
       driverInstanceId: driver.driverInstanceId,
       prompt: "hello",
       sessionRunId: SESSION_RUN_ID,

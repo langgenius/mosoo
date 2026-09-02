@@ -5,7 +5,6 @@ import type {
   DriverReadyInput,
 } from "@mosoo/agent-driver/orpc";
 import { SANDBOX_ORGANIZATION_ROOT } from "@mosoo/agent-driver/paths";
-import { createPlatformId } from "@mosoo/id";
 
 import { logInfo } from "../../../../platform/cloudflare/logger";
 import { DRIVER_HEARTBEAT_INTERVAL_MS } from "../../domain/runtime-config";
@@ -67,31 +66,57 @@ export class DriverInstanceRpcHandshakeController {
     context: DriverInstanceRpcOperationContext,
   ): Promise<DriverHelloOutput> {
     const { env, state, withRuntimeLogContext } = this.#dependencies;
-
-    if (state.hello) {
-      throw new Error("Driver hello has already been received.");
-    }
     context.assertActiveConnection();
 
-    const recorded = await recordDriverInstanceHello(env, {
+    let link: RuntimeSessionLink | null = null;
+    let output = state.helloOutput ?? state.pendingHello?.output ?? null;
+
+    if (output === null) {
+      link = await this.#getRuntimeSessionLink(context);
+      context.assertActiveConnection();
+      output = {
+        acceptedCapabilities: input.capabilities,
+        connectionId: context.connectionId,
+        driverInstanceId: state.requireDriverInstanceId(),
+        heartbeatIntervalMs: DRIVER_HEARTBEAT_INTERVAL_MS,
+        runConfig: {
+          commandLeaseMs: COMMAND_LEASE_MS,
+          envPolicy: "strict",
+          eventBatchMaxSize: EVENT_BATCH_MAX_SIZE,
+          organizationPath: SANDBOX_ORGANIZATION_ROOT,
+        },
+        runId: link.sessionRunId,
+      };
+    }
+
+    const staged = await state.stageHello(context.epoch, input, output);
+    context.assertActiveConnection();
+
+    if (staged === "replay") {
+      return output;
+    }
+
+    const projection = await recordDriverInstanceHello(env, {
       connectionId: context.connectionId,
       driverInstanceId: state.requireDriverInstanceId(),
-      generation: state.requireDriverGeneration(),
+      generation: context.epoch.generation,
       hello: input,
     });
 
-    if (!recorded) {
-      throw new Error("Driver connection is no longer current.");
+    if (projection === "conflict") {
+      throw new Error("Driver hello conflicts with the lifecycle projection.");
     }
     context.assertActiveConnection();
 
-    const result = await state.recordHello(input);
-    state.resolveHelloWaiters(result);
+    const committedOutput = await state.commitHello(context.epoch);
+    context.assertActiveConnection();
 
-    const link = await this.#getRuntimeSessionLink();
+    link ??= await this.#getRuntimeSessionLink(context);
+    context.assertActiveConnection();
 
     if (state.traceId === null && link.traceId !== null) {
-      await state.setTraceId(link.traceId);
+      await state.setTraceId(link.traceId, context.epoch);
+      context.assertActiveConnection();
     }
 
     withRuntimeLogContext(() => {
@@ -105,19 +130,7 @@ export class DriverInstanceRpcHandshakeController {
       });
     });
 
-    return {
-      acceptedCapabilities: input.capabilities,
-      connectionId: state.connectionId ?? createPlatformId(),
-      driverInstanceId: state.requireDriverInstanceId(),
-      heartbeatIntervalMs: DRIVER_HEARTBEAT_INTERVAL_MS,
-      runConfig: {
-        commandLeaseMs: COMMAND_LEASE_MS,
-        envPolicy: "strict",
-        eventBatchMaxSize: EVENT_BATCH_MAX_SIZE,
-        organizationPath: SANDBOX_ORGANIZATION_ROOT,
-      },
-      runId: link.sessionRunId,
-    };
+    return committedOutput;
   }
 
   async handleReady(
@@ -134,25 +147,29 @@ export class DriverInstanceRpcHandshakeController {
       throw new Error("Driver hello is required before ready.");
     }
 
-    if (state.ready) {
-      throw new Error("Driver ready has already been received.");
-    }
     context.assertActiveConnection();
 
-    const markedReady = await markDriverInstanceReady(env, {
+    const staged = await state.stageReady(context.epoch, input);
+    context.assertActiveConnection();
+
+    if (staged === "replay") {
+      return { ok: true };
+    }
+
+    const projection = await markDriverInstanceReady(env, {
       ...input,
       connectionId: context.connectionId,
       driverInstanceId: state.requireDriverInstanceId(),
-      generation: state.requireDriverGeneration(),
+      generation: context.epoch.generation,
     });
 
-    if (!markedReady) {
-      throw new Error("Driver connection is no longer current.");
+    if (projection === "conflict") {
+      throw new Error("Driver ready conflicts with the lifecycle projection.");
     }
     context.assertActiveConnection();
 
-    const result = await state.recordReady(input);
-    state.resolveReadyWaiters(result);
+    const result = await state.commitReady(context.epoch);
+    state.resolveReadyWaiters(result, context.epoch.generation);
 
     withRuntimeLogContext(() => {
       logInfo("runtime.driver.ready.received", {
@@ -165,7 +182,10 @@ export class DriverInstanceRpcHandshakeController {
     return { ok: true };
   }
 
-  async #getRuntimeSessionLink(options: { refresh?: boolean } = {}): Promise<RuntimeSessionLink> {
+  async #getRuntimeSessionLink(
+    context: DriverInstanceRpcOperationContext,
+    options: { refresh?: boolean } = {},
+  ): Promise<RuntimeSessionLink> {
     const { env, state } = this.#dependencies;
 
     if (options.refresh !== true && state.runtimeSessionLink !== null) {
@@ -173,6 +193,7 @@ export class DriverInstanceRpcHandshakeController {
     }
 
     const link = await getRuntimeSessionLink(env.DB, state.requireDriverInstanceId());
+    context.assertActiveConnection();
     state.setRuntimeSessionLink(link);
     return link;
   }

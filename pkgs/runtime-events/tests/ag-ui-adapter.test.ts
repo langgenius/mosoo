@@ -6,6 +6,7 @@ import { PLATFORM_ID_FIXTURES } from "@mosoo/id/testing";
 import {
   createProcessDraftFromRuntimeEvent,
   createRuntimeEvent,
+  createRuntimeToolResultMessageId,
   parseRuntimeEventEnvelope,
   projectRuntimeEventToAgUiSessionEvents,
   toRuntimeEventInput,
@@ -36,6 +37,15 @@ function first<T>(values: readonly T[]): T {
 }
 
 describe("runtime event AG-UI adapter", () => {
+  test("uses the Run ULID as the parentless tool message identity", () => {
+    expect(
+      createRuntimeToolResultMessageId({
+        runId: PLATFORM_ID_FIXTURES.sessionRun,
+        toolCallId: "tool-1",
+      }),
+    ).toBe(PLATFORM_ID_FIXTURES.sessionRun);
+  });
+
   test("normalizes canonical driver drafts into canonical runtime envelopes", () => {
     const event = first(
       toRuntimeEventInput(createContext(), {
@@ -50,7 +60,146 @@ describe("runtime event AG-UI adapter", () => {
     expect(event.kind).toBe("run.started");
     expect(event.runId).toBe(PLATFORM_ID_FIXTURES.sessionRun);
     expect(event.sessionId).toBe(PLATFORM_ID_FIXTURES.session);
-    expect(event.schemaVersion).toBe("2026-05-26");
+    expect(event.schemaVersion).toBe("2026-08-29");
+  });
+
+  test("projects task snapshots as one participant state replacement", () => {
+    const event = createRuntimeEvent({
+      driverInstanceId: PLATFORM_ID_FIXTURES.driverInstance,
+      id: createPlatformId(),
+      kind: "agent.tasks.replaced",
+      occurredAt: OCCURRED_AT,
+      payload: {
+        tasks: [
+          { taskId: "task-1", title: "Inspect" },
+          { taskId: "task-2", taskType: "review" },
+        ],
+      },
+      runId: PLATFORM_ID_FIXTURES.sessionRun,
+      sessionId: PLATFORM_ID_FIXTURES.session,
+    });
+
+    expect(projectRuntimeEventToAgUiSessionEvents(event)).toEqual([
+      {
+        name: MOSOO_CUSTOM_EVENT.sessionTasksReplaced.name,
+        type: EventType.CUSTOM,
+        value: {
+          driverInstanceId: PLATFORM_ID_FIXTURES.driverInstance,
+          runId: PLATFORM_ID_FIXTURES.sessionRun,
+          tasks: [
+            { taskId: "task-1", title: "Inspect" },
+            { taskId: "task-2", taskType: "review" },
+          ],
+        },
+      },
+    ]);
+    expect(createProcessDraftFromRuntimeEvent(event)).toEqual({
+      content: "2 background tasks active.",
+      type: "session.status",
+    });
+    expect(parseRuntimeEventEnvelope(event)).toMatchObject({
+      delivery: "lossless",
+      visibility: "participant",
+    });
+    expect(() => parseRuntimeEventEnvelope({ ...event, delivery: "best_effort" })).toThrow();
+    expect(() => parseRuntimeEventEnvelope({ ...event, visibility: "owner_debug" })).toThrow();
+  });
+
+  test.each([
+    [
+      "message.cancelled",
+      { messageId: "message-cancelled", role: "agent" },
+      EventType.TEXT_MESSAGE_END,
+    ],
+    [
+      "message.completed",
+      { messageId: "message-completed", role: "agent" },
+      EventType.TEXT_MESSAGE_END,
+    ],
+    [
+      "message.failed",
+      {
+        error: { code: "runtime.failed", message: "Runtime failed." },
+        messageId: "message-failed",
+        role: "agent",
+      },
+      EventType.TEXT_MESSAGE_END,
+    ],
+    ["thought.cancelled", { thoughtId: "thought-cancelled" }, EventType.REASONING_MESSAGE_END],
+    ["thought.completed", { thoughtId: "thought-completed" }, EventType.REASONING_MESSAGE_END],
+  ] as const)("projects %s as its canonical AG-UI end", (kind, payload, type) => {
+    const event = first(toRuntimeEventInput(createContext(), { kind, payload }));
+    const messageId = "messageId" in payload ? payload.messageId : payload.thoughtId;
+
+    expect(projectRuntimeEventToAgUiSessionEvents(event)).toEqual([{ messageId, type }]);
+  });
+
+  test.each([
+    ["message.cancelled", {}, "messageId"],
+    ["thought.cancelled", {}, "thoughtId"],
+  ] as const)("does not use the envelope ID for anonymous %s", (kind, payload, idField) => {
+    const event = createRuntimeEvent({
+      id: createPlatformId(),
+      kind,
+      occurredAt: OCCURRED_AT,
+      payload,
+      sessionId: PLATFORM_ID_FIXTURES.session,
+    });
+
+    expect(() => projectRuntimeEventToAgUiSessionEvents(event)).toThrow(
+      `${idField} must be a non-empty string`,
+    );
+  });
+
+  test("marks failed message drafts as errors without appending the failure to message text", () => {
+    const event = first(
+      toRuntimeEventInput(createContext(), {
+        kind: "message.failed",
+        payload: {
+          error: { code: "runtime.failed", message: "Sensitive provider failure." },
+          messageId: "message-1",
+          role: "agent",
+        },
+      }),
+    );
+
+    expect(createProcessDraftFromRuntimeEvent(event)).toEqual({
+      content: "Message updated.",
+      status: "error",
+      type: "agent.message.delta",
+    });
+  });
+
+  test("projects cancelled tools without fabricating a result", () => {
+    const event = first(
+      toRuntimeEventInput(createContext(), {
+        kind: "tool.call.updated",
+        payload: { status: "cancelled", toolCallId: "tool-1" },
+      }),
+    );
+
+    expect(projectRuntimeEventToAgUiSessionEvents(event)).toEqual([
+      {
+        name: MOSOO_CUSTOM_EVENT.sessionToolUpdated.name,
+        timestamp: Date.parse(OCCURRED_AT),
+        type: EventType.CUSTOM,
+        value: {
+          inputDelta: null,
+          inputSnapshot: null,
+          outputDelta: null,
+          outputSnapshot: null,
+          parentMessageId: null,
+          resultMessageId: createRuntimeToolResultMessageId({
+            runId: event.runId ?? null,
+            toolCallId: "tool-1",
+          }),
+          runId: event.runId ?? null,
+          toolCallId: "tool-1",
+          toolName: "Tool",
+        },
+      },
+    ]);
+    expect(createProcessDraftFromRuntimeEvent(event).type).toBe("tool.use.completed");
   });
 
   test("uses the build context run id as the canonical runtime run id", () => {
@@ -77,6 +226,7 @@ describe("runtime event AG-UI adapter", () => {
     const started = first(
       projectRuntimeEventToAgUiSessionEvents(
         createRuntimeEvent({
+          driverInstanceId: PLATFORM_ID_FIXTURES.driverInstance,
           id: createPlatformId(),
           kind: "run.started",
           occurredAt: OCCURRED_AT,
@@ -93,6 +243,7 @@ describe("runtime event AG-UI adapter", () => {
     const failed = first(
       projectRuntimeEventToAgUiSessionEvents(
         createRuntimeEvent({
+          driverInstanceId: PLATFORM_ID_FIXTURES.driverInstance,
           id: createPlatformId(),
           kind: "run.failed",
           occurredAt: failedAt,
@@ -100,7 +251,9 @@ describe("runtime event AG-UI adapter", () => {
             error: {
               code: "runtime.failed",
               message: "Runtime failed.",
+              retryable: false,
             },
+            recoverable: false,
           },
           runId: PLATFORM_ID_FIXTURES.sessionRun,
           sessionId: PLATFORM_ID_FIXTURES.session,
@@ -113,6 +266,7 @@ describe("runtime event AG-UI adapter", () => {
       name: MOSOO_CUSTOM_EVENT.sessionRunUpdated.name,
       type: EventType.CUSTOM,
       value: {
+        driverInstanceId: PLATFORM_ID_FIXTURES.driverInstance,
         lifecycle: "RUNNING",
         run: {
           id: PLATFORM_ID_FIXTURES.sessionRun,
@@ -126,6 +280,7 @@ describe("runtime event AG-UI adapter", () => {
       name: MOSOO_CUSTOM_EVENT.sessionRunUpdated.name,
       type: EventType.CUSTOM,
       value: {
+        driverInstanceId: PLATFORM_ID_FIXTURES.driverInstance,
         lifecycle: "IDLE",
         run: {
           completedAt: failedAt,
@@ -171,6 +326,7 @@ describe("runtime event AG-UI adapter", () => {
       name: MOSOO_CUSTOM_EVENT.sessionRunUpdated.name,
       type: EventType.CUSTOM,
       value: {
+        driverInstanceId: null,
         lifecycle: "TERMINATED",
         run: {
           completedAt,
@@ -304,7 +460,7 @@ describe("runtime event AG-UI adapter", () => {
         message: "ok",
       },
       runId: PLATFORM_ID_FIXTURES.sessionRun.toLowerCase(),
-      schemaVersion: "2026-05-26",
+      schemaVersion: "2026-08-29",
       sessionId: PLATFORM_ID_FIXTURES.session.toLowerCase(),
       visibility: "participant",
     };
@@ -332,7 +488,7 @@ describe("runtime event AG-UI adapter", () => {
           organizationId: PLATFORM_ID_FIXTURES.organization,
         },
       }),
-    ).toThrow("Runtime event context organizationId is not supported.");
+    ).toThrow("Runtime event context field organizationId is unsupported.");
   });
 
   test("rejects malformed public runtime event payloads at ingress", () => {
@@ -457,8 +613,8 @@ describe("runtime event AG-UI adapter", () => {
     }
 
     expect(deliveryEvent.name).toBe(MOSOO_CUSTOM_EVENT.sessionPermissionsUpdated.name);
-    expect(deliveryEvent.value.permissionRequests).toHaveLength(1);
-    expect(deliveryEvent.value.permissionRequests[0]).toMatchObject({
+    expect(deliveryEvent.value.permissionRequests).toEqual([]);
+    expect(deliveryEvent.value.permissionRequest).toMatchObject({
       driverInstanceId: PLATFORM_ID_FIXTURES.driverInstance,
       rawInput: '{"command":"pwd"}',
       requestId: "permission-1",
@@ -469,7 +625,7 @@ describe("runtime event AG-UI adapter", () => {
     });
   });
 
-  test("projects failed tool output as a tool result before ending the call", () => {
+  test("projects failed tool output through the shared tool update", () => {
     const event = createRuntimeEvent({
       id: createPlatformId(),
       kind: "tool.call.updated",
@@ -486,20 +642,101 @@ describe("runtime event AG-UI adapter", () => {
 
     expect(projectRuntimeEventToAgUiSessionEvents(event)).toEqual([
       {
-        content:
-          "Tool failed before returning a result: Runtime driver control socket is not connected.",
-        messageId: event.id,
-        toolCallId: "tool-1",
-        type: EventType.TOOL_CALL_RESULT,
-      },
-      {
-        toolCallId: "tool-1",
-        type: EventType.TOOL_CALL_END,
+        name: MOSOO_CUSTOM_EVENT.sessionToolUpdated.name,
+        timestamp: Date.parse(OCCURRED_AT),
+        type: EventType.CUSTOM,
+        value: {
+          inputDelta: null,
+          inputSnapshot: null,
+          outputDelta: null,
+          outputSnapshot:
+            "Tool failed before returning a result: Runtime driver control socket is not connected.",
+          parentMessageId: null,
+          resultMessageId: createRuntimeToolResultMessageId({
+            runId: event.runId ?? null,
+            toolCallId: "tool-1",
+          }),
+          runId: event.runId ?? null,
+          toolCallId: "tool-1",
+          toolName: "Shell",
+        },
       },
     ]);
   });
 
-  test("projects running tool input updates as tool args without fabricating a new start", () => {
+  test("preserves an explicit empty tool output snapshot", () => {
+    const event = createRuntimeEvent({
+      id: createPlatformId(),
+      kind: "tool.call.updated",
+      occurredAt: OCCURRED_AT,
+      payload: {
+        rawOutput: "",
+        status: "completed",
+        toolCallId: "tool-1",
+      },
+      sessionId: PLATFORM_ID_FIXTURES.session,
+    });
+
+    expect(projectRuntimeEventToAgUiSessionEvents(event)).toEqual([
+      {
+        name: MOSOO_CUSTOM_EVENT.sessionToolUpdated.name,
+        timestamp: Date.parse(OCCURRED_AT),
+        type: EventType.CUSTOM,
+        value: {
+          inputDelta: null,
+          inputSnapshot: null,
+          outputDelta: null,
+          outputSnapshot: "",
+          parentMessageId: null,
+          resultMessageId: createRuntimeToolResultMessageId({
+            runId: event.runId ?? null,
+            toolCallId: "tool-1",
+          }),
+          runId: event.runId ?? null,
+          toolCallId: "tool-1",
+          toolName: "Tool",
+        },
+      },
+    ]);
+  });
+
+  test("projects a tool output delta as an append", () => {
+    const event = createRuntimeEvent({
+      id: createPlatformId(),
+      kind: "tool.call.updated",
+      occurredAt: OCCURRED_AT,
+      payload: {
+        rawOutputDelta: "partial",
+        status: "completed",
+        toolCallId: "tool-1",
+      },
+      sessionId: PLATFORM_ID_FIXTURES.session,
+    });
+
+    expect(projectRuntimeEventToAgUiSessionEvents(event)).toEqual([
+      {
+        name: MOSOO_CUSTOM_EVENT.sessionToolUpdated.name,
+        timestamp: Date.parse(OCCURRED_AT),
+        type: EventType.CUSTOM,
+        value: {
+          inputDelta: null,
+          inputSnapshot: null,
+          outputDelta: "partial",
+          outputSnapshot: null,
+          parentMessageId: null,
+          resultMessageId: createRuntimeToolResultMessageId({
+            runId: event.runId ?? null,
+            toolCallId: "tool-1",
+          }),
+          runId: event.runId ?? null,
+          toolCallId: "tool-1",
+          toolName: "Tool",
+        },
+      },
+    ]);
+  });
+
+  test("projects a running tool input snapshot as a replacement", () => {
     const event = createRuntimeEvent({
       id: createPlatformId(),
       kind: "tool.call.updated",
@@ -514,14 +751,28 @@ describe("runtime event AG-UI adapter", () => {
 
     expect(projectRuntimeEventToAgUiSessionEvents(event)).toEqual([
       {
-        delta: '{"command":"pwd"}',
-        toolCallId: "tool-1",
-        type: EventType.TOOL_CALL_ARGS,
+        name: MOSOO_CUSTOM_EVENT.sessionToolUpdated.name,
+        timestamp: Date.parse(OCCURRED_AT),
+        type: EventType.CUSTOM,
+        value: {
+          inputDelta: null,
+          inputSnapshot: '{"command":"pwd"}',
+          outputDelta: null,
+          outputSnapshot: null,
+          parentMessageId: null,
+          resultMessageId: createRuntimeToolResultMessageId({
+            runId: event.runId ?? null,
+            toolCallId: "tool-1",
+          }),
+          runId: event.runId ?? null,
+          toolCallId: "tool-1",
+          toolName: "Tool",
+        },
       },
     ]);
   });
 
-  test("projects running tool start metadata before tool args", () => {
+  test("projects running tool identity and input snapshot atomically", () => {
     const event = createRuntimeEvent({
       id: createPlatformId(),
       kind: "tool.call.updated",
@@ -538,15 +789,23 @@ describe("runtime event AG-UI adapter", () => {
 
     expect(projectRuntimeEventToAgUiSessionEvents(event)).toEqual([
       {
-        parentMessageId: "assistant-1",
-        toolCallId: "tool-1",
-        toolCallName: "Bash",
-        type: EventType.TOOL_CALL_START,
-      },
-      {
-        delta: '{"command":"pwd"}',
-        toolCallId: "tool-1",
-        type: EventType.TOOL_CALL_ARGS,
+        name: MOSOO_CUSTOM_EVENT.sessionToolUpdated.name,
+        timestamp: Date.parse(OCCURRED_AT),
+        type: EventType.CUSTOM,
+        value: {
+          inputDelta: null,
+          inputSnapshot: '{"command":"pwd"}',
+          outputDelta: null,
+          outputSnapshot: null,
+          parentMessageId: "assistant-1",
+          resultMessageId: createRuntimeToolResultMessageId({
+            runId: event.runId ?? null,
+            toolCallId: "tool-1",
+          }),
+          runId: event.runId ?? null,
+          toolCallId: "tool-1",
+          toolName: "Bash",
+        },
       },
     ]);
   });
@@ -560,6 +819,7 @@ describe("runtime event AG-UI adapter", () => {
         outcome: "allow_once",
         requestId: "permission-1",
       },
+      runId: PLATFORM_ID_FIXTURES.sessionRun,
       sessionId: PLATFORM_ID_FIXTURES.session,
     });
 
@@ -569,6 +829,8 @@ describe("runtime event AG-UI adapter", () => {
       name: MOSOO_CUSTOM_EVENT.sessionPermissionsUpdated.name,
       value: {
         permissionRequests: [],
+        resolvedRequestId: "permission-1",
+        runId: PLATFORM_ID_FIXTURES.sessionRun,
       },
     });
   });

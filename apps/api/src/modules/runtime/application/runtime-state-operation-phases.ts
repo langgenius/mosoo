@@ -4,16 +4,15 @@ import type { AgentId, RuntimeOperationId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { buildRuntimeStateOperationEvents } from "./runtime-state-operation-events";
-import type { RuntimeOperationEvent } from "./runtime-state-operation-events";
 import {
-  broadcastRuntimeOperationEvent,
-  writeRuntimeOperationInterruptedSnapshots,
+  publishRuntimeOperationEvent,
   writeRuntimeOperationTimedOutSnapshots,
 } from "./runtime-state-operation-target-events";
 import { restoreRuntimeOperationFailedTargets } from "./runtime-state-operation-target-recovery";
 import {
+  claimRuntimeOperationTargets,
   expireStaleRuntimeOperationTargets,
-  transitionRuntimeTargetSessionStatus,
+  listRuntimeOperationTargets,
 } from "./runtime-state-operation-target-store";
 import type {
   RuntimeSessionTarget,
@@ -46,31 +45,6 @@ function listAdmissibleOperationTargets(
   );
 }
 
-async function broadcastOperationPhase(
-  bindings: ApiBindings,
-  input: {
-    readonly event: RuntimeOperationEvent;
-    readonly expectedStatus?: RuntimeSessionTarget["sessionStatus"];
-    readonly operationId: RuntimeOperationId;
-    readonly status: RuntimeSessionTarget["sessionStatus"];
-    readonly targets: RuntimeSessionTarget[];
-  },
-): Promise<RuntimeSessionTargetTransition[]> {
-  const transitions = await transitionRuntimeTargetSessionStatus(bindings.DB, {
-    ...(input.expectedStatus ? { expectedStatus: input.expectedStatus } : {}),
-    expectedOperationId: input.expectedStatus === undefined ? null : input.operationId,
-    operationId: input.operationId,
-    status: input.status,
-    targets: input.targets,
-  });
-  await broadcastRuntimeOperationEvent(bindings, {
-    event: input.event,
-    operationId: input.operationId,
-    targets: listCurrentTargets(transitions),
-  });
-  return transitions;
-}
-
 export async function startRuntimeStateOperationPhase(
   bindings: ApiBindings,
   input: {
@@ -89,11 +63,51 @@ export async function startRuntimeStateOperationPhase(
     startedAt,
     targetVersion: input.targetVersion,
   });
-  const reschedulingTargets = await broadcastOperationPhase(bindings, {
+  const admissibleTargets = listAdmissibleOperationTargets(input.targets);
+  let reschedulingTargets: RuntimeSessionTargetTransition[];
+
+  try {
+    reschedulingTargets = await claimRuntimeOperationTargets(bindings.DB, {
+      event: updatingEvent,
+      operationId,
+      targets: admissibleTargets,
+    });
+  } catch (error) {
+    const claimedTargets = await listRuntimeOperationTargets(bindings.DB, {
+      operationId,
+      targets: admissibleTargets,
+    });
+    const partialTransitions = claimedTargets.map((current) => ({ current }));
+    const [, readyEvent] = buildRuntimeStateOperationEvents({
+      agentId: input.agentId,
+      operation: input.operation,
+      readyAt: new Date().toISOString(),
+      startedAt,
+      targetVersion: input.targetVersion,
+    });
+
+    try {
+      await restoreRuntimeOperationFailedTargets(bindings, {
+        operationId,
+        readyEvent,
+        targets: partialTransitions,
+        terminalTimestampMs: Date.parse(startedAt),
+      });
+    } catch (recoveryError) {
+      throw new AggregateError(
+        [error, recoveryError],
+        "Runtime operation admission and partial-target recovery both failed.",
+        { cause: recoveryError },
+      );
+    }
+    throw new Error("Runtime operation admission failed after partial-target recovery.", {
+      cause: error,
+    });
+  }
+  await publishRuntimeOperationEvent(bindings, {
     event: updatingEvent,
     operationId,
-    status: "RESCHEDULING",
-    targets: listAdmissibleOperationTargets(input.targets),
+    targets: listCurrentTargets(reschedulingTargets),
   });
 
   return {
@@ -104,31 +118,7 @@ export async function startRuntimeStateOperationPhase(
   };
 }
 
-export async function failRuntimeStateOperationPhase(
-  bindings: ApiBindings,
-  input: {
-    readonly agentId: AgentId;
-    readonly operation: RuntimeStateOperationName;
-    readonly phase: RuntimeStateOperationPhase;
-  },
-): Promise<void> {
-  const failedAt = new Date().toISOString();
-  const [, failureReadyEvent] = buildRuntimeStateOperationEvents({
-    agentId: input.agentId,
-    operation: input.operation,
-    readyAt: failedAt,
-    startedAt: input.phase.startedAt,
-    targetVersion: input.phase.targetVersion,
-  });
-
-  await restoreRuntimeOperationFailedTargets(bindings, {
-    operationId: input.phase.operationId,
-    readyEvent: failureReadyEvent,
-    targets: input.phase.reschedulingTargets,
-  });
-}
-
-export async function completeRuntimeStateOperationPhase(
+async function finishRuntimeStateOperationPhase(
   bindings: ApiBindings,
   input: {
     readonly agentId: AgentId;
@@ -144,28 +134,26 @@ export async function completeRuntimeStateOperationPhase(
     startedAt: input.phase.startedAt,
     targetVersion: input.phase.targetVersion,
   });
-
+  const phaseTargets = listRuntimeStateOperationPhaseTargets(input.phase);
   const timedOutTargets = await expireStaleRuntimeOperationTargets(bindings.DB, {
     operationId: input.phase.operationId,
-    targets: listRuntimeStateOperationPhaseTargets(input.phase),
+    targets: phaseTargets,
   });
   await writeRuntimeOperationTimedOutSnapshots(bindings, {
     operationId: input.phase.operationId,
     targets: timedOutTargets,
   });
-  const readyTransitions = await transitionRuntimeTargetSessionStatus(bindings.DB, {
-    expectedOperationId: input.phase.operationId,
-    expectedStatus: "RESCHEDULING",
-    status: "IDLE",
-    targets: listRuntimeStateOperationPhaseTargets(input.phase),
-  });
-  await writeRuntimeOperationInterruptedSnapshots(bindings, {
+  const timedOutIds = new Set(timedOutTargets.map((target) => target.sessionId));
+
+  await restoreRuntimeOperationFailedTargets(bindings, {
     operationId: input.phase.operationId,
-    targets: readyTransitions.map((transition) => transition.previous),
-  });
-  await broadcastRuntimeOperationEvent(bindings, {
-    event: readyEvent,
-    operationId: input.phase.operationId,
-    targets: listCurrentTargets(readyTransitions),
+    readyEvent,
+    targets: input.phase.reschedulingTargets.filter(
+      (target) => !timedOutIds.has(target.current.sessionId),
+    ),
+    terminalTimestampMs: Date.parse(input.phase.startedAt),
   });
 }
+
+export const failRuntimeStateOperationPhase = finishRuntimeStateOperationPhase;
+export const completeRuntimeStateOperationPhase = finishRuntimeStateOperationPhase;

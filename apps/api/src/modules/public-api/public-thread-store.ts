@@ -1,15 +1,9 @@
 import type { SessionSummary } from "@mosoo/contracts/session";
-import {
-  sessionEventsTable,
-  sessionMessagesTable,
-  sessionRunsTable,
-  sessionsTable,
-} from "@mosoo/db";
+import { sessionRunsTable, sessionsTable } from "@mosoo/db";
 import { parsePlatformId } from "@mosoo/id";
 import type {
   AccountId,
   AgentId,
-  FileId,
   PersonalAccessTokenId,
   PublicThreadId,
   SessionId,
@@ -19,7 +13,7 @@ import { and, eq, sql } from "drizzle-orm";
 import type { ApiBindings } from "../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../platform/db/drizzle";
 import { currentTimestampMs, toIsoString } from "../../time";
-import { fileStore } from "../files/application/file-store";
+import { deleteSessionCascade } from "../sessions/application/session-cleanup.service";
 import {
   buildSessionSummaryFromJoinedRow,
   sessionSummaryWithLastRunColumns,
@@ -46,35 +40,9 @@ export interface ThreadSnapshot {
 
 export async function cleanupFailedThreadCreation(input: {
   bindings: ApiBindings;
-  fileIds: FileId[];
   sessionId: SessionId;
 }): Promise<void> {
-  if (input.fileIds.length > 0) {
-    await fileStore.deleteScope(input.bindings, {
-      id: input.sessionId,
-      kind: "session",
-    });
-  }
-
-  await getAppDatabase(input.bindings.DB)
-    .delete(sessionEventsTable)
-    .where(eq(sessionEventsTable.sessionId, input.sessionId))
-    .run();
-
-  await getAppDatabase(input.bindings.DB)
-    .delete(sessionMessagesTable)
-    .where(eq(sessionMessagesTable.sessionId, input.sessionId))
-    .run();
-
-  await getAppDatabase(input.bindings.DB)
-    .delete(sessionRunsTable)
-    .where(eq(sessionRunsTable.sessionId, input.sessionId))
-    .run();
-
-  await getAppDatabase(input.bindings.DB)
-    .delete(sessionsTable)
-    .where(eq(sessionsTable.id, input.sessionId))
-    .run();
+  await deleteSessionCascade(input.bindings, input.sessionId);
 }
 
 export async function getThreadSnapshot(

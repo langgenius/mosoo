@@ -8,7 +8,20 @@ interface SessionDelegate {
   closeViewers(sessionId: string, reason: string): Promise<void>;
   destroy(sessionId: string, reason: string): Promise<void>;
   fetch(request: Request): Promise<Response>;
-  publishEvents(sessionId: string, events: AgUiSessionEvent[]): Promise<void>;
+  publishEventBatches(
+    sessionId: string,
+    batches: Array<{
+      events: AgUiSessionEvent[];
+      previousRuntimeEventSeqCursor: number | null;
+      runtimeEventSeqCursor: number | null;
+    }>,
+  ): Promise<void>;
+  publishEvents(
+    sessionId: string,
+    events: AgUiSessionEvent[],
+    runtimeEventSeqCursor?: number | null,
+    previousRuntimeEventSeqCursor?: number | null,
+  ): Promise<void>;
   syncViewers(sessionId: string): Promise<void>;
   webSocketClose(ws: WebSocket, code: number, reason: string): Promise<void>;
   webSocketError(ws: WebSocket, error: unknown): Promise<void> | void;
@@ -34,8 +47,26 @@ export class Session extends DurableObject {
     await (await this.#delegatePromise).alarm();
   }
 
-  async publishEvents(sessionId: string, events: AgUiSessionEvent[]): Promise<void> {
-    await (await this.#delegatePromise).publishEvents(sessionId, events);
+  async publishEvents(
+    sessionId: string,
+    events: AgUiSessionEvent[],
+    runtimeEventSeqCursor: number | null = null,
+    previousRuntimeEventSeqCursor: number | null = null,
+  ): Promise<void> {
+    await (
+      await this.#delegatePromise
+    ).publishEvents(sessionId, events, runtimeEventSeqCursor, previousRuntimeEventSeqCursor);
+  }
+
+  async publishEventBatches(
+    sessionId: string,
+    batches: Array<{
+      events: AgUiSessionEvent[];
+      previousRuntimeEventSeqCursor: number | null;
+      runtimeEventSeqCursor: number | null;
+    }>,
+  ): Promise<void> {
+    await (await this.#delegatePromise).publishEventBatches(sessionId, batches);
   }
 
   async syncViewers(sessionId: string): Promise<void> {

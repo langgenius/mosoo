@@ -62,7 +62,7 @@ function isPersonalAccessTokenValue(tokenValue: string): boolean {
 export async function hashTokenValue(tokenValue: string): Promise<string> {
   const encoded = new TextEncoder().encode(tokenValue);
   const digest = await crypto.subtle.digest("SHA-256", encoded);
-  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  return new Uint8Array(digest).toHex();
 }
 
 function toTokenSummary(row: PersonalAccessTokenListRow): PersonalAccessTokenSummary {

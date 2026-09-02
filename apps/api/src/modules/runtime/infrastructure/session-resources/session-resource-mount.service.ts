@@ -1,6 +1,11 @@
-import { getSessionResourceRootPath } from "@mosoo/agent-driver/paths";
+import {
+  SANDBOX_WORKSPACE_ROOT,
+  getSessionResourceBackingPath,
+  getSessionResourceRootPath,
+} from "@mosoo/agent-driver/paths";
 
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
+import { quoteShellArg } from "../../../../shared/shell";
 import {
   createRuntimeSandboxBucketMountOptions,
   isRuntimeSandboxLocalBucketEnabled,
@@ -10,12 +15,8 @@ import { toRuntimeBucketMountConflictError } from "../runtime-sandbox-mount-erro
 import { RuntimeBucketMountConflictError } from "../runtime-subject-lifecycle/runtime-subject-errors";
 import type { SandboxHandle } from "../sandbox-handles";
 
-function quoteShellArg(value: string): string {
-  return `'${value.replaceAll("'", `'"'"'`)}'`;
-}
-
 function getSessionResourceMountPath(sessionId: string): string {
-  return getSessionResourceRootPath(sessionId);
+  return getSessionResourceBackingPath(sessionId);
 }
 
 function getSessionResourceBucketPrefix(sessionId: string): string {
@@ -37,64 +38,82 @@ async function sandboxBucketMountIsReady(input: {
   return probe.success && probe.exitCode === 0;
 }
 
+async function ensureSessionResourceAlias(input: {
+  readonly mountPath: string;
+  readonly publicPath: string;
+  readonly sandbox: SandboxHandle;
+}): Promise<void> {
+  const workspacePrefix = `${SANDBOX_WORKSPACE_ROOT}/`;
+  const publicParent = input.publicPath.slice(0, input.publicPath.lastIndexOf("/"));
+  if (!publicParent.startsWith(workspacePrefix) || !input.mountPath.startsWith(workspacePrefix)) {
+    throw new Error("Session resource paths must be inside the workspace root.");
+  }
+  const parentDepth = publicParent.slice(workspacePrefix.length).split("/").length;
+  const target = `${"../".repeat(parentDepth)}${input.mountPath.slice(workspacePrefix.length)}`;
+  const command = [
+    "set -eu",
+    `link=${quoteShellArg(input.publicPath)}`,
+    `target=${quoteShellArg(target)}`,
+    'if [ -L "$link" ]; then [ "$(readlink "$link")" = "$target" ];',
+    'elif [ -e "$link" ]; then exit 42;',
+    'else ln -s "$target" "$link" 2>/dev/null || { [ -L "$link" ] && [ "$(readlink "$link")" = "$target" ]; }; fi',
+  ].join("; ");
+  const result = await input.sandbox.exec(`sh -lc ${quoteShellArg(command)}`);
+  if (!result.success || result.exitCode !== 0) {
+    throw new Error("Session resource alias conflicts with its reserved workspace path.");
+  }
+}
+
 export async function ensureSessionResourcesMounted(input: {
   bindings: ApiBindings;
   sandbox: SandboxHandle;
   sessionId: string;
 }): Promise<void> {
   const mountPath = getSessionResourceMountPath(input.sessionId);
+  const publicPath = getSessionResourceRootPath(input.sessionId);
   const bucket = resolveRuntimeSandboxBucketMountTarget(input.bindings);
   const prefix = getSessionResourceBucketPrefix(input.sessionId);
   const localBucket = isRuntimeSandboxLocalBucketEnabled(input.bindings);
 
-  if (
-    await sandboxBucketMountIsReady({
-      localBucket,
-      mountPath,
-      sandbox: input.sandbox,
-    })
-  ) {
-    return;
-  }
+  const ready = await sandboxBucketMountIsReady({
+    localBucket,
+    mountPath,
+    sandbox: input.sandbox,
+  });
 
-  await input.sandbox.mkdir(mountPath, { recursive: true });
+  if (!ready) {
+    await input.sandbox.mkdir(mountPath, { recursive: true });
 
-  try {
-    await input.sandbox.mountBucket(
-      bucket,
-      mountPath,
-      createRuntimeSandboxBucketMountOptions(input.bindings, {
-        prefix,
-        readOnly: true,
-      }),
-    );
-  } catch (cause) {
-    const error =
-      toRuntimeBucketMountConflictError(cause, {
+    try {
+      await input.sandbox.mountBucket(
+        bucket,
         mountPath,
-      }) ?? cause;
-
-    if (
-      error instanceof RuntimeBucketMountConflictError &&
-      (localBucket ||
-        (await sandboxBucketMountIsReady({
-          localBucket,
+        createRuntimeSandboxBucketMountOptions(input.bindings, {
+          prefix,
+          readOnly: true,
+        }),
+      );
+    } catch (cause) {
+      const error =
+        toRuntimeBucketMountConflictError(cause, {
           mountPath,
-          sandbox: input.sandbox,
-        })))
-    ) {
-      return;
-    }
+        }) ?? cause;
 
-    if (
-      !localBucket &&
-      error instanceof RuntimeBucketMountConflictError &&
-      error.bucket === bucket &&
-      error.prefix === prefix
-    ) {
-      return;
-    }
+      const sameMount =
+        error instanceof RuntimeBucketMountConflictError &&
+        (localBucket ||
+          (await sandboxBucketMountIsReady({
+            localBucket,
+            mountPath,
+            sandbox: input.sandbox,
+          })) ||
+          (error.bucket === bucket && error.prefix === prefix));
 
-    throw error;
+      if (!sameMount) {
+        throw error;
+      }
+    }
   }
+
+  await ensureSessionResourceAlias({ mountPath, publicPath, sandbox: input.sandbox });
 }

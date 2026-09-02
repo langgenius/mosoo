@@ -1,7 +1,5 @@
-import type { AgentKind } from "@mosoo/contracts/agent";
-import type { SessionStatus, SessionType } from "@mosoo/contracts/session";
+import type { SessionStatus } from "@mosoo/contracts/session";
 import type {
-  RunError,
   SessionRunStatus,
   SessionRunSummary,
   SessionRunTrigger,
@@ -17,9 +15,8 @@ import type {
   SessionRunId,
 } from "@mosoo/id";
 import { generateTraceId } from "@mosoo/observability";
-import { and, eq, exists, inArray, notInArray, sql } from "drizzle-orm";
+import { and, eq, exists, isNull, notInArray, sql } from "drizzle-orm";
 
-import { createErrorLogContext, logInfo, logWarn } from "../../../../platform/cloudflare/logger";
 import {
   getAppDatabase,
   getD1ChangeCount,
@@ -28,7 +25,6 @@ import {
 import { currentTimestampMs, toIsoString } from "../../../../time";
 import { toSessionLifecycleStatusForRunStatus } from "../../../sessions/domain/session-lifecycle";
 import {
-  ACTIVE_SESSION_RUN_STATUSES,
   decideSessionRunTransition,
   isTerminalSessionRunStatus,
   toSessionRunStatusLifecycleEventName,
@@ -40,10 +36,8 @@ import type { ActiveSessionRunStatus } from "./session-run-row.mapper";
 import { updateSessionLastRun } from "./session-run-session.repository";
 
 type SessionRunStatusUpdateInput = {
-  error?: RunError | null;
-  operationId?: RuntimeOperationId | null;
   source?: SessionRunTransitionSource;
-  status: SessionRunStatus;
+  status: ActiveSessionRunStatus;
 };
 
 type UpdateSessionRunStatusInput = SessionRunStatusUpdateInput & {
@@ -52,7 +46,6 @@ type UpdateSessionRunStatusInput = SessionRunStatusUpdateInput & {
    * check is atomic with the write via the status_seq optimistic guard.
    */
   expectedCurrentStatus?: SessionRunStatus;
-  preserveSessionLifecycle?: boolean;
   runId: SessionRunId;
 };
 
@@ -75,8 +68,6 @@ type SessionRunTransitionSource =
   | "system"
   | "viewer";
 
-const SESSION_RUN_STATUS_WRITE_BATCH_SIZE = 50;
-
 interface LoadedSessionRunLifecycleRow {
   completed_at: number | null;
   created_at: number;
@@ -85,15 +76,19 @@ interface LoadedSessionRunLifecycleRow {
   error_code: string | null;
   error_details_json: string | null;
   error_message: string | null;
+  error_retryable: boolean | null;
   id: SessionRunId;
   model: string | null;
   provider: string | null;
   runtime_id: string;
+  session_archived_at: number | null;
+  session_cleanup_operation_kind: "archive" | "delete" | null;
   session_id: SessionId;
-  session_kind: AgentKind;
   session_last_run_id: SessionRunId | null;
   session_status: SessionStatus;
-  session_type: SessionType;
+  session_status_operation_id: RuntimeOperationId | null;
+  session_status_seq: number;
+  session_updated_at: number;
   started_at: number | null;
   status: SessionRunStatus;
   status_seq: number;
@@ -107,7 +102,7 @@ export type SessionRunTransitionOutcome =
       kind: "applied";
       previousStatus: SessionRunStatus;
       run: SessionRunSummary;
-      sessionLifecycle: "current_last_run_updated" | "not_current_last_run" | "preserved";
+      sessionLifecycle: "current_last_run_updated" | "not_current_last_run";
       statusSeq: number;
     }
   | {
@@ -141,17 +136,13 @@ export type SessionRunTransitionOutcome =
       statusSeq: number;
     };
 
-export interface NonTerminalSessionRunsStatusUpdateResult {
-  readonly runIds: readonly SessionRunId[];
-  readonly timestampMs: number;
-}
-
 function createSessionRunStatusUpdate(input: SessionRunStatusUpdateInput, timestampMs: number) {
   return {
-    completedAt: isTerminalSessionRunStatus(input.status) ? timestampMs : undefined,
-    errorCode: input.error?.code ?? null,
-    errorDetailsJson: input.error ? JSON.stringify(input.error.details) : null,
-    errorMessage: input.error?.message ?? null,
+    completedAt: undefined,
+    errorCode: null,
+    errorDetailsJson: null,
+    errorMessage: null,
+    errorRetryable: null,
     startedAt:
       input.status === "queued"
         ? undefined
@@ -159,7 +150,7 @@ function createSessionRunStatusUpdate(input: SessionRunStatusUpdateInput, timest
     status: input.status,
     statusChangedAt: timestampMs,
     statusEvent: toSessionRunStatusLifecycleEventName(input.status),
-    statusOperationId: input.operationId ?? null,
+    statusOperationId: null,
     statusSeq: sql`${sessionRunsTable.statusSeq} + 1`,
     statusSource: input.source ?? "system",
     updatedAt: timestampMs,
@@ -167,51 +158,13 @@ function createSessionRunStatusUpdate(input: SessionRunStatusUpdateInput, timest
 }
 
 function createCurrentSessionRunProjectionPatch(input: {
-  readonly sessionKind: AgentKind;
-  readonly status: SessionRunStatus;
+  readonly status: ActiveSessionRunStatus;
   readonly timestampMs: number;
 }) {
-  return {
-    ...createSessionStatusTransitionPatch({
-      status: toSessionLifecycleStatusForRunStatus(input.status),
-      timestampMs: input.timestampMs,
-    }),
-    ...(input.sessionKind === "cattle" && input.status === "completed"
-      ? { workspaceCheckpointRequired: true }
-      : {}),
-  };
-}
-
-function logTerminalSessionRun(
-  current: LoadedSessionRunLifecycleRow,
-  input: SessionRunStatusUpdateInput,
-  timestampMs: number,
-): void {
-  if (!isTerminalSessionRunStatus(input.status)) return;
-
-  try {
-    logInfo("session.run.terminal", {
-      durationMs: Math.max(0, timestampMs - (current.started_at ?? current.created_at)),
-      endToEndMs: Math.max(0, timestampMs - current.created_at),
-      errorCode: input.error?.code ?? null,
-      runId: current.id,
-      runtimeId: current.runtime_id,
-      sessionType: current.session_type,
-      source: input.source ?? "system",
-      status: input.status,
-      traceId: current.trace_id,
-      trigger: current.trigger,
-    });
-  } catch (error) {
-    try {
-      logWarn("session.run.terminal_log.failed", {
-        ...createErrorLogContext(error),
-        runId: current.id,
-      });
-    } catch {
-      // Observability must never turn a committed Run transition into an API failure.
-    }
-  }
+  return createSessionStatusTransitionPatch({
+    status: toSessionLifecycleStatusForRunStatus(input.status),
+    timestampMs: input.timestampMs,
+  });
 }
 
 function applySessionRunStatusUpdate(
@@ -221,17 +174,8 @@ function applySessionRunStatusUpdate(
 ): SessionRunSummary {
   return {
     ...run,
-    completedAt: isTerminalSessionRunStatus(input.status)
-      ? toIsoString(timestampMs)
-      : run.completedAt,
-    error: input.error
-      ? {
-          code: input.error.code,
-          details: input.error.details,
-          message: input.error.message,
-          retryable: input.error.retryable,
-        }
-      : null,
+    completedAt: run.completedAt,
+    error: null,
     startedAt:
       input.status === "queued" ? run.startedAt : (run.startedAt ?? toIsoString(timestampMs)),
     status: input.status,
@@ -248,15 +192,19 @@ function sessionRunLifecycleColumns() {
     error_code: sessionRunsTable.errorCode,
     error_details_json: sessionRunsTable.errorDetailsJson,
     error_message: sessionRunsTable.errorMessage,
+    error_retryable: sessionRunsTable.errorRetryable,
     id: sessionRunsTable.id,
     model: sessionRunsTable.model,
     provider: sessionRunsTable.provider,
     runtime_id: sessionsTable.runtimeId,
+    session_archived_at: sessionsTable.archivedAt,
+    session_cleanup_operation_kind: sessionsTable.cleanupOperationKind,
     session_id: sessionRunsTable.sessionId,
-    session_kind: sessionsTable.kind,
     session_last_run_id: sessionsTable.lastRunId,
     session_status: sessionsTable.status,
-    session_type: sessionsTable.type,
+    session_status_operation_id: sessionsTable.statusOperationId,
+    session_status_seq: sessionsTable.statusSeq,
+    session_updated_at: sessionsTable.updatedAt,
     started_at: sessionRunsTable.startedAt,
     status: sessionRunsTable.status,
     status_seq: sessionRunsTable.statusSeq,
@@ -264,6 +212,22 @@ function sessionRunLifecycleColumns() {
     trigger: sessionRunsTable.trigger,
     updated_at: sessionRunsTable.updatedAt,
   };
+}
+
+function writableObservedSessionCondition(current: LoadedSessionRunLifecycleRow) {
+  return and(
+    eq(sessionsTable.id, current.session_id),
+    current.session_last_run_id === null
+      ? isNull(sessionsTable.lastRunId)
+      : eq(sessionsTable.lastRunId, current.session_last_run_id),
+    eq(sessionsTable.status, current.session_status),
+    notInArray(sessionsTable.status, ["TERMINATED"]),
+    eq(sessionsTable.statusSeq, current.session_status_seq),
+    eq(sessionsTable.updatedAt, current.session_updated_at),
+    isNull(sessionsTable.archivedAt),
+    isNull(sessionsTable.cleanupOperationKind),
+    isNull(sessionsTable.statusOperationId),
+  );
 }
 
 function toSessionRunSummaryFromLifecycleRow(row: LoadedSessionRunLifecycleRow): SessionRunSummary {
@@ -275,6 +239,7 @@ function toSessionRunSummaryFromLifecycleRow(row: LoadedSessionRunLifecycleRow):
     error_code: row.error_code,
     error_details_json: row.error_details_json,
     error_message: row.error_message,
+    error_retryable: row.error_retryable,
     id: row.id,
     model: row.model,
     provider: row.provider,
@@ -311,6 +276,7 @@ export function createInsertedSessionRunSummary(
     error_code: null,
     error_details_json: null,
     error_message: null,
+    error_retryable: null,
     id: identifiers.runId,
     model: input.model ?? null,
     provider: input.provider ?? null,
@@ -372,6 +338,7 @@ export async function createSessionRunRecordIfSessionIdle(
               error_code,
               error_message,
               error_details_json,
+              error_retryable,
               started_at,
               completed_at,
               created_by_account_id,
@@ -395,6 +362,7 @@ export async function createSessionRunRecordIfSessionIdle(
             ${input.provider ?? null},
             ${input.model ?? null},
             ${traceId},
+            NULL,
             NULL,
             NULL,
             NULL,
@@ -466,130 +434,10 @@ export async function setSessionRunStatus(
   database: D1Database,
   input: UpdateSessionRunStatusInput,
 ): Promise<SessionRunTransitionOutcome> {
+  if (isTerminalSessionRunStatus(input.status)) {
+    throw new Error("Terminal Session Run transitions require the atomic terminal projection.");
+  }
   return transitionSessionRunStatusAt(database, input, currentTimestampMs());
-}
-
-export async function cancelActiveSessionRunsForRuntimeOperation(
-  database: D1Database,
-  input: {
-    readonly error: RunError;
-    readonly operationId: RuntimeOperationId;
-    readonly runIds: readonly SessionRunId[];
-  },
-): Promise<NonTerminalSessionRunsStatusUpdateResult> {
-  const runIds = [...new Set(input.runIds)].filter((runId) => runId !== "");
-
-  if (runIds.length === 0) {
-    return {
-      runIds: [],
-      timestampMs: currentTimestampMs(),
-    };
-  }
-
-  const cancelledRunIds = new Set<SessionRunId>();
-  let timestampMs = currentTimestampMs();
-
-  for (let index = 0; index < runIds.length; index += SESSION_RUN_STATUS_WRITE_BATCH_SIZE) {
-    const runIdBatch = runIds.slice(index, index + SESSION_RUN_STATUS_WRITE_BATCH_SIZE);
-    const updated = await setNonTerminalSessionRunsStatus(database, {
-      error: input.error,
-      operationId: input.operationId,
-      preserveSessionLifecycle: true,
-      runIds: runIdBatch,
-      source: "runtime_operation",
-      status: "cancelled",
-    });
-    timestampMs = updated.timestampMs;
-
-    const rows = await getAppDatabase(database)
-      .select({ id: sessionRunsTable.id })
-      .from(sessionRunsTable)
-      .where(
-        and(
-          inArray(sessionRunsTable.id, runIdBatch),
-          eq(sessionRunsTable.status, "cancelled"),
-          eq(sessionRunsTable.statusOperationId, input.operationId),
-        ),
-      )
-      .all();
-
-    for (const row of rows) {
-      cancelledRunIds.add(row.id);
-    }
-  }
-
-  return {
-    runIds: [...cancelledRunIds],
-    timestampMs,
-  };
-}
-
-async function setNonTerminalSessionRunsStatus(
-  database: D1Database,
-  input: SessionRunStatusUpdateInput & {
-    readonly preserveSessionLifecycle?: boolean;
-    readonly runIds: readonly SessionRunId[];
-  },
-): Promise<NonTerminalSessionRunsStatusUpdateResult> {
-  const runIds = [...new Set(input.runIds)].filter((runId) => runId !== "");
-  const timestampMs = currentTimestampMs();
-
-  if (runIds.length === 0) {
-    return {
-      runIds: [],
-      timestampMs,
-    };
-  }
-
-  const updatedRuns = await getAppDatabase(database)
-    .update(sessionRunsTable)
-    .set(createSessionRunStatusUpdate(input, timestampMs))
-    .where(
-      and(
-        inArray(sessionRunsTable.id, runIds),
-        inArray(sessionRunsTable.status, ACTIVE_SESSION_RUN_STATUSES),
-      ),
-    )
-    .returning({
-      id: sessionRunsTable.id,
-      sessionId: sessionRunsTable.sessionId,
-    })
-    .all();
-
-  if (input.preserveSessionLifecycle === true || updatedRuns.length === 0) {
-    return {
-      runIds: updatedRuns.map((run) => run.id),
-      timestampMs,
-    };
-  }
-
-  await getAppDatabase(database)
-    .update(sessionsTable)
-    .set(
-      createSessionStatusTransitionPatch({
-        status: toSessionLifecycleStatusForRunStatus(input.status),
-        timestampMs,
-      }),
-    )
-    .where(
-      and(
-        inArray(
-          sessionsTable.id,
-          updatedRuns.map((run) => run.sessionId),
-        ),
-        inArray(
-          sessionsTable.lastRunId,
-          updatedRuns.map((run) => run.id),
-        ),
-        notInArray(sessionsTable.status, ["TERMINATED"]),
-      ),
-    )
-    .run();
-
-  return {
-    runIds: updatedRuns.map((run) => run.id),
-    timestampMs,
-  };
 }
 
 async function transitionSessionRunStatusAt(
@@ -614,12 +462,22 @@ async function repairCurrentSessionRunProjection(
 
   const projectedStatus = toSessionLifecycleStatusForRunStatus(input.targetStatus);
 
-  if (input.current.session_status === projectedStatus) {
+  if (
+    input.current.session_status === projectedStatus &&
+    input.current.session_archived_at === null &&
+    input.current.session_cleanup_operation_kind === null &&
+    input.current.session_status_operation_id === null
+  ) {
     return "already_projected";
   }
 
-  if (input.current.session_status === "TERMINATED") {
-    return "already_projected";
+  if (
+    input.current.session_archived_at !== null ||
+    input.current.session_cleanup_operation_kind !== null ||
+    input.current.session_status_operation_id !== null ||
+    input.current.session_status === "TERMINATED"
+  ) {
+    return "repair_needed";
   }
 
   const sessionUpdateResult = await getAppDatabase(database)
@@ -630,13 +488,7 @@ async function repairCurrentSessionRunProjection(
         timestampMs: input.timestampMs,
       }),
     )
-    .where(
-      and(
-        eq(sessionsTable.id, input.current.session_id),
-        eq(sessionsTable.lastRunId, input.current.id),
-        notInArray(sessionsTable.status, ["TERMINATED"]),
-      ),
-    )
+    .where(writableObservedSessionCondition(input.current))
     .run();
 
   return getD1ChangeCount(sessionUpdateResult) > 0 ? "repaired" : "repair_needed";
@@ -683,22 +535,20 @@ async function transitionSessionRunStatus(
       break;
     }
     case "duplicate": {
-      if (input.preserveSessionLifecycle !== true) {
-        const projection = await repairCurrentSessionRunProjection(database, {
-          current,
-          targetStatus: input.status,
-          timestampMs,
-        });
+      const projection = await repairCurrentSessionRunProjection(database, {
+        current,
+        targetStatus: input.status,
+        timestampMs,
+      });
 
-        if (projection === "repair_needed") {
-          return {
-            kind: "repair_needed",
-            previousStatus: current.status,
-            reason: "session_lifecycle_not_updated",
-            run: toSessionRunSummaryFromLifecycleRow(current),
-            statusSeq: current.status_seq,
-          };
-        }
+      if (projection === "repair_needed") {
+        return {
+          kind: "repair_needed",
+          previousStatus: current.status,
+          reason: "session_lifecycle_not_updated",
+          run: toSessionRunSummaryFromLifecycleRow(current),
+          statusSeq: current.status_seq,
+        };
       }
 
       return {
@@ -729,39 +579,6 @@ async function transitionSessionRunStatus(
   const run = toUpdatedSessionRunSummary(current, input, timestampMs);
   const statusSeq = current.status_seq + 1;
 
-  if (input.preserveSessionLifecycle === true) {
-    const runUpdateResult = await getAppDatabase(database)
-      .update(sessionRunsTable)
-      .set(createSessionRunStatusUpdate(input, timestampMs))
-      .where(
-        and(
-          eq(sessionRunsTable.id, input.runId),
-          eq(sessionRunsTable.status, current.status),
-          eq(sessionRunsTable.statusSeq, current.status_seq),
-        ),
-      )
-      .run();
-
-    if (getD1ChangeCount(runUpdateResult) === 0) {
-      return {
-        currentStatus: current.status,
-        kind: "stale",
-        reason: "concurrent_transition",
-        targetStatus: input.status,
-      };
-    }
-
-    logTerminalSessionRun(current, input, timestampMs);
-
-    return {
-      kind: "applied",
-      previousStatus: current.status,
-      run,
-      sessionLifecycle: "preserved",
-      statusSeq,
-    };
-  }
-
   if (current.session_last_run_id !== input.runId) {
     const runUpdateResult = await getAppDatabase(database)
       .update(sessionRunsTable)
@@ -771,6 +588,12 @@ async function transitionSessionRunStatus(
           eq(sessionRunsTable.id, input.runId),
           eq(sessionRunsTable.status, current.status),
           eq(sessionRunsTable.statusSeq, current.status_seq),
+          exists(
+            getAppDatabase(database)
+              .select({ id: sessionsTable.id })
+              .from(sessionsTable)
+              .where(writableObservedSessionCondition(current)),
+          ),
         ),
       )
       .run();
@@ -783,8 +606,6 @@ async function transitionSessionRunStatus(
         targetStatus: input.status,
       };
     }
-
-    logTerminalSessionRun(current, input, timestampMs);
 
     return {
       kind: "applied",
@@ -804,22 +625,25 @@ async function transitionSessionRunStatus(
           eq(sessionRunsTable.id, input.runId),
           eq(sessionRunsTable.status, current.status),
           eq(sessionRunsTable.statusSeq, current.status_seq),
+          exists(
+            db
+              .select({ id: sessionsTable.id })
+              .from(sessionsTable)
+              .where(writableObservedSessionCondition(current)),
+          ),
         ),
       ),
     db
       .update(sessionsTable)
       .set(
         createCurrentSessionRunProjectionPatch({
-          sessionKind: current.session_kind,
           status: input.status,
           timestampMs,
         }),
       )
       .where(
         and(
-          eq(sessionsTable.id, current.session_id),
-          eq(sessionsTable.lastRunId, input.runId),
-          notInArray(sessionsTable.status, ["TERMINATED"]),
+          writableObservedSessionCondition(current),
           exists(
             db
               .select({ id: sessionRunsTable.id })
@@ -844,8 +668,6 @@ async function transitionSessionRunStatus(
       targetStatus: input.status,
     };
   }
-
-  logTerminalSessionRun(current, input, timestampMs);
 
   if (getD1ChangeCount(sessionUpdateResult) === 0 && current.session_status !== "TERMINATED") {
     return {

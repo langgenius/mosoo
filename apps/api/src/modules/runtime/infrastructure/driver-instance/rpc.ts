@@ -1,12 +1,12 @@
 import type {
   DriverCommandUpdateInput,
   DriverCompletionInput,
-  DriverEventBatchInput,
   DriverEventBatchOutput,
   DriverExternalToolEffectClaimInput,
   DriverExternalToolEffectClaimOutput,
-  DriverExternalToolEffectCompleteInput,
-  DriverExternalToolEffectUnknownInput,
+  DriverExternalToolEffectObserveInput,
+  DriverExternalToolEffectSettleInput,
+  DriverExternalToolEffectState,
   DriverFailureInput,
   DriverHeartbeatInput,
   DriverHelloInput,
@@ -19,12 +19,15 @@ import type {
 } from "@mosoo/agent-driver/orpc";
 import type { RuntimeCommand } from "@mosoo/contracts/runtime-command";
 
+import type { HostDriverEventBatchInput } from "./event-types";
 import type { RuntimeOrpcContext } from "./rpc-wire";
+import type { DriverInstanceConnectionEpoch } from "./state";
 
 export type DriverInstanceRpcContext = RuntimeOrpcContext;
 
 export interface DriverInstanceRpcOperationContext {
   readonly connectionId: string;
+  readonly epoch: DriverInstanceConnectionEpoch;
   assertActiveConnection(): void;
 }
 
@@ -37,10 +40,10 @@ export interface DriverInstanceRpcHandler {
     input: DriverExternalToolEffectClaimInput,
     context: DriverInstanceRpcOperationContext,
   ): Promise<DriverExternalToolEffectClaimOutput>;
-  handleCompleteExternalToolEffect(
-    input: DriverExternalToolEffectCompleteInput,
+  handleObserveExternalToolEffect(
+    input: DriverExternalToolEffectObserveInput,
     context: DriverInstanceRpcOperationContext,
-  ): Promise<{ ok: true }>;
+  ): Promise<DriverExternalToolEffectState>;
   handleCompleteRun(
     input: DriverCompletionInput,
     context: DriverInstanceRpcOperationContext,
@@ -62,17 +65,17 @@ export interface DriverInstanceRpcHandler {
     context: DriverInstanceRpcOperationContext,
   ): Promise<DriverNextCommandOutput>;
   handlePushEvents(
-    input: DriverEventBatchInput,
+    input: HostDriverEventBatchInput,
     context: DriverInstanceRpcOperationContext,
   ): Promise<DriverEventBatchOutput>;
   handlePushLogs(
     input: DriverLogBatchInput,
     context: DriverInstanceRpcOperationContext,
   ): Promise<DriverLogBatchOutput>;
-  handleMarkExternalToolEffectUnknown(
-    input: DriverExternalToolEffectUnknownInput,
+  handleSettleExternalToolEffect(
+    input: DriverExternalToolEffectSettleInput,
     context: DriverInstanceRpcOperationContext,
-  ): Promise<{ ok: true }>;
+  ): Promise<DriverExternalToolEffectState>;
   handleReady(
     input: DriverReadyInput,
     context: DriverInstanceRpcOperationContext,
@@ -88,18 +91,18 @@ export function createDriverInstanceRpcContext(
     onClaimExternalToolEffect: async (input) =>
       handler.handleClaimExternalToolEffect(input, context),
     onCommandUpdate: async (input) => handler.handleCommandUpdate(input, context),
-    onCompleteExternalToolEffect: async (input) =>
-      handler.handleCompleteExternalToolEffect(input, context),
     onCompleteRun: async (input) => handler.handleCompleteRun(input, context),
     onFailRun: async (input) => handler.handleFailRun(input, context),
     onHeartbeat: async (input) => handler.handleHeartbeat(input, context),
     onHello: async (input) => handler.handleHello(input, context),
     onNextCommand: async (input) => handler.handleNextCommand(input, context),
+    onObserveExternalToolEffect: async (input) =>
+      handler.handleObserveExternalToolEffect(input, context),
     onPushEvents: async (input) => handler.handlePushEvents(input, context),
     onPushLogs: async (input) => handler.handlePushLogs(input, context),
-    onMarkExternalToolEffectUnknown: async (input) =>
-      handler.handleMarkExternalToolEffectUnknown(input, context),
     onReady: async (input) => handler.handleReady(input, context),
+    onSettleExternalToolEffect: async (input) =>
+      handler.handleSettleExternalToolEffect(input, context),
     onWatchCommands: () =>
       handler.watchCommands(context)[Symbol.asyncIterator]() as ReturnType<
         RuntimeOrpcContext["onWatchCommands"]

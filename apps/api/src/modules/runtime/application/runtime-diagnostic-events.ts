@@ -30,6 +30,7 @@ export interface RuntimeDiagnosticEventInput<
   TName extends RuntimeDiagnosticEventName = RuntimeDiagnosticEventName,
 > {
   eventName: TName;
+  sourceEventId?: string;
   value: RuntimeDiagnosticEventValue<TName>;
 }
 
@@ -76,11 +77,18 @@ export async function appendRuntimeDiagnosticEvent<TName extends RuntimeDiagnost
   input: {
     eventName: TName;
     sessionId: SessionId;
+    sourceEventId?: string;
     value: RuntimeDiagnosticEventValue<TName>;
   },
 ): Promise<boolean> {
   return appendRuntimeDiagnosticEvents(bindings, {
-    events: [{ eventName: input.eventName, value: input.value }],
+    events: [
+      {
+        eventName: input.eventName,
+        ...(input.sourceEventId === undefined ? {} : { sourceEventId: input.sourceEventId }),
+        value: input.value,
+      },
+    ],
     sessionId: input.sessionId,
   });
 }
@@ -104,6 +112,7 @@ export async function appendRuntimeDiagnosticEvents(
         createRuntimeDiagnosticSessionEvent({
           eventName: event.eventName,
           sessionId: input.sessionId,
+          ...(event.sourceEventId === undefined ? {} : { sourceEventId: event.sourceEventId }),
           value: event.value,
         }),
       ),
@@ -172,6 +181,7 @@ function createRuntimeDiagnosticSessionEvent<TName extends RuntimeDiagnosticEven
     origin: "system",
     payload: createRuntimeDiagnosticPayload(definition, input.value),
     sessionId: input.sessionId,
+    ...(input.sourceEventId === undefined ? {} : { sourceEventId: input.sourceEventId }),
     visibility: "owner_debug",
   });
 }

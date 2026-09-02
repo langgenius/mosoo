@@ -1,3 +1,5 @@
+export { ActiveAgentTasks } from "./active-agent-tasks";
+export type { AgentTaskView } from "./active-agent-tasks";
 export {
   SESSION_EVENT_DOMAIN_TONE,
   getSessionEventChipTone,

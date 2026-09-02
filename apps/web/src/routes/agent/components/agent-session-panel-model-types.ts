@@ -1,6 +1,6 @@
 import type { SessionLiveState, SessionRunView } from "@mosoo/ag-ui-session";
 import type { AgentReadiness } from "@mosoo/contracts/agent";
-import type { SessionSummary, SessionType } from "@mosoo/contracts/session";
+import type { AgentTask, SessionSummary, SessionType } from "@mosoo/contracts/session";
 import type { Dispatch, KeyboardEvent, RefObject, SetStateAction } from "react";
 
 import type { PermissionRequest } from "@/domains/runtime/use-session-stream";
@@ -38,6 +38,7 @@ export interface UseAgentSessionPanelModelInput {
 }
 
 export interface AgentSessionPanelModel {
+  activeTasks: AgentTask[];
   activeSession: SessionSummary | null;
   activeSessionId: string | null;
   cancel: () => Promise<void>;

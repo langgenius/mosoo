@@ -19,6 +19,7 @@ export type {
 } from "@ag-ui/core";
 export * from "./live-state";
 export * from "./live-state.reducer";
+export { applyToolCallUpdateToSessionLiveState } from "./live-state-message.reducer";
 export * from "./ag-ui-session-codec";
 export * from "./ag-ui-session-compaction";
 export * from "./ag-ui-session-events";

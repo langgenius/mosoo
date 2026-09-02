@@ -1,4 +1,1 @@
-export {
-  publishSessionViewerEvents,
-  syncSessionViewerState,
-} from "../infrastructure/session/client";
+export { syncSessionViewerState } from "../infrastructure/session/client";

@@ -28,6 +28,7 @@ import {
   createDriverInstanceRecord,
   markDriverInstanceFailedIfBootTokenMatches,
   recordRuntimeProcessStarted,
+  runtimeProvisioningDriverLaunchIsOwned,
 } from "../driver-instance/driver-instance-record.repository";
 import { relayDriverProcessLogs } from "../driver-process-log-relay";
 import { getNativeResumeRefForRuntime } from "../native-resume-ref.repository";
@@ -44,7 +45,10 @@ import {
   getLostPrewarmOwnershipError,
   usesInsertOnlyDriverRecord,
 } from "./runtime-driver-prewarm-ownership";
-import { stopProvisionProcess } from "./runtime-driver-process-cleanup";
+import {
+  startProvisionProcessWithOwnershipFence,
+  stopProvisionProcess,
+} from "./runtime-driver-process-cleanup";
 import {
   appendRuntimeEnvironmentInstallFailed,
   createRuntimeEnvironmentInstallState,
@@ -158,6 +162,7 @@ async function provisionDriver(
 
   const { driverInstanceId } = input;
   const processId = sanitizeProcessId(driverInstanceId);
+  const bootPayloadPath = `/tmp/.mosoo-driver-boot-${processId}.json`;
   const sandboxId = input.profile.sandbox.id;
   const runtimeEntry = getRuntimeCatalogEntry(input.runtime);
 
@@ -202,7 +207,11 @@ async function provisionDriver(
       mcpGrants: input.resolvedMcpServers.map(toDriverInstanceMcpGrantRecord),
       conflictStrategy: input.driverRecordConflictStrategy ?? "replace",
       runtime: input.runtime,
+      ...(input.runtimeProvisioningLease
+        ? { runtimeProvisioningLease: input.runtimeProvisioningLease }
+        : {}),
       sandboxId,
+      sandboxIncarnation: input.sandboxIncarnation,
       sandboxSessionId: input.sandboxSessionId,
     }),
   );
@@ -306,7 +315,6 @@ async function provisionDriver(
       sandboxId,
       traceparent,
     });
-    const bootPayloadPath = `${input.profile.session.homePath}/driver-boot-payload-${processId}.json`;
     const bootPayloadJson = JSON.stringify(bootPayload);
 
     const bootPayloadPreparedPromise = timing.measure("onBootPayloadPrepared", async () => {
@@ -329,15 +337,34 @@ async function provisionDriver(
     await timing.measure("writeBootPayload", () =>
       input.cloudflareSession.writeFile(bootPayloadPath, bootPayloadJson),
     );
+    const assertLaunchOwned = async (): Promise<void> => {
+      if (
+        input.runtimeProvisioningLease !== undefined &&
+        !(await runtimeProvisioningDriverLaunchIsOwned(env.DB, {
+          bootTokenHash: bootToken.hash,
+          driverGeneration: activeDriverGeneration,
+          driverInstanceId,
+          lease: input.runtimeProvisioningLease,
+        }))
+      ) {
+        throw new Error("Runtime Driver provisioning lost launch ownership.");
+      }
+    };
     const startedProcess = await timing.measure("startProcess", () =>
-      input.cloudflareSession.startProcess(AGENT_DRIVER_PROCESS_COMMAND, {
-        autoCleanup: true,
-        cwd: organizationPath,
-        env: {
-          [DRIVER_BOOT_PAYLOAD_FILE_ENV_NAME]: bootPayloadPath,
-          ...toRuntimeProcessProxyEnv(env, runtimeProfile.network.networkPolicy),
-        },
-        processId,
+      startProvisionProcessWithOwnershipFence({
+        assertOwned: assertLaunchOwned,
+        context: { driverInstanceId, sandboxId },
+        message: "runtime.driver.provision.late_process_cleanup_failed",
+        startProcess: () =>
+          input.cloudflareSession.startProcess(AGENT_DRIVER_PROCESS_COMMAND, {
+            autoCleanup: true,
+            cwd: organizationPath,
+            env: {
+              [DRIVER_BOOT_PAYLOAD_FILE_ENV_NAME]: bootPayloadPath,
+              ...toRuntimeProcessProxyEnv(env, runtimeProfile.network.networkPolicy),
+            },
+            processId,
+          }),
       }),
     );
     process = startedProcess;
@@ -363,6 +390,7 @@ async function provisionDriver(
         if (staleError !== null) {
           throw staleError;
         }
+        throw new Error("Runtime Driver process start lost durable ownership.");
       }
     });
     void processRecordPromise.catch(() => undefined);
@@ -431,6 +459,10 @@ async function provisionDriver(
         },
         message: "runtime.driver.provision.skipped_process_cleanup_failed",
         process,
+      });
+      await removeProvisionBootPayload(input.cloudflareSession, bootPayloadPath, {
+        driverInstanceId,
+        sandboxId,
       });
       disposeRpcResource(process);
       logInfo("runtime.driver.provision.skipped", {
@@ -503,6 +535,10 @@ async function provisionDriver(
       message: "runtime.driver.provision.process_cleanup_failed",
       process,
     });
+    await removeProvisionBootPayload(input.cloudflareSession, bootPayloadPath, {
+      driverInstanceId,
+      sandboxId,
+    });
 
     disposeRpcResource(process);
 
@@ -523,4 +559,18 @@ async function provisionDriver(
 
     throw error;
   }
+}
+
+async function removeProvisionBootPayload(
+  session: ProvisionDriverInput["cloudflareSession"],
+  path: string,
+  context: Record<string, unknown>,
+): Promise<void> {
+  await runBestEffortRuntimeCleanup({
+    context,
+    message: "runtime.driver.provision.boot_payload_cleanup_failed",
+    task: async () => {
+      await session.exec(`rm -f -- '${path}'`);
+    },
+  });
 }

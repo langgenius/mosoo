@@ -73,25 +73,27 @@ export async function prewarmAgentSessionRuntime(
     }
 
     const sandboxId = hydrated.value.profile.sandbox.id;
-    const { subject: sandbox } = await timing.measure("activateRuntimeSubject", () =>
-      createRuntimeSubjectLifecycleService(bindings).activate({
-        agentId: hydrated.value.profile.agentId,
-        executionOwnerUserId: hydrated.value.profile.session.origin.executionOwnerUserId,
-        kind: hydrated.value.profile.kind,
-        networkConstraints: resolveRuntimeSubjectNetworkConstraints(bindings, {
-          envVars: hydrated.value.profile.envVars,
+    const { incarnation: sandboxIncarnation, subject: sandbox } = await timing.measure(
+      "activateRuntimeSubject",
+      () =>
+        createRuntimeSubjectLifecycleService(bindings).activate({
+          agentId: hydrated.value.profile.agentId,
+          executionOwnerUserId: hydrated.value.profile.session.origin.executionOwnerUserId,
           kind: hydrated.value.profile.kind,
-          network: hydrated.value.profile.network,
-          requestUrl: request.requestUrl,
+          networkConstraints: resolveRuntimeSubjectNetworkConstraints(bindings, {
+            envVars: hydrated.value.profile.envVars,
+            kind: hydrated.value.profile.kind,
+            network: hydrated.value.profile.network,
+            requestUrl: request.requestUrl,
+            subjectKind: hydrated.value.profile.sandbox.subjectKind,
+          }),
+          runtimeSubjectId: sandboxId,
+          projectId: session.projectId,
+          purpose: "prewarm",
+          subjectId: hydrated.value.profile.sandbox.subjectId,
           subjectKind: hydrated.value.profile.sandbox.subjectKind,
+          timing,
         }),
-        runtimeSubjectId: sandboxId,
-        projectId: session.projectId,
-        purpose: "prewarm",
-        subjectId: hydrated.value.profile.sandbox.subjectId,
-        subjectKind: hydrated.value.profile.sandbox.subjectKind,
-        timing,
-      }),
     );
     handles.subject = sandbox;
 
@@ -103,6 +105,7 @@ export async function prewarmAgentSessionRuntime(
         origin: hydrated.value.profile.session.origin,
         sandbox,
         sandboxId,
+        sandboxIncarnation,
         sessionId: session.id,
         timing,
       }),
@@ -136,6 +139,7 @@ export async function prewarmAgentSessionRuntime(
         resolvedSkillCatalog: hydrated.value.skillCatalog,
         resolvedSkills: hydrated.value.skills,
         sandbox,
+        sandboxIncarnation,
         sandboxSessionId: session.id,
         sessionId: session.id,
       }),

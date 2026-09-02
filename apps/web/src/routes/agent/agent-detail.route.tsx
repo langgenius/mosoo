@@ -1,5 +1,5 @@
 import { ArrowLeft, Settings } from "lucide-react";
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useMemo, useState } from "react";
 import type { ReactElement } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
@@ -227,6 +227,7 @@ export function AgentDetailPage() {
   const { agentId } = useParams<{ agentId: string }>();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const settingsParam = searchParams.get("settings");
   const { activeProjectId } = useAppSession();
   const { user } = useAuth();
   const [selectedMode, setSelectedMode] = useState<DetailMode | null>(null);
@@ -255,6 +256,7 @@ export function AgentDetailPage() {
     viewerRole: detailQuery.data?.viewerRole ?? null,
   });
   const urlMode = toDetailMode(searchParams.get("tab") ?? searchParams.get("mode"));
+  const settingsOpen = showSettings || settingsParam === "1";
 
   const handleSelectMode = useCallback(
     (nextMode: DetailMode) => {
@@ -270,24 +272,6 @@ export function AgentDetailPage() {
     },
     [setSearchParams],
   );
-
-  // Allow other surfaces (e.g. the Agents list dropdown) to deep-link
-  // Straight into the settings sheet via `?settings=1`.
-  const settingsParam = searchParams.get("settings");
-  useEffect(() => {
-    if (settingsParam !== "1") {
-      return;
-    }
-    setShowSettings(true);
-    setSearchParams(
-      (current) => {
-        const nextParams = new URLSearchParams(current);
-        nextParams.delete("settings");
-        return nextParams;
-      },
-      { replace: true },
-    );
-  }, [settingsParam, setSearchParams]);
 
   // Default mode is Preview (config + test chat). Consume is still reachable
   // via `?tab=consume` (e.g. the post-publish success modal's "Open Chat" CTA),
@@ -407,12 +391,24 @@ export function AgentDetailPage() {
         )}
       </div>
 
-      {showSettings ? (
+      {settingsOpen ? (
         <Suspense fallback={null}>
           <SettingsSheet
             agent={agent}
-            open={showSettings}
-            onOpenChange={setShowSettings}
+            open={settingsOpen}
+            onOpenChange={(open) => {
+              setShowSettings(open);
+              if (!open && settingsParam === "1") {
+                setSearchParams(
+                  (current) => {
+                    const nextParams = new URLSearchParams(current);
+                    nextParams.delete("settings");
+                    return nextParams;
+                  },
+                  { replace: true },
+                );
+              }
+            }}
             canManageAccess={canManageAgentAccess}
           />
         </Suspense>

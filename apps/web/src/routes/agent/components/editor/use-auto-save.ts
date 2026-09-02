@@ -1,5 +1,5 @@
 import type { AgentConfigChangePlan } from "@mosoo/contracts/agent-config-change-plan";
-import { useEffect, useRef } from "react";
+import { useEffect, useEffectEvent, useRef } from "react";
 
 import type { AgentEditorModel } from "./use-model";
 
@@ -18,8 +18,7 @@ export function isAutoSaveEligible(changePlan: AgentConfigChangePlan): boolean {
 export function useAgentEditorAutoSave(model: AgentEditorModel): void {
   const { snapshotHash, dirty, saving, changePlan, readOnly, save } = model;
   const eligible = isAutoSaveEligible(changePlan);
-  const saveRef = useRef(save);
-  saveRef.current = save;
+  const saveLatestDraft = useEffectEvent(save);
   // Tracks the snapshot we last attempted to flush. A retry of the exact same
   // draft after a failure would just refire the same validation/network error,
   // so we wait for the user to type something else before trying again.
@@ -36,7 +35,7 @@ export function useAgentEditorAutoSave(model: AgentEditorModel): void {
 
     const timer = globalThis.setTimeout(() => {
       lastAttemptedHashRef.current = snapshotHash;
-      void saveRef.current();
+      void saveLatestDraft();
     }, AUTO_SAVE_DEBOUNCE_MS);
 
     return () => {

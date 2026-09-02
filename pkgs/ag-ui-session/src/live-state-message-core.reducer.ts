@@ -65,7 +65,14 @@ export function createSessionLiveStateMessage(input: {
   return createLiveStateMessage(input);
 }
 
-export function upsertMessage(
+export function agUiEventTimestampToIso(timestamp: number): string;
+export function agUiEventTimestampToIso(timestamp: undefined): undefined;
+export function agUiEventTimestampToIso(timestamp: number | undefined): string | undefined;
+export function agUiEventTimestampToIso(timestamp: number | undefined): string | undefined {
+  return timestamp === undefined ? undefined : new Date(timestamp).toISOString();
+}
+
+function upsertMessage(
   state: SessionLiveState,
   nextMessage: SessionLiveStateMessage,
 ): SessionLiveState {
@@ -82,4 +89,33 @@ export function upsertMessage(
     ...state,
     messages,
   });
+}
+
+export function replaceMessageText(
+  state: SessionLiveState,
+  input: {
+    content: string;
+    createdAt?: string;
+    id: string;
+    role: "assistant" | "user";
+  },
+): SessionLiveState {
+  const current = state.messages.find((message) => message.id === input.id);
+
+  return upsertMessage(
+    state,
+    current === undefined
+      ? createSessionLiveStateMessage(input)
+      : {
+          ...current,
+          content: input.content,
+          createdAt: current.segments.some(
+            (segment) => segment.kind === "tool_result" && segment.runId === current.id,
+          )
+            ? current.createdAt
+            : (input.createdAt ?? current.createdAt),
+          role: input.role,
+          segments: current.segments.filter((segment) => segment.kind !== "text"),
+        },
+  );
 }

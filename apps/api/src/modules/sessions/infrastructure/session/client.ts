@@ -15,6 +15,12 @@ function getSessionStub(env: ApiBindings, sessionId: SessionId): DurableObjectSt
   return binding.get(binding.idFromName(sessionId));
 }
 
+export interface SessionViewerEventBatch {
+  events: AgUiSessionEvent[];
+  previousRuntimeEventSeqCursor: number | null;
+  runtimeEventSeqCursor: number | null;
+}
+
 function createSessionDoRequest(sessionId: SessionId, path: string, init?: RequestInit): Request {
   const headers = new Headers(init?.headers);
   headers.set(SESSION_ID_HEADER, sessionId);
@@ -52,16 +58,19 @@ export async function connectSessionViewerWebSocket(
   );
 }
 
-export async function publishSessionViewerEvents(
+export async function publishSessionViewerEventBatches(
   env: ApiBindings,
   sessionId: SessionId | null,
-  events: AgUiSessionEvent[],
+  batches: SessionViewerEventBatch[],
 ): Promise<void> {
-  if (sessionId === null || sessionId === "" || events.length === 0) {
+  if (
+    sessionId === null ||
+    sessionId === "" ||
+    batches.every((batch) => batch.events.length === 0)
+  ) {
     return;
   }
-
-  await getSessionStub(env, sessionId).publishEvents(sessionId, events);
+  await getSessionStub(env, sessionId).publishEventBatches(sessionId, batches);
 }
 
 export async function connectSessionPublicEventWebSocket(

@@ -8,14 +8,12 @@ import {
 import { reconcileStaleActiveSessionRun } from "../../../runtime/application/session-runs/stale-run-reconciliation.service";
 import { getActiveProjectSessionParticipantAccess } from "../../domain/session-access.policy";
 import type { SessionLiveState } from "../session-live-state.types";
-import { loadViewerLiveState } from "./viewer-live-state";
+import { loadSessionViewerStateSnapshot } from "../session-viewer-live-snapshot.repository";
 import type { ViewerSocketAttachment } from "./viewer-socket";
 
 interface SendViewerSocketStateSyncOptions {
   attachment: ViewerSocketAttachment;
-  cachedState: SessionLiveState | null;
   database: D1Database;
-  getLatestCachedState(): SessionLiveState | null;
   updateLiveStateCache(state: SessionLiveState | null): void;
   ws: WebSocket;
 }
@@ -26,9 +24,7 @@ interface ViewerSocketStateSyncTarget {
 }
 
 interface SendViewerSocketStateSyncBatchOptions {
-  cachedState: SessionLiveState | null;
   database: D1Database;
-  getLatestCachedState(): SessionLiveState | null;
   sockets: ViewerSocketStateSyncTarget[];
   updateLiveStateCache(state: SessionLiveState | null): void;
 }
@@ -56,9 +52,7 @@ export async function sendViewerSocketStateSync(
   options: SendViewerSocketStateSyncOptions,
 ): Promise<void> {
   await sendViewerSocketStateSyncBatch({
-    cachedState: options.cachedState,
     database: options.database,
-    getLatestCachedState: options.getLatestCachedState,
     sockets: [
       {
         attachment: options.attachment,
@@ -73,7 +67,6 @@ export async function sendViewerSocketStateSyncBatch(
   options: SendViewerSocketStateSyncBatchOptions,
 ): Promise<void> {
   const groupedTargets = groupOpenViewerSockets(options.sockets);
-  let cachedState = options.cachedState;
   const reconciledStaleRunsBySessionId = new Map<SessionId, boolean>();
 
   for (const targets of groupedTargets.values()) {
@@ -97,28 +90,30 @@ export async function sendViewerSocketStateSyncBatch(
       throw error;
     }
 
-    cachedState ??= options.getLatestCachedState();
-    const reconciledStaleRun = await getReconciledStaleRun(
+    await getReconciledStaleRun(
       options.database,
       firstTarget.attachment.sessionId,
       reconciledStaleRunsBySessionId,
     );
-    const state = await loadViewerLiveState({
-      cachedState,
-      database: options.database,
-      reconciledStaleRun,
+    const snapshot = await loadSessionViewerStateSnapshot(options.database, {
       sessionId: firstTarget.attachment.sessionId,
-      viewer: firstTarget.attachment.viewer,
+      viewerId: firstTarget.attachment.viewer.id,
     });
-    const latestState = options.getLatestCachedState();
-    const stateToSend = latestState !== null && latestState !== cachedState ? latestState : state;
+    const stateToSend = snapshot.state;
     const frames = createStateSyncFrames(stateToSend);
 
     options.updateLiveStateCache(stateToSend);
-    cachedState = stateToSend;
 
     for (const target of targets) {
-      sendFrames(target.socket, frames);
+      try {
+        sendFrames(target.socket, frames);
+        target.socket.serializeAttachment({
+          ...target.attachment,
+          runtimeEventSeqCursor: snapshot.runtimeEventSeqCursor,
+        } satisfies ViewerSocketAttachment);
+      } catch {
+        closeOpenSocket(target.socket, 1011, "session.viewer.state-sync-failed");
+      }
     }
   }
 }

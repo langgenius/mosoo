@@ -1,5 +1,14 @@
+import { normalizeLibraryFilePath } from "@mosoo/contracts/file";
+
 export const RUNTIME_SESSION_OUTPUT_DIR_NAME = "outputs";
 export const RUNTIME_SESSION_OUTPUT_SCAN_MAX_FILES = 100;
+export const RUNTIME_SESSION_OUTPUT_MAX_FILE_BYTES = 8 * 1024 * 1024;
+export const RUNTIME_SESSION_OUTPUT_MAX_TOTAL_BYTES = 32 * 1024 * 1024;
+
+export interface RuntimeSessionOutputInventoryFile {
+  readonly relativePath: string;
+  readonly size: number;
+}
 
 export interface RuntimeSessionOutputFile {
   readonly artifactPath: string;
@@ -27,10 +36,6 @@ const contentTypesByExtension = new Map<string, string>([
   ["zip", "application/zip"],
 ]);
 
-function normalizeSandboxPath(value: string): string {
-  return value.trim().replaceAll("\\", "/").replace(/\/+$/, "");
-}
-
 function joinSandboxPath(parent: string, child: string): string {
   return `${parent.replace(/\/+$/, "")}/${child.replace(/^\/+/, "")}`;
 }
@@ -44,31 +49,12 @@ export function normalizeRuntimeSessionOutputRelativePath(value: unknown): strin
     return null;
   }
 
-  const normalizedPath = value.trim().replaceAll("\\", "/");
-
-  if (
-    normalizedPath.length === 0 ||
-    normalizedPath.includes("\0") ||
-    normalizedPath.startsWith("/")
-  ) {
+  try {
+    const normalizedPath = normalizeLibraryFilePath(value);
+    return normalizedPath === value ? normalizedPath : null;
+  } catch {
     return null;
   }
-
-  const segments: string[] = [];
-
-  for (const segment of normalizedPath.split("/")) {
-    if (segment.length === 0 || segment === ".") {
-      continue;
-    }
-
-    if (segment === "..") {
-      return null;
-    }
-
-    segments.push(segment);
-  }
-
-  return segments.length === 0 ? null : segments.join("/");
 }
 
 export function toRuntimeSessionOutputArtifactPath(relativePath: string): string {
@@ -91,18 +77,16 @@ export function toRuntimeSessionOutputFile(input: {
   readonly path: string;
 }): RuntimeSessionOutputFile | null {
   const outputDir = getRuntimeSessionOutputDirectory(input.cwd);
-  const normalizedPath = normalizeSandboxPath(input.path);
+  const normalizedPath = input.path;
   let relativePath: string | null;
 
   if (normalizedPath.startsWith("/")) {
-    const normalizedOutputDir = normalizeSandboxPath(outputDir);
-
-    if (!normalizedPath.startsWith(`${normalizedOutputDir}/`)) {
+    if (!normalizedPath.startsWith(`${outputDir}/`)) {
       return null;
     }
 
     relativePath = normalizeRuntimeSessionOutputRelativePath(
-      normalizedPath.slice(normalizedOutputDir.length + 1),
+      normalizedPath.slice(outputDir.length + 1),
     );
   } else {
     const normalizedRelativePath = normalizeRuntimeSessionOutputRelativePath(normalizedPath);
@@ -140,24 +124,41 @@ export function toRuntimeSessionOutputFile(input: {
   };
 }
 
-export function readRuntimeSessionOutputListing(stdout: string): string[] {
+export function readRuntimeSessionOutputInventory(
+  stdout: string,
+): RuntimeSessionOutputInventoryFile[] {
+  const files: RuntimeSessionOutputInventoryFile[] = [];
   const seen = new Set<string>();
-  const paths: string[] = [];
+  const fields = stdout.split("\0");
 
-  for (const line of stdout.split("\n")) {
-    const normalizedPath = normalizeRuntimeSessionOutputRelativePath(line);
-
-    if (normalizedPath === null || seen.has(normalizedPath)) {
-      continue;
-    }
-
-    seen.add(normalizedPath);
-    paths.push(normalizedPath);
-
-    if (paths.length >= RUNTIME_SESSION_OUTPUT_SCAN_MAX_FILES) {
-      break;
-    }
+  if (fields.at(-1) === "") {
+    fields.pop();
+  }
+  if (fields.length % 2 !== 0) {
+    throw new Error("Runtime output inventory is invalid.");
   }
 
-  return paths;
+  for (let index = 0; index < fields.length; index += 2) {
+    const inventoryPath = fields[index];
+    const relativePath = inventoryPath?.startsWith("./")
+      ? normalizeRuntimeSessionOutputRelativePath(inventoryPath.slice(2))
+      : null;
+    const sizeText = fields[index + 1];
+    const size = Number(sizeText);
+
+    if (
+      relativePath === null ||
+      seen.has(relativePath) ||
+      !/^\d+$/.test(sizeText ?? "") ||
+      !Number.isSafeInteger(size) ||
+      size < 0
+    ) {
+      throw new Error("Runtime output inventory is invalid.");
+    }
+
+    seen.add(relativePath);
+    files.push({ relativePath, size });
+  }
+
+  return files;
 }
