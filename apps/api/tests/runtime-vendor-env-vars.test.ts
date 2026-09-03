@@ -469,6 +469,11 @@ describe("runtime vendor proxy env vars", () => {
         small_model: `${providerId}/${model}`,
         provider: {
           [providerId]: {
+            models: {
+              [model]: {
+                name: model,
+              },
+            },
             name,
             npm,
             options: {
@@ -543,6 +548,37 @@ describe("runtime vendor proxy env vars", () => {
           options: {
             apiKey: "{env:OPENAI_COMPATIBLE_API_KEY}",
             baseURL: PROXY_URL,
+          },
+        },
+      },
+    });
+  });
+
+  test("declares the selected custom OpenCode model for an unrestricted credential", async () => {
+    const envVars = await buildVendorProxyEnvVars({
+      bindings: BINDINGS,
+      driverGeneration: DRIVER_GENERATION,
+      driverInstanceId: DRIVER_INSTANCE_ID,
+      profile: {
+        model: "deepseek-v4-flash",
+        runtimeId: "acp-fallback",
+        vendorCredential: vendorCredential({
+          apiBase: "https://api.deepseek.com",
+          vendorId: "openai-compatible",
+        }),
+      },
+      requestUrl: REQUEST_URL,
+    });
+
+    expect(parseOpenCodeConfig(envVars)).toMatchObject({
+      enabled_providers: ["openai-compatible"],
+      model: "openai-compatible/deepseek-v4-flash",
+      provider: {
+        "openai-compatible": {
+          models: {
+            "deepseek-v4-flash": {
+              name: "deepseek-v4-flash",
+            },
           },
         },
       },
