@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import { Download, FileStack, RefreshCw } from "lucide-react";
 import type { ReactElement } from "react";
 import { useMemo, useState } from "react";
 
@@ -15,6 +14,7 @@ import { cn } from "@/shared/lib/class-names";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { EmptyState } from "@/shared/ui/empty-state";
+import { Download, FileStack, RefreshCw } from "@/shared/ui/icons";
 import {
   ListPageContent,
   ListPageSearch,

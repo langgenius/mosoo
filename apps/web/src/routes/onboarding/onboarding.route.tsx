@@ -1,9 +1,9 @@
 import { sleepPromise } from "@mosoo/effects";
-import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useReducer } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useTranslation } from "@/shared/i18n";
+import { Loader2 } from "@/shared/ui/icons";
 
 import { captureProductEvent, PRODUCT_ANALYTICS_EVENTS } from "../../analytics/product-analytics";
 import { useAppSession } from "../../app/session-provider";

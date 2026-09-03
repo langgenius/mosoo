@@ -45,6 +45,13 @@ Fixed rem scale (not fluid in product UI): `--fs-12 … --fs-64`. Line heights
 `.t-body/.t-body-sm/.t-caption/.t-micro/.t-eyebrow/.t-mono/.t-link`. Base body is
 `--fs-15` / weight 500 with `ss01`. Product headings stay fixed.
 
+## Icons
+
+Generic interface glyphs use Hugeicons Free through `src/shared/ui/icons.tsx`, with
+`currentColor` and a 1.5px stroke by default. Use its semantic exports rather than
+importing an icon library at a route. Brand marks, provider/channel logos, favicons,
+and product illustrations remain owned assets rather than UI glyphs.
+
 ## Spacing & Radius
 
 Spacing scale `--s-1 (4px) … --s-24 (96px)`. Radius `--r-xs 4 / -sm 6 / -md 10 / -lg 14

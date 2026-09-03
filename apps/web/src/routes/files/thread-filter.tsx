@@ -1,4 +1,3 @@
-import { Check, ChevronDown, Copy } from "lucide-react";
 import type { MouseEvent, ReactElement } from "react";
 import { useState } from "react";
 
@@ -11,6 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu";
+import { Check, ChevronDown, Copy } from "@/shared/ui/icons";
 
 import type { FilesAgentOption, FilesSessionOption } from "./files-list-model";
 

@@ -1,4 +1,3 @@
-import { Inbox, Plus } from "lucide-react";
 import { useCallback, useMemo } from "react";
 import type { ReactElement } from "react";
 
@@ -7,6 +6,7 @@ import type { ListedFileEntry } from "@/domains/file/api/files";
 import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import { EmptyState } from "@/shared/ui/empty-state";
+import { Inbox, Plus } from "@/shared/ui/icons";
 import { ListPageContent, ListPageToolbar, ListPageToolbarSpacer } from "@/shared/ui/list-page";
 import { PageHeader } from "@/shared/ui/page-header";
 

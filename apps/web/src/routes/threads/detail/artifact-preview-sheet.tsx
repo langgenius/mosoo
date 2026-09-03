@@ -1,4 +1,3 @@
-import { Download } from "lucide-react";
 import type { ReactElement } from "react";
 
 import { createFileDownload } from "@/domains/file/api/file-download-client";
@@ -6,6 +5,7 @@ import type { ListedFileEntry } from "@/domains/file/api/files";
 import { FilePreviewContent, formatFileSize } from "@/features/file-preview/file-preview-content";
 import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
+import { Download } from "@/shared/ui/icons";
 import { Sheet, SheetContent, SheetTitle } from "@/shared/ui/sheet";
 
 export function ArtifactPreviewSheet({

@@ -1,4 +1,3 @@
-import { ArrowUpRight, BookOpen, Search } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 
 import { HELP_DOCS, HELP_DOCS_HOME_URL, searchHelpDocs } from "@/shared/config/help-docs";
@@ -12,6 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/shared/ui/dialog";
+import { ArrowUpRight, BookOpen, Search } from "@/shared/ui/icons";
 import { Input } from "@/shared/ui/input";
 import { ScrollArea } from "@/shared/ui/scroll-area";
 

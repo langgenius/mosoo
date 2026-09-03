@@ -1,5 +1,4 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Copy, Download, MoreHorizontal, Pencil, Settings, Trash2 } from "lucide-react";
 import { useState } from "react";
 import type { ReactElement } from "react";
 import { useNavigate } from "react-router-dom";
@@ -24,6 +23,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu";
+import { Copy, Download, MoreHorizontal, Pencil, Settings, Trash2 } from "@/shared/ui/icons";
 
 import type { Agent } from "../agent.types";
 

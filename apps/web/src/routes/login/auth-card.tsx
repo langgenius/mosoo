@@ -1,8 +1,8 @@
-import { Loader2 } from "lucide-react";
 import type { CSSProperties, ReactElement } from "react";
 
 import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
+import { Loader2 } from "@/shared/ui/icons";
 import { Input } from "@/shared/ui/input";
 import { Separator } from "@/shared/ui/separator";
 

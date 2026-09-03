@@ -1,8 +1,8 @@
 import { Select as SelectPrimitive } from "@base-ui/react/select";
-import { Check, ChevronDown } from "lucide-react";
 import type { ComponentProps, ReactElement } from "react";
 
 import { cn } from "@/shared/lib/class-names";
+import { Check, ChevronDown } from "@/shared/ui/icons";
 
 function Select<Value>({
   modal = false,

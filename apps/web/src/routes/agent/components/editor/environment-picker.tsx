@@ -1,6 +1,5 @@
 import { Popover } from "@base-ui/react/popover";
 import type { EnvironmentSummary } from "@mosoo/contracts/environment";
-import { Box, Check, ExternalLink, Plus, Star } from "lucide-react";
 import { useState } from "react";
 import type { ReactElement } from "react";
 import { Link } from "react-router-dom";
@@ -9,6 +8,7 @@ import { CreateEnvironmentDialog } from "@/domains/environment/components/create
 import { useProjectEnvironmentsQuery } from "@/domains/environment/query/environment-queries";
 import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
+import { Box, Check, ExternalLink, Plus, Star } from "@/shared/ui/icons";
 import { Label } from "@/shared/ui/label";
 
 import {

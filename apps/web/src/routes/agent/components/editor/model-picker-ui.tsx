@@ -1,4 +1,3 @@
-import { ExternalLink } from "lucide-react";
 import type { ReactElement } from "react";
 import { Link } from "react-router-dom";
 
@@ -10,6 +9,7 @@ import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Badge } from "@/shared/ui/badge";
 import { DropdownMenuItem } from "@/shared/ui/dropdown-menu";
+import { ExternalLink } from "@/shared/ui/icons";
 
 import type { ResolvedModelEntry } from "../../../../domains/vendor-credential/api/vendor-credential-client";
 

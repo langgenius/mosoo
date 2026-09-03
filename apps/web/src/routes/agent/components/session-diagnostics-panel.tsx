@@ -1,11 +1,11 @@
 import type { SessionSummary } from "@mosoo/contracts/session";
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from "lucide-react";
 import type { ReactElement } from "react";
 import { useState } from "react";
 
 import type { AgentSessionDiagnosticsQuery } from "@/gql/graphql";
 import { useTranslation } from "@/shared/i18n";
 import { Badge } from "@/shared/ui/badge";
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from "@/shared/ui/icons";
 import { ScrollArea } from "@/shared/ui/scroll-area";
 
 type AgentSessionDiagnostics = AgentSessionDiagnosticsQuery["agentSessionDiagnostics"];

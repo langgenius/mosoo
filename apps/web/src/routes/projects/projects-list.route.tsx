@@ -1,6 +1,5 @@
 import type { ProjectSummary } from "@mosoo/contracts/project";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ChevronRight, Plus, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -11,6 +10,7 @@ import { projectKeys } from "@/domains/project/query/project-queries";
 import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
+import { ChevronRight, Plus, Search } from "@/shared/ui/icons";
 import { Input } from "@/shared/ui/input";
 import { ProjectIdBadge } from "@/shared/ui/project-id-badge";
 

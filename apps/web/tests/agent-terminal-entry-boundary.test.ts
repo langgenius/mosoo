@@ -11,7 +11,6 @@ describe("Agent terminal entry boundary", () => {
     const terminalButtonIndex = source.indexOf('aria-label={t("agent.openTerminal")}');
     const gatedEntryIndex = source.lastIndexOf("canUseTerminal &&", terminalButtonIndex);
 
-    expect(source).toContain('import { ArrowLeft, Settings } from "lucide-react";');
     expect(source).not.toContain("TerminalSquare");
     expect(terminalButtonIndex).toBeGreaterThan(-1);
     expect(gatedEntryIndex).toBeGreaterThan(-1);

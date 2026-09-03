@@ -1,6 +1,5 @@
 import type { ProjectId } from "@mosoo/contracts/id";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { FormEvent, ReactElement } from "react";
 import { useNavigate } from "react-router-dom";
@@ -13,6 +12,7 @@ import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
+import { Loader2 } from "@/shared/ui/icons";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 

@@ -1,7 +1,6 @@
 import { PUBLIC_VENDORS, getVendor } from "@mosoo/runtime-catalog";
 import type { RuntimeCatalogVendor } from "@mosoo/runtime-catalog";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Pencil, Plus, Trash2 } from "lucide-react";
 import type { ReactElement } from "react";
 import { useId, useMemo, useState } from "react";
 
@@ -29,6 +28,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/shared/ui/dialog";
+import { Pencil, Plus, Trash2 } from "@/shared/ui/icons";
 import { Input } from "@/shared/ui/input";
 import { PageHeader } from "@/shared/ui/page-header";
 

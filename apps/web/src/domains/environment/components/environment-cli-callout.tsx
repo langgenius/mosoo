@@ -1,9 +1,9 @@
-import { Terminal } from "lucide-react";
 import type { ReactElement } from "react";
 
 import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { CommandBlock } from "@/shared/ui/command-block";
+import { Terminal } from "@/shared/ui/icons";
 
 export const ENVIRONMENT_CLI_CREATE_COMMAND = "mosoo console environments create-environment";
 

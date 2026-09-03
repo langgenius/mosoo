@@ -1,15 +1,4 @@
 import type { SkillsShCatalogSkill, SkillsShCatalogView } from "@mosoo/contracts/skill";
-import {
-  ArrowLeft,
-  ArrowRight,
-  Check,
-  ExternalLink,
-  Flame,
-  Info,
-  RefreshCw,
-  TrendingUp,
-} from "lucide-react";
-import type { LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useReducer, useState } from "react";
 
 import { useSkillsShCatalogQuery } from "@/domains/skill/query/skill-queries";
@@ -26,6 +15,17 @@ import {
   DialogTitle,
 } from "@/shared/ui/dialog";
 import { EmptyState } from "@/shared/ui/empty-state";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  ExternalLink,
+  Flame,
+  Info,
+  RefreshCw,
+  TrendingUp,
+} from "@/shared/ui/icons";
+import type { AppIcon } from "@/shared/ui/icons";
 import { Switch } from "@/shared/ui/switch";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 
@@ -502,7 +502,7 @@ function CatalogViewButton({
   onClick,
 }: {
   active: boolean;
-  icon: LucideIcon;
+  icon: AppIcon;
   label: string;
   onClick: () => void;
 }) {

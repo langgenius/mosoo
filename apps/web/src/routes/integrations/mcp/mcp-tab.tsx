@@ -1,9 +1,9 @@
-import { Plus, Search, Zap } from "lucide-react";
 import { Fragment, useMemo, useReducer } from "react";
 
 import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import { EmptyState } from "@/shared/ui/empty-state";
+import { Plus, Search, Zap } from "@/shared/ui/icons";
 import { Input } from "@/shared/ui/input";
 import { PageHeader } from "@/shared/ui/page-header";
 

@@ -1,7 +1,7 @@
-import { Check } from "lucide-react";
 import type { ReactElement } from "react";
 
 import { useTranslation } from "@/shared/i18n";
+import { Check } from "@/shared/ui/icons";
 
 type TestConnectionState = "failure" | "idle" | "running" | "success";
 

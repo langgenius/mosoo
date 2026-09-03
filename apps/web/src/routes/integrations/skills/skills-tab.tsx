@@ -1,11 +1,11 @@
-import { Compass, Library, Search, Sparkles, Upload } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
 import { EmptyState } from "@/shared/ui/empty-state";
+import { Compass, Library, Search, Sparkles, Upload } from "@/shared/ui/icons";
+import type { AppIcon } from "@/shared/ui/icons";
 import { Input } from "@/shared/ui/input";
 import { PageHeader } from "@/shared/ui/page-header";
 
@@ -206,7 +206,7 @@ function SkillsModeButton({
   onClick,
 }: {
   active: boolean;
-  icon: LucideIcon;
+  icon: AppIcon;
   label: string;
   onClick: () => void;
 }) {

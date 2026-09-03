@@ -1,10 +1,10 @@
 import { ActionBarPrimitive, MessagePrimitive, useAuiState } from "@assistant-ui/react";
 import type { ReasoningMessagePartComponent, TextMessagePartComponent } from "@assistant-ui/react";
-import { ChevronRight, Copy } from "lucide-react";
 import type { ReactElement } from "react";
 import { useState } from "react";
 
 import { useTranslation } from "@/shared/i18n";
+import { ChevronRight, Copy } from "@/shared/ui/icons";
 import { Markdown } from "@/shared/ui/markdown";
 
 import { SessionToolPart } from "./session-tool-part";

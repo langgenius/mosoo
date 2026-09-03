@@ -3,12 +3,12 @@ import type { AgentBuiltInToolConfig } from "@mosoo/contracts/agent";
 import { normalizeAgentBuiltInTools } from "@mosoo/contracts/agent";
 import type { RuntimeAdvancedSettingDefinition } from "@mosoo/runtime-catalog";
 import { listRuntimeAdvancedSettings } from "@mosoo/runtime-catalog";
-import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 import type { ReactElement } from "react";
 
 import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
+import { ChevronDown } from "@/shared/ui/icons";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 

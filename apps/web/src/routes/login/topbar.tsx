@@ -1,9 +1,9 @@
 import { MOSOO_MARKETING_ORIGIN } from "@mosoo/contracts/origin";
-import { ArrowLeft } from "lucide-react";
 import type { ReactElement } from "react";
 
 import { useTranslation } from "@/shared/i18n";
 import { LocaleSwitcher } from "@/shared/i18n/locale-switcher";
+import { ArrowLeft } from "@/shared/ui/icons";
 
 function Brand(): ReactElement {
   return (

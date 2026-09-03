@@ -1,5 +1,3 @@
-import { MoreHorizontal, Pencil, Power, PowerOff, Trash2, Unplug } from "lucide-react";
-
 import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
@@ -10,6 +8,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu";
+import { MoreHorizontal, Pencil, Power, PowerOff, Trash2, Unplug } from "@/shared/ui/icons";
 
 import { authTypeLabel, statusText } from "./format";
 import { IconAvatar } from "./icon-avatar";

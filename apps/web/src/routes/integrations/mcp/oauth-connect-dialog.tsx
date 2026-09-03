@@ -1,5 +1,4 @@
 import type { McpOAuthFlowState, StartMcpOAuthPayload } from "@mosoo/contracts/mcp";
-import { Check, ExternalLink, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useTranslation } from "@/shared/i18n";
@@ -12,6 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/shared/ui/dialog";
+import { Check, ExternalLink, Loader2 } from "@/shared/ui/icons";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 

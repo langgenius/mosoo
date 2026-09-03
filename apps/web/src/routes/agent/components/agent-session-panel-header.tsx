@@ -1,10 +1,10 @@
-import { Plus, RotateCcw } from "lucide-react";
 import type React from "react";
 
 import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
+import { Plus, RotateCcw } from "@/shared/ui/icons";
 
 import type { SessionControlMode } from "./agent-session-panel-rules";
 import { sessionIndicatorClassName } from "./agent-session-panel-status";

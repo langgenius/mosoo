@@ -1,6 +1,5 @@
 import type { SessionSummary } from "@mosoo/contracts/session";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, ChevronRight } from "lucide-react";
 import type { ComponentProps, ReactElement } from "react";
 import { useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -15,6 +14,7 @@ import { getCurrentLocale, useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
+import { ArrowLeft, ChevronRight } from "@/shared/ui/icons";
 import { ScrollArea } from "@/shared/ui/scroll-area";
 import { SessionEventFeed } from "@/shared/ui/session-events";
 

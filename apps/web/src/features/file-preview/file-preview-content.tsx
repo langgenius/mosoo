@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import { Download, FileQuestion, LoaderCircle } from "lucide-react";
 import type { ReactElement } from "react";
 
 import { createFileDownload, readFileText } from "@/domains/file/api/file-download-client";
@@ -7,6 +6,7 @@ import { fileKeys } from "@/domains/file/api/files";
 import type { ListedFileEntry } from "@/domains/file/api/files";
 import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
+import { Download, FileQuestion, LoaderCircle } from "@/shared/ui/icons";
 import { StaticMarkdown } from "@/shared/ui/static-markdown";
 
 import {

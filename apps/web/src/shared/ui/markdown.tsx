@@ -1,4 +1,3 @@
-import { FileText } from "lucide-react";
 import { useMemo } from "react";
 import type { ComponentProps, ReactElement } from "react";
 import { Streamdown, defaultRehypePlugins } from "streamdown";
@@ -6,6 +5,7 @@ import type { Components } from "streamdown";
 
 import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
+import { FileText } from "@/shared/ui/icons";
 
 interface MarkdownProps {
   children: string;

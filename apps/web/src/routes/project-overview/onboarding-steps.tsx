@@ -1,4 +1,3 @@
-import { ArrowUpRight, Check, ChevronRight } from "lucide-react";
 import type { ReactElement } from "react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
@@ -10,6 +9,7 @@ import { writeClipboardText } from "@/shared/lib/clipboard";
 import { Badge } from "@/shared/ui/badge";
 import { RuntimeIcon } from "@/shared/ui/brand-icons";
 import { CopyCheckIcon } from "@/shared/ui/copy-check-icon";
+import { ArrowUpRight, Check, ChevronRight } from "@/shared/ui/icons";
 
 import { buildOnboardingSetupPrompt } from "./onboarding-setup-prompt";
 import { useOnboardingProgress } from "./use-onboarding-progress";

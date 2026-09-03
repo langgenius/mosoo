@@ -1,5 +1,4 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Lock, Star } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -22,6 +21,7 @@ import {
 import { toEnvironmentId, toProjectId } from "@/routes/typed-id";
 import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
+import { Lock, Star } from "@/shared/ui/icons";
 
 import { isTruthy } from "../../shared/lib/truthiness";
 import { EnvironmentBadges } from "./environment-badges";

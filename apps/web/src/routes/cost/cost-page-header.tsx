@@ -1,8 +1,7 @@
-import { Download } from "lucide-react";
-
 import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
+import { Download } from "@/shared/ui/icons";
 
 import { downloadCsv } from "./cost-csv";
 import {

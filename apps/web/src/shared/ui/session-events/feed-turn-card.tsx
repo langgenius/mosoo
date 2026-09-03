@@ -1,10 +1,10 @@
 import type { SessionProcessEvent } from "@mosoo/contracts/session";
-import { ChevronRight, Clock3 } from "lucide-react";
 import type { ReactElement } from "react";
 
 import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
+import { ChevronRight, Clock3 } from "@/shared/ui/icons";
 
 import {
   getSessionEventChipTone,

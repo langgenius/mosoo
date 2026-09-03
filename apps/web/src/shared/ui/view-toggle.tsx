@@ -1,8 +1,8 @@
-import { Grid2X2, List } from "lucide-react";
 import type { ReactElement } from "react";
 
 import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
+import { Grid2X2, List } from "@/shared/ui/icons";
 
 type ViewMode = "list" | "grid";
 

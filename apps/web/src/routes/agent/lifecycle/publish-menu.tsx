@@ -1,4 +1,3 @@
-import { Check, ChevronDown, Code, Copy, Inbox, Upload } from "lucide-react";
 import type { ReactElement } from "react";
 import { useMemo, useState } from "react";
 
@@ -13,6 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu";
+import { Check, ChevronDown, Code, Copy, Inbox, Upload } from "@/shared/ui/icons";
 
 import type { Agent } from "../agent.types";
 import { buildAgentDistribution, buildAgentInstructionPrompt } from "./distribution-info";

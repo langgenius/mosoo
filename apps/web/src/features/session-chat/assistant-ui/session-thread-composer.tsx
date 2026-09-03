@@ -1,5 +1,4 @@
 import { ComposerPrimitive, ThreadPrimitive } from "@assistant-ui/react";
-import { ArrowUp, FileText, Paperclip } from "lucide-react";
 import type React from "react";
 import type { ReactElement } from "react";
 
@@ -8,6 +7,7 @@ import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { isTruthy } from "@/shared/lib/truthiness";
 import { Button } from "@/shared/ui/button";
+import { ArrowUp, FileText, Paperclip } from "@/shared/ui/icons";
 
 import type { SessionResourceMention } from "../session-resource-mentions";
 

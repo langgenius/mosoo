@@ -1,11 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
-import { BarChart3 } from "lucide-react";
 import { useState } from "react";
 
 import { fetchProjectCost } from "@/domains/cost/api/cost-client";
 import type { CostRunPurpose } from "@/domains/cost/api/cost-client";
 import { toProjectId } from "@/routes/typed-id";
 import { useTranslation } from "@/shared/i18n";
+import { BarChart3 } from "@/shared/ui/icons";
 
 import { useAppSession } from "../../app/session-provider";
 import { CostAgentsPanel } from "./cost-agents-panel";

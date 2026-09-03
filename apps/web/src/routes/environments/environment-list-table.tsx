@@ -1,5 +1,4 @@
 import type { EnvironmentSummary } from "@mosoo/contracts/environment";
-import { GitFork, MoreHorizontal, Trash2 } from "lucide-react";
 import { useState } from "react";
 import type { ReactElement } from "react";
 import { Link } from "react-router-dom";
@@ -22,6 +21,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu";
+import { GitFork, MoreHorizontal, Trash2 } from "@/shared/ui/icons";
 
 import { EnvironmentBadges } from "./environment-badges";
 
