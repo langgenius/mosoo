@@ -1,4 +1,3 @@
-import { Check, Copy } from "lucide-react";
 import type { MouseEvent, ReactElement } from "react";
 import { useState } from "react";
 
@@ -6,6 +5,7 @@ import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { writeClipboardText } from "@/shared/lib/clipboard";
 import { Button } from "@/shared/ui/button";
+import { Check, Copy } from "@/shared/ui/icons";
 
 export function ProjectIdBadge({
   projectId,

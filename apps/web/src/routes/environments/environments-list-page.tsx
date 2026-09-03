@@ -1,5 +1,4 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Box, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { useAppSession } from "@/app/session-provider";
@@ -17,6 +16,7 @@ import { toEnvironmentId, toProjectId } from "@/routes/typed-id";
 import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import { EmptyState } from "@/shared/ui/empty-state";
+import { Box, Plus } from "@/shared/ui/icons";
 import { ListPageContent, ListPageSearch, ListPageToolbar } from "@/shared/ui/list-page";
 import { PageHeader } from "@/shared/ui/page-header";
 

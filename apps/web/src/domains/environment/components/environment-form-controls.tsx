@@ -2,7 +2,6 @@ import type {
   EnvironmentNetworkPolicy,
   EnvironmentPackageManager,
 } from "@mosoo/contracts/environment";
-import { Check, ChevronDown } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { useTranslation } from "@/shared/i18n";
@@ -12,6 +11,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu";
+import { Check, ChevronDown } from "@/shared/ui/icons";
 
 import { isTruthy } from "../../../shared/lib/truthiness";
 import {

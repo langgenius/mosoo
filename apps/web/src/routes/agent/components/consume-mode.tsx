@@ -1,9 +1,9 @@
-import { ArrowLeft, Settings } from "lucide-react";
 import type { ReactElement } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
+import { ArrowLeft, Settings } from "@/shared/ui/icons";
 
 import type { Agent } from "../agent.types";
 import { getRuntimeInfo } from "../runtime-catalog";

@@ -1,5 +1,4 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Copy, Download, Upload } from "lucide-react";
 import type { ReactElement } from "react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -10,6 +9,7 @@ import { createFileDownload } from "@/domains/file/api/file-download-client";
 import { toAgentId, toProjectId } from "@/routes/typed-id";
 import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
+import { Copy, Download, Upload } from "@/shared/ui/icons";
 
 import type { Agent } from "../agent.types";
 import { ImportAgentPackageDialog } from "./import-agent-package-dialog";

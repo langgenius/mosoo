@@ -3,11 +3,20 @@ import {
   listAgentKindRuntimePolicies,
 } from "@mosoo/contracts/agent";
 import type { AgentKind } from "@mosoo/contracts/agent";
-import { ChevronDown, Bot, Zap, Lock, Sparkles, Layers, AlertTriangle, Target } from "lucide-react";
 import { useState } from "react";
 
 import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
+import {
+  ChevronDown,
+  Bot,
+  Zap,
+  Lock,
+  Sparkles,
+  Layers,
+  AlertTriangle,
+  Target,
+} from "@/shared/ui/icons";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 
 const CARDS = listAgentKindRuntimePolicies();

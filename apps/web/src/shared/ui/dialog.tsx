@@ -1,10 +1,10 @@
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
-import { XIcon } from "lucide-react";
 import type { ComponentProps, ReactElement } from "react";
 
 import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
+import { XIcon } from "@/shared/ui/icons";
 
 function Dialog({ ...props }: ComponentProps<typeof DialogPrimitive.Root>): ReactElement {
   return <DialogPrimitive.Root {...props} />;

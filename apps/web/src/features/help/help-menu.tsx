@@ -1,8 +1,8 @@
-import { HelpCircle } from "lucide-react";
 import { lazy, Suspense, useEffect, useState } from "react";
 
 import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
+import { HelpCircle } from "@/shared/ui/icons";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 
 // Loaded on demand the first time Help is opened. The dialog drags in the Radix

@@ -1,9 +1,9 @@
 import { isWritableEnvironmentPackageManager } from "@mosoo/contracts/environment";
-import { Check, Plus, Trash2 } from "lucide-react";
 
 import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
+import { Check, Plus, Trash2 } from "@/shared/ui/icons";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { Switch } from "@/shared/ui/switch";

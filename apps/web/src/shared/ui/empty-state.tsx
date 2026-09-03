@@ -1,7 +1,7 @@
-import type { LucideIcon } from "lucide-react";
 import type { ReactElement, ReactNode } from "react";
 
 import { cn } from "@/shared/lib/class-names";
+import type { AppIcon } from "@/shared/ui/icons";
 
 export function EmptyState({
   icon: Icon,
@@ -11,7 +11,7 @@ export function EmptyState({
   children,
   className,
 }: {
-  icon: LucideIcon;
+  icon: AppIcon;
   title: ReactNode;
   description?: ReactNode;
   action?: ReactNode;

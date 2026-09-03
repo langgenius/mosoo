@@ -1,4 +1,3 @@
-import { FileQuestion } from "lucide-react";
 import { lazy } from "react";
 import type { ComponentType, ReactElement, ReactNode } from "react";
 import { Link, Navigate, useParams, useRoutes } from "react-router-dom";
@@ -7,6 +6,7 @@ import type { RouteObject } from "react-router-dom";
 import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import { EmptyState } from "@/shared/ui/empty-state";
+import { FileQuestion } from "@/shared/ui/icons";
 
 import { GuestRoute, OnboardingRoute, ProtectedRoute } from "./route-guards";
 

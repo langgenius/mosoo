@@ -1,4 +1,3 @@
-import { Check, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { useAppSession } from "@/app/session-provider";
@@ -7,6 +6,7 @@ import { useTranslation } from "@/shared/i18n";
 import { isTruthy } from "@/shared/lib/truthiness";
 import { Button } from "@/shared/ui/button";
 import { CommandBlock } from "@/shared/ui/command-block";
+import { Check, Loader2 } from "@/shared/ui/icons";
 
 // Org-layer General settings — the account/billing shell's identity.
 export function OrgSettingsPage() {

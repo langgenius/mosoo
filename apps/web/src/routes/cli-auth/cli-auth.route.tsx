@@ -1,10 +1,10 @@
-import { AlertCircle, CheckCircle2, KeyRound, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { confirmCliOAuthDeviceFlow } from "@/domains/auth/api/cli-oauth-client";
 import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
+import { AlertCircle, CheckCircle2, KeyRound, Loader2 } from "@/shared/ui/icons";
 
 export function CliAuthPage() {
   const { t } = useTranslation();

@@ -1,5 +1,4 @@
 import type { SessionProcessEvent } from "@mosoo/contracts/session";
-import { ChevronRight } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { ReactElement } from "react";
 
@@ -14,6 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/shared/ui/dialog";
+import { ChevronRight } from "@/shared/ui/icons";
 
 import {
   getSessionEventChipTone,

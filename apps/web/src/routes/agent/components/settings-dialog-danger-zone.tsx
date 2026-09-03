@@ -1,6 +1,5 @@
 import { agentKindSupportsResetState } from "@mosoo/contracts/agent";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { LockKeyhole, PowerOff, RotateCcw, Trash2, XCircle } from "lucide-react";
 import { useState } from "react";
 
 import { resetAgentState, unpublishAgent } from "@/domains/agent/api/agent-client";
@@ -15,6 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/shared/ui/dialog";
+import { LockKeyhole, PowerOff, RotateCcw, Trash2, XCircle } from "@/shared/ui/icons";
 import { Input } from "@/shared/ui/input";
 
 import type { Agent } from "../agent.types";

@@ -1,7 +1,7 @@
-import { Check, Copy } from "lucide-react";
 import type { ReactElement } from "react";
 
 import { cn } from "@/shared/lib/class-names";
+import { Check, Copy } from "@/shared/ui/icons";
 
 /**
  * Copy-button glyph: the copy and check icons stacked in one grid cell,

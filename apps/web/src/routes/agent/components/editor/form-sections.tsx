@@ -1,7 +1,6 @@
-import { AlertTriangle } from "lucide-react";
-
 import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
+import { AlertTriangle } from "@/shared/ui/icons";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 

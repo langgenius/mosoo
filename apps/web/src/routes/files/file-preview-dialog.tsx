@@ -1,4 +1,3 @@
-import { Download } from "lucide-react";
 import type { ReactElement } from "react";
 
 import { createFileDownload } from "@/domains/file/api/file-download-client";
@@ -13,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/shared/ui/dialog";
+import { Download } from "@/shared/ui/icons";
 
 interface FilePreviewDialogProps {
   file: ListedFileEntry;

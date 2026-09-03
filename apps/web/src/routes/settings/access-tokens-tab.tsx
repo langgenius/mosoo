@@ -1,6 +1,5 @@
 import type { PersonalAccessTokenSummary } from "@mosoo/contracts/auth";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ExternalLink, KeyRound, Loader2, Plus, Trash2 } from "lucide-react";
 import { useReducer } from "react";
 
 import {
@@ -12,6 +11,7 @@ import { MOSOO_API_REFERENCE_URL } from "@/shared/config/external-links";
 import { getCurrentLocale, useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import { CopyCheckIcon } from "@/shared/ui/copy-check-icon";
+import { ExternalLink, KeyRound, Loader2, Plus, Trash2 } from "@/shared/ui/icons";
 import { Input } from "@/shared/ui/input";
 
 import { isTruthy } from "../../shared/lib/truthiness";

@@ -1,10 +1,10 @@
-import { Check, Copy } from "lucide-react";
 import type { ReactElement } from "react";
 import { useState } from "react";
 
 import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { writeClipboardText } from "@/shared/lib/clipboard";
+import { Check, Copy } from "@/shared/ui/icons";
 
 // A copyable terminal command / code line. The leading prompt (default "$") is
 // decorative and never copied — only `command` lands on the clipboard.

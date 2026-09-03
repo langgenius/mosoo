@@ -1,9 +1,9 @@
 import type { SessionRunStatus, SessionRunSummary } from "@mosoo/contracts/session-run";
-import { ChevronRight, CircleX } from "lucide-react";
 import type { ReactElement } from "react";
 
 import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
+import { ChevronRight, CircleX } from "@/shared/ui/icons";
 
 interface ThreadRunFailureDetails {
   code: string | null;

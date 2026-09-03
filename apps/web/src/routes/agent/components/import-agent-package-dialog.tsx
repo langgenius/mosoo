@@ -1,6 +1,5 @@
 import type { FileId } from "@mosoo/contracts/id";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, CheckCircle2, FileArchive, Upload } from "lucide-react";
 import { useRef, useState } from "react";
 import type { ChangeEvent, ReactElement } from "react";
 
@@ -18,6 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/shared/ui/dialog";
+import { AlertTriangle, CheckCircle2, FileArchive, Upload } from "@/shared/ui/icons";
 
 import { isTruthy } from "../../../shared/lib/truthiness";
 import { PackageResolutionIssueCard } from "./package-resolution-issue-card";

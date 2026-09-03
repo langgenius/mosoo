@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import { ChevronDown } from "lucide-react";
 import type { ReactElement } from "react";
 
 import { toProjectId } from "@/routes/typed-id";
@@ -13,6 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu";
+import { ChevronDown } from "@/shared/ui/icons";
 import { Label } from "@/shared/ui/label";
 
 import { listAvailableAgentModels } from "../../../../domains/vendor-credential/api/vendor-credential-client";
