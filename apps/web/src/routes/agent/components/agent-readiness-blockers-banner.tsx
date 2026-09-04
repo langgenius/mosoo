@@ -1,5 +1,4 @@
 import type { AgentReadiness } from "@mosoo/contracts/agent";
-import { ExternalLink } from "lucide-react";
 import type { ReactElement } from "react";
 import { Link } from "react-router-dom";
 
@@ -11,6 +10,7 @@ import {
 } from "@/domains/vendor-credential/model/provider-readiness-copy";
 import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
+import { ExternalLink } from "@/shared/ui/icons";
 
 function readinessBlockMessages(
   readiness: AgentReadiness | null,

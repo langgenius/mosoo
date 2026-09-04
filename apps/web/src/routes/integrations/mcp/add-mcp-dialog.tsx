@@ -1,4 +1,3 @@
-import { ChevronDown } from "lucide-react";
 import { useReducer } from "react";
 
 import { useTranslation } from "@/shared/i18n";
@@ -12,6 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/shared/ui/dialog";
+import { ChevronDown } from "@/shared/ui/icons";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { Textarea } from "@/shared/ui/textarea";

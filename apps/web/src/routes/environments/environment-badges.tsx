@@ -1,7 +1,6 @@
-import { Star } from "lucide-react";
-
 import { useTranslation } from "@/shared/i18n";
 import { Badge } from "@/shared/ui/badge";
+import { Star } from "@/shared/ui/icons";
 
 export function EnvironmentBadges({
   environment,

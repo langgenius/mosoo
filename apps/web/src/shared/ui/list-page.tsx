@@ -1,7 +1,7 @@
-import { Search } from "lucide-react";
 import type { ReactElement, ReactNode } from "react";
 
 import { cn } from "@/shared/lib/class-names";
+import { Search } from "@/shared/ui/icons";
 import { Input } from "@/shared/ui/input";
 
 export function ListPageToolbar({

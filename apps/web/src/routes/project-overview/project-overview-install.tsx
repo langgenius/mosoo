@@ -1,4 +1,3 @@
-import { MousePointerClick, SquareTerminal } from "lucide-react";
 import type { ReactElement } from "react";
 import { useState } from "react";
 
@@ -7,6 +6,7 @@ import { cn } from "@/shared/lib/class-names";
 import { writeClipboardText } from "@/shared/lib/clipboard";
 import { Button } from "@/shared/ui/button";
 import { CopyCheckIcon } from "@/shared/ui/copy-check-icon";
+import { MousePointerClick, SquareTerminal } from "@/shared/ui/icons";
 
 import { INSTALL_COMMAND } from "./onboarding-setup-prompt";
 import { DocsAction, OnboardingActions, OnboardingSteps } from "./onboarding-steps";

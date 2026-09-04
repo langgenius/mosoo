@@ -1,8 +1,8 @@
-import { GitBranch } from "lucide-react";
 import type { ReactElement } from "react";
 
 import { useFormatDate, useTranslation } from "@/shared/i18n";
 import { Badge } from "@/shared/ui/badge";
+import { GitBranch } from "@/shared/ui/icons";
 import { ScrollArea } from "@/shared/ui/scroll-area";
 
 import type { Agent } from "../agent.types";

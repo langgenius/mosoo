@@ -1,8 +1,8 @@
-import { ExternalLink } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
+import { ExternalLink } from "@/shared/ui/icons";
 
 import {
   agentCostChange,

@@ -1,5 +1,4 @@
 import type { AgentSummary } from "@mosoo/contracts/agent";
-import { Check, Copy } from "lucide-react";
 import { useState } from "react";
 import type { ReactElement } from "react";
 
@@ -13,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/shared/ui/dialog";
+import { Check, Copy } from "@/shared/ui/icons";
 import { SessionEventDrawerCore } from "@/shared/ui/session-events";
 
 import { AgentAvatar } from "../agent-avatar";

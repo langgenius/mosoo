@@ -3,14 +3,15 @@ import type { ConnectionState } from "@cloudflare/sandbox/xterm";
 import { getAgentKindRuntimePolicy } from "@mosoo/contracts/agent";
 import { FitAddon } from "@xterm/addon-fit";
 import { Terminal as XTermTerminal } from "@xterm/xterm";
-import { Circle, RefreshCw, Terminal as TerminalIcon, TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
 import type { ReactElement, RefObject } from "react";
 
-import "@xterm/xterm/css/xterm.css";
 import { useTranslation } from "@/shared/i18n";
+
+import "@xterm/xterm/css/xterm.css";
 import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
+import { Circle, RefreshCw, Terminal as TerminalIcon, TriangleAlert } from "@/shared/ui/icons";
 
 import type { Agent } from "../agent.types";
 import { installTerminalReconnectClearGuard } from "../terminal-reconnect-buffer";

@@ -1,8 +1,8 @@
-import { Bot, Box, KeyRound } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { useAppSession } from "@/app/session-provider";
 import { useTranslation } from "@/shared/i18n";
+import { Bot, Box, KeyRound } from "@/shared/ui/icons";
 import { ProjectIdBadge } from "@/shared/ui/project-id-badge";
 
 import { ProjectOverviewInstallGuide } from "./project-overview-install";

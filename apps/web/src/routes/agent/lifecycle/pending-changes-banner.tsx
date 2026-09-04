@@ -1,9 +1,9 @@
-import { ShieldCheck, Undo2 } from "lucide-react";
 import { useState } from "react";
 import type { ReactElement } from "react";
 
 import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
+import { ShieldCheck, Undo2 } from "@/shared/ui/icons";
 
 import type { Agent } from "../agent.types";
 import { isAutoSaveEligible } from "../components/editor/use-auto-save";

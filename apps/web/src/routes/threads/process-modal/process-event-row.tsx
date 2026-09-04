@@ -1,8 +1,8 @@
-import { ChevronRight } from "lucide-react";
 import type { ReactElement } from "react";
 
 import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
+import { ChevronRight } from "@/shared/ui/icons";
 import { getSessionEventChipTone, getSessionEventLabel } from "@/shared/ui/session-events";
 
 import type { ThreadProcessEvent } from "../model/process";

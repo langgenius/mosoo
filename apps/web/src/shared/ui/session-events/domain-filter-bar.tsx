@@ -1,8 +1,8 @@
-import { AlertTriangle } from "lucide-react";
 import type { ReactElement } from "react";
 
 import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
+import { AlertTriangle } from "@/shared/ui/icons";
 
 import {
   SESSION_EVENT_DOMAIN_TONE,

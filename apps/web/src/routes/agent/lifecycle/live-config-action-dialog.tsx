@@ -1,5 +1,4 @@
 import type { AgentConfigChangeAction } from "@mosoo/contracts/agent-config-change-plan";
-import { AlertTriangle, Lock, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 
 import { useTranslation } from "@/shared/i18n";
@@ -13,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/shared/ui/dialog";
+import { AlertTriangle, Lock, ShieldCheck } from "@/shared/ui/icons";
 import { Input } from "@/shared/ui/input";
 
 /**

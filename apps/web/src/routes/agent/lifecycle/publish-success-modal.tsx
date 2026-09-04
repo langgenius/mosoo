@@ -1,4 +1,3 @@
-import { ArrowRight, Check, Globe } from "lucide-react";
 import { useMemo } from "react";
 
 import { useTranslation } from "@/shared/i18n";
@@ -10,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/shared/ui/dialog";
+import { ArrowRight, Check, Globe } from "@/shared/ui/icons";
 import { Separator } from "@/shared/ui/separator";
 
 import type { Agent } from "../agent.types";

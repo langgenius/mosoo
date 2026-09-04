@@ -1,5 +1,4 @@
 import type { McpServerWithCredential as PoolServer } from "@mosoo/contracts/mcp";
-import { ExternalLink, Plus, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -14,6 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu";
+import { ExternalLink, Plus, X } from "@/shared/ui/icons";
 import { Switch } from "@/shared/ui/switch";
 
 import { isTruthy } from "../../../../shared/lib/truthiness";

@@ -1,7 +1,7 @@
-import { FileText } from "lucide-react";
 import type { ReactElement, ReactNode } from "react";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
+import { FileText } from "@/shared/ui/icons";
 
 export function MarkdownPreviewDialog({
   badge = null,

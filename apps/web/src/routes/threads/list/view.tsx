@@ -1,3 +1,10 @@
+import { useState } from "react";
+import type { ReactElement } from "react";
+
+import { useTranslation } from "@/shared/i18n";
+import { cn } from "@/shared/lib/class-names";
+import { Button } from "@/shared/ui/button";
+import { EmptyState } from "@/shared/ui/empty-state";
 import {
   Archive,
   Bell,
@@ -8,14 +15,7 @@ import {
   PinOff,
   Plus,
   Trash2,
-} from "lucide-react";
-import { useState } from "react";
-import type { ReactElement } from "react";
-
-import { useTranslation } from "@/shared/i18n";
-import { cn } from "@/shared/lib/class-names";
-import { Button } from "@/shared/ui/button";
-import { EmptyState } from "@/shared/ui/empty-state";
+} from "@/shared/ui/icons";
 
 import { AgentAvatar } from "../agent-avatar";
 import { getNotificationPermission, formatShortRelative } from "../model/format";

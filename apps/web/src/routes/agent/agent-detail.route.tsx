@@ -1,4 +1,3 @@
-import { ArrowLeft, Settings } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactElement } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -9,6 +8,7 @@ import { useAuth } from "@/domains/auth/use-auth";
 import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
+import { ArrowLeft, Settings } from "@/shared/ui/icons";
 
 import { isTruthy } from "../../shared/lib/truthiness";
 import { canShowAgentDebugMenuItem } from "./agent-debug-menu-policy";

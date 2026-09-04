@@ -1,8 +1,8 @@
-import { Check, Loader2, Upload } from "lucide-react";
 import { useEffect, useReducer, useRef } from "react";
 
 import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
+import { Check, Loader2, Upload } from "@/shared/ui/icons";
 
 import { useAppSession } from "../../app/session-provider";
 import { uploadAccountAvatar } from "../../domains/file/api/account-avatar-client";

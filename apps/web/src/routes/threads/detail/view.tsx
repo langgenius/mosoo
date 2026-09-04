@@ -4,19 +4,6 @@ import type {
   SessionMessage,
   SessionProcessEvent,
 } from "@mosoo/contracts/session";
-import {
-  Archive,
-  ArrowLeft,
-  ChevronRight,
-  CornerDownLeft,
-  Inbox,
-  MoreHorizontal,
-  Paperclip,
-  Pin,
-  PinOff,
-  RotateCcw,
-  Trash2,
-} from "lucide-react";
 import { useMemo, useState } from "react";
 import type { ReactElement } from "react";
 
@@ -34,6 +21,19 @@ import {
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu";
 import { EmptyState } from "@/shared/ui/empty-state";
+import {
+  Archive,
+  ArrowLeft,
+  ChevronRight,
+  CornerDownLeft,
+  Inbox,
+  MoreHorizontal,
+  Paperclip,
+  Pin,
+  PinOff,
+  RotateCcw,
+  Trash2,
+} from "@/shared/ui/icons";
 import { Markdown } from "@/shared/ui/markdown";
 import type { MarkdownLinkResolver } from "@/shared/ui/markdown";
 import { Textarea } from "@/shared/ui/textarea";

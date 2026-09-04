@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import { BarChart3, Download, ExternalLink } from "lucide-react";
 import { useState } from "react";
 import type { ReactElement, ReactNode } from "react";
 import { Link } from "react-router-dom";
@@ -21,6 +20,7 @@ import type { CostRange, CostRunPurpose } from "@/routes/cost/cost-model";
 import { toAgentId, toProjectId } from "@/routes/typed-id";
 import { getCurrentLocale, useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
+import { BarChart3, Download, ExternalLink } from "@/shared/ui/icons";
 
 const COST_RANGE_KEYS = {
   "7d": "cost.range7d",

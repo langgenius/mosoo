@@ -1,7 +1,6 @@
 import { AssistantRuntimeProvider } from "@assistant-ui/react";
 import type { AgentReadiness } from "@mosoo/contracts/agent";
 import { useQueryClient } from "@tanstack/react-query";
-import { ShieldAlert, X } from "lucide-react";
 import { useCallback, useRef } from "react";
 
 import { sessionResourcesQueryKey } from "@/domains/session/api/session-resources";
@@ -21,6 +20,7 @@ import { uploadSessionResource } from "@/features/session-files/session-resource
 import { toProjectId, toSessionId } from "@/routes/typed-id";
 import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
+import { ShieldAlert, X } from "@/shared/ui/icons";
 
 import { isTruthy } from "../../../shared/lib/truthiness";
 import { AgentReadinessBlockersBanner } from "./agent-readiness-blockers-banner";

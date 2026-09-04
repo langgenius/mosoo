@@ -1,5 +1,3 @@
-import { ArrowRight, Bot, Check, Info, Plus, X, Zap } from "lucide-react";
-
 import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import {
@@ -10,6 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/shared/ui/dialog";
+import { ArrowRight, Bot, Check, Info, Plus, X, Zap } from "@/shared/ui/icons";
 
 import type { AgentKind } from "../agent.types";
 

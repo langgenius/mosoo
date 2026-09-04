@@ -1,5 +1,4 @@
 import type { SkillSummary } from "@mosoo/contracts/skill";
-import { ExternalLink, Plus } from "lucide-react";
 import { useState } from "react";
 import type { ReactElement } from "react";
 import { Link } from "react-router-dom";
@@ -13,6 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu";
+import { ExternalLink, Plus } from "@/shared/ui/icons";
 import { SkillFileCountBadge } from "@/shared/ui/skill-file-count-badge";
 
 import type { SkillInfo } from "../../agent.types";

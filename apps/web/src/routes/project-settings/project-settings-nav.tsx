@@ -1,12 +1,12 @@
-import { BarChart3, Box } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
+import { BarChart3, Box } from "@/shared/ui/icons";
+import type { AppIcon } from "@/shared/ui/icons";
 
 interface ProjectSettingsNavItem {
-  icon: LucideIcon;
+  icon: AppIcon;
   labelKey: string;
   path: string;
 }

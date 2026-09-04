@@ -1,7 +1,7 @@
-import { ChevronRight, Loader2, ShieldAlert } from "lucide-react";
 import type { ReactElement } from "react";
 
 import { useTranslation } from "@/shared/i18n";
+import { ChevronRight, Loader2, ShieldAlert } from "@/shared/ui/icons";
 
 import { isTruthy } from "../../shared/lib/truthiness";
 export interface ToolCall {

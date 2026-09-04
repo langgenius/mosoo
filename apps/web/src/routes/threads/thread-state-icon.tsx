@@ -1,7 +1,7 @@
-import { CheckCircle2, CircleDashed, CircleX } from "lucide-react";
 import type { ReactElement } from "react";
 
 import { useTranslation } from "@/shared/i18n";
+import { CheckCircle2, CircleDashed, CircleX } from "@/shared/ui/icons";
 
 import type { ThreadStateGlyph } from "./model/thread";
 

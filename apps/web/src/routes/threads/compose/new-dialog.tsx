@@ -1,17 +1,4 @@
 import type { AgentSummary } from "@mosoo/contracts/agent";
-import {
-  ArrowUpRight,
-  Bot,
-  Check,
-  ChevronDown,
-  FileText,
-  Maximize2,
-  Minimize2,
-  Paperclip,
-  Plus,
-  Send,
-  X,
-} from "lucide-react";
 import { useMemo, useReducer, useRef } from "react";
 import type { ReactElement } from "react";
 import { useNavigate } from "react-router-dom";
@@ -33,6 +20,19 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu";
+import {
+  ArrowUpRight,
+  Bot,
+  Check,
+  ChevronDown,
+  FileText,
+  Maximize2,
+  Minimize2,
+  Paperclip,
+  Plus,
+  Send,
+  X,
+} from "@/shared/ui/icons";
 import { Textarea } from "@/shared/ui/textarea";
 
 import { AgentAvatar } from "../agent-avatar";

@@ -1,4 +1,3 @@
-import { Bot, Plus, Upload } from "lucide-react";
 import { useEffect, useMemo, useReducer } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
@@ -8,6 +7,7 @@ import { useAuth } from "@/domains/auth/use-auth";
 import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import { EmptyState } from "@/shared/ui/empty-state";
+import { Bot, Plus, Upload } from "@/shared/ui/icons";
 import {
   ListPageContent,
   ListPageSearch,
