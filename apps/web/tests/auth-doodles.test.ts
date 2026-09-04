@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
 
-import { loadLoginDoodles } from "../src/routes/login/login-doodles-loader";
+import { loadAuthDoodles } from "../src/shared/ui/auth-scene/auth-doodles-loader";
 
-describe("login doodles", () => {
+describe("auth doodles", () => {
   test("falls back to no artwork when the deferred chunk fails", async () => {
-    const doodles = await loadLoginDoodles(async () => {
+    const doodles = await loadAuthDoodles(async () => {
       throw new Error("chunk failed");
     });
 

@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 
 import { confirmCliOAuthDeviceFlow } from "@/domains/auth/api/cli-oauth-client";
 import { useTranslation } from "@/shared/i18n";
+import { AuthScene } from "@/shared/ui/auth-scene/auth-scene";
 import { Button } from "@/shared/ui/button";
 import { AlertCircle, CheckCircle2, KeyRound, Loader2 } from "@/shared/ui/icons";
 
@@ -32,8 +33,9 @@ export function CliAuthPage() {
   }
 
   return (
-    <main className="mx-auto flex w-full max-w-xl flex-col gap-5 px-6 py-12">
-      <div className="border-border-default bg-bg-elevated rounded-lg border p-6 shadow-sm">
+    <AuthScene brand="computer">
+      <main className="flex flex-1 items-center justify-center px-6 pb-16">
+        <div className="border-border-default bg-bg-elevated w-full max-w-xl rounded-lg border p-6 shadow-sm">
         <div className="flex items-start gap-4">
           <div className="bg-accent-soft text-accent flex size-10 shrink-0 items-center justify-center rounded-md">
             <KeyRound className="size-5" />
@@ -54,8 +56,9 @@ export function CliAuthPage() {
           </Button>
           <StatusMessage error={error} status={status} />
         </div>
-      </div>
-    </main>
+        </div>
+      </main>
+    </AuthScene>
   );
 }
 

@@ -119,7 +119,7 @@ interface CharRig {
   name: string;
 }
 
-export function LoginDoodles(): ReactElement {
+export function AuthDoodles(): ReactElement {
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
