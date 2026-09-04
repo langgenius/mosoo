@@ -25,7 +25,8 @@ workspace checkpoint used to continue a Task Agent.
 3. Outputs that mosoo records from the Agent appear as artifacts in the same
    Thread. When an Agent reply links to a recorded `outputs/` file, selecting
    that link opens the artifact in a Thread preview drawer with a download
-   action.
+   action. Public integrations receive the producing Run ID and stable file ID
+   directly; duplicate filenames do not require inference.
 4. The Files page lets the Builder search, filter, preview supported formats,
    and download attachments and artifacts.
 

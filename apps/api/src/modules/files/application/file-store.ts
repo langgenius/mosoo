@@ -19,14 +19,21 @@ import type {
   SessionFile,
   SessionResource,
 } from "@mosoo/contracts/session";
-import { fileRecordsTable, sessionsTable } from "@mosoo/db";
+import { fileRecordsTable, sessionRunArtifactsTable, sessionsTable } from "@mosoo/db";
 import { createPlatformId, parsePlatformId } from "@mosoo/id";
-import type { AccountId, ProjectId, FileId, SessionId } from "@mosoo/id";
+import type {
+  AccountId,
+  FileId,
+  ProjectId,
+  RuntimeEventId,
+  SessionId,
+  SessionRunId,
+} from "@mosoo/id";
 import { and, asc, desc, eq, inArray, or } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
-import { getAppDatabase } from "../../../platform/db/drizzle";
+import { getAppDatabase, runAppDatabaseBatch } from "../../../platform/db/drizzle";
 import { toArrayBuffer } from "../../../shared/bytes";
 import { currentTimestampMs } from "../../../time";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
@@ -96,6 +103,7 @@ export interface RuntimeOutputFileInput {
   createdBy: AccountId;
   path: string;
   sessionId: SessionId;
+  sessionRunId: SessionRunId;
 }
 
 export interface AgentPackageFileAdmissionInput {
@@ -193,7 +201,11 @@ export interface FileStore {
     database: D1Database,
     sessionId: SessionId,
   ): Promise<SessionArtifactSource[]>;
-  listReadySessionArtifactKeys(database: D1Database, sessionId: SessionId): Promise<string[]>;
+  listReadySessionArtifactKeys(
+    database: D1Database,
+    sessionId: SessionId,
+    sessionRunId: SessionRunId,
+  ): Promise<string[]>;
   listReadySessionFiles(database: D1Database, sessionId: SessionId): Promise<SessionFile[]>;
   listSessionResourcePathEntries(
     database: D1Database,
@@ -233,8 +245,9 @@ export interface FileStore {
 async function publishSessionResourceUpsert(
   bindings: ApiBindings,
   file: FileRecord,
+  options?: { eventId: RuntimeEventId; runId: SessionRunId },
 ): Promise<void> {
-  await publishSessionResourceUpsertEvent(bindings, file);
+  await publishSessionResourceUpsertEvent(bindings, file, options);
 }
 
 function readRuntimeOutputPathSegments(path: string): string[] {
@@ -639,18 +652,21 @@ async function listReadySessionFiles(
 async function listReadySessionArtifactKeys(
   database: D1Database,
   sessionId: SessionId,
+  sessionRunId: SessionRunId,
 ): Promise<string[]> {
   const rows = await getAppDatabase(database)
     .select({
       parentPath: fileRecordsTable.parentPath,
     })
     .from(fileRecordsTable)
+    .innerJoin(sessionRunArtifactsTable, eq(sessionRunArtifactsTable.fileId, fileRecordsTable.id))
     .where(
       and(
         eq(fileRecordsTable.scopeKind, "session"),
         eq(fileRecordsTable.scopeId, sessionId),
         eq(fileRecordsTable.status, "ready"),
         eq(fileRecordsTable.sessionKind, "artifact"),
+        eq(sessionRunArtifactsTable.sessionRunId, sessionRunId),
       ),
     )
     .all();
@@ -908,6 +924,7 @@ async function readSessionArtifactBytes(
 
 async function recordRuntimeOutput(input: RuntimeOutputFileInput): Promise<FileRecord> {
   const fileId = createPlatformId<FileId>();
+  const committedEventId = createPlatformId<RuntimeEventId>();
   const name = getRuntimeOutputName(input.path);
   const contentType = normalizeContentType(input.contentType ?? "application/octet-stream");
   const contentSha256 = input.contentSha256 ?? (await createRuntimeOutputContentSha256(input.body));
@@ -929,9 +946,8 @@ async function recordRuntimeOutput(input: RuntimeOutputFileInput): Promise<FileR
     objectKey,
   });
 
-  await getAppDatabase(input.bindings.DB)
-    .insert(fileRecordsTable)
-    .values({
+  await runAppDatabaseBatch(input.bindings.DB, (database) => [
+    database.insert(fileRecordsTable).values({
       committed: true,
       createdAt: timestampMs,
       createdByAccountId: input.createdBy,
@@ -953,8 +969,17 @@ async function recordRuntimeOutput(input: RuntimeOutputFileInput): Promise<FileR
       status: "ready",
       updatedAt: timestampMs,
       version: 1,
-    })
-    .run();
+    }),
+    database.insert(sessionRunArtifactsTable).values({
+      committedEventId,
+      createdAt: timestampMs,
+      fileId,
+      mimeType: object.contentType ?? contentType,
+      name,
+      sessionRunId: input.sessionRunId,
+      size: object.contentLength,
+    }),
+  ]);
 
   const createdRows = await listFileRecordsById(input.bindings.DB, [fileId]);
   const createdRow = createdRows[0];
@@ -964,7 +989,10 @@ async function recordRuntimeOutput(input: RuntimeOutputFileInput): Promise<FileR
   }
 
   const file = toFileRecord(createdRow);
-  await publishSessionResourceUpsert(input.bindings, file);
+  await publishSessionResourceUpsert(input.bindings, file, {
+    eventId: committedEventId,
+    runId: input.sessionRunId,
+  });
   return file;
 }
 

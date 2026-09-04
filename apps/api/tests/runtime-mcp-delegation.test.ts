@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
+import { verifyDelegation } from "../../../pkgs/public-api-client/src/delegation.ts";
 import { copyProxyRequestHeaders } from "../src/adapters/http/routes/driver-route";
 import {
   RUNTIME_MCP_TOOL_CALL_ID_HEADER,
@@ -133,5 +134,29 @@ describe("runtime MCP end-user delegation", () => {
     expect(() =>
       readRuntimeMcpToolCallId(new Headers({ [RUNTIME_MCP_TOOL_CALL_ID_HEADER]: " " })),
     ).toThrow("invalid");
+  });
+
+  test("produces tokens accepted by the public SDK verifier", async () => {
+    const token = await createRuntimeMcpDelegationToken({
+      accessToken: "mcp-upstream-secret",
+      audience: "https://tools.example.com/mcp",
+      claims,
+      nowMs: 1_800_000_000_000,
+    });
+
+    await expect(
+      verifyDelegation({
+        accessToken: "mcp-upstream-secret",
+        audience: "https://tools.example.com/mcp",
+        nowMs: 1_800_000_030_000,
+        token,
+      }),
+    ).resolves.toMatchObject({
+      agentId: claims.agentId,
+      appId: claims.appId,
+      runId: claims.runId,
+      threadId: claims.threadId,
+      userId: claims.endUserId,
+    });
   });
 });

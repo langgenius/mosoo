@@ -90,9 +90,10 @@ export async function requestPublicApiWithBindings(
   app: Hono,
   request: Request,
   bindings: ApiBindings,
+  executionContext: ExecutionContext = createTestExecutionContext(),
 ): Promise<Response> {
   return runWithRequestLogContext(request, () =>
-    app.request(request, undefined, bindings, createTestExecutionContext()),
+    app.request(request, undefined, bindings, executionContext),
   );
 }
 

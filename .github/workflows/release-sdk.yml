@@ -1,0 +1,105 @@
+name: Release SDK
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: npm-sdk-release
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify SDK on Node.js ${{ matrix.node-version }}
+    if: github.repository == 'langgenius/mosoo' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [22, 24]
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 1
+          submodules: true
+          persist-credentials: false
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: ${{ matrix.node-version }}
+          package-manager-cache: false
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: canary
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Verify SDK
+        run: |
+          bun run --filter @mosoo/sdk lint
+          bun run --filter @mosoo/sdk tc
+          bun run --filter @mosoo/sdk test
+
+  publish:
+    name: Publish npm Beta
+    needs: verify
+    if: github.repository == 'langgenius/mosoo' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 1
+          submodules: true
+          persist-credentials: false
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: canary
+
+      - name: Install release toolchain
+        run: |
+          bun install --frozen-lockfile
+          npm install --global npm@12.0.2
+
+      - name: Check release version
+        working-directory: pkgs/public-api-client
+        run: |
+          package_version="$(node --print 'require("./package.json").version')"
+          if [[ "$package_version" != *-beta.* ]]; then
+            echo "::error::SDK release version must use the beta prerelease channel."
+            exit 1
+          fi
+          if npm view "@mosoo/sdk@$package_version" version >/dev/null 2>&1; then
+            echo "::error::@mosoo/sdk@$package_version is already published."
+            exit 1
+          fi
+
+      - name: Inspect package
+        working-directory: pkgs/public-api-client
+        run: npm pack --dry-run
+
+      - name: Publish Beta
+        working-directory: pkgs/public-api-client
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [[ -n "$NPM_TOKEN" ]]; then
+            export NODE_AUTH_TOKEN="$NPM_TOKEN"
+          fi
+          npm publish --access public --tag beta --provenance
