@@ -10,6 +10,7 @@ import { registerDriverRoute } from "../src/adapters/http/routes/driver-route";
 import { getRuntimeDriverLlmProxyPath } from "../src/modules/runtime/domain/runtime-driver-routes";
 import { createRuntimeActionToken } from "../src/modules/runtime/infrastructure/runtime-boot-token";
 import type { RuntimeActionTokenPayload } from "../src/modules/runtime/infrastructure/runtime-boot-token";
+import { buildVendorProxyEnvVars } from "../src/modules/runtime/infrastructure/runtime-sandbox-provisioning/runtime-vendor-proxy-env.builder";
 import { storeVendorCredentialSecret } from "../src/modules/vendor-credentials/application/vendor-credential.secret-resolution";
 import type { ApiBindings, ApiGatewayEnvironment } from "../src/platform/cloudflare/worker-types";
 import {
@@ -234,6 +235,54 @@ async function dispatch(bindings: ApiBindings, request: Request): Promise<Respon
 }
 
 describe("driver LLM proxy route", () => {
+  test("admits the provisioned custom model while rejecting a different model or protocol", async () => {
+    const apiBase = "https://gateway.example.com/v1";
+    const modelId = "deepseek/deepseek-v4-flash";
+    const { bindings } = await setupFixture({ apiBase, vendorId: "openai-compatible" });
+    const envVars = await buildVendorProxyEnvVars({
+      bindings,
+      driverGeneration: 0,
+      driverInstanceId: DRIVER_INSTANCE_ID,
+      profile: {
+        model: modelId,
+        runtimeId: "acp-fallback",
+        vendorCredential: {
+          apiBase,
+          credentialId: CREDENTIAL_ID,
+          models: null,
+          projectId: PROJECT_ID,
+          vendorId: "openai-compatible",
+        },
+      },
+      requestUrl: "https://api.example.com",
+    });
+    const captured = captureUpstreamFetch();
+
+    for (const [path, model, status] of [
+      ["/chat/completions", modelId, 200],
+      ["/chat/completions", "deepseek-v4-flash", 403],
+      ["/responses", modelId, 403],
+    ] as const) {
+      const response = await dispatch(
+        bindings,
+        llmProxyRequest(path, {
+          body: JSON.stringify({ model }),
+          headers: {
+            Authorization: `Bearer ${envVars["OPENAI_COMPATIBLE_API_KEY"]}`,
+            "Content-Type": "application/json",
+          },
+          method: "POST",
+        }),
+      );
+      expect(response.status).toBe(status);
+    }
+
+    expect(captured).toHaveLength(1);
+    expect(captured[0]?.url).toBe(`${apiBase}/chat/completions`);
+    expect(captured[0]?.body).toBe(JSON.stringify({ model: modelId }));
+    expect(captured[0]?.headers.get("authorization")).toBe(`Bearer ${UPSTREAM_API_KEY}`);
+  });
+
   test("forwards api-key style requests with the vault credential injected", async () => {
     const { bindings } = await setupFixture();
     const captured = captureUpstreamFetch();
