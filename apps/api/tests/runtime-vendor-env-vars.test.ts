@@ -554,6 +554,44 @@ describe("runtime vendor proxy env vars", () => {
     });
   });
 
+  test.each([
+    "deepseek-v4-flash",
+    "deepseek/deepseek-v4-flash",
+    "team/deepseek/deepseek-v4-flash",
+    "openai-compatible/deepseek-v4-flash",
+  ])("preserves custom model %s in both OpenCode and its proxy grant", async (modelId) => {
+    const envVars = await buildVendorProxyEnvVars({
+      bindings: BINDINGS,
+      driverGeneration: DRIVER_GENERATION,
+      driverInstanceId: DRIVER_INSTANCE_ID,
+      profile: {
+        model: modelId,
+        runtimeId: "acp-fallback",
+        vendorCredential: vendorCredential({
+          apiBase: "https://gateway.example.com/v1",
+          models: ["gpt-5", modelId],
+          vendorId: "openai-compatible",
+        }),
+      },
+      requestUrl: REQUEST_URL,
+    });
+
+    expect(parseOpenCodeConfig(envVars)).toMatchObject({
+      enabled_providers: ["openai-compatible"],
+      model: `openai-compatible/${modelId}`,
+      small_model: `openai-compatible/${modelId}`,
+      provider: {
+        "openai-compatible": {
+          models: { [modelId]: { name: modelId } },
+        },
+      },
+    });
+    await expectLlmProxyGrant(envVars["OPENAI_COMPATIBLE_API_KEY"], {
+      modelId,
+      modelProtocol: "openai-chat-completions",
+    });
+  });
+
   test("declares the selected custom OpenCode model for an unrestricted credential", async () => {
     const envVars = await buildVendorProxyEnvVars({
       bindings: BINDINGS,

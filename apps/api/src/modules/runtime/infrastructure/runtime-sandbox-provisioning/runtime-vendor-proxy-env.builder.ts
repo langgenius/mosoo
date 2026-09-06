@@ -31,7 +31,7 @@ export interface VendorProxyEnvironmentInput {
 
 interface OpenCodeProviderConfigInput {
   credential: DriverVendorCredentialProfile;
-  model: string;
+  modelId: string;
   proxyUrl: string;
   vendor: RuntimeCatalogVendor;
 }
@@ -51,6 +51,11 @@ function getRuntimeLlmProxyUrl(requestUrl: string, credentialId: VendorCredentia
 }
 
 function resolveVendorModelId(vendorId: string, model: string): string {
+  // Custom endpoint model IDs are opaque, including any provider-like prefix.
+  if (vendorId === "openai-compatible") {
+    return model;
+  }
+
   const vendorPrefix = `${vendorId}/`;
   return model.startsWith(vendorPrefix) ? model.slice(vendorPrefix.length) : model;
 }
@@ -163,7 +168,7 @@ export async function buildVendorProxyEnvVars(
   if (input.profile.runtimeId === "acp-fallback") {
     envVars[OPENCODE_CONFIG_CONTENT_ENV] = buildOpenCodeConfig({
       credential,
-      model: input.profile.model,
+      modelId: modelBinding.modelId,
       proxyUrl,
       vendor,
     });
@@ -174,7 +179,8 @@ export async function buildVendorProxyEnvVars(
 
 function buildOpenCodeConfig(input: OpenCodeProviderConfigInput): string {
   const openCodeProviderId = resolveOpenCodeProviderId(input.vendor);
-  const model = resolveOpenCodeModelId(input.vendor, input.model);
+  // OpenCode owns the first segment; the remaining model ID must match the grant.
+  const model = `${openCodeProviderId}/${input.modelId}`;
   const providerConfig = buildOpenCodeProviderConfig(input);
 
   return JSON.stringify({
@@ -190,32 +196,6 @@ function buildOpenCodeConfig(input: OpenCodeProviderConfigInput): string {
 
 function resolveOpenCodeProviderId(vendor: RuntimeCatalogVendor): string {
   return vendor.openCodeProvider?.providerId ?? vendor.vendorId;
-}
-
-function resolveOpenCodeModelId(vendor: RuntimeCatalogVendor, model: string): string {
-  const openCodeProviderId = resolveOpenCodeProviderId(vendor);
-
-  if (!model.includes("/")) {
-    return `${openCodeProviderId}/${model}`;
-  }
-
-  const vendorPrefix = `${vendor.vendorId}/`;
-
-  if (openCodeProviderId !== vendor.vendorId && model.startsWith(vendorPrefix)) {
-    return `${openCodeProviderId}/${model.slice(vendorPrefix.length)}`;
-  }
-
-  return model;
-}
-
-function resolveOpenCodeProviderModelId(vendor: RuntimeCatalogVendor, model: string): string {
-  const openCodeProviderId = resolveOpenCodeProviderId(vendor);
-  const openCodeModel = resolveOpenCodeModelId(vendor, model);
-  const providerPrefix = `${openCodeProviderId}/`;
-
-  return openCodeModel.startsWith(providerPrefix)
-    ? openCodeModel.slice(providerPrefix.length)
-    : openCodeModel;
 }
 
 function resolveOpenCodeProxyBaseUrl(vendor: RuntimeCatalogVendor, proxyUrl: string): string {
@@ -238,7 +218,7 @@ function buildOpenCodeProviderConfig(input: OpenCodeProviderConfigInput): OpenCo
   // OpenCode removes configured providers that have no models. An unrestricted
   // Mosoo credential still needs the active model rendered for ACP startup.
   const declaredModelIds = new Set(input.credential.models ?? []);
-  declaredModelIds.add(resolveOpenCodeProviderModelId(input.vendor, input.model));
+  declaredModelIds.add(input.modelId);
   const models = Object.fromEntries(
     [...declaredModelIds].map((modelId) => [modelId, { name: modelId }]),
   );
