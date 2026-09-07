@@ -195,8 +195,8 @@ function resolveOpenCodeProviderId(vendor: RuntimeCatalogVendor): string {
 function resolveOpenCodeModelId(vendor: RuntimeCatalogVendor, model: string): string {
   const openCodeProviderId = resolveOpenCodeProviderId(vendor);
 
-  if (!model.includes("/")) {
-    return `${openCodeProviderId}/${model}`;
+  if (model.startsWith(`${openCodeProviderId}/`)) {
+    return model;
   }
 
   const vendorPrefix = `${vendor.vendorId}/`;
@@ -205,7 +205,10 @@ function resolveOpenCodeModelId(vendor: RuntimeCatalogVendor, model: string): st
     return `${openCodeProviderId}/${model.slice(vendorPrefix.length)}`;
   }
 
-  return model;
+  // A slash can belong to the upstream model ID (for example an OpenRouter
+  // model), rather than naming the OpenCode provider. Keep it on the provider
+  // whose credential and proxy grant were selected for this Run.
+  return `${openCodeProviderId}/${model}`;
 }
 
 function resolveOpenCodeProviderModelId(vendor: RuntimeCatalogVendor, model: string): string {
