@@ -31,6 +31,10 @@ expired)` for real `ui` Runs. Preview Runs and cancellations
   Tail event. A runtime becomes `unknown` after 24 hours without a real Run;
   the page does not manufacture traffic to keep it green.
 
+Overall health is `degraded` when any fresh component reports degradation;
+otherwise it is `unknown` when the platform or any runtime lacks a fresh
+observation. API liveness alone must not imply that all runtimes have recovered.
+
 A failed API invocation is shown immediately. A runtime becomes `degraded`
 after three consecutive observed Run failures; earlier failures remain visible
 in its completion rate and latest error code. Three consecutive failures also
