@@ -195,8 +195,8 @@ function resolveOpenCodeProviderId(vendor: RuntimeCatalogVendor): string {
 function resolveOpenCodeModelId(vendor: RuntimeCatalogVendor, model: string): string {
   const openCodeProviderId = resolveOpenCodeProviderId(vendor);
 
-  if (!model.includes("/")) {
-    return `${openCodeProviderId}/${model}`;
+  if (model.startsWith(`${openCodeProviderId}/`)) {
+    return model;
   }
 
   const vendorPrefix = `${vendor.vendorId}/`;
@@ -205,7 +205,20 @@ function resolveOpenCodeModelId(vendor: RuntimeCatalogVendor, model: string): st
     return `${openCodeProviderId}/${model.slice(vendorPrefix.length)}`;
   }
 
-  return model;
+  // A slash can belong to the upstream model ID (for example an OpenRouter
+  // model), rather than naming the OpenCode provider. Keep it on the provider
+  // whose credential and proxy grant were selected for this Run.
+  return `${openCodeProviderId}/${model}`;
+}
+
+function resolveOpenCodeProviderModelId(vendor: RuntimeCatalogVendor, model: string): string {
+  const openCodeProviderId = resolveOpenCodeProviderId(vendor);
+  const openCodeModel = resolveOpenCodeModelId(vendor, model);
+  const providerPrefix = `${openCodeProviderId}/`;
+
+  return openCodeModel.startsWith(providerPrefix)
+    ? openCodeModel.slice(providerPrefix.length)
+    : openCodeModel;
 }
 
 function resolveOpenCodeProxyBaseUrl(vendor: RuntimeCatalogVendor, proxyUrl: string): string {
@@ -225,17 +238,20 @@ function buildOpenCodeProviderConfig(input: OpenCodeProviderConfigInput): OpenCo
   const options: Record<string, string> = {
     apiKey: `{env:${input.vendor.apiKeyEnvVar}}`,
   };
-  const models =
-    input.credential.models === null
-      ? undefined
-      : Object.fromEntries(input.credential.models.map((modelId) => [modelId, { name: modelId }]));
+  // OpenCode removes configured providers that have no models. An unrestricted
+  // Mosoo credential still needs the active model rendered for ACP startup.
+  const declaredModelIds = new Set(input.credential.models ?? []);
+  declaredModelIds.add(resolveOpenCodeProviderModelId(input.vendor, input.model));
+  const models = Object.fromEntries(
+    [...declaredModelIds].map((modelId) => [modelId, { name: modelId }]),
+  );
   const provider = input.vendor.openCodeProvider;
 
   if (provider === undefined) {
     options["baseURL"] = resolveOpenCodeProxyBaseUrl(input.vendor, input.proxyUrl);
 
     return {
-      ...(models === undefined ? {} : { models }),
+      models,
       options,
     };
   }
@@ -246,7 +262,7 @@ function buildOpenCodeProviderConfig(input: OpenCodeProviderConfigInput): OpenCo
   );
 
   return {
-    ...(models === undefined ? {} : { models }),
+    models,
     name: provider.name,
     npm: provider.npmPackage,
     options,

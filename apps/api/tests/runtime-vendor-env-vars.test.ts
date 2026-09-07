@@ -431,6 +431,11 @@ describe("runtime vendor proxy env vars", () => {
         small_model: `${providerId}/${model}`,
         provider: {
           [providerId]: {
+            models: {
+              [model]: {
+                name: model,
+              },
+            },
             name,
             npm,
             options: {
@@ -505,6 +510,74 @@ describe("runtime vendor proxy env vars", () => {
           options: {
             apiKey: "{env:OPENAI_COMPATIBLE_API_KEY}",
             baseURL: PROXY_URL,
+          },
+        },
+      },
+    });
+  });
+
+  test.each(["deepseek/deepseek-v4-flash", "openai-compatible/deepseek/deepseek-v4-flash"])(
+    "keeps namespaced custom model %s on its credential provider",
+    async (model) => {
+      const envVars = await buildVendorProxyEnvVars({
+        bindings: BINDINGS,
+        driverGeneration: DRIVER_GENERATION,
+        driverInstanceId: DRIVER_INSTANCE_ID,
+        profile: {
+          model,
+          runtimeId: "acp-fallback",
+          vendorCredential: vendorCredential({
+            apiBase: "https://models.example.com/v1",
+            vendorId: "openai-compatible",
+          }),
+        },
+        requestUrl: REQUEST_URL,
+      });
+
+      await expectLlmProxyGrant(envVars["OPENAI_COMPATIBLE_API_KEY"], {
+        modelId: "deepseek/deepseek-v4-flash",
+        modelProtocol: "openai-chat-completions",
+      });
+      expect(parseOpenCodeConfig(envVars)).toMatchObject({
+        enabled_providers: ["openai-compatible"],
+        model: "openai-compatible/deepseek/deepseek-v4-flash",
+        small_model: "openai-compatible/deepseek/deepseek-v4-flash",
+        provider: {
+          "openai-compatible": {
+            models: {
+              "deepseek/deepseek-v4-flash": { name: "deepseek/deepseek-v4-flash" },
+            },
+          },
+        },
+      });
+    },
+  );
+
+  test("declares the selected custom OpenCode model for an unrestricted credential", async () => {
+    const envVars = await buildVendorProxyEnvVars({
+      bindings: BINDINGS,
+      driverGeneration: DRIVER_GENERATION,
+      driverInstanceId: DRIVER_INSTANCE_ID,
+      profile: {
+        model: "deepseek-v4-flash",
+        runtimeId: "acp-fallback",
+        vendorCredential: vendorCredential({
+          apiBase: "https://api.deepseek.com",
+          vendorId: "openai-compatible",
+        }),
+      },
+      requestUrl: REQUEST_URL,
+    });
+
+    expect(parseOpenCodeConfig(envVars)).toMatchObject({
+      enabled_providers: ["openai-compatible"],
+      model: "openai-compatible/deepseek-v4-flash",
+      provider: {
+        "openai-compatible": {
+          models: {
+            "deepseek-v4-flash": {
+              name: "deepseek-v4-flash",
+            },
           },
         },
       },
