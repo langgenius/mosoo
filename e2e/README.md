@@ -33,7 +33,7 @@ provider keys or Worker runtime bindings. It starts only `@mosoo/web` by default
 set `MOSOO_E2E_WEB_SERVER_COMMAND` to override the server command.
 
 `ui sidebar` is the console sidebar acceptance case for the shell hierarchy
-(work zone, persistent zone, Tools icons, collapsed rail, keyboard focus, CJK
+(work zone, persistent zone, resource icons, collapsed rail, keyboard focus, CJK
 labels, mobile drawer, Org layer). It is fixture-backed like `ui files-page`,
 starts only `@mosoo/web`, and writes review screenshots to `.tmp/e2e/sidebar/`.
 Point it at a running console with `MOSOO_E2E_BASE_URL` to capture a branch that

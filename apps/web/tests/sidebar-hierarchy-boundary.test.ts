@@ -18,14 +18,14 @@ const SIDEBAR_SOURCES = {
   navigation: "../src/app/navigation.tsx",
   orgNavigation: "../src/app/org-navigation.tsx",
   sidebar: "../src/shared/ui/sidebar.tsx",
-  toolIcons: "../src/shared/ui/tool-icons.tsx",
+  resourceIcons: "../src/shared/ui/resource-icons.tsx",
 } as const;
 
-const TOOL_ENTRY_POINTS = [
-  { icon: "SkillsToolIcon", key: "nav.skills", path: "/integrations/skills" },
-  { icon: "McpServersToolIcon", key: "nav.mcpServers", path: "/integrations/mcp" },
-  { icon: "ProvidersToolIcon", key: "nav.providers", path: "/providers" },
-  { icon: "EnvironmentsToolIcon", key: "nav.environments", path: "/environment" },
+const RESOURCE_ENTRY_POINTS = [
+  { icon: "SkillsResourceIcon", key: "nav.skills", path: "/integrations/skills" },
+  { icon: "McpServersResourceIcon", key: "nav.mcpServers", path: "/integrations/mcp" },
+  { icon: "ProvidersResourceIcon", key: "nav.providers", path: "/providers" },
+  { icon: "EnvironmentsResourceIcon", key: "nav.environments", path: "/environment" },
 ] as const;
 
 const LOCALES = { en, ja, "zh-CN": zhCN, "zh-TW": zhTW } as const;
@@ -46,7 +46,7 @@ describe("Console sidebar hierarchy", () => {
 
   test("keeps the Project work list and the persistent footer on one navigation source", () => {
     const source = readSource(SIDEBAR_SOURCES.navigation);
-    const toolsIndex = source.indexOf('t("nav.tools")');
+    const toolsIndex = source.indexOf('t("nav.resources")');
     const settingsIndex = source.indexOf('t("nav.settings")');
 
     expect(toolsIndex).toBeGreaterThan(-1);
@@ -55,26 +55,26 @@ describe("Console sidebar hierarchy", () => {
     expect(source).not.toContain("SlidersHorizontalIcon");
   });
 
-  test("gives the four Tools their dedicated icon family instead of stock glyphs", () => {
+  test("gives the four resources their dedicated icon family instead of stock glyphs", () => {
     const source = readSource(SIDEBAR_SOURCES.navigation);
 
-    expect(source).toContain('from "@/shared/ui/tool-icons"');
-    for (const tool of TOOL_ENTRY_POINTS) {
+    expect(source).toContain('from "@/shared/ui/resource-icons"');
+    for (const tool of RESOURCE_ENTRY_POINTS) {
       expect(source).toMatch(
         new RegExp(`icon: ${tool.icon},\\s*label: t\\("${tool.key}"\\),\\s*path: "${tool.path}"`),
       );
     }
   });
 
-  test("tool icons follow one construction contract", () => {
-    const source = readSource(SIDEBAR_SOURCES.toolIcons);
+  test("resource icons follow one construction contract", () => {
+    const source = readSource(SIDEBAR_SOURCES.resourceIcons);
 
     expect(source).toContain('viewBox="0 0 24 24"');
     expect(source).toContain("strokeWidth={1.5}");
     expect(source).toContain('strokeLinecap="round"');
     expect(source).toContain('strokeLinejoin="round"');
     expect(source).toContain('aria-hidden="true"');
-    expect(source.match(/tool="[a-z-]+"/g)).toHaveLength(TOOL_ENTRY_POINTS.length);
+    expect(source.match(/resource="[a-z-]+"/g)).toHaveLength(RESOURCE_ENTRY_POINTS.length);
     expect(source).not.toMatch(/#[0-9a-f]{3,8}\b/iu);
     expect(source).not.toMatch(/fill="(?!none|currentColor)/u);
   });
@@ -131,7 +131,10 @@ describe("Console sidebar hierarchy", () => {
 
   test("disambiguates project settings from account settings in every locale", () => {
     for (const [locale, catalog] of Object.entries(LOCALES)) {
-      expect({ locale, tools: catalog.nav.tools.length > 0 }).toEqual({ locale, tools: true });
+      expect({ locale, resources: catalog.nav.resources.length > 0 }).toEqual({
+        locale,
+        resources: true,
+      });
       expect({ locale, distinct: catalog.nav.settings !== catalog.nav.accountSettings }).toEqual({
         locale,
         distinct: true,

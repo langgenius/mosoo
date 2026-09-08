@@ -110,7 +110,9 @@
   --bg-elevated: #ffffff;
   --bg-sunken: var(--paper-200);
   --bg-canvas: #ffffff;
-  --bg-sidebar: #fbfbfc;
+  /* The sidebar sits one step below the canvas so the two surfaces read as
+     different materials, not merely a hairline apart. */
+  --bg-sidebar: var(--paper-200);
 
   /* Sidebar rows: neutral hover/selected fills. Selection is never green; the
      accent is reserved for the keyboard focus ring. */

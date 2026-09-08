@@ -1,8 +1,8 @@
 import type { ComponentProps, ReactElement, ReactNode } from "react";
 
 /**
- * Original icon family for the four Project Tools entry points: Skills, MCP
- * servers, Providers, and Environments.
+ * Original icon family for the four Project resources in the sidebar: Skills,
+ * MCP servers, Providers, and Environments.
  *
  * These are the modules an Agent is assembled from, so they share one
  * construction contract instead of borrowing unrelated stock glyphs:
@@ -17,12 +17,12 @@ import type { ComponentProps, ReactElement, ReactNode } from "react";
  *   colours, as well as the dark theme, are decided by the row, never here.
  *
  * The same paths are published as standalone SVG files under
- * docs/design/assets/tool-icons for Mosoo Computer and other surfaces.
+ * docs/design/assets/resource-icons for Mosoo Computer and other surfaces.
  */
 
-export type ToolIconName = "environments" | "mcp-servers" | "providers" | "skills";
+export type ResourceIconName = "environments" | "mcp-servers" | "providers" | "skills";
 
-export type ToolIconProps = Omit<ComponentProps<"svg">, "children" | "viewBox">;
+export type ResourceIconProps = Omit<ComponentProps<"svg">, "children" | "viewBox">;
 
 const TINT_OPACITY = 0.12;
 
@@ -31,11 +31,11 @@ const SKILLS_BODY =
 const MCP_BODY = "M5 7H19V12A7 7 0 0 1 5 12Z";
 const ENVIRONMENTS_TOP = "M12 2.75L20 7.25L12 11.75L4 7.25Z";
 
-function ToolIconFrame({
+function ResourceIconFrame({
   children,
-  tool,
+  resource,
   ...props
-}: ToolIconProps & { children: ReactNode; tool: ToolIconName }): ReactElement {
+}: ResourceIconProps & { children: ReactNode; resource: ResourceIconName }): ReactElement {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -49,7 +49,7 @@ function ToolIconFrame({
       strokeLinejoin="round"
       aria-hidden="true"
       focusable="false"
-      data-tool-icon={tool}
+      data-resource-icon={resource}
       {...props}
     >
       {children}
@@ -57,36 +57,36 @@ function ToolIconFrame({
   );
 }
 
-function ToolIconTint({ d }: { d: string }): ReactElement {
+function ResourceIconTint({ d }: { d: string }): ReactElement {
   return <path d={d} fill="currentColor" fillOpacity={TINT_OPACITY} stroke="none" />;
 }
 
 /** Skills: a puzzle piece, the reusable capability that slots into an Agent. */
-export function SkillsToolIcon(props: ToolIconProps): ReactElement {
+export function SkillsResourceIcon(props: ResourceIconProps): ReactElement {
   return (
-    <ToolIconFrame tool="skills" {...props}>
-      <ToolIconTint d={SKILLS_BODY} />
+    <ResourceIconFrame resource="skills" {...props}>
+      <ResourceIconTint d={SKILLS_BODY} />
       <path d={SKILLS_BODY} />
-    </ToolIconFrame>
+    </ResourceIconFrame>
   );
 }
 
 /** MCP servers: a plug, the external capability an Agent connects to. */
-export function McpServersToolIcon(props: ToolIconProps): ReactElement {
+export function McpServersResourceIcon(props: ResourceIconProps): ReactElement {
   return (
-    <ToolIconFrame tool="mcp-servers" {...props}>
-      <ToolIconTint d={MCP_BODY} />
+    <ResourceIconFrame resource="mcp-servers" {...props}>
+      <ResourceIconTint d={MCP_BODY} />
       <path d="M8.5 2.5V7M15.5 2.5V7" />
       <path d={MCP_BODY} />
       <path d="M12 19V21.5" />
-    </ToolIconFrame>
+    </ResourceIconFrame>
   );
 }
 
 /** Providers: a key, the credential that unlocks a model provider. */
-export function ProvidersToolIcon(props: ToolIconProps): ReactElement {
+export function ProvidersResourceIcon(props: ResourceIconProps): ReactElement {
   return (
-    <ToolIconFrame tool="providers" {...props}>
+    <ResourceIconFrame resource="providers" {...props}>
       <circle
         cx={7.25}
         cy={12}
@@ -97,17 +97,17 @@ export function ProvidersToolIcon(props: ToolIconProps): ReactElement {
       />
       <circle cx={7.25} cy={12} r={4.25} />
       <path d="M11.5 12H21M17.25 12V15.5M21 12V14.5" />
-    </ToolIconFrame>
+    </ResourceIconFrame>
   );
 }
 
 /** Environments: a cube, the sandbox image an Agent runs inside. */
-export function EnvironmentsToolIcon(props: ToolIconProps): ReactElement {
+export function EnvironmentsResourceIcon(props: ResourceIconProps): ReactElement {
   return (
-    <ToolIconFrame tool="environments" {...props}>
-      <ToolIconTint d={ENVIRONMENTS_TOP} />
+    <ResourceIconFrame resource="environments" {...props}>
+      <ResourceIconTint d={ENVIRONMENTS_TOP} />
       <path d="M12 2.75L20 7.25V16.75L12 21.25L4 16.75V7.25Z" />
       <path d="M4 7.25L12 11.75L20 7.25M12 11.75V21.25" />
-    </ToolIconFrame>
+    </ResourceIconFrame>
   );
 }

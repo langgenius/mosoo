@@ -2,7 +2,7 @@
 
 Status: implemented design record for the console shell sidebar
 ([langgenius/mosoo#600](https://github.com/langgenius/mosoo/issues/600)). It
-documents the layout logic, the row grammar, the state matrix, the Tools icon
+documents the layout logic, the row grammar, the state matrix, the resource icon
 family, and the review gate that keeps them from drifting. Product behaviour,
 routes, and permissions are unchanged; this page only governs how the sidebar
 looks and how it is reviewed.
@@ -16,7 +16,7 @@ short the viewport is.
 | Zone                  | Sizing                           | Contents (Project layer)                                                                                        |
 | --------------------- | -------------------------------- | --------------------------------------------------------------------------------------------------------------- |
 | Identity (fixed)      | `shrink-0`                       | Brand row (wordmark, collapse toggle) and the Project switcher row.                                             |
-| Work (scrolls)        | `min-h-0 flex-1 overflow-y-auto` | Create agent; Overview, Runs, Agents, Files; **Tools**: Skills, MCP servers, Providers, Environments.           |
+| Work (scrolls)        | `min-h-0 flex-1 overflow-y-auto` | Create agent; Overview, Runs, Agents, Files; **Resources**: Skills, MCP servers, Providers, Environments.       |
 | Persistent (anchored) | `shrink-0`, hairline top border  | Project settings, Help & docs, Language, then the account row (Account settings and Sign out live in its menu). |
 
 Rules that follow from the split:
@@ -29,20 +29,26 @@ Rules that follow from the split:
   `--border-default` line under the identity zone that only appears once the
   work list has scrolled (pure CSS, `@supports (animation-timeline: scroll())`,
   no line in browsers without it).
+- The sidebar sits on `--paper-200` while the canvas stays on `--paper-100`, so
+  the two surfaces separate by tone as well as by the hairline; in the dark theme
+  the same step is `ink-950` against `ink-900`.
 - The Org layer keeps its horizontal header (that is what tells the account
-  layer apart from a Project) but shares the width, the row recipe, and the
-  persistent footer.
+  layer apart from a Project) but shares the width, the row recipe, the sidebar
+  surface (the header's left cell carries it too), and the persistent footer.
 
 Decisions worth restating because they change what people see:
 
 | Before                                                                                               | After                                                                                          | Why                                                                                                                          |
 | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| "Config" disclosure group hiding Skills, MCP servers, Providers, Environments as unlabelled children | Flat **Tools** section, four rows, each with its own glyph                                     | The group's own path redirected to its first child; the four entry points are peers and need to be recognisable in the rail. |
+| "Config" disclosure group hiding Skills, MCP servers, Providers, Environments as unlabelled children | Flat **Resources** section, four rows, each with its own glyph                                 | The group's own path redirected to its first child; the four entry points are peers and need to be recognisable in the rail. |
 | Full-width black "Create agent" button                                                               | Quiet first row of the work list (`text-fg-1`, plus glyph); disabled row when no Project       | A quick action, not a destination; a filled button in the rail competed with the page's real primary actions.                |
 | Bordered "PROJECT / name" card plus a tiny "Back to org" link above it                               | One identity row (monogram tile, name, chevrons); "Back to {org}" moved into the switcher menu | One anchor for "where am I"; returning to the account layer is rare and now sits with the other Project-level choices.       |
 | "Settings" (Project) in the list and "Settings" (account) in the menu                                | "Project settings" row in the persistent zone; "Account settings" in the account menu          | Two identical labels a few rows apart were ambiguous in every locale.                                                        |
-| Collapsed rail showed one "sliders" icon with a menu for the four tools                              | Four rows with the Tools glyphs; project monogram tile; brand mark on top                      | Recognisability in the icon-only state was the issue's core complaint.                                                       |
+| Collapsed rail showed one "sliders" icon with a menu for the four resources                          | Four rows with the resource glyphs; project monogram tile; brand mark on top                   | Recognisability in the icon-only state was the issue's core complaint.                                                       |
+| Sidebar and canvas shared `#fbfbfc`                                                                  | Sidebar on `--paper-200` (`#f4f6f8`), canvas on `--paper-100` (`#fbfbfc`)                      | Two surfaces that only differ by a hairline read as one; a one-step tonal drop makes the navigation a place, not a column.   |
 | Mobile drawer anchored left but animated in from the right                                           | `SheetContent side="left"` picks position and direction together                               | Class merging cannot reconcile two enter animations; the primitive now owns the pairing.                                     |
+
+Naming: the section is **Resources**, not "Tools". An Agent's tools (MCP tools and skills exposed to the model) already own that word in the console, so a navigation group called Tools would collide with it; "Resources" is the noun the Spec and the PRD index use for Project-owned Skills, MCP servers, credentials, and Environments.
 
 ## 2. Row grammar
 
@@ -89,7 +95,7 @@ Transitions are targeted (`background-color, color`, 150 ms, ease-out); there is
 no `transition-all` and no press-scale. `prefers-reduced-motion` already
 disables the label fade and applies here unchanged.
 
-## 4. Tools icon family
+## 4. Resource icon family
 
 Skills, MCP servers, Providers, and Environments are the modules an Agent is
 assembled from, so they carry one original family rather than four unrelated
@@ -102,8 +108,8 @@ stock glyphs.
 | Providers    | horizontal key                 | the credential that unlocks a model provider    |
 | Environments | isometric cube                 | the sandbox image the Agent runs inside         |
 
-Construction contract (source of truth: `apps/web/src/shared/ui/tool-icons.tsx`;
-standalone copies in [`assets/tool-icons/`](./assets/tool-icons/)):
+Construction contract (source of truth: `apps/web/src/shared/ui/resource-icons.tsx`;
+standalone copies in [`assets/resource-icons/`](./assets/resource-icons/)):
 
 - 24-unit grid, 1.5 stroke, round caps and joins, silhouettes spanning 16 to 19
   units and centred on (12, 12), matching the Hugeicons neighbours.
@@ -115,7 +121,7 @@ standalone copies in [`assets/tool-icons/`](./assets/tool-icons/)):
 - Mosoo Computer consumes the SVG files, not the React components. Any change
   to a path is made in both places in the same PR.
 
-![Tools icon family at 16, 24, 48 px next to the primary navigation glyphs](./assets/sidebar/tool-icons-sheet.png)
+![Resource icon family at 16, 24, 48 px next to the primary navigation glyphs](./assets/sidebar/resource-icons-sheet.png)
 
 ## 5. Review gate
 
@@ -123,7 +129,7 @@ The checks below run before a change is reviewed, not after it ships.
 
 Automated (part of `just test` and the E2E harness):
 
-- `apps/web/tests/sidebar-hierarchy-boundary.test.ts`: zone structure, Tools
+- `apps/web/tests/sidebar-hierarchy-boundary.test.ts`: zone structure, resource
   icons bound to their rows, icon construction contract, no emoji or raw hex
   colours in sidebar sources, one row recipe with focus / selected / open /
   disabled states, tokens defined for both themes, distinct "Project settings"

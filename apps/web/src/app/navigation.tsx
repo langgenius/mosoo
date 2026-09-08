@@ -6,14 +6,14 @@ import Settings02Icon from "@hugeicons/core-free-icons/Settings02Icon";
 import type { ReactElement } from "react";
 
 import { useTranslation } from "@/shared/i18n";
+import {
+  EnvironmentsResourceIcon,
+  McpServersResourceIcon,
+  ProvidersResourceIcon,
+  SkillsResourceIcon,
+} from "@/shared/ui/resource-icons";
 import { SidebarRow, SidebarSectionLabel } from "@/shared/ui/sidebar";
 import type { SidebarIcon } from "@/shared/ui/sidebar";
-import {
-  EnvironmentsToolIcon,
-  McpServersToolIcon,
-  ProvidersToolIcon,
-  SkillsToolIcon,
-} from "@/shared/ui/tool-icons";
 
 import { createHugeicon } from "./hugeicon";
 
@@ -37,9 +37,9 @@ const AgentsIcon = createHugeicon(BotIcon, "AgentsIcon");
 const FilesIcon = createHugeicon(Files02Icon, "FilesIcon");
 const ProjectSettingsIcon = createHugeicon(Settings02Icon, "ProjectSettingsIcon");
 
-// Upper area: the Project's daily work surfaces first, then the four Tools an
-// Agent is assembled from, each with its own glyph so it stays recognisable in
-// the icon-only rail. Lower area: project-level settings, which sit with the
+// Upper area: the Project's daily work surfaces first, then the four Project
+// resources an Agent is assembled from, each with its own glyph so it stays
+// recognisable in the icon-only rail. Lower area: project-level settings, which sit with the
 // other infrequent, persistent entry points instead of interrupting the work list.
 function useProjectNavSections(): Record<ProjectNavZone, ProjectNavSection[]> {
   const { t } = useTranslation();
@@ -56,12 +56,12 @@ function useProjectNavSections(): Record<ProjectNavZone, ProjectNavSection[]> {
       },
       {
         items: [
-          { icon: SkillsToolIcon, label: t("nav.skills"), path: "/integrations/skills" },
-          { icon: McpServersToolIcon, label: t("nav.mcpServers"), path: "/integrations/mcp" },
-          { icon: ProvidersToolIcon, label: t("nav.providers"), path: "/providers" },
-          { icon: EnvironmentsToolIcon, label: t("nav.environments"), path: "/environment" },
+          { icon: SkillsResourceIcon, label: t("nav.skills"), path: "/integrations/skills" },
+          { icon: McpServersResourceIcon, label: t("nav.mcpServers"), path: "/integrations/mcp" },
+          { icon: ProvidersResourceIcon, label: t("nav.providers"), path: "/providers" },
+          { icon: EnvironmentsResourceIcon, label: t("nav.environments"), path: "/environment" },
         ],
-        label: t("nav.tools"),
+        label: t("nav.resources"),
       },
     ],
     persistent: [

@@ -514,7 +514,7 @@ export function OrgLayout({ children }: { children: ReactNode }): ReactElement {
         <header className="border-border-soft hidden shrink-0 border-b md:flex">
           <div
             className={cn(
-              "flex min-h-[76px] shrink-0 items-center gap-2 px-4",
+              "bg-sidebar border-border-soft flex min-h-[76px] shrink-0 items-center gap-2 border-r px-4",
               SIDEBAR_WIDTH_CLASS,
             )}
           >
@@ -543,7 +543,7 @@ export function OrgLayout({ children }: { children: ReactNode }): ReactElement {
           title={resolvedHeaderTitle}
         />
         <div className="flex min-h-0 flex-1">
-          <aside className="border-border-soft hidden w-[240px] shrink-0 flex-col border-r px-3 md:flex">
+          <aside className="bg-sidebar border-border-soft hidden w-[240px] shrink-0 flex-col border-r px-3 md:flex">
             <div
               data-sidebar-zone="work"
               className="sidebar-scroll flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto pt-4 pb-3"

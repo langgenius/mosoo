@@ -7,7 +7,7 @@ import type { Locator, Page, Route } from "@playwright/test";
 import { formatHarnessError } from "../../lib/env-preflight";
 
 // Deterministic acceptance for the console sidebar (langgenius/mosoo#600): the
-// upper work zone / lower persistent zone split, the dedicated Tools icons, the
+// upper work zone / lower persistent zone split, the dedicated resource icons, the
 // collapsed rail, keyboard focus, CJK labels, the no-Project state, the mobile
 // drawer, and the Org layer. Every API projection is a fixture, so the case
 // needs no provider keys and doubles as the screenshot capture for design
@@ -21,7 +21,7 @@ const projectId = "01J00000000000000000000200";
 const secondProjectId = "01J00000000000000000000210";
 const now = "2026-09-08T08:00:00.000Z";
 
-const TOOL_LINKS = [
+const RESOURCE_LINKS = [
   { icon: "skills", name: "Skills", path: "/integrations/skills" },
   { icon: "mcp-servers", name: "MCP servers", path: "/integrations/mcp" },
   { icon: "providers", name: "Providers", path: "/providers" },
@@ -34,7 +34,7 @@ const WORK_LINKS = [
   { name: "Runs", path: "/threads" },
   { name: "Agents", path: "/agent" },
   { name: "Files", path: "/files" },
-  ...TOOL_LINKS,
+  ...RESOURCE_LINKS,
 ] as const;
 
 const PERSISTENT_LINKS = [{ name: "Project settings", path: "/project-settings" }] as const;
@@ -323,14 +323,14 @@ test("expanded sidebar separates the work zone from the persistent zone", async 
     "aria-current",
     "page",
   );
-  for (const tool of TOOL_LINKS) {
+  for (const resource of RESOURCE_LINKS) {
     await expect(
       nav
-        .getByRole("link", { exact: true, name: tool.name })
-        .locator(`svg[data-tool-icon="${tool.icon}"]`),
+        .getByRole("link", { exact: true, name: resource.name })
+        .locator(`svg[data-resource-icon="${resource.icon}"]`),
     ).toBeVisible();
   }
-  await expect(nav.getByText("Tools", { exact: true })).toBeVisible();
+  await expect(nav.getByText("Resources", { exact: true })).toBeVisible();
   await expect(
     nav.getByRole("button", { name: /Switch project: Console redesign/u }),
   ).toBeVisible();
@@ -403,10 +403,10 @@ test("collapsed rail keeps every entry point recognisable and reachable", async 
     "aria-current",
     "page",
   );
-  for (const tool of TOOL_LINKS) {
-    await expect(nav.locator(`svg[data-tool-icon="${tool.icon}"]`)).toBeVisible();
+  for (const resource of RESOURCE_LINKS) {
+    await expect(nav.locator(`svg[data-resource-icon="${resource.icon}"]`)).toBeVisible();
   }
-  await expect(nav.getByText("Tools", { exact: true })).toHaveCount(0);
+  await expect(nav.getByText("Resources", { exact: true })).toHaveCount(0);
 
   await nav.getByRole("link", { exact: true, name: "Providers" }).hover();
   await expect(page.locator('[data-slot="tooltip-content"]')).toHaveText("Providers");
@@ -451,7 +451,7 @@ test("labels stay on one line in CJK locales", async ({ page }) => {
 
   const nav = desktopSidebar(page);
   await expect(nav.getByRole("link", { exact: true, name: "项目设置" })).toBeVisible();
-  await expect(nav.getByText("工具", { exact: true })).toBeVisible();
+  await expect(nav.getByText("资源", { exact: true })).toBeVisible();
 
   const overflowing = await nav
     .locator("a, button")
