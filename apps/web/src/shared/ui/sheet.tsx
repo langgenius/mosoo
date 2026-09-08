@@ -25,11 +25,22 @@ function SheetOverlay({
   );
 }
 
+type SheetSide = "left" | "right";
+
+// The edge the sheet is anchored to also decides which way it slides. The two
+// enter/exit animations are separate utilities that class merging cannot
+// reconcile, so callers pick a side instead of overriding the classes.
+const SHEET_SIDE_CLASS: Record<SheetSide, string> = {
+  left: "left-0 data-[closed]:slide-out-to-left data-[open]:slide-in-from-left",
+  right: "right-0 data-[closed]:slide-out-to-right data-[open]:slide-in-from-right",
+};
+
 function SheetContent({
   className,
   children,
+  side = "right",
   ...props
-}: ComponentProps<typeof DialogPrimitive.Popup>): ReactElement {
+}: ComponentProps<typeof DialogPrimitive.Popup> & { side?: SheetSide }): ReactElement {
   const { t } = useTranslation();
 
   return (
@@ -37,8 +48,10 @@ function SheetContent({
       <SheetOverlay />
       <DialogPrimitive.Popup
         data-slot="sheet-content"
+        data-side={side}
         className={cn(
-          "fixed inset-y-0 right-0 z-50 flex w-[420px] max-w-[calc(100vw-2rem)] flex-col bg-background shadow-xl duration-300 outline-none data-[closed]:animate-out data-[closed]:slide-out-to-right data-[open]:animate-in data-[open]:slide-in-from-right",
+          "fixed inset-y-0 z-50 flex w-[420px] max-w-[calc(100vw-2rem)] flex-col bg-background shadow-xl duration-300 outline-none data-[closed]:animate-out data-[open]:animate-in",
+          SHEET_SIDE_CLASS[side],
           className,
         )}
         {...props}

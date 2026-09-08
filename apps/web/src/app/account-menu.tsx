@@ -1,12 +1,12 @@
 import ChevronsDownUpIcon from "@hugeicons/core-free-icons/ChevronsDownUpIcon";
 import Logout01Icon from "@hugeicons/core-free-icons/Logout01Icon";
 import Settings02Icon from "@hugeicons/core-free-icons/Settings02Icon";
+import type { ReactElement } from "react";
 import { Link } from "react-router-dom";
 
 import { resetProductAnalytics } from "@/analytics/product-analytics";
 import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
-import { Button } from "@/shared/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,7 +15,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
+import { SidebarTooltip } from "@/shared/ui/sidebar";
 
 import { authClient } from "../domains/auth/api/auth-client";
 import { getAvatarBackground, getAvatarInitial } from "../shared/lib/avatar";
@@ -34,17 +34,17 @@ interface AccountMenuUser {
 }
 
 function UserAvatar({
-  size = 28,
+  size = 26,
   user,
 }: {
   size?: number;
   user: { email?: string | null; image?: string | null; name: string } | null;
-}) {
+}): ReactElement {
   if (isTruthy(user?.image)) {
     return (
       <img
         src={user.image}
-        alt={user.name}
+        alt=""
         className="shrink-0 rounded-full object-cover"
         style={{ height: size, width: size }}
         referrerPolicy="no-referrer"
@@ -53,7 +53,8 @@ function UserAvatar({
   }
 
   return (
-    <div
+    <span
+      aria-hidden="true"
       className="flex shrink-0 items-center justify-center rounded-full font-bold tracking-[0.02em] text-white"
       style={{
         background: getAvatarBackground(user?.email ?? user?.name),
@@ -63,61 +64,68 @@ function UserAvatar({
       }}
     >
       {getAvatarInitial(user?.name)}
-    </div>
+    </span>
   );
 }
 
+// Anchored account row at the foot of the sidebar: identity at a glance, with
+// account-level settings and sign-out one step away in an upward menu.
 export function AccountMenu({
   collapsed,
   user,
 }: {
   collapsed: boolean;
   user: AccountMenuUser | null;
-}) {
+}): ReactElement {
   const { t } = useTranslation();
-  const wrapperClassName = cn(collapsed ? "flex justify-center pb-3 pt-2" : "px-2 pb-3 pt-2");
-  const trigger = collapsed ? (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Button
-          variant="ghost"
-          aria-label={user?.name ?? t("nav.account")}
-          className="hover:bg-ink-900/[0.04] size-9 justify-center self-center rounded-full p-0"
-        >
-          <UserAvatar size={28} user={user} />
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent side="right">{user?.name ?? t("nav.account")}</TooltipContent>
-    </Tooltip>
-  ) : (
-    <Button
-      variant="ghost"
-      className="hover:bg-ink-900/[0.04] flex h-auto w-full items-center justify-start gap-2.5 rounded-lg p-2 text-left"
+  const name = user?.name ?? t("nav.account");
+
+  const trigger = (
+    <button
+      type="button"
+      aria-label={collapsed ? name : undefined}
+      className={cn(
+        "hover:bg-sidebar-row-hover focus-visible:ring-ring focus-visible:ring-offset-sidebar data-[popup-open]:bg-sidebar-row-active flex shrink-0 items-center rounded-md text-left outline-none transition-[background-color] duration-150 ease-out focus-visible:ring-2 focus-visible:ring-offset-1",
+        collapsed ? "mx-auto size-8 justify-center" : "h-11 w-full gap-2.5 px-2",
+      )}
     >
-      <UserAvatar user={user} />
-      <div className="sidebar-label-enter min-w-0 flex-1">
-        <div className="text-fg-1 truncate text-[13px] font-bold">{user?.name}</div>
-        <div className="text-fg-3 truncate text-[11.5px]">{user?.email}</div>
-      </div>
-      <AccountMenuChevronIcon className="sidebar-label-enter text-fg-3 size-3.5 shrink-0" />
-    </Button>
+      <UserAvatar size={collapsed ? 24 : 26} user={user} />
+      {collapsed ? null : (
+        <>
+          <span className="sidebar-label-enter min-w-0 flex-1">
+            <span className="text-fg-1 block truncate text-[13px] leading-4 font-semibold">
+              {name}
+            </span>
+            <span className="text-fg-3 block truncate text-[11.5px] leading-4">{user?.email}</span>
+          </span>
+          <AccountMenuChevronIcon className="sidebar-label-enter text-fg-3 size-3.5 shrink-0" />
+        </>
+      )}
+    </button>
   );
 
   return (
-    <div className={wrapperClassName}>
+    <div className={cn("flex flex-col pt-1 pb-2", collapsed ? "items-center" : "")}>
       <DropdownMenu>
-        <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
+        <SidebarTooltip collapsed={collapsed} label={name}>
+          <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
+        </SidebarTooltip>
 
-        <DropdownMenuContent align="start" side="top" className="w-[220px] rounded-lg p-1">
+        <DropdownMenuContent
+          align="start"
+          side={collapsed ? "right" : "top"}
+          sideOffset={8}
+          className="w-[224px] rounded-lg p-1"
+        >
           <DropdownMenuLabel className="px-2 pb-1">
-            <div className="text-fg-1 text-[13px] font-semibold">{user?.name}</div>
-            <div className="text-fg-3 mt-0.5 text-[11.5px] font-normal">{user?.email}</div>
+            <div className="text-fg-1 truncate text-[13px] font-semibold">{name}</div>
+            <div className="text-fg-3 mt-0.5 truncate text-[11.5px] font-normal">{user?.email}</div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuItem asChild className="cursor-pointer rounded-md">
             <Link to="/settings">
               <AccountMenuSettingsIcon className="size-4" />
-              {t("nav.settings")}
+              {t("nav.accountSettings")}
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem

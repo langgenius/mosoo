@@ -112,6 +112,11 @@
   --bg-canvas: #ffffff;
   --bg-sidebar: #fbfbfc;
 
+  /* Sidebar rows: neutral hover/selected fills. Selection is never green; the
+     accent is reserved for the keyboard focus ring. */
+  --sidebar-row-hover: rgba(28, 32, 36, 0.045);
+  --sidebar-row-active: rgba(28, 32, 36, 0.065);
+
   --fg-1: var(--ink-900);
   --fg-2: var(--ink-500);
   --fg-3: var(--ink-400);
@@ -208,6 +213,9 @@
   --bg-canvas: var(--ink-800);
   --bg-sidebar: var(--ink-950);
 
+  --sidebar-row-hover: rgba(244, 246, 248, 0.06);
+  --sidebar-row-active: rgba(244, 246, 248, 0.1);
+
   --fg-1: var(--paper-100);
   --fg-2: var(--ink-200);
   --fg-3: var(--ink-300);
@@ -276,6 +284,8 @@
   --color-sidebar-accent-foreground: var(--fg-1);
   --color-sidebar-border: var(--border-soft);
   --color-sidebar-ring: var(--accent-ring);
+  --color-sidebar-row-hover: var(--sidebar-row-hover);
+  --color-sidebar-row-active: var(--sidebar-row-active);
 
   --color-paper-50: var(--paper-50);
   --color-paper-100: var(--paper-100);
@@ -484,6 +494,15 @@
   }
 }
 
+@keyframes sidebar-scroll-edge {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 @keyframes sidebar-label-enter {
   from {
     opacity: 0;
@@ -544,6 +563,36 @@
      the surrounding dialog/page entrance has landed. */
   .success-check-enter {
     animation: success-check-enter var(--dur-3) var(--ease-spring) 120ms backwards;
+  }
+
+  /* Sidebar work area: scrolls on short viewports so the persistent footer stays
+     anchored; a thin, contained scrollbar keeps the rail quiet. */
+  .sidebar-scroll {
+    overscroll-behavior: contain;
+    scrollbar-color: rgba(28, 32, 36, 0.14) transparent;
+    scrollbar-width: thin;
+  }
+
+  /* Once the work area has scrolled, a hairline appears under the fixed identity
+     row so a clipped row reads as "more above" rather than a layout fault. Driven
+     by the scroll position alone; browsers without scroll-driven animations get
+     no line, which is the same as today. */
+  @supports (animation-timeline: scroll()) {
+    .sidebar-scroll::before {
+      content: "";
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      display: block;
+      height: 1px;
+      margin: 0 4px;
+      flex-shrink: 0;
+      background: var(--border-default);
+      opacity: 0;
+      animation: sidebar-scroll-edge linear both;
+      animation-timeline: scroll(nearest block);
+      animation-range: 0 24px;
+    }
   }
 
   .environment-scroll-area {
