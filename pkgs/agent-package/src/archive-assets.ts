@@ -12,6 +12,12 @@ interface PackageAssetReadResult {
   issues: AgentResolutionIssue[];
 }
 
+type ArchiveEntry = [path: string, contentBytes: Uint8Array];
+
+function toSkillPath(skillId: string): string {
+  return skillId.endsWith("/") ? skillId : `${skillId}/`;
+}
+
 export function readPackageAssets(
   agentPackage: AgentPackage,
   entries: Record<string, Uint8Array>,
@@ -30,11 +36,11 @@ function readSkillAssets(
   assets: AgentPackageAsset[],
   issues: AgentResolutionIssue[],
 ): void {
+  const skillEntriesByPath = indexSkillEntries(agentPackage, entries);
+
   for (const skill of agentPackage.manifest.skills) {
-    const skillPath = skill.skillId.endsWith("/") ? skill.skillId : `${skill.skillId}/`;
-    const skillEntries = Object.entries(entries).filter(
-      ([path, entry]) => path.startsWith(skillPath) && entry.byteLength > 0,
-    );
+    const skillPath = toSkillPath(skill.skillId);
+    const skillEntries = skillEntriesByPath.get(skillPath) ?? [];
 
     if (skillEntries.length === 0) {
       issues.push(
@@ -74,4 +80,41 @@ function readSkillAssets(
       });
     }
   }
+}
+
+function indexSkillEntries(
+  agentPackage: AgentPackage,
+  entries: Record<string, Uint8Array>,
+): ReadonlyMap<string, readonly ArchiveEntry[]> {
+  const entriesBySkillPath = new Map<string, ArchiveEntry[]>();
+
+  for (const skill of agentPackage.manifest.skills) {
+    entriesBySkillPath.set(toSkillPath(skill.skillId), []);
+  }
+
+  if (entriesBySkillPath.size === 0) {
+    return entriesBySkillPath;
+  }
+
+  for (const entry of Object.entries(entries)) {
+    const [path, contentBytes] = entry;
+
+    if (contentBytes.byteLength === 0) {
+      continue;
+    }
+
+    let slashIndex = path.indexOf("/");
+
+    while (slashIndex !== -1) {
+      const matchingEntries = entriesBySkillPath.get(path.slice(0, slashIndex + 1));
+
+      if (matchingEntries !== undefined) {
+        matchingEntries.push(entry);
+      }
+
+      slashIndex = path.indexOf("/", slashIndex + 1);
+    }
+  }
+
+  return entriesBySkillPath;
 }
