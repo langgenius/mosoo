@@ -91,9 +91,8 @@ function CodingAgentLane(): ReactElement {
           onClick={() => {
             void copyInstallCommand();
           }}
-          className="w-full bg-[rgb(111_211_4)] text-black hover:bg-[rgb(111_211_4)] sm:w-auto"
-          size="default"
-          variant="accent"
+          className="w-full sm:w-auto"
+          variant="outline"
         >
           <CopyCheckIcon copied={copied} />
           {copied ? t("common.copied") : t("common.copy")}

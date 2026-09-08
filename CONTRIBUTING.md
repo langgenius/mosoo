@@ -243,12 +243,14 @@ just e2e public-api
 just e2e contract harness
 just e2e deterministic session-log
 just e2e ui sidebar
+just e2e ui design-contract
+just e2e ui typography-proof
 just e2e ui preview
 just e2e public-api runtime
 just e2e public-api latency
 ```
 
-`just e2e deterministic session-log` is the local acceptance path without external credentials. `just e2e ui sidebar` is the fixture-backed console sidebar acceptance case and writes review screenshots to `.tmp/e2e/sidebar/`. `just e2e contract harness` covers local harness contracts that do not need live credentials. Preview and latency cases accept `openai|anthropic`; `public-api runtime` additionally accepts `opencode|deepseek`. Use the matching provider-specific key or `MOSOO_E2E_PROVIDER_API_KEY`. ACP fallback is the runtime path used by the OpenCode and DeepSeek public-API cases and is also covered by driver fixtures and API integration gates.
+`just e2e deterministic session-log` is the local acceptance path without external credentials. `just e2e ui sidebar` is the fixture-backed console sidebar acceptance case and writes review screenshots to `.tmp/e2e/sidebar/`. `just e2e ui design-contract` measures the shared component recipes against `docs/design/console-design-contract.md` and writes before/after review screenshots to `.tmp/e2e/design-contract/`; `just e2e ui typography-proof` renders the typography comparison. `just e2e contract harness` covers local harness contracts that do not need live credentials. Preview and latency cases accept `openai|anthropic`; `public-api runtime` additionally accepts `opencode|deepseek`. Use the matching provider-specific key or `MOSOO_E2E_PROVIDER_API_KEY`. ACP fallback is the runtime path used by the OpenCode and DeepSeek public-API cases and is also covered by driver fixtures and API integration gates.
 
 ## Engineering Principles
 

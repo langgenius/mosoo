@@ -1,0 +1,196 @@
+# Mosoo Console icon registry.
+#
+# Governs the boundary between general interface glyphs (Hugeicons Free through
+# the semantic adapter in apps/web/src/shared/ui/icons.tsx) and purpose-built
+# SVGs (brand, vendor, runtime, sidebar, state, and illustration art). The
+# design gate test apps/web/tests/console-design-contract-boundary.test.ts reads
+# this file: every createHugeicon(...) registration in the web app must appear
+# under `general` or `navigation`, and purpose-built assets must appear under
+# `purpose_built`. Add an entry in the same change that adds the icon.
+#
+# Rules (docs/design/console-design-contract.md, section 6):
+# - General glyphs render from currentColor at a 1.5 stroke, 16px inline and
+#   20px in empty states; they never carry colour of their own.
+# - Purpose-built marks keep their own colour and are never used as generic
+#   glyphs; general glyphs are never used to stand in for a brand.
+# - No emoji, no one-off "close enough" substitutes, no second icon library.
+version: 1
+
+libraries:
+  hugeicons_free:
+    package: "@hugeicons/core-free-icons"
+    adapter: apps/web/src/shared/ui/icons.tsx
+    stroke: 1.5
+    sizes: [16, 20]
+  purpose_built:
+    construction: 24 grid, 1.5 stroke, round caps and joins, currentColor unless the mark owns a brand colour
+
+# Semantic export name in icons.tsx -> Hugeicons source glyph.
+general:
+  AlertCircle: AlertCircleIcon
+  AlertTriangle: Alert01Icon
+  Archive: ArchiveIcon
+  ArrowLeft: ArrowLeft01Icon
+  ArrowRight: ArrowRight01Icon
+  ArrowUp: ArrowUp01Icon
+  ArrowUpRight: ArrowUpRight01Icon
+  BarChart3: BarChartIcon
+  Bell: BellIcon
+  BookOpen: BookOpen01Icon
+  Bot: BotIcon
+  Box: BoxIcon
+  Check: CheckIcon
+  CheckCircle2: CheckmarkCircle02Icon
+  ChevronDown: ChevronDownIcon
+  ChevronLeft: ChevronLeftIcon
+  ChevronRight: ChevronRightIcon
+  ChevronUp: ChevronUpIcon
+  Circle: CircleIcon
+  CircleDashed: CircleDashedIcon
+  CircleX: CircleXIcon
+  Clock3: Clock03Icon
+  Code: CodeIcon
+  Compass: CompassIcon
+  Copy: Copy01Icon
+  CornerDownLeft: CornerDownLeftIcon
+  Download: Download01Icon
+  ExternalLink: ExternalLinkIcon
+  FileArchive: FileArchiveIcon
+  FileQuestion: FileQuestionMarkIcon
+  FileStack: FileStackIcon
+  FileText: File02Icon
+  Flame: FlameIcon
+  GitBranch: GitBranchIcon
+  GitFork: GitForkIcon
+  Globe: GlobeIcon
+  Grid2X2: Grid2X2Icon
+  HelpCircle: HelpCircleIcon
+  Inbox: InboxIcon
+  Info: InformationCircleIcon
+  KeyRound: Key02Icon
+  Layers: Layers01Icon
+  Library: LibraryIcon
+  List: ListViewIcon
+  Loader2: Loading02Icon
+  LoaderCircle: Loading03Icon
+  Lock: LockIcon
+  LockKeyhole: LockKeyIcon
+  Maximize2: Maximize02Icon
+  Minimize2: Minimize02Icon
+  MoreHorizontal: MoreHorizontalIcon
+  MousePointerClick: CursorPointer02Icon
+  Paperclip: AttachmentIcon
+  Pencil: PencilIcon
+  Pin: PinIcon
+  PinOff: PinOffIcon
+  Plus: Add01Icon
+  Power: PowerIcon
+  PowerOff: PowerOffIcon
+  RefreshCw: RefreshIcon
+  RotateCcw: RotateLeft01Icon
+  Search: Search01Icon
+  Send: SentIcon
+  Settings: Settings02Icon
+  ShieldAlert: SecurityWarningIcon
+  ShieldCheck: SecurityCheckIcon
+  Sparkles: SparklesIcon
+  SquareTerminal: ComputerTerminal01Icon
+  Star: StarIcon
+  Target: Target01Icon
+  Terminal: ComputerTerminal01Icon
+  Trash2: Delete02Icon
+  TrendingUp: AnalyticsUpIcon
+  TriangleAlert: Alert01Icon
+  Undo2: Undo02Icon
+  Unplug: PlugSocketIcon
+  Upload: Upload01Icon
+  User: UserIcon
+  X: Cancel01Icon
+  XCircle: CancelCircleIcon
+  Zap: ZapIcon
+
+# Shell and navigation glyphs registered next to the surface that owns them.
+navigation:
+  AccountMenuChevronIcon:
+    source: ChevronsDownUpIcon
+    owner: app/account-menu.tsx
+  AccountMenuSettingsIcon:
+    source: Settings02Icon
+    owner: app/account-menu.tsx
+  AccountMenuSignOutIcon:
+    source: Logout01Icon
+    owner: app/account-menu.tsx
+  BackIcon:
+    source: ArrowLeft01Icon
+    owner: app/app-shell.tsx
+  CheckmarkIcon:
+    source: CheckIcon
+    owner: app/app-shell.tsx
+  CollapseSidebarIcon:
+    source: PanelLeftCloseIcon
+    owner: app/app-shell.tsx
+  ExpandSidebarIcon:
+    source: PanelLeftOpenIcon
+    owner: app/app-shell.tsx
+  NewAgentIcon:
+    source: Add01Icon
+    owner: app/app-shell.tsx
+  SwitcherChevronIcon:
+    source: ChevronsDownUpIcon
+    owner: app/app-shell.tsx
+  ProjectSettingsIcon:
+    source: Settings02Icon
+    owner: app/navigation.tsx
+  BillingIcon:
+    source: Wallet02Icon
+    owner: app/org-navigation.tsx
+  OrgSettingsIcon:
+    source: Settings02Icon
+    owner: app/org-navigation.tsx
+  ProjectsIcon:
+    source: GridViewIcon
+    owner: app/org-navigation.tsx
+  UsageIcon:
+    source: ChartLineData01Icon
+    owner: app/org-navigation.tsx
+  LanguageIcon:
+    source: LanguageCircleIcon
+    owner: shared/i18n/locale-switcher.tsx
+  SelectedLocaleIcon:
+    source: CheckIcon
+    owner: shared/i18n/locale-switcher.tsx
+
+purpose_built:
+  product:
+    - id: logo-mark
+      path: apps/web/public/brand/logo-mark.svg
+      colour: brand green on white; the only place the raw brand hex is allowed outside tokens
+    - id: logo-wordmark-onlight
+      path: apps/web/public/brand/logo-wordmark-onlight.svg
+    - id: logo-wordmark-ondark
+      path: apps/web/public/brand/logo-wordmark-ondark.svg
+    - id: favicon
+      path: apps/web/public/favicon.svg
+  sidebar:
+    owner: apps/web/src/shared/ui/sidebar-icons.tsx
+    assets: docs/design/assets/sidebar-icons/
+    ids: [overview, runs, agents, files, skills, mcp-servers, providers, environments]
+    reading: currentColor duotone family for the eight Project work rows (docs/design/console-sidebar.md, section 4)
+  vendor:
+    owner: apps/web/src/shared/ui/brand-icons/vendor-icon-data.ts
+    ids: [anthropic, deepseek, gemini, kimi, minimax, openai, opencode, qwen, zhipu]
+    reading: model vendor marks; keep their own colour, render inside a neutral tile
+  runtime:
+    owner: apps/web/src/shared/ui/brand-icons/runtime-icon-data.ts
+    ids: [claude-code, cline, codex, cursor, openai, opencode]
+    reading: agent runtime marks; keep their own colour, render inside a neutral tile
+  channel:
+    owner: apps/web/src/routes/integrations/mcp/icon-avatar.tsx
+    reading: MCP server favicons or a deterministic letter tile; the fixed avatar palette is allowed because it identifies a server, not a Mosoo state
+  state:
+    owner: apps/web/src/routes/threads/thread-state-icon.tsx
+    ids: [working, success, failed, archived]
+    reading: run lifecycle glyphs; colour comes from semantic status tokens, never from the brand accent
+  illustration:
+    owner: apps/web/src/routes/login/doodles.tsx
+    reading: login doodles are illustration, not interface glyphs; they do not appear inside the console shell

@@ -38,11 +38,14 @@ export function CommandBlock({
   return (
     <div
       className={cn(
-        "border-border bg-bg-sunken flex items-center gap-3 rounded-md border px-3 py-2.5",
+        "border-border bg-sunken flex min-h-10 items-center gap-3 rounded-md border px-3 py-2",
         className,
       )}
     >
-      <code className="text-fg-1 min-w-0 flex-1 truncate font-mono text-[13px]">
+      <code
+        data-slot="mono"
+        className="text-fg-1 min-w-0 flex-1 truncate font-mono text-[12.5px] tabular-nums"
+      >
         {prompt === null ? null : <span className="text-fg-3 select-none">{prompt} </span>}
         {command}
       </code>
@@ -50,7 +53,7 @@ export function CommandBlock({
         type="button"
         aria-label={copied ? t("common.copied") : (copyLabel ?? t("common.copyCommand"))}
         onClick={copy}
-        className="text-fg-3 hover:bg-ink-900/[0.06] hover:text-fg-1 flex size-7 shrink-0 items-center justify-center rounded-md transition-colors"
+        className="text-fg-3 hover:bg-hover hover:text-fg-1 focus-visible:ring-ring rounded-compact flex size-7 shrink-0 items-center justify-center transition-[background-color,color] duration-150 ease-out outline-none focus-visible:ring-2"
       >
         {copied ? <Check className="text-success size-3.5" /> : <Copy className="size-3.5" />}
       </button>

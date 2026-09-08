@@ -20,7 +20,7 @@ function SelectTrigger({
     <SelectPrimitive.Trigger
       data-slot="select-trigger"
       className={cn(
-        "bg-card border-border-strong text-fg-2 hover:text-fg-1 focus-visible:border-ring data-[popup-open]:border-ring inline-flex h-8 min-w-0 cursor-default items-center justify-between gap-2 rounded-md border px-2.5 text-[12.5px] transition-colors outline-none disabled:pointer-events-none disabled:opacity-50",
+        "inline-flex h-8 min-w-0 cursor-default items-center justify-between gap-2 rounded-md border border-border-strong bg-card px-3 text-[13px] text-fg-1 shadow-xs outline-none transition-[border-color,box-shadow,background-color] duration-150 ease-out hover:bg-paper-100 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 data-[popup-open]:border-ring aria-invalid:border-danger disabled:cursor-not-allowed disabled:border-border-soft disabled:bg-paper-200 disabled:text-fg-3 data-[placeholder]:text-fg-muted",
         className,
       )}
       {...props}
@@ -71,7 +71,7 @@ function SelectContent({
         <SelectPrimitive.Popup
           data-slot="select-content"
           className={cn(
-            "bg-popover text-popover-foreground origin-(--transform-origin) data-[open]:animate-in data-[closed]:animate-out data-[closed]:fade-out-0 data-[open]:fade-in-0 data-[closed]:zoom-out-95 data-[open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2 max-h-[min(24rem,var(--available-height))] min-w-[var(--anchor-width)] border-border-strong overflow-x-hidden overflow-y-auto rounded-md border p-1 shadow-md outline-none",
+            "bg-popover text-popover-foreground origin-(--transform-origin) data-[open]:animate-in data-[closed]:animate-out data-[closed]:fade-out-0 data-[open]:fade-in-0 data-[closed]:zoom-out-95 data-[open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2 max-h-[min(24rem,var(--available-height))] min-w-[var(--anchor-width)] overflow-x-hidden overflow-y-auto rounded-md border border-border p-1 shadow-md outline-none",
             className,
           )}
           {...props}
@@ -90,7 +90,7 @@ function SelectItem({
     <SelectPrimitive.Item
       data-slot="select-item"
       className={cn(
-        "data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground relative flex cursor-default items-center gap-2 rounded-sm py-1.5 pr-8 pl-2 text-[12.5px] transition-colors outline-none select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        "relative flex cursor-default items-center gap-2 rounded-sm py-1.5 pr-8 pl-2 text-[13px] text-fg-1 outline-none select-none transition-[background-color,color] duration-150 ease-out data-[highlighted]:bg-hover data-[highlighted]:text-fg-1 data-[disabled]:pointer-events-none data-[disabled]:text-fg-muted",
         className,
       )}
       {...props}
@@ -114,7 +114,7 @@ function SelectGroupLabel({
   return (
     <SelectPrimitive.GroupLabel
       data-slot="select-group-label"
-      className={cn("text-muted-foreground px-2 py-1.5 text-xs font-medium", className)}
+      className={cn("px-2 py-1.5 text-[12px] font-medium text-fg-3", className)}
       {...props}
     />
   );
@@ -124,7 +124,7 @@ function SelectSeparator({ className, ...props }: ComponentProps<"div">): ReactE
   return (
     <div
       data-slot="select-separator"
-      className={cn("bg-muted -mx-1 my-1 h-px", className)}
+      className={cn("-mx-1 my-1 h-px bg-border-soft", className)}
       {...props}
     />
   );

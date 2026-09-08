@@ -30,13 +30,13 @@ export function SettingsNav() {
 
   return (
     <aside className="border-border-soft flex w-full shrink-0 flex-col gap-3 overflow-x-auto border-b px-4 py-2 md:w-[220px] md:overflow-visible md:border-r md:border-b-0 md:px-3 md:py-5">
-      <div className="text-fg-3 hidden px-2.5 pb-1 text-[10px] font-semibold tracking-[0.14em] uppercase md:block">
+      <div className="text-fg-3 hidden px-2.5 pb-1 text-[11px] leading-4 font-semibold tracking-[0.06em] uppercase md:block">
         {t("pageTitle.settings")}
       </div>
       {SETTINGS_NAV_SECTIONS.map((section) => {
         return (
           <div key={section.labelKey} className="flex flex-col gap-1">
-            <div className="text-fg-3 hidden px-2.5 pb-1 text-[10px] font-semibold tracking-[0.14em] uppercase md:block">
+            <div className="text-fg-3 hidden px-2.5 pb-1 text-[11px] leading-4 font-semibold tracking-[0.06em] uppercase md:block">
               {t(section.labelKey)}
             </div>
             <div className="flex gap-1 md:flex-col md:gap-0.5">
@@ -46,10 +46,10 @@ export function SettingsNav() {
                   to={item.path}
                   className={({ isActive }) =>
                     cn(
-                      "flex min-h-11 shrink-0 items-center gap-2.5 whitespace-nowrap rounded-md px-2.5 py-2 text-[13px] font-medium transition-colors md:min-h-0",
+                      "focus-visible:ring-ring focus-visible:ring-offset-background flex min-h-11 shrink-0 items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] font-medium whitespace-nowrap outline-none transition-[background-color,color] duration-150 ease-out focus-visible:ring-2 focus-visible:ring-offset-1 md:min-h-0",
                       isActive
-                        ? "bg-ink-100 text-fg-1"
-                        : "text-fg-2 hover:bg-ink-900/[0.04] hover:text-fg-1",
+                        ? "bg-selected text-fg-1"
+                        : "text-fg-2 hover:bg-hover hover:text-fg-1",
                     )
                   }
                 >

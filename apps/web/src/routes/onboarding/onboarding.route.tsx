@@ -129,7 +129,7 @@ function OnboardingLoadingScreen() {
   return (
     <div className="bg-background fixed inset-0 flex items-center justify-center">
       <div className="flex flex-col items-center gap-4">
-        <Loader2 className="text-primary size-8 animate-spin" />
+        <Loader2 className="text-brand-mark size-8 animate-spin" />
         <p className="text-muted-foreground text-sm">{t("onboarding.settingUp")}</p>
       </div>
     </div>
@@ -141,7 +141,7 @@ function OnboardingProvisioningScreen() {
   return (
     <div className="bg-background fixed inset-0 flex items-center justify-center">
       <div className="flex flex-col items-center gap-4">
-        <Loader2 className="text-primary size-8 animate-spin" />
+        <Loader2 className="text-brand-mark size-8 animate-spin" />
         <p className="text-muted-foreground text-sm">{t("onboarding.creatingDefaultProject")}</p>
       </div>
     </div>

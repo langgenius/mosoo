@@ -16,10 +16,10 @@ export function EnvironmentBadges({
 
   return (
     <div className="flex flex-wrap gap-1.5">
-      {environment.isBuiltIn ? <Badge variant="primary">{t("environments.builtIn")}</Badge> : null}
+      {environment.isBuiltIn ? <Badge variant="outline">{t("environments.builtIn")}</Badge> : null}
       {environment.isDefault ? (
-        <Badge className="gap-1" variant="warning">
-          <Star className="size-3" />
+        <Badge variant="brand">
+          <Star />
           {t("environments.default")}
         </Badge>
       ) : null}

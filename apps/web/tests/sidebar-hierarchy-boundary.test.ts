@@ -72,7 +72,8 @@ describe("Console sidebar hierarchy", () => {
     expect(source).not.toContain("bg-primary");
     expect(source).toContain('aria-disabled="true"');
     expect(css.match(/--sidebar-cta-bg:/g)).toHaveLength(2);
-    expect(css).toContain("--sidebar-cta-bg: var(--ink-900)");
+    expect(css).toContain("--sidebar-cta-bg: var(--emphasis)");
+    expect(css).toContain("--emphasis: var(--ink-900)");
     expect(css).toContain("--color-sidebar-cta: var(--sidebar-cta-bg)");
   });
 

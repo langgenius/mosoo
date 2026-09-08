@@ -564,7 +564,7 @@ export function OrgLayout({ children }: { children: ReactNode }): ReactElement {
           </div>
           {resolvedHeaderTitle === null ? null : (
             <div className="flex min-w-0 flex-1 items-center px-8">
-              <h1 className="text-foreground truncate text-2xl font-semibold tracking-normal">
+              <h1 className="font-heading text-fg-heading truncate text-[24px] leading-tight font-medium tracking-[-0.01em]">
                 {resolvedHeaderTitle}
               </h1>
             </div>

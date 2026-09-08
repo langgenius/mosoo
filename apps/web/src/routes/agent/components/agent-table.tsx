@@ -118,7 +118,7 @@ export function AgentTable({
                           referrerPolicy="no-referrer"
                         />
                       ) : null}
-                      <AvatarFallback className="bg-primary/10 text-primary text-[10px]">
+                      <AvatarFallback className="bg-brand-soft text-brand text-[10px]">
                         {getOwnerInitial(agent.owner.name)}
                       </AvatarFallback>
                     </Avatar>

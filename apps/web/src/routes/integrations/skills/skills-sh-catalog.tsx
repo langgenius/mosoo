@@ -421,7 +421,7 @@ function SkillsShCatalogCard({
   const installRequiresApi = !installable && skill.sourceType === "well-known";
 
   return (
-    <article className="border-border bg-card hover:border-border-strong flex min-h-[168px] min-w-0 flex-col gap-3 rounded-lg border p-4 transition-all hover:shadow-sm">
+    <article className="border-border bg-card hover:border-border-strong flex min-h-[168px] min-w-0 flex-col gap-3 rounded-lg border p-4 transition-[border-color,box-shadow] duration-150 ease-out hover:shadow-sm">
       <div className="flex min-w-0 items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="text-fg-1 truncate text-[14px] font-bold">{skill.name}</div>
@@ -459,7 +459,7 @@ function SkillsShCatalogCard({
                 size="sm"
                 aria-disabled="true"
                 aria-label={t("skills.cannotInstallLabel", { name: skill.name })}
-                className="hover:bg-primary cursor-not-allowed opacity-40 active:scale-100"
+                className="bg-paper-300 text-fg-3 hover:bg-paper-300 active:bg-paper-300 cursor-not-allowed border-transparent shadow-none"
                 onClick={(event) => {
                   event.preventDefault();
                 }}

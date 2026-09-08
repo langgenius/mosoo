@@ -40,7 +40,7 @@ export function AgentGrid({
               onClick={() => {
                 onSelect(agent.id);
               }}
-              className="border-border bg-card hover:border-border-strong cursor-pointer rounded-lg border p-4 text-left transition-all"
+              className="border-border bg-card hover:border-border-strong focus-visible:ring-ring cursor-pointer rounded-lg border p-4 text-left transition-[border-color,box-shadow] duration-150 ease-out outline-none focus-visible:ring-2 focus-visible:ring-offset-1"
               style={AGENT_GRID_CARD_STYLE}
             >
               <div className="mb-3 flex items-start justify-between">
@@ -66,7 +66,7 @@ export function AgentGrid({
                           referrerPolicy="no-referrer"
                         />
                       ) : null}
-                      <AvatarFallback className="bg-primary/10 text-primary text-[9px]">
+                      <AvatarFallback className="bg-brand-soft text-brand text-[9px]">
                         {getOwnerInitial(agent.owner.name)}
                       </AvatarFallback>
                     </Avatar>
