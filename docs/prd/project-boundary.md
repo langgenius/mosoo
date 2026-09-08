@@ -2,6 +2,8 @@
 
 Status: shipped resource and ownership boundary. [mosoo Spec](../SPEC.md) defines the managed Agent runtime contract.
 
+Target transition (2026-09-08): #581 moves this boundary to Workspace with Workspace-scoped execution keys, preserving resource identity, ownership, and history. The target console centers API access and Session records, with optional Agent configuration secondary. The sections below record current Project behavior, not the completed target. See [remaining slices](./managed-agent-v1.md).
+
 ## Problem
 
 Builders previously had to understand mosoo through separate Agents and scattered resources. The Project boundary gives them one place to see and operate the product they are building.

@@ -5,7 +5,7 @@
 <h1 align="center">mosoo</h1>
 
 <p align="center">
-  <strong>An open-source agent runtime for coding agents.</strong><br />
+  <strong>An open-source managed agent runtime for application backends.</strong><br />
   Run OpenAI Codex, Claude Agent SDK, and OpenCode behind API endpoints in isolated AI agent sandboxes.
 </p>
 
@@ -27,7 +27,11 @@ mosoo provides a Cloudflare-native control plane to stream tool activity, inspec
 
 Your application remains yours. Its backend owns product behavior and end-user access. mosoo focuses on Agent execution and lifecycle.
 
-## How It Works
+## Target Direction
+
+mosoo v1 targets research, data analysis, file processing, and report generation through `Workspace key + Agent + Input + optional files -> durable Session`. Agent configuration is optional and publishing is removed from first use. The reference acceptance flow is CSV analysis with reports, charts, and result data, followed by durable modification turns. This transition is not complete; see [SPEC](./docs/SPEC.md) and [remaining execution slices](./docs/prd/managed-agent-v1.md).
+
+## How It Works Today
 
 ```text
 configure Agent + Skills + MCP + provider
