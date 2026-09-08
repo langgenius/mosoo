@@ -47,7 +47,7 @@ export async function getViewerFromRequest(
   return readViewerFromRequest(bindings, request);
 }
 
-export async function getAuthenticatedViewerFromRequest(
+export async function getApiViewerFromRequest(
   bindings: ApiBindings,
   request: Request,
 ): Promise<AuthenticatedViewer | null> {
@@ -63,4 +63,13 @@ export async function getAuthenticatedViewerFromRequest(
 
   const tokenCaller = await authenticatePersonalAccessToken(bindings.DB, token);
   return tokenCaller?.viewer ?? null;
+}
+
+/** Account control-plane routes never accept application Project keys. */
+export async function getAuthenticatedViewerFromRequest(
+  bindings: ApiBindings,
+  request: Request,
+): Promise<AuthenticatedViewer | null> {
+  const viewer = await getApiViewerFromRequest(bindings, request);
+  return viewer?.projectId === undefined ? viewer : null;
 }

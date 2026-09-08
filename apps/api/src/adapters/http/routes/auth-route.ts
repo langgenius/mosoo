@@ -11,7 +11,10 @@ import {
   pollCliOAuthDeviceToken,
   startCliOAuthDeviceFlow,
 } from "../../../modules/auth/application/cli-oauth-device.service";
-import { getViewerFromRequest } from "../../../modules/auth/application/viewer-auth.service";
+import {
+  getAuthenticatedViewerFromRequest,
+  getViewerFromRequest,
+} from "../../../modules/auth/application/viewer-auth.service";
 import type { ApiGatewayEnvironment } from "../../../platform/cloudflare/worker-types";
 
 function isAuthConfigured(bindings: Pick<ApiGatewayEnvironment["Bindings"], "BETTER_AUTH_SECRET">) {
@@ -60,6 +63,12 @@ function cliOAuthError(error: unknown): Response {
 
 export function registerAuthRoute(app: Hono<ApiGatewayEnvironment>) {
   const auth = new Hono<ApiGatewayEnvironment>();
+
+  auth.get("/cli/session", async (c) => {
+    const viewer = await getAuthenticatedViewerFromRequest(c.env, c.req.raw);
+    if (!viewer) return c.json({ error: "Run mosoo login to authenticate this CLI." }, 401);
+    return c.json({ user: { id: viewer.id, email: viewer.email, name: viewer.name } });
+  });
 
   auth.post("/cli/start", async (c) => {
     try {

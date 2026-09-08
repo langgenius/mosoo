@@ -1,25 +1,29 @@
 import type {
   CreatePersonalAccessTokenRequest,
+  CreateProjectApiKeyRequest,
   CreatePersonalAccessTokenResponse,
   PersonalAccessTokenListResponse,
   PersonalAccessTokenSummary,
 } from "@mosoo/contracts/auth";
 import { accountsTable, personalAccessTokensTable } from "@mosoo/db";
 import { createPlatformId } from "@mosoo/id";
-import type { PersonalAccessTokenId } from "@mosoo/id";
+import type { PersonalAccessTokenId, ProjectId } from "@mosoo/id";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
+import { forbiddenError, validationError } from "../../../platform/errors";
 import { toBase64Url } from "../../../shared/bytes";
 import { isTruthy } from "../../../shared/truthiness";
 import { currentTimestampMs, toIsoString } from "../../../time";
+import { ensureProjectOwnership } from "../../projects/application/project.service";
 import type { AuthenticatedViewer } from "./viewer-auth.service";
 const TOKEN_SECRET_BYTE_LENGTH = 32;
-const TOKEN_VALUE_PREFIX = "mst_";
-const LEGACY_TOKEN_VALUE_PREFIX = "grt_pat_";
+const CLI_TOKEN_PREFIX = "mcli_";
+const PROJECT_TOKEN_PREFIX = "msp_";
 const MAX_LABEL_LENGTH = 80;
 
 interface PersonalAccessTokenListRow {
+  project_id: ProjectId | null;
   created_at: number;
   id: PersonalAccessTokenId;
   label: string;
@@ -37,26 +41,24 @@ function normalizeTokenLabel(label: string): string {
   const normalized = label.trim();
 
   if (!normalized) {
-    throw new Error("Token label is required.");
+    throw validationError("Key label is required.");
   }
 
   if (normalized.length > MAX_LABEL_LENGTH) {
-    throw new Error(`Token label must be ${MAX_LABEL_LENGTH} characters or fewer.`);
+    throw validationError(`Key label must be ${MAX_LABEL_LENGTH} characters or fewer.`);
   }
 
   return normalized;
 }
 
-function createTokenValue(): string {
+function createTokenValue(projectId: ProjectId | null): string {
   const bytes = new Uint8Array(TOKEN_SECRET_BYTE_LENGTH);
   crypto.getRandomValues(bytes);
-  return `${TOKEN_VALUE_PREFIX}${toBase64Url(bytes)}`;
+  return `${projectId === null ? CLI_TOKEN_PREFIX : PROJECT_TOKEN_PREFIX}${toBase64Url(bytes)}`;
 }
 
 function isPersonalAccessTokenValue(tokenValue: string): boolean {
-  return (
-    tokenValue.startsWith(TOKEN_VALUE_PREFIX) || tokenValue.startsWith(LEGACY_TOKEN_VALUE_PREFIX)
-  );
+  return tokenValue.startsWith(CLI_TOKEN_PREFIX) || tokenValue.startsWith(PROJECT_TOKEN_PREFIX);
 }
 
 export async function hashTokenValue(tokenValue: string): Promise<string> {
@@ -67,6 +69,7 @@ export async function hashTokenValue(tokenValue: string): Promise<string> {
 
 function toTokenSummary(row: PersonalAccessTokenListRow): PersonalAccessTokenSummary {
   return {
+    projectId: row.project_id,
     createdAt: toIsoString(row.created_at),
     id: row.id,
     label: row.label,
@@ -89,9 +92,13 @@ export function readBearerToken(request: Request): string | null {
 export async function listPersonalAccessTokens(
   database: D1Database,
   viewer: AuthenticatedViewer,
+  projectId: ProjectId,
 ): Promise<PersonalAccessTokenListResponse> {
+  if (viewer.projectId !== undefined) throw forbiddenError();
+  await ensureProjectOwnership(database, viewer.id, projectId);
   const results = await getAppDatabase(database)
     .select({
+      project_id: personalAccessTokensTable.projectId,
       created_at: sql<number>`${personalAccessTokensTable.createdAt}`,
       id: personalAccessTokensTable.id,
       label: personalAccessTokensTable.label,
@@ -102,6 +109,7 @@ export async function listPersonalAccessTokens(
     .where(
       and(
         eq(personalAccessTokensTable.accountId, viewer.id),
+        eq(personalAccessTokensTable.projectId, projectId),
         isNull(personalAccessTokensTable.revokedAt),
       ),
     )
@@ -113,13 +121,15 @@ export async function listPersonalAccessTokens(
   };
 }
 
-export async function createPersonalAccessToken(
+async function createToken(
   database: D1Database,
   viewer: AuthenticatedViewer,
   input: CreatePersonalAccessTokenRequest,
+  projectId: ProjectId | null,
 ): Promise<CreatePersonalAccessTokenResponse> {
+  if (viewer.projectId !== undefined) throw forbiddenError();
   const label = normalizeTokenLabel(input.label);
-  const tokenValue = createTokenValue();
+  const tokenValue = createTokenValue(projectId);
   const tokenHash = await hashTokenValue(tokenValue);
   const timestampMs = currentTimestampMs();
   const tokenId = createPlatformId<PersonalAccessTokenId>();
@@ -128,6 +138,7 @@ export async function createPersonalAccessToken(
     .insert(personalAccessTokensTable)
     .values({
       accountId: viewer.id,
+      projectId,
       createdAt: sql`${timestampMs}`,
       id: tokenId,
       label,
@@ -140,6 +151,7 @@ export async function createPersonalAccessToken(
 
   return {
     token: {
+      projectId,
       createdAt: toIsoString(timestampMs),
       id: tokenId,
       label,
@@ -150,11 +162,31 @@ export async function createPersonalAccessToken(
   };
 }
 
+export function createPersonalAccessToken(
+  database: D1Database,
+  viewer: AuthenticatedViewer,
+  input: CreatePersonalAccessTokenRequest,
+): Promise<CreatePersonalAccessTokenResponse> {
+  // Only the completed CLI login flow mints account credentials. Never expose this on a key CRUD route.
+  return createToken(database, viewer, input, null);
+}
+
+export async function createProjectApiKey(
+  database: D1Database,
+  viewer: AuthenticatedViewer,
+  input: CreateProjectApiKeyRequest,
+): Promise<CreatePersonalAccessTokenResponse> {
+  if (viewer.projectId !== undefined) throw forbiddenError();
+  await ensureProjectOwnership(database, viewer.id, input.projectId);
+  return createToken(database, viewer, input, input.projectId);
+}
+
 export async function revokePersonalAccessToken(
   database: D1Database,
   viewer: AuthenticatedViewer,
   tokenId: PersonalAccessTokenId,
 ): Promise<void> {
+  if (viewer.projectId !== undefined) throw forbiddenError();
   const timestampMs = currentTimestampMs();
   const token =
     (await getAppDatabase(database)
@@ -209,6 +241,7 @@ export async function authenticatePersonalAccessToken(
         account_name: accountsTable.name,
         id: sql`${personalAccessTokensTable.id}`.mapWith(personalAccessTokensTable.id).as("id"),
         label: personalAccessTokensTable.label,
+        project_id: personalAccessTokensTable.projectId,
       })
       .from(personalAccessTokensTable)
       .innerJoin(accountsTable, eq(accountsTable.id, personalAccessTokensTable.accountId))
@@ -221,8 +254,17 @@ export async function authenticatePersonalAccessToken(
       .limit(1)
       .get()) ?? null;
 
-  if (!row) {
+  if (
+    !row ||
+    (tokenValue.startsWith(PROJECT_TOKEN_PREFIX)
+      ? row.project_id === null
+      : row.project_id !== null)
+  ) {
     return null;
+  }
+
+  if (row.project_id !== null) {
+    await ensureProjectOwnership(database, row.account_id, row.project_id);
   }
 
   const timestampMs = currentTimestampMs();
@@ -240,6 +282,8 @@ export async function authenticatePersonalAccessToken(
     tokenId: row.id,
     tokenLabel: row.label,
     viewer: {
+      apiKeyId: row.id,
+      ...(row.project_id === null ? {} : { projectId: row.project_id }),
       email: row.account_email,
       emailVerified: row.account_email_verified === 1,
       id: row.account_id,

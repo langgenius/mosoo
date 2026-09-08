@@ -117,6 +117,7 @@ async function createReconciliationDatabase(): Promise<SqliteD1Database> {
     );
 
     CREATE TABLE session_run (
+      created_by_key_id text,
       agent_id text NOT NULL,
       completed_at integer,
       created_by_account_id text NOT NULL,

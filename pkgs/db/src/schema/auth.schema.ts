@@ -1,4 +1,4 @@
-import type { AccountId, CliOAuthFlowId, PersonalAccessTokenId } from "@mosoo/id";
+import type { AccountId, CliOAuthFlowId, PersonalAccessTokenId, ProjectId } from "@mosoo/id";
 import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 import { platformIdColumn } from "./id-column";
@@ -75,6 +75,7 @@ export const personalAccessTokensTable = sqliteTable(
   "personal_access_token",
   {
     accountId: platformIdColumn<AccountId>("account_id").notNull(),
+    projectId: platformIdColumn<ProjectId>("project_id"),
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
     id: platformIdColumn<PersonalAccessTokenId>("id").primaryKey(),
     label: text("label").notNull(),
@@ -85,6 +86,7 @@ export const personalAccessTokensTable = sqliteTable(
   },
   (table) => [
     index("personal_access_token_account_created_idx").on(table.accountId, table.createdAt),
+    index("personal_access_token_project_idx").on(table.projectId, table.id),
     uniqueIndex("personal_access_token_hash_idx").on(table.tokenHash),
   ],
 );

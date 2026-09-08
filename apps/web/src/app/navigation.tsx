@@ -63,18 +63,13 @@ function useNavSections(): ProjectNavSection[] {
           label: t("nav.config"),
           path: "/integrations",
         },
-      ],
-      label: t("nav.project"),
-    },
-    {
-      items: [
         {
           icon: createHugeicon(Settings02Icon, "ProjectSettingsIcon"),
           label: t("nav.settings"),
           path: "/project-settings",
         },
       ],
-      label: t("nav.account"),
+      label: t("nav.project"),
     },
   ];
 }

@@ -35,6 +35,7 @@ function createDatabase(): SqliteD1Database {
     );
 
     CREATE TABLE session_run (
+      created_by_key_id text,
       id text PRIMARY KEY NOT NULL,
       driver_instance_id text,
       status text NOT NULL

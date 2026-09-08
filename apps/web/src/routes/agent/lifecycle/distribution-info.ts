@@ -21,7 +21,7 @@ export interface AgentDistribution {
 
 type Translate = (key: string, variables?: Record<string, string>) => string;
 
-const ACCESS_TOKEN_SETTINGS_PATH = "/settings/access-tokens";
+const ACCESS_TOKEN_SETTINGS_PATH = "/project-settings/api-keys";
 const AGENT_API_ENDPOINT_BASE_PATH = `${PUBLIC_API_PREFIX}${PUBLIC_API_VERSION_PREFIX}`;
 const AGENT_API_ENDPOINT_OPENAPI_PATH = `${AGENT_API_ENDPOINT_BASE_PATH}/openapi.json`;
 

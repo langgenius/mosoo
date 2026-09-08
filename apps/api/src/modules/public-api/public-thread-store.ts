@@ -11,6 +11,7 @@ import type {
   AgentId,
   FileId,
   PersonalAccessTokenId,
+  ProjectId,
   PublicThreadId,
   SessionId,
 } from "@mosoo/id";
@@ -124,6 +125,7 @@ export async function findPublicThreadSnapshotByIdempotencyKey(
     agentId: AgentId;
     idempotencyKey: string;
     tokenId: PersonalAccessTokenId;
+    projectId?: ProjectId;
   },
 ): Promise<ThreadSnapshot | null> {
   const row =
@@ -140,7 +142,9 @@ export async function findPublicThreadSnapshotByIdempotencyKey(
         and(
           eq(sessionsTable.agentId, input.agentId),
           sql`json_extract(${sessionsTable.metadataJson}, '$.public_api.source') = 'public_api'`,
-          sql`json_extract(${sessionsTable.metadataJson}, '$.public_api.created_by.token_id') = ${input.tokenId}`,
+          input.projectId === undefined
+            ? sql`json_extract(${sessionsTable.metadataJson}, '$.public_api.created_by.token_id') = ${input.tokenId}`
+            : eq(sessionsTable.projectId, input.projectId),
           sql`json_extract(${sessionsTable.metadataJson}, '$.public_api.idempotency_key') = ${input.idempotencyKey}`,
         ),
       )

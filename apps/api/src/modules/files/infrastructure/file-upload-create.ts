@@ -26,6 +26,7 @@ import {
   createStagingObjectKey,
   normalizeContentType,
 } from "./file-paths";
+import { ensureProjectKeyFileScope } from "./file-record-access";
 import {
   ensureUploadAccess,
   expirePathLocks,
@@ -136,6 +137,7 @@ export async function createFileUpload(
       target: input.target,
       viewer,
     });
+  await ensureProjectKeyFileScope(bindings.DB, viewer, scopeKind, scopeId);
   const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
 
   if (getFileScopeDescriptor(scopeKind).capabilities.pathLocks) {

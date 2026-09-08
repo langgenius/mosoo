@@ -10,7 +10,7 @@ import { toProjectId } from "@/routes/typed-id";
 export interface OnboardingProgress {
   /** At least one provider credential exists on the active Project. */
   hasProviderKey: boolean | null;
-  /** At least one non-revoked personal access token exists. */
+  /** At least one active API key exists in the selected Project. */
   hasApiToken: boolean | null;
   /** At least one agent is visible on the active Project. */
   hasAgent: boolean | null;
@@ -34,7 +34,8 @@ const onboardingKeys = {
     ["onboarding-progress", "provider-keys", projectId ?? "missing"] as const,
   sessions: (projectId: string | null) =>
     ["onboarding-progress", "sessions", projectId ?? "missing"] as const,
-  tokens: ["onboarding-progress", "access-tokens"] as const,
+  tokens: (projectId: string | null) =>
+    ["onboarding-progress", "access-tokens", projectId] as const,
 };
 
 /**
@@ -57,8 +58,12 @@ export function useOnboardingProgress(projectId: string | null): OnboardingProgr
     retry: 1,
   });
   const tokensQuery = useQuery({
-    queryFn: listPersonalAccessTokens,
-    queryKey: onboardingKeys.tokens,
+    enabled: projectId !== null,
+    queryFn: () => {
+      if (projectId === null) throw new Error("Project ID is required to list API keys.");
+      return listPersonalAccessTokens(toProjectId(projectId));
+    },
+    queryKey: onboardingKeys.tokens(projectId),
     retry: 1,
   });
   const agentsQuery = useVisibleAgentsQuery(projectId);

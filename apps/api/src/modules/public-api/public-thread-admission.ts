@@ -60,7 +60,10 @@ export async function admitPublicThreadReader(
   caller: AuthenticatedViewer,
   snapshot: ThreadReadSnapshot,
 ): Promise<void> {
-  if (!canReadThreadFromOwnership(caller, snapshot)) {
+  if (
+    !canReadThreadFromOwnership(caller, snapshot) ||
+    (caller.projectId !== undefined && caller.projectId !== snapshot.session.projectId)
+  ) {
     throw publicNotFound("Thread not found.");
   }
 

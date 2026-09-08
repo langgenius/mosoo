@@ -11,7 +11,7 @@ The application owns business logic, end-user authentication, business queues, r
 The core workflow is:
 
 ```text
-Workspace API key + Agent + Input + optional files
+Project API key + Agent + Input + optional files
   -> create a durable Session and execute work
   -> inspect status, read or stream events, download artifacts
   -> send follow-up Input to the same Session
@@ -19,20 +19,23 @@ Workspace API key + Agent + Input + optional files
 
 ## 2. First Request And Ownership
 
-- A developer creates one Workspace API key and completes a real task without first creating or publishing an Agent, selecting an Environment, or configuring model-provider credentials.
+- A developer creates one Project API key and completes a real task without first creating or publishing an Agent, selecting an Environment, or configuring model-provider credentials.
 - Managed Codex and Claude Code Agents are immediately callable. Already integrated runtimes use a shared lifecycle; developer-supplied runtime integration is outside v1.
 - Each managed Agent has a visible default model. Model overrides are supported, but first use does not require choosing a model. The actual model is recorded and fixed within the Session, with no silent model or runtime fallback.
 - The hosted platform supplies default model access. Bring your own key (BYOK) remains optional where already supported. Default access does not promise free or unlimited inference.
-- Workspace is the tenant and resource-ownership boundary. A key grants access only to its Workspace, including when the same account owns other Workspaces.
-- The API serves trusted application backends. Applications authenticate their end users and keep platform keys on the server.
+- Project is the tenant and resource-ownership boundary. A key grants access only to its Project, including when the same account owns other Projects.
+- Project keys serve trusted application backends. They may configure Agents, execute Sessions, and access files only within their Project, without fine-grained scopes. They cannot manage accounts, delete Projects, or manage API keys.
+- Account owners use the console or CLI login for account management and cross-Project operations. CLI login credentials are distinct from application keys and may execute work in an explicitly selected owned Project.
+- The authentication cutover intentionally rejects old manually created account tokens and old CLI credentials. Users create new Project keys for integrations and log in again for CLI access; no default-Project reassignment is performed.
+- Revoking a Project key rejects subsequent requests but does not cancel work already admitted. The owner or another active key in the same Project can inspect and cancel that work.
 
 ## 3. Optional Private Agents
 
-- Developers may save reusable instructions, Skills, and existing MCP connection references as Workspace-private Agents. Creation and updates are available through both API and console; programmatic configuration does not require the console.
+- Developers may save reusable instructions, Skills, and existing MCP connection references as Project-private Agents. Creation and updates are available through both API and console; programmatic configuration does not require the console.
 - Saving makes the Agent immediately callable.
 - Public invocation uses an Agent ID. New Sessions resolve its latest configuration; there is no public historical-version selector.
 - Each Session retains its initial configuration snapshot internally. Updating an Agent affects new Sessions only; existing Sessions keep their instructions, Skills, and tool configuration.
-- Retain existing remote HTTPS MCP support, OAuth/Bearer authorization, connection ownership checks, and credential isolation, adapting them to Workspace and the new Session API.
+- Retain existing remote HTTPS MCP support, OAuth/Bearer authorization, connection ownership checks, and credential isolation, adapting them to Project and the new Session API.
 
 ## 4. Session Lifecycle And Durability
 
@@ -49,7 +52,7 @@ Workspace API key + Agent + Input + optional files
 ## 5. Execution Permissions And Cost Controls
 
 - Integrated runtimes use full-access execution within the Session sandbox and authorized resources. v1 does not provide interactive tool approvals.
-- Full access retains Workspace isolation, credential protection, resource authorization checks, and budget enforcement.
+- Full access retains Project isolation, credential protection, resource authorization checks, and budget enforcement.
 - Each turn has a platform default budget. Callers may set a cap within platform limits. Once reached, stop issuing new model requests, preserve available artifacts, and explicitly report budget exhaustion.
 - In-flight requests may cause a small overshoot; an exact hard financial ceiling is not promised.
 - Record truthful usage and distinguish measured values from cost estimates. Settlement, invoices, subscriptions, and payments are outside this refactor.
@@ -59,19 +62,19 @@ Workspace API key + Agent + Input + optional files
 
 - Session creation may include the first input. Follow-up input and cancellation use the same Session handle.
 - Provide status retrieval, replayable historical events, and SSE. After disconnecting, callers can recover missed persisted events. v1 does not provide Webhooks.
-- Creation supports an optional `Idempotency-Key`: within a Workspace, the same key and request return the original Session without duplicate work; reusing the key with a different request fails explicitly. Without a key, create a new Session.
+- Creation supports an optional `Idempotency-Key`: within a Project, the same key and request return the original Session without duplicate work; reusing the key with a different request fails explicitly. Without a key, create a new Session.
 - Prefer reusing existing mechanisms for follow-up idempotency instead of building a separate orchestration system. Deduplication details and key retention are implementation decisions; creation idempotency does not guarantee exactly-once external side effects.
 - Support input file upload and artifact download. Users request modifications through Agent instructions; v1 does not require an online file editor or file-manager UI.
 - Console onboarding prioritizes key creation and a minimal API example. After first use, Session records, status, artifacts, and usage are the primary surfaces. Private Agent configuration is secondary.
 
 ## 7. Reference Acceptance: CSV Analysis And Follow-Up
 
-1. Create a Workspace API key and upload a CSV.
+1. Create a Project API key and upload a CSV.
 2. Invoke a managed Agent with analysis instructions without configuring a provider, publishing an Agent, or selecting an Environment. Both Codex and Claude Code must execute real tools.
 3. Read status and events, then download an analysis report, chart, and result data. Verify calculations against a known fixture and check artifact formats.
 4. Request modifications in the same Session and verify existing files and native conversation continuity. Repeat after forced runtime reclamation.
 5. Create a private Agent with reusable analysis instructions through the API and repeat the flow. After updating the Agent, new Sessions use the new configuration while existing Sessions retain their original configuration.
-6. Run targeted checks for duplicate creation, input submitted while busy, cancellation, budget exhaustion, cross-Workspace denial, and recovery expiry.
+6. Run targeted checks for duplicate creation, input submitted while busy, cancellation, budget exhaustion, cross-Project denial, and recovery expiry.
 
 ## 8. Scope Boundaries
 
@@ -95,7 +98,7 @@ These boundaries do not prohibit an Agent from using existing authorized tools f
 
 ## 9. Implementation Status And Migration
 
-Existing code provides runtime adapters, sandboxes, Thread/Run history, checkpoint recovery, files, MCP, events, and usage. Workspace keys, the new Session contract, and remaining product cleanup still need implementation and real acceptance evidence. This document does not establish production reliability, adoption, willingness to pay, or task economics.
+Existing code provides runtime adapters, sandboxes, Thread/Run history, checkpoint recovery, files, MCP, events, and usage. Project keys, the new Session contract, and remaining product cleanup still need implementation and real acceptance evidence. This document does not establish production reliability, adoption, willingness to pay, or task economics.
 
 #579 and #580 are closed. Remaining work follows #581 -> #582 -> #583 -> #584; see the [execution scope mapping](./prd/managed-agent-v1.md). #546 and its children still need reconciliation with this document, especially replacing ghfind/Git acceptance with CSV analysis and removing public version selection and interactive approval requirements.
 

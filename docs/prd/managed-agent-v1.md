@@ -6,9 +6,9 @@ Status: target scope from the 2026-09-08 owner interview. Implementation and rem
 
 #579 (Channels) and #580 (App Deployment / bound capabilities) are closed with release evidence. Do not restore their product surfaces because inert historical storage remains.
 
-## #581 — Workspace And Keys
+## #581 — Project And Keys
 
-Move current App/Project terminology and execution authentication to Workspace semantics while preserving resource identities, ownership, and history. Deliver key creation/revocation and strict cross-Workspace denial. Retain existing migration and SDK/CLI acceptance obligations; this is not just a UI rename.
+Retain Project as the resource boundary: one account owns multiple Projects and each Project has multiple keys. Deliver key creation/revocation in Project settings and strict cross-Project denial for Agent configuration, execution, and files. Account control-plane and cross-Project access use console or CLI login, with a distinct account credential. The cutover rejects old account tokens and requires CLI re-login; it does not assign existing keys to a default Project. Preserve resources and history and verify the matching CLI release.
 
 ## #582 — Managed Agents And Durable Sessions
 

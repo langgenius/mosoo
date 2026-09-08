@@ -43,7 +43,7 @@ const DOCUMENT_TITLE_RULES: DocumentTitleRule[] = [
   { path: "/project-settings/general", scope: "project", titleKey: "pageTitle.projectSettings" },
   { path: "/project-settings/usage", scope: "project", titleKey: "pageTitle.usage" },
   { path: "/project-settings", scope: "project", titleKey: "pageTitle.projectSettings" },
-  { path: "/settings/access-tokens", scope: "global", titleKey: "pageTitle.accessTokens" },
+  { path: "/project-settings/api-keys", scope: "project", titleKey: "pageTitle.accessTokens" },
   { path: "/settings/profile", scope: "global", titleKey: "pageTitle.profile" },
   { path: "/settings", scope: "global", titleKey: "pageTitle.settings" },
   { path: "/environment/:environmentId", scope: "project", titleKey: "pageTitle.environments" },

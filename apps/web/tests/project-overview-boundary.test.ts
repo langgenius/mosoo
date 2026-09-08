@@ -96,7 +96,7 @@ describe("Project overview boundary", () => {
     expect(stepsSource).toContain('to: "/providers"');
     expect(stepsSource).toContain('t("onboarding.optional")');
     expect(stepsSource).toContain('t("onboarding.createApiToken")');
-    expect(stepsSource).toContain('to: "/settings/access-tokens"');
+    expect(stepsSource).toContain('to: "/project-settings/api-keys"');
     expect(stepsSource).toContain('t("onboarding.createAgent")');
     expect(stepsSource).toContain("/agent?create=1");
     expect(stepsSource).toContain("/threads?compose=1");

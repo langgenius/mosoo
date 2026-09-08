@@ -3,7 +3,7 @@ import { NavLink } from "react-router-dom";
 import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import type { AppIcon } from "@/shared/ui/icons";
-import { KeyRound, User } from "@/shared/ui/icons";
+import { User } from "@/shared/ui/icons";
 
 interface SettingsNavItem {
   icon: AppIcon;
@@ -20,10 +20,7 @@ interface SettingsNavSection {
 // primary Project sidebar.
 const SETTINGS_NAV_SECTIONS: SettingsNavSection[] = [
   {
-    items: [
-      { icon: User, labelKey: "settings.profile", path: "/settings/profile" },
-      { icon: KeyRound, labelKey: "settings.accessTokens", path: "/settings/access-tokens" },
-    ],
+    items: [{ icon: User, labelKey: "settings.profile", path: "/settings/profile" }],
     labelKey: "settings.account",
   },
 ];

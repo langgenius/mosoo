@@ -1,10 +1,10 @@
-import type { CreatePersonalAccessTokenRequest } from "@mosoo/contracts/auth";
+import type { CreateProjectApiKeyRequest } from "@mosoo/contracts/auth";
 import { parsePlatformId } from "@mosoo/id";
-import type { PersonalAccessTokenId } from "@mosoo/id";
+import type { PersonalAccessTokenId, ProjectId } from "@mosoo/id";
 import type { Hono } from "hono";
 
 import {
-  createPersonalAccessToken,
+  createProjectApiKey,
   listPersonalAccessTokens,
   revokePersonalAccessToken,
 } from "../../../modules/auth/application/personal-access-token.service";
@@ -45,9 +45,9 @@ function parseRequestPlatformId(value: unknown, label: string) {
   }
 }
 
-async function readCreatePersonalAccessTokenRequest(
+async function readCreateProjectApiKeyRequest(
   request: Request,
-): Promise<CreatePersonalAccessTokenRequest | null> {
+): Promise<CreateProjectApiKeyRequest | null> {
   const body = await request.json().catch(() => {
     throw validationError("Request body must be valid JSON.");
   });
@@ -63,6 +63,10 @@ async function readCreatePersonalAccessTokenRequest(
 
   return {
     label: body.label,
+    projectId: parseRequestPlatformId(
+      "projectId" in body ? body.projectId : null,
+      "Project ID",
+    ) as ProjectId,
   };
 }
 
@@ -74,7 +78,13 @@ export function registerAccessTokenRoute(app: Hono<ApiGatewayEnvironment>) {
         return unauthorized();
       }
 
-      return c.json(await listPersonalAccessTokens(c.env.DB, viewer));
+      return c.json(
+        await listPersonalAccessTokens(
+          c.env.DB,
+          viewer,
+          parseRequestPlatformId(c.req.query("projectId"), "Project ID") as ProjectId,
+        ),
+      );
     } catch (error) {
       return tokenError(error);
     }
@@ -87,12 +97,12 @@ export function registerAccessTokenRoute(app: Hono<ApiGatewayEnvironment>) {
         return unauthorized();
       }
 
-      const body = await readCreatePersonalAccessTokenRequest(c.req.raw);
+      const body = await readCreateProjectApiKeyRequest(c.req.raw);
       if (!body) {
         return invalidRequest("Token label is required.");
       }
 
-      return c.json(await createPersonalAccessToken(c.env.DB, viewer, body), 201);
+      return c.json(await createProjectApiKey(c.env.DB, viewer, body), 201);
     } catch (error) {
       return tokenError(error);
     }

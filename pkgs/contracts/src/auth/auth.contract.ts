@@ -1,10 +1,11 @@
-import type { PersonalAccessTokenId } from "../id/id.contract";
+import type { PersonalAccessTokenId, ProjectId } from "../id/id.contract";
 
 export type AuthMethod = "email_otp" | "google_oauth";
 
 export type AuthSecurityLevel = "basic" | "verified_email" | "strong";
 
 export interface PersonalAccessTokenSummary {
+  projectId: ProjectId | null;
   createdAt: string;
   id: PersonalAccessTokenId;
   label: string;
@@ -14,6 +15,10 @@ export interface PersonalAccessTokenSummary {
 
 export interface CreatePersonalAccessTokenRequest {
   label: string;
+}
+
+export interface CreateProjectApiKeyRequest extends CreatePersonalAccessTokenRequest {
+  projectId: ProjectId;
 }
 
 export interface CreatePersonalAccessTokenResponse {

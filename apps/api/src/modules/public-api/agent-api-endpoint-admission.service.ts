@@ -5,6 +5,7 @@ import { isTruthy } from "../../shared/truthiness";
 import { getAgentRow } from "../agents/application/agent-repository";
 import type { AgentRow } from "../agents/application/agent-types";
 import type { AuthenticatedViewer } from "../auth/application/viewer-auth.service";
+import { assertProjectKeyAccess } from "../auth/domain/project-key-access";
 import { ensureProjectOwnership } from "../projects/application/project.service";
 import {
   publicAgentNotExposed,
@@ -35,6 +36,7 @@ export async function ensureAgentApiEndpointCallerAccess(
   caller: AuthenticatedViewer,
   agent: AgentRow,
 ): Promise<void> {
+  assertProjectKeyAccess(caller, agent.projectId);
   ensureAgentApiEndpointReady(agent);
   await ensureCallerOwnsAgentProject(database, caller, agent);
 }

@@ -30,6 +30,7 @@ import { getAppDatabase } from "../../../platform/db/drizzle";
 import { toArrayBuffer } from "../../../shared/bytes";
 import { currentTimestampMs } from "../../../time";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
+import { assertProjectKeyAccess } from "../../auth/domain/project-key-access";
 import { ensureProjectOwnership } from "../../projects/application/project.service";
 import { publishSessionResourceUpsert as publishSessionResourceUpsertEvent } from "../../sessions/application/session-resource-events.service";
 import {
@@ -329,6 +330,7 @@ async function loadClaimContext(
 ): Promise<{ projectId: ProjectId; viewerId: AccountId }> {
   const viewerId = parsePlatformId<AccountId>(viewer.id, "viewer ID");
   const projectId = await getSessionProjectId(bindings.DB, sessionId);
+  assertProjectKeyAccess(viewer, projectId);
 
   await ensureProjectSessionFileAccess(bindings.DB, viewerId, {
     projectId,
@@ -456,6 +458,7 @@ async function admitAgentPackageFile(
   viewer: AuthenticatedViewer,
   input: AgentPackageFileAdmissionInput,
 ): Promise<AdmittedAgentPackageFile> {
+  assertProjectKeyAccess(viewer, input.projectId);
   await ensureProjectOwnership(bindings.DB, viewer.id, input.projectId);
 
   const file =
@@ -529,6 +532,7 @@ async function list(
       ? undefined
       : parsePlatformId<SessionId>(query.sessionId, "file list session ID");
 
+  assertProjectKeyAccess(viewer, projectId);
   await ensureProjectOwnership(bindings.DB, viewerId, projectId);
 
   if (sessionId !== undefined) {

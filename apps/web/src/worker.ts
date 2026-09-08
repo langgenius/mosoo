@@ -51,13 +51,13 @@ export default {
           : {
               agent_auth: {
                 anonymous: {
-                  claim_uri: `${url.origin}/settings/access-tokens`,
+                  claim_uri: `${url.origin}/project-settings/api-keys`,
                   credential_types_supported: ["mosoo_personal_access_token"],
                 },
-                claim_uri: `${url.origin}/settings/access-tokens`,
+                claim_uri: `${url.origin}/project-settings/api-keys`,
                 identity_types_supported: ["anonymous"],
-                register_uri: `${url.origin}/settings/access-tokens`,
-                revocation_uri: `${url.origin}/settings/access-tokens`,
+                register_uri: `${url.origin}/project-settings/api-keys`,
+                revocation_uri: `${url.origin}/project-settings/api-keys`,
                 skill: "https://mosoo.ai/auth.md",
               },
               issuer: url.origin,
