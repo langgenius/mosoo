@@ -1,6 +1,7 @@
 import type {
   PublicThreadApiCreateThreadResponse,
   PublicThreadApiRetrieveThreadResponse,
+  PublicThreadArtifact,
   PublicThreadFinalOutput,
   PublicThreadLinks,
   PublicThreadSummary,
@@ -83,6 +84,7 @@ export function toCreateThreadResponse(input: {
 }
 
 export function toRetrieveThreadResponse(input: {
+  artifacts: PublicThreadArtifact[];
   endUserId: string;
   finalOutput: PublicThreadFinalOutput | null;
   session: SessionSummary;
@@ -94,7 +96,10 @@ export function toRetrieveThreadResponse(input: {
     run:
       input.session.lastRun === null
         ? null
-        : toPublicThreadRunSummary(input.session.lastRun, { finalOutput: input.finalOutput }),
+        : toPublicThreadRunSummary(input.session.lastRun, {
+            artifacts: input.artifacts,
+            finalOutput: input.finalOutput,
+          }),
     thread: toPublicThreadSummary({
       endUserId: input.endUserId,
       session,

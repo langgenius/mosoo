@@ -1,5 +1,9 @@
-import type { PublicFile, PublicThreadSummary } from "@mosoo/contracts/public-api";
-import type { SessionFile, SessionSummary } from "@mosoo/contracts/session";
+import type {
+  PublicFile,
+  PublicThreadFile,
+  PublicThreadSummary,
+} from "@mosoo/contracts/public-api";
+import type { SessionSummary } from "@mosoo/contracts/session";
 import type { SessionRunSummary } from "@mosoo/contracts/session-run";
 
 import { createPublicApiOpenApiDocument } from "../src/adapters/http/routes/public-api-openapi";
@@ -174,14 +178,16 @@ export function publicThreadRequestExamples(): Array<[string, unknown]> {
   ]);
 }
 
-export function createSessionFile(): SessionFile {
+export function createSessionFile(): PublicThreadFile {
   return {
     committed: true,
     createdAt: "2026-05-19T00:02:00.000Z",
+    fileId: PUBLIC_API_TEST_IDS.file,
     id: PUBLIC_API_TEST_IDS.file,
     kind: "attachment",
     mimeType: "text/plain",
     name: "brief.txt",
+    runId: null,
     size: 19,
   };
 }

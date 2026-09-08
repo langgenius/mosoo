@@ -54,6 +54,9 @@ Agent's API Access panel shows its identifier, token creation, and API reference
   write-capable integration should enforce a uniqueness boundary such as
   `(app_id, tool_call_id)` and return its stored result when the call is
   delivered again.
+- A committed artifact carries the same structured `fileId`, `runId`, name,
+  MIME type, size, and kind in Thread file lists, persisted public events, and
+  retrieved Run snapshots. Integrations use IDs rather than filename matching.
 - Thread files include explicit attachments and recorded Agent artifacts, not a
   complete runtime workspace. Thread history also does not guarantee that every
   later Run receives prior private runtime state or every earlier file.

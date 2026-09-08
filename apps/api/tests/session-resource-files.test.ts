@@ -18,6 +18,7 @@ import {
   createPublicHttpContractDatabase,
   createPublicHttpTestBindings,
   insertOwnerSession,
+  insertRunningSessionRun,
 } from "./helpers/public-api-http-test-fixture";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
@@ -576,6 +577,7 @@ describe("session resource files", () => {
   test("records runtime outputs as session-scoped artifacts", async () => {
     const database = await createPublicHttpContractDatabase();
     await insertOwnerSession(database);
+    await insertRunningSessionRun(database);
     const bucket = new PublicApiMemoryFileBucket();
     const ownerViewer: AuthenticatedViewer = {
       email: "owner@example.com",
@@ -593,6 +595,7 @@ describe("session resource files", () => {
       createdBy: PUBLIC_API_TEST_IDS.ownerAccount,
       path: "outputs/reports/summary.md",
       sessionId: PUBLIC_API_TEST_IDS.ownerSession,
+      sessionRunId: PUBLIC_API_TEST_IDS.run,
     });
 
     expect(file.owner).toEqual({

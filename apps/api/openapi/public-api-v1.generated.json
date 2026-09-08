@@ -199,6 +199,50 @@
         "required": ["type", "file_id"],
         "type": "object"
       },
+      "Artifact": {
+        "additionalProperties": false,
+        "description": "A durable output artifact committed by one Agent Run.",
+        "properties": {
+          "createdAt": {
+            "description": "Timestamp (RFC 3339) at which the artifact was committed.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "fileId": {
+            "example": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            "format": "ulid",
+            "pattern": "^[0-7][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{25}$",
+            "type": "string",
+            "description": "Stable file ID used by the existing file download endpoints."
+          },
+          "kind": {
+            "const": "artifact",
+            "description": "Discriminator for Agent-produced output files."
+          },
+          "mimeType": {
+            "description": "Detected MIME type of the artifact, or null when unknown.",
+            "type": ["string", "null"]
+          },
+          "name": {
+            "description": "Artifact file name; names are not unique within a Thread or Run.",
+            "type": "string"
+          },
+          "runId": {
+            "example": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            "format": "ulid",
+            "pattern": "^[0-7][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{25}$",
+            "type": "string",
+            "description": "Stable ID of the Run that committed this artifact."
+          },
+          "size": {
+            "description": "Artifact size in bytes.",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": ["createdAt", "fileId", "kind", "mimeType", "name", "runId", "size"],
+        "type": "object"
+      },
       "PublicFile": {
         "additionalProperties": false,
         "description": "Public file metadata.",
@@ -313,8 +357,12 @@
       },
       "ThreadEventLogEntry": {
         "additionalProperties": false,
-        "description": "A single public event log entry for a Thread. This is the stable read surface and never exposes raw runtime payloads, transcripts, or diagnostics.",
+        "description": "A single public progress entry for a Thread. Event snapshots may be truncated and are not the canonical final Run output. Raw runtime payloads, transcripts, and diagnostics are never exposed.",
         "properties": {
+          "artifact": {
+            "$ref": "#/components/schemas/Artifact",
+            "description": "Committed artifact metadata for this event. Present only when this persisted event committed an Agent output file."
+          },
           "content": {
             "description": "Public content of the event — typically a reference to the associated payload (such as a message ID) rather than the raw runtime data.",
             "type": "string"
@@ -572,12 +620,19 @@
             "format": "date-time",
             "type": "string"
           },
+          "fileId": {
+            "example": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            "format": "ulid",
+            "pattern": "^[0-7][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{25}$",
+            "type": "string",
+            "description": "Stable file ID used by file download endpoints."
+          },
           "id": {
             "example": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
             "format": "ulid",
             "pattern": "^[0-7][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{25}$",
             "type": "string",
-            "description": "Unique file ID (bare ULID)."
+            "description": "Backward-compatible alias of `fileId`."
           },
           "kind": {
             "description": "Files added through the public API are attachments; artifacts are files produced by the Agent.",
@@ -590,6 +645,20 @@
           "name": {
             "description": "Original file name.",
             "type": "string"
+          },
+          "runId": {
+            "description": "Run that committed this artifact, or null for attachments and artifacts created before Run provenance was recorded.",
+            "oneOf": [
+              {
+                "example": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                "format": "ulid",
+                "pattern": "^[0-7][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{25}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "size": {
             "description": "File size in bytes.",
@@ -722,6 +791,13 @@
         "additionalProperties": false,
         "description": "Summary of a single Agent Run on a Thread.",
         "properties": {
+          "artifacts": {
+            "description": "Artifacts committed by this Run. Included on retrieved Run snapshots; an empty array means the Run committed none.",
+            "items": {
+              "$ref": "#/components/schemas/Artifact"
+            },
+            "type": "array"
+          },
           "completedAt": {
             "description": "Timestamp (RFC 3339) at which the Run reached a terminal state, or null while it has not finished.",
             "format": "date-time",
@@ -879,7 +955,7 @@
     },
     "securitySchemes": {
       "accessToken": {
-        "bearerFormat": "mosoo Access Token",
+        "bearerFormat": "Mosoo API token",
         "description": "Use Authorization: Bearer mst_... . Access Tokens identify an account and do not carry scopes.",
         "scheme": "bearer",
         "type": "http"
@@ -887,8 +963,8 @@
     }
   },
   "info": {
-    "description": "Public HTTPS API for creating and retrieving Threads on mosoo Agent API Endpoints. v1 resource identifiers are bare ULIDs, not prefixed IDs. Access Tokens identify the account caller. Runtime execution resolves the Agent API Endpoint owner's capabilities while the Thread is attributed to the token owner.",
-    "title": "mosoo Public Thread API",
+    "description": "Public HTTPS API for creating and retrieving Threads on Mosoo Agent API Endpoints. v1 resource identifiers are bare ULIDs, not prefixed IDs. API tokens authenticate the calling Mosoo account. Every Thread also carries a required immutable application `userId` that is delegated during Runs. Runtime execution uses the published Agent configuration.",
+    "title": "Mosoo Public Thread API",
     "version": "v1"
   },
   "openapi": "3.1.0",
@@ -1291,7 +1367,7 @@
         }
       },
       "post": {
-        "description": "Creates a Thread and the backing AgentSession for the required application `userId`. If input is present, mosoo also queues the initial Run. If input is omitted, the Thread is immediately visible with IDLE status and no run.",
+        "description": "Creates a Thread and the backing AgentSession for the required application `userId`. If input is present, Mosoo also queues the initial Run. If input is omitted, the Thread is immediately visible with IDLE status and no run.",
         "parameters": [
           {
             "description": "Agent API Endpoint ID from the Agent's API Access panel. v1 IDs are bare ULIDs.",
@@ -1881,10 +1957,12 @@
                     {
                       "committed": true,
                       "createdAt": "2026-05-19T00:02:00.000Z",
+                      "fileId": "01J0000000000000000000000J",
                       "id": "01J0000000000000000000000J",
                       "kind": "attachment",
                       "mimeType": "text/plain",
                       "name": "brief.txt",
+                      "runId": null,
                       "size": 19
                     }
                   ]

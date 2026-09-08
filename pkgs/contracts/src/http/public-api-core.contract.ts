@@ -87,6 +87,16 @@ export interface PublicThreadFinalOutputWarning {
   count: number;
 }
 
+export interface PublicThreadArtifact {
+  createdAt: string;
+  fileId: FileId;
+  kind: "artifact";
+  mimeType: string | null;
+  name: string;
+  runId: SessionRunId;
+  size: number;
+}
+
 export interface PublicThreadRunError {
   code: string;
   message: string;
@@ -94,6 +104,7 @@ export interface PublicThreadRunError {
 }
 
 export interface PublicThreadRunSummary {
+  artifacts?: PublicThreadArtifact[];
   completedAt: string | null;
   createdAt: string;
   error: PublicThreadRunError | null;
@@ -184,6 +195,7 @@ export interface PublicThreadApiSendEventsResponse {
 }
 
 export interface PublicThreadEventLogEntry {
+  artifact?: PublicThreadArtifact;
   content: string;
   durationMs: number | null;
   id: RuntimeEventId;
@@ -217,10 +229,12 @@ export interface PublicFileResponse {
 export interface PublicThreadFile {
   committed: boolean;
   createdAt: string;
+  fileId?: FileId;
   id: FileId;
   kind: "artifact" | "attachment";
   mimeType: string | null;
   name: string;
+  runId?: SessionRunId | null;
   size: number;
 }
 

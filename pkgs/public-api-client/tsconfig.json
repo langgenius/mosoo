@@ -4,5 +4,6 @@
     "lib": ["ESNext", "DOM"],
     "types": ["bun"]
   },
+  "exclude": ["tests/fixtures/**"],
   "include": ["src/**/*.ts", "tests/**/*.ts"]
 }

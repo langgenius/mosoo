@@ -6,11 +6,20 @@ import type {
   FileUploadStatus,
   FileUploadStrategy,
 } from "@mosoo/contracts/file";
-import type { AccountId, FileVersionId, FileId, PlatformId, UploadId } from "@mosoo/id";
+import type {
+  AccountId,
+  FileVersionId,
+  FileId,
+  PlatformId,
+  RuntimeEventId,
+  SessionRunId,
+  UploadId,
+} from "@mosoo/id";
 import { sql } from "drizzle-orm";
 import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 import { platformIdColumn } from "./id-column";
+import { sessionRunsTable } from "./session/runs.schema";
 
 export type FileVersionReason = "delete" | "directory_delete" | "move_overwrite" | "overwrite";
 
@@ -80,6 +89,29 @@ export const fileRecordsTable = sqliteTable(
   ],
 );
 
+export const sessionRunArtifactsTable = sqliteTable(
+  "session_run_artifact",
+  {
+    committedEventId: platformIdColumn<RuntimeEventId>("committed_event_id").notNull(),
+    createdAt: integer("created_at").notNull(),
+    fileId: platformIdColumn<FileId>("file_id").primaryKey(),
+    mimeType: text("mime_type"),
+    name: text("name").notNull(),
+    sessionRunId: platformIdColumn<SessionRunId>("session_run_id")
+      .notNull()
+      .references(() => sessionRunsTable.id, { onDelete: "cascade" }),
+    size: integer("size").notNull(),
+  },
+  (table) => [
+    uniqueIndex("session_run_artifact_committed_event_idx").on(table.committedEventId),
+    index("session_run_artifact_run_created_idx").on(
+      table.sessionRunId,
+      table.createdAt,
+      table.fileId,
+    ),
+  ],
+);
+
 export const fileUploadsTable = sqliteTable(
   "file_upload",
   {
@@ -142,5 +174,6 @@ export const fileVersionsTable = sqliteTable(
 );
 
 export type FileRecordRow = typeof fileRecordsTable.$inferSelect;
+export type SessionRunArtifactRow = typeof sessionRunArtifactsTable.$inferSelect;
 export type FileUploadRow = typeof fileUploadsTable.$inferSelect;
 export type FileVersionRow = typeof fileVersionsTable.$inferSelect;
