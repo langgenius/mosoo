@@ -208,6 +208,55 @@ describe("session runtime event store", () => {
     expect(count?.count).toBe(0);
   });
 
+  test("batches one-event allocations within D1's bound parameter limit", async () => {
+    const database = createRuntimeEventStoreDatabase({ maxBoundParams: 100 });
+    const originalBatch = database.batch.bind(database);
+    const batchSizes: number[] = [];
+    database.batch = async <T = unknown>(statements: D1PreparedStatement[]) => {
+      batchSizes.push(statements.length);
+      return originalBatch<T>(statements);
+    };
+
+    for (let index = 2; index <= 98; index += 1) {
+      await database
+        .prepare("INSERT INTO session (id, agent_id, archived_at, status) VALUES (?, ?, NULL, ?)")
+        .bind(`session-${index}`, "01J00000000000000000000009", "TERMINATED")
+        .run();
+    }
+
+    const records = Array.from({ length: 98 }, (_, index) => {
+      const sessionId = `session-${index + 1}`;
+      const terminated = index > 0;
+
+      return {
+        event: runtimeEvent({
+          id: `event-${index + 1}`,
+          kind: terminated ? "session.lifecycle.updated" : "agent.task.updated",
+          occurredAtMs: 4_000 + index,
+          payload: terminated
+            ? { status: "TERMINATED" }
+            : {
+                agentId: "01J00000000000000000000009",
+                operation: "restart",
+                startedAt: new Date(4_000 + index).toISOString(),
+                status: "running",
+              },
+          sessionId,
+        }),
+        occurredAt: 4_000 + index,
+        sessionId,
+      };
+    });
+    const result = await persistOneRuntimeEventPerSession(database, { records });
+    const allocated = await database
+      .prepare("SELECT COUNT(*) AS count FROM session WHERE runtime_event_seq_cursor = 1")
+      .first<{ count: number }>();
+
+    expect(result).toEqual({ persistedCount: 98, skippedSessionIds: [] });
+    expect(allocated?.count).toBe(98);
+    expect(batchSizes[0]).toBe(3);
+  });
+
   test("persists mixed source ids and skips source replays before allocating sequence", async () => {
     const database = createRuntimeEventStoreDatabase();
 
