@@ -80,8 +80,8 @@ export function ThreadProcessModal({
                         aria-hidden="true"
                         className="relative inline-flex size-2 items-center justify-center"
                       >
-                        <span className="bg-primary absolute size-2 animate-ping rounded-full opacity-70" />
-                        <span className="bg-primary relative size-2 rounded-full" />
+                        <span className="bg-brand-mark absolute size-2 animate-ping rounded-full opacity-70" />
+                        <span className="bg-brand-mark relative size-2 rounded-full" />
                       </span>
                     ) : null}
                     {threadFailed

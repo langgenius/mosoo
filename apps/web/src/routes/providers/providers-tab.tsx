@@ -18,6 +18,7 @@ import { getErrorMessage } from "@/domains/vendor-credential/model/provider-cred
 import { formatProviderErrorMessage } from "@/domains/vendor-credential/model/provider-readiness-copy";
 import { toProjectId, toVendorCredentialId } from "@/routes/typed-id";
 import { useTranslation } from "@/shared/i18n";
+import { Badge } from "@/shared/ui/badge";
 import { VendorIcon, hasVendorIcon } from "@/shared/ui/brand-icons";
 import { Button } from "@/shared/ui/button";
 import {
@@ -30,6 +31,9 @@ import {
 } from "@/shared/ui/dialog";
 import { Pencil, Plus, Trash2 } from "@/shared/ui/icons";
 import { Input } from "@/shared/ui/input";
+import { Label } from "@/shared/ui/label";
+import { ConnectionRow } from "@/shared/ui/list-row";
+import { MonoText } from "@/shared/ui/mono-text";
 import { PageHeader } from "@/shared/ui/page-header";
 
 import { ProviderTestStatus } from "./provider-test-status";
@@ -313,7 +317,7 @@ export function ProvidersTab({ projectId }: { projectId: string }): ReactElement
         title={t("providers.title")}
         description={t("providers.description")}
       >
-        <Button onClick={() => startCreate(CUSTOM_PROVIDER_VENDOR_ID)} size="sm" variant="outline">
+        <Button onClick={() => startCreate(CUSTOM_PROVIDER_VENDOR_ID)} variant="outline">
           <Plus className="size-3.5" />
           {t("providers.addCustomModel")}
         </Button>
@@ -322,13 +326,16 @@ export function ProvidersTab({ projectId }: { projectId: string }): ReactElement
       <main className="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-8">
         <div className="mx-auto max-w-4xl space-y-6">
           {credentialsLoading ? (
-            <div className="border-border bg-card text-muted-foreground rounded-lg border px-4 py-6 text-sm">
+            <div className="border-border bg-card text-fg-3 rounded-lg border px-4 py-6 text-[13px]">
               {t("providers.loading")}
             </div>
           ) : null}
 
           {pageError === null ? null : (
-            <div className="border-destructive/30 bg-destructive/5 text-destructive rounded-md border px-3 py-2 text-sm">
+            <div
+              className="border-danger/30 bg-danger-bg text-danger-fg rounded-md border px-3 py-2 text-[13px]"
+              role="alert"
+            >
               {pageError}
             </div>
           )}
@@ -427,6 +434,13 @@ function ProviderCredentialDialogForm({
   const apiBaseInputId = `${formId}-api-base`;
   const modelsInputId = `${formId}-models`;
   const vendorName = t(vendorLabel(form.vendorId));
+  // Invalid decoration appears only after a failed save; it never replaces the
+  // focus ring (contract section 4, field recipe).
+  const showInvalid = error !== null;
+  const nameInvalid = showInvalid && form.name.trim().length === 0;
+  const apiKeyInvalid = showInvalid && form.id === null && form.apiKey.trim().length === 0;
+  const modelsInvalid =
+    showInvalid && form.vendorId === CUSTOM_PROVIDER_VENDOR_ID && formModels(form) === undefined;
 
   return (
     <>
@@ -440,32 +454,32 @@ function ProviderCredentialDialogForm({
       </DialogHeader>
       <div className="space-y-3">
         <div className={endpointEnabled ? "grid gap-3 sm:grid-cols-2" : "grid gap-3"}>
-          <label className="space-y-1" htmlFor={nameInputId}>
-            <div className="text-muted-foreground text-xs font-medium">{t("providers.name")}</div>
+          <div className="space-y-1.5">
+            <Label htmlFor={nameInputId}>{t("providers.name")}</Label>
             <Input
+              aria-invalid={nameInvalid || undefined}
               id={nameInputId}
               placeholder={t("providers.productionPlaceholder")}
               value={form.name}
               onChange={(event) => onChange({ ...form, name: event.target.value })}
             />
-          </label>
+          </div>
           {endpointEnabled ? (
-            <label className="space-y-1" htmlFor={apiBaseInputId}>
-              <div className="text-muted-foreground text-xs font-medium">
-                {t("providers.baseUrl")}
-              </div>
+            <div className="space-y-1.5">
+              <Label htmlFor={apiBaseInputId}>{t("providers.baseUrl")}</Label>
               <Input
                 id={apiBaseInputId}
                 placeholder={defaultApiBaseForVendor(form.vendorId) || "https://api.example.com/v1"}
                 value={form.apiBase}
                 onChange={(event) => onChange({ ...form, apiBase: event.target.value })}
               />
-            </label>
+            </div>
           ) : null}
         </div>
-        <label className="block space-y-1" htmlFor={apiKeyInputId}>
-          <div className="text-muted-foreground text-xs font-medium">{t("providers.apiKey")}</div>
+        <div className="space-y-1.5">
+          <Label htmlFor={apiKeyInputId}>{t("providers.apiKey")}</Label>
           <Input
+            aria-invalid={apiKeyInvalid || undefined}
             autoComplete="new-password"
             data-1p-ignore="true"
             id={apiKeyInputId}
@@ -475,37 +489,46 @@ function ProviderCredentialDialogForm({
             value={form.apiKey}
             onChange={(event) => onChange({ ...form, apiKey: event.target.value })}
           />
-        </label>
+        </div>
         {form.vendorId === CUSTOM_PROVIDER_VENDOR_ID ? (
-          <label className="block space-y-1" htmlFor={modelsInputId}>
-            <div className="text-muted-foreground text-xs font-medium">{t("providers.models")}</div>
+          <div className="space-y-1.5">
+            <Label htmlFor={modelsInputId}>{t("providers.models")}</Label>
             <Input
+              aria-invalid={modelsInvalid || undefined}
               id={modelsInputId}
               placeholder="gpt-4.1, claude-sonnet-4"
               value={form.modelsText}
               onChange={(event) => onChange({ ...form, modelsText: event.target.value })}
             />
-          </label>
+          </div>
         ) : null}
         {error === null ? null : (
-          <div className="border-destructive/30 bg-destructive/5 text-destructive rounded-md border px-3 py-2 text-sm">
+          <div
+            className="border-danger/30 bg-danger-bg text-danger-fg rounded-md border px-3 py-2 text-[13px]"
+            role="alert"
+          >
             {error}
           </div>
         )}
       </div>
       <DialogFooter>
         <div className="flex flex-1 items-center gap-2">
-          <Button onClick={onCancel} size="sm" variant="ghost">
+          <Button onClick={onCancel} variant="ghost">
             {t("common.cancel")}
           </Button>
         </div>
         <div className="flex items-center gap-2">
-          <Button disabled={testState === "running"} onClick={onTest} size="sm" variant="outline">
+          <Button
+            aria-busy={testState === "running" || undefined}
+            disabled={testState === "running"}
+            onClick={onTest}
+            variant="outline"
+          >
             {testState === "running" ? t("providers.testing") : t("providers.test")}
           </Button>
           <ProviderTestStatus state={testState} />
         </div>
-        <Button disabled={saving} onClick={onSave} size="sm">
+        <Button aria-busy={saving || undefined} disabled={saving} onClick={onSave}>
           {saving ? t("providers.saving") : t("common.save")}
         </Button>
       </DialogFooter>
@@ -536,16 +559,18 @@ function ProviderCredentialSection({
         <div className="flex min-w-0 items-center gap-3">
           {hasVendorIcon(vendor.iconKey) ? (
             <VendorIcon
-              className="size-7 shrink-0 rounded-md bg-white p-1"
+              className="border-border-soft bg-card rounded-compact size-7 shrink-0 border p-1"
               iconKey={vendor.iconKey}
             />
           ) : null}
           <div className="min-w-0">
-            <h2 className="text-fg-1 truncate text-[15px] font-semibold">{t(vendor.label)}</h2>
-            <p className="text-muted-foreground text-[12px]">{t("providers.projectLevelKeys")}</p>
+            <h2 className="text-fg-heading truncate text-[14px] font-semibold">
+              {t(vendor.label)}
+            </h2>
+            <p className="text-fg-3 text-[12px] leading-4">{t("providers.projectLevelKeys")}</p>
           </div>
         </div>
-        <Button onClick={onCreate} size="sm" variant="outline">
+        <Button onClick={onCreate} variant="outline">
           <Plus className="size-3.5" />
           {t("providers.addKey")}
         </Button>
@@ -553,62 +578,50 @@ function ProviderCredentialSection({
       {credentials.length > 0 ? (
         <div className="space-y-2">
           {credentials.map((credential) => (
-            <div
-              className="bg-muted/50 flex items-center justify-between gap-3 rounded-lg px-3 py-2"
-              key={credential.id}
-            >
+            <ConnectionRow className="justify-between" key={credential.id} tone="tinted">
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="text-fg-1 truncate text-[13px] font-medium">
-                    {credential.name}
-                  </span>
+                  <span className="text-fg-1 truncate font-medium">{credential.name}</span>
                   {credential.isDefault ? (
-                    <span className="bg-success-bg text-success-fg shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium">
-                      {t("providers.default")}
-                    </span>
+                    <Badge variant="brand">{t("providers.default")}</Badge>
                   ) : null}
                 </div>
-                <div className="text-muted-foreground truncate font-mono text-[12px]">
-                  {credential.maskedApiKey}
-                  <span className="text-muted-foreground/60 ml-2">
+                <div className="mt-0.5 flex min-w-0 items-baseline gap-2 leading-4">
+                  <MonoText className="text-fg-3 truncate">{credential.maskedApiKey}</MonoText>
+                  <span className="text-fg-muted truncate text-[12px]">
                     {displayApiBase(credential, t)}
                   </span>
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-1">
                 {credential.isDefault ? null : (
-                  <Button
-                    className="text-muted-foreground h-7 px-2 text-[12px]"
-                    onClick={() => onSetDefault(credential)}
-                    size="sm"
-                    variant="ghost"
-                  >
+                  <Button onClick={() => onSetDefault(credential)} size="sm" variant="ghost">
                     {t("providers.setDefault")}
                   </Button>
                 )}
                 <Button
                   aria-label={t("providers.editCredentialKey", { name: credential.name })}
                   onClick={() => onEdit(credential)}
-                  size="icon"
+                  size="icon-sm"
                   variant="ghost"
                 >
                   <Pencil className="size-4" />
                 </Button>
                 <Button
                   aria-label={t("providers.deleteCredentialKey", { name: credential.name })}
-                  className="text-destructive hover:text-destructive"
+                  className="text-danger-fg hover:text-danger-fg"
                   onClick={() => onDelete(credential)}
-                  size="icon"
+                  size="icon-sm"
                   variant="ghost"
                 >
                   <Trash2 className="size-4" />
                 </Button>
               </div>
-            </div>
+            </ConnectionRow>
           ))}
         </div>
       ) : (
-        <div className="text-muted-foreground/70 rounded-md border border-dashed px-3 py-3 text-[13px]">
+        <div className="border-border text-fg-3 flex min-h-10 items-center rounded-md border border-dashed px-3 text-[13px]">
           {t("providers.noKeyConfigured")}
         </div>
       )}

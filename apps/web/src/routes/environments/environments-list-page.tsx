@@ -107,7 +107,6 @@ export function EnvironmentsListPage() {
           onClick={() => {
             setCreateOpen(true);
           }}
-          size="sm"
         >
           <Plus className="size-3.5" />
           {t("environments.create")}
@@ -126,7 +125,10 @@ export function EnvironmentsListPage() {
         <EnvironmentCliCallout />
 
         {isTruthy(error) ? (
-          <div className="border-destructive/30 bg-destructive/10 text-destructive rounded-md border px-3 py-2 text-[13px]">
+          <div
+            className="border-danger/30 bg-danger-bg text-danger-fg rounded-md border px-3 py-2 text-[13px]"
+            role="alert"
+          >
             {error}
           </div>
         ) : null}

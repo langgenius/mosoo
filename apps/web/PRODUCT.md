@@ -27,8 +27,9 @@ not a shipped console capability. Public landing and blog content live in
 
 Three words: precise, developer-native, restrained. Voice is plain and concrete: say
 what the product literally does, no marketing buzzwords. The Moso-bamboo green is a
-disciplined accent (growth/action), not a wash; the UI is neutral-first, GitHub-like.
-Confidence through clarity, not decoration.
+disciplined accent (growth/action), not a wash; the UI is neutral-first and calm, in
+the way Supabase's and Mintlify's product shells are. Confidence through clarity, not
+decoration.
 
 ## Anti-references
 
@@ -39,8 +40,10 @@ Confidence through clarity, not decoration.
 
 ## Design Principles
 
-1. **Neutral-first, green as punctuation.** Cool grays carry the UI; the bright green
-   marks the one focal action, current selection, and state, never decoration.
+1. **Neutral-first, green as punctuation.** Pure neutral grays carry the UI; the brand
+   green marks the one focal action per surface, keyboard focus, checked controls, and
+   a few live markers. Selection stays neutral and feedback states use their own hues
+   (see `docs/design/theme-color-usage.md`).
 2. **Earned familiarity.** Standard affordances (top/side nav, tabs, command-style
    inputs) so the tool disappears into the task. No reinvented controls.
 3. **Consistency over surprise.** One button vocabulary, one form vocabulary, one
@@ -54,5 +57,7 @@ Confidence through clarity, not decoration.
 
 Target WCAG AA. Body text ≥4.5:1, large/UI text ≥3:1, including placeholders and muted
 copy on tinted surfaces. Visible focus rings on every interactive element. Honor
-`prefers-reduced-motion` for new motion work. A dark token palette exists, but a
-user-selectable/activated dark theme is not currently shipped.
+`prefers-reduced-motion` for new motion work. Every state is distinguishable without
+colour alone (glyphs, underlines, rings, surface changes). A dark token palette exists
+and is captured in the design-contract E2E case, but a user-selectable dark theme is
+not currently shipped.

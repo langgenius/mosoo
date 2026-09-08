@@ -4,6 +4,21 @@
 
 @source "../../../node_modules/streamdown/dist/*.js";
 
+/*
+ * Console design contract, token layer (docs/design/console-design-contract.md).
+ *
+ * Three layers, top to bottom:
+ *   1. Primitives: raw palettes, type scale, spacing, radii, elevation, motion.
+ *   2. Semantic roles: canvas/surface/text/border/action/focus and the status
+ *      quartet, mapped for light and dark.
+ *   3. Component recipes live in src/shared/ui and consume semantic roles only.
+ *
+ * Route code consumes Tailwind classes bridged from the semantic layer
+ * (`text-fg-2`, `bg-selected`, `border-border-strong`, ...). Raw palette
+ * values and one-off typography inside reusable components are a review
+ * failure; see the design gate test apps/web/tests/console-design-contract-boundary.test.ts.
+ */
+
 @font-face {
   font-family: "Geist";
   font-style: normal;
@@ -12,15 +27,6 @@
   src:
     url("/fonts/Geist-Variable.woff2") format("woff2-variations"),
     url("/fonts/Geist-Variable.woff2") format("woff2");
-}
-@font-face {
-  font-family: "Cabinet Grotesk";
-  font-style: normal;
-  font-weight: 100 900;
-  font-display: swap;
-  src:
-    url("/fonts/CabinetGrotesk-Variable.woff2") format("woff2-variations"),
-    url("/fonts/CabinetGrotesk-Variable.woff2") format("woff2");
 }
 @font-face {
   font-family: "Inter";
@@ -49,10 +55,44 @@
     url("/fonts/GeistMono-Variable.woff2") format("woff2-variations"),
     url("/fonts/GeistMono-Variable.woff2") format("woff2");
 }
+/* Heading voice (contract section 3): Instrument Sans, SIL OFL 1.1, Latin.
+   CJK headings fall back to the system sans at the same weight. */
+@font-face {
+  font-family: "Instrument Sans";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src:
+    url("/fonts/InstrumentSans-Variable.woff2") format("woff2-variations"),
+    url("/fonts/InstrumentSans-Variable.woff2") format("woff2");
+}
+/* Precise information (ids, model ids, durations, versions): IBM Plex Mono,
+   SIL OFL 1.1, official complete build. */
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/IBMPlexMono-Regular.woff2") format("woff2");
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/fonts/IBMPlexMono-Medium.woff2") format("woff2");
+}
 
 :root {
-  /* Brand green — the bright Moso-bamboo shoot (#6FD305). A disciplined accent
-     only: primary actions stay BLACK; green marks growth/action/life. */
+  /* ------------------------------------------------------------------ */
+  /* 1. Primitives                                                        */
+  /* ------------------------------------------------------------------ */
+
+  /* Brand green cluster: the Moso bamboo shoot, anchored on the logo mark
+     (#6fd305, oklch 0.775 0.226 135). One hue, several tones with fixed jobs:
+     500 is the only large fill (dark ink text on it), 700 carries small
+     marks that need contrast on white (focus ring, checked track), 800 is
+     the text tone. Nothing else in the console is this hue. */
   --green-50: #f4fce4;
   --green-100: #e7f8c4;
   --green-200: #d3f195;
@@ -65,94 +105,56 @@
   --green-900: #2c5113;
   --green-950: #1a310b;
 
-  /* Neutrals — true cool grays, GitHub-like. No green cast; the grays carry
-     the UI and the green only punctuates it. */
-  --ink-50: #f4f6f8;
-  --ink-100: #e9ecf0;
-  --ink-200: #d2d7dd;
-  --ink-300: #aeb5be;
-  --ink-400: #828a93;
-  --ink-500: #656c75;
-  --ink-600: #515860;
-  --ink-700: #3d434b;
-  --ink-800: #2b3036;
-  --ink-900: #1c2024;
-  --ink-950: #08090a;
+  /* Neutrals: pure neutral, no blue or green cast (oklch chroma 0). The
+     references for #601 and the Apps cheatsheet for #599 are all pure
+     neutral; the grays carry the console and the green only punctuates it. */
+  --ink-50: #f5f5f5;
+  --ink-100: #ebebeb;
+  --ink-200: #d6d6d6;
+  --ink-300: #b8b8b8;
+  --ink-400: #8a8a8a;
+  --ink-500: #707070;
+  --ink-600: #5c5c5c;
+  --ink-700: #454545;
+  --ink-800: #333333;
+  --ink-900: #1f1f1f;
+  --ink-950: #0d0d0d;
 
-  /* Paper — cool near-white surface ramp (was warm cream). */
+  /* Paper: near-white surface ramp. 100 is the canvas, 200 the sidebar and
+     sunken groups, 300/400 pressed and disabled fills. */
   --paper-50: #ffffff;
-  --paper-100: #fbfbfc;
-  --paper-200: #f4f6f8;
-  --paper-300: #e9ecf0;
-  --paper-400: #dfe3e8;
+  --paper-100: #fafafa;
+  --paper-200: #f4f4f4;
+  --paper-300: #ebebeb;
+  --paper-400: #e0e0e0;
 
-  /* Status accents — kept small, marker-level only. Each carries a paired
-     darker text (_fg) and soft tint (_bg) so chips can render readable copy
-     on a brand-tinted background without falling back to Tailwind defaults.
-     Values mirror the semantic-status quartet (success / warning / danger /
-     info) in the mosoo design system's colors_and_type.css handoff. */
-  --soil: #7a5230;
-  --soil-fg: #5b3c22;
-  --soil-bg: #f4ece2;
-  --sky: #2f6bd4;
-  --sky-fg: #235fbe;
-  --sky-bg: #e8f0fd;
-  --amber: #e0a106;
-  --amber-fg: #9a6800;
-  --amber-bg: #fbf1d4;
-  --ember: #dc2a2a;
-  --ember-fg: #b91c1c;
-  --ember-bg: #fbeaea;
-  --success-fg: var(--green-800);
-  --success-bg: #edf9d8;
+  /* Status hues: feedback colours, never brand. Success is a true green
+     (hue ~147) so a "connected" badge is never mistaken for the brand lime
+     (hue ~135) and vice versa. Each hue carries a mark tone, a readable text
+     tone (>= 4.5:1 on its tint) and a soft tint. */
+  --success-500: #15b042;
+  --success-700: #0e6b33;
+  --success-100: #caface;
+  --amber-500: #e0a106;
+  --amber-700: #8a5a00;
+  --amber-100: #fdf1cf;
+  --ember-500: #dc2a2a;
+  --ember-700: #b91c1c;
+  --ember-100: #fbeaea;
+  --sky-500: #2f6bd4;
+  --sky-700: #235fbe;
+  --sky-100: #e8f0fd;
+  --soil-500: #7a5230;
+  --soil-700: #5b3c22;
+  --soil-100: #f4ece2;
 
-  --bg: var(--paper-100);
-  --bg-elevated: #ffffff;
-  --bg-sunken: var(--paper-200);
-  --bg-canvas: #ffffff;
-  /* The sidebar sits one step below the canvas so the two surfaces read as
-     different materials, not merely a hairline apart. */
-  --bg-sidebar: var(--paper-200);
-
-  /* Sidebar rows: neutral hover/selected fills. Selection is never green; the
-     accent is reserved for the keyboard focus ring. */
-  --sidebar-row-hover: rgba(28, 32, 36, 0.045);
-  --sidebar-row-active: rgba(28, 32, 36, 0.065);
-
-  --fg-1: var(--ink-900);
-  --fg-2: var(--ink-500);
-  --fg-3: var(--ink-400);
-  --fg-muted: var(--ink-300);
-  --fg-inverse: var(--paper-100);
-
-  /* Cool hairlines — ink-900 based, no green cast. */
-  --border-soft: rgba(28, 32, 36, 0.06);
-  --border-default: rgba(28, 32, 36, 0.1);
-  --border-strong: rgba(28, 32, 36, 0.16);
-
-  /* Primary = black (neutral-first, like GitHub). Green is the rare accent. */
-  --primary: var(--ink-900);
-  --primary-hover: var(--ink-800);
-  --fg-on-accent: #0f1a02; /* dark ink on bright green */
-
-  --accent: var(--green-500);
-  --accent-hover: var(--green-600);
-  --accent-press: var(--green-800);
-  --accent-soft: var(--green-50);
-  --accent-soft-hover: var(--green-100);
-  --accent-ring: rgba(111, 211, 5, 0.45);
-
-  --success: var(--green-700);
-  --info: var(--sky);
-  --warning: var(--amber);
-  --danger: var(--ember);
-
-  --font-display:
-    "Geist", "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI Variable", sans-serif;
   --font-sans:
     "Geist", "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI Variable", sans-serif;
-  --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --font-heading:
+    "Instrument Sans", "Geist", "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "IBM Plex Mono", "Geist Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
+  --fs-11: 0.6875rem;
   --fs-12: 0.75rem;
   --fs-13: 0.8125rem;
   --fs-14: 0.875rem;
@@ -161,13 +163,10 @@
   --fs-18: 1.125rem;
   --fs-20: 1.25rem;
   --fs-24: 1.5rem;
-  --fs-30: 1.875rem;
-  --fs-36: 2.25rem;
-  --fs-48: 3rem;
-  --fs-64: 4rem;
+  --fs-28: 1.75rem;
 
-  --lh-tight: 1.1;
-  --lh-snug: 1.25;
+  --lh-tight: 1.15;
+  --lh-snug: 1.3;
   --lh-normal: 1.45;
   --lh-loose: 1.6;
 
@@ -184,19 +183,25 @@
   --s-20: 80px;
   --s-24: 96px;
 
+  /* Radius ladder (contract section 5). Nested corners step down one rung
+     per level: dialog/card 14 -> group/menu 10 -> compact control 8 -> row,
+     badge, menu item 6 -> tag, checkbox 4. Cards never round past 14. */
   --r-xs: 4px;
   --r-sm: 6px;
+  --r-compact: 8px;
   --r-md: 10px;
   --r-lg: 14px;
   --r-xl: 20px;
 
-  --shadow-xs: 0 1px 0 rgba(28, 32, 36, 0.04), 0 1px 2px rgba(28, 32, 36, 0.04);
-  --shadow-sm: 0 1px 2px rgba(28, 32, 36, 0.05), 0 2px 6px rgba(28, 32, 36, 0.04);
-  --shadow-md: 0 4px 10px rgba(28, 32, 36, 0.06), 0 8px 20px rgba(28, 32, 36, 0.05);
-  --shadow-lg: 0 12px 28px rgba(28, 32, 36, 0.1), 0 4px 12px rgba(28, 32, 36, 0.05);
-  --shadow-xl: 0 30px 60px rgba(28, 32, 36, 0.16), 0 10px 20px rgba(28, 32, 36, 0.07);
-  --shadow-inset: inset 0 0 0 1px rgba(28, 32, 36, 0.06);
-  --shadow-focus: 0 0 0 2px var(--accent-ring);
+  /* Elevation: the canvas sits under white surfaces separated by hairlines;
+     shadows are reserved for raised or selected surfaces (menus, dialogs,
+     the selected segment). Never pair a 1px border with a wide shadow. */
+  --elev-xs: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --elev-sm: 0 1px 2px rgba(0, 0, 0, 0.05), 0 2px 6px rgba(0, 0, 0, 0.04);
+  --elev-md: 0 4px 12px rgba(0, 0, 0, 0.07), 0 1px 3px rgba(0, 0, 0, 0.05);
+  --elev-lg: 0 12px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
+  --elev-xl: 0 30px 60px rgba(0, 0, 0, 0.16), 0 10px 20px rgba(0, 0, 0, 0.07);
+  --elev-inset: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
 
   --ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
@@ -205,6 +210,93 @@
   --dur-2: 180ms;
   --dur-3: 260ms;
   --dur-4: 420ms;
+
+  /* ------------------------------------------------------------------ */
+  /* 2. Semantic roles (light)                                            */
+  /* ------------------------------------------------------------------ */
+
+  /* Canvas and surfaces */
+  --bg: var(--paper-100);
+  --bg-elevated: var(--paper-50);
+  --bg-sunken: var(--paper-200);
+  --bg-canvas: var(--paper-50);
+  --bg-sidebar: var(--paper-200);
+  /* Interaction fills on any surface: neutral, never green. */
+  --hover: rgba(0, 0, 0, 0.04);
+  --selected: rgba(0, 0, 0, 0.065);
+  --pressed: rgba(0, 0, 0, 0.09);
+  --sidebar-row-hover: var(--hover);
+  --sidebar-row-active: var(--selected);
+
+  /* Text roles: heading (near-dark), default #333, secondary, subtle #707070
+     (the cheatsheet's #777 pulled to >= 4.5:1 on the sidebar tint), muted for
+     placeholders and disabled labels (>= 3:1 only). */
+  --fg-heading: var(--ink-900);
+  --fg-1: var(--ink-800);
+  --fg-2: var(--ink-600);
+  --fg-3: var(--ink-500);
+  --fg-muted: var(--ink-400);
+  --fg-inverse: var(--paper-50);
+
+  /* Borders: thin and low-contrast; strong is for controls that must read
+     as controls (inputs, outline buttons). */
+  --border-soft: rgba(0, 0, 0, 0.06);
+  --border-default: rgba(0, 0, 0, 0.1);
+  --border-strong: rgba(0, 0, 0, 0.16);
+
+  /* Brand emphasis. The one focal action per surface is a green-500 fill with
+     dark ink text (9.4:1); a hairline of the deep tone keeps its edge on the
+     canvas. Hover darkens one step, press two. */
+  --action-primary-bg: var(--green-500);
+  --action-primary-fg: #0f1a02;
+  --action-primary-hover: var(--green-600);
+  --action-primary-active: #55a600;
+  --action-primary-border: rgba(58, 110, 14, 0.35);
+  /* Neutral strong emphasis (tooltips, the account tile, and the sidebar's
+     one filled control). Black on purpose: a brand fill in the persistent
+     sidebar would put two green actions on every screen. */
+  --emphasis: var(--ink-900);
+  --emphasis-hover: var(--ink-800);
+  --emphasis-fg: var(--paper-50);
+  --sidebar-cta-bg: var(--emphasis);
+  --sidebar-cta-bg-hover: var(--emphasis-hover);
+  --sidebar-cta-fg: var(--emphasis-fg);
+  /* Text links: deep brand tone (6.2:1), underlined so colour is not alone. */
+  --link: var(--green-800);
+  --link-hover: var(--green-900);
+  /* Keyboard focus: the same 2px ring everywhere, 1px offset so it reads on
+     any fill, including the green primary. green-700 is 4.2:1 on white. */
+  --focus-ring: var(--green-700);
+  /* Checked controls (switch, checkbox, radio): a state token in the brand
+     cluster, deep enough for 3:1 against white (non-text contrast). */
+  --control-checked: var(--green-700);
+  --control-unchecked: var(--ink-300);
+  /* Brand tint for lifecycle markers that mean something Mosoo-specific
+     (default key, built-in resource); text is the deep tone. */
+  --brand: var(--green-800);
+  --brand-soft: var(--green-50);
+  --brand-soft-hover: var(--green-100);
+  --brand-mark: var(--green-500);
+
+  /* Status roles: mark (dot, icon), text on tint, tint. */
+  --success: var(--success-500);
+  --success-fg: var(--success-700);
+  --success-bg: var(--success-100);
+  --warning: var(--amber-500);
+  --warning-fg: var(--amber-700);
+  --warning-bg: var(--amber-100);
+  --danger: var(--ember-500);
+  --danger-fg: var(--ember-700);
+  --danger-bg: var(--ember-100);
+  --info: var(--sky-500);
+  --info-fg: var(--sky-700);
+  --info-bg: var(--sky-100);
+  --pending: var(--ink-400);
+  --pending-fg: var(--ink-600);
+  --pending-bg: var(--paper-200);
+  --soil: var(--soil-500);
+  --soil-fg: var(--soil-700);
+  --soil-bg: var(--soil-100);
 }
 
 .dark,
@@ -214,78 +306,149 @@
   --bg-sunken: var(--ink-950);
   --bg-canvas: var(--ink-800);
   --bg-sidebar: var(--ink-950);
+  --hover: rgba(255, 255, 255, 0.06);
+  --selected: rgba(255, 255, 255, 0.1);
+  --pressed: rgba(255, 255, 255, 0.14);
+  --sidebar-row-hover: var(--hover);
+  --sidebar-row-active: var(--selected);
 
-  --sidebar-row-hover: rgba(244, 246, 248, 0.06);
-  --sidebar-row-active: rgba(244, 246, 248, 0.1);
-
+  --fg-heading: var(--paper-50);
   --fg-1: var(--paper-100);
   --fg-2: var(--ink-200);
   --fg-3: var(--ink-300);
   --fg-muted: var(--ink-400);
   --fg-inverse: var(--ink-900);
 
-  --border-soft: rgba(244, 246, 248, 0.05);
-  --border-default: rgba(244, 246, 248, 0.09);
-  --border-strong: rgba(244, 246, 248, 0.18);
+  --border-soft: rgba(255, 255, 255, 0.06);
+  --border-default: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.18);
 
-  /* On dark surfaces a black primary disappears; lift it to green (white fg
-     reads against it), matching GitHub's dark primary buttons. */
-  --primary: var(--green-600);
-  --primary-hover: var(--green-500);
+  /* The bright fill keeps its dark ink text on dark surfaces too; that is
+     what makes it the one unmistakable action. */
+  --action-primary-bg: var(--green-500);
+  --action-primary-fg: #0f1a02;
+  --action-primary-hover: var(--green-400);
+  --action-primary-active: var(--green-600);
+  --action-primary-border: rgba(111, 211, 5, 0.4);
+  --emphasis: var(--paper-100);
+  --emphasis-hover: var(--paper-50);
+  --emphasis-fg: var(--ink-900);
+  --sidebar-cta-bg: var(--emphasis);
+  --sidebar-cta-bg-hover: var(--emphasis-hover);
+  --sidebar-cta-fg: var(--emphasis-fg);
+  --link: var(--green-400);
+  --link-hover: var(--green-300);
+  --focus-ring: var(--green-500);
+  --control-checked: var(--green-500);
+  --control-unchecked: var(--ink-600);
+  --brand: var(--green-400);
+  --brand-soft: rgba(111, 211, 5, 0.14);
+  --brand-soft-hover: rgba(111, 211, 5, 0.22);
+  --brand-mark: var(--green-500);
 
-  --accent: var(--green-500);
-  --accent-hover: var(--green-400);
-  --accent-press: var(--green-300);
-  --accent-soft: rgba(111, 211, 5, 0.16);
-  --accent-soft-hover: rgba(111, 211, 5, 0.24);
+  --success: #3ccf6b;
+  --success-fg: #7ee3a0;
+  --success-bg: rgba(21, 176, 66, 0.16);
+  --warning: #f0b429;
+  --warning-fg: #f5cf6b;
+  --warning-bg: rgba(224, 161, 6, 0.16);
+  --danger: #f05252;
+  --danger-fg: #f59a9a;
+  --danger-bg: rgba(220, 42, 42, 0.16);
+  --info: #5b93ea;
+  --info-fg: #9cc0f5;
+  --info-bg: rgba(47, 107, 212, 0.18);
+  --pending: var(--ink-400);
+  --pending-fg: var(--ink-300);
+  --pending-bg: rgba(255, 255, 255, 0.08);
+  --soil: #b07a4a;
+  --soil-fg: #d8b08a;
+  --soil-bg: rgba(122, 82, 48, 0.2);
 
-  --shadow-xs: 0 1px 0 rgba(0, 0, 0, 0.4);
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4), 0 2px 6px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 10px rgba(0, 0, 0, 0.4), 0 8px 20px rgba(0, 0, 0, 0.3);
-  --shadow-lg: 0 12px 28px rgba(0, 0, 0, 0.5);
-  --shadow-xl: 0 30px 60px rgba(0, 0, 0, 0.6);
-  --shadow-inset: inset 0 0 0 1px rgba(247, 246, 241, 0.06);
+  --elev-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --elev-sm: 0 1px 2px rgba(0, 0, 0, 0.4), 0 2px 6px rgba(0, 0, 0, 0.3);
+  --elev-md: 0 4px 12px rgba(0, 0, 0, 0.45), 0 1px 3px rgba(0, 0, 0, 0.4);
+  --elev-lg: 0 12px 32px rgba(0, 0, 0, 0.55);
+  --elev-xl: 0 30px 60px rgba(0, 0, 0, 0.6);
+  --elev-inset: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
 }
 
+/* Tailwind bridge: semantic roles become utility classes. Legacy aliases at
+   the bottom keep older call sites compiling while they migrate to the
+   role names above. */
 @theme inline {
   --color-background: var(--bg);
   --color-foreground: var(--fg-1);
-
   --color-card: var(--bg-elevated);
   --color-card-foreground: var(--fg-1);
-
   --color-popover: var(--bg-elevated);
   --color-popover-foreground: var(--fg-1);
+  --color-sunken: var(--bg-sunken);
+  --color-canvas: var(--bg-canvas);
 
-  --color-primary: var(--primary);
-  --color-primary-foreground: #ffffff;
-  --color-primary-hover: var(--primary-hover);
-  --color-on-accent: var(--fg-on-accent);
+  --color-hover: var(--hover);
+  --color-selected: var(--selected);
+  --color-pressed: var(--pressed);
 
-  --color-secondary: var(--paper-200);
-  --color-secondary-foreground: var(--fg-1);
+  --color-fg-heading: var(--fg-heading);
+  --color-fg-1: var(--fg-1);
+  --color-fg-2: var(--fg-2);
+  --color-fg-3: var(--fg-3);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-inverse: var(--fg-inverse);
 
-  --color-muted: var(--bg-sunken);
-  --color-muted-foreground: var(--fg-3);
+  --color-border: var(--border-default);
+  --color-border-soft: var(--border-soft);
+  --color-border-strong: var(--border-strong);
+  --color-input: var(--border-strong);
 
-  --color-accent: var(--paper-200);
-  --color-accent-foreground: var(--fg-1);
+  --color-primary: var(--action-primary-bg);
+  --color-primary-foreground: var(--action-primary-fg);
+  --color-primary-hover: var(--action-primary-hover);
+  --color-primary-active: var(--action-primary-active);
+  --color-primary-border: var(--action-primary-border);
+  --color-emphasis: var(--emphasis);
+  --color-emphasis-hover: var(--emphasis-hover);
+  --color-emphasis-foreground: var(--emphasis-fg);
+  --color-sidebar-cta: var(--sidebar-cta-bg);
+  --color-sidebar-cta-hover: var(--sidebar-cta-bg-hover);
+  --color-sidebar-cta-fg: var(--sidebar-cta-fg);
+  --color-link: var(--link);
+  --color-link-hover: var(--link-hover);
+  --color-ring: var(--focus-ring);
+  --color-control-checked: var(--control-checked);
+  --color-control-unchecked: var(--control-unchecked);
 
+  --color-brand: var(--brand);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-soft-hover: var(--brand-soft-hover);
+  --color-brand-mark: var(--brand-mark);
+
+  --color-success: var(--success);
+  --color-success-fg: var(--success-fg);
+  --color-success-bg: var(--success-bg);
+  --color-warning: var(--warning);
+  --color-warning-fg: var(--warning-fg);
+  --color-warning-bg: var(--warning-bg);
+  --color-danger: var(--danger);
+  --color-danger-fg: var(--danger-fg);
+  --color-danger-bg: var(--danger-bg);
+  --color-info: var(--info);
+  --color-info-fg: var(--info-fg);
+  --color-info-bg: var(--info-bg);
+  --color-pending: var(--pending);
+  --color-pending-fg: var(--pending-fg);
+  --color-pending-bg: var(--pending-bg);
+  --color-soil: var(--soil);
+  --color-soil-fg: var(--soil-fg);
+  --color-soil-bg: var(--soil-bg);
   --color-destructive: var(--danger);
   --color-destructive-foreground: #ffffff;
 
-  --color-border: var(--border-default);
-  --color-input: var(--border-strong);
-  --color-ring: var(--accent-ring);
-
   --color-sidebar: var(--bg-sidebar);
   --color-sidebar-foreground: var(--fg-2);
-  --color-sidebar-primary: var(--primary);
-  --color-sidebar-primary-foreground: #ffffff;
-  --color-sidebar-accent: var(--paper-200);
-  --color-sidebar-accent-foreground: var(--fg-1);
   --color-sidebar-border: var(--border-soft);
-  --color-sidebar-ring: var(--accent-ring);
+  --color-sidebar-ring: var(--focus-ring);
   --color-sidebar-row-hover: var(--sidebar-row-hover);
   --color-sidebar-row-active: var(--sidebar-row-active);
 
@@ -294,7 +457,6 @@
   --color-paper-200: var(--paper-200);
   --color-paper-300: var(--paper-300);
   --color-paper-400: var(--paper-400);
-
   --color-ink-50: var(--ink-50);
   --color-ink-100: var(--ink-100);
   --color-ink-200: var(--ink-200);
@@ -305,7 +467,6 @@
   --color-ink-700: var(--ink-700);
   --color-ink-800: var(--ink-800);
   --color-ink-900: var(--ink-900);
-
   --color-green-50: var(--green-50);
   --color-green-100: var(--green-100);
   --color-green-200: var(--green-200);
@@ -317,54 +478,53 @@
   --color-green-800: var(--green-800);
   --color-green-900: var(--green-900);
 
-  --color-soil: var(--soil);
-  --color-soil-fg: var(--soil-fg);
-  --color-soil-bg: var(--soil-bg);
-  --color-amber: var(--amber);
-  --color-amber-fg: var(--amber-fg);
-  --color-amber-bg: var(--amber-bg);
-  --color-ember: var(--ember);
-  --color-ember-fg: var(--ember-fg);
-  --color-ember-bg: var(--ember-bg);
-  --color-sky: var(--sky);
-  --color-sky-fg: var(--sky-fg);
-  --color-sky-bg: var(--sky-bg);
-  --color-success-fg: var(--success-fg);
-  --color-success-bg: var(--success-bg);
-
-  --color-fg-1: var(--fg-1);
-  --color-fg-2: var(--fg-2);
-  --color-fg-3: var(--fg-3);
-  --color-fg-muted: var(--fg-muted);
-
-  --color-border-soft: var(--border-soft);
-  --color-border-strong: var(--border-strong);
-
-  --color-accent-soft: var(--accent-soft);
-  --color-accent-press: var(--accent-press);
-  --color-accent-hover: var(--accent-hover);
-
   --radius-xs: var(--r-xs);
   --radius-sm: var(--r-sm);
+  --radius-compact: var(--r-compact);
   --radius-md: var(--r-md);
   --radius-lg: var(--r-lg);
   --radius-xl: var(--r-xl);
 
+  --shadow-xs: var(--elev-xs);
+  --shadow-sm: var(--elev-sm);
+  --shadow-md: var(--elev-md);
+  --shadow-lg: var(--elev-lg);
+  --shadow-xl: var(--elev-xl);
+  --inset-shadow-hairline: var(--elev-inset);
+
   --font-sans: var(--font-sans);
+  --font-heading: var(--font-heading);
   --font-mono: var(--font-mono);
 
-  /* brand = readable dark green for accent text, borders, and selection
-     markers (icons, radios, dots). The bright --accent (green-500) is reserved
-     for toggles, the one focal action, and the accent dot. */
-  --color-brand: var(--accent-press);
-  /* selection fills are NEUTRAL, not green washes (the key restraint move);
-     --accent-soft stays green for badges, chips, and tonal accents. */
-  --color-brand-light: var(--ink-50);
-  --color-brand-ring: var(--accent-ring);
+  /* Legacy aliases (migration in progress; do not add new consumers). */
+  --color-secondary: var(--paper-200);
+  --color-secondary-foreground: var(--fg-1);
+  --color-muted: var(--bg-sunken);
+  --color-muted-foreground: var(--fg-3);
+  --color-accent: var(--hover);
+  --color-accent-foreground: var(--fg-1);
+  --color-accent-soft: var(--brand-soft);
+  --color-accent-soft-hover: var(--brand-soft-hover);
+  --color-accent-press: var(--brand);
+  --color-accent-hover: var(--green-700);
+  --color-on-accent: var(--action-primary-fg);
+  --color-brand-light: var(--selected);
+  --color-brand-ring: var(--focus-ring);
   --color-surface-warm: var(--paper-200);
   --color-text-secondary: var(--fg-2);
   --color-text-muted: var(--fg-3);
   --color-border-subtle: var(--border-soft);
+  --color-border-default: var(--border-default);
+  --color-bg-sunken: var(--bg-sunken);
+  --color-amber: var(--warning);
+  --color-amber-fg: var(--warning-fg);
+  --color-amber-bg: var(--warning-bg);
+  --color-ember: var(--danger);
+  --color-ember-fg: var(--danger-fg);
+  --color-ember-bg: var(--danger-bg);
+  --color-sky: var(--info);
+  --color-sky-fg: var(--info-fg);
+  --color-sky-bg: var(--info-bg);
 }
 
 @layer base {
@@ -376,7 +536,7 @@
     font-family: var(--font-sans);
     color: var(--fg-1);
     background: var(--bg);
-    font-weight: 500;
+    font-weight: 400;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
@@ -384,95 +544,81 @@
   }
   body {
     margin: 0;
-    font-size: var(--fs-15);
+    /* Everyday UI: 14px Geist at weight 400; controls and dense rows step
+       down to 13px inside their recipes. */
+    font-size: var(--fs-14);
     line-height: var(--lh-normal);
     letter-spacing: 0;
   }
   ::selection {
-    background: var(--green-200);
+    background: var(--green-100);
     color: var(--ink-900);
   }
 }
 
 @layer components {
-  .h-display {
-    font-family: var(--font-display);
-    font-size: var(--fs-64);
-    line-height: var(--lh-tight);
-    letter-spacing: 0;
-    font-weight: 800;
-    color: var(--fg-1);
-  }
-  .h1 {
-    font-family: var(--font-display);
-    font-size: var(--fs-36);
-    line-height: var(--lh-tight);
-    letter-spacing: 0;
-    font-weight: 800;
-    color: var(--fg-1);
-  }
-  .h2 {
-    font-family: var(--font-display);
+  /* Type roles (contract section 3). Sizes are fixed rem values; headings do
+     not scale with the viewport in product UI. */
+  .t-page-title {
+    font-family: var(--font-heading);
     font-size: var(--fs-24);
-    line-height: var(--lh-snug);
-    letter-spacing: 0;
-    font-weight: 700;
-    color: var(--fg-1);
+    line-height: var(--lh-tight);
+    letter-spacing: -0.01em;
+    font-weight: 500;
+    color: var(--fg-heading);
   }
-  .h3 {
-    font-size: var(--fs-18);
-    line-height: var(--lh-snug);
-    letter-spacing: 0;
-    font-weight: 700;
-    color: var(--fg-1);
-  }
-  .h4 {
+  .t-section-title {
     font-size: var(--fs-15);
     line-height: var(--lh-snug);
-    font-weight: 700;
+    letter-spacing: 0;
+    font-weight: 600;
+    color: var(--fg-heading);
+  }
+  .t-label {
+    font-size: var(--fs-13);
+    line-height: var(--lh-snug);
+    font-weight: 500;
     color: var(--fg-1);
   }
   .t-body {
-    font-size: var(--fs-15);
+    font-size: var(--fs-14);
     line-height: var(--lh-normal);
     color: var(--fg-1);
   }
   .t-body-sm {
-    font-size: var(--fs-14);
+    font-size: var(--fs-13);
     line-height: var(--lh-normal);
     color: var(--fg-2);
   }
   .t-caption {
-    font-size: var(--fs-13);
-    color: var(--fg-3);
-    line-height: var(--lh-normal);
-  }
-  .t-micro {
     font-size: var(--fs-12);
+    line-height: var(--lh-normal);
     color: var(--fg-3);
-    letter-spacing: 0;
   }
   .t-eyebrow {
-    font-size: var(--fs-12);
-    font-weight: 700;
-    letter-spacing: 0;
+    font-size: var(--fs-11);
+    line-height: 1rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
     color: var(--fg-3);
   }
   .t-mono {
     font-family: var(--font-mono);
-    font-size: 0.92em;
+    font-size: var(--fs-12);
     letter-spacing: 0;
+    font-variant-numeric: tabular-nums;
   }
   .t-link {
-    color: var(--accent-press);
-    text-decoration: none;
-    border-bottom: 1px solid var(--accent-ring);
+    color: var(--link);
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, var(--link) 45%, transparent);
+    text-underline-offset: 3px;
     transition: color var(--dur-1) var(--ease-out);
   }
   .t-link:hover {
-    color: var(--accent-hover);
-    border-bottom-color: var(--accent-hover);
+    color: var(--link-hover);
+    text-decoration-color: currentColor;
   }
 }
 
@@ -571,7 +717,7 @@
      anchored; a thin, contained scrollbar keeps the rail quiet. */
   .sidebar-scroll {
     overscroll-behavior: contain;
-    scrollbar-color: rgba(28, 32, 36, 0.14) transparent;
+    scrollbar-color: rgba(0, 0, 0, 0.14) transparent;
     scrollbar-width: thin;
   }
 
@@ -598,7 +744,7 @@
   }
 
   .environment-scroll-area {
-    scrollbar-color: rgba(28, 32, 36, 0.22) transparent;
+    scrollbar-color: rgba(0, 0, 0, 0.22) transparent;
     scrollbar-gutter: stable;
     scrollbar-width: thin;
   }
@@ -612,12 +758,12 @@
   }
 
   .environment-scroll-area::-webkit-scrollbar-thumb {
-    background: rgba(28, 32, 36, 0.18);
+    background: rgba(0, 0, 0, 0.18);
     border-radius: 999px;
   }
 
   .environment-scroll-area::-webkit-scrollbar-thumb:hover {
-    background: rgba(28, 32, 36, 0.28);
+    background: rgba(0, 0, 0, 0.28);
   }
 }
 
@@ -641,6 +787,19 @@
   .success-check-enter {
     animation: success-check-enter-fade var(--dur-3) var(--ease-out) 120ms backwards;
   }
+
+  /* Shared controls: state changes still happen, they just do not animate. */
+  [data-slot="button"],
+  [data-slot="input"],
+  [data-slot="textarea"],
+  [data-slot="select-trigger"],
+  [data-slot="switch"],
+  [data-slot="switch-thumb"],
+  [data-slot="badge"],
+  [data-slot="data-row"],
+  [data-slot="connection-row"] {
+    transition-duration: 0ms;
+  }
 }
 
 ::-webkit-scrollbar {
@@ -651,15 +810,15 @@
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(28, 32, 36, 0.07);
+  background: rgba(0, 0, 0, 0.07);
   border-radius: 999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(28, 32, 36, 0.16);
+  background: rgba(0, 0, 0, 0.16);
 }
 
 html {
-  scrollbar-color: rgba(28, 32, 36, 0.08) transparent;
+  scrollbar-color: rgba(0, 0, 0, 0.08) transparent;
   scrollbar-width: thin;
 }
 

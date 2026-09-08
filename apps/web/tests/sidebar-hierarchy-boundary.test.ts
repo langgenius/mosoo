@@ -18,17 +18,26 @@ const SIDEBAR_SOURCES = {
   navigation: "../src/app/navigation.tsx",
   orgNavigation: "../src/app/org-navigation.tsx",
   sidebar: "../src/shared/ui/sidebar.tsx",
-  resourceIcons: "../src/shared/ui/resource-icons.tsx",
+  sidebarIcons: "../src/shared/ui/sidebar-icons.tsx",
 } as const;
 
-const RESOURCE_ENTRY_POINTS = [
-  { icon: "SkillsResourceIcon", key: "nav.skills", path: "/integrations/skills" },
-  { icon: "McpServersResourceIcon", key: "nav.mcpServers", path: "/integrations/mcp" },
-  { icon: "ProvidersResourceIcon", key: "nav.providers", path: "/providers" },
-  { icon: "EnvironmentsResourceIcon", key: "nav.environments", path: "/environment" },
+// Every row in the Project work list uses the original glyph family.
+const GLYPH_ENTRY_POINTS = [
+  { icon: "OverviewIcon", key: "nav.overview", path: "/" },
+  { icon: "RunsIcon", key: "nav.runs", path: "/threads" },
+  { icon: "AgentsIcon", key: "nav.agents", path: "/agent" },
+  { icon: "FilesIcon", key: "nav.files", path: "/files" },
+  { icon: "SkillsIcon", key: "nav.skills", path: "/integrations/skills" },
+  { icon: "McpServersIcon", key: "nav.mcpServers", path: "/integrations/mcp" },
+  { icon: "ProvidersIcon", key: "nav.providers", path: "/providers" },
+  { icon: "EnvironmentsIcon", key: "nav.environments", path: "/environment" },
 ] as const;
 
 const LOCALES = { en, ja, "zh-CN": zhCN, "zh-TW": zhTW } as const;
+
+function rawColors(path: string): string[] {
+  return (readSource(path).match(/#[0-9a-f]{3,8}\b/giu) ?? []).map((hex) => hex.toLowerCase());
+}
 
 // Console sidebar design gate. Each check encodes a decision from
 // docs/design/console-sidebar.md so a regression fails in `just test` instead
@@ -46,37 +55,57 @@ describe("Console sidebar hierarchy", () => {
 
   test("keeps the Project work list and the persistent footer on one navigation source", () => {
     const source = readSource(SIDEBAR_SOURCES.navigation);
-    const toolsIndex = source.indexOf('t("nav.resources")');
+    const resourcesIndex = source.indexOf('t("nav.resources")');
     const settingsIndex = source.indexOf('t("nav.settings")');
 
-    expect(toolsIndex).toBeGreaterThan(-1);
-    expect(settingsIndex).toBeGreaterThan(toolsIndex);
+    expect(resourcesIndex).toBeGreaterThan(-1);
+    expect(settingsIndex).toBeGreaterThan(resourcesIndex);
     expect(source).toContain("persistent: [");
     expect(source).not.toContain("SlidersHorizontalIcon");
   });
 
-  test("gives the four resources their dedicated icon family instead of stock glyphs", () => {
-    const source = readSource(SIDEBAR_SOURCES.navigation);
+  test("keeps Create agent the one filled control, black through its own token", () => {
+    const source = readSource(SIDEBAR_SOURCES.appShell);
+    const css = readSource("../src/shared/styles/app.css");
 
-    expect(source).toContain('from "@/shared/ui/resource-icons"');
-    for (const tool of RESOURCE_ENTRY_POINTS) {
-      expect(source).toMatch(
-        new RegExp(`icon: ${tool.icon},\\s*label: t\\("${tool.key}"\\),\\s*path: "${tool.path}"`),
-      );
-    }
+    expect(source).toContain("bg-sidebar-cta text-sidebar-cta-fg hover:bg-sidebar-cta-hover");
+    expect(source).not.toContain("bg-primary");
+    expect(source).toContain('aria-disabled="true"');
+    expect(css.match(/--sidebar-cta-bg:/g)).toHaveLength(2);
+    expect(css).toContain("--sidebar-cta-bg: var(--emphasis)");
+    expect(css).toContain("--emphasis: var(--ink-900)");
+    expect(css).toContain("--color-sidebar-cta: var(--sidebar-cta-bg)");
   });
 
-  test("resource icons follow one construction contract", () => {
-    const source = readSource(SIDEBAR_SOURCES.resourceIcons);
+  test("draws all eight work rows with the original glyph family, no stock substitutes", () => {
+    const source = readSource(SIDEBAR_SOURCES.navigation);
+
+    expect(source).toContain('from "@/shared/ui/sidebar-icons"');
+    for (const glyph of GLYPH_ENTRY_POINTS) {
+      expect(source).toMatch(
+        new RegExp(
+          `icon: ${glyph.icon},\\s*label: t\\("${glyph.key}"\\),\\s*path: "${glyph.path}"`,
+        ),
+      );
+    }
+    // Only the persistent footer's project settings row still uses Hugeicons.
+    expect(source.match(/@hugeicons\/core-free-icons\//g)).toHaveLength(1);
+    expect(source).toContain("Settings02Icon");
+  });
+
+  test("sidebar glyphs follow one construction contract", () => {
+    const source = readSource(SIDEBAR_SOURCES.sidebarIcons);
 
     expect(source).toContain('viewBox="0 0 24 24"');
     expect(source).toContain("strokeWidth={1.5}");
     expect(source).toContain('strokeLinecap="round"');
     expect(source).toContain('strokeLinejoin="round"');
     expect(source).toContain('aria-hidden="true"');
-    expect(source.match(/resource="[a-z-]+"/g)).toHaveLength(RESOURCE_ENTRY_POINTS.length);
-    expect(source).not.toMatch(/#[0-9a-f]{3,8}\b/iu);
+    expect(source).toContain("data-sidebar-icon={glyph}");
+    expect(source.match(/glyph="[a-z-]+"/g)).toHaveLength(GLYPH_ENTRY_POINTS.length);
+    expect(rawColors(SIDEBAR_SOURCES.sidebarIcons)).toEqual([]);
     expect(source).not.toMatch(/fill="(?!none|currentColor)/u);
+    expect(source).not.toContain("linearGradient");
   });
 
   test("keeps emoji and improvised glyphs out of the sidebar", () => {
@@ -120,12 +149,10 @@ describe("Console sidebar hierarchy", () => {
     expect(css.match(/--sidebar-row-active:/g)).toHaveLength(2);
     expect(css).toContain("--color-sidebar-row-hover: var(--sidebar-row-hover)");
     expect(css).toContain("--color-sidebar-row-active: var(--sidebar-row-active)");
+    expect(css).toContain("--bg-sidebar: var(--paper-200)");
 
     for (const path of Object.values(SIDEBAR_SOURCES)) {
-      expect({ path, rawColor: /#[0-9a-f]{3,8}\b/iu.exec(readSource(path))?.[0] ?? null }).toEqual({
-        path,
-        rawColor: null,
-      });
+      expect({ offenders: rawColors(path), path }).toEqual({ offenders: [], path });
     }
   });
 
@@ -135,9 +162,9 @@ describe("Console sidebar hierarchy", () => {
         locale,
         resources: true,
       });
-      expect({ locale, distinct: catalog.nav.settings !== catalog.nav.accountSettings }).toEqual({
-        locale,
+      expect({ distinct: catalog.nav.settings !== catalog.nav.accountSettings, locale }).toEqual({
         distinct: true,
+        locale,
       });
     }
 

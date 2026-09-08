@@ -15,7 +15,7 @@ export function SkillCard({ onOpen, skill }: { onOpen: () => void; skill: SkillS
       type="button"
       onClick={onOpen}
       className={cn(
-        "group text-left relative flex flex-col min-h-[168px] gap-3 rounded-lg border border-border bg-card p-4 cursor-pointer transition-all",
+        "group text-left relative flex flex-col min-h-[168px] gap-3 rounded-lg border border-border bg-card p-4 cursor-pointer transition-[border-color,box-shadow] duration-150 ease-out",
         "hover:border-border-strong hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
       )}
     >

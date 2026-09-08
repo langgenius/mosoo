@@ -16,7 +16,7 @@ export function ProviderTestStatus({ state }: { state: TestConnectionState }): R
   }
 
   return (
-    <span className="inline-flex items-center gap-1 text-[12px] text-green-700">
+    <span className="text-success-fg inline-flex items-center gap-1 text-[12px] font-medium">
       <Check className="size-3.5 shrink-0" />
       {t("providers.connectionOk")}
     </span>

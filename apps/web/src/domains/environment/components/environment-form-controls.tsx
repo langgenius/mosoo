@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu";
 import { Check, ChevronDown } from "@/shared/ui/icons";
+import { fieldClassName } from "@/shared/ui/input";
 
 import { isTruthy } from "../../../shared/lib/truthiness";
 import {
@@ -23,7 +24,7 @@ function SelectButton({ disabled = false, label }: { disabled?: boolean; label: 
   return (
     <DropdownMenuTrigger asChild>
       <button
-        className="border-border-strong bg-card text-foreground hover:bg-paper-100 focus-visible:ring-ring flex h-9 w-full min-w-0 items-center justify-between gap-2 rounded-md border px-3 text-left text-sm transition-colors outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
+        className={`${fieldClassName} hover:bg-paper-100 data-[popup-open]:border-ring cursor-default items-center justify-between gap-2 text-left`}
         disabled={disabled}
         type="button"
       >
@@ -61,7 +62,7 @@ export function NetworkPolicySelect({
             }}
           >
             {t(NETWORK_POLICY_LABELS[policy])}
-            {policy === value ? <Check className="text-primary size-3.5" /> : null}
+            {policy === value ? <Check className="text-fg-1 size-3.5" /> : null}
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>
@@ -99,7 +100,7 @@ export function PackageManagerSelect({
             }}
           >
             {PACKAGE_MANAGER_LABELS[manager]}
-            {manager === value ? <Check className="text-primary size-3.5" /> : null}
+            {manager === value ? <Check className="text-fg-1 size-3.5" /> : null}
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>

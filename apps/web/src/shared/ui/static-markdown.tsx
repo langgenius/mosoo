@@ -123,7 +123,7 @@ export function StaticMarkdown({ children, className }: StaticMarkdownProps): Re
     <div
       className={cn(
         "space-y-3 break-words text-[13.5px] leading-relaxed text-foreground",
-        "[&_a]:text-primary [&_a:hover]:text-primary/80",
+        "[&_a]:text-link [&_a]:underline [&_a]:underline-offset-[3px] [&_a:hover]:text-link-hover",
         className,
       )}
     >

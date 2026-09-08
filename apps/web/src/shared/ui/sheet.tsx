@@ -17,7 +17,7 @@ function SheetOverlay({
     <DialogPrimitive.Backdrop
       data-slot="sheet-overlay"
       className={cn(
-        "fixed inset-0 z-50 bg-black/50 data-[closed]:animate-out data-[closed]:fade-out-0 data-[open]:animate-in data-[open]:fade-in-0",
+        "fixed inset-0 z-50 bg-ink-900/40 data-[closed]:animate-out data-[closed]:fade-out-0 data-[open]:animate-in data-[open]:fade-in-0",
         className,
       )}
       {...props}
@@ -59,7 +59,7 @@ function SheetContent({
         {children}
         <DialogPrimitive.Close
           data-slot="sheet-close"
-          className="ring-offset-background focus:ring-ring absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+          className="rounded-compact text-fg-3 hover:bg-hover hover:text-fg-1 focus-visible:ring-ring focus-visible:ring-offset-background absolute top-3.5 right-3.5 flex size-7 items-center justify-center transition-[background-color,color] duration-150 ease-out outline-none focus-visible:ring-2 focus-visible:ring-offset-1 disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
         >
           <XIcon />
           <span className="sr-only">{t("common.close")}</span>
@@ -76,7 +76,7 @@ function SheetTitle({
   return (
     <DialogPrimitive.Title
       data-slot="sheet-title"
-      className={cn("text-lg font-semibold leading-none", className)}
+      className={cn("text-[16px] leading-snug font-semibold text-fg-heading", className)}
       {...props}
     />
   );

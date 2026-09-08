@@ -1,0 +1,14 @@
+You are generating production icon artwork for the mosoo console sidebar. Use your image generation tool.
+
+Context images attached:
+1. reference-ace-sidebar.png — the target STYLE: the four "Tools" rows (Campaign, Creatives, Briefs, Workflows) use small rounded-square app-icon tiles with a smooth, saturated two-tone gradient fill and a simple white glyph centered on each tile. Match that treatment (tile shape, corner softness, gradient smoothness, white glyph weight). Do not copy their glyphs, colours, or brand.
+2. glyphs-skills-mcp-providers-environments.png — OUR four glyphs, in this order left to right: Skills (puzzle piece), MCP servers (plug with two prongs and a cable), Providers (horizontal key), Environments (isometric cube). Reproduce these exact glyph shapes as clean white line icons (round caps and joins, consistent stroke weight) on the tiles.
+
+Produce ONE image, 2048 x 512 pixels, plain flat white background (#FFFFFF), containing exactly four tiles in a single row, evenly spaced, each tile 400 x 400 px with continuous-curvature rounded corners (radius about 22% of the tile), no drop shadow, no text, no labels, no extra decoration:
+- Tile 1 Skills: violet gradient (top-left #A78BFA to bottom-right #6D28D9), white puzzle-piece glyph.
+- Tile 2 MCP servers: blue gradient (#60A5FA to #1D4ED8), white plug glyph.
+- Tile 3 Providers: amber gradient (#FBBF24 to #D97706), white horizontal key glyph.
+- Tile 4 Environments: teal gradient (#2DD4BF to #0F766E), white isometric cube glyph.
+The glyphs must be centered, occupy about 55% of the tile width, and share the same stroke weight. Keep everything crisp and geometric, flat vector look, no bevels, no 3D, no photorealism.
+
+Save the generated image in the current working directory as resource-tiles-sheet.png (move or rename the tool output if needed). Then also produce four individual 1024 x 1024 images with the same specification but one tile each, filling most of the canvas on a white background, saved as skills.png, mcp-servers.png, providers.png, environments.png. Finally, print the absolute paths of all saved files.

@@ -44,7 +44,7 @@ export function ProjectOverviewPage() {
           </Link>
           <Link
             to="/agent?create=1"
-            className="bg-primary text-primary-foreground hover:bg-primary-hover inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-md px-3 text-sm font-semibold shadow-xs transition-colors sm:flex-none"
+            className="bg-primary text-primary-foreground hover:bg-primary-hover inline-flex h-8 flex-1 items-center justify-center gap-2 rounded-md px-3 text-sm font-semibold shadow-xs transition-colors sm:flex-none"
           >
             <Bot className="size-4" />
             {t("projectOverview.newAgent")}

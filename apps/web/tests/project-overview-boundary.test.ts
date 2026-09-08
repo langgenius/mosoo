@@ -38,8 +38,11 @@ describe("Project overview boundary", () => {
     expect(routeSource).toContain("ProjectIdBadge");
     expect(installSource).toContain('t("onboarding.title")');
     expect(installSource).toContain("coding");
-    expect(installSource).toContain("bg-[rgb(111_211_4)]");
-    expect(installSource).toContain("hover:bg-[rgb(111_211_4)]");
+    // The copy action is the shared primary Button; the brand colour comes from
+    // the design contract tokens, never from a raw value in route code.
+    expect(installSource).not.toContain("rgb(111_211_4)");
+    expect(installSource).not.toMatch(/#[0-9a-f]{6}\b/iu);
+    expect(installSource).toContain("<Button");
     expect(promptSource).toContain("curl -fsSL https://install.mosoo.ai/install.sh | bash");
     expect(installSource).toContain('t("onboarding.setupDescription")');
     expect(installSource).toContain('t("common.copy")');

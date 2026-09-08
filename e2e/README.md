@@ -13,6 +13,8 @@ just e2e contract harness
 just e2e deterministic session-log
 just e2e ui files-page
 just e2e ui sidebar
+just e2e ui design-contract
+just e2e ui typography-proof
 just e2e ui preview
 just e2e public-api runtime
 just e2e public-api latency
@@ -38,6 +40,22 @@ labels, mobile drawer, Org layer). It is fixture-backed like `ui files-page`,
 starts only `@mosoo/web`, and writes review screenshots to `.tmp/e2e/sidebar/`.
 Point it at a running console with `MOSOO_E2E_BASE_URL` to capture a branch that
 is already served on another port.
+
+`ui design-contract` is the acceptance case for the Console design contract
+(`docs/design/console-design-contract.md`): it measures the shipped button,
+badge, switch, field, and row recipes, checks focus, disabled, invalid, and
+success states, and writes review screenshots to
+`.tmp/e2e/design-contract/<label>/`. `MOSOO_E2E_DESIGN_LABEL=before` captures
+the same views from a pre-change checkout for side-by-side evidence.
+`ui typography-proof` renders the same fixture-backed surfaces with only the
+type-role families swapped (`current`, `general-sans`, `instrument-sans`) into
+`.tmp/e2e/typography-proof/<variant>/`; the General Sans files are fetched
+from Fontshare into `.tmp/e2e/typography-proof/fonts/` for the run and are never
+committed (if Node cannot reach the CDN through your network, download
+`GeneralSans-Medium.woff2` and `GeneralSans-Semibold.woff2` from fontshare.com
+into that folder first). Both cases share `e2e/lib/console-fixtures.ts`.
+`bun e2e/tools/theme-color-probe.ts` regenerates the reference-site evidence
+behind `docs/design/theme-color-usage.md`.
 
 Each live case requires a key matching `MOSOO_E2E_PROVIDER` (or the generic
 `MOSOO_E2E_PROVIDER_API_KEY`):

@@ -3,6 +3,8 @@ import { useEffect, useReducer, useRef } from "react";
 import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import { Check, Loader2, Upload } from "@/shared/ui/icons";
+import { Input } from "@/shared/ui/input";
+import { Label } from "@/shared/ui/label";
 
 import { useAppSession } from "../../app/session-provider";
 import { uploadAccountAvatar } from "../../domains/file/api/account-avatar-client";
@@ -203,8 +205,8 @@ export function ProfileTab() {
             </div>
           )}
           <div className="min-w-0">
-            <div className="text-foreground truncate text-lg font-semibold">{user?.name}</div>
-            <div className="text-muted-foreground truncate text-sm">{user?.email}</div>
+            <div className="text-fg-heading truncate text-[16px] font-semibold">{user?.name}</div>
+            <div className="text-fg-3 truncate text-[13px]">{user?.email}</div>
             <div className="mt-2">
               <input
                 ref={fileInputRef}
@@ -241,11 +243,9 @@ export function ProfileTab() {
         </div>
 
         <div className="space-y-2">
-          <label className="text-foreground text-sm font-medium" htmlFor="profile-avatar-url">
-            {t("settings.profilePictureUrl")}
-          </label>
-          <p className="text-fg-2 text-[12px]">{t("settings.avatarHelp")}</p>
-          <input
+          <Label htmlFor="profile-avatar-url">{t("settings.profilePictureUrl")}</Label>
+          <p className="text-fg-3 text-[12px] leading-4">{t("settings.avatarHelp")}</p>
+          <Input
             aria-label={t("settings.profilePictureUrl")}
             id="profile-avatar-url"
             type="text"
@@ -255,18 +255,17 @@ export function ProfileTab() {
             onChange={(event) => {
               dispatch({ avatarInput: event.target.value, type: "changeAvatar" });
             }}
-            className="border-border bg-background text-foreground focus:ring-primary/20 focus:border-primary h-10 w-full rounded-lg border px-3 text-sm transition-colors focus:ring-2 focus:outline-none"
           />
           {trimmedAvatar !== "" && !avatarValid ? (
-            <p className="text-destructive text-[12px]">{t("settings.invalidUrl")}</p>
+            <p className="text-danger-fg text-[12px]" role="alert">
+              {t("settings.invalidUrl")}
+            </p>
           ) : null}
         </div>
 
         <div className="mt-4 space-y-2">
-          <label className="text-foreground text-sm font-medium" htmlFor="profile-display-name">
-            {t("settings.displayName")}
-          </label>
-          <input
+          <Label htmlFor="profile-display-name">{t("settings.displayName")}</Label>
+          <Input
             aria-label={t("settings.displayName")}
             id="profile-display-name"
             type="text"
@@ -274,32 +273,35 @@ export function ProfileTab() {
             onChange={(event) => {
               dispatch({ name: event.target.value, type: "changeName" });
             }}
-            className="border-border bg-background text-foreground focus:ring-primary/20 focus:border-primary h-10 w-full rounded-lg border px-3 text-sm transition-colors focus:ring-2 focus:outline-none"
           />
         </div>
 
         <div className="mt-4 space-y-2">
-          <label className="text-foreground text-sm font-medium" htmlFor="profile-email">
-            {t("settings.email")}
-          </label>
-          <input
+          <Label htmlFor="profile-email">{t("settings.email")}</Label>
+          <Input
             aria-label={t("settings.email")}
             id="profile-email"
             type="email"
             value={user?.email ?? ""}
             readOnly
-            className="border-border bg-muted text-muted-foreground h-10 w-full cursor-not-allowed rounded-lg border px-3 text-sm"
           />
         </div>
 
         {isTruthy(error) ? (
-          <div className="bg-destructive/10 text-destructive mt-4 rounded-lg p-3 text-sm">
+          <div
+            className="border-danger/30 bg-danger-bg text-danger-fg mt-4 rounded-md border px-3 py-2 text-[13px]"
+            role="alert"
+          >
             {error}
           </div>
         ) : null}
 
         <div className="mt-6">
-          <Button onClick={() => void handleSave()} disabled={!canSave} size="sm">
+          <Button
+            aria-busy={saving || undefined}
+            disabled={!canSave}
+            onClick={() => void handleSave()}
+          >
             {saving ? (
               <>
                 <Loader2 className="mr-1 size-4 animate-spin" /> {t("settings.saving")}
