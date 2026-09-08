@@ -12,14 +12,9 @@ import { ArrowRight, Bot, Check, Info, Plus, X, Zap } from "@/shared/ui/icons";
 
 import type { AgentKind } from "../agent.types";
 
-const KIND_LABELS: Record<AgentKind, { title: string; icon: typeof Bot }> = {
-  pet: { title: "Assistant Agent", icon: Bot },
-  cattle: { title: "Task Agent", icon: Zap },
-};
-
-const KIND_TAGLINE_KEYS: Record<AgentKind, string> = {
-  pet: "agentLifecycle.kindPetTagline",
-  cattle: "agentLifecycle.kindCattleTagline",
+const KIND_COPY: Record<AgentKind, { titleKey: string; taglineKey: string; icon: typeof Bot }> = {
+  pet: { titleKey: "agent.assistantAgent", taglineKey: "agent.kindAssistantTagline", icon: Bot },
+  cattle: { titleKey: "agent.taskAgent", taglineKey: "agent.kindTaskTagline", icon: Zap },
 };
 
 const CARRIED_OVER = [
@@ -59,12 +54,14 @@ export function KindForkDialog({
   onConfirm: () => void;
 }) {
   const { t } = useTranslation();
-  const current = KIND_LABELS[currentKind];
-  const target = KIND_LABELS[targetKind];
+  const current = KIND_COPY[currentKind];
+  const target = KIND_COPY[targetKind];
   const CurrentIcon = current.icon;
   const TargetIcon = target.icon;
-  const currentTagline = t(KIND_TAGLINE_KEYS[currentKind]);
-  const targetTagline = t(KIND_TAGLINE_KEYS[targetKind]);
+  const currentTitle = t(current.titleKey);
+  const targetTitle = t(target.titleKey);
+  const currentTagline = t(current.taglineKey);
+  const targetTagline = t(target.taglineKey);
   const isPetToCattle = currentKind === "pet" && targetKind === "cattle";
   const dropped = isPetToCattle ? DROPPED_PET_TO_CATTLE.map((key) => t(key)) : [];
   const added = !isPetToCattle ? ADDED_CATTLE_TO_PET.map((key) => t(key)) : [];
@@ -75,15 +72,15 @@ export function KindForkDialog({
         <DialogHeader>
           <DialogTitle className="text-[15px]">{t("agentLifecycle.forkTitle")}</DialogTitle>
           <DialogDescription className="text-fg-2 text-[12.5px] leading-relaxed">
-            {t("agentLifecycle.forkDescription", { agentName, target: target.title })}
+            {t("agentLifecycle.forkDescription", { agentName, target: targetTitle })}
           </DialogDescription>
         </DialogHeader>
 
         <div className="border-border-subtle bg-bg-1 rounded-lg border px-3 py-2.5">
           <div className="flex items-center gap-2 text-[12.5px]">
-            <KindChip icon={CurrentIcon} label={current.title} tagline={currentTagline} muted />
+            <KindChip icon={CurrentIcon} label={currentTitle} tagline={currentTagline} muted />
             <ArrowRight className="text-fg-3 size-4 shrink-0" />
-            <KindChip icon={TargetIcon} label={target.title} tagline={targetTagline} />
+            <KindChip icon={TargetIcon} label={targetTitle} tagline={targetTagline} />
           </div>
         </div>
 
@@ -126,9 +123,7 @@ export function KindForkDialog({
             {t("common.cancel")}
           </Button>
           <Button disabled={busy} onClick={onConfirm} size="sm">
-            {busy
-              ? t("agentLifecycle.forking")
-              : t("agentLifecycle.forkAs", { title: target.title })}
+            {busy ? t("agentLifecycle.forking") : t("agentLifecycle.forkAs", { kind: targetTitle })}
           </Button>
         </DialogFooter>
       </DialogContent>

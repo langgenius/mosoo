@@ -68,6 +68,38 @@ describe("reported i18n and dialog layout regressions", () => {
     }
   });
 
+  test("resolves every Agent kind fork dialog key in every locale", () => {
+    const source = readSource("../src/routes/agent/lifecycle/kind-fork-dialog.tsx");
+    const referencedKeys = [
+      ...source.matchAll(/"((?:agent|agentLifecycle|environments|common)\.[A-Za-z0-9]+)"/gu),
+    ].map((match) => match[1] ?? "");
+
+    expect(referencedKeys.length).toBeGreaterThan(0);
+
+    for (const catalog of [en, zhCN, zhTW, ja]) {
+      for (const key of referencedKeys) {
+        const value = lookup(catalog, key);
+        expect(typeof value).toBe("string");
+        expect(value).not.toBe(key);
+      }
+    }
+  });
+
+  test("passes the {{kind}} variable the fork confirm label interpolates", () => {
+    const source = readSource("../src/routes/agent/lifecycle/kind-fork-dialog.tsx");
+
+    expect(source).toContain('t("agentLifecycle.forkAs", { kind:');
+    for (const catalog of [en, zhCN, zhTW, ja]) {
+      expect(lookup(catalog, "agentLifecycle.forkAs")).toContain("{{kind}}");
+    }
+  });
+
+  test("keeps dialog grid columns shrinkable so content cannot outgrow the dialog", () => {
+    const source = readSource("../src/shared/ui/dialog.tsx");
+
+    expect(source).toContain("grid-cols-[minmax(0,1fr)]");
+  });
+
   test("does not render contract-owned Agent kind English copy directly", () => {
     const source = readSource("../src/routes/agent/components/kind-selector.tsx");
 
