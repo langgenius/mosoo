@@ -38,15 +38,18 @@ const HELP_MENU_SOURCE = readFileSync(
   new URL("../src/features/help/help-menu.tsx", import.meta.url),
   "utf8",
 );
+const SHEET_SOURCE = readFileSync(new URL("../src/shared/ui/sheet.tsx", import.meta.url), "utf8");
 
 describe("mobile console boundaries", () => {
   test("Project and Org shells expose a discoverable mobile navigation drawer", () => {
     expect(APP_SHELL_SOURCE).toContain('aria-label={t("projects.openNavigation")}');
     expect(APP_SHELL_SOURCE).toContain("mobileSidebar");
     expect(APP_SHELL_SOURCE).toContain('className="md:hidden"');
-    expect(APP_SHELL_SOURCE).toContain("left-0");
-    expect(APP_SHELL_SOURCE).toContain("right-auto");
-    expect(APP_SHELL_SOURCE).toContain("hidden w-[224px] shrink-0 flex-col");
+    expect(APP_SHELL_SOURCE).toContain('side="left"');
+    expect(SHEET_SOURCE).toContain(
+      'left: "left-0 data-[closed]:slide-out-to-left data-[open]:slide-in-from-left"',
+    );
+    expect(APP_SHELL_SOURCE).toContain("hidden w-[240px] shrink-0 flex-col");
     expect(APP_SHELL_SOURCE).toContain("md:flex");
   });
 

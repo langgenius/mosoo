@@ -25,3 +25,10 @@ Fill what changed. Use N/A for irrelevant or maintainer-only items. See `CONTRIB
 
 - Closest review areas:
 - Known trade-offs:
+
+## Design (UI changes only, otherwise N/A)
+
+- Screenshots at desktop and narrow widths, covering rest / hover / selected / focus / disabled where they apply:
+- Icons are Hugeicons or a purpose-built SVG family; no emoji, no one-off generic substitutes:
+- Colours, spacing, and radii come from tokens; no new decoration without an interaction purpose:
+- Copy was read by a person in context; labels are unambiguous in every locale:
