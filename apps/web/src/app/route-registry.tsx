@@ -176,6 +176,7 @@ const appRoutes = [
     children: [
       { element: <Navigate to="/project-settings/general" replace />, index: true },
       { element: <ProjectSettingsGeneral />, path: "general" },
+      { element: <SettingsAccessTokens />, path: "api-keys" },
       { element: <ProjectUsage />, path: "usage" },
       { element: <Navigate to="/project-settings/usage" replace />, path: "cost" },
     ],
@@ -202,7 +203,7 @@ const appRoutes = [
     children: [
       { element: <Navigate to="/settings/profile" replace />, index: true },
       { element: <SettingsProfile />, path: "profile" },
-      { element: <SettingsAccessTokens />, path: "access-tokens" },
+      { element: <Navigate to="/project-settings/api-keys" replace />, path: "access-tokens" },
       { element: <Navigate to="/project-settings/general" replace />, path: "project" },
       { element: <Navigate to="/project-settings/general" replace />, path: "app" },
       { element: <Navigate to="/project-settings/usage" replace />, path: "usage" },

@@ -11,6 +11,7 @@ CREATE TABLE account (
 );
 
 CREATE TABLE personal_access_token (
+      project_id text,
   id text PRIMARY KEY NOT NULL,
   account_id text NOT NULL,
   label text NOT NULL,

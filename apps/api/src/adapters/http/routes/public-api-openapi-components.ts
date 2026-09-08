@@ -56,7 +56,7 @@ export function createPublicApiOpenApiComponents() {
       accessToken: {
         bearerFormat: "mosoo Access Token",
         description:
-          "Use Authorization: Bearer mst_... . Access Tokens identify an account and do not carry scopes.",
+          "Use Authorization: Bearer msp_... . Project API keys can configure Agents, execute Sessions, and access files only in their Project. Key and account management require console or CLI login. Legacy account tokens are rejected.",
         scheme: "bearer",
         type: "http",
       },

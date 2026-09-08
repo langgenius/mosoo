@@ -51,6 +51,7 @@ CREATE TABLE session (
 );
 
 CREATE TABLE session_run (
+      created_by_key_id text,
   id text PRIMARY KEY NOT NULL,
   session_id text NOT NULL,
   agent_id text NOT NULL,

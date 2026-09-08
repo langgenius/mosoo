@@ -1,7 +1,12 @@
 import { GraphQLError } from "graphql";
 
 import { createErrorLogContext, logError } from "../../platform/cloudflare/logger";
-import { isApiError, toApiErrorResponseDetails, unauthorizedError } from "../../platform/errors";
+import {
+  forbiddenError,
+  isApiError,
+  toApiErrorResponseDetails,
+  unauthorizedError,
+} from "../../platform/errors";
 import type { AuthenticatedGraphQLContext, GraphQLContext } from "./graphql-context";
 
 type GraphQLResolverFor<Context extends GraphQLContext> = {
@@ -111,6 +116,39 @@ function logUnhandledResolverError(
   });
 }
 
+// Only reviewed, explicitly Project-addressed operations accept application keys.
+const PROJECT_KEY_OPERATIONS = new Set([
+  "Query.accessibleAgentList",
+  "Query.agent",
+  "Query.agentEditorState",
+  "Mutation.createAgent",
+  "Mutation.updateAgentConfig",
+  "Mutation.deleteAgent",
+  "Mutation.publishAgent",
+  "Mutation.unpublishAgent",
+]);
+
+function authorizeProjectKeyOperation(
+  context: GraphQLContext,
+  args: unknown,
+  operation: string,
+): void {
+  const projectId = context.viewer?.projectId;
+  if (projectId === undefined) return;
+  if (!PROJECT_KEY_OPERATIONS.has(operation)) {
+    throw forbiddenError("Use an account login for this operation.");
+  }
+  const input = typeof args === "object" && args !== null && "input" in args ? args.input : args;
+  if (
+    typeof input !== "object" ||
+    input === null ||
+    !("projectId" in input) ||
+    input.projectId !== projectId
+  ) {
+    throw forbiddenError("This API key cannot access another Project.");
+  }
+}
+
 function withApiErrors(
   resolver: GraphQLResolver,
   fieldName: string,
@@ -118,6 +156,7 @@ function withApiErrors(
 ): GraphQLResolver {
   return async (parent, args, context) => {
     try {
+      authorizeProjectKeyOperation(context, args, `${typeName}.${fieldName}`);
       return await resolver(parent, args, context);
     } catch (error) {
       if (!isApiError(error)) {

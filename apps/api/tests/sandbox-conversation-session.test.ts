@@ -102,6 +102,7 @@ function createConversationSessionDatabase(kind: AgentKind = "pet"): SqliteD1Dat
     );
 
     CREATE TABLE session_run (
+      created_by_key_id text,
       driver_instance_id text,
       id text PRIMARY KEY NOT NULL,
       status text NOT NULL

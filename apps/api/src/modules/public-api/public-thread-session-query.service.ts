@@ -39,6 +39,7 @@ interface PublicThreadSessionAdmission {
 function publicThreadCallerScopeConditions(caller: AuthenticatedViewer): SQL[] {
   return [
     eq(sessionsTable.creatorAccountId, caller.id),
+    ...(caller.projectId === undefined ? [] : [eq(sessionsTable.projectId, caller.projectId)]),
     sql`json_extract(${sessionsTable.metadataJson}, '$.public_api.source') = 'public_api'`,
   ];
 }

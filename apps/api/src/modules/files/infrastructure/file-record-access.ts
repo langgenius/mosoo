@@ -1,6 +1,10 @@
+import { sessionsTable } from "@mosoo/db";
 import { parsePlatformId } from "@mosoo/id";
-import type { AccountId, ProjectId } from "@mosoo/id";
+import type { AccountId, ProjectId, SessionId } from "@mosoo/id";
+import { and, eq } from "drizzle-orm";
 
+import { getAppDatabase } from "../../../platform/db/drizzle";
+import type { AuthenticatedViewer } from "../../auth/domain/authenticated-viewer";
 import { ensureProjectOwnership } from "../../projects/application/project.service";
 import { createFileNotFoundError } from "./file-errors";
 import type {
@@ -12,6 +16,35 @@ import type {
 import { getFileRecordById } from "./file-record-queries";
 import { getFileUploadAccessContextByFileId } from "./file-upload-context-store";
 import { ensureSessionFileAccess } from "./session-file-ownership";
+
+export async function ensureProjectKeyFileScope(
+  database: D1Database,
+  viewer: AuthenticatedViewer,
+  scopeKind: string,
+  scopeId: string | null,
+): Promise<void> {
+  if (viewer.projectId === undefined) return;
+  if (scopeKind === "session" && scopeId !== null) {
+    const session = await getAppDatabase(database)
+      .select({ id: sessionsTable.id })
+      .from(sessionsTable)
+      .where(
+        and(
+          eq(sessionsTable.id, parsePlatformId<SessionId>(scopeId, "session ID")),
+          eq(sessionsTable.projectId, viewer.projectId),
+        ),
+      )
+      .limit(1)
+      .get();
+    if (session) return;
+  } else if (
+    (scopeKind === "library" || scopeKind === "app_draft" || scopeKind === "agent_package") &&
+    scopeId === viewer.projectId
+  ) {
+    return;
+  }
+  throw createFileNotFoundError("File not found.");
+}
 
 async function ensureAgentPackageFileAccess(
   database: D1Database,
@@ -81,6 +114,13 @@ export async function ensureUploadAccess({
     throw createFileNotFoundError("Upload not found.");
   }
 
+  await ensureProjectKeyFileScope(
+    database,
+    viewer,
+    context.upload.scope_kind,
+    context.upload.scope_id,
+  );
+
   if (context.upload.scope_kind === "account") {
     ensureAccountFileAccess(viewerId, context.file, "upload");
   } else if (context.upload.scope_kind === "library") {
@@ -121,6 +161,8 @@ export async function ensureFileAccess({
   if (!file) {
     throw createFileNotFoundError("File not found.");
   }
+
+  await ensureProjectKeyFileScope(database, viewer, file.scope_kind, file.scope_id);
 
   if (file.scope_kind === "account") {
     ensureAccountFileAccess(viewerId, file, "file");

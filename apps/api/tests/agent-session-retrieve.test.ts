@@ -55,6 +55,7 @@ function createAgentSessionRetrieveDatabase(): SqliteD1Database {
     );
 
     CREATE TABLE session_run (
+      created_by_key_id text,
       completed_at integer,
       created_at integer,
       deployment_version_id text,

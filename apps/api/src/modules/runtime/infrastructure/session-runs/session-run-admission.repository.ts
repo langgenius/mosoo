@@ -10,6 +10,7 @@ import {
 } from "@mosoo/db";
 import type {
   AccountId,
+  PersonalAccessTokenId,
   AgentDeploymentVersionId,
   AgentId,
   ProjectId,
@@ -35,6 +36,7 @@ import { createSessionStatusTransitionPatch } from "./session-lifecycle-projecti
 interface QueuedRunAdmissionRecord {
   agentId: AgentId;
   createdBy: AccountId;
+  createdByKeyId?: PersonalAccessTokenId;
   deploymentVersionId: AgentDeploymentVersionId | null;
   deploymentVersionNumber: number | null;
   id: SessionRunId;
@@ -236,6 +238,7 @@ function createRunInsertQuery(db: AppDatabase, input: CommitQueuedSessionRunAdmi
         completedAt: selectedValue(null, "completed_at"),
         createdAt: selectedValue(input.run.timestampMs, "created_at"),
         createdByAccountId: selectedValue(input.run.createdBy, "created_by_account_id"),
+        createdByKeyId: selectedValue(input.run.createdByKeyId ?? null, "created_by_key_id"),
         deploymentVersionId: selectedValue(input.run.deploymentVersionId, "deployment_version_id"),
         deploymentVersionNumber: selectedValue(
           input.run.deploymentVersionNumber,

@@ -87,12 +87,12 @@ export function createTestExecutionContext(): ExecutionContext {
 }
 
 export const TOKENS = {
-  legacyGrant: "mst_legacy_grant_public_http_token_01",
-  disabled: "mst_disabled_public_http_token_01",
-  nonOwner: "mst_non_owner_public_http_token_01",
-  outsider: "mst_outsider_public_http_token_01",
-  owner: "mst_owner_public_http_token_01",
-  revoked: "mst_revoked_public_http_token_01",
+  legacyGrant: "mcli_legacy_grant_public_http_token_01",
+  disabled: "mcli_disabled_public_http_token_01",
+  nonOwner: "mcli_non_owner_public_http_token_01",
+  outsider: "mcli_outsider_public_http_token_01",
+  owner: "mcli_owner_public_http_token_01",
+  revoked: "mcli_revoked_public_http_token_01",
 } as const;
 
 export function nowMsForTest(): number {

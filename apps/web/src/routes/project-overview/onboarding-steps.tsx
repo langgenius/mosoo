@@ -93,7 +93,7 @@ export function OnboardingSteps(): ReactElement {
       label: t("onboarding.createApiToken"),
       number: 2,
       optional: true,
-      to: "/settings/access-tokens",
+      to: "/project-settings/api-keys",
     },
     {
       done: progress.hasAgent === true && progress.hasRunThread === true,

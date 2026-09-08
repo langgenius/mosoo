@@ -1,7 +1,9 @@
 import type { PersonalAccessTokenSummary } from "@mosoo/contracts/auth";
+import type { ProjectId } from "@mosoo/contracts/id";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useReducer } from "react";
 
+import { useAppSession } from "@/app/session-provider";
 import {
   createPersonalAccessToken,
   listPersonalAccessTokens,
@@ -17,8 +19,6 @@ import { Input } from "@/shared/ui/input";
 import { isTruthy } from "../../shared/lib/truthiness";
 import { SettingsTabBody, SettingsTabHeader } from "./settings-tab-layout";
 
-const ACCESS_TOKEN_QUERY_KEY = ["auth", "personal-access-tokens"] as const;
-
 interface AccessTokensState {
   copied: boolean;
   createdToken: string | null;
@@ -27,7 +27,7 @@ interface AccessTokensState {
 
 type AccessTokensAction =
   | { type: "changeLabel"; label: string }
-  | { type: "createdToken"; token: string }
+  | { type: "createdToken"; token: string | null }
   | { type: "setCopied"; copied: boolean };
 
 const ACCESS_TOKENS_INITIAL_STATE: AccessTokensState = {
@@ -75,25 +75,38 @@ async function writeCreatedTokenToClipboard(token: string): Promise<boolean> {
 }
 
 export function AccessTokensTab() {
+  const { activeProject } = useAppSession();
+  return activeProject === null ? null : (
+    <ProjectAccessTokens key={activeProject.id} projectId={activeProject.id} />
+  );
+}
+
+function ProjectAccessTokens({ projectId }: { projectId: ProjectId }) {
+  const queryKey = ["auth", "project-api-keys", projectId];
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [state, dispatch] = useReducer(accessTokensReducer, ACCESS_TOKENS_INITIAL_STATE);
   const { copied, createdToken, label } = state;
-  const { data: tokensData, isLoading: tokensLoading } = useQuery({
-    queryFn: listPersonalAccessTokens,
-    queryKey: ACCESS_TOKEN_QUERY_KEY,
+  const {
+    data: tokensData,
+    isLoading: tokensLoading,
+    error: listError,
+  } = useQuery({
+    queryFn: () => listPersonalAccessTokens(projectId),
+    queryKey: queryKey,
   });
   const createMutation = useMutation({
-    mutationFn: createPersonalAccessToken,
+    mutationFn: (nextLabel: string) => createPersonalAccessToken(nextLabel, projectId),
     onSuccess: (response) => {
       dispatch({ token: response.value, type: "createdToken" });
-      void queryClient.invalidateQueries({ queryKey: ACCESS_TOKEN_QUERY_KEY });
+      void queryClient.invalidateQueries({ queryKey: queryKey });
     },
   });
   const revokeMutation = useMutation({
     mutationFn: revokePersonalAccessToken,
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ACCESS_TOKEN_QUERY_KEY });
+      dispatch({ token: null, type: "createdToken" });
+      void queryClient.invalidateQueries({ queryKey: queryKey });
     },
   });
 
@@ -151,6 +164,11 @@ export function AccessTokensTab() {
             onCreate={handleCreate}
           />
 
+          {listError || revokeMutation.error ? (
+            <p className="text-destructive text-sm">
+              {(listError ?? revokeMutation.error)?.message}
+            </p>
+          ) : null}
           <AccessTokensTable
             loading={tokensLoading}
             onRevoke={(tokenId) => {

@@ -25,7 +25,7 @@ import {
   readPublicApiIdempotencyKey,
 } from "../../../modules/public-api/public-api-idempotency.service";
 import { enforcePublicApiRateLimit } from "../../../modules/public-api/public-api-rate-limit.service";
-import { createErrorLogContext, logError } from "../../../platform/cloudflare/logger";
+import { createErrorLogContext, logInfo, logError } from "../../../platform/cloudflare/logger";
 import type { ApiGatewayEnvironment } from "../../../platform/cloudflare/worker-types";
 import { API_ERROR_CODE, isApiError } from "../../../platform/errors";
 import type { ApiError } from "../../../platform/errors";
@@ -71,9 +71,16 @@ async function requireAccessTokenCaller(
   const caller = await authenticatePersonalAccessToken(c.env.DB, token);
 
   if (!caller) {
-    throw publicUnauthenticated("Access Token is invalid or revoked.");
+    throw publicUnauthenticated(
+      "API key is invalid or revoked. Create a Project key in Project settings, or run mosoo login again.",
+    );
   }
 
+  logInfo("public-api.authenticated", {
+    accountId: caller.viewer.id,
+    projectId: caller.viewer.projectId ?? null,
+    apiKeyId: caller.tokenId,
+  });
   return caller;
 }
 
@@ -81,7 +88,7 @@ async function requireRateLimitedAccessTokenCaller(
   c: PublicApiRouteContext,
 ): Promise<PersonalAccessTokenCaller> {
   const caller = await requireAccessTokenCaller(c);
-  await enforcePublicApiRateLimit(c.env.DB, caller.tokenId);
+  await enforcePublicApiRateLimit(c.env.DB, caller.viewer.projectId ?? caller.tokenId);
   return caller;
 }
 
@@ -383,13 +390,14 @@ export async function runPublicApiSessionMutation<T, Prepared = undefined>(
     const status = input.status ?? 200;
     const operation = async (_idempotencyKey: string | null) =>
       input.operation({ ...operationInput, prepared, threadId });
-    const beforeOperation = () => enforcePublicApiRateLimit(c.env.DB, caller.tokenId);
+    const beforeOperation = () =>
+      enforcePublicApiRateLimit(c.env.DB, caller.viewer.projectId ?? caller.tokenId);
 
     if (input.bodyHash) {
       return await runPublicApiIdempotentJson(c, {
         bodyHash: input.bodyHash(prepared),
         beforeOperation,
-        idempotencySubjectId: caller.tokenId,
+        idempotencySubjectId: caller.viewer.projectId ?? caller.tokenId,
         operation,
         status,
       });
@@ -475,13 +483,14 @@ export async function runPublicApiThreadMutation<T, Prepared = undefined>(
       ? async (idempotencyKey: string) =>
           input.recover?.({ ...operationInput, agentId, idempotencyKey, prepared }) ?? null
       : undefined;
-    const beforeOperation = () => enforcePublicApiRateLimit(c.env.DB, caller.tokenId);
+    const beforeOperation = () =>
+      enforcePublicApiRateLimit(c.env.DB, caller.viewer.projectId ?? caller.tokenId);
 
     if (input.bodyHash) {
       return await runPublicApiIdempotentJson(c, {
         bodyHash: input.bodyHash(prepared),
         beforeOperation,
-        idempotencySubjectId: caller.tokenId,
+        idempotencySubjectId: caller.viewer.projectId ?? caller.tokenId,
         operation,
         persistOperationErrors: true,
         recover,

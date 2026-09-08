@@ -182,6 +182,9 @@ export async function recoverPublicThreadCreation(
     agentId: request.agentId,
     idempotencyKey: request.idempotencyKey,
     tokenId: admission.createdBy.token_id,
+    ...(admission.creatorViewer.projectId === undefined
+      ? {}
+      : { projectId: admission.creatorViewer.projectId }),
   });
 
   if (!snapshot) {

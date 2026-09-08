@@ -91,6 +91,7 @@ function createRuntimeSubjectRecycleDatabase(): SqliteD1Database {
     );
 
     CREATE TABLE session_run (
+      created_by_key_id text,
       agent_id text DEFAULT '' NOT NULL,
       id text PRIMARY KEY NOT NULL,
       driver_instance_id text,

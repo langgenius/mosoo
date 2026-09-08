@@ -18,7 +18,7 @@ that an integration can start, follow, continue, and recover.
 
 ## User flow
 
-1. The owner exposes an Agent, creates an Access Token, and stores it on a
+1. The owner exposes an Agent, creates a Project API key, and stores it on a
    trusted backend.
 2. After authenticating its user, the backend creates a Thread with that user's
    opaque `userId`, empty or with an initial message and files.
@@ -34,8 +34,9 @@ Agent's API Access panel shows its identifier, token creation, and API reference
 
 ## User-visible boundaries
 
-- Access Tokens belong to the Project owner. The Agent must be exposed, owned by
-  that same owner, and remain inside the same Project.
+- API keys belong to one Project. The Agent must be exposed and remain inside
+  that Project, even when the same owner has other Projects. Rotation does not
+  change Thread ownership; another key in that Project can continue the Thread.
 - `userId` is supplied only by the trusted backend, is immutable after Thread
   creation, and scopes the Thread, its Runs, files, and delegated MCP calls.
 - The identity boundary is `(Project, userId)`. A user may own multiple Threads;
@@ -52,7 +53,7 @@ Agent's API Access panel shows its identifier, token creation, and API reference
   listing, replay, and SSE reconnects instead of pairing human-readable text.
 - `toolCallId` is an idempotency key, not an exactly-once guarantee. A
   write-capable integration should enforce a uniqueness boundary such as
-  `(app_id, tool_call_id)` and return its stored result when the call is
+  `(project_id, tool_call_id)` and return its stored result when the call is
   delivered again.
 - Thread files include explicit attachments and recorded Agent artifacts, not a
   complete runtime workspace. Thread history also does not guarantee that every

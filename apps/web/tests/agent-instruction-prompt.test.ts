@@ -19,7 +19,7 @@ const distribution: AgentDistribution = {
   openApiUrl: "https://console.test/api/public/v1/openapi.json",
   threadsPath: "/threads?compose=1&agent=agent_123&lock=1",
   threadsUrl: "https://console.test/threads?compose=1&agent=agent_123&lock=1",
-  tokenSettingsPath: "/settings/access-tokens",
+  tokenSettingsPath: "/project-settings/api-keys",
   webUrl: "https://console.test/a/research-agent-agent1",
 };
 

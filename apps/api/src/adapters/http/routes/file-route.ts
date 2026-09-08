@@ -12,7 +12,7 @@ import type { FileListQuery, FileSessionKind } from "@mosoo/contracts/file";
 import type { ProjectId, FileId, SessionId } from "@mosoo/id";
 import type { Hono } from "hono";
 
-import { getAuthenticatedViewerFromRequest } from "../../../modules/auth/application/viewer-auth.service";
+import { getApiViewerFromRequest } from "../../../modules/auth/application/viewer-auth.service";
 import {
   FileControlError,
   createFileErrorResponse,
@@ -141,7 +141,7 @@ function toFileEntry(file: FileRecord): FileEntry {
 export function registerFileRoute(app: Hono<ApiGatewayEnvironment>) {
   app.get("/files", async (c) => {
     try {
-      const viewer = await getAuthenticatedViewerFromRequest(c.env, c.req.raw);
+      const viewer = await getApiViewerFromRequest(c.env, c.req.raw);
 
       if (!viewer) {
         return Response.json(createFileErrorResponse(unauthorizedFileError()), { status: 401 });
@@ -163,7 +163,7 @@ export function registerFileRoute(app: Hono<ApiGatewayEnvironment>) {
 
   app.post("/files", async (c) => {
     try {
-      const viewer = await getAuthenticatedViewerFromRequest(c.env, c.req.raw);
+      const viewer = await getApiViewerFromRequest(c.env, c.req.raw);
 
       if (!viewer) {
         return Response.json(createFileErrorResponse(unauthorizedFileError()), { status: 401 });
@@ -179,7 +179,7 @@ export function registerFileRoute(app: Hono<ApiGatewayEnvironment>) {
 
   app.get("/files/:fileId/upload", async (c) => {
     try {
-      const viewer = await getAuthenticatedViewerFromRequest(c.env, c.req.raw);
+      const viewer = await getApiViewerFromRequest(c.env, c.req.raw);
 
       if (!viewer) {
         return Response.json(createFileErrorResponse(unauthorizedFileError()), { status: 401 });
@@ -199,7 +199,7 @@ export function registerFileRoute(app: Hono<ApiGatewayEnvironment>) {
 
   app.put("/files/:fileId/content", async (c) => {
     try {
-      const viewer = await getAuthenticatedViewerFromRequest(c.env, c.req.raw);
+      const viewer = await getApiViewerFromRequest(c.env, c.req.raw);
 
       if (!viewer) {
         return Response.json(createFileErrorResponse(unauthorizedFileError()), { status: 401 });
@@ -219,7 +219,7 @@ export function registerFileRoute(app: Hono<ApiGatewayEnvironment>) {
 
   app.put("/files/:fileId/parts/:partNumber", async (c) => {
     try {
-      const viewer = await getAuthenticatedViewerFromRequest(c.env, c.req.raw);
+      const viewer = await getApiViewerFromRequest(c.env, c.req.raw);
 
       if (!viewer) {
         return Response.json(createFileErrorResponse(unauthorizedFileError()), { status: 401 });
@@ -241,7 +241,7 @@ export function registerFileRoute(app: Hono<ApiGatewayEnvironment>) {
 
   app.post("/files/:fileId/complete", async (c) => {
     try {
-      const viewer = await getAuthenticatedViewerFromRequest(c.env, c.req.raw);
+      const viewer = await getApiViewerFromRequest(c.env, c.req.raw);
 
       if (!viewer) {
         return Response.json(createFileErrorResponse(unauthorizedFileError()), { status: 401 });
@@ -263,7 +263,7 @@ export function registerFileRoute(app: Hono<ApiGatewayEnvironment>) {
 
   app.delete("/files/:fileId/upload", async (c) => {
     try {
-      const viewer = await getAuthenticatedViewerFromRequest(c.env, c.req.raw);
+      const viewer = await getApiViewerFromRequest(c.env, c.req.raw);
 
       if (!viewer) {
         return Response.json(createFileErrorResponse(unauthorizedFileError()), { status: 401 });
@@ -282,7 +282,7 @@ export function registerFileRoute(app: Hono<ApiGatewayEnvironment>) {
 
   app.get("/files/:fileId/content", async (c) => {
     try {
-      const viewer = await getAuthenticatedViewerFromRequest(c.env, c.req.raw);
+      const viewer = await getApiViewerFromRequest(c.env, c.req.raw);
 
       if (!viewer) {
         return Response.json(createFileErrorResponse(unauthorizedFileError()), { status: 401 });
@@ -307,7 +307,7 @@ export function registerFileRoute(app: Hono<ApiGatewayEnvironment>) {
 
   app.patch("/files/:fileId", async (c) => {
     try {
-      const viewer = await getAuthenticatedViewerFromRequest(c.env, c.req.raw);
+      const viewer = await getApiViewerFromRequest(c.env, c.req.raw);
 
       if (!viewer) {
         return Response.json(createFileErrorResponse(unauthorizedFileError()), { status: 401 });
@@ -329,7 +329,7 @@ export function registerFileRoute(app: Hono<ApiGatewayEnvironment>) {
 
   app.delete("/files/:fileId", async (c) => {
     try {
-      const viewer = await getAuthenticatedViewerFromRequest(c.env, c.req.raw);
+      const viewer = await getApiViewerFromRequest(c.env, c.req.raw);
 
       if (!viewer) {
         return c.json(

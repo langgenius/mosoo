@@ -23,7 +23,10 @@ describe("Project settings boundary", () => {
     const settingsNav = readSource("../src/routes/settings/settings-nav.tsx");
 
     expect(settingsNav).toContain('labelKey: "settings.profile"');
-    expect(settingsNav).toContain('labelKey: "settings.accessTokens"');
+    expect(settingsNav).not.toContain('labelKey: "settings.accessTokens"');
+    expect(readSource("../src/routes/project-settings/project-settings-nav.tsx")).toContain(
+      'path: "/project-settings/api-keys"',
+    );
     expect(settingsNav).not.toContain('label: "Project usage"');
     expect(settingsNav).not.toContain('label: "Project"');
     expect(settingsNav).not.toContain('path: "/settings/usage"');
@@ -94,7 +97,7 @@ describe("Project settings boundary", () => {
     const distributionInfo = readSource("../src/routes/agent/lifecycle/distribution-info.ts");
 
     expect(distributionInfo).toContain(
-      'const ACCESS_TOKEN_SETTINGS_PATH = "/settings/access-tokens";',
+      'const ACCESS_TOKEN_SETTINGS_PATH = "/project-settings/api-keys";',
     );
     expect(apiAccessPanel).toContain('import { Link } from "react-router-dom";');
     expect(apiAccessPanel).toContain("<Link to={distribution.tokenSettingsPath}>");

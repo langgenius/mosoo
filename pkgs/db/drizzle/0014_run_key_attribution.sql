@@ -1,0 +1,1 @@
+ALTER TABLE `session_run` ADD `created_by_key_id` text CHECK ("created_by_key_id" = upper("created_by_key_id") AND length("created_by_key_id") = 26 AND substr("created_by_key_id", 1, 1) GLOB '[0-7]' AND "created_by_key_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*');

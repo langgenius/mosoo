@@ -3,7 +3,7 @@ import type {
   PersonalAccessTokenListResponse,
   PersonalAccessTokenSummary,
 } from "@mosoo/contracts/auth";
-import type { PersonalAccessTokenId } from "@mosoo/contracts/id";
+import type { PersonalAccessTokenId, ProjectId } from "@mosoo/contracts/id";
 
 import { apiFetch } from "@/platform/http/public-api";
 
@@ -36,9 +36,10 @@ function parsePersonalAccessTokenSummary(value: unknown): PersonalAccessTokenSum
     throw new Error("Invalid access token response.");
   }
 
-  const { createdAt, id, label, lastUsedAt, revokedAt } = value;
+  const { createdAt, id, label, lastUsedAt, revokedAt, projectId } = value;
 
   if (
+    (projectId !== null && typeof projectId !== "string") ||
     typeof createdAt !== "string" ||
     typeof id !== "string" ||
     typeof label !== "string" ||
@@ -49,6 +50,7 @@ function parsePersonalAccessTokenSummary(value: unknown): PersonalAccessTokenSum
   }
 
   return {
+    projectId: projectId as ProjectId | null,
     createdAt,
     id: toPersonalAccessTokenId(id),
     label,
@@ -95,8 +97,10 @@ function parsePersonalAccessTokenDeleteResponse(value: unknown): PersonalAccessT
   return { ok: true };
 }
 
-export async function listPersonalAccessTokens(): Promise<PersonalAccessTokenListResponse> {
-  const response = await apiFetch("/access-tokens", {
+export async function listPersonalAccessTokens(
+  projectId: ProjectId,
+): Promise<PersonalAccessTokenListResponse> {
+  const response = await apiFetch(`/access-tokens?projectId=${encodeURIComponent(projectId)}`, {
     credentials: "include",
   });
 
@@ -105,9 +109,10 @@ export async function listPersonalAccessTokens(): Promise<PersonalAccessTokenLis
 
 export async function createPersonalAccessToken(
   label: string,
+  projectId: ProjectId,
 ): Promise<CreatePersonalAccessTokenResponse> {
   const response = await apiFetch("/access-tokens", {
-    body: JSON.stringify({ label }),
+    body: JSON.stringify({ label, projectId }),
     credentials: "include",
     headers: {
       "Content-Type": "application/json",

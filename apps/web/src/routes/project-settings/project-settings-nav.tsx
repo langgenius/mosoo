@@ -2,7 +2,7 @@ import { NavLink } from "react-router-dom";
 
 import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
-import { BarChart3, Box } from "@/shared/ui/icons";
+import { BarChart3, Box, KeyRound } from "@/shared/ui/icons";
 import type { AppIcon } from "@/shared/ui/icons";
 
 interface ProjectSettingsNavItem {
@@ -12,6 +12,7 @@ interface ProjectSettingsNavItem {
 }
 
 const PROJECT_SETTINGS_NAV_ITEMS: ProjectSettingsNavItem[] = [
+  { icon: KeyRound, labelKey: "settings.accessTokens", path: "/project-settings/api-keys" },
   { icon: Box, labelKey: "settings.general", path: "/project-settings/general" },
   { icon: BarChart3, labelKey: "projectSettings.usage", path: "/project-settings/usage" },
 ];

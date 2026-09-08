@@ -104,7 +104,7 @@ describe("MosooPublicThreadClient", () => {
     const client = new MosooPublicThreadClient({
       baseUrl: "https://api.example.com",
       fetch: fetchMock,
-      token: "mst_test",
+      token: "msp_test",
     });
 
     await client.createThread({
@@ -132,7 +132,7 @@ describe("MosooPublicThreadClient", () => {
 
       expect(request.method).toBe("POST");
       expect(request.url).toBe("https://api.example.com/api/v1/agents/agent-1/files");
-      expect(request.headers.get("Authorization")).toBe("Bearer mst_test");
+      expect(request.headers.get("Authorization")).toBe("Bearer msp_test");
       expect(request.headers.get("Content-Type")).toStartWith("multipart/form-data;");
       expect(file).toBeInstanceOf(File);
       expect(file).toMatchObject({
@@ -156,7 +156,7 @@ describe("MosooPublicThreadClient", () => {
     const client = new MosooPublicThreadClient({
       baseUrl: "https://api.example.com",
       fetch: fetchMock,
-      token: "mst_test",
+      token: "msp_test",
     });
 
     const response = await client.uploadAgentFile({
@@ -242,7 +242,7 @@ describe("MosooPublicThreadClient", () => {
     const client = new MosooPublicThreadClient({
       baseUrl: "https://api.example.com",
       fetch: fetchMock,
-      token: "mst_test",
+      token: "msp_test",
     });
     const result = await client.createThreadAndWait({
       agentId: "agent-1",
@@ -254,7 +254,7 @@ describe("MosooPublicThreadClient", () => {
 
     expect(result.finalOutput).toEqual({ text: "最终答复：完整的中文、Markdown 和 😀。" });
     expect(result.run.finalOutput).toEqual({ text: "最终答复：完整的中文、Markdown 和 😀。" });
-    expect(requests[0]?.headers.get("Authorization")).toBe("Bearer mst_test");
+    expect(requests[0]?.headers.get("Authorization")).toBe("Bearer msp_test");
     expect(requests[0]?.headers.get("Idempotency-Key")).toBe("thread-create-1");
     expect(requests[0]?.body).toEqual({
       input: {
@@ -305,7 +305,7 @@ describe("MosooPublicThreadClient", () => {
     const client = new MosooPublicThreadClient({
       baseUrl: "https://api.example.com",
       fetch: fetchMock,
-      token: "mst_test",
+      token: "msp_test",
     });
     let thrown: unknown = null;
 
@@ -372,7 +372,7 @@ describe("MosooPublicThreadClient", () => {
     const client = new MosooPublicThreadClient({
       baseUrl: "https://api.example.com",
       fetch: fetchMock,
-      token: "mst_test",
+      token: "msp_test",
     });
 
     const result = await client.createThreadAndWait({
@@ -437,7 +437,7 @@ describe("MosooPublicThreadClient", () => {
     const client = new MosooPublicThreadClient({
       baseUrl: "https://api.example.com",
       fetch: fetchMock,
-      token: "mst_test",
+      token: "msp_test",
     });
 
     let thrown: unknown = null;
@@ -508,7 +508,7 @@ describe("MosooPublicThreadClient", () => {
     const client = new MosooPublicThreadClient({
       baseUrl: "https://api.example.com/api/v1",
       fetch: fetchMock,
-      token: "mst_test",
+      token: "msp_test",
     });
 
     let thrown: unknown = null;
@@ -548,7 +548,7 @@ describe("MosooPublicThreadClient", () => {
     const client = new MosooPublicThreadClient({
       baseUrl: "https://api.example.com",
       fetch: fetchMock,
-      token: "mst_test",
+      token: "msp_test",
     });
     const events: PublicThreadEventLogEntry[] = [];
 

@@ -2,7 +2,7 @@
 
 Status: shipped resource and ownership boundary. [mosoo Spec](../SPEC.md) defines the managed Agent runtime contract.
 
-Target transition (2026-09-08): #581 moves this boundary to Workspace with Workspace-scoped execution keys, preserving resource identity, ownership, and history. The target console centers API access and Session records, with optional Agent configuration secondary. The sections below record current Project behavior, not the completed target. See [remaining slices](./managed-agent-v1.md).
+Project API keys belong to exactly one Project. Accounts may own multiple Projects, each with multiple keys. Resources and history retain their identities. Console and CLI login supply account-level access; application keys cannot cross Projects or manage accounts, Projects, or keys.
 
 ## Problem
 
@@ -31,3 +31,9 @@ The Project-centered console and managed Agent resources are implemented in the 
 A Project is the Builder's product container in mosoo. Its resources, activity, settings, and usage are kept separate from other Projects.
 
 The baseline is single-owner and does not offer organization-wide catalogs or collaboration. Use the Spec for new runtime and integration promises.
+
+## API Key Cutover
+
+Owners create and revoke keys in Project settings. A key is shown once and only its hash is stored. All Project keys support Agent configuration, Sessions, and files without configurable scopes. Revocation rejects future requests but leaves admitted work running; another active key in the Project or its owner can operate the existing Session.
+
+Old account tokens and CLI credentials must be replaced. Existing integrations create a new key in each target Project and update their configuration; CLI users run `mosoo login` again. Existing keys are not reassigned to a default Project.

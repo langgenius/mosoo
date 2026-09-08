@@ -181,6 +181,7 @@ export async function queueSessionRun(request: QueueSessionRunRequest): Promise<
     run: {
       agentId: input.session.agent_id,
       createdBy: viewerId,
+      ...(viewer.apiKeyId === undefined ? {} : { createdByKeyId: viewer.apiKeyId }),
       deploymentVersionId: input.session.deployment_version_id,
       deploymentVersionNumber: input.session.deployment_version_number,
       id: createdRun.id,

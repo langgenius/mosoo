@@ -34,6 +34,7 @@ function createCliOAuthDatabase(): SqliteD1Database {
     );
 
     CREATE TABLE personal_access_token (
+      project_id text,
       id text PRIMARY KEY NOT NULL,
       account_id text NOT NULL,
       label text NOT NULL,
@@ -112,7 +113,7 @@ describe("CLI OAuth device flow", () => {
       device_code: start.device_code,
     });
     expect(token.status).toBe("authorized");
-    expect(token.access_token).toStartWith("mst_");
+    expect(token.access_token).toStartWith("mcli_");
     expect(token.user?.email).toBe("owner@example.com");
 
     const caller = await authenticatePersonalAccessToken(database, token.access_token ?? "");

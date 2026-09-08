@@ -1,7 +1,7 @@
 import { PUBLIC_API_PREFIX } from "@mosoo/contracts/public-api";
 import { createYoga } from "graphql-yoga";
 
-import { getAuthenticatedViewerFromRequest } from "../../modules/auth/application/viewer-auth.service";
+import { getApiViewerFromRequest } from "../../modules/auth/application/viewer-auth.service";
 import type { ApiServerContext } from "../../platform/cloudflare/worker-types";
 import { createGraphQLSchema } from "./create-graphql-schema";
 import type { GraphQLContext } from "./graphql-context";
@@ -11,7 +11,7 @@ export function createGraphQLGateway() {
   return createYoga<ApiServerContext, GraphQLContext>({
     context: async ({ request, ...serverContext }) => {
       const { executionCtx: executionContext, ...bindings } = serverContext;
-      const viewer = await getAuthenticatedViewerFromRequest(bindings, request);
+      const viewer = await getApiViewerFromRequest(bindings, request);
 
       return {
         ...serverContext,
