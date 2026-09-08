@@ -410,7 +410,7 @@ and `just deploy-web` publish directly. The API deploy applies pending remote D1
 migrations as its first remote action (see
 [Database And Migrations](#database-and-migrations)).
 
-API production config lives in `apps/api/wrangler.toml`; web production config lives in `apps/web/wrangler.toml`. Cloudflare routes send `cloud.mosoo.ai/api/*` to the API Worker and `cloud.mosoo.ai/*` to the console Web Worker. The legacy console host redirects Web traffic to `cloud.mosoo.ai` but keeps `try.mosoo.ai/api/*` as a direct compatibility route. The public landing page and blog on `mosoo.ai/*` are owned by `langgenius/mosoo-website`.
+API production config lives in `apps/api/wrangler.toml`; web production config lives in `apps/web/wrangler.toml`. Cloudflare routes send `cloud.mosoo.ai/api/*` to the API Worker and `cloud.mosoo.ai/*` to the console Web Worker. New console URLs and product copy must use `cloud.mosoo.ai`; do not introduce new `try.mosoo.ai` links. The legacy host redirects Web traffic to `cloud.mosoo.ai`, while `try.mosoo.ai/api/*` remains only a direct API compatibility route. The public landing page and blog on `mosoo.ai/*` are owned by `langgenius/mosoo-website`.
 
 Do not deploy production directly from an unreviewed local branch.
 
