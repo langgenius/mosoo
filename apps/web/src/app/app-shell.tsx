@@ -23,7 +23,7 @@ import {
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTitle } from "@/shared/ui/sheet";
-import { SidebarRow, SidebarTooltip } from "@/shared/ui/sidebar";
+import { SidebarTooltip } from "@/shared/ui/sidebar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/shared/ui/tooltip";
 
 import { AccountMenu } from "./account-menu";
@@ -163,8 +163,12 @@ function ProjectSwitcher({
   );
 }
 
-// "Create agent" is a quick action, not a destination, so it reads as the first
-// row of the work list rather than a filled button competing with the content.
+// "Create agent" is the one filled control in the sidebar. It stays black
+// through its own token (not --primary, so a palette change cannot recolour
+// it), and everything around it stays quiet so the call to action is unmistakable.
+const NEW_AGENT_CLASS =
+  "focus-visible:ring-ring focus-visible:ring-offset-sidebar flex h-8 shrink-0 items-center justify-center gap-2 rounded-md text-[13px] leading-none font-semibold outline-none transition-[background-color,color] duration-150 ease-out focus-visible:ring-2 focus-visible:ring-offset-1 [&_svg]:size-4 [&_svg]:shrink-0";
+
 function NewAgentAction({
   collapsed,
   disabled,
@@ -174,19 +178,47 @@ function NewAgentAction({
 }): ReactElement {
   const { t } = useTranslation();
   const label = t("agent.create");
+  const layout = collapsed ? "mx-auto w-8" : "w-full px-3";
+  const body = (
+    <>
+      <NewAgentIcon />
+      {collapsed ? null : <span className="sidebar-label-enter truncate">{label}</span>}
+    </>
+  );
 
   if (disabled) {
-    return <SidebarRow collapsed={collapsed} disabled icon={NewAgentIcon} label={label} />;
+    return (
+      <SidebarTooltip collapsed={collapsed} label={label}>
+        <button
+          type="button"
+          aria-disabled="true"
+          aria-label={collapsed ? label : undefined}
+          className={cn(
+            NEW_AGENT_CLASS,
+            layout,
+            "bg-sidebar-row-active text-fg-muted cursor-not-allowed",
+          )}
+        >
+          {body}
+        </button>
+      </SidebarTooltip>
+    );
   }
 
   return (
-    <SidebarRow
-      className="text-fg-1"
-      collapsed={collapsed}
-      icon={NewAgentIcon}
-      label={label}
-      to="/agent?create=1"
-    />
+    <SidebarTooltip collapsed={collapsed} label={label}>
+      <Link
+        to="/agent?create=1"
+        aria-label={collapsed ? label : undefined}
+        className={cn(
+          NEW_AGENT_CLASS,
+          layout,
+          "bg-sidebar-cta text-sidebar-cta-fg hover:bg-sidebar-cta-hover shadow-xs",
+        )}
+      >
+        {body}
+      </Link>
+    </SidebarTooltip>
   );
 }
 
@@ -459,7 +491,7 @@ export function Layout({ children }: { children: ReactNode }): ReactElement {
     return (
       <>
         <NewAgentAction collapsed={isCollapsed} disabled={activeProject === null} />
-        <div className="mt-2">
+        <div className="mt-3">
           <ProjectNavigation collapsed={isCollapsed} pathname={location.pathname} />
         </div>
       </>
