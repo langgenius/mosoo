@@ -119,6 +119,12 @@
   --sidebar-row-hover: rgba(28, 32, 36, 0.045);
   --sidebar-row-active: rgba(28, 32, 36, 0.065);
 
+  /* Sidebar call to action: the one filled control in the sidebar stays black
+     regardless of what --primary maps to, and inverts on the dark surface. */
+  --sidebar-cta-bg: var(--ink-900);
+  --sidebar-cta-bg-hover: var(--ink-800);
+  --sidebar-cta-fg: #ffffff;
+
   --fg-1: var(--ink-900);
   --fg-2: var(--ink-500);
   --fg-3: var(--ink-400);
@@ -218,6 +224,10 @@
   --sidebar-row-hover: rgba(244, 246, 248, 0.06);
   --sidebar-row-active: rgba(244, 246, 248, 0.1);
 
+  --sidebar-cta-bg: var(--paper-100);
+  --sidebar-cta-bg-hover: #ffffff;
+  --sidebar-cta-fg: var(--ink-900);
+
   --fg-1: var(--paper-100);
   --fg-2: var(--ink-200);
   --fg-3: var(--ink-300);
@@ -288,6 +298,9 @@
   --color-sidebar-ring: var(--accent-ring);
   --color-sidebar-row-hover: var(--sidebar-row-hover);
   --color-sidebar-row-active: var(--sidebar-row-active);
+  --color-sidebar-cta: var(--sidebar-cta-bg);
+  --color-sidebar-cta-hover: var(--sidebar-cta-bg-hover);
+  --color-sidebar-cta-fg: var(--sidebar-cta-fg);
 
   --color-paper-50: var(--paper-50);
   --color-paper-100: var(--paper-100);

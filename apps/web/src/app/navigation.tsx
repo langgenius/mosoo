@@ -1,19 +1,19 @@
-import BotIcon from "@hugeicons/core-free-icons/BotIcon";
-import DashboardSquare01Icon from "@hugeicons/core-free-icons/DashboardSquare01Icon";
-import Files02Icon from "@hugeicons/core-free-icons/Files02Icon";
-import InboxIcon from "@hugeicons/core-free-icons/InboxIcon";
 import Settings02Icon from "@hugeicons/core-free-icons/Settings02Icon";
 import type { ReactElement } from "react";
 
 import { useTranslation } from "@/shared/i18n";
-import {
-  EnvironmentsResourceIcon,
-  McpServersResourceIcon,
-  ProvidersResourceIcon,
-  SkillsResourceIcon,
-} from "@/shared/ui/resource-icons";
 import { SidebarRow, SidebarSectionLabel } from "@/shared/ui/sidebar";
 import type { SidebarIcon } from "@/shared/ui/sidebar";
+import {
+  AgentsIcon,
+  EnvironmentsIcon,
+  FilesIcon,
+  McpServersIcon,
+  OverviewIcon,
+  ProvidersIcon,
+  RunsIcon,
+  SkillsIcon,
+} from "@/shared/ui/sidebar-icons";
 
 import { createHugeicon } from "./hugeicon";
 
@@ -31,15 +31,11 @@ interface ProjectNavSection {
 /** `work` is the upper, scrolling area; `persistent` is the anchored footer. */
 export type ProjectNavZone = "persistent" | "work";
 
-const OverviewIcon = createHugeicon(DashboardSquare01Icon, "OverviewIcon");
-const RunsIcon = createHugeicon(InboxIcon, "RunsIcon");
-const AgentsIcon = createHugeicon(BotIcon, "AgentsIcon");
-const FilesIcon = createHugeicon(Files02Icon, "FilesIcon");
 const ProjectSettingsIcon = createHugeicon(Settings02Icon, "ProjectSettingsIcon");
 
 // Upper area: the Project's daily work surfaces first, then the four Project
-// resources an Agent is assembled from, each with its own glyph so it stays
-// recognisable in the icon-only rail. Lower area: project-level settings, which sit with the
+// resources an Agent is assembled from. All eight rows use the sidebar glyph
+// family so the list reads as one product and stays recognisable in the rail. Lower area: project-level settings, which sit with the
 // other infrequent, persistent entry points instead of interrupting the work list.
 function useProjectNavSections(): Record<ProjectNavZone, ProjectNavSection[]> {
   const { t } = useTranslation();
@@ -56,10 +52,10 @@ function useProjectNavSections(): Record<ProjectNavZone, ProjectNavSection[]> {
       },
       {
         items: [
-          { icon: SkillsResourceIcon, label: t("nav.skills"), path: "/integrations/skills" },
-          { icon: McpServersResourceIcon, label: t("nav.mcpServers"), path: "/integrations/mcp" },
-          { icon: ProvidersResourceIcon, label: t("nav.providers"), path: "/providers" },
-          { icon: EnvironmentsResourceIcon, label: t("nav.environments"), path: "/environment" },
+          { icon: SkillsIcon, label: t("nav.skills"), path: "/integrations/skills" },
+          { icon: McpServersIcon, label: t("nav.mcpServers"), path: "/integrations/mcp" },
+          { icon: ProvidersIcon, label: t("nav.providers"), path: "/providers" },
+          { icon: EnvironmentsIcon, label: t("nav.environments"), path: "/environment" },
         ],
         label: t("nav.resources"),
       },

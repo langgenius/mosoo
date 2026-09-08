@@ -7,7 +7,7 @@ import type { Locator, Page, Route } from "@playwright/test";
 import { formatHarnessError } from "../../lib/env-preflight";
 
 // Deterministic acceptance for the console sidebar (langgenius/mosoo#600): the
-// upper work zone / lower persistent zone split, the dedicated resource icons, the
+// upper work zone / lower persistent zone split, the original sidebar glyphs, the
 // collapsed rail, keyboard focus, CJK labels, the no-Project state, the mobile
 // drawer, and the Org layer. Every API projection is a fixture, so the case
 // needs no provider keys and doubles as the screenshot capture for design
@@ -21,21 +21,18 @@ const projectId = "01J00000000000000000000200";
 const secondProjectId = "01J00000000000000000000210";
 const now = "2026-09-08T08:00:00.000Z";
 
-const RESOURCE_LINKS = [
+const GLYPH_LINKS = [
+  { icon: "overview", name: "Overview", path: "/" },
+  { icon: "runs", name: "Runs", path: "/threads" },
+  { icon: "agents", name: "Agents", path: "/agent" },
+  { icon: "files", name: "Files", path: "/files" },
   { icon: "skills", name: "Skills", path: "/integrations/skills" },
   { icon: "mcp-servers", name: "MCP servers", path: "/integrations/mcp" },
   { icon: "providers", name: "Providers", path: "/providers" },
   { icon: "environments", name: "Environments", path: "/environment" },
 ] as const;
 
-const WORK_LINKS = [
-  { name: "Create agent", path: "/agent?create=1" },
-  { name: "Overview", path: "/" },
-  { name: "Runs", path: "/threads" },
-  { name: "Agents", path: "/agent" },
-  { name: "Files", path: "/files" },
-  ...RESOURCE_LINKS,
-] as const;
+const WORK_LINKS = [{ name: "Create agent", path: "/agent?create=1" }, ...GLYPH_LINKS] as const;
 
 const PERSISTENT_LINKS = [{ name: "Project settings", path: "/project-settings" }] as const;
 
@@ -323,11 +320,11 @@ test("expanded sidebar separates the work zone from the persistent zone", async 
     "aria-current",
     "page",
   );
-  for (const resource of RESOURCE_LINKS) {
+  for (const glyph of GLYPH_LINKS) {
     await expect(
       nav
-        .getByRole("link", { exact: true, name: resource.name })
-        .locator(`svg[data-resource-icon="${resource.icon}"]`),
+        .getByRole("link", { exact: true, name: glyph.name })
+        .locator(`svg[data-sidebar-icon="${glyph.icon}"]`),
     ).toBeVisible();
   }
   await expect(nav.getByText("Resources", { exact: true })).toBeVisible();
@@ -403,8 +400,8 @@ test("collapsed rail keeps every entry point recognisable and reachable", async 
     "aria-current",
     "page",
   );
-  for (const resource of RESOURCE_LINKS) {
-    await expect(nav.locator(`svg[data-resource-icon="${resource.icon}"]`)).toBeVisible();
+  for (const glyph of GLYPH_LINKS) {
+    await expect(nav.locator(`svg[data-sidebar-icon="${glyph.icon}"]`)).toBeVisible();
   }
   await expect(nav.getByText("Resources", { exact: true })).toHaveCount(0);
 
