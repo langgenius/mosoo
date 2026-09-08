@@ -11,6 +11,8 @@ import { isTruthy } from "@/shared/lib/truthiness";
 import { Button } from "@/shared/ui/button";
 import { CommandBlock } from "@/shared/ui/command-block";
 import { Check, Loader2 } from "@/shared/ui/icons";
+import { Input } from "@/shared/ui/input";
+import { Label } from "@/shared/ui/label";
 
 import { SettingsTabBody, SettingsTabHeader } from "../settings/settings-tab-layout";
 
@@ -61,12 +63,10 @@ function GeneralForm({ activeProject }: { activeProject: ProjectSummary | null }
     <>
       <SettingsTabHeader title={t("settings.general")} />
       <SettingsTabBody>
-        <div className="space-y-2">
-          <label className="text-foreground text-sm font-medium" htmlFor="project-name">
-            {t("settings.projectName")}
-          </label>
-          <p className="text-fg-2 text-[12px]">{t("settings.projectDescription")}</p>
-          <input
+        <div className="space-y-1.5">
+          <Label htmlFor="project-name">{t("settings.projectName")}</Label>
+          <p className="text-fg-3 text-[12px] leading-4">{t("settings.projectDescription")}</p>
+          <Input
             aria-label={t("settings.projectName")}
             id="project-name"
             type="text"
@@ -75,13 +75,20 @@ function GeneralForm({ activeProject }: { activeProject: ProjectSummary | null }
             onChange={(event) => {
               setName(event.target.value);
             }}
-            className="border-border bg-background text-foreground focus:ring-primary/20 focus:border-primary disabled:bg-muted disabled:text-muted-foreground h-10 w-full rounded-lg border px-3 text-sm transition-colors focus:ring-2 focus:outline-none disabled:cursor-not-allowed"
           />
-          {isTruthy(error) ? <p className="text-destructive text-[12px]">{error}</p> : null}
+          {isTruthy(error) ? (
+            <p className="text-danger-fg text-[12px]" role="alert">
+              {error}
+            </p>
+          ) : null}
         </div>
 
         <div className="mt-6">
-          <Button onClick={() => void handleSave()} disabled={!canSave} size="sm">
+          <Button
+            aria-busy={saving || undefined}
+            disabled={!canSave}
+            onClick={() => void handleSave()}
+          >
             {saving ? (
               <>
                 <Loader2 className="mr-1 size-4 animate-spin" /> {t("settings.saving")}
@@ -99,8 +106,10 @@ function GeneralForm({ activeProject }: { activeProject: ProjectSummary | null }
         {activeProject === null ? null : (
           <div className="mt-8 space-y-6">
             <div className="space-y-2">
-              <div className="text-foreground text-sm font-medium">{t("agent.projectId")}</div>
-              <p className="text-fg-2 text-[12px]">{t("projectSettings.projectIdDescription")}</p>
+              <div className="text-fg-1 text-[13px] font-medium">{t("agent.projectId")}</div>
+              <p className="text-fg-3 text-[12px] leading-4">
+                {t("projectSettings.projectIdDescription")}
+              </p>
               <CommandBlock command={activeProject.id} prompt={null} />
             </div>
           </div>

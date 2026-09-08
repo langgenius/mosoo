@@ -82,6 +82,30 @@ export const e2eCases: readonly E2ECase[] = [
     layer: "ui",
   },
   {
+    command: {
+      ...playwrightSpec("e2e/cases/ui/design-contract.spec.ts"),
+      env: {
+        MOSOO_E2E_WEB_SERVER_COMMAND: "node_modules/.bin/vp run --filter @mosoo/web dev",
+      },
+    },
+    description:
+      "Verify the console design contract (button, badge, switch, row, field, focus, and disabled recipes) and capture acceptance screenshots.",
+    id: ["ui", "design-contract"],
+    layer: "ui",
+  },
+  {
+    command: {
+      ...playwrightSpec("e2e/cases/ui/typography-proof.spec.ts"),
+      env: {
+        MOSOO_E2E_WEB_SERVER_COMMAND: "node_modules/.bin/vp run --filter @mosoo/web dev",
+      },
+    },
+    description:
+      "Render the Providers, Runs, and Settings typography proofs for the current, General Sans, and Instrument Sans role sets.",
+    id: ["ui", "typography-proof"],
+    layer: "ui",
+  },
+  {
     command: playwrightSpec("e2e/cases/ui/preview.spec.ts"),
     description: "Run the live Preview browser journey.",
     id: ["ui", "preview"],

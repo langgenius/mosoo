@@ -32,11 +32,11 @@ export function PageHeader({
             {eyebrow}
           </div>
         ) : null}
-        <h1 className="text-fg-1 text-[22px] font-semibold tracking-[-0.01em] text-balance sm:text-[24px]">
+        <h1 className="font-heading text-fg-heading text-[22px] leading-tight font-medium tracking-[-0.01em] text-balance sm:text-[24px]">
           {title}
         </h1>
         {description ? (
-          <p className="text-fg-2 mt-1 max-w-[560px] text-[13px] leading-5 text-pretty">
+          <p className="text-fg-2 mt-1.5 max-w-[560px] text-[13px] leading-5 text-pretty">
             {description}
           </p>
         ) : null}

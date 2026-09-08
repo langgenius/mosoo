@@ -172,8 +172,10 @@ function AgentDetailHeader({
               onSelectMode(tab.id);
             }}
             className={cn(
-              "px-3.5 py-1.5 rounded-lg text-[13px] font-medium transition-all",
-              mode === tab.id ? "bg-ink-100 text-fg-1" : "text-muted-foreground hover:bg-accent",
+              "rounded-compact px-3.5 py-1.5 text-[13px] font-medium transition-[background-color,color] duration-150 ease-out",
+              mode === tab.id
+                ? "bg-selected text-fg-1"
+                : "text-fg-2 hover:bg-hover hover:text-fg-1",
             )}
           >
             {t(tab.labelKey)}
@@ -186,10 +188,10 @@ function AgentDetailHeader({
               onSelectMode("terminal");
             }}
             className={cn(
-              "rounded-lg px-3.5 py-1.5 text-[13px] font-medium transition-all",
+              "rounded-compact px-3.5 py-1.5 text-[13px] font-medium transition-[background-color,color] duration-150 ease-out",
               mode === "terminal"
-                ? "bg-ink-100 text-fg-1"
-                : "text-muted-foreground hover:bg-accent",
+                ? "bg-selected text-fg-1"
+                : "text-fg-2 hover:bg-hover hover:text-fg-1",
             )}
             aria-label={t("agent.openTerminal")}
           >

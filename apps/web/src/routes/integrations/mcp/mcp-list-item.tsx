@@ -1,5 +1,6 @@
 import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
+import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import {
   DropdownMenu,
@@ -8,7 +9,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu";
-import { MoreHorizontal, Pencil, Power, PowerOff, Trash2, Unplug } from "@/shared/ui/icons";
+import { Check, MoreHorizontal, Pencil, Power, PowerOff, Trash2, Unplug } from "@/shared/ui/icons";
+import { ConnectionRow } from "@/shared/ui/list-row";
 
 import { authTypeLabel, statusText } from "./format";
 import { IconAvatar } from "./icon-avatar";
@@ -23,6 +25,11 @@ interface Props {
   onToggleEnabled: () => void;
 }
 
+// One 44px connection row per server (docs/design/console-design-contract.md,
+// section 4): mark, name plus a single meta line, then the state. Authorized
+// is a success badge with a glyph; a server that still needs authorization
+// shows the Connect action instead of a status; a disabled server keeps
+// legible text and says so with a badge rather than fading the row.
 export function McpListItem({
   server,
   onConnect,
@@ -40,55 +47,53 @@ export function McpListItem({
   if (isAuthorized && subjectLabel !== null && subjectLabel !== undefined) {
     metaParts.push(subjectLabel);
   }
+  if (server.description) {
+    metaParts.unshift(server.description);
+  }
 
   return (
-    <div
-      className={cn(
-        "flex items-center gap-4 px-4 py-3 transition-colors",
-        "hover:bg-muted/40",
-        !server.enabled && "opacity-60",
-      )}
-    >
+    <ConnectionRow interactive className="px-4">
       <IconAvatar
         url={server.iconUrl ?? undefined}
         serverUrl={server.url}
         name={server.name}
-        size={40}
+        size={32}
       />
 
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <span className="text-foreground truncate text-[14px] font-medium">{server.name}</span>
-          {!server.enabled && (
-            <span className="text-amber-fg shrink-0 text-[10px]">{t("mcp.disabled")}</span>
+          <span
+            className={cn(
+              "truncate text-[13px] font-medium",
+              server.enabled ? "text-fg-heading" : "text-fg-3",
+            )}
+          >
+            {server.name}
+          </span>
+          {server.enabled ? null : (
+            <Badge variant="pending">
+              <PowerOff />
+              {t("mcp.disabled")}
+            </Badge>
           )}
         </div>
-        {server.description && (
-          <p className="text-muted-foreground mt-0.5 truncate text-[12px]">{server.description}</p>
-        )}
-        <p className="text-muted-foreground/80 mt-0.5 truncate text-[11px]">
-          {metaParts.join(" · ")}
-        </p>
+        <p className="text-fg-3 mt-0.5 truncate text-[12px] leading-4">{metaParts.join(" · ")}</p>
       </div>
 
-      <div className="flex shrink-0 items-center gap-1">
+      <div className="flex shrink-0 items-center gap-1.5">
         {isAuthorized ? (
-          <span className="inline-flex items-center rounded-sm bg-green-100 px-2.5 py-0.5 text-[11px] font-bold tracking-[0.02em] text-green-800">
+          <Badge variant="success">
+            <Check />
             {statusText("active", t)}
-          </span>
+          </Badge>
         ) : (
-          <Button onClick={onConnect} size="sm" variant="outline">
+          <Button disabled={!server.enabled} onClick={onConnect} size="sm" variant="outline">
             {t("mcp.connect")}
           </Button>
         )}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button
-              aria-label={t("mcp.serverActions")}
-              variant="ghost"
-              size="icon"
-              className="text-muted-foreground size-8"
-            >
+            <Button aria-label={t("mcp.serverActions")} variant="ghost" size="icon-sm">
               <MoreHorizontal />
             </Button>
           </DropdownMenuTrigger>
@@ -108,16 +113,13 @@ export function McpListItem({
               {server.enabled ? t("mcp.disable") : t("mcp.enable")}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={onDelete}
-              className="text-destructive focus:text-destructive"
-            >
+            <DropdownMenuItem onClick={onDelete} variant="destructive">
               <Trash2 />
               {t("common.delete")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-    </div>
+    </ConnectionRow>
   );
 }

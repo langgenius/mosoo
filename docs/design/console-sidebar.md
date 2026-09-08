@@ -31,7 +31,11 @@ Rules that follow from the split:
   no line in browsers without it).
 - The sidebar sits on `--paper-200` while the canvas stays on `--paper-100`, so
   the two surfaces separate by tone as well as by the hairline; in the dark theme
-  the same step is `ink-950` against `ink-900`.
+  the same step is `ink-950` against `ink-900`. The neutral values themselves
+  (pure neutral greys, no cool cast), the interaction fills, and the emphasis
+  role behind the Create agent fill are owned by the
+  [Console design contract](./console-design-contract.md); this page consumes
+  them.
 - The Org layer keeps its horizontal header (that is what tells the account
   layer apart from a Project) but shares the width, the row recipe, the sidebar
   surface (the header's left cell carries it too), and the persistent footer.
@@ -74,10 +78,11 @@ Colour comes from tokens only:
 
 | Token                                | Light                 | Dark                    | Used for                                                |
 | ------------------------------------ | --------------------- | ----------------------- | ------------------------------------------------------- |
-| `--sidebar-row-hover`                | `rgba(28,32,36,.045)` | `rgba(244,246,248,.06)` | hover fill (fine pointers only)                         |
-| `--sidebar-row-active`               | `rgba(28,32,36,.065)` | `rgba(244,246,248,.10)` | selected row, open menu trigger, pressed, monogram tile |
+| `--sidebar-row-hover` (= `--hover`)     | `rgba(0,0,0,.04)`  | `rgba(255,255,255,.06)` | hover fill (fine pointers only)                         |
+| `--sidebar-row-active` (= `--selected`) | `rgba(0,0,0,.065)` | `rgba(255,255,255,.10)` | selected row, open menu trigger, pressed, monogram tile |
+| `--sidebar-cta-bg/-fg` (= `--emphasis`) | `#1f1f1f` / white  | `#fafafa` / `#1f1f1f`   | the Create agent fill; black on purpose, never the brand green |
 | `--border-soft` / `--border-default` | existing hairlines    | existing hairlines      | zone separators                                         |
-| `--accent-ring`                      | brand green           | brand green             | keyboard focus ring, nothing else                       |
+| `--focus-ring`                       | `#498c07`             | `#6fd305`               | keyboard focus ring, nothing else                       |
 | `--fg-2` / `--fg-1` / `--fg-muted`   | existing text ramp    | existing text ramp      | rest / hover+selected / disabled text                   |
 
 Selection is neutral on purpose: the brand green stays reserved for the focus
@@ -87,7 +92,7 @@ ring, so "where am I" and "what has keyboard focus" never look alike.
 
 | Row kind                                   | rest                                             | hover (fine pointer)     | pressed     | keyboard focus                    | selected                                                 | open                                                                                                  | disabled |
 | ------------------------------------------ | ------------------------------------------------ | ------------------------ | ----------- | --------------------------------- | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | -------- |
-| Navigation link                            | `--fg-2`, no fill                                | hover fill, `--fg-1`     | active fill | 2 px `--accent-ring`, 1 px offset | active fill, `--fg-1`, weight 600, `aria-current="page"` | n/a                                                                                                   | n/a      |
+| Navigation link                            | `--fg-2`, no fill                                | hover fill, `--fg-1`     | active fill | 2 px `--focus-ring`, 1 px offset | active fill, `--fg-1`, weight 600, `aria-current="page"` | n/a                                                                                                   | n/a      |
 | Quick action (Create agent)                | `--sidebar-cta-bg` fill, `--sidebar-cta-fg` text | `--sidebar-cta-bg-hover` | ring        | n/a                               | n/a                                                      | `--sidebar-row-active` fill, `--fg-muted` text, `cursor-not-allowed`, `aria-disabled`, still labelled |
 | Menu trigger (switcher, language, account) | as link                                          | hover fill               | active fill | ring                              | n/a                                                      | active fill, `--fg-1` (`data-popup-open`)                                                             | n/a      |
 | Inert row (Usage, Billing "Soon")          | `--fg-muted` + SOON pill                         | none                     | none        | not focusable                     | n/a                                                      | n/a                                                                                                   | always   |

@@ -302,8 +302,8 @@ export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, r
               className={cn(
                 "group flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed py-14 transition-colors",
                 dragOver
-                  ? "border-primary bg-primary/5"
-                  : "border-border hover:border-primary/60 hover:bg-muted/30",
+                  ? "border-emphasis bg-selected"
+                  : "border-border hover:border-border-strong hover:bg-hover",
               )}
               onDragOver={(e) => {
                 e.preventDefault();
@@ -339,7 +339,7 @@ export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, r
               {t("skills.or")}{" "}
               <button
                 type="button"
-                className="text-primary underline-offset-2 hover:underline"
+                className="text-link hover:text-link-hover underline underline-offset-2"
                 onClick={() => folderInputRef.current?.click()}
               >
                 {t("skills.selectAFolder")}
@@ -408,7 +408,7 @@ export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, r
                   href="https://www.skills.sh/"
                   target="_blank"
                   rel="noreferrer"
-                  className="text-primary underline-offset-2 hover:underline"
+                  className="text-link hover:text-link-hover underline underline-offset-2"
                 >
                   {t("skills.skillPageUrl")}
                 </a>

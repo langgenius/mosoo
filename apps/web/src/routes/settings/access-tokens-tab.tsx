@@ -373,7 +373,7 @@ function AccessTokensTable({
       </div>
 
       <div className="hidden min-w-[560px] xl:block">
-        <div className="border-border text-muted-foreground grid grid-cols-[minmax(180px,1fr)_140px_160px_64px] border-b px-4 py-2.5 text-[11px] font-semibold tracking-[0.12em] uppercase">
+        <div className="border-border text-fg-3 grid grid-cols-[minmax(180px,1fr)_140px_160px_64px] border-b px-4 py-2.5 text-[11px] leading-4 font-semibold tracking-[0.06em] uppercase">
           <div>{t("settings.label")}</div>
           <div>{t("settings.tokenId")}</div>
           <div>{t("settings.lastUsed")}</div>
@@ -411,17 +411,22 @@ function AccessTokenRow({
   const { t } = useTranslation();
 
   return (
-    <div className="border-border grid grid-cols-[minmax(180px,1fr)_140px_160px_64px] items-center border-b px-4 py-3 text-sm last:border-b-0">
+    <div
+      data-slot="data-row"
+      className="border-border-soft hover:bg-hover grid min-h-10 grid-cols-[minmax(180px,1fr)_140px_160px_64px] items-center border-b px-4 py-2 text-[13px] transition-[background-color] duration-150 ease-out last:border-b-0"
+    >
       <div className="min-w-0">
-        <div className="text-foreground truncate font-medium">{token.label}</div>
-        <div className="text-muted-foreground mt-0.5 text-xs">
+        <div className="text-fg-1 truncate font-medium">{token.label}</div>
+        <div className="text-fg-3 mt-0.5 text-[12px] leading-4">
           {t("settings.createdAt", {
             date: formatDateTime(token.createdAt) ?? t("settings.never"),
           })}
         </div>
       </div>
-      <code className="text-muted-foreground truncate text-xs">{token.id}</code>
-      <div className="text-muted-foreground text-xs">
+      <code data-slot="mono" className="text-fg-3 truncate font-mono text-[12px] tabular-nums">
+        {token.id}
+      </code>
+      <div className="text-fg-3 text-[12px]">
         {formatDateTime(token.lastUsedAt) ?? t("settings.never")}
       </div>
       <div className="flex justify-end">

@@ -216,7 +216,7 @@ export function OAuthConnectDialog({
           </div>
         ) : stage === "pending" ? (
           <div className="flex flex-col items-center justify-center gap-3 py-10">
-            <Loader2 className="text-primary size-6 animate-spin" />
+            <Loader2 className="text-brand-mark size-6 animate-spin" />
             <div className="text-muted-foreground text-[13px]">
               {t("mcp.completingAuthorization")}
             </div>

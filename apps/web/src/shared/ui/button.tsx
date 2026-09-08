@@ -6,8 +6,19 @@ import type { ComponentProps, ReactElement } from "react";
 
 import { cn } from "@/shared/lib/class-names";
 
+/**
+ * Button recipe (docs/design/console-design-contract.md, section 4).
+ *
+ * Density ladder: default 32px / 10px radius, sm 28px / 8px, xs 24px / 6px,
+ * lg 36px / 10px; icon sizes mirror the same heights. `default` is the one
+ * focal action per surface (brand green fill, dark ink text); everything
+ * else stays neutral. States: rest, hover (enabled only), pressed, keyboard
+ * focus (the shared 2px ring), disabled (surface and text change, never a
+ * whole-control opacity fade), busy (`aria-busy`, callers swap the leading
+ * glyph for a spinner). Transitions are targeted; there is no press scale.
+ */
 const buttonVariants = cva(
-  "inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md text-sm font-semibold tracking-[0.01em] whitespace-nowrap transition-all outline-none focus-visible:border-ring focus-visible:ring-[2px] focus-visible:ring-ring active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "inline-flex shrink-0 items-center justify-center gap-1.5 font-medium whitespace-nowrap outline-none select-none transition-[background-color,border-color,color,box-shadow] duration-150 ease-out focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:shadow-none aria-busy:cursor-progress [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     defaultVariants: {
       size: "default",
@@ -15,26 +26,33 @@ const buttonVariants = cva(
     },
     variants: {
       size: {
-        default: "h-9 px-4 py-2 has-[>svg]:px-3.5",
-        icon: "size-9 active:scale-100",
-        "icon-lg": "size-10 active:scale-100",
-        "icon-sm": "size-8 active:scale-100",
-        "icon-xs": "size-7 rounded-md [&_svg:not([class*='size-'])]:size-3 active:scale-100",
-        lg: "h-11 rounded-md px-5 text-[15px] has-[>svg]:px-4",
-        sm: "h-8 gap-1.5 rounded-md px-3 text-[13px] has-[>svg]:px-2.5",
-        xs: "h-7 gap-1 rounded-md px-2 text-xs has-[>svg]:px-1.5 [&_svg:not([class*='size-'])]:size-3",
+        default: "h-8 rounded-md px-3 text-[13px] has-[>svg]:px-2.5",
+        icon: "size-8 rounded-md",
+        "icon-lg": "size-9 rounded-md",
+        "icon-sm": "size-7 rounded-compact",
+        "icon-xs": "size-6 rounded-sm [&_svg:not([class*='size-'])]:size-3",
+        lg: "h-9 rounded-md px-4 text-[14px] has-[>svg]:px-3.5",
+        sm: "h-7 rounded-compact px-2.5 text-[12.5px] has-[>svg]:px-2",
+        xs: "h-6 rounded-sm px-2 text-[12px] has-[>svg]:px-1.5 [&_svg:not([class*='size-'])]:size-3",
       },
       variant: {
-        default: "bg-primary text-primary-foreground shadow-xs hover:bg-primary-hover",
-        accent: "bg-green-500 text-on-accent shadow-xs hover:bg-green-600",
+        /** The focal action: brand green fill, dark ink text, deep-tone hairline. */
+        default:
+          "border border-primary-border bg-primary text-primary-foreground shadow-xs hover:bg-primary-hover active:bg-primary-active disabled:border-transparent disabled:bg-paper-300 disabled:text-fg-3",
+        /** Legacy alias of `default`; new call sites use `default`. */
+        accent:
+          "border border-primary-border bg-primary text-primary-foreground shadow-xs hover:bg-primary-hover active:bg-primary-active disabled:border-transparent disabled:bg-paper-300 disabled:text-fg-3",
         destructive:
-          "bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:bg-destructive/60 dark:focus-visible:ring-destructive/40",
-        ghost: "text-fg-2 hover:bg-paper-200/60 hover:text-fg-1 active:scale-100",
-        link: "text-primary underline-offset-4 hover:underline active:scale-100",
+          "bg-danger text-white shadow-xs hover:bg-danger/90 active:bg-danger/80 disabled:bg-paper-300 disabled:text-fg-3",
+        ghost:
+          "text-fg-2 hover:bg-hover hover:text-fg-1 active:bg-pressed disabled:bg-transparent disabled:text-fg-muted",
+        link: "h-auto rounded-none px-0 text-link underline decoration-link/45 underline-offset-[3px] hover:text-link-hover hover:decoration-current disabled:text-fg-muted",
         outline:
-          "border border-border-strong bg-card text-foreground hover:bg-paper-200 dark:border-input dark:bg-input/30 dark:hover:bg-input/50",
-        secondary: "bg-secondary text-secondary-foreground hover:bg-paper-300/70",
-        tonal: "bg-accent-soft text-accent-press hover:bg-accent-soft-hover",
+          "border border-border-strong bg-card text-fg-1 shadow-xs hover:bg-paper-100 active:bg-paper-200 disabled:border-border-soft disabled:bg-paper-100 disabled:text-fg-muted",
+        secondary:
+          "bg-paper-200 text-fg-1 hover:bg-paper-300 active:bg-paper-400 disabled:bg-paper-200 disabled:text-fg-muted",
+        tonal:
+          "bg-brand-soft text-brand hover:bg-brand-soft-hover active:bg-green-200 disabled:bg-paper-200 disabled:text-fg-muted",
       },
     },
   },

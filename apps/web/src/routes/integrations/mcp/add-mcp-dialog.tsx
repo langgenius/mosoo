@@ -225,7 +225,7 @@ export function AddMcpDialog({ open, onOpenChange, onSubmit }: Props) {
                   className={cn(
                     "rounded-md border px-3 py-2 text-[13px] text-left transition",
                     authType === authTypeOption
-                      ? "border-primary bg-primary/5 text-foreground"
+                      ? "border-emphasis bg-selected text-fg-1"
                       : "border-border text-muted-foreground hover:bg-muted/40",
                   )}
                 >

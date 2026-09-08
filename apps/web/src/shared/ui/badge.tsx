@@ -6,28 +6,37 @@ import type { ComponentProps, ReactElement } from "react";
 
 import { cn } from "@/shared/lib/class-names";
 
+/**
+ * Badge recipe (docs/design/console-design-contract.md, section 4): 20px tall,
+ * 6px radius, 11.5px semibold. Status variants pair a tint with a text tone
+ * that clears 4.5:1 on it; `brand` is reserved for Mosoo-specific lifecycle
+ * markers (default key, built-in resource). Success, warning, danger, and
+ * pending should carry a glyph as well as a colour when they stand alone.
+ */
 const badgeVariants = cva(
-  "inline-flex w-fit shrink-0 items-center justify-center gap-1 overflow-hidden rounded-sm border border-transparent px-2 py-0.5 text-[11.5px] font-bold tracking-[0.02em] whitespace-nowrap transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[2px] focus-visible:ring-ring aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&>svg]:pointer-events-none [&>svg]:size-3",
+  "inline-flex h-5 w-fit shrink-0 items-center justify-center gap-1 rounded-sm border border-transparent px-2 text-[11.5px] leading-none font-semibold tracking-[0.01em] whitespace-nowrap transition-[background-color,color] duration-150 ease-out focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 [&>svg]:pointer-events-none [&>svg]:size-3 [&>svg]:shrink-0",
   {
     defaultVariants: {
       variant: "default",
     },
     variants: {
       variant: {
-        danger:
-          "bg-destructive/12 text-destructive focus-visible:ring-destructive/20 [a&]:hover:bg-destructive/20",
-        default: "bg-secondary text-fg-2 [a&]:hover:bg-paper-300",
-        destructive:
-          "bg-destructive text-white focus-visible:ring-destructive/20 dark:bg-destructive/60 dark:focus-visible:ring-destructive/40 [a&]:hover:bg-destructive/90",
-        ghost: "[a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
-        link: "text-primary underline-offset-4 [a&]:hover:underline",
-        outline:
-          "border-border-strong text-fg-2 [a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
-        primary: "bg-accent-soft text-accent-press [a&]:hover:bg-green-100",
-        secondary: "bg-secondary text-secondary-foreground [a&]:hover:bg-secondary/80",
+        brand: "bg-brand-soft text-brand [a&]:hover:bg-brand-soft-hover",
+        danger: "bg-danger-bg text-danger-fg [a&]:hover:bg-danger-bg/70",
+        default: "bg-paper-200 text-fg-2 [a&]:hover:bg-paper-300",
+        destructive: "bg-danger text-white [a&]:hover:bg-danger/90",
+        ghost: "text-fg-2 [a&]:hover:bg-hover [a&]:hover:text-fg-1",
+        info: "bg-info-bg text-info-fg [a&]:hover:bg-info-bg/70",
+        link: "text-link underline underline-offset-2 [a&]:hover:text-link-hover",
+        outline: "border-border-strong bg-card text-fg-2 [a&]:hover:bg-paper-100",
+        pending: "bg-pending-bg text-pending-fg [a&]:hover:bg-paper-300",
+        /** Legacy alias of `brand`. */
+        primary: "bg-brand-soft text-brand [a&]:hover:bg-brand-soft-hover",
+        /** Legacy alias of `default`. */
+        secondary: "bg-paper-200 text-fg-2 [a&]:hover:bg-paper-300",
         soil: "bg-soil-bg text-soil-fg [a&]:hover:bg-soil-bg/70",
         success: "bg-success-bg text-success-fg [a&]:hover:bg-success-bg/70",
-        warning: "bg-amber-bg text-amber-fg [a&]:hover:bg-amber-bg/70",
+        warning: "bg-warning-bg text-warning-fg [a&]:hover:bg-warning-bg/70",
       },
     },
   },

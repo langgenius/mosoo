@@ -15,14 +15,12 @@ export function ThreadStateIcon({ glyph }: { glyph: ThreadStateGlyph }): ReactEl
       );
     }
     case "failed": {
-      return (
-        <CircleX className="text-destructive size-3.5 shrink-0" aria-label={t("threads.failed")} />
-      );
+      return <CircleX className="text-danger size-3.5 shrink-0" aria-label={t("threads.failed")} />;
     }
     case "success": {
       return (
         <CheckCircle2
-          className="text-primary size-3.5 shrink-0"
+          className="text-success size-3.5 shrink-0"
           aria-label={t("threads.completed")}
         />
       );
@@ -35,7 +33,7 @@ export function ThreadStateIcon({ glyph }: { glyph: ThreadStateGlyph }): ReactEl
           viewBox="0 0 14 14"
           xmlns="http://www.w3.org/2000/svg"
         >
-          <circle cx="7" cy="7" r="4" className="fill-primary opacity-70">
+          <circle cx="7" cy="7" r="4" className="fill-brand-mark opacity-70">
             <animate attributeName="r" values="3;5;3" dur="1s" repeatCount="indefinite" />
             <animate
               attributeName="opacity"
@@ -44,7 +42,7 @@ export function ThreadStateIcon({ glyph }: { glyph: ThreadStateGlyph }): ReactEl
               repeatCount="indefinite"
             />
           </circle>
-          <circle cx="7" cy="7" r="4" className="fill-primary" />
+          <circle cx="7" cy="7" r="4" className="fill-brand-mark" />
         </svg>
       );
     }

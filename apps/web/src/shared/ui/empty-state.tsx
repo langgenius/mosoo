@@ -27,10 +27,12 @@ export function EmptyState({
         className,
       )}
     >
-      <div className="bg-paper-200 text-fg-3 flex size-12 items-center justify-center rounded-full">
+      <div className="bg-sunken text-fg-3 flex size-12 items-center justify-center rounded-full">
         <Icon className="size-5" strokeWidth={1.5} />
       </div>
-      <p className="text-fg-1 mt-4 text-[14px] font-semibold text-balance">{title}</p>
+      <p className="font-heading text-fg-heading mt-4 text-[16px] font-medium text-balance">
+        {title}
+      </p>
       {description ? (
         <p className="text-fg-3 mt-1.5 max-w-[360px] text-[13px] text-pretty">{description}</p>
       ) : null}

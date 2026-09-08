@@ -4,7 +4,6 @@ import type { ReactElement } from "react";
 import { Link } from "react-router-dom";
 
 import { getCurrentLocale, useTranslation } from "@/shared/i18n";
-import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
 import {
   Dialog,
@@ -22,6 +21,8 @@ import {
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu";
 import { GitFork, MoreHorizontal, Trash2 } from "@/shared/ui/icons";
+import { DataRow, RowList } from "@/shared/ui/list-row";
+import { MonoText } from "@/shared/ui/mono-text";
 
 import { EnvironmentBadges } from "./environment-badges";
 
@@ -43,6 +44,8 @@ function networkLabel(environment: EnvironmentSummary, t: Translate): string {
   });
 }
 
+// One 40px data row per environment; a description or fork origin adds whole
+// lines below the name instead of squeezing the row.
 export function EnvironmentListTable({
   environments,
   onDelete,
@@ -61,30 +64,30 @@ export function EnvironmentListTable({
   }
 
   return (
-    <div className="border-border bg-card overflow-hidden rounded-lg border">
-      {environments.map((environment, index) => (
-        <div
-          className={cn(
-            "grid items-center gap-3 px-4 py-3 md:grid-cols-[minmax(0,1.4fr)_160px_90px_120px_auto]",
-            index !== environments.length - 1 && "border-b border-border-soft",
-          )}
+    <RowList>
+      {environments.map((environment) => (
+        <DataRow
+          interactive
+          className="grid gap-3 px-4 md:grid-cols-[minmax(0,1.4fr)_160px_90px_120px_auto]"
           key={environment.id}
         >
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <Link
-                className="text-fg-1 hover:text-accent-press truncate text-[14px] font-semibold"
+                className="text-fg-heading hover:text-link truncate text-[13px] font-medium hover:underline"
                 to={`/environment/${environment.id}`}
               >
                 {environment.name}
               </Link>
               <EnvironmentBadges environment={environment} />
             </div>
-            <div className="text-fg-3 mt-1 line-clamp-1 text-[12px]">
-              {environment.description || t("environments.noDescription")}
-            </div>
+            {environment.description ? (
+              <div className="text-fg-3 mt-0.5 line-clamp-1 text-[12px] leading-4">
+                {environment.description}
+              </div>
+            ) : null}
             {environment.forkOrigin ? (
-              <div className="text-fg-3 mt-1 flex items-center gap-1.5 text-[11.5px]">
+              <div className="text-fg-3 mt-0.5 flex items-center gap-1.5 text-[12px] leading-4">
                 <GitFork className="size-3" />
                 {t("environments.forkedFrom", {
                   owner: environment.forkOrigin.ownerName,
@@ -94,18 +97,13 @@ export function EnvironmentListTable({
             ) : null}
           </div>
           <div className="text-fg-2 text-[12px]">{networkLabel(environment, t)}</div>
-          <div className="text-fg-2 font-mono text-[12px]">{environment.usedByAgentCount}</div>
+          <MonoText className="text-fg-2">{environment.usedByAgentCount}</MonoText>
           <div className="text-fg-3 text-[12px]" suppressHydrationWarning>
             {new Date(environment.updatedAt).toLocaleDateString(getCurrentLocale())}
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button
-                aria-label={t("environments.actions")}
-                className="size-8"
-                size="icon"
-                variant="ghost"
-              >
+              <Button aria-label={t("environments.actions")} size="icon-sm" variant="ghost">
                 <MoreHorizontal className="size-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -137,7 +135,7 @@ export function EnvironmentListTable({
               ) : null}
             </DropdownMenuContent>
           </DropdownMenu>
-        </div>
+        </DataRow>
       ))}
 
       <Dialog
@@ -181,6 +179,6 @@ export function EnvironmentListTable({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </RowList>
   );
 }

@@ -141,7 +141,10 @@ function ThreadRow({
   });
 
   return (
-    <div className="group hover:bg-ink-900/[0.025] relative flex min-w-0 items-center gap-3 rounded-md px-2 py-1.5 transition-colors">
+    <div
+      data-slot="data-row"
+      className="group hover:bg-hover relative flex min-h-10 min-w-0 items-center gap-3 rounded-md px-2 py-1.5 transition-[background-color] duration-150 ease-out"
+    >
       <button
         type="button"
         onClick={() => {
@@ -152,7 +155,7 @@ function ThreadRow({
         <span
           className={cn(
             "shrink-0 rounded-full",
-            thread.read ? "bg-transparent size-1.5" : "bg-accent size-1.5",
+            thread.read ? "bg-transparent size-1.5" : "bg-brand-mark size-1.5",
           )}
           aria-hidden
         />
@@ -171,7 +174,7 @@ function ThreadRow({
 
         <span
           className={cn(
-            "min-w-0 flex-1 truncate text-[12.5px] tracking-tight",
+            "min-w-0 flex-1 truncate text-[13px]",
             thread.read ? "text-fg-2" : "text-fg-1 font-semibold",
           )}
           title={t(thread.title)}
@@ -182,12 +185,12 @@ function ThreadRow({
         <span className="text-fg-3 shrink-0 text-[12px]">[{t(thread.agentName)}]</span>
 
         <span
-          className={cn("shrink-0 text-[12px]", thread.failed ? "text-destructive" : "text-fg-3")}
+          className={cn("shrink-0 text-[12px]", thread.failed ? "text-danger-fg" : "text-fg-3")}
         >
           {translateThreadStatusLine(thread.statusLine, t)}
         </span>
 
-        <span className="text-fg-3 shrink-0 text-[11.5px] tabular-nums">
+        <span className="text-fg-3 shrink-0 font-mono text-[11.5px] tabular-nums">
           {formatShortRelative(thread.lastActivityAt, t)}
         </span>
       </button>

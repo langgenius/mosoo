@@ -1,10 +1,11 @@
-import { Fragment, useMemo, useReducer } from "react";
+import { useMemo, useReducer } from "react";
 
 import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import { EmptyState } from "@/shared/ui/empty-state";
 import { Plus, Search, Zap } from "@/shared/ui/icons";
 import { Input } from "@/shared/ui/input";
+import { RowList } from "@/shared/ui/list-row";
 import { PageHeader } from "@/shared/ui/page-header";
 
 import { AddMcpDialog } from "./add-mcp-dialog";
@@ -93,7 +94,6 @@ export function McpTab() {
           onClick={() => {
             dispatch({ open: true, type: "setAddOpen" });
           }}
-          size="sm"
         >
           <Plus className="size-3.5" />
           {t("mcp.addMcp")}
@@ -116,7 +116,10 @@ export function McpTab() {
 
       <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-8 sm:px-8">
         {registry.error && (
-          <div className="border-destructive/20 bg-destructive/[0.06] text-destructive mb-4 rounded-md border px-3 py-2 text-[12px]">
+          <div
+            className="border-danger/30 bg-danger-bg text-danger-fg mb-4 rounded-md border px-3 py-2 text-[13px]"
+            role="alert"
+          >
             {registry.error}
           </div>
         )}
@@ -130,25 +133,23 @@ export function McpTab() {
             }}
           />
         ) : (
-          <div className="border-border bg-card overflow-hidden rounded-lg border">
-            {list.map((server, index) => (
-              <Fragment key={server.id}>
-                {index > 0 && <div className="bg-border-soft mx-4 h-px" />}
-                <McpListItem
-                  server={server}
-                  onConnect={() => {
-                    dispatch({ server, type: "setOauthServer" });
-                  }}
-                  onEdit={() => {
-                    dispatch({ server, type: "setEditServer" });
-                  }}
-                  onDelete={() => void registry.deleteServer(server.id)}
-                  onRevoke={() => void registry.revokeCredential(server.id)}
-                  onToggleEnabled={() => void registry.setServerEnabled(server.id, !server.enabled)}
-                />
-              </Fragment>
+          <RowList>
+            {list.map((server) => (
+              <McpListItem
+                key={server.id}
+                server={server}
+                onConnect={() => {
+                  dispatch({ server, type: "setOauthServer" });
+                }}
+                onEdit={() => {
+                  dispatch({ server, type: "setEditServer" });
+                }}
+                onDelete={() => void registry.deleteServer(server.id)}
+                onRevoke={() => void registry.revokeCredential(server.id)}
+                onToggleEnabled={() => void registry.setServerEnabled(server.id, !server.enabled)}
+              />
             ))}
-          </div>
+          </RowList>
         )}
       </div>
 
@@ -231,7 +232,7 @@ function McpEmptyState({ searching, onAdd }: { searching: boolean; onAdd: () => 
       title={t("mcp.noServersTitle")}
       description={t("mcp.noServersDescription")}
     >
-      <Button onClick={onAdd} size="sm">
+      <Button onClick={onAdd}>
         <Plus className="size-3.5" />
         {t("mcp.addMcp")}
       </Button>
