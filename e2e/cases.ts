@@ -70,6 +70,18 @@ export const e2eCases: readonly E2ECase[] = [
     layer: "ui",
   },
   {
+    command: {
+      ...playwrightSpec("e2e/cases/ui/sidebar.spec.ts"),
+      env: {
+        MOSOO_E2E_WEB_SERVER_COMMAND: "node_modules/.bin/vp run --filter @mosoo/web dev",
+      },
+    },
+    description:
+      "Verify the console sidebar hierarchy and states, and capture acceptance screenshots.",
+    id: ["ui", "sidebar"],
+    layer: "ui",
+  },
+  {
     command: playwrightSpec("e2e/cases/ui/preview.spec.ts"),
     description: "Run the live Preview browser journey.",
     id: ["ui", "preview"],

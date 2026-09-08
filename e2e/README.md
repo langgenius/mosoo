@@ -12,6 +12,7 @@ just e2e public-api
 just e2e contract harness
 just e2e deterministic session-log
 just e2e ui files-page
+just e2e ui sidebar
 just e2e ui preview
 just e2e public-api runtime
 just e2e public-api latency
@@ -30,6 +31,13 @@ The harness is grouped by layer. `just e2e <layer>` runs every case in that laye
 projection fixtures, so it is safe for local PR evidence and does not require
 provider keys or Worker runtime bindings. It starts only `@mosoo/web` by default;
 set `MOSOO_E2E_WEB_SERVER_COMMAND` to override the server command.
+
+`ui sidebar` is the console sidebar acceptance case for the shell hierarchy
+(work zone, persistent zone, resource icons, collapsed rail, keyboard focus, CJK
+labels, mobile drawer, Org layer). It is fixture-backed like `ui files-page`,
+starts only `@mosoo/web`, and writes review screenshots to `.tmp/e2e/sidebar/`.
+Point it at a running console with `MOSOO_E2E_BASE_URL` to capture a branch that
+is already served on another port.
 
 Each live case requires a key matching `MOSOO_E2E_PROVIDER` (or the generic
 `MOSOO_E2E_PROVIDER_API_KEY`):

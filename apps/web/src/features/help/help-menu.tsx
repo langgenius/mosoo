@@ -1,9 +1,8 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 
 import { useTranslation } from "@/shared/i18n";
-import { cn } from "@/shared/lib/class-names";
 import { HelpCircle } from "@/shared/ui/icons";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
+import { SidebarRow } from "@/shared/ui/sidebar";
 
 // Loaded on demand the first time Help is opened. The dialog drags in the Radix
 // dialog primitive and the help-docs search index, none of which the app shell
@@ -74,33 +73,16 @@ export function HelpMenu({
     };
   }, [shortcutEnabled]);
 
-  const button = (
-    <button
-      type="button"
-      onClick={() => {
-        openHelp();
-      }}
-      aria-label={t("help.helpAndDocs")}
-      className={cn(
-        "text-fg-2 hover:bg-ink-900/[0.04] hover:text-fg-1 flex items-center rounded-md text-[13.5px] font-semibold transition-colors",
-        collapsed ? "size-9 justify-center self-center" : "w-full gap-2.5 px-2.5 py-2",
-      )}
-    >
-      <HelpCircle className="size-4" />
-      {collapsed ? null : <span className="sidebar-label-enter">{t("help.helpAndDocs")}</span>}
-    </button>
-  );
-
   return (
     <>
-      {collapsed ? (
-        <Tooltip>
-          <TooltipTrigger asChild>{button}</TooltipTrigger>
-          <TooltipContent side="right">{t("help.helpAndDocs")}</TooltipContent>
-        </Tooltip>
-      ) : (
-        button
-      )}
+      <SidebarRow
+        collapsed={collapsed}
+        icon={HelpCircle}
+        label={t("help.helpAndDocs")}
+        onClick={() => {
+          openHelp();
+        }}
+      />
       {hasOpened ? (
         <Suspense fallback={null}>
           <HelpDocsDialog open={open} onOpenChange={handleOpenChange} />
