@@ -57,11 +57,9 @@ export function RuntimeAvailabilitySection({
   const rows = listRuntimeAvailabilityRows(credentials, t);
 
   return (
-    <section className="border-border bg-card rounded-lg border p-4">
+    <section className="border-border bg-card rounded-lg border p-6">
       <div className="mb-3">
-        <h2 className="text-fg-heading text-[14px] font-semibold">
-          {t("providers.runtimeAvailability")}
-        </h2>
+        <h2 className="t-section-title">{t("providers.runtimeAvailability")}</h2>
         <p className="text-fg-3 mt-1 text-[12px] leading-4">
           {t("providers.runtimeAvailabilityDescription")}
         </p>

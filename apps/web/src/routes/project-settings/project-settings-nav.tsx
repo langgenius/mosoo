@@ -22,9 +22,7 @@ export function ProjectSettingsNav() {
 
   return (
     <aside className="border-border-soft flex w-full shrink-0 flex-col gap-3 overflow-x-auto border-b px-4 py-2 md:w-[220px] md:overflow-visible md:border-r md:border-b-0 md:px-3 md:py-5">
-      <div className="text-fg-3 hidden px-2.5 pb-1 text-[12px] leading-4 font-medium md:block">
-        {t("nav.project")}
-      </div>
+      <div className="t-group-label hidden px-2.5 pb-1 md:block">{t("nav.project")}</div>
       <div className="flex gap-1 md:flex-col md:gap-0.5">
         {PROJECT_SETTINGS_NAV_ITEMS.map((item) => (
           <NavLink

@@ -390,7 +390,7 @@ export function NewThreadDialog({
             selectedAgentId={selectedAgentId}
           />
 
-          <div className="border-border-subtle bg-card focus-within:border-ring focus-within:ring-ring/50 rounded-lg border px-3.5 py-3 shadow-[var(--shadow-sm)] transition-[color,box-shadow] focus-within:ring-[3px]">
+          <div className="border-border-subtle bg-card focus-within:border-ring focus-within:ring-ring/50 rounded-lg border px-3.5 py-3 transition-[color,box-shadow] focus-within:ring-[3px]">
             <Textarea
               value={body}
               onChange={(event) => {

@@ -18,6 +18,23 @@
     <meta property="og:site_name" content="mosoo" />
     <meta name="twitter:card" content="summary" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!-- The two console families (docs/design/typography-audit.md). Preloading
+         them starts the fetch before the stylesheet is parsed, so the swap
+         from the metric-matched fallback happens within the first paint. -->
+    <link
+      rel="preload"
+      href="/fonts/Geist-Variable.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      href="/fonts/GeistMono-Variable.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
     <title>mosoo</title>
     <!-- Set html lang attribute early based on stored locale preference.
          Falls back to navigator.language. Runs before React mounts so the

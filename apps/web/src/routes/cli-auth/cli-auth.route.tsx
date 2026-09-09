@@ -33,7 +33,7 @@ export function CliAuthPage() {
 
   return (
     <main className="mx-auto flex w-full max-w-xl flex-col gap-5 px-6 py-12">
-      <div className="border-border-default bg-bg-elevated rounded-lg border p-6 shadow-sm">
+      <div className="border-border-default bg-bg-elevated rounded-lg border p-6">
         <div className="flex items-start gap-4">
           <div className="bg-accent-soft text-accent flex size-10 shrink-0 items-center justify-center rounded-md">
             <KeyRound className="size-5" />

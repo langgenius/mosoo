@@ -30,7 +30,7 @@ export function McpOAuthCompletePage() {
 
   return (
     <div className="bg-background flex min-h-dvh items-center justify-center px-6">
-      <div className="border-border bg-card w-full max-w-md rounded-lg border p-8 shadow-sm">
+      <div className="border-border bg-card w-full max-w-md rounded-lg border p-6">
         <h1 className="text-foreground text-[20px] font-semibold">MCP OAuth</h1>
         <p className="text-muted-foreground mt-3 text-sm">{t(getStatusLabel(status))}</p>
         {flowId && (

@@ -107,7 +107,7 @@ export function OnboardingSteps(): ReactElement {
   return (
     <nav
       aria-label={t("onboarding.steps")}
-      className="border-border bg-card divide-border mt-8 w-full divide-y overflow-hidden rounded-lg border text-left shadow-xs"
+      className="border-border bg-card divide-border mt-8 w-full divide-y overflow-hidden rounded-lg border text-left"
     >
       {steps.map((step) => (
         <StepRow key={step.number} step={step} />

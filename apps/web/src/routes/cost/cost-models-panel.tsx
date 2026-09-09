@@ -22,12 +22,12 @@ export function CostModelsPanel({ models }: { models: CostModelRow[] }) {
   return (
     <section className="grid gap-4 lg:grid-cols-[380px_minmax(0,1fr)]">
       <div className="space-y-4">
-        <div className="border-border bg-card rounded-lg border p-4">
+        <div className="border-border bg-card rounded-lg border p-6">
           <h2 className="text-foreground mb-4 text-sm font-semibold">{t("cost.spendByModel")}</h2>
           <ModelDonut models={models} totalCost={totalCost} />
         </div>
 
-        <div className="border-border bg-card rounded-lg border p-4">
+        <div className="border-border bg-card rounded-lg border p-6">
           <h2 className="text-foreground mb-4 text-sm font-semibold">{t("cost.byVendor")}</h2>
           <div className="space-y-3">
             {vendors.map((vendor, index) => {
@@ -64,7 +64,7 @@ export function CostModelsPanel({ models }: { models: CostModelRow[] }) {
       </div>
 
       <div className="border-border bg-card overflow-x-auto rounded-lg border">
-        <div className="border-border bg-muted/30 text-muted-foreground grid min-w-[980px] grid-cols-[minmax(180px,1.2fr)_110px_100px_120px_90px_120px_120px_100px_100px] border-b px-4 py-2 text-[11px] font-semibold tracking-[0.12em] uppercase">
+        <div className="border-border bg-muted/30 text-fg-2 grid min-w-[980px] grid-cols-[minmax(180px,1.2fr)_110px_100px_120px_90px_120px_120px_100px_100px] border-b px-4 py-2 text-[12px] font-medium">
           <div>{t("cost.model")}</div>
           <div>{t("cost.vendor")}</div>
           <div>{t("cost.requests")}</div>

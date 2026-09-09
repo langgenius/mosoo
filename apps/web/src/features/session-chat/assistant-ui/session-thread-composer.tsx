@@ -100,10 +100,7 @@ export function SessionThreadComposer({
   const { t } = useTranslation();
 
   return (
-    <ComposerPrimitive.Root
-      className={cn("border-border-strong bg-card rounded-lg border")}
-      style={{ boxShadow: "var(--shadow-md)" }}
-    >
+    <ComposerPrimitive.Root className={cn("border-border-strong bg-card rounded-lg border")}>
       {composerError ? (
         <div className="border-destructive/20 bg-destructive/[0.06] text-destructive mx-3 mt-3 rounded-md border px-3 py-2 text-[13px]">
           <div>{composerError.message}</div>

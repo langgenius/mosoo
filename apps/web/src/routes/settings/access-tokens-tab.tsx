@@ -205,10 +205,10 @@ function PersonalTokenSection({
   const { t } = useTranslation();
 
   return (
-    <section className="border-border bg-card rounded-lg border p-4">
+    <section className="border-border bg-card rounded-lg border p-6">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <div className="text-foreground flex items-center gap-2 text-sm font-semibold">
+          <div className="t-section-title flex items-center gap-2">
             <KeyRound className="text-fg-3 size-4" />
             {t("settings.apiTokens")}
           </div>
@@ -373,7 +373,7 @@ function AccessTokensTable({
       </div>
 
       <div className="hidden min-w-[560px] xl:block">
-        <div className="border-border text-fg-3 grid grid-cols-[minmax(180px,1fr)_140px_160px_64px] border-b px-4 py-2.5 text-[12px] leading-4 font-medium">
+        <div className="border-border text-fg-2 grid grid-cols-[minmax(180px,1fr)_140px_160px_64px] border-b px-4 py-2.5 text-[12px] leading-4 font-medium">
           <div>{t("settings.label")}</div>
           <div>{t("settings.tokenId")}</div>
           <div>{t("settings.lastUsed")}</div>

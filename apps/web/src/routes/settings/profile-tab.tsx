@@ -205,7 +205,9 @@ export function ProfileTab() {
             </div>
           )}
           <div className="min-w-0">
-            <div className="text-fg-heading truncate text-[16px] font-semibold">{user?.name}</div>
+            <div className="text-fg-heading tracking-subtitle truncate text-[16px] leading-5 font-semibold">
+              {user?.name}
+            </div>
             <div className="text-fg-3 truncate text-[13px]">{user?.email}</div>
             <div className="mt-2">
               <input

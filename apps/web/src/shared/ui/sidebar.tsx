@@ -201,9 +201,7 @@ export function SidebarSectionLabel({
   }
 
   return (
-    <div className="sidebar-label-enter text-fg-3 px-2.5 pt-4 pb-1 text-[12px] leading-4 font-medium select-none">
-      {children}
-    </div>
+    <div className="sidebar-label-enter t-group-label px-2.5 pt-4 pb-1 select-none">{children}</div>
   );
 }
 
