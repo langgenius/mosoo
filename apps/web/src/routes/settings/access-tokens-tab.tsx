@@ -373,7 +373,7 @@ function AccessTokensTable({
       </div>
 
       <div className="hidden min-w-[560px] xl:block">
-        <div className="border-border text-fg-3 grid grid-cols-[minmax(180px,1fr)_140px_160px_64px] border-b px-4 py-2.5 text-[11px] leading-4 font-semibold tracking-[0.06em] uppercase">
+        <div className="border-border text-fg-3 grid grid-cols-[minmax(180px,1fr)_140px_160px_64px] border-b px-4 py-2.5 text-[12px] leading-4 font-medium">
           <div>{t("settings.label")}</div>
           <div>{t("settings.tokenId")}</div>
           <div>{t("settings.lastUsed")}</div>

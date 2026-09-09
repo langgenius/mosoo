@@ -30,13 +30,13 @@ export function SettingsNav() {
 
   return (
     <aside className="border-border-soft flex w-full shrink-0 flex-col gap-3 overflow-x-auto border-b px-4 py-2 md:w-[220px] md:overflow-visible md:border-r md:border-b-0 md:px-3 md:py-5">
-      <div className="text-fg-3 hidden px-2.5 pb-1 text-[11px] leading-4 font-semibold tracking-[0.06em] uppercase md:block">
+      <div className="text-fg-3 hidden px-2.5 pb-1 text-[12px] leading-4 font-medium md:block">
         {t("pageTitle.settings")}
       </div>
       {SETTINGS_NAV_SECTIONS.map((section) => {
         return (
           <div key={section.labelKey} className="flex flex-col gap-1">
-            <div className="text-fg-3 hidden px-2.5 pb-1 text-[11px] leading-4 font-semibold tracking-[0.06em] uppercase md:block">
+            <div className="text-fg-3 hidden px-2.5 pb-1 text-[12px] leading-4 font-medium md:block">
               {t(section.labelKey)}
             </div>
             <div className="flex gap-1 md:flex-col md:gap-0.5">

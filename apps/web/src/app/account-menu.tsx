@@ -1,4 +1,4 @@
-import ChevronsDownUpIcon from "@hugeicons/core-free-icons/ChevronsDownUpIcon";
+import ChevronDownIcon from "@hugeicons/core-free-icons/ChevronDownIcon";
 import Logout01Icon from "@hugeicons/core-free-icons/Logout01Icon";
 import Settings02Icon from "@hugeicons/core-free-icons/Settings02Icon";
 import type { ReactElement } from "react";
@@ -11,8 +11,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu";
 import { SidebarTooltip } from "@/shared/ui/sidebar";
@@ -22,7 +20,7 @@ import { getAvatarBackground, getAvatarInitial } from "../shared/lib/avatar";
 import { isTruthy } from "../shared/lib/truthiness";
 import { createHugeicon } from "./hugeicon";
 
-const AccountMenuChevronIcon = createHugeicon(ChevronsDownUpIcon, "AccountMenuChevronIcon");
+const AccountMenuChevronIcon = createHugeicon(ChevronDownIcon, "AccountMenuChevronIcon");
 const AccountMenuSettingsIcon = createHugeicon(Settings02Icon, "AccountMenuSettingsIcon");
 const AccountMenuSignOutIcon = createHugeicon(Logout01Icon, "AccountMenuSignOutIcon");
 
@@ -68,8 +66,12 @@ function UserAvatar({
   );
 }
 
-// Anchored account row at the foot of the sidebar: identity at a glance, with
-// account-level settings and sign-out one step away in an upward menu.
+// Anchored account card at the foot of the sidebar: the bordered card from the
+// sidebar references (avatar, name, email, chevron on the far edge), the
+// counterpart of the identity row at the head. It is the one bordered surface
+// in the sidebar, which is what anchors the persistent zone without a rule.
+// The card already shows the name and email, so the upward menu lists only
+// Account settings and Sign out.
 export function AccountMenu({
   collapsed,
   user,
@@ -84,19 +86,22 @@ export function AccountMenu({
     <button
       type="button"
       aria-label={collapsed ? name : undefined}
+      data-slot="account-card"
       className={cn(
-        "hover:bg-sidebar-row-hover focus-visible:ring-ring focus-visible:ring-offset-sidebar data-[popup-open]:bg-sidebar-row-active flex shrink-0 items-center rounded-md text-left outline-none transition-[background-color] duration-150 ease-out focus-visible:ring-2 focus-visible:ring-offset-1",
-        collapsed ? "mx-auto size-8 justify-center" : "h-11 w-full gap-2.5 px-2",
+        "focus-visible:ring-ring focus-visible:ring-offset-sidebar flex shrink-0 items-center text-left outline-none transition-[background-color,border-color] duration-150 ease-out focus-visible:ring-2 focus-visible:ring-offset-1",
+        collapsed
+          ? "hover:bg-sidebar-row-hover data-[popup-open]:bg-sidebar-row-active mx-auto size-8 justify-center rounded-md"
+          : "border-border bg-card hover:border-border-strong data-[popup-open]:border-border-strong h-[52px] w-full gap-2.5 rounded-md border pr-2.5 pl-2.5",
       )}
     >
-      <UserAvatar size={collapsed ? 24 : 26} user={user} />
+      <UserAvatar size={collapsed ? 24 : 30} user={user} />
       {collapsed ? null : (
         <>
           <span className="sidebar-label-enter min-w-0 flex-1">
             <span className="text-fg-1 block truncate text-[13px] leading-4 font-semibold">
               {name}
             </span>
-            <span className="text-fg-3 block truncate text-[11.5px] leading-4">{user?.email}</span>
+            <span className="text-fg-3 block truncate text-[12px] leading-4">{user?.email}</span>
           </span>
           <AccountMenuChevronIcon className="sidebar-label-enter text-fg-3 size-3.5 shrink-0" />
         </>
@@ -105,7 +110,7 @@ export function AccountMenu({
   );
 
   return (
-    <div className={cn("flex flex-col pt-1 pb-2", collapsed ? "items-center" : "")}>
+    <div className={cn("flex flex-col pt-2 pb-3", collapsed ? "items-center" : "")}>
       <DropdownMenu>
         <SidebarTooltip collapsed={collapsed} label={name}>
           <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
@@ -115,21 +120,16 @@ export function AccountMenu({
           align="start"
           side={collapsed ? "right" : "top"}
           sideOffset={8}
-          className="w-[224px] rounded-lg p-1"
+          className="w-[216px]"
         >
-          <DropdownMenuLabel className="px-2 pb-1">
-            <div className="text-fg-1 truncate text-[13px] font-semibold">{name}</div>
-            <div className="text-fg-3 mt-0.5 truncate text-[11.5px] font-normal">{user?.email}</div>
-          </DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem asChild className="cursor-pointer rounded-md">
+          <DropdownMenuItem asChild className="cursor-pointer">
             <Link to="/settings">
               <AccountMenuSettingsIcon className="size-4" />
               {t("nav.accountSettings")}
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem
-            className="cursor-pointer rounded-md"
+            className="cursor-pointer"
             onSelect={() => {
               void (async () => {
                 await authClient["signOut"]();

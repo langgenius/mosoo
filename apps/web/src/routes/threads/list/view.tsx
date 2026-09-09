@@ -288,7 +288,7 @@ export function ThreadSectionGroup({
           onClick={() => {
             onCollapseChange(!collapsed);
           }}
-          className="text-fg-3 hover:text-fg-1 flex h-7 items-center gap-1.5 text-[11px] font-bold tracking-[0.12em] uppercase"
+          className="text-fg-3 hover:text-fg-1 flex h-7 items-center gap-1.5 text-[12px] font-medium"
         >
           {collapsed ? <ChevronRight className="size-3" /> : <ChevronDown className="size-3" />}
           {t(SECTION_LABELS[section])} ({threads.length})
@@ -304,7 +304,7 @@ export function ThreadSectionGroup({
         onClick={() => {
           onCollapseChange(!collapsed);
         }}
-        className="text-fg-3 hover:text-fg-1 flex h-7 items-center gap-1.5 text-[11px] font-bold tracking-[0.12em] uppercase"
+        className="text-fg-3 hover:text-fg-1 flex h-7 items-center gap-1.5 text-[12px] font-medium"
       >
         {collapsed ? <ChevronRight className="size-3" /> : <ChevronDown className="size-3" />}
         {t(SECTION_LABELS[section])} ({threads.length})

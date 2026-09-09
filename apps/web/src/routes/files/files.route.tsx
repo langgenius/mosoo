@@ -46,17 +46,15 @@ function SegmentedButtonGroup<T extends string>({
   return (
     <fieldset
       aria-label={label}
-      className="bg-card border-border-strong m-0 inline-flex h-8 w-full min-w-0 overflow-hidden rounded-md border p-0 sm:w-auto"
+      className="bg-sunken m-0 inline-flex h-8 w-full min-w-0 items-center gap-0.5 rounded-md p-0.5 sm:w-auto"
     >
       {options.map((option) => (
         <button
           key={option.value}
           aria-pressed={option.value === value}
           className={cn(
-            "border-border-strong min-w-0 flex-1 border-r px-3 text-[12.5px] font-semibold transition-colors last:border-r-0 sm:min-w-24 sm:flex-none",
-            option.value === value
-              ? "bg-paper-200 text-fg-1"
-              : "text-fg-2 hover:bg-paper-200/60 hover:text-fg-1",
+            "rounded-compact focus-visible:ring-ring h-full min-w-0 flex-1 px-3 text-[12.5px] font-medium outline-none transition-[background-color,color,box-shadow] duration-150 ease-out focus-visible:ring-2 sm:flex-none",
+            option.value === value ? "bg-card text-fg-1 shadow-xs" : "text-fg-2 hover:text-fg-1",
           )}
           onClick={() => {
             onChange(option.value);
@@ -222,7 +220,6 @@ export function FilesPage(): ReactElement {
     data: sessionOptions = [],
     error: sessionOptionsError,
     isFetching: sessionOptionsFetching,
-    isLoading: sessionOptionsLoading,
     refetch: refetchSessionOptions,
   } = useQuery({
     enabled: activeProjectId !== null,
@@ -308,11 +305,15 @@ export function FilesPage(): ReactElement {
         </Button>
       </PageHeader>
 
-      <ListPageToolbar className="flex-wrap items-end">
-        <div className="flex w-full min-w-0 flex-col gap-1 sm:w-[220px]">
-          <span className="text-fg-3 text-[11px] font-semibold">{t("files.agent")}</span>
+      <ListPageToolbar>
+        <ListPageSearch
+          onChange={setSearch}
+          placeholder={t("files.searchPlaceholder")}
+          value={search}
+        />
+        <div className="w-full min-w-0 sm:w-[200px]">
           <Select
-            disabled={sessionOptionsLoading || sessionOptionsError !== null}
+            disabled={sessionOptionsError !== null}
             items={agentItems}
             onValueChange={(value) => {
               setAgentId(value ?? "");
@@ -320,7 +321,10 @@ export function FilesPage(): ReactElement {
             }}
             value={filesView.agentId}
           >
-            <SelectTrigger aria-label={t("files.agentFilter")} className="w-full">
+            <SelectTrigger
+              aria-label={t("files.agentFilter")}
+              className="data-[placeholder]:text-fg-1 w-full"
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -334,23 +338,17 @@ export function FilesPage(): ReactElement {
         </div>
         <ThreadFilter
           agents={filesView.agentOptions}
-          disabled={sessionOptionsLoading || sessionOptionsError !== null}
+          disabled={sessionOptionsError !== null}
           onChange={setSessionId}
           sessions={filesView.sessionOptions}
           value={filesView.sessionId}
         />
+        <ListPageToolbarSpacer />
         <SegmentedButtonGroup<SessionKindFilter>
           label={t("files.threadFileCategory")}
           onChange={setSessionKind}
           options={sessionKindOptions}
           value={sessionKind}
-        />
-        <ListPageToolbarSpacer />
-        <ListPageSearch
-          className="w-full sm:w-auto sm:min-w-[240px] sm:grow lg:w-[280px] lg:grow-0"
-          onChange={setSearch}
-          placeholder={t("files.searchPlaceholder")}
-          value={search}
         />
       </ListPageToolbar>
 

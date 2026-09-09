@@ -110,7 +110,7 @@ Feedback colours, never brand. Success is a true green (hue 147) so that
 | Section title       | `sans` = Geist              | 14-15px / 600                                      | card titles, dialog titles (16px)                                                                 |
 | Label               | Geist                       | 13px / 500                                         | `Label`, sidebar rows, row names                                                                  |
 | Everyday UI         | Geist                       | 14px body / 400; 13px inside controls              | descriptions, values, menu items, buttons                                                         |
-| Caption / eyebrow   | Geist                       | 12px / 400; eyebrow 11px / 600 / +0.06em uppercase | helper text, table headers, section eyebrows                                                      |
+| Caption / group label | Geist | 12px / 400; group labels and table headers 12px / 500, sentence case | helper text, table headers, sidebar and settings section labels (no tracked capitals) |
 | Precise information | `mono` = IBM Plex Mono      | 12-12.5px / 400, tabular numerals                  | ids, masked keys, model ids, durations, versions, command blocks (`MonoText`, `data-slot="mono"`) |
 
 Rules: body weight is 400 (the previous 500 base made every line semi-bold and

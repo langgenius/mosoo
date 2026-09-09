@@ -352,6 +352,10 @@ test("expanded sidebar separates the work zone from the persistent zone", async 
     "href",
     "/projects",
   );
+  // Let the popup's enter animation finish so the capture shows the resting menu.
+  await menu.evaluate(async (element) => {
+    await Promise.all(element.getAnimations().map(async (animation) => animation.finished));
+  });
   await screenshot(page, "project-switcher-menu", { height: 480, width: 720 });
 });
 

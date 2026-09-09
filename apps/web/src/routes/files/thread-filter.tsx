@@ -65,18 +65,16 @@ export function ThreadFilter({
   }
 
   return (
-    <div className="flex w-full min-w-0 flex-col gap-1 sm:w-[360px]">
-      <span className="text-fg-3 text-[11px] font-semibold">{t("files.thread")}</span>
+    <div className="w-full min-w-0 sm:w-[260px]">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
             aria-label={t("files.threadFilter")}
-            className="w-full min-w-0 justify-between px-2 font-normal"
+            className="w-full min-w-0 justify-between px-3 font-normal"
             disabled={disabled}
-            size="sm"
             variant="outline"
           >
-            <span className="min-w-0 truncate text-[12.5px]" title={selectedLabel}>
+            <span className="min-w-0 truncate" title={selectedLabel}>
               {selectedLabel}
             </span>
             <ChevronDown className="text-fg-3 size-3.5" />
@@ -93,7 +91,7 @@ export function ThreadFilter({
             }}
           >
             <span>{t("files.allThreads")}</span>
-            {value === "" ? <Check className="text-accent-press size-3.5" /> : null}
+            {value === "" ? <Check className="text-fg-1 size-3.5" /> : null}
           </DropdownMenuItem>
           {sessions.map((session) => {
             const title = formatThreadTitle(session.title, t);
@@ -115,7 +113,7 @@ export function ThreadFilter({
                       {agentNameById.get(session.agentId) ?? t("files.agentUnavailable")}
                     </span>
                   </div>
-                  {value === session.id ? <Check className="text-accent-press size-3.5" /> : null}
+                  {value === session.id ? <Check className="text-fg-1 size-3.5" /> : null}
                 </DropdownMenuItem>
                 <Button
                   aria-label={copied ? t("files.threadIdCopied") : t("files.copyThreadId")}

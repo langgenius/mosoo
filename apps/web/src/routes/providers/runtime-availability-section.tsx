@@ -8,8 +8,8 @@ import { DataRow } from "@/shared/ui/list-row";
 
 import { listRuntimeAvailabilityRows } from "./runtime-availability-model";
 
-// 40px data row per runtime. Ready is the success mark plus its text tone; a
-// runtime without a key keeps fully legible muted text instead of a faded row.
+// 40px data row per runtime. The words carry the state ("Ready", "Needs key");
+// there is no status light, and a runtime without a key keeps legible muted text.
 function RuntimeRow({
   label,
   runtimeId,
@@ -36,18 +36,11 @@ function RuntimeRow({
       </div>
       <span
         className={cn(
-          "flex min-w-0 shrink items-center gap-1.5 truncate text-[12px] font-medium",
-          tone === "ready" ? "text-success-fg" : "text-fg-3",
+          "min-w-0 shrink truncate text-[12px]",
+          tone === "ready" ? "text-fg-2" : "text-fg-3",
         )}
       >
-        <span
-          aria-hidden="true"
-          className={cn(
-            "size-1.5 shrink-0 rounded-full",
-            tone === "ready" ? "bg-success" : "bg-fg-muted",
-          )}
-        />
-        <span className="truncate">{status}</span>
+        {status}
       </span>
     </DataRow>
   );

@@ -227,6 +227,7 @@
     "copyProjectId": "プロジェクト ID をコピー",
     "created": "作成日",
     "draft": "下書き",
+    "published": "公開済み",
     "failedToLoadAgents": "エージェントの読み込みに失敗しました。",
     "failedToLoadPreviewChat": "プレビューチャットの読み込みに失敗しました。",
     "failedToLoadSessions": "セッションの読み込みに失敗しました。",
