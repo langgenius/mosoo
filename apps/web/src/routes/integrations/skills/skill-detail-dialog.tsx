@@ -140,7 +140,7 @@ export function SkillDetailDialog({ onOpenChange, registry, skill }: Props) {
   return (
     <>
       <Dialog open onOpenChange={onOpenChange}>
-        <DialogContent className="flex max-h-[min(80vh,720px)] w-[calc(100vw-2rem)] flex-col gap-0 p-0 sm:max-w-[640px] sm:rounded-xl">
+        <DialogContent className="flex max-h-[min(80vh,720px)] w-[calc(100vw-2rem)] flex-col gap-0 p-0 sm:max-w-[640px]">
           <DialogHeader className="space-y-2 px-6 pt-6 pr-14 pb-4 text-left">
             <div className="min-w-0">
               <DialogTitle className="flex items-baseline gap-2 text-[18px] font-semibold">

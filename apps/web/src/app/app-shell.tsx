@@ -208,7 +208,7 @@ function NewAgentAction({
         className={cn(
           NEW_AGENT_CLASS,
           layout,
-          "bg-sidebar-cta text-sidebar-cta-fg hover:bg-sidebar-cta-hover shadow-xs",
+          "bg-sidebar-cta text-sidebar-cta-fg hover:bg-sidebar-cta-hover",
         )}
       >
         {body}
@@ -574,9 +574,7 @@ export function OrgLayout({ children }: { children: ReactNode }): ReactElement {
           </div>
           {resolvedHeaderTitle === null ? null : (
             <div className="flex min-w-0 flex-1 items-center px-8">
-              <h1 className="font-heading text-fg-heading truncate text-[24px] leading-tight font-medium tracking-[-0.01em]">
-                {resolvedHeaderTitle}
-              </h1>
+              <h1 className="t-page-title truncate">{resolvedHeaderTitle}</h1>
             </div>
           )}
         </header>

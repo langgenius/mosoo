@@ -30,7 +30,7 @@ export function EmptyState({
       <div className="bg-sunken text-fg-3 flex size-12 items-center justify-center rounded-full">
         <Icon className="size-5" strokeWidth={1.5} />
       </div>
-      <p className="font-heading text-fg-heading mt-4 text-[16px] font-medium text-balance">
+      <p className="font-heading text-fg-heading tracking-subtitle mt-4 text-[16px] leading-5 font-medium text-balance">
         {title}
       </p>
       {description ? (

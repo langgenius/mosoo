@@ -69,7 +69,7 @@ export function CostOverviewPanel({
       </section>
 
       <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="border-border bg-card rounded-lg border p-4">
+        <div className="border-border bg-card rounded-lg border p-6">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-foreground text-sm font-semibold">{t("cost.dailySpend")}</h2>
             <Badge variant="outline">{t(rangeLabel(range))}</Badge>
@@ -77,7 +77,7 @@ export function CostOverviewPanel({
           <DailySpendChart dailyCosts={card?.daily ?? []} />
         </div>
 
-        <div className="border-border bg-card rounded-lg border p-4">
+        <div className="border-border bg-card rounded-lg border p-6">
           <h2 className="text-foreground mb-3 text-sm font-semibold">{t("cost.topAgents")}</h2>
           {(card?.agents ?? []).length === 0 ? (
             <PanelEmpty>{t("cost.noAgentSpend")}</PanelEmpty>
@@ -106,7 +106,7 @@ export function CostOverviewPanel({
       </section>
 
       <section>
-        <div className="border-border bg-card rounded-lg border p-4">
+        <div className="border-border bg-card rounded-lg border p-6">
           <h2 className="text-foreground mb-3 text-sm font-semibold">{t("cost.spendByModel")}</h2>
           {(card?.models ?? []).length === 0 ? (
             <PanelEmpty>{t("cost.noModelSpend")}</PanelEmpty>

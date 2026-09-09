@@ -53,7 +53,7 @@ function SegmentedButtonGroup<T extends string>({
           key={option.value}
           aria-pressed={option.value === value}
           className={cn(
-            "rounded-compact focus-visible:ring-ring h-full min-w-0 flex-1 px-3 text-[12.5px] font-medium outline-none transition-[background-color,color,box-shadow] duration-150 ease-out focus-visible:ring-2 sm:flex-none",
+            "rounded-sm focus-visible:ring-ring h-full min-w-0 flex-1 px-3 text-[12.5px] font-medium outline-none transition-[background-color,color,box-shadow] duration-150 ease-out focus-visible:ring-2 sm:flex-none",
             option.value === value ? "bg-card text-fg-1 shadow-xs" : "text-fg-2 hover:text-fg-1",
           )}
           onClick={() => {

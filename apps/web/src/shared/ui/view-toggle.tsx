@@ -55,7 +55,7 @@ export function ViewToggle({
           <Radio.Root
             key={mode}
             aria-label={labels[mode]}
-            className="rounded-compact text-fg-3 hover:text-fg-1 focus-visible:ring-ring data-[checked]:bg-card data-[checked]:text-fg-1 flex h-full w-8 items-center justify-center transition-[background-color,color,box-shadow] duration-150 ease-out outline-none focus-visible:ring-2 data-[checked]:shadow-xs"
+            className="text-fg-3 hover:text-fg-1 focus-visible:ring-ring data-[checked]:bg-card data-[checked]:text-fg-1 flex h-full w-8 items-center justify-center rounded-sm transition-[background-color,color,box-shadow] duration-150 ease-out outline-none focus-visible:ring-2 data-[checked]:shadow-xs"
             value={mode}
           >
             <Icon className="size-3.5" />

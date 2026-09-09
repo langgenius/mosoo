@@ -326,7 +326,7 @@ export function ProvidersTab({ projectId }: { projectId: string }): ReactElement
       <main className="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-8">
         <div className="mx-auto max-w-4xl space-y-6">
           {credentialsLoading ? (
-            <div className="border-border bg-card text-fg-3 rounded-lg border px-4 py-6 text-[13px]">
+            <div className="border-border bg-card text-fg-3 rounded-lg border p-6 text-[13px]">
               {t("providers.loading")}
             </div>
           ) : null}
@@ -554,19 +554,17 @@ function ProviderCredentialSection({
   const { t } = useTranslation();
 
   return (
-    <section className="border-border bg-card space-y-3 rounded-lg border p-4">
+    <section className="border-border bg-card space-y-4 rounded-lg border p-6">
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           {hasVendorIcon(vendor.iconKey) ? (
             <VendorIcon
-              className="border-border-soft bg-card rounded-compact size-7 shrink-0 border p-1"
+              className="border-border-soft bg-card size-7 shrink-0 rounded-sm border p-1"
               iconKey={vendor.iconKey}
             />
           ) : null}
           <div className="min-w-0">
-            <h2 className="text-fg-heading truncate text-[14px] font-semibold">
-              {t(vendor.label)}
-            </h2>
+            <h2 className="t-section-title truncate">{t(vendor.label)}</h2>
             <p className="text-fg-3 text-[12px] leading-4">{t("providers.projectLevelKeys")}</p>
           </div>
         </div>

@@ -48,7 +48,7 @@ export function AgentTable({
       <div className="border-border bg-card overflow-hidden rounded-lg border">
         <div
           className={cn(
-            "border-border-soft grid h-10 items-center border-b px-4 text-[12px] font-medium text-fg-3",
+            "border-border grid h-10 items-center border-b px-4 text-[12px] font-medium text-fg-2",
             gridCols,
           )}
         >

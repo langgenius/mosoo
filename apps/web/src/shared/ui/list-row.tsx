@@ -13,7 +13,7 @@ import { cn } from "@/shared/lib/class-names";
  * neutral interaction tokens; the brand green never marks a row.
  *
  * `tone="tinted"` is the nested variant that sits inside a card (sunken
- * surface, 10px radius, one rung below the 14px card); `tone="flat"` is a row
+ * surface, 4px radius, one rung below the 6px card); `tone="flat"` is a row
  * inside a bordered list that separates rows with hairlines.
  */
 type RowTone = "flat" | "tinted";
@@ -29,7 +29,7 @@ const ROW_BASE =
 
 const ROW_TONE: Record<RowTone, string> = {
   flat: "",
-  tinted: "rounded-md bg-sunken",
+  tinted: "rounded-sm bg-sunken",
 };
 
 function rowClassName(options: {

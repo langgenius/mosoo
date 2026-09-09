@@ -53,7 +53,7 @@ export function CommandBlock({
         type="button"
         aria-label={copied ? t("common.copied") : (copyLabel ?? t("common.copyCommand"))}
         onClick={copy}
-        className="text-fg-3 hover:bg-hover hover:text-fg-1 focus-visible:ring-ring rounded-compact flex size-7 shrink-0 items-center justify-center transition-[background-color,color] duration-150 ease-out outline-none focus-visible:ring-2"
+        className="text-fg-3 hover:bg-hover hover:text-fg-1 focus-visible:ring-ring flex size-7 shrink-0 items-center justify-center rounded-sm transition-[background-color,color] duration-150 ease-out outline-none focus-visible:ring-2"
       >
         {copied ? <Check className="text-success size-3.5" /> : <Copy className="size-3.5" />}
       </button>

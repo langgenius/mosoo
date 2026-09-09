@@ -51,7 +51,7 @@ function DialogContent({
         {showCloseButton && (
           <DialogPrimitive.Close
             data-slot="dialog-close"
-            className="rounded-compact text-fg-3 hover:bg-hover hover:text-fg-1 focus-visible:ring-ring focus-visible:ring-offset-background absolute top-3.5 right-3.5 flex size-7 items-center justify-center transition-[background-color,color] duration-150 ease-out outline-none focus-visible:ring-2 focus-visible:ring-offset-1 disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+            className="text-fg-3 hover:bg-hover hover:text-fg-1 focus-visible:ring-ring focus-visible:ring-offset-background absolute top-3.5 right-3.5 flex size-7 items-center justify-center rounded-sm transition-[background-color,color] duration-150 ease-out outline-none focus-visible:ring-2 focus-visible:ring-offset-1 disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
           >
             <XIcon />
             <span className="sr-only">{t("common.close")}</span>
@@ -103,7 +103,10 @@ function DialogTitle({
   return (
     <DialogPrimitive.Title
       data-slot="dialog-title"
-      className={cn("text-[16px] leading-snug font-semibold text-fg-heading", className)}
+      className={cn(
+        "text-[16px] leading-5 font-semibold tracking-subtitle text-fg-heading",
+        className,
+      )}
       {...props}
     />
   );

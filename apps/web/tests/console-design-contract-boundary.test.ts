@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync, readdirSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 import { parse as parseYaml } from "yaml";
 
@@ -13,6 +14,8 @@ function readSource(path: string): string {
 
 const CSS = readSource("../src/shared/styles/app.css");
 const UI_DIR = new URL("../src/shared/ui/", import.meta.url);
+const SRC_DIR = new URL("../src/", import.meta.url);
+const FONTS_DIR = fileURLToPath(new URL("../public/fonts/", import.meta.url));
 
 const RECIPES = {
   badge: "../src/shared/ui/badge.tsx",
@@ -99,32 +102,78 @@ function themeBlock(selector: string): string {
   throw new Error(`Unterminated block for ${selector}`);
 }
 
-function luminance(hex: string): number {
+type Rgba = [number, number, number, number];
+
+function parseColor(value: string): Rgba {
+  const hex = /^#([0-9a-f]{6})$/iu.exec(value);
+  if (hex?.[1] !== undefined) {
+    return [
+      Number.parseInt(hex[1].slice(0, 2), 16),
+      Number.parseInt(hex[1].slice(2, 4), 16),
+      Number.parseInt(hex[1].slice(4, 6), 16),
+      1,
+    ];
+  }
+  const rgba = /^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*(?:,\s*([\d.]+)\s*)?\)$/u.exec(
+    value,
+  );
+  expect({ value, parsed: rgba !== null }).toEqual({ value, parsed: true });
+  return [
+    Number(rgba?.[1]),
+    Number(rgba?.[2]),
+    Number(rgba?.[3]),
+    rgba?.[4] === undefined ? 1 : Number(rgba[4]),
+  ];
+}
+
+function composite(top: Rgba, bottom: Rgba): Rgba {
+  const alpha = top[3];
+  return [
+    top[0] * alpha + bottom[0] * (1 - alpha),
+    top[1] * alpha + bottom[1] * (1 - alpha),
+    top[2] * alpha + bottom[2] * (1 - alpha),
+    1,
+  ];
+}
+
+function luminance([r, g, b]: Rgba): number {
   const channel = (value: number): number => {
     const c = value / 255;
     return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
   };
-  const r = Number.parseInt(hex.slice(1, 3), 16);
-  const g = Number.parseInt(hex.slice(3, 5), 16);
-  const b = Number.parseInt(hex.slice(5, 7), 16);
   return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
 }
 
+/** WCAG contrast of a (possibly translucent) text tone over an opaque surface. */
 function contrast(foreground: string, background: string): number {
-  const lighter = Math.max(luminance(foreground), luminance(background));
-  const darker = Math.min(luminance(foreground), luminance(background));
+  const surface = parseColor(background);
+  expect({ background, opaque: surface[3] === 1 }).toEqual({ background, opaque: true });
+  const text = composite(parseColor(foreground), surface);
+  const lighter = Math.max(luminance(text), luminance(surface));
+  const darker = Math.min(luminance(text), luminance(surface));
   return (lighter + 0.05) / (darker + 0.05);
 }
 
-function resolveToken(block: string, name: string, depth = 0): string {
-  const match = new RegExp(`${name}:\\s*([^;]+);`, "u").exec(block);
-  expect({ name, defined: match !== null }).toEqual({ name, defined: true });
-  const value = match?.[1]?.trim() ?? "";
-  const reference = /^var\((--[a-z0-9-]+)\)$/u.exec(value);
-  if (reference?.[1] !== undefined && depth < 6) {
-    return resolveToken(block, reference[1], depth + 1);
+/**
+ * Resolve a token through `var()` references. Theme blocks only redefine the
+ * semantic roles, so a primitive referenced from the dark block is looked up
+ * in the light block.
+ */
+function resolveToken(blocks: readonly string[], name: string, depth = 0): string {
+  let value: string | undefined;
+  for (const block of blocks) {
+    const match = new RegExp(`${name}:\\s*([^;]+);`, "u").exec(block);
+    if (match?.[1] !== undefined) {
+      value = match[1].replaceAll(/\s+/gu, " ").trim();
+      break;
+    }
   }
-  return value;
+  expect({ name, defined: value !== undefined }).toEqual({ name, defined: true });
+  const reference = /^var\((--[a-z0-9-]+)\)$/u.exec(value ?? "");
+  if (reference?.[1] !== undefined && depth < 6) {
+    return resolveToken(blocks, reference[1], depth + 1);
+  }
+  return value ?? "";
 }
 
 describe("Console design contract", () => {
@@ -139,13 +188,20 @@ describe("Console design contract", () => {
   });
 
   test("text and status roles clear WCAG AA on their light surfaces", () => {
-    const light = themeBlock(":root");
+    const light = [themeBlock(":root")];
+    // Text tones are alphas of the ink (contract section 2.2), so each is
+    // composited over white, the canvas, and the sidebar / sunken-row tint.
     const pairs: Array<[string, string, number]> = [
       ["--fg-1", "--paper-50", 4.5],
       ["--fg-1", "--paper-200", 4.5],
+      ["--fg-2", "--paper-50", 4.5],
+      ["--fg-2", "--paper-100", 4.5],
       ["--fg-2", "--paper-200", 4.5],
       ["--fg-3", "--paper-50", 4.5],
+      ["--fg-3", "--paper-100", 4.5],
       ["--fg-3", "--paper-200", 4.5],
+      ["--fg-muted", "--paper-50", 3],
+      ["--fg-muted", "--paper-200", 3],
       ["--action-primary-fg", "--action-primary-bg", 4.5],
       ["--link", "--paper-50", 4.5],
       ["--brand", "--brand-soft", 4.5],
@@ -168,8 +224,47 @@ describe("Console design contract", () => {
     }
   });
 
-  test("keeps the brand hue and the success hue apart", () => {
+  test("text roles keep their order and clear AA on the dark surfaces", () => {
     const light = themeBlock(":root");
+    const dark = [themeBlock('.dark,\n[data-theme="dark"]'), light];
+    // Primary ink is never pure black or pure white.
+    expect(resolveToken([light], "--fg-1")).not.toBe("#000000");
+    expect(resolveToken(dark, "--fg-1")).not.toBe("#ffffff");
+    expect(resolveToken(dark, "--fg-heading")).not.toBe("#ffffff");
+    // Secondary sits at about 72% of the ink, subtle below it, muted below that.
+    const alphaOf = (value: string): number => parseColor(value)[3];
+    for (const blocks of [[light], dark]) {
+      const secondary = alphaOf(resolveToken(blocks, "--fg-2"));
+      const subtle = alphaOf(resolveToken(blocks, "--fg-3"));
+      const muted = alphaOf(resolveToken(blocks, "--fg-muted"));
+      expect(secondary).toBeGreaterThanOrEqual(0.7);
+      expect(secondary).toBeLessThanOrEqual(0.74);
+      expect(subtle).toBeLessThan(secondary);
+      expect(muted).toBeLessThan(subtle);
+    }
+    const pairs: Array<[string, string, number]> = [
+      ["--fg-1", "--bg", 4.5],
+      ["--fg-1", "--bg-elevated", 4.5],
+      ["--fg-2", "--bg", 4.5],
+      ["--fg-2", "--bg-elevated", 4.5],
+      ["--fg-2", "--bg-sidebar", 4.5],
+      ["--fg-3", "--bg", 4.5],
+      ["--fg-3", "--bg-elevated", 4.5],
+      ["--fg-3", "--bg-sidebar", 4.5],
+      ["--fg-muted", "--bg-elevated", 3],
+    ];
+    for (const [foreground, background, minimum] of pairs) {
+      const ratio = contrast(resolveToken(dark, foreground), resolveToken(dark, background));
+      expect({ foreground, background, passes: ratio >= minimum }).toEqual({
+        foreground,
+        background,
+        passes: true,
+      });
+    }
+  });
+
+  test("keeps the brand hue and the success hue apart", () => {
+    const light = [themeBlock(":root")];
     // Brand lime sits near hue 135; semantic success sits near hue 147. Both
     // are green, but the tints must not be the same value.
     expect(resolveToken(light, "--brand-soft")).not.toBe(resolveToken(light, "--success-bg"));
@@ -192,26 +287,73 @@ describe("Console design contract", () => {
       "--color-brand-mark: var(--brand-mark)",
       "--color-success-fg: var(--success-fg)",
       "--color-pending-bg: var(--pending-bg)",
-      "--radius-compact: var(--r-compact)",
+      "--radius-sm: var(--r-sm)",
       "--font-heading: var(--font-heading)",
+      "--tracking-title: var(--track-title)",
       "--shadow-xs: var(--elev-xs)",
     ]) {
       expect(CSS).toContain(bridge);
     }
-    expect(CSS).toContain("--r-compact: 8px");
-    expect(CSS).toContain("--r-md: 10px");
-    expect(CSS).toContain("--r-lg: 14px");
-    expect(CSS).toMatch(/--font-heading:\s*\n?\s*"Instrument Sans"/u);
-    expect(CSS).toMatch(/--font-mono:\s*"IBM Plex Mono"/u);
+    // Radius ladder (contract section 5): 6 for surfaces and 32px controls,
+    // 4 for nested rows, badges, and small controls, 2 for tags. The compact
+    // and xl rungs are gone; nothing rounds past 6px.
+    expect(CSS).toContain("--r-xs: 2px");
+    expect(CSS).toContain("--r-sm: 4px");
+    expect(CSS).toContain("--r-md: 6px");
+    expect(CSS).toContain("--r-lg: 6px");
+    expect(CSS).not.toContain("--r-compact");
+    expect(CSS).not.toContain("--r-xl");
+    expect(CSS).toContain("--track-title: -0.02em");
+    expect(CSS).toContain("--track-subtitle: -0.01em");
     expect(CSS).toContain(".t-page-title");
-    expect(CSS).toContain(".t-eyebrow");
+    expect(CSS).toContain(".t-group-label");
+    // Group labels are sentence case (owner review, #619): no tracked capitals.
+    expect(CSS).not.toMatch(/\.t-group-label \{[^}]*text-transform: uppercase/u);
+    expect(CSS).not.toContain("--track-caps");
     expect(CSS).toContain(".t-mono");
+    expect(CSS).toMatch(/\.t-page-title \{[^}]*letter-spacing: var\(--track-title\)/u);
+    expect(CSS).toMatch(/\.t-page-title \{[^}]*line-height: 1\.75rem/u);
+  });
+
+  test("ships one sans family and one mono family, self-hosted with licences", () => {
+    // Typography (contract section 3, docs/design/typography-audit.md): Geist
+    // carries every sans role including page titles, Geist Mono carries
+    // precise information, and a metric-matched local fallback covers the
+    // swap. No other family is declared or shipped.
+    const faces = [...CSS.matchAll(/@font-face \{[^}]*font-family: "([^"]+)"/gu)].map(
+      (match) => match[1],
+    );
+    expect(faces).toEqual(["Geist", "Geist Fallback", "Geist Mono"]);
+    expect([...CSS.matchAll(/font-display: (\w+)/gu)].map((match) => match[1])).toEqual([
+      "swap",
+      "swap",
+    ]);
+    expect(CSS).toMatch(/--font-sans:\s*\n?\s*"Geist", "Geist Fallback"/u);
+    expect(CSS).toMatch(/--font-heading:\s*var\(--font-sans\)/u);
+    expect(CSS).toMatch(/--font-mono:\s*"Geist Mono"/u);
+    expect(CSS).toContain('src: local("Arial");');
+    for (const retired of ["Inter", "Instrument Sans", "IBM Plex Mono", "General Sans"]) {
+      expect({ retired, present: CSS.includes(`"${retired}"`) }).toEqual({
+        retired,
+        present: false,
+      });
+    }
+    expect(readdirSync(FONTS_DIR).toSorted()).toEqual([
+      "Geist-LICENSE.txt",
+      "Geist-Variable.woff2",
+      "GeistMono-LICENSE.txt",
+      "GeistMono-Variable.woff2",
+    ]);
+    // Both files are preloaded from the document head.
+    const html = readSource("../index.html");
+    expect(html).toContain('href="/fonts/Geist-Variable.woff2"');
+    expect(html).toContain('href="/fonts/GeistMono-Variable.woff2"');
   });
 
   test("shared recipes carry the contract measurements", () => {
     const button = readSource(RECIPES.button);
     expect(button).toContain('default: "h-8 rounded-md');
-    expect(button).toContain('sm: "h-7 rounded-compact');
+    expect(button).toContain('sm: "h-7 rounded-sm');
     expect(button).toContain('xs: "h-6 rounded-sm');
     expect(button).toContain('lg: "h-9 rounded-md');
     expect(button).toContain("bg-primary text-primary-foreground");
@@ -240,7 +382,7 @@ describe("Console design contract", () => {
     expect(rows).toContain('data-slot="connection-row"');
     expect(rows).toContain("min-h-11");
 
-    expect(readSource(RECIPES.pageHeader)).toContain("font-heading");
+    expect(readSource(RECIPES.pageHeader)).toContain("t-page-title");
     // The single-choice view toggle is a real radio group (Base UI supplies
     // the roles, roving focus, and arrow-key movement).
     expect(readSource(RECIPES.viewToggle)).toContain('from "@base-ui/react/radio-group"');
@@ -282,6 +424,54 @@ describe("Console design contract", () => {
         offender: null,
       });
     }
+  });
+
+  test("resting surfaces are flat; shadows stay on floating layers and the checked segment", () => {
+    // Contract section 5: no drop shadow on a card, control, row, or field at
+    // rest. Menus and dialogs float and keep theirs; the segmented control's
+    // checked segment is the one raised element.
+    const restingShadow =
+      /(?<!focus-visible:)(?<!data-\[checked\]:)\bshadow-(?:xs|sm|md|lg|xl|\[)/u;
+    for (const path of [
+      RECIPES.badge,
+      RECIPES.button,
+      RECIPES.input,
+      RECIPES.label,
+      RECIPES.listRow,
+      RECIPES.pageHeader,
+      RECIPES.switch,
+      RECIPES.table,
+      RECIPES.textarea,
+      RECIPES.viewToggle,
+      RECIPES.sidebar,
+    ]) {
+      expect({ path, offender: restingShadow.exec(readSource(path))?.[0] ?? null }).toEqual({
+        path,
+        offender: null,
+      });
+    }
+    for (const path of [RECIPES.dialog, RECIPES.dropdownMenu]) {
+      expect({ path, floats: /\bshadow-(?:md|lg)\b/u.test(readSource(path)) }).toEqual({
+        path,
+        floats: true,
+      });
+    }
+    expect(readSource(RECIPES.viewToggle)).toContain("data-[checked]:shadow-xs");
+  });
+
+  test("nothing in the console rounds past the 6px surface corner", () => {
+    const offenders: string[] = [];
+    for (const file of readdirSync(SRC_DIR, { recursive: true }).map(String)) {
+      if (!file.endsWith(".tsx")) {
+        continue;
+      }
+      const source = readFileSync(new URL(file, SRC_DIR), "utf8");
+      const match = /\brounded-(?:xl|2xl|3xl|4xl|compact|\[(?:[7-9]|\d{2,})px\])\b/u.exec(source);
+      if (match) {
+        offenders.push(`${file}: ${match[0]}`);
+      }
+    }
+    expect(offenders).toEqual([]);
   });
 
   test("shared UI consumes semantic tokens, not raw palette values", () => {
