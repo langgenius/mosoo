@@ -352,6 +352,22 @@ test("Account settings: read-only field and secondary actions at narrow width", 
   await screenshot(page, "settings-profile-390x844");
 });
 
+test("Agents: list rows show the name, tools, and a plain status, no id chips", async ({
+  page,
+}) => {
+  await page.setViewportSize(DESKTOP);
+  await installConsoleFixtures(page);
+  await page.goto("/agent");
+  await expect(page.getByRole("heading", { level: 1, name: "Agents" })).toBeVisible();
+  await expect(page.getByText("Review bot")).toBeVisible();
+  await screenshot(page, "agents-1440x900");
+
+  await expect(page.getByText("Published", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("Draft", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText(/^ID:/u)).toHaveCount(0);
+  await expect(page.getByText(/agent\.published/u)).toHaveCount(0);
+});
+
 test("Runs: dense rows stay on the 40px rhythm with working, done, and failed states", async ({
   page,
 }) => {

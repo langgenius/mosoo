@@ -112,7 +112,7 @@ general:
 # Shell and navigation glyphs registered next to the surface that owns them.
 navigation:
   AccountMenuChevronIcon:
-    source: ChevronsDownUpIcon
+    source: ChevronDownIcon
     owner: app/account-menu.tsx
   AccountMenuSettingsIcon:
     source: Settings02Icon
@@ -136,7 +136,7 @@ navigation:
     source: Add01Icon
     owner: app/app-shell.tsx
   SwitcherChevronIcon:
-    source: ChevronsDownUpIcon
+    source: ChevronDownIcon
     owner: app/app-shell.tsx
   ProjectSettingsIcon:
     source: Settings02Icon

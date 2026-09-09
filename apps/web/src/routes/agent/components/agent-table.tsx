@@ -8,7 +8,6 @@ import { Avatar } from "@/shared/ui/avatar-root";
 
 import type { Agent } from "../agent.types";
 import { getRuntimeInfo } from "../runtime-catalog";
-import { AgentIdBadge } from "./agent-id-badge";
 import { AgentRowActions } from "./agent-row-actions";
 import { RuntimeIcon } from "./runtime-icon";
 import { StatusBadge } from "./status-badge";
@@ -47,24 +46,17 @@ export function AgentTable({
   return (
     <div className={className}>
       <div className="border-border bg-card overflow-hidden rounded-lg border">
-        <div className={cn("grid h-10 items-center px-4 border-b border-border", gridCols)}>
-          <span className="text-fg-3 text-[11px] font-extrabold tracking-[0.1em] uppercase">
-            {t("agent.agent")}
-          </span>
-          <span className="text-fg-3 hidden text-[11px] font-extrabold tracking-[0.1em] uppercase lg:block">
-            {t("agent.tools")}
-          </span>
-          <span className="text-fg-3 text-[11px] font-extrabold tracking-[0.1em] uppercase">
-            {t("agent.status")}
-          </span>
-          {showOwner && (
-            <span className="text-fg-3 hidden text-[11px] font-extrabold tracking-[0.1em] uppercase lg:block">
-              {t("agent.owner")}
-            </span>
+        <div
+          className={cn(
+            "border-border-soft grid h-10 items-center border-b px-4 text-[12px] font-medium text-fg-3",
+            gridCols,
           )}
-          <span className="text-fg-3 hidden text-[11px] font-extrabold tracking-[0.1em] uppercase lg:block">
-            {t("agent.created")}
-          </span>
+        >
+          <span>{t("agent.agent")}</span>
+          <span className="hidden lg:block">{t("agent.tools")}</span>
+          <span>{t("agent.status")}</span>
+          {showOwner && <span className="hidden lg:block">{t("agent.owner")}</span>}
+          <span className="hidden lg:block">{t("agent.created")}</span>
           <span />
         </div>
 
@@ -74,7 +66,7 @@ export function AgentTable({
             <div
               key={agent.id}
               className={cn(
-                "grid items-center px-4 h-14 hover:bg-paper-50 transition-colors",
+                "grid h-14 items-center px-4 transition-[background-color] duration-150 ease-out hover:bg-hover",
                 gridCols,
                 index !== agents.length - 1 && "border-b border-border-soft",
               )}
@@ -90,13 +82,10 @@ export function AgentTable({
                 <div className="flex min-w-0 items-center gap-3">
                   <RuntimeIcon runtime={runtime} size={32} />
                   <div className="min-w-0">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <span className="text-fg-1 truncate text-[14px] font-bold">{agent.name}</span>
-                      {agent.status === "published" ? (
-                        <AgentIdBadge agentId={agent.id} className="shrink-0" />
-                      ) : null}
+                    <div className="text-fg-heading truncate text-[13px] font-medium">
+                      {agent.name}
                     </div>
-                    <div className="text-fg-2 max-w-[320px] truncate text-[12.5px]">
+                    <div className="text-fg-3 max-w-[360px] truncate text-[12px]">
                       {agent.description}
                     </div>
                   </div>
