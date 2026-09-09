@@ -32,8 +32,12 @@ A Project is the Builder's product container in mosoo. Its resources, activity, 
 
 The baseline is single-owner and does not offer organization-wide catalogs or collaboration. Use the Spec for new runtime and integration promises.
 
+The target Session API executes one task per Session; additional work creates a new Session. This pending lifecycle change preserves the shipped Project ownership boundary and does not erase existing history or saved artifacts. Current Agent conversations remain available until the verified, notified lifecycle cutover.
+
 ## API Key Cutover
 
 Owners create and revoke keys in Project settings. A key is shown once and only its hash is stored. All Project keys support Agent configuration, Sessions, and files without configurable scopes. Revocation rejects future requests but leaves admitted work running; another active key in the Project or its owner can operate the existing Session.
 
 Old account tokens and CLI credentials must be replaced. Existing integrations create a new key in each target Project and update their configuration; CLI users run `mosoo login` again. Existing keys are not reassigned to a default Project.
+
+This key cutover is complete under [#581](https://github.com/langgenius/mosoo/issues/581#issuecomment-5582765337), including the compatible CLI release and Cloudflare user notices. Future breaking lifecycle changes require their own verified migration instructions and notification evidence; the key notice is not a notice of those future changes.
