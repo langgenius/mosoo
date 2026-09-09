@@ -302,52 +302,6 @@ Acceptance:
 - If local HTTPS probes resolve through the local TUN/fake-IP path, keep
   `--interface en0` and `--resolve` in the smoke commands.
 
-## Breaking-Change Notification
-
-The owner accepts breaking API and lifecycle changes for the managed Agent
-refactor, provided affected users receive accurate migration instructions. This
-does not waive data-preservation, backup, rollback, or destructive-migration
-approval requirements.
-
-1. Before cutover, inventory affected integrations and active tasks. Record the
-   exact contract change, expected interruption, how admitted work is handled,
-   preserved history and artifacts, compatible API/console/CLI versions, and
-   the rollback point. Prepare the recipient snapshot and notice before
-   deploying. Use all registered accounts for a broad product-wide break;
-   narrower changes may use a verified affected audience. Do not infer that
-   recipients are inactive or omit them because they have not logged in.
-2. Prepare an actionable notice with the effective time, what changes, what is
-   preserved, and the exact migration steps and links. Advance notice must
-   describe planned behavior as upcoming. A notice that says the replacement
-   is available may be sent only after the replacement API, console, and
-   compatible CLI are deployed and verified. Documentation-only synchronization
-   does not trigger a rollout notice.
-3. Send through Cloudflare Email Service using the configured Mosoo sender.
-   Verify one intended recipient's inbox and the actual content before sending
-   the rest. Send individually, keep the audience private, and persist a
-   per-recipient attempt and provider message ID so interrupted sends do not
-   blindly resend accepted or uncertain messages. Do not bypass recipient
-   suppression or retry an unknown outcome without resolving its status.
-4. Before marking the release or issue complete, reconcile the recipient
-   snapshot with accepted, failed, suppressed, unknown, and unattempted
-   outcomes. Resolve unknown outcomes and unattempted recipients; investigate
-   known failures and record their disposition or outstanding follow-up. Keep
-   private receipts and publish only aggregate counts plus sample-delivery
-   evidence. Provider acceptance alone is not proof of every inbox delivery.
-
-One coordinated notice may cover multiple slices shipped together when it
-describes every affected workflow and compatible client action. Do not send
-duplicate notices merely to satisfy separate issue checklists for that release.
-
-For #582, the notice must explain that one Session accepts one task input and
-cannot be continued or reopened. Further work creates a new Session; existing
-history and saved artifacts remain readable. Verify replacement client examples
-and the corresponding non-production smoke before cutover, including checkpoint
-failure and access to persisted artifacts after runtime reclamation. The current
-Thread smoke above must be updated as part of that implementation. The #581 key
-rotation notice does not cover this later lifecycle change; do not instruct
-users to rotate otherwise valid Project keys unless that release changes keys.
-
 ## Stop Conditions
 
 Stop before any real deploy when any item below is true:

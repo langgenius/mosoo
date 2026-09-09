@@ -29,7 +29,7 @@ Your application remains yours. Its backend owns product behavior and end-user a
 
 ## Target Direction
 
-mosoo v1 targets research, data analysis, file processing, and report generation through `Project key + Agent + Input + optional files -> one task per Session`. Agent configuration is optional and publishing is removed from first use. The reference acceptance flow is a CSV analysis task producing a report, chart, and result data, committed with a checkpoint before success. Further work creates a new Session. Project keys and separate CLI login have shipped; the single-task lifecycle and remaining cleanup are still targets. See [SPEC](./docs/SPEC.md) and [remaining execution slices](./docs/prd/managed-agent-v1.md).
+mosoo v1 targets research, data analysis, file processing, and report generation through `Project key + Agent + Input + optional files -> durable Session`. Agent configuration is optional and publishing is removed from first use. The reference acceptance flow is CSV analysis with reports, charts, and result data, followed by durable modification turns. This transition is not complete; see [SPEC](./docs/SPEC.md) and [remaining execution slices](./docs/prd/managed-agent-v1.md).
 
 ## How It Works Today
 
