@@ -11,7 +11,7 @@ their machine-readable contracts, code, or [Architecture](../architecture.md).
 
 ## Runtime and API
 
-- [Managed Agent v1 target and remaining slices](./managed-agent-v1.md) — Project keys are shipped; one task per Session with checkpoint-gated completion is the remaining target. The current Thread and continuation notes below describe behavior to replace at the lifecycle cutover.
+- [Managed Agent v1 target and remaining slices](./managed-agent-v1.md) — agreed target, not shipped behavior.
 - [Agent API Endpoint](./agent-endpoint-mvp.md)
 - [Public Thread API](./public-thread-api-surface.md)
 - [Runtime Sessions](./runtime-session-kernel.md)
