@@ -48,12 +48,17 @@ success states, and writes review screenshots to
 `.tmp/e2e/design-contract/<label>/`. `MOSOO_E2E_DESIGN_LABEL=before` captures
 the same views from a pre-change checkout for side-by-side evidence.
 `ui typography-proof` renders the same fixture-backed surfaces with only the
-type-role families swapped (`current`, `general-sans`, `instrument-sans`) into
-`.tmp/e2e/typography-proof/<variant>/`; the General Sans files are fetched
-from Fontshare into `.tmp/e2e/typography-proof/fonts/` for the run and are never
+type-role families swapped (`geist`, the shipped set, and `instrument-sans`,
+the previous Instrument Sans / IBM Plex Mono set) into
+`.tmp/e2e/typography-proof/<variant>/`, and writes the font files each variant
+made the page fetch to `font-requests.json` next to the PNGs. The previous
+set's SIL OFL files are fetched from the jsDelivr mirror of the Fontsource
+packages into `.tmp/e2e/typography-proof/fonts/` for the run and are never
 committed (if Node cannot reach the CDN through your network, download
-`GeneralSans-Medium.woff2` and `GeneralSans-Semibold.woff2` from fontshare.com
-into that folder first). Both cases share `e2e/lib/console-fixtures.ts`.
+`instrument-sans-latin-wght-normal.woff2`, `ibm-plex-mono-latin-400-normal.woff2`,
+and `ibm-plex-mono-latin-500-normal.woff2` from the `@fontsource-variable/instrument-sans`
+and `@fontsource/ibm-plex-mono` packages into that folder first). Both cases
+share `e2e/lib/console-fixtures.ts`.
 `bun e2e/tools/theme-color-probe.ts` regenerates the reference-site evidence
 behind `docs/design/theme-color-usage.md`.
 

@@ -14,7 +14,7 @@ export function AgentSettingsSummary({ agent }: { agent: Agent }): ReactElement 
 
   return (
     <div className="flex items-center gap-4">
-      <div className="rounded-lg shadow-xs">
+      <div className="rounded-lg">
         <RuntimeIcon runtime={runtime} size={48} />
       </div>
       <div className="min-w-0 flex-1 space-y-2">

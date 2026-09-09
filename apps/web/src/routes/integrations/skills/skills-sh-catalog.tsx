@@ -329,7 +329,7 @@ function SkillsShInstallConfirmDialog({
           </DialogHeader>
 
           <div className="space-y-4">
-            <div className="border-border bg-card rounded-lg border p-4">
+            <div className="border-border bg-card rounded-lg border p-6">
               <div className="flex min-w-0 items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="text-fg-1 truncate text-[15px] font-bold">{skill.name}</div>
@@ -421,7 +421,7 @@ function SkillsShCatalogCard({
   const installRequiresApi = !installable && skill.sourceType === "well-known";
 
   return (
-    <article className="border-border bg-card hover:border-border-strong flex min-h-[168px] min-w-0 flex-col gap-3 rounded-lg border p-4 transition-[border-color,box-shadow] duration-150 ease-out hover:shadow-sm">
+    <article className="border-border bg-card hover:border-border-strong flex min-h-[168px] min-w-0 flex-col gap-3 rounded-lg border p-4 transition-[border-color] duration-150 ease-out">
       <div className="flex min-w-0 items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="text-fg-1 truncate text-[14px] font-bold">{skill.name}</div>

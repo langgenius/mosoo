@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactElement } from "react";
+import type { ReactElement } from "react";
 
 import { AvatarFallback } from "@/shared/ui/avatar-fallback";
 import { AvatarImage } from "@/shared/ui/avatar-image";
@@ -9,8 +9,6 @@ import { getRuntimeInfo } from "../runtime-catalog";
 import { RuntimeIcon } from "./runtime-icon";
 import { StatusBadge } from "./status-badge";
 import { ToolIcons } from "./tool-icons";
-
-const AGENT_GRID_CARD_STYLE: CSSProperties = { boxShadow: "var(--shadow-xs)" };
 
 function getOwnerInitial(name: string): string {
   const initial = name.charAt(0).toUpperCase();
@@ -41,7 +39,6 @@ export function AgentGrid({
                 onSelect(agent.id);
               }}
               className="border-border bg-card hover:border-border-strong focus-visible:ring-ring cursor-pointer rounded-lg border p-4 text-left transition-[border-color,box-shadow] duration-150 ease-out outline-none focus-visible:ring-2 focus-visible:ring-offset-1"
-              style={AGENT_GRID_CARD_STYLE}
             >
               <div className="mb-3 flex items-start justify-between">
                 <RuntimeIcon runtime={runtime} size={40} />

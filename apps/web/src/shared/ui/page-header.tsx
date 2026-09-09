@@ -2,17 +2,26 @@ import type { ReactElement, ReactNode } from "react";
 
 import { cn } from "@/shared/lib/class-names";
 
+/**
+ * Page header recipe (docs/design/console-design-contract.md, section 3): the
+ * `t-page-title` role (Geist 24px / 500 / -0.02em on a 28px line, 22px under
+ * 640px) over an optional 13px secondary description, with the surface's
+ * actions on the trailing side. `meta` renders beside the title, outside the
+ * heading (an id badge, a status), so it keeps body sizing. There is no
+ * eyebrow slot on purpose: a kicker above the title only repeats what the
+ * sidebar already says.
+ */
 export function PageHeader({
   title,
   description,
-  eyebrow,
+  meta,
   actions,
   children,
   className,
 }: {
   title: ReactNode;
   description?: ReactNode;
-  eyebrow?: ReactNode;
+  meta?: ReactNode;
   actions?: ReactNode;
   children?: ReactNode;
   className?: string;
@@ -27,14 +36,14 @@ export function PageHeader({
       )}
     >
       <div className="min-w-0">
-        {eyebrow ? (
-          <div className="text-fg-3 mb-2 text-[11px] font-semibold tracking-[0.12em] uppercase">
-            {eyebrow}
+        {meta ? (
+          <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+            <h1 className="t-page-title min-w-0 truncate max-sm:text-[22px]">{title}</h1>
+            {meta}
           </div>
-        ) : null}
-        <h1 className="font-heading text-fg-heading text-[22px] leading-tight font-medium tracking-[-0.01em] text-balance sm:text-[24px]">
-          {title}
-        </h1>
+        ) : (
+          <h1 className="t-page-title max-sm:text-[22px]">{title}</h1>
+        )}
         {description ? (
           <p className="text-fg-2 mt-1.5 max-w-[560px] text-[13px] leading-5 text-pretty">
             {description}

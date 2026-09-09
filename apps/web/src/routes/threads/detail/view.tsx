@@ -320,7 +320,7 @@ function ThreadReplyComposer({
             {actionError}
           </div>
         ) : null}
-        <div className="border-border-subtle bg-card flex items-end gap-2 rounded-lg border px-3 py-2.5 shadow-[var(--shadow-sm)]">
+        <div className="border-border-subtle bg-card flex items-end gap-2 rounded-lg border px-3 py-2.5">
           <Textarea
             value={reply}
             onChange={(event) => {

@@ -172,7 +172,7 @@ function AgentDetailHeader({
               onSelectMode(tab.id);
             }}
             className={cn(
-              "rounded-compact px-3.5 py-1.5 text-[13px] font-medium transition-[background-color,color] duration-150 ease-out",
+              "rounded-sm px-3.5 py-1.5 text-[13px] font-medium transition-[background-color,color] duration-150 ease-out",
               mode === tab.id
                 ? "bg-selected text-fg-1"
                 : "text-fg-2 hover:bg-hover hover:text-fg-1",
@@ -188,7 +188,7 @@ function AgentDetailHeader({
               onSelectMode("terminal");
             }}
             className={cn(
-              "rounded-compact px-3.5 py-1.5 text-[13px] font-medium transition-[background-color,color] duration-150 ease-out",
+              "rounded-sm px-3.5 py-1.5 text-[13px] font-medium transition-[background-color,color] duration-150 ease-out",
               mode === "terminal"
                 ? "bg-selected text-fg-1"
                 : "text-fg-2 hover:bg-hover hover:text-fg-1",

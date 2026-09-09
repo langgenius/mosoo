@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactElement } from "react";
+import type { ReactElement } from "react";
 
 import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
@@ -8,8 +8,6 @@ import { Separator } from "@/shared/ui/separator";
 
 import { shouldSubmitLoginInput } from "./login-keyboard";
 import type { AuthStep } from "./use-login";
-
-const AUTH_CARD_STYLE = { boxShadow: "var(--shadow-md)" } satisfies CSSProperties;
 
 interface LoginAuthCardProps {
   email: string;
@@ -53,10 +51,7 @@ export function LoginAuthCard({
 
   return (
     <div className="flex flex-1 items-center justify-center px-6 pb-16">
-      <div
-        className="border-border bg-card w-full max-w-[420px] rounded-xl border p-8"
-        style={AUTH_CARD_STYLE}
-      >
+      <div className="border-border bg-card w-full max-w-[420px] rounded-lg border p-6">
         <h2 className="text-fg-1 text-center text-[26px] font-semibold tracking-[-0.02em]">
           {heading}
         </h2>
