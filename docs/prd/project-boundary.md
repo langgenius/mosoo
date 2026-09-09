@@ -4,6 +4,10 @@ Status: shipped resource and ownership boundary. [mosoo Spec](../SPEC.md) define
 
 Project API keys belong to exactly one Project. Accounts may own multiple Projects, each with multiple keys. Resources and history retain their identities. Console and CLI login supply account-level access; application keys cannot cross Projects or manage accounts, Projects, or keys.
 
+## Managed Session Target
+
+The remaining [managed Agent slices](./managed-agent-v1.md) use Project as the ownership boundary for private Agent configuration, durable Sessions, files, and usage. A Session supports both a single-turn task and later input in the same workspace and native conversation. Console entry prioritizes keys, API examples, Session records, artifacts, and usage; private Agent configuration is optional. This target does not establish that the new Session API has shipped.
+
 ## Problem
 
 Builders previously had to understand mosoo through separate Agents and scattered resources. The Project boundary gives them one place to see and operate the product they are building.
@@ -34,6 +38,8 @@ The baseline is single-owner and does not offer organization-wide catalogs or co
 
 ## API Key Cutover
 
+The #581 cutover is complete; see its [release and notification evidence](https://github.com/langgenius/mosoo/issues/581#issuecomment-5582765337).
+
 Owners create and revoke keys in Project settings. A key is shown once and only its hash is stored. All Project keys support Agent configuration, Sessions, and files without configurable scopes. Revocation rejects future requests but leaves admitted work running; another active key in the Project or its owner can operate the existing Session.
 
-Old account tokens and CLI credentials must be replaced. Existing integrations create a new key in each target Project and update their configuration; CLI users run `mosoo login` again. Existing keys are not reassigned to a default Project.
+Old account tokens and CLI credentials must be replaced. Existing integrations create a new key in each target Project and update their configuration; CLI users run `mosoo auth login` again. Existing keys are not reassigned to a default Project.
