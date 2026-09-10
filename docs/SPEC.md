@@ -1,6 +1,6 @@
 # Mosoo Product Spec
 
-Status: canonical target product contract, updated after the product review on September 9, 2026. Single-turn tasks and multi-turn continuation share one durable Session contract. This document describes intended behavior; source, acceptance checks, and release evidence establish what is actually shipped.
+Status: canonical target product contract, updated after the product review on September 10, 2026. Single-turn tasks and multi-turn continuation share one durable Session contract. This document describes intended behavior; source, acceptance checks, and release evidence establish what is actually shipped.
 
 ## 1. Product Thesis
 
@@ -43,6 +43,8 @@ One admitted input starts one turn, which may include multiple model requests an
 
 ### Execution And Continuation
 
+Within the recovery period, a user returning seconds or days later to the same Session must be able to continue the same work. The Session preserves its conversation context, working files, and admitted execution configuration across idle time and sandbox reclamation. Users do not need to restate prior work, upload the same material again, or create a replacement Session to continue. Recovery may take longer than warm continuation; continuity does not promise identical model wording or preservation of live processes.
+
 - `session_id` is the single primary public execution handle. Callers do not need to manage internal Run or retry Attempt IDs.
 - Only one turn executes at a time in a Session. Busy Sessions reject new input, without input queuing or mid-execution steering.
 - The active turn can be cancelled. Another input is accepted only after that turn ends; cancellation cannot undo completed external side effects.
@@ -51,7 +53,7 @@ One admitted input starts one turn, which may include multiple model requests an
 
 ### Checkpoint Gate
 
-A checkpoint represents committed state that can be restored. It is the durability and safe-reclamation gate for each turn.
+A checkpoint represents committed state that can be restored. It is the durability and safe-reclamation gate for each turn. Actual continuation from that state establishes acceptance of the design; a successful backup operation alone does not prove the Session continuity promise.
 
 - After execution ends, persist artifacts, events, and usage, and commit a restorable checkpoint.
 - Model or tool execution ending alone does not establish successful turn completion. Required artifacts and a ready checkpoint must be committed before reporting success or reclaiming the uncommitted workspace.
@@ -107,8 +109,9 @@ A checkpoint represents committed state that can be restored. It is the durabili
 1. Create a Project API key and upload a CSV.
 2. Invoke a managed Agent with analysis instructions without configuring a provider, publishing an Agent, or selecting an Environment. Both Codex and Claude Code must execute real tools.
 3. Read status and events, then download an analysis report, chart, and result data. Verify calculations against a known fixture and check artifact formats.
-4. Request modifications in the same Session and verify existing files and native conversation continuity. Repeat after forced runtime reclamation.
-5. Create a private Agent with reusable analysis instructions through the API and repeat the flow. After updating the Agent, new Sessions use the new configuration while existing Sessions retain their original configuration.
+4. Request modifications seconds later in the same Session and verify that the Agent uses prior conversation context and existing working files, including files outside the published artifacts, without being given that state again.
+5. Repeat continuation after a multi-day idle interval within the recovery period and after forced runtime reclamation. Verify the same Session ID, admitted configuration, context-dependent task result, and prior file contents. Use controlled time and persisted fixtures for deterministic retention checks; record actual elapsed time separately in live delayed-continuation evidence. A clock-advanced test is not evidence that a live Session survived several days.
+6. Create a private Agent with reusable analysis instructions through the API and repeat the flow. After updating the Agent, new Sessions use the new configuration while existing Sessions retain their original configuration.
 
 ### Shared Failure And Boundary Checks
 
@@ -154,7 +157,7 @@ Existing code provides runtime adapters, sandboxes, Thread/Run history, checkpoi
 | #583  | Remaining: remove Package, Manifest, and Fork product lifecycles while preserving necessary configuration and history.                                          |
 | #584  | Remaining: optional private Agent configuration and testing, without publishing or public version selection.                                                    |
 
-Remaining work follows #582 -> #583 -> #584, with a working acceptance path and a migration rollback point for each slice; see the [execution scope mapping](./prd/managed-agent-v1.md). #581 has [release evidence](https://github.com/langgenius/mosoo/issues/581#issuecomment-5582765337). Reconcile #546 and its children with this contract: retain ghFind alongside multi-turn acceptance, defer typed Git infrastructure and interactive approvals, and remove public historical-version selection.
+Remaining work follows #582 -> #583 -> #584, with a working acceptance path and a migration rollback point for each slice; see the [execution scope mapping](./prd/managed-agent-v1.md). #581 has [release evidence](https://github.com/langgenius/mosoo/issues/581#issuecomment-5582765337). The issue scope follows this contract: retain ghFind alongside multi-turn acceptance, defer typed Git infrastructure and interactive approvals, and remove public historical-version selection.
 
 ## 10. Migration And Breaking-Change Notification
 

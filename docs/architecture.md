@@ -2,9 +2,11 @@
 
 ## 1. Vision And Principles
 
-Target direction (2026-09-09): [SPEC](./SPEC.md) defines a Project-scoped managed runtime for general application-backend tasks. A Project key, Agent, input, and optional files create a durable Session. Single-turn ghFind evaluation and multi-turn CSV analysis share this contract. New Sessions resolve the latest Agent configuration and retain internal immutable snapshots; callers neither select historical versions nor deploy Workers per configuration.
+Target direction (2026-09-10): [SPEC](./SPEC.md) defines a Project-scoped managed runtime for general application-backend tasks. A Project key, Agent, input, and optional files create a durable Session. Single-turn ghFind evaluation and multi-turn CSV analysis share this contract. New Sessions resolve the latest Agent configuration and retain internal immutable snapshots; callers neither select historical versions nor deploy Workers per configuration.
 
 Existing checkpoint and runtime primitives must support native continuation without Pet/Cattle product semantics. Persist required artifacts, events, usage, and a ready checkpoint before reporting a successful turn or reclaiming its uncommitted workspace. Follow-up uses committed state; cold continuation restores the workspace and native conversation or fails explicitly. Recovery remains available for at least 30 days after the last successful turn, renewed by successful follow-up. Completing a turn leaves the Session available for continuation.
+
+The user-visible invariant is continuity of the same Session across seconds or days of idle time and runtime reclamation. Verify continuation against prior conversation context, working files, and the admitted configuration; successful backup creation is only an intermediate check. Live delayed-continuation evidence records actual elapsed time separately from deterministic tests that advance the clock.
 
 Full-access execution retains isolation and authorization. Interactive approvals and typed Git resource infrastructure remain deferred; ghFind's fixed-commit material delivery is an explicit open decision. See [remaining slices](./prd/managed-agent-v1.md). The topology and flows below describe current implementation until those slices land, including its existing checkpoint retention policy.
 

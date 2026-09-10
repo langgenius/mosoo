@@ -1,12 +1,12 @@
 # Managed Agent v1: Remaining Execution Slices
 
-Status: target scope from the September 9, 2026 product review. Single-turn tasks and multi-turn continuation share the same durable Session contract. [SPEC](../SPEC.md) is the target contract; the remaining slices require implementation and release evidence.
+Status: target scope from the September 10, 2026 product review. Single-turn tasks and multi-turn continuation share the same durable Session contract. [SPEC](../SPEC.md) is the target contract; the remaining slices require implementation and release evidence.
 
 ## #546 — API-First Managed Agent Runtime
 
 An application supplies a Project key, Agent, input, and optional files. Mosoo owns execution, sandboxing, durable continuation, events, artifacts, usage, and cleanup. The application keeps its business logic, end-user identity, queue, validation, storage, and UI. Managed Codex and Claude Code are directly callable; saved private Agent configuration is optional and never requires publishing.
 
-Both ghFind's single-turn evaluation and CSV analysis with follow-up are required acceptance paths. A single-turn integration does not restrict Session continuation. Reconcile the parent and child issue descriptions with this mapping, including removal of public historical-version selection and interactive approvals and deferral of typed Git infrastructure.
+Both ghFind's single-turn evaluation and CSV analysis with follow-up are required acceptance paths. A single-turn integration does not restrict Session continuation. The parent and child issue descriptions follow this mapping, including removal of public historical-version selection and interactive approvals and deferral of typed Git infrastructure.
 
 ## Completed Prerequisites
 
@@ -23,9 +23,9 @@ Deliver the default-model, platform-funded first request and one public Session 
 Require both acceptance paths:
 
 - **ghFind:** one evaluation input and fixed-commit repository material produce validated analysis JSON, evidence JSON, and a Markdown report through one Session. Repeated idempotent creation does not duplicate work. History and saved artifacts remain readable after runtime reclamation, without requiring a follow-up turn. The concrete material delivery contract remains open; prefer existing file input capabilities with caller-prepared material. Typed Git mounting, private-repository authorization, and branch/PR workflows remain deferred.
-- **CSV analysis:** managed Codex and Claude Code execute real tools to produce verified reports, charts, and result data; follow-up retains the workspace and native conversation, including after forced reclamation. Recovery remains available for at least 30 days after the last successful turn, renewed by successful follow-up, with explicit expiry and preserved history/artifacts.
+- **CSV analysis:** managed Codex and Claude Code execute real tools to produce verified reports, charts, and result data. Follow-up seconds or days later retains the same Session, workspace, native conversation, and admitted configuration, including after forced reclamation. Verify a context-dependent modification using prior files without re-supplying them, including workspace files outside published artifacts. Recovery remains available for at least 30 days after the last successful turn, renewed by successful follow-up, with explicit expiry and preserved history/artifacts. Distinguish controlled-clock retention tests from actual elapsed-time evidence for delayed live continuation.
 
-Keep checkpoint as the turn durability and safe-reclamation gate. Required artifacts, events, usage, and a ready checkpoint precede successful completion and reclamation of an uncommitted workspace. Follow-up uses committed state; restore or checkpoint failure is explicit. Failure, cancellation, and budget exhaustion retain their actual outcomes and saved artifacts.
+Keep checkpoint as the turn durability and safe-reclamation gate. Required artifacts, events, usage, and a ready checkpoint precede successful completion and reclamation of an uncommitted workspace. Follow-up uses committed state; restore or checkpoint failure is explicit. Acceptance must prove actual continuation, not just backup creation. Failure, cancellation, and budget exhaustion retain their actual outcomes and saved artifacts.
 
 Use full access while retaining isolation and defer interactive approvals. Include per-turn budgets, creation idempotency, status/history/SSE, cancellation, and busy rejection. No input queue, steering, or Webhooks.
 
@@ -45,7 +45,7 @@ Prioritize keys, API examples, Session records, artifacts, and usage in the cons
 
 ## Delivery Boundaries
 
-With #581 shipped, preserve dependency order #582 -> #583 -> #584, with a working, verifiable path and data-preservation/rollback obligations for each slice. Favor reuse and the smallest implementation meeting SPEC. Remote GitHub issues have not been edited by this documentation change; their descriptions must be reconciled with this mapping when the specification lands.
+With #581 shipped, preserve dependency order #582 -> #583 -> #584, with a working, verifiable path and data-preservation/rollback obligations for each slice. Favor reuse and the smallest implementation meeting SPEC. The GitHub issue descriptions were aligned with this reviewed scope on September 10; implementation and release evidence are still required before closing them.
 
 Intentional breaking changes require a defined cutover, compatible client instructions, and Cloudflare user notification under the [release runbook](../production-deploy-verification.md#breaking-change-notification). The completed #581 key notice does not cover a later Session or Builder release. Resolve default model supply/budgets and the ghFind material input contract before accepting their corresponding capabilities.
 

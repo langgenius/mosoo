@@ -335,7 +335,12 @@ release's actual changes; require key rotation only if it changes valid keys.
 
 The target #582 acceptance covers both ghFind single-turn evaluation and
 multi-turn continuation, including checkpoint failure and recovery after
-runtime reclamation. Update the existing Thread smoke for the implemented
+runtime reclamation. Verify that replies seconds or days later use the same
+Session, prior conversation context, working files, and admitted configuration
+without re-supplying that state. Include working files outside published
+artifacts. Record actual elapsed time for delayed live continuation separately
+from controlled-clock retention checks; backup creation alone is insufficient
+acceptance evidence. Update the existing Thread smoke for the implemented
 Session contract and verify both paths in non-production before cutover.
 
 ## Stop Conditions
