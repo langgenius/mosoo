@@ -302,6 +302,47 @@ Acceptance:
 - If local HTTPS probes resolve through the local TUN/fake-IP path, keep
   `--interface en0` and `--resolve` in the smoke commands.
 
+## Breaking-Change Notification
+
+Intentional breaking changes to the managed Agent API and configuration
+lifecycle require accurate migration instructions for affected users. Preserve
+the existing data, backup, rollback, and destructive-migration approval rules.
+
+1. Before cutover, inventory affected integrations and active tasks. Record
+   the exact contract change, treatment of admitted work, preserved history
+   and artifacts, compatible API/console/CLI versions, and rollback point.
+   Prepare the affected recipient snapshot and notice before deploying.
+2. State the effective time, actual changes, preserved data, and concrete
+   user migration steps and links. Advance notices describe upcoming behavior.
+   A notice claiming the replacement is available follows deployment and
+   verification of the API, console, and applicable CLI. Documentation-only
+   synchronization does not trigger a rollout notice.
+3. Send through Cloudflare Email Service using the configured Mosoo sender.
+   Verify sample inbox delivery and actual content, send individually, and
+   retain private per-recipient attempts, outcomes, and provider message IDs.
+   Resolve uncertain outcomes before retrying to avoid duplicate notices.
+4. Reconcile the recipient snapshot with accepted, failed, suppressed,
+   unknown, and unattempted outcomes before declaring notification complete.
+   Resolve unknown outcomes and unattempted recipients; investigate known
+   failures and record their disposition or outstanding follow-up. Publish
+   only aggregate counts and sample verification. Provider acceptance is not
+   proof of delivery to every inbox.
+
+One coordinated notice may cover slices shipped together when it describes
+all affected workflows and client actions. The completed #581 key-rotation
+notice does not cover a future Session or Builder change. Describe that
+release's actual changes; require key rotation only if it changes valid keys.
+
+The target #582 acceptance covers both ghFind single-turn evaluation and
+multi-turn continuation, including checkpoint failure and recovery after
+runtime reclamation. Verify that replies seconds or days later use the same
+Session, prior conversation context, working files, and admitted configuration
+without re-supplying that state. Include working files outside published
+artifacts. Record actual elapsed time for delayed live continuation separately
+from controlled-clock retention checks; backup creation alone is insufficient
+acceptance evidence. Update the existing Thread smoke for the implemented
+Session contract and verify both paths in non-production before cutover.
+
 ## Stop Conditions
 
 Stop before any real deploy when any item below is true:

@@ -24,6 +24,10 @@ import type { RuntimeSessionLink } from "../src/modules/runtime/infrastructure/d
 import { DriverInstanceRpcEventIngestionController } from "../src/modules/runtime/infrastructure/driver-instance/rpc-event-ingestion-controller";
 import { RuntimeSessionViewCache } from "../src/modules/runtime/infrastructure/driver-instance/runtime-session-view-cache";
 import { recordDriverInstanceCompletion } from "../src/modules/runtime/infrastructure/driver-instance/terminal-driver-events";
+import type { SandboxHandle } from "../src/modules/runtime/infrastructure/sandbox-handles";
+import { isCattleTerminalCheckpointReadyForNextRun } from "../src/modules/runtime/infrastructure/session-runs/session-run-admission.repository";
+import { getSessionRunSummary } from "../src/modules/runtime/infrastructure/session-runs/session-run-read.repository";
+import { setSessionRunStatus } from "../src/modules/runtime/infrastructure/session-runs/session-run-write.repository";
 import { loadSessionViewerState } from "../src/modules/sessions/application/session-live-state.service";
 import { createSessionProcessEventsFromSessionEventRows } from "../src/modules/sessions/application/session-process-events.service";
 import type { SessionEventProcessRow } from "../src/modules/sessions/application/session-process-events.service";
@@ -232,6 +236,75 @@ async function insertRuntimeFixture(database: SqliteD1Database): Promise<void> {
   `);
 }
 
+async function createCheckpointCompletionFixture(createBackup: SandboxHandle["createBackup"]) {
+  const database = await createPublicHttpContractDatabase();
+  await insertRuntimeFixture(database);
+  database.execute(`
+    UPDATE session SET kind = 'cattle', last_message_at = 1 WHERE id = '${SESSION_ID}';
+    UPDATE sandbox SET kind = 'cattle', subject_kind = 'session', subject_id = '${SESSION_ID}';
+    UPDATE sandbox_session SET cwd = '/workspace/se/${SESSION_ID}';
+    CREATE TABLE native_resume_ref (
+      committed_session_run_id text,
+      committed_value text,
+      created_at integer NOT NULL,
+      kind text NOT NULL,
+      observed_driver_instance_id text,
+      observed_session_run_id text,
+      runtime_id text NOT NULL,
+      session_id text PRIMARY KEY NOT NULL,
+      updated_at integer NOT NULL,
+      value text NOT NULL
+    );
+    INSERT INTO native_resume_ref (
+      created_at, kind, observed_driver_instance_id, observed_session_run_id,
+      runtime_id, session_id, updated_at, value
+    ) VALUES (
+      1, 'openai_thread_id', '${DRIVER_ID}', '${RUN_ID}',
+      'openai-runtime', '${SESSION_ID}', 1, 'thread-durable-completion'
+    );
+  `);
+  const unavailable = async (): Promise<never> => {
+    throw new Error("Unexpected sandbox operation during completion.");
+  };
+  const sandbox: SandboxHandle = {
+    configureNetworkConstraints: unavailable,
+    createBackup,
+    createSession: unavailable,
+    deleteSession: unavailable,
+    destroy: unavailable,
+    exec: async () => ({ exitCode: 0, stderr: "", stdout: "", success: true }),
+    getSession: unavailable,
+    mkdir: unavailable,
+    mountBucket: unavailable,
+    readFile: unavailable,
+    restoreBackup: unavailable,
+    setKeepAlive: unavailable,
+    startProcess: unavailable,
+    terminal: unavailable,
+    unmountBucket: async () => {},
+    watch: unavailable,
+    writeFile: unavailable,
+    wsConnect: unavailable,
+  };
+  const deletedBackupKeys: string[] = [];
+  const baseBindings = createPublicHttpTestBindings(database);
+  const bindings: ApiBindings = {
+    ...baseBindings,
+    SANDBOX_STATE_BUCKET: new Proxy(baseBindings.SANDBOX_STATE_BUCKET, {
+      get(target, property) {
+        if (property === "delete") {
+          return async (keys: string | string[]) => {
+            deletedBackupKeys.push(...(typeof keys === "string" ? [keys] : keys));
+          };
+        }
+        return Reflect.get(target, property);
+      },
+    }),
+    runtimeSubjectHandleFactory: () => sandbox,
+  };
+  return { bindings, database, deletedBackupKeys };
+}
+
 function failTerminalSessionEventInsert(database: D1Database): D1Database {
   function wrapStatement(
     statement: D1PreparedStatement,
@@ -303,6 +376,333 @@ async function pushFreshController(
 }
 
 describe("runtime final output ingestion", () => {
+  test("keeps success and final output unavailable until the Session checkpoint is committed", async () => {
+    const started = Promise.withResolvers<void>();
+    const backup = Promise.withResolvers<{ dir: string; id: string }>();
+    const { bindings, database } = await createCheckpointCompletionFixture(async () => {
+      started.resolve();
+      return backup.promise;
+    });
+    const completion = pushFreshController(bindings, [
+      runtimeEvent({
+        kind: "run.completed",
+        payload: {
+          finalMessageId: createPlatformId<SessionMessageId>(),
+          finalMessageText: "The report is ready.",
+          stopReason: "end_turn",
+        },
+        sourceEventId: TERMINAL_SOURCE_EVENT_ID,
+      }),
+    ]);
+
+    await started.promise;
+    try {
+      expect((await getSessionRunSummary(database, RUN_ID))?.status).toBe("running");
+      await expect(
+        readPublicThreadRunFinalOutput({ database, runId: RUN_ID, sessionId: SESSION_ID }),
+      ).resolves.toBeNull();
+    } finally {
+      backup.resolve({
+        dir: `/workspace/se/${SESSION_ID}`,
+        id: "550e8400-e29b-41d4-a716-446655440002",
+      });
+      await completion;
+    }
+    expect((await getSessionRunSummary(database, RUN_ID))?.status).toBe("completed");
+    expect(
+      await readPublicThreadRunFinalOutput({ database, runId: RUN_ID, sessionId: SESSION_ID }),
+    ).toMatchObject({ text: "The report is ready." });
+  });
+
+  test("a cancellation during checkpoint creation cannot publish a successful result or resume cursor", async () => {
+    const started = Promise.withResolvers<void>();
+    const backup = Promise.withResolvers<{ dir: string; id: string }>();
+    const { bindings, database, deletedBackupKeys } = await createCheckpointCompletionFixture(
+      async () => {
+        started.resolve();
+        return backup.promise;
+      },
+    );
+    const completion = pushFreshController(bindings, [
+      runtimeEvent({
+        kind: "run.completed",
+        payload: {
+          finalMessageId: createPlatformId<SessionMessageId>(),
+          finalMessageText: FINAL_TEXT,
+          stopReason: "end_turn",
+        },
+        sourceEventId: TERMINAL_SOURCE_EVENT_ID,
+      }),
+    ]);
+    await started.promise;
+    try {
+      await setSessionRunStatus(database, { runId: RUN_ID, status: "cancelled" });
+    } finally {
+      backup.resolve({
+        dir: `/workspace/se/${SESSION_ID}`,
+        id: "550e8400-e29b-41d4-a716-446655440002",
+      });
+      await completion;
+    }
+    expect((await getSessionRunSummary(database, RUN_ID))?.status).toBe("cancelled");
+    await expect(
+      readPublicThreadRunFinalOutput({ database, runId: RUN_ID, sessionId: SESSION_ID }),
+    ).resolves.toBeNull();
+    await expect(
+      database
+        .prepare("SELECT id FROM sandbox_backup WHERE session_run_id = ?")
+        .bind(RUN_ID)
+        .first(),
+    ).resolves.toBeNull();
+    await expect(
+      database
+        .prepare("SELECT committed_session_run_id, committed_value FROM native_resume_ref")
+        .first(),
+    ).resolves.toEqual({ committed_session_run_id: null, committed_value: null });
+    expect(deletedBackupKeys).toEqual([
+      "backups/550e8400-e29b-41d4-a716-446655440002/data.sqsh",
+      "backups/550e8400-e29b-41d4-a716-446655440002/meta.json",
+    ]);
+  });
+
+  test.each(["backup", "database"] as const)(
+    "retries a %s failure without publishing partial completion or losing the previous cursor",
+    async (failure) => {
+      let failBackup = failure === "backup";
+      const { bindings, database } = await createCheckpointCompletionFixture(async (options) => {
+        if (failBackup) {
+          throw new Error("backup service unavailable");
+        }
+        return { dir: options.dir, id: crypto.randomUUID() };
+      });
+      const priorRunId = createPlatformId<SessionRunId>();
+      database.execute(`
+        UPDATE native_resume_ref SET committed_session_run_id = '${priorRunId}', committed_value = 'thread-previous';
+      `);
+      if (failure === "database") {
+        database.execute(`
+          CREATE TRIGGER reject_completion BEFORE UPDATE OF committed_value ON native_resume_ref
+          BEGIN SELECT RAISE(ABORT, 'injected native cursor commit failure'); END;
+        `);
+      }
+      const events = [
+        runtimeEvent({
+          kind: "run.completed",
+          payload: {
+            finalMessageId: createPlatformId<SessionMessageId>(),
+            finalMessageText: FINAL_TEXT,
+            stopReason: "end_turn",
+          },
+          sourceEventId: TERMINAL_SOURCE_EVENT_ID,
+        }),
+      ];
+      await expect(pushFreshController(bindings, events)).rejects.toBeInstanceOf(Error);
+      expect((await getSessionRunSummary(database, RUN_ID))?.status).toBe("running");
+      await expect(
+        readPublicThreadRunFinalOutput({ database, runId: RUN_ID, sessionId: SESSION_ID }),
+      ).resolves.toBeNull();
+      await expect(
+        database
+          .prepare("SELECT id FROM sandbox_backup WHERE session_run_id = ?")
+          .bind(RUN_ID)
+          .first(),
+      ).resolves.toBeNull();
+      await expect(
+        database
+          .prepare("SELECT committed_session_run_id, committed_value FROM native_resume_ref")
+          .first(),
+      ).resolves.toEqual({
+        committed_session_run_id: priorRunId,
+        committed_value: "thread-previous",
+      });
+
+      failBackup = false;
+      database.execute("DROP TRIGGER IF EXISTS reject_completion");
+      await pushFreshController(bindings, events);
+      expect((await getSessionRunSummary(database, RUN_ID))?.status).toBe("completed");
+      await expect(
+        readPublicThreadRunFinalOutput({ database, runId: RUN_ID, sessionId: SESSION_ID }),
+      ).resolves.toEqual({ text: FINAL_TEXT });
+      await expect(
+        database
+          .prepare("SELECT committed_session_run_id, committed_value FROM native_resume_ref")
+          .first(),
+      ).resolves.toEqual({
+        committed_session_run_id: RUN_ID,
+        committed_value: "thread-durable-completion",
+      });
+    },
+  );
+
+  test("rejects a cursor changed during backup and retries with a matching workspace snapshot", async () => {
+    let changeCursor = true;
+    const { bindings, database, deletedBackupKeys } = await createCheckpointCompletionFixture(
+      async (options) => {
+        if (changeCursor) {
+          database.execute("UPDATE native_resume_ref SET value = 'thread-updated'");
+        }
+        return { dir: options.dir, id: crypto.randomUUID() };
+      },
+    );
+    const events = [
+      runtimeEvent({
+        kind: "run.completed",
+        payload: {
+          finalMessageId: createPlatformId<SessionMessageId>(),
+          finalMessageText: FINAL_TEXT,
+          stopReason: "end_turn",
+        },
+        sourceEventId: TERMINAL_SOURCE_EVENT_ID,
+      }),
+    ];
+    await expect(pushFreshController(bindings, events)).rejects.toThrow("concurrent status race");
+    expect((await getSessionRunSummary(database, RUN_ID))?.status).toBe("running");
+    await expect(
+      database
+        .prepare("SELECT id FROM sandbox_backup WHERE session_run_id = ?")
+        .bind(RUN_ID)
+        .first(),
+    ).resolves.toBeNull();
+    await expect(
+      database.prepare("SELECT committed_value FROM native_resume_ref").first(),
+    ).resolves.toEqual({ committed_value: null });
+    expect(deletedBackupKeys).toHaveLength(2);
+
+    changeCursor = false;
+    await pushFreshController(bindings, events);
+    expect((await getSessionRunSummary(database, RUN_ID))?.status).toBe("completed");
+    await expect(
+      database.prepare("SELECT committed_value FROM native_resume_ref").first(),
+    ).resolves.toEqual({ committed_value: "thread-updated" });
+  });
+
+  test("the terminal RPC also waits for a checkpoint before declaring success", async () => {
+    let backupAvailable = false;
+    const { bindings, database } = await createCheckpointCompletionFixture(async (options) => {
+      if (!backupAvailable) {
+        throw new Error("backup service unavailable");
+      }
+      return { dir: options.dir, id: crypto.randomUUID() };
+    });
+    await expect(
+      recordDriverInstanceCompletion(bindings, { driverInstanceId: DRIVER_ID, driverReady: true }),
+    ).rejects.toBeInstanceOf(Error);
+    expect((await getSessionRunSummary(database, RUN_ID))?.status).toBe("running");
+    backupAvailable = true;
+    await recordDriverInstanceCompletion(bindings, {
+      driverInstanceId: DRIVER_ID,
+      driverReady: true,
+    });
+    expect((await getSessionRunSummary(database, RUN_ID))?.status).toBe("completed");
+    await expect(
+      database.prepare("SELECT committed_value FROM native_resume_ref").first(),
+    ).resolves.toEqual({ committed_value: "thread-durable-completion" });
+  });
+
+  test.each(["missing", "uncommitted previous turn", "different runtime"] as const)(
+    "cannot complete with a %s native resume cursor",
+    async (cursorState) => {
+      let backupCalls = 0;
+      const { bindings, database } = await createCheckpointCompletionFixture(async (options) => {
+        backupCalls += 1;
+        return { dir: options.dir, id: crypto.randomUUID() };
+      });
+      if (cursorState === "missing") {
+        database.execute("DELETE FROM native_resume_ref");
+      } else if (cursorState === "uncommitted previous turn") {
+        database.execute("UPDATE native_resume_ref SET observed_session_run_id = NULL");
+      } else {
+        database.execute(
+          "UPDATE native_resume_ref SET runtime_id = 'claude-agent-sdk', kind = 'claude_session_id'",
+        );
+      }
+      await expect(
+        recordDriverInstanceCompletion(bindings, {
+          driverInstanceId: DRIVER_ID,
+          driverReady: true,
+        }),
+      ).rejects.toThrow("checkpoint failed");
+      expect((await getSessionRunSummary(database, RUN_ID))?.status).toBe("running");
+      expect(backupCalls).toBe(0);
+    },
+  );
+
+  test("commits a stable cursor already saved by a previous successful turn", async () => {
+    const { bindings, database } = await createCheckpointCompletionFixture(async (options) => ({
+      dir: options.dir,
+      id: crypto.randomUUID(),
+    }));
+    const previousRunId = createPlatformId<SessionRunId>();
+    database.execute(
+      `UPDATE native_resume_ref SET observed_session_run_id = '${previousRunId}', committed_session_run_id = '${previousRunId}', committed_value = value`,
+    );
+    await recordDriverInstanceCompletion(bindings, {
+      driverInstanceId: DRIVER_ID,
+      driverReady: true,
+    });
+    await expect(
+      database
+        .prepare("SELECT committed_session_run_id, committed_value FROM native_resume_ref")
+        .first(),
+    ).resolves.toEqual({
+      committed_session_run_id: RUN_ID,
+      committed_value: "thread-durable-completion",
+    });
+  });
+
+  test.each(["assistant", "terminal event"] as const)(
+    "blocks follow-up after %s persistence fails and replays without another checkpoint",
+    async (failure) => {
+      let backupCalls = 0;
+      const { bindings, database } = await createCheckpointCompletionFixture(async (options) => {
+        backupCalls += 1;
+        return { dir: options.dir, id: crypto.randomUUID() };
+      });
+      database.execute(
+        failure === "assistant"
+          ? `
+        CREATE TRIGGER reject_final_output BEFORE INSERT ON session_message WHEN NEW.role = 'assistant'
+        BEGIN SELECT RAISE(ABORT, 'injected assistant persistence failure'); END;
+      `
+          : `
+        CREATE TRIGGER reject_final_output BEFORE INSERT ON session_event WHEN NEW.event_type = 'run.completed'
+        BEGIN SELECT RAISE(ABORT, 'injected terminal history persistence failure'); END;
+      `,
+      );
+      const events = [
+        runtimeEvent({
+          kind: "run.completed",
+          payload: {
+            finalMessageId: createPlatformId<SessionMessageId>(),
+            finalMessageText: FINAL_TEXT,
+            stopReason: "end_turn",
+          },
+          sourceEventId: TERMINAL_SOURCE_EVENT_ID,
+        }),
+      ];
+      await expect(pushFreshController(bindings, events)).rejects.toBeInstanceOf(Error);
+      await expect(isCattleTerminalCheckpointReadyForNextRun(database, SESSION_ID)).resolves.toBe(
+        false,
+      );
+      await recordDriverInstanceCompletion(bindings, {
+        driverInstanceId: DRIVER_ID,
+        driverReady: true,
+      });
+      await expect(isCattleTerminalCheckpointReadyForNextRun(database, SESSION_ID)).resolves.toBe(
+        false,
+      );
+      database.execute("DROP TRIGGER reject_final_output");
+      await pushFreshController(bindings, events);
+      await expect(isCattleTerminalCheckpointReadyForNextRun(database, SESSION_ID)).resolves.toBe(
+        true,
+      );
+      await expect(
+        readPublicThreadRunFinalOutput({ database, runId: RUN_ID, sessionId: SESSION_ID }),
+      ).resolves.toEqual({ text: FINAL_TEXT });
+      expect(backupCalls).toBe(1);
+    },
+  );
+
   test.each([
     ["omits", false],
     ["provides", true],

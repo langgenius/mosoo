@@ -1,9 +1,14 @@
 import { describe, expect, test } from "bun:test";
 
+import { createPlatformId } from "@mosoo/id";
+import type { RuntimeEventId } from "@mosoo/id";
+import { createRuntimeEvent } from "@mosoo/runtime-events";
+
 import { releaseTerminalDriverInstanceSessionRun } from "../src/modules/runtime/infrastructure/driver-instance/terminal-run-release";
 import { encodeSandboxBackupIdForStorage } from "../src/modules/runtime/infrastructure/sandbox-backup-id";
 import type { SandboxHandle } from "../src/modules/runtime/infrastructure/sandbox-handles";
 import { isCattleTerminalCheckpointReadyForNextRun } from "../src/modules/runtime/infrastructure/session-runs/session-run-admission.repository";
+import { persistSessionRuntimeEvents } from "../src/modules/sessions/infrastructure/session-runtime-event-store.repository";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import {
   PUBLIC_API_TEST_IDS,
@@ -178,6 +183,23 @@ describe("cattle terminal checkpoint", () => {
   test("keeps the last good checkpoint and blocks continuation until a retry commits the Run", async () => {
     const { bindings, commands, database, sandboxState } = await createTerminalCheckpointFixture();
 
+    await persistSessionRuntimeEvents(database, {
+      records: [
+        {
+          event: createRuntimeEvent({
+            id: createPlatformId<RuntimeEventId>(),
+            kind: "run.completed",
+            occurredAt: new Date().toISOString(),
+            payload: { stopReason: "end_turn" },
+            runId: PUBLIC_API_TEST_IDS.run,
+            sessionId: PUBLIC_API_TEST_IDS.ownerSession,
+          }),
+          occurredAt: null,
+          sourceEventId: null,
+        },
+      ],
+      sessionId: PUBLIC_API_TEST_IDS.ownerSession,
+    });
     await expect(
       releaseTerminalDriverInstanceSessionRun(bindings, {
         driverInstanceId: PUBLIC_API_TEST_IDS.driverOwner,

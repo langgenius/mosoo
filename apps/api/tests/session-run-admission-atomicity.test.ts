@@ -1,13 +1,15 @@
 import { describe, expect, test } from "bun:test";
 
-import { parsePlatformId } from "@mosoo/id";
-import type { AgentDeploymentVersionId, SessionId, SessionRunId } from "@mosoo/id";
+import { createPlatformId, parsePlatformId } from "@mosoo/id";
+import type { AgentDeploymentVersionId, RuntimeEventId, SessionId, SessionRunId } from "@mosoo/id";
+import { createRuntimeEvent } from "@mosoo/runtime-events";
 
 import { API_COMMAND_QUEUE_SEND_FAILED_CODE } from "../src/modules/api-command/application/api-command-ledger";
 import { getAccountViewer } from "../src/modules/auth/application/viewer-auth.service";
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
 import { queueSessionRun } from "../src/modules/runtime/application/session-run.service";
 import { setSessionRunStatus } from "../src/modules/runtime/infrastructure/session-runs/session-run-store.repository";
+import { persistSessionRuntimeEvents } from "../src/modules/sessions/infrastructure/session-runtime-event-store.repository";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import { API_ERROR_CODE } from "../src/platform/errors";
 import {
@@ -198,7 +200,7 @@ async function completeRun(database: D1Database, runId: SessionRunId): Promise<v
 }
 
 describe("Session Run atomic admission", () => {
-  test("blocks a cattle follow-up until the previous completed Run has a ready checkpoint", async () => {
+  test("blocks a cattle follow-up until the previous completed Run has a checkpoint and completion history", async () => {
     const { database, viewer } = await createFixture();
     const apiCommandQueue = createApiCommandQueueStub();
     const bindings = createPublicHttpTestBindings(database, { apiCommandQueue }) as ApiBindings;
@@ -224,7 +226,7 @@ describe("Session Run atomic admission", () => {
       queueOwnerRun({ bindings, clientRequestId: "checkpoint-run-b", viewer }),
     ).rejects.toMatchObject({
       code: API_ERROR_CODE.sessionRunCheckpointPending,
-      message: expect.stringContaining("still committing its previous workspace checkpoint"),
+      message: expect.stringContaining("still saving its previous turn"),
       status: 409,
     });
 
@@ -256,6 +258,26 @@ describe("Session Run atomic admission", () => {
       );
     `);
 
+    await expect(
+      queueOwnerRun({ bindings, clientRequestId: "checkpoint-run-b", viewer }),
+    ).rejects.toMatchObject({ code: API_ERROR_CODE.sessionRunCheckpointPending, status: 409 });
+    await persistSessionRuntimeEvents(database, {
+      records: [
+        {
+          event: createRuntimeEvent({
+            id: createPlatformId<RuntimeEventId>(),
+            kind: "run.completed",
+            occurredAt: new Date().toISOString(),
+            payload: { stopReason: "end_turn" },
+            runId: first.run.id,
+            sessionId: PUBLIC_API_TEST_IDS.ownerSession,
+          }),
+          occurredAt: null,
+          sourceEventId: null,
+        },
+      ],
+      sessionId: PUBLIC_API_TEST_IDS.ownerSession,
+    });
     const second = await queueOwnerRun({
       bindings,
       clientRequestId: "checkpoint-run-b",
