@@ -159,7 +159,7 @@ export function KindSelector({
                       }
                     }}
                     className={cn(
-                      "focus-visible:ring-brand-ring inline-flex items-center gap-1.5 rounded-[5px] px-2.5 py-1 text-[12.5px] font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none",
+                      "focus-visible:ring-brand-ring inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1 text-[12.5px] font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none",
                       selected
                         ? "text-foreground bg-white shadow-sm"
                         : "text-fg-2 hover:text-foreground",
@@ -203,7 +203,7 @@ export function KindSelector({
       {compareOpen ? (
         <div className="border-border-subtle mt-2 overflow-hidden rounded-lg border">
           <table className="w-full border-collapse text-left text-[12px]">
-            <thead className="bg-bg-1 text-fg-3 text-[11px] tracking-wide uppercase">
+            <thead className="bg-bg-1 text-fg-2 text-[12px] font-medium">
               <tr>
                 <th className="w-[140px] px-3 py-2 font-medium">{t("agent.dimension")}</th>
                 <th className="text-foreground px-3 py-2 font-medium">

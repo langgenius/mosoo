@@ -1,7 +1,7 @@
 import Add01Icon from "@hugeicons/core-free-icons/Add01Icon";
 import ArrowLeft01Icon from "@hugeicons/core-free-icons/ArrowLeft01Icon";
 import CheckIcon from "@hugeicons/core-free-icons/CheckIcon";
-import ChevronsDownUpIcon from "@hugeicons/core-free-icons/ChevronsDownUpIcon";
+import ChevronDownIcon from "@hugeicons/core-free-icons/ChevronDownIcon";
 import PanelLeftCloseIcon from "@hugeicons/core-free-icons/PanelLeftCloseIcon";
 import PanelLeftOpenIcon from "@hugeicons/core-free-icons/PanelLeftOpenIcon";
 import type { ProjectSummary } from "@mosoo/contracts/project";
@@ -12,7 +12,6 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { HelpMenu } from "@/features/help/help-menu";
 import { useTranslation } from "@/shared/i18n";
 import { LocaleSwitcher } from "@/shared/i18n/locale-switcher";
-import { getAvatarInitial } from "@/shared/lib/avatar";
 import { cn } from "@/shared/lib/class-names";
 import {
   DropdownMenu,
@@ -38,7 +37,7 @@ const CheckmarkIcon = createHugeicon(CheckIcon, "CheckmarkIcon");
 const CollapseSidebarIcon = createHugeicon(PanelLeftCloseIcon, "CollapseSidebarIcon");
 const ExpandSidebarIcon = createHugeicon(PanelLeftOpenIcon, "ExpandSidebarIcon");
 const NewAgentIcon = createHugeicon(Add01Icon, "NewAgentIcon");
-const SwitcherChevronIcon = createHugeicon(ChevronsDownUpIcon, "SwitcherChevronIcon");
+const SwitcherChevronIcon = createHugeicon(ChevronDownIcon, "SwitcherChevronIcon");
 
 // Both console sidebars share one width so the Org and Project layers line up.
 const SIDEBAR_WIDTH_CLASS = "w-[240px]";
@@ -47,26 +46,19 @@ const SIDEBAR_RAIL_WIDTH_CLASS = "w-[64px]";
 const ICON_BUTTON_CLASS =
   "text-fg-3 hover:bg-sidebar-row-hover hover:text-fg-1 focus-visible:ring-ring focus-visible:ring-offset-sidebar flex size-7 shrink-0 items-center justify-center rounded-md outline-none transition-[background-color,color] duration-150 ease-out focus-visible:ring-2 focus-visible:ring-offset-1";
 
-// Project identity for the switcher and the icon-only rail: a neutral monogram
-// tile keeps the active Project recognisable once its label is gone, without a
-// second coloured avatar competing with the account row.
-function ProjectMonogram({
-  name,
-  size = "sm",
-}: {
-  name: string | null;
-  size?: "md" | "sm";
-}): ReactElement {
+// Brand mark used as the identity tile. The sidebar references put the tenant's
+// logo tile at the head of the sidebar; here the mark is the constant, the
+// Project name beside it is the variable, so "which product, which Project" is
+// one glance. Decorative: the trigger's accessible name carries the Project.
+function BrandTile({ className }: { className?: string }): ReactElement {
   return (
-    <span
+    <img
+      src="/brand/logo-mark.svg"
+      alt=""
       aria-hidden="true"
-      className={cn(
-        "bg-sidebar-row-active text-fg-1 flex shrink-0 items-center justify-center rounded-[6px] font-bold tracking-[0.02em] select-none",
-        size === "md" ? "size-6 text-[11px]" : "size-5 text-[10px]",
-      )}
-    >
-      {getAvatarInitial(name)}
-    </span>
+      className={cn("block size-6 shrink-0 select-none", className)}
+      draggable={false}
+    />
   );
 }
 
@@ -77,17 +69,22 @@ function BackToOrgLink({ orgName }: { orgName: string | null }): ReactElement {
   const label = t("nav.backTo", { label: orgName ?? t("pageTitle.projects") });
 
   return (
-    <DropdownMenuItem asChild className="cursor-pointer gap-2 rounded-md">
+    <DropdownMenuItem asChild className="text-fg-2 cursor-pointer gap-2">
       <Link to="/projects">
-        <BackIcon className="text-fg-3 size-4 shrink-0" />
+        <BackIcon className="size-4 shrink-0" />
         <span className="min-w-0 flex-1 truncate">{label}</span>
       </Link>
     </DropdownMenuItem>
   );
 }
 
-// Project switcher: the active Project's identity row; the menu switches
-// Projects inline and offers the way back to the Org layer.
+// Project switcher = the identity row at the head of the sidebar: brand tile,
+// Project name, and a chevron that hugs the name (the tenant row from the
+// sidebar references), sharing the header line with the collapse toggle. No
+// border: the hover fill wraps only the tile and name, so it reads as a title
+// with a disclosure rather than a form control. In the rail the tile alone is
+// the trigger. The menu switches Projects inline and offers the way back to
+// the Org layer.
 function ProjectSwitcher({
   activeProject,
   collapsed,
@@ -112,18 +109,19 @@ function ProjectSwitcher({
     <button
       type="button"
       aria-label={accessibleName}
+      data-slot="project-switcher"
       className={cn(
-        "hover:bg-sidebar-row-hover focus-visible:ring-ring focus-visible:ring-offset-sidebar data-[popup-open]:bg-sidebar-row-active flex shrink-0 items-center rounded-md outline-none transition-[background-color] duration-150 ease-out focus-visible:ring-2 focus-visible:ring-offset-1",
-        collapsed ? "mx-auto size-8 justify-center" : "h-9 w-full gap-2.5 px-2 text-left",
+        "hover:bg-sidebar-row-hover data-[popup-open]:bg-sidebar-row-active focus-visible:ring-ring focus-visible:ring-offset-sidebar flex h-8 shrink-0 items-center rounded-md outline-none transition-[background-color] duration-150 ease-out focus-visible:ring-2 focus-visible:ring-offset-1",
+        collapsed ? "w-8 justify-center" : "min-w-0 max-w-full gap-1.5 pr-2 pl-1.5 text-left",
       )}
     >
-      <ProjectMonogram name={activeProject?.name ?? null} size={collapsed ? "md" : "sm"} />
+      <BrandTile />
       {collapsed ? null : (
         <>
-          <span className="sidebar-label-enter text-fg-1 min-w-0 flex-1 truncate text-[13px] leading-none font-semibold">
+          <span className="sidebar-label-enter text-fg-1 min-w-0 truncate text-[13px] leading-none font-semibold">
             {displayLabel}
           </span>
-          <SwitcherChevronIcon className="sidebar-label-enter text-fg-3 size-3.5 shrink-0" />
+          <SwitcherChevronIcon className="sidebar-label-enter text-fg-3 -ml-0.5 size-3.5 shrink-0" />
         </>
       )}
     </button>
@@ -137,19 +135,16 @@ function ProjectSwitcher({
       <DropdownMenuContent
         align="start"
         side={collapsed ? "right" : "bottom"}
-        sideOffset={6}
-        className="w-[232px] rounded-lg p-1"
+        sideOffset={collapsed ? 8 : 4}
+        className="w-[216px]"
       >
-        <DropdownMenuLabel className="text-fg-3 px-2 py-1 text-[10.5px] font-semibold tracking-[0.06em] uppercase">
-          {t("pageTitle.projects")}
-        </DropdownMenuLabel>
+        <DropdownMenuLabel>{t("pageTitle.projects")}</DropdownMenuLabel>
         {projects.map((project) => (
           <DropdownMenuItem
             key={project.id}
-            className="cursor-pointer gap-2 rounded-md"
+            className="cursor-pointer"
             onSelect={() => onSwitch(project.id)}
           >
-            <ProjectMonogram name={project.name} />
             <span className="min-w-0 flex-1 truncate">{project.name}</span>
             {activeProject !== null && project.id === activeProject.id ? (
               <CheckmarkIcon className="text-fg-1 size-4 shrink-0" />
@@ -213,7 +208,7 @@ function NewAgentAction({
         className={cn(
           NEW_AGENT_CLASS,
           layout,
-          "bg-sidebar-cta text-sidebar-cta-fg hover:bg-sidebar-cta-hover shadow-xs",
+          "bg-sidebar-cta text-sidebar-cta-fg hover:bg-sidebar-cta-hover",
         )}
       >
         {body}
@@ -222,11 +217,16 @@ function NewAgentAction({
   );
 }
 
+// Fixed header line: the identity row (Project switcher) on the left, the
+// collapse toggle on the right; the rail stacks the same two controls. Without
+// an identity (no Project layer) the brand wordmark stands in.
 function SidebarHeader({
   collapsed,
+  identity,
   onToggleCollapsed,
 }: {
   collapsed: boolean;
+  identity?: ReactNode;
   onToggleCollapsed: () => void;
 }): ReactElement {
   const { t } = useTranslation();
@@ -253,19 +253,21 @@ function SidebarHeader({
   if (collapsed) {
     return (
       <div className="flex shrink-0 flex-col items-center gap-1 pt-3 pb-2">
-        <img src="/brand/logo-mark.svg" alt="mosoo" className="block size-6" />
+        {identity ?? <BrandTile className="my-1" />}
         {toggle}
       </div>
     );
   }
 
   return (
-    <div className="flex h-12 shrink-0 items-center justify-between pr-0.5 pl-2">
-      <img
-        src="/brand/logo-wordmark-onlight.svg"
-        alt="mosoo"
-        className="sidebar-label-enter block h-5"
-      />
+    <div className="flex h-12 shrink-0 items-center justify-between gap-1 pr-0.5">
+      {identity ?? (
+        <img
+          src="/brand/logo-wordmark-onlight.svg"
+          alt="mosoo"
+          className="sidebar-label-enter ml-2 block h-5"
+        />
+      )}
       {toggle}
     </div>
   );
@@ -285,10 +287,7 @@ function ConsoleSidebarFooter({
   const { user } = useAppSession();
 
   return (
-    <div
-      data-sidebar-zone="persistent"
-      className="border-border-soft flex shrink-0 flex-col border-t pt-2"
-    >
+    <div data-sidebar-zone="persistent" className="flex shrink-0 flex-col pt-3">
       <div className="flex flex-col gap-0.5">
         {children}
         <HelpMenu collapsed={collapsed} shortcutEnabled={helpShortcutEnabled} />
@@ -301,10 +300,13 @@ function ConsoleSidebarFooter({
 
 function MobileNavigation({
   footer,
+  renderIdentity,
   renderNavigation,
   title,
 }: {
   footer?: ReactNode;
+  /** Identity row for the drawer header; the wordmark stands in without one. */
+  renderIdentity?: (closeNavigation: () => void) => ReactNode;
   renderNavigation: (closeNavigation: () => void) => ReactNode;
   title?: string | null;
 }): ReactElement {
@@ -368,11 +370,13 @@ function MobileNavigation({
           className="bg-sidebar flex w-[min(20rem,calc(100vw-2rem))] max-w-none flex-col p-3"
         >
           <SheetTitle className="sr-only">{t("common.navigation")}</SheetTitle>
-          <div className="flex h-11 shrink-0 items-center px-2">
-            <img src="/brand/logo-wordmark-onlight.svg" alt="mosoo" className="block h-5" />
+          <div className="flex h-11 shrink-0 items-center">
+            {renderIdentity?.(closeNavigation) ?? (
+              <img src="/brand/logo-wordmark-onlight.svg" alt="mosoo" className="ml-2 block h-5" />
+            )}
           </div>
           <nav
-            className="flex min-h-0 flex-1 flex-col overflow-y-auto pt-2 [&_[aria-disabled]]:min-h-11 [&_a]:min-h-11 [&_button]:min-h-11"
+            className="flex min-h-0 flex-1 flex-col overflow-y-auto pt-1 [&_[aria-disabled]]:min-h-11 [&_a]:min-h-11 [&_button]:min-h-11"
             onClickCapture={(event) => {
               if (event.target instanceof Element && event.target.closest("a") !== null) {
                 closeNavigation();
@@ -413,6 +417,7 @@ function ConsoleShell({
   collapsed,
   footer,
   identity,
+  mobileIdentity,
   mobileSidebar,
   onToggleCollapsed,
   sidebar,
@@ -420,8 +425,10 @@ function ConsoleShell({
   children: ReactNode;
   collapsed: boolean;
   footer?: ReactNode;
-  /** Non-scrolling identity row under the brand header (the Project switcher). */
+  /** The identity row in the fixed header line (the Project switcher). */
   identity?: ReactNode;
+  /** Identity row for the mobile drawer; receives the drawer's close callback. */
+  mobileIdentity?: (closeNavigation: () => void) => ReactNode;
   mobileSidebar: (closeNavigation: () => void) => ReactNode;
   onToggleCollapsed: () => void;
   sidebar: ReactNode;
@@ -437,11 +444,14 @@ function ConsoleShell({
           collapsed ? SIDEBAR_RAIL_WIDTH_CLASS : SIDEBAR_WIDTH_CLASS,
         )}
       >
-        <SidebarHeader collapsed={collapsed} onToggleCollapsed={onToggleCollapsed} />
-        {identity === undefined ? null : <div className="shrink-0 pb-1">{identity}</div>}
+        <SidebarHeader
+          collapsed={collapsed}
+          identity={identity}
+          onToggleCollapsed={onToggleCollapsed}
+        />
         <div
           data-sidebar-zone="work"
-          className="sidebar-scroll flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto pt-2 pb-3"
+          className="sidebar-scroll flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto pt-1 pb-3"
         >
           {sidebar}
         </div>
@@ -450,7 +460,11 @@ function ConsoleShell({
 
       <div className="flex min-w-0 flex-1">
         <main className="bg-background md:border-border-soft flex min-w-0 flex-1 flex-col overflow-hidden md:rounded-md md:border-l">
-          <MobileNavigation footer={footer} renderNavigation={mobileSidebar} />
+          <MobileNavigation
+            footer={footer}
+            renderNavigation={mobileSidebar}
+            {...(mobileIdentity === undefined ? {} : { renderIdentity: mobileIdentity })}
+          />
           <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
         </main>
       </div>
@@ -498,14 +512,9 @@ export function Layout({ children }: { children: ReactNode }): ReactElement {
     );
   }
 
-  // Mobile drawer: identity row and work list stacked, always expanded.
-  function projectDrawer(onNavigate: () => void): ReactNode {
-    return (
-      <>
-        <div className="pb-2">{projectIdentity(false, onNavigate)}</div>
-        {projectWork(false)}
-      </>
-    );
+  // Mobile drawer: the identity row heads the sheet, the work list follows.
+  function projectDrawer(): ReactNode {
+    return projectWork(false);
   }
 
   function projectFooter(isCollapsed: boolean): ReactNode {
@@ -520,7 +529,8 @@ export function Layout({ children }: { children: ReactNode }): ReactElement {
         collapsed={collapsed}
         footer={projectFooter(collapsed)}
         identity={projectIdentity(collapsed)}
-        mobileSidebar={(closeNavigation) => projectDrawer(closeNavigation)}
+        mobileIdentity={(closeNavigation) => projectIdentity(false, closeNavigation)}
+        mobileSidebar={() => projectDrawer()}
         onToggleCollapsed={toggleCollapsed}
         sidebar={projectWork(collapsed)}
       >
@@ -564,9 +574,7 @@ export function OrgLayout({ children }: { children: ReactNode }): ReactElement {
           </div>
           {resolvedHeaderTitle === null ? null : (
             <div className="flex min-w-0 flex-1 items-center px-8">
-              <h1 className="font-heading text-fg-heading truncate text-[24px] leading-tight font-medium tracking-[-0.01em]">
-                {resolvedHeaderTitle}
-              </h1>
+              <h1 className="t-page-title truncate">{resolvedHeaderTitle}</h1>
             </div>
           )}
         </header>

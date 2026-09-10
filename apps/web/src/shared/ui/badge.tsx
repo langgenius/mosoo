@@ -8,7 +8,7 @@ import { cn } from "@/shared/lib/class-names";
 
 /**
  * Badge recipe (docs/design/console-design-contract.md, section 4): 20px tall,
- * 6px radius, 11.5px semibold. Status variants pair a tint with a text tone
+ * 4px radius, 11.5px semibold. Status variants pair a tint with a text tone
  * that clears 4.5:1 on it; `brand` is reserved for Mosoo-specific lifecycle
  * markers (default key, built-in resource). Success, warning, danger, and
  * pending should carry a glyph as well as a colour when they stand alone.

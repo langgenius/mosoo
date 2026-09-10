@@ -139,7 +139,10 @@ describe("Project overview boundary", () => {
     const stepsSource = readSource("../src/routes/project-overview/onboarding-steps.tsx");
 
     expect(routeSource).toContain("max-w-4xl");
-    expect(routeSource).toContain("lg:flex-row");
+    // The header is the shared PageHeader recipe (stacked under 640px,
+    // title and actions side by side above it), not a bespoke layout.
+    expect(routeSource).toContain("<PageHeader");
+    expect(routeSource).not.toContain("uppercase");
     expect(installSource).toContain("max-w-3xl");
     expect(installSource).toContain("sm:flex-row");
     expect(stepsSource).toContain("text-sm leading-6");

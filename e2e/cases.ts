@@ -101,7 +101,7 @@ export const e2eCases: readonly E2ECase[] = [
       },
     },
     description:
-      "Render the Providers, Runs, and Settings typography proofs for the current, General Sans, and Instrument Sans role sets.",
+      "Render the Providers, Runs, and Settings typography proofs for the shipped Geist set and the previous Instrument Sans / IBM Plex Mono set, recording the font files each fetches.",
     id: ["ui", "typography-proof"],
     layer: "ui",
   },

@@ -15,20 +15,21 @@ short the viewport is.
 
 | Zone                  | Sizing                           | Contents (Project layer)                                                                                        |
 | --------------------- | -------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| Identity (fixed)      | `shrink-0`                       | Brand row (wordmark, collapse toggle) and the Project switcher row.                                             |
+| Identity (fixed)      | `shrink-0`                       | One header line: the identity row (brand tile, Project name, chevron) and the collapse toggle.                 |
 | Work (scrolls)        | `min-h-0 flex-1 overflow-y-auto` | Create agent; Overview, Runs, Agents, Files; **Resources**: Skills, MCP servers, Providers, Environments.       |
-| Persistent (anchored) | `shrink-0`, hairline top border  | Project settings, Help & docs, Language, then the account row (Account settings and Sign out live in its menu). |
+| Persistent (anchored) | `shrink-0`, spacing above        | Project settings, Help & docs, Language, then the account card (Account settings and Sign out live in its menu). |
 
 Rules that follow from the split:
 
 - Frequent work sits in the upper zone; account, settings, help, and language
   sit in the lower zone. The lower zone never shrinks, so it stays reachable
   when the upper zone scrolls (verified at 1280 x 560 by `just e2e ui sidebar`).
-- Boundaries come from whitespace and two hairlines: a permanent
-  `--border-soft` line above the persistent zone, and a scroll-driven
-  `--border-default` line under the identity zone that only appears once the
-  work list has scrolled (pure CSS, `@supports (animation-timeline: scroll())`,
-  no line in browsers without it).
+- Boundaries come from whitespace and one hairline: the persistent zone is
+  separated from the work list by spacing alone (the permanent rule above it
+  was removed as visual noise), and a scroll-driven `--border-default` line
+  under the identity zone only appears once the work list has scrolled (pure
+  CSS, `@supports (animation-timeline: scroll())`, no line in browsers without
+  it).
 - The sidebar sits on `--paper-200` while the canvas stays on `--paper-100`, so
   the two surfaces separate by tone as well as by the hairline; in the dark theme
   the same step is `ink-950` against `ink-900`. The neutral values themselves
@@ -46,9 +47,9 @@ Decisions worth restating because they change what people see:
 | ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | "Config" disclosure group hiding Skills, MCP servers, Providers, Environments as unlabelled children | Flat **Resources** section, four rows, each with its own glyph                                                                                                                | The group's own path redirected to its first child; the four entry points are peers and need to be recognisable in the rail.                                                                                                        |
 | Full-width black "Create agent" button                                                               | Still the one filled control: black through its own `--sidebar-cta-*` tokens (not `--primary`), 32 px, flush with the rows; muted fill (not opacity) when there is no Project | It was briefly demoted to a quiet row and reverted after review: the single call to action must not be easy to miss, and its colour must survive palette changes.                                                                   |
-| Bordered "PROJECT / name" card plus a tiny "Back to org" link above it                               | One identity row (monogram tile, name, chevrons); "Back to {org}" moved into the switcher menu                                                                                | One anchor for "where am I"; returning to the account layer is rare and now sits with the other Project-level choices.                                                                                                              |
+| Bordered "PROJECT / name" card plus a tiny "Back to org" link above it                               | One identity row (brand tile, name, chevron) on the header line; "Back to {org}" moved into the switcher menu                                                                 | One anchor for "where am I"; returning to the account layer is rare and now sits with the other Project-level choices.                                                                                                              |
 | "Settings" (Project) in the list and "Settings" (account) in the menu                                | "Project settings" row in the persistent zone; "Account settings" in the account menu                                                                                         | Two identical labels a few rows apart were ambiguous in every locale.                                                                                                                                                               |
-| Collapsed rail showed one "sliders" icon with a menu for the four resources                          | Four rows with the resource glyphs; project monogram tile; brand mark on top                                                                                                  | Recognisability in the icon-only state was the issue's core complaint.                                                                                                                                                              |
+| Collapsed rail showed one "sliders" icon with a menu for the four resources                          | Four rows with the resource glyphs; the brand tile on top doubles as the Project switcher                                                                                     | Recognisability in the icon-only state was the issue's core complaint.                                                                                                                                                              |
 | Overview, Runs, Agents, Files on Hugeicons; only the four resources original                         | All eight work rows drawn as one original family (line, 1.5 stroke, one 12 % plane); a gradient-tile direction was explored and rejected                                      | Mixed stock and original glyphs read as two products in one list. The tiles (see `assets/sidebar-icons/explorations/`) were too loud for an otherwise neutral sidebar; the quiet family language was extended to every row instead. |
 | Sidebar and canvas shared `#fbfbfc`                                                                  | Sidebar on `--paper-200` (`#f4f6f8`), canvas on `--paper-100` (`#fbfbfc`)                                                                                                     | Two surfaces that only differ by a hairline read as one; a one-step tonal drop makes the navigation a place, not a column.                                                                                                          |
 | Mobile drawer anchored left but animated in from the right                                           | `SheetContent side="left"` picks position and direction together                                                                                                              | Class merging cannot reconcile two enter animations; the primitive now owns the pairing.                                                                                                                                            |
@@ -68,9 +69,9 @@ drawer.
 | Create agent button | 32 px, 6 px radius, `--sidebar-cta-bg` fill, centred label; 32 x 32 in the rail    |
 | Icon                | 16 px, 1.5 stroke, same colour as the label                                        |
 | Label               | 13 px / weight 500; weight 600 when selected; truncates, never wraps               |
-| Section eyebrow     | 11 px / weight 600, uppercase, 0.06 em tracking, `--fg-3`, 16 px above, 4 px below |
-| Identity row        | 36 px; 20 px monogram tile (24 px in the rail)                                     |
-| Account row         | 44 px; 26 px avatar, name 13 px / 600, email 11.5 px `--fg-3`                      |
+| Section label   | 12 px / weight 500, sentence case, `--fg-3`, 16 px above, 4 px below |
+| Identity row    | 32 px trigger on the 48 px header line: 24 px brand tile, Project name 13 px / 600, chevron hugging the name; hover fill wraps only the content, no border; in the rail the tile alone is the trigger |
+| Account card    | 52 px bordered card (the one bordered surface in the sidebar); 30 px avatar, name 13 px / 600, email 12 px `--fg-3`, chevron on the far edge; the menu lists Account settings and Sign out |
 | Rail rows           | 32 x 32 centred; tooltip on the right                                              |
 | Mobile drawer       | Same components, rows forced to a 44 px minimum height                             |
 
@@ -79,7 +80,7 @@ Colour comes from tokens only:
 | Token                                | Light                 | Dark                    | Used for                                                |
 | ------------------------------------ | --------------------- | ----------------------- | ------------------------------------------------------- |
 | `--sidebar-row-hover` (= `--hover`)     | `rgba(0,0,0,.04)`  | `rgba(255,255,255,.06)` | hover fill (fine pointers only)                         |
-| `--sidebar-row-active` (= `--selected`) | `rgba(0,0,0,.065)` | `rgba(255,255,255,.10)` | selected row, open menu trigger, pressed, monogram tile |
+| `--sidebar-row-active` (= `--selected`) | `rgba(0,0,0,.065)` | `rgba(255,255,255,.10)` | selected row, open menu trigger, pressed |
 | `--sidebar-cta-bg/-fg` (= `--emphasis`) | `#1f1f1f` / white  | `#fafafa` / `#1f1f1f`   | the Create agent fill; black on purpose, never the brand green |
 | `--border-soft` / `--border-default` | existing hairlines    | existing hairlines      | zone separators                                         |
 | `--focus-ring`                       | `#498c07`             | `#6fd305`               | keyboard focus ring, nothing else                       |

@@ -22,17 +22,43 @@ const SCREENSHOT_DIR = fileURLToPath(
 const DESKTOP = { height: 900, width: 1440 } as const;
 const NARROW = { height: 844, width: 390 } as const;
 
-// Contract measurements (docs/design/console-design-contract.md, section 4).
+// Contract measurements (docs/design/console-design-contract.md, sections 3
+// to 5): the 6 / 4 / 2 radius ladder, flat 24px-padded cards, and the page
+// title role (24px / 500 / -0.02em on a 28px line).
 const CONTRACT = {
   badgeHeight: 20,
-  badgeRadius: 6,
+  badgeRadius: 4,
   buttonHeight: 32,
-  buttonRadius: 10,
+  buttonRadius: 6,
+  cardPadding: "24px",
+  cardRadius: 6,
   connectionRowMinHeight: 44,
   dataRowMinHeight: 40,
+  rowRadius: 4,
+  secondaryText: "rgba(51, 51, 51, 0.72)",
   switchThumb: 10,
   switchTrack: { height: 14, width: 24 },
+  title: { fontSize: "24px", fontWeight: "500", letterSpacing: "-0.48px", lineHeight: "28px" },
 } as const;
+
+// Let every finite entrance animation land (sidebar labels fade in 80ms after
+// mount) so a capture shows the resting page, never a mid-fade sidebar.
+// Infinite animations (spinners) are skipped, and a stuck one cannot hang the
+// capture past one second.
+async function settlePage(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    const finite = document
+      .getAnimations()
+      .filter((animation) => animation.effect?.getTiming().iterations !== Number.POSITIVE_INFINITY)
+      .map(async (animation) => animation.finished.catch(() => undefined));
+    await Promise.race([
+      Promise.all(finite),
+      new Promise((resolve) => {
+        setTimeout(resolve, 1_000);
+      }),
+    ]);
+  });
+}
 
 async function screenshot(
   page: Page,
@@ -40,6 +66,7 @@ async function screenshot(
   target?: Locator,
   clip?: { height: number; width: number },
 ): Promise<void> {
+  await settlePage(page);
   if (target) {
     await target.screenshot({ path: `${SCREENSHOT_DIR}${name}.png` });
     return;
@@ -168,9 +195,11 @@ test("Providers: sections, credential rows, badges, and the credential dialog st
   await screenshot(page, "providers-1440x900");
 
   // Hover on a credential row, then keyboard focus on a row action: the two
-  // states must read differently from each other and from rest.
+  // states must read differently from each other and from rest. At rest a
+  // button is flat; the focus ring is the only box-shadow it ever carries.
   const firstCredentialRow = page.locator('main [data-slot="connection-row"]').first();
   const addKey = page.getByRole("button", { name: "Add key" }).first();
+  expect(await styleOf(addKey, "box-shadow")).toBe("none");
   await addKey.hover();
   await settle(addKey);
   await screenshot(page, "providers-hover", page.locator("main").first());
@@ -208,11 +237,21 @@ test("Providers: sections, credential rows, badges, and the credential dialog st
   expect((await boxOf(firstCredentialRow)).height).toBeGreaterThanOrEqual(
     CONTRACT.connectionRowMinHeight,
   );
+  // Cards are flat work surfaces: 6px corner, 24px inner padding, no shadow.
   // Nested radii step down from the card to the row to the control.
   const card = firstCredentialRow.locator("xpath=ancestor::section[1]");
+  expect(await radiusOf(card)).toBe(CONTRACT.cardRadius);
+  expect(await styleOf(card, "box-shadow")).toBe("none");
+  expect(await styleOf(card, "padding-left")).toBe(CONTRACT.cardPadding);
+  expect(await styleOf(card, "padding-top")).toBe(CONTRACT.cardPadding);
+  expect(await radiusOf(firstCredentialRow)).toBe(CONTRACT.rowRadius);
   expect(await radiusOf(card)).toBeGreaterThan(await radiusOf(firstCredentialRow));
   const rowAction = firstCredentialRow.getByRole("button").first();
   expect(await radiusOf(firstCredentialRow)).toBeGreaterThanOrEqual(await radiusOf(rowAction));
+  // Section titles inside cards share the title tracking rule at their size.
+  const sectionTitle = card.locator("h2").first();
+  expect(await styleOf(sectionTitle, "font-weight")).toBe("600");
+  expect(await styleOf(sectionTitle, "letter-spacing")).toBe("-0.15px");
 });
 
 test("Providers: narrow viewport keeps the header, actions, and rows readable", async ({
@@ -336,8 +375,66 @@ test("Project settings: form fields, disabled and enabled primary action", async
   expect(await boxOf(save)).toMatchObject({ height: CONTRACT.buttonHeight });
   expect(await boxOf(nameInput)).toMatchObject({ height: CONTRACT.buttonHeight });
   expect(await radiusOf(nameInput)).toBe(CONTRACT.buttonRadius);
+  // Fields are flat at rest; the ring is the only box-shadow they ever carry.
+  await nameInput.blur();
+  await settle(nameInput);
+  expect(await styleOf(nameInput, "box-shadow")).toBe("none");
   await nameInput.focus();
   expect(await styleOf(nameInput, "box-shadow")).not.toBe("none");
+});
+
+test("Overview: the shared header recipe, flat onboarding card, one primary action", async ({
+  page,
+}) => {
+  await page.setViewportSize(DESKTOP);
+  await installConsoleFixtures(page);
+  await page.goto("/");
+
+  const title = page.getByRole("heading", { level: 1, name: "Console redesign" });
+  await expect(title).toBeVisible();
+  await expect(page.getByRole("link", { name: "Provider keys" })).toBeVisible();
+  await screenshot(page, "overview-1440x900");
+
+  expect(await styleOf(title, "font-size")).toBe(CONTRACT.title.fontSize);
+  expect(await styleOf(title, "letter-spacing")).toBe(CONTRACT.title.letterSpacing);
+  const newAgent = page.getByRole("link", { name: "New agent" });
+  expect(await boxOf(newAgent)).toMatchObject({ height: CONTRACT.buttonHeight });
+  expect(await radiusOf(newAgent)).toBe(CONTRACT.buttonRadius);
+  expect(await styleOf(newAgent, "box-shadow")).toBe("none");
+  // One primary per surface: the other header action is the outline recipe.
+  const providerKeys = page.getByRole("link", { name: "Provider keys" });
+  expect(await styleOf(providerKeys, "background-color")).not.toBe(
+    await styleOf(newAgent, "background-color"),
+  );
+  // Every rounded surface on the page (onboarding card, lane tabs, prompt
+  // box) is flat and stays on the 6px ladder.
+  await expect(page.getByRole("heading", { level: 2 })).toBeVisible();
+  for (const raised of await page.locator("main [class*='rounded-lg']").all()) {
+    expect(await styleOf(raised, "box-shadow")).toBe("none");
+    expect(await radiusOf(raised)).toBeLessThanOrEqual(CONTRACT.cardRadius);
+  }
+});
+
+test("Empty state: skills teaches the surface with the title role one step down", async ({
+  page,
+}) => {
+  await page.setViewportSize(DESKTOP);
+  await installConsoleFixtures(page);
+  await page.goto("/integrations/skills");
+
+  const title = page.getByText("No skills yet", { exact: true });
+  await expect(title).toBeVisible();
+  await screenshot(page, "skills-empty-1440x900");
+  expect(await styleOf(title, "font-size")).toBe("16px");
+  expect(await styleOf(title, "font-weight")).toBe("500");
+  expect(await styleOf(title, "letter-spacing")).toBe("-0.16px");
+  expect(await styleOf(title, "line-height")).toBe("20px");
+  // The empty state's own action (the header carries a second "Add skill").
+  const addSkill = title
+    .locator("xpath=ancestor::div[1]")
+    .getByRole("button", { name: "Add skill" });
+  await expect(addSkill).toBeVisible();
+  expect(await radiusOf(addSkill)).toBe(CONTRACT.rowRadius);
 });
 
 test("Account settings: read-only field and secondary actions at narrow width", async ({
@@ -350,6 +447,22 @@ test("Account settings: read-only field and secondary actions at narrow width", 
   await expect(page.getByLabel("Email")).toHaveAttribute("readonly", "");
   await expectNoHorizontalOverflow(page);
   await screenshot(page, "settings-profile-390x844");
+});
+
+test("Agents: list rows show the name, tools, and a plain status, no id chips", async ({
+  page,
+}) => {
+  await page.setViewportSize(DESKTOP);
+  await installConsoleFixtures(page);
+  await page.goto("/agent");
+  await expect(page.getByRole("heading", { level: 1, name: "Agents" })).toBeVisible();
+  await expect(page.getByText("Review bot")).toBeVisible();
+  await screenshot(page, "agents-1440x900");
+
+  await expect(page.getByText("Published", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("Draft", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText(/^ID:/u)).toHaveCount(0);
+  await expect(page.getByText(/agent\.published/u)).toHaveCount(0);
 });
 
 test("Runs: dense rows stay on the 40px rhythm with working, done, and failed states", async ({
@@ -394,7 +507,7 @@ test("Dark theme tokens map every role on the same surface", async ({ page }) =>
   expect(await contrastOf(description)).toBeGreaterThanOrEqual(4.5);
 });
 
-test("Typography roles resolve to the contract families", async ({ page }) => {
+test("Typography roles resolve to the two contract families", async ({ page }) => {
   await page.setViewportSize(DESKTOP);
   await installConsoleFixtures(page);
   await page.goto("/providers");
@@ -412,12 +525,28 @@ test("Typography roles resolve to the contract families", async ({ page }) => {
   // Computed font-family normalises quoting, so compare the leading family.
   const leadingFamily = (stack: string): string =>
     stack.split(",")[0]?.replaceAll('"', "").trim() ?? "";
-  expect(leadingFamily(families.heading)).toBe("Instrument Sans");
-  expect(leadingFamily(await styleOf(title, "font-family"))).toBe(leadingFamily(families.heading));
-  expect(await styleOf(title, "font-weight")).toBe("500");
+  // One sans family carries every role, page titles included; the heading
+  // voice is size, weight, tracking, and tone (contract section 3).
+  expect(leadingFamily(families.sans)).toBe("Geist");
+  expect(leadingFamily(families.heading)).toBe("Geist");
+  expect(leadingFamily(await styleOf(title, "font-family"))).toBe("Geist");
+  expect(await styleOf(title, "font-size")).toBe(CONTRACT.title.fontSize);
+  expect(await styleOf(title, "font-weight")).toBe(CONTRACT.title.fontWeight);
+  expect(await styleOf(title, "letter-spacing")).toBe(CONTRACT.title.letterSpacing);
+  expect(await styleOf(title, "line-height")).toBe(CONTRACT.title.lineHeight);
+  const description = page.locator("main p").first();
+  expect(await styleOf(description, "letter-spacing")).toBe("normal");
+  expect(await styleOf(description, "color")).toBe(CONTRACT.secondaryText);
   const id = page.locator('[data-slot="mono"]').first();
   await expect(id).toBeVisible();
-  expect(leadingFamily(await styleOf(id, "font-family"))).toBe(leadingFamily(families.mono));
-  expect(leadingFamily(families.mono)).toBe("IBM Plex Mono");
-  expect(leadingFamily(families.sans)).toBe("Geist");
+  expect(leadingFamily(families.mono)).toBe("Geist Mono");
+  expect(leadingFamily(await styleOf(id, "font-family"))).toBe("Geist Mono");
+  expect(await styleOf(id, "font-variant-numeric")).toBe("tabular-nums");
+  // Only the two families (plus the local metric fallback) are declared.
+  const declared = await page.evaluate(() =>
+    [
+      ...new Set(Array.from(document.fonts).map((face) => face.family.replaceAll('"', ""))),
+    ].toSorted(),
+  );
+  expect(declared).toEqual(["Geist", "Geist Fallback", "Geist Mono"]);
 });

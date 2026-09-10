@@ -61,7 +61,7 @@ export function CostAgentsPanel({
         </label>
       </div>
 
-      <div className="border-border bg-muted/30 text-muted-foreground grid grid-cols-[minmax(180px,1.4fr)_150px_110px_110px_110px_110px_110px_120px] border-b px-4 py-2 text-[11px] font-semibold tracking-[0.12em] uppercase">
+      <div className="border-border bg-muted/30 text-fg-2 grid grid-cols-[minmax(180px,1.4fr)_150px_110px_110px_110px_110px_110px_120px] border-b px-4 py-2 text-[12px] font-medium">
         <div>{t("cost.agent")}</div>
         <div>{t("cost.owner")}</div>
         <div>{t("cost.runMix")}</div>

@@ -188,7 +188,7 @@ export function SidebarRow(props: SidebarRowProps): ReactElement {
   );
 }
 
-/** Quiet eyebrow for a group of rows; the rail shows a short rule instead. */
+/** Quiet sentence-case label for a group of rows; the rail shows a short rule instead. */
 export function SidebarSectionLabel({
   children,
   collapsed = false,
@@ -201,9 +201,7 @@ export function SidebarSectionLabel({
   }
 
   return (
-    <div className="sidebar-label-enter text-fg-3 px-2.5 pt-4 pb-1 text-[11px] leading-4 font-semibold tracking-[0.06em] uppercase select-none">
-      {children}
-    </div>
+    <div className="sidebar-label-enter t-group-label px-2.5 pt-4 pb-1 select-none">{children}</div>
   );
 }
 

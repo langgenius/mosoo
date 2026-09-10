@@ -1,0 +1,90 @@
+{
+  "providers-en": [
+    {
+      "bytes": 29288,
+      "url": "/fonts/Geist-Variable.woff2"
+    },
+    {
+      "bytes": 71136,
+      "url": "/fonts/GeistMono-Variable.woff2"
+    },
+    {
+      "bytes": 14708,
+      "url": "/__proof-fonts/ibm-plex-mono-latin-400-normal.woff2"
+    },
+    {
+      "bytes": 30092,
+      "url": "/__proof-fonts/instrument-sans-latin-wght-normal.woff2"
+    }
+  ],
+  "runs-en": [
+    {
+      "bytes": 29288,
+      "url": "/fonts/Geist-Variable.woff2"
+    },
+    {
+      "bytes": 71136,
+      "url": "/fonts/GeistMono-Variable.woff2"
+    },
+    {
+      "bytes": 30092,
+      "url": "/__proof-fonts/instrument-sans-latin-wght-normal.woff2"
+    },
+    {
+      "bytes": 14708,
+      "url": "/__proof-fonts/ibm-plex-mono-latin-400-normal.woff2"
+    }
+  ],
+  "settings-en": [
+    {
+      "bytes": 29288,
+      "url": "/fonts/Geist-Variable.woff2"
+    },
+    {
+      "bytes": 71136,
+      "url": "/fonts/GeistMono-Variable.woff2"
+    },
+    {
+      "bytes": 14708,
+      "url": "/__proof-fonts/ibm-plex-mono-latin-400-normal.woff2"
+    },
+    {
+      "bytes": 30092,
+      "url": "/__proof-fonts/instrument-sans-latin-wght-normal.woff2"
+    },
+    {
+      "bytes": 29288,
+      "url": "/fonts/Geist-Variable.woff2"
+    },
+    {
+      "bytes": 71136,
+      "url": "/fonts/GeistMono-Variable.woff2"
+    },
+    {
+      "bytes": 30092,
+      "url": "/__proof-fonts/instrument-sans-latin-wght-normal.woff2"
+    },
+    {
+      "bytes": 14708,
+      "url": "/__proof-fonts/ibm-plex-mono-latin-400-normal.woff2"
+    }
+  ],
+  "providers-zh-cn": [
+    {
+      "bytes": 29288,
+      "url": "/fonts/Geist-Variable.woff2"
+    },
+    {
+      "bytes": 71136,
+      "url": "/fonts/GeistMono-Variable.woff2"
+    },
+    {
+      "bytes": 14708,
+      "url": "/__proof-fonts/ibm-plex-mono-latin-400-normal.woff2"
+    },
+    {
+      "bytes": 30092,
+      "url": "/__proof-fonts/instrument-sans-latin-wght-normal.woff2"
+    }
+  ]
+}

@@ -154,7 +154,7 @@ export function ProjectOverviewInstallGuide(): ReactElement {
   return (
     <section className="py-8 sm:py-10">
       <div className="mx-auto flex max-w-3xl flex-col items-center text-center">
-        <h2 className="text-foreground text-3xl font-semibold tracking-tight sm:text-4xl">
+        <h2 className="text-foreground tracking-title text-3xl font-semibold sm:text-4xl">
           {t("onboarding.title")}
         </h2>
         <p className="text-muted-foreground mt-3 max-w-2xl text-base leading-7">
