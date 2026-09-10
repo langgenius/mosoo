@@ -684,6 +684,13 @@ describe("runtime final output ingestion", () => {
       await expect(isCattleTerminalCheckpointReadyForNextRun(database, SESSION_ID)).resolves.toBe(
         false,
       );
+      await recordDriverInstanceCompletion(bindings, {
+        driverInstanceId: DRIVER_ID,
+        driverReady: true,
+      });
+      await expect(isCattleTerminalCheckpointReadyForNextRun(database, SESSION_ID)).resolves.toBe(
+        false,
+      );
       database.execute("DROP TRIGGER reject_final_output");
       await pushFreshController(bindings, events);
       await expect(isCattleTerminalCheckpointReadyForNextRun(database, SESSION_ID)).resolves.toBe(
