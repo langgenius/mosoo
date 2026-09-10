@@ -12,6 +12,10 @@ import { currentTimestampMs } from "../../../../time";
 import { createSessionRuntimeEvent } from "../../../sessions/application/session-event-write.service";
 import { upsertSessionModelCallUsage } from "../../../sessions/application/session-model-call.service";
 import { persistSessionRuntimeEvents } from "../../../sessions/infrastructure/session-runtime-event-store.repository";
+import {
+  discardUncommittedCompletionCheckpoint,
+  prepareSessionRunCompletionCheckpoint,
+} from "../session-runs/session-run-completion-checkpoint";
 import { setSessionRunStatus } from "../session-runs/session-run-store.repository";
 import type { SessionRunTransitionOutcome } from "../session-runs/session-run-store.repository";
 import { persistAssistantMessageProjection } from "./assistant-message-projection";
@@ -250,11 +254,13 @@ export async function persistProjectedRuntimeDriverEvents(
   // remains last: a crash after the CAS is repaired by replay against the exact
   // completed Run link.
   if (deferCompletedRunTransition && link.sessionRunId !== null) {
+    const completionCheckpoint = await prepareSessionRunCompletionCheckpoint(bindings, link);
     runTransitionOutcome = await setDriverProjectedSessionRunStatus(database, {
+      ...(completionCheckpoint === undefined ? {} : { completionCheckpoint }),
       runId: link.sessionRunId,
       source: "driver",
       status: "completed",
-    });
+    }).finally(() => discardUncommittedCompletionCheckpoint(bindings, completionCheckpoint));
     staleTerminalRunTransition = isStaleTerminalRunTransition(runTransitionOutcome);
 
     if (

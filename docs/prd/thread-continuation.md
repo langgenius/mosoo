@@ -10,9 +10,11 @@ mosoo recycled the execution container between those turns.
 
 ## Product contract
 
-After a turn completes successfully, mosoo commits the Task Agent's complete
-Thread working directory and provider resume state before admitting a follow-up
-or releasing its runtime.
+After execution ends, mosoo prepares the Task Agent's complete Thread workspace
+checkpoint. The ready checkpoint record, captured provider resume cursor, and
+successful Run status are committed together before admitting a follow-up or
+releasing its runtime. Both the ordered completion event and terminal Driver RPC
+use this boundary; pending checkpoint work remains visible as a running turn.
 The next turn restores that committed state before accepting new input. Given the
 same Agent version, Environment version, current-message attachments, and external
 tool state, a warm continuation and a forced-cold continuation therefore expose the
@@ -27,8 +29,10 @@ same:
   manifest.
 
 The commit is atomic from the user's perspective. A failed checkpoint never
-replaces the last successful checkpoint and blocks follow-up admission until the
-completed turn is committed. Restore is retryable and idempotent. A missing,
+replaces the last successful checkpoint or publishes a successful turn. Retrying
+completion can commit the turn once storage recovers. A concurrent cancellation
+keeps its cancelled outcome and cannot advance the checkpoint or resume cursor.
+Restore is retryable and idempotent. A missing,
 expired, corrupt, or unrestorable checkpoint fails the continuation with an
 actionable error instead of opening an empty workspace.
 

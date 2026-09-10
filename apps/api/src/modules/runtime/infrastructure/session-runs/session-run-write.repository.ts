@@ -34,6 +34,12 @@ import {
   toSessionRunStatusLifecycleEventName,
 } from "../../domain/session-run-lifecycle.machine";
 import { createSessionStatusTransitionPatch } from "./session-lifecycle-projection.repository";
+import {
+  completionCheckpointRecordedCondition,
+  completionCheckpointSnapshotCondition,
+  completionCheckpointWrites,
+} from "./session-run-completion-checkpoint";
+import type { SessionRunCompletionCheckpoint } from "./session-run-completion-checkpoint";
 import { getActiveSessionRunSummary } from "./session-run-read.repository";
 import { buildActiveSessionRunStatusFilter, toSessionRunSummary } from "./session-run-row.mapper";
 import type { ActiveSessionRunStatus } from "./session-run-row.mapper";
@@ -47,6 +53,7 @@ type SessionRunStatusUpdateInput = {
 };
 
 type UpdateSessionRunStatusInput = SessionRunStatusUpdateInput & {
+  completionCheckpoint?: SessionRunCompletionCheckpoint;
   /**
    * Reject the transition unless the run is currently in this status. The
    * check is atomic with the write via the status_seq optimistic guard.
@@ -728,6 +735,17 @@ async function transitionSessionRunStatus(
 
   const run = toUpdatedSessionRunSummary(current, input, timestampMs);
   const statusSeq = current.status_seq + 1;
+  const checkpoint = input.completionCheckpoint;
+  if (
+    checkpoint !== undefined &&
+    (input.status !== "completed" ||
+      checkpoint.sessionRunId !== input.runId ||
+      checkpoint.sessionId !== current.session_id ||
+      current.session_last_run_id !== input.runId ||
+      input.preserveSessionLifecycle === true)
+  ) {
+    throw new Error("A completion checkpoint must belong to the current Session Run.");
+  }
 
   if (input.preserveSessionLifecycle === true) {
     const runUpdateResult = await getAppDatabase(database)
@@ -795,7 +813,7 @@ async function transitionSessionRunStatus(
     };
   }
 
-  const [runUpdateResult, sessionUpdateResult] = await runAppDatabaseBatch(database, (db) => [
+  const results = await runAppDatabaseBatch(database, (db) => [
     db
       .update(sessionRunsTable)
       .set(createSessionRunStatusUpdate(input, timestampMs))
@@ -804,8 +822,12 @@ async function transitionSessionRunStatus(
           eq(sessionRunsTable.id, input.runId),
           eq(sessionRunsTable.status, current.status),
           eq(sessionRunsTable.statusSeq, current.status_seq),
+          checkpoint === undefined
+            ? undefined
+            : completionCheckpointSnapshotCondition(db, checkpoint),
         ),
       ),
+    ...(checkpoint === undefined ? [] : completionCheckpointWrites(db, checkpoint, timestampMs)),
     db
       .update(sessionsTable)
       .set(
@@ -820,6 +842,9 @@ async function transitionSessionRunStatus(
           eq(sessionsTable.id, current.session_id),
           eq(sessionsTable.lastRunId, input.runId),
           notInArray(sessionsTable.status, ["TERMINATED"]),
+          checkpoint === undefined
+            ? undefined
+            : completionCheckpointRecordedCondition(db, checkpoint),
           exists(
             db
               .select({ id: sessionRunsTable.id })
@@ -835,6 +860,9 @@ async function transitionSessionRunStatus(
         ),
       ),
   ]);
+
+  const runUpdateResult = results[0];
+  const sessionUpdateResult = results.at(-1);
 
   if (getD1ChangeCount(runUpdateResult) === 0) {
     return {
