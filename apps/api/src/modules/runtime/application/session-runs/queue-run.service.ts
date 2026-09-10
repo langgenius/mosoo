@@ -84,7 +84,7 @@ export interface QueuedSessionRunState {
 function createCheckpointPendingError(sessionId: SessionId) {
   return createApiError(
     API_ERROR_CODE.sessionRunCheckpointPending,
-    `Thread ${sessionId} is still committing its previous workspace checkpoint. Retry after checkpointing finishes; if the error persists, contact support.`,
+    `Thread ${sessionId} is still saving its previous turn. Retry shortly; if the error persists, contact support.`,
   );
 }
 

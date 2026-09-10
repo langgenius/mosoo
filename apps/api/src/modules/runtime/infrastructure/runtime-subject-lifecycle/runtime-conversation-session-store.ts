@@ -16,7 +16,10 @@ import {
   getRuntimeSubjectInactiveDeadline,
 } from "../../domain/runtime-kind-policy";
 import { toRuntimeSubjectStatusLifecycleEventName } from "../../domain/runtime-subject-lifecycle.machine";
-import { isCattleTerminalCheckpointReadyForNextRun } from "../session-runs/session-run-admission.repository";
+import {
+  completedRunHistoryPredicate,
+  isCattleTerminalCheckpointReadyForNextRun,
+} from "../session-runs/session-run-admission.repository";
 import {
   activeConversationSessionQuery,
   mapReadyRuntimeSubjectBackup,
@@ -159,6 +162,7 @@ export async function listIdleSessionScopedConversationSessions(
                   eq(sandboxBackupsTable.dir, sandboxSessionsTable.cwd),
                   eq(sandboxBackupsTable.sessionRunId, sessionsTable.lastRunId),
                   eq(sandboxBackupsTable.status, "ready"),
+                  completedRunHistoryPredicate(appDb, sessionsTable.lastRunId),
                 ),
               ),
           ),

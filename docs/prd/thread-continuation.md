@@ -15,6 +15,11 @@ checkpoint. The ready checkpoint record, captured provider resume cursor, and
 successful Run status are committed together before admitting a follow-up or
 releasing its runtime. Both the ordered completion event and terminal Driver RPC
 use this boundary; pending checkpoint work remains visible as a running turn.
+Missing or uncommitted native cursors reject completion. A stable cursor saved by
+a previous successful turn remains valid when a runtime reuses the same native
+Session ID. Follow-up admission and idle reclamation also wait for final-message
+projection and completion history; their persistence retry never re-creates an
+already committed workspace backup.
 The next turn restores that committed state before accepting new input. Given the
 same Agent version, Environment version, current-message attachments, and external
 tool state, a warm continuation and a forced-cold continuation therefore expose the

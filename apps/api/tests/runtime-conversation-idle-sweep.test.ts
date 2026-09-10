@@ -55,6 +55,11 @@ function createDatabase(): SqliteD1Database {
       session_run_id text,
       status text NOT NULL
     );
+    CREATE TABLE session_event (
+      id text PRIMARY KEY NOT NULL,
+      run_id text,
+      event_type text NOT NULL
+    );
   `);
 
   return database;
@@ -118,7 +123,7 @@ async function insertActiveRunLease(
 }
 
 describe("idle session-scoped conversation sweep", () => {
-  test("keeps a completed cattle turn alive until its workspace checkpoint is ready", async () => {
+  test("keeps a completed cattle turn alive until its checkpoint and completion history are ready", async () => {
     const database = createDatabase();
     await insertConversation(database, {
       kind: "cattle",
@@ -157,6 +162,17 @@ describe("idle session-scoped conversation sweep", () => {
         "INSERT INTO sandbox_backup (dir, id, sandbox_id, session_run_id, status) VALUES (?, ?, ?, ?, ?)",
       )
       .bind("cwd", "backup-checkpoint", "sb-checkpoint", "run-checkpoint", "ready")
+      .run();
+
+    await expect(
+      listIdleSessionScopedConversationSessions(database, {
+        idleSinceLte: NOW - GRACE_MS,
+        limit: 10,
+      }),
+    ).resolves.toEqual([]);
+    await database
+      .prepare("INSERT INTO session_event (id, run_id, event_type) VALUES (?, ?, ?)")
+      .bind("completion-history", "run-checkpoint", "run.completed")
       .run();
 
     await expect(

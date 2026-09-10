@@ -1,7 +1,7 @@
 import { nativeResumeRefsTable, sandboxBackupsTable, sessionRunsTable } from "@mosoo/db";
 import { parsePlatformId } from "@mosoo/id";
 import type { SandboxBackupId, SandboxId, SessionId, SessionRunId } from "@mosoo/id";
-import { and, eq, exists, isNull, notExists, sql } from "drizzle-orm";
+import { and, eq, exists, isNull, sql } from "drizzle-orm";
 
 import { logWarn } from "../../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
@@ -14,17 +14,21 @@ import { RuntimeSubjectCheckpointFailedError } from "../runtime-subject-lifecycl
 import { SANDBOX_BACKUP_TTL_SECONDS } from "../sandbox-backup-config";
 import { createRuntimeSandboxBackup, deleteSandboxBackupObjects } from "../sandbox-backup-platform";
 import { listSandboxSessionBackupCandidates } from "../sandbox-backup-store";
-import { getSessionRunSummary } from "./session-run-read.repository";
 
 type NativeResumeSnapshot = Pick<
   typeof nativeResumeRefsTable.$inferSelect,
-  "kind" | "runtimeId" | "value" | "observedSessionRunId"
+  | "kind"
+  | "runtimeId"
+  | "value"
+  | "observedSessionRunId"
+  | "committedSessionRunId"
+  | "committedValue"
 >;
 
 export interface SessionRunCompletionCheckpoint {
   backupId: SandboxBackupId;
   dir: string;
-  nativeResume: NativeResumeSnapshot | null;
+  nativeResume: NativeResumeSnapshot;
   sandboxId: SandboxId;
   sessionId: SessionId;
   sessionRunId: SessionRunId;
@@ -42,8 +46,13 @@ export async function prepareSessionRunCompletionCheckpoint(
   if (link.sandboxId === null || link.sessionId === null || link.sessionRunId === null) {
     throw new Error("Session completion requires a linked workspace.");
   }
-  const run = await getSessionRunSummary(bindings.DB, link.sessionRunId);
-  if (run !== null && isTerminalSessionRunStatus(run.status)) {
+  const db = getAppDatabase(bindings.DB);
+  const run = await db
+    .select({ status: sessionRunsTable.status, runtimeId: sessionRunsTable.runtimeId })
+    .from(sessionRunsTable)
+    .where(eq(sessionRunsTable.id, link.sessionRunId))
+    .get();
+  if (run !== undefined && isTerminalSessionRunStatus(run.status)) {
     return undefined;
   }
 
@@ -56,6 +65,8 @@ export async function prepareSessionRunCompletionCheckpoint(
     const nativeResume =
       (await getAppDatabase(bindings.DB)
         .select({
+          committedSessionRunId: nativeResumeRefsTable.committedSessionRunId,
+          committedValue: nativeResumeRefsTable.committedValue,
           kind: nativeResumeRefsTable.kind,
           observedSessionRunId: nativeResumeRefsTable.observedSessionRunId,
           runtimeId: nativeResumeRefsTable.runtimeId,
@@ -64,6 +75,18 @@ export async function prepareSessionRunCompletionCheckpoint(
         .from(nativeResumeRefsTable)
         .where(eq(nativeResumeRefsTable.sessionId, link.sessionId))
         .get()) ?? null;
+    if (
+      nativeResume === null ||
+      nativeResume.value.trim().length === 0 ||
+      nativeResume.runtimeId !== run?.runtimeId ||
+      (nativeResume.observedSessionRunId !== link.sessionRunId &&
+        (nativeResume.committedSessionRunId === null ||
+          nativeResume.value !== nativeResume.committedValue))
+    ) {
+      throw new Error(
+        "Session completion requires a valid native resume cursor for this runtime and turn.",
+      );
+    }
     const backup = await createRuntimeSandboxBackup(bindings, {
       dir: target.cwd,
       sandboxId: link.sandboxId,
@@ -91,9 +114,6 @@ export function completionCheckpointSnapshotCondition(
   const query = db
     .select({ sessionId: nativeResumeRefsTable.sessionId })
     .from(nativeResumeRefsTable);
-  if (snapshot === null) {
-    return notExists(query.where(eq(nativeResumeRefsTable.sessionId, checkpoint.sessionId)));
-  }
   return exists(
     query.where(
       and(
@@ -104,6 +124,12 @@ export function completionCheckpointSnapshotCondition(
         snapshot.observedSessionRunId === null
           ? isNull(nativeResumeRefsTable.observedSessionRunId)
           : eq(nativeResumeRefsTable.observedSessionRunId, snapshot.observedSessionRunId),
+        snapshot.committedSessionRunId === null
+          ? isNull(nativeResumeRefsTable.committedSessionRunId)
+          : eq(nativeResumeRefsTable.committedSessionRunId, snapshot.committedSessionRunId),
+        snapshot.committedValue === null
+          ? isNull(nativeResumeRefsTable.committedValue)
+          : eq(nativeResumeRefsTable.committedValue, snapshot.committedValue),
       ),
     ),
   );
@@ -178,9 +204,6 @@ export function completionCheckpointWrites(
       .from(sessionRunsTable)
       .where(and(eq(sessionRunsTable.id, checkpoint.sessionRunId), sql`changes() = 1`)),
   );
-  if (checkpoint.nativeResume?.observedSessionRunId !== checkpoint.sessionRunId) {
-    return [insert];
-  }
   return [
     insert,
     db

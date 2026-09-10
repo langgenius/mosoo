@@ -25,6 +25,7 @@ import { DriverInstanceRpcEventIngestionController } from "../src/modules/runtim
 import { RuntimeSessionViewCache } from "../src/modules/runtime/infrastructure/driver-instance/runtime-session-view-cache";
 import { recordDriverInstanceCompletion } from "../src/modules/runtime/infrastructure/driver-instance/terminal-driver-events";
 import type { SandboxHandle } from "../src/modules/runtime/infrastructure/sandbox-handles";
+import { isCattleTerminalCheckpointReadyForNextRun } from "../src/modules/runtime/infrastructure/session-runs/session-run-admission.repository";
 import { getSessionRunSummary } from "../src/modules/runtime/infrastructure/session-runs/session-run-read.repository";
 import { setSessionRunStatus } from "../src/modules/runtime/infrastructure/session-runs/session-run-write.repository";
 import { loadSessionViewerState } from "../src/modules/sessions/application/session-live-state.service";
@@ -597,6 +598,103 @@ describe("runtime final output ingestion", () => {
       database.prepare("SELECT committed_value FROM native_resume_ref").first(),
     ).resolves.toEqual({ committed_value: "thread-durable-completion" });
   });
+
+  test.each(["missing", "uncommitted previous turn", "different runtime"] as const)(
+    "cannot complete with a %s native resume cursor",
+    async (cursorState) => {
+      let backupCalls = 0;
+      const { bindings, database } = await createCheckpointCompletionFixture(async (options) => {
+        backupCalls += 1;
+        return { dir: options.dir, id: crypto.randomUUID() };
+      });
+      if (cursorState === "missing") {
+        database.execute("DELETE FROM native_resume_ref");
+      } else if (cursorState === "uncommitted previous turn") {
+        database.execute("UPDATE native_resume_ref SET observed_session_run_id = NULL");
+      } else {
+        database.execute(
+          "UPDATE native_resume_ref SET runtime_id = 'claude-agent-sdk', kind = 'claude_session_id'",
+        );
+      }
+      await expect(
+        recordDriverInstanceCompletion(bindings, {
+          driverInstanceId: DRIVER_ID,
+          driverReady: true,
+        }),
+      ).rejects.toThrow("checkpoint failed");
+      expect((await getSessionRunSummary(database, RUN_ID))?.status).toBe("running");
+      expect(backupCalls).toBe(0);
+    },
+  );
+
+  test("commits a stable cursor already saved by a previous successful turn", async () => {
+    const { bindings, database } = await createCheckpointCompletionFixture(async (options) => ({
+      dir: options.dir,
+      id: crypto.randomUUID(),
+    }));
+    const previousRunId = createPlatformId<SessionRunId>();
+    database.execute(
+      `UPDATE native_resume_ref SET observed_session_run_id = '${previousRunId}', committed_session_run_id = '${previousRunId}', committed_value = value`,
+    );
+    await recordDriverInstanceCompletion(bindings, {
+      driverInstanceId: DRIVER_ID,
+      driverReady: true,
+    });
+    await expect(
+      database
+        .prepare("SELECT committed_session_run_id, committed_value FROM native_resume_ref")
+        .first(),
+    ).resolves.toEqual({
+      committed_session_run_id: RUN_ID,
+      committed_value: "thread-durable-completion",
+    });
+  });
+
+  test.each(["assistant", "terminal event"] as const)(
+    "blocks follow-up after %s persistence fails and replays without another checkpoint",
+    async (failure) => {
+      let backupCalls = 0;
+      const { bindings, database } = await createCheckpointCompletionFixture(async (options) => {
+        backupCalls += 1;
+        return { dir: options.dir, id: crypto.randomUUID() };
+      });
+      database.execute(
+        failure === "assistant"
+          ? `
+        CREATE TRIGGER reject_final_output BEFORE INSERT ON session_message WHEN NEW.role = 'assistant'
+        BEGIN SELECT RAISE(ABORT, 'injected assistant persistence failure'); END;
+      `
+          : `
+        CREATE TRIGGER reject_final_output BEFORE INSERT ON session_event WHEN NEW.event_type = 'run.completed'
+        BEGIN SELECT RAISE(ABORT, 'injected terminal history persistence failure'); END;
+      `,
+      );
+      const events = [
+        runtimeEvent({
+          kind: "run.completed",
+          payload: {
+            finalMessageId: createPlatformId<SessionMessageId>(),
+            finalMessageText: FINAL_TEXT,
+            stopReason: "end_turn",
+          },
+          sourceEventId: TERMINAL_SOURCE_EVENT_ID,
+        }),
+      ];
+      await expect(pushFreshController(bindings, events)).rejects.toBeInstanceOf(Error);
+      await expect(isCattleTerminalCheckpointReadyForNextRun(database, SESSION_ID)).resolves.toBe(
+        false,
+      );
+      database.execute("DROP TRIGGER reject_final_output");
+      await pushFreshController(bindings, events);
+      await expect(isCattleTerminalCheckpointReadyForNextRun(database, SESSION_ID)).resolves.toBe(
+        true,
+      );
+      await expect(
+        readPublicThreadRunFinalOutput({ database, runId: RUN_ID, sessionId: SESSION_ID }),
+      ).resolves.toEqual({ text: FINAL_TEXT });
+      expect(backupCalls).toBe(1);
+    },
+  );
 
   test.each([
     ["omits", false],

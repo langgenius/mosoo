@@ -83,6 +83,22 @@ function admissionSessionPredicate(input: CommitQueuedSessionRunAdmissionInput) 
   );
 }
 
+export function completedRunHistoryPredicate(
+  db: AppDatabase,
+  runId: SessionRunId | typeof sessionsTable.lastRunId,
+) {
+  // Completion history is written after canonical output. A ready backup alone
+  // must not admit input while the previous turn's final projection is retrying.
+  return exists(
+    db
+      .select({ id: sessionEventsTable.id })
+      .from(sessionEventsTable)
+      .where(
+        and(eq(sessionEventsTable.runId, runId), eq(sessionEventsTable.eventType, "run.completed")),
+      ),
+  );
+}
+
 function claimableSessionPredicate(db: AppDatabase, input: CommitQueuedSessionRunAdmissionInput) {
   return and(
     eq(sessionsTable.id, input.session.id),
@@ -122,6 +138,7 @@ function claimableSessionPredicate(db: AppDatabase, input: CommitQueuedSessionRu
             and(
               eq(sandboxBackupsTable.sessionRunId, sessionsTable.lastRunId),
               eq(sandboxBackupsTable.status, "ready"),
+              completedRunHistoryPredicate(db, sessionsTable.lastRunId),
             ),
           ),
       ),
@@ -198,6 +215,7 @@ export async function isCattleTerminalCheckpointReadyForNextRun(
         and(
           eq(sandboxBackupsTable.sessionRunId, session.lastRunId),
           eq(sandboxBackupsTable.status, "ready"),
+          completedRunHistoryPredicate(appDb, session.lastRunId),
         ),
       )
       .limit(1)
