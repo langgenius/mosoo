@@ -22,6 +22,7 @@ import {
 } from "../session-runs/session-run-admission.repository";
 import {
   activeConversationSessionQuery,
+  activeSessionRunQueryForListedSubject,
   mapReadyRuntimeSubjectBackup,
   readyConversationBackupTable,
   runLeaseQuery,
@@ -169,6 +170,56 @@ export async function listIdleSessionScopedConversationSessions(
         ),
       ),
     )
+    .limit(input.limit)
+    .all();
+}
+
+// Older releases could publish success before the terminal checkpoint. A follow-up
+// is blocked by the admission gate until this exact completed turn is durable.
+export async function listPendingIdleConversationCheckpoints(
+  database: D1Database,
+  input: { readonly idleSinceLte: number; readonly limit: number },
+) {
+  const appDb = getAppDatabase(database);
+  return appDb
+    .select({
+      sandboxId: sandboxSessionsTable.sandboxId,
+      sessionId: sandboxSessionsTable.sessionId,
+      sessionRunId: sessionRunsTable.id,
+    })
+    .from(sandboxSessionsTable)
+    .innerJoin(sandboxesTable, eq(sandboxesTable.id, sandboxSessionsTable.sandboxId))
+    .innerJoin(sessionsTable, eq(sessionsTable.id, sandboxSessionsTable.sessionId))
+    .innerJoin(sessionRunsTable, eq(sessionRunsTable.id, sessionsTable.lastRunId))
+    .where(
+      and(
+        eq(sandboxSessionsTable.status, "active"),
+        eq(sandboxesTable.status, "active"),
+        eq(sandboxesTable.kind, "cattle"),
+        eq(sessionsTable.status, "IDLE"),
+        eq(sessionsTable.workspaceCheckpointRequired, true),
+        eq(sessionRunsTable.status, "completed"),
+        lte(sandboxSessionsTable.updatedAt, input.idleSinceLte),
+        isNull(sandboxesTable.claimOwner),
+        notExists(activeSessionRunQueryForListedSubject(appDb)),
+        notExists(runLeaseQueryForListedSubject(appDb)),
+        completedRunHistoryPredicate(appDb, sessionsTable.lastRunId),
+        notExists(
+          appDb
+            .select({ id: sandboxBackupsTable.id })
+            .from(sandboxBackupsTable)
+            .where(
+              and(
+                eq(sandboxBackupsTable.sandboxId, sandboxSessionsTable.sandboxId),
+                eq(sandboxBackupsTable.dir, sandboxSessionsTable.cwd),
+                eq(sandboxBackupsTable.sessionRunId, sessionRunsTable.id),
+                eq(sandboxBackupsTable.status, "ready"),
+              ),
+            ),
+        ),
+      ),
+    )
+    .orderBy(sandboxSessionsTable.sessionId)
     .limit(input.limit)
     .all();
 }

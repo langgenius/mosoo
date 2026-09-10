@@ -25,12 +25,8 @@ export interface SessionRuntimePrewarmAck {
 /**
  * Re-schedules the prewarm pipeline for an existing session.
  *
- * The viewer-socket entry point already prewarms once on initial connect, but
- * Durable Object hibernation after a few minutes of idle clears the warm
- * driver state with no automatic re-trigger. This service is the cheap path
- * that lets the client request another prewarm — e.g. when the user resumes
- * typing in the follow-up composer — without having to actually send a
- * message to discover that the runtime went cold.
+ * Viewer sockets only subscribe to events. Explicit composer activity can
+ * request prewarm here before a user sends another message.
  *
  * Authorization piggy-backs on participant access (same gate that lets a
  * viewer read messages). The underlying scheduler is fire-and-forget through
