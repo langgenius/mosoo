@@ -122,8 +122,8 @@ function AgentDetailHeader({
   const { t } = useTranslation();
 
   return (
-    <header className="border-border-subtle relative flex min-h-13 shrink-0 flex-wrap items-center gap-y-2 border-b bg-white px-3 py-2 sm:px-5 md:h-13 md:flex-nowrap md:py-0">
-      <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
+    <header className="border-border-subtle flex min-h-13 shrink-0 flex-wrap items-center gap-y-2 border-b bg-white px-3 py-2 sm:px-5 lg:h-13 lg:flex-nowrap lg:py-0">
+      <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3 lg:flex-initial">
         <Button
           aria-label={t("agent.backToAgents")}
           variant="ghost"
@@ -139,7 +139,10 @@ function AgentDetailHeader({
             <RuntimeIcon runtime={runtime} size={28} />
           </span>
         ) : null}
-        <span className="text-foreground min-w-0 truncate text-[14px] font-medium">
+        <span
+          className="text-foreground min-w-0 truncate text-[14px] font-medium"
+          title={agent.name}
+        >
           {agent.name}
         </span>
         {agent.status === "draft" ? (
@@ -163,7 +166,10 @@ function AgentDetailHeader({
         ) : null}
       </div>
 
-      <div className="border-border-subtle order-3 flex w-full items-center gap-1 overflow-x-auto border-t pt-2 md:absolute md:left-1/2 md:order-none md:w-auto md:-translate-x-1/2 md:border-0 md:pt-0">
+      {/* From lg the tab strip stays in flow with auto margins: centred while there
+          is room, and a long name truncates inside the identity cluster instead of
+          running underneath the tabs. Below lg the strip wraps to its own row. */}
+      <div className="border-border-subtle order-3 flex w-full items-center gap-1 overflow-x-auto border-t pt-2 lg:order-none lg:mx-auto lg:w-auto lg:shrink-0 lg:border-0 lg:px-3 lg:pt-0">
         {MODE_TABS.map((tab) => (
           <button
             key={tab.id}

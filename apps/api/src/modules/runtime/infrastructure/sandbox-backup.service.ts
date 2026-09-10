@@ -3,6 +3,7 @@ import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { shouldBackupSandboxSession } from "../../sessions/domain/session-lifecycle";
 import type { RuntimeCheckpointRule } from "../domain/runtime-kind-policy";
 import { RuntimeSubjectCheckpointFailedError } from "./runtime-subject-lifecycle/runtime-subject-errors";
+import { SANDBOX_BACKUP_TTL_SECONDS } from "./sandbox-backup-config";
 import { createRuntimeSandboxBackup, deleteSandboxBackupObjects } from "./sandbox-backup-platform";
 import { selectSandboxBackupPruneIds } from "./sandbox-backup-pruning";
 import type { CreatedSandboxBackupWrite } from "./sandbox-backup-store";
@@ -15,8 +16,6 @@ import {
   markSandboxBackupsPruned,
   recordCreatedSandboxBackups,
 } from "./sandbox-backup-store";
-
-const BACKUP_TTL_SECONDS = 10 * 365 * 24 * 60 * 60;
 
 export interface SandboxSessionBackupTarget {
   cwd: string;
@@ -106,7 +105,7 @@ async function createSandboxBackupsForTargets(
         dir: target.dir,
         sandboxId: input.sandboxId,
         sessionId: target.sessionId,
-        ttlSeconds: BACKUP_TTL_SECONDS,
+        ttlSeconds: SANDBOX_BACKUP_TTL_SECONDS,
       }).catch((error: unknown) => {
         throw new RuntimeSubjectCheckpointFailedError({
           cause: error,
@@ -152,7 +151,7 @@ async function recordCreatedCheckpointBackups(
       ...(input.operationId === undefined ? {} : { operationId: input.operationId }),
       sandboxId: input.sandboxId,
       ...(input.sessionRunId === undefined ? {} : { sessionRunId: input.sessionRunId }),
-      ttlSeconds: BACKUP_TTL_SECONDS,
+      ttlSeconds: SANDBOX_BACKUP_TTL_SECONDS,
     });
   } catch (error) {
     if (input.sessionRunId !== undefined) {
@@ -257,26 +256,24 @@ async function createSandboxCheckpointBackups(
       ).map((backup) => backup.dir),
     );
     targets = targets.filter((target) => !readyDirs.has(target.dir));
-
-    if (targets.length === 0) {
-      return;
-    }
   }
 
-  const backups = await createSandboxBackupsForTargets(bindings, {
-    sandboxId: input.sandboxId,
-    targets,
-  });
+  if (targets.length > 0) {
+    const backups = await createSandboxBackupsForTargets(bindings, {
+      sandboxId: input.sandboxId,
+      targets,
+    });
 
-  await recordCreatedCheckpointBackups(bindings, {
-    backups,
-    ...(input.requiredSessionId === undefined
-      ? {}
-      : { checkpointSessionId: input.requiredSessionId }),
-    ...(input.operationId === undefined ? {} : { operationId: input.operationId }),
-    sandboxId: input.sandboxId,
-    ...(input.sessionRunId === undefined ? {} : { sessionRunId: input.sessionRunId }),
-  });
+    await recordCreatedCheckpointBackups(bindings, {
+      backups,
+      ...(input.requiredSessionId === undefined
+        ? {}
+        : { checkpointSessionId: input.requiredSessionId }),
+      ...(input.operationId === undefined ? {} : { operationId: input.operationId }),
+      sandboxId: input.sandboxId,
+      ...(input.sessionRunId === undefined ? {} : { sessionRunId: input.sessionRunId }),
+    });
+  }
 
   try {
     await pruneSandboxBackups(bindings, input.sandboxId);

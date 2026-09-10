@@ -13,6 +13,11 @@ they create or continue work for an end user.
 
 ## User flow
 
+Viewing history or reconnecting its event stream does not wake the Sandbox. Explicit
+composer activity may prewarm it; sending a task activates it when needed.
+Maintenance retries missing checkpoints for idle completed turns before reclamation;
+a failed backup keeps the resident workspace available for another attempt.
+
 1. A user starts a Thread and sends a task. While the Agent is working, output appears in the
    conversation.
 2. In Preview or live chat, **Stop generating** ends the current attempt. The Thread remains

@@ -1,18 +1,11 @@
 import { describe, expect, test } from "bun:test";
 
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
-import {
-  connectAuthenticatedSessionViewerWebSocket,
-  shouldSchedulePreviewRuntimePrewarmForViewerSocket,
-} from "../src/modules/sessions/application/session-viewer-socket.service";
-import type {
-  SessionViewerSocketConnector,
-  SessionViewerSocketRuntimePrewarmRequest,
-} from "../src/modules/sessions/application/session-viewer-socket.service";
+import { connectAuthenticatedSessionViewerWebSocket } from "../src/modules/sessions/application/session-viewer-socket.service";
+import type { SessionViewerSocketConnector } from "../src/modules/sessions/application/session-viewer-socket.service";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import {
   createPublicHttpTestBindings,
-  createTestExecutionContext,
   SqliteD1Database,
 } from "./helpers/public-api-http-test-fixture";
 
@@ -128,22 +121,15 @@ async function connectForTest(input: {
 }): Promise<{
   connectorCallCount: number;
   response: Response;
-  scheduledRequest: SessionViewerSocketRuntimePrewarmRequest | null;
 }> {
-  const executionContext = createTestExecutionContext();
   let connectorCallCount = 0;
-  let scheduledRequest: SessionViewerSocketRuntimePrewarmRequest | null = null;
   const sessionViewerSocketConnector: SessionViewerSocketConnector = async () => {
     connectorCallCount += 1;
     return createSocketResponse(input.responseStatus);
   };
 
   const response = await connectAuthenticatedSessionViewerWebSocket(createBindings(input), {
-    executionContext,
     request: new Request(SESSION_VIEWER_SOCKET_URL),
-    runtimePrewarmScheduler: (request) => {
-      scheduledRequest = request;
-    },
     projectId: PROJECT_ID,
     sessionId: SESSION_ID,
     sessionViewerSocketConnector,
@@ -153,89 +139,44 @@ async function connectForTest(input: {
   return {
     connectorCallCount,
     response,
-    scheduledRequest,
   };
 }
 
-describe("session viewer socket runtime prewarm", () => {
-  test("schedules prewarm only after an active preview viewer socket is accepted", async () => {
-    const { connectorCallCount, response, scheduledRequest } = await connectForTest({
-      responseStatus: 101,
-      type: "preview",
-    });
+describe("session viewer socket subscriptions", () => {
+  test.each(["preview", "ui"] as const)(
+    "accepts repeated %s subscriptions without runtime bindings",
+    async (type) => {
+      // The fixture has no Sandbox/Driver runtime. Every reconnect must remain read-only.
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        const { connectorCallCount, response } = await connectForTest({
+          responseStatus: 101,
+          type,
+        });
+        expect(connectorCallCount).toBe(1);
+        expect(response.status).toBe(101);
+      }
+    },
+  );
 
-    expect(connectorCallCount).toBe(1);
-    expect(response.status).toBe(101);
-    expect(scheduledRequest).not.toBeNull();
-    if (!scheduledRequest) {
-      throw new Error("Expected accepted preview viewer socket to schedule runtime prewarm.");
-    }
-
-    expect(scheduledRequest.requestUrl).toBe(SESSION_VIEWER_SOCKET_URL);
-    expect(scheduledRequest.session).toEqual({
-      id: SESSION_ID,
-      projectId: PROJECT_ID,
-    });
-    expect(scheduledRequest.viewer).toBe(VIEWER);
-  });
-
-  test("does not schedule prewarm when the preview viewer socket is rejected", async () => {
-    const { connectorCallCount, response, scheduledRequest } = await connectForTest({
-      responseStatus: 426,
-      type: "preview",
-    });
-
-    expect(connectorCallCount).toBe(1);
+  test("preserves a rejected socket response", async () => {
+    const { response } = await connectForTest({ responseStatus: 426, type: "preview" });
     expect(response.status).toBe(426);
-    expect(scheduledRequest).toBeNull();
-    expect(
-      shouldSchedulePreviewRuntimePrewarmForViewerSocket({
-        responseStatus: 426,
-        sessionType: "preview",
-      }),
-    ).toBe(false);
   });
 
-  test("does not schedule prewarm for an accepted UI viewer socket", async () => {
-    const { connectorCallCount, response, scheduledRequest } = await connectForTest({
-      responseStatus: 101,
-      type: "ui",
-    });
-
-    expect(connectorCallCount).toBe(1);
-    expect(response.status).toBe(101);
-    expect(scheduledRequest).toBeNull();
-    expect(
-      shouldSchedulePreviewRuntimePrewarmForViewerSocket({
-        responseStatus: 101,
-        sessionType: "ui",
-      }),
-    ).toBe(false);
-  });
-
-  test("does not connect or prewarm when the viewer cannot access the session", async () => {
-    let scheduledRequest: SessionViewerSocketRuntimePrewarmRequest | null = null;
+  test("does not connect when the viewer cannot access the session", async () => {
     let connectorCallCount = 0;
-    const sessionViewerSocketConnector: SessionViewerSocketConnector = async () => {
-      connectorCallCount += 1;
-      return createSocketResponse(101);
-    };
-
     await expect(
       connectAuthenticatedSessionViewerWebSocket(createBindings({ type: "preview" }), {
-        executionContext: createTestExecutionContext(),
         request: new Request(SESSION_VIEWER_SOCKET_URL),
-        runtimePrewarmScheduler: (request) => {
-          scheduledRequest = request;
-        },
         projectId: PROJECT_ID,
         sessionId: SESSION_ID,
-        sessionViewerSocketConnector,
+        sessionViewerSocketConnector: async () => {
+          connectorCallCount += 1;
+          return createSocketResponse(101);
+        },
         viewer: OUTSIDER_VIEWER,
       }),
     ).rejects.toThrow();
-
     expect(connectorCallCount).toBe(0);
-    expect(scheduledRequest).toBeNull();
   });
 });

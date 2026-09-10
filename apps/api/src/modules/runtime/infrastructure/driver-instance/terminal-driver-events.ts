@@ -9,6 +9,10 @@ import { appendSessionRuntimeEvents } from "../../../sessions/application/sessio
 import { projectRuntimeEventToSessionDeliveryEvents } from "../../../sessions/application/session-live-state.service";
 import { recordCanonicalSessionRunFailure } from "../../application/session-runs/session-run-terminal-failure.service";
 import { isTerminalSessionRunStatus } from "../../domain/session-run-status";
+import {
+  discardUncommittedCompletionCheckpoint,
+  prepareSessionRunCompletionCheckpoint,
+} from "../session-runs/session-run-completion-checkpoint";
 import { setSessionRunStatus } from "../session-runs/session-run-store.repository";
 import type { SessionRunTransitionOutcome } from "../session-runs/session-run-store.repository";
 import type { RuntimeSessionLink } from "./event-types";
@@ -164,11 +168,16 @@ async function synthesizeDriverRunFinished(
   // message, which may be progress or belong to an earlier run. The canonical
   // projection is written only by an ordered runtime run.completed event that
   // names finalMessageId.
+  const completionCheckpoint = await prepareSessionRunCompletionCheckpoint(
+    input.bindings,
+    input.link,
+  );
   const outcome = await setSessionRunStatus(database, {
+    ...(completionCheckpoint === undefined ? {} : { completionCheckpoint }),
     runId: input.link.sessionRunId,
     source: "driver",
     status: "completed",
-  });
+  }).finally(() => discardUncommittedCompletionCheckpoint(input.bindings, completionCheckpoint));
   assertTerminalDriverSessionRunTransition(outcome);
   if (isStaleTerminalRunTransition(outcome) && !isStaleTerminalRunStatus(outcome, "completed")) {
     return;

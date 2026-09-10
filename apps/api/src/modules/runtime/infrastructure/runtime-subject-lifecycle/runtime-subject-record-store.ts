@@ -11,7 +11,7 @@ import type {
   SandboxBackupId,
   SandboxId,
 } from "@mosoo/id";
-import { and, eq, inArray, isNull, lte, notExists, or, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, lte, notExists, or, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 
 import { getAppDatabase, getD1ChangeCount } from "../../../../platform/db/drizzle";
@@ -28,13 +28,16 @@ import type { RuntimeSubjectOperationStatus } from "../../domain/runtime-subject
 import {
   activeSessionRunQueryForListedSubject,
   lastBackupTable,
+  liveDriverInstanceQueryForListedSubject,
   mapRuntimeSubjectBackup,
   mapReadyRuntimeSubjectBackup,
   readyLastBackupTable,
   runLeaseQuery,
+  runLeaseQueryForListedSubject,
 } from "./runtime-subject-store-queries";
 import type {
   RuntimeSubjectActivationRecord,
+  RuntimeSubjectOperationRepairCandidate,
   RuntimeSubjectRecord,
   RuntimeSubjectStatus,
 } from "./runtime-subject-store.types";
@@ -455,6 +458,65 @@ export async function markRuntimeSubjectActive(
     .run();
 
   return getD1ChangeCount(result) > 0;
+}
+
+/** Fence abandoned restores into the existing retryable teardown path. */
+export async function claimExpiredRuntimeSubjectActivations(
+  database: D1Database,
+  input: {
+    readonly limit: number;
+    readonly now: number;
+    readonly staleChangedAtLte: number;
+  },
+): Promise<RuntimeSubjectOperationRepairCandidate[]> {
+  const appDb = getAppDatabase(database);
+  const eligible = and(
+    eq(sandboxesTable.status, "restoring"),
+    lte(sandboxesTable.statusChangedAt, input.staleChangedAtLte),
+    or(isNull(sandboxesTable.claimExpiresAt), lte(sandboxesTable.claimExpiresAt, input.now)),
+    notExists(liveDriverInstanceQueryForListedSubject(appDb)),
+    notExists(activeSessionRunQueryForListedSubject(appDb)),
+    notExists(runLeaseQueryForListedSubject(appDb)),
+  );
+  const candidates = await appDb
+    .select({ id: sandboxesTable.id, kind: sandboxesTable.kind, seq: sandboxesTable.statusSeq })
+    .from(sandboxesTable)
+    .where(eligible)
+    .orderBy(asc(sandboxesTable.id))
+    .limit(input.limit)
+    .all();
+  const claimed: RuntimeSubjectOperationRepairCandidate[] = [];
+  for (const candidate of candidates) {
+    const operationId = createPlatformId<RuntimeOperationId>();
+    // Recheck both the lease and live-work guards at the write boundary.
+    const result = await appDb
+      .update(sandboxesTable)
+      .set({
+        claimOwner: null,
+        claimExpiresAt: null,
+        inactiveDeadlineAt: null,
+        lastError: "Runtime subject activation expired before restore completed.",
+        lastErrorCode: "runtime.subject_activation_failed",
+        ...runtimeSubjectStatusPatch({
+          now: input.now,
+          operationId,
+          source: "maintenance",
+          status: "destroying",
+        }),
+      })
+      .where(
+        and(
+          eligible,
+          eq(sandboxesTable.id, candidate.id),
+          eq(sandboxesTable.statusSeq, candidate.seq),
+        ),
+      )
+      .run();
+    if (getD1ChangeCount(result) > 0) {
+      claimed.push({ id: candidate.id, kind: candidate.kind, operationId, status: "destroying" });
+    }
+  }
+  return claimed;
 }
 
 export async function markRuntimeSubjectActivationDestroying(

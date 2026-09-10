@@ -1,5 +1,7 @@
 import { ApiError } from "../../../platform/errors";
 
+export const SANDBOX_BACKUP_TTL_SECONDS = 10 * 365 * 24 * 60 * 60;
+
 export const SANDBOX_BACKUP_CREDENTIAL_KEYS = [
   "CLOUDFLARE_ACCOUNT_ID",
   "R2_ACCESS_KEY_ID",

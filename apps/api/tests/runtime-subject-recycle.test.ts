@@ -13,6 +13,7 @@ import {
 import {
   listInactiveRuntimeSubjects,
   listStaleRuntimeSubjectOperations,
+  claimExpiredRuntimeSubjectActivations,
 } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-store";
 import { encodeSandboxBackupIdForStorage } from "../src/modules/runtime/infrastructure/sandbox-backup-id";
 import type { SandboxHandle } from "../src/modules/runtime/infrastructure/sandbox-handles";
@@ -646,5 +647,82 @@ describe("runtime subject recycle", () => {
         status: "destroying",
       },
     ]);
+  });
+
+  test("repairs an expired restore without an operation id and preserves its backup", async () => {
+    const database = createRuntimeSubjectRecycleDatabase();
+    await database
+      .prepare(
+        "UPDATE sandbox SET status = 'restoring', status_changed_at = 10, claim_expires_at = 20, status_operation_id = NULL, last_backup_id = ? WHERE id = ?",
+      )
+      .bind(BACKUP_ID, SANDBOX_ID)
+      .run();
+    const [candidate] = await claimExpiredRuntimeSubjectActivations(database, {
+      limit: 20,
+      now: 30,
+      staleChangedAtLte: 10,
+    });
+    expect(candidate).toMatchObject({ id: SANDBOX_ID, status: "destroying" });
+    if (!candidate) throw new Error("Expected an expired activation repair.");
+    expect(isPlatformId(candidate.operationId)).toBe(true);
+    await expect(
+      claimExpiredRuntimeSubjectActivations(database, {
+        limit: 20,
+        now: 30,
+        staleChangedAtLte: 10,
+      }),
+    ).resolves.toEqual([]);
+    currentSandbox = {
+      ...createSandboxHandle(),
+      destroy: async () => {
+        throw new Error("temporary teardown failure");
+      },
+    };
+    const repair = {
+      kind: candidate.kind,
+      operationId: candidate.operationId,
+      reason: "test.expired_activation",
+      runtimeSubjectId: candidate.id,
+      status: candidate.status,
+    };
+    await expect(
+      resumeRuntimeSubjectRecycleOperation(createBindings(database), repair),
+    ).rejects.toThrow("temporary teardown failure");
+    await expect(readRuntimeSubjectRecycleRow(database)).resolves.toMatchObject({
+      status: "destroying",
+      status_operation_id: candidate.operationId,
+      last_backup_id: BACKUP_ID,
+    });
+    currentSandbox = { ...createSandboxHandle(), destroy: async () => {} };
+    await resumeRuntimeSubjectRecycleOperation(createBindings(database), repair);
+    await expect(readRuntimeSubjectRecycleRow(database)).resolves.toMatchObject({
+      status: "cold",
+      last_backup_id: BACKUP_ID,
+    });
+  });
+
+  test.each([
+    "UPDATE sandbox SET claim_expires_at = 31",
+    "INSERT INTO driver_instance (id, sandbox_id, status) SELECT 'leased', id, 'stopped' FROM sandbox; INSERT INTO session_run (id, driver_instance_id, status) VALUES ('lease', 'leased', 'running')",
+    "UPDATE sandbox SET status_changed_at = 11",
+    "INSERT INTO driver_instance (id, sandbox_id, status) SELECT 'live', id, 'ready' FROM sandbox",
+    "INSERT INTO session_run (id, session_id, status) SELECT 'run', subject_id, 'running' FROM sandbox",
+    "UPDATE sandbox SET subject_kind = 'agent'; INSERT INTO session_run (id, agent_id, status) SELECT 'run', subject_id, 'queued' FROM sandbox",
+  ])("does not reclaim a restore with live work or a fresh lease: %s", async (protection) => {
+    const database = createRuntimeSubjectRecycleDatabase();
+    database.execute(
+      "UPDATE sandbox SET status = 'restoring', status_changed_at = 10, claim_expires_at = 20, status_operation_id = NULL",
+    );
+    database.execute(protection);
+    await expect(
+      claimExpiredRuntimeSubjectActivations(database, {
+        limit: 20,
+        now: 30,
+        staleChangedAtLte: 10,
+      }),
+    ).resolves.toEqual([]);
+    await expect(readRuntimeSubjectRecycleRow(database)).resolves.toMatchObject({
+      status: "restoring",
+    });
   });
 });
