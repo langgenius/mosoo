@@ -19,6 +19,7 @@ export {
 export {
   advanceRuntimeSubjectOperationStatus,
   claimRuntimeSubjectActivation,
+  claimExpiredRuntimeSubjectActivations,
   ensureRuntimeSubjectId,
   getRuntimeSubject,
   getRuntimeSubjectActivationRecord,

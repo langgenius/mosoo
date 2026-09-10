@@ -26,7 +26,6 @@ export function registerRootRoute(app: Hono<ApiGatewayEnvironment>) {
 
     try {
       return await connectAuthenticatedSessionViewerWebSocket(c.env, {
-        executionContext: c.executionCtx,
         projectId: projectId ?? "",
         request: c.req.raw,
         sessionId,

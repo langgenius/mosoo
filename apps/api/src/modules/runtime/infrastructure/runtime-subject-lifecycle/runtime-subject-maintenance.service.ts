@@ -16,14 +16,19 @@ import { reconcileStaleActiveSessionRuns } from "../../application/session-runs/
 import { reconcileTerminalSessionRuns } from "../../application/session-runs/terminal-run-reconciliation.service";
 import { getRuntimeKindPolicy } from "../../domain/runtime-kind-policy";
 import { cleanupDriverInstances } from "../driver-instance/maintenance";
+import { createSandboxCheckpoints } from "../sandbox-backup.service";
 import { repairRuntimeCommandRecords } from "../session-runs/runtime-command-store.repository";
 import { createSessionStatusTransitionPatch } from "../session-runs/session-lifecycle-projection.repository";
 import { setSessionRunStatus } from "../session-runs/session-run-store.repository";
 import type { SessionRunTransitionOutcome } from "../session-runs/session-run-store.repository";
-import { listIdleSessionScopedConversationSessions } from "./runtime-conversation-session-store";
+import {
+  listPendingIdleConversationCheckpoints,
+  listIdleSessionScopedConversationSessions,
+} from "./runtime-conversation-session-store";
 import { repairStrandedRuntimeSubjectDeadlines } from "./runtime-subject-maintenance-store";
 import {
   claimInactiveRuntimeSubject,
+  claimExpiredRuntimeSubjectActivations,
   listInactiveRuntimeSubjects,
   listStaleRuntimeSubjectOperations,
 } from "./runtime-subject-store";
@@ -286,6 +291,33 @@ async function closeIdleSessionScopedConversationSessions(
   }
 }
 
+export async function repairIdleConversationCheckpoints(
+  bindings: ApiBindings,
+  now: number,
+): Promise<void> {
+  const policy = getRuntimeKindPolicy("cattle");
+  const pending = await listPendingIdleConversationCheckpoints(bindings.DB, {
+    idleSinceLte: now - policy.subject.idleReleaseDelayMs,
+    limit: MAINTENANCE_BATCH_SIZE,
+  });
+  for (const candidate of pending) {
+    try {
+      await createSandboxCheckpoints(bindings, {
+        requiredSessionId: candidate.sessionId,
+        rules: policy.checkpoint.createOnTerminal,
+        sandboxId: candidate.sandboxId,
+        sessionRunId: candidate.sessionRunId,
+      });
+    } catch (error) {
+      // Preserve the resident workspace and retry on the next sweep.
+      logWarn("runtime.conversation.checkpoint_repair_failed", {
+        ...createErrorLogContext(error),
+        ...candidate,
+      });
+    }
+  }
+}
+
 export async function runSandboxMaintenance(bindings: ApiBindings): Promise<void> {
   const now = Date.now();
 
@@ -312,6 +344,7 @@ export async function runSandboxMaintenance(bindings: ApiBindings): Promise<void
     limit: MAINTENANCE_BATCH_SIZE,
     staleUpdatedAtLte: now - MAINTENANCE_OPERATION_REPAIR_AFTER_MS,
   });
+  await repairIdleConversationCheckpoints(bindings, now);
   await closeIdleSessionScopedConversationSessions(bindings, now);
   const repairedDeadlines = await repairStrandedRuntimeSubjectDeadlines(bindings.DB, { now });
 
@@ -325,7 +358,7 @@ export async function runSandboxMaintenance(bindings: ApiBindings): Promise<void
     logWarn("runtime.subject.orphan_pet_deadline_repaired", { count: repairedDeadlines.pet });
   }
 
-  const [candidates, repairCandidates] = await Promise.all([
+  const [candidates, staleOperations, expiredActivations] = await Promise.all([
     listInactiveRuntimeSubjects(bindings.DB, {
       limit: MAINTENANCE_BATCH_SIZE,
       now,
@@ -334,7 +367,13 @@ export async function runSandboxMaintenance(bindings: ApiBindings): Promise<void
       limit: MAINTENANCE_BATCH_SIZE,
       staleChangedAtLte: now - MAINTENANCE_OPERATION_REPAIR_AFTER_MS,
     }),
+    claimExpiredRuntimeSubjectActivations(bindings.DB, {
+      limit: MAINTENANCE_BATCH_SIZE,
+      now,
+      staleChangedAtLte: now - MAINTENANCE_OPERATION_REPAIR_AFTER_MS,
+    }),
   ]);
+  const repairCandidates = [...staleOperations, ...expiredActivations];
 
   if (candidates.length === 0 && repairCandidates.length === 0) {
     return;
