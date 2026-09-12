@@ -7,6 +7,8 @@ import {
 import type { AgentPackage } from "@mosoo/contracts/agent-manifest";
 import { AGENT_MANIFEST_VERSION, AGENT_PACKAGE_VERSION } from "@mosoo/contracts/agent-manifest";
 
+import { readPackageAssets } from "../src/archive-assets";
+
 interface StoredZipEntry {
   body: Uint8Array;
   path: string;
@@ -233,6 +235,56 @@ describe("agent package archive entry admission", () => {
       "skills/demo/SKILL.md",
       "skills/demo/scripts/run.ts",
       "skills/other/SKILL.md",
+    ]);
+  });
+
+  test("indexes skill assets without changing declaration or entry order", () => {
+    const agentPackage = createAgentPackageFixture({
+      skills: [
+        {
+          ownerName: null,
+          skillId: "skills/demo/nested/",
+          skillName: "Nested",
+          state: "active",
+        },
+        {
+          ownerName: null,
+          skillId: "skills/demo/",
+          skillName: "Demo",
+          state: "active",
+        },
+        {
+          ownerName: null,
+          skillId: "skills/demo/",
+          skillName: "Demo duplicate",
+          state: "active",
+        },
+        {
+          ownerName: null,
+          skillId: "skills/empty/",
+          skillName: "Empty",
+          state: "active",
+        },
+      ],
+    });
+    const result = readPackageAssets(agentPackage, {
+      "skills/demo/nested/child.txt": textToArchiveBytes("child"),
+      "skills/demo/root.txt": textToArchiveBytes("root"),
+      "skills/empty/zero.txt": new Uint8Array(),
+    });
+
+    expect(result.assets.map((asset) => ({ filename: asset.filename, key: asset.key }))).toEqual([
+      { filename: "child.txt", key: "skills/demo/nested/child.txt" },
+      { filename: "nested/child.txt", key: "skills/demo/nested/child.txt" },
+      { filename: "root.txt", key: "skills/demo/root.txt" },
+      { filename: "nested/child.txt", key: "skills/demo/nested/child.txt" },
+      { filename: "root.txt", key: "skills/demo/root.txt" },
+    ]);
+    expect(result.issues).toEqual([
+      expect.objectContaining({
+        code: "package.skill.missing",
+        targetLabel: "Empty",
+      }),
     ]);
   });
 
