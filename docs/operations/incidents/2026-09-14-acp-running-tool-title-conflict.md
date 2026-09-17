@@ -1,6 +1,6 @@
 # 2026-09-14 — ACP Running Tool Titles Conflicted With Durable Identity
 
-- Status: Tenant-configuration canary passed; production release pending
+- Status: Resolved; staging and production canaries passed
 - Severity: SEV-2
 - Investigation window: 2026-09-14 00:00–2026-09-17 00:00 UTC
 - Affected surface: OpenCode (ACP) Runs
@@ -128,7 +128,59 @@ checkpoint `7MG8G930YJ2CKE1CA4Z07PCYSV` is `ready`. The final staging Worker
 version is `2aecfc79-a83b-4889-a8c2-b451b4c47e53`.
 
 The [Public API non-production smoke](https://github.com/langgenius/mosoo/actions/runs/35191744280)
-also passed after the staging update. Production release remains pending.
+also passed after the staging update.
+
+## Production Release
+
+[Driver #123](https://github.com/langgenius/mosoo-agent-driver/pull/123) and
+[Mosoo #630](https://github.com/langgenius/mosoo/pull/630) were merged after
+verification. Release commit `0178c2f91ac36dc19bd7b620257fcbdec6c38651` has
+the same tree as reviewed main commit
+`52b4cde0302de8d55d5827f3ddf9de25debf6237` and pins protocol-v2 Driver
+`ab1b2290786460b88f7de25eb91efcac84bc13c5`.
+
+The [release workflow](https://github.com/langgenius/mosoo/actions/runs/35192788811)
+passed the repository gate and isolated migration-chain check, then stopped
+at read-only production D1 inspection with Cloudflare authorization error 7403.
+That job performed no production deployment mutation. After repeating the
+production preflight with authorized Wrangler OAuth, `just deploy-api`
+published the reviewed API and container at September 17, 07:12:31.846 UTC:
+
+- Worker: `9f331765-4fda-4734-bc42-94546f20c1ef`.
+- Container: `sha256:42e47522ff1eabcf7caf28c4254527754dd33de1f8e6b491172463ff1156c7dc`.
+- The code release applied no database migration or secret change; Web was
+  unchanged. A separate storage-credential repair followed, as described below.
+- Production health, GraphQL, and homepage checks returned HTTP 200.
+
+The first production canary, `01M2Q3E7B6EMKBWC538C9R2CXD`, stopped during
+provisioning with `Network connection lost.` before any model or tool call.
+Its cause is unconfirmed and it is not evidence of the title-conflict bug.
+The next Run, `01M2Q3M5S1FNA09EB4Q6XWS1AR`, completed 70 distinct tool calls
+and committed all three artifacts. The original Skill validator passed in the
+sandbox and again after download. However, its final checkpoint failed with
+R2 HTTP 403. At 07:26:20.681 UTC, log `01M2Q44R090000000000000018` records
+`RuntimeSubjectCheckpointFailedError`, caused by `BackupCreateError` on the
+presigned upload while persisting `run.completed`. This is a separate storage
+authorization failure, not another tool identity conflict. The old credential's
+exact defect is unconfirmed because its secret value is unavailable.
+
+A new R2 credential was limited to object read/write access on the production
+file and sandbox-state buckets. Upload, read, and deletion of an incident-only
+probe returned HTTP 200, 200, and 204 on both buckets. With no queued or running
+production Runs, the matching storage secrets were applied at 07:37:22.575 UTC.
+Worker `34117295-6b55-44d9-847c-04a73b0d0a95` preserves the reviewed code and
+container. Historical data and existing tokens were not deleted. The new
+credential is a non-expiring user token; account-token administration is not
+available to the current operator, so future removal of this Cloudflare user
+must include a credential transfer.
+
+After this storage repair, production Run `01M2Q4TH9A0AW6E2DZKP5MGCSA`
+completed at 07:41:33.608 UTC on Thread `01M2Q4TGSEBC9BHX3WTKFV29NX`.
+It persisted 287 tool events for 71 distinct tool calls, committed all three
+artifacts, and passed the original Skill validator inside the sandbox and after
+download (`artifacts valid`, exit 0). Checkpoint `7M9P6Z4CSD2R00KPD8RA34X78K`
+is `ready`. The copied configuration and authorized OpenRouter route were
+preserved; no original customer task was replayed.
 
 ## Remaining Actions
 
@@ -137,11 +189,15 @@ also passed after the staging update. Production release remains pending.
       output artifacts and the Skill's artifact validator.
 - [x] Publish and review [Driver #123](https://github.com/langgenius/mosoo-agent-driver/pull/123),
       then pin revision `ab1b2290786460b88f7de25eb91efcac84bc13c5`.
-- [ ] Complete the production deploy verification runbook on the release commit.
-- [ ] Deploy the reviewed release and verify a fresh canary tool call completes
-      without persistence errors. Do not automatically replay the user's task.
+- [x] Complete the production deploy verification preflight on the release commit.
+- [x] Deploy the reviewed release, repair the independently failing checkpoint
+      credential, and complete a fresh production canary with validated artifacts
+      and a ready checkpoint.
+- [x] Close [#629 with sanitized diagnostics and release evidence](https://github.com/langgenius/mosoo/issues/629#issuecomment-5710838467).
 - [ ] Attribute the remaining historical failures individually before expanding
       the confirmed incident count beyond the inspected Runs.
+- [ ] Repair the GitHub production deployment credential's Cloudflare access
+      and rerun its read-only preflight.
 
 ## Lesson
 
