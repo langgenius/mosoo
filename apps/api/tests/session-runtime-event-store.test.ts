@@ -7,6 +7,8 @@ import type {
   RuntimeEventOrigin,
 } from "@mosoo/runtime-events";
 
+import type { RunId } from "../../driver/src/protocol/id";
+import { AcpTurnEventState } from "../../driver/src/runtimes/acp/acp-event-translator";
 import { RuntimeEventPersistenceCompactor } from "../src/modules/runtime/infrastructure/driver-instance/runtime-event-persistence-compactor";
 import {
   persistOneRuntimeEventPerSession,
@@ -519,6 +521,69 @@ describe("session runtime event store", () => {
       .prepare("SELECT COUNT(*) AS count FROM session_event")
       .first<{ count: number }>();
     expect(count?.count).toBe(3);
+  });
+
+  test("persists an ACP tool through changing progress titles without an identity conflict", async () => {
+    const database = createRuntimeEventStoreDatabase();
+    const state = new AcpTurnEventState();
+    state.begin({ messageId: "message-1", runId: "run-1" as RunId, sessionId: "session-1" });
+    let eventIndex = 0;
+
+    for (const update of [
+      {
+        kind: "execute",
+        rawInput: {},
+        sessionUpdate: "tool_call",
+        status: "pending",
+        title: "bash",
+        toolCallId: "tool-1",
+      },
+      {
+        rawInput: { command: "printf 'ok'", description: "Inspect repository" },
+        sessionUpdate: "tool_call_update",
+        status: "in_progress",
+        title: "printf 'ok'",
+        toolCallId: "tool-1",
+      },
+      {
+        rawOutput: { output: "ok", metadata: { exit: 0 } },
+        sessionUpdate: "tool_call_update",
+        status: "completed",
+        title: "Inspection complete",
+        toolCallId: "tool-1",
+      },
+    ]) {
+      const events = state.translateUpdate({ update });
+      await persistSessionRuntimeEvents(database, {
+        records: events.map((event) => ({
+          event: runtimeEvent({
+            id: `acp-title-${eventIndex++}`,
+            kind: event.kind,
+            occurredAtMs: 2_000 + eventIndex,
+            origin: "driver",
+            payload: event.payload,
+            runId: "run-1",
+          }),
+          occurredAt: 2_000 + eventIndex,
+          sourceEventId: event.sourceEventId ?? null,
+        })),
+        sessionId: "session-1",
+      });
+    }
+
+    const rows = await database
+      .prepare(
+        "SELECT tool_name, tool_input_json, content_text FROM session_event WHERE event_type = 'tool.call.updated' ORDER BY seq",
+      )
+      .all<{ tool_name: string | null; tool_input_json: string | null; content_text: string }>();
+    expect(rows.results).toHaveLength(3);
+    expect(rows.results.map((row) => row.tool_name)).toEqual(["bash", "bash", null]);
+    expect(rows.results.map((row) => row.tool_input_json)).toEqual([
+      null,
+      null,
+      '{"command":"printf \'ok\'","description":"Inspect repository"}',
+    ]);
+    expect(rows.results[2]?.content_text).toContain("Inspection complete result:");
   });
 
   test("rejects runtime event batches for a different envelope session", async () => {
