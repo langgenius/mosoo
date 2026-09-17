@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, spyOn, test } from "bun:test";
 
 import { driverInstancesTable, vendorCredentialsTable } from "@mosoo/db";
 import { parsePlatformId } from "@mosoo/id";
@@ -11,6 +11,7 @@ import { getRuntimeDriverLlmProxyPath } from "../src/modules/runtime/domain/runt
 import { createRuntimeActionToken } from "../src/modules/runtime/infrastructure/runtime-boot-token";
 import type { RuntimeActionTokenPayload } from "../src/modules/runtime/infrastructure/runtime-boot-token";
 import { storeVendorCredentialSecret } from "../src/modules/vendor-credentials/application/vendor-credential.secret-resolution";
+import { runWithRequestLogContext } from "../src/platform/cloudflare/logger";
 import type { ApiBindings, ApiGatewayEnvironment } from "../src/platform/cloudflare/worker-types";
 import {
   PUBLIC_API_TEST_IDS,
@@ -234,6 +235,84 @@ async function dispatch(bindings: ApiBindings, request: Request): Promise<Respon
 }
 
 describe("driver LLM proxy route", () => {
+  test.each([
+    { method: "DELETE", path: "/chat/completions", reason: "method_not_allowed" },
+    { path: "/responses", reason: "path_not_allowed" },
+    { path: "/private-path-content", reason: "path_not_allowed" },
+    { body: "private-invalid-json", reason: "body_invalid_json" },
+    { body: "[]", reason: "body_invalid_shape" },
+    { body: '{"prompt":"private-prompt"}', reason: "body_model_missing" },
+    { body: '{"model":null}', reason: "body_model_invalid" },
+    {
+      body: '{"model":"private-model-content","messages":[{"role":"user","content":"private-prompt"}]}',
+      reason: "body_model_mismatch",
+    },
+  ])(
+    "logs sanitized, trace-correlated rejection: $reason",
+    async ({ body, method, path, reason }) => {
+      const { bindings } = await setupFixture({ vendorId: "openai-compatible" });
+      const captured = captureUpstreamFetch();
+      const grant = await createLlmProxyGrant(bindings, {
+        modelId: "deepseek/deepseek-v4-flash",
+        modelProtocol: "openai-chat-completions",
+      });
+      const request = llmProxyRequest(
+        `${path ?? "/chat/completions"}?private_query=private-query-content`,
+        {
+          ...(method === "DELETE"
+            ? {}
+            : { body: body ?? '{"model":"deepseek/deepseek-v4-flash"}' }),
+          headers: {
+            Authorization: `Bearer ${grant}`,
+            "content-type": "application/json",
+            traceparent: "00-0123456789abcdef0123456789abcdef-0123456789abcdef-01",
+            "x-request-id": "proxy-rejection-test",
+          },
+          method: method ?? "POST",
+        },
+      );
+      const warning = spyOn(console, "warn").mockImplementation(() => {});
+
+      try {
+        const response = await runWithRequestLogContext(request, () => dispatch(bindings, request));
+
+        expect(response.status).toBe(403);
+        expect(await response.json()).toEqual({
+          error: "LLM proxy request is outside the granted model capability.",
+        });
+        expect(captured).toHaveLength(0);
+        expect(warning).toHaveBeenCalledTimes(1);
+        const serializedLog = String(warning.mock.calls[0]?.[0]);
+        const entry = JSON.parse(serializedLog);
+        expect(entry).toMatchObject({
+          message: "runtime.llm_proxy.capability_rejected",
+          context: {
+            traceId: "0123456789abcdef0123456789abcdef",
+            requestId: "proxy-rejection-test",
+          },
+        });
+        expect(entry.metadata).toEqual({
+          credentialId: CREDENTIAL_ID,
+          driverGeneration: 0,
+          driverInstanceId: DRIVER_INSTANCE_ID,
+          modelProtocol: "openai-chat-completions",
+          projectId: PROJECT_ID,
+          reason,
+        });
+        for (const sensitiveValue of [
+          grant,
+          UPSTREAM_API_KEY,
+          "private-",
+          "deepseek/deepseek-v4-flash",
+        ]) {
+          expect(serializedLog).not.toContain(sensitiveValue);
+        }
+      } finally {
+        warning.mockRestore();
+      }
+    },
+  );
+
   test("forwards api-key style requests with the vault credential injected", async () => {
     const { bindings } = await setupFixture();
     const captured = captureUpstreamFetch();
@@ -360,6 +439,53 @@ describe("driver LLM proxy route", () => {
     expect(captured[1]?.headers.get("content-type")).toStartWith("multipart/form-data; boundary=");
     expect(captured[1]?.body).toContain('name="model"');
     expect(captured[1]?.body).toContain("gpt-image-2");
+  });
+
+  test.each([
+    { models: [], reason: "body_model_missing" },
+    { models: ["gpt-image-2", "gpt-image-2"], reason: "body_model_ambiguous" },
+    { models: [new Blob(["private-model-content"])], reason: "body_model_invalid" },
+    { models: ["private-model-content"], reason: "body_model_mismatch" },
+    { models: [], malformed: true, reason: "body_invalid_multipart" },
+  ])("diagnoses rejected multipart edits: $reason", async ({ models, malformed, reason }) => {
+    const { bindings } = await setupFixture({ vendorId: "openai" });
+    const captured = captureUpstreamFetch();
+    const grant = await createLlmProxyGrant(bindings, {
+      imageModelId: "gpt-image-2",
+      modelId: "gpt-5.4",
+      modelProtocol: "openai-responses",
+    });
+    const body = new FormData();
+    for (const model of models) body.append("model", model);
+    body.append("prompt", "private-prompt");
+    body.append("image", new Blob(["private-image-content"]), "private-image-name.png");
+    const warning = spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const response = await dispatch(
+        bindings,
+        llmProxyRequest("/images/edits", {
+          body: malformed ? "private-invalid-multipart" : body,
+          headers: {
+            Authorization: `Bearer ${grant}`,
+            ...(malformed ? { "content-type": "multipart/form-data; boundary=missing" } : {}),
+          },
+          method: "POST",
+        }),
+      );
+
+      expect(response.status).toBe(403);
+      expect(captured).toHaveLength(0);
+      expect(warning).toHaveBeenCalledTimes(1);
+      const serializedLog = String(warning.mock.calls[0]?.[0]);
+      expect(JSON.parse(serializedLog)).toMatchObject({
+        message: "runtime.llm_proxy.capability_rejected",
+        metadata: { modelProtocol: "openai-responses", reason },
+      });
+      expect(serializedLog).not.toContain("private-");
+      expect(serializedLog).not.toContain(grant);
+    } finally {
+      warning.mockRestore();
+    }
   });
 
   test("rejects OpenAI image calls outside the scoped model capability", async () => {
