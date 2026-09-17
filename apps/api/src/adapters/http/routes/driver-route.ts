@@ -64,6 +64,8 @@ const HOP_BY_HOP_HEADERS = new Set([
 const LLM_PROXY_GRANT_HEADERS = new Set(["authorization", "x-api-key", "x-goog-api-key"]);
 const LLM_PROXY_PATH_MARKER = "/llm/proxy/";
 const LLM_PROXY_UNSAFE_PATH_ENCODING = /%(?:25|2f|5c)/iu;
+const MCP_PROXY_PATH_MARKER = "/mcp/proxy/";
+const MCP_PROXY_UNSAFE_PATH_ENCODING = /%(?:25|2f|5c)/iu;
 const OPENAI_IMAGE_API_PATHS = new Set(["/images/edits", "/images/generations"]);
 
 async function requireDriverActionGrant(c: Context<ApiGatewayEnvironment>) {
@@ -121,9 +123,14 @@ function copyProxyResponseHeaders(headers: Headers): Headers {
   return nextHeaders;
 }
 
-function toUpstreamProxyUrl(request: Request, upstreamUrl: string): string {
+function toUpstreamProxyUrl(request: Request, upstreamUrl: string, subPath = ""): string {
   const target = new URL(upstreamUrl);
   const incoming = new URL(request.url);
+
+  const trimmedSubPath = subPath.replace(/^\/+|\/+$/g, "");
+  if (trimmedSubPath.length > 0) {
+    target.pathname = target.pathname.replace(/\/+$/, "") + `/${trimmedSubPath}`;
+  }
 
   for (const [key, value] of incoming.searchParams) {
     if (key !== "grant") {
@@ -214,6 +221,44 @@ function extractLlmProxySubPath(pathname: string): string | null {
   const subPath = slashIndex === -1 ? "" : rest.slice(slashIndex);
 
   if (subPath.includes("\\") || LLM_PROXY_UNSAFE_PATH_ENCODING.test(subPath)) {
+    return null;
+  }
+
+  for (const segment of subPath.split("/")) {
+    let decoded: string;
+
+    try {
+      decoded = decodeURIComponent(segment);
+    } catch {
+      return null;
+    }
+
+    if (
+      decoded === "." ||
+      decoded === ".." ||
+      decoded.includes("/") ||
+      decoded.includes("\\") ||
+      decoded.includes("%")
+    ) {
+      return null;
+    }
+  }
+
+  return subPath;
+}
+
+function extractMcpProxySubPath(pathname: string): string | null {
+  const markerIndex = pathname.indexOf(MCP_PROXY_PATH_MARKER);
+
+  if (markerIndex === -1) {
+    return null;
+  }
+
+  const rest = pathname.slice(markerIndex + MCP_PROXY_PATH_MARKER.length);
+  const slashIndex = rest.indexOf("/");
+  const subPath = slashIndex === -1 ? "" : rest.slice(slashIndex);
+
+  if (subPath.includes("\\") || MCP_PROXY_UNSAFE_PATH_ENCODING.test(subPath)) {
     return null;
   }
 
@@ -453,6 +498,7 @@ async function proxyRuntimeMcpRequest(
     upstreamAccessToken: string;
     url: string;
   },
+  subPath: string,
 ): Promise<Response> {
   const init: RequestInit = {
     headers: copyProxyRequestHeaders(
@@ -467,7 +513,7 @@ async function proxyRuntimeMcpRequest(
     init.body = request.body;
   }
 
-  const response = await fetch(toUpstreamProxyUrl(request, input.url), init);
+  const response = await fetch(toUpstreamProxyUrl(request, input.url, subPath), init);
 
   return new Response(response.body, {
     headers: copyProxyResponseHeaders(response.headers),
@@ -780,7 +826,7 @@ export function registerDriverRoute(app: Hono<ApiGatewayEnvironment>) {
     }
   });
 
-  driver.all("/mcp/proxy/:serverId", async (c) => {
+  const handleRuntimeMcpProxy = async (c: Context<ApiGatewayEnvironment>) => {
     await cleanupDriverInstances(c.env);
 
     let grant: Awaited<ReturnType<typeof requireDriverAuthorizationGrant>>;
@@ -797,7 +843,7 @@ export function registerDriverRoute(app: Hono<ApiGatewayEnvironment>) {
     let serverId: McpServerId;
 
     try {
-      serverId = toPlatformId<McpServerId>(c.req.param("serverId"), "MCP server ID");
+      serverId = toPlatformId<McpServerId>(c.req.param("serverId") ?? "", "MCP server ID");
     } catch (error) {
       const response = driverPlatformIdErrorResponse(error);
       if (response !== null) {
@@ -818,6 +864,12 @@ export function registerDriverRoute(app: Hono<ApiGatewayEnvironment>) {
         { error: "Runtime action grant does not match this MCP server." },
         { status: 403 },
       );
+    }
+
+    const subPath = extractMcpProxySubPath(new URL(c.req.url).pathname);
+
+    if (subPath === null) {
+      return Response.json({ error: "MCP proxy path is invalid." }, { status: 400 });
     }
 
     let target: Awaited<ReturnType<typeof resolveRuntimeMcpProxyTarget>>;
@@ -847,7 +899,7 @@ export function registerDriverRoute(app: Hono<ApiGatewayEnvironment>) {
     }
 
     try {
-      return await proxyRuntimeMcpRequest(c.req.raw, target);
+      return await proxyRuntimeMcpRequest(c.req.raw, target, subPath);
     } catch {
       const proxyError = createRuntimeMcpProxyError({
         code: "mcp_upstream_unavailable",
@@ -857,7 +909,10 @@ export function registerDriverRoute(app: Hono<ApiGatewayEnvironment>) {
       const details = toRuntimeMcpProxyPublicErrorDetails(proxyError);
       return Response.json(runtimeMcpProxyErrorBody(details), { status: details.status });
     }
-  });
+  };
+
+  driver.all("/mcp/proxy/:serverId", handleRuntimeMcpProxy);
+  driver.all("/mcp/proxy/:serverId/*", handleRuntimeMcpProxy);
 
   app.route(getRuntimeDriverRoutePrefix(), driver);
 }
