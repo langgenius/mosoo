@@ -1,6 +1,6 @@
 # 2026-09-14 — ACP Running Tool Titles Conflicted With Durable Identity
 
-- Status: Fix deployed to staging; tenant-configuration canary pending
+- Status: Tenant-configuration canary passed; production release pending
 - Severity: SEV-2
 - Investigation window: 2026-09-14 00:00–2026-09-17 00:00 UTC
 - Affected surface: OpenCode (ACP) Runs
@@ -44,6 +44,12 @@ denominator and must not be reported as 496 affected users or Runs.
   and passed afterward. A native OpenCode 1.18.4 prompt then executed a local
   shell tool against a deterministic local model endpoint; its changing title
   passed the production migration's unmodified identity trigger.
+- September 17, 06:17:55.142 — The first hosted canary exposed a second ingress
+  path: a permission request emitted its original tool payload after updating
+  normalized state. That bypassed the stable running title and reproduced the
+  same D1 constraint error. A regression reproduced the failure before this
+  path was corrected; both normal and permission tool updates now use the
+  normalized state payload.
 
 The three inspected production attempts used Worker version
 `abdade22-3f8f-4710-af18-d89b0a826e39`.
@@ -59,6 +65,12 @@ with title `bash`, then changes the running title to the command when its
 arguments arrive. The Driver previously forwarded both titles unchanged, so a
 normal progress update looked like identity reuse. Native reproduction observed
 this exact transition and the pre-fix persistence test failed on it.
+
+The permission-request path also emits a tool progress event. Its translation
+updated the tool state but discarded the normalized payload, forwarding the
+permission's native title instead. The hosted canary caught this path after the
+initial local regression had passed. Permission descriptions still retain the
+native title; only the emitted tool identity uses the stable running title.
 
 The [August incident](./2026-08-13-acp-tool-call-identity-conflict.md) fixed
 streamed arguments and terminal display titles, but its coverage kept the
@@ -78,11 +90,13 @@ Verification completed:
   partial updates, and fresh-turn state.
 - API session runtime event store tests: 16 passed, including the regression
   against the identity trigger and rejection of conflicting terminal inputs.
-  The complete API test package passed all 988 tests.
+  The complete API test package passed all 988 tests. Permission translation
+  tests passed all 20 cases, including changing native titles and parent identity.
 - Native OpenCode smoke: a real shell command wrote the expected local marker;
   the prompt ended with `end_turn` and no identity constraint errors.
-- The full `just check` gate passed in Linux: 2,694 tests passed, 40 skipped,
-  and zero failed. This includes 1,260 Driver tests and all 988 API tests, plus
+- The full `just check` gate passed in Linux: 2,695 tests passed, 40 skipped,
+  and zero failed on the complete fix. The Linux verification container uses
+  an init process to reap orphaned test subprocesses. This includes 1,261 Driver tests and all 988 API tests, plus
   formatting, documentation links, lint, workspace typechecks, GraphQL
   freshness, and Public API compatibility. The initial macOS run failed 11
   Linux process-supervision cases; those cases passed in Linux.
@@ -91,17 +105,38 @@ Verification completed:
   affected Agent's published prompt, runtime, model, tools, exact Skill blob,
   and latest Environment revision. No customer Run is replayed.
 
-The real StepFun canary is still pending an authorized test credential. Local
-native execution and staging health do not establish that the complete hosted
-repository-assessment workflow has recovered. Production remains unchanged.
+The authorized hosted canary uses `stepfun/step-3.7-flash` through OpenRouter,
+replacing the customer's direct StepFun endpoint and adding `openrouter.ai` to
+the isolated environment's network allowlist. The prompt, tools, Skill content,
+setup script, and remaining environment configuration are preserved. This
+validates the custom OpenAI-compatible runtime path; it is not verification of
+the customer's original StepFun credential or direct endpoint. The first run
+failed as described above.
+A subsequent attempt generated all three artifacts and ran the original Skill
+validator successfully (`artifacts valid`, exit 0), completing 47 distinct tool
+calls without a tool identity conflict. Its final checkpoint was rejected by
+staging R2 with HTTP 403, so it is not counted as a successful Run. An earlier
+attempt also disconnected with WebSocket 1006 before any model or tool call; its
+underlying cause is unconfirmed.
+
+After replacing the staging backup credential with object read/write access
+limited to the two staging buckets, Run `01M2Q248W3YWP57Z0WCES0FMJQ` completed
+on September 17 at 06:55:52.132 UTC. It persisted 366 tool events for 85 distinct
+tool calls, committed all three artifacts, and passed the original Skill
+validator both in the sandbox and after downloading the artifacts. Its durable
+checkpoint `7MG8G930YJ2CKE1CA4Z07PCYSV` is `ready`. The final staging Worker
+version is `2aecfc79-a83b-4889-a8c2-b451b4c47e53`.
+
+The [Public API non-production smoke](https://github.com/langgenius/mosoo/actions/runs/35191744280)
+also passed after the staging update. Production release remains pending.
 
 ## Remaining Actions
 
 - [x] Pass the full repository gate on Linux.
-- [ ] Complete the isolated tenant-configuration canary, including all three
+- [x] Complete the isolated tenant-configuration canary, including all three
       output artifacts and the Skill's artifact validator.
-- [ ] Publish and review the Driver fix, then update the Mosoo submodule pin to
-      the reviewed revision.
+- [x] Publish and review [Driver #123](https://github.com/langgenius/mosoo-agent-driver/pull/123),
+      then pin revision `ab1b2290786460b88f7de25eb91efcac84bc13c5`.
 - [ ] Complete the production deploy verification runbook on the release commit.
 - [ ] Deploy the reviewed release and verify a fresh canary tool call completes
       without persistence errors. Do not automatically replay the user's task.
