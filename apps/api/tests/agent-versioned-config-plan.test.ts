@@ -134,6 +134,48 @@ describe("agent versioned config plan", () => {
     );
   });
 
+  test("keeps MCP binding order changes visible", () => {
+    const plan = planVersionedAgentConfigChange({
+      agentStatus: "published",
+      current: createAgentConfigChangeSnapshot({
+        agent,
+        environment,
+        mcpServerIds: ["mcp_linear", "mcp_github"],
+        skillIds: [],
+      }),
+      next: createAgentConfigChangeSnapshot({
+        agent,
+        environment,
+        mcpServerIds: ["mcp_github", "mcp_linear"],
+        skillIds: [],
+      }),
+    });
+
+    expect(plan.action).toBe("patch-and-restart");
+    expect(plan.fieldLabels).toEqual(["MCP Servers"]);
+  });
+
+  test("keeps skill order changes visible", () => {
+    const plan = planVersionedAgentConfigChange({
+      agentStatus: "published",
+      current: createAgentConfigChangeSnapshot({
+        agent,
+        environment,
+        mcpServerIds: [],
+        skillIds: ["skill_browser", "skill_shell"],
+      }),
+      next: createAgentConfigChangeSnapshot({
+        agent,
+        environment,
+        mcpServerIds: [],
+        skillIds: ["skill_shell", "skill_browser"],
+      }),
+    });
+
+    expect(plan.action).toBe("patch-and-restart");
+    expect(plan.fieldLabels).toEqual(["Skills"]);
+  });
+
   test("classifies advanced provider option edits as patch-and-restart", () => {
     const plan = planVersionedAgentConfigChange({
       agentStatus: "published",

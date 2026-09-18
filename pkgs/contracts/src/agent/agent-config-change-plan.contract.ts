@@ -73,6 +73,27 @@ function changed(left: unknown, right: unknown): boolean {
   return stableStringify(left) !== stableStringify(right);
 }
 
+function orderedStringArraysChanged(left: readonly string[], right: readonly string[]): boolean {
+  if (left.length !== right.length) {
+    return true;
+  }
+
+  return left.some((value, index) => value !== right[index]);
+}
+
+function skillsChanged(
+  left: readonly AgentConfigChangeSkill[],
+  right: readonly AgentConfigChangeSkill[],
+): boolean {
+  if (left.length !== right.length) {
+    return true;
+  }
+
+  return left.some(
+    (skill, index) => skill.id !== right[index]?.id || skill.state !== right[index]?.state,
+  );
+}
+
 function pushIfChanged(plans: FieldPlan[], input: FieldPlan & { changed: boolean }): void {
   if (!input.changed) {
     return;
@@ -126,7 +147,7 @@ export function classifyAgentConfigChanges(input: {
   });
   pushIfChanged(fieldPlans, {
     action: "patch-and-restart",
-    changed: changed(input.current.mcpServerIds, input.saved.mcpServerIds),
+    changed: orderedStringArraysChanged(input.current.mcpServerIds, input.saved.mcpServerIds),
     label: "MCP Servers",
     rank: 2,
   });
@@ -156,7 +177,7 @@ export function classifyAgentConfigChanges(input: {
   });
   pushIfChanged(fieldPlans, {
     action: "patch-and-restart",
-    changed: changed(input.current.skills, input.saved.skills),
+    changed: skillsChanged(input.current.skills, input.saved.skills),
     label: "Skills",
     rank: 2,
   });
