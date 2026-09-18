@@ -1456,7 +1456,7 @@
               }
             }
           },
-          "required": true
+          "required": false
         },
         "summary": "Create a Thread for an Agent API Endpoint",
         "responses": {

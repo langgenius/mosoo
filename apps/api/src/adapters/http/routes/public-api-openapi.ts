@@ -450,7 +450,7 @@ export function createPublicApiOpenApiDocument(
               },
             },
           },
-          { required: true },
+          { required: apiVersion === "v1" },
         ),
         success: {
           "201": idempotentJsonResponse("Created Thread.", {

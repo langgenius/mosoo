@@ -488,6 +488,14 @@ describe("saved-Agent Thread API v2", () => {
     const newSchemas = expectRecord(expectRecord(newDocument["components"])["schemas"]);
     expect(expectRecord(oldSchemas["CreateThreadRequest"])["required"]).toEqual(["userId"]);
     expect(expectRecord(newSchemas["CreateThreadRequest"])["required"]).toEqual([]);
+    const oldCreate = expectRecord(
+      expectRecord(expectRecord(oldDocument["paths"])["/agents/{agentId}/threads"])["post"],
+    );
+    const newCreate = expectRecord(
+      expectRecord(expectRecord(newDocument["paths"])["/agents/{agentId}/threads"])["post"],
+    );
+    expect(expectRecord(oldCreate["requestBody"])["required"]).toBeTrue();
+    expect(expectRecord(newCreate["requestBody"])["required"]).toBeFalse();
     expect(expectRecord(oldDocument["paths"])["/threads/{threadId}/usage"]).toBeUndefined();
     expect(expectRecord(newDocument["paths"])["/threads/{threadId}/usage"]).toBeObject();
     expect(newDocument["servers"]).toEqual([{ url: "https://api.example.com/api/v2" }]);
