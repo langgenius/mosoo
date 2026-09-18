@@ -236,6 +236,43 @@ describe("agent package archive entry admission", () => {
     ]);
   });
 
+  test("preserves archive order when declared skill roots overlap", () => {
+    const parsed = parseAgentPackageArchiveBytes(
+      createStoredZipArchive([
+        {
+          body: textToArchiveBytes(
+            createPackageManifestJson({
+              skills: [
+                { name: "Nested", path: "skills/demo/nested/" },
+                { name: "Demo", path: "skills/demo/" },
+              ],
+            }),
+          ),
+          path: "manifest.json",
+        },
+        {
+          body: textToArchiveBytes('{"secretNames":[],"setupScript":""}'),
+          path: "environment/definition.json",
+        },
+        {
+          body: textToArchiveBytes("nested"),
+          path: "skills/demo/nested/file.txt",
+        },
+        {
+          body: textToArchiveBytes("root"),
+          path: "skills/demo/root.txt",
+        },
+      ]),
+    );
+
+    expect(parsed.package).not.toBeNull();
+    expect(parsed.package?.assets.map((asset) => [asset.key, asset.filename])).toEqual([
+      ["skills/demo/nested/file.txt", "file.txt"],
+      ["skills/demo/nested/file.txt", "nested/file.txt"],
+      ["skills/demo/root.txt", "root.txt"],
+    ]);
+  });
+
   test("rejects package assets that point at a declared skill root", () => {
     const parsed = parseAgentPackageArchiveBytes(
       createStoredZipArchive([
