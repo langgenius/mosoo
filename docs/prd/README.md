@@ -14,7 +14,7 @@ their machine-readable contracts, code, or [Architecture](../architecture.md).
 - [Managed Agent v1 target and remaining slices](./managed-agent-v1.md) — shipped Project keys, remaining Session and configuration work, with single-turn and multi-turn acceptance.
 - [Cloud migration and compatibility](../SPEC.md#10-migration-and-breaking-change-notification) — preserve compatible Thread APIs and verify the transition from shared machines to Session isolation.
 - [Agent API Endpoint](./agent-endpoint-mvp.md)
-- [Public Thread API](./public-thread-api-surface.md)
+- [Public Thread API](./public-thread-api-surface.md) — shipped v1 contract and unreleased saved-Agent v2 entry point.
 - [Runtime Sessions](./runtime-session-kernel.md)
 - [Runtime Choice](./runtime-catalog.md)
 - [Runs and Threads](./default-consumption-surface.md)

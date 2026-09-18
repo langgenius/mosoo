@@ -1,4 +1,5 @@
 import type {
+  PublicApiVersion,
   PublicThreadApiCreateThreadResponse,
   PublicThreadApiRetrieveThreadResponse,
   PublicThreadFinalOutput,
@@ -15,16 +16,19 @@ import {
 } from "./public-thread-api-presenter";
 import type { PublicThreadSessionProjection } from "./public-thread-api-presenter";
 
-function createThreadLinks(threadId: PublicThreadId): PublicThreadLinks {
+function createThreadLinks(
+  threadId: PublicThreadId,
+  apiVersion: PublicApiVersion = "v1",
+): PublicThreadLinks {
   return {
-    thread: `/api/v1/threads/${threadId}`,
+    thread: `/api/${apiVersion}/threads/${threadId}`,
   };
 }
 
-export function toPublicThreadSummary(input: {
-  endUserId: string;
+export function toPublicThreadSummary<UserId extends string | null>(input: {
+  endUserId: UserId;
   session: PublicThreadSessionProjection;
-}): PublicThreadSummary {
+}): PublicThreadSummary<UserId> {
   return {
     agent_id: input.session.agentId,
     created_at: input.session.createdAt,
@@ -67,13 +71,14 @@ export function toCreateEmptyThreadSessionSummary(
   return toPublicThreadSessionSummary(session);
 }
 
-export function toCreateThreadResponse(input: {
-  endUserId: string;
+export function toCreateThreadResponse<UserId extends string | null>(input: {
+  apiVersion?: PublicApiVersion | undefined;
+  endUserId: UserId;
   run: SessionRunSummary | null;
   session: PublicThreadSessionProjection;
-}): PublicThreadApiCreateThreadResponse {
+}): PublicThreadApiCreateThreadResponse<UserId> {
   return {
-    links: createThreadLinks(input.session.id),
+    links: createThreadLinks(input.session.id, input.apiVersion),
     run: toPublicThreadRunSummary(input.run),
     thread: toPublicThreadSummary({
       endUserId: input.endUserId,
@@ -82,15 +87,16 @@ export function toCreateThreadResponse(input: {
   };
 }
 
-export function toRetrieveThreadResponse(input: {
-  endUserId: string;
+export function toRetrieveThreadResponse<UserId extends string | null>(input: {
+  apiVersion?: PublicApiVersion | undefined;
+  endUserId: UserId;
   finalOutput: PublicThreadFinalOutput | null;
   session: SessionSummary;
-}): PublicThreadApiRetrieveThreadResponse {
+}): PublicThreadApiRetrieveThreadResponse<UserId> {
   const session = toPublicThreadSessionSummary(input.session);
 
   return {
-    links: createThreadLinks(session.id),
+    links: createThreadLinks(session.id, input.apiVersion),
     run:
       input.session.lastRun === null
         ? null

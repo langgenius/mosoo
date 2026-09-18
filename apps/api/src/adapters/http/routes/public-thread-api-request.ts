@@ -1,4 +1,7 @@
-import type { PublicThreadApiSendEventsRequest } from "@mosoo/contracts/public-api";
+import type {
+  PublicApiVersion,
+  PublicThreadApiSendEventsRequest,
+} from "@mosoo/contracts/public-api";
 import {
   PUBLIC_THREAD_EVENTS_DEFAULT_LIMIT,
   PUBLIC_THREAD_EVENTS_MAX_LIMIT,
@@ -9,7 +12,7 @@ import {
   PUBLIC_THREAD_USER_ID_MAX_LENGTH,
 } from "@mosoo/contracts/public-api";
 import { parsePlatformId } from "@mosoo/id";
-import type { AgentId, FileId, PublicThreadId, SessionRunId } from "@mosoo/id";
+import type { AgentId, FileId, PublicThreadId, SessionModelCallId, SessionRunId } from "@mosoo/id";
 
 import {
   PublicApiError,
@@ -51,7 +54,7 @@ const CREATE_THREAD_REQUEST_FIELDS: ReadonlySet<string> = new Set(
 export interface ParsedCreateThreadRequest {
   fileIds: FileId[];
   inputText?: string | undefined;
-  userId: string;
+  userId: string | null;
 }
 
 function parseContentLength(value: string | null): number | null {
@@ -198,6 +201,12 @@ export function parseThreadIdParam(value: string): PublicThreadId {
 
 export function parseFileIdParam(value: string): FileId {
   return parsePublicPlatformId(value, "File ID") as FileId;
+}
+
+export function parseUsageCursor(value: string | undefined): SessionModelCallId | null {
+  return value === undefined
+    ? null
+    : (parsePublicPlatformId(value, "Usage cursor") as SessionModelCallId);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -449,6 +458,7 @@ export async function readSendEventsRequest(
 
 export async function readCreateThreadRequest(
   c: RawJsonRequestContext,
+  apiVersion: PublicApiVersion = "v1",
 ): Promise<ParsedCreateThreadRequest> {
   const body = await readOptionalJsonBodyWithLimit(c, PUBLIC_THREAD_JSON_BODY_MAX_BYTES);
 
@@ -457,7 +467,10 @@ export async function readCreateThreadRequest(
   }
 
   assertOnlyFields(body, CREATE_THREAD_REQUEST_FIELDS, "create thread");
-  const userId = readLimitedStringField(body, "userId", PUBLIC_THREAD_USER_ID_MAX_LENGTH);
+  const userId =
+    apiVersion === "v2" && body["userId"] === undefined
+      ? null
+      : readLimitedStringField(body, "userId", PUBLIC_THREAD_USER_ID_MAX_LENGTH);
   const inputText = readCreateThreadInputText(body);
 
   return {

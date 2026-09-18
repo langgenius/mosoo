@@ -90,10 +90,10 @@ export function toPublicThreadSessionSummary(
   };
 }
 
-export function toPublicThreadEventBatch(input: {
+export function toPublicThreadEventBatch<UserId extends string | null>(input: {
   batch: AgentSessionEventBatch;
-  thread: PublicThreadSummary;
-}): PublicThreadApiSendEventsResponse {
+  thread: PublicThreadSummary<UserId>;
+}): PublicThreadApiSendEventsResponse<UserId> {
   return {
     acceptedAt: input.batch.acceptedAt,
     events: input.batch.events.map((event) => ({

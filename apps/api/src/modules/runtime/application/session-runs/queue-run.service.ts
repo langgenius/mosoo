@@ -39,16 +39,6 @@ import { dispatchQueuedSessionRun } from "./dispatch-queued-run.service";
 import { createQueuedSessionRunRuntimeEvents } from "./session-run-view-events.service";
 import { reconcileStaleActiveSessionRun } from "./stale-run-reconciliation.service";
 
-class SessionActiveRunExistsError extends Error {
-  readonly activeRun: SessionRunSummary;
-
-  constructor(activeRun: SessionRunSummary) {
-    super("This conversation already has an active run. Wait for it to finish or cancel it first.");
-    this.name = "SessionActiveRunExistsError";
-    this.activeRun = activeRun;
-  }
-}
-
 interface QueueSessionRunInput {
   accessViewer?: AuthenticatedViewer;
   attachmentIds: FileId[];
@@ -216,7 +206,10 @@ export async function queueSessionRun(request: QueueSessionRunRequest): Promise<
     const activeRun = await getActiveSessionRunSummary(bindings.DB, input.session.id);
 
     if (activeRun !== null) {
-      throw new SessionActiveRunExistsError(activeRun);
+      throw createApiError(
+        API_ERROR_CODE.sessionRunActive,
+        "This conversation already has an active run. Wait for it to finish or cancel it first.",
+      );
     }
 
     if (!(await isCattleTerminalCheckpointReadyForNextRun(bindings.DB, input.session.id))) {

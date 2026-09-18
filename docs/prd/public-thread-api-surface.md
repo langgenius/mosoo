@@ -59,6 +59,45 @@ Agent's API Access panel shows its identifier, token creation, and API reference
   complete runtime workspace. Thread history also does not guarantee that every
   later Run receives prior private runtime state or every earlier file.
 
+## Unreleased saved-Agent entry point
+
+`/api/v2` reuses the Thread lifecycle and conversation ID for the #582 admission
+transition. A Project key can invoke a private Agent by ID without publishing.
+A new Thread captures the latest saved configuration, even when the Agent has
+an older published version; later Agent edits do not change that snapshot.
+Omitting `userId` stores no end-user identity and returns `userId: null`. A
+supplied value remains immutable and carries the existing delegated MCP identity.
+
+Read, events, continuation, cancellation, and file access use the Session's owner
+and Project boundary, regardless of the creation channel or current publication
+state. The same ID addresses an existing owned Session. This does not grant a
+Project key access to another Project or invent missing recovery state.
+
+The new version is required because latest-saved admission differs from v1's
+published/live behavior. It does not rename Thread resources or retire v1.
+Existing v1 callers keep their published configuration and required `userId`;
+v2-created Threads are excluded from v1's public-channel view. Platform-funded
+first use, budgets, retention, and the shared-workspace migration are separate
+#582 slices and are not established by this entry point.
+
+`GET /api/v2/threads/{threadId}/usage` returns paginated persisted runtime usage
+observations. Missing values remain null. Token accounting follows the recorded
+provider convention; runtime cost estimates are not invoices. Empty observations
+do not establish that no inference occurred. The endpoint reads Session records,
+so it does not lose observations when the seven-day billing detail rolls up.
+
+The [executable workflow](../../scripts/public-api-session-workflow.ts) is the
+shared HTTP acceptance example for clients, CLI, and documentation. It uses one
+`thread.id` for create/read, real tools and artifact download, SSE, usage,
+follow-up with private workspace state, and cancellation without a Run ID.
+Run `just public-api-session-workflow` with a nonproduction `/api/v2` URL in
+`MOSOO_PUBLIC_SESSION_BASE_URL`, a saved Agent ID in
+`MOSOO_PUBLIC_SESSION_AGENT_ID`, a Project key in `MOSOO_API_TOKEN`, and a unique
+`MOSOO_PUBLIC_SESSION_TEST_ID`. Use `MOSOO_E2E_ENV_FILE` for a local ignored key
+file. It runs real inference and leaves its Session/artifacts available for
+inspection; use a fresh test ID for a full rerun. Evidence goes to
+`.tmp/e2e/session-workflow` or `MOSOO_PUBLIC_SESSION_OUTPUT_DIR`.
+
 ## `/api/v1` compatibility policy
 
 The #582 durable Session target can extend this Thread API. Keeping the Thread

@@ -9,10 +9,10 @@ import type { RetrievePublicThreadRequest } from "./public-thread.types";
 
 export async function retrievePublicThread(
   request: RetrievePublicThreadRequest,
-): Promise<PublicThreadApiRetrieveThreadResponse> {
-  const snapshot = await getThreadSnapshot(request.database, request.threadId);
+): Promise<PublicThreadApiRetrieveThreadResponse<string | null>> {
+  const snapshot = await getThreadSnapshot(request.database, request.threadId, request.apiVersion);
 
-  await admitPublicThreadReader(request.database, request.caller, snapshot);
+  await admitPublicThreadReader(request.database, request.caller, snapshot, request.apiVersion);
 
   const finalOutput =
     snapshot.session.lastRun?.status === "completed"
@@ -24,6 +24,7 @@ export async function retrievePublicThread(
       : null;
 
   return toRetrieveThreadResponse({
+    apiVersion: request.apiVersion,
     endUserId: snapshot.endUserId,
     finalOutput,
     session: snapshot.session,

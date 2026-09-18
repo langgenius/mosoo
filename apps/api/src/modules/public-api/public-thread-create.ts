@@ -55,12 +55,14 @@ async function ensureThreadFilesClaimable(input: {
 
 export async function createPublicThread(
   request: CreatePublicThreadRequest,
-): Promise<PublicThreadApiCreateThreadResponse> {
+): Promise<PublicThreadApiCreateThreadResponse<string | null>> {
   const admission = await admitPublicThreadCreator(request.bindings.DB, request.caller, {
     agentId: request.agentId,
+    apiVersion: request.apiVersion,
   });
   let createdSessionId: SessionId | null = null;
   const metadata = createPublicApiThreadMetadata({
+    apiVersion: request.apiVersion,
     createdBy: admission.createdBy,
     idempotencyKey: request.idempotencyKey,
   });
@@ -76,6 +78,7 @@ export async function createPublicThread(
       },
       options: {
         accessViewer: admission.accessViewer,
+        ...(request.apiVersion === "v2" ? { configurationSource: "saved" as const } : {}),
         endUserId: request.input.userId,
         metadata: { public_api: metadata },
       },
@@ -101,6 +104,7 @@ export async function createPublicThread(
 
     if (request.input.inputText === undefined) {
       return toCreateThreadResponse({
+        apiVersion: request.apiVersion,
         endUserId: request.input.userId,
         run: null,
         session: toCreateEmptyThreadSessionSummary(session),
@@ -146,6 +150,7 @@ export async function createPublicThread(
     });
 
     return toCreateThreadResponse({
+      apiVersion: request.apiVersion,
       endUserId: request.input.userId,
       run,
       session: updatedSession,
@@ -170,16 +175,18 @@ export async function createPublicThread(
 
 export async function recoverPublicThreadCreation(
   request: CreatePublicThreadRequest,
-): Promise<PublicThreadApiCreateThreadResponse | null> {
+): Promise<PublicThreadApiCreateThreadResponse<string | null> | null> {
   if (request.idempotencyKey === null) {
     return null;
   }
 
   const admission = await admitPublicThreadCreator(request.bindings.DB, request.caller, {
     agentId: request.agentId,
+    apiVersion: request.apiVersion,
   });
   const snapshot = await findPublicThreadSnapshotByIdempotencyKey(request.bindings.DB, {
     agentId: request.agentId,
+    apiVersion: request.apiVersion,
     idempotencyKey: request.idempotencyKey,
     tokenId: admission.createdBy.token_id,
     ...(admission.creatorViewer.projectId === undefined
@@ -192,6 +199,7 @@ export async function recoverPublicThreadCreation(
   }
 
   return toCreateThreadResponse({
+    apiVersion: request.apiVersion,
     endUserId: snapshot.endUserId,
     run: snapshot.session.lastRun,
     session: toPublicThreadSessionSummary(snapshot.session),

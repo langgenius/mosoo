@@ -734,3 +734,79 @@ export const PUBLIC_API_OPENAPI_SCHEMAS = {
     type: "object",
   },
 } satisfies Record<string, PublicApiOpenApiSchema>;
+
+export const PUBLIC_API_OPENAPI_V2_SCHEMAS = {
+  ...PUBLIC_API_OPENAPI_SCHEMAS,
+  CreateThreadRequest: {
+    ...PUBLIC_API_OPENAPI_SCHEMAS.CreateThreadRequest,
+    description:
+      "Create a durable Thread from the latest saved private Agent configuration. userId is optional; omit input for an idle Thread. Existing Threads retain their admitted configuration.",
+    required: [],
+  },
+  ThreadSummary: {
+    ...PUBLIC_API_OPENAPI_SCHEMAS.ThreadSummary,
+    properties: {
+      ...PUBLIC_API_OPENAPI_SCHEMAS.ThreadSummary.properties,
+      source: {
+        const: "api",
+        description:
+          "Public API response marker; does not indicate the Session's creation channel.",
+      },
+      userId: {
+        type: ["string", "null"],
+        description:
+          "The original application user identity, or null when none was supplied. Never replaced with an invented identity.",
+      },
+    },
+  },
+  ThreadUsageResponse: {
+    additionalProperties: false,
+    description:
+      "Persisted runtime usage observations in ID order. Null means unreported, not zero. Token conventions follow usageContract; reported costs are runtime estimates, not a settled bill. Poll again to observe updates to in-progress calls.",
+    type: "object",
+    required: ["usage", "nextCursor"],
+    properties: {
+      nextCursor: {
+        type: ["string", "null"],
+        description: "Pass as after to read the next page, or null on the final page.",
+      },
+      usage: {
+        type: "array",
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: [
+            "id",
+            "runId",
+            "provider",
+            "model",
+            "status",
+            "inputTokens",
+            "outputTokens",
+            "cacheReadTokens",
+            "cacheCreationTokens",
+            "reportedCostUsd",
+            "usageContract",
+          ],
+          properties: {
+            id: { type: "string", format: "ulid" },
+            runId: { type: "string", format: "ulid" },
+            provider: { type: "string" },
+            model: { type: "string" },
+            status: { enum: ["started", "completed", "failed"] },
+            inputTokens: { type: ["integer", "null"], minimum: 0 },
+            outputTokens: { type: ["integer", "null"], minimum: 0 },
+            cacheReadTokens: { type: ["integer", "null"], minimum: 0 },
+            cacheCreationTokens: { type: ["integer", "null"], minimum: 0 },
+            reportedCostUsd: { type: ["number", "null"], minimum: 0 },
+            usageContract: {
+              type: ["string", "null"],
+              description:
+                "anthropic_bucketed input excludes cache buckets; openai_total_with_cached_breakdown and openai_runtime_total_with_cached_breakdown include cache reads in input. Unknown remains null; do not infer it from the model name.",
+            },
+          },
+        },
+      },
+    },
+  },
+} satisfies Record<string, PublicApiOpenApiSchema>;

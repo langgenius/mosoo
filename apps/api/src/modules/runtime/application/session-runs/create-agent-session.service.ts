@@ -35,6 +35,7 @@ import type { SessionExecutionPlan } from "../session-definition/session-executi
 
 export interface CreateAgentSessionOptions {
   accessViewer?: AuthenticatedViewer;
+  configurationSource?: "saved";
   endUserId?: string | null | undefined;
   metadata?: AgentSessionMetadata | null | undefined;
   participantAccountId?: string | AccountId | null | undefined;
@@ -43,6 +44,7 @@ export interface CreateAgentSessionOptions {
 
 export interface AgentSessionMetadata {
   public_api?: {
+    api_version?: "v1" | "v2";
     created_by: {
       token_id: string;
       token_label: string;
@@ -75,6 +77,7 @@ interface AgentSessionExecutionSource {
 
 async function resolveAgentSessionExecutionSource(input: {
   accessViewer: AuthenticatedViewer;
+  configurationSource?: "saved" | undefined;
   bindings: ApiBindings;
   agentId: AgentId;
   projectId: ProjectId;
@@ -85,7 +88,7 @@ async function resolveAgentSessionExecutionSource(input: {
     projectId: input.projectId,
   });
   const liveVersion =
-    agent.status === "published"
+    agent.status === "published" && input.configurationSource !== "saved"
       ? await requireAgentLiveDeploymentVersionRecord(input.bindings.DB, agent)
       : null;
   const environment = liveVersion
@@ -280,6 +283,7 @@ export async function createAgentSession(
   const projectId = parsePlatformId<ProjectId>(request.input.projectId, "project id");
   const source = await resolveAgentSessionExecutionSource({
     accessViewer,
+    configurationSource: options.configurationSource,
     agentId,
     bindings: request.bindings,
     projectId,

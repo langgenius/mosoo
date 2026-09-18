@@ -10,6 +10,8 @@ The user-visible invariant is continuity of the same Session across seconds or d
 
 The September 18 compatibility clarification keeps existing Thread routes, conversation IDs, and compatible Run result fields. Session describes the durable ownership and continuation contract; it does not mandate a new endpoint name. Changes to admission, saved/live selection, identity, or outcomes require behavior-level compatibility evidence independently of naming.
 
+The unreleased `/api/v2` routes reuse the Public Thread services and Session kernel with explicit saved-configuration admission. They accept private Agents, optional end-user identity, and owned Sessions from other creation channels. `/api/v1` retains published/live selection and its public-channel identity boundary. Both resolve the same Session IDs and Project authorization; publication is not a read authorization boundary in v2. This slice does not migrate shared Pet workspaces or provide platform-funded defaults.
+
 ### Target Session ownership and Cloud transition
 
 The following boundaries are targets for #582, not a claim that existing Pet workloads have migrated:

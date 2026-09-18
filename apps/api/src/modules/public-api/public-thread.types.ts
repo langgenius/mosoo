@@ -1,3 +1,4 @@
+import type { PublicApiVersion } from "@mosoo/contracts/public-api";
 import type { AgentId, FileId, PublicThreadId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../platform/cloudflare/worker-types";
@@ -7,10 +8,11 @@ import type { AuthenticatedViewer } from "../auth/application/viewer-auth.servic
 export interface CreatePublicThreadInput {
   fileIds: FileId[];
   inputText?: string | undefined;
-  userId: string;
+  userId: string | null;
 }
 
 export interface CreatePublicThreadRequest {
+  apiVersion?: PublicApiVersion | undefined;
   agentId: AgentId;
   bindings: ApiBindings;
   caller: PersonalAccessTokenCaller;
@@ -21,12 +23,14 @@ export interface CreatePublicThreadRequest {
 }
 
 export interface RetrievePublicThreadRequest {
+  apiVersion?: PublicApiVersion | undefined;
   caller: AuthenticatedViewer;
   database: D1Database;
   threadId: PublicThreadId;
 }
 
 export interface ListPublicThreadEventsRequest {
+  apiVersion?: PublicApiVersion | undefined;
   caller: AuthenticatedViewer;
   database: D1Database;
   limit: number;

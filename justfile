@@ -128,6 +128,10 @@ public-api-openapi:
 public-api-openapi-check:
     bun run public-api:contract:check
 
+# Exercise saved-Agent v2 create, real tools/artifacts, follow-up, SSE, usage, and cancellation on stage.
+public-api-session-workflow:
+    bun scripts/public-api-session-workflow.ts
+
 # Smoke the documented minimal Thread shape against configured non-production.
 public-api-smoke:
     bun run public-api:smoke
