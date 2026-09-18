@@ -36,10 +36,12 @@ import { getActiveSessionRunSummary } from "../../infrastructure/session-runs/se
 import { createInsertedSessionRunSummary } from "../../infrastructure/session-runs/session-run-write.repository";
 import { getSessionExecutionPlan } from "../session-definition/session-execution.repository";
 import { dispatchQueuedSessionRun } from "./dispatch-queued-run.service";
+import { assertSessionRecoveryAvailable } from "./session-recovery.service";
 import { createQueuedSessionRunRuntimeEvents } from "./session-run-view-events.service";
 import { reconcileStaleActiveSessionRun } from "./stale-run-reconciliation.service";
 
 interface QueueSessionRunInput {
+  recoveryRequestedAtMs?: number;
   accessViewer?: AuthenticatedViewer;
   attachmentIds: FileId[];
   clientRequestId: string | null;
@@ -85,6 +87,7 @@ export async function queueSessionRun(request: QueueSessionRunRequest): Promise<
 }> {
   const { bindings, input, requestUrl, viewer } = request;
   const queueStartedAtMs = Date.now();
+  const recoveryRequestedAtMs = input.recoveryRequestedAtMs ?? currentTimestampMs();
 
   const runtimeId = getSupportedRuntimeId(input.session.runtime_id);
   const viewerId: AccountId = parsePlatformId(viewer.id, "viewer id");
@@ -96,6 +99,7 @@ export async function queueSessionRun(request: QueueSessionRunRequest): Promise<
   // Pre-admission guards are independent; run them concurrently instead of
   // paying three serial D1 round trips before the run row exists.
   await Promise.all([
+    assertSessionRecoveryAvailable(bindings.DB, input.session.id, recoveryRequestedAtMs),
     reconcileStaleActiveSessionRun(bindings.DB, input.session.id),
     isCattleTerminalCheckpointReadyForNextRun(bindings.DB, input.session.id).then((ready) => {
       if (!ready) {
@@ -159,6 +163,7 @@ export async function queueSessionRun(request: QueueSessionRunRequest): Promise<
     timestampMs: admittedAtMs,
   });
   const admitted = await commitQueuedSessionRunAdmission(bindings.DB, {
+    recoveryRequestedAtMs,
     apiCommand,
     clientRequestId: input.clientRequestId,
     events: queuedEvents,
@@ -211,6 +216,8 @@ export async function queueSessionRun(request: QueueSessionRunRequest): Promise<
         "This conversation already has an active run. Wait for it to finish or cancel it first.",
       );
     }
+
+    await assertSessionRecoveryAvailable(bindings.DB, input.session.id, recoveryRequestedAtMs);
 
     if (!(await isCattleTerminalCheckpointReadyForNextRun(bindings.DB, input.session.id))) {
       throw createCheckpointPendingError(input.session.id);

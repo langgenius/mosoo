@@ -30,6 +30,7 @@ export interface QueueSessionRunsOutput {
 }
 
 export interface StartRunsOptions {
+  recoveryRequestedAtMs?: number;
   accessViewer?: AuthenticatedViewer;
 }
 
@@ -85,6 +86,9 @@ async function queueRunRequest(
       clientRequestId: runRequest.clientRequestId ?? null,
       prompt,
       session,
+      ...(context.options.recoveryRequestedAtMs === undefined
+        ? {}
+        : { recoveryRequestedAtMs: context.options.recoveryRequestedAtMs }),
       ...(context.options.accessViewer ? { accessViewer: context.options.accessViewer } : {}),
     },
     requestUrl: context.requestUrl,

@@ -25,6 +25,7 @@ import type {
 import { eq } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../../platform/db/drizzle";
+import { SESSION_RECOVERY_RETENTION_MS } from "../../domain/session-recovery-policy";
 import type { SessionExecutionPlan } from "./session-execution.types";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -250,10 +251,18 @@ function parseBuiltInTools(value: unknown): SessionExecutionPlan["builtInTools"]
 function parseSessionExecutionPlanJson(planJson: string): SessionExecutionPlan {
   const parsed: unknown = JSON.parse(planJson);
   const record = readRecord(parsed, "sessionExecutionPlan");
+  const recoveryRetentionMs =
+    record["recoveryRetentionMs"] === undefined
+      ? undefined
+      : readNumber(record["recoveryRetentionMs"], "sessionExecutionPlan.recoveryRetentionMs");
+  if (recoveryRetentionMs !== undefined && recoveryRetentionMs < SESSION_RECOVERY_RETENTION_MS) {
+    throw new TypeError("Session recovery retention must be at least 30 days.");
+  }
 
   return {
     binding: parseBinding(record["binding"]),
     builtInTools: parseBuiltInTools(record["builtInTools"]),
+    ...(recoveryRetentionMs === undefined ? {} : { recoveryRetentionMs }),
     ...(record["configJson"] === undefined
       ? {}
       : {

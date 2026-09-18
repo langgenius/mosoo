@@ -32,6 +32,7 @@ import type { PreparedApiCommand } from "../../../api-command/application/api-co
 import { createSessionRuntimeEventProjection } from "../../../sessions/domain/session-runtime-event-projection";
 import { ACTIVE_SESSION_RUN_STATUSES } from "../../domain/session-run-lifecycle.machine";
 import { createSessionStatusTransitionPatch } from "./session-lifecycle-projection.repository";
+import { sessionRecoveryAvailablePredicate } from "./session-recovery-retention.repository";
 
 interface QueuedRunAdmissionRecord {
   agentId: AgentId;
@@ -57,6 +58,7 @@ interface QueuedMessageAdmissionRecord {
 }
 
 export interface CommitQueuedSessionRunAdmissionInput {
+  recoveryRequestedAtMs?: number;
   apiCommand: PreparedApiCommand;
   clientRequestId: string | null;
   events: readonly RuntimeEventEnvelope[];
@@ -101,6 +103,7 @@ export function completedRunHistoryPredicate(
 
 function claimableSessionPredicate(db: AppDatabase, input: CommitQueuedSessionRunAdmissionInput) {
   return and(
+    sessionRecoveryAvailablePredicate(db, input.recoveryRequestedAtMs ?? input.run.timestampMs),
     eq(sessionsTable.id, input.session.id),
     eq(sessionsTable.agentId, input.session.agentId),
     eq(sessionsTable.projectId, input.session.projectId),

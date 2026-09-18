@@ -70,6 +70,22 @@ turn then uses the strict Run-bound admission and restore contract above.
 
 ## Retention and deletion
 
+The unreleased saved-Agent API records a 30-day recovery period for newly
+admitted isolated Sessions. The period starts at the last successful turn and
+renews only after another success; failed or cancelled attempts do not extend it.
+Inputs received at or after the deadline fail explicitly with the expiry time,
+before adding a message or claiming new draft files. File claim and atomic Run
+admission use the same server-recorded request time: an input received before the
+deadline may finish transferring its files afterward. Other admission failures
+can leave files attached to the Session. History, events, usage and saved file contents remain
+readable, and recovery expiry does not delete them.
+
+Existing snapshots without this policy keep their current behavior pending the
+reviewed Cloud transition. Do not apply a deadline retroactively or rewrite an
+old snapshot. Clock-controlled tests establish renewal/expiry logic, not actual
+multi-day live survival. Backup storage TTL is independent of this admission
+policy and is not shortened by this slice.
+
 A committed Task Thread checkpoint remains restorable for at least 20 days while
 the Thread exists. Archiving does not remove it. Permanently deleting the Thread
 deletes its checkpoint records and backup objects with the rest of the Thread's

@@ -77,8 +77,19 @@ The new version is required because latest-saved admission differs from v1's
 published/live behavior. It does not rename Thread resources or retire v1.
 Existing v1 callers keep their published configuration and required `userId`;
 v2-created Threads are excluded from v1's public-channel view. Platform-funded
-first use, budgets, retention, and the shared-workspace migration are separate
+first use, budgets, and the shared-workspace migration are separate
 #582 slices and are not established by this entry point.
+
+New isolated v2 Sessions admit a 30-day recovery period from the last successful
+turn, renewed on success. Expired continuation returns `readiness_blocked` with
+an explicit expiry time; history, events, usage and saved files remain readable.
+Input received after expiry does not retitle the Session or claim new draft files.
+The server records one request time for both file claim and Run admission, so a
+transfer begun before expiry may finish afterward. Other admission failures can
+leave supplied files attached to the Session.
+Existing Sessions without a recorded recovery policy are not retroactively
+expired. This admission rule does not by itself prove cold or multi-day restore;
+see [Thread Continuation](./thread-continuation.md#retention-and-deletion).
 
 `GET /api/v2/threads/{threadId}/usage` returns paginated persisted runtime usage
 observations. Missing values remain null. Token accounting follows the recorded

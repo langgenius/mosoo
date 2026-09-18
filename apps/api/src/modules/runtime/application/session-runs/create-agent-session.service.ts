@@ -31,6 +31,7 @@ import type { AgentRow } from "../../../agents/application/agent-types";
 import type { AuthenticatedViewer } from "../../../auth/application/viewer-auth.service";
 import { resolveReadyEnvironmentPackageArtifact } from "../../../environments/application/environment-package-artifact.service";
 import { resolveAgentEnvironmentSnapshot } from "../../../environments/application/environment.service";
+import { SESSION_RECOVERY_RETENTION_MS } from "../../domain/session-recovery-policy";
 import type { SessionExecutionPlan } from "../session-definition/session-execution.types";
 
 export interface CreateAgentSessionOptions {
@@ -298,6 +299,9 @@ export async function createAgentSession(
     bindings: request.bindings,
     source,
   });
+  if (options.configurationSource === "saved" && source.kind === "cattle") {
+    executionPlan.recoveryRetentionMs = SESSION_RECOVERY_RETENTION_MS;
+  }
   await resolveReadyEnvironmentPackageArtifact(
     request.bindings,
     source.agent.projectId,
