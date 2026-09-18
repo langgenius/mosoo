@@ -248,6 +248,7 @@ function createBindings(
   database: D1Database,
   options: {
     readonly accountConcurrentSandboxLimit?: string;
+    readonly runtimeImagesEnabled?: boolean;
     readonly configureNetworkError?: Error;
     readonly destroyError?: Error;
     readonly destroyPromise?: Promise<void>;
@@ -260,6 +261,7 @@ function createBindings(
   return {
     DB: database,
     MOSOO_ACCOUNT_CONCURRENT_SANDBOX_LIMIT: options.accountConcurrentSandboxLimit ?? "5",
+    MOSOO_RUNTIME_IMAGES_ENABLED: options.runtimeImagesEnabled ? "true" : "false",
     SANDBOX_FILE_BUCKET_LOCAL: "true",
     runtimeSubjectHandleFactory: () => createSandboxHandle(options),
   } as unknown as ApiBindings;
@@ -269,7 +271,10 @@ describe("runtime subject lifecycle machine", () => {
   test("keeps one deployment ceiling across runtime image classes", async () => {
     const database = createRuntimeSubjectLifecycleDatabase();
     const lifecycle = createRuntimeSubjectLifecycleService(
-      createBindings(database, { accountConcurrentSandboxLimit: "100" }),
+      createBindings(database, {
+        accountConcurrentSandboxLimit: "100",
+        runtimeImagesEnabled: true,
+      }),
     );
     const runtimes = ["claude-agent-sdk", "openai-runtime", "acp-fallback"];
     const outcomes = await Promise.allSettled(
@@ -287,6 +292,14 @@ describe("runtime subject lifecycle machine", () => {
     );
     expect(outcomes.filter((outcome) => outcome.status === "fulfilled")).toHaveLength(50);
     expect(outcomes.filter((outcome) => outcome.status === "rejected")).toHaveLength(1);
+    const profiles = await database
+      .prepare("SELECT DISTINCT sandbox_binding FROM sandbox ORDER BY sandbox_binding")
+      .all<{ sandbox_binding: string }>();
+    expect(profiles.results.map((row) => row.sandbox_binding)).toEqual([
+      "SandboxClaude",
+      "SandboxOpenAI",
+      "SandboxOpenCode",
+    ]);
   });
 
   test("keeps subject operation transitions explicit", () => {
