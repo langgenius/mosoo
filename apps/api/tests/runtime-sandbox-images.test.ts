@@ -2,12 +2,16 @@ import { describe, expect, mock, test } from "bun:test";
 import { readFileSync, readdirSync } from "node:fs";
 
 import { PLATFORM_ID_FIXTURES as ids } from "@mosoo/id/testing";
+import { PUBLIC_RUNTIME_CATALOG } from "@mosoo/runtime-catalog";
 
 import {
   ensureRuntimeSubjectId,
   getRuntimeSubject,
 } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-record-store";
-import { requireCloudflareSandboxBinding } from "../src/platform/cloudflare/sandbox-binding";
+import {
+  requireCloudflareSandboxBinding,
+  RUNTIME_SANDBOX_IMAGES,
+} from "../src/platform/cloudflare/sandbox-binding";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
@@ -54,11 +58,9 @@ const allocation = {
   subjectId: ids.session,
   runtimeSubjectId: ids.sandbox,
 } as const;
-const profiles = [
-  ["claude-agent-sdk", "SandboxClaude", "claude"],
-  ["openai-runtime", "SandboxOpenAI", "openai"],
-  ["acp-fallback", "SandboxOpenCode", "opencode"],
-] as const;
+const profiles = Object.entries(RUNTIME_SANDBOX_IMAGES).map(
+  ([runtimeId, image]) => [runtimeId, image.binding, image.profile] as const,
+);
 
 function database(): SqliteD1Database {
   const db = new SqliteD1Database();
@@ -67,6 +69,31 @@ function database(): SqliteD1Database {
 }
 
 describe("runtime-specific Sandbox images", () => {
+  test("covers the product catalog and the pinned Driver image manifest exactly", () => {
+    const images = JSON.parse(
+      readFileSync(new URL("../../driver/runtime-images.json", import.meta.url), "utf8"),
+    ) as { runtimeId: string; profile: string }[];
+    expect(profiles.map(([runtimeId]) => runtimeId).toSorted()).toEqual(
+      PUBLIC_RUNTIME_CATALOG.map((runtime) => runtime.runtimeId).toSorted(),
+    );
+    expect(
+      Object.fromEntries(profiles.map(([runtimeId, , profile]) => [runtimeId, profile])),
+    ).toEqual(Object.fromEntries(images.map((image) => [image.runtimeId, image.profile])));
+  });
+
+  test("keeps the pinned Sandbox image on the Worker SDK version", () => {
+    const containerfile = readFileSync(
+      new URL("../../driver/Containerfile", import.meta.url),
+      "utf8",
+    );
+    const apiPackage = JSON.parse(
+      readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+    ) as { dependencies: { "@cloudflare/sandbox": string } };
+    expect(containerfile).toContain(
+      `cloudflare/sandbox:${apiPackage.dependencies["@cloudflare/sandbox"]}@sha256:`,
+    );
+  });
+
   test("disables new allocations during rollout without redirecting existing split subjects", async () => {
     for (const enabled of [false, true]) {
       const db = database();
