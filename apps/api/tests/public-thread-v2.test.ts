@@ -6,6 +6,7 @@ import {
   PUBLIC_API_TEST_IDS as IDS,
   PublicApiMemoryFileBucket,
   createPublicHttpContractDatabase,
+  createPublicHttpTestBindings,
   insertOwnerSession,
 } from "./helpers/public-api-http-test-fixture";
 import {
@@ -17,12 +18,17 @@ import {
   expectRecord,
   expectString,
   readJson,
-  requestPublicApi,
+  requestPublicApiWithBindings,
   insertRuntimeEvent,
   withProviderProbeMock,
 } from "./public-thread-api-fixtures";
 
-async function setup(options: { sessionNamespace?: ApiBindings["Session"] } = {}) {
+async function setup(
+  options: {
+    sessionNamespace?: ApiBindings["Session"];
+    requestDatabase?: (database: D1Database) => D1Database;
+  } = {},
+) {
   const database = await createPublicHttpContractDatabase();
   const key = await createProjectApiKey(database, OWNER_VIEWER, {
     label: "Session HTTP test",
@@ -30,15 +36,18 @@ async function setup(options: { sessionNamespace?: ApiBindings["Session"] } = {}
   });
   const app = createPublicThreadApiTestApp();
   const bucket = new PublicApiMemoryFileBucket();
+  const requestDatabase = options.requestDatabase?.(database) ?? database;
   const request = (path: string, init: RequestInit = {}, token = key.value) =>
-    requestPublicApi(
+    requestPublicApiWithBindings(
       app,
-      database,
       new Request(`https://api.example.com/api/${path}`, {
         ...init,
         headers: { Authorization: bearer(token), ...init.headers },
       }),
-      { fileBucket: bucket as unknown as R2Bucket, ...options },
+      createPublicHttpTestBindings(requestDatabase, {
+        fileBucket: bucket as unknown as R2Bucket,
+        ...options,
+      }) as ApiBindings,
     );
   const create = (version: "v1" | "v2", body: unknown, idempotencyKey?: string) =>
     request(`${version}/agents/${IDS.agent}/threads`, {
@@ -59,9 +68,260 @@ async function setup(options: { sessionNamespace?: ApiBindings["Session"] } = {}
   return { create, database, request, snapshot };
 }
 
+// Simulate a lost D1 response after its transaction committed. The HTTP boundary
+// must reconcile this ambiguous outcome without deleting or repeating admitted work.
+function loseCommittedBatchResponse(
+  database: D1Database,
+  sqlFragment: string,
+  enabled = () => true,
+): D1Database {
+  const rawStatements = new WeakMap<D1PreparedStatement, D1PreparedStatement>();
+  const queries = new WeakMap<D1PreparedStatement, string>();
+  let failed = false;
+  const wrap = (statement: D1PreparedStatement, query: string): D1PreparedStatement => {
+    const wrapped = new Proxy(statement, {
+      get(target, property, receiver) {
+        if (property === "bind")
+          return (...values: unknown[]) => wrap(target.bind(...values), query);
+        const value = Reflect.get(target, property, receiver);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+    rawStatements.set(wrapped, statement);
+    queries.set(wrapped, query);
+    return wrapped;
+  };
+  return new Proxy(database, {
+    get(target, property, receiver) {
+      if (property === "prepare") return (query: string) => wrap(target.prepare(query), query);
+      if (property === "batch")
+        return async (statements: D1PreparedStatement[]) => {
+          const matches = statements.some((statement) =>
+            queries.get(statement)?.includes(sqlFragment),
+          );
+          const results = await target.batch(
+            statements.map((statement) => rawStatements.get(statement) ?? statement),
+          );
+          if (!failed && matches && enabled()) {
+            failed = true;
+            throw new Error("Injected lost D1 commit response.");
+          }
+          return results;
+        };
+      const value = Reflect.get(target, property, receiver);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
+}
+
 // These tests exercise HTTP authentication/admission and the real Session store.
 // Runtime provisioning is intentionally absent; live tool/restore evidence is separate.
 describe("saved-Agent Thread API v2", () => {
+  test("does not mistake a later message for the interrupted creation input", async () => {
+    const { create, database, request } = await setup({
+      requestDatabase: (db) =>
+        loseCommittedBatchResponse(db, 'insert into "session_execution_snapshot"'),
+    });
+    const input = {
+      input: {
+        type: "user.message",
+        content: [{ type: "text", text: "Original creation input." }],
+      },
+    };
+    await withProviderProbeMock(async () => {
+      expect((await create("v2", input, "interleaved-message")).status).toBe(500);
+      const list = await readJson(await request(`v2/agents/${IDS.agent}/threads`));
+      const id = expectString(expectRecord(expectArray(list["threads"])[0])["id"]);
+      const other = await request(`v2/threads/${id}/events`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          events: [{ type: "user_message", text: "Different later input." }],
+        }),
+      });
+      expect(other.status).toBe(200);
+      // This fixture has no Cloudflare runtime. Wait for its explicit failure,
+      // leaving room for the original creation turn to be admitted on recovery.
+      let otherRun: Record<string, unknown> = {};
+      const deadline = Date.now() + 2_000;
+      while (Date.now() < deadline) {
+        otherRun = expectRecord((await readJson(await request(`v2/threads/${id}`)))["run"]);
+        if (otherRun["status"] === "failed") break;
+        await Bun.sleep(5);
+      }
+      expect(otherRun["status"]).toBe("failed");
+      await database
+        .prepare("UPDATE public_api_idempotency_key SET updated_at = ? WHERE idempotency_key = ?")
+        .bind(Date.now() - 11 * 60 * 1000, "interleaved-message")
+        .run();
+      const recovered = await create("v2", input, "interleaved-message");
+      expect(recovered.status).toBe(201);
+      const body = await readJson(recovered);
+      expect(expectRecord(body["thread"])["id"]).toBe(id);
+      expect(expectRecord(body["run"])["id"]).not.toBe(otherRun["id"]);
+      const events = await readJson(await request(`v2/threads/${id}/events`));
+      expect(expectArray(events["events"])).toContainEqual(
+        expect.objectContaining({
+          type: "user.message",
+          content: "Original creation input.",
+        }),
+      );
+    });
+  });
+
+  test("does not recover an older Session when a retained key expires and is reused", async () => {
+    let interrupt = false;
+    const { create, database } = await setup({
+      requestDatabase: (db) =>
+        loseCommittedBatchResponse(db, 'insert into "session_execution_snapshot"', () => interrupt),
+    });
+    await withProviderProbeMock(async () => {
+      const old = await readJson(await create("v2", {}, "reused-key"));
+      const oldId = expectString(expectRecord(old["thread"])["id"]);
+      const priorDay = Date.now() - 25 * 60 * 60 * 1000;
+      await database
+        .prepare("UPDATE session SET created_at = ? WHERE id = ?")
+        .bind(priorDay, oldId)
+        .run();
+      await database
+        .prepare(
+          "UPDATE public_api_idempotency_key SET created_at = ?, updated_at = ? WHERE idempotency_key = ?",
+        )
+        .bind(priorDay, priorDay, "reused-key")
+        .run();
+      interrupt = true;
+      expect((await create("v2", {}, "reused-key")).status).toBe(500);
+      await database
+        .prepare("UPDATE public_api_idempotency_key SET updated_at = ? WHERE idempotency_key = ?")
+        .bind(Date.now() - 11 * 60 * 1000, "reused-key")
+        .run();
+      const recovered = await create("v2", {}, "reused-key");
+      expect(recovered.status).toBe(201);
+      expect(expectRecord((await readJson(recovered))["thread"])["id"]).not.toBe(oldId);
+    });
+  });
+
+  test("retains uploaded material when its claim commits but the response is lost", async () => {
+    const { create, database, request } = await setup({
+      requestDatabase: (db) => loseCommittedBatchResponse(db, '"owner_kind" = ?'),
+    });
+    const material = "region,revenue\nnorth,120\n";
+    const form = new FormData();
+    form.set("file", new File([material], "input.csv", { type: "text/csv" }));
+    const uploaded = await request(`v2/agents/${IDS.agent}/files`, {
+      method: "POST",
+      body: form,
+    });
+    expect(uploaded.status).toBe(201);
+    const fileId = expectString(expectRecord((await readJson(uploaded))["file"])["id"]);
+    const input = {
+      resources: [{ type: "file", file_id: fileId }],
+      input: { type: "user.message", content: [{ type: "text", text: "Analyze the CSV." }] },
+    };
+    await withProviderProbeMock(async () => {
+      expect((await create("v2", input, "lost-file-claim")).status).toBe(500);
+      const list = await readJson(await request(`v2/agents/${IDS.agent}/threads`));
+      const threads = expectArray(list["threads"]);
+      expect(threads).toHaveLength(1);
+      const id = expectString(expectRecord(threads[0])["id"]);
+      const content = await request(`v2/files/${fileId}/content`);
+      expect(content.status).toBe(200);
+      expect(await content.text()).toBe(material);
+      await database
+        .prepare("UPDATE public_api_idempotency_key SET updated_at = ? WHERE idempotency_key = ?")
+        .bind(Date.now() - 11 * 60 * 1000, "lost-file-claim")
+        .run();
+      const retry = await create("v2", input, "lost-file-claim");
+      expect(retry.status).toBe(201);
+      const recovered = await readJson(retry);
+      expect(expectRecord(recovered["thread"])["id"]).toBe(id);
+      expect(recovered["run"]).not.toBeNull();
+      const files = await readJson(await request(`v2/threads/${id}/files`));
+      expect(expectArray(files["files"])).toHaveLength(1);
+      expect(await (await request(`v2/files/${fileId}/content`)).text()).toBe(material);
+    });
+  });
+
+  test("resumes an interrupted creation using its original Session and saved configuration", async () => {
+    const { create, database, request, snapshot } = await setup({
+      requestDatabase: (db) =>
+        loseCommittedBatchResponse(db, 'insert into "session_execution_snapshot"'),
+    });
+    const input = {
+      input: {
+        type: "user.message",
+        content: [{ type: "text", text: "Analyze original material." }],
+      },
+    };
+    await withProviderProbeMock(async () => {
+      expect((await create("v2", input, "lost-session-commit")).status).toBe(500);
+      const list = await readJson(await request(`v2/agents/${IDS.agent}/threads`));
+      const threads = expectArray(list["threads"]);
+      expect(threads).toHaveLength(1);
+      const id = expectString(expectRecord(threads[0])["id"]);
+      const originalSnapshot = await snapshot(id);
+      await database
+        .prepare("UPDATE agent SET prompt = 'Different instructions' WHERE id = ?")
+        .bind(IDS.agent)
+        .run();
+      await database
+        .prepare("UPDATE public_api_idempotency_key SET updated_at = ? WHERE idempotency_key = ?")
+        .bind(Date.now() - 11 * 60 * 1000, "lost-session-commit")
+        .run();
+      const [retry, concurrentRetry] = await Promise.all([
+        create("v2", input, "lost-session-commit"),
+        create("v2", input, "lost-session-commit"),
+      ]);
+      expect(retry.status).toBe(201);
+      expect(concurrentRetry.status).toBe(201);
+      const recovered = await readJson(retry);
+      expect(expectRecord((await readJson(concurrentRetry))["run"])["id"]).toBe(
+        expectRecord(recovered["run"])["id"],
+      );
+      expect(expectRecord(recovered["thread"])["id"]).toBe(id);
+      expect(recovered["run"]).not.toBeNull();
+      expect(await snapshot(id)).toEqual(originalSnapshot);
+      const events = await readJson(await request(`v2/threads/${id}/events`));
+      expect(expectArray(events["events"])).toContainEqual(
+        expect.objectContaining({ type: "user.message", content: "Analyze original material." }),
+      );
+    });
+  });
+
+  test("recovers one admitted initial turn when D1 loses the commit response", async () => {
+    const { create, database, request } = await setup({
+      requestDatabase: (db) => loseCommittedBatchResponse(db, 'insert into "session_run"'),
+    });
+    const input = {
+      input: { type: "user.message", content: [{ type: "text", text: "Analyze fixed material." }] },
+    };
+    await withProviderProbeMock(async () => {
+      expect((await create("v2", input, "lost-run-commit")).status).toBe(500);
+      const list = await readJson(await request(`v2/agents/${IDS.agent}/threads`));
+      const threads = expectArray(list["threads"]);
+      expect(threads).toHaveLength(1);
+      const thread = expectRecord(threads[0]);
+      const id = expectString(thread["id"]);
+      const before = await readJson(await request(`v2/threads/${id}`));
+      const runId = expectString(expectRecord(before["run"])["id"]);
+      await database
+        .prepare("UPDATE public_api_idempotency_key SET updated_at = ? WHERE idempotency_key = ?")
+        .bind(Date.now() - 11 * 60 * 1000, "lost-run-commit")
+        .run();
+      const retry = await create("v2", input, "lost-run-commit");
+      expect(retry.status).toBe(201);
+      const recovered = await readJson(retry);
+      expect(expectRecord(recovered["thread"])["id"]).toBe(id);
+      expect(expectRecord(recovered["run"])["id"]).toBe(runId);
+      const events = await readJson(await request(`v2/threads/${id}/events`));
+      expect(
+        expectArray(events["events"]).filter(
+          (event) => expectRecord(event)["type"] === "user.message",
+        ),
+      ).toHaveLength(1);
+    });
+  });
+
   test("replays persisted events over v2 SSE for an owner-created Session", async () => {
     const live = createPublicEventSessionNamespace();
     const { database, request } = await setup({ sessionNamespace: live.binding });

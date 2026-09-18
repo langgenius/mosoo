@@ -18,6 +18,7 @@ export interface PublicApiThreadMetadata {
 export interface PublicApiThreadRecordMetadata {
   api_version?: PublicApiVersion;
   idempotency_key: string | null;
+  initial_request_id?: string | null;
   source: "public_api";
 }
 
@@ -81,10 +82,14 @@ export function parsePublicApiThreadRecordMetadata(
   }
 
   const idempotencyKey = metadata["idempotency_key"];
+  const initialRequestId = parsed["public_api_initial_request_id"];
 
   if (
     !isRecord(metadata["created_by"]) ||
-    (idempotencyKey !== null && typeof idempotencyKey !== "string")
+    (idempotencyKey !== null && typeof idempotencyKey !== "string") ||
+    (initialRequestId !== undefined &&
+      initialRequestId !== null &&
+      (typeof initialRequestId !== "string" || initialRequestId.length === 0))
   ) {
     return null;
   }
@@ -92,6 +97,7 @@ export function parsePublicApiThreadRecordMetadata(
   return {
     ...(metadata["api_version"] === "v2" ? { api_version: "v2" as const } : {}),
     idempotency_key: idempotencyKey,
+    ...(initialRequestId === undefined ? {} : { initial_request_id: initialRequestId }),
     source: "public_api",
   };
 }

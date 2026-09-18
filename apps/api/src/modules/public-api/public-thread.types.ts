@@ -18,6 +18,7 @@ export interface CreatePublicThreadRequest {
   caller: PersonalAccessTokenCaller;
   executionContext: Pick<ExecutionContext, "waitUntil"> | null;
   idempotencyKey: string | null;
+  idempotencyCreatedAt?: number;
   input: CreatePublicThreadInput;
   requestUrl: string;
 }

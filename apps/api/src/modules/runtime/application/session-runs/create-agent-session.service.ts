@@ -43,6 +43,7 @@ export interface CreateAgentSessionOptions {
 }
 
 export interface AgentSessionMetadata {
+  public_api_initial_request_id?: string | null;
   public_api?: {
     api_version?: "v1" | "v2";
     created_by: {

@@ -8,9 +8,9 @@ import type {
   PublicThreadFileListResponse,
   PublicThreadUsageResponse,
 } from "@mosoo/contracts/public-api";
-import { parsePlatformId } from "@mosoo/id";
 
 import { loadRepoEnv } from "../e2e/env";
+import { parsePlatformId } from "../pkgs/id/src/index";
 import { assertNonProductionBaseUrl } from "./public-api-nonproduction-smoke";
 
 // Reuse these requests for CLI/client contract acceptance. All operations use thread.id.
@@ -205,11 +205,16 @@ export async function runSessionWorkflow(input: {
   )
     throw new Error("Follow-up recorded no new successful tool execution.");
   const followupEvents = events.events.filter((event) => !initialEventIds.has(event.id));
+  // Some runtimes expose a tool result but no structured input. This is supporting
+  // trace evidence; the independent first-turn hash remains the continuity check.
   if (
     !followupEvents.some(
       (event) =>
-        event.toolInput !== undefined &&
-        /input\.csv|\.private|nonce/.test(JSON.stringify(event.toolInput)),
+        (event.toolInput !== undefined &&
+          /input\.csv|\.private|nonce/.test(JSON.stringify(event.toolInput))) ||
+        (event.type === "tool.use.completed" &&
+          event.status === "available" &&
+          /input\.csv|\.private|nonce/.test(event.content)),
     )
   )
     throw new Error("Follow-up trace does not show a tool accessing the prior workspace material.");

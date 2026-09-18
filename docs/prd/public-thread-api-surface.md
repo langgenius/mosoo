@@ -98,6 +98,21 @@ file. It runs real inference and leaves its Session/artifacts available for
 inspection; use a fresh test ID for a full rerun. Evidence goes to
 `.tmp/e2e/session-workflow` or `MOSOO_PUBLIC_SESSION_OUTPUT_DIR`.
 
+### Creation retries
+
+An optional `Idempotency-Key` is shared by keys in the same Project. Retained
+receipts reject changed input and replay the same admitted Session. The current
+receipt window is 24 hours; callers must save the returned Thread ID, because
+reuse after expiry can create new work. A still-processing request returns 409.
+After ten minutes, a retry can reconcile an interrupted creation against its
+persisted Session, initial-turn receipt, configuration and file identities.
+An unrelated later turn is not evidence that the original input was admitted.
+
+An ambiguous infrastructure failure keeps the creation recoverable; it must not
+delete an admitted Run or an object that a committed file record may reference.
+Explicit request rejections remain replayable. Neither creation idempotency nor
+recovery guarantees exactly-once effects in external tools.
+
 ## `/api/v1` compatibility policy
 
 The #582 durable Session target can extend this Thread API. Keeping the Thread

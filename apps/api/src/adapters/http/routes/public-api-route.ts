@@ -138,7 +138,7 @@ function registerPublicThreadRoutes(
           bodyHash: await hashCreateThreadIdempotencyBody(body),
         };
       },
-      recover: async ({ agentId, caller, idempotencyKey, prepared }) => {
+      recover: async ({ agentId, caller, idempotencyKey, idempotencyCreatedAt, prepared }) => {
         const { recoverPublicThreadCreation } = await loadPublicThreadService();
         return recoverPublicThreadCreation({
           apiVersion,
@@ -147,6 +147,7 @@ function registerPublicThreadRoutes(
           caller,
           executionContext: c.executionCtx,
           idempotencyKey,
+          idempotencyCreatedAt,
           input: prepared.body,
           requestUrl: c.req.url,
         });

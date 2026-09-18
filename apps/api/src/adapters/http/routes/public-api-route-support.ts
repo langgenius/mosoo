@@ -209,7 +209,7 @@ async function runPublicApiIdempotentJson<T>(
     beforeOperation?: (() => Promise<void>) | undefined;
     operation: (idempotencyKey: string | null) => Promise<T>;
     persistOperationErrors?: boolean | undefined;
-    recover?: ((idempotencyKey: string) => Promise<T | null>) | undefined;
+    recover?: ((idempotencyKey: string, createdAt: number) => Promise<T | null>) | undefined;
     status: number;
   },
 ): Promise<Response> {
@@ -241,7 +241,9 @@ async function runPublicApiIdempotentJson<T>(
       );
     }
 
-    const recovered = input.recover ? await input.recover(idempotencyKey) : null;
+    const recovered = input.recover
+      ? await input.recover(idempotencyKey, reservation.createdAt)
+      : null;
 
     if (recovered !== null) {
       try {
@@ -303,6 +305,11 @@ async function runPublicApiIdempotentJson<T>(
   } catch (error) {
     if (input.persistOperationErrors === true) {
       const errorResponse = toErrorResponseDetails(error);
+      if (input.recover && errorResponse.status >= 500) {
+        // Creation may already have committed. Keep the reservation recoverable
+        // instead of making an ambiguous infrastructure error the stored result.
+        return Response.json(errorResponse.body, { status: errorResponse.status });
+      }
       await completePublicApiIdempotency(c.env.DB, reservation.reservationId, {
         body: errorResponse.body,
         status: errorResponse.status,
@@ -465,6 +472,7 @@ export async function runPublicApiThreadMutation<T, Prepared = undefined>(
       input: PublicApiTokenOperation & {
         agentId: AgentId;
         idempotencyKey: string;
+        idempotencyCreatedAt: number;
         prepared: Prepared;
       },
     ) => Promise<T | null>;
@@ -480,8 +488,14 @@ export async function runPublicApiThreadMutation<T, Prepared = undefined>(
     const operation = async (idempotencyKey: string | null) =>
       input.operation({ ...operationInput, agentId, idempotencyKey, prepared });
     const recover = input.recover
-      ? async (idempotencyKey: string) =>
-          input.recover?.({ ...operationInput, agentId, idempotencyKey, prepared }) ?? null
+      ? async (idempotencyKey: string, idempotencyCreatedAt: number) =>
+          input.recover?.({
+            ...operationInput,
+            agentId,
+            idempotencyKey,
+            idempotencyCreatedAt,
+            prepared,
+          }) ?? null
       : undefined;
     const beforeOperation = () =>
       enforcePublicApiRateLimit(c.env.DB, caller.viewer.projectId ?? caller.tokenId);
