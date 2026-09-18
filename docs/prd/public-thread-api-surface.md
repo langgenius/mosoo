@@ -61,6 +61,12 @@ Agent's API Access panel shows its identifier, token creation, and API reference
 
 ## `/api/v1` compatibility policy
 
+The #582 durable Session target can extend this Thread API. Keeping the Thread
+name, existing conversation IDs, or compatible Run result fields does not
+conflict with one primary conversation handle. A terminology change alone does
+not require a new version or removal of the old routes. Assess admission,
+configuration selection, identity, continuation, and outcomes separately.
+
 `/api/v1` is backward compatible by default. Existing request fields, accepted
 values, response fields, operations, and documented behavior must not be removed
 or narrowed in place. A semantic change that cannot remain compatible must use a

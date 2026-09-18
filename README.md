@@ -31,6 +31,8 @@ Your application remains yours. Its backend owns product behavior and end-user a
 
 mosoo v1 targets research, data analysis, file processing, and report generation through `Project key + Agent + Input + optional files -> durable Session`. Agent configuration is optional and publishing is removed from first use. Acceptance covers a single-turn ghFind repository evaluation and CSV analysis with durable follow-up, including recovery after runtime reclamation. Both use the same Session API and checkpoint gate. Project keys have shipped; the Session transition is not complete. See [SPEC](./docs/SPEC.md) and [remaining execution slices](./docs/prd/managed-agent-v1.md).
 
+The durable Session contract can use the existing Thread API and conversation IDs. Compatible names and fields do not need a separate API migration. Moving shared Agent machines to isolated Sessions does require a verified transition for existing Cloud workloads; see the [migration contract](./docs/SPEC.md#10-migration-and-breaking-change-notification).
+
 ## How It Works Today
 
 ```text

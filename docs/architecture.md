@@ -8,7 +8,21 @@ Existing checkpoint and runtime primitives must support native continuation with
 
 The user-visible invariant is continuity of the same Session across seconds or days of idle time and runtime reclamation. Verify continuation against prior conversation context, working files, and the admitted configuration; successful backup creation is only an intermediate check. Live delayed-continuation evidence records actual elapsed time separately from deterministic tests that advance the clock.
 
-Full-access execution retains isolation and authorization. Interactive approvals and typed Git resource infrastructure remain deferred; ghFind's fixed-commit material delivery is an explicit open decision. See [remaining slices](./prd/managed-agent-v1.md). The topology and flows below describe current implementation until those slices land, including its existing checkpoint retention policy.
+The September 18 compatibility clarification keeps existing Thread routes, conversation IDs, and compatible Run result fields. Session describes the durable ownership and continuation contract; it does not mandate a new endpoint name. Changes to admission, saved/live selection, identity, or outcomes require behavior-level compatibility evidence independently of naming.
+
+### Target Session ownership and Cloud transition
+
+The following boundaries are targets for #582, not a claim that existing Pet workloads have migrated:
+
+- Project owns authorization, Agent definitions, provider references, and saved file records. Agent is a reusable configuration; each admitted Session freezes its execution configuration.
+- Session owns its writable working directory, native runtime context, serialized turn admission, and checkpoint lineage. Sandbox/Driver are replaceable execution resources bound to that Session. Reusable immutable environment/package artifacts may be shared; writable Agent memory, home directories, credentials grants, and runtime-native state may not cross Sessions. Separate directories alone do not enforce isolation when tools have full access in a shared container.
+- Cold recovery validates Project/Session ownership, the committed turn, native state, and workspace checkpoint together. It restores the same Session or returns an explicit recovery error. It must not substitute another Session's state or silently start an empty conversation.
+- Existing Cloud Pet Sandboxes can contain several Sessions and Agent-wide state. Inventory those relationships and active work before changing allocation. Preserve old IDs, history, artifacts, and delegated identity. A per-Session copy of a verified checkpoint is possible only when its ownership and native lineage are known; copying the whole shared machine into every Session is not a safe default. Unassigned shared state and process-dependent workflows need a specific transition decision.
+- Drain admitted work and verify backup/restore on isolated copies before releasing a shared resource. Do not change a live Pet's kind to force the new allocator, restart it for inventory, or rewrite missing historical configuration as if it were recorded. Compatibility readers and inert historical columns may remain while active Pet/Cattle behavior is retired.
+
+The sections below describe the current implementation, including the shared Pet path. Update those sections as each migration slice lands, with Cloud customer evidence under the [migration contract](./SPEC.md#10-migration-and-breaking-change-notification).
+
+Full-access execution retains isolation and authorization. Interactive approvals and typed Git resource infrastructure remain deferred. ghFind may provide a public repository URL and exact commit for the Agent to fetch with existing tools, or optionally upload material from that commit. Record and validate the actual material identity across retries. See [remaining slices](./prd/managed-agent-v1.md). The topology and flows below describe current implementation until those slices land, including its existing checkpoint retention policy.
 
 mosoo provides a Project-scoped control plane for configuring, publishing, running, and observing coding Agents through the console and Public Thread API.
 

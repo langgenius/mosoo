@@ -148,6 +148,30 @@ driver-update:
 deploy: check
     bun run deploy
 
+# Build and validate both isolated staging Workers without publishing.
+stage-preflight:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    ./node_modules/.bin/vp run --filter @mosoo/agent-driver build
+    ./node_modules/.bin/vp run --filter @mosoo/web build
+    (cd apps/api && ../../node_modules/.bin/vp exec wrangler deploy --env stage --minify --dry-run)
+    (cd apps/web && ../../node_modules/.bin/vp exec wrangler deploy --env stage --dry-run)
+
+# Publish a reviewed, clean staging candidate; follow docs/staging-deploy-verification.md.
+# Does not apply migrations, upload model keys, or target production.
+deploy-stage: stage-preflight
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [[ -n "$(git status --porcelain --untracked-files=all)" ]]; then
+        echo "Commit and review the candidate before deploying staging." >&2
+        exit 1
+    fi
+    stage_revision="$(git rev-parse HEAD)"
+    stage_driver_revision="$(git -C apps/driver rev-parse HEAD)"
+    stage_message="mosoo=$stage_revision driver=$stage_driver_revision"
+    (cd apps/api && ../../node_modules/.bin/vp exec wrangler deploy --env stage --minify --containers-rollout immediate --tag "$stage_revision" --message "$stage_message")
+    (cd apps/web && ../../node_modules/.bin/vp exec wrangler deploy --env stage --tag "$stage_revision" --message "$stage_message")
+
 # Deploy the API production target.
 deploy-api:
     bun run deploy:api

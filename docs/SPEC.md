@@ -1,6 +1,6 @@
 # Mosoo Product Spec
 
-Status: canonical target product contract, updated after the product review on September 10, 2026. Single-turn tasks and multi-turn continuation share one durable Session contract. This document describes intended behavior; source, acceptance checks, and release evidence establish what is actually shipped.
+Status: canonical target product contract, with API compatibility and Cloud migration clarified on September 18, 2026. Single-turn tasks and multi-turn continuation share one durable Session contract. This document describes intended behavior; source, acceptance checks, and release evidence establish what is actually shipped.
 
 ## 1. Product Thesis
 
@@ -45,7 +45,7 @@ One admitted input starts one turn, which may include multiple model requests an
 
 Within the recovery period, a user returning seconds or days later to the same Session must be able to continue the same work. The Session preserves its conversation context, working files, and admitted execution configuration across idle time and sandbox reclamation. Users do not need to restate prior work, upload the same material again, or create a replacement Session to continue. Recovery may take longer than warm continuation; continuity does not promise identical model wording or preservation of live processes.
 
-- `session_id` is the single primary public execution handle. Callers do not need to manage internal Run or retry Attempt IDs.
+- One durable conversation ID is the primary public execution handle. Existing `thread.id` and Thread routes can represent that Session; the contract does not require renaming them to `session_id`. Callers do not need to manage internal Run or retry Attempt IDs, although existing Run results remain compatible observability data.
 - Only one turn executes at a time in a Session. Busy Sessions reject new input, without input queuing or mid-execution steering.
 - The active turn can be cancelled. Another input is accepted only after that turn ends; cancellation cannot undo completed external side effects.
 - Completing a turn returns the Session to a state that accepts follow-up input; it does not terminate the conversation.
@@ -81,6 +81,7 @@ A checkpoint represents committed state that can be restored. It is the durabili
 
 ## 6. API And Console
 
+- Extend the existing Thread API where its behavior satisfies this contract. Preserve compatible routes, IDs, response fields, and retry behavior. A terminology change alone does not justify a new API version, duplicate execution surface, or old-endpoint sunset.
 - Session creation may include the first input. Follow-up input and cancellation use the same Session handle.
 - Provide status retrieval, replayable historical events, and SSE. After disconnecting, callers can recover missed persisted events. v1 does not provide Webhooks.
 - Creation supports an optional `Idempotency-Key`: within a Project, the same key and request return the original Session without duplicate work; reusing the key with a different request fails explicitly. Without a key, create a new Session.
@@ -102,7 +103,7 @@ A checkpoint represents committed state that can be restored. It is the durabili
 7. Successful completion satisfies the artifact-persistence and checkpoint gate. After runtime reclamation, status, historical events, and saved artifacts remain readable.
 8. Complete this business acceptance in one turn without requiring follow-up input. ghFind retains its own analysis ID, queue, rubric, validation, storage, and UI.
 
-**Open decision: repository input delivery.** Acceptance must record the fixed commit and material actually used. Prefer caller-prepared material from that commit through existing file input capabilities; #582 must settle the concrete input contract. Typed Git Resource mounting, private-repository authorization, and branch/PR workflows remain deferred extensions rather than implicit requirements of this acceptance case.
+**Repository input delivery.** ghFind may supply a public repository URL and an exact commit SHA for the Agent to fetch using existing tools, or attach material prepared from that commit. Caller upload is optional. Acceptance must record and validate the resolved commit and material actually used; retries must retain that identity. Typed Git Resource mounting, private-repository authorization, and branch/PR workflows remain deferred extensions rather than implicit requirements of this acceptance case.
 
 ### Multi-Turn Scenario: CSV Analysis And Follow-Up
 
@@ -163,6 +164,12 @@ Remaining work follows #582 -> #583 -> #584, with a working acceptance path and 
 
 Migration preserves existing resource identities, ownership, and promised history, without redesigning Organization governance. Production D1 is append-only. Inventory active state before cutover and follow CONTRIBUTING.md. Destructive or data-rewrite migrations require explicit approval, backups, verification, and rollback plans. This document does not authorize destructive production operations.
 
+Session isolation changes the runtime ownership boundary, not just the Agent type name. New Sessions own their writable workspace, runtime-native conversation, credentials grants, and checkpoint lineage. An Agent definition is reusable configuration, not a shared writable machine. Historical Pet Sessions may already share files, memory, processes, and one Sandbox; changing a database label or allocating fresh empty Sandboxes does not migrate that state.
+
+Before changing existing Cloud customers' behavior, inventory shared Sandbox membership, active work, saved/live configuration differences, and recoverable state. Preserve old resource IDs, history, artifacts, and end-user/MCP identity. Drain admitted work without replaying unknown external side effects. For each shared workspace, establish what belongs to each Session and what needs explicit transfer; never copy shared secrets or other Sessions' private state into every new workspace. Verify restoration from isolated copies before releasing the old execution resource. Missing native or workspace state must be reported, not reconstructed by assumption. Any required customer action or loss of a shared-machine capability needs a concrete transition and notice before enforcement.
+
+Keeping an inert historical schema field or a compatible Thread route does not retain the Pet/Cattle product model. Remove active dual-type behavior only after existing workloads have a verified transition; removing field names or rewriting old rows is not a closure criterion by itself.
+
 Intentional breaking changes are accepted with a defined cutover, treatment of admitted work, compatible clients, migration instructions, and a rollback point. Prepare the affected audience and notice before release. Notices must state the effective time, actual changes, preserved data, and required user actions.
 
 Use Cloudflare Email Service and retain sending outcomes plus sample inbox/content verification under the [breaking-change notification runbook](./production-deploy-verification.md#breaking-change-notification). Distinguish provider acceptance from inbox delivery; unattempted recipients or unknown outcomes cannot count as completed notification. Documentation synchronization alone does not trigger a release notice. A notice claiming the replacement is available follows deployment and verification of the API, console, and applicable CLI.
@@ -172,6 +179,5 @@ The completed #581 key notice does not cover later Session or Builder changes. F
 ## 11. Open Decisions
 
 1. **Default model access and cost controls:** concrete default models, hosted provider supply, default turn budgets, allowed caps, and operational limits.
-2. **ghFind repository input contract:** the smallest way to supply fixed-commit material and record its identity for retries and validation.
 
 Resolve these before accepting and shipping the corresponding capabilities.
