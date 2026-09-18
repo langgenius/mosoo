@@ -18,6 +18,8 @@ import type {
 export interface SessionExecutionPlan {
   binding: Omit<SessionExecutionBinding, "sessionId">;
   builtInTools: AgentBuiltInToolConfig[];
+  /** Absent only on Sessions admitted before execution config freezing. */
+  configJson?: string;
   environment: {
     allowMcpServers: boolean;
     allowPackageManagers: boolean;

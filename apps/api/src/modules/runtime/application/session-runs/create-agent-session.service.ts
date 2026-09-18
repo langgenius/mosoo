@@ -180,6 +180,7 @@ async function buildSessionExecutionPlan(input: {
       runtimeId: input.source.runtimeId,
     },
     builtInTools: storedConfig.builtInTools,
+    configJson: input.source.configJson,
     environment: {
       allowMcpServers: environmentSnapshot.record.allowMcpServers === 1,
       allowPackageManagers: environmentSnapshot.record.allowPackageManagers === 1,

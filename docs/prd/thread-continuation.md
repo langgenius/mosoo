@@ -41,6 +41,24 @@ Restore is retryable and idempotent. A missing,
 expired, corrupt, or unrestorable checkpoint fails the continuation with an
 actionable error instead of opening an empty workspace.
 
+## Admitted configuration
+
+New Sessions store the admitted Agent configuration alongside their execution plan,
+including provider options and package-readiness state. Both cold hydration and
+warm cache refresh use that saved configuration. Later Agent edits apply to new
+Sessions, while provider credentials and MCP authorization are resolved again on
+continuation so revoked access does not survive in a cached profile.
+
+This configuration change does not establish the complete managed Session API or
+live cold-continuation acceptance. Existing snapshots without the configuration
+field retain the previous read path: published Sessions use their pinned deployment
+version; unpublished Sessions use the current Agent configuration. The original
+unrecorded settings of those unpublished Sessions cannot be reconstructed. Inventory
+and explicit legacy treatment are required before claiming the new continuity
+contract for that population or removing deployment-version storage. A present but
+invalid configuration fails hydration rather than falling back to current settings.
+No existing snapshot or production data is rewritten by this change.
+
 ## Rollout compatibility
 
 Threads whose last successful turn predates the workspace-checkpoint rollout are

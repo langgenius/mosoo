@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
+import { hydrateCachedRunContextFromSession } from "../src/modules/runtime/application/session-definition/hydrate-run-context.service";
 import { createAgentSession } from "../src/modules/runtime/application/session-run.service";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import {
@@ -78,6 +79,117 @@ describe("createAgentSession", () => {
     });
     expect(session.id).toBeString();
     expect(session.createdAt).toBe(session.updatedAt);
+  });
+
+  test("freezes provider options across cold hydration, cache refresh, and later Agent edits", async () => {
+    const database = await createPublicHttpContractDatabase();
+    const bindings = createPublicHttpTestBindings(database) as ApiBindings;
+    await database
+      .prepare(
+        "UPDATE agent SET status = 'draft', live_deployment_version_id = NULL, config_json = ? WHERE id = ?",
+      )
+      .bind(
+        JSON.stringify({
+          packageMcpServers: [],
+          packageSkills: [],
+          packageResolution: null,
+          providerOptions: { reasoningEffort: "low" },
+        }),
+        PUBLIC_API_TEST_IDS.agent,
+      )
+      .run();
+    const createSession = () =>
+      withProviderProbeMock(() =>
+        createAgentSession({
+          bindings,
+          input: {
+            agentId: PUBLIC_API_TEST_IDS.agent,
+            projectId: PUBLIC_API_TEST_IDS.project,
+            type: "ui",
+          },
+          viewer: OWNER_VIEWER,
+        }),
+      );
+    const original = await createSession();
+    await database
+      .prepare("UPDATE agent SET config_json = ? WHERE id = ?")
+      .bind(
+        JSON.stringify({
+          packageMcpServers: [],
+          packageSkills: [],
+          packageResolution: null,
+          providerOptions: { reasoningEffort: "high" },
+        }),
+        PUBLIC_API_TEST_IDS.agent,
+      )
+      .run();
+    const cold = await hydrateCachedRunContextFromSession(bindings, OWNER_VIEWER, original);
+    expect(cold.cacheHit).toBe(false);
+    expect(cold.value.profile.providerOptions).toEqual({ reasoningEffort: "low" });
+    const warm = await hydrateCachedRunContextFromSession(bindings, OWNER_VIEWER, original);
+    expect(warm.cacheHit).toBe(true);
+    expect(warm.value.profile.providerOptions).toEqual({ reasoningEffort: "low" });
+    const latest = await createSession();
+    const latestContext = await hydrateCachedRunContextFromSession(bindings, OWNER_VIEWER, latest);
+    expect(latestContext.value.profile.providerOptions).toEqual({ reasoningEffort: "high" });
+    await database.prepare("DELETE FROM vendor_credential").run();
+    await expect(
+      hydrateCachedRunContextFromSession(bindings, OWNER_VIEWER, original),
+    ).rejects.toThrow("No credential available");
+  });
+
+  test("reads legacy published configuration but never falls back from a corrupt new snapshot", async () => {
+    const database = await createPublicHttpContractDatabase();
+    const bindings = createPublicHttpTestBindings(database) as ApiBindings;
+    const session = await withProviderProbeMock(() =>
+      createAgentSession({
+        bindings,
+        input: {
+          agentId: PUBLIC_API_TEST_IDS.agent,
+          projectId: PUBLIC_API_TEST_IDS.project,
+          type: "ui",
+        },
+        viewer: OWNER_VIEWER,
+      }),
+    );
+    await database
+      .prepare(
+        "UPDATE session_execution_snapshot SET plan_json = json_remove(plan_json, '$.configJson') WHERE session_id = ?",
+      )
+      .bind(session.id)
+      .run();
+    await database
+      .prepare("UPDATE agent SET config_json = ? WHERE id = ?")
+      .bind(
+        JSON.stringify({
+          packageMcpServers: [],
+          packageSkills: [],
+          packageResolution: null,
+          providerOptions: { reasoningEffort: "high" },
+        }),
+        PUBLIC_API_TEST_IDS.agent,
+      )
+      .run();
+    const legacy = await hydrateCachedRunContextFromSession(bindings, OWNER_VIEWER, session);
+    expect(legacy.value.profile.providerOptions).toEqual({});
+    await database
+      .prepare(
+        "UPDATE session_execution_snapshot SET plan_json = json_set(plan_json, '$.configJson', 'broken') WHERE session_id = ?",
+      )
+      .bind(session.id)
+      .run();
+    await expect(
+      hydrateCachedRunContextFromSession(bindings, OWNER_VIEWER, session),
+    ).rejects.toThrow();
+    await database
+      .prepare(
+        "UPDATE session_execution_snapshot SET plan_json = json_set(plan_json, '$.configJson', NULL) WHERE session_id = ?",
+      )
+      .bind(session.id)
+      .run();
+    await expect(
+      hydrateCachedRunContextFromSession(bindings, OWNER_VIEWER, session),
+    ).rejects.toThrow("sessionExecutionPlan.configJson must be a string");
   });
 
   test("fails Public Thread session creation when the live version is missing", async () => {

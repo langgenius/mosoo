@@ -254,6 +254,11 @@ function parseSessionExecutionPlanJson(planJson: string): SessionExecutionPlan {
   return {
     binding: parseBinding(record["binding"]),
     builtInTools: parseBuiltInTools(record["builtInTools"]),
+    ...(record["configJson"] === undefined
+      ? {}
+      : {
+          configJson: readString(record["configJson"], "sessionExecutionPlan.configJson"),
+        }),
     environment: parseEnvironment(record["environment"]),
     skills: readArray(record["skills"], "sessionExecutionPlan.skills").map(parseSkillReference),
     tools: readArray(record["tools"], "sessionExecutionPlan.tools").map(parseToolReference),

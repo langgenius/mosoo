@@ -185,11 +185,13 @@ async function hydrateRunContextFromSession(
       agentId: binding.agentId,
       projectId: session.projectId,
     }).then((access) => access.agent),
-    isTruthy(binding.deploymentVersionId)
+    executionPlan.configJson === undefined && isTruthy(binding.deploymentVersionId)
       ? getAgentDeploymentVersionRecord(bindings.DB, binding.deploymentVersionId)
       : Promise.resolve(null),
   ]);
-  const storedConfig = parseAgentStoredConfig(deploymentVersion?.configJson ?? agent.configJson);
+  const storedConfig = parseAgentStoredConfig(
+    executionPlan.configJson ?? deploymentVersion?.configJson ?? agent.configJson,
+  );
   const environmentSnapshot = executionPlan.environment;
   const toolReferences = executionPlan.tools.toSorted(
     (left, right) => left.sortOrder - right.sortOrder,
@@ -389,11 +391,13 @@ async function refreshCachedRunContextVolatileFields(
       agentId: binding.agentId,
       projectId: session.projectId,
     }).then((access) => access.agent),
-    isTruthy(binding.deploymentVersionId)
+    executionPlan.configJson === undefined && isTruthy(binding.deploymentVersionId)
       ? getAgentDeploymentVersionRecord(bindings.DB, binding.deploymentVersionId)
       : Promise.resolve(null),
   ]);
-  const storedConfig = parseAgentStoredConfig(deploymentVersion?.configJson ?? agent.configJson);
+  const storedConfig = parseAgentStoredConfig(
+    executionPlan.configJson ?? deploymentVersion?.configJson ?? agent.configJson,
+  );
   const catalogEntry = getRuntimeCatalogEntry(runtimeId);
 
   if (catalogEntry === null) {
