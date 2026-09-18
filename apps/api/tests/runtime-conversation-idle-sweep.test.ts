@@ -26,6 +26,7 @@ function createDatabase(): SqliteD1Database {
     );
 
     CREATE TABLE sandbox (
+      sandbox_binding text NOT NULL DEFAULT 'Sandbox',
       id text PRIMARY KEY NOT NULL,
       status text DEFAULT 'active',
       claim_owner text,

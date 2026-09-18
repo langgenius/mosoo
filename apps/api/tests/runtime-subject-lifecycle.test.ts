@@ -27,6 +27,7 @@ const SESSION_ID = "01J00000000000000000000009";
 const CLOUDFLARE_BACKUP_ID = "550e8400-e29b-41d4-a716-446655440000";
 const STORED_BACKUP_ID = encodeSandboxBackupIdForStorage(CLOUDFLARE_BACKUP_ID);
 const RUNTIME_SUBJECT_QUOTA_SCOPE = {
+  runtimeId: "claude-agent-sdk",
   agentId: AGENT_ID,
   projectId: PROJECT_ID,
   executionOwnerUserId: ACCOUNT_ID,
@@ -41,6 +42,7 @@ function createRuntimeSubjectLifecycleDatabase(): SqliteD1Database {
 
   database.execute(`
     CREATE TABLE sandbox (
+      sandbox_binding text NOT NULL DEFAULT 'Sandbox',
       agent_id text,
       project_id text,
       bind_mount_ready integer DEFAULT false NOT NULL,
@@ -246,6 +248,7 @@ function createBindings(
   database: D1Database,
   options: {
     readonly accountConcurrentSandboxLimit?: string;
+    readonly runtimeImagesEnabled?: boolean;
     readonly configureNetworkError?: Error;
     readonly destroyError?: Error;
     readonly destroyPromise?: Promise<void>;
@@ -258,12 +261,47 @@ function createBindings(
   return {
     DB: database,
     MOSOO_ACCOUNT_CONCURRENT_SANDBOX_LIMIT: options.accountConcurrentSandboxLimit ?? "5",
+    MOSOO_RUNTIME_IMAGES_ENABLED: options.runtimeImagesEnabled ? "true" : "false",
     SANDBOX_FILE_BUCKET_LOCAL: "true",
     runtimeSubjectHandleFactory: () => createSandboxHandle(options),
   } as unknown as ApiBindings;
 }
 
 describe("runtime subject lifecycle machine", () => {
+  test("keeps one deployment ceiling across runtime image classes", async () => {
+    const database = createRuntimeSubjectLifecycleDatabase();
+    const lifecycle = createRuntimeSubjectLifecycleService(
+      createBindings(database, {
+        accountConcurrentSandboxLimit: "100",
+        runtimeImagesEnabled: true,
+      }),
+    );
+    const runtimes = ["claude-agent-sdk", "openai-runtime", "acp-fallback"];
+    const outcomes = await Promise.allSettled(
+      Array.from({ length: 51 }, (_, index) =>
+        lifecycle.activate({
+          ...RUNTIME_SUBJECT_QUOTA_SCOPE,
+          runtimeId: runtimes[index % runtimes.length],
+          kind: "cattle",
+          networkConstraints: { allowedHosts: [], networkPolicy: "full" },
+          runtimeSubjectId: createPlatformId<SandboxId>(),
+          subjectId: createPlatformId<SessionId>(),
+          subjectKind: "session",
+        }),
+      ),
+    );
+    expect(outcomes.filter((outcome) => outcome.status === "fulfilled")).toHaveLength(50);
+    expect(outcomes.filter((outcome) => outcome.status === "rejected")).toHaveLength(1);
+    const profiles = await database
+      .prepare("SELECT DISTINCT sandbox_binding FROM sandbox ORDER BY sandbox_binding")
+      .all<{ sandbox_binding: string }>();
+    expect(profiles.results.map((row) => row.sandbox_binding)).toEqual([
+      "SandboxClaude",
+      "SandboxOpenAI",
+      "SandboxOpenCode",
+    ]);
+  });
+
   test("keeps subject operation transitions explicit", () => {
     expect(
       decideRuntimeSubjectTransition({
@@ -325,6 +363,7 @@ describe("runtime subject lifecycle machine", () => {
 
       return {
         agentId: AGENT_ID,
+        runtimeId: "claude-agent-sdk",
         projectId: PROJECT_ID,
         executionOwnerUserId: ACCOUNT_ID,
         kind: "cattle",

@@ -15,6 +15,7 @@ import type {
 import { getRuntimeCatalogEntry, getRuntimeCatalogVendorForProvider } from "@mosoo/runtime-catalog";
 import { RUNTIME_DIAGNOSTIC_EVENT } from "@mosoo/runtime-events";
 
+import { runtimeImagesEnabled } from "../../../../platform/cloudflare/sandbox-binding";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { validationError } from "../../../../platform/errors";
 import { isTruthy } from "../../../../shared/truthiness";
@@ -72,6 +73,7 @@ async function resolveRuntimeProfileIds(
     projectId: ProjectId;
     executionOwnerUserId: AccountId;
     kind: DriverProfileConfig["kind"];
+    runtimeId: string;
     sessionId: SessionId;
   },
 ): Promise<{
@@ -81,6 +83,8 @@ async function resolveRuntimeProfileIds(
   const sandboxSubject = resolveAgentRuntimeSandboxSubject(input);
   const [sandboxId, existingConversationSession] = await Promise.all([
     ensureRuntimeSubjectId(bindings.DB, {
+      runtimeId: input.runtimeId,
+      runtimeImagesEnabled: runtimeImagesEnabled(bindings.MOSOO_RUNTIME_IMAGES_ENABLED),
       ...sandboxSubject,
       agentId: input.agentId,
       projectId: input.projectId,
@@ -289,6 +293,7 @@ async function hydrateRunContextFromSession(
 
   let profile: DriverProfileConfig;
   const runtimeProfileIds = await resolveRuntimeProfileIds(bindings, {
+    runtimeId,
     agentId: agent.id,
     projectId: session.projectId,
     executionOwnerUserId: agent.ownerId,
@@ -447,6 +452,7 @@ async function refreshCachedRunContextVolatileFields(
   }
 
   const runtimeProfileIds = await resolveRuntimeProfileIds(bindings, {
+    runtimeId,
     agentId: agent.id,
     projectId: session.projectId,
     executionOwnerUserId: agent.ownerId,

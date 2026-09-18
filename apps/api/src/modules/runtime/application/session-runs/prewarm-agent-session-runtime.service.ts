@@ -75,6 +75,7 @@ export async function prewarmAgentSessionRuntime(
     const sandboxId = hydrated.value.profile.sandbox.id;
     const { subject: sandbox } = await timing.measure("activateRuntimeSubject", () =>
       createRuntimeSubjectLifecycleService(bindings).activate({
+        runtimeId,
         agentId: hydrated.value.profile.agentId,
         executionOwnerUserId: hydrated.value.profile.session.origin.executionOwnerUserId,
         kind: hydrated.value.profile.kind,
