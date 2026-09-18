@@ -81,6 +81,72 @@ describe("createAgentSession", () => {
     expect(session.createdAt).toBe(session.updatedAt);
   });
 
+  test("saved v2 admission isolates each Session without moving the Agent's legacy shared workspace", async () => {
+    const database = await createPublicHttpContractDatabase();
+    const bindings = createPublicHttpTestBindings(database) as ApiBindings;
+    const create = (saved: boolean) =>
+      withProviderProbeMock(() =>
+        createAgentSession({
+          bindings,
+          input: {
+            agentId: PUBLIC_API_TEST_IDS.agent,
+            projectId: PUBLIC_API_TEST_IDS.project,
+            type: "ui",
+          },
+          ...(saved ? { options: { configurationSource: "saved" as const } } : {}),
+          viewer: OWNER_VIEWER,
+        }),
+      );
+    const legacy = await create(false);
+    const legacyContext = await hydrateCachedRunContextFromSession(bindings, OWNER_VIEWER, legacy);
+    const before = await database
+      .prepare("SELECT * FROM session_execution_snapshot WHERE session_id = ?")
+      .bind(legacy.id)
+      .first();
+    const first = await create(true);
+    const second = await create(true);
+    const firstContext = await hydrateCachedRunContextFromSession(bindings, OWNER_VIEWER, first);
+    const secondContext = await hydrateCachedRunContextFromSession(bindings, OWNER_VIEWER, second);
+    expect(legacyContext.value.profile.sandbox.subjectId).toBe(PUBLIC_API_TEST_IDS.agent);
+    expect(firstContext.value.profile.sandbox.subjectId).toBe(first.id);
+    expect(secondContext.value.profile.sandbox.subjectId).toBe(second.id);
+    expect(
+      new Set([
+        legacyContext.value.profile.sandbox.id,
+        firstContext.value.profile.sandbox.id,
+        secondContext.value.profile.sandbox.id,
+      ]).size,
+    ).toBe(3);
+    expect(firstContext.value.profile.session.homePath).not.toBe(
+      secondContext.value.profile.session.homePath,
+    );
+    expect(firstContext.value.profile.session.sessionOrganizationPath).not.toBe(
+      secondContext.value.profile.session.sessionOrganizationPath,
+    );
+    for (const session of [first, second]) {
+      const row = await database
+        .prepare("SELECT plan_json FROM session_execution_snapshot WHERE session_id = ?")
+        .bind(session.id)
+        .first<{ plan_json: string }>();
+      expect(JSON.parse(row?.plan_json ?? "{}").recoveryRetentionMs).toBe(30 * 24 * 60 * 60 * 1000);
+      expect(session.kind).toBe("cattle");
+    }
+    expect(
+      await database
+        .prepare("SELECT kind FROM agent WHERE id = ?")
+        .bind(PUBLIC_API_TEST_IDS.agent)
+        .first(),
+    ).toEqual({ kind: "pet" });
+    expect(
+      await database
+        .prepare("SELECT * FROM session_execution_snapshot WHERE session_id = ?")
+        .bind(legacy.id)
+        .first(),
+    ).toEqual(before);
+    const legacyAgain = await hydrateCachedRunContextFromSession(bindings, OWNER_VIEWER, legacy);
+    expect(legacyAgain.value.profile.sandbox).toEqual(legacyContext.value.profile.sandbox);
+  });
+
   test("freezes provider options across cold hydration, cache refresh, and later Agent edits", async () => {
     const database = await createPublicHttpContractDatabase();
     const bindings = createPublicHttpTestBindings(database) as ApiBindings;

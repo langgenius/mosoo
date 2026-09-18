@@ -102,7 +102,9 @@ async function resolveAgentSessionExecutionSource(input: {
     configJson: liveVersion?.configJson ?? agent.configJson,
     environment,
     liveVersion,
-    kind: liveVersion?.kind ?? agent.kind,
+    // New saved-config Sessions own their execution state. A legacy Agent's
+    // shared subject stays attached only to its previously admitted Sessions.
+    kind: input.configurationSource === "saved" ? "cattle" : (liveVersion?.kind ?? agent.kind),
     model: liveVersion?.model ?? agent.model,
     prompt: liveVersion?.prompt ?? agent.prompt,
     provider: liveVersion?.provider ?? agent.provider,
