@@ -2,7 +2,6 @@ import { describe, expect, mock, test } from "bun:test";
 import { readFileSync, readdirSync } from "node:fs";
 
 import { PLATFORM_ID_FIXTURES as ids } from "@mosoo/id/testing";
-import { parse } from "smol-toml";
 
 import {
   ensureRuntimeSubjectId,
@@ -162,7 +161,9 @@ describe("runtime-specific Sandbox images", () => {
   });
 
   test("builds the matching profile and registers all classes in every environment", () => {
-    const config = parse(readFileSync(new URL("../wrangler.toml", import.meta.url), "utf8"));
+    const config = Bun.TOML.parse(
+      readFileSync(new URL("../wrangler.toml", import.meta.url), "utf8"),
+    );
     for (const environment of [
       config,
       (config.env as Record<string, unknown>).stage,
