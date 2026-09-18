@@ -19,6 +19,7 @@ import {
   requireRuntimeDriverInstanceGrant,
   verifyRuntimeActionToken,
 } from "../../../modules/runtime/application/runtime-driver-access.service";
+import { executeBudgetedModelRequest } from "../../../modules/runtime/application/runtime-llm-budget.service";
 import type { RuntimeLlmProxyTarget } from "../../../modules/runtime/application/runtime-llm-proxy.service";
 import {
   RuntimeLlmProxyError,
@@ -39,6 +40,7 @@ import { resolveRuntimeMcpProxyTarget } from "../../../modules/runtime/applicati
 import { getRuntimeDriverRoutePrefix } from "../../../modules/runtime/domain/runtime-driver-routes";
 import { upgradeDriverInstanceSocket } from "../../../modules/runtime/infrastructure/driver-instance/client";
 import { getDriverInstanceRecord } from "../../../modules/runtime/infrastructure/driver-instance/driver-instance-record.repository";
+import { SessionRunBudgetError } from "../../../modules/runtime/infrastructure/session-runs/session-run-budget.repository";
 import { readSkillPackageBytesFromSnapshot } from "../../../modules/skills/application/skill-package-snapshot.service";
 import { createErrorLogContext, logError, logWarn } from "../../../platform/cloudflare/logger";
 import type { ApiGatewayEnvironment } from "../../../platform/cloudflare/worker-types";
@@ -799,8 +801,32 @@ export function registerDriverRoute(app: Hono<ApiGatewayEnvironment>) {
     }
 
     try {
-      return await proxyRuntimeLlmRequest(c.req.raw, subPath, target, grantedRequestBody.body);
+      // Anthropic's count_tokens endpoint performs no model generation and is
+      // free. Its input_tokens estimate is not billable response usage.
+      if (grant.modelProtocol === "anthropic-messages" && subPath === "/v1/messages/count_tokens") {
+        return await proxyRuntimeLlmRequest(c.req.raw, subPath, target, grantedRequestBody.body);
+      }
+      return await executeBudgetedModelRequest(
+        c.env,
+        {
+          driverInstanceId: grant.driverInstanceId,
+          projectId: grant.projectId,
+          model: grantedModelId,
+          provider: target.vendor.vendorId,
+          protocol: grant.modelProtocol,
+        },
+        () => proxyRuntimeLlmRequest(c.req.raw, subPath, target, grantedRequestBody.body),
+      );
     } catch (error) {
+      if (error instanceof SessionRunBudgetError) {
+        return Response.json(
+          { error: error.message, code: error.code },
+          {
+            status: error.status,
+            ...(error.status === 429 ? { headers: { "Retry-After": "1" } } : {}),
+          },
+        );
+      }
       if (error instanceof RuntimeLlmProxyError) {
         return Response.json({ error: error.message }, { status: error.status });
       }

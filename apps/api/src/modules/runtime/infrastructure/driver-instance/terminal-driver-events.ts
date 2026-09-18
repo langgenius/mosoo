@@ -9,6 +9,7 @@ import { appendSessionRuntimeEvents } from "../../../sessions/application/sessio
 import { projectRuntimeEventToSessionDeliveryEvents } from "../../../sessions/application/session-live-state.service";
 import { recordCanonicalSessionRunFailure } from "../../application/session-runs/session-run-terminal-failure.service";
 import { isTerminalSessionRunStatus } from "../../domain/session-run-status";
+import { getSessionRunBudgetFailure } from "../session-runs/session-run-budget.repository";
 import {
   discardUncommittedCompletionCheckpoint,
   prepareSessionRunCompletionCheckpoint,
@@ -16,6 +17,7 @@ import {
 import { setSessionRunStatus } from "../session-runs/session-run-store.repository";
 import type { SessionRunTransitionOutcome } from "../session-runs/session-run-store.repository";
 import type { RuntimeSessionLink } from "./event-types";
+import { recordRuntimeSessionOutputDirectory } from "./runtime-session-output-store";
 import { getRuntimeSessionLink } from "./session-link.repository";
 import { releaseTerminalDriverInstanceSessionRun } from "./terminal-run-release";
 
@@ -73,6 +75,18 @@ export async function recordDriverInstanceCompletion(
   void input.driverReady;
   const database = bindings.DB;
   const link = await getRuntimeSessionLink(database, input.driverInstanceId);
+  const budgetFailure =
+    link.sessionRunId !== null
+      ? await getSessionRunBudgetFailure(database, link.sessionRunId)
+      : null;
+  if (budgetFailure !== null) {
+    await recordDriverInstanceFailure(bindings, {
+      driverInstanceId: input.driverInstanceId,
+      error: budgetFailure,
+      link,
+    });
+    return;
+  }
 
   if (
     hasLinkedSessionRun(link) &&
@@ -104,8 +118,16 @@ export async function recordDriverInstanceFailure(
   const link = input.link ?? (await getRuntimeSessionLink(database, input.driverInstanceId));
 
   if (hasLinkedSessionRun(link)) {
+    const budgetFailure = await getSessionRunBudgetFailure(database, link.sessionRunId);
+    if (budgetFailure !== null && link.sessionRunStatus !== "cancelled") {
+      await recordRuntimeSessionOutputDirectory({
+        bindings,
+        driverInstanceId: input.driverInstanceId,
+        link,
+      });
+    }
     const outcome = await recordCanonicalSessionRunFailure(bindings, {
-      error: input.error,
+      error: budgetFailure ?? input.error,
       runId: link.sessionRunId,
       sessionId: link.sessionId,
       source: "driver",

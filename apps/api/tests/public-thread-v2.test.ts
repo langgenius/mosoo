@@ -26,6 +26,7 @@ import {
 
 async function setup(
   options: {
+    budgetPolicy?: string;
     sessionNamespace?: ApiBindings["Session"];
     requestDatabase?: (database: D1Database) => D1Database;
   } = {},
@@ -45,10 +46,13 @@ async function setup(
         ...init,
         headers: { Authorization: bearer(token), ...init.headers },
       }),
-      createPublicHttpTestBindings(requestDatabase, {
-        fileBucket: bucket as unknown as R2Bucket,
-        ...options,
-      }) as ApiBindings,
+      {
+        ...createPublicHttpTestBindings(requestDatabase, {
+          fileBucket: bucket as unknown as R2Bucket,
+          ...options,
+        }),
+        MOSOO_TURN_BUDGET_POLICY: options.budgetPolicy,
+      } as ApiBindings,
     );
   const create = (version: "v1" | "v2", body: unknown, idempotencyKey?: string) =>
     request(`${version}/agents/${IDS.agent}/threads`, {
@@ -118,6 +122,37 @@ function loseCommittedBatchResponse(
 // These tests exercise HTTP authentication/admission and the real Session store.
 // Runtime provisioning is intentionally absent; live tool/restore evidence is separate.
 describe("saved-Agent Thread API v2", () => {
+  test("records a caller's per-turn cap and rejects changed-budget idempotent retries", async () => {
+    const { create, request } = await setup({ budgetPolicy: '{"defaultUsd":0.05,"maxUsd":1}' });
+    await withProviderProbeMock(async () => {
+      const body = {
+        maxCostUsd: 0.02,
+        input: { type: "user.message", content: [{ type: "text", text: "Read the input" }] },
+      };
+      const response = await create("v2", body, "bounded-create");
+      expect(response.status).toBe(201);
+      const created = await readJson(response);
+      expect(expectRecord(created["run"])["budget"]).toEqual({
+        capUsd: 0.02,
+        estimatedCostUsd: 0,
+        state: "available",
+      });
+      const id = expectString(expectRecord(created["thread"])["id"]);
+      const retrieved = await readJson(await request(`v2/threads/${id}`));
+      expect(expectRecord(retrieved["run"])["budget"]).toEqual({
+        capUsd: 0.02,
+        estimatedCostUsd: 0,
+        state: "available",
+      });
+      expect((await create("v2", { ...body, maxCostUsd: 0.03 }, "bounded-create")).status).toBe(
+        409,
+      );
+      expect((await create("v2", { ...body, maxCostUsd: 2 })).status).toBe(400);
+      expect((await create("v2", { maxCostUsd: 0.02 })).status).toBe(400);
+      const defaulted = await readJson(await create("v2", { input: body.input }));
+      expect(expectRecord(defaulted["run"])["budget"]).toMatchObject({ capUsd: 0.05 });
+    });
+  });
   test("uses the received input time when file transfer crosses the recovery deadline", async () => {
     const { bucket, create, database, request } = await setup();
     await database.prepare("UPDATE agent SET kind = 'cattle' WHERE id = ?").bind(IDS.agent).run();

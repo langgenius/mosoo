@@ -121,6 +121,11 @@ export interface PublicThreadRunError {
 }
 
 export interface PublicThreadRunSummary {
+  budget?: {
+    capUsd: number;
+    estimatedCostUsd: number;
+    state: "available" | "settling" | "budget_exhausted" | "budget_usage_unavailable";
+  };
   completedAt: string | null;
   createdAt: string;
   error: PublicThreadRunError | null;
@@ -200,6 +205,7 @@ export interface PublicThreadApiListThreadsResponse<UserId extends string | null
 }
 
 export interface PublicThreadApiSendEventsRequest {
+  maxCostUsd?: number;
   events: PublicThreadEventInput[];
 }
 

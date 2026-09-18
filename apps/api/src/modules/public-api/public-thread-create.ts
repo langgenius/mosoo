@@ -12,6 +12,7 @@ import { createAgentSession, queueSessionRun } from "../runtime/application/sess
 import { admitPublicThreadCreator } from "./public-thread-admission";
 import type { ThreadCreationAdmission } from "./public-thread-admission";
 import { toPublicThreadSessionSummary } from "./public-thread-api-presenter";
+import { resolvePublicThreadTurnBudget, withPublicRunBudget } from "./public-thread-budget";
 import { toPublicThreadId } from "./public-thread-ids";
 import { createPublicApiThreadMetadata } from "./public-thread-metadata";
 import {
@@ -27,6 +28,15 @@ import {
   setSessionTitleFromThreadPrompt,
 } from "./public-thread-store";
 import type { CreatePublicThreadRequest } from "./public-thread.types";
+
+async function withCreateResponseBudget(
+  request: CreatePublicThreadRequest,
+  response: PublicThreadApiCreateThreadResponse<string | null>,
+) {
+  return request.apiVersion === "v2"
+    ? { ...response, run: await withPublicRunBudget(request.bindings.DB, response.run) }
+    : response;
+}
 
 async function claimThreadFiles(input: {
   bindings: ApiBindings;
@@ -74,6 +84,10 @@ async function startInitialThreadRun(
     bindings: request.bindings,
     executionContext: request.executionContext ?? null,
     input: {
+      budgetCapUsdMicros:
+        request.apiVersion === "v2"
+          ? resolvePublicThreadTurnBudget(request.bindings, request.input.maxCostUsd)
+          : null,
       accessViewer: admission.accessViewer,
       attachmentIds: request.input.fileIds,
       clientRequestId,
@@ -108,12 +122,15 @@ async function startInitialThreadRun(
     titleUpdate,
   });
 
-  return toCreateThreadResponse({
-    apiVersion: request.apiVersion,
-    endUserId: request.input.userId,
-    run,
-    session: updatedSession,
-  });
+  return withCreateResponseBudget(
+    request,
+    toCreateThreadResponse({
+      apiVersion: request.apiVersion,
+      endUserId: request.input.userId,
+      run,
+      session: updatedSession,
+    }),
+  );
 }
 
 export async function createPublicThread(
@@ -123,6 +140,8 @@ export async function createPublicThread(
     agentId: request.agentId,
     apiVersion: request.apiVersion,
   });
+  if (request.apiVersion === "v2" && request.input.inputText !== undefined)
+    resolvePublicThreadTurnBudget(request.bindings, request.input.maxCostUsd);
   let createdSessionId: SessionId | null = null;
   let durableMutationStarted = false;
   const initialRequestId = createPlatformId();
@@ -289,10 +308,13 @@ export async function recoverPublicThreadCreation(
     }
   }
 
-  return toCreateThreadResponse({
-    apiVersion: request.apiVersion,
-    endUserId: snapshot.endUserId,
-    run: initialRun,
-    session: toPublicThreadSessionSummary(snapshot.session),
-  });
+  return withCreateResponseBudget(
+    request,
+    toCreateThreadResponse({
+      apiVersion: request.apiVersion,
+      endUserId: snapshot.endUserId,
+      run: initialRun,
+      session: toPublicThreadSessionSummary(snapshot.session),
+    }),
+  );
 }

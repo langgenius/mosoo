@@ -12,6 +12,18 @@ The September 18 compatibility clarification keeps existing Thread routes, conve
 
 The unreleased `/api/v2` routes reuse the Public Thread services and Session kernel with explicit saved-configuration admission. They accept private Agents, optional end-user identity, and owned Sessions from other creation channels. `/api/v1` retains published/live selection and its public-channel identity boundary. Both resolve the same Session IDs and Project authorization; publication is not a read authorization boundary in v2. New v2 Sessions always allocate a Session-owned sandbox, even when the saved Agent retains a legacy Pet label. Admission selects the existing isolated execution policy and records a 30-day recovery policy in the Session snapshot; it does not rewrite the Agent, existing Session bindings, or their shared workspace. This is the new-admission boundary, not completion of Pet/Cattle removal. Input admission derives expiry from the latest successful Run and checks it again within the admission transaction; expiry does not delete readable history or artifacts. Existing snapshots without that policy retain their behavior pending the Cloud transition. This slice does not migrate shared Pet workspaces or provide platform-funded defaults.
 
+### Turn model budgets (unreleased)
+
+The native Claude Messages and OpenAI Responses proxy can enforce a per-turn model-cost estimate cap. A deployment opts in with `MOSOO_TURN_BUDGET_POLICY`, a JSON object with positive `defaultUsd` and `maxUsd` values. No default values or platform-funded supply are configured by the implementation. Production values and provider funding remain pre-release decisions. Unconfigured deployments reject an explicit `maxCostUsd` rather than silently accepting an unenforced cap.
+
+New v2 user-message admission freezes the selected cap in `session_run_budget` in the same D1 batch as the Run, input and dispatch command. A caller can lower or raise it within the configured maximum; it applies only to that turn. Retries bind the requested cap into the existing idempotency hash. Removing the deployment policy disables new budgeted admission; persisted budgets and their terminal outcomes remain enforced for already admitted turns. Legacy admitted Runs and v1 requests keep their existing admission behavior.
+
+The proxy resolves the active Run from its unique Driver lease, reserves one in-flight model request atomically, and settles provider token counters before returning the terminal response frame. Competing requests receive a retryable 429 while settlement is pending. Reaching the cap prevents another upstream request; missing or truncated usage fails closed. Costs use the repository's dated model price schedule and remain estimates, not settled bills. The already admitted request can exceed the cap; no exact financial ceiling is promised. Budgeted inference currently requires the two native protocols; other protocols must not be priced by assumption.
+
+Budget exhaustion and unavailable usage remain explicit Run failures even if the SDK reports completion. Available workspace outputs are collected before projecting the terminal failure. Cancellation retains its cancellation outcome. This does not supply a new checkpoint lineage for a failed turn or establish multi-day live recovery evidence.
+
+Migration `0016_session-run-budgets.sql` adds a table and does not rewrite customer rows. Before rolling back to a Worker that does not enforce budgets, drain or cancel budgeted turns and disable new budgeted admission; retaining the table alone does not preserve enforcement in old code.
+
 ### Target Session ownership and Cloud transition
 
 The following boundaries are targets for #582, not a claim that existing Pet workloads have migrated:

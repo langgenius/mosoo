@@ -6,6 +6,7 @@ import type { PersonalAccessTokenCaller } from "../auth/application/personal-acc
 import type { AuthenticatedViewer } from "../auth/application/viewer-auth.service";
 
 export interface CreatePublicThreadInput {
+  maxCostUsd?: number;
   fileIds: FileId[];
   inputText?: string | undefined;
   userId: string | null;

@@ -28,6 +28,7 @@ interface OptionalLocalProviderFetchProxyBindings {
 }
 
 interface OptionalRuntimeBindings {
+  MOSOO_TURN_BUDGET_POLICY?: string;
   MOSOO_RUNTIME_IMAGES_ENABLED?: string;
   MOSOO_RUNTIME_CONTROL_ORIGIN?: string;
   MOSOO_RUNTIME_ALL_PROXY?: string;

@@ -36,6 +36,7 @@ interface SendAgentSessionEventsInput {
 }
 
 interface AgentSessionEventsOptions {
+  budgetCapUsdMicros?: number | null;
   recoveryRequestedAtMs?: number;
   accessViewer?: AuthenticatedViewer;
   actionAuthorization?: SessionActionAuthorization;

@@ -22,6 +22,7 @@ import {
   toPublicThreadEventBatch,
   toPublicThreadSessionSummary,
 } from "./public-thread-api-presenter";
+import { resolvePublicThreadTurnBudget, withPublicRunBudget } from "./public-thread-budget";
 import { claimPublicThreadFiles } from "./public-thread-file-api.service";
 import { toBackingSessionId } from "./public-thread-ids";
 import { toPublicThreadSummary } from "./public-thread-presenter";
@@ -97,6 +98,11 @@ export async function sendPublicThreadSessionEvents(
     request.apiVersion,
   );
   const accessViewer = await getAccountViewer(request.bindings.DB, request.caller.id);
+  const budgetCapUsdMicros =
+    request.apiVersion === "v2" &&
+    request.input.events.some((event) => event.type === "user_message")
+      ? resolvePublicThreadTurnBudget(request.bindings, request.input.maxCostUsd)
+      : null;
 
   if (!accessViewer) {
     throw publicNotFound("Agent owner account was not found.");
@@ -122,6 +128,7 @@ export async function sendPublicThreadSessionEvents(
       sessionId,
     },
     options: {
+      budgetCapUsdMicros,
       accessViewer,
       actionAuthorization: "admitted",
       recoveryRequestedAtMs,
@@ -129,13 +136,24 @@ export async function sendPublicThreadSessionEvents(
     requestUrl: request.requestUrl,
     viewer: request.caller,
   });
-  return toPublicThreadEventBatch({
+  const response = toPublicThreadEventBatch({
     batch,
     thread: toPublicThreadSummary({
       endUserId: admission.session.end_user_id,
       session: toPublicThreadSessionSummary(batch.session),
     }),
   });
+  return request.apiVersion === "v2"
+    ? {
+        ...response,
+        events: await Promise.all(
+          response.events.map(async (event) => ({
+            ...event,
+            run: await withPublicRunBudget(request.bindings.DB, event.run),
+          })),
+        ),
+      }
+    : response;
 }
 
 export async function archivePublicThreadSession(

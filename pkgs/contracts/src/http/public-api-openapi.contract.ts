@@ -742,6 +742,48 @@ export const PUBLIC_API_OPENAPI_V2_SCHEMAS = {
     description:
       "Create a durable Thread from the latest saved private Agent configuration. userId is optional; omit input for an idle Thread. Existing Threads retain their admitted configuration.",
     required: [],
+    properties: {
+      ...PUBLIC_API_OPENAPI_SCHEMAS.CreateThreadRequest.properties,
+      maxCostUsd: {
+        type: "number",
+        minimum: 0.000001,
+        description:
+          "Optional model-cost estimate cap for the initial turn, in USD (up to six decimal places). Requires input and a configured deployment budget policy; must not exceed the platform maximum. In-flight usage can exceed the cap. Omission uses the configured default when available.",
+      },
+    },
+  },
+  SendEventsRequest: {
+    ...PUBLIC_API_OPENAPI_SCHEMAS.SendEventsRequest,
+    properties: {
+      ...PUBLIC_API_OPENAPI_SCHEMAS.SendEventsRequest.properties,
+      maxCostUsd: {
+        type: "number",
+        minimum: 0.000001,
+        description:
+          "Optional model-cost estimate cap for a user_message turn in this request. Requires a configured deployment budget policy. Does not change earlier turns or the Session's subsequent defaults.",
+      },
+    },
+  },
+  RunSummary: {
+    ...PUBLIC_API_OPENAPI_SCHEMAS.RunSummary,
+    properties: {
+      ...PUBLIC_API_OPENAPI_SCHEMAS.RunSummary.properties,
+      budget: {
+        type: "object",
+        additionalProperties: false,
+        required: ["capUsd", "estimatedCostUsd", "state"],
+        description:
+          "Present only when this turn admitted a model budget. estimatedCostUsd uses provider counters and Mosoo's price schedule; it is not a settled bill. With budget_usage_unavailable it covers only requests whose usage could be established.",
+        properties: {
+          capUsd: { type: "number" },
+          estimatedCostUsd: { type: "number" },
+          state: {
+            type: "string",
+            enum: ["available", "settling", "budget_exhausted", "budget_usage_unavailable"],
+          },
+        },
+      },
+    },
   },
   ThreadSummary: {
     ...PUBLIC_API_OPENAPI_SCHEMAS.ThreadSummary,
