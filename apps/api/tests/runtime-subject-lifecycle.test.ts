@@ -631,6 +631,7 @@ describe("runtime subject lifecycle machine", () => {
     expect(restoredBackup).toEqual({
       dir: "/workspace/memory",
       id: CLOUDFLARE_BACKUP_ID,
+      localBucket: true,
     });
     expect((await readRuntimeSubject(database)).status).toBe("active");
   });
