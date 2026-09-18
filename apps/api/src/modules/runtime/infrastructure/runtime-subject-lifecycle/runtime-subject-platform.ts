@@ -3,7 +3,11 @@ import {
   SANDBOX_MEMORY_PATH,
   SANDBOX_SESSION_ROOT,
 } from "@mosoo/agent-driver/paths";
+import { sandboxesTable } from "@mosoo/db";
 import { discardPromiseResult } from "@mosoo/effects";
+import { parsePlatformId } from "@mosoo/id";
+import type { SandboxId } from "@mosoo/id";
+import { eq } from "drizzle-orm";
 
 import {
   withDisposedRpcResource,
@@ -11,6 +15,7 @@ import {
 } from "../../../../platform/cloudflare/rpc-disposal";
 import { requireCloudflareSandboxBinding } from "../../../../platform/cloudflare/sandbox-binding";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
+import { getAppDatabase } from "../../../../platform/db/drizzle";
 import type { RuntimeStateClearRule } from "../../domain/runtime-kind-policy";
 import type { SandboxNetworkConstraints } from "../../domain/sandbox-network-constraints";
 import { withRuntimeProvisionTimeout } from "../runtime-provision-timeout";
@@ -23,7 +28,7 @@ function quoteShellArg(value: string): string {
   return `'${value.replaceAll("'", `'"'"'`)}'`;
 }
 
-export function getRuntimeSubjectKeepAliveHandle(
+export async function getRuntimeSubjectKeepAliveHandle(
   bindings: ApiBindings,
   runtimeSubjectId: string,
 ): Promise<SandboxHandle> {
@@ -31,18 +36,35 @@ export function getRuntimeSubjectKeepAliveHandle(
     return Promise.resolve(toSandboxHandle(bindings.runtimeSubjectHandleFactory(runtimeSubjectId)));
   }
 
-  return getCloudflareRuntimeSubjectKeepAliveHandle(bindings, runtimeSubjectId);
+  const record = await getAppDatabase(bindings.DB)
+    .select({ sandboxBinding: sandboxesTable.sandboxBinding })
+    .from(sandboxesTable)
+    .where(
+      eq(sandboxesTable.id, parsePlatformId<SandboxId>(runtimeSubjectId, "Runtime subject ID")),
+    )
+    .get();
+  if (!record) throw new Error("Runtime subject has no recorded Sandbox binding.");
+  return getCloudflareRuntimeSubjectKeepAliveHandle(
+    bindings,
+    runtimeSubjectId,
+    record.sandboxBinding,
+  );
 }
 
 async function getCloudflareRuntimeSubjectKeepAliveHandle(
   bindings: ApiBindings,
   runtimeSubjectId: string,
+  sandboxBinding: string,
 ): Promise<SandboxHandle> {
   const { getSandbox } = await import("@cloudflare/sandbox");
-  const sandbox = getSandbox(requireCloudflareSandboxBinding(bindings), runtimeSubjectId, {
-    keepAlive: true,
-    normalizeId: true,
-  });
+  const sandbox = getSandbox(
+    requireCloudflareSandboxBinding(bindings, sandboxBinding),
+    runtimeSubjectId,
+    {
+      keepAlive: true,
+      normalizeId: true,
+    },
+  );
   return toSandboxHandle(sandbox);
 }
 

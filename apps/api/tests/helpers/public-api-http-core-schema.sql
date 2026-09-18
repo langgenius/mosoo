@@ -178,6 +178,7 @@ CREATE TABLE vendor_credential (
 );
 
 CREATE TABLE sandbox (
+  sandbox_binding text NOT NULL DEFAULT 'Sandbox',
   id text PRIMARY KEY NOT NULL,
   agent_id text,
   project_id text,
