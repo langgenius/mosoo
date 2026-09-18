@@ -89,3 +89,9 @@ for (const method of SANDBOX_RPC_FORWARD_METHODS) {
     },
   });
 }
+
+// Distinct physical namespaces share the exact same lifecycle and network
+// enforcement. Wrangler selects the preinstalled native runtime for each class.
+export class SandboxClaude extends Sandbox {}
+export class SandboxOpenAI extends Sandbox {}
+export class SandboxOpenCode extends Sandbox {}

@@ -52,6 +52,9 @@ async function resolveOwnerDebugTerminalTarget(
     executionOwnerUserId: agent.ownerId,
     kind: agent.kind,
     runtimeSubjectId: await ensureRuntimeSubjectId(database, {
+      runtimeId: agent.runtimeId,
+      // Pet terminals share the Agent workspace and retain the union image.
+      runtimeImagesEnabled: false,
       ...subject,
       agentId: agent.id,
       projectId: agent.projectId,

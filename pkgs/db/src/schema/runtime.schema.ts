@@ -58,6 +58,8 @@ export const sandboxesTable = sqliteTable(
     createdAt: integer("created_at").notNull(),
     globalMountsJson: text("global_mounts_json").notNull().default("[]"),
     id: platformIdColumn<SandboxId>("id").primaryKey(),
+    // Immutable physical namespace; existing subjects retain the legacy image.
+    sandboxBinding: text("sandbox_binding").notNull().default("Sandbox"),
     inactiveDeadlineAt: integer("inactive_deadline_at"),
     kind: text("kind").$type<AgentKind>().notNull(),
     lastBackupId: platformIdColumn<SandboxBackupId>("last_backup_id"),

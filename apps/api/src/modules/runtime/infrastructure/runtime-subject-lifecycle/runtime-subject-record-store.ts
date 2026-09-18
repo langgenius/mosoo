@@ -14,6 +14,7 @@ import type {
 import { and, asc, eq, inArray, isNull, lte, notExists, or, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 
+import { sandboxBindingForRuntime } from "../../../../platform/cloudflare/sandbox-binding";
 import { getAppDatabase, getD1ChangeCount } from "../../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../../time";
 import {
@@ -55,7 +56,13 @@ function runtimeSubjectAccountCapacityPredicate(input: {
 }): SQL {
   // ponytail: use the existing status/claim indexes until measured contention
   // justifies durable admission counters.
+  // One atomic deployment ceiling across image classes, preserving the former
+  // single class's 50-subject capacity instead of multiplying it by four.
   return sql`(
+    SELECT COUNT(*) FROM ${sandboxesTable} AS deployment_sandbox
+    WHERE deployment_sandbox.status IN ('restoring', 'active', 'backing_up', 'destroying')
+      OR (deployment_sandbox.claim_owner IS NOT NULL AND deployment_sandbox.claim_expires_at > ${input.now})
+  ) < 50 AND (
     SELECT COUNT(*)
     FROM ${sandboxesTable} AS account_sandbox
     WHERE account_sandbox.owner_account_id = ${input.executionOwnerUserId}
@@ -106,6 +113,7 @@ export async function getRuntimeSubject(
     (await getAppDatabase(database)
       .select({
         id: sandboxesTable.id,
+        sandboxBinding: sandboxesTable.sandboxBinding,
         kind: sandboxesTable.kind,
         status: sandboxesTable.status,
         subjectKind: sandboxesTable.subjectKind,
@@ -118,17 +126,17 @@ export async function getRuntimeSubject(
   return row ?? null;
 }
 
-export async function getRuntimeSubjectIdByTuple(
+async function findRuntimeSubjectAllocation(
   database: D1Database,
   input: {
     readonly kind: AgentKind;
     readonly subjectId: PlatformId;
     readonly subjectKind: SandboxSubjectKind;
   },
-): Promise<SandboxId | null> {
+): Promise<{ id: SandboxId; sandboxBinding: string } | null> {
   const row =
     (await getAppDatabase(database)
-      .select({ id: sandboxesTable.id })
+      .select({ id: sandboxesTable.id, sandboxBinding: sandboxesTable.sandboxBinding })
       .from(sandboxesTable)
       .where(
         and(
@@ -140,7 +148,18 @@ export async function getRuntimeSubjectIdByTuple(
       .limit(1)
       .get()) ?? null;
 
-  return row?.id ?? null;
+  return row;
+}
+
+export async function getRuntimeSubjectIdByTuple(
+  database: D1Database,
+  input: {
+    readonly kind: AgentKind;
+    readonly subjectId: PlatformId;
+    readonly subjectKind: SandboxSubjectKind;
+  },
+): Promise<SandboxId | null> {
+  return (await findRuntimeSubjectAllocation(database, input))?.id ?? null;
 }
 
 export async function ensureRuntimeSubjectId(
@@ -150,16 +169,24 @@ export async function ensureRuntimeSubjectId(
     readonly projectId: ProjectId;
     readonly executionOwnerUserId: AccountId;
     readonly kind: AgentKind;
+    readonly runtimeId: string;
+    readonly runtimeImagesEnabled?: boolean;
     readonly now?: number;
     readonly runtimeSubjectId?: SandboxId;
     readonly subjectId: PlatformId;
     readonly subjectKind: SandboxSubjectKind;
   },
 ): Promise<SandboxId> {
-  const existing = await getRuntimeSubjectIdByTuple(database, input);
+  // Pet workspaces can serve Sessions with different frozen runtimes after
+  // draft edits or unpublishing. Their union image preserves that capability.
+  const expectedBinding = sandboxBindingForRuntime(input.runtimeId);
+  const sandboxBinding =
+    input.kind === "pet" || input.runtimeImagesEnabled !== true ? "Sandbox" : expectedBinding;
+  const existing = await findRuntimeSubjectAllocation(database, input);
 
   if (existing !== null) {
-    return existing;
+    assertRuntimeSubjectImage(existing.sandboxBinding, expectedBinding);
+    return existing.id;
   }
 
   const now = input.now ?? currentTimestampMs();
@@ -175,6 +202,7 @@ export async function ensureRuntimeSubjectId(
       createdAt: now,
       globalMountsJson: "[]",
       id: runtimeSubjectId,
+      sandboxBinding,
       inactiveDeadlineAt: getRuntimeSubjectInactiveDeadline(getRuntimeKindPolicy(input.kind), now),
       kind: input.kind,
       ownerAccountId: input.executionOwnerUserId,
@@ -195,13 +223,20 @@ export async function ensureRuntimeSubjectId(
     return runtimeSubjectId;
   }
 
-  const createdByConcurrentRequest = await getRuntimeSubjectIdByTuple(database, input);
+  const createdByConcurrentRequest = await findRuntimeSubjectAllocation(database, input);
 
   if (createdByConcurrentRequest === null) {
     throw new Error("Runtime subject could not be allocated.");
   }
 
-  return createdByConcurrentRequest;
+  assertRuntimeSubjectImage(createdByConcurrentRequest.sandboxBinding, expectedBinding);
+  return createdByConcurrentRequest.id;
+}
+
+function assertRuntimeSubjectImage(actual: string, expected: string): void {
+  if (actual !== "Sandbox" && actual !== expected) {
+    throw new Error("Runtime subject image does not match the admitted runtime.");
+  }
 }
 
 export async function getRuntimeSubjectActivationRecord(

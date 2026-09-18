@@ -23,6 +23,8 @@ BACKUP_BUCKET_NAME = "mosoo-sandbox-state"
 SANDBOX_STATE_BUCKET_NAME = "mosoo-sandbox-state"
 SANDBOX_FILE_BUCKET_LOCAL = "true"
 MOSOO_ACCOUNT_CONCURRENT_SANDBOX_LIMIT = "5"
+# Enable new allocations only after the routing-aware Worker has rolled out.
+MOSOO_RUNTIME_IMAGES_ENABLED = "false"
 MOSOO_DEPLOYMENT_MODE = "cloud"
 MOSOO_ENVIRONMENT = "development"
 POSTHOG_API_HOST = "https://us.i.posthog.com"
@@ -54,6 +56,39 @@ class_name = "Session"
 [[durable_objects.bindings]]
 name = "Sandbox"
 class_name = "Sandbox"
+
+[[durable_objects.bindings]]
+name = "SandboxClaude"
+class_name = "SandboxClaude"
+
+[[containers]]
+class_name = "SandboxClaude"
+image = "../driver/Containerfile"
+image_vars = { RUNTIME = "claude" }
+instance_type = "lite"
+max_instances = 1
+
+[[durable_objects.bindings]]
+name = "SandboxOpenAI"
+class_name = "SandboxOpenAI"
+
+[[containers]]
+class_name = "SandboxOpenAI"
+image = "../driver/Containerfile"
+image_vars = { RUNTIME = "openai" }
+instance_type = "lite"
+max_instances = 1
+
+[[durable_objects.bindings]]
+name = "SandboxOpenCode"
+class_name = "SandboxOpenCode"
+
+[[containers]]
+class_name = "SandboxOpenCode"
+image = "../driver/Containerfile"
+image_vars = { RUNTIME = "opencode" }
+instance_type = "lite"
+max_instances = 1
 
 [[containers]]
 class_name = "Sandbox"
@@ -134,6 +169,8 @@ BACKUP_BUCKET_NAME = "mosoo-stage-sandbox-state"
 SANDBOX_STATE_BUCKET_NAME = "mosoo-stage-sandbox-state"
 SANDBOX_FILE_BUCKET_LOCAL = "false"
 MOSOO_ACCOUNT_CONCURRENT_SANDBOX_LIMIT = "5"
+# Enable new allocations only after the routing-aware Worker has rolled out.
+MOSOO_RUNTIME_IMAGES_ENABLED = "false"
 MOSOO_DEPLOYMENT_MODE = "cloud"
 MOSOO_ENVIRONMENT = "production"
 POSTHOG_API_HOST = "https://us.i.posthog.com"
@@ -164,6 +201,39 @@ class_name = "Session"
 [[env.stage.durable_objects.bindings]]
 name = "Sandbox"
 class_name = "Sandbox"
+
+[[env.stage.durable_objects.bindings]]
+name = "SandboxClaude"
+class_name = "SandboxClaude"
+
+[[env.stage.containers]]
+class_name = "SandboxClaude"
+image = "../driver/Containerfile"
+image_vars = { RUNTIME = "claude" }
+instance_type = "standard-2"
+max_instances = 50
+
+[[env.stage.durable_objects.bindings]]
+name = "SandboxOpenAI"
+class_name = "SandboxOpenAI"
+
+[[env.stage.containers]]
+class_name = "SandboxOpenAI"
+image = "../driver/Containerfile"
+image_vars = { RUNTIME = "openai" }
+instance_type = "standard-2"
+max_instances = 50
+
+[[env.stage.durable_objects.bindings]]
+name = "SandboxOpenCode"
+class_name = "SandboxOpenCode"
+
+[[env.stage.containers]]
+class_name = "SandboxOpenCode"
+image = "../driver/Containerfile"
+image_vars = { RUNTIME = "opencode" }
+instance_type = "standard-2"
+max_instances = 50
 
 [[env.stage.containers]]
 class_name = "Sandbox"
@@ -248,6 +318,8 @@ BACKUP_BUCKET_NAME = "mosoo-sandbox-state"
 SANDBOX_STATE_BUCKET_NAME = "mosoo-sandbox-state"
 SANDBOX_FILE_BUCKET_LOCAL = "false"
 MOSOO_ACCOUNT_CONCURRENT_SANDBOX_LIMIT = "5"
+# Enable new allocations only after the routing-aware Worker has rolled out.
+MOSOO_RUNTIME_IMAGES_ENABLED = "false"
 MOSOO_DEPLOYMENT_MODE = "cloud"
 MOSOO_ENVIRONMENT = "production"
 POSTHOG_API_HOST = "https://us.i.posthog.com"
@@ -286,6 +358,39 @@ class_name = "Session"
 [[env.prod.durable_objects.bindings]]
 name = "Sandbox"
 class_name = "Sandbox"
+
+[[env.prod.durable_objects.bindings]]
+name = "SandboxClaude"
+class_name = "SandboxClaude"
+
+[[env.prod.containers]]
+class_name = "SandboxClaude"
+image = "../driver/Containerfile"
+image_vars = { RUNTIME = "claude" }
+instance_type = "standard-2"
+max_instances = 50
+
+[[env.prod.durable_objects.bindings]]
+name = "SandboxOpenAI"
+class_name = "SandboxOpenAI"
+
+[[env.prod.containers]]
+class_name = "SandboxOpenAI"
+image = "../driver/Containerfile"
+image_vars = { RUNTIME = "openai" }
+instance_type = "standard-2"
+max_instances = 50
+
+[[env.prod.durable_objects.bindings]]
+name = "SandboxOpenCode"
+class_name = "SandboxOpenCode"
+
+[[env.prod.containers]]
+class_name = "SandboxOpenCode"
+image = "../driver/Containerfile"
+image_vars = { RUNTIME = "opencode" }
+instance_type = "standard-2"
+max_instances = 50
 
 [[env.prod.containers]]
 class_name = "Sandbox"
@@ -367,3 +472,15 @@ new_sqlite_classes = ["DriverConnection", "Sandbox", "Session", "ChannelConnecti
 [[env.stage.migrations]]
 tag = "v2"
 deleted_classes = ["ChannelConnection"]
+
+[[migrations]]
+tag = "v3-runtime-images"
+new_sqlite_classes = ["SandboxClaude", "SandboxOpenAI", "SandboxOpenCode"]
+
+[[env.stage.migrations]]
+tag = "v3-runtime-images"
+new_sqlite_classes = ["SandboxClaude", "SandboxOpenAI", "SandboxOpenCode"]
+
+[[env.prod.migrations]]
+tag = "v3-runtime-images"
+new_sqlite_classes = ["SandboxClaude", "SandboxOpenAI", "SandboxOpenCode"]

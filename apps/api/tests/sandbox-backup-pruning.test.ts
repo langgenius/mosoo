@@ -23,6 +23,7 @@ function createSandboxBackupDatabase(input: { maxBoundParams?: number } = {}): S
 
   database.execute(`
     CREATE TABLE sandbox (
+      sandbox_binding text NOT NULL DEFAULT 'Sandbox',
       id text PRIMARY KEY NOT NULL,
       last_backup_id text,
       status text NOT NULL,
