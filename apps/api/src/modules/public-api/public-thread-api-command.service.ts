@@ -1,4 +1,5 @@
 import type {
+  PublicApiVersion,
   PublicThreadEventInput,
   PublicThreadApiSendEventsRequest,
   PublicThreadApiSendEventsResponse,
@@ -7,6 +8,7 @@ import type { AgentSessionEventInput } from "@mosoo/contracts/session";
 import type { PublicThreadId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../platform/cloudflare/worker-types";
+import { currentTimestampMs } from "../../time";
 import { getAccountViewer } from "../auth/application/viewer-auth.service";
 import type { AuthenticatedViewer } from "../auth/application/viewer-auth.service";
 import { sendAgentSessionEvents } from "../runtime/application/session-run.service";
@@ -20,12 +22,14 @@ import {
   toPublicThreadEventBatch,
   toPublicThreadSessionSummary,
 } from "./public-thread-api-presenter";
+import { resolvePublicThreadTurnBudget, withPublicRunBudget } from "./public-thread-budget";
 import { claimPublicThreadFiles } from "./public-thread-file-api.service";
 import { toBackingSessionId } from "./public-thread-ids";
 import { toPublicThreadSummary } from "./public-thread-presenter";
 import { admitPublicSessionCaller } from "./public-thread-session-query.service";
 
 export interface SendPublicThreadSessionEventsRequest {
+  apiVersion?: PublicApiVersion | undefined;
   bindings: ApiBindings;
   caller: AuthenticatedViewer;
   executionContext: Pick<ExecutionContext, "waitUntil"> | null;
@@ -35,21 +39,25 @@ export interface SendPublicThreadSessionEventsRequest {
 }
 
 export interface PublicThreadSessionMutationRequest {
+  apiVersion?: PublicApiVersion | undefined;
   bindings: ApiBindings;
   caller: AuthenticatedViewer;
   threadId: PublicThreadId;
 }
 
 export interface UnarchivePublicThreadSessionRequest {
+  apiVersion?: PublicApiVersion | undefined;
   caller: AuthenticatedViewer;
   database: D1Database;
   threadId: PublicThreadId;
 }
 
 async function toAgentSessionEventInput(input: {
+  apiVersion?: PublicApiVersion | undefined;
   bindings: ApiBindings;
   caller: AuthenticatedViewer;
   event: PublicThreadEventInput;
+  recoveryRequestedAtMs: number;
   threadId: PublicThreadId;
 }): Promise<AgentSessionEventInput> {
   if (input.event.type !== "user_message") {
@@ -57,10 +65,16 @@ async function toAgentSessionEventInput(input: {
   }
 
   const fileIds = (input.event.resources ?? []).map((resource) => resource.file_id);
-  const attachmentIds = await claimPublicThreadFiles(input.bindings, input.caller, {
-    fileIds,
-    threadId: input.threadId,
-  });
+  const attachmentIds = await claimPublicThreadFiles(
+    input.bindings,
+    input.caller,
+    {
+      fileIds,
+      recoveryRequestedAtMs: input.recoveryRequestedAtMs,
+      threadId: input.threadId,
+    },
+    input.apiVersion,
+  );
   const { requestId, resources: _resources, ...event } = input.event;
 
   return {
@@ -72,14 +86,23 @@ async function toAgentSessionEventInput(input: {
 
 export async function sendPublicThreadSessionEvents(
   request: SendPublicThreadSessionEventsRequest,
-): Promise<PublicThreadApiSendEventsResponse> {
+): Promise<PublicThreadApiSendEventsResponse<string | null>> {
+  // File transfer and durable Run admission must agree on expiry, including
+  // when the copy crosses the deadline. This time never comes from the client.
+  const recoveryRequestedAtMs = currentTimestampMs();
   const sessionId = toBackingSessionId(request.threadId);
   const admission = await admitPublicSessionCaller(
     request.bindings.DB,
     request.caller,
     request.threadId,
+    request.apiVersion,
   );
-  const accessViewer = await getAccountViewer(request.bindings.DB, admission.agent.ownerId);
+  const accessViewer = await getAccountViewer(request.bindings.DB, request.caller.id);
+  const budgetCapUsdMicros =
+    request.apiVersion === "v2" &&
+    request.input.events.some((event) => event.type === "user_message")
+      ? resolvePublicThreadTurnBudget(request.bindings, request.input.maxCostUsd)
+      : null;
 
   if (!accessViewer) {
     throw publicNotFound("Agent owner account was not found.");
@@ -87,9 +110,11 @@ export async function sendPublicThreadSessionEvents(
   const events = await Promise.all(
     request.input.events.map((event) =>
       toAgentSessionEventInput({
+        apiVersion: request.apiVersion,
         bindings: request.bindings,
         caller: request.caller,
         event,
+        recoveryRequestedAtMs,
         threadId: request.threadId,
       }),
     ),
@@ -103,19 +128,32 @@ export async function sendPublicThreadSessionEvents(
       sessionId,
     },
     options: {
+      budgetCapUsdMicros,
       accessViewer,
       actionAuthorization: "admitted",
+      recoveryRequestedAtMs,
     },
     requestUrl: request.requestUrl,
     viewer: request.caller,
   });
-  return toPublicThreadEventBatch({
+  const response = toPublicThreadEventBatch({
     batch,
     thread: toPublicThreadSummary({
       endUserId: admission.session.end_user_id,
       session: toPublicThreadSessionSummary(batch.session),
     }),
   });
+  return request.apiVersion === "v2"
+    ? {
+        ...response,
+        events: await Promise.all(
+          response.events.map(async (event) => ({
+            ...event,
+            run: await withPublicRunBudget(request.bindings.DB, event.run),
+          })),
+        ),
+      }
+    : response;
 }
 
 export async function archivePublicThreadSession(
@@ -126,6 +164,7 @@ export async function archivePublicThreadSession(
     request.bindings.DB,
     request.caller,
     request.threadId,
+    request.apiVersion,
   );
   await archiveAgentSession({
     authorization: "admitted",
@@ -144,6 +183,7 @@ export async function unarchivePublicThreadSession(
     request.database,
     request.caller,
     request.threadId,
+    request.apiVersion,
   );
   await unarchiveAgentSession({
     authorization: "admitted",
@@ -162,6 +202,7 @@ export async function deletePublicThreadSession(
     request.bindings.DB,
     request.caller,
     request.threadId,
+    request.apiVersion,
   );
   await deleteAgentSession({
     authorization: "admitted",

@@ -59,7 +59,79 @@ Agent's API Access panel shows its identifier, token creation, and API reference
   complete runtime workspace. Thread history also does not guarantee that every
   later Run receives prior private runtime state or every earlier file.
 
+## Unreleased saved-Agent entry point
+
+`/api/v2` reuses the Thread lifecycle and conversation ID for the #582 admission
+transition. A Project key can invoke a private Agent by ID without publishing.
+A new Thread captures the latest saved configuration, even when the Agent has
+an older published version; later Agent edits do not change that snapshot.
+Omitting `userId` stores no end-user identity and returns `userId: null`. A
+supplied value remains immutable and carries the existing delegated MCP identity.
+
+Read, events, continuation, cancellation, and file access use the Session's owner
+and Project boundary, regardless of the creation channel or current publication
+state. The same ID addresses an existing owned Session. This does not grant a
+Project key access to another Project or invent missing recovery state.
+
+The new version is required because latest-saved admission differs from v1's
+published/live behavior. It does not rename Thread resources or retire v1.
+Existing v1 callers keep their published configuration and required `userId`;
+v2-created Threads are excluded from v1's public-channel view. The #582 release
+requires a model-provider account configured in the Project (BYOK). Turn budgets
+and the shared-workspace transition remain #582 work; platform-funded first use,
+recharge, and commercial billing are independent #636 scope.
+
+New isolated v2 Sessions admit a 30-day recovery period from the last successful
+turn, renewed on success. Expired continuation returns `readiness_blocked` with
+an explicit expiry time; history, events, usage and saved files remain readable.
+Input received after expiry does not retitle the Session or claim new draft files.
+The server records one request time for both file claim and Run admission, so a
+transfer begun before expiry may finish afterward. Other admission failures can
+leave supplied files attached to the Session.
+Existing Sessions without a recorded recovery policy are not retroactively
+expired. This admission rule does not by itself prove cold or multi-day restore;
+see [Thread Continuation](./thread-continuation.md#retention-and-deletion).
+
+`GET /api/v2/threads/{threadId}/usage` returns paginated persisted runtime usage
+observations. Missing values remain null. Token accounting follows the recorded
+provider convention; runtime cost estimates are not invoices. Empty observations
+do not establish that no inference occurred. The endpoint reads Session records,
+so it does not lose observations when the seven-day billing detail rolls up.
+
+The [executable workflow](../../scripts/public-api-session-workflow.ts) is the
+shared HTTP acceptance example for clients, CLI, and documentation. It uses one
+`thread.id` for create/read, real tools and artifact download, SSE, usage,
+follow-up with private workspace state, and cancellation without a Run ID.
+Run `just public-api-session-workflow` with a nonproduction `/api/v2` URL in
+`MOSOO_PUBLIC_SESSION_BASE_URL`, a saved Agent ID in
+`MOSOO_PUBLIC_SESSION_AGENT_ID`, a Project key in `MOSOO_API_TOKEN`, and a unique
+`MOSOO_PUBLIC_SESSION_TEST_ID`. Use `MOSOO_E2E_ENV_FILE` for a local ignored key
+file. It runs real inference and leaves its Session/artifacts available for
+inspection; use a fresh test ID for a full rerun. Evidence goes to
+`.tmp/e2e/session-workflow` or `MOSOO_PUBLIC_SESSION_OUTPUT_DIR`.
+
+### Creation retries
+
+An optional `Idempotency-Key` is shared by keys in the same Project. Retained
+receipts reject changed input and replay the same admitted Session. The current
+receipt window is 24 hours; callers must save the returned Thread ID, because
+reuse after expiry can create new work. A still-processing request returns 409.
+After ten minutes, a retry can reconcile an interrupted creation against its
+persisted Session, initial-turn receipt, configuration and file identities.
+An unrelated later turn is not evidence that the original input was admitted.
+
+An ambiguous infrastructure failure keeps the creation recoverable; it must not
+delete an admitted Run or an object that a committed file record may reference.
+Explicit request rejections remain replayable. Neither creation idempotency nor
+recovery guarantees exactly-once effects in external tools.
+
 ## `/api/v1` compatibility policy
+
+The #582 durable Session target can extend this Thread API. Keeping the Thread
+name, existing conversation IDs, or compatible Run result fields does not
+conflict with one primary conversation handle. A terminology change alone does
+not require a new version or removal of the old routes. Assess admission,
+configuration selection, identity, continuation, and outcomes separately.
 
 `/api/v1` is backward compatible by default. Existing request fields, accepted
 values, response fields, operations, and documented behavior must not be removed

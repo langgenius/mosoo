@@ -5,12 +5,10 @@ import {
   parseNullableSessionUsageSummary,
 } from "@mosoo/ag-ui-session";
 import type { DriverEventEnvelope } from "@mosoo/agent-driver/events";
-import { parsePlatformId } from "@mosoo/id";
 import type { DriverInstanceId } from "@mosoo/id";
-import type { AccountId, SessionId } from "@mosoo/id";
 import {
+  createRuntimeEvent,
   parseRuntimeEventEnvelope,
-  readRuntimeEventFileChanges,
   readRuntimeEventPayload,
   readRuntimeEventPermissionRequest,
   readRuntimeEventString,
@@ -18,15 +16,9 @@ import {
 } from "@mosoo/runtime-events";
 import type { RuntimeEventEnvelope } from "@mosoo/runtime-events";
 
-import { createErrorLogContext, logInfo, logWarn } from "../../../../platform/cloudflare/logger";
-import { withDisposedRpcResource } from "../../../../platform/cloudflare/rpc-disposal";
+import { logInfo } from "../../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { isTruthy } from "../../../../shared/truthiness";
-import {
-  createRuntimeOutputContentSha256,
-  createRuntimeOutputParentPath,
-  fileStore,
-} from "../../../files/application/file-store";
 import {
   applyAgUiEventToSessionLiveState,
   loadSessionViewerState,
@@ -39,10 +31,7 @@ import type {
 import { getRuntimeKindPolicy } from "../../domain/runtime-kind-policy";
 import { createSessionRunTerminalFailureSourceId } from "../../domain/session-run-terminal-event-id";
 import { upsertNativeResumeRef } from "../native-resume-ref.repository";
-import { getRuntimeSubjectKeepAliveHandle } from "../runtime-subject-lifecycle/runtime-subject-lifecycle.service";
-import { getRuntimeConversationSession } from "../runtime-subject-lifecycle/runtime-subject-store";
-import { readSandboxFileBytes } from "../sandbox-file-bytes";
-import type { ExecutionSessionHandle } from "../sandbox-handles";
+import { getSessionRunBudgetFailure } from "../session-runs/session-run-budget.repository";
 import {
   assertRuntimeEventMatchesDriverEnvelope,
   assertRuntimeEventMatchesDriverLink,
@@ -63,14 +52,9 @@ import type {
 } from "./event-types";
 import { readNativeResumeRef } from "./native-resume-ref-event";
 import {
-  RUNTIME_SESSION_OUTPUT_DIR_NAME,
-  RUNTIME_SESSION_OUTPUT_SCAN_MAX_FILES,
-  getRuntimeSessionOutputDirectory,
-  guessRuntimeSessionOutputContentType,
-  readRuntimeSessionOutputListing,
-  toRuntimeSessionOutputArtifactPath,
-  toRuntimeSessionOutputFile,
-} from "./runtime-session-outputs";
+  recordRuntimeFileChanges,
+  recordRuntimeSessionOutputDirectory,
+} from "./runtime-session-output-store";
 import { getRuntimeSessionLink } from "./session-link.repository";
 export type {
   ProjectRuntimeDriverEventsResult,
@@ -83,85 +67,6 @@ export {
   recordDriverInstanceCompletion,
   recordDriverInstanceFailure,
 } from "./terminal-driver-events";
-
-function quoteShellArg(value: string): string {
-  return `'${value.replaceAll("'", `'"'"'`)}'`;
-}
-
-function resolveRuntimeOutputCreator(link: RuntimeSessionLink): AccountId | null {
-  const actorId = link.executionOwnerId ?? link.callerId ?? link.creatorId;
-
-  if (!isTruthy(actorId)) {
-    return null;
-  }
-
-  return parsePlatformId<AccountId>(actorId, "runtime output creator account ID");
-}
-
-function readRuntimeFileChangeContentType(
-  metadata: Record<string, unknown> | undefined,
-): string | null {
-  const contentType = metadata?.["contentType"] ?? metadata?.["mimeType"];
-  return typeof contentType === "string" && contentType.trim().length > 0 ? contentType : null;
-}
-
-function createRuntimeSessionOutputListCommand(outputDir: string): string {
-  const quotedOutputDir = quoteShellArg(outputDir);
-  const command = [
-    `if [ ! -d ${quotedOutputDir} ]; then exit 0; fi`,
-    `cd ${quotedOutputDir}`,
-    `find . -type f -print | sed 's#^\\./##' | sort | head -n ${RUNTIME_SESSION_OUTPUT_SCAN_MAX_FILES}`,
-  ].join(" && ");
-
-  return `sh -lc ${quoteShellArg(command)}`;
-}
-
-async function listRuntimeSessionOutputFiles(
-  handle: ExecutionSessionHandle,
-  outputDir: string,
-): Promise<string[]> {
-  const result = await handle.exec(createRuntimeSessionOutputListCommand(outputDir));
-
-  if (!result.success || result.exitCode !== 0) {
-    throw new Error(
-      result.stderr.trim() ||
-        result.stdout.trim() ||
-        `Failed to list runtime session outputs in ${outputDir}.`,
-    );
-  }
-
-  return readRuntimeSessionOutputListing(result.stdout);
-}
-
-async function recordRuntimeSessionOutputFile(input: {
-  bindings: ApiBindings;
-  body: Uint8Array;
-  contentType: string | null;
-  createdBy: AccountId;
-  existingArtifacts: Set<string>;
-  path: string;
-  recordedArtifacts: Set<string>;
-  sessionId: SessionId;
-}): Promise<void> {
-  const contentSha256 = await createRuntimeOutputContentSha256(input.body);
-  const artifactKey = createRuntimeOutputParentPath(input.path, contentSha256);
-
-  if (input.recordedArtifacts.has(artifactKey) || input.existingArtifacts.has(artifactKey)) {
-    return;
-  }
-
-  await fileStore.recordRuntimeOutput({
-    bindings: input.bindings,
-    body: input.body,
-    contentSha256,
-    contentType: input.contentType,
-    createdBy: input.createdBy,
-    path: input.path,
-    sessionId: input.sessionId,
-  });
-  input.recordedArtifacts.add(artifactKey);
-  input.existingArtifacts.add(artifactKey);
-}
 
 function readTerminalPendingToolResult(event: RuntimeEventEnvelope): string | null {
   if (event.kind === "run.failed") {
@@ -213,177 +118,6 @@ function createPendingToolResultEvents(
       ];
     });
   });
-}
-
-async function recordRuntimeFileChanges(input: {
-  bindings: ApiBindings;
-  event: RuntimeEventEnvelope;
-  link: RuntimeSessionLink;
-}): Promise<void> {
-  const sessionId = input.link.sessionId;
-  const sandboxId = input.link.sandboxId;
-  const createdBy = resolveRuntimeOutputCreator(input.link);
-  const changes = readRuntimeEventFileChanges(input.event).filter(
-    (change) => change.change === "upsert",
-  );
-
-  if (changes.length === 0) {
-    return;
-  }
-
-  if (sessionId === null || sandboxId === null || createdBy === null) {
-    logWarn("runtime.file_artifact.record_skipped", {
-      driverInstanceId: input.event.driverInstanceId ?? null,
-      hasCreatedBy: createdBy !== null,
-      sandboxId,
-      sessionId,
-    });
-    return;
-  }
-
-  const conversation = await getRuntimeConversationSession(input.bindings.DB, sessionId);
-
-  if (conversation === null) {
-    logWarn("runtime.file_artifact.record_skipped.missing_session", {
-      sandboxId,
-      sessionId,
-    });
-    return;
-  }
-
-  const outputChanges = changes.flatMap((change) => {
-    const outputFile = toRuntimeSessionOutputFile({
-      contentType: readRuntimeFileChangeContentType(change.metadata),
-      cwd: conversation.cwd,
-      path: change.path,
-    });
-
-    return outputFile === null ? [] : [outputFile];
-  });
-
-  if (outputChanges.length === 0) {
-    return;
-  }
-
-  const parsedSessionId = parsePlatformId<SessionId>(sessionId, "runtime output session ID");
-  const existingArtifacts = new Set(
-    await fileStore.listReadySessionArtifactKeys(input.bindings.DB, parsedSessionId),
-  );
-  const recordedArtifacts = new Set<string>();
-
-  await withDisposedRpcResource(
-    await getRuntimeSubjectKeepAliveHandle(input.bindings, sandboxId),
-    async (sandbox) => {
-      const sandboxSession = await sandbox.getSession(conversation.sandboxSessionId);
-
-      for (const outputFile of outputChanges) {
-        try {
-          await recordRuntimeSessionOutputFile({
-            bindings: input.bindings,
-            body: await readSandboxFileBytes(sandboxSession, outputFile.readPath),
-            contentType: outputFile.contentType,
-            createdBy,
-            existingArtifacts,
-            path: outputFile.artifactPath,
-            recordedArtifacts,
-            sessionId: parsedSessionId,
-          });
-        } catch (error) {
-          logWarn("runtime.file_artifact.record_failed", {
-            ...createErrorLogContext(error),
-            path: outputFile.artifactPath,
-            sandboxId,
-            sessionId,
-          });
-        }
-      }
-    },
-  );
-}
-
-async function recordRuntimeSessionOutputDirectory(input: {
-  bindings: ApiBindings;
-  event: RuntimeEventEnvelope;
-  link: RuntimeSessionLink;
-}): Promise<void> {
-  const sessionId = input.link.sessionId;
-  const sandboxId = input.link.sandboxId;
-  const createdBy = resolveRuntimeOutputCreator(input.link);
-
-  if (sessionId === null || sandboxId === null || createdBy === null) {
-    return;
-  }
-
-  const parsedSessionId = parsePlatformId<SessionId>(sessionId, "runtime output session ID");
-  let conversation;
-
-  try {
-    conversation = await getRuntimeConversationSession(input.bindings.DB, parsedSessionId);
-  } catch (error) {
-    logWarn("runtime.file_artifact.output_scan_session_lookup_failed", {
-      ...createErrorLogContext(error),
-      driverInstanceId: input.event.driverInstanceId ?? null,
-      sandboxId,
-      sessionId,
-    });
-    return;
-  }
-
-  if (conversation === null) {
-    return;
-  }
-
-  try {
-    await withDisposedRpcResource(
-      await getRuntimeSubjectKeepAliveHandle(input.bindings, sandboxId),
-      async (sandbox) => {
-        const sandboxSession = await sandbox.getSession(conversation.sandboxSessionId);
-        const outputDir = getRuntimeSessionOutputDirectory(conversation.cwd);
-        const outputPaths = await listRuntimeSessionOutputFiles(sandboxSession, outputDir);
-
-        if (outputPaths.length === 0) {
-          return;
-        }
-
-        const existingArtifacts = new Set(
-          await fileStore.listReadySessionArtifactKeys(input.bindings.DB, parsedSessionId),
-        );
-        const recordedArtifacts = new Set<string>();
-
-        for (const outputPath of outputPaths) {
-          const artifactPath = toRuntimeSessionOutputArtifactPath(outputPath);
-
-          try {
-            await recordRuntimeSessionOutputFile({
-              bindings: input.bindings,
-              body: await readSandboxFileBytes(sandboxSession, `${outputDir}/${outputPath}`),
-              contentType: guessRuntimeSessionOutputContentType(outputPath),
-              createdBy,
-              existingArtifacts,
-              path: artifactPath,
-              recordedArtifacts,
-              sessionId: parsedSessionId,
-            });
-          } catch (error) {
-            logWarn("runtime.file_artifact.output_record_failed", {
-              ...createErrorLogContext(error),
-              path: artifactPath,
-              sandboxId,
-              sessionId,
-            });
-          }
-        }
-      },
-    );
-  } catch (error) {
-    logWarn("runtime.file_artifact.output_scan_failed", {
-      ...createErrorLogContext(error),
-      driverInstanceId: input.event.driverInstanceId ?? null,
-      outputDir: `${RUNTIME_SESSION_OUTPUT_DIR_NAME}/`,
-      sandboxId,
-      sessionId,
-    });
-  }
 }
 
 export async function projectRuntimeDriverEvents(
@@ -448,7 +182,7 @@ export async function projectRuntimeDriverEvents(
 
   for (const envelope of input.events) {
     input.assertCurrentConnection?.();
-    const event = parseRuntimeEventEnvelope(envelope.event);
+    let event = parseRuntimeEventEnvelope(envelope.event);
     assertRuntimeEventMatchesDriverLink(event, {
       driverInstanceId: input.driverInstanceId,
       link,
@@ -456,6 +190,24 @@ export async function projectRuntimeDriverEvents(
     assertRuntimeEventMatchesDriverEnvelope(event, {
       eventId: envelope.eventId,
     });
+    if (
+      link.sessionRunId !== null &&
+      (event.kind === "run.completed" || event.kind === "run.failed")
+    ) {
+      const budgetFailure = await getSessionRunBudgetFailure(database, link.sessionRunId);
+      if (budgetFailure !== null) {
+        await recordRuntimeSessionOutputDirectory({
+          bindings,
+          driverInstanceId: input.driverInstanceId,
+          link,
+        });
+        event = createRuntimeEvent({
+          ...event,
+          kind: "run.failed",
+          payload: { error: budgetFailure },
+        });
+      }
+    }
     appendCanonicalEvent(envelope, event);
 
     if (event.kind === "runtime.resume.updated") {
@@ -526,7 +278,7 @@ export async function projectRuntimeDriverEvents(
           : { id: finalMessageId, text: finalMessageText };
       await recordRuntimeSessionOutputDirectory({
         bindings,
-        event,
+        driverInstanceId: input.driverInstanceId,
         link,
       });
     }

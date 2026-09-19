@@ -61,6 +61,49 @@ function readText(path: string): string {
 }
 
 describe("API to driver boundary", () => {
+  test("reports budget exhaustion instead of projecting a driver completion as success", async () => {
+    const database = new SqliteD1Database();
+    database.execute(readText("./helpers/public-api-http-runtime-schema.sql"));
+    database.execute(`INSERT INTO session_run (id,session_id,agent_id,created_by_account_id,trigger,status) VALUES ('${API_DRIVER_BOUNDARY_IDS.sessionRun}','${API_DRIVER_BOUNDARY_IDS.session}','${API_DRIVER_BOUNDARY_IDS.agent}','${API_DRIVER_BOUNDARY_IDS.account}','user_prompt','running');
+      INSERT INTO session_run_budget (session_run_id,cap_usd_micros,estimated_cost_usd_micros,blocked_reason,created_at,updated_at)
+      VALUES ('${API_DRIVER_BOUNDARY_IDS.sessionRun}',10000,18000,'budget_exhausted',1,1);`);
+    const link = createRuntimeSessionLink();
+    const batch = parseDriverEventBatchInput({
+      driverInstanceId: API_DRIVER_BOUNDARY_IDS.driverInstance,
+      events: [
+        {
+          event: createDriverEvent({
+            kind: "run.completed",
+            payload: { stopReason: "end_turn" },
+            runId: API_DRIVER_BOUNDARY_IDS.sessionRun,
+          }),
+          eventId: "budget-completion",
+          occurredAt: "2026-09-18T12:00:00.000Z",
+        },
+      ],
+    });
+    const projection = await projectRuntimeDriverEvents({ DB: database } as ApiBindings, {
+      currentLiveState: {
+        ...createBaseLiveState({
+          callerId: link.callerId,
+          creatorId: link.creatorId,
+          driverInstanceId: API_DRIVER_BOUNDARY_IDS.driverInstance,
+          sessionId: link.sessionId,
+        }),
+        lifecycle: "RUNNING",
+        run: { id: API_DRIVER_BOUNDARY_IDS.sessionRun, status: "running" },
+      },
+      driverInstanceId: API_DRIVER_BOUNDARY_IDS.driverInstance,
+      events: batch.events,
+      link,
+    });
+    expect(projection.transitions).toMatchObject([
+      { status: "failed", error: { code: "budget_exhausted", retryable: false } },
+    ]);
+    expect(projection.runtimeEvents[0]?.event.kind).toBe("run.failed");
+    expect(projection.nextLiveState?.run.status).toBe("failed");
+    expect(projection.finalAssistantMessage).toBeNull();
+  });
   test("assigns driver control ports inside the sandbox image contract", () => {
     const port = getDriverControlPort("driver-01KRZRFGXAA788FW1GDBT7F0EZ");
 
@@ -584,6 +627,8 @@ describe("API to driver boundary", () => {
   });
 
   test("adds failed tool result delivery before terminal run update", async () => {
+    const database = new SqliteD1Database();
+    database.execute(readText("./helpers/public-api-http-runtime-schema.sql"));
     const link = createRuntimeSessionLink();
     const baseLiveState = createBaseLiveState({
       callerId: link.callerId,
@@ -612,41 +657,38 @@ describe("API to driver boundary", () => {
       ],
     });
 
-    const projection = await projectRuntimeDriverEvents(
-      { DB: new SqliteD1Database() } as ApiBindings,
-      {
-        currentLiveState: {
-          ...baseLiveState,
-          lifecycle: "RUNNING",
-          messages: [
-            {
-              content: "",
-              createdAt: "2026-05-26T00:00:00.000Z",
-              id: "assistant-1",
-              plan: [],
-              role: "assistant",
-              segments: [
-                {
-                  argsText: '{"cmd":"pwd"}',
-                  kind: "tool_use",
-                  path: null,
-                  tool: "Shell",
-                  toolCallId: "tool-1",
-                },
-              ],
-            },
-          ],
-          run: {
-            ...baseLiveState.run,
-            id: API_DRIVER_BOUNDARY_IDS.sessionRun,
-            status: "running",
+    const projection = await projectRuntimeDriverEvents({ DB: database } as ApiBindings, {
+      currentLiveState: {
+        ...baseLiveState,
+        lifecycle: "RUNNING",
+        messages: [
+          {
+            content: "",
+            createdAt: "2026-05-26T00:00:00.000Z",
+            id: "assistant-1",
+            plan: [],
+            role: "assistant",
+            segments: [
+              {
+                argsText: '{"cmd":"pwd"}',
+                kind: "tool_use",
+                path: null,
+                tool: "Shell",
+                toolCallId: "tool-1",
+              },
+            ],
           },
+        ],
+        run: {
+          ...baseLiveState.run,
+          id: API_DRIVER_BOUNDARY_IDS.sessionRun,
+          status: "running",
         },
-        driverInstanceId: API_DRIVER_BOUNDARY_IDS.driverInstance,
-        events: batch.events,
-        link,
       },
-    );
+      driverInstanceId: API_DRIVER_BOUNDARY_IDS.driverInstance,
+      events: batch.events,
+      link,
+    });
     const canonicalFailureSourceId = `session-run-terminal:${API_DRIVER_BOUNDARY_IDS.sessionRun}:run.failed`;
 
     expect(projection.runtimeEvents).toMatchObject([{ sourceEventId: canonicalFailureSourceId }]);

@@ -37,6 +37,7 @@ import {
   runtimeCheckpointRulesInclude,
 } from "../../domain/runtime-kind-policy";
 import type { SandboxNetworkConstraints } from "../../domain/sandbox-network-constraints";
+import { isRuntimeSandboxLocalBucketEnabled } from "../runtime-sandbox-bucket-mount";
 import type { SandboxHandle } from "../sandbox-handles";
 import { deleteActiveSandboxConversationSession } from "../sandbox-session/sandbox-conversation-session-delete";
 import {
@@ -663,6 +664,7 @@ export class RuntimeSubjectLifecycleService {
     try {
       await restoreRuntimeSubjectBackup(input.subject, {
         backup: readyBackup,
+        localBucket: isRuntimeSandboxLocalBucketEnabled(this.#bindings),
         runtimeSubjectId: input.runtimeSubjectId,
       });
     } catch (error) {

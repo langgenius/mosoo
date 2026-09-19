@@ -40,6 +40,7 @@ async function loadClaimableDraftFiles(
   viewer: AuthenticatedViewer,
   projectId: ProjectId,
   fileIds: readonly FileId[],
+  sessionId?: SessionId,
 ): Promise<FileRecordRow[]> {
   const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
   await ensureProjectOwnership(database, viewerId, projectId);
@@ -57,6 +58,21 @@ async function loadClaimableDraftFiles(
 
     if (file.created_by_account_id !== viewerId) {
       throw new Error(`Attachment ${fileId} was not found.`);
+    }
+
+    if (
+      sessionId !== undefined &&
+      file.owner_kind === "session" &&
+      file.owner_id === sessionId &&
+      file.scope_kind === "session" &&
+      file.scope_id === sessionId &&
+      file.purpose === "session_attachment" &&
+      file.session_kind === "attachment" &&
+      file.status === "ready" &&
+      file.committed === 1
+    ) {
+      // Claim retries retain the same file ID and bytes in the same Session.
+      continue;
     }
 
     if (
@@ -104,6 +120,7 @@ export async function claimProjectDraftFilesToSession(
     attachmentIds: FileId[];
     projectId: ProjectId;
     sessionId: SessionId;
+    resume?: boolean;
   },
 ): Promise<void> {
   if (input.attachmentIds.length === 0) {
@@ -121,93 +138,80 @@ export async function claimProjectDraftFilesToSession(
     viewer,
     input.projectId,
     input.attachmentIds,
+    input.resume ? input.sessionId : undefined,
   );
+  if (files.length === 0) return;
   const claimedFiles: ClaimedDraftFile[] = [];
 
-  try {
-    for (const file of files) {
-      const nextObjectKey = createFinalObjectKey(toSessionAttachmentRecord(file, input.sessionId));
-      const copyOptions = isTruthy(file.etag) ? { sourceIfMatch: file.etag } : {};
+  // Preserve copied objects on an ambiguous D1 failure: the transaction may
+  // already reference them. Retrying this Session reuses the admitted file IDs.
+  for (const file of files) {
+    const nextObjectKey = createFinalObjectKey(toSessionAttachmentRecord(file, input.sessionId));
+    const copyOptions = isTruthy(file.etag) ? { sourceIfMatch: file.etag } : {};
 
-      const copied = await copyObject({
-        bindings,
-        destinationObjectKey: nextObjectKey,
-        options: copyOptions,
-        sourceObjectKey: file.object_key,
-      });
+    const copied = await copyObject({
+      bindings,
+      destinationObjectKey: nextObjectKey,
+      options: copyOptions,
+      sourceObjectKey: file.object_key,
+    });
 
-      claimedFiles.push({
-        etag: copied.etag,
-        file,
-        nextObjectKey,
-      });
+    claimedFiles.push({
+      etag: copied.etag,
+      file,
+      nextObjectKey,
+    });
+  }
+
+  const timestampMs = currentTimestampMs();
+  await runAppDatabaseBatch(bindings.DB, (database) => {
+    const updateQueries = claimedFiles.flatMap(({ etag, file, nextObjectKey }) => [
+      database
+        .update(fileRecordsTable)
+        .set({
+          committed: true,
+          etag,
+          expiresAt: null,
+          objectKey: nextObjectKey,
+          ownerId: input.sessionId,
+          ownerKind: "session" as const,
+          purpose: "session_attachment" as const,
+          scopeId: input.sessionId,
+          scopeKind: "session" as const,
+          sessionKind: "attachment" as const,
+          updatedAt: timestampMs,
+          version: sql`${fileRecordsTable.version} + 1`,
+        })
+        .where(
+          and(
+            eq(fileRecordsTable.id, file.id),
+            eq(fileRecordsTable.scopeKind, "app_draft"),
+            eq(fileRecordsTable.scopeId, input.projectId),
+          ),
+        ),
+      database
+        .update(fileUploadsTable)
+        .set({
+          scopeId: input.sessionId,
+          scopeKind: "session" as const,
+          updatedAt: timestampMs,
+        })
+        .where(
+          and(
+            eq(fileUploadsTable.fileId, file.id),
+            eq(fileUploadsTable.scopeKind, "app_draft"),
+            eq(fileUploadsTable.scopeId, input.projectId),
+          ),
+        ),
+    ]);
+    const firstQuery = updateQueries[0];
+
+    if (firstQuery === undefined) {
+      throw new Error("Expected at least one draft claim update.");
     }
 
-    const timestampMs = currentTimestampMs();
-    await runAppDatabaseBatch(bindings.DB, (database) => {
-      const updateQueries = claimedFiles.flatMap(({ etag, file, nextObjectKey }) => [
-        database
-          .update(fileRecordsTable)
-          .set({
-            committed: true,
-            etag,
-            expiresAt: null,
-            objectKey: nextObjectKey,
-            ownerId: input.sessionId,
-            ownerKind: "session" as const,
-            purpose: "session_attachment" as const,
-            scopeId: input.sessionId,
-            scopeKind: "session" as const,
-            sessionKind: "attachment" as const,
-            updatedAt: timestampMs,
-            version: sql`${fileRecordsTable.version} + 1`,
-          })
-          .where(
-            and(
-              eq(fileRecordsTable.id, file.id),
-              eq(fileRecordsTable.scopeKind, "app_draft"),
-              eq(fileRecordsTable.scopeId, input.projectId),
-            ),
-          ),
-        database
-          .update(fileUploadsTable)
-          .set({
-            scopeId: input.sessionId,
-            scopeKind: "session" as const,
-            updatedAt: timestampMs,
-          })
-          .where(
-            and(
-              eq(fileUploadsTable.fileId, file.id),
-              eq(fileUploadsTable.scopeKind, "app_draft"),
-              eq(fileUploadsTable.scopeId, input.projectId),
-            ),
-          ),
-      ]);
-      const firstQuery = updateQueries[0];
-
-      if (firstQuery === undefined) {
-        throw new Error("Expected at least one draft claim update.");
-      }
-
-      return [firstQuery, ...updateQueries.slice(1)];
-    });
-  } catch (error) {
-    await Promise.all(
-      claimedFiles.map(async ({ nextObjectKey }) =>
-        deleteObject(bindings, nextObjectKey).catch((cleanupError: unknown) => {
-          logError("file.draft-claim.cleanup.failed", {
-            ...createErrorLogContext(cleanupError),
-            nextObjectKey,
-            projectId: input.projectId,
-            sessionId: input.sessionId,
-          });
-        }),
-      ),
-    );
-
-    throw error;
-  }
+    return [firstQuery, ...updateQueries.slice(1)];
+  });
 
   await Promise.all(
     claimedFiles.map(async ({ file }) =>

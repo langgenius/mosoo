@@ -30,6 +30,8 @@ export interface QueueSessionRunsOutput {
 }
 
 export interface StartRunsOptions {
+  budgetCapUsdMicros?: number | null;
+  recoveryRequestedAtMs?: number;
   accessViewer?: AuthenticatedViewer;
 }
 
@@ -81,10 +83,14 @@ async function queueRunRequest(
     bindings: context.bindings,
     executionContext: context.executionContext,
     input: {
+      budgetCapUsdMicros: context.options.budgetCapUsdMicros ?? null,
       attachmentIds: parseAttachmentIds(runRequest.attachmentIds),
       clientRequestId: runRequest.clientRequestId ?? null,
       prompt,
       session,
+      ...(context.options.recoveryRequestedAtMs === undefined
+        ? {}
+        : { recoveryRequestedAtMs: context.options.recoveryRequestedAtMs }),
       ...(context.options.accessViewer ? { accessViewer: context.options.accessViewer } : {}),
     },
     requestUrl: context.requestUrl,

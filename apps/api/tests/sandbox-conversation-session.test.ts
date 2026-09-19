@@ -413,31 +413,35 @@ describe("ensureSandboxConversationSession", () => {
     await expect(readInactiveDeadline(database)).resolves.toBeNull();
   });
 
-  test("restores a cold cattle session from a 20-day-old committed checkpoint", async () => {
-    const database = createConversationSessionDatabase("cattle");
-    await insertConversationSession(database, { status: "closed" });
-    await setWorkspaceCheckpointRequired(database, true);
-    await insertConversationBackup(database, {
-      createdAt: Date.now() - 20 * 24 * 60 * 60 * 1000,
-    });
-    let restoredBackup: { readonly dir: string; readonly id: string } | null = null;
-    const sandbox = createSandbox({
-      cwdHasContent: false,
-      onRestore: (backup) => {
-        restoredBackup = backup;
-      },
-    });
+  test.each(["true", "false"])(
+    "restores a cold session checkpoint from its configured bucket (local %s)",
+    async (localBucket) => {
+      const database = createConversationSessionDatabase("cattle");
+      await insertConversationSession(database, { status: "closed" });
+      await setWorkspaceCheckpointRequired(database, true);
+      await insertConversationBackup(database, {
+        createdAt: Date.now() - 20 * 24 * 60 * 60 * 1000,
+      });
+      let restoredBackup: { readonly dir: string; readonly id: string } | null = null;
+      const sandbox = createSandbox({
+        cwdHasContent: false,
+        onRestore: (backup) => {
+          restoredBackup = backup;
+        },
+      });
 
-    await ensureSandboxConversationSession(
-      createBindings(database),
-      createInput(sandbox, "cattle"),
-    );
+      await ensureSandboxConversationSession(
+        { ...createBindings(database), SANDBOX_FILE_BUCKET_LOCAL: localBucket },
+        createInput(sandbox, "cattle"),
+      );
 
-    expect(restoredBackup).toEqual({
-      dir: "/workspace/se/session-1",
-      id: CLOUDFLARE_BACKUP_ID,
-    });
-  });
+      expect(restoredBackup).toEqual({
+        dir: "/workspace/se/session-1",
+        id: CLOUDFLARE_BACKUP_ID,
+        localBucket: localBucket === "true",
+      });
+    },
+  );
 
   test("fails cold cattle continuation when its exact Thread checkpoint is missing", async () => {
     const database = createConversationSessionDatabase("cattle");
@@ -516,6 +520,7 @@ describe("ensureSandboxConversationSession", () => {
     expect(restoredBackup).toEqual({
       dir: "/workspace/se/session-1",
       id: CLOUDFLARE_BACKUP_ID,
+      localBucket: false,
     });
     await expect(readConversationSession(database)).resolves.toMatchObject({
       cloudflare_session_id: "01J00000000000000000000001",

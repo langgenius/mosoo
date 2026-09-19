@@ -1,4 +1,7 @@
-import type { PublicThreadApiSendEventsRequest } from "@mosoo/contracts/public-api";
+import type {
+  PublicApiVersion,
+  PublicThreadApiSendEventsRequest,
+} from "@mosoo/contracts/public-api";
 import {
   PUBLIC_THREAD_EVENTS_DEFAULT_LIMIT,
   PUBLIC_THREAD_EVENTS_MAX_LIMIT,
@@ -9,12 +12,13 @@ import {
   PUBLIC_THREAD_USER_ID_MAX_LENGTH,
 } from "@mosoo/contracts/public-api";
 import { parsePlatformId } from "@mosoo/id";
-import type { AgentId, FileId, PublicThreadId, SessionRunId } from "@mosoo/id";
+import type { AgentId, FileId, PublicThreadId, SessionModelCallId, SessionRunId } from "@mosoo/id";
 
 import {
   PublicApiError,
   publicInvalidRequest,
 } from "../../../modules/public-api/public-api-errors";
+import { parseTurnBudgetUsd } from "../../../modules/public-api/public-thread-budget";
 
 interface JsonRequestContext {
   req: {
@@ -49,9 +53,10 @@ const CREATE_THREAD_REQUEST_FIELDS: ReadonlySet<string> = new Set(
 );
 
 export interface ParsedCreateThreadRequest {
+  maxCostUsd?: number;
   fileIds: FileId[];
   inputText?: string | undefined;
-  userId: string;
+  userId: string | null;
 }
 
 function parseContentLength(value: string | null): number | null {
@@ -198,6 +203,12 @@ export function parseThreadIdParam(value: string): PublicThreadId {
 
 export function parseFileIdParam(value: string): FileId {
   return parsePublicPlatformId(value, "File ID") as FileId;
+}
+
+export function parseUsageCursor(value: string | undefined): SessionModelCallId | null {
+  return value === undefined
+    ? null
+    : (parsePublicPlatformId(value, "Usage cursor") as SessionModelCallId);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -422,6 +433,7 @@ function readPublicThreadEvent(input: unknown): PublicThreadApiSendEventsRequest
 
 export async function readSendEventsRequest(
   c: JsonRequestContext,
+  apiVersion: PublicApiVersion = "v1",
 ): Promise<PublicThreadApiSendEventsRequest> {
   const body = await c.req.json<unknown>();
 
@@ -429,7 +441,13 @@ export async function readSendEventsRequest(
     throw publicInvalidRequest("Request body must be an object.");
   }
 
-  assertOnlyFields(body, SEND_EVENTS_REQUEST_FIELDS, "send events request");
+  assertOnlyFields(
+    body,
+    apiVersion === "v2"
+      ? new Set([...SEND_EVENTS_REQUEST_FIELDS, "maxCostUsd"])
+      : SEND_EVENTS_REQUEST_FIELDS,
+    "send events request",
+  );
   const events = body["events"];
 
   if (!Array.isArray(events) || events.length === 0) {
@@ -442,13 +460,15 @@ export async function readSendEventsRequest(
     parsedEvents.push(readPublicThreadEvent(event));
   }
 
-  return {
-    events: parsedEvents,
-  };
+  const maxCostUsd = parseTurnBudgetUsd(body["maxCostUsd"]);
+  if (maxCostUsd !== undefined && !parsedEvents.some((event) => event.type === "user_message"))
+    throw publicInvalidRequest("maxCostUsd requires a user_message event.");
+  return { events: parsedEvents, ...(maxCostUsd === undefined ? {} : { maxCostUsd }) };
 }
 
 export async function readCreateThreadRequest(
   c: RawJsonRequestContext,
+  apiVersion: PublicApiVersion = "v1",
 ): Promise<ParsedCreateThreadRequest> {
   const body = await readOptionalJsonBodyWithLimit(c, PUBLIC_THREAD_JSON_BODY_MAX_BYTES);
 
@@ -456,12 +476,25 @@ export async function readCreateThreadRequest(
     throw publicInvalidRequest("Request body must be an object.");
   }
 
-  assertOnlyFields(body, CREATE_THREAD_REQUEST_FIELDS, "create thread");
-  const userId = readLimitedStringField(body, "userId", PUBLIC_THREAD_USER_ID_MAX_LENGTH);
+  assertOnlyFields(
+    body,
+    apiVersion === "v2"
+      ? new Set([...CREATE_THREAD_REQUEST_FIELDS, "maxCostUsd"])
+      : CREATE_THREAD_REQUEST_FIELDS,
+    "create thread",
+  );
+  const userId =
+    apiVersion === "v2" && body["userId"] === undefined
+      ? null
+      : readLimitedStringField(body, "userId", PUBLIC_THREAD_USER_ID_MAX_LENGTH);
   const inputText = readCreateThreadInputText(body);
+  const maxCostUsd = parseTurnBudgetUsd(body["maxCostUsd"]);
+  if (maxCostUsd !== undefined && inputText === undefined)
+    throw publicInvalidRequest("maxCostUsd applies to a turn and requires input.");
 
   return {
     fileIds: readCreateThreadFileIds(body),
+    ...(maxCostUsd === undefined ? {} : { maxCostUsd }),
     ...(inputText === undefined ? {} : { inputText }),
     userId,
   };

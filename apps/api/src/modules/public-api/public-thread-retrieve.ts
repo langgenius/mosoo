@@ -1,6 +1,7 @@
 import type { PublicThreadApiRetrieveThreadResponse } from "@mosoo/contracts/public-api";
 
 import { admitPublicThreadReader } from "./public-thread-admission";
+import { withPublicRunBudget } from "./public-thread-budget";
 import { readPublicThreadRunFinalOutput } from "./public-thread-events";
 import { toBackingSessionId } from "./public-thread-ids";
 import { toRetrieveThreadResponse } from "./public-thread-presenter";
@@ -9,10 +10,10 @@ import type { RetrievePublicThreadRequest } from "./public-thread.types";
 
 export async function retrievePublicThread(
   request: RetrievePublicThreadRequest,
-): Promise<PublicThreadApiRetrieveThreadResponse> {
-  const snapshot = await getThreadSnapshot(request.database, request.threadId);
+): Promise<PublicThreadApiRetrieveThreadResponse<string | null>> {
+  const snapshot = await getThreadSnapshot(request.database, request.threadId, request.apiVersion);
 
-  await admitPublicThreadReader(request.database, request.caller, snapshot);
+  await admitPublicThreadReader(request.database, request.caller, snapshot, request.apiVersion);
 
   const finalOutput =
     snapshot.session.lastRun?.status === "completed"
@@ -23,9 +24,13 @@ export async function retrievePublicThread(
         })
       : null;
 
-  return toRetrieveThreadResponse({
+  const response = toRetrieveThreadResponse({
+    apiVersion: request.apiVersion,
     endUserId: snapshot.endUserId,
     finalOutput,
     session: snapshot.session,
   });
+  return request.apiVersion === "v2"
+    ? { ...response, run: await withPublicRunBudget(request.database, response.run) }
+    : response;
 }

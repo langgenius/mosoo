@@ -1,4 +1,6 @@
+import type { PublicApiVersion } from "@mosoo/contracts/public-api";
 import type { SessionSummary } from "@mosoo/contracts/session";
+import type { SessionRunSummary } from "@mosoo/contracts/session-run";
 import {
   sessionEventsTable,
   sessionMessagesTable,
@@ -15,12 +17,13 @@ import type {
   PublicThreadId,
   SessionId,
 } from "@mosoo/id";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, gte, sql } from "drizzle-orm";
 
 import type { ApiBindings } from "../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../platform/db/drizzle";
 import { currentTimestampMs, toIsoString } from "../../time";
 import { fileStore } from "../files/application/file-store";
+import { getSessionRunSummary } from "../runtime/infrastructure/session-runs/session-run-read.repository";
 import {
   buildSessionSummaryFromJoinedRow,
   sessionSummaryWithLastRunColumns,
@@ -34,15 +37,34 @@ import type { PublicApiThreadRecordMetadata } from "./public-thread-metadata";
 
 export interface ThreadSnapshotRow extends SessionSummaryWithLastRunRow {
   creator_account_id: AccountId;
-  end_user_id: string;
+  end_user_id: string | null;
   metadata_json: string;
 }
 
 export interface ThreadSnapshot {
-  endUserId: string;
-  metadata: PublicApiThreadRecordMetadata;
+  endUserId: string | null;
+  metadata: PublicApiThreadRecordMetadata | null;
   row: ThreadSnapshotRow;
   session: SessionSummary;
+}
+
+export async function getPublicThreadInitialRun(
+  database: D1Database,
+  sessionId: SessionId,
+  requestId: string,
+): Promise<SessionRunSummary | null> {
+  const receipt = await getAppDatabase(database)
+    .select({ runId: sessionEventsTable.runId })
+    .from(sessionEventsTable)
+    .where(
+      and(
+        eq(sessionEventsTable.sessionId, sessionId),
+        eq(sessionEventsTable.sourceEventId, requestId),
+      ),
+    )
+    .limit(1)
+    .get();
+  return receipt?.runId ? getSessionRunSummary(database, receipt.runId) : null;
 }
 
 export async function cleanupFailedThreadCreation(input: {
@@ -81,6 +103,7 @@ export async function cleanupFailedThreadCreation(input: {
 export async function getThreadSnapshot(
   database: D1Database,
   threadId: PublicThreadId,
+  apiVersion: PublicApiVersion = "v1",
 ): Promise<ThreadSnapshot> {
   const sessionId = toBackingSessionId(threadId);
   const row =
@@ -103,7 +126,10 @@ export async function getThreadSnapshot(
 
   const metadata = parsePublicApiThreadRecordMetadata(row.metadata_json);
 
-  if (!metadata || row.end_user_id === null) {
+  if (
+    apiVersion === "v1" &&
+    (!metadata || metadata.api_version === "v2" || row.end_user_id === null)
+  ) {
     throw publicNotFound("Thread not found.");
   }
 
@@ -123,7 +149,9 @@ export async function findPublicThreadSnapshotByIdempotencyKey(
   database: D1Database,
   input: {
     agentId: AgentId;
+    apiVersion?: PublicApiVersion | undefined;
     idempotencyKey: string;
+    createdAfterMs?: number | undefined;
     tokenId: PersonalAccessTokenId;
     projectId?: ProjectId;
   },
@@ -141,6 +169,10 @@ export async function findPublicThreadSnapshotByIdempotencyKey(
       .where(
         and(
           eq(sessionsTable.agentId, input.agentId),
+          input.createdAfterMs === undefined
+            ? undefined
+            : gte(sessionsTable.createdAt, input.createdAfterMs),
+          sql`coalesce(json_extract(${sessionsTable.metadataJson}, '$.public_api.api_version'), 'v1') = ${input.apiVersion ?? "v1"}`,
           sql`json_extract(${sessionsTable.metadataJson}, '$.public_api.source') = 'public_api'`,
           input.projectId === undefined
             ? sql`json_extract(${sessionsTable.metadataJson}, '$.public_api.created_by.token_id') = ${input.tokenId}`
@@ -157,7 +189,11 @@ export async function findPublicThreadSnapshotByIdempotencyKey(
 
   const metadata = parsePublicApiThreadRecordMetadata(row.metadata_json);
 
-  if (!metadata || metadata.idempotency_key !== input.idempotencyKey || row.end_user_id === null) {
+  if (
+    !metadata ||
+    metadata.idempotency_key !== input.idempotencyKey ||
+    ((input.apiVersion ?? "v1") === "v1" && row.end_user_id === null)
+  ) {
     return null;
   }
 

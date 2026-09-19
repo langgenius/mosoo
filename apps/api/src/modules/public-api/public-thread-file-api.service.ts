@@ -1,6 +1,7 @@
 import type { FileEntry, FileRecord } from "@mosoo/contracts/file";
 import { PUBLIC_THREAD_FILE_UPLOAD_MAX_BYTES } from "@mosoo/contracts/public-api";
 import type {
+  PublicApiVersion,
   PublicFile,
   PublicFileResponse,
   PublicThreadFile,
@@ -13,6 +14,7 @@ import type { ApiBindings } from "../../platform/cloudflare/worker-types";
 import type { AuthenticatedViewer } from "../auth/application/viewer-auth.service";
 import { FileControlError } from "../files/application/file-control-errors";
 import { fileStore } from "../files/application/file-store";
+import { assertSessionRecoveryAvailable } from "../runtime/application/session-run.service";
 import { publishSessionResourceDelete } from "../sessions/application/session-resource-events.service";
 import { admitAgentApiEndpointCaller } from "./agent-api-endpoint-admission.service";
 import { toBackingSessionId, toPublicThreadId } from "./public-thread-ids";
@@ -22,8 +24,9 @@ async function admitPublicThreadFileAccess(
   bindings: ApiBindings,
   caller: AuthenticatedViewer,
   threadId: PublicThreadId,
+  apiVersion: PublicApiVersion = "v1",
 ): Promise<{ projectId: ProjectId; sessionId: SessionId }> {
-  const admission = await admitPublicSessionCaller(bindings.DB, caller, threadId);
+  const admission = await admitPublicSessionCaller(bindings.DB, caller, threadId, apiVersion);
   return {
     projectId: admission.session.project_id,
     sessionId: toBackingSessionId(threadId),
@@ -78,12 +81,13 @@ async function admitPublicFileRecord(
   bindings: ApiBindings,
   caller: AuthenticatedViewer,
   fileId: FileId,
+  apiVersion: PublicApiVersion = "v1",
 ): Promise<FileRecord> {
   const file = await fileStore.getRecord(bindings, caller, fileId);
 
   if (file.scope.kind === "session") {
     const threadId = requirePublicThreadFile(file);
-    await admitPublicSessionCaller(bindings.DB, caller, threadId);
+    await admitPublicSessionCaller(bindings.DB, caller, threadId, apiVersion);
     return file;
   }
 
@@ -98,8 +102,14 @@ export async function listPublicThreadFiles(
   bindings: ApiBindings,
   caller: AuthenticatedViewer,
   threadId: PublicThreadId,
+  apiVersion: PublicApiVersion = "v1",
 ): Promise<PublicThreadFileListResponse> {
-  const { projectId, sessionId } = await admitPublicThreadFileAccess(bindings, caller, threadId);
+  const { projectId, sessionId } = await admitPublicThreadFileAccess(
+    bindings,
+    caller,
+    threadId,
+    apiVersion,
+  );
   return {
     files: (
       await fileStore.list(bindings, caller, {
@@ -117,6 +127,7 @@ export async function createPublicAgentFile(
     agentId: AgentId;
     file: File;
   },
+  apiVersion: PublicApiVersion = "v1",
 ): Promise<PublicFileResponse> {
   if (input.file.size > PUBLIC_THREAD_FILE_UPLOAD_MAX_BYTES) {
     throw new FileControlError(
@@ -126,7 +137,7 @@ export async function createPublicAgentFile(
     );
   }
 
-  const agent = await admitAgentApiEndpointCaller(bindings.DB, caller, input.agentId);
+  const agent = await admitAgentApiEndpointCaller(bindings.DB, caller, input.agentId, apiVersion);
   const upload = await fileStore.createUpload(bindings, caller, {
     file: {
       contentType: input.file.type || "application/octet-stream",
@@ -159,8 +170,9 @@ export async function retrievePublicFile(
   bindings: ApiBindings,
   caller: AuthenticatedViewer,
   fileId: FileId,
+  apiVersion: PublicApiVersion = "v1",
 ): Promise<PublicFileResponse> {
-  const file = await admitPublicFileRecord(bindings, caller, fileId);
+  const file = await admitPublicFileRecord(bindings, caller, fileId, apiVersion);
   return {
     file: toPublicFile(file),
   };
@@ -171,14 +183,22 @@ export async function claimPublicThreadFiles(
   caller: AuthenticatedViewer,
   input: {
     fileIds: FileId[];
+    recoveryRequestedAtMs: number;
     threadId: PublicThreadId;
   },
+  apiVersion: PublicApiVersion = "v1",
 ): Promise<FileId[]> {
   if (input.fileIds.length === 0) {
     return [];
   }
 
-  const { sessionId } = await admitPublicThreadFileAccess(bindings, caller, input.threadId);
+  const { sessionId } = await admitPublicThreadFileAccess(
+    bindings,
+    caller,
+    input.threadId,
+    apiVersion,
+  );
+  await assertSessionRecoveryAvailable(bindings.DB, sessionId, input.recoveryRequestedAtMs);
   const claimedFiles = await fileStore.claimToSession(bindings, caller, sessionId, input.fileIds);
 
   return claimedFiles.map((file) => parsePlatformId<FileId>(file.id, "File ID"));
@@ -188,8 +208,9 @@ export async function deletePublicFile(
   bindings: ApiBindings,
   caller: AuthenticatedViewer,
   fileId: FileId,
+  apiVersion: PublicApiVersion = "v1",
 ): Promise<void> {
-  const file = await admitPublicFileRecord(bindings, caller, fileId);
+  const file = await admitPublicFileRecord(bindings, caller, fileId, apiVersion);
 
   await fileStore.delete(bindings, caller, fileId);
 
@@ -209,11 +230,12 @@ export async function downloadPublicThreadFileContent(
     disposition: "attachment" | "inline";
     fileId: FileId;
   },
+  apiVersion: PublicApiVersion = "v1",
 ): Promise<Response> {
   const file = await fileStore.getRecord(bindings, caller, input.fileId);
   const threadId = requirePublicThreadFile(file);
 
-  await admitPublicSessionCaller(bindings.DB, caller, threadId);
+  await admitPublicSessionCaller(bindings.DB, caller, threadId, apiVersion);
   const response = await fileStore.streamContent(bindings, caller, input.fileId, input.disposition);
   const headers = new Headers(response.headers);
   headers.set("Cache-Control", "no-store");
@@ -231,8 +253,14 @@ export async function deletePublicThreadFile(
     fileId: FileId;
     threadId: PublicThreadId;
   },
+  apiVersion: PublicApiVersion = "v1",
 ): Promise<void> {
-  const { sessionId } = await admitPublicThreadFileAccess(bindings, caller, input.threadId);
+  const { sessionId } = await admitPublicThreadFileAccess(
+    bindings,
+    caller,
+    input.threadId,
+    apiVersion,
+  );
   const file = await fileStore.getRecord(bindings, caller, input.fileId);
 
   assertPublicThreadFile(file, sessionId);

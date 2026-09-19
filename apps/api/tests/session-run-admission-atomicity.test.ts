@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 
 import { createPlatformId, parsePlatformId } from "@mosoo/id";
 import type { AgentDeploymentVersionId, RuntimeEventId, SessionId, SessionRunId } from "@mosoo/id";
@@ -12,6 +12,7 @@ import { setSessionRunStatus } from "../src/modules/runtime/infrastructure/sessi
 import { persistSessionRuntimeEvents } from "../src/modules/sessions/infrastructure/session-runtime-event-store.repository";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import { API_ERROR_CODE } from "../src/platform/errors";
+import { systemClock } from "../src/time";
 import {
   PUBLIC_API_TEST_IDS,
   createApiCommandQueueStub,
@@ -200,6 +201,93 @@ async function completeRun(database: D1Database, runId: SessionRunId): Promise<v
 }
 
 describe("Session Run atomic admission", () => {
+  test("successful continuation renews recovery while a later failed turn does not", async () => {
+    const { database, viewer } = await createFixture();
+    const bindings = createPublicHttpTestBindings(database, {
+      apiCommandQueue: createApiCommandQueueStub(),
+    }) as ApiBindings;
+    await database
+      .prepare(
+        "UPDATE session_execution_snapshot SET plan_json = json_set(plan_json, '$.recoveryRetentionMs', ?) WHERE session_id = ?",
+      )
+      .bind(30 * 24 * 60 * 60 * 1000, PUBLIC_API_TEST_IDS.ownerSession)
+      .run();
+    const start = Date.now();
+    const clock = spyOn(systemClock, "nowMs");
+    try {
+      clock.mockReturnValue(start);
+      const first = await queueOwnerRun({ bindings, clientRequestId: "day-0", viewer });
+      await completeRun(database, first.run.id);
+      clock.mockReturnValue(start + 29 * 24 * 60 * 60 * 1000);
+      const renewed = await queueOwnerRun({ bindings, clientRequestId: "day-29", viewer });
+      await completeRun(database, renewed.run.id);
+      clock.mockReturnValue(start + 31 * 24 * 60 * 60 * 1000);
+      const later = await queueOwnerRun({ bindings, clientRequestId: "day-31", viewer });
+      expect(later.run.status).toBe("queued");
+      await setSessionRunStatus(database, {
+        runId: later.run.id,
+        source: "driver",
+        status: "failed",
+      });
+      clock.mockReturnValue(start + 60 * 24 * 60 * 60 * 1000);
+      await expect(
+        queueOwnerRun({ bindings, clientRequestId: "day-60", viewer }),
+      ).rejects.toMatchObject({ code: "SESSION_RECOVERY_EXPIRED" });
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
+  test("does not retroactively expire existing Sessions without an admitted retention policy", async () => {
+    const { database, viewer } = await createFixture();
+    const bindings = createPublicHttpTestBindings(database, {
+      apiCommandQueue: createApiCommandQueueStub(),
+    }) as ApiBindings;
+    const first = await queueOwnerRun({ bindings, clientRequestId: "legacy-original", viewer });
+    await completeRun(database, first.run.id);
+    const clock = spyOn(systemClock, "nowMs");
+    try {
+      clock.mockReturnValue(Date.now() + 90 * 24 * 60 * 60 * 1000);
+      expect(
+        (await queueOwnerRun({ bindings, clientRequestId: "legacy-90-days", viewer })).run.status,
+      ).toBe("queued");
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
+  test("rejects expired continuation without admitting another message or changing history", async () => {
+    const { database, viewer } = await createFixture();
+    const bindings = createPublicHttpTestBindings(database, {
+      apiCommandQueue: createApiCommandQueueStub(),
+    }) as ApiBindings;
+    await database
+      .prepare(
+        "UPDATE session_execution_snapshot SET plan_json = json_set(plan_json, '$.recoveryRetentionMs', ?) WHERE session_id = ?",
+      )
+      .bind(30 * 24 * 60 * 60 * 1000, PUBLIC_API_TEST_IDS.ownerSession)
+      .run();
+    const first = await queueOwnerRun({ bindings, clientRequestId: "retained-first", viewer });
+    await completeRun(database, first.run.id);
+    const completed = await database
+      .prepare("SELECT completed_at FROM session_run WHERE id = ?")
+      .bind(first.run.id)
+      .first<number>("completed_at");
+    if (completed === null) throw new Error("Completed turn is missing its timestamp.");
+    const before = await readAdmissionCounts(database);
+    const clock = spyOn(systemClock, "nowMs");
+    try {
+      clock.mockReturnValue(completed + 30 * 24 * 60 * 60 * 1000);
+      await expect(
+        queueOwnerRun({ bindings, clientRequestId: "after-expiry", viewer }),
+      ).rejects.toMatchObject({ code: "SESSION_RECOVERY_EXPIRED", status: 409 });
+      expect(await readAdmissionCounts(database)).toEqual(before);
+      expect((await readSessionState(database)).lastRunId).toBe(first.run.id);
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
   test("blocks a cattle follow-up until the previous completed Run has a checkpoint and completion history", async () => {
     const { database, viewer } = await createFixture();
     const apiCommandQueue = createApiCommandQueueStub();

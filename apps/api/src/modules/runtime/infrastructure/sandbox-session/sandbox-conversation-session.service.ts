@@ -15,6 +15,7 @@ import {
   getRuntimeSubjectInactiveDeadline,
   runtimeCheckpointRulesInclude,
 } from "../../domain/runtime-kind-policy";
+import { isRuntimeSandboxLocalBucketEnabled } from "../runtime-sandbox-bucket-mount";
 import type { RuntimeConversationSessionRecord } from "../runtime-subject-lifecycle/runtime-subject-store";
 import {
   claimIdleSessionScopedConversationForClose,
@@ -117,6 +118,7 @@ function resolveConversationContinuationPlan(input: {
 
 async function restoreSandboxSessionCwdIfMissing(input: {
   cwd: string;
+  localBucket: boolean;
   latestReadyBackup: RuntimeConversationSessionRecord["latestReadyBackup"];
   requireCheckpoint: boolean;
   sandbox: EnsureSandboxConversationSessionInput["sandbox"];
@@ -140,6 +142,7 @@ async function restoreSandboxSessionCwdIfMissing(input: {
     await restoreSandboxConversationDirectoryBackup(input.sandbox, {
       backup: input.latestReadyBackup,
       cwd: input.cwd,
+      localBucket: input.localBucket,
     });
   } catch (cause) {
     throw new Error(
@@ -190,6 +193,7 @@ export async function ensureSandboxConversationSession(
     await measureOptional(input.timing, "conversation.restoreCwd", () =>
       restoreSandboxSessionCwdIfMissing({
         cwd,
+        localBucket: isRuntimeSandboxLocalBucketEnabled(bindings),
         latestReadyBackup: existingSession.latestReadyBackup,
         requireCheckpoint: continuation.requireCwdCheckpoint,
         sandbox: input.sandbox,

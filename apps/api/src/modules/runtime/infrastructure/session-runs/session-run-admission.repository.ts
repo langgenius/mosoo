@@ -6,6 +6,7 @@ import {
   sessionEventsTable,
   sessionMessagesTable,
   sessionRunsTable,
+  sessionRunBudgetsTable,
   sessionsTable,
 } from "@mosoo/db";
 import type {
@@ -32,6 +33,7 @@ import type { PreparedApiCommand } from "../../../api-command/application/api-co
 import { createSessionRuntimeEventProjection } from "../../../sessions/domain/session-runtime-event-projection";
 import { ACTIVE_SESSION_RUN_STATUSES } from "../../domain/session-run-lifecycle.machine";
 import { createSessionStatusTransitionPatch } from "./session-lifecycle-projection.repository";
+import { sessionRecoveryAvailablePredicate } from "./session-recovery-retention.repository";
 
 interface QueuedRunAdmissionRecord {
   agentId: AgentId;
@@ -57,6 +59,8 @@ interface QueuedMessageAdmissionRecord {
 }
 
 export interface CommitQueuedSessionRunAdmissionInput {
+  budgetCapUsdMicros?: number | null;
+  recoveryRequestedAtMs?: number;
   apiCommand: PreparedApiCommand;
   clientRequestId: string | null;
   events: readonly RuntimeEventEnvelope[];
@@ -101,6 +105,7 @@ export function completedRunHistoryPredicate(
 
 function claimableSessionPredicate(db: AppDatabase, input: CommitQueuedSessionRunAdmissionInput) {
   return and(
+    sessionRecoveryAvailablePredicate(db, input.recoveryRequestedAtMs ?? input.run.timestampMs),
     eq(sessionsTable.id, input.session.id),
     eq(sessionsTable.agentId, input.session.agentId),
     eq(sessionsTable.projectId, input.session.projectId),
@@ -461,6 +466,24 @@ export async function commitQueuedSessionRunAdmission(
         ),
       ),
     createMessageInsertQuery(db, input),
+    ...(input.budgetCapUsdMicros == null
+      ? []
+      : [
+          db.insert(sessionRunBudgetsTable).select(
+            db
+              .select({
+                sessionRunId: selectedValue(input.run.id, "session_run_id"),
+                capUsdMicros: selectedValue(input.budgetCapUsdMicros, "cap_usd_micros"),
+                estimatedCostUsdMicros: selectedValue(0, "estimated_cost_usd_micros"),
+                activeRequestId: selectedValue(null, "active_request_id"),
+                blockedReason: selectedValue(null, "blocked_reason"),
+                createdAt: selectedValue(input.run.timestampMs, "created_at"),
+                updatedAt: selectedValue(input.run.timestampMs, "updated_at"),
+              })
+              .from(sessionsTable)
+              .where(admissionSessionPredicate(input)),
+          ),
+        ]),
     ...input.events.map((event, index) => createEventInsertQuery(db, input, event, index)),
     createApiCommandInsertQuery(db, input),
   ]);

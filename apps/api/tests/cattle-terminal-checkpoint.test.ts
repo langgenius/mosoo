@@ -24,7 +24,7 @@ const CREATED_BACKUP_ID = "550e8400-e29b-41d4-a716-446655440002";
 
 interface CheckpointSandboxState {
   backupAvailable: boolean;
-  backupOptions: Array<{ dir: string; ttl: number | undefined }>;
+  backupOptions: Array<{ dir: string; localBucket: boolean | undefined; ttl: number | undefined }>;
   createBackupCalls: number;
 }
 
@@ -43,7 +43,11 @@ function createCheckpointSandbox(state: CheckpointSandboxState): {
       configureNetworkConstraints: unavailable,
       async createBackup(options) {
         state.createBackupCalls += 1;
-        state.backupOptions.push({ dir: options.dir, ttl: options.ttl });
+        state.backupOptions.push({
+          dir: options.dir,
+          localBucket: options.localBucket,
+          ttl: options.ttl,
+        });
 
         if (!state.backupAvailable) {
           throw new Error("backup service unavailable");
@@ -180,94 +184,99 @@ async function createTerminalCheckpointFixture(): Promise<{
 }
 
 describe("cattle terminal checkpoint", () => {
-  test("keeps the last good checkpoint and blocks continuation until a retry commits the Run", async () => {
-    const { bindings, commands, database, sandboxState } = await createTerminalCheckpointFixture();
+  test.each(["true", "false"])(
+    "keeps the last good checkpoint until a retry commits the Run (local bucket %s)",
+    async (localBucket) => {
+      const { bindings, commands, database, sandboxState } =
+        await createTerminalCheckpointFixture();
+      bindings.SANDBOX_FILE_BUCKET_LOCAL = localBucket;
 
-    await persistSessionRuntimeEvents(database, {
-      records: [
-        {
-          event: createRuntimeEvent({
-            id: createPlatformId<RuntimeEventId>(),
-            kind: "run.completed",
-            occurredAt: new Date().toISOString(),
-            payload: { stopReason: "end_turn" },
-            runId: PUBLIC_API_TEST_IDS.run,
-            sessionId: PUBLIC_API_TEST_IDS.ownerSession,
-          }),
-          occurredAt: null,
-          sourceEventId: null,
-        },
-      ],
-      sessionId: PUBLIC_API_TEST_IDS.ownerSession,
-    });
-    await expect(
-      releaseTerminalDriverInstanceSessionRun(bindings, {
+      await persistSessionRuntimeEvents(database, {
+        records: [
+          {
+            event: createRuntimeEvent({
+              id: createPlatformId<RuntimeEventId>(),
+              kind: "run.completed",
+              occurredAt: new Date().toISOString(),
+              payload: { stopReason: "end_turn" },
+              runId: PUBLIC_API_TEST_IDS.run,
+              sessionId: PUBLIC_API_TEST_IDS.ownerSession,
+            }),
+            occurredAt: null,
+            sourceEventId: null,
+          },
+        ],
+        sessionId: PUBLIC_API_TEST_IDS.ownerSession,
+      });
+      await expect(
+        releaseTerminalDriverInstanceSessionRun(bindings, {
+          driverInstanceId: PUBLIC_API_TEST_IDS.driverOwner,
+          sessionRunId: PUBLIC_API_TEST_IDS.run,
+        }),
+      ).rejects.toThrow("checkpoint failed");
+
+      await expect(
+        isCattleTerminalCheckpointReadyForNextRun(database, PUBLIC_API_TEST_IDS.ownerSession),
+      ).resolves.toBe(false);
+      const afterFailure = await database
+        .prepare("SELECT id, session_run_id FROM sandbox_backup ORDER BY created_at")
+        .all<{ id: string; session_run_id: string | null }>();
+      expect(afterFailure.results).toEqual([
+        { id: PRIOR_BACKUP_ID, session_run_id: PUBLIC_API_TEST_IDS.runAlt },
+      ]);
+      await expect(
+        database
+          .prepare("SELECT committed_session_run_id, committed_value FROM native_resume_ref")
+          .first(),
+      ).resolves.toEqual({ committed_session_run_id: null, committed_value: null });
+
+      sandboxState.backupAvailable = true;
+      await releaseTerminalDriverInstanceSessionRun(bindings, {
         driverInstanceId: PUBLIC_API_TEST_IDS.driverOwner,
         sessionRunId: PUBLIC_API_TEST_IDS.run,
-      }),
-    ).rejects.toThrow("checkpoint failed");
+      });
 
-    await expect(
-      isCattleTerminalCheckpointReadyForNextRun(database, PUBLIC_API_TEST_IDS.ownerSession),
-    ).resolves.toBe(false);
-    const afterFailure = await database
-      .prepare("SELECT id, session_run_id FROM sandbox_backup ORDER BY created_at")
-      .all<{ id: string; session_run_id: string | null }>();
-    expect(afterFailure.results).toEqual([
-      { id: PRIOR_BACKUP_ID, session_run_id: PUBLIC_API_TEST_IDS.runAlt },
-    ]);
-    await expect(
-      database
-        .prepare("SELECT committed_session_run_id, committed_value FROM native_resume_ref")
-        .first(),
-    ).resolves.toEqual({ committed_session_run_id: null, committed_value: null });
+      await expect(
+        isCattleTerminalCheckpointReadyForNextRun(database, PUBLIC_API_TEST_IDS.ownerSession),
+      ).resolves.toBe(true);
+      const committed = await database
+        .prepare(
+          "SELECT dir, session_run_id, status, ttl_seconds FROM sandbox_backup WHERE session_run_id = ?",
+        )
+        .bind(PUBLIC_API_TEST_IDS.run)
+        .first<{
+          dir: string;
+          session_run_id: string;
+          status: string;
+          ttl_seconds: number;
+        }>();
+      expect(committed).toEqual({
+        dir: SESSION_CWD,
+        session_run_id: PUBLIC_API_TEST_IDS.run,
+        status: "ready",
+        ttl_seconds: 10 * 365 * 24 * 60 * 60,
+      });
+      await expect(
+        database
+          .prepare("SELECT committed_session_run_id, committed_value FROM native_resume_ref")
+          .first(),
+      ).resolves.toEqual({
+        committed_session_run_id: PUBLIC_API_TEST_IDS.run,
+        committed_value: "thread-checkpointed",
+      });
+      expect(sandboxState.backupOptions).toEqual([
+        { dir: SESSION_CWD, localBucket: localBucket === "true", ttl: 10 * 365 * 24 * 60 * 60 },
+        { dir: SESSION_CWD, localBucket: localBucket === "true", ttl: 10 * 365 * 24 * 60 * 60 },
+      ]);
+      expect(commands.join("\n")).toContain("session-files");
+      expect(commands.join("\n")).toContain("driver-boot-payload-*.json");
+      expect(commands.join("\n")).toContain("openai-runtime/auth.json");
 
-    sandboxState.backupAvailable = true;
-    await releaseTerminalDriverInstanceSessionRun(bindings, {
-      driverInstanceId: PUBLIC_API_TEST_IDS.driverOwner,
-      sessionRunId: PUBLIC_API_TEST_IDS.run,
-    });
-
-    await expect(
-      isCattleTerminalCheckpointReadyForNextRun(database, PUBLIC_API_TEST_IDS.ownerSession),
-    ).resolves.toBe(true);
-    const committed = await database
-      .prepare(
-        "SELECT dir, session_run_id, status, ttl_seconds FROM sandbox_backup WHERE session_run_id = ?",
-      )
-      .bind(PUBLIC_API_TEST_IDS.run)
-      .first<{
-        dir: string;
-        session_run_id: string;
-        status: string;
-        ttl_seconds: number;
-      }>();
-    expect(committed).toEqual({
-      dir: SESSION_CWD,
-      session_run_id: PUBLIC_API_TEST_IDS.run,
-      status: "ready",
-      ttl_seconds: 10 * 365 * 24 * 60 * 60,
-    });
-    await expect(
-      database
-        .prepare("SELECT committed_session_run_id, committed_value FROM native_resume_ref")
-        .first(),
-    ).resolves.toEqual({
-      committed_session_run_id: PUBLIC_API_TEST_IDS.run,
-      committed_value: "thread-checkpointed",
-    });
-    expect(sandboxState.backupOptions).toEqual([
-      { dir: SESSION_CWD, ttl: 10 * 365 * 24 * 60 * 60 },
-      { dir: SESSION_CWD, ttl: 10 * 365 * 24 * 60 * 60 },
-    ]);
-    expect(commands.join("\n")).toContain("session-files");
-    expect(commands.join("\n")).toContain("driver-boot-payload-*.json");
-    expect(commands.join("\n")).toContain("openai-runtime/auth.json");
-
-    await releaseTerminalDriverInstanceSessionRun(bindings, {
-      driverInstanceId: PUBLIC_API_TEST_IDS.driverOwner,
-      sessionRunId: PUBLIC_API_TEST_IDS.run,
-    });
-    expect(sandboxState.createBackupCalls).toBe(2);
-  });
+      await releaseTerminalDriverInstanceSessionRun(bindings, {
+        driverInstanceId: PUBLIC_API_TEST_IDS.driverOwner,
+        sessionRunId: PUBLIC_API_TEST_IDS.run,
+      });
+      expect(sandboxState.createBackupCalls).toBe(2);
+    },
+  );
 });

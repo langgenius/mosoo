@@ -9,6 +9,7 @@ import {
   withDisposedRpcResult,
 } from "../../../platform/cloudflare/rpc-disposal";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
+import { isRuntimeSandboxLocalBucketEnabled } from "./runtime-sandbox-bucket-mount";
 import {
   decodeSandboxBackupIdForPlatform,
   encodeSandboxBackupIdForStorage,
@@ -107,6 +108,7 @@ export async function createRuntimeSandboxBackup(
       return withDisposedRpcResult(
         sandbox.createBackup({
           dir: input.dir,
+          localBucket: isRuntimeSandboxLocalBucketEnabled(bindings),
           ttl: input.ttlSeconds,
         }),
         (result) => ({

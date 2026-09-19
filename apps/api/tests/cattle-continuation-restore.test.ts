@@ -171,6 +171,7 @@ describe("recycled cattle sandbox continuation", () => {
       {
         dir: SESSION_CWD,
         id: CLOUDFLARE_BACKUP_ID,
+        localBucket: true,
       },
     ]);
   });
@@ -199,6 +200,7 @@ describe("recycled cattle sandbox continuation", () => {
       {
         dir: SESSION_CWD,
         id: CLOUDFLARE_BACKUP_ID,
+        localBucket: true,
       },
     ]);
   });

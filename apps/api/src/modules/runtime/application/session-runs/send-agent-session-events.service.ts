@@ -36,6 +36,8 @@ interface SendAgentSessionEventsInput {
 }
 
 interface AgentSessionEventsOptions {
+  budgetCapUsdMicros?: number | null;
+  recoveryRequestedAtMs?: number;
   accessViewer?: AuthenticatedViewer;
   actionAuthorization?: SessionActionAuthorization;
   cachedState?: SessionLiveState | null;
@@ -201,11 +203,6 @@ async function handleAgentSessionEvent(input: {
   switch (input.event.type) {
     case "user_message": {
       const text = parseNonEmptyText(input.event.text, "User message text");
-      const titleUpdate = await autoTitleSessionFromPrompt({
-        database: input.bindings.DB,
-        sessionId: input.sessionId,
-        text,
-      });
       const started = await startRuns({
         bindings: input.bindings,
         executionContext: input.executionContext,
@@ -227,6 +224,11 @@ async function handleAgentSessionEvent(input: {
         options: input.options,
         requestUrl: input.requestUrl,
         viewer: input.viewer,
+      });
+      const titleUpdate = await autoTitleSessionFromPrompt({
+        database: input.bindings.DB,
+        sessionId: input.sessionId,
+        text,
       });
 
       return {

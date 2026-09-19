@@ -5,7 +5,10 @@ import type { DriverInstanceId, SessionRunId } from "@mosoo/id";
 import { recordCanonicalSessionRunFailure } from "../src/modules/runtime/application/session-runs/session-run-terminal-failure.service";
 import { reconcileTerminalSessionRuns } from "../src/modules/runtime/application/session-runs/terminal-run-reconciliation.service";
 import { getRuntimeSessionLink } from "../src/modules/runtime/infrastructure/driver-instance/session-link.repository";
-import { recordDriverInstanceFailure } from "../src/modules/runtime/infrastructure/driver-instance/terminal-driver-events";
+import {
+  recordDriverInstanceCompletion,
+  recordDriverInstanceFailure,
+} from "../src/modules/runtime/infrastructure/driver-instance/terminal-driver-events";
 import { setSessionRunStatus } from "../src/modules/runtime/infrastructure/session-runs/session-run-store.repository";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import {
@@ -153,6 +156,54 @@ async function readFailureEvents(database: SqliteD1Database): Promise<FailureEve
 }
 
 describe("canonical session run terminal failure", () => {
+  test.each(["completion", "failure"] as const)(
+    "preserves the persisted budget outcome when the driver reports %s with no current policy",
+    async (terminal) => {
+      const database = await createPublicHttpContractDatabase();
+      await insertLinkedRunFixture(database);
+      const bindings = createPublicHttpTestBindings(database) as ApiBindings;
+      database.execute(`INSERT INTO session_run_budget (session_run_id,cap_usd_micros,estimated_cost_usd_micros,blocked_reason,created_at,updated_at)
+        VALUES ('${RUN_ID}',10000,18000,'budget_exhausted',1,1)`);
+      if (terminal === "completion") {
+        await recordDriverInstanceCompletion(bindings, {
+          driverInstanceId: DRIVER_ID,
+          driverReady: true,
+        });
+      } else {
+        await recordDriverInstanceFailure(bindings, {
+          driverInstanceId: DRIVER_ID,
+          error: DRIVER_ERROR,
+        });
+      }
+      expect(
+        await database
+          .prepare("SELECT status, error_code FROM session_run WHERE id = ?")
+          .bind(RUN_ID)
+          .first(),
+      ).toEqual({ status: "failed", error_code: "budget_exhausted" });
+      expect(await readFailureEvents(database)).toMatchObject([{ event_type: "run.failed" }]);
+    },
+  );
+
+  test("does not replace a cancelled turn with a budget failure on a late completion RPC", async () => {
+    const database = await createPublicHttpContractDatabase();
+    await insertLinkedRunFixture(database, "cancelled");
+    const bindings = createPublicHttpTestBindings(database) as ApiBindings;
+    database.execute(`INSERT INTO session_run_budget (session_run_id,cap_usd_micros,active_request_id,created_at,updated_at)
+      VALUES ('${RUN_ID}',10000,'pending-model-request',1,1)`);
+    await recordDriverInstanceCompletion(bindings, {
+      driverInstanceId: DRIVER_ID,
+      driverReady: true,
+    });
+    expect(
+      await database
+        .prepare("SELECT status, error_code FROM session_run WHERE id = ?")
+        .bind(RUN_ID)
+        .first(),
+    ).toEqual({ status: "cancelled", error_code: null });
+    expect(await readFailureEvents(database)).toHaveLength(0);
+  });
+
   test("treats a concurrent failed transition as canonical success", async () => {
     const database = await createPublicHttpContractDatabase();
     await insertLinkedRunFixture(database);

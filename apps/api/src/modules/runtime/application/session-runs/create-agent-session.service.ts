@@ -31,10 +31,12 @@ import type { AgentRow } from "../../../agents/application/agent-types";
 import type { AuthenticatedViewer } from "../../../auth/application/viewer-auth.service";
 import { resolveReadyEnvironmentPackageArtifact } from "../../../environments/application/environment-package-artifact.service";
 import { resolveAgentEnvironmentSnapshot } from "../../../environments/application/environment.service";
+import { SESSION_RECOVERY_RETENTION_MS } from "../../domain/session-recovery-policy";
 import type { SessionExecutionPlan } from "../session-definition/session-execution.types";
 
 export interface CreateAgentSessionOptions {
   accessViewer?: AuthenticatedViewer;
+  configurationSource?: "saved";
   endUserId?: string | null | undefined;
   metadata?: AgentSessionMetadata | null | undefined;
   participantAccountId?: string | AccountId | null | undefined;
@@ -42,7 +44,9 @@ export interface CreateAgentSessionOptions {
 }
 
 export interface AgentSessionMetadata {
+  public_api_initial_request_id?: string | null;
   public_api?: {
+    api_version?: "v1" | "v2";
     created_by: {
       token_id: string;
       token_label: string;
@@ -75,6 +79,7 @@ interface AgentSessionExecutionSource {
 
 async function resolveAgentSessionExecutionSource(input: {
   accessViewer: AuthenticatedViewer;
+  configurationSource?: "saved" | undefined;
   bindings: ApiBindings;
   agentId: AgentId;
   projectId: ProjectId;
@@ -85,7 +90,7 @@ async function resolveAgentSessionExecutionSource(input: {
     projectId: input.projectId,
   });
   const liveVersion =
-    agent.status === "published"
+    agent.status === "published" && input.configurationSource !== "saved"
       ? await requireAgentLiveDeploymentVersionRecord(input.bindings.DB, agent)
       : null;
   const environment = liveVersion
@@ -97,7 +102,9 @@ async function resolveAgentSessionExecutionSource(input: {
     configJson: liveVersion?.configJson ?? agent.configJson,
     environment,
     liveVersion,
-    kind: liveVersion?.kind ?? agent.kind,
+    // New saved-config Sessions own their execution state. A legacy Agent's
+    // shared subject stays attached only to its previously admitted Sessions.
+    kind: input.configurationSource === "saved" ? "cattle" : (liveVersion?.kind ?? agent.kind),
     model: liveVersion?.model ?? agent.model,
     prompt: liveVersion?.prompt ?? agent.prompt,
     provider: liveVersion?.provider ?? agent.provider,
@@ -180,6 +187,7 @@ async function buildSessionExecutionPlan(input: {
       runtimeId: input.source.runtimeId,
     },
     builtInTools: storedConfig.builtInTools,
+    configJson: input.source.configJson,
     environment: {
       allowMcpServers: environmentSnapshot.record.allowMcpServers === 1,
       allowPackageManagers: environmentSnapshot.record.allowPackageManagers === 1,
@@ -279,6 +287,7 @@ export async function createAgentSession(
   const projectId = parsePlatformId<ProjectId>(request.input.projectId, "project id");
   const source = await resolveAgentSessionExecutionSource({
     accessViewer,
+    configurationSource: options.configurationSource,
     agentId,
     bindings: request.bindings,
     projectId,
@@ -292,6 +301,9 @@ export async function createAgentSession(
     bindings: request.bindings,
     source,
   });
+  if (options.configurationSource === "saved" && source.kind === "cattle") {
+    executionPlan.recoveryRetentionMs = SESSION_RECOVERY_RETENTION_MS;
+  }
   await resolveReadyEnvironmentPackageArtifact(
     request.bindings,
     source.agent.projectId,

@@ -25,6 +25,17 @@ The shipped view uses model-call usage recorded by mosoo. For recognized models,
 
 This view is not a Provider invoice or a mosoo charge. It does not reconcile taxes, credits, discounts, subscriptions, or infrastructure costs. **All** can include usage types that have no separate filter. On an Agent's Cost tab, the latest seven usage events are shown and currently are not limited by the selected time range. Budgets, alerts, invoices, and payment controls are not available here.
 
+Recorded input excludes the separately shown cache-write bucket and includes
+cache reads. OpenAI total-input reports are normalized to that convention so
+cache writes are not priced twice; long-context pricing uses the full input,
+including writes. Price corrections do not run a bulk historical recalculation.
+Existing per-call usage updates and replay still replace that call's estimate
+through the normal idempotent ledger update, so a corrected or more complete
+usage report can change a previously displayed estimate. Usage reported by a
+runtime may omit cache-write counters even when the native model proxy observes
+them; the usage view and a turn's proxy-enforced budget are not invoice
+reconciliation.
+
 ## Historical ledger reconciliation
 
 The API can audit model calls created before atomic model-call and usage-ledger persistence was introduced. The workflow is disabled unless `MOSOO_COST_LEDGER_RECONCILIATION_MODE` is set to `audit` or `repair`:

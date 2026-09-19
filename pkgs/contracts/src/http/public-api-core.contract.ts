@@ -1,5 +1,12 @@
 import { PLATFORM_ID_INPUT_PATTERN } from "@mosoo/id";
-import type { AgentId, FileId, PublicThreadId, RuntimeEventId, SessionRunId } from "@mosoo/id";
+import type {
+  AgentId,
+  FileId,
+  PublicThreadId,
+  RuntimeEventId,
+  SessionModelCallId,
+  SessionRunId,
+} from "@mosoo/id";
 
 import type { AgentKind } from "../agent/agent.contract";
 import { SINGLE_PUT_THRESHOLD_BYTES } from "../file/file.contract";
@@ -17,6 +24,26 @@ import type { JsonObject } from "../validation/primitives.contract";
 export const PUBLIC_API_PREFIX = "/api";
 export const PUBLIC_API_VERSION_PREFIX = "/v1";
 export const PUBLIC_API_VERSION = "v1";
+export type PublicApiVersion = "v1" | "v2";
+
+export interface PublicThreadUsageEntry {
+  id: SessionModelCallId;
+  runId: SessionRunId;
+  provider: string;
+  model: string;
+  status: "started" | "completed" | "failed";
+  inputTokens: number | null;
+  outputTokens: number | null;
+  cacheReadTokens: number | null;
+  cacheCreationTokens: number | null;
+  reportedCostUsd: number | null;
+  usageContract: string | null;
+}
+
+export interface PublicThreadUsageResponse {
+  usage: PublicThreadUsageEntry[];
+  nextCursor: SessionModelCallId | null;
+}
 export const PUBLIC_THREAD_INPUT_TEXT_MAX_LENGTH = 32_000;
 export const PUBLIC_THREAD_USER_ID_MAX_LENGTH = 255;
 export const PUBLIC_THREAD_FILE_ID_MAX_LENGTH = 26;
@@ -94,6 +121,11 @@ export interface PublicThreadRunError {
 }
 
 export interface PublicThreadRunSummary {
+  budget?: {
+    capUsd: number;
+    estimatedCostUsd: number;
+    state: "available" | "settling" | "budget_exhausted" | "budget_usage_unavailable";
+  };
   completedAt: string | null;
   createdAt: string;
   error: PublicThreadRunError | null;
@@ -139,7 +171,7 @@ export interface PublicThreadEventResult {
 
 export type PublicThreadStatus = "IDLE" | "RESCHEDULING" | "RUNNING" | "TERMINATED";
 
-export interface PublicThreadSummary {
+export interface PublicThreadSummary<UserId extends string | null = string> {
   agent_id: AgentId;
   created_at: string;
   id: PublicThreadId;
@@ -149,37 +181,38 @@ export interface PublicThreadSummary {
   status: PublicThreadStatus;
   title: string | null;
   updated_at: string;
-  userId: string;
+  userId: UserId;
 }
 
 export interface PublicThreadLinks {
   thread: string;
 }
 
-export interface PublicThreadApiCreateThreadResponse {
+export interface PublicThreadApiCreateThreadResponse<UserId extends string | null = string> {
   links: PublicThreadLinks;
   run: PublicThreadRunSummary | null;
-  thread: PublicThreadSummary;
+  thread: PublicThreadSummary<UserId>;
 }
 
-export interface PublicThreadApiRetrieveThreadResponse {
+export interface PublicThreadApiRetrieveThreadResponse<UserId extends string | null = string> {
   links: PublicThreadLinks;
   run: PublicThreadRunSummary | null;
-  thread: PublicThreadSummary;
+  thread: PublicThreadSummary<UserId>;
 }
 
-export interface PublicThreadApiListThreadsResponse {
-  threads: PublicThreadSummary[];
+export interface PublicThreadApiListThreadsResponse<UserId extends string | null = string> {
+  threads: PublicThreadSummary<UserId>[];
 }
 
 export interface PublicThreadApiSendEventsRequest {
+  maxCostUsd?: number;
   events: PublicThreadEventInput[];
 }
 
-export interface PublicThreadApiSendEventsResponse {
+export interface PublicThreadApiSendEventsResponse<UserId extends string | null = string> {
   acceptedAt: string;
   events: PublicThreadEventResult[];
-  thread: PublicThreadSummary;
+  thread: PublicThreadSummary<UserId>;
   warnings: UserWarning[];
 }
 

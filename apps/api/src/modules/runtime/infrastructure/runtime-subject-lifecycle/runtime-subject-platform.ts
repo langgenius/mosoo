@@ -109,6 +109,7 @@ export async function restoreRuntimeSubjectBackup(
   subject: SandboxHandle,
   input: {
     readonly backup: ReadyRuntimeSubjectBackupRecord;
+    readonly localBucket: boolean;
     readonly runtimeSubjectId: string;
   },
 ): Promise<void> {
@@ -117,6 +118,7 @@ export async function restoreRuntimeSubjectBackup(
       subject.restoreBackup({
         dir: input.backup.dir,
         id: decodeSandboxBackupIdForPlatform(input.backup.id),
+        localBucket: input.localBucket,
       }),
       `Runtime subject restore for ${input.runtimeSubjectId}`,
     ),
