@@ -86,6 +86,32 @@ describe("cost pricing", () => {
     });
   });
 
+  test.each([
+    { model: "gpt-5.6-luna", atMs: Date.UTC(2026, 6, 30), before: [1, 6], after: [0.2, 1.2] },
+    { model: "gpt-5.6-terra", atMs: Date.UTC(2026, 6, 30), before: [2.5, 15], after: [2, 12] },
+    { model: "gpt-5.6-sol", atMs: Date.UTC(2026, 7, 21), before: [5, 30], after: [4, 20] },
+  ])("selects $model prices at the published reduction date", ({ model, atMs, before, after }) => {
+    for (const [pricedAtMs, rates] of [
+      [atMs - 1, before],
+      [atMs, after],
+    ] as const) {
+      const result = calculateUsageCost({
+        cacheCreationTokens: 100_000,
+        cacheReadTokens: 100_000,
+        inputTokens: 200_000,
+        model,
+        outputTokens: 10_000,
+        pricedAtMs,
+        provider: "openai",
+      });
+      expect(result.pricing).toMatchObject({
+        inputUsdPerMillion: rates[0],
+        outputUsdPerMillion: rates[1],
+      });
+      expect(result.totalCostUsd).toBeCloseTo(rates[0]! * 0.235 + rates[1]! * 0.01, 8);
+    }
+  });
+
   test("normalizes model IDs emitted by OpenCode-compatible providers", () => {
     const cases = [
       {
@@ -156,6 +182,7 @@ describe("cost pricing", () => {
       inputTokens: 272_000,
       model: "gpt-5.6-terra",
       outputTokens: 1_000,
+      pricedAtMs: Date.UTC(2026, 8, 19),
       provider: "openai",
     });
     const longContextResult = calculateUsageCost({
@@ -164,21 +191,22 @@ describe("cost pricing", () => {
       inputTokens: 272_001,
       model: "gpt-5.6-terra",
       outputTokens: 1_000,
+      pricedAtMs: Date.UTC(2026, 8, 19),
       provider: "openai",
     });
 
     expect(JSON.parse(thresholdResult.priceSnapshotJson ?? "{}")).toMatchObject({
-      inputUsdPerMillion: 2.5,
+      inputUsdPerMillion: 2,
       longContextApplied: false,
-      outputUsdPerMillion: 15,
+      outputUsdPerMillion: 12,
     });
     expect(JSON.parse(longContextResult.priceSnapshotJson ?? "{}")).toMatchObject({
-      cacheReadUsdPerMillion: 0.5,
-      cacheWriteUsdPerMillion: 6.25,
-      inputUsdPerMillion: 5,
+      cacheReadUsdPerMillion: 0.4,
+      cacheWriteUsdPerMillion: 5,
+      inputUsdPerMillion: 4,
       longContextApplied: true,
-      outputUsdPerMillion: 22.5,
+      outputUsdPerMillion: 18,
     });
-    expect(longContextResult.totalCostUsd).toBeCloseTo(0.995005, 8);
+    expect(longContextResult.totalCostUsd).toBeCloseTo(0.796004, 8);
   });
 });
