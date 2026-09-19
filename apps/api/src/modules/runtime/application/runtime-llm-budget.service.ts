@@ -3,6 +3,7 @@ import type { DriverInstanceId, ProjectId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { calculateUsageCost, findModelPricing } from "../../cost/domain/cost-pricing";
+import { normalizeUsageTokens } from "../../cost/domain/usage-contract";
 import {
   reserveSessionRunModelRequest,
   settleSessionRunModelRequest,
@@ -116,13 +117,21 @@ class ModelUsageObserver {
   cost(input: { model: string; provider: string; pricedAtMs: number }): number | null {
     if (!this.finished || this.invalidUsage || this.input === null || this.output === null)
       return null;
-    if (this.protocol !== "anthropic-messages" && this.cacheRead > this.input) return null;
-    const cost = calculateUsageCost({
-      ...input,
-      inputTokens: this.input + (this.protocol === "anthropic-messages" ? this.cacheRead : 0),
+    if (this.protocol !== "anthropic-messages" && this.cacheRead + this.cacheWrite > this.input)
+      return null;
+    const tokens = normalizeUsageTokens({
+      inputTokens: this.input,
       outputTokens: this.output,
       cacheReadTokens: this.cacheRead,
       cacheCreationTokens: this.cacheWrite,
+      usageContract:
+        this.protocol === "anthropic-messages"
+          ? "anthropic_bucketed"
+          : "openai_total_with_cached_breakdown",
+    });
+    const cost = calculateUsageCost({
+      ...input,
+      ...tokens,
     });
     const micros = Math.ceil(cost.totalCostUsd * 1_000_000);
     return cost.pricingStatus === "priced" && Number.isSafeInteger(micros) ? micros : null;

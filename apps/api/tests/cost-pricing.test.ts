@@ -96,7 +96,7 @@ describe("cost pricing", () => {
       [atMs, after],
     ] as const) {
       const result = calculateUsageCost({
-        cacheCreationTokens: 100_000,
+        cacheCreationTokens: 50_000,
         cacheReadTokens: 100_000,
         inputTokens: 200_000,
         model,
@@ -108,7 +108,7 @@ describe("cost pricing", () => {
         inputUsdPerMillion: rates[0],
         outputUsdPerMillion: rates[1],
       });
-      expect(result.totalCostUsd).toBeCloseTo(rates[0]! * 0.235 + rates[1]! * 0.01, 8);
+      expect(result.totalCostUsd).toBeCloseTo(rates[0]! * 0.1725 + rates[1]! * 0.01, 8);
     }
   });
 
@@ -208,5 +208,23 @@ describe("cost pricing", () => {
       outputUsdPerMillion: 18,
     });
     expect(longContextResult.totalCostUsd).toBeCloseTo(0.796004, 8);
+  });
+
+  test("includes separately normalized cache writes in the long-context threshold", () => {
+    for (const cacheCreationTokens of [72_000, 72_001]) {
+      const result = calculateUsageCost({
+        cacheCreationTokens,
+        cacheReadTokens: 100_000,
+        inputTokens: 200_000,
+        model: "gpt-5.6-luna",
+        outputTokens: 100,
+        pricedAtMs: Date.UTC(2026, 8, 19),
+        provider: "openai",
+      });
+      expect(JSON.parse(result.priceSnapshotJson ?? "{}")).toMatchObject({
+        longContextApplied: cacheCreationTokens > 72_000,
+        inputUsdPerMillion: cacheCreationTokens > 72_000 ? 0.4 : 0.2,
+      });
+    }
   });
 });

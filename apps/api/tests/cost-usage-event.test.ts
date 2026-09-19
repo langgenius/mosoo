@@ -164,7 +164,7 @@ describe("cost usage event", () => {
       agent_publication_state_at_run: "unpublished",
       cache_creation_tokens: 1,
       cache_read_tokens: 2,
-      input_tokens: 10,
+      input_tokens: 9,
       model: "run-model",
       output_tokens: 4,
       price_snapshot_json: null,
@@ -178,7 +178,7 @@ describe("cost usage event", () => {
     });
   });
 
-  test("prices known model usage from the persisted provider identity", async () => {
+  test("prices and replays known usage with normalized cache writes and persisted identity", async () => {
     const database = createUsageEventDatabase();
     const runContext = {
       ...RUN_CONTEXT,
@@ -204,6 +204,19 @@ describe("cost usage event", () => {
       nativeCallId: null,
       run: runContext,
       usage,
+    });
+
+    // A replay can correct an estimate stored under the previous normalization.
+    database.execute("UPDATE usage_event SET input_tokens = 1000, total_cost_usd_micros = 5400");
+    await recordRuntimeUsageEvent(database, {
+      callKey: "priced-call",
+      driverInstanceId: DRIVER_INSTANCE_ID,
+      nativeCallId: null,
+      run: runContext,
+      usage,
+    });
+    expect(await database.prepare("SELECT COUNT(*) AS count FROM usage_event").first()).toEqual({
+      count: 1,
     });
 
     const row = await database
@@ -240,16 +253,16 @@ describe("cost usage event", () => {
     expect(row).toMatchObject({
       cache_creation_tokens: 40,
       cache_read_tokens: 100,
-      input_tokens: 1_000,
+      input_tokens: 960,
       model: "gpt-5.4",
       output_tokens: 200,
       pricing_status: "priced",
       provider: "openai",
-      total_cost_usd_micros: 5_400,
+      total_cost_usd_micros: 5_300,
     });
     const priceSnapshot = JSON.parse(row?.price_snapshot_json ?? "{}") as Record<string, unknown>;
     expect(priceSnapshot).toMatchObject({
-      billableInputTokens: 900,
+      billableInputTokens: 860,
       cacheReadUsdPerMillion: 0.25,
       cacheWriteUsdPerMillion: 3.125,
       inputUsdPerMillion: 2.5,
@@ -318,11 +331,11 @@ describe("cost usage event", () => {
       pricing_status: "priced",
       provider: "kimi",
       runtime_id: "opencode",
-      total_cost_usd_micros: 1_671,
+      total_cost_usd_micros: 1_633,
     });
     const priceSnapshot = JSON.parse(row?.price_snapshot_json ?? "{}") as Record<string, unknown>;
     expect(priceSnapshot).toMatchObject({
-      billableInputTokens: 900,
+      billableInputTokens: 860,
       cacheReadUsdPerMillion: 0.16,
       inputUsdPerMillion: 0.95,
       model: "kimi-k2.6",

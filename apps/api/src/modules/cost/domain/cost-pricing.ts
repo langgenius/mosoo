@@ -561,7 +561,7 @@ export function calculateUsageCost(input: {
   const longContextApplied =
     pricing.provider === "openai" &&
     OPENAI_LONG_CONTEXT_MODEL_IDS.has(pricing.model) &&
-    input.inputTokens > OPENAI_LONG_CONTEXT_INPUT_THRESHOLD;
+    input.inputTokens + input.cacheCreationTokens > OPENAI_LONG_CONTEXT_INPUT_THRESHOLD;
   const inputPriceFactor = longContextApplied ? 2 : 1;
   const outputPriceFactor = longContextApplied ? 1.5 : 1;
   const effectivePricing: ModelPricing = {

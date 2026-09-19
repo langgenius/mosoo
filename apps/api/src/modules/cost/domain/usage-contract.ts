@@ -24,6 +24,7 @@ export interface UsageTokenInput {
 export interface NormalizedUsageTokens {
   cacheCreationTokens: number;
   cacheReadTokens: number;
+  /** Ordinary input plus cache reads; cache writes are a separate bucket. */
   inputTokens: number;
   outputTokens: number;
 }
@@ -41,7 +42,7 @@ export function normalizeUsageTokens(input: UsageTokenInput): NormalizedUsageTok
   return {
     cacheCreationTokens: input.cacheCreationTokens,
     cacheReadTokens: input.cacheReadTokens,
-    inputTokens: input.inputTokens,
+    inputTokens: Math.max(0, input.inputTokens - input.cacheCreationTokens),
     outputTokens: input.outputTokens,
   };
 }

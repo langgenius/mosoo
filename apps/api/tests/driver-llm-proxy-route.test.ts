@@ -390,6 +390,75 @@ describe("driver LLM proxy route", () => {
     expect(captured).toHaveLength(1);
   });
 
+  test.each([false, true])(
+    "does not spend an OpenAI cache write twice: streaming=%s",
+    async (streaming) => {
+      const { bindings, database } = await setupBudgetFixture("openai", 500);
+      const usage = {
+        input_tokens: 1000,
+        output_tokens: 100,
+        input_tokens_details: { cached_tokens: 100, cache_write_tokens: 800 },
+      };
+      const captured = captureUpstreamFetch(() =>
+        streaming
+          ? new Response(
+              `data: ${JSON.stringify({ type: "response.completed", response: { usage } })}\n\n`,
+              { headers: { "Content-Type": "text/event-stream" } },
+            )
+          : Response.json({ usage }),
+      );
+      const grant = await createLlmProxyGrant(bindings, {
+        modelId: "gpt-5.6-luna",
+        modelProtocol: "openai-responses",
+      });
+      const request = () =>
+        llmProxyRequest("/responses", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${grant}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ model: "gpt-5.6-luna", input: "test", stream: streaming }),
+        });
+      for (let call = 0; call < 2; call++) {
+        const response = await dispatch(bindings, request());
+        expect(response.status).toBe(200);
+        await response.text();
+      }
+      const budget = await database
+        .prepare("SELECT estimated_cost_usd_micros,active_request_id FROM session_run_budget")
+        .first();
+      expect(budget).toMatchObject({ estimated_cost_usd_micros: 684, active_request_id: null });
+      expect((await dispatch(bindings, request())).status).toBe(402);
+      expect(captured).toHaveLength(2);
+    },
+  );
+
+  test("rejects inconsistent OpenAI cache buckets as unavailable usage", async () => {
+    const { bindings } = await setupBudgetFixture("openai");
+    const captured = captureUpstreamFetch(() =>
+      Response.json({
+        usage: {
+          input_tokens: 1000,
+          output_tokens: 100,
+          input_tokens_details: { cached_tokens: 800, cache_write_tokens: 300 },
+        },
+      }),
+    );
+    const grant = await createLlmProxyGrant(bindings, {
+      modelId: "gpt-5.6-luna",
+      modelProtocol: "openai-responses",
+    });
+    const request = () =>
+      llmProxyRequest("/responses", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${grant}`, "Content-Type": "application/json" },
+        body: '{"model":"gpt-5.6-luna","input":"test"}',
+      });
+    await (await dispatch(bindings, request())).text();
+    const denied = await dispatch(bindings, request());
+    expect(denied.status).toBe(402);
+    expect(await denied.json()).toMatchObject({ code: "budget_usage_unavailable" });
+    expect(captured).toHaveLength(1);
+  });
+
   test("fails closed on truncated usage instead of treating it as zero cost", async () => {
     const { bindings } = await setupBudgetFixture();
     const captured = captureUpstreamFetch(
