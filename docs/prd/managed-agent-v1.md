@@ -1,10 +1,10 @@
 # Managed Agent v1: Remaining Execution Slices
 
-Status: target scope from the September 10, 2026 product review. Single-turn tasks and multi-turn continuation share the same durable Session contract. [SPEC](../SPEC.md) is the target contract; the remaining slices require implementation and release evidence.
+Status: target scope from the September 10, 2026 product review, with the owner-approved BYOK release boundary on September 19. Single-turn tasks and multi-turn continuation share the same durable Session contract. [SPEC](../SPEC.md) is the target contract; the remaining slices require implementation and release evidence.
 
 ## #546 — API-First Managed Agent Runtime
 
-An application supplies a Project key, Agent, input, and optional files. Mosoo owns execution, sandboxing, durable continuation, events, artifacts, usage, and cleanup. The application keeps its business logic, end-user identity, queue, validation, storage, and UI. Managed Codex and Claude Code are directly callable; saved private Agent configuration is optional and never requires publishing.
+An application supplies a Project key, Agent, input, and optional files. Mosoo owns execution, sandboxing, durable continuation, events, artifacts, usage, and cleanup. The application keeps its business logic, end-user identity, queue, validation, storage, and UI. The #582 release calls saved private Codex and Claude Code Agents using model credentials configured in the Project, without publishing. Platform-supplied, setup-free access remains separate #636 work.
 
 Both ghFind's single-turn evaluation and CSV analysis with follow-up are required acceptance paths. A single-turn integration does not restrict Session continuation. The parent and child issue descriptions follow this mapping, including removal of public historical-version selection and interactive approvals and deferral of typed Git infrastructure.
 
@@ -16,9 +16,9 @@ Both ghFind's single-turn evaluation and CSV analysis with follow-up are require
 
 Project is the shipped resource boundary: one account owns multiple Projects and each Project has multiple keys. Project settings provide key creation/revocation, with cross-Project denial for Agent configuration, execution, and files. Account control-plane and cross-Project access use console or CLI login with a distinct account credential. The completed cutover rejects old account tokens and requires CLI re-login; it does not assign existing keys to a default Project. Resources and history were preserved and the compatible CLI was released. Cloudflare accepted 153 user notices with sample inbox verification; see [#581 release evidence](https://github.com/langgenius/mosoo/issues/581#issuecomment-5582765337).
 
-## #582 — Managed Agents And Durable Sessions
+## #582 — Durable Sessions With Project Model Credentials
 
-Deliver the default-model, platform-funded first request and one public Session handle. Reuse runtime, files, events, usage, and checkpoints. Remove Pet/Cattle without removing native continuation.
+Deliver one public Session handle for saved private Agents with Project-owned model credentials (BYOK). Reuse runtime, files, events, usage, turn budgets, and checkpoints. Remove Pet/Cattle without removing native continuation. Platform model supply, recharge, and commercial billing are not #582 acceptance or closure requirements.
 
 The existing Thread API and conversation IDs can provide that handle. Preserve compatible names, routes, fields, and retries; #582 does not require cosmetic API replacement or an old-endpoint sunset. Run details may remain visible without being required for callers to continue or cancel work.
 
@@ -27,13 +27,13 @@ Session isolation replaces shared writable Agent machines. Before changing exist
 Require both acceptance paths:
 
 - **ghFind:** one evaluation input and fixed-commit repository material produce validated analysis JSON, evidence JSON, and a Markdown report through one Session. Repeated idempotent creation does not duplicate work. History and saved artifacts remain readable after runtime reclamation, without requiring a follow-up turn. The Agent may fetch a public repository at an exact commit using existing tools; caller-prepared file input is optional. Record and validate the actual material identity across retries. Typed Git mounting, private-repository authorization, and branch/PR workflows remain deferred.
-- **CSV analysis:** managed Codex and Claude Code execute real tools to produce verified reports, charts, and result data. Follow-up seconds or days later retains the same Session, workspace, native conversation, and admitted configuration, including after forced reclamation. Verify a context-dependent modification using prior files without re-supplying them, including workspace files outside published artifacts. Recovery remains available for at least 30 days after the last successful turn, renewed by successful follow-up, with explicit expiry and preserved history/artifacts. Distinguish controlled-clock retention tests from actual elapsed-time evidence for delayed live continuation.
+- **CSV analysis:** saved Codex and Claude Code Agents with Project model credentials execute real tools to produce verified reports, charts, and result data. Follow-up seconds or days later retains the same Session, workspace, native conversation, and admitted configuration, including after forced reclamation. Verify a context-dependent modification using prior files without re-supplying them, including workspace files outside published artifacts. Recovery remains available for at least 30 days after the last successful turn, renewed by successful follow-up, with explicit expiry and preserved history/artifacts. Distinguish controlled-clock retention tests from actual elapsed-time evidence for delayed live continuation.
 
 Keep checkpoint as the turn durability and safe-reclamation gate. Required artifacts, events, usage, and a ready checkpoint precede successful completion and reclamation of an uncommitted workspace. Follow-up uses committed state; restore or checkpoint failure is explicit. Acceptance must prove actual continuation, not just backup creation. Failure, cancellation, and budget exhaustion retain their actual outcomes and saved artifacts.
 
 Use full access while retaining isolation and defer interactive approvals. Include per-turn budgets, creation idempotency, status/history/SSE, cancellation, and busy rejection. No input queue, steering, or Webhooks.
 
-Private Agents are invoked by ID at their latest configuration, with immutable Session snapshots internally and no public version selector. That callable path belongs here even if remaining Builder cleanup lands in #584. Hosted provider funding and budget defaults need operational resolution before quickstart acceptance.
+Private Agents are invoked by ID at their latest configuration, with immutable Session snapshots internally and no public version selector. That callable path belongs here even if remaining Builder cleanup lands in #584. Configure and verify the turn-budget policy before releasing the BYOK execution guard. The provider charges the user’s account; Mosoo budget records enforce execution limits and are not a commercial balance or payment ledger.
 
 ## #583 — Remove Package Lifecycle
 
@@ -41,16 +41,20 @@ Remove packages, manifest-as-public-lifecycle, and Fork. Preserve reusable instr
 
 Retained private Agents are immediately callable by ID at their latest configuration. Internal immutable Session snapshots preserve admitted configuration; this slice does not introduce explicit historical-version invocation, package compatibility parsers, or a replacement distribution format.
 
-## #584 — Optional Configuration And Console
+## #584 — Configuration And Console
 
 Expose private Agent creation/update entirely through API and console, immediately callable after saving. Remove Publish/Unpublish and Draft/Live/version-selection experiences. Retain existing MCP and Skills capabilities. A new Session uses the latest saved configuration; existing Sessions retain their initial snapshots. Any retained Preview/Test action executes through the ordinary Session API and appears in the same Session records.
 
 Prioritize keys, API examples, Session records, artifacts, and usage in the console; Agent configuration is secondary. Input upload and output download suffice. New file-manager and online-editor work are deferred; this is not authorization to delete stored files.
 
+## #636 — Separate Model Supply And Commercial Billing
+
+The owner separated platform-supplied models, setup-free managed access, recharge, and commercial usage billing from #582 on September 19. Resolve the customer experience, pricing, funding, accounting, and any AI Gateway design before implementation of that commercial scope. It remains open and does not block the BYOK Session release. Existing turn budgets and truthful usage stay in #582; moving this scope does not imply that billing has shipped.
+
 ## Delivery Boundaries
 
 With #581 shipped, preserve dependency order #582 -> #583 -> #584, with a working, verifiable path and data-preservation/rollback obligations for each slice. Favor reuse and the smallest implementation meeting SPEC. The GitHub issue descriptions were aligned with this reviewed scope on September 10; implementation and release evidence are still required before closing them.
 
-Intentional breaking changes require a defined cutover, compatible client instructions, and Cloudflare user notification under the [release runbook](../production-deploy-verification.md#breaking-change-notification). The completed #581 key notice does not cover a later Session or Builder release. Resolve default model supply/budgets before accepting the corresponding capability. Existing Cloud customer evidence determines the migration work; terminology alone does not.
+Intentional breaking changes require a defined cutover, compatible client instructions, and Cloudflare user notification under the [release runbook](../production-deploy-verification.md#breaking-change-notification). The completed #581 key notice does not cover a later Session or Builder release. Resolve BYOK execution-budget defaults for #582; platform supply and commercial funding decisions belong to #636. Existing Cloud customer evidence determines the migration work; terminology alone does not.
 
 Current-state PRDs still describe Project/Thread, publishing, Agent Type, and package behavior. Update those notes as their implementation slices land; do not describe targets as shipped capabilities.

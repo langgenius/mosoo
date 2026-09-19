@@ -76,9 +76,10 @@ Project key access to another Project or invent missing recovery state.
 The new version is required because latest-saved admission differs from v1's
 published/live behavior. It does not rename Thread resources or retire v1.
 Existing v1 callers keep their published configuration and required `userId`;
-v2-created Threads are excluded from v1's public-channel view. Platform-funded
-first use, budgets, and the shared-workspace migration are separate
-#582 slices and are not established by this entry point.
+v2-created Threads are excluded from v1's public-channel view. The #582 release
+requires a model-provider account configured in the Project (BYOK). Turn budgets
+and the shared-workspace transition remain #582 work; platform-funded first use,
+recharge, and commercial billing are independent #636 scope.
 
 New isolated v2 Sessions admit a 30-day recovery period from the last successful
 turn, renewed on success. Expired continuation returns `readiness_blocked` with

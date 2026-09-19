@@ -1,6 +1,6 @@
 # Mosoo Product Spec
 
-Status: canonical target product contract, with API compatibility and Cloud migration clarified on September 18, 2026. Single-turn tasks and multi-turn continuation share one durable Session contract. This document describes intended behavior; source, acceptance checks, and release evidence establish what is actually shipped.
+Status: canonical target product contract, with API compatibility and Cloud migration clarified on September 18, 2026, and the owner-approved BYOK release scope on September 19. Single-turn tasks and multi-turn continuation share one durable Session contract. This document describes intended behavior; source, acceptance checks, and release evidence establish what is actually shipped.
 
 ## 1. Product Thesis
 
@@ -21,19 +21,19 @@ One admitted input starts one turn, which may include multiple model requests an
 
 ## 2. First Request And Ownership
 
-- A developer creates one Project API key and completes a real task without first creating or publishing an Agent, selecting an Environment, or configuring model-provider credentials.
-- Managed Codex and Claude Code Agents are immediately callable. Already integrated runtimes use a shared lifecycle; developer-supplied runtime integration is outside v1.
-- Each managed Agent has a visible default model. Model overrides are supported, but first use does not require choosing a model. The actual model is recorded and fixed within the Session, with no silent model or runtime fallback.
-- The hosted platform supplies default model access. Bring your own key (BYOK) remains optional where already supported. Default access does not promise free or unlimited inference.
+- The #582 release uses bring your own key (BYOK): a developer configures a model-provider account in the Project, saves or selects a private Agent, and creates a Project API key. Invocation requires no Agent Publish, App Deployment, or Environment setup.
+- Saved Codex and Claude Code Agents are callable immediately after configuration. Already integrated runtimes use a shared lifecycle; developer-supplied runtime integration is outside v1.
+- The Agent’s configured runtime and model are visible, recorded, and fixed within the Session, with no silent fallback. Model credentials remain Project-owned; the provider charges that account.
+- Platform-supplied models, setup-free managed selectors, recharge, and commercial usage billing are separate #636 work. They do not block #582 acceptance or closure. No free or unlimited inference is promised.
 - Project is the tenant and resource-ownership boundary. An account may own multiple Projects, each with multiple API keys. A key grants access only to its Project, including when the same account owns other Projects.
 - Project keys serve trusted application backends. They may configure Agents, execute Sessions, and access files only within their Project, without fine-grained scopes. They cannot manage accounts, delete Projects, or manage API keys.
 - Account owners use the console or CLI login for account management and cross-Project operations. CLI login credentials are distinct from application keys and may execute work in an explicitly selected owned Project.
 - The completed #581 authentication cutover rejects old manually created account tokens and old CLI credentials. Users create new Project keys for integrations and log in again for CLI access; no default-Project reassignment is performed.
 - Revoking a Project key rejects subsequent requests but does not cancel work already admitted. The owner or another active key in the same Project can inspect and cancel that work.
 
-## 3. Optional Private Agents
+## 3. Saved Private Agents
 
-- Developers may save reusable instructions, Skills, and existing MCP connection references as Project-private Agents. Creation and updates are available through both API and console; programmatic configuration does not require the console.
+- Developers save reusable instructions, Skills, and existing MCP connection references as Project-private Agents. Creation and updates are available through both API and console; programmatic configuration does not require the console.
 - Saving makes the Agent immediately callable.
 - Public invocation uses an Agent ID. New Sessions resolve its latest configuration; there is no public historical-version selector.
 - Each Session retains its initial configuration snapshot internally. Updating an Agent affects new Sessions only; existing Sessions keep their instructions, Skills, and tool configuration.
@@ -74,10 +74,10 @@ A checkpoint represents committed state that can be restored. It is the durabili
 
 - Integrated runtimes use full-access execution within the Session sandbox and authorized resources. v1 does not provide interactive tool approvals.
 - Full access retains Project isolation, credential protection, resource authorization checks, and budget enforcement.
-- Each turn has a platform default budget. Callers may set a cap within platform limits. Once reached, stop issuing new model requests, preserve available artifacts, and explicitly report budget exhaustion.
+- Each turn has a configured default model-cost estimate budget. Callers may set a cap within deployment limits. This execution guard remains in #582 for BYOK: once reached, stop issuing new model requests, preserve available artifacts, and explicitly report budget exhaustion.
 - In-flight requests may cause a small overshoot; an exact hard financial ceiling is not promised.
 - Record truthful usage and distinguish measured values from cost estimates. Settlement, invoices, subscriptions, and payments are outside this refactor.
-- Default budgets, allowed caps, and platform provider funding and operational limits must be defined before default model access ships. This document does not assign values that have not been decided.
+- Configure and verify default turn budgets and allowed caps before releasing that guard. Platform funding, customer balances, and commercial pricing belong to #636; budget records are not a wallet or payment ledger. This document does not assign undecided production values.
 
 ## 6. API And Console
 
@@ -87,14 +87,14 @@ A checkpoint represents committed state that can be restored. It is the durabili
 - Creation supports an optional `Idempotency-Key`: within a Project, the same key and request return the original Session without duplicate work; reusing the key with a different request fails explicitly. Without a key, create a new Session.
 - Prefer reusing existing mechanisms for follow-up idempotency instead of building a separate orchestration system. Deduplication details and key retention are implementation decisions; creation idempotency does not guarantee exactly-once external side effects.
 - Support input file upload and artifact download. Users request modifications through Agent instructions; v1 does not require an online file editor or file-manager UI.
-- Console onboarding prioritizes key creation and a minimal API example. After first use, Session records, status, artifacts, and usage are the primary surfaces. Private Agent configuration is secondary.
+- Console onboarding explains Project provider configuration, saving a private Agent, key creation, and a minimal API example. After setup, Session records, status, artifacts, and usage are the primary surfaces.
 - Builder is a console client of the same Agent configuration and Session APIs. Any retained Preview/Test action uses an ordinary Session and appears in the same operational Session records.
 
 ## 7. Acceptance: Single-Turn Tasks And Multi-Turn Continuation
 
 ### Single-Turn Scenario: ghFind Repository Evaluation
 
-1. ghFind uses a Project key to create or select a private evaluator Agent that is callable immediately after saving.
+1. ghFind uses a Project with configured model credentials and a Project key to create or select a private evaluator Agent that is callable immediately after saving.
 2. Submit one evaluation input and fixed-revision repository material, receiving one Session ID.
 3. Require no Agent Publish, Environment setup, App Deployment, or additional public Run ID.
 4. Execute real tools and produce analysis JSON, evidence JSON, and a Markdown report.
@@ -107,8 +107,8 @@ A checkpoint represents committed state that can be restored. It is the durabili
 
 ### Multi-Turn Scenario: CSV Analysis And Follow-Up
 
-1. Create a Project API key and upload a CSV.
-2. Invoke a managed Agent with analysis instructions without configuring a provider, publishing an Agent, or selecting an Environment. Both Codex and Claude Code must execute real tools.
+1. Configure a model-provider account in the Project, save or select a private Agent, create a Project API key, and upload a CSV.
+2. Invoke that Agent with analysis instructions without publishing it or selecting an Environment. Both Codex and Claude Code must execute real tools using the configured Project credentials.
 3. Read status and events, then download an analysis report, chart, and result data. Verify calculations against a known fixture and check artifact formats.
 4. Request modifications seconds later in the same Session and verify that the Agent uses prior conversation context and existing working files, including files outside the published artifacts, without being given that state again.
 5. Repeat continuation after a multi-day idle interval within the recovery period and after forced runtime reclamation. Verify the same Session ID, admitted configuration, context-dependent task result, and prior file contents. Use controlled time and persisted fixtures for deterministic retention checks; record actual elapsed time separately in live delayed-continuation evidence. A clock-advanced test is not evidence that a live Session survived several days.
@@ -140,7 +140,7 @@ These are not a backlog to restore automatically after v1. Internal configuratio
 - Typed Git repository mounting, private repository authorization, and branch/PR workflows.
 - Developer-supplied runtimes, a connector marketplace, and new local-process MCP support.
 - Interactive tool approvals, Webhooks, online file editing, and a file-manager UI.
-- Billing settlement, subscriptions, and payments.
+- Platform-supplied models and setup-free managed selectors; recharge, commercial usage billing, settlement, subscriptions, and payments (#636).
 
 These boundaries do not prohibit an Agent from using existing authorized tools for an individual task.
 
@@ -148,15 +148,17 @@ These boundaries do not prohibit an Agent from using existing authorized tools f
 
 Existing code provides runtime adapters, sandboxes, Thread/Run history, checkpoint recovery, files, MCP, events, and usage. Project keys and separate CLI login shipped in #581. The new Session contract and remaining product cleanup still need implementation and real acceptance evidence. This document does not establish production reliability, adoption, willingness to pay, or task economics.
 
-| Issue | Status And Responsibility                                                                                                                                       |
-| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| #546  | Overall Vision: an API-first managed Agent runtime.                                                                                                             |
-| #579  | Closed: remove Channels from Mosoo main.                                                                                                                        |
-| #580  | Closed: remove App Deployment and bound-capability coupling.                                                                                                    |
-| #581  | Shipped: multiple Projects, Project keys, separate CLI login, authentication cutover, and user notification.                                                    |
-| #582  | Remaining: managed Agents and one durable Session API, single-turn and multi-turn acceptance, checkpoint and recovery, and removal of the Pet/Cattle dual type. |
-| #583  | Remaining: remove Package, Manifest, and Fork product lifecycles while preserving necessary configuration and history.                                          |
-| #584  | Remaining: optional private Agent configuration and testing, without publishing or public version selection.                                                    |
+| Issue | Status And Responsibility                                                                                                                                                     |
+| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| #546  | Overall Vision: an API-first managed Agent runtime.                                                                                                                           |
+| #579  | Closed: remove Channels from Mosoo main.                                                                                                                                      |
+| #580  | Closed: remove App Deployment and bound-capability coupling.                                                                                                                  |
+| #581  | Shipped: multiple Projects, Project keys, separate CLI login, authentication cutover, and user notification.                                                                  |
+| #582  | Remaining: BYOK private Agents and one durable Session API, single-turn and multi-turn acceptance, budgets, checkpoint and recovery, and removal of the Pet/Cattle dual type. |
+| #583  | Remaining: remove Package, Manifest, and Fork product lifecycles while preserving necessary configuration and history.                                                        |
+| #584  | Remaining: private Agent configuration and console cleanup, without publishing or public version selection.                                                                   |
+
+#636 separately tracks platform model supply, setup-free managed access, recharge, and commercial usage billing; it is not a #582 dependency.
 
 Remaining work follows #582 -> #583 -> #584, with a working acceptance path and a migration rollback point for each slice; see the [execution scope mapping](./prd/managed-agent-v1.md). #581 has [release evidence](https://github.com/langgenius/mosoo/issues/581#issuecomment-5582765337). The issue scope follows this contract: retain ghFind alongside multi-turn acceptance, defer typed Git infrastructure and interactive approvals, and remove public historical-version selection.
 
@@ -178,6 +180,7 @@ The completed #581 key notice does not cover later Session or Builder changes. F
 
 ## 11. Open Decisions
 
-1. **Default model access and cost controls:** concrete default models, hosted provider supply, default turn budgets, allowed caps, and operational limits.
+1. **#582 execution guard:** production default turn budgets, allowed caps, and their operational limits for BYOK.
+2. **Separate #636 commercialization:** platform model supply, default models, customer recharge, commercial pricing/billing, and financial limits. These decisions do not block the BYOK #582 release.
 
 Resolve these before accepting and shipping the corresponding capabilities.
