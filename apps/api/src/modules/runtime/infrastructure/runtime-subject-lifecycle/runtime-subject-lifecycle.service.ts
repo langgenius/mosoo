@@ -9,7 +9,6 @@ import type {
   ProjectId,
   RuntimeOperationId,
   SandboxId,
-  SandboxSessionId,
   SessionId,
   SessionRunId,
 } from "@mosoo/id";
@@ -33,13 +32,11 @@ import type { RuntimeDiagnosticContext } from "../../application/runtime-diagnos
 import type { RuntimeTimingRecorder } from "../../application/session-runs/session-runtime-timing";
 import {
   getRuntimeKindPolicy,
-  getRuntimeSubjectInactiveDeadline,
   runtimeCheckpointRulesInclude,
 } from "../../domain/runtime-kind-policy";
 import type { SandboxNetworkConstraints } from "../../domain/sandbox-network-constraints";
 import { isRuntimeSandboxLocalBucketEnabled } from "../runtime-sandbox-bucket-mount";
 import type { SandboxHandle } from "../sandbox-handles";
-import { deleteActiveSandboxConversationSession } from "../sandbox-session/sandbox-conversation-session-delete";
 import {
   recordRuntimeRunLeaseAcquiredOutcome,
   recordRuntimeRunLeaseReleased,
@@ -61,7 +58,6 @@ import {
 import {
   claimRuntimeSubjectActivation,
   ensureRuntimeSubjectId,
-  getRuntimeConversationSessionState,
   getRuntimeSubjectActivationRecord,
   markRuntimeSubjectActivationDestroying,
   markRuntimeSubjectActivationFailed,
@@ -69,9 +65,6 @@ import {
   markRuntimeSubjectRestoreApplied,
   markRuntimeSubjectRestoring,
   preemptRuntimeSubjectActivationClaim,
-  recordRuntimeConversationSessionActive,
-  recordRuntimeConversationSessionClosed,
-  recordRuntimeConversationSessionError,
 } from "./runtime-subject-store";
 import type { RuntimeSubjectActivationRecord } from "./runtime-subject-store";
 import type { ReadyRuntimeSubjectBackupRecord } from "./runtime-subject-store";
@@ -353,70 +346,6 @@ export class RuntimeSubjectLifecycleService {
     }
 
     return { subject };
-  }
-
-  async activateConversationSession(input: {
-    readonly sandboxSessionId: SandboxSessionId;
-    readonly cwd: string;
-    readonly now: number;
-    readonly originJson: string;
-    readonly runtimeSubjectId: SandboxId;
-    readonly sessionId: SessionId;
-  }): Promise<void> {
-    await recordRuntimeConversationSessionActive(this.#bindings.DB, input);
-  }
-
-  async failConversationSession(input: {
-    readonly sandboxSessionId: SandboxSessionId;
-    readonly cwd: string;
-    readonly errorCode: RuntimeSubjectErrorCode;
-    readonly message: string;
-    readonly now: number;
-    readonly originJson: string;
-    readonly runtimeSubjectId: SandboxId;
-    readonly sessionId: SessionId;
-  }): Promise<void> {
-    await recordRuntimeConversationSessionError(this.#bindings.DB, input);
-  }
-
-  async closeConversationSession(input: {
-    readonly runtimeSubjectId: SandboxId;
-    readonly sessionId: SessionId;
-  }): Promise<void> {
-    const state = await getRuntimeConversationSessionState(this.#bindings.DB, input);
-
-    if (!state || state.status !== "active") {
-      return;
-    }
-
-    const now = currentTimestampMs();
-
-    await deleteActiveSandboxConversationSession(this.#bindings, {
-      sandboxSessionId: state.sandboxSessionId,
-      sandboxId: input.runtimeSubjectId,
-    });
-
-    if (state.agentId) {
-      await appendRuntimeDiagnosticEvent(this.#bindings, {
-        eventName: RUNTIME_DIAGNOSTIC_EVENT.sandboxSessionDestroyed.name,
-        sessionId: input.sessionId,
-        value: {
-          ...toRuntimeDiagnosticBaseValue({
-            agentId: state.agentId,
-            sessionId: input.sessionId,
-          }),
-          reason: "runtime_subject_session_closed",
-          sandboxId: input.runtimeSubjectId,
-        },
-      });
-    }
-
-    await recordRuntimeConversationSessionClosed(this.#bindings.DB, {
-      inactiveDeadlineAt: getRuntimeSubjectInactiveDeadline(getRuntimeKindPolicy(state.kind), now),
-      now,
-      runtimeSubjectId: input.runtimeSubjectId,
-      sessionId: input.sessionId,
-    });
   }
 
   async acquireRunLease(input: {

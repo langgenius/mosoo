@@ -10,7 +10,11 @@ import { createPlatformId } from "@mosoo/id";
 import type { SandboxId, SandboxSessionId, SessionId } from "@mosoo/id";
 import { and, desc, eq, exists, inArray, isNull, lte, notExists, or, sql } from "drizzle-orm";
 
-import { getAppDatabase, runAppDatabaseBatch } from "../../../../platform/db/drizzle";
+import {
+  getAppDatabase,
+  getD1ChangeCount,
+  runAppDatabaseBatch,
+} from "../../../../platform/db/drizzle";
 import {
   getRuntimeKindPolicy,
   getRuntimeSubjectInactiveDeadline,
@@ -316,39 +320,36 @@ export async function ensureRuntimeConversationSessionRecord(
   return created;
 }
 
+interface ConversationSessionBinding {
+  readonly expectedSandboxSessionId: SandboxSessionId;
+  readonly runtimeSubjectId: SandboxId;
+  readonly sessionId: SessionId;
+}
+
+function conversationBindingPredicate(input: ConversationSessionBinding) {
+  return and(
+    eq(sandboxSessionsTable.sessionId, input.sessionId),
+    eq(sandboxSessionsTable.sandboxId, input.runtimeSubjectId),
+    eq(sandboxSessionsTable.sandboxSessionId, input.expectedSandboxSessionId),
+  );
+}
+
 export async function recordRuntimeConversationSessionError(
   database: D1Database,
-  input: {
-    readonly sandboxSessionId: SandboxSessionId;
-    readonly cwd: string;
+  input: ConversationSessionBinding & {
     readonly message: string;
     readonly errorCode: RuntimeSubjectErrorCode;
     readonly now: number;
-    readonly originJson: string;
-    readonly runtimeSubjectId: SandboxId;
-    readonly sessionId: SessionId;
   },
 ): Promise<void> {
   await runAppDatabaseBatch(database, (appDb) => [
     appDb
-      .insert(sandboxSessionsTable)
-      .values({
-        sandboxSessionId: input.sandboxSessionId,
-        createdAt: input.now,
-        cwd: input.cwd,
-        originJson: input.originJson,
-        sandboxId: input.runtimeSubjectId,
-        sessionId: input.sessionId,
+      .update(sandboxSessionsTable)
+      .set({
         status: "error",
         updatedAt: input.now,
       })
-      .onConflictDoUpdate({
-        set: {
-          status: "error",
-          updatedAt: sql`excluded.updated_at`,
-        },
-        target: sandboxSessionsTable.sessionId,
-      }),
+      .where(conversationBindingPredicate(input)),
     appDb
       .update(sandboxesTable)
       .set({
@@ -366,6 +367,12 @@ export async function recordRuntimeConversationSessionError(
         and(
           eq(sandboxesTable.id, input.runtimeSubjectId),
           inArray(sandboxesTable.status, ["restoring", "active"]),
+          exists(
+            appDb
+              .select({ sessionId: sandboxSessionsTable.sessionId })
+              .from(sandboxSessionsTable)
+              .where(conversationBindingPredicate(input)),
+          ),
         ),
       ),
   ]);
@@ -373,13 +380,10 @@ export async function recordRuntimeConversationSessionError(
 
 export async function recordRuntimeConversationSessionActive(
   database: D1Database,
-  input: {
+  input: ConversationSessionBinding & {
     readonly sandboxSessionId: SandboxSessionId;
     readonly cwd: string;
     readonly now: number;
-    readonly originJson: string;
-    readonly runtimeSubjectId: SandboxId;
-    readonly sessionId: SessionId;
   },
 ): Promise<void> {
   const petInactiveDeadlineAt = getRuntimeSubjectInactiveDeadline(
@@ -387,28 +391,9 @@ export async function recordRuntimeConversationSessionActive(
     input.now,
   );
 
-  await runAppDatabaseBatch(database, (appDb) => [
-    appDb
-      .insert(sandboxSessionsTable)
-      .values({
-        sandboxSessionId: input.sandboxSessionId,
-        createdAt: input.now,
-        cwd: input.cwd,
-        originJson: input.originJson,
-        sandboxId: input.runtimeSubjectId,
-        sessionId: input.sessionId,
-        status: "active",
-        updatedAt: input.now,
-      })
-      .onConflictDoUpdate({
-        set: {
-          sandboxSessionId: sql`excluded.cloudflare_session_id`,
-          cwd: sql`excluded.cwd`,
-          status: "active",
-          updatedAt: sql`excluded.updated_at`,
-        },
-        target: sandboxSessionsTable.sessionId,
-      }),
+  // Remote open/close calls can finish after a rebind or a newer execution
+  // session. Both writes compare the binding read before the remote operation.
+  const results = await runAppDatabaseBatch(database, (appDb) => [
     appDb
       .update(sandboxesTable)
       .set({
@@ -421,17 +406,38 @@ export async function recordRuntimeConversationSessionActive(
         `,
         updatedAt: input.now,
       })
-      .where(eq(sandboxesTable.id, input.runtimeSubjectId)),
+      .where(
+        and(
+          eq(sandboxesTable.id, input.runtimeSubjectId),
+          exists(
+            appDb
+              .select({ sessionId: sandboxSessionsTable.sessionId })
+              .from(sandboxSessionsTable)
+              .where(conversationBindingPredicate(input)),
+          ),
+        ),
+      ),
+    appDb
+      .update(sandboxSessionsTable)
+      .set({
+        sandboxSessionId: input.sandboxSessionId,
+        cwd: input.cwd,
+        status: "active",
+        updatedAt: input.now,
+      })
+      .where(conversationBindingPredicate(input)),
   ]);
+
+  if (getD1ChangeCount((results as readonly unknown[])[1]) === 0) {
+    throw new Error("Sandbox session binding changed during activation.");
+  }
 }
 
 export async function recordRuntimeConversationSessionClosed(
   database: D1Database,
-  input: {
+  input: ConversationSessionBinding & {
     readonly inactiveDeadlineAt: number | null;
     readonly now: number;
-    readonly runtimeSubjectId: SandboxId;
-    readonly sessionId: SessionId;
   },
 ): Promise<void> {
   await runAppDatabaseBatch(database, (appDb) => [
@@ -441,7 +447,7 @@ export async function recordRuntimeConversationSessionClosed(
         status: "closed",
         updatedAt: input.now,
       })
-      .where(eq(sandboxSessionsTable.sessionId, input.sessionId)),
+      .where(conversationBindingPredicate(input)),
     appDb
       .update(sandboxesTable)
       .set({
@@ -451,6 +457,12 @@ export async function recordRuntimeConversationSessionClosed(
       .where(
         and(
           eq(sandboxesTable.id, input.runtimeSubjectId),
+          exists(
+            appDb
+              .select({ sessionId: sandboxSessionsTable.sessionId })
+              .from(sandboxSessionsTable)
+              .where(conversationBindingPredicate(input)),
+          ),
           notExists(activeConversationSessionQuery(appDb, input.runtimeSubjectId)),
           notExists(runLeaseQuery(appDb, input.runtimeSubjectId)),
         ),

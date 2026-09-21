@@ -20,7 +20,11 @@ mock.module("@cloudflare/sandbox", () => ({
   },
 }));
 
-const { closeIdleCattleConversationSession, ensureSandboxConversationSession } =
+const {
+  closeIdleCattleConversationSession,
+  closeSandboxConversationSession,
+  ensureSandboxConversationSession,
+} =
   await import("../src/modules/runtime/infrastructure/sandbox-session/sandbox-conversation-session.service");
 
 const ORIGIN = {
@@ -60,6 +64,8 @@ function createConversationSessionDatabase(kind: AgentKind = "pet"): SqliteD1Dat
       id text PRIMARY KEY NOT NULL,
       inactive_deadline_at integer,
       kind text NOT NULL,
+      last_error text,
+      last_error_code text,
       status text DEFAULT 'active' NOT NULL,
       status_changed_at integer DEFAULT 0 NOT NULL,
       status_event text DEFAULT 'runtime_subject.active' NOT NULL,
@@ -259,6 +265,8 @@ function createSandbox(
   options: {
     cwdHasContent?: boolean;
     deleteSessionError?: Error;
+    onOpen?: () => Promise<void>;
+    onDelete?: () => Promise<void>;
     onRestore?: (backup: { readonly dir: string; readonly id: string }) => void;
     onWriteFile?: (path: string) => void;
     restoreError?: Error;
@@ -276,9 +284,11 @@ function createSandbox(
       return { dir: "/backup", id: "backup-1" };
     },
     async createSession() {
+      await options.onOpen?.();
       return executionSession;
     },
     async deleteSession(sessionId) {
+      await options.onDelete?.();
       if (options.deleteSessionError) {
         throw options.deleteSessionError;
       }
@@ -287,6 +297,7 @@ function createSandbox(
     },
     async destroy() {},
     async getSession() {
+      await options.onOpen?.();
       return executionSession;
     },
     async mountBucket() {},
@@ -342,6 +353,86 @@ function createInput(sandbox: SandboxHandle, kind: AgentKind = "pet") {
     sessionId: "session-1",
   };
 }
+
+describe("conversation callbacks after a binding change", () => {
+  for (const change of ["sandbox", "execution session", "deleted"] as const) {
+    for (const operation of ["activate", "close"] as const) {
+      test(`late ${operation} leaves the ${change} replacement intact`, async () => {
+        const database = createConversationSessionDatabase();
+        await insertConversationSession(database, { status: "active" });
+        let expected: unknown;
+        const beforeSandbox = await database.prepare("SELECT * FROM sandbox").all();
+        const replaceBinding = async () => {
+          if (change === "deleted") {
+            database.execute("DELETE FROM sandbox_session WHERE session_id = 'session-1'");
+          } else {
+            database.execute(`
+              UPDATE sandbox_session SET
+                ${change === "sandbox" ? "sandbox_id = '01J0000000000000000000000E'," : ""}
+                cloudflare_session_id = '01J00000000000000000000002',
+                status = 'active', updated_at = 999
+              WHERE session_id = 'session-1'
+            `);
+          }
+          expected = await database.prepare("SELECT * FROM sandbox_session").all();
+        };
+        const sandbox = createSandbox(
+          operation === "activate" ? { onOpen: replaceBinding } : { onDelete: replaceBinding },
+        );
+
+        if (operation === "activate") {
+          const result = await ensureSandboxConversationSession(
+            createBindings(database),
+            createInput(sandbox),
+          ).then(
+            () => null,
+            (error: unknown) => error,
+          );
+          expect(await database.prepare("SELECT * FROM sandbox_session").all()).toEqual(expected);
+          expect(result).toBeInstanceOf(Error);
+          if (!(result instanceof Error)) {
+            throw new Error("Stale activation unexpectedly succeeded.");
+          }
+          expect(result.message).toContain("binding changed");
+        } else {
+          await closeSandboxConversationSession(createBindings(database, sandbox), {
+            sandboxId: "01J0000000000000000000000D",
+            sessionId: "session-1",
+          });
+          expect(await database.prepare("SELECT * FROM sandbox_session").all()).toEqual(expected);
+        }
+        expect(await database.prepare("SELECT * FROM sandbox").all()).toEqual(beforeSandbox);
+      });
+    }
+  }
+
+  test.each(["pet", "cattle"] as const)(
+    "a matching %s activation failure still records its error",
+    async (kind) => {
+      const database = createConversationSessionDatabase(kind);
+      await insertConversationSession(database, { status: "closed" });
+      database.execute(`
+      CREATE TRIGGER fail_activation BEFORE UPDATE ON sandbox_session
+      WHEN NEW.status = 'active'
+      BEGIN SELECT RAISE(ABORT, 'injected activation failure'); END;
+    `);
+
+      await expect(
+        ensureSandboxConversationSession(
+          createBindings(database),
+          createInput(createSandbox(), kind),
+        ),
+      ).rejects.toThrow("injected activation failure");
+      expect(await readConversationSession(database)).toMatchObject({ status: "error" });
+      expect(await database.prepare("SELECT status, last_error_code FROM sandbox").first()).toEqual(
+        {
+          status: "cold",
+          last_error_code: "runtime.conversation_mount_failed",
+        },
+      );
+    },
+  );
+});
 
 describe("ensureSandboxConversationSession", () => {
   test("reuses an active session without preparing directories", async () => {

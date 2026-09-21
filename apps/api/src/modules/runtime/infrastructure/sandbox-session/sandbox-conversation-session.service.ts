@@ -253,10 +253,10 @@ export async function ensureSandboxConversationSession(
   try {
     await measureOptional(input.timing, "conversation.activateRecord", () =>
       recordRuntimeConversationSessionActive(bindings.DB, {
+        expectedSandboxSessionId: sessionRecord.sandboxSessionId,
         sandboxSessionId,
         cwd,
         now,
-        originJson: JSON.stringify(frozenOrigin),
         runtimeSubjectId: input.sandboxId,
         sessionId: input.sessionId,
       }),
@@ -266,12 +266,10 @@ export async function ensureSandboxConversationSession(
       error instanceof Error ? error.message : "Sandbox conversation session activation failed.";
 
     await recordRuntimeConversationSessionError(bindings.DB, {
-      sandboxSessionId,
-      cwd,
+      expectedSandboxSessionId: sessionRecord.sandboxSessionId,
       errorCode: "runtime.conversation_mount_failed",
       message,
       now,
-      originJson: JSON.stringify(frozenOrigin),
       runtimeSubjectId: input.sandboxId,
       sessionId: input.sessionId,
     });
@@ -392,6 +390,7 @@ async function finalizeSandboxConversationClose(
   } finally {
     // Remote cleanup must not strand the local subject outside reclamation.
     await recordRuntimeConversationSessionClosed(bindings.DB, {
+      expectedSandboxSessionId: input.state.sandboxSessionId,
       inactiveDeadlineAt: getRuntimeSubjectInactiveDeadline(
         getRuntimeKindPolicy(input.state.kind),
         now,

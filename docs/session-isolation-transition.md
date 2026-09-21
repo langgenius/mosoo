@@ -142,6 +142,15 @@ preflight followed by unconditional independent updates is not a concurrency gat
 Test that a conflicting admission or changed source leaves all original rows and
 objects intact.
 
+Late remote callbacks also cross this boundary. Conversation activation, error
+recording, and close now compare the original Sandbox and execution-session ID
+within their D1 writes. A callback from the old binding cannot change the replacement
+or recreate a removed binding. The regression tests replace or delete the binding
+during the actual remote open/close seam and verify that stale activation and its
+error cleanup, as well as stale close, leave both records unchanged. This fence
+does not replace the production admission/drain gate or stop an already running
+Driver; the conversion executor must still verify those preconditions.
+
 ## Rollback and release
 
 Before accepting new work on a converted Session, prove both data restoration and
