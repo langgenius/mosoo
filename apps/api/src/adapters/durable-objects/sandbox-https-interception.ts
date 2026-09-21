@@ -18,8 +18,13 @@ export function configureSandboxHttpsInterception(
   const envVars = { ...sandbox.envVars };
   if (enabled) {
     envVars["SANDBOX_INTERCEPT_HTTPS"] = "1";
+    // Bun reads additional roots at process startup. The SDK installs the CA
+    // later, which covers subprocess curl but not its own multipart fetches.
+    envVars["NODE_EXTRA_CA_CERTS"] =
+      envVars["SANDBOX_CA_CERT"] ?? "/etc/cloudflare/certs/cloudflare-containers-ca.crt";
   } else {
     delete envVars["SANDBOX_INTERCEPT_HTTPS"];
+    delete envVars["NODE_EXTRA_CA_CERTS"];
   }
   sandbox.envVars = envVars;
 }
