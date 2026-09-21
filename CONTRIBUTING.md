@@ -239,6 +239,7 @@ Recommended baseline:
 
 - Documentation changes: `just fmt-check-path <path>`, plus link / path checks when moving documents.
 - TypeScript package changes: `just tc-package <package>` and focused unit tests; run root `just tc` when cross-contract behavior changes.
+- Root `just tc` rebuilds Driver declarations before checking consumers. Use it after changing Driver contracts so local checks cannot read stale declarations from a previous submodule revision.
 - API behavior changes: focused `just test-file <path>`; add `just tc-package @mosoo/api` when types or bindings are involved.
 - Web behavior changes: focused `just test-file <path>` and `just tc-package @mosoo/web`; user-visible flows need browser or manual checks.
 - GraphQL changes: `just graphql-codegen`.

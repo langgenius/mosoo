@@ -108,7 +108,7 @@ export interface MosooSessionConfigTraceBootPayload {
 }
 
 export interface MosooSessionConfigTraceValue {
-  agentId: string;
+  agentId: string | null;
   configRevisionId: string | null;
   deploymentVersionId: string | null;
   deploymentVersionNumber: number | null;

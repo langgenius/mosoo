@@ -61,7 +61,7 @@ const MosooSessionConfigTraceBootPayloadSchema = type({
 });
 
 const MosooSessionConfigTraceValueSchema = type({
-  agentId: "string",
+  agentId: NullableString,
   configRevisionId: NullableString,
   deploymentVersionId: NullableString,
   deploymentVersionNumber: "number | null",
