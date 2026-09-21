@@ -101,3 +101,29 @@ export async function admitPublicThreadCreator(
     createdBy: toPublicApiThreadCreatedBy(caller),
   };
 }
+
+export async function admitPublicProjectThreadCreator(
+  database: D1Database,
+  caller: PersonalAccessTokenCaller,
+  projectId: ProjectId,
+): Promise<ThreadCreationAdmission> {
+  const project = await admitPublicProjectCaller(database, caller.viewer, projectId);
+  return {
+    accessViewer: await getOwnerViewer(database, project.ownerAccountId),
+    creatorViewer: caller.viewer,
+    fileViewer: caller.viewer,
+    projectId,
+    createdBy: toPublicApiThreadCreatedBy(caller),
+  };
+}
+
+export async function admitPublicProjectCaller(
+  database: D1Database,
+  caller: AuthenticatedViewer,
+  projectId: ProjectId,
+) {
+  if (caller.projectId !== undefined && caller.projectId !== projectId) {
+    throw publicNotFound("Project not found.");
+  }
+  return ensureProjectOwnership(database, caller.id, projectId);
+}

@@ -1,4 +1,4 @@
-import type { AgentId, PlatformId, PublicThreadId } from "@mosoo/id";
+import type { PlatformId, PublicThreadId } from "@mosoo/id";
 import type { Context } from "hono";
 
 import {
@@ -458,11 +458,10 @@ export async function runPublicApiThreadReadResponse(
 export async function runPublicApiThreadMutation<T, Prepared = undefined>(
   c: PublicApiRouteContext,
   input: {
-    agentId: RouteValue<AgentId>;
+    idempotencySubjectId?: (prepared: Prepared) => PlatformId;
     bodyHash?: (prepared: Prepared) => string | null;
     operation: (
       input: PublicApiTokenOperation & {
-        agentId: AgentId;
         idempotencyKey: string | null;
         prepared: Prepared;
       },
@@ -470,7 +469,6 @@ export async function runPublicApiThreadMutation<T, Prepared = undefined>(
     prepare?: (input: PublicApiTokenOperation) => Promise<Prepared>;
     recover?: (
       input: PublicApiTokenOperation & {
-        agentId: AgentId;
         idempotencyKey: string;
         idempotencyCreatedAt: number;
         prepared: Prepared;
@@ -481,30 +479,29 @@ export async function runPublicApiThreadMutation<T, Prepared = undefined>(
 ): Promise<Response> {
   try {
     const caller = await requireAccessTokenCaller(c);
-    const agentId = resolveRequiredRouteValue(input.agentId);
     const operationInput: PublicApiTokenOperation = { caller };
     const prepared = input.prepare ? await input.prepare(operationInput) : (undefined as Prepared);
     const status = input.status ?? 200;
     const operation = async (idempotencyKey: string | null) =>
-      input.operation({ ...operationInput, agentId, idempotencyKey, prepared });
+      input.operation({ ...operationInput, idempotencyKey, prepared });
     const recover = input.recover
       ? async (idempotencyKey: string, idempotencyCreatedAt: number) =>
           input.recover?.({
             ...operationInput,
-            agentId,
             idempotencyKey,
             idempotencyCreatedAt,
             prepared,
           }) ?? null
       : undefined;
-    const beforeOperation = () =>
-      enforcePublicApiRateLimit(c.env.DB, caller.viewer.projectId ?? caller.tokenId);
+    const subjectId =
+      input.idempotencySubjectId?.(prepared) ?? caller.viewer.projectId ?? caller.tokenId;
+    const beforeOperation = () => enforcePublicApiRateLimit(c.env.DB, subjectId);
 
     if (input.bodyHash) {
       return await runPublicApiIdempotentJson(c, {
         bodyHash: input.bodyHash(prepared),
         beforeOperation,
-        idempotencySubjectId: caller.viewer.projectId ?? caller.tokenId,
+        idempotencySubjectId: subjectId,
         operation,
         persistOperationErrors: true,
         recover,

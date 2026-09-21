@@ -582,6 +582,71 @@ export function createPublicApiOpenApiDocument(
   } satisfies OpenApiPaths;
 
   if (apiVersion === "v2") {
+    const projectIdParameter: OpenApiParameter = {
+      in: "path",
+      name: "projectId",
+      required: true,
+      schema: createPublicApiPlatformIdSchema(),
+      description:
+        "Owned Project. A Project key can access only its own Project; CLI login supplies an explicit owned Project.",
+    };
+    paths["/projects/{projectId}/files"] = {
+      post: operation({
+        description:
+          "Upload a Project draft file for direct or preset Session creation; no Agent is required.",
+        parameters: [projectIdParameter],
+        requestBody: multipartFileRequestBody(),
+        security: ACCESS_TOKEN_SECURITY,
+        success: {
+          "201": jsonResponse("Uploaded file.", {
+            $ref: "#/components/schemas/PublicFileResponse",
+          }),
+        },
+        summary: "Upload a Project file",
+      }),
+    };
+    paths["/projects/{projectId}/threads"] = {
+      post: operation({
+        description:
+          "Create a durable Session from explicit inline harness/model/instructions, or an optional saved Agent preset in this Project. Project model credentials are required. Input and files are optional. Creation freezes the effective configuration and never creates a hidden Agent; follow-ups use the returned Thread ID.",
+        parameters: [projectIdParameter, idempotencyKeyParameter],
+        requestBody: jsonRequestBodyExamples(
+          { $ref: "#/components/schemas/CreateProjectThreadRequest" },
+          {
+            inline: {
+              summary: "Execute without creating an Agent",
+              value: {
+                configuration: {
+                  type: "inline",
+                  harness: "openai-runtime",
+                  provider: "openai",
+                  model: "gpt-5.6-luna",
+                  instructions: "Analyze the supplied material and save the results.",
+                },
+                input: {
+                  type: "user.message",
+                  content: [{ type: "text", text: "Create an analysis report." }],
+                },
+              },
+            },
+            preset: {
+              summary: "Use an optional saved Agent preset",
+              value: {
+                configuration: { type: "agent", agent_id: "01ARZ3NDEKTSV4RRFFQ69G5FAV" },
+              },
+            },
+          },
+          { required: true },
+        ),
+        security: ACCESS_TOKEN_SECURITY,
+        success: {
+          "201": idempotentJsonResponse("Created Session.", {
+            $ref: "#/components/schemas/CreateThreadResponse",
+          }),
+        },
+        summary: "Create a Project Session",
+      }),
+    };
     paths["/threads/{threadId}/usage"] = {
       get: operation({
         description:
@@ -618,7 +683,7 @@ export function createPublicApiOpenApiDocument(
       description:
         apiVersion === "v1"
           ? "Public HTTPS API for creating and retrieving Threads on mosoo Agent API Endpoints. v1 resource identifiers are bare ULIDs, not prefixed IDs. Access Tokens identify the account caller. Runtime execution resolves the Agent API Endpoint owner's capabilities while the Thread is attributed to the token owner."
-          : "Project-scoped durable Threads for private saved Agents. The existing Thread ID remains the conversation handle for reading, continuing, cancelling, and downloading files, regardless of creation channel or current publication state. v1 retains its existing admission and published-configuration behavior.",
+          : "Project-owned durable Sessions with direct harness/model/instructions input and optional saved Agent presets. No Agent is required for direct execution. The returned Thread ID remains the conversation handle for reading, continuing, cancelling, and downloading files. Project model credentials are required; v1 retains its existing admission and published-configuration behavior.",
       title: "mosoo Public Thread API",
       version: apiVersion,
     },

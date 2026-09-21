@@ -1,10 +1,12 @@
 import { describe, expect, spyOn, test } from "bun:test";
 
 import { createProjectApiKey } from "../src/modules/auth/application/personal-access-token.service";
+import * as runtimePrewarm from "../src/modules/runtime/application/session-runs/prewarm-agent-session-runtime.service";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import { systemClock } from "../src/time";
 import {
   PUBLIC_API_TEST_IDS as IDS,
+  TOKENS,
   PublicApiMemoryFileBucket,
   createPublicHttpContractDatabase,
   createPublicHttpTestBindings,
@@ -54,8 +56,8 @@ async function setup(
         MOSOO_TURN_BUDGET_POLICY: options.budgetPolicy,
       } as ApiBindings,
     );
-  const create = (version: "v1" | "v2", body: unknown, idempotencyKey?: string) =>
-    request(`${version}/agents/${IDS.agent}/threads`, {
+  const createAt = (path: string, body: unknown, idempotencyKey?: string) =>
+    request(path, {
       body: JSON.stringify(body),
       headers: {
         "Content-Type": "application/json",
@@ -63,6 +65,10 @@ async function setup(
       },
       method: "POST",
     });
+  const create = (version: "v1" | "v2", body: unknown, idempotencyKey?: string) =>
+    createAt(`${version}/agents/${IDS.agent}/threads`, body, idempotencyKey);
+  const createProject = (body: unknown, idempotencyKey?: string) =>
+    createAt(`v2/projects/${IDS.project}/threads`, body, idempotencyKey);
   const snapshot = async (id: string) => {
     const row = await database
       .prepare("SELECT plan_json FROM session_execution_snapshot WHERE session_id = ?")
@@ -70,7 +76,7 @@ async function setup(
       .first<{ plan_json: string }>();
     return expectRecord(JSON.parse(expectString(row?.plan_json)));
   };
-  return { bucket, create, database, request, snapshot };
+  return { bucket, create, createProject, database, request, snapshot };
 }
 
 // Simulate a lost D1 response after its transaction committed. The HTTP boundary
@@ -121,6 +127,268 @@ function loseCommittedBatchResponse(
 
 // These tests exercise HTTP authentication/admission and the real Session store.
 // Runtime provisioning is intentionally absent; live tool/restore evidence is separate.
+describe("Project direct Session API v2", () => {
+  const configuration = {
+    type: "inline",
+    harness: "openai-runtime",
+    provider: "openai",
+    model: "gpt-5.4",
+    instructions: "Use the supplied files and preserve these instructions.",
+  };
+
+  test("uploads and admits exactly one Session and Run without an Agent", async () => {
+    const { createProject, database, request, snapshot } = await setup();
+    await database.prepare("DELETE FROM agent").run();
+    const form = new FormData();
+    form.set("file", new File(["a,b\n1,2\n"], "input.csv", { type: "text/csv" }));
+    const upload = await request(`v2/projects/${IDS.project}/files`, {
+      method: "POST",
+      body: form,
+    });
+    expect(upload.status).toBe(201);
+    const fileId = expectString(expectRecord((await readJson(upload))["file"])["id"]);
+    const body = {
+      configuration,
+      resources: [{ type: "file", file_id: fileId }],
+      input: { type: "user.message", content: [{ type: "text", text: "Analyze the CSV." }] },
+    };
+    await withProviderProbeMock(async () => {
+      const response = await createProject(body, "direct-once");
+      expect(response.status).toBe(201);
+      const created = await readJson(response);
+      const thread = expectRecord(created["thread"]);
+      const id = expectString(thread["id"]);
+      expect(thread["agent_id"]).toBeNull();
+      expect(expectRecord(await snapshot(id))["binding"]).toMatchObject({
+        agentId: null,
+        prompt: configuration.instructions,
+      });
+      const retry = await createProject(body, "direct-once");
+      expect(retry.headers.get("Idempotency-Replayed")).toBe("true");
+      expect(await readJson(retry)).toEqual(created);
+      expect(
+        (
+          await createProject(
+            {
+              ...body,
+              configuration: { ...configuration, instructions: "Different instructions." },
+            },
+            "direct-once",
+          )
+        ).status,
+      ).toBe(409);
+      expect(await database.prepare("SELECT count(*) AS count FROM agent").first()).toEqual({
+        count: 0,
+      });
+      expect(await database.prepare("SELECT count(*) AS count FROM session").first()).toEqual({
+        count: 1,
+      });
+      expect(
+        await database
+          .prepare("SELECT count(*) AS count FROM session_run WHERE agent_id IS NULL")
+          .first(),
+      ).toEqual({ count: 1 });
+      expect((await request(`v2/threads/${id}`)).status).toBe(200);
+      expect((await request(`v1/threads/${id}`)).status).toBe(404);
+      expect(await (await request(`v2/files/${fileId}/content`)).text()).toBe("a,b\n1,2\n");
+    });
+  });
+
+  test("recovers a committed inline Session without repeating creation", async () => {
+    const { createProject, database } = await setup({
+      requestDatabase: (db) =>
+        loseCommittedBatchResponse(db, 'insert into "session_execution_snapshot"'),
+    });
+    await database.prepare("DELETE FROM agent").run();
+    await withProviderProbeMock(async () => {
+      expect((await createProject({ configuration }, "direct-recover")).status).toBe(500);
+      const row = await database.prepare("SELECT id FROM session").first<{ id: string }>();
+      await database
+        .prepare("UPDATE public_api_idempotency_key SET updated_at = ? WHERE idempotency_key = ?")
+        .bind(Date.now() - 11 * 60 * 1000, "direct-recover")
+        .run();
+      const retry = await createProject({ configuration }, "direct-recover");
+      expect(retry.status).toBe(201);
+      expect(retry.headers.get("Idempotency-Replayed")).toBe("true");
+      expect(expectRecord((await readJson(retry))["thread"])["id"]).toBe(row?.id);
+      expect(await database.prepare("SELECT count(*) AS count FROM session").first()).toEqual({
+        count: 1,
+      });
+    });
+  });
+
+  test("keeps keys route-bound and recovers a frozen Session after its preset is deleted", async () => {
+    let interrupt = false;
+    const { create, createProject, database } = await setup({
+      requestDatabase: (db) =>
+        loseCommittedBatchResponse(db, 'insert into "session_execution_snapshot"', () => interrupt),
+    });
+    await withProviderProbeMock(async () => {
+      const old = await readJson(await create("v2", {}, "shared-key"));
+      const oldId = expectString(expectRecord(old["thread"])["id"]);
+      interrupt = true;
+      const body = { configuration: { type: "agent", agent_id: IDS.agent } };
+      expect((await createProject(body, "shared-key")).status).toBe(409);
+      expect((await createProject(body, "preset-recovery")).status).toBe(500);
+      const row = await database
+        .prepare("SELECT id FROM session WHERE id != ?")
+        .bind(oldId)
+        .first<{ id: string }>();
+      await database.prepare("DELETE FROM agent").run();
+      await database
+        .prepare("UPDATE public_api_idempotency_key SET updated_at = ? WHERE idempotency_key = ?")
+        .bind(Date.now() - 11 * 60 * 1000, "preset-recovery")
+        .run();
+      const retry = await createProject(body, "preset-recovery");
+      expect(retry.status).toBe(201);
+      expect(expectRecord((await readJson(retry))["thread"])["id"]).toBe(row?.id);
+      expect(row?.id).not.toBe(oldId);
+      expect(await database.prepare("SELECT count(*) AS count FROM session").first()).toEqual({
+        count: 2,
+      });
+    });
+  });
+
+  test("rejects ambiguous configuration, unsupported selections and missing credentials before admission", async () => {
+    const { createProject, database } = await setup();
+    await withProviderProbeMock(async () => {
+      for (const candidate of [
+        { ...configuration, agent_id: IDS.agent },
+        { type: "agent", agent_id: IDS.agent, instructions: "Hidden override" },
+        { ...configuration, instructions: "" },
+      ]) {
+        const response = await createProject({ configuration: candidate });
+        expect(response.status).toBe(400);
+        expect((await readJson(response))["error"]).toMatchObject({ code: "invalid_request" });
+      }
+      for (const candidate of [
+        { ...configuration, harness: "unsupported-runtime" },
+        { ...configuration, provider: "unsupported-provider" },
+        { ...configuration, harness: "claude-agent-sdk" },
+        { ...configuration, model: "unavailable-model" },
+      ]) {
+        const response = await createProject({ configuration: candidate });
+        expect(response.status).toBe(409);
+        expect((await readJson(response))["error"]).toMatchObject({ code: "readiness_blocked" });
+      }
+      await database.prepare("DELETE FROM vendor_credential").run();
+      expect((await createProject({ configuration })).status).toBe(409);
+      expect(await database.prepare("SELECT count(*) AS count FROM session").first()).toEqual({
+        count: 0,
+      });
+    });
+  });
+
+  test("denies a Project key on another Project before upload or execution", async () => {
+    const { request, database } = await setup();
+    const otherProject = "01J00000000000000000000099";
+    await database
+      .prepare(
+        "INSERT INTO project (id, organization_id, owner_account_id, name, created_at, updated_at) VALUES (?, ?, ?, 'Other Project', 1, 1)",
+      )
+      .bind(otherProject, IDS.organization, IDS.ownerAccount)
+      .run();
+    const path = `v2/projects/${otherProject}`;
+    const response = await request(`${path}/threads`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ configuration }),
+    });
+    expect(response.status).toBe(404);
+    const form = new FormData();
+    form.set("file", new File(["private"], "private.txt"));
+    expect((await request(`${path}/files`, { method: "POST", body: form })).status).toBe(404);
+    expect(await database.prepare("SELECT count(*) AS count FROM session").first()).toEqual({
+      count: 0,
+    });
+  });
+
+  test("keeps CLI login and replacement keys in the same explicit Project receipt boundary", async () => {
+    const { request, database } = await setup({
+      requestDatabase: (db) =>
+        loseCommittedBatchResponse(db, 'insert into "session_execution_snapshot"'),
+    });
+    const path = `v2/projects/${IDS.project}/threads`;
+    const init = {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Idempotency-Key": "cli-project-once" },
+      body: JSON.stringify({ configuration }),
+    };
+    await withProviderProbeMock(async () => {
+      expect((await request(path, init, TOKENS.outsider)).status).toBe(403);
+      expect((await request(path, init, TOKENS.owner)).status).toBe(500);
+      const row = await database.prepare("SELECT id FROM session").first<{ id: string }>();
+      await database
+        .prepare("UPDATE public_api_idempotency_key SET updated_at = ?")
+        .bind(Date.now() - 11 * 60 * 1000)
+        .run();
+      const replacement = await createProjectApiKey(database, OWNER_VIEWER, {
+        projectId: IDS.project,
+        label: "Replacement key",
+      });
+      const recovered = await request(path, init, replacement.value);
+      expect(recovered.status).toBe(201);
+      expect(recovered.headers.get("Idempotency-Replayed")).toBe("true");
+      const body = await readJson(recovered);
+      expect(expectRecord(body["thread"])["id"]).toBe(row?.id);
+      expect(await readJson(await request(path, init, TOKENS.owner))).toEqual(body);
+      expect(await database.prepare("SELECT count(*) AS count FROM session").first()).toEqual({
+        count: 1,
+      });
+    });
+  });
+
+  test("rejects a foreign preset and file even for CLI login owning both Projects", async () => {
+    const { request, database } = await setup();
+    const otherProject = "01J0000000000000000000007A";
+    await database
+      .prepare(
+        "INSERT INTO project (id, organization_id, owner_account_id, name, created_at, updated_at) VALUES (?, ?, ?, 'Other Project', 1, 1)",
+      )
+      .bind(otherProject, IDS.organization, IDS.ownerAccount)
+      .run();
+    const form = new FormData();
+    form.set("file", new File(["private"], "private.txt"));
+    const upload = await request(
+      `v2/projects/${otherProject}/files`,
+      { method: "POST", body: form },
+      TOKENS.owner,
+    );
+    expect(upload.status).toBe(201);
+    const fileId = expectString(expectRecord((await readJson(upload))["file"])["id"]);
+    await database
+      .prepare("UPDATE agent SET project_id = ? WHERE id = ?")
+      .bind(otherProject, IDS.agent)
+      .run();
+    const prewarm = spyOn(runtimePrewarm, "scheduleAgentSessionRuntimePrewarm");
+    try {
+      await withProviderProbeMock(async () => {
+        for (const [body, status] of [
+          [{ configuration: { type: "agent", agent_id: IDS.agent } }, 403],
+          [{ configuration, resources: [{ type: "file", file_id: fileId }] }, 400],
+        ] as const) {
+          const response = await request(
+            `v2/projects/${IDS.project}/threads`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(body),
+            },
+            TOKENS.owner,
+          );
+          expect(response.status).toBe(status);
+        }
+        expect(await database.prepare("SELECT count(*) AS count FROM session").first()).toEqual({
+          count: 0,
+        });
+        expect(prewarm).not.toHaveBeenCalled();
+      });
+    } finally {
+      prewarm.mockRestore();
+    }
+  });
+});
+
 describe("saved-Agent Thread API v2", () => {
   test("records a caller's per-turn cap and rejects changed-budget idempotent retries", async () => {
     const { create, request } = await setup({ budgetPolicy: '{"defaultUsd":0.05,"maxUsd":1}' });

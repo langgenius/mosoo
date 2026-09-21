@@ -1,5 +1,5 @@
 import type { PublicApiVersion } from "@mosoo/contracts/public-api";
-import type { AgentId, FileId, PublicThreadId } from "@mosoo/id";
+import type { AgentId, FileId, ProjectId, PublicThreadId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../platform/cloudflare/worker-types";
 import type { PersonalAccessTokenCaller } from "../auth/application/personal-access-token.service";
@@ -14,7 +14,7 @@ export interface CreatePublicThreadInput {
 
 export interface CreatePublicThreadRequest {
   apiVersion?: PublicApiVersion | undefined;
-  agentId: AgentId;
+  source: PublicThreadCreationSource;
   bindings: ApiBindings;
   caller: PersonalAccessTokenCaller;
   executionContext: Pick<ExecutionContext, "waitUntil"> | null;
@@ -23,6 +23,17 @@ export interface CreatePublicThreadRequest {
   input: CreatePublicThreadInput;
   requestUrl: string;
 }
+
+export type PublicThreadCreationSource =
+  | { type: "agent"; agentId: AgentId }
+  | {
+      type: "inline";
+      projectId: ProjectId;
+      runtimeId: string;
+      provider: string;
+      model: string;
+      instructions: string;
+    };
 
 export interface RetrievePublicThreadRequest {
   apiVersion?: PublicApiVersion | undefined;

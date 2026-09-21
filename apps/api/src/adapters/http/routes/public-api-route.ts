@@ -1,12 +1,18 @@
-import type { PublicApiVersion } from "@mosoo/contracts/public-api";
-import type { PublicThreadId } from "@mosoo/id";
+import type {
+  PublicApiVersion,
+  PublicThreadApiCreateThreadResponse,
+  PublicThreadConfiguration,
+} from "@mosoo/contracts/public-api";
+import type { ProjectId, PublicThreadId } from "@mosoo/id";
 import { Hono } from "hono";
 import type { Context } from "hono";
 
+import type { PersonalAccessTokenCaller } from "../../../modules/auth/application/personal-access-token.service";
 import type { AuthenticatedViewer } from "../../../modules/auth/application/viewer-auth.service";
 import { publicInvalidRequest } from "../../../modules/public-api/public-api-errors";
 import { hashPublicApiIdempotencyBody } from "../../../modules/public-api/public-api-idempotency.service";
 import { listAgentApiEndpointThreads } from "../../../modules/public-api/public-thread-session-query.service";
+import type { PublicThreadCreationSource } from "../../../modules/public-api/public-thread.types";
 import type { ApiGatewayEnvironment } from "../../../platform/cloudflare/worker-types";
 import { createPublicApiOpenApiDocument } from "./public-api-openapi";
 import {
@@ -21,20 +27,33 @@ import {
   parseFileContentDisposition,
   parseOptionalBoolean,
   parseAgentIdParam,
+  parseProjectIdParam,
   parseFileIdParam,
   parseThreadIdParam,
   parseThreadEventsLimit,
   parseUsageCursor,
   readCreateThreadRequest,
+  readCreateProjectThreadRequest,
   readSendEventsRequest,
 } from "./public-thread-api-request";
-import type { ParsedCreateThreadRequest } from "./public-thread-api-request";
+import type {
+  ParsedCreateProjectThreadRequest,
+  ParsedCreateThreadRequest,
+} from "./public-thread-api-request";
 
 type PublicApiRouteContext = Context<ApiGatewayEnvironment>;
 interface PublicAgentFileUploadRequest {
   file: File;
 }
 type PublicThreadFileService = Awaited<ReturnType<typeof loadPublicThreadFileService>>;
+
+interface PreparedProjectThreadCreation {
+  projectId: ProjectId;
+  source: PublicThreadCreationSource;
+  body: ParsedCreateProjectThreadRequest;
+  caller: PersonalAccessTokenCaller;
+  bodyHash: string | null;
+}
 
 async function loadPublicThreadCommandService() {
   return import("../../../modules/public-api/public-thread-api-command.service");
@@ -71,12 +90,14 @@ async function runPublicThreadFileRoute<T>(
 
 async function hashCreateThreadIdempotencyBody(
   body: ParsedCreateThreadRequest,
+  configuration?: PublicThreadConfiguration,
 ): Promise<string | null> {
   return hashPublicApiIdempotencyBody({
     fileIds: body.fileIds,
     inputText: body.inputText ?? null,
     ...(body.maxCostUsd === undefined ? {} : { maxCostUsd: body.maxCostUsd }),
     userId: body.userId,
+    ...(configuration === undefined ? {} : { configuration }),
   });
 }
 
@@ -98,6 +119,83 @@ function registerPublicThreadRoutes(
   apiVersion: PublicApiVersion,
 ): void {
   if (apiVersion === "v2") {
+    routes.post("/projects/:projectId/threads", async (c) =>
+      runPublicApiThreadMutation<
+        PublicThreadApiCreateThreadResponse<string | null>,
+        PreparedProjectThreadCreation
+      >(c, {
+        bodyHash: (prepared) => prepared.bodyHash,
+        idempotencySubjectId: (prepared) => prepared.projectId,
+        prepare: async ({ caller }): Promise<PreparedProjectThreadCreation> => {
+          const projectId = parseProjectIdParam(c.req.param("projectId") ?? "");
+          const { admitPublicProjectCaller } =
+            await import("../../../modules/public-api/public-thread-admission");
+          await admitPublicProjectCaller(c.env.DB, caller.viewer, projectId);
+          const body = await readCreateProjectThreadRequest(c);
+          const configuration = body.configuration;
+          const source: PublicThreadCreationSource =
+            configuration.type === "agent"
+              ? { type: "agent", agentId: configuration.agent_id }
+              : {
+                  type: "inline",
+                  projectId,
+                  runtimeId: configuration.harness,
+                  provider: configuration.provider,
+                  model: configuration.model,
+                  instructions: configuration.instructions,
+                };
+          return {
+            projectId,
+            source,
+            body,
+            caller: { ...caller, viewer: { ...caller.viewer, projectId } },
+            bodyHash: await hashCreateThreadIdempotencyBody(body, configuration),
+          };
+        },
+        operation: async ({ idempotencyKey, prepared }) => {
+          const { createPublicThread } = await loadPublicThreadService();
+          return createPublicThread({
+            apiVersion: "v2",
+            source: prepared.source,
+            caller: prepared.caller,
+            bindings: c.env,
+            executionContext: c.executionCtx,
+            idempotencyKey,
+            input: prepared.body,
+            requestUrl: c.req.url,
+          });
+        },
+        recover: async ({ idempotencyKey, idempotencyCreatedAt, prepared }) => {
+          const { recoverPublicThreadCreation } = await loadPublicThreadService();
+          return recoverPublicThreadCreation({
+            apiVersion: "v2",
+            source: prepared.source,
+            caller: prepared.caller,
+            bindings: c.env,
+            executionContext: c.executionCtx,
+            idempotencyKey,
+            idempotencyCreatedAt,
+            input: prepared.body,
+            requestUrl: c.req.url,
+          });
+        },
+        status: 201,
+      }),
+    );
+    routes.post("/projects/:projectId/files", async (c) =>
+      runPublicApiAuthenticatedJson(
+        c,
+        async (caller) => {
+          const service = await loadPublicThreadFileService();
+          const prepared = await readPublicAgentFileUploadRequest(c);
+          return service.createPublicProjectFile(c.env, caller, {
+            projectId: parseProjectIdParam(c.req.param("projectId") ?? ""),
+            file: prepared.file,
+          });
+        },
+        201,
+      ),
+    );
     routes.get("/threads/:threadId/usage", async (c) =>
       runPublicApiThreadReadJson(c, {
         operation: async ({ caller, threadId }) => {
@@ -117,13 +215,12 @@ function registerPublicThreadRoutes(
   }
   routes.post("/agents/:agentId/threads", async (c) => {
     return runPublicApiThreadMutation(c, {
-      agentId: () => parseAgentIdParam(c.req.param("agentId") ?? ""),
       bodyHash: (prepared) => prepared.bodyHash,
-      operation: async ({ agentId, caller, idempotencyKey, prepared }) => {
+      operation: async ({ caller, idempotencyKey, prepared }) => {
         const { createPublicThread } = await loadPublicThreadService();
         return createPublicThread({
           apiVersion,
-          agentId,
+          source: { type: "agent", agentId: prepared.agentId },
           bindings: c.env,
           caller,
           executionContext: c.executionCtx,
@@ -133,17 +230,19 @@ function registerPublicThreadRoutes(
         });
       },
       prepare: async () => {
+        const agentId = parseAgentIdParam(c.req.param("agentId") ?? "");
         const body = await readCreateThreadRequest(c, apiVersion);
         return {
+          agentId,
           body,
           bodyHash: await hashCreateThreadIdempotencyBody(body),
         };
       },
-      recover: async ({ agentId, caller, idempotencyKey, idempotencyCreatedAt, prepared }) => {
+      recover: async ({ caller, idempotencyKey, idempotencyCreatedAt, prepared }) => {
         const { recoverPublicThreadCreation } = await loadPublicThreadService();
         return recoverPublicThreadCreation({
           apiVersion,
-          agentId,
+          source: { type: "agent", agentId: prepared.agentId },
           bindings: c.env,
           caller,
           executionContext: c.executionCtx,

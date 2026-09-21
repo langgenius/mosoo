@@ -3,7 +3,10 @@ import { describe, expect, test } from "bun:test";
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
 import { hydrateCachedRunContextFromSession } from "../src/modules/runtime/application/session-definition/hydrate-run-context.service";
 import { parseSessionExecutionPlanJson } from "../src/modules/runtime/application/session-definition/session-execution.repository";
-import { createAgentSession } from "../src/modules/runtime/application/session-run.service";
+import {
+  createAgentSession,
+  createProjectSession,
+} from "../src/modules/runtime/application/session-run.service";
 import { PREVIEW_RETENTION_MS } from "../src/modules/sessions/domain/preview-retention-policy";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import {
@@ -48,6 +51,84 @@ async function withProviderProbeFailure<T>(operation: () => Promise<T>): Promise
     globalThis.fetch = originalFetch;
   }
 }
+
+describe("createProjectSession", () => {
+  const input = {
+    projectId: PUBLIC_API_TEST_IDS.project,
+    runtimeId: "openai-runtime",
+    provider: "openai",
+    model: "gpt-5.4",
+    instructions: "Keep this admitted instruction exactly.",
+  };
+
+  test("creates and hydrates isolated execution without any Agent records", async () => {
+    const database = await createPublicHttpContractDatabase();
+    await database.prepare("DELETE FROM agent").run();
+    const bindings = createPublicHttpTestBindings(database) as ApiBindings;
+    const session = await withProviderProbeMock(() =>
+      createProjectSession({ bindings, input, viewer: OWNER_VIEWER }),
+    );
+    expect(session).toMatchObject({
+      agentId: null,
+      deploymentVersionId: null,
+      deploymentVersionNumber: null,
+      projectId: input.projectId,
+      kind: "cattle",
+      type: "ui",
+      model: input.model,
+    });
+    expect(await database.prepare("SELECT count(*) AS count FROM agent").first()).toEqual({
+      count: 0,
+    });
+    const snapshot = await database
+      .prepare("SELECT plan_json FROM session_execution_snapshot WHERE session_id = ?")
+      .bind(session.id)
+      .first<{ plan_json: string }>();
+    const plan = parseSessionExecutionPlanJson(snapshot!.plan_json);
+    expect(plan.binding.prompt).toBe(input.instructions);
+    expect(plan.binding.agentId).toBeNull();
+    expect(plan.configJson).toBe("{}");
+    expect(plan.recoveryRetentionMs).toBe(30 * 86_400_000);
+    expect(plan.previewRetentionMs).toBeUndefined();
+    const cold = await hydrateCachedRunContextFromSession(bindings, OWNER_VIEWER, session);
+    expect(cold.cacheHit).toBe(false);
+    expect(cold.value.profile.configRevision.agentId).toBeNull();
+    const warm = await hydrateCachedRunContextFromSession(bindings, OWNER_VIEWER, session);
+    expect(warm.cacheHit).toBe(true);
+    expect(warm.value.profile.configRevision).toEqual(cold.value.profile.configRevision);
+  });
+
+  test("enforces Project key and ownership boundaries before creating execution", async () => {
+    const database = await createPublicHttpContractDatabase();
+    const bindings = createPublicHttpTestBindings(database) as ApiBindings;
+    for (const viewer of [
+      { ...OWNER_VIEWER, projectId: "01J00000000000000000000099" },
+      { ...OWNER_VIEWER, id: PUBLIC_API_TEST_IDS.outsiderAccount },
+    ]) {
+      await expect(createProjectSession({ bindings, input, viewer })).rejects.toThrow("permission");
+    }
+    expect(await database.prepare("SELECT count(*) AS count FROM session").first()).toEqual({
+      count: 0,
+    });
+  });
+
+  test("rejects unavailable models before admitting a Session", async () => {
+    const database = await createPublicHttpContractDatabase();
+    const bindings = createPublicHttpTestBindings(database) as ApiBindings;
+    await expect(
+      withProviderProbeMock(() =>
+        createProjectSession({
+          bindings,
+          input: { ...input, model: "unavailable-model" },
+          viewer: OWNER_VIEWER,
+        }),
+      ),
+    ).rejects.toThrow();
+    expect(await database.prepare("SELECT count(*) AS count FROM session").first()).toEqual({
+      count: 0,
+    });
+  });
+});
 
 describe("createAgentSession", () => {
   test("enrolls only new Cloud console Previews and preserves the policy through parsing", async () => {

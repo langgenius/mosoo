@@ -2,6 +2,8 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import type {
+  PublicFileResponse,
+  PublicThreadConfiguration,
   PublicThreadApiCreateThreadResponse,
   PublicThreadApiListThreadEventsResponse,
   PublicThreadApiRetrieveThreadResponse,
@@ -20,7 +22,7 @@ export const SESSION_WORKFLOW_INPUT = {
     content: [
       {
         type: "text",
-        text: "Use real Python tools to save and analyze this CSV: region,revenue\nnorth,120\nsouth,80\nnorth,30\n. Save input.csv in the working directory. Generate a random private nonce in .private/nonce outside outputs. Write outputs/initial.json with grand_total and private_nonce_sha256 (hash the raw file bytes). Save outputs/report.md and outputs/chart.svg. Keep input.csv and the nonce for our next turn. Do not return success if any tool fails.",
+        text: "Use real Python tools to read the attached input.csv and copy it into the working directory for analysis. Generate a random private nonce in .private/nonce outside outputs. Write outputs/initial.json with grand_total and private_nonce_sha256 (hash the raw file bytes). Save outputs/report.md and outputs/chart.svg. Keep input.csv and the nonce for our next turn. Do not return success if any tool fails.",
       },
     ],
   },
@@ -49,14 +51,19 @@ function requireEnv(name: string): string {
 }
 
 export async function runSessionWorkflow(input: {
-  agentId: string;
+  projectId: string;
+  configuration: PublicThreadConfiguration;
+  maxCostUsd: number;
   baseUrl: URL;
   idempotencyPrefix: string;
   outputDirectory: string;
   token: string;
 }): Promise<void> {
-  const base = input.baseUrl.href.replace(/\/$/, "");
-  const agentId = parsePlatformId(input.agentId, "Agent ID");
+  const base = assertNonProductionBaseUrl(input.baseUrl.href, "v2").href.replace(/\/$/, "");
+  const projectId = parsePlatformId(input.projectId, "Project ID");
+  if (!Number.isFinite(input.maxCostUsd) || input.maxCostUsd <= 0) {
+    throw new Error("The workflow requires a positive per-turn model budget.");
+  }
   const headers = { Authorization: `Bearer ${input.token}` };
   const call = async (path: string, init: RequestInit = {}) => {
     const response = await fetch(`${base}${path}`, {
@@ -77,8 +84,25 @@ export async function runSessionWorkflow(input: {
         "Idempotency-Key": `${input.idempotencyPrefix}-${step}`,
       },
     });
+  const upload = new FormData();
+  upload.set(
+    "file",
+    new File(["region,revenue\nnorth,120\nsouth,80\nnorth,30\n"], "input.csv", {
+      type: "text/csv",
+    }),
+  );
+  const uploaded: PublicFileResponse = await (
+    await call(`/projects/${projectId}/files`, { method: "POST", body: upload })
+  ).json();
+  const createBody = {
+    ...SESSION_WORKFLOW_INPUT,
+    configuration: input.configuration,
+    maxCostUsd: input.maxCostUsd,
+    resources: [{ type: "file", file_id: uploaded.file.id }],
+  };
+  const createPath = `/projects/${projectId}/threads`;
   const created: PublicThreadApiCreateThreadResponse<string | null> = await (
-    await post(`/agents/${agentId}/threads`, SESSION_WORKFLOW_INPUT, "create")
+    await post(createPath, createBody, "create")
   ).json();
   const threadId = parsePlatformId(created.thread.id, "Thread ID");
   await mkdir(input.outputDirectory, { recursive: true, mode: 0o700 });
@@ -87,10 +111,15 @@ export async function runSessionWorkflow(input: {
   });
   console.log(JSON.stringify({ phase: "created", threadId }));
   const replay: PublicThreadApiCreateThreadResponse<string | null> = await (
-    await post(`/agents/${agentId}/threads`, SESSION_WORKFLOW_INPUT, "create")
+    await post(createPath, createBody, "create")
   ).json();
   if (replay.thread.id !== threadId || created.thread.userId !== null)
     throw new Error("Create identity/idempotency contract failed.");
+  if (
+    created.thread.agent_id !==
+    (input.configuration.type === "agent" ? input.configuration.agent_id : null)
+  )
+    throw new Error("Session configuration source does not match the request.");
 
   const state = async (): Promise<PublicThreadApiRetrieveThreadResponse<string | null>> =>
     (await call(`/threads/${threadId}`)).json();
@@ -175,7 +204,11 @@ export async function runSessionWorkflow(input: {
   }
   await writeFile(join(input.outputDirectory, "events.sse"), sseText, { mode: 0o600 });
 
-  await post(`/threads/${threadId}/events`, SESSION_WORKFLOW_FOLLOWUP, "followup");
+  await post(
+    `/threads/${threadId}/events`,
+    { ...SESSION_WORKFLOW_FOLLOWUP, maxCostUsd: input.maxCostUsd },
+    "followup",
+  );
   await waitForTerminal("completed");
   const { manifest, bodies: artifactBodies } = await downloadArtifacts();
   for (const name of ["initial.json", "followup.json", "report.md", "chart.svg"]) {
@@ -237,7 +270,11 @@ export async function runSessionWorkflow(input: {
     { mode: 0o600 },
   );
 
-  await post(`/threads/${threadId}/events`, CANCEL_WORK_INPUT, "cancel-work");
+  await post(
+    `/threads/${threadId}/events`,
+    { ...CANCEL_WORK_INPUT, maxCostUsd: input.maxCostUsd },
+    "cancel-work",
+  );
   await post(`/threads/${threadId}/events`, { events: [{ type: "user_interrupt" }] }, "cancel");
   const cancelled = await waitForTerminal("cancelled");
   await writeFile(
@@ -258,8 +295,30 @@ export async function runSessionWorkflow(input: {
 
 if (import.meta.main) {
   loadRepoEnv();
+  const agentId = process.env["MOSOO_PUBLIC_SESSION_AGENT_ID"]?.trim();
+  const inlineFields = ["HARNESS", "PROVIDER", "MODEL", "INSTRUCTIONS"];
+  if (
+    agentId &&
+    inlineFields.some((field) => process.env[`MOSOO_PUBLIC_SESSION_${field}`]?.trim())
+  ) {
+    throw new Error(
+      "Select an Agent preset or inline harness/model configuration, without overrides.",
+    );
+  }
   await runSessionWorkflow({
-    agentId: requireEnv("MOSOO_PUBLIC_SESSION_AGENT_ID"),
+    projectId: requireEnv("MOSOO_PUBLIC_SESSION_PROJECT_ID"),
+    configuration: agentId
+      ? { type: "agent", agent_id: parsePlatformId(agentId, "Agent ID") }
+      : {
+          type: "inline",
+          harness: requireEnv("MOSOO_PUBLIC_SESSION_HARNESS"),
+          provider: requireEnv("MOSOO_PUBLIC_SESSION_PROVIDER"),
+          model: requireEnv("MOSOO_PUBLIC_SESSION_MODEL"),
+          instructions:
+            process.env["MOSOO_PUBLIC_SESSION_INSTRUCTIONS"]?.trim() ||
+            "Use tools to analyze files, verify results and retain private working state for follow-up.",
+        },
+    maxCostUsd: Number(process.env["MOSOO_PUBLIC_SESSION_MAX_COST_USD"] ?? "0.05"),
     baseUrl: assertNonProductionBaseUrl(requireEnv("MOSOO_PUBLIC_SESSION_BASE_URL"), "v2"),
     idempotencyPrefix: requireEnv("MOSOO_PUBLIC_SESSION_TEST_ID"),
     outputDirectory: process.env["MOSOO_PUBLIC_SESSION_OUTPUT_DIR"] ?? ".tmp/e2e/session-workflow",

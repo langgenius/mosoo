@@ -17,7 +17,7 @@ import type {
   PublicThreadId,
   SessionId,
 } from "@mosoo/id";
-import { and, eq, gte, sql } from "drizzle-orm";
+import { and, eq, gte, isNull, sql } from "drizzle-orm";
 
 import type { ApiBindings } from "../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../platform/db/drizzle";
@@ -148,7 +148,7 @@ export async function getThreadSnapshot(
 export async function findPublicThreadSnapshotByIdempotencyKey(
   database: D1Database,
   input: {
-    agentId: AgentId;
+    agentId: AgentId | null;
     apiVersion?: PublicApiVersion | undefined;
     idempotencyKey: string;
     createdAfterMs?: number | undefined;
@@ -168,7 +168,9 @@ export async function findPublicThreadSnapshotByIdempotencyKey(
       .leftJoin(sessionRunsTable, eq(sessionRunsTable.id, sessionsTable.lastRunId))
       .where(
         and(
-          eq(sessionsTable.agentId, input.agentId),
+          input.agentId === null
+            ? isNull(sessionsTable.agentId)
+            : eq(sessionsTable.agentId, input.agentId),
           input.createdAfterMs === undefined
             ? undefined
             : gte(sessionsTable.createdAt, input.createdAfterMs),

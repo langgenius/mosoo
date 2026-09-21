@@ -8,8 +8,16 @@ import type { ApiBindings } from "../../platform/cloudflare/worker-types";
 import { API_ERROR_CODE, isApiError } from "../../platform/errors";
 import type { AuthenticatedViewer } from "../auth/application/viewer-auth.service";
 import { fileStore } from "../files/application/file-store";
-import { createAgentSession, queueSessionRun } from "../runtime/application/session-run.service";
-import { admitPublicThreadCreator } from "./public-thread-admission";
+import {
+  createAgentSession,
+  createProjectSession,
+  queueSessionRun,
+} from "../runtime/application/session-run.service";
+import { publicInvalidRequest } from "./public-api-errors";
+import {
+  admitPublicProjectThreadCreator,
+  admitPublicThreadCreator,
+} from "./public-thread-admission";
 import type { ThreadCreationAdmission } from "./public-thread-admission";
 import { toPublicThreadSessionSummary } from "./public-thread-api-presenter";
 import { resolvePublicThreadTurnBudget, withPublicRunBudget } from "./public-thread-budget";
@@ -136,10 +144,20 @@ async function startInitialThreadRun(
 export async function createPublicThread(
   request: CreatePublicThreadRequest,
 ): Promise<PublicThreadApiCreateThreadResponse<string | null>> {
-  const admission = await admitPublicThreadCreator(request.bindings.DB, request.caller, {
-    agentId: request.agentId,
-    apiVersion: request.apiVersion,
-  });
+  if (request.source.type === "inline" && request.apiVersion !== "v2") {
+    throw publicInvalidRequest("Inline execution requires API v2.");
+  }
+  const admission =
+    request.source.type === "inline"
+      ? await admitPublicProjectThreadCreator(
+          request.bindings.DB,
+          request.caller,
+          request.source.projectId,
+        )
+      : await admitPublicThreadCreator(request.bindings.DB, request.caller, {
+          agentId: request.source.agentId,
+          apiVersion: request.apiVersion,
+        });
   if (request.apiVersion === "v2" && request.input.inputText !== undefined)
     resolvePublicThreadTurnBudget(request.bindings, request.input.maxCostUsd);
   let createdSessionId: SessionId | null = null;
@@ -152,14 +170,9 @@ export async function createPublicThread(
   });
 
   try {
-    const session = await createAgentSession({
+    const creation = {
       bindings: request.bindings,
       executionContext: request.executionContext,
-      input: {
-        agentId: request.agentId,
-        projectId: admission.projectId,
-        type: "ui",
-      },
       options: {
         accessViewer: admission.accessViewer,
         ...(request.apiVersion === "v2" ? { configurationSource: "saved" as const } : {}),
@@ -172,9 +185,15 @@ export async function createPublicThread(
             request.input.inputText === undefined ? null : initialRequestId,
         },
       },
-      ...(request.input.inputText === undefined ? { requestUrl: request.requestUrl } : {}),
       viewer: admission.creatorViewer,
-    });
+    };
+    const session =
+      request.source.type === "inline"
+        ? await createProjectSession({ ...creation, input: request.source })
+        : await createAgentSession({
+            ...creation,
+            input: { agentId: request.source.agentId, projectId: admission.projectId, type: "ui" },
+          });
     const sessionId = session.id;
     createdSessionId = sessionId;
 
@@ -196,6 +215,18 @@ export async function createPublicThread(
     });
 
     if (request.input.inputText === undefined) {
+      // File admission can still reject this request. Start runtime work only
+      // after the complete request has passed and its attachments are claimed.
+      const { scheduleAgentSessionRuntimePrewarm } =
+        await import("../runtime/application/session-runs/prewarm-agent-session-runtime.service");
+      scheduleAgentSessionRuntimePrewarm({
+        bindings: request.bindings,
+        executionContext: request.executionContext ?? null,
+        requestUrl: request.requestUrl,
+        session,
+        accessViewer: admission.accessViewer,
+        viewer: admission.creatorViewer,
+      });
       return toCreateThreadResponse({
         apiVersion: request.apiVersion,
         endUserId: request.input.userId,
@@ -236,24 +267,39 @@ export async function recoverPublicThreadCreation(
     return null;
   }
 
-  const admission = await admitPublicThreadCreator(request.bindings.DB, request.caller, {
-    agentId: request.agentId,
-    apiVersion: request.apiVersion,
-  });
+  if (request.source.type === "inline" && request.apiVersion !== "v2") {
+    throw publicInvalidRequest("Inline execution requires API v2.");
+  }
+  // v2 recovery authorizes the frozen Session's Project, even when its optional
+  // preset has been edited or removed since the first admitted request.
+  let admission =
+    request.apiVersion !== "v2" && request.source.type === "agent"
+      ? await admitPublicThreadCreator(request.bindings.DB, request.caller, {
+          agentId: request.source.agentId,
+          apiVersion: request.apiVersion,
+        })
+      : null;
   let snapshot = await findPublicThreadSnapshotByIdempotencyKey(request.bindings.DB, {
-    agentId: request.agentId,
+    agentId: request.source.type === "agent" ? request.source.agentId : null,
     apiVersion: request.apiVersion,
     idempotencyKey: request.idempotencyKey,
-    tokenId: admission.createdBy.token_id,
+    tokenId: request.caller.tokenId,
     createdAfterMs: request.idempotencyCreatedAt,
-    ...(admission.creatorViewer.projectId === undefined
-      ? {}
-      : { projectId: admission.creatorViewer.projectId }),
+    ...(request.source.type === "inline"
+      ? { projectId: request.source.projectId }
+      : request.caller.viewer.projectId === undefined
+        ? {}
+        : { projectId: request.caller.viewer.projectId }),
   });
 
   if (!snapshot) {
     return null;
   }
+  admission ??= await admitPublicProjectThreadCreator(
+    request.bindings.DB,
+    request.caller,
+    snapshot.session.projectId,
+  );
 
   const initialRequestId = snapshot.metadata?.initial_request_id;
   let initialRun =

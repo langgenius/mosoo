@@ -902,6 +902,122 @@
         "required": ["code", "message"],
         "type": "object"
       },
+      "ThreadConfiguration": {
+        "description": "Choose inline execution or an owned Agent preset explicitly. The two sources cannot be combined; admitted configuration is frozen for the Session.",
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["type", "harness", "provider", "model", "instructions"],
+            "properties": {
+              "type": {
+                "const": "inline"
+              },
+              "harness": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 255,
+                "description": "Supported runtime catalog ID, such as openai-runtime or claude-agent-sdk."
+              },
+              "provider": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 255
+              },
+              "model": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 255
+              },
+              "instructions": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 32000
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["type", "agent_id"],
+            "properties": {
+              "type": {
+                "const": "agent"
+              },
+              "agent_id": {
+                "example": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                "format": "ulid",
+                "pattern": "^[0-7][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{25}$",
+                "type": "string"
+              }
+            }
+          }
+        ]
+      },
+      "CreateProjectThreadRequest": {
+        "additionalProperties": false,
+        "description": "Create a Project-owned durable Session with inline configuration or an optional saved Agent preset. No Agent is created for inline execution. Model credentials must already be configured in this Project.",
+        "properties": {
+          "userId": {
+            "description": "Opaque application-user identifier supplied by the trusted backend. It is immutable for the lifetime of the Thread and is delegated to MCP servers during Runs.",
+            "maxLength": 255,
+            "minLength": 1,
+            "type": "string"
+          },
+          "resources": {
+            "description": "Project draft files to attach to this Session and mount for execution.",
+            "items": {
+              "$ref": "#/components/schemas/FileResource"
+            },
+            "type": "array"
+          },
+          "input": {
+            "additionalProperties": false,
+            "description": "Initial user message that seeds the Thread and queues the first Run. Omit to create an empty Thread with no run.",
+            "properties": {
+              "content": {
+                "description": "Ordered content parts that make up the initial message.",
+                "items": {
+                  "additionalProperties": false,
+                  "description": "A single content part of the initial message.",
+                  "properties": {
+                    "text": {
+                      "description": "The text of this content part. Must not be empty.",
+                      "maxLength": 32000,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "type": {
+                      "const": "text",
+                      "description": "Content part discriminator. Only `text` is supported today."
+                    }
+                  },
+                  "required": ["type", "text"],
+                  "type": "object"
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              "type": {
+                "const": "user.message",
+                "description": "Discriminator for the initial input. Always `user.message`."
+              }
+            },
+            "required": ["type", "content"],
+            "type": "object"
+          },
+          "maxCostUsd": {
+            "type": "number",
+            "minimum": 0.000001,
+            "description": "Optional model-cost estimate cap for the initial turn, in USD (up to six decimal places). Requires input and a configured deployment budget policy; must not exceed the platform maximum. In-flight usage can exceed the cap. Omission uses the configured default when available."
+          },
+          "configuration": {
+            "$ref": "#/components/schemas/ThreadConfiguration"
+          }
+        },
+        "required": ["configuration"],
+        "type": "object"
+      },
       "ThreadUsageResponse": {
         "additionalProperties": false,
         "description": "Persisted runtime usage observations in ID order. Null means unreported, not zero. Token conventions follow usageContract; reported costs are runtime estimates, not a settled bill. Poll again to observe updates to in-progress calls.",
@@ -988,7 +1104,7 @@
     }
   },
   "info": {
-    "description": "Project-scoped durable Threads for private saved Agents. The existing Thread ID remains the conversation handle for reading, continuing, cancelling, and downloading files, regardless of creation channel or current publication state. v1 retains its existing admission and published-configuration behavior.",
+    "description": "Project-owned durable Sessions with direct harness/model/instructions input and optional saved Agent presets. No Agent is required for direct execution. The returned Thread ID remains the conversation handle for reading, continuing, cancelling, and downloading files. Project model credentials are required; v1 retains its existing admission and published-configuration behavior.",
     "title": "mosoo Public Thread API",
     "version": "v2"
   },
@@ -2140,6 +2256,202 @@
               }
             },
             "description": "Unarchived."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/projects/{projectId}/files": {
+      "post": {
+        "description": "Upload a Project draft file for direct or preset Session creation; no Agent is required.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "example": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+              "format": "ulid",
+              "pattern": "^[0-7][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{25}$",
+              "type": "string"
+            },
+            "description": "Owned Project. A Project key can access only its own Project; CLI login supplies an explicit owned Project."
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "file": {
+                    "description": "File bytes to upload before attaching them to a Thread.",
+                    "format": "binary",
+                    "type": "string"
+                  }
+                },
+                "required": ["file"],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "accessToken": []
+          }
+        ],
+        "summary": "Upload a Project file",
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicFileResponse"
+                }
+              }
+            },
+            "description": "Uploaded file."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/projects/{projectId}/threads": {
+      "post": {
+        "description": "Create a durable Session from explicit inline harness/model/instructions, or an optional saved Agent preset in this Project. Project model credentials are required. Input and files are optional. Creation freezes the effective configuration and never creates a hidden Agent; follow-ups use the returned Thread ID.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "example": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+              "format": "ulid",
+              "pattern": "^[0-7][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{25}$",
+              "type": "string"
+            },
+            "description": "Owned Project. A Project key can access only its own Project; CLI login supplies an explicit owned Project."
+          },
+          {
+            "description": "Optional key for retry-safe create-thread and send-events calls. Reusing the same key with the same request returns the original response. Reusing the key while the original request is still processing returns 409.",
+            "example": "thread-20260528-linear-eng-123",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "schema": {
+              "maxLength": 128,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "examples": {
+                "inline": {
+                  "summary": "Execute without creating an Agent",
+                  "value": {
+                    "configuration": {
+                      "type": "inline",
+                      "harness": "openai-runtime",
+                      "provider": "openai",
+                      "model": "gpt-5.6-luna",
+                      "instructions": "Analyze the supplied material and save the results."
+                    },
+                    "input": {
+                      "type": "user.message",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Create an analysis report."
+                        }
+                      ]
+                    }
+                  }
+                },
+                "preset": {
+                  "summary": "Use an optional saved Agent preset",
+                  "value": {
+                    "configuration": {
+                      "type": "agent",
+                      "agent_id": "01ARZ3NDEKTSV4RRFFQ69G5FAV"
+                    }
+                  }
+                }
+              },
+              "schema": {
+                "$ref": "#/components/schemas/CreateProjectThreadRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "accessToken": []
+          }
+        ],
+        "summary": "Create a Project Session",
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateThreadResponse"
+                }
+              }
+            },
+            "description": "Created Session.",
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "Present as true when this response is replayed from a previous completed request.",
+                "schema": {
+                  "const": "true",
+                  "type": "string"
+                }
+              }
+            }
           },
           "400": {
             "$ref": "#/components/responses/InvalidRequest"

@@ -35,7 +35,7 @@ The durable Session contract can use the existing Thread API and conversation ID
 
 Cloud debug Previews have a separate target lifecycle: continue within 30 days of debugging activity, then clean up the Preview and start a new one on return. Formal and API-used Sessions retain their continuation contract. Existing Preview cleanup requires an approved inventory and backup plan; see [Thread Lifecycle](./docs/prd/session-lifecycle.md#cloud-debug-preview-retention-unreleased).
 
-The current unreleased `/api/v2` Thread entry point selects saved private Agent configuration and makes `userId` optional. The approved direct-invocation target also requires creation without a pre-existing Agent; that path is not yet implemented. `/api/v1` retains published/live selection and its existing identity contract. This version boundary changes configuration admission, not conversation IDs; see the [API compatibility contract](./docs/prd/public-thread-api-surface.md#unreleased-saved-agent-entry-point).
+The unreleased `/api/v2/projects/{projectId}/threads` entry point accepts inline harness/model configuration or an explicit saved Agent preset, with optional `userId`. Project file upload and direct creation use the same Session kernel; inline execution creates no hidden Agent. Direct hosted acceptance and coordinated release are still pending. `/api/v1` retains published/live selection and its existing identity contract. This version boundary changes configuration admission, not conversation IDs; see the [API compatibility contract](./docs/prd/public-thread-api-surface.md#unreleased-saved-agent-entry-point).
 
 ## How It Works Today
 

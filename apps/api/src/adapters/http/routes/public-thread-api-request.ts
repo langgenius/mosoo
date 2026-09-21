@@ -1,5 +1,6 @@
 import type {
   PublicApiVersion,
+  PublicThreadConfiguration,
   PublicThreadApiSendEventsRequest,
 } from "@mosoo/contracts/public-api";
 import {
@@ -8,11 +9,19 @@ import {
   PUBLIC_THREAD_FILE_ID_MAX_LENGTH,
   PUBLIC_THREAD_INPUT_TEXT_MAX_LENGTH,
   PUBLIC_THREAD_JSON_BODY_MAX_BYTES,
+  PUBLIC_PROJECT_THREAD_JSON_BODY_MAX_BYTES,
   PUBLIC_API_OPENAPI_SCHEMAS,
   PUBLIC_THREAD_USER_ID_MAX_LENGTH,
 } from "@mosoo/contracts/public-api";
 import { parsePlatformId } from "@mosoo/id";
-import type { AgentId, FileId, PublicThreadId, SessionModelCallId, SessionRunId } from "@mosoo/id";
+import type {
+  AgentId,
+  FileId,
+  ProjectId,
+  PublicThreadId,
+  SessionModelCallId,
+  SessionRunId,
+} from "@mosoo/id";
 
 import {
   PublicApiError,
@@ -57,6 +66,14 @@ export interface ParsedCreateThreadRequest {
   fileIds: FileId[];
   inputText?: string | undefined;
   userId: string | null;
+}
+
+export interface ParsedCreateProjectThreadRequest extends ParsedCreateThreadRequest {
+  configuration: PublicThreadConfiguration;
+}
+
+export function parseProjectIdParam(value: string): ProjectId {
+  return parsePublicPlatformId(value, "projectId") as ProjectId;
 }
 
 function parseContentLength(value: string | null): number | null {
@@ -483,6 +500,13 @@ export async function readCreateThreadRequest(
       : CREATE_THREAD_REQUEST_FIELDS,
     "create thread",
   );
+  return parseCreateThreadFields(body, apiVersion);
+}
+
+function parseCreateThreadFields(
+  body: Record<string, unknown>,
+  apiVersion: PublicApiVersion,
+): ParsedCreateThreadRequest {
   const userId =
     apiVersion === "v2" && body["userId"] === undefined
       ? null
@@ -497,5 +521,52 @@ export async function readCreateThreadRequest(
     ...(maxCostUsd === undefined ? {} : { maxCostUsd }),
     ...(inputText === undefined ? {} : { inputText }),
     userId,
+  };
+}
+
+export async function readCreateProjectThreadRequest(
+  c: RawJsonRequestContext,
+): Promise<ParsedCreateProjectThreadRequest> {
+  const body = await readOptionalJsonBodyWithLimit(c, PUBLIC_PROJECT_THREAD_JSON_BODY_MAX_BYTES);
+  if (!isRecord(body)) throw publicInvalidRequest("Request body must be an object.");
+  assertOnlyFields(
+    body,
+    new Set([...CREATE_THREAD_REQUEST_FIELDS, "maxCostUsd", "configuration"]),
+    "create Project thread",
+  );
+  const configuration = body["configuration"];
+  if (!isRecord(configuration)) throw publicInvalidRequest("configuration must be an object.");
+  const fields = parseCreateThreadFields(body, "v2");
+  if (configuration["type"] === "agent") {
+    assertOnlyFields(configuration, new Set(["type", "agent_id"]), "Agent configuration");
+    return {
+      ...fields,
+      configuration: {
+        type: "agent",
+        agent_id: parseAgentIdParam(readStringField(configuration, "agent_id")),
+      },
+    };
+  }
+  if (configuration["type"] !== "inline") {
+    throw publicInvalidRequest("configuration.type must be inline or agent.");
+  }
+  assertOnlyFields(
+    configuration,
+    new Set(["type", "harness", "provider", "model", "instructions"]),
+    "inline configuration",
+  );
+  return {
+    ...fields,
+    configuration: {
+      type: "inline",
+      harness: readLimitedStringField(configuration, "harness", 255),
+      provider: readLimitedStringField(configuration, "provider", 255),
+      model: readLimitedStringField(configuration, "model", 255),
+      instructions: readLimitedStringField(
+        configuration,
+        "instructions",
+        PUBLIC_THREAD_INPUT_TEXT_MAX_LENGTH,
+      ),
+    },
   };
 }

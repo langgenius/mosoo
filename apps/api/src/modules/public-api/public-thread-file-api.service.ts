@@ -17,6 +17,7 @@ import { fileStore } from "../files/application/file-store";
 import { assertSessionRecoveryAvailable } from "../runtime/application/session-run.service";
 import { publishSessionResourceDelete } from "../sessions/application/session-resource-events.service";
 import { admitAgentApiEndpointCaller } from "./agent-api-endpoint-admission.service";
+import { admitPublicProjectCaller } from "./public-thread-admission";
 import { toBackingSessionId, toPublicThreadId } from "./public-thread-ids";
 import { admitPublicSessionCaller } from "./public-thread-session-query.service";
 
@@ -138,6 +139,33 @@ export async function createPublicAgentFile(
   }
 
   const agent = await admitAgentApiEndpointCaller(bindings.DB, caller, input.agentId, apiVersion);
+  return uploadPublicProjectFile(bindings, caller, {
+    projectId: agent.projectId,
+    file: input.file,
+  });
+}
+
+export async function createPublicProjectFile(
+  bindings: ApiBindings,
+  caller: AuthenticatedViewer,
+  input: { projectId: ProjectId; file: File },
+): Promise<PublicFileResponse> {
+  if (input.file.size > PUBLIC_THREAD_FILE_UPLOAD_MAX_BYTES) {
+    throw new FileControlError(
+      400,
+      "file_invalid_request",
+      `file.size must be ${PUBLIC_THREAD_FILE_UPLOAD_MAX_BYTES} bytes or fewer.`,
+    );
+  }
+  await admitPublicProjectCaller(bindings.DB, caller, input.projectId);
+  return uploadPublicProjectFile(bindings, caller, input);
+}
+
+async function uploadPublicProjectFile(
+  bindings: ApiBindings,
+  caller: AuthenticatedViewer,
+  input: { projectId: ProjectId; file: File },
+): Promise<PublicFileResponse> {
   const upload = await fileStore.createUpload(bindings, caller, {
     file: {
       contentType: input.file.type || "application/octet-stream",
@@ -147,7 +175,7 @@ export async function createPublicAgentFile(
     overwrite: false,
     purpose: "app_draft",
     target: {
-      id: agent.projectId,
+      id: input.projectId,
       kind: "app_draft",
       name: input.file.name,
     },

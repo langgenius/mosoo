@@ -735,20 +735,70 @@ export const PUBLIC_API_OPENAPI_SCHEMAS = {
   },
 } satisfies Record<string, PublicApiOpenApiSchema>;
 
+const PUBLIC_API_V2_CREATE_THREAD_REQUEST_SCHEMA = {
+  ...PUBLIC_API_OPENAPI_SCHEMAS.CreateThreadRequest,
+  description:
+    "Create a durable Thread from the latest saved private Agent configuration. userId is optional; omit input for an idle Thread. Existing Threads retain their admitted configuration.",
+  required: [],
+  properties: {
+    ...PUBLIC_API_OPENAPI_SCHEMAS.CreateThreadRequest.properties,
+    maxCostUsd: {
+      type: "number",
+      minimum: 0.000001,
+      description:
+        "Optional model-cost estimate cap for the initial turn, in USD (up to six decimal places). Requires input and a configured deployment budget policy; must not exceed the platform maximum. In-flight usage can exceed the cap. Omission uses the configured default when available.",
+    },
+  },
+};
+
 export const PUBLIC_API_OPENAPI_V2_SCHEMAS = {
   ...PUBLIC_API_OPENAPI_SCHEMAS,
-  CreateThreadRequest: {
-    ...PUBLIC_API_OPENAPI_SCHEMAS.CreateThreadRequest,
+  CreateThreadRequest: PUBLIC_API_V2_CREATE_THREAD_REQUEST_SCHEMA,
+  ThreadConfiguration: {
     description:
-      "Create a durable Thread from the latest saved private Agent configuration. userId is optional; omit input for an idle Thread. Existing Threads retain their admitted configuration.",
-    required: [],
+      "Choose inline execution or an owned Agent preset explicitly. The two sources cannot be combined; admitted configuration is frozen for the Session.",
+    oneOf: [
+      {
+        type: "object",
+        additionalProperties: false,
+        required: ["type", "harness", "provider", "model", "instructions"],
+        properties: {
+          type: { const: "inline" },
+          harness: {
+            type: "string",
+            minLength: 1,
+            maxLength: 255,
+            description:
+              "Supported runtime catalog ID, such as openai-runtime or claude-agent-sdk.",
+          },
+          provider: { type: "string", minLength: 1, maxLength: 255 },
+          model: { type: "string", minLength: 1, maxLength: 255 },
+          instructions: {
+            type: "string",
+            minLength: 1,
+            maxLength: PUBLIC_THREAD_INPUT_TEXT_MAX_LENGTH,
+          },
+        },
+      },
+      {
+        type: "object",
+        additionalProperties: false,
+        required: ["type", "agent_id"],
+        properties: { type: { const: "agent" }, agent_id: PLATFORM_ID_SCHEMA },
+      },
+    ],
+  },
+  CreateProjectThreadRequest: {
+    ...PUBLIC_API_V2_CREATE_THREAD_REQUEST_SCHEMA,
+    description:
+      "Create a Project-owned durable Session with inline configuration or an optional saved Agent preset. No Agent is created for inline execution. Model credentials must already be configured in this Project.",
+    required: ["configuration"],
     properties: {
-      ...PUBLIC_API_OPENAPI_SCHEMAS.CreateThreadRequest.properties,
-      maxCostUsd: {
-        type: "number",
-        minimum: 0.000001,
-        description:
-          "Optional model-cost estimate cap for the initial turn, in USD (up to six decimal places). Requires input and a configured deployment budget policy; must not exceed the platform maximum. In-flight usage can exceed the cap. Omission uses the configured default when available.",
+      ...PUBLIC_API_V2_CREATE_THREAD_REQUEST_SCHEMA.properties,
+      configuration: { $ref: "#/components/schemas/ThreadConfiguration" },
+      resources: {
+        ...PUBLIC_API_V2_CREATE_THREAD_REQUEST_SCHEMA.properties.resources,
+        description: "Project draft files to attach to this Session and mount for execution.",
       },
     },
   },

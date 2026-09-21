@@ -20,6 +20,8 @@ Keep existing v1 live-selection and identity behavior. Existing v2 Agent-scoped 
 
 ## Implementation sequence
 
+The implemented wire shape is `POST /api/v2/projects/{projectId}/threads` with `configuration: {type: "inline", harness, provider, model, instructions}` or `configuration: {type: "agent", agent_id}`. Inline instructions are required. Project draft files use `POST /api/v2/projects/{projectId}/files`; the existing `input`, `resources`, optional `userId` and per-turn `maxCostUsd` are unchanged. The v2 Agent-scoped endpoint remains a preset adapter. These source contracts do not establish deployed acceptance.
+
 1. Update canonical product and boundary documents before changing code. Record the latest scope in #582, #634, #639, #640 and the umbrella PR; previous saved-Agent acceptance is only partial evidence.
 2. Remove runtime hydration's dependence on a mutable Agent for frozen Sessions. Resolve execution authority from the Session's Project and configuration from its execution snapshot. Preserve explicit legacy fallback reads for old snapshots; never fabricate missing configuration.
 3. Make Agent provenance optional across stored execution records and Driver contracts, with an appended migration that preserves existing records and indexes. Verify data preservation, foreign-key behavior, and rollback on disposable copies before proposing production application. Match Host/Driver versions whenever their protocol changes.
