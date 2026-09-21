@@ -316,6 +316,8 @@ describe("runtime subject recycle", () => {
     let backupIndex = 0;
     currentSandbox = {
       ...createSandboxHandle(),
+      // Both eligible conversation directories are resident in this fixture.
+      exec: async () => ({ exitCode: 0, stderr: "", stdout: "resident", success: true }),
       createBackup: async (options) => {
         checkpointDirs.push(options.dir);
         const id = CLOUDFLARE_BACKUP_IDS[backupIndex];
@@ -365,7 +367,7 @@ describe("runtime subject recycle", () => {
       "/workspace/se/session-1",
       "/workspace/se/session-2",
     ]);
-    expect(preparedDirs.toSorted()).toEqual(checkpointDirs.toSorted());
+    expect(preparedDirs).toEqual(["/workspace/memory"]);
     expect(lifecycleCalls).toEqual(["keepAlive:false", "destroy"]);
     await expect(readRuntimeSubjectRecycleRow(database)).resolves.toMatchObject({
       last_error: null,

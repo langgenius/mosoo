@@ -62,6 +62,17 @@ tool effect and shared file. The other 28 Sessions still lack a nonempty source
 among the inspected retained workspace backups; that observation does not
 establish permanent data loss or justify discarding their state.
 
+A local reproduction of the shared-subject checkpoint path found that creating a
+missing conversation directory produced an empty ready archive. Repeating this
+across three reclamations also pruned the earlier complete archive. The fix keeps
+the existing reference when an idle, closed conversation is not resident and its
+latest ready checkpoint is no older than its last message. Resident workspaces
+are still checkpointed; missing required workspaces stop reclamation. Pruning
+only considers directories actually checkpointed by that operation. This prevents
+that replacement path; it does not prove that a retained legacy archive is valid,
+recover earlier deletions, or establish the historical cause of every empty
+production archive. The Cloud conversion evidence is still required.
+
 Do not infer data loss from missing metadata or a missing entry in the current
 Container list. Preserve the original resources while investigating. Missing
 configuration cannot be replaced with current Agent settings merely because they

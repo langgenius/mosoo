@@ -72,6 +72,7 @@ export async function listReadySandboxBackupsForSessionRun(
 }
 
 export interface SandboxSessionBackupCandidate {
+  readonly canRetainCheckpointWhenMissing: boolean;
   readonly cwd: string;
   readonly lastMessageAt: number | null;
   readonly sessionId: SessionId;
@@ -264,8 +265,17 @@ export async function listSandboxSessionBackupCandidates(
   const parsedSandboxId = parsePlatformId<SandboxId>(sandboxId, "sandbox id");
   const results = await getAppDatabase(database)
     .select({
+      conversation_status: sandboxSessionsTable.status,
       cwd: sandboxSessionsTable.cwd,
       last_message_at: sessionsTable.lastMessageAt,
+      latest_backup_at: sql<number | null>`(
+        SELECT ${sandboxBackupsTable.createdAt} FROM ${sandboxBackupsTable}
+        WHERE ${sandboxBackupsTable.sandboxId} = ${sandboxSessionsTable.sandboxId}
+          AND ${sandboxBackupsTable.dir} = ${sandboxSessionsTable.cwd}
+          AND ${sandboxBackupsTable.status} = 'ready'
+        ORDER BY ${sandboxBackupsTable.createdAt} DESC, ${sandboxBackupsTable.id} DESC
+        LIMIT 1
+      )`,
       session_id: sandboxSessionsTable.sessionId,
       session_status: sessionsTable.status,
     })
@@ -280,6 +290,12 @@ export async function listSandboxSessionBackupCandidates(
     .all();
 
   return results.map((row) => ({
+    canRetainCheckpointWhenMissing:
+      row.conversation_status === "closed" &&
+      row.session_status === "IDLE" &&
+      row.last_message_at !== null &&
+      row.latest_backup_at !== null &&
+      row.latest_backup_at >= row.last_message_at,
     cwd: row.cwd,
     lastMessageAt: row.last_message_at,
     sessionId: row.session_id,

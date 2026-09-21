@@ -18,19 +18,29 @@ import {
 } from "./sandbox-backup-store";
 
 export interface SandboxSessionBackupTarget {
+  canRetainCheckpointWhenMissing: boolean;
   cwd: string;
   sessionId: string;
 }
 
 interface SandboxCheckpointBackupTarget {
   readonly dir: string;
+  readonly sanitizeTransientState: boolean;
   readonly sessionId: string | null;
+  readonly skipMissingWorkspace: boolean;
   readonly updateSandboxLastBackup: boolean;
 }
 
-async function pruneSandboxBackups(bindings: ApiBindings, sandboxId: string): Promise<void> {
+async function pruneSandboxBackups(
+  bindings: ApiBindings,
+  sandboxId: string,
+  checkpointedDirs: ReadonlySet<string>,
+): Promise<void> {
+  if (checkpointedDirs.size === 0) return;
   const backups = await listReadySandboxBackupsForPruning(bindings.DB, sandboxId);
-  const pruneIds = selectSandboxBackupPruneIds(backups);
+  const pruneIds = selectSandboxBackupPruneIds(
+    backups.filter((backup) => checkpointedDirs.has(backup.dir)),
+  );
 
   await deleteSandboxBackupObjects(bindings, pruneIds);
   await markSandboxBackupsPruned(bindings.DB, pruneIds);
@@ -50,6 +60,7 @@ async function listSandboxSessionBackupTargets(
       }),
     )
     .map((candidate) => ({
+      canRetainCheckpointWhenMissing: candidate.canRetainCheckpointWhenMissing,
       cwd: candidate.cwd,
       sessionId: candidate.sessionId,
     }));
@@ -70,7 +81,9 @@ async function listSandboxCheckpointBackupTargets(
       case "subject_memory": {
         targets.push({
           dir: rule.path,
+          sanitizeTransientState: false,
           sessionId: null,
+          skipMissingWorkspace: false,
           updateSandboxLastBackup: rule.updateSubjectCheckpoint,
         });
         break;
@@ -80,7 +93,10 @@ async function listSandboxCheckpointBackupTargets(
         targets.push(
           ...sessionTargets.map((target) => ({
             dir: target.cwd,
-            sessionId: rule.sanitizeTransientState ? target.sessionId : null,
+            sanitizeTransientState: rule.sanitizeTransientState,
+            sessionId: target.sessionId,
+            skipMissingWorkspace:
+              !rule.sanitizeTransientState && target.canRetainCheckpointWhenMissing,
             updateSandboxLastBackup: false,
           })),
         );
@@ -103,8 +119,10 @@ async function createSandboxBackupsForTargets(
     input.targets.map(async (target) => ({
       backup: await createRuntimeSandboxBackup(bindings, {
         dir: target.dir,
+        sanitizeTransientState: target.sanitizeTransientState,
         sandboxId: input.sandboxId,
         sessionId: target.sessionId,
+        skipMissingWorkspace: target.skipMissingWorkspace,
         ttlSeconds: SANDBOX_BACKUP_TTL_SECONDS,
       }).catch((error: unknown) => {
         throw new RuntimeSubjectCheckpointFailedError({
@@ -117,7 +135,9 @@ async function createSandboxBackupsForTargets(
     })),
   );
   const createdBackups = results.flatMap((result) =>
-    result.status === "fulfilled" ? [result.value] : [],
+    result.status === "fulfilled" && result.value.backup !== null
+      ? [{ ...result.value, backup: result.value.backup }]
+      : [],
   );
   const failedBackup = results.find((result) => result.status === "rejected");
 
@@ -229,6 +249,7 @@ async function createSandboxCheckpointBackups(
   },
 ): Promise<void> {
   let targets = await listSandboxCheckpointBackupTargets(bindings.DB, input);
+  const checkpointedDirs = new Set<string>();
 
   if (
     input.requiredSessionId !== undefined &&
@@ -244,6 +265,14 @@ async function createSandboxCheckpointBackups(
 
   if (targets.length === 0) {
     return;
+  }
+
+  if (input.requiredSessionId !== undefined) {
+    targets = targets.map((target) =>
+      target.sessionId === input.requiredSessionId
+        ? { ...target, skipMissingWorkspace: false }
+        : target,
+    );
   }
 
   if (input.sessionRunId !== undefined) {
@@ -273,10 +302,11 @@ async function createSandboxCheckpointBackups(
       sandboxId: input.sandboxId,
       ...(input.sessionRunId === undefined ? {} : { sessionRunId: input.sessionRunId }),
     });
+    for (const entry of backups) checkpointedDirs.add(entry.backup.dir);
   }
 
   try {
-    await pruneSandboxBackups(bindings, input.sandboxId);
+    await pruneSandboxBackups(bindings, input.sandboxId, checkpointedDirs);
   } catch (error) {
     if (input.sessionRunId === undefined) {
       throw error;

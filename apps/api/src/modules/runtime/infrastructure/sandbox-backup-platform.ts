@@ -87,24 +87,46 @@ export async function createRuntimeSandboxBackup(
   bindings: ApiBindings,
   input: {
     readonly dir: string;
+    readonly sanitizeTransientState: boolean;
     readonly sandboxId: string;
     readonly sessionId: string | null;
+    readonly skipMissingWorkspace: boolean;
     readonly ttlSeconds: number;
   },
-): Promise<SandboxBackupObject> {
+): Promise<SandboxBackupObject | null> {
   const { getRuntimeSubjectKeepAliveHandle } =
     await import("./runtime-subject-lifecycle/runtime-subject-lifecycle.service");
 
   return withDisposedRpcResource(
     await getRuntimeSubjectKeepAliveHandle(bindings, input.sandboxId),
     async (sandbox) => {
-      if (input.sessionId !== null) {
+      if (input.sessionId !== null && input.sanitizeTransientState) {
         await prepareRuntimeSessionWorkspaceCheckpoint(sandbox, {
           cwd: input.dir,
           sessionId: input.sessionId,
         });
-      } else {
+      } else if (input.sessionId === null) {
         await sandbox.mkdir(input.dir, { recursive: true });
+      } else {
+        // A shared subject restores each conversation lazily. A closed
+        // conversation can have a checkpoint without being resident on this
+        // incarnation; creating its missing directory would overwrite that
+        // checkpoint with an empty archive and eventually prune the real one.
+        const dir = quoteShellArg(input.dir);
+        const command = `if test -d ${dir}; then printf resident; elif test ! -e ${dir} && test ! -L ${dir}; then printf missing; else exit 1; fi`;
+        const residency = await withDisposedRpcResult(
+          sandbox.exec(`sh -lc ${quoteShellArg(command)}`),
+          (result) => {
+            if (!result.success || result.exitCode !== 0) {
+              throw new Error("Session workspace residency could not be checked.");
+            }
+            return result.stdout.trim();
+          },
+        );
+        if (residency === "missing" && input.skipMissingWorkspace) return null;
+        if (residency !== "resident") {
+          throw new Error("Session workspace is missing its required checkpoint source.");
+        }
       }
 
       return withDisposedRpcResult(

@@ -89,10 +89,15 @@ export async function prepareSessionRunCompletionCheckpoint(
     }
     const backup = await createRuntimeSandboxBackup(bindings, {
       dir: target.cwd,
+      sanitizeTransientState: true,
       sandboxId: link.sandboxId,
       sessionId: link.sessionId,
+      skipMissingWorkspace: false,
       ttlSeconds: SANDBOX_BACKUP_TTL_SECONDS,
     });
+    if (backup === null) {
+      throw new Error("Session completion did not create its required workspace checkpoint.");
+    }
     return {
       backupId: parsePlatformId<SandboxBackupId>(backup.id, "completion checkpoint id"),
       dir: backup.dir,
