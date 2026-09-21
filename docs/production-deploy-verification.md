@@ -356,6 +356,11 @@ all affected workflows and client actions. The completed #581 key-rotation
 notice does not cover a future Session or Builder change. Describe that
 release's actual changes; require key rotation only if it changes valid keys.
 
+For #582 Cloud conversion, also follow the
+[Session isolation transition](./session-isolation-transition.md) evidence,
+concurrent-admission, and functional rollback requirements. A ready backup row or
+a successful metadata check is not proof that the original workspace is usable.
+
 The target #582 acceptance covers both ghFind single-turn evaluation and
 multi-turn continuation, including checkpoint failure and recovery after
 runtime reclamation. Verify that replies seconds or days later use the same
