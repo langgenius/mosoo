@@ -9,7 +9,11 @@ not a contractual SLA or a synthetic SLO.
 The status pipeline reuses two production signals:
 
 1. Cloudflare Tail Worker events report every `mosoo-api-prod` invocation
-   outcome and HTTP 5xx response. The API's existing one-minute maintenance
+   outcome and API HTTP 5xx response. Completed Sandbox egress responses are
+   marked by `runtime.sandbox.egress.http_error`: upstream HTTP errors and SDK
+   policy denials (520) do not indicate an API failure. Worker exceptions and
+   severe outcomes still count as failures, including in the egress proxy.
+   The API's existing one-minute maintenance
    schedule supplies an idle-traffic liveness signal without calling a model.
 2. Mosoo's shared Run lifecycle emits one structured `session.run.terminal`
    business log when it commits a terminal transition. The log contains the
@@ -23,7 +27,8 @@ invokes an Agent, or consumes model tokens.
 ## Public Measurements
 
 - **Service availability** is the share of observed API Worker invocations that
-  finish without a severe Worker outcome or HTTP 5xx response.
+  finish without a severe Worker outcome, unhandled exception, or API HTTP 5xx
+  response. Marked egress HTTP results do not count as API HTTP failures.
 - **Runtime Run completion rate** is `completed / (completed + failed +
 expired)` for real `ui` Runs. Preview Runs and cancellations
   are excluded.

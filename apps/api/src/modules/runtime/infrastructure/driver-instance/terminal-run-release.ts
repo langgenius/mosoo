@@ -189,8 +189,9 @@ export async function repairFinalizedTerminalDriverRunState(
         reclaimReason: "socket_closed",
         runStatus: link.sessionRunStatus,
       });
-      logInfo("runtime.reclaim.recovery.decided", {
-        action: recovery.kind,
+      logInfo("runtime.reclaim.recovery.recommended", {
+        executed: false,
+        recommendedAction: recovery.kind,
         driverInstanceId: input.driverInstanceId,
         priorTrigger: run.trigger,
         runId: run.id,
