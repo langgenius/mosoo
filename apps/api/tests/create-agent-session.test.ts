@@ -300,6 +300,55 @@ describe("createAgentSession", () => {
     ).rejects.toThrow("sessionExecutionPlan.configJson must be a string");
   });
 
+  test("hydrates frozen isolated execution without a saved Agent, including cache refresh", async () => {
+    const database = await createPublicHttpContractDatabase();
+    const bindings = createPublicHttpTestBindings(database) as ApiBindings;
+    const session = await withProviderProbeMock(() =>
+      createAgentSession({
+        bindings,
+        input: {
+          agentId: PUBLIC_API_TEST_IDS.agent,
+          projectId: PUBLIC_API_TEST_IDS.project,
+          type: "ui",
+        },
+        options: { configurationSource: "saved" },
+        viewer: OWNER_VIEWER,
+      }),
+    );
+    await database.prepare("DELETE FROM agent WHERE id = ?").bind(session.agentId).run();
+
+    const cold = await hydrateCachedRunContextFromSession(bindings, OWNER_VIEWER, session);
+    expect(cold.cacheHit).toBe(false);
+    expect(cold.value.profile.model).toBe(session.model);
+    expect(cold.value.profile.session.origin.executionOwnerUserId).toBe(OWNER_VIEWER.id);
+    expect(cold.value.profile.vendorCredential.projectId).toBe(session.projectId);
+    expect(cold.value.profile.sandbox.subjectId).toBe(session.id);
+    const warm = await hydrateCachedRunContextFromSession(bindings, OWNER_VIEWER, session);
+    expect(warm.cacheHit).toBe(true);
+    expect(warm.value.profile.configRevision).toEqual(cold.value.profile.configRevision);
+
+    await expect(
+      hydrateCachedRunContextFromSession(
+        bindings,
+        { ...OWNER_VIEWER, projectId: "01J00000000000000000000099" },
+        session,
+      ),
+    ).rejects.toThrow("permission");
+    await expect(
+      hydrateCachedRunContextFromSession(bindings, OWNER_VIEWER, {
+        ...session,
+        projectId: "01J00000000000000000000099",
+      }),
+    ).rejects.toThrow("permission");
+    await database
+      .prepare("UPDATE project SET owner_account_id = ? WHERE id = ?")
+      .bind(PUBLIC_API_TEST_IDS.outsiderAccount, session.projectId)
+      .run();
+    await expect(
+      hydrateCachedRunContextFromSession(bindings, OWNER_VIEWER, session),
+    ).rejects.toThrow("permission");
+  });
+
   test("fails Public Thread session creation when the live version is missing", async () => {
     const database = await createPublicHttpContractDatabase();
     database.execute("PRAGMA ignore_check_constraints = ON");

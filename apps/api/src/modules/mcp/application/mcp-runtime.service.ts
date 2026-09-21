@@ -1,10 +1,9 @@
 import type { McpAuthorizationState } from "@mosoo/contracts/mcp";
-import type { AccountId, AgentId, CredentialId, McpServerId } from "@mosoo/id";
+import type { AccountId, AgentId, CredentialId, McpServerId, ProjectId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { isTruthy } from "../../../shared/truthiness";
 import { currentTimestampMs, toIsoString } from "../../../time";
-import { getAgentRow } from "../../agents/application/agent-repository";
 import { ensureProjectOwnership } from "../../projects/application/project.service";
 import type { DriverResolvedMcpServer } from "../../runtime/domain/driver-snapshot";
 import { readMcpCredentialSecret } from "./mcp-credential-secret-resolution";
@@ -21,7 +20,13 @@ import {
   toUnavailableCredentialStatus,
 } from "./mcp-mappers";
 import { exchangeOAuthToken, getOrDiscoverOAuthMetadata } from "./mcp-oauth.service";
-import { readAccountId, readAgentId, readCredentialId, readMcpServerId } from "./mcp-platform-ids";
+import {
+  readAccountId,
+  readAgentId,
+  readCredentialId,
+  readMcpServerId,
+  readProjectId,
+} from "./mcp-platform-ids";
 import { getServerRow, listServerRowsById } from "./mcp-server.repository";
 import type {
   AgentBindingRow,
@@ -89,9 +94,11 @@ export async function resolveRuntimeMcpServersForSnapshot(
     bindings: RuntimeMcpBindingSnapshot[];
     callerUserId: AccountId | string;
     executionOwnerUserId: AccountId | string;
+    projectId: ProjectId | string;
   },
 ): Promise<DriverResolvedMcpServer[]> {
   const agentId = readAgentId(input.agentId);
+  const projectId = readProjectId(input.projectId);
   const callerUserId = readAccountId(input.callerUserId, "callerUserId");
   const executionOwnerUserId = readAccountId(input.executionOwnerUserId, "executionOwnerUserId");
   const orderedBindings = [...input.bindings]
@@ -108,11 +115,10 @@ export async function resolveRuntimeMcpServersForSnapshot(
       };
     })
     .toSorted((left, right) => left.sortOrder - right.sortOrder);
-  const agent = await getAgentRow(bindings.DB, agentId);
-  await ensureProjectOwnership(bindings.DB, callerUserId, agent.projectId);
+  const project = await ensureProjectOwnership(bindings.DB, callerUserId, projectId);
 
-  if (executionOwnerUserId !== agent.ownerId) {
-    throw new Error("Runtime MCP credentials must resolve for the agent owner.");
+  if (executionOwnerUserId !== project.ownerAccountId) {
+    throw new Error("Runtime MCP credentials must resolve for the Project owner.");
   }
 
   const serversById = await listServerRowsById(
@@ -136,7 +142,7 @@ export async function resolveRuntimeMcpServersForSnapshot(
       throw new Error("MCP server not found.");
     }
 
-    if (server.projectId !== agent.projectId) {
+    if (server.projectId !== project.id) {
       throw new Error("MCP server is not available in this project.");
     }
 
@@ -146,7 +152,7 @@ export async function resolveRuntimeMcpServersForSnapshot(
 
     credentialBindings.push({
       agentCredentialId: snapshot.agentCredentialId,
-      agentId: agent.id,
+      agentId,
       credentialMode: snapshot.credentialMode,
       credentialScope: server.credentialScope,
       serverId: server.id,

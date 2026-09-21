@@ -345,3 +345,24 @@ CREATE TABLE `session_run_budget` (
 	`updated_at` integer NOT NULL,
 	FOREIGN KEY (`session_run_id`) REFERENCES `session_run`(`id`) ON UPDATE no action ON DELETE cascade
 );
+
+CREATE TABLE mcp_credential (
+  account_id text,
+  agent_id text,
+  auth_type text NOT NULL,
+  created_at integer NOT NULL,
+  expires_at integer,
+  id text PRIMARY KEY NOT NULL,
+  last_refreshed_at integer,
+  oauth_client_id text,
+  oauth_client_secret_secret_id text,
+  project_id text NOT NULL,
+  refresh_secret_id text,
+  scope text NOT NULL,
+  scope_values_json text,
+  secret_id text NOT NULL,
+  server_id text NOT NULL,
+  status text NOT NULL,
+  subject_label text,
+  updated_at integer NOT NULL
+);

@@ -154,15 +154,15 @@ These boundaries do not prohibit an Agent from using existing authorized tools f
 
 Existing code provides runtime adapters, sandboxes, Thread/Run history, checkpoint recovery, files, MCP, events, and usage. Project keys and separate CLI login shipped in #581. The new Session contract and remaining product cleanup still need implementation and real acceptance evidence. This document does not establish production reliability, adoption, willingness to pay, or task economics.
 
-| Issue | Status And Responsibility                                                                                                                                                     |
-| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| #546  | Overall Vision: an API-first managed Agent runtime.                                                                                                                           |
-| #579  | Closed: remove Channels from Mosoo main.                                                                                                                                      |
-| #580  | Closed: remove App Deployment and bound-capability coupling.                                                                                                                  |
-| #581  | Shipped: multiple Projects, Project keys, separate CLI login, authentication cutover, and user notification.                                                                  |
-| #582  | Remaining: BYOK private Agents and one durable Session API, single-turn and multi-turn acceptance, budgets, checkpoint and recovery, and removal of the Pet/Cattle dual type. |
-| #583  | Remaining: remove Package, Manifest, and Fork product lifecycles while preserving necessary configuration and history.                                                        |
-| #584  | Remaining: private Agent configuration and console cleanup, without publishing or public version selection.                                                                   |
+| Issue | Status And Responsibility                                                                                                                                            |
+| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| #546  | Overall Vision: an API-first managed Agent runtime.                                                                                                                  |
+| #579  | Closed: remove Channels from Mosoo main.                                                                                                                             |
+| #580  | Closed: remove App Deployment and bound-capability coupling.                                                                                                         |
+| #581  | Shipped: multiple Projects, Project keys, separate CLI login, authentication cutover, and user notification.                                                         |
+| #582  | Remaining: BYOK direct harness invocation, optional presets, durable Sessions, both acceptance paths, budgets, recovery, Cloud migration, and Pet/Cattle retirement. |
+| #583  | Remaining: remove Package, Manifest, and Fork product lifecycles while preserving necessary configuration and history.                                               |
+| #584  | Remaining: private Agent configuration and console cleanup, without publishing or public version selection.                                                          |
 
 #636 separately tracks platform model supply, setup-free managed access, recharge, and commercial usage billing; it is not a #582 dependency.
 
