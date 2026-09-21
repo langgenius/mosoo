@@ -131,7 +131,7 @@ async function restoreSandboxSessionCwdIfMissing(input: {
   if (!input.latestReadyBackup) {
     if (input.requireCheckpoint) {
       throw new Error(
-        `Thread ${input.sessionId} has no committed workspace checkpoint. Retry after the previous turn finishes checkpointing; if the error persists, start a new Thread or contact support.`,
+        `Thread ${input.sessionId} has no committed workspace checkpoint. Retry this Thread after the previous turn finishes checkpointing; contact support if recovery remains unavailable.`,
       );
     }
 
@@ -146,7 +146,7 @@ async function restoreSandboxSessionCwdIfMissing(input: {
     });
   } catch (cause) {
     throw new Error(
-      `Thread ${input.sessionId} workspace checkpoint could not be restored. Retry the continuation; if the error persists, start a new Thread or contact support.`,
+      `Thread ${input.sessionId} workspace checkpoint could not be restored. Retry this Thread; contact support if recovery remains unavailable.`,
       { cause },
     );
   }
