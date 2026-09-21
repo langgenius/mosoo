@@ -17,7 +17,6 @@ function draft(overrides: Partial<AgentEditorDraft> = {}): AgentEditorDraft {
     mcpServers: [],
     model: "gpt-5",
     name: "Agent",
-    kind: "pet",
     prompt: "Help",
     provider: "openai",
     providerOptions: {},
@@ -37,8 +36,8 @@ describe("agent config change plan", () => {
 
     expect(plan.action).toBe("restart-process");
     expect(plan.requiresDeploymentVersion).toBe(true);
-    expect(plan.requiresRuntimeOperation).toBe(true);
-    expect(plan.agentStatePreserved).toBe(true);
+    expect(plan.requiresRuntimeOperation).toBe(false);
+    expect(plan.agentStatePreserved).toBe(false);
   });
 
   test("uses recreate-preserving-state as the max rank for environment changes", () => {
@@ -55,21 +54,21 @@ describe("agent config change plan", () => {
 
     expect(plan.action).toBe("recreate-preserving-state");
     expect(plan.requiresDeploymentVersion).toBe(true);
-    expect(plan.requiresRuntimeOperation).toBe(true);
+    expect(plan.requiresRuntimeOperation).toBe(false);
     expect(plan.fieldLabels.length).toBeGreaterThan(1);
   });
 
-  test("saves published Cattle config changes for future sessions without runtime operations", () => {
+  test("preserves legacy shared-workspace maintenance for published config changes", () => {
     const plan = classifyAgentConfigChanges({
       agentStatus: "published",
-      current: toAgentConfigChangeSnapshot(draft({ kind: "cattle", prompt: "Help more" })),
-      saved: toAgentConfigChangeSnapshot(draft({ kind: "cattle" })),
+      current: toAgentConfigChangeSnapshot(draft({ prompt: "Help more" }), "pet"),
+      saved: toAgentConfigChangeSnapshot(draft(), "pet"),
     });
 
     expect(plan.action).toBe("restart-process");
     expect(plan.requiresDeploymentVersion).toBe(true);
-    expect(plan.requiresRuntimeOperation).toBe(false);
-    expect(plan.agentStatePreserved).toBe(false);
+    expect(plan.requiresRuntimeOperation).toBe(true);
+    expect(plan.agentStatePreserved).toBe(true);
   });
 
   test("classifies MCP binding edits as patch-and-restart", () => {
@@ -94,7 +93,7 @@ describe("agent config change plan", () => {
 
     expect(plan.action).toBe("patch-and-restart");
     expect(plan.requiresDeploymentVersion).toBe(true);
-    expect(plan.requiresRuntimeOperation).toBe(true);
+    expect(plan.requiresRuntimeOperation).toBe(false);
   });
 
   test("classifies advanced provider option edits as patch-and-restart", () => {
@@ -112,7 +111,7 @@ describe("agent config change plan", () => {
 
     expect(plan.action).toBe("patch-and-restart");
     expect(plan.requiresDeploymentVersion).toBe(true);
-    expect(plan.requiresRuntimeOperation).toBe(true);
+    expect(plan.requiresRuntimeOperation).toBe(false);
     expect(plan.fieldLabels).toEqual(["Advanced settings"]);
   });
 
@@ -129,29 +128,16 @@ describe("agent config change plan", () => {
     expect(plan.agentStatePreserved).toBe(false);
   });
 
-  test("requires fork-agent for published kind changes", () => {
+  test("historical type labels do not create a configuration change", () => {
     const plan = classifyAgentConfigChanges({
       agentStatus: "published",
-      current: toAgentConfigChangeSnapshot(draft({ kind: "cattle" })),
-      saved: toAgentConfigChangeSnapshot(draft()),
+      current: toAgentConfigChangeSnapshot(draft(), "cattle"),
+      saved: toAgentConfigChangeSnapshot(draft(), "pet"),
     });
 
-    expect(plan.action).toBe("fork-agent");
+    expect(plan.action).toBe("direct-update");
     expect(plan.requiresDeploymentVersion).toBe(false);
     expect(plan.requiresRuntimeOperation).toBe(false);
-    expect(plan.agentStatePreserved).toBe(false);
-  });
-
-  test("keeps published kind changes on fork-agent even when runtime fields also changed", () => {
-    const plan = classifyAgentConfigChanges({
-      agentStatus: "published",
-      current: toAgentConfigChangeSnapshot(draft({ kind: "cattle", prompt: "Help more" })),
-      saved: toAgentConfigChangeSnapshot(draft()),
-    });
-
-    expect(plan.action).toBe("fork-agent");
-    expect(plan.requiresDeploymentVersion).toBe(false);
-    expect(plan.requiresRuntimeOperation).toBe(false);
-    expect(plan.fieldLabels).toHaveLength(2);
+    expect(plan.fieldLabels).toEqual([]);
   });
 });

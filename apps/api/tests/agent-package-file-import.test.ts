@@ -408,6 +408,7 @@ describe("agent package file import", () => {
     });
 
     expect(imported.agent.name).toBe("Imported Package Agent");
+    expect(imported.agent.kind).toBe("cattle");
     expect(await readFileRow(database, fileId)).toBeNull();
     expect(bucket.objects.has(objectKey)).toBe(false);
   });

@@ -12,7 +12,7 @@ The September 22 Preview exception applies only to Cloud debugging: an explicitl
 
 The September 18 compatibility clarification keeps existing Thread routes, conversation IDs, and compatible Run result fields. Session describes the durable ownership and continuation contract; it does not mandate a new endpoint name. Changes to admission, saved/live selection, identity, or outcomes require behavior-level compatibility evidence independently of naming.
 
-The unreleased `/api/v2` routes reuse the Public Thread services and Session kernel with explicit saved-configuration admission. They accept private Agents, optional end-user identity, and owned Sessions from other creation channels. `/api/v1` retains published/live selection and its public-channel identity boundary. Both resolve the same Session IDs and Project authorization; publication is not a read authorization boundary in v2. New v2 Sessions always allocate a Session-owned sandbox, even when the saved Agent retains a legacy Pet label. Admission selects the existing isolated execution policy and records a 30-day recovery policy in the Session snapshot; it does not rewrite the Agent, existing Session bindings, or their shared workspace. This is the new-admission boundary, not completion of Pet/Cattle removal. Input admission derives expiry from the latest successful Run and checks it again within the admission transaction; expiry does not delete readable history or artifacts. Existing snapshots without that policy retain their behavior pending the Cloud transition. This slice does not migrate shared Pet workspaces or provide platform-funded defaults.
+The unreleased `/api/v2` routes reuse the Public Thread services and Session kernel with explicit saved-configuration admission. They accept private Agents, optional end-user identity, and owned Sessions from other creation channels. `/api/v1` retains published/live selection and its public-channel identity boundary. Both resolve the same Session IDs and Project authorization; publication is not a read authorization boundary in v2. Every new Session, including console Preview, v1 live admission, v2 saved presets and direct Project invocation, allocates a Session-owned sandbox even when its Agent retains a legacy Pet label. Creating, importing and forking an Agent cannot opt into shared execution, and the console no longer exposes a type choice. v2 saved-preset and direct admission record a 30-day recovery policy in the Session snapshot; it does not rewrite the Agent, existing Session bindings, or their shared workspace. This is the new-admission boundary, not completion of Pet/Cattle removal. Input admission derives expiry from the latest successful Run and checks it again within the admission transaction; expiry does not delete readable history or artifacts. Existing snapshots without that policy retain their behavior pending the Cloud transition. This slice does not migrate shared Pet workspaces or provide platform-funded defaults.
 
 The September 19 scope decision makes #582 a BYOK release: callers configure a Project provider before invocation. The September 22 direct-invocation decision removes the requirement to save a private Agent. Platform-owned model supply, recharge, and commercial billing remain independent #636 work; choosing a harness/model directly does not require platform funding. Existing per-turn budgets and usage remain part of the Session execution guard.
 
@@ -291,7 +291,7 @@ Design constraints for any future assistant:
 
 ### 4.5 Agent Sandbox And Persistence Layers
 
-An Agent's runtime filesystem must not be treated as a generic workspace. The architecture first separates Sandbox lifecycle by Agent `kind`, then separates the reserved Project library scope, platform Session history, Session artifacts, and disposable cache. The principle is: **file records are control-plane data; Sandbox is an execution environment; Session history/artifacts are session data; they must not impersonate each other**.
+An Agent's runtime filesystem must not be treated as a generic workspace. New admission uses Session-owned Sandboxes; existing shared bindings retain their legacy lifecycle until verified migration. The compatibility labels in the table and execution diagrams below distinguish those stored bindings, not a new Agent type choice. The architecture separates the reserved Project library scope, platform Session history, Session artifacts, and disposable cache. The principle is: **file records are control-plane data; Sandbox is an execution environment; Session history/artifacts are session data; they must not impersonate each other**.
 
 | Layer                        | Applies To   | Lifecycle                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Typical Content                                                                                 | Canonical Owner                                                              |
 | ---------------------------- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
@@ -354,9 +354,9 @@ sequenceDiagram
 
     AS->>Sandbox: Determine kind and sandbox subject (agent:{agentId} or session:{sessionId})
     AS->>Sandbox: Configure immutable Environment network policy<br/>(before first container-starting RPC)
-    alt Pet
+    alt Existing shared binding
         AS->>Sandbox: Provision stable Agent Sandbox<br/>restore selected checkpoint paths when present
-    else Cattle
+    else Session-owned binding
         AS->>Sandbox: Ensure Session-scoped Sandbox for this Run
         AS->>Sandbox: Restore latest ready Session workspace checkpoint<br/>including Driver-local resume state
     end
@@ -399,9 +399,9 @@ sequenceDiagram
     AS->>DriverDO: Enqueue turn.cancel / session.stop command
     DriverDO-->>Driver: ORPC nextCommand polling
     Driver->>AgentProc: Graceful shutdown / kill
-    alt Pet
+    alt Existing shared binding
         AS->>Sandbox: If policy requires, checkpoint selected memory/workspace paths
-    else Cattle
+    else Session-owned binding
         AS->>Sandbox: On successful completion, exclude attachment mount<br/>and transient credentials; checkpoint complete workspace
         AS->>AS: Admit follow-up / idle recycle only after<br/>Run-bound checkpoint is ready
     end

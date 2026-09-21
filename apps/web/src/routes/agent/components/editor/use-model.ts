@@ -22,7 +22,7 @@ import {
   toSkillId,
 } from "@/routes/typed-id";
 
-import type { Agent, AgentKind, McpServer, RuntimeId, SkillInfo } from "../../agent.types";
+import type { Agent, McpServer, RuntimeId, SkillInfo } from "../../agent.types";
 import {
   createEditorSaveSnapshot,
   createInitialDraft,
@@ -64,7 +64,6 @@ export interface AgentEditorModel {
   setBuiltInTools(tools: AgentBuiltInToolConfig[]): void;
   setDescription(description: string): void;
   setEnvironmentId(environmentId: string | null): void;
-  setKind(kind: AgentKind): void;
   setMcpServers(servers: McpServer[]): void;
   setModel(model: string): void;
   setModelSelection(selection: { model: string; provider: string }): void;
@@ -132,8 +131,8 @@ export function useAgentEditorModel({
   const dirty = createEditorSaveSnapshot(draft) !== savedSnapshot;
   const changePlan = classifyAgentConfigChanges({
     agentStatus: agent.status,
-    current: toAgentConfigChangeSnapshot(draft),
-    saved: toAgentConfigChangeSnapshot(savedDraft),
+    current: toAgentConfigChangeSnapshot(draft, agent.kind),
+    saved: toAgentConfigChangeSnapshot(savedDraft, agent.kind),
   });
   const saving =
     configMutation.isPending ||
@@ -177,12 +176,12 @@ export function useAgentEditorModel({
 
     const draftChangePlan = classifyAgentConfigChanges({
       agentStatus: agent.status,
-      current: toAgentConfigChangeSnapshot(draftToSave),
-      saved: toAgentConfigChangeSnapshot(savedDraft),
+      current: toAgentConfigChangeSnapshot(draftToSave, agent.kind),
+      saved: toAgentConfigChangeSnapshot(savedDraft, agent.kind),
     });
 
     if (draftChangePlan.action === "fork-agent") {
-      const error = "Fork the Agent to change type or runtime after publishing.";
+      const error = "Fork the Agent to change runtime after publishing.";
       setSaveError(error);
       return { error, ok: false };
     }
@@ -198,7 +197,6 @@ export function useAgentEditorModel({
           environmentId:
             draftToSave.environmentId === null ? null : toEnvironmentId(draftToSave.environmentId),
         },
-        kind: draftToSave.kind,
         mcpServerIds: normalizeMcpServers(draftToSave.mcpServers).map((server) =>
           toMcpServerId(server.id),
         ),
@@ -288,12 +286,6 @@ export function useAgentEditorModel({
     },
     setEnvironmentId(environmentId) {
       updateDraft((current) => withEnvironmentId(current, environmentId));
-    },
-    setKind(kind) {
-      updateDraft((current) => ({
-        ...current,
-        kind,
-      }));
     },
     setMcpServers(servers) {
       updateDraft((current) => ({

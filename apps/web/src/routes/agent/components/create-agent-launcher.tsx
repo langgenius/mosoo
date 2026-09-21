@@ -101,7 +101,6 @@ function CreateAgentLauncherBody({
 
     try {
       const createdAgent = await createAgentMutation.mutateAsync({
-        kind: "pet",
         model: runtimeConfig.model,
         name: trimmedName,
         projectId,

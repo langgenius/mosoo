@@ -190,7 +190,7 @@ describe("createAgentSession", () => {
       agentId: PUBLIC_API_TEST_IDS.agent,
       deploymentVersionId: PUBLIC_API_TEST_IDS.deployment,
       deploymentVersionNumber: 1,
-      kind: "pet",
+      kind: "cattle",
       lastRun: null,
       model: "gpt-5.4",
       provider: "openai",
@@ -204,7 +204,7 @@ describe("createAgentSession", () => {
     expect(session.createdAt).toBe(session.updatedAt);
   });
 
-  test("saved v2 admission isolates each Session without moving the Agent's legacy shared workspace", async () => {
+  test("live and saved admission isolate new Sessions without moving an existing shared workspace", async () => {
     const database = await createPublicHttpContractDatabase();
     const bindings = createPublicHttpTestBindings(database) as ApiBindings;
     const create = (saved: boolean) =>
@@ -220,16 +220,34 @@ describe("createAgentSession", () => {
           viewer: OWNER_VIEWER,
         }),
       );
-    const legacy = await create(false);
+    const seed = await create(false);
+    const legacy = { ...seed, kind: "pet" as const };
+    const legacySnapshot = await database
+      .prepare("SELECT plan_json FROM session_execution_snapshot WHERE session_id = ?")
+      .bind(legacy.id)
+      .first<{ plan_json: string }>();
+    const legacyPlan = parseSessionExecutionPlanJson(legacySnapshot!.plan_json);
+    // Model a previously admitted shared Session before any runtime hydration.
+    await database.batch([
+      database.prepare("UPDATE session SET kind = 'pet' WHERE id = ?").bind(legacy.id),
+      database
+        .prepare("UPDATE session_execution_snapshot SET plan_json = ? WHERE session_id = ?")
+        .bind(
+          JSON.stringify({ ...legacyPlan, binding: { ...legacyPlan.binding, kind: "pet" } }),
+          legacy.id,
+        ),
+    ]);
     const legacyContext = await hydrateCachedRunContextFromSession(bindings, OWNER_VIEWER, legacy);
     const before = await database
       .prepare("SELECT * FROM session_execution_snapshot WHERE session_id = ?")
       .bind(legacy.id)
       .first();
-    const first = await create(true);
+    const first = await create(false);
     const second = await create(true);
     const firstContext = await hydrateCachedRunContextFromSession(bindings, OWNER_VIEWER, first);
     const secondContext = await hydrateCachedRunContextFromSession(bindings, OWNER_VIEWER, second);
+    expect(first.deploymentVersionId).toBe(PUBLIC_API_TEST_IDS.deployment);
+    expect(second.deploymentVersionId).toBeNull();
     expect(legacyContext.value.profile.sandbox.subjectId).toBe(PUBLIC_API_TEST_IDS.agent);
     expect(firstContext.value.profile.sandbox.subjectId).toBe(first.id);
     expect(secondContext.value.profile.sandbox.subjectId).toBe(second.id);
@@ -251,7 +269,9 @@ describe("createAgentSession", () => {
         .prepare("SELECT plan_json FROM session_execution_snapshot WHERE session_id = ?")
         .bind(session.id)
         .first<{ plan_json: string }>();
-      expect(JSON.parse(row?.plan_json ?? "{}").recoveryRetentionMs).toBe(30 * 24 * 60 * 60 * 1000);
+      expect(parseSessionExecutionPlanJson(row!.plan_json).recoveryRetentionMs).toBe(
+        session.id === second.id ? 30 * 24 * 60 * 60 * 1000 : undefined,
+      );
       expect(session.kind).toBe("cattle");
     }
     expect(

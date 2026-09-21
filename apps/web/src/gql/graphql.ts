@@ -169,13 +169,15 @@ export type CostRunPurpose =
 
 export type CreateAgentForkInput = {
   agentId: PlatformId;
+  /** @deprecated Forks do not select a runtime ownership type. */
   kind?: AgentKind | null | undefined;
   projectId: PlatformId;
 };
 
 export type CreateAgentInput = {
   description?: string | null | undefined;
-  kind: AgentKind;
+  /** @deprecated Every new Session has isolated execution. */
+  kind?: AgentKind | null | undefined;
   model: string;
   name: string;
   projectId: PlatformId;
@@ -499,7 +501,8 @@ export type UpdateAgentConfigInput = {
   builtInTools?: Array<AgentBuiltInToolConfigInput> | null | undefined;
   description?: string | null | undefined;
   environment: AgentEnvironmentConfigInput;
-  kind: AgentKind;
+  /** @deprecated Configuration changes do not select a runtime ownership type. */
+  kind?: AgentKind | null | undefined;
   mcpServerIds: Array<PlatformId>;
   model: string;
   name: string;

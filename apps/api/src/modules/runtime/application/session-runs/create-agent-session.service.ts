@@ -28,7 +28,6 @@ import {
 } from "../../../agents/application/agent-readiness.service";
 import { toAgentRuntimeModelProjection } from "../../../agents/application/agent-runtime-model-identity";
 import { parseAgentStoredConfig } from "../../../agents/application/agent-stored-config.service";
-import type { AgentRow } from "../../../agents/application/agent-types";
 import type { AuthenticatedViewer } from "../../../auth/application/viewer-auth.service";
 import { resolveReadyEnvironmentPackageArtifact } from "../../../environments/application/environment-package-artifact.service";
 import { resolveAgentEnvironmentSnapshot } from "../../../environments/application/environment.service";
@@ -89,7 +88,6 @@ interface AgentSessionExecutionSource {
   projectId: ProjectId;
   configJson: string;
   environment: AgentEnvironmentConfig;
-  kind: AgentRow["kind"];
   liveVersion: AgentDeploymentVersionRecord | null;
   model: string;
   prompt: string;
@@ -124,9 +122,6 @@ async function resolveAgentSessionExecutionSource(input: {
     configJson: liveVersion?.configJson ?? agent.configJson,
     environment,
     liveVersion,
-    // New saved-config Sessions own their execution state. A legacy Agent's
-    // shared subject stays attached only to its previously admitted Sessions.
-    kind: input.configurationSource === "saved" ? "cattle" : (liveVersion?.kind ?? agent.kind),
     model: liveVersion?.model ?? agent.model,
     prompt: liveVersion?.prompt ?? agent.prompt,
     provider: liveVersion?.provider ?? agent.provider,
@@ -153,7 +148,7 @@ async function ensureAgentReadyToCreateSession(input: {
     agentId: input.source.agentId,
     bindings: input.bindings,
     environment: input.source.environment,
-    kind: input.source.kind,
+    kind: "cattle",
     model: input.source.model,
     packageResolution: parseAgentStoredConfig(input.source.configJson).packageResolution,
     projectId: input.source.projectId,
@@ -213,7 +208,7 @@ async function buildSessionExecutionPlan(input: {
       agentId: input.source.agentId,
       deploymentVersionId: input.source.liveVersion?.id ?? null,
       deploymentVersionNumber: input.source.liveVersion?.versionNumber ?? null,
-      kind: input.source.kind,
+      kind: "cattle",
       model: input.source.model,
       prompt: input.source.prompt,
       provider: input.source.provider,
@@ -260,7 +255,7 @@ async function insertAgentSessionSnapshot(input: {
       deploymentVersionId: input.source.liveVersion?.id ?? null,
       deploymentVersionNumber: input.source.liveVersion?.versionNumber ?? null,
       id: input.sessionId,
-      kind: input.source.kind,
+      kind: "cattle",
       ...(input.endUserId === null ? {} : { endUserId: input.endUserId }),
       metadataJson: JSON.stringify(input.metadata ?? {}),
       model: input.source.model,
@@ -297,7 +292,7 @@ function buildCreatedSessionSummary(input: {
     deploymentVersionId: input.source.liveVersion?.id ?? null,
     deploymentVersionNumber: input.source.liveVersion?.versionNumber ?? null,
     id: input.sessionId,
-    kind: input.source.kind,
+    kind: "cattle",
     lastMessageAt: null,
     lastRun: null,
     model: input.source.model,
@@ -349,7 +344,6 @@ export async function createProjectSession(
       projectId,
       configJson: "{}",
       environment: { environmentId: null },
-      kind: "cattle",
       liveVersion: null,
       prompt: request.input.instructions,
     },
@@ -371,10 +365,7 @@ async function createSessionFromSource(
     bindings: request.bindings,
     source,
   });
-  if (
-    (options.configurationSource === "saved" || source.agentId === null) &&
-    source.kind === "cattle"
-  ) {
+  if (options.configurationSource === "saved" || source.agentId === null) {
     executionPlan.recoveryRetentionMs = SESSION_RECOVERY_RETENTION_MS;
   }
   await resolveReadyEnvironmentPackageArtifact(

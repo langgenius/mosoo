@@ -270,7 +270,7 @@ export const agentSchema = /* GraphQL */ `
 
   input CreateAgentInput {
     description: String
-    kind: AgentKind!
+    kind: AgentKind @deprecated(reason: "Every new Session has isolated execution.")
     model: String!
     name: String!
     prompt: String!
@@ -285,7 +285,8 @@ export const agentSchema = /* GraphQL */ `
     builtInTools: [AgentBuiltInToolConfigInput!]
     description: String
     environment: AgentEnvironmentConfigInput!
-    kind: AgentKind!
+    kind: AgentKind
+      @deprecated(reason: "Configuration changes do not select a runtime ownership type.")
     mcpServerIds: [ULID!]!
     model: String!
     name: String!
@@ -323,7 +324,7 @@ export const agentSchema = /* GraphQL */ `
 
   input CreateAgentForkInput {
     agentId: ULID!
-    kind: AgentKind
+    kind: AgentKind @deprecated(reason: "Forks do not select a runtime ownership type.")
     projectId: ULID!
   }
 `;

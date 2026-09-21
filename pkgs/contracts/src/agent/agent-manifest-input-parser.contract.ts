@@ -109,7 +109,7 @@ function readManifestSections(input: Record<string, unknown>): ManifestSections 
 
   return {
     environment,
-    kind: readAgentKind(input["kind"]),
+    kind: input["kind"] == null ? "cattle" : readAgentKind(input["kind"]),
     metadata,
     model: readString(runtime, "model"),
     name: readString(metadata, "name"),

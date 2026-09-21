@@ -104,6 +104,8 @@ API health is `/api/health`, not `/health`. The mosoo control-plane development 
 
 If setup fails, start with the focused recipe: submodule issues use `git submodule update --init`, missing local secrets use `just env-init`, and D1 schema errors use `just db-migrate`. See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full workflow and verification expectations.
 
+The unreleased #582 candidate uses an independent durable workspace for every new Session. Agent creation, import and Fork no longer select Pet/Cattle; existing shared Cloud Sessions retain their bindings until verified migration. See [Session isolation](./docs/prd/agent-type.md) for continuity and the 30-day Cloud Preview policy.
+
 ## Example: Build a Codex Agent API
 
 [Codex Pet](https://mosoo.ai/en/use-cases/codex-pet) shows a published mosoo Agent integrated into an existing product backend through the Thread API. The same API can expose Agents backed by Claude Agent SDK or OpenCode.

@@ -28,7 +28,7 @@ their machine-readable contracts, code, or [Architecture](../architecture.md).
 ## Agent configuration
 
 - [Project Boundary](./project-boundary.md)
-- [Agent Type](./agent-type.md)
+- [Session Isolation and Legacy Agent Types](./agent-type.md)
 - [Agent Manifest](./agent-manifest.md)
 - [Agent Publishing and Versions](./agent-service-identity.md)
 - [Agent Version History](./agent-versions.md)

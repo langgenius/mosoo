@@ -1,25 +1,23 @@
-# Agent Type
+# Session Isolation and Legacy Agent Types
 
-Status: available in the current Agent Preview flow.
+Status: new-admission behavior implemented for the unreleased #582 candidate; existing Cloud migration and full legacy runtime retirement remain open.
 
-## Why this matters
+## Product contract
 
-mosoo supports two Agent types because users need different kinds of continuity. Some Agents should feel like ongoing teammates; others should start each job cleanly so unrelated work does not share temporary state. The Project owner chooses the type based on that user expectation, not on the model or provider.
+An Agent is reusable configuration. Each new Session owns an independent working environment and its own native conversation, files and checkpoint lineage. Continuing the same Session restores its committed state after the live runtime has been reclaimed. Another Session never receives that state, even when both use the same Agent.
 
-## The two choices
+Owners choose a name, harness and model. They do not select Assistant/Task or Pet/Cattle, lock that choice at publication, or fork just to change a type. Creating, importing and forking configuration cannot opt into a shared machine. Old kind inputs remain accepted for compatibility but do not select execution behavior. Draft YAML and generated calling instructions expose no type choice; package input may omit the legacy kind field.
 
-- **Assistant Agent** keeps a stable working environment across sessions. It suits daily helpers, knowledge assistants, and copilots that benefit from ongoing context. Sessions may share local working state, so it is not the right choice when every job must be isolated. Continuity is bounded: a rebuild preserves selected memory and workspace content, but may lose local sign-ins, caches, or tool-specific state.
-- **Task Agent** gives each Thread an isolated working environment. The live container may stay warm briefly, but mosoo can recycle it while the Thread's last successfully completed turn remains committed. It suits PR reviews, ticket triage, webhooks, and batch work. Continuing the same Thread restores its last committed working directory and provider resume state before the follow-up starts, even after a cold recycle. That state never crosses into another Thread. Earlier attachments must still be selected again because attachment access follows the current message, not the workspace checkpoint.
+This applies to console Preview, v1 published/live admission, v2 saved presets and direct Project invocation. v1 retains its existing publication and identity requirements. Publishing an Agent remains separate from the Session ownership rule.
 
-## User flow
+## Existing Cloud Sessions
 
-1. The Project owner creates an Agent by choosing a name and runtime. New Agents start as Assistant Agents.
-2. In Preview, the owner can compare the two types, switch freely, and test the Agent before publishing.
-3. The first Publish locks the type. This prevents an existing Agent from silently changing its continuity and isolation behavior.
-4. To change type later, the owner forks the Agent into a new draft. Reusable configuration carries over; existing sessions, cost history, logs, and working state stay with the original Agent.
+New admission does not rewrite any existing Agent label, Session binding or shared workspace. Existing Sessions retain their admitted configuration and maintenance access until their transition is verified. Migration must preserve the same ID, native conversation and promised working files; allocating an empty isolated workspace is not migration.
 
-## Current product boundary
+The compatibility storage fields and legacy maintenance paths are transitional. #582 is not complete until all continuable Cloud Sessions have a verified transition and the remaining active type-dependent behavior is retired. Keeping inert historical metadata is not a product type choice.
 
-Type selection, locking, forking, and type-specific working environments are available today. Owners can open a Terminal and reset working state for Assistant Agents; Task Agents do not show those controls. Both types otherwise use the same Preview, publishing, conversation, logs, and cost surfaces. Agents remain capabilities inside a Project, not standalone products.
+## Preview retention
 
-See [Thread Continuation](./thread-continuation.md) for the Task Agent durability and isolation contract.
+Cloud console debugging uses one inactivity period: 30 days since message, Run or file activity. Reads and console login do not renew it. After expiry, the console starts a new Preview. Formal or API-used Sessions are protected; historical enrollment and cleanup require the reviewed inventory, recoverable backup and approved cutover.
+
+See [Thread Continuation](./thread-continuation.md), the [Session transition contract](../session-isolation-transition.md) and the [implementation plan](../plans/2026-09-22-session-type-retirement-design.md).

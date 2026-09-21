@@ -25,15 +25,7 @@ export const AGENT_KIND_RUNTIME_SUBJECT_SCOPES = {
   pet: "agent",
 } as const satisfies Record<AgentKind, AgentRuntimeSubjectScope>;
 
-export interface AgentKindRuntimeCardCopy {
-  readonly description: string;
-  readonly examples: string;
-  readonly label: string;
-  readonly tagline: string;
-}
-
 export interface AgentKindRuntimePolicy {
-  readonly copy: AgentKindRuntimeCardCopy;
   readonly kind: AgentKind;
   readonly operations: {
     readonly ownerTerminal: boolean;
@@ -54,21 +46,8 @@ export interface AgentKindRuntimePolicy {
   };
 }
 
-export interface AgentKindRuntimeComparisonRow {
-  readonly id: string;
-  readonly label: string;
-  readonly values: Readonly<Record<AgentKind, string>>;
-}
-
 export const AGENT_KIND_RUNTIME_POLICIES = {
   cattle: {
-    copy: {
-      description:
-        "Independent, checkpointed workspace per Thread. Best for high-concurrency tasks, PR reviews, and webhook triggers.",
-      examples: "e.g. PR auto-review | Linear ticket triage | Batch jobs",
-      label: "Task Agent",
-      tagline: "On-demand worker",
-    },
     kind: "cattle",
     operations: {
       ownerTerminal: false,
@@ -89,13 +68,6 @@ export const AGENT_KIND_RUNTIME_POLICIES = {
     },
   },
   pet: {
-    copy: {
-      description:
-        "Stable sandbox per agent with Backup/Restore continuity. Best for daily helpers, knowledge agents, and personal copilots.",
-      examples: "e.g. Research helper | Knowledge butler | Personal copilot",
-      label: "Assistant Agent",
-      tagline: "Always-on teammate",
-    },
     kind: "pet",
     operations: {
       ownerTerminal: true,
@@ -116,49 +88,6 @@ export const AGENT_KIND_RUNTIME_POLICIES = {
     },
   },
 } as const satisfies Record<AgentKind, AgentKindRuntimePolicy>;
-
-export const AGENT_KIND_RUNTIME_COMPARISON_ROWS = [
-  {
-    id: "cross_session_memory",
-    label: "Cross-session memory",
-    values: {
-      cattle: "None; isolated Thread checkpoint",
-      pet: "Stable sandbox continuity",
-    },
-  },
-  {
-    id: "scaling",
-    label: "Scaling",
-    values: {
-      cattle: "Independent session sandboxes",
-      pet: "1 stable sandbox, <=8 concurrent sessions",
-    },
-  },
-  {
-    id: "best_for",
-    label: "Best for",
-    values: {
-      cattle: "Webhooks, PR review, batch tasks",
-      pet: "Daily helpers, copilots, ops",
-    },
-  },
-  {
-    id: "failure_pattern",
-    label: "Failure pattern",
-    values: {
-      cattle: "Driver crash -> logs session error",
-      pet: "Reset agent-state to recover drift",
-    },
-  },
-  {
-    id: "switch_cost",
-    label: "Switch cost",
-    values: {
-      cattle: "Free in draft; fork after publish",
-      pet: "Free in draft; fork after publish",
-    },
-  },
-] as const satisfies readonly AgentKindRuntimeComparisonRow[];
 
 export function getAgentKindRuntimeSubjectScope(kind: AgentKind): AgentRuntimeSubjectScope {
   return AGENT_KIND_RUNTIME_POLICIES[kind].subject.scope;
@@ -182,14 +111,6 @@ export function agentKindSupportsOwnerTerminal(kind: AgentKind): boolean {
 
 export function agentKindSupportsResetState(kind: AgentKind): boolean {
   return getAgentKindRuntimePolicy(kind).operations.resetSubjectState;
-}
-
-export function listAgentKindRuntimePolicies(): readonly AgentKindRuntimePolicy[] {
-  return AGENT_KIND_VALUES.map((kind) => AGENT_KIND_RUNTIME_POLICIES[kind]);
-}
-
-export function listAgentKindRuntimeComparisonRows(): readonly AgentKindRuntimeComparisonRow[] {
-  return AGENT_KIND_RUNTIME_COMPARISON_ROWS;
 }
 
 export type AgentStatus = "draft" | "published";
@@ -360,7 +281,8 @@ export interface AgentEditorState {
 
 export interface CreateAgentInput {
   description?: string | null;
-  kind: AgentKind;
+  /** Legacy input; every new Agent uses Session-isolated execution. */
+  kind?: AgentKind | null;
   model: string;
   name: string;
   prompt: string;
@@ -375,7 +297,8 @@ export interface UpdateAgentConfigInput {
   builtInTools?: AgentBuiltInToolConfig[];
   description?: string | null;
   environment: AgentEnvironmentConfig;
-  kind: AgentKind;
+  /** Legacy input; changing configuration cannot migrate existing workspaces. */
+  kind?: AgentKind | null;
   mcpServerIds: McpServerId[];
   model: string;
   name: string;

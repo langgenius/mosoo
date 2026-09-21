@@ -75,7 +75,9 @@ describe("agent instruction prompt", () => {
     expect(prompt).toContain(
       'curl -X POST "https://console.test/api/public/v1/agents/agent_123/threads"',
     );
-    expect(prompt).toContain("Job-style agent designed for one-shot calls");
+    expect(prompt).toContain("Continue the same Session to retain context and working files.");
+    expect(prompt).not.toContain("MOSOO_AGENT_KIND");
+    expect(buildAgentInstructionPrompt(agent({ kind: "pet" }), distribution)).toBe(prompt);
     expect(prompt).not.toContain("skill.md");
   });
 
@@ -89,7 +91,7 @@ describe("agent instruction prompt", () => {
 
     expect(prompt).toContain("# Localized instruction: Research Agent");
     expect(prompt).toContain("localized:agentLifecycle.instructionIntro");
-    expect(prompt).toContain("> localized:agentLifecycle.kindHintTask");
+    expect(prompt).toContain("> localized:agentLifecycle.sessionContinuityHint");
   });
 
   test("uses the publish menu item as a clipboard instruction action", () => {

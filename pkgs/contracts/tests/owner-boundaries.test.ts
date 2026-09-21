@@ -8,7 +8,6 @@ import {
   agentKindUsesStableRuntimeSubject,
   getAgentKindRuntimePolicy,
   getAgentKindRuntimeSubjectScope,
-  listAgentKindRuntimeComparisonRows,
 } from "@mosoo/contracts/agent";
 import { AGENT_MANIFEST_VERSION, AGENT_PACKAGE_VERSION } from "@mosoo/contracts/agent-manifest";
 import {
@@ -68,7 +67,7 @@ describe("contracts owner boundaries", () => {
     expect("can" in Contracts).toBe(false);
   });
 
-  test("agent kind runtime policy owns Pet and Cattle semantics", () => {
+  test("legacy runtime policies preserve subject and maintenance access", () => {
     expect(getAgentKindRuntimeSubjectScope("pet")).toBe("agent");
     expect(getAgentKindRuntimeSubjectScope("cattle")).toBe("session");
     expect(agentKindUsesStableRuntimeSubject("pet")).toBe(true);
@@ -79,33 +78,31 @@ describe("contracts owner boundaries", () => {
     expect(agentKindSupportsResetState("cattle")).toBe(false);
 
     expect(getAgentKindRuntimePolicy("pet")).toMatchObject({
-      copy: {
-        label: "Assistant Agent",
-        tagline: "Always-on teammate",
-      },
       terminal: {
         target: "stable_subject",
       },
     });
     expect(getAgentKindRuntimePolicy("cattle")).toMatchObject({
-      copy: {
-        label: "Task Agent",
-        tagline: "On-demand worker",
-      },
       terminal: {
         target: "unavailable",
       },
     });
-
-    expect(listAgentKindRuntimeComparisonRows()).toContainEqual({
-      id: "cross_session_memory",
-      label: "Cross-session memory",
-      values: {
-        cattle: "None; isolated Thread checkpoint",
-        pet: "Stable sandbox continuity",
-      },
-    });
   });
+
+  test.each([undefined, null, "pet", "cattle"] as const)(
+    "accepts a package with optional legacy kind %s",
+    (kind) => {
+      const parsed = parseAgentManifestInput({
+        ...(kind === undefined ? {} : { kind }),
+        manifestVersion: AGENT_MANIFEST_VERSION,
+        metadata: { name: "Session configuration" },
+        prompts: { system: "Retain these instructions." },
+        runtime: { id: "openai-runtime", provider: "openai", model: "gpt-5.4" },
+      });
+      expect(parsed.issues).toEqual([]);
+      expect(parsed.manifest?.prompts.system).toBe("Retain these instructions.");
+    },
+  );
 
   test("agent manifest parser owns required public manifest fields", () => {
     const invalid = parseAgentManifestInput({});
@@ -115,7 +112,6 @@ describe("contracts owner boundaries", () => {
       expect.arrayContaining([
         "manifest.version.unsupported",
         "manifest.metadata.name.missing",
-        "manifest.kind.missing",
         "manifest.runtime.missing",
         "manifest.model.missing",
       ]),

@@ -35,6 +35,17 @@ function bunTest(args: readonly string[]): E2ECommand {
 
 export const e2eCases: readonly E2ECase[] = [
   {
+    command: {
+      ...playwrightSpec("e2e/cases/ui/session-isolation.spec.ts"),
+      env: {
+        MOSOO_E2E_WEB_SERVER_COMMAND: "node_modules/.bin/vp run --filter @mosoo/web dev",
+      },
+    },
+    description: "Verify creation and editing without an Agent type choice or kind input.",
+    id: ["ui", "session-isolation"],
+    layer: "ui",
+  },
+  {
     command: bunTest(["e2e/cases/contract/harness.test.ts"]),
     description: "Verify local E2E harness helpers and environment preflight contracts.",
     id: ["contract", "harness"],

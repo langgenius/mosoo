@@ -13,7 +13,6 @@ export interface AgentEditorDraft {
   builtInTools: AgentBuiltInToolConfig[];
   description: string;
   environmentId: string | null;
-  kind: AgentKind;
   mcpServers: McpServer[];
   model: string;
   name: string;
@@ -29,7 +28,6 @@ export function createInitialDraft(agent: Agent): AgentEditorDraft {
     builtInTools: normalizeAgentBuiltInTools(agent.config.builtInTools),
     description: agent.description,
     environmentId: agent.config.environmentId,
-    kind: agent.kind,
     mcpServers: [...agent.config.mcpServers],
     model: agent.config.model,
     name: agent.name,
@@ -53,12 +51,15 @@ export function createSnapshotHash(draft: AgentEditorDraft): string {
   return hashText(createSnapshot(draft));
 }
 
-export function toAgentConfigChangeSnapshot(draft: AgentEditorDraft): AgentConfigChangeSnapshot {
+export function toAgentConfigChangeSnapshot(
+  draft: AgentEditorDraft,
+  legacyKind: AgentKind = "cattle",
+): AgentConfigChangeSnapshot {
   return {
     builtInTools: normalizeAgentBuiltInTools(draft.builtInTools),
     description: draft.description,
     environmentId: draft.environmentId === null ? null : toEnvironmentId(draft.environmentId),
-    kind: draft.kind,
+    kind: legacyKind,
     mcpServerIds: draft.mcpServers.map((server) => toMcpServerId(server.id)),
     model: draft.model,
     name: draft.name,
@@ -108,7 +109,6 @@ interface AgentDraftYamlShape {
     description: string;
     name: string;
   };
-  kind: AgentKind;
   prompt: string;
   runtime: {
     id: RuntimeId;
@@ -138,7 +138,6 @@ function toDraftYamlShape(draft: AgentEditorDraft): AgentDraftYamlShape {
       description: draft.description,
       name: draft.name,
     },
-    kind: draft.kind,
     prompt: draft.prompt,
     runtime: {
       id: draft.runtime,
@@ -195,7 +194,6 @@ export function parseDraftYaml(yaml: string, fallback: AgentEditorDraft): AgentE
     builtInTools: readBuiltInTools(root["builtInTools"], fallback.builtInTools),
     description: readString(identity["description"], fallback.description),
     environmentId: readNullableString(environment["environmentId"], fallback.environmentId),
-    kind: readAgentKind(root["kind"], fallback.kind),
     mcpServers: readMcpServers(assets["mcpServers"], fallback.mcpServers),
     model: readString(runtime["model"], fallback.model),
     name: readString(identity["name"], fallback.name),
@@ -269,10 +267,6 @@ function readNullableString(value: unknown, fallback: string | null): string | n
   }
 
   return typeof value === "string" ? value : fallback;
-}
-
-function readAgentKind(value: unknown, fallback: AgentKind): AgentKind {
-  return value === "pet" || value === "cattle" ? value : fallback;
 }
 
 function readBuiltInTools(

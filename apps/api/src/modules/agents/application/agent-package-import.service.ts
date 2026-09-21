@@ -96,7 +96,6 @@ export async function importAgentPackage(
     builtInTools: manifest.builtInTools,
     description: parsed.package.project.description,
     environmentId,
-    kind: manifest.kind,
     mcpServerIds,
     model: manifest.runtime.model,
     ownerId: viewer.id,

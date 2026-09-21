@@ -1,6 +1,6 @@
 # Thread Continuation
 
-Status: available for Task Agents, with the boundaries below.
+Status: existing isolated Thread continuation is available. The unreleased #582 candidate applies Session isolation to every new admission; verified transition of existing shared Cloud Sessions remains required.
 
 ## Why it matters
 
@@ -10,7 +10,7 @@ mosoo recycled the execution container between those turns.
 
 ## Product contract
 
-After execution ends, mosoo prepares the Task Agent's complete Thread workspace
+After execution ends, mosoo prepares the Session's complete workspace
 checkpoint. The ready checkpoint record, captured provider resume cursor, and
 successful Run status are committed together before admitting a follow-up or
 releasing its runtime. Both the ordered completion event and terminal Driver RPC
@@ -21,7 +21,7 @@ Session ID. Follow-up admission and idle reclamation also wait for final-message
 projection and completion history; their persistence retry never re-creates an
 already committed workspace backup.
 The next turn restores that committed state before accepting new input. Given the
-same Agent version, Environment version, current-message attachments, and external
+same admitted configuration, Environment version, current-message attachments, and external
 tool state, a warm continuation and a forced-cold continuation therefore expose the
 same:
 
@@ -43,7 +43,7 @@ actionable error instead of opening an empty workspace.
 
 ## Admitted configuration
 
-New Sessions store the admitted Agent configuration alongside their execution plan,
+New Sessions store the admitted inline or Agent-preset configuration alongside their execution plan,
 including provider options and package-readiness state. Both cold hydration and
 warm cache refresh use that saved configuration. Later Agent edits apply to new
 Sessions, while provider credentials and MCP authorization are resolved again on
@@ -70,7 +70,7 @@ turn then uses the strict Run-bound admission and restore contract above.
 
 ## Retention and deletion
 
-The unreleased saved-Agent API records a 30-day recovery period for newly
+The unreleased direct Project and saved-preset APIs record a 30-day recovery period for newly
 admitted isolated Sessions. The period starts at the last successful turn and
 renews only after another success; failed or cancelled attempts do not extend it.
 Inputs received at or after the deadline fail explicitly with the expiry time,
@@ -86,14 +86,14 @@ old snapshot. Clock-controlled tests establish renewal/expiry logic, not actual
 multi-day live survival. Backup storage TTL is independent of this admission
 policy and is not shortened by this slice.
 
-A committed Task Thread checkpoint remains restorable for at least 20 days while
+A committed isolated Thread checkpoint remains restorable for at least 30 days while
 the Thread exists. Archiving does not remove it. Permanently deleting the Thread
 deletes its checkpoint records and backup objects with the rest of the Thread's
 data.
 
 ## Security and isolation boundaries
 
-The checkpoint belongs to exactly one Project, Agent, and Thread. It is never searched
+The checkpoint belongs to exactly one Project and Session; an Agent is optional configuration provenance. It is never searched
 or restored by path alone and is never shared with another Thread or tenant.
 Checkpoint creation and restoration remain auditable runtime operations.
 
@@ -109,9 +109,6 @@ The durable checkpoint does not contain:
 Re-created processes may rebuild disposable machine caches, but the restored Thread
 working directory is the authoritative continuation state.
 
-## Assistant Agent distinction
+## Legacy shared workspaces
 
-Task Agent durability is Thread-scoped isolation, not shared memory. Assistant
-Agents may additionally preserve selected Agent-level memory and allow multiple
-Threads to share a stable Sandbox. A Task Agent never receives another Thread's
-checkpoint, even when both Threads use the same Agent.
+Existing shared Agent workspaces remain readable and continuable through the legacy binding until their Cloud transition is verified. New Sessions never select that shared binding, even when their preset retains a historical Pet label. Migration must preserve each existing Session's identity, context and promised files. See [Session isolation](./agent-type.md) for the transition and the separate Cloud Preview inactivity policy.

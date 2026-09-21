@@ -194,7 +194,7 @@ describe("agent versioned config plan", () => {
     );
   });
 
-  test("requires fork-agent for published kind changes", () => {
+  test("historical kind metadata does not request a fork", () => {
     const plan = planVersionedAgentConfigChange({
       agentStatus: "published",
       current: createAgentConfigChangeSnapshot({
@@ -214,13 +214,13 @@ describe("agent versioned config plan", () => {
       }),
     });
 
-    expect(plan.action).toBe("fork-agent");
+    expect(plan.action).toBe("direct-update");
     expect(plan.requiresDeploymentVersion).toBe(false);
     expect(plan.requiresRuntimeOperation).toBe(false);
-    expect(summarizeVersionedAgentConfigChange(plan)).toBe("Fork Agent · Agent type");
+    expect(plan.fieldLabels).toEqual([]);
   });
 
-  test("keeps published kind changes on fork-agent even when versioned fields also changed", () => {
+  test("classifies editable fields independently of historical kind metadata", () => {
     const plan = planVersionedAgentConfigChange({
       agentStatus: "published",
       current: createAgentConfigChangeSnapshot({
@@ -241,11 +241,9 @@ describe("agent versioned config plan", () => {
       }),
     });
 
-    expect(plan.action).toBe("fork-agent");
-    expect(plan.requiresDeploymentVersion).toBe(false);
-    expect(plan.requiresRuntimeOperation).toBe(false);
-    expect(summarizeVersionedAgentConfigChange(plan)).toBe(
-      "Fork Agent · Agent type, System prompt",
-    );
+    expect(plan.action).toBe("restart-process");
+    expect(plan.requiresDeploymentVersion).toBe(true);
+    expect(plan.requiresRuntimeOperation).toBe(true);
+    expect(summarizeVersionedAgentConfigChange(plan)).toBe("Restart Agent process · System prompt");
   });
 });

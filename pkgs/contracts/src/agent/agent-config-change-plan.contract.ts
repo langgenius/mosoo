@@ -113,12 +113,6 @@ export function classifyAgentConfigChanges(input: {
     rank: 0,
   });
   pushIfChanged(fieldPlans, {
-    action: input.agentStatus === "published" ? "fork-agent" : "direct-update",
-    changed: input.current.kind !== input.saved.kind,
-    label: "Agent type",
-    rank: 0,
-  });
-  pushIfChanged(fieldPlans, {
     action: "restart-process",
     changed: input.current.prompt !== input.saved.prompt,
     label: "System prompt",

@@ -1,4 +1,5 @@
 import { Popover } from "@base-ui/react/popover";
+import type { AgentKind } from "@mosoo/contracts/agent";
 import type { EnvironmentSummary } from "@mosoo/contracts/environment";
 import { useState } from "react";
 import type { ReactElement } from "react";
@@ -68,10 +69,12 @@ function EnvironmentOption({
 }
 
 export function EnvironmentPicker({
+  legacyKind,
   model,
   projectId,
   readOnly = false,
 }: {
+  legacyKind: AgentKind;
   model: AgentEditorModel;
   projectId: string | null;
   readOnly?: boolean;
@@ -97,7 +100,7 @@ export function EnvironmentPicker({
       ? false
       : getEnvironmentSelectionBlockReason(
           {
-            kind: model.draft.kind,
+            kind: legacyKind,
             networkPolicy: selectedEnvironment.networkPolicy,
           },
           t,
@@ -152,7 +155,7 @@ export function EnvironmentPicker({
                 <EnvironmentMenuContent
                   environments={environments}
                   error={environmentsQuery.error}
-                  kind={model.draft.kind}
+                  kind={legacyKind}
                   loading={environmentsQuery.isLoading}
                   onSelect={(environmentId) => {
                     model.setEnvironmentId(environmentId);
@@ -209,7 +212,7 @@ export function EnvironmentPicker({
           onCreated={(environment) => {
             const blockReason = getEnvironmentSelectionBlockReason(
               {
-                kind: model.draft.kind,
+                kind: legacyKind,
                 networkPolicy: environment.networkPolicy,
               },
               t,
@@ -241,7 +244,7 @@ function EnvironmentMenuContent({
 }: {
   environments: EnvironmentSummary[];
   error: unknown;
-  kind: AgentEditorModel["draft"]["kind"];
+  kind: AgentKind;
   loading: boolean;
   onSelect(environmentId: string): void;
   selectedEnvironment: EnvironmentSummary | null;

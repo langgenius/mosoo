@@ -1,7 +1,6 @@
 # Agent Terminal
 
-Status: Available today for owners of Assistant Agents (Pet). It is not available for
-Task Agents (Cattle).
+Status: retained for owners of existing shared Agent workspaces during the #582 Cloud transition. Newly created configuration uses Session-owned workspaces and has no Agent-level Terminal.
 
 ## What it is
 
@@ -15,7 +14,7 @@ Agent.
 
 ## How to use it
 
-Open an Assistant Agent in the mosoo console and select **Terminal**. mosoo shows the
+Open an existing shared Agent in the mosoo console and select **Terminal**. mosoo shows the
 connection status and offers a reconnect action. The first connection may take a few
 seconds while the Agent's environment wakes up.
 
@@ -26,7 +25,7 @@ changes through the Agent's normal configuration and publishing flows.
 ## Current limits
 
 - Only the Agent owner can open the Terminal.
-- Task Agents do not show it because their environments are temporary.
+- Session-owned workspaces do not expose an Agent-level Terminal. Their durable state still continues through the same Session; this is independent of live container lifetime.
 - Terminal changes may disappear after an environment is reset, rebuilt, or replaced.
 - mosoo does not promise a specific folder layout, source-code checkout, or set of
   maintenance commands inside the Terminal.
