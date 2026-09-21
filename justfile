@@ -67,6 +67,10 @@ test-package package:
 test-file path:
     bun test "{{ path }}"
 
+# Prepare private Session conversion/rollback batches; performs no remote action.
+session-isolation-plan input output:
+    bun run --filter @mosoo/api session-isolation:plan "{{ input }}" "{{ output }}"
+
 # Run the full repository verification gate.
 check:
     bun run check

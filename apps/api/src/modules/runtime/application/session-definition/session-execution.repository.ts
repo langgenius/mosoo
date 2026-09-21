@@ -248,7 +248,7 @@ function parseBuiltInTools(value: unknown): SessionExecutionPlan["builtInTools"]
   );
 }
 
-function parseSessionExecutionPlanJson(planJson: string): SessionExecutionPlan {
+export function parseSessionExecutionPlanJson(planJson: string): SessionExecutionPlan {
   const parsed: unknown = JSON.parse(planJson);
   const record = readRecord(parsed, "sessionExecutionPlan");
   const recoveryRetentionMs =

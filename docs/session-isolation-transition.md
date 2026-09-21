@@ -1,7 +1,8 @@
 # Session Isolation Transition
 
-Status: unreleased #582 / #638 / #640 operating contract. The production
-migration executor, concurrency gate, and release approval are still required.
+Status: unreleased #582 / #638 / #640 operating contract. An offline database
+batch planner is available; the production executor, verified object preparation,
+physical drain, full cutover acceptance, and release approval remain outstanding.
 This document does not authorize production writes, customer model/tool calls,
 resource destruction, or notification delivery.
 
@@ -150,6 +151,65 @@ during the actual remote open/close seam and verify that stale activation and it
 error cleanup, as well as stale close, leave both records unchanged. This fence
 does not replace the production admission/drain gate or stop an already running
 Driver; the conversion executor must still verify those preconditions.
+
+### Prepare reviewable database batches
+
+`just session-isolation-plan <absolute input.json> <absolute new output directory>`
+reads a private local manifest and writes `forward.json`, `rollback.json`,
+`state.json`, and `review.json`. It performs no network, model, deployment, or D1
+operation. The input must be a regular file with no group/other permissions and
+at most 1 MB; the new output directory and files use modes `0700` and `0600`.
+Existing output is never overwritten. Keep both input and output in ignored,
+access-controlled storage.
+
+The JSON input has these fields:
+
+- `source`: complete raw `SELECT *` rows with database column names for `session`,
+  `sandbox`, `workspace` (`sandbox_session`), `native` (`native_resume_ref`),
+  `snapshot` (`session_execution_snapshot`), `run`, `sourceBackup`, `latestBackup`,
+  `agent`, and `deployment` (`agent_deployment_version`). The selected source and
+  latest ready backup may differ. `deployment` may be `null` only when the
+  snapshot already contains its frozen `configJson`; otherwise supply the
+  original immutable version referenced by the snapshot, never today's Agent
+  config. Missing columns or missing original configuration stop preparation.
+- `preparedAt`: a millisecond timestamp later than the latest ready backup.
+- `destination`: fresh `sandboxId`, `executionSessionId`,
+  `rollbackExecutionSessionId`, `backupId`, and `rollbackBackupId`. Backup IDs use
+  the repository's encoded Sandbox backup format. The rollback execution ID
+  must differ from both earlier execution IDs so stale callbacks cannot become
+  valid again. The public Session ID never changes.
+- `workspaceEvidence`: `sessionId`, `sourceBackupId`, `completedRunId`, `cwd`,
+  `runtimeId`, `nativeValue`, `sourceArchiveSha256`, `preparedArchiveSha256`, and
+  `rollbackArchiveSha256`. These declare independently collected evidence; the
+  planner checks their shape and correspondence but does **not** inspect archives,
+  verify remote object bytes, or establish shared-memory ownership.
+
+This initial planner supports an idle, unarchived legacy Session whose latest Run
+completed successfully and whose original configuration and native source are
+known. It does not qualify missing sources, active work, or other lifecycle states.
+It preserves the existing recovery policy and all unrelated snapshot fields.
+
+Both output files contain one `{ "batch": [...] }` of bound SQL statements. The
+first statement checks complete before-images, successful completion history,
+Agent-wide active Runs, live Drivers and conversation bindings, and current backup
+selection. A tie in the old timestamp-only backup lookup is rejected. A stale
+precondition raises a SQL error; use **one atomic D1 batch**, never separate calls
+for its statements. A failure after destination insertion must roll back the
+whole batch. Repeated application fails without replacing the winning state.
+
+Forward preparation retains original backup rows and attaches a separate verified
+checkpoint to the Session-owned Sandbox. Rollback keeps those resources and adds
+a verified original-layout checkpoint newer than the known latest backup, so the
+actual old reader can restore it. The recorded before-image alone is not the
+rollback destination. The rollback guard rejects newly admitted work or changed
+source/destination resources; it cannot undo later model/tool effects.
+
+Before execution, verify the exact target account/database, source and destination
+object hashes and restore behavior, original configuration, drained Drivers, and
+reviewed batch hashes. Attach those facts to the approval packet. `review.json`
+records input and batch hashes, statement counts, and zero remote actions; it is
+neither a production target authorization nor proof that those external checks
+passed. No production execution command is supplied by this planner.
 
 ## Rollback and release
 
