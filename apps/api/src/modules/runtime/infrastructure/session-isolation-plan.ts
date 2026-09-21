@@ -10,9 +10,9 @@ import {
   sandboxSessionsTable,
   sandboxesTable,
   sessionExecutionSnapshotsTable,
-  sessionRunsTable,
   sessionsTable,
 } from "@mosoo/db";
+import { retiredSessionRunsPhysicalStorage } from "@mosoo/db/migration-schema";
 import { parsePlatformId } from "@mosoo/id";
 import { getTableConfig } from "drizzle-orm/sqlite-core";
 
@@ -37,7 +37,9 @@ const SOURCE_TABLES = {
   workspace: sandboxSessionsTable,
   native: nativeResumeRefsTable,
   snapshot: sessionExecutionSnapshotsTable,
-  run: sessionRunsTable,
+  // The operator reads physical SELECT * rows, including inert history omitted
+  // from the runtime table. Compare it too; never discard part of a before-image.
+  run: retiredSessionRunsPhysicalStorage,
   sourceBackup: sandboxBackupsTable,
   latestBackup: sandboxBackupsTable,
   agent: agentsTable,
@@ -215,7 +217,7 @@ export function buildSessionIsolationPlan(value: unknown): SessionIsolationPlan 
       sandbox["status"] === "cold" &&
       sandbox["claim_owner"] === null &&
       sandbox["claim_expires_at"] === null &&
-      sandbox["status_operation_id"] === null,
+      sandbox["status_event"] === "runtime_subject.cold",
     "Source Sandbox must be drained and cold.",
   );
   requireValue(
@@ -227,9 +229,10 @@ export function buildSessionIsolationPlan(value: unknown): SessionIsolationPlan 
   requireValue(
     agent["id"] === session["agent_id"] &&
       agent["project_id"] === session["project_id"] &&
-      sandbox["agent_id"] === session["agent_id"] &&
-      sandbox["project_id"] === session["project_id"] &&
-      sandbox["owner_account_id"] === agent["owner_account_id"],
+      (sandbox["agent_id"] === null || sandbox["agent_id"] === session["agent_id"]) &&
+      (sandbox["project_id"] === null || sandbox["project_id"] === session["project_id"]) &&
+      (sandbox["owner_account_id"] === null ||
+        sandbox["owner_account_id"] === agent["owner_account_id"]),
     "Source ownership does not match.",
   );
   const origin = parseSandboxConversationOrigin(text(workspace["origin_json"]));
@@ -348,6 +351,9 @@ export function buildSessionIsolationPlan(value: unknown): SessionIsolationPlan 
   const targetSandbox: Row = {
     ...sandbox,
     id: sandboxId,
+    agent_id: session["agent_id"],
+    project_id: session["project_id"]!,
+    owner_account_id: agent["owner_account_id"],
     kind: "cattle",
     subject_kind: "session",
     subject_id: session["id"]!,
@@ -358,6 +364,7 @@ export function buildSessionIsolationPlan(value: unknown): SessionIsolationPlan 
     last_restore_backup_id: null,
     last_error: null,
     last_error_code: null,
+    status_operation_id: null,
     status_seq: 0,
     status_changed_at: now,
     status_event: "runtime_subject.cold",

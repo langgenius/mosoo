@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 
 import {
   driverInstancesTable,
@@ -17,6 +17,7 @@ import { getSessionExecutionPlan } from "../src/modules/runtime/application/sess
 import { queueSessionRun } from "../src/modules/runtime/application/session-run.service";
 import { getNativeResumeRefForRuntime } from "../src/modules/runtime/infrastructure/native-resume-ref.repository";
 import { getRuntimeConversationSession } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-conversation-session-store";
+import { markRuntimeSubjectCold } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-record-store";
 import { encodeSandboxBackupIdForStorage } from "../src/modules/runtime/infrastructure/sandbox-backup-id";
 import { buildSessionIsolationPlan } from "../src/modules/runtime/infrastructure/session-isolation-plan";
 import type { TransitionStatement } from "../src/modules/runtime/infrastructure/session-isolation-plan";
@@ -29,6 +30,7 @@ import {
   insertOwnerSession,
   nowMsForTest,
   PUBLIC_API_TEST_IDS as ID,
+  SqliteD1Database,
 } from "./helpers/public-api-http-test-fixture";
 
 const CWD = `/workspace/se/${ID.ownerSession}`;
@@ -73,6 +75,22 @@ async function dump(database: D1Database) {
 
 async function fixture() {
   const database = await createPublicHttpContractDatabase();
+  // Runtime fixtures omit inert storage columns. An operator's SELECT * still
+  // contains the immutable migration history, including its Project rename.
+  database.execute(
+    readFileSync(
+      new URL("../../../pkgs/db/drizzle/0001_bound-capability-run-provenance.sql", import.meta.url),
+      "utf8",
+    ),
+  );
+  const projectRename = readFileSync(
+    new URL("../../../pkgs/db/drizzle/0012_rename_app_to_project.sql", import.meta.url),
+    "utf8",
+  )
+    .split("--> statement-breakpoint")
+    .find((statement) => statement.includes("RENAME COLUMN `bound_capability_app_id`"));
+  if (!projectRename) throw new Error("Historical Run column rename is missing.");
+  database.execute(projectRename);
   await insertOwnerSession(database);
   // Reuse the real native-ref table and additive columns, not a guessed schema.
   const baseline = readFileSync(
@@ -266,6 +284,130 @@ async function fixture() {
 }
 
 describe("legacy Session isolation batch", () => {
+  test("accepts a completed recycle operation without copying its operation ID into the new subject", async () => {
+    const { database, input } = await fixture();
+    await database
+      .prepare("UPDATE sandbox SET status = 'destroying', status_operation_id = ? WHERE id = ?")
+      .bind(ID.operation, ID.sandbox)
+      .run();
+    expect(
+      await markRuntimeSubjectCold(database, {
+        clearBackups: false,
+        expectedStatus: "destroying",
+        operationId: ID.operation,
+        runtimeSubjectId: ID.sandbox,
+        source: "maintenance",
+      }),
+    ).toBe(true);
+    const sandbox = await database
+      .prepare("SELECT * FROM sandbox WHERE id = ?")
+      .bind(ID.sandbox)
+      .first();
+    const plan = buildSessionIsolationPlan({ ...input, source: { ...input.source, sandbox } });
+    expect(plan.before.sandbox.status_operation_id).toBe(ID.operation);
+    expect(plan.after.sandbox.status_operation_id).toBeNull();
+    await execute(database, plan.forward);
+    await execute(database, plan.rollback);
+    expect(
+      await database.prepare("SELECT * FROM sandbox WHERE id = ?").bind(ID.sandbox).first(),
+    ).toEqual(sandbox);
+  });
+
+  test("derives missing historical Sandbox ownership from the bound Agent and delegated identity", async () => {
+    const { database, input } = await fixture();
+    await database
+      .prepare("UPDATE sandbox SET agent_id = NULL, project_id = NULL, owner_account_id = NULL")
+      .run();
+    const sandbox = await database
+      .prepare("SELECT * FROM sandbox WHERE id = ?")
+      .bind(ID.sandbox)
+      .first();
+    const plan = buildSessionIsolationPlan({ ...input, source: { ...input.source, sandbox } });
+    expect(plan.after.sandbox).toMatchObject({
+      agent_id: ID.agent,
+      project_id: ID.project,
+      owner_account_id: ID.ownerAccount,
+    });
+    await execute(database, plan.forward);
+    await execute(database, plan.rollback);
+    expect(
+      await database.prepare("SELECT * FROM sandbox WHERE id = ?").bind(ID.sandbox).first(),
+    ).toEqual(sandbox);
+  });
+
+  test.each(["agent_id", "project_id", "owner_account_id"])(
+    "rejects conflicting non-null Sandbox %s",
+    async (column) => {
+      const { input } = await fixture();
+      expect(() =>
+        buildSessionIsolationPlan({
+          ...input,
+          source: {
+            ...input.source,
+            sandbox: { ...input.source.sandbox, [column]: ID.outsiderAccount },
+          },
+        }),
+      ).toThrow("Source ownership does not match");
+    },
+  );
+
+  test("guards and preserves retired physical Run columns through the full migration chain", async () => {
+    const { database: fixtureDatabase, input } = await fixture();
+    const database = new SqliteD1Database();
+    const migrations = new URL("../../../pkgs/db/drizzle/", import.meta.url);
+    for (const filename of readdirSync(migrations)
+      .filter((name) => name.endsWith(".sql"))
+      .toSorted()) {
+      database.execute(readFileSync(new URL(filename, migrations), "utf8"));
+    }
+    const rows = await dump(fixtureDatabase);
+    await database.batch([
+      database.prepare("PRAGMA defer_foreign_keys = ON"),
+      ...rows.flatMap((tableRows, index) =>
+        tableRows.map((row) => {
+          const columns = Object.keys(row);
+          return database
+            .prepare(
+              `INSERT INTO ${TABLES[index]} (${columns.join(",")}) VALUES (${columns.map(() => "?").join(",")})`,
+            )
+            .bind(...columns.map((column) => row[column]));
+        }),
+      ),
+    ]);
+    await database
+      .prepare("UPDATE session_run SET bound_capability_binding_name = 'original-binding'")
+      .run();
+    const run = await database
+      .prepare("SELECT * FROM session_run WHERE id = ?")
+      .bind(ID.run)
+      .first();
+    const physicalInput = { ...input, source: { ...input.source, run } };
+    const plan = buildSessionIsolationPlan(physicalInput);
+    expect(plan.before.run.bound_capability_binding_name).toBe("original-binding");
+    await database
+      .prepare("UPDATE session_run SET bound_capability_binding_name = 'changed-after-plan'")
+      .run();
+    const changed = await dump(database);
+    await expect(execute(database, plan.forward)).rejects.toThrow();
+    expect(await dump(database)).toEqual(changed);
+    await database
+      .prepare("UPDATE session_run SET bound_capability_binding_name = 'original-binding'")
+      .run();
+    await execute(database, plan.forward);
+    await execute(database, plan.rollback);
+    expect(
+      await database.prepare("SELECT * FROM session_run WHERE id = ?").bind(ID.run).first(),
+    ).toEqual(run);
+    const incompleteRun = { ...run };
+    delete incompleteRun.bound_capability_binding_name;
+    expect(() =>
+      buildSessionIsolationPlan({
+        ...physicalInput,
+        source: { ...physicalInput.source, run: incompleteRun },
+      }),
+    ).toThrow("complete before-image");
+  });
+
   test("publishes one coherent continuation and rolls back through a verified replacement source", async () => {
     const { database, plan } = await fixture();
     const originalPlan = await getSessionExecutionPlan(database, ID.ownerSession);
@@ -370,6 +512,7 @@ describe("legacy Session isolation batch", () => {
       "UPDATE sandbox_session SET cloudflare_session_id = '01J000000000000000000000Z1'",
     ],
     ["subject activation", "UPDATE sandbox SET status = 'restoring'"],
+    ["subject operation", "UPDATE sandbox SET status_operation_id = '01J000000000000000000000Z3'"],
     ["subject claim", "UPDATE sandbox SET claim_owner = 'prewarm'"],
     ["operation", "UPDATE session SET status_operation_id = '01J000000000000000000000Z2'"],
     ["source pruning", `UPDATE sandbox_backup SET status = 'pruned' WHERE id = '${SOURCE_BACKUP}'`],

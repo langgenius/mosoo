@@ -172,6 +172,9 @@ The JSON input has these fields:
   snapshot already contains its frozen `configJson`; otherwise supply the
   original immutable version referenced by the snapshot, never today's Agent
   config. Missing columns or missing original configuration stop preparation.
+  Run before-images include the inert historical columns retained by the migration
+  schema. The offline planner compares those columns without restoring their
+  retired product behavior; an active-runtime projection is not a complete source.
 - `preparedAt`: a millisecond timestamp later than the latest ready backup.
 - `destination`: fresh `sandboxId`, `executionSessionId`,
   `rollbackExecutionSessionId`, `backupId`, and `rollbackBackupId`. Backup IDs use
@@ -188,6 +191,12 @@ This initial planner supports an idle, unarchived legacy Session whose latest Ru
 completed successfully and whose original configuration and native source are
 known. It does not qualify missing sources, active work, or other lifecycle states.
 It preserves the existing recovery policy and all unrelated snapshot fields.
+Completed recycling can leave an operation ID on a cold Sandbox; the planner
+compares that original marker and creates the destination without it. Older
+Sandbox rows can lack redundant Agent/Project/owner fields. The planner derives
+the destination's ownership only when the original subject, bound Agent, Session
+Project, and delegated identity agree. Conflicting non-null ownership is rejected;
+the original records remain unchanged for rollback.
 
 Both output files contain one `{ "batch": [...] }` of bound SQL statements. The
 first statement checks complete before-images, successful completion history,
