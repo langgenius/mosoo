@@ -67,6 +67,23 @@ column and all four bindings. Do not roll back to a Worker that always uses
 fix that preserves routing and the pinned Driver protocol. This change does not
 upgrade the Driver protocol or migrate an existing subject's namespace.
 
+### #582 native continuation protocol cutover
+
+The unreleased Session recovery change uses Driver protocol 3 to carry the
+native-continuation requirement. Boot payloads and new handshakes reject protocol
+1 or 2. This is an internal API/Driver compatibility change, not a change to
+public Thread/Run routes or customer Session IDs.
+
+Prepare one matched API revision and Driver image set. Before switching versions,
+close new admission, finish admitted work and verify its committed recovery state,
+then stop old Drivers, including idle/prewarmed instances. Do not rely on a new
+handshake to protect a connection that was already accepted by the old Worker.
+Reopen admission only after the matched image/Worker versions and restored native
+continuation pass staging acceptance. Rehearse the reverse sequence with matched
+rollback artifacts and the same admission barrier; do not split API and Driver
+versions or interrupt customer work to force an upgrade. The production plan and
+its rollback still require the owner's concrete approval.
+
 ## Step 1 - Run The Full Repository Gate
 
 ```bash

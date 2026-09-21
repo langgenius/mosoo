@@ -217,6 +217,7 @@ export interface DriverExecutionSessionSpec {
   readonly cwd: string;
   readonly mcpServers: DriverBootMcpServer[];
   readonly nativeResumeRef: DriverNativeRuntimeRef | null;
+  readonly nativeResumeRequired: boolean;
   readonly recoveryMessages: DriverRecoveryMessage[];
 }
 

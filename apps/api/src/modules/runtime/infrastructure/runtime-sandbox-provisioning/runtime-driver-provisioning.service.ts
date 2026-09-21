@@ -22,7 +22,6 @@ import {
 import { createRuntimeTimingRecorder } from "../../application/session-runs/session-runtime-timing";
 import { DRIVER_HEARTBEAT_INTERVAL_MS } from "../../domain/runtime-config";
 import { getRuntimeDriverSocketPath } from "../../domain/runtime-driver-routes";
-import { getRuntimeKindPolicy } from "../../domain/runtime-kind-policy";
 import { getDriverControlPort } from "../../domain/sandbox-layout";
 import {
   createDriverInstanceRecord,
@@ -208,7 +207,6 @@ async function provisionDriver(
   );
   void driverRecordPromise.catch(() => undefined);
 
-  const policy = getRuntimeKindPolicy(input.profile.kind);
   const nativeResumeRefPromise = timing.measure("getNativeResumeRef", () =>
     getNativeResumeRefForRuntime(env.DB, {
       runtimeId: input.runtime,
@@ -243,15 +241,13 @@ async function provisionDriver(
     if (driverRecord.status === "skipped") {
       throw new DriverPrewarmProvisionSkippedError(driverInstanceId);
     }
-    // A fresh driver without a native session to resume can only recover
-    // conversation context through a bounded platform-history replay. Cattle
-    // keeps that fallback for runtimes that do not emit a native reference;
-    // openai-runtime additionally keeps the semantic-recovery fallback for a
-    // present-but-unmaterialized rollout.
+    // Preserve the legacy shared OpenAI fallback until those Sessions have
+    // verified native checkpoints. Session-owned execution must resume its
+    // committed native state, never a bounded transcript substitute.
     const shouldReplayRecoveryMessages =
-      nativeResumeRef === null
-        ? policy.continuation.replayRecoveryMessages
-        : input.runtime === "openai-runtime";
+      input.profile.sandbox.subjectKind === "agent" &&
+      nativeResumeRef !== null &&
+      input.runtime === "openai-runtime";
     const recoveryMessages = shouldReplayRecoveryMessages
       ? await timing.measure("getRuntimeRecoveryMessages", () =>
           getSessionRuntimeRecoveryMessages(env.DB, {

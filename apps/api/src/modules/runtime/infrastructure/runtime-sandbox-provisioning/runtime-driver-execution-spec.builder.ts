@@ -224,7 +224,9 @@ export async function buildExecutionSpec(
       cwd: organizationPath,
       mcpServers,
       nativeResumeRef: input.nativeResumeRef ?? null,
-      recoveryMessages: input.recoveryMessages ?? [],
+      nativeResumeRequired: input.profile.sandbox.subjectKind === "session",
+      recoveryMessages:
+        input.profile.sandbox.subjectKind === "session" ? [] : (input.recoveryMessages ?? []),
     },
     skillCatalog: input.resolvedSkillCatalog,
     skills,

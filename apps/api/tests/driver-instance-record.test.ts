@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
+import { DRIVER_PROTOCOL_VERSION } from "@mosoo/agent-driver/boot";
 import { parsePlatformId } from "@mosoo/id";
 import type { DriverInstanceId, SandboxId, SessionId, SessionRunId } from "@mosoo/id";
 import { PLATFORM_ID_FIXTURES } from "@mosoo/id/testing";
@@ -502,7 +503,7 @@ describe("driver instance records", () => {
         capabilities: [],
         driverVersion: "driver-test",
         pid: 11,
-        protocolVersion: 2,
+        protocolVersion: DRIVER_PROTOCOL_VERSION,
         runtime: "openai-runtime",
         startedAt: "2026-05-08T00:00:00.000Z",
       },
@@ -523,7 +524,7 @@ describe("driver instance records", () => {
           capabilities: [],
           driverVersion: "late-driver-test",
           pid: 99,
-          protocolVersion: 2,
+          protocolVersion: DRIVER_PROTOCOL_VERSION,
           runtime: "openai-runtime",
           startedAt: "2026-05-08T00:00:02.000Z",
         },

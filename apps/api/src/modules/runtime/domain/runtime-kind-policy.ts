@@ -39,9 +39,6 @@ export interface RuntimeKindPolicy {
     readonly createOnTerminal: readonly RuntimeCheckpointRule[];
     readonly restoreOnActivate: readonly RuntimeCheckpointRule[];
   };
-  readonly continuation: {
-    readonly replayRecoveryMessages: boolean;
-  };
   readonly kind: AgentKind;
   readonly operations: {
     readonly resetSubjectState: boolean;
@@ -107,12 +104,6 @@ export const RUNTIME_KIND_POLICIES = {
       createOnTerminal: [CATTLE_SESSION_WORKSPACE_CHECKPOINT],
       restoreOnActivate: [CATTLE_SESSION_WORKSPACE_CHECKPOINT],
     },
-    // Cattle commits the complete session workspace, including provider-native
-    // state, before terminal lease release. Platform history remains the
-    // fallback for runtimes that do not expose a native resume reference.
-    continuation: {
-      replayRecoveryMessages: true,
-    },
     kind: "cattle",
     operations: {
       resetSubjectState: AGENT_KIND_RUNTIME_POLICIES.cattle.operations.resetSubjectState,
@@ -132,12 +123,6 @@ export const RUNTIME_KIND_POLICIES = {
       createOnReset: [SESSION_WORKSPACES_CHECKPOINT],
       createOnTerminal: [],
       restoreOnActivate: [SESSION_WORKSPACES_CHECKPOINT, SUBJECT_MEMORY_CHECKPOINT],
-    },
-    // Pet continuity comes from the stable container plus workspace/memory
-    // checkpoints and platform-persisted native resume, so no artifact or
-    // history replay is layered on top.
-    continuation: {
-      replayRecoveryMessages: false,
     },
     kind: "pet",
     operations: {

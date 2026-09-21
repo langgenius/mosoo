@@ -61,6 +61,58 @@ function readText(path: string): string {
 }
 
 describe("API to driver boundary", () => {
+  test.each([
+    ["cattle", true],
+    ["pet", false],
+  ] as const)(
+    "carries native recovery ownership through the %s boot boundary",
+    async (kind, required) => {
+      const profile = createDriverProfile();
+      const execution = await buildExecutionSpec(bindings, {
+        builtInTools: [],
+        driverGeneration: 0,
+        driverInstanceId: API_DRIVER_BOUNDARY_IDS.driverInstance,
+        nativeResumeRef: {
+          kind: "openai_thread_id",
+          runtimeId: "openai-runtime",
+          value: "committed-thread",
+        },
+        profile: {
+          ...profile,
+          kind,
+          sandbox: {
+            ...profile.sandbox,
+            kind,
+            subjectKind: kind === "cattle" ? "session" : "agent",
+          },
+        },
+        recoveryMessages: [{ role: "user", content: "A partial legacy transcript" }],
+        requestUrl: "https://api.example.com/api/driver/connect",
+        resolvedMcpServers: [],
+        resolvedSkillCatalog: [],
+        resolvedSkills: [],
+      });
+      const payload = createDriverBootPayload({
+        bootToken: "native-recovery-test",
+        controlUrl: "https://api.example.com/api/driver/socket",
+        driverControlPort: DRIVER_CONTROL_PORT_MIN,
+        driverGeneration: 0,
+        driverInstanceId: API_DRIVER_BOUNDARY_IDS.driverInstance,
+        execution,
+        heartbeatIntervalMs: 1_000,
+        runtime: "openai-runtime",
+        runtimeTransport: "openai-app-server",
+        sandboxId: API_DRIVER_BOUNDARY_IDS.sandbox,
+        traceparent: "00-00000000000000000000000000000001-0000000000000001-01",
+      });
+      const parsed = parseDriverBootPayloadJson(JSON.stringify(payload));
+      expect(parsed.execution.session.nativeResumeRequired).toBe(required);
+      expect(parsed.execution.session.recoveryMessages).toEqual(
+        required ? [] : [{ role: "user", content: "A partial legacy transcript" }],
+      );
+    },
+  );
+
   test("reports budget exhaustion instead of projecting a driver completion as success", async () => {
     const database = new SqliteD1Database();
     database.execute(readText("./helpers/public-api-http-runtime-schema.sql"));
