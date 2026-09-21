@@ -63,6 +63,7 @@ const AGENT_SESSION_LIST_QUERY = graphql(/* GraphQL */ `
     $archived: Boolean
     $participantOnly: Boolean
     $projectId: ULID!
+    $sessionId: ULID
     $type: SessionType
   ) {
     agentSessionList(
@@ -70,6 +71,7 @@ const AGENT_SESSION_LIST_QUERY = graphql(/* GraphQL */ `
       archived: $archived
       participantOnly: $participantOnly
       projectId: $projectId
+      sessionId: $sessionId
       type: $type
     ) {
       nodes {
@@ -292,6 +294,7 @@ export async function listAgentSessions(
   options: {
     archived?: boolean | null;
     participantOnly?: boolean | null;
+    sessionId?: SessionId | null;
     type?: SessionType | null;
   } = {},
 ): Promise<SessionSummary[]> {
@@ -300,6 +303,7 @@ export async function listAgentSessions(
     archived: options.archived ?? null,
     participantOnly: options.participantOnly ?? null,
     projectId,
+    sessionId: options.sessionId ?? null,
     type: options.type ?? null,
   });
 

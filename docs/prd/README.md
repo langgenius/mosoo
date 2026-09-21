@@ -19,7 +19,7 @@ their machine-readable contracts, code, or [Architecture](../architecture.md).
 - [Runtime Choice](./runtime-catalog.md)
 - [Runs and Threads](./default-consumption-surface.md)
 - [Agent Work History](./agent-session-api.md)
-- [Thread Lifecycle](./session-lifecycle.md)
+- [Thread Lifecycle](./session-lifecycle.md) — formal continuation and the Cloud debug Preview 30-day inactivity policy.
 - [Thread Continuation](./thread-continuation.md)
 - [Runtime State Operations](./runtime-state-operations.md)
 - [Agent Terminal](./agent-terminal.md)

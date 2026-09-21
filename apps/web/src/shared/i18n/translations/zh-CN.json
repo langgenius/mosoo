@@ -255,6 +255,7 @@
     "reconnecting": "正在重新连接…",
     "rejectOnce": "拒绝一次",
     "resetChat": "重置聊天",
+    "previewRetention": "连续 30 天未调试，预览聊天和文件将被清理；回来时会开启新预览。",
     "resetChatToTestConfig": "将聊天重置为测试配置",
     "retrySend": "重试发送",
     "searchPlaceholder": "搜索智能体…",

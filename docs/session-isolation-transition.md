@@ -256,3 +256,25 @@ Thread routes and IDs where compatible; naming alone does not require an endpoin
 sunset. Finish active Pet/Cattle removal and compatible API/Driver/CLI/docs release
 before closing #582. Platform supply, recharge, and commercial billing stay in
 independent #636 scope.
+
+## Cloud debug Preview retirement
+
+The owner-approved exception is a single 30-day inactivity period for Cloud debug
+Previews; it does not change formal/API-invoked continuation. New console Previews
+record `previewRetentionMs` in their execution snapshot. Last message/Run activity
+and an explicit file-mutation clock in Session metadata determine inactivity;
+general `updated_at` maintenance timestamps do not. A selected Preview is checked
+by ID, not inferred missing from a paginated list. Cleanup rechecks policy, API
+provenance, active Runs, uploads, and lifecycle ownership when claiming the existing
+terminal cleanup operation.
+
+Historical Sessions have no new deadline by default. Before enrolling or retiring
+any of them, produce the exact ID list and activity evidence, distinguish console
+debugging from API use, and back up their D1 rows, files, checkpoints, and shared
+resource mapping. Verify restoration in isolation and obtain approval for that
+cohort. Enroll only intact original snapshots; never fabricate missing execution
+configuration merely to make a policy marker fit. An expired historical Preview
+without an intact snapshot needs an explicitly reviewed retirement operation.
+Data deletion is irreversible without those backups; a Worker rollback cannot
+undo an already admitted cleanup. Do not release a shared Agent machine or its
+unassigned archives just because one Preview was removed.

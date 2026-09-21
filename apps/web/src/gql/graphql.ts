@@ -899,6 +899,7 @@ export type AgentSessionListQueryVariables = Exact<{
   archived?: boolean | null | undefined;
   participantOnly?: boolean | null | undefined;
   projectId: PlatformId;
+  sessionId?: PlatformId | null | undefined;
   type?: SessionType | null | undefined;
 }>;
 
@@ -3099,12 +3100,13 @@ export const CreateAgentSessionDocument = /*#__PURE__*/ new TypedDocumentString(
 }
     `) as unknown as TypedDocumentString<CreateAgentSessionMutation, CreateAgentSessionMutationVariables>;
 export const AgentSessionListDocument = /*#__PURE__*/ new TypedDocumentString(`
-    query AgentSessionList($agentId: ULID!, $archived: Boolean, $participantOnly: Boolean, $projectId: ULID!, $type: SessionType) {
+    query AgentSessionList($agentId: ULID!, $archived: Boolean, $participantOnly: Boolean, $projectId: ULID!, $sessionId: ULID, $type: SessionType) {
   agentSessionList(
     agentId: $agentId
     archived: $archived
     participantOnly: $participantOnly
     projectId: $projectId
+    sessionId: $sessionId
     type: $type
   ) {
     nodes {

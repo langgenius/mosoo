@@ -106,6 +106,9 @@ export function useAgentSessionPanelModel(
   const [sending, setSending] = useState(false);
   const [pendingSends, setPendingSends] = useState<PendingSend[]>([]);
   const sessionCreatePromiseRef = useRef<Promise<string> | null>(null);
+  const sessionResolutionPromiseRef = useRef<Promise<string> | null>(null);
+  const retiredPreviewIdsRef = useRef(new Set<string>());
+  const unlistedCreatedSessionIdRef = useRef<string | null>(null);
   // Bumped by reset/new-session/retry so an in-flight create that they
   // superseded cannot re-select its (now orphaned) session when it resolves.
   const sessionEpochRef = useRef(0);
@@ -113,20 +116,56 @@ export function useAgentSessionPanelModel(
 
   const sessionsQuery = useQuery({
     enabled: input.projectId !== null,
-    queryFn: async () =>
-      input.projectId === null
-        ? []
-        : listAgentSessions(toProjectId(input.projectId), toAgentId(input.agentId), {
-            archived: false,
-            participantOnly: true,
-            type: input.sessionType,
-          }),
-    queryKey: ["agent-session-list", input.agentId, input.sessionType, "active"],
+    queryFn: async () => {
+      if (input.projectId === null) return [];
+      const sessions = await listAgentSessions(
+        toProjectId(input.projectId),
+        toAgentId(input.agentId),
+        {
+          archived: false,
+          participantOnly: true,
+          type: input.sessionType,
+        },
+      );
+      // Absence from a page is not expiry. Preserve a still-valid selected Preview
+      // even when newer Sessions have pushed it beyond the first page.
+      if (
+        input.sessionType === "preview" &&
+        selectedSessionId != null &&
+        !sessions.some((session) => session.id === selectedSessionId)
+      ) {
+        const selected = await findAvailablePreview(selectedSessionId);
+        return [...sessions, ...selected];
+      }
+      return sessions;
+    },
+    queryKey: ["agent-session-list", input.agentId, input.sessionType, "active", selectedSessionId],
   });
+
+  async function findAvailablePreview(sessionId: string) {
+    if (input.projectId === null) throw new Error("Project id is required to query a Preview.");
+    return listAgentSessions(toProjectId(input.projectId), toAgentId(input.agentId), {
+      archived: false,
+      participantOnly: true,
+      sessionId: toSessionId(sessionId),
+      type: "preview",
+    });
+  }
 
   const agentSessions = sessionsQuery.data ?? [];
   const defaultSessionId = agentSessions[0]?.id ?? null;
-  const activeSessionId = selectedSessionId === undefined ? defaultSessionId : selectedSessionId;
+  const selectedPreviewWasRemoved =
+    input.sessionType === "preview" &&
+    sessionsQuery.isSuccess &&
+    selectedSessionId !== undefined &&
+    selectedSessionId !== null &&
+    selectedSessionId !== unlistedCreatedSessionIdRef.current &&
+    !agentSessions.some((session) => session.id === selectedSessionId);
+  const activeSessionId = selectedPreviewWasRemoved
+    ? null
+    : selectedSessionId === undefined
+      ? defaultSessionId
+      : selectedSessionId;
   const activeSession =
     activeSessionId === null
       ? null
@@ -205,7 +244,10 @@ export function useAgentSessionPanelModel(
       return;
     }
 
-    await sessionsQuery.refetch();
+    const current = await sessionsQuery.refetch();
+    if (current.data?.some((session) => session.id === unlistedCreatedSessionIdRef.current)) {
+      unlistedCreatedSessionIdRef.current = null;
+    }
   }
 
   function clearComposerError(): void {
@@ -254,6 +296,7 @@ export function useAgentSessionPanelModel(
     }
 
     setSelectedSessionId(createdSession.id);
+    unlistedCreatedSessionIdRef.current = createdSession.id;
     void refreshSessions();
     return createdSession.id;
   }
@@ -331,8 +374,38 @@ export function useAgentSessionPanelModel(
   }
 
   async function ensureActiveSession(): Promise<string> {
-    if (activeSessionId !== null) {
+    if (activeSessionId !== null && input.sessionType !== "preview") {
       return activeSessionId;
+    }
+
+    if (sessionResolutionPromiseRef.current !== null) {
+      return sessionResolutionPromiseRef.current;
+    }
+
+    const resolution = resolveSessionForAction();
+    sessionResolutionPromiseRef.current = resolution;
+    try {
+      return await resolution;
+    } finally {
+      if (sessionResolutionPromiseRef.current === resolution) {
+        sessionResolutionPromiseRef.current = null;
+      }
+    }
+  }
+
+  async function resolveSessionForAction(): Promise<string> {
+    const candidateId =
+      activeSessionId ?? (input.sessionType === "preview" ? (selectedSessionId ?? null) : null);
+    if (candidateId !== null && !retiredPreviewIdsRef.current.has(candidateId)) {
+      // An old tab may outlive Preview retention. Revalidate before upload/send;
+      // a failed list request must not replace a potentially continuable Session.
+      const current = await findAvailablePreview(candidateId);
+      if (current.some((session) => session.id === candidateId)) {
+        return candidateId;
+      }
+      retiredPreviewIdsRef.current.add(candidateId);
+      supersedeInFlightSessionCreate();
+      setSelectedSessionId(null);
     }
 
     // Typing-triggered speculative creation and send-triggered creation share

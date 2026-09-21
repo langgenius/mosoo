@@ -2,7 +2,9 @@ import { describe, expect, test } from "bun:test";
 
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
 import { hydrateCachedRunContextFromSession } from "../src/modules/runtime/application/session-definition/hydrate-run-context.service";
+import { parseSessionExecutionPlanJson } from "../src/modules/runtime/application/session-definition/session-execution.repository";
 import { createAgentSession } from "../src/modules/runtime/application/session-run.service";
+import { PREVIEW_RETENTION_MS } from "../src/modules/sessions/domain/preview-retention-policy";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import {
   createPublicHttpContractDatabase,
@@ -48,6 +50,46 @@ async function withProviderProbeFailure<T>(operation: () => Promise<T>): Promise
 }
 
 describe("createAgentSession", () => {
+  test("enrolls only new Cloud console Previews and preserves the policy through parsing", async () => {
+    const database = await createPublicHttpContractDatabase();
+    for (const scenario of [
+      { cloud: true, console: true, type: "preview" as const, managed: true },
+      { cloud: true, console: true, type: "ui" as const, managed: false },
+      { cloud: false, console: true, type: "preview" as const, managed: false },
+      { cloud: true, console: false, type: "preview" as const, managed: false },
+    ]) {
+      const session = await withProviderProbeMock(() =>
+        createAgentSession({
+          bindings: {
+            ...createPublicHttpTestBindings(database),
+            ...(scenario.cloud ? { MOSOO_DEPLOYMENT_MODE: "cloud" } : {}),
+          } as ApiBindings,
+          input: {
+            agentId: PUBLIC_API_TEST_IDS.agent,
+            projectId: PUBLIC_API_TEST_IDS.project,
+            type: scenario.type,
+          },
+          ...(scenario.console ? { options: { origin: "console_preview" as const } } : {}),
+          viewer: OWNER_VIEWER,
+        }),
+      );
+      const snapshot = await database
+        .prepare("SELECT plan_json FROM session_execution_snapshot WHERE session_id = ?")
+        .bind(session.id)
+        .first<{ plan_json: string }>();
+      expect(snapshot).not.toBeNull();
+      const plan = parseSessionExecutionPlanJson(snapshot!.plan_json);
+      expect(plan.previewRetentionMs).toBe(scenario.managed ? PREVIEW_RETENTION_MS : undefined);
+      if (scenario.managed) {
+        expect(() =>
+          parseSessionExecutionPlanJson(
+            JSON.stringify({ ...plan, previewRetentionMs: 3 * 86_400_000 }),
+          ),
+        ).toThrow("must be 30 days");
+      }
+    }
+  });
+
   test("returns the created Session summary", async () => {
     const database = await createPublicHttpContractDatabase();
 

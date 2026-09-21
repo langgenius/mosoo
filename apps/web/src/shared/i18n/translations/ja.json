@@ -255,6 +255,7 @@
     "reconnecting": "再接続中…",
     "rejectOnce": "一度だけ拒否",
     "resetChat": "チャットをリセット",
+    "previewRetention": "30 日間デバッグ操作がないと、プレビューのチャットとファイルは削除されます。戻ったときは新しいプレビューが始まります。",
     "resetChatToTestConfig": "チャットをテスト設定にリセット",
     "retrySend": "送信を再試行",
     "searchPlaceholder": "エージェントを検索…",

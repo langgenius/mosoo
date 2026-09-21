@@ -1149,7 +1149,7 @@ type Query {
   agentEditorState(agentId: ULID!, projectId: ULID!): AgentEditorState!
   agentManifest(agentId: ULID!, projectId: ULID!): AgentManifestExport!
   agentSessionDiagnostics(projectId: ULID!, sessionId: ULID!): AgentSessionDiagnostics!
-  agentSessionList(agentId: ULID!, archived: Boolean, beforeCursor: String, limit: Int, participantOnly: Boolean, projectId: ULID!, type: SessionType): SessionConnection!
+  agentSessionList(agentId: ULID!, archived: Boolean, beforeCursor: String, limit: Int, participantOnly: Boolean, projectId: ULID!, sessionId: ULID, type: SessionType): SessionConnection!
   agentSessionRetrieve(projectId: ULID!, sessionId: ULID!): AgentSessionRetrieve!
   appInfo: AppInfo!
   availableAgentModels(currentModelId: String, currentVendorId: String, projectId: ULID!, runtimeId: String!): [ResolvedModelEntry!]!

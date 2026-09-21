@@ -526,6 +526,12 @@ function createApiTestSchema(database: SqliteD1Database): void {
       updated_at integer NOT NULL
     );
 
+    CREATE TABLE session_execution_snapshot (
+      session_id text PRIMARY KEY NOT NULL,
+      created_at integer NOT NULL,
+      plan_json text NOT NULL
+    );
+
     CREATE TABLE session_run (
       created_by_key_id text,
       agent_id text NOT NULL,

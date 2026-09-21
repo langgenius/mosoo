@@ -201,6 +201,50 @@ async function completeRun(database: D1Database, runId: SessionRunId): Promise<v
 }
 
 describe("Session Run atomic admission", () => {
+  test("rechecks Preview expiry inside the native admission batch without enqueuing work", async () => {
+    const { database, viewer } = await createFixture();
+    const now = Date.now();
+    await database
+      .prepare(
+        "UPDATE session SET type = 'preview', created_at = ?, last_message_at = NULL WHERE id = ?",
+      )
+      .bind(now, PUBLIC_API_TEST_IDS.ownerSession)
+      .run();
+    await database
+      .prepare(
+        "UPDATE session_execution_snapshot SET plan_json = json_set(plan_json, '$.previewRetentionMs', ?) WHERE session_id = ?",
+      )
+      .bind(30 * 86_400_000, PUBLIC_API_TEST_IDS.ownerSession)
+      .run();
+    let changed = false;
+    const interleaved = {
+      prepare: database.prepare.bind(database),
+      batch: async <T = unknown>(statements: D1PreparedStatement[]) => {
+        if (!changed) {
+          changed = true;
+          await database
+            .prepare("UPDATE session SET created_at = ? WHERE id = ?")
+            .bind(now - 30 * 86_400_000 - 1, PUBLIC_API_TEST_IDS.ownerSession)
+            .run();
+        }
+        return database.batch<T>(statements);
+      },
+    } as D1Database;
+    await expect(
+      queueOwnerRun({
+        bindings: createPublicHttpTestBindings(interleaved) as ApiBindings,
+        viewer,
+      }),
+    ).rejects.toMatchObject({ code: API_ERROR_CODE.sessionPreviewExpired });
+    expect(changed).toBe(true);
+    expect(await readAdmissionCounts(database)).toEqual({
+      apiCommand: 0,
+      event: 0,
+      message: 0,
+      run: 0,
+    });
+  });
+
   test("successful continuation renews recovery while a later failed turn does not", async () => {
     const { database, viewer } = await createFixture();
     const bindings = createPublicHttpTestBindings(database, {

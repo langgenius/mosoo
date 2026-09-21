@@ -133,7 +133,7 @@ export const sessionGraphQLSpec = {
     "threadSessionProcessEvents(projectId: ULID!, limit: Int, sessionId: ULID!): [SessionProcessEvent!]!",
     "listSessionResources(projectId: ULID!, sessionId: ULID!): [SessionResource!]!",
     "sessionList(archived: Boolean, beforeCursor: String, limit: Int, projectId: ULID!, type: SessionType): SessionConnection!",
-    "agentSessionList(projectId: ULID!, agentId: ULID!, archived: Boolean, beforeCursor: String, limit: Int, participantOnly: Boolean, type: SessionType): SessionConnection!",
+    "agentSessionList(projectId: ULID!, agentId: ULID!, sessionId: ULID, archived: Boolean, beforeCursor: String, limit: Int, participantOnly: Boolean, type: SessionType): SessionConnection!",
   ],
   typeDefs: sessionSchema,
 } satisfies GraphQLModuleSpec;

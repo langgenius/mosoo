@@ -31,6 +31,7 @@ import {
 import type { AppDatabase } from "../../../../platform/db/drizzle";
 import type { PreparedApiCommand } from "../../../api-command/application/api-command-ledger";
 import { createSessionRuntimeEventProjection } from "../../../sessions/domain/session-runtime-event-projection";
+import { previewAvailablePredicate } from "../../../sessions/infrastructure/preview-retention.repository";
 import { ACTIVE_SESSION_RUN_STATUSES } from "../../domain/session-run-lifecycle.machine";
 import { createSessionStatusTransitionPatch } from "./session-lifecycle-projection.repository";
 import { sessionRecoveryAvailablePredicate } from "./session-recovery-retention.repository";
@@ -105,6 +106,7 @@ export function completedRunHistoryPredicate(
 
 function claimableSessionPredicate(db: AppDatabase, input: CommitQueuedSessionRunAdmissionInput) {
   return and(
+    previewAvailablePredicate(db, input.recoveryRequestedAtMs ?? input.run.timestampMs),
     sessionRecoveryAvailablePredicate(db, input.recoveryRequestedAtMs ?? input.run.timestampMs),
     eq(sessionsTable.id, input.session.id),
     eq(sessionsTable.agentId, input.session.agentId),

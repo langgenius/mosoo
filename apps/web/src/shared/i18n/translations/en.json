@@ -255,6 +255,7 @@
     "reconnecting": "Reconnecting…",
     "rejectOnce": "Reject once",
     "resetChat": "Reset chat",
+    "previewRetention": "Preview chats and files are cleaned up after 30 days without debugging activity. Returning starts a new Preview.",
     "resetChatToTestConfig": "Reset chat to test config",
     "retrySend": "Retry send",
     "searchPlaceholder": "Search agents…",

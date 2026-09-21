@@ -31,10 +31,12 @@ import type { AgentRow } from "../../../agents/application/agent-types";
 import type { AuthenticatedViewer } from "../../../auth/application/viewer-auth.service";
 import { resolveReadyEnvironmentPackageArtifact } from "../../../environments/application/environment-package-artifact.service";
 import { resolveAgentEnvironmentSnapshot } from "../../../environments/application/environment.service";
+import { PREVIEW_RETENTION_MS } from "../../../sessions/domain/preview-retention-policy";
 import { SESSION_RECOVERY_RETENTION_MS } from "../../domain/session-recovery-policy";
 import type { SessionExecutionPlan } from "../session-definition/session-execution.types";
 
 export interface CreateAgentSessionOptions {
+  origin?: "console_preview";
   accessViewer?: AuthenticatedViewer;
   configurationSource?: "saved";
   endUserId?: string | null | undefined;
@@ -312,6 +314,16 @@ export async function createAgentSession(
   const sessionId = options.sessionId ?? createPlatformId<SessionId>();
   const timestampMs = currentTimestampMs();
   const sessionType = request.input.type ?? "preview";
+  if (
+    request.bindings.MOSOO_DEPLOYMENT_MODE === "cloud" &&
+    options.origin === "console_preview" &&
+    sessionType === "preview" &&
+    accessViewer.apiKeyId === undefined &&
+    request.viewer.apiKeyId === undefined &&
+    options.metadata?.public_api === undefined
+  ) {
+    executionPlan.previewRetentionMs = PREVIEW_RETENTION_MS;
+  }
 
   if (request.input.waitForRuntimeReady === true && sessionType !== "preview") {
     throw validationError(

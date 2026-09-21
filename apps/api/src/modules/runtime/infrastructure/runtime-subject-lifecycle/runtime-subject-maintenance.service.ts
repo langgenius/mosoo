@@ -7,7 +7,10 @@ import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../../platform/db/drizzle";
 import { isTruthy } from "../../../../shared/truthiness";
 import { toIsoString } from "../../../../time";
-import { repairStaleSessionDeleteCleanups } from "../../../sessions/application/session-cleanup.service";
+import {
+  cleanupExpiredPreviewSessions,
+  repairStaleSessionDeleteCleanups,
+} from "../../../sessions/application/session-cleanup.service";
 import { appendSessionRuntimeEvents } from "../../../sessions/application/session-event-write.service";
 import { syncSessionViewerState } from "../../../sessions/application/session-viewer-events.service";
 import { RESCHEDULING_RECONNECT_WINDOW_MS } from "../../../sessions/domain/session-lifecycle";
@@ -344,6 +347,7 @@ export async function runSandboxMaintenance(bindings: ApiBindings): Promise<void
     limit: MAINTENANCE_BATCH_SIZE,
     staleUpdatedAtLte: now - MAINTENANCE_OPERATION_REPAIR_AFTER_MS,
   });
+  await cleanupExpiredPreviewSessions(bindings, { limit: MAINTENANCE_BATCH_SIZE, nowMs: now });
   await repairIdleConversationCheckpoints(bindings, now);
   await closeIdleSessionScopedConversationSessions(bindings, now);
   const repairedDeadlines = await repairStrandedRuntimeSubjectDeadlines(bindings.DB, { now });

@@ -59,6 +59,9 @@ function createSessionResourceDatabase(input: { includeFile?: boolean } = {}): S
   database.execute(`
     CREATE TABLE session (
       id text PRIMARY KEY NOT NULL,
+      created_at integer NOT NULL DEFAULT 1,
+      last_message_at integer,
+      type text NOT NULL DEFAULT 'preview',
       creator_account_id text NOT NULL,
       attributed_user_id text,
       archived_at integer,
@@ -68,6 +71,21 @@ function createSessionResourceDatabase(input: { includeFile?: boolean } = {}): S
       runtime_id text NOT NULL,
       status text NOT NULL,
       title text
+    );
+
+    CREATE TABLE session_execution_snapshot (
+      session_id text PRIMARY KEY NOT NULL,
+      created_at integer NOT NULL,
+      plan_json text NOT NULL
+    );
+
+    CREATE TABLE session_run (
+      id text PRIMARY KEY NOT NULL,
+      session_id text NOT NULL,
+      created_by_key_id text,
+      created_at integer NOT NULL,
+      completed_at integer,
+      status text NOT NULL
     );
 
     CREATE TABLE project (

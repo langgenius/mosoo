@@ -53,3 +53,18 @@ in the Console and public integrations. Recovery is partial: retry actions exist
 Preview failures, while automatic replay after runtime loss is not shipped. Existing Threads
 keep the Agent configuration captured when they began; testing newer configuration requires a
 new Thread or Preview session.
+
+## Cloud debug Preview retention (unreleased)
+
+Cloud debug Previews have one inactivity period: **30 days**. A Preview can be continued
+within that period. Sending a message, running work, or writing/uploading a file renews it;
+reading history, opening the console, and background maintenance do not. After 30 days
+without debugging activity, the Preview and its history/files may be permanently cleaned
+up. Returning to the draft starts a new Preview. There is no separate three-day deadline.
+Running work and admitted uploads must finish or expire before cleanup can claim a Preview.
+
+This rule does not expire formal conversations or API-used Sessions, regardless of a legacy
+`preview` label. Self-hosted installations retain their existing behavior. New Cloud debug
+Previews record the policy at creation. Existing Previews remain unchanged until a reviewed
+inventory, backup/restore plan, and approved production cutover enroll them. Agent definitions
+remain available after Preview cleanup. Deploy rollback alone cannot restore deleted data.

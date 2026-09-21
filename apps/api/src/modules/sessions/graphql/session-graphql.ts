@@ -78,6 +78,7 @@ interface StartAgentRunArgs {
 
 interface AgentSessionListArgs {
   agentId: string;
+  sessionId?: string | null;
   archived?: Parameters<typeof listAgentSessions>[2]["archived"];
   beforeCursor?: string | null;
   limit?: number | null;
@@ -125,6 +126,7 @@ export const sessionGraphQLModule = {
         bindings: context.bindings,
         executionContext: context.executionContext,
         input: args.input,
+        options: { origin: "console_preview" },
         requestUrl: context.request.url,
         viewer: context.viewer,
       }),
@@ -199,6 +201,7 @@ export const sessionGraphQLModule = {
     agentSessionList: async (_parent, args: AgentSessionListArgs, context) =>
       listAgentSessions(context.bindings.DB, context.viewer, {
         agentId: readAgentId(args.agentId),
+        sessionId: args.sessionId == null ? null : readSessionId(args.sessionId),
         archived: args.archived ?? null,
         beforeCursor: args.beforeCursor ?? null,
         limit: args.limit ?? null,

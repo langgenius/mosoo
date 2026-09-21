@@ -33,6 +33,8 @@ mosoo v1 targets research, data analysis, file processing, and report generation
 
 The durable Session contract can use the existing Thread API and conversation IDs. Compatible names and fields do not need a separate API migration. Moving shared Agent machines to isolated Sessions does require a verified transition for existing Cloud workloads; see the [migration contract](./docs/SPEC.md#10-migration-and-breaking-change-notification).
 
+Cloud debug Previews have a separate target lifecycle: continue within 30 days of debugging activity, then clean up the Preview and start a new one on return. Formal and API-used Sessions retain their continuation contract. Existing Preview cleanup requires an approved inventory and backup plan; see [Thread Lifecycle](./docs/prd/session-lifecycle.md#cloud-debug-preview-retention-unreleased).
+
 The unreleased `/api/v2` Thread entry point selects saved private Agent configuration and makes `userId` optional. `/api/v1` retains published/live selection and its existing identity contract. This version boundary changes configuration admission, not conversation IDs; see the [API compatibility contract](./docs/prd/public-thread-api-surface.md#unreleased-saved-agent-entry-point).
 
 ## How It Works Today

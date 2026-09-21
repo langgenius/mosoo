@@ -1,6 +1,7 @@
 import type { SessionId } from "@mosoo/id";
 
 import { API_ERROR_CODE, createApiError } from "../../../../platform/errors";
+import { assertPreviewAvailable } from "../../../sessions/infrastructure/preview-retention.repository";
 import { getSessionRecoveryExpiresAt } from "../../infrastructure/session-runs/session-recovery-retention.repository";
 
 export async function assertSessionRecoveryAvailable(
@@ -8,6 +9,7 @@ export async function assertSessionRecoveryAvailable(
   sessionId: SessionId,
   now: number,
 ): Promise<void> {
+  await assertPreviewAvailable(database, sessionId, now);
   const expiresAt = await getSessionRecoveryExpiresAt(database, sessionId);
   if (expiresAt !== null && expiresAt <= now) {
     throw createApiError(

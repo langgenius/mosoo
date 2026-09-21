@@ -209,6 +209,12 @@ export function AgentSessionPanel({
               tone={tone}
             />
 
+            {tone === "preview" && import.meta.env.VITE_MOSOO_DEPLOYMENT_MODE === "cloud" ? (
+              <p className="text-muted-foreground border-b px-4 py-2 text-xs leading-relaxed">
+                {t("agent.previewRetention")}
+              </p>
+            ) : null}
+
             {isTruthy(model.sessionLoadError) ? (
               <div className="border-amber/30 bg-amber-bg text-amber-fg border-b px-4 py-2.5 text-[12px] leading-relaxed">
                 {sessionLoadErrorMessage}

@@ -5,6 +5,7 @@ import { disposeRpcResource } from "../../../../platform/cloudflare/rpc-disposal
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { isApiError } from "../../../../platform/errors";
 import type { AuthenticatedViewer } from "../../../auth/application/viewer-auth.service";
+import { assertPreviewAvailable } from "../../../sessions/infrastructure/preview-retention.repository";
 import { getSupportedRuntimeId } from "../../domain/runtime-config";
 import { prewarmDriverSession } from "../../infrastructure/driver-session.service";
 import { createRuntimeSubjectLifecycleService } from "../../infrastructure/runtime-subject-lifecycle/runtime-subject-lifecycle.service";
@@ -51,6 +52,7 @@ export async function prewarmAgentSessionRuntime(
   });
 
   try {
+    await assertPreviewAvailable(bindings.DB, session.id, Date.now());
     if (await hasActiveSessionRun(bindings.DB, session.id)) {
       logInfo("session.runtime.prewarm.skipped", {
         reason: "active_run_present",
