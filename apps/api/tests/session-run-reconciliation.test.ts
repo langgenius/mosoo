@@ -14,6 +14,67 @@ import {
 } from "./helpers/public-api-http-test-fixture";
 
 describe("session run reconciliation", () => {
+  test.each(["single", "batch"] as const)(
+    "%s reconciliation preserves a cold boot before a driver is attached",
+    async (mode) => {
+      const database = await createPublicHttpContractDatabase();
+      await insertNonOwnerSession(database);
+      const sessionId = "01J0000000000000000000000B";
+      const runId = "01J0000000000000000000000N";
+      // The delayed staging continuation was reclaimed after 41 seconds of
+      // booting, before preparation had attached any driver to the run.
+      const bootStartedAt = Date.now() - 41_000;
+      await database
+        .prepare(
+          `INSERT INTO session_run (
+            id, session_id, agent_id, created_by_account_id, trigger, status,
+            provider, model, runtime_id, trace_id, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(
+          runId,
+          sessionId,
+          "01J00000000000000000000009",
+          "01J00000000000000000000002",
+          "user_prompt",
+          "booting",
+          "anthropic",
+          "claude-sonnet-5",
+          "claude-agent-sdk",
+          "trace-cold-prepare",
+          bootStartedAt,
+          bootStartedAt,
+        )
+        .run();
+      await database
+        .prepare("UPDATE session SET last_run_id = ?, status = ? WHERE id = ?")
+        .bind(runId, "RUNNING", sessionId)
+        .run();
+
+      const reconcile = async () =>
+        mode === "single"
+          ? reconcileStaleActiveSessionRun(database, sessionId)
+          : (
+              await reconcileStaleActiveSessionRuns(database, { limit: 10 })
+            ).reconciledRunIds.includes(runId);
+
+      expect(await reconcile()).toBe(false);
+      expect(
+        await database
+          .prepare("SELECT status, driver_instance_id FROM session_run WHERE id = ?")
+          .bind(runId)
+          .first(),
+      ).toEqual({ status: "booting", driver_instance_id: null });
+
+      // An abandoned preparation still expires at the cold-ready deadline.
+      await database
+        .prepare("UPDATE session_run SET updated_at = ? WHERE id = ?")
+        .bind(Date.now() - DRIVER_COLD_READY_TIMEOUT_MS - 1_000, runId)
+        .run();
+      expect(await reconcile()).toBe(true);
+    },
+  );
+
   test("keeps connecting runs alive for the cold ready budget", async () => {
     const database = await createPublicHttpContractDatabase();
     await insertNonOwnerSession(database);
