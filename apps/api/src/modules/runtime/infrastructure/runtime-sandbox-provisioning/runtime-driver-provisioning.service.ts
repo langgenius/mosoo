@@ -198,6 +198,7 @@ async function provisionDriver(
     createDriverInstanceRecord(env, {
       bootTokenHash: bootToken.hash,
       driverInstanceId,
+      executionSessionId: input.profile.session.sandboxSessionId,
       mcpGrants: input.resolvedMcpServers.map(toDriverInstanceMcpGrantRecord),
       conflictStrategy: input.driverRecordConflictStrategy ?? "replace",
       runtime: input.runtime,
@@ -223,6 +224,13 @@ async function provisionDriver(
   let driverLaunchAttempted = false;
 
   try {
+    // Claim the active binding before any remote filesystem/setup side effect.
+    // The live record also prevents conversion while preparation is in flight.
+    const driverRecord = await driverRecordPromise;
+    if (driverRecord.status === "skipped") {
+      throw new DriverPrewarmProvisionSkippedError(driverInstanceId);
+    }
+
     await installRuntimeEnvironment(env, {
       cloudflareSession: input.cloudflareSession,
       environmentRevisionId,
@@ -234,13 +242,7 @@ async function provisionDriver(
       timing,
     });
 
-    const [nativeResumeRef, driverRecord] = await Promise.all([
-      nativeResumeRefPromise,
-      driverRecordPromise,
-    ]);
-    if (driverRecord.status === "skipped") {
-      throw new DriverPrewarmProvisionSkippedError(driverInstanceId);
-    }
+    const nativeResumeRef = await nativeResumeRefPromise;
     // Preserve the legacy shared OpenAI fallback until those Sessions have
     // verified native checkpoints. Session-owned execution must resume its
     // committed native state, never a bounded transcript substitute.

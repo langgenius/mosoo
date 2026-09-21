@@ -143,6 +143,14 @@ preflight followed by unconditional independent updates is not a concurrency gat
 Test that a conflicting admission or changed source leaves all original rows and
 objects intact.
 
+Driver provisioning must claim the current active Session, Sandbox and internal
+execution-session binding in the same transaction that creates or replaces its
+Driver record. Check the binding before resetting commands or grants, and await
+that claim before installing files or running setup in the workspace. A pending
+request captured before conversion must not recreate a Driver on the old binding.
+A live provisioning record then participates in the converter's existing drain
+guard; this claim does not replace physical Driver shutdown or admission control.
+
 Late remote callbacks also cross this boundary. Conversation activation, error
 recording, and close now compare the original Sandbox and execution-session ID
 within their D1 writes. A callback from the old binding cannot change the replacement
