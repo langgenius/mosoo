@@ -28,7 +28,6 @@ import type {
   SessionDeliveryEvent,
   SessionLiveState,
 } from "../../../sessions/application/session-live-state.service";
-import { getRuntimeKindPolicy } from "../../domain/runtime-kind-policy";
 import { createSessionRunTerminalFailureSourceId } from "../../domain/session-run-terminal-event-id";
 import { upsertNativeResumeRef } from "../native-resume-ref.repository";
 import { getSessionRunBudgetFailure } from "../session-runs/session-run-budget.repository";
@@ -217,9 +216,7 @@ export async function projectRuntimeDriverEvents(
         continue;
       }
 
-      const policy = link.sandboxKind === null ? null : getRuntimeKindPolicy(link.sandboxKind);
-
-      if (policy?.nativeResume.persistence !== "platform") {
+      if (link.sandboxKind === null) {
         logInfo("runtime.native_resume_ref.ignored", {
           driverInstanceId: input.driverInstanceId,
           kind: nativeResumeRef.kind,

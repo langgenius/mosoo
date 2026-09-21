@@ -20,7 +20,6 @@ import { setSessionRunStatus } from "../session-runs/session-run-store.repositor
 import type { SessionRunTransitionOutcome } from "../session-runs/session-run-store.repository";
 import type { RuntimeSessionLink } from "./event-types";
 import { getRuntimeSessionLink } from "./session-link.repository";
-import { closeReleasedTerminalRuntimeLeaseIfNeeded } from "./terminal-runtime-lease";
 
 interface LinkedSessionRunStatusRow {
   readonly sessionRunId: SessionRunId | null;
@@ -133,8 +132,6 @@ export async function releaseTerminalDriverInstanceSessionRun(
       status: outcome.status,
     });
   }
-
-  await closeReleasedTerminalRuntimeLeaseIfNeeded(bindings, { link, released });
 
   return { link, released };
 }

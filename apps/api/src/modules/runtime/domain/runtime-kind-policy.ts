@@ -2,7 +2,6 @@ import { SANDBOX_MEMORY_PATH } from "@mosoo/agent-driver/paths";
 import { AGENT_KIND_RUNTIME_POLICIES } from "@mosoo/contracts/agent";
 import type {
   AgentKind,
-  AgentRuntimeNativeResumePersistence,
   AgentRuntimeSubjectScope,
   AgentRuntimeTerminalTarget,
 } from "@mosoo/contracts/agent";
@@ -28,7 +27,6 @@ export type RuntimeStateClearRule =
   | {
       readonly type: "session_runtime_state";
     };
-export type RuntimeNativeResumePersistence = AgentRuntimeNativeResumePersistence;
 export type RuntimePolicySubjectKind = Extract<SandboxSubjectKind, "agent" | "session">;
 export type RuntimeTerminalTargetPolicy = AgentRuntimeTerminalTarget;
 
@@ -43,19 +41,10 @@ export interface RuntimeKindPolicy {
   };
   readonly continuation: {
     readonly replayRecoveryMessages: boolean;
-    readonly restoreSessionArtifacts: boolean;
   };
   readonly kind: AgentKind;
-  readonly lease: {
-    readonly closeOnRunTerminal: boolean;
-  };
-  readonly nativeResume: {
-    readonly persistence: RuntimeNativeResumePersistence;
-  };
   readonly operations: {
-    readonly recreateSubject: boolean;
     readonly resetSubjectState: boolean;
-    readonly restartDriver: boolean;
     readonly terminalTarget: RuntimeTerminalTargetPolicy;
   };
   readonly subject: {
@@ -123,26 +112,10 @@ export const RUNTIME_KIND_POLICIES = {
     // fallback for runtimes that do not expose a native resume reference.
     continuation: {
       replayRecoveryMessages: true,
-      restoreSessionArtifacts: false,
     },
     kind: "cattle",
-    lease: {
-      // Keeping the conversation session open across terminal runs keeps the
-      // driver process (and its provider session) resident inside the idle
-      // grace window, so a follow-up turn skips the driver respawn that
-      // dominated the warm prepare path. The conversation idle sweep closes
-      // sessions quiet for longer than the subject grace, which arms the
-      // subject inactive deadline and hands reclamation to the existing
-      // maintenance chain.
-      closeOnRunTerminal: false,
-    },
-    nativeResume: {
-      persistence: AGENT_KIND_RUNTIME_POLICIES.cattle.nativeResume.persistence,
-    },
     operations: {
-      recreateSubject: AGENT_KIND_RUNTIME_POLICIES.cattle.operations.recreateSubject,
       resetSubjectState: AGENT_KIND_RUNTIME_POLICIES.cattle.operations.resetSubjectState,
-      restartDriver: AGENT_KIND_RUNTIME_POLICIES.cattle.operations.restartDriver,
       terminalTarget: AGENT_KIND_RUNTIME_POLICIES.cattle.terminal.target,
     },
     subject: {
@@ -165,19 +138,10 @@ export const RUNTIME_KIND_POLICIES = {
     // history replay is layered on top.
     continuation: {
       replayRecoveryMessages: false,
-      restoreSessionArtifacts: false,
     },
     kind: "pet",
-    lease: {
-      closeOnRunTerminal: false,
-    },
-    nativeResume: {
-      persistence: AGENT_KIND_RUNTIME_POLICIES.pet.nativeResume.persistence,
-    },
     operations: {
-      recreateSubject: AGENT_KIND_RUNTIME_POLICIES.pet.operations.recreateSubject,
       resetSubjectState: AGENT_KIND_RUNTIME_POLICIES.pet.operations.resetSubjectState,
-      restartDriver: AGENT_KIND_RUNTIME_POLICIES.pet.operations.restartDriver,
       terminalTarget: AGENT_KIND_RUNTIME_POLICIES.pet.terminal.target,
     },
     subject: {

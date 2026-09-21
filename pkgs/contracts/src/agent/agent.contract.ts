@@ -18,7 +18,6 @@ export const AGENT_KIND_LIST_LABEL = AGENT_KIND_VALUES.join(" or ");
 export const AgentKind = type.enumerated(...AGENT_KIND_VALUES);
 export type AgentKind = typeof AgentKind.infer;
 export type AgentRuntimeSubjectScope = "agent" | "session";
-export type AgentRuntimeNativeResumePersistence = "platform" | "volatile";
 export type AgentRuntimeTerminalTarget = "stable_subject" | "unavailable";
 
 export const AGENT_KIND_RUNTIME_SUBJECT_SCOPES = {
@@ -36,14 +35,9 @@ export interface AgentKindRuntimeCardCopy {
 export interface AgentKindRuntimePolicy {
   readonly copy: AgentKindRuntimeCardCopy;
   readonly kind: AgentKind;
-  readonly nativeResume: {
-    readonly persistence: AgentRuntimeNativeResumePersistence;
-  };
   readonly operations: {
     readonly ownerTerminal: boolean;
-    readonly recreateSubject: boolean;
     readonly resetSubjectState: boolean;
-    readonly restartDriver: boolean;
   };
   readonly stateRetention: {
     readonly preservesRuntimeState: boolean;
@@ -76,14 +70,9 @@ export const AGENT_KIND_RUNTIME_POLICIES = {
       tagline: "On-demand worker",
     },
     kind: "cattle",
-    nativeResume: {
-      persistence: "platform",
-    },
     operations: {
       ownerTerminal: false,
-      recreateSubject: true,
       resetSubjectState: false,
-      restartDriver: true,
     },
     stateRetention: {
       preservesRuntimeState: true,
@@ -108,14 +97,9 @@ export const AGENT_KIND_RUNTIME_POLICIES = {
       tagline: "Always-on teammate",
     },
     kind: "pet",
-    nativeResume: {
-      persistence: "platform",
-    },
     operations: {
       ownerTerminal: true,
-      recreateSubject: true,
       resetSubjectState: true,
-      restartDriver: true,
     },
     stateRetention: {
       preservesRuntimeState: true,

@@ -209,15 +209,12 @@ async function provisionDriver(
   void driverRecordPromise.catch(() => undefined);
 
   const policy = getRuntimeKindPolicy(input.profile.kind);
-  const nativeResumeRefPromise =
-    policy.nativeResume.persistence === "volatile"
-      ? Promise.resolve(null)
-      : timing.measure("getNativeResumeRef", () =>
-          getNativeResumeRefForRuntime(env.DB, {
-            runtimeId: input.runtime,
-            sessionId: input.sandboxSessionId,
-          }),
-        );
+  const nativeResumeRefPromise = timing.measure("getNativeResumeRef", () =>
+    getNativeResumeRefForRuntime(env.DB, {
+      runtimeId: input.runtime,
+      sessionId: input.sandboxSessionId,
+    }),
+  );
   void nativeResumeRefPromise.catch(() => undefined);
 
   const explicitControlOrigin = env.MOSOO_RUNTIME_CONTROL_ORIGIN?.trim() || undefined;

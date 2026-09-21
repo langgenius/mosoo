@@ -62,17 +62,12 @@ function resolveConversationContinuationPlan(input: {
   shouldRestoreSessionArtifacts: boolean;
 } {
   const policy = getRuntimeKindPolicy(input.kind);
-  // A workspace being (re)created is the artifact-restore trigger: recorded
-  // session artifacts are the only durable workspace state a policy without
-  // workspace checkpoints can rehydrate after the sandbox was recycled. A
-  // first-ever conversation passes through the same path and finds no
-  // artifacts to restore.
-  const isLegacyCattleContinuation =
+  // Pre-checkpoint Cattle sessions retain their recorded artifact recovery
+  // path. Sessions admitted with workspace durability require that checkpoint.
+  const shouldRestoreSessionArtifacts =
     input.kind === "cattle" &&
     input.existingSession !== null &&
     !input.existingSession.workspaceCheckpointRequired;
-  const shouldRestoreSessionArtifacts =
-    policy.continuation.restoreSessionArtifacts || isLegacyCattleContinuation;
 
   if (input.existingSession === null) {
     return {

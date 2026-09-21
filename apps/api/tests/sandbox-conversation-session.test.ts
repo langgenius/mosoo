@@ -467,7 +467,7 @@ describe("ensureSandboxConversationSession", () => {
 
     await expect(
       ensureSandboxConversationSession(createBindings(database), createInput(sandbox, "cattle")),
-    ).rejects.toThrow("workspace checkpoint could not be restored. Retry the continuation");
+    ).rejects.toThrow("workspace checkpoint could not be restored. Retry this Thread");
   });
 
   test("restores recorded artifacts for a pre-rollout cattle Thread", async () => {

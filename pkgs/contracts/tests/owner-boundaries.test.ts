@@ -83,9 +83,6 @@ describe("contracts owner boundaries", () => {
         label: "Assistant Agent",
         tagline: "Always-on teammate",
       },
-      nativeResume: {
-        persistence: "platform",
-      },
       terminal: {
         target: "stable_subject",
       },
@@ -94,9 +91,6 @@ describe("contracts owner boundaries", () => {
       copy: {
         label: "Task Agent",
         tagline: "On-demand worker",
-      },
-      nativeResume: {
-        persistence: "platform",
       },
       terminal: {
         target: "unavailable",
