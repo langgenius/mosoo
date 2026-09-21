@@ -5,6 +5,9 @@ import type { ApiCommandMessage } from "../../modules/api-command/application/ap
 
 interface OptionalSandboxBinding {
   Sandbox?: DurableObjectNamespace<Sandbox>;
+  SandboxClaude?: DurableObjectNamespace<Sandbox>;
+  SandboxOpenAI?: DurableObjectNamespace<Sandbox>;
+  SandboxOpenCode?: DurableObjectNamespace<Sandbox>;
 }
 
 interface OptionalDriverConnectionBinding {
@@ -25,6 +28,7 @@ interface OptionalLocalProviderFetchProxyBindings {
 }
 
 interface OptionalRuntimeBindings {
+  MOSOO_RUNTIME_IMAGES_ENABLED?: string;
   MOSOO_RUNTIME_CONTROL_ORIGIN?: string;
   MOSOO_RUNTIME_ALL_PROXY?: string;
   MOSOO_RUNTIME_HTTP_PROXY?: string;

@@ -21,6 +21,7 @@ import {
   SERVER_PRODUCT_ANALYTICS_EVENTS,
 } from "../../../../platform/analytics/product-analytics";
 import { createErrorLogContext, logWarn } from "../../../../platform/cloudflare/logger";
+import { runtimeImagesEnabled } from "../../../../platform/cloudflare/sandbox-binding";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { currentTimestampMs } from "../../../../time";
 import {
@@ -84,6 +85,8 @@ const MAINTENANCE_CLAIM_OWNER_PREFIXES = ["scheduled-", "immediate-"] as const;
 export type RuntimeSubjectActivationPurpose = "interactive" | "prewarm";
 
 export interface ActivateRuntimeSubjectInput {
+  /** Required when allocating a subject; existing subjects keep their recorded image. */
+  readonly runtimeId?: string;
   readonly agentId: AgentId;
   readonly executionOwnerUserId: AccountId;
   readonly kind: AgentKind;
@@ -444,7 +447,12 @@ export class RuntimeSubjectLifecycleService {
     );
 
     if (!record) {
+      if (input.runtimeId === undefined) {
+        throw new Error("A new runtime subject requires its admitted runtime.");
+      }
       const runtimeSubjectId = await ensureRuntimeSubjectId(this.#bindings.DB, {
+        runtimeId: input.runtimeId,
+        runtimeImagesEnabled: runtimeImagesEnabled(this.#bindings.MOSOO_RUNTIME_IMAGES_ENABLED),
         agentId: input.agentId,
         projectId: input.projectId,
         executionOwnerUserId: input.executionOwnerUserId,

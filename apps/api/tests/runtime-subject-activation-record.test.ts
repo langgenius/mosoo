@@ -10,6 +10,7 @@ function createRuntimeSubjectDatabase(): SqliteD1Database {
 
   database.execute(`
     CREATE TABLE sandbox (
+      sandbox_binding text NOT NULL DEFAULT 'Sandbox',
       claim_expires_at integer,
       claim_owner text,
       global_mounts_json text NOT NULL,

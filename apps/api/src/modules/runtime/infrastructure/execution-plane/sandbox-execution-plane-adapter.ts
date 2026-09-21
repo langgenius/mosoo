@@ -154,6 +154,7 @@ class SandboxExecutionPlaneAdapter implements RuntimeExecutionPlaneAdapter {
       });
       const { subject: sandbox } = await timing.measure("activateRuntimeSubject", () =>
         runtimeSubjectLifecycle.activate({
+          runtimeId: input.profile.runtimeId,
           agentId: input.profile.agentId,
           diagnosticContext: {
             agentId: input.profile.configRevision.agentId,

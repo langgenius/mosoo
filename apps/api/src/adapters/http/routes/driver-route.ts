@@ -40,7 +40,7 @@ import { getRuntimeDriverRoutePrefix } from "../../../modules/runtime/domain/run
 import { upgradeDriverInstanceSocket } from "../../../modules/runtime/infrastructure/driver-instance/client";
 import { getDriverInstanceRecord } from "../../../modules/runtime/infrastructure/driver-instance/driver-instance-record.repository";
 import { readSkillPackageBytesFromSnapshot } from "../../../modules/skills/application/skill-package-snapshot.service";
-import { createErrorLogContext, logError } from "../../../platform/cloudflare/logger";
+import { createErrorLogContext, logError, logWarn } from "../../../platform/cloudflare/logger";
 import type { ApiGatewayEnvironment } from "../../../platform/cloudflare/worker-types";
 import { toArrayBuffer } from "../../../shared/bytes";
 import { toPlatformId } from "../../../shared/platform-id";
@@ -310,12 +310,43 @@ function isOpenAiResponsesWebSocketProbe(
   );
 }
 
+type LlmProxyRejectionReason =
+  | "method_not_allowed"
+  | "path_not_allowed"
+  | "body_invalid_json"
+  | "body_invalid_multipart"
+  | "body_invalid_shape"
+  | "body_model_missing"
+  | "body_model_ambiguous"
+  | "body_model_invalid"
+  | "body_model_mismatch";
+
+function rejectLlmProxyCapability(
+  grant: Extract<RuntimeActionTokenPayload, { action: "llm_proxy" }>,
+  reason: LlmProxyRejectionReason,
+): Response {
+  // The request log context supplies trace/request correlation. Do not copy
+  // arbitrary paths, models, headers, parse errors, or body content into logs.
+  logWarn("runtime.llm_proxy.capability_rejected", {
+    credentialId: grant.resourceId,
+    driverGeneration: grant.driverGeneration,
+    driverInstanceId: grant.driverInstanceId,
+    modelProtocol: grant.modelProtocol,
+    projectId: grant.projectId,
+    reason,
+  });
+  return Response.json(
+    { error: "LLM proxy request is outside the granted model capability." },
+    { status: 403 },
+  );
+}
+
 async function readGrantedLlmProxyRequestBody(
   request: Request,
   modelId: string,
   modelProtocol: PresetModelProtocol,
   subPath: string,
-): Promise<{ body: BodyInit | null } | null> {
+): Promise<{ body: BodyInit | null } | { reason: LlmProxyRejectionReason }> {
   if (modelProtocol === "google-gemini") {
     // Gemini binds the model in the exact admitted request path.
     return { body: request.body };
@@ -330,31 +361,32 @@ async function readGrantedLlmProxyRequestBody(
   ) {
     try {
       const models = (await request.clone().formData()).getAll("model");
-      return models.length === 1 && models[0] === modelId ? { body: request.body } : null;
+      if (models.length === 0) return { reason: "body_model_missing" };
+      if (models.length !== 1) return { reason: "body_model_ambiguous" };
+      if (typeof models[0] !== "string") return { reason: "body_model_invalid" };
+      return models[0] === modelId ? { body: request.body } : { reason: "body_model_mismatch" };
     } catch {
-      return null;
+      return { reason: "body_invalid_multipart" };
     }
   }
 
   try {
     const body: unknown = await request.json();
 
-    if (
-      typeof body === "object" &&
-      body !== null &&
-      !Array.isArray(body) &&
-      "model" in body &&
-      body.model === modelId
-    ) {
-      // Re-serialize the parsed body so duplicate JSON keys cannot make the
-      // proxy and the upstream disagree about which model was requested.
-      return { body: JSON.stringify(body) };
+    if (typeof body !== "object" || body === null || Array.isArray(body)) {
+      return { reason: "body_invalid_shape" };
     }
+    if (!("model" in body)) return { reason: "body_model_missing" };
+    if (typeof body.model !== "string") return { reason: "body_model_invalid" };
+    if (body.model !== modelId) return { reason: "body_model_mismatch" };
+
+    // Re-serialize the parsed body so duplicate JSON keys cannot make the
+    // proxy and the upstream disagree about which model was requested.
+    return { body: JSON.stringify(body) };
   } catch {
     // Invalid JSON is outside the model inference capability.
+    return { reason: "body_invalid_json" };
   }
-
-  return null;
 }
 
 function toLlmProxyUpstreamUrl(request: Request, upstreamBaseUrl: string, subPath: string): string {
@@ -735,9 +767,9 @@ export function registerDriverRoute(app: Hono<ApiGatewayEnvironment>) {
     );
 
     if (grantedModelId === null) {
-      return Response.json(
-        { error: "LLM proxy request is outside the granted model capability." },
-        { status: 403 },
+      return rejectLlmProxyCapability(
+        grant,
+        c.req.method === "POST" ? "path_not_allowed" : "method_not_allowed",
       );
     }
 
@@ -748,11 +780,8 @@ export function registerDriverRoute(app: Hono<ApiGatewayEnvironment>) {
       subPath,
     );
 
-    if (grantedRequestBody === null) {
-      return Response.json(
-        { error: "LLM proxy request is outside the granted model capability." },
-        { status: 403 },
-      );
+    if ("reason" in grantedRequestBody) {
+      return rejectLlmProxyCapability(grant, grantedRequestBody.reason);
     }
 
     let target: RuntimeLlmProxyTarget;

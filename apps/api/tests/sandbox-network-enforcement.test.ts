@@ -51,7 +51,10 @@ describe("sandbox network enforcement", () => {
 
     expect(delegate.enableInternet).toBe(false);
     expect(delegate.interceptHttps).toBe(true);
-    expect(delegate.envVars).toEqual({ SANDBOX_INTERCEPT_HTTPS: "1" });
+    expect(delegate.envVars).toEqual({
+      SANDBOX_INTERCEPT_HTTPS: "1",
+      NODE_EXTRA_CA_CERTS: "/etc/cloudflare/certs/cloudflare-containers-ca.crt",
+    });
     expect(delegate.allowedHostsCalls).toEqual([["api.anthropic.com", "api.example.com"]]);
     expect(storage.values.get(SANDBOX_NETWORK_CONSTRAINTS_STORAGE_KEY)).toEqual(constraints);
   });
@@ -218,7 +221,10 @@ describe("sandbox network enforcement", () => {
     );
     expect(limited.enableInternet).toBe(false);
     expect(limited.interceptHttps).toBe(true);
-    expect(limited.envVars).toEqual({ SANDBOX_INTERCEPT_HTTPS: "1" });
+    expect(limited.envVars).toEqual({
+      SANDBOX_INTERCEPT_HTTPS: "1",
+      NODE_EXTRA_CA_CERTS: "/etc/cloudflare/certs/cloudflare-containers-ca.crt",
+    });
     // The SDK restores its own persisted allowlist; restore only re-applies
     // the start-time properties.
     expect(limited.allowedHostsCalls).toEqual([]);

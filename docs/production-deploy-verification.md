@@ -44,6 +44,29 @@ Acceptance:
 - No tracked path uses Git `assume-unchanged` or `skip-worktree`, and no ignored
   file exists under the Web `src` or `public` build-input directories.
 
+### Runtime image namespace compatibility
+
+The runtime image split adds `sandbox.sandbox_binding` with the legacy `Sandbox`
+default and registers `SandboxClaude`, `SandboxOpenAI`, and `SandboxOpenCode`.
+Apply the additive D1 migration before deploying the Worker. The allocation
+flag `MOSOO_RUNTIME_IMAGES_ENABLED` defaults to `false`: deploy the routing-aware
+Worker and all four container classes first, drain requests from older Worker
+versions, then set it to `true` in a separately reviewed deployment. Reverting
+the flag stops new split-image allocations while existing subjects keep their
+recorded namespace. Verify this sequence in stage before production. Keep the legacy
+class and all new classes reachable during later deploys: an existing subject's
+recorded namespace must never be redirected or overwritten to change its image.
+New Cattle subjects select a single-runtime image; existing subjects, Pet shared
+workspaces, and Environment artifact builders retain the union image. D1
+admission keeps the deployment-wide ceiling at 50 runtime subjects despite the
+additional Cloudflare container classes.
+
+After the first split-image subject exists, rollback must retain the routing
+column and all four bindings. Do not roll back to a Worker that always uses
+`Sandbox`, or drop a class while any subject still references it. Use a forward
+fix that preserves routing and the pinned Driver protocol. This change does not
+upgrade the Driver protocol or migrate an existing subject's namespace.
+
 ## Step 1 - Run The Full Repository Gate
 
 ```bash

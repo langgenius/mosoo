@@ -22,6 +22,7 @@ import type { RuntimeSubjectOperationStatus } from "../../domain/runtime-subject
 export type RuntimeSubjectStatus = SandboxStatus;
 
 export interface RuntimeSubjectRecord {
+  readonly sandboxBinding: string;
   readonly id: SandboxId;
   readonly kind: AgentKind;
   readonly status: RuntimeSubjectStatus;

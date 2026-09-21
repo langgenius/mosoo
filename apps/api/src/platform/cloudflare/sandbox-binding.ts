@@ -1,14 +1,45 @@
 import type { Sandbox as CloudflareSandbox } from "@cloudflare/sandbox";
+import { isSupportedDriverRuntime } from "@mosoo/agent-driver/runtime";
+import type { DriverRuntime } from "@mosoo/agent-driver/runtime";
 
 import type { ApiBindings } from "./worker-types";
 
 type CloudflareSandboxNamespace = DurableObjectNamespace<CloudflareSandbox>;
 
-export function requireCloudflareSandboxBinding(env: ApiBindings): CloudflareSandboxNamespace {
-  const binding = env.Sandbox;
+export const RUNTIME_SANDBOX_IMAGES = {
+  "claude-agent-sdk": { binding: "SandboxClaude", profile: "claude" },
+  "openai-runtime": { binding: "SandboxOpenAI", profile: "openai" },
+  "acp-fallback": { binding: "SandboxOpenCode", profile: "opencode" },
+} as const satisfies Record<DriverRuntime, { binding: keyof ApiBindings; profile: string }>;
+
+export type SandboxBinding = "Sandbox" | (typeof RUNTIME_SANDBOX_IMAGES)[DriverRuntime]["binding"];
+
+export function runtimeImagesEnabled(value: string | undefined): boolean {
+  return value === "true";
+}
+
+export function sandboxBindingForRuntime(runtimeId: string): SandboxBinding {
+  if (!isSupportedDriverRuntime(runtimeId)) {
+    throw new Error(`No Sandbox image for runtime: ${runtimeId}.`);
+  }
+  return RUNTIME_SANDBOX_IMAGES[runtimeId].binding;
+}
+
+export function requireCloudflareSandboxBinding(
+  env: ApiBindings,
+  name: string = "Sandbox",
+): CloudflareSandboxNamespace {
+  const bindingName =
+    name === "Sandbox"
+      ? name
+      : Object.values(RUNTIME_SANDBOX_IMAGES).find((image) => image.binding === name)?.binding;
+  if (bindingName === undefined) {
+    throw new Error(`Unknown Sandbox binding: ${name}.`);
+  }
+  const binding = env[bindingName];
 
   if (binding === undefined) {
-    throw new Error("Sandbox binding is not configured in wrangler.toml.");
+    throw new Error(`${name} binding is not configured in wrangler.toml.`);
   }
 
   // The wrapper DO forwards the SDK surface dynamically, so its declared shape

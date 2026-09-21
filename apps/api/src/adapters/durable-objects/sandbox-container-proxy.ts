@@ -1,5 +1,6 @@
 import { ContainerProxy as CloudflareSandboxContainerProxy } from "@cloudflare/sandbox";
 
+import { logInfo } from "../../platform/cloudflare/logger";
 import { preventAutomaticOutboundRedirects } from "./sandbox-container-proxy-request";
 
 /**
@@ -9,7 +10,13 @@ import { preventAutomaticOutboundRedirects } from "./sandbox-container-proxy-req
  * is checked against the allowlist independently.
  */
 export class ContainerProxy extends CloudflareSandboxContainerProxy {
-  override fetch(request: Request): Promise<Response> {
-    return super.fetch(preventAutomaticOutboundRedirects(request));
+  override async fetch(request: Request): Promise<Response> {
+    const response = await super.fetch(preventAutomaticOutboundRedirects(request));
+    if (response.status >= 500) {
+      // Includes intentional SDK allowlist denials (520). This is an egress
+      // result, not an API response. Keep thrown proxy/Worker faults distinct.
+      logInfo("runtime.sandbox.egress.http_error", { httpStatus: response.status });
+    }
+    return response;
   }
 }
