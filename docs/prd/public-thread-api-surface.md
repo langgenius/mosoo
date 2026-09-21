@@ -59,6 +59,12 @@ Agent's API Access panel shows its identifier, token creation, and API reference
   complete runtime workspace. Thread history also does not guarantee that every
   later Run receives prior private runtime state or every earlier file.
 
+## Direct-invocation target (not yet implemented)
+
+The September 22 owner direction makes a Project key plus explicit harness/model, instructions, input, and optional files the primary creation path. No business Agent must be created or published first. An owned saved Agent remains an optional preset; a request selects inline configuration or a preset, without implicit merging. Both use the same Session ID, file/event/usage surfaces, turn budget, idempotency, and native cold-continuation contract. Credentials remain Project-owned BYOK; this does not reopen #636.
+
+The current implementation below only admits saved Agents. It is an intermediate path and does not satisfy direct-invocation acceptance. CLI, clients, and examples must follow the final HTTP contract; a field rename or skipping Publish does not establish Router completion. See the [design and acceptance plan](../plans/2026-09-22-direct-session-design.md).
+
 ## Unreleased saved-Agent entry point
 
 `/api/v2` reuses the Thread lifecycle and conversation ID for the #582 admission

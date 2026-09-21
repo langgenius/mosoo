@@ -1,6 +1,6 @@
 # Mosoo Product Spec
 
-Status: canonical target product contract, with API compatibility and Cloud migration clarified on September 18, 2026, the owner-approved BYOK release scope on September 19, seamless existing-Session continuation reaffirmed on September 21, and the Cloud debug Preview exception on September 22. Single-turn tasks and multi-turn continuation share one durable Session contract. This document describes intended behavior; source, acceptance checks, and release evidence establish what is actually shipped.
+Status: canonical target product contract, with API compatibility and Cloud migration clarified on September 18, 2026, the owner-approved BYOK release scope on September 19, seamless existing-Session continuation reaffirmed on September 21, and the Cloud debug Preview exception and direct-invocation-first direction on September 22. Single-turn tasks and multi-turn continuation share one durable Session contract. This document describes intended behavior; source, acceptance checks, and release evidence establish what is actually shipped.
 
 ## 1. Product Thesis
 
@@ -11,7 +11,7 @@ The application owns business logic, end-user authentication, business queues, r
 The core workflow is:
 
 ```text
-Project API key + Agent + Input + optional files
+Project API key + harness/model + instructions + Input + optional files
   -> create a durable Session and execute work
   -> inspect status, read or stream events, download artifacts
   -> optionally send follow-up Input to the same Session
@@ -21,22 +21,22 @@ One admitted input starts one turn, which may include multiple model requests an
 
 ## 2. First Request And Ownership
 
-- The #582 release uses bring your own key (BYOK): a developer configures a model-provider account in the Project, saves or selects a private Agent, and creates a Project API key. Invocation requires no Agent Publish, App Deployment, or Environment setup.
-- Saved Codex and Claude Code Agents are callable immediately after configuration. Already integrated runtimes use a shared lifecycle; developer-supplied runtime integration is outside v1.
-- The Agent’s configured runtime and model are visible, recorded, and fixed within the Session, with no silent fallback. Model credentials remain Project-owned; the provider charges that account.
-- Platform-supplied models, setup-free managed selectors, recharge, and commercial usage billing are separate #636 work. They do not block #582 acceptance or closure. No free or unlimited inference is promised.
+- The #582 release uses bring your own key (BYOK): a developer configures a model-provider account in the Project and creates a Project API key. The primary request supplies its harness, model, instructions, input, and optional files directly. It requires no pre-created Agent, Publish, App Deployment, or Environment setup.
+- Codex and Claude Code use the same public execution contract. A saved private Agent is an optional reusable preset. Already integrated runtimes use a shared lifecycle; developer-supplied harness integration is outside this release.
+- The selected harness and model are independent choices: the harness owns the tool/execution loop and the model supplies inference. Their supported combination is checked, recorded, and fixed within the Session, with no silent fallback. Model credentials remain Project-owned; the provider charges that account.
+- Platform-supplied model credentials, recharge, and commercial usage billing are separate #636 work and do not block #582 acceptance or closure. Direct harness/model selection with Project credentials belongs to #582. No free or unlimited inference is promised.
 - Project is the tenant and resource-ownership boundary. An account may own multiple Projects, each with multiple API keys. A key grants access only to its Project, including when the same account owns other Projects.
 - Project keys serve trusted application backends. They may configure Agents, execute Sessions, and access files only within their Project, without fine-grained scopes. They cannot manage accounts, delete Projects, or manage API keys.
 - Account owners use the console or CLI login for account management and cross-Project operations. CLI login credentials are distinct from application keys and may execute work in an explicitly selected owned Project.
 - The completed #581 authentication cutover rejects old manually created account tokens and old CLI credentials. Users create new Project keys for integrations and log in again for CLI access; no default-Project reassignment is performed.
 - Revoking a Project key rejects subsequent requests but does not cancel work already admitted. The owner or another active key in the same Project can inspect and cancel that work.
 
-## 3. Saved Private Agents
+## 3. Optional Saved Private Agents
 
 - Developers save reusable instructions, Skills, and existing MCP connection references as Project-private Agents. Creation and updates are available through both API and console; programmatic configuration does not require the console.
 - Saving makes the Agent immediately callable.
-- Public invocation uses an Agent ID. New Sessions resolve its latest configuration; there is no public historical-version selector.
-- Each Session retains its initial configuration snapshot internally. Updating an Agent affects new Sessions only; existing Sessions keep their instructions, Skills, and tool configuration.
+- Public invocation accepts an inline execution configuration or an owned Agent ID as a preset. Inline invocation creates no hidden reusable Agent. Preset invocation resolves its latest saved configuration; there is no public historical-version selector. A request must select one source explicitly; this release does not silently merge inline fields with preset configuration.
+- Each Session retains its effective initial configuration and configuration source internally. Updating a preset affects new Sessions only; existing Sessions keep their harness, model, instructions, Skills, and tool configuration. Changing a model or harness inside an existing Session is outside this release.
 - Retain existing remote HTTPS MCP support, OAuth/Bearer authorization, connection ownership checks, and credential isolation, adapting them to Project and the new Session API.
 
 ## 4. Session Lifecycle And Durability
@@ -91,14 +91,16 @@ A checkpoint represents committed state that can be restored. It is the durabili
 - Creation supports an optional `Idempotency-Key`: within a Project, the same key and request return the original Session without duplicate work; reusing the key with a different request fails explicitly. Without a key, create a new Session.
 - Prefer reusing existing mechanisms for follow-up idempotency instead of building a separate orchestration system. Deduplication details and key retention are implementation decisions; creation idempotency does not guarantee exactly-once external side effects.
 - Support input file upload and artifact download. Users request modifications through Agent instructions; v1 does not require an online file editor or file-manager UI.
-- Console onboarding explains Project provider configuration, saving a private Agent, key creation, and a minimal API example. After setup, Session records, status, artifacts, and usage are the primary surfaces.
+- Console onboarding explains Project provider configuration, key creation, and a minimal direct API example; saving an Agent is an optional configuration-reuse path. After setup, Session records, status, artifacts, and usage are the primary surfaces.
 - Builder is a console client of the same Agent configuration and Session APIs. Any retained Preview/Test action uses an ordinary Session and appears in the same operational Session records.
 
 ## 7. Acceptance: Single-Turn Tasks And Multi-Turn Continuation
 
+Both scenarios must work without pre-creating an Agent. Use the same public contract for Codex and Claude Code with Project credentials, real tool execution, and verified artifacts. Reject unsupported harness/model combinations explicitly; creation retries must not repeat execution. Verify Project boundaries, configuration snapshots, and same-ID cold continuation. Also retain the optional saved-Agent path, including proof that later preset edits do not change an admitted Session. The existing saved-Agent acceptance alone is insufficient for the direct-invocation target.
+
 ### Single-Turn Scenario: ghFind Repository Evaluation
 
-1. ghFind uses a Project with configured model credentials and a Project key to create or select a private evaluator Agent that is callable immediately after saving.
+1. ghFind uses a Project with configured model credentials and a Project key to select a harness/model and supply evaluator instructions directly. No evaluator Agent must be saved first; an owned saved evaluator is an optional preset.
 2. Submit one evaluation input and fixed-revision repository material, receiving one Session ID.
 3. Require no Agent Publish, Environment setup, App Deployment, or additional public Run ID.
 4. Execute real tools and produce analysis JSON, evidence JSON, and a Markdown report.
@@ -111,8 +113,8 @@ A checkpoint represents committed state that can be restored. It is the durabili
 
 ### Multi-Turn Scenario: CSV Analysis And Follow-Up
 
-1. Configure a model-provider account in the Project, save or select a private Agent, create a Project API key, and upload a CSV.
-2. Invoke that Agent with analysis instructions without publishing it or selecting an Environment. Both Codex and Claude Code must execute real tools using the configured Project credentials.
+1. Configure a model-provider account in the Project, create a Project API key, and upload a CSV without creating an Agent.
+2. Select a harness/model and supply analysis instructions directly without publishing or selecting an Environment. Both Codex and Claude Code must execute real tools using the configured Project credentials.
 3. Read status and events, then download an analysis report, chart, and result data. Verify calculations against a known fixture and check artifact formats.
 4. Request modifications seconds later in the same Session and verify that the Agent uses prior conversation context and existing working files, including files outside the published artifacts, without being given that state again.
 5. Repeat continuation after a multi-day idle interval within the recovery period and after forced runtime reclamation. Verify the same Session ID, admitted configuration, context-dependent task result, and prior file contents. Record server-observed timestamps and verify no intervening turn or resupplied state. Use controlled time and persisted fixtures to exercise retention, renewal, and expiry boundaries. The one-minute/seven-day examples describe the same continuity requirement, not a mandatory seven-day observation delay; require a distinct live interval only when a time-dependent behavior needs that evidence. Report the actual elapsed live interval without relabeling it as seven-day observation.
@@ -144,7 +146,7 @@ These are not a backlog to restore automatically after v1. Internal configuratio
 - Typed Git repository mounting, private repository authorization, and branch/PR workflows.
 - Developer-supplied runtimes, a connector marketplace, and new local-process MCP support.
 - Interactive tool approvals, Webhooks, online file editing, and a file-manager UI.
-- Platform-supplied models and setup-free managed selectors; recharge, commercial usage billing, settlement, subscriptions, and payments (#636).
+- Platform-supplied model credentials; recharge, commercial usage billing, settlement, subscriptions, and payments (#636). Direct harness/model selection using Project credentials is included in #582.
 
 These boundaries do not prohibit an Agent from using existing authorized tools for an individual task.
 
