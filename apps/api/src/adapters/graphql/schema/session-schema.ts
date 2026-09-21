@@ -103,7 +103,7 @@ export const sessionSchema = /* GraphQL */ `
   }
 
   type Session {
-    agentId: ULID!
+    agentId: ULID
     archivedAt: String
     createdAt: String!
     deploymentVersionId: ULID
@@ -214,7 +214,7 @@ export const sessionSchema = /* GraphQL */ `
   }
 
   type SessionExecutionBinding {
-    agentId: ULID!
+    agentId: ULID
     deploymentVersionId: ULID
     deploymentVersionNumber: Int
     kind: AgentKind!

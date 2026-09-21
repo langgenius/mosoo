@@ -172,7 +172,7 @@ export interface PublicThreadEventResult {
 export type PublicThreadStatus = "IDLE" | "RESCHEDULING" | "RUNNING" | "TERMINATED";
 
 export interface PublicThreadSummary<UserId extends string | null = string> {
-  agent_id: AgentId;
+  agent_id: AgentId | null;
   created_at: string;
   id: PublicThreadId;
   kind: AgentKind;

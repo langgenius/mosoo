@@ -120,6 +120,13 @@
       "when": 1789734979167,
       "tag": "0016_session-run-budgets",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1790021575921,
+      "tag": "0017_optional-session-agent",
+      "breakpoints": true
     }
   ]
 }

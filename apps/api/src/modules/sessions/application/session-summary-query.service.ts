@@ -49,7 +49,7 @@ export interface SessionSummaryListOptions {
 }
 
 export interface SessionSummaryRow {
-  agent_id: AgentId;
+  agent_id: AgentId | null;
   archived_at: number | null;
   created_at: number;
   deployment_version_id: AgentDeploymentVersionId | null;
@@ -372,7 +372,7 @@ export async function getSessionSummaryAccessById(
     throw new Error("Session not found.");
   }
 
-  if (row.is_session_participant !== 1) {
+  if (row.is_session_participant !== 1 && row.agent_id !== null) {
     await ensureProjectAgentOwner(database, viewerId, {
       agentId: row.agent_id,
       projectId: input.projectId,

@@ -128,8 +128,11 @@ function readCredentialMode(value: unknown, field: string): AgentMcpCredentialMo
 function parseBinding(value: unknown): SessionExecutionPlan["binding"] {
   const record = readRecord(value, "sessionExecutionPlan.binding");
 
-  return {
-    agentId: readPlatformId(record["agentId"], "sessionExecutionPlan.binding.agentId") as AgentId,
+  const binding: SessionExecutionPlan["binding"] = {
+    agentId: readNullablePlatformId(
+      record["agentId"],
+      "sessionExecutionPlan.binding.agentId",
+    ) as AgentId | null,
     deploymentVersionId: readNullablePlatformId(
       record["deploymentVersionId"],
       "sessionExecutionPlan.binding.deploymentVersionId",
@@ -144,6 +147,17 @@ function parseBinding(value: unknown): SessionExecutionPlan["binding"] {
     provider: readString(record["provider"], "sessionExecutionPlan.binding.provider"),
     runtimeId: readString(record["runtimeId"], "sessionExecutionPlan.binding.runtimeId"),
   };
+  if (
+    binding.agentId === null &&
+    (binding.kind !== "cattle" ||
+      binding.deploymentVersionId !== null ||
+      binding.deploymentVersionNumber !== null)
+  ) {
+    throw new TypeError(
+      "A Session without an Agent preset requires isolated execution and no deployment revision.",
+    );
+  }
+  return binding;
 }
 
 function parseEnvironment(value: unknown): SessionExecutionPlan["environment"] {

@@ -23,7 +23,7 @@ import { parsePublicApiThreadRecordMetadata } from "./public-thread-metadata";
 import { toPublicThreadSummary } from "./public-thread-presenter";
 
 interface PublicThreadSessionRow {
-  agent_id: AgentId;
+  agent_id: AgentId | null;
   end_user_id: string | null;
   id: SessionId;
   project_id: ProjectId;
@@ -113,6 +113,7 @@ export async function admitPublicSessionCaller(
 ): Promise<PublicThreadSessionAdmission> {
   const access = await getPublicThreadSessionAccess(database, caller, threadId, apiVersion);
   if (apiVersion === "v1") {
+    if (access.row.agent_id === null) throw publicNotFound("Thread not found.");
     const agent = await admitAgentApiEndpointCaller(database, caller, access.row.agent_id);
     if (agent.projectId !== access.row.project_id) throw publicNotFound("Thread not found.");
   } else {

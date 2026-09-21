@@ -44,7 +44,7 @@ import type {
 } from "./runtime-subject-store.types";
 
 interface RuntimeSubjectQuotaScope {
-  readonly agentId: AgentId;
+  readonly agentId: AgentId | null;
   readonly projectId: ProjectId;
   readonly executionOwnerUserId: AccountId;
 }
@@ -165,7 +165,7 @@ export async function getRuntimeSubjectIdByTuple(
 export async function ensureRuntimeSubjectId(
   database: D1Database,
   input: {
-    readonly agentId: AgentId;
+    readonly agentId: AgentId | null;
     readonly projectId: ProjectId;
     readonly executionOwnerUserId: AccountId;
     readonly kind: AgentKind;

@@ -564,7 +564,7 @@ describe("legacy Session isolation batch", () => {
           sandboxSessionId: EXECUTION_ID,
           runtime: "openai-runtime",
           protocol: "orpc-ws",
-          protocolVersion: 4,
+          protocolVersion: 5,
           bootTokenHash: new Uint8Array([1, 2, 3]),
           bootTokenExpiresAt: NOW + 60_000,
           expiresAt: NOW + 60_000,

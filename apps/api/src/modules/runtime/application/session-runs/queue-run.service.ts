@@ -48,7 +48,7 @@ interface QueueSessionRunInput {
   clientRequestId: string | null;
   prompt: string;
   session: {
-    agent_id: AgentId;
+    agent_id: AgentId | null;
     deployment_version_id: AgentDeploymentVersionId | null;
     deployment_version_number: number | null;
     id: SessionId;

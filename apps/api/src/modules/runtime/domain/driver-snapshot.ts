@@ -56,7 +56,7 @@ export interface DriverSessionContext {
 }
 
 export interface DriverConfigRevision {
-  readonly agentId: AgentId;
+  readonly agentId: AgentId | null;
   readonly deploymentVersionId: AgentDeploymentVersionId | null;
   readonly deploymentVersionNumber: number | null;
   readonly environmentId: EnvironmentId;
@@ -100,7 +100,7 @@ export interface DriverNetworkProfile {
 }
 
 export interface DriverProfileConfig {
-  readonly agentId: AgentId;
+  readonly agentId: AgentId | null;
   readonly configRevision: DriverConfigRevision;
   readonly envVarNames: string[];
   readonly envVars: Record<string, string>;

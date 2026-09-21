@@ -90,19 +90,22 @@ function toRuntimeResolvedMcpServer(input: {
 export async function resolveRuntimeMcpServersForSnapshot(
   bindings: RuntimeMcpDatabaseBindings,
   input: {
-    agentId: AgentId | string;
+    agentId: AgentId | string | null;
     bindings: RuntimeMcpBindingSnapshot[];
     callerUserId: AccountId | string;
     executionOwnerUserId: AccountId | string;
     projectId: ProjectId | string;
   },
 ): Promise<DriverResolvedMcpServer[]> {
-  const agentId = readAgentId(input.agentId);
+  const agentId = input.agentId === null ? null : readAgentId(input.agentId);
   const projectId = readProjectId(input.projectId);
   const callerUserId = readAccountId(input.callerUserId, "callerUserId");
   const executionOwnerUserId = readAccountId(input.executionOwnerUserId, "executionOwnerUserId");
   const orderedBindings = [...input.bindings]
     .map((binding) => {
+      if (agentId === null && binding.credentialMode === "agent_bound") {
+        throw new Error("Agent-bound MCP credentials require an Agent preset.");
+      }
       return {
         agentCredentialId:
           binding.agentCredentialId === null
@@ -127,7 +130,7 @@ export async function resolveRuntimeMcpServersForSnapshot(
   );
   const credentialBindings: {
     agentCredentialId: CredentialId | null;
-    agentId: AgentId;
+    agentId: AgentId | null;
     credentialMode: AgentBindingRow["credentialMode"];
     credentialScope: AgentBindingRow["credentialScope"];
     serverId: McpServerId;

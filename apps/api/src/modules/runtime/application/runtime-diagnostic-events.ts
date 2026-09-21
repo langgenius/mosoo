@@ -17,7 +17,7 @@ import {
 } from "../../sessions/application/session-event-write.service";
 
 export interface RuntimeDiagnosticContext {
-  agentId: AgentId;
+  agentId: AgentId | null;
   deploymentVersion?: {
     id: AgentDeploymentVersionId;
     versionNumber: number;
@@ -40,7 +40,7 @@ export interface RuntimeDiagnosticSessionEventInput<
 }
 
 export function toRuntimeDiagnosticBaseValue(input: RuntimeDiagnosticContext): {
-  agentId: string;
+  agentId: string | null;
   deploymentVersionId?: string;
   deploymentVersionNumber?: number;
   sessionId: string;

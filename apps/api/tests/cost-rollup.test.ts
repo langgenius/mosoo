@@ -30,7 +30,7 @@ function createCostRollupDatabase(): SqliteD1Database {
     CREATE TABLE usage_event (
       organization_id text NOT NULL,
       project_id text NOT NULL,
-      agent_id text NOT NULL,
+      agent_id text,
       actor_user_id text NOT NULL,
       agent_owner_user_id text NOT NULL,
       created_at integer NOT NULL,
@@ -50,7 +50,8 @@ function createCostRollupDatabase(): SqliteD1Database {
     CREATE TABLE usage_daily_rollup (
       organization_id text NOT NULL,
       project_id text NOT NULL,
-      agent_id text NOT NULL,
+      agent_id text,
+      agent_scope_key text GENERATED ALWAYS AS (coalesce(agent_id, '')) VIRTUAL,
       actor_user_id text NOT NULL,
       agent_owner_user_id text NOT NULL,
       date text NOT NULL,
@@ -65,10 +66,10 @@ function createCostRollupDatabase(): SqliteD1Database {
       cache_creation_tokens integer NOT NULL,
       total_cost_usd_micros integer NOT NULL,
       unpriced_request_count integer NOT NULL,
-      PRIMARY KEY (
+      UNIQUE (
         organization_id,
         project_id,
-        agent_id,
+        agent_scope_key,
         actor_user_id,
         agent_owner_user_id,
         date,

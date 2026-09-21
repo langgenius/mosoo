@@ -28,15 +28,19 @@ export function resolveStableAgentRuntimeSubject(input: {
 }
 
 export function resolveAgentRuntimeSandboxSubject(input: {
-  agentId: AgentId;
+  agentId: AgentId | null;
   kind: AgentKind;
   sessionId: SessionId;
 }): RuntimeSandboxSubject {
   const policy = getRuntimeKindPolicy(input.kind);
+  const subjectId = policy.subject.scope === "agent" ? input.agentId : input.sessionId;
+  if (subjectId === null) {
+    throw new Error("A shared runtime subject requires an Agent preset.");
+  }
 
   return toRuntimeSandboxSubject({
     kind: input.kind,
-    subjectId: policy.subject.scope === "agent" ? input.agentId : input.sessionId,
+    subjectId,
     subjectKind: policy.subject.subjectKind,
   });
 }

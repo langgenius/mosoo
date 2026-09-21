@@ -29,7 +29,7 @@ export interface ActiveSessionParticipantAccessRow {
 }
 
 export interface SessionQueueAccessRow {
-  agent_id: AgentId;
+  agent_id: AgentId | null;
   deployment_version_id: AgentDeploymentVersionId | null;
   deployment_version_number: number | null;
   id: SessionId;

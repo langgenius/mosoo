@@ -22,7 +22,7 @@ interface SessionRunSummaryLike {
 }
 
 interface SessionSummaryLike {
-  agentId: string;
+  agentId: string | null;
   archivedAt: string | null;
   createdAt: string;
   deploymentVersionId: string | null;
@@ -79,7 +79,7 @@ function toSessionRunSummary(run: SessionRunSummaryLike | null): SessionRunSumma
 
 export function toSessionSummary(session: SessionSummaryLike): SessionSummary {
   return {
-    agentId: toAgentId(session.agentId),
+    agentId: session.agentId === null ? null : toAgentId(session.agentId),
     archivedAt: session.archivedAt,
     createdAt: session.createdAt,
     deploymentVersionId: toNullableAgentDeploymentVersionId(session.deploymentVersionId),

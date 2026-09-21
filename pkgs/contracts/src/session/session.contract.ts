@@ -25,7 +25,8 @@ export const SESSION_TYPES = ["preview", "ui"] as const;
 export type SessionType = (typeof SESSION_TYPES)[number];
 
 export interface SessionSummary {
-  agentId: AgentId;
+  /** Optional reusable preset; Project owns every Session. */
+  agentId: AgentId | null;
   archivedAt: string | null;
   createdAt: string;
   deploymentVersionId: AgentDeploymentVersionId | null;
@@ -56,7 +57,7 @@ export interface SessionSummaryConnection {
 }
 
 export interface SessionExecutionBinding {
-  agentId: AgentId;
+  agentId: AgentId | null;
   deploymentVersionId: AgentDeploymentVersionId | null;
   deploymentVersionNumber: number | null;
   kind: AgentKind;

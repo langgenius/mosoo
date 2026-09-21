@@ -6,7 +6,7 @@ import type { DriverOrigin as DriverOriginValue } from "../../domain/driver-snap
 import type { ExecutionSessionHandle, SandboxHandle } from "../sandbox-handles";
 
 export interface EnsureSandboxConversationSessionInput {
-  agentId: AgentId;
+  agentId: AgentId | null;
   kind: AgentKind;
   mountSessionResources: boolean;
   origin: DriverOriginValue;

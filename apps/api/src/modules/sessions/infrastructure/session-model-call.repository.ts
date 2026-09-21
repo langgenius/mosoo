@@ -25,10 +25,10 @@ import { currentTimestampMs } from "../../../time";
 import { createRuntimeUsageEventUpsert } from "../../cost/application/cost-usage-event.service";
 import type { SessionUsageSummary } from "./session-live-state.types";
 interface SessionModelCallRunRow {
-  agent_id: AgentId;
+  agent_id: AgentId | null;
   agent_owner_user_id: AccountId;
   agent_revision_id: AgentDeploymentVersionId | null;
-  agent_status: "draft" | "published";
+  agent_status: "draft" | "published" | null;
   actor_user_id: AccountId;
   completed_at: number | null;
   model: string | null;
@@ -95,9 +95,9 @@ async function getSessionModelCallRunRow(
       .select({
         actor_user_id: sessionRunsTable.createdByAccountId,
         agent_id: sessionRunsTable.agentId,
-        agent_owner_user_id: agentsTable.ownerId,
+        agent_owner_user_id: projectsTable.ownerAccountId,
         agent_revision_id: sessionRunsTable.deploymentVersionId,
-        agent_status: sql<"draft" | "published">`${agentsTable.status}`,
+        agent_status: sql<"draft" | "published" | null>`${agentsTable.status}`,
         completed_at: sessionRunsTable.completedAt,
         model: sql`${sessionRunsTable.model}`.mapWith(sessionRunsTable.model).as("model"),
         project_organization_id: projectsTable.organizationId,
@@ -121,7 +121,7 @@ async function getSessionModelCallRunRow(
       })
       .from(sessionRunsTable)
       .innerJoin(sessionsTable, eq(sessionsTable.id, sessionRunsTable.sessionId))
-      .innerJoin(
+      .leftJoin(
         agentsTable,
         and(
           eq(agentsTable.id, sessionRunsTable.agentId),
@@ -146,7 +146,7 @@ export async function upsertSessionModelCallUsage(
 
   const run = await getSessionModelCallRunRow(database, input.sessionRunId);
 
-  if (!run) {
+  if (!run || run.session_id !== input.sessionId) {
     throw new Error("Session run not found for model call usage.");
   }
 

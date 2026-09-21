@@ -333,7 +333,7 @@ export function createInsertedSessionRunSummary(
 export async function createSessionRunRecordIfSessionIdle(
   database: D1Database,
   input: {
-    agentId: AgentId;
+    agentId: AgentId | null;
     createdBy: AccountId;
     deploymentVersionId?: AgentDeploymentVersionId | null;
     deploymentVersionNumber?: number | null;

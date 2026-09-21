@@ -101,6 +101,9 @@ async function resolveSessionExecutionConfiguration(input: {
   // snapshots without configJson still need the explicit compatibility read.
   let configJson = input.plan.configJson;
   if (configJson === undefined) {
+    if (input.plan.binding.agentId === null) {
+      throw new Error("A direct Session requires its frozen execution configuration.");
+    }
     const { agent } = await ensureProjectAgentOwner(input.database, accessViewer.id, {
       agentId: input.plan.binding.agentId,
       projectId: authority.projectId,
@@ -126,7 +129,7 @@ async function resolveSessionExecutionConfiguration(input: {
 async function resolveRuntimeProfileIds(
   bindings: ApiBindings,
   input: {
-    agentId: AgentId;
+    agentId: AgentId | null;
     projectId: ProjectId;
     executionOwnerUserId: AccountId;
     kind: DriverProfileConfig["kind"];

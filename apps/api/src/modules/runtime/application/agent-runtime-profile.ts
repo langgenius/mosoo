@@ -16,7 +16,7 @@ import { getSupportedRuntimeId } from "../domain/runtime-config";
 import { resolveAgentRuntimeSandboxSubject } from "../domain/runtime-sandbox-subject";
 
 export function createAgentRuntimeProfile(input: {
-  agentId: AgentId;
+  agentId: AgentId | null;
   callerUserId: AccountId;
   configRevision: DriverConfigRevision;
   entrypoint?: "api" | "chat";

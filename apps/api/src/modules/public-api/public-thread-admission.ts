@@ -22,7 +22,7 @@ interface ThreadReadSnapshot {
     creator_account_id: PlatformId;
   };
   session: {
-    agentId: AgentId;
+    agentId: AgentId | null;
     projectId: ProjectId;
   };
 }
@@ -71,6 +71,7 @@ export async function admitPublicThreadReader(
   }
 
   if (apiVersion === "v1") {
+    if (snapshot.session.agentId === null) throw publicNotFound("Thread not found.");
     await admitAgentApiEndpointCaller(database, caller, snapshot.session.agentId);
   } else {
     await ensureProjectOwnership(database, caller.id, snapshot.session.projectId);

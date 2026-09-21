@@ -4,6 +4,7 @@ export type UsageContract =
   | "openai_total_with_cached_breakdown";
 
 export type AgentPublicationStateAtRun =
+  | "not_applicable"
   | "archived"
   | "draft_of_published"
   | "published"

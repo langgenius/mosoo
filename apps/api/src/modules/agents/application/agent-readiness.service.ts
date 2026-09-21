@@ -44,7 +44,7 @@ function isSqliteEnabled(value: boolean | number | string): boolean {
 
 async function collectMcpIssues(
   database: D1Database,
-  agentId: AgentId,
+  agentId: AgentId | null,
   snapshotServerIds?: readonly McpServerId[],
 ): Promise<AgentReadinessIssue[]> {
   if (snapshotServerIds) {
@@ -92,6 +92,8 @@ async function collectMcpIssues(
     ];
   }
 
+  if (agentId === null) return [];
+
   const results = await getAppDatabase(database)
     .select({
       bindingEnabled: sql<boolean | number | string>`${agentMcpBindingsTable.enabled}`.as(
@@ -125,8 +127,21 @@ async function collectMcpIssues(
 
 async function listBoundMcpServerNames(
   database: D1Database,
-  agentId: AgentId,
+  agentId: AgentId | null,
+  snapshotServerIds?: readonly McpServerId[],
 ): Promise<Set<string>> {
+  if (snapshotServerIds !== undefined) {
+    if (snapshotServerIds.length === 0) return new Set();
+    const rows = await getAppDatabase(database)
+      .select({ serverName: mcpServersTable.name })
+      .from(mcpServersTable)
+      .where(
+        and(inArray(mcpServersTable.id, [...snapshotServerIds]), eq(mcpServersTable.enabled, true)),
+      )
+      .all();
+    return new Set(rows.map((row) => row.serverName.toLowerCase()));
+  }
+  if (agentId === null) return new Set();
   const results = await getAppDatabase(database)
     .select({ serverName: mcpServersTable.name })
     .from(agentMcpBindingsTable)
@@ -220,7 +235,8 @@ async function collectPendingEnvironmentSecretIssues(
 async function collectPackageResolutionIssues(
   database: D1Database,
   input: {
-    agentId: AgentId;
+    agentId: AgentId | null;
+    mcpServerIds?: readonly McpServerId[];
     environment: AgentEnvironmentConfig;
     environmentSecretNames: Set<string>;
     packageResolution: AgentPackageResolutionState | null | undefined;
@@ -237,7 +253,7 @@ async function collectPackageResolutionIssues(
       (issue.status === "missing" || issue.status === "needs_reconnect"),
   );
   const boundMcpServerNames = needsMcpNames
-    ? await listBoundMcpServerNames(database, input.agentId)
+    ? await listBoundMcpServerNames(database, input.agentId, input.mcpServerIds)
     : new Set<string>();
   const issues: AgentReadinessIssue[] = [];
 
@@ -380,7 +396,7 @@ export async function computeAgentReadiness(
   database: D1Database,
   permissionPrincipalUserId: AccountId,
   input: {
-    agentId: AgentId;
+    agentId: AgentId | null;
     environment: AgentEnvironmentConfig;
     environmentNetworkPolicy?: EnvironmentNetworkPolicy;
     kind: AgentKind;
@@ -435,6 +451,7 @@ export async function computeAgentReadiness(
   issues.push(
     ...(await collectPackageResolutionIssues(database, {
       agentId: input.agentId,
+      ...(input.mcpServerIds === undefined ? {} : { mcpServerIds: input.mcpServerIds }),
       environment: input.environment,
       environmentSecretNames: await listEnvironmentSecretNames(
         database,

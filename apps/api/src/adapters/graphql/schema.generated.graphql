@@ -476,7 +476,7 @@ type ControlPlaneOverviewProjectList {
 
 type CostAgentRow implements CostAggregate {
   activeUsers: Int!
-  agentId: ULID!
+  agentId: ULID
   agentName: String!
   cacheCreationTokens: Int!
   cacheReadTokens: Int!
@@ -1258,7 +1258,7 @@ input RuntimeStateTargetVersionInput {
 }
 
 type Session {
-  agentId: ULID!
+  agentId: ULID
   archivedAt: String
   createdAt: String!
   deploymentVersionId: ULID
@@ -1283,7 +1283,7 @@ type SessionConnection {
 }
 
 type SessionExecutionBinding {
-  agentId: ULID!
+  agentId: ULID
   deploymentVersionId: ULID
   deploymentVersionNumber: Int
   kind: AgentKind!

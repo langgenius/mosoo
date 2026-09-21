@@ -69,9 +69,9 @@ upgrade the Driver protocol or migrate an existing subject's namespace.
 
 ### #582 native continuation protocol cutover
 
-The unreleased Session recovery change uses Driver protocol 4 to carry the
-native-continuation requirement. Boot payloads and new handshakes reject protocol
-1, 2 or 3. Version 3 is reserved by the separate upstream SDK boundary migration,
+The unreleased Session changes use Driver protocol 5 to carry the
+native-continuation requirement and explicitly nullable Agent provenance.
+Boot payloads and new handshakes reject protocols 1 through 4. Version 3 is reserved by the separate upstream SDK boundary migration,
 which still needs compatible main/release integration before this host backport
 can be released. This is an internal API/Driver compatibility change, not a change to
 public Thread/Run routes or customer Session IDs.
@@ -85,6 +85,18 @@ continuation pass staging acceptance. Rehearse the reverse sequence with matched
 rollback artifacts and the same admission barrier; do not split API and Driver
 versions or interrupt customer work to force an upgrade. The production plan and
 its rollback still require the owner's concrete approval.
+
+Migration `0017_optional-session-agent.sql` preserves existing Agent references
+while allowing Project-owned execution without a preset. It rewrites the Agent
+association columns in Session, Run, event, and usage records, and rebuilds only
+the derived daily usage rollup. Before production application, verify a full D1
+backup and restore, row/relationship preservation on a recent copy, the admission
+barrier, and the exact matched release/rollback revisions with the owner. Once a
+Session without an Agent has been admitted, a previous build that requires an
+Agent is not a valid rollback target. Keep a nullable-aware Host/Driver rollback
+pair; do not delete direct Sessions or invent Agent IDs to fit an older schema.
+This schema change does not convert legacy Pet workspaces or authorize Preview
+cleanup.
 
 ## Step 1 - Run The Full Repository Gate
 

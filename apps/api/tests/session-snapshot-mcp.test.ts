@@ -66,6 +66,23 @@ test("frozen MCP references use Project authority without a mutable Agent", asyn
   expect(resolved).toMatchObject([
     { authorizationState: "active", credentialId, projectId: IDS.project, serverId },
   ]);
+  expect(
+    await resolveRuntimeMcpServersForSnapshot({ DB: database }, { ...input, agentId: null }),
+  ).toMatchObject([
+    { authorizationState: "active", credentialId, projectId: IDS.project, serverId },
+  ]);
+  await expect(
+    resolveRuntimeMcpServersForSnapshot(
+      { DB: database },
+      {
+        ...input,
+        agentId: null,
+        bindings: [
+          { ...input.bindings[0], credentialMode: "agent_bound", agentCredentialId: credentialId },
+        ],
+      },
+    ),
+  ).rejects.toThrow("Agent-bound MCP credentials require an Agent preset");
   await expect(
     resolveRuntimeMcpServersForSnapshot(
       { DB: database },

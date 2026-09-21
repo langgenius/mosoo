@@ -113,7 +113,7 @@ export async function runUsageDailyRollup(env: ApiBindings, now = new Date()): P
         ON CONFLICT(
           organization_id,
           project_id,
-          agent_id,
+          agent_scope_key,
           actor_user_id,
           agent_owner_user_id,
           date,

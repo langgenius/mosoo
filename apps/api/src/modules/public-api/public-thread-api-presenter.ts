@@ -9,13 +9,13 @@ import type {
 import type { AgentSessionEventBatch, SessionSummary } from "@mosoo/contracts/session";
 import type { SessionStatus } from "@mosoo/contracts/session";
 import type { SessionRunSummary } from "@mosoo/contracts/session-run";
-import { parsePlatformId } from "@mosoo/id";
+import { parseNullablePlatformId, parsePlatformId } from "@mosoo/id";
 import type { AgentId, PublicThreadId, SessionRunId } from "@mosoo/id";
 
 import { toPublicThreadId } from "./public-thread-ids";
 
 export interface PublicThreadSessionProjection {
-  agentId: AgentId;
+  agentId: AgentId | null;
   archivedAt: string | null;
   createdAt: string;
   id: PublicThreadId;
@@ -77,7 +77,7 @@ export function toPublicThreadSessionSummary(
   session: SessionSummary,
 ): PublicThreadSessionProjection {
   return {
-    agentId: parsePlatformId(session.agentId, "Agent ID") as AgentId,
+    agentId: parseNullablePlatformId<AgentId>(session.agentId, "Agent ID"),
     archivedAt: session.archivedAt,
     createdAt: session.createdAt,
     id: toPublicThreadId(session.id),

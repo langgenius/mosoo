@@ -37,7 +37,7 @@ import { createSessionStatusTransitionPatch } from "./session-lifecycle-projecti
 import { sessionRecoveryAvailablePredicate } from "./session-recovery-retention.repository";
 
 interface QueuedRunAdmissionRecord {
-  agentId: AgentId;
+  agentId: AgentId | null;
   createdBy: AccountId;
   createdByKeyId?: PersonalAccessTokenId;
   deploymentVersionId: AgentDeploymentVersionId | null;
@@ -68,7 +68,7 @@ export interface CommitQueuedSessionRunAdmissionInput {
   message: QueuedMessageAdmissionRecord;
   run: QueuedRunAdmissionRecord;
   session: {
-    agentId: AgentId;
+    agentId: AgentId | null;
     projectId: ProjectId;
     id: SessionId;
   };
@@ -81,7 +81,9 @@ function selectedValue<T>(value: T, alias: string) {
 function admissionSessionPredicate(input: CommitQueuedSessionRunAdmissionInput) {
   return and(
     eq(sessionsTable.id, input.session.id),
-    eq(sessionsTable.agentId, input.session.agentId),
+    input.session.agentId === null
+      ? isNull(sessionsTable.agentId)
+      : eq(sessionsTable.agentId, input.session.agentId),
     eq(sessionsTable.projectId, input.session.projectId),
     eq(sessionsTable.lastRunId, input.run.id),
     eq(sessionsTable.status, "RUNNING"),
@@ -109,7 +111,9 @@ function claimableSessionPredicate(db: AppDatabase, input: CommitQueuedSessionRu
     previewAvailablePredicate(db, input.recoveryRequestedAtMs ?? input.run.timestampMs),
     sessionRecoveryAvailablePredicate(db, input.recoveryRequestedAtMs ?? input.run.timestampMs),
     eq(sessionsTable.id, input.session.id),
-    eq(sessionsTable.agentId, input.session.agentId),
+    input.session.agentId === null
+      ? isNull(sessionsTable.agentId)
+      : eq(sessionsTable.agentId, input.session.agentId),
     eq(sessionsTable.projectId, input.session.projectId),
     isNull(sessionsTable.archivedAt),
     eq(sessionsTable.status, "IDLE"),
@@ -454,7 +458,9 @@ export async function commitQueuedSessionRunAdmission(
       .where(
         and(
           eq(sessionsTable.id, input.session.id),
-          eq(sessionsTable.agentId, input.session.agentId),
+          input.session.agentId === null
+            ? isNull(sessionsTable.agentId)
+            : eq(sessionsTable.agentId, input.session.agentId),
           eq(sessionsTable.projectId, input.session.projectId),
           isNull(sessionsTable.archivedAt),
           eq(sessionsTable.status, "IDLE"),

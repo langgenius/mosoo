@@ -52,6 +52,21 @@ const agents = [
 ];
 
 describe("Files list model", () => {
+  test("retains direct Session files without inventing an Agent filter or attribution", () => {
+    const directSession = { agentId: null, id: FIRST_SESSION_ID, title: "Direct result" };
+    const view = createFilesViewModel(files, [directSession], [], {
+      agentId: "",
+      search: "",
+      sessionId: FIRST_SESSION_ID,
+      sessionKind: "all",
+    });
+    expect(view.agentOptions).toEqual([]);
+    expect(view.sessionOptions).toEqual([directSession]);
+    expect(view.files).toHaveLength(1);
+    expect(view.files[0]?.agent).toBeNull();
+    expect(view.files[0]?.sessionId).toBe(FIRST_SESSION_ID);
+  });
+
   test("only offers Agents and Threads that own files", () => {
     const view = createFilesViewModel(files, sessions, agents, {
       agentId: "",

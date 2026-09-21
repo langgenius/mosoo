@@ -81,7 +81,7 @@ export type RuntimeSubjectActivationPurpose = "interactive" | "prewarm";
 export interface ActivateRuntimeSubjectInput {
   /** Required when allocating a subject; existing subjects keep their recorded image. */
   readonly runtimeId?: string;
-  readonly agentId: AgentId;
+  readonly agentId: AgentId | null;
   readonly executionOwnerUserId: AccountId;
   readonly kind: AgentKind;
   readonly diagnosticContext?: RuntimeDiagnosticContext;

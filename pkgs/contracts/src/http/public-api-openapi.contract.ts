@@ -789,6 +789,12 @@ export const PUBLIC_API_OPENAPI_V2_SCHEMAS = {
     ...PUBLIC_API_OPENAPI_SCHEMAS.ThreadSummary,
     properties: {
       ...PUBLIC_API_OPENAPI_SCHEMAS.ThreadSummary.properties,
+      agent_id: {
+        ...PLATFORM_ID_SCHEMA,
+        type: ["string", "null"],
+        description:
+          "Optional saved Agent preset provenance. Null for a Session created with inline execution configuration.",
+      },
       source: {
         const: "api",
         description:

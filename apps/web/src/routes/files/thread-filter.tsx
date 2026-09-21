@@ -110,7 +110,9 @@ export function ThreadFilter({
                       {title}
                     </span>
                     <span className="text-fg-3 truncate text-[11px]">
-                      {agentNameById.get(session.agentId) ?? t("files.agentUnavailable")}
+                      {session.agentId === null
+                        ? t("threads.directInvocation")
+                        : (agentNameById.get(session.agentId) ?? t("files.agentUnavailable"))}
                     </span>
                   </div>
                   {value === session.id ? <Check className="text-fg-1 size-3.5" /> : null}

@@ -148,6 +148,7 @@ async function readSessionState(database: SqliteD1Database): Promise<SessionAdmi
 function queueOwnerRun(input: {
   bindings: ApiBindings;
   clientRequestId?: string;
+  withoutPreset?: boolean;
   viewer: AuthenticatedViewer;
 }) {
   return queueSessionRun({
@@ -159,13 +160,15 @@ function queueOwnerRun(input: {
       clientRequestId: input.clientRequestId ?? "issue-329-request",
       prompt: "Admit this request atomically.",
       session: {
-        agent_id: PUBLIC_API_TEST_IDS.agent,
+        agent_id: input.withoutPreset ? null : PUBLIC_API_TEST_IDS.agent,
         project_id: PUBLIC_API_TEST_IDS.project,
-        deployment_version_id: parsePlatformId<AgentDeploymentVersionId>(
-          PUBLIC_API_TEST_IDS.deployment,
-          "fixture deployment version",
-        ),
-        deployment_version_number: 1,
+        deployment_version_id: input.withoutPreset
+          ? null
+          : parsePlatformId<AgentDeploymentVersionId>(
+              PUBLIC_API_TEST_IDS.deployment,
+              "fixture deployment version",
+            ),
+        deployment_version_number: input.withoutPreset ? null : 1,
         id: parsePlatformId<SessionId>(PUBLIC_API_TEST_IDS.ownerSession, "fixture session"),
         model: "gpt-5.4",
         provider: "openai",
@@ -201,6 +204,37 @@ async function completeRun(database: D1Database, runId: SessionRunId): Promise<v
 }
 
 describe("Session Run atomic admission", () => {
+  test("admits and deduplicates a Project-owned Session with no Agent preset", async () => {
+    const { database, viewer } = await createFixture();
+    await database
+      .prepare(
+        "UPDATE session SET agent_id = NULL, deployment_version_id = NULL, deployment_version_number = NULL, kind = 'cattle' WHERE id = ?",
+      )
+      .bind(PUBLIC_API_TEST_IDS.ownerSession)
+      .run();
+    await database
+      .prepare(
+        "UPDATE session_execution_snapshot SET plan_json = json_set(plan_json, '$.binding.agentId', NULL, '$.binding.deploymentVersionId', NULL, '$.binding.deploymentVersionNumber', NULL, '$.binding.kind', 'cattle', '$.configJson', '{}') WHERE session_id = ?",
+      )
+      .bind(PUBLIC_API_TEST_IDS.ownerSession)
+      .run();
+    await database.prepare("DELETE FROM agent").run();
+    const apiCommandQueue = createApiCommandQueueStub();
+    const bindings = createPublicHttpTestBindings(database, { apiCommandQueue }) as ApiBindings;
+    await queueOwnerRun({ bindings, viewer, withoutPreset: true });
+    const firstCounts = await readAdmissionCounts(database);
+    expect(firstCounts).toMatchObject({ apiCommand: 1, message: 1, run: 1 });
+    expect(await database.prepare("SELECT agent_id FROM session_run").first()).toEqual({
+      agent_id: null,
+    });
+    expect(await database.prepare("SELECT agent_id FROM session_event LIMIT 1").first()).toEqual({
+      agent_id: null,
+    });
+    expect((await readSessionState(database)).status).toBe("RUNNING");
+    await expect(queueOwnerRun({ bindings, viewer, withoutPreset: true })).rejects.toThrow();
+    expect(await readAdmissionCounts(database)).toEqual(firstCounts);
+  });
+
   test("rechecks Preview expiry inside the native admission batch without enqueuing work", async () => {
     const { database, viewer } = await createFixture();
     const now = Date.now();
