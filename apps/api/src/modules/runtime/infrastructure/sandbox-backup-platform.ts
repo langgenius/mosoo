@@ -29,8 +29,8 @@ function quoteShellArg(value: string): string {
   return `'${value.replaceAll("'", `'"'"'`)}'`;
 }
 
-async function prepareRuntimeSessionWorkspaceCheckpoint(
-  sandbox: SandboxHandle,
+export async function prepareRuntimeSessionWorkspaceCheckpoint(
+  sandbox: Pick<SandboxHandle, "exec" | "unmountBucket">,
   input: {
     readonly cwd: string;
     readonly sessionId: string;
@@ -39,6 +39,7 @@ async function prepareRuntimeSessionWorkspaceCheckpoint(
   const resourceRoot = getSessionResourceRootPath(input.sessionId);
   const stateRoot = getSessionStateRootPath(input.sessionId);
   const openAiAuthPath = `${getSessionRuntimeStatePath(input.sessionId, "openai-runtime")}/auth.json`;
+  const openAiMemoryPath = `${getSessionRuntimeStatePath(input.sessionId, "openai-runtime")}/memories`;
 
   if (!resourceRoot.startsWith(`${input.cwd}/`) || !stateRoot.startsWith(`${input.cwd}/`)) {
     throw new Error("Session checkpoint exclusions must stay inside the session workspace.");
@@ -56,6 +57,7 @@ async function prepareRuntimeSessionWorkspaceCheckpoint(
     "set -eu",
     `cwd=${quoteShellArg(input.cwd)}`,
     'test -d "$cwd"',
+    `if [ -L ${quoteShellArg(openAiMemoryPath)} ]; then echo 'Legacy runtime memory requires verified migration before checkpoint commit.' >&2; exit 1; fi`,
     `resource_root=${quoteShellArg(resourceRoot)}`,
     'if [ -L "$resource_root" ]; then unlink "$resource_root"; elif mountpoint -q "$resource_root"; then fusermount -u "$resource_root"; fi',
     'if [ -e "$resource_root" ]; then rm -rf "$resource_root"; fi',

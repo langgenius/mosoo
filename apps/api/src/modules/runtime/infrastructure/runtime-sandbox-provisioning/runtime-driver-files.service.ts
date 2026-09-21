@@ -137,7 +137,7 @@ export async function ensureProvisioningDirectories(
 }
 
 export async function ensureRuntimeMemoryMounts(
-  session: ExecutionSessionHandle,
+  session: Pick<ExecutionSessionHandle, "exec">,
   profile: DriverProfileConfig,
 ): Promise<void> {
   const mounts = RUNTIME_MEMORY_MOUNTS[profile.runtimeId] ?? [];
@@ -146,6 +146,23 @@ export async function ensureRuntimeMemoryMounts(
     mounts.map(async (mount) => {
       const targetPath = `${profile.session.homePath}/${mount.targetRelativePath}`;
       const targetParent = getParentDirectory(targetPath);
+
+      if (profile.sandbox.subjectKind === "session") {
+        // The Session checkpoint must contain the memory itself. Never replace
+        // restored files, or infer ownership/emptiness from a legacy symlink.
+        const command = [
+          "set -eu",
+          `if [ -L ${quoteShellArg(targetPath)} ]; then echo 'Legacy runtime memory requires verified migration before this Thread can continue.' >&2; exit 1; fi`,
+          `mkdir -p ${quoteShellArg(targetPath)}`,
+        ].join("\n");
+        const result = await session.exec(`sh -lc ${quoteShellArg(command)}`);
+        if (!result.success || result.exitCode !== 0) {
+          throw new Error(
+            result.stderr.trim() || `Session runtime memory is unavailable at ${targetPath}.`,
+          );
+        }
+        return;
+      }
 
       // Bind-mounts need CAP_SYS_ADMIN, which the sandbox's unprivileged shell
       // does not have. A symlink gives the runtime the same memory path without
