@@ -311,6 +311,51 @@ describe("runtime command store", () => {
     expect(stored?.error).toBeNull();
   });
 
+  test("replayed accepted receipts preserve the committed ACK and never requeue execution", async () => {
+    const database = createRuntimeCommandDatabase();
+    await createRuntimeCommandRecord(database, {
+      command: inputStartCommand(COMMAND_IDS.accepted),
+      driverInstanceId: DRIVER_INSTANCE_ID,
+      expiresAt: Date.now() + 60_000,
+    });
+    await claimNextQueuedRuntimeCommandRecord(database, DRIVER_INSTANCE_ID, "connection-1");
+    const receipt = {
+      commandId: COMMAND_IDS.accepted,
+      deliveryConnectionId: "connection-1",
+      driverInstanceId: DRIVER_INSTANCE_ID,
+      status: "accepted" as const,
+    };
+    expect(await updateRuntimeCommandRecord(database, receipt)).toEqual({
+      kind: "applied",
+      status: "accepted",
+    });
+    const committed = await getRuntimeCommandRecord(
+      database,
+      DRIVER_INSTANCE_ID,
+      COMMAND_IDS.accepted,
+    );
+    expect(committed?.ackedAt).not.toBeNull();
+    expect(await updateRuntimeCommandRecord(database, receipt)).toEqual({
+      kind: "duplicate",
+      status: "accepted",
+    });
+    const replayed = await getRuntimeCommandRecord(
+      database,
+      DRIVER_INSTANCE_ID,
+      COMMAND_IDS.accepted,
+    );
+    expect(replayed?.ackedAt).toBe(committed?.ackedAt);
+    expect(
+      await claimNextQueuedRuntimeCommandRecord(database, DRIVER_INSTANCE_ID, "connection-1"),
+    ).toBeNull();
+    expect(
+      await updateRuntimeCommandRecord(database, {
+        ...receipt,
+        deliveryConnectionId: "stale-connection",
+      }),
+    ).toMatchObject({ kind: "rejected", reason: "stale_delivery_connection" });
+  });
+
   test("recovers commands delivered to stale connections", async () => {
     const database = createRuntimeCommandDatabase();
 

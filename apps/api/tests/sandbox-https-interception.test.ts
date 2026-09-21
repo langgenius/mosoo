@@ -11,7 +11,11 @@ describe("Sandbox HTTPS interception", () => {
 
     configureSandboxHttpsInterception(sandbox, true);
     expect(sandbox.interceptHttps).toBe(true);
-    expect(sandbox.envVars).toEqual({ EXISTING: "kept", SANDBOX_INTERCEPT_HTTPS: "1" });
+    expect(sandbox.envVars).toEqual({
+      EXISTING: "kept",
+      SANDBOX_INTERCEPT_HTTPS: "1",
+      NODE_EXTRA_CA_CERTS: "/etc/cloudflare/certs/cloudflare-containers-ca.crt",
+    });
 
     configureSandboxHttpsInterception(sandbox, false);
     expect(sandbox.interceptHttps).toBe(false);
