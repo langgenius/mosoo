@@ -69,9 +69,11 @@ upgrade the Driver protocol or migrate an existing subject's namespace.
 
 ### #582 native continuation protocol cutover
 
-The unreleased Session recovery change uses Driver protocol 3 to carry the
+The unreleased Session recovery change uses Driver protocol 4 to carry the
 native-continuation requirement. Boot payloads and new handshakes reject protocol
-1 or 2. This is an internal API/Driver compatibility change, not a change to
+1, 2 or 3. Version 3 is reserved by the separate upstream SDK boundary migration,
+which still needs compatible main/release integration before this host backport
+can be released. This is an internal API/Driver compatibility change, not a change to
 public Thread/Run routes or customer Session IDs.
 
 Prepare one matched API revision and Driver image set. Before switching versions,
