@@ -9,6 +9,7 @@ import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { API_ERROR_CODE, createApiError } from "../../../platform/errors";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { ensureProjectOwnership } from "../../projects/application/project.service";
+import { assertPreviewAvailable } from "../../sessions/infrastructure/preview-retention.repository";
 import { createSandboxExecutionPlaneAdapter } from "../infrastructure/execution-plane/sandbox-execution-plane-adapter";
 import { isSessionTerminalCheckpointReadyForNextRun } from "../infrastructure/session-runs/session-run-admission.repository";
 import { executeRuntimeStateOperationSubjects } from "./runtime-state-operation-execution";
@@ -20,7 +21,6 @@ import {
 } from "./runtime-state-operation-phases";
 import { resolveSessionRuntimeOperationScope } from "./runtime-state-operation-subjects";
 import { appendRuntimeDriverRestartAttemptedEvents } from "./runtime-state-operation-target-events";
-import { assertSessionRecoveryAvailable } from "./session-runs/session-recovery.service";
 
 const executionPlane = createSandboxExecutionPlaneAdapter();
 
@@ -42,7 +42,7 @@ async function executeSessionRuntimeOperation(
   const project = await ensureProjectOwnership(bindings.DB, viewer.id, input.projectId);
   const target = { ...input, executionOwnerUserId: project.ownerAccountId };
   const scope = await resolveSessionRuntimeOperationScope(bindings.DB, target);
-  await assertSessionRecoveryAvailable(bindings.DB, input.sessionId, Date.now());
+  await assertPreviewAvailable(bindings.DB, input.sessionId, Date.now());
   await assertSessionCheckpointReady(bindings.DB, input.sessionId);
   if (scope.targets.length === 0) {
     return { affectedSessionCount: 0, ok: true, operation, sessionId: input.sessionId };

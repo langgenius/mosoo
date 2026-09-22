@@ -96,16 +96,15 @@ v2-created Threads are excluded from v1's public-channel view. The #582 release
 requires a model-provider account configured in the Project (BYOK). Usage and the shared-workspace transition remain #582 work; platform-funded first use,
 recharge, and commercial billing are independent #636 scope.
 
-New isolated v2 Sessions admit a 30-day recovery period from the last successful
-turn, renewed on success. Expired continuation returns `readiness_blocked` with
-an explicit expiry time; history, events, usage and saved files remain readable.
-Input received after expiry does not retitle the Session or claim new draft files.
-The server records one request time for both file claim and Run admission, so a
-transfer begun before expiry may finish afterward. Other admission failures can
-leave supplied files attached to the Session.
-Existing Sessions without a recorded recovery policy are not retroactively
-expired. This admission rule does not by itself prove cold or multi-day restore;
-see [Thread Continuation](./thread-continuation.md#retention-and-deletion).
+Formal v2 Sessions do not expire from inactivity. Later input and files continue
+the same Session using its frozen configuration and committed recovery state;
+old snapshot recovery deadlines are ignored without rewriting those snapshots.
+Only explicitly enrolled Cloud debug Previews use the 30-day inactivity policy.
+The reviewed inactive legacy migration cohort remains read-only. File claim and
+Run admission share one request time for Preview expiry checks; other admission
+failures can leave supplied files attached. Removing an admission deadline does
+not by itself prove cold or multi-day restore; see
+[Thread Continuation](./thread-continuation.md#retention-and-deletion).
 
 `GET /api/v2/threads/{threadId}/usage` returns paginated persisted runtime usage
 observations. Missing values remain null. Token accounting follows the recorded

@@ -14,8 +14,8 @@ import type { ApiBindings } from "../../platform/cloudflare/worker-types";
 import type { AuthenticatedViewer } from "../auth/application/viewer-auth.service";
 import { FileControlError } from "../files/application/file-control-errors";
 import { fileStore } from "../files/application/file-store";
-import { assertSessionRecoveryAvailable } from "../runtime/application/session-run.service";
 import { publishSessionResourceDelete } from "../sessions/application/session-resource-events.service";
+import { assertPreviewAvailable } from "../sessions/infrastructure/preview-retention.repository";
 import { admitAgentApiEndpointCaller } from "./agent-api-endpoint-admission.service";
 import { admitPublicProjectCaller } from "./public-thread-admission";
 import { toBackingSessionId, toPublicThreadId } from "./public-thread-ids";
@@ -211,7 +211,7 @@ export async function claimPublicThreadFiles(
   caller: AuthenticatedViewer,
   input: {
     fileIds: FileId[];
-    recoveryRequestedAtMs: number;
+    admissionRequestedAtMs: number;
     threadId: PublicThreadId;
   },
   apiVersion: PublicApiVersion = "v1",
@@ -226,7 +226,7 @@ export async function claimPublicThreadFiles(
     input.threadId,
     apiVersion,
   );
-  await assertSessionRecoveryAvailable(bindings.DB, sessionId, input.recoveryRequestedAtMs);
+  await assertPreviewAvailable(bindings.DB, sessionId, input.admissionRequestedAtMs);
   const claimedFiles = await fileStore.claimToSession(bindings, caller, sessionId, input.fileIds);
 
   return claimedFiles.map((file) => parsePlatformId<FileId>(file.id, "File ID"));

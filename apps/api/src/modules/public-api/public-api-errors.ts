@@ -45,7 +45,6 @@ export function toPublicApiError(error: unknown): PublicApiError | null {
     case API_ERROR_CODE.notFound:
       return publicNotFound(error.message);
     case API_ERROR_CODE.sessionRunCheckpointPending:
-    case API_ERROR_CODE.sessionRecoveryExpired:
     case API_ERROR_CODE.sessionRunActive:
       return publicReadinessBlocked(error.message);
     case API_ERROR_CODE.sessionRunClientRequestDuplicate:

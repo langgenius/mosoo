@@ -94,7 +94,13 @@ describe("createProjectSession", () => {
     expect(plan.binding.prompt).toBe(input.instructions);
     expect(plan.binding.agentId).toBeNull();
     expect(plan.configJson).toBe("{}");
-    expect(plan.recoveryRetentionMs).toBe(30 * 86_400_000);
+    expect(plan).not.toHaveProperty("recoveryRetentionMs");
+    expect(JSON.parse(snapshot!.plan_json)).not.toHaveProperty("recoveryRetentionMs");
+    expect(
+      parseSessionExecutionPlanJson(
+        JSON.stringify({ ...plan, recoveryRetentionMs: 30 * 86_400_000 }),
+      ),
+    ).toEqual(plan);
     expect(plan.previewRetentionMs).toBeUndefined();
     const cold = await hydrateCachedRunContextFromSession(bindings, OWNER_VIEWER, session);
     expect(cold.cacheHit).toBe(false);
@@ -322,9 +328,7 @@ describe("createAgentSession", () => {
         .prepare("SELECT plan_json FROM session_execution_snapshot WHERE session_id = ?")
         .bind(session.id)
         .first<{ plan_json: string }>();
-      expect(parseSessionExecutionPlanJson(row!.plan_json).recoveryRetentionMs).toBe(
-        session.id === second.id ? 30 * 24 * 60 * 60 * 1000 : undefined,
-      );
+      expect(JSON.parse(row!.plan_json)).not.toHaveProperty("recoveryRetentionMs");
       expect(session).not.toHaveProperty("kind");
     }
     expect(

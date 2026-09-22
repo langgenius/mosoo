@@ -197,9 +197,19 @@ async function committedBoundary(database: D1Database) {
 }
 
 describe("Session runtime maintenance", () => {
-  test("recreates one direct Session without an Agent and preserves its committed state", async () => {
+  test("recreates a 90-day-idle direct Session and preserves committed state despite an old deadline", async () => {
     const { bindings, calls, database, siblingSandbox } = await setup();
     await committedBoundary(database);
+    await database
+      .prepare("UPDATE session_run SET completed_at = ? WHERE id = ?")
+      .bind(Date.now() - 90 * 86_400_000, IDS.run)
+      .run();
+    await database
+      .prepare(
+        "UPDATE session_execution_snapshot SET plan_json = json_set(plan_json, '$.recoveryRetentionMs', ?) WHERE session_id = ?",
+      )
+      .bind(30 * 86_400_000, IDS.ownerSession)
+      .run();
     const snapshotBefore = await database
       .prepare("SELECT * FROM session_execution_snapshot ORDER BY session_id")
       .all();

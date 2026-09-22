@@ -24,7 +24,6 @@ import { eq } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../../platform/db/drizzle";
 import { PREVIEW_RETENTION_MS } from "../../../sessions/domain/preview-retention-policy";
-import { SESSION_RECOVERY_RETENTION_MS } from "../../domain/session-recovery-policy";
 import type { SessionExecutionPlan } from "./session-execution.types";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -257,19 +256,11 @@ export function parseSessionExecutionPlanJson(planJson: string): SessionExecutio
   if (previewRetentionMs !== undefined && previewRetentionMs !== PREVIEW_RETENTION_MS) {
     throw new TypeError("Cloud debug Preview retention must be 30 days.");
   }
-  const recoveryRetentionMs =
-    record["recoveryRetentionMs"] === undefined
-      ? undefined
-      : readNumber(record["recoveryRetentionMs"], "sessionExecutionPlan.recoveryRetentionMs");
-  if (recoveryRetentionMs !== undefined && recoveryRetentionMs < SESSION_RECOVERY_RETENTION_MS) {
-    throw new TypeError("Session recovery retention must be at least 30 days.");
-  }
 
   return {
     binding: parseBinding(record["binding"]),
     builtInTools: parseBuiltInTools(record["builtInTools"]),
     ...(previewRetentionMs === undefined ? {} : { previewRetentionMs }),
-    ...(recoveryRetentionMs === undefined ? {} : { recoveryRetentionMs }),
     ...(record["configJson"] === undefined
       ? {}
       : {

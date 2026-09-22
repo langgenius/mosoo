@@ -56,7 +56,7 @@ async function toAgentSessionEventInput(input: {
   bindings: ApiBindings;
   caller: AuthenticatedViewer;
   event: PublicThreadEventInput;
-  recoveryRequestedAtMs: number;
+  admissionRequestedAtMs: number;
   threadId: PublicThreadId;
 }): Promise<AgentSessionEventInput> {
   if (input.event.type !== "user_message") {
@@ -69,7 +69,7 @@ async function toAgentSessionEventInput(input: {
     input.caller,
     {
       fileIds,
-      recoveryRequestedAtMs: input.recoveryRequestedAtMs,
+      admissionRequestedAtMs: input.admissionRequestedAtMs,
       threadId: input.threadId,
     },
     input.apiVersion,
@@ -88,7 +88,7 @@ export async function sendPublicThreadSessionEvents(
 ): Promise<PublicThreadApiSendEventsResponse<string | null, PublicApiVersion>> {
   // File transfer and durable Run admission must agree on expiry, including
   // when the copy crosses the deadline. This time never comes from the client.
-  const recoveryRequestedAtMs = currentTimestampMs();
+  const admissionRequestedAtMs = currentTimestampMs();
   const sessionId = toBackingSessionId(request.threadId);
   const admission = await admitPublicSessionCaller(
     request.bindings.DB,
@@ -108,7 +108,7 @@ export async function sendPublicThreadSessionEvents(
         bindings: request.bindings,
         caller: request.caller,
         event,
-        recoveryRequestedAtMs,
+        admissionRequestedAtMs,
         threadId: request.threadId,
       }),
     ),
@@ -124,7 +124,7 @@ export async function sendPublicThreadSessionEvents(
     options: {
       accessViewer,
       actionAuthorization: "admitted",
-      recoveryRequestedAtMs,
+      admissionRequestedAtMs,
     },
     requestUrl: request.requestUrl,
     viewer: request.caller,

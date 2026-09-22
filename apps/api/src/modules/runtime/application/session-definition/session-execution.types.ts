@@ -20,8 +20,6 @@ export interface SessionExecutionPlan {
   builtInTools: AgentBuiltInToolConfig[];
   /** Absent only on Sessions admitted before execution config freezing. */
   configJson?: string;
-  /** Admitted recovery period; absent on legacy Sessions pending transition. */
-  recoveryRetentionMs?: number;
   /** Explicit Cloud debug enrollment; absent on legacy and formal/API Sessions. */
   previewRetentionMs?: number;
   environment: {

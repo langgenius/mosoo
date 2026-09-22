@@ -30,7 +30,6 @@ import { previewAvailablePredicate } from "../../../sessions/infrastructure/prev
 import { runSessionIsolationAwareBatch } from "../../../sessions/infrastructure/session-isolation-barrier.repository";
 import { ACTIVE_SESSION_RUN_STATUSES } from "../../domain/session-run-lifecycle.machine";
 import { createSessionStatusTransitionPatch } from "./session-lifecycle-projection.repository";
-import { sessionRecoveryAvailablePredicate } from "./session-recovery-retention.repository";
 
 interface QueuedRunAdmissionRecord {
   agentId: AgentId | null;
@@ -56,7 +55,7 @@ interface QueuedMessageAdmissionRecord {
 }
 
 export interface CommitQueuedSessionRunAdmissionInput {
-  recoveryRequestedAtMs?: number;
+  admissionRequestedAtMs?: number;
   apiCommand: PreparedApiCommand;
   clientRequestId: string | null;
   events: readonly RuntimeEventEnvelope[];
@@ -103,8 +102,7 @@ export function completedRunHistoryPredicate(
 
 function claimableSessionPredicate(db: AppDatabase, input: CommitQueuedSessionRunAdmissionInput) {
   return and(
-    previewAvailablePredicate(db, input.recoveryRequestedAtMs ?? input.run.timestampMs),
-    sessionRecoveryAvailablePredicate(db, input.recoveryRequestedAtMs ?? input.run.timestampMs),
+    previewAvailablePredicate(db, input.admissionRequestedAtMs ?? input.run.timestampMs),
     eq(sessionsTable.id, input.session.id),
     input.session.agentId === null
       ? isNull(sessionsTable.agentId)

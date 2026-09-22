@@ -71,9 +71,8 @@ A checkpoint represents committed state that can be restored. It is the durabili
 ### Reclamation, Recovery, And Expiry
 
 - After sandbox reclamation, continuation restores the working directory and runtime-native conversation. Restore failure is explicit and never silently starts an empty conversation.
-- Recovery state remains available for at least 30 days after the last successfully completed turn. Each successful follow-up restarts the period, and expiry is visible to users. Live processes, network connections, and machine-wide temporary state are excluded.
-- After recovery expiry, the old Session rejects continuation. History and saved artifacts remain viewable and are not automatically deleted by recovery expiry. This is not an indefinite retention promise or an exception to explicit deletion.
-- After recovery expiry, users may explicitly create a new Session with selected historical summary and saved artifacts. It receives a new ID and does not claim restoration of the old workspace or native conversation. This optional post-expiry flow cannot substitute for promised continuation or serve as the Cloud migration fallback.
+- Formal and API-used Sessions have no recurring inactivity deadline. Retain the committed workspace and native context needed for same-ID continuation while the Session exists; elapsed time or a failed follow-up does not expire that state. Live processes, network connections, and machine-wide temporary state are excluded. Explicit deletion still removes Session data.
+- Cloud debug Previews alone may expire after 30 inactive days under their explicitly recorded policy. The separately reviewed inactive legacy migration cohort may become read-only with history and saved files retained. Neither exception enrolls other formal Sessions or permits substituting a new Session for their promised continuation.
 - Record actual execution configuration, runtime/model, managed environment identity, turn inputs, attachment identities, events, artifacts, and usage. Internal retries preserve the turn's admitted inputs.
 
 ## 5. Execution Permissions And Usage
