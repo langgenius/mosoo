@@ -31,6 +31,25 @@ function createRun(
 }
 
 describe("thread run failure notice", () => {
+  test.each(["acp.content_blocked", "acp.refused"])(
+    "explains %s without suggesting a retry",
+    (code) => {
+      const run = createRun("failed", {
+        code,
+        details: { stage: "unknown" },
+        message: "Upstream rejection",
+        retryable: false,
+      });
+      const failure = getThreadRunFailure(run);
+      expect(failure?.message).toContain("will not be retried automatically");
+      expect(failure?.message).toContain("Earlier tool actions may already have completed");
+      expect(failure?.title).not.toBe("Run failed");
+      expect(getThreadRunFailure(run, (key) => `translated:${key}`)?.message).toBe(
+        `translated:threads.${code === "acp.content_blocked" ? "runContentBlockedMessage" : "runRefusedMessage"}`,
+      );
+    },
+  );
+
   test("renders the persisted run error and process action", () => {
     const run = createRun("failed", {
       code: "runtime.provision_failed",
