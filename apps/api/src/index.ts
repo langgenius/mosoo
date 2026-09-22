@@ -9,7 +9,6 @@ export {
   SandboxOpenCode,
 } from "./adapters/durable-objects/sandbox.do";
 export { Session } from "./adapters/durable-objects/session.do";
-export { SessionIsolationAdmin } from "./adapters/session-isolation-admin";
 
 void arktypeWorkerConfigInitialized;
 

@@ -14,7 +14,13 @@ This applies to console Preview, v1 published/live admission, v2 saved presets a
 
 New admission does not rewrite any existing Agent label, Session binding or shared workspace. Existing Sessions retain their admitted configuration and maintenance access until their transition is verified. Migration must preserve the same ID, native conversation and promised working files; allocating an empty isolated workspace is not migration.
 
-The compatibility storage fields and legacy maintenance paths are transitional. #582 is not complete until all continuable Cloud Sessions have a verified transition and the remaining active type-dependent behavior is retired. Keeping inert historical metadata is not a product type choice.
+The final September 22 decision allows reviewed old Sessions with no calls or file activity
+for 30 days to become read-only, even if the account remains active. Preserve history and
+saved files and permit a fresh direct or preset Session. All Run outcomes, file mutations
+and pending work must be checked before the approved cutover; uncertain cases remain
+protected. This is a one-time migration scope, not rolling expiry of formal Sessions.
+
+The compatibility storage fields and legacy maintenance paths are transitional. #582 is not complete until all protected Cloud Sessions have a verified transition and the remaining active type-dependent behavior is retired. Final main contains one Session model and no ongoing conversion service; necessary one-time operations use a pinned release build with a defined rollback window. Keeping inert historical metadata is not a product type choice.
 
 ## Preview retention
 

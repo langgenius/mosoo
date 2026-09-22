@@ -1,6 +1,6 @@
-# Retire Pet/Cattle From New Execution
+# Retire Pet/Cattle From Session Execution
 
-Status: implementation in progress; not released. The owner has selected Session-isolated execution for every Agent and removal of the active Pet/Cattle product choice. This plan applies that decision without treating legacy shared-state migration as complete.
+Status: implementation in progress; not released. The owner selected one Session execution model and removal of active Pet/Cattle fields and branches. New admission is already isolated; full runtime retirement and Cloud conversion remain open. The final September 22 scope qualifies the one-time old-Session exception by its own 30-day call/file activity, even when its owner remains active. This does not authorize a deployment or historical data rewrite.
 
 ## Product outcome
 
@@ -19,8 +19,17 @@ Removing only the selector would leave imports, forks, and API callers able to c
 
 ## Verification
 
+Keep the already verified conversion code and its matching Driver at pinned commit
+`9bff2a7c11aa6bb8e721df43073f2322ff27d560` as finite release material. The final
+candidate removes the executor, planner, operator entrypoint and operator CLI commands;
+retain existing guards during the remaining runtime retirement. Before final cutover,
+all approved inactive Sessions must be read-only, protected Sessions must have verified
+isolated continuation, and no conversion claim or physical fence may remain pending.
+Then retire the transitional guards together with active dual-type behavior. Preserve
+normal permissions, concurrency, stale-binding and durability checks.
+
 Exercise new Session creation through console Preview, v1 published/live selection, v2 saved preset, and direct Project invocation. In particular, a legacy Pet preset must create a new isolated Session without changing a previously admitted shared Session. Verify configuration, identity and resource ownership, not only returned labels.
 
 Cover Agent create, import, and fork with old and omitted kind inputs. Verify edits preserve historical bindings and do not change the selected harness/model. Regenerate GraphQL from schema/documents, run relevant API/contract/web tests, workspace typecheck, generated-contract checks and v1 compatibility. Check the rendered create/editor flow after the source change.
 
-No database migration, production data rewrite, resource cleanup, deployment, or model request is authorized by this plan. The separately prepared staging candidate remains pinned to `70bfda2a10a0410ba2ab11a7656e01ee9d04c340`; this work is developed in an isolated checkout and will join the umbrella release after its own verification.
+No database migration, production data rewrite, resource cleanup, deployment, or model request is authorized by this plan. This work is developed in an isolated checkout from `9bff2a7c11aa6bb8e721df43073f2322ff27d560`; earlier source-specific staging proposals do not authorize this candidate. Final API/Driver/CLI/docs pins and hosted acceptance must follow the completed source.

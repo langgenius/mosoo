@@ -266,9 +266,6 @@ export function parseApiCommandPayload(
   const parsed = parsePayloadJson(payloadJson);
 
   switch (kind) {
-    case "session_isolation": {
-      throw new ApiCommandPayloadError("Session isolation is an operator-owned operation.");
-    }
     case "cost_ledger_reconciliation": {
       return parseCostLedgerReconciliationPayload(parsed);
     }

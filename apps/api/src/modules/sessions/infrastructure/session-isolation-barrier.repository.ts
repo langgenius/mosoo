@@ -1,5 +1,5 @@
 import { sandboxesTable, sessionsTable } from "@mosoo/db";
-import type { RuntimeOperationId, SessionId } from "@mosoo/id";
+import type { SessionId } from "@mosoo/id";
 import { and, eq, exists, isNull, notLike, or, sql } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
@@ -8,10 +8,6 @@ import type { AppDatabase } from "../../../platform/db/drizzle";
 // A migration claim has no lease expiry. Only its reviewed recovery sequence
 // may reopen admission after both the physical fence and D1 transition settle.
 const ISOLATION_CLAIM_PREFIX = "session-isolation:";
-
-export function sessionIsolationClaimOwner(operationId: RuntimeOperationId): string {
-  return `${ISOLATION_CLAIM_PREFIX}${operationId}`;
-}
 
 export function sandboxIsolationAvailablePredicate() {
   return or(

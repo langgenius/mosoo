@@ -1,6 +1,6 @@
 # Resumable Session isolation execution
 
-Status: implementation candidate under #582/#638/#640; no deployment or customer conversion is authorized here. This implements the already selected same-ID, native-context, workspace, configuration and identity preservation contract in [Session Isolation Transition](../session-isolation-transition.md).
+Status: retained design for the one-time [conversion build 9bff2a7c11](https://github.com/langgenius/mosoo/commit/9bff2a7c11aa6bb8e721df43073f2322ff27d560), under #582/#638/#640. The final Session candidate removes this executor, planner, operator entrypoint and CLI commands from main. Existing admission and physical guards remain until the separately verified runtime retirement; their presence does not claim migration completion. No deployment or customer conversion is authorized here. The release procedure follows [Session Isolation Transition](../session-isolation-transition.md).
 
 A local-only progress file cannot atomically prove that database admission was released. A new workflow store would duplicate the existing command ledger. Use an operator-owned `session_isolation` record in `api_command`, with a frozen reviewed request and durable phase, and update its completion receipt in the same D1 batch that releases the cohort. It is never submitted to the ordinary command queue and has no expiring execution claim. The operator resumes the same operation after a disconnect; it must not infer completion from a Session that may already be running again.
 

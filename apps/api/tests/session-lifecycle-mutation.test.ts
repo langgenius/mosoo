@@ -1,14 +1,8 @@
 import { describe, expect, test } from "bun:test";
 
-import { parsePlatformId } from "@mosoo/id";
 import type { RuntimeOperationId } from "@mosoo/id";
 
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
-import {
-  claimSessionIsolationCohort,
-  readSessionIsolationCohort,
-  releaseSessionIsolationCohort,
-} from "../src/modules/runtime/infrastructure/session-isolation-claim.repository";
 import {
   deleteSessionCascade,
   repairStaleSessionDeleteCleanups,
@@ -370,16 +364,19 @@ describe("session lifecycle mutations", () => {
       await insertSandboxSession(database, PUBLIC_API_TEST_IDS.ownerSession);
       await database.prepare("UPDATE sandbox SET status = 'cold'").run();
       await database.prepare("UPDATE sandbox_session SET status = 'closed'").run();
-      const cohort = await readSessionIsolationCohort(database, PUBLIC_API_TEST_IDS.sandbox);
-      const claim = {
-        cohort,
-        operationId: parsePlatformId<RuntimeOperationId>(
-          PUBLIC_API_TEST_IDS.operation,
-          "migration",
-        ),
-        now: 10,
-      };
-      await claimSessionIsolationCohort(database, claim);
+      // A pinned conversion build may have left an unfinished operation. The
+      // product must preserve its guard even though it no longer creates claims.
+      const operationId = PUBLIC_API_TEST_IDS.operation;
+      await database.batch([
+        database
+          .prepare(
+            "UPDATE session SET status_operation_id = ?, status_seq = status_seq + 1 WHERE id = ?",
+          )
+          .bind(operationId, PUBLIC_API_TEST_IDS.ownerSession),
+        database
+          .prepare("UPDATE sandbox SET claim_owner = ?, claim_expires_at = NULL WHERE id = ?")
+          .bind(`session-isolation:${operationId}`, PUBLIC_API_TEST_IDS.sandbox),
+      ]);
       const blocked = Promise.withResolvers<void>();
       const wrapped = new Proxy(database, {
         get(target, property) {
@@ -391,7 +388,7 @@ describe("session lifecycle mutations", () => {
                 typeof last === "object" &&
                 last !== null &&
                 "status_operation_id" in last &&
-                last.status_operation_id === claim.operationId
+                last.status_operation_id === operationId
               )
                 blocked.resolve();
               return results;
@@ -421,8 +418,17 @@ describe("session lifecycle mutations", () => {
           .prepare("SELECT status_operation_id, status, archived_at FROM session WHERE id = ?")
           .bind(PUBLIC_API_TEST_IDS.ownerSession)
           .first(),
-      ).toEqual({ status_operation_id: claim.operationId, status: "IDLE", archived_at: null });
-      await releaseSessionIsolationCohort(database, { ...claim, now: 20 });
+      ).toEqual({ status_operation_id: operationId, status: "IDLE", archived_at: null });
+      await database.batch([
+        database
+          .prepare(
+            "UPDATE session SET status_operation_id = NULL, status_seq = status_seq + 1 WHERE id = ?",
+          )
+          .bind(PUBLIC_API_TEST_IDS.ownerSession),
+        database
+          .prepare("UPDATE sandbox SET claim_owner = NULL WHERE id = ?")
+          .bind(PUBLIC_API_TEST_IDS.sandbox),
+      ]);
       await pending;
       const session = await database
         .prepare("SELECT archived_at FROM session WHERE id = ?")

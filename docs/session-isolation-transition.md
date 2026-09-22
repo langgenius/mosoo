@@ -13,22 +13,25 @@ Follow [SPEC](./SPEC.md#10-migration-and-breaking-change-notification),
 and [Production Deploy Verification](./production-deploy-verification.md).
 The owner requires protected continuable Sessions to retain the same public ID,
 context, promised files, admitted configuration, and delegated identity. The reviewed
-inactive-published cohort below is the explicit exception; other customers must not
+inactive-Session cohort below is the explicit exception; other customers must not
 reconstruct state or move to a replacement conversation.
 
-## Qualify the inactive-published read-only cohort first
+## Qualify the inactive-Session read-only cohort first
 
-The September 22 owner decision excludes a reviewed group of old published Pet
-Sessions from full context/workspace recovery: neither the owner nor their business
-has visible activity within 30 days. Keep their history and saved files readable;
-returning users use the existing Agent and new-Session entry point. Reuse the existing
-stopped Session capabilities rather than adding a lifecycle or a general migration
-framework. Debug Preview continues to follow its own approved 30-day rule.
+The final September 22 owner decision excludes reviewed old Pet Sessions from full
+context/workspace/configuration recovery after 30 days without their own calls or file
+activity, even if the owner remains active. Keep history and saved files readable;
+returning users use direct invocation or an existing Agent preset to start a new Session.
+Reuse existing stopped Session capabilities. Debug Preview retains its separate 30-day rule.
 
-Maintain an explicit private list with publication/ownership and owner-wide Agent,
-Project, caller, console/authentication and file-activity evidence. Missing ownership
-or uncertain activity is not inactivity. Refresh that evidence before the approved
-cutover; exclude anyone with new activity, an active Run or pending file writes.
+Maintain an explicit private list with ownership, all Run outcomes, file uploads,
+edits/deletes, pending work and physical runtime evidence. Publication and owner activity
+describe impact but do not determine Session eligibility. A removed Agent preset does
+not erase valid Project ownership. Missing authority or uncertain activity is not
+inactivity. An old unfinished model record can be stale telemetry only when its associated
+Run is terminal and current Driver/claim/work evidence agrees. An old maintenance marker
+requires exact-operation/sequence reconciliation, not a blanket timeout update. Refresh
+evidence before the approved cutover; exclude any Session with new activity or pending work.
 This exception is not an ongoing 30-day expiry rule for formal Sessions.
 
 For this cohort, verify retained history, saved file objects, access controls,
@@ -40,7 +43,26 @@ does not authorize deletion, resource reclamation or customer notifications.
 
 The recovery/conversion procedure below applies to Sessions that retain the
 continuity requirement. Shared migration safeguards cannot be removed while those
-Sessions still depend on them.
+Sessions still depend on them in the conversion build.
+
+## Finite release operation
+
+The final main branch contains one Session execution model. It does not retain the
+Pet/Cattle runtime branches or an ongoing migration service. Preserve the immutable
+[conversion candidate 9bff2a7c11](https://github.com/langgenius/mosoo/commit/9bff2a7c11aa6bb8e721df43073f2322ff27d560),
+its matching Driver, private manifests, complete backups and tested rollback artifacts
+as release material while the final source is simplified. The implementation references
+below describe that conversion candidate, not a promise to keep those modules in main.
+
+Before the final cutover, verify every approved inactive Session is read-only with retained
+history/files, every protected Session has a verified isolated continuation, and no
+conversion operation, D1 claim or physical migration fence remains pending. Keep generic
+Project permissions, turn serialization, stale-binding guards and checkpoint guarantees
+in the final product. Do not drop or rewrite applied schema history. After the reviewed
+rollback window, archive the one-time operational evidence; do not add a recurring
+conversion scheduler or expose migration controls as product features.
+
+Neither the pinned build nor this plan authorizes deployment or a production rewrite.
 
 ## Recovery evidence before a cutover
 

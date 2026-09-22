@@ -6,6 +6,10 @@ Project API keys belong to exactly one Project. Accounts may own multiple Projec
 
 ## Managed Session Target
 
+Project remains the authority when an optional Agent preset is absent or removed. The
+final main branch has one Session execution model. One-time Cloud conversion and its
+backup/rollback evidence belong to release operations, not a permanent resource type.
+
 The remaining [managed Agent slices](./managed-agent-v1.md) use Project as the ownership boundary for private Agent configuration, durable Sessions, files, and usage. A Session supports both a single-turn task and later input in the same workspace and native conversation. Console entry prioritizes keys, API examples, Session records, artifacts, and usage; private Agent configuration is optional. A Project key can directly select a supported harness/model and supply instructions, input, and files without creating an Agent. Project ownership authorizes the Session independently of a preset. This target does not establish that the new Session API has shipped.
 
 Existing Thread routes and IDs may express this Session contract without renaming. Session isolation changes the writable runtime boundary inside a Project; it must not silently discard shared state used by existing Cloud customers or mix that state across their Sessions. Follow the [migration contract](../SPEC.md#10-migration-and-breaking-change-notification) before changing existing workloads. Project keys do not need another rotation for #582.
