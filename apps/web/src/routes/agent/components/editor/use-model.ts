@@ -1,6 +1,9 @@
 import type { JsonObject } from "@mosoo/contracts";
 import type { AgentBuiltInToolConfig } from "@mosoo/contracts/agent";
-import { normalizeAgentBuiltInTools } from "@mosoo/contracts/agent";
+import {
+  getAgentBuiltInToolSupportError,
+  normalizeAgentBuiltInTools,
+} from "@mosoo/contracts/agent";
 import { classifyAgentConfigChanges } from "@mosoo/contracts/agent-config-change-plan";
 import type { AgentConfigChangePlan } from "@mosoo/contracts/agent-config-change-plan";
 import { normalizeRuntimeAdvancedSettings } from "@mosoo/runtime-catalog";
@@ -173,6 +176,15 @@ export function useAgentEditorModel({
       const error = "Provider is required.";
       setSaveError(error);
       return { error, ok: false };
+    }
+
+    const toolSupportError = getAgentBuiltInToolSupportError(
+      draftToSave.runtime,
+      draftToSave.builtInTools,
+    );
+    if (toolSupportError) {
+      setSaveError(toolSupportError);
+      return { error: toolSupportError, ok: false };
     }
 
     const draftChangePlan = classifyAgentConfigChanges({

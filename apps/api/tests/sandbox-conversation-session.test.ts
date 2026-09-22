@@ -299,6 +299,7 @@ function createSandbox(
       return backup;
     },
     async setKeepAlive() {},
+    async ensureContainerReady() {},
     async terminal() {
       return new Response();
     },

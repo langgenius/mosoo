@@ -1,4 +1,5 @@
 import { getSessionOrganizationPath } from "@mosoo/agent-driver/paths";
+import { getAgentBuiltInToolSupportError } from "@mosoo/contracts/agent";
 import type { SessionSummary } from "@mosoo/contracts/session";
 import type { UserWarning } from "@mosoo/contracts/session-run";
 import type { ResolvedRunSkill } from "@mosoo/contracts/skill";
@@ -54,7 +55,7 @@ import {
   toRuntimeDiagnosticReason,
 } from "../runtime-diagnostic-events";
 import { getSessionExecutionPlan } from "./session-execution.repository";
-import type { HydratedSessionRunContext } from "./session-execution.types";
+import type { HydratedSessionRunContext, SessionExecutionPlan } from "./session-execution.types";
 import { resolveSessionSkillReferences } from "./session-skill-reference-resolution.service";
 import { buildSnapshotAgentEnvironment } from "./session-snapshot-hydration";
 
@@ -65,6 +66,13 @@ interface HydratedRunContextCacheEntry {
 
 const HYDRATED_RUN_CONTEXT_CACHE_TTL_MS = 20_000;
 const hydratedRunContextCache = new Map<string, HydratedRunContextCacheEntry>();
+
+function assertSessionToolSupport(plan: SessionExecutionPlan): void {
+  const message = getAgentBuiltInToolSupportError(plan.binding.runtimeId, plan.builtInTools);
+  if (message !== null) {
+    throw validationError(`Agent is not ready to run: ${message}`, "AGENT_SESSION_NOT_READY");
+  }
+}
 
 async function resolveRuntimeProfileIds(
   bindings: ApiBindings,
@@ -168,6 +176,7 @@ async function hydrateRunContextFromSession(
   },
 ): Promise<HydratedSessionRunContext> {
   const executionPlan = await getSessionExecutionPlan(bindings.DB, session.id);
+  assertSessionToolSupport(executionPlan);
   const binding = {
     ...executionPlan.binding,
     sessionId: session.id,
@@ -208,6 +217,7 @@ async function hydrateRunContextFromSession(
   // Config/publish readiness callers keep the live probe.
   const agentReadiness = await computeAgentReadiness(bindings.DB, agent.ownerId, {
     agentId: agent.id,
+    builtInTools: executionPlan.builtInTools,
     environment: snapshotEnvironment,
     environmentNetworkPolicy: environmentSnapshot.networkPolicy,
     kind: binding.kind,
@@ -379,6 +389,7 @@ async function refreshCachedRunContextVolatileFields(
   cached: HydratedSessionRunContext,
 ): Promise<HydratedSessionRunContext> {
   const executionPlan = await getSessionExecutionPlan(bindings.DB, session.id);
+  assertSessionToolSupport(executionPlan);
   const binding = {
     ...executionPlan.binding,
     sessionId: session.id,

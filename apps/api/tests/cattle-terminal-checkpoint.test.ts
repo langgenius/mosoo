@@ -64,6 +64,7 @@ function createCheckpointSandbox(state: CheckpointSandboxState): {
       readFile: unavailable,
       restoreBackup: unavailable,
       setKeepAlive: unavailable,
+      ensureContainerReady: unavailable,
       startProcess: unavailable,
       terminal: unavailable,
       unmountBucket: async () => {},

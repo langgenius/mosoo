@@ -1,9 +1,11 @@
 import type {
+  AgentBuiltInToolConfig,
   AgentEnvironmentConfig,
   AgentKind,
   AgentReadiness,
   AgentReadinessIssue,
 } from "@mosoo/contracts/agent";
+import { getAgentBuiltInToolSupportError } from "@mosoo/contracts/agent";
 import type {
   AgentPackageResolutionState,
   AgentResolutionIssue,
@@ -381,6 +383,7 @@ export async function computeAgentReadiness(
   permissionPrincipalUserId: AccountId,
   input: {
     agentId: AgentId;
+    builtInTools: readonly AgentBuiltInToolConfig[];
     environment: AgentEnvironmentConfig;
     environmentNetworkPolicy?: EnvironmentNetworkPolicy;
     kind: AgentKind;
@@ -393,6 +396,14 @@ export async function computeAgentReadiness(
     runtimeId: string;
   },
 ): Promise<AgentReadiness> {
+  const toolSupportError = getAgentBuiltInToolSupportError(input.runtimeId, input.builtInTools);
+  if (toolSupportError !== null) {
+    return {
+      checkedAt: toIsoString(Date.now()),
+      issues: [createIssue("agent.runtime.tool_restrictions_unsupported", toolSupportError)],
+      ready: false,
+    };
+  }
   const issues: AgentReadinessIssue[] = [];
   const effectiveEnvironmentNetworkPolicy =
     input.environmentNetworkPolicy ??

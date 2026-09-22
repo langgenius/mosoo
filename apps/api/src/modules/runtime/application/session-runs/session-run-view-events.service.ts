@@ -5,6 +5,7 @@ import type { RuntimeEventId, SessionId, SessionMessageId } from "@mosoo/id";
 import type { RuntimeEventEnvelope, RuntimeEventKind } from "@mosoo/runtime-events";
 
 import { createSessionRuntimeEvent } from "../../../sessions/application/session-event-write.service";
+import { isTerminalSessionRunStatus } from "../../domain/session-run-status";
 
 function toPrimitiveRecord(value: Record<string, unknown>): PrimitiveRecord {
   const details: PrimitiveRecord = {};
@@ -47,6 +48,12 @@ function toSessionRunView(run: SessionRunSummary): SessionRunView {
   };
 }
 
+function toPersistedTerminalEventTime(run: SessionRunSummary) {
+  return isTerminalSessionRunStatus(run.status)
+    ? { occurredAtMs: Date.parse(run.completedAt ?? run.updatedAt) }
+    : {};
+}
+
 export function createSessionRunUpdatedEvent(
   run: SessionRunSummary,
   sessionId: SessionId,
@@ -54,6 +61,7 @@ export function createSessionRunUpdatedEvent(
   sourceEventId?: string,
 ): RuntimeEventEnvelope {
   return createSessionRuntimeEvent({
+    ...toPersistedTerminalEventTime(run),
     kind: toRuntimeEventKindForRunStatus(run.status),
     payload: {
       lifecycle,
@@ -140,6 +148,7 @@ export function createCancelledSessionRunRuntimeEvent(input: {
   };
 
   return createSessionRuntimeEvent({
+    ...toPersistedTerminalEventTime(input.run),
     ...(input.eventId === undefined ? {} : { id: input.eventId }),
     ...(input.sourceEventId === undefined ? {} : { sourceEventId: input.sourceEventId }),
     kind: "run.cancelled",
@@ -160,6 +169,7 @@ export function createFailedSessionRunRuntimeEvent(input: {
   sourceEventId?: string;
 }): RuntimeEventEnvelope {
   return createSessionRuntimeEvent({
+    ...toPersistedTerminalEventTime(input.run),
     kind: "run.failed",
     payload: {
       error: {

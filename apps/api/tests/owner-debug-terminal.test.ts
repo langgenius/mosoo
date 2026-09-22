@@ -74,6 +74,7 @@ function createTerminalSandboxHandleSpy(): TerminalSpy {
     mountBucket: unavailable,
     readFile: unavailable,
     restoreBackup: unavailable,
+    ensureContainerReady: async () => {},
     setKeepAlive: async (value) => {
       setKeepAliveCalls.push(value);
     },
