@@ -85,7 +85,7 @@ async function toAgentSessionEventInput(input: {
 
 export async function sendPublicThreadSessionEvents(
   request: SendPublicThreadSessionEventsRequest,
-): Promise<PublicThreadApiSendEventsResponse<string | null>> {
+): Promise<PublicThreadApiSendEventsResponse<string | null, PublicApiVersion>> {
   // File transfer and durable Run admission must agree on expiry, including
   // when the copy crosses the deadline. This time never comes from the client.
   const recoveryRequestedAtMs = currentTimestampMs();
@@ -132,7 +132,9 @@ export async function sendPublicThreadSessionEvents(
   return toPublicThreadEventBatch({
     batch,
     thread: toPublicThreadSummary({
+      apiVersion: request.apiVersion,
       endUserId: admission.session.end_user_id,
+      legacyKind: admission.session.kind,
       session: toPublicThreadSessionSummary(batch.session),
     }),
   });

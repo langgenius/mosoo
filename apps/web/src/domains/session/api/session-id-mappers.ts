@@ -28,7 +28,6 @@ interface SessionSummaryLike {
   deploymentVersionId: string | null;
   deploymentVersionNumber: number | null;
   id: string;
-  kind: SessionSummary["kind"];
   lastMessageAt?: string | null | undefined;
   lastRun: SessionRunSummaryLike | null;
   model: string;
@@ -85,7 +84,6 @@ export function toSessionSummary(session: SessionSummaryLike): SessionSummary {
     deploymentVersionId: toNullableAgentDeploymentVersionId(session.deploymentVersionId),
     deploymentVersionNumber: session.deploymentVersionNumber,
     id: toSessionId(session.id),
-    kind: session.kind,
     lastRun: toSessionRunSummary(session.lastRun),
     model: session.model,
     provider: session.provider,

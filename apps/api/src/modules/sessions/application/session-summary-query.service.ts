@@ -55,7 +55,6 @@ export interface SessionSummaryRow {
   deployment_version_id: AgentDeploymentVersionId | null;
   deployment_version_number: number | null;
   id: SessionId;
-  kind: SessionSummary["kind"];
   last_message_at: number | null;
   last_run_id: SessionRunId | null;
   model: string;
@@ -233,7 +232,6 @@ export function sessionSummaryColumns() {
       .mapWith(sessionsTable.deploymentVersionNumber)
       .as("deployment_version_number"),
     id: sql`${sessionsTable.id}`.mapWith(sessionsTable.id).as("id"),
-    kind: sessionsTable.kind,
     last_message_at: sessionsTable.lastMessageAt,
     last_run_id: sessionsTable.lastRunId,
     model: sql`${sessionsTable.model}`.mapWith(sessionsTable.model).as("model"),
@@ -304,7 +302,6 @@ function buildSessionSummaryFromRow(
     deploymentVersionId: row.deployment_version_id,
     deploymentVersionNumber: row.deployment_version_number,
     id: row.id,
-    kind: row.kind,
     lastMessageAt: row.last_message_at === null ? null : toIsoString(row.last_message_at),
     lastRun,
     model: row.model,

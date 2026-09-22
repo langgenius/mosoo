@@ -1,6 +1,5 @@
 import { type } from "arktype";
 
-import type { AgentKind } from "../agent/agent.contract";
 import type {
   DriverInstanceId,
   PlatformId,
@@ -40,7 +39,6 @@ export type DriverInstanceStatus = typeof DriverInstanceStatus.infer;
 export interface SandboxSummary {
   id: SandboxId;
   inactiveDeadlineAt: string | null;
-  kind: AgentKind;
   lastBackupId: SandboxBackupId | null;
   lastError: string | null;
   lastRestoreBackupId: SandboxBackupId | null;

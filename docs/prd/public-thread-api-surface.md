@@ -78,6 +78,12 @@ an older published version; later Agent edits do not change that snapshot.
 Omitting `userId` stores no end-user identity and returns `userId: null`. A
 supplied value remains immutable and carries the existing delegated MCP identity.
 
+Session and execution-binding GraphQL outputs and v2 Thread summaries omit the
+retired Pet/Cattle `kind`. The v1 summary retains the stored Session label for
+compatibility, including interrupted-creation recovery and event responses;
+editing an Agent preset cannot change that historical label. Clients should
+select the versioned response contract rather than expect `kind` in v2.
+
 Read, events, continuation, cancellation, and file access use the Session's owner
 and Project boundary, regardless of the creation channel or current publication
 state. The same ID addresses an existing owned Session. This does not grant a

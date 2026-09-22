@@ -216,7 +216,6 @@ export async function buildExecutionSpec(
         homePath: input.profile.session.homePath,
         origin: input.profile.session.origin,
         sandboxId: input.profile.sandbox.id,
-        sandboxKind: "cattle",
         sandboxSubjectId: input.profile.sandbox.subjectId,
         sandboxSubjectKind: input.profile.sandbox.subjectKind,
         sessionOrganizationPath: organizationPath,

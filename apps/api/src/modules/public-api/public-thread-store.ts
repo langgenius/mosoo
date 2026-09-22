@@ -1,3 +1,4 @@
+import type { AgentKind } from "@mosoo/contracts/agent";
 import type { PublicApiVersion } from "@mosoo/contracts/public-api";
 import type { SessionSummary } from "@mosoo/contracts/session";
 import type { SessionRunSummary } from "@mosoo/contracts/session-run";
@@ -36,6 +37,7 @@ import { parsePublicApiThreadRecordMetadata } from "./public-thread-metadata";
 import type { PublicApiThreadRecordMetadata } from "./public-thread-metadata";
 
 export interface ThreadSnapshotRow extends SessionSummaryWithLastRunRow {
+  kind: AgentKind;
   creator_account_id: AccountId;
   end_user_id: string | null;
   metadata_json: string;
@@ -110,6 +112,7 @@ export async function getThreadSnapshot(
     (await getAppDatabase(database)
       .select({
         ...sessionSummaryWithLastRunColumns(),
+        kind: sessionsTable.kind,
         creator_account_id: sessionsTable.creatorAccountId,
         end_user_id: sessionsTable.endUserId,
         metadata_json: sessionsTable.metadataJson,
@@ -160,6 +163,7 @@ export async function findPublicThreadSnapshotByIdempotencyKey(
     (await getAppDatabase(database)
       .select({
         ...sessionSummaryWithLastRunColumns(),
+        kind: sessionsTable.kind,
         creator_account_id: sessionsTable.creatorAccountId,
         end_user_id: sessionsTable.endUserId,
         metadata_json: sessionsTable.metadataJson,

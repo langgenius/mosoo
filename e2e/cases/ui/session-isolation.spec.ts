@@ -198,7 +198,6 @@ test("direct Session maintenance targets only the selected Session and exposes a
     deploymentVersionId: null,
     deploymentVersionNumber: null,
     id,
-    kind: "cattle",
     lastMessageAt: now,
     lastRun: null,
     model: "gpt-5.4",

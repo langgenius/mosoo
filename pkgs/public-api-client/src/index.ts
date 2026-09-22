@@ -117,7 +117,7 @@ export interface MosooPublicThreadWaitResult {
   events: PublicThreadEventLogEntry[];
   finalOutput: PublicThreadFinalOutput | null;
   run: PublicThreadRunSummary;
-  thread: PublicThreadSummary<string | null>;
+  thread: PublicThreadSummary<string | null, PublicApiVersion>;
   truncated: boolean;
 }
 
@@ -147,7 +147,7 @@ export interface MosooPublicThreadFinalOutputResult {
   events: PublicThreadEventLogEntry[];
   finalOutput: PublicThreadFinalOutput;
   run: MosooPublicThreadCompletedRunSummary;
-  thread: PublicThreadSummary<string | null>;
+  thread: PublicThreadSummary<string | null, PublicApiVersion>;
   truncated: boolean;
 }
 
@@ -155,7 +155,7 @@ export interface MosooPublicThreadTerminalRunErrorInput {
   events: PublicThreadEventLogEntry[];
   finalOutput: PublicThreadFinalOutput | null;
   run: MosooPublicThreadUnsuccessfulRunSummary;
-  thread: PublicThreadSummary<string | null>;
+  thread: PublicThreadSummary<string | null, PublicApiVersion>;
   truncated: boolean;
 }
 
@@ -200,7 +200,7 @@ export class MosooPublicThreadTerminalRunError extends Error {
   readonly finalOutput: PublicThreadFinalOutput | null;
   readonly run: MosooPublicThreadUnsuccessfulRunSummary;
   readonly runStatus: MosooPublicThreadUnsuccessfulTerminalStatus;
-  readonly thread: PublicThreadSummary<string | null>;
+  readonly thread: PublicThreadSummary<string | null, PublicApiVersion>;
   readonly truncated: boolean;
 
   constructor(input: MosooPublicThreadTerminalRunErrorInput) {
@@ -532,7 +532,9 @@ export class MosooPublicThreadClient {
     this.token = options.token;
   }
 
-  async createThread(input: MosooCreateThreadInput): Promise<PublicThreadApiCreateThreadResponse> {
+  async createThread(
+    input: MosooCreateThreadInput,
+  ): Promise<PublicThreadApiCreateThreadResponse<string | null, PublicApiVersion>> {
     return this.requestJson("POST", `/agents/${input.agentId}/threads`, {
       body: createCreateThreadBody(input),
       idempotencyKey: input.idempotencyKey,
@@ -543,7 +545,7 @@ export class MosooPublicThreadClient {
 
   async createProjectThread(
     input: MosooCreateProjectThreadInput,
-  ): Promise<PublicThreadApiCreateThreadResponse<string | null>> {
+  ): Promise<PublicThreadApiCreateThreadResponse<string | null, "v2">> {
     this.requireV2();
     return this.requestJson("POST", `/projects/${encodeURIComponent(input.projectId)}/threads`, {
       body: {
@@ -587,7 +589,7 @@ export class MosooPublicThreadClient {
   async retrieveThread(
     threadId: string,
     options: { signal?: AbortSignal | undefined } = {},
-  ): Promise<PublicThreadApiRetrieveThreadResponse<string | null>> {
+  ): Promise<PublicThreadApiRetrieveThreadResponse<string | null, PublicApiVersion>> {
     return this.requestJson("GET", `/threads/${threadId}`, {
       signal: options.signal,
       status: 200,
@@ -596,7 +598,7 @@ export class MosooPublicThreadClient {
 
   async sendEvents(
     input: MosooSendEventsInput,
-  ): Promise<PublicThreadApiSendEventsResponse<string | null>> {
+  ): Promise<PublicThreadApiSendEventsResponse<string | null, PublicApiVersion>> {
     return this.requestJson("POST", `/threads/${input.threadId}/events`, {
       body: {
         events: input.events,

@@ -23,7 +23,6 @@ const CREATE_AGENT_SESSION_MUTATION = graphql(/* GraphQL */ `
       deploymentVersionId
       deploymentVersionNumber
       id
-      kind
       lastMessageAt
       lastRun {
         completedAt
@@ -81,7 +80,6 @@ const AGENT_SESSION_LIST_QUERY = graphql(/* GraphQL */ `
         deploymentVersionId
         deploymentVersionNumber
         id
-        kind
         lastMessageAt
         lastRun {
           completedAt

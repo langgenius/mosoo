@@ -1,6 +1,4 @@
 import {
-  AGENT_KIND_LIST_LABEL,
-  AgentKind,
   createDefaultAgentBuiltInTools,
   isAgentBuiltInToolName,
   normalizeAgentBuiltInTools,
@@ -93,14 +91,6 @@ function readBoolean(value: unknown, field: string): boolean {
   return value;
 }
 
-function readAgentKind(value: unknown, field: string): AgentKind {
-  if (AgentKind.allows(value)) {
-    return value;
-  }
-
-  throw new Error(`${field} must be ${AGENT_KIND_LIST_LABEL}.`);
-}
-
 function readNetworkPolicy(value: unknown, field: string): EnvironmentNetworkPolicy {
   if (value === "full" || value === "limited") {
     return value;
@@ -141,7 +131,6 @@ function parseBinding(value: unknown): SessionExecutionPlan["binding"] {
       record["deploymentVersionNumber"],
       "sessionExecutionPlan.binding.deploymentVersionNumber",
     ),
-    kind: readAgentKind(record["kind"], "sessionExecutionPlan.binding.kind"),
     model: readString(record["model"], "sessionExecutionPlan.binding.model"),
     prompt: readString(record["prompt"], "sessionExecutionPlan.binding.prompt"),
     provider: readString(record["provider"], "sessionExecutionPlan.binding.provider"),
@@ -149,12 +138,10 @@ function parseBinding(value: unknown): SessionExecutionPlan["binding"] {
   };
   if (
     binding.agentId === null &&
-    (binding.kind !== "cattle" ||
-      binding.deploymentVersionId !== null ||
-      binding.deploymentVersionNumber !== null)
+    (binding.deploymentVersionId !== null || binding.deploymentVersionNumber !== null)
   ) {
     throw new TypeError(
-      "A Session without an Agent preset requires isolated execution and no deployment revision.",
+      "A Session without an Agent preset cannot reference a deployment revision.",
     );
   }
   return binding;

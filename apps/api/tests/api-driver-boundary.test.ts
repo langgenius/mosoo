@@ -103,6 +103,8 @@ describe("API to driver boundary", () => {
         traceparent: "00-00000000000000000000000000000001-0000000000000001-01",
       });
       const parsed = parseDriverBootPayloadJson(JSON.stringify(payload));
+      expect(payload.execution.session.context).not.toHaveProperty("sandboxKind");
+      expect(parsed.execution.session.context).not.toHaveProperty("sandboxKind");
       expect(parsed.execution.session.nativeResumeRequired).toBe(required);
       expect(parsed.execution.session.recoveryMessages).toEqual([]);
     },

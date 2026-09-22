@@ -745,6 +745,9 @@ const PUBLIC_API_V2_CREATE_THREAD_REQUEST_SCHEMA = {
   },
 };
 
+const { kind: _legacyThreadKind, ...v2ThreadProperties } =
+  PUBLIC_API_OPENAPI_SCHEMAS.ThreadSummary.properties;
+
 export const PUBLIC_API_OPENAPI_V2_SCHEMAS = {
   ...PUBLIC_API_OPENAPI_SCHEMAS,
   CreateThreadRequest: PUBLIC_API_V2_CREATE_THREAD_REQUEST_SCHEMA,
@@ -798,8 +801,9 @@ export const PUBLIC_API_OPENAPI_V2_SCHEMAS = {
   },
   ThreadSummary: {
     ...PUBLIC_API_OPENAPI_SCHEMAS.ThreadSummary,
+    required: PUBLIC_API_OPENAPI_SCHEMAS.ThreadSummary.required.filter((field) => field !== "kind"),
     properties: {
-      ...PUBLIC_API_OPENAPI_SCHEMAS.ThreadSummary.properties,
+      ...v2ThreadProperties,
       agent_id: {
         ...PLATFORM_ID_SCHEMA,
         type: ["string", "null"],

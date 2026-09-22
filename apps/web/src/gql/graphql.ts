@@ -841,7 +841,7 @@ export type ThreadAgentSessionRetrieveQueryVariables = Exact<{
 }>;
 
 
-export type ThreadAgentSessionRetrieveQuery = { threadAgentSessionRetrieve: { capabilities: Array<{ action: AgentSessionActionCapabilityName, reason: string | null, status: AgentSessionActionCapabilityStatus }>, recoverability: { reason: string | null, status: AgentSessionRecoverabilityStatus }, session: { agentId: PlatformId | null, archivedAt: string | null, createdAt: string, deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, kind: AgentKind, lastMessageAt: string | null, model: string, provider: string, projectId: PlatformId, runtimeId: string, status: SessionStatus, title: string | null, updatedAt: string, lastRun: { completedAt: string | null, createdAt: string, deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, model: string | null, provider: string | null, startedAt: string | null, status: RunStatus, traceId: string, trigger: SessionRunTrigger, updatedAt: string, error: { code: string, details: PrimitiveRecord, message: string, retryable: boolean } | null } | null } } };
+export type ThreadAgentSessionRetrieveQuery = { threadAgentSessionRetrieve: { capabilities: Array<{ action: AgentSessionActionCapabilityName, reason: string | null, status: AgentSessionActionCapabilityStatus }>, recoverability: { reason: string | null, status: AgentSessionRecoverabilityStatus }, session: { agentId: PlatformId | null, archivedAt: string | null, createdAt: string, deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, lastMessageAt: string | null, model: string, provider: string, projectId: PlatformId, runtimeId: string, status: SessionStatus, title: string | null, updatedAt: string, lastRun: { completedAt: string | null, createdAt: string, deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, model: string | null, provider: string | null, startedAt: string | null, status: RunStatus, traceId: string, trigger: SessionRunTrigger, updatedAt: string, error: { code: string, details: PrimitiveRecord, message: string, retryable: boolean } | null } | null } } };
 
 export type AgentSessionDiagnosticsQueryVariables = Exact<{
   projectId: PlatformId;
@@ -849,14 +849,14 @@ export type AgentSessionDiagnosticsQueryVariables = Exact<{
 }>;
 
 
-export type AgentSessionDiagnosticsQuery = { agentSessionDiagnostics: { generatedAt: string, pendingPermissionCount: number, execution: { binding: { deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, kind: AgentKind, model: string, provider: string, runtimeId: string, sessionId: PlatformId }, skills: Array<{ skillId: PlatformId, skillName: string }>, tools: Array<{ credentialMode: string, serverId: PlatformId }> } | null, nativeRuntimeRef: { kind: string | null, runtimeId: string | null, status: string, valuePreview: string | null }, session: { deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, kind: AgentKind, model: string, provider: string, runtimeId: string, status: SessionStatus, title: string | null, lastRun: { deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, model: string | null, provider: string | null, status: RunStatus, traceId: string } | null } } };
+export type AgentSessionDiagnosticsQuery = { agentSessionDiagnostics: { generatedAt: string, pendingPermissionCount: number, execution: { binding: { deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, model: string, provider: string, runtimeId: string, sessionId: PlatformId }, skills: Array<{ skillId: PlatformId, skillName: string }>, tools: Array<{ credentialMode: string, serverId: PlatformId }> } | null, nativeRuntimeRef: { kind: string | null, runtimeId: string | null, status: string, valuePreview: string | null }, session: { deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, model: string, provider: string, runtimeId: string, status: SessionStatus, title: string | null, lastRun: { deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, model: string | null, provider: string | null, status: RunStatus, traceId: string } | null } } };
 
 export type CreateAgentSessionMutationVariables = Exact<{
   input: CreateAgentSessionInput;
 }>;
 
 
-export type CreateAgentSessionMutation = { createAgentSession: { agentId: PlatformId | null, archivedAt: string | null, createdAt: string, deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, kind: AgentKind, lastMessageAt: string | null, model: string, provider: string, projectId: PlatformId, runtimeId: string, status: SessionStatus, title: string | null, type: SessionType, updatedAt: string, lastRun: { completedAt: string | null, createdAt: string, deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, model: string | null, provider: string | null, startedAt: string | null, status: RunStatus, traceId: string, trigger: SessionRunTrigger, updatedAt: string, error: { code: string, details: PrimitiveRecord, message: string, retryable: boolean } | null } | null } };
+export type CreateAgentSessionMutation = { createAgentSession: { agentId: PlatformId | null, archivedAt: string | null, createdAt: string, deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, lastMessageAt: string | null, model: string, provider: string, projectId: PlatformId, runtimeId: string, status: SessionStatus, title: string | null, type: SessionType, updatedAt: string, lastRun: { completedAt: string | null, createdAt: string, deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, model: string | null, provider: string | null, startedAt: string | null, status: RunStatus, traceId: string, trigger: SessionRunTrigger, updatedAt: string, error: { code: string, details: PrimitiveRecord, message: string, retryable: boolean } | null } | null } };
 
 export type AgentSessionListQueryVariables = Exact<{
   agentId: PlatformId;
@@ -868,7 +868,7 @@ export type AgentSessionListQueryVariables = Exact<{
 }>;
 
 
-export type AgentSessionListQuery = { agentSessionList: { nodes: Array<{ agentId: PlatformId | null, archivedAt: string | null, createdAt: string, deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, kind: AgentKind, lastMessageAt: string | null, model: string, provider: string, projectId: PlatformId, runtimeId: string, status: SessionStatus, title: string | null, type: SessionType, updatedAt: string, lastRun: { completedAt: string | null, createdAt: string, deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, model: string | null, provider: string | null, startedAt: string | null, status: RunStatus, traceId: string, trigger: SessionRunTrigger, updatedAt: string, error: { code: string, details: PrimitiveRecord, message: string, retryable: boolean } | null } | null }> } };
+export type AgentSessionListQuery = { agentSessionList: { nodes: Array<{ agentId: PlatformId | null, archivedAt: string | null, createdAt: string, deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, lastMessageAt: string | null, model: string, provider: string, projectId: PlatformId, runtimeId: string, status: SessionStatus, title: string | null, type: SessionType, updatedAt: string, lastRun: { completedAt: string | null, createdAt: string, deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, model: string | null, provider: string | null, startedAt: string | null, status: RunStatus, traceId: string, trigger: SessionRunTrigger, updatedAt: string, error: { code: string, details: PrimitiveRecord, message: string, retryable: boolean } | null } | null }> } };
 
 export type AgentSessionProcessEventsQueryVariables = Exact<{
   limit: number;
@@ -912,7 +912,7 @@ export type ThreadAgentSessionListQueryVariables = Exact<{
 }>;
 
 
-export type ThreadAgentSessionListQuery = { threadAgentSessionList: { nodes: Array<{ capabilities: Array<{ action: AgentSessionActionCapabilityName, reason: string | null, status: AgentSessionActionCapabilityStatus }>, session: { agentId: PlatformId | null, archivedAt: string | null, createdAt: string, deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, kind: AgentKind, lastMessageAt: string | null, model: string, provider: string, projectId: PlatformId, runtimeId: string, status: SessionStatus, title: string | null, type: SessionType, updatedAt: string, lastRun: { completedAt: string | null, createdAt: string, deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, model: string | null, provider: string | null, startedAt: string | null, status: RunStatus, traceId: string, trigger: SessionRunTrigger, updatedAt: string, error: { code: string, details: PrimitiveRecord, message: string, retryable: boolean } | null } | null } }>, pageInfo: { endCursor: string | null, hasMore: boolean } } };
+export type ThreadAgentSessionListQuery = { threadAgentSessionList: { nodes: Array<{ capabilities: Array<{ action: AgentSessionActionCapabilityName, reason: string | null, status: AgentSessionActionCapabilityStatus }>, session: { agentId: PlatformId | null, archivedAt: string | null, createdAt: string, deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, lastMessageAt: string | null, model: string, provider: string, projectId: PlatformId, runtimeId: string, status: SessionStatus, title: string | null, type: SessionType, updatedAt: string, lastRun: { completedAt: string | null, createdAt: string, deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, model: string | null, provider: string | null, startedAt: string | null, status: RunStatus, traceId: string, trigger: SessionRunTrigger, updatedAt: string, error: { code: string, details: PrimitiveRecord, message: string, retryable: boolean } | null } | null } }>, pageInfo: { endCursor: string | null, hasMore: boolean } } };
 
 export type AutoTitleSessionMutationVariables = Exact<{
   input: RenameSessionInput;
@@ -2903,7 +2903,6 @@ export const ThreadAgentSessionRetrieveDocument = /*#__PURE__*/ new TypedDocumen
       deploymentVersionId
       deploymentVersionNumber
       id
-      kind
       lastMessageAt
       lastRun {
         completedAt
@@ -2943,7 +2942,6 @@ export const AgentSessionDiagnosticsDocument = /*#__PURE__*/ new TypedDocumentSt
       binding {
         deploymentVersionId
         deploymentVersionNumber
-        kind
         model
         provider
         runtimeId
@@ -2970,7 +2968,6 @@ export const AgentSessionDiagnosticsDocument = /*#__PURE__*/ new TypedDocumentSt
       deploymentVersionId
       deploymentVersionNumber
       id
-      kind
       lastRun {
         deploymentVersionId
         deploymentVersionNumber
@@ -2998,7 +2995,6 @@ export const CreateAgentSessionDocument = /*#__PURE__*/ new TypedDocumentString(
     deploymentVersionId
     deploymentVersionNumber
     id
-    kind
     lastMessageAt
     lastRun {
       completedAt
@@ -3048,7 +3044,6 @@ export const AgentSessionListDocument = /*#__PURE__*/ new TypedDocumentString(`
       deploymentVersionId
       deploymentVersionNumber
       id
-      kind
       lastMessageAt
       lastRun {
         completedAt
@@ -3168,7 +3163,6 @@ export const ThreadAgentSessionListDocument = /*#__PURE__*/ new TypedDocumentStr
         deploymentVersionId
         deploymentVersionNumber
         id
-        kind
         lastMessageAt
         lastRun {
           completedAt

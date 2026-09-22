@@ -1238,7 +1238,6 @@ type Session {
   deploymentVersionId: ULID
   deploymentVersionNumber: Int
   id: ULID!
-  kind: AgentKind!
   lastMessageAt: String
   lastRun: SessionRun
   model: String!
@@ -1260,7 +1259,6 @@ type SessionExecutionBinding {
   agentId: ULID
   deploymentVersionId: ULID
   deploymentVersionNumber: Int
-  kind: AgentKind!
   model: String!
   prompt: String!
   provider: String!

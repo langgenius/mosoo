@@ -7,8 +7,20 @@ Target direction (2026-09-10): [SPEC](./SPEC.md) defines a Project-scoped manage
 Agent configuration and exports carry no execution ownership type. Legacy kind values
 are confined to compatibility input validation and historical storage; they cannot
 select a runtime or constrain an environment's network policy. Project Agent listings
-and Agent GraphQL outputs omit the retired field. Session ownership and the admitted
+and Agent GraphQL outputs omit the retired field. Session summaries, execution
+bindings and v2 Thread responses also omit it. The v1 HTTP adapter alone returns
+the historical Session row's label for wire compatibility; mutable preset labels
+never determine that response. Existing execution snapshots may contain the old
+field, which the current reader ignores. Session ownership and the admitted
 network configuration determine execution.
+
+The matching Driver uses boot protocol 6 without the required `sandboxKind`
+marker. Older boot and control protocols are rejected before execution. New
+execution snapshots also omit `binding.kind`; release and rollback candidates
+must both read these snapshots and use a matching Driver. Earlier protocol-5
+conversion and rollback builds remain pinned evidence for their own source,
+not qualified rollback targets for this candidate. No stored rows are rewritten
+by this contract removal.
 
 Existing checkpoint and runtime primitives must support native continuation without Pet/Cattle product semantics. Persist required artifacts, events, usage, and a ready checkpoint before reporting a successful turn or reclaiming its uncommitted workspace. Follow-up uses committed state; cold continuation restores the workspace and native conversation or fails explicitly. Recovery remains available for at least 30 days after the last successful turn, renewed by successful follow-up. Completing a turn leaves the Session available for continuation.
 

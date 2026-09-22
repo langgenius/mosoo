@@ -73,7 +73,6 @@ describe("createProjectSession", () => {
       deploymentVersionId: null,
       deploymentVersionNumber: null,
       projectId: input.projectId,
-      kind: "cattle",
       type: "ui",
       model: input.model,
     });
@@ -85,6 +84,13 @@ describe("createProjectSession", () => {
       .bind(session.id)
       .first<{ plan_json: string }>();
     const plan = parseSessionExecutionPlanJson(snapshot!.plan_json);
+    expect(session).not.toHaveProperty("kind");
+    expect(plan.binding).not.toHaveProperty("kind");
+    expect(JSON.parse(snapshot!.plan_json).binding).not.toHaveProperty("kind");
+    for (const legacyKind of [undefined, "pet", "cattle"]) {
+      const legacy = { ...plan, binding: { ...plan.binding, kind: legacyKind } };
+      expect(parseSessionExecutionPlanJson(JSON.stringify(legacy)).binding).toEqual(plan.binding);
+    }
     expect(plan.binding.prompt).toBe(input.instructions);
     expect(plan.binding.agentId).toBeNull();
     expect(plan.configJson).toBe("{}");
@@ -238,7 +244,6 @@ describe("createAgentSession", () => {
       agentId: PUBLIC_API_TEST_IDS.agent,
       deploymentVersionId: PUBLIC_API_TEST_IDS.deployment,
       deploymentVersionNumber: 1,
-      kind: "cattle",
       lastRun: null,
       model: "gpt-5.4",
       provider: "openai",
@@ -320,7 +325,7 @@ describe("createAgentSession", () => {
       expect(parseSessionExecutionPlanJson(row!.plan_json).recoveryRetentionMs).toBe(
         session.id === second.id ? 30 * 24 * 60 * 60 * 1000 : undefined,
       );
-      expect(session.kind).toBe("cattle");
+      expect(session).not.toHaveProperty("kind");
     }
     expect(
       await database
@@ -502,7 +507,6 @@ describe("createAgentSession", () => {
           },
         };
         for (const invalidBinding of [
-          { ...directPlan.binding, kind: "pet" },
           { ...directPlan.binding, deploymentVersionId: PUBLIC_API_TEST_IDS.deployment },
           { ...directPlan.binding, deploymentVersionNumber: 1 },
         ]) {
@@ -510,7 +514,7 @@ describe("createAgentSession", () => {
             parseSessionExecutionPlanJson(
               JSON.stringify({ ...directPlan, binding: invalidBinding }),
             ),
-          ).toThrow("requires isolated execution and no deployment revision");
+          ).toThrow("cannot reference a deployment revision");
         }
         await database
           .prepare(

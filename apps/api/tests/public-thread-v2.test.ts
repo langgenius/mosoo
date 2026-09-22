@@ -183,6 +183,7 @@ describe("Project direct Session API v2", () => {
       const thread = expectRecord(created["thread"]);
       const id = expectString(thread["id"]);
       expect(thread["agent_id"]).toBeNull();
+      expect(thread).not.toHaveProperty("kind");
       expect(expectRecord(await snapshot(id))["binding"]).toMatchObject({
         agentId: null,
         prompt: configuration.instructions,
@@ -826,6 +827,12 @@ describe("saved-Agent Thread API v2", () => {
     const newDocument = await readJson(await request("v2/openapi.json"));
     const oldSchemas = expectRecord(expectRecord(oldDocument["components"])["schemas"]);
     const newSchemas = expectRecord(expectRecord(newDocument["components"])["schemas"]);
+    const oldThread = expectRecord(oldSchemas["ThreadSummary"]);
+    const newThread = expectRecord(newSchemas["ThreadSummary"]);
+    expect(expectRecord(oldThread["properties"])).toHaveProperty("kind");
+    expect(expectArray(oldThread["required"])).toContain("kind");
+    expect(expectRecord(newThread["properties"])).not.toHaveProperty("kind");
+    expect(expectArray(newThread["required"])).not.toContain("kind");
     expect(expectRecord(oldSchemas["CreateThreadRequest"])["required"]).toEqual(["userId"]);
     expect(expectRecord(newSchemas["CreateThreadRequest"])["required"]).toEqual([]);
     const oldCreate = expectRecord(
@@ -980,6 +987,48 @@ describe("saved-Agent Thread API v2", () => {
     });
   });
 
+  test("preserves v1 historical labels through recovery, reads and events without exposing them in v2", async () => {
+    const { create, database, request } = await setup({
+      requestDatabase: (db) =>
+        loseCommittedBatchResponse(db, 'insert into "session_execution_snapshot"'),
+    });
+    await withProviderProbeMock(async () => {
+      expect((await create("v1", { userId: "customer" }, "legacy-recover")).status).toBe(500);
+      const row = await database.prepare("SELECT id FROM session").first<{ id: string }>();
+      const id = expectString(row?.id);
+      await database.prepare("UPDATE session SET kind = 'pet' WHERE id = ?").bind(id).run();
+      await database.prepare("UPDATE agent SET kind = 'cattle' WHERE id = ?").bind(IDS.agent).run();
+      await database
+        .prepare("UPDATE public_api_idempotency_key SET updated_at = ? WHERE idempotency_key = ?")
+        .bind(Date.now() - 11 * 60 * 1000, "legacy-recover")
+        .run();
+
+      const retry = await create("v1", { userId: "customer" }, "legacy-recover");
+      expect(retry.status).toBe(201);
+      expect(expectRecord((await readJson(retry))["thread"])).toMatchObject({ id, kind: "pet" });
+      for (const version of ["v1", "v2"] as const) {
+        const retrieved = await readJson(await request(`${version}/threads/${id}`));
+        const listed = await readJson(await request(`${version}/agents/${IDS.agent}/threads`));
+        for (const thread of [retrieved["thread"], ...expectArray(listed["threads"])]) {
+          const summary = expectRecord(thread);
+          expect(summary["id"]).toBe(id);
+          if (version === "v1") expect(summary["kind"]).toBe("pet");
+          else expect(summary).not.toHaveProperty("kind");
+        }
+      }
+      const sent = await request(`v1/threads/${id}/events`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ events: [{ type: "user_message", text: "Continue." }] }),
+      });
+      expect(sent.status).toBe(200);
+      expect(expectRecord((await readJson(sent))["thread"])).toMatchObject({ id, kind: "pet" });
+      expect(await database.prepare("SELECT count(*) AS count FROM session").first()).toEqual({
+        count: 1,
+      });
+    });
+  });
+
   test("keeps v1 live selection, required identity, links, and listing separate", async () => {
     const fixture = await setup();
     await fixture.database
@@ -997,6 +1046,8 @@ describe("saved-Agent Thread API v2", () => {
       const saved = await readJson(savedResponse);
       const legacyId = expectString(expectRecord(legacy["thread"])["id"]);
       const savedId = expectString(expectRecord(saved["thread"])["id"]);
+      expect(expectRecord(legacy["thread"])["kind"]).toBe("cattle");
+      expect(expectRecord(saved["thread"])).not.toHaveProperty("kind");
       expect(savedId).not.toBe(legacyId);
       expect(legacy["links"]).toEqual({ thread: `/api/v1/threads/${legacyId}` });
       expect((await fixture.snapshot(legacyId))["binding"]).toMatchObject({

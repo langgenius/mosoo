@@ -203,7 +203,6 @@ export interface DriverExecutionSessionContext {
   readonly origin: DriverOrigin;
   readonly sandboxId: SandboxId;
   /** Inert compatibility marker for the pinned Driver protocol. */
-  readonly sandboxKind: "cattle";
   readonly sandboxSubjectId: PlatformId;
   readonly sandboxSubjectKind: "session";
   readonly sessionOrganizationPath: string;
