@@ -2,6 +2,8 @@ import { DurableObject } from "cloudflare:workers";
 
 import type { ApiBindings } from "../../platform/cloudflare/worker-types";
 import { SandboxHandleGuard } from "./sandbox-handle-guard";
+import { SandboxMigrationFence } from "./sandbox-migration-fence";
+import type { SandboxMigrationFenceClaim } from "./sandbox-migration-fence";
 import {
   configureSandboxNetworkConstraints,
   restoreSandboxNetworkEnforcement,
@@ -31,6 +33,7 @@ export interface SandboxContainerObservation {
 
 export class Sandbox extends DurableObject<ApiBindings> {
   readonly #handleGuard = new SandboxHandleGuard();
+  readonly #migrationFence: SandboxMigrationFence;
   #initialization?: {
     delegate: Promise<SandboxDelegate>;
     networkRestore: Promise<void>;
@@ -40,6 +43,7 @@ export class Sandbox extends DurableObject<ApiBindings> {
   constructor(ctx: DurableObjectState<{}>, env: ApiBindings) {
     super(ctx, env);
 
+    this.#migrationFence = new SandboxMigrationFence(ctx);
     this.#httpsInterceptionDisabled = env.SANDBOX_FILE_BUCKET_LOCAL === "true";
   }
 
@@ -49,6 +53,24 @@ export class Sandbox extends DurableObject<ApiBindings> {
       state: running === true ? "running" : running === false ? "stopped" : "unavailable",
       observedAt: Date.now(),
     };
+  }
+
+  async getMigrationFence() {
+    return { ...(await this.#migrationFence.inspect()), ...this.getContainerObservation() };
+  }
+
+  async beginMigrationFence(claim: SandboxMigrationFenceClaim) {
+    return this.#migrationFence.begin(claim);
+  }
+
+  async stopMigrationFence(claim: SandboxMigrationFenceClaim) {
+    await this.#migrationFence.stop(claim);
+    return this.getMigrationFence();
+  }
+
+  async releaseMigrationFence(claim: SandboxMigrationFenceClaim) {
+    await this.#migrationFence.release(claim);
+    return this.getMigrationFence();
   }
 
   #initializeDelegate() {
@@ -72,6 +94,7 @@ export class Sandbox extends DurableObject<ApiBindings> {
   }
 
   async configureNetworkConstraints(constraints: unknown): Promise<void> {
+    await this.#migrationFence.assertOpen();
     const initialization = this.#initializeDelegate();
     await initialization.networkRestore;
     const delegate = await initialization.delegate;
@@ -83,12 +106,14 @@ export class Sandbox extends DurableObject<ApiBindings> {
   }
 
   override async fetch(request: Request): Promise<Response> {
+    await this.#migrationFence.assertOpen();
     const initialization = this.#initializeDelegate();
     await initialization.networkRestore;
     return (await initialization.delegate).fetch(request);
   }
 
   override async alarm(alarmProps?: { isRetry: boolean; retryCount: number }): Promise<void> {
+    if ((await this.#migrationFence.inspect()).operationId !== null) return;
     const initialization = this.#initializeDelegate();
     await initialization.networkRestore;
     await (await initialization.delegate).alarm(alarmProps);
@@ -98,6 +123,7 @@ export class Sandbox extends DurableObject<ApiBindings> {
     method: SandboxRpcForwardMethod,
     args: readonly unknown[],
   ): Promise<unknown> {
+    await this.#migrationFence.assertOpen();
     const action = () => this.#invokeDelegate(method, args);
     return method === "destroy"
       ? this.#handleGuard.destroy(action)

@@ -243,6 +243,38 @@ exclude new resource access, settle previously dispatched operations, and apply
 the guarded batch while that exclusion holds. Do not use repeated observations
 or a wrapper RPC counter as a substitute for that barrier.
 
+The internal Sandbox migration fence provides physical exclusion without starting
+the SDK. Its caller must first atomically protect the idle Session cohort, shared
+resource bindings, uploads, lifecycle operations and new Run admission in D1.
+Never stop admitted customer work to make a resource eligible for conversion.
+The fence is not a customer-facing migration endpoint or a production executor.
+
+Read the recorded physical resource's fence revision, then claim it with one
+operation ID and that revision. Acquisition durably flushes its marker before
+resetting the Durable Object; the initial RPC therefore disconnects. A fresh stub
+must confirm that the same claim survived and no longer requires a reset before
+stopping the container. The reset revokes old SDK callbacks and pending JavaScript
+and stream continuations; physical stop also waits for the container exit monitor
+and requires an observed stopped state. A successful destroy request alone is
+insufficient. While held, SDK/configuration/fetch access is rejected and alarms
+cannot initialize the SDK. Read-only physical observation remains available.
+
+Keep this fence through the guarded database transition. Release requires its
+owner and revision, completed stopping, and a stopped physical container. Release
+durably increments the revision, so an old claim cannot reacquire the resource;
+retrying the completed release is harmless. A fence does not expire automatically.
+A failed or interrupted operation must inspect the retained claim and resume its
+reviewed recovery sequence. This primitive does not yet establish the D1 admission
+barrier, checkpoint ownership, migration/rollback execution or Cloud acceptance.
+
+A local replay against the pinned SDK and product wrapper verifies persisted
+fencing across actor reset, rejected old Session/Process callbacks, interrupted
+synthetic execution and streaming, stopped physical state, owner-checked release
+and fresh execution afterward. Replaying the old claim after release does not
+reset or interrupt that fresh execution. The revision survives ordinary SDK
+destruction. These are local synthetic resource checks, not evidence of customer
+workspace conversion or same-public-Session native restoration.
+
 A tie in the old timestamp-only backup lookup is rejected. A stale
 precondition raises a SQL error; use **one atomic D1 batch**, never separate calls
 for its statements. A failure after destination insertion must roll back the
