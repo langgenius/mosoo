@@ -1,20 +1,24 @@
-import { fileRecordsTable, fileUploadsTable } from "@mosoo/db";
+import { fileRecordsTable, fileUploadsTable, sessionsTable } from "@mosoo/db";
 import { parsePlatformId } from "@mosoo/id";
 import type { AccountId, FileId, ProjectId, SessionId } from "@mosoo/id";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, exists, isNull, ne, sql } from "drizzle-orm";
 
 import { createErrorLogContext, logError } from "../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
-import { runAppDatabaseBatch } from "../../../platform/db/drizzle";
+import { getD1ChangeCount, runAppDatabaseBatch } from "../../../platform/db/drizzle";
 import { isTruthy } from "../../../shared/truthiness";
 import { currentTimestampMs } from "../../../time";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { ensureProjectOwnership } from "../../projects/application/project.service";
+import { createFileConflictError } from "./file-errors";
 import { createFinalObjectKey } from "./file-paths";
 import { listFileRecordsById } from "./file-record-store";
 import type { FileRecordRow } from "./file-record-store";
 import { copyObject, deleteObject } from "./r2-s3-client";
-import { ensureProjectSessionFileAccess } from "./session-file-ownership";
+import {
+  ensureProjectSessionFileAccess,
+  ensureSessionFileWritable,
+} from "./session-file-ownership";
 interface ClaimedDraftFile {
   etag: string;
   file: FileRecordRow;
@@ -132,6 +136,7 @@ export async function claimProjectDraftFilesToSession(
     projectId: input.projectId,
     sessionId: input.sessionId,
   });
+  await ensureSessionFileWritable(bindings.DB, input.sessionId);
 
   const files = await loadClaimableDraftFiles(
     bindings.DB,
@@ -164,7 +169,19 @@ export async function claimProjectDraftFilesToSession(
   }
 
   const timestampMs = currentTimestampMs();
-  await runAppDatabaseBatch(bindings.DB, (database) => {
+  const results = await runAppDatabaseBatch(bindings.DB, (database) => {
+    const writableSession = exists(
+      database
+        .select({ id: sessionsTable.id })
+        .from(sessionsTable)
+        .where(
+          and(
+            eq(sessionsTable.id, input.sessionId),
+            isNull(sessionsTable.archivedAt),
+            ne(sessionsTable.status, "TERMINATED"),
+          ),
+        ),
+    );
     const updateQueries = claimedFiles.flatMap(({ etag, file, nextObjectKey }) => [
       database
         .update(fileRecordsTable)
@@ -187,6 +204,7 @@ export async function claimProjectDraftFilesToSession(
             eq(fileRecordsTable.id, file.id),
             eq(fileRecordsTable.scopeKind, "app_draft"),
             eq(fileRecordsTable.scopeId, input.projectId),
+            writableSession,
           ),
         ),
       database
@@ -201,6 +219,7 @@ export async function claimProjectDraftFilesToSession(
             eq(fileUploadsTable.fileId, file.id),
             eq(fileUploadsTable.scopeKind, "app_draft"),
             eq(fileUploadsTable.scopeId, input.projectId),
+            writableSession,
           ),
         ),
     ]);
@@ -212,6 +231,10 @@ export async function claimProjectDraftFilesToSession(
 
     return [firstQuery, ...updateQueries.slice(1)];
   });
+
+  if (results.some((result: unknown) => getD1ChangeCount(result) === 0)) {
+    throw createFileConflictError("Session or draft file changed before the claim completed.");
+  }
 
   await Promise.all(
     claimedFiles.map(async ({ file }) =>

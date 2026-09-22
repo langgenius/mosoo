@@ -68,3 +68,18 @@ This rule does not expire formal conversations or API-used Sessions, regardless 
 Previews record the policy at creation. Existing Previews remain unchanged until a reviewed
 inventory, backup/restore plan, and approved production cutover enroll them. Agent definitions
 remain available after Preview cleanup. Deploy rollback alone cannot restore deleted data.
+
+## Inactive published legacy Sessions (unreleased migration only)
+
+For the reviewed old Pet migration cohort, the owner permits published Sessions to become
+read-only when the owner and their business have no visible activity in the preceding
+30 days. Keep history and saved files readable. Returning users can use the Agent and
+start a new Session; the old execution context and workspace need not be resumed.
+
+This is a one-time, explicitly reviewed cohort, not automatic expiry of formal Sessions.
+Refresh ownership, publication, calls, console/authentication and file activity before
+cutover; active or uncertain cases keep the seamless continuation requirement. Reuse the
+existing stopped Session capabilities and new-Session entry point. Debug Preview retains
+its separate 30-day policy. Production changes still require a backup and rollback plan
+and explicit approval; this decision does not authorize deleting retained data or shared
+execution resources.
