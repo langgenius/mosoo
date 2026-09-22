@@ -14,9 +14,11 @@ import {
 } from "@mosoo/db";
 import { retiredSessionRunsPhysicalStorage } from "@mosoo/db/migration-schema";
 import { parsePlatformId } from "@mosoo/id";
+import type { RuntimeOperationId } from "@mosoo/id";
 import { getTableConfig } from "drizzle-orm/sqlite-core";
 
 import { parseAgentStoredConfig } from "../../agents/application/agent-stored-config.service";
+import { sessionIsolationClaimOwner } from "../../sessions/infrastructure/session-isolation-barrier.repository";
 import { parseSessionExecutionPlanJson } from "../application/session-definition/session-execution.repository";
 import { LIVE_DRIVER_INSTANCE_STATUSES } from "../domain/driver-instance-lifecycle.machine";
 import { ACTIVE_SESSION_RUN_STATUSES } from "../domain/session-run-lifecycle.machine";
@@ -188,6 +190,10 @@ export interface SessionIsolationPlan {
 /** Offline operator plan only: does not read resources, call models or write D1. */
 export function buildSessionIsolationPlan(value: unknown): SessionIsolationPlan {
   const input = record(value);
+  const operationId =
+    input["operationId"] === undefined
+      ? null
+      : parsePlatformId<RuntimeOperationId>(input["operationId"], "isolation operation");
   const before = sourceFrom(input["source"]);
   const {
     session,
@@ -212,7 +218,7 @@ export function buildSessionIsolationPlan(value: unknown): SessionIsolationPlan 
     session["kind"] === "pet" &&
       session["status"] === "IDLE" &&
       session["archived_at"] === null &&
-      session["status_operation_id"] === null,
+      session["status_operation_id"] === operationId,
     "Source Session is not an idle unarchived legacy Session.",
   );
   requireValue(
@@ -220,7 +226,8 @@ export function buildSessionIsolationPlan(value: unknown): SessionIsolationPlan 
       sandbox["subject_kind"] === "agent" &&
       sandbox["subject_id"] === session["agent_id"] &&
       sandbox["status"] === "cold" &&
-      sandbox["claim_owner"] === null &&
+      sandbox["claim_owner"] ===
+        (operationId === null ? null : sessionIsolationClaimOwner(operationId)) &&
       sandbox["claim_expires_at"] === null &&
       sandbox["status_event"] === "runtime_subject.cold",
     "Source Sandbox must be drained and cold.",

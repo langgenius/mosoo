@@ -61,6 +61,7 @@ function createConversationSessionDatabase(kind: AgentKind = "pet"): SqliteD1Dat
   database.execute(`
     CREATE TABLE sandbox (
       sandbox_binding text NOT NULL DEFAULT 'Sandbox',
+      claim_owner text,
       id text PRIMARY KEY NOT NULL,
       inactive_deadline_at integer,
       kind text NOT NULL,
@@ -100,6 +101,7 @@ function createConversationSessionDatabase(kind: AgentKind = "pet"): SqliteD1Dat
       id text PRIMARY KEY NOT NULL,
       kind text DEFAULT '${kind}' NOT NULL,
       last_run_id text,
+      status_operation_id text,
       workspace_checkpoint_required integer DEFAULT 0 NOT NULL
     );
 
@@ -132,6 +134,7 @@ function createConversationSessionDatabase(kind: AgentKind = "pet"): SqliteD1Dat
   database.execute(`
     INSERT INTO sandbox (id, inactive_deadline_at, kind, updated_at)
     VALUES ('01J0000000000000000000000D', 123, '${kind}', 1);
+    INSERT INTO session (agent_id, id) VALUES (NULL, 'session-1');
   `);
 
   return database;

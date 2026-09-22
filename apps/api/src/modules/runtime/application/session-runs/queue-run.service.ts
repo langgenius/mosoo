@@ -26,12 +26,14 @@ import type { AuthenticatedViewer } from "../../../auth/application/viewer-auth.
 import { resolveReadyEnvironmentPackageArtifact } from "../../../environments/application/environment-package-artifact.service";
 import { fileStore } from "../../../files/application/file-store";
 import { publishPersistedSessionRuntimeEvents } from "../../../sessions/application/session-event-write.service";
+import { waitForSessionIsolation } from "../../../sessions/infrastructure/session-isolation-barrier.repository";
 import { getSupportedRuntimeId } from "../../domain/runtime-config";
 import {
-  commitQueuedSessionRunAdmission,
+  attemptQueuedSessionRunAdmission,
   hasSessionRunAdmissionClientRequestReceipt,
   isCattleTerminalCheckpointReadyForNextRun,
 } from "../../infrastructure/session-runs/session-run-admission.repository";
+import type { CommitQueuedSessionRunAdmissionInput } from "../../infrastructure/session-runs/session-run-admission.repository";
 import { getActiveSessionRunSummary } from "../../infrastructure/session-runs/session-run-read.repository";
 import { createInsertedSessionRunSummary } from "../../infrastructure/session-runs/session-run-write.repository";
 import { getSessionExecutionPlan } from "../session-definition/session-execution.repository";
@@ -163,7 +165,7 @@ export async function queueSessionRun(request: QueueSessionRunRequest): Promise<
   const apiCommand = prepareApiCommand(createSessionRunDispatchApiCommandInput(dispatchPayload), {
     timestampMs: admittedAtMs,
   });
-  const admitted = await commitQueuedSessionRunAdmission(bindings.DB, {
+  const admission: CommitQueuedSessionRunAdmissionInput = {
     budgetCapUsdMicros: input.budgetCapUsdMicros ?? null,
     recoveryRequestedAtMs,
     apiCommand,
@@ -195,9 +197,17 @@ export async function queueSessionRun(request: QueueSessionRunRequest): Promise<
       projectId: input.session.project_id,
       id: input.session.id,
     },
-  });
+  };
 
-  if (!admitted) {
+  let outcome = await attemptQueuedSessionRunAdmission(bindings.DB, admission);
+  while (outcome === "isolation_pending") {
+    await waitForSessionIsolation(bindings.DB, input.session.id);
+    // Reuse the original input, IDs, configuration and idempotency receipt.
+    // Dispatch resolves the current binding only after this durable admission.
+    outcome = await attemptQueuedSessionRunAdmission(bindings.DB, admission);
+  }
+
+  if (outcome !== "admitted") {
     if (
       await hasSessionRunAdmissionClientRequestReceipt(bindings.DB, {
         clientRequestId: input.clientRequestId,

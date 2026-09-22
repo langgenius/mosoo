@@ -9,18 +9,37 @@ import {
   sandboxesTable,
   sessionRunsTable,
 } from "@mosoo/db";
-import { createPlatformId } from "@mosoo/id";
+import { createPlatformId, parsePlatformId } from "@mosoo/id";
+import type { RuntimeOperationId, SandboxSessionId } from "@mosoo/id";
 import { createRuntimeEvent } from "@mosoo/runtime-events";
 
 import { getAccountViewer } from "../src/modules/auth/application/viewer-auth.service";
 import { getSessionExecutionPlan } from "../src/modules/runtime/application/session-definition/session-execution.repository";
 import { queueSessionRun } from "../src/modules/runtime/application/session-run.service";
 import { getNativeResumeRefForRuntime } from "../src/modules/runtime/infrastructure/native-resume-ref.repository";
-import { getRuntimeConversationSession } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-conversation-session-store";
-import { markRuntimeSubjectCold } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-record-store";
+import {
+  ensureRuntimeConversationSessionRecord,
+  getRuntimeConversationSession,
+  recordRuntimeConversationSessionActive,
+  recordRuntimeConversationSessionClosed,
+  recordRuntimeConversationSessionError,
+} from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-conversation-session-store";
+import {
+  claimRuntimeSubjectActivation,
+  markRuntimeSubjectCold,
+  markRuntimeSubjectOperationStarted,
+} from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-record-store";
 import { encodeSandboxBackupIdForStorage } from "../src/modules/runtime/infrastructure/sandbox-backup-id";
+import {
+  claimSessionIsolationCohort,
+  readSessionIsolationCohort,
+  releaseSessionIsolationCohort,
+} from "../src/modules/runtime/infrastructure/session-isolation-claim.repository";
 import { buildSessionIsolationPlan } from "../src/modules/runtime/infrastructure/session-isolation-plan";
 import type { TransitionStatement } from "../src/modules/runtime/infrastructure/session-isolation-plan";
+import { PREVIEW_RETENTION_MS } from "../src/modules/sessions/domain/preview-retention-policy";
+import { admitPreviewFileActivity } from "../src/modules/sessions/infrastructure/preview-retention.repository";
+import { sessionIsolationClaimOwner } from "../src/modules/sessions/infrastructure/session-isolation-barrier.repository";
 import { persistSessionRuntimeEvents } from "../src/modules/sessions/infrastructure/session-runtime-event-store.repository";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import {
@@ -256,9 +275,9 @@ async function fixture() {
   };
   const viewer = await getAccountViewer(database, ID.ownerAccount);
   if (viewer === null) throw new Error("Fixture viewer is missing.");
-  const queue = () =>
+  const queue = (requestDatabase: D1Database = database) =>
     queueSessionRun({
-      bindings: createPublicHttpTestBindings(database, {
+      bindings: createPublicHttpTestBindings(requestDatabase, {
         apiCommandQueue: createApiCommandQueueStub(),
       }) as ApiBindings,
       executionContext: null,
@@ -774,5 +793,345 @@ describe("legacy Session isolation batch", () => {
     expect(() =>
       buildSessionIsolationPlan({ ...input, source: { ...input.source, deployment: null } }),
     ).toThrow("Original immutable configuration");
+  });
+});
+
+const ISOLATION_OPERATION = parsePlatformId<RuntimeOperationId>(
+  ID.operation,
+  "isolation operation",
+);
+
+function observeIsolationAdmission(database: D1Database, onBlocked: () => Promise<void> | void) {
+  let notified = false;
+  return new Proxy(database, {
+    get(target, property) {
+      if (property === "batch") {
+        return async <T>(statements: D1PreparedStatement[]) => {
+          const results = await target.batch<T>(statements);
+          const last = results.at(-1)?.results[0];
+          if (
+            !notified &&
+            typeof last === "object" &&
+            last !== null &&
+            "status_operation_id" in last &&
+            last.status_operation_id === ISOLATION_OPERATION
+          ) {
+            notified = true;
+            await onBlocked();
+          }
+          return results;
+        };
+      }
+      const member = Reflect.get(target, property);
+      return typeof member === "function" ? member.bind(target) : member;
+    },
+  });
+}
+
+describe("Session isolation cohort admission", () => {
+  test("claims all legacy peers atomically, retries its owner and rejects a released revision", async () => {
+    const { database } = await fixture();
+    await insertNonOwnerSession(database);
+    const cohort = await readSessionIsolationCohort(database, ID.sandbox);
+    expect(cohort.sessions.map((s) => s.id).toSorted()).toEqual(
+      [ID.nonOwnerSession, ID.ownerSession].toSorted(),
+    );
+    const input = { cohort, operationId: ISOLATION_OPERATION, now: NOW + 45 };
+    await claimSessionIsolationCohort(database, input);
+    const held = await dump(database);
+    await expect(
+      ensureRuntimeConversationSessionRecord(database, {
+        cwd: `/workspace/se/${ID.nonOwnerSession}`,
+        now: NOW + 46,
+        originJson: "{}",
+        runtimeSubjectId: ID.sandbox,
+        sessionId: ID.nonOwnerSession,
+      }),
+    ).rejects.toThrow("malformed JSON");
+    await claimSessionIsolationCohort(database, input);
+    expect(await dump(database)).toEqual(held);
+    await expect(
+      releaseSessionIsolationCohort(database, {
+        ...input,
+        operationId: createPlatformId<RuntimeOperationId>(),
+      }),
+    ).rejects.toThrow("malformed JSON");
+    expect(await dump(database)).toEqual(held);
+    await releaseSessionIsolationCohort(database, { ...input, now: NOW + 55 });
+    const released = await dump(database);
+    await expect(claimSessionIsolationCohort(database, input)).rejects.toThrow("malformed JSON");
+    expect(await dump(database)).toEqual(released);
+  });
+
+  test("a newly admitted Run wins without cancellation or partial claims", async () => {
+    const { database, queue } = await fixture();
+    const cohort = await readSessionIsolationCohort(database, ID.sandbox);
+    await queue();
+    const before = await dump(database);
+    await expect(
+      claimSessionIsolationCohort(database, {
+        cohort,
+        operationId: ISOLATION_OPERATION,
+        now: NOW + 45,
+      }),
+    ).rejects.toThrow();
+    expect(await dump(database)).toEqual(before);
+  });
+
+  test("a new peer or changed namespace invalidates the complete cohort before any claim", async () => {
+    for (const change of ["peer", "namespace"] as const) {
+      const { database } = await fixture();
+      const cohort = await readSessionIsolationCohort(database, ID.sandbox);
+      if (change === "peer") await insertNonOwnerSession(database);
+      else await database.prepare("UPDATE sandbox SET sandbox_binding = 'SandboxOpenAI'").run();
+      const before = await dump(database);
+      await expect(
+        claimSessionIsolationCohort(database, {
+          cohort,
+          operationId: ISOLATION_OPERATION,
+          now: NOW + 45,
+        }),
+      ).rejects.toThrow();
+      expect(await dump(database)).toEqual(before);
+    }
+  });
+
+  test("actual resource leases block a claim despite absent provenance and terminal Drivers", async () => {
+    for (const relationship of ["workspace", "stopped-driver", "failed-driver"] as const) {
+      const { database } = await fixture();
+      await insertUnattributedActivePeer(database, ID.sandbox, relationship);
+      const cohort = await readSessionIsolationCohort(database, ID.sandbox);
+      const before = await dump(database);
+      await expect(
+        claimSessionIsolationCohort(database, {
+          cohort,
+          operationId: ISOLATION_OPERATION,
+          now: NOW + 45,
+        }),
+      ).rejects.toThrow();
+      expect(await dump(database)).toEqual(before);
+    }
+  });
+
+  test("release retains the whole claim while an actual resource lease is unresolved", async () => {
+    for (const relationship of ["workspace", "stopped-driver", "failed-driver"] as const) {
+      const { database } = await fixture();
+      const cohort = await readSessionIsolationCohort(database, ID.sandbox);
+      const claim = { cohort, operationId: ISOLATION_OPERATION, now: NOW + 45 };
+      await claimSessionIsolationCohort(database, claim);
+      await insertUnattributedActivePeer(database, ID.sandbox, relationship);
+      const before = await dump(database);
+      await expect(releaseSessionIsolationCohort(database, claim)).rejects.toThrow(
+        "malformed JSON",
+      );
+      expect(await dump(database)).toEqual(before);
+      await database
+        .prepare("UPDATE session_run SET status = 'completed' WHERE id = ?")
+        .bind(ID.runAlt)
+        .run();
+      await releaseSessionIsolationCohort(database, { ...claim, now: NOW + 55 });
+      expect(
+        await database
+          .prepare("SELECT status_operation_id FROM session WHERE id = ?")
+          .bind(ID.ownerSession)
+          .first("status_operation_id"),
+      ).toBeNull();
+    }
+  });
+
+  test("file activity continues while held and invalidates a stale plan without losing its renewal", async () => {
+    const { database, input } = await fixture();
+    await database
+      .prepare("UPDATE session SET type = 'preview', metadata_json = '{}' WHERE id = ?")
+      .bind(ID.ownerSession)
+      .run();
+    await database
+      .prepare(
+        "UPDATE session_execution_snapshot SET plan_json = json_set(plan_json, '$.previewRetentionMs', ?) WHERE session_id = ?",
+      )
+      .bind(PREVIEW_RETENTION_MS, ID.ownerSession)
+      .run();
+    const cohort = await readSessionIsolationCohort(database, ID.sandbox);
+    const claim = { cohort, operationId: ISOLATION_OPERATION, now: NOW + 45 };
+    await claimSessionIsolationCohort(database, claim);
+    const plan = buildSessionIsolationPlan({
+      ...input,
+      operationId: ISOLATION_OPERATION,
+      source: {
+        ...input.source,
+        session: await database
+          .prepare("SELECT * FROM session WHERE id = ?")
+          .bind(ID.ownerSession)
+          .first(),
+        sandbox: await database
+          .prepare("SELECT * FROM sandbox WHERE id = ?")
+          .bind(ID.sandbox)
+          .first(),
+        snapshot: await database
+          .prepare("SELECT * FROM session_execution_snapshot WHERE session_id = ?")
+          .bind(ID.ownerSession)
+          .first(),
+      },
+    });
+    await admitPreviewFileActivity(database, ID.ownerSession, NOW + 48);
+    const renewed = await dump(database);
+    await expect(execute(database, plan.forward)).rejects.toThrow("malformed JSON");
+    expect(await dump(database)).toEqual(renewed);
+    await releaseSessionIsolationCohort(database, { ...claim, now: NOW + 55 });
+    expect(
+      await database
+        .prepare(
+          "SELECT json_extract(metadata_json, '$.preview_last_activity_at') AS activity FROM session WHERE id = ?",
+        )
+        .bind(ID.ownerSession)
+        .first("activity"),
+    ).toBe(NOW + 48);
+    expect((await getRuntimeConversationSession(database, ID.ownerSession))?.sandboxId).toBe(
+      ID.sandbox,
+    );
+  });
+
+  test("non-expiring claims reject activation, maintenance and late binding callbacks", async () => {
+    const { database } = await fixture();
+    const cohort = await readSessionIsolationCohort(database, ID.sandbox);
+    await claimSessionIsolationCohort(database, {
+      cohort,
+      operationId: ISOLATION_OPERATION,
+      now: NOW + 45,
+    });
+    const before = await dump(database);
+    expect(
+      await claimRuntimeSubjectActivation(database, {
+        runtimeSubjectId: ID.sandbox,
+        agentId: ID.agent,
+        projectId: ID.project,
+        executionOwnerUserId: ID.ownerAccount,
+        accountConcurrentSandboxLimit: 50,
+        claimExpiresAt: NOW + 999_999,
+        claimOwner: "ordinary-activation",
+        expectedStatus: "cold",
+        now: NOW + 100_000,
+      }),
+    ).toBe(false);
+    expect(
+      await markRuntimeSubjectOperationStarted(database, {
+        runtimeSubjectId: ID.sandbox,
+        operationId: createPlatformId<RuntimeOperationId>(),
+        status: "destroying",
+      }),
+    ).toBe(false);
+    const binding = {
+      sessionId: ID.ownerSession,
+      runtimeSubjectId: ID.sandbox,
+      expectedSandboxSessionId: parsePlatformId<SandboxSessionId>(
+        EXECUTION_ID,
+        "execution session",
+      ),
+      now: NOW + 46,
+    };
+    await expect(
+      recordRuntimeConversationSessionActive(database, {
+        ...binding,
+        sandboxSessionId: parsePlatformId<SandboxSessionId>(
+          NEXT_EXECUTION_ID,
+          "new execution session",
+        ),
+        cwd: CWD,
+      }),
+    ).rejects.toThrow();
+    await recordRuntimeConversationSessionClosed(database, {
+      ...binding,
+      inactiveDeadlineAt: NOW + 70,
+    });
+    await recordRuntimeConversationSessionError(database, {
+      ...binding,
+      errorCode: "runtime.subject_activation_failed",
+      message: "late callback",
+    });
+    expect(await dump(database)).toEqual(before);
+  });
+
+  for (const direction of ["forward", "rollback"] as const) {
+    test(`input waits through ${direction} and is admitted once on the same Session`, async () => {
+      const { database, input, queue } = await fixture();
+      const cohort = await readSessionIsolationCohort(database, ID.sandbox);
+      const claim = { cohort, operationId: ISOLATION_OPERATION, now: NOW + 45 };
+      await claimSessionIsolationCohort(database, claim);
+      const blocked = Promise.withResolvers<void>();
+      const pending = queue(observeIsolationAdmission(database, () => blocked.resolve()));
+      let settled = false;
+      void pending.then(
+        () => {
+          settled = true;
+        },
+        () => {
+          settled = true;
+        },
+      );
+      await blocked.promise;
+      expect(settled).toBe(false);
+      expect(await database.prepare("SELECT COUNT(*) n FROM session_run").first("n")).toBe(1);
+      const plan = buildSessionIsolationPlan({
+        ...input,
+        operationId: ISOLATION_OPERATION,
+        source: {
+          ...input.source,
+          session: await database
+            .prepare("SELECT * FROM session WHERE id = ?")
+            .bind(ID.ownerSession)
+            .first(),
+          sandbox: await database
+            .prepare("SELECT * FROM sandbox WHERE id = ?")
+            .bind(ID.sandbox)
+            .first(),
+        },
+      });
+      await execute(database, plan.forward);
+      expect(plan.after.sandbox.claim_owner).toBe(sessionIsolationClaimOwner(ISOLATION_OPERATION));
+      if (direction === "rollback") await execute(database, plan.rollback);
+      await releaseSessionIsolationCohort(database, { ...claim, now: NOW + 55 });
+      const result = await pending;
+      expect(result.sessionState.sessionId).toBe(ID.ownerSession);
+      expect(result.run.model).toBe("gpt-5.4");
+      expect(await database.prepare("SELECT COUNT(*) n FROM session_run").first("n")).toBe(2);
+      expect(
+        await database
+          .prepare("SELECT COUNT(*) n FROM session_message WHERE role = 'user'")
+          .first("n"),
+      ).toBe(1);
+      expect((await getRuntimeConversationSession(database, ID.ownerSession))?.sandboxId).toBe(
+        direction === "rollback" ? ID.sandbox : TARGET_SANDBOX,
+      );
+      expect(
+        (await getRuntimeConversationSession(database, ID.ownerSession))?.latestReadyBackup?.id,
+      ).toBe(direction === "rollback" ? ROLLBACK_BACKUP : NEW_BACKUP);
+      expect(
+        (
+          await getNativeResumeRefForRuntime(database, {
+            sessionId: ID.ownerSession,
+            runtimeId: "openai-runtime",
+          })
+        )?.value,
+      ).toBe("native-original");
+    });
+  }
+
+  test("release before the caller sees its failed admission still retries the same input", async () => {
+    const { database, queue } = await fixture();
+    const cohort = await readSessionIsolationCohort(database, ID.sandbox);
+    const claim = { cohort, operationId: ISOLATION_OPERATION, now: NOW + 45 };
+    await claimSessionIsolationCohort(database, claim);
+    const result = await queue(
+      observeIsolationAdmission(database, () =>
+        releaseSessionIsolationCohort(database, { ...claim, now: NOW + 55 }),
+      ),
+    );
+    expect(result.sessionState.sessionId).toBe(ID.ownerSession);
+    expect(await database.prepare("SELECT COUNT(*) n FROM session_run").first("n")).toBe(2);
+    expect(
+      await database
+        .prepare("SELECT COUNT(*) n FROM session_message WHERE role = 'user'")
+        .first("n"),
+    ).toBe(1);
   });
 });

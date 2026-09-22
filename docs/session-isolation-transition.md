@@ -245,7 +245,8 @@ or a wrapper RPC counter as a substitute for that barrier.
 
 The internal Sandbox migration fence provides physical exclusion without starting
 the SDK. Its caller must first atomically protect the idle Session cohort, shared
-resource bindings, uploads, lifecycle operations and new Run admission in D1.
+resource bindings, lifecycle operations and new Run admission in D1, and preserve
+admitted file changes in their separate storage scope.
 Never stop admitted customer work to make a resource eligible for conversion.
 The fence is not a customer-facing migration endpoint or a production executor.
 
@@ -274,6 +275,39 @@ and fresh execution afterward. Replaying the old claim after release does not
 reset or interrupt that fresh execution. The revision survives ordinary SDK
 destruction. These are local synthetic resource checks, not evidence of customer
 workspace conversion or same-public-Session native restoration.
+
+The D1 cohort barrier reserves every existing workspace peer and every legacy
+Session that could allocate on the shared Agent resource, including peers whose
+Agent provenance is missing or different. Its atomic claim checks membership,
+Session revisions, closed bindings, cold resource state, live Drivers and actual
+Run leases. It waits for ordinary completion; it never cancels work to qualify.
+The marker uses the existing operation fields and has no automatic expiry.
+Activation, maintenance and delayed binding callbacks must honor that marker.
+An exact claim retry is harmless; a released claim cannot reacquire an old revision.
+Release rechecks closed bindings, live Drivers and actual Run leases on every
+claimed resource, including destinations. A terminal Driver status cannot hide
+a still-active Run; failed release leaves the whole D1 claim intact.
+
+When Run admission races a held cohort, retain the request's original input,
+configuration, IDs and idempotency key, wait for release and retry atomic admission.
+Read the migration rejection cause in the same D1 transaction so a fast release
+cannot turn it into a generic error. Ordinary busy-Run rejection remains unchanged;
+this is a temporary migration barrier, not a queue behind an executing turn.
+Archive and explicit deletion similarly wait before mutating lifecycle state;
+automatic Preview cleanup skips held Sessions.
+
+Explicit Session attachments remain in their existing object-store scope. A
+workspace conversion neither moves nor deletes those records/objects, and its
+checkpoint preparation excludes the current attachment mount. Uploads and file
+edits may finish under the same public Session identity; preserve their current
+records and renewed Preview activity. A changed complete Session before-image
+invalidates the prepared database plan rather than overwriting that activity.
+
+The offline planner accepts an optional `operationId` with matching held Session
+and Sandbox before-images. The destination retains the marker through forward
+and rollback batches. Release physical fences first, then atomically release the
+recorded D1 cohort and destination claims. These primitives still need the complete
+resumable orchestration, verified objects and hosted cutover/rollback acceptance.
 
 A tie in the old timestamp-only backup lookup is rejected. A stale
 precondition raises a SQL error; use **one atomic D1 batch**, never separate calls
