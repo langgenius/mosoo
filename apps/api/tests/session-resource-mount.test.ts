@@ -94,6 +94,7 @@ function createSandbox(input: {
       return backup;
     },
     async setKeepAlive() {},
+    async ensureContainerReady() {},
     async startProcess() {
       throw new Error("startProcess is not used in session resource mount tests.");
     },

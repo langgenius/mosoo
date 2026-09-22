@@ -1,5 +1,7 @@
+import type { Sandbox as CloudflareSandbox } from "@cloudflare/sandbox";
 import { DurableObject } from "cloudflare:workers";
 
+import { SandboxStartup } from "../../platform/cloudflare/sandbox-startup";
 import type { ApiBindings } from "../../platform/cloudflare/worker-types";
 import {
   configureSandboxNetworkConstraints,
@@ -10,7 +12,10 @@ import { waitForSandboxNetworkRestore } from "./sandbox-network-restore-gate";
 import { SANDBOX_RPC_FORWARD_METHODS } from "./sandbox-rpc-methods";
 import type { SandboxRpcForwardMethod } from "./sandbox-rpc-methods";
 
-interface SandboxDelegate extends SandboxNetworkDelegate {
+interface SandboxDelegate
+  extends
+    SandboxNetworkDelegate,
+    Pick<CloudflareSandbox, "destroy" | "getState" | "startAndWaitForPorts"> {
   alarm(alarmProps?: { isRetry: boolean; retryCount: number }): Promise<void>;
   fetch(request: Request): Promise<Response>;
 }
@@ -27,6 +32,7 @@ export class Sandbox extends DurableObject {
   readonly #delegatePromise: Promise<SandboxDelegate>;
   readonly #httpsInterceptionDisabled: boolean;
   readonly #networkRestorePromise: Promise<void>;
+  readonly #startupPromise: Promise<SandboxStartup>;
 
   constructor(ctx: DurableObjectState<{}>, env: ApiBindings) {
     super(ctx, env);
@@ -43,6 +49,18 @@ export class Sandbox extends DurableObject {
         httpsInterceptionDisabled: this.#httpsInterceptionDisabled,
       }),
     );
+    this.#startupPromise = this.#delegatePromise.then(
+      (delegate) =>
+        new SandboxStartup(delegate, {
+          sandboxId: ctx.id.toString(),
+          isRunning: () => (ctx as SandboxContainerState).container?.running === true,
+        }),
+    );
+  }
+
+  async ensureContainerReady(options: { allowRecovery: boolean }): Promise<void> {
+    await this.#networkRestorePromise;
+    await (await this.#startupPromise).ensureReady(options.allowRecovery);
   }
 
   async configureNetworkConstraints(constraints: unknown): Promise<void> {
@@ -71,6 +89,7 @@ export class Sandbox extends DurableObject {
   ): Promise<unknown> {
     await waitForSandboxNetworkRestore(this.#networkRestorePromise, method, args);
     const delegate = await this.#delegatePromise;
+    if (method === "destroy") await (await this.#startupPromise).cancelAndDrain();
     const action = Reflect.get(delegate, method);
 
     if (typeof action !== "function") {

@@ -201,6 +201,7 @@ function createSandboxHandle(): SandboxHandle {
     readFile: unavailable,
     restoreBackup: unavailable,
     setKeepAlive: async () => {},
+    ensureContainerReady: async () => {},
     startProcess: unavailable,
     terminal: unavailable,
     unmountBucket: unavailable,
