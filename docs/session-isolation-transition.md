@@ -9,9 +9,36 @@ resource destruction, or notification delivery.
 Follow [SPEC](./SPEC.md#10-migration-and-breaking-change-notification),
 [Architecture](./architecture.md#target-session-ownership-and-cloud-transition),
 and [Production Deploy Verification](./production-deploy-verification.md).
-The owner requires existing continuable Sessions to retain the same public ID,
-context, promised files, admitted configuration, and delegated identity. Customers
-must not reconstruct state or move to a replacement conversation.
+The owner requires protected continuable Sessions to retain the same public ID,
+context, promised files, admitted configuration, and delegated identity. The reviewed
+inactive-published cohort below is the explicit exception; other customers must not
+reconstruct state or move to a replacement conversation.
+
+## Qualify the inactive-published read-only cohort first
+
+The September 22 owner decision excludes a reviewed group of old published Pet
+Sessions from full context/workspace recovery: neither the owner nor their business
+has visible activity within 30 days. Keep their history and saved files readable;
+returning users use the existing Agent and new-Session entry point. Reuse the existing
+stopped Session capabilities rather than adding a lifecycle or a general migration
+framework. Debug Preview continues to follow its own approved 30-day rule.
+
+Maintain an explicit private list with publication/ownership and owner-wide Agent,
+Project, caller, console/authentication and file-activity evidence. Missing ownership
+or uncertain activity is not inactivity. Refresh that evidence before the approved
+cutover; exclude anyone with new activity, an active Run or pending file writes.
+This exception is not an ongoing 30-day expiry rule for formal Sessions.
+
+For this cohort, verify retained history, saved file objects, access controls,
+read-only behavior and fresh Session creation. Do not spend migration work rebuilding
+their old native state or historical execution configuration. Keep the shared source
+resources until all protected peers and retained data are accounted for. A reviewed
+backup, rollback and explicit production approval remain required; the scope decision
+does not authorize deletion, resource reclamation or customer notifications.
+
+The recovery/conversion procedure below applies to Sessions that retain the
+continuity requirement. Shared migration safeguards cannot be removed while those
+Sessions still depend on them.
 
 ## Recovery evidence before a cutover
 

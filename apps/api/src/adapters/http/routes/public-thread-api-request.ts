@@ -27,7 +27,6 @@ import {
   PublicApiError,
   publicInvalidRequest,
 } from "../../../modules/public-api/public-api-errors";
-import { parseTurnBudgetUsd } from "../../../modules/public-api/public-thread-budget";
 
 interface JsonRequestContext {
   req: {
@@ -62,7 +61,6 @@ const CREATE_THREAD_REQUEST_FIELDS: ReadonlySet<string> = new Set(
 );
 
 export interface ParsedCreateThreadRequest {
-  maxCostUsd?: number;
   fileIds: FileId[];
   inputText?: string | undefined;
   userId: string | null;
@@ -450,7 +448,6 @@ function readPublicThreadEvent(input: unknown): PublicThreadApiSendEventsRequest
 
 export async function readSendEventsRequest(
   c: JsonRequestContext,
-  apiVersion: PublicApiVersion = "v1",
 ): Promise<PublicThreadApiSendEventsRequest> {
   const body = await c.req.json<unknown>();
 
@@ -458,13 +455,7 @@ export async function readSendEventsRequest(
     throw publicInvalidRequest("Request body must be an object.");
   }
 
-  assertOnlyFields(
-    body,
-    apiVersion === "v2"
-      ? new Set([...SEND_EVENTS_REQUEST_FIELDS, "maxCostUsd"])
-      : SEND_EVENTS_REQUEST_FIELDS,
-    "send events request",
-  );
+  assertOnlyFields(body, SEND_EVENTS_REQUEST_FIELDS, "send events request");
   const events = body["events"];
 
   if (!Array.isArray(events) || events.length === 0) {
@@ -477,10 +468,7 @@ export async function readSendEventsRequest(
     parsedEvents.push(readPublicThreadEvent(event));
   }
 
-  const maxCostUsd = parseTurnBudgetUsd(body["maxCostUsd"]);
-  if (maxCostUsd !== undefined && !parsedEvents.some((event) => event.type === "user_message"))
-    throw publicInvalidRequest("maxCostUsd requires a user_message event.");
-  return { events: parsedEvents, ...(maxCostUsd === undefined ? {} : { maxCostUsd }) };
+  return { events: parsedEvents };
 }
 
 export async function readCreateThreadRequest(
@@ -493,13 +481,7 @@ export async function readCreateThreadRequest(
     throw publicInvalidRequest("Request body must be an object.");
   }
 
-  assertOnlyFields(
-    body,
-    apiVersion === "v2"
-      ? new Set([...CREATE_THREAD_REQUEST_FIELDS, "maxCostUsd"])
-      : CREATE_THREAD_REQUEST_FIELDS,
-    "create thread",
-  );
+  assertOnlyFields(body, CREATE_THREAD_REQUEST_FIELDS, "create thread");
   return parseCreateThreadFields(body, apiVersion);
 }
 
@@ -512,13 +494,9 @@ function parseCreateThreadFields(
       ? null
       : readLimitedStringField(body, "userId", PUBLIC_THREAD_USER_ID_MAX_LENGTH);
   const inputText = readCreateThreadInputText(body);
-  const maxCostUsd = parseTurnBudgetUsd(body["maxCostUsd"]);
-  if (maxCostUsd !== undefined && inputText === undefined)
-    throw publicInvalidRequest("maxCostUsd applies to a turn and requires input.");
 
   return {
     fileIds: readCreateThreadFileIds(body),
-    ...(maxCostUsd === undefined ? {} : { maxCostUsd }),
     ...(inputText === undefined ? {} : { inputText }),
     userId,
   };
@@ -531,7 +509,7 @@ export async function readCreateProjectThreadRequest(
   if (!isRecord(body)) throw publicInvalidRequest("Request body must be an object.");
   assertOnlyFields(
     body,
-    new Set([...CREATE_THREAD_REQUEST_FIELDS, "maxCostUsd", "configuration"]),
+    new Set([...CREATE_THREAD_REQUEST_FIELDS, "configuration"]),
     "create Project thread",
   );
   const configuration = body["configuration"];

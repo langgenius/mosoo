@@ -7,7 +7,6 @@ import {
 import type { DriverEventEnvelope } from "@mosoo/agent-driver/events";
 import type { DriverInstanceId } from "@mosoo/id";
 import {
-  createRuntimeEvent,
   parseRuntimeEventEnvelope,
   readRuntimeEventPayload,
   readRuntimeEventPermissionRequest,
@@ -30,7 +29,6 @@ import type {
 } from "../../../sessions/application/session-live-state.service";
 import { createSessionRunTerminalFailureSourceId } from "../../domain/session-run-terminal-event-id";
 import { upsertNativeResumeRef } from "../native-resume-ref.repository";
-import { getSessionRunBudgetFailure } from "../session-runs/session-run-budget.repository";
 import {
   assertRuntimeEventMatchesDriverEnvelope,
   assertRuntimeEventMatchesDriverLink,
@@ -181,7 +179,7 @@ export async function projectRuntimeDriverEvents(
 
   for (const envelope of input.events) {
     input.assertCurrentConnection?.();
-    let event = parseRuntimeEventEnvelope(envelope.event);
+    const event = parseRuntimeEventEnvelope(envelope.event);
     assertRuntimeEventMatchesDriverLink(event, {
       driverInstanceId: input.driverInstanceId,
       link,
@@ -189,24 +187,6 @@ export async function projectRuntimeDriverEvents(
     assertRuntimeEventMatchesDriverEnvelope(event, {
       eventId: envelope.eventId,
     });
-    if (
-      link.sessionRunId !== null &&
-      (event.kind === "run.completed" || event.kind === "run.failed")
-    ) {
-      const budgetFailure = await getSessionRunBudgetFailure(database, link.sessionRunId);
-      if (budgetFailure !== null) {
-        await recordRuntimeSessionOutputDirectory({
-          bindings,
-          driverInstanceId: input.driverInstanceId,
-          link,
-        });
-        event = createRuntimeEvent({
-          ...event,
-          kind: "run.failed",
-          payload: { error: budgetFailure },
-        });
-      }
-    }
     appendCanonicalEvent(envelope, event);
 
     if (event.kind === "runtime.resume.updated") {
@@ -273,6 +253,14 @@ export async function projectRuntimeDriverEvents(
         finalMessageId === null || finalMessageText === null
           ? null
           : { id: finalMessageId, text: finalMessageText };
+      await recordRuntimeSessionOutputDirectory({
+        bindings,
+        driverInstanceId: input.driverInstanceId,
+        link,
+      });
+    }
+
+    if (event.kind === "run.failed") {
       await recordRuntimeSessionOutputDirectory({
         bindings,
         driverInstanceId: input.driverInstanceId,

@@ -30,7 +30,6 @@ export interface QueueSessionRunsOutput {
 }
 
 export interface StartRunsOptions {
-  budgetCapUsdMicros?: number | null;
   recoveryRequestedAtMs?: number;
   accessViewer?: AuthenticatedViewer;
 }
@@ -83,7 +82,6 @@ async function queueRunRequest(
     bindings: context.bindings,
     executionContext: context.executionContext,
     input: {
-      budgetCapUsdMicros: context.options.budgetCapUsdMicros ?? null,
       attachmentIds: parseAttachmentIds(runRequest.attachmentIds),
       clientRequestId: runRequest.clientRequestId ?? null,
       prompt,

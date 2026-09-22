@@ -95,7 +95,6 @@ async function hashCreateThreadIdempotencyBody(
   return hashPublicApiIdempotencyBody({
     fileIds: body.fileIds,
     inputText: body.inputText ?? null,
-    ...(body.maxCostUsd === undefined ? {} : { maxCostUsd: body.maxCostUsd }),
     userId: body.userId,
     ...(configuration === undefined ? {} : { configuration }),
   });
@@ -359,7 +358,7 @@ function registerPublicThreadRoutes(
         });
       },
       prepare: async () => {
-        const body = await readSendEventsRequest(c, apiVersion);
+        const body = await readSendEventsRequest(c);
         return {
           body,
           bodyHash: await hashPublicApiIdempotencyBody(body),

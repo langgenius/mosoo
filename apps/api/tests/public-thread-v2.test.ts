@@ -28,7 +28,6 @@ import {
 
 async function setup(
   options: {
-    budgetPolicy?: string;
     sessionNamespace?: ApiBindings["Session"];
     requestDatabase?: (database: D1Database) => D1Database;
   } = {},
@@ -53,7 +52,6 @@ async function setup(
           fileBucket: bucket as unknown as R2Bucket,
           ...options,
         }),
-        MOSOO_TURN_BUDGET_POLICY: options.budgetPolicy,
       } as ApiBindings,
     );
   const createAt = (path: string, body: unknown, idempotencyKey?: string) =>
@@ -135,6 +133,32 @@ describe("Project direct Session API v2", () => {
     model: "gpt-5.4",
     instructions: "Use the supplied files and preserve these instructions.",
   };
+
+  test("rejects retired monetary caps and exposes no budget on a direct turn", async () => {
+    const { create, createProject, request } = await setup();
+    const input = { type: "user.message", content: [{ type: "text", text: "Read the input" }] };
+    const capped = { input, maxCostUsd: 0.02 };
+    expect((await createProject({ configuration, ...capped })).status).toBe(400);
+    expect((await create("v2", capped)).status).toBe(400);
+    await withProviderProbeMock(async () => {
+      const response = await createProject({ configuration, input });
+      expect(response.status).toBe(201);
+      const created = await readJson(response);
+      expect(expectRecord(created["run"])).not.toHaveProperty("budget");
+      const id = expectString(expectRecord(created["thread"])["id"]);
+      const retrieved = await readJson(await request(`v2/threads/${id}`));
+      expect(expectRecord(retrieved["run"])).not.toHaveProperty("budget");
+      const events = await request(`v2/threads/${id}/events`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          events: [{ type: "user_message", text: "Continue" }],
+          maxCostUsd: 0.02,
+        }),
+      });
+      expect(events.status).toBe(400);
+    });
+  });
 
   test("uploads and admits exactly one Session and Run without an Agent", async () => {
     const { createProject, database, request, snapshot } = await setup();
@@ -390,65 +414,134 @@ describe("Project direct Session API v2", () => {
 });
 
 describe("saved-Agent Thread API v2", () => {
-  test("records a caller's per-turn cap and rejects changed-budget idempotent retries", async () => {
-    const { create, request } = await setup({ budgetPolicy: '{"defaultUsd":0.05,"maxUsd":1}' });
-    await withProviderProbeMock(async () => {
-      const body = {
-        maxCostUsd: 0.02,
-        input: { type: "user.message", content: [{ type: "text", text: "Read the input" }] },
-      };
-      const response = await create("v2", body, "bounded-create");
-      expect(response.status).toBe(201);
-      const created = await readJson(response);
-      expect(expectRecord(created["run"])["budget"]).toEqual({
-        capUsd: 0.02,
-        estimatedCostUsd: 0,
-        state: "available",
+  test.each(["recovery deadline", "read-only cutover"] as const)(
+    "guards file transfer across %s",
+    async (boundary) => {
+      const { bucket, create, database, request } = await setup();
+      await database.prepare("UPDATE agent SET kind = 'cattle' WHERE id = ?").bind(IDS.agent).run();
+      await withProviderProbeMock(async () => {
+        const created = await readJson(await create("v2", {}));
+        const id = expectString(expectRecord(created["thread"])["id"]);
+        const deadline = Date.now();
+        const completedAt = deadline - 30 * 24 * 60 * 60 * 1000;
+        await database
+          .prepare(
+            "INSERT INTO session_run (id, session_id, agent_id, created_by_account_id, trigger, status, provider, model, runtime_id, trace_id, created_at, completed_at, updated_at) VALUES (?, ?, ?, ?, 'user_prompt', 'completed', 'openai', 'gpt-5.4', 'openai-runtime', 'expiry-boundary-fixture', ?, ?, ?)",
+          )
+          .bind(IDS.run, id, IDS.agent, IDS.ownerAccount, completedAt, completedAt, completedAt)
+          .run();
+        const upload = new FormData();
+        upload.set("file", new File(["new work"], "next.txt"));
+        const uploaded = await readJson(
+          await request(`v2/agents/${IDS.agent}/files`, { method: "POST", body: upload }),
+        );
+        const fileId = expectString(expectRecord(uploaded["file"])["id"]);
+        const clock = spyOn(systemClock, "nowMs").mockReturnValue(deadline - 1);
+        const put = bucket.put.bind(bucket);
+        const copy = spyOn(bucket, "put").mockImplementation(async (...args) => {
+          const result = await put(...args);
+          clock.mockReturnValue(deadline);
+          if (boundary === "read-only cutover") {
+            await database
+              .prepare("UPDATE session SET status = 'TERMINATED' WHERE id = ?")
+              .bind(id)
+              .run();
+          }
+          return result;
+        });
+        try {
+          const continuation = await request(`v2/threads/${id}/events`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              events: [
+                {
+                  type: "user_message",
+                  text: "Received before expiry.",
+                  resources: [{ type: "file", file_id: fileId }],
+                },
+              ],
+            }),
+          });
+          const files = await readJson(await request(`v2/threads/${id}/files`));
+          if (boundary === "recovery deadline") {
+            expect(continuation.status).toBe(200);
+            const result = await readJson(continuation);
+            expect(result["events"]).toMatchObject([{ run: { status: "queued" } }]);
+            expect(files["files"]).toMatchObject([{ id: fileId, committed: true }]);
+          } else {
+            expect(files["files"]).toEqual([]);
+            expect(continuation.status).toBe(400);
+            expect(
+              (await create("v2", { resources: [{ type: "file", file_id: fileId }] })).status,
+            ).toBe(201);
+            expect(await (await request(`v2/files/${fileId}/content`)).text()).toBe("new work");
+          }
+          expect(copy).toHaveBeenCalled();
+        } finally {
+          copy.mockRestore();
+          clock.mockRestore();
+        }
       });
-      const id = expectString(expectRecord(created["thread"])["id"]);
-      const retrieved = await readJson(await request(`v2/threads/${id}`));
-      expect(expectRecord(retrieved["run"])["budget"]).toEqual({
-        capUsd: 0.02,
-        estimatedCostUsd: 0,
-        state: "available",
-      });
-      expect((await create("v2", { ...body, maxCostUsd: 0.03 }, "bounded-create")).status).toBe(
-        409,
-      );
-      expect((await create("v2", { ...body, maxCostUsd: 2 })).status).toBe(400);
-      expect((await create("v2", { maxCostUsd: 0.02 })).status).toBe(400);
-      const defaulted = await readJson(await create("v2", { input: body.input }));
-      expect(expectRecord(defaulted["run"])["budget"]).toMatchObject({ capUsd: 0.05 });
-    });
-  });
-  test("uses the received input time when file transfer crosses the recovery deadline", async () => {
-    const { bucket, create, database, request } = await setup();
-    await database.prepare("UPDATE agent SET kind = 'cattle' WHERE id = ?").bind(IDS.agent).run();
-    await withProviderProbeMock(async () => {
-      const created = await readJson(await create("v2", {}));
-      const id = expectString(expectRecord(created["thread"])["id"]);
-      const deadline = Date.now();
-      const completedAt = deadline - 30 * 24 * 60 * 60 * 1000;
-      await database
-        .prepare(
-          "INSERT INTO session_run (id, session_id, agent_id, created_by_account_id, trigger, status, provider, model, runtime_id, trace_id, created_at, completed_at, updated_at) VALUES (?, ?, ?, ?, 'user_prompt', 'completed', 'openai', 'gpt-5.4', 'openai-runtime', 'expiry-boundary-fixture', ?, ?, ?)",
-        )
-        .bind(IDS.run, id, IDS.agent, IDS.ownerAccount, completedAt, completedAt, completedAt)
-        .run();
-      const upload = new FormData();
-      upload.set("file", new File(["new work"], "next.txt"));
-      const uploaded = await readJson(
-        await request(`v2/agents/${IDS.agent}/files`, { method: "POST", body: upload }),
-      );
-      const fileId = expectString(expectRecord(uploaded["file"])["id"]);
-      const clock = spyOn(systemClock, "nowMs").mockReturnValue(deadline - 1);
-      const put = bucket.put.bind(bucket);
-      const copy = spyOn(bucket, "put").mockImplementation(async (...args) => {
-        const result = await put(...args);
-        clock.mockReturnValue(deadline);
-        return result;
-      });
-      try {
+    },
+  );
+
+  test.each(["recovery expiry", "reviewed read-only cutover"] as const)(
+    "%s preserves history and files while allowing a fresh Session",
+    async (reason) => {
+      const { create, database, request } = await setup();
+      await database.prepare("UPDATE agent SET kind = 'cattle' WHERE id = ?").bind(IDS.agent).run();
+      await withProviderProbeMock(async () => {
+        const savedFile = new FormData();
+        savedFile.set("file", new File(["saved result"], "report.txt"));
+        const uploadedSaved = await readJson(
+          await request(`v2/agents/${IDS.agent}/files`, { method: "POST", body: savedFile }),
+        );
+        const savedId = expectString(expectRecord(uploadedSaved["file"])["id"]);
+        const created = await readJson(
+          await create("v2", { resources: [{ type: "file", file_id: savedId }] }),
+        );
+        const id = expectString(expectRecord(created["thread"])["id"]);
+        await database
+          .prepare("UPDATE file_record SET session_kind = 'artifact' WHERE id = ?")
+          .bind(savedId)
+          .run();
+        const completedAt =
+          Date.now() - (reason === "recovery expiry" ? 31 : 1) * 24 * 60 * 60 * 1000;
+        await database
+          .prepare(
+            "INSERT INTO session_run (id, session_id, agent_id, created_by_account_id, trigger, status, provider, model, runtime_id, trace_id, created_at, completed_at, updated_at) VALUES (?, ?, ?, ?, 'user_prompt', 'completed', 'openai', 'gpt-5.4', 'openai-runtime', 'expiry-fixture', ?, ?, ?)",
+          )
+          .bind(IDS.run, id, IDS.agent, IDS.ownerAccount, completedAt, completedAt, completedAt)
+          .run();
+        await database
+          .prepare("UPDATE session SET last_run_id = ? WHERE id = ?")
+          .bind(IDS.run, id)
+          .run();
+        await insertRuntimeEvent(database, {
+          kind: "run.completed",
+          occurredAt: completedAt,
+          payload: { stopReason: "end_turn" },
+          runId: IDS.run,
+          seq: 2,
+          sessionId: id,
+        });
+        if (reason === "reviewed read-only cutover") {
+          await database
+            .prepare("UPDATE session SET status = 'TERMINATED' WHERE id = ?")
+            .bind(id)
+            .run();
+        }
+        const history = await readJson(await request(`v2/threads/${id}`));
+        expect(history["run"]).toMatchObject({ id: IDS.run, status: "completed" });
+        const savedEvents = await readJson(await request(`v2/threads/${id}/events`));
+        const savedFiles = await readJson(await request(`v2/threads/${id}/files`));
+        const upload = new FormData();
+        upload.set("file", new File(["new work"], "next.txt"));
+        const uploaded = await readJson(
+          await request(`v2/agents/${IDS.agent}/files`, { method: "POST", body: upload }),
+        );
+        const fileId = expectString(expectRecord(uploaded["file"])["id"]);
         const continuation = await request(`v2/threads/${id}/events`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -456,97 +549,41 @@ describe("saved-Agent Thread API v2", () => {
             events: [
               {
                 type: "user_message",
-                text: "Received before expiry.",
+                text: "Continue after expiry.",
                 resources: [{ type: "file", file_id: fileId }],
               },
             ],
           }),
         });
-        expect(continuation.status).toBe(200);
-        const result = await readJson(continuation);
-        expect(result["events"]).toMatchObject([{ run: { status: "queued" } }]);
-        const files = await readJson(await request(`v2/threads/${id}/files`));
-        expect(files["files"]).toMatchObject([{ id: fileId, committed: true }]);
-        expect(copy).toHaveBeenCalled();
-      } finally {
-        copy.mockRestore();
-        clock.mockRestore();
-      }
-    });
-  });
-
-  test("expires new isolated Session continuation after 30 days while preserving readable history", async () => {
-    const { create, database, request } = await setup();
-    await database.prepare("UPDATE agent SET kind = 'cattle' WHERE id = ?").bind(IDS.agent).run();
-    await withProviderProbeMock(async () => {
-      const savedFile = new FormData();
-      savedFile.set("file", new File(["saved result"], "report.txt"));
-      const uploadedSaved = await readJson(
-        await request(`v2/agents/${IDS.agent}/files`, { method: "POST", body: savedFile }),
-      );
-      const savedId = expectString(expectRecord(uploadedSaved["file"])["id"]);
-      const created = await readJson(
-        await create("v2", { resources: [{ type: "file", file_id: savedId }] }),
-      );
-      const id = expectString(expectRecord(created["thread"])["id"]);
-      await database
-        .prepare("UPDATE file_record SET session_kind = 'artifact' WHERE id = ?")
-        .bind(savedId)
-        .run();
-      const completedAt = Date.now() - 31 * 24 * 60 * 60 * 1000;
-      await database
-        .prepare(
-          "INSERT INTO session_run (id, session_id, agent_id, created_by_account_id, trigger, status, provider, model, runtime_id, trace_id, created_at, completed_at, updated_at) VALUES (?, ?, ?, ?, 'user_prompt', 'completed', 'openai', 'gpt-5.4', 'openai-runtime', 'expiry-fixture', ?, ?, ?)",
-        )
-        .bind(IDS.run, id, IDS.agent, IDS.ownerAccount, completedAt, completedAt, completedAt)
-        .run();
-      await database
-        .prepare("UPDATE session SET last_run_id = ? WHERE id = ?")
-        .bind(IDS.run, id)
-        .run();
-      await insertRuntimeEvent(database, {
-        kind: "run.completed",
-        occurredAt: completedAt,
-        payload: { stopReason: "end_turn" },
-        runId: IDS.run,
-        seq: 2,
-        sessionId: id,
+        expect(await readJson(await request(`v2/threads/${id}/files`))).toEqual(savedFiles);
+        if (reason === "recovery expiry") {
+          expect(continuation.status).toBe(409);
+          expect(await continuation.text()).toContain("recovery expired");
+        } else {
+          expect(continuation.status).toBe(400);
+          const textOnly = await request(`v2/threads/${id}/events`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ events: [{ type: "user_message", text: "Continue." }] }),
+          });
+          expect(textOnly.status).toBe(403);
+          expect((await readJson(textOnly))["error"]).toMatchObject({ code: "forbidden" });
+          expect((await request(`v2/threads/${id}/unarchive`, { method: "POST" })).status).toBe(
+            403,
+          );
+          expect((await request(`v2/files/${savedId}`, { method: "DELETE" })).status).toBe(400);
+        }
+        expect(await readJson(await request(`v2/threads/${id}`))).toEqual(history);
+        for (const suffix of ["events", "files", "usage"])
+          expect((await request(`v2/threads/${id}/${suffix}`)).status).toBe(200);
+        expect(await readJson(await request(`v2/threads/${id}/events`))).toEqual(savedEvents);
+        expect(await readJson(await request(`v2/threads/${id}/files`))).toEqual(savedFiles);
+        expect(await (await request(`v2/files/${savedId}/content`)).text()).toBe("saved result");
+        const fresh = await create("v2", { resources: [{ type: "file", file_id: fileId }] });
+        expect(fresh.status).toBe(201);
       });
-      const history = await readJson(await request(`v2/threads/${id}`));
-      expect(history["run"]).toMatchObject({ id: IDS.run, status: "completed" });
-      const savedEvents = await readJson(await request(`v2/threads/${id}/events`));
-      const savedFiles = await readJson(await request(`v2/threads/${id}/files`));
-      const upload = new FormData();
-      upload.set("file", new File(["new work"], "next.txt"));
-      const uploaded = await readJson(
-        await request(`v2/agents/${IDS.agent}/files`, { method: "POST", body: upload }),
-      );
-      const fileId = expectString(expectRecord(uploaded["file"])["id"]);
-      const continuation = await request(`v2/threads/${id}/events`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          events: [
-            {
-              type: "user_message",
-              text: "Continue after expiry.",
-              resources: [{ type: "file", file_id: fileId }],
-            },
-          ],
-        }),
-      });
-      expect(continuation.status).toBe(409);
-      expect(await continuation.text()).toContain("recovery expired");
-      expect(await readJson(await request(`v2/threads/${id}`))).toEqual(history);
-      for (const suffix of ["events", "files", "usage"])
-        expect((await request(`v2/threads/${id}/${suffix}`)).status).toBe(200);
-      expect(await readJson(await request(`v2/threads/${id}/events`))).toEqual(savedEvents);
-      expect(await readJson(await request(`v2/threads/${id}/files`))).toEqual(savedFiles);
-      expect(await (await request(`v2/files/${savedId}/content`)).text()).toBe("saved result");
-      const fresh = await create("v2", { resources: [{ type: "file", file_id: fileId }] });
-      expect(fresh.status).toBe(201);
-    });
-  });
+    },
+  );
 
   test("does not mistake a later message for the interrupted creation input", async () => {
     const { create, database, request } = await setup({

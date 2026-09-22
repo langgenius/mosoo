@@ -6,11 +6,11 @@ Status: the owner approved direct invocation as the primary experience on Septem
 
 A backend with a Project key and configured model-provider credentials can select a supported harness and model, supply instructions, input, and files, and receive a durable Session. It does not first create or publish an Agent. An owned private Agent remains an optional reusable preset. Both paths preserve the same public ID, native context, working files, effective configuration, artifacts, events, usage, and cancellation behavior.
 
-The request selects inline configuration or an Agent preset explicitly. It does not silently combine them. A new preset-based Session uses the latest saved configuration and freezes it; subsequent preset edits cannot modify the admitted Session. Public historical-version selection, in-Session model/harness changes, and interchangeable native contexts are outside this slice. Project credentials and turn budgets remain BYOK; #636 commercial supply and billing stay separate.
+The request selects inline configuration or an Agent preset explicitly. It does not silently combine them. A new preset-based Session uses the latest saved configuration and freezes it; subsequent preset edits cannot modify the admitted Session. Public historical-version selection, in-Session model/harness changes, and interchangeable native contexts are outside this slice. Project credentials remain BYOK; #636 commercial supply and billing stay separate.
 
 ## Design choice
 
-Use the existing Session execution kernel with two configuration sources. Resolve ownership and configuration once before admission, freeze one execution plan, and reuse the existing Run, file, event, budget, checkpoint, and retry paths.
+Use the existing Session execution kernel with two configuration sources. Resolve ownership and configuration once before admission, freeze one execution plan, and reuse the existing Run, file, event, usage, checkpoint, and retry paths.
 
 Creating a hidden Agent per inline request would preserve the current coupling, produce misleading reusable resources, and complicate cleanup. A separate Router execution stack would duplicate durability and authorization. Neither is required for the approved experience.
 
@@ -20,7 +20,7 @@ Keep existing v1 live-selection and identity behavior. Existing v2 Agent-scoped 
 
 ## Implementation sequence
 
-The implemented wire shape is `POST /api/v2/projects/{projectId}/threads` with `configuration: {type: "inline", harness, provider, model, instructions}` or `configuration: {type: "agent", agent_id}`. Inline instructions are required. Project draft files use `POST /api/v2/projects/{projectId}/files`; the existing `input`, `resources`, optional `userId` and per-turn `maxCostUsd` are unchanged. The v2 Agent-scoped endpoint remains a preset adapter. These source contracts do not establish deployed acceptance.
+The implemented wire shape is `POST /api/v2/projects/{projectId}/threads` with `configuration: {type: "inline", harness, provider, model, instructions}` or `configuration: {type: "agent", agent_id}`. Inline instructions are required. Project draft files use `POST /api/v2/projects/{projectId}/files`; the existing `input`, `resources`, and optional `userId` remain. The later September 22 owner decision removes per-turn `maxCostUsd` and budget responses from the release. The v2 Agent-scoped endpoint remains a preset adapter. These source contracts do not establish deployed acceptance.
 
 1. Update canonical product and boundary documents before changing code. Record the latest scope in #582, #634, #639, #640 and the umbrella PR; previous saved-Agent acceptance is only partial evidence.
 2. Remove runtime hydration's dependence on a mutable Agent for frozen Sessions. Resolve execution authority from the Session's Project and configuration from its execution snapshot. Preserve explicit legacy fallback reads for old snapshots; never fabricate missing configuration.

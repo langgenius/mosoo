@@ -49,6 +49,8 @@ The September 21 owner clarification makes the user-visible criterion explicit: 
 
 The September 22 owner decision permits one scoped exception: **Cloud debug Previews expire after 30 days without debugging activity**. They continue within that period; message/Run/file activity renews it, while history reads, console login, and maintenance do not. After expiry the Preview history and files may be cleaned up and returning to the draft starts a new Preview. There is no separate three-day rule. Formal/API-used Sessions retain the continuity contract, including Sessions with a legacy Preview label. Existing Preview enrollment requires an impact inventory, recoverable backup, and approved production cutover; no historical data is silently assigned the new policy. Active work and admitted uploads are protected from cleanup races. See [Thread Lifecycle](./prd/session-lifecycle.md#cloud-debug-preview-retention-unreleased).
 
+The owner's later September 22 decision adds a **one-time legacy Cloud migration exception**: reviewed published Pet Sessions whose owner and business have no visible activity in the preceding 30 days may become read-only. Preserve their history and saved files; returning users can use the Agent and start a new Session, without a promise to resume the old native context or workspace. Refresh publication, ownership, calls, console/authentication and file activity before cutover. Active or uncertain cases retain same-ID continuity. The debug Preview rule remains separate. This is not a rolling inactivity expiry for formal Sessions or permission to delete data or execute a production migration.
+
 - One durable conversation ID is the primary public execution handle. Existing `thread.id` and Thread routes can represent that Session; the contract does not require renaming them to `session_id`. Callers do not need to manage internal Run or retry Attempt IDs, although existing Run results remain compatible observability data.
 - Only one turn executes at a time in a Session. Busy Sessions reject new input, without input queuing or mid-execution steering.
 - The active turn can be cancelled. Another input is accepted only after that turn ends; cancellation cannot undo completed external side effects.
@@ -63,7 +65,7 @@ A checkpoint represents committed state that can be restored. It is the durabili
 - Model or tool execution ending alone does not establish successful turn completion. Required artifacts and a ready checkpoint must be committed before reporting success or reclaiming the uncommitted workspace.
 - Follow-up admission must continue from the preceding turn's committed state.
 - Checkpoint failure is explicit; it must not fabricate success or silently discard uncommitted output.
-- Failure, cancellation, and budget exhaustion retain their truthful outcomes and saved artifacts. A successful checkpoint does not turn those outcomes into successful execution.
+- Failure and cancellation retain their truthful outcomes and saved artifacts. A successful checkpoint does not turn those outcomes into successful execution.
 - The same gate applies to single-turn tasks and multi-turn Sessions. Applications do not need to send a second input to obtain durable results.
 
 ### Reclamation, Recovery, And Expiry
@@ -74,14 +76,13 @@ A checkpoint represents committed state that can be restored. It is the durabili
 - After recovery expiry, users may explicitly create a new Session with selected historical summary and saved artifacts. It receives a new ID and does not claim restoration of the old workspace or native conversation. This optional post-expiry flow cannot substitute for promised continuation or serve as the Cloud migration fallback.
 - Record actual execution configuration, runtime/model, managed environment identity, turn inputs, attachment identities, events, artifacts, and usage. Internal retries preserve the turn's admitted inputs.
 
-## 5. Execution Permissions And Cost Controls
+## 5. Execution Permissions And Usage
 
 - Integrated runtimes use full-access execution within the Session sandbox and authorized resources. v1 does not provide interactive tool approvals.
-- Full access retains Project isolation, credential protection, resource authorization checks, and budget enforcement.
-- Each turn has a configured default model-cost estimate budget. Callers may set a cap within deployment limits. This execution guard remains in #582 for BYOK: once reached, stop issuing new model requests, preserve available artifacts, and explicitly report budget exhaustion.
-- In-flight requests may cause a small overshoot; an exact hard financial ceiling is not promised.
+- Full access retains Project isolation, credential protection, and resource authorization checks.
+- The September 22 owner decision removes per-turn monetary budgets from #582. The API has no cost-cap parameter or budget response; no Mosoo spending ceiling is promised. Project model providers charge the configured BYOK account.
 - Record truthful usage and distinguish measured values from cost estimates. Settlement, invoices, subscriptions, and payments are outside this refactor.
-- Configure and verify default turn budgets and allowed caps before releasing that guard. Platform funding, customer balances, and commercial pricing belong to #636; budget records are not a wallet or payment ledger. This document does not assign undecided production values.
+- Platform funding, customer balances, and commercial pricing belong to #636. Production budget configuration is not a #582 release prerequisite.
 
 ## 6. API And Console
 
@@ -124,7 +125,7 @@ Both scenarios must work without pre-creating an Agent. Use the same public cont
 
 - Duplicate creation and reuse of an idempotency key with a changed request.
 - Input submitted while a Session is busy.
-- Cancellation, budget exhaustion, and truthful outcome reporting.
+- Cancellation and truthful outcome reporting.
 - Checkpoint failure preventing false success and unsafe reclamation.
 - Cross-Project denial and credential isolation.
 - Recovery after reclamation, with explicit failure instead of an empty-conversation fallback.
@@ -160,7 +161,7 @@ Existing code provides runtime adapters, sandboxes, Thread/Run history, checkpoi
 | #579  | Closed: remove Channels from Mosoo main.                                                                                                                             |
 | #580  | Closed: remove App Deployment and bound-capability coupling.                                                                                                         |
 | #581  | Shipped: multiple Projects, Project keys, separate CLI login, authentication cutover, and user notification.                                                         |
-| #582  | Remaining: BYOK direct harness invocation, optional presets, durable Sessions, both acceptance paths, budgets, recovery, Cloud migration, and Pet/Cattle retirement. |
+| #582  | Remaining: BYOK direct harness invocation, optional presets, durable Sessions, both acceptance paths, recovery, Cloud migration, and Pet/Cattle retirement. |
 | #583  | Remaining: remove Package, Manifest, and Fork product lifecycles while preserving necessary configuration and history.                                               |
 | #584  | Remaining: private Agent configuration and console cleanup, without publishing or public version selection.                                                          |
 
@@ -176,7 +177,7 @@ Session isolation changes the runtime ownership boundary, not just the Agent typ
 
 Before changing existing Cloud customers' behavior, inventory shared Sandbox membership, active work, saved/live configuration differences, and recoverable state. Preserve old resource IDs, history, artifacts, and end-user/MCP identity. Drain admitted work without replaying unknown external side effects. For each shared workspace, establish what belongs to each Session and transfer it internally; never copy shared secrets or other Sessions' private state into every new workspace. Verify restoration from isolated copies before releasing the old execution resource. Missing native or workspace state must be reported, not reconstructed by assumption.
 
-Existing continuable Sessions must retain their same-ID context, promised working files, and admitted configuration through migration. The owner rejected transferring users to a replacement Session or asking them to rebuild missing context. An unverified or incomplete recovery blocks that Session's cutover and remains a #582 closure blocker; retain its existing mapping, data, and resources while investigating. Missing metadata alone does not establish data loss. Do not introduce retroactive expiry to avoid the migration obligation. Notices, readable history, or an explicit recovery error cannot substitute for a verified seamless transition. Engineering must resolve shared-state ownership and recovery without exposing another Session's private data or requiring the customer to perform the conversion.
+Outside the reviewed inactive-published exception above, existing continuable Sessions must retain their same-ID context, promised working files, and admitted configuration through migration. The owner rejected transferring these users to a replacement Session or asking them to rebuild missing context. An unverified or incomplete recovery blocks that Session's cutover and remains a #582 closure blocker; retain its existing mapping, data, and resources while investigating. Missing metadata alone does not establish data loss. Do not introduce retroactive expiry to avoid the migration obligation. Notices, readable history, or an explicit recovery error cannot substitute for a verified seamless transition. Engineering must resolve shared-state ownership and recovery without exposing another Session's private data or requiring the customer to perform the conversion.
 
 Keeping an inert historical schema field or a compatible Thread route does not retain the Pet/Cattle product model. Remove active dual-type behavior only after existing workloads have a verified transition; removing field names or rewriting old rows is not a closure criterion by itself.
 
@@ -188,7 +189,6 @@ The completed #581 key notice does not cover later Session or Builder changes. F
 
 ## 11. Open Decisions
 
-1. **#582 execution guard:** production default turn budgets, allowed caps, and their operational limits for BYOK.
-2. **Separate #636 commercialization:** platform model supply, default models, customer recharge, commercial pricing/billing, and financial limits. These decisions do not block the BYOK #582 release.
+1. **Separate #636 commercialization:** platform model supply, default models, customer recharge, commercial pricing/billing, and financial limits. These decisions do not block the BYOK #582 release.
 
 Resolve these before accepting and shipping the corresponding capabilities.

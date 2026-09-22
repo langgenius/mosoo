@@ -1,4 +1,5 @@
 import type { PublicApiErrorCode } from "@mosoo/contracts/public-api";
+import { AgentSessionActionUnavailableError } from "@mosoo/session-policy";
 
 import { API_ERROR_CODE, isApiError } from "../../platform/errors";
 
@@ -26,6 +27,10 @@ export class PublicApiError extends Error {
 export function toPublicApiError(error: unknown): PublicApiError | null {
   if (error instanceof PublicApiError) {
     return error;
+  }
+
+  if (error instanceof AgentSessionActionUnavailableError) {
+    return publicForbidden(error.message);
   }
 
   if (!isApiError(error)) {
