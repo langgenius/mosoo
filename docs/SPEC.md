@@ -65,7 +65,7 @@ A checkpoint represents committed state that can be restored. It is the durabili
 - Model or tool execution ending alone does not establish successful turn completion. Required artifacts and a ready checkpoint must be committed before reporting success or reclaiming the uncommitted workspace.
 - Follow-up admission must continue from the preceding turn's committed state.
 - Checkpoint failure is explicit; it must not fabricate success or silently discard uncommitted output.
-- Failure, cancellation, and budget exhaustion retain their truthful outcomes and saved artifacts. A successful checkpoint does not turn those outcomes into successful execution.
+- Failure and cancellation retain their truthful outcomes and saved artifacts. A successful checkpoint does not turn those outcomes into successful execution.
 - The same gate applies to single-turn tasks and multi-turn Sessions. Applications do not need to send a second input to obtain durable results.
 
 ### Reclamation, Recovery, And Expiry
@@ -76,14 +76,13 @@ A checkpoint represents committed state that can be restored. It is the durabili
 - After recovery expiry, users may explicitly create a new Session with selected historical summary and saved artifacts. It receives a new ID and does not claim restoration of the old workspace or native conversation. This optional post-expiry flow cannot substitute for promised continuation or serve as the Cloud migration fallback.
 - Record actual execution configuration, runtime/model, managed environment identity, turn inputs, attachment identities, events, artifacts, and usage. Internal retries preserve the turn's admitted inputs.
 
-## 5. Execution Permissions And Cost Controls
+## 5. Execution Permissions And Usage
 
 - Integrated runtimes use full-access execution within the Session sandbox and authorized resources. v1 does not provide interactive tool approvals.
-- Full access retains Project isolation, credential protection, resource authorization checks, and budget enforcement.
-- Each turn has a configured default model-cost estimate budget. Callers may set a cap within deployment limits. This execution guard remains in #582 for BYOK: once reached, stop issuing new model requests, preserve available artifacts, and explicitly report budget exhaustion.
-- In-flight requests may cause a small overshoot; an exact hard financial ceiling is not promised.
+- Full access retains Project isolation, credential protection, and resource authorization checks.
+- The September 22 owner decision removes per-turn monetary budgets from #582. The API has no cost-cap parameter or budget response; no Mosoo spending ceiling is promised. Project model providers charge the configured BYOK account.
 - Record truthful usage and distinguish measured values from cost estimates. Settlement, invoices, subscriptions, and payments are outside this refactor.
-- Configure and verify default turn budgets and allowed caps before releasing that guard. Platform funding, customer balances, and commercial pricing belong to #636; budget records are not a wallet or payment ledger. This document does not assign undecided production values.
+- Platform funding, customer balances, and commercial pricing belong to #636. Production budget configuration is not a #582 release prerequisite.
 
 ## 6. API And Console
 
@@ -126,7 +125,7 @@ Both scenarios must work without pre-creating an Agent. Use the same public cont
 
 - Duplicate creation and reuse of an idempotency key with a changed request.
 - Input submitted while a Session is busy.
-- Cancellation, budget exhaustion, and truthful outcome reporting.
+- Cancellation and truthful outcome reporting.
 - Checkpoint failure preventing false success and unsafe reclamation.
 - Cross-Project denial and credential isolation.
 - Recovery after reclamation, with explicit failure instead of an empty-conversation fallback.
@@ -162,7 +161,7 @@ Existing code provides runtime adapters, sandboxes, Thread/Run history, checkpoi
 | #579  | Closed: remove Channels from Mosoo main.                                                                                                                             |
 | #580  | Closed: remove App Deployment and bound-capability coupling.                                                                                                         |
 | #581  | Shipped: multiple Projects, Project keys, separate CLI login, authentication cutover, and user notification.                                                         |
-| #582  | Remaining: BYOK direct harness invocation, optional presets, durable Sessions, both acceptance paths, budgets, recovery, Cloud migration, and Pet/Cattle retirement. |
+| #582  | Remaining: BYOK direct harness invocation, optional presets, durable Sessions, both acceptance paths, recovery, Cloud migration, and Pet/Cattle retirement. |
 | #583  | Remaining: remove Package, Manifest, and Fork product lifecycles while preserving necessary configuration and history.                                               |
 | #584  | Remaining: private Agent configuration and console cleanup, without publishing or public version selection.                                                          |
 
@@ -190,7 +189,6 @@ The completed #581 key notice does not cover later Session or Builder changes. F
 
 ## 11. Open Decisions
 
-1. **#582 execution guard:** production default turn budgets, allowed caps, and their operational limits for BYOK.
-2. **Separate #636 commercialization:** platform model supply, default models, customer recharge, commercial pricing/billing, and financial limits. These decisions do not block the BYOK #582 release.
+1. **Separate #636 commercialization:** platform model supply, default models, customer recharge, commercial pricing/billing, and financial limits. These decisions do not block the BYOK #582 release.
 
 Resolve these before accepting and shipping the corresponding capabilities.

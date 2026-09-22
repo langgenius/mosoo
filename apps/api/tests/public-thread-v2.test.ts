@@ -28,7 +28,6 @@ import {
 
 async function setup(
   options: {
-    budgetPolicy?: string;
     sessionNamespace?: ApiBindings["Session"];
     requestDatabase?: (database: D1Database) => D1Database;
   } = {},
@@ -53,7 +52,6 @@ async function setup(
           fileBucket: bucket as unknown as R2Bucket,
           ...options,
         }),
-        MOSOO_TURN_BUDGET_POLICY: options.budgetPolicy,
       } as ApiBindings,
     );
   const createAt = (path: string, body: unknown, idempotencyKey?: string) =>
@@ -135,6 +133,32 @@ describe("Project direct Session API v2", () => {
     model: "gpt-5.4",
     instructions: "Use the supplied files and preserve these instructions.",
   };
+
+  test("rejects retired monetary caps and exposes no budget on a direct turn", async () => {
+    const { create, createProject, request } = await setup();
+    const input = { type: "user.message", content: [{ type: "text", text: "Read the input" }] };
+    const capped = { input, maxCostUsd: 0.02 };
+    expect((await createProject({ configuration, ...capped })).status).toBe(400);
+    expect((await create("v2", capped)).status).toBe(400);
+    await withProviderProbeMock(async () => {
+      const response = await createProject({ configuration, input });
+      expect(response.status).toBe(201);
+      const created = await readJson(response);
+      expect(expectRecord(created["run"])).not.toHaveProperty("budget");
+      const id = expectString(expectRecord(created["thread"])["id"]);
+      const retrieved = await readJson(await request(`v2/threads/${id}`));
+      expect(expectRecord(retrieved["run"])).not.toHaveProperty("budget");
+      const events = await request(`v2/threads/${id}/events`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          events: [{ type: "user_message", text: "Continue" }],
+          maxCostUsd: 0.02,
+        }),
+      });
+      expect(events.status).toBe(400);
+    });
+  });
 
   test("uploads and admits exactly one Session and Run without an Agent", async () => {
     const { createProject, database, request, snapshot } = await setup();
@@ -390,37 +414,6 @@ describe("Project direct Session API v2", () => {
 });
 
 describe("saved-Agent Thread API v2", () => {
-  test("records a caller's per-turn cap and rejects changed-budget idempotent retries", async () => {
-    const { create, request } = await setup({ budgetPolicy: '{"defaultUsd":0.05,"maxUsd":1}' });
-    await withProviderProbeMock(async () => {
-      const body = {
-        maxCostUsd: 0.02,
-        input: { type: "user.message", content: [{ type: "text", text: "Read the input" }] },
-      };
-      const response = await create("v2", body, "bounded-create");
-      expect(response.status).toBe(201);
-      const created = await readJson(response);
-      expect(expectRecord(created["run"])["budget"]).toEqual({
-        capUsd: 0.02,
-        estimatedCostUsd: 0,
-        state: "available",
-      });
-      const id = expectString(expectRecord(created["thread"])["id"]);
-      const retrieved = await readJson(await request(`v2/threads/${id}`));
-      expect(expectRecord(retrieved["run"])["budget"]).toEqual({
-        capUsd: 0.02,
-        estimatedCostUsd: 0,
-        state: "available",
-      });
-      expect((await create("v2", { ...body, maxCostUsd: 0.03 }, "bounded-create")).status).toBe(
-        409,
-      );
-      expect((await create("v2", { ...body, maxCostUsd: 2 })).status).toBe(400);
-      expect((await create("v2", { maxCostUsd: 0.02 })).status).toBe(400);
-      const defaulted = await readJson(await create("v2", { input: body.input }));
-      expect(expectRecord(defaulted["run"])["budget"]).toMatchObject({ capUsd: 0.05 });
-    });
-  });
   test.each(["recovery deadline", "read-only cutover"] as const)(
     "guards file transfer across %s",
     async (boundary) => {

@@ -32,9 +32,8 @@ including writes. Price corrections do not run a bulk historical recalculation.
 Existing per-call usage updates and replay still replace that call's estimate
 through the normal idempotent ledger update, so a corrected or more complete
 usage report can change a previously displayed estimate. Usage reported by a
-runtime may omit cache-write counters even when the native model proxy observes
-them; the usage view and a turn's proxy-enforced budget are not invoice
-reconciliation.
+runtime may omit cache-write counters; the usage view is not invoice
+reconciliation. Per-turn monetary budgets are outside the #582 release scope.
 
 ## Historical ledger reconciliation
 

@@ -53,7 +53,6 @@ function requireEnv(name: string): string {
 export async function runSessionWorkflow(input: {
   projectId: string;
   configuration: PublicThreadConfiguration;
-  maxCostUsd: number;
   baseUrl: URL;
   idempotencyPrefix: string;
   outputDirectory: string;
@@ -61,9 +60,6 @@ export async function runSessionWorkflow(input: {
 }): Promise<void> {
   const base = assertNonProductionBaseUrl(input.baseUrl.href, "v2").href.replace(/\/$/, "");
   const projectId = parsePlatformId(input.projectId, "Project ID");
-  if (!Number.isFinite(input.maxCostUsd) || input.maxCostUsd <= 0) {
-    throw new Error("The workflow requires a positive per-turn model budget.");
-  }
   const headers = { Authorization: `Bearer ${input.token}` };
   const call = async (path: string, init: RequestInit = {}) => {
     const response = await fetch(`${base}${path}`, {
@@ -97,7 +93,6 @@ export async function runSessionWorkflow(input: {
   const createBody = {
     ...SESSION_WORKFLOW_INPUT,
     configuration: input.configuration,
-    maxCostUsd: input.maxCostUsd,
     resources: [{ type: "file", file_id: uploaded.file.id }],
   };
   const createPath = `/projects/${projectId}/threads`;
@@ -204,11 +199,7 @@ export async function runSessionWorkflow(input: {
   }
   await writeFile(join(input.outputDirectory, "events.sse"), sseText, { mode: 0o600 });
 
-  await post(
-    `/threads/${threadId}/events`,
-    { ...SESSION_WORKFLOW_FOLLOWUP, maxCostUsd: input.maxCostUsd },
-    "followup",
-  );
+  await post(`/threads/${threadId}/events`, SESSION_WORKFLOW_FOLLOWUP, "followup");
   await waitForTerminal("completed");
   const { manifest, bodies: artifactBodies } = await downloadArtifacts();
   for (const name of ["initial.json", "followup.json", "report.md", "chart.svg"]) {
@@ -270,11 +261,7 @@ export async function runSessionWorkflow(input: {
     { mode: 0o600 },
   );
 
-  await post(
-    `/threads/${threadId}/events`,
-    { ...CANCEL_WORK_INPUT, maxCostUsd: input.maxCostUsd },
-    "cancel-work",
-  );
+  await post(`/threads/${threadId}/events`, CANCEL_WORK_INPUT, "cancel-work");
   await post(`/threads/${threadId}/events`, { events: [{ type: "user_interrupt" }] }, "cancel");
   const cancelled = await waitForTerminal("cancelled");
   await writeFile(
@@ -318,7 +305,6 @@ if (import.meta.main) {
             process.env["MOSOO_PUBLIC_SESSION_INSTRUCTIONS"]?.trim() ||
             "Use tools to analyze files, verify results and retain private working state for follow-up.",
         },
-    maxCostUsd: Number(process.env["MOSOO_PUBLIC_SESSION_MAX_COST_USD"] ?? "0.05"),
     baseUrl: assertNonProductionBaseUrl(requireEnv("MOSOO_PUBLIC_SESSION_BASE_URL"), "v2"),
     idempotencyPrefix: requireEnv("MOSOO_PUBLIC_SESSION_TEST_ID"),
     outputDirectory: process.env["MOSOO_PUBLIC_SESSION_OUTPUT_DIR"] ?? ".tmp/e2e/session-workflow",

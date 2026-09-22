@@ -9,7 +9,6 @@ import { appendSessionRuntimeEvents } from "../../../sessions/application/sessio
 import { projectRuntimeEventToSessionDeliveryEvents } from "../../../sessions/application/session-live-state.service";
 import { recordCanonicalSessionRunFailure } from "../../application/session-runs/session-run-terminal-failure.service";
 import { isTerminalSessionRunStatus } from "../../domain/session-run-status";
-import { getSessionRunBudgetFailure } from "../session-runs/session-run-budget.repository";
 import {
   discardUncommittedCompletionCheckpoint,
   prepareSessionRunCompletionCheckpoint,
@@ -75,19 +74,6 @@ export async function recordDriverInstanceCompletion(
   void input.driverReady;
   const database = bindings.DB;
   const link = await getRuntimeSessionLink(database, input.driverInstanceId);
-  const budgetFailure =
-    link.sessionRunId !== null
-      ? await getSessionRunBudgetFailure(database, link.sessionRunId)
-      : null;
-  if (budgetFailure !== null) {
-    await recordDriverInstanceFailure(bindings, {
-      driverInstanceId: input.driverInstanceId,
-      error: budgetFailure,
-      link,
-    });
-    return;
-  }
-
   if (
     hasLinkedSessionRun(link) &&
     link.sessionRunStatus !== null &&
@@ -118,8 +104,7 @@ export async function recordDriverInstanceFailure(
   const link = input.link ?? (await getRuntimeSessionLink(database, input.driverInstanceId));
 
   if (hasLinkedSessionRun(link)) {
-    const budgetFailure = await getSessionRunBudgetFailure(database, link.sessionRunId);
-    if (budgetFailure !== null && link.sessionRunStatus !== "cancelled") {
+    if (link.sessionRunStatus !== "cancelled") {
       await recordRuntimeSessionOutputDirectory({
         bindings,
         driverInstanceId: input.driverInstanceId,
@@ -127,7 +112,7 @@ export async function recordDriverInstanceFailure(
       });
     }
     const outcome = await recordCanonicalSessionRunFailure(bindings, {
-      error: budgetFailure ?? input.error,
+      error: input.error,
       runId: link.sessionRunId,
       sessionId: link.sessionId,
       source: "driver",

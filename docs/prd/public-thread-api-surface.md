@@ -61,9 +61,9 @@ Agent's API Access panel shows its identifier, token creation, and API reference
 
 ## Direct invocation (unreleased)
 
-The September 22 owner direction makes a Project key plus explicit harness/model, instructions, input, and optional files the primary creation path. No business Agent must be created or published first. An owned saved Agent remains an optional preset; a request selects inline configuration or a preset, without implicit merging. Both use the same Session ID, file/event/usage surfaces, turn budget, idempotency, and native cold-continuation contract. Credentials remain Project-owned BYOK; this does not reopen #636.
+The September 22 owner direction makes a Project key plus explicit harness/model, instructions, input, and optional files the primary creation path. No business Agent must be created or published first. An owned saved Agent remains an optional preset; a request selects inline configuration or a preset, without implicit merging. Both use the same Session ID, file/event/usage surfaces, idempotency, and native cold-continuation contract. Credentials remain Project-owned BYOK; this does not reopen #636.
 
-`POST /api/v2/projects/{projectId}/threads` accepts a required `configuration` object: either `{type: "inline", harness, provider, model, instructions}` or `{type: "agent", agent_id}`. Inline instructions are required and nonblank. Mixed sources and unknown fields return `invalid_request`; unsupported selections or missing model credentials return `readiness_blocked`. `input`, Project draft `resources`, `userId`, and the initial turn's `maxCostUsd` retain the existing v2 contract. Inline admission creates no Agent row and returns `agent_id: null`.
+`POST /api/v2/projects/{projectId}/threads` accepts a required `configuration` object: either `{type: "inline", harness, provider, model, instructions}` or `{type: "agent", agent_id}`. Inline instructions are required and nonblank. Mixed sources and unknown fields return `invalid_request`; unsupported selections or missing model credentials return `readiness_blocked`. `input`, Project draft `resources`, and `userId` retain the existing v2 contract. Per-turn monetary budgets are excluded from this release; cost-cap parameters are rejected rather than silently ignored. Inline admission creates no Agent row and returns `agent_id: null`.
 
 `POST /api/v2/projects/{projectId}/files` uploads a draft file for the same Project. Project keys cannot name another Project; CLI login must explicitly select an owned Project. Files and presets cannot cross that boundary even when the account owns both Projects. Configuration is included in the creation receipt, so changed instructions/model/source with the same idempotency key conflict. A pending committed creation recovers its frozen Session even if its preset has since been removed. Validating and claiming attachments precedes runtime prewarm.
 
@@ -87,8 +87,7 @@ The new version is required because latest-saved admission differs from v1's
 published/live behavior. It does not rename Thread resources or retire v1.
 Existing v1 callers keep their published configuration and required `userId`;
 v2-created Threads are excluded from v1's public-channel view. The #582 release
-requires a model-provider account configured in the Project (BYOK). Turn budgets
-and the shared-workspace transition remain #582 work; platform-funded first use,
+requires a model-provider account configured in the Project (BYOK). Usage and the shared-workspace transition remain #582 work; platform-funded first use,
 recharge, and commercial billing are independent #636 scope.
 
 New isolated v2 Sessions admit a 30-day recovery period from the last successful
@@ -119,8 +118,7 @@ explicit `MOSOO_PUBLIC_SESSION_HARNESS`, `MOSOO_PUBLIC_SESSION_PROVIDER` and
 `MOSOO_PUBLIC_SESSION_TEST_ID`. It uploads a known CSV and invokes inline instructions
 without creating an Agent. `MOSOO_PUBLIC_SESSION_INSTRUCTIONS` can replace the example's
 analysis instructions. To exercise a preset instead, supply `MOSOO_PUBLIC_SESSION_AGENT_ID`
-and omit all four inline fields. The default per-turn cap is $0.05; override it with
-`MOSOO_PUBLIC_SESSION_MAX_COST_USD` only within the configured deployment budget policy.
+and omit all four inline fields. This workflow makes real BYOK model calls and has no server-enforced monetary cap; use the agreed inexpensive models and inspect recorded usage.
 Use `MOSOO_E2E_ENV_FILE` for a local ignored key file. It runs real inference and leaves its Session/artifacts available for
 inspection; use a fresh test ID for a full rerun. Evidence goes to
 `.tmp/e2e/session-workflow` or `MOSOO_PUBLIC_SESSION_OUTPUT_DIR`.

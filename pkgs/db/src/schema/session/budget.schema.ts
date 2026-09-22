@@ -1,3 +1,4 @@
+// Historical table from applied migration 0016. No active runtime budget policy.
 import type { SessionRunId } from "@mosoo/id";
 import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 

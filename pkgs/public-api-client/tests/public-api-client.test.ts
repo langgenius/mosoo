@@ -155,7 +155,6 @@ describe("MosooPublicThreadClient", () => {
       configuration,
       fileIds: [file.file.id],
       input: "Summarize.",
-      maxCostUsd: 0.05,
       idempotencyKey: "direct-once",
     });
     expect(result.finalOutput.text).toBe("Done.");
@@ -165,16 +164,13 @@ describe("MosooPublicThreadClient", () => {
       configuration,
       input: { type: "user.message", content: [{ type: "text", text: "Summarize." }] },
       resources: [{ type: "file", file_id: FILE_ID }],
-      maxCostUsd: 0.05,
     });
     await client.sendEvents({
       threadId: THREAD_ID,
       events: [{ type: "user_message", text: "Continue." }],
-      maxCostUsd: 0.02,
     });
     expect(requests.at(-1)?.body).toEqual({
       events: [{ type: "user_message", text: "Continue." }],
-      maxCostUsd: 0.02,
     });
   });
 

@@ -6,7 +6,6 @@ import {
   sessionEventsTable,
   sessionMessagesTable,
   sessionRunsTable,
-  sessionRunBudgetsTable,
   sessionsTable,
 } from "@mosoo/db";
 import type {
@@ -57,7 +56,6 @@ interface QueuedMessageAdmissionRecord {
 }
 
 export interface CommitQueuedSessionRunAdmissionInput {
-  budgetCapUsdMicros?: number | null;
   recoveryRequestedAtMs?: number;
   apiCommand: PreparedApiCommand;
   clientRequestId: string | null;
@@ -474,24 +472,6 @@ export async function attemptQueuedSessionRunAdmission(
           ),
         ),
       createMessageInsertQuery(db, input),
-      ...(input.budgetCapUsdMicros == null
-        ? []
-        : [
-            db.insert(sessionRunBudgetsTable).select(
-              db
-                .select({
-                  sessionRunId: selectedValue(input.run.id, "session_run_id"),
-                  capUsdMicros: selectedValue(input.budgetCapUsdMicros, "cap_usd_micros"),
-                  estimatedCostUsdMicros: selectedValue(0, "estimated_cost_usd_micros"),
-                  activeRequestId: selectedValue(null, "active_request_id"),
-                  blockedReason: selectedValue(null, "blocked_reason"),
-                  createdAt: selectedValue(input.run.timestampMs, "created_at"),
-                  updatedAt: selectedValue(input.run.timestampMs, "updated_at"),
-                })
-                .from(sessionsTable)
-                .where(admissionSessionPredicate(input)),
-            ),
-          ]),
       ...input.events.map((event, index) => createEventInsertQuery(db, input, event, index)),
       createApiCommandInsertQuery(db, input),
     ],

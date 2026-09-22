@@ -173,11 +173,6 @@
             },
             "minItems": 1,
             "type": "array"
-          },
-          "maxCostUsd": {
-            "type": "number",
-            "minimum": 0.000001,
-            "description": "Optional model-cost estimate cap for a user_message turn in this request. Requires a configured deployment budget policy. Does not change earlier turns or the Session's subsequent defaults."
           }
         },
         "required": ["events"],
@@ -505,11 +500,6 @@
             },
             "required": ["type", "content"],
             "type": "object"
-          },
-          "maxCostUsd": {
-            "type": "number",
-            "minimum": 0.000001,
-            "description": "Optional model-cost estimate cap for the initial turn, in USD (up to six decimal places). Requires input and a configured deployment budget policy; must not exceed the platform maximum. In-flight usage can exceed the cap. Omission uses the configured default when available."
           }
         },
         "required": [],
@@ -795,24 +785,6 @@
             "description": "Timestamp (RFC 3339) of the most recent change to the Run.",
             "format": "date-time",
             "type": "string"
-          },
-          "budget": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["capUsd", "estimatedCostUsd", "state"],
-            "description": "Present only when this turn admitted a model budget. estimatedCostUsd uses provider counters and Mosoo's price schedule; it is not a settled bill. With budget_usage_unavailable it covers only requests whose usage could be established.",
-            "properties": {
-              "capUsd": {
-                "type": "number"
-              },
-              "estimatedCostUsd": {
-                "type": "number"
-              },
-              "state": {
-                "type": "string",
-                "enum": ["available", "settling", "budget_exhausted", "budget_usage_unavailable"]
-              }
-            }
           }
         },
         "required": [
@@ -1005,11 +977,6 @@
             },
             "required": ["type", "content"],
             "type": "object"
-          },
-          "maxCostUsd": {
-            "type": "number",
-            "minimum": 0.000001,
-            "description": "Optional model-cost estimate cap for the initial turn, in USD (up to six decimal places). Requires input and a configured deployment budget policy; must not exceed the platform maximum. In-flight usage can exceed the cap. Omission uses the configured default when available."
           },
           "configuration": {
             "$ref": "#/components/schemas/ThreadConfiguration"

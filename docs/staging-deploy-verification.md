@@ -70,6 +70,10 @@ tested, even when a later secret-only deployment changes the version ID.
 - Read both deployed versions and confirm source/Driver provenance. Check API
   health, Web-to-API routing, normal login, Project isolation, and current
   OpenAPI. Health alone is insufficient.
+- Before removing the retired monetary-budget prototype, let previously budgeted
+  turns finish and verify no active request remains. Keep applied migration 0016
+  and its historical rows unchanged. New acceptance uses inexpensive BYOK models;
+  no Mosoo monetary cap is enforced.
 - Use a dedicated stage Project and its own application key. Production Project
   keys and encrypted credential rows do not transfer across databases. Provision
   authorized provider credentials through the ordinary credential service.
@@ -83,7 +87,7 @@ tested, even when a later secret-only deployment changes the version ID.
 - Run ghFind against an exact public repository commit, fetched by tools or
   supplied as files. Validate analysis JSON, evidence JSON, and Markdown against
   the same material identity and verify idempotent retry does not start new work.
-- Verify busy rejection, cancellation, budget/checkpoint/recovery failure,
+- Verify busy rejection, cancellation, checkpoint/recovery failure,
   expiry with readable history/artifacts, and cross-Project denial. Preserve the
   truthful outcome even when a failed turn has saved artifacts.
 

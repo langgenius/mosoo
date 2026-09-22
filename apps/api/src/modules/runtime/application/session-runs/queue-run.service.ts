@@ -43,7 +43,6 @@ import { createQueuedSessionRunRuntimeEvents } from "./session-run-view-events.s
 import { reconcileStaleActiveSessionRun } from "./stale-run-reconciliation.service";
 
 interface QueueSessionRunInput {
-  budgetCapUsdMicros?: number | null;
   recoveryRequestedAtMs?: number;
   accessViewer?: AuthenticatedViewer;
   attachmentIds: FileId[];
@@ -166,7 +165,6 @@ export async function queueSessionRun(request: QueueSessionRunRequest): Promise<
     timestampMs: admittedAtMs,
   });
   const admission: CommitQueuedSessionRunAdmissionInput = {
-    budgetCapUsdMicros: input.budgetCapUsdMicros ?? null,
     recoveryRequestedAtMs,
     apiCommand,
     clientRequestId: input.clientRequestId,

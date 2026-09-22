@@ -64,7 +64,6 @@ export interface MosooCreateProjectThreadInput {
   fileIds?: string[];
   idempotencyKey?: string;
   input?: string;
-  maxCostUsd?: number;
   signal?: AbortSignal | undefined;
   userId?: string;
 }
@@ -83,7 +82,6 @@ export interface MosooUploadProjectFileInput extends Omit<MosooUploadAgentFileIn
 export interface MosooSendEventsInput {
   events: PublicThreadApiSendEventsRequest["events"];
   idempotencyKey?: string;
-  maxCostUsd?: number;
   signal?: AbortSignal | undefined;
   threadId: string;
 }
@@ -551,7 +549,6 @@ export class MosooPublicThreadClient {
       body: {
         ...createCreateThreadBody(input),
         configuration: input.configuration,
-        ...(input.maxCostUsd === undefined ? {} : { maxCostUsd: input.maxCostUsd }),
       },
       idempotencyKey: input.idempotencyKey,
       signal: input.signal,
@@ -600,11 +597,9 @@ export class MosooPublicThreadClient {
   async sendEvents(
     input: MosooSendEventsInput,
   ): Promise<PublicThreadApiSendEventsResponse<string | null>> {
-    if (input.maxCostUsd !== undefined) this.requireV2();
     return this.requestJson("POST", `/threads/${input.threadId}/events`, {
       body: {
         events: input.events,
-        ...(input.maxCostUsd === undefined ? {} : { maxCostUsd: input.maxCostUsd }),
       },
       idempotencyKey: input.idempotencyKey,
       signal: input.signal,
@@ -803,7 +798,7 @@ export class MosooPublicThreadClient {
   private requireV2(): void {
     if (!this.apiBaseUrl.endsWith("/api/v2")) {
       throw new Error(
-        "Project Session creation, Project file upload and turn budgets require Public API v2. Set apiVersion to v2.",
+        "Project Session creation and Project file upload require Public API v2. Set apiVersion to v2.",
       );
     }
   }
