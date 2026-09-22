@@ -48,6 +48,7 @@ export async function getAgentEditorState(
     providerOptions: storedConfig.providerOptions,
     readiness: await computeAgentReadiness(database, editable.agent.ownerId, {
       agentId: editable.agent.id,
+      builtInTools: storedConfig.builtInTools,
       environment,
       kind: editable.agent.kind,
       model: editable.agent.model,
