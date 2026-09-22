@@ -554,12 +554,18 @@ describe("driver finalization repair", () => {
       source: "api",
       status: "failed",
     });
+    const completedAt = Date.parse("2026-09-21T23:59:59.000Z");
+    await database
+      .prepare("UPDATE session_run SET completed_at = ?, updated_at = ? WHERE id = ?")
+      .bind(completedAt, completedAt, FINALIZE_RUN_ID)
+      .run();
     const before = await database
       .prepare("SELECT * FROM session_run WHERE id = ?")
       .bind(FINALIZE_RUN_ID)
       .first();
     expect(await readTerminalEvents(database)).toEqual([]);
     const output: string[] = [];
+    const repairStartedAt = Date.now();
     const originalInfo = console.info;
     console.info = (...values: unknown[]) => output.push(values.map(String).join(" "));
     try {
@@ -584,6 +590,17 @@ describe("driver finalization repair", () => {
     expect(logs.length).toBeLessThanOrEqual(2);
     expect(logs.every((entry) => entry.metadata.errorCode === PROVISION_ERROR.code)).toBe(true);
     expect(await readTerminalEvents(database)).toHaveLength(1);
+    const eventTime = await database
+      .prepare(
+        "SELECT occurred_at, ended_at, created_at FROM session_event WHERE run_id = ? AND event_type = 'run.failed'",
+      )
+      .bind(FINALIZE_RUN_ID)
+      .first<{ occurred_at: number; ended_at: number; created_at: number }>();
+    expect(eventTime).toMatchObject({ occurred_at: completedAt, ended_at: completedAt });
+    expect(eventTime?.created_at).toBeGreaterThanOrEqual(repairStartedAt);
+    expect(logs.every((entry) => Date.parse(entry.timestamp) === eventTime?.occurred_at)).toBe(
+      true,
+    );
     expect(
       await database
         .prepare("SELECT * FROM session_run WHERE id = ?")

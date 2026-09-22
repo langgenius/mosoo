@@ -266,6 +266,7 @@ describe("canonical session run terminal failure", () => {
       const bindings = createPublicHttpTestBindings(database) as ApiBindings;
       const output: string[] = [];
       const originalInfo = console.info;
+      const repairStartedAt = Date.now();
       console.info = (...values: unknown[]) => output.push(values.map(String).join(" "));
       try {
         for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -312,6 +313,14 @@ describe("canonical session run terminal failure", () => {
           .bind(RUN_ID)
           .first(),
       ).toEqual({ count: 1 });
+      const eventTime = await database
+        .prepare(
+          "SELECT occurred_at, ended_at, created_at FROM session_event WHERE run_id = ? AND event_type IN ('run.failed', 'run.completed', 'run.cancelled')",
+        )
+        .bind(RUN_ID)
+        .first<{ occurred_at: number; ended_at: number; created_at: number }>();
+      expect(eventTime).toMatchObject({ occurred_at: completedAt, ended_at: completedAt });
+      expect(eventTime?.created_at).toBeGreaterThanOrEqual(repairStartedAt);
     },
   );
 
