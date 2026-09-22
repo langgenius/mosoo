@@ -10,7 +10,7 @@ import {
 } from "../../application/runtime-diagnostic-events";
 import { resolvePendingRuntimeCommands } from "./commands";
 import { runtimeSessionLinkNeedsRefresh } from "./event-types";
-import { finalizeDriverInstance } from "./lifecycle";
+import { finalizeDriverInstance, getTerminalDriverInstanceStatusForConnection } from "./lifecycle";
 import type { RuntimeSessionViewCache } from "./runtime-session-view-cache";
 import type { DriverInstanceRuntimeState } from "./runtime-state";
 import { getRuntimeSessionLink } from "./session-link.repository";
@@ -29,6 +29,7 @@ interface DriverInstanceTerminalStateCoordinatorOptions {
 export class DriverInstanceTerminalStateCoordinator {
   readonly #clearStorage: () => Promise<void>;
   readonly #env: ApiBindings;
+  #pendingFinalization: Promise<void> | null = null;
   readonly #state: DriverInstanceRuntimeState;
   readonly #viewCache: RuntimeSessionViewCache;
   readonly #viewerEventDelivery: SessionViewerEventDeliveryBuffer;
@@ -44,12 +45,22 @@ export class DriverInstanceTerminalStateCoordinator {
   }
 
   async finalize(): Promise<void> {
-    if (this.#state.terminalized) {
+    if (this.#state.finalizationCompleted) {
       return;
     }
 
+    const task = (this.#pendingFinalization ??= this.#finalize());
+    try {
+      await task;
+    } finally {
+      if (this.#pendingFinalization === task) {
+        this.#pendingFinalization = null;
+      }
+    }
+  }
+
+  async #finalize(): Promise<void> {
     this.#state.terminalized = true;
-    await this.#viewerEventDelivery.flushSafely();
 
     const driverInstanceId = this.#state.requireDriverInstanceId();
     const close = await this.#ensureCloseSnapshot();
@@ -72,17 +83,34 @@ export class DriverInstanceTerminalStateCoordinator {
         })
       : false;
 
-    if (finalized) {
+    const terminalStatus = finalized
+      ? status
+      : isTruthy(connectionId)
+        ? await getTerminalDriverInstanceStatusForConnection(this.#env, {
+            driverInstanceId,
+            connectionId,
+            generation: this.#state.requireDriverGeneration(),
+          })
+        : null;
+
+    // A prior attempt may have committed the driver row and stopped before the
+    // run/effect/lease repair. Only the same connection and generation may retry.
+    if (terminalStatus !== null) {
       await this.#repairFinalizedRunState({
         driverInstanceId,
-        status,
+        status: terminalStatus,
       });
+    }
+
+    if (finalized) {
       await this.#appendDriverCrashedEventIfNeeded({
         close,
         driverInstanceId,
         status,
       });
+    }
 
+    if (terminalStatus !== null) {
       this.#withRuntimeLogContext(() => {
         logInfo("runtime.run.finalized", {
           closeCode: close.code,
@@ -93,7 +121,8 @@ export class DriverInstanceTerminalStateCoordinator {
           driverPid: this.#state.hello?.pid ?? null,
           errorMessage: this.#state.errorMessage,
           heartbeatCount: this.#state.heartbeatCount,
-          status,
+          recovered: !finalized,
+          status: terminalStatus,
         });
       });
     }
@@ -115,6 +144,7 @@ export class DriverInstanceTerminalStateCoordinator {
 
     resolvePendingRuntimeCommands(this.#state.commandWaiters);
     await this.#state.persistTerminalSnapshot();
+    await this.#viewerEventDelivery.flushSafely();
   }
 
   async resetForReuse(): Promise<void> {
@@ -209,6 +239,7 @@ export class DriverInstanceTerminalStateCoordinator {
           status: input.status,
         });
       });
+      throw error;
     }
   }
 }

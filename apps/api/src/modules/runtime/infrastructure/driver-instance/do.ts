@@ -126,6 +126,12 @@ export class DriverInstance extends DurableObject implements DriverInstanceHttpH
     }
   }
 
+  override async alarm(): Promise<void> {
+    if (!this.#destroyed && this.#state.close !== null) {
+      await this.#terminalState.finalize();
+    }
+  }
+
   override async webSocketClose(ws: WebSocket, code: number, reason: string): Promise<void> {
     if (this.#destroyed) {
       return;
@@ -347,6 +353,7 @@ export class DriverInstance extends DurableObject implements DriverInstanceHttpH
       }
 
       if (this.#state.terminalized) {
+        await this.#terminalState.finalize();
         const status = await getDriverInstanceStatus(this.env, this.#state.driverInstanceId);
 
         if (status === "provisioning" || status === "connecting" || status === "ready") {

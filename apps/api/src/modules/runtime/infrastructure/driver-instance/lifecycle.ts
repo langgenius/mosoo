@@ -234,3 +234,22 @@ export async function getDriverInstanceStatus(
 
   return row?.status ?? null;
 }
+
+export async function getTerminalDriverInstanceStatusForConnection(
+  bindings: ApiBindings,
+  input: { driverInstanceId: DriverInstanceId; connectionId: string; generation: number },
+): Promise<"failed" | "stopped" | null> {
+  const row = await getAppDatabase(bindings.DB)
+    .select({ status: driverInstancesTable.status })
+    .from(driverInstancesTable)
+    .where(
+      and(
+        eq(driverInstancesTable.id, input.driverInstanceId),
+        eq(driverInstancesTable.connectionId, input.connectionId),
+        eq(driverInstancesTable.generation, input.generation),
+      ),
+    )
+    .get();
+
+  return row?.status === "failed" || row?.status === "stopped" ? row.status : null;
+}
