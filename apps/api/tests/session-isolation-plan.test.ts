@@ -102,7 +102,15 @@ async function dump(database: D1Database) {
   );
 }
 
-async function fixture() {
+async function fixture(
+  options: {
+    nativeTerminal?: "completed" | "failed";
+    earlierObservation?: boolean;
+    archived?: boolean;
+  } = {},
+) {
+  const runtimeId = options.nativeTerminal ? "acp-fallback" : "openai-runtime";
+  const terminalStatus = options.nativeTerminal ?? "completed";
   const database = await createPublicHttpContractDatabase();
   // Runtime fixtures omit inert storage columns. An operator's SELECT * still
   // contains the immutable migration history, including its Project rename.
@@ -121,6 +129,17 @@ async function fixture() {
   if (!projectRename) throw new Error("Historical Run column rename is missing.");
   database.execute(projectRename);
   await insertOwnerSession(database);
+  if (options.nativeTerminal) {
+    for (const table of ["session", "agent", "agent_deployment_version"]) {
+      await database.prepare(`UPDATE ${table} SET runtime_id = ?`).bind(runtimeId).run();
+    }
+    await database
+      .prepare(
+        "UPDATE session_execution_snapshot SET plan_json = json_set(plan_json, '$.binding.runtimeId', ?)",
+      )
+      .bind(runtimeId)
+      .run();
+  }
   // Reuse the real native-ref table and additive columns, not a guessed schema.
   const baseline = readFileSync(
     new URL("../../../pkgs/db/drizzle/0000_baseline.sql", import.meta.url),
@@ -178,12 +197,12 @@ async function fixture() {
       id: ID.run,
       sessionId: ID.ownerSession,
       agentId: ID.agent,
-      status: "completed",
+      status: terminalStatus,
       trigger: "user_prompt",
       createdByAccountId: ID.ownerAccount,
       provider: "openai",
       model: "gpt-5.4",
-      runtimeId: "openai-runtime",
+      runtimeId,
       deploymentVersionId: ID.deployment,
       deploymentVersionNumber: 1,
       traceId: "fixture-trace",
@@ -197,10 +216,10 @@ async function fixture() {
     .insert(nativeResumeRefsTable)
     .values({
       sessionId: ID.ownerSession,
-      kind: "openai_thread_id",
-      runtimeId: "openai-runtime",
+      kind: options.nativeTerminal ? "acp_session_id" : "openai_thread_id",
+      runtimeId,
       value: "native-original",
-      observedSessionRunId: ID.run,
+      observedSessionRunId: options.earlierObservation ? ID.runAlt : ID.run,
       observedDriverInstanceId: ID.driverOwner,
       createdAt: NOW,
       updatedAt: NOW + 20,
@@ -234,9 +253,12 @@ async function fixture() {
       {
         event: createRuntimeEvent({
           id: createPlatformId(),
-          kind: "run.completed",
+          kind: terminalStatus === "failed" ? "run.failed" : "run.completed",
           occurredAt: new Date(NOW + 20).toISOString(),
-          payload: { stopReason: "end_turn" },
+          payload:
+            terminalStatus === "failed"
+              ? { error: { code: "runtime.failed", message: "Preserved original failure." } }
+              : { stopReason: "end_turn" },
           runId: ID.run,
           sessionId: ID.ownerSession,
         }),
@@ -245,6 +267,12 @@ async function fixture() {
       },
     ],
   });
+  if (options.archived) {
+    await database
+      .prepare("UPDATE session SET archived_at = ? WHERE id = ?")
+      .bind(NOW + 25, ID.ownerSession)
+      .run();
+  }
   const select = (table: string, column: string, id: string) =>
     database.prepare(`SELECT * FROM ${table} WHERE ${column} = ?`).bind(id).first();
   const source = {
@@ -273,13 +301,40 @@ async function fixture() {
     workspaceEvidence: {
       sessionId: ID.ownerSession,
       sourceBackupId: SOURCE_BACKUP,
-      completedRunId: ID.run,
+      ...(terminalStatus === "failed" ? { terminalRunId: ID.run } : { completedRunId: ID.run }),
       cwd: CWD,
-      runtimeId: "openai-runtime",
+      runtimeId,
       nativeValue: "native-original",
       sourceArchiveSha256: "a".repeat(64),
       preparedArchiveSha256: "b".repeat(64),
       rollbackArchiveSha256: "c".repeat(64),
+      ...(options.nativeTerminal
+        ? {
+            terminalEvidence: {
+              version: 1,
+              runId: ID.run,
+              status: terminalStatus,
+              completedAt: NOW + 20,
+              observedRunId: options.earlierObservation ? ID.runAlt : ID.run,
+              sourceRevision: "2bda2d940acf382dfc718745619ecc54797ce793",
+              driverRevision: "16e47258aab1ac1d9dde3cd9d55f6374a4ce9a50",
+              harnessVersion: "1.18.4",
+              nativeLoadImage:
+                "sha256:e2e1722e39655ae4e46d86bbce49888fbc62c74e8d748a6f5dd2f4a8b2f49eac",
+              nativeLoadReceiptSha256: "d".repeat(64),
+              canonicalHistoryReceiptSha256: "e".repeat(64),
+              workspaceReceiptSha256: "f".repeat(64),
+              nativeRowsSha256: "1".repeat(64),
+              canonicalTextCount: 2,
+              matchedCanonicalTextCount: 2,
+              nativeTextCount: 2,
+              replayedNativeTextCount: 2,
+              nativeMessageRowsPreserved: true,
+              nativePartRowsPreserved: true,
+              workspaceFilesPreserved: true,
+            },
+          }
+        : {}),
     },
   };
   const viewer = await getAccountViewer(database, ID.ownerAccount);
@@ -390,6 +445,160 @@ async function insertUnattributedActivePeer(
 }
 
 describe("legacy Session isolation batch", () => {
+  test("verified archived ACP copies retain their archive boundary and reject concurrent reopening", async () => {
+    const { database, plan } = await fixture({
+      nativeTerminal: "completed",
+      earlierObservation: true,
+      archived: true,
+    });
+    await execute(database, plan.forward);
+    expect(
+      await database
+        .prepare("SELECT archived_at FROM session WHERE id = ?")
+        .bind(ID.ownerSession)
+        .first("archived_at"),
+    ).toBe(NOW + 25);
+    await execute(database, plan.rollback);
+    expect(
+      await database
+        .prepare("SELECT archived_at FROM session WHERE id = ?")
+        .bind(ID.ownerSession)
+        .first("archived_at"),
+    ).toBe(NOW + 25);
+    const pending = await fixture({
+      nativeTerminal: "completed",
+      earlierObservation: true,
+      archived: true,
+    });
+    await pending.database
+      .prepare("UPDATE session SET archived_at = NULL WHERE id = ?")
+      .bind(ID.ownerSession)
+      .run();
+    const before = await dump(pending.database);
+    await expect(execute(pending.database, pending.plan.forward)).rejects.toThrow();
+    expect(await dump(pending.database)).toEqual(before);
+  });
+
+  test.each(["completed", "failed"] as const)(
+    "imports a verified ACP %s boundary with an older native observation and preserves its Run through rollback",
+    async (nativeTerminal) => {
+      const { database, plan } = await fixture({ nativeTerminal, earlierObservation: true });
+      const originalRun = await database
+        .prepare("SELECT * FROM session_run WHERE id = ?")
+        .bind(ID.run)
+        .first();
+      const originalEvents = await database
+        .prepare("SELECT * FROM session_event WHERE run_id = ? ORDER BY id")
+        .bind(ID.run)
+        .all();
+      await execute(database, plan.forward);
+      expect(
+        await database.prepare("SELECT * FROM session_run WHERE id = ?").bind(ID.run).first(),
+      ).toEqual(originalRun);
+      expect(
+        await database
+          .prepare("SELECT * FROM session_event WHERE run_id = ? ORDER BY id")
+          .bind(ID.run)
+          .all(),
+      ).toEqual(originalEvents);
+      expect(
+        await getNativeResumeRefForRuntime(database, {
+          runtimeId: "acp-fallback",
+          sessionId: ID.ownerSession,
+        }),
+      ).toEqual({ kind: "acp_session_id", runtimeId: "acp-fallback", value: "native-original" });
+      const associatedRun = nativeTerminal === "completed" ? ID.run : null;
+      expect(
+        await database
+          .prepare("SELECT committed_session_run_id FROM native_resume_ref WHERE session_id = ?")
+          .bind(ID.ownerSession)
+          .first("committed_session_run_id"),
+      ).toBe(associatedRun);
+      expect(
+        await database
+          .prepare("SELECT session_run_id FROM sandbox_backup WHERE id = ?")
+          .bind(NEW_BACKUP)
+          .first("session_run_id"),
+      ).toBe(associatedRun);
+      await execute(database, plan.rollback);
+      expect(
+        await database.prepare("SELECT * FROM session_run WHERE id = ?").bind(ID.run).first(),
+      ).toEqual(originalRun);
+      expect(
+        await database
+          .prepare("SELECT * FROM session_event WHERE run_id = ? ORDER BY id")
+          .bind(ID.run)
+          .all(),
+      ).toEqual(originalEvents);
+      expect(
+        await database
+          .prepare("SELECT * FROM native_resume_ref WHERE session_id = ?")
+          .bind(ID.ownerSession)
+          .first(),
+      ).toEqual(plan.before.native);
+    },
+  );
+
+  test("requires matching ACP receipts and refuses incomplete canonical history", async () => {
+    const { input } = await fixture({ nativeTerminal: "failed" });
+    const evidence = input.workspaceEvidence.terminalEvidence;
+    if (!evidence) throw new Error("Fixture terminal evidence is missing.");
+    for (const mutation of [
+      { status: "completed" },
+      { runId: ID.runAlt },
+      { observedRunId: ID.runAlt },
+      { completedAt: NOW },
+      { canonicalTextCount: 0 },
+      { matchedCanonicalTextCount: 1 },
+      { replayedNativeTextCount: 1 },
+      { nativeMessageRowsPreserved: false },
+      { nativePartRowsPreserved: false },
+      { workspaceFilesPreserved: false },
+      { nativeLoadReceiptSha256: "missing" },
+      { canonicalHistoryReceiptSha256: "missing" },
+      { nativeLoadImage: "another-image" },
+      { harnessVersion: "old" },
+    ]) {
+      expect(() =>
+        buildSessionIsolationPlan({
+          ...input,
+          workspaceEvidence: {
+            ...input.workspaceEvidence,
+            terminalEvidence: { ...evidence, ...mutation },
+          },
+        }),
+      ).toThrow();
+    }
+    expect(() =>
+      buildSessionIsolationPlan({
+        ...input,
+        workspaceEvidence: { ...input.workspaceEvidence, terminalEvidence: undefined },
+      }),
+    ).toThrow();
+  });
+
+  test("ACP conversion checks persisted failure and rejects changes after qualification atomically", async () => {
+    const { database, plan } = await fixture({ nativeTerminal: "failed" });
+    await database
+      .prepare("UPDATE session_event SET event_type = 'run.completed' WHERE run_id = ?")
+      .bind(ID.run)
+      .run();
+    const before = await dump(database);
+    await expect(execute(database, plan.forward)).rejects.toThrow();
+    expect(await dump(database)).toEqual(before);
+    await database
+      .prepare("UPDATE session_event SET event_type = 'run.failed' WHERE run_id = ?")
+      .bind(ID.run)
+      .run();
+    await database
+      .prepare("UPDATE native_resume_ref SET observed_session_run_id = ? WHERE session_id = ?")
+      .bind(ID.runAlt, ID.ownerSession)
+      .run();
+    const changed = await dump(database);
+    await expect(execute(database, plan.forward)).rejects.toThrow();
+    expect(await dump(database)).toEqual(changed);
+  });
+
   for (const phase of ["forward", "rollback-source", "rollback-destination"] as const) {
     test.each(["workspace", "stopped-driver", "failed-driver"] as const)(
       `${phase} rejects an active Run linked by %s without Agent provenance`,
@@ -1247,8 +1456,8 @@ function localExecutionPlatform() {
   };
 }
 
-async function executionFixture() {
-  const state = await fixture();
+async function executionFixture(options: Parameters<typeof fixture>[0] = {}) {
+  const state = await fixture(options);
   const resources = localExecutionPlatform();
   const request = {
     operationId: ISOLATION_OPERATION,
@@ -1294,6 +1503,55 @@ async function atFixtureTime(action: () => Promise<void>) {
 }
 
 describe("Resumable Session isolation execution", () => {
+  for (const decision of ["forward", "rollback"] as const) {
+    test.each(["completed", "failed"] as const)(
+      `${decision} of a verified archived ACP %s boundary retains archival and terminal history through claim release`,
+      async (nativeTerminal) => {
+        const f = await executionFixture({
+          nativeTerminal,
+          archived: true,
+          earlierObservation: true,
+        });
+        const run = await f.database
+          .prepare("SELECT * FROM session_run WHERE id = ?")
+          .bind(ID.run)
+          .first();
+        await expect(
+          prepareSessionIsolationExecution(f.database, f.platform, {
+            ...f.request,
+            cohort: {
+              ...f.request.cohort,
+              sessions: f.request.cohort.sessions.map((member) => ({
+                ...member,
+                archivedAt: null,
+              })),
+            },
+          }),
+        ).rejects.toThrow("Reviewed isolation cohort");
+        await prepareSessionIsolationExecution(f.database, f.platform, f.request);
+        if (decision === "rollback") {
+          await f.step();
+          await f.step();
+          await requestSessionIsolationRollback(f.database, ISOLATION_OPERATION);
+        }
+        await f.finish();
+        expect(
+          await f.database
+            .prepare("SELECT archived_at,kind,status_operation_id FROM session WHERE id = ?")
+            .bind(ID.ownerSession)
+            .first(),
+        ).toEqual({
+          archived_at: NOW + 25,
+          kind: decision === "forward" ? "cattle" : "pet",
+          status_operation_id: null,
+        });
+        expect(
+          await f.database.prepare("SELECT * FROM session_run WHERE id = ?").bind(ID.run).first(),
+        ).toEqual(run);
+      },
+    );
+  }
+
   test("an unexpired source may have been created before its D1 row was recorded", () =>
     atFixtureTime(async () => {
       const f = await executionFixture();

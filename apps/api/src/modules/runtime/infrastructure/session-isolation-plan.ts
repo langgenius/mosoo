@@ -50,6 +50,67 @@ const SOURCE_TABLES = {
 type SourceName = keyof typeof SOURCE_TABLES;
 type Source = Record<Exclude<SourceName, "deployment">, Row> & { deployment: Row | null };
 
+// Finite operator qualification, pinned to the independently rehearsed reader.
+// Receipts remain private, declarative inputs; this does not inspect their files.
+function hasVerifiedNativeTerminal(
+  source: Source,
+  workspaceEvidence: Record<string, unknown>,
+): boolean {
+  if (workspaceEvidence["terminalEvidence"] === undefined) return false;
+  const evidence = record(workspaceEvidence["terminalEvidence"]);
+  const { session, run, native } = source;
+  requireValue(
+    session["runtime_id"] === "acp-fallback" &&
+      evidence["version"] === 1 &&
+      evidence["runId"] === run["id"] &&
+      evidence["status"] === run["status"] &&
+      (run["status"] === "completed" || run["status"] === "failed") &&
+      evidence["completedAt"] === run["completed_at"] &&
+      evidence["observedRunId"] === native["observed_session_run_id"] &&
+      evidence["sourceRevision"] === "2bda2d940acf382dfc718745619ecc54797ce793" &&
+      evidence["driverRevision"] === "16e47258aab1ac1d9dde3cd9d55f6374a4ce9a50" &&
+      evidence["harnessVersion"] === "1.18.4" &&
+      evidence["nativeLoadImage"] ===
+        "sha256:e2e1722e39655ae4e46d86bbce49888fbc62c74e8d748a6f5dd2f4a8b2f49eac",
+    "Native terminal evidence does not match this ACP boundary or rehearsed reader.",
+  );
+  for (const [total, matched] of [
+    ["canonicalTextCount", "matchedCanonicalTextCount"],
+    ["nativeTextCount", "replayedNativeTextCount"],
+  ] as const) {
+    const count = evidence[total];
+    requireValue(
+      typeof count === "number" &&
+        Number.isSafeInteger(count) &&
+        count > 0 &&
+        count === evidence[matched],
+      "Native terminal evidence requires complete canonical history and native replay.",
+    );
+  }
+  for (const key of [
+    "nativeMessageRowsPreserved",
+    "nativePartRowsPreserved",
+    "workspaceFilesPreserved",
+  ]) {
+    requireValue(
+      evidence[key] === true,
+      "Native terminal evidence requires unchanged durable state.",
+    );
+  }
+  for (const key of [
+    "nativeLoadReceiptSha256",
+    "canonicalHistoryReceiptSha256",
+    "workspaceReceiptSha256",
+    "nativeRowsSha256",
+  ]) {
+    requireValue(
+      /^[a-f0-9]{64}$/.test(text(evidence[key])),
+      "Native terminal evidence needs bound SHA-256 receipts.",
+    );
+  }
+  return true;
+}
+
 function requireValue(condition: boolean, message: string): asserts condition {
   if (!condition) throw new Error(message);
 }
@@ -155,7 +216,8 @@ function guard(source: Source, original?: Source): TransitionStatement {
   const liveDrivers = LIVE_DRIVER_INSTANCE_STATUSES.map((status) => `'${status}'`).join(",");
   predicates.push(
     `NOT EXISTS (SELECT 1 FROM session_run WHERE agent_id = json_extract(expected.value, '$.session.agent_id') AND status IN (${activeRuns}))`,
-    `EXISTS (SELECT 1 FROM session_event WHERE run_id = json_extract(expected.value, '$.run.id') AND event_type = 'run.completed')`,
+    `EXISTS (SELECT 1 FROM session_event WHERE run_id = json_extract(expected.value, '$.run.id') AND event_type = 'run.' || json_extract(expected.value, '$.run.status'))`,
+    `NOT EXISTS (SELECT 1 FROM session_event WHERE run_id = json_extract(expected.value, '$.run.id') AND event_type IN ('run.completed', 'run.failed', 'run.cancelled') AND event_type <> 'run.' || json_extract(expected.value, '$.run.status'))`,
   );
   for (const prefix of original ? ["", "original."] : [""]) {
     // Agent provenance and a terminal Driver status do not release a Run.
@@ -227,6 +289,8 @@ export function buildSessionIsolationPlan(value: unknown): SessionIsolationPlan 
       ? null
       : parsePlatformId<RuntimeOperationId>(input["operationId"], "isolation operation");
   const before = sourceFrom(input["source"]);
+  const workspaceEvidence = record(input["workspaceEvidence"]);
+  const verifiedNativeTerminal = hasVerifiedNativeTerminal(before, workspaceEvidence);
   const {
     session,
     sandbox,
@@ -249,9 +313,9 @@ export function buildSessionIsolationPlan(value: unknown): SessionIsolationPlan 
   requireValue(
     session["kind"] === "pet" &&
       session["status"] === "IDLE" &&
-      session["archived_at"] === null &&
+      (session["archived_at"] === null || verifiedNativeTerminal) &&
       session["status_operation_id"] === operationId,
-    "Source Session is not an idle unarchived legacy Session.",
+    "Source Session is not an idle legacy Session with a qualified archive state.",
   );
   requireValue(
     sandbox["kind"] === "pet" &&
@@ -291,13 +355,13 @@ export function buildSessionIsolationPlan(value: unknown): SessionIsolationPlan 
       run["model"] === session["model"] &&
       run["provider"] === session["provider"] &&
       run["runtime_id"] === session["runtime_id"] &&
-      run["status"] === "completed" &&
+      (run["status"] === "completed" || verifiedNativeTerminal) &&
       run["status_operation_id"] === null,
     "Latest Run must be completely committed before conversion.",
   );
   requireValue(
     native["session_id"] === session["id"] &&
-      native["observed_session_run_id"] === run["id"] &&
+      (native["observed_session_run_id"] === run["id"] || verifiedNativeTerminal) &&
       native["runtime_id"] === session["runtime_id"],
     "Native reference does not match the successful boundary.",
   );
@@ -350,11 +414,11 @@ export function buildSessionIsolationPlan(value: unknown): SessionIsolationPlan 
     );
   }
   parseAgentStoredConfig(text(configJson));
-  const workspaceEvidence = record(input["workspaceEvidence"]);
   requireValue(
     workspaceEvidence["sessionId"] === session["id"] &&
       workspaceEvidence["sourceBackupId"] === sourceBackup["id"] &&
-      workspaceEvidence["completedRunId"] === run["id"] &&
+      workspaceEvidence[run["status"] === "completed" ? "completedRunId" : "terminalRunId"] ===
+        run["id"] &&
       workspaceEvidence["cwd"] === workspace["cwd"] &&
       workspaceEvidence["nativeValue"] === native["value"] &&
       workspaceEvidence["runtimeId"] === native["runtime_id"],
@@ -422,11 +486,13 @@ export function buildSessionIsolationPlan(value: unknown): SessionIsolationPlan 
     binding: { ...record(rawPlan["binding"]), kind: "cattle" },
     configJson,
   };
+  // An imported failed boundary is durable native state, never a successful Run.
+  const successfulRunId = run["status"] === "completed" ? run["id"]! : null;
   const targetBackup: Row = {
     ...sourceBackup,
     id: backupId,
     sandbox_id: sandboxId,
-    session_run_id: run["id"]!,
+    session_run_id: successfulRunId,
     keep: 1,
     error_message: null,
     ttl_seconds: Math.max(Number(sourceBackup["ttl_seconds"]), 30 * 24 * 60 * 60),
@@ -443,7 +509,11 @@ export function buildSessionIsolationPlan(value: unknown): SessionIsolationPlan 
       cloudflare_session_id: executionId,
       updated_at: now,
     },
-    native: { ...native, committed_value: native["value"]!, committed_session_run_id: run["id"]! },
+    native: {
+      ...native,
+      committed_value: native["value"]!,
+      committed_session_run_id: successfulRunId,
+    },
     snapshot: { ...snapshot, plan_json: JSON.stringify(newPlan) },
     sourceBackup: targetBackup,
     latestBackup: targetBackup,

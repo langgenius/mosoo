@@ -303,7 +303,7 @@ export async function prepareSessionIsolationExecution(
     source.updatedAt !== original.before.sandbox["updated_at"] ||
     !member ||
     member.statusSeq !== original.before.session["status_seq"] ||
-    member.archivedAt !== null
+    member.archivedAt !== original.before.session["archived_at"]
   ) {
     throw new Error("Reviewed isolation cohort does not describe the original source.");
   }

@@ -153,9 +153,14 @@ context. The execution snapshot's binding also participates in allocation.
 
 Prepare one consistent transition that preserves public identity and admitted
 configuration while binding the Session to its own Sandbox, original directory,
-verified checkpoint, and matching native commit. Do not mark the latest observed
-native reference committed unless the selected workspace and successful Run
-establish that boundary. Preserve history, events, artifacts, delegated identity,
+verified checkpoint, and matching native commit. The ordinary path requires a
+successful Run. A finite ACP conversion can also use a separately verified native
+terminal boundary: the original ID/directory, all canonical text, native rows,
+and durable files must survive a current-harness resume and history-read rehearsal.
+This is an imported durable checkpoint, not a claim that a failed Run succeeded.
+Failed Runs retain their status and events; their imported backup and native
+commit leave the successful-Run association null. Missing canonical text is not
+qualified by a successful native load. Preserve history, events, artifacts, delegated identity,
 runtime/model, and immutable environment/resource references. Revalidate current
 credential and resource authorization when execution resumes.
 
@@ -223,10 +228,24 @@ The JSON input has these fields:
   `rollbackArchiveSha256`. These declare independently collected evidence; the
   planner checks their shape and correspondence but does **not** inspect archives,
   verify remote object bytes, or establish shared-memory ownership.
+- For the finite ACP terminal path, `workspaceEvidence.terminalEvidence` binds
+  the exact terminal Run/status/time and observed native Run, current API/Driver/
+  harness versions, native-load image and receipt, canonical-history receipt,
+  preserved native rows, and equal nonzero canonical/native replay counts.
+  A failed boundary uses `terminalRunId` instead of `completedRunId`. All evidence
+  must describe the same source/prepared archives already named above; retain the
+  private receipts for independent review. This declaration is not an archive
+  verifier and cannot authorize a remote data rewrite.
 
-This initial planner supports an idle, unarchived legacy Session whose latest Run
+The ordinary planner supports an idle, unarchived legacy Session whose latest Run
 completed successfully and whose original configuration and native source are
-known. It does not qualify missing sources, active work, or other lifecycle states.
+known. The finite ACP path additionally permits a failed last Run or an older
+observation of the same proven native ID. It requires complete terminal evidence
+and the corresponding persisted terminal event. An already archived ACP Session
+may be copied under the same evidence; its archive timestamp remains unchanged
+through conversion, claim release and rollback, and it is not reopened. A later
+archive/unarchive change still invalidates the before-image. It does not qualify missing
+canonical messages, unknown configuration, active work, or other lifecycle states.
 It preserves the existing recovery policy and all unrelated snapshot fields.
 Completed recycling can leave an operation ID on a cold Sandbox; the planner
 compares that original marker and creates the destination without it. Older
@@ -236,7 +255,7 @@ Project, and delegated identity agree. Conflicting non-null ownership is rejecte
 the original records remain unchanged for rollback.
 
 Both output files contain one `{ "batch": [...] }` of bound SQL statements. The
-first statement checks complete before-images, successful completion history,
+first statement checks complete before-images, matching terminal history,
 Agent-wide active Runs, live Drivers and conversation bindings, and current backup
 selection. It also checks active Runs through every workspace and Driver attached
 to each affected Sandbox, independently of Agent provenance or Driver status.
