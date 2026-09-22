@@ -82,10 +82,10 @@ const ACTIVE_RUNS = ACTIVE_SESSION_RUN_STATUSES.map((s) => `'${s}'`).join(",");
 const LIVE_DRIVERS = LIVE_DRIVER_INSTANCE_STATUSES.map((s) => `'${s}'`).join(",");
 
 /** Internal D1 barrier only. Physical exclusion and verified conversion are separate steps. */
-export async function claimSessionIsolationCohort(
+export function prepareSessionIsolationClaim(
   database: D1Database,
   input: { cohort: SessionIsolationCohort; operationId: RuntimeOperationId; now: number },
-): Promise<void> {
+): D1PreparedStatement[] {
   const { cohort, operationId, now } = input;
   if (
     !cohort.sessions.length ||
@@ -131,7 +131,7 @@ export async function claimSessionIsolationCohort(
       OR EXISTS (SELECT 1 FROM driver_instance d WHERE d.id = r.driver_instance_id
         AND d.sandbox_id = json_extract(e.value, '$.sandbox.id'))))
     THEN 1 ELSE json('session isolation cohort changed or is busy') END AS ready FROM e`;
-  await database.batch([
+  return [
     database.prepare(guard).bind(expected),
     database
       .prepare(`UPDATE session SET status_operation_id = ?, status_seq = status_seq + 1
@@ -141,14 +141,21 @@ export async function claimSessionIsolationCohort(
       .prepare(`UPDATE sandbox SET claim_owner = ?, updated_at = ?
       WHERE id = ? AND claim_owner IS NULL`)
       .bind(owner, now, cohort.sandbox.id),
-  ]);
+  ];
 }
 
-/** Call only after all owned physical fences are safely released; never expire a claim. */
-export async function releaseSessionIsolationCohort(
+export async function claimSessionIsolationCohort(
   database: D1Database,
   input: { cohort: SessionIsolationCohort; operationId: RuntimeOperationId; now: number },
 ): Promise<void> {
+  await database.batch(prepareSessionIsolationClaim(database, input));
+}
+
+/** Call only after all owned physical fences are safely released; never expire a claim. */
+export function prepareSessionIsolationRelease(
+  database: D1Database,
+  input: { cohort: SessionIsolationCohort; operationId: RuntimeOperationId; now: number },
+): D1PreparedStatement[] {
   const { cohort, operationId, now } = input;
   if (
     !cohort.sessions.length ||
@@ -158,7 +165,7 @@ export async function releaseSessionIsolationCohort(
   }
   const owner = sessionIsolationClaimOwner(operationId);
   const expected = JSON.stringify({ ...cohort, operationId, owner });
-  await database.batch([
+  return [
     database
       .prepare(`WITH e(value) AS (SELECT ?) SELECT CASE WHEN
       EXISTS (SELECT 1 FROM sandbox WHERE id = json_extract(e.value, '$.sandbox.id')
@@ -190,5 +197,12 @@ export async function releaseSessionIsolationCohort(
     database
       .prepare("UPDATE sandbox SET claim_owner = NULL, updated_at = ? WHERE claim_owner = ?")
       .bind(now, owner),
-  ]);
+  ];
+}
+
+export async function releaseSessionIsolationCohort(
+  database: D1Database,
+  input: { cohort: SessionIsolationCohort; operationId: RuntimeOperationId; now: number },
+): Promise<void> {
+  await database.batch(prepareSessionIsolationRelease(database, input));
 }

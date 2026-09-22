@@ -13,6 +13,7 @@ import { createPlatformId, parsePlatformId } from "@mosoo/id";
 import type { RuntimeOperationId, SandboxSessionId } from "@mosoo/id";
 import { createRuntimeEvent } from "@mosoo/runtime-events";
 
+import { SandboxMigrationFence } from "../src/adapters/durable-objects/sandbox-migration-fence";
 import { getAccountViewer } from "../src/modules/auth/application/viewer-auth.service";
 import { getSessionExecutionPlan } from "../src/modules/runtime/application/session-definition/session-execution.repository";
 import { queueSessionRun } from "../src/modules/runtime/application/session-run.service";
@@ -30,11 +31,19 @@ import {
   markRuntimeSubjectOperationStarted,
 } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-record-store";
 import { encodeSandboxBackupIdForStorage } from "../src/modules/runtime/infrastructure/sandbox-backup-id";
+import { getSandboxBackupObjectKeys } from "../src/modules/runtime/infrastructure/sandbox-backup-platform";
 import {
   claimSessionIsolationCohort,
   readSessionIsolationCohort,
   releaseSessionIsolationCohort,
 } from "../src/modules/runtime/infrastructure/session-isolation-claim.repository";
+import {
+  advanceSessionIsolationExecution,
+  inspectSessionIsolationExecution,
+  prepareSessionIsolationExecution,
+  requestSessionIsolationRollback,
+} from "../src/modules/runtime/infrastructure/session-isolation-execution";
+import type { SessionIsolationExecutionPlatform } from "../src/modules/runtime/infrastructure/session-isolation-execution";
 import { buildSessionIsolationPlan } from "../src/modules/runtime/infrastructure/session-isolation-plan";
 import type { TransitionStatement } from "../src/modules/runtime/infrastructure/session-isolation-plan";
 import { PREVIEW_RETENTION_MS } from "../src/modules/sessions/domain/preview-retention-policy";
@@ -1133,5 +1142,433 @@ describe("Session isolation cohort admission", () => {
         .prepare("SELECT COUNT(*) n FROM session_message WHERE role = 'user'")
         .first("n"),
     ).toBe(1);
+  });
+});
+
+function localExecutionPlatform() {
+  const records = new Map<string, ReturnType<typeof createFence>>();
+  const objects = new Map<string, string>();
+  for (const [id, hash] of [
+    [SOURCE_BACKUP, "a"],
+    [NEW_BACKUP, "b"],
+    [ROLLBACK_BACKUP, "c"],
+  ]) {
+    const [archive, metadata] = getSandboxBackupObjectKeys(id);
+    objects.set(archive, hash.repeat(64));
+    objects.set(metadata, "d".repeat(64));
+  }
+  function createFence() {
+    const storage = new Map<string, unknown>();
+    const container = {
+      running: false,
+      monitor: async () => {},
+      destroy: async () => {
+        container.running = false;
+      },
+    };
+    let reset = false;
+    const context = {
+      storage: {
+        get: async (key: string) => storage.get(key),
+        put: async (key: string, value: unknown) => {
+          storage.set(key, value);
+        },
+        sync: async () => {},
+      },
+      container,
+      blockConcurrencyWhile: async <T>(action: () => Promise<T>) => action(),
+      abort: () => {
+        reset = true;
+        throw new Error("synthetic actor reset");
+      },
+    };
+    return {
+      container,
+      fence: new SandboxMigrationFence(context),
+      async begin(claim: { operationId: string; revision: number }) {
+        try {
+          return await this.fence.begin(claim);
+        } finally {
+          if (reset) {
+            reset = false;
+            this.fence = new SandboxMigrationFence(context);
+          }
+        }
+      },
+    };
+  }
+  const resource = (id: string) => {
+    let result = records.get(id);
+    if (!result) {
+      result = createFence();
+      records.set(id, result);
+    }
+    return result;
+  };
+  let loseReleaseResponse = false;
+  const platform: SessionIsolationExecutionPlatform = {
+    async inspect(r) {
+      const state = resource(r.sandboxId);
+      return {
+        ...(await state.fence.inspect()),
+        state: state.container.running ? "running" : "stopped",
+        observedAt: Date.now(),
+      };
+    },
+    begin: (r, claim) => resource(r.sandboxId).begin(claim),
+    stop: (r, claim) => resource(r.sandboxId).fence.stop(claim),
+    async release(r, claim) {
+      await resource(r.sandboxId).fence.release(claim);
+      if (loseReleaseResponse) {
+        loseReleaseResponse = false;
+        throw new Error("lost release response");
+      }
+    },
+    async verifyObject(key, hash) {
+      if (objects.get(key) !== hash) throw new Error("missing or changed recovery object");
+    },
+  };
+  return {
+    platform,
+    objects,
+    loseReleaseResponse: () => {
+      loseReleaseResponse = true;
+    },
+  };
+}
+
+async function executionFixture() {
+  const state = await fixture();
+  const resources = localExecutionPlatform();
+  const request = {
+    operationId: ISOLATION_OPERATION,
+    cohort: await readSessionIsolationCohort(state.database, ID.sandbox),
+    plan: state.input,
+    metadataHashes: { source: "d".repeat(64), prepared: "d".repeat(64), rollback: "d".repeat(64) },
+  };
+  const step = (database: D1Database = state.database) =>
+    advanceSessionIsolationExecution(database, resources.platform, ISOLATION_OPERATION);
+  const finish = async () => {
+    for (let attempt = 0; attempt < 6; attempt++) if ((await step()).phase === "complete") return;
+    throw new Error("isolation did not finish within its bounded phase sequence");
+  };
+  return { ...state, ...resources, request, step, finish };
+}
+
+function loseNextBatchResponse(database: D1Database) {
+  let lost = false;
+  return new Proxy(database, {
+    get(target, property) {
+      if (property === "batch")
+        return async <T>(statements: D1PreparedStatement[]) => {
+          const result = await target.batch<T>(statements);
+          if (!lost) {
+            lost = true;
+            throw new Error("lost database response");
+          }
+          return result;
+        };
+      const member = Reflect.get(target, property);
+      return typeof member === "function" ? member.bind(target) : member;
+    },
+  });
+}
+
+describe("Resumable Session isolation execution", () => {
+  test("holds input through conversion and releases it once with an atomic completion receipt", async () => {
+    const f = await executionFixture();
+    expect((await prepareSessionIsolationExecution(f.database, f.platform, f.request)).phase).toBe(
+      "prepared",
+    );
+    await f.step();
+    let blocked!: () => void;
+    const waiting = new Promise<void>((resolve) => {
+      blocked = resolve;
+    });
+    const admitted = f.queue(observeIsolationAdmission(f.database, blocked));
+    await waiting;
+    expect(
+      await f.database
+        .prepare("SELECT kind FROM session WHERE id = ?")
+        .bind(ID.ownerSession)
+        .first("kind"),
+    ).toBe("pet");
+    expect((await f.step()).phase).toBe("converted");
+    expect(
+      await f.database
+        .prepare("SELECT status_operation_id FROM session WHERE id = ?")
+        .bind(ID.ownerSession)
+        .first("status_operation_id"),
+    ).toBe(ISOLATION_OPERATION);
+    await f.finish();
+    expect((await admitted).sessionState.sessionId).toBe(ID.ownerSession);
+    expect(await f.database.prepare("SELECT COUNT(*) n FROM session_run").first("n")).toBe(2);
+    expect(
+      await f.database
+        .prepare("SELECT COUNT(*) n FROM session_message WHERE role = 'user'")
+        .first("n"),
+    ).toBe(1);
+    expect(
+      await f.database
+        .prepare("SELECT status FROM api_command WHERE kind = 'session_isolation'")
+        .first("status"),
+    ).toBe("succeeded");
+    const after = await dump(f.database);
+    await f.step();
+    await prepareSessionIsolationExecution(f.database, f.platform, f.request);
+    expect(await dump(f.database)).toEqual(after);
+  });
+
+  test("lost D1 conversion acknowledgement resumes from the committed phase", async () => {
+    const f = await executionFixture();
+    await prepareSessionIsolationExecution(f.database, f.platform, f.request);
+    await f.step();
+    await expect(f.step(loseNextBatchResponse(f.database))).rejects.toThrow(
+      "lost database response",
+    );
+    expect((await inspectSessionIsolationExecution(f.database, ISOLATION_OPERATION)).phase).toBe(
+      "converted",
+    );
+    await f.finish();
+    expect(
+      await f.database
+        .prepare("SELECT COUNT(*) n FROM sandbox_backup WHERE id = ?")
+        .bind(NEW_BACKUP)
+        .first("n"),
+    ).toBe(1);
+  });
+
+  test("lost physical release and final D1 acknowledgements never reacquire an already live Session", async () => {
+    const f = await executionFixture();
+    await prepareSessionIsolationExecution(f.database, f.platform, f.request);
+    await f.step();
+    await f.step();
+    await f.step();
+    f.loseReleaseResponse();
+    await expect(f.step()).rejects.toThrow("lost release response");
+    expect((await inspectSessionIsolationExecution(f.database, ISOLATION_OPERATION)).phase).toBe(
+      "releasing",
+    );
+    await expect(f.step(loseNextBatchResponse(f.database))).rejects.toThrow(
+      "lost database response",
+    );
+    await f.queue();
+    const before = await dump(f.database);
+    expect((await f.step()).phase).toBe("complete");
+    expect(await dump(f.database)).toEqual(before);
+    await expect(requestSessionIsolationRollback(f.database, ISOLATION_OPERATION)).rejects.toThrow(
+      "release has begun",
+    );
+  });
+
+  test("rollback preserves concurrent file activity and renaming while restoring the native reader", async () => {
+    const f = await executionFixture();
+    await prepareSessionIsolationExecution(f.database, f.platform, f.request);
+    await f.step();
+    await f.step();
+    await f.database
+      .prepare(
+        "UPDATE session SET metadata_json = ?, title = ?, renamed = 1, updated_at = ? WHERE id = ?",
+      )
+      .bind('{"preview_last_activity_at":12345}', "new user title", NOW + 100, ID.ownerSession)
+      .run();
+    await f.database
+      .prepare("UPDATE agent SET prompt = ?, model = ?, updated_at = ? WHERE id = ?")
+      .bind("new draft instructions", "new-draft-model", NOW + 100, ID.agent)
+      .run();
+    await requestSessionIsolationRollback(f.database, ISOLATION_OPERATION);
+    await f.finish();
+    expect(
+      await f.database
+        .prepare("SELECT kind, metadata_json, title, renamed, updated_at FROM session WHERE id = ?")
+        .bind(ID.ownerSession)
+        .first(),
+    ).toEqual({
+      kind: "pet",
+      metadata_json: '{"preview_last_activity_at":12345}',
+      title: "new user title",
+      renamed: 1,
+      updated_at: NOW + 100,
+    });
+    const restored = await getRuntimeConversationSession(f.database, ID.ownerSession);
+    expect(restored?.sandboxSessionId).toBe(ROLLBACK_EXECUTION_ID);
+    expect(
+      await f.database
+        .prepare("SELECT COUNT(*) n FROM sandbox_backup WHERE id = ?")
+        .bind(ROLLBACK_BACKUP)
+        .first("n"),
+    ).toBe(1);
+    expect(
+      (
+        await getNativeResumeRefForRuntime(f.database, {
+          sessionId: ID.ownerSession,
+          runtimeId: "openai-runtime",
+        })
+      )?.value,
+    ).toBe("native-original");
+    expect((await getSessionExecutionPlan(f.database, ID.ownerSession))?.binding.model).toBe(
+      "gpt-5.4",
+    );
+    expect(
+      await f.database
+        .prepare("SELECT model FROM agent WHERE id = ?")
+        .bind(ID.agent)
+        .first("model"),
+    ).toBe("new-draft-model");
+  });
+
+  test("changed archive prevents conversion and explicit abort releases only newly reserved state", async () => {
+    const f = await executionFixture();
+    await prepareSessionIsolationExecution(f.database, f.platform, f.request);
+    await f.step();
+    f.objects.clear();
+    await expect(f.step()).rejects.toThrow("missing or changed recovery object");
+    expect(
+      await f.database
+        .prepare("SELECT kind FROM session WHERE id = ?")
+        .bind(ID.ownerSession)
+        .first("kind"),
+    ).toBe("pet");
+    await requestSessionIsolationRollback(f.database, ISOLATION_OPERATION);
+    await f.finish();
+    expect(
+      await f.database
+        .prepare("SELECT COUNT(*) n FROM sandbox WHERE id = ?")
+        .bind(TARGET_SANDBOX)
+        .first("n"),
+    ).toBe(0);
+    expect(await f.database.prepare("SELECT COUNT(*) n FROM sandbox_backup").first("n")).toBe(2);
+    expect(
+      await f.database
+        .prepare("SELECT status_operation_id FROM session WHERE id = ?")
+        .bind(ID.ownerSession)
+        .first("status_operation_id"),
+    ).toBeNull();
+  });
+
+  test("a changed execution field prevents rollback without overwriting the winning state", async () => {
+    const f = await executionFixture();
+    await prepareSessionIsolationExecution(f.database, f.platform, f.request);
+    await f.step();
+    await f.step();
+    await requestSessionIsolationRollback(f.database, ISOLATION_OPERATION);
+    await f.database
+      .prepare("UPDATE session SET model = 'changed-model' WHERE id = ?")
+      .bind(ID.ownerSession)
+      .run();
+    const before = await dump(f.database);
+    await expect(f.step()).rejects.toThrow("changed execution state");
+    expect(await dump(f.database)).toEqual(before);
+  });
+
+  test("rollback requires its verified copy even when a forward archive is no longer usable", async () => {
+    const f = await executionFixture();
+    await prepareSessionIsolationExecution(f.database, f.platform, f.request);
+    await f.step();
+    await f.step();
+    await requestSessionIsolationRollback(f.database, ISOLATION_OPERATION);
+    const [rollbackArchive, rollbackMetadata] = getSandboxBackupObjectKeys(ROLLBACK_BACKUP);
+    f.objects.clear();
+    await expect(f.step()).rejects.toThrow("missing or changed recovery object");
+    expect((await inspectSessionIsolationExecution(f.database, ISOLATION_OPERATION)).phase).toBe(
+      "converted",
+    );
+    f.objects.set(rollbackArchive, "c".repeat(64));
+    f.objects.set(rollbackMetadata, "d".repeat(64));
+    await f.finish();
+    expect(
+      (await getRuntimeConversationSession(f.database, ID.ownerSession))?.latestReadyBackup?.id,
+    ).toBe(ROLLBACK_BACKUP);
+  });
+
+  test("preparation is immutable and a new peer prevents the whole claim", async () => {
+    const f = await executionFixture();
+    await prepareSessionIsolationExecution(f.database, f.platform, f.request);
+    await expect(
+      prepareSessionIsolationExecution(f.database, f.platform, {
+        ...f.request,
+        metadataHashes: { ...f.request.metadataHashes, source: "e".repeat(64) },
+      }),
+    ).rejects.toThrow("input is immutable");
+    await insertNonOwnerSession(f.database);
+    const before = await dump(f.database);
+    await expect(f.step()).rejects.toThrow();
+    expect(await dump(f.database)).toEqual(before);
+    await requestSessionIsolationRollback(f.database, ISOLATION_OPERATION);
+    await f.finish();
+    expect(
+      await f.database
+        .prepare("SELECT COUNT(*) n FROM sandbox WHERE id = ?")
+        .bind(TARGET_SANDBOX)
+        .first("n"),
+    ).toBe(0);
+  });
+});
+
+describe("Isolation execution conflicts", () => {
+  test("a rollback decision prevents a concurrently stopping forward worker from converting", async () => {
+    const f = await executionFixture();
+    await prepareSessionIsolationExecution(f.database, f.platform, f.request);
+    await f.step();
+    let reached!: () => void;
+    let resume!: () => void;
+    const stopping = new Promise<void>((resolve) => {
+      reached = resolve;
+    });
+    const resumeStop = new Promise<void>((resolve) => {
+      resume = resolve;
+    });
+    const originalStop = f.platform.stop;
+    let first = true;
+    f.platform.stop = async (resource, claim) => {
+      const result = await originalStop(resource, claim);
+      if (first) {
+        first = false;
+        reached();
+        await resumeStop;
+      }
+      return result;
+    };
+    const concurrent = f.step();
+    await stopping;
+    await requestSessionIsolationRollback(f.database, ISOLATION_OPERATION);
+    resume();
+    await expect(concurrent).rejects.toThrow();
+    expect(
+      (await inspectSessionIsolationExecution(f.database, ISOLATION_OPERATION)).direction,
+    ).toBe("rollback");
+    expect(
+      await f.database
+        .prepare("SELECT kind FROM session WHERE id = ?")
+        .bind(ID.ownerSession)
+        .first("kind"),
+    ).toBe("pet");
+    await f.finish();
+    expect(
+      await f.database
+        .prepare("SELECT COUNT(*) n FROM sandbox WHERE id = ?")
+        .bind(TARGET_SANDBOX)
+        .first("n"),
+    ).toBe(0);
+  });
+
+  test("a destination collision atomically leaves the source and the other resource untouched", async () => {
+    const f = await executionFixture();
+    await prepareSessionIsolationExecution(f.database, f.platform, f.request);
+    await execute(f.database, [f.plan.forward[1]]);
+    const before = await dump(f.database);
+    await expect(f.step()).rejects.toThrow();
+    expect(await dump(f.database)).toEqual(before);
+    await requestSessionIsolationRollback(f.database, ISOLATION_OPERATION);
+    await f.finish();
+    expect(
+      await f.database
+        .prepare("SELECT COUNT(*) n FROM sandbox WHERE id = ?")
+        .bind(TARGET_SANDBOX)
+        .first("n"),
+    ).toBe(1);
+    expect(
+      await f.platform.inspect({ sandboxId: TARGET_SANDBOX, binding: "Sandbox", revision: 0 }),
+    ).toMatchObject({ operationId: null, revision: 0 });
   });
 });

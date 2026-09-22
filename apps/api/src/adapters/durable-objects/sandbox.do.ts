@@ -73,6 +73,17 @@ export class Sandbox extends DurableObject<ApiBindings> {
     return this.getMigrationFence();
   }
 
+  async completeMigrationFence(claim: SandboxMigrationFenceClaim) {
+    const current = await this.#migrationFence.inspect();
+    if (current.operationId === claim.operationId && current.revision === claim.revision) {
+      // A resumed actor has lost its in-memory stop proof. Re-establish it and
+      // release in one RPC; an already released claim remains an idempotent retry.
+      await this.#migrationFence.stop(claim);
+    }
+    await this.#migrationFence.release(claim);
+    return this.getMigrationFence();
+  }
+
   #initializeDelegate() {
     if (this.#initialization) return this.#initialization;
 

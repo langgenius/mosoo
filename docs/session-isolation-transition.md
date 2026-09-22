@@ -1,8 +1,10 @@
 # Session Isolation Transition
 
-Status: unreleased #582 / #638 / #640 operating contract. An offline database
-batch planner is available; the production executor, verified object preparation,
-physical drain, full cutover acceptance, and release approval remain outstanding.
+Status: unreleased #582 / #638 / #640 operating contract. The offline planner and
+resumable operator executor are implementation candidates. Local native D1/R2 and
+container tests cover forward conversion and rollback. Customer source recovery,
+verified object preparation, hosted cutover acceptance, and release approval
+remain outstanding.
 This document does not authorize production writes, customer model/tool calls,
 resource destruction, or notification delivery.
 
@@ -265,8 +267,9 @@ owner and revision, completed stopping, and a stopped physical container. Releas
 durably increments the revision, so an old claim cannot reacquire the resource;
 retrying the completed release is harmless. A fence does not expire automatically.
 A failed or interrupted operation must inspect the retained claim and resume its
-reviewed recovery sequence. This primitive does not yet establish the D1 admission
-barrier, checkpoint ownership, migration/rollback execution or Cloud acceptance.
+reviewed recovery sequence. This physical primitive alone does not establish the
+D1 admission barrier, checkpoint ownership or Cloud acceptance. The operator
+executor below composes it with the database barrier and reviewed transition.
 
 A local replay against the pinned SDK and product wrapper verifies persisted
 fencing across actor reset, rejected old Session/Process callbacks, interrupted
@@ -306,8 +309,9 @@ invalidates the prepared database plan rather than overwriting that activity.
 The offline planner accepts an optional `operationId` with matching held Session
 and Sandbox before-images. The destination retains the marker through forward
 and rollback batches. Release physical fences first, then atomically release the
-recorded D1 cohort and destination claims. These primitives still need the complete
-resumable orchestration, verified objects and hosted cutover/rollback acceptance.
+recorded D1 cohort and destination claims. The executor below performs that
+sequence; verified customer objects and hosted cutover/rollback acceptance remain
+release prerequisites.
 
 A tie in the old timestamp-only backup lookup is rejected. A stale
 precondition raises a SQL error; use **one atomic D1 batch**, never separate calls
@@ -327,6 +331,90 @@ reviewed batch hashes. Attach those facts to the approval packet. `review.json`
 records input and batch hashes, statement counts, and zero remote actions; it is
 neither a production target authorization nor proof that those external checks
 passed. No production execution command is supplied by this planner.
+
+### Execute and resume a reviewed operation
+
+The separate operator executor converts one qualified Session while holding its
+entire shared-source cohort. It uses the existing `api_command` table for an
+operator-owned `session_isolation` record. The ordinary command queue cannot
+execute it. Its reviewed input and phase are durable; its ownership does not
+expire. Each step compares the previous receipt in the same native D1 batch as
+its database changes. A lost response is resolved by inspecting and resuming the
+same operation ID, never by clearing claims or guessing from live Session rows.
+
+Prepare a private JSON request containing:
+
+- `operationId`: a fresh platform ID, retained for every retry;
+- `cohort`: the original Sandbox identity, binding, lifecycle revision and update
+  timestamp, plus every member's Session ID, lifecycle revision and archive state,
+  as returned by `readSessionIsolationCohort`;
+- `plan`: the original, unheld input to the offline planner, including all reviewed
+  before-images and source/prepared/rollback archive hashes;
+- `metadataHashes`: SHA-256 values named `source`, `prepared` and `rollback` for
+  those archives' actual `meta.json` objects.
+
+Preparation verifies the actual object bytes and rejects changed, missing,
+misidentified or expired metadata. Metadata must describe the reviewed directory,
+archive size and at least the backup lifetime promised by the database. This is
+an identity/integrity check, not a replacement for inspecting the archive contents
+and proving recovery before approving a customer cohort.
+
+The phases are `prepared` → `held` → `converted` → `releasing` → `complete`.
+Claiming the full source cohort and reserving the fresh destination row is atomic.
+The next step acquires both recorded physical fence revisions, resets stale actors,
+stops both containers, rechecks the objects and applies the guarded conversion.
+Release re-establishes a stopped observation after an actor restart, releases both
+physical fences, then atomically releases database admission and saves completion.
+A completed operation only returns its receipt; retrying it cannot stop newly
+admitted work or reacquire an old fence revision.
+
+Rollback records its direction before applying the inverse and passes through
+`restored` before release. It preserves current attachment activity, titles and
+Agent edits while checking all execution fields and restoring the reviewed frozen
+configuration and native context. Before any conversion, abort removes only its
+own unused destination reservation. After conversion it retains copied resources
+and backups. Rollback revalidates its original-layout copy; an unusable forward
+archive cannot prevent recovery from that verified copy. Rollback selection closes
+when phase `releasing` begins; later work
+needs a new reviewed transition, not reuse of an old inverse.
+
+`SessionIsolationAdmin` is a named Worker service entrypoint with no HTTP route.
+An account-owned operator config must explicitly bind `SESSION_ISOLATION` to that
+entrypoint on the reviewed API Worker. A hosted binding uses the selected account
+and service with `remote = true`; a local fixture uses its local service instead.
+This service binding is the control path; a local proxy must not simulate remote
+Durable Objects or Containers, which do not support remote bindings.
+
+```toml
+name = "mosoo-session-isolation-operator"
+account_id = "<reviewed account ID>"
+compatibility_date = "2026-08-01"
+compatibility_flags = ["nodejs_compat"]
+
+[[services]]
+binding = "SESSION_ISOLATION"
+service = "<reviewed API Worker name>"
+entrypoint = "SessionIsolationAdmin"
+remote = true
+```
+
+Run `just session-isolation-run <absolute operator config> <mode> <input> <absolute
+new receipt directory>`. `prepare` takes the private request path; `inspect`,
+`advance`, `run` and `rollback` take the existing operation ID. `advance` performs
+one durable step; `run` resumes through completion; `rollback` records the inverse
+direction and resumes it. Each invocation needs a new receipt directory. The CLI
+saves private `receipt.json` or `failure.json` with directory/file modes `0700` and
+`0600`; it makes no model request. Failed operations are not retried by a background
+scheduler. The operator must inspect and resume them, retaining admission
+protection until the recorded recovery sequence completes.
+
+Local verification combines all 18 D1 migrations, actual R2 archives, the named
+service entrypoint, the actual operator CLI and real containers. It covers lost conversion acknowledgement,
+actor restart before release, same-ID workspace restoration, rollback, expired
+metadata rejection and harmless completion replay. The native-context marker in
+this fixture is synthetic; it proves preserved references and file bytes, not a
+customer harness turn or hosted acceptance. Production use still requires the
+reviewed target/cohort, source recovery, backup/rollback plan and explicit approval.
 
 ## Rollback and release
 

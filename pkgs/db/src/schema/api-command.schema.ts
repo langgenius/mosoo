@@ -9,6 +9,7 @@ export type ApiCommandKind =
   | "cost_ledger_reconciliation"
   | "environment_package_artifact_build"
   | "scheduled_maintenance"
+  | "session_isolation"
   | "session_run_dispatch";
 export type ApiCommandStatus = "dead_lettered" | "failed" | "queued" | "running" | "succeeded";
 

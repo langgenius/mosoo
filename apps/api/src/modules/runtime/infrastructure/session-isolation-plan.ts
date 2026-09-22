@@ -184,7 +184,39 @@ export interface SessionIsolationPlan {
   // Source and destination objects must be verified independently before use.
   before: Source;
   after: Source;
+  rollbackBackup: Row;
   workspaceEvidence: Record<string, unknown>;
+}
+
+/** Preserve concurrent attachment activity and renames; migration-owned state must still match. */
+export function prepareSessionIsolationRollback(
+  plan: SessionIsolationPlan,
+  currentSession: unknown,
+  currentAgent: unknown,
+): TransitionStatement[] {
+  const session = readRow("session", currentSession);
+  const agent = readRow("agent", currentAgent);
+  const mutable = new Set(["metadata_json", "renamed", "title", "updated_at"]);
+  for (const [column, value] of Object.entries(plan.after.session)) {
+    requireValue(
+      mutable.has(column) || session[column] === value,
+      "Session isolation rollback encountered changed execution state.",
+    );
+  }
+  for (const column of ["id", "project_id", "owner_account_id", "kind", "created_at"]) {
+    requireValue(
+      agent[column] === plan.after.agent[column],
+      "Session isolation rollback ownership changed.",
+    );
+  }
+  const retainedSource = {
+    ...plan.before,
+    sourceBackup: { ...plan.before.sourceBackup, keep: 1 },
+    latestBackup: { ...plan.before.latestBackup, keep: 1 },
+  };
+  // Current Agent edits are not the admitted configuration. Keep them intact;
+  // the snapshot and its original immutable deployment remain fully guarded.
+  return [guard({ ...plan.after, session, agent }, retainedSource), ...plan.rollback.slice(1)];
 }
 
 /** Offline operator plan only: does not read resources, call models or write D1. */
@@ -442,6 +474,7 @@ export function buildSessionIsolationPlan(value: unknown): SessionIsolationPlan 
   return {
     before,
     after,
+    rollbackBackup,
     workspaceEvidence,
     forward: [
       guard(before),
