@@ -20,14 +20,11 @@ import {
   sandboxIsolationAvailablePredicate,
   sessionIsolationPendingPredicate,
 } from "../../../sessions/infrastructure/session-isolation-barrier.repository";
-import {
-  getRuntimeKindPolicy,
-  getRuntimeSubjectInactiveDeadline,
-} from "../../domain/runtime-kind-policy";
+import { getRuntimeSubjectInactiveDeadline } from "../../domain/runtime-kind-policy";
 import { toRuntimeSubjectStatusLifecycleEventName } from "../../domain/runtime-subject-lifecycle.machine";
 import {
   completedRunHistoryPredicate,
-  isCattleTerminalCheckpointReadyForNextRun,
+  isSessionTerminalCheckpointReadyForNextRun,
 } from "../session-runs/session-run-admission.repository";
 import {
   activeConversationSessionQuery,
@@ -103,7 +100,6 @@ export async function getRuntimeConversationSessionState(
       .select({
         agentId: sessionsTable.agentId,
         sandboxSessionId: sandboxSessionsTable.sandboxSessionId,
-        kind: sandboxesTable.kind,
         status: sandboxSessionsTable.status,
       })
       .from(sandboxSessionsTable)
@@ -120,7 +116,7 @@ export async function getRuntimeConversationSessionState(
   );
 }
 
-// Session-scoped (cattle) conversations stay open across terminal runs so the
+// Session conversations stay open across terminal runs so the
 // driver survives the idle grace. This lists the ones quiet past that grace so
 // the maintenance sweep can close them; the close path arms the subject
 // inactive deadline, which feeds the existing subject reclamation chain. Rows
@@ -145,7 +141,6 @@ export async function listIdleSessionScopedConversationSessions(
     .where(
       and(
         eq(sandboxSessionsTable.status, "active"),
-        eq(sandboxesTable.kind, "cattle"),
         sql`${sandboxSessionsTable.updatedAt} <= ${input.idleSinceLte}`,
         notExists(runLeaseQueryForListedSubject(appDb)),
         or(
@@ -204,7 +199,6 @@ export async function listPendingIdleConversationCheckpoints(
       and(
         eq(sandboxSessionsTable.status, "active"),
         eq(sandboxesTable.status, "active"),
-        eq(sandboxesTable.kind, "cattle"),
         eq(sessionsTable.status, "IDLE"),
         eq(sessionsTable.workspaceCheckpointRequired, true),
         eq(sessionRunsTable.status, "completed"),
@@ -253,7 +247,7 @@ export async function claimIdleSessionScopedConversationForClose(
     readonly sessionId: SessionId;
   },
 ): Promise<boolean> {
-  if (!(await isCattleTerminalCheckpointReadyForNextRun(database, input.sessionId))) {
+  if (!(await isSessionTerminalCheckpointReadyForNextRun(database, input.sessionId))) {
     return false;
   }
 
@@ -416,10 +410,7 @@ export async function recordRuntimeConversationSessionActive(
     readonly now: number;
   },
 ): Promise<void> {
-  const petInactiveDeadlineAt = getRuntimeSubjectInactiveDeadline(
-    getRuntimeKindPolicy("pet"),
-    input.now,
-  );
+  const petInactiveDeadlineAt = getRuntimeSubjectInactiveDeadline(input.now);
 
   // Remote open/close calls can finish after a rebind or a newer execution
   // session. Both writes compare the binding read before the remote operation.

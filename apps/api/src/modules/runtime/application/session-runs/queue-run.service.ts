@@ -31,7 +31,7 @@ import { getSupportedRuntimeId } from "../../domain/runtime-config";
 import {
   attemptQueuedSessionRunAdmission,
   hasSessionRunAdmissionClientRequestReceipt,
-  isCattleTerminalCheckpointReadyForNextRun,
+  isSessionTerminalCheckpointReadyForNextRun,
 } from "../../infrastructure/session-runs/session-run-admission.repository";
 import type { CommitQueuedSessionRunAdmissionInput } from "../../infrastructure/session-runs/session-run-admission.repository";
 import { getActiveSessionRunSummary } from "../../infrastructure/session-runs/session-run-read.repository";
@@ -103,7 +103,7 @@ export async function queueSessionRun(request: QueueSessionRunRequest): Promise<
   await Promise.all([
     assertSessionRecoveryAvailable(bindings.DB, input.session.id, recoveryRequestedAtMs),
     reconcileStaleActiveSessionRun(bindings.DB, input.session.id),
-    isCattleTerminalCheckpointReadyForNextRun(bindings.DB, input.session.id).then((ready) => {
+    isSessionTerminalCheckpointReadyForNextRun(bindings.DB, input.session.id).then((ready) => {
       if (!ready) {
         throw createCheckpointPendingError(input.session.id);
       }
@@ -229,7 +229,7 @@ export async function queueSessionRun(request: QueueSessionRunRequest): Promise<
 
     await assertSessionRecoveryAvailable(bindings.DB, input.session.id, recoveryRequestedAtMs);
 
-    if (!(await isCattleTerminalCheckpointReadyForNextRun(bindings.DB, input.session.id))) {
+    if (!(await isSessionTerminalCheckpointReadyForNextRun(bindings.DB, input.session.id))) {
       throw createCheckpointPendingError(input.session.id);
     }
 

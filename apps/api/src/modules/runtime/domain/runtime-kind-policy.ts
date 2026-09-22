@@ -51,9 +51,7 @@ export interface RuntimeKindPolicy {
   };
 }
 
-const RUNTIME_SUBJECT_IDLE_GRACE_MS = 5 * 60_000;
-
-// Cattle subjects are per-session sandboxes; tearing them down after every
+// Subjects are per-session sandboxes; tearing them down after every
 // terminal run made each follow-up turn in the same session pay the full
 // container boot (measured 2.4-4.8s vs ~0.3s on a warm container). The idle
 // grace keeps the sandbox — and, since conversations no longer close on run
@@ -66,7 +64,7 @@ const RUNTIME_SUBJECT_IDLE_GRACE_MS = 5 * 60_000;
 // inactive deadline — so worst-case container residency after the last run is
 // ~2x the grace (~10min), not one grace. Acceptable at current cattle volume;
 // shorten the post-close deadline for sweep-closes if that residency matters.
-const CATTLE_SUBJECT_IDLE_GRACE_MS = 5 * 60_000;
+export const SESSION_RUNTIME_IDLE_GRACE_MS = 5 * 60_000;
 
 const SUBJECT_MEMORY_CHECKPOINT = {
   path: SANDBOX_MEMORY_PATH,
@@ -80,7 +78,7 @@ const SESSION_WORKSPACES_CHECKPOINT = {
   updateSubjectCheckpoint: false,
 } as const satisfies RuntimeCheckpointRule;
 
-const CATTLE_SESSION_WORKSPACE_CHECKPOINT = {
+export const SESSION_WORKSPACE_CHECKPOINT = {
   ...SESSION_WORKSPACES_CHECKPOINT,
   sanitizeTransientState: true,
 } as const satisfies RuntimeCheckpointRule;
@@ -101,8 +99,8 @@ export const RUNTIME_KIND_POLICIES = {
       createOnHibernate: [],
       createOnRecreate: [],
       createOnReset: [],
-      createOnTerminal: [CATTLE_SESSION_WORKSPACE_CHECKPOINT],
-      restoreOnActivate: [CATTLE_SESSION_WORKSPACE_CHECKPOINT],
+      createOnTerminal: [SESSION_WORKSPACE_CHECKPOINT],
+      restoreOnActivate: [SESSION_WORKSPACE_CHECKPOINT],
     },
     kind: "cattle",
     operations: {
@@ -110,7 +108,7 @@ export const RUNTIME_KIND_POLICIES = {
       terminalTarget: AGENT_KIND_RUNTIME_POLICIES.cattle.terminal.target,
     },
     subject: {
-      idleReleaseDelayMs: CATTLE_SUBJECT_IDLE_GRACE_MS,
+      idleReleaseDelayMs: SESSION_RUNTIME_IDLE_GRACE_MS,
       scope: AGENT_KIND_RUNTIME_POLICIES.cattle.subject.scope,
       subjectKind: AGENT_KIND_RUNTIME_POLICIES.cattle.subject.scope,
     },
@@ -130,7 +128,7 @@ export const RUNTIME_KIND_POLICIES = {
       terminalTarget: AGENT_KIND_RUNTIME_POLICIES.pet.terminal.target,
     },
     subject: {
-      idleReleaseDelayMs: RUNTIME_SUBJECT_IDLE_GRACE_MS,
+      idleReleaseDelayMs: SESSION_RUNTIME_IDLE_GRACE_MS,
       scope: AGENT_KIND_RUNTIME_POLICIES.pet.subject.scope,
       subjectKind: AGENT_KIND_RUNTIME_POLICIES.pet.subject.scope,
     },
@@ -141,8 +139,8 @@ export function getRuntimeKindPolicy(kind: AgentKind): RuntimeKindPolicy {
   return RUNTIME_KIND_POLICIES[kind];
 }
 
-export function getRuntimeSubjectInactiveDeadline(policy: RuntimeKindPolicy, now: number): number {
-  return now + policy.subject.idleReleaseDelayMs;
+export function getRuntimeSubjectInactiveDeadline(now: number): number {
+  return now + SESSION_RUNTIME_IDLE_GRACE_MS;
 }
 
 export function runtimeCheckpointRulesInclude(

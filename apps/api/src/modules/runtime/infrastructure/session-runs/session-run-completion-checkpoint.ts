@@ -40,9 +40,6 @@ export async function prepareSessionRunCompletionCheckpoint(
   bindings: ApiBindings,
   link: RuntimeSessionLink,
 ): Promise<SessionRunCompletionCheckpoint | undefined> {
-  if (link.sandboxKind !== "cattle") {
-    return undefined;
-  }
   if (link.sandboxId === null || link.sessionId === null || link.sessionRunId === null) {
     throw new Error("Session completion requires a linked workspace.");
   }

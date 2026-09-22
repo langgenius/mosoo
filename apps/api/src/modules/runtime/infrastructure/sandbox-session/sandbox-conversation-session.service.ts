@@ -10,11 +10,7 @@ import {
   appendRuntimeDiagnosticEvent,
   toRuntimeDiagnosticBaseValue,
 } from "../../application/runtime-diagnostic-events";
-import {
-  getRuntimeKindPolicy,
-  getRuntimeSubjectInactiveDeadline,
-  runtimeCheckpointRulesInclude,
-} from "../../domain/runtime-kind-policy";
+import { getRuntimeSubjectInactiveDeadline } from "../../domain/runtime-kind-policy";
 import { isRuntimeSandboxLocalBucketEnabled } from "../runtime-sandbox-bucket-mount";
 import type { RuntimeConversationSessionRecord } from "../runtime-subject-lifecycle/runtime-subject-store";
 import {
@@ -52,7 +48,6 @@ function measureOptional<T>(
 
 function resolveConversationContinuationPlan(input: {
   existingSession: RuntimeConversationSessionRecord | null;
-  kind: EnsureSandboxConversationSessionInput["kind"];
 }): {
   sandboxSessionId?: SandboxSessionId;
   requireCwdCheckpoint: boolean;
@@ -61,13 +56,10 @@ function resolveConversationContinuationPlan(input: {
   shouldRestoreCwd: boolean;
   shouldRestoreSessionArtifacts: boolean;
 } {
-  const policy = getRuntimeKindPolicy(input.kind);
-  // Pre-checkpoint Cattle sessions retain their recorded artifact recovery
+  // Pre-checkpoint Sessions retain their recorded artifact recovery
   // path. Sessions admitted with workspace durability require that checkpoint.
   const shouldRestoreSessionArtifacts =
-    input.kind === "cattle" &&
-    input.existingSession !== null &&
-    !input.existingSession.workspaceCheckpointRequired;
+    input.existingSession !== null && !input.existingSession.workspaceCheckpointRequired;
 
   if (input.existingSession === null) {
     return {
@@ -89,12 +81,7 @@ function resolveConversationContinuationPlan(input: {
     };
   }
 
-  const shouldRestoreCwd = runtimeCheckpointRulesInclude(
-    policy.checkpoint.restoreOnActivate,
-    "session_workspaces",
-  );
-  const shouldUseNewCloudflareSession =
-    input.existingSession.status === "closed" && policy.subject.scope === "session";
+  const shouldUseNewCloudflareSession = input.existingSession.status === "closed";
 
   return {
     ...(shouldUseNewCloudflareSession
@@ -103,10 +90,9 @@ function resolveConversationContinuationPlan(input: {
     shouldCreateCloudflareSession: true,
     shouldDeleteErrorSession: input.existingSession.status === "error",
     requireCwdCheckpoint:
-      input.kind === "cattle" &&
       input.existingSession.status === "closed" &&
       input.existingSession.workspaceCheckpointRequired,
-    shouldRestoreCwd,
+    shouldRestoreCwd: true,
     shouldRestoreSessionArtifacts,
   };
 }
@@ -157,7 +143,6 @@ export async function ensureSandboxConversationSession(
   );
   const continuation = resolveConversationContinuationPlan({
     existingSession,
-    kind: input.kind,
   });
   const cwd = existingSession?.cwd ?? getSessionOrganizationPath(input.sessionId);
 
@@ -303,7 +288,7 @@ export async function closeSandboxConversationSession(
   }
 
   // Force-close: session-end / cleanup callers must tear down regardless of
-  // idleness. The idle sweep uses closeIdleCattleConversationSession instead.
+  // idleness. The idle sweep uses closeIdleConversationSession instead.
   await finalizeSandboxConversationClose(bindings, {
     sandboxId: input.sandboxId,
     sessionId: input.sessionId,
@@ -317,7 +302,7 @@ export async function closeSandboxConversationSession(
 // LIST->CLOSE race where a follow-up turn re-uses the resident session before
 // its run lease exists. If the claim loses, the follow-up owns the session and
 // the sweep leaves it. Returns true when it closed the conversation.
-export async function closeIdleCattleConversationSession(
+export async function closeIdleConversationSession(
   bindings: ApiBindings,
   input: {
     idleSinceLte: number;
@@ -391,10 +376,7 @@ async function finalizeSandboxConversationClose(
     // Remote cleanup must not strand the local subject outside reclamation.
     await recordRuntimeConversationSessionClosed(bindings.DB, {
       expectedSandboxSessionId: input.state.sandboxSessionId,
-      inactiveDeadlineAt: getRuntimeSubjectInactiveDeadline(
-        getRuntimeKindPolicy(input.state.kind),
-        now,
-      ),
+      inactiveDeadlineAt: getRuntimeSubjectInactiveDeadline(now),
       now,
       runtimeSubjectId: input.sandboxId,
       sessionId: input.sessionId,

@@ -21,7 +21,7 @@ mock.module("@cloudflare/sandbox", () => ({
 }));
 
 const {
-  closeIdleCattleConversationSession,
+  closeIdleConversationSession,
   closeSandboxConversationSession,
   ensureSandboxConversationSession,
 } =
@@ -594,9 +594,10 @@ describe("ensureSandboxConversationSession", () => {
     expect(restoredPaths).toContain("/workspace/se/session-1/outputs/legacy.txt");
   });
 
-  test("continues a closed pet session through the stable restore path", async () => {
+  test("a legacy label cannot retain a closed execution handle or change the public Session", async () => {
     const database = createConversationSessionDatabase();
     await insertConversationSession(database, { status: "closed" });
+    await setWorkspaceCheckpointRequired(database, true);
     await insertConversationBackup(database);
     let restoredBackup: { readonly dir: string; readonly id: string } | null = null;
     const sandbox = createSandbox({
@@ -611,20 +612,24 @@ describe("ensureSandboxConversationSession", () => {
       createInput(sandbox, "pet"),
     );
 
-    expect(result.sandboxSessionId).toBe("01J00000000000000000000001");
+    expect(result.sandboxSessionId).not.toBe("01J00000000000000000000001");
+    expect(isPlatformId(result.sandboxSessionId)).toBe(true);
     expect(restoredBackup).toEqual({
       dir: "/workspace/se/session-1",
       id: CLOUDFLARE_BACKUP_ID,
       localBucket: false,
     });
     await expect(readConversationSession(database)).resolves.toMatchObject({
-      cloudflare_session_id: "01J00000000000000000000001",
+      cloudflare_session_id: result.sandboxSessionId,
       status: "active",
     });
+    expect(
+      (await database.prepare("SELECT session_id FROM sandbox_session").all()).results,
+    ).toEqual([{ session_id: "session-1" }]);
   });
 });
 
-describe("closeIdleCattleConversationSession", () => {
+describe("closeIdleConversationSession", () => {
   test("arms subject reclamation when the remote session is already absent", async () => {
     const database = createConversationSessionDatabase("cattle");
     await insertConversationSession(database, { status: "active" });
@@ -636,7 +641,7 @@ describe("closeIdleCattleConversationSession", () => {
     const startedAt = Date.now();
 
     await expect(
-      closeIdleCattleConversationSession(createBindings(database, sandbox), {
+      closeIdleConversationSession(createBindings(database, sandbox), {
         idleSinceLte: 1,
         sandboxId: "01J0000000000000000000000D",
         sessionId: "session-1",

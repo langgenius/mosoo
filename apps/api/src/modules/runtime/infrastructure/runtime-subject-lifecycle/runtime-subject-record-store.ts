@@ -18,10 +18,7 @@ import { sandboxBindingForRuntime } from "../../../../platform/cloudflare/sandbo
 import { getAppDatabase, getD1ChangeCount } from "../../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../../time";
 import { sandboxIsolationAvailablePredicate } from "../../../sessions/infrastructure/session-isolation-barrier.repository";
-import {
-  getRuntimeKindPolicy,
-  getRuntimeSubjectInactiveDeadline,
-} from "../../domain/runtime-kind-policy";
+import { getRuntimeSubjectInactiveDeadline } from "../../domain/runtime-kind-policy";
 import {
   RUNTIME_SUBJECT_CLAIMABLE_STATUSES,
   toRuntimeSubjectStatusLifecycleEventName,
@@ -204,7 +201,7 @@ export async function ensureRuntimeSubjectId(
       globalMountsJson: "[]",
       id: runtimeSubjectId,
       sandboxBinding,
-      inactiveDeadlineAt: getRuntimeSubjectInactiveDeadline(getRuntimeKindPolicy(input.kind), now),
+      inactiveDeadlineAt: getRuntimeSubjectInactiveDeadline(now),
       kind: input.kind,
       ownerAccountId: input.executionOwnerUserId,
       status: "cold",
@@ -455,7 +452,7 @@ export async function markRuntimeSubjectActive(
       claimExpiresAt: null,
       claimOwner: null,
       globalMountsJson: "[]",
-      inactiveDeadlineAt: getRuntimeSubjectInactiveDeadline(getRuntimeKindPolicy(input.kind), now),
+      inactiveDeadlineAt: getRuntimeSubjectInactiveDeadline(now),
       lastError: null,
       lastErrorCode: null,
       status: "active",

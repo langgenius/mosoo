@@ -196,7 +196,6 @@ class SandboxExecutionPlaneAdapter implements RuntimeExecutionPlaneAdapter {
       const executionSession = await timing.measure("ensureSandboxConversationSession", () =>
         ensureSandboxConversationSession(bindings, {
           agentId: input.profile.configRevision.agentId,
-          kind: input.profile.kind,
           mountSessionResources: input.attachmentIds.length > 0,
           origin: input.profile.session.origin,
           sandbox,

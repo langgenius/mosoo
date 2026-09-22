@@ -7,7 +7,7 @@ import { createRuntimeEvent } from "@mosoo/runtime-events";
 import { releaseTerminalDriverInstanceSessionRun } from "../src/modules/runtime/infrastructure/driver-instance/terminal-run-release";
 import { encodeSandboxBackupIdForStorage } from "../src/modules/runtime/infrastructure/sandbox-backup-id";
 import type { SandboxHandle } from "../src/modules/runtime/infrastructure/sandbox-handles";
-import { isCattleTerminalCheckpointReadyForNextRun } from "../src/modules/runtime/infrastructure/session-runs/session-run-admission.repository";
+import { isSessionTerminalCheckpointReadyForNextRun } from "../src/modules/runtime/infrastructure/session-runs/session-run-admission.repository";
 import { persistSessionRuntimeEvents } from "../src/modules/sessions/infrastructure/session-runtime-event-store.repository";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import {
@@ -184,13 +184,22 @@ async function createTerminalCheckpointFixture(): Promise<{
   return { bindings, commands, database, sandboxState };
 }
 
-describe("cattle terminal checkpoint", () => {
-  test.each(["true", "false"])(
-    "keeps the last good checkpoint until a retry commits the Run (local bucket %s)",
-    async (localBucket) => {
+describe("Session terminal checkpoint", () => {
+  test.each([
+    ["true", "pet"],
+    ["false", "pet"],
+    ["true", "cattle"],
+    ["false", "cattle"],
+  ] as const)(
+    "keeps the last good checkpoint until a retry commits the Run (local bucket %s, legacy label %s)",
+    async (localBucket, legacyKind) => {
       const { bindings, commands, database, sandboxState } =
         await createTerminalCheckpointFixture();
       bindings.SANDBOX_FILE_BUCKET_LOCAL = localBucket;
+      await database.batch([
+        database.prepare("UPDATE session SET kind = ?").bind(legacyKind),
+        database.prepare("UPDATE sandbox SET kind = ?").bind(legacyKind),
+      ]);
 
       await persistSessionRuntimeEvents(database, {
         records: [
@@ -217,7 +226,7 @@ describe("cattle terminal checkpoint", () => {
       ).rejects.toThrow("checkpoint failed");
 
       await expect(
-        isCattleTerminalCheckpointReadyForNextRun(database, PUBLIC_API_TEST_IDS.ownerSession),
+        isSessionTerminalCheckpointReadyForNextRun(database, PUBLIC_API_TEST_IDS.ownerSession),
       ).resolves.toBe(false);
       const afterFailure = await database
         .prepare("SELECT id, session_run_id FROM sandbox_backup ORDER BY created_at")
@@ -238,7 +247,7 @@ describe("cattle terminal checkpoint", () => {
       });
 
       await expect(
-        isCattleTerminalCheckpointReadyForNextRun(database, PUBLIC_API_TEST_IDS.ownerSession),
+        isSessionTerminalCheckpointReadyForNextRun(database, PUBLIC_API_TEST_IDS.ownerSession),
       ).resolves.toBe(true);
       const committed = await database
         .prepare(

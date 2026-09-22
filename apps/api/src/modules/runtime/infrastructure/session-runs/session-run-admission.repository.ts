@@ -20,7 +20,7 @@ import type {
   SessionRunId,
 } from "@mosoo/id";
 import type { RuntimeEventEnvelope } from "@mosoo/runtime-events";
-import { and, eq, exists, inArray, isNull, ne, notExists, or, sql } from "drizzle-orm";
+import { and, eq, exists, inArray, isNull, notExists, or, sql } from "drizzle-orm";
 
 import { getAppDatabase, getD1ChangeCount } from "../../../../platform/db/drizzle";
 import type { AppDatabase } from "../../../../platform/db/drizzle";
@@ -114,7 +114,6 @@ function claimableSessionPredicate(db: AppDatabase, input: CommitQueuedSessionRu
     eq(sessionsTable.status, "IDLE"),
     isNull(sessionsTable.statusOperationId),
     or(
-      ne(sessionsTable.kind, "cattle"),
       eq(sessionsTable.workspaceCheckpointRequired, false),
       isNull(sessionsTable.lastRunId),
       notExists(
@@ -176,7 +175,7 @@ function claimableSessionPredicate(db: AppDatabase, input: CommitQueuedSessionRu
   );
 }
 
-export async function isCattleTerminalCheckpointReadyForNextRun(
+export async function isSessionTerminalCheckpointReadyForNextRun(
   database: D1Database,
   sessionId: SessionId,
 ): Promise<boolean> {
@@ -184,7 +183,6 @@ export async function isCattleTerminalCheckpointReadyForNextRun(
   const session =
     (await appDb
       .select({
-        kind: sessionsTable.kind,
         lastRunId: sessionsTable.lastRunId,
         lastRunStatus: sessionRunsTable.status,
         workspaceCheckpointRequired: sessionsTable.workspaceCheckpointRequired,
@@ -197,7 +195,6 @@ export async function isCattleTerminalCheckpointReadyForNextRun(
 
   if (
     session === null ||
-    session.kind !== "cattle" ||
     !session.workspaceCheckpointRequired ||
     session.lastRunId === null ||
     session.lastRunStatus !== "completed"

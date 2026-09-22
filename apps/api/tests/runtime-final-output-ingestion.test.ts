@@ -25,7 +25,7 @@ import { DriverInstanceRpcEventIngestionController } from "../src/modules/runtim
 import { RuntimeSessionViewCache } from "../src/modules/runtime/infrastructure/driver-instance/runtime-session-view-cache";
 import { recordDriverInstanceCompletion } from "../src/modules/runtime/infrastructure/driver-instance/terminal-driver-events";
 import type { SandboxHandle } from "../src/modules/runtime/infrastructure/sandbox-handles";
-import { isCattleTerminalCheckpointReadyForNextRun } from "../src/modules/runtime/infrastructure/session-runs/session-run-admission.repository";
+import { isSessionTerminalCheckpointReadyForNextRun } from "../src/modules/runtime/infrastructure/session-runs/session-run-admission.repository";
 import { getSessionRunSummary } from "../src/modules/runtime/infrastructure/session-runs/session-run-read.repository";
 import { setSessionRunStatus } from "../src/modules/runtime/infrastructure/session-runs/session-run-write.repository";
 import { loadSessionViewerState } from "../src/modules/sessions/application/session-live-state.service";
@@ -236,7 +236,12 @@ async function insertRuntimeFixture(database: SqliteD1Database): Promise<void> {
   `);
 }
 
-async function createCheckpointCompletionFixture(createBackup: SandboxHandle["createBackup"]) {
+async function createCheckpointCompletionFixture(
+  createBackup: SandboxHandle["createBackup"] = async ({ dir }) => ({
+    dir,
+    id: crypto.randomUUID(),
+  }),
+) {
   const database = await createPublicHttpContractDatabase();
   await insertRuntimeFixture(database);
   database.execute(`
@@ -377,43 +382,50 @@ async function pushFreshController(
 }
 
 describe("runtime final output ingestion", () => {
-  test("keeps success and final output unavailable until the Session checkpoint is committed", async () => {
-    const started = Promise.withResolvers<void>();
-    const backup = Promise.withResolvers<{ dir: string; id: string }>();
-    const { bindings, database } = await createCheckpointCompletionFixture(async () => {
-      started.resolve();
-      return backup.promise;
-    });
-    const completion = pushFreshController(bindings, [
-      runtimeEvent({
-        kind: "run.completed",
-        payload: {
-          finalMessageId: createPlatformId<SessionMessageId>(),
-          finalMessageText: "The report is ready.",
-          stopReason: "end_turn",
-        },
-        sourceEventId: TERMINAL_SOURCE_EVENT_ID,
-      }),
-    ]);
-
-    await started.promise;
-    try {
-      expect((await getSessionRunSummary(database, RUN_ID))?.status).toBe("running");
-      await expect(
-        readPublicThreadRunFinalOutput({ database, runId: RUN_ID, sessionId: SESSION_ID }),
-      ).resolves.toBeNull();
-    } finally {
-      backup.resolve({
-        dir: `/workspace/se/${SESSION_ID}`,
-        id: "550e8400-e29b-41d4-a716-446655440002",
+  test.each(["pet", "cattle"])(
+    "keeps a %s-labeled Session's success and output unavailable until its checkpoint commits",
+    async (legacyKind) => {
+      const started = Promise.withResolvers<void>();
+      const backup = Promise.withResolvers<{ dir: string; id: string }>();
+      const { bindings, database } = await createCheckpointCompletionFixture(async () => {
+        started.resolve();
+        return backup.promise;
       });
-      await completion;
-    }
-    expect((await getSessionRunSummary(database, RUN_ID))?.status).toBe("completed");
-    expect(
-      await readPublicThreadRunFinalOutput({ database, runId: RUN_ID, sessionId: SESSION_ID }),
-    ).toMatchObject({ text: "The report is ready." });
-  });
+      await database.batch([
+        database.prepare("UPDATE session SET kind = ?").bind(legacyKind),
+        database.prepare("UPDATE sandbox SET kind = ?").bind(legacyKind),
+      ]);
+      const completion = pushFreshController(bindings, [
+        runtimeEvent({
+          kind: "run.completed",
+          payload: {
+            finalMessageId: createPlatformId<SessionMessageId>(),
+            finalMessageText: "The report is ready.",
+            stopReason: "end_turn",
+          },
+          sourceEventId: TERMINAL_SOURCE_EVENT_ID,
+        }),
+      ]);
+
+      await started.promise;
+      try {
+        expect((await getSessionRunSummary(database, RUN_ID))?.status).toBe("running");
+        await expect(
+          readPublicThreadRunFinalOutput({ database, runId: RUN_ID, sessionId: SESSION_ID }),
+        ).resolves.toBeNull();
+      } finally {
+        backup.resolve({
+          dir: `/workspace/se/${SESSION_ID}`,
+          id: "550e8400-e29b-41d4-a716-446655440002",
+        });
+        await completion;
+      }
+      expect((await getSessionRunSummary(database, RUN_ID))?.status).toBe("completed");
+      expect(
+        await readPublicThreadRunFinalOutput({ database, runId: RUN_ID, sessionId: SESSION_ID }),
+      ).toMatchObject({ text: "The report is ready." });
+    },
+  );
 
   test("a cancellation during checkpoint creation cannot publish a successful result or resume cursor", async () => {
     const started = Promise.withResolvers<void>();
@@ -682,19 +694,19 @@ describe("runtime final output ingestion", () => {
         }),
       ];
       await expect(pushFreshController(bindings, events)).rejects.toBeInstanceOf(Error);
-      await expect(isCattleTerminalCheckpointReadyForNextRun(database, SESSION_ID)).resolves.toBe(
+      await expect(isSessionTerminalCheckpointReadyForNextRun(database, SESSION_ID)).resolves.toBe(
         false,
       );
       await recordDriverInstanceCompletion(bindings, {
         driverInstanceId: DRIVER_ID,
         driverReady: true,
       });
-      await expect(isCattleTerminalCheckpointReadyForNextRun(database, SESSION_ID)).resolves.toBe(
+      await expect(isSessionTerminalCheckpointReadyForNextRun(database, SESSION_ID)).resolves.toBe(
         false,
       );
       database.execute("DROP TRIGGER reject_final_output");
       await pushFreshController(bindings, events);
-      await expect(isCattleTerminalCheckpointReadyForNextRun(database, SESSION_ID)).resolves.toBe(
+      await expect(isSessionTerminalCheckpointReadyForNextRun(database, SESSION_ID)).resolves.toBe(
         true,
       );
       await expect(
@@ -710,15 +722,14 @@ describe("runtime final output ingestion", () => {
   ] as const)(
     "persists one final assistant snapshot when the driver %s it",
     async (_driverBehavior, driverProvidesSnapshot) => {
-      const database = await createPublicHttpContractDatabase();
-      await insertRuntimeFixture(database);
+      const { bindings: fixtureBindings, database } = await createCheckpointCompletionFixture();
       const capturedEvents: unknown[] = [];
       setServerProductAnalyticsTransportForTests(async (_input, init) => {
         capturedEvents.push(JSON.parse(init.body as string) as unknown);
         return new Response(null, { status: 200 });
       });
       const bindings = {
-        ...createPublicHttpTestBindings(database),
+        ...fixtureBindings,
         POSTHOG_PROJECT_KEY: "phc_test",
       } as ApiBindings;
       const finalText = "The final answer.";
@@ -780,8 +791,8 @@ describe("runtime final output ingestion", () => {
           properties: expect.objectContaining({
             run_duration_ms: expect.any(Number),
             sandbox_id: PUBLIC_API_TEST_IDS.sandbox,
-            sandbox_kind: "pet",
-            sandbox_subject_kind: "agent",
+            sandbox_kind: "cattle",
+            sandbox_subject_kind: "session",
             session_type: "ui",
           }),
         }),
@@ -790,9 +801,7 @@ describe("runtime final output ingestion", () => {
   );
 
   test("preserves a long final snapshot across hibernation, terminal failure, and replay", async () => {
-    const database = await createPublicHttpContractDatabase();
-    await insertRuntimeFixture(database);
-    const bindings = createPublicHttpTestBindings(database) as ApiBindings;
+    const { bindings, database } = await createCheckpointCompletionFixture();
     const progressMessageIds = PROGRESS_TEXTS.map(() => createPlatformId<SessionMessageId>());
     const finalMessageId = createPlatformId<SessionMessageId>();
     const progressEvents = [
@@ -970,9 +979,7 @@ describe("runtime final output ingestion", () => {
   });
 
   test("removes provider-private citations at the public final-output boundary", async () => {
-    const database = await createPublicHttpContractDatabase();
-    await insertRuntimeFixture(database);
-    const bindings = createPublicHttpTestBindings(database) as ApiBindings;
+    const { bindings, database } = await createCheckpointCompletionFixture();
     const finalMessageId = createPlatformId<SessionMessageId>();
     const privateCitation = "\uE200cite\uE202turn2view0\uE202turn8view0\uE201";
     const providerText = `before${privateCitation}after`;
@@ -1015,9 +1022,7 @@ describe("runtime final output ingestion", () => {
   });
 
   test("omits live-only reasoning from stored final assistant segments", async () => {
-    const database = await createPublicHttpContractDatabase();
-    await insertRuntimeFixture(database);
-    const bindings = createPublicHttpTestBindings(database) as ApiBindings;
+    const { bindings, database } = await createCheckpointCompletionFixture();
     const finalMessageId = createPlatformId<SessionMessageId>();
     const privateReasoningText = "Private reasoning should stay out of stored history.";
     const events = [
@@ -1067,9 +1072,7 @@ describe("runtime final output ingestion", () => {
   });
 
   test("fails closed when a cross-boot replay conflicts with the persisted final snapshot", async () => {
-    const database = await createPublicHttpContractDatabase();
-    await insertRuntimeFixture(database);
-    const bindings = createPublicHttpTestBindings(database) as ApiBindings;
+    const { bindings, database } = await createCheckpointCompletionFixture();
     const finalMessageId = createPlatformId<SessionMessageId>();
     const terminalBatch = [
       ...messageEvents({
@@ -1134,9 +1137,7 @@ describe("runtime final output ingestion", () => {
   });
 
   test("does not guess a progress message when the terminal RPC has no final identity", async () => {
-    const database = await createPublicHttpContractDatabase();
-    await insertRuntimeFixture(database);
-    const bindings = createPublicHttpTestBindings(database) as ApiBindings;
+    const { bindings, database } = await createCheckpointCompletionFixture();
     const progressMessageId = createPlatformId<SessionMessageId>();
     const progressEvents = messageEvents({
       messageId: progressMessageId,
@@ -1165,9 +1166,7 @@ describe("runtime final output ingestion", () => {
   });
 
   test("fails closed when run completion omits the final text snapshot", async () => {
-    const database = await createPublicHttpContractDatabase();
-    await insertRuntimeFixture(database);
-    const bindings = createPublicHttpTestBindings(database) as ApiBindings;
+    const { bindings, database } = await createCheckpointCompletionFixture();
     const progressMessageId = createPlatformId<SessionMessageId>();
     const events = [
       ...messageEvents({
@@ -1190,10 +1189,8 @@ describe("runtime final output ingestion", () => {
   });
 
   test("does not persist canonical output after another terminal status wins", async () => {
-    const database = await createPublicHttpContractDatabase();
-    await insertRuntimeFixture(database);
+    const { bindings, database } = await createCheckpointCompletionFixture();
     database.execute(`UPDATE session_run SET status = 'failed' WHERE id = '${RUN_ID}'`);
-    const bindings = createPublicHttpTestBindings(database) as ApiBindings;
     const finalMessageId = createPlatformId<SessionMessageId>();
     const events = [
       ...messageEvents({

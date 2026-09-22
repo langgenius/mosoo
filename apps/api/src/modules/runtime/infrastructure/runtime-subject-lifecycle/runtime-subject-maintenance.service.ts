@@ -17,7 +17,10 @@ import { RESCHEDULING_RECONNECT_WINDOW_MS } from "../../../sessions/domain/sessi
 import { createSessionLifecycleTerminatedEvent } from "../../application/session-runs/session-run-view-events.service";
 import { reconcileStaleActiveSessionRuns } from "../../application/session-runs/stale-run-reconciliation.service";
 import { reconcileTerminalSessionRuns } from "../../application/session-runs/terminal-run-reconciliation.service";
-import { getRuntimeKindPolicy } from "../../domain/runtime-kind-policy";
+import {
+  SESSION_RUNTIME_IDLE_GRACE_MS,
+  SESSION_WORKSPACE_CHECKPOINT,
+} from "../../domain/runtime-kind-policy";
 import { cleanupDriverInstances } from "../driver-instance/maintenance";
 import { createSandboxCheckpoints } from "../sandbox-backup.service";
 import { repairRuntimeCommandRecords } from "../session-runs/runtime-command-store.repository";
@@ -258,28 +261,27 @@ export async function expireStaleReschedulingSessions(bindings: ApiBindings): Pr
   );
 }
 
-// Cattle conversations no longer close on run terminal (the resident driver is
+// Session conversations no longer close on run terminal (the resident driver is
 // what makes follow-up turns warm), so this sweep is what ends them: close the
-// ones quiet past the cattle idle grace, which arms the subject inactive
+// ones quiet past the Session idle grace, which arms the subject inactive
 // deadline and hands the container to the existing subject reclamation pass.
 async function closeIdleSessionScopedConversationSessions(
   bindings: ApiBindings,
   now: number,
 ): Promise<void> {
-  const idleGraceMs = getRuntimeKindPolicy("cattle").subject.idleReleaseDelayMs;
-  const idleSinceLte = now - idleGraceMs;
+  const idleSinceLte = now - SESSION_RUNTIME_IDLE_GRACE_MS;
   const idle = await listIdleSessionScopedConversationSessions(bindings.DB, {
     idleSinceLte,
     limit: MAINTENANCE_BATCH_SIZE,
   });
-  const { closeIdleCattleConversationSession } = await import("../sandbox-session.service");
+  const { closeIdleConversationSession } = await import("../sandbox-session.service");
 
   for (const conversation of idle) {
     try {
       // Atomic claim inside: closes only if the row is still the same, idle,
       // lease-free session — a follow-up turn that re-used it since the list
       // snapshot makes the claim lose and is left running.
-      await closeIdleCattleConversationSession(bindings, {
+      await closeIdleConversationSession(bindings, {
         idleSinceLte,
         sandboxId: conversation.sandboxId,
         sessionId: conversation.sessionId,
@@ -298,16 +300,15 @@ export async function repairIdleConversationCheckpoints(
   bindings: ApiBindings,
   now: number,
 ): Promise<void> {
-  const policy = getRuntimeKindPolicy("cattle");
   const pending = await listPendingIdleConversationCheckpoints(bindings.DB, {
-    idleSinceLte: now - policy.subject.idleReleaseDelayMs,
+    idleSinceLte: now - SESSION_RUNTIME_IDLE_GRACE_MS,
     limit: MAINTENANCE_BATCH_SIZE,
   });
   for (const candidate of pending) {
     try {
       await createSandboxCheckpoints(bindings, {
         requiredSessionId: candidate.sessionId,
-        rules: policy.checkpoint.createOnTerminal,
+        rules: [SESSION_WORKSPACE_CHECKPOINT],
         sandboxId: candidate.sandboxId,
         sessionRunId: candidate.sessionRunId,
       });

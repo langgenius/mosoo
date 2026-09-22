@@ -17,6 +17,14 @@ Removing only the selector would leave imports, forks, and API callers able to c
 - Remove the console's type selector, type-specific fork, comparison copy, badges and editable draft field. Keep legacy maintenance access where removing it would strand an unconverted customer workspace; it is not shown as a type selection for new work.
 - Keep legacy snapshot/storage decoding and conversion checks until the actual cohort has migrated. Full #582 completion still requires deleting the remaining active runtime kind branches after that transition; this commit alone cannot establish full Type retirement.
 
+Continuation has one commit boundary: a successful turn records its native cursor and
+workspace checkpoint together. Recovery reads that committed cursor, never a newer
+observation from a failed or interrupted turn. Admission waits for that checkpoint and
+the completed output projection for every Session, independently of historical kind
+metadata. The pinned Cloud conversion must establish this boundary for protected old
+Sessions before the final candidate is deployed; a missing cursor is not an acceptable
+substitute for their promised migration.
+
 ## Verification
 
 Keep the already verified conversion code and its matching Driver at pinned commit

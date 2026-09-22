@@ -1,5 +1,5 @@
 export {
-  closeIdleCattleConversationSession,
+  closeIdleConversationSession,
   closeSandboxConversationSession,
   ensureSandboxConversationSession,
 } from "./sandbox-session/sandbox-conversation-session.service";

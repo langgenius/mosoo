@@ -9,7 +9,7 @@ import { getAppDatabase } from "../../../../platform/db/drizzle";
 import { appendSessionRuntimeEvents } from "../../../sessions/application/session-event-write.service";
 import { createFailedSessionRunRuntimeEvent } from "../../application/session-runs/session-run-view-events.service";
 import { repairTerminalSessionRunProjections } from "../../application/session-runs/terminal-run-reconciliation.service";
-import { getRuntimeKindPolicy } from "../../domain/runtime-kind-policy";
+import { SESSION_WORKSPACE_CHECKPOINT } from "../../domain/runtime-kind-policy";
 import { classifyReclaim, decideReclaimRecovery } from "../../domain/session-run-reclaim-recovery";
 import { isTerminalSessionRunStatus } from "../../domain/session-run-status";
 import { createSessionRunTerminalFailureSourceId } from "../../domain/session-run-terminal-event-id";
@@ -42,7 +42,6 @@ async function checkpointTerminalRuntimeSessionIfNeeded(
 ): Promise<void> {
   if (
     link.sandboxId === null ||
-    link.sandboxKind === null ||
     link.sessionId === null ||
     link.sessionRunId === null ||
     link.sessionRunStatus !== "completed"
@@ -50,15 +49,9 @@ async function checkpointTerminalRuntimeSessionIfNeeded(
     return;
   }
 
-  const rules = getRuntimeKindPolicy(link.sandboxKind).checkpoint.createOnTerminal;
-
-  if (rules.length === 0) {
-    return;
-  }
-
   await createSandboxCheckpoints(bindings, {
     requiredSessionId: link.sessionId,
-    rules,
+    rules: [SESSION_WORKSPACE_CHECKPOINT],
     sandboxId: link.sandboxId,
     sessionRunId: link.sessionRunId,
   });

@@ -10,6 +10,11 @@ Owners choose a name, harness and model. They do not select Assistant/Task or Pe
 
 This applies to console Preview, v1 published/live admission, v2 saved presets and direct Project invocation. v1 retains its existing publication and identity requirements. Publishing an Agent remains separate from the Session ownership rule.
 
+All Sessions use the same durable completion boundary: the native cursor and complete
+workspace checkpoint commit with the successful turn. A later failed turn cannot replace
+that recovery point. Historical kind metadata cannot bypass checkpoint or output-history
+readiness when admitting another turn.
+
 ## Existing Cloud Sessions
 
 New admission does not rewrite any existing Agent label, Session binding or shared workspace. Existing Sessions retain their admitted configuration and maintenance access until their transition is verified. Migration must preserve the same ID, native conversation and promised working files; allocating an empty isolated workspace is not migration.

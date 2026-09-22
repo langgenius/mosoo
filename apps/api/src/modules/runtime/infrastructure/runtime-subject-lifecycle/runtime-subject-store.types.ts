@@ -65,7 +65,6 @@ export interface RuntimeConversationSessionRecord {
 export interface RuntimeConversationSessionState {
   readonly agentId: AgentId | null;
   readonly sandboxSessionId: SandboxSessionId;
-  readonly kind: AgentKind;
   readonly status: RuntimeConversationSessionRecord["status"];
 }
 
