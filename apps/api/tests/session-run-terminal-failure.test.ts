@@ -1,12 +1,17 @@
 import { describe, expect, test } from "bun:test";
 
 import type { DriverInstanceId, SessionRunId } from "@mosoo/id";
+import { createRuntimeEvent } from "@mosoo/runtime-events";
 
 import { recordCanonicalSessionRunFailure } from "../src/modules/runtime/application/session-runs/session-run-terminal-failure.service";
 import { reconcileTerminalSessionRuns } from "../src/modules/runtime/application/session-runs/terminal-run-reconciliation.service";
+import { readRuntimeDriverRunTransition } from "../src/modules/runtime/infrastructure/driver-instance/event-projection";
 import { getRuntimeSessionLink } from "../src/modules/runtime/infrastructure/driver-instance/session-link.repository";
 import { recordDriverInstanceFailure } from "../src/modules/runtime/infrastructure/driver-instance/terminal-driver-events";
-import { setSessionRunStatus } from "../src/modules/runtime/infrastructure/session-runs/session-run-store.repository";
+import {
+  getSessionRunSummary,
+  setSessionRunStatus,
+} from "../src/modules/runtime/infrastructure/session-runs/session-run-store.repository";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import {
   createPublicHttpContractDatabase,
@@ -153,6 +158,62 @@ async function readFailureEvents(database: SqliteD1Database): Promise<FailureEve
 }
 
 describe("canonical session run terminal failure", () => {
+  test("preserves provider content rejection through projection, persistence and late generic failure", async () => {
+    const database = await createPublicHttpContractDatabase();
+    await insertLinkedRunFixture(database);
+    const bindings = createPublicHttpTestBindings(database) as ApiBindings;
+    const error = {
+      code: "acp.content_blocked",
+      details: { acpErrorCode: -32603, category: "content_policy", stage: "unknown" },
+      message: "The model provider blocked this turn under its content policy.",
+      retryable: false,
+    };
+    const transition = readRuntimeDriverRunTransition(
+      createRuntimeEvent({
+        id: "provider-rejection",
+        kind: "run.failed",
+        occurredAt: "2026-09-22T00:00:00.000Z",
+        payload: { error, recoverable: false },
+        runId: RUN_ID,
+        sessionId: PUBLIC_API_TEST_IDS.ownerSession,
+      }),
+    );
+    if (transition?.status !== "failed") {
+      throw new Error("Expected a failed provider-rejection transition.");
+    }
+    await recordCanonicalSessionRunFailure(bindings, {
+      error: transition.error,
+      runId: RUN_ID,
+      sessionId: PUBLIC_API_TEST_IDS.ownerSession,
+      source: "driver",
+    });
+    await recordDriverInstanceFailure(bindings, {
+      driverInstanceId: DRIVER_ID,
+      error: DRIVER_ERROR,
+    });
+
+    expect(await getSessionRunSummary(database, RUN_ID)).toMatchObject({ error, status: "failed" });
+    expect(await readFailureEvents(database)).toEqual([
+      {
+        content_text: error.message,
+        event_type: "run.failed",
+        source_event_id: CANONICAL_FAILURE_SOURCE_ID,
+      },
+    ]);
+    expect(
+      await database
+        .prepare("SELECT status FROM session WHERE id = ?")
+        .bind(PUBLIC_API_TEST_IDS.ownerSession)
+        .first(),
+    ).toEqual({ status: "IDLE" });
+    expect(
+      await database
+        .prepare("SELECT COUNT(*) AS count FROM session_run WHERE session_id = ?")
+        .bind(PUBLIC_API_TEST_IDS.ownerSession)
+        .first(),
+    ).toEqual({ count: 1 });
+  });
+
   test.each(["canonical", "maintenance"] as const)(
     "emits the observation before an interrupted terminal event commit returns: %s",
     async (path) => {
