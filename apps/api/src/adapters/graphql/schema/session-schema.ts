@@ -20,6 +20,13 @@ import {
 import { graphQLEnumValues } from "./graphql-enum-values";
 
 export const sessionSchema = /* GraphQL */ `
+  type SessionRuntimeOperationResult {
+    affectedSessionCount: Int!
+    ok: Boolean!
+    operation: RuntimeStateOperation!
+    sessionId: ULID!
+  }
+
   enum SessionMessageRole {
     assistant
     user

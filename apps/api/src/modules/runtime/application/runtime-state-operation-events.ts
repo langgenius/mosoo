@@ -4,7 +4,7 @@ import type { AgentDeploymentVersionId, AgentId } from "@mosoo/id";
 import type { RuntimeOperationTargetVersion } from "./runtime-state-operation-version";
 
 export interface RuntimeOperationEvent {
-  agentId: AgentId;
+  agentId: AgentId | null;
   deploymentVersionId?: AgentDeploymentVersionId;
   deploymentVersionNumber?: number;
   operation: RuntimeStateOperationName;
@@ -13,7 +13,7 @@ export interface RuntimeOperationEvent {
 }
 
 export function buildRuntimeStateOperationEvents(input: {
-  agentId: AgentId;
+  agentId: AgentId | null;
   operation: RuntimeStateOperationName;
   readyAt: string;
   startedAt: string;

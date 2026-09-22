@@ -4,6 +4,10 @@ import type { AgentId, ProjectId, SessionId } from "@mosoo/id";
 import type { GraphQLModule } from "../../../adapters/graphql/graphql-module";
 import { sessionGraphQLSpec } from "../../../adapters/graphql/graphql-module-specs";
 import {
+  restartSessionDriver,
+  recreateSessionSandbox,
+} from "../../runtime/application/runtime-state-operations.service";
+import {
   createAgentSession,
   sendAgentSessionEvents,
 } from "../../runtime/application/session-run.service";
@@ -107,6 +111,16 @@ function readSessionId(value: string): SessionId {
 export const sessionGraphQLModule = {
   ...sessionGraphQLSpec,
   authenticatedMutationResolvers: {
+    restartSessionDriver: async (_parent, args: SessionArgs, context) =>
+      restartSessionDriver(context.bindings, context.viewer, {
+        projectId: readProjectId(args.projectId),
+        sessionId: readSessionId(args.sessionId),
+      }),
+    recreateSessionSandbox: async (_parent, args: SessionArgs, context) =>
+      recreateSessionSandbox(context.bindings, context.viewer, {
+        projectId: readProjectId(args.projectId),
+        sessionId: readSessionId(args.sessionId),
+      }),
     addSessionResource: async (_parent, args: AddSessionResourceArgs, context) =>
       addSessionResource(context.bindings, context.viewer, args.input),
     archiveAgentSession: async (_parent, args: SessionArgs, context) => {

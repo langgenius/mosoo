@@ -109,6 +109,8 @@ export const projectGraphQLSpec = {
 
 export const sessionGraphQLSpec = {
   mutationFields: [
+    "restartSessionDriver(projectId: ULID!, sessionId: ULID!): SessionRuntimeOperationResult!",
+    "recreateSessionSandbox(projectId: ULID!, sessionId: ULID!): SessionRuntimeOperationResult!",
     "addSessionResource(input: AddSessionResourceInput!): SessionResourceUpload!",
     "createAgentSession(input: CreateAgentSessionInput!): Session!",
     "prewarmAgentSession(projectId: ULID!, sessionId: ULID!): SessionRuntimePrewarmAck!",

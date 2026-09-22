@@ -107,7 +107,7 @@ export const MosooServerCustomEventSchema = type.or(
     name: eventNameLiteral(MOSOO_CUSTOM_EVENT.agentReady.name),
     type: '"CUSTOM"',
     value: {
-      agentId: "string",
+      agentId: NullableString,
       operation: '"recreateSandbox" | "resetAgentState" | "restartDriver"',
       readyAt: "string",
     },
@@ -116,7 +116,7 @@ export const MosooServerCustomEventSchema = type.or(
     name: eventNameLiteral(MOSOO_CUSTOM_EVENT.agentUpdating.name),
     type: '"CUSTOM"',
     value: {
-      agentId: "string",
+      agentId: NullableString,
       operation: '"recreateSandbox" | "resetAgentState" | "restartDriver"',
       startedAt: "string",
     },

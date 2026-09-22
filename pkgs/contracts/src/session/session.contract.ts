@@ -24,6 +24,20 @@ export type SessionStatus = (typeof SESSION_STATUSES)[number];
 export const SESSION_TYPES = ["preview", "ui"] as const;
 export type SessionType = (typeof SESSION_TYPES)[number];
 
+export type SessionRuntimeOperationName = "restartDriver" | "recreateSandbox";
+
+export interface SessionRuntimeOperationInput {
+  projectId: ProjectId;
+  sessionId: SessionId;
+}
+
+export interface SessionRuntimeOperationResult {
+  affectedSessionCount: number;
+  ok: boolean;
+  operation: SessionRuntimeOperationName;
+  sessionId: SessionId;
+}
+
 export interface SessionSummary {
   /** Optional reusable preset; Project owns every Session. */
   agentId: AgentId | null;

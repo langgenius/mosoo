@@ -1014,12 +1014,14 @@ type Mutation {
   prewarmAgentSession(projectId: ULID!, sessionId: ULID!): SessionRuntimePrewarmAck!
   publishAgent(input: PublishAgentInput!): Agent!
   recreateSandbox(input: RuntimeStateOperationInput!): RuntimeStateOperationResult!
+  recreateSessionSandbox(projectId: ULID!, sessionId: ULID!): SessionRuntimeOperationResult!
   removeSessionResource(input: RemoveSessionResourceInput!): OperationResult!
   renameOrganization(input: RenameOrganizationInput!): Organization!
   renameProject(input: RenameProjectInput!): Project!
   renameSession(input: RenameSessionInput!): Session!
   resetAgentState(input: RuntimeStateOperationInput!): RuntimeStateOperationResult!
   restartDriver(input: RuntimeStateOperationInput!): RuntimeStateOperationResult!
+  restartSessionDriver(projectId: ULID!, sessionId: ULID!): SessionRuntimeOperationResult!
   revokeMcpCredential(projectId: ULID!, serverId: ULID!): McpServerWithCredential!
   sendAgentSessionEvents(events: [AgentSessionEventInput!]!, projectId: ULID!, sessionId: ULID!): AgentSessionEventBatch!
   setDefaultVendorCredential(input: SetDefaultVendorCredentialInput!): VendorCredential!
@@ -1448,6 +1450,13 @@ enum SessionRunTrigger {
   retry
   system
   user_prompt
+}
+
+type SessionRuntimeOperationResult {
+  affectedSessionCount: Int!
+  ok: Boolean!
+  operation: RuntimeStateOperation!
+  sessionId: ULID!
 }
 
 type SessionRuntimePrewarmAck {

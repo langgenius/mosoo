@@ -15,6 +15,15 @@ workspace checkpoint commit with the successful turn. A later failed turn cannot
 that recovery point. Historical kind metadata cannot bypass checkpoint or output-history
 readiness when admitting another turn.
 
+Runtime maintenance targets an explicit Session. Its Project owner can restart the
+Driver or recreate the Session's execution resource while retaining the public ID,
+frozen configuration and committed workspace/native boundary. This also works without
+an Agent preset. It never restarts a sibling Session or adopts the preset's latest
+configuration. An active turn may be cancelled by an explicit maintenance request;
+its historical outcome remains recorded. Archived, terminated, busy or incompletely
+checkpointed Sessions cannot be silently reset. A shared or mismatched legacy binding
+must cross the verified migration boundary before Session maintenance is available.
+
 ## Existing Cloud Sessions
 
 New admission does not rewrite any existing Agent label, Session binding or shared workspace. Existing Sessions retain their admitted configuration and maintenance access until their transition is verified. Migration must preserve the same ID, native conversation and promised working files; allocating an empty isolated workspace is not migration.

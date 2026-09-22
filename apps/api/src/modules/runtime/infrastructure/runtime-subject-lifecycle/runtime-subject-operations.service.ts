@@ -30,6 +30,7 @@ import {
   markRuntimeSubjectCold,
   markRuntimeSubjectFailed,
   markRuntimeSubjectOperationStarted,
+  markRuntimeSubjectOperationRepairNeeded,
 } from "./runtime-subject-store";
 
 export { stopRuntimeSubjectDrivers } from "./runtime-subject-driver-stop";
@@ -54,10 +55,6 @@ async function appendCheckpointFailureDiagnostics(
 
   await appendOneRuntimeDiagnosticEventPerSession(bindings, {
     events: input.targets.flatMap((target) => {
-      if (target.agentId === null) {
-        return [];
-      }
-
       return [
         {
           eventName: RUNTIME_DIAGNOSTIC_EVENT.sandboxCheckpointFailed.name,
@@ -110,7 +107,12 @@ export async function recreateRuntimeSubjectPreservingState(
 
   let destroyStarted = false;
 
-  const policy = getRuntimeKindPolicy(subject.kind);
+  // Exclusive Session subjects resume from the last committed turn. Historical
+  // kind metadata must not send them through the shared Agent-memory path.
+  const checkpointRules =
+    subject.subjectKind === "session"
+      ? []
+      : getRuntimeKindPolicy(subject.kind).checkpoint.createOnRecreate;
   const started = await markRuntimeSubjectOperationStarted(bindings.DB, {
     operationId: input.operationId,
     runtimeSubjectId: input.runtimeSubjectId,
@@ -132,7 +134,7 @@ export async function recreateRuntimeSubjectPreservingState(
     });
     await createSandboxCheckpoints(bindings, {
       operationId: input.operationId,
-      rules: policy.checkpoint.createOnRecreate,
+      rules: checkpointRules,
       sandboxId: input.runtimeSubjectId,
     });
     destroyStarted = await advanceRuntimeSubjectOperationStatus(bindings.DB, {
@@ -152,7 +154,7 @@ export async function recreateRuntimeSubjectPreservingState(
     });
     await closeRuntimeSubjectSessionsForRecycle(bindings.DB, input.runtimeSubjectId);
     const completed = await markRuntimeSubjectCold(bindings.DB, {
-      clearBackups: policy.checkpoint.createOnRecreate.length === 0,
+      clearBackups: checkpointRules.length === 0,
       expectedStatus: "destroying",
       operationId: input.operationId,
       runtimeSubjectId: input.runtimeSubjectId,
@@ -166,13 +168,13 @@ export async function recreateRuntimeSubjectPreservingState(
       runtimeSubjectId: input.runtimeSubjectId,
       targets: input.targets,
     });
-    await markRuntimeSubjectFailed(bindings.DB, {
+    await markRuntimeSubjectOperationRepairNeeded(bindings.DB, {
       errorCode: getRuntimeSubjectOperationErrorCode(error),
       errorMessage: getRuntimeOperationErrorMessage(error),
       expectedStatus: destroyStarted ? "destroying" : "backing_up",
       operationId: input.operationId,
       runtimeSubjectId: input.runtimeSubjectId,
-      status: "cold",
+      source: "api",
     });
     throw error;
   }

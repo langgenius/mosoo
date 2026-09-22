@@ -27,6 +27,26 @@ substitute for their promised migration.
 
 ## Verification
 
+### Session maintenance boundary
+
+Move maintenance authority to Project + Session before deleting the remaining stable
+Agent-subject paths. Add Session-targeted restart/recreate through the existing console
+GraphQL boundary, reusing the same phase transitions and execution plane. These are
+ordinary owner operations, not test-only endpoints. Direct Sessions need no Agent;
+saved-preset Sessions never read the latest mutable preset to perform maintenance.
+Keep existing Agent-scoped adapters while their console callers move to explicit
+Session selection. Agent-wide memory/reset and terminal allocation disappear with
+the remaining dual-type runtime retirement.
+
+Qualify the exact Session-to-Sandbox binding and forbid a shared physical workspace,
+including archived peers. Recheck after lifecycle admission to catch a binding change
+between the initial read and the operation. Preserve the existing claim/fence and
+Run/lease guards. If a successful turn has not durably checkpointed, do not destroy its
+resource. Exercise null Agent provenance, cross-Project rejection, sibling isolation,
+busy/archived/terminal refusal, changed binding, active-turn cancellation, checkpoint
+failure, and failure rollback. No live cloud operation is authorized by adding this
+surface; source-pinned staging and production cutovers retain their approval gates.
+
 Keep the already verified conversion code and its matching Driver at pinned commit
 `9bff2a7c11aa6bb8e721df43073f2322ff27d560` as finite release material. The final
 candidate removes the executor, planner, operator entrypoint and operator CLI commands;
