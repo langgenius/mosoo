@@ -163,3 +163,20 @@ export function getRuntimeSubjectInactiveDeadlineSql(now: number) {
     END
   `;
 }
+
+export function exclusiveSessionRuntimeSubjectPredicate() {
+  return sql`(
+    ${sandboxesTable.subjectKind} = 'session'
+    AND EXISTS (
+      SELECT 1 FROM session AS owned_session
+      INNER JOIN project AS owning_project ON owning_project.id = owned_session.project_id
+      WHERE owned_session.id = ${sandboxesTable.subjectId}
+        AND owned_session.project_id = ${sandboxesTable.projectId}
+        AND owning_project.owner_account_id = ${sandboxesTable.ownerAccountId}
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM sandbox_session AS peer
+      WHERE peer.sandbox_id = ${sandboxesTable.id} AND peer.session_id <> ${sandboxesTable.subjectId}
+    )
+  )`;
+}

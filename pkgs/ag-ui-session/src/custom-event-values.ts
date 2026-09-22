@@ -58,13 +58,13 @@ export interface MosooSessionInfraRunningValue {
 }
 
 export interface MosooAgentUpdatingValue {
-  agentId: string;
+  agentId: string | null;
   operation: "recreateSandbox" | "resetAgentState" | "restartDriver";
   startedAt: string;
 }
 
 export interface MosooAgentReadyValue {
-  agentId: string;
+  agentId: string | null;
   operation: "recreateSandbox" | "resetAgentState" | "restartDriver";
   readyAt: string;
 }

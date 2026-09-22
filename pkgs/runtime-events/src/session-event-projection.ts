@@ -122,7 +122,7 @@ function projectAgentTaskUpdated(event: RuntimeEventEnvelope): AgUiSessionEvent[
   const status = readRuntimeEventString(payload, "status");
   const agentId = readRuntimeEventString(payload, "agentId");
 
-  if (operation === null || agentId === null) {
+  if (operation === null || (agentId === null && payload["agentId"] !== null)) {
     return [];
   }
 

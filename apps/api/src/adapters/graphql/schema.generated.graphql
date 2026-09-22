@@ -27,7 +27,6 @@ type Agent {
   createdAt: String!
   description: String
   id: ULID!
-  kind: AgentKind!
   liveVersion: AgentDeploymentVersion
   model: String!
   name: String!
@@ -81,7 +80,6 @@ type AgentDeploymentVersion {
   environmentId: ULID
   id: ULID!
   isLive: Boolean!
-  kind: AgentKind!
   model: String!
   provider: String!
   runtimeId: String!
@@ -93,7 +91,6 @@ type AgentDetail {
   createdAt: String!
   description: String
   id: ULID!
-  kind: AgentKind!
   liveVersion: AgentDeploymentVersion
   model: String!
   name: String!
@@ -407,7 +404,6 @@ type AgentSummary {
   createdAt: String!
   description: String
   id: ULID!
-  kind: AgentKind!
   name: String!
   owner: AgentOwnerSummary!
   projectId: ULID!
@@ -1013,13 +1009,12 @@ type Mutation {
   onboardingBootstrap(input: BootstrapOnboardingInput!): OnboardingStatus!
   prewarmAgentSession(projectId: ULID!, sessionId: ULID!): SessionRuntimePrewarmAck!
   publishAgent(input: PublishAgentInput!): Agent!
-  recreateSandbox(input: RuntimeStateOperationInput!): RuntimeStateOperationResult!
+  recreateSessionSandbox(projectId: ULID!, sessionId: ULID!): SessionRuntimeOperationResult!
   removeSessionResource(input: RemoveSessionResourceInput!): OperationResult!
   renameOrganization(input: RenameOrganizationInput!): Organization!
   renameProject(input: RenameProjectInput!): Project!
   renameSession(input: RenameSessionInput!): Session!
-  resetAgentState(input: RuntimeStateOperationInput!): RuntimeStateOperationResult!
-  restartDriver(input: RuntimeStateOperationInput!): RuntimeStateOperationResult!
+  restartSessionDriver(projectId: ULID!, sessionId: ULID!): SessionRuntimeOperationResult!
   revokeMcpCredential(projectId: ULID!, serverId: ULID!): McpServerWithCredential!
   sendAgentSessionEvents(events: [AgentSessionEventInput!]!, projectId: ULID!, sessionId: ULID!): AgentSessionEventBatch!
   setDefaultVendorCredential(input: SetDefaultVendorCredentialInput!): VendorCredential!
@@ -1092,7 +1087,6 @@ type ProjectOverview {
 type ProjectOverviewAgent {
   description: String
   id: ULID!
-  kind: AgentKind!
   model: String!
   name: String!
   projectId: ULID!
@@ -1237,26 +1231,6 @@ enum RuntimeStateOperation {
   restartDriver
 }
 
-input RuntimeStateOperationInput {
-  affectedFields: [String!]
-  agentId: ULID!
-  applyActionKind: String
-  projectId: ULID!
-  targetVersion: RuntimeStateTargetVersionInput
-}
-
-type RuntimeStateOperationResult {
-  affectedSessionCount: Int!
-  agentId: ULID!
-  ok: Boolean!
-  operation: RuntimeStateOperation!
-}
-
-input RuntimeStateTargetVersionInput {
-  id: ULID!
-  versionNumber: Int!
-}
-
 type Session {
   agentId: ULID
   archivedAt: String
@@ -1264,7 +1238,6 @@ type Session {
   deploymentVersionId: ULID
   deploymentVersionNumber: Int
   id: ULID!
-  kind: AgentKind!
   lastMessageAt: String
   lastRun: SessionRun
   model: String!
@@ -1286,7 +1259,6 @@ type SessionExecutionBinding {
   agentId: ULID
   deploymentVersionId: ULID
   deploymentVersionNumber: Int
-  kind: AgentKind!
   model: String!
   prompt: String!
   provider: String!
@@ -1448,6 +1420,13 @@ enum SessionRunTrigger {
   retry
   system
   user_prompt
+}
+
+type SessionRuntimeOperationResult {
+  affectedSessionCount: Int!
+  ok: Boolean!
+  operation: RuntimeStateOperation!
+  sessionId: ULID!
 }
 
 type SessionRuntimePrewarmAck {

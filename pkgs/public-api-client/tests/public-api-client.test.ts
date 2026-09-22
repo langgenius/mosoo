@@ -187,7 +187,8 @@ describe("MosooPublicThreadClient", () => {
       const request = new Request(input, init);
       requests++;
       expect(request.url).toBe("https://api.example.com/api/v2/projects/project-1/threads");
-      return jsonResponse({ thread: { ...threadResponse(), userId: null }, run: null }, 201);
+      const { kind: _legacyKind, ...thread } = threadResponse();
+      return jsonResponse({ thread: { ...thread, agent_id: null, userId: null }, run: null }, 201);
     };
     const legacy = new MosooPublicThreadClient({
       baseUrl: "https://api.example.com",
@@ -208,7 +209,9 @@ describe("MosooPublicThreadClient", () => {
       token: "msp_test",
       fetch,
     });
-    await v2.createProjectThread({ projectId: "project-1", configuration });
+    const created = await v2.createProjectThread({ projectId: "project-1", configuration });
+    expect(created.thread.agent_id).toBeNull();
+    expect(created.thread).not.toHaveProperty("kind");
     expect(requests).toBe(1);
     expect(
       () =>

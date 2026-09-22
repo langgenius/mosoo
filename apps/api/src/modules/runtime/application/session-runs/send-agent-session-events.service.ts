@@ -36,7 +36,7 @@ interface SendAgentSessionEventsInput {
 }
 
 interface AgentSessionEventsOptions {
-  recoveryRequestedAtMs?: number;
+  admissionRequestedAtMs?: number;
   accessViewer?: AuthenticatedViewer;
   actionAuthorization?: SessionActionAuthorization;
   cachedState?: SessionLiveState | null;

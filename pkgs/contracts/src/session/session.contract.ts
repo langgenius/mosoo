@@ -1,4 +1,4 @@
-import type { AgentBuiltInToolConfig, AgentKind } from "../agent/agent.contract";
+import type { AgentBuiltInToolConfig } from "../agent/agent.contract";
 import type { FileUploadSummary } from "../file/file.contract";
 import type {
   AgentDeploymentVersionId,
@@ -24,6 +24,20 @@ export type SessionStatus = (typeof SESSION_STATUSES)[number];
 export const SESSION_TYPES = ["preview", "ui"] as const;
 export type SessionType = (typeof SESSION_TYPES)[number];
 
+export type SessionRuntimeOperationName = "restartDriver" | "recreateSandbox";
+
+export interface SessionRuntimeOperationInput {
+  projectId: ProjectId;
+  sessionId: SessionId;
+}
+
+export interface SessionRuntimeOperationResult {
+  affectedSessionCount: number;
+  ok: boolean;
+  operation: SessionRuntimeOperationName;
+  sessionId: SessionId;
+}
+
 export interface SessionSummary {
   /** Optional reusable preset; Project owns every Session. */
   agentId: AgentId | null;
@@ -32,7 +46,6 @@ export interface SessionSummary {
   deploymentVersionId: AgentDeploymentVersionId | null;
   deploymentVersionNumber: number | null;
   id: SessionId;
-  kind: AgentKind;
   lastMessageAt?: string | null;
   lastRun: SessionRunSummary | null;
   model: string;
@@ -60,7 +73,6 @@ export interface SessionExecutionBinding {
   agentId: AgentId | null;
   deploymentVersionId: AgentDeploymentVersionId | null;
   deploymentVersionNumber: number | null;
-  kind: AgentKind;
   model: string;
   prompt: string;
   provider: string;

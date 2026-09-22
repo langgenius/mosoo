@@ -196,12 +196,11 @@ export async function projectRuntimeDriverEvents(
         continue;
       }
 
-      if (link.sandboxKind === null) {
+      if (link.sandboxSubjectKind === null) {
         logInfo("runtime.native_resume_ref.ignored", {
           driverInstanceId: input.driverInstanceId,
           kind: nativeResumeRef.kind,
           runtimeId: nativeResumeRef.runtimeId,
-          sandboxKind: link.sandboxKind,
           sandboxSubjectKind: link.sandboxSubjectKind,
           sessionId: link.sessionId,
           sessionRunId: link.sessionRunId,

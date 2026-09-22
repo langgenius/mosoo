@@ -1,13 +1,9 @@
 import { SANDBOX_MEMORY_PATH } from "@mosoo/agent-driver/paths";
-import { AGENT_KIND_RUNTIME_POLICIES } from "@mosoo/contracts/agent";
-import type {
-  AgentKind,
-  AgentRuntimeSubjectScope,
-  AgentRuntimeTerminalTarget,
-} from "@mosoo/contracts/agent";
+import type { AgentKind } from "@mosoo/contracts/agent";
 import type { SandboxSubjectKind } from "@mosoo/contracts/sandbox";
 
-export type RuntimeSubjectScope = AgentRuntimeSubjectScope;
+// Private rollback compatibility for legacy stored subjects, not an Agent configuration field.
+export type RuntimeSubjectScope = "agent" | "session";
 export type RuntimeCheckpointRule =
   | {
       readonly path: typeof SANDBOX_MEMORY_PATH;
@@ -28,7 +24,7 @@ export type RuntimeStateClearRule =
       readonly type: "session_runtime_state";
     };
 export type RuntimePolicySubjectKind = Extract<SandboxSubjectKind, "agent" | "session">;
-export type RuntimeTerminalTargetPolicy = AgentRuntimeTerminalTarget;
+export type RuntimeTerminalTargetPolicy = "unavailable" | "stable_subject";
 
 export interface RuntimeKindPolicy {
   readonly checkpoint: {
@@ -106,13 +102,13 @@ export const RUNTIME_KIND_POLICIES = {
     },
     kind: "cattle",
     operations: {
-      resetSubjectState: AGENT_KIND_RUNTIME_POLICIES.cattle.operations.resetSubjectState,
-      terminalTarget: AGENT_KIND_RUNTIME_POLICIES.cattle.terminal.target,
+      resetSubjectState: false,
+      terminalTarget: "unavailable",
     },
     subject: {
       idleReleaseDelayMs: CATTLE_SUBJECT_IDLE_GRACE_MS,
-      scope: AGENT_KIND_RUNTIME_POLICIES.cattle.subject.scope,
-      subjectKind: AGENT_KIND_RUNTIME_POLICIES.cattle.subject.scope,
+      scope: "session",
+      subjectKind: "session",
     },
   },
   pet: {
@@ -126,13 +122,13 @@ export const RUNTIME_KIND_POLICIES = {
     },
     kind: "pet",
     operations: {
-      resetSubjectState: AGENT_KIND_RUNTIME_POLICIES.pet.operations.resetSubjectState,
-      terminalTarget: AGENT_KIND_RUNTIME_POLICIES.pet.terminal.target,
+      resetSubjectState: true,
+      terminalTarget: "stable_subject",
     },
     subject: {
       idleReleaseDelayMs: RUNTIME_SUBJECT_IDLE_GRACE_MS,
-      scope: AGENT_KIND_RUNTIME_POLICIES.pet.subject.scope,
-      subjectKind: AGENT_KIND_RUNTIME_POLICIES.pet.subject.scope,
+      scope: "agent",
+      subjectKind: "agent",
     },
   },
 } as const satisfies Record<AgentKind, RuntimeKindPolicy>;

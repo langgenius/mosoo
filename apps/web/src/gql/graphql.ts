@@ -386,24 +386,6 @@ export type RunStatus =
   | 'running'
   | 'waiting_input';
 
-export type RuntimeStateOperation =
-  | 'recreateSandbox'
-  | 'resetAgentState'
-  | 'restartDriver';
-
-export type RuntimeStateOperationInput = {
-  affectedFields?: Array<string> | null | undefined;
-  agentId: PlatformId;
-  applyActionKind?: string | null | undefined;
-  projectId: PlatformId;
-  targetVersion?: RuntimeStateTargetVersionInput | null | undefined;
-};
-
-export type RuntimeStateTargetVersionInput = {
-  id: PlatformId;
-  versionNumber: number;
-};
-
 export type SessionMessagePlanPriority =
   | 'high'
   | 'low'
@@ -546,11 +528,11 @@ export type UpdateVendorCredentialInput = {
   projectId: PlatformId;
 };
 
-export type AgentFieldsFragment = { createdAt: string, description: string | null, id: PlatformId, kind: AgentKind, model: string, name: string, projectId: PlatformId, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, visibility: AgentVisibility, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }> };
+export type AgentFieldsFragment = { createdAt: string, description: string | null, id: PlatformId, model: string, name: string, projectId: PlatformId, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, visibility: AgentVisibility, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }> };
 
 export type AgentToolSummaryFieldsFragment = { enabled: boolean, iconUrl: string | null, name: string, serverId: PlatformId };
 
-export type AgentDeploymentVersionFieldsFragment = { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number };
+export type AgentDeploymentVersionFieldsFragment = { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number };
 
 export type AgentOwnerFieldsFragment = { id: PlatformId, imageUrl: string | null, name: string | null };
 
@@ -559,7 +541,7 @@ export type CreateAgentMutationVariables = Exact<{
 }>;
 
 
-export type CreateAgentMutation = { createAgent: { createdAt: string, description: string | null, id: PlatformId, kind: AgentKind, model: string, name: string, projectId: PlatformId, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, visibility: AgentVisibility, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }> } };
+export type CreateAgentMutation = { createAgent: { createdAt: string, description: string | null, id: PlatformId, model: string, name: string, projectId: PlatformId, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, visibility: AgentVisibility, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }> } };
 
 export type DeleteAgentMutationVariables = Exact<{
   input: DeleteAgentInput;
@@ -573,7 +555,7 @@ export type AccessibleAgentsQueryVariables = Exact<{
 }>;
 
 
-export type AccessibleAgentsQuery = { accessibleAgentList: Array<{ createdAt: string, description: string | null, id: PlatformId, kind: AgentKind, name: string, projectId: PlatformId, runtimeId: string, status: AgentStatus, updatedAt: string, viewerRole: AgentViewerRole, visibility: AgentVisibility, owner: { id: PlatformId, imageUrl: string | null, name: string | null }, tools: Array<{ enabled: boolean, iconUrl: string | null, name: string, serverId: PlatformId }> }> };
+export type AccessibleAgentsQuery = { accessibleAgentList: Array<{ createdAt: string, description: string | null, id: PlatformId, name: string, projectId: PlatformId, runtimeId: string, status: AgentStatus, updatedAt: string, viewerRole: AgentViewerRole, visibility: AgentVisibility, owner: { id: PlatformId, imageUrl: string | null, name: string | null }, tools: Array<{ enabled: boolean, iconUrl: string | null, name: string, serverId: PlatformId }> }> };
 
 export type AgentQueryVariables = Exact<{
   agentId: PlatformId;
@@ -581,7 +563,7 @@ export type AgentQueryVariables = Exact<{
 }>;
 
 
-export type AgentQuery = { agent: { createdAt: string, description: string | null, id: PlatformId, kind: AgentKind, model: string, name: string, projectId: PlatformId, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, viewerRole: AgentViewerRole, visibility: AgentVisibility, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, owner: { id: PlatformId, imageUrl: string | null, name: string | null }, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }>, tools: Array<{ enabled: boolean, iconUrl: string | null, name: string, serverId: PlatformId }>, versions: Array<{ agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number }> } };
+export type AgentQuery = { agent: { createdAt: string, description: string | null, id: PlatformId, model: string, name: string, projectId: PlatformId, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, viewerRole: AgentViewerRole, visibility: AgentVisibility, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, owner: { id: PlatformId, imageUrl: string | null, name: string | null }, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }>, tools: Array<{ enabled: boolean, iconUrl: string | null, name: string, serverId: PlatformId }>, versions: Array<{ agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number }> } };
 
 export type AgentEditorStateQueryVariables = Exact<{
   agentId: PlatformId;
@@ -596,7 +578,7 @@ export type UpdateAgentConfigMutationVariables = Exact<{
 }>;
 
 
-export type UpdateAgentConfigMutation = { updateAgentConfig: { createdAt: string, description: string | null, id: PlatformId, kind: AgentKind, model: string, name: string, projectId: PlatformId, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, visibility: AgentVisibility, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }> } };
+export type UpdateAgentConfigMutation = { updateAgentConfig: { createdAt: string, description: string | null, id: PlatformId, model: string, name: string, projectId: PlatformId, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, visibility: AgentVisibility, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }> } };
 
 export type AgentManifestQueryVariables = Exact<{
   agentId: PlatformId;
@@ -619,21 +601,21 @@ export type ImportAgentPackageMutationVariables = Exact<{
 }>;
 
 
-export type ImportAgentPackageMutation = { importAgentPackage: { agent: { createdAt: string, description: string | null, id: PlatformId, kind: AgentKind, model: string, name: string, projectId: PlatformId, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, visibility: AgentVisibility, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }> }, resolution: { issues: Array<{ actionLabel: string | null, code: string, message: string, required: boolean, severity: AgentResolutionSeverity, status: AgentResolutionStatus, targetLabel: string | null, targetType: AgentResolutionTargetType }>, summary: { boundMcpServerCount: number, boundSkillCount: number, copiedAssetCount: number, createdMcpServerCount: number, reusedMcpServerCount: number } } } };
+export type ImportAgentPackageMutation = { importAgentPackage: { agent: { createdAt: string, description: string | null, id: PlatformId, model: string, name: string, projectId: PlatformId, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, visibility: AgentVisibility, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }> }, resolution: { issues: Array<{ actionLabel: string | null, code: string, message: string, required: boolean, severity: AgentResolutionSeverity, status: AgentResolutionStatus, targetLabel: string | null, targetType: AgentResolutionTargetType }>, summary: { boundMcpServerCount: number, boundSkillCount: number, copiedAssetCount: number, createdMcpServerCount: number, reusedMcpServerCount: number } } } };
 
 export type CreateAgentForkMutationVariables = Exact<{
   input: CreateAgentForkInput;
 }>;
 
 
-export type CreateAgentForkMutation = { createAgentFork: { agent: { createdAt: string, description: string | null, id: PlatformId, kind: AgentKind, model: string, name: string, projectId: PlatformId, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, visibility: AgentVisibility, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }> }, resolution: { issues: Array<{ actionLabel: string | null, code: string, message: string, required: boolean, severity: AgentResolutionSeverity, status: AgentResolutionStatus, targetLabel: string | null, targetType: AgentResolutionTargetType }>, summary: { boundMcpServerCount: number, boundSkillCount: number, copiedAssetCount: number, createdMcpServerCount: number, reusedMcpServerCount: number } } } };
+export type CreateAgentForkMutation = { createAgentFork: { agent: { createdAt: string, description: string | null, id: PlatformId, model: string, name: string, projectId: PlatformId, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, visibility: AgentVisibility, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }> }, resolution: { issues: Array<{ actionLabel: string | null, code: string, message: string, required: boolean, severity: AgentResolutionSeverity, status: AgentResolutionStatus, targetLabel: string | null, targetType: AgentResolutionTargetType }>, summary: { boundMcpServerCount: number, boundSkillCount: number, copiedAssetCount: number, createdMcpServerCount: number, reusedMcpServerCount: number } } } };
 
 export type PublishAgentMutationVariables = Exact<{
   input: PublishAgentInput;
 }>;
 
 
-export type PublishAgentMutation = { publishAgent: { createdAt: string, description: string | null, id: PlatformId, kind: AgentKind, model: string, name: string, projectId: PlatformId, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, visibility: AgentVisibility, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }> } };
+export type PublishAgentMutation = { publishAgent: { createdAt: string, description: string | null, id: PlatformId, model: string, name: string, projectId: PlatformId, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, visibility: AgentVisibility, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }> } };
 
 export type UnpublishAgentMutationVariables = Exact<{
   agentId: PlatformId;
@@ -641,28 +623,7 @@ export type UnpublishAgentMutationVariables = Exact<{
 }>;
 
 
-export type UnpublishAgentMutation = { unpublishAgent: { createdAt: string, description: string | null, id: PlatformId, kind: AgentKind, model: string, name: string, projectId: PlatformId, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, visibility: AgentVisibility, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }> } };
-
-export type RestartDriverMutationVariables = Exact<{
-  input: RuntimeStateOperationInput;
-}>;
-
-
-export type RestartDriverMutation = { restartDriver: { affectedSessionCount: number, agentId: PlatformId, ok: boolean, operation: RuntimeStateOperation } };
-
-export type RecreateSandboxMutationVariables = Exact<{
-  input: RuntimeStateOperationInput;
-}>;
-
-
-export type RecreateSandboxMutation = { recreateSandbox: { affectedSessionCount: number, agentId: PlatformId, ok: boolean, operation: RuntimeStateOperation } };
-
-export type ResetAgentStateMutationVariables = Exact<{
-  input: RuntimeStateOperationInput;
-}>;
-
-
-export type ResetAgentStateMutation = { resetAgentState: { affectedSessionCount: number, agentId: PlatformId, ok: boolean, operation: RuntimeStateOperation } };
+export type UnpublishAgentMutation = { unpublishAgent: { createdAt: string, description: string | null, id: PlatformId, model: string, name: string, projectId: PlatformId, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, visibility: AgentVisibility, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }> } };
 
 type CostTotalsFields_CostAgentRow_Fragment = { activeUsers: number, cacheCreationTokens: number, cacheReadTokens: number, inputTokens: number, outputTokens: number, requestCount: number, totalCostUsd: number, unpricedRequestCount: number };
 
@@ -880,7 +841,7 @@ export type ThreadAgentSessionRetrieveQueryVariables = Exact<{
 }>;
 
 
-export type ThreadAgentSessionRetrieveQuery = { threadAgentSessionRetrieve: { capabilities: Array<{ action: AgentSessionActionCapabilityName, reason: string | null, status: AgentSessionActionCapabilityStatus }>, recoverability: { reason: string | null, status: AgentSessionRecoverabilityStatus }, session: { agentId: PlatformId | null, archivedAt: string | null, createdAt: string, deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, kind: AgentKind, lastMessageAt: string | null, model: string, provider: string, projectId: PlatformId, runtimeId: string, status: SessionStatus, title: string | null, updatedAt: string, lastRun: { completedAt: string | null, createdAt: string, deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, model: string | null, provider: string | null, startedAt: string | null, status: RunStatus, traceId: string, trigger: SessionRunTrigger, updatedAt: string, error: { code: string, details: PrimitiveRecord, message: string, retryable: boolean } | null } | null } } };
+export type ThreadAgentSessionRetrieveQuery = { threadAgentSessionRetrieve: { capabilities: Array<{ action: AgentSessionActionCapabilityName, reason: string | null, status: AgentSessionActionCapabilityStatus }>, recoverability: { reason: string | null, status: AgentSessionRecoverabilityStatus }, session: { agentId: PlatformId | null, archivedAt: string | null, createdAt: string, deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, lastMessageAt: string | null, model: string, provider: string, projectId: PlatformId, runtimeId: string, status: SessionStatus, title: string | null, updatedAt: string, lastRun: { completedAt: string | null, createdAt: string, deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, model: string | null, provider: string | null, startedAt: string | null, status: RunStatus, traceId: string, trigger: SessionRunTrigger, updatedAt: string, error: { code: string, details: PrimitiveRecord, message: string, retryable: boolean } | null } | null } } };
 
 export type AgentSessionDiagnosticsQueryVariables = Exact<{
   projectId: PlatformId;
@@ -888,14 +849,14 @@ export type AgentSessionDiagnosticsQueryVariables = Exact<{
 }>;
 
 
-export type AgentSessionDiagnosticsQuery = { agentSessionDiagnostics: { generatedAt: string, pendingPermissionCount: number, execution: { binding: { deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, kind: AgentKind, model: string, provider: string, runtimeId: string, sessionId: PlatformId }, skills: Array<{ skillId: PlatformId, skillName: string }>, tools: Array<{ credentialMode: string, serverId: PlatformId }> } | null, nativeRuntimeRef: { kind: string | null, runtimeId: string | null, status: string, valuePreview: string | null }, session: { deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, kind: AgentKind, model: string, provider: string, runtimeId: string, status: SessionStatus, title: string | null, lastRun: { deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, model: string | null, provider: string | null, status: RunStatus, traceId: string } | null } } };
+export type AgentSessionDiagnosticsQuery = { agentSessionDiagnostics: { generatedAt: string, pendingPermissionCount: number, execution: { binding: { deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, model: string, provider: string, runtimeId: string, sessionId: PlatformId }, skills: Array<{ skillId: PlatformId, skillName: string }>, tools: Array<{ credentialMode: string, serverId: PlatformId }> } | null, nativeRuntimeRef: { kind: string | null, runtimeId: string | null, status: string, valuePreview: string | null }, session: { deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, model: string, provider: string, runtimeId: string, status: SessionStatus, title: string | null, lastRun: { deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, model: string | null, provider: string | null, status: RunStatus, traceId: string } | null } } };
 
 export type CreateAgentSessionMutationVariables = Exact<{
   input: CreateAgentSessionInput;
 }>;
 
 
-export type CreateAgentSessionMutation = { createAgentSession: { agentId: PlatformId | null, archivedAt: string | null, createdAt: string, deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, kind: AgentKind, lastMessageAt: string | null, model: string, provider: string, projectId: PlatformId, runtimeId: string, status: SessionStatus, title: string | null, type: SessionType, updatedAt: string, lastRun: { completedAt: string | null, createdAt: string, deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, model: string | null, provider: string | null, startedAt: string | null, status: RunStatus, traceId: string, trigger: SessionRunTrigger, updatedAt: string, error: { code: string, details: PrimitiveRecord, message: string, retryable: boolean } | null } | null } };
+export type CreateAgentSessionMutation = { createAgentSession: { agentId: PlatformId | null, archivedAt: string | null, createdAt: string, deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, lastMessageAt: string | null, model: string, provider: string, projectId: PlatformId, runtimeId: string, status: SessionStatus, title: string | null, type: SessionType, updatedAt: string, lastRun: { completedAt: string | null, createdAt: string, deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, model: string | null, provider: string | null, startedAt: string | null, status: RunStatus, traceId: string, trigger: SessionRunTrigger, updatedAt: string, error: { code: string, details: PrimitiveRecord, message: string, retryable: boolean } | null } | null } };
 
 export type AgentSessionListQueryVariables = Exact<{
   agentId: PlatformId;
@@ -907,7 +868,7 @@ export type AgentSessionListQueryVariables = Exact<{
 }>;
 
 
-export type AgentSessionListQuery = { agentSessionList: { nodes: Array<{ agentId: PlatformId | null, archivedAt: string | null, createdAt: string, deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, kind: AgentKind, lastMessageAt: string | null, model: string, provider: string, projectId: PlatformId, runtimeId: string, status: SessionStatus, title: string | null, type: SessionType, updatedAt: string, lastRun: { completedAt: string | null, createdAt: string, deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, model: string | null, provider: string | null, startedAt: string | null, status: RunStatus, traceId: string, trigger: SessionRunTrigger, updatedAt: string, error: { code: string, details: PrimitiveRecord, message: string, retryable: boolean } | null } | null }> } };
+export type AgentSessionListQuery = { agentSessionList: { nodes: Array<{ agentId: PlatformId | null, archivedAt: string | null, createdAt: string, deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, lastMessageAt: string | null, model: string, provider: string, projectId: PlatformId, runtimeId: string, status: SessionStatus, title: string | null, type: SessionType, updatedAt: string, lastRun: { completedAt: string | null, createdAt: string, deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, model: string | null, provider: string | null, startedAt: string | null, status: RunStatus, traceId: string, trigger: SessionRunTrigger, updatedAt: string, error: { code: string, details: PrimitiveRecord, message: string, retryable: boolean } | null } | null }> } };
 
 export type AgentSessionProcessEventsQueryVariables = Exact<{
   limit: number;
@@ -951,7 +912,7 @@ export type ThreadAgentSessionListQueryVariables = Exact<{
 }>;
 
 
-export type ThreadAgentSessionListQuery = { threadAgentSessionList: { nodes: Array<{ capabilities: Array<{ action: AgentSessionActionCapabilityName, reason: string | null, status: AgentSessionActionCapabilityStatus }>, session: { agentId: PlatformId | null, archivedAt: string | null, createdAt: string, deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, kind: AgentKind, lastMessageAt: string | null, model: string, provider: string, projectId: PlatformId, runtimeId: string, status: SessionStatus, title: string | null, type: SessionType, updatedAt: string, lastRun: { completedAt: string | null, createdAt: string, deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, model: string | null, provider: string | null, startedAt: string | null, status: RunStatus, traceId: string, trigger: SessionRunTrigger, updatedAt: string, error: { code: string, details: PrimitiveRecord, message: string, retryable: boolean } | null } | null } }>, pageInfo: { endCursor: string | null, hasMore: boolean } } };
+export type ThreadAgentSessionListQuery = { threadAgentSessionList: { nodes: Array<{ capabilities: Array<{ action: AgentSessionActionCapabilityName, reason: string | null, status: AgentSessionActionCapabilityStatus }>, session: { agentId: PlatformId | null, archivedAt: string | null, createdAt: string, deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, lastMessageAt: string | null, model: string, provider: string, projectId: PlatformId, runtimeId: string, status: SessionStatus, title: string | null, type: SessionType, updatedAt: string, lastRun: { completedAt: string | null, createdAt: string, deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, model: string | null, provider: string | null, startedAt: string | null, status: RunStatus, traceId: string, trigger: SessionRunTrigger, updatedAt: string, error: { code: string, details: PrimitiveRecord, message: string, retryable: boolean } | null } | null } }>, pageInfo: { endCursor: string | null, hasMore: boolean } } };
 
 export type AutoTitleSessionMutationVariables = Exact<{
   input: RenameSessionInput;
@@ -990,6 +951,22 @@ export type AddSessionResourceMutationVariables = Exact<{
 
 
 export type AddSessionResourceMutation = { addSessionResource: { contentType: string, expectedSize: number, expiresAt: string, fileId: PlatformId, partSize: number | null, path: string, status: FileUploadStatus, strategy: FileUploadStrategy } };
+
+export type RestartSessionDriverMutationVariables = Exact<{
+  projectId: PlatformId;
+  sessionId: PlatformId;
+}>;
+
+
+export type RestartSessionDriverMutation = { restartSessionDriver: { ok: boolean, sessionId: PlatformId } };
+
+export type RecreateSessionSandboxMutationVariables = Exact<{
+  projectId: PlatformId;
+  sessionId: PlatformId;
+}>;
+
+
+export type RecreateSessionSandboxMutation = { recreateSessionSandbox: { ok: boolean, sessionId: PlatformId } };
 
 export type SessionProcessEventsQueryVariables = Exact<{
   limit: number;
@@ -1124,7 +1101,6 @@ export const AgentDeploymentVersionFieldsFragmentDoc = /*#__PURE__*/ new TypedDo
   environmentId
   id
   isLive
-  kind
   model
   provider
   runtimeId
@@ -1137,7 +1113,6 @@ export const AgentFieldsFragmentDoc = /*#__PURE__*/ new TypedDocumentString(`
   createdAt
   description
   id
-  kind
   liveVersion {
     ...AgentDeploymentVersionFields
   }
@@ -1164,7 +1139,6 @@ export const AgentFieldsFragmentDoc = /*#__PURE__*/ new TypedDocumentString(`
   environmentId
   id
   isLive
-  kind
   model
   provider
   runtimeId
@@ -1604,7 +1578,6 @@ export const CreateAgentDocument = /*#__PURE__*/ new TypedDocumentString(`
   createdAt
   description
   id
-  kind
   liveVersion {
     ...AgentDeploymentVersionFields
   }
@@ -1631,7 +1604,6 @@ fragment AgentDeploymentVersionFields on AgentDeploymentVersion {
   environmentId
   id
   isLive
-  kind
   model
   provider
   runtimeId
@@ -1651,7 +1623,6 @@ export const AccessibleAgentsDocument = /*#__PURE__*/ new TypedDocumentString(`
     createdAt
     description
     id
-    kind
     name
     projectId
     owner {
@@ -1684,7 +1655,6 @@ export const AgentDocument = /*#__PURE__*/ new TypedDocumentString(`
     createdAt
     description
     id
-    kind
     liveVersion {
       ...AgentDeploymentVersionFields
     }
@@ -1728,7 +1698,6 @@ fragment AgentDeploymentVersionFields on AgentDeploymentVersion {
   environmentId
   id
   isLive
-  kind
   model
   provider
   runtimeId
@@ -1815,7 +1784,6 @@ export const UpdateAgentConfigDocument = /*#__PURE__*/ new TypedDocumentString(`
   createdAt
   description
   id
-  kind
   liveVersion {
     ...AgentDeploymentVersionFields
   }
@@ -1842,7 +1810,6 @@ fragment AgentDeploymentVersionFields on AgentDeploymentVersion {
   environmentId
   id
   isLive
-  kind
   model
   provider
   runtimeId
@@ -1901,7 +1868,6 @@ export const ImportAgentPackageDocument = /*#__PURE__*/ new TypedDocumentString(
   createdAt
   description
   id
-  kind
   liveVersion {
     ...AgentDeploymentVersionFields
   }
@@ -1928,7 +1894,6 @@ fragment AgentDeploymentVersionFields on AgentDeploymentVersion {
   environmentId
   id
   isLive
-  kind
   model
   provider
   runtimeId
@@ -1966,7 +1931,6 @@ export const CreateAgentForkDocument = /*#__PURE__*/ new TypedDocumentString(`
   createdAt
   description
   id
-  kind
   liveVersion {
     ...AgentDeploymentVersionFields
   }
@@ -1993,7 +1957,6 @@ fragment AgentDeploymentVersionFields on AgentDeploymentVersion {
   environmentId
   id
   isLive
-  kind
   model
   provider
   runtimeId
@@ -2010,7 +1973,6 @@ export const PublishAgentDocument = /*#__PURE__*/ new TypedDocumentString(`
   createdAt
   description
   id
-  kind
   liveVersion {
     ...AgentDeploymentVersionFields
   }
@@ -2037,7 +1999,6 @@ fragment AgentDeploymentVersionFields on AgentDeploymentVersion {
   environmentId
   id
   isLive
-  kind
   model
   provider
   runtimeId
@@ -2054,7 +2015,6 @@ export const UnpublishAgentDocument = /*#__PURE__*/ new TypedDocumentString(`
   createdAt
   description
   id
-  kind
   liveVersion {
     ...AgentDeploymentVersionFields
   }
@@ -2081,43 +2041,12 @@ fragment AgentDeploymentVersionFields on AgentDeploymentVersion {
   environmentId
   id
   isLive
-  kind
   model
   provider
   runtimeId
   summary
   versionNumber
 }`) as unknown as TypedDocumentString<UnpublishAgentMutation, UnpublishAgentMutationVariables>;
-export const RestartDriverDocument = /*#__PURE__*/ new TypedDocumentString(`
-    mutation RestartDriver($input: RuntimeStateOperationInput!) {
-  restartDriver(input: $input) {
-    affectedSessionCount
-    agentId
-    ok
-    operation
-  }
-}
-    `) as unknown as TypedDocumentString<RestartDriverMutation, RestartDriverMutationVariables>;
-export const RecreateSandboxDocument = /*#__PURE__*/ new TypedDocumentString(`
-    mutation RecreateSandbox($input: RuntimeStateOperationInput!) {
-  recreateSandbox(input: $input) {
-    affectedSessionCount
-    agentId
-    ok
-    operation
-  }
-}
-    `) as unknown as TypedDocumentString<RecreateSandboxMutation, RecreateSandboxMutationVariables>;
-export const ResetAgentStateDocument = /*#__PURE__*/ new TypedDocumentString(`
-    mutation ResetAgentState($input: RuntimeStateOperationInput!) {
-  resetAgentState(input: $input) {
-    affectedSessionCount
-    agentId
-    ok
-    operation
-  }
-}
-    `) as unknown as TypedDocumentString<ResetAgentStateMutation, ResetAgentStateMutationVariables>;
 export const ProjectCostCardDocument = /*#__PURE__*/ new TypedDocumentString(`
     query ProjectCostCard($projectId: ULID!, $range: CostRange!, $runPurposes: [CostRunPurpose!]) {
   projectCostCard(projectId: $projectId, range: $range, runPurposes: $runPurposes) {
@@ -2974,7 +2903,6 @@ export const ThreadAgentSessionRetrieveDocument = /*#__PURE__*/ new TypedDocumen
       deploymentVersionId
       deploymentVersionNumber
       id
-      kind
       lastMessageAt
       lastRun {
         completedAt
@@ -3014,7 +2942,6 @@ export const AgentSessionDiagnosticsDocument = /*#__PURE__*/ new TypedDocumentSt
       binding {
         deploymentVersionId
         deploymentVersionNumber
-        kind
         model
         provider
         runtimeId
@@ -3041,7 +2968,6 @@ export const AgentSessionDiagnosticsDocument = /*#__PURE__*/ new TypedDocumentSt
       deploymentVersionId
       deploymentVersionNumber
       id
-      kind
       lastRun {
         deploymentVersionId
         deploymentVersionNumber
@@ -3069,7 +2995,6 @@ export const CreateAgentSessionDocument = /*#__PURE__*/ new TypedDocumentString(
     deploymentVersionId
     deploymentVersionNumber
     id
-    kind
     lastMessageAt
     lastRun {
       completedAt
@@ -3119,7 +3044,6 @@ export const AgentSessionListDocument = /*#__PURE__*/ new TypedDocumentString(`
       deploymentVersionId
       deploymentVersionNumber
       id
-      kind
       lastMessageAt
       lastRun {
         completedAt
@@ -3239,7 +3163,6 @@ export const ThreadAgentSessionListDocument = /*#__PURE__*/ new TypedDocumentStr
         deploymentVersionId
         deploymentVersionNumber
         id
-        kind
         lastMessageAt
         lastRun {
           completedAt
@@ -3320,6 +3243,22 @@ export const AddSessionResourceDocument = /*#__PURE__*/ new TypedDocumentString(
   }
 }
     `) as unknown as TypedDocumentString<AddSessionResourceMutation, AddSessionResourceMutationVariables>;
+export const RestartSessionDriverDocument = /*#__PURE__*/ new TypedDocumentString(`
+    mutation RestartSessionDriver($projectId: ULID!, $sessionId: ULID!) {
+  restartSessionDriver(projectId: $projectId, sessionId: $sessionId) {
+    ok
+    sessionId
+  }
+}
+    `) as unknown as TypedDocumentString<RestartSessionDriverMutation, RestartSessionDriverMutationVariables>;
+export const RecreateSessionSandboxDocument = /*#__PURE__*/ new TypedDocumentString(`
+    mutation RecreateSessionSandbox($projectId: ULID!, $sessionId: ULID!) {
+  recreateSessionSandbox(projectId: $projectId, sessionId: $sessionId) {
+    ok
+    sessionId
+  }
+}
+    `) as unknown as TypedDocumentString<RecreateSessionSandboxMutation, RecreateSessionSandboxMutationVariables>;
 export const SessionProcessEventsDocument = /*#__PURE__*/ new TypedDocumentString(`
     query SessionProcessEvents($limit: Int!, $projectId: ULID!, $sessionId: ULID!) {
   threadSessionProcessEvents(

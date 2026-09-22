@@ -27,7 +27,6 @@ const THREAD_AGENT_SESSION_RETRIEVE_QUERY = graphql(/* GraphQL */ `
         deploymentVersionId
         deploymentVersionNumber
         id
-        kind
         lastMessageAt
         lastRun {
           completedAt
@@ -68,7 +67,6 @@ const AGENT_SESSION_DIAGNOSTICS_QUERY = graphql(/* GraphQL */ `
         binding {
           deploymentVersionId
           deploymentVersionNumber
-          kind
           model
           provider
           runtimeId
@@ -95,7 +93,6 @@ const AGENT_SESSION_DIAGNOSTICS_QUERY = graphql(/* GraphQL */ `
         deploymentVersionId
         deploymentVersionNumber
         id
-        kind
         lastRun {
           deploymentVersionId
           deploymentVersionNumber

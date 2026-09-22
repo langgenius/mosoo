@@ -1,3 +1,4 @@
+import type { AgentKind } from "@mosoo/contracts/agent";
 import type {
   PublicApiVersion,
   PublicThreadApiCreateThreadResponse,
@@ -26,14 +27,16 @@ function createThreadLinks(
 }
 
 export function toPublicThreadSummary<UserId extends string | null>(input: {
+  apiVersion?: PublicApiVersion | undefined;
   endUserId: UserId;
+  legacyKind: AgentKind;
   session: PublicThreadSessionProjection;
-}): PublicThreadSummary<UserId> {
+}): PublicThreadSummary<UserId, PublicApiVersion> {
   return {
     agent_id: input.session.agentId,
     created_at: input.session.createdAt,
     id: input.session.id,
-    kind: input.session.kind,
+    ...(input.apiVersion === "v2" ? {} : { kind: input.legacyKind }),
     last_run_id: input.session.lastRun?.id ?? null,
     source: "api",
     status: input.session.status,
@@ -74,14 +77,17 @@ export function toCreateEmptyThreadSessionSummary(
 export function toCreateThreadResponse<UserId extends string | null>(input: {
   apiVersion?: PublicApiVersion | undefined;
   endUserId: UserId;
+  legacyKind: AgentKind;
   run: SessionRunSummary | null;
   session: PublicThreadSessionProjection;
-}): PublicThreadApiCreateThreadResponse<UserId> {
+}): PublicThreadApiCreateThreadResponse<UserId, PublicApiVersion> {
   return {
     links: createThreadLinks(input.session.id, input.apiVersion),
     run: toPublicThreadRunSummary(input.run),
     thread: toPublicThreadSummary({
+      apiVersion: input.apiVersion,
       endUserId: input.endUserId,
+      legacyKind: input.legacyKind,
       session: input.session,
     }),
   };
@@ -90,9 +96,10 @@ export function toCreateThreadResponse<UserId extends string | null>(input: {
 export function toRetrieveThreadResponse<UserId extends string | null>(input: {
   apiVersion?: PublicApiVersion | undefined;
   endUserId: UserId;
+  legacyKind: AgentKind;
   finalOutput: PublicThreadFinalOutput | null;
   session: SessionSummary;
-}): PublicThreadApiRetrieveThreadResponse<UserId> {
+}): PublicThreadApiRetrieveThreadResponse<UserId, PublicApiVersion> {
   const session = toPublicThreadSessionSummary(input.session);
 
   return {
@@ -102,7 +109,9 @@ export function toRetrieveThreadResponse<UserId extends string | null>(input: {
         ? null
         : toPublicThreadRunSummary(input.session.lastRun, { finalOutput: input.finalOutput }),
     thread: toPublicThreadSummary({
+      apiVersion: input.apiVersion,
       endUserId: input.endUserId,
+      legacyKind: input.legacyKind,
       session,
     }),
   };

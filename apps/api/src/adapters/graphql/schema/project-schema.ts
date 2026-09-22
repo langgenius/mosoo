@@ -15,7 +15,6 @@ export const projectSchema = /* GraphQL */ `
     projectId: ULID!
     description: String
     id: ULID!
-    kind: AgentKind!
     model: String!
     name: String!
     provider: String!

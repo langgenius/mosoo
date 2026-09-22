@@ -62,7 +62,10 @@ describe("Agent type retirement", () => {
         runtimeId: "openai-runtime",
         skillIds: [],
       });
-      expect(result.kind).toBe(migrating ? "cattle" : "pet");
+      expect(result).not.toHaveProperty("kind");
+      expect(
+        await database.prepare("SELECT kind FROM agent WHERE id = ?").bind(ids.agentId).first(),
+      ).toEqual({ kind: migrating ? "cattle" : "pet" });
       expect(result.prompt).toBe("New instructions for later admission.");
     },
   );
@@ -83,8 +86,8 @@ describe("Agent type retirement", () => {
           skillIds: [],
         }),
       );
+      expect(agent).not.toHaveProperty("kind");
       expect(agent).toMatchObject({
-        kind: "cattle",
         model: "gpt-5.4",
         prompt: "Retain this configuration.",
       });
@@ -116,7 +119,10 @@ describe("Agent type retirement", () => {
         }),
       );
       expect(result.agent.id).not.toBe(ids.agentId);
-      expect(result.agent.kind).toBe("cattle");
+      expect(result.agent).not.toHaveProperty("kind");
+      expect(
+        await database.prepare("SELECT kind FROM agent WHERE id = ?").bind(result.agent.id).first(),
+      ).toEqual({ kind: "cattle" });
       expect(result.agent.model).toBe(original?.["model"]);
       expect(result.agent.prompt).toBe(original?.["prompt"]);
       expect(

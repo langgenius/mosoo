@@ -28,6 +28,7 @@ import {
 import type { RuntimeSubjectOperationStatus } from "../../domain/runtime-subject-lifecycle.machine";
 import {
   activeSessionRunQueryForListedSubject,
+  exclusiveSessionRuntimeSubjectPredicate,
   lastBackupTable,
   liveDriverInstanceQueryForListedSubject,
   mapRuntimeSubjectBackup,
@@ -845,4 +846,31 @@ export async function markRuntimeSubjectFailed(
     .run();
 
   return getD1ChangeCount(result) > 0;
+}
+
+export async function assertExclusiveSessionRuntimeSubject(
+  database: D1Database,
+  runtimeSubjectId: SandboxId,
+  operation?: {
+    readonly id: RuntimeOperationId | null;
+    readonly status: RuntimeSubjectOperationStatus;
+  },
+): Promise<void> {
+  const record = await getAppDatabase(database)
+    .select({ id: sandboxesTable.id })
+    .from(sandboxesTable)
+    .where(
+      and(
+        eq(sandboxesTable.id, runtimeSubjectId),
+        exclusiveSessionRuntimeSubjectPredicate(),
+        ...(operation === undefined
+          ? []
+          : [
+              eq(sandboxesTable.status, operation.status),
+              ...runtimeSubjectStatusOperationCondition(operation.id),
+            ]),
+      ),
+    )
+    .get();
+  if (!record) throw new Error("Session does not have a verified exclusive execution binding.");
 }

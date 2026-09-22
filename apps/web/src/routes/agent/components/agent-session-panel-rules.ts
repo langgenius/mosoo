@@ -14,7 +14,6 @@ export interface SessionConfigurationFreshnessInput {
 }
 
 export interface ComposerSendBlockInput {
-  configurationRefreshRequired: boolean;
   lifecycle: SessionLiveState["lifecycle"];
   readinessBlockMessage: string | null;
   reconnecting: boolean;
@@ -99,7 +98,6 @@ export function isComposerSendBlocked(input: ComposerSendBlockInput): boolean {
     input.streaming ||
     input.reconnecting ||
     input.lifecycle === "RESCHEDULING" ||
-    input.configurationRefreshRequired ||
     input.readinessBlockMessage !== null
   );
 }

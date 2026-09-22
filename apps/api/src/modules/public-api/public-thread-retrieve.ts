@@ -1,3 +1,4 @@
+import type { PublicApiVersion } from "@mosoo/contracts/public-api";
 import type { PublicThreadApiRetrieveThreadResponse } from "@mosoo/contracts/public-api";
 
 import { admitPublicThreadReader } from "./public-thread-admission";
@@ -9,7 +10,7 @@ import type { RetrievePublicThreadRequest } from "./public-thread.types";
 
 export async function retrievePublicThread(
   request: RetrievePublicThreadRequest,
-): Promise<PublicThreadApiRetrieveThreadResponse<string | null>> {
+): Promise<PublicThreadApiRetrieveThreadResponse<string | null, PublicApiVersion>> {
   const snapshot = await getThreadSnapshot(request.database, request.threadId, request.apiVersion);
 
   await admitPublicThreadReader(request.database, request.caller, snapshot, request.apiVersion);
@@ -26,6 +27,7 @@ export async function retrievePublicThread(
   return toRetrieveThreadResponse({
     apiVersion: request.apiVersion,
     endUserId: snapshot.endUserId,
+    legacyKind: snapshot.row.kind,
     finalOutput,
     session: snapshot.session,
   });

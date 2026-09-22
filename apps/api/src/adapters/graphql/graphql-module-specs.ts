@@ -35,9 +35,6 @@ export const agentGraphQLSpec = {
     "deleteAgent(input: DeleteAgentInput!): OperationResult!",
     "importAgentPackage(input: ImportAgentPackageInput!): AgentPackageImportResult!",
     "publishAgent(input: PublishAgentInput!): Agent!",
-    "recreateSandbox(input: RuntimeStateOperationInput!): RuntimeStateOperationResult!",
-    "resetAgentState(input: RuntimeStateOperationInput!): RuntimeStateOperationResult!",
-    "restartDriver(input: RuntimeStateOperationInput!): RuntimeStateOperationResult!",
     "unpublishAgent(projectId: ULID!, agentId: ULID!): Agent!",
     "updateAgentConfig(input: UpdateAgentConfigInput!): Agent!",
   ],
@@ -109,6 +106,8 @@ export const projectGraphQLSpec = {
 
 export const sessionGraphQLSpec = {
   mutationFields: [
+    "restartSessionDriver(projectId: ULID!, sessionId: ULID!): SessionRuntimeOperationResult!",
+    "recreateSessionSandbox(projectId: ULID!, sessionId: ULID!): SessionRuntimeOperationResult!",
     "addSessionResource(input: AddSessionResourceInput!): SessionResourceUpload!",
     "createAgentSession(input: CreateAgentSessionInput!): Session!",
     "prewarmAgentSession(projectId: ULID!, sessionId: ULID!): SessionRuntimePrewarmAck!",

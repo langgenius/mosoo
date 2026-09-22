@@ -1,3 +1,5 @@
+import type { AgentKind } from "@mosoo/contracts/agent";
+import type { PublicApiVersion } from "@mosoo/contracts/public-api";
 import type { PublicThreadApiCreateThreadResponse } from "@mosoo/contracts/public-api";
 import type { SessionSummary } from "@mosoo/contracts/session";
 import { createPlatformId } from "@mosoo/id";
@@ -74,9 +76,10 @@ async function startInitialThreadRun(
   request: CreatePublicThreadRequest,
   admission: ThreadCreationAdmission,
   session: SessionSummary,
+  legacyKind: AgentKind,
   prompt: string,
   clientRequestId: string,
-): Promise<PublicThreadApiCreateThreadResponse<string | null>> {
+): Promise<PublicThreadApiCreateThreadResponse<string | null, PublicApiVersion>> {
   const sessionId = session.id;
   const queuedRun = await queueSessionRun({
     bindings: request.bindings,
@@ -119,6 +122,7 @@ async function startInitialThreadRun(
   return toCreateThreadResponse({
     apiVersion: request.apiVersion,
     endUserId: request.input.userId,
+    legacyKind,
     run,
     session: updatedSession,
   });
@@ -126,7 +130,7 @@ async function startInitialThreadRun(
 
 export async function createPublicThread(
   request: CreatePublicThreadRequest,
-): Promise<PublicThreadApiCreateThreadResponse<string | null>> {
+): Promise<PublicThreadApiCreateThreadResponse<string | null, PublicApiVersion>> {
   if (request.source.type === "inline" && request.apiVersion !== "v2") {
     throw publicInvalidRequest("Inline execution requires API v2.");
   }
@@ -211,6 +215,7 @@ export async function createPublicThread(
       return toCreateThreadResponse({
         apiVersion: request.apiVersion,
         endUserId: request.input.userId,
+        legacyKind: "cattle",
         run: null,
         session: toCreateEmptyThreadSessionSummary(session),
       });
@@ -220,6 +225,7 @@ export async function createPublicThread(
       request,
       admission,
       session,
+      "cattle", // New Session rows retain this inert value for v1 compatibility.
       request.input.inputText,
       initialRequestId,
     );
@@ -243,7 +249,7 @@ export async function createPublicThread(
 
 export async function recoverPublicThreadCreation(
   request: CreatePublicThreadRequest,
-): Promise<PublicThreadApiCreateThreadResponse<string | null> | null> {
+): Promise<PublicThreadApiCreateThreadResponse<string | null, PublicApiVersion> | null> {
   if (request.idempotencyKey === null) {
     return null;
   }
@@ -308,6 +314,7 @@ export async function recoverPublicThreadCreation(
           request,
           admission,
           snapshot.session,
+          snapshot.row.kind,
           request.input.inputText,
           initialRequestId ?? "public-api:initial-turn",
         );
@@ -338,6 +345,7 @@ export async function recoverPublicThreadCreation(
   return toCreateThreadResponse({
     apiVersion: request.apiVersion,
     endUserId: snapshot.endUserId,
+    legacyKind: snapshot.row.kind,
     run: initialRun,
     session: toPublicThreadSessionSummary(snapshot.session),
   });

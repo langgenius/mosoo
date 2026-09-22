@@ -1,15 +1,17 @@
 import type {
-  RuntimeStateOperationInput,
-  RuntimeStateOperationName,
-  RuntimeStateOperationResult,
-} from "@mosoo/contracts/agent";
+  SessionRuntimeOperationInput,
+  SessionRuntimeOperationName,
+  SessionRuntimeOperationResult,
+} from "@mosoo/contracts/session";
+import type { SessionId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
-import { ensureProjectAgentOwner } from "../../agents/application/agent-access.service";
+import { API_ERROR_CODE, createApiError } from "../../../platform/errors";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import { getRuntimeKindPolicy } from "../domain/runtime-kind-policy";
+import { ensureProjectOwnership } from "../../projects/application/project.service";
+import { assertPreviewAvailable } from "../../sessions/infrastructure/preview-retention.repository";
 import { createSandboxExecutionPlaneAdapter } from "../infrastructure/execution-plane/sandbox-execution-plane-adapter";
-import { enforceSandboxBackupConfigured } from "../infrastructure/sandbox-backup-config";
+import { isSessionTerminalCheckpointReadyForNextRun } from "../infrastructure/session-runs/session-run-admission.repository";
 import { executeRuntimeStateOperationSubjects } from "./runtime-state-operation-execution";
 import {
   completeRuntimeStateOperationPhase,
@@ -17,118 +19,96 @@ import {
   listRuntimeStateOperationPhaseTargets,
   startRuntimeStateOperationPhase,
 } from "./runtime-state-operation-phases";
-import {
-  resolveRuntimeOperationScope,
-  selectAdmittedRuntimeOperationSubjects,
-} from "./runtime-state-operation-subjects";
-import type { RuntimeOperationSubject } from "./runtime-state-operation-subjects";
+import { resolveSessionRuntimeOperationScope } from "./runtime-state-operation-subjects";
 import { appendRuntimeDriverRestartAttemptedEvents } from "./runtime-state-operation-target-events";
-import { resolveRuntimeOperationTargetVersion } from "./runtime-state-operation-version";
 
 const executionPlane = createSandboxExecutionPlaneAdapter();
 
-async function executeRuntimeStateOperation(context: {
-  bindings: ApiBindings;
-  input: RuntimeStateOperationInput;
-  operation: RuntimeStateOperationName;
-  viewer: AuthenticatedViewer;
-}): Promise<RuntimeStateOperationResult> {
-  const { bindings, input, operation, viewer } = context;
-  const { agent } = await ensureProjectAgentOwner(bindings.DB, viewer.id, {
-    agentId: input.agentId,
-    projectId: input.projectId,
-  });
-  const targetVersion = await resolveRuntimeOperationTargetVersion(bindings.DB, {
-    agent,
-    ...(input.targetVersion === undefined ? {} : { targetVersion: input.targetVersion }),
-  });
-  const policy = getRuntimeKindPolicy(agent.kind);
-  if (
-    (operation === "resetAgentState" && policy.operations.resetSubjectState) ||
-    (operation === "recreateSandbox" && policy.checkpoint.createOnRecreate.length > 0)
-  ) {
-    enforceSandboxBackupConfigured(bindings);
+async function assertSessionCheckpointReady(database: D1Database, sessionId: SessionId) {
+  if (!(await isSessionTerminalCheckpointReadyForNextRun(database, sessionId))) {
+    throw createApiError(
+      API_ERROR_CODE.sessionRunCheckpointPending,
+      "Session maintenance must wait for its successful turn checkpoint and history.",
+    );
   }
-  if (operation === "resetAgentState" && !policy.operations.resetSubjectState) {
-    throw new Error("Reset subject state is not available for this runtime kind.");
+}
+
+async function executeSessionRuntimeOperation(
+  bindings: ApiBindings,
+  viewer: AuthenticatedViewer,
+  input: SessionRuntimeOperationInput,
+  operation: SessionRuntimeOperationName,
+): Promise<SessionRuntimeOperationResult> {
+  const project = await ensureProjectOwnership(bindings.DB, viewer.id, input.projectId);
+  const target = { ...input, executionOwnerUserId: project.ownerAccountId };
+  const scope = await resolveSessionRuntimeOperationScope(bindings.DB, target);
+  await assertPreviewAvailable(bindings.DB, input.sessionId, Date.now());
+  await assertSessionCheckpointReady(bindings.DB, input.sessionId);
+  if (scope.targets.length === 0) {
+    return { affectedSessionCount: 0, ok: true, operation, sessionId: input.sessionId };
   }
 
-  const { subjects, targets } = await resolveRuntimeOperationScope(bindings.DB, agent);
-
+  const agentId = scope.targets[0]!.agentId;
   const phase = await startRuntimeStateOperationPhase(bindings, {
-    agentId: agent.id,
+    agentId,
     operation,
-    targetVersion,
-    targets,
+    targetVersion: null,
+    targets: scope.targets,
   });
   const admittedTargets = listRuntimeStateOperationPhaseTargets(phase);
-  let admittedSubjects: RuntimeOperationSubject[] = [];
-
   try {
-    admittedSubjects = selectAdmittedRuntimeOperationSubjects({
-      admittedTargets,
-      scope: policy.subject.scope,
-      subjects,
-      targets,
+    if (admittedTargets.length !== 1) {
+      throw createApiError(
+        API_ERROR_CODE.sessionRuntimeOperationUnavailable,
+        "Session changed before maintenance could be admitted.",
+      );
+    }
+    const current = await resolveSessionRuntimeOperationScope(bindings.DB, {
+      ...target,
+      expectedOperationId: phase.operationId,
     });
-
+    if (scope.subjects[0]?.runtimeSubjectId !== current.subjects[0]?.runtimeSubjectId) {
+      throw createApiError(
+        API_ERROR_CODE.sessionRuntimeOperationUnavailable,
+        "Session execution binding changed before maintenance.",
+      );
+    }
+    await assertSessionCheckpointReady(bindings.DB, input.sessionId);
     if (operation === "restartDriver") {
       await appendRuntimeDriverRestartAttemptedEvents(bindings, {
         targets: admittedTargets,
-        targetVersion,
+        targetVersion: null,
       });
     }
-
     await executeRuntimeStateOperationSubjects(bindings, {
       executionPlane,
       operation,
       operationId: phase.operationId,
-      subjects: admittedSubjects,
+      subjects: current.subjects.map((subject) => ({
+        runtimeSubjectId: subject.runtimeSubjectId,
+        targets: admittedTargets,
+      })),
     });
   } catch (error) {
-    await failRuntimeStateOperationPhase(bindings, {
-      agentId: agent.id,
-      operation,
-      phase,
-    });
-
+    await failRuntimeStateOperationPhase(bindings, { agentId, operation, phase });
     throw error;
   }
-
-  await completeRuntimeStateOperationPhase(bindings, {
-    agentId: agent.id,
-    operation,
-    phase,
-  });
-
-  return {
-    affectedSessionCount: admittedTargets.length,
-    agentId: agent.id,
-    ok: true,
-    operation,
-  };
+  await completeRuntimeStateOperationPhase(bindings, { agentId, operation, phase });
+  return { affectedSessionCount: 1, ok: true, operation, sessionId: input.sessionId };
 }
 
-export async function restartDriver(
+export function restartSessionDriver(
   bindings: ApiBindings,
   viewer: AuthenticatedViewer,
-  input: RuntimeStateOperationInput,
-): Promise<RuntimeStateOperationResult> {
-  return executeRuntimeStateOperation({ bindings, input, operation: "restartDriver", viewer });
+  input: SessionRuntimeOperationInput,
+) {
+  return executeSessionRuntimeOperation(bindings, viewer, input, "restartDriver");
 }
 
-export async function recreateSandbox(
+export function recreateSessionSandbox(
   bindings: ApiBindings,
   viewer: AuthenticatedViewer,
-  input: RuntimeStateOperationInput,
-): Promise<RuntimeStateOperationResult> {
-  return executeRuntimeStateOperation({ bindings, input, operation: "recreateSandbox", viewer });
-}
-
-export async function resetAgentState(
-  bindings: ApiBindings,
-  viewer: AuthenticatedViewer,
-  input: RuntimeStateOperationInput,
-): Promise<RuntimeStateOperationResult> {
-  return executeRuntimeStateOperation({ bindings, input, operation: "resetAgentState", viewer });
+  input: SessionRuntimeOperationInput,
+) {
+  return executeSessionRuntimeOperation(bindings, viewer, input, "recreateSandbox");
 }

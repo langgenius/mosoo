@@ -266,7 +266,7 @@ async function hydrateRunContextFromSession(
     agentId: binding.agentId,
     environment: snapshotEnvironment,
     environmentNetworkPolicy: environmentSnapshot.networkPolicy,
-    kind: binding.kind,
+    kind: binding.kind ?? "cattle",
     mcpServerIds: toolReferences.map((reference) => reference.serverId),
     model: binding.model,
     packageResolution: storedConfig.packageResolution,
@@ -351,7 +351,7 @@ async function hydrateRunContextFromSession(
     agentId: binding.agentId,
     projectId: session.projectId,
     executionOwnerUserId,
-    kind: binding.kind,
+    kind: binding.kind ?? "cattle",
     sessionId: session.id,
   });
 
@@ -372,7 +372,7 @@ async function hydrateRunContextFromSession(
       envVars,
       environmentArtifact,
       executionOwnerUserId,
-      kind: binding.kind,
+      kind: binding.kind ?? "cattle",
       model: binding.model,
       network: toDriverNetworkProfile({
         environment: environmentSnapshot,
@@ -506,7 +506,7 @@ async function refreshCachedRunContextVolatileFields(
     agentId: binding.agentId,
     projectId: session.projectId,
     executionOwnerUserId,
-    kind: binding.kind,
+    kind: binding.kind ?? "cattle",
     sessionId: session.id,
   });
   const profile = createAgentRuntimeProfile({
@@ -525,7 +525,7 @@ async function refreshCachedRunContextVolatileFields(
     envVars,
     environmentArtifact: cached.profile.environmentArtifact ?? null,
     executionOwnerUserId,
-    kind: binding.kind,
+    kind: binding.kind ?? "cattle",
     model: binding.model,
     network: toDriverNetworkProfile({
       environment: environmentSnapshot,

@@ -1,3 +1,4 @@
+import { getAgentBuiltInToolSupportError } from "@mosoo/contracts/agent";
 import type { Agent, CreateAgentInput, UpdateAgentConfigInput } from "@mosoo/contracts/agent";
 import { createDefaultAgentBuiltInTools, normalizeAgentBuiltInTools } from "@mosoo/contracts/agent";
 import {
@@ -16,6 +17,7 @@ import {
 } from "../../../platform/analytics/product-analytics";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase, runAppDatabaseBatch } from "../../../platform/db/drizzle";
+import { validationError } from "../../../platform/errors";
 import { forbiddenError } from "../../../platform/errors";
 import { currentTimestampMs } from "../../../time";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
@@ -51,7 +53,6 @@ import { buildAgentSpecForPreparedProfile, listAgentSpecSkillsByIds } from "./ag
 import { parseAgentStoredConfig, serializeAgentStoredConfig } from "./agent-stored-config.service";
 import {
   evaluateAgentRuntimeSelection,
-  enforcePublishedRuntimeStability,
   createAgentConfigChangeSnapshot,
   listAgentSkillIds,
   planVersionedAgentConfigChange,
@@ -180,6 +181,8 @@ export async function updateAgentConfig(
     input.builtInTools === undefined
       ? currentStoredConfig.builtInTools
       : normalizeAgentBuiltInTools(input.builtInTools);
+  const toolSupportError = getAgentBuiltInToolSupportError(runtimeId, builtInTools);
+  if (toolSupportError) throw validationError(toolSupportError);
   const requestedProviderOptions = input.providerOptions ?? {};
   const providerOptionsUnchanged =
     stableStringify(currentStoredConfig.providerOptions) ===
@@ -233,7 +236,6 @@ export async function updateAgentConfig(
   });
   const { environmentId } = input.environment;
 
-  enforcePublishedRuntimeStability(editable.agent, runtimeId);
   await ensureAgentSkillSelectionAccess(database, viewer, editable.agent.projectId, skillIds);
   if (
     environmentId !== null &&

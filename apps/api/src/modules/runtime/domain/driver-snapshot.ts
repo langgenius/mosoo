@@ -205,7 +205,6 @@ export interface DriverExecutionSessionContext {
   readonly homePath: string;
   readonly origin: DriverOrigin;
   readonly sandboxId: SandboxId;
-  readonly sandboxKind: AgentKind;
   readonly sandboxSubjectId: PlatformId;
   readonly sandboxSubjectKind: SandboxSubjectKind;
   readonly sessionOrganizationPath: string;

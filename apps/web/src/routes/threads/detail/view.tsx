@@ -9,6 +9,7 @@ import type { ReactElement } from "react";
 
 import type { ListedFileEntry } from "@/domains/file/api/files";
 import { triggerAgentSessionPrewarm } from "@/domains/session/api/agent-session";
+import { SessionRuntimeControls } from "@/features/session-chat/session-runtime-controls";
 import { toSessionId } from "@/routes/typed-id";
 import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
@@ -248,6 +249,7 @@ function ThreadDetailHeader({
             {t("threads.archive")}
           </Button>
         ) : null}
+        <SessionRuntimeControls key={thread.id} session={thread.session} />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button size="icon-sm" variant="ghost" aria-label={t("common.moreActions")}>

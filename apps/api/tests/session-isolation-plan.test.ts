@@ -421,7 +421,7 @@ describe("legacy Session isolation batch", () => {
     const isolatedPlan = await getSessionExecutionPlan(database, ID.ownerSession);
     expect(isolatedPlan).toEqual({
       ...originalPlan,
-      binding: { ...originalPlan.binding, kind: "cattle" },
+      binding: { ...originalPlan.binding, kind: undefined },
       configJson: plan.before.deployment?.config_json,
     });
     expect(isolatedPlan.recoveryRetentionMs).toBeUndefined();

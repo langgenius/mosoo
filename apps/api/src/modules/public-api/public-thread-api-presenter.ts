@@ -1,4 +1,4 @@
-import type { AgentKind } from "@mosoo/contracts/agent";
+import type { PublicApiVersion } from "@mosoo/contracts/public-api";
 import type {
   PublicThreadApiSendEventsResponse,
   PublicThreadFinalOutput,
@@ -19,7 +19,6 @@ export interface PublicThreadSessionProjection {
   archivedAt: string | null;
   createdAt: string;
   id: PublicThreadId;
-  kind: AgentKind;
   lastMessageAt?: string | null;
   lastRun: PublicThreadRunSummary | null;
   status: SessionStatus;
@@ -81,7 +80,6 @@ export function toPublicThreadSessionSummary(
     archivedAt: session.archivedAt,
     createdAt: session.createdAt,
     id: toPublicThreadId(session.id),
-    kind: session.kind,
     lastRun: toPublicThreadRunSummary(session.lastRun),
     status: session.status,
     title: session.title,
@@ -92,8 +90,8 @@ export function toPublicThreadSessionSummary(
 
 export function toPublicThreadEventBatch<UserId extends string | null>(input: {
   batch: AgentSessionEventBatch;
-  thread: PublicThreadSummary<UserId>;
-}): PublicThreadApiSendEventsResponse<UserId> {
+  thread: PublicThreadSummary<UserId, PublicApiVersion>;
+}): PublicThreadApiSendEventsResponse<UserId, PublicApiVersion> {
   return {
     acceptedAt: input.batch.acceptedAt,
     events: input.batch.events.map((event) => ({

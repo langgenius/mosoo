@@ -1,21 +1,17 @@
 import type { JsonObject } from "@mosoo/contracts";
 import type { AgentBuiltInToolConfig } from "@mosoo/contracts/agent";
-import { normalizeAgentBuiltInTools } from "@mosoo/contracts/agent";
-import { classifyAgentConfigChanges } from "@mosoo/contracts/agent-config-change-plan";
-import type { AgentConfigChangePlan } from "@mosoo/contracts/agent-config-change-plan";
+import {
+  getAgentBuiltInToolSupportError,
+  normalizeAgentBuiltInTools,
+} from "@mosoo/contracts/agent";
 import { normalizeRuntimeAdvancedSettings } from "@mosoo/runtime-catalog";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import {
-  recreateSandbox,
-  restartDriver,
-  updateAgentConfig,
-} from "@/domains/agent/api/agent-client";
+import { updateAgentConfig } from "@/domains/agent/api/agent-client";
 import { agentKeys } from "@/domains/agent/query/agent-queries";
 import {
   toAgentId,
-  toAgentDeploymentVersionId,
   toEnvironmentId,
   toMcpServerId,
   toProjectId,
@@ -28,7 +24,6 @@ import {
   createInitialDraft,
   createSnapshotHash,
   normalizeMcpServers,
-  toAgentConfigChangeSnapshot,
 } from "./draft";
 import type { AgentEditorDraft } from "./draft";
 import { applyAgentEditorPatch, withEnvironmentId } from "./patch";
@@ -36,23 +31,8 @@ import type { AgentFormSectionId } from "./section-ids";
 
 export type { AgentEditorDraft } from "./draft";
 
-function toRuntimeOperationTargetVersion(agent: {
-  liveVersion: { id: string; versionNumber: number } | null;
-  status: string;
-}) {
-  if (agent.status !== "published" || agent.liveVersion === null) {
-    return null;
-  }
-
-  return {
-    id: toAgentDeploymentVersionId(agent.liveVersion.id),
-    versionNumber: agent.liveVersion.versionNumber,
-  };
-}
-
 export interface AgentEditorModel {
   draft: AgentEditorDraft;
-  changePlan: AgentConfigChangePlan;
   discard(): void;
   dirty: boolean;
   readOnly: boolean;
@@ -111,33 +91,8 @@ export function useAgentEditorModel({
       ]);
     },
   });
-  const restartDriverMutation = useMutation({
-    mutationFn: restartDriver,
-    onSuccess: async (_data, variables) => {
-      await queryClient.invalidateQueries({
-        queryKey: agentKeys.detail(variables.projectId, variables.agentId),
-      });
-    },
-  });
-  const recreateSandboxMutation = useMutation({
-    mutationFn: recreateSandbox,
-    onSuccess: async (_data, variables) => {
-      await queryClient.invalidateQueries({
-        queryKey: agentKeys.detail(variables.projectId, variables.agentId),
-      });
-    },
-  });
-
   const dirty = createEditorSaveSnapshot(draft) !== savedSnapshot;
-  const changePlan = classifyAgentConfigChanges({
-    agentStatus: agent.status,
-    current: toAgentConfigChangeSnapshot(draft, agent.kind),
-    saved: toAgentConfigChangeSnapshot(savedDraft, agent.kind),
-  });
-  const saving =
-    configMutation.isPending ||
-    restartDriverMutation.isPending ||
-    recreateSandboxMutation.isPending;
+  const saving = configMutation.isPending;
 
   function updateDraft(transform: (current: AgentEditorDraft) => AgentEditorDraft) {
     setDraft((current) => transform(current));
@@ -146,7 +101,6 @@ export function useAgentEditorModel({
 
   async function persistDraft(
     draftToSave: AgentEditorDraft,
-    options: { runRuntimeOperations: boolean },
   ): Promise<{ error: string | null; ok: boolean }> {
     if (readOnly) {
       return { error: null, ok: false };
@@ -174,22 +128,19 @@ export function useAgentEditorModel({
       return { error, ok: false };
     }
 
-    const draftChangePlan = classifyAgentConfigChanges({
-      agentStatus: agent.status,
-      current: toAgentConfigChangeSnapshot(draftToSave, agent.kind),
-      saved: toAgentConfigChangeSnapshot(savedDraft, agent.kind),
-    });
-
-    if (draftChangePlan.action === "fork-agent") {
-      const error = "Fork the Agent to change runtime after publishing.";
-      setSaveError(error);
-      return { error, ok: false };
+    const toolSupportError = getAgentBuiltInToolSupportError(
+      draftToSave.runtime,
+      draftToSave.builtInTools,
+    );
+    if (toolSupportError) {
+      setSaveError(toolSupportError);
+      return { error: toolSupportError, ok: false };
     }
 
     setSaveError(null);
 
     try {
-      const savedAgent = await configMutation.mutateAsync({
+      await configMutation.mutateAsync({
         agentId: typedAgentId,
         builtInTools: normalizeAgentBuiltInTools(draftToSave.builtInTools),
         description: draftToSave.description.trim() || null,
@@ -211,31 +162,6 @@ export function useAgentEditorModel({
           skill.state === "tombstone" ? [] : [toSkillId(skill.id)],
         ),
       });
-      const targetVersion = toRuntimeOperationTargetVersion(savedAgent);
-
-      if (options.runRuntimeOperations && draftChangePlan.requiresRuntimeOperation) {
-        if (draftChangePlan.action === "recreate-preserving-state") {
-          await recreateSandboxMutation.mutateAsync({
-            affectedFields: draftChangePlan.fieldLabels,
-            agentId: typedAgentId,
-            applyActionKind: "recreate-preserving-state",
-            projectId: typedProjectId,
-            targetVersion,
-          });
-        } else if (
-          draftChangePlan.action === "patch-and-restart" ||
-          draftChangePlan.action === "restart-process"
-        ) {
-          await restartDriverMutation.mutateAsync({
-            affectedFields: draftChangePlan.fieldLabels,
-            agentId: typedAgentId,
-            applyActionKind: draftChangePlan.action,
-            projectId: typedProjectId,
-            targetVersion,
-          });
-        }
-      }
-
       setSavedDraft(draftToSave);
       setSavedSnapshot(createEditorSaveSnapshot(draftToSave));
       return { error: null, ok: true };
@@ -247,14 +173,13 @@ export function useAgentEditorModel({
   }
 
   async function save() {
-    return (await persistDraft(draft, { runRuntimeOperations: true })).ok;
+    return (await persistDraft(draft)).ok;
   }
 
   return {
     applyPatch(patch) {
       updateDraft((current) => applyAgentEditorPatch(current, patch));
     },
-    changePlan,
     dirty,
     discard() {
       setDraft(savedDraft);

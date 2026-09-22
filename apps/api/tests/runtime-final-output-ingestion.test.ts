@@ -779,7 +779,6 @@ describe("runtime final output ingestion", () => {
           properties: expect.objectContaining({
             run_duration_ms: expect.any(Number),
             sandbox_id: PUBLIC_API_TEST_IDS.sandbox,
-            sandbox_kind: "pet",
             sandbox_subject_kind: "agent",
             session_type: "ui",
           }),

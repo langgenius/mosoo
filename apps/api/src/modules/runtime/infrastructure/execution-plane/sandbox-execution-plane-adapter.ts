@@ -1,4 +1,3 @@
-import type { PtyOptions } from "@cloudflare/sandbox";
 import type { SessionId } from "@mosoo/id";
 import { RUNTIME_DIAGNOSTIC_EVENT } from "@mosoo/runtime-events";
 
@@ -30,7 +29,6 @@ import {
 import { resolveRuntimeSubjectNetworkConstraints } from "../runtime-subject-lifecycle/runtime-subject-network";
 import {
   recreateRuntimeSubjectPreservingState,
-  resetRuntimeSubjectAgentState,
   stopRuntimeSubjectDrivers,
 } from "../runtime-subject-lifecycle/runtime-subject-operations.service";
 import { getRuntimeConversationSession } from "../runtime-subject-lifecycle/runtime-subject-store";
@@ -46,67 +44,6 @@ function releaseRunResources(handles: {
   disposeRpcResource(handles.subject);
   handles.executionSession = null;
   handles.subject = null;
-}
-
-type TerminalSessionHandle = ExecutionSessionHandle & {
-  terminal(request: Request, options?: PtyOptions): Promise<Response>;
-};
-
-function isSessionAlreadyExistsError(error: unknown): boolean {
-  if (!(error instanceof Error)) {
-    return false;
-  }
-  if (error.name === "SessionAlreadyExistsError") {
-    return true;
-  }
-  // workerd serializes errors across DO RPC boundaries as plain Error, dropping
-  // the original class name. The wrapped message is `${originalName}: ${originalMessage}`,
-  // so fall back to a message-prefix check.
-  return error.message.startsWith("SessionAlreadyExistsError:");
-}
-
-function toTerminalSessionHandle(session: ExecutionSessionHandle): TerminalSessionHandle {
-  if (typeof Reflect.get(session, "terminal") !== "function") {
-    throw new TypeError("Cloudflare Sandbox session handle is missing terminal.");
-  }
-
-  return session as TerminalSessionHandle;
-}
-
-async function ensureTerminalSession(
-  subject: SandboxHandle,
-  sessionId: string,
-): Promise<TerminalSessionHandle> {
-  try {
-    return toTerminalSessionHandle(
-      await subject.createSession({
-        cwd: "/workspace",
-        id: sessionId,
-      }),
-    );
-  } catch (error) {
-    if (!isSessionAlreadyExistsError(error)) {
-      throw error;
-    }
-
-    return toTerminalSessionHandle(await subject.getSession(sessionId));
-  }
-}
-
-export async function connectPreparedSandboxTerminal(
-  subject: SandboxHandle,
-  input: {
-    options?: PtyOptions;
-    request: Request;
-    terminalSessionId?: string;
-  },
-): Promise<Response> {
-  if (input.terminalSessionId) {
-    const terminalSession = await ensureTerminalSession(subject, input.terminalSessionId);
-    return terminalSession.terminal(input.request, input.options);
-  }
-
-  return subject.terminal(input.request, input.options);
 }
 
 class SandboxExecutionPlaneAdapter implements RuntimeExecutionPlaneAdapter {
@@ -314,13 +251,6 @@ class SandboxExecutionPlaneAdapter implements RuntimeExecutionPlaneAdapter {
     input: RuntimeSubjectOperationInput,
   ): Promise<void> {
     await recreateRuntimeSubjectPreservingState(bindings, input);
-  }
-
-  async resetSubjectAgentState(
-    bindings: ApiBindings,
-    input: RuntimeSubjectOperationInput,
-  ): Promise<void> {
-    await resetRuntimeSubjectAgentState(bindings, input);
   }
 }
 

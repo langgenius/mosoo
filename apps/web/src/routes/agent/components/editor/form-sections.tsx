@@ -118,21 +118,12 @@ export function BasicsSection({
                 {t("agent.runtime")}
                 <RequiredMark />
               </Label>
-              {agent.status === "published" ? (
-                <span
-                  className="text-muted-foreground text-[11px]"
-                  title={t("agent.runtimeLocked")}
-                >
-                  {t("agentEditor.runtimeLockedHint")}
-                </span>
-              ) : null}
             </div>
             <div className="grid grid-cols-2 gap-3">
               {listRuntimeOptions(model.draft.runtime).map((runtime) => {
                 const selected = runtime.id === model.draft.runtime;
                 const selectable = isRuntimeSelectable(runtime.id);
-                const publishedRuntimeLocked = agent.status === "published" && !selected;
-                const disabled = readOnly || !selectable || publishedRuntimeLocked;
+                const disabled = readOnly || !selectable;
 
                 return (
                   <button
@@ -155,13 +146,11 @@ export function BasicsSection({
                     <div className="min-w-0">
                       <div className="text-foreground text-[13px] font-medium">{runtime.name}</div>
                       <div className="text-muted-foreground text-[11px]">
-                        {publishedRuntimeLocked
-                          ? t("agentEditor.forkAgentRequired")
-                          : selectable
-                            ? runtime.vendor
-                            : selected
-                              ? t("agentEditor.runtimeDisabled")
-                              : t("agentEditor.runtimeUnavailable")}
+                        {selectable
+                          ? runtime.vendor
+                          : selected
+                            ? t("agentEditor.runtimeDisabled")
+                            : t("agentEditor.runtimeUnavailable")}
                       </div>
                     </div>
                   </button>
@@ -252,12 +241,7 @@ export function EnvironmentSection({
     <div className="space-y-5">
       <div>
         <SectionHeader>{t("agent.environment")}</SectionHeader>
-        <EnvironmentPicker
-          legacyKind={agent.kind}
-          model={model}
-          projectId={agent.projectId}
-          readOnly={readOnly}
-        />
+        <EnvironmentPicker model={model} projectId={agent.projectId} readOnly={readOnly} />
       </div>
     </div>
   );

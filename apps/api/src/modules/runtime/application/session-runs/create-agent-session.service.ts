@@ -33,7 +33,6 @@ import { resolveReadyEnvironmentPackageArtifact } from "../../../environments/ap
 import { resolveAgentEnvironmentSnapshot } from "../../../environments/application/environment.service";
 import { ensureProjectOwnership } from "../../../projects/application/project.service";
 import { PREVIEW_RETENTION_MS } from "../../../sessions/domain/preview-retention-policy";
-import { SESSION_RECOVERY_RETENTION_MS } from "../../domain/session-recovery-policy";
 import type { SessionExecutionPlan } from "../session-definition/session-execution.types";
 
 export interface CreateAgentSessionOptions {
@@ -208,7 +207,6 @@ async function buildSessionExecutionPlan(input: {
       agentId: input.source.agentId,
       deploymentVersionId: input.source.liveVersion?.id ?? null,
       deploymentVersionNumber: input.source.liveVersion?.versionNumber ?? null,
-      kind: "cattle",
       model: input.source.model,
       prompt: input.source.prompt,
       provider: input.source.provider,
@@ -292,7 +290,6 @@ function buildCreatedSessionSummary(input: {
     deploymentVersionId: input.source.liveVersion?.id ?? null,
     deploymentVersionNumber: input.source.liveVersion?.versionNumber ?? null,
     id: input.sessionId,
-    kind: "cattle",
     lastMessageAt: null,
     lastRun: null,
     model: input.source.model,
@@ -365,9 +362,6 @@ async function createSessionFromSource(
     bindings: request.bindings,
     source,
   });
-  if (options.configurationSource === "saved" || source.agentId === null) {
-    executionPlan.recoveryRetentionMs = SESSION_RECOVERY_RETENTION_MS;
-  }
   await resolveReadyEnvironmentPackageArtifact(
     request.bindings,
     source.projectId,

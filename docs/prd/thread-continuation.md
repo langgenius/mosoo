@@ -70,26 +70,26 @@ turn then uses the strict Run-bound admission and restore contract above.
 
 ## Retention and deletion
 
-The unreleased direct Project and saved-preset APIs record a 30-day recovery period for newly
-admitted isolated Sessions. The period starts at the last successful turn and
-renews only after another success; failed or cancelled attempts do not extend it.
-Inputs received at or after the deadline fail explicitly with the expiry time,
-before adding a message or claiming new draft files. File claim and atomic Run
-admission use the same server-recorded request time: an input received before the
-deadline may finish transferring its files afterward. Other admission failures
-can leave files attached to the Session. History, events, usage and saved file contents remain
-readable, and recovery expiry does not delete them.
+Formal and API-used Sessions have no recurring inactivity deadline. Continuation,
+file admission, and runtime maintenance use the same Session and its committed
+state even after more than 30 days. New execution plans omit the former
+`recoveryRetentionMs` field; readers ignore it in historical snapshots without
+rewriting stored data. Ownership, terminal lifecycle, concurrency, and committed
+checkpoint requirements still apply. A missing checkpoint cannot be replaced by
+an empty workspace or a new Session.
 
-Existing snapshots without this policy keep their current behavior pending the
-reviewed Cloud transition. Do not apply a deadline retroactively or rewrite an
-old snapshot. Clock-controlled tests establish renewal/expiry logic, not actual
-multi-day live survival. Backup storage TTL is independent of this admission
-policy and is not shortened by this slice.
+Only explicitly enrolled [Cloud debug Previews](./session-lifecycle.md#cloud-debug-preview-retention-unreleased)
+have the 30-day inactivity policy. File claim and atomic Run admission share the
+server-recorded input time, so a transfer admitted before Preview expiry may
+finish afterward. Other admission failures can leave files attached to the
+Session. The [reviewed inactive legacy cohort](./session-lifecycle.md#inactive-legacy-sessions-unreleased-migration-only)
+remains a one-time read-only migration exception, not recurring formal expiry.
 
-A committed isolated Thread checkpoint remains restorable for at least 30 days while
-the Thread exists. Archiving does not remove it. Permanently deleting the Thread
-deletes its checkpoint records and backup objects with the rest of the Thread's
-data.
+Keep a committed isolated Thread checkpoint restorable while the Thread exists.
+Archiving does not remove it. Permanently deleting the Thread deletes its
+checkpoint records and backup objects with the rest of its data. Clock-controlled
+tests establish age-independent admission and restore selection, not actual
+multi-day live survival or the storage provider's retention behavior.
 
 ## Security and isolation boundaries
 

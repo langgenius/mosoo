@@ -3,7 +3,6 @@ export {
   createProjectSession,
 } from "./session-runs/create-agent-session.service";
 export { queueSessionRun } from "./session-runs/queue-run.service";
-export { assertSessionRecoveryAvailable } from "./session-runs/session-recovery.service";
 export { rejectSessionPermissionRequests } from "./session-runs/session-permission-decision.service";
 export {
   type QueueSessionRunsInput,

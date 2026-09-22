@@ -1,3 +1,4 @@
+import type { AgentKind } from "@mosoo/contracts/agent";
 import { PUBLIC_THREAD_API_THREADS_MAX_LIMIT } from "@mosoo/contracts/public-api";
 import type {
   PublicApiVersion,
@@ -23,6 +24,7 @@ import { parsePublicApiThreadRecordMetadata } from "./public-thread-metadata";
 import { toPublicThreadSummary } from "./public-thread-presenter";
 
 interface PublicThreadSessionRow {
+  kind: AgentKind;
   agent_id: AgentId | null;
   end_user_id: string | null;
   id: SessionId;
@@ -67,6 +69,7 @@ async function getPublicThreadSessionAccess(
         agent_id: sessionsTable.agentId,
         end_user_id: sessionsTable.endUserId,
         id: sessionsTable.id,
+        kind: sessionsTable.kind,
         metadata_json: sessionsTable.metadataJson,
         project_id: sessionsTable.projectId,
         title: sessionsTable.title,
@@ -99,6 +102,7 @@ async function getPublicThreadSessionAccess(
       agent_id: row.agent_id,
       end_user_id: row.end_user_id,
       id: row.id,
+      kind: row.kind,
       project_id: row.project_id,
       title: row.title,
     },
@@ -133,7 +137,7 @@ export async function listAgentApiEndpointThreads(
     apiVersion?: PublicApiVersion | undefined;
     archived: boolean | null;
   },
-): Promise<PublicThreadApiListThreadsResponse<string | null>> {
+): Promise<PublicThreadApiListThreadsResponse<string | null, PublicApiVersion>> {
   await admitAgentApiEndpointCaller(database, caller, input.agentId, input.apiVersion);
 
   const filters: SQL[] = [
@@ -150,6 +154,7 @@ export async function listAgentApiEndpointThreads(
   const rows = await getAppDatabase(database)
     .select({
       ...sessionSummaryWithLastRunColumns(),
+      kind: sessionsTable.kind,
       end_user_id: sessionsTable.endUserId,
       metadata_json: sessionsTable.metadataJson,
     })
@@ -172,7 +177,9 @@ export async function listAgentApiEndpointThreads(
 
       return [
         toPublicThreadSummary({
+          apiVersion: input.apiVersion,
           endUserId: row.end_user_id,
+          legacyKind: row.kind,
           session: toPublicThreadSessionSummary(buildSessionSummaryFromJoinedRow(row)),
         }),
       ];

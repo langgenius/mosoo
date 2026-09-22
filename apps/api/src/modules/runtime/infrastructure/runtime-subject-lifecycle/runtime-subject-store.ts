@@ -18,6 +18,7 @@ export {
 } from "./runtime-subject-maintenance-store";
 export {
   advanceRuntimeSubjectOperationStatus,
+  assertExclusiveSessionRuntimeSubject,
   claimRuntimeSubjectActivation,
   claimExpiredRuntimeSubjectActivations,
   ensureRuntimeSubjectId,

@@ -120,7 +120,7 @@ function registerPublicThreadRoutes(
   if (apiVersion === "v2") {
     routes.post("/projects/:projectId/threads", async (c) =>
       runPublicApiThreadMutation<
-        PublicThreadApiCreateThreadResponse<string | null>,
+        PublicThreadApiCreateThreadResponse<string | null, PublicApiVersion>,
         PreparedProjectThreadCreation
       >(c, {
         bodyHash: (prepared) => prepared.bodyHash,

@@ -111,7 +111,6 @@ export function createPackageIssue(
 
 export function collectPackageIssues(input: Record<string, unknown>): AgentResolutionIssue[] {
   const issues: AgentResolutionIssue[] = [];
-  const kind = readAgentKind(input["kind"]);
   const runtime = readString(input, "runtime");
   const provider = readString(input, "provider");
   const model = readString(input, "model");
@@ -177,11 +176,11 @@ export function collectPackageIssues(input: Record<string, unknown>): AgentResol
   issues.push(...collectMcpCatalogIssues(input["mcpServers"]));
   issues.push(...collectEnvironmentCatalogIssues(input["environment"]));
 
-  if (kind === null) {
+  if (input["kind"] != null && readAgentKind(input["kind"]) === null) {
     issues.push(
       createPackageIssue(
         "manifest.kind.missing",
-        `Agent Manifest kind must be ${AGENT_KIND_LIST_LABEL}.`,
+        `Legacy Agent Manifest kind must be ${AGENT_KIND_LIST_LABEL}.`,
       ),
     );
   }

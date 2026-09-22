@@ -178,11 +178,10 @@ export interface PublicThreadEventResult {
 
 export type PublicThreadStatus = "IDLE" | "RESCHEDULING" | "RUNNING" | "TERMINATED";
 
-export interface PublicThreadSummary<UserId extends string | null = string> {
+interface PublicThreadSessionSummary<UserId extends string | null> {
   agent_id: AgentId | null;
   created_at: string;
   id: PublicThreadId;
-  kind: AgentKind;
   last_run_id: SessionRunId | null;
   source: "api";
   status: PublicThreadStatus;
@@ -191,34 +190,52 @@ export interface PublicThreadSummary<UserId extends string | null = string> {
   userId: UserId;
 }
 
+/** Only v1 exposes the inert historical ownership label. */
+export type PublicThreadSummary<
+  UserId extends string | null = string,
+  Version extends PublicApiVersion = "v1",
+> = PublicThreadSessionSummary<UserId> & (Version extends "v1" ? { kind: AgentKind } : object);
+
 export interface PublicThreadLinks {
   thread: string;
 }
 
-export interface PublicThreadApiCreateThreadResponse<UserId extends string | null = string> {
+export interface PublicThreadApiCreateThreadResponse<
+  UserId extends string | null = string,
+  Version extends PublicApiVersion = "v1",
+> {
   links: PublicThreadLinks;
   run: PublicThreadRunSummary | null;
-  thread: PublicThreadSummary<UserId>;
+  thread: PublicThreadSummary<UserId, Version>;
 }
 
-export interface PublicThreadApiRetrieveThreadResponse<UserId extends string | null = string> {
+export interface PublicThreadApiRetrieveThreadResponse<
+  UserId extends string | null = string,
+  Version extends PublicApiVersion = "v1",
+> {
   links: PublicThreadLinks;
   run: PublicThreadRunSummary | null;
-  thread: PublicThreadSummary<UserId>;
+  thread: PublicThreadSummary<UserId, Version>;
 }
 
-export interface PublicThreadApiListThreadsResponse<UserId extends string | null = string> {
-  threads: PublicThreadSummary<UserId>[];
+export interface PublicThreadApiListThreadsResponse<
+  UserId extends string | null = string,
+  Version extends PublicApiVersion = "v1",
+> {
+  threads: PublicThreadSummary<UserId, Version>[];
 }
 
 export interface PublicThreadApiSendEventsRequest {
   events: PublicThreadEventInput[];
 }
 
-export interface PublicThreadApiSendEventsResponse<UserId extends string | null = string> {
+export interface PublicThreadApiSendEventsResponse<
+  UserId extends string | null = string,
+  Version extends PublicApiVersion = "v1",
+> {
   acceptedAt: string;
   events: PublicThreadEventResult[];
-  thread: PublicThreadSummary<UserId>;
+  thread: PublicThreadSummary<UserId, Version>;
   warnings: UserWarning[];
 }
 

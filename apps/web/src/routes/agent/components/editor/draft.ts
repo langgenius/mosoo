@@ -1,12 +1,16 @@
 import type { JsonObject, JsonValue } from "@mosoo/contracts";
 import type { AgentBuiltInToolConfig } from "@mosoo/contracts/agent";
-import { isAgentBuiltInToolName, normalizeAgentBuiltInTools } from "@mosoo/contracts/agent";
+import {
+  getAgentBuiltInToolSupportError,
+  isAgentBuiltInToolName,
+  normalizeAgentBuiltInTools,
+} from "@mosoo/contracts/agent";
 import type { AgentConfigChangeSnapshot } from "@mosoo/contracts/agent-config-change-plan";
 import { parseDocument, stringify } from "yaml";
 
 import { toEnvironmentId, toMcpServerId, toSkillId } from "@/routes/typed-id";
 
-import type { Agent, AgentKind, McpServer, RuntimeId, SkillInfo } from "../../agent.types";
+import type { Agent, McpServer, RuntimeId, SkillInfo } from "../../agent.types";
 import { getRuntimeInfo } from "../../runtime-catalog";
 
 export interface AgentEditorDraft {
@@ -51,15 +55,11 @@ export function createSnapshotHash(draft: AgentEditorDraft): string {
   return hashText(createSnapshot(draft));
 }
 
-export function toAgentConfigChangeSnapshot(
-  draft: AgentEditorDraft,
-  legacyKind: AgentKind = "cattle",
-): AgentConfigChangeSnapshot {
+export function toAgentConfigChangeSnapshot(draft: AgentEditorDraft): AgentConfigChangeSnapshot {
   return {
     builtInTools: normalizeAgentBuiltInTools(draft.builtInTools),
     description: draft.description,
     environmentId: draft.environmentId === null ? null : toEnvironmentId(draft.environmentId),
-    kind: legacyKind,
     mcpServerIds: draft.mcpServers.map((server) => toMcpServerId(server.id)),
     model: draft.model,
     name: draft.name,
@@ -85,7 +85,7 @@ export function normalizeMcpServers(servers: McpServer[]): McpServer[] {
 }
 
 interface AgentDraftYamlShape {
-  builtInTools: AgentBuiltInToolConfig[];
+  builtInTools?: AgentBuiltInToolConfig[];
   assets: {
     skills: {
       filename: string;
@@ -121,7 +121,10 @@ interface AgentDraftYamlShape {
 
 function toDraftYamlShape(draft: AgentEditorDraft): AgentDraftYamlShape {
   return {
-    builtInTools: normalizeAgentBuiltInTools(draft.builtInTools),
+    ...(draft.runtime === "claude-agent-sdk" ||
+    getAgentBuiltInToolSupportError(draft.runtime, draft.builtInTools)
+      ? { builtInTools: normalizeAgentBuiltInTools(draft.builtInTools) }
+      : {}),
     assets: {
       skills: draft.skills.map((skill) => ({
         filename: skill.filename,

@@ -390,7 +390,6 @@ export async function persistProjectedRuntimeDriverEvents(
         run_id: link.sessionRunId,
         run_duration_ms: runDurationMs,
         sandbox_id: link.sandboxId,
-        sandbox_kind: link.sandboxKind,
         sandbox_subject_kind: link.sandboxSubjectKind,
         session_id: link.sessionId,
         session_type: link.sessionType,

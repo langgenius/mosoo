@@ -153,7 +153,6 @@ function createRuntimeLink(): RuntimeSessionLink {
     creatorId: PUBLIC_API_TEST_IDS.ownerAccount,
     executionOwnerId: PUBLIC_API_TEST_IDS.ownerAccount,
     sandboxId: PUBLIC_API_TEST_IDS.sandbox,
-    sandboxKind: "cattle",
     sandboxSubjectKind: "session",
     sessionId: PUBLIC_API_TEST_IDS.ownerSession,
     sessionRunId: PUBLIC_API_TEST_IDS.run,
