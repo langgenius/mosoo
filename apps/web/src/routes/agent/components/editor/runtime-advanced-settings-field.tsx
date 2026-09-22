@@ -1,4 +1,5 @@
 import type { JsonObject } from "@mosoo/contracts";
+import { getAgentBuiltInToolSupportError } from "@mosoo/contracts/agent";
 import type { AgentBuiltInToolConfig } from "@mosoo/contracts/agent";
 import { normalizeAgentBuiltInTools } from "@mosoo/contracts/agent";
 import type { RuntimeAdvancedSettingDefinition } from "@mosoo/runtime-catalog";
@@ -221,7 +222,9 @@ export function RuntimeAdvancedSettingsField({
     setBuiltInTools !== undefined;
   const [open, setOpen] = useState(false);
 
-  if (definitions.length === 0 && !showBuiltInTools) {
+  const toolSupportError = getAgentBuiltInToolSupportError(runtimeId, builtInTools ?? []);
+
+  if (definitions.length === 0 && !showBuiltInTools && !toolSupportError) {
     return null;
   }
 
@@ -245,6 +248,11 @@ export function RuntimeAdvancedSettingsField({
 
   return (
     <div className="pt-1">
+      {toolSupportError ? (
+        <p role="alert" className="text-destructive text-[12px]">
+          {toolSupportError}
+        </p>
+      ) : null}
       <button
         aria-expanded={open}
         className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-[12px] transition"

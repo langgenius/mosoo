@@ -257,6 +257,20 @@ export function normalizeAgentBuiltInTools(
   }));
 }
 
+// Keep this admission rule aligned with the Agent Driver provider registry.
+export function getAgentBuiltInToolSupportError(
+  runtimeId: string,
+  tools: readonly AgentBuiltInToolConfig[],
+): string | null {
+  if (
+    runtimeId === "claude-agent-sdk" ||
+    !normalizeAgentBuiltInTools(tools).some((tool) => !tool.enabled)
+  ) {
+    return null;
+  }
+  return `Runtime ${runtimeId} does not support disabling built-in tools. Use Claude Agent SDK for tool restrictions, or explicitly enable all built-in tools if unrestricted tools are intended.`;
+}
+
 export interface AgentSkillReference {
   ownerName: string | null;
   skillId: SkillId;
