@@ -1,3 +1,4 @@
+import { getAgentBuiltInToolSupportError } from "@mosoo/contracts/agent";
 import type { Agent, DeleteAgentInput, PublishAgentInput } from "@mosoo/contracts/agent";
 import { agentDeploymentVersionsTable, agentSkillsTable, agentsTable } from "@mosoo/db";
 import type { AgentId, ProjectId } from "@mosoo/id";
@@ -48,7 +49,9 @@ export async function publishAgent(
     projectId: readProjectId(input.projectId),
   });
   const environment = await loadAgentEnvironmentConfig(database, agent.id, agent.environmentId);
-  const { packageResolution } = parseAgentStoredConfig(agent.configJson);
+  const { packageResolution, builtInTools } = parseAgentStoredConfig(agent.configJson);
+  const toolSupportError = getAgentBuiltInToolSupportError(agent.runtimeId, builtInTools);
+  if (toolSupportError) throw validationError(toolSupportError);
   const readiness = await computeAgentReadiness(database, agent.ownerId, {
     agentId: agent.id,
     bindings,
