@@ -27,6 +27,10 @@ Preview runs real sessions for the runtime choices currently offered by mosoo; i
 - The unreleased #582 candidate isolates every new Session. Existing shared-Agent workspaces retain their legacy binding until a verified Cloud transition. Neither execution path promises live processes, sockets, an in-memory kernel, machine-wide temporary state, or persisted short-lived credentials.
 - Existing sessions do not silently adopt later configuration changes.
 - Interrupted requests are not silently replayed; the user may need to resend them.
+- Explicit ACP provider content blocks and Agent refusals end the Run as failed and
+  are not automatically retried. The console distinguishes these from platform
+  failures. A content block does not identify input or output as the cause unless
+  the provider supplies that evidence; earlier tool effects are not rolled back.
 
 Exact execution and persistence mechanics belong in [Architecture](../architecture.md).
 The user-visible Session continuation guarantee is defined in [Thread Continuation](./thread-continuation.md).

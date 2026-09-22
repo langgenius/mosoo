@@ -64,6 +64,7 @@ async function fixture() {
     createSession: unavailable,
     deleteSession: unavailable,
     destroy: unavailable,
+    ensureContainerReady: unavailable,
     async exec(command) {
       try {
         const result = await execFileAsync("sh", [

@@ -1,5 +1,7 @@
+import type { Sandbox as CloudflareSandbox } from "@cloudflare/sandbox";
 import { DurableObject } from "cloudflare:workers";
 
+import { SandboxStartup } from "../../platform/cloudflare/sandbox-startup";
 import type { ApiBindings } from "../../platform/cloudflare/worker-types";
 import { SandboxHandleGuard } from "./sandbox-handle-guard";
 import { SandboxMigrationFence } from "./sandbox-migration-fence";
@@ -13,7 +15,10 @@ import { waitForSandboxNetworkRestore } from "./sandbox-network-restore-gate";
 import { SANDBOX_RPC_FORWARD_METHODS } from "./sandbox-rpc-methods";
 import type { SandboxRpcForwardMethod } from "./sandbox-rpc-methods";
 
-interface SandboxDelegate extends SandboxNetworkDelegate {
+interface SandboxDelegate
+  extends
+    SandboxNetworkDelegate,
+    Pick<CloudflareSandbox, "destroy" | "getState" | "startAndWaitForPorts"> {
   alarm(alarmProps?: { isRetry: boolean; retryCount: number }): Promise<void>;
   fetch(request: Request): Promise<Response>;
 }
@@ -37,6 +42,7 @@ export class Sandbox extends DurableObject<ApiBindings> {
   #initialization?: {
     delegate: Promise<SandboxDelegate>;
     networkRestore: Promise<void>;
+    startup: Promise<SandboxStartup>;
   };
   readonly #httpsInterceptionDisabled: boolean;
 
@@ -100,8 +106,22 @@ export class Sandbox extends DurableObject<ApiBindings> {
         httpsInterceptionDisabled: this.#httpsInterceptionDisabled,
       }),
     );
-    this.#initialization = { delegate, networkRestore };
+    const startup = delegate.then(
+      (sandbox) =>
+        new SandboxStartup(sandbox, {
+          sandboxId: this.ctx.id.toString(),
+          isRunning: () => (this.ctx as SandboxContainerState).container?.running === true,
+        }),
+    );
+    this.#initialization = { delegate, networkRestore, startup };
     return this.#initialization;
+  }
+
+  async ensureContainerReady(options: { allowRecovery: boolean }): Promise<void> {
+    await this.#migrationFence.assertOpen();
+    const initialization = this.#initializeDelegate();
+    await initialization.networkRestore;
+    await (await initialization.startup).ensureReady(options.allowRecovery);
   }
 
   async configureNetworkConstraints(constraints: unknown): Promise<void> {
@@ -148,6 +168,7 @@ export class Sandbox extends DurableObject<ApiBindings> {
     const initialization = this.#initializeDelegate();
     await waitForSandboxNetworkRestore(initialization.networkRestore, method, args);
     const delegate = await initialization.delegate;
+    if (method === "destroy") await (await initialization.startup).cancelAndDrain();
     const action = Reflect.get(delegate, method);
 
     if (typeof action !== "function") {

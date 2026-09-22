@@ -106,3 +106,14 @@ describe("agent draft YAML codec", () => {
     expect(createSnapshotHash(parsed)).toBe(createSnapshotHash(current));
   });
 });
+
+test("non-Claude YAML omits all-enabled switches but preserves invalid restrictions for explicit correction", () => {
+  const current = draft();
+  const enabled = { ...current, builtInTools: createDefaultAgentBuiltInTools() };
+  expect(createDraftYaml(enabled)).not.toContain("builtInTools:");
+  expect(parseDraftYaml(createDraftYaml(enabled), enabled).builtInTools).toEqual(
+    enabled.builtInTools,
+  );
+  expect(createDraftYaml(current)).toContain("enabled: false");
+  expect(createDraftYaml({ ...enabled, runtime: "claude-agent-sdk" })).toContain("builtInTools:");
+});

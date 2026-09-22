@@ -10,6 +10,7 @@ if (process.env.MOSOO_TEST_SANDBOX_OBSERVATION === "1") {
   let executions = 0;
   let destructions = 0;
   let sessionReads = 0;
+  let onStartup: (signal: AbortSignal) => Promise<void> = async () => {};
   mock.module("cloudflare:workers", () => ({
     DurableObject: class {
       constructor(
@@ -33,6 +34,12 @@ if (process.env.MOSOO_TEST_SANDBOX_OBSERVATION === "1") {
       async destroy() {
         destructions++;
       }
+      async getState() {
+        return { status: "stopped" };
+      }
+      async startAndWaitForPorts(options: { cancellationOptions: { abort: AbortSignal } }) {
+        await onStartup(options.cancellationOptions.abort);
+      }
       async createSession() {
         return {
           async readFile() {
@@ -48,6 +55,7 @@ if (process.env.MOSOO_TEST_SANDBOX_OBSERVATION === "1") {
   function fixture(running?: boolean, corrupt = false, persistedFence?: unknown) {
     let reads = 0;
     const ctx = {
+      id: { toString: () => "sandbox-observation" },
       ...(running === undefined ? {} : { container: { running } }),
       storage: {
         async get(key: string) {
@@ -145,6 +153,9 @@ if (process.env.MOSOO_TEST_SANDBOX_OBSERVATION === "1") {
     await expect(sandbox.configureNetworkConstraints({})).rejects.toThrow(
       "migration fence is held",
     );
+    await expect(sandbox.ensureContainerReady({ allowRecovery: true })).rejects.toThrow(
+      "migration fence is held",
+    );
     await expect(sandbox.fetch(new Request("https://sandbox.test"))).rejects.toThrow(
       "migration fence is held",
     );
@@ -155,6 +166,56 @@ if (process.env.MOSOO_TEST_SANDBOX_OBSERVATION === "1") {
       state: "stopped",
     });
     expect(initializations).toBe(before);
+  });
+
+  test("corrupt policy blocks explicit startup before any container attempt", async () => {
+    let attempts = 0;
+    onStartup = async () => {
+      attempts++;
+    };
+    try {
+      const { sandbox } = fixture(false, true);
+      await expect(sandbox.ensureContainerReady({ allowRecovery: true })).rejects.toThrow(
+        "unknown network policy",
+      );
+      expect(attempts).toBe(0);
+    } finally {
+      onStartup = async () => {};
+    }
+  });
+
+  test("forwarded teardown waits for startup cancellation without a recovery attempt", async () => {
+    const started = Promise.withResolvers<void>();
+    const cancelled = Promise.withResolvers<void>();
+    const drained = Promise.withResolvers<void>();
+    let attempts = 0;
+    onStartup = async (signal) => {
+      attempts++;
+      signal.addEventListener("abort", () => cancelled.resolve(), { once: true });
+      started.resolve();
+      await drained.promise;
+      signal.throwIfAborted();
+    };
+    try {
+      const { sandbox } = fixture(false);
+      const starting = sandbox
+        .ensureContainerReady({ allowRecovery: true })
+        .catch((error: unknown) => error);
+      await started.promise;
+      const before = destructions;
+      const destroy = Reflect.get(sandbox, "destroy") as () => Promise<void>;
+      const destroying = destroy.call(sandbox);
+      await cancelled.promise;
+      expect(destructions).toBe(before);
+      drained.resolve();
+      expect(await starting).toBeInstanceOf(Error);
+      await destroying;
+      expect(destructions).toBe(before + 1);
+      expect(attempts).toBe(1);
+    } finally {
+      drained.resolve();
+      onStartup = async () => {};
+    }
   });
 } else {
   test("actual Sandbox wrapper observation and lazy initialization", async () => {

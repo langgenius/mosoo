@@ -1,6 +1,10 @@
 import type { JsonObject, JsonValue } from "@mosoo/contracts";
 import type { AgentBuiltInToolConfig } from "@mosoo/contracts/agent";
-import { isAgentBuiltInToolName, normalizeAgentBuiltInTools } from "@mosoo/contracts/agent";
+import {
+  getAgentBuiltInToolSupportError,
+  isAgentBuiltInToolName,
+  normalizeAgentBuiltInTools,
+} from "@mosoo/contracts/agent";
 import type { AgentConfigChangeSnapshot } from "@mosoo/contracts/agent-config-change-plan";
 import { parseDocument, stringify } from "yaml";
 
@@ -85,7 +89,7 @@ export function normalizeMcpServers(servers: McpServer[]): McpServer[] {
 }
 
 interface AgentDraftYamlShape {
-  builtInTools: AgentBuiltInToolConfig[];
+  builtInTools?: AgentBuiltInToolConfig[];
   assets: {
     skills: {
       filename: string;
@@ -121,7 +125,10 @@ interface AgentDraftYamlShape {
 
 function toDraftYamlShape(draft: AgentEditorDraft): AgentDraftYamlShape {
   return {
-    builtInTools: normalizeAgentBuiltInTools(draft.builtInTools),
+    ...(draft.runtime === "claude-agent-sdk" ||
+    getAgentBuiltInToolSupportError(draft.runtime, draft.builtInTools)
+      ? { builtInTools: normalizeAgentBuiltInTools(draft.builtInTools) }
+      : {}),
     assets: {
       skills: draft.skills.map((skill) => ({
         filename: skill.filename,

@@ -192,6 +192,7 @@ function createSandboxHandle(
     readonly destroyPromise?: Promise<void>;
     readonly onConfigureNetwork?: () => void;
     readonly onDestroy?: () => void;
+    readonly onStartup?: (allowRecovery: boolean) => Promise<void>;
     readonly onRestore?: (backup: { readonly dir: string; readonly id: string }) => void;
     readonly prepareError?: Error;
   } = {},
@@ -235,6 +236,7 @@ function createSandboxHandle(
         }
       : unavailable,
     setKeepAlive: async () => {},
+    ensureContainerReady: async ({ allowRecovery }) => options.onStartup?.(allowRecovery),
     startProcess: unavailable,
     terminal: unavailable,
     unmountBucket: unavailable,
@@ -254,6 +256,7 @@ function createBindings(
     readonly destroyPromise?: Promise<void>;
     readonly onConfigureNetwork?: () => void;
     readonly onDestroy?: () => void;
+    readonly onStartup?: (allowRecovery: boolean) => Promise<void>;
     readonly onRestore?: (backup: { readonly dir: string; readonly id: string }) => void;
     readonly prepareError?: Error;
   } = {},
@@ -268,6 +271,72 @@ function createBindings(
 }
 
 describe("runtime subject lifecycle machine", () => {
+  test("limits startup recovery to cold subjects without live Drivers", async () => {
+    for (const [status, driverStatus, expected] of [
+      ["cold", null, true],
+      ["active", null, false],
+      ["cold", "ready", false],
+      ["cold", "stopped", true],
+    ] as const) {
+      const database = createRuntimeSubjectLifecycleDatabase();
+      await insertRuntimeSubject(database, { status });
+      if (driverStatus) {
+        await database
+          .prepare("INSERT INTO driver_instance (id, sandbox_id, status) VALUES (?, ?, ?)")
+          .bind("01J0000000000000000000000F", RUNTIME_SUBJECT_ID, driverStatus)
+          .run();
+      }
+      const recoveries: boolean[] = [];
+      await createRuntimeSubjectLifecycleService(
+        createBindings(database, {
+          onStartup: async (allowRecovery) => {
+            recoveries.push(allowRecovery);
+          },
+        }),
+      ).activate({
+        ...RUNTIME_SUBJECT_QUOTA_SCOPE,
+        kind: "cattle",
+        networkConstraints: { allowedHosts: [], networkPolicy: "full" },
+        runtimeSubjectId: RUNTIME_SUBJECT_ID,
+        subjectId: SESSION_ID,
+        subjectKind: "session",
+      });
+      expect(recoveries).toEqual([expected]);
+    }
+  });
+
+  test("startup failure becomes cold only after confirmed cleanup", async () => {
+    for (const destroyError of [undefined, new Error("cleanup not confirmed")]) {
+      const database = createRuntimeSubjectLifecycleDatabase();
+      await insertRuntimeSubject(database, { status: "cold" });
+      let destroys = 0;
+      await expect(
+        createRuntimeSubjectLifecycleService(
+          createBindings(database, {
+            onStartup: async () => {
+              throw new Error("container startup attempt 2 timed out");
+            },
+            onDestroy: () => {
+              destroys += 1;
+            },
+            destroyError,
+          }),
+        ).activate({
+          ...RUNTIME_SUBJECT_QUOTA_SCOPE,
+          kind: "cattle",
+          networkConstraints: { allowedHosts: [], networkPolicy: "full" },
+          runtimeSubjectId: RUNTIME_SUBJECT_ID,
+          subjectId: SESSION_ID,
+          subjectKind: "session",
+        }),
+      ).rejects.toThrow("startup attempt 2");
+      expect(destroys).toBe(1);
+      expect((await readRuntimeSubject(database)).status).toBe(
+        destroyError ? "destroying" : "cold",
+      );
+    }
+  });
+
   test("keeps one deployment ceiling across runtime image classes", async () => {
     const database = createRuntimeSubjectLifecycleDatabase();
     const lifecycle = createRuntimeSubjectLifecycleService(

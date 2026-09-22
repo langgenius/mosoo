@@ -1,13 +1,14 @@
 import type { RunError, SessionRunStatus, SessionRunSummary } from "@mosoo/contracts/session-run";
 import { sessionRunsTable } from "@mosoo/db";
 import type { DriverInstanceId, SessionId, SessionRunId } from "@mosoo/id";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 
 import { logInfo, logWarn } from "../../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../../platform/db/drizzle";
 import { appendSessionRuntimeEvents } from "../../../sessions/application/session-event-write.service";
 import { createFailedSessionRunRuntimeEvent } from "../../application/session-runs/session-run-view-events.service";
+import { repairTerminalSessionRunProjections } from "../../application/session-runs/terminal-run-reconciliation.service";
 import { getRuntimeKindPolicy } from "../../domain/runtime-kind-policy";
 import { classifyReclaim, decideReclaimRecovery } from "../../domain/session-run-reclaim-recovery";
 import { isTerminalSessionRunStatus } from "../../domain/session-run-status";
@@ -16,12 +17,16 @@ import { recordRuntimeRunLeaseReleasedOutcome } from "../runtime-subject-lifecyc
 import { createSandboxCheckpoints } from "../sandbox-backup.service";
 import { markExecutingExternalToolEffectsUnknownForDriver } from "../session-runs/external-tool-effect-store.repository";
 import { failAcceptedRuntimeCommandsForTerminalDriver } from "../session-runs/runtime-command-store.repository";
-import { setSessionRunStatus } from "../session-runs/session-run-store.repository";
+import {
+  getSessionRunSummary,
+  setSessionRunStatus,
+} from "../session-runs/session-run-store.repository";
 import type { SessionRunTransitionOutcome } from "../session-runs/session-run-store.repository";
 import type { RuntimeSessionLink } from "./event-types";
 import { getRuntimeSessionLink } from "./session-link.repository";
 
 interface LinkedSessionRunStatusRow {
+  readonly sessionId: SessionId;
   readonly sessionRunId: SessionRunId | null;
   readonly status: SessionRunStatus | null;
 }
@@ -151,7 +156,9 @@ export async function repairFinalizedTerminalDriverRunState(
   const link = await getRuntimeSessionLink(bindings.DB, input.driverInstanceId);
 
   if (link.sessionRunId === null || link.sessionRunStatus === null) {
-    return { link, released: false };
+    // A previous attempt may have committed the terminal Run before its event
+    // or lease cleanup. The default link query only returns active Runs.
+    return releaseLinkedTerminalDriverInstanceSessionRun(bindings, input.driverInstanceId);
   }
 
   if (!isTerminalSessionRunStatus(link.sessionRunStatus)) {
@@ -211,6 +218,7 @@ export async function releaseLinkedTerminalDriverInstanceSessionRun(
   const row: LinkedSessionRunStatusRow | null =
     (await getAppDatabase(database)
       .select({
+        sessionId: sessionRunsTable.sessionId,
         sessionRunId: sessionRunsTable.id,
         status: sessionRunsTable.status,
       })
@@ -221,11 +229,21 @@ export async function releaseLinkedTerminalDriverInstanceSessionRun(
           inArray(sessionRunsTable.status, ["cancelled", "completed", "expired", "failed"]),
         ),
       )
+      .orderBy(desc(sessionRunsTable.id))
       .limit(1)
       .get()) ?? null;
 
   if (row === null || row.sessionRunId === null || !isTerminalSessionRunStatus(row.status)) {
     return { link: null, released: false };
+  }
+
+  const run = await getSessionRunSummary(database, row.sessionRunId);
+  if (run !== null) {
+    await repairTerminalSessionRunProjections(bindings, {
+      preserveSessionLifecycle: true,
+      run,
+      sessionId: row.sessionId,
+    });
   }
 
   return releaseTerminalDriverInstanceSessionRun(bindings, {

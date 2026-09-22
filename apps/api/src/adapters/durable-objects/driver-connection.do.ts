@@ -3,6 +3,7 @@ import { DurableObject } from "cloudflare:workers";
 import type { ApiBindings } from "../../platform/cloudflare/worker-types";
 
 interface DriverConnectionDelegate {
+  alarm(): Promise<void>;
   fetch(request: Request): Promise<Response>;
   webSocketClose(ws: WebSocket, code: number, reason: string): Promise<void>;
   webSocketError(ws: WebSocket, error: unknown): Promise<void> | void;
@@ -22,6 +23,10 @@ export class DriverConnection extends DurableObject {
 
   override async fetch(request: Request): Promise<Response> {
     return (await this.#delegatePromise).fetch(request);
+  }
+
+  override async alarm(): Promise<void> {
+    await (await this.#delegatePromise).alarm();
   }
 
   override async webSocketClose(ws: WebSocket, code: number, reason: string): Promise<void> {

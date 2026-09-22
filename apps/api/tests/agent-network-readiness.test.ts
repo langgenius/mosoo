@@ -25,6 +25,7 @@ async function computeReadiness(
 ) {
   return computeAgentReadiness(database, PUBLIC_API_TEST_IDS.ownerAccount, {
     agentId: PUBLIC_API_TEST_IDS.agent,
+    builtInTools: [],
     environment: { environmentId: input.environmentId },
     ...(input.environmentNetworkPolicy === undefined
       ? {}

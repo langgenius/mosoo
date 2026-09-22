@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 
 import type { RuntimeCommand } from "@mosoo/contracts/runtime-command";
 import type { DriverCommandId, DriverInstanceId, SessionRunId } from "@mosoo/id";
@@ -16,7 +16,13 @@ import type { RuntimeCommand as DriverRuntimeCommand } from "../../driver/src/ru
 import { driverBootPayload } from "../../driver/tests/driver-boot-payload-fixture";
 import { recordCanonicalSessionRunFailure } from "../src/modules/runtime/application/session-runs/session-run-terminal-failure.service";
 import { cleanupDriverInstances } from "../src/modules/runtime/infrastructure/driver-instance/maintenance";
+import { RuntimeSessionViewCache } from "../src/modules/runtime/infrastructure/driver-instance/runtime-session-view-cache";
+import { DriverInstanceRuntimeState } from "../src/modules/runtime/infrastructure/driver-instance/runtime-state";
+import type { DriverInstanceRuntimeStateContext } from "../src/modules/runtime/infrastructure/driver-instance/runtime-state-store";
+import { DRIVER_INSTANCE_STATE_STORAGE_KEY } from "../src/modules/runtime/infrastructure/driver-instance/runtime-state-store";
+import { SessionViewerEventDeliveryBuffer } from "../src/modules/runtime/infrastructure/driver-instance/session-viewer-event-delivery-buffer";
 import { repairFinalizedTerminalDriverRunState } from "../src/modules/runtime/infrastructure/driver-instance/terminal-run-release";
+import { DriverInstanceTerminalStateCoordinator } from "../src/modules/runtime/infrastructure/driver-instance/terminal-state-coordinator";
 import {
   claimExternalToolEffect,
   completeExternalToolEffect,
@@ -27,6 +33,7 @@ import {
   createRuntimeCommandRecord,
   getRuntimeCommandRecord,
 } from "../src/modules/runtime/infrastructure/session-runs/runtime-command-store.repository";
+import { setSessionRunStatus } from "../src/modules/runtime/infrastructure/session-runs/session-run-store.repository";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import {
   createPublicHttpContractDatabase,
@@ -542,7 +549,338 @@ async function createAfterBenchmarkSample() {
   };
 }
 
+async function createSocketCloseFinalizationFixture() {
+  const database = await createPublicHttpContractDatabase();
+  await insertFinalizedDriverLeaseFixture(database);
+  const bindings = createPublicHttpTestBindings(database) as ApiBindings;
+  const driverInstanceId = PUBLIC_API_TEST_IDS.driverOwner as DriverInstanceId;
+  await database
+    .prepare("UPDATE driver_instance SET status = 'ready' WHERE id = ?")
+    .bind(driverInstanceId)
+    .run();
+  const stored = new Map<string, unknown>();
+  let alarm: number | null = null;
+  const storage: DriverInstanceRuntimeStateContext["storage"] = {
+    async deleteAlarm() {
+      alarm = null;
+    },
+    async setAlarm(at: number) {
+      alarm = at;
+    },
+    async deleteAll() {
+      stored.clear();
+    },
+    async get<T>(key: string) {
+      return structuredClone(stored.get(key)) as T | undefined;
+    },
+    async put(key: string, value: unknown) {
+      stored.set(key, structuredClone(value));
+    },
+  };
+  const beforeRestart = new DriverInstanceRuntimeState({ storage });
+  await beforeRestart.setDriverInstanceId(driverInstanceId);
+  await beforeRestart.recordAcceptedConnection({
+    connectedAt: 1,
+    connectionId: "connection-finalized",
+    driverGeneration: 0,
+    traceId: null,
+  });
+  await beforeRestart.persistClose({
+    at: new Date().toISOString(),
+    code: 1006,
+    reason: "WebSocket disconnected without sending Close frame.",
+  });
+
+  async function restore() {
+    const state = new DriverInstanceRuntimeState({ storage });
+    await state.load();
+    const viewerEventDelivery = new SessionViewerEventDeliveryBuffer({
+      ctx: { waitUntil() {} } as unknown as DurableObjectState,
+      env: bindings,
+      getDriverInstanceId: () => driverInstanceId,
+      withRuntimeLogContext: (fn) => fn(),
+    });
+    const coordinator = new DriverInstanceTerminalStateCoordinator({
+      clearStorage: () => storage.deleteAll(),
+      env: bindings,
+      state,
+      viewCache: new RuntimeSessionViewCache(),
+      viewerEventDelivery,
+      withRuntimeLogContext: (fn) => fn(),
+    });
+    return { coordinator, state, viewerEventDelivery };
+  }
+  return { database, driverInstanceId, restore, stored, readAlarm: () => alarm };
+}
+
 describe("driver finalization repair", () => {
+  test("resumes event and lease cleanup after the terminal Run was already committed", async () => {
+    const database = await createPublicHttpContractDatabase();
+    await insertFinalizedDriverLeaseFixture(database);
+    const bindings = createPublicHttpTestBindings(database) as ApiBindings;
+    await setSessionRunStatus(database, {
+      error: PROVISION_ERROR,
+      runId: FINALIZE_RUN_ID,
+      source: "api",
+      status: "failed",
+    });
+    const completedAt = Date.parse("2026-09-21T23:59:59.000Z");
+    await database
+      .prepare("UPDATE session_run SET completed_at = ?, updated_at = ? WHERE id = ?")
+      .bind(completedAt, completedAt, FINALIZE_RUN_ID)
+      .run();
+    const before = await database
+      .prepare("SELECT * FROM session_run WHERE id = ?")
+      .bind(FINALIZE_RUN_ID)
+      .first();
+    expect(await readTerminalEvents(database)).toEqual([]);
+    const output: string[] = [];
+    const repairStartedAt = Date.now();
+    const originalInfo = console.info;
+    console.info = (...values: unknown[]) => output.push(values.map(String).join(" "));
+    try {
+      // Both callers can observe the same missing receipt before either writes it.
+      const repair = () =>
+        repairFinalizedTerminalDriverRunState(bindings, {
+          driverInstanceId: PUBLIC_API_TEST_IDS.driverOwner as DriverInstanceId,
+          status: "stopped",
+        });
+      const outcomes = await Promise.all([repair(), repair()]);
+      expect(outcomes.every((outcome) => outcome.released)).toBe(true);
+      const emittedAfterRace = output.length;
+      await repair();
+      expect(output).toHaveLength(emittedAfterRace);
+    } finally {
+      console.info = originalInfo;
+    }
+    const logs = output
+      .map((entry) => JSON.parse(entry))
+      .filter((entry) => entry.message === "session.run.terminal");
+    expect(logs.length).toBeGreaterThan(0);
+    expect(logs.length).toBeLessThanOrEqual(2);
+    expect(logs.every((entry) => entry.metadata.errorCode === PROVISION_ERROR.code)).toBe(true);
+    expect(await readTerminalEvents(database)).toHaveLength(1);
+    const eventTime = await database
+      .prepare(
+        "SELECT occurred_at, ended_at, created_at FROM session_event WHERE run_id = ? AND event_type = 'run.failed'",
+      )
+      .bind(FINALIZE_RUN_ID)
+      .first<{ occurred_at: number; ended_at: number; created_at: number }>();
+    expect(eventTime).toMatchObject({ occurred_at: completedAt, ended_at: completedAt });
+    expect(eventTime?.created_at).toBeGreaterThanOrEqual(repairStartedAt);
+    expect(logs.every((entry) => Date.parse(entry.timestamp) === eventTime?.occurred_at)).toBe(
+      true,
+    );
+    expect(
+      await database
+        .prepare("SELECT * FROM session_run WHERE id = ?")
+        .bind(FINALIZE_RUN_ID)
+        .first(),
+    ).toEqual(before);
+    expect(
+      await database
+        .prepare("SELECT inactive_deadline_at FROM sandbox WHERE id = ?")
+        .bind(PUBLIC_API_TEST_IDS.sandbox)
+        .first(),
+    ).toMatchObject({ inactive_deadline_at: expect.any(Number) });
+  });
+
+  test("repairs a persisted socket close after object reconstruction without replaying the run", async () => {
+    const fixture = await createSocketCloseFinalizationFixture();
+    const { database, driverInstanceId } = fixture;
+    expect(fixture.readAlarm()).not.toBeNull();
+    await createRuntimeCommandRecord(database, {
+      command: mcpExecuteCommand(MCP_COMMAND_ID),
+      driverInstanceId,
+      status: "accepted",
+    });
+    await claimExternalToolEffect(database, { commandId: MCP_COMMAND_ID, driverInstanceId });
+    const { coordinator, state } = await fixture.restore();
+    expect(state.terminalized).toBe(true);
+    expect(state.finalizationCompleted).toBe(false);
+    await Promise.all([coordinator.finalize(), coordinator.finalize()]);
+    await state.persistClose({ at: new Date().toISOString(), code: 1000, reason: "duplicate" });
+    await coordinator.finalize();
+
+    expect(
+      await database
+        .prepare("SELECT status, close_code, status_seq FROM driver_instance WHERE id = ?")
+        .bind(driverInstanceId)
+        .first(),
+    ).toEqual({ status: "failed", close_code: 1006, status_seq: 1 });
+    expect(
+      await database.prepare("SELECT id, status FROM session_run ORDER BY id").all(),
+    ).toMatchObject({ results: [{ id: FINALIZE_RUN_ID, status: "failed" }] });
+    expect(
+      (await readTerminalEvents(database)).filter((event) => event.event_type === "run.failed"),
+    ).toHaveLength(1);
+    expect(fixture.readAlarm()).toBeNull();
+    expect(
+      await getExternalToolEffectForCommand(database, {
+        commandId: MCP_COMMAND_ID,
+        driverInstanceId,
+      }),
+    ).toMatchObject({ status: "unknown", attemptCount: 1 });
+    expect(
+      await claimExternalToolEffect(database, { commandId: MCP_COMMAND_ID, driverInstanceId }),
+    ).toMatchObject({ kind: "unknown" });
+    const restored = await fixture.restore();
+    expect(restored.state.finalizationCompleted).toBe(true);
+    await restored.coordinator.finalize();
+    expect(
+      (await readTerminalEvents(database)).filter((event) => event.event_type === "run.failed"),
+    ).toHaveLength(1);
+  });
+
+  test("retries after driver finalization commits but run repair fails", async () => {
+    const fixture = await createSocketCloseFinalizationFixture();
+    const { database, driverInstanceId } = fixture;
+    database.execute(`CREATE TRIGGER fail_run_terminal BEFORE UPDATE OF status ON session_run
+      BEGIN SELECT RAISE(ABORT, 'injected run write failure'); END;`);
+    const { coordinator, state } = await fixture.restore();
+    await expect(coordinator.finalize()).rejects.toThrow();
+    expect(state.finalizationCompleted).toBe(false);
+    expect(fixture.readAlarm()).not.toBeNull();
+    expect(
+      await database
+        .prepare("SELECT status FROM driver_instance WHERE id = ?")
+        .bind(driverInstanceId)
+        .first(),
+    ).toEqual({ status: "failed" });
+    database.execute("DROP TRIGGER fail_run_terminal");
+    const restored = await fixture.restore();
+    await restored.coordinator.finalize();
+    expect(
+      await database
+        .prepare("SELECT status FROM session_run WHERE id = ?")
+        .bind(FINALIZE_RUN_ID)
+        .first(),
+    ).toEqual({ status: "failed" });
+    expect(
+      (await readTerminalEvents(database)).filter((event) => event.event_type === "run.failed"),
+    ).toHaveLength(1);
+    expect(fixture.readAlarm()).toBeNull();
+  });
+
+  test("retries a failed driver write in the same object", async () => {
+    const fixture = await createSocketCloseFinalizationFixture();
+    const { database } = fixture;
+    database.execute(`CREATE TRIGGER fail_driver_terminal BEFORE UPDATE OF status ON driver_instance
+      BEGIN SELECT RAISE(ABORT, 'injected driver write failure'); END;`);
+    const { coordinator } = await fixture.restore();
+    await expect(coordinator.finalize()).rejects.toThrow();
+    database.execute("DROP TRIGGER fail_driver_terminal");
+    await coordinator.finalize();
+    expect(
+      (await readTerminalEvents(database)).filter((event) => event.event_type === "run.failed"),
+    ).toHaveLength(1);
+    expect(fixture.readAlarm()).toBeNull();
+  });
+
+  test("retries after canonical completion without duplicating the terminal event", async () => {
+    const fixture = await createSocketCloseFinalizationFixture();
+    const { coordinator, state } = await fixture.restore();
+    const persist = spyOn(state, "persistTerminalSnapshot").mockRejectedValueOnce(
+      new Error("injected finalization snapshot failure"),
+    );
+    try {
+      await expect(coordinator.finalize()).rejects.toThrow(
+        "injected finalization snapshot failure",
+      );
+    } finally {
+      persist.mockRestore();
+    }
+    expect(state.finalizationCompleted).toBe(false);
+    const restored = await fixture.restore();
+    await restored.coordinator.finalize();
+    expect(restored.state.finalizationCompleted).toBe(true);
+    expect(
+      (await readTerminalEvents(fixture.database)).filter(
+        (event) => event.event_type === "run.failed",
+      ),
+    ).toHaveLength(1);
+    expect(fixture.readAlarm()).toBeNull();
+  });
+
+  test("treats a legacy close snapshot as pending finalization", async () => {
+    const fixture = await createSocketCloseFinalizationFixture();
+    const snapshot = fixture.stored.get(DRIVER_INSTANCE_STATE_STORAGE_KEY);
+    if (
+      typeof snapshot !== "object" ||
+      snapshot === null ||
+      !("finalizationCompleted" in snapshot)
+    ) {
+      throw new Error("Expected a persisted finalization snapshot.");
+    }
+    delete snapshot.finalizationCompleted;
+    const { coordinator, state } = await fixture.restore();
+    expect(state.finalizationCompleted).toBe(false);
+    await coordinator.finalize();
+    expect(
+      (await readTerminalEvents(fixture.database)).filter(
+        (event) => event.event_type === "run.failed",
+      ),
+    ).toHaveLength(1);
+  });
+
+  test.each([
+    { connectionId: "successor-connection", generation: 0 },
+    { connectionId: "connection-finalized", generation: 1 },
+  ])(
+    "never repairs a successor connection or generation: %j",
+    async ({ connectionId, generation }) => {
+      const fixture = await createSocketCloseFinalizationFixture();
+      const { database, driverInstanceId } = fixture;
+      await database
+        .prepare("UPDATE driver_instance SET connection_id = ?, generation = ? WHERE id = ?")
+        .bind(connectionId, generation, driverInstanceId)
+        .run();
+      const { coordinator } = await fixture.restore();
+      await Promise.all([coordinator.finalize(), coordinator.finalize()]);
+      expect(
+        await database
+          .prepare("SELECT status, close_code FROM driver_instance WHERE id = ?")
+          .bind(driverInstanceId)
+          .first(),
+      ).toEqual({ status: "ready", close_code: null });
+      expect(
+        await database
+          .prepare("SELECT status FROM session_run WHERE id = ?")
+          .bind(FINALIZE_RUN_ID)
+          .first(),
+      ).toEqual({ status: "running" });
+      expect(
+        (await readTerminalEvents(database)).filter((event) => event.event_type === "run.failed"),
+      ).toHaveLength(0);
+      expect(fixture.readAlarm()).toBeNull();
+    },
+  );
+
+  test("commits terminal state before waiting for buffered viewer delivery", async () => {
+    const fixture = await createSocketCloseFinalizationFixture();
+    const { coordinator, state, viewerEventDelivery } = await fixture.restore();
+    const delivery = Promise.withResolvers<void>();
+    const entered = Promise.withResolvers<void>();
+    const flush = spyOn(viewerEventDelivery, "flushSafely").mockImplementation(async () => {
+      entered.resolve();
+      await delivery.promise;
+    });
+    const task = coordinator.finalize();
+    try {
+      await entered.promise;
+      expect(state.finalizationCompleted).toBe(true);
+      expect(
+        (await readTerminalEvents(fixture.database)).filter(
+          (event) => event.event_type === "run.failed",
+        ),
+      ).toHaveLength(1);
+    } finally {
+      delivery.resolve();
+      await task;
+      flush.mockRestore();
+    }
+  });
+
   test("fails active run lease, accepted commands, and publishes a replayable terminal event", async () => {
     const database = await createPublicHttpContractDatabase();
     await insertFinalizedDriverLeaseFixture(database);
