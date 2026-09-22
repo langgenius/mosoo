@@ -386,24 +386,6 @@ export type RunStatus =
   | 'running'
   | 'waiting_input';
 
-export type RuntimeStateOperation =
-  | 'recreateSandbox'
-  | 'resetAgentState'
-  | 'restartDriver';
-
-export type RuntimeStateOperationInput = {
-  affectedFields?: Array<string> | null | undefined;
-  agentId: PlatformId;
-  applyActionKind?: string | null | undefined;
-  projectId: PlatformId;
-  targetVersion?: RuntimeStateTargetVersionInput | null | undefined;
-};
-
-export type RuntimeStateTargetVersionInput = {
-  id: PlatformId;
-  versionNumber: number;
-};
-
 export type SessionMessagePlanPriority =
   | 'high'
   | 'low'
@@ -642,27 +624,6 @@ export type UnpublishAgentMutationVariables = Exact<{
 
 
 export type UnpublishAgentMutation = { unpublishAgent: { createdAt: string, description: string | null, id: PlatformId, kind: AgentKind, model: string, name: string, projectId: PlatformId, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, visibility: AgentVisibility, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }> } };
-
-export type RestartDriverMutationVariables = Exact<{
-  input: RuntimeStateOperationInput;
-}>;
-
-
-export type RestartDriverMutation = { restartDriver: { affectedSessionCount: number, agentId: PlatformId, ok: boolean, operation: RuntimeStateOperation } };
-
-export type RecreateSandboxMutationVariables = Exact<{
-  input: RuntimeStateOperationInput;
-}>;
-
-
-export type RecreateSandboxMutation = { recreateSandbox: { affectedSessionCount: number, agentId: PlatformId, ok: boolean, operation: RuntimeStateOperation } };
-
-export type ResetAgentStateMutationVariables = Exact<{
-  input: RuntimeStateOperationInput;
-}>;
-
-
-export type ResetAgentStateMutation = { resetAgentState: { affectedSessionCount: number, agentId: PlatformId, ok: boolean, operation: RuntimeStateOperation } };
 
 type CostTotalsFields_CostAgentRow_Fragment = { activeUsers: number, cacheCreationTokens: number, cacheReadTokens: number, inputTokens: number, outputTokens: number, requestCount: number, totalCostUsd: number, unpricedRequestCount: number };
 
@@ -990,6 +951,22 @@ export type AddSessionResourceMutationVariables = Exact<{
 
 
 export type AddSessionResourceMutation = { addSessionResource: { contentType: string, expectedSize: number, expiresAt: string, fileId: PlatformId, partSize: number | null, path: string, status: FileUploadStatus, strategy: FileUploadStrategy } };
+
+export type RestartSessionDriverMutationVariables = Exact<{
+  projectId: PlatformId;
+  sessionId: PlatformId;
+}>;
+
+
+export type RestartSessionDriverMutation = { restartSessionDriver: { ok: boolean, sessionId: PlatformId } };
+
+export type RecreateSessionSandboxMutationVariables = Exact<{
+  projectId: PlatformId;
+  sessionId: PlatformId;
+}>;
+
+
+export type RecreateSessionSandboxMutation = { recreateSessionSandbox: { ok: boolean, sessionId: PlatformId } };
 
 export type SessionProcessEventsQueryVariables = Exact<{
   limit: number;
@@ -2088,36 +2065,6 @@ fragment AgentDeploymentVersionFields on AgentDeploymentVersion {
   summary
   versionNumber
 }`) as unknown as TypedDocumentString<UnpublishAgentMutation, UnpublishAgentMutationVariables>;
-export const RestartDriverDocument = /*#__PURE__*/ new TypedDocumentString(`
-    mutation RestartDriver($input: RuntimeStateOperationInput!) {
-  restartDriver(input: $input) {
-    affectedSessionCount
-    agentId
-    ok
-    operation
-  }
-}
-    `) as unknown as TypedDocumentString<RestartDriverMutation, RestartDriverMutationVariables>;
-export const RecreateSandboxDocument = /*#__PURE__*/ new TypedDocumentString(`
-    mutation RecreateSandbox($input: RuntimeStateOperationInput!) {
-  recreateSandbox(input: $input) {
-    affectedSessionCount
-    agentId
-    ok
-    operation
-  }
-}
-    `) as unknown as TypedDocumentString<RecreateSandboxMutation, RecreateSandboxMutationVariables>;
-export const ResetAgentStateDocument = /*#__PURE__*/ new TypedDocumentString(`
-    mutation ResetAgentState($input: RuntimeStateOperationInput!) {
-  resetAgentState(input: $input) {
-    affectedSessionCount
-    agentId
-    ok
-    operation
-  }
-}
-    `) as unknown as TypedDocumentString<ResetAgentStateMutation, ResetAgentStateMutationVariables>;
 export const ProjectCostCardDocument = /*#__PURE__*/ new TypedDocumentString(`
     query ProjectCostCard($projectId: ULID!, $range: CostRange!, $runPurposes: [CostRunPurpose!]) {
   projectCostCard(projectId: $projectId, range: $range, runPurposes: $runPurposes) {
@@ -3320,6 +3267,22 @@ export const AddSessionResourceDocument = /*#__PURE__*/ new TypedDocumentString(
   }
 }
     `) as unknown as TypedDocumentString<AddSessionResourceMutation, AddSessionResourceMutationVariables>;
+export const RestartSessionDriverDocument = /*#__PURE__*/ new TypedDocumentString(`
+    mutation RestartSessionDriver($projectId: ULID!, $sessionId: ULID!) {
+  restartSessionDriver(projectId: $projectId, sessionId: $sessionId) {
+    ok
+    sessionId
+  }
+}
+    `) as unknown as TypedDocumentString<RestartSessionDriverMutation, RestartSessionDriverMutationVariables>;
+export const RecreateSessionSandboxDocument = /*#__PURE__*/ new TypedDocumentString(`
+    mutation RecreateSessionSandbox($projectId: ULID!, $sessionId: ULID!) {
+  recreateSessionSandbox(projectId: $projectId, sessionId: $sessionId) {
+    ok
+    sessionId
+  }
+}
+    `) as unknown as TypedDocumentString<RecreateSessionSandboxMutation, RecreateSessionSandboxMutationVariables>;
 export const SessionProcessEventsDocument = /*#__PURE__*/ new TypedDocumentString(`
     query SessionProcessEvents($limit: Int!, $projectId: ULID!, $sessionId: ULID!) {
   threadSessionProcessEvents(

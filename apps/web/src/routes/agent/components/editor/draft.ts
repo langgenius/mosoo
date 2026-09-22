@@ -10,7 +10,7 @@ import { parseDocument, stringify } from "yaml";
 
 import { toEnvironmentId, toMcpServerId, toSkillId } from "@/routes/typed-id";
 
-import type { Agent, AgentKind, McpServer, RuntimeId, SkillInfo } from "../../agent.types";
+import type { Agent, McpServer, RuntimeId, SkillInfo } from "../../agent.types";
 import { getRuntimeInfo } from "../../runtime-catalog";
 
 export interface AgentEditorDraft {
@@ -55,15 +55,11 @@ export function createSnapshotHash(draft: AgentEditorDraft): string {
   return hashText(createSnapshot(draft));
 }
 
-export function toAgentConfigChangeSnapshot(
-  draft: AgentEditorDraft,
-  legacyKind: AgentKind = "cattle",
-): AgentConfigChangeSnapshot {
+export function toAgentConfigChangeSnapshot(draft: AgentEditorDraft): AgentConfigChangeSnapshot {
   return {
     builtInTools: normalizeAgentBuiltInTools(draft.builtInTools),
     description: draft.description,
     environmentId: draft.environmentId === null ? null : toEnvironmentId(draft.environmentId),
-    kind: legacyKind,
     mcpServerIds: draft.mcpServers.map((server) => toMcpServerId(server.id)),
     model: draft.model,
     name: draft.name,

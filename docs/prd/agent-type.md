@@ -24,6 +24,18 @@ its historical outcome remains recorded. Archived, terminated, busy or incomplet
 checkpointed Sessions cannot be silently reset. A shared or mismatched legacy binding
 must cross the verified migration boundary before Session maintenance is available.
 
+Saving an Agent preset changes configuration for new Sessions only, including changes
+to its harness. It never restarts, recreates or resets admitted Sessions. Existing
+Previews can continue with their original configuration. They show that newer
+configuration is available and require an explicit new Preview to test it. Failed saves remain retryable in the editor.
+
+The final Session-only console removes the old shared-Agent Terminal and Agent-wide
+state reset. These belonged to the retired shared machine. Explicit Session restart
+and recreation retain the committed state; starting a new Session is a separate user
+action. The old Terminal route and maintenance mutations retire at the coordinated
+Cloud cutover, after protected workloads are converted. This source change alone
+neither rewrites data nor authorizes deployment.
+
 ## Existing Cloud Sessions
 
 New admission does not rewrite any existing Agent label, Session binding or shared workspace. Existing Sessions retain their admitted configuration and maintenance access until their transition is verified. Migration must preserve the same ID, native conversation and promised working files; allocating an empty isolated workspace is not migration.

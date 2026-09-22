@@ -335,27 +335,3 @@ export interface PublishAgentInput {
 }
 
 export type RuntimeStateOperationName = "restartDriver" | "recreateSandbox" | "resetAgentState";
-export type RuntimeStateApplyActionKind =
-  | "patch-and-restart"
-  | "recreate-preserving-state"
-  | "restart-process";
-
-export interface RuntimeStateTargetVersionInput {
-  id: AgentDeploymentVersionId;
-  versionNumber: number;
-}
-
-export interface RuntimeStateOperationInput {
-  affectedFields?: string[] | null;
-  agentId: AgentId;
-  applyActionKind?: RuntimeStateApplyActionKind | null;
-  projectId: ProjectId;
-  targetVersion?: RuntimeStateTargetVersionInput | null;
-}
-
-export interface RuntimeStateOperationResult {
-  affectedSessionCount: number;
-  agentId: AgentId;
-  ok: boolean;
-  operation: RuntimeStateOperationName;
-}

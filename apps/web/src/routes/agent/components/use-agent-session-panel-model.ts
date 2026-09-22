@@ -181,7 +181,7 @@ export function useAgentSessionPanelModel(
   });
   const stream = useSessionStream(input.projectId, activeSessionId);
   const readiness = selectSessionPanelReadiness({
-    agentReadiness: input.readiness,
+    agentReadiness: activeSessionId === null ? input.readiness : null,
     streamReadiness: stream.readiness,
   });
   const readinessBlockMessage = getReadinessBlockMessage(readiness);
@@ -435,11 +435,7 @@ export function useAgentSessionPanelModel(
     }
 
     if (activeSessionId !== null) {
-      if (
-        stream.lifecycle === "TERMINATED" ||
-        configurationRefreshRequired ||
-        readinessBlockMessage !== null
-      ) {
+      if (stream.lifecycle === "TERMINATED" || readinessBlockMessage !== null) {
         return;
       }
 
@@ -509,7 +505,6 @@ export function useAgentSessionPanelModel(
 
     if (
       isComposerSendBlocked({
-        configurationRefreshRequired,
         lifecycle: stream.lifecycle,
         readinessBlockMessage,
         reconnecting: stream.reconnecting,

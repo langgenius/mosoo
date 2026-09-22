@@ -22,17 +22,12 @@ import {
 import { SANDBOX_STARTUP_RPC_TIMEOUT_MS } from "../../../../platform/cloudflare/sandbox-startup";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../../platform/db/drizzle";
-import type { RuntimeStateClearRule } from "../../domain/runtime-kind-policy";
 import type { SandboxNetworkConstraints } from "../../domain/sandbox-network-constraints";
 import { withRuntimeProvisionTimeout } from "../runtime-provision-timeout";
 import { decodeSandboxBackupIdForPlatform } from "../sandbox-backup-id";
 import { toSandboxHandle } from "../sandbox-handles";
 import type { SandboxHandle } from "../sandbox-handles";
 import type { ReadyRuntimeSubjectBackupRecord } from "./runtime-subject-store";
-
-function quoteShellArg(value: string): string {
-  return `'${value.replaceAll("'", `'"'"'`)}'`;
-}
 
 async function readRuntimeSubjectSandboxBinding(
   bindings: ApiBindings,
@@ -185,41 +180,5 @@ export async function destroyRuntimeSubjectContainer(
       ))(),
     `Runtime subject destroy for ${runtimeSubjectId}`,
     timeoutMs,
-  );
-}
-
-export async function clearRuntimeSubjectAgentState(
-  bindings: ApiBindings,
-  input: {
-    readonly rules: readonly RuntimeStateClearRule[];
-    readonly runtimeSubjectId: string;
-    readonly stateTargets: readonly string[];
-  },
-): Promise<void> {
-  await withDisposedRpcResource(
-    await getRuntimeSubjectKeepAliveHandle(bindings, input.runtimeSubjectId),
-    async (subject) => {
-      const commands = input.rules.flatMap((rule) => {
-        switch (rule.type) {
-          case "subject_memory": {
-            return [
-              `rm -rf ${quoteShellArg(rule.path)}`,
-              `mkdir -p ${quoteShellArg(SANDBOX_MEMORY_PATH)}`,
-            ];
-          }
-          case "session_runtime_state": {
-            return input.stateTargets.map((target) => `rm -rf ${quoteShellArg(target)}`);
-          }
-        }
-      });
-
-      const result = await subject.exec(`sh -lc ${quoteShellArg(commands.join("; "))}`);
-
-      if (!result.success || result.exitCode !== 0) {
-        throw new Error(
-          result.stderr.trim() || result.stdout.trim() || "Runtime agent-state cleanup failed.",
-        );
-      }
-    },
   );
 }

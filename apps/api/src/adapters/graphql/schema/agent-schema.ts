@@ -187,26 +187,6 @@ export const agentSchema = /* GraphQL */ `
     resolution: AgentPackageResolutionReport!
   }
 
-  type RuntimeStateOperationResult {
-    affectedSessionCount: Int!
-    agentId: ULID!
-    ok: Boolean!
-    operation: RuntimeStateOperation!
-  }
-
-  input RuntimeStateOperationInput {
-    affectedFields: [String!]
-    agentId: ULID!
-    applyActionKind: String
-    targetVersion: RuntimeStateTargetVersionInput
-    projectId: ULID!
-  }
-
-  input RuntimeStateTargetVersionInput {
-    id: ULID!
-    versionNumber: Int!
-  }
-
   type AgentOwnerSummary {
     id: ULID!
     imageUrl: String

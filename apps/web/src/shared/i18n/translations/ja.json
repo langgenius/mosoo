@@ -303,7 +303,14 @@
     "deleteFailed": "エージェントの削除に失敗しました。",
     "packageActionFailed": "エージェントパッケージ操作に失敗しました。",
     "deleteDescription": "{{name}} とそのすべての記録を完全に削除します。この操作は元に戻せません。",
-    "actionCouldNotBeCompleted": "操作を完了できませんでした。"
+    "actionCouldNotBeCompleted": "操作を完了できませんでした。",
+    "savingPreset": "プリセットを保存中…",
+    "presetSessionScope": "保存した変更は新しいセッションに適用されます。既存のセッションは開始時の設定を保持します。",
+    "sessionMaintenance": "セッションのメンテナンス",
+    "restartSession": "実行を再起動",
+    "recreateSession": "実行環境を再作成",
+    "sessionMaintenanceDescription": "このセッションだけが対象で、実行中のターンを停止します。保存済みのコンテキスト、作業ファイル、開始時の設定は保持されます。中断したターンの未保存の作業は失われる場合があります。",
+    "sessionPresetChanged": "このセッションは開始時の設定で続行できます。保存した変更を試すには新しいセッションを開始してください。"
   },
   "threads": {
     "title": "実行履歴",

@@ -53,7 +53,6 @@ import { buildAgentSpecForPreparedProfile, listAgentSpecSkillsByIds } from "./ag
 import { parseAgentStoredConfig, serializeAgentStoredConfig } from "./agent-stored-config.service";
 import {
   evaluateAgentRuntimeSelection,
-  enforcePublishedRuntimeStability,
   createAgentConfigChangeSnapshot,
   listAgentSkillIds,
   planVersionedAgentConfigChange,
@@ -237,7 +236,6 @@ export async function updateAgentConfig(
   });
   const { environmentId } = input.environment;
 
-  enforcePublishedRuntimeStability(editable.agent, runtimeId);
   await ensureAgentSkillSelectionAccess(database, viewer, editable.agent.projectId, skillIds);
   if (
     environmentId !== null &&

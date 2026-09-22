@@ -1,6 +1,7 @@
 import { expect, mock, test } from "bun:test";
 import { fileURLToPath } from "node:url";
 
+import type { AgentReadiness } from "@mosoo/contracts/agent";
 import type { SessionSummary, SessionType } from "@mosoo/contracts/session";
 import { createPlatformId } from "@mosoo/id";
 import type { SessionId } from "@mosoo/id";
@@ -33,6 +34,8 @@ if (process.env.MOSOO_TEST_PREVIEW_PANEL !== "1") {
   const AGENT = "01J0000000000000000000000A";
   const OLD = createPlatformId<SessionId>();
   let sessionType: SessionType = "preview";
+  let configurationChangedAt: string | null = null;
+  let readiness: AgentReadiness | null = null;
   const makeSession = (id: SessionId): SessionSummary => ({
     agentId: AGENT,
     projectId: PROJECT,
@@ -134,9 +137,9 @@ if (process.env.MOSOO_TEST_PREVIEW_PANEL !== "1") {
         agentId: AGENT,
         projectId: PROJECT,
         sessionType,
-        configurationChangedAt: null,
+        configurationChangedAt,
         configurationRevisionKey: null,
-        readiness: null,
+        readiness,
         requireFreshConfiguration: true,
         waitForRuntimeReadyOnNewSession: false,
       });
@@ -163,6 +166,29 @@ if (process.env.MOSOO_TEST_PREVIEW_PANEL !== "1") {
         expect(await model().ensureActiveSession()).toBe(OLD);
       });
       expect(creates).toBe(0);
+      configurationChangedAt = new Date(Date.now() + 60_000).toISOString();
+      readiness = {
+        checkedAt: configurationChangedAt,
+        issues: [
+          { code: "provider_missing", message: "New preset has no provider", severity: "error" },
+        ],
+        ready: false,
+      };
+      await render();
+      expect(model().configurationRefreshRequired).toBe(true);
+      expect(model().readinessBlockMessage).toBeNull();
+      await act(async () => {
+        expect(await model().handleSend({ text: "Continue the original configuration" })).toBe(
+          true,
+        );
+      });
+      expect(sent).toEqual([
+        expect.objectContaining({ sessionId: OLD, text: "Continue the original configuration" }),
+      ]);
+      expect(creates).toBe(0);
+      configurationChangedAt = null;
+      readiness = null;
+      await render();
       await act(async () => {
         model().setInput("Keep this new request");
       });
@@ -192,8 +218,8 @@ if (process.env.MOSOO_TEST_PREVIEW_PANEL !== "1") {
       await act(async () => {
         expect(await model().handleSend({ text: "New work" })).toBe(true);
       });
-      expect(sent).toHaveLength(1);
-      expect(sent[0]).toMatchObject({ sessionId: replaced[0], text: "New work" });
+      expect(sent).toHaveLength(2);
+      expect(sent[1]).toMatchObject({ sessionId: replaced[0], text: "New work" });
 
       offPageSession = sessions[0] ?? null;
       sessions = [];

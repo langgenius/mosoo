@@ -14,7 +14,7 @@ Removing only the selector would leave imports, forks, and API callers able to c
 
 - One Session creation path selects the isolated policy independently of a saved or live Agent's historical label. Existing source-selection behavior remains intact.
 - Agent creation, package import, and fork select the same default. Legacy kind input is optional compatibility data and cannot request shared execution. Configuration updates preserve an old stored label until the approved migration changes it; they do not change existing workspace ownership.
-- Remove the console's type selector, type-specific fork, comparison copy, badges and editable draft field. Keep legacy maintenance access where removing it would strand an unconverted customer workspace; it is not shown as a type selection for new work.
+- Remove the console's type selector, type-specific fork, comparison copy, badges and editable draft field. The final console targets maintenance by Session and retires shared-Agent Terminal and reset. The deployed legacy build remains available until protected customer workspaces cross the verified conversion boundary.
 - Keep legacy snapshot/storage decoding and conversion checks until the actual cohort has migrated. Full #582 completion still requires deleting the remaining active runtime kind branches after that transition; this commit alone cannot establish full Type retirement.
 
 Continuation has one commit boundary: a successful turn records its native cursor and
@@ -34,9 +34,17 @@ Agent-subject paths. Add Session-targeted restart/recreate through the existing 
 GraphQL boundary, reusing the same phase transitions and execution plane. These are
 ordinary owner operations, not test-only endpoints. Direct Sessions need no Agent;
 saved-preset Sessions never read the latest mutable preset to perform maintenance.
-Keep existing Agent-scoped adapters while their console callers move to explicit
-Session selection. Agent-wide memory/reset and terminal allocation disappear with
-the remaining dual-type runtime retirement.
+Move console callers to explicit Session selection, including direct Sessions with
+no Agent. Retire Agent-scoped maintenance mutations and the shared-Agent Terminal
+route together. Preset saves, including harness changes after publication, affect
+new Sessions only and never operate an existing runtime. An existing Preview can
+continue its original configuration even when the new preset is not ready; choosing
+a new Preview is explicit. Failed preset saves remain retryable.
+
+This removes legacy console GraphQL operations and Terminal access at deployment.
+It is a coordinated Cloud cutover change, not authorization to replace the currently
+deployed build before protected Sessions are converted. The v1 public API keeps its
+existing calling contract. No interactive Session terminal is introduced here.
 
 Qualify the exact Session-to-Sandbox binding and forbid a shared physical workspace,
 including archived peers. Recheck after lifecycle admission to catch a binding change

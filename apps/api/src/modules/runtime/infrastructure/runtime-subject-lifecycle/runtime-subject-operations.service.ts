@@ -10,7 +10,6 @@ import {
 } from "../../application/runtime-diagnostic-events";
 import { appendRuntimeSubjectTerminatedEvents } from "../../application/runtime-state-operation-target-events";
 import { getRuntimeKindPolicy } from "../../domain/runtime-kind-policy";
-import { deleteNativeResumeRefsForSessions } from "../native-resume-ref.repository";
 import { createSandboxCheckpoints } from "../sandbox-backup.service";
 import { stopRuntimeSubjectDrivers } from "./runtime-subject-driver-stop";
 import {
@@ -18,17 +17,12 @@ import {
   getRuntimeSubjectOperationErrorCode,
   RuntimeSubjectCheckpointFailedError,
 } from "./runtime-subject-errors";
-import {
-  clearRuntimeSubjectAgentState,
-  destroyRuntimeSubjectContainer,
-} from "./runtime-subject-platform";
+import { destroyRuntimeSubjectContainer } from "./runtime-subject-platform";
 import {
   advanceRuntimeSubjectOperationStatus,
   closeRuntimeSubjectSessionsForRecycle,
   getRuntimeSubject,
-  listRuntimeSubjectSessionStateTargets,
   markRuntimeSubjectCold,
-  markRuntimeSubjectFailed,
   markRuntimeSubjectOperationStarted,
   markRuntimeSubjectOperationRepairNeeded,
 } from "./runtime-subject-store";
@@ -175,93 +169,6 @@ export async function recreateRuntimeSubjectPreservingState(
       operationId: input.operationId,
       runtimeSubjectId: input.runtimeSubjectId,
       source: "api",
-    });
-    throw error;
-  }
-}
-
-export async function resetRuntimeSubjectAgentState(
-  bindings: ApiBindings,
-  input: RuntimeSubjectOperationInput,
-): Promise<void> {
-  const subject = await getRuntimeSubject(bindings.DB, input.runtimeSubjectId);
-
-  if (!subject) {
-    return;
-  }
-
-  const policy = getRuntimeKindPolicy(subject.kind);
-
-  if (!policy.operations.resetSubjectState) {
-    throw new Error("This runtime kind does not have resettable subject state.");
-  }
-
-  const started = await markRuntimeSubjectOperationStarted(bindings.DB, {
-    operationId: input.operationId,
-    runtimeSubjectId: input.runtimeSubjectId,
-    status: "destroying",
-  });
-
-  if (!started) {
-    throw new Error("Runtime subject is busy with lifecycle maintenance.");
-  }
-
-  try {
-    await stopRuntimeSubjectDrivers(bindings, {
-      operationId: input.operationId,
-      runtimeSubjectId: input.runtimeSubjectId,
-      preserveSessionLifecycle: true,
-      reason: input.reason,
-      targets: input.targets,
-      terminalRun: input.terminalRun,
-    });
-    const stateTargets = await listRuntimeSubjectSessionStateTargets(bindings.DB, {
-      runtimeSubjectId: input.runtimeSubjectId,
-      sessionIds: input.targets.map((target) => target.sessionId),
-    });
-    await clearRuntimeSubjectAgentState(bindings, {
-      runtimeSubjectId: input.runtimeSubjectId,
-      rules: policy.checkpoint.clearOnReset,
-      stateTargets,
-    });
-    await deleteNativeResumeRefsForSessions(
-      bindings.DB,
-      input.targets.map((target) => target.sessionId),
-    );
-    await createSandboxCheckpoints(bindings, {
-      operationId: input.operationId,
-      rules: policy.checkpoint.createOnReset,
-      sandboxId: input.runtimeSubjectId,
-    });
-    await destroyRuntimeSubjectContainer(bindings, input.runtimeSubjectId);
-    await appendTerminatedEventsForRuntimeSubject(bindings, {
-      reason: input.reason,
-      runtimeSubjectId: input.runtimeSubjectId,
-      targets: input.targets,
-    });
-    await closeRuntimeSubjectSessionsForRecycle(bindings.DB, input.runtimeSubjectId);
-    const completed = await markRuntimeSubjectCold(bindings.DB, {
-      clearBackups: true,
-      expectedStatus: "destroying",
-      operationId: input.operationId,
-      runtimeSubjectId: input.runtimeSubjectId,
-    });
-    if (!completed) {
-      throw new Error("Runtime subject changed before reset completion.");
-    }
-  } catch (error) {
-    await appendCheckpointFailureDiagnostics(bindings, {
-      error,
-      runtimeSubjectId: input.runtimeSubjectId,
-      targets: input.targets,
-    });
-    await markRuntimeSubjectFailed(bindings.DB, {
-      errorCode: getRuntimeSubjectOperationErrorCode(error),
-      errorMessage: getRuntimeOperationErrorMessage(error),
-      expectedStatus: "destroying",
-      operationId: input.operationId,
-      runtimeSubjectId: input.runtimeSubjectId,
-      status: "cold",
     });
     throw error;
   }

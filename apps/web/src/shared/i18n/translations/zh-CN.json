@@ -303,7 +303,14 @@
     "deleteFailed": "删除智能体失败。",
     "packageActionFailed": "智能体包操作失败。",
     "deleteDescription": "将永久删除 {{name}} 及其所有记录，此操作无法撤销。",
-    "actionCouldNotBeCompleted": "无法完成此操作。"
+    "actionCouldNotBeCompleted": "无法完成此操作。",
+    "savingPreset": "正在保存预设…",
+    "presetSessionScope": "保存的更改适用于新会话；已有会话保留创建时的配置。",
+    "sessionMaintenance": "会话维护",
+    "restartSession": "重启执行",
+    "recreateSession": "重建运行环境",
+    "sessionMaintenanceDescription": "仅影响当前会话，并停止正在执行的这一轮。保留已保存的上下文、工作文件和初始配置；被中断这一轮中尚未保存的工作可能丢失。",
+    "sessionPresetChanged": "当前会话继续使用初始配置；新建会话可测试已保存的更改。"
   },
   "threads": {
     "title": "运行记录",

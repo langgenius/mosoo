@@ -12,9 +12,6 @@ describe("runtime state operation execution", () => {
       async recreateSubjectPreservingState() {
         throw new Error("Unexpected recreate operation.");
       },
-      async resetSubjectAgentState() {
-        throw new Error("Unexpected reset operation.");
-      },
       async stopSubjectDrivers(_bindings, input) {
         startedRuntimeSubjectIds.push(input.runtimeSubjectId);
         operationIds.push(input.operationId ?? "");

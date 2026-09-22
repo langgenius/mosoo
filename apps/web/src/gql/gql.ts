@@ -31,9 +31,6 @@ type Documents = {
     "\n  mutation CreateAgentFork($input: CreateAgentForkInput!) {\n    createAgentFork(input: $input) {\n      agent {\n        ...AgentFields\n      }\n      resolution {\n        issues {\n          actionLabel\n          code\n          message\n          required\n          severity\n          status\n          targetLabel\n          targetType\n        }\n        summary {\n          boundMcpServerCount\n          boundSkillCount\n          copiedAssetCount\n          createdMcpServerCount\n          reusedMcpServerCount\n        }\n      }\n    }\n  }\n": typeof types.CreateAgentForkDocument,
     "\n  mutation PublishAgent($input: PublishAgentInput!) {\n    publishAgent(input: $input) {\n      ...AgentFields\n    }\n  }\n": typeof types.PublishAgentDocument,
     "\n  mutation UnpublishAgent($agentId: ULID!, $projectId: ULID!) {\n    unpublishAgent(agentId: $agentId, projectId: $projectId) {\n      ...AgentFields\n    }\n  }\n": typeof types.UnpublishAgentDocument,
-    "\n  mutation RestartDriver($input: RuntimeStateOperationInput!) {\n    restartDriver(input: $input) {\n      affectedSessionCount\n      agentId\n      ok\n      operation\n    }\n  }\n": typeof types.RestartDriverDocument,
-    "\n  mutation RecreateSandbox($input: RuntimeStateOperationInput!) {\n    recreateSandbox(input: $input) {\n      affectedSessionCount\n      agentId\n      ok\n      operation\n    }\n  }\n": typeof types.RecreateSandboxDocument,
-    "\n  mutation ResetAgentState($input: RuntimeStateOperationInput!) {\n    resetAgentState(input: $input) {\n      affectedSessionCount\n      agentId\n      ok\n      operation\n    }\n  }\n": typeof types.ResetAgentStateDocument,
     "\n  fragment CostTotalsFields on CostAggregate {\n    activeUsers\n    cacheCreationTokens\n    cacheReadTokens\n    inputTokens\n    outputTokens\n    requestCount\n    totalCostUsd\n    unpricedRequestCount\n  }\n": typeof types.CostTotalsFieldsFragmentDoc,
     "\n  fragment CostDailyFields on CostDailyPoint {\n    activeUsers\n    cacheCreationTokens\n    cacheReadTokens\n    date\n    inputTokens\n    outputTokens\n    requestCount\n    totalCostUsd\n    unpricedRequestCount\n  }\n": typeof types.CostDailyFieldsFragmentDoc,
     "\n  fragment CostAgentFields on CostAgentRow {\n    activeUsers\n    agentId\n    agentName\n    cacheCreationTokens\n    cacheReadTokens\n    debugCostUsd\n    evalCostUsd\n    inputTokens\n    outputTokens\n    ownerEmail\n    ownerId\n    ownerName\n    previousCostUsd\n    previewCostUsd\n    productionCostUsd\n    requestCount\n    scheduledCostUsd\n    totalCostUsd\n    unpricedRequestCount\n  }\n": typeof types.CostAgentFieldsFragmentDoc,
@@ -84,6 +81,8 @@ type Documents = {
     "\n  mutation RestoreSession($projectId: ULID!, $sessionId: ULID!) {\n    unarchiveAgentSession(projectId: $projectId, sessionId: $sessionId) {\n      ok\n    }\n  }\n": typeof types.RestoreSessionDocument,
     "\n  mutation DeleteAgentSession($projectId: ULID!, $sessionId: ULID!) {\n    deleteAgentSession(projectId: $projectId, sessionId: $sessionId) {\n      ok\n    }\n  }\n": typeof types.DeleteAgentSessionDocument,
     "\n  mutation AddSessionResource($input: AddSessionResourceInput!) {\n    addSessionResource(input: $input) {\n      contentType\n      expectedSize\n      expiresAt\n      fileId\n      partSize\n      path\n      status\n      strategy\n    }\n  }\n": typeof types.AddSessionResourceDocument,
+    "\n  mutation RestartSessionDriver($projectId: ULID!, $sessionId: ULID!) {\n    restartSessionDriver(projectId: $projectId, sessionId: $sessionId) {\n      ok\n      sessionId\n    }\n  }\n": typeof types.RestartSessionDriverDocument,
+    "\n  mutation RecreateSessionSandbox($projectId: ULID!, $sessionId: ULID!) {\n    recreateSessionSandbox(projectId: $projectId, sessionId: $sessionId) {\n      ok\n      sessionId\n    }\n  }\n": typeof types.RecreateSessionSandboxDocument,
     "\n  query SessionProcessEvents($limit: Int!, $projectId: ULID!, $sessionId: ULID!) {\n    threadSessionProcessEvents(limit: $limit, projectId: $projectId, sessionId: $sessionId) {\n      content\n      durationMs\n      id\n      occurredAt\n      status\n      tokens\n      type\n    }\n  }\n": typeof types.SessionProcessEventsDocument,
     "\n  fragment SkillSummaryFields on SkillSummary {\n    author\n    createdAt\n    description\n    fileCount\n    forkOrigin {\n      name\n      ownerName\n      skillId\n    }\n    id\n    name\n    ownerId\n    ownerName\n    projectId\n    snapshotId\n    sourceKind\n    updatedAt\n  }\n": typeof types.SkillSummaryFieldsFragmentDoc,
     "\n  fragment SkillDetailFields on SkillDetail {\n    author\n    createdAt\n    description\n    fileCount\n    forkOrigin {\n      name\n      ownerName\n      skillId\n    }\n    id\n    name\n    ownerId\n    ownerName\n    projectId\n    snapshotId\n    sourceKind\n    updatedAt\n    currentSnapshot {\n      archiveFormat\n      author\n      blobKey\n      blobSha256\n      blobSize\n      compression\n      createdAt\n      description\n      id\n      name\n      skillMarkdownPath\n      uncompressedSize\n      version\n    }\n    entries {\n      entryKind\n      isExecutable\n      mimeType\n      path\n      sha256\n      size\n    }\n  }\n": typeof types.SkillDetailFieldsFragmentDoc,
@@ -118,9 +117,6 @@ const documents: Documents = {
     "\n  mutation CreateAgentFork($input: CreateAgentForkInput!) {\n    createAgentFork(input: $input) {\n      agent {\n        ...AgentFields\n      }\n      resolution {\n        issues {\n          actionLabel\n          code\n          message\n          required\n          severity\n          status\n          targetLabel\n          targetType\n        }\n        summary {\n          boundMcpServerCount\n          boundSkillCount\n          copiedAssetCount\n          createdMcpServerCount\n          reusedMcpServerCount\n        }\n      }\n    }\n  }\n": types.CreateAgentForkDocument,
     "\n  mutation PublishAgent($input: PublishAgentInput!) {\n    publishAgent(input: $input) {\n      ...AgentFields\n    }\n  }\n": types.PublishAgentDocument,
     "\n  mutation UnpublishAgent($agentId: ULID!, $projectId: ULID!) {\n    unpublishAgent(agentId: $agentId, projectId: $projectId) {\n      ...AgentFields\n    }\n  }\n": types.UnpublishAgentDocument,
-    "\n  mutation RestartDriver($input: RuntimeStateOperationInput!) {\n    restartDriver(input: $input) {\n      affectedSessionCount\n      agentId\n      ok\n      operation\n    }\n  }\n": types.RestartDriverDocument,
-    "\n  mutation RecreateSandbox($input: RuntimeStateOperationInput!) {\n    recreateSandbox(input: $input) {\n      affectedSessionCount\n      agentId\n      ok\n      operation\n    }\n  }\n": types.RecreateSandboxDocument,
-    "\n  mutation ResetAgentState($input: RuntimeStateOperationInput!) {\n    resetAgentState(input: $input) {\n      affectedSessionCount\n      agentId\n      ok\n      operation\n    }\n  }\n": types.ResetAgentStateDocument,
     "\n  fragment CostTotalsFields on CostAggregate {\n    activeUsers\n    cacheCreationTokens\n    cacheReadTokens\n    inputTokens\n    outputTokens\n    requestCount\n    totalCostUsd\n    unpricedRequestCount\n  }\n": types.CostTotalsFieldsFragmentDoc,
     "\n  fragment CostDailyFields on CostDailyPoint {\n    activeUsers\n    cacheCreationTokens\n    cacheReadTokens\n    date\n    inputTokens\n    outputTokens\n    requestCount\n    totalCostUsd\n    unpricedRequestCount\n  }\n": types.CostDailyFieldsFragmentDoc,
     "\n  fragment CostAgentFields on CostAgentRow {\n    activeUsers\n    agentId\n    agentName\n    cacheCreationTokens\n    cacheReadTokens\n    debugCostUsd\n    evalCostUsd\n    inputTokens\n    outputTokens\n    ownerEmail\n    ownerId\n    ownerName\n    previousCostUsd\n    previewCostUsd\n    productionCostUsd\n    requestCount\n    scheduledCostUsd\n    totalCostUsd\n    unpricedRequestCount\n  }\n": types.CostAgentFieldsFragmentDoc,
@@ -171,6 +167,8 @@ const documents: Documents = {
     "\n  mutation RestoreSession($projectId: ULID!, $sessionId: ULID!) {\n    unarchiveAgentSession(projectId: $projectId, sessionId: $sessionId) {\n      ok\n    }\n  }\n": types.RestoreSessionDocument,
     "\n  mutation DeleteAgentSession($projectId: ULID!, $sessionId: ULID!) {\n    deleteAgentSession(projectId: $projectId, sessionId: $sessionId) {\n      ok\n    }\n  }\n": types.DeleteAgentSessionDocument,
     "\n  mutation AddSessionResource($input: AddSessionResourceInput!) {\n    addSessionResource(input: $input) {\n      contentType\n      expectedSize\n      expiresAt\n      fileId\n      partSize\n      path\n      status\n      strategy\n    }\n  }\n": types.AddSessionResourceDocument,
+    "\n  mutation RestartSessionDriver($projectId: ULID!, $sessionId: ULID!) {\n    restartSessionDriver(projectId: $projectId, sessionId: $sessionId) {\n      ok\n      sessionId\n    }\n  }\n": types.RestartSessionDriverDocument,
+    "\n  mutation RecreateSessionSandbox($projectId: ULID!, $sessionId: ULID!) {\n    recreateSessionSandbox(projectId: $projectId, sessionId: $sessionId) {\n      ok\n      sessionId\n    }\n  }\n": types.RecreateSessionSandboxDocument,
     "\n  query SessionProcessEvents($limit: Int!, $projectId: ULID!, $sessionId: ULID!) {\n    threadSessionProcessEvents(limit: $limit, projectId: $projectId, sessionId: $sessionId) {\n      content\n      durationMs\n      id\n      occurredAt\n      status\n      tokens\n      type\n    }\n  }\n": types.SessionProcessEventsDocument,
     "\n  fragment SkillSummaryFields on SkillSummary {\n    author\n    createdAt\n    description\n    fileCount\n    forkOrigin {\n      name\n      ownerName\n      skillId\n    }\n    id\n    name\n    ownerId\n    ownerName\n    projectId\n    snapshotId\n    sourceKind\n    updatedAt\n  }\n": types.SkillSummaryFieldsFragmentDoc,
     "\n  fragment SkillDetailFields on SkillDetail {\n    author\n    createdAt\n    description\n    fileCount\n    forkOrigin {\n      name\n      ownerName\n      skillId\n    }\n    id\n    name\n    ownerId\n    ownerName\n    projectId\n    snapshotId\n    sourceKind\n    updatedAt\n    currentSnapshot {\n      archiveFormat\n      author\n      blobKey\n      blobSha256\n      blobSize\n      compression\n      createdAt\n      description\n      id\n      name\n      skillMarkdownPath\n      uncompressedSize\n      version\n    }\n    entries {\n      entryKind\n      isExecutable\n      mimeType\n      path\n      sha256\n      size\n    }\n  }\n": types.SkillDetailFieldsFragmentDoc,
@@ -253,18 +251,6 @@ export function graphql(source: "\n  mutation PublishAgent($input: PublishAgentI
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  mutation UnpublishAgent($agentId: ULID!, $projectId: ULID!) {\n    unpublishAgent(agentId: $agentId, projectId: $projectId) {\n      ...AgentFields\n    }\n  }\n"): typeof import('./graphql').UnpublishAgentDocument;
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  mutation RestartDriver($input: RuntimeStateOperationInput!) {\n    restartDriver(input: $input) {\n      affectedSessionCount\n      agentId\n      ok\n      operation\n    }\n  }\n"): typeof import('./graphql').RestartDriverDocument;
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  mutation RecreateSandbox($input: RuntimeStateOperationInput!) {\n    recreateSandbox(input: $input) {\n      affectedSessionCount\n      agentId\n      ok\n      operation\n    }\n  }\n"): typeof import('./graphql').RecreateSandboxDocument;
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  mutation ResetAgentState($input: RuntimeStateOperationInput!) {\n    resetAgentState(input: $input) {\n      affectedSessionCount\n      agentId\n      ok\n      operation\n    }\n  }\n"): typeof import('./graphql').ResetAgentStateDocument;
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
@@ -465,6 +451,14 @@ export function graphql(source: "\n  mutation DeleteAgentSession($projectId: ULI
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  mutation AddSessionResource($input: AddSessionResourceInput!) {\n    addSessionResource(input: $input) {\n      contentType\n      expectedSize\n      expiresAt\n      fileId\n      partSize\n      path\n      status\n      strategy\n    }\n  }\n"): typeof import('./graphql').AddSessionResourceDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation RestartSessionDriver($projectId: ULID!, $sessionId: ULID!) {\n    restartSessionDriver(projectId: $projectId, sessionId: $sessionId) {\n      ok\n      sessionId\n    }\n  }\n"): typeof import('./graphql').RestartSessionDriverDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation RecreateSessionSandbox($projectId: ULID!, $sessionId: ULID!) {\n    recreateSessionSandbox(projectId: $projectId, sessionId: $sessionId) {\n      ok\n      sessionId\n    }\n  }\n"): typeof import('./graphql').RecreateSessionSandboxDocument;
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

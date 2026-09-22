@@ -1,15 +1,15 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { ReactElement } from "react";
-import { lazy, Suspense, useEffect, useReducer } from "react";
+import { lazy, Suspense, useReducer } from "react";
 import { createPortal } from "react-dom";
 
 import { publishAgent } from "@/domains/agent/api/agent-client";
 import { agentKeys } from "@/domains/agent/query/agent-queries";
 import { toAgentId, toProjectId } from "@/routes/typed-id";
+import { useTranslation } from "@/shared/i18n";
 
 import type { Agent } from "../agent.types";
 import { AgentApiAccessDialog } from "../lifecycle/api-access-panel";
-import type { LifecycleActionKind } from "../lifecycle/live-config-action-dialog";
 import { PendingChangesBanner } from "../lifecycle/pending-changes-banner";
 import { PublishMenu } from "../lifecycle/publish-menu";
 import { PublishSuccessModal } from "../lifecycle/publish-success-modal";
@@ -22,8 +22,6 @@ const AgentSessionPanel = lazy(async () => {
   return { default: mod.AgentSessionPanel };
 });
 
-type AppliedToastKind = LifecycleActionKind | "direct-update";
-
 interface PublishStatusMessage {
   readonly tone: "danger" | "neutral";
   readonly text: string;
@@ -31,24 +29,15 @@ interface PublishStatusMessage {
 
 interface PreviewModeState {
   apiAccessDialogOpen: boolean;
-  appliedKind: AppliedToastKind | null;
-  discardCounter: number;
-  showAppliedToast: boolean;
   showSuccessModal: boolean;
 }
 
 type PreviewModeAction =
-  | { type: "applied"; kind: AppliedToastKind }
-  | { type: "discarded" }
   | { type: "setApiAccessDialogOpen"; open: boolean }
-  | { type: "setAppliedToast"; open: boolean }
   | { type: "setSuccessModalOpen"; open: boolean };
 
 const PREVIEW_MODE_INITIAL_STATE: PreviewModeState = {
   apiAccessDialogOpen: false,
-  appliedKind: null,
-  discardCounter: 0,
-  showAppliedToast: false,
   showSuccessModal: false,
 };
 
@@ -87,44 +76,21 @@ function publishStatusMessage({
 
 function previewModeReducer(state: PreviewModeState, action: PreviewModeAction): PreviewModeState {
   switch (action.type) {
-    case "applied":
-      return { ...state, appliedKind: action.kind, showAppliedToast: true };
-    case "discarded":
-      return { ...state, discardCounter: state.discardCounter + 1 };
     case "setApiAccessDialogOpen":
       return { ...state, apiAccessDialogOpen: action.open };
-    case "setAppliedToast":
-      return { ...state, showAppliedToast: action.open };
     case "setSuccessModalOpen":
       return { ...state, showSuccessModal: action.open };
   }
 }
 
-// Preview surface for Draft stage 2 and Live debug-and-iterate flows.
-// The writable form classifies dirty fields and routes them to the right apply action.
+// Saving a preset affects future Sessions. The selected Preview keeps its snapshot.
 export function PreviewMode({ agent, headerActionTarget }: PreviewModeProps): ReactElement {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const model = useAgentEditorModel({ agent });
   useAgentEditorAutoSave(model);
   const [state, dispatch] = useReducer(previewModeReducer, PREVIEW_MODE_INITIAL_STATE);
-  const { apiAccessDialogOpen, appliedKind, discardCounter, showAppliedToast, showSuccessModal } =
-    state;
-
-  useEffect(() => {
-    let timer: ReturnType<typeof globalThis.setTimeout> | null = null;
-
-    if (showAppliedToast) {
-      timer = globalThis.setTimeout(() => {
-        dispatch({ open: false, type: "setAppliedToast" });
-      }, 2400);
-    }
-
-    return () => {
-      if (timer !== null) {
-        globalThis.clearTimeout(timer);
-      }
-    };
-  }, [showAppliedToast]);
+  const { apiAccessDialogOpen, showSuccessModal } = state;
 
   const publishBlocked =
     agent.readiness?.issues.some((issue) => issue.severity === "error") ?? false;
@@ -192,27 +158,16 @@ export function PreviewMode({ agent, headerActionTarget }: PreviewModeProps): Re
             />
           </Suspense>
         </div>
-
-        {showAppliedToast && appliedKind ? (
-          <div className="bg-success-bg text-success-fg shrink-0 border-t border-green-200/60 px-4 py-2 text-[12px]">
-            Applied · {appliedToastText(appliedKind)}
-          </div>
-        ) : null}
       </div>
 
       <div className="flex h-[58%] w-full min-w-0 flex-col md:h-auto md:w-1/2">
-        <PendingChangesBanner
-          agent={agent}
-          key={`${agent.id}:${discardCounter}`}
-          model={model}
-          onAfterApply={(kind) => {
-            dispatch({ kind, type: "applied" });
-          }}
-          onDiscard={() => {
-            model.discard();
-            dispatch({ type: "discarded" });
-          }}
-        />
+        <PendingChangesBanner model={model} onDiscard={model.discard} />
+        <p
+          className="border-border-subtle text-muted-foreground border-b px-4 py-2 text-xs"
+          data-testid="preset-session-scope"
+        >
+          {model.saving ? t("agent.savingPreset") : t("agent.presetSessionScope")}
+        </p>
 
         <div
           className="min-h-0 flex-1 overflow-y-auto bg-white p-4 sm:p-5"
@@ -251,34 +206,4 @@ export function PreviewMode({ agent, headerActionTarget }: PreviewModeProps): Re
       />
     </div>
   );
-}
-
-function appliedToastText(kind: AppliedToastKind): string {
-  switch (kind) {
-    case "direct-update": {
-      return "Changes saved";
-    }
-    case "restart-process": {
-      return "Agent process restarted";
-    }
-    case "patch-and-restart": {
-      return "Native config patched + Agent process restarted";
-    }
-    case "recreate-preserving-state": {
-      return "Sandbox recreated · checkpointed memory/workspaces restored";
-    }
-    case "fork-agent": {
-      return "New Agent forked with the new runtime";
-    }
-    case "reset-agent-state": {
-      return "agent-state cleared";
-    }
-    default: {
-      return unreachableCase(kind, "Unsupported applied toast kind.");
-    }
-  }
-}
-
-function unreachableCase(_value: never, message: string): never {
-  throw new Error(message);
 }
