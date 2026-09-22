@@ -9,11 +9,13 @@ import { parsePlatformId } from "@mosoo/id";
 import type { SandboxId } from "@mosoo/id";
 import { eq } from "drizzle-orm";
 
+import { createErrorLogContext, logInfo, logWarn } from "../../../../platform/cloudflare/logger";
 import {
   withDisposedRpcResource,
   withDisposedRpcResult,
 } from "../../../../platform/cloudflare/rpc-disposal";
 import { requireCloudflareSandboxBinding } from "../../../../platform/cloudflare/sandbox-binding";
+import { SANDBOX_STARTUP_RPC_TIMEOUT_MS } from "../../../../platform/cloudflare/sandbox-startup";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../../platform/db/drizzle";
 import type { RuntimeStateClearRule } from "../../domain/runtime-kind-policy";
@@ -84,24 +86,43 @@ export async function configureRuntimeSubjectNetwork(
   );
 }
 
-export async function prepareRuntimeSubjectFilesystem(subject: SandboxHandle): Promise<void> {
-  // Guard these container RPCs with the provision timeout. On local Apple Silicon container
-  // reactivation the SDK's
-  // port-readiness wait can stall ~120s; without a timeout the run wedges in `booting`
-  // indefinitely until the next message reconciles it as `runtime.inactive`. Failing fast
-  // surfaces a retryable `runtime.provision_failed` instead.
-  // The four RPCs are mutually independent: setKeepAlive configures the
-  // container lifetime while the mkdirs assert platform roots. Awaiting all of
-  // them keeps the explicit completion barrier for each call while removing
-  // the serial keep-alive wait from the first-token critical path.
-  await withRuntimeProvisionTimeout(
-    Promise.all([
-      subject.setKeepAlive(true),
-      subject.mkdir(SANDBOX_CACHE_PATH, { recursive: true }),
-      subject.mkdir(SANDBOX_MEMORY_PATH, { recursive: true }),
-      subject.mkdir(SANDBOX_SESSION_ROOT, { recursive: true }),
-    ]).then(() => undefined),
-    "Runtime subject filesystem prepare",
+export async function prepareRuntimeSubjectFilesystem(
+  subject: SandboxHandle,
+  input: { allowStartupRecovery: boolean; runtimeSubjectId: string },
+): Promise<void> {
+  async function step(name: string, task: () => Promise<void>, timeoutMs?: number): Promise<void> {
+    const startedAt = Date.now();
+    try {
+      await withRuntimeProvisionTimeout(task(), `Runtime subject ${name}`, timeoutMs);
+      logInfo("runtime.subject.prepare.step", {
+        durationMs: Date.now() - startedAt,
+        runtimeSubjectId: input.runtimeSubjectId,
+        step: name,
+      });
+    } catch (error) {
+      logWarn("runtime.subject.prepare.failed", {
+        ...createErrorLogContext(error),
+        durationMs: Date.now() - startedAt,
+        runtimeSubjectId: input.runtimeSubjectId,
+        step: name,
+      });
+      throw error;
+    }
+  }
+
+  await step("keep-alive", () => subject.setKeepAlive(true));
+  await step(
+    "container startup",
+    () => subject.ensureContainerReady({ allowRecovery: input.allowStartupRecovery }),
+    SANDBOX_STARTUP_RPC_TIMEOUT_MS,
+  );
+  // These operations now run against a ready container. Each keeps the original
+  // 15s limit and identifies the failing path instead of hiding startup retries
+  // inside three parallel implicit default-session initializations.
+  await Promise.all(
+    [SANDBOX_CACHE_PATH, SANDBOX_MEMORY_PATH, SANDBOX_SESSION_ROOT].map((path) =>
+      step(`mkdir ${path}`, () => subject.mkdir(path, { recursive: true })),
+    ),
   );
 }
 
