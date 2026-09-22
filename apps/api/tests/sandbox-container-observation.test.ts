@@ -7,6 +7,7 @@ if (process.env.MOSOO_TEST_SANDBOX_OBSERVATION === "1") {
   let initializations = 0;
   let executions = 0;
   let destructions = 0;
+  let sessionReads = 0;
   mock.module("cloudflare:workers", () => ({
     DurableObject: class {
       constructor(
@@ -29,6 +30,14 @@ if (process.env.MOSOO_TEST_SANDBOX_OBSERVATION === "1") {
       }
       async destroy() {
         destructions++;
+      }
+      async createSession() {
+        return {
+          async readFile() {
+            sessionReads++;
+            return "synthetic file";
+          },
+        };
       }
     },
   }));
@@ -100,6 +109,23 @@ if (process.env.MOSOO_TEST_SANDBOX_OBSERVATION === "1") {
     await destroy.call(sandbox);
     expect(destructions).toBe(before + 1);
     expect(sandbox.getContainerObservation().state).toBe("stopped");
+  });
+
+  test("forwarded teardown invalidates old handles while fresh handles remain usable", async () => {
+    const { sandbox } = fixture(false);
+    const createSession = Reflect.get(sandbox, "createSession") as () => Promise<{
+      readFile(): Promise<string>;
+    }>;
+    const destroy = Reflect.get(sandbox, "destroy") as () => Promise<void>;
+    const old = await createSession.call(sandbox);
+    expect(await old.readFile()).toBe("synthetic file");
+    const before = sessionReads;
+    await destroy.call(sandbox);
+    await expect(old.readFile()).rejects.toThrow("invalidated by container teardown");
+    expect(sessionReads).toBe(before);
+    const fresh = await createSession.call(sandbox);
+    expect(await fresh.readFile()).toBe("synthetic file");
+    expect(sessionReads).toBe(before + 1);
   });
 } else {
   test("actual Sandbox wrapper observation and lazy initialization", async () => {

@@ -1,6 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
 
 import type { ApiBindings } from "../../platform/cloudflare/worker-types";
+import { SandboxHandleGuard } from "./sandbox-handle-guard";
 import {
   configureSandboxNetworkConstraints,
   restoreSandboxNetworkEnforcement,
@@ -29,6 +30,7 @@ export interface SandboxContainerObservation {
 }
 
 export class Sandbox extends DurableObject<ApiBindings> {
+  readonly #handleGuard = new SandboxHandleGuard();
   #initialization?: {
     delegate: Promise<SandboxDelegate>;
     networkRestore: Promise<void>;
@@ -93,6 +95,16 @@ export class Sandbox extends DurableObject<ApiBindings> {
   }
 
   async [FORWARD_SANDBOX_METHOD](
+    method: SandboxRpcForwardMethod,
+    args: readonly unknown[],
+  ): Promise<unknown> {
+    const action = () => this.#invokeDelegate(method, args);
+    return method === "destroy"
+      ? this.#handleGuard.destroy(action)
+      : this.#handleGuard.capture(action);
+  }
+
+  async #invokeDelegate(
     method: SandboxRpcForwardMethod,
     args: readonly unknown[],
   ): Promise<unknown> {

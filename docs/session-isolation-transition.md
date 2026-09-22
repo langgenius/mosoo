@@ -227,8 +227,18 @@ Normal operations still initialize the SDK once and restore the network policy
 before access; teardown remains possible when policy restoration fails.
 
 This timestamped observation is not a drain lease or permission to execute a
-transition. In particular, existing SDK Session methods retain delegate closures,
-and a later request can start a stopped container. The executor still needs to
+transition. A local replay on the pinned SDK reproduced a retained Session handle
+starting a container after `destroy()` returned, then reporting a missing file.
+The wrapper now invalidates returned Session/Process callbacks across explicit
+destruction, including nested handles, delayed creation and overlapping or failed
+teardown. Freshly obtained handles remain available for normal restoration.
+The local container replay verifies that old Session, nested Process and listed
+Process calls leave the destroyed container stopped, while fresh handles can
+read/write files and execute commands; process dates and execution streams retain
+their normal behavior. This verifies the wrapper on the pinned SDK, not Cloud
+customer migration or a hosted release.
+This guard does not drain calls or streams already in flight, intercept every
+platform stop, or block later top-level SDK requests. The executor still needs to
 exclude new resource access, settle previously dispatched operations, and apply
 the guarded batch while that exclusion holds. Do not use repeated observations
 or a wrapper RPC counter as a substitute for that barrier.
