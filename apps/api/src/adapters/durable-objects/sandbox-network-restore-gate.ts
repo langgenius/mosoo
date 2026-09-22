@@ -14,5 +14,9 @@ export async function waitForSandboxNetworkRestore(
 ): Promise<void> {
   if (!canBypassSandboxNetworkRestore(method, args)) {
     await restore;
+  } else {
+    // Teardown may initialize a corrupt policy for the first time. It must not
+    // wait for that policy, but its expected rejection still needs a handler.
+    void restore.catch(() => undefined);
   }
 }

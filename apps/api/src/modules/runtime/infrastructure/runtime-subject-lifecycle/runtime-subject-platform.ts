@@ -9,11 +9,15 @@ import { parsePlatformId } from "@mosoo/id";
 import type { SandboxId } from "@mosoo/id";
 import { eq } from "drizzle-orm";
 
+import type { SandboxContainerObservation } from "../../../../adapters/durable-objects/sandbox.do";
 import {
   withDisposedRpcResource,
   withDisposedRpcResult,
 } from "../../../../platform/cloudflare/rpc-disposal";
-import { requireCloudflareSandboxBinding } from "../../../../platform/cloudflare/sandbox-binding";
+import {
+  requireCloudflareSandboxBinding,
+  requireSandboxBinding,
+} from "../../../../platform/cloudflare/sandbox-binding";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../../platform/db/drizzle";
 import type { RuntimeStateClearRule } from "../../domain/runtime-kind-policy";
@@ -28,14 +32,10 @@ function quoteShellArg(value: string): string {
   return `'${value.replaceAll("'", `'"'"'`)}'`;
 }
 
-export async function getRuntimeSubjectKeepAliveHandle(
+async function readRuntimeSubjectSandboxBinding(
   bindings: ApiBindings,
   runtimeSubjectId: string,
-): Promise<SandboxHandle> {
-  if (bindings.runtimeSubjectHandleFactory) {
-    return Promise.resolve(toSandboxHandle(bindings.runtimeSubjectHandleFactory(runtimeSubjectId)));
-  }
-
+): Promise<string> {
   const record = await getAppDatabase(bindings.DB)
     .select({ sandboxBinding: sandboxesTable.sandboxBinding })
     .from(sandboxesTable)
@@ -44,10 +44,32 @@ export async function getRuntimeSubjectKeepAliveHandle(
     )
     .get();
   if (!record) throw new Error("Runtime subject has no recorded Sandbox binding.");
+  return record.sandboxBinding;
+}
+
+export async function getRuntimeSubjectContainerObservation(
+  bindings: ApiBindings,
+  runtimeSubjectId: string,
+): Promise<SandboxContainerObservation> {
+  const sandboxId = parsePlatformId<SandboxId>(runtimeSubjectId, "Runtime subject ID");
+  const binding = await readRuntimeSubjectSandboxBinding(bindings, sandboxId);
+  // Match getSandbox(normalizeId: true), without its configuration RPCs.
+  const subject = requireSandboxBinding(bindings, binding).getByName(sandboxId.toLowerCase());
+  return withDisposedRpcResource(subject, (handle) => handle.getContainerObservation());
+}
+
+export async function getRuntimeSubjectKeepAliveHandle(
+  bindings: ApiBindings,
+  runtimeSubjectId: string,
+): Promise<SandboxHandle> {
+  if (bindings.runtimeSubjectHandleFactory) {
+    return Promise.resolve(toSandboxHandle(bindings.runtimeSubjectHandleFactory(runtimeSubjectId)));
+  }
+
   return getCloudflareRuntimeSubjectKeepAliveHandle(
     bindings,
     runtimeSubjectId,
-    record.sandboxBinding,
+    await readRuntimeSubjectSandboxBinding(bindings, runtimeSubjectId),
   );
 }
 

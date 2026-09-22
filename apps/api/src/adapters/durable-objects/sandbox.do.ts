@@ -23,31 +23,56 @@ type SandboxContainerState = DurableObjectState<{}> & {
 
 const FORWARD_SANDBOX_METHOD = Symbol("forwardSandboxMethod");
 
-export class Sandbox extends DurableObject {
-  readonly #delegatePromise: Promise<SandboxDelegate>;
+export interface SandboxContainerObservation {
+  readonly state: "running" | "stopped" | "unavailable";
+  readonly observedAt: number;
+}
+
+export class Sandbox extends DurableObject<ApiBindings> {
+  #initialization?: {
+    delegate: Promise<SandboxDelegate>;
+    networkRestore: Promise<void>;
+  };
   readonly #httpsInterceptionDisabled: boolean;
-  readonly #networkRestorePromise: Promise<void>;
 
   constructor(ctx: DurableObjectState<{}>, env: ApiBindings) {
     super(ctx, env);
 
     this.#httpsInterceptionDisabled = env.SANDBOX_FILE_BUCKET_LOCAL === "true";
-    this.#delegatePromise = import("@cloudflare/sandbox").then(
-      ({ Sandbox: SandboxImplementation }) => new SandboxImplementation(ctx, env),
+  }
+
+  getContainerObservation(): SandboxContainerObservation {
+    const running = (this.ctx as SandboxContainerState).container?.running;
+    return {
+      state: running === true ? "running" : running === false ? "stopped" : "unavailable",
+      observedAt: Date.now(),
+    };
+  }
+
+  #initializeDelegate() {
+    if (this.#initialization) return this.#initialization;
+
+    // Observation must not initialize the SDK: its constructor restores lifetime
+    // settings and schedules alarms, even when the container is stopped.
+    const delegate = import("@cloudflare/sandbox").then(
+      ({ Sandbox: SandboxImplementation }) => new SandboxImplementation(this.ctx, this.env),
     );
     // Re-assert the persisted internet switch before any container start. A
     // rejected restore blocks every access/start RPC, while teardown remains
     // available so lifecycle repair can remove the untrusted container.
-    this.#networkRestorePromise = this.#delegatePromise.then((delegate) =>
-      restoreSandboxNetworkEnforcement(ctx.storage, delegate, {
+    const networkRestore = delegate.then((sandbox) =>
+      restoreSandboxNetworkEnforcement(this.ctx.storage, sandbox, {
         httpsInterceptionDisabled: this.#httpsInterceptionDisabled,
       }),
     );
+    this.#initialization = { delegate, networkRestore };
+    return this.#initialization;
   }
 
   async configureNetworkConstraints(constraints: unknown): Promise<void> {
-    await this.#networkRestorePromise;
-    const delegate = await this.#delegatePromise;
+    const initialization = this.#initializeDelegate();
+    await initialization.networkRestore;
+    const delegate = await initialization.delegate;
 
     await configureSandboxNetworkConstraints(this.ctx.storage, delegate, constraints, {
       containerRunning: (this.ctx as SandboxContainerState).container?.running === true,
@@ -56,21 +81,24 @@ export class Sandbox extends DurableObject {
   }
 
   override async fetch(request: Request): Promise<Response> {
-    await this.#networkRestorePromise;
-    return (await this.#delegatePromise).fetch(request);
+    const initialization = this.#initializeDelegate();
+    await initialization.networkRestore;
+    return (await initialization.delegate).fetch(request);
   }
 
   override async alarm(alarmProps?: { isRetry: boolean; retryCount: number }): Promise<void> {
-    await this.#networkRestorePromise;
-    await (await this.#delegatePromise).alarm(alarmProps);
+    const initialization = this.#initializeDelegate();
+    await initialization.networkRestore;
+    await (await initialization.delegate).alarm(alarmProps);
   }
 
   async [FORWARD_SANDBOX_METHOD](
     method: SandboxRpcForwardMethod,
     args: readonly unknown[],
   ): Promise<unknown> {
-    await waitForSandboxNetworkRestore(this.#networkRestorePromise, method, args);
-    const delegate = await this.#delegatePromise;
+    const initialization = this.#initializeDelegate();
+    await waitForSandboxNetworkRestore(initialization.networkRestore, method, args);
+    const delegate = await initialization.delegate;
     const action = Reflect.get(delegate, method);
 
     if (typeof action !== "function") {

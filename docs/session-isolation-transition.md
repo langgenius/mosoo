@@ -216,6 +216,23 @@ must wait for normal reconciliation rather than marking that Run terminal to pas
 the check. Rollback checks both original and isolated resources. Unrelated direct
 Runs do not block the transition. These transactional checks do not establish
 physical container shutdown, which still requires separate evidence.
+
+Physical observation must not change the resource being inspected. The internal
+`getContainerObservation` RPC reads `ctx.container.running` without loading the
+Sandbox SDK, configuring its lifetime, contacting the container, or reading or
+writing DO storage. Resolve the recorded physical namespace and normalized Sandbox
+ID directly; `getSandbox` configures the SDK even when used to obtain a handle.
+Absent platform state is `unavailable`, never evidence of a stopped container.
+Normal operations still initialize the SDK once and restore the network policy
+before access; teardown remains possible when policy restoration fails.
+
+This timestamped observation is not a drain lease or permission to execute a
+transition. In particular, existing SDK Session methods retain delegate closures,
+and a later request can start a stopped container. The executor still needs to
+exclude new resource access, settle previously dispatched operations, and apply
+the guarded batch while that exclusion holds. Do not use repeated observations
+or a wrapper RPC counter as a substitute for that barrier.
+
 A tie in the old timestamp-only backup lookup is rejected. A stale
 precondition raises a SQL error; use **one atomic D1 batch**, never separate calls
 for its statements. A failure after destination insertion must roll back the
