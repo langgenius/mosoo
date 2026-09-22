@@ -209,7 +209,14 @@ the original records remain unchanged for rollback.
 Both output files contain one `{ "batch": [...] }` of bound SQL statements. The
 first statement checks complete before-images, successful completion history,
 Agent-wide active Runs, live Drivers and conversation bindings, and current backup
-selection. A tie in the old timestamp-only backup lookup is rejected. A stale
+selection. It also checks active Runs through every workspace and Driver attached
+to each affected Sandbox, independently of Agent provenance or Driver status.
+A stopped/failed Driver can still hold an active Run lease; conversion and rollback
+must wait for normal reconciliation rather than marking that Run terminal to pass
+the check. Rollback checks both original and isolated resources. Unrelated direct
+Runs do not block the transition. These transactional checks do not establish
+physical container shutdown, which still requires separate evidence.
+A tie in the old timestamp-only backup lookup is rejected. A stale
 precondition raises a SQL error; use **one atomic D1 batch**, never separate calls
 for its statements. A failure after destination insertion must roll back the
 whole batch. Repeated application fails without replacing the winning state.

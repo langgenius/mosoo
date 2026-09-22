@@ -27,6 +27,7 @@ import {
   createApiCommandQueueStub,
   createPublicHttpContractDatabase,
   createPublicHttpTestBindings,
+  insertNonOwnerSession,
   insertOwnerSession,
   nowMsForTest,
   PUBLIC_API_TEST_IDS as ID,
@@ -283,7 +284,124 @@ async function fixture() {
   return { database, input, queue, plan: buildSessionIsolationPlan(input) };
 }
 
+async function insertUnattributedActivePeer(
+  database: SqliteD1Database,
+  sandboxId: string,
+  relationship: "workspace" | "stopped-driver" | "failed-driver" | "unrelated",
+) {
+  await insertNonOwnerSession(database);
+  await database
+    .prepare("UPDATE session SET agent_id = NULL, status = 'RUNNING', last_run_id = ? WHERE id = ?")
+    .bind(ID.runAlt, ID.nonOwnerSession)
+    .run();
+  if (relationship === "workspace") {
+    await database
+      .prepare(
+        "INSERT INTO sandbox_session (session_id, sandbox_id, cloudflare_session_id, cwd, origin_json, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'closed', ?, ?)",
+      )
+      .bind(
+        ID.nonOwnerSession,
+        sandboxId,
+        "01J000000000000000000000Z5",
+        `/workspace/se/${ID.nonOwnerSession}`,
+        JSON.stringify({
+          callerUserId: ID.nonOwnerAccount,
+          executionOwnerUserId: ID.ownerAccount,
+          entrypoint: "api",
+          type: "agent",
+        }),
+        NOW,
+        NOW,
+      )
+      .run();
+  }
+  const driverStatus =
+    relationship === "stopped-driver"
+      ? "stopped"
+      : relationship === "failed-driver"
+        ? "failed"
+        : null;
+  if (driverStatus !== null) {
+    await database
+      .app()
+      .insert(driverInstancesTable)
+      .values({
+        id: ID.driverNonOwner,
+        sandboxId,
+        sandboxSessionId: ID.nonOwnerSession,
+        runtime: "openai-runtime",
+        protocol: "orpc-ws",
+        protocolVersion: 5,
+        bootTokenHash: new Uint8Array([7, 8, 9]),
+        bootTokenExpiresAt: NOW + 60_000,
+        expiresAt: NOW + 60_000,
+        heartbeatCount: 0,
+        status: driverStatus,
+        createdAt: NOW,
+        updatedAt: NOW,
+      })
+      .run();
+  }
+  await database
+    .app()
+    .insert(sessionRunsTable)
+    .values({
+      id: ID.runAlt,
+      agentId: null,
+      sessionId: ID.nonOwnerSession,
+      createdByAccountId: ID.nonOwnerAccount,
+      status:
+        driverStatus === null ? "queued" : driverStatus === "stopped" ? "running" : "waiting_input",
+      driverInstanceId: driverStatus === null ? null : ID.driverNonOwner,
+      trigger: "user_prompt",
+      traceId: "unattributed-active-peer",
+      createdAt: NOW,
+      updatedAt: NOW,
+    })
+    .run();
+}
+
 describe("legacy Session isolation batch", () => {
+  for (const phase of ["forward", "rollback-source", "rollback-destination"] as const) {
+    test.each(["workspace", "stopped-driver", "failed-driver"] as const)(
+      `${phase} rejects an active Run linked by %s without Agent provenance`,
+      async (relationship) => {
+        const { database, plan } = await fixture();
+        if (phase !== "forward") await execute(database, plan.forward);
+        await insertUnattributedActivePeer(
+          database,
+          phase === "rollback-destination" ? TARGET_SANDBOX : ID.sandbox,
+          relationship,
+        );
+        const before = await dump(database);
+        const batch = phase === "forward" ? plan.forward : plan.rollback;
+        await expect(execute(database, batch)).rejects.toThrow();
+        expect(await dump(database)).toEqual(before);
+
+        // A terminal Run no longer leases the resource. Keep its original
+        // Driver, workspace and history; only normal drain changes eligibility.
+        await database
+          .prepare("UPDATE session_run SET status = 'cancelled' WHERE id = ?")
+          .bind(ID.runAlt)
+          .run();
+        await expect(execute(database, batch)).resolves.toBeDefined();
+      },
+    );
+  }
+
+  test("an unrelated direct Run does not block a different resource's conversion", async () => {
+    const { database, plan } = await fixture();
+    await insertUnattributedActivePeer(database, ID.sandbox, "unrelated");
+    await expect(execute(database, plan.forward)).resolves.toBeDefined();
+    await expect(execute(database, plan.rollback)).resolves.toBeDefined();
+    expect(
+      await database
+        .prepare("SELECT status FROM session_run WHERE id = ?")
+        .bind(ID.runAlt)
+        .first("status"),
+    ).toBe("queued");
+  });
+
   test("accepts a completed recycle operation without copying its operation ID into the new subject", async () => {
     const { database, input } = await fixture();
     await database

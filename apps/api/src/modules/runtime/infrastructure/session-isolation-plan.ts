@@ -156,8 +156,13 @@ function guard(source: Source, original?: Source): TransitionStatement {
     `EXISTS (SELECT 1 FROM session_event WHERE run_id = json_extract(expected.value, '$.run.id') AND event_type = 'run.completed')`,
   );
   for (const prefix of original ? ["", "original."] : [""]) {
+    // Agent provenance and a terminal Driver status do not release a Run.
+    // Inspect both workspace membership and the actual Driver lease, including
+    // peers with missing/reassigned provenance, on both sides of rollback.
     predicates.push(
       `NOT EXISTS (SELECT 1 FROM driver_instance WHERE sandbox_id = json_extract(expected.value, '$.${prefix}sandbox.id') AND status IN (${liveDrivers}))`,
+      `NOT EXISTS (SELECT 1 FROM session_run AS active_run INNER JOIN sandbox_session AS bound_workspace ON bound_workspace.session_id = active_run.session_id WHERE bound_workspace.sandbox_id = json_extract(expected.value, '$.${prefix}sandbox.id') AND active_run.status IN (${activeRuns}))`,
+      `NOT EXISTS (SELECT 1 FROM session_run AS leased_run INNER JOIN driver_instance AS leased_driver ON leased_driver.id = leased_run.driver_instance_id WHERE leased_driver.sandbox_id = json_extract(expected.value, '$.${prefix}sandbox.id') AND leased_run.status IN (${activeRuns}))`,
       `NOT EXISTS (SELECT 1 FROM sandbox_session WHERE sandbox_id = json_extract(expected.value, '$.${prefix}sandbox.id') AND status <> 'closed')`,
       `(SELECT id FROM sandbox_backup WHERE sandbox_id = json_extract(expected.value, '$.${prefix}sandbox.id') AND dir = json_extract(expected.value, '$.${prefix}workspace.cwd') AND status = 'ready' ORDER BY created_at DESC LIMIT 1) IS json_extract(expected.value, '$.${prefix}latestBackup.id')`,
       `NOT EXISTS (SELECT 1 FROM sandbox_backup WHERE sandbox_id = json_extract(expected.value, '$.${prefix}sandbox.id') AND dir = json_extract(expected.value, '$.${prefix}workspace.cwd') AND status = 'ready' AND created_at = json_extract(expected.value, '$.${prefix}latestBackup.created_at') AND id <> json_extract(expected.value, '$.${prefix}latestBackup.id'))`,
