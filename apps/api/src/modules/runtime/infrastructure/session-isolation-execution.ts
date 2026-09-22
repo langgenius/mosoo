@@ -274,7 +274,12 @@ async function verifyObjects(execution: Execution, platform: SessionIsolationExe
     await platform.verifyObject(metadata!, metadataHash, {
       id: decodeSandboxBackupIdForPlatform(backupId),
       dir: String(backup["dir"]),
-      minimumExpiresAt: Number(backup["created_at"]) + Number(backup["ttl_seconds"]) * 1000,
+      // Legacy D1 rows were recorded after SDK archive creation. The source
+      // must still be usable now; new copies must cover their promised lifetime.
+      minimumExpiresAt:
+        backupId === prepared.before.sourceBackup["id"]
+          ? Date.now() + 60_000
+          : Number(backup["created_at"]) + Number(backup["ttl_seconds"]) * 1000,
     });
   }
 }

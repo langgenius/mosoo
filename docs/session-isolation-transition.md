@@ -354,10 +354,12 @@ Prepare a private JSON request containing:
   those archives' actual `meta.json` objects.
 
 Preparation verifies the actual object bytes and rejects changed, missing,
-misidentified or expired metadata. Metadata must describe the reviewed directory,
-archive size and at least the backup lifetime promised by the database. This is
-an identity/integrity check, not a replacement for inspecting the archive contents
-and proving recovery before approving a customer cohort.
+misidentified or expired metadata. Metadata must describe the reviewed directory
+and archive size. A source must remain usable through the verification safety
+buffer; its SDK creation time may precede the later D1 record timestamp. Prepared
+and rollback copies must cover at least their full database-promised lifetime.
+This is an identity/integrity check, not a replacement for inspecting the archive
+contents and proving recovery before approving a customer cohort.
 
 The phases are `prepared` → `held` → `converted` → `releasing` → `complete`.
 Claiming the full source cohort and reserving the fresh destination row is atomic.

@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 import { readFileSync, readdirSync } from "node:fs";
 
 import {
@@ -1148,6 +1148,7 @@ describe("Session isolation cohort admission", () => {
 function localExecutionPlatform() {
   const records = new Map<string, ReturnType<typeof createFence>>();
   const objects = new Map<string, string>();
+  const objectExpiresAt = new Map<string, number>();
   for (const [id, hash] of [
     [SOURCE_BACKUP, "a"],
     [NEW_BACKUP, "b"],
@@ -1224,13 +1225,22 @@ function localExecutionPlatform() {
         throw new Error("lost release response");
       }
     },
-    async verifyObject(key, hash) {
+    async verifyObject(key, hash, metadata) {
       if (objects.get(key) !== hash) throw new Error("missing or changed recovery object");
+      const expiresAt = objectExpiresAt.get(key);
+      if (
+        metadata &&
+        expiresAt !== undefined &&
+        expiresAt < Math.max(metadata.minimumExpiresAt, Date.now() + 60_000)
+      ) {
+        throw new Error("recovery object does not cover the required lifetime");
+      }
     },
   };
   return {
     platform,
     objects,
+    objectExpiresAt,
     loseReleaseResponse: () => {
       loseReleaseResponse = true;
     },
@@ -1274,7 +1284,53 @@ function loseNextBatchResponse(database: D1Database) {
   });
 }
 
+async function atFixtureTime(action: () => Promise<void>) {
+  const clock = spyOn(Date, "now").mockReturnValue(NOW + 100);
+  try {
+    await action();
+  } finally {
+    clock.mockRestore();
+  }
+}
+
 describe("Resumable Session isolation execution", () => {
+  test("an unexpired source may have been created before its D1 row was recorded", () =>
+    atFixtureTime(async () => {
+      const f = await executionFixture();
+      const backup = f.input.source.sourceBackup!;
+      f.objectExpiresAt.set(
+        getSandboxBackupObjectKeys(SOURCE_BACKUP)[1],
+        Number(backup["created_at"]) + Number(backup["ttl_seconds"]) * 1000 - 2673,
+      );
+      await prepareSessionIsolationExecution(f.database, f.platform, f.request);
+      await f.finish();
+      expect((await getRuntimeConversationSession(f.database, ID.ownerSession))?.sandboxId).toBe(
+        TARGET_SANDBOX,
+      );
+    }));
+
+  for (const target of ["prepared", "rollback", "expired source"] as const) {
+    test(`${target} recovery must cover its required lifetime before preparation`, () =>
+      atFixtureTime(async () => {
+        const f = await executionFixture();
+        const plan = buildSessionIsolationPlan(f.input);
+        const backup = target === "rollback" ? plan.rollbackBackup : plan.after.sourceBackup;
+        f.objectExpiresAt.set(
+          getSandboxBackupObjectKeys(
+            target === "expired source" ? SOURCE_BACKUP : String(backup["id"]),
+          )[1],
+          target === "expired source"
+            ? Date.now() - 1
+            : Number(backup["created_at"]) + Number(backup["ttl_seconds"]) * 1000 - 1,
+        );
+        const before = await dump(f.database);
+        await expect(
+          prepareSessionIsolationExecution(f.database, f.platform, f.request),
+        ).rejects.toThrow("required lifetime");
+        expect(await dump(f.database)).toEqual(before);
+      }));
+  }
+
   test("holds input through conversion and releases it once with an atomic completion receipt", async () => {
     const f = await executionFixture();
     expect((await prepareSessionIsolationExecution(f.database, f.platform, f.request)).phase).toBe(
