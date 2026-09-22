@@ -2,26 +2,15 @@ import type { SessionStatus } from "@mosoo/contracts/session";
 import {
   sandboxBackupsTable,
   sandboxSessionsTable,
-  sandboxesTable,
   nativeResumeRefsTable,
   sessionsTable,
 } from "@mosoo/db";
 import { parsePlatformId } from "@mosoo/id";
-import type {
-  RuntimeOperationId,
-  SandboxBackupId,
-  SandboxId,
-  SessionId,
-  SessionRunId,
-} from "@mosoo/id";
-import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import type { SandboxBackupId, SandboxId, SessionId, SessionRunId } from "@mosoo/id";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 
 import type { AppDatabase } from "../../../platform/db/drizzle";
-import {
-  getAppDatabase,
-  getD1ChangeCount,
-  runAppDatabaseBatch,
-} from "../../../platform/db/drizzle";
+import { getAppDatabase, runAppDatabaseBatch } from "../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../time";
 
 // Each row binds ten values; nine rows stay below D1's per-statement variable limit.
@@ -35,7 +24,6 @@ export interface CreatedSandboxBackupRecord {
 
 export interface CreatedSandboxBackupWrite {
   readonly backup: CreatedSandboxBackupRecord;
-  readonly updateSandboxLastBackup: boolean;
 }
 
 export interface ReadySandboxBackupForPruning {
@@ -72,7 +60,6 @@ export async function listReadySandboxBackupsForSessionRun(
 }
 
 export interface SandboxSessionBackupCandidate {
-  readonly canRetainCheckpointWhenMissing: boolean;
   readonly cwd: string;
   readonly lastMessageAt: number | null;
   readonly sessionId: SessionId;
@@ -83,16 +70,6 @@ function parseSandboxBackupIds(values: readonly string[], label: string): Sandbo
   return values.map((value, index) =>
     parsePlatformId<SandboxBackupId>(value, `${label}[${index}]`),
   );
-}
-
-function sandboxStatusOperationCondition(operationId: RuntimeOperationId | null | undefined) {
-  if (operationId === undefined) {
-    return [];
-  }
-
-  return operationId === null
-    ? [isNull(sandboxesTable.statusOperationId)]
-    : [eq(sandboxesTable.statusOperationId, operationId)];
 }
 
 export async function listReadySandboxBackupsForPruning(
@@ -143,7 +120,6 @@ export async function recordCreatedSandboxBackups(
   input: {
     readonly backups: readonly CreatedSandboxBackupWrite[];
     readonly checkpointSessionId?: string;
-    readonly operationId?: string | null;
     readonly sandboxId: string;
     readonly sessionRunId?: string;
     readonly ttlSeconds: number;
@@ -158,10 +134,6 @@ export async function recordCreatedSandboxBackups(
     input.checkpointSessionId === undefined
       ? null
       : parsePlatformId<SessionId>(input.checkpointSessionId, "checkpoint session id");
-  const operationId =
-    input.operationId === undefined || input.operationId === null
-      ? input.operationId
-      : parsePlatformId<RuntimeOperationId>(input.operationId, "runtime operation id");
   const sessionRunId =
     input.sessionRunId === undefined
       ? null
@@ -179,15 +151,7 @@ export async function recordCreatedSandboxBackups(
     ttlSeconds: input.ttlSeconds,
     updatedAt: now,
   }));
-  let subjectCheckpointBackup: CreatedSandboxBackupRecord | null = null;
-
-  for (const entry of input.backups) {
-    if (entry.updateSandboxLastBackup) {
-      subjectCheckpointBackup = entry.backup;
-    }
-  }
-
-  const results = await runAppDatabaseBatch(database, (appDb) => {
+  await runAppDatabaseBatch(database, (appDb) => {
     const queries: [AppDatabaseBatchItem, ...AppDatabaseBatchItem[]] = [
       appDb
         .insert(sandboxBackupsTable)
@@ -223,39 +187,8 @@ export async function recordCreatedSandboxBackups(
       );
     }
 
-    if (subjectCheckpointBackup) {
-      queries.push(
-        appDb
-          .update(sandboxesTable)
-          .set({
-            lastBackupId: parsePlatformId<SandboxBackupId>(
-              subjectCheckpointBackup.id,
-              "checkpoint sandbox backup id",
-            ),
-            updatedAt: now,
-          })
-          .where(
-            and(
-              eq(sandboxesTable.id, sandboxId),
-              inArray(sandboxesTable.status, ["backing_up", "destroying"]),
-              ...sandboxStatusOperationCondition(operationId),
-            ),
-          ),
-      );
-    }
-
     return queries;
   });
-
-  if (!subjectCheckpointBackup) {
-    return;
-  }
-
-  const updated = results.at(-1);
-
-  if (getD1ChangeCount(updated) === 0) {
-    throw new Error("Runtime subject changed before checkpoint backup was recorded.");
-  }
 }
 
 export async function listSandboxSessionBackupCandidates(
@@ -265,17 +198,8 @@ export async function listSandboxSessionBackupCandidates(
   const parsedSandboxId = parsePlatformId<SandboxId>(sandboxId, "sandbox id");
   const results = await getAppDatabase(database)
     .select({
-      conversation_status: sandboxSessionsTable.status,
       cwd: sandboxSessionsTable.cwd,
       last_message_at: sessionsTable.lastMessageAt,
-      latest_backup_at: sql<number | null>`(
-        SELECT ${sandboxBackupsTable.createdAt} FROM ${sandboxBackupsTable}
-        WHERE ${sandboxBackupsTable.sandboxId} = ${sandboxSessionsTable.sandboxId}
-          AND ${sandboxBackupsTable.dir} = ${sandboxSessionsTable.cwd}
-          AND ${sandboxBackupsTable.status} = 'ready'
-        ORDER BY ${sandboxBackupsTable.createdAt} DESC, ${sandboxBackupsTable.id} DESC
-        LIMIT 1
-      )`,
       session_id: sandboxSessionsTable.sessionId,
       session_status: sessionsTable.status,
     })
@@ -290,12 +214,6 @@ export async function listSandboxSessionBackupCandidates(
     .all();
 
   return results.map((row) => ({
-    canRetainCheckpointWhenMissing:
-      row.conversation_status === "closed" &&
-      row.session_status === "IDLE" &&
-      row.last_message_at !== null &&
-      row.latest_backup_at !== null &&
-      row.latest_backup_at >= row.last_message_at,
     cwd: row.cwd,
     lastMessageAt: row.last_message_at,
     sessionId: row.session_id,

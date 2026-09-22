@@ -1,12 +1,13 @@
-import type { AgentKind } from "@mosoo/contracts/agent";
 import type {
   RuntimeSubjectErrorCode,
-  SandboxBackupStatus,
   SandboxSessionStatus,
   SandboxStatus,
   SandboxSubjectKind,
 } from "@mosoo/contracts/sandbox";
 import type {
+  AccountId,
+  ProjectId,
+  PlatformId,
   AgentId,
   DriverInstanceId,
   RuntimeOperationId,
@@ -24,7 +25,6 @@ export type RuntimeSubjectStatus = SandboxStatus;
 export interface RuntimeSubjectRecord {
   readonly sandboxBinding: string;
   readonly id: SandboxId;
-  readonly kind: AgentKind;
   readonly status: RuntimeSubjectStatus;
   readonly subjectKind: SandboxSubjectKind;
 }
@@ -33,18 +33,14 @@ export interface RuntimeSubjectActivationRecord {
   readonly claimExpiresAt: number | null;
   readonly claimOwner: string | null;
   readonly id: SandboxId;
-  readonly kind: AgentKind;
+  readonly ownerAccountId: AccountId | null;
+  readonly projectId: ProjectId | null;
+  readonly subjectId: PlatformId;
+  readonly subjectKind: SandboxSubjectKind;
+  readonly foreignSessionCount: number;
   readonly lastError: string | null;
   readonly lastErrorCode: RuntimeSubjectErrorCode | null;
-  readonly lastBackup: RuntimeSubjectBackupRecord | null;
-  readonly lastReadyBackup: ReadyRuntimeSubjectBackupRecord | null;
   readonly status: RuntimeSubjectStatus;
-}
-
-export interface RuntimeSubjectBackupRecord {
-  readonly dir: string;
-  readonly id: SandboxBackupId;
-  readonly status: SandboxBackupStatus;
 }
 
 export interface ReadyRuntimeSubjectBackupRecord {
@@ -70,12 +66,10 @@ export interface RuntimeConversationSessionState {
 
 export interface RuntimeSubjectMaintenanceCandidate {
   readonly id: SandboxId;
-  readonly kind: AgentKind;
 }
 
 export interface RuntimeSubjectOperationRepairCandidate {
   readonly id: SandboxId;
-  readonly kind: AgentKind;
   readonly operationId: RuntimeOperationId;
   readonly status: RuntimeSubjectOperationStatus;
 }

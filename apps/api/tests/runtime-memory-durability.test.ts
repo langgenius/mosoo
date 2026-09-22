@@ -142,16 +142,20 @@ describe("Session runtime memory durability", () => {
     expect(await Bun.file(join(f.home, "auth.json")).exists()).toBe(false);
   });
 
-  test("retains the original shared memory binding until its subject is migrated", async () => {
+  test("historical type metadata cannot recreate a shared memory binding", async () => {
     const f = await fixture();
-    const profile: DriverProfileConfig = {
+    const profile = {
       ...f.profile,
       kind: "pet",
-      sandbox: { ...f.profile.sandbox, kind: "pet", subjectKind: "agent" },
+      sandbox: { ...f.profile.sandbox, kind: "pet" },
     };
-    await ensureRuntimeMemoryMounts(f.session, profile);
+    await mkdir(f.home, { recursive: true });
+    await mkdir(f.shared, { recursive: true });
     await writeFile(join(f.shared, "original.md"), "legacy memory");
-    await ensureRuntimeMemoryMounts(f.session, profile);
+    await symlink(f.shared, f.memory);
+    await expect(ensureRuntimeMemoryMounts(f.session, profile)).rejects.toThrow(
+      "Legacy runtime memory requires verified migration",
+    );
     expect(await readlink(f.memory)).toBe(f.shared);
     expect(await readFile(join(f.memory, "original.md"), "utf8")).toBe("legacy memory");
   });

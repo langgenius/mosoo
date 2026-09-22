@@ -38,6 +38,15 @@ neither rewrites data nor authorizes deployment.
 
 ## Existing Cloud Sessions
 
+The final runtime allocates and activates only exclusive Session resources. It uses
+the Session's frozen harness for image selection and applies its admitted network
+constraints on every activation. Historical type labels do not choose ownership,
+backup, recovery or maintenance behavior. Check actual Session/Project/owner bindings
+before allocation or lifecycle admission; a pre-existing shared, ambiguous or foreign
+binding must never be replaced by a fresh empty environment. Maintenance must leave
+unconverted shared resources untouched. The pinned conversion build owns their
+transition before the final candidate can be deployed.
+
 New admission does not rewrite any existing Agent label, Session binding or shared workspace. Existing Sessions retain their admitted configuration and maintenance access until their transition is verified. Migration must preserve the same ID, native conversation and promised working files; allocating an empty isolated workspace is not migration.
 
 The final September 22 decision allows reviewed old Sessions with no calls or file activity

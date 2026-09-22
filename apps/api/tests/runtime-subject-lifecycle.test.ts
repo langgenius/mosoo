@@ -30,6 +30,7 @@ const RUNTIME_SUBJECT_QUOTA_SCOPE = {
   runtimeId: "claude-agent-sdk",
   agentId: AGENT_ID,
   projectId: PROJECT_ID,
+  sessionId: SESSION_ID,
   executionOwnerUserId: ACCOUNT_ID,
 } as const;
 
@@ -41,10 +42,15 @@ function createRuntimeSubjectLifecycleDatabase(): SqliteD1Database {
   const database = new SqliteD1Database();
 
   database.execute(`
+    CREATE TABLE project (id text PRIMARY KEY, owner_account_id text NOT NULL);
+    CREATE TABLE session (id text PRIMARY KEY, project_id text NOT NULL);
+    CREATE TABLE sandbox_session (sandbox_id text, session_id text PRIMARY KEY, status text);
+    INSERT INTO project VALUES ('${PROJECT_ID}', '${ACCOUNT_ID}');
+    INSERT INTO session VALUES ('${SESSION_ID}', '${PROJECT_ID}');
     CREATE TABLE sandbox (
       sandbox_binding text NOT NULL DEFAULT 'Sandbox',
       agent_id text,
-      project_id text,
+      project_id text DEFAULT '${PROJECT_ID}',
       bind_mount_ready integer DEFAULT false NOT NULL,
       claim_expires_at integer,
       claim_owner text,
@@ -57,7 +63,7 @@ function createRuntimeSubjectLifecycleDatabase(): SqliteD1Database {
       last_error text,
       last_error_code text,
       last_restore_backup_id text,
-      owner_account_id text,
+      owner_account_id text DEFAULT '${ACCOUNT_ID}',
       status text NOT NULL,
       status_changed_at integer DEFAULT 0 NOT NULL,
       status_event text DEFAULT 'runtime_subject.cold' NOT NULL,
@@ -295,11 +301,10 @@ describe("runtime subject lifecycle machine", () => {
         }),
       ).activate({
         ...RUNTIME_SUBJECT_QUOTA_SCOPE,
-        kind: "cattle",
+
         networkConstraints: { allowedHosts: [], networkPolicy: "full" },
         runtimeSubjectId: RUNTIME_SUBJECT_ID,
-        subjectId: SESSION_ID,
-        subjectKind: "session",
+        sessionId: SESSION_ID,
       });
       expect(recoveries).toEqual([expected]);
     }
@@ -323,11 +328,10 @@ describe("runtime subject lifecycle machine", () => {
           }),
         ).activate({
           ...RUNTIME_SUBJECT_QUOTA_SCOPE,
-          kind: "cattle",
+
           networkConstraints: { allowedHosts: [], networkPolicy: "full" },
           runtimeSubjectId: RUNTIME_SUBJECT_ID,
-          subjectId: SESSION_ID,
-          subjectKind: "session",
+          sessionId: SESSION_ID,
         }),
       ).rejects.toThrow("startup attempt 2");
       expect(destroys).toBe(1);
@@ -347,17 +351,20 @@ describe("runtime subject lifecycle machine", () => {
     );
     const runtimes = ["claude-agent-sdk", "openai-runtime", "acp-fallback"];
     const outcomes = await Promise.allSettled(
-      Array.from({ length: 51 }, (_, index) =>
-        lifecycle.activate({
+      Array.from({ length: 51 }, async (_, index) => {
+        const sessionId = createPlatformId<SessionId>();
+        await database
+          .prepare("INSERT INTO session (id, project_id) VALUES (?, ?)")
+          .bind(sessionId, PROJECT_ID)
+          .run();
+        return lifecycle.activate({
           ...RUNTIME_SUBJECT_QUOTA_SCOPE,
           runtimeId: runtimes[index % runtimes.length],
-          kind: "cattle",
           networkConstraints: { allowedHosts: [], networkPolicy: "full" },
           runtimeSubjectId: createPlatformId<SandboxId>(),
-          subjectId: createPlatformId<SessionId>(),
-          subjectKind: "session",
-        }),
-      ),
+          sessionId,
+        });
+      }),
     );
     expect(outcomes.filter((outcome) => outcome.status === "fulfilled")).toHaveLength(50);
     expect(outcomes.filter((outcome) => outcome.status === "rejected")).toHaveLength(1);
@@ -405,24 +412,35 @@ describe("runtime subject lifecycle machine", () => {
     ).toMatchObject({ kind: "accepted", nextStatus: "cold" });
   });
 
-  test("rejects Pet Limited before lifecycle admission", async () => {
+  test("preserves an unconverted shared binding before any container admission", async () => {
     const database = createRuntimeSubjectLifecycleDatabase();
-
+    await insertRuntimeSubject(database, { status: "cold" });
+    database.execute(
+      `UPDATE sandbox SET subject_kind = 'agent', subject_id = '${AGENT_ID}', kind = 'pet'`,
+    );
+    const before = await database.prepare("SELECT * FROM sandbox").all();
+    let containerCalls = 0;
     await expect(
-      createRuntimeSubjectLifecycleService(createBindings(database)).activate({
+      createRuntimeSubjectLifecycleService(
+        createBindings(database, {
+          onConfigureNetwork: () => {
+            containerCalls += 1;
+          },
+          onStartup: async () => {
+            containerCalls += 1;
+          },
+          onDestroy: () => {
+            containerCalls += 1;
+          },
+        }),
+      ).activate({
         ...RUNTIME_SUBJECT_QUOTA_SCOPE,
-        kind: "pet",
         networkConstraints: { allowedHosts: ["api.example.com"], networkPolicy: "limited" },
         runtimeSubjectId: RUNTIME_SUBJECT_ID,
-        spaceAliases: [],
-        subjectId: AGENT_ID,
-        subjectKind: "agent",
       }),
-    ).rejects.toThrow("only for Task Agents");
-
-    await expect(
-      database.prepare("SELECT id FROM sandbox WHERE id = ?").bind(RUNTIME_SUBJECT_ID).first("id"),
-    ).resolves.toBeNull();
+    ).rejects.toThrow("verified exclusive execution binding");
+    expect(containerCalls).toBe(0);
+    expect(await database.prepare("SELECT * FROM sandbox").all()).toEqual(before);
   });
 
   test("atomically applies the configured concurrent sandbox limit per account", async () => {
@@ -435,14 +453,19 @@ describe("runtime subject lifecycle machine", () => {
         runtimeId: "claude-agent-sdk",
         projectId: PROJECT_ID,
         executionOwnerUserId: ACCOUNT_ID,
-        kind: "cattle",
+
         networkConstraints: { allowedHosts: [], networkPolicy: "full" },
         runtimeSubjectId: createPlatformId<SandboxId>(),
-        subjectId: sessionId,
-        subjectKind: "session",
+        sessionId: sessionId,
       };
     });
 
+    for (const input of inputs) {
+      await database
+        .prepare("INSERT INTO session (id, project_id) VALUES (?, ?)")
+        .bind(input.sessionId, input.projectId)
+        .run();
+    }
     const lifecycle = createRuntimeSubjectLifecycleService(
       createBindings(database, { accountConcurrentSandboxLimit: "2" }),
     );
@@ -468,16 +491,28 @@ describe("runtime subject lifecycle machine", () => {
         agentId: createPlatformId(),
         projectId: createPlatformId(),
         runtimeSubjectId: createPlatformId<SandboxId>(),
-        subjectId: createPlatformId<SessionId>(),
+        sessionId: createPlatformId<SessionId>(),
       }),
     ).rejects.toThrow();
 
+    const otherOwner = createPlatformId();
+    const otherProject = createPlatformId();
+    const otherSession = createPlatformId<SessionId>();
+    await database
+      .prepare("INSERT INTO project (id, owner_account_id) VALUES (?, ?)")
+      .bind(otherProject, otherOwner)
+      .run();
+    await database
+      .prepare("INSERT INTO session (id, project_id) VALUES (?, ?)")
+      .bind(otherSession, otherProject)
+      .run();
     await expect(
       lifecycle.activate({
         ...inputs[0],
-        executionOwnerUserId: createPlatformId(),
+        projectId: otherProject,
+        executionOwnerUserId: otherOwner,
         runtimeSubjectId: createPlatformId<SandboxId>(),
-        subjectId: createPlatformId<SessionId>(),
+        sessionId: otherSession,
       }),
     ).resolves.toBeDefined();
   });
@@ -560,12 +595,11 @@ describe("runtime subject lifecycle machine", () => {
       createBindings(database),
     ).activate({
       ...RUNTIME_SUBJECT_QUOTA_SCOPE,
-      kind: "cattle",
+
       networkConstraints: { allowedHosts: [], networkPolicy: "full" },
       runtimeSubjectId: RUNTIME_SUBJECT_ID,
       spaceAliases: [],
-      subjectId: SESSION_ID,
-      subjectKind: "session",
+      sessionId: SESSION_ID,
     });
 
     expect(activation.subject).toBeTruthy();
@@ -605,13 +639,13 @@ describe("runtime subject lifecycle machine", () => {
     } as ApiBindings;
     const service = createRuntimeSubjectLifecycleService(bindings);
     const activation = {
+      ...RUNTIME_SUBJECT_QUOTA_SCOPE,
       executionOwnerUserId: "01J00000000000000000000002",
-      kind: "cattle" as const,
+
       networkConstraints: { allowedHosts: [], networkPolicy: "full" as const },
       runtimeSubjectId: RUNTIME_SUBJECT_ID,
       spaceAliases: [],
-      subjectId: "01J00000000000000000000009",
-      subjectKind: "session" as const,
+      sessionId: "01J00000000000000000000009",
     };
 
     await service.activate(activation);
@@ -625,10 +659,7 @@ describe("runtime subject lifecycle machine", () => {
         distinct_id: activation.executionOwnerUserId,
         execution_owner_id: activation.executionOwnerUserId,
         sandbox_id: RUNTIME_SUBJECT_ID,
-        sandbox_kind: "cattle",
-        session_id: activation.subjectId,
-        subject_id: activation.subjectId,
-        subject_kind: "session",
+        session_id: activation.sessionId,
       },
     });
   });
@@ -659,7 +690,7 @@ describe("runtime subject lifecycle machine", () => {
     await expect(
       recycleRuntimeSubject(createBindings(database), {
         claimOwner: "scheduled-race",
-        kind: "pet",
+
         now: Date.now(),
         reason: "test",
         runtimeSubjectId: RUNTIME_SUBJECT_ID,
@@ -674,7 +705,7 @@ describe("runtime subject lifecycle machine", () => {
     ).resolves.toBeNull();
   });
 
-  test("restores pet memory when the same logical subject activates from cold", async () => {
+  test("ignores historical kind and shared memory pointers on an exclusive Session", async () => {
     const database = createRuntimeSubjectLifecycleDatabase();
     await insertRuntimeSubject(database, { status: "cold" });
     await database
@@ -710,7 +741,7 @@ describe("runtime subject lifecycle machine", () => {
       .prepare(
         "UPDATE sandbox SET kind = ?, last_backup_id = ?, subject_id = ?, subject_kind = ? WHERE id = ?",
       )
-      .bind("pet", STORED_BACKUP_ID, AGENT_ID, "agent", RUNTIME_SUBJECT_ID)
+      .bind("pet", STORED_BACKUP_ID, SESSION_ID, "session", RUNTIME_SUBJECT_ID)
       .run();
     let restoredBackup: { readonly dir: string; readonly id: string } | null = null;
     let configureNetworkCalls = 0;
@@ -726,21 +757,16 @@ describe("runtime subject lifecycle machine", () => {
       }),
     ).activate({
       ...RUNTIME_SUBJECT_QUOTA_SCOPE,
-      kind: "pet",
+
       networkConstraints: { allowedHosts: [], networkPolicy: "full" },
       runtimeSubjectId: RUNTIME_SUBJECT_ID,
       spaceAliases: [],
-      subjectId: AGENT_ID,
-      subjectKind: "agent",
+      sessionId: SESSION_ID,
     });
 
     expect(activation.subject).toBeTruthy();
-    expect(configureNetworkCalls).toBe(0);
-    expect(restoredBackup).toEqual({
-      dir: "/workspace/memory",
-      id: CLOUDFLARE_BACKUP_ID,
-      localBucket: true,
-    });
+    expect(configureNetworkCalls).toBe(1);
+    expect(restoredBackup).toBeNull();
     expect((await readRuntimeSubject(database)).status).toBe("active");
   });
 
@@ -760,12 +786,11 @@ describe("runtime subject lifecycle machine", () => {
       createBindings(database),
     ).activate({
       ...RUNTIME_SUBJECT_QUOTA_SCOPE,
-      kind: "cattle",
+
       networkConstraints: { allowedHosts: [], networkPolicy: "full" },
       runtimeSubjectId: RUNTIME_SUBJECT_ID,
       spaceAliases: [],
-      subjectId: SESSION_ID,
-      subjectKind: "session",
+      sessionId: SESSION_ID,
     });
 
     expect(activation.subject).toBeTruthy();
@@ -805,12 +830,11 @@ describe("runtime subject lifecycle machine", () => {
     await expect(
       createRuntimeSubjectLifecycleService(createBindings(database, { prepareError })).activate({
         ...RUNTIME_SUBJECT_QUOTA_SCOPE,
-        kind: "cattle",
+
         networkConstraints: { allowedHosts: [], networkPolicy: "full" },
         runtimeSubjectId: RUNTIME_SUBJECT_ID,
         spaceAliases: [],
-        subjectId: SESSION_ID,
-        subjectKind: "session",
+        sessionId: SESSION_ID,
       }),
     ).rejects.toThrow("Runtime subject filesystem prepare timed out after 15000ms.");
 
@@ -855,12 +879,11 @@ describe("runtime subject lifecycle machine", () => {
         }),
       ).activate({
         ...RUNTIME_SUBJECT_QUOTA_SCOPE,
-        kind: "cattle",
+
         networkConstraints: { allowedHosts: [], networkPolicy: "full" },
         runtimeSubjectId: RUNTIME_SUBJECT_ID,
         spaceAliases: [],
-        subjectId: SESSION_ID,
-        subjectKind: "session",
+        sessionId: SESSION_ID,
       }),
     ).rejects.toThrow("original activation failure");
 
@@ -917,12 +940,11 @@ describe("runtime subject lifecycle machine", () => {
         }),
       ).activate({
         ...RUNTIME_SUBJECT_QUOTA_SCOPE,
-        kind: "cattle",
+
         networkConstraints: { allowedHosts: [], networkPolicy: "limited" },
         runtimeSubjectId: RUNTIME_SUBJECT_ID,
         spaceAliases: [],
-        subjectId: SESSION_ID,
-        subjectKind: "session",
+        sessionId: SESSION_ID,
       }),
     ).rejects.toThrow("cannot be enforced");
 
@@ -946,12 +968,11 @@ describe("runtime subject lifecycle machine", () => {
         createBindings(database, { onDestroy: () => (destroyCalls += 1), prepareError }),
       ).activate({
         ...RUNTIME_SUBJECT_QUOTA_SCOPE,
-        kind: "cattle",
+
         networkConstraints: { allowedHosts: [], networkPolicy: "full" },
         runtimeSubjectId: RUNTIME_SUBJECT_ID,
         spaceAliases: [],
-        subjectId: SESSION_ID,
-        subjectKind: "session",
+        sessionId: SESSION_ID,
       }),
     ).rejects.toThrow("filesystem prepare timed out");
 
@@ -963,12 +984,11 @@ describe("runtime subject lifecycle machine", () => {
     const recovered = await createRuntimeSubjectLifecycleService(createBindings(database)).activate(
       {
         ...RUNTIME_SUBJECT_QUOTA_SCOPE,
-        kind: "cattle",
+
         networkConstraints: { allowedHosts: [], networkPolicy: "full" },
         runtimeSubjectId: RUNTIME_SUBJECT_ID,
         spaceAliases: [],
-        subjectId: SESSION_ID,
-        subjectKind: "session",
+        sessionId: SESSION_ID,
       },
     );
 

@@ -189,12 +189,12 @@ async function insertRuntimeFixture(database: SqliteD1Database): Promise<void> {
   await insertOwnerSession(database);
   database.execute(`
     INSERT INTO sandbox (
-      id, kind, subject_kind, subject_id, status, bind_mount_ready,
+      id, kind, subject_kind, subject_id, project_id, owner_account_id, status, bind_mount_ready,
       global_mounts_json, created_at, updated_at
     )
     VALUES (
-      '${PUBLIC_API_TEST_IDS.sandbox}', 'pet', 'agent', '${PUBLIC_API_TEST_IDS.agent}',
-      'active', 1, '[]', 1, 1
+      '${PUBLIC_API_TEST_IDS.sandbox}', 'pet', 'session', '${SESSION_ID}',
+      '${PUBLIC_API_TEST_IDS.project}', '${PUBLIC_API_TEST_IDS.ownerAccount}', 'active', 1, '[]', 1, 1
     );
 
     INSERT INTO sandbox_session (

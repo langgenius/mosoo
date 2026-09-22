@@ -57,7 +57,6 @@ export async function publishAgent(
     builtInTools,
     bindings,
     environment,
-    kind: agent.kind,
     model: agent.model,
     packageResolution,
     projectId: agent.projectId,

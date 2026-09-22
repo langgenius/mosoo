@@ -45,7 +45,6 @@ import type {
   DriverSkillCatalogEntry,
 } from "../../domain/driver-snapshot";
 import { getSupportedRuntimeId } from "../../domain/runtime-config";
-import { resolveAgentRuntimeSandboxSubject } from "../../domain/runtime-sandbox-subject";
 import { parseEnvironmentAllowedHosts } from "../../domain/sandbox-network-constraints";
 import {
   ensureRuntimeSubjectId,
@@ -140,7 +139,6 @@ async function resolveRuntimeProfileIds(
     agentId: AgentId | null;
     projectId: ProjectId;
     executionOwnerUserId: AccountId;
-    kind: DriverProfileConfig["kind"];
     runtimeId: string;
     sessionId: SessionId;
   },
@@ -148,18 +146,21 @@ async function resolveRuntimeProfileIds(
   sandboxSessionId: SandboxSessionId;
   sandboxId: SandboxId;
 }> {
-  const sandboxSubject = resolveAgentRuntimeSandboxSubject(input);
-  const [sandboxId, existingConversationSession] = await Promise.all([
-    ensureRuntimeSubjectId(bindings.DB, {
-      runtimeId: input.runtimeId,
-      runtimeImagesEnabled: runtimeImagesEnabled(bindings.MOSOO_RUNTIME_IMAGES_ENABLED),
-      ...sandboxSubject,
-      agentId: input.agentId,
-      projectId: input.projectId,
-      executionOwnerUserId: input.executionOwnerUserId,
-    }),
-    getRuntimeConversationSession(bindings.DB, input.sessionId),
-  ]);
+  const existingConversationSession = await getRuntimeConversationSession(
+    bindings.DB,
+    input.sessionId,
+  );
+  const sandboxId = await ensureRuntimeSubjectId(bindings.DB, {
+    runtimeId: input.runtimeId,
+    runtimeImagesEnabled: runtimeImagesEnabled(bindings.MOSOO_RUNTIME_IMAGES_ENABLED),
+    agentId: input.agentId,
+    projectId: input.projectId,
+    executionOwnerUserId: input.executionOwnerUserId,
+    sessionId: input.sessionId,
+    ...(existingConversationSession === null
+      ? {}
+      : { runtimeSubjectId: existingConversationSession.sandboxId }),
+  });
 
   return {
     sandboxSessionId:
@@ -275,8 +276,6 @@ async function hydrateRunContextFromSession(
     agentId: binding.agentId,
     builtInTools: executionPlan.builtInTools,
     environment: snapshotEnvironment,
-    environmentNetworkPolicy: environmentSnapshot.networkPolicy,
-    kind: binding.kind,
     mcpServerIds: toolReferences.map((reference) => reference.serverId),
     model: binding.model,
     packageResolution: storedConfig.packageResolution,
@@ -361,7 +360,6 @@ async function hydrateRunContextFromSession(
     agentId: binding.agentId,
     projectId: session.projectId,
     executionOwnerUserId,
-    kind: binding.kind,
     sessionId: session.id,
   });
 
@@ -382,7 +380,6 @@ async function hydrateRunContextFromSession(
       envVars,
       environmentArtifact,
       executionOwnerUserId,
-      kind: binding.kind,
       model: binding.model,
       network: toDriverNetworkProfile({
         environment: environmentSnapshot,
@@ -517,7 +514,6 @@ async function refreshCachedRunContextVolatileFields(
     agentId: binding.agentId,
     projectId: session.projectId,
     executionOwnerUserId,
-    kind: binding.kind,
     sessionId: session.id,
   });
   const profile = createAgentRuntimeProfile({
@@ -536,7 +532,6 @@ async function refreshCachedRunContextVolatileFields(
     envVars,
     environmentArtifact: cached.profile.environmentArtifact ?? null,
     executionOwnerUserId,
-    kind: binding.kind,
     model: binding.model,
     network: toDriverNetworkProfile({
       environment: environmentSnapshot,

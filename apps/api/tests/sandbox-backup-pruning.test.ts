@@ -128,7 +128,7 @@ describe("sandbox backup pruning", () => {
     ]);
   });
 
-  test("records checkpoint backup batch and stores latest subject checkpoint", async () => {
+  test("records checkpoints without advancing a shared subject pointer", async () => {
     const database = createSandboxBackupDatabase();
     await insertSandbox(database);
 
@@ -136,15 +136,12 @@ describe("sandbox backup pruning", () => {
       backups: [
         {
           backup: { dir: "/workspace/one", id: SESSION_BACKUP_ID },
-          updateSandboxLastBackup: false,
         },
         {
           backup: { dir: "/memory", id: MEMORY_OLD_BACKUP_ID },
-          updateSandboxLastBackup: true,
         },
         {
           backup: { dir: "/memory", id: MEMORY_NEW_BACKUP_ID },
-          updateSandboxLastBackup: true,
         },
       ],
       sandboxId: "01J0000000000000000000000D",
@@ -180,7 +177,7 @@ describe("sandbox backup pruning", () => {
       .bind("01J0000000000000000000000D")
       .first<{ last_backup_id: string; status: string; status_seq: number }>();
     expect(sandbox).toEqual({
-      last_backup_id: MEMORY_NEW_BACKUP_ID,
+      last_backup_id: null,
       status: "backing_up",
       status_seq: 0,
     });
@@ -197,7 +194,6 @@ describe("sandbox backup pruning", () => {
           dir: index === suffixes.length - 1 ? "/memory" : `/workspace/${index}`,
           id: `01J000000000000000000000H${suffix}`,
         },
-        updateSandboxLastBackup: index === suffixes.length - 1,
       })),
       sandboxId: "01J0000000000000000000000D",
       ttlSeconds: 100,
@@ -212,6 +208,6 @@ describe("sandbox backup pruning", () => {
       .first<{ last_backup_id: string }>();
 
     expect(backupCount?.count).toBe(16);
-    expect(sandbox?.last_backup_id).toBe("01J000000000000000000000HG");
+    expect(sandbox?.last_backup_id).toBeNull();
   });
 });

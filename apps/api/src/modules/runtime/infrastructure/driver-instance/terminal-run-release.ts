@@ -9,7 +9,6 @@ import { getAppDatabase } from "../../../../platform/db/drizzle";
 import { appendSessionRuntimeEvents } from "../../../sessions/application/session-event-write.service";
 import { createFailedSessionRunRuntimeEvent } from "../../application/session-runs/session-run-view-events.service";
 import { repairTerminalSessionRunProjections } from "../../application/session-runs/terminal-run-reconciliation.service";
-import { SESSION_WORKSPACE_CHECKPOINT } from "../../domain/runtime-kind-policy";
 import { classifyReclaim, decideReclaimRecovery } from "../../domain/session-run-reclaim-recovery";
 import { isTerminalSessionRunStatus } from "../../domain/session-run-status";
 import { createSessionRunTerminalFailureSourceId } from "../../domain/session-run-terminal-event-id";
@@ -51,7 +50,6 @@ async function checkpointTerminalRuntimeSessionIfNeeded(
 
   await createSandboxCheckpoints(bindings, {
     requiredSessionId: link.sessionId,
-    rules: [SESSION_WORKSPACE_CHECKPOINT],
     sandboxId: link.sandboxId,
     sessionRunId: link.sessionRunId,
   });

@@ -1,8 +1,11 @@
+import { parsePlatformId } from "@mosoo/id";
+import type { SandboxId } from "@mosoo/id";
+
 import { logWarn } from "../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { shouldBackupSandboxSession } from "../../sessions/domain/session-lifecycle";
-import type { RuntimeCheckpointRule } from "../domain/runtime-kind-policy";
 import { RuntimeSubjectCheckpointFailedError } from "./runtime-subject-lifecycle/runtime-subject-errors";
+import { assertExclusiveSessionRuntimeSubject } from "./runtime-subject-lifecycle/runtime-subject-record-store";
 import { SANDBOX_BACKUP_TTL_SECONDS } from "./sandbox-backup-config";
 import { createRuntimeSandboxBackup, deleteSandboxBackupObjects } from "./sandbox-backup-platform";
 import { selectSandboxBackupPruneIds } from "./sandbox-backup-pruning";
@@ -17,18 +20,11 @@ import {
   recordCreatedSandboxBackups,
 } from "./sandbox-backup-store";
 
-export interface SandboxSessionBackupTarget {
-  canRetainCheckpointWhenMissing: boolean;
-  cwd: string;
-  sessionId: string;
-}
-
 interface SandboxCheckpointBackupTarget {
   readonly dir: string;
   readonly sanitizeTransientState: boolean;
   readonly sessionId: string | null;
   readonly skipMissingWorkspace: boolean;
-  readonly updateSandboxLastBackup: boolean;
 }
 
 async function pruneSandboxBackups(
@@ -46,66 +42,30 @@ async function pruneSandboxBackups(
   await markSandboxBackupsPruned(bindings.DB, pruneIds);
 }
 
-async function listSandboxSessionBackupTargets(
-  database: D1Database,
-  sandboxId: string,
-): Promise<SandboxSessionBackupTarget[]> {
-  const candidates = await listSandboxSessionBackupCandidates(database, sandboxId);
-
-  return candidates
-    .filter((candidate) =>
-      shouldBackupSandboxSession({
-        lastMessageAt: candidate.lastMessageAt,
-        sessionStatus: candidate.sessionStatus,
-      }),
-    )
-    .map((candidate) => ({
-      canRetainCheckpointWhenMissing: candidate.canRetainCheckpointWhenMissing,
-      cwd: candidate.cwd,
-      sessionId: candidate.sessionId,
-    }));
-}
-
 async function listSandboxCheckpointBackupTargets(
   database: D1Database,
-  input: {
-    readonly rules: readonly RuntimeCheckpointRule[];
-    readonly sandboxId: string;
-  },
+  input: { readonly requiredSessionId: string; readonly sandboxId: string },
 ): Promise<SandboxCheckpointBackupTarget[]> {
-  const targets: SandboxCheckpointBackupTarget[] = [];
-  let sessionTargets: SandboxSessionBackupTarget[] | null = null;
-
-  for (const rule of input.rules) {
-    switch (rule.type) {
-      case "subject_memory": {
-        targets.push({
-          dir: rule.path,
-          sanitizeTransientState: false,
-          sessionId: null,
-          skipMissingWorkspace: false,
-          updateSandboxLastBackup: rule.updateSubjectCheckpoint,
-        });
-        break;
-      }
-      case "session_workspaces": {
-        sessionTargets ??= await listSandboxSessionBackupTargets(database, input.sandboxId);
-        targets.push(
-          ...sessionTargets.map((target) => ({
-            dir: target.cwd,
-            sanitizeTransientState: rule.sanitizeTransientState,
-            sessionId: target.sessionId,
-            skipMissingWorkspace:
-              !rule.sanitizeTransientState && target.canRetainCheckpointWhenMissing,
-            updateSandboxLastBackup: false,
-          })),
-        );
-        break;
-      }
-    }
-  }
-
-  return targets;
+  await assertExclusiveSessionRuntimeSubject(
+    database,
+    parsePlatformId<SandboxId>(input.sandboxId, "Sandbox ID"),
+  );
+  const candidates = await listSandboxSessionBackupCandidates(database, input.sandboxId);
+  return candidates
+    .filter(
+      (candidate) =>
+        candidate.sessionId === input.requiredSessionId &&
+        shouldBackupSandboxSession({
+          lastMessageAt: candidate.lastMessageAt,
+          sessionStatus: candidate.sessionStatus,
+        }),
+    )
+    .map((candidate) => ({
+      dir: candidate.cwd,
+      sanitizeTransientState: true,
+      sessionId: candidate.sessionId,
+      skipMissingWorkspace: false,
+    }));
 }
 
 async function createSandboxBackupsForTargets(
@@ -131,7 +91,6 @@ async function createSandboxBackupsForTargets(
           runtimeSubjectId: input.sandboxId,
         });
       }),
-      updateSandboxLastBackup: target.updateSandboxLastBackup,
     })),
   );
   const createdBackups = results.flatMap((result) =>
@@ -157,7 +116,6 @@ async function recordCreatedCheckpointBackups(
   input: {
     readonly backups: readonly CreatedSandboxBackupWrite[];
     readonly checkpointSessionId?: string;
-    readonly operationId?: string | null;
     readonly sandboxId: string;
     readonly sessionRunId?: string;
   },
@@ -168,7 +126,6 @@ async function recordCreatedCheckpointBackups(
       ...(input.checkpointSessionId === undefined
         ? {}
         : { checkpointSessionId: input.checkpointSessionId }),
-      ...(input.operationId === undefined ? {} : { operationId: input.operationId }),
       sandboxId: input.sandboxId,
       ...(input.sessionRunId === undefined ? {} : { sessionRunId: input.sessionRunId }),
       ttlSeconds: SANDBOX_BACKUP_TTL_SECONDS,
@@ -241,20 +198,15 @@ async function recordCreatedCheckpointBackups(
 async function createSandboxCheckpointBackups(
   bindings: ApiBindings,
   input: {
-    readonly operationId?: string | null;
-    readonly requiredSessionId?: string;
-    readonly rules: readonly RuntimeCheckpointRule[];
+    readonly requiredSessionId: string;
     readonly sandboxId: string;
-    readonly sessionRunId?: string;
+    readonly sessionRunId: string;
   },
 ): Promise<void> {
   let targets = await listSandboxCheckpointBackupTargets(bindings.DB, input);
   const checkpointedDirs = new Set<string>();
 
-  if (
-    input.requiredSessionId !== undefined &&
-    !targets.some((target) => target.sessionId === input.requiredSessionId)
-  ) {
+  if (!targets.some((target) => target.sessionId === input.requiredSessionId)) {
     throw new RuntimeSubjectCheckpointFailedError({
       cause: new Error(
         `Session ${input.requiredSessionId} has no eligible workspace checkpoint target.`,
@@ -263,19 +215,7 @@ async function createSandboxCheckpointBackups(
     });
   }
 
-  if (targets.length === 0) {
-    return;
-  }
-
-  if (input.requiredSessionId !== undefined) {
-    targets = targets.map((target) =>
-      target.sessionId === input.requiredSessionId
-        ? { ...target, skipMissingWorkspace: false }
-        : target,
-    );
-  }
-
-  if (input.sessionRunId !== undefined) {
+  {
     const readyDirs = new Set(
       (
         await listReadySandboxBackupsForSessionRun(bindings.DB, {
@@ -295,12 +235,9 @@ async function createSandboxCheckpointBackups(
 
     await recordCreatedCheckpointBackups(bindings, {
       backups,
-      ...(input.requiredSessionId === undefined
-        ? {}
-        : { checkpointSessionId: input.requiredSessionId }),
-      ...(input.operationId === undefined ? {} : { operationId: input.operationId }),
+      checkpointSessionId: input.requiredSessionId,
       sandboxId: input.sandboxId,
-      ...(input.sessionRunId === undefined ? {} : { sessionRunId: input.sessionRunId }),
+      sessionRunId: input.sessionRunId,
     });
     for (const entry of backups) checkpointedDirs.add(entry.backup.dir);
   }
@@ -308,10 +245,6 @@ async function createSandboxCheckpointBackups(
   try {
     await pruneSandboxBackups(bindings, input.sandboxId, checkpointedDirs);
   } catch (error) {
-    if (input.sessionRunId === undefined) {
-      throw error;
-    }
-
     logWarn("runtime.sandbox_checkpoint.prune_failed", {
       error: error instanceof Error ? error.message : String(error),
       sandboxId: input.sandboxId,
@@ -323,11 +256,9 @@ async function createSandboxCheckpointBackups(
 export async function createSandboxCheckpoints(
   bindings: ApiBindings,
   input: {
-    operationId?: string | null;
-    requiredSessionId?: string;
-    rules: readonly RuntimeCheckpointRule[];
+    requiredSessionId: string;
     sandboxId: string;
-    sessionRunId?: string;
+    sessionRunId: string;
   },
 ): Promise<void> {
   await createSandboxCheckpointBackups(bindings, input);

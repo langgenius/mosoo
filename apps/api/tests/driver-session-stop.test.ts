@@ -64,6 +64,7 @@ function createDriverStopDatabase(): SqliteD1Database {
     );
 
     CREATE TABLE sandbox (
+      subject_kind text NOT NULL DEFAULT 'session',
       sandbox_binding text NOT NULL DEFAULT 'Sandbox',
       id text PRIMARY KEY NOT NULL,
       kind text NOT NULL,

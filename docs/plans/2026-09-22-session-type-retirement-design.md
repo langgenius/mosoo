@@ -27,6 +27,23 @@ substitute for their promised migration.
 
 ## Verification
 
+### One runtime ownership path
+
+Remove the Agent-versus-Session subject policy from allocation, activation, image and
+network selection, checkpoint restore, and recycling. Runtime profiles carry Session
+identity rather than a product type. Resolve an existing physical binding before any
+allocation and verify its Project, execution owner, Session identity and absence of
+foreign members. Repeat the ownership predicates in lifecycle admission so a changed
+binding cannot be adopted. Existing shared/foreign/ambiguous resources fail before a
+new allocation, restore, configuration RPC or destructive action. Maintenance only
+selects verified exclusive Session resources. Keep legacy source data and applied
+schema history inert; the version-pinned conversion remains a release prerequisite.
+
+Use the last committed Session workspace/native boundary for restoration and safe
+reclamation. No subject-wide memory checkpoint can be fanned out to Session resources.
+Network policy always applies to the Session; legacy labels cannot skip it. Dedicated
+images use the frozen harness, with the existing deployment image flag retained.
+
 ### Session maintenance boundary
 
 Move maintenance authority to Project + Session before deleting the remaining stable

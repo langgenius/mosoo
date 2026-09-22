@@ -63,11 +63,16 @@ function readText(path: string): string {
 describe("API to driver boundary", () => {
   test.each([
     ["cattle", true],
-    ["pet", false],
+    ["pet", true],
   ] as const)(
-    "carries native recovery ownership through the %s boot boundary",
+    "requires native recovery even when the boot input retains a historical %s label",
     async (kind, required) => {
       const profile = createDriverProfile();
+      const historicalProfile = {
+        ...profile,
+        kind,
+        sandbox: { ...profile.sandbox, kind },
+      };
       const execution = await buildExecutionSpec(bindings, {
         builtInTools: [],
         driverGeneration: 0,
@@ -77,15 +82,7 @@ describe("API to driver boundary", () => {
           runtimeId: "openai-runtime",
           value: "committed-thread",
         },
-        profile: {
-          ...profile,
-          kind,
-          sandbox: {
-            ...profile.sandbox,
-            kind,
-            subjectKind: kind === "cattle" ? "session" : "agent",
-          },
-        },
+        profile: historicalProfile,
         recoveryMessages: [{ role: "user", content: "A partial legacy transcript" }],
         requestUrl: "https://api.example.com/api/driver/connect",
         resolvedMcpServers: [],
@@ -107,9 +104,7 @@ describe("API to driver boundary", () => {
       });
       const parsed = parseDriverBootPayloadJson(JSON.stringify(payload));
       expect(parsed.execution.session.nativeResumeRequired).toBe(required);
-      expect(parsed.execution.session.recoveryMessages).toEqual(
-        required ? [] : [{ role: "user", content: "A partial legacy transcript" }],
-      );
+      expect(parsed.execution.session.recoveryMessages).toEqual([]);
     },
   );
 

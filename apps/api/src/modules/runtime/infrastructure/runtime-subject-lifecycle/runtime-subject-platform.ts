@@ -1,20 +1,12 @@
-import {
-  SANDBOX_CACHE_PATH,
-  SANDBOX_MEMORY_PATH,
-  SANDBOX_SESSION_ROOT,
-} from "@mosoo/agent-driver/paths";
+import { SANDBOX_CACHE_PATH, SANDBOX_SESSION_ROOT } from "@mosoo/agent-driver/paths";
 import { sandboxesTable } from "@mosoo/db";
-import { discardPromiseResult } from "@mosoo/effects";
 import { parsePlatformId } from "@mosoo/id";
 import type { SandboxId } from "@mosoo/id";
 import { eq } from "drizzle-orm";
 
 import type { SandboxContainerObservation } from "../../../../adapters/durable-objects/sandbox.do";
 import { createErrorLogContext, logInfo, logWarn } from "../../../../platform/cloudflare/logger";
-import {
-  withDisposedRpcResource,
-  withDisposedRpcResult,
-} from "../../../../platform/cloudflare/rpc-disposal";
+import { withDisposedRpcResource } from "../../../../platform/cloudflare/rpc-disposal";
 import {
   requireCloudflareSandboxBinding,
   requireSandboxBinding,
@@ -24,10 +16,8 @@ import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../../platform/db/drizzle";
 import type { SandboxNetworkConstraints } from "../../domain/sandbox-network-constraints";
 import { withRuntimeProvisionTimeout } from "../runtime-provision-timeout";
-import { decodeSandboxBackupIdForPlatform } from "../sandbox-backup-id";
 import { toSandboxHandle } from "../sandbox-handles";
 import type { SandboxHandle } from "../sandbox-handles";
-import type { ReadyRuntimeSubjectBackupRecord } from "./runtime-subject-store";
 
 async function readRuntimeSubjectSandboxBinding(
   bindings: ApiBindings,
@@ -135,32 +125,11 @@ export async function prepareRuntimeSubjectFilesystem(
   );
   // These operations now run against a ready container. Each keeps the original
   // 15s limit and identifies the failing path instead of hiding startup retries
-  // inside three parallel implicit default-session initializations.
+  // inside parallel implicit default-session initializations.
   await Promise.all(
-    [SANDBOX_CACHE_PATH, SANDBOX_MEMORY_PATH, SANDBOX_SESSION_ROOT].map((path) =>
+    [SANDBOX_CACHE_PATH, SANDBOX_SESSION_ROOT].map((path) =>
       step(`mkdir ${path}`, () => subject.mkdir(path, { recursive: true })),
     ),
-  );
-}
-
-export async function restoreRuntimeSubjectBackup(
-  subject: SandboxHandle,
-  input: {
-    readonly backup: ReadyRuntimeSubjectBackupRecord;
-    readonly localBucket: boolean;
-    readonly runtimeSubjectId: string;
-  },
-): Promise<void> {
-  await withDisposedRpcResult(
-    withRuntimeProvisionTimeout(
-      subject.restoreBackup({
-        dir: input.backup.dir,
-        id: decodeSandboxBackupIdForPlatform(input.backup.id),
-        localBucket: input.localBucket,
-      }),
-      `Runtime subject restore for ${input.runtimeSubjectId}`,
-    ),
-    discardPromiseResult,
   );
 }
 

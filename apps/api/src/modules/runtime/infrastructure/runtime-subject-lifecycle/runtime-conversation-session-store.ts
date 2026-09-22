@@ -20,7 +20,6 @@ import {
   sandboxIsolationAvailablePredicate,
   sessionIsolationPendingPredicate,
 } from "../../../sessions/infrastructure/session-isolation-barrier.repository";
-import { getRuntimeSubjectInactiveDeadline } from "../../domain/runtime-kind-policy";
 import { toRuntimeSubjectStatusLifecycleEventName } from "../../domain/runtime-subject-lifecycle.machine";
 import {
   completedRunHistoryPredicate,
@@ -227,7 +226,7 @@ export async function listPendingIdleConversationCheckpoints(
     .all();
 }
 
-// Atomically claim an idle cattle conversation for the sweep to close. Between
+// Atomically claim an idle Session conversation for the sweep to close. Between
 // the sweep's LIST and its per-row close there is a window where a follow-up
 // turn can re-use the resident session (ensureSandboxConversationSession
 // refreshes updatedAt) before its run lease exists — the list-time lease guard
@@ -410,21 +409,13 @@ export async function recordRuntimeConversationSessionActive(
     readonly now: number;
   },
 ): Promise<void> {
-  const petInactiveDeadlineAt = getRuntimeSubjectInactiveDeadline(input.now);
-
   // Remote open/close calls can finish after a rebind or a newer execution
   // session. Both writes compare the binding read before the remote operation.
   const results = await runAppDatabaseBatch(database, (appDb) => [
     appDb
       .update(sandboxesTable)
       .set({
-        inactiveDeadlineAt: sql`
-          CASE
-            WHEN ${sandboxesTable.kind} = 'pet'
-              THEN COALESCE(${sandboxesTable.inactiveDeadlineAt}, ${petInactiveDeadlineAt})
-            ELSE NULL
-          END
-        `,
+        inactiveDeadlineAt: null,
         updatedAt: input.now,
       })
       .where(

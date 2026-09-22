@@ -1,7 +1,7 @@
 import type { DriverRecoveryMessage } from "@mosoo/agent-driver/boot";
 import type { DriverNativeRuntimeRef, DriverRuntime } from "@mosoo/agent-driver/runtime";
 import type { JsonObject } from "@mosoo/contracts";
-import type { AgentBuiltInToolConfig, AgentKind, AgentReadiness } from "@mosoo/contracts/agent";
+import type { AgentBuiltInToolConfig, AgentReadiness } from "@mosoo/contracts/agent";
 import type { EnvironmentNetworkPolicy } from "@mosoo/contracts/environment";
 import type {
   ActiveMcpAuthorizationState,
@@ -11,7 +11,6 @@ import type {
   UnavailableMcpAuthorizationState,
   UnavailableMcpCredentialStatus,
 } from "@mosoo/contracts/mcp";
-import type { SandboxSubjectKind } from "@mosoo/contracts/sandbox";
 import type { SkillMaterializationStatus, SkillResolutionMode } from "@mosoo/contracts/skill";
 import type {
   AccountId,
@@ -43,9 +42,8 @@ export interface DriverOrigin {
 
 export interface DriverSandboxContext {
   readonly id: SandboxId;
-  readonly kind: AgentKind;
-  readonly subjectId: PlatformId;
-  readonly subjectKind: SandboxSubjectKind;
+  readonly subjectId: SessionId;
+  readonly subjectKind: "session";
 }
 
 export interface DriverSessionContext {
@@ -105,7 +103,6 @@ export interface DriverProfileConfig {
   readonly envVarNames: string[];
   readonly envVars: Record<string, string>;
   readonly environmentArtifact?: DriverEnvironmentArtifactProfile | null;
-  readonly kind: AgentKind;
   readonly model: string;
   readonly network: DriverNetworkProfile;
   readonly permissionPolicy: DriverPermissionPolicy;
@@ -205,9 +202,10 @@ export interface DriverExecutionSessionContext {
   readonly homePath: string;
   readonly origin: DriverOrigin;
   readonly sandboxId: SandboxId;
-  readonly sandboxKind: AgentKind;
+  /** Inert compatibility marker for the pinned Driver protocol. */
+  readonly sandboxKind: "cattle";
   readonly sandboxSubjectId: PlatformId;
-  readonly sandboxSubjectKind: SandboxSubjectKind;
+  readonly sandboxSubjectKind: "session";
   readonly sessionOrganizationPath: string;
 }
 

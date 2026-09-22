@@ -682,7 +682,8 @@ describe("driver finalization repair", () => {
         .prepare("SELECT inactive_deadline_at FROM sandbox WHERE id = ?")
         .bind(PUBLIC_API_TEST_IDS.sandbox)
         .first(),
-    ).toMatchObject({ inactive_deadline_at: expect.any(Number) });
+      // A released Run is not permission to recycle a still-resident conversation.
+    ).toMatchObject({ inactive_deadline_at: null });
   });
 
   test("repairs a persisted socket close after object reconstruction without replaying the run", async () => {

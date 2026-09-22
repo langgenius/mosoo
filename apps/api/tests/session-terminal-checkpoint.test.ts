@@ -94,12 +94,12 @@ async function createTerminalCheckpointFixture(): Promise<{
     WHERE id = '${PUBLIC_API_TEST_IDS.ownerSession}';
 
     INSERT INTO sandbox (
-      id, kind, subject_kind, subject_id, status, bind_mount_ready,
+      id, kind, subject_kind, subject_id, project_id, owner_account_id, status, bind_mount_ready,
       global_mounts_json, created_at, updated_at
     )
     VALUES (
       '${PUBLIC_API_TEST_IDS.sandbox}', 'cattle', 'session', '${PUBLIC_API_TEST_IDS.ownerSession}',
-      'active', 1, '[]', 1, 1
+      '${PUBLIC_API_TEST_IDS.project}', '${PUBLIC_API_TEST_IDS.ownerAccount}', 'active', 1, '[]', 1, 1
     );
 
     INSERT INTO sandbox_session (

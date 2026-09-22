@@ -150,7 +150,6 @@ async function ensureAgentReadyToCreateSession(input: {
     builtInTools: storedConfig.builtInTools,
     bindings: input.bindings,
     environment: input.source.environment,
-    kind: "cattle",
     model: input.source.model,
     packageResolution: storedConfig.packageResolution,
     projectId: input.source.projectId,

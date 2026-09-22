@@ -13,7 +13,6 @@ import {
 } from "../../../../platform/cloudflare/logger";
 import { disposeRpcResource } from "../../../../platform/cloudflare/rpc-disposal";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
-import { getSessionRuntimeRecoveryMessages } from "../../../sessions/application/session-runtime-recovery-query.service";
 import {
   appendRuntimeDiagnosticEvent,
   toRuntimeDiagnosticBaseValue,
@@ -243,21 +242,6 @@ async function provisionDriver(
     });
 
     const nativeResumeRef = await nativeResumeRefPromise;
-    // Preserve the legacy shared OpenAI fallback until those Sessions have
-    // verified native checkpoints. Session-owned execution must resume its
-    // committed native state, never a bounded transcript substitute.
-    const shouldReplayRecoveryMessages =
-      input.profile.sandbox.subjectKind === "agent" &&
-      nativeResumeRef !== null &&
-      input.runtime === "openai-runtime";
-    const recoveryMessages = shouldReplayRecoveryMessages
-      ? await timing.measure("getRuntimeRecoveryMessages", () =>
-          getSessionRuntimeRecoveryMessages(env.DB, {
-            excludeRunId: input.sessionRunId ?? null,
-            sessionId: input.sandboxSessionId,
-          }),
-        )
-      : [];
     const activeDriverGeneration = driverRecord.generation;
     driverGeneration = activeDriverGeneration;
 
@@ -279,7 +263,7 @@ async function provisionDriver(
         driverInstanceId,
         nativeResumeRef,
         profile: runtimeProfile,
-        recoveryMessages,
+        recoveryMessages: [],
         requestUrl: containerRequestUrl,
         resolvedMcpServers: input.resolvedMcpServers,
         resolvedSkillCatalog: input.resolvedSkillCatalog,

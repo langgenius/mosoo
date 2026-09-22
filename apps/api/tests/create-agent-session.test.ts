@@ -252,7 +252,7 @@ describe("createAgentSession", () => {
     expect(session.createdAt).toBe(session.updatedAt);
   });
 
-  test("live and saved admission isolate new Sessions without moving an existing shared workspace", async () => {
+  test("live and saved admission isolate Sessions and preserve unconverted physical bindings", async () => {
     const database = await createPublicHttpContractDatabase();
     const bindings = createPublicHttpTestBindings(database) as ApiBindings;
     const create = (saved: boolean) =>
@@ -275,7 +275,7 @@ describe("createAgentSession", () => {
       .bind(legacy.id)
       .first<{ plan_json: string }>();
     const legacyPlan = parseSessionExecutionPlanJson(legacySnapshot!.plan_json);
-    // Model a previously admitted shared Session before any runtime hydration.
+    // A historical kind alone is not a physical shared binding.
     await database.batch([
       database.prepare("UPDATE session SET kind = 'pet' WHERE id = ?").bind(legacy.id),
       database
@@ -296,7 +296,7 @@ describe("createAgentSession", () => {
     const secondContext = await hydrateCachedRunContextFromSession(bindings, OWNER_VIEWER, second);
     expect(first.deploymentVersionId).toBe(PUBLIC_API_TEST_IDS.deployment);
     expect(second.deploymentVersionId).toBeNull();
-    expect(legacyContext.value.profile.sandbox.subjectId).toBe(PUBLIC_API_TEST_IDS.agent);
+    expect(legacyContext.value.profile.sandbox.subjectId).toBe(legacy.id);
     expect(firstContext.value.profile.sandbox.subjectId).toBe(first.id);
     expect(secondContext.value.profile.sandbox.subjectId).toBe(second.id);
     expect(
@@ -336,6 +336,24 @@ describe("createAgentSession", () => {
     ).toEqual(before);
     const legacyAgain = await hydrateCachedRunContextFromSession(bindings, OWNER_VIEWER, legacy);
     expect(legacyAgain.value.profile.sandbox).toEqual(legacyContext.value.profile.sandbox);
+    // Once an old Session actually points at a shared physical machine, hydration
+    // must preserve that mapping for the pinned conversion, never create a replacement.
+    const oldSandboxId = legacyContext.value.profile.sandbox.id;
+    await database
+      .prepare("UPDATE sandbox SET subject_kind = 'agent', subject_id = ? WHERE id = ?")
+      .bind(PUBLIC_API_TEST_IDS.agent, oldSandboxId)
+      .run();
+    await database
+      .prepare(`INSERT INTO sandbox_session
+      (session_id, sandbox_id, cloudflare_session_id, cwd, origin_json, status, created_at, updated_at)
+      VALUES (?, ?, ?, '/workspace', '{}', 'closed', 1, 1)`)
+      .bind(legacy.id, oldSandboxId, legacy.id)
+      .run();
+    const physicalBefore = await database.prepare("SELECT * FROM sandbox").all();
+    await expect(
+      hydrateCachedRunContextFromSession(bindings, OWNER_VIEWER, legacy),
+    ).rejects.toThrow("verified exclusive execution binding");
+    expect(await database.prepare("SELECT * FROM sandbox").all()).toEqual(physicalBefore);
   });
 
   test("freezes provider options across cold hydration, cache refresh, and later Agent edits", async () => {

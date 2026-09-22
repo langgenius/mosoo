@@ -9,8 +9,6 @@ import {
   toRuntimeDiagnosticReason,
 } from "../../application/runtime-diagnostic-events";
 import { appendRuntimeSubjectTerminatedEvents } from "../../application/runtime-state-operation-target-events";
-import { getRuntimeKindPolicy } from "../../domain/runtime-kind-policy";
-import { createSandboxCheckpoints } from "../sandbox-backup.service";
 import { stopRuntimeSubjectDrivers } from "./runtime-subject-driver-stop";
 import {
   getRuntimeSubjectErrorCode,
@@ -20,6 +18,7 @@ import {
 import { destroyRuntimeSubjectContainer } from "./runtime-subject-platform";
 import {
   advanceRuntimeSubjectOperationStatus,
+  assertExclusiveSessionRuntimeSubject,
   closeRuntimeSubjectSessionsForRecycle,
   getRuntimeSubject,
   markRuntimeSubjectCold,
@@ -101,12 +100,6 @@ export async function recreateRuntimeSubjectPreservingState(
 
   let destroyStarted = false;
 
-  // Exclusive Session subjects resume from the last committed turn. Historical
-  // kind metadata must not send them through the shared Agent-memory path.
-  const checkpointRules =
-    subject.subjectKind === "session"
-      ? []
-      : getRuntimeKindPolicy(subject.kind).checkpoint.createOnRecreate;
   const started = await markRuntimeSubjectOperationStarted(bindings.DB, {
     operationId: input.operationId,
     runtimeSubjectId: input.runtimeSubjectId,
@@ -126,11 +119,6 @@ export async function recreateRuntimeSubjectPreservingState(
       targets: input.targets,
       terminalRun: input.terminalRun,
     });
-    await createSandboxCheckpoints(bindings, {
-      operationId: input.operationId,
-      rules: checkpointRules,
-      sandboxId: input.runtimeSubjectId,
-    });
     destroyStarted = await advanceRuntimeSubjectOperationStatus(bindings.DB, {
       expectedStatus: "backing_up",
       operationId: input.operationId,
@@ -140,6 +128,10 @@ export async function recreateRuntimeSubjectPreservingState(
     if (!destroyStarted) {
       throw new Error("Runtime subject changed before destroy.");
     }
+    await assertExclusiveSessionRuntimeSubject(bindings.DB, input.runtimeSubjectId, {
+      id: input.operationId ?? null,
+      status: "destroying",
+    });
     await destroyRuntimeSubjectContainer(bindings, input.runtimeSubjectId);
     await appendTerminatedEventsForRuntimeSubject(bindings, {
       reason: input.reason,
@@ -148,7 +140,7 @@ export async function recreateRuntimeSubjectPreservingState(
     });
     await closeRuntimeSubjectSessionsForRecycle(bindings.DB, input.runtimeSubjectId);
     const completed = await markRuntimeSubjectCold(bindings.DB, {
-      clearBackups: checkpointRules.length === 0,
+      clearBackups: true,
       expectedStatus: "destroying",
       operationId: input.operationId,
       runtimeSubjectId: input.runtimeSubjectId,

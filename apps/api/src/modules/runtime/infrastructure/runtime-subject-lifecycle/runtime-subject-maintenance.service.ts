@@ -17,10 +17,7 @@ import { RESCHEDULING_RECONNECT_WINDOW_MS } from "../../../sessions/domain/sessi
 import { createSessionLifecycleTerminatedEvent } from "../../application/session-runs/session-run-view-events.service";
 import { reconcileStaleActiveSessionRuns } from "../../application/session-runs/stale-run-reconciliation.service";
 import { reconcileTerminalSessionRuns } from "../../application/session-runs/terminal-run-reconciliation.service";
-import {
-  SESSION_RUNTIME_IDLE_GRACE_MS,
-  SESSION_WORKSPACE_CHECKPOINT,
-} from "../../domain/runtime-kind-policy";
+import { SESSION_RUNTIME_IDLE_GRACE_MS } from "../../domain/session-runtime-policy";
 import { cleanupDriverInstances } from "../driver-instance/maintenance";
 import { createSandboxCheckpoints } from "../sandbox-backup.service";
 import { repairRuntimeCommandRecords } from "../session-runs/runtime-command-store.repository";
@@ -52,7 +49,6 @@ type RecycleRuntimeSubject = (
   bindings: ApiBindings,
   input: {
     readonly claimOwner: string;
-    readonly kind: RuntimeSubjectMaintenanceCandidate["kind"];
     readonly now: number;
     readonly reason: string;
     readonly runtimeSubjectId: SandboxId;
@@ -61,7 +57,6 @@ type RecycleRuntimeSubject = (
 type ResumeRuntimeSubjectRecycleOperation = (
   bindings: ApiBindings,
   input: {
-    readonly kind: RuntimeSubjectOperationRepairCandidate["kind"];
     readonly operationId: RuntimeSubjectOperationRepairCandidate["operationId"];
     readonly reason: string;
     readonly runtimeSubjectId: RuntimeSubjectOperationRepairCandidate["id"];
@@ -136,7 +131,6 @@ async function recycleInactiveRuntimeSubjectCandidate(
   try {
     await input.recycleRuntimeSubject(bindings, {
       claimOwner: input.claimOwner,
-      kind: input.candidate.kind,
       now: input.now,
       reason: input.reason,
       runtimeSubjectId: input.candidate.id,
@@ -159,7 +153,6 @@ async function repairRuntimeSubjectOperationCandidate(
 ): Promise<void> {
   try {
     await input.resumeRuntimeSubjectRecycleOperation(bindings, {
-      kind: input.candidate.kind,
       operationId: input.candidate.operationId,
       reason: input.reason,
       runtimeSubjectId: input.candidate.id,
@@ -308,7 +301,6 @@ export async function repairIdleConversationCheckpoints(
     try {
       await createSandboxCheckpoints(bindings, {
         requiredSessionId: candidate.sessionId,
-        rules: [SESSION_WORKSPACE_CHECKPOINT],
         sandboxId: candidate.sandboxId,
         sessionRunId: candidate.sessionRunId,
       });
@@ -353,14 +345,8 @@ export async function runSandboxMaintenance(bindings: ApiBindings): Promise<void
   await closeIdleSessionScopedConversationSessions(bindings, now);
   const repairedDeadlines = await repairStrandedRuntimeSubjectDeadlines(bindings.DB, { now });
 
-  if (repairedDeadlines.cattle > 0) {
-    logWarn("runtime.subject.inactive_deadline_repaired", { count: repairedDeadlines.cattle });
-  }
-
-  // A repaired pet is an orphan that was billing with no live driver and no
-  // active run — a distinct alert signal from routine resident-cattle repair.
-  if (repairedDeadlines.pet > 0) {
-    logWarn("runtime.subject.orphan_pet_deadline_repaired", { count: repairedDeadlines.pet });
+  if (repairedDeadlines > 0) {
+    logWarn("runtime.subject.inactive_deadline_repaired", { count: repairedDeadlines });
   }
 
   const [candidates, staleOperations, expiredActivations] = await Promise.all([

@@ -5,7 +5,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
-import { getRuntimeKindPolicy } from "../src/modules/runtime/domain/runtime-kind-policy";
 import { encodeSandboxBackupIdForStorage } from "../src/modules/runtime/infrastructure/sandbox-backup-id";
 import { createSandboxCheckpoints } from "../src/modules/runtime/infrastructure/sandbox-backup.service";
 import type { SandboxHandle } from "../src/modules/runtime/infrastructure/sandbox-handles";
@@ -33,11 +32,24 @@ async function fixture() {
   const database = await createPublicHttpContractDatabase();
   await insertOwnerSession(database);
   database.execute(`
+    CREATE TABLE native_resume_ref (
+      committed_session_run_id text,
+      committed_value text,
+      created_at integer NOT NULL,
+      kind text NOT NULL,
+      observed_driver_instance_id text,
+      observed_session_run_id text,
+      runtime_id text NOT NULL,
+      session_id text PRIMARY KEY NOT NULL,
+      updated_at integer NOT NULL,
+      value text NOT NULL
+    );
+
     UPDATE session SET kind = 'pet', last_message_at = 1, status = 'IDLE'
     WHERE id = '${ids.ownerSession}';
-    INSERT INTO sandbox (id, kind, subject_kind, subject_id, status, bind_mount_ready,
+    INSERT INTO sandbox (id, kind, subject_kind, subject_id, project_id, owner_account_id, status, bind_mount_ready,
       global_mounts_json, created_at, updated_at)
-    VALUES ('${ids.sandbox}', 'pet', 'agent', '${ids.agent}', 'backing_up', 1, '[]', 1, 1);
+    VALUES ('${ids.sandbox}', 'pet', 'session', '${ids.ownerSession}', '${ids.project}', '${ids.ownerAccount}', 'active', 1, '[]', 1, 1);
     INSERT INTO sandbox_session (cloudflare_session_id, created_at, cwd, origin_json,
       sandbox_id, session_id, status, updated_at)
     VALUES ('01J0000000000000000000000Z', 1, '${cwd}', '{}',
@@ -111,33 +123,25 @@ async function fixture() {
 
 async function checkpoint(f: Awaited<ReturnType<typeof fixture>>) {
   await createSandboxCheckpoints(f.bindings, {
-    rules: getRuntimeKindPolicy("pet").checkpoint.createOnHibernate,
+    requiredSessionId: ids.ownerSession,
+    sessionRunId: ids.run,
     sandboxId: ids.sandbox,
   });
 }
 
 describe("checkpoint residency", () => {
-  test("keeps a cold Session's real checkpoint through repeated shared-subject reclamation", async () => {
+  test("preserves an unconverted shared workspace and its saved archives", async () => {
     const f = await fixture();
-    // A different Session can reactivate the shared machine without restoring
-    // this closed Session's directory. Hibernate must not replace its archive.
+    await f.database
+      .prepare("UPDATE sandbox SET subject_kind = 'agent', subject_id = ?")
+      .bind(ids.agent)
+      .run();
+    const before = await f.database.prepare("SELECT * FROM sandbox_backup").all();
     for (let cycle = 0; cycle < 3; cycle += 1) {
-      await checkpoint(f);
-      await rm(f.path("/workspace"), { recursive: true, force: true });
+      await expect(checkpoint(f)).rejects.toThrow("verified exclusive execution binding");
     }
-    const prior = await f.database
-      .prepare("SELECT status FROM sandbox_backup WHERE id = ?")
-      .bind(priorId)
-      .first<{ status: string }>();
-    expect(prior?.status).toBe("ready");
-    const latest = await f.database
-      .prepare(
-        "SELECT id FROM sandbox_backup WHERE sandbox_id = ? AND dir = ? AND status = 'ready' ORDER BY created_at DESC, id DESC LIMIT 1",
-      )
-      .bind(ids.sandbox, cwd)
-      .first<{ id: string }>();
-    expect(latest?.id).toBe(priorId);
-    expect(f.createdDirs).not.toContain(cwd);
+    expect(await f.database.prepare("SELECT * FROM sandbox_backup").all()).toEqual(before);
+    expect(f.createdDirs).toEqual([]);
     expect(await readFile(join(f.archive(priorPlatformId), "private.txt"), "utf8")).toBe(
       "original Session work",
     );
@@ -173,7 +177,7 @@ describe("checkpoint residency", () => {
     },
   );
 
-  test("does not prune an unchanged directory when another checkpoint is created", async () => {
+  test("does not prune saved backups when the required workspace is missing", async () => {
     const f = await fixture();
     for (let time = 2; time <= 4; time += 1) {
       await f.database
@@ -183,13 +187,13 @@ describe("checkpoint residency", () => {
         .bind(time, cwd, encodeSandboxBackupIdForStorage(crypto.randomUUID()), ids.sandbox, time)
         .run();
     }
-    await checkpoint(f);
+    await expect(checkpoint(f)).rejects.toThrow("checkpoint");
     const retained = await f.database
       .prepare("SELECT COUNT(*) AS count FROM sandbox_backup WHERE dir = ? AND status = 'ready'")
       .bind(cwd)
       .first<{ count: number }>();
     expect(retained?.count).toBe(4);
-    expect(f.createdDirs).toEqual(["/workspace/memory"]);
+    expect(f.createdDirs).toEqual([]);
     expect(await readFile(join(f.archive(priorPlatformId), "private.txt"), "utf8")).toBe(
       "original Session work",
     );
@@ -203,14 +207,15 @@ describe("checkpoint residency", () => {
     expect(f.createdDirs).not.toContain(cwd);
   });
 
-  test("does not skip the required workspace of an explicit checkpoint", async () => {
+  test("retries the same committed Run without replacing its checkpoint", async () => {
     const f = await fixture();
-    await expect(
-      createSandboxCheckpoints(f.bindings, {
-        requiredSessionId: ids.ownerSession,
-        rules: getRuntimeKindPolicy("pet").checkpoint.createOnHibernate,
-        sandboxId: ids.sandbox,
-      }),
-    ).rejects.toThrow("checkpoint");
+    await mkdir(f.path(cwd), { recursive: true });
+    await writeFile(join(f.path(cwd), "private.txt"), "committed work");
+    await checkpoint(f);
+    const before = await f.database.prepare("SELECT * FROM sandbox_backup").all();
+    await rm(f.path(cwd), { recursive: true, force: true });
+    await checkpoint(f);
+    expect(f.createdDirs).toEqual([cwd]);
+    expect(await f.database.prepare("SELECT * FROM sandbox_backup").all()).toEqual(before);
   });
 });

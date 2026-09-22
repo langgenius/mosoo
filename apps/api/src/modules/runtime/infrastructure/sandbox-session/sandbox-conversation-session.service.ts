@@ -10,7 +10,7 @@ import {
   appendRuntimeDiagnosticEvent,
   toRuntimeDiagnosticBaseValue,
 } from "../../application/runtime-diagnostic-events";
-import { getRuntimeSubjectInactiveDeadline } from "../../domain/runtime-kind-policy";
+import { getRuntimeSubjectInactiveDeadline } from "../../domain/session-runtime-policy";
 import { isRuntimeSandboxLocalBucketEnabled } from "../runtime-sandbox-bucket-mount";
 import type { RuntimeConversationSessionRecord } from "../runtime-subject-lifecycle/runtime-subject-store";
 import {

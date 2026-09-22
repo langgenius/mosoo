@@ -57,18 +57,28 @@ const allocation = {
   agentId: ids.agent,
   projectId: ids.project,
   executionOwnerUserId: ids.account,
-  kind: "cattle",
-  subjectKind: "session",
-  subjectId: ids.session,
+  sessionId: ids.session,
   runtimeSubjectId: ids.sandbox,
 } as const;
 const profiles = Object.entries(RUNTIME_SANDBOX_IMAGES).map(
   ([runtimeId, image]) => [runtimeId, image.binding, image.profile] as const,
 );
 
+function seedSessionAuthority(db: SqliteD1Database): void {
+  db.execute(`
+    INSERT INTO project (id, name, organization_id, owner_account_id, created_at, updated_at)
+    VALUES ('${ids.project}', 'Fixture', '${ids.organization}', '${ids.account}', 1, 1);
+    INSERT INTO session (id, agent_id, project_id, creator_account_id, kind, model, provider,
+      runtime_id, renamed, status, created_at, updated_at)
+    VALUES ('${ids.session}', '${ids.agent}', '${ids.project}', '${ids.account}', 'cattle',
+      'gpt-5.4', 'openai', 'openai-runtime', 0, 'IDLE', 1, 1);
+  `);
+}
+
 function database(): SqliteD1Database {
   const db = new SqliteD1Database();
   applyDrizzleMigrations(db);
+  seedSessionAuthority(db);
   return db;
 }
 
@@ -147,6 +157,7 @@ describe("runtime-specific Sandbox images", () => {
   test("preserves legacy namespaces when the additive migration meets existing data", async () => {
     const db = new SqliteD1Database();
     applyDrizzleMigrationsBefore(db, "0015_runtime-sandbox-images");
+    seedSessionAuthority(db);
     db.execute(`INSERT INTO sandbox (id, agent_id, project_id, owner_account_id, kind, subject_kind, subject_id, status, created_at, updated_at)
       VALUES ('${ids.sandbox}', '${ids.agent}', '${ids.project}', '${ids.account}', 'cattle', 'session', '${ids.session}', 'cold', 1, 1)`);
     applyDrizzleMigration(db, "0015_runtime-sandbox-images");
@@ -215,18 +226,19 @@ describe("runtime-specific Sandbox images", () => {
     expect(disposed).toBe(true);
   });
 
-  test("keeps editable Pet workspaces compatible with different frozen Session runtimes", async () => {
+  test("does not replace an old shared machine with a new image", async () => {
     const db = database();
+    await ensureRuntimeSubjectId(db, { ...allocation, runtimeId: "openai-runtime" });
+    db.execute(
+      `UPDATE sandbox SET kind = 'pet', subject_kind = 'agent', subject_id = '${ids.agent}', sandbox_binding = 'Sandbox'`,
+    );
+    const before = await db.prepare("SELECT * FROM sandbox").all();
     for (const [runtimeId] of profiles) {
-      await ensureRuntimeSubjectId(db, {
-        ...allocation,
-        kind: "pet",
-        subjectKind: "agent",
-        subjectId: ids.agent,
-        runtimeId,
-      });
+      await expect(ensureRuntimeSubjectId(db, { ...allocation, runtimeId })).rejects.toThrow(
+        "verified exclusive execution binding",
+      );
     }
-    expect((await getRuntimeSubject(db, ids.sandbox))?.sandboxBinding).toBe("Sandbox");
+    expect(await db.prepare("SELECT * FROM sandbox").all()).toEqual(before);
   });
 
   test("fails closed on unknown runtime, missing record, corrupt or unavailable binding", async () => {
