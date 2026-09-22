@@ -54,6 +54,7 @@ export async function publishAgent(
   if (toolSupportError) throw validationError(toolSupportError);
   const readiness = await computeAgentReadiness(database, agent.ownerId, {
     agentId: agent.id,
+    builtInTools,
     bindings,
     environment,
     kind: agent.kind,

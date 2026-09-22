@@ -5,6 +5,8 @@ import {
   publishAgent,
 } from "../src/modules/agents/application/agent-command.service";
 import { createDraftAgent } from "../src/modules/agents/application/agent-package-draft.service";
+import { getAgentEditorState } from "../src/modules/agents/application/agent-query.service";
+import { computeAgentReadiness } from "../src/modules/agents/application/agent-readiness.service";
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import {
@@ -21,6 +23,51 @@ const viewer: AuthenticatedViewer = {
   name: "Owner",
 };
 const restricted = [{ name: "bash" as const, enabled: false }];
+
+test("readiness exposes unsupported restrictions before provider probing", async () => {
+  const db = await createPublicHttpContractDatabase();
+  const readiness = await computeAgentReadiness(db, ids.ownerAccount, {
+    agentId: ids.agent,
+    bindings: createPublicHttpTestBindings(db) as ApiBindings,
+    builtInTools: restricted,
+    environment: { environmentId: ids.environment },
+    kind: "cattle",
+    model: "gpt-5.6-luna",
+    projectId: ids.project,
+    provider: "openai",
+    runtimeId: "openai-runtime",
+  });
+  expect(readiness).toMatchObject({
+    ready: false,
+    issues: [{ code: "agent.runtime.tool_restrictions_unsupported", severity: "error" }],
+  });
+  expect(readiness.issues[0]?.message).toContain("does not support disabling");
+});
+
+test("editor readiness retains and explains legacy restrictions", async () => {
+  const db = await createPublicHttpContractDatabase();
+  await db
+    .prepare("UPDATE agent SET config_json = ? WHERE id = ?")
+    .bind(
+      JSON.stringify({
+        builtInTools: restricted,
+        packageMcpServers: [],
+        packageSkills: [],
+        packageResolution: null,
+      }),
+      ids.agent,
+    )
+    .run();
+  const state = await getAgentEditorState(db, viewer, {
+    agentId: ids.agent,
+    projectId: ids.project,
+  });
+  expect(state.builtInTools).toContainEqual(restricted[0]);
+  expect(state.readiness).toMatchObject({
+    ready: false,
+    issues: [{ code: "agent.runtime.tool_restrictions_unsupported" }],
+  });
+});
 test("API rejects unsupported tool restrictions before changing stored config or deployment versions", async () => {
   const db = await createPublicHttpContractDatabase();
   const before = await db
