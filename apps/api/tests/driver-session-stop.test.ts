@@ -29,6 +29,7 @@ function createDriverStopDatabase(): SqliteD1Database {
       status text NOT NULL,
       model text,
       provider text,
+      runtime_id text,
       trace_id text NOT NULL,
       trigger text NOT NULL,
       error_code text,
@@ -55,6 +56,11 @@ function createDriverStopDatabase(): SqliteD1Database {
       type text DEFAULT 'ui' NOT NULL,
       updated_at integer NOT NULL,
       workspace_checkpoint_required integer DEFAULT 0 NOT NULL
+    );
+
+    CREATE TABLE session_event (
+      run_id text,
+      event_type text NOT NULL
     );
 
     CREATE TABLE sandbox (

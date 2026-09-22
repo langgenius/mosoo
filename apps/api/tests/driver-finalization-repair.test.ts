@@ -27,6 +27,7 @@ import {
   createRuntimeCommandRecord,
   getRuntimeCommandRecord,
 } from "../src/modules/runtime/infrastructure/session-runs/runtime-command-store.repository";
+import { setSessionRunStatus } from "../src/modules/runtime/infrastructure/session-runs/session-run-store.repository";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import {
   createPublicHttpContractDatabase,
@@ -543,6 +544,60 @@ async function createAfterBenchmarkSample() {
 }
 
 describe("driver finalization repair", () => {
+  test("resumes event and lease cleanup after the terminal Run was already committed", async () => {
+    const database = await createPublicHttpContractDatabase();
+    await insertFinalizedDriverLeaseFixture(database);
+    const bindings = createPublicHttpTestBindings(database) as ApiBindings;
+    await setSessionRunStatus(database, {
+      error: PROVISION_ERROR,
+      runId: FINALIZE_RUN_ID,
+      source: "api",
+      status: "failed",
+    });
+    const before = await database
+      .prepare("SELECT * FROM session_run WHERE id = ?")
+      .bind(FINALIZE_RUN_ID)
+      .first();
+    expect(await readTerminalEvents(database)).toEqual([]);
+    const output: string[] = [];
+    const originalInfo = console.info;
+    console.info = (...values: unknown[]) => output.push(values.map(String).join(" "));
+    try {
+      // Both callers can observe the same missing receipt before either writes it.
+      const repair = () =>
+        repairFinalizedTerminalDriverRunState(bindings, {
+          driverInstanceId: PUBLIC_API_TEST_IDS.driverOwner as DriverInstanceId,
+          status: "stopped",
+        });
+      const outcomes = await Promise.all([repair(), repair()]);
+      expect(outcomes.every((outcome) => outcome.released)).toBe(true);
+      const emittedAfterRace = output.length;
+      await repair();
+      expect(output).toHaveLength(emittedAfterRace);
+    } finally {
+      console.info = originalInfo;
+    }
+    const logs = output
+      .map((entry) => JSON.parse(entry))
+      .filter((entry) => entry.message === "session.run.terminal");
+    expect(logs.length).toBeGreaterThan(0);
+    expect(logs.length).toBeLessThanOrEqual(2);
+    expect(logs.every((entry) => entry.metadata.errorCode === PROVISION_ERROR.code)).toBe(true);
+    expect(await readTerminalEvents(database)).toHaveLength(1);
+    expect(
+      await database
+        .prepare("SELECT * FROM session_run WHERE id = ?")
+        .bind(FINALIZE_RUN_ID)
+        .first(),
+    ).toEqual(before);
+    expect(
+      await database
+        .prepare("SELECT inactive_deadline_at FROM sandbox WHERE id = ?")
+        .bind(PUBLIC_API_TEST_IDS.sandbox)
+        .first(),
+    ).toMatchObject({ inactive_deadline_at: expect.any(Number) });
+  });
+
   test("fails active run lease, accepted commands, and publishes a replayable terminal event", async () => {
     const database = await createPublicHttpContractDatabase();
     await insertFinalizedDriverLeaseFixture(database);

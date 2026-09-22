@@ -153,6 +153,168 @@ async function readFailureEvents(database: SqliteD1Database): Promise<FailureEve
 }
 
 describe("canonical session run terminal failure", () => {
+  test.each(["canonical", "maintenance"] as const)(
+    "emits the observation before an interrupted terminal event commit returns: %s",
+    async (path) => {
+      const database = await createPublicHttpContractDatabase();
+      await insertLinkedRunFixture(database, "failed");
+      await database
+        .prepare("UPDATE driver_instance SET status = 'stopped' WHERE id = ?")
+        .bind(DRIVER_ID)
+        .run();
+      const output: string[] = [];
+      let interrupted = false;
+      const interruptedDatabase = new Proxy(database, {
+        get(target, property, receiver) {
+          if (property === "batch") {
+            return async (statements: D1PreparedStatement[]) => {
+              const result = await target.batch(statements);
+              if (!interrupted && (await readFailureEvents(database)).length > 0) {
+                interrupted = true;
+                expect(output.some((entry) => entry.includes('"session.run.terminal"'))).toBe(true);
+                throw new Error("injected cancellation after durable terminal event");
+              }
+              return result;
+            };
+          }
+          const value = Reflect.get(target, property, receiver);
+          return typeof value === "function" ? value.bind(target) : value;
+        },
+      });
+      const repair = (db: SqliteD1Database) => {
+        const bindings = createPublicHttpTestBindings(db) as ApiBindings;
+        return path === "maintenance"
+          ? reconcileTerminalSessionRuns(bindings, { limit: 10 })
+          : recordCanonicalSessionRunFailure(bindings, {
+              error: PROVISION_ERROR,
+              runId: RUN_ID,
+              sessionId: PUBLIC_API_TEST_IDS.ownerSession,
+              source: "api",
+            });
+      };
+      const originalInfo = console.info;
+      console.info = (...values: unknown[]) => output.push(values.map(String).join(" "));
+      try {
+        await expect(repair(interruptedDatabase)).rejects.toThrow("injected cancellation");
+        await repair(database);
+      } finally {
+        console.info = originalInfo;
+      }
+      expect(interrupted).toBe(true);
+      expect(output.filter((entry) => entry.includes('"session.run.terminal"'))).toHaveLength(1);
+      expect(await readFailureEvents(database)).toHaveLength(1);
+    },
+  );
+
+  test("does not reopen committed history when the console observation is lost", async () => {
+    const database = await createPublicHttpContractDatabase();
+    await insertLinkedRunFixture(database, "failed");
+    const bindings = createPublicHttpTestBindings(database) as ApiBindings;
+    const repair = () =>
+      recordCanonicalSessionRunFailure(bindings, {
+        error: PROVISION_ERROR,
+        runId: RUN_ID,
+        sessionId: PUBLIC_API_TEST_IDS.ownerSession,
+        source: "api",
+      });
+    const originalInfo = console.info;
+    const replayed: string[] = [];
+    try {
+      // Tail delivery has no durable acknowledgement; simulate dropping the log.
+      console.info = () => {};
+      await repair();
+      console.info = (...values: unknown[]) => replayed.push(values.map(String).join(" "));
+      await repair();
+    } finally {
+      console.info = originalInfo;
+    }
+    expect(await readFailureEvents(database)).toHaveLength(1);
+    expect(replayed.filter((entry) => entry.includes('"session.run.terminal"'))).toEqual([]);
+  });
+
+  test.each([
+    { path: "canonical", status: "failed" },
+    { path: "maintenance", status: "failed" },
+    { path: "maintenance", status: "completed" },
+    { path: "maintenance", status: "cancelled" },
+    { path: "maintenance", status: "expired" },
+  ] as const)(
+    "repairs terminal observation using persisted identity and time: %p",
+    async ({ path, status }) => {
+      const database = await createPublicHttpContractDatabase();
+      await insertLinkedRunFixture(database, "failed");
+      const completedAt = Date.parse("2026-09-21T23:59:59.000Z");
+      await database
+        .prepare(
+          `UPDATE session_run SET status = ?, status_source = 'api', completed_at = ?, started_at = ?, created_at = ?, updated_at = ? WHERE id = ?`,
+        )
+        .bind(status, completedAt, completedAt - 10_000, completedAt - 12_000, completedAt, RUN_ID)
+        .run();
+      await database
+        .prepare("UPDATE driver_instance SET status = 'stopped' WHERE id = ?")
+        .bind(DRIVER_ID)
+        .run();
+      // The Run's persisted runtime is authoritative even if another source drifts.
+      await database
+        .prepare("UPDATE session SET runtime_id = 'acp-fallback' WHERE id = ?")
+        .bind(PUBLIC_API_TEST_IDS.ownerSession)
+        .run();
+      const before = await database
+        .prepare("SELECT * FROM session_run WHERE id = ?")
+        .bind(RUN_ID)
+        .first();
+      const bindings = createPublicHttpTestBindings(database) as ApiBindings;
+      const output: string[] = [];
+      const originalInfo = console.info;
+      console.info = (...values: unknown[]) => output.push(values.map(String).join(" "));
+      try {
+        for (let attempt = 0; attempt < 2; attempt += 1) {
+          if (path === "canonical") {
+            await recordCanonicalSessionRunFailure(bindings, {
+              error: PROVISION_ERROR,
+              runId: RUN_ID,
+              sessionId: PUBLIC_API_TEST_IDS.ownerSession,
+              source: "driver",
+            });
+          } else {
+            await reconcileTerminalSessionRuns(bindings, { limit: 10 });
+          }
+        }
+      } finally {
+        console.info = originalInfo;
+      }
+      const logs = output
+        .map((line) => JSON.parse(line))
+        .filter((entry) => entry.message === "session.run.terminal");
+      expect(logs).toHaveLength(1);
+      expect(logs[0]).toMatchObject({
+        timestamp: "2026-09-21T23:59:59.000Z",
+        metadata: {
+          completedAt: "2026-09-21T23:59:59.000Z",
+          durationMs: 10_000,
+          endToEndMs: 12_000,
+          errorCode: DRIVER_ERROR.code,
+          runId: RUN_ID,
+          runtimeId: "openai-runtime",
+          sessionType: "ui",
+          source: "api",
+          status,
+        },
+      });
+      expect(
+        await database.prepare("SELECT * FROM session_run WHERE id = ?").bind(RUN_ID).first(),
+      ).toEqual(before);
+      expect(
+        await database
+          .prepare(
+            "SELECT COUNT(*) AS count FROM session_event WHERE run_id = ? AND event_type IN ('run.failed', 'run.completed', 'run.cancelled')",
+          )
+          .bind(RUN_ID)
+          .first(),
+      ).toEqual({ count: 1 });
+    },
+  );
+
   test("treats a concurrent failed transition as canonical success", async () => {
     const database = await createPublicHttpContractDatabase();
     await insertLinkedRunFixture(database);
