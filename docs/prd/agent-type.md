@@ -8,6 +8,13 @@ An Agent is reusable configuration. Each new Session owns an independent working
 
 Owners choose a name, harness and model. They do not select Assistant/Task or Pet/Cattle, lock that choice at publication, or fork just to change a type. Creating, importing and forking configuration cannot opt into a shared machine. Old kind inputs remain accepted for compatibility but do not select execution behavior. Draft YAML and generated calling instructions expose no type choice; package input may omit the legacy kind field.
 
+The candidate's Agent models, Project Agent listings and exported manifests no longer
+return a Pet/Cattle field. Import validates an optional historical label and discards
+it before producing reusable configuration. Existing database labels remain untouched.
+Every preset can select an owned environment with a full or limited network policy;
+the Session runtime enforces that policy. A historical Pet label cannot disable a
+limited-network choice in the editor.
+
 This applies to console Preview, v1 published/live admission, v2 saved presets and direct Project invocation. v1 retains its existing publication and identity requirements. Publishing an Agent remains separate from the Session ownership rule.
 
 All Sessions use the same durable completion boundary: the native cursor and complete

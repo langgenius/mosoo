@@ -23,12 +23,10 @@ import type {
   AgentManifestValidationResult,
   AgentResolutionIssue,
 } from "./agent-manifest.contract";
-import type { AgentKind } from "./agent.contract";
 import { AGENT_KIND_LIST_LABEL, normalizeAgentBuiltInTools } from "./agent.contract";
 
 interface ManifestSections {
   environment: Record<string, unknown>;
-  kind: AgentKind | null;
   metadata: Record<string, unknown>;
   model: string | null;
   name: string | null;
@@ -40,7 +38,6 @@ interface ManifestSections {
 }
 
 interface CompleteManifestSections extends ManifestSections {
-  kind: AgentKind;
   model: string;
   name: string;
   provider: string;
@@ -109,7 +106,6 @@ function readManifestSections(input: Record<string, unknown>): ManifestSections 
 
   return {
     environment,
-    kind: input["kind"] == null ? "cattle" : readAgentKind(input["kind"]),
     metadata,
     model: readString(runtime, "model"),
     name: readString(metadata, "name"),
@@ -139,7 +135,7 @@ function collectManifestIssues(
     );
   }
 
-  appendMissingManifestIssues(issues, sections);
+  appendMissingManifestIssues(issues, sections, input);
 
   if (hasRecordEntries(unknownFields)) {
     issues.push(
@@ -158,6 +154,7 @@ function collectManifestIssues(
 function appendMissingManifestIssues(
   issues: AgentResolutionIssue[],
   sections: ManifestSections,
+  input: Record<string, unknown>,
 ): void {
   if (!hasRequiredText(sections.name)) {
     issues.push(
@@ -169,11 +166,12 @@ function appendMissingManifestIssues(
     );
   }
 
-  if (sections.kind === null) {
+  if (input["kind"] != null && readAgentKind(input["kind"]) === null) {
     issues.push(
       createValidationIssue({
         code: "manifest.kind.missing",
-        message: `Agent Manifest kind must be ${AGENT_KIND_LIST_LABEL}.`,
+        message: `Legacy Agent Manifest kind must be ${AGENT_KIND_LIST_LABEL}.`,
+        status: "unsupported",
         targetType: "agent",
       }),
     );
@@ -203,7 +201,6 @@ function appendMissingManifestIssues(
 function hasCompleteManifestCore(sections: ManifestSections): sections is CompleteManifestSections {
   return (
     hasRequiredText(sections.name) &&
-    sections.kind !== null &&
     hasRequiredText(sections.runtimeId) &&
     hasRequiredText(sections.provider) &&
     hasRequiredText(sections.model) &&
@@ -233,7 +230,6 @@ function buildAgentManifest(
       packages: readParsedArray(sections.environment, "packages", readEnvironmentPackageSpec),
       setupScript: readString(sections.environment, "setupScript") ?? "",
     },
-    kind: sections.kind,
     manifestVersion: AGENT_MANIFEST_VERSION,
     mcpServers: readParsedArray(input, "mcpServers", readMcpServerBinding),
     metadata: {

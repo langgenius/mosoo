@@ -27,7 +27,6 @@ type Agent {
   createdAt: String!
   description: String
   id: ULID!
-  kind: AgentKind!
   liveVersion: AgentDeploymentVersion
   model: String!
   name: String!
@@ -81,7 +80,6 @@ type AgentDeploymentVersion {
   environmentId: ULID
   id: ULID!
   isLive: Boolean!
-  kind: AgentKind!
   model: String!
   provider: String!
   runtimeId: String!
@@ -93,7 +91,6 @@ type AgentDetail {
   createdAt: String!
   description: String
   id: ULID!
-  kind: AgentKind!
   liveVersion: AgentDeploymentVersion
   model: String!
   name: String!
@@ -407,7 +404,6 @@ type AgentSummary {
   createdAt: String!
   description: String
   id: ULID!
-  kind: AgentKind!
   name: String!
   owner: AgentOwnerSummary!
   projectId: ULID!
@@ -1091,7 +1087,6 @@ type ProjectOverview {
 type ProjectOverviewAgent {
   description: String
   id: ULID!
-  kind: AgentKind!
   model: String!
   name: String!
   projectId: ULID!

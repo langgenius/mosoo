@@ -46,7 +46,7 @@ interface AgentDeploymentVersionRow {
   createdByAccountId: AccountId;
   environmentId: EnvironmentId | null;
   id: AgentDeploymentVersionId;
-  kind: AgentDeploymentVersion["kind"];
+  kind: AgentRow["kind"];
   mcpBindingsJson: string;
   model: string;
   prompt: string;
@@ -105,7 +105,7 @@ export interface AgentDeploymentVersionRecord {
   createdByAccountId: AccountId;
   environmentId: EnvironmentId | null;
   id: AgentDeploymentVersionId;
-  kind: AgentDeploymentVersion["kind"];
+  kind: AgentRow["kind"];
   mcpBindings: AgentVersionMcpBindingSnapshot[];
   model: string;
   prompt: string;
@@ -225,7 +225,7 @@ export async function prepareAgentDeploymentVersionCandidate(
     createdByAccountId: viewer.id,
     environmentId: spec.environment.environmentId,
     id: versionId,
-    kind: spec.kind,
+    kind: agent.kind,
     mcpBindingsJson: JSON.stringify(mcpBindings),
     model: spec.model,
     prompt: spec.prompt,
@@ -244,7 +244,7 @@ export async function prepareAgentDeploymentVersionCandidate(
       createdByAccountId: readAccountId(viewer.id, "Account ID"),
       environmentId: spec.environment.environmentId,
       id: versionId,
-      kind: spec.kind,
+      kind: agent.kind,
       mcpBindings,
       model: spec.model,
       prompt: spec.prompt,
@@ -368,7 +368,6 @@ export function toAgentDeploymentVersionModel(
     environmentId: version.environmentId,
     id: version.id,
     isLive: version.id === liveDeploymentVersionId,
-    kind: version.kind,
     model: runtimeModel.model,
     provider: runtimeModel.provider,
     runtimeId: runtimeModel.runtimeId,

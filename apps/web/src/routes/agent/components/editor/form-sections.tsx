@@ -241,12 +241,7 @@ export function EnvironmentSection({
     <div className="space-y-5">
       <div>
         <SectionHeader>{t("agent.environment")}</SectionHeader>
-        <EnvironmentPicker
-          legacyKind={agent.kind}
-          model={model}
-          projectId={agent.projectId}
-          readOnly={readOnly}
-        />
+        <EnvironmentPicker model={model} projectId={agent.projectId} readOnly={readOnly} />
       </div>
     </div>
   );

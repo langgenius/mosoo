@@ -13,106 +13,11 @@ import type { AgentMcpBinding } from "../mcp/mcp.contract";
 import type { JsonObject } from "../validation/primitives.contract";
 import type { AgentPackageResolutionState } from "./agent-manifest.contract";
 
+/** Historical storage and compatibility inputs only; never selects runtime ownership. */
 export const AGENT_KIND_VALUES = ["pet", "cattle"] as const;
 export const AGENT_KIND_LIST_LABEL = AGENT_KIND_VALUES.join(" or ");
 export const AgentKind = type.enumerated(...AGENT_KIND_VALUES);
 export type AgentKind = typeof AgentKind.infer;
-export type AgentRuntimeSubjectScope = "agent" | "session";
-export type AgentRuntimeTerminalTarget = "stable_subject" | "unavailable";
-
-export const AGENT_KIND_RUNTIME_SUBJECT_SCOPES = {
-  cattle: "session",
-  pet: "agent",
-} as const satisfies Record<AgentKind, AgentRuntimeSubjectScope>;
-
-export interface AgentKindRuntimePolicy {
-  readonly kind: AgentKind;
-  readonly operations: {
-    readonly ownerTerminal: boolean;
-    readonly resetSubjectState: boolean;
-  };
-  readonly stateRetention: {
-    readonly preservesRuntimeState: boolean;
-    readonly summary: string;
-  };
-  readonly subject: {
-    readonly scope: AgentRuntimeSubjectScope;
-    readonly stable: boolean;
-    readonly summary: string;
-  };
-  readonly terminal: {
-    readonly summary: string;
-    readonly target: AgentRuntimeTerminalTarget;
-  };
-}
-
-export const AGENT_KIND_RUNTIME_POLICIES = {
-  cattle: {
-    kind: "cattle",
-    operations: {
-      ownerTerminal: false,
-      resetSubjectState: false,
-    },
-    stateRetention: {
-      preservesRuntimeState: true,
-      summary: "Thread workspace and resume state are preserved through Backup/Restore.",
-    },
-    subject: {
-      scope: "session",
-      stable: false,
-      summary: "Session-scoped runtime subject, subject = session:{sessionId}.",
-    },
-    terminal: {
-      summary: "Owner terminal is unavailable for session-scoped sandboxes.",
-      target: "unavailable",
-    },
-  },
-  pet: {
-    kind: "pet",
-    operations: {
-      ownerTerminal: true,
-      resetSubjectState: true,
-    },
-    stateRetention: {
-      preservesRuntimeState: true,
-      summary: "Agent sandbox state is preserved through Backup/Restore.",
-    },
-    subject: {
-      scope: "agent",
-      stable: true,
-      summary: "Agent-scoped stable runtime subject, subject = agent:{agentId}.",
-    },
-    terminal: {
-      summary: "Owner terminal connects to the stable agent sandbox.",
-      target: "stable_subject",
-    },
-  },
-} as const satisfies Record<AgentKind, AgentKindRuntimePolicy>;
-
-export function getAgentKindRuntimeSubjectScope(kind: AgentKind): AgentRuntimeSubjectScope {
-  return AGENT_KIND_RUNTIME_POLICIES[kind].subject.scope;
-}
-
-export function getAgentKindRuntimePolicy(kind: AgentKind): AgentKindRuntimePolicy {
-  return AGENT_KIND_RUNTIME_POLICIES[kind];
-}
-
-export function agentKindUsesStableRuntimeSubject(kind: AgentKind): boolean {
-  return getAgentKindRuntimePolicy(kind).subject.stable;
-}
-
-export function agentKindPreservesRuntimeState(kind: AgentKind): boolean {
-  return getAgentKindRuntimePolicy(kind).stateRetention.preservesRuntimeState;
-}
-
-export function agentKindSupportsOwnerTerminal(kind: AgentKind): boolean {
-  return getAgentKindRuntimePolicy(kind).operations.ownerTerminal;
-}
-
-export function agentKindSupportsResetState(kind: AgentKind): boolean {
-  return getAgentKindRuntimePolicy(kind).operations.resetSubjectState;
-}
-
 export type AgentStatus = "draft" | "published";
 export type AgentVisibility = "private";
 export type AgentSkillState = "active" | "tombstone";
@@ -207,7 +112,6 @@ export interface AgentDeploymentVersion {
   environmentId: EnvironmentId | null;
   id: AgentDeploymentVersionId;
   isLive: boolean;
-  kind: AgentKind;
   model: string;
   provider: string;
   runtimeId: string;
@@ -219,7 +123,6 @@ export interface AgentSummary {
   createdAt: string;
   description: string | null;
   id: AgentId;
-  kind: AgentKind;
   name: string;
   owner: AgentOwnerSummary;
   runtimeId: string;
@@ -235,7 +138,6 @@ export interface Agent {
   createdAt: string;
   description: string | null;
   id: AgentId;
-  kind: AgentKind;
   liveVersion: AgentDeploymentVersion | null;
   model: string;
   name: string;
@@ -253,7 +155,6 @@ export interface AgentDetail {
   createdAt: string;
   description: string | null;
   id: AgentId;
-  kind: AgentKind;
   liveVersion: AgentDeploymentVersion | null;
   model: string;
   name: string;

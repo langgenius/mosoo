@@ -1,4 +1,4 @@
-import type { AgentKind, AgentStatus } from "../agent/agent.contract";
+import type { AgentStatus } from "../agent/agent.contract";
 import type {
   AccountId,
   AgentId,
@@ -27,7 +27,6 @@ export interface ProjectOverviewAgent {
   projectId: ProjectId;
   description: string | null;
   id: AgentId;
-  kind: AgentKind;
   model: string;
   name: string;
   provider: string;

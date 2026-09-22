@@ -90,7 +90,6 @@ export const agentSchema = /* GraphQL */ `
     environmentId: ULID
     id: ULID!
     isLive: Boolean!
-    kind: AgentKind!
     model: String!
     provider: String!
     runtimeId: String!
@@ -102,7 +101,6 @@ export const agentSchema = /* GraphQL */ `
     createdAt: String!
     description: String
     id: ULID!
-    kind: AgentKind!
     liveVersion: AgentDeploymentVersion
     model: String!
     name: String!
@@ -204,7 +202,6 @@ export const agentSchema = /* GraphQL */ `
     createdAt: String!
     description: String
     id: ULID!
-    kind: AgentKind!
     name: String!
     owner: AgentOwnerSummary!
     runtimeId: String!
@@ -220,7 +217,6 @@ export const agentSchema = /* GraphQL */ `
     createdAt: String!
     description: String
     id: ULID!
-    kind: AgentKind!
     liveVersion: AgentDeploymentVersion
     model: String!
     name: String!

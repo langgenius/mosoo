@@ -43,7 +43,6 @@ export function readAgentPackageFromRecord(
 }
 
 export function buildPackageManifest(input: Record<string, unknown>): AgentManifest | null {
-  const kind = readAgentKind(input["kind"]);
   const runtime = readString(input, "runtime");
   const provider = readString(input, "provider");
   const model = readString(input, "model");
@@ -53,7 +52,7 @@ export function buildPackageManifest(input: Record<string, unknown>): AgentManif
   const runtimeSettings = input["settings"] ?? input["providerOptions"];
 
   if (
-    kind === null ||
+    (input["kind"] != null && readAgentKind(input["kind"]) === null) ||
     !hasRequiredText(name) ||
     !hasRequiredText(runtime) ||
     !hasRequiredText(provider) ||
@@ -69,7 +68,6 @@ export function buildPackageManifest(input: Record<string, unknown>): AgentManif
       readParsedArray(input, "builtInTools", readBuiltInToolConfig),
     ),
     environment: readPackageEnvironment(input["environment"]),
-    kind,
     manifestVersion: AGENT_MANIFEST_VERSION,
     mcpServers: readParsedArray(input, "mcpServers", readPackageMcpServer),
     metadata: {

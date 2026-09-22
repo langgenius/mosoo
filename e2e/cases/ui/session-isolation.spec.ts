@@ -17,8 +17,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 // UI wiring only. D1 creation/import/fork and existing Session ownership are
 // verified by API tests; this fixture never invokes a model or a real API.
-for (const kind of ["cattle", "pet"] as const) {
-  test(`Session isolation: ${kind} configuration has no type selection`, async ({ page }) => {
+for (const status of ["draft", "published"] as const) {
+  test(`Session isolation: ${status} configuration has no type selection`, async ({ page }) => {
     await installConsoleFixtures(page, { locale: "en" });
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
@@ -29,7 +29,6 @@ for (const kind of ["cattle", "pet"] as const) {
       createdAt: now,
       description: "UI acceptance fixture",
       id: agentId,
-      kind,
       liveVersion: null,
       model: "gpt-5.4",
       name: "Session configuration",
@@ -39,7 +38,7 @@ for (const kind of ["cattle", "pet"] as const) {
       provider: "openai",
       runtimeId: "openai-runtime",
       skills: [],
-      status: kind === "pet" ? "published" : "draft",
+      status,
       tools: [],
       updatedAt: now,
       versions: [],
@@ -53,7 +52,7 @@ for (const kind of ["cattle", "pet"] as const) {
       }
       const operation = /(?:query|mutation)\s+(\w+)/u.exec(body["query"])?.[1];
       if (operation) operations.push(operation);
-      if (operation === "UpdateAgentConfig" && kind === "pet" && !failedSave) {
+      if (operation === "UpdateAgentConfig" && status === "published" && !failedSave) {
         failedSave = true;
         await route.fulfill({
           contentType: "application/json",
@@ -116,7 +115,7 @@ for (const kind of ["cattle", "pet"] as const) {
       await route.fulfill({ contentType: "application/json", body: JSON.stringify({ data }) });
     });
 
-    if (kind === "cattle") {
+    if (status === "draft") {
       await page.goto("/agent?create=1");
       const dialog = page.getByRole("dialog", { name: "New Agent" });
       await expect(dialog).toBeVisible();
@@ -137,14 +136,14 @@ for (const kind of ["cattle", "pet"] as const) {
     await page
       .getByRole("textbox", { name: "System prompt", exact: true })
       .fill("Edited durable instructions.");
-    if (kind === "pet") {
+    if (status === "published") {
       await expect(page.getByRole("alert")).toContainText("Temporary preset save failure");
       await page.getByRole("button", { name: "Retry", exact: true }).click();
     }
     await expect
       .poll(() => writes.some((write) => write["prompt"] === "Edited durable instructions."))
       .toBe(true);
-    if (kind === "pet") {
+    if (status === "published") {
       const claude = page.getByRole("button", { name: /Claude Agent SDK|Claude Code/u });
       await expect(claude).toBeEnabled();
       await claude.click();
@@ -152,7 +151,23 @@ for (const kind of ["cattle", "pet"] as const) {
         .poll(() => writes.some((write) => write["runtimeId"] === "claude-agent-sdk"))
         .toBe(true);
     }
-    expect(agent.kind).toBe(kind);
+    await page.getByRole("button", { name: /Default sandbox/u }).click();
+    const limitedEnvironment = page.getByRole("button", {
+      name: /Review runner \(restricted egress\)/u,
+    });
+    await expect(limitedEnvironment).toBeEnabled();
+    await limitedEnvironment.click();
+    await expect
+      .poll(() =>
+        writes.some((write) => {
+          const environment = write["environment"];
+          return (
+            isRecord(environment) && environment["environmentId"] === "01J00000000000000000000702"
+          );
+        }),
+      )
+      .toBe(true);
+    expect(agent).not.toHaveProperty("kind");
     expect(
       operations.filter((name) =>
         ["RestartDriver", "RecreateSandbox", "ResetAgentState", "CreateAgentFork"].includes(name),
@@ -163,7 +178,7 @@ for (const kind of ["cattle", "pet"] as const) {
     );
     await expect(page.getByRole("button", { name: "Open terminal", exact: true })).toHaveCount(0);
     mkdirSync(output, { recursive: true });
-    await page.screenshot({ path: `${output}${kind}-editor.png`, fullPage: true });
+    await page.screenshot({ path: `${output}${status}-editor.png`, fullPage: true });
     expect(errors).toEqual([]);
   });
 }
