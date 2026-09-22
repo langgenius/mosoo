@@ -27,6 +27,14 @@ Custom OpenAI-compatible models remain on OpenCode by default because some endpo
 
 The Providers page currently offers those nine named providers plus the custom-model action. A saved key unlocks only models that the selected runtime can run.
 
+## Built-in tool restrictions
+
+Only Claude Agent SDK supports disabling individual built-in tools. OpenAI Runtime and OpenCode hide these switches and omit the all-enabled tool list from editable YAML. Explicit disabled settings remain visible as invalid configuration and must not be silently reset to enabled.
+
+Console saves, API/CLI updates, package imports/forks, and publishing reject unsupported restrictions before writing an Agent or deployment version. Existing invalid configurations must be explicitly corrected before saving or publishing; this does not automatically repair an already published deployment.
+
+Readiness and Session creation also reject an existing draft or published version with unsupported restrictions before creating a Session. Cold and cached Run preparation validate the frozen Session configuration before provisioning a runtime; changing the current Agent draft does not silently alter a published version or existing Session's tool policy.
+
 ## Product boundary
 
 The runtime catalog exists to launch supported Agents reliably, not to become a provider marketplace. The exact provider list may change during Alpha; the stable product promise is a normalized managed runtime and API for supported Agent configurations.
