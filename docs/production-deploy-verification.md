@@ -69,12 +69,12 @@ upgrade the Driver protocol or migrate an existing subject's namespace.
 
 ### #582 native continuation protocol cutover
 
-The unreleased Session changes use Driver protocol 5 to carry the
+The unreleased Session changes use Driver protocol 6 to carry the
 native-continuation requirement and explicitly nullable Agent provenance.
-Boot payloads and new handshakes reject protocols 1 through 4. Version 3 is reserved by the separate upstream SDK boundary migration,
-which still needs compatible main/release integration before this host backport
-can be released. This is an internal API/Driver compatibility change, not a change to
-public Thread/Run routes or customer Session IDs.
+Boot payloads and new handshakes accept exactly protocol 6, including rejecting
+protocol 5. Compatible Driver main/release integration remains a release
+prerequisite. This internal API/Driver cutover preserves public Thread/Run routes
+and customer Session IDs.
 
 Prepare one matched API revision and Driver image set. Before switching versions,
 close new admission, finish admitted work and verify its committed recovery state,
@@ -85,6 +85,13 @@ continuation pass staging acceptance. Rehearse the reverse sequence with matched
 rollback artifacts and the same admission barrier; do not split API and Driver
 versions or interrupt customer work to force an upgrade. The production plan and
 its rollback still require the owner's concrete approval.
+
+Rollback qualification requires successful real tool work in the same direct
+Session on the rollback candidate, followed by successful continuation after
+switching forward. Verify the native identity, frozen configuration, original
+files, and work committed during rollback. A failed rollback Run remains a
+failed rehearsal even if switching forward restores the prior successful
+checkpoint; retain its Run and artifact evidence for diagnosis.
 
 Migration `0017_optional-session-agent.sql` preserves existing Agent references
 while allowing Project-owned execution without a preset. It rewrites the Agent
