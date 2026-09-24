@@ -16,10 +16,6 @@ import {
   runAppDatabaseBatch,
 } from "../../../../platform/db/drizzle";
 import type { AppDatabase } from "../../../../platform/db/drizzle";
-import {
-  sandboxIsolationAvailablePredicate,
-  sessionIsolationPendingPredicate,
-} from "../../../sessions/infrastructure/session-isolation-barrier.repository";
 import { toRuntimeSubjectStatusLifecycleEventName } from "../../domain/runtime-subject-lifecycle.machine";
 import {
   completedRunHistoryPredicate,
@@ -295,11 +291,9 @@ export async function ensureRuntimeConversationSessionRecord(
     .select({
       ready: sql<number>`CASE WHEN EXISTS (
       SELECT 1 FROM ${sessionsTable} WHERE ${sessionsTable.id} = ${input.sessionId}
-        AND NOT ${sessionIsolationPendingPredicate(db)}
     ) AND EXISTS (
       SELECT 1 FROM ${sandboxesTable} WHERE ${sandboxesTable.id} = ${input.runtimeSubjectId}
-        AND ${sandboxIsolationAvailablePredicate()}
-    ) THEN 1 ELSE json('sandbox allocation is held by a Session operation') END`,
+    ) THEN 1 ELSE json('sandbox allocation is missing its owner') END`,
     })
     .from(sql`(SELECT 1)`);
   const insert = db
@@ -350,9 +344,7 @@ function conversationBindingPredicate(db: AppDatabase, input: ConversationSessio
       db
         .select({ id: sandboxesTable.id })
         .from(sandboxesTable)
-        .where(
-          and(eq(sandboxesTable.id, input.runtimeSubjectId), sandboxIsolationAvailablePredicate()),
-        ),
+        .where(eq(sandboxesTable.id, input.runtimeSubjectId)),
     ),
   );
 }

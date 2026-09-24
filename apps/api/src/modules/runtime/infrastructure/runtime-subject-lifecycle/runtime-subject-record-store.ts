@@ -16,7 +16,6 @@ import type { SQL } from "drizzle-orm";
 import { sandboxBindingForRuntime } from "../../../../platform/cloudflare/sandbox-binding";
 import { getAppDatabase, getD1ChangeCount } from "../../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../../time";
-import { sandboxIsolationAvailablePredicate } from "../../../sessions/infrastructure/session-isolation-barrier.repository";
 import {
   RUNTIME_SUBJECT_CLAIMABLE_STATUSES,
   toRuntimeSubjectStatusLifecycleEventName,
@@ -336,7 +335,6 @@ export async function claimRuntimeSubjectActivation(
           exclusiveSessionRuntimeSubjectPredicate(),
           eq(sandboxesTable.status, input.expectedStatus),
           inArray(sandboxesTable.status, RUNTIME_SUBJECT_CLAIMABLE_STATUSES),
-          sandboxIsolationAvailablePredicate(),
           or(
             isNull(sandboxesTable.claimOwner),
             isNull(sandboxesTable.claimExpiresAt),
@@ -384,7 +382,6 @@ export async function preemptRuntimeSubjectActivationClaim(
           exclusiveSessionRuntimeSubjectPredicate(),
           eq(sandboxesTable.status, input.expectedStatus),
           inArray(sandboxesTable.status, RUNTIME_SUBJECT_CLAIMABLE_STATUSES),
-          sandboxIsolationAvailablePredicate(),
           eq(sandboxesTable.claimOwner, input.expectedClaimOwner),
           eq(sandboxesTable.claimExpiresAt, input.expectedClaimExpiresAt),
         ),
@@ -665,7 +662,6 @@ export async function markRuntimeSubjectOperationStarted(
         exclusiveSessionRuntimeSubjectPredicate(),
         eq(sandboxesTable.id, input.runtimeSubjectId),
         inArray(sandboxesTable.status, RUNTIME_SUBJECT_CLAIMABLE_STATUSES),
-        sandboxIsolationAvailablePredicate(),
         claimPredicate,
         ...(input.source === "maintenance"
           ? [
@@ -813,10 +809,7 @@ export async function markRuntimeSubjectFailed(
   },
 ): Promise<boolean> {
   const now = currentTimestampMs();
-  const conditions: SQL[] = [
-    eq(sandboxesTable.id, input.runtimeSubjectId),
-    sandboxIsolationAvailablePredicate(),
-  ];
+  const conditions: SQL[] = [eq(sandboxesTable.id, input.runtimeSubjectId)];
 
   if (input.expectedStatus !== undefined) {
     conditions.push(eq(sandboxesTable.status, input.expectedStatus));

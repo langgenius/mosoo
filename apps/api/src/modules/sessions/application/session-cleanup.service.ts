@@ -8,7 +8,7 @@ import {
 import { createPlatformId } from "@mosoo/id";
 import type { RuntimeOperationId, SessionId, SessionRunId } from "@mosoo/id";
 import type { SQL } from "drizzle-orm";
-import { and, asc, eq, exists, inArray, isNotNull, lte, not, or, sql } from "drizzle-orm";
+import { and, asc, eq, exists, inArray, isNotNull, lte, or, sql } from "drizzle-orm";
 
 import { createErrorLogContext, logWarn } from "../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
@@ -32,11 +32,6 @@ import type {
   SessionDeleteCleanupTargets,
 } from "../domain/session-cleanup-plan";
 import { previewCleanupCandidatePredicate } from "../infrastructure/preview-retention.repository";
-import {
-  runSessionIsolationAwareBatch,
-  sessionIsolationPendingPredicate,
-  waitForSessionIsolation,
-} from "../infrastructure/session-isolation-barrier.repository";
 import { destroySessionDurableObject } from "../infrastructure/session/client";
 
 type AppDatabase = ReturnType<typeof getAppDatabase>;
@@ -108,37 +103,26 @@ async function admitSessionDeleteCleanup(
     readonly expiredPreviewAtMs?: number;
   },
 ): Promise<boolean> {
-  for (;;) {
-    const { results, isolationPending } = await runSessionIsolationAwareBatch(
-      database,
-      input.sessionId,
-      (db) => [
-        db
-          .update(sessionsTable)
-          .set({
-            archivedAt: sql`COALESCE(${sessionsTable.archivedAt}, ${input.timestampMs})`,
-            status: "TERMINATED",
-            statusOperationId: input.operationId,
-            statusSeq: sql`${sessionsTable.statusSeq} + 1`,
-            updatedAt: input.timestampMs,
-          })
-          .where(
-            and(
-              eq(sessionsTable.id, input.sessionId),
-              not(sessionIsolationPendingPredicate(db)),
-              input.expiredPreviewAtMs === undefined
-                ? undefined
-                : previewCleanupCandidatePredicate(db, input.expiredPreviewAtMs),
-            ),
-          ),
-      ],
-    );
-    if (!isolationPending) return getD1ChangeCount(results[0]) > 0;
-    // The maintenance sweep skips claimed Previews; an explicit user deletion
-    // waits and then resolves the current binding for its existing cleanup plan.
-    if (input.expiredPreviewAtMs !== undefined) return false;
-    await waitForSessionIsolation(database, input.sessionId);
-  }
+  const db = getAppDatabase(database);
+  const result = await db
+    .update(sessionsTable)
+    .set({
+      archivedAt: sql`COALESCE(${sessionsTable.archivedAt}, ${input.timestampMs})`,
+      status: "TERMINATED",
+      statusOperationId: input.operationId,
+      statusSeq: sql`${sessionsTable.statusSeq} + 1`,
+      updatedAt: input.timestampMs,
+    })
+    .where(
+      and(
+        eq(sessionsTable.id, input.sessionId),
+        input.expiredPreviewAtMs === undefined
+          ? undefined
+          : previewCleanupCandidatePredicate(db, input.expiredPreviewAtMs),
+      ),
+    )
+    .run();
+  return getD1ChangeCount(result) > 0;
 }
 
 async function listSessionDeleteCleanupRepairCandidates(

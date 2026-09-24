@@ -2,7 +2,7 @@ import type { AgentSessionActionCapabilityName } from "@mosoo/contracts/session"
 import { sandboxSessionsTable, sessionRunsTable, sessionsTable } from "@mosoo/db";
 import type { ProjectId, SessionId, SessionRunId } from "@mosoo/id";
 import { getAvailableAgentSessionActionCapability } from "@mosoo/session-policy";
-import { and, eq, inArray, not } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
@@ -37,11 +37,6 @@ import type {
   SessionArchiveCleanupStepOutcome,
   SessionArchiveCleanupTargets,
 } from "../domain/session-cleanup-plan";
-import {
-  runSessionIsolationAwareBatch,
-  sessionIsolationPendingPredicate,
-  waitForSessionIsolation,
-} from "../infrastructure/session-isolation-barrier.repository";
 import { closeSessionViewerSockets } from "../infrastructure/session/client";
 import { deleteSessionCascade } from "./session-cleanup.service";
 
@@ -303,26 +298,11 @@ async function writeSessionArchivedAt(
   database: D1Database,
   input: { archivedAt: number | null; projectId: ProjectId; sessionId: SessionId },
 ): Promise<void> {
-  for (;;) {
-    const { isolationPending } = await runSessionIsolationAwareBatch(
-      database,
-      input.sessionId,
-      (db) => [
-        db
-          .update(sessionsTable)
-          .set({ archivedAt: input.archivedAt, updatedAt: currentTimestampMs() })
-          .where(
-            and(
-              eq(sessionsTable.id, input.sessionId),
-              eq(sessionsTable.projectId, input.projectId),
-              not(sessionIsolationPendingPredicate(db)),
-            ),
-          ),
-      ],
-    );
-    if (!isolationPending) return;
-    await waitForSessionIsolation(database, input.sessionId);
-  }
+  await getAppDatabase(database)
+    .update(sessionsTable)
+    .set({ archivedAt: input.archivedAt, updatedAt: currentTimestampMs() })
+    .where(and(eq(sessionsTable.id, input.sessionId), eq(sessionsTable.projectId, input.projectId)))
+    .run();
 }
 
 export async function deleteAgentSession({

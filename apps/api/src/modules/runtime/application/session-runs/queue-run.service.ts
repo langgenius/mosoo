@@ -27,7 +27,6 @@ import { resolveReadyEnvironmentPackageArtifact } from "../../../environments/ap
 import { fileStore } from "../../../files/application/file-store";
 import { publishPersistedSessionRuntimeEvents } from "../../../sessions/application/session-event-write.service";
 import { assertPreviewAvailable } from "../../../sessions/infrastructure/preview-retention.repository";
-import { waitForSessionIsolation } from "../../../sessions/infrastructure/session-isolation-barrier.repository";
 import { getSupportedRuntimeId } from "../../domain/runtime-config";
 import {
   attemptQueuedSessionRunAdmission,
@@ -197,13 +196,7 @@ export async function queueSessionRun(request: QueueSessionRunRequest): Promise<
     },
   };
 
-  let outcome = await attemptQueuedSessionRunAdmission(bindings.DB, admission);
-  while (outcome === "isolation_pending") {
-    await waitForSessionIsolation(bindings.DB, input.session.id);
-    // Reuse the original input, IDs, configuration and idempotency receipt.
-    // Dispatch resolves the current binding only after this durable admission.
-    outcome = await attemptQueuedSessionRunAdmission(bindings.DB, admission);
-  }
+  const outcome = await attemptQueuedSessionRunAdmission(bindings.DB, admission);
 
   if (outcome !== "admitted") {
     if (
