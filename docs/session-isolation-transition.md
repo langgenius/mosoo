@@ -1,8 +1,10 @@
 # Session Isolation Transition
 
-Status: unreleased #582 / #638 / #640 operating contract. An offline database
-batch planner is available; the production executor, verified object preparation,
-physical drain, full cutover acceptance, and release approval remain outstanding.
+Status: unreleased #582 / #638 / #640 operating contract. The offline planner and
+resumable operator executor are implementation candidates. Local native D1/R2 and
+container tests cover forward conversion and rollback. Customer source recovery,
+verified object preparation, hosted cutover acceptance, and release approval
+remain outstanding.
 This document does not authorize production writes, customer model/tool calls,
 resource destruction, or notification delivery.
 
@@ -11,22 +13,25 @@ Follow [SPEC](./SPEC.md#10-migration-and-breaking-change-notification),
 and [Production Deploy Verification](./production-deploy-verification.md).
 The owner requires protected continuable Sessions to retain the same public ID,
 context, promised files, admitted configuration, and delegated identity. The reviewed
-inactive-published cohort below is the explicit exception; other customers must not
+inactive-Session cohort below is the explicit exception; other customers must not
 reconstruct state or move to a replacement conversation.
 
-## Qualify the inactive-published read-only cohort first
+## Qualify the inactive-Session read-only cohort first
 
-The September 22 owner decision excludes a reviewed group of old published Pet
-Sessions from full context/workspace recovery: neither the owner nor their business
-has visible activity within 30 days. Keep their history and saved files readable;
-returning users use the existing Agent and new-Session entry point. Reuse the existing
-stopped Session capabilities rather than adding a lifecycle or a general migration
-framework. Debug Preview continues to follow its own approved 30-day rule.
+The final September 22 owner decision excludes reviewed old Pet Sessions from full
+context/workspace/configuration recovery after 30 days without their own calls or file
+activity, even if the owner remains active. Keep history and saved files readable;
+returning users use direct invocation or an existing Agent preset to start a new Session.
+Reuse existing stopped Session capabilities. Debug Preview retains its separate 30-day rule.
 
-Maintain an explicit private list with publication/ownership and owner-wide Agent,
-Project, caller, console/authentication and file-activity evidence. Missing ownership
-or uncertain activity is not inactivity. Refresh that evidence before the approved
-cutover; exclude anyone with new activity, an active Run or pending file writes.
+Maintain an explicit private list with ownership, all Run outcomes, file uploads,
+edits/deletes, pending work and physical runtime evidence. Publication and owner activity
+describe impact but do not determine Session eligibility. A removed Agent preset does
+not erase valid Project ownership. Missing authority or uncertain activity is not
+inactivity. An old unfinished model record can be stale telemetry only when its associated
+Run is terminal and current Driver/claim/work evidence agrees. An old maintenance marker
+requires exact-operation/sequence reconciliation, not a blanket timeout update. Refresh
+evidence before the approved cutover; exclude any Session with new activity or pending work.
 This exception is not an ongoing 30-day expiry rule for formal Sessions.
 
 For this cohort, verify retained history, saved file objects, access controls,
@@ -38,7 +43,33 @@ does not authorize deletion, resource reclamation or customer notifications.
 
 The recovery/conversion procedure below applies to Sessions that retain the
 continuity requirement. Shared migration safeguards cannot be removed while those
-Sessions still depend on them.
+Sessions still depend on them in the conversion build.
+
+## Finite release operation
+
+The final main branch contains one Session execution model. It does not retain the
+Pet/Cattle runtime branches or an ongoing migration service. Preserve the immutable
+[conversion source 7283c68256](https://github.com/langgenius/mosoo/commit/7283c68256eefd8fc4929c46eadc0aed3b863e06),
+its matching Driver, private manifests, complete backups and tested rollback artifacts
+as release material while the final source is simplified. The implementation references
+below describe that conversion candidate, not a promise to keep those modules in main.
+
+The temporary Cloud transition build integrates this converter with the current public
+contracts, formal Session retention policy and matched Driver protocol. It retains shared
+workspace readers solely to perform and reverse the reviewed conversion. Qualify its real
+hosted continuation and rollback before use; compilation or local copy tests do not qualify
+it. After conversion and claim release, deploy the single-Session build. Do not merge the
+legacy runtime branches or operator service back into that final product.
+
+Before the final cutover, verify every approved inactive Session is read-only with retained
+history/files, every protected Session has a verified isolated continuation, and no
+conversion operation, D1 claim or physical migration fence remains pending. Keep generic
+Project permissions, turn serialization, stale-binding guards and checkpoint guarantees
+in the final product. Do not drop or rewrite applied schema history. After the reviewed
+rollback window, archive the one-time operational evidence; do not add a recurring
+conversion scheduler or expose migration controls as product features.
+
+Neither the pinned build nor this plan authorizes deployment or a production rewrite.
 
 ## Recovery evidence before a cutover
 
@@ -151,9 +182,22 @@ context. The execution snapshot's binding also participates in allocation.
 
 Prepare one consistent transition that preserves public identity and admitted
 configuration while binding the Session to its own Sandbox, original directory,
-verified checkpoint, and matching native commit. Do not mark the latest observed
-native reference committed unless the selected workspace and successful Run
-establish that boundary. Preserve history, events, artifacts, delegated identity,
+verified checkpoint, and matching native commit. The ordinary path requires a
+successful Run. A finite ACP conversion can also use a separately verified native
+terminal boundary: the original ID/directory, all canonical text, native rows,
+and durable files must survive a current-harness resume and history-read rehearsal.
+This is an imported durable checkpoint, not a claim that a failed Run succeeded.
+Failed Runs retain their status and events; their imported backup and native
+commit leave the successful-Run association null. A successful native load alone
+does not qualify missing canonical text. The finite operator may preserve one
+audited pre-existing difference: the latest failed Run has exactly one user input
+in platform history, absent from both a verified pre-input archive and the selected
+post-failure archive, whose native message/part rows are identical. Preserve that
+input, failure and native state exactly; do not replay the request, synthesize
+native messages, or infer that no external execution occurred. This does not cover
+missing successful history, assistant output, unknown workspace bytes or newly
+introduced loss. The canonical input and earlier backup join the transactional
+before-image guards. Preserve history, events, artifacts, delegated identity,
 runtime/model, and immutable environment/resource references. Revalidate current
 credential and resource authorization when execution resumes.
 
@@ -221,10 +265,34 @@ The JSON input has these fields:
   `rollbackArchiveSha256`. These declare independently collected evidence; the
   planner checks their shape and correspondence but does **not** inspect archives,
   verify remote object bytes, or establish shared-memory ownership.
+- For the finite ACP terminal path, `workspaceEvidence.terminalEvidence` binds
+  the exact terminal Run/status/time and observed native Run, current API/Driver/
+  harness versions, native-load image and receipt, canonical-history receipt,
+  preserved native rows, and equal nonzero canonical/native replay counts.
+  A failed boundary uses `terminalRunId` instead of `completedRunId`. All evidence
+  must describe the same source/prepared archives already named above; retain the
+  private receipts for independent review. This declaration is not an archive
+  verifier and cannot authorize a remote data rewrite.
+- The audited pre-existing difference additionally supplies complete
+  `source.unmatchedInput` and `source.priorBackup` rows plus
+  `terminalEvidence.preexistingInputGap`: `messageId`, `priorArchiveSha256`,
+  `priorNativeRowsSha256` and `comparisonReceiptSha256`. The earlier ready backup
+  must belong to the same workspace and predate the input. Its native logical-row
+  digest must equal the selected archive's digest; the independent comparison
+  receipt must demonstrate that only this failed user input is unmatched. All
+  existing native text still has to survive resume/history replay. Both SQL
+  directions reject changes to either source row or another message for that Run.
 
-This initial planner supports an idle, unarchived legacy Session whose latest Run
+The ordinary planner supports an idle, unarchived legacy Session whose latest Run
 completed successfully and whose original configuration and native source are
-known. It does not qualify missing sources, active work, or other lifecycle states.
+known. The finite ACP path additionally permits a failed last Run or an older
+observation of the same proven native ID. It requires complete terminal evidence
+and the corresponding persisted terminal event. An already archived ACP Session
+may be copied under the same evidence; its archive timestamp remains unchanged
+through conversion, claim release and rollback, and it is not reopened. A later
+archive/unarchive change still invalidates the before-image. Apart from the
+explicit pre-existing failed-input difference above, it does not qualify missing
+canonical messages, unknown configuration, active work, or other lifecycle states.
 It preserves the existing recovery policy and all unrelated snapshot fields.
 Completed recycling can leave an operation ID on a cold Sandbox; the planner
 compares that original marker and creates the destination without it. Older
@@ -234,9 +302,111 @@ Project, and delegated identity agree. Conflicting non-null ownership is rejecte
 the original records remain unchanged for rollback.
 
 Both output files contain one `{ "batch": [...] }` of bound SQL statements. The
-first statement checks complete before-images, successful completion history,
+first statement checks complete before-images, matching terminal history,
 Agent-wide active Runs, live Drivers and conversation bindings, and current backup
-selection. A tie in the old timestamp-only backup lookup is rejected. A stale
+selection. It also checks active Runs through every workspace and Driver attached
+to each affected Sandbox, independently of Agent provenance or Driver status.
+A stopped/failed Driver can still hold an active Run lease; conversion and rollback
+must wait for normal reconciliation rather than marking that Run terminal to pass
+the check. Rollback checks both original and isolated resources. Unrelated direct
+Runs do not block the transition. These transactional checks do not establish
+physical container shutdown, which still requires separate evidence.
+
+Physical observation must not change the resource being inspected. The internal
+`getContainerObservation` RPC reads `ctx.container.running` without loading the
+Sandbox SDK, configuring its lifetime, contacting the container, or reading or
+writing DO storage. Resolve the recorded physical namespace and normalized Sandbox
+ID directly; `getSandbox` configures the SDK even when used to obtain a handle.
+Absent platform state is `unavailable`, never evidence of a stopped container.
+Normal operations still initialize the SDK once and restore the network policy
+before access; teardown remains possible when policy restoration fails.
+
+This timestamped observation is not a drain lease or permission to execute a
+transition. A local replay on the pinned SDK reproduced a retained Session handle
+starting a container after `destroy()` returned, then reporting a missing file.
+The wrapper now invalidates returned Session/Process callbacks across explicit
+destruction, including nested handles, delayed creation and overlapping or failed
+teardown. Freshly obtained handles remain available for normal restoration.
+The local container replay verifies that old Session, nested Process and listed
+Process calls leave the destroyed container stopped, while fresh handles can
+read/write files and execute commands; process dates and execution streams retain
+their normal behavior. This verifies the wrapper on the pinned SDK, not Cloud
+customer migration or a hosted release.
+This guard does not drain calls or streams already in flight, intercept every
+platform stop, or block later top-level SDK requests. The executor still needs to
+exclude new resource access, settle previously dispatched operations, and apply
+the guarded batch while that exclusion holds. Do not use repeated observations
+or a wrapper RPC counter as a substitute for that barrier.
+
+The internal Sandbox migration fence provides physical exclusion without starting
+the SDK. Its caller must first atomically protect the idle Session cohort, shared
+resource bindings, lifecycle operations and new Run admission in D1, and preserve
+admitted file changes in their separate storage scope.
+Never stop admitted customer work to make a resource eligible for conversion.
+The fence is not a customer-facing migration endpoint or a production executor.
+
+Read the recorded physical resource's fence revision, then claim it with one
+operation ID and that revision. Acquisition durably flushes its marker before
+resetting the Durable Object; the initial RPC therefore disconnects. A fresh stub
+must confirm that the same claim survived and no longer requires a reset before
+stopping the container. The reset revokes old SDK callbacks and pending JavaScript
+and stream continuations; physical stop also waits for the container exit monitor
+and requires an observed stopped state. A successful destroy request alone is
+insufficient. While held, SDK/configuration/fetch access is rejected and alarms
+cannot initialize the SDK. Read-only physical observation remains available.
+
+Keep this fence through the guarded database transition. Release requires its
+owner and revision, completed stopping, and a stopped physical container. Release
+durably increments the revision, so an old claim cannot reacquire the resource;
+retrying the completed release is harmless. A fence does not expire automatically.
+A failed or interrupted operation must inspect the retained claim and resume its
+reviewed recovery sequence. This physical primitive alone does not establish the
+D1 admission barrier, checkpoint ownership or Cloud acceptance. The operator
+executor below composes it with the database barrier and reviewed transition.
+
+A local replay against the pinned SDK and product wrapper verifies persisted
+fencing across actor reset, rejected old Session/Process callbacks, interrupted
+synthetic execution and streaming, stopped physical state, owner-checked release
+and fresh execution afterward. Replaying the old claim after release does not
+reset or interrupt that fresh execution. The revision survives ordinary SDK
+destruction. These are local synthetic resource checks, not evidence of customer
+workspace conversion or same-public-Session native restoration.
+
+The D1 cohort barrier reserves every existing workspace peer and every legacy
+Session that could allocate on the shared Agent resource, including peers whose
+Agent provenance is missing or different. Its atomic claim checks membership,
+Session revisions, closed bindings, cold resource state, live Drivers and actual
+Run leases. It waits for ordinary completion; it never cancels work to qualify.
+The marker uses the existing operation fields and has no automatic expiry.
+Activation, maintenance and delayed binding callbacks must honor that marker.
+An exact claim retry is harmless; a released claim cannot reacquire an old revision.
+Release rechecks closed bindings, live Drivers and actual Run leases on every
+claimed resource, including destinations. A terminal Driver status cannot hide
+a still-active Run; failed release leaves the whole D1 claim intact.
+
+When Run admission races a held cohort, retain the request's original input,
+configuration, IDs and idempotency key, wait for release and retry atomic admission.
+Read the migration rejection cause in the same D1 transaction so a fast release
+cannot turn it into a generic error. Ordinary busy-Run rejection remains unchanged;
+this is a temporary migration barrier, not a queue behind an executing turn.
+Archive and explicit deletion similarly wait before mutating lifecycle state;
+automatic Preview cleanup skips held Sessions.
+
+Explicit Session attachments remain in their existing object-store scope. A
+workspace conversion neither moves nor deletes those records/objects, and its
+checkpoint preparation excludes the current attachment mount. Uploads and file
+edits may finish under the same public Session identity; preserve their current
+records and renewed Preview activity. A changed complete Session before-image
+invalidates the prepared database plan rather than overwriting that activity.
+
+The offline planner accepts an optional `operationId` with matching held Session
+and Sandbox before-images. The destination retains the marker through forward
+and rollback batches. Release physical fences first, then atomically release the
+recorded D1 cohort and destination claims. The executor below performs that
+sequence; verified customer objects and hosted cutover/rollback acceptance remain
+release prerequisites.
+
+A tie in the old timestamp-only backup lookup is rejected. A stale
 precondition raises a SQL error; use **one atomic D1 batch**, never separate calls
 for its statements. A failure after destination insertion must roll back the
 whole batch. Repeated application fails without replacing the winning state.
@@ -254,6 +424,92 @@ reviewed batch hashes. Attach those facts to the approval packet. `review.json`
 records input and batch hashes, statement counts, and zero remote actions; it is
 neither a production target authorization nor proof that those external checks
 passed. No production execution command is supplied by this planner.
+
+### Execute and resume a reviewed operation
+
+The separate operator executor converts one qualified Session while holding its
+entire shared-source cohort. It uses the existing `api_command` table for an
+operator-owned `session_isolation` record. The ordinary command queue cannot
+execute it. Its reviewed input and phase are durable; its ownership does not
+expire. Each step compares the previous receipt in the same native D1 batch as
+its database changes. A lost response is resolved by inspecting and resuming the
+same operation ID, never by clearing claims or guessing from live Session rows.
+
+Prepare a private JSON request containing:
+
+- `operationId`: a fresh platform ID, retained for every retry;
+- `cohort`: the original Sandbox identity, binding, lifecycle revision and update
+  timestamp, plus every member's Session ID, lifecycle revision and archive state,
+  as returned by `readSessionIsolationCohort`;
+- `plan`: the original, unheld input to the offline planner, including all reviewed
+  before-images and source/prepared/rollback archive hashes;
+- `metadataHashes`: SHA-256 values named `source`, `prepared` and `rollback` for
+  those archives' actual `meta.json` objects.
+
+Preparation verifies the actual object bytes and rejects changed, missing,
+misidentified or expired metadata. Metadata must describe the reviewed directory
+and archive size. A source must remain usable through the verification safety
+buffer; its SDK creation time may precede the later D1 record timestamp. Prepared
+and rollback copies must cover at least their full database-promised lifetime.
+This is an identity/integrity check, not a replacement for inspecting the archive
+contents and proving recovery before approving a customer cohort.
+
+The phases are `prepared` → `held` → `converted` → `releasing` → `complete`.
+Claiming the full source cohort and reserving the fresh destination row is atomic.
+The next step acquires both recorded physical fence revisions, resets stale actors,
+stops both containers, rechecks the objects and applies the guarded conversion.
+Release re-establishes a stopped observation after an actor restart, releases both
+physical fences, then atomically releases database admission and saves completion.
+A completed operation only returns its receipt; retrying it cannot stop newly
+admitted work or reacquire an old fence revision.
+
+Rollback records its direction before applying the inverse and passes through
+`restored` before release. It preserves current attachment activity, titles and
+Agent edits while checking all execution fields and restoring the reviewed frozen
+configuration and native context. Before any conversion, abort removes only its
+own unused destination reservation. After conversion it retains copied resources
+and backups. Rollback revalidates its original-layout copy; an unusable forward
+archive cannot prevent recovery from that verified copy. Rollback selection closes
+when phase `releasing` begins; later work
+needs a new reviewed transition, not reuse of an old inverse.
+
+`SessionIsolationAdmin` is a named Worker service entrypoint with no HTTP route.
+An account-owned operator config must explicitly bind `SESSION_ISOLATION` to that
+entrypoint on the reviewed API Worker. A hosted binding uses the selected account
+and service with `remote = true`; a local fixture uses its local service instead.
+This service binding is the control path; a local proxy must not simulate remote
+Durable Objects or Containers, which do not support remote bindings.
+
+```toml
+name = "mosoo-session-isolation-operator"
+account_id = "<reviewed account ID>"
+compatibility_date = "2026-08-01"
+compatibility_flags = ["nodejs_compat"]
+
+[[services]]
+binding = "SESSION_ISOLATION"
+service = "<reviewed API Worker name>"
+entrypoint = "SessionIsolationAdmin"
+remote = true
+```
+
+Run `just session-isolation-run <absolute operator config> <mode> <input> <absolute
+new receipt directory>`. `prepare` takes the private request path; `inspect`,
+`advance`, `run` and `rollback` take the existing operation ID. `advance` performs
+one durable step; `run` resumes through completion; `rollback` records the inverse
+direction and resumes it. Each invocation needs a new receipt directory. The CLI
+saves private `receipt.json` or `failure.json` with directory/file modes `0700` and
+`0600`; it makes no model request. Failed operations are not retried by a background
+scheduler. The operator must inspect and resume them, retaining admission
+protection until the recorded recovery sequence completes.
+
+Local verification combines all 18 D1 migrations, actual R2 archives, the named
+service entrypoint, the actual operator CLI and real containers. It covers lost conversion acknowledgement,
+actor restart before release, same-ID workspace restoration, rollback, expired
+metadata rejection and harmless completion replay. The native-context marker in
+this fixture is synthetic; it proves preserved references and file bytes, not a
+customer harness turn or hosted acceptance. Production use still requires the
+reviewed target/cohort, source recovery, backup/rollback plan and explicit approval.
 
 ## Rollback and release
 

@@ -4,6 +4,7 @@ import {
   createResolutionReport,
   parseAgentPackageArchiveBytes,
 } from "@mosoo/agent-package";
+import { getAgentBuiltInToolSupportError } from "@mosoo/contracts/agent";
 import type { Agent } from "@mosoo/contracts/agent";
 import type {
   AgentPackageImportResult,
@@ -11,6 +12,7 @@ import type {
 } from "@mosoo/contracts/agent-manifest";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
+import { validationError } from "../../../platform/errors";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { ensureProjectOwnership } from "../../projects/application/project.service";
 import { toAgentModel } from "./agent-models";
@@ -54,6 +56,11 @@ export async function importAgentPackage(
   }
 
   const { manifest } = parsed;
+  const toolSupportError = getAgentBuiltInToolSupportError(
+    manifest.runtime.id,
+    manifest.builtInTools,
+  );
+  if (toolSupportError) throw validationError(toolSupportError);
   const providerOptions = assertRuntimeAdvancedSettings({
     modelId: manifest.runtime.model,
     runtimeId: manifest.runtime.id,

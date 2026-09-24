@@ -1,8 +1,14 @@
 import { describe, expect, test } from "bun:test";
 
+import { parsePlatformId } from "@mosoo/id";
 import type { RuntimeOperationId } from "@mosoo/id";
 
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
+import {
+  claimSessionIsolationCohort,
+  readSessionIsolationCohort,
+  releaseSessionIsolationCohort,
+} from "../src/modules/runtime/infrastructure/session-isolation-claim.repository";
 import {
   deleteSessionCascade,
   repairStaleSessionDeleteCleanups,
@@ -357,6 +363,77 @@ async function insertSessionFileForCleanup(database: D1Database): Promise<void> 
 }
 
 describe("session lifecycle mutations", () => {
+  test("archive and explicit deletion wait without stealing a migration claim", async () => {
+    for (const action of ["archive", "delete"] as const) {
+      const database = await createPublicHttpContractDatabase();
+      await insertOwnerSession(database);
+      await insertSandboxSession(database, PUBLIC_API_TEST_IDS.ownerSession);
+      await database.prepare("UPDATE sandbox SET status = 'cold'").run();
+      await database.prepare("UPDATE sandbox_session SET status = 'closed'").run();
+      const cohort = await readSessionIsolationCohort(database, PUBLIC_API_TEST_IDS.sandbox);
+      const claim = {
+        cohort,
+        operationId: parsePlatformId<RuntimeOperationId>(
+          PUBLIC_API_TEST_IDS.operation,
+          "migration",
+        ),
+        now: 10,
+      };
+      await claimSessionIsolationCohort(database, claim);
+      const blocked = Promise.withResolvers<void>();
+      const wrapped = new Proxy(database, {
+        get(target, property) {
+          if (property === "batch")
+            return async <T>(statements: D1PreparedStatement[]) => {
+              const results = await target.batch<T>(statements);
+              const last = results.at(-1)?.results[0];
+              if (
+                typeof last === "object" &&
+                last !== null &&
+                "status_operation_id" in last &&
+                last.status_operation_id === claim.operationId
+              )
+                blocked.resolve();
+              return results;
+            };
+          const member = Reflect.get(target, property);
+          return typeof member === "function" ? member.bind(target) : member;
+        },
+      });
+      const paths: string[] = [];
+      const bindings = withSessionLifecycleBinding(
+        createPublicHttpTestBindings(wrapped) as ApiBindings,
+        paths,
+      );
+      const request = {
+        bindings,
+        projectId: PUBLIC_API_TEST_IDS.project,
+        sessionId: PUBLIC_API_TEST_IDS.ownerSession,
+        viewer: OWNER_VIEWER,
+      };
+      const pending =
+        action === "archive" ? archiveAgentSession(request) : deleteAgentSession(request);
+      void pending.catch(() => {});
+      await blocked.promise;
+      expect(paths).toEqual([]);
+      expect(
+        await database
+          .prepare("SELECT status_operation_id, status, archived_at FROM session WHERE id = ?")
+          .bind(PUBLIC_API_TEST_IDS.ownerSession)
+          .first(),
+      ).toEqual({ status_operation_id: claim.operationId, status: "IDLE", archived_at: null });
+      await releaseSessionIsolationCohort(database, { ...claim, now: 20 });
+      await pending;
+      const session = await database
+        .prepare("SELECT archived_at FROM session WHERE id = ?")
+        .bind(PUBLIC_API_TEST_IDS.ownerSession)
+        .first();
+      if (action === "delete") expect(session).toBeNull();
+      else expect(session?.archived_at).toBeNumber();
+      expect(paths.length).toBeGreaterThan(0);
+    }
+  });
+
   test("delete cascade removes live and terminal driver instances associated with the session", async () => {
     const database = await createPublicHttpContractDatabase();
     await insertNonOwnerSession(database);

@@ -101,6 +101,7 @@ function createSandboxHandle(files: ReadonlyMap<string, string>): SandboxHandle 
     readFile,
     restoreBackup: unavailable,
     setKeepAlive: unavailable,
+    ensureContainerReady: unavailable,
     startProcess: unavailable,
     terminal: unavailable,
     unmountBucket: unavailable,

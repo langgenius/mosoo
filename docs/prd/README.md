@@ -14,12 +14,12 @@ their machine-readable contracts, code, or [Architecture](../architecture.md).
 - [Managed Agent v1 target and remaining slices](./managed-agent-v1.md) — shipped Project keys, BYOK direct invocation with optional Agent presets, with single-turn and multi-turn acceptance; platform supply and billing are separate.
 - [Cloud migration and compatibility](../SPEC.md#10-migration-and-breaking-change-notification) — preserve compatible Thread APIs and verify the transition from shared machines to Session isolation.
 - [Agent API Endpoint](./agent-endpoint-mvp.md)
-- [Public Thread API](./public-thread-api-surface.md) — shipped v1 contract, current saved-Agent v2 entry point, and the unimplemented direct-invocation target.
+- [Public Thread API](./public-thread-api-surface.md) — shipped v1 contract and the unreleased v2 Project-direct candidate with optional Agent presets; real hosted acceptance remains open.
 - [Runtime Sessions](./runtime-session-kernel.md)
 - [Runtime Choice](./runtime-catalog.md)
 - [Runs and Threads](./default-consumption-surface.md)
 - [Agent Work History](./agent-session-api.md)
-- [Thread Lifecycle](./session-lifecycle.md) — formal continuation and the Cloud debug Preview 30-day inactivity policy.
+- [Thread Lifecycle](./session-lifecycle.md) — formal continuation, Cloud debug Preview's 30-day policy, and the one-time old-Session inactivity exception.
 - [Thread Continuation](./thread-continuation.md)
 - [Runtime State Operations](./runtime-state-operations.md)
 - [Agent Terminal](./agent-terminal.md)

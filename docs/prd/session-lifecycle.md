@@ -69,16 +69,20 @@ Previews record the policy at creation. Existing Previews remain unchanged until
 inventory, backup/restore plan, and approved production cutover enroll them. Agent definitions
 remain available after Preview cleanup. Deploy rollback alone cannot restore deleted data.
 
-## Inactive published legacy Sessions (unreleased migration only)
+## Inactive legacy Sessions (unreleased migration only)
 
-For the reviewed old Pet migration cohort, the owner permits published Sessions to become
-read-only when the owner and their business have no visible activity in the preceding
-30 days. Keep history and saved files readable. Returning users can use the Agent and
-start a new Session; the old execution context and workspace need not be resumed.
+For this migration, an old Pet Session with no calls or file activity in the preceding
+30 days may become read-only, even when its account remains active. Publication and
+account activity still describe impact; the Session's own activity determines eligibility.
+Keep history and saved files readable. Returning users can start a new Session directly
+or with an existing Agent preset; the old execution context, workspace and unrecorded
+configuration need not be recovered for the reviewed inactive cohort.
 
 This is a one-time, explicitly reviewed cohort, not automatic expiry of formal Sessions.
-Refresh ownership, publication, calls, console/authentication and file activity before
-cutover; active or uncertain cases keep the seamless continuation requirement. Reuse the
+Refresh ownership, all Run outcomes, file uploads/edits/deletes and pending work before
+cutover; active or uncertain cases keep the seamless continuation requirement. Login,
+history reads and maintenance do not renew Session activity. Stale maintenance or model
+telemetry records require evidence and guarded reconciliation. Reuse the
 existing stopped Session capabilities and new-Session entry point. Debug Preview retains
 its separate 30-day policy. Production changes still require a backup and rollback plan
 and explicit approval; this decision does not authorize deleting retained data or shared

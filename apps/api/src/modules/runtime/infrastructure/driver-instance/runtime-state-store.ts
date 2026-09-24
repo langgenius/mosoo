@@ -17,6 +17,7 @@ import type { DriverInstanceCloseSnapshot } from "./state";
 
 export const HEARTBEAT_STATE_PERSIST_INTERVAL_MS = 10_000;
 export const DRIVER_INSTANCE_STATE_STORAGE_KEY = "driverInstanceState";
+export const DRIVER_FINALIZATION_RETRY_MS = 5_000;
 
 export interface DriverInstanceStoredState {
   close: DriverInstanceCloseSnapshot | null;
@@ -26,6 +27,7 @@ export interface DriverInstanceStoredState {
   driverGeneration: number | null;
   driverInstanceId: DriverInstanceId | null;
   errorMessage: string | null;
+  finalizationCompleted: boolean;
   heartbeatCount: number;
   hello: DriverHelloInput | null;
   lastHeartbeat: DriverHeartbeatInput | null;
@@ -34,9 +36,11 @@ export interface DriverInstanceStoredState {
 }
 
 interface DriverInstanceRuntimeStorage {
+  deleteAlarm(): Promise<void>;
   deleteAll(): Promise<void>;
   get<T>(key: string): Promise<T | undefined>;
   put(key: string, value: unknown): Promise<void>;
+  setAlarm(scheduledTime: number): Promise<void>;
 }
 
 export interface DriverInstanceRuntimeStateContext {
@@ -70,6 +74,8 @@ export function parseStoredState(value: unknown): DriverInstanceStoredState {
     driverGeneration: readNullableNumber(value, "driverGeneration"),
     driverInstanceId: readNullableDriverInstanceId(value, "driverInstanceId"),
     errorMessage: readNullableString(value, "errorMessage"),
+    // Older snapshots only recorded socket closure, not successful finalization.
+    finalizationCompleted: value["finalizationCompleted"] === true,
     heartbeatCount: readRequiredNumber(value, "heartbeatCount"),
     hello: parseNullableHello(value["hello"]),
     lastHeartbeat: parseNullableHeartbeat(value["lastHeartbeat"]),
@@ -87,6 +93,7 @@ export function createEmptyStoredState(): DriverInstanceStoredState {
     driverGeneration: null,
     driverInstanceId: null,
     errorMessage: null,
+    finalizationCompleted: false,
     heartbeatCount: 0,
     hello: null,
     lastHeartbeat: null,

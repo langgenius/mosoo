@@ -106,6 +106,8 @@ If setup fails, start with the focused recipe: submodule issues use `git submodu
 
 The unreleased #582 candidate uses an independent durable workspace for every new Session. Agent creation, import and Fork no longer select Pet/Cattle; existing shared Cloud Sessions retain their bindings until verified migration. See [Session isolation](./docs/prd/agent-type.md) for continuity and the 30-day Cloud Preview policy.
 
+The final release uses one Session execution model, with direct harness invocation and optional Agent presets. Its one-time Cloud transition may make reviewed old Sessions read-only after 30 days without their own calls or file activity, preserving history and saved files even when the account remains active. Protected Sessions retain seamless continuation. Conversion, backup and rollback have a finite release procedure; they do not become a permanent migration product.
+
 ## Example: Build a Codex Agent API
 
 [Codex Pet](https://mosoo.ai/en/use-cases/codex-pet) shows a published mosoo Agent integrated into an existing product backend through the Thread API. The same API can expose Agents backed by Claude Agent SDK or OpenCode.

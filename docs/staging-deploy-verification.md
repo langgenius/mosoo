@@ -70,6 +70,11 @@ tested, even when a later secret-only deployment changes the version ID.
 - Read both deployed versions and confirm source/Driver provenance. Check API
   health, Web-to-API routing, normal login, Project isolation, and current
   OpenAPI. Health alone is insufficient.
+- Wait for all four container applications to report ready before runtime
+  acceptance. Verify their actual image digests and Driver bundle contents.
+  A Worker update can reuse an existing identical image, so its version ID does
+  not necessarily identify a new image tag. Keep model admission closed until
+  the matched images are ready and previous Drivers have drained.
 - Before removing the retired monetary-budget prototype, let previously budgeted
   turns finish and verify no active request remains. Keep applied migration 0016
   and its historical rows unchanged. New acceptance uses inexpensive BYOK models;

@@ -77,7 +77,7 @@ export async function prepareRuntimeSessionWorkspaceCheckpoint(
   });
 }
 
-function getSandboxBackupObjectKeys(backupId: string): string[] {
+export function getSandboxBackupObjectKeys(backupId: string): string[] {
   const platformBackupId = decodeSandboxBackupIdForPlatform(backupId);
 
   return [`backups/${platformBackupId}/data.sqsh`, `backups/${platformBackupId}/meta.json`];

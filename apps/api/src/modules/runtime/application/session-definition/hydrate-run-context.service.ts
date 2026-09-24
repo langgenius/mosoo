@@ -1,4 +1,5 @@
 import { getSessionOrganizationPath } from "@mosoo/agent-driver/paths";
+import { getAgentBuiltInToolSupportError } from "@mosoo/contracts/agent";
 import type { SessionSummary } from "@mosoo/contracts/session";
 import type { UserWarning } from "@mosoo/contracts/session-run";
 import type { ResolvedRunSkill } from "@mosoo/contracts/skill";
@@ -126,6 +127,13 @@ async function resolveSessionExecutionConfiguration(input: {
   };
 }
 
+function assertSessionToolSupport(plan: SessionExecutionPlan): void {
+  const message = getAgentBuiltInToolSupportError(plan.binding.runtimeId, plan.builtInTools);
+  if (message !== null) {
+    throw validationError(`Agent is not ready to run: ${message}`, "AGENT_SESSION_NOT_READY");
+  }
+}
+
 async function resolveRuntimeProfileIds(
   bindings: ApiBindings,
   input: {
@@ -228,6 +236,7 @@ async function hydrateRunContextFromSession(
   },
 ): Promise<HydratedSessionRunContext> {
   const executionPlan = await getSessionExecutionPlan(bindings.DB, session.id);
+  assertSessionToolSupport(executionPlan);
   const binding = {
     ...executionPlan.binding,
     sessionId: session.id,
@@ -264,6 +273,7 @@ async function hydrateRunContextFromSession(
   // Config/publish readiness callers keep the live probe.
   const agentReadiness = await computeAgentReadiness(bindings.DB, executionOwnerUserId, {
     agentId: binding.agentId,
+    builtInTools: executionPlan.builtInTools,
     environment: snapshotEnvironment,
     environmentNetworkPolicy: environmentSnapshot.networkPolicy,
     kind: binding.kind ?? "cattle",
@@ -436,6 +446,7 @@ async function refreshCachedRunContextVolatileFields(
   cached: HydratedSessionRunContext,
 ): Promise<HydratedSessionRunContext> {
   const executionPlan = await getSessionExecutionPlan(bindings.DB, session.id);
+  assertSessionToolSupport(executionPlan);
   const binding = {
     ...executionPlan.binding,
     sessionId: session.id,

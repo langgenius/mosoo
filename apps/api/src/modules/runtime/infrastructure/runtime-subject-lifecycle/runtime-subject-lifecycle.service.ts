@@ -59,6 +59,7 @@ import {
   claimRuntimeSubjectActivation,
   ensureRuntimeSubjectId,
   getRuntimeSubjectActivationRecord,
+  listRuntimeSubjectDriverIds,
   markRuntimeSubjectActivationDestroying,
   markRuntimeSubjectActivationFailed,
   markRuntimeSubjectActive,
@@ -221,9 +222,16 @@ export class RuntimeSubjectLifecycleService {
           configureRuntimeSubjectNetwork(subject, input.networkConstraints),
         );
       }
-      await measureOptional(input.timing, "runtimeSubject.prepareFilesystem", () =>
-        prepareRuntimeSubjectFilesystem(subject),
-      );
+      await measureOptional(input.timing, "runtimeSubject.prepareFilesystem", async () => {
+        const allowStartupRecovery =
+          isCold &&
+          (await listRuntimeSubjectDriverIds(this.#bindings.DB, input.runtimeSubjectId)).length ===
+            0;
+        await prepareRuntimeSubjectFilesystem(subject, {
+          allowStartupRecovery,
+          runtimeSubjectId: input.runtimeSubjectId,
+        });
+      });
 
       if (isCold) {
         const restoring = await measureOptional(input.timing, "runtimeSubject.markRestoring", () =>

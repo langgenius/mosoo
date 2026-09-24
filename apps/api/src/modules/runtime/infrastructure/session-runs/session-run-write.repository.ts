@@ -6,7 +6,7 @@ import type {
   SessionRunSummary,
   SessionRunTrigger,
 } from "@mosoo/contracts/session-run";
-import { sessionRunsTable, sessionsTable } from "@mosoo/db";
+import { sessionEventsTable, sessionRunsTable, sessionsTable } from "@mosoo/db";
 import { createPlatformId } from "@mosoo/id";
 import type {
   AccountId,
@@ -16,10 +16,10 @@ import type {
   SessionId,
   SessionRunId,
 } from "@mosoo/id";
-import { generateTraceId } from "@mosoo/observability";
+import { createConsoleLogger, generateTraceId } from "@mosoo/observability";
 import { and, eq, exists, inArray, notInArray, sql } from "drizzle-orm";
 
-import { createErrorLogContext, logInfo, logWarn } from "../../../../platform/cloudflare/logger";
+import { createErrorLogContext, logWarn } from "../../../../platform/cloudflare/logger";
 import {
   getAppDatabase,
   getD1ChangeCount,
@@ -84,6 +84,25 @@ type SessionRunTransitionSource =
 
 const SESSION_RUN_STATUS_WRITE_BATCH_SIZE = 50;
 
+const terminalRunLogger = createConsoleLogger({ namespace: "api", service: "api" });
+const terminalRunTransports = [...terminalRunLogger.getTransports()];
+terminalRunLogger.removeTransport("console");
+terminalRunLogger.addTransport({
+  config: { level: "info", name: "terminal-event-time" },
+  name: "terminal-event-time",
+  log(entry) {
+    // Keep the normal logger's sanitization, but retain the business event time
+    // when a later invocation repairs a lost terminal observation.
+    const completedAt = entry.metadata?.["completedAt"];
+    for (const transport of terminalRunTransports) {
+      void transport.log({
+        ...entry,
+        timestamp: typeof completedAt === "string" ? completedAt : entry.timestamp,
+      });
+    }
+  },
+});
+
 interface LoadedSessionRunLifecycleRow {
   completed_at: number | null;
   created_at: number;
@@ -104,6 +123,8 @@ interface LoadedSessionRunLifecycleRow {
   started_at: number | null;
   status: SessionRunStatus;
   status_seq: number;
+  status_source: string;
+  terminal_event_exists: number;
   trace_id: string;
   trigger: SessionRunTrigger;
   updated_at: number;
@@ -197,14 +218,18 @@ function logTerminalSessionRun(
   if (!isTerminalSessionRunStatus(input.status)) return;
 
   try {
-    logInfo("session.run.terminal", {
-      durationMs: Math.max(0, timestampMs - (current.started_at ?? current.created_at)),
+    terminalRunLogger.info("session.run.terminal", {
+      completedAt: toIsoString(timestampMs),
+      // The committed transition initializes a missing started_at to this time.
+      durationMs: Math.max(0, timestampMs - (current.started_at ?? timestampMs)),
       endToEndMs: Math.max(0, timestampMs - current.created_at),
       errorCode: input.error?.code ?? null,
       runId: current.id,
       runtimeId: current.runtime_id,
       sessionType: current.session_type,
-      source: input.source ?? "system",
+      source: isTerminalSessionRunStatus(current.status)
+        ? current.status_source
+        : (input.source ?? "system"),
       status: input.status,
       traceId: current.trace_id,
       trigger: current.trigger,
@@ -258,7 +283,7 @@ function sessionRunLifecycleColumns() {
     id: sessionRunsTable.id,
     model: sessionRunsTable.model,
     provider: sessionRunsTable.provider,
-    runtime_id: sessionsTable.runtimeId,
+    runtime_id: sql<string>`COALESCE(${sessionRunsTable.runtimeId}, ${sessionsTable.runtimeId})`,
     session_id: sessionRunsTable.sessionId,
     session_kind: sessionsTable.kind,
     session_last_run_id: sessionsTable.lastRunId,
@@ -267,6 +292,16 @@ function sessionRunLifecycleColumns() {
     started_at: sessionRunsTable.startedAt,
     status: sessionRunsTable.status,
     status_seq: sessionRunsTable.statusSeq,
+    status_source: sessionRunsTable.statusSource,
+    terminal_event_exists: sql<number>`EXISTS (
+      SELECT 1 FROM ${sessionEventsTable}
+      WHERE ${sessionEventsTable.runId} = ${sessionRunsTable.id}
+        AND ${sessionEventsTable.eventType} = CASE ${sessionRunsTable.status}
+          WHEN 'completed' THEN 'run.completed'
+          WHEN 'failed' THEN 'run.failed'
+          ELSE 'run.cancelled'
+        END
+    )`,
     trace_id: sessionRunsTable.traceId,
     trigger: sessionRunsTable.trigger,
     updated_at: sessionRunsTable.updatedAt,
@@ -706,6 +741,20 @@ async function transitionSessionRunStatus(
             statusSeq: current.status_seq,
           };
         }
+      }
+
+      if (isTerminalSessionRunStatus(current.status) && !current.terminal_event_exists) {
+        // A cancelled waitUntil can commit the Run but lose both its log and
+        // event. Emit before persisting the event, which closes this repair
+        // obligation. Tail consumers deduplicate these observations by runId.
+        logTerminalSessionRun(
+          current,
+          {
+            error: toSessionRunSummaryFromLifecycleRow(current).error,
+            status: current.status,
+          },
+          current.completed_at ?? current.updated_at,
+        );
       }
 
       return {

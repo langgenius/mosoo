@@ -38,6 +38,13 @@ export interface TerminalRunReconciliationResult {
   readonly reconciledSessionIds: readonly SessionId[];
 }
 
+interface RepairTerminalSessionRunProjectionsInput {
+  readonly preserveSessionLifecycle: boolean;
+  readonly run: SessionRunSummary;
+  readonly sessionId: SessionId;
+  readonly terminalEventExists?: boolean;
+}
+
 function assertTerminalRunProjection(outcome: SessionRunTransitionOutcome): void {
   switch (outcome.kind) {
     case "applied":
@@ -161,15 +168,9 @@ async function readPersistedTerminalEventKeys(
   bindings: ApiBindings,
   runIds: readonly SessionRunId[],
 ): Promise<Set<string>> {
-  if (runIds.length === 0) {
-    return new Set<string>();
-  }
-
+  if (runIds.length === 0) return new Set();
   const rows = await getAppDatabase(bindings.DB)
-    .select({
-      eventType: sessionEventsTable.eventType,
-      runId: sessionEventsTable.runId,
-    })
+    .select({ eventType: sessionEventsTable.eventType, runId: sessionEventsTable.runId })
     .from(sessionEventsTable)
     .where(
       and(
@@ -178,10 +179,51 @@ async function readPersistedTerminalEventKeys(
       ),
     )
     .all();
-
   return new Set(
     rows.flatMap((row) => (row.runId === null ? [] : [`${row.runId}:${row.eventType}`])),
   );
+}
+
+export async function repairTerminalSessionRunProjections(
+  bindings: ApiBindings,
+  input: RepairTerminalSessionRunProjectionsInput,
+): Promise<boolean> {
+  const projection = await setSessionRunStatus(bindings.DB, {
+    preserveSessionLifecycle: input.preserveSessionLifecycle,
+    runId: input.run.id,
+    source: "maintenance",
+    status: input.run.status,
+  });
+  assertTerminalRunProjection(projection);
+  const kind = terminalEventKind(input.run.status);
+
+  const terminalEventExists =
+    input.terminalEventExists ??
+    Boolean(
+      await getAppDatabase(bindings.DB)
+        .select({ id: sessionEventsTable.id })
+        .from(sessionEventsTable)
+        .where(
+          and(eq(sessionEventsTable.runId, input.run.id), eq(sessionEventsTable.eventType, kind)),
+        )
+        .limit(1)
+        .get(),
+    );
+  if (terminalEventExists) return false;
+
+  const persisted = await appendSessionRuntimeEvents({
+    bindings,
+    events: [
+      createTerminalRunRecoveryEvent({
+        kind,
+        run: input.run,
+        sessionId: input.sessionId,
+        sourceEventId: createSessionRunTerminalSourceId(input.run.id, kind),
+      }),
+    ],
+    sessionId: input.sessionId,
+  });
+  return persisted.persistedCount > 0;
 }
 
 /**
@@ -213,37 +255,16 @@ export async function reconcileTerminalSessionRuns(
       continue;
     }
 
-    if (candidate.sessionLastRunId === run.id && candidate.sessionStatus === "RUNNING") {
-      const projection = await setSessionRunStatus(bindings.DB, {
-        runId: run.id,
-        source: "maintenance",
-        status: run.status,
-      });
-      assertTerminalRunProjection(projection);
-    }
-
-    const kind = terminalEventKind(run.status);
-    const eventKey = `${run.id}:${kind}`;
-
-    if (!persistedTerminalEventKeys.has(eventKey)) {
-      const sourceEventId = createSessionRunTerminalSourceId(run.id, kind);
-      const persisted = await appendSessionRuntimeEvents({
-        bindings,
-        events: [
-          createTerminalRunRecoveryEvent({
-            kind,
-            run,
-            sessionId: candidate.sessionId,
-            sourceEventId,
-          }),
-        ],
-        sessionId: candidate.sessionId,
-      });
-
-      if (persisted.persistedCount > 0) {
-        reconciledRunIds.push(run.id);
-      }
-    }
+    const repaired = await repairTerminalSessionRunProjections(bindings, {
+      preserveSessionLifecycle:
+        candidate.sessionLastRunId !== run.id || candidate.sessionStatus !== "RUNNING",
+      run,
+      sessionId: candidate.sessionId,
+      terminalEventExists: persistedTerminalEventKeys.has(
+        `${run.id}:${terminalEventKind(run.status)}`,
+      ),
+    });
+    if (repaired) reconciledRunIds.push(run.id);
 
     reconciledSessionIds.add(candidate.sessionId);
   }

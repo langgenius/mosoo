@@ -15,6 +15,11 @@ import {
   getD1ChangeCount,
   runAppDatabaseBatch,
 } from "../../../../platform/db/drizzle";
+import type { AppDatabase } from "../../../../platform/db/drizzle";
+import {
+  sandboxIsolationAvailablePredicate,
+  sessionIsolationPendingPredicate,
+} from "../../../sessions/infrastructure/session-isolation-barrier.repository";
 import {
   getRuntimeKindPolicy,
   getRuntimeSubjectInactiveDeadline,
@@ -292,7 +297,19 @@ export async function ensureRuntimeConversationSessionRecord(
     return existing;
   }
 
-  await getAppDatabase(database)
+  const db = getAppDatabase(database);
+  const available = db
+    .select({
+      ready: sql<number>`CASE WHEN EXISTS (
+      SELECT 1 FROM ${sessionsTable} WHERE ${sessionsTable.id} = ${input.sessionId}
+        AND NOT ${sessionIsolationPendingPredicate(db)}
+    ) AND EXISTS (
+      SELECT 1 FROM ${sandboxesTable} WHERE ${sandboxesTable.id} = ${input.runtimeSubjectId}
+        AND ${sandboxIsolationAvailablePredicate()}
+    ) THEN 1 ELSE json('sandbox allocation is held by a Session operation') END`,
+    })
+    .from(sql`(SELECT 1)`);
+  const insert = db
     .insert(sandboxSessionsTable)
     .values({
       sandboxSessionId: createPlatformId<SandboxSessionId>(input.now),
@@ -304,8 +321,13 @@ export async function ensureRuntimeConversationSessionRecord(
       status: "closed",
       updatedAt: input.now,
     })
-    .onConflictDoNothing({ target: sandboxSessionsTable.sessionId })
-    .run();
+    .onConflictDoNothing({ target: sandboxSessionsTable.sessionId });
+  await database.batch(
+    [available, insert].map((query) => {
+      const statement = query.toSQL();
+      return database.prepare(statement.sql).bind(...statement.params);
+    }),
+  );
 
   const created = await getRuntimeConversationSession(database, input.sessionId);
 
@@ -326,11 +348,19 @@ interface ConversationSessionBinding {
   readonly sessionId: SessionId;
 }
 
-function conversationBindingPredicate(input: ConversationSessionBinding) {
+function conversationBindingPredicate(db: AppDatabase, input: ConversationSessionBinding) {
   return and(
     eq(sandboxSessionsTable.sessionId, input.sessionId),
     eq(sandboxSessionsTable.sandboxId, input.runtimeSubjectId),
     eq(sandboxSessionsTable.sandboxSessionId, input.expectedSandboxSessionId),
+    exists(
+      db
+        .select({ id: sandboxesTable.id })
+        .from(sandboxesTable)
+        .where(
+          and(eq(sandboxesTable.id, input.runtimeSubjectId), sandboxIsolationAvailablePredicate()),
+        ),
+    ),
   );
 }
 
@@ -349,7 +379,7 @@ export async function recordRuntimeConversationSessionError(
         status: "error",
         updatedAt: input.now,
       })
-      .where(conversationBindingPredicate(input)),
+      .where(conversationBindingPredicate(appDb, input)),
     appDb
       .update(sandboxesTable)
       .set({
@@ -371,7 +401,7 @@ export async function recordRuntimeConversationSessionError(
             appDb
               .select({ sessionId: sandboxSessionsTable.sessionId })
               .from(sandboxSessionsTable)
-              .where(conversationBindingPredicate(input)),
+              .where(conversationBindingPredicate(appDb, input)),
           ),
         ),
       ),
@@ -413,7 +443,7 @@ export async function recordRuntimeConversationSessionActive(
             appDb
               .select({ sessionId: sandboxSessionsTable.sessionId })
               .from(sandboxSessionsTable)
-              .where(conversationBindingPredicate(input)),
+              .where(conversationBindingPredicate(appDb, input)),
           ),
         ),
       ),
@@ -425,7 +455,7 @@ export async function recordRuntimeConversationSessionActive(
         status: "active",
         updatedAt: input.now,
       })
-      .where(conversationBindingPredicate(input)),
+      .where(conversationBindingPredicate(appDb, input)),
   ]);
 
   if (getD1ChangeCount((results as readonly unknown[])[1]) === 0) {
@@ -447,7 +477,7 @@ export async function recordRuntimeConversationSessionClosed(
         status: "closed",
         updatedAt: input.now,
       })
-      .where(conversationBindingPredicate(input)),
+      .where(conversationBindingPredicate(appDb, input)),
     appDb
       .update(sandboxesTable)
       .set({
@@ -461,7 +491,7 @@ export async function recordRuntimeConversationSessionClosed(
             appDb
               .select({ sessionId: sandboxSessionsTable.sessionId })
               .from(sandboxSessionsTable)
-              .where(conversationBindingPredicate(input)),
+              .where(conversationBindingPredicate(appDb, input)),
           ),
           notExists(activeConversationSessionQuery(appDb, input.runtimeSubjectId)),
           notExists(runLeaseQuery(appDb, input.runtimeSubjectId)),

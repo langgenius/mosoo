@@ -17,6 +17,7 @@ import type { SQL } from "drizzle-orm";
 import { sandboxBindingForRuntime } from "../../../../platform/cloudflare/sandbox-binding";
 import { getAppDatabase, getD1ChangeCount } from "../../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../../time";
+import { sandboxIsolationAvailablePredicate } from "../../../sessions/infrastructure/session-isolation-barrier.repository";
 import {
   getRuntimeKindPolicy,
   getRuntimeSubjectInactiveDeadline,
@@ -331,6 +332,7 @@ export async function claimRuntimeSubjectActivation(
           eq(sandboxesTable.id, input.runtimeSubjectId),
           eq(sandboxesTable.status, input.expectedStatus),
           inArray(sandboxesTable.status, RUNTIME_SUBJECT_CLAIMABLE_STATUSES),
+          sandboxIsolationAvailablePredicate(),
           or(
             isNull(sandboxesTable.claimOwner),
             isNull(sandboxesTable.claimExpiresAt),
@@ -372,6 +374,7 @@ export async function preemptRuntimeSubjectActivationClaim(
           eq(sandboxesTable.id, input.runtimeSubjectId),
           eq(sandboxesTable.status, input.expectedStatus),
           inArray(sandboxesTable.status, RUNTIME_SUBJECT_CLAIMABLE_STATUSES),
+          sandboxIsolationAvailablePredicate(),
           eq(sandboxesTable.claimOwner, input.expectedClaimOwner),
           eq(sandboxesTable.claimExpiresAt, input.expectedClaimExpiresAt),
         ),
@@ -674,6 +677,7 @@ export async function markRuntimeSubjectOperationStarted(
       and(
         eq(sandboxesTable.id, input.runtimeSubjectId),
         inArray(sandboxesTable.status, RUNTIME_SUBJECT_CLAIMABLE_STATUSES),
+        sandboxIsolationAvailablePredicate(),
         claimPredicate,
         ...(input.source === "maintenance"
           ? [
@@ -818,7 +822,10 @@ export async function markRuntimeSubjectFailed(
   },
 ): Promise<boolean> {
   const now = currentTimestampMs();
-  const conditions: SQL[] = [eq(sandboxesTable.id, input.runtimeSubjectId)];
+  const conditions: SQL[] = [
+    eq(sandboxesTable.id, input.runtimeSubjectId),
+    sandboxIsolationAvailablePredicate(),
+  ];
 
   if (input.expectedStatus !== undefined) {
     conditions.push(eq(sandboxesTable.status, input.expectedStatus));

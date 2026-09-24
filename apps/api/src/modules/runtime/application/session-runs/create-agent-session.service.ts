@@ -143,13 +143,15 @@ async function ensureAgentReadyToCreateSession(input: {
     );
   }
 
+  const storedConfig = parseAgentStoredConfig(input.source.configJson);
   const readiness = await computeAgentReadiness(input.bindings.DB, input.source.ownerId, {
     agentId: input.source.agentId,
+    builtInTools: storedConfig.builtInTools,
     bindings: input.bindings,
     environment: input.source.environment,
     kind: "cattle",
     model: input.source.model,
-    packageResolution: parseAgentStoredConfig(input.source.configJson).packageResolution,
+    packageResolution: storedConfig.packageResolution,
     projectId: input.source.projectId,
     provider: input.source.provider,
     runtimeId: input.source.runtimeId,

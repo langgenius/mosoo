@@ -22,15 +22,12 @@ import type {
 import type { RuntimeEventEnvelope } from "@mosoo/runtime-events";
 import { and, eq, exists, inArray, isNull, ne, notExists, or, sql } from "drizzle-orm";
 
-import {
-  getAppDatabase,
-  getD1ChangeCount,
-  runAppDatabaseBatch,
-} from "../../../../platform/db/drizzle";
+import { getAppDatabase, getD1ChangeCount } from "../../../../platform/db/drizzle";
 import type { AppDatabase } from "../../../../platform/db/drizzle";
 import type { PreparedApiCommand } from "../../../api-command/application/api-command-ledger";
 import { createSessionRuntimeEventProjection } from "../../../sessions/domain/session-runtime-event-projection";
 import { previewAvailablePredicate } from "../../../sessions/infrastructure/preview-retention.repository";
+import { runSessionIsolationAwareBatch } from "../../../sessions/infrastructure/session-isolation-barrier.repository";
 import { ACTIVE_SESSION_RUN_STATUSES } from "../../domain/session-run-lifecycle.machine";
 import { createSessionStatusTransitionPatch } from "./session-lifecycle-projection.repository";
 
@@ -421,10 +418,10 @@ function createApiCommandInsertQuery(db: AppDatabase, input: CommitQueuedSession
   );
 }
 
-export async function commitQueuedSessionRunAdmission(
+export async function attemptQueuedSessionRunAdmission(
   database: D1Database,
   input: CommitQueuedSessionRunAdmissionInput,
-): Promise<boolean> {
+): Promise<"admitted" | "isolation_pending" | "unavailable"> {
   if (input.events.length === 0) {
     throw new Error("Queued Session Run admission requires canonical runtime events.");
   }
@@ -435,46 +432,51 @@ export async function commitQueuedSessionRunAdmission(
     }
   }
 
-  const results = await runAppDatabaseBatch(database, (db) => [
-    createRunInsertQuery(db, input),
-    db
-      .update(sessionsTable)
-      .set({
-        lastMessageAt: input.message.timestampMs,
-        lastRunId: input.run.id,
-        messageSeqCursor: sql`${sessionsTable.messageSeqCursor} + 1`,
-        model: sql`COALESCE(${input.run.model}, ${sessionsTable.model})`,
-        provider: sql`COALESCE(${input.run.provider}, ${sessionsTable.provider})`,
-        runtimeEventSeqCursor: sql`${sessionsTable.runtimeEventSeqCursor} + ${input.events.length}`,
-        ...createSessionStatusTransitionPatch({
-          status: "RUNNING",
-          timestampMs: input.run.timestampMs,
-        }),
-      })
-      .where(
-        and(
-          eq(sessionsTable.id, input.session.id),
-          input.session.agentId === null
-            ? isNull(sessionsTable.agentId)
-            : eq(sessionsTable.agentId, input.session.agentId),
-          eq(sessionsTable.projectId, input.session.projectId),
-          isNull(sessionsTable.archivedAt),
-          eq(sessionsTable.status, "IDLE"),
-          isNull(sessionsTable.statusOperationId),
-          exists(
-            db
-              .select({ id: sessionRunsTable.id })
-              .from(sessionRunsTable)
-              .where(eq(sessionRunsTable.id, input.run.id)),
+  const { results, isolationPending } = await runSessionIsolationAwareBatch(
+    database,
+    input.session.id,
+    (db) => [
+      createRunInsertQuery(db, input),
+      db
+        .update(sessionsTable)
+        .set({
+          lastMessageAt: input.message.timestampMs,
+          lastRunId: input.run.id,
+          messageSeqCursor: sql`${sessionsTable.messageSeqCursor} + 1`,
+          model: sql`COALESCE(${input.run.model}, ${sessionsTable.model})`,
+          provider: sql`COALESCE(${input.run.provider}, ${sessionsTable.provider})`,
+          runtimeEventSeqCursor: sql`${sessionsTable.runtimeEventSeqCursor} + ${input.events.length}`,
+          ...createSessionStatusTransitionPatch({
+            status: "RUNNING",
+            timestampMs: input.run.timestampMs,
+          }),
+        })
+        .where(
+          and(
+            eq(sessionsTable.id, input.session.id),
+            input.session.agentId === null
+              ? isNull(sessionsTable.agentId)
+              : eq(sessionsTable.agentId, input.session.agentId),
+            eq(sessionsTable.projectId, input.session.projectId),
+            isNull(sessionsTable.archivedAt),
+            eq(sessionsTable.status, "IDLE"),
+            isNull(sessionsTable.statusOperationId),
+            exists(
+              db
+                .select({ id: sessionRunsTable.id })
+                .from(sessionRunsTable)
+                .where(eq(sessionRunsTable.id, input.run.id)),
+            ),
           ),
         ),
-      ),
-    createMessageInsertQuery(db, input),
-    ...input.events.map((event, index) => createEventInsertQuery(db, input, event, index)),
-    createApiCommandInsertQuery(db, input),
-  ]);
+      createMessageInsertQuery(db, input),
+      ...input.events.map((event, index) => createEventInsertQuery(db, input, event, index)),
+      createApiCommandInsertQuery(db, input),
+    ],
+  );
 
-  return getD1ChangeCount((results as readonly unknown[])[0]) > 0;
+  if (getD1ChangeCount((results as readonly unknown[])[0]) > 0) return "admitted";
+  return isolationPending ? "isolation_pending" : "unavailable";
 }
 
 // Public Session maintenance also applies the existing committed-turn barrier.

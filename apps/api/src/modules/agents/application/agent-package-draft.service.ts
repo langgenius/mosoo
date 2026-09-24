@@ -1,4 +1,5 @@
 import type { JsonObject } from "@mosoo/contracts";
+import { getAgentBuiltInToolSupportError } from "@mosoo/contracts/agent";
 import type { AgentBuiltInToolConfig } from "@mosoo/contracts/agent";
 import { createDefaultAgentBuiltInTools, normalizeAgentBuiltInTools } from "@mosoo/contracts/agent";
 import type {
@@ -19,6 +20,7 @@ import type {
 
 import { getAppDatabase, runAppDatabaseBatch } from "../../../platform/db/drizzle";
 import type { AppDatabase } from "../../../platform/db/drizzle";
+import { validationError } from "../../../platform/errors";
 import { currentTimestampMs } from "../../../time";
 import { getAgentRow } from "./agent-repository";
 import { normalizeAgentSkillIds } from "./agent-skill-resolution.service";
@@ -61,6 +63,11 @@ export async function createDraftAgentBatch(
   database: D1Database,
   input: CreateDraftAgentBatchInput,
 ): Promise<AgentRow> {
+  const toolSupportError = getAgentBuiltInToolSupportError(
+    input.runtimeId,
+    input.builtInTools ?? [],
+  );
+  if (toolSupportError) throw validationError(toolSupportError);
   const agentId = createPlatformId<AgentId>();
   const timestampMs = currentTimestampMs();
   const uniqueSkillIds = normalizeAgentSkillIds(input.skillIds);

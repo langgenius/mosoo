@@ -183,6 +183,54 @@ describe("createAgentSession", () => {
     }
   });
 
+  test.each(["draft", "published"] as const)(
+    "rejects legacy %s tool restrictions before creating a Session or probing a model",
+    async (status) => {
+      const database = await createPublicHttpContractDatabase();
+      await database
+        .prepare("UPDATE agent SET status = ? WHERE id = ?")
+        .bind(status, PUBLIC_API_TEST_IDS.agent)
+        .run();
+      // Published admission must use the frozen version even if the editable Agent is valid.
+      const table = status === "published" ? "agent_deployment_version" : "agent";
+      await database
+        .prepare(`UPDATE ${table} SET config_json = ? WHERE id = ?`)
+        .bind(
+          JSON.stringify({
+            builtInTools: [{ name: "bash", enabled: false }],
+            packageMcpServers: [],
+            packageSkills: [],
+            packageResolution: null,
+          }),
+          status === "published" ? PUBLIC_API_TEST_IDS.deployment : PUBLIC_API_TEST_IDS.agent,
+        )
+        .run();
+      await expect(
+        withProviderProbeFailure(() =>
+          createAgentSession({
+            bindings: createPublicHttpTestBindings(database) as ApiBindings,
+            input: {
+              agentId: PUBLIC_API_TEST_IDS.agent,
+              projectId: PUBLIC_API_TEST_IDS.project,
+              type: "ui",
+            },
+            viewer: OWNER_VIEWER,
+          }),
+        ),
+      ).rejects.toMatchObject({
+        code: "AGENT_SESSION_NOT_READY",
+        status: 400,
+        message: expect.stringContaining("does not support disabling"),
+      });
+      expect(await database.prepare('SELECT COUNT(*) AS count FROM "session"').first()).toEqual({
+        count: 0,
+      });
+      expect(
+        await database.prepare("SELECT COUNT(*) AS count FROM session_execution_snapshot").first(),
+      ).toEqual({ count: 0 });
+    },
+  );
+
   test("returns the created Session summary", async () => {
     const database = await createPublicHttpContractDatabase();
 

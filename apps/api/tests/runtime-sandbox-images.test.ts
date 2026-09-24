@@ -45,7 +45,11 @@ mock.module("@cloudflare/sandbox", () => ({
     );
   },
 }));
-const { getRuntimeSubjectKeepAliveHandle, destroyRuntimeSubjectContainer } =
+const {
+  getRuntimeSubjectKeepAliveHandle,
+  getRuntimeSubjectContainerObservation,
+  destroyRuntimeSubjectContainer,
+} =
   await import("../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-platform");
 
 const allocation = {
@@ -149,6 +153,66 @@ describe("runtime-specific Sandbox images", () => {
     for (const [runtimeId] of profiles)
       await ensureRuntimeSubjectId(db, { ...allocation, runtimeId });
     expect((await getRuntimeSubject(db, ids.sandbox))?.sandboxBinding).toBe("Sandbox");
+  });
+
+  test("observes the recorded namespace without configuring an SDK handle", async () => {
+    for (const sandboxBinding of ["Sandbox", ...profiles.map(([, binding]) => binding)]) {
+      const db = database();
+      await ensureRuntimeSubjectId(db, { ...allocation, runtimeId: "openai-runtime" });
+      db.execute(`UPDATE sandbox SET sandbox_binding = '${sandboxBinding}'`);
+      const sdkCalls = calls.length;
+      const names: string[] = [];
+      let disposed = 0;
+      const namespace = {
+        getByName(name: string) {
+          names.push(name);
+          return {
+            getContainerObservation: async () => ({ state: "stopped", observedAt: 123 }),
+            [Symbol.dispose]() {
+              disposed++;
+            },
+          };
+        },
+      };
+      const bindings = { DB: db, [sandboxBinding]: namespace } as unknown as ApiBindings;
+      expect(await getRuntimeSubjectContainerObservation(bindings, ids.sandbox)).toEqual({
+        state: "stopped",
+        observedAt: 123,
+      });
+      expect(names).toEqual([ids.sandbox.toLowerCase()]);
+      expect(disposed).toBe(1);
+      expect(calls).toHaveLength(sdkCalls);
+    }
+  });
+
+  test("observation does not fabricate stopped state for missing resources or failed RPCs", async () => {
+    const db = database();
+    const bindings = { DB: db } as ApiBindings;
+    await expect(getRuntimeSubjectContainerObservation(bindings, ids.sandbox)).rejects.toThrow(
+      "no recorded Sandbox binding",
+    );
+    await ensureRuntimeSubjectId(db, { ...allocation, runtimeId: "openai-runtime" });
+    await expect(getRuntimeSubjectContainerObservation(bindings, ids.sandbox)).rejects.toThrow(
+      "SandboxOpenAI binding is not configured",
+    );
+    let disposed = false;
+    const failedBindings = {
+      DB: db,
+      SandboxOpenAI: {
+        getByName: () => ({
+          getContainerObservation: async () => {
+            throw new Error("observation transport failed");
+          },
+          [Symbol.dispose]() {
+            disposed = true;
+          },
+        }),
+      },
+    } as unknown as ApiBindings;
+    await expect(
+      getRuntimeSubjectContainerObservation(failedBindings, ids.sandbox),
+    ).rejects.toThrow("observation transport failed");
+    expect(disposed).toBe(true);
   });
 
   test("keeps editable Pet workspaces compatible with different frozen Session runtimes", async () => {

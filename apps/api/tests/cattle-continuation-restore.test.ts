@@ -78,6 +78,7 @@ function createContinuationSandbox(input: { restoreError?: Error } = {}): {
         return backup;
       },
       setKeepAlive: unavailable,
+      ensureContainerReady: unavailable,
       startProcess: unavailable,
       terminal: unavailable,
       unmountBucket: unavailable,
