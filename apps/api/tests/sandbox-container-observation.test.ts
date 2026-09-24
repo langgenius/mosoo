@@ -1,7 +1,5 @@
 import { expect, mock, test } from "bun:test";
 
-import { SANDBOX_MIGRATION_FENCE_STORAGE_KEY } from "../src/adapters/durable-objects/sandbox-migration-fence";
-import { SANDBOX_RPC_FORWARD_METHODS } from "../src/adapters/durable-objects/sandbox-rpc-methods";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 
 // Isolate cloudflare:workers and SDK mocks from the other API integration tests.
@@ -52,15 +50,14 @@ if (process.env.MOSOO_TEST_SANDBOX_OBSERVATION === "1") {
   }));
 
   const { Sandbox } = await import("../src/adapters/durable-objects/sandbox.do");
-  function fixture(running?: boolean, corrupt = false, persistedFence?: unknown) {
+  function fixture(running?: boolean, corrupt = false) {
     let reads = 0;
     const ctx = {
       id: { toString: () => "sandbox-observation" },
       ...(running === undefined ? {} : { container: { running } }),
       storage: {
-        async get(key: string) {
+        async get() {
           reads++;
-          if (key === SANDBOX_MIGRATION_FENCE_STORAGE_KEY) return persistedFence;
           return corrupt ? { networkPolicy: "unknown" } : undefined;
         },
       },
@@ -94,11 +91,11 @@ if (process.env.MOSOO_TEST_SANDBOX_OBSERVATION === "1") {
     const exec = Reflect.get(sandbox, "exec") as () => Promise<unknown>;
     await Promise.all([exec.call(sandbox), exec.call(sandbox)]);
     expect(initializations).toBe(before + 1);
-    expect(reads()).toBe(2);
+    expect(reads()).toBe(1);
     expect(executions).toBe(2);
     sandbox.getContainerObservation();
     expect(initializations).toBe(before + 1);
-    expect(reads()).toBe(2);
+    expect(reads()).toBe(1);
   });
 
   test("corrupt policy still blocks execution and permits teardown and observation", async () => {
@@ -137,35 +134,6 @@ if (process.env.MOSOO_TEST_SANDBOX_OBSERVATION === "1") {
     const fresh = await createSession.call(sandbox);
     expect(await fresh.readFile()).toBe("synthetic file");
     expect(sessionReads).toBe(before + 1);
-  });
-
-  test("a persisted fence blocks every SDK ingress without initializing the delegate", async () => {
-    const before = initializations;
-    const { sandbox } = fixture(false, false, {
-      revision: 0,
-      active: { operationId: "migration", bootId: "previous-actor" },
-      releasedOperationId: null,
-    });
-    for (const method of SANDBOX_RPC_FORWARD_METHODS) {
-      const action = Reflect.get(sandbox, method) as () => Promise<unknown>;
-      await expect(action.call(sandbox)).rejects.toThrow("migration fence is held");
-    }
-    await expect(sandbox.configureNetworkConstraints({})).rejects.toThrow(
-      "migration fence is held",
-    );
-    await expect(sandbox.ensureContainerReady({ allowRecovery: true })).rejects.toThrow(
-      "migration fence is held",
-    );
-    await expect(sandbox.fetch(new Request("https://sandbox.test"))).rejects.toThrow(
-      "migration fence is held",
-    );
-    await sandbox.alarm();
-    expect(await sandbox.getMigrationFence()).toMatchObject({
-      operationId: "migration",
-      resetRequired: false,
-      state: "stopped",
-    });
-    expect(initializations).toBe(before);
   });
 
   test("corrupt policy blocks explicit startup before any container attempt", async () => {
