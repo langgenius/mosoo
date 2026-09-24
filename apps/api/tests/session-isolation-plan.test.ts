@@ -68,6 +68,8 @@ const SOURCE_BACKUP = encodeSandboxBackupIdForStorage("550e8400-e29b-41d4-a716-4
 const EMPTY_BACKUP = encodeSandboxBackupIdForStorage("550e8400-e29b-41d4-a716-446655440002");
 const NEW_BACKUP = encodeSandboxBackupIdForStorage("550e8400-e29b-41d4-a716-446655440003");
 const ROLLBACK_BACKUP = encodeSandboxBackupIdForStorage("550e8400-e29b-41d4-a716-446655440004");
+const PRIOR_BACKUP = encodeSandboxBackupIdForStorage("550e8400-e29b-41d4-a716-446655440005");
+const UNMATCHED_INPUT = "01J000000000000000000000Y5";
 const TARGET_SANDBOX = "01J000000000000000000000Y1";
 const EXECUTION_ID = "01J000000000000000000000Y2";
 const NEXT_EXECUTION_ID = "01J000000000000000000000Y3";
@@ -107,6 +109,7 @@ async function fixture(
     nativeTerminal?: "completed" | "failed";
     earlierObservation?: boolean;
     archived?: boolean;
+    preexistingInputGap?: boolean;
   } = {},
 ) {
   const runtimeId = options.nativeTerminal ? "acp-fallback" : "openai-runtime";
@@ -273,6 +276,24 @@ async function fixture(
       .bind(NOW + 25, ID.ownerSession)
       .run();
   }
+  if (options.preexistingInputGap) {
+    await db.insert(sandboxBackupsTable).values({
+      id: PRIOR_BACKUP,
+      sandboxId: ID.sandbox,
+      dir: CWD,
+      status: "ready",
+      keep: false,
+      ttlSeconds: 31_536_000,
+      createdAt: NOW - 10,
+      updatedAt: NOW - 10,
+    });
+    await database
+      .prepare(
+        "INSERT INTO session_message (id, session_id, session_run_id, role, content_text, created_at, created_by_account_id, seq) VALUES (?, ?, ?, 'user', 'Preserve this failed input; do not replay it.', ?, ?, 3)",
+      )
+      .bind(UNMATCHED_INPUT, ID.ownerSession, ID.run, NOW, ID.ownerAccount)
+      .run();
+  }
   const select = (table: string, column: string, id: string) =>
     database.prepare(`SELECT * FROM ${table} WHERE ${column} = ?`).bind(id).first();
   const source = {
@@ -286,6 +307,12 @@ async function fixture(
     latestBackup: await select("sandbox_backup", "id", EMPTY_BACKUP),
     agent: await select("agent", "id", ID.agent),
     deployment: await select("agent_deployment_version", "id", ID.deployment),
+    unmatchedInput: options.preexistingInputGap
+      ? await select("session_message", "id", UNMATCHED_INPUT)
+      : null,
+    priorBackup: options.preexistingInputGap
+      ? await select("sandbox_backup", "id", PRIOR_BACKUP)
+      : null,
   };
   const input = {
     source,
@@ -325,13 +352,23 @@ async function fixture(
               canonicalHistoryReceiptSha256: "e".repeat(64),
               workspaceReceiptSha256: "f".repeat(64),
               nativeRowsSha256: "1".repeat(64),
-              canonicalTextCount: 2,
+              canonicalTextCount: options.preexistingInputGap ? 3 : 2,
               matchedCanonicalTextCount: 2,
               nativeTextCount: 2,
               replayedNativeTextCount: 2,
               nativeMessageRowsPreserved: true,
               nativePartRowsPreserved: true,
               workspaceFilesPreserved: true,
+              ...(options.preexistingInputGap
+                ? {
+                    preexistingInputGap: {
+                      messageId: UNMATCHED_INPUT,
+                      priorArchiveSha256: "2".repeat(64),
+                      priorNativeRowsSha256: "1".repeat(64),
+                      comparisonReceiptSha256: "3".repeat(64),
+                    },
+                  }
+                : {}),
             },
           }
         : {}),
@@ -539,7 +576,118 @@ describe("legacy Session isolation batch", () => {
     },
   );
 
-  test("requires matching ACP receipts and refuses incomplete canonical history", async () => {
+  test("preserves an audited pre-existing failed input without replay or success reclassification", async () => {
+    const { database, plan } = await fixture({
+      nativeTerminal: "failed",
+      earlierObservation: true,
+      preexistingInputGap: true,
+    });
+    const history = () =>
+      Promise.all(
+        ["session_message", "session_event", "session_run", "api_command"].map(
+          async (table) =>
+            (await database.prepare(`SELECT * FROM ${table} ORDER BY 1,2`).all()).results,
+        ),
+      );
+    const original = await history();
+    for (const batch of [plan.forward, plan.rollback]) {
+      await execute(database, batch);
+      expect(await history()).toEqual(original);
+      expect(
+        await getNativeResumeRefForRuntime(database, {
+          runtimeId: "acp-fallback",
+          sessionId: ID.ownerSession,
+        }),
+      ).toEqual({ kind: "acp_session_id", runtimeId: "acp-fallback", value: "native-original" });
+      expect(
+        await database
+          .prepare("SELECT committed_session_run_id FROM native_resume_ref WHERE session_id = ?")
+          .bind(ID.ownerSession)
+          .first("committed_session_run_id"),
+      ).toBeNull();
+    }
+  });
+
+  test("pre-existing input evidence cannot excuse other missing history", async () => {
+    const { input, plan } = await fixture({ nativeTerminal: "failed", preexistingInputGap: true });
+    const evidence = input.workspaceEvidence.terminalEvidence;
+    if (!evidence?.preexistingInputGap) throw new Error("Missing synthetic difference evidence.");
+    for (const mutation of [
+      { canonicalTextCount: 4 },
+      { matchedCanonicalTextCount: 0 },
+      { preexistingInputGap: undefined },
+      {
+        preexistingInputGap: {
+          ...evidence.preexistingInputGap,
+          priorNativeRowsSha256: "4".repeat(64),
+        },
+      },
+      {
+        preexistingInputGap: {
+          ...evidence.preexistingInputGap,
+          comparisonReceiptSha256: "missing",
+        },
+      },
+      { preexistingInputGap: { ...evidence.preexistingInputGap, messageId: ID.runAlt } },
+    ]) {
+      expect(() =>
+        buildSessionIsolationPlan({
+          ...input,
+          workspaceEvidence: {
+            ...input.workspaceEvidence,
+            terminalEvidence: { ...evidence, ...mutation },
+          },
+        }),
+      ).toThrow();
+    }
+    for (const [key, mutation] of [
+      ["unmatchedInput", { role: "assistant" }],
+      ["unmatchedInput", { session_id: ID.nonOwnerSession }],
+      ["unmatchedInput", { session_run_id: ID.runAlt }],
+      ["unmatchedInput", { content_text: "" }],
+      ["unmatchedInput", { created_at: NOW - 1 }],
+      ["priorBackup", { sandbox_id: TARGET_SANDBOX }],
+      ["priorBackup", { created_at: NOW + 1 }],
+      ["priorBackup", { status: "failed" }],
+    ] as const) {
+      expect(() =>
+        buildSessionIsolationPlan({
+          ...input,
+          source: { ...plan.before, [key]: { ...plan.before[key], ...mutation } },
+        }),
+      ).toThrow();
+    }
+    expect(() =>
+      buildSessionIsolationPlan({
+        ...input,
+        source: { ...plan.before, run: { ...plan.before.run, status: "completed" } },
+        workspaceEvidence: {
+          ...input.workspaceEvidence,
+          terminalEvidence: { ...evidence, status: "completed" },
+        },
+      }),
+    ).toThrow();
+  });
+
+  for (const direction of ["forward", "rollback"] as const) {
+    test.each([
+      "UPDATE session_message SET content_text = 'changed after review'",
+      "UPDATE sandbox_backup SET ttl_seconds = 1 WHERE id = '" + PRIOR_BACKUP + "'",
+      "INSERT INTO session_message (id, content_text, created_at, created_by_account_id, plan_json, role, segments_json, seq, session_id, session_run_id) SELECT '01J000000000000000000000Y6', content_text, created_at, created_by_account_id, plan_json, 'assistant', segments_json, seq + 1, session_id, session_run_id FROM session_message",
+    ])(`${direction} rejects drift in audited failed-input sources: %s`, async (mutation) => {
+      const { database, plan } = await fixture({
+        nativeTerminal: "failed",
+        preexistingInputGap: true,
+      });
+      if (direction === "rollback") await execute(database, plan.forward);
+      await database.prepare(mutation).run();
+      const before = await dump(database);
+      await expect(execute(database, plan[direction])).rejects.toThrow();
+      expect(await dump(database)).toEqual(before);
+    });
+  }
+
+  test("requires matching ACP receipts and refuses unexplained incomplete canonical history", async () => {
     const { input } = await fixture({ nativeTerminal: "failed" });
     const evidence = input.workspaceEvidence.terminalEvidence;
     if (!evidence) throw new Error("Fixture terminal evidence is missing.");

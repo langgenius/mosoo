@@ -159,8 +159,16 @@ terminal boundary: the original ID/directory, all canonical text, native rows,
 and durable files must survive a current-harness resume and history-read rehearsal.
 This is an imported durable checkpoint, not a claim that a failed Run succeeded.
 Failed Runs retain their status and events; their imported backup and native
-commit leave the successful-Run association null. Missing canonical text is not
-qualified by a successful native load. Preserve history, events, artifacts, delegated identity,
+commit leave the successful-Run association null. A successful native load alone
+does not qualify missing canonical text. The finite operator may preserve one
+audited pre-existing difference: the latest failed Run has exactly one user input
+in platform history, absent from both a verified pre-input archive and the selected
+post-failure archive, whose native message/part rows are identical. Preserve that
+input, failure and native state exactly; do not replay the request, synthesize
+native messages, or infer that no external execution occurred. This does not cover
+missing successful history, assistant output, unknown workspace bytes or newly
+introduced loss. The canonical input and earlier backup join the transactional
+before-image guards. Preserve history, events, artifacts, delegated identity,
 runtime/model, and immutable environment/resource references. Revalidate current
 credential and resource authorization when execution resumes.
 
@@ -236,6 +244,15 @@ The JSON input has these fields:
   must describe the same source/prepared archives already named above; retain the
   private receipts for independent review. This declaration is not an archive
   verifier and cannot authorize a remote data rewrite.
+- The audited pre-existing difference additionally supplies complete
+  `source.unmatchedInput` and `source.priorBackup` rows plus
+  `terminalEvidence.preexistingInputGap`: `messageId`, `priorArchiveSha256`,
+  `priorNativeRowsSha256` and `comparisonReceiptSha256`. The earlier ready backup
+  must belong to the same workspace and predate the input. Its native logical-row
+  digest must equal the selected archive's digest; the independent comparison
+  receipt must demonstrate that only this failed user input is unmatched. All
+  existing native text still has to survive resume/history replay. Both SQL
+  directions reject changes to either source row or another message for that Run.
 
 The ordinary planner supports an idle, unarchived legacy Session whose latest Run
 completed successfully and whose original configuration and native source are
@@ -244,7 +261,8 @@ observation of the same proven native ID. It requires complete terminal evidence
 and the corresponding persisted terminal event. An already archived ACP Session
 may be copied under the same evidence; its archive timestamp remains unchanged
 through conversion, claim release and rollback, and it is not reopened. A later
-archive/unarchive change still invalidates the before-image. It does not qualify missing
+archive/unarchive change still invalidates the before-image. Apart from the
+explicit pre-existing failed-input difference above, it does not qualify missing
 canonical messages, unknown configuration, active work, or other lifecycle states.
 It preserves the existing recovery policy and all unrelated snapshot fields.
 Completed recycling can leave an operation ID on a cold Sandbox; the planner

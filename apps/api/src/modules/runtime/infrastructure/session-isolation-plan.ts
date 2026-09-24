@@ -10,6 +10,7 @@ import {
   sandboxSessionsTable,
   sandboxesTable,
   sessionExecutionSnapshotsTable,
+  sessionMessagesTable,
   sessionsTable,
 } from "@mosoo/db";
 import { retiredSessionRunsPhysicalStorage } from "@mosoo/db/migration-schema";
@@ -46,9 +47,13 @@ const SOURCE_TABLES = {
   latestBackup: sandboxBackupsTable,
   agent: agentsTable,
   deployment: agentDeploymentVersionsTable,
+  unmatchedInput: sessionMessagesTable,
+  priorBackup: sandboxBackupsTable,
 } as const;
 type SourceName = keyof typeof SOURCE_TABLES;
-type Source = Record<Exclude<SourceName, "deployment">, Row> & { deployment: Row | null };
+type OptionalSourceName = "deployment" | "unmatchedInput" | "priorBackup";
+type Source = Record<Exclude<SourceName, OptionalSourceName>, Row> &
+  Record<OptionalSourceName, Row | null>;
 
 // Finite operator qualification, pinned to the independently rehearsed reader.
 // Receipts remain private, declarative inputs; this does not inspect their files.
@@ -56,7 +61,13 @@ function hasVerifiedNativeTerminal(
   source: Source,
   workspaceEvidence: Record<string, unknown>,
 ): boolean {
-  if (workspaceEvidence["terminalEvidence"] === undefined) return false;
+  if (workspaceEvidence["terminalEvidence"] === undefined) {
+    requireValue(
+      source.unmatchedInput === null && source.priorBackup === null,
+      "An unmatched input requires independently verified native terminal evidence.",
+    );
+    return false;
+  }
   const evidence = record(workspaceEvidence["terminalEvidence"]);
   const { session, run, native } = source;
   requireValue(
@@ -74,16 +85,56 @@ function hasVerifiedNativeTerminal(
         "sha256:e2e1722e39655ae4e46d86bbce49888fbc62c74e8d748a6f5dd2f4a8b2f49eac",
     "Native terminal evidence does not match this ACP boundary or rehearsed reader.",
   );
+  let preexistingUnmatchedCount = 0;
+  const { unmatchedInput, priorBackup, sourceBackup, workspace } = source;
+  if (evidence["preexistingInputGap"] !== undefined) {
+    const gap = record(evidence["preexistingInputGap"]);
+    requireValue(
+      run["status"] === "failed" &&
+        unmatchedInput !== null &&
+        priorBackup !== null &&
+        unmatchedInput["id"] === gap["messageId"] &&
+        unmatchedInput["session_id"] === session["id"] &&
+        unmatchedInput["session_run_id"] === run["id"] &&
+        unmatchedInput["role"] === "user" &&
+        text(unmatchedInput["content_text"]).trim().length > 0 &&
+        Number(unmatchedInput["created_at"]) >= Number(run["created_at"]) &&
+        Number(unmatchedInput["created_at"]) <= Number(run["completed_at"]) &&
+        priorBackup["id"] !== sourceBackup["id"] &&
+        priorBackup["sandbox_id"] === workspace["sandbox_id"] &&
+        priorBackup["dir"] === workspace["cwd"] &&
+        priorBackup["status"] === "ready" &&
+        Number(priorBackup["created_at"]) < Number(unmatchedInput["created_at"]) &&
+        gap["priorNativeRowsSha256"] === evidence["nativeRowsSha256"],
+      "Only an unchanged, independently audited failed user input may remain unmatched.",
+    );
+    for (const key of ["priorArchiveSha256", "comparisonReceiptSha256"]) {
+      requireValue(
+        /^[a-f0-9]{64}$/.test(text(gap[key])),
+        "Pre-existing input differences require bound archive and comparison receipts.",
+      );
+    }
+    preexistingUnmatchedCount = 1;
+  } else {
+    requireValue(
+      unmatchedInput === null && priorBackup === null,
+      "An unmatched input cannot be supplied without its comparison evidence.",
+    );
+  }
   for (const [total, matched] of [
     ["canonicalTextCount", "matchedCanonicalTextCount"],
     ["nativeTextCount", "replayedNativeTextCount"],
   ] as const) {
     const count = evidence[total];
+    const matchedCount = evidence[matched];
     requireValue(
       typeof count === "number" &&
         Number.isSafeInteger(count) &&
         count > 0 &&
-        count === evidence[matched],
+        typeof matchedCount === "number" &&
+        Number.isSafeInteger(matchedCount) &&
+        matchedCount > 0 &&
+        count === matchedCount + (total === "canonicalTextCount" ? preexistingUnmatchedCount : 0),
       "Native terminal evidence requires complete canonical history and native replay.",
     );
   }
@@ -162,6 +213,9 @@ function sourceFrom(value: unknown): Source {
     latestBackup: readRow("latestBackup", input["latestBackup"]),
     agent: readRow("agent", input["agent"]),
     deployment: input["deployment"] === null ? null : readRow("deployment", input["deployment"]),
+    unmatchedInput:
+      input["unmatchedInput"] == null ? null : readRow("unmatchedInput", input["unmatchedInput"]),
+    priorBackup: input["priorBackup"] == null ? null : readRow("priorBackup", input["priorBackup"]),
   };
 }
 
@@ -219,6 +273,12 @@ function guard(source: Source, original?: Source): TransitionStatement {
     `EXISTS (SELECT 1 FROM session_event WHERE run_id = json_extract(expected.value, '$.run.id') AND event_type = 'run.' || json_extract(expected.value, '$.run.status'))`,
     `NOT EXISTS (SELECT 1 FROM session_event WHERE run_id = json_extract(expected.value, '$.run.id') AND event_type IN ('run.completed', 'run.failed', 'run.cancelled') AND event_type <> 'run.' || json_extract(expected.value, '$.run.status'))`,
   );
+  if (source.unmatchedInput !== null) {
+    predicates.push(
+      `NOT EXISTS (SELECT 1 FROM session_message WHERE session_run_id = json_extract(expected.value, '$.run.id') AND id <> json_extract(expected.value, '$.unmatchedInput.id'))`,
+      `NOT EXISTS (SELECT 1 FROM session_message WHERE session_id = json_extract(expected.value, '$.session.id') AND seq > json_extract(expected.value, '$.unmatchedInput.seq'))`,
+    );
+  }
   for (const prefix of original ? ["", "original."] : [""]) {
     // Agent provenance and a terminal Driver status do not release a Run.
     // Inspect both workspace membership and the actual Driver lease, including
