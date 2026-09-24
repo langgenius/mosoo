@@ -88,6 +88,7 @@ function createSessionModelCallDatabase(): SqliteD1Database {
       created_by_key_id text,
       agent_id text,
       completed_at integer,
+      status text DEFAULT 'completed' NOT NULL,
       created_by_account_id text NOT NULL,
       deployment_version_id text,
       id text PRIMARY KEY NOT NULL,
@@ -288,7 +289,6 @@ describe("session model call identity", () => {
       driverInstanceId: DRIVER_INSTANCE_ID,
       sessionId: SESSION_ID,
       sessionRunId: SESSION_RUN_ID,
-      status: "completed" as const,
       traceId: "direct-usage",
       usage: {
         callId: "direct-call",
@@ -326,7 +326,6 @@ describe("session model call identity", () => {
         driverInstanceId: DRIVER_INSTANCE_ID,
         sessionId: parsePlatformId<SessionId>("01J00000000000000000000099", "unrelated Session"),
         sessionRunId: SESSION_RUN_ID,
-        status: "completed",
         traceId: "wrong-session",
         usage: {
           callId: "wrong-session-call",
@@ -362,7 +361,6 @@ describe("session model call identity", () => {
       driverInstanceId: DRIVER_INSTANCE_ID,
       sessionId: SESSION_ID,
       sessionRunId: SESSION_RUN_ID,
-      status: "completed",
       traceId: "trace-1",
       usage,
     });
@@ -445,7 +443,6 @@ describe("session model call identity", () => {
       driverInstanceId: DRIVER_INSTANCE_ID,
       sessionId: SESSION_ID,
       sessionRunId: SESSION_RUN_ID,
-      status: "completed",
       traceId: "trace-wrong-project",
       usage,
     });
@@ -471,7 +468,6 @@ describe("session model call identity", () => {
       driverInstanceId: DRIVER_INSTANCE_ID,
       sessionId: SESSION_ID,
       sessionRunId: SESSION_RUN_ID,
-      status: "completed" as const,
       traceId: "trace-atomic-ledger",
       usage,
     };

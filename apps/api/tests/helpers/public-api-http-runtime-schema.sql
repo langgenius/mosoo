@@ -51,6 +51,16 @@ CREATE TABLE session (
 );
 
 CREATE TABLE session_model_call (
+  call_key text,
+  native_call_id text,
+  driver_instance_id text,
+  trace_id text,
+  started_at integer,
+  completed_at integer,
+  error_code text,
+  error_message text,
+  created_at integer,
+  updated_at integer,
   id text PRIMARY KEY NOT NULL,
   session_id text NOT NULL,
   session_run_id text NOT NULL,
@@ -63,7 +73,8 @@ CREATE TABLE session_model_call (
   cache_creation_tokens integer,
   cost_currency text,
   total_cost_usd_micros integer,
-  metadata_json text
+  metadata_json text,
+  UNIQUE (session_run_id, call_key)
 );
 
 CREATE TABLE session_run (
@@ -365,4 +376,33 @@ CREATE TABLE mcp_credential (
   status text NOT NULL,
   subject_label text,
   updated_at integer NOT NULL
+);
+
+CREATE TABLE usage_event (
+  actor_user_id text NOT NULL,
+  agent_id text,
+  agent_owner_user_id text NOT NULL,
+  agent_publication_state_at_run text NOT NULL,
+  agent_revision_id text,
+  cache_creation_tokens integer NOT NULL,
+  cache_read_tokens integer NOT NULL,
+  created_at integer NOT NULL,
+  id text PRIMARY KEY NOT NULL,
+  input_tokens integer NOT NULL,
+  model text NOT NULL,
+  organization_id text NOT NULL,
+  project_id text NOT NULL,
+  output_tokens integer NOT NULL,
+  price_snapshot_json text,
+  pricing_status text NOT NULL,
+  provider text NOT NULL,
+  run_purpose text NOT NULL,
+  runtime_id text,
+  session_id text,
+  session_run_id text,
+  source text NOT NULL,
+  source_event_id text NOT NULL,
+  total_cost_usd_micros integer NOT NULL,
+  usage_contract text NOT NULL,
+  UNIQUE (source, source_event_id)
 );

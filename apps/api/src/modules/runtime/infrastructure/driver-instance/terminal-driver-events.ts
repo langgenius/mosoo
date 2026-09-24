@@ -7,6 +7,7 @@ import type { RuntimeEventEnvelope } from "@mosoo/runtime-events";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { appendSessionRuntimeEvents } from "../../../sessions/application/session-event-write.service";
 import { projectRuntimeEventToSessionDeliveryEvents } from "../../../sessions/application/session-live-state.service";
+import { finalizeSessionModelCallUsage } from "../../../sessions/application/session-model-call.service";
 import { recordCanonicalSessionRunFailure } from "../../application/session-runs/session-run-terminal-failure.service";
 import { isTerminalSessionRunStatus } from "../../domain/session-run-status";
 import {
@@ -189,6 +190,7 @@ async function synthesizeDriverRunFinished(
   if (isStaleTerminalRunTransition(outcome) && !isStaleTerminalRunStatus(outcome, "completed")) {
     return;
   }
+  await finalizeSessionModelCallUsage(database, input.link.sessionRunId);
   await appendCanonicalTerminalDriverEvent({
     bindings: input.bindings,
     event: runCompletedEvent,

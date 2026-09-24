@@ -10,7 +10,10 @@ import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../../time";
 import { createSessionRuntimeEvent } from "../../../sessions/application/session-event-write.service";
-import { upsertSessionModelCallUsage } from "../../../sessions/application/session-model-call.service";
+import {
+  finalizeSessionModelCallUsage,
+  upsertSessionModelCallUsage,
+} from "../../../sessions/application/session-model-call.service";
 import { persistSessionRuntimeEvents } from "../../../sessions/infrastructure/session-runtime-event-store.repository";
 import {
   discardUncommittedCompletionCheckpoint,
@@ -30,22 +33,6 @@ import { hasTerminalRuntimeDriverRunTransition } from "./run-transitions";
 
 async function loadTerminalRunRelease() {
   return import("./terminal-run-release");
-}
-
-function getModelCallStatus(
-  transitions: ReturnType<typeof compactRuntimeDriverRunTransitions>,
-): "completed" | "failed" | "started" {
-  for (const transition of transitions) {
-    if (transition.status === "completed") {
-      return "completed";
-    }
-
-    if (transition.status === "cancelled" || transition.status === "failed") {
-      return "failed";
-    }
-  }
-
-  return "started";
 }
 
 type DriverProjectedSessionRunStatusInput = Parameters<typeof setSessionRunStatus>[1];
@@ -222,7 +209,6 @@ export async function persistProjectedRuntimeDriverEvents(
       driverInstanceId: input.driverInstanceId,
       sessionId: link.sessionId,
       sessionRunId: link.sessionRunId,
-      status: getModelCallStatus(transitions),
       traceId,
       usage: projection.usage,
     });
@@ -344,6 +330,10 @@ export async function persistProjectedRuntimeDriverEvents(
         sourceEventId,
       });
     }
+  }
+
+  if (shouldReleaseDriverRun && link.sessionRunId !== null) {
+    await finalizeSessionModelCallUsage(database, link.sessionRunId);
   }
 
   const persistedTerminalEvents = await persistSessionRuntimeEvents(database, {

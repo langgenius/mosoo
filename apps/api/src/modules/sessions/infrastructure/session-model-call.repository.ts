@@ -17,9 +17,13 @@ import type {
   SessionModelCallId,
   SessionRunId,
 } from "@mosoo/id";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 
-import { getAppDatabase, runAppDatabaseBatch } from "../../../platform/db/drizzle";
+import {
+  getAppDatabase,
+  getD1ChangeCount,
+  runAppDatabaseBatch,
+} from "../../../platform/db/drizzle";
 import { isTruthy } from "../../../shared/truthiness";
 import { currentTimestampMs } from "../../../time";
 import { createRuntimeUsageEventUpsert } from "../../cost/application/cost-usage-event.service";
@@ -50,7 +54,6 @@ export interface UpsertSessionModelCallUsageInput {
   driverInstanceId: DriverInstanceId;
   sessionId: SessionId;
   sessionRunId: SessionRunId;
-  status: SessionModelCallStatus;
   traceId: string;
   usage: SessionUsageSummary | null;
 }
@@ -151,10 +154,7 @@ export async function upsertSessionModelCallUsage(
   }
 
   const timestampMs = currentTimestampMs();
-  const completedAt =
-    input.status === "completed" || input.status === "failed"
-      ? (run.completed_at ?? timestampMs)
-      : null;
+  const completedAt = run.completed_at;
   const nativeCallId = normalizeUsageCallId(usage.callId);
   const callKey = isTruthy(nativeCallId) ? `model_call:${nativeCallId}` : "run_usage";
   const provider = run.provider ?? run.session_provider;
@@ -190,7 +190,7 @@ export async function upsertSessionModelCallUsage(
         cacheCreationTokens: toTokenCount(usage.cachedWriteTokens),
         cacheReadTokens: toTokenCount(usage.cachedReadTokens),
         callKey,
-        completedAt,
+        completedAt: sql`(SELECT completed_at FROM session_run WHERE id = ${input.sessionRunId})`,
         costCurrency: usage.costCurrency ?? null,
         createdAt: timestampMs,
         driverInstanceId: input.driverInstanceId,
@@ -206,7 +206,12 @@ export async function upsertSessionModelCallUsage(
         sessionId: input.sessionId,
         sessionRunId: input.sessionRunId,
         startedAt: run.started_at ?? timestampMs,
-        status: input.status,
+        // Read inside the write transaction: usage and the terminal Run can
+        // arrive in either order, and completion must wait for its checkpoint.
+        status: sql`(SELECT CASE
+          WHEN status = 'completed' THEN 'completed'
+          WHEN status IN ('failed', 'cancelled', 'expired') THEN 'failed'
+          ELSE 'started' END FROM session_run WHERE id = ${input.sessionRunId})`,
         totalCostUsdMicros: toUsdMicros(usage.costAmount),
         traceId: input.traceId,
         updatedAt: timestampMs,
@@ -240,6 +245,43 @@ export async function upsertSessionModelCallUsage(
 
     return usageEventUpsert === null ? [modelCallUpsert] : [modelCallUpsert, usageEventUpsert];
   });
+}
+
+/** Close existing usage only from the persisted outcome, before acknowledging a terminal event. */
+export async function finalizeSessionModelCallUsage(
+  database: D1Database,
+  sessionRunId: SessionRunId,
+): Promise<boolean> {
+  const appDatabase = getAppDatabase(database);
+  const result = await appDatabase
+    .update(sessionModelCallsTable)
+    .set({
+      status: sql`(SELECT CASE WHEN status = 'completed' THEN 'completed' ELSE 'failed' END
+        FROM session_run WHERE id = ${sessionRunId})`,
+      completedAt: sql`(SELECT COALESCE(completed_at, updated_at)
+        FROM session_run WHERE id = ${sessionRunId})`,
+      updatedAt: currentTimestampMs(),
+    })
+    .where(
+      and(
+        eq(sessionModelCallsTable.sessionRunId, sessionRunId),
+        eq(sessionModelCallsTable.status, "started"),
+        inArray(
+          sessionModelCallsTable.sessionRunId,
+          appDatabase
+            .select({ id: sessionRunsTable.id })
+            .from(sessionRunsTable)
+            .where(
+              and(
+                eq(sessionRunsTable.id, sessionRunId),
+                inArray(sessionRunsTable.status, ["completed", "failed", "cancelled", "expired"]),
+              ),
+            ),
+        ),
+      ),
+    )
+    .run();
+  return getD1ChangeCount(result) > 0;
 }
 
 function normalizeUsageCallId(value: string | null | undefined): string | null {
