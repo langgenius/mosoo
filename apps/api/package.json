@@ -9,7 +9,7 @@
     "cf:types": "mkdir -p .tmp/.config .tmp/types && XDG_CONFIG_HOME=$PWD/.tmp/.config vp exec wrangler types .tmp/types/worker-configuration.d.ts",
     "db:migrate:local": "vp exec wrangler d1 migrations apply DB --local",
     "session-isolation:plan": "vp exec bun bin/prepare-session-isolation.ts",
-    "session-isolation:run": "vp exec bun bin/run-session-isolation.ts",
+    "session-isolation:run": "vp exec node --experimental-strip-types bin/run-session-isolation.ts",
     "lint": "vp lint .",
     "tc": "vp run cf:types && vp exec tsc --noEmit",
     "test": "vp exec bun test tests"

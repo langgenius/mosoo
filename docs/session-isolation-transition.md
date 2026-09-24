@@ -499,7 +499,9 @@ new receipt directory>`. `prepare` takes the private request path; `inspect`,
 one durable step; `run` resumes through completion; `rollback` records the inverse
 direction and resumes it. Each invocation needs a new receipt directory. The CLI
 saves private `receipt.json` or `failure.json` with directory/file modes `0700` and
-`0600`; it makes no model request. Failed operations are not retried by a background
+`0600`; it makes no model request. The command runs Wrangler's remote-binding
+transport in Node.js, verified with Node.js 25.9.0. Bun 1.4.0 stalled while
+establishing the same hosted connection with the pinned Wrangler 4.123.0. Failed operations are not retried by a background
 scheduler. The operator must inspect and resume them, retaining admission
 protection until the recorded recovery sequence completes.
 
