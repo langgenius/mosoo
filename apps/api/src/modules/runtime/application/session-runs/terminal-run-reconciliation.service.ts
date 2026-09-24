@@ -3,15 +3,17 @@ import type { SessionRunStatus, SessionRunSummary } from "@mosoo/contracts/sessi
 import {
   driverInstancesTable,
   sessionEventsTable,
+  sessionModelCallsTable,
   sessionRunsTable,
   sessionsTable,
 } from "@mosoo/db";
 import type { SessionId, SessionRunId } from "@mosoo/id";
-import { and, asc, eq, inArray, isNull, notExists, or, sql } from "drizzle-orm";
+import { and, asc, eq, exists, inArray, isNull, notExists, or, sql } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../../platform/db/drizzle";
 import { appendSessionRuntimeEvents } from "../../../sessions/application/session-event-write.service";
+import { finalizeSessionModelCallUsage } from "../../../sessions/application/session-model-call.service";
 import { createSessionRunTerminalSourceId } from "../../domain/session-run-terminal-event-id";
 import {
   getSessionRunSummariesByIds,
@@ -131,6 +133,17 @@ async function findTerminalRunCandidates(
         ),
       ),
   );
+  const unfinishedUsage = exists(
+    database
+      .select({ id: sessionModelCallsTable.id })
+      .from(sessionModelCallsTable)
+      .where(
+        and(
+          eq(sessionModelCallsTable.sessionRunId, sessionRunsTable.id),
+          eq(sessionModelCallsTable.status, "started"),
+        ),
+      ),
+  );
   const staleSessionProjection = and(
     eq(sessionsTable.lastRunId, sessionRunsTable.id),
     eq(sessionsTable.status, "RUNNING"),
@@ -156,7 +169,7 @@ async function findTerminalRunCandidates(
           isNull(driverInstancesTable.id),
           inArray(driverInstancesTable.status, TERMINAL_DRIVER_STATUSES),
         ),
-        or(staleSessionProjection, missingTerminalEvent),
+        or(staleSessionProjection, missingTerminalEvent, unfinishedUsage),
       ),
     )
     .orderBy(asc(sessionRunsTable.updatedAt), asc(sessionRunsTable.id))
@@ -195,6 +208,7 @@ export async function repairTerminalSessionRunProjections(
     status: input.run.status,
   });
   assertTerminalRunProjection(projection);
+  const usageFinalized = await finalizeSessionModelCallUsage(bindings.DB, input.run.id);
   const kind = terminalEventKind(input.run.status);
 
   const terminalEventExists =
@@ -209,7 +223,7 @@ export async function repairTerminalSessionRunProjections(
         .limit(1)
         .get(),
     );
-  if (terminalEventExists) return false;
+  if (terminalEventExists) return usageFinalized;
 
   const persisted = await appendSessionRuntimeEvents({
     bindings,
@@ -223,7 +237,7 @@ export async function repairTerminalSessionRunProjections(
     ],
     sessionId: input.sessionId,
   });
-  return persisted.persistedCount > 0;
+  return usageFinalized || persisted.persistedCount > 0;
 }
 
 /**

@@ -7,6 +7,7 @@ import { logInfo, logWarn } from "../../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../../platform/db/drizzle";
 import { appendSessionRuntimeEvents } from "../../../sessions/application/session-event-write.service";
+import { finalizeSessionModelCallUsage } from "../../../sessions/application/session-model-call.service";
 import { createFailedSessionRunRuntimeEvent } from "../../application/session-runs/session-run-view-events.service";
 import { repairTerminalSessionRunProjections } from "../../application/session-runs/terminal-run-reconciliation.service";
 import { classifyReclaim, decideReclaimRecovery } from "../../domain/session-run-reclaim-recovery";
@@ -113,6 +114,7 @@ export async function releaseTerminalDriverInstanceSessionRun(
   });
 
   await checkpointTerminalRuntimeSessionIfNeeded(bindings, link);
+  await finalizeSessionModelCallUsage(database, input.sessionRunId);
 
   const outcome = await recordRuntimeRunLeaseReleasedOutcome(database, {
     driverInstanceId: input.driverInstanceId,
