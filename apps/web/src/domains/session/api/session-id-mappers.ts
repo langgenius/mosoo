@@ -22,13 +22,12 @@ interface SessionRunSummaryLike {
 }
 
 interface SessionSummaryLike {
-  agentId: string;
+  agentId: string | null;
   archivedAt: string | null;
   createdAt: string;
   deploymentVersionId: string | null;
   deploymentVersionNumber: number | null;
   id: string;
-  kind: SessionSummary["kind"];
   lastMessageAt?: string | null | undefined;
   lastRun: SessionRunSummaryLike | null;
   model: string;
@@ -79,13 +78,12 @@ function toSessionRunSummary(run: SessionRunSummaryLike | null): SessionRunSumma
 
 export function toSessionSummary(session: SessionSummaryLike): SessionSummary {
   return {
-    agentId: toAgentId(session.agentId),
+    agentId: session.agentId === null ? null : toAgentId(session.agentId),
     archivedAt: session.archivedAt,
     createdAt: session.createdAt,
     deploymentVersionId: toNullableAgentDeploymentVersionId(session.deploymentVersionId),
     deploymentVersionNumber: session.deploymentVersionNumber,
     id: toSessionId(session.id),
-    kind: session.kind,
     lastRun: toSessionRunSummary(session.lastRun),
     model: session.model,
     provider: session.provider,

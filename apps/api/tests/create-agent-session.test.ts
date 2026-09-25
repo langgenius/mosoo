@@ -1,7 +1,13 @@
 import { describe, expect, test } from "bun:test";
 
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
-import { createAgentSession } from "../src/modules/runtime/application/session-run.service";
+import { hydrateCachedRunContextFromSession } from "../src/modules/runtime/application/session-definition/hydrate-run-context.service";
+import { parseSessionExecutionPlanJson } from "../src/modules/runtime/application/session-definition/session-execution.repository";
+import {
+  createAgentSession,
+  createProjectSession,
+} from "../src/modules/runtime/application/session-run.service";
+import { PREVIEW_RETENTION_MS } from "../src/modules/sessions/domain/preview-retention-policy";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import {
   createPublicHttpContractDatabase,
@@ -46,7 +52,137 @@ async function withProviderProbeFailure<T>(operation: () => Promise<T>): Promise
   }
 }
 
+describe("createProjectSession", () => {
+  const input = {
+    projectId: PUBLIC_API_TEST_IDS.project,
+    runtimeId: "openai-runtime",
+    provider: "openai",
+    model: "gpt-5.4",
+    instructions: "Keep this admitted instruction exactly.",
+  };
+
+  test("creates and hydrates isolated execution without any Agent records", async () => {
+    const database = await createPublicHttpContractDatabase();
+    await database.prepare("DELETE FROM agent").run();
+    const bindings = createPublicHttpTestBindings(database) as ApiBindings;
+    const session = await withProviderProbeMock(() =>
+      createProjectSession({ bindings, input, viewer: OWNER_VIEWER }),
+    );
+    expect(session).toMatchObject({
+      agentId: null,
+      deploymentVersionId: null,
+      deploymentVersionNumber: null,
+      projectId: input.projectId,
+      type: "ui",
+      model: input.model,
+    });
+    expect(await database.prepare("SELECT count(*) AS count FROM agent").first()).toEqual({
+      count: 0,
+    });
+    const snapshot = await database
+      .prepare("SELECT plan_json FROM session_execution_snapshot WHERE session_id = ?")
+      .bind(session.id)
+      .first<{ plan_json: string }>();
+    const plan = parseSessionExecutionPlanJson(snapshot!.plan_json);
+    expect(session).not.toHaveProperty("kind");
+    expect(plan.binding).not.toHaveProperty("kind");
+    expect(JSON.parse(snapshot!.plan_json).binding).not.toHaveProperty("kind");
+    for (const legacyKind of [undefined, "pet", "cattle"]) {
+      const legacy = { ...plan, binding: { ...plan.binding, kind: legacyKind } };
+      expect(parseSessionExecutionPlanJson(JSON.stringify(legacy)).binding).toEqual(plan.binding);
+    }
+    expect(plan.binding.prompt).toBe(input.instructions);
+    expect(plan.binding.agentId).toBeNull();
+    expect(plan.configJson).toBe("{}");
+    expect(plan).not.toHaveProperty("recoveryRetentionMs");
+    expect(JSON.parse(snapshot!.plan_json)).not.toHaveProperty("recoveryRetentionMs");
+    expect(
+      parseSessionExecutionPlanJson(
+        JSON.stringify({ ...plan, recoveryRetentionMs: 30 * 86_400_000 }),
+      ),
+    ).toEqual(plan);
+    expect(plan.previewRetentionMs).toBeUndefined();
+    const cold = await hydrateCachedRunContextFromSession(bindings, OWNER_VIEWER, session);
+    expect(cold.cacheHit).toBe(false);
+    expect(cold.value.profile.configRevision.agentId).toBeNull();
+    const warm = await hydrateCachedRunContextFromSession(bindings, OWNER_VIEWER, session);
+    expect(warm.cacheHit).toBe(true);
+    expect(warm.value.profile.configRevision).toEqual(cold.value.profile.configRevision);
+  });
+
+  test("enforces Project key and ownership boundaries before creating execution", async () => {
+    const database = await createPublicHttpContractDatabase();
+    const bindings = createPublicHttpTestBindings(database) as ApiBindings;
+    for (const viewer of [
+      { ...OWNER_VIEWER, projectId: "01J00000000000000000000099" },
+      { ...OWNER_VIEWER, id: PUBLIC_API_TEST_IDS.outsiderAccount },
+    ]) {
+      await expect(createProjectSession({ bindings, input, viewer })).rejects.toThrow("permission");
+    }
+    expect(await database.prepare("SELECT count(*) AS count FROM session").first()).toEqual({
+      count: 0,
+    });
+  });
+
+  test("rejects unavailable models before admitting a Session", async () => {
+    const database = await createPublicHttpContractDatabase();
+    const bindings = createPublicHttpTestBindings(database) as ApiBindings;
+    await expect(
+      withProviderProbeMock(() =>
+        createProjectSession({
+          bindings,
+          input: { ...input, model: "unavailable-model" },
+          viewer: OWNER_VIEWER,
+        }),
+      ),
+    ).rejects.toThrow();
+    expect(await database.prepare("SELECT count(*) AS count FROM session").first()).toEqual({
+      count: 0,
+    });
+  });
+});
+
 describe("createAgentSession", () => {
+  test("enrolls only new Cloud console Previews and preserves the policy through parsing", async () => {
+    const database = await createPublicHttpContractDatabase();
+    for (const scenario of [
+      { cloud: true, console: true, type: "preview" as const, managed: true },
+      { cloud: true, console: true, type: "ui" as const, managed: false },
+      { cloud: false, console: true, type: "preview" as const, managed: false },
+      { cloud: true, console: false, type: "preview" as const, managed: false },
+    ]) {
+      const session = await withProviderProbeMock(() =>
+        createAgentSession({
+          bindings: {
+            ...createPublicHttpTestBindings(database),
+            ...(scenario.cloud ? { MOSOO_DEPLOYMENT_MODE: "cloud" } : {}),
+          } as ApiBindings,
+          input: {
+            agentId: PUBLIC_API_TEST_IDS.agent,
+            projectId: PUBLIC_API_TEST_IDS.project,
+            type: scenario.type,
+          },
+          ...(scenario.console ? { options: { origin: "console_preview" as const } } : {}),
+          viewer: OWNER_VIEWER,
+        }),
+      );
+      const snapshot = await database
+        .prepare("SELECT plan_json FROM session_execution_snapshot WHERE session_id = ?")
+        .bind(session.id)
+        .first<{ plan_json: string }>();
+      expect(snapshot).not.toBeNull();
+      const plan = parseSessionExecutionPlanJson(snapshot!.plan_json);
+      expect(plan.previewRetentionMs).toBe(scenario.managed ? PREVIEW_RETENTION_MS : undefined);
+      if (scenario.managed) {
+        expect(() =>
+          parseSessionExecutionPlanJson(
+            JSON.stringify({ ...plan, previewRetentionMs: 3 * 86_400_000 }),
+          ),
+        ).toThrow("must be 30 days");
+      }
+    }
+  });
+
   test.each(["draft", "published"] as const)(
     "rejects legacy %s tool restrictions before creating a Session or probing a model",
     async (status) => {
@@ -114,7 +250,6 @@ describe("createAgentSession", () => {
       agentId: PUBLIC_API_TEST_IDS.agent,
       deploymentVersionId: PUBLIC_API_TEST_IDS.deployment,
       deploymentVersionNumber: 1,
-      kind: "pet",
       lastRun: null,
       model: "gpt-5.4",
       provider: "openai",
@@ -127,6 +262,318 @@ describe("createAgentSession", () => {
     expect(session.id).toBeString();
     expect(session.createdAt).toBe(session.updatedAt);
   });
+
+  test("live and saved admission isolate Sessions and preserve unconverted physical bindings", async () => {
+    const database = await createPublicHttpContractDatabase();
+    const bindings = createPublicHttpTestBindings(database) as ApiBindings;
+    const create = (saved: boolean) =>
+      withProviderProbeMock(() =>
+        createAgentSession({
+          bindings,
+          input: {
+            agentId: PUBLIC_API_TEST_IDS.agent,
+            projectId: PUBLIC_API_TEST_IDS.project,
+            type: "ui",
+          },
+          ...(saved ? { options: { configurationSource: "saved" as const } } : {}),
+          viewer: OWNER_VIEWER,
+        }),
+      );
+    const seed = await create(false);
+    const legacy = { ...seed, kind: "pet" as const };
+    const legacySnapshot = await database
+      .prepare("SELECT plan_json FROM session_execution_snapshot WHERE session_id = ?")
+      .bind(legacy.id)
+      .first<{ plan_json: string }>();
+    const legacyPlan = parseSessionExecutionPlanJson(legacySnapshot!.plan_json);
+    // A historical kind alone is not a physical shared binding.
+    await database.batch([
+      database.prepare("UPDATE session SET kind = 'pet' WHERE id = ?").bind(legacy.id),
+      database
+        .prepare("UPDATE session_execution_snapshot SET plan_json = ? WHERE session_id = ?")
+        .bind(
+          JSON.stringify({ ...legacyPlan, binding: { ...legacyPlan.binding, kind: "pet" } }),
+          legacy.id,
+        ),
+    ]);
+    const legacyContext = await hydrateCachedRunContextFromSession(bindings, OWNER_VIEWER, legacy);
+    const before = await database
+      .prepare("SELECT * FROM session_execution_snapshot WHERE session_id = ?")
+      .bind(legacy.id)
+      .first();
+    const first = await create(false);
+    const second = await create(true);
+    const firstContext = await hydrateCachedRunContextFromSession(bindings, OWNER_VIEWER, first);
+    const secondContext = await hydrateCachedRunContextFromSession(bindings, OWNER_VIEWER, second);
+    expect(first.deploymentVersionId).toBe(PUBLIC_API_TEST_IDS.deployment);
+    expect(second.deploymentVersionId).toBeNull();
+    expect(legacyContext.value.profile.sandbox.subjectId).toBe(legacy.id);
+    expect(firstContext.value.profile.sandbox.subjectId).toBe(first.id);
+    expect(secondContext.value.profile.sandbox.subjectId).toBe(second.id);
+    expect(
+      new Set([
+        legacyContext.value.profile.sandbox.id,
+        firstContext.value.profile.sandbox.id,
+        secondContext.value.profile.sandbox.id,
+      ]).size,
+    ).toBe(3);
+    expect(firstContext.value.profile.session.homePath).not.toBe(
+      secondContext.value.profile.session.homePath,
+    );
+    expect(firstContext.value.profile.session.sessionOrganizationPath).not.toBe(
+      secondContext.value.profile.session.sessionOrganizationPath,
+    );
+    for (const session of [first, second]) {
+      const row = await database
+        .prepare("SELECT plan_json FROM session_execution_snapshot WHERE session_id = ?")
+        .bind(session.id)
+        .first<{ plan_json: string }>();
+      expect(JSON.parse(row!.plan_json)).not.toHaveProperty("recoveryRetentionMs");
+      expect(session).not.toHaveProperty("kind");
+    }
+    expect(
+      await database
+        .prepare("SELECT kind FROM agent WHERE id = ?")
+        .bind(PUBLIC_API_TEST_IDS.agent)
+        .first(),
+    ).toEqual({ kind: "pet" });
+    expect(
+      await database
+        .prepare("SELECT * FROM session_execution_snapshot WHERE session_id = ?")
+        .bind(legacy.id)
+        .first(),
+    ).toEqual(before);
+    const legacyAgain = await hydrateCachedRunContextFromSession(bindings, OWNER_VIEWER, legacy);
+    expect(legacyAgain.value.profile.sandbox).toEqual(legacyContext.value.profile.sandbox);
+    // Once an old Session actually points at a shared physical machine, hydration
+    // must preserve that mapping for the pinned conversion, never create a replacement.
+    const oldSandboxId = legacyContext.value.profile.sandbox.id;
+    await database
+      .prepare("UPDATE sandbox SET subject_kind = 'agent', subject_id = ? WHERE id = ?")
+      .bind(PUBLIC_API_TEST_IDS.agent, oldSandboxId)
+      .run();
+    await database
+      .prepare(`INSERT INTO sandbox_session
+      (session_id, sandbox_id, cloudflare_session_id, cwd, origin_json, status, created_at, updated_at)
+      VALUES (?, ?, ?, '/workspace', '{}', 'closed', 1, 1)`)
+      .bind(legacy.id, oldSandboxId, legacy.id)
+      .run();
+    const physicalBefore = await database.prepare("SELECT * FROM sandbox").all();
+    await expect(
+      hydrateCachedRunContextFromSession(bindings, OWNER_VIEWER, legacy),
+    ).rejects.toThrow("verified exclusive execution binding");
+    expect(await database.prepare("SELECT * FROM sandbox").all()).toEqual(physicalBefore);
+  });
+
+  test("freezes provider options across cold hydration, cache refresh, and later Agent edits", async () => {
+    const database = await createPublicHttpContractDatabase();
+    const bindings = createPublicHttpTestBindings(database) as ApiBindings;
+    await database
+      .prepare(
+        "UPDATE agent SET status = 'draft', live_deployment_version_id = NULL, config_json = ? WHERE id = ?",
+      )
+      .bind(
+        JSON.stringify({
+          packageMcpServers: [],
+          packageSkills: [],
+          packageResolution: null,
+          providerOptions: { reasoningEffort: "low" },
+        }),
+        PUBLIC_API_TEST_IDS.agent,
+      )
+      .run();
+    const createSession = () =>
+      withProviderProbeMock(() =>
+        createAgentSession({
+          bindings,
+          input: {
+            agentId: PUBLIC_API_TEST_IDS.agent,
+            projectId: PUBLIC_API_TEST_IDS.project,
+            type: "ui",
+          },
+          viewer: OWNER_VIEWER,
+        }),
+      );
+    const original = await createSession();
+    await database
+      .prepare("UPDATE agent SET config_json = ? WHERE id = ?")
+      .bind(
+        JSON.stringify({
+          packageMcpServers: [],
+          packageSkills: [],
+          packageResolution: null,
+          providerOptions: { reasoningEffort: "high" },
+        }),
+        PUBLIC_API_TEST_IDS.agent,
+      )
+      .run();
+    const cold = await hydrateCachedRunContextFromSession(bindings, OWNER_VIEWER, original);
+    expect(cold.cacheHit).toBe(false);
+    expect(cold.value.profile.providerOptions).toEqual({ reasoningEffort: "low" });
+    const warm = await hydrateCachedRunContextFromSession(bindings, OWNER_VIEWER, original);
+    expect(warm.cacheHit).toBe(true);
+    expect(warm.value.profile.providerOptions).toEqual({ reasoningEffort: "low" });
+    const latest = await createSession();
+    const latestContext = await hydrateCachedRunContextFromSession(bindings, OWNER_VIEWER, latest);
+    expect(latestContext.value.profile.providerOptions).toEqual({ reasoningEffort: "high" });
+    await database.prepare("DELETE FROM vendor_credential").run();
+    await expect(
+      hydrateCachedRunContextFromSession(bindings, OWNER_VIEWER, original),
+    ).rejects.toThrow("No credential available");
+  });
+
+  test("reads legacy published configuration but never falls back from a corrupt new snapshot", async () => {
+    const database = await createPublicHttpContractDatabase();
+    const bindings = createPublicHttpTestBindings(database) as ApiBindings;
+    const session = await withProviderProbeMock(() =>
+      createAgentSession({
+        bindings,
+        input: {
+          agentId: PUBLIC_API_TEST_IDS.agent,
+          projectId: PUBLIC_API_TEST_IDS.project,
+          type: "ui",
+        },
+        viewer: OWNER_VIEWER,
+      }),
+    );
+    await database
+      .prepare(
+        "UPDATE session_execution_snapshot SET plan_json = json_remove(plan_json, '$.configJson') WHERE session_id = ?",
+      )
+      .bind(session.id)
+      .run();
+    await database
+      .prepare("UPDATE agent SET config_json = ? WHERE id = ?")
+      .bind(
+        JSON.stringify({
+          packageMcpServers: [],
+          packageSkills: [],
+          packageResolution: null,
+          providerOptions: { reasoningEffort: "high" },
+        }),
+        PUBLIC_API_TEST_IDS.agent,
+      )
+      .run();
+    const legacy = await hydrateCachedRunContextFromSession(bindings, OWNER_VIEWER, session);
+    expect(legacy.value.profile.providerOptions).toEqual({});
+    await database
+      .prepare(
+        "UPDATE session_execution_snapshot SET plan_json = json_set(plan_json, '$.configJson', 'broken') WHERE session_id = ?",
+      )
+      .bind(session.id)
+      .run();
+    await expect(
+      hydrateCachedRunContextFromSession(bindings, OWNER_VIEWER, session),
+    ).rejects.toThrow();
+    await database
+      .prepare(
+        "UPDATE session_execution_snapshot SET plan_json = json_set(plan_json, '$.configJson', NULL) WHERE session_id = ?",
+      )
+      .bind(session.id)
+      .run();
+    await expect(
+      hydrateCachedRunContextFromSession(bindings, OWNER_VIEWER, session),
+    ).rejects.toThrow("sessionExecutionPlan.configJson must be a string");
+  });
+
+  test.each(["retained", "absent"] as const)(
+    "hydrates frozen isolated execution with %s Agent provenance, including cache refresh",
+    async (provenance) => {
+      const database = await createPublicHttpContractDatabase();
+      const bindings = createPublicHttpTestBindings(database) as ApiBindings;
+      const session = await withProviderProbeMock(() =>
+        createAgentSession({
+          bindings,
+          input: {
+            agentId: PUBLIC_API_TEST_IDS.agent,
+            projectId: PUBLIC_API_TEST_IDS.project,
+            type: "ui",
+          },
+          options: { configurationSource: "saved" },
+          viewer: OWNER_VIEWER,
+        }),
+      );
+      await database.prepare("DELETE FROM agent WHERE id = ?").bind(session.agentId).run();
+
+      if (provenance === "absent") {
+        const snapshot = await database
+          .prepare("SELECT plan_json FROM session_execution_snapshot WHERE session_id = ?")
+          .bind(session.id)
+          .first<{ plan_json: string }>();
+        const plan = parseSessionExecutionPlanJson(snapshot!.plan_json);
+        const directPlan = {
+          ...plan,
+          binding: {
+            ...plan.binding,
+            agentId: null,
+            deploymentVersionId: null,
+            deploymentVersionNumber: null,
+          },
+        };
+        for (const invalidBinding of [
+          { ...directPlan.binding, deploymentVersionId: PUBLIC_API_TEST_IDS.deployment },
+          { ...directPlan.binding, deploymentVersionNumber: 1 },
+        ]) {
+          expect(() =>
+            parseSessionExecutionPlanJson(
+              JSON.stringify({ ...directPlan, binding: invalidBinding }),
+            ),
+          ).toThrow("cannot reference a deployment revision");
+        }
+        await database
+          .prepare(
+            "UPDATE session SET agent_id = NULL, deployment_version_id = NULL, deployment_version_number = NULL WHERE id = ?",
+          )
+          .bind(session.id)
+          .run();
+        await database
+          .prepare("UPDATE session_execution_snapshot SET plan_json = ? WHERE session_id = ?")
+          .bind(JSON.stringify({ ...directPlan, configJson: undefined }), session.id)
+          .run();
+        await expect(
+          hydrateCachedRunContextFromSession(bindings, OWNER_VIEWER, session),
+        ).rejects.toThrow("A direct Session requires its frozen execution configuration");
+        await database
+          .prepare("UPDATE session_execution_snapshot SET plan_json = ? WHERE session_id = ?")
+          .bind(JSON.stringify(directPlan), session.id)
+          .run();
+      }
+
+      const cold = await hydrateCachedRunContextFromSession(bindings, OWNER_VIEWER, session);
+      expect(cold.cacheHit).toBe(false);
+      expect(cold.value.profile.model).toBe(session.model);
+      expect(cold.value.profile.session.origin.executionOwnerUserId).toBe(OWNER_VIEWER.id);
+      expect(cold.value.profile.vendorCredential.projectId).toBe(session.projectId);
+      expect(cold.value.profile.sandbox.subjectId).toBe(session.id);
+      expect(cold.value.profile.configRevision.agentId).toBe(
+        provenance === "absent" ? null : session.agentId,
+      );
+      const warm = await hydrateCachedRunContextFromSession(bindings, OWNER_VIEWER, session);
+      expect(warm.cacheHit).toBe(true);
+      expect(warm.value.profile.configRevision).toEqual(cold.value.profile.configRevision);
+
+      await expect(
+        hydrateCachedRunContextFromSession(
+          bindings,
+          { ...OWNER_VIEWER, projectId: "01J00000000000000000000099" },
+          session,
+        ),
+      ).rejects.toThrow("permission");
+      await expect(
+        hydrateCachedRunContextFromSession(bindings, OWNER_VIEWER, {
+          ...session,
+          projectId: "01J00000000000000000000099",
+        }),
+      ).rejects.toThrow("permission");
+      await database
+        .prepare("UPDATE project SET owner_account_id = ? WHERE id = ?")
+        .bind(PUBLIC_API_TEST_IDS.outsiderAccount, session.projectId)
+        .run();
+      await expect(
+        hydrateCachedRunContextFromSession(bindings, OWNER_VIEWER, session),
+      ).rejects.toThrow("permission");
+    },
+  );
 
   test("fails Public Thread session creation when the live version is missing", async () => {
     const database = await createPublicHttpContractDatabase();

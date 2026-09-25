@@ -13,201 +13,11 @@ import type { AgentMcpBinding } from "../mcp/mcp.contract";
 import type { JsonObject } from "../validation/primitives.contract";
 import type { AgentPackageResolutionState } from "./agent-manifest.contract";
 
+/** Historical storage and compatibility inputs only; never selects runtime ownership. */
 export const AGENT_KIND_VALUES = ["pet", "cattle"] as const;
 export const AGENT_KIND_LIST_LABEL = AGENT_KIND_VALUES.join(" or ");
 export const AgentKind = type.enumerated(...AGENT_KIND_VALUES);
 export type AgentKind = typeof AgentKind.infer;
-export type AgentRuntimeSubjectScope = "agent" | "session";
-export type AgentRuntimeNativeResumePersistence = "platform" | "volatile";
-export type AgentRuntimeTerminalTarget = "stable_subject" | "unavailable";
-
-export const AGENT_KIND_RUNTIME_SUBJECT_SCOPES = {
-  cattle: "session",
-  pet: "agent",
-} as const satisfies Record<AgentKind, AgentRuntimeSubjectScope>;
-
-export interface AgentKindRuntimeCardCopy {
-  readonly description: string;
-  readonly examples: string;
-  readonly label: string;
-  readonly tagline: string;
-}
-
-export interface AgentKindRuntimePolicy {
-  readonly copy: AgentKindRuntimeCardCopy;
-  readonly kind: AgentKind;
-  readonly nativeResume: {
-    readonly persistence: AgentRuntimeNativeResumePersistence;
-  };
-  readonly operations: {
-    readonly ownerTerminal: boolean;
-    readonly recreateSubject: boolean;
-    readonly resetSubjectState: boolean;
-    readonly restartDriver: boolean;
-  };
-  readonly stateRetention: {
-    readonly preservesRuntimeState: boolean;
-    readonly summary: string;
-  };
-  readonly subject: {
-    readonly scope: AgentRuntimeSubjectScope;
-    readonly stable: boolean;
-    readonly summary: string;
-  };
-  readonly terminal: {
-    readonly summary: string;
-    readonly target: AgentRuntimeTerminalTarget;
-  };
-}
-
-export interface AgentKindRuntimeComparisonRow {
-  readonly id: string;
-  readonly label: string;
-  readonly values: Readonly<Record<AgentKind, string>>;
-}
-
-export const AGENT_KIND_RUNTIME_POLICIES = {
-  cattle: {
-    copy: {
-      description:
-        "Independent, checkpointed workspace per Thread. Best for high-concurrency tasks, PR reviews, and webhook triggers.",
-      examples: "e.g. PR auto-review | Linear ticket triage | Batch jobs",
-      label: "Task Agent",
-      tagline: "On-demand worker",
-    },
-    kind: "cattle",
-    nativeResume: {
-      persistence: "platform",
-    },
-    operations: {
-      ownerTerminal: false,
-      recreateSubject: true,
-      resetSubjectState: false,
-      restartDriver: true,
-    },
-    stateRetention: {
-      preservesRuntimeState: true,
-      summary: "Thread workspace and resume state are preserved through Backup/Restore.",
-    },
-    subject: {
-      scope: "session",
-      stable: false,
-      summary: "Session-scoped runtime subject, subject = session:{sessionId}.",
-    },
-    terminal: {
-      summary: "Owner terminal is unavailable for session-scoped sandboxes.",
-      target: "unavailable",
-    },
-  },
-  pet: {
-    copy: {
-      description:
-        "Stable sandbox per agent with Backup/Restore continuity. Best for daily helpers, knowledge agents, and personal copilots.",
-      examples: "e.g. Research helper | Knowledge butler | Personal copilot",
-      label: "Assistant Agent",
-      tagline: "Always-on teammate",
-    },
-    kind: "pet",
-    nativeResume: {
-      persistence: "platform",
-    },
-    operations: {
-      ownerTerminal: true,
-      recreateSubject: true,
-      resetSubjectState: true,
-      restartDriver: true,
-    },
-    stateRetention: {
-      preservesRuntimeState: true,
-      summary: "Agent sandbox state is preserved through Backup/Restore.",
-    },
-    subject: {
-      scope: "agent",
-      stable: true,
-      summary: "Agent-scoped stable runtime subject, subject = agent:{agentId}.",
-    },
-    terminal: {
-      summary: "Owner terminal connects to the stable agent sandbox.",
-      target: "stable_subject",
-    },
-  },
-} as const satisfies Record<AgentKind, AgentKindRuntimePolicy>;
-
-export const AGENT_KIND_RUNTIME_COMPARISON_ROWS = [
-  {
-    id: "cross_session_memory",
-    label: "Cross-session memory",
-    values: {
-      cattle: "None; isolated Thread checkpoint",
-      pet: "Stable sandbox continuity",
-    },
-  },
-  {
-    id: "scaling",
-    label: "Scaling",
-    values: {
-      cattle: "Independent session sandboxes",
-      pet: "1 stable sandbox, <=8 concurrent sessions",
-    },
-  },
-  {
-    id: "best_for",
-    label: "Best for",
-    values: {
-      cattle: "Webhooks, PR review, batch tasks",
-      pet: "Daily helpers, copilots, ops",
-    },
-  },
-  {
-    id: "failure_pattern",
-    label: "Failure pattern",
-    values: {
-      cattle: "Driver crash -> logs session error",
-      pet: "Reset agent-state to recover drift",
-    },
-  },
-  {
-    id: "switch_cost",
-    label: "Switch cost",
-    values: {
-      cattle: "Free in draft; fork after publish",
-      pet: "Free in draft; fork after publish",
-    },
-  },
-] as const satisfies readonly AgentKindRuntimeComparisonRow[];
-
-export function getAgentKindRuntimeSubjectScope(kind: AgentKind): AgentRuntimeSubjectScope {
-  return AGENT_KIND_RUNTIME_POLICIES[kind].subject.scope;
-}
-
-export function getAgentKindRuntimePolicy(kind: AgentKind): AgentKindRuntimePolicy {
-  return AGENT_KIND_RUNTIME_POLICIES[kind];
-}
-
-export function agentKindUsesStableRuntimeSubject(kind: AgentKind): boolean {
-  return getAgentKindRuntimePolicy(kind).subject.stable;
-}
-
-export function agentKindPreservesRuntimeState(kind: AgentKind): boolean {
-  return getAgentKindRuntimePolicy(kind).stateRetention.preservesRuntimeState;
-}
-
-export function agentKindSupportsOwnerTerminal(kind: AgentKind): boolean {
-  return getAgentKindRuntimePolicy(kind).operations.ownerTerminal;
-}
-
-export function agentKindSupportsResetState(kind: AgentKind): boolean {
-  return getAgentKindRuntimePolicy(kind).operations.resetSubjectState;
-}
-
-export function listAgentKindRuntimePolicies(): readonly AgentKindRuntimePolicy[] {
-  return AGENT_KIND_VALUES.map((kind) => AGENT_KIND_RUNTIME_POLICIES[kind]);
-}
-
-export function listAgentKindRuntimeComparisonRows(): readonly AgentKindRuntimeComparisonRow[] {
-  return AGENT_KIND_RUNTIME_COMPARISON_ROWS;
-}
-
 export type AgentStatus = "draft" | "published";
 export type AgentVisibility = "private";
 export type AgentSkillState = "active" | "tombstone";
@@ -302,7 +112,6 @@ export interface AgentDeploymentVersion {
   environmentId: EnvironmentId | null;
   id: AgentDeploymentVersionId;
   isLive: boolean;
-  kind: AgentKind;
   model: string;
   provider: string;
   runtimeId: string;
@@ -314,7 +123,6 @@ export interface AgentSummary {
   createdAt: string;
   description: string | null;
   id: AgentId;
-  kind: AgentKind;
   name: string;
   owner: AgentOwnerSummary;
   runtimeId: string;
@@ -330,7 +138,6 @@ export interface Agent {
   createdAt: string;
   description: string | null;
   id: AgentId;
-  kind: AgentKind;
   liveVersion: AgentDeploymentVersion | null;
   model: string;
   name: string;
@@ -348,7 +155,6 @@ export interface AgentDetail {
   createdAt: string;
   description: string | null;
   id: AgentId;
-  kind: AgentKind;
   liveVersion: AgentDeploymentVersion | null;
   model: string;
   name: string;
@@ -390,7 +196,8 @@ export interface AgentEditorState {
 
 export interface CreateAgentInput {
   description?: string | null;
-  kind: AgentKind;
+  /** Legacy input; every new Agent uses Session-isolated execution. */
+  kind?: AgentKind | null;
   model: string;
   name: string;
   prompt: string;
@@ -405,7 +212,8 @@ export interface UpdateAgentConfigInput {
   builtInTools?: AgentBuiltInToolConfig[];
   description?: string | null;
   environment: AgentEnvironmentConfig;
-  kind: AgentKind;
+  /** Legacy input; changing configuration cannot migrate existing workspaces. */
+  kind?: AgentKind | null;
   mcpServerIds: McpServerId[];
   model: string;
   name: string;
@@ -428,27 +236,3 @@ export interface PublishAgentInput {
 }
 
 export type RuntimeStateOperationName = "restartDriver" | "recreateSandbox" | "resetAgentState";
-export type RuntimeStateApplyActionKind =
-  | "patch-and-restart"
-  | "recreate-preserving-state"
-  | "restart-process";
-
-export interface RuntimeStateTargetVersionInput {
-  id: AgentDeploymentVersionId;
-  versionNumber: number;
-}
-
-export interface RuntimeStateOperationInput {
-  affectedFields?: string[] | null;
-  agentId: AgentId;
-  applyActionKind?: RuntimeStateApplyActionKind | null;
-  projectId: ProjectId;
-  targetVersion?: RuntimeStateTargetVersionInput | null;
-}
-
-export interface RuntimeStateOperationResult {
-  affectedSessionCount: number;
-  agentId: AgentId;
-  ok: boolean;
-  operation: RuntimeStateOperationName;
-}

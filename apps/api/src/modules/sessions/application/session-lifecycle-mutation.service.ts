@@ -191,14 +191,11 @@ export async function archiveAgentSession({
   async function executeStep(step: SessionArchiveCleanupStep): Promise<void> {
     switch (step) {
       case "archive_session_row": {
-        await getAppDatabase(bindings.DB)
-          .update(sessionsTable)
-          .set({
-            archivedAt: timestampMs,
-            updatedAt: timestampMs,
-          })
-          .where(and(eq(sessionsTable.id, sessionId), eq(sessionsTable.projectId, projectId)))
-          .run();
+        await writeSessionArchivedAt(bindings.DB, {
+          archivedAt: timestampMs,
+          projectId,
+          sessionId,
+        });
         return;
       }
       case "close_viewer_sockets": {
@@ -294,13 +291,17 @@ export async function unarchiveAgentSession({
 
   await normalizeSessionRuntimeLifecycle(database, sessionId);
 
+  await writeSessionArchivedAt(database, { archivedAt: null, projectId, sessionId });
+}
+
+async function writeSessionArchivedAt(
+  database: D1Database,
+  input: { archivedAt: number | null; projectId: ProjectId; sessionId: SessionId },
+): Promise<void> {
   await getAppDatabase(database)
     .update(sessionsTable)
-    .set({
-      archivedAt: null,
-      updatedAt: currentTimestampMs(),
-    })
-    .where(and(eq(sessionsTable.id, sessionId), eq(sessionsTable.projectId, projectId)))
+    .set({ archivedAt: input.archivedAt, updatedAt: currentTimestampMs() })
+    .where(and(eq(sessionsTable.id, input.sessionId), eq(sessionsTable.projectId, input.projectId)))
     .run();
 }
 

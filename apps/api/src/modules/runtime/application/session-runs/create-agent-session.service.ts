@@ -7,11 +7,11 @@ import type {
 import { sessionExecutionSnapshotsTable, sessionsTable } from "@mosoo/db";
 import { createPlatformId, parseNullablePlatformId, parsePlatformId } from "@mosoo/id";
 import type { AccountId, AgentId, CredentialId, ProjectId, SessionId } from "@mosoo/id";
-import { getAvailableAgentSessionActionCapability } from "@mosoo/session-policy";
+import { getAgentSessionActionCapability } from "@mosoo/session-policy";
 
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { runAppDatabaseBatch } from "../../../../platform/db/drizzle";
-import { validationError } from "../../../../platform/errors";
+import { forbiddenError, validationError } from "../../../../platform/errors";
 import { currentTimestampMs, toIsoString } from "../../../../time";
 import { ensureProjectAgentOwner } from "../../../agents/application/agent-access.service";
 import {
@@ -26,15 +26,19 @@ import {
   computeAgentReadiness,
   formatAgentReadinessFailureMessage,
 } from "../../../agents/application/agent-readiness.service";
+import { toAgentRuntimeModelProjection } from "../../../agents/application/agent-runtime-model-identity";
 import { parseAgentStoredConfig } from "../../../agents/application/agent-stored-config.service";
-import type { AgentRow } from "../../../agents/application/agent-types";
 import type { AuthenticatedViewer } from "../../../auth/application/viewer-auth.service";
 import { resolveReadyEnvironmentPackageArtifact } from "../../../environments/application/environment-package-artifact.service";
 import { resolveAgentEnvironmentSnapshot } from "../../../environments/application/environment.service";
+import { ensureProjectOwnership } from "../../../projects/application/project.service";
+import { PREVIEW_RETENTION_MS } from "../../../sessions/domain/preview-retention-policy";
 import type { SessionExecutionPlan } from "../session-definition/session-execution.types";
 
 export interface CreateAgentSessionOptions {
+  origin?: "console_preview";
   accessViewer?: AuthenticatedViewer;
+  configurationSource?: "saved";
   endUserId?: string | null | undefined;
   metadata?: AgentSessionMetadata | null | undefined;
   participantAccountId?: string | AccountId | null | undefined;
@@ -42,7 +46,9 @@ export interface CreateAgentSessionOptions {
 }
 
 export interface AgentSessionMetadata {
+  public_api_initial_request_id?: string | null;
   public_api?: {
+    api_version?: "v1" | "v2";
     created_by: {
       token_id: string;
       token_label: string;
@@ -61,11 +67,26 @@ export interface CreateAgentSessionRequest {
   viewer: AuthenticatedViewer;
 }
 
+export interface CreateProjectSessionRequest extends Omit<CreateAgentSessionRequest, "input"> {
+  input: {
+    projectId: ProjectId;
+    runtimeId: string;
+    provider: string;
+    model: string;
+    instructions: string;
+  };
+}
+
+interface SessionCreationRequest extends Omit<CreateAgentSessionRequest, "input"> {
+  input: Pick<CreateAgentSessionInput, "type" | "waitForRuntimeReady">;
+}
+
 interface AgentSessionExecutionSource {
-  agent: AgentRow;
+  agentId: AgentId | null;
+  ownerId: AccountId;
+  projectId: ProjectId;
   configJson: string;
   environment: AgentEnvironmentConfig;
-  kind: AgentRow["kind"];
   liveVersion: AgentDeploymentVersionRecord | null;
   model: string;
   prompt: string;
@@ -75,6 +96,7 @@ interface AgentSessionExecutionSource {
 
 async function resolveAgentSessionExecutionSource(input: {
   accessViewer: AuthenticatedViewer;
+  configurationSource?: "saved" | undefined;
   bindings: ApiBindings;
   agentId: AgentId;
   projectId: ProjectId;
@@ -85,7 +107,7 @@ async function resolveAgentSessionExecutionSource(input: {
     projectId: input.projectId,
   });
   const liveVersion =
-    agent.status === "published"
+    agent.status === "published" && input.configurationSource !== "saved"
       ? await requireAgentLiveDeploymentVersionRecord(input.bindings.DB, agent)
       : null;
   const environment = liveVersion
@@ -93,11 +115,12 @@ async function resolveAgentSessionExecutionSource(input: {
     : await loadAgentEnvironmentConfig(input.bindings.DB, agent.id, agent.environmentId);
 
   return {
-    agent,
+    agentId: agent.id,
+    ownerId: agent.ownerId,
+    projectId: agent.projectId,
     configJson: liveVersion?.configJson ?? agent.configJson,
     environment,
     liveVersion,
-    kind: liveVersion?.kind ?? agent.kind,
     model: liveVersion?.model ?? agent.model,
     prompt: liveVersion?.prompt ?? agent.prompt,
     provider: liveVersion?.provider ?? agent.provider,
@@ -109,28 +132,36 @@ async function ensureAgentReadyToCreateSession(input: {
   bindings: ApiBindings;
   source: AgentSessionExecutionSource;
 }): Promise<void> {
-  getAvailableAgentSessionActionCapability({
+  const capability = getAgentSessionActionCapability({
     action: "create_session",
     runtimeId: input.source.runtimeId,
   });
+  if (capability.status === "unavailable") {
+    throw validationError(
+      capability.reason ?? "This harness cannot create a Session.",
+      "AGENT_SESSION_NOT_READY",
+    );
+  }
 
   const storedConfig = parseAgentStoredConfig(input.source.configJson);
-  const readiness = await computeAgentReadiness(input.bindings.DB, input.source.agent.ownerId, {
-    agentId: input.source.agent.id,
+  const readiness = await computeAgentReadiness(input.bindings.DB, input.source.ownerId, {
+    agentId: input.source.agentId,
     builtInTools: storedConfig.builtInTools,
     bindings: input.bindings,
     environment: input.source.environment,
-    kind: input.source.kind,
     model: input.source.model,
     packageResolution: storedConfig.packageResolution,
-    projectId: input.source.agent.projectId,
+    projectId: input.source.projectId,
     provider: input.source.provider,
     runtimeId: input.source.runtimeId,
   });
 
   if (!readiness.ready) {
     throw validationError(
-      formatAgentReadinessFailureMessage("Agent is not ready to run", readiness),
+      formatAgentReadinessFailureMessage(
+        input.source.agentId === null ? "Session is not ready to run" : "Agent is not ready to run",
+        readiness,
+      ),
       "AGENT_SESSION_NOT_READY",
     );
   }
@@ -140,13 +171,13 @@ async function buildSessionExecutionPlan(input: {
   bindings: ApiBindings;
   source: AgentSessionExecutionSource;
 }): Promise<SessionExecutionPlan> {
-  const storedConfig = parseAgentStoredConfig(
-    input.source.liveVersion?.configJson ?? input.source.agent.configJson,
-  );
+  const storedConfig = parseAgentStoredConfig(input.source.configJson);
   const [skills, tools, environmentSnapshot] = await Promise.all([
     input.source.liveVersion
       ? Promise.resolve(input.source.liveVersion.skills)
-      : listAgentSkillReferences(input.bindings.DB, input.source.agent.id),
+      : input.source.agentId === null
+        ? Promise.resolve([])
+        : listAgentSkillReferences(input.bindings.DB, input.source.agentId),
     input.source.liveVersion
       ? Promise.resolve(
           input.source.liveVersion.mcpBindings
@@ -162,26 +193,28 @@ async function buildSessionExecutionPlan(input: {
               sortOrder: binding.sortOrder,
             })),
         )
-      : listAgentToolReferences(input.bindings.DB, input.source.agent.id),
+      : input.source.agentId === null
+        ? Promise.resolve([])
+        : listAgentToolReferences(input.bindings.DB, input.source.agentId),
     resolveAgentEnvironmentSnapshot(input.bindings, {
       agentEnvironmentId: input.source.environment.environmentId,
-      agentOwnerId: input.source.agent.ownerId,
-      projectId: input.source.agent.projectId,
+      agentOwnerId: input.source.ownerId,
+      projectId: input.source.projectId,
     }),
   ]);
 
   return {
     binding: {
-      agentId: input.source.agent.id,
+      agentId: input.source.agentId,
       deploymentVersionId: input.source.liveVersion?.id ?? null,
       deploymentVersionNumber: input.source.liveVersion?.versionNumber ?? null,
-      kind: input.source.kind,
       model: input.source.model,
       prompt: input.source.prompt,
       provider: input.source.provider,
       runtimeId: input.source.runtimeId,
     },
     builtInTools: storedConfig.builtInTools,
+    configJson: input.source.configJson,
     environment: {
       allowMcpServers: environmentSnapshot.record.allowMcpServers === 1,
       allowPackageManagers: environmentSnapshot.record.allowPackageManagers === 1,
@@ -215,17 +248,17 @@ async function insertAgentSessionSnapshot(input: {
 
   await runAppDatabaseBatch(input.bindings.DB, (database) => [
     database.insert(sessionsTable).values({
-      agentId: input.source.agent.id,
+      agentId: input.source.agentId,
       createdAt: input.timestampMs,
       creatorAccountId: viewerId,
       deploymentVersionId: input.source.liveVersion?.id ?? null,
       deploymentVersionNumber: input.source.liveVersion?.versionNumber ?? null,
       id: input.sessionId,
-      kind: input.source.kind,
+      kind: "cattle",
       ...(input.endUserId === null ? {} : { endUserId: input.endUserId }),
       metadataJson: JSON.stringify(input.metadata ?? {}),
       model: input.source.model,
-      projectId: input.source.agent.projectId,
+      projectId: input.source.projectId,
       provider: input.source.provider,
       participantAccountId: input.participantAccountId,
       renamed: false,
@@ -252,17 +285,16 @@ function buildCreatedSessionSummary(input: {
   const timestamp = toIsoString(input.timestampMs);
 
   return {
-    agentId: input.source.agent.id,
+    agentId: input.source.agentId,
     archivedAt: null,
     createdAt: timestamp,
     deploymentVersionId: input.source.liveVersion?.id ?? null,
     deploymentVersionNumber: input.source.liveVersion?.versionNumber ?? null,
     id: input.sessionId,
-    kind: input.source.kind,
     lastMessageAt: null,
     lastRun: null,
     model: input.source.model,
-    projectId: input.source.agent.projectId,
+    projectId: input.source.projectId,
     provider: input.source.provider,
     runtimeId: input.source.runtimeId,
     status: "IDLE",
@@ -281,10 +313,47 @@ export async function createAgentSession(
   const projectId = parsePlatformId<ProjectId>(request.input.projectId, "project id");
   const source = await resolveAgentSessionExecutionSource({
     accessViewer,
+    configurationSource: options.configurationSource,
     agentId,
     bindings: request.bindings,
     projectId,
   });
+  return createSessionFromSource(request, source);
+}
+
+export async function createProjectSession(
+  request: CreateProjectSessionRequest,
+): Promise<SessionSummary> {
+  const accessViewer = request.options?.accessViewer ?? request.viewer;
+  const projectId = parsePlatformId<ProjectId>(request.input.projectId, "project id");
+  for (const viewer of [request.viewer, accessViewer]) {
+    if (viewer.projectId !== undefined && viewer.projectId !== projectId) {
+      throw forbiddenError();
+    }
+  }
+  const project = await ensureProjectOwnership(request.bindings.DB, accessViewer.id, projectId);
+  const selection = toAgentRuntimeModelProjection(request.input);
+  return createSessionFromSource(
+    { ...request, input: { type: "ui" } },
+    {
+      ...selection,
+      agentId: null,
+      ownerId: project.ownerAccountId,
+      projectId,
+      configJson: "{}",
+      environment: { environmentId: null },
+      liveVersion: null,
+      prompt: request.input.instructions,
+    },
+  );
+}
+
+async function createSessionFromSource(
+  request: SessionCreationRequest,
+  source: AgentSessionExecutionSource,
+): Promise<SessionSummary> {
+  const options = request.options ?? {};
+  const accessViewer = options.accessViewer ?? request.viewer;
   await ensureAgentReadyToCreateSession({
     bindings: request.bindings,
     source,
@@ -296,12 +365,22 @@ export async function createAgentSession(
   });
   await resolveReadyEnvironmentPackageArtifact(
     request.bindings,
-    source.agent.projectId,
+    source.projectId,
     executionPlan.environment.packagesJson,
   );
   const sessionId = options.sessionId ?? createPlatformId<SessionId>();
   const timestampMs = currentTimestampMs();
   const sessionType = request.input.type ?? "preview";
+  if (
+    request.bindings.MOSOO_DEPLOYMENT_MODE === "cloud" &&
+    options.origin === "console_preview" &&
+    sessionType === "preview" &&
+    accessViewer.apiKeyId === undefined &&
+    request.viewer.apiKeyId === undefined &&
+    options.metadata?.public_api === undefined
+  ) {
+    executionPlan.previewRetentionMs = PREVIEW_RETENTION_MS;
+  }
 
   if (request.input.waitForRuntimeReady === true && sessionType !== "preview") {
     throw validationError(

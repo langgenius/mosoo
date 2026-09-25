@@ -1,4 +1,3 @@
-import type { AgentKind } from "@mosoo/contracts/agent";
 import type { SessionStatus, SessionType } from "@mosoo/contracts/session";
 import type {
   RunError,
@@ -116,7 +115,6 @@ interface LoadedSessionRunLifecycleRow {
   provider: string | null;
   runtime_id: string;
   session_id: SessionId;
-  session_kind: AgentKind;
   session_last_run_id: SessionRunId | null;
   session_status: SessionStatus;
   session_type: SessionType;
@@ -195,7 +193,6 @@ function createSessionRunStatusUpdate(input: SessionRunStatusUpdateInput, timest
 }
 
 function createCurrentSessionRunProjectionPatch(input: {
-  readonly sessionKind: AgentKind;
   readonly status: SessionRunStatus;
   readonly timestampMs: number;
 }) {
@@ -204,9 +201,7 @@ function createCurrentSessionRunProjectionPatch(input: {
       status: toSessionLifecycleStatusForRunStatus(input.status),
       timestampMs: input.timestampMs,
     }),
-    ...(input.sessionKind === "cattle" && input.status === "completed"
-      ? { workspaceCheckpointRequired: true }
-      : {}),
+    ...(input.status === "completed" ? { workspaceCheckpointRequired: true } : {}),
   };
 }
 
@@ -285,7 +280,6 @@ function sessionRunLifecycleColumns() {
     provider: sessionRunsTable.provider,
     runtime_id: sql<string>`COALESCE(${sessionRunsTable.runtimeId}, ${sessionsTable.runtimeId})`,
     session_id: sessionRunsTable.sessionId,
-    session_kind: sessionsTable.kind,
     session_last_run_id: sessionsTable.lastRunId,
     session_status: sessionsTable.status,
     session_type: sessionsTable.type,
@@ -368,7 +362,7 @@ export function createInsertedSessionRunSummary(
 export async function createSessionRunRecordIfSessionIdle(
   database: D1Database,
   input: {
-    agentId: AgentId;
+    agentId: AgentId | null;
     createdBy: AccountId;
     deploymentVersionId?: AgentDeploymentVersionId | null;
     deploymentVersionNumber?: number | null;
@@ -881,7 +875,6 @@ async function transitionSessionRunStatus(
       .update(sessionsTable)
       .set(
         createCurrentSessionRunProjectionPatch({
-          sessionKind: current.session_kind,
           status: input.status,
           timestampMs,
         }),

@@ -1,3 +1,4 @@
+import type { PublicApiVersion } from "@mosoo/contracts/public-api";
 import type { AgentId } from "@mosoo/id";
 
 import { isApiError } from "../../platform/errors";
@@ -17,6 +18,7 @@ export async function admitAgentApiEndpointCaller(
   database: D1Database,
   caller: AuthenticatedViewer,
   agentId: AgentId,
+  apiVersion: PublicApiVersion = "v1",
 ): Promise<AgentRow> {
   const agent = await getAgentRow(database, agentId).catch((error: unknown) => {
     if (isApiError(error) && error.status === 404) {
@@ -26,7 +28,7 @@ export async function admitAgentApiEndpointCaller(
     throw error;
   });
 
-  await ensureAgentApiEndpointCallerAccess(database, caller, agent);
+  await ensureAgentApiEndpointCallerAccess(database, caller, agent, apiVersion);
 
   return agent;
 }
@@ -35,9 +37,10 @@ export async function ensureAgentApiEndpointCallerAccess(
   database: D1Database,
   caller: AuthenticatedViewer,
   agent: AgentRow,
+  apiVersion: PublicApiVersion = "v1",
 ): Promise<void> {
   assertProjectKeyAccess(caller, agent.projectId);
-  ensureAgentApiEndpointReady(agent);
+  if (apiVersion === "v1") ensureAgentApiEndpointReady(agent);
   await ensureCallerOwnsAgentProject(database, caller, agent);
 }
 

@@ -124,22 +124,22 @@ async function fulfillAuthSessionFixture(route: Route): Promise<void> {
   });
 }
 
-function createSessionSummary() {
+function createSessionSummary(withoutPreset: boolean) {
   return {
-    agentId,
+    agentId: withoutPreset ? null : agentId,
     projectId,
     archivedAt: null,
     createdAt: now,
-    deploymentVersionId,
-    deploymentVersionNumber: 1,
+    deploymentVersionId: withoutPreset ? null : deploymentVersionId,
+    deploymentVersionNumber: withoutPreset ? null : 1,
     id: sessionId,
-    kind: "pet",
+    kind: withoutPreset ? "cattle" : "pet",
     lastMessageAt: now,
     lastRun: {
       completedAt: now,
       createdAt: now,
-      deploymentVersionId,
-      deploymentVersionNumber: 1,
+      deploymentVersionId: withoutPreset ? null : deploymentVersionId,
+      deploymentVersionNumber: withoutPreset ? null : 1,
       error: null,
       id: runId,
       model: "gpt-4.1-mini",
@@ -232,6 +232,7 @@ function listFilesForInput(input: FileListInput) {
 async function installFilesPageFixtures(
   page: Page,
   seenFileListInputs: FileListInput[],
+  withoutPreset: boolean,
 ): Promise<void> {
   await page.route(/\/api\/auth\/get-session(?:\?|$)/u, fulfillAuthSessionFixture);
   await page.route("**/api/graphql", async (route) => {
@@ -301,7 +302,7 @@ async function installFilesPageFixtures(
               : [
                   {
                     capabilities: [],
-                    session: createSessionSummary(),
+                    session: createSessionSummary(withoutPreset),
                   },
                 ],
             pageInfo: {
@@ -336,33 +337,43 @@ async function installFilesPageFixtures(
   });
 }
 
-test("Files page lists Thread files and filters by Thread or session kind", async ({ page }) => {
-  const seenFileListInputs: FileListInput[] = [];
+for (const withoutPreset of [false, true]) {
+  test(`Files page lists and filters Thread files with ${withoutPreset ? "absent" : "retained"} Agent provenance`, async ({
+    page,
+  }) => {
+    const seenFileListInputs: FileListInput[] = [];
 
-  await installFilesPageFixtures(page, seenFileListInputs);
-  await page.goto("/files");
+    await installFilesPageFixtures(page, seenFileListInputs, withoutPreset);
+    await page.goto("/files");
 
-  await expect(page.getByRole("heading", { name: "Files" })).toBeVisible();
-  await expect(page.getByRole("row", { name: /library-seed\.csv/u })).toBeVisible();
-  await expect(page.getByRole("row", { name: /user-brief\.txt/u })).toBeVisible();
-  await expect(page.getByRole("row", { name: /runtime-report\.md/u })).toBeVisible();
-  expect(seenFileListInputs).toContainEqual({});
+    await expect(page.getByRole("heading", { name: "Files" })).toBeVisible();
+    await expect(page.getByRole("row", { name: /library-seed\.csv/u })).toBeVisible();
+    await expect(page.getByRole("row", { name: /user-brief\.txt/u })).toBeVisible();
+    await expect(page.getByRole("row", { name: /runtime-report\.md/u })).toBeVisible();
+    expect(seenFileListInputs).toContainEqual({});
 
-  await page.getByRole("button", { name: "Thread filter" }).click();
-  await page.getByRole("menuitem", { name: /Files scope fixture session/u }).click();
+    await page.getByRole("button", { name: "Thread filter" }).click();
+    if (withoutPreset) {
+      await expect(
+        page.getByRole("menuitem", { name: /Files scope fixture session/u }),
+      ).toContainText("Direct invocation");
+      await expect(page.locator('a[href*="/agent/null"]')).toHaveCount(0);
+    }
+    await page.getByRole("menuitem", { name: /Files scope fixture session/u }).click();
 
-  await expect(page.getByRole("row", { name: /library-seed\.csv/u })).toHaveCount(0);
-  await expect(page.getByRole("row", { name: /user-brief\.txt/u })).toBeVisible();
-  await expect(page.getByRole("row", { name: /runtime-report\.md/u })).toBeVisible();
+    await expect(page.getByRole("row", { name: /library-seed\.csv/u })).toHaveCount(0);
+    await expect(page.getByRole("row", { name: /user-brief\.txt/u })).toBeVisible();
+    await expect(page.getByRole("row", { name: /runtime-report\.md/u })).toBeVisible();
 
-  await page.getByRole("button", { name: "Artifacts" }).click();
+    await page.getByRole("button", { name: "Artifacts" }).click();
 
-  await expect(page.getByRole("row", { name: /runtime-report\.md/u })).toBeVisible();
-  await expect(page.getByRole("row", { name: /user-brief\.txt/u })).toHaveCount(0);
+    await expect(page.getByRole("row", { name: /runtime-report\.md/u })).toBeVisible();
+    await expect(page.getByRole("row", { name: /user-brief\.txt/u })).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Attachments" }).click();
+    await page.getByRole("button", { name: "Attachments" }).click();
 
-  await expect(page.getByRole("row", { name: /user-brief\.txt/u })).toBeVisible();
-  await expect(page.getByRole("row", { name: /runtime-report\.md/u })).toHaveCount(0);
-  expect(seenFileListInputs).toEqual([{}]);
-});
+    await expect(page.getByRole("row", { name: /user-brief\.txt/u })).toBeVisible();
+    await expect(page.getByRole("row", { name: /runtime-report\.md/u })).toHaveCount(0);
+    expect(seenFileListInputs).toEqual([{}]);
+  });
+}

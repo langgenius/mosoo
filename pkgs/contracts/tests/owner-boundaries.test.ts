@@ -2,19 +2,15 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 
 import * as Contracts from "@mosoo/contracts";
-import {
-  agentKindSupportsOwnerTerminal,
-  agentKindSupportsResetState,
-  agentKindUsesStableRuntimeSubject,
-  getAgentKindRuntimePolicy,
-  getAgentKindRuntimeSubjectScope,
-  listAgentKindRuntimeComparisonRows,
-} from "@mosoo/contracts/agent";
 import { AGENT_MANIFEST_VERSION, AGENT_PACKAGE_VERSION } from "@mosoo/contracts/agent-manifest";
 import {
   parseAgentManifestInput,
   parseAgentPackageJson,
 } from "@mosoo/contracts/agent-manifest-parser";
+import {
+  serializeAgentManifestToYaml,
+  serializeAgentPackageToJson,
+} from "@mosoo/contracts/agent-manifest-serializer";
 import {
   SESSION_RESOURCE_MOUNT_DIR,
   createAccountAvatarPath,
@@ -68,50 +64,77 @@ describe("contracts owner boundaries", () => {
     expect("can" in Contracts).toBe(false);
   });
 
-  test("agent kind runtime policy owns Pet and Cattle semantics", () => {
-    expect(getAgentKindRuntimeSubjectScope("pet")).toBe("agent");
-    expect(getAgentKindRuntimeSubjectScope("cattle")).toBe("session");
-    expect(agentKindUsesStableRuntimeSubject("pet")).toBe(true);
-    expect(agentKindUsesStableRuntimeSubject("cattle")).toBe(false);
-    expect(agentKindSupportsOwnerTerminal("pet")).toBe(true);
-    expect(agentKindSupportsOwnerTerminal("cattle")).toBe(false);
-    expect(agentKindSupportsResetState("pet")).toBe(true);
-    expect(agentKindSupportsResetState("cattle")).toBe(false);
+  test.each([undefined, null, "pet", "cattle"] as const)(
+    "accepts a package with optional legacy kind %s",
+    (kind) => {
+      const parsed = parseAgentManifestInput({
+        ...(kind === undefined ? {} : { kind }),
+        manifestVersion: AGENT_MANIFEST_VERSION,
+        metadata: { name: "Session configuration" },
+        prompts: { system: "Retain these instructions." },
+        runtime: { id: "openai-runtime", provider: "openai", model: "gpt-5.4" },
+      });
+      expect(parsed.issues).toEqual([]);
+      expect(parsed.manifest?.prompts.system).toBe("Retain these instructions.");
+      expect(parsed.manifest).not.toHaveProperty("kind");
+    },
+  );
 
-    expect(getAgentKindRuntimePolicy("pet")).toMatchObject({
-      copy: {
-        label: "Assistant Agent",
-        tagline: "Always-on teammate",
-      },
-      nativeResume: {
-        persistence: "platform",
-      },
-      terminal: {
-        target: "stable_subject",
-      },
-    });
-    expect(getAgentKindRuntimePolicy("cattle")).toMatchObject({
-      copy: {
-        label: "Task Agent",
-        tagline: "On-demand worker",
-      },
-      nativeResume: {
-        persistence: "platform",
-      },
-      terminal: {
-        target: "unavailable",
-      },
-    });
+  test.each([undefined, null, "pet", "cattle"] as const)(
+    "imports and re-exports a package without retaining legacy kind %s",
+    (kind) => {
+      const parsed = parseAgentPackageJson(
+        JSON.stringify({
+          ...(kind === undefined ? {} : { kind }),
+          manifestVersion: AGENT_MANIFEST_VERSION,
+          packageVersion: AGENT_PACKAGE_VERSION,
+          name: "Session preset",
+          prompts: { system: "Retain these instructions." },
+          runtime: "openai-runtime",
+          provider: "openai",
+          model: "gpt-5.4",
+          settings: { model_reasoning_effort: "low" },
+        }),
+      );
+      expect(parsed.issues).toEqual([]);
+      if (parsed.package === null) throw new Error("Expected a valid package");
+      expect(parsed.package.manifest).not.toHaveProperty("kind");
+      expect(serializeAgentManifestToYaml(parsed.package.manifest)).not.toContain("kind:");
+      const exported = serializeAgentPackageToJson(parsed.package);
+      expect(JSON.parse(exported)).not.toHaveProperty("kind");
+      expect(parseAgentPackageJson(exported).manifest).toEqual(parsed.manifest);
+      expect(parsed.manifest?.runtime.providerOptions).toEqual({ model_reasoning_effort: "low" });
+    },
+  );
 
-    expect(listAgentKindRuntimeComparisonRows()).toContainEqual({
-      id: "cross_session_memory",
-      label: "Cross-session memory",
-      values: {
-        cattle: "None; isolated Thread checkpoint",
-        pet: "Stable sandbox continuity",
-      },
-    });
-  });
+  test.each([{ kind: "session" }, { kind: true }, { kind: {} }, { kind: [] }])(
+    "rejects malformed legacy kind %j",
+    ({ kind }) => {
+      const parsed = parseAgentManifestInput({
+        kind,
+        manifestVersion: AGENT_MANIFEST_VERSION,
+        metadata: { name: "Session preset" },
+        prompts: { system: "Retain these instructions." },
+        runtime: { id: "openai-runtime", provider: "openai", model: "gpt-5.4" },
+      });
+      expect(parsed.manifest).toBeNull();
+      expect(parsed.issues.some((issue) => issue.code === "manifest.kind.missing")).toBe(true);
+      const packaged = parseAgentPackageJson(
+        JSON.stringify({
+          kind,
+          manifestVersion: AGENT_MANIFEST_VERSION,
+          packageVersion: AGENT_PACKAGE_VERSION,
+          name: "Session preset",
+          prompts: { system: "Retain these instructions." },
+          runtime: "openai-runtime",
+          provider: "openai",
+          model: "gpt-5.4",
+        }),
+      );
+      expect(packaged.package).toBeNull();
+      expect(packaged.issues.some((issue) => issue.code === "manifest.kind.missing")).toBe(true);
+    },
+  );
 
   test("agent manifest parser owns required public manifest fields", () => {
     const invalid = parseAgentManifestInput({});
@@ -121,7 +144,6 @@ describe("contracts owner boundaries", () => {
       expect.arrayContaining([
         "manifest.version.unsupported",
         "manifest.metadata.name.missing",
-        "manifest.kind.missing",
         "manifest.runtime.missing",
         "manifest.model.missing",
       ]),
@@ -188,7 +210,7 @@ describe("contracts owner boundaries", () => {
     );
 
     expect(parsed.issues).toEqual([]);
-    expect(parsed.package?.manifest.kind).toBe("cattle");
+    expect(parsed.package?.manifest).not.toHaveProperty("kind");
     expect(parsed.package?.manifest.runtime.providerOptions).toEqual({
       model_reasoning_effort: "high",
     });

@@ -1,7 +1,6 @@
 import type {
   AgentBuiltInToolConfig,
   AgentEnvironmentConfig,
-  AgentKind,
   AgentReadiness,
   AgentReadinessIssue,
 } from "@mosoo/contracts/agent";
@@ -10,10 +9,8 @@ import type {
   AgentPackageResolutionState,
   AgentResolutionIssue,
 } from "@mosoo/contracts/agent-manifest";
-import type { EnvironmentNetworkPolicy } from "@mosoo/contracts/environment";
 import {
   agentMcpBindingsTable,
-  projectsTable,
   environmentRevisionsTable,
   environmentsTable,
   mcpServersTable,
@@ -46,7 +43,7 @@ function isSqliteEnabled(value: boolean | number | string): boolean {
 
 async function collectMcpIssues(
   database: D1Database,
-  agentId: AgentId,
+  agentId: AgentId | null,
   snapshotServerIds?: readonly McpServerId[],
 ): Promise<AgentReadinessIssue[]> {
   if (snapshotServerIds) {
@@ -94,6 +91,8 @@ async function collectMcpIssues(
     ];
   }
 
+  if (agentId === null) return [];
+
   const results = await getAppDatabase(database)
     .select({
       bindingEnabled: sql<boolean | number | string>`${agentMcpBindingsTable.enabled}`.as(
@@ -127,8 +126,21 @@ async function collectMcpIssues(
 
 async function listBoundMcpServerNames(
   database: D1Database,
-  agentId: AgentId,
+  agentId: AgentId | null,
+  snapshotServerIds?: readonly McpServerId[],
 ): Promise<Set<string>> {
+  if (snapshotServerIds !== undefined) {
+    if (snapshotServerIds.length === 0) return new Set();
+    const rows = await getAppDatabase(database)
+      .select({ serverName: mcpServersTable.name })
+      .from(mcpServersTable)
+      .where(
+        and(inArray(mcpServersTable.id, [...snapshotServerIds]), eq(mcpServersTable.enabled, true)),
+      )
+      .all();
+    return new Set(rows.map((row) => row.serverName.toLowerCase()));
+  }
+  if (agentId === null) return new Set();
   const results = await getAppDatabase(database)
     .select({ serverName: mcpServersTable.name })
     .from(agentMcpBindingsTable)
@@ -222,7 +234,8 @@ async function collectPendingEnvironmentSecretIssues(
 async function collectPackageResolutionIssues(
   database: D1Database,
   input: {
-    agentId: AgentId;
+    agentId: AgentId | null;
+    mcpServerIds?: readonly McpServerId[];
     environment: AgentEnvironmentConfig;
     environmentSecretNames: Set<string>;
     packageResolution: AgentPackageResolutionState | null | undefined;
@@ -239,7 +252,7 @@ async function collectPackageResolutionIssues(
       (issue.status === "missing" || issue.status === "needs_reconnect"),
   );
   const boundMcpServerNames = needsMcpNames
-    ? await listBoundMcpServerNames(database, input.agentId)
+    ? await listBoundMcpServerNames(database, input.agentId, input.mcpServerIds)
     : new Set<string>();
   const issues: AgentReadinessIssue[] = [];
 
@@ -325,48 +338,6 @@ function dedupeReadinessIssues(issues: AgentReadinessIssue[]): AgentReadinessIss
   return deduped;
 }
 
-async function resolveEffectiveEnvironmentNetworkPolicy(
-  database: D1Database,
-  input: {
-    projectId: ProjectId;
-    environmentId: EnvironmentId | null;
-  },
-): Promise<EnvironmentNetworkPolicy | null> {
-  const environmentId =
-    input.environmentId ??
-    (
-      await getAppDatabase(database)
-        .select({ environmentId: projectsTable.defaultEnvironmentId })
-        .from(projectsTable)
-        .where(eq(projectsTable.id, input.projectId))
-        .limit(1)
-        .get()
-    )?.environmentId ??
-    null;
-
-  if (environmentId === null || environmentId === "") {
-    return null;
-  }
-
-  const row = await getAppDatabase(database)
-    .select({ networkPolicy: environmentRevisionsTable.networkPolicy })
-    .from(environmentsTable)
-    .innerJoin(
-      environmentRevisionsTable,
-      eq(environmentRevisionsTable.id, environmentsTable.currentRevisionId),
-    )
-    .where(
-      and(
-        eq(environmentsTable.id, environmentId),
-        eq(environmentsTable.projectId, input.projectId),
-      ),
-    )
-    .limit(1)
-    .get();
-
-  return row?.networkPolicy ?? null;
-}
-
 export function formatAgentReadinessFailureMessage(
   prefix: string,
   readiness: Pick<AgentReadiness, "issues">,
@@ -382,11 +353,9 @@ export async function computeAgentReadiness(
   database: D1Database,
   permissionPrincipalUserId: AccountId,
   input: {
-    agentId: AgentId;
+    agentId: AgentId | null;
     builtInTools: readonly AgentBuiltInToolConfig[];
     environment: AgentEnvironmentConfig;
-    environmentNetworkPolicy?: EnvironmentNetworkPolicy;
-    kind: AgentKind;
     model: string;
     packageResolution?: AgentPackageResolutionState | null;
     bindings?: ApiBindings;
@@ -405,22 +374,6 @@ export async function computeAgentReadiness(
     };
   }
   const issues: AgentReadinessIssue[] = [];
-  const effectiveEnvironmentNetworkPolicy =
-    input.environmentNetworkPolicy ??
-    (await resolveEffectiveEnvironmentNetworkPolicy(database, {
-      projectId: input.projectId,
-      environmentId: input.environment.environmentId,
-    }));
-
-  if (input.kind === "pet" && effectiveEnvironmentNetworkPolicy === "limited") {
-    issues.push(
-      createIssue(
-        "agent.environment.network_policy_unsupported",
-        "Assistant Agents require a Full network Environment because their stable sandbox cannot safely change egress policy between sessions.",
-      ),
-    );
-  }
-
   if (getSupportedRuntimeId(input.runtimeId) === null) {
     issues.push(
       createIssue(
@@ -446,6 +399,7 @@ export async function computeAgentReadiness(
   issues.push(
     ...(await collectPackageResolutionIssues(database, {
       agentId: input.agentId,
+      ...(input.mcpServerIds === undefined ? {} : { mcpServerIds: input.mcpServerIds }),
       environment: input.environment,
       environmentSecretNames: await listEnvironmentSecretNames(
         database,

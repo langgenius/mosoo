@@ -7,6 +7,7 @@ import type { RuntimeEventEnvelope } from "@mosoo/runtime-events";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { appendSessionRuntimeEvents } from "../../../sessions/application/session-event-write.service";
 import { projectRuntimeEventToSessionDeliveryEvents } from "../../../sessions/application/session-live-state.service";
+import { finalizeSessionModelCallUsage } from "../../../sessions/application/session-model-call.service";
 import { recordCanonicalSessionRunFailure } from "../../application/session-runs/session-run-terminal-failure.service";
 import { isTerminalSessionRunStatus } from "../../domain/session-run-status";
 import {
@@ -16,6 +17,7 @@ import {
 import { setSessionRunStatus } from "../session-runs/session-run-store.repository";
 import type { SessionRunTransitionOutcome } from "../session-runs/session-run-store.repository";
 import type { RuntimeSessionLink } from "./event-types";
+import { recordRuntimeSessionOutputDirectory } from "./runtime-session-output-store";
 import { getRuntimeSessionLink } from "./session-link.repository";
 import { releaseTerminalDriverInstanceSessionRun } from "./terminal-run-release";
 
@@ -73,7 +75,6 @@ export async function recordDriverInstanceCompletion(
   void input.driverReady;
   const database = bindings.DB;
   const link = await getRuntimeSessionLink(database, input.driverInstanceId);
-
   if (
     hasLinkedSessionRun(link) &&
     link.sessionRunStatus !== null &&
@@ -104,6 +105,13 @@ export async function recordDriverInstanceFailure(
   const link = input.link ?? (await getRuntimeSessionLink(database, input.driverInstanceId));
 
   if (hasLinkedSessionRun(link)) {
+    if (link.sessionRunStatus !== "cancelled") {
+      await recordRuntimeSessionOutputDirectory({
+        bindings,
+        driverInstanceId: input.driverInstanceId,
+        link,
+      });
+    }
     const outcome = await recordCanonicalSessionRunFailure(bindings, {
       error: input.error,
       runId: link.sessionRunId,
@@ -182,6 +190,7 @@ async function synthesizeDriverRunFinished(
   if (isStaleTerminalRunTransition(outcome) && !isStaleTerminalRunStatus(outcome, "completed")) {
     return;
   }
+  await finalizeSessionModelCallUsage(database, input.link.sessionRunId);
   await appendCanonicalTerminalDriverEvent({
     bindings: input.bindings,
     event: runCompletedEvent,

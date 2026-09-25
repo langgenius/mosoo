@@ -18,12 +18,13 @@ export {
 } from "./runtime-subject-maintenance-store";
 export {
   advanceRuntimeSubjectOperationStatus,
+  assertSessionRuntimeSubjectBinding,
+  assertExclusiveSessionRuntimeSubject,
   claimRuntimeSubjectActivation,
   claimExpiredRuntimeSubjectActivations,
   ensureRuntimeSubjectId,
   getRuntimeSubject,
   getRuntimeSubjectActivationRecord,
-  getRuntimeSubjectIdByTuple,
   markRuntimeSubjectActivationDestroying,
   markRuntimeSubjectActivationFailed,
   markRuntimeSubjectActive,
@@ -32,7 +33,6 @@ export {
   markRuntimeSubjectOperationStarted,
   markRuntimeSubjectOperationRepairNeeded,
   preemptRuntimeSubjectActivationClaim,
-  markRuntimeSubjectRestoreApplied,
   markRuntimeSubjectRestoring,
 } from "./runtime-subject-record-store";
 export type {

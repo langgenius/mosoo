@@ -1,4 +1,3 @@
-import type { AgentKind } from "@mosoo/contracts/agent";
 import type { AgentId, SandboxId, SandboxSessionId, SessionId } from "@mosoo/id";
 
 import type { RuntimeTimingRecorder } from "../../application/session-runs/session-runtime-timing";
@@ -6,8 +5,7 @@ import type { DriverOrigin as DriverOriginValue } from "../../domain/driver-snap
 import type { ExecutionSessionHandle, SandboxHandle } from "../sandbox-handles";
 
 export interface EnsureSandboxConversationSessionInput {
-  agentId: AgentId;
-  kind: AgentKind;
+  agentId: AgentId | null;
   mountSessionResources: boolean;
   origin: DriverOriginValue;
   sandbox: SandboxHandle;

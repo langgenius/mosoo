@@ -91,6 +91,7 @@ async function createReconciliationDatabase(): Promise<SqliteD1Database> {
   database.execute(`
     CREATE TABLE project (
       id text PRIMARY KEY NOT NULL,
+      owner_account_id text NOT NULL,
       organization_id text NOT NULL
     );
 
@@ -118,7 +119,7 @@ async function createReconciliationDatabase(): Promise<SqliteD1Database> {
 
     CREATE TABLE session_run (
       created_by_key_id text,
-      agent_id text NOT NULL,
+      agent_id text,
       completed_at integer,
       created_by_account_id text NOT NULL,
       deployment_version_id text,
@@ -160,7 +161,7 @@ async function createReconciliationDatabase(): Promise<SqliteD1Database> {
 
     CREATE TABLE usage_event (
       actor_user_id text NOT NULL,
-      agent_id text NOT NULL,
+      agent_id text,
       agent_owner_user_id text NOT NULL,
       agent_publication_state_at_run text NOT NULL,
       agent_revision_id text,
@@ -190,7 +191,8 @@ async function createReconciliationDatabase(): Promise<SqliteD1Database> {
     CREATE TABLE usage_daily_rollup (
       organization_id text NOT NULL,
       project_id text NOT NULL,
-      agent_id text NOT NULL,
+      agent_id text,
+      agent_scope_key text GENERATED ALWAYS AS (coalesce(agent_id, '')) VIRTUAL,
       actor_user_id text NOT NULL,
       agent_owner_user_id text NOT NULL,
       date text NOT NULL,
@@ -205,10 +207,10 @@ async function createReconciliationDatabase(): Promise<SqliteD1Database> {
       cache_creation_tokens integer NOT NULL,
       total_cost_usd_micros integer NOT NULL,
       unpriced_request_count integer NOT NULL,
-      PRIMARY KEY (
+      UNIQUE (
         organization_id,
         project_id,
-        agent_id,
+        agent_scope_key,
         actor_user_id,
         agent_owner_user_id,
         date,
@@ -246,8 +248,8 @@ async function createReconciliationDatabase(): Promise<SqliteD1Database> {
   `);
 
   database.execute(`
-    INSERT INTO project (id, organization_id)
-    VALUES ('${PROJECT_ID}', '${ORGANIZATION_ID}');
+    INSERT INTO project (id, organization_id, owner_account_id)
+    VALUES ('${PROJECT_ID}', '${ORGANIZATION_ID}', '${OWNER_ID}');
 
     INSERT INTO agent (id, owner_account_id, project_id, status)
     VALUES ('${AGENT_ID}', '${OWNER_ID}', '${PROJECT_ID}', 'published');
@@ -496,6 +498,43 @@ async function countUsageEvents(database: D1Database): Promise<number> {
 }
 
 describe("cost ledger reconciliation", () => {
+  test("repairs direct usage exactly once with Project ownership and no Agent or revision", async () => {
+    const database = await createReconciliationDatabase();
+    await database
+      .prepare("UPDATE session_run SET agent_id = NULL, deployment_version_id = NULL WHERE id = ?")
+      .bind(RUN_ID)
+      .run();
+    await database.prepare("DELETE FROM agent").run();
+    await database.prepare("DELETE FROM agent_deployment_version").run();
+    await insertModelCall(database, {
+      id: MODEL_CALL_IDS.nativeRepair,
+      nativeCallId: "direct-repair",
+    });
+    const first = await reconcileCostLedgerPage(database, {
+      mode: "repair",
+      now: new Date(NOW_MS),
+    });
+    expect(first).toMatchObject({ repaired: 1, indeterminate: 0, failed: 0 });
+    expect(
+      await database
+        .prepare(
+          "SELECT agent_id, agent_revision_id, agent_owner_user_id, project_id, agent_publication_state_at_run, run_purpose FROM usage_event",
+        )
+        .first(),
+    ).toEqual({
+      agent_id: null,
+      agent_revision_id: null,
+      agent_owner_user_id: OWNER_ID,
+      project_id: PROJECT_ID,
+      agent_publication_state_at_run: "not_applicable",
+      run_purpose: "production",
+    });
+    expect(
+      await reconcileCostLedgerPage(database, { mode: "repair", now: new Date(NOW_MS) }),
+    ).toMatchObject({ present: 1, repaired: 0 });
+    expect(await countUsageEvents(database)).toBe(1);
+  });
+
   test("audits present, repairable, skipped, and indeterminate history without writing", async () => {
     const database = await createReconciliationDatabase();
     await insertRun(database, RUN_WITHOUT_REVISION_ID, null);

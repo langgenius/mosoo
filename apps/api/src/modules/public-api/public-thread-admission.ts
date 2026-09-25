@@ -1,8 +1,10 @@
+import type { PublicApiVersion } from "@mosoo/contracts/public-api";
 import type { AccountId, AgentId, ProjectId, PlatformId } from "@mosoo/id";
 
 import type { PersonalAccessTokenCaller } from "../auth/application/personal-access-token.service";
 import { getAccountViewer } from "../auth/application/viewer-auth.service";
 import type { AuthenticatedViewer } from "../auth/application/viewer-auth.service";
+import { ensureProjectOwnership } from "../projects/application/project.service";
 import { admitAgentApiEndpointCaller } from "./agent-api-endpoint-admission.service";
 import { publicNotFound } from "./public-api-errors";
 import type { PublicApiThreadCreatedByMetadata } from "./public-thread-metadata";
@@ -20,7 +22,7 @@ interface ThreadReadSnapshot {
     creator_account_id: PlatformId;
   };
   session: {
-    agentId: AgentId;
+    agentId: AgentId | null;
     projectId: ProjectId;
   };
 }
@@ -59,6 +61,7 @@ export async function admitPublicThreadReader(
   database: D1Database,
   caller: AuthenticatedViewer,
   snapshot: ThreadReadSnapshot,
+  apiVersion: PublicApiVersion = "v1",
 ): Promise<void> {
   if (
     !canReadThreadFromOwnership(caller, snapshot) ||
@@ -67,7 +70,12 @@ export async function admitPublicThreadReader(
     throw publicNotFound("Thread not found.");
   }
 
-  await admitAgentApiEndpointCaller(database, caller, snapshot.session.agentId);
+  if (apiVersion === "v1") {
+    if (snapshot.session.agentId === null) throw publicNotFound("Thread not found.");
+    await admitAgentApiEndpointCaller(database, caller, snapshot.session.agentId);
+  } else {
+    await ensureProjectOwnership(database, caller.id, snapshot.session.projectId);
+  }
 }
 
 export async function admitPublicThreadCreator(
@@ -75,9 +83,15 @@ export async function admitPublicThreadCreator(
   caller: PersonalAccessTokenCaller,
   input: {
     agentId: AgentId;
+    apiVersion?: PublicApiVersion | undefined;
   },
 ): Promise<ThreadCreationAdmission> {
-  const agent = await admitAgentApiEndpointCaller(database, caller.viewer, input.agentId);
+  const agent = await admitAgentApiEndpointCaller(
+    database,
+    caller.viewer,
+    input.agentId,
+    input.apiVersion,
+  );
 
   return {
     accessViewer: await getOwnerViewer(database, agent.ownerId),
@@ -86,4 +100,30 @@ export async function admitPublicThreadCreator(
     projectId: agent.projectId,
     createdBy: toPublicApiThreadCreatedBy(caller),
   };
+}
+
+export async function admitPublicProjectThreadCreator(
+  database: D1Database,
+  caller: PersonalAccessTokenCaller,
+  projectId: ProjectId,
+): Promise<ThreadCreationAdmission> {
+  const project = await admitPublicProjectCaller(database, caller.viewer, projectId);
+  return {
+    accessViewer: await getOwnerViewer(database, project.ownerAccountId),
+    creatorViewer: caller.viewer,
+    fileViewer: caller.viewer,
+    projectId,
+    createdBy: toPublicApiThreadCreatedBy(caller),
+  };
+}
+
+export async function admitPublicProjectCaller(
+  database: D1Database,
+  caller: AuthenticatedViewer,
+  projectId: ProjectId,
+) {
+  if (caller.projectId !== undefined && caller.projectId !== projectId) {
+    throw publicNotFound("Project not found.");
+  }
+  return ensureProjectOwnership(database, caller.id, projectId);
 }

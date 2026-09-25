@@ -29,7 +29,13 @@ Your application remains yours. Its backend owns product behavior and end-user a
 
 ## Target Direction
 
-mosoo v1 targets research, data analysis, file processing, and report generation through `Project key + Agent + Input + optional files -> durable Session`. Agent configuration is optional and publishing is removed from first use. Acceptance covers a single-turn ghFind repository evaluation and CSV analysis with durable follow-up, including recovery after runtime reclamation. Both use the same Session API and checkpoint gate. Project keys have shipped; the Session transition is not complete. See [SPEC](./docs/SPEC.md) and [remaining execution slices](./docs/prd/managed-agent-v1.md).
+mosoo v1 targets research, data analysis, file processing, and report generation through `Project key + harness/model + instructions + Input + optional files -> durable Session`. The #582 release uses a configured Project model account (BYOK). Direct invocation is the primary path; a saved private Agent is an optional preset. Platform model supply and commercial billing are separate #636 work. Acceptance covers a single-turn ghFind repository evaluation and CSV analysis with durable follow-up, including recovery after runtime reclamation. Both use the same Session API and checkpoint gate. Project keys have shipped; the Session transition is not complete. See [SPEC](./docs/SPEC.md) and [remaining execution slices](./docs/prd/managed-agent-v1.md).
+
+The durable Session contract can use the existing Thread API and conversation IDs. Compatible names and fields do not need a separate API migration. Moving shared Agent machines to isolated Sessions does require a verified transition for existing Cloud workloads; see the [migration contract](./docs/SPEC.md#10-migration-and-breaking-change-notification).
+
+Cloud debug Previews have a separate target lifecycle: continue within 30 days of debugging activity, then clean up the Preview and start a new one on return. Formal and API-used Sessions retain their continuation contract. Existing Preview cleanup requires an approved inventory and backup plan; see [Thread Lifecycle](./docs/prd/session-lifecycle.md#cloud-debug-preview-retention-unreleased).
+
+The unreleased `/api/v2/projects/{projectId}/threads` entry point accepts inline harness/model configuration or an explicit saved Agent preset, with optional `userId`. Project file upload and direct creation use the same Session kernel; inline execution creates no hidden Agent. Direct hosted acceptance and coordinated release are still pending. `/api/v1` retains published/live selection and its existing identity contract. This version boundary changes configuration admission, not conversation IDs; see the [API compatibility contract](./docs/prd/public-thread-api-surface.md#unreleased-saved-agent-entry-point).
 
 ## How It Works Today
 
@@ -97,6 +103,10 @@ API health is `/api/health`, not `/health`. The mosoo control-plane development 
 ### Troubleshooting
 
 If setup fails, start with the focused recipe: submodule issues use `git submodule update --init`, missing local secrets use `just env-init`, and D1 schema errors use `just db-migrate`. See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full workflow and verification expectations.
+
+The unreleased #582 candidate uses an independent durable workspace for every new Session. Agent creation, import and Fork no longer select Pet/Cattle; existing shared Cloud Sessions retain their bindings until verified migration. See [Session isolation](./docs/prd/agent-type.md) for continuity and the 30-day Cloud Preview policy.
+
+The final release uses one Session execution model, with direct harness invocation and optional Agent presets. Its one-time Cloud transition may make reviewed old Sessions read-only after 30 days without their own calls or file activity, preserving history and saved files even when the account remains active. Protected Sessions retain seamless continuation. Conversion, backup and rollback have a finite release procedure; they do not become a permanent migration product.
 
 ## Example: Build a Codex Agent API
 

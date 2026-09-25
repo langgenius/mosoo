@@ -1,32 +1,16 @@
-# Agent Terminal
+# Legacy Agent Terminal
 
-Status: Available today for owners of Assistant Agents (Pet). It is not available for
-Task Agents (Cattle).
+Status: removed from the Session-only product candidate for #582. The deployed legacy
+surface remains unchanged until the approved Cloud cutover.
 
-## What it is
+The former owner Terminal connected to a shared Agent machine. A saved Agent is now
+configuration for future Sessions and owns no running machine. The old Agent tab and
+WebSocket route therefore retire with the shared runtime. This release does not add
+a separate interactive Session terminal.
 
-Terminal is a troubleshooting tool for an Agent's live environment. It helps an owner
-understand why an Agent is not behaving as expected by checking its files, running
-processes, and installed tools directly. This shortens diagnosis when Preview or Logs
-do not provide enough context.
-
-Terminal is an expert recovery surface, not the normal way to configure or publish an
-Agent.
-
-## How to use it
-
-Open an Assistant Agent in the mosoo console and select **Terminal**. mosoo shows the
-connection status and offers a reconnect action. The first connection may take a few
-seconds while the Agent's environment wakes up.
-
-Commands have broad access and can change the live environment. Owners should use the
-Terminal for inspection or deliberate manual recovery, then make lasting product
-changes through the Agent's normal configuration and publishing flows.
-
-## Current limits
-
-- Only the Agent owner can open the Terminal.
-- Task Agents do not show it because their environments are temporary.
-- Terminal changes may disappear after an environment is reset, rebuilt, or replaced.
-- mosoo does not promise a specific folder layout, source-code checkout, or set of
-  maintenance commands inside the Terminal.
+Owners can inspect Session history and saved files, or explicitly restart/recreate
+one Session while retaining its committed workspace and native context. Existing
+Cloud Sessions must be qualified and converted before the final candidate replaces
+the shared runtime; removing this surface is not migration evidence. See
+[Agent runtime model](./agent-type.md) and the
+[Session isolation transition](../session-isolation-transition.md).

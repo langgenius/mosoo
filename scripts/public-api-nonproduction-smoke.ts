@@ -12,7 +12,7 @@ function requireRecord(value: unknown, label: string): Record<string, unknown> {
   return value;
 }
 
-export function assertNonProductionBaseUrl(value: string): URL {
+export function assertNonProductionBaseUrl(value: string, version: "v1" | "v2" = "v1"): URL {
   const url = new URL(value);
 
   if (url.protocol !== "https:") {
@@ -25,8 +25,8 @@ export function assertNonProductionBaseUrl(value: string): URL {
 
   const normalizedPath = url.pathname.replace(/\/+$/, "");
 
-  if (!normalizedPath.endsWith("/api/v1")) {
-    throw new Error("Public API smoke base URL must end in /api/v1.");
+  if (!normalizedPath.endsWith(`/api/${version}`)) {
+    throw new Error(`Public API smoke base URL must end in /api/${version}.`);
   }
 
   url.pathname = normalizedPath;

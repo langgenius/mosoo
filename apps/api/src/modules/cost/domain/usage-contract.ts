@@ -4,6 +4,7 @@ export type UsageContract =
   | "openai_total_with_cached_breakdown";
 
 export type AgentPublicationStateAtRun =
+  | "not_applicable"
   | "archived"
   | "draft_of_published"
   | "published"
@@ -24,6 +25,7 @@ export interface UsageTokenInput {
 export interface NormalizedUsageTokens {
   cacheCreationTokens: number;
   cacheReadTokens: number;
+  /** Ordinary input plus cache reads; cache writes are a separate bucket. */
   inputTokens: number;
   outputTokens: number;
 }
@@ -41,7 +43,7 @@ export function normalizeUsageTokens(input: UsageTokenInput): NormalizedUsageTok
   return {
     cacheCreationTokens: input.cacheCreationTokens,
     cacheReadTokens: input.cacheReadTokens,
-    inputTokens: input.inputTokens,
+    inputTokens: Math.max(0, input.inputTokens - input.cacheCreationTokens),
     outputTokens: input.outputTokens,
   };
 }

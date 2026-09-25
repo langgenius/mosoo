@@ -16,7 +16,6 @@ const environment: AgentEnvironmentConfig = {
 const agent = {
   builtInTools: createDefaultAgentBuiltInTools(),
   description: null,
-  kind: "pet" as const,
   model: "gpt-5",
   name: "Agent",
   prompt: "Help",
@@ -25,227 +24,59 @@ const agent = {
   runtimeId: "openai-runtime",
 };
 
-describe("agent versioned config plan", () => {
-  test("keeps direct metadata edits out of runtime deployment versions", () => {
-    const plan = planVersionedAgentConfigChange({
-      agentStatus: "published",
-      current: createAgentConfigChangeSnapshot({
-        agent,
-        environment,
-        mcpServerIds: [],
-        skillIds: [],
-      }),
-      next: createAgentConfigChangeSnapshot({
-        agent: {
-          ...agent,
-          name: "Renamed Agent",
-        },
-        environment,
-        mcpServerIds: [],
-        skillIds: [],
-      }),
-    });
-
-    expect(plan.action).toBe("direct-update");
-    expect(plan.requiresDeploymentVersion).toBe(false);
-    expect(plan.requiresRuntimeOperation).toBe(false);
-    expect(summarizeVersionedAgentConfigChange(plan)).toBe("Save changes · Name");
+describe("Agent preset change plan", () => {
+  const current = createAgentConfigChangeSnapshot({
+    agent,
+    environment,
+    mcpServerIds: [],
+    skillIds: [],
   });
-
-  test("uses the shared runtime action labels for version summaries", () => {
+  test("metadata edits do not change published execution versions", () => {
     const plan = planVersionedAgentConfigChange({
       agentStatus: "published",
-      current: createAgentConfigChangeSnapshot({
-        agent,
-        environment,
-        mcpServerIds: [],
-        skillIds: [],
-      }),
-      next: createAgentConfigChangeSnapshot({
-        agent,
-        environment: {
-          ...environment,
-          environmentId: "env-2",
-        },
-        mcpServerIds: [],
-        skillIds: [],
-      }),
+      current,
+      next: { ...current, name: "New name" },
     });
-
-    expect(plan.action).toBe("recreate-preserving-state");
+    expect(plan).toEqual({ fieldLabels: ["Name"], requiresDeploymentVersion: false });
+    expect(summarizeVersionedAgentConfigChange(plan)).toBe("Preset updated · Name");
+  });
+  test.each([
+    { prompt: "New instructions" },
+    { model: "new-model" },
+    { provider: "anthropic" },
+    { runtimeId: "claude-agent-sdk" },
+    { environmentId: "01J000000000000000000000B1" },
+    { providerOptions: { reasoning_effort: "high" } },
+    { mcpServerIds: ["01J000000000000000000000B2"] },
+    { skills: [{ id: "01J000000000000000000000B3", state: "active" as const }] },
+    { builtInTools: [] },
+  ])("records execution edits for future consumers without a runtime action: %j", (patch) => {
+    const plan = planVersionedAgentConfigChange({
+      agentStatus: "published",
+      current,
+      next: { ...current, ...patch },
+    });
+    expect(plan.fieldLabels).toHaveLength(1);
     expect(plan.requiresDeploymentVersion).toBe(true);
-    expect(plan.requiresRuntimeOperation).toBe(true);
-    expect(summarizeVersionedAgentConfigChange(plan)).toBe("Recreate sandbox · Environment");
+    expect(plan).not.toHaveProperty("action");
+    expect(plan).not.toHaveProperty("requiresRuntimeOperation");
   });
-
-  test("creates a deployment version for published Cattle config without runtime operation", () => {
-    const cattleAgent = {
-      ...agent,
-      kind: "cattle" as const,
-    };
-    const plan = planVersionedAgentConfigChange({
-      agentStatus: "published",
-      current: createAgentConfigChangeSnapshot({
-        agent: cattleAgent,
-        environment,
-        mcpServerIds: [],
-        skillIds: [],
+  test("draft presets need no publishing step to save a different harness", () => {
+    expect(
+      planVersionedAgentConfigChange({
+        agentStatus: "draft",
+        current,
+        next: { ...current, runtimeId: "claude-agent-sdk" },
       }),
-      next: createAgentConfigChangeSnapshot({
-        agent: {
-          ...cattleAgent,
-          prompt: "Help more",
-        },
-        environment,
-        mcpServerIds: [],
-        skillIds: [],
-      }),
-    });
-
-    expect(plan.action).toBe("restart-process");
-    expect(plan.actionLabel).toBe("Save for new sessions");
-    expect(plan.requiresDeploymentVersion).toBe(true);
-    expect(plan.requiresRuntimeOperation).toBe(false);
-    expect(summarizeVersionedAgentConfigChange(plan)).toBe("Save for new sessions · System prompt");
+    ).toEqual({ fieldLabels: ["Runtime"], requiresDeploymentVersion: false });
   });
-
-  test("classifies MCP binding edits as patch-and-restart", () => {
-    const plan = planVersionedAgentConfigChange({
-      agentStatus: "published",
-      current: createAgentConfigChangeSnapshot({
-        agent,
-        environment,
-        mcpServerIds: [],
-        skillIds: [],
+  test("equivalent provider options do not create a version", () => {
+    expect(
+      planVersionedAgentConfigChange({
+        agentStatus: "published",
+        current: { ...current, providerOptions: { a: 1, b: 2 } },
+        next: { ...current, providerOptions: { b: 2, a: 1 } },
       }),
-      next: createAgentConfigChangeSnapshot({
-        agent,
-        environment,
-        mcpServerIds: ["mcp_linear"],
-        skillIds: [],
-      }),
-    });
-
-    expect(plan.action).toBe("patch-and-restart");
-    expect(plan.requiresDeploymentVersion).toBe(true);
-    expect(plan.requiresRuntimeOperation).toBe(true);
-    expect(summarizeVersionedAgentConfigChange(plan)).toBe(
-      "Patch native config + restart · MCP Servers",
-    );
-  });
-
-  test("classifies advanced provider option edits as patch-and-restart", () => {
-    const plan = planVersionedAgentConfigChange({
-      agentStatus: "published",
-      current: createAgentConfigChangeSnapshot({
-        agent,
-        environment,
-        mcpServerIds: [],
-        skillIds: [],
-      }),
-      next: createAgentConfigChangeSnapshot({
-        agent: {
-          ...agent,
-          providerOptions: {
-            reasoning_effort: "high",
-          },
-        },
-        environment,
-        mcpServerIds: [],
-        skillIds: [],
-      }),
-    });
-
-    expect(plan.action).toBe("patch-and-restart");
-    expect(plan.requiresDeploymentVersion).toBe(true);
-    expect(plan.requiresRuntimeOperation).toBe(true);
-    expect(summarizeVersionedAgentConfigChange(plan)).toBe(
-      "Patch native config + restart · Advanced settings",
-    );
-  });
-
-  test("classifies built-in tool edits as patch-and-restart", () => {
-    const plan = planVersionedAgentConfigChange({
-      agentStatus: "published",
-      current: createAgentConfigChangeSnapshot({
-        agent,
-        environment,
-        mcpServerIds: [],
-        skillIds: [],
-      }),
-      next: createAgentConfigChangeSnapshot({
-        agent: {
-          ...agent,
-          builtInTools: agent.builtInTools.map((tool) =>
-            tool.name === "bash" ? { enabled: false, name: tool.name } : tool,
-          ),
-        },
-        environment,
-        mcpServerIds: [],
-        skillIds: [],
-      }),
-    });
-
-    expect(plan.action).toBe("patch-and-restart");
-    expect(plan.requiresDeploymentVersion).toBe(true);
-    expect(plan.requiresRuntimeOperation).toBe(true);
-    expect(summarizeVersionedAgentConfigChange(plan)).toBe(
-      "Patch native config + restart · Built-in tools",
-    );
-  });
-
-  test("requires fork-agent for published kind changes", () => {
-    const plan = planVersionedAgentConfigChange({
-      agentStatus: "published",
-      current: createAgentConfigChangeSnapshot({
-        agent,
-        environment,
-        mcpServerIds: [],
-        skillIds: [],
-      }),
-      next: createAgentConfigChangeSnapshot({
-        agent: {
-          ...agent,
-          kind: "cattle",
-        },
-        environment,
-        mcpServerIds: [],
-        skillIds: [],
-      }),
-    });
-
-    expect(plan.action).toBe("fork-agent");
-    expect(plan.requiresDeploymentVersion).toBe(false);
-    expect(plan.requiresRuntimeOperation).toBe(false);
-    expect(summarizeVersionedAgentConfigChange(plan)).toBe("Fork Agent · Agent type");
-  });
-
-  test("keeps published kind changes on fork-agent even when versioned fields also changed", () => {
-    const plan = planVersionedAgentConfigChange({
-      agentStatus: "published",
-      current: createAgentConfigChangeSnapshot({
-        agent,
-        environment,
-        mcpServerIds: [],
-        skillIds: [],
-      }),
-      next: createAgentConfigChangeSnapshot({
-        agent: {
-          ...agent,
-          kind: "cattle",
-          prompt: "Help more",
-        },
-        environment,
-        mcpServerIds: [],
-        skillIds: [],
-      }),
-    });
-
-    expect(plan.action).toBe("fork-agent");
-    expect(plan.requiresDeploymentVersion).toBe(false);
-    expect(plan.requiresRuntimeOperation).toBe(false);
-    expect(summarizeVersionedAgentConfigChange(plan)).toBe(
-      "Fork Agent · Agent type, System prompt",
-    );
+    ).toEqual({ fieldLabels: [], requiresDeploymentVersion: false });
   });
 });

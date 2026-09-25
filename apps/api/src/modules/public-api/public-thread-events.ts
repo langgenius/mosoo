@@ -515,9 +515,9 @@ export async function readPublicThreadRunFinalOutput(input: {
 async function resolvePublicThreadEventSessionId(
   request: ListPublicThreadEventsRequest,
 ): Promise<SessionId> {
-  const snapshot = await getThreadSnapshot(request.database, request.threadId);
+  const snapshot = await getThreadSnapshot(request.database, request.threadId, request.apiVersion);
 
-  await admitPublicThreadReader(request.database, request.caller, snapshot);
+  await admitPublicThreadReader(request.database, request.caller, snapshot, request.apiVersion);
 
   return toBackingSessionId(request.threadId);
 }

@@ -25,7 +25,7 @@ function createUsageDatabase(): SqliteD1Database {
   database.execute(`
     CREATE TABLE usage_event (
       actor_user_id text NOT NULL,
-      agent_id text NOT NULL,
+      agent_id text,
       agent_owner_user_id text NOT NULL,
       agent_publication_state_at_run text NOT NULL,
       agent_revision_id text,
@@ -56,7 +56,8 @@ function createUsageDatabase(): SqliteD1Database {
     CREATE TABLE usage_daily_rollup (
       organization_id text NOT NULL,
       project_id text NOT NULL,
-      agent_id text NOT NULL,
+      agent_id text,
+      agent_scope_key text GENERATED ALWAYS AS (coalesce(agent_id, '')) VIRTUAL,
       actor_user_id text NOT NULL,
       agent_owner_user_id text NOT NULL,
       date text NOT NULL,
@@ -71,10 +72,10 @@ function createUsageDatabase(): SqliteD1Database {
       cache_creation_tokens integer NOT NULL,
       total_cost_usd_micros integer NOT NULL,
       unpriced_request_count integer NOT NULL,
-      PRIMARY KEY (
+      UNIQUE (
         organization_id,
         project_id,
-        agent_id,
+        agent_scope_key,
         actor_user_id,
         agent_owner_user_id,
         date,
@@ -147,6 +148,40 @@ async function readRollupTotals(
 }
 
 describe("runtime usage idempotency across rollup", () => {
+  test("groups direct usage once across separate rollup batches without an Agent ID", async () => {
+    const database = createUsageDatabase();
+    const env = { DB: database } as unknown as ApiBindings;
+    const first = createUsageEventInput();
+    first.run = { ...first.run, agentId: null, agentRevisionId: null, agentStatus: null };
+    await recordRuntimeUsageEvent(database, first);
+    expect(
+      await database
+        .prepare("SELECT agent_id, agent_publication_state_at_run, run_purpose FROM usage_event")
+        .first(),
+    ).toEqual({
+      agent_id: null,
+      agent_publication_state_at_run: "not_applicable",
+      run_purpose: "production",
+    });
+    await runUsageDailyRollup(env, ROLLUP_TIME);
+    const second = { ...first, nativeCallId: "direct-second-call" };
+    await recordRuntimeUsageEvent(database, second);
+    await runUsageDailyRollup(env, ROLLUP_TIME);
+    await recordRuntimeUsageEvent(database, first);
+    await recordRuntimeUsageEvent(database, second);
+    await runUsageDailyRollup(env, ROLLUP_TIME);
+    expect(
+      await database
+        .prepare("SELECT agent_id, request_count, total_cost_usd_micros FROM usage_daily_rollup")
+        .all(),
+    ).toMatchObject({
+      results: [{ agent_id: null, request_count: 2, total_cost_usd_micros: 10_000_000 }],
+    });
+    expect(await database.prepare("SELECT COUNT(*) AS count FROM usage_event").first()).toEqual({
+      count: 0,
+    });
+  });
+
   test("does not double-count an event replayed after its raw row is rolled up", async () => {
     const database = createUsageDatabase();
     const env = { DB: database } as unknown as ApiBindings;

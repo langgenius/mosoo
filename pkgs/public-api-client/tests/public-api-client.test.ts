@@ -81,6 +81,148 @@ function jsonResponse(value: unknown, status = 200): Response {
 }
 
 describe("MosooPublicThreadClient", () => {
+  test("uploads, creates and waits for a direct v2 Session without an Agent or userId", async () => {
+    const configuration = {
+      type: "inline" as const,
+      harness: "openai-runtime",
+      provider: "openai",
+      model: "gpt-5.4",
+      instructions: "Analyze the supplied file.",
+    };
+    const thread = {
+      ...threadResponse("IDLE"),
+      agent_id: null,
+      kind: "cattle" as const,
+      userId: null,
+    };
+    const requests: RecordedRequest[] = [];
+    const client = new MosooPublicThreadClient({
+      baseUrl: "https://api.example.com/api/v2/",
+      token: "msp_test",
+      fetch: async (input, init) => {
+        const request = new Request(input, init);
+        expect(request.headers.get("Authorization")).toBe("Bearer msp_test");
+        expect(new URL(request.url).pathname).toStartWith("/api/v2/");
+        if (request.url.endsWith("/projects/project-1/files")) {
+          const file = (await request.formData()).get("file");
+          expect(file).toBeInstanceOf(File);
+          expect(file).toMatchObject({ name: "brief.txt", size: 5 });
+          return jsonResponse({ file: { id: FILE_ID } }, 201);
+        }
+        requests.push({
+          body: await readRequestBody(request.clone()),
+          headers: request.headers,
+          method: request.method,
+          url: request.url,
+        });
+        if (request.url.endsWith("/projects/project-1/threads")) {
+          expect(request.headers.get("Idempotency-Key")).toBe("direct-once");
+          return jsonResponse(
+            {
+              links: { thread: `/api/v2/threads/${THREAD_ID}` },
+              thread,
+              run: runResponse("running"),
+            } satisfies PublicThreadApiCreateThreadResponse<string | null>,
+            201,
+          );
+        }
+        if (request.method === "POST" && request.url.endsWith("/events")) {
+          return jsonResponse({
+            thread,
+            events: [],
+            warnings: [],
+            acceptedAt: "2026-09-22T00:00:00.000Z",
+          });
+        }
+        if (request.url.endsWith("/threads/" + THREAD_ID)) {
+          return jsonResponse({
+            links: { thread: `/api/v2/threads/${THREAD_ID}` },
+            thread,
+            run: runResponse("completed", { text: "Done." }),
+          } satisfies PublicThreadApiRetrieveThreadResponse<string | null>);
+        }
+        if (request.url.includes("/events?")) return jsonResponse({ events: [], truncated: false });
+        throw new Error(`Unexpected request: ${request.url}`);
+      },
+    });
+    const file = await client.uploadProjectFile({
+      projectId: "project-1",
+      file: new Blob(["Hello"]),
+      filename: "brief.txt",
+    });
+    const result = await client.createThreadAndWait({
+      projectId: "project-1",
+      configuration,
+      fileIds: [file.file.id],
+      input: "Summarize.",
+      idempotencyKey: "direct-once",
+    });
+    expect(result.finalOutput.text).toBe("Done.");
+    expect(result.thread.agent_id).toBeNull();
+    expect(result.thread.userId).toBeNull();
+    expect(requests[0]?.body).toEqual({
+      configuration,
+      input: { type: "user.message", content: [{ type: "text", text: "Summarize." }] },
+      resources: [{ type: "file", file_id: FILE_ID }],
+    });
+    await client.sendEvents({
+      threadId: THREAD_ID,
+      events: [{ type: "user_message", text: "Continue." }],
+    });
+    expect(requests.at(-1)?.body).toEqual({
+      events: [{ type: "user_message", text: "Continue." }],
+    });
+  });
+
+  test("selects v2 explicitly and refuses a v1 client for Project operations", async () => {
+    const configuration = {
+      type: "inline" as const,
+      harness: "openai-runtime",
+      provider: "openai",
+      model: "gpt-5.4",
+      instructions: "Be concise.",
+    };
+    let requests = 0;
+    const fetch: MosooPublicApiFetch = async (input, init) => {
+      const request = new Request(input, init);
+      requests++;
+      expect(request.url).toBe("https://api.example.com/api/v2/projects/project-1/threads");
+      const { kind: _legacyKind, ...thread } = threadResponse();
+      return jsonResponse({ thread: { ...thread, agent_id: null, userId: null }, run: null }, 201);
+    };
+    const legacy = new MosooPublicThreadClient({
+      baseUrl: "https://api.example.com",
+      token: "msp_test",
+      fetch,
+    });
+    let failure: unknown;
+    try {
+      await legacy.createProjectThread({ projectId: "project-1", configuration });
+    } catch (error) {
+      failure = error;
+    }
+    expect(failure).toMatchObject({ message: expect.stringContaining("require Public API v2") });
+    expect(requests).toBe(0);
+    const v2 = new MosooPublicThreadClient({
+      baseUrl: "https://api.example.com/api",
+      apiVersion: "v2",
+      token: "msp_test",
+      fetch,
+    });
+    const created = await v2.createProjectThread({ projectId: "project-1", configuration });
+    expect(created.thread.agent_id).toBeNull();
+    expect(created.thread).not.toHaveProperty("kind");
+    expect(requests).toBe(1);
+    expect(
+      () =>
+        new MosooPublicThreadClient({
+          baseUrl: "https://api.example.com/api/v1",
+          apiVersion: "v2",
+          token: "msp_test",
+        }),
+    ).toThrow("same Public API version");
+  });
+
   test("maps createThread fileIds to public file resources", async () => {
     const requests: RecordedRequest[] = [];
     const fetchMock: MosooPublicApiFetch = async (input, init) => {

@@ -428,6 +428,17 @@ function createApiTestSchema(database: SqliteD1Database): void {
       version text
     );
 
+    CREATE TABLE skill_snapshot_entry (
+      entry_kind text NOT NULL,
+      is_executable integer NOT NULL,
+      mime_type text,
+      path text NOT NULL,
+      sha256 text,
+      size integer NOT NULL,
+      snapshot_id text NOT NULL,
+      PRIMARY KEY (snapshot_id, path)
+    );
+
     CREATE TABLE file_record (
       committed integer NOT NULL,
       created_at integer NOT NULL,
@@ -524,6 +535,12 @@ function createApiTestSchema(database: SqliteD1Database): void {
       title text,
       type text DEFAULT 'preview' NOT NULL,
       updated_at integer NOT NULL
+    );
+
+    CREATE TABLE session_execution_snapshot (
+      session_id text PRIMARY KEY NOT NULL,
+      created_at integer NOT NULL,
+      plan_json text NOT NULL
     );
 
     CREATE TABLE session_run (

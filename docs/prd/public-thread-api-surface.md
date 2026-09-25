@@ -59,7 +59,97 @@ Agent's API Access panel shows its identifier, token creation, and API reference
   complete runtime workspace. Thread history also does not guarantee that every
   later Run receives prior private runtime state or every earlier file.
 
+## Direct invocation (unreleased)
+
+The September 22 owner direction makes a Project key plus explicit harness/model, instructions, input, and optional files the primary creation path. No business Agent must be created or published first. An owned saved Agent remains an optional preset; a request selects inline configuration or a preset, without implicit merging. Both use the same Session ID, file/event/usage surfaces, idempotency, and native cold-continuation contract. Credentials remain Project-owned BYOK; this does not reopen #636.
+
+`POST /api/v2/projects/{projectId}/threads` accepts a required `configuration` object: either `{type: "inline", harness, provider, model, instructions}` or `{type: "agent", agent_id}`. Inline instructions are required and nonblank. Mixed sources and unknown fields return `invalid_request`; unsupported selections or missing model credentials return `readiness_blocked`. `input`, Project draft `resources`, and `userId` retain the existing v2 contract. Per-turn monetary budgets are excluded from this release; cost-cap parameters are rejected rather than silently ignored. Inline admission creates no Agent row and returns `agent_id: null`.
+
+`POST /api/v2/projects/{projectId}/files` uploads a draft file for the same Project. Project keys cannot name another Project; CLI login must explicitly select an owned Project. Files and presets cannot cross that boundary even when the account owns both Projects. Configuration is included in the creation receipt, so changed instructions/model/source with the same idempotency key conflict. A pending committed creation recovers its frozen Session even if its preset has since been removed. Validating and claiming attachments precedes runtime prewarm.
+
+The source implementation, typed client, generated OpenAPI and executable workflow include this path. Direct hosted acceptance, external CLI/docs synchronization and release remain pending; saved-Agent evidence alone does not establish direct invocation. See the [design and acceptance plan](../plans/2026-09-22-direct-session-design.md).
+
+## Unreleased saved-Agent entry point
+
+`/api/v2` reuses the Thread lifecycle and conversation ID for the #582 admission
+transition. A Project key can invoke a private Agent by ID without publishing.
+A new Thread captures the latest saved configuration, even when the Agent has
+an older published version; later Agent edits do not change that snapshot.
+Omitting `userId` stores no end-user identity and returns `userId: null`. A
+supplied value remains immutable and carries the existing delegated MCP identity.
+
+Session and execution-binding GraphQL outputs and v2 Thread summaries omit the
+retired Pet/Cattle `kind`. The v1 summary retains the stored Session label for
+compatibility, including interrupted-creation recovery and event responses;
+editing an Agent preset cannot change that historical label. Clients should
+select the versioned response contract rather than expect `kind` in v2.
+
+Read, events, continuation, cancellation, and file access use the Session's owner
+and Project boundary, regardless of the creation channel or current publication
+state. The same ID addresses an existing owned Session. This does not grant a
+Project key access to another Project or invent missing recovery state.
+
+The new version is required because latest-saved admission differs from v1's
+published/live behavior. It does not rename Thread resources or retire v1.
+Existing v1 callers keep their published configuration and required `userId`;
+v2-created Threads are excluded from v1's public-channel view. The #582 release
+requires a model-provider account configured in the Project (BYOK). Usage and the shared-workspace transition remain #582 work; platform-funded first use,
+recharge, and commercial billing are independent #636 scope.
+
+Formal v2 Sessions do not expire from inactivity. Later input and files continue
+the same Session using its frozen configuration and committed recovery state;
+old snapshot recovery deadlines are ignored without rewriting those snapshots.
+Only explicitly enrolled Cloud debug Previews use the 30-day inactivity policy.
+The reviewed inactive legacy migration cohort remains read-only. File claim and
+Run admission share one request time for Preview expiry checks; other admission
+failures can leave supplied files attached. Removing an admission deadline does
+not by itself prove cold or multi-day restore; see
+[Thread Continuation](./thread-continuation.md#retention-and-deletion).
+
+`GET /api/v2/threads/{threadId}/usage` returns paginated persisted runtime usage
+observations. Missing values remain null. Token accounting follows the recorded
+provider convention; runtime cost estimates are not invoices. Empty observations
+do not establish that no inference occurred. The endpoint reads Session records,
+so it does not lose observations when the seven-day billing detail rolls up.
+
+The [executable workflow](../../scripts/public-api-session-workflow.ts) is the
+shared HTTP acceptance example for clients, CLI, and documentation. It uses one
+`thread.id` for create/read, real tools and artifact download, SSE, usage,
+follow-up with private workspace state, and cancellation without a Run ID.
+Run `just public-api-session-workflow` with a nonproduction `/api/v2` URL in
+`MOSOO_PUBLIC_SESSION_BASE_URL`, an owned Project ID in `MOSOO_PUBLIC_SESSION_PROJECT_ID`,
+explicit `MOSOO_PUBLIC_SESSION_HARNESS`, `MOSOO_PUBLIC_SESSION_PROVIDER` and
+`MOSOO_PUBLIC_SESSION_MODEL`, a Project key in `MOSOO_API_TOKEN`, and a unique
+`MOSOO_PUBLIC_SESSION_TEST_ID`. It uploads a known CSV and invokes inline instructions
+without creating an Agent. `MOSOO_PUBLIC_SESSION_INSTRUCTIONS` can replace the example's
+analysis instructions. To exercise a preset instead, supply `MOSOO_PUBLIC_SESSION_AGENT_ID`
+and omit all four inline fields. This workflow makes real BYOK model calls and has no server-enforced monetary cap; use the agreed inexpensive models and inspect recorded usage.
+Use `MOSOO_E2E_ENV_FILE` for a local ignored key file. It runs real inference and leaves its Session/artifacts available for
+inspection; use a fresh test ID for a full rerun. Evidence goes to
+`.tmp/e2e/session-workflow` or `MOSOO_PUBLIC_SESSION_OUTPUT_DIR`.
+
+### Creation retries
+
+An optional `Idempotency-Key` is shared by keys in the same Project. Retained
+receipts reject changed input and replay the same admitted Session. The current
+receipt window is 24 hours; callers must save the returned Thread ID, because
+reuse after expiry can create new work. A still-processing request returns 409.
+After ten minutes, a retry can reconcile an interrupted creation against its
+persisted Session, initial-turn receipt, configuration and file identities.
+An unrelated later turn is not evidence that the original input was admitted.
+
+An ambiguous infrastructure failure keeps the creation recoverable; it must not
+delete an admitted Run or an object that a committed file record may reference.
+Explicit request rejections remain replayable. Neither creation idempotency nor
+recovery guarantees exactly-once effects in external tools.
+
 ## `/api/v1` compatibility policy
+
+The #582 durable Session target can extend this Thread API. Keeping the Thread
+name, existing conversation IDs, or compatible Run result fields does not
+conflict with one primary conversation handle. A terminology change alone does
+not require a new version or removal of the old routes. Assess admission,
+configuration selection, identity, continuation, and outcomes separately.
 
 `/api/v1` is backward compatible by default. Existing request fields, accepted
 values, response fields, operations, and documented behavior must not be removed

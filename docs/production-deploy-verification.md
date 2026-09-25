@@ -67,6 +67,44 @@ column and all four bindings. Do not roll back to a Worker that always uses
 fix that preserves routing and the pinned Driver protocol. This change does not
 upgrade the Driver protocol or migrate an existing subject's namespace.
 
+### #582 native continuation protocol cutover
+
+The unreleased Session changes use Driver protocol 6 to carry the
+native-continuation requirement and explicitly nullable Agent provenance.
+Boot payloads and new handshakes accept exactly protocol 6, including rejecting
+protocol 5. Compatible Driver main/release integration remains a release
+prerequisite. This internal API/Driver cutover preserves public Thread/Run routes
+and customer Session IDs.
+
+Prepare one matched API revision and Driver image set. Before switching versions,
+close new admission, finish admitted work and verify its committed recovery state,
+then stop old Drivers, including idle/prewarmed instances. Do not rely on a new
+handshake to protect a connection that was already accepted by the old Worker.
+Reopen admission only after the matched image/Worker versions and restored native
+continuation pass staging acceptance. Rehearse the reverse sequence with matched
+rollback artifacts and the same admission barrier; do not split API and Driver
+versions or interrupt customer work to force an upgrade. The production plan and
+its rollback still require the owner's concrete approval.
+
+Rollback qualification requires successful real tool work in the same direct
+Session on the rollback candidate, followed by successful continuation after
+switching forward. Verify the native identity, frozen configuration, original
+files, and work committed during rollback. A failed rollback Run remains a
+failed rehearsal even if switching forward restores the prior successful
+checkpoint; retain its Run and artifact evidence for diagnosis.
+
+Migration `0017_optional-session-agent.sql` preserves existing Agent references
+while allowing Project-owned execution without a preset. It rewrites the Agent
+association columns in Session, Run, event, and usage records, and rebuilds only
+the derived daily usage rollup. Before production application, verify a full D1
+backup and restore, row/relationship preservation on a recent copy, the admission
+barrier, and the exact matched release/rollback revisions with the owner. Once a
+Session without an Agent has been admitted, a previous build that requires an
+Agent is not a valid rollback target. Keep a nullable-aware Host/Driver rollback
+pair; do not delete direct Sessions or invent Agent IDs to fit an older schema.
+This schema change does not convert legacy Pet workspaces or authorize Preview
+cleanup.
+
 ## Step 1 - Run The Full Repository Gate
 
 ```bash
@@ -355,6 +393,11 @@ One coordinated notice may cover slices shipped together when it describes
 all affected workflows and client actions. The completed #581 key-rotation
 notice does not cover a future Session or Builder change. Describe that
 release's actual changes; require key rotation only if it changes valid keys.
+
+For #582 Cloud conversion, also follow the
+[Session isolation transition](./session-isolation-transition.md) evidence,
+concurrent-admission, and functional rollback requirements. A ready backup row or
+a successful metadata check is not proof that the original workspace is usable.
 
 The target #582 acceptance covers both ghFind single-turn evaluation and
 multi-turn continuation, including checkpoint failure and recovery after

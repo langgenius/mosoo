@@ -53,3 +53,37 @@ in the Console and public integrations. Recovery is partial: retry actions exist
 Preview failures, while automatic replay after runtime loss is not shipped. Existing Threads
 keep the Agent configuration captured when they began; testing newer configuration requires a
 new Thread or Preview session.
+
+## Cloud debug Preview retention (unreleased)
+
+Cloud debug Previews have one inactivity period: **30 days**. A Preview can be continued
+within that period. Sending a message, running work, or writing/uploading a file renews it;
+reading history, opening the console, and background maintenance do not. After 30 days
+without debugging activity, the Preview and its history/files may be permanently cleaned
+up. Returning to the draft starts a new Preview. There is no separate three-day deadline.
+Running work and admitted uploads must finish or expire before cleanup can claim a Preview.
+
+This rule does not expire formal conversations or API-used Sessions, regardless of a legacy
+`preview` label. Self-hosted installations retain their existing behavior. New Cloud debug
+Previews record the policy at creation. Existing Previews remain unchanged until a reviewed
+inventory, backup/restore plan, and approved production cutover enroll them. Agent definitions
+remain available after Preview cleanup. Deploy rollback alone cannot restore deleted data.
+
+## Inactive legacy Sessions (unreleased migration only)
+
+For this migration, an old Pet Session with no calls or file activity in the preceding
+30 days may become read-only, even when its account remains active. Publication and
+account activity still describe impact; the Session's own activity determines eligibility.
+Keep history and saved files readable. Returning users can start a new Session directly
+or with an existing Agent preset; the old execution context, workspace and unrecorded
+configuration need not be recovered for the reviewed inactive cohort.
+
+This is a one-time, explicitly reviewed cohort, not automatic expiry of formal Sessions.
+Refresh ownership, all Run outcomes, file uploads/edits/deletes and pending work before
+cutover; active or uncertain cases keep the seamless continuation requirement. Login,
+history reads and maintenance do not renew Session activity. Stale maintenance or model
+telemetry records require evidence and guarded reconciliation. Reuse the
+existing stopped Session capabilities and new-Session entry point. Debug Preview retains
+its separate 30-day policy. Production changes still require a backup and rollback plan
+and explicit approval; this decision does not authorize deleting retained data or shared
+execution resources.

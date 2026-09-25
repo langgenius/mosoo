@@ -141,7 +141,7 @@ const LIST_USAGE_CANDIDATES_SQL = `
       agent_deployment_version.id AS resolved_revision_id,
       session.type AS session_type,
       session.runtime_id AS session_runtime_id,
-      agent.owner_account_id AS agent_owner_user_id,
+      project.owner_account_id AS agent_owner_user_id,
       project.id AS project_id,
       project.organization_id,
       CASE
@@ -163,9 +163,6 @@ const LIST_USAGE_CANDIDATES_SQL = `
     LEFT JOIN session
       ON session.id = session_model_call.session_id
       AND session.id = session_run.session_id
-    LEFT JOIN agent
-      ON agent.id = session_run.agent_id
-      AND agent.project_id = session.project_id
     LEFT JOIN agent_deployment_version
       ON agent_deployment_version.id = session_run.deployment_version_id
       AND agent_deployment_version.agent_id = session_run.agent_id
@@ -375,7 +372,6 @@ function classifyCandidate(
   if (
     row.resolved_run_id === null ||
     row.actor_user_id === null ||
-    row.agent_id === null ||
     row.agent_owner_user_id === null ||
     row.project_id === null ||
     row.organization_id === null ||
@@ -384,7 +380,16 @@ function classifyCandidate(
     return { kind: "indeterminate", reason: "missing_run_context" };
   }
 
-  if (row.agent_revision_id === null || row.resolved_revision_id === null) {
+  if (row.agent_id === null && row.agent_revision_id !== null) {
+    return { kind: "indeterminate", reason: "missing_run_context" };
+  }
+
+  // Direct execution has no publication state to reconstruct. Legacy preset
+  // usage still needs its recorded revision before historical repair is safe.
+  if (
+    row.agent_id !== null &&
+    (row.agent_revision_id === null || row.resolved_revision_id === null)
+  ) {
     return { kind: "indeterminate", reason: "missing_published_revision" };
   }
 
@@ -408,16 +413,16 @@ function classifyCandidate(
       nativeCallId: normalizeNativeCallId(row.native_call_id),
       run: {
         actorUserId: parsePlatformId<AccountId>(row.actor_user_id, "actor user ID"),
-        agentId: parsePlatformId<AgentId>(row.agent_id, "agent ID"),
+        agentId: row.agent_id === null ? null : parsePlatformId<AgentId>(row.agent_id, "agent ID"),
         agentOwnerUserId: parsePlatformId<AccountId>(
           row.agent_owner_user_id,
           "agent owner user ID",
         ),
-        agentRevisionId: parsePlatformId<AgentDeploymentVersionId>(
-          row.agent_revision_id,
-          "agent revision ID",
-        ),
-        agentStatus: "published",
+        agentRevisionId:
+          row.agent_revision_id === null
+            ? null
+            : parsePlatformId<AgentDeploymentVersionId>(row.agent_revision_id, "agent revision ID"),
+        agentStatus: row.agent_id === null ? null : "published",
         createdAtMs: row.completed_at ?? row.created_at,
         model: row.model,
         organizationId: parsePlatformId<OrganizationId>(row.organization_id, "organization ID"),

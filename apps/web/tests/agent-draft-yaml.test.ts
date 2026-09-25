@@ -17,7 +17,6 @@ function draft(): AgentEditorDraft {
     ),
     description: "Reviews releases before publish.",
     environmentId: "01J000000000000000000000E2",
-    kind: "pet",
     mcpServers: [
       {
         credentialMode: "runtime_resolved",
@@ -59,6 +58,7 @@ describe("agent draft YAML codec", () => {
     expect(yaml).toContain("name: bash");
     expect(yaml).toContain("settings:");
     expect(yaml).toContain("model_reasoning_effort: high");
+    expect(yaml).not.toContain("kind:");
     expect(createDraftYamlHash(parsed)).toBe(createDraftYamlHash(current));
     expect(createSnapshotHash(parsed)).toBe(createSnapshotHash(current));
   });
@@ -87,7 +87,7 @@ describe("agent draft YAML codec", () => {
     });
   });
 
-  test("ignores legacy Builder metadata in Draft YAML", () => {
+  test("ignores legacy type selection and Builder metadata in Draft YAML", () => {
     const current = draft();
     const parsed = parseDraftYaml(
       [

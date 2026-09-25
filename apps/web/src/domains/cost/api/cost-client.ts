@@ -44,7 +44,7 @@ export type {
 function toCostAgentRow(agent: CostAgentFieldsFragment): CostAgentRow {
   return {
     ...agent,
-    agentId: toAgentId(agent.agentId),
+    agentId: agent.agentId == null ? null : toAgentId(agent.agentId),
     ownerId: toAccountId(agent.ownerId),
   };
 }

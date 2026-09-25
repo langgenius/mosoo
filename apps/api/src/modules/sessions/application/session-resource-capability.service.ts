@@ -2,12 +2,14 @@ import type { AgentSessionActionCapabilityName } from "@mosoo/contracts/session"
 import type { ProjectId, SessionId } from "@mosoo/id";
 import { getAvailableAgentSessionActionCapability } from "@mosoo/session-policy";
 
+import { currentTimestampMs } from "../../../time";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import type { SessionActionAuthorization } from "../domain/session-access.policy";
 import {
   getProjectSessionParticipantCapabilityAccess,
   resolveSessionActionCreatorFlag,
 } from "../domain/session-access.policy";
+import { admitPreviewFileActivity } from "../infrastructure/preview-retention.repository";
 
 export async function ensureSessionResourceCapability(input: {
   action: AgentSessionActionCapabilityName;
@@ -36,4 +38,7 @@ export async function ensureSessionResourceCapability(input: {
     runtimeId: session.runtime_id,
     status: session.status,
   });
+  if (input.action === "remove_session_resource") {
+    await admitPreviewFileActivity(input.database, input.sessionId, currentTimestampMs());
+  }
 }

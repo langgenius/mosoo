@@ -45,7 +45,11 @@ mock.module("@cloudflare/sandbox", () => ({
     );
   },
 }));
-const { getRuntimeSubjectKeepAliveHandle, destroyRuntimeSubjectContainer } =
+const {
+  getRuntimeSubjectKeepAliveHandle,
+  getRuntimeSubjectContainerObservation,
+  destroyRuntimeSubjectContainer,
+} =
   await import("../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-platform");
 
 const allocation = {
@@ -53,18 +57,28 @@ const allocation = {
   agentId: ids.agent,
   projectId: ids.project,
   executionOwnerUserId: ids.account,
-  kind: "cattle",
-  subjectKind: "session",
-  subjectId: ids.session,
+  sessionId: ids.session,
   runtimeSubjectId: ids.sandbox,
 } as const;
 const profiles = Object.entries(RUNTIME_SANDBOX_IMAGES).map(
   ([runtimeId, image]) => [runtimeId, image.binding, image.profile] as const,
 );
 
+function seedSessionAuthority(db: SqliteD1Database): void {
+  db.execute(`
+    INSERT INTO project (id, name, organization_id, owner_account_id, created_at, updated_at)
+    VALUES ('${ids.project}', 'Fixture', '${ids.organization}', '${ids.account}', 1, 1);
+    INSERT INTO session (id, agent_id, project_id, creator_account_id, kind, model, provider,
+      runtime_id, renamed, status, created_at, updated_at)
+    VALUES ('${ids.session}', '${ids.agent}', '${ids.project}', '${ids.account}', 'cattle',
+      'gpt-5.4', 'openai', 'openai-runtime', 0, 'IDLE', 1, 1);
+  `);
+}
+
 function database(): SqliteD1Database {
   const db = new SqliteD1Database();
   applyDrizzleMigrations(db);
+  seedSessionAuthority(db);
   return db;
 }
 
@@ -143,6 +157,7 @@ describe("runtime-specific Sandbox images", () => {
   test("preserves legacy namespaces when the additive migration meets existing data", async () => {
     const db = new SqliteD1Database();
     applyDrizzleMigrationsBefore(db, "0015_runtime-sandbox-images");
+    seedSessionAuthority(db);
     db.execute(`INSERT INTO sandbox (id, agent_id, project_id, owner_account_id, kind, subject_kind, subject_id, status, created_at, updated_at)
       VALUES ('${ids.sandbox}', '${ids.agent}', '${ids.project}', '${ids.account}', 'cattle', 'session', '${ids.session}', 'cold', 1, 1)`);
     applyDrizzleMigration(db, "0015_runtime-sandbox-images");
@@ -151,18 +166,79 @@ describe("runtime-specific Sandbox images", () => {
     expect((await getRuntimeSubject(db, ids.sandbox))?.sandboxBinding).toBe("Sandbox");
   });
 
-  test("keeps editable Pet workspaces compatible with different frozen Session runtimes", async () => {
-    const db = database();
-    for (const [runtimeId] of profiles) {
-      await ensureRuntimeSubjectId(db, {
-        ...allocation,
-        kind: "pet",
-        subjectKind: "agent",
-        subjectId: ids.agent,
-        runtimeId,
+  test("observes the recorded namespace without configuring an SDK handle", async () => {
+    for (const sandboxBinding of ["Sandbox", ...profiles.map(([, binding]) => binding)]) {
+      const db = database();
+      await ensureRuntimeSubjectId(db, { ...allocation, runtimeId: "openai-runtime" });
+      db.execute(`UPDATE sandbox SET sandbox_binding = '${sandboxBinding}'`);
+      const sdkCalls = calls.length;
+      const names: string[] = [];
+      let disposed = 0;
+      const namespace = {
+        getByName(name: string) {
+          names.push(name);
+          return {
+            getContainerObservation: async () => ({ state: "stopped", observedAt: 123 }),
+            [Symbol.dispose]() {
+              disposed++;
+            },
+          };
+        },
+      };
+      const bindings = { DB: db, [sandboxBinding]: namespace } as unknown as ApiBindings;
+      expect(await getRuntimeSubjectContainerObservation(bindings, ids.sandbox)).toEqual({
+        state: "stopped",
+        observedAt: 123,
       });
+      expect(names).toEqual([ids.sandbox.toLowerCase()]);
+      expect(disposed).toBe(1);
+      expect(calls).toHaveLength(sdkCalls);
     }
-    expect((await getRuntimeSubject(db, ids.sandbox))?.sandboxBinding).toBe("Sandbox");
+  });
+
+  test("observation does not fabricate stopped state for missing resources or failed RPCs", async () => {
+    const db = database();
+    const bindings = { DB: db } as ApiBindings;
+    await expect(getRuntimeSubjectContainerObservation(bindings, ids.sandbox)).rejects.toThrow(
+      "no recorded Sandbox binding",
+    );
+    await ensureRuntimeSubjectId(db, { ...allocation, runtimeId: "openai-runtime" });
+    await expect(getRuntimeSubjectContainerObservation(bindings, ids.sandbox)).rejects.toThrow(
+      "SandboxOpenAI binding is not configured",
+    );
+    let disposed = false;
+    const failedBindings = {
+      DB: db,
+      SandboxOpenAI: {
+        getByName: () => ({
+          getContainerObservation: async () => {
+            throw new Error("observation transport failed");
+          },
+          [Symbol.dispose]() {
+            disposed = true;
+          },
+        }),
+      },
+    } as unknown as ApiBindings;
+    await expect(
+      getRuntimeSubjectContainerObservation(failedBindings, ids.sandbox),
+    ).rejects.toThrow("observation transport failed");
+    expect(disposed).toBe(true);
+  });
+
+  test("does not replace an old shared machine with a new image", async () => {
+    const db = database();
+    await ensureRuntimeSubjectId(db, { ...allocation, runtimeId: "openai-runtime" });
+    db.execute(
+      `UPDATE sandbox SET kind = 'pet', subject_kind = 'agent', subject_id = '${ids.agent}', sandbox_binding = 'Sandbox'`,
+    );
+    const before = await db.prepare("SELECT * FROM sandbox").all();
+    for (const [runtimeId] of profiles) {
+      await expect(ensureRuntimeSubjectId(db, { ...allocation, runtimeId })).rejects.toThrow(
+        "verified exclusive execution binding",
+      );
+    }
+    expect(await db.prepare("SELECT * FROM sandbox").all()).toEqual(before);
   });
 
   test("fails closed on unknown runtime, missing record, corrupt or unavailable binding", async () => {

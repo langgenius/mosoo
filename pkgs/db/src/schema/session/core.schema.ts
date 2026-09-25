@@ -19,7 +19,7 @@ import { platformIdColumn } from "../id-column";
 export const sessionsTable = sqliteTable(
   "session",
   {
-    agentId: platformIdColumn<AgentId>("agent_id").notNull(),
+    agentId: platformIdColumn<AgentId>("agent_id"),
     archivedAt: integer("archived_at"),
     endUserId: text("end_user_id"),
     participantAccountId: platformIdColumn<AccountId>("attributed_user_id"),

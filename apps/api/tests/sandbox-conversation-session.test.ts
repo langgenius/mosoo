@@ -20,7 +20,11 @@ mock.module("@cloudflare/sandbox", () => ({
   },
 }));
 
-const { closeIdleCattleConversationSession, ensureSandboxConversationSession } =
+const {
+  closeIdleConversationSession,
+  closeSandboxConversationSession,
+  ensureSandboxConversationSession,
+} =
   await import("../src/modules/runtime/infrastructure/sandbox-session/sandbox-conversation-session.service");
 
 const ORIGIN = {
@@ -57,9 +61,12 @@ function createConversationSessionDatabase(kind: AgentKind = "pet"): SqliteD1Dat
   database.execute(`
     CREATE TABLE sandbox (
       sandbox_binding text NOT NULL DEFAULT 'Sandbox',
+      claim_owner text,
       id text PRIMARY KEY NOT NULL,
       inactive_deadline_at integer,
       kind text NOT NULL,
+      last_error text,
+      last_error_code text,
       status text DEFAULT 'active' NOT NULL,
       status_changed_at integer DEFAULT 0 NOT NULL,
       status_event text DEFAULT 'runtime_subject.active' NOT NULL,
@@ -94,6 +101,7 @@ function createConversationSessionDatabase(kind: AgentKind = "pet"): SqliteD1Dat
       id text PRIMARY KEY NOT NULL,
       kind text DEFAULT '${kind}' NOT NULL,
       last_run_id text,
+      status_operation_id text,
       workspace_checkpoint_required integer DEFAULT 0 NOT NULL
     );
 
@@ -126,6 +134,7 @@ function createConversationSessionDatabase(kind: AgentKind = "pet"): SqliteD1Dat
   database.execute(`
     INSERT INTO sandbox (id, inactive_deadline_at, kind, updated_at)
     VALUES ('01J0000000000000000000000D', 123, '${kind}', 1);
+    INSERT INTO session (agent_id, id) VALUES (NULL, 'session-1');
   `);
 
   return database;
@@ -259,6 +268,8 @@ function createSandbox(
   options: {
     cwdHasContent?: boolean;
     deleteSessionError?: Error;
+    onOpen?: () => Promise<void>;
+    onDelete?: () => Promise<void>;
     onRestore?: (backup: { readonly dir: string; readonly id: string }) => void;
     onWriteFile?: (path: string) => void;
     restoreError?: Error;
@@ -276,9 +287,11 @@ function createSandbox(
       return { dir: "/backup", id: "backup-1" };
     },
     async createSession() {
+      await options.onOpen?.();
       return executionSession;
     },
     async deleteSession(sessionId) {
+      await options.onDelete?.();
       if (options.deleteSessionError) {
         throw options.deleteSessionError;
       }
@@ -287,6 +300,7 @@ function createSandbox(
     },
     async destroy() {},
     async getSession() {
+      await options.onOpen?.();
       return executionSession;
     },
     async mountBucket() {},
@@ -344,6 +358,86 @@ function createInput(sandbox: SandboxHandle, kind: AgentKind = "pet") {
   };
 }
 
+describe("conversation callbacks after a binding change", () => {
+  for (const change of ["sandbox", "execution session", "deleted"] as const) {
+    for (const operation of ["activate", "close"] as const) {
+      test(`late ${operation} leaves the ${change} replacement intact`, async () => {
+        const database = createConversationSessionDatabase();
+        await insertConversationSession(database, { status: "active" });
+        let expected: unknown;
+        const beforeSandbox = await database.prepare("SELECT * FROM sandbox").all();
+        const replaceBinding = async () => {
+          if (change === "deleted") {
+            database.execute("DELETE FROM sandbox_session WHERE session_id = 'session-1'");
+          } else {
+            database.execute(`
+              UPDATE sandbox_session SET
+                ${change === "sandbox" ? "sandbox_id = '01J0000000000000000000000E'," : ""}
+                cloudflare_session_id = '01J00000000000000000000002',
+                status = 'active', updated_at = 999
+              WHERE session_id = 'session-1'
+            `);
+          }
+          expected = await database.prepare("SELECT * FROM sandbox_session").all();
+        };
+        const sandbox = createSandbox(
+          operation === "activate" ? { onOpen: replaceBinding } : { onDelete: replaceBinding },
+        );
+
+        if (operation === "activate") {
+          const result = await ensureSandboxConversationSession(
+            createBindings(database),
+            createInput(sandbox),
+          ).then(
+            () => null,
+            (error: unknown) => error,
+          );
+          expect(await database.prepare("SELECT * FROM sandbox_session").all()).toEqual(expected);
+          expect(result).toBeInstanceOf(Error);
+          if (!(result instanceof Error)) {
+            throw new Error("Stale activation unexpectedly succeeded.");
+          }
+          expect(result.message).toContain("binding changed");
+        } else {
+          await closeSandboxConversationSession(createBindings(database, sandbox), {
+            sandboxId: "01J0000000000000000000000D",
+            sessionId: "session-1",
+          });
+          expect(await database.prepare("SELECT * FROM sandbox_session").all()).toEqual(expected);
+        }
+        expect(await database.prepare("SELECT * FROM sandbox").all()).toEqual(beforeSandbox);
+      });
+    }
+  }
+
+  test.each(["pet", "cattle"] as const)(
+    "a matching %s activation failure still records its error",
+    async (kind) => {
+      const database = createConversationSessionDatabase(kind);
+      await insertConversationSession(database, { status: "closed" });
+      database.execute(`
+      CREATE TRIGGER fail_activation BEFORE UPDATE ON sandbox_session
+      WHEN NEW.status = 'active'
+      BEGIN SELECT RAISE(ABORT, 'injected activation failure'); END;
+    `);
+
+      await expect(
+        ensureSandboxConversationSession(
+          createBindings(database),
+          createInput(createSandbox(), kind),
+        ),
+      ).rejects.toThrow("injected activation failure");
+      expect(await readConversationSession(database)).toMatchObject({ status: "error" });
+      expect(await database.prepare("SELECT status, last_error_code FROM sandbox").first()).toEqual(
+        {
+          status: "cold",
+          last_error_code: "runtime.conversation_mount_failed",
+        },
+      );
+    },
+  );
+});
+
 describe("ensureSandboxConversationSession", () => {
   test("reuses an active session without preparing directories", async () => {
     const database = createConversationSessionDatabase();
@@ -361,7 +455,7 @@ describe("ensureSandboxConversationSession", () => {
       cwd: "/workspace/se/session-1",
       status: "active",
     });
-    await expect(readInactiveDeadline(database)).resolves.toBe(123);
+    await expect(readInactiveDeadline(database)).resolves.toBeNull();
   });
 
   test("creates a missing conversation session record", async () => {
@@ -381,18 +475,15 @@ describe("ensureSandboxConversationSession", () => {
     });
   });
 
-  test("arms an idle deadline when a legacy Pet session has none", async () => {
-    const database = createConversationSessionDatabase();
-    database.execute("UPDATE sandbox SET inactive_deadline_at = NULL");
-    const sandbox = createSandbox();
-    const startedAt = Date.now();
-
-    await ensureSandboxConversationSession(createBindings(database), createInput(sandbox));
-
-    const deadline = await readInactiveDeadline(database);
-    expect(deadline).toBeGreaterThanOrEqual(startedAt + 5 * 60_000);
-    expect(deadline).toBeLessThanOrEqual(Date.now() + 5 * 60_000);
-  });
+  test.each(["pet", "cattle"] as const)(
+    "an active Session clears the idle deadline despite its historical %s label",
+    async (kind) => {
+      const database = createConversationSessionDatabase(kind);
+      const sandbox = createSandbox();
+      await ensureSandboxConversationSession(createBindings(database), createInput(sandbox, kind));
+      expect(await readInactiveDeadline(database)).toBeNull();
+    },
+  );
 
   test("continues a warm closed cattle session with a new execution session id", async () => {
     const database = createConversationSessionDatabase("cattle");
@@ -414,31 +505,35 @@ describe("ensureSandboxConversationSession", () => {
     await expect(readInactiveDeadline(database)).resolves.toBeNull();
   });
 
-  test("restores a cold cattle session from a 20-day-old committed checkpoint", async () => {
-    const database = createConversationSessionDatabase("cattle");
-    await insertConversationSession(database, { status: "closed" });
-    await setWorkspaceCheckpointRequired(database, true);
-    await insertConversationBackup(database, {
-      createdAt: Date.now() - 20 * 24 * 60 * 60 * 1000,
-    });
-    let restoredBackup: { readonly dir: string; readonly id: string } | null = null;
-    const sandbox = createSandbox({
-      cwdHasContent: false,
-      onRestore: (backup) => {
-        restoredBackup = backup;
-      },
-    });
+  test.each(["true", "false"])(
+    "restores a cold session checkpoint from its configured bucket (local %s)",
+    async (localBucket) => {
+      const database = createConversationSessionDatabase("cattle");
+      await insertConversationSession(database, { status: "closed" });
+      await setWorkspaceCheckpointRequired(database, true);
+      await insertConversationBackup(database, {
+        createdAt: Date.now() - 20 * 24 * 60 * 60 * 1000,
+      });
+      let restoredBackup: { readonly dir: string; readonly id: string } | null = null;
+      const sandbox = createSandbox({
+        cwdHasContent: false,
+        onRestore: (backup) => {
+          restoredBackup = backup;
+        },
+      });
 
-    await ensureSandboxConversationSession(
-      createBindings(database),
-      createInput(sandbox, "cattle"),
-    );
+      await ensureSandboxConversationSession(
+        { ...createBindings(database), SANDBOX_FILE_BUCKET_LOCAL: localBucket },
+        createInput(sandbox, "cattle"),
+      );
 
-    expect(restoredBackup).toEqual({
-      dir: "/workspace/se/session-1",
-      id: CLOUDFLARE_BACKUP_ID,
-    });
-  });
+      expect(restoredBackup).toEqual({
+        dir: "/workspace/se/session-1",
+        id: CLOUDFLARE_BACKUP_ID,
+        localBucket: localBucket === "true",
+      });
+    },
+  );
 
   test("fails cold cattle continuation when its exact Thread checkpoint is missing", async () => {
     const database = createConversationSessionDatabase("cattle");
@@ -464,7 +559,7 @@ describe("ensureSandboxConversationSession", () => {
 
     await expect(
       ensureSandboxConversationSession(createBindings(database), createInput(sandbox, "cattle")),
-    ).rejects.toThrow("workspace checkpoint could not be restored. Retry the continuation");
+    ).rejects.toThrow("workspace checkpoint could not be restored. Retry this Thread");
   });
 
   test("restores recorded artifacts for a pre-rollout cattle Thread", async () => {
@@ -496,9 +591,10 @@ describe("ensureSandboxConversationSession", () => {
     expect(restoredPaths).toContain("/workspace/se/session-1/outputs/legacy.txt");
   });
 
-  test("continues a closed pet session through the stable restore path", async () => {
+  test("a legacy label cannot retain a closed execution handle or change the public Session", async () => {
     const database = createConversationSessionDatabase();
     await insertConversationSession(database, { status: "closed" });
+    await setWorkspaceCheckpointRequired(database, true);
     await insertConversationBackup(database);
     let restoredBackup: { readonly dir: string; readonly id: string } | null = null;
     const sandbox = createSandbox({
@@ -513,19 +609,24 @@ describe("ensureSandboxConversationSession", () => {
       createInput(sandbox, "pet"),
     );
 
-    expect(result.sandboxSessionId).toBe("01J00000000000000000000001");
+    expect(result.sandboxSessionId).not.toBe("01J00000000000000000000001");
+    expect(isPlatformId(result.sandboxSessionId)).toBe(true);
     expect(restoredBackup).toEqual({
       dir: "/workspace/se/session-1",
       id: CLOUDFLARE_BACKUP_ID,
+      localBucket: false,
     });
     await expect(readConversationSession(database)).resolves.toMatchObject({
-      cloudflare_session_id: "01J00000000000000000000001",
+      cloudflare_session_id: result.sandboxSessionId,
       status: "active",
     });
+    expect(
+      (await database.prepare("SELECT session_id FROM sandbox_session").all()).results,
+    ).toEqual([{ session_id: "session-1" }]);
   });
 });
 
-describe("closeIdleCattleConversationSession", () => {
+describe("closeIdleConversationSession", () => {
   test("arms subject reclamation when the remote session is already absent", async () => {
     const database = createConversationSessionDatabase("cattle");
     await insertConversationSession(database, { status: "active" });
@@ -537,7 +638,7 @@ describe("closeIdleCattleConversationSession", () => {
     const startedAt = Date.now();
 
     await expect(
-      closeIdleCattleConversationSession(createBindings(database, sandbox), {
+      closeIdleConversationSession(createBindings(database, sandbox), {
         idleSinceLte: 1,
         sandboxId: "01J0000000000000000000000D",
         sessionId: "session-1",

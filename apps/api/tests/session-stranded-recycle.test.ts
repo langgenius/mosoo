@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import { reconcileStaleActiveSessionRuns } from "../src/modules/runtime/application/session-runs/stale-run-reconciliation.service";
 import { RUNTIME_SOCKET_TIMEOUT_MS } from "../src/modules/runtime/domain/runtime-config";
-import { getRuntimeKindPolicy } from "../src/modules/runtime/domain/runtime-kind-policy";
+import { SESSION_RUNTIME_IDLE_GRACE_MS } from "../src/modules/runtime/domain/session-runtime-policy";
 import { cleanupDriverInstances } from "../src/modules/runtime/infrastructure/driver-instance/maintenance";
 import { repairStrandedRuntimeSubjectDeadlines } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-maintenance-store";
 import { listInactiveRuntimeSubjects } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-store";
@@ -10,6 +10,7 @@ import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import {
   createPublicHttpContractDatabase,
   insertNonOwnerSession,
+  PUBLIC_API_TEST_IDS as ids,
 } from "./helpers/public-api-http-test-fixture";
 import type { SqliteD1Database } from "./helpers/sqlite-d1";
 
@@ -18,7 +19,6 @@ const DRIVER_ID = "01J0000000000000000000000E";
 const RUN_ID = "01J0000000000000000000000N";
 const SESSION_ID = "01J0000000000000000000000B";
 const AGENT_ID = "01J00000000000000000000009";
-const PET_IDLE_GRACE_MS = getRuntimeKindPolicy("pet").subject.idleReleaseDelayMs;
 
 function createBindings(database: D1Database): ApiBindings {
   return { DB: database } as ApiBindings;
@@ -36,15 +36,15 @@ async function insertSandbox(
   await database
     .prepare(
       `
-        INSERT INTO sandbox (id, kind, subject_kind, subject_id, status, inactive_deadline_at, created_at, updated_at)
-        VALUES (?, ?, ?, ?, 'active', NULL, 1, 1)
+        INSERT INTO sandbox (id, kind, subject_kind, subject_id, project_id, owner_account_id, status, inactive_deadline_at, created_at, updated_at)
+        VALUES (?, ?, ?, ?, '${ids.project}', '${ids.ownerAccount}', 'active', NULL, 1, 1)
       `,
     )
     .bind(
       input.id ?? SANDBOX_ID,
       input.kind ?? "pet",
-      input.subjectKind ?? "agent",
-      input.subjectId ?? AGENT_ID,
+      input.subjectKind ?? "session",
+      input.subjectId ?? SESSION_ID,
     )
     .run();
 }
@@ -143,7 +143,7 @@ async function insertRun(
       "openai",
       "gpt-5.4",
       "openai-runtime",
-      "trace-pet-stranded",
+      "trace-session-stranded",
       input.driverInstanceId === undefined ? DRIVER_ID : input.driverInstanceId,
       1,
       1,
@@ -167,13 +167,10 @@ async function readSandboxDeadline(
   return row.inactive_deadline_at;
 }
 
-// Production chain YEF-1126: a pet driver heartbeat dies, maintenance fails the
-// driver and the run, but nothing re-arms the pet inactive deadline, so the
-// sandbox stays active (and billing) forever. These tests pin the repaired
-// chain: heartbeat timeout -> terminal failed run -> lease released ->
-// deadline armed -> recycle candidate.
-describe("pet stranded recycle", () => {
-  test("maintenance reclaim of a heartbeat-stale pet run arms the inactive deadline", async () => {
+// A dead Driver can leave an otherwise idle Session without an inactive
+// deadline. Repair must preserve resident or executing work.
+describe("Session stranded recycle", () => {
+  test("maintenance reclaim of a heartbeat-stale Session run arms the inactive deadline", async () => {
     const database = await createPublicHttpContractDatabase();
     await insertNonOwnerSession(database);
     const startMs = Date.now();
@@ -207,15 +204,15 @@ describe("pet stranded recycle", () => {
 
     const deadline = await readSandboxDeadline(database);
     expect(deadline).not.toBeNull();
-    expect(deadline).toBeGreaterThanOrEqual(startMs + PET_IDLE_GRACE_MS);
-    expect(deadline).toBeLessThanOrEqual(Date.now() + PET_IDLE_GRACE_MS);
+    expect(deadline).toBeGreaterThanOrEqual(startMs + SESSION_RUNTIME_IDLE_GRACE_MS);
+    expect(deadline).toBeLessThanOrEqual(Date.now() + SESSION_RUNTIME_IDLE_GRACE_MS);
 
     await expect(
       listInactiveRuntimeSubjects(database, { limit: 10, now: deadline ?? 0 }),
-    ).resolves.toEqual([{ id: SANDBOX_ID, kind: "pet" }]);
+    ).resolves.toEqual([{ id: SANDBOX_ID }]);
   });
 
-  test("repairs a stranded pet after the failed driver row was retention-deleted", async () => {
+  test("repairs a stranded Session after the failed driver row was retention-deleted", async () => {
     const database = await createPublicHttpContractDatabase();
     await insertNonOwnerSession(database);
     const startMs = Date.now();
@@ -225,55 +222,42 @@ describe("pet stranded recycle", () => {
     // sandbox. Only the defensive repair can arm the deadline now.
     await insertRun(database, { driverInstanceId: DRIVER_ID, status: "failed" });
 
-    await expect(
-      repairStrandedRuntimeSubjectDeadlines(database, { now: startMs }),
-    ).resolves.toEqual({ cattle: 0, pet: 1 });
+    await expect(repairStrandedRuntimeSubjectDeadlines(database, { now: startMs })).resolves.toBe(
+      1,
+    );
 
     const deadline = await readSandboxDeadline(database);
-    expect(deadline).toBe(startMs + PET_IDLE_GRACE_MS);
+    expect(deadline).toBe(startMs + SESSION_RUNTIME_IDLE_GRACE_MS);
 
     await expect(
-      listInactiveRuntimeSubjects(database, { limit: 10, now: startMs + PET_IDLE_GRACE_MS }),
-    ).resolves.toEqual([{ id: SANDBOX_ID, kind: "pet" }]);
+      listInactiveRuntimeSubjects(database, {
+        limit: 10,
+        now: startMs + SESSION_RUNTIME_IDLE_GRACE_MS,
+      }),
+    ).resolves.toEqual([{ id: SANDBOX_ID }]);
   });
 
-  test("leaves live, busy, and resident subjects alone", async () => {
+  test.each(["running", "resident", "shared"])("leaves a %s binding untouched", async (state) => {
     const database = await createPublicHttpContractDatabase();
     await insertNonOwnerSession(database);
-    const nowMs = Date.now();
-    // A pet with a live driver is not reclaimable.
-    await insertSandbox(database, { id: "01J0000000000000000000000V" });
-    await insertDriver(database, {
-      id: "01J0000000000000000000000W",
-      lastHeartbeatAt: nowMs,
-      sandboxId: "01J0000000000000000000000V",
-    });
-    // A pet whose subject still has an active run is not reclaimable, even
-    // when no driver row links the run to the sandbox yet.
-    await insertSandbox(database, {
-      id: "01J0000000000000000000000X",
-      subjectId: SESSION_ID,
-      subjectKind: "session",
-    });
-    await insertRun(database, { driverInstanceId: null, status: "queued" });
-    // A cattle subject with an active conversation stays resident.
-    await insertSandbox(database, { id: "01J0000000000000000000000Y", kind: "cattle" });
-    await database
-      .prepare(
-        `
-          INSERT INTO sandbox_session (cloudflare_session_id, created_at, cwd, origin_json, sandbox_id, session_id, status, updated_at)
-          VALUES ('cf-session-1', 1, '/workspace', '{}', '01J0000000000000000000000Y', '01J0000000000000000000000C', 'active', 1)
-        `,
-      )
-      .run();
-
-    await expect(repairStrandedRuntimeSubjectDeadlines(database, { now: nowMs })).resolves.toEqual({
-      cattle: 0,
-      pet: 0,
-    });
-
-    await expect(readSandboxDeadline(database, "01J0000000000000000000000V")).resolves.toBeNull();
-    await expect(readSandboxDeadline(database, "01J0000000000000000000000X")).resolves.toBeNull();
-    await expect(readSandboxDeadline(database, "01J0000000000000000000000Y")).resolves.toBeNull();
+    await insertSandbox(database);
+    if (state === "running") {
+      await insertRun(database, { driverInstanceId: null });
+    } else if (state === "resident") {
+      await database
+        .prepare(`INSERT INTO sandbox_session
+        (cloudflare_session_id, created_at, cwd, origin_json, sandbox_id, session_id, status, updated_at)
+        VALUES (?, 1, '/workspace', '{}', ?, ?, 'active', 1)`)
+        .bind(SESSION_ID, SANDBOX_ID, SESSION_ID)
+        .run();
+    } else {
+      await database
+        .prepare("UPDATE sandbox SET subject_kind = 'agent', subject_id = ?")
+        .bind(AGENT_ID)
+        .run();
+    }
+    const before = await database.prepare("SELECT * FROM sandbox").all();
+    expect(await repairStrandedRuntimeSubjectDeadlines(database, { now: Date.now() })).toBe(0);
+    expect(await database.prepare("SELECT * FROM sandbox").all()).toEqual(before);
   });
 });

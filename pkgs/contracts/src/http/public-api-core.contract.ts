@@ -1,5 +1,12 @@
 import { PLATFORM_ID_INPUT_PATTERN } from "@mosoo/id";
-import type { AgentId, FileId, PublicThreadId, RuntimeEventId, SessionRunId } from "@mosoo/id";
+import type {
+  AgentId,
+  FileId,
+  PublicThreadId,
+  RuntimeEventId,
+  SessionModelCallId,
+  SessionRunId,
+} from "@mosoo/id";
 
 import type { AgentKind } from "../agent/agent.contract";
 import { SINGLE_PUT_THRESHOLD_BYTES } from "../file/file.contract";
@@ -17,12 +24,44 @@ import type { JsonObject } from "../validation/primitives.contract";
 export const PUBLIC_API_PREFIX = "/api";
 export const PUBLIC_API_VERSION_PREFIX = "/v1";
 export const PUBLIC_API_VERSION = "v1";
+export type PublicApiVersion = "v1" | "v2";
+
+export type PublicThreadConfiguration =
+  | {
+      type: "inline";
+      harness: string;
+      provider: string;
+      model: string;
+      instructions: string;
+    }
+  | { type: "agent"; agent_id: AgentId };
+
+export interface PublicThreadUsageEntry {
+  id: SessionModelCallId;
+  runId: SessionRunId;
+  provider: string;
+  model: string;
+  status: "started" | "completed" | "failed";
+  inputTokens: number | null;
+  outputTokens: number | null;
+  cacheReadTokens: number | null;
+  cacheCreationTokens: number | null;
+  reportedCostUsd: number | null;
+  usageContract: string | null;
+}
+
+export interface PublicThreadUsageResponse {
+  usage: PublicThreadUsageEntry[];
+  nextCursor: SessionModelCallId | null;
+}
 export const PUBLIC_THREAD_INPUT_TEXT_MAX_LENGTH = 32_000;
 export const PUBLIC_THREAD_USER_ID_MAX_LENGTH = 255;
 export const PUBLIC_THREAD_FILE_ID_MAX_LENGTH = 26;
 export const PUBLIC_THREAD_FILE_UPLOAD_MAX_BYTES = SINGLE_PUT_THRESHOLD_BYTES;
 export const PUBLIC_THREAD_ID_PATTERN = PLATFORM_ID_INPUT_PATTERN;
 export const PUBLIC_THREAD_JSON_BODY_MAX_BYTES = PUBLIC_THREAD_INPUT_TEXT_MAX_LENGTH + 8192;
+export const PUBLIC_PROJECT_THREAD_JSON_BODY_MAX_BYTES =
+  2 * PUBLIC_THREAD_INPUT_TEXT_MAX_LENGTH + 8192;
 export const PUBLIC_THREAD_API_THREADS_MAX_LIMIT = 100;
 export const PUBLIC_THREAD_EVENTS_DEFAULT_LIMIT = 100;
 export const PUBLIC_THREAD_EVENTS_MAX_LIMIT = 1000;
@@ -139,47 +178,64 @@ export interface PublicThreadEventResult {
 
 export type PublicThreadStatus = "IDLE" | "RESCHEDULING" | "RUNNING" | "TERMINATED";
 
-export interface PublicThreadSummary {
-  agent_id: AgentId;
+interface PublicThreadSessionSummary<UserId extends string | null> {
+  agent_id: AgentId | null;
   created_at: string;
   id: PublicThreadId;
-  kind: AgentKind;
   last_run_id: SessionRunId | null;
   source: "api";
   status: PublicThreadStatus;
   title: string | null;
   updated_at: string;
-  userId: string;
+  userId: UserId;
 }
+
+/** Only v1 exposes the inert historical ownership label. */
+export type PublicThreadSummary<
+  UserId extends string | null = string,
+  Version extends PublicApiVersion = "v1",
+> = PublicThreadSessionSummary<UserId> & (Version extends "v1" ? { kind: AgentKind } : object);
 
 export interface PublicThreadLinks {
   thread: string;
 }
 
-export interface PublicThreadApiCreateThreadResponse {
+export interface PublicThreadApiCreateThreadResponse<
+  UserId extends string | null = string,
+  Version extends PublicApiVersion = "v1",
+> {
   links: PublicThreadLinks;
   run: PublicThreadRunSummary | null;
-  thread: PublicThreadSummary;
+  thread: PublicThreadSummary<UserId, Version>;
 }
 
-export interface PublicThreadApiRetrieveThreadResponse {
+export interface PublicThreadApiRetrieveThreadResponse<
+  UserId extends string | null = string,
+  Version extends PublicApiVersion = "v1",
+> {
   links: PublicThreadLinks;
   run: PublicThreadRunSummary | null;
-  thread: PublicThreadSummary;
+  thread: PublicThreadSummary<UserId, Version>;
 }
 
-export interface PublicThreadApiListThreadsResponse {
-  threads: PublicThreadSummary[];
+export interface PublicThreadApiListThreadsResponse<
+  UserId extends string | null = string,
+  Version extends PublicApiVersion = "v1",
+> {
+  threads: PublicThreadSummary<UserId, Version>[];
 }
 
 export interface PublicThreadApiSendEventsRequest {
   events: PublicThreadEventInput[];
 }
 
-export interface PublicThreadApiSendEventsResponse {
+export interface PublicThreadApiSendEventsResponse<
+  UserId extends string | null = string,
+  Version extends PublicApiVersion = "v1",
+> {
   acceptedAt: string;
   events: PublicThreadEventResult[];
-  thread: PublicThreadSummary;
+  thread: PublicThreadSummary<UserId, Version>;
   warnings: UserWarning[];
 }
 

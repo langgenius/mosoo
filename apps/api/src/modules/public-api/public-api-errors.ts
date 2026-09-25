@@ -1,4 +1,5 @@
 import type { PublicApiErrorCode } from "@mosoo/contracts/public-api";
+import { AgentSessionActionUnavailableError } from "@mosoo/session-policy";
 
 import { API_ERROR_CODE, isApiError } from "../../platform/errors";
 
@@ -28,6 +29,10 @@ export function toPublicApiError(error: unknown): PublicApiError | null {
     return error;
   }
 
+  if (error instanceof AgentSessionActionUnavailableError) {
+    return publicForbidden(error.message);
+  }
+
   if (!isApiError(error)) {
     return null;
   }
@@ -40,6 +45,7 @@ export function toPublicApiError(error: unknown): PublicApiError | null {
     case API_ERROR_CODE.notFound:
       return publicNotFound(error.message);
     case API_ERROR_CODE.sessionRunCheckpointPending:
+    case API_ERROR_CODE.sessionRunActive:
       return publicReadinessBlocked(error.message);
     case API_ERROR_CODE.sessionRunClientRequestDuplicate:
       return publicIdempotencyConflict(error.message);

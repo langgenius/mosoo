@@ -4,6 +4,7 @@ import {
 } from "@mosoo/contracts/public-api";
 import type {
   PublicApiErrorCode,
+  PublicApiVersion,
   PublicFileResponse,
   PublicThreadApiCreateThreadResponse,
   PublicThreadApiListThreadEventsResponse,
@@ -11,6 +12,7 @@ import type {
   PublicThreadApiSendEventsRequest,
   PublicThreadApiSendEventsResponse,
   PublicThreadEventLogEntry,
+  PublicThreadConfiguration,
   PublicThreadFinalOutput,
   PublicThreadRunStatus,
   PublicThreadRunSummary,
@@ -29,7 +31,7 @@ interface CreateThreadRequestBody {
     type: "user.message";
   };
   resources?: { file_id: string; type: "file" }[];
-  userId: string;
+  userId?: string;
 }
 
 interface SseMessage {
@@ -40,6 +42,7 @@ interface SseMessage {
 
 export interface MosooPublicThreadClientOptions {
   allowBrowserToken?: boolean;
+  apiVersion?: PublicApiVersion;
   baseUrl: string;
   fetch?: MosooPublicApiFetch;
   pollIntervalMs?: number;
@@ -55,11 +58,25 @@ export interface MosooCreateThreadInput {
   userId: string;
 }
 
+export interface MosooCreateProjectThreadInput {
+  projectId: string;
+  configuration: PublicThreadConfiguration;
+  fileIds?: string[];
+  idempotencyKey?: string;
+  input?: string;
+  signal?: AbortSignal | undefined;
+  userId?: string;
+}
+
 export interface MosooUploadAgentFileInput {
   agentId: string;
   file: Blob;
   filename?: string | undefined;
   signal?: AbortSignal | undefined;
+}
+
+export interface MosooUploadProjectFileInput extends Omit<MosooUploadAgentFileInput, "agentId"> {
+  projectId: string;
 }
 
 export interface MosooSendEventsInput {
@@ -86,28 +103,31 @@ export interface MosooWaitForRunInput {
   timeoutMs?: number;
 }
 
-export interface MosooCreateThreadAndWaitInput extends MosooCreateThreadInput {
+export type MosooCreateThreadAndWaitInput = (
+  | MosooCreateThreadInput
+  | MosooCreateProjectThreadInput
+) & {
   eventLimit?: number;
   pollIntervalMs?: number;
   timeoutMs?: number;
   throwOnFailedRun?: boolean;
-}
+};
 
 export interface MosooPublicThreadWaitResult {
   events: PublicThreadEventLogEntry[];
   finalOutput: PublicThreadFinalOutput | null;
   run: PublicThreadRunSummary;
-  thread: PublicThreadSummary;
+  thread: PublicThreadSummary<string | null, PublicApiVersion>;
   truncated: boolean;
 }
 
-export interface MosooCreateThreadAndWaitFinalOutputInput extends MosooCreateThreadAndWaitInput {
+export type MosooCreateThreadAndWaitFinalOutputInput = MosooCreateThreadAndWaitInput & {
   throwOnFailedRun?: true;
-}
+};
 
-export interface MosooCreateThreadAndWaitTerminalInput extends MosooCreateThreadAndWaitInput {
+export type MosooCreateThreadAndWaitTerminalInput = MosooCreateThreadAndWaitInput & {
   throwOnFailedRun: false;
-}
+};
 
 export type MosooPublicThreadUnsuccessfulTerminalStatus = Exclude<
   PublicThreadRunTerminalStatus,
@@ -127,7 +147,7 @@ export interface MosooPublicThreadFinalOutputResult {
   events: PublicThreadEventLogEntry[];
   finalOutput: PublicThreadFinalOutput;
   run: MosooPublicThreadCompletedRunSummary;
-  thread: PublicThreadSummary;
+  thread: PublicThreadSummary<string | null, PublicApiVersion>;
   truncated: boolean;
 }
 
@@ -135,7 +155,7 @@ export interface MosooPublicThreadTerminalRunErrorInput {
   events: PublicThreadEventLogEntry[];
   finalOutput: PublicThreadFinalOutput | null;
   run: MosooPublicThreadUnsuccessfulRunSummary;
-  thread: PublicThreadSummary;
+  thread: PublicThreadSummary<string | null, PublicApiVersion>;
   truncated: boolean;
 }
 
@@ -180,7 +200,7 @@ export class MosooPublicThreadTerminalRunError extends Error {
   readonly finalOutput: PublicThreadFinalOutput | null;
   readonly run: MosooPublicThreadUnsuccessfulRunSummary;
   readonly runStatus: MosooPublicThreadUnsuccessfulTerminalStatus;
-  readonly thread: PublicThreadSummary;
+  readonly thread: PublicThreadSummary<string | null, PublicApiVersion>;
   readonly truncated: boolean;
 
   constructor(input: MosooPublicThreadTerminalRunErrorInput) {
@@ -203,16 +223,20 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function normalizePublicApiBaseUrl(baseUrl: string): string {
+function normalizePublicApiBaseUrl(baseUrl: string, apiVersion?: PublicApiVersion): string {
   const url = new URL(baseUrl);
   const pathname = url.pathname.replace(/\/+$/, "");
-
-  if (pathname.endsWith("/api/v1")) {
+  const explicitVersion = /\/api\/(v1|v2)$/.exec(pathname)?.[1];
+  if (explicitVersion !== undefined && apiVersion !== undefined && explicitVersion !== apiVersion) {
+    throw new Error("baseUrl and apiVersion must select the same Public API version.");
+  }
+  const version = apiVersion ?? explicitVersion ?? "v1";
+  if (explicitVersion !== undefined) {
     url.pathname = pathname;
   } else if (pathname.endsWith("/api")) {
-    url.pathname = `${pathname}/v1`;
+    url.pathname = `${pathname}/${version}`;
   } else {
-    url.pathname = `${pathname}/api/v1`;
+    url.pathname = `${pathname}/api/${version}`;
   }
 
   url.hash = "";
@@ -225,8 +249,11 @@ function isBrowserLikeRuntime(): boolean {
   return typeof window === "object" && typeof document === "object";
 }
 
-function createCreateThreadBody(input: MosooCreateThreadInput): CreateThreadRequestBody {
-  const body: CreateThreadRequestBody = { userId: input.userId };
+function createCreateThreadBody(
+  input: MosooCreateThreadInput | MosooCreateProjectThreadInput,
+): CreateThreadRequestBody {
+  const body: CreateThreadRequestBody = {};
+  if (input.userId !== undefined) body.userId = input.userId;
 
   if (input.fileIds !== undefined && input.fileIds.length > 0) {
     body.resources = input.fileIds.map((fileId) => ({ file_id: fileId, type: "file" }));
@@ -499,13 +526,15 @@ export class MosooPublicThreadClient {
       throw new Error("MosooPublicThreadClient requires a fetch implementation.");
     }
 
-    this.apiBaseUrl = normalizePublicApiBaseUrl(options.baseUrl);
+    this.apiBaseUrl = normalizePublicApiBaseUrl(options.baseUrl, options.apiVersion);
     this.fetchImpl = fetchImpl.bind(globalThis);
     this.pollIntervalMs = options.pollIntervalMs ?? 1_000;
     this.token = options.token;
   }
 
-  async createThread(input: MosooCreateThreadInput): Promise<PublicThreadApiCreateThreadResponse> {
+  async createThread(
+    input: MosooCreateThreadInput,
+  ): Promise<PublicThreadApiCreateThreadResponse<string | null, PublicApiVersion>> {
     return this.requestJson("POST", `/agents/${input.agentId}/threads`, {
       body: createCreateThreadBody(input),
       idempotencyKey: input.idempotencyKey,
@@ -514,7 +543,34 @@ export class MosooPublicThreadClient {
     });
   }
 
+  async createProjectThread(
+    input: MosooCreateProjectThreadInput,
+  ): Promise<PublicThreadApiCreateThreadResponse<string | null, "v2">> {
+    this.requireV2();
+    return this.requestJson("POST", `/projects/${encodeURIComponent(input.projectId)}/threads`, {
+      body: {
+        ...createCreateThreadBody(input),
+        configuration: input.configuration,
+      },
+      idempotencyKey: input.idempotencyKey,
+      signal: input.signal,
+      status: 201,
+    });
+  }
+
   async uploadAgentFile(input: MosooUploadAgentFileInput): Promise<PublicFileResponse> {
+    return this.uploadFile(`/agents/${encodeURIComponent(input.agentId)}/files`, input);
+  }
+
+  async uploadProjectFile(input: MosooUploadProjectFileInput): Promise<PublicFileResponse> {
+    this.requireV2();
+    return this.uploadFile(`/projects/${encodeURIComponent(input.projectId)}/files`, input);
+  }
+
+  private async uploadFile(
+    path: string,
+    input: Omit<MosooUploadAgentFileInput, "agentId">,
+  ): Promise<PublicFileResponse> {
     const formData = new FormData();
 
     if (input.filename === undefined) {
@@ -523,7 +579,7 @@ export class MosooPublicThreadClient {
       formData.append("file", input.file, input.filename);
     }
 
-    return this.requestJson("POST", `/agents/${input.agentId}/files`, {
+    return this.requestJson("POST", path, {
       body: formData,
       signal: input.signal,
       status: 201,
@@ -533,16 +589,20 @@ export class MosooPublicThreadClient {
   async retrieveThread(
     threadId: string,
     options: { signal?: AbortSignal | undefined } = {},
-  ): Promise<PublicThreadApiRetrieveThreadResponse> {
+  ): Promise<PublicThreadApiRetrieveThreadResponse<string | null, PublicApiVersion>> {
     return this.requestJson("GET", `/threads/${threadId}`, {
       signal: options.signal,
       status: 200,
     });
   }
 
-  async sendEvents(input: MosooSendEventsInput): Promise<PublicThreadApiSendEventsResponse> {
+  async sendEvents(
+    input: MosooSendEventsInput,
+  ): Promise<PublicThreadApiSendEventsResponse<string | null, PublicApiVersion>> {
     return this.requestJson("POST", `/threads/${input.threadId}/events`, {
-      body: { events: input.events },
+      body: {
+        events: input.events,
+      },
       idempotencyKey: input.idempotencyKey,
       signal: input.signal,
       status: 200,
@@ -696,7 +756,8 @@ export class MosooPublicThreadClient {
   async createThreadAndWait(
     input: MosooCreateThreadAndWaitInput,
   ): Promise<MosooPublicThreadWaitResult | MosooPublicThreadFinalOutputResult> {
-    const created = await this.createThread(input);
+    const created =
+      "projectId" in input ? await this.createProjectThread(input) : await this.createThread(input);
 
     if (created.run === null) {
       throw new Error("createThreadAndWait requires input that starts a Run.");
@@ -734,6 +795,14 @@ export class MosooPublicThreadClient {
 
   private url(path: string): URL {
     return new URL(`${this.apiBaseUrl}${path}`);
+  }
+
+  private requireV2(): void {
+    if (!this.apiBaseUrl.endsWith("/api/v2")) {
+      throw new Error(
+        "Project Session creation and Project file upload require Public API v2. Set apiVersion to v2.",
+      );
+    }
   }
 
   private async requestJson<T>(

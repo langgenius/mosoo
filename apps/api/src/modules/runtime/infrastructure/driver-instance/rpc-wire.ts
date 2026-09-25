@@ -1,3 +1,4 @@
+import { DRIVER_PROTOCOL_VERSION } from "@mosoo/agent-driver/boot";
 import { parseDriverEventEnvelope } from "@mosoo/agent-driver/events";
 import type {
   DriverCommandUpdateInput,
@@ -36,7 +37,7 @@ const DriverHelloInputWire = type({
   capabilities: DriverCapability.array(),
   driverVersion: NonEmptyString,
   pid: "number",
-  protocolVersion: "2",
+  protocolVersion: type.unit(DRIVER_PROTOCOL_VERSION),
   runtime: '"openai-runtime" | "claude-agent-sdk" | "acp-fallback"',
   startedAt: "string",
 });

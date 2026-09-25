@@ -1,4 +1,4 @@
-import type { AgentKind } from "@mosoo/contracts/agent";
+import type { PublicApiVersion } from "@mosoo/contracts/public-api";
 import type {
   PublicThreadApiSendEventsResponse,
   PublicThreadFinalOutput,
@@ -9,17 +9,16 @@ import type {
 import type { AgentSessionEventBatch, SessionSummary } from "@mosoo/contracts/session";
 import type { SessionStatus } from "@mosoo/contracts/session";
 import type { SessionRunSummary } from "@mosoo/contracts/session-run";
-import { parsePlatformId } from "@mosoo/id";
+import { parseNullablePlatformId, parsePlatformId } from "@mosoo/id";
 import type { AgentId, PublicThreadId, SessionRunId } from "@mosoo/id";
 
 import { toPublicThreadId } from "./public-thread-ids";
 
 export interface PublicThreadSessionProjection {
-  agentId: AgentId;
+  agentId: AgentId | null;
   archivedAt: string | null;
   createdAt: string;
   id: PublicThreadId;
-  kind: AgentKind;
   lastMessageAt?: string | null;
   lastRun: PublicThreadRunSummary | null;
   status: SessionStatus;
@@ -77,11 +76,10 @@ export function toPublicThreadSessionSummary(
   session: SessionSummary,
 ): PublicThreadSessionProjection {
   return {
-    agentId: parsePlatformId(session.agentId, "Agent ID") as AgentId,
+    agentId: parseNullablePlatformId<AgentId>(session.agentId, "Agent ID"),
     archivedAt: session.archivedAt,
     createdAt: session.createdAt,
     id: toPublicThreadId(session.id),
-    kind: session.kind,
     lastRun: toPublicThreadRunSummary(session.lastRun),
     status: session.status,
     title: session.title,
@@ -90,10 +88,10 @@ export function toPublicThreadSessionSummary(
   };
 }
 
-export function toPublicThreadEventBatch(input: {
+export function toPublicThreadEventBatch<UserId extends string | null>(input: {
   batch: AgentSessionEventBatch;
-  thread: PublicThreadSummary;
-}): PublicThreadApiSendEventsResponse {
+  thread: PublicThreadSummary<UserId, PublicApiVersion>;
+}): PublicThreadApiSendEventsResponse<UserId, PublicApiVersion> {
   return {
     acceptedAt: input.batch.acceptedAt,
     events: input.batch.events.map((event) => ({

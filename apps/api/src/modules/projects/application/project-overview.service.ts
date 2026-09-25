@@ -47,7 +47,6 @@ function toOverviewAgent(row: AgentRow): ProjectOverviewAgent {
     projectId: row.projectId,
     description: row.description,
     id: row.id,
-    kind: row.kind,
     model: runtimeModel.model,
     name: row.name,
     provider: runtimeModel.provider,

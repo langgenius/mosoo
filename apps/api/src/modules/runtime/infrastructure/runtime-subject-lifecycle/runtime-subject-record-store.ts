@@ -1,6 +1,5 @@
-import type { AgentKind } from "@mosoo/contracts/agent";
 import type { RuntimeSubjectErrorCode, SandboxSubjectKind } from "@mosoo/contracts/sandbox";
-import { sandboxesTable } from "@mosoo/db";
+import { projectsTable, sandboxesTable, sandboxSessionsTable, sessionsTable } from "@mosoo/db";
 import { createPlatformId } from "@mosoo/id";
 import type {
   AccountId,
@@ -8,8 +7,8 @@ import type {
   PlatformId,
   ProjectId,
   RuntimeOperationId,
-  SandboxBackupId,
   SandboxId,
+  SessionId,
 } from "@mosoo/id";
 import { and, asc, eq, inArray, isNull, lte, notExists, or, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
@@ -18,21 +17,16 @@ import { sandboxBindingForRuntime } from "../../../../platform/cloudflare/sandbo
 import { getAppDatabase, getD1ChangeCount } from "../../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../../time";
 import {
-  getRuntimeKindPolicy,
-  getRuntimeSubjectInactiveDeadline,
-} from "../../domain/runtime-kind-policy";
-import {
   RUNTIME_SUBJECT_CLAIMABLE_STATUSES,
   toRuntimeSubjectStatusLifecycleEventName,
 } from "../../domain/runtime-subject-lifecycle.machine";
 import type { RuntimeSubjectOperationStatus } from "../../domain/runtime-subject-lifecycle.machine";
+import { getRuntimeSubjectInactiveDeadline } from "../../domain/session-runtime-policy";
 import {
+  activeConversationSessionQueryForListedSubject,
   activeSessionRunQueryForListedSubject,
-  lastBackupTable,
+  exclusiveSessionRuntimeSubjectPredicate,
   liveDriverInstanceQueryForListedSubject,
-  mapRuntimeSubjectBackup,
-  mapReadyRuntimeSubjectBackup,
-  readyLastBackupTable,
   runLeaseQuery,
   runLeaseQueryForListedSubject,
 } from "./runtime-subject-store-queries";
@@ -44,10 +38,42 @@ import type {
 } from "./runtime-subject-store.types";
 
 interface RuntimeSubjectQuotaScope {
-  readonly agentId: AgentId;
+  readonly agentId: AgentId | null;
   readonly projectId: ProjectId;
   readonly executionOwnerUserId: AccountId;
+  readonly sessionId: SessionId;
 }
+
+export interface SessionRuntimeSubjectBinding {
+  readonly ownerAccountId: AccountId | null;
+  readonly projectId: ProjectId | null;
+  readonly subjectId: PlatformId;
+  readonly subjectKind: SandboxSubjectKind;
+  readonly foreignSessionCount: number;
+}
+
+export function assertSessionRuntimeSubjectBinding(
+  record: SessionRuntimeSubjectBinding,
+  input: Pick<RuntimeSubjectQuotaScope, "executionOwnerUserId" | "projectId" | "sessionId">,
+): void {
+  if (
+    record.subjectKind !== "session" ||
+    record.subjectId !== input.sessionId ||
+    record.projectId !== input.projectId ||
+    record.ownerAccountId !== input.executionOwnerUserId ||
+    record.foreignSessionCount !== 0
+  ) {
+    throw new Error("Session does not have a verified exclusive execution binding.");
+  }
+}
+
+const sessionBindingColumns = {
+  ownerAccountId: sandboxesTable.ownerAccountId,
+  projectId: sandboxesTable.projectId,
+  subjectId: sandboxesTable.subjectId,
+  subjectKind: sandboxesTable.subjectKind,
+  foreignSessionCount: sql<number>`(SELECT COUNT(*) FROM sandbox_session AS peer WHERE peer.sandbox_id = ${sandboxesTable.id} AND peer.session_id <> ${sandboxesTable.subjectId})`,
+};
 
 function runtimeSubjectAccountCapacityPredicate(input: {
   readonly accountConcurrentSandboxLimit: number;
@@ -114,7 +140,6 @@ export async function getRuntimeSubject(
       .select({
         id: sandboxesTable.id,
         sandboxBinding: sandboxesTable.sandboxBinding,
-        kind: sandboxesTable.kind,
         status: sandboxesTable.status,
         subjectKind: sandboxesTable.subjectKind,
       })
@@ -128,61 +153,77 @@ export async function getRuntimeSubject(
 
 async function findRuntimeSubjectAllocation(
   database: D1Database,
-  input: {
-    readonly kind: AgentKind;
-    readonly subjectId: PlatformId;
-    readonly subjectKind: SandboxSubjectKind;
-  },
+  input: RuntimeSubjectQuotaScope & { readonly runtimeSubjectId?: SandboxId },
+  boundSandboxId: SandboxId | null,
 ): Promise<{ id: SandboxId; sandboxBinding: string } | null> {
-  const row =
-    (await getAppDatabase(database)
-      .select({ id: sandboxesTable.id, sandboxBinding: sandboxesTable.sandboxBinding })
-      .from(sandboxesTable)
-      .where(
+  const rows = await getAppDatabase(database)
+    .select({
+      id: sandboxesTable.id,
+      sandboxBinding: sandboxesTable.sandboxBinding,
+      ...sessionBindingColumns,
+    })
+    .from(sandboxesTable)
+    .where(
+      or(
         and(
-          eq(sandboxesTable.kind, input.kind),
-          eq(sandboxesTable.subjectKind, input.subjectKind),
-          eq(sandboxesTable.subjectId, input.subjectId),
+          eq(sandboxesTable.subjectKind, "session"),
+          eq(sandboxesTable.subjectId, input.sessionId),
         ),
-      )
-      .limit(1)
-      .get()) ?? null;
-
+        ...(boundSandboxId === null ? [] : [eq(sandboxesTable.id, boundSandboxId)]),
+        ...(input.runtimeSubjectId === undefined
+          ? []
+          : [eq(sandboxesTable.id, input.runtimeSubjectId)]),
+      ),
+    )
+    .limit(2)
+    .all();
+  if (rows.length > 1) throw new Error("Session execution binding is ambiguous.");
+  const row = rows[0];
+  if (row === undefined) {
+    if (boundSandboxId !== null)
+      throw new Error("Session execution binding has no recorded resource.");
+    return null;
+  }
+  if (boundSandboxId !== null && row.id !== boundSandboxId) {
+    throw new Error("Session execution binding changed before allocation.");
+  }
+  assertSessionRuntimeSubjectBinding(row, input);
+  if (input.runtimeSubjectId !== undefined && row.id !== input.runtimeSubjectId) {
+    throw new Error("Session execution binding changed before allocation.");
+  }
   return row;
-}
-
-export async function getRuntimeSubjectIdByTuple(
-  database: D1Database,
-  input: {
-    readonly kind: AgentKind;
-    readonly subjectId: PlatformId;
-    readonly subjectKind: SandboxSubjectKind;
-  },
-): Promise<SandboxId | null> {
-  return (await findRuntimeSubjectAllocation(database, input))?.id ?? null;
 }
 
 export async function ensureRuntimeSubjectId(
   database: D1Database,
   input: {
-    readonly agentId: AgentId;
+    readonly agentId: AgentId | null;
     readonly projectId: ProjectId;
     readonly executionOwnerUserId: AccountId;
-    readonly kind: AgentKind;
     readonly runtimeId: string;
     readonly runtimeImagesEnabled?: boolean;
     readonly now?: number;
     readonly runtimeSubjectId?: SandboxId;
-    readonly subjectId: PlatformId;
-    readonly subjectKind: SandboxSubjectKind;
+    readonly sessionId: SessionId;
   },
 ): Promise<SandboxId> {
-  // Pet workspaces can serve Sessions with different frozen runtimes after
-  // draft edits or unpublishing. Their union image preserves that capability.
+  const authority = await getAppDatabase(database)
+    .select({ id: sessionsTable.id, sandboxId: sandboxSessionsTable.sandboxId })
+    .from(sessionsTable)
+    .leftJoin(sandboxSessionsTable, eq(sandboxSessionsTable.sessionId, sessionsTable.id))
+    .innerJoin(projectsTable, eq(projectsTable.id, sessionsTable.projectId))
+    .where(
+      and(
+        eq(sessionsTable.id, input.sessionId),
+        eq(sessionsTable.projectId, input.projectId),
+        eq(projectsTable.ownerAccountId, input.executionOwnerUserId),
+      ),
+    )
+    .get();
+  if (!authority) throw new Error("Session execution authority is unavailable.");
   const expectedBinding = sandboxBindingForRuntime(input.runtimeId);
-  const sandboxBinding =
-    input.kind === "pet" || input.runtimeImagesEnabled !== true ? "Sandbox" : expectedBinding;
-  const existing = await findRuntimeSubjectAllocation(database, input);
+  const sandboxBinding = input.runtimeImagesEnabled === true ? expectedBinding : "Sandbox";
+  const existing = await findRuntimeSubjectAllocation(database, input, authority.sandboxId);
 
   if (existing !== null) {
     assertRuntimeSubjectImage(existing.sandboxBinding, expectedBinding);
@@ -203,8 +244,8 @@ export async function ensureRuntimeSubjectId(
       globalMountsJson: "[]",
       id: runtimeSubjectId,
       sandboxBinding,
-      inactiveDeadlineAt: getRuntimeSubjectInactiveDeadline(getRuntimeKindPolicy(input.kind), now),
-      kind: input.kind,
+      inactiveDeadlineAt: getRuntimeSubjectInactiveDeadline(now),
+      kind: "cattle",
       ownerAccountId: input.executionOwnerUserId,
       status: "cold",
       statusChangedAt: now,
@@ -212,8 +253,8 @@ export async function ensureRuntimeSubjectId(
       statusOperationId: null,
       statusSeq: 0,
       statusSource: "api",
-      subjectId: input.subjectId,
-      subjectKind: input.subjectKind,
+      subjectId: input.sessionId,
+      subjectKind: "session",
       updatedAt: now,
     })
     .onConflictDoNothing()
@@ -223,7 +264,11 @@ export async function ensureRuntimeSubjectId(
     return runtimeSubjectId;
   }
 
-  const createdByConcurrentRequest = await findRuntimeSubjectAllocation(database, input);
+  const createdByConcurrentRequest = await findRuntimeSubjectAllocation(
+    database,
+    input,
+    authority.sandboxId,
+  );
 
   if (createdByConcurrentRequest === null) {
     throw new Error("Runtime subject could not be allocated.");
@@ -243,64 +288,21 @@ export async function getRuntimeSubjectActivationRecord(
   database: D1Database,
   runtimeSubjectId: SandboxId,
 ): Promise<RuntimeSubjectActivationRecord | null> {
-  const row =
+  return (
     (await getAppDatabase(database)
       .select({
         claimExpiresAt: sandboxesTable.claimExpiresAt,
         claimOwner: sandboxesTable.claimOwner,
         id: sandboxesTable.id,
-        kind: sandboxesTable.kind,
+        ...sessionBindingColumns,
         lastError: sandboxesTable.lastError,
         lastErrorCode: sandboxesTable.lastErrorCode,
-        lastBackupDir: lastBackupTable.dir,
-        lastBackupId: lastBackupTable.id,
-        lastBackupStatus: lastBackupTable.status,
-        lastReadyBackupDir: readyLastBackupTable.dir,
-        lastReadyBackupId: readyLastBackupTable.id,
         status: sandboxesTable.status,
       })
       .from(sandboxesTable)
-      .leftJoin(
-        lastBackupTable,
-        and(
-          eq(lastBackupTable.id, sandboxesTable.lastBackupId),
-          eq(lastBackupTable.sandboxId, sandboxesTable.id),
-        ),
-      )
-      .leftJoin(
-        readyLastBackupTable,
-        and(
-          eq(readyLastBackupTable.id, sandboxesTable.lastBackupId),
-          eq(readyLastBackupTable.sandboxId, sandboxesTable.id),
-          eq(readyLastBackupTable.status, "ready"),
-        ),
-      )
       .where(eq(sandboxesTable.id, runtimeSubjectId))
-      .limit(1)
-      .get()) ?? null;
-
-  if (!row) {
-    return null;
-  }
-
-  return {
-    claimExpiresAt: row.claimExpiresAt,
-    claimOwner: row.claimOwner,
-    id: row.id,
-    kind: row.kind,
-    lastError: row.lastError,
-    lastErrorCode: row.lastErrorCode,
-    lastBackup: mapRuntimeSubjectBackup({
-      dir: row.lastBackupDir,
-      id: row.lastBackupId,
-      status: row.lastBackupStatus,
-    }),
-    lastReadyBackup: mapReadyRuntimeSubjectBackup({
-      dir: row.lastReadyBackupDir,
-      id: row.lastReadyBackupId,
-    }),
-    status: row.status,
-  };
+      .get()) ?? null
+  );
 }
 
 export async function claimRuntimeSubjectActivation(
@@ -318,16 +320,19 @@ export async function claimRuntimeSubjectActivation(
     (await getAppDatabase(database)
       .update(sandboxesTable)
       .set({
-        agentId: input.agentId,
-        projectId: input.projectId,
         claimExpiresAt: input.claimExpiresAt,
         claimOwner: input.claimOwner,
-        ownerAccountId: input.executionOwnerUserId,
         updatedAt: input.now,
       })
       .where(
         and(
           eq(sandboxesTable.id, input.runtimeSubjectId),
+          eq(sandboxesTable.projectId, input.projectId),
+          eq(sandboxesTable.ownerAccountId, input.executionOwnerUserId),
+          eq(sandboxesTable.subjectKind, "session"),
+          eq(sandboxesTable.subjectId, input.sessionId),
+          eq(sessionBindingColumns.foreignSessionCount, 0),
+          exclusiveSessionRuntimeSubjectPredicate(),
           eq(sandboxesTable.status, input.expectedStatus),
           inArray(sandboxesTable.status, RUNTIME_SUBJECT_CLAIMABLE_STATUSES),
           or(
@@ -348,7 +353,7 @@ export async function claimRuntimeSubjectActivation(
 
 export async function preemptRuntimeSubjectActivationClaim(
   database: D1Database,
-  input: {
+  input: RuntimeSubjectQuotaScope & {
     readonly claimExpiresAt: number;
     readonly claimOwner: string;
     readonly expectedClaimExpiresAt: number;
@@ -369,6 +374,12 @@ export async function preemptRuntimeSubjectActivationClaim(
       .where(
         and(
           eq(sandboxesTable.id, input.runtimeSubjectId),
+          eq(sandboxesTable.projectId, input.projectId),
+          eq(sandboxesTable.ownerAccountId, input.executionOwnerUserId),
+          eq(sandboxesTable.subjectKind, "session"),
+          eq(sandboxesTable.subjectId, input.sessionId),
+          eq(sessionBindingColumns.foreignSessionCount, 0),
+          exclusiveSessionRuntimeSubjectPredicate(),
           eq(sandboxesTable.status, input.expectedStatus),
           inArray(sandboxesTable.status, RUNTIME_SUBJECT_CLAIMABLE_STATUSES),
           eq(sandboxesTable.claimOwner, input.expectedClaimOwner),
@@ -413,34 +424,10 @@ export async function markRuntimeSubjectRestoring(
   return getD1ChangeCount(result) > 0;
 }
 
-export async function markRuntimeSubjectRestoreApplied(
-  database: D1Database,
-  input: {
-    readonly backupId: SandboxBackupId;
-    readonly claimOwner: string;
-    readonly runtimeSubjectId: SandboxId;
-  },
-): Promise<void> {
-  await getAppDatabase(database)
-    .update(sandboxesTable)
-    .set({
-      lastRestoreBackupId: input.backupId,
-      updatedAt: currentTimestampMs(),
-    })
-    .where(
-      and(
-        eq(sandboxesTable.id, input.runtimeSubjectId),
-        eq(sandboxesTable.claimOwner, input.claimOwner),
-      ),
-    )
-    .run();
-}
-
 export async function markRuntimeSubjectActive(
   database: D1Database,
   input: {
     readonly claimOwner: string;
-    readonly kind: AgentKind;
     readonly runtimeSubjectId: SandboxId;
   },
 ): Promise<boolean> {
@@ -452,7 +439,7 @@ export async function markRuntimeSubjectActive(
       claimExpiresAt: null,
       claimOwner: null,
       globalMountsJson: "[]",
-      inactiveDeadlineAt: getRuntimeSubjectInactiveDeadline(getRuntimeKindPolicy(input.kind), now),
+      inactiveDeadlineAt: getRuntimeSubjectInactiveDeadline(now),
       lastError: null,
       lastErrorCode: null,
       status: "active",
@@ -514,7 +501,7 @@ export async function claimExpiredRuntimeSubjectActivations(
     notExists(runLeaseQueryForListedSubject(appDb)),
   );
   const candidates = await appDb
-    .select({ id: sandboxesTable.id, kind: sandboxesTable.kind, seq: sandboxesTable.statusSeq })
+    .select({ id: sandboxesTable.id, seq: sandboxesTable.statusSeq })
     .from(sandboxesTable)
     .where(eligible)
     .orderBy(asc(sandboxesTable.id))
@@ -541,6 +528,7 @@ export async function claimExpiredRuntimeSubjectActivations(
       })
       .where(
         and(
+          exclusiveSessionRuntimeSubjectPredicate(),
           eligible,
           eq(sandboxesTable.id, candidate.id),
           eq(sandboxesTable.statusSeq, candidate.seq),
@@ -548,7 +536,7 @@ export async function claimExpiredRuntimeSubjectActivations(
       )
       .run();
     if (getD1ChangeCount(result) > 0) {
-      claimed.push({ id: candidate.id, kind: candidate.kind, operationId, status: "destroying" });
+      claimed.push({ id: candidate.id, operationId, status: "destroying" });
     }
   }
   return claimed;
@@ -671,11 +659,13 @@ export async function markRuntimeSubjectOperationStarted(
     })
     .where(
       and(
+        exclusiveSessionRuntimeSubjectPredicate(),
         eq(sandboxesTable.id, input.runtimeSubjectId),
         inArray(sandboxesTable.status, RUNTIME_SUBJECT_CLAIMABLE_STATUSES),
         claimPredicate,
         ...(input.source === "maintenance"
           ? [
+              notExists(activeConversationSessionQueryForListedSubject(appDb)),
               notExists(activeSessionRunQueryForListedSubject(appDb)),
               notExists(runLeaseQuery(appDb, input.runtimeSubjectId)),
             ]
@@ -710,6 +700,7 @@ export async function advanceRuntimeSubjectOperationStatus(
     })
     .where(
       and(
+        exclusiveSessionRuntimeSubjectPredicate(),
         eq(sandboxesTable.id, input.runtimeSubjectId),
         eq(sandboxesTable.status, input.expectedStatus),
         ...runtimeSubjectStatusOperationCondition(input.operationId),
@@ -794,6 +785,7 @@ export async function markRuntimeSubjectOperationRepairNeeded(
     })
     .where(
       and(
+        exclusiveSessionRuntimeSubjectPredicate(),
         eq(sandboxesTable.id, input.runtimeSubjectId),
         eq(sandboxesTable.status, input.expectedStatus),
         eq(sandboxesTable.statusOperationId, input.operationId),
@@ -845,4 +837,31 @@ export async function markRuntimeSubjectFailed(
     .run();
 
   return getD1ChangeCount(result) > 0;
+}
+
+export async function assertExclusiveSessionRuntimeSubject(
+  database: D1Database,
+  runtimeSubjectId: SandboxId,
+  operation?: {
+    readonly id: RuntimeOperationId | null;
+    readonly status: RuntimeSubjectOperationStatus;
+  },
+): Promise<void> {
+  const record = await getAppDatabase(database)
+    .select({ id: sandboxesTable.id })
+    .from(sandboxesTable)
+    .where(
+      and(
+        eq(sandboxesTable.id, runtimeSubjectId),
+        exclusiveSessionRuntimeSubjectPredicate(),
+        ...(operation === undefined
+          ? []
+          : [
+              eq(sandboxesTable.status, operation.status),
+              ...runtimeSubjectStatusOperationCondition(operation.id),
+            ]),
+      ),
+    )
+    .get();
+  if (!record) throw new Error("Session does not have a verified exclusive execution binding.");
 }

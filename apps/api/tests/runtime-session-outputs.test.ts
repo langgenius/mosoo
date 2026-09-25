@@ -11,6 +11,10 @@ import {
   readRuntimeSessionOutputListing,
   toRuntimeSessionOutputFile,
 } from "../src/modules/runtime/infrastructure/driver-instance/runtime-session-outputs";
+import {
+  recordDriverInstanceCompletion,
+  recordDriverInstanceFailure,
+} from "../src/modules/runtime/infrastructure/driver-instance/terminal-driver-events";
 import type { SandboxHandle } from "../src/modules/runtime/infrastructure/sandbox-handles";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import { API_DRIVER_BOUNDARY_IDS } from "./api-driver-boundary-fixtures";
@@ -128,7 +132,12 @@ async function insertActiveSandboxSession(database: D1Database): Promise<void> {
       API_DRIVER_BOUNDARY_IDS.sandboxSession,
       nowMsForTest(),
       "/workspace/session",
-      "{}",
+      JSON.stringify({
+        callerUserId: PUBLIC_API_TEST_IDS.ownerAccount,
+        executionOwnerUserId: PUBLIC_API_TEST_IDS.ownerAccount,
+        entrypoint: "api",
+        type: "agent",
+      }),
       PUBLIC_API_TEST_IDS.sandbox,
       PUBLIC_API_TEST_IDS.ownerSession,
       "active",
@@ -145,7 +154,6 @@ function createRuntimeLink(): RuntimeSessionLink {
     creatorId: PUBLIC_API_TEST_IDS.ownerAccount,
     executionOwnerId: PUBLIC_API_TEST_IDS.ownerAccount,
     sandboxId: PUBLIC_API_TEST_IDS.sandbox,
-    sandboxKind: "cattle",
     sandboxSubjectKind: "session",
     sessionId: PUBLIC_API_TEST_IDS.ownerSession,
     sessionRunId: PUBLIC_API_TEST_IDS.run,
@@ -241,6 +249,40 @@ async function dispatchRuntimeEvent(input: {
 }
 
 describe("runtime session outputs", () => {
+  test("saves failed-turn artifacts once when the failure RPC is retried", async () => {
+    const database = await createPublicHttpContractDatabase();
+    await insertOwnerSession(database);
+    await insertActiveSandboxSession(database);
+    const { bindings, bucket } = await createBindings({
+      database,
+      files: new Map([["/workspace/session/outputs/partial.txt", "Saved partial work"]]),
+    });
+    const ids = PUBLIC_API_TEST_IDS;
+    database.execute(`INSERT INTO driver_instance (id,sandbox_id,sandbox_session_id,runtime,protocol,protocol_version,status,boot_token_hash,boot_token_expires_at,heartbeat_count,expires_at,created_at,updated_at)
+      VALUES ('${ids.driverOwner}','${ids.sandbox}','${ids.ownerSession}','openai-runtime','orpc-ws',1,'ready',X'01',1,0,1,1,1);
+      INSERT INTO session_run (id,session_id,agent_id,created_by_account_id,driver_instance_id,trigger,status,created_at,updated_at)
+      VALUES ('${ids.run}','${ids.ownerSession}','${ids.agent}','${ids.ownerAccount}','${ids.driverOwner}','user_prompt','running',1,1);
+      UPDATE session SET last_run_id = '${ids.run}', status = 'RUNNING' WHERE id = '${ids.ownerSession}';`);
+    const notify = () =>
+      recordDriverInstanceFailure(bindings, {
+        driverInstanceId: ids.driverOwner,
+        error: { code: "sdk.stopped", message: "SDK stopped", details: {}, retryable: false },
+      });
+    await notify();
+    await notify();
+    expect(
+      await database
+        .prepare("SELECT status,error_code FROM session_run WHERE id = ?")
+        .bind(ids.run)
+        .first(),
+    ).toEqual({ status: "failed", error_code: "sdk.stopped" });
+    const files = await database
+      .prepare("SELECT name,size,status FROM file_record WHERE session_kind = 'artifact'")
+      .all();
+    expect(files.results).toEqual([{ name: "partial.txt", size: 18, status: "ready" }]);
+    expect([...bucket.objects.values()]).toHaveLength(1);
+  });
+
   test("normalizes the session output directory contract", () => {
     expect(getRuntimeSessionOutputDirectory("/workspace/session")).toBe(
       "/workspace/session/outputs",

@@ -13,17 +13,16 @@ const LIMITED_NETWORK = {
 } as const;
 
 describe("runtime subject network constraints", () => {
-  test("Full keeps the sandbox defaults for a stable Pet subject", () => {
+  test("Full keeps the sandbox defaults", () => {
     expect(
       resolveRuntimeSubjectNetworkConstraints(createBindings(), {
         envVars: {},
-        kind: "pet",
+
         network: {
           environmentAllowedHosts: ["api.example.com"],
           networkPolicy: "full",
         },
         requestUrl: "https://cloud.mosoo.ai/api/session",
-        subjectKind: "agent",
       }),
     ).toEqual({ allowedHosts: [], networkPolicy: "full" });
   });
@@ -32,10 +31,9 @@ describe("runtime subject network constraints", () => {
     expect(
       resolveRuntimeSubjectNetworkConstraints(createBindings(), {
         envVars: {},
-        kind: "cattle",
+
         network: LIMITED_NETWORK,
         requestUrl: "https://cloud.mosoo.ai/api/session",
-        subjectKind: "session",
       }),
     ).toEqual({
       allowedHosts: ["api.example.com", "cloud.mosoo.ai", "mcp.linear.app"],
@@ -52,10 +50,9 @@ describe("runtime subject network constraints", () => {
         }),
         {
           envVars: {},
-          kind: "cattle",
+
           network: LIMITED_NETWORK,
           requestUrl: "https://cloud.mosoo.ai/api/session",
-          subjectKind: "session",
         },
       ).allowedHosts,
     ).toEqual([
@@ -76,10 +73,9 @@ describe("runtime subject network constraints", () => {
         }),
         {
           envVars: {},
-          kind: "cattle",
+
           network: { ...LIMITED_NETWORK, environmentAllowedHosts: [] },
           requestUrl: "https://cloud.mosoo.ai/api/session",
-          subjectKind: "session",
         },
       ).allowedHosts,
     ).toEqual(["abc123.eu.r2.cloudflarestorage.com", "control.mosoo.ai"]);
@@ -89,24 +85,11 @@ describe("runtime subject network constraints", () => {
     expect(
       resolveRuntimeSubjectNetworkConstraints(createBindings(), {
         envVars: {},
-        kind: "cattle",
+
         network: { ...LIMITED_NETWORK, environmentAllowedHosts: [] },
         requestUrl: "http://localhost:8787/api/session",
-        subjectKind: "session",
       }).allowedHosts,
     ).toEqual(["host.docker.internal"]);
-  });
-
-  test("Limited rejects stable Pet subjects at admission", () => {
-    expect(() =>
-      resolveRuntimeSubjectNetworkConstraints(createBindings(), {
-        envVars: {},
-        kind: "pet",
-        network: LIMITED_NETWORK,
-        requestUrl: "https://cloud.mosoo.ai/api/session",
-        subjectKind: "agent",
-      }),
-    ).toThrow("only for Task Agents");
   });
 
   test("Limited rejects ordinary proxy variables at admission", () => {
@@ -116,10 +99,9 @@ describe("runtime subject network constraints", () => {
           HTTPS_PROXY: "http://proxy.internal:3128",
           http_proxy: "http://proxy.internal:3128",
         },
-        kind: "cattle",
+
         network: LIMITED_NETWORK,
         requestUrl: "https://cloud.mosoo.ai/api/session",
-        subjectKind: "session",
       }),
     ).toThrow("HTTPS_PROXY, http_proxy");
   });

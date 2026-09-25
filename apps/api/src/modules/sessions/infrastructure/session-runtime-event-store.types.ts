@@ -40,12 +40,12 @@ export interface ProjectedSessionRuntimeEventRowInput {
 }
 
 export interface SessionRuntimeEventBatchAllocation {
-  readonly agentId: AgentId;
+  readonly agentId: AgentId | null;
   readonly firstSeq: number;
 }
 
 export interface OneRuntimeEventPerSessionAllocation {
-  readonly agentId: AgentId;
+  readonly agentId: AgentId | null;
   readonly seq: number;
   readonly sessionId: SessionId;
 }
@@ -73,7 +73,7 @@ export interface SessionRuntimeEventSourceReceipt {
 }
 
 export interface SessionEventInsertValue {
-  readonly agentId: AgentId;
+  readonly agentId: AgentId | null;
   readonly contentText: string;
   readonly createdAt: number;
   readonly endedAt: number;

@@ -86,7 +86,6 @@ export function serializeAgentManifestToYaml(
   const lines: string[] = [
     `manifestVersion: ${yamlString(manifest.manifestVersion)}`,
     ...(sourceAgentId === null ? [] : [`sourceAgentId: ${yamlString(sourceAgentId)}`]),
-    `kind: ${yamlString(manifest.kind)}`,
     "metadata:",
     `  name: ${yamlString(manifest.metadata.name)}`,
     `  description: ${yamlString(manifest.metadata.description)}`,
@@ -247,7 +246,6 @@ export function toAgentPackageManifestJson(agentPackage: AgentPackage): Record<s
     exportedAt: agentPackage.exportedAt,
     packageVersion: agentPackage.packageVersion,
     manifestVersion: manifest.manifestVersion,
-    kind: manifest.kind,
     runtime: manifest.runtime.id,
     model: manifest.runtime.model,
     provider: manifest.runtime.provider,

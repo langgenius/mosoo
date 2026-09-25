@@ -11,8 +11,6 @@ import type {
   CreateAgentInput,
   DeleteAgentInput,
   PublishAgentInput,
-  RuntimeStateOperationInput,
-  RuntimeStateOperationResult,
   UpdateAgentConfigInput,
 } from "@mosoo/contracts/agent";
 import type {
@@ -33,9 +31,6 @@ import type {
   CreateAgentForkMutation,
   ExportAgentPackageQuery,
   ImportAgentPackageMutation,
-  RecreateSandboxMutation,
-  ResetAgentStateMutation,
-  RestartDriverMutation,
 } from "@/gql/graphql";
 import { requestGraphQL } from "@/platform/http/graphql-client";
 import {
@@ -57,9 +52,6 @@ import {
   GET_AGENT_QUERY,
   LIST_VISIBLE_AGENTS_QUERY,
   PUBLISH_AGENT_MUTATION,
-  RECREATE_SANDBOX_MUTATION,
-  RESET_AGENT_STATE_MUTATION,
-  RESTART_DRIVER_MUTATION,
   UNPUBLISH_AGENT_MUTATION,
   UPDATE_AGENT_CONFIG_MUTATION,
 } from "./agent-documents";
@@ -73,11 +65,6 @@ import {
 type GraphQLAgentSummary = AccessibleAgentsQuery["accessibleAgentList"][number];
 type GraphQLAgentDetail = AgentQuery["agent"];
 type GraphQLAgentEditorState = AgentEditorStateQuery["agentEditorState"];
-type GraphQLRuntimeStateOperationResult =
-  | RestartDriverMutation["restartDriver"]
-  | RecreateSandboxMutation["recreateSandbox"]
-  | ResetAgentStateMutation["resetAgentState"];
-
 function toAgentSkillReference(skill: AgentFieldsFragment["skills"][number]): AgentSkillReference {
   return {
     ...skill,
@@ -163,15 +150,6 @@ function toAgentEditorState(state: GraphQLAgentEditorState): AgentEditorState {
       id: toAgentMcpBindingId(binding.id),
       serverId: toMcpServerId(binding.serverId),
     })),
-  };
-}
-
-function toRuntimeStateOperationResult(
-  result: GraphQLRuntimeStateOperationResult,
-): RuntimeStateOperationResult {
-  return {
-    ...result,
-    agentId: toAgentId(result.agentId),
   };
 }
 
@@ -285,28 +263,4 @@ export async function createAgentFork(
   const payload = await requestGraphQL(CREATE_AGENT_FORK_MUTATION, { input });
 
   return toAgentPackageImportResult(payload.createAgentFork);
-}
-
-export async function restartDriver(
-  input: RuntimeStateOperationInput,
-): Promise<RuntimeStateOperationResult> {
-  const payload = await requestGraphQL(RESTART_DRIVER_MUTATION, { input });
-
-  return toRuntimeStateOperationResult(payload.restartDriver);
-}
-
-export async function recreateSandbox(
-  input: RuntimeStateOperationInput,
-): Promise<RuntimeStateOperationResult> {
-  const payload = await requestGraphQL(RECREATE_SANDBOX_MUTATION, { input });
-
-  return toRuntimeStateOperationResult(payload.recreateSandbox);
-}
-
-export async function resetAgentState(
-  input: RuntimeStateOperationInput,
-): Promise<RuntimeStateOperationResult> {
-  const payload = await requestGraphQL(RESET_AGENT_STATE_MUTATION, { input });
-
-  return toRuntimeStateOperationResult(payload.resetAgentState);
 }

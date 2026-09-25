@@ -7,7 +7,10 @@ import { recordCanonicalSessionRunFailure } from "../src/modules/runtime/applica
 import { reconcileTerminalSessionRuns } from "../src/modules/runtime/application/session-runs/terminal-run-reconciliation.service";
 import { readRuntimeDriverRunTransition } from "../src/modules/runtime/infrastructure/driver-instance/event-projection";
 import { getRuntimeSessionLink } from "../src/modules/runtime/infrastructure/driver-instance/session-link.repository";
-import { recordDriverInstanceFailure } from "../src/modules/runtime/infrastructure/driver-instance/terminal-driver-events";
+import {
+  recordDriverInstanceCompletion,
+  recordDriverInstanceFailure,
+} from "../src/modules/runtime/infrastructure/driver-instance/terminal-driver-events";
 import {
   getSessionRunSummary,
   setSessionRunStatus,
@@ -158,6 +161,23 @@ async function readFailureEvents(database: SqliteD1Database): Promise<FailureEve
 }
 
 describe("canonical session run terminal failure", () => {
+  test("does not replace a cancelled turn on a late completion RPC", async () => {
+    const database = await createPublicHttpContractDatabase();
+    await insertLinkedRunFixture(database, "cancelled");
+    const bindings = createPublicHttpTestBindings(database) as ApiBindings;
+    await recordDriverInstanceCompletion(bindings, {
+      driverInstanceId: DRIVER_ID,
+      driverReady: true,
+    });
+    expect(
+      await database
+        .prepare("SELECT status, error_code FROM session_run WHERE id = ?")
+        .bind(RUN_ID)
+        .first(),
+    ).toEqual({ status: "cancelled", error_code: null });
+    expect(await readFailureEvents(database)).toHaveLength(0);
+  });
+
   test("preserves provider content rejection through projection, persistence and late generic failure", async () => {
     const database = await createPublicHttpContractDatabase();
     await insertLinkedRunFixture(database);

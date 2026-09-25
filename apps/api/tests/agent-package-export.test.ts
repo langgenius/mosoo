@@ -24,7 +24,6 @@ function createSourceManifest(): AgentManifest {
       packages: [{ manager: "pip", packages: ["requests==2.32.4"] }],
       setupScript: "bun install",
     },
-    kind: "pet",
     manifestVersion: AGENT_MANIFEST_VERSION,
     mcpServers: [
       {
@@ -82,5 +81,6 @@ describe("agent package export", () => {
       expect(manifestYaml).not.toContain(sourceId);
     }
     expect(manifestYaml).toContain("requests==2.32.4");
+    expect(manifestYaml).not.toContain("kind:");
   });
 });

@@ -15,7 +15,7 @@ import { runBestEffortRuntimeCleanup } from "./runtime-cleanup";
 import type { RuntimeProcessHandle } from "./sandbox-handles";
 
 export interface DriverRuntimeStartupEventContext {
-  agentId: AgentId;
+  agentId: AgentId | null;
   driverControlPort: number;
   driverInstanceId: DriverInstanceId;
   sessionId: SessionId;

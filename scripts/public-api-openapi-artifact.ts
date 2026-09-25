@@ -1,40 +1,41 @@
 import { spawnSync } from "node:child_process";
 import { readFile, writeFile } from "node:fs/promises";
 
+import type { PublicApiVersion } from "@mosoo/contracts/public-api";
+
 import { createPublicApiOpenApiDocument } from "../apps/api/src/adapters/http/routes/public-api-openapi";
 
 export const PUBLIC_API_OPENAPI_ARTIFACT_PATH = "apps/api/openapi/public-api-v1.generated.json";
 
-export function renderPublicApiOpenApiArtifact(): string {
-  return `${JSON.stringify(createPublicApiOpenApiDocument("https://cloud.mosoo.ai"), null, 2)}\n`;
+export function renderPublicApiOpenApiArtifact(version: PublicApiVersion = "v1"): string {
+  return `${JSON.stringify(createPublicApiOpenApiDocument("https://cloud.mosoo.ai", version), null, 2)}\n`;
 }
 
-function runArtifactFormatter(mode: "--check" | "--write"): void {
-  const result = spawnSync("vp", ["fmt", PUBLIC_API_OPENAPI_ARTIFACT_PATH, mode], {
+function runArtifactFormatter(path: string, mode: "--check" | "--write"): void {
+  const result = spawnSync("vp", ["fmt", path, mode], {
     stdio: "inherit",
   });
 
   if (result.status !== 0) {
-    throw new Error(`Failed to format ${PUBLIC_API_OPENAPI_ARTIFACT_PATH}.`);
+    throw new Error(`Failed to format ${path}.`);
   }
 }
 
-async function main(): Promise<void> {
-  const mode = process.argv[2];
-  const expected = renderPublicApiOpenApiArtifact();
+async function updateArtifact(
+  version: PublicApiVersion,
+  mode: "--check" | "--write",
+): Promise<void> {
+  const path = `apps/api/openapi/public-api-${version}.generated.json`;
+  const expected = renderPublicApiOpenApiArtifact(version);
 
   if (mode === "--write") {
-    await writeFile(PUBLIC_API_OPENAPI_ARTIFACT_PATH, expected, "utf8");
-    runArtifactFormatter("--write");
-    console.log(`Wrote ${PUBLIC_API_OPENAPI_ARTIFACT_PATH}.`);
+    await writeFile(path, expected, "utf8");
+    runArtifactFormatter(path, "--write");
+    console.log(`Wrote ${path}.`);
     return;
   }
 
-  if (mode !== "--check") {
-    throw new Error("Usage: public-api-openapi-artifact.ts --write|--check");
-  }
-
-  const actual = await readFile(PUBLIC_API_OPENAPI_ARTIFACT_PATH, "utf8").catch(() => null);
+  const actual = await readFile(path, "utf8").catch(() => null);
   let matches = false;
 
   if (actual !== null) {
@@ -46,17 +47,18 @@ async function main(): Promise<void> {
   }
 
   if (!matches) {
-    console.error(
-      `Public API OpenAPI artifact is stale. Run \`bun run public-api:openapi:generate\`.`,
-    );
+    console.error(`${path} is stale. Run \`just public-api-openapi\`.`);
     process.exitCode = 1;
     return;
   }
 
-  runArtifactFormatter("--check");
-  console.log(`Public API OpenAPI artifact is current: ${PUBLIC_API_OPENAPI_ARTIFACT_PATH}`);
+  runArtifactFormatter(path, "--check");
+  console.log(`Public API OpenAPI artifact is current: ${path}`);
 }
 
 if (import.meta.main) {
-  await main();
+  const mode = process.argv[2];
+  if (mode !== "--check" && mode !== "--write")
+    throw new Error("Usage: public-api-openapi-artifact.ts --write|--check");
+  for (const version of ["v1", "v2"] as const) await updateArtifact(version, mode);
 }

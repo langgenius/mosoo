@@ -67,14 +67,4 @@ describe("reported i18n and dialog layout regressions", () => {
       expect(source).toContain("min-h-0 space-y-4 overflow-y-auto");
     }
   });
-
-  test("does not render contract-owned Agent kind English copy directly", () => {
-    const source = readSource("../src/routes/agent/components/kind-selector.tsx");
-
-    expect(source).toContain("CARD_COPY_KEYS");
-    expect(source).toContain("COMPARISON_COPY_KEYS");
-    expect(source).not.toContain("card.copy.label");
-    expect(source).not.toContain("row.values.pet");
-    expect(source).not.toContain("row.values.cattle");
-  });
 });

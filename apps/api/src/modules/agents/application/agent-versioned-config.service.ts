@@ -13,15 +13,6 @@ import { getRuntimeCatalogEntry } from "@mosoo/runtime-catalog";
 import { listEditableAgentSkillReferences } from "./agent-deployment-version.service";
 import type { AgentRow } from "./agent-types";
 
-class AgentRuntimeForkRequiredError extends Error {
-  public constructor() {
-    super(
-      "Runtime change is not allowed in place on a Agent API Endpoint. Fork Agent to change runtime; sessions, logs, cost, and agent-state stay attached to the original Agent.",
-    );
-    this.name = "AgentRuntimeForkRequiredError";
-  }
-}
-
 export type AgentRuntimeSelectionResult =
   | {
       ok: true;
@@ -68,10 +59,10 @@ export async function listAgentSkillIds(
 }
 
 export function createAgentConfigChangeSnapshot(input: {
-  agent: Pick<
-    AgentRow,
-    "description" | "kind" | "model" | "name" | "prompt" | "provider" | "runtimeId"
-  > & { builtInTools: readonly AgentBuiltInToolConfig[]; providerOptions: JsonObject };
+  agent: Pick<AgentRow, "description" | "model" | "name" | "prompt" | "provider" | "runtimeId"> & {
+    builtInTools: readonly AgentBuiltInToolConfig[];
+    providerOptions: JsonObject;
+  };
   environment: AgentEnvironmentConfig;
   mcpServerIds: readonly McpServerId[];
   skillIds: readonly SkillId[];
@@ -80,7 +71,6 @@ export function createAgentConfigChangeSnapshot(input: {
     builtInTools: input.agent.builtInTools,
     description: input.agent.description ?? "",
     environmentId: input.environment.environmentId,
-    kind: input.agent.kind,
     mcpServerIds: input.mcpServerIds,
     model: input.agent.model,
     name: input.agent.name,
@@ -109,14 +99,5 @@ export function summarizeVersionedAgentConfigChange(plan: AgentConfigChangePlan)
     return "Configuration updated";
   }
 
-  return `${plan.actionLabel} · ${plan.fieldLabels.join(", ")}`;
-}
-
-export function enforcePublishedRuntimeStability(
-  agent: Pick<AgentRow, "runtimeId" | "status">,
-  runtimeId: string,
-): void {
-  if (agent.status === "published" && runtimeId !== agent.runtimeId) {
-    throw new AgentRuntimeForkRequiredError();
-  }
+  return `Preset updated · ${plan.fieldLabels.join(", ")}`;
 }

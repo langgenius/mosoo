@@ -1,6 +1,6 @@
 import type { JsonObject } from "@mosoo/contracts";
 import { getAgentBuiltInToolSupportError } from "@mosoo/contracts/agent";
-import type { AgentBuiltInToolConfig, AgentKind } from "@mosoo/contracts/agent";
+import type { AgentBuiltInToolConfig } from "@mosoo/contracts/agent";
 import { createDefaultAgentBuiltInTools, normalizeAgentBuiltInTools } from "@mosoo/contracts/agent";
 import type {
   AgentManifestMcpServerBinding,
@@ -33,7 +33,6 @@ export interface CreateDraftAgentInput {
   builtInTools?: readonly AgentBuiltInToolConfig[];
   description: string | null;
   environmentId: EnvironmentId | null;
-  kind: AgentKind;
   model: string;
   ownerId: AccountId;
   packageMcpServers: AgentManifestMcpServerBinding[];
@@ -90,7 +89,7 @@ export async function createDraftAgentBatch(
       description: input.description,
       environmentId: input.environmentId,
       id: agentId,
-      kind: input.kind,
+      kind: "cattle",
       model: input.model,
       name: input.agentName,
       ownerId: input.ownerId,

@@ -7,14 +7,17 @@ import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../../platform/db/drizzle";
 import { isTruthy } from "../../../../shared/truthiness";
 import { toIsoString } from "../../../../time";
-import { repairStaleSessionDeleteCleanups } from "../../../sessions/application/session-cleanup.service";
+import {
+  cleanupExpiredPreviewSessions,
+  repairStaleSessionDeleteCleanups,
+} from "../../../sessions/application/session-cleanup.service";
 import { appendSessionRuntimeEvents } from "../../../sessions/application/session-event-write.service";
 import { syncSessionViewerState } from "../../../sessions/application/session-viewer-events.service";
 import { RESCHEDULING_RECONNECT_WINDOW_MS } from "../../../sessions/domain/session-lifecycle";
 import { createSessionLifecycleTerminatedEvent } from "../../application/session-runs/session-run-view-events.service";
 import { reconcileStaleActiveSessionRuns } from "../../application/session-runs/stale-run-reconciliation.service";
 import { reconcileTerminalSessionRuns } from "../../application/session-runs/terminal-run-reconciliation.service";
-import { getRuntimeKindPolicy } from "../../domain/runtime-kind-policy";
+import { SESSION_RUNTIME_IDLE_GRACE_MS } from "../../domain/session-runtime-policy";
 import { cleanupDriverInstances } from "../driver-instance/maintenance";
 import { createSandboxCheckpoints } from "../sandbox-backup.service";
 import { repairRuntimeCommandRecords } from "../session-runs/runtime-command-store.repository";
@@ -46,7 +49,6 @@ type RecycleRuntimeSubject = (
   bindings: ApiBindings,
   input: {
     readonly claimOwner: string;
-    readonly kind: RuntimeSubjectMaintenanceCandidate["kind"];
     readonly now: number;
     readonly reason: string;
     readonly runtimeSubjectId: SandboxId;
@@ -55,7 +57,6 @@ type RecycleRuntimeSubject = (
 type ResumeRuntimeSubjectRecycleOperation = (
   bindings: ApiBindings,
   input: {
-    readonly kind: RuntimeSubjectOperationRepairCandidate["kind"];
     readonly operationId: RuntimeSubjectOperationRepairCandidate["operationId"];
     readonly reason: string;
     readonly runtimeSubjectId: RuntimeSubjectOperationRepairCandidate["id"];
@@ -130,7 +131,6 @@ async function recycleInactiveRuntimeSubjectCandidate(
   try {
     await input.recycleRuntimeSubject(bindings, {
       claimOwner: input.claimOwner,
-      kind: input.candidate.kind,
       now: input.now,
       reason: input.reason,
       runtimeSubjectId: input.candidate.id,
@@ -153,7 +153,6 @@ async function repairRuntimeSubjectOperationCandidate(
 ): Promise<void> {
   try {
     await input.resumeRuntimeSubjectRecycleOperation(bindings, {
-      kind: input.candidate.kind,
       operationId: input.candidate.operationId,
       reason: input.reason,
       runtimeSubjectId: input.candidate.id,
@@ -255,28 +254,27 @@ export async function expireStaleReschedulingSessions(bindings: ApiBindings): Pr
   );
 }
 
-// Cattle conversations no longer close on run terminal (the resident driver is
+// Session conversations no longer close on run terminal (the resident driver is
 // what makes follow-up turns warm), so this sweep is what ends them: close the
-// ones quiet past the cattle idle grace, which arms the subject inactive
+// ones quiet past the Session idle grace, which arms the subject inactive
 // deadline and hands the container to the existing subject reclamation pass.
 async function closeIdleSessionScopedConversationSessions(
   bindings: ApiBindings,
   now: number,
 ): Promise<void> {
-  const idleGraceMs = getRuntimeKindPolicy("cattle").subject.idleReleaseDelayMs;
-  const idleSinceLte = now - idleGraceMs;
+  const idleSinceLte = now - SESSION_RUNTIME_IDLE_GRACE_MS;
   const idle = await listIdleSessionScopedConversationSessions(bindings.DB, {
     idleSinceLte,
     limit: MAINTENANCE_BATCH_SIZE,
   });
-  const { closeIdleCattleConversationSession } = await import("../sandbox-session.service");
+  const { closeIdleConversationSession } = await import("../sandbox-session.service");
 
   for (const conversation of idle) {
     try {
       // Atomic claim inside: closes only if the row is still the same, idle,
       // lease-free session — a follow-up turn that re-used it since the list
       // snapshot makes the claim lose and is left running.
-      await closeIdleCattleConversationSession(bindings, {
+      await closeIdleConversationSession(bindings, {
         idleSinceLte,
         sandboxId: conversation.sandboxId,
         sessionId: conversation.sessionId,
@@ -295,16 +293,14 @@ export async function repairIdleConversationCheckpoints(
   bindings: ApiBindings,
   now: number,
 ): Promise<void> {
-  const policy = getRuntimeKindPolicy("cattle");
   const pending = await listPendingIdleConversationCheckpoints(bindings.DB, {
-    idleSinceLte: now - policy.subject.idleReleaseDelayMs,
+    idleSinceLte: now - SESSION_RUNTIME_IDLE_GRACE_MS,
     limit: MAINTENANCE_BATCH_SIZE,
   });
   for (const candidate of pending) {
     try {
       await createSandboxCheckpoints(bindings, {
         requiredSessionId: candidate.sessionId,
-        rules: policy.checkpoint.createOnTerminal,
         sandboxId: candidate.sandboxId,
         sessionRunId: candidate.sessionRunId,
       });
@@ -344,18 +340,13 @@ export async function runSandboxMaintenance(bindings: ApiBindings): Promise<void
     limit: MAINTENANCE_BATCH_SIZE,
     staleUpdatedAtLte: now - MAINTENANCE_OPERATION_REPAIR_AFTER_MS,
   });
+  await cleanupExpiredPreviewSessions(bindings, { limit: MAINTENANCE_BATCH_SIZE, nowMs: now });
   await repairIdleConversationCheckpoints(bindings, now);
   await closeIdleSessionScopedConversationSessions(bindings, now);
   const repairedDeadlines = await repairStrandedRuntimeSubjectDeadlines(bindings.DB, { now });
 
-  if (repairedDeadlines.cattle > 0) {
-    logWarn("runtime.subject.inactive_deadline_repaired", { count: repairedDeadlines.cattle });
-  }
-
-  // A repaired pet is an orphan that was billing with no live driver and no
-  // active run — a distinct alert signal from routine resident-cattle repair.
-  if (repairedDeadlines.pet > 0) {
-    logWarn("runtime.subject.orphan_pet_deadline_repaired", { count: repairedDeadlines.pet });
+  if (repairedDeadlines > 0) {
+    logWarn("runtime.subject.inactive_deadline_repaired", { count: repairedDeadlines });
   }
 
   const [candidates, staleOperations, expiredActivations] = await Promise.all([

@@ -242,7 +242,7 @@ type RuntimeDiagnosticRegistryValue = RuntimeDiagnosticRegistry[keyof RuntimeDia
 export type RuntimeDiagnosticEventName = RuntimeDiagnosticRegistryValue["name"];
 
 export interface RuntimeDiagnosticBaseValue {
-  readonly agentId: string;
+  readonly agentId: string | null;
   readonly deploymentVersionId?: string;
   readonly deploymentVersionNumber?: number;
   readonly message?: string | null;

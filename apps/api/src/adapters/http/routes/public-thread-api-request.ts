@@ -1,15 +1,27 @@
-import type { PublicThreadApiSendEventsRequest } from "@mosoo/contracts/public-api";
+import type {
+  PublicApiVersion,
+  PublicThreadConfiguration,
+  PublicThreadApiSendEventsRequest,
+} from "@mosoo/contracts/public-api";
 import {
   PUBLIC_THREAD_EVENTS_DEFAULT_LIMIT,
   PUBLIC_THREAD_EVENTS_MAX_LIMIT,
   PUBLIC_THREAD_FILE_ID_MAX_LENGTH,
   PUBLIC_THREAD_INPUT_TEXT_MAX_LENGTH,
   PUBLIC_THREAD_JSON_BODY_MAX_BYTES,
+  PUBLIC_PROJECT_THREAD_JSON_BODY_MAX_BYTES,
   PUBLIC_API_OPENAPI_SCHEMAS,
   PUBLIC_THREAD_USER_ID_MAX_LENGTH,
 } from "@mosoo/contracts/public-api";
 import { parsePlatformId } from "@mosoo/id";
-import type { AgentId, FileId, PublicThreadId, SessionRunId } from "@mosoo/id";
+import type {
+  AgentId,
+  FileId,
+  ProjectId,
+  PublicThreadId,
+  SessionModelCallId,
+  SessionRunId,
+} from "@mosoo/id";
 
 import {
   PublicApiError,
@@ -51,7 +63,15 @@ const CREATE_THREAD_REQUEST_FIELDS: ReadonlySet<string> = new Set(
 export interface ParsedCreateThreadRequest {
   fileIds: FileId[];
   inputText?: string | undefined;
-  userId: string;
+  userId: string | null;
+}
+
+export interface ParsedCreateProjectThreadRequest extends ParsedCreateThreadRequest {
+  configuration: PublicThreadConfiguration;
+}
+
+export function parseProjectIdParam(value: string): ProjectId {
+  return parsePublicPlatformId(value, "projectId") as ProjectId;
 }
 
 function parseContentLength(value: string | null): number | null {
@@ -198,6 +218,12 @@ export function parseThreadIdParam(value: string): PublicThreadId {
 
 export function parseFileIdParam(value: string): FileId {
   return parsePublicPlatformId(value, "File ID") as FileId;
+}
+
+export function parseUsageCursor(value: string | undefined): SessionModelCallId | null {
+  return value === undefined
+    ? null
+    : (parsePublicPlatformId(value, "Usage cursor") as SessionModelCallId);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -442,13 +468,12 @@ export async function readSendEventsRequest(
     parsedEvents.push(readPublicThreadEvent(event));
   }
 
-  return {
-    events: parsedEvents,
-  };
+  return { events: parsedEvents };
 }
 
 export async function readCreateThreadRequest(
   c: RawJsonRequestContext,
+  apiVersion: PublicApiVersion = "v1",
 ): Promise<ParsedCreateThreadRequest> {
   const body = await readOptionalJsonBodyWithLimit(c, PUBLIC_THREAD_JSON_BODY_MAX_BYTES);
 
@@ -457,12 +482,69 @@ export async function readCreateThreadRequest(
   }
 
   assertOnlyFields(body, CREATE_THREAD_REQUEST_FIELDS, "create thread");
-  const userId = readLimitedStringField(body, "userId", PUBLIC_THREAD_USER_ID_MAX_LENGTH);
+  return parseCreateThreadFields(body, apiVersion);
+}
+
+function parseCreateThreadFields(
+  body: Record<string, unknown>,
+  apiVersion: PublicApiVersion,
+): ParsedCreateThreadRequest {
+  const userId =
+    apiVersion === "v2" && body["userId"] === undefined
+      ? null
+      : readLimitedStringField(body, "userId", PUBLIC_THREAD_USER_ID_MAX_LENGTH);
   const inputText = readCreateThreadInputText(body);
 
   return {
     fileIds: readCreateThreadFileIds(body),
     ...(inputText === undefined ? {} : { inputText }),
     userId,
+  };
+}
+
+export async function readCreateProjectThreadRequest(
+  c: RawJsonRequestContext,
+): Promise<ParsedCreateProjectThreadRequest> {
+  const body = await readOptionalJsonBodyWithLimit(c, PUBLIC_PROJECT_THREAD_JSON_BODY_MAX_BYTES);
+  if (!isRecord(body)) throw publicInvalidRequest("Request body must be an object.");
+  assertOnlyFields(
+    body,
+    new Set([...CREATE_THREAD_REQUEST_FIELDS, "configuration"]),
+    "create Project thread",
+  );
+  const configuration = body["configuration"];
+  if (!isRecord(configuration)) throw publicInvalidRequest("configuration must be an object.");
+  const fields = parseCreateThreadFields(body, "v2");
+  if (configuration["type"] === "agent") {
+    assertOnlyFields(configuration, new Set(["type", "agent_id"]), "Agent configuration");
+    return {
+      ...fields,
+      configuration: {
+        type: "agent",
+        agent_id: parseAgentIdParam(readStringField(configuration, "agent_id")),
+      },
+    };
+  }
+  if (configuration["type"] !== "inline") {
+    throw publicInvalidRequest("configuration.type must be inline or agent.");
+  }
+  assertOnlyFields(
+    configuration,
+    new Set(["type", "harness", "provider", "model", "instructions"]),
+    "inline configuration",
+  );
+  return {
+    ...fields,
+    configuration: {
+      type: "inline",
+      harness: readLimitedStringField(configuration, "harness", 255),
+      provider: readLimitedStringField(configuration, "provider", 255),
+      model: readLimitedStringField(configuration, "model", 255),
+      instructions: readLimitedStringField(
+        configuration,
+        "instructions",
+        PUBLIC_THREAD_INPUT_TEXT_MAX_LENGTH,
+      ),
+    },
   };
 }

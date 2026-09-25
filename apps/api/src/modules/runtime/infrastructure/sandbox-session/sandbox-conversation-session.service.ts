@@ -10,11 +10,8 @@ import {
   appendRuntimeDiagnosticEvent,
   toRuntimeDiagnosticBaseValue,
 } from "../../application/runtime-diagnostic-events";
-import {
-  getRuntimeKindPolicy,
-  getRuntimeSubjectInactiveDeadline,
-  runtimeCheckpointRulesInclude,
-} from "../../domain/runtime-kind-policy";
+import { getRuntimeSubjectInactiveDeadline } from "../../domain/session-runtime-policy";
+import { isRuntimeSandboxLocalBucketEnabled } from "../runtime-sandbox-bucket-mount";
 import type { RuntimeConversationSessionRecord } from "../runtime-subject-lifecycle/runtime-subject-store";
 import {
   claimIdleSessionScopedConversationForClose,
@@ -51,7 +48,6 @@ function measureOptional<T>(
 
 function resolveConversationContinuationPlan(input: {
   existingSession: RuntimeConversationSessionRecord | null;
-  kind: EnsureSandboxConversationSessionInput["kind"];
 }): {
   sandboxSessionId?: SandboxSessionId;
   requireCwdCheckpoint: boolean;
@@ -60,18 +56,10 @@ function resolveConversationContinuationPlan(input: {
   shouldRestoreCwd: boolean;
   shouldRestoreSessionArtifacts: boolean;
 } {
-  const policy = getRuntimeKindPolicy(input.kind);
-  // A workspace being (re)created is the artifact-restore trigger: recorded
-  // session artifacts are the only durable workspace state a policy without
-  // workspace checkpoints can rehydrate after the sandbox was recycled. A
-  // first-ever conversation passes through the same path and finds no
-  // artifacts to restore.
-  const isLegacyCattleContinuation =
-    input.kind === "cattle" &&
-    input.existingSession !== null &&
-    !input.existingSession.workspaceCheckpointRequired;
+  // Pre-checkpoint Sessions retain their recorded artifact recovery
+  // path. Sessions admitted with workspace durability require that checkpoint.
   const shouldRestoreSessionArtifacts =
-    policy.continuation.restoreSessionArtifacts || isLegacyCattleContinuation;
+    input.existingSession !== null && !input.existingSession.workspaceCheckpointRequired;
 
   if (input.existingSession === null) {
     return {
@@ -93,12 +81,7 @@ function resolveConversationContinuationPlan(input: {
     };
   }
 
-  const shouldRestoreCwd = runtimeCheckpointRulesInclude(
-    policy.checkpoint.restoreOnActivate,
-    "session_workspaces",
-  );
-  const shouldUseNewCloudflareSession =
-    input.existingSession.status === "closed" && policy.subject.scope === "session";
+  const shouldUseNewCloudflareSession = input.existingSession.status === "closed";
 
   return {
     ...(shouldUseNewCloudflareSession
@@ -107,16 +90,16 @@ function resolveConversationContinuationPlan(input: {
     shouldCreateCloudflareSession: true,
     shouldDeleteErrorSession: input.existingSession.status === "error",
     requireCwdCheckpoint:
-      input.kind === "cattle" &&
       input.existingSession.status === "closed" &&
       input.existingSession.workspaceCheckpointRequired,
-    shouldRestoreCwd,
+    shouldRestoreCwd: true,
     shouldRestoreSessionArtifacts,
   };
 }
 
 async function restoreSandboxSessionCwdIfMissing(input: {
   cwd: string;
+  localBucket: boolean;
   latestReadyBackup: RuntimeConversationSessionRecord["latestReadyBackup"];
   requireCheckpoint: boolean;
   sandbox: EnsureSandboxConversationSessionInput["sandbox"];
@@ -129,7 +112,7 @@ async function restoreSandboxSessionCwdIfMissing(input: {
   if (!input.latestReadyBackup) {
     if (input.requireCheckpoint) {
       throw new Error(
-        `Thread ${input.sessionId} has no committed workspace checkpoint. Retry after the previous turn finishes checkpointing; if the error persists, start a new Thread or contact support.`,
+        `Thread ${input.sessionId} has no committed workspace checkpoint. Retry this Thread after the previous turn finishes checkpointing; contact support if recovery remains unavailable.`,
       );
     }
 
@@ -140,10 +123,11 @@ async function restoreSandboxSessionCwdIfMissing(input: {
     await restoreSandboxConversationDirectoryBackup(input.sandbox, {
       backup: input.latestReadyBackup,
       cwd: input.cwd,
+      localBucket: input.localBucket,
     });
   } catch (cause) {
     throw new Error(
-      `Thread ${input.sessionId} workspace checkpoint could not be restored. Retry the continuation; if the error persists, start a new Thread or contact support.`,
+      `Thread ${input.sessionId} workspace checkpoint could not be restored. Retry this Thread; contact support if recovery remains unavailable.`,
       { cause },
     );
   }
@@ -159,7 +143,6 @@ export async function ensureSandboxConversationSession(
   );
   const continuation = resolveConversationContinuationPlan({
     existingSession,
-    kind: input.kind,
   });
   const cwd = existingSession?.cwd ?? getSessionOrganizationPath(input.sessionId);
 
@@ -190,6 +173,7 @@ export async function ensureSandboxConversationSession(
     await measureOptional(input.timing, "conversation.restoreCwd", () =>
       restoreSandboxSessionCwdIfMissing({
         cwd,
+        localBucket: isRuntimeSandboxLocalBucketEnabled(bindings),
         latestReadyBackup: existingSession.latestReadyBackup,
         requireCheckpoint: continuation.requireCwdCheckpoint,
         sandbox: input.sandbox,
@@ -254,10 +238,10 @@ export async function ensureSandboxConversationSession(
   try {
     await measureOptional(input.timing, "conversation.activateRecord", () =>
       recordRuntimeConversationSessionActive(bindings.DB, {
+        expectedSandboxSessionId: sessionRecord.sandboxSessionId,
         sandboxSessionId,
         cwd,
         now,
-        originJson: JSON.stringify(frozenOrigin),
         runtimeSubjectId: input.sandboxId,
         sessionId: input.sessionId,
       }),
@@ -267,12 +251,10 @@ export async function ensureSandboxConversationSession(
       error instanceof Error ? error.message : "Sandbox conversation session activation failed.";
 
     await recordRuntimeConversationSessionError(bindings.DB, {
-      sandboxSessionId,
-      cwd,
+      expectedSandboxSessionId: sessionRecord.sandboxSessionId,
       errorCode: "runtime.conversation_mount_failed",
       message,
       now,
-      originJson: JSON.stringify(frozenOrigin),
       runtimeSubjectId: input.sandboxId,
       sessionId: input.sessionId,
     });
@@ -306,7 +288,7 @@ export async function closeSandboxConversationSession(
   }
 
   // Force-close: session-end / cleanup callers must tear down regardless of
-  // idleness. The idle sweep uses closeIdleCattleConversationSession instead.
+  // idleness. The idle sweep uses closeIdleConversationSession instead.
   await finalizeSandboxConversationClose(bindings, {
     sandboxId: input.sandboxId,
     sessionId: input.sessionId,
@@ -320,7 +302,7 @@ export async function closeSandboxConversationSession(
 // LIST->CLOSE race where a follow-up turn re-uses the resident session before
 // its run lease exists. If the claim loses, the follow-up owns the session and
 // the sweep leaves it. Returns true when it closed the conversation.
-export async function closeIdleCattleConversationSession(
+export async function closeIdleConversationSession(
   bindings: ApiBindings,
   input: {
     idleSinceLte: number;
@@ -393,10 +375,8 @@ async function finalizeSandboxConversationClose(
   } finally {
     // Remote cleanup must not strand the local subject outside reclamation.
     await recordRuntimeConversationSessionClosed(bindings.DB, {
-      inactiveDeadlineAt: getRuntimeSubjectInactiveDeadline(
-        getRuntimeKindPolicy(input.state.kind),
-        now,
-      ),
+      expectedSandboxSessionId: input.state.sandboxSessionId,
+      inactiveDeadlineAt: getRuntimeSubjectInactiveDeadline(now),
       now,
       runtimeSubjectId: input.sandboxId,
       sessionId: input.sessionId,

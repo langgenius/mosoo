@@ -29,7 +29,6 @@ export async function createAgentFork(
     agentId: input.agentId,
     projectId: input.projectId,
   });
-  const forkKind = input.kind ?? sourceAgent.kind;
   const manifest = await buildAgentManifest(bindings.DB, sourceAgent);
   const summary = createEmptyResolutionSummary();
   const issues: AgentResolutionIssue[] = [];
@@ -73,7 +72,6 @@ export async function createAgentFork(
     builtInTools: sourceStoredConfig.builtInTools,
     description: sourceAgent.description,
     environmentId: sourceAgent.environmentId,
-    kind: forkKind,
     model: sourceAgent.model,
     ownerId: viewer.id,
     packageMcpServers: mcpResolution.packageMcpServers,

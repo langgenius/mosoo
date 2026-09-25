@@ -13,7 +13,6 @@ import {
 } from "../../../../platform/cloudflare/logger";
 import { disposeRpcResource } from "../../../../platform/cloudflare/rpc-disposal";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
-import { getSessionRuntimeRecoveryMessages } from "../../../sessions/application/session-runtime-recovery-query.service";
 import {
   appendRuntimeDiagnosticEvent,
   toRuntimeDiagnosticBaseValue,
@@ -22,7 +21,6 @@ import {
 import { createRuntimeTimingRecorder } from "../../application/session-runs/session-runtime-timing";
 import { DRIVER_HEARTBEAT_INTERVAL_MS } from "../../domain/runtime-config";
 import { getRuntimeDriverSocketPath } from "../../domain/runtime-driver-routes";
-import { getRuntimeKindPolicy } from "../../domain/runtime-kind-policy";
 import { getDriverControlPort } from "../../domain/sandbox-layout";
 import {
   createDriverInstanceRecord,
@@ -199,6 +197,7 @@ async function provisionDriver(
     createDriverInstanceRecord(env, {
       bootTokenHash: bootToken.hash,
       driverInstanceId,
+      executionSessionId: input.profile.session.sandboxSessionId,
       mcpGrants: input.resolvedMcpServers.map(toDriverInstanceMcpGrantRecord),
       conflictStrategy: input.driverRecordConflictStrategy ?? "replace",
       runtime: input.runtime,
@@ -208,16 +207,12 @@ async function provisionDriver(
   );
   void driverRecordPromise.catch(() => undefined);
 
-  const policy = getRuntimeKindPolicy(input.profile.kind);
-  const nativeResumeRefPromise =
-    policy.nativeResume.persistence === "volatile"
-      ? Promise.resolve(null)
-      : timing.measure("getNativeResumeRef", () =>
-          getNativeResumeRefForRuntime(env.DB, {
-            runtimeId: input.runtime,
-            sessionId: input.sandboxSessionId,
-          }),
-        );
+  const nativeResumeRefPromise = timing.measure("getNativeResumeRef", () =>
+    getNativeResumeRefForRuntime(env.DB, {
+      runtimeId: input.runtime,
+      sessionId: input.sandboxSessionId,
+    }),
+  );
   void nativeResumeRefPromise.catch(() => undefined);
 
   const explicitControlOrigin = env.MOSOO_RUNTIME_CONTROL_ORIGIN?.trim() || undefined;
@@ -228,6 +223,13 @@ async function provisionDriver(
   let driverLaunchAttempted = false;
 
   try {
+    // Claim the active binding before any remote filesystem/setup side effect.
+    // The live record also prevents conversion while preparation is in flight.
+    const driverRecord = await driverRecordPromise;
+    if (driverRecord.status === "skipped") {
+      throw new DriverPrewarmProvisionSkippedError(driverInstanceId);
+    }
+
     await installRuntimeEnvironment(env, {
       cloudflareSession: input.cloudflareSession,
       environmentRevisionId,
@@ -239,30 +241,7 @@ async function provisionDriver(
       timing,
     });
 
-    const [nativeResumeRef, driverRecord] = await Promise.all([
-      nativeResumeRefPromise,
-      driverRecordPromise,
-    ]);
-    if (driverRecord.status === "skipped") {
-      throw new DriverPrewarmProvisionSkippedError(driverInstanceId);
-    }
-    // A fresh driver without a native session to resume can only recover
-    // conversation context through a bounded platform-history replay. Cattle
-    // keeps that fallback for runtimes that do not emit a native reference;
-    // openai-runtime additionally keeps the semantic-recovery fallback for a
-    // present-but-unmaterialized rollout.
-    const shouldReplayRecoveryMessages =
-      nativeResumeRef === null
-        ? policy.continuation.replayRecoveryMessages
-        : input.runtime === "openai-runtime";
-    const recoveryMessages = shouldReplayRecoveryMessages
-      ? await timing.measure("getRuntimeRecoveryMessages", () =>
-          getSessionRuntimeRecoveryMessages(env.DB, {
-            excludeRunId: input.sessionRunId ?? null,
-            sessionId: input.sandboxSessionId,
-          }),
-        )
-      : [];
+    const nativeResumeRef = await nativeResumeRefPromise;
     const activeDriverGeneration = driverRecord.generation;
     driverGeneration = activeDriverGeneration;
 
@@ -284,7 +263,7 @@ async function provisionDriver(
         driverInstanceId,
         nativeResumeRef,
         profile: runtimeProfile,
-        recoveryMessages,
+        recoveryMessages: [],
         requestUrl: containerRequestUrl,
         resolvedMcpServers: input.resolvedMcpServers,
         resolvedSkillCatalog: input.resolvedSkillCatalog,

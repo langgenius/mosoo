@@ -1,20 +1,14 @@
-import type { AgentKind } from "@mosoo/contracts/agent";
-import type { SandboxSubjectKind } from "@mosoo/contracts/sandbox";
-import type { RuntimeSubjectErrorCode } from "@mosoo/contracts/sandbox";
 import type {
   AccountId,
   AgentId,
   DriverInstanceId,
-  PlatformId,
   ProjectId,
   RuntimeOperationId,
   SandboxId,
-  SandboxSessionId,
   SessionId,
   SessionRunId,
 } from "@mosoo/id";
 import { createPlatformId } from "@mosoo/id";
-import { RUNTIME_DIAGNOSTIC_EVENT } from "@mosoo/runtime-events";
 
 import {
   captureServerProductEvent,
@@ -24,57 +18,35 @@ import { createErrorLogContext, logWarn } from "../../../../platform/cloudflare/
 import { runtimeImagesEnabled } from "../../../../platform/cloudflare/sandbox-binding";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { currentTimestampMs } from "../../../../time";
-import {
-  appendRuntimeDiagnosticEvent,
-  toRuntimeDiagnosticBaseValue,
-  toRuntimeDiagnosticReason,
-} from "../../application/runtime-diagnostic-events";
 import type { RuntimeDiagnosticContext } from "../../application/runtime-diagnostic-events";
 import type { RuntimeTimingRecorder } from "../../application/session-runs/session-runtime-timing";
-import {
-  getRuntimeKindPolicy,
-  getRuntimeSubjectInactiveDeadline,
-  runtimeCheckpointRulesInclude,
-} from "../../domain/runtime-kind-policy";
 import type { SandboxNetworkConstraints } from "../../domain/sandbox-network-constraints";
 import type { SandboxHandle } from "../sandbox-handles";
-import { deleteActiveSandboxConversationSession } from "../sandbox-session/sandbox-conversation-session-delete";
 import {
   recordRuntimeRunLeaseAcquiredOutcome,
   recordRuntimeRunLeaseReleased,
 } from "./runtime-run-lease-store";
 import type { RuntimeRunLeaseTransitionOutcome } from "./runtime-run-lease-store";
-import {
-  getRuntimeSubjectErrorCode,
-  RuntimeSubjectBackupNotReadyError,
-  RuntimeSubjectRestoreFailedError,
-} from "./runtime-subject-errors";
-import { assertRuntimeSubjectNetworkPolicySupported } from "./runtime-subject-network";
+import { getRuntimeSubjectErrorCode } from "./runtime-subject-errors";
 import {
   configureRuntimeSubjectNetwork,
   destroyRuntimeSubjectContainer,
   getRuntimeSubjectKeepAliveHandle,
   prepareRuntimeSubjectFilesystem,
-  restoreRuntimeSubjectBackup,
 } from "./runtime-subject-platform";
 import {
+  assertSessionRuntimeSubjectBinding,
   claimRuntimeSubjectActivation,
   ensureRuntimeSubjectId,
-  getRuntimeConversationSessionState,
   getRuntimeSubjectActivationRecord,
   listRuntimeSubjectDriverIds,
   markRuntimeSubjectActivationDestroying,
   markRuntimeSubjectActivationFailed,
   markRuntimeSubjectActive,
-  markRuntimeSubjectRestoreApplied,
   markRuntimeSubjectRestoring,
   preemptRuntimeSubjectActivationClaim,
-  recordRuntimeConversationSessionActive,
-  recordRuntimeConversationSessionClosed,
-  recordRuntimeConversationSessionError,
 } from "./runtime-subject-store";
 import type { RuntimeSubjectActivationRecord } from "./runtime-subject-store";
-import type { ReadyRuntimeSubjectBackupRecord } from "./runtime-subject-store";
 
 const RUNTIME_SUBJECT_ACTIVATION_CLAIM_TTL_MS = 10 * 60_000;
 const RUNTIME_SUBJECT_ACTIVATION_CLAIM_WAIT_MAX_MS = 8_000;
@@ -88,16 +60,14 @@ export type RuntimeSubjectActivationPurpose = "interactive" | "prewarm";
 export interface ActivateRuntimeSubjectInput {
   /** Required when allocating a subject; existing subjects keep their recorded image. */
   readonly runtimeId?: string;
-  readonly agentId: AgentId;
+  readonly agentId: AgentId | null;
   readonly executionOwnerUserId: AccountId;
-  readonly kind: AgentKind;
   readonly diagnosticContext?: RuntimeDiagnosticContext;
   readonly networkConstraints: SandboxNetworkConstraints;
   readonly purpose?: RuntimeSubjectActivationPurpose;
   readonly runtimeSubjectId: SandboxId;
   readonly projectId: ProjectId;
-  readonly subjectId: PlatformId;
-  readonly subjectKind: SandboxSubjectKind;
+  readonly sessionId: SessionId;
   readonly timing?: RuntimeTimingRecorder;
 }
 
@@ -149,35 +119,6 @@ function isUnstartedMaintenanceClaim(record: RuntimeSubjectActivationRecord): bo
   );
 }
 
-export function selectRuntimeSubjectRestoreBackup(input: {
-  readonly kind: AgentKind;
-  readonly record: RuntimeSubjectActivationRecord | null;
-  readonly runtimeSubjectId: SandboxId;
-}): ReadyRuntimeSubjectBackupRecord | null {
-  const policy = getRuntimeKindPolicy(input.kind);
-
-  if (!runtimeCheckpointRulesInclude(policy.checkpoint.restoreOnActivate, "subject_memory")) {
-    return null;
-  }
-
-  const lastBackup = input.record?.lastBackup ?? null;
-  const readyBackup = input.record?.lastReadyBackup ?? null;
-
-  if (lastBackup === null) {
-    return null;
-  }
-
-  if (readyBackup === null) {
-    throw new RuntimeSubjectBackupNotReadyError({
-      backupId: lastBackup.id,
-      runtimeSubjectId: input.runtimeSubjectId,
-      status: lastBackup.status,
-    });
-  }
-
-  return readyBackup;
-}
-
 export class RuntimeSubjectLifecycleService {
   readonly #accountConcurrentSandboxLimit: number;
   readonly #bindings: ApiBindings;
@@ -202,12 +143,6 @@ export class RuntimeSubjectLifecycleService {
   }
 
   async activate(input: ActivateRuntimeSubjectInput): Promise<ActiveRuntimeSubject> {
-    assertRuntimeSubjectNetworkPolicySupported({
-      kind: input.kind,
-      networkPolicy: input.networkConstraints.networkPolicy,
-      subjectKind: input.subjectKind,
-    });
-
     const purpose = input.purpose ?? "interactive";
     const claimOwner = createRuntimeSubjectActivationClaimOwner(purpose);
     const record = await measureOptional(input.timing, "runtimeSubject.admitLifecycle", () =>
@@ -217,17 +152,10 @@ export class RuntimeSubjectLifecycleService {
     const isCold = record === null || record.status === "cold";
 
     try {
-      // Network constraints must land before the first container-starting RPC
-      // below; a limited policy that cannot be applied fails the activation
-      // (and the catch path destroys the container) instead of running open.
-      // Stable Pet subjects support Full only and keep their existing runtime
-      // path unchanged. Cattle records Full as well as Limited so the
-      // session-scoped subject can never switch policy after admission.
-      if (input.kind === "cattle") {
-        await measureOptional(input.timing, "runtimeSubject.configureNetwork", () =>
-          configureRuntimeSubjectNetwork(subject, input.networkConstraints),
-        );
-      }
+      // Apply the Session policy before any container-starting RPC.
+      await measureOptional(input.timing, "runtimeSubject.configureNetwork", () =>
+        configureRuntimeSubjectNetwork(subject, input.networkConstraints),
+      );
       await measureOptional(input.timing, "runtimeSubject.prepareFilesystem", async () => {
         const allowStartupRecovery =
           isCold &&
@@ -250,22 +178,11 @@ export class RuntimeSubjectLifecycleService {
         if (!restoring) {
           throw new Error("Runtime subject activation claim expired before restore.");
         }
-
-        await measureOptional(input.timing, "runtimeSubject.restoreBackup", () =>
-          this.#restoreLastBackup({
-            claimOwner,
-            kind: input.kind,
-            record,
-            runtimeSubjectId: input.runtimeSubjectId,
-            subject,
-          }),
-        );
       }
 
       const activated = await measureOptional(input.timing, "runtimeSubject.markActive", () =>
         markRuntimeSubjectActive(this.#bindings.DB, {
           claimOwner,
-          kind: input.kind,
           runtimeSubjectId: input.runtimeSubjectId,
         }),
       );
@@ -280,17 +197,10 @@ export class RuntimeSubjectLifecycleService {
           event: SERVER_PRODUCT_ANALYTICS_EVENTS.sandboxCreated,
           properties: {
             activation_purpose: purpose,
-            agent_id:
-              input.diagnosticContext?.agentId ??
-              (input.subjectKind === "agent" ? input.subjectId : undefined),
+            agent_id: input.diagnosticContext?.agentId ?? input.agentId ?? undefined,
             execution_owner_id: input.executionOwnerUserId,
             sandbox_id: input.runtimeSubjectId,
-            sandbox_kind: input.kind,
-            session_id:
-              input.diagnosticContext?.sessionId ??
-              (input.subjectKind === "session" ? input.subjectId : undefined),
-            subject_id: input.subjectId,
-            subject_kind: input.subjectKind,
+            session_id: input.sessionId,
           },
         });
       }
@@ -348,82 +258,10 @@ export class RuntimeSubjectLifecycleService {
         }
       }
 
-      await this.#appendRestoreFailureDiagnostic({
-        diagnosticContext: input.diagnosticContext,
-        error,
-        errorCode,
-        record,
-        runtimeSubjectId: input.runtimeSubjectId,
-      });
-
       throw new Error(message, { cause: error });
     }
 
     return { subject };
-  }
-
-  async activateConversationSession(input: {
-    readonly sandboxSessionId: SandboxSessionId;
-    readonly cwd: string;
-    readonly now: number;
-    readonly originJson: string;
-    readonly runtimeSubjectId: SandboxId;
-    readonly sessionId: SessionId;
-  }): Promise<void> {
-    await recordRuntimeConversationSessionActive(this.#bindings.DB, input);
-  }
-
-  async failConversationSession(input: {
-    readonly sandboxSessionId: SandboxSessionId;
-    readonly cwd: string;
-    readonly errorCode: RuntimeSubjectErrorCode;
-    readonly message: string;
-    readonly now: number;
-    readonly originJson: string;
-    readonly runtimeSubjectId: SandboxId;
-    readonly sessionId: SessionId;
-  }): Promise<void> {
-    await recordRuntimeConversationSessionError(this.#bindings.DB, input);
-  }
-
-  async closeConversationSession(input: {
-    readonly runtimeSubjectId: SandboxId;
-    readonly sessionId: SessionId;
-  }): Promise<void> {
-    const state = await getRuntimeConversationSessionState(this.#bindings.DB, input);
-
-    if (!state || state.status !== "active") {
-      return;
-    }
-
-    const now = currentTimestampMs();
-
-    await deleteActiveSandboxConversationSession(this.#bindings, {
-      sandboxSessionId: state.sandboxSessionId,
-      sandboxId: input.runtimeSubjectId,
-    });
-
-    if (state.agentId) {
-      await appendRuntimeDiagnosticEvent(this.#bindings, {
-        eventName: RUNTIME_DIAGNOSTIC_EVENT.sandboxSessionDestroyed.name,
-        sessionId: input.sessionId,
-        value: {
-          ...toRuntimeDiagnosticBaseValue({
-            agentId: state.agentId,
-            sessionId: input.sessionId,
-          }),
-          reason: "runtime_subject_session_closed",
-          sandboxId: input.runtimeSubjectId,
-        },
-      });
-    }
-
-    await recordRuntimeConversationSessionClosed(this.#bindings.DB, {
-      inactiveDeadlineAt: getRuntimeSubjectInactiveDeadline(getRuntimeKindPolicy(state.kind), now),
-      now,
-      runtimeSubjectId: input.runtimeSubjectId,
-      sessionId: input.sessionId,
-    });
   }
 
   async acquireRunLease(input: {
@@ -464,11 +302,9 @@ export class RuntimeSubjectLifecycleService {
         agentId: input.agentId,
         projectId: input.projectId,
         executionOwnerUserId: input.executionOwnerUserId,
-        kind: input.kind,
         now,
         runtimeSubjectId: input.runtimeSubjectId,
-        subjectId: input.subjectId,
-        subjectKind: input.subjectKind,
+        sessionId: input.sessionId,
       });
 
       if (runtimeSubjectId !== input.runtimeSubjectId) {
@@ -514,9 +350,7 @@ export class RuntimeSubjectLifecycleService {
   }): Promise<RuntimeSubjectActivationRecord> {
     let record = input.record;
 
-    if (record.kind !== input.activation.kind) {
-      throw new Error("Runtime subject kind does not match the requested runtime kind.");
-    }
+    assertSessionRuntimeSubjectBinding(record, input.activation);
 
     if (record.status === "backing_up" || record.status === "destroying") {
       throw new Error("Runtime subject is busy with lifecycle maintenance.");
@@ -559,9 +393,7 @@ export class RuntimeSubjectLifecycleService {
         throw new Error("Runtime subject activation could not refresh the lifecycle record.");
       }
       record = refreshed;
-      if (record.kind !== input.activation.kind) {
-        throw new Error("Runtime subject kind does not match the requested runtime kind.");
-      }
+      assertSessionRuntimeSubjectBinding(record, input.activation);
       if (record.status === "backing_up" || record.status === "destroying") {
         throw new Error("Runtime subject is busy with lifecycle maintenance.");
       }
@@ -587,6 +419,7 @@ export class RuntimeSubjectLifecycleService {
       accountConcurrentSandboxLimit: this.#accountConcurrentSandboxLimit,
       agentId: input.activation.agentId,
       projectId: input.activation.projectId,
+      sessionId: input.activation.sessionId,
       claimExpiresAt: input.claimExpiresAt,
       claimOwner: input.claimOwner,
       executionOwnerUserId: input.activation.executionOwnerUserId,
@@ -641,6 +474,10 @@ export class RuntimeSubjectLifecycleService {
     }
 
     return preemptRuntimeSubjectActivationClaim(this.#bindings.DB, {
+      agentId: input.activation.agentId,
+      projectId: input.activation.projectId,
+      sessionId: input.activation.sessionId,
+      executionOwnerUserId: input.activation.executionOwnerUserId,
       claimExpiresAt: input.claimExpiresAt,
       claimOwner: input.claimOwner,
       expectedClaimExpiresAt: record.claimExpiresAt,
@@ -648,76 +485,6 @@ export class RuntimeSubjectLifecycleService {
       expectedStatus: record.status,
       now: currentTimestampMs(),
       runtimeSubjectId: input.activation.runtimeSubjectId,
-    });
-  }
-
-  async #restoreLastBackup(input: {
-    readonly claimOwner: string;
-    readonly kind: AgentKind;
-    readonly record: RuntimeSubjectActivationRecord | null;
-    readonly runtimeSubjectId: SandboxId;
-    readonly subject: SandboxHandle;
-  }): Promise<void> {
-    const readyBackup = selectRuntimeSubjectRestoreBackup({
-      kind: input.kind,
-      record: input.record,
-      runtimeSubjectId: input.runtimeSubjectId,
-    });
-
-    if (readyBackup === null) {
-      return;
-    }
-
-    try {
-      await restoreRuntimeSubjectBackup(input.subject, {
-        backup: readyBackup,
-        runtimeSubjectId: input.runtimeSubjectId,
-      });
-    } catch (error) {
-      throw new RuntimeSubjectRestoreFailedError({
-        backupId: readyBackup.id,
-        cause: error,
-        runtimeSubjectId: input.runtimeSubjectId,
-      });
-    }
-    await markRuntimeSubjectRestoreApplied(this.#bindings.DB, {
-      backupId: readyBackup.id,
-      claimOwner: input.claimOwner,
-      runtimeSubjectId: input.runtimeSubjectId,
-    });
-  }
-
-  async #appendRestoreFailureDiagnostic(input: {
-    readonly diagnosticContext: RuntimeDiagnosticContext | undefined;
-    readonly error: unknown;
-    readonly errorCode: RuntimeSubjectErrorCode;
-    readonly record: RuntimeSubjectActivationRecord | null;
-    readonly runtimeSubjectId: SandboxId;
-  }): Promise<void> {
-    if (
-      input.diagnosticContext === undefined ||
-      (input.errorCode !== "runtime.subject_backup_not_ready" &&
-        input.errorCode !== "runtime.subject_restore_failed")
-    ) {
-      return;
-    }
-
-    const backupId =
-      input.error instanceof RuntimeSubjectBackupNotReadyError ||
-      input.error instanceof RuntimeSubjectRestoreFailedError
-        ? input.error.backupId
-        : (input.record?.lastBackup?.id ?? null);
-
-    await appendRuntimeDiagnosticEvent(this.#bindings, {
-      eventName: RUNTIME_DIAGNOSTIC_EVENT.sandboxRestoreFailed.name,
-      sessionId: input.diagnosticContext.sessionId,
-      value: {
-        ...toRuntimeDiagnosticBaseValue(input.diagnosticContext),
-        backupId,
-        errorCode: input.errorCode,
-        reason: toRuntimeDiagnosticReason(input.error, "Runtime subject restore failed."),
-        sandboxId: input.runtimeSubjectId,
-      },
     });
   }
 }

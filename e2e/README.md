@@ -13,6 +13,7 @@ just e2e contract harness
 just e2e deterministic session-log
 just e2e ui files-page
 just e2e ui sidebar
+just e2e ui session-isolation
 just e2e ui design-contract
 just e2e ui typography-proof
 just e2e ui preview

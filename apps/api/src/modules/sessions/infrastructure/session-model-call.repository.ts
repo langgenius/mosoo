@@ -17,18 +17,22 @@ import type {
   SessionModelCallId,
   SessionRunId,
 } from "@mosoo/id";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 
-import { getAppDatabase, runAppDatabaseBatch } from "../../../platform/db/drizzle";
+import {
+  getAppDatabase,
+  getD1ChangeCount,
+  runAppDatabaseBatch,
+} from "../../../platform/db/drizzle";
 import { isTruthy } from "../../../shared/truthiness";
 import { currentTimestampMs } from "../../../time";
 import { createRuntimeUsageEventUpsert } from "../../cost/application/cost-usage-event.service";
 import type { SessionUsageSummary } from "./session-live-state.types";
 interface SessionModelCallRunRow {
-  agent_id: AgentId;
+  agent_id: AgentId | null;
   agent_owner_user_id: AccountId;
   agent_revision_id: AgentDeploymentVersionId | null;
-  agent_status: "draft" | "published";
+  agent_status: "draft" | "published" | null;
   actor_user_id: AccountId;
   completed_at: number | null;
   model: string | null;
@@ -50,7 +54,6 @@ export interface UpsertSessionModelCallUsageInput {
   driverInstanceId: DriverInstanceId;
   sessionId: SessionId;
   sessionRunId: SessionRunId;
-  status: SessionModelCallStatus;
   traceId: string;
   usage: SessionUsageSummary | null;
 }
@@ -95,9 +98,9 @@ async function getSessionModelCallRunRow(
       .select({
         actor_user_id: sessionRunsTable.createdByAccountId,
         agent_id: sessionRunsTable.agentId,
-        agent_owner_user_id: agentsTable.ownerId,
+        agent_owner_user_id: projectsTable.ownerAccountId,
         agent_revision_id: sessionRunsTable.deploymentVersionId,
-        agent_status: sql<"draft" | "published">`${agentsTable.status}`,
+        agent_status: sql<"draft" | "published" | null>`${agentsTable.status}`,
         completed_at: sessionRunsTable.completedAt,
         model: sql`${sessionRunsTable.model}`.mapWith(sessionRunsTable.model).as("model"),
         project_organization_id: projectsTable.organizationId,
@@ -121,7 +124,7 @@ async function getSessionModelCallRunRow(
       })
       .from(sessionRunsTable)
       .innerJoin(sessionsTable, eq(sessionsTable.id, sessionRunsTable.sessionId))
-      .innerJoin(
+      .leftJoin(
         agentsTable,
         and(
           eq(agentsTable.id, sessionRunsTable.agentId),
@@ -146,15 +149,12 @@ export async function upsertSessionModelCallUsage(
 
   const run = await getSessionModelCallRunRow(database, input.sessionRunId);
 
-  if (!run) {
+  if (!run || run.session_id !== input.sessionId) {
     throw new Error("Session run not found for model call usage.");
   }
 
   const timestampMs = currentTimestampMs();
-  const completedAt =
-    input.status === "completed" || input.status === "failed"
-      ? (run.completed_at ?? timestampMs)
-      : null;
+  const completedAt = run.completed_at;
   const nativeCallId = normalizeUsageCallId(usage.callId);
   const callKey = isTruthy(nativeCallId) ? `model_call:${nativeCallId}` : "run_usage";
   const provider = run.provider ?? run.session_provider;
@@ -190,7 +190,7 @@ export async function upsertSessionModelCallUsage(
         cacheCreationTokens: toTokenCount(usage.cachedWriteTokens),
         cacheReadTokens: toTokenCount(usage.cachedReadTokens),
         callKey,
-        completedAt,
+        completedAt: sql`(SELECT completed_at FROM session_run WHERE id = ${input.sessionRunId})`,
         costCurrency: usage.costCurrency ?? null,
         createdAt: timestampMs,
         driverInstanceId: input.driverInstanceId,
@@ -206,7 +206,12 @@ export async function upsertSessionModelCallUsage(
         sessionId: input.sessionId,
         sessionRunId: input.sessionRunId,
         startedAt: run.started_at ?? timestampMs,
-        status: input.status,
+        // Read inside the write transaction: usage and the terminal Run can
+        // arrive in either order, and completion must wait for its checkpoint.
+        status: sql`(SELECT CASE
+          WHEN status = 'completed' THEN 'completed'
+          WHEN status IN ('failed', 'cancelled', 'expired') THEN 'failed'
+          ELSE 'started' END FROM session_run WHERE id = ${input.sessionRunId})`,
         totalCostUsdMicros: toUsdMicros(usage.costAmount),
         traceId: input.traceId,
         updatedAt: timestampMs,
@@ -240,6 +245,43 @@ export async function upsertSessionModelCallUsage(
 
     return usageEventUpsert === null ? [modelCallUpsert] : [modelCallUpsert, usageEventUpsert];
   });
+}
+
+/** Close existing usage only from the persisted outcome, before acknowledging a terminal event. */
+export async function finalizeSessionModelCallUsage(
+  database: D1Database,
+  sessionRunId: SessionRunId,
+): Promise<boolean> {
+  const appDatabase = getAppDatabase(database);
+  const result = await appDatabase
+    .update(sessionModelCallsTable)
+    .set({
+      status: sql`(SELECT CASE WHEN status = 'completed' THEN 'completed' ELSE 'failed' END
+        FROM session_run WHERE id = ${sessionRunId})`,
+      completedAt: sql`(SELECT COALESCE(completed_at, updated_at)
+        FROM session_run WHERE id = ${sessionRunId})`,
+      updatedAt: currentTimestampMs(),
+    })
+    .where(
+      and(
+        eq(sessionModelCallsTable.sessionRunId, sessionRunId),
+        eq(sessionModelCallsTable.status, "started"),
+        inArray(
+          sessionModelCallsTable.sessionRunId,
+          appDatabase
+            .select({ id: sessionRunsTable.id })
+            .from(sessionRunsTable)
+            .where(
+              and(
+                eq(sessionRunsTable.id, sessionRunId),
+                inArray(sessionRunsTable.status, ["completed", "failed", "cancelled", "expired"]),
+              ),
+            ),
+        ),
+      ),
+    )
+    .run();
+  return getD1ChangeCount(result) > 0;
 }
 
 function normalizeUsageCallId(value: string | null | undefined): string | null {

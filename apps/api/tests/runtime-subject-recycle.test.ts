@@ -21,11 +21,6 @@ import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
 const CLOUDFLARE_BACKUP_ID = "550e8400-e29b-41d4-a716-446655440000";
-const CLOUDFLARE_BACKUP_IDS = [
-  CLOUDFLARE_BACKUP_ID,
-  "550e8400-e29b-41d4-a716-446655440001",
-  "550e8400-e29b-41d4-a716-446655440002",
-] as const;
 const BACKUP_ID = encodeSandboxBackupIdForStorage(CLOUDFLARE_BACKUP_ID);
 const CLAIM_OWNER = "scheduled-maintenance-owner";
 const OPERATION_ID = "01J0000000000000000000000R";
@@ -44,7 +39,12 @@ function createRuntimeSubjectRecycleDatabase(): SqliteD1Database {
       status text NOT NULL
     );
 
+    CREATE TABLE project (id text PRIMARY KEY, owner_account_id text NOT NULL);
+    INSERT INTO project VALUES ('${PLATFORM_ID_FIXTURES.project}', '${PLATFORM_ID_FIXTURES.account}');
     CREATE TABLE sandbox (
+      project_id text DEFAULT '${PLATFORM_ID_FIXTURES.project}',
+      owner_account_id text DEFAULT '${PLATFORM_ID_FIXTURES.account}',
+
       sandbox_binding text NOT NULL DEFAULT 'Sandbox',
       claim_expires_at integer,
       claim_owner text,
@@ -87,6 +87,7 @@ function createRuntimeSubjectRecycleDatabase(): SqliteD1Database {
     );
 
     CREATE TABLE session (
+      project_id text DEFAULT '${PLATFORM_ID_FIXTURES.project}',
       id text PRIMARY KEY NOT NULL,
       last_message_at integer,
       status text NOT NULL
@@ -101,6 +102,7 @@ function createRuntimeSubjectRecycleDatabase(): SqliteD1Database {
       status text NOT NULL
     );
 
+    INSERT INTO session (id, last_message_at, status) VALUES ('01J00000000000000000000009', 1, 'IDLE');
     INSERT INTO sandbox (
       claim_expires_at,
       claim_owner,
@@ -212,7 +214,7 @@ function createSandboxHandle(): SandboxHandle {
 }
 
 describe("runtime subject recycle", () => {
-  test("repairs stranded cattle subjects without touching active conversations", async () => {
+  test("repairs stranded exclusive Session subjects without touching active conversations", async () => {
     const database = createRuntimeSubjectRecycleDatabase();
     database.execute(`
       UPDATE sandbox
@@ -223,29 +225,23 @@ describe("runtime subject recycle", () => {
       WHERE id = '${SANDBOX_ID}';
 
       INSERT INTO sandbox_session (cwd, sandbox_id, session_id, status, updated_at)
-      VALUES ('/workspace', '${SANDBOX_ID}', 'session-1', 'closed', 1);
+      VALUES ('/workspace', '${SANDBOX_ID}', '01J00000000000000000000009', 'closed', 1);
     `);
 
-    await expect(repairStrandedRuntimeSubjectDeadlines(database, { now: 10 })).resolves.toEqual({
-      cattle: 1,
-      pet: 0,
-    });
+    await expect(repairStrandedRuntimeSubjectDeadlines(database, { now: 10 })).resolves.toBe(1);
     await expect(
       listInactiveRuntimeSubjects(database, { limit: 10, now: 300_009 }),
     ).resolves.toEqual([]);
     await expect(
       listInactiveRuntimeSubjects(database, { limit: 10, now: 300_010 }),
-    ).resolves.toEqual([{ id: SANDBOX_ID, kind: "cattle" }]);
+    ).resolves.toEqual([{ id: SANDBOX_ID }]);
 
     database.execute(`
       UPDATE sandbox SET inactive_deadline_at = NULL WHERE id = '${SANDBOX_ID}';
-      UPDATE sandbox_session SET status = 'active' WHERE session_id = 'session-1';
+      UPDATE sandbox_session SET status = 'active' WHERE session_id = '01J00000000000000000000009';
     `);
 
-    await expect(repairStrandedRuntimeSubjectDeadlines(database, { now: 20 })).resolves.toEqual({
-      cattle: 0,
-      pet: 0,
-    });
+    await expect(repairStrandedRuntimeSubjectDeadlines(database, { now: 20 })).resolves.toBe(0);
   });
 
   test("uses a generated operation id instead of the maintenance claim owner", async () => {
@@ -255,7 +251,7 @@ describe("runtime subject recycle", () => {
     await expect(
       recycleRuntimeSubject(createBindings(database), {
         claimOwner: CLAIM_OWNER,
-        kind: "pet",
+
         now: 10,
         reason: "test.recycle",
         runtimeSubjectId: SANDBOX_ID,
@@ -278,115 +274,43 @@ describe("runtime subject recycle", () => {
       }>();
 
     expect(subject?.status).toBe("cold");
-    expect(subject?.last_backup_id).toBe(BACKUP_ID);
+    expect(subject?.last_backup_id).toBeNull();
     expect(subject?.status_operation_id).not.toBe(CLAIM_OWNER);
     expect(isPlatformId(subject?.status_operation_id)).toBe(true);
   });
 
-  test("hibernates one idle pet subject across sessions after checkpointing durable state", async () => {
+  test("preserves a shared machine and all its conversation bindings", async () => {
     const database = createRuntimeSubjectRecycleDatabase();
-    await database
-      .prepare(
-        `
-          UPDATE sandbox
-          SET claim_expires_at = NULL,
-              claim_owner = NULL,
-              inactive_deadline_at = ?,
-              subject_kind = ?
-          WHERE id = ?
-        `,
-      )
-      .bind(10, "agent", SANDBOX_ID)
-      .run();
     database.execute(`
+      UPDATE sandbox SET claim_expires_at = NULL, claim_owner = NULL,
+        inactive_deadline_at = 1, subject_kind = 'agent';
       INSERT INTO sandbox_session (cwd, sandbox_id, session_id, status, updated_at)
-      VALUES
-        ('/workspace/se/session-1', '${SANDBOX_ID}', '01J0000000000000000000000S', 'active', 1),
-        ('/workspace/se/session-2', '${SANDBOX_ID}', '01J0000000000000000000000T', 'active', 1),
-        ('/workspace/se/terminated', '${SANDBOX_ID}', '01J0000000000000000000000U', 'active', 1);
-
-      INSERT INTO session (id, last_message_at, status)
-      VALUES
-        ('01J0000000000000000000000S', 1, 'IDLE'),
-        ('01J0000000000000000000000T', 1, 'IDLE'),
-        ('01J0000000000000000000000U', 1, 'TERMINATED');
+        VALUES ('/workspace', '${SANDBOX_ID}', '01J0000000000000000000000T', 'closed', 1);
     `);
-    const checkpointDirs: string[] = [];
-    const preparedDirs: string[] = [];
-    const lifecycleCalls: string[] = [];
-    let backupIndex = 0;
+    const before = await database.prepare("SELECT * FROM sandbox").all();
+    const conversations = await database.prepare("SELECT * FROM sandbox_session").all();
+    let physicalCalls = 0;
     currentSandbox = {
       ...createSandboxHandle(),
-      createBackup: async (options) => {
-        checkpointDirs.push(options.dir);
-        const id = CLOUDFLARE_BACKUP_IDS[backupIndex];
-        backupIndex += 1;
-        if (!id) {
-          throw new Error("Unexpected extra checkpoint.");
-        }
-        return { dir: options.dir, id };
-      },
-      mkdir: async (path) => {
-        preparedDirs.push(path);
-      },
       destroy: async () => {
-        lifecycleCalls.push("destroy");
+        physicalCalls++;
       },
-      setKeepAlive: async (keepAlive) => {
-        lifecycleCalls.push(`keepAlive:${keepAlive}`);
+      createBackup: async () => {
+        physicalCalls++;
+        throw new Error("Unexpected backup");
       },
     };
-    const bindings = createBindings(database);
-
-    await expect(
-      listInactiveRuntimeSubjects(database, {
-        limit: 10,
+    expect(await listInactiveRuntimeSubjects(database, { limit: 10, now: 10 })).toEqual([]);
+    expect(
+      await recycleInactiveRuntimeSubjectNow(createBindings(database), {
         now: 10,
-      }),
-    ).resolves.toEqual([{ id: SANDBOX_ID, kind: "pet" }]);
-    await expect(
-      recycleInactiveRuntimeSubjectNow(bindings, {
-        kind: "pet",
-        now: 10,
-        reason: "test.pet_idle_hibernate",
+        reason: "test.shared",
         runtimeSubjectId: SANDBOX_ID,
       }),
-    ).resolves.toBe(true);
-    await expect(
-      recycleInactiveRuntimeSubjectNow(bindings, {
-        kind: "pet",
-        now: 10,
-        reason: "test.pet_idle_hibernate_duplicate",
-        runtimeSubjectId: SANDBOX_ID,
-      }),
-    ).resolves.toBe(false);
-
-    expect(checkpointDirs.toSorted()).toEqual([
-      "/workspace/memory",
-      "/workspace/se/session-1",
-      "/workspace/se/session-2",
-    ]);
-    expect(preparedDirs.toSorted()).toEqual(checkpointDirs.toSorted());
-    expect(lifecycleCalls).toEqual(["keepAlive:false", "destroy"]);
-    await expect(readRuntimeSubjectRecycleRow(database)).resolves.toMatchObject({
-      last_error: null,
-      last_error_code: null,
-      status: "cold",
-    });
-    const sessions = await database
-      .prepare("SELECT status FROM sandbox_session ORDER BY session_id")
-      .all<{ status: string }>();
-    expect(sessions.results).toEqual([
-      { status: "closed" },
-      { status: "closed" },
-      { status: "closed" },
-    ]);
-    await expect(
-      listInactiveRuntimeSubjects(database, {
-        limit: 10,
-        now: Number.MAX_SAFE_INTEGER,
-      }),
-    ).resolves.toEqual([]);
+    ).toBe(false);
+    expect(physicalCalls).toBe(0);
+    expect(await database.prepare("SELECT * FROM sandbox").all()).toEqual(before);
+    expect(await database.prepare("SELECT * FROM sandbox_session").all()).toEqual(conversations);
   });
 
   test("resumes a stale destroy phase using the recorded operation id", async () => {
@@ -412,12 +336,11 @@ describe("runtime subject recycle", () => {
           VALUES (?, ?, ?, ?, ?)
         `,
       )
-      .bind("/workspace", SANDBOX_ID, "01J0000000000000000000000S", "active", 1)
+      .bind("/workspace", SANDBOX_ID, "01J00000000000000000000009", "active", 1)
       .run();
 
     await expect(
       resumeRuntimeSubjectRecycleOperation(createBindings(database), {
-        kind: "pet",
         operationId: OPERATION_ID,
         reason: "test.repair",
         runtimeSubjectId: SANDBOX_ID,
@@ -440,7 +363,7 @@ describe("runtime subject recycle", () => {
       }>();
     const session = await database
       .prepare("SELECT status FROM sandbox_session WHERE session_id = ?")
-      .bind("01J0000000000000000000000S")
+      .bind("01J00000000000000000000009")
       .first<{ status: string }>();
 
     expect(subject).toEqual({
@@ -450,103 +373,63 @@ describe("runtime subject recycle", () => {
     expect(session).toEqual({ status: "closed" });
   });
 
-  test("keeps backup failures as stale repair candidates", async () => {
+  test("rechecks resident conversation state after an idle claim", async () => {
     const database = createRuntimeSubjectRecycleDatabase();
-    let backupAvailable = false;
-    const lifecycleCalls: string[] = [];
-    await database
-      .prepare(
-        `
-          INSERT INTO sandbox_session (cwd, sandbox_id, session_id, status, updated_at)
-          VALUES (?, ?, ?, ?, ?)
-        `,
-      )
-      .bind("/workspace/se/session-1", SANDBOX_ID, "01J0000000000000000000000S", "active", 1)
-      .run();
+    database.execute(`INSERT INTO sandbox_session (cwd, sandbox_id, session_id, status, updated_at)
+      VALUES ('/workspace', '${SANDBOX_ID}', '01J00000000000000000000009', 'active', 1)`);
+    let destroys = 0;
     currentSandbox = {
       ...createSandboxHandle(),
-      createBackup: async (options) => {
-        if (!backupAvailable) {
-          backupAvailable = true;
-          throw new Error("backup service unavailable");
-        }
-
-        return {
-          dir: options.dir,
-          id: CLOUDFLARE_BACKUP_ID,
-        };
-      },
       destroy: async () => {
-        lifecycleCalls.push("destroy");
-      },
-      setKeepAlive: async (keepAlive) => {
-        lifecycleCalls.push(`keepAlive:${keepAlive}`);
+        destroys++;
       },
     };
-
-    await expect(
-      recycleRuntimeSubject(createBindings(database), {
+    expect(
+      await recycleRuntimeSubject(createBindings(database), {
         claimOwner: CLAIM_OWNER,
-        kind: "pet",
         now: 10,
-        reason: "test.recycle",
+        reason: "test.race",
         runtimeSubjectId: SANDBOX_ID,
       }),
-    ).rejects.toThrow("checkpoint failed");
-
-    const failedSubject = await readRuntimeSubjectRecycleRow(database);
-    const operationId = requireRuntimeOperationId(failedSubject.status_operation_id);
-
-    expect(failedSubject).toMatchObject({
-      last_backup_id: null,
-      last_error_code: "runtime.subject_checkpoint_failed",
-      status: "backing_up",
-      status_operation_id: operationId,
-    });
-    expect(failedSubject.last_error).toContain("checkpoint failed");
-    expect(lifecycleCalls).toEqual([]);
-    await expect(
-      database
-        .prepare("SELECT status FROM sandbox_session WHERE session_id = ?")
-        .bind("01J0000000000000000000000S")
-        .first("status"),
-    ).resolves.toBe("active");
-    await expect(
-      listStaleRuntimeSubjectOperations(database, {
-        limit: 10,
-        staleChangedAtLte: Number.MAX_SAFE_INTEGER,
-      }),
-    ).resolves.toEqual([
-      {
-        id: SANDBOX_ID,
-        kind: "pet",
-        operationId,
-        status: "backing_up",
-      },
-    ]);
-
-    await expect(
-      resumeRuntimeSubjectRecycleOperation(createBindings(database), {
-        kind: "pet",
-        operationId,
-        reason: "test.repair",
-        runtimeSubjectId: SANDBOX_ID,
-        status: "backing_up",
-      }),
-    ).resolves.toBe(true);
-
-    await expect(readRuntimeSubjectRecycleRow(database)).resolves.toMatchObject({
-      last_backup_id: BACKUP_ID,
-      last_error: null,
-      last_error_code: null,
-      status: "cold",
-      status_operation_id: operationId,
-    });
-    expect(lifecycleCalls).toEqual(["keepAlive:false", "destroy"]);
+    ).toBe(false);
+    expect(destroys).toBe(0);
+    expect(await readRuntimeSubjectRecycleRow(database)).toMatchObject({ status: "active" });
+    expect(await database.prepare("SELECT status FROM sandbox_session").first("status")).toBe(
+      "active",
+    );
   });
+
+  test.each(["active", "newer operation"])(
+    "a stale destroy task cannot touch a %s Session",
+    async (change) => {
+      const database = createRuntimeSubjectRecycleDatabase();
+      database.execute(
+        `UPDATE sandbox SET status = '${change === "active" ? "active" : "destroying"}', status_operation_id = '01J0000000000000000000000S'`,
+      );
+      const before = await database.prepare("SELECT * FROM sandbox").all();
+      let destroys = 0;
+      currentSandbox = {
+        ...createSandboxHandle(),
+        destroy: async () => {
+          destroys++;
+        },
+      };
+      await expect(
+        resumeRuntimeSubjectRecycleOperation(createBindings(database), {
+          operationId: OPERATION_ID,
+          reason: "test.stale",
+          runtimeSubjectId: SANDBOX_ID,
+          status: "destroying",
+        }),
+      ).rejects.toThrow();
+      expect(destroys).toBe(0);
+      expect(await database.prepare("SELECT * FROM sandbox").all()).toEqual(before);
+    },
+  );
 
   test("keeps destroy failures as stale repair candidates with the recorded backup", async () => {
     const database = createRuntimeSubjectRecycleDatabase();
+    await database.prepare("UPDATE sandbox SET last_backup_id = ?").bind(BACKUP_ID).run();
     let destroyAvailable = false;
     currentSandbox = {
       ...createSandboxHandle(),
@@ -567,7 +450,7 @@ describe("runtime subject recycle", () => {
     await expect(
       recycleRuntimeSubject(createBindings(database), {
         claimOwner: CLAIM_OWNER,
-        kind: "pet",
+
         now: 10,
         reason: "test.recycle",
         runtimeSubjectId: SANDBOX_ID,
@@ -592,7 +475,7 @@ describe("runtime subject recycle", () => {
     ).resolves.toEqual([
       {
         id: SANDBOX_ID,
-        kind: "pet",
+
         operationId,
         status: "destroying",
       },
@@ -600,7 +483,6 @@ describe("runtime subject recycle", () => {
 
     await expect(
       resumeRuntimeSubjectRecycleOperation(createBindings(database), {
-        kind: "pet",
         operationId,
         reason: "test.repair",
         runtimeSubjectId: SANDBOX_ID,
@@ -644,7 +526,7 @@ describe("runtime subject recycle", () => {
     ).resolves.toEqual([
       {
         id: SANDBOX_ID,
-        kind: "pet",
+
         operationId: OPERATION_ID,
         status: "destroying",
       },
@@ -681,7 +563,6 @@ describe("runtime subject recycle", () => {
       },
     };
     const repair = {
-      kind: candidate.kind,
       operationId: candidate.operationId,
       reason: "test.expired_activation",
       runtimeSubjectId: candidate.id,
