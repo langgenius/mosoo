@@ -14,11 +14,11 @@
   "dependencies": {
     "@mosoo/contracts": "workspace:*",
     "@mosoo/id": "workspace:*",
-    "drizzle-orm": "^0.45.2"
+    "drizzle-orm": "^0.45.3"
   },
   "devDependencies": {
     "@types/node": "^25.8.0",
-    "drizzle-kit": "^0.31.10",
+    "drizzle-kit": "^0.31.11",
     "typescript": "^6.0.3",
     "vite-plus": "^0.1.23"
   }
