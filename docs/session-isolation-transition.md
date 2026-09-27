@@ -45,6 +45,25 @@ The recovery/conversion procedure below applies to Sessions that retain the
 continuity requirement. Shared migration safeguards cannot be removed while those
 Sessions still depend on them in the conversion build.
 
+## Reviewed recent Preview exception
+
+The September 25 owner decision chooses the smaller implementation for the six
+reviewed recent debug Previews with missing original configuration: retain history
+and existing saved files, make the old Preview permanently stopped/read-only, and
+use the existing new-Preview entry point. Do not reconstruct missing configuration
+or add another runtime policy or retention parameter. Keep the exact six IDs and
+before-images in private release material; four were in the protected Pet cohort
+and two already used isolated execution. The fixed 169-Pet inventory therefore has
+162 read-only candidates and seven continuity-protected Sessions; including the
+two separate Previews gives 164 read-only candidates. Seven original candidates
+still require their existing guarded stale-operation reconciliation.
+
+This is an explicit experience exception, not a finding of inactivity or permission
+to mutate production. Recheck ownership, debug-only provenance, every pending Run,
+upload and operation; formal/API use or unresolved active work stops that object's
+cutover. Preserve shared resources and all retained data, with backed-up before-images
+and a guarded rollback. The ordinary 30-day Preview policy remains unchanged.
+
 ## Finite release operation
 
 The final main branch contains one Session execution model. It does not retain the

@@ -87,3 +87,5 @@ existing stopped Session capabilities and new-Session entry point. Debug Preview
 its separate 30-day policy. Production changes still require a backup and rollback plan
 and explicit approval; this decision does not authorize deleting retained data or shared
 execution resources.
+
+On September 25, the owner also approved this retained-history experience for six specifically reviewed recent Cloud debug Previews with missing original configuration. Preserve their history and existing saved files; returning users open a new Preview. Reuse the permanently stopped lifecycle instead of reconstructing missing configuration. This fixed, private allowlist does not require waiting for 30-day inactivity and does not extend to formal/API-used Sessions or other recent Previews. The ordinary debug Preview policy still has only its existing 30-day parameter. Backup, drain, rollback and production approval remain required.
