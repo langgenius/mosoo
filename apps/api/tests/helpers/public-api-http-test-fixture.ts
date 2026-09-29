@@ -288,8 +288,10 @@ export function createPublicHttpTestBindings(
   };
 }
 
-export async function createPublicHttpContractDatabase(): Promise<SqliteD1Database> {
-  const database = new SqliteD1Database();
+export async function createPublicHttpContractDatabase(
+  input: { maxBoundParams?: number } = {},
+): Promise<SqliteD1Database> {
+  const database = new SqliteD1Database(input);
   const nowMs = nowMsForTest();
 
   database.execute(CONTRACT_SCHEMA_SQL);
