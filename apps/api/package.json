@@ -13,7 +13,7 @@
     "test": "vp exec bun test tests"
   },
   "dependencies": {
-    "@cloudflare/sandbox": "0.12.6",
+    "@cloudflare/sandbox": "0.12.9",
     "@mosoo/ag-ui-session": "workspace:*",
     "@mosoo/agent-driver": "workspace:*",
     "@mosoo/agent-package": "workspace:*",

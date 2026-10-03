@@ -47,10 +47,10 @@ Acceptance:
 ### Runtime image namespace compatibility
 
 The runtime image split adds `sandbox.sandbox_binding` with the legacy `Sandbox`
-default and registers `SandboxClaude`, `SandboxOpenAI`, and `SandboxOpenCode`.
-Apply the additive D1 migration before deploying the Worker. The allocation
+default and registers `SandboxClaude`, `SandboxOpenAI`, `SandboxOpenCode`, and `SandboxPi`.
+Apply the additive D1 migration before deploying the Worker. Pi additionally appends the `v4-pi-runtime` Durable Object migration; preserve all prior class migration tags. The allocation
 flag `MOSOO_RUNTIME_IMAGES_ENABLED` defaults to `false`: deploy the routing-aware
-Worker and all four container classes first, drain requests from older Worker
+Worker and all five container classes first, drain requests from older Worker
 versions, then set it to `true` in a separately reviewed deployment. Reverting
 the flag stops new split-image allocations while existing subjects keep their
 recorded namespace. Verify this sequence in stage before production. Keep the legacy

@@ -165,6 +165,19 @@ export async function buildExecutionSpec(
     sessionRunId?: SessionRunId | null;
   },
 ): Promise<DriverExecutionSpec> {
+  if (input.profile.runtimeId === "pi-acp") {
+    if (
+      input.profile.provider !== "openai-compatible" ||
+      input.profile.vendorCredential.vendorId !== "openai-compatible"
+    ) {
+      throw new Error("Pi requires an OpenAI-compatible provider.");
+    }
+    if (input.resolvedMcpServers.length > 0) throw new Error("Pi does not support MCP servers.");
+    if (input.profile.permissionPolicy !== "full_access")
+      throw new Error("Pi requires full_access.");
+    if (input.builtInTools.some((tool) => !tool.enabled))
+      throw new Error("Pi requires unrestricted built-in tools.");
+  }
   const organizationPath = getOrganizationPath(input.profile);
   const actionUrlContext: RuntimeActionUrlContext = {
     bindings,
@@ -210,7 +223,10 @@ export async function buildExecutionSpec(
     provider: input.profile.provider,
     providerOptions: input.profile.providerOptions,
     session: {
-      additionalDirectories: listAdditionalDirectories(input.profile, organizationPath),
+      additionalDirectories:
+        input.profile.runtimeId === "pi-acp"
+          ? []
+          : listAdditionalDirectories(input.profile, organizationPath),
       context: {
         sandboxSessionId: input.profile.session.sandboxSessionId,
         homePath: input.profile.session.homePath,

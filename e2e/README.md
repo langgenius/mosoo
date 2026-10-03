@@ -75,7 +75,7 @@ MOSOO_E2E_DEEPSEEK_API_KEY=...
 ```
 
 `ui preview` and `public-api latency` support `openai|anthropic`.
-`public-api runtime` supports `openai|anthropic|opencode|deepseek`. Omitting
+`public-api runtime` supports `openai|anthropic|opencode|deepseek|openai-compatible`. Omitting
 `MOSOO_E2E_PROVIDER` selects `openai`, so an unrelated DeepSeek/OpenCode key does
 not satisfy preflight.
 Optional environment can live in `.env`, `MOSOO_ENV_FILE`, or
@@ -150,3 +150,14 @@ Use dedicated performance staging only; never deploy the overlay to production.
 Missing provenance or stage evidence fails closed. The balanced 4-pair
 `1/2/17/18` run is staging acceptance, not statistical certification, and does
 not modify or replace the frozen 32-pair protocol.
+
+### Pi v1 runtime
+
+Run the existing public API case against a non-production local or staging stack
+with `MOSOO_E2E_PROVIDER=openai-compatible`, `MOSOO_E2E_RUNTIME_ID=pi-acp`,
+`MOSOO_E2E_COMPATIBLE_MODEL`, `MOSOO_E2E_COMPATIBLE_BASE_URL`, and
+`MOSOO_E2E_COMPATIBLE_API_KEY` (or `MOSOO_E2E_PROVIDER_API_KEY`). The case creates
+an Agent, configures its Project credential, publishes the Agent, and admits a
+real public API Thread through the Cloudflare Sandbox runtime. Keep credentials
+in the environment; never commit them. Pi accepts text input, full access and
+unrestricted built-in tools. MCP bindings are unsupported.

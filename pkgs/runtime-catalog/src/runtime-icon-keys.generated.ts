@@ -7,4 +7,5 @@ export const GENERATED_RUNTIME_ICON_KEYS: Record<string, string> = {
   "system-agent": "openai",
   "openai-runtime": "openai",
   "acp-fallback": "opencode",
+  "pi-acp": "pi",
 };

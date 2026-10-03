@@ -83,10 +83,13 @@ function database(): SqliteD1Database {
 }
 
 describe("runtime-specific Sandbox images", () => {
-  test("covers the product catalog and the pinned Driver image manifest exactly", () => {
+  test("covers every public runtime with its Cloudflare Sandbox image", () => {
     const images = JSON.parse(
       readFileSync(new URL("../../driver/runtime-images.json", import.meta.url), "utf8"),
     ) as { runtimeId: string; profile: string }[];
+    expect(images.filter((image) => image.runtimeId === "pi-acp")).toEqual([
+      expect.objectContaining({ runtimeId: "pi-acp", profile: "pi" }),
+    ]);
     expect(profiles.map(([runtimeId]) => runtimeId).toSorted()).toEqual(
       PUBLIC_RUNTIME_CATALOG.map((runtime) => runtime.runtimeId).toSorted(),
     );

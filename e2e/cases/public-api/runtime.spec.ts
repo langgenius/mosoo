@@ -3,10 +3,16 @@ import { PUBLIC_RUNTIME_CATALOG, listPresetModelsForVendor } from "@mosoo/runtim
 import { expect, test } from "@playwright/test";
 import type { APIRequestContext } from "@playwright/test";
 
+import { requireCompatibleRuntimeSettings } from "../../lib/env-preflight";
 import { createRuntimeSignalCollector } from "../../lib/runtime-progress";
 
-type ProviderId = "anthropic" | "deepseek" | "openai" | "opencode";
-type RuntimeCredentialVendorId = "anthropic" | "deepseek" | "openai" | "opencode";
+type ProviderId = "anthropic" | "deepseek" | "openai" | "opencode" | "openai-compatible";
+type RuntimeCredentialVendorId =
+  | "anthropic"
+  | "deepseek"
+  | "openai"
+  | "opencode"
+  | "openai-compatible";
 
 const DEFAULT_DEEPSEEK_MODEL = "deepseek-v4-pro";
 
@@ -35,7 +41,7 @@ function readProviderId(): ProviderId {
     return "anthropic";
   }
 
-  if (provider === "deepseek" || provider === "opencode") {
+  if (provider === "deepseek" || provider === "opencode" || provider === "openai-compatible") {
     return provider;
   }
 
@@ -51,7 +57,9 @@ function requireProviderApiKey(providerId: ProviderId): string {
         ? process.env["MOSOO_E2E_DEEPSEEK_API_KEY"]?.trim()
         : providerId === "opencode"
           ? process.env["MOSOO_E2E_OPENCODE_API_KEY"]?.trim()
-          : process.env["MOSOO_E2E_OPENAI_API_KEY"]?.trim()) ||
+          : providerId === "openai-compatible"
+            ? process.env["MOSOO_E2E_COMPATIBLE_API_KEY"]?.trim()
+            : process.env["MOSOO_E2E_OPENAI_API_KEY"]?.trim()) ||
     "";
 
   if (apiKey.length === 0) {
@@ -159,6 +167,23 @@ function selectAcpFallbackRuntime(providerId: "deepseek" | "opencode"): RuntimeS
 }
 
 function getRuntimeSelection(providerId: ProviderId): RuntimeSelection {
+  if (providerId === "openai-compatible") {
+    const runtimeId = readRuntimeIdOverride() ?? "pi-acp";
+    const runtime = findPublicRuntime(runtimeId);
+    if (!runtime?.vendors.some((vendor) => vendor.vendorId === providerId)) {
+      throw new Error(`Runtime ${runtimeId} does not support OpenAI-compatible providers.`);
+    }
+    const { model, apiBase } = requireCompatibleRuntimeSettings();
+    return {
+      apiBase,
+      model,
+      providerId,
+      runtimeId,
+      credentialVendorId: providerId,
+      providerModelIds: [model],
+    };
+  }
+
   if (providerId === "deepseek" || providerId === "opencode") {
     return selectAcpFallbackRuntime(providerId);
   }
@@ -421,9 +446,10 @@ async function publishAgent(
 async function createPersonalAccessToken(
   request: APIRequestContext,
   label: string,
+  projectId: string,
 ): Promise<string> {
   const response = await request.post(`${PUBLIC_API_PREFIX}/access-tokens`, {
-    data: { label },
+    data: { label, projectId },
     timeout: 30_000,
   });
   const payload: unknown = await response.json().catch(() => null);
@@ -601,7 +627,7 @@ test("Public API creates a real runtime thread and receives runtime events", asy
   });
   await publishAgent(request, { agentId, projectId });
   signals.checkpoint("api.agent.published", { agentId });
-  const pat = await createPersonalAccessToken(request, `Public API runtime ${label}`);
+  const pat = await createPersonalAccessToken(request, `Public API runtime ${label}`, projectId);
   signals.checkpoint("public-api.token.created");
   const threadId = await createThreadViaPublicApi(request, {
     agentId,

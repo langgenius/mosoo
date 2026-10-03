@@ -50,8 +50,10 @@ export function resolveDefaultAgentRuntime(
   const configuredVendorIds = toConfiguredVendorIds(credentials);
 
   for (const entry of PUBLIC_RUNTIME_CATALOG) {
-    const configuredVendor = entry.vendors.find((vendor) =>
-      configuredVendorIds.has(vendor.vendorId),
+    const configuredVendor = entry.vendors.find(
+      (vendor) =>
+        vendor.vendorId !== VENDOR_OPENAI_COMPATIBLE.vendorId &&
+        configuredVendorIds.has(vendor.vendorId),
     );
 
     if (configuredVendor !== undefined) {

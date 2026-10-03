@@ -170,7 +170,7 @@ export const driverInstancesTable = sqliteTable(
     protocolVersion: integer("protocol_version").notNull(),
     restartCount: integer("restart_count").notNull().default(0),
     runtime: text("runtime")
-      .$type<"acp-fallback" | "claude-agent-sdk" | "openai-runtime">()
+      .$type<"acp-fallback" | "claude-agent-sdk" | "openai-runtime" | "pi-acp">()
       .notNull(),
     sandboxId: platformIdColumn<SandboxId>("sandbox_id").notNull(),
     sandboxSessionId: platformIdColumn<SessionId>("sandbox_session_id").notNull(),
@@ -345,7 +345,7 @@ export const nativeResumeRefsTable = sqliteTable(
     observedDriverInstanceId: platformIdColumn<DriverInstanceId>("observed_driver_instance_id"),
     observedSessionRunId: platformIdColumn<SessionRunId>("observed_session_run_id"),
     runtimeId: text("runtime_id")
-      .$type<"acp-fallback" | "claude-agent-sdk" | "openai-runtime">()
+      .$type<"acp-fallback" | "claude-agent-sdk" | "openai-runtime" | "pi-acp">()
       .notNull(),
     sessionId: platformIdColumn<SessionId>("session_id")
       .primaryKey()

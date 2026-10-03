@@ -309,3 +309,20 @@ describe("available models", () => {
     });
   });
 });
+
+test("Given a Pi credential declaring only qwen-coder, When listing models, Then do not admit an undeclared compatible preset", async () => {
+  const entries = await resolveAvailableModels(createAvailableModelsDatabase(), {
+    projectId: PROJECT_ID,
+    runtimeId: "pi-acp",
+    currentModelId: "gpt-5.5",
+    currentVendorId: "openai-compatible",
+  });
+  expect(
+    entries.find(
+      (entry) => entry.vendorId === "openai-compatible" && entry.modelId === "qwen-coder",
+    ),
+  ).toMatchObject({ available: true, source: "custom" });
+  expect(
+    entries.find((entry) => entry.vendorId === "openai-compatible" && entry.modelId === "gpt-5.5"),
+  ).toMatchObject({ available: false });
+});

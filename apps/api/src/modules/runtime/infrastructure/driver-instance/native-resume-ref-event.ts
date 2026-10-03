@@ -37,6 +37,7 @@ function readNativeResumeRefShape(
         runtimeId,
       };
     }
+    case "pi-acp":
     case "acp-fallback": {
       return {
         kind: "acp_session_id",

@@ -38,7 +38,7 @@ const DriverHelloInputWire = type({
   driverVersion: NonEmptyString,
   pid: "number",
   protocolVersion: type.unit(DRIVER_PROTOCOL_VERSION),
-  runtime: '"openai-runtime" | "claude-agent-sdk" | "acp-fallback"',
+  runtime: '"openai-runtime" | "claude-agent-sdk" | "acp-fallback" | "pi-acp"',
   startedAt: "string",
 });
 

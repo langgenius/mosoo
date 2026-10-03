@@ -5,6 +5,7 @@ import { e2eCases } from "./cases";
 import type { E2ECase, E2ECommand } from "./cases";
 import { matchE2ERunTarget } from "./cli-targets";
 import { loadRepoEnv } from "./env";
+import { requireCompatibleRuntimeSettings } from "./lib/env-preflight";
 
 const HELP_ARGS = new Set(["", "-h", "--help", "help"]);
 
@@ -59,6 +60,12 @@ function hasEnvGroup(group: string): boolean {
 }
 
 function requireCaseEnv(entry: E2ECase): void {
+  if (
+    entry.id.join(" ") === "public-api runtime" &&
+    process.env["MOSOO_E2E_PROVIDER"]?.trim() === "openai-compatible"
+  ) {
+    requireCompatibleRuntimeSettings();
+  }
   const missing = (entry.requiresEnv ?? []).filter((group) => !hasEnvGroup(group));
 
   if (missing.length === 0) {

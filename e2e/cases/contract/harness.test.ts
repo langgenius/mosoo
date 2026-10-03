@@ -443,3 +443,22 @@ describe("Preview live harness environment preflight", () => {
     });
   });
 });
+
+import * as compatiblePreflight from "../../lib/env-preflight";
+
+test("Given compatible runtime E2E, When model or endpoint is missing, Then preflight provides guidance before startup", () => {
+  expect(() => compatiblePreflight.requireCompatibleRuntimeSettings({})).toThrow(
+    "MOSOO_E2E_COMPATIBLE_MODEL",
+  );
+  expect(() =>
+    compatiblePreflight.requireCompatibleRuntimeSettings({
+      MOSOO_E2E_COMPATIBLE_MODEL: "qwen-coder",
+    }),
+  ).toThrow("MOSOO_E2E_COMPATIBLE_BASE_URL");
+  expect(
+    compatiblePreflight.requireCompatibleRuntimeSettings({
+      MOSOO_E2E_COMPATIBLE_MODEL: "qwen-coder",
+      MOSOO_E2E_COMPATIBLE_BASE_URL: "https://api.example.com/v1",
+    }),
+  ).toEqual({ model: "qwen-coder", apiBase: "https://api.example.com/v1" });
+});

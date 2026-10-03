@@ -81,3 +81,16 @@ export function requireProviderRuntimeEnv(label: string): void {
     `${label} requires MOSOO_E2E_PROVIDER_API_KEY or ${providerSpecificKey} for MOSOO_E2E_PROVIDER=${providerId}.`,
   );
 }
+
+export function requireCompatibleRuntimeSettings(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): { model: string; apiBase: string } {
+  const model = env["MOSOO_E2E_COMPATIBLE_MODEL"]?.trim();
+  const apiBase = env["MOSOO_E2E_COMPATIBLE_BASE_URL"]?.trim();
+  if (!model || !apiBase) {
+    throw new Error(
+      "Compatible runtime E2E requires MOSOO_E2E_COMPATIBLE_MODEL and MOSOO_E2E_COMPATIBLE_BASE_URL. Set both before starting the case.",
+    );
+  }
+  return { model, apiBase };
+}

@@ -12,6 +12,7 @@ export const GENERATED_MODEL_DEFAULT_IDS = {
   openai: "gpt-5.5",
   qwen: "qwen3.7-plus",
   zhipu: "glm-4.7",
+  "openai-compatible": "gpt-5.5",
 } as const;
 
 export const GENERATED_VENDOR_CATALOG = [
@@ -433,6 +434,13 @@ export const GENERATED_PRESET_MODEL_CATALOG = [
     vendorId: "opencode",
     vendorLabel: "OpenCode Zen",
   },
+  {
+    displayName: "GPT-5.5",
+    modelId: "gpt-5.5",
+    protocol: "openai-chat-completions",
+    vendorId: "openai-compatible",
+    vendorLabel: "OpenAI-Compatible",
+  },
 ] as const;
 
 export const GENERATED_RUNTIME_CATALOG = [
@@ -761,6 +769,85 @@ export const GENERATED_RUNTIME_CATALOG = [
       "glm-5.2",
       "minimax-m2.7",
     ],
+  },
+  {
+    acceptsCustomProvider: true,
+    defaultIdentity: {
+      modelId: "gpt-5.5",
+      providerId: "openai-compatible",
+    },
+    display: {
+      iconKey: "pi",
+      providerLabel: "OpenAI-Compatible",
+    },
+    label: "Pi",
+    runtimeId: "pi-acp",
+    transport: "pi-acp",
+    vendorIds: ["openai-compatible"],
+    visibility: "public",
+    capabilities: [
+      {
+        id: "custom_tool_execute",
+        status: "unsupported",
+        version: 1,
+      },
+      {
+        id: "input_start",
+        status: "supported",
+        version: 1,
+      },
+      {
+        id: "mcp_execute",
+        status: "unsupported",
+        version: 1,
+      },
+      {
+        id: "native_resume",
+        status: "supported",
+        version: 1,
+      },
+      {
+        id: "permission_request",
+        status: "unsupported",
+        version: 1,
+      },
+      {
+        id: "session_stop",
+        status: "supported",
+        version: 1,
+      },
+      {
+        id: "thinking_stream",
+        status: "supported",
+        version: 1,
+      },
+      {
+        id: "text_stream",
+        status: "supported",
+        version: 1,
+      },
+      {
+        id: "tool_stream",
+        status: "supported",
+        version: 1,
+      },
+      {
+        id: "turn_cancel",
+        status: "supported",
+        version: 1,
+      },
+      {
+        id: "usage",
+        status: "supported",
+        version: 1,
+      },
+      {
+        id: "visible_activity",
+        status: "supported",
+        version: 1,
+      },
+    ],
+    supportedModelIds: ["gpt-5.5"],
   },
 ] as const;
 

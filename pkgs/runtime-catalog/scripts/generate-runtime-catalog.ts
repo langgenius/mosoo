@@ -33,7 +33,7 @@ const CAPABILITY_IDS = new Set([
   "visible_activity",
 ]);
 
-const TRANSPORTS = new Set(["openai-app-server", "claude-agent-sdk", "acp-fallback"]);
+const TRANSPORTS = new Set(["openai-app-server", "claude-agent-sdk", "acp-fallback", "pi-acp"]);
 const VISIBILITIES = new Set(["internal", "public"]);
 const SURFACES = new Set(["landing", "provider-settings"]);
 

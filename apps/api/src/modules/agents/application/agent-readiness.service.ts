@@ -365,6 +365,31 @@ export async function computeAgentReadiness(
     runtimeId: string;
   },
 ): Promise<AgentReadiness> {
+  if (input.runtimeId === "pi-acp") {
+    const hasMcpBindings =
+      input.mcpServerIds !== undefined
+        ? input.mcpServerIds.length > 0
+        : input.agentId !== null &&
+          (
+            await getAppDatabase(database)
+              .select({ enabled: agentMcpBindingsTable.enabled })
+              .from(agentMcpBindingsTable)
+              .where(eq(agentMcpBindingsTable.agentId, input.agentId))
+              .all()
+          ).some((row) => isSqliteEnabled(row.enabled));
+    if (hasMcpBindings) {
+      return {
+        checkedAt: toIsoString(Date.now()),
+        issues: [
+          createIssue(
+            "agent.runtime.mcp_unsupported",
+            "Pi does not support MCP servers. Remove enabled MCP bindings before publishing or running.",
+          ),
+        ],
+        ready: false,
+      };
+    }
+  }
   const toolSupportError = getAgentBuiltInToolSupportError(input.runtimeId, input.builtInTools);
   if (toolSupportError !== null) {
     return {

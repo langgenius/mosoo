@@ -19,7 +19,7 @@ Builders and Project Owners are the primary users. They configure and test a Pro
 
 ## Current availability
 
-Preview runs real sessions for the runtime choices currently offered by mosoo; it is not a mock chat. The shipped surface covers readiness blockers, streaming responses, tool activity, cancellation, stopped sessions, and diagnostics. Live success still depends on valid setup and an available provider.
+Preview runs real sessions for the runtime choices currently offered by mosoo; it is not a mock chat. The shipped surface covers readiness blockers, streaming responses, tool activity, cancellation, stopped sessions, and diagnostics. Live success still depends on valid setup and an available provider. Pi uses a configured OpenAI-compatible model, text input and unrestricted built-in tools inside Cloudflare Sandbox; enabled MCP bindings and supervised approval are unsupported and must block admission.
 
 ## User-visible boundaries
 

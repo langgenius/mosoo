@@ -95,7 +95,7 @@ The architecture is built on the Cloudflare platform and uses a Serverless shape
   library scope, and sandbox state backups. Runtime-produced files are recorded
   as session artifacts. Sandbox private state backups use a separate backup
   bucket and must not be mixed with user-visible file prefixes.
-- **Execution sandbox: Cloudflare Sandbox / Containers**. Heterogeneous Agents run in container-image-backed isolated environments, with Sandbox APIs and Durable Object boundaries controlling runtime lifecycle.
+- **Execution sandbox: Cloudflare Sandbox / Containers**. Heterogeneous Agents run in container-image-backed isolated environments, with Sandbox APIs and Durable Object boundaries controlling runtime lifecycle. Pi 1.0.0 uses the same Session-owned boundary, managed OpenAI-compatible proxy and complete workspace checkpoints; its public runtime supports text and unrestricted tools, with MCP and supervised approval rejected. Read [Pi runtime contract](./pi-v1-driver.md) when changing its provisioning or continuation.
 - **Configuration editing**. Owner-side Agent configuration is currently edited through Preview, which combines the writable configuration form with in-context test chat. There is no dedicated `AgentBuilderSystemAgent` topology in the current codebase. Future configuration assistance must remain a control-plane feature and must not enter the full Sandbox / Driver runtime path.
 
 ---

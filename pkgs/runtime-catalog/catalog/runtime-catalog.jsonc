@@ -11,6 +11,7 @@
     "openai": "gpt-5.5",
     "qwen": "qwen3.7-plus",
     "zhipu": "glm-4.7",
+    "openai-compatible": "gpt-5.5",
   },
   "vendors": [
     {
@@ -398,6 +399,12 @@
       "protocol": "google-gemini",
       "vendorId": "opencode",
     },
+    {
+      "displayName": "GPT-5.5",
+      "modelId": "gpt-5.5",
+      "protocol": "openai-chat-completions",
+      "vendorId": "openai-compatible",
+    },
   ],
   "capabilityProfiles": {
     "none": [],
@@ -414,6 +421,68 @@
       { "id": "turn_cancel", "status": "supported", "version": 1 },
       { "id": "usage", "status": "supported", "version": 1 },
       { "id": "visible_activity", "status": "supported", "version": 1 },
+    ],
+    "pi": [
+      {
+        "id": "custom_tool_execute",
+        "status": "unsupported",
+        "version": 1,
+      },
+      {
+        "id": "input_start",
+        "status": "supported",
+        "version": 1,
+      },
+      {
+        "id": "mcp_execute",
+        "status": "unsupported",
+        "version": 1,
+      },
+      {
+        "id": "native_resume",
+        "status": "supported",
+        "version": 1,
+      },
+      {
+        "id": "permission_request",
+        "status": "unsupported",
+        "version": 1,
+      },
+      {
+        "id": "session_stop",
+        "status": "supported",
+        "version": 1,
+      },
+      {
+        "id": "thinking_stream",
+        "status": "supported",
+        "version": 1,
+      },
+      {
+        "id": "text_stream",
+        "status": "supported",
+        "version": 1,
+      },
+      {
+        "id": "tool_stream",
+        "status": "supported",
+        "version": 1,
+      },
+      {
+        "id": "turn_cancel",
+        "status": "supported",
+        "version": 1,
+      },
+      {
+        "id": "usage",
+        "status": "supported",
+        "version": 1,
+      },
+      {
+        "id": "visible_activity",
+        "status": "supported",
+        "version": 1,
+      },
     ],
   },
   "runtimes": [
@@ -519,6 +588,26 @@
       "display": {
         "iconKey": "opencode",
         "providerLabel": "OpenCode",
+      },
+    },
+    {
+      "runtimeId": "pi-acp",
+      "label": "Pi",
+      "visibility": "public",
+      "transport": "pi-acp",
+      "acceptsCustomProvider": true,
+      "capabilityProfile": "pi",
+      "defaultIdentity": {
+        "providerId": "openai-compatible",
+        "modelId": "gpt-5.5",
+      },
+      "vendorIds": ["openai-compatible"],
+      "supportedModels": {
+        "vendorIds": ["openai-compatible"],
+      },
+      "display": {
+        "iconKey": "pi",
+        "providerLabel": "OpenAI-Compatible",
       },
     },
   ],
