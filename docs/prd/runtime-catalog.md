@@ -22,14 +22,15 @@ The Project Owner configures runtime access while creating and editing an Agent.
 - **Claude Agent SDK** runs Anthropic Claude models.
 - **OpenAI Runtime** runs OpenAI GPT models and custom OpenAI-compatible models that implement the Responses API.
 - **OpenCode** can use Anthropic, OpenAI, DeepSeek, Gemini, Qwen, Kimi, Zhipu, MiniMax, OpenCode Zen, and custom OpenAI-compatible models.
+- **Pi** runs explicitly configured custom OpenAI-compatible models through the Chat Completions API. It supports text and tool execution, MCP, file changes, thinking, cancellation, usage, and native session resume. Product execution uses full access within the Session sandbox, without interactive tool approvals.
 
-Custom OpenAI-compatible models remain on OpenCode by default because some endpoints implement only Chat Completions. Builders can explicitly select OpenAI Runtime when the configured endpoint implements the Responses API.
+Custom OpenAI-compatible models remain on OpenCode by default because some endpoints implement only Chat Completions. Builders can explicitly select Pi for Chat Completions or OpenAI Runtime when the configured endpoint implements the Responses API. Pi has no preset models: a saved custom credential must explicitly declare each model before it becomes available. Its catalog default is only an incomplete configuration until a declared model is selected.
 
 The Providers page currently offers those nine named providers plus the custom-model action. A saved key unlocks only models that the selected runtime can run.
 
 ## Built-in tool restrictions
 
-Only Claude Agent SDK supports disabling individual built-in tools. OpenAI Runtime and OpenCode hide these switches and omit the all-enabled tool list from editable YAML. Explicit disabled settings remain visible as invalid configuration and must not be silently reset to enabled.
+Only Claude Agent SDK supports disabling individual built-in tools. OpenAI Runtime, OpenCode, and Pi hide these switches and omit the all-enabled tool list from editable YAML. Explicit disabled settings remain visible as invalid configuration and must not be silently reset to enabled.
 
 Console saves, API/CLI updates, package imports/forks, and publishing reject unsupported restrictions before writing an Agent or deployment version. Existing invalid configurations must be explicitly corrected before saving or publishing; this does not automatically repair an already published deployment.
 

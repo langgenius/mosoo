@@ -117,8 +117,63 @@ describe("runtime vendor proxy env vars", () => {
         EXISTING_ENV: "kept",
         OPENAI_BASE_URL: "https://attacker.example.com/v1",
         OPENCODE_CONFIG_CONTENT: '{"provider":{"openai":{"options":{"apiKey":"raw"}}}}',
+        MOSOO_PI_CONFIG_CONTENT:
+          '{"providers":{"mosoo":{"baseUrl":"https://attacker.example.com"}}}',
+        MOSOO_PI_PROXY_GRANT: "untrusted-grant",
       }),
     ).toEqual({ EXISTING_ENV: "kept" });
+  });
+
+  test("configures Pi with only the selected custom model and an environment grant reference", async () => {
+    const envVars = await buildVendorProxyEnvVars({
+      bindings: BINDINGS,
+      driverGeneration: DRIVER_GENERATION,
+      driverInstanceId: DRIVER_INSTANCE_ID,
+      profile: {
+        model: "openai-compatible/vendor/custom-model",
+        runtimeId: "pi",
+        vendorCredential: vendorCredential({
+          apiBase: "https://gateway.example.com/v1",
+          models: ["vendor/custom-model", "other-model"],
+          vendorId: "openai-compatible",
+        }),
+      },
+      requestUrl: REQUEST_URL,
+    });
+
+    expect(Object.keys(envVars).toSorted()).toEqual([
+      "MOSOO_PI_CONFIG_CONTENT",
+      "MOSOO_PI_PROXY_GRANT",
+    ]);
+    expect(JSON.parse(envVars["MOSOO_PI_CONFIG_CONTENT"] ?? "{}")).toEqual({
+      providers: {
+        mosoo: {
+          api: "openai-completions",
+          apiKey: "${MOSOO_PI_PROXY_GRANT}",
+          baseUrl: PROXY_URL,
+          models: [{ id: "vendor/custom-model" }],
+        },
+      },
+    });
+    await expectLlmProxyGrant(envVars["MOSOO_PI_PROXY_GRANT"], {
+      modelId: "vendor/custom-model",
+      modelProtocol: "openai-chat-completions",
+    });
+  });
+
+  test.each([
+    vendorCredential({ vendorId: "openai" }),
+    vendorCredential({ vendorId: "openai-compatible" }),
+  ])("rejects Pi credentials without a custom endpoint", async (credential) => {
+    await expect(
+      buildVendorProxyEnvVars({
+        bindings: BINDINGS,
+        driverGeneration: DRIVER_GENERATION,
+        driverInstanceId: DRIVER_INSTANCE_ID,
+        profile: { model: "custom-model", runtimeId: "pi", vendorCredential: credential },
+        requestUrl: REQUEST_URL,
+      }),
+    ).rejects.toThrow("Pi requires a custom OpenAI-compatible provider endpoint.");
   });
 
   test("injects a driver-bound proxy grant instead of the Anthropic API key", async () => {

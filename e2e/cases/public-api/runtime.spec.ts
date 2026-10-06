@@ -3,10 +3,16 @@ import { PUBLIC_RUNTIME_CATALOG, listPresetModelsForVendor } from "@mosoo/runtim
 import { expect, test } from "@playwright/test";
 import type { APIRequestContext } from "@playwright/test";
 
+import { requirePiRuntimeSettings } from "../../lib/env-preflight";
 import { createRuntimeSignalCollector } from "../../lib/runtime-progress";
 
-type ProviderId = "anthropic" | "deepseek" | "openai" | "opencode";
-type RuntimeCredentialVendorId = "anthropic" | "deepseek" | "openai" | "opencode";
+type ProviderId = "anthropic" | "deepseek" | "openai" | "opencode" | "pi";
+type RuntimeCredentialVendorId =
+  | "anthropic"
+  | "deepseek"
+  | "openai"
+  | "opencode"
+  | "openai-compatible";
 
 const DEFAULT_DEEPSEEK_MODEL = "deepseek-v4-pro";
 
@@ -35,7 +41,7 @@ function readProviderId(): ProviderId {
     return "anthropic";
   }
 
-  if (provider === "deepseek" || provider === "opencode") {
+  if (provider === "deepseek" || provider === "opencode" || provider === "pi") {
     return provider;
   }
 
@@ -43,6 +49,10 @@ function readProviderId(): ProviderId {
 }
 
 function requireProviderApiKey(providerId: ProviderId): string {
+  if (providerId === "pi") {
+    return requirePiRuntimeSettings().apiKey;
+  }
+
   const apiKey =
     process.env["MOSOO_E2E_PROVIDER_API_KEY"]?.trim() ||
     (providerId === "anthropic"
@@ -159,6 +169,27 @@ function selectAcpFallbackRuntime(providerId: "deepseek" | "opencode"): RuntimeS
 }
 
 function getRuntimeSelection(providerId: ProviderId): RuntimeSelection {
+  if (providerId === "pi") {
+    const { apiBase, model, runtimeId } = requirePiRuntimeSettings();
+    const runtime = findPublicRuntime(runtimeId);
+
+    if (
+      runtime?.transport !== "pi-rpc" ||
+      !runtime.vendors.some((vendor) => vendor.vendorId === "openai-compatible")
+    ) {
+      throw new Error("Pi runtime must expose pi-rpc and custom OpenAI-compatible models.");
+    }
+
+    return {
+      apiBase,
+      credentialVendorId: "openai-compatible",
+      model,
+      providerId,
+      providerModelIds: [model],
+      runtimeId,
+    };
+  }
+
   if (providerId === "deepseek" || providerId === "opencode") {
     return selectAcpFallbackRuntime(providerId);
   }
@@ -421,9 +452,10 @@ async function publishAgent(
 async function createPersonalAccessToken(
   request: APIRequestContext,
   label: string,
+  projectId: string,
 ): Promise<string> {
   const response = await request.post(`${PUBLIC_API_PREFIX}/access-tokens`, {
-    data: { label },
+    data: { label, projectId },
     timeout: 30_000,
   });
   const payload: unknown = await response.json().catch(() => null);
@@ -601,7 +633,7 @@ test("Public API creates a real runtime thread and receives runtime events", asy
   });
   await publishAgent(request, { agentId, projectId });
   signals.checkpoint("api.agent.published", { agentId });
-  const pat = await createPersonalAccessToken(request, `Public API runtime ${label}`);
+  const pat = await createPersonalAccessToken(request, `Public API runtime ${label}`, projectId);
   signals.checkpoint("public-api.token.created");
   const threadId = await createThreadViaPublicApi(request, {
     agentId,

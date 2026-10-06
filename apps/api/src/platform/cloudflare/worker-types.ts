@@ -8,6 +8,7 @@ interface OptionalSandboxBinding {
   SandboxClaude?: DurableObjectNamespace<Sandbox>;
   SandboxOpenAI?: DurableObjectNamespace<Sandbox>;
   SandboxOpenCode?: DurableObjectNamespace<Sandbox>;
+  SandboxPi?: DurableObjectNamespace<Sandbox>;
 }
 
 interface OptionalDriverConnectionBinding {

@@ -81,3 +81,30 @@ export function requireProviderRuntimeEnv(label: string): void {
     `${label} requires MOSOO_E2E_PROVIDER_API_KEY or ${providerSpecificKey} for MOSOO_E2E_PROVIDER=${providerId}.`,
   );
 }
+
+export function requirePiRuntimeSettings(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): { apiKey: string; apiBase: string; model: string; runtimeId: "pi" } {
+  const runtimeId = env["MOSOO_E2E_RUNTIME_ID"]?.trim() || "pi";
+
+  if (runtimeId !== "pi") {
+    throw new Error("MOSOO_E2E_PROVIDER=pi requires MOSOO_E2E_RUNTIME_ID=pi (or unset).");
+  }
+
+  const model = env["MOSOO_E2E_PI_MODEL"]?.trim();
+  const apiBase = env["MOSOO_E2E_PI_BASE_URL"]?.trim();
+
+  if (!model || !apiBase) {
+    throw new Error(
+      "Pi runtime E2E requires MOSOO_E2E_PI_MODEL and MOSOO_E2E_PI_BASE_URL for a custom OpenAI-compatible model.",
+    );
+  }
+
+  const apiKey = env["MOSOO_E2E_PROVIDER_API_KEY"]?.trim() || env["MOSOO_E2E_PI_API_KEY"]?.trim();
+
+  if (!apiKey) {
+    throw new Error("Pi runtime E2E requires MOSOO_E2E_PROVIDER_API_KEY or MOSOO_E2E_PI_API_KEY.");
+  }
+
+  return { apiKey, apiBase, model, runtimeId };
+}

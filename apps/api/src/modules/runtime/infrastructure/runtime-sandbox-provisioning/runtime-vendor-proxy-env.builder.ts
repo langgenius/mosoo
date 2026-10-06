@@ -17,7 +17,11 @@ import {
   createRuntimeActionToken,
 } from "../runtime-boot-token";
 import type { RuntimeActionTokenBindings } from "../runtime-boot-token";
-import { OPENCODE_CONFIG_CONTENT_ENV } from "./runtime-vendor-env-policy";
+import {
+  OPENCODE_CONFIG_CONTENT_ENV,
+  PI_CONFIG_CONTENT_ENV,
+  PI_PROXY_GRANT_ENV,
+} from "./runtime-vendor-env-policy";
 
 const OPENAI_IMAGE_MODEL_ID = "gpt-image-2";
 
@@ -124,6 +128,13 @@ export async function buildVendorProxyEnvVars(
     throw new Error(`Unknown vendor: ${credential.vendorId}.`);
   }
 
+  if (
+    input.profile.runtimeId === "pi" &&
+    (credential.vendorId !== "openai-compatible" || !isTruthy(credential.apiBase))
+  ) {
+    throw new Error("Pi requires a custom OpenAI-compatible provider endpoint.");
+  }
+
   if (isTruthy(credential.apiBase)) {
     // Fail fast at provisioning time; the proxy enforces this again on every
     // forwarded request in case the credential changes mid-session.
@@ -145,6 +156,21 @@ export async function buildVendorProxyEnvVars(
     resourceId: credential.credentialId,
   });
   const proxyUrl = getRuntimeLlmProxyUrl(input.requestUrl, credential.credentialId);
+  if (input.profile.runtimeId === "pi") {
+    return {
+      [PI_PROXY_GRANT_ENV]: proxyGrant,
+      [PI_CONFIG_CONTENT_ENV]: JSON.stringify({
+        providers: {
+          mosoo: {
+            api: "openai-completions",
+            apiKey: `\${${PI_PROXY_GRANT_ENV}}`,
+            baseUrl: proxyUrl,
+            models: [{ id: modelBinding.modelId }],
+          },
+        },
+      }),
+    };
+  }
   const envVars: Record<string, string> = {
     [vendor.apiKeyEnvVar]: proxyGrant,
   };

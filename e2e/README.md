@@ -72,10 +72,11 @@ MOSOO_E2E_OPENAI_API_KEY=...
 MOSOO_E2E_ANTHROPIC_API_KEY=...
 MOSOO_E2E_OPENCODE_API_KEY=...
 MOSOO_E2E_DEEPSEEK_API_KEY=...
+MOSOO_E2E_PI_API_KEY=...
 ```
 
 `ui preview` and `public-api latency` support `openai|anthropic`.
-`public-api runtime` supports `openai|anthropic|opencode|deepseek`. Omitting
+`public-api runtime` supports `openai|anthropic|opencode|deepseek|pi`. Omitting
 `MOSOO_E2E_PROVIDER` selects `openai`, so an unrelated DeepSeek/OpenCode key does
 not satisfy preflight.
 Optional environment can live in `.env`, `MOSOO_ENV_FILE`, or
@@ -95,6 +96,29 @@ MOSOO_E2E_DEEPSEEK_MODEL=deepseek-v4-pro
 Use `MOSOO_E2E_OPENCODE_API_KEY` only for the OpenCode Zen provider. DeepSeek official keys must use
 `MOSOO_E2E_DEEPSEEK_API_KEY` or the generic `MOSOO_E2E_PROVIDER_API_KEY` with
 `MOSOO_E2E_PROVIDER=deepseek`.
+
+`MOSOO_E2E_PROVIDER=pi` runs the native Pi runtime (`pi-rpc`) with a custom
+OpenAI-compatible Chat Completions model. Set the endpoint and model explicitly;
+the harness accepts either the Pi key or the generic provider key (preferred
+when both are present):
+
+```bash
+MOSOO_E2E_PROVIDER=pi
+MOSOO_E2E_RUNTIME_ID=pi
+MOSOO_E2E_PI_MODEL=custom-coder
+MOSOO_E2E_PI_BASE_URL=https://models.example.com/v1
+MOSOO_E2E_PI_API_KEY=...
+```
+
+Run `just e2e public-api runtime` against a configured non-production local stack.
+The case creates a Project credential and Agent, publishes the Agent, creates a
+Project-scoped API key, then verifies a real runtime response through the Public
+API. It makes model calls and requires a reachable Sandbox environment. This
+smoke covers text completion; it does not prove tool execution or cold resume.
+Pi uses full-access execution within the Session sandbox, without interactive
+tool approvals. `just e2e contract harness` validates the Pi configuration
+without provider calls. Keep credentials in the environment and out of
+committed files.
 
 Common optional values:
 

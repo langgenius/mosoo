@@ -1,9 +1,13 @@
 import { ALL_VENDORS } from "@mosoo/runtime-catalog";
 
 export const OPENCODE_CONFIG_CONTENT_ENV = "OPENCODE_CONFIG_CONTENT";
+export const PI_CONFIG_CONTENT_ENV = "MOSOO_PI_CONFIG_CONTENT";
+export const PI_PROXY_GRANT_ENV = "MOSOO_PI_PROXY_GRANT";
 
 const RUNTIME_MANAGED_VENDOR_ENV_NAMES = new Set<string>([
   OPENCODE_CONFIG_CONTENT_ENV,
+  PI_CONFIG_CONTENT_ENV,
+  PI_PROXY_GRANT_ENV,
   ...ALL_VENDORS.map((vendor) => vendor.apiKeyEnvVar),
   ...ALL_VENDORS.flatMap((vendor) =>
     vendor.apiBaseEnvVar === undefined ? [] : [vendor.apiBaseEnvVar],

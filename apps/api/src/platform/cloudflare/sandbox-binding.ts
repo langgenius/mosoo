@@ -11,6 +11,7 @@ export const RUNTIME_SANDBOX_IMAGES = {
   "claude-agent-sdk": { binding: "SandboxClaude", profile: "claude" },
   "openai-runtime": { binding: "SandboxOpenAI", profile: "openai" },
   "acp-fallback": { binding: "SandboxOpenCode", profile: "opencode" },
+  pi: { binding: "SandboxPi", profile: "pi" },
 } as const satisfies Record<DriverRuntime, { binding: keyof ApiBindings; profile: string }>;
 
 export type SandboxBinding = "Sandbox" | (typeof RUNTIME_SANDBOX_IMAGES)[DriverRuntime]["binding"];

@@ -20,6 +20,7 @@ const MODEL_PROTOCOLS = new Set([
 
 const CAPABILITY_IDS = new Set([
   "custom_tool_execute",
+  "file_change",
   "input_start",
   "mcp_execute",
   "native_resume",
@@ -33,7 +34,7 @@ const CAPABILITY_IDS = new Set([
   "visible_activity",
 ]);
 
-const TRANSPORTS = new Set(["openai-app-server", "claude-agent-sdk", "acp-fallback"]);
+const TRANSPORTS = new Set(["openai-app-server", "claude-agent-sdk", "acp-fallback", "pi-rpc"]);
 const VISIBILITIES = new Set(["internal", "public"]);
 const SURFACES = new Set(["landing", "provider-settings"]);
 
@@ -568,7 +569,14 @@ function createGeneratedCatalog(catalog: RawCatalog): GeneratedCatalog {
       fail(`Runtime ${runtime.runtimeId} default provider is not listed in vendorIds.`);
     }
 
+    const hasCustomDefault = runtime.defaultIdentity.providerId === "openai-compatible";
+
+    if (hasCustomDefault && !runtime.acceptsCustomProvider) {
+      fail(`Runtime ${runtime.runtimeId} default identity requires custom provider support.`);
+    }
+
     if (
+      !hasCustomDefault &&
       !modelKeys.has(modelKey(runtime.defaultIdentity.providerId, runtime.defaultIdentity.modelId))
     ) {
       fail(`Runtime ${runtime.runtimeId} default identity references an unknown preset model.`);
@@ -576,7 +584,7 @@ function createGeneratedCatalog(catalog: RawCatalog): GeneratedCatalog {
 
     const supportedModelIds = resolveSupportedModelIds(runtime, modelsByVendor);
 
-    if (!supportedModelIds.includes(runtime.defaultIdentity.modelId)) {
+    if (!hasCustomDefault && !supportedModelIds.includes(runtime.defaultIdentity.modelId)) {
       fail(
         `Runtime ${runtime.runtimeId} default model is not supported by its supportedModels scope.`,
       );
