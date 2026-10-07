@@ -64,6 +64,81 @@ function announceTools(harness: Harness, tools: JsonObject[]): string {
 }
 
 describe("Pi tools across the Host event and transcript boundary", () => {
+  test.each(["running", "completed", "failed"] as const)(
+    "accepts empty %s tool output through canonical validation and the Host reducer",
+    (status) => {
+      const harness = createHarness();
+      const args = { command: status === "failed" ? "false" : "true" };
+      const parentMessageId = announceTools(harness, [
+        { type: "toolCall", id: "empty-bash", name: "bash", arguments: args },
+      ]);
+      harness.send({
+        type: "tool_execution_start",
+        toolCallId: "empty-bash",
+        toolName: "bash",
+        args,
+      });
+
+      // An empty native partial or terminal result is not a non-empty
+      // canonical rawOutput. Keep absence distinct from fabricated stdout.
+      const emptyResult = { content: [{ type: "text", text: "" }] };
+      const projected = harness.send(
+        status === "running"
+          ? {
+              type: "tool_execution_update",
+              toolCallId: "empty-bash",
+              toolName: "bash",
+              args,
+              partialResult: emptyResult,
+            }
+          : {
+              type: "tool_execution_end",
+              toolCallId: "empty-bash",
+              toolName: "bash",
+              isError: status === "failed",
+              result: emptyResult,
+            },
+      );
+      expect(projected.runtimeEvents).toHaveLength(1);
+      const event = projected.runtimeEvents[0];
+      if (event === undefined) throw new Error("Empty-output tool event was lost");
+      expect(event.payload).toMatchObject({ parentMessageId, status, toolCallId: "empty-bash" });
+      expect(event.payload).not.toHaveProperty("rawOutput");
+      expect(event.payload).not.toHaveProperty("outputText");
+      expect(createSessionRuntimeEventProjection(event)).toMatchObject({
+        processStatus: status === "failed" ? "error" : "available",
+        toolInputJson: status === "running" ? null : JSON.stringify(args),
+      });
+
+      expect(harness.state.messages).toHaveLength(1);
+      expect(harness.state.messages[0]).toMatchObject({
+        id: parentMessageId,
+        segments: [
+          {
+            kind: "tool_use",
+            tool: "bash",
+            toolCallId: "empty-bash",
+            argsText: status === "running" ? "" : JSON.stringify(args),
+          },
+          // Host's existing failure status fallback is not provider stdout.
+          ...(status === "failed"
+            ? [
+                {
+                  kind: "tool_result",
+                  tool: "bash",
+                  toolCallId: "empty-bash",
+                  output: "bash failed.",
+                },
+              ]
+            : []),
+        ],
+      });
+      expect(projected.deliveryEvents.some((entry) => entry.type === EventType.TOOL_CALL_END)).toBe(
+        status !== "running",
+      );
+    },
+  );
+
   test("keeps bash and read calls on their assistant message with complete inputs and outputs", () => {
     const harness = createHarness();
     const bashArgs = { command: "printf 'workspace-ok\\n'", timeout: 30 };
