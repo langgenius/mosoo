@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { isTruthy } from "../../../shared/truthiness";
 import { currentTimestampMs } from "../../../time";
+import { parseOAuthEndpoint } from "./mcp-oauth-endpoint";
 import type { OAuthMetadata, OAuthTokenResponse, ServerRow } from "./mcp-types";
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -69,10 +70,12 @@ function parseOAuthMetadata(value: unknown, invalidMessage: string): OAuthMetada
   const scopesSupported = parseOptionalStringArray(value, "scopes_supported", invalidMessage);
 
   return {
-    authorization_endpoint: authorizationEndpoint,
-    ...(isTruthy(registrationEndpoint) ? { registration_endpoint: registrationEndpoint } : {}),
+    authorization_endpoint: parseOAuthEndpoint(authorizationEndpoint),
+    ...(isTruthy(registrationEndpoint)
+      ? { registration_endpoint: parseOAuthEndpoint(registrationEndpoint) }
+      : {}),
     ...(scopesSupported ? { scopes_supported: scopesSupported } : {}),
-    token_endpoint: tokenEndpoint,
+    token_endpoint: parseOAuthEndpoint(tokenEndpoint),
   };
 }
 
@@ -117,7 +120,7 @@ export async function getOrDiscoverOAuthMetadata(
     );
   }
 
-  const serverUrl = new URL(server.url);
+  const serverUrl = new URL(parseOAuthEndpoint(server.url));
   const candidates = [
     new URL("/.well-known/oauth-authorization-server", serverUrl.origin).toString(),
     new URL("/.well-known/openid-configuration", serverUrl.origin).toString(),
@@ -129,6 +132,7 @@ export async function getOrDiscoverOAuthMetadata(
       headers: {
         accept: "application/json",
       },
+      redirect: "manual",
     });
 
     if (!response.ok) {
@@ -164,6 +168,8 @@ export async function exchangeOAuthToken(input: {
   refreshToken?: string;
   tokenEndpoint: string;
 }): Promise<OAuthTokenResponse> {
+  // Revalidate persisted flow endpoints before constructing a credential-bearing request.
+  const tokenEndpoint = parseOAuthEndpoint(input.tokenEndpoint);
   const body = new URLSearchParams();
   body.set("client_id", input.clientId);
 
@@ -181,12 +187,14 @@ export async function exchangeOAuthToken(input: {
     body.set("redirect_uri", input.redirectUri);
   }
 
-  const response = await fetch(input.tokenEndpoint, {
+  const response = await fetch(tokenEndpoint, {
     body,
     headers: {
       "content-type": "application/x-www-form-urlencoded",
     },
     method: "POST",
+    // A 307/308 can forward the entire credential body to an insecure destination.
+    redirect: "manual",
   });
 
   if (!response.ok) {

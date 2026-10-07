@@ -20,6 +20,8 @@ The Builder who owns a Project configures MCP. Project Users benefit when an Age
 
 ## Current Availability and Boundaries
 
+OAuth authorization, token, and registration endpoints must also use HTTPS without embedded URL credentials or fragments. Discovery, token exchange, and client registration do not follow redirects; providers must publish their canonical endpoint addresses. Insecure cached metadata and saved authorization-flow endpoints are rejected before credentials are sent.
+
 The complete add-to-use path is available for remote HTTPS MCP servers. Binding before authorization is allowed, but does not make tools usable.
 
 “Connected” means mosoo has an active stored credential; it does not prove the server or its tools work. There is no standalone connection test or tool browser, so failures appear when an Agent first uses the server.
