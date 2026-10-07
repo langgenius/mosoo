@@ -65,6 +65,11 @@ mosoo is for developers extending Codex, Claude Agent SDK, OpenCode, or another 
 
 mosoo is in Alpha. The managed runtime and Agent API surfaces above are shipped and covered by repository tests, but production reliability and external adoption have not been proven. Public APIs and product behavior may still change.
 
+This candidate also adds [Pi through its native RPC transport](./docs/pi-runtime.md).
+Pi must be selected explicitly with a declared custom OpenAI-compatible model;
+custom providers still default to OpenCode. Hosted availability requires the
+matched Driver, API, and Sandbox image rollout described in that guide.
+
 ## Getting Started
 
 The fastest way to try mosoo is the hosted console at [cloud.mosoo.ai](https://cloud.mosoo.ai). To run it yourself, self-host from a clean clone as below.
