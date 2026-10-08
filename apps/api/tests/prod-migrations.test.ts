@@ -23,6 +23,7 @@ function ledger(names: string[]): string {
 function fixture(options: {
   applied: string[];
   queryExit?: number;
+  queryError?: string;
   applyExit?: number;
   applyRecords?: boolean;
 }) {
@@ -47,6 +48,10 @@ const args = process.argv.slice(2);
 appendFileSync(${JSON.stringify(log)}, JSON.stringify(args) + "\\n");
 if (args[1] === "execute") {
   if (!args.at(-1).startsWith('SELECT name FROM "d1_migrations"')) process.exit(9);
+  if (${JSON.stringify(options.queryError)} !== undefined) {
+    process.stdout.write(${JSON.stringify(options.queryError ?? "")});
+    process.exit(1);
+  }
   process.stdout.write(existsSync(${JSON.stringify(marker)}) ? ${JSON.stringify(ledger(migrations))} : ${JSON.stringify(ledger(options.applied))});
   process.exit(${options.queryExit ?? 0});
 }
@@ -88,6 +93,12 @@ test("failed ledger reads stop before any migration command", () => {
   expect(() => applyProdMigrations(f.apiDir, f.wranglerBin)).toThrow(
     "Could not read production migration ledger",
   );
+  expect(f.calls()).toHaveLength(1);
+});
+
+test("JSON-mode errors written to stdout remain visible in deployment diagnostics", () => {
+  const f = fixture({ applied: [], queryError: '{"error":"D1 query rejected","code":7403}' });
+  expect(() => inspectProdMigrations(f.apiDir, f.wranglerBin)).toThrow('"code":7403');
   expect(f.calls()).toHaveLength(1);
 });
 
