@@ -193,8 +193,12 @@ D1 state and reapplies the chain. Never delete or regenerate established files
 under `pkgs/db/drizzle`.
 
 Production D1 is not reset during deploy. `just deploy-api` runs
-`apps/api/bin/deploy-prod.ts`, whose first remote action is applying pending D1
-migrations. It then verifies that every table in the latest Drizzle snapshot
+`apps/api/bin/deploy-prod.ts`, whose first remote action reads the existing D1
+migration ledger. An exact filename comparison skips migration initialization
+when all configured SQL files are already applied; pending migrations still use
+Wrangler apply and are checked again. Missing or unreadable ledgers, malformed
+results, and applied migrations absent from the checkout stop deployment. It
+then verifies that every table in the latest Drizzle snapshot
 exists in production — the DEPLOY-D1-001 missing-table guard — ensures the
 environment-artifact queue, builds the Driver, and deploys the API Worker.
 The guard does not compare columns, indexes, constraints, or extra live tables.
@@ -420,8 +424,9 @@ just deploy-web   # Web only — runs no gate; does not touch D1
 ```
 
 Only `just deploy` runs the repository gate before publishing; `just deploy-api`
-and `just deploy-web` publish directly. The API deploy applies pending remote D1
-migrations as its first remote action (see
+and `just deploy-web` publish directly. The API deploy first reads the remote D1
+ledger and only invokes migration apply
+when configured SQL files are pending (see
 [Database And Migrations](#database-and-migrations)).
 
 API production config lives in `apps/api/wrangler.toml`; web production config lives in `apps/web/wrangler.toml`. Cloudflare routes send `cloud.mosoo.ai/api/*` to the API Worker and `cloud.mosoo.ai/*` to the console Web Worker. The legacy console host redirects Web traffic to `cloud.mosoo.ai` but keeps `try.mosoo.ai/api/*` as a direct compatibility route. The public landing page and blog on `mosoo.ai/*` are owned by `langgenius/mosoo-website`.

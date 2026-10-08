@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 import type { BunRuntime } from "../../../config/bun-script-types";
+import { applyProdMigrations } from "./prod-migrations";
 import {
   extractTableNames,
   findMissingProdTables,
@@ -46,15 +47,11 @@ function runVp(args: string[], cwd = repoRoot): void {
   }
 }
 
-function applyD1Migrations(): void {
-  run(["d1", "migrations", "apply", D1_BINDING, "--remote", "--env", ENV]);
-}
-
 const MIGRATION_META_DIR = `${repoRoot}/pkgs/db/drizzle/meta`;
 
 /**
  * Refuse to deploy a Worker whose schema references tables missing from prod.
- * Runs AFTER `applyD1Migrations`, so on the correct append-only path every
+ * Runs AFTER `applyProdMigrations`, so on the correct append-only path every
  * table is already present (DEPLOY-D1-001).
  */
 async function loadExpectedMigrationTables(): Promise<string[]> {
@@ -175,7 +172,7 @@ const expectedMigrationTables = await loadExpectedMigrationTables().catch((error
 });
 
 writeStdout("▶ Applying pending D1 migrations");
-applyD1Migrations();
+applyProdMigrations(apiDir, wranglerBin);
 
 writeStdout("▶ Verifying prod D1 schema matches the latest migration snapshot");
 await assertProdSchemaMatchesMigrations(expectedMigrationTables).catch((error: unknown) => {

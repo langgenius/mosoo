@@ -45,6 +45,7 @@ interface BunProcessOptions {
 }
 
 export interface BunRuntime {
+  readonly TOML: { parse(source: string): unknown };
   $(strings: TemplateStringsArray, ...values: readonly unknown[]): BunShellOutput;
   readonly CryptoHasher: new (algorithm: "sha256") => BunHasher;
   file(path: string): BunFile;
