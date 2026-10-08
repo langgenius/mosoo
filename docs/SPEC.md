@@ -56,6 +56,8 @@ On September 25, the owner approved the same retained-history, new-Preview exper
 - One durable conversation ID is the primary public execution handle. Existing `thread.id` and Thread routes can represent that Session; the contract does not require renaming them to `session_id`. Callers do not need to manage internal Run or retry Attempt IDs, although existing Run results remain compatible observability data.
 - Only one turn executes at a time in a Session. Busy Sessions reject new input, without input queuing or mid-execution steering.
 - The active turn can be cancelled. Another input is accepted only after that turn ends; cancellation cannot undo completed external side effects.
+- The October 8 owner decision limits a turn to two hours. At the limit mosoo cancels it the same way a caller cancellation would: the turn ends `cancelled` with error `run.time_limit_exceeded`, history and saved artifacts remain, and the stopped turn does not advance the committed workspace. The next input continues from the last completed turn.
+- The same decision makes a full sandbox capacity fail fast. When mosoo is at its sandbox capacity, or the caller's account already holds its maximum number of active Sessions, the turn fails immediately with the retryable error `runtime.capacity_exhausted`, which names the limit that was reached. mosoo does not queue the turn.
 - Completing a turn returns the Session to a state that accepts follow-up input; it does not terminate the conversation.
 - Follow-up continues the same working directory and runtime-native conversation, including after sandbox reclamation.
 
