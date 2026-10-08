@@ -4,7 +4,9 @@ import { apiCommandsTable } from "@mosoo/db";
 import { eq } from "drizzle-orm";
 
 import {
+  API_COMMAND_LEASE_EXPIRED_CODE,
   API_COMMAND_LEASE_MS,
+  API_COMMAND_MAX_CLAIM_ATTEMPTS,
   API_COMMAND_QUEUE_DELIVERY_PENDING_CODE,
   API_COMMAND_QUEUE_SEND_FAILED_CODE,
   admitApiCommand,
@@ -13,6 +15,7 @@ import {
   enqueueApiCommand,
   redriveFailedApiCommandEnqueues,
   renewApiCommandClaim,
+  requeueExpiredApiCommandClaims,
 } from "../src/modules/api-command/application/api-command-ledger";
 import type { ApiCommandMessage } from "../src/modules/api-command/application/api-command-message";
 import { parseApiCommandPayload } from "../src/modules/api-command/application/api-command-payload";
@@ -350,5 +353,110 @@ describe("API command queue", () => {
       .get();
 
     expect(row?.claimExpiresAt).toBe(2_000 + API_COMMAND_LEASE_MS);
+  });
+
+  describe("expired claims", () => {
+    async function insertRunningCommand(
+      database: Awaited<ReturnType<typeof createPublicHttpContractDatabase>>,
+      input: { attemptCount: number; claimExpiresAt: number; id: string },
+    ): Promise<void> {
+      await database
+        .app()
+        .insert(apiCommandsTable)
+        .values({
+          attemptCount: input.attemptCount,
+          claimExpiresAt: input.claimExpiresAt,
+          claimOwner: "killed-consumer",
+          completedAt: null,
+          createdAt: 1_000,
+          dedupeKey: `scheduled:${input.id}`,
+          id: input.id,
+          kind: "scheduled_maintenance",
+          lastErrorCode: null,
+          lastErrorMessage: null,
+          payloadJson: JSON.stringify({ scheduledTime: 1_000 }),
+          status: "running",
+          updatedAt: 1_000,
+        })
+        .run();
+    }
+
+    async function readCommand(
+      database: Awaited<ReturnType<typeof createPublicHttpContractDatabase>>,
+      id: string,
+    ) {
+      return database
+        .app()
+        .select({
+          claimOwner: apiCommandsTable.claimOwner,
+          lastErrorCode: apiCommandsTable.lastErrorCode,
+          status: apiCommandsTable.status,
+        })
+        .from(apiCommandsTable)
+        .where(eq(apiCommandsTable.id, id))
+        .get();
+    }
+
+    test("hands a command whose consumer died back to the outbox", async () => {
+      const database = await createPublicHttpContractDatabase();
+      const queue = createApiCommandQueueStub();
+      const bindings = createPublicHttpTestBindings(database, {
+        apiCommandQueue: queue,
+      }) as ApiBindings;
+      const commandId = "01J0000000000000000000000D";
+      await insertRunningCommand(database, {
+        attemptCount: 1,
+        claimExpiresAt: Date.now() - 10 * 60_000,
+        id: commandId,
+      });
+
+      await redriveFailedApiCommandEnqueues(bindings);
+
+      expect(queue.sent.map((message) => message.body)).toEqual([{ commandId }]);
+      await expect(readCommand(database, commandId)).resolves.toEqual({
+        claimOwner: null,
+        lastErrorCode: null,
+        status: "queued",
+      });
+      await expect(
+        claimApiCommand({ commandId, database, ownerId: "next-consumer" }),
+      ).resolves.toMatchObject({ attemptCount: 2, commandId });
+    });
+
+    test("dead-letters an expired command that used every attempt", async () => {
+      const database = await createPublicHttpContractDatabase();
+      const commandId = "01J0000000000000000000000E";
+      await insertRunningCommand(database, {
+        attemptCount: API_COMMAND_MAX_CLAIM_ATTEMPTS,
+        claimExpiresAt: 1_000,
+        id: commandId,
+      });
+
+      await requeueExpiredApiCommandClaims(database, 10 * 60_000);
+
+      await expect(readCommand(database, commandId)).resolves.toEqual({
+        claimOwner: null,
+        lastErrorCode: API_COMMAND_LEASE_EXPIRED_CODE,
+        status: "dead_lettered",
+      });
+    });
+
+    test("leaves a claim alone inside the renewal grace period", async () => {
+      const database = await createPublicHttpContractDatabase();
+      const commandId = "01J0000000000000000000000F";
+      await insertRunningCommand(database, {
+        attemptCount: 1,
+        claimExpiresAt: 100_000,
+        id: commandId,
+      });
+
+      await requeueExpiredApiCommandClaims(database, 130_000);
+
+      await expect(readCommand(database, commandId)).resolves.toEqual({
+        claimOwner: "killed-consumer",
+        lastErrorCode: null,
+        status: "running",
+      });
+    });
   });
 });
