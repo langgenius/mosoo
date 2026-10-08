@@ -4,6 +4,7 @@ export const vendorCredentialSchema = /* GraphQL */ `
     id: ULID!
     isDefault: Boolean!
     maskedApiKey: String!
+    modelProtocol: String
     models: [String!]
     name: String!
     projectId: ULID!
@@ -13,6 +14,7 @@ export const vendorCredentialSchema = /* GraphQL */ `
   input CreateVendorCredentialInput {
     apiBase: String
     apiKey: String!
+    modelProtocol: String
     models: [String!]
     name: String!
     projectId: ULID!
@@ -23,6 +25,7 @@ export const vendorCredentialSchema = /* GraphQL */ `
     apiBase: String
     apiKey: String
     id: ULID!
+    modelProtocol: String
     models: [String!]
     name: String
     projectId: ULID!
@@ -42,6 +45,7 @@ export const vendorCredentialSchema = /* GraphQL */ `
     available: Boolean!
     displayName: String!
     modelId: String!
+    modelProtocol: String
     reason: String
     source: ModelCatalogSource!
     statusDetail: String
@@ -59,6 +63,7 @@ export const vendorCredentialSchema = /* GraphQL */ `
     apiBase: String
     apiKey: String!
     modelId: String
+    modelProtocol: String
     projectId: ULID!
     vendorId: String!
   }

@@ -16,7 +16,7 @@ their machine-readable contracts, code, or [Architecture](../architecture.md).
 - [Agent API Endpoint](./agent-endpoint-mvp.md)
 - [Public Thread API](./public-thread-api-surface.md) — shipped v1 contract and the unreleased v2 Project-direct candidate with optional Agent presets; real hosted acceptance remains open.
 - [Runtime Sessions](./runtime-session-kernel.md)
-- [Runtime Choice](./runtime-catalog.md)
+- [Runtime Choice](./runtime-catalog.md) — provider/model protocols, runtime compatibility, and frozen Session protocol selection.
 - [Runs and Threads](./default-consumption-surface.md)
 - [Agent Work History](./agent-session-api.md)
 - [Thread Lifecycle](./session-lifecycle.md) — formal continuation, Cloud debug Preview's 30-day policy, and the one-time old-Session inactivity exception.

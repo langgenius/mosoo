@@ -33,6 +33,7 @@ function createAvailableModelsDatabase(): D1Database {
       created_at INTEGER NOT NULL,
       id TEXT PRIMARY KEY,
       is_default INTEGER DEFAULT false NOT NULL,
+      model_protocol TEXT,
       models TEXT,
       name TEXT NOT NULL,
       project_id TEXT NOT NULL,

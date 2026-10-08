@@ -1,3 +1,4 @@
+import type { PresetModelProtocol } from "@mosoo/contracts/models";
 import type { PlatformId, ProjectId, VendorCredentialId } from "@mosoo/id";
 import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
@@ -17,6 +18,7 @@ export const vendorCredentialsTable = sqliteTable(
     createdAt: integer("created_at").notNull(),
     id: platformIdColumn<VendorCredentialId>("id").primaryKey(),
     isDefault: integer("is_default", { mode: "boolean" }).notNull().default(false),
+    modelProtocol: text("model_protocol").$type<PresetModelProtocol>(),
     models: text("models", { mode: "json" }).$type<string[]>(),
     name: text("name").notNull(),
     projectId: platformIdColumn<ProjectId>("project_id").notNull(),

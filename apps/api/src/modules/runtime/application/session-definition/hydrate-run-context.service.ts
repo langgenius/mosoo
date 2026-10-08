@@ -1,5 +1,6 @@
 import { getSessionOrganizationPath } from "@mosoo/agent-driver/paths";
 import { getAgentBuiltInToolSupportError } from "@mosoo/contracts/agent";
+import type { PresetModelProtocol } from "@mosoo/contracts/models";
 import type { SessionSummary } from "@mosoo/contracts/session";
 import type { UserWarning } from "@mosoo/contracts/session-run";
 import type { ResolvedRunSkill } from "@mosoo/contracts/skill";
@@ -14,7 +15,12 @@ import type {
   SandboxSessionId,
   SessionId,
 } from "@mosoo/id";
-import { getRuntimeCatalogEntry, getRuntimeCatalogVendorForProvider } from "@mosoo/runtime-catalog";
+import {
+  VENDOR_OPENAI_COMPATIBLE,
+  getRuntimeCatalogEntry,
+  getRuntimeCatalogVendorForProvider,
+  resolveRuntimeModelProtocol,
+} from "@mosoo/runtime-catalog";
 import { RUNTIME_DIAGNOSTIC_EVENT } from "@mosoo/runtime-events";
 import { eq } from "drizzle-orm";
 
@@ -43,6 +49,7 @@ import type {
   DriverNetworkProfile,
   DriverProfileConfig,
   DriverSkillCatalogEntry,
+  DriverVendorCredentialProfile,
 } from "../../domain/driver-snapshot";
 import { getSupportedRuntimeId } from "../../domain/runtime-config";
 import { parseEnvironmentAllowedHosts } from "../../domain/sandbox-network-constraints";
@@ -131,6 +138,47 @@ function assertSessionToolSupport(plan: SessionExecutionPlan): void {
   if (message !== null) {
     throw validationError(`Agent is not ready to run: ${message}`, "AGENT_SESSION_NOT_READY");
   }
+}
+
+function resolveSessionModelProtocol(
+  plan: SessionExecutionPlan,
+  credential: DriverVendorCredentialProfile,
+): PresetModelProtocol {
+  const resolution = resolveRuntimeModelProtocol({
+    runtimeId: plan.binding.runtimeId,
+    vendorId: credential.vendorId,
+    modelId: plan.binding.model,
+    customModelProtocol: credential.modelProtocol ?? null,
+  });
+  // Legacy custom Sessions used a fixed protocol per runtime before credentials
+  // declared it. Preserve that route without rewriting the historical snapshot.
+  const legacyCustomProtocol =
+    credential.vendorId === VENDOR_OPENAI_COMPATIBLE.vendorId
+      ? plan.binding.runtimeId === "openai-runtime"
+        ? "openai-responses"
+        : "openai-chat-completions"
+      : undefined;
+  const selectedProtocol =
+    legacyCustomProtocol === undefined
+      ? resolution.ok
+        ? resolution.modelProtocol
+        : undefined
+      : (credential.modelProtocol ?? legacyCustomProtocol);
+  const frozenProtocol = plan.modelProtocol ?? legacyCustomProtocol ?? selectedProtocol;
+  if (
+    frozenProtocol !== undefined &&
+    selectedProtocol !== undefined &&
+    frozenProtocol !== selectedProtocol
+  ) {
+    throw validationError(
+      `The provider model protocol changed from ${frozenProtocol} to ${selectedProtocol}. Restore the original protocol or start a new Session.`,
+      "AGENT_SESSION_NOT_READY",
+    );
+  }
+  if (!resolution.ok) {
+    throw validationError(resolution.message, "AGENT_SESSION_NOT_READY");
+  }
+  return frozenProtocol ?? resolution.modelProtocol;
 }
 
 async function resolveRuntimeProfileIds(
@@ -267,30 +315,6 @@ async function hydrateRunContextFromSession(
   const snapshotEnvironment = buildSnapshotAgentEnvironment({
     environmentId: environmentSnapshot.environmentId,
   });
-  // No `bindings` here on purpose: passing them makes readiness run a live
-  // provider probe (GET /models plus a possible POST /chat/completions, 10s
-  // timeout each) on the first-token critical path. D1-backed checks still
-  // gate the run; broken credentials surface from the actual model call.
-  // Config/publish readiness callers keep the live probe.
-  const agentReadiness = await computeAgentReadiness(bindings.DB, executionOwnerUserId, {
-    agentId: binding.agentId,
-    builtInTools: executionPlan.builtInTools,
-    environment: snapshotEnvironment,
-    mcpServerIds: toolReferences.map((reference) => reference.serverId),
-    model: binding.model,
-    packageResolution: storedConfig.packageResolution,
-    projectId: session.projectId,
-    provider: binding.provider,
-    runtimeId,
-  });
-
-  if (!agentReadiness.ready) {
-    throw validationError(
-      formatAgentReadinessFailureMessage("Agent is not ready to run", agentReadiness),
-      "AGENT_SESSION_NOT_READY",
-    );
-  }
-
   const skillMountRoot = `${getSessionOrganizationPath(session.id)}/.mosoo/skill`;
 
   const resolvedSkillReferences = await resolveSessionSkillReferences({
@@ -355,6 +379,31 @@ async function hydrateRunContextFromSession(
   }
 
   let profile: DriverProfileConfig;
+  const modelProtocol = resolveSessionModelProtocol(executionPlan, vendorCredential);
+  // No `bindings` here on purpose: passing them makes readiness run a live
+  // provider probe (GET /models plus a possible POST /chat/completions, 10s
+  // timeout each) on the first-token critical path. D1-backed checks still
+  // gate the run; broken credentials surface from the actual model call.
+  // Config/publish readiness callers keep the live probe.
+  const agentReadiness = await computeAgentReadiness(bindings.DB, executionOwnerUserId, {
+    agentId: binding.agentId,
+    builtInTools: executionPlan.builtInTools,
+    environment: snapshotEnvironment,
+    mcpServerIds: toolReferences.map((reference) => reference.serverId),
+    model: binding.model,
+    packageResolution: storedConfig.packageResolution,
+    projectId: session.projectId,
+    provider: binding.provider,
+    runtimeId,
+  });
+
+  if (!agentReadiness.ready) {
+    throw validationError(
+      formatAgentReadinessFailureMessage("Agent is not ready to run", agentReadiness),
+      "AGENT_SESSION_NOT_READY",
+    );
+  }
+
   const runtimeProfileIds = await resolveRuntimeProfileIds(bindings, {
     runtimeId,
     agentId: binding.agentId,
@@ -381,6 +430,7 @@ async function hydrateRunContextFromSession(
       environmentArtifact,
       executionOwnerUserId,
       model: binding.model,
+      modelProtocol,
       network: toDriverNetworkProfile({
         environment: environmentSnapshot,
       }),
@@ -509,6 +559,7 @@ async function refreshCachedRunContextVolatileFields(
     throw new Error(`No credential available for ${vendor.label}. Configure in Providers.`);
   }
 
+  const modelProtocol = resolveSessionModelProtocol(executionPlan, vendorCredential);
   const runtimeProfileIds = await resolveRuntimeProfileIds(bindings, {
     runtimeId,
     agentId: binding.agentId,
@@ -533,6 +584,7 @@ async function refreshCachedRunContextVolatileFields(
     environmentArtifact: cached.profile.environmentArtifact ?? null,
     executionOwnerUserId,
     model: binding.model,
+    modelProtocol,
     network: toDriverNetworkProfile({
       environment: environmentSnapshot,
     }),

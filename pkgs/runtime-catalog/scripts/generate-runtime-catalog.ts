@@ -104,6 +104,7 @@ interface RawRuntime {
   };
   label: string;
   runtimeId: string;
+  supportedModelProtocols: string[];
   supportedModels: {
     modelIds?: string[];
     vendorIds?: string[];
@@ -128,6 +129,7 @@ interface GeneratedCatalog {
   runtimeCatalog: Array<
     Omit<RawRuntime, "capabilityProfile" | "supportedModels" | "vendorIds"> & {
       capabilities: RawCapability[];
+      supportedModelIdentities: Array<Pick<RawModel, "vendorId" | "modelId">>;
       supportedModelIds: string[];
       vendorIds: string[];
     }
@@ -434,6 +436,16 @@ function readRuntimes(value: unknown): RawRuntime[] {
     );
     const transport = readString(runtime["transport"], `runtimes[${index}].transport`);
     const visibility = readString(runtime["visibility"], `runtimes[${index}].visibility`);
+    const supportedModelProtocols = readUniqueStringArray(
+      runtime["supportedModelProtocols"],
+      `runtimes[${index}].supportedModelProtocols`,
+    );
+    if (supportedModelProtocols.length === 0) {
+      fail(`runtimes[${index}].supportedModelProtocols must not be empty.`);
+    }
+    for (const protocol of supportedModelProtocols) {
+      assertKnown(protocol, MODEL_PROTOCOLS, `runtimes[${index}].supportedModelProtocols`);
+    }
 
     assertKnown(transport, TRANSPORTS, `runtimes[${index}].transport`);
     assertKnown(visibility, VISIBILITIES, `runtimes[${index}].visibility`);
@@ -475,6 +487,7 @@ function readRuntimes(value: unknown): RawRuntime[] {
       },
       label: readString(runtime["label"], `runtimes[${index}].label`),
       runtimeId: readString(runtime["runtimeId"], `runtimes[${index}].runtimeId`),
+      supportedModelProtocols,
       supportedModels: {
         modelIds:
           supportedModels["modelIds"] === undefined
@@ -582,9 +595,21 @@ function createGeneratedCatalog(catalog: RawCatalog): GeneratedCatalog {
       fail(`Runtime ${runtime.runtimeId} default identity references an unknown preset model.`);
     }
 
-    const supportedModelIds = resolveSupportedModelIds(runtime, modelsByVendor);
+    const supportedModels = resolveSupportedModels(runtime, modelsByVendor);
+    const supportedModelIds = [...new Set(supportedModels.map((model) => model.modelId))];
+    const supportedModelIdentities = supportedModels.map(({ vendorId, modelId }) => ({
+      vendorId,
+      modelId,
+    }));
 
-    if (!hasCustomDefault && !supportedModelIds.includes(runtime.defaultIdentity.modelId)) {
+    if (
+      !hasCustomDefault &&
+      !supportedModelIdentities.some(
+        (model) =>
+          model.vendorId === runtime.defaultIdentity.providerId &&
+          model.modelId === runtime.defaultIdentity.modelId,
+      )
+    ) {
       fail(
         `Runtime ${runtime.runtimeId} default model is not supported by its supportedModels scope.`,
       );
@@ -599,6 +624,7 @@ function createGeneratedCatalog(catalog: RawCatalog): GeneratedCatalog {
     return {
       ...base,
       capabilities,
+      supportedModelIdentities,
       supportedModelIds,
     };
   });
@@ -627,13 +653,26 @@ function modelKey(vendorId: string, modelId: string): string {
   return `${vendorId}:${modelId}`;
 }
 
-function resolveSupportedModelIds(
+function resolveSupportedModels(
   runtime: RawRuntime,
   modelsByVendor: ReadonlyMap<string, readonly RawModel[]>,
-): string[] {
-  const modelIds: string[] = [];
+): RawModel[] {
+  const admitted = new Map<string, RawModel>();
+  function addModel(model: RawModel): void {
+    if (!runtime.supportedModelProtocols.includes(model.protocol)) {
+      fail(
+        `Runtime ${runtime.runtimeId} cannot use ${model.vendorId}/${model.modelId} protocol ${model.protocol}.`,
+      );
+    }
+    admitted.set(modelKey(model.vendorId, model.modelId), model);
+  }
 
   for (const vendorId of runtime.supportedModels.vendorIds ?? []) {
+    if (!runtime.vendorIds.includes(vendorId)) {
+      fail(
+        `Runtime ${runtime.runtimeId} supportedModels references a vendor outside vendorIds: ${vendorId}.`,
+      );
+    }
     const models = modelsByVendor.get(vendorId);
 
     if (models === undefined) {
@@ -641,13 +680,24 @@ function resolveSupportedModelIds(
     }
 
     for (const model of models) {
-      modelIds.push(model.modelId);
+      addModel(model);
     }
   }
 
-  modelIds.push(...(runtime.supportedModels.modelIds ?? []));
+  for (const modelId of runtime.supportedModels.modelIds ?? []) {
+    const matches = runtime.vendorIds.flatMap((vendorId) =>
+      (modelsByVendor.get(vendorId) ?? []).filter((model) => model.modelId === modelId),
+    );
+    if (matches.length !== 1) {
+      fail(
+        `Runtime ${runtime.runtimeId} supportedModels.modelIds entry ${modelId} must identify exactly one declared provider model.`,
+      );
+    }
+    const model = matches[0];
+    if (model !== undefined) addModel(model);
+  }
 
-  return [...new Set(modelIds)];
+  return [...admitted.values()];
 }
 
 function renderGeneratedCatalog(catalog: GeneratedCatalog): string {

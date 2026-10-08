@@ -127,6 +127,13 @@
       "when": 1790021575921,
       "tag": "0017_optional-session-agent",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1791438250851,
+      "tag": "0018_vendor-credential-model-protocol",
+      "breakpoints": true
     }
   ]
 }

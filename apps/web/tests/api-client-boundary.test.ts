@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { createAgentSession } from "../src/domains/session/api/agent-session";
 import {
   deleteVendorCredential,
+  listAvailableAgentModels,
   updateVendorCredential,
 } from "../src/domains/vendor-credential/api/vendor-credential-client";
 import { requestGraphQL, UnauthorizedError } from "../src/platform/http/graphql-client";
@@ -59,6 +60,38 @@ afterEach(() => {
 });
 
 describe("web API client boundary", () => {
+  test("preserves a model protocol mismatch returned by the model catalog", async () => {
+    globalThis.fetch = async () =>
+      Response.json({
+        data: {
+          availableAgentModels: [
+            {
+              available: false,
+              displayName: "Custom chat",
+              modelId: "custom-chat",
+              modelProtocol: "openai-chat-completions",
+              reason: "wrong-protocol",
+              source: "custom",
+              statusDetail: "OpenAI Runtime requires OpenAI Responses.",
+              statusLabel: "Protocol not supported",
+              vendorId: "openai-compatible",
+              vendorLabel: "Custom Provider",
+            },
+          ],
+        },
+      });
+    const entries = await listAvailableAgentModels({
+      projectId: toProjectId(PROJECT_ID),
+      runtimeId: "openai-runtime",
+    });
+    expect(entries[0]).toMatchObject({
+      available: false,
+      modelProtocol: "openai-chat-completions",
+      reason: "wrong-protocol",
+      statusLabel: "Protocol not supported",
+    });
+  });
+
   test("targets the same-origin API prefix", () => {
     expect(apiPath("/graphql")).toBe("/api/graphql");
     expect(apiPath("/v1/openapi.json")).toBe("/api/v1/openapi.json");
@@ -186,6 +219,7 @@ describe("web API client boundary", () => {
               apiBase: null,
               id: VENDOR_CREDENTIAL_ID,
               maskedApiKey: "sk-...",
+              modelProtocol: null,
               models: null,
               name: "Updated",
               projectId: PROJECT_ID,

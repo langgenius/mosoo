@@ -1,3 +1,4 @@
+import type { PresetModelProtocol } from "@mosoo/contracts/models";
 import type { RuntimeCatalogVendor } from "@mosoo/runtime-catalog";
 
 import type { ProviderFetchProxyConfig } from "./provider-fetch-proxy";
@@ -22,7 +23,16 @@ export function toVendorProbeEndpointUrl(
 export function toVendorProbeAuthHeaders(
   vendor: RuntimeCatalogVendor,
   apiKey: string,
+  modelProtocol?: PresetModelProtocol | null,
 ): Record<string, string> {
+  if (vendor.vendorId === "openai-compatible") {
+    if (modelProtocol === "anthropic-messages") {
+      return { "anthropic-version": "2023-06-01", "x-api-key": apiKey };
+    }
+    if (modelProtocol === "google-gemini") {
+      return { "x-goog-api-key": apiKey };
+    }
+  }
   switch (vendor.authHeader.scheme) {
     case "api-key": {
       return {
@@ -52,7 +62,7 @@ export async function fetchVendorProbe(
       return await fetchViaProviderProxy(url, init, timeoutMs, fetchProxy, controller.signal);
     }
 
-    return await fetch(url, { ...init, signal: controller.signal });
+    return await fetch(url, { ...init, redirect: "manual", signal: controller.signal });
   } finally {
     clearTimeout(timeout);
   }
@@ -238,6 +248,10 @@ export function validateVendorProbeBaseUrl(baseUrl: string): string | null {
 }
 
 export function vendorProbeModelListIncludes(payload: unknown, modelId: string): boolean {
+  if (isRecord(payload) && Array.isArray(payload["models"])) {
+    const canonicalModelId = modelId.startsWith("models/") ? modelId : `models/${modelId}`;
+    return payload["models"].some((entry) => isRecord(entry) && entry["name"] === canonicalModelId);
+  }
   const data = Array.isArray(payload)
     ? payload
     : isRecord(payload) && "data" in payload

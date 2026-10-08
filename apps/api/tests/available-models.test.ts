@@ -34,6 +34,7 @@ function createAvailableModelsDatabase(): SqliteD1Database {
       api_key_secret_id text NOT NULL,
       api_base text,
       is_default integer DEFAULT false NOT NULL,
+      model_protocol text,
       models text
     );
 
@@ -127,24 +128,24 @@ function createAvailableModelsDatabase(): SqliteD1Database {
 }
 
 describe("available models", () => {
-  test("makes only explicitly declared custom models available for Pi", async () => {
+  test("makes configured preset and declared custom models available for Pi", async () => {
     const entries = await resolveAvailableModels(createAvailableModelsDatabase(), {
       projectId: PROJECT_ID,
       runtimeId: "pi",
     });
 
-    expect(entries.filter((entry) => entry.available)).toEqual([
+    expect(entries.filter((entry) => entry.available && entry.source === "custom")).toEqual([
       expect.objectContaining({
         modelId: "qwen-coder",
+        modelProtocol: "openai-chat-completions",
         source: "custom",
         vendorId: "openai-compatible",
       }),
     ]);
     expect(entries.some((entry) => entry.modelId === "custom-model")).toBe(false);
     expect(entries.find((entry) => entry.vendorId === "openai")).toMatchObject({
-      available: false,
-      reason: "wrong-runtime",
-      statusDetail: "OpenAI is not available for Pi.",
+      available: true,
+      modelProtocol: "openai-responses",
     });
   });
 
@@ -161,7 +162,7 @@ describe("available models", () => {
       runtimeId: "pi",
     });
 
-    expect(entries.filter((entry) => entry.available)).toEqual([]);
+    expect(entries.filter((entry) => entry.available && entry.source === "custom")).toEqual([]);
     expect(entries.find((entry) => entry.modelId === "custom-model")).toMatchObject({
       available: false,
       reason: "needs-key",
@@ -170,7 +171,7 @@ describe("available models", () => {
     });
   });
 
-  test("makes custom models available for OpenAI runtime", async () => {
+  test("preserves Responses for legacy undeclared custom models on OpenAI runtime", async () => {
     const entries = await resolveAvailableModels(createAvailableModelsDatabase(), {
       projectId: PROJECT_ID,
       runtimeId: "openai-runtime",
@@ -185,6 +186,7 @@ describe("available models", () => {
       ),
     ).toMatchObject({
       available: true,
+      modelProtocol: "openai-responses",
       source: "custom",
       statusDetail: null,
       statusLabel: "Available",
@@ -197,7 +199,55 @@ describe("available models", () => {
     });
   });
 
-  test("makes OpenAI preset models available for the internal System Agent runtime", async () => {
+  test.each(["openai-chat-completions", "openai-responses", "anthropic-messages", "google-gemini"])(
+    "uses the selected custom credential's %s declaration for every runtime",
+    async (protocol) => {
+      const database = createAvailableModelsDatabase();
+      await database
+        .prepare("UPDATE vendor_credential SET model_protocol = ? WHERE id = 'credential-custom'")
+        .bind(protocol)
+        .run();
+      for (const runtimeId of ["pi", "acp-fallback", "openai-runtime"]) {
+        const entries = await resolveAvailableModels(database, {
+          projectId: PROJECT_ID,
+          runtimeId,
+        });
+        const entry = entries.find((model) => model.modelId === "qwen-coder");
+        if (runtimeId === "openai-runtime" && protocol !== "openai-responses") {
+          expect(entry).toMatchObject({
+            available: false,
+            reason: "wrong-protocol",
+            statusDetail: `Runtime openai-runtime does not support model protocol ${protocol}.`,
+          });
+        } else {
+          expect(entry).toMatchObject({ available: true, modelProtocol: protocol });
+        }
+      }
+    },
+  );
+
+  test("does not skip the first name/id credential to find a compatible duplicate model", async () => {
+    const database = createAvailableModelsDatabase();
+    database.execute(`
+      UPDATE vendor_credential SET model_protocol = 'openai-chat-completions'
+      WHERE id = 'credential-custom';
+      INSERT INTO vendor_credential (
+        id, project_id, vendor_id, name, api_key_secret_id, api_base, models, model_protocol
+      ) VALUES (
+        'credential-z', '${PROJECT_ID}', 'openai-compatible', 'Custom default',
+        'secret-z', 'https://responses.example.com/v1', '["qwen-coder"]', 'openai-responses'
+      );
+    `);
+    const entries = await resolveAvailableModels(database, {
+      projectId: PROJECT_ID,
+      runtimeId: "openai-runtime",
+    });
+    expect(entries.filter((entry) => entry.modelId === "qwen-coder")).toEqual([
+      expect.objectContaining({ available: false, reason: "wrong-protocol" }),
+    ]);
+  });
+
+  test("does not advertise models for the disabled internal System Agent runtime", async () => {
     const entries = await resolveAvailableModels(createAvailableModelsDatabase(), {
       projectId: PROJECT_ID,
       runtimeId: "system-agent",
@@ -206,9 +256,9 @@ describe("available models", () => {
     expect(
       entries.find((entry) => entry.vendorId === "openai" && entry.modelId === "gpt-5.4"),
     ).toMatchObject({
-      available: true,
-      statusDetail: null,
-      statusLabel: "Available",
+      available: false,
+      reason: "wrong-runtime",
+      statusLabel: "Not available",
     });
     expect(entries.find((entry) => entry.vendorId === "anthropic")).toMatchObject({
       available: false,

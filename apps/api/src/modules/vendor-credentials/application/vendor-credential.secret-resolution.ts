@@ -247,6 +247,7 @@ async function resolveCredentialFromRow(
     apiBase: command.credential.apiBase,
     apiKey: secret.apiKey,
     credentialId: command.credential.id,
+    modelProtocol: command.credential.modelProtocol ?? null,
     models: parseCredentialModels(command.credential.modelsJson),
   };
 }
@@ -344,6 +345,7 @@ export async function resolveVendorCredentialRef(
     apiBase: resolved.row.apiBase,
     projectId: resolved.row.projectId,
     credentialId: resolved.row.id,
+    modelProtocol: resolved.row.modelProtocol ?? null,
     models: parseCredentialModels(resolved.row.modelsJson),
     vendorId: resolved.row.vendorId,
   };

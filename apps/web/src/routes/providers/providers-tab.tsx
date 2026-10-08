@@ -15,6 +15,10 @@ import {
 } from "@/domains/vendor-credential/api/vendor-credential-client";
 import { canUseCustomEndpoint } from "@/domains/vendor-credential/model/provider-credential-endpoint";
 import { getErrorMessage } from "@/domains/vendor-credential/model/provider-credential-error";
+import {
+  CUSTOM_MODEL_PROTOCOL_OPTIONS,
+  modelProtocolLabel,
+} from "@/domains/vendor-credential/model/provider-model-protocol";
 import { formatProviderErrorMessage } from "@/domains/vendor-credential/model/provider-readiness-copy";
 import { toProjectId, toVendorCredentialId } from "@/routes/typed-id";
 import { useTranslation } from "@/shared/i18n";
@@ -35,6 +39,7 @@ import { Label } from "@/shared/ui/label";
 import { ConnectionRow } from "@/shared/ui/list-row";
 import { MonoText } from "@/shared/ui/mono-text";
 import { PageHeader } from "@/shared/ui/page-header";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
 
 import { ProviderTestStatus } from "./provider-test-status";
 import { RuntimeAvailabilitySection } from "./runtime-availability-section";
@@ -42,7 +47,7 @@ import { RuntimeAvailabilitySection } from "./runtime-availability-section";
 const CUSTOM_PROVIDER_VENDOR_ID = "openai-compatible";
 const CUSTOM_PROVIDER_DISPLAY: Pick<RuntimeCatalogVendor, "iconKey" | "label" | "vendorId"> = {
   iconKey: "openai",
-  label: "providers.customModels",
+  label: "providers.customProvider",
   vendorId: CUSTOM_PROVIDER_VENDOR_ID,
 };
 
@@ -53,6 +58,7 @@ interface CredentialForm {
   apiKey: string;
   id: string | null;
   maskedApiKey: string | null;
+  modelProtocol: PresetModelProtocol | null;
   modelsText: string;
   name: string;
   vendorId: string;
@@ -63,6 +69,7 @@ const EMPTY_FORM: CredentialForm = {
   apiKey: "",
   id: null,
   maskedApiKey: null,
+  modelProtocol: null,
   modelsText: "",
   name: "",
   vendorId: "",
@@ -111,7 +118,7 @@ function formModels(form: CredentialForm): string[] | undefined {
 
 function vendorLabel(vendorId: string): string {
   if (vendorId === CUSTOM_PROVIDER_VENDOR_ID) {
-    return "providers.customModels";
+    return "providers.customProvider";
   }
 
   return PUBLIC_VENDORS.find((vendor) => vendor.vendorId === vendorId)?.label ?? vendorId;
@@ -156,6 +163,13 @@ export function ProvidersTab({ projectId }: { projectId: string }): ReactElement
   });
   const groupedCredentials = useMemo(() => credentialsByVendor(credentials), [credentials]);
 
+  async function invalidateProviderQueries(): Promise<void> {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: providerCredentialKeys.list(projectId) }),
+      queryClient.invalidateQueries({ queryKey: ["available-agent-models", projectId] }),
+    ]);
+  }
+
   const saveMutation = useMutation({
     mutationFn: async (nextForm: CredentialForm) => {
       const name = nextForm.name.trim();
@@ -165,6 +179,10 @@ export function ProvidersTab({ projectId }: { projectId: string }): ReactElement
         : null;
       const models =
         nextForm.vendorId === CUSTOM_PROVIDER_VENDOR_ID ? formModels(nextForm) : undefined;
+      const protocolInput =
+        nextForm.vendorId === CUSTOM_PROVIDER_VENDOR_ID
+          ? { modelProtocol: nextForm.modelProtocol }
+          : {};
 
       if (name.length === 0 || (nextForm.id === null && apiKey.length === 0)) {
         throw new Error(
@@ -178,6 +196,7 @@ export function ProvidersTab({ projectId }: { projectId: string }): ReactElement
 
       if (nextForm.id === null) {
         return createVendorCredential({
+          ...protocolInput,
           apiBase,
           apiKey,
           name,
@@ -188,6 +207,7 @@ export function ProvidersTab({ projectId }: { projectId: string }): ReactElement
       }
 
       return updateVendorCredential({
+        ...protocolInput,
         apiBase,
         ...(apiKey.length > 0 ? { apiKey } : {}),
         id: toVendorCredentialId(nextForm.id),
@@ -200,7 +220,7 @@ export function ProvidersTab({ projectId }: { projectId: string }): ReactElement
       setForm(EMPTY_FORM);
       setFormError(null);
       setTestState("idle");
-      await queryClient.invalidateQueries({ queryKey: providerCredentialKeys.list(projectId) });
+      await invalidateProviderQueries();
     },
   });
 
@@ -208,7 +228,7 @@ export function ProvidersTab({ projectId }: { projectId: string }): ReactElement
     mutationFn: async (credential: VendorCredential) =>
       deleteVendorCredential({ id: credential.id, projectId: typedProjectId }),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: providerCredentialKeys.list(projectId) });
+      await invalidateProviderQueries();
     },
   });
 
@@ -216,7 +236,7 @@ export function ProvidersTab({ projectId }: { projectId: string }): ReactElement
     mutationFn: async (credential: VendorCredential) =>
       setDefaultVendorCredential({ id: credential.id, projectId: typedProjectId }),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: providerCredentialKeys.list(projectId) });
+      await invalidateProviderQueries();
     },
   });
 
@@ -246,6 +266,9 @@ export function ProvidersTab({ projectId }: { projectId: string }): ReactElement
         apiBase: canUseCustomEndpoint(form.vendorId) ? form.apiBase.trim() || null : null,
         apiKey,
         modelId: firstModel,
+        ...(form.vendorId === CUSTOM_PROVIDER_VENDOR_ID
+          ? { modelProtocol: form.modelProtocol }
+          : {}),
         projectId: typedProjectId,
         vendorId: form.vendorId,
       });
@@ -265,7 +288,12 @@ export function ProvidersTab({ projectId }: { projectId: string }): ReactElement
   }
 
   function startCreate(vendorId: string): void {
-    setForm({ ...EMPTY_FORM, apiBase: defaultApiBaseForVendor(vendorId), vendorId });
+    setForm({
+      ...EMPTY_FORM,
+      apiBase: defaultApiBaseForVendor(vendorId),
+      modelProtocol: vendorId === CUSTOM_PROVIDER_VENDOR_ID ? "openai-chat-completions" : null,
+      vendorId,
+    });
     setFormError(null);
     setTestState("idle");
   }
@@ -276,6 +304,7 @@ export function ProvidersTab({ projectId }: { projectId: string }): ReactElement
       apiKey: "",
       id: credential.id,
       maskedApiKey: credential.maskedApiKey,
+      modelProtocol: credential.modelProtocol,
       modelsText: credential.models?.join("\n") ?? "",
       name: credential.name,
       vendorId: credential.vendorId,
@@ -319,7 +348,7 @@ export function ProvidersTab({ projectId }: { projectId: string }): ReactElement
       >
         <Button onClick={() => startCreate(CUSTOM_PROVIDER_VENDOR_ID)} variant="outline">
           <Plus className="size-3.5" />
-          {t("providers.addCustomModel")}
+          {t("providers.addCustomProvider")}
         </Button>
       </PageHeader>
 
@@ -433,6 +462,14 @@ function ProviderCredentialDialogForm({
   const apiKeyInputId = `${formId}-api-key`;
   const apiBaseInputId = `${formId}-api-base`;
   const modelsInputId = `${formId}-models`;
+  const modelProtocolInputId = `${formId}-model-protocol`;
+  const modelProtocolHelpId = `${formId}-model-protocol-help`;
+  const isCustomProvider = form.vendorId === CUSTOM_PROVIDER_VENDOR_ID;
+  const protocolUnspecified = isCustomProvider && form.modelProtocol === null;
+  const protocolItems = [
+    ...(protocolUnspecified ? [{ label: t("providers.protocolUnspecified"), value: "" }] : []),
+    ...CUSTOM_MODEL_PROTOCOL_OPTIONS,
+  ];
   const vendorName = t(vendorLabel(form.vendorId));
   // Invalid decoration appears only after a failed save; it never replaces the
   // focus ring (contract section 4, field recipe).
@@ -492,6 +529,41 @@ function ProviderCredentialDialogForm({
         </div>
         {form.vendorId === CUSTOM_PROVIDER_VENDOR_ID ? (
           <div className="space-y-1.5">
+            <Label htmlFor={modelProtocolInputId}>{t("providers.modelProtocol")}</Label>
+            <Select
+              items={protocolItems}
+              onValueChange={(value) => {
+                const protocol = CUSTOM_MODEL_PROTOCOL_OPTIONS.find(
+                  (option) => option.value === value,
+                );
+                if (protocol !== undefined) {
+                  onChange({ ...form, modelProtocol: protocol.value });
+                }
+              }}
+              value={form.modelProtocol ?? ""}
+            >
+              <SelectTrigger
+                aria-describedby={modelProtocolHelpId}
+                className="w-full"
+                id={modelProtocolInputId}
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {protocolItems.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-fg-3 text-[12px] leading-4" id={modelProtocolHelpId}>
+              {t(protocolUnspecified ? "providers.protocolLegacyHelp" : "providers.protocolHelp")}
+            </p>
+          </div>
+        ) : null}
+        {form.vendorId === CUSTOM_PROVIDER_VENDOR_ID ? (
+          <div className="space-y-1.5">
             <Label htmlFor={modelsInputId}>{t("providers.models")}</Label>
             <Input
               aria-invalid={modelsInvalid || undefined}
@@ -520,7 +592,7 @@ function ProviderCredentialDialogForm({
         <div className="flex items-center gap-2">
           <Button
             aria-busy={testState === "running" || undefined}
-            disabled={testState === "running"}
+            disabled={testState === "running" || protocolUnspecified}
             onClick={onTest}
             variant="outline"
           >
@@ -583,6 +655,13 @@ function ProviderCredentialSection({
                   {credential.isDefault ? (
                     <Badge variant="brand">{t("providers.default")}</Badge>
                   ) : null}
+                  {credential.vendorId === CUSTOM_PROVIDER_VENDOR_ID ? (
+                    <Badge variant="secondary">
+                      {credential.modelProtocol === null
+                        ? t("providers.protocolUnspecified")
+                        : modelProtocolLabel(credential.modelProtocol)}
+                    </Badge>
+                  ) : null}
                 </div>
                 <div className="mt-0.5 flex min-w-0 items-baseline gap-2 leading-4">
                   <MonoText className="text-fg-3 truncate">{credential.maskedApiKey}</MonoText>
@@ -626,3 +705,4 @@ function ProviderCredentialSection({
     </section>
   );
 }
+import type { PresetModelProtocol } from "@mosoo/contracts/models";

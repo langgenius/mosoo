@@ -26,6 +26,7 @@ export function toVendorCredentialWithSecret(
     id: row.id,
     isDefault: row.isDefault,
     maskedApiKey: maskApiKey(apiKey),
+    modelProtocol: row.modelProtocol ?? null,
     models: parseCredentialModels(row.modelsJson),
     name: row.name,
     projectId: row.projectId,

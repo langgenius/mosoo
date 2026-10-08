@@ -9,7 +9,7 @@ import { vendorCredentialsTable } from "@mosoo/db";
 import { ignorePromiseRejection } from "@mosoo/effects";
 import { createPlatformId } from "@mosoo/id";
 import type { VendorCredentialId } from "@mosoo/id";
-import { getVendor } from "@mosoo/runtime-catalog";
+import { VENDOR_OPENAI_COMPATIBLE, getVendor } from "@mosoo/runtime-catalog";
 import { and, eq } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
@@ -22,6 +22,7 @@ import {
   enforceCredentialModelShape,
   normalizeApiBase,
   normalizeCredentialModels,
+  normalizeCredentialModelProtocol,
   normalizeCredentialName,
 } from "./vendor-credential-validation";
 import { parseCredentialModels, toVendorCredentialWithSecret } from "./vendor-credential.mapper";
@@ -81,6 +82,9 @@ export async function createVendorCredential(
   const apiKey = input.apiKey.trim();
   const apiBase = normalizeApiBase(input.apiBase);
   const models = normalizeCredentialModels(input.models);
+  const modelProtocol =
+    normalizeCredentialModelProtocol(input.vendorId, input.modelProtocol) ??
+    (input.vendorId === VENDOR_OPENAI_COMPATIBLE.vendorId ? "openai-chat-completions" : null);
 
   if (getVendor(input.vendorId) === null) {
     throw new Error(`Unknown vendor: ${input.vendorId}.`);
@@ -115,6 +119,7 @@ export async function createVendorCredential(
         createdAt: timestampMs,
         id,
         isDefault: isFirstForVendor,
+        modelProtocol,
         models,
         name,
         projectId: input.projectId,
@@ -156,6 +161,13 @@ export async function updateVendorCredential(
 
   const name = input.name !== undefined ? normalizeCredentialName(input.name) : row.name;
   const apiBase = input.apiBase !== undefined ? normalizeApiBase(input.apiBase) : row.apiBase;
+  const modelProtocol =
+    input.modelProtocol === undefined
+      ? (row.modelProtocol ?? null)
+      : normalizeCredentialModelProtocol(row.vendorId, input.modelProtocol);
+  if (row.modelProtocol !== undefined && row.modelProtocol !== null && modelProtocol === null) {
+    throw new Error("An explicit model protocol cannot be cleared.");
+  }
   const models =
     input.models !== undefined
       ? normalizeCredentialModels(input.models)
@@ -179,6 +191,7 @@ export async function updateVendorCredential(
       .set({
         apiBase,
         apiKeySecretId: nextSecretId,
+        modelProtocol,
         models,
         name,
         updatedAt: currentTimestampMs(),

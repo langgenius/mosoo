@@ -66,6 +66,7 @@ function createCredentialRuntimeDatabase(): SqliteD1Database {
       created_at integer NOT NULL,
       id text PRIMARY KEY NOT NULL,
       is_default integer DEFAULT false NOT NULL,
+      model_protocol text,
       models text,
       name text NOT NULL,
       project_id text NOT NULL,
@@ -193,6 +194,7 @@ describe("vendor credential runtime selection", () => {
     await insertVendorCredential(database, {
       apiBase: null,
       credentialId: OPENAI_CREDENTIAL_ID,
+      modelProtocol: null,
       models: null,
       name: "OpenAI",
       secretId: openAiSecretId,
@@ -209,6 +211,7 @@ describe("vendor credential runtime selection", () => {
     await insertVendorCredential(database, {
       apiBase: "https://api.deepseek.com",
       credentialId: CUSTOM_PRIMARY_CREDENTIAL_ID,
+      modelProtocol: null,
       models: ["deepseek-v4-flash"],
       name: "A Custom",
       secretId: primaryCustomSecretId,
@@ -227,6 +230,7 @@ describe("vendor credential runtime selection", () => {
       apiBase: "https://api.deepseek.com",
       apiKey: "custom-primary-key",
       credentialId: CUSTOM_PRIMARY_CREDENTIAL_ID,
+      modelProtocol: null,
       models: ["deepseek-v4-flash"],
     });
 
@@ -258,6 +262,7 @@ describe("vendor credential runtime selection", () => {
     await insertVendorCredential(database, {
       apiBase: null,
       credentialId: OPENAI_CREDENTIAL_ID,
+      modelProtocol: null,
       models: null,
       name: "OpenAI",
       secretId: openAiSecretId,
@@ -286,6 +291,7 @@ describe("vendor credential runtime selection", () => {
       apiBase: null,
       apiKey: "openai-key",
       credentialId: OPENAI_CREDENTIAL_ID,
+      modelProtocol: null,
       models: null,
     });
   });
@@ -296,6 +302,7 @@ describe("vendor credential runtime selection", () => {
     await insertVendorCredential(database, {
       apiBase: null,
       credentialId: OPENAI_CREDENTIAL_ID,
+      modelProtocol: null,
       models: null,
       name: "OpenAI",
       secretId: "secret-openai",

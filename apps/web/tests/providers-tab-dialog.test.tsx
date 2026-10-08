@@ -156,6 +156,7 @@ function createdCustomCredentialResponse(): Response {
         isDefault: true,
         maskedApiKey: "sk-***",
         models: ["custom-large", "custom-small"],
+        modelProtocol: "openai-chat-completions",
         name: "Custom gateway",
         projectId: PROJECT_ID,
         vendorId: "openai-compatible",
@@ -172,6 +173,7 @@ function updatedMinimaxCredentialResponse(): Response {
         id: MINIMAX_CREDENTIAL_ID,
         isDefault: true,
         maskedApiKey: "eyJh••••OSmA",
+        modelProtocol: null,
         models: null,
         name: "mm",
         projectId: PROJECT_ID,
@@ -196,13 +198,19 @@ function setupFetch(credentials: unknown[] = []): CapturedGraphQLBody[] {
       return updatedMinimaxCredentialResponse();
     }
 
+    if (body.query.includes("testVendorCredential")) {
+      return Response.json({
+        data: { testVendorCredential: { errorCode: null, latencyMs: 1, ok: true } },
+      });
+    }
+
     return listResponse(credentials);
   };
 
   return capturedBodies;
 }
 
-async function renderProviders(): Promise<void> {
+async function renderProviders(): Promise<QueryClient> {
   const [{ createRoot }, { ProvidersTab }, { I18nProvider }] = await Promise.all([
     import("react-dom/client"),
     import("../src/routes/providers/providers-tab"),
@@ -233,6 +241,7 @@ async function renderProviders(): Promise<void> {
   await waitFor(() => {
     expect(document.body.textContent).not.toContain("Loading providers");
   });
+  return queryClient;
 }
 
 async function click(element: Element): Promise<void> {
@@ -260,10 +269,36 @@ async function fillLabeledInput(labelText: string, value: string): Promise<void>
 }
 
 async function openCustomModelDialog(): Promise<void> {
-  await click(getButton("Add custom model"));
+  await click(getButton("Add custom provider"));
   await waitFor(() => {
     expect(queryDialog()).not.toBeNull();
   });
+}
+
+function protocolSelect(): HTMLElement {
+  const label = Array.from(document.querySelectorAll("label")).find(
+    (element) => element.textContent === "Model protocol",
+  );
+  const trigger = label?.htmlFor ? document.getElementById(label.htmlFor) : null;
+  if (!(trigger instanceof HTMLElement)) {
+    throw new Error("Model protocol selector not found.");
+  }
+  return trigger;
+}
+
+async function selectProtocol(label: string): Promise<void> {
+  await click(protocolSelect());
+  let option: Element | undefined;
+  await waitFor(() => {
+    option = Array.from(document.querySelectorAll('[role="option"]')).find(
+      (element) => element.textContent === label,
+    );
+    expect(option).toBeDefined();
+  });
+  if (option === undefined) {
+    throw new Error(`Missing model protocol: ${label}`);
+  }
+  await click(option);
 }
 
 function getButton(name: string): HTMLButtonElement {
@@ -348,15 +383,16 @@ describe("ProvidersTab custom model dialog", () => {
     setupFetch();
     await renderProviders();
 
-    expect(document.querySelector("main")?.textContent).not.toContain("Custom models");
+    expect(document.querySelector("main")?.textContent).not.toContain("Custom Provider");
 
     await openCustomModelDialog();
 
     const dialog = queryDialog();
-    expect(dialog?.textContent).toContain("Add Custom models key");
+    expect(dialog?.textContent).toContain("Add Custom Provider key");
     expect(dialog?.textContent).toContain("Base URL");
     expect(dialog?.textContent).toContain("Models");
-    expect(document.querySelector("main")?.textContent).not.toContain("Add Custom models key");
+    expect(protocolSelect().textContent).toContain("OpenAI Chat Completions");
+    expect(document.querySelector("main")?.textContent).not.toContain("Add Custom Provider key");
   });
 
   test("cancel closes the custom model dialog and clears draft state", async () => {
@@ -378,7 +414,9 @@ describe("ProvidersTab custom model dialog", () => {
 
   test("save creates a custom credential and closes the dialog", async () => {
     const capturedBodies = setupFetch();
-    await renderProviders();
+    const queryClient = await renderProviders();
+    const modelsQueryKey = ["available-agent-models", PROJECT_ID, "openai-runtime", null, null];
+    queryClient.setQueryData(modelsQueryKey, []);
 
     await openCustomModelDialog();
     await fillLabeledInput("Name", "Custom gateway");
@@ -398,11 +436,13 @@ describe("ProvidersTab custom model dialog", () => {
         apiBase: "https://custom.example.com/v1",
         apiKey: "sk-test",
         models: ["custom-large", "custom-small"],
+        modelProtocol: "openai-chat-completions",
         name: "Custom gateway",
         projectId: PROJECT_ID,
         vendorId: "openai-compatible",
       },
     });
+    expect(queryClient.getQueryState(modelsQueryKey)?.isInvalidated).toBe(true);
   });
 
   test("edit mode shows the masked key without resubmitting it when unchanged", async () => {
@@ -412,6 +452,7 @@ describe("ProvidersTab custom model dialog", () => {
         id: MINIMAX_CREDENTIAL_ID,
         isDefault: true,
         maskedApiKey: "eyJh••••OSmA",
+        modelProtocol: null,
         models: null,
         name: "mm",
         projectId: PROJECT_ID,
@@ -445,6 +486,130 @@ describe("ProvidersTab custom model dialog", () => {
         apiBase: "https://api.minimax.io/anthropic/v1",
         id: MINIMAX_CREDENTIAL_ID,
         name: "mm",
+        projectId: PROJECT_ID,
+      },
+    });
+  });
+
+  test.each([
+    ["OpenAI Chat Completions", "openai-chat-completions"],
+    ["OpenAI Responses", "openai-responses"],
+    ["Anthropic Messages", "anthropic-messages"],
+    ["Google Gemini", "google-gemini"],
+  ])("test and save use the selected %s protocol", async (label, modelProtocol) => {
+    const capturedBodies = setupFetch();
+    await renderProviders();
+    await openCustomModelDialog();
+    await fillLabeledInput("Name", "Protocol gateway");
+    await fillLabeledInput("Base URL", "https://custom.example.com/v1");
+    await fillLabeledInput("API key", "sk-test");
+    await fillLabeledInput("Models", "custom-model");
+    await selectProtocol(label);
+    await click(getButton("Test"));
+    await waitFor(() => expect(queryDialog()?.textContent).toContain("Connection ok"));
+    expect(
+      capturedBodies.find((body) => body.query.includes("testVendorCredential"))?.variables,
+    ).toEqual({
+      input: {
+        apiBase: "https://custom.example.com/v1",
+        apiKey: "sk-test",
+        modelId: "custom-model",
+        modelProtocol,
+        projectId: PROJECT_ID,
+        vendorId: "openai-compatible",
+      },
+    });
+    await click(getButton("Save"));
+    await waitFor(() => expect(queryDialog()).toBeNull());
+    expect(
+      capturedBodies.find((body) => body.query.includes("createVendorCredential"))?.variables,
+    ).toMatchObject({
+      input: { modelProtocol },
+    });
+  });
+
+  test("keeps an undeclared legacy protocol when editing other fields", async () => {
+    const capturedBodies = setupFetch([
+      {
+        apiBase: "https://custom.example.com/v1",
+        id: CUSTOM_CREDENTIAL_ID,
+        isDefault: true,
+        maskedApiKey: "sk-***",
+        modelProtocol: null,
+        models: ["legacy-model"],
+        name: "Legacy gateway",
+        projectId: PROJECT_ID,
+        vendorId: "openai-compatible",
+      },
+    ]);
+    await renderProviders();
+    await click(getButtonByLabel("Edit Legacy gateway key"));
+    expect(protocolSelect().textContent).toContain("Unspecified (legacy configuration)");
+    expect(getButton("Test").disabled).toBe(true);
+    await fillLabeledInput("Name", "Renamed gateway");
+    await click(getButton("Save"));
+    await waitFor(() => expect(queryDialog()).toBeNull());
+    expect(
+      capturedBodies.find((body) => body.query.includes("updateVendorCredential"))?.variables,
+    ).toMatchObject({
+      input: { modelProtocol: null, name: "Renamed gateway" },
+    });
+  });
+
+  test("an explicit protocol cannot be reset to unspecified", async () => {
+    setupFetch([
+      {
+        apiBase: "https://custom.example.com/v1",
+        id: CUSTOM_CREDENTIAL_ID,
+        isDefault: true,
+        maskedApiKey: "sk-***",
+        modelProtocol: "openai-responses",
+        models: ["custom-model"],
+        name: "Responses gateway",
+        projectId: PROJECT_ID,
+        vendorId: "openai-compatible",
+      },
+    ]);
+    await renderProviders();
+    await click(getButtonByLabel("Edit Responses gateway key"));
+    expect(protocolSelect().textContent).toContain("OpenAI Responses");
+    await click(protocolSelect());
+    await waitFor(() => expect(document.querySelectorAll('[role="option"]').length).toBe(4));
+    expect(
+      Array.from(document.querySelectorAll('[role="option"]')).some((option) =>
+        option.textContent?.includes("Unspecified"),
+      ),
+    ).toBe(false);
+  });
+
+  test("allows a legacy credential to explicitly declare its protocol without replacing the key", async () => {
+    const capturedBodies = setupFetch([
+      {
+        apiBase: "https://custom.example.com/v1",
+        id: CUSTOM_CREDENTIAL_ID,
+        isDefault: true,
+        maskedApiKey: "sk-***",
+        modelProtocol: null,
+        models: ["legacy-model"],
+        name: "Legacy gateway",
+        projectId: PROJECT_ID,
+        vendorId: "openai-compatible",
+      },
+    ]);
+    await renderProviders();
+    await click(getButtonByLabel("Edit Legacy gateway key"));
+    await selectProtocol("OpenAI Responses");
+    await click(getButton("Save"));
+    await waitFor(() => expect(queryDialog()).toBeNull());
+    expect(
+      capturedBodies.find((body) => body.query.includes("updateVendorCredential"))?.variables,
+    ).toEqual({
+      input: {
+        apiBase: "https://custom.example.com/v1",
+        id: CUSTOM_CREDENTIAL_ID,
+        modelProtocol: "openai-responses",
+        models: ["legacy-model"],
+        name: "Legacy gateway",
         projectId: PROJECT_ID,
       },
     });

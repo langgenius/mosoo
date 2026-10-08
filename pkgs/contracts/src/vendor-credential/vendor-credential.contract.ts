@@ -1,3 +1,4 @@
+import type { PresetModelProtocol } from "../../models/model-catalog.types";
 import type { ProjectId, VendorCredentialId } from "../id/id.contract";
 
 export interface VendorCredential {
@@ -5,6 +6,7 @@ export interface VendorCredential {
   id: VendorCredentialId;
   isDefault: boolean;
   maskedApiKey: string;
+  modelProtocol?: PresetModelProtocol | null;
   models: string[] | null;
   name: string;
   projectId: ProjectId;
@@ -20,6 +22,7 @@ export interface VendorCredentialSummary {
 export interface CreateVendorCredentialInput {
   apiBase?: string | null;
   apiKey: string;
+  modelProtocol?: PresetModelProtocol | null;
   models?: string[] | null;
   name: string;
   projectId: ProjectId;
@@ -30,6 +33,7 @@ export interface UpdateVendorCredentialInput {
   apiBase?: string | null;
   apiKey?: string;
   id: VendorCredentialId;
+  modelProtocol?: PresetModelProtocol | null;
   models?: string[] | null;
   name?: string;
   projectId: ProjectId;
@@ -39,6 +43,7 @@ export interface TestVendorCredentialInput {
   apiBase?: string | null;
   apiKey: string;
   modelId?: string | null;
+  modelProtocol?: PresetModelProtocol | null;
   projectId: ProjectId;
   vendorId: string;
 }

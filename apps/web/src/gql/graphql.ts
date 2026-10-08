@@ -231,6 +231,7 @@ export type CreateSkillForkInput = {
 export type CreateVendorCredentialInput = {
   apiBase?: string | null | undefined;
   apiKey: string;
+  modelProtocol?: string | null | undefined;
   models?: Array<string> | null | undefined;
   name: string;
   projectId: PlatformId;
@@ -469,6 +470,7 @@ export type TestVendorCredentialInput = {
   apiBase?: string | null | undefined;
   apiKey: string;
   modelId?: string | null | undefined;
+  modelProtocol?: string | null | undefined;
   projectId: PlatformId;
   vendorId: string;
 };
@@ -523,6 +525,7 @@ export type UpdateVendorCredentialInput = {
   apiBase?: string | null | undefined;
   apiKey?: string | null | undefined;
   id: PlatformId;
+  modelProtocol?: string | null | undefined;
   models?: Array<string> | null | undefined;
   name?: string | null | undefined;
   projectId: PlatformId;
@@ -1028,21 +1031,21 @@ export type VendorCredentialListQueryVariables = Exact<{
 }>;
 
 
-export type VendorCredentialListQuery = { vendorCredentialList: Array<{ apiBase: string | null, id: PlatformId, isDefault: boolean, maskedApiKey: string, models: Array<string> | null, name: string, projectId: PlatformId, vendorId: string }> };
+export type VendorCredentialListQuery = { vendorCredentialList: Array<{ apiBase: string | null, id: PlatformId, isDefault: boolean, maskedApiKey: string, modelProtocol: string | null, models: Array<string> | null, name: string, projectId: PlatformId, vendorId: string }> };
 
 export type CreateVendorCredentialMutationVariables = Exact<{
   input: CreateVendorCredentialInput;
 }>;
 
 
-export type CreateVendorCredentialMutation = { createVendorCredential: { apiBase: string | null, id: PlatformId, isDefault: boolean, maskedApiKey: string, models: Array<string> | null, name: string, projectId: PlatformId, vendorId: string } };
+export type CreateVendorCredentialMutation = { createVendorCredential: { apiBase: string | null, id: PlatformId, isDefault: boolean, maskedApiKey: string, modelProtocol: string | null, models: Array<string> | null, name: string, projectId: PlatformId, vendorId: string } };
 
 export type UpdateVendorCredentialMutationVariables = Exact<{
   input: UpdateVendorCredentialInput;
 }>;
 
 
-export type UpdateVendorCredentialMutation = { updateVendorCredential: { apiBase: string | null, id: PlatformId, isDefault: boolean, maskedApiKey: string, models: Array<string> | null, name: string, projectId: PlatformId, vendorId: string } };
+export type UpdateVendorCredentialMutation = { updateVendorCredential: { apiBase: string | null, id: PlatformId, isDefault: boolean, maskedApiKey: string, modelProtocol: string | null, models: Array<string> | null, name: string, projectId: PlatformId, vendorId: string } };
 
 export type DeleteVendorCredentialMutationVariables = Exact<{
   input: DeleteVendorCredentialInput;
@@ -1056,7 +1059,7 @@ export type SetDefaultVendorCredentialMutationVariables = Exact<{
 }>;
 
 
-export type SetDefaultVendorCredentialMutation = { setDefaultVendorCredential: { apiBase: string | null, id: PlatformId, isDefault: boolean, maskedApiKey: string, models: Array<string> | null, name: string, projectId: PlatformId, vendorId: string } };
+export type SetDefaultVendorCredentialMutation = { setDefaultVendorCredential: { apiBase: string | null, id: PlatformId, isDefault: boolean, maskedApiKey: string, modelProtocol: string | null, models: Array<string> | null, name: string, projectId: PlatformId, vendorId: string } };
 
 export type AvailableAgentModelsQueryVariables = Exact<{
   projectId: PlatformId;
@@ -1066,7 +1069,7 @@ export type AvailableAgentModelsQueryVariables = Exact<{
 }>;
 
 
-export type AvailableAgentModelsQuery = { availableAgentModels: Array<{ available: boolean, displayName: string, modelId: string, reason: string | null, source: ModelCatalogSource, statusDetail: string | null, statusLabel: string, vendorId: string, vendorLabel: string }> };
+export type AvailableAgentModelsQuery = { availableAgentModels: Array<{ available: boolean, displayName: string, modelId: string, modelProtocol: string | null, reason: string | null, source: ModelCatalogSource, statusDetail: string | null, statusLabel: string, vendorId: string, vendorLabel: string }> };
 
 export type TestVendorCredentialMutationVariables = Exact<{
   input: TestVendorCredentialInput;
@@ -3428,6 +3431,7 @@ export const VendorCredentialListDocument = /*#__PURE__*/ new TypedDocumentStrin
     id
     isDefault
     maskedApiKey
+    modelProtocol
     models
     name
     projectId
@@ -3442,6 +3446,7 @@ export const CreateVendorCredentialDocument = /*#__PURE__*/ new TypedDocumentStr
     id
     isDefault
     maskedApiKey
+    modelProtocol
     models
     name
     projectId
@@ -3456,6 +3461,7 @@ export const UpdateVendorCredentialDocument = /*#__PURE__*/ new TypedDocumentStr
     id
     isDefault
     maskedApiKey
+    modelProtocol
     models
     name
     projectId
@@ -3477,6 +3483,7 @@ export const SetDefaultVendorCredentialDocument = /*#__PURE__*/ new TypedDocumen
     id
     isDefault
     maskedApiKey
+    modelProtocol
     models
     name
     projectId
@@ -3495,6 +3502,7 @@ export const AvailableAgentModelsDocument = /*#__PURE__*/ new TypedDocumentStrin
     available
     displayName
     modelId
+    modelProtocol
     reason
     source
     statusDetail

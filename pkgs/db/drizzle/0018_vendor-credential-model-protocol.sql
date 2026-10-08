@@ -1,0 +1,1 @@
+ALTER TABLE `vendor_credential` ADD `model_protocol` text;

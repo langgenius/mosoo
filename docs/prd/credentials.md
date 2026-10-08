@@ -20,7 +20,9 @@ The Project owner manages credentials. Agents in that same Project may use them 
 
 ## Current Availability and Boundaries
 
-Provider keys and remote MCP credentials are available now, including custom provider endpoints. Custom OpenAI-compatible credentials can run through OpenCode, or through OpenAI Runtime when the endpoint implements the Responses API. A connection test is optional and does not make saving conditional on success.
+Provider keys and remote MCP credentials are available now, including custom provider endpoints. Custom credentials declare one model protocol for their endpoint: Chat Completions (the new-credential default), Responses, Anthropic Messages, or Google Gemini. OpenCode and Pi support these four protocols; OpenAI Runtime requires Responses. The historical API provider ID `openai-compatible` remains unchanged for custom credentials. A connection test is optional and does not make saving conditional on success; explicit protocol testing uses that protocol's model endpoint.
+
+Existing credentials with no declared protocol keep legacy behavior until configured explicitly. Editing unrelated fields preserves that state. Once a protocol is declared, it cannot be cleared to an unspecified state. Changing it may invalidate existing Sessions and proxy grants; create a new Session for a different protocol. Provider/model protocol compatibility is separate from key validity and does not prove every endpoint supports tool calls.
 
 Credentials belong to one Project and can be managed only by its owner. There is no organization-wide pool, personal key selection, caller-selected key, or cross-Project inheritance.
 

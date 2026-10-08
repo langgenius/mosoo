@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
+import type { PresetModelProtocol } from "@mosoo/contracts/models";
 import { parsePlatformId } from "@mosoo/id";
 import type { DriverInstanceId, ProjectId, VendorCredentialId } from "@mosoo/id";
 import {
@@ -161,19 +162,113 @@ describe("runtime vendor proxy env vars", () => {
     });
   });
 
-  test.each([
-    vendorCredential({ vendorId: "openai" }),
-    vendorCredential({ vendorId: "openai-compatible" }),
-  ])("rejects Pi credentials without a custom endpoint", async (credential) => {
+  test("rejects custom Pi credentials without an endpoint", async () => {
     await expect(
       buildVendorProxyEnvVars({
         bindings: BINDINGS,
         driverGeneration: DRIVER_GENERATION,
         driverInstanceId: DRIVER_INSTANCE_ID,
-        profile: { model: "custom-model", runtimeId: "pi", vendorCredential: credential },
+        profile: {
+          model: "custom-model",
+          runtimeId: "pi",
+          vendorCredential: vendorCredential({ vendorId: "openai-compatible" }),
+        },
         requestUrl: REQUEST_URL,
       }),
-    ).rejects.toThrow("Pi requires a custom OpenAI-compatible provider endpoint.");
+    ).rejects.toThrow("Custom providers require an endpoint.");
+  });
+
+  test.each([
+    ["openai-chat-completions", "openai-completions", "@ai-sdk/openai-compatible"],
+    ["openai-responses", "openai-responses", "@ai-sdk/openai"],
+    ["anthropic-messages", "anthropic-messages", "@ai-sdk/anthropic"],
+    ["google-gemini", "google-generative-ai", "@ai-sdk/google"],
+  ] as const)(
+    "binds Pi and OpenCode custom %s to the same protocol",
+    async (modelProtocol, api, npm) => {
+      for (const runtimeId of ["pi", "acp-fallback"] as const) {
+        const env = await buildVendorProxyEnvVars({
+          bindings: BINDINGS,
+          driverGeneration: DRIVER_GENERATION,
+          driverInstanceId: DRIVER_INSTANCE_ID,
+          profile: {
+            model: "openai-compatible/custom-model",
+            modelProtocol,
+            runtimeId,
+            vendorCredential: vendorCredential({
+              apiBase: "https://models.example.com/v1",
+              modelProtocol,
+              vendorId: "openai-compatible",
+            }),
+          },
+          requestUrl: REQUEST_URL,
+        });
+        if (runtimeId === "pi") {
+          expect(JSON.parse(env["MOSOO_PI_CONFIG_CONTENT"] ?? "{}")).toEqual({
+            providers: {
+              mosoo: {
+                api,
+                apiKey: "${MOSOO_PI_PROXY_GRANT}",
+                baseUrl: PROXY_URL,
+                models: [{ id: "custom-model" }],
+              },
+            },
+          });
+          await expectLlmProxyGrant(env["MOSOO_PI_PROXY_GRANT"], {
+            modelId: "custom-model",
+            modelProtocol,
+          });
+        } else {
+          expect(parseOpenCodeConfig(env)).toMatchObject({
+            provider: { "openai-compatible": { npm, options: { baseURL: PROXY_URL } } },
+          });
+          await expectLlmProxyGrant(env["OPENAI_COMPATIBLE_API_KEY"], {
+            modelId: "custom-model",
+            modelProtocol,
+          });
+        }
+      }
+    },
+  );
+
+  test.each([
+    { vendorId: "openai", model: "gpt-5.4", modelProtocol: "openai-responses" },
+    { vendorId: "anthropic", model: "claude-sonnet-5", modelProtocol: "anthropic-messages" },
+    { vendorId: "gemini", model: "gemini-3.5-flash", modelProtocol: "openai-chat-completions" },
+    { vendorId: "opencode", model: "gemini-3.5-flash", modelProtocol: "google-gemini" },
+  ] satisfies { vendorId: string; model: string; modelProtocol: PresetModelProtocol }[])(
+    "uses Pi preset $vendorId/$model's catalog protocol",
+    async ({ vendorId, model, modelProtocol }) => {
+      const env = await buildVendorProxyEnvVars({
+        bindings: BINDINGS,
+        driverGeneration: DRIVER_GENERATION,
+        driverInstanceId: DRIVER_INSTANCE_ID,
+        profile: { model, runtimeId: "pi", vendorCredential: vendorCredential({ vendorId }) },
+        requestUrl: REQUEST_URL,
+      });
+      await expectLlmProxyGrant(env["MOSOO_PI_PROXY_GRANT"], { modelId: model, modelProtocol });
+    },
+  );
+
+  test("rejects a credential protocol changed after the Session was frozen", async () => {
+    await expect(
+      buildVendorProxyEnvVars({
+        bindings: BINDINGS,
+        driverGeneration: DRIVER_GENERATION,
+        driverInstanceId: DRIVER_INSTANCE_ID,
+        profile: {
+          model: "custom-model",
+          runtimeId: "pi",
+          modelProtocol: "openai-responses",
+          vendorCredential: vendorCredential({
+            apiBase: "https://models.example.com/v1",
+            vendorId: "openai-compatible",
+            modelProtocol: "anthropic-messages",
+          }),
+        },
+        requestUrl: REQUEST_URL,
+      }),
+    ).rejects.toThrow("differs from the frozen execution configuration");
   });
 
   test("injects a driver-bound proxy grant instead of the Anthropic API key", async () => {
@@ -335,7 +430,7 @@ describe("runtime vendor proxy env vars", () => {
     ).rejects.toThrow("Custom endpoint path is not canonical for runtime proxying.");
   });
 
-  test("fails closed when a runtime has no env var to reach the proxy", async () => {
+  test("rejects an unsupported runtime/provider before rendering proxy configuration", async () => {
     await expect(
       buildVendorProxyEnvVars({
         bindings: BINDINGS,
@@ -348,7 +443,7 @@ describe("runtime vendor proxy env vars", () => {
         },
         requestUrl: REQUEST_URL,
       }),
-    ).rejects.toThrow("cannot be routed through the control-plane LLM proxy");
+    ).rejects.toThrow("Runtime claude-agent-sdk does not support provider opencode.");
   });
 
   test("routes OpenCode Zen through the proxy for ACP fallback runtime", async () => {

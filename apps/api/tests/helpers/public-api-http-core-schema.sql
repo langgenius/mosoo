@@ -172,6 +172,7 @@ CREATE TABLE vendor_credential (
   api_key_secret_id text NOT NULL,
   api_base text,
   is_default integer DEFAULT false NOT NULL,
+  model_protocol text,
   models text,
   created_at integer NOT NULL,
   updated_at integer NOT NULL

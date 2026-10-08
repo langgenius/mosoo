@@ -121,12 +121,15 @@ export interface RuntimeCatalogEntry {
   readonly display: RuntimeCatalogDisplay;
   readonly label: string;
   readonly runtimeId: string;
+  readonly supportedModelProtocols: readonly PresetModelProtocol[];
+  /** Preset allowlist keyed by both provider and model, avoiding cross-provider aliases. */
+  readonly supportedModelIdentities?: readonly Pick<PresetModelEntry, "vendorId" | "modelId">[];
   /**
    * Per-runtime preset model allowlist. When defined, only preset models whose
    * `modelId` is listed here are surfaced as `available` for this runtime;
    * other presets are returned with `reason: "wrong-runtime"`. Custom
-   * (OpenAI-Compatible) credentials are NOT constrained by this list — the
-   * vendor-level `acceptsCustomProvider` switch governs them instead.
+   * (OpenAI-Compatible) credentials are not constrained by this preset list;
+   * custom-provider admission and supportedModelProtocols govern them instead.
    *
    * Omit when every preset model for the runtime vendors is allowed.
    */
@@ -348,6 +351,11 @@ function createGeneratedRuntimeCatalogEntry(
     },
     label: input.label,
     runtimeId: input.runtimeId,
+    supportedModelProtocols: input.supportedModelProtocols,
+    supportedModelIdentities: input.supportedModelIdentities.map((model) => ({
+      modelId: admitModelId(model.modelId),
+      vendorId: admitProviderId(model.vendorId),
+    })),
     supportedModelIds: input.supportedModelIds.map((modelId) => admitModelId(modelId)),
     transport: input.transport,
     vendors: input.vendorIds.map(requireVendor),
@@ -536,9 +544,11 @@ export function isPublicRuntimeCatalogEntry(runtimeId: string): boolean {
 
 export type RuntimeModelIdentityRejectionCode =
   | "custom-provider-kind-mismatch"
+  | "identity-invalid"
   | "model-unsupported"
   | "model-unknown"
   | "provider-unsupported"
+  | "protocol-unsupported"
   | "runtime-disabled"
   | "runtime-unknown";
 
@@ -546,6 +556,7 @@ export type RuntimeModelIdentityAdmission =
   | {
       readonly identity: RuntimeModelIdentity;
       readonly model: null;
+      readonly modelProtocol: PresetModelProtocol;
       readonly ok: true;
       readonly runtime: RuntimeCatalogEntry;
       readonly vendor: RuntimeCatalogVendor;
@@ -553,6 +564,7 @@ export type RuntimeModelIdentityAdmission =
   | {
       readonly identity: RuntimeModelIdentity;
       readonly model: PresetModelEntry;
+      readonly modelProtocol: PresetModelProtocol;
       readonly ok: true;
       readonly runtime: RuntimeCatalogEntry;
       readonly vendor: RuntimeCatalogVendor;
@@ -574,19 +586,83 @@ function isOpenAiCompatibleProvider(providerId: string): boolean {
   return providerId === VENDOR_OPENAI_COMPATIBLE.vendorId;
 }
 
-function runtimeSupportsPresetModel(runtime: RuntimeCatalogEntry, modelId: ModelId): boolean {
-  return runtime.supportedModelIds === undefined || runtime.supportedModelIds.includes(modelId);
+function runtimeSupportsPresetModel(
+  runtime: RuntimeCatalogEntry,
+  model: PresetModelEntry,
+): boolean {
+  return (
+    (runtime.supportedModelIds === undefined ||
+      runtime.supportedModelIds.includes(model.modelId)) &&
+    (runtime.supportedModelIdentities === undefined ||
+      runtime.supportedModelIdentities.some(
+        (candidate) => candidate.vendorId === model.vendorId && candidate.modelId === model.modelId,
+      ))
+  );
+}
+
+export interface RuntimeModelProtocolOptions {
+  readonly customModelProtocol?: PresetModelProtocol | null;
+}
+
+export type RuntimeModelProtocolResolution =
+  | { readonly ok: true; readonly modelProtocol: PresetModelProtocol }
+  | Extract<RuntimeModelIdentityAdmission, { ok: false }>;
+
+function resolveAdmittedModelProtocol(
+  runtime: RuntimeCatalogEntry,
+  model: PresetModelEntry | null,
+  options: RuntimeModelProtocolOptions,
+): RuntimeModelProtocolResolution {
+  // Historical custom credentials have no protocol declaration. Preserve their
+  // existing runtime-specific route until the credential explicitly declares one.
+  const modelProtocol =
+    model?.protocol ??
+    options.customModelProtocol ??
+    (runtime.transport === "openai-app-server" ? "openai-responses" : "openai-chat-completions");
+
+  if (!runtime.supportedModelProtocols.includes(modelProtocol)) {
+    return {
+      code: "protocol-unsupported",
+      message: `Runtime ${runtime.runtimeId} does not support model protocol ${modelProtocol}.`,
+      ok: false,
+    };
+  }
+
+  return { modelProtocol, ok: true };
+}
+
+export function resolveRuntimeModelProtocol(
+  input: RuntimeModelProtocolOptions & {
+    readonly modelId: string;
+    readonly runtimeId: string;
+    readonly vendorId: string;
+  },
+): RuntimeModelProtocolResolution {
+  let identity: RuntimeModelIdentity;
+  try {
+    identity = createCatalogRuntimeModelIdentity({
+      modelId: input.modelId,
+      providerId: input.vendorId,
+      runtimeId: input.runtimeId,
+    });
+  } catch {
+    return { code: "identity-invalid", message: "Invalid runtime model identity.", ok: false };
+  }
+  const admission = admitRuntimeModelIdentity(identity, input);
+  return admission.ok ? { modelProtocol: admission.modelProtocol, ok: true } : admission;
 }
 
 export function admitRuntimeModelIdentity(
   identity: RuntimeModelIdentity,
+  options: RuntimeModelProtocolOptions = {},
 ): RuntimeModelIdentityAdmission {
-  return admitRuntimeModelIdentityForCatalog(RUNTIME_CATALOG, identity);
+  return admitRuntimeModelIdentityForCatalog(RUNTIME_CATALOG, identity, options);
 }
 
 export function admitRuntimeModelIdentityForCatalog(
   catalog: readonly RuntimeCatalogEntry[],
   identity: RuntimeModelIdentity,
+  options: RuntimeModelProtocolOptions = {},
 ): RuntimeModelIdentityAdmission {
   const runtime = catalog.find((candidate) => candidate.runtimeId === identity.runtimeId) ?? null;
 
@@ -631,9 +707,12 @@ export function admitRuntimeModelIdentityForCatalog(
   }
 
   if (identity.provider.kind === "custom") {
+    const protocol = resolveAdmittedModelProtocol(runtime, null, options);
+    if (!protocol.ok) return protocol;
     return {
       identity,
       model: null,
+      modelProtocol: protocol.modelProtocol,
       ok: true,
       runtime,
       vendor,
@@ -649,16 +728,19 @@ export function admitRuntimeModelIdentityForCatalog(
     );
   }
 
-  if (!runtimeSupportsPresetModel(runtime, identity.modelId)) {
+  if (!runtimeSupportsPresetModel(runtime, model)) {
     return rejectRuntimeModelIdentity(
       "model-unsupported",
       `Runtime ${identity.runtimeId} does not support model ${identity.modelId}.`,
     );
   }
 
+  const protocol = resolveAdmittedModelProtocol(runtime, model, options);
+  if (!protocol.ok) return protocol;
   return {
     identity,
     model,
+    modelProtocol: protocol.modelProtocol,
     ok: true,
     runtime,
     vendor,
