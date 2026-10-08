@@ -4,6 +4,7 @@ import {
 } from "../../../platform/cloudflare/rpc-disposal";
 import { requireCloudflareSandboxBinding } from "../../../platform/cloudflare/sandbox-binding";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
+import { ApiCommandPermanentError } from "../../api-command/application/api-command-payload";
 import type { EnvironmentPackageArtifactBuildCommandPayload } from "../../api-command/application/api-command-payload";
 import { isRuntimeSandboxLocalBucketEnabled } from "../../runtime/infrastructure/runtime-sandbox-bucket-mount";
 import { deleteSandboxBackupObjects } from "../../runtime/infrastructure/sandbox-backup-platform";
@@ -62,9 +63,20 @@ async function closeBuildSandbox(sandbox: SandboxHandle): Promise<void> {
   }
 }
 
+// The same package set would time out again, so it fails once with an
+// actionable message instead of burning every Queue retry on the limit.
+function createInstallTimeoutError(cause?: unknown): ApiCommandPermanentError {
+  return new ApiCommandPermanentError(
+    "environment_package_build_timeout",
+    `Package installation exceeded the ${ENVIRONMENT_PACKAGE_ARTIFACT_MAX_BUILD_MS / 60_000}-minute limit. Remove some packages, then save the Environment to retry.`,
+    cause === undefined ? undefined : { cause },
+  );
+}
+
 export async function buildEnvironmentPackageArtifact(
   bindings: ApiBindings,
   payload: EnvironmentPackageArtifactBuildCommandPayload,
+  nowMs: () => number = Date.now,
 ): Promise<void> {
   const packages = normalizePackages(payload.packages);
   const key = await createEnvironmentPackageArtifactKey({
@@ -91,7 +103,11 @@ export async function buildEnvironmentPackageArtifact(
     getSandbox(
       requireCloudflareSandboxBinding(bindings),
       environmentPackageArtifactSandboxId(key),
-      { keepAlive: true, normalizeId: true },
+      // A running command keeps the builder awake. Without keepAlive, a builder
+      // orphaned before `finally` (consumer wall-clock limit, deploy) sleeps
+      // after inactivity instead of billing until someone notices. `false` also
+      // clears the flag persisted by earlier builds of the same key.
+      { keepAlive: false, normalizeId: true },
     ),
   );
 
@@ -102,17 +118,27 @@ export async function buildEnvironmentPackageArtifact(
     if (!reset.success) {
       throw new Error("Environment package build directory could not be prepared.");
     }
-    const result = await sandbox.exec(
-      createEnvironmentPackageArtifactBuildScript({
-        npmRoot,
-        npmSpecs,
-        pipRoot,
-        pipSpecs,
-        tempRoot,
-      }),
-      { timeout: ENVIRONMENT_PACKAGE_ARTIFACT_MAX_BUILD_MS },
-    );
+    const installStartedAtMs = nowMs();
+    const installLimitReached = () =>
+      nowMs() - installStartedAtMs >= ENVIRONMENT_PACKAGE_ARTIFACT_MAX_BUILD_MS;
+    const result = await sandbox
+      .exec(
+        createEnvironmentPackageArtifactBuildScript({
+          npmRoot,
+          npmSpecs,
+          pipRoot,
+          pipSpecs,
+          tempRoot,
+        }),
+        { timeout: ENVIRONMENT_PACKAGE_ARTIFACT_MAX_BUILD_MS },
+      )
+      .catch((error: unknown) => {
+        throw installLimitReached() ? createInstallTimeoutError(error) : error;
+      });
     if (!result.success) {
+      if (installLimitReached()) {
+        throw createInstallTimeoutError();
+      }
       const tail = `${result.stdout}\n${result.stderr}`.trim().slice(-4096);
       throw new Error(tail || "Environment package installation failed.");
     }

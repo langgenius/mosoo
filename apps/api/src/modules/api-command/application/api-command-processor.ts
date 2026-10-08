@@ -27,7 +27,7 @@ import {
 import type { ApiCommandClaim } from "./api-command-ledger";
 import { parseApiCommandMessage } from "./api-command-message";
 import type { ApiCommandMessage } from "./api-command-message";
-import { ApiCommandPayloadError, parseApiCommandPayload } from "./api-command-payload";
+import { ApiCommandPermanentError, parseApiCommandPayload } from "./api-command-payload";
 import type {
   CostLedgerReconciliationCommandPayload,
   EnvironmentPackageArtifactBuildCommandPayload,
@@ -47,8 +47,8 @@ function getErrorMessage(error: unknown): string {
 }
 
 function getErrorCode(error: unknown): string {
-  if (error instanceof ApiCommandPayloadError) {
-    return "invalid_payload";
+  if (error instanceof ApiCommandPermanentError) {
+    return error.code;
   }
 
   if (error instanceof Error && error.name.trim().length > 0) {
@@ -290,7 +290,7 @@ export async function processApiCommandMessage(
       kind: claim.kind,
     });
 
-    if (error instanceof ApiCommandPayloadError) {
+    if (error instanceof ApiCommandPermanentError) {
       await markApiCommandFailed({
         commandId,
         database: bindings.DB,
