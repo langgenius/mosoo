@@ -12,7 +12,7 @@ import { currentTimestampMs } from "../../../../time";
 import { createSessionRuntimeEvent } from "../../../sessions/application/session-event-write.service";
 import {
   finalizeSessionModelCallUsage,
-  upsertSessionModelCallUsage,
+  upsertSessionModelCallUsages,
 } from "../../../sessions/application/session-model-call.service";
 import { persistSessionRuntimeEvents } from "../../../sessions/infrastructure/session-runtime-event-store.repository";
 import {
@@ -204,13 +204,13 @@ export async function persistProjectedRuntimeDriverEvents(
 
   const traceId = link.traceId ?? link.sessionRunId ?? link.sessionId;
 
-  if (projection.usage && link.sessionRunId !== null) {
-    await upsertSessionModelCallUsage(database, {
+  if (projection.usageUpdates.length > 0 && link.sessionRunId !== null) {
+    await upsertSessionModelCallUsages(database, {
       driverInstanceId: input.driverInstanceId,
       sessionId: link.sessionId,
       sessionRunId: link.sessionRunId,
       traceId,
-      usage: projection.usage,
+      usages: projection.usageUpdates,
     });
   }
 

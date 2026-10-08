@@ -152,7 +152,7 @@ export async function projectRuntimeDriverEvents(
   let liveStateChanged = false;
   let finalAssistantMessage: ProjectRuntimeDriverEventsResult["finalAssistantMessage"] = null;
   let sessionTitle: string | null = null;
-  let usage: ProjectRuntimeDriverEventsResult["usage"] = null;
+  const usageUpdates: ProjectRuntimeDriverEventsResult["usageUpdates"] = [];
   const runtimeEvents: ProjectedRuntimeEventRecord[] = [];
   const sessionDeliveryEvents: ProjectRuntimeDriverEventsResult["sessionDeliveryEvents"] = [];
   const transitions: RuntimeDriverRunTransition[] = [];
@@ -319,13 +319,24 @@ export async function projectRuntimeDriverEvents(
     const setSessionTitle = (title: string | null): void => {
       sessionTitle = title;
     };
-    const setUsage = (nextUsage: ProjectRuntimeDriverEventsResult["usage"]): void => {
-      usage = nextUsage;
+    const appendUsage = (
+      nextUsage: ProjectRuntimeDriverEventsResult["usageUpdates"][number] | null,
+    ): void => {
+      if (nextUsage === null) return;
+
+      // Pi emits one usage report per assistant response, not a Run total.
+      // Its existing source identity survives retransmission/re-enveloping;
+      // canonical event.id does not. Other runtimes retain their snapshot semantics.
+      usageUpdates.push(
+        event.runtimeId === "pi" && !nextUsage.callId?.trim()
+          ? { ...nextUsage, callId: `pi-usage:${envelope.eventId}` }
+          : nextUsage,
+      );
     };
 
     appendRuntimeDriverCanonicalSideEffects(event, {
       setSessionTitle,
-      setUsage,
+      appendUsage,
       transitions,
     });
 
@@ -345,7 +356,7 @@ export async function projectRuntimeDriverEvents(
     sessionTitle,
     sessionDeliveryEvents,
     transitions,
-    usage,
+    usageUpdates,
   };
 }
 
@@ -375,7 +386,7 @@ function appendRuntimeDriverCanonicalSideEffects(
   event: RuntimeEventEnvelope,
   output: {
     setSessionTitle: (title: string | null) => void;
-    setUsage: (usage: ProjectRuntimeDriverEventsResult["usage"]) => void;
+    appendUsage: (usage: ProjectRuntimeDriverEventsResult["usageUpdates"][number] | null) => void;
     transitions: RuntimeDriverRunTransition[];
   },
 ): void {
@@ -389,7 +400,7 @@ function appendRuntimeDriverCanonicalSideEffects(
   }
 
   if (event.kind === "usage.updated") {
-    output.setUsage(parseNullableSessionUsageSummary(event.payload));
+    output.appendUsage(parseNullableSessionUsageSummary(event.payload));
     return;
   }
 

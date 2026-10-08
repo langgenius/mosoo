@@ -35,6 +35,12 @@ usage report can change a previously displayed estimate. Usage reported by a
 runtime may omit cache-write counters; the usage view is not invoice
 reconciliation. Per-turn monetary budgets are outside the #582 release scope.
 
+Pi records each assistant response as a separate model call, including responses
+that request tools. Delivery retries do not add another call or charge. A Pi Run
+already recorded using the previous Run-level snapshot keeps that legacy mode
+until it ends; the next Run uses per-call records. Historical snapshots are not
+recomputed and may understate earlier Pi usage.
+
 ## Historical ledger reconciliation
 
 The API can audit model calls created before atomic model-call and usage-ledger persistence was introduced. The workflow is disabled unless `MOSOO_COST_LEDGER_RECONCILIATION_MODE` is set to `audit` or `repair`:

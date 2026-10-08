@@ -35,6 +35,7 @@ interface SessionModelCallRunRow {
   agent_status: "draft" | "published" | null;
   actor_user_id: AccountId;
   completed_at: number | null;
+  has_legacy_run_usage: number;
   model: string | null;
   project_organization_id: OrganizationId;
   project_id: ProjectId;
@@ -56,6 +57,13 @@ export interface UpsertSessionModelCallUsageInput {
   sessionRunId: SessionRunId;
   traceId: string;
   usage: SessionUsageSummary | null;
+}
+
+export interface UpsertSessionModelCallUsagesInput extends Omit<
+  UpsertSessionModelCallUsageInput,
+  "usage"
+> {
+  usages: readonly SessionUsageSummary[];
 }
 
 function toTokenCount(value: number | null | undefined): number | null {
@@ -102,6 +110,10 @@ async function getSessionModelCallRunRow(
         agent_revision_id: sessionRunsTable.deploymentVersionId,
         agent_status: sql<"draft" | "published" | null>`${agentsTable.status}`,
         completed_at: sessionRunsTable.completedAt,
+        has_legacy_run_usage: sql<number>`EXISTS (
+          SELECT 1 FROM session_model_call
+          WHERE session_run_id = ${sessionRunsTable.id} AND call_key = 'run_usage'
+        )`,
         model: sql`${sessionRunsTable.model}`.mapWith(sessionRunsTable.model).as("model"),
         project_organization_id: projectsTable.organizationId,
         project_id: sessionsTable.projectId,
@@ -142,10 +154,17 @@ export async function upsertSessionModelCallUsage(
   database: D1Database,
   input: UpsertSessionModelCallUsageInput,
 ): Promise<void> {
-  if (!input.usage) {
-    return;
-  }
-  const usage = input.usage;
+  await upsertSessionModelCallUsages(database, {
+    ...input,
+    usages: input.usage ? [input.usage] : [],
+  });
+}
+
+export async function upsertSessionModelCallUsages(
+  database: D1Database,
+  input: UpsertSessionModelCallUsagesInput,
+): Promise<void> {
+  if (input.usages.length === 0) return;
 
   const run = await getSessionModelCallRunRow(database, input.sessionRunId);
 
@@ -155,95 +174,108 @@ export async function upsertSessionModelCallUsage(
 
   const timestampMs = currentTimestampMs();
   const completedAt = run.completed_at;
-  const nativeCallId = normalizeUsageCallId(usage.callId);
-  const callKey = isTruthy(nativeCallId) ? `model_call:${nativeCallId}` : "run_usage";
-  const provider = run.provider ?? run.session_provider;
-  const model = run.model ?? run.session_model;
 
-  const usageEventInput = {
-    callKey,
-    driverInstanceId: input.driverInstanceId,
-    nativeCallId,
-    run: {
-      actorUserId: run.actor_user_id,
-      agentId: run.agent_id,
-      agentOwnerUserId: run.agent_owner_user_id,
-      agentRevisionId: run.agent_revision_id,
-      agentStatus: run.agent_status,
-      createdAtMs: completedAt ?? timestampMs,
-      model,
-      organizationId: run.project_organization_id,
-      projectId: run.project_id,
-      provider,
-      runtimeId: run.runtime_id ?? run.session_runtime_id,
-      sessionId: run.session_id,
-      sessionRunId: input.sessionRunId,
-      trigger: run.trigger,
-    },
-    usage,
-  } satisfies Parameters<typeof createRuntimeUsageEventUpsert>[1];
+  // An in-flight Pi Run may already have a legacy snapshot when the Host is
+  // upgraded. Keep that Run's identity so retransmission cannot count the old
+  // snapshot and a new per-call row twice. Subsequent Runs use per-call rows.
+  const retainLegacySnapshot =
+    (run.runtime_id ?? run.session_runtime_id) === "pi" && run.has_legacy_run_usage === 1;
 
   await runAppDatabaseBatch(database, (appDatabase) => {
-    const modelCallUpsert = appDatabase
-      .insert(sessionModelCallsTable)
-      .values({
-        cacheCreationTokens: toTokenCount(usage.cachedWriteTokens),
-        cacheReadTokens: toTokenCount(usage.cachedReadTokens),
-        callKey,
-        completedAt: sql`(SELECT completed_at FROM session_run WHERE id = ${input.sessionRunId})`,
-        costCurrency: usage.costCurrency ?? null,
-        createdAt: timestampMs,
-        driverInstanceId: input.driverInstanceId,
-        errorCode: null,
-        errorMessage: null,
-        id: createPlatformId<SessionModelCallId>(),
-        inputTokens: toTokenCount(usage.inputTokens),
-        metadataJson: buildUsageMetadata(usage),
-        model,
-        nativeCallId,
-        outputTokens: toTokenCount(usage.outputTokens),
-        provider,
-        sessionId: input.sessionId,
-        sessionRunId: input.sessionRunId,
-        startedAt: run.started_at ?? timestampMs,
-        // Read inside the write transaction: usage and the terminal Run can
-        // arrive in either order, and completion must wait for its checkpoint.
-        status: sql`(SELECT CASE
-          WHEN status = 'completed' THEN 'completed'
-          WHEN status IN ('failed', 'cancelled', 'expired') THEN 'failed'
-          ELSE 'started' END FROM session_run WHERE id = ${input.sessionRunId})`,
-        totalCostUsdMicros: toUsdMicros(usage.costAmount),
-        traceId: input.traceId,
-        updatedAt: timestampMs,
-      })
-      .onConflictDoUpdate({
-        set: {
-          cacheCreationTokens: sql`COALESCE(excluded.cache_creation_tokens, ${sessionModelCallsTable.cacheCreationTokens})`,
-          cacheReadTokens: sql`COALESCE(excluded.cache_read_tokens, ${sessionModelCallsTable.cacheReadTokens})`,
-          completedAt: sql`COALESCE(excluded.completed_at, ${sessionModelCallsTable.completedAt})`,
-          costCurrency: sql`COALESCE(excluded.cost_currency, ${sessionModelCallsTable.costCurrency})`,
-          driverInstanceId: sql`excluded.driver_instance_id`,
-          inputTokens: sql`COALESCE(excluded.input_tokens, ${sessionModelCallsTable.inputTokens})`,
-          metadataJson: sql`excluded.metadata_json`,
-          model: sql`excluded.model`,
-          outputTokens: sql`COALESCE(excluded.output_tokens, ${sessionModelCallsTable.outputTokens})`,
-          provider: sql`excluded.provider`,
-          startedAt: sql`COALESCE(${sessionModelCallsTable.startedAt}, excluded.started_at)`,
-          status: sql`CASE
-            WHEN ${sessionModelCallsTable.status} IN ('completed', 'failed')
-              AND excluded.status = 'started'
-              THEN ${sessionModelCallsTable.status}
-            ELSE excluded.status
-          END`,
-          totalCostUsdMicros: sql`COALESCE(excluded.total_cost_usd_micros, ${sessionModelCallsTable.totalCostUsdMicros})`,
-          traceId: sql`excluded.trace_id`,
-          updatedAt: sql`excluded.updated_at`,
-        },
-        target: [sessionModelCallsTable.sessionRunId, sessionModelCallsTable.callKey],
-      });
-    const usageEventUpsert = createRuntimeUsageEventUpsert(appDatabase, usageEventInput);
+    const queries = input.usages.flatMap((reportedUsage) => {
+      const usage = retainLegacySnapshot ? { ...reportedUsage, callId: null } : reportedUsage;
+      const nativeCallId = normalizeUsageCallId(usage.callId);
+      const callKey = isTruthy(nativeCallId) ? `model_call:${nativeCallId}` : "run_usage";
+      const provider = run.provider ?? run.session_provider;
+      const model = run.model ?? run.session_model;
 
-    return usageEventUpsert === null ? [modelCallUpsert] : [modelCallUpsert, usageEventUpsert];
+      const usageEventInput = {
+        callKey,
+        driverInstanceId: input.driverInstanceId,
+        nativeCallId,
+        run: {
+          actorUserId: run.actor_user_id,
+          agentId: run.agent_id,
+          agentOwnerUserId: run.agent_owner_user_id,
+          agentRevisionId: run.agent_revision_id,
+          agentStatus: run.agent_status,
+          createdAtMs: completedAt ?? timestampMs,
+          model,
+          organizationId: run.project_organization_id,
+          projectId: run.project_id,
+          provider,
+          runtimeId: run.runtime_id ?? run.session_runtime_id,
+          sessionId: run.session_id,
+          sessionRunId: input.sessionRunId,
+          trigger: run.trigger,
+        },
+        usage,
+      } satisfies Parameters<typeof createRuntimeUsageEventUpsert>[1];
+
+      const modelCallUpsert = appDatabase
+        .insert(sessionModelCallsTable)
+        .values({
+          cacheCreationTokens: toTokenCount(usage.cachedWriteTokens),
+          cacheReadTokens: toTokenCount(usage.cachedReadTokens),
+          callKey,
+          completedAt: sql`(SELECT completed_at FROM session_run WHERE id = ${input.sessionRunId})`,
+          costCurrency: usage.costCurrency ?? null,
+          createdAt: timestampMs,
+          driverInstanceId: input.driverInstanceId,
+          errorCode: null,
+          errorMessage: null,
+          id: createPlatformId<SessionModelCallId>(),
+          inputTokens: toTokenCount(usage.inputTokens),
+          metadataJson: buildUsageMetadata(usage),
+          model,
+          nativeCallId,
+          outputTokens: toTokenCount(usage.outputTokens),
+          provider,
+          sessionId: input.sessionId,
+          sessionRunId: input.sessionRunId,
+          startedAt: run.started_at ?? timestampMs,
+          // Read inside the write transaction: usage and the terminal Run can
+          // arrive in either order, and completion must wait for its checkpoint.
+          status: sql`(SELECT CASE
+            WHEN status = 'completed' THEN 'completed'
+            WHEN status IN ('failed', 'cancelled', 'expired') THEN 'failed'
+            ELSE 'started' END FROM session_run WHERE id = ${input.sessionRunId})`,
+          totalCostUsdMicros: toUsdMicros(usage.costAmount),
+          traceId: input.traceId,
+          updatedAt: timestampMs,
+        })
+        .onConflictDoUpdate({
+          set: {
+            cacheCreationTokens: sql`COALESCE(excluded.cache_creation_tokens, ${sessionModelCallsTable.cacheCreationTokens})`,
+            cacheReadTokens: sql`COALESCE(excluded.cache_read_tokens, ${sessionModelCallsTable.cacheReadTokens})`,
+            completedAt: sql`COALESCE(excluded.completed_at, ${sessionModelCallsTable.completedAt})`,
+            costCurrency: sql`COALESCE(excluded.cost_currency, ${sessionModelCallsTable.costCurrency})`,
+            driverInstanceId: sql`excluded.driver_instance_id`,
+            inputTokens: sql`COALESCE(excluded.input_tokens, ${sessionModelCallsTable.inputTokens})`,
+            metadataJson: sql`excluded.metadata_json`,
+            model: sql`excluded.model`,
+            outputTokens: sql`COALESCE(excluded.output_tokens, ${sessionModelCallsTable.outputTokens})`,
+            provider: sql`excluded.provider`,
+            startedAt: sql`COALESCE(${sessionModelCallsTable.startedAt}, excluded.started_at)`,
+            status: sql`CASE
+              WHEN ${sessionModelCallsTable.status} IN ('completed', 'failed')
+                AND excluded.status = 'started'
+                THEN ${sessionModelCallsTable.status}
+              ELSE excluded.status
+            END`,
+            totalCostUsdMicros: sql`COALESCE(excluded.total_cost_usd_micros, ${sessionModelCallsTable.totalCostUsdMicros})`,
+            traceId: sql`excluded.trace_id`,
+            updatedAt: sql`excluded.updated_at`,
+          },
+          target: [sessionModelCallsTable.sessionRunId, sessionModelCallsTable.callKey],
+        });
+      const usageEventUpsert = createRuntimeUsageEventUpsert(appDatabase, usageEventInput);
+
+      return usageEventUpsert === null ? [modelCallUpsert] : [modelCallUpsert, usageEventUpsert];
+    });
+    const [firstQuery, ...remainingQueries] = queries;
+    if (firstQuery === undefined) throw new Error("Model usage batch must not be empty.");
+    return [firstQuery, ...remainingQueries];
   });
 }
 
