@@ -3,7 +3,7 @@ import { readFileSync, readdirSync } from "node:fs";
 
 import { getSessionOrganizationPath, getSessionRuntimeStatePath } from "@mosoo/agent-driver/paths";
 import { PLATFORM_ID_FIXTURES as ids } from "@mosoo/id/testing";
-import { getPublicRuntimeCatalogEntry } from "@mosoo/runtime-catalog";
+import { getPublicRuntimeCatalogEntry, resolveRuntimeModelProtocol } from "@mosoo/runtime-catalog";
 import { createRuntimeEvent } from "@mosoo/runtime-events";
 
 import { createDriverInstanceRecord } from "../src/modules/runtime/infrastructure/driver-instance/driver-instance-record.repository";
@@ -25,7 +25,13 @@ import { SqliteD1Database } from "./helpers/sqlite-d1";
 test("Given Pi v1, When selecting the public runtime, Then admit its Cloudflare image and honest capabilities", () => {
   const entry = getPublicRuntimeCatalogEntry("pi");
   expect(entry).not.toBeNull();
-  expect(entry?.vendors.map((v) => v.vendorId)).toEqual(["openai-compatible"]);
+  expect(entry?.vendors.map((v) => v.vendorId)).toContain("openai-compatible");
+  expect(
+    resolveRuntimeModelProtocol({ runtimeId: "pi", vendorId: "openai", modelId: "gpt-5.5" }),
+  ).toEqual({
+    ok: true,
+    modelProtocol: "openai-responses",
+  });
   expect(entry?.capabilities).toContainEqual({
     id: "mcp_execute",
     status: "supported",

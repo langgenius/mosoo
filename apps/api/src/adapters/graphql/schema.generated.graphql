@@ -650,6 +650,7 @@ input CreateSkillForkInput {
 input CreateVendorCredentialInput {
   apiBase: String
   apiKey: String!
+  modelProtocol: String
   models: [String!]
   name: String!
   projectId: ULID!
@@ -1199,6 +1200,7 @@ type ResolvedModelEntry {
   available: Boolean!
   displayName: String!
   modelId: String!
+  modelProtocol: String
   reason: String
   source: ModelCatalogSource!
   statusDetail: String
@@ -1573,6 +1575,7 @@ input TestVendorCredentialInput {
   apiBase: String
   apiKey: String!
   modelId: String
+  modelProtocol: String
   projectId: ULID!
   vendorId: String!
 }
@@ -1634,6 +1637,7 @@ input UpdateVendorCredentialInput {
   apiBase: String
   apiKey: String
   id: ULID!
+  modelProtocol: String
   models: [String!]
   name: String
   projectId: ULID!
@@ -1649,6 +1653,7 @@ type VendorCredential {
   id: ULID!
   isDefault: Boolean!
   maskedApiKey: String!
+  modelProtocol: String
   models: [String!]
   name: String!
   projectId: ULID!

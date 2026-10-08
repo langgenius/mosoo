@@ -1,9 +1,10 @@
-import type { PresetModelEntry } from "@mosoo/contracts/models";
+import type { PresetModelEntry, PresetModelProtocol } from "@mosoo/contracts/models";
 import type { ProjectId } from "@mosoo/id";
 import {
   PRESET_MODEL_CATALOG,
   VENDOR_OPENAI_COMPATIBLE,
   getRuntimeCatalogEntry,
+  resolveRuntimeModelProtocol,
 } from "@mosoo/runtime-catalog";
 
 import { isTruthy } from "../../../shared/truthiness";
@@ -25,12 +26,14 @@ export type ResolvedModelReason =
   | "needs-key"
   | "unknown-model"
   | "unknown-provider"
+  | "wrong-protocol"
   | "wrong-runtime";
 
 export interface ResolvedModelEntry {
   available: boolean;
   displayName: string;
   modelId: string;
+  modelProtocol?: PresetModelProtocol | null;
   reason?: ResolvedModelReason;
   source: ModelCatalogSource;
   statusDetail: string | null;
@@ -104,6 +107,7 @@ function wrongRuntimeStatus(
 
 function resolvePresetEntry(
   entry: PresetModelEntry,
+  runtimeId: string,
   availableVendorIds: ReadonlySet<string>,
   runtimeLabel: string | null,
   runtimeSupportsVendor: boolean,
@@ -121,11 +125,31 @@ function resolvePresetEntry(
     };
   }
 
+  const protocol = resolveRuntimeModelProtocol({
+    runtimeId,
+    vendorId: entry.vendorId,
+    modelId: entry.modelId,
+  });
+  if (!protocol.ok) {
+    return {
+      available: false,
+      displayName: entry.displayName,
+      modelId: entry.modelId,
+      source: "preset",
+      ...(protocol.code === "protocol-unsupported"
+        ? wrongProtocolStatus(protocol.message)
+        : wrongRuntimeStatus(entry.vendorLabel, runtimeLabel)),
+      vendorId: entry.vendorId,
+      vendorLabel: entry.vendorLabel,
+    };
+  }
+
   if (!availableVendorIds.has(entry.vendorId)) {
     return {
       available: false,
       displayName: entry.displayName,
       modelId: entry.modelId,
+      modelProtocol: protocol.modelProtocol,
       source: "preset",
       ...needsKeyStatus(entry.vendorLabel),
       vendorId: entry.vendorId,
@@ -137,6 +161,7 @@ function resolvePresetEntry(
     available: true,
     displayName: entry.displayName,
     modelId: entry.modelId,
+    modelProtocol: protocol.modelProtocol,
     source: "preset",
     ...availableStatus(),
     vendorId: entry.vendorId,
@@ -145,6 +170,7 @@ function resolvePresetEntry(
 }
 
 function resolveCustomEntries(
+  runtimeId: string,
   acceptsCustomProvider: boolean,
   runtimeLabel: string | null,
   credentialRows: readonly VendorCredentialRow[],
@@ -153,20 +179,39 @@ function resolveCustomEntries(
   const entries: ResolvedModelEntry[] = [];
 
   for (const { modelId, row } of listEffectiveCustomCredentialModelRows(rows)) {
+    const protocol = resolveRuntimeModelProtocol({
+      runtimeId,
+      vendorId: VENDOR_OPENAI_COMPATIBLE.vendorId,
+      modelId,
+      customModelProtocol: row.modelProtocol ?? null,
+    });
     entries.push({
-      available: acceptsCustomProvider,
+      available: acceptsCustomProvider && protocol.ok,
       displayName: `${modelId} (custom)`,
       modelId,
+      ...(protocol.ok ? { modelProtocol: protocol.modelProtocol } : {}),
       source: "custom",
-      ...(acceptsCustomProvider
-        ? availableStatus()
-        : wrongRuntimeStatus(`Custom · ${row.name}`, runtimeLabel)),
+      ...(!acceptsCustomProvider || (!protocol.ok && protocol.code !== "protocol-unsupported")
+        ? wrongRuntimeStatus(`Custom · ${row.name}`, runtimeLabel)
+        : protocol.ok
+          ? availableStatus()
+          : wrongProtocolStatus(protocol.message)),
       vendorId: VENDOR_OPENAI_COMPATIBLE.vendorId,
       vendorLabel: `Custom · ${row.name}`,
     });
   }
 
   return entries;
+}
+
+function wrongProtocolStatus(
+  message: string,
+): Pick<ResolvedModelEntry, "reason" | "statusDetail" | "statusLabel"> {
+  return {
+    reason: "wrong-protocol",
+    statusDetail: message,
+    statusLabel: "Incompatible protocol",
+  };
 }
 
 function resolveMissingCurrentEntry(input: {
@@ -260,6 +305,7 @@ export async function resolveAvailableModels(
   const credentialRows = await listProjectVendorCredentialRows(database, input.projectId);
   const availableVendorIds = collectAvailableVendorIds(credentialRows);
   const customEntries = resolveCustomEntries(
+    input.runtimeId,
     scope.acceptsCustomProvider,
     scope.label,
     credentialRows,
@@ -270,6 +316,7 @@ export async function resolveAvailableModels(
   ).map((entry) =>
     resolvePresetEntry(
       entry,
+      input.runtimeId,
       availableVendorIds,
       scope.label,
       scope.vendorIds.has(entry.vendorId),

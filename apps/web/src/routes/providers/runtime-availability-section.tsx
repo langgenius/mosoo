@@ -8,7 +8,7 @@ import { DataRow } from "@/shared/ui/list-row";
 
 import { listRuntimeAvailabilityRows } from "./runtime-availability-model";
 
-// 40px data row per runtime. The words carry the state ("Ready", "Needs key");
+// 40px data row per runtime. The words carry the state ("Configured", "Needs key");
 // there is no status light, and a runtime without a key keeps legible muted text.
 function RuntimeRow({
   label,
@@ -46,8 +46,8 @@ function RuntimeRow({
   );
 }
 
-// Shows which agent runtimes can launch given the keys configured in this Project.
-// A runtime is ready when the active Project has a key for the vendor it resolves.
+// Shows configured models whose provider protocol is supported by each runtime.
+// This is configuration compatibility, not evidence that a connection test ran.
 export function RuntimeAvailabilitySection({
   credentials,
 }: {

@@ -449,6 +449,7 @@ export const GENERATED_RUNTIME_CATALOG = [
     },
     label: "Claude Agent SDK",
     runtimeId: "claude-agent-sdk",
+    supportedModelProtocols: ["anthropic-messages"],
     transport: "claude-agent-sdk",
     vendorIds: ["anthropic"],
     visibility: "public",
@@ -519,6 +520,40 @@ export const GENERATED_RUNTIME_CATALOG = [
         version: 1,
       },
     ],
+    supportedModelIdentities: [
+      {
+        vendorId: "anthropic",
+        modelId: "claude-fable-5",
+      },
+      {
+        vendorId: "anthropic",
+        modelId: "claude-sonnet-5",
+      },
+      {
+        vendorId: "anthropic",
+        modelId: "claude-opus-4-7",
+      },
+      {
+        vendorId: "anthropic",
+        modelId: "claude-opus-4-6",
+      },
+      {
+        vendorId: "anthropic",
+        modelId: "claude-opus-4-5",
+      },
+      {
+        vendorId: "anthropic",
+        modelId: "claude-sonnet-4-6",
+      },
+      {
+        vendorId: "anthropic",
+        modelId: "claude-sonnet-4-5",
+      },
+      {
+        vendorId: "anthropic",
+        modelId: "claude-haiku-4-5",
+      },
+    ],
     supportedModelIds: [
       "claude-fable-5",
       "claude-sonnet-5",
@@ -543,10 +578,45 @@ export const GENERATED_RUNTIME_CATALOG = [
     },
     label: "System Agent",
     runtimeId: "system-agent",
+    supportedModelProtocols: ["openai-responses"],
     transport: "openai-app-server",
     vendorIds: ["openai"],
     visibility: "internal",
     capabilities: [],
+    supportedModelIdentities: [
+      {
+        vendorId: "openai",
+        modelId: "gpt-5.6-sol",
+      },
+      {
+        vendorId: "openai",
+        modelId: "gpt-5.6-terra",
+      },
+      {
+        vendorId: "openai",
+        modelId: "gpt-5.6-luna",
+      },
+      {
+        vendorId: "openai",
+        modelId: "gpt-5.5",
+      },
+      {
+        vendorId: "openai",
+        modelId: "gpt-5.4",
+      },
+      {
+        vendorId: "openai",
+        modelId: "gpt-5.4-mini",
+      },
+      {
+        vendorId: "openai",
+        modelId: "gpt-5.3",
+      },
+      {
+        vendorId: "openai",
+        modelId: "gpt-5.2",
+      },
+    ],
     supportedModelIds: [
       "gpt-5.6-sol",
       "gpt-5.6-terra",
@@ -572,6 +642,7 @@ export const GENERATED_RUNTIME_CATALOG = [
     },
     label: "OpenAI Runtime",
     runtimeId: "openai-runtime",
+    supportedModelProtocols: ["openai-responses"],
     transport: "openai-app-server",
     vendorIds: ["openai"],
     visibility: "public",
@@ -642,6 +713,40 @@ export const GENERATED_RUNTIME_CATALOG = [
         version: 1,
       },
     ],
+    supportedModelIdentities: [
+      {
+        vendorId: "openai",
+        modelId: "gpt-5.6-sol",
+      },
+      {
+        vendorId: "openai",
+        modelId: "gpt-5.6-terra",
+      },
+      {
+        vendorId: "openai",
+        modelId: "gpt-5.6-luna",
+      },
+      {
+        vendorId: "openai",
+        modelId: "gpt-5.5",
+      },
+      {
+        vendorId: "openai",
+        modelId: "gpt-5.4",
+      },
+      {
+        vendorId: "openai",
+        modelId: "gpt-5.4-mini",
+      },
+      {
+        vendorId: "openai",
+        modelId: "gpt-5.3",
+      },
+      {
+        vendorId: "openai",
+        modelId: "gpt-5.2",
+      },
+    ],
     supportedModelIds: [
       "gpt-5.6-sol",
       "gpt-5.6-terra",
@@ -665,6 +770,12 @@ export const GENERATED_RUNTIME_CATALOG = [
     },
     label: "OpenCode",
     runtimeId: "acp-fallback",
+    supportedModelProtocols: [
+      "anthropic-messages",
+      "google-gemini",
+      "openai-chat-completions",
+      "openai-responses",
+    ],
     transport: "acp-fallback",
     vendorIds: [
       "openai",
@@ -745,6 +856,136 @@ export const GENERATED_RUNTIME_CATALOG = [
         version: 1,
       },
     ],
+    supportedModelIdentities: [
+      {
+        vendorId: "anthropic",
+        modelId: "claude-fable-5",
+      },
+      {
+        vendorId: "anthropic",
+        modelId: "claude-sonnet-5",
+      },
+      {
+        vendorId: "anthropic",
+        modelId: "claude-opus-4-7",
+      },
+      {
+        vendorId: "anthropic",
+        modelId: "claude-opus-4-6",
+      },
+      {
+        vendorId: "anthropic",
+        modelId: "claude-opus-4-5",
+      },
+      {
+        vendorId: "anthropic",
+        modelId: "claude-sonnet-4-6",
+      },
+      {
+        vendorId: "anthropic",
+        modelId: "claude-sonnet-4-5",
+      },
+      {
+        vendorId: "anthropic",
+        modelId: "claude-haiku-4-5",
+      },
+      {
+        vendorId: "openai",
+        modelId: "gpt-5.6-sol",
+      },
+      {
+        vendorId: "openai",
+        modelId: "gpt-5.6-terra",
+      },
+      {
+        vendorId: "openai",
+        modelId: "gpt-5.6-luna",
+      },
+      {
+        vendorId: "openai",
+        modelId: "gpt-5.5",
+      },
+      {
+        vendorId: "openai",
+        modelId: "gpt-5.4",
+      },
+      {
+        vendorId: "openai",
+        modelId: "gpt-5.4-mini",
+      },
+      {
+        vendorId: "openai",
+        modelId: "gpt-5.3",
+      },
+      {
+        vendorId: "openai",
+        modelId: "gpt-5.2",
+      },
+      {
+        vendorId: "deepseek",
+        modelId: "deepseek-v4-pro",
+      },
+      {
+        vendorId: "deepseek",
+        modelId: "deepseek-v4-flash",
+      },
+      {
+        vendorId: "gemini",
+        modelId: "gemini-3.5-flash",
+      },
+      {
+        vendorId: "qwen",
+        modelId: "qwen3.7-plus",
+      },
+      {
+        vendorId: "qwen",
+        modelId: "qwen3.6-plus",
+      },
+      {
+        vendorId: "kimi",
+        modelId: "kimi-k2.6",
+      },
+      {
+        vendorId: "kimi",
+        modelId: "kimi-k2.7-code",
+      },
+      {
+        vendorId: "zhipu",
+        modelId: "glm-4.7",
+      },
+      {
+        vendorId: "zhipu",
+        modelId: "glm-4.6",
+      },
+      {
+        vendorId: "minimax",
+        modelId: "MiniMax-M3",
+      },
+      {
+        vendorId: "minimax",
+        modelId: "MiniMax-M2.7",
+      },
+      {
+        vendorId: "opencode",
+        modelId: "deepseek-v4-pro",
+      },
+      {
+        vendorId: "opencode",
+        modelId: "qwen3.6-plus",
+      },
+      {
+        vendorId: "opencode",
+        modelId: "glm-5.2",
+      },
+      {
+        vendorId: "opencode",
+        modelId: "minimax-m2.7",
+      },
+      {
+        vendorId: "opencode",
+        modelId: "gemini-3.5-flash",
+      },
+    ],
     supportedModelIds: [
       "claude-fable-5",
       "claude-sonnet-5",
@@ -789,8 +1030,25 @@ export const GENERATED_RUNTIME_CATALOG = [
     },
     label: "Pi",
     runtimeId: "pi",
+    supportedModelProtocols: [
+      "anthropic-messages",
+      "google-gemini",
+      "openai-chat-completions",
+      "openai-responses",
+    ],
     transport: "pi-rpc",
-    vendorIds: ["openai-compatible"],
+    vendorIds: [
+      "openai-compatible",
+      "openai",
+      "anthropic",
+      "deepseek",
+      "gemini",
+      "qwen",
+      "kimi",
+      "zhipu",
+      "minimax",
+      "opencode",
+    ],
     visibility: "public",
     capabilities: [
       {
@@ -859,7 +1117,167 @@ export const GENERATED_RUNTIME_CATALOG = [
         version: 1,
       },
     ],
-    supportedModelIds: [],
+    supportedModelIdentities: [
+      {
+        vendorId: "anthropic",
+        modelId: "claude-fable-5",
+      },
+      {
+        vendorId: "anthropic",
+        modelId: "claude-sonnet-5",
+      },
+      {
+        vendorId: "anthropic",
+        modelId: "claude-opus-4-7",
+      },
+      {
+        vendorId: "anthropic",
+        modelId: "claude-opus-4-6",
+      },
+      {
+        vendorId: "anthropic",
+        modelId: "claude-opus-4-5",
+      },
+      {
+        vendorId: "anthropic",
+        modelId: "claude-sonnet-4-6",
+      },
+      {
+        vendorId: "anthropic",
+        modelId: "claude-sonnet-4-5",
+      },
+      {
+        vendorId: "anthropic",
+        modelId: "claude-haiku-4-5",
+      },
+      {
+        vendorId: "openai",
+        modelId: "gpt-5.6-sol",
+      },
+      {
+        vendorId: "openai",
+        modelId: "gpt-5.6-terra",
+      },
+      {
+        vendorId: "openai",
+        modelId: "gpt-5.6-luna",
+      },
+      {
+        vendorId: "openai",
+        modelId: "gpt-5.5",
+      },
+      {
+        vendorId: "openai",
+        modelId: "gpt-5.4",
+      },
+      {
+        vendorId: "openai",
+        modelId: "gpt-5.4-mini",
+      },
+      {
+        vendorId: "openai",
+        modelId: "gpt-5.3",
+      },
+      {
+        vendorId: "openai",
+        modelId: "gpt-5.2",
+      },
+      {
+        vendorId: "deepseek",
+        modelId: "deepseek-v4-pro",
+      },
+      {
+        vendorId: "deepseek",
+        modelId: "deepseek-v4-flash",
+      },
+      {
+        vendorId: "gemini",
+        modelId: "gemini-3.5-flash",
+      },
+      {
+        vendorId: "qwen",
+        modelId: "qwen3.7-plus",
+      },
+      {
+        vendorId: "qwen",
+        modelId: "qwen3.6-plus",
+      },
+      {
+        vendorId: "kimi",
+        modelId: "kimi-k2.6",
+      },
+      {
+        vendorId: "kimi",
+        modelId: "kimi-k2.7-code",
+      },
+      {
+        vendorId: "zhipu",
+        modelId: "glm-4.7",
+      },
+      {
+        vendorId: "zhipu",
+        modelId: "glm-4.6",
+      },
+      {
+        vendorId: "minimax",
+        modelId: "MiniMax-M3",
+      },
+      {
+        vendorId: "minimax",
+        modelId: "MiniMax-M2.7",
+      },
+      {
+        vendorId: "opencode",
+        modelId: "deepseek-v4-pro",
+      },
+      {
+        vendorId: "opencode",
+        modelId: "qwen3.6-plus",
+      },
+      {
+        vendorId: "opencode",
+        modelId: "glm-5.2",
+      },
+      {
+        vendorId: "opencode",
+        modelId: "minimax-m2.7",
+      },
+      {
+        vendorId: "opencode",
+        modelId: "gemini-3.5-flash",
+      },
+    ],
+    supportedModelIds: [
+      "claude-fable-5",
+      "claude-sonnet-5",
+      "claude-opus-4-7",
+      "claude-opus-4-6",
+      "claude-opus-4-5",
+      "claude-sonnet-4-6",
+      "claude-sonnet-4-5",
+      "claude-haiku-4-5",
+      "gpt-5.6-sol",
+      "gpt-5.6-terra",
+      "gpt-5.6-luna",
+      "gpt-5.5",
+      "gpt-5.4",
+      "gpt-5.4-mini",
+      "gpt-5.3",
+      "gpt-5.2",
+      "deepseek-v4-pro",
+      "deepseek-v4-flash",
+      "gemini-3.5-flash",
+      "qwen3.7-plus",
+      "qwen3.6-plus",
+      "kimi-k2.6",
+      "kimi-k2.7-code",
+      "glm-4.7",
+      "glm-4.6",
+      "MiniMax-M3",
+      "MiniMax-M2.7",
+      "glm-5.2",
+      "minimax-m2.7",
+    ],
   },
 ] as const;
 

@@ -5,14 +5,7 @@ import type {
 } from "@mosoo/contracts/agent-manifest";
 import { vendorCredentialsTable } from "@mosoo/db";
 import type { AccountId, ProjectId } from "@mosoo/id";
-import {
-  VENDOR_DEEPSEEK,
-  VENDOR_OPENAI,
-  VENDOR_OPENAI_COMPATIBLE,
-  VENDOR_OPENCODE,
-  getRuntimeCatalogEntry,
-  getVendor,
-} from "@mosoo/runtime-catalog";
+import { getRuntimeCatalogEntry } from "@mosoo/runtime-catalog";
 import { and, asc, eq } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
@@ -44,22 +37,6 @@ interface RuntimeCapabilityIssueInput {
 }
 
 const READINESS_PROVIDER_PROBE_TIMEOUT_MS = 10_000;
-const BUILT_IN_OPENAI_SHAPED_PROVIDER_IDS = new Set([
-  VENDOR_DEEPSEEK.vendorId,
-  VENDOR_OPENAI.vendorId,
-  VENDOR_OPENAI_COMPATIBLE.vendorId,
-  VENDOR_OPENCODE.vendorId,
-]);
-const OPENAI_COMPATIBLE_AI_SDK_PACKAGE = "@ai-sdk/openai-compatible";
-
-function allowsOpenAiChatCompletionProbe(providerId: string): boolean {
-  if (BUILT_IN_OPENAI_SHAPED_PROVIDER_IDS.has(providerId)) {
-    return true;
-  }
-
-  return getVendor(providerId)?.openCodeProvider?.npmPackage === OPENAI_COMPATIBLE_AI_SDK_PACKAGE;
-}
-
 async function hasProjectCredential(
   database: D1Database,
   actorAccountId: AccountId,
@@ -171,12 +148,12 @@ async function collectProviderProbeIssues(
   }
 
   const result = await probeVendorCredential({
-    allowChatCompletionProbe: allowsOpenAiChatCompletionProbe(input.selection.provider),
     apiBase: credential.apiBase,
     apiKey: credential.apiKey,
     emitEvent: false,
     fetchProxy: resolveProviderFetchProxy(bindings),
     modelId: input.selection.model,
+    modelProtocol: modelEntry.modelProtocol ?? null,
     timeoutMs: READINESS_PROVIDER_PROBE_TIMEOUT_MS,
     vendorId: input.selection.provider,
   });

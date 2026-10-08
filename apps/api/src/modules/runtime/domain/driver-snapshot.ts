@@ -11,6 +11,7 @@ import type {
   UnavailableMcpAuthorizationState,
   UnavailableMcpCredentialStatus,
 } from "@mosoo/contracts/mcp";
+import type { PresetModelProtocol } from "@mosoo/contracts/models";
 import type { SkillMaterializationStatus, SkillResolutionMode } from "@mosoo/contracts/skill";
 import type {
   AccountId,
@@ -82,6 +83,8 @@ export const DEFAULT_DRIVER_PERMISSION_POLICY = "full_access" satisfies DriverPe
  */
 export interface DriverVendorCredentialProfile {
   readonly apiBase: string | null;
+  /** Credential declaration; null/absent retains legacy runtime-specific routing. */
+  readonly modelProtocol?: PresetModelProtocol | null;
   readonly projectId: ProjectId;
   readonly credentialId: VendorCredentialId;
   readonly models: readonly string[] | null;
@@ -104,6 +107,8 @@ export interface DriverProfileConfig {
   readonly envVars: Record<string, string>;
   readonly environmentArtifact?: DriverEnvironmentArtifactProfile | null;
   readonly model: string;
+  /** Selected protocol from the Session snapshot, distinct from the credential declaration. */
+  readonly modelProtocol?: PresetModelProtocol;
   readonly network: DriverNetworkProfile;
   readonly permissionPolicy: DriverPermissionPolicy;
   readonly prompt: string;

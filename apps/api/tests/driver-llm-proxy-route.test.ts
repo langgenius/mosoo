@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, spyOn, test } from "bun:test";
 
+import type { PresetModelProtocol } from "@mosoo/contracts/models";
 import { driverInstancesTable, vendorCredentialsTable } from "@mosoo/db";
 import { parsePlatformId } from "@mosoo/id";
 import type { DriverInstanceId, ProjectId, VendorCredentialId } from "@mosoo/id";
@@ -10,9 +11,17 @@ import { registerDriverRoute } from "../src/adapters/http/routes/driver-route";
 import { getRuntimeDriverLlmProxyPath } from "../src/modules/runtime/domain/runtime-driver-routes";
 import { createRuntimeActionToken } from "../src/modules/runtime/infrastructure/runtime-boot-token";
 import type { RuntimeActionTokenPayload } from "../src/modules/runtime/infrastructure/runtime-boot-token";
+import { buildVendorProxyEnvVars } from "../src/modules/runtime/infrastructure/runtime-sandbox-provisioning/runtime-vendor-proxy-env.builder";
 import { storeVendorCredentialSecret } from "../src/modules/vendor-credentials/application/vendor-credential.secret-resolution";
 import { runWithRequestLogContext } from "../src/platform/cloudflare/logger";
 import type { ApiBindings, ApiGatewayEnvironment } from "../src/platform/cloudflare/worker-types";
+import {
+  PI_PROXY_FINAL_TEXT,
+  PI_PROXY_TOOL_PROOF,
+  piProxyProtocolResponse,
+  runOpenCodeProxyTurn,
+  runPiProxyTurn,
+} from "./helpers/pi-proxy-protocol-fixture";
 import {
   PUBLIC_API_TEST_IDS,
   createPublicHttpContractDatabase,
@@ -142,6 +151,7 @@ async function insertVendorCredential(
   input: {
     apiBase?: string | null;
     credentialId?: VendorCredentialId;
+    modelProtocol?: PresetModelProtocol | null;
     vendorId: string;
   },
 ) {
@@ -165,6 +175,7 @@ async function insertVendorCredential(
       id: credentialId,
       isDefault: true,
       models: null,
+      modelProtocol: input.modelProtocol ?? null,
       name: `${input.vendorId} credential`,
       projectId: PROJECT_ID,
       updatedAt: nowMs,
@@ -206,6 +217,7 @@ async function setupFixture(input?: {
   driverGeneration?: number;
   driverStatus?: "provisioning" | "connecting" | "ready" | "failed" | "absent";
   driverUpdatedAt?: number;
+  modelProtocol?: PresetModelProtocol | null;
   vendorId?: string;
 }) {
   const database = await createPublicHttpContractDatabase();
@@ -220,6 +232,7 @@ async function setupFixture(input?: {
 
   await insertVendorCredential(database, bindings, {
     apiBase: input?.apiBase ?? null,
+    modelProtocol: input?.modelProtocol ?? null,
     vendorId: input?.vendorId ?? "anthropic",
   });
 
@@ -236,6 +249,208 @@ async function dispatch(bindings: ApiBindings, request: Request): Promise<Respon
 }
 
 describe("driver LLM proxy route", () => {
+  test.each(
+    (
+      [
+        {
+          protocol: "openai-chat-completions",
+          path: "/v1/chat/completions",
+          header: "authorization",
+          value: `Bearer ${UPSTREAM_API_KEY}`,
+        },
+        {
+          protocol: "openai-responses",
+          path: "/v1/responses",
+          header: "authorization",
+          value: `Bearer ${UPSTREAM_API_KEY}`,
+        },
+        {
+          protocol: "anthropic-messages",
+          path: "/v1/messages",
+          header: "x-api-key",
+          value: UPSTREAM_API_KEY,
+        },
+        {
+          protocol: "google-gemini",
+          path: "/v1/models/pi-test:streamGenerateContent",
+          header: "x-goog-api-key",
+          value: UPSTREAM_API_KEY,
+        },
+      ] satisfies { protocol: PresetModelProtocol; path: string; header: string; value: string }[]
+    ).flatMap((entry) =>
+      (["pi", "acp-fallback"] as const).map((runtimeId) => ({
+        protocol: entry.protocol,
+        path: entry.path,
+        header: entry.header,
+        value: entry.value,
+        runtimeId,
+      })),
+    ),
+  )(
+    "runs native $runtimeId $protocol streaming and a real tool through Host admission and the vault proxy",
+    async ({ protocol, path, header, value, runtimeId }) => {
+      const { bindings } = await setupFixture({
+        apiBase: "https://models.example.com/v1",
+        modelProtocol: protocol,
+        vendorId: "openai-compatible",
+      });
+      let modelCalls = 0;
+      const captured = captureUpstreamFetch(() =>
+        piProxyProtocolResponse(protocol, ++modelCalls === 1),
+      );
+      const proxy = Bun.serve({
+        hostname: "127.0.0.1",
+        port: 0,
+        fetch: (request) => dispatch(bindings, request),
+      });
+      try {
+        const env = await buildVendorProxyEnvVars({
+          bindings,
+          driverGeneration: 0,
+          driverInstanceId: DRIVER_INSTANCE_ID,
+          profile: {
+            model: "pi-test",
+            modelProtocol: protocol,
+            runtimeId,
+            vendorCredential: {
+              apiBase: "https://models.example.com/v1",
+              credentialId: CREDENTIAL_ID,
+              projectId: PROJECT_ID,
+              models: ["pi-test"],
+              modelProtocol: protocol,
+              vendorId: "openai-compatible",
+            },
+          },
+          requestUrl: `http://127.0.0.1:${proxy.port}/api/sessions`,
+        });
+        const events = await (runtimeId === "pi" ? runPiProxyTurn(env) : runOpenCodeProxyTurn(env));
+        expect(modelCalls).toBe(2);
+        if (runtimeId === "pi") {
+          expect(
+            events.some(
+              (event) =>
+                event["type"] === "tool_execution_end" &&
+                (JSON.stringify(event["result"]) ?? "").includes(PI_PROXY_TOOL_PROOF),
+            ),
+          ).toBe(true);
+          expect(
+            JSON.stringify(events.findLast((event) => event["type"] === "agent_end")),
+          ).toContain(PI_PROXY_FINAL_TEXT);
+        } else {
+          expect(
+            events.some((event) => {
+              const part = event["part"];
+              if (
+                event["type"] !== "tool_use" ||
+                typeof part !== "object" ||
+                part === null ||
+                !("state" in part)
+              )
+                return false;
+              const state = part.state;
+              return (
+                typeof state === "object" &&
+                state !== null &&
+                "status" in state &&
+                state.status === "completed" &&
+                "output" in state &&
+                typeof state.output === "string" &&
+                state.output.includes(PI_PROXY_TOOL_PROOF)
+              );
+            }),
+          ).toBe(true);
+          expect(
+            events.some(
+              (event) =>
+                event["type"] === "text" && JSON.stringify(event).includes(PI_PROXY_FINAL_TEXT),
+            ),
+          ).toBe(true);
+        }
+        expect(captured[1]?.body).toContain(PI_PROXY_TOOL_PROOF);
+        const grant =
+          env[runtimeId === "pi" ? "MOSOO_PI_PROXY_GRANT" : "OPENAI_COMPATIBLE_API_KEY"];
+        for (const request of captured) {
+          expect(new URL(request.url).pathname).toBe(path);
+          expect(request.headers.get(header)).toBe(value);
+          for (const credentialHeader of ["authorization", "x-api-key", "x-goog-api-key"]) {
+            if (credentialHeader !== header)
+              expect(request.headers.get(credentialHeader)).toBeNull();
+          }
+          expect(JSON.stringify([...request.headers])).not.toContain(grant);
+          expect(request.body).not.toContain(grant);
+          expect(request.redirect).toBe("manual");
+        }
+        if (protocol === "google-gemini")
+          expect(new URL(captured[0]?.url ?? "").searchParams.get("alt")).toBe("sse");
+      } finally {
+        await proxy.stop(true);
+      }
+    },
+    35_000,
+  );
+
+  test.each(["/messages", "/v1/messages", "/v1/messages/count_tokens"])(
+    "normalizes Anthropic client path %s without duplicating the upstream API version",
+    async (path) => {
+      for (const apiBase of [
+        "https://gateway.example.com",
+        "https://gateway.example.com/anthropic/v1",
+      ]) {
+        const { bindings } = await setupFixture({
+          apiBase,
+          modelProtocol: "anthropic-messages",
+          vendorId: "openai-compatible",
+        });
+        const captured = captureUpstreamFetch();
+        const grant = await createLlmProxyGrant(bindings);
+        const response = await dispatch(
+          bindings,
+          llmProxyRequest(path, {
+            method: "POST",
+            headers: { "x-api-key": grant },
+            body: JSON.stringify({ model: "claude-sonnet-5" }),
+          }),
+        );
+        expect(response.status).toBe(200);
+        expect(captured[0]?.url).toBe(
+          `${apiBase.endsWith("/v1") ? apiBase : `${apiBase}/v1`}/messages${path.endsWith("/count_tokens") ? "/count_tokens" : ""}`,
+        );
+      }
+    },
+  );
+
+  test("revokes a custom credential's existing grant after its protocol is changed", async () => {
+    const { bindings, database } = await setupFixture({
+      apiBase: "https://models.example.com/v1",
+      modelProtocol: "openai-responses",
+      vendorId: "openai-compatible",
+    });
+    const captured = captureUpstreamFetch();
+    const grant = await createLlmProxyGrant(bindings, {
+      modelId: "pi-test",
+      modelProtocol: "openai-responses",
+    });
+    await database
+      .app()
+      .update(vendorCredentialsTable)
+      .set({ modelProtocol: "anthropic-messages" })
+      .where(eq(vendorCredentialsTable.id, CREDENTIAL_ID))
+      .run();
+    const response = await dispatch(
+      bindings,
+      llmProxyRequest("/responses", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${grant}` },
+        body: JSON.stringify({ model: "pi-test" }),
+      }),
+    );
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({
+      error: "Vendor credential model protocol has changed.",
+    });
+    expect(captured).toHaveLength(0);
+  });
+
   test.each([
     { method: "DELETE", path: "/chat/completions", reason: "method_not_allowed" },
     { path: "/responses", reason: "path_not_allowed" },

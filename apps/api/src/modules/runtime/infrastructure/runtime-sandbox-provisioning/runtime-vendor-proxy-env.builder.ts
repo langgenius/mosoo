@@ -1,6 +1,6 @@
 import type { PresetModelProtocol } from "@mosoo/contracts/models";
 import type { DriverInstanceId, VendorCredentialId } from "@mosoo/id";
-import { getPresetModel, getVendor } from "@mosoo/runtime-catalog";
+import { getVendor, resolveRuntimeModelProtocol } from "@mosoo/runtime-catalog";
 import type { RuntimeCatalogVendor } from "@mosoo/runtime-catalog";
 
 import { isTruthy } from "../../../../shared/truthiness";
@@ -29,13 +29,14 @@ export interface VendorProxyEnvironmentInput {
   bindings: RuntimeActionTokenBindings;
   driverGeneration: number;
   driverInstanceId: DriverInstanceId;
-  profile: Pick<DriverProfileConfig, "model" | "runtimeId" | "vendorCredential">;
+  profile: Pick<DriverProfileConfig, "model" | "modelProtocol" | "runtimeId" | "vendorCredential">;
   requestUrl: string;
 }
 
 interface OpenCodeProviderConfigInput {
   credential: DriverVendorCredentialProfile;
   model: string;
+  modelProtocol: PresetModelProtocol;
   proxyUrl: string;
   vendor: RuntimeCatalogVendor;
 }
@@ -72,42 +73,32 @@ function resolveLlmProxyModelBinding(
     throw new Error(`Model ${profile.model} cannot be bound to an LLM proxy grant.`);
   }
 
-  const preset = getPresetModel({
+  const resolution = resolveRuntimeModelProtocol({
+    runtimeId: profile.runtimeId,
     modelId,
     vendorId: vendor.vendorId,
+    customModelProtocol: profile.vendorCredential.modelProtocol ?? null,
   });
-
-  if (profile.runtimeId === "claude-agent-sdk") {
-    return { modelId, modelProtocol: "anthropic-messages" };
+  if (!resolution.ok) throw new Error(resolution.message);
+  if (profile.modelProtocol !== undefined && profile.modelProtocol !== resolution.modelProtocol) {
+    throw new Error("The provider model protocol differs from the frozen execution configuration.");
   }
-
-  if (profile.runtimeId === "openai-runtime") {
-    return { modelId, modelProtocol: "openai-responses" };
-  }
-
-  if (
-    vendor.vendorId === "anthropic" ||
-    vendor.openCodeProvider?.npmPackage === "@ai-sdk/anthropic"
-  ) {
-    return { modelId, modelProtocol: "anthropic-messages" };
-  }
-
-  if (vendor.openCodeProvider?.npmPackage === "@ai-sdk/openai-compatible") {
-    return { modelId, modelProtocol: "openai-chat-completions" };
-  }
-
-  if (preset !== null) {
-    return { modelId, modelProtocol: preset.protocol };
-  }
-
-  if (vendor.vendorId === "opencode") {
-    throw new Error(
-      `OpenCode Zen model ${profile.model} has no catalog protocol for LLM proxy admission.`,
-    );
-  }
-
-  return { modelId, modelProtocol: "openai-chat-completions" };
+  return { modelId, modelProtocol: profile.modelProtocol ?? resolution.modelProtocol };
 }
+
+const PI_API_BY_PROTOCOL: Record<PresetModelProtocol, string> = {
+  "anthropic-messages": "anthropic-messages",
+  "google-gemini": "google-generative-ai",
+  "openai-chat-completions": "openai-completions",
+  "openai-responses": "openai-responses",
+};
+
+const OPENCODE_SDK_BY_PROTOCOL: Record<PresetModelProtocol, string> = {
+  "anthropic-messages": "@ai-sdk/anthropic",
+  "google-gemini": "@ai-sdk/google",
+  "openai-chat-completions": "@ai-sdk/openai-compatible",
+  "openai-responses": "@ai-sdk/openai",
+};
 
 /**
  * Builds the vendor env vars a runtime boots with. The raw provider API key
@@ -128,11 +119,8 @@ export async function buildVendorProxyEnvVars(
     throw new Error(`Unknown vendor: ${credential.vendorId}.`);
   }
 
-  if (
-    input.profile.runtimeId === "pi" &&
-    (credential.vendorId !== "openai-compatible" || !isTruthy(credential.apiBase))
-  ) {
-    throw new Error("Pi requires a custom OpenAI-compatible provider endpoint.");
+  if (credential.vendorId === "openai-compatible" && !isTruthy(credential.apiBase)) {
+    throw new Error("Custom providers require an endpoint.");
   }
 
   if (isTruthy(credential.apiBase)) {
@@ -162,7 +150,7 @@ export async function buildVendorProxyEnvVars(
       [PI_CONFIG_CONTENT_ENV]: JSON.stringify({
         providers: {
           mosoo: {
-            api: "openai-completions",
+            api: PI_API_BY_PROTOCOL[modelBinding.modelProtocol],
             apiKey: `\${${PI_PROXY_GRANT_ENV}}`,
             baseUrl: proxyUrl,
             models: [{ id: modelBinding.modelId }],
@@ -190,6 +178,7 @@ export async function buildVendorProxyEnvVars(
     envVars[OPENCODE_CONFIG_CONTENT_ENV] = buildOpenCodeConfig({
       credential,
       model: input.profile.model,
+      modelProtocol: modelBinding.modelProtocol,
       proxyUrl,
       vendor,
     });
@@ -290,7 +279,10 @@ function buildOpenCodeProviderConfig(input: OpenCodeProviderConfigInput): OpenCo
   return {
     models,
     name: provider.name,
-    npm: provider.npmPackage,
+    npm:
+      input.vendor.vendorId === "openai-compatible"
+        ? OPENCODE_SDK_BY_PROTOCOL[input.modelProtocol]
+        : provider.npmPackage,
     options,
   };
 }

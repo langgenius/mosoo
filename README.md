@@ -51,7 +51,7 @@ configure Agent + Skills + MCP + provider
 
 What works today across the Agent runtime and API:
 
-- **Agent runtime and control plane.** Configure and run OpenAI Codex, Claude Agent SDK, and OpenCode behind one normalized runtime protocol.
+- **Agent runtime and control plane.** Configure and run OpenAI Codex, Claude Agent SDK, OpenCode, and Pi behind one normalized runtime protocol.
 - **Agent API.** Start, follow, continue, stop, archive, and delete Agent work from a trusted backend.
 - **AI agent sandboxes.** Stream responses and tool activity, handle permission requests, cancel work, and inspect diagnostics in isolated execution environments.
 - **Durable work.** Keep Threads, Runs, events, and managed files across individual executions.
@@ -66,8 +66,10 @@ mosoo is for developers extending Codex, Claude Agent SDK, OpenCode, or another 
 mosoo is in Alpha. The managed runtime and Agent API surfaces above are shipped and covered by repository tests, but production reliability and external adoption have not been proven. Public APIs and product behavior may still change.
 
 This candidate also adds [Pi through its native RPC transport](./docs/pi-runtime.md).
-Pi must be selected explicitly with a declared custom OpenAI-compatible model;
-custom providers still default to OpenCode. Hosted availability requires the
+Pi must be selected explicitly and uses the protocol declared for the selected
+provider/model, including Responses, Chat Completions, Anthropic Messages, and
+Google Gemini. Custom providers still default to OpenCode. See the
+[runtime compatibility contract](./docs/prd/runtime-catalog.md). Hosted availability requires the
 matched Driver, API, and Sandbox image rollout described in that guide.
 
 ## Getting Started

@@ -1,3 +1,4 @@
+import type { PresetModelProtocol } from "@mosoo/contracts/models";
 import { ALL_VENDORS, VENDOR_OPENAI_COMPATIBLE, getVendor } from "@mosoo/runtime-catalog";
 
 import { isTruthy } from "../../../shared/truthiness";
@@ -15,6 +16,30 @@ export function normalizeCredentialName(input: string): string {
 export function normalizeApiBase(input: string | null | undefined): string | null {
   const apiBase = input?.trim() ?? "";
   return apiBase || null;
+}
+
+export function normalizeCredentialModelProtocol(
+  vendorId: string,
+  input: unknown,
+): PresetModelProtocol | null {
+  if (input === undefined || input === null) {
+    return null;
+  }
+  if (vendorId !== VENDOR_OPENAI_COMPATIBLE.vendorId) {
+    throw new Error("Preset provider credentials cannot declare a model protocol.");
+  }
+  if (typeof input !== "string") {
+    throw new Error("Unsupported model protocol.");
+  }
+  switch (input) {
+    case "anthropic-messages":
+    case "google-gemini":
+    case "openai-chat-completions":
+    case "openai-responses":
+      return input;
+    default:
+      throw new Error("Unsupported model protocol.");
+  }
 }
 
 function formatUnsafeApiBaseMessage(reason: string): string {

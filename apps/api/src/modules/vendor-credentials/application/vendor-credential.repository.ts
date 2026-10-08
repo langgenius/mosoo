@@ -18,6 +18,7 @@ function selectVendorCredentialRows(database: D1Database) {
       apiKeySecretId: vendorCredentialsTable.apiKeySecretId,
       id: vendorCredentialsTable.id,
       isDefault: vendorCredentialsTable.isDefault,
+      modelProtocol: vendorCredentialsTable.modelProtocol,
       modelsJson: vendorCredentialsTable.models,
       name: vendorCredentialsTable.name,
       projectId: vendorCredentialsTable.projectId,

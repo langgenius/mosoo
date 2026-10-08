@@ -1,6 +1,7 @@
 import { getSessionOrganizationPath, getSessionRuntimeStatePath } from "@mosoo/agent-driver/paths";
 import type { JsonObject } from "@mosoo/contracts";
 import type { AgentReadiness } from "@mosoo/contracts/agent";
+import type { PresetModelProtocol } from "@mosoo/contracts/models";
 import type { AccountId, AgentId, SandboxId, SandboxSessionId, SessionId } from "@mosoo/id";
 
 import type {
@@ -23,6 +24,7 @@ export function createAgentRuntimeProfile(input: {
   environmentArtifact?: DriverEnvironmentArtifactProfile | null;
   executionOwnerUserId: AccountId;
   model: string;
+  modelProtocol?: PresetModelProtocol;
   network: DriverNetworkProfile;
   permissionPolicy?: DriverPermissionPolicy;
   prompt: string;
@@ -49,6 +51,7 @@ export function createAgentRuntimeProfile(input: {
     envVars: input.envVars,
     environmentArtifact: input.environmentArtifact ?? null,
     model: input.model,
+    ...(input.modelProtocol === undefined ? {} : { modelProtocol: input.modelProtocol }),
     network: input.network,
     permissionPolicy: input.permissionPolicy ?? DEFAULT_DRIVER_PERMISSION_POLICY,
     prompt: input.prompt,

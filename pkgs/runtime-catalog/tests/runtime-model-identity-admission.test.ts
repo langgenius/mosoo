@@ -30,7 +30,7 @@ import {
 import type { RuntimeCatalogEntry } from "@mosoo/runtime-catalog";
 
 describe("runtime catalog identity admission", () => {
-  test("admits Pi custom models without advertising a preset model", () => {
+  test("admits Pi custom and preset models while preserving its custom default", () => {
     const runtime = getPublicRuntimeCatalogEntry("pi");
     const custom = admitRuntimeModelIdentity(
       createRuntimeModelIdentity({
@@ -55,7 +55,8 @@ describe("runtime catalog identity admission", () => {
 
     expect(runtime).toMatchObject({
       acceptsCustomProvider: true,
-      supportedModelIds: [],
+      defaultProvider: "openai-compatible",
+      defaultModel: "custom-model",
       transport: "pi-rpc",
     });
     expect(custom).toMatchObject({
@@ -63,7 +64,7 @@ describe("runtime catalog identity admission", () => {
       ok: true,
       vendor: { vendorId: VENDOR_OPENAI_COMPATIBLE.vendorId },
     });
-    expect(preset).toMatchObject({ code: "provider-unsupported", ok: false });
+    expect(preset).toMatchObject({ modelProtocol: "openai-responses", ok: true });
     expect(listPresetModelsForVendor(VENDOR_OPENAI_COMPATIBLE.vendorId)).toEqual([]);
     expect(getRuntimeIconKey("pi")).toBe("pi");
   });
@@ -415,6 +416,7 @@ function createRuntimeFixture(
     defaultProvider: defaultIdentity.provider.providerId,
     label: "OpenAI Runtime",
     runtimeId: defaultIdentity.runtimeId,
+    supportedModelProtocols: ["openai-responses"],
     supportedModelIds: undefined,
     transport: "openai-app-server",
     vendors: [VENDOR_OPENAI],

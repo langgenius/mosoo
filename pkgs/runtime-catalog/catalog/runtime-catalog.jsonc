@@ -420,6 +420,7 @@
   "runtimes": [
     {
       "runtimeId": "claude-agent-sdk",
+      "supportedModelProtocols": ["anthropic-messages"],
       "label": "Claude Agent SDK",
       "visibility": "public",
       "transport": "claude-agent-sdk",
@@ -441,6 +442,7 @@
     },
     {
       "runtimeId": "system-agent",
+      "supportedModelProtocols": ["openai-responses"],
       "label": "System Agent",
       "visibility": "internal",
       "transport": "openai-app-server",
@@ -462,6 +464,7 @@
     },
     {
       "runtimeId": "openai-runtime",
+      "supportedModelProtocols": ["openai-responses"],
       "label": "OpenAI Runtime",
       "visibility": "public",
       "transport": "openai-app-server",
@@ -484,6 +487,12 @@
     },
     {
       "runtimeId": "acp-fallback",
+      "supportedModelProtocols": [
+        "anthropic-messages",
+        "google-gemini",
+        "openai-chat-completions",
+        "openai-responses",
+      ],
       "label": "OpenCode",
       "visibility": "public",
       "transport": "acp-fallback",
@@ -524,6 +533,12 @@
     },
     {
       "runtimeId": "pi",
+      "supportedModelProtocols": [
+        "anthropic-messages",
+        "google-gemini",
+        "openai-chat-completions",
+        "openai-responses",
+      ],
       "label": "Pi",
       "visibility": "public",
       "transport": "pi-rpc",
@@ -531,12 +546,33 @@
       "capabilityProfile": "standard",
       "defaultIdentity": {
         "providerId": "openai-compatible",
-        // A custom-only runtime has no preset model to use as a launchable default.
+        // Preserve the custom-provider default; callers may also select a preset model.
         "modelId": "custom-model",
       },
-      "vendorIds": ["openai-compatible"],
+      "vendorIds": [
+        "openai-compatible",
+        "openai",
+        "anthropic",
+        "deepseek",
+        "gemini",
+        "qwen",
+        "kimi",
+        "zhipu",
+        "minimax",
+        "opencode",
+      ],
       "supportedModels": {
-        "modelIds": [],
+        "vendorIds": [
+          "anthropic",
+          "openai",
+          "deepseek",
+          "gemini",
+          "qwen",
+          "kimi",
+          "zhipu",
+          "minimax",
+          "opencode",
+        ],
       },
       "display": {
         "iconKey": "pi",

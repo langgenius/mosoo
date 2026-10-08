@@ -1,5 +1,6 @@
 import type { AgentBuiltInToolConfig } from "@mosoo/contracts/agent";
 import type { EnvironmentNetworkPolicy } from "@mosoo/contracts/environment";
+import type { PresetModelProtocol } from "@mosoo/contracts/models";
 import type {
   SessionExecutionBinding,
   SessionExecutionSkillReference,
@@ -20,6 +21,8 @@ export interface SessionExecutionPlan {
   builtInTools: AgentBuiltInToolConfig[];
   /** Absent only on Sessions admitted before execution config freezing. */
   configJson?: string;
+  /** Absent only on Sessions admitted before model protocol freezing. */
+  modelProtocol?: PresetModelProtocol;
   /** Explicit Cloud debug enrollment; absent on legacy and formal/API Sessions. */
   previewRetentionMs?: number;
   environment: {

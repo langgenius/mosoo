@@ -45,6 +45,7 @@ export async function fetchViaProviderProxy(
       "Content-Type": "application/json",
     },
     method: "POST",
+    redirect: "manual",
     ...(signal === undefined ? {} : { signal }),
   });
 

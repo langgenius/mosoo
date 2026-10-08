@@ -111,6 +111,7 @@ async function handleProviderProxyRequest(token: string, request: Request): Prom
       ...(payload.body === null ? {} : { body: payload.body }),
       headers: payload.headers,
       method: payload.method,
+      redirect: "manual",
       signal: controller.signal,
     });
     return jsonResponse(200, {

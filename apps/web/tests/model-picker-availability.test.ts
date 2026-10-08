@@ -11,6 +11,7 @@ function entry(overrides: Partial<ResolvedModelEntry>): ResolvedModelEntry {
     available: true,
     displayName: "GPT",
     modelId: "gpt-5.4",
+    modelProtocol: null,
     reason: null,
     source: "preset",
     statusDetail: null,
@@ -22,6 +23,23 @@ function entry(overrides: Partial<ResolvedModelEntry>): ResolvedModelEntry {
 }
 
 describe("model picker availability projection", () => {
+  test("keeps a current model protocol mismatch visible and excludes it as a new choice", () => {
+    const wrongProtocol = entry({
+      available: false,
+      modelId: "custom-chat",
+      modelProtocol: "openai-chat-completions",
+      reason: "wrong-protocol",
+      source: "custom",
+      statusLabel: "Protocol not supported",
+      vendorId: "openai-compatible",
+    });
+    const compatible = entry({ modelProtocol: "openai-responses" });
+    expect(listModelPickerEntries([wrongProtocol, compatible], null, null)).toEqual([compatible]);
+    expect(
+      listModelPickerEntries([compatible, wrongProtocol], "custom-chat", "openai-compatible"),
+    ).toEqual([wrongProtocol, compatible]);
+  });
+
   test("keeps the API-projected unavailable current model ahead of available entries", () => {
     const current = entry({
       available: false,

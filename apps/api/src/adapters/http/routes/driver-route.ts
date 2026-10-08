@@ -37,6 +37,7 @@ import {
 } from "../../../modules/runtime/application/runtime-mcp-proxy-errors";
 import { resolveRuntimeMcpProxyTarget } from "../../../modules/runtime/application/runtime-mcp-proxy.service";
 import { getRuntimeDriverRoutePrefix } from "../../../modules/runtime/domain/runtime-driver-routes";
+import { resolveRuntimeLlmUpstreamPath } from "../../../modules/runtime/domain/runtime-llm-proxy-base-url";
 import { upgradeDriverInstanceSocket } from "../../../modules/runtime/infrastructure/driver-instance/client";
 import { getDriverInstanceRecord } from "../../../modules/runtime/infrastructure/driver-instance/driver-instance-record.repository";
 import { readSkillPackageBytesFromSnapshot } from "../../../modules/skills/application/skill-package-snapshot.service";
@@ -389,10 +390,16 @@ async function readGrantedLlmProxyRequestBody(
   }
 }
 
-function toLlmProxyUpstreamUrl(request: Request, upstreamBaseUrl: string, subPath: string): string {
+function toLlmProxyUpstreamUrl(
+  request: Request,
+  upstreamBaseUrl: string,
+  subPath: string,
+  modelProtocol: PresetModelProtocol,
+): string {
   const base = new URL(upstreamBaseUrl);
   const basePath = base.pathname === "/" ? "" : base.pathname.replace(/\/+$/u, "");
-  const expectedPath = `${basePath}${subPath}`;
+  const upstreamPath = resolveRuntimeLlmUpstreamPath({ basePath, subPath, modelProtocol });
+  const expectedPath = `${basePath}${upstreamPath}`;
 
   if (
     base.hash !== "" ||
@@ -430,7 +437,18 @@ function buildLlmProxyUpstreamHeaders(incoming: Headers, target: RuntimeLlmProxy
     }
   }
 
-  const { authHeader } = target.vendor;
+  const authHeader =
+    target.vendor.vendorId === "openai-compatible" &&
+    ["anthropic-messages", "google-gemini"].includes(target.modelProtocol)
+      ? {
+          scheme: "api-key" as const,
+          apiKeyHeader: target.modelProtocol === "google-gemini" ? "x-goog-api-key" : "x-api-key",
+          extraHeaders:
+            target.modelProtocol === "anthropic-messages"
+              ? { "anthropic-version": "2023-06-01" }
+              : {},
+        }
+      : target.vendor.authHeader;
 
   if (authHeader.scheme === "bearer") {
     headers.set(authHeader.apiKeyHeader, `Bearer ${target.apiKey}`);
@@ -467,7 +485,7 @@ async function proxyRuntimeLlmRequest(
   }
 
   const response = await fetch(
-    toLlmProxyUpstreamUrl(request, target.upstreamBaseUrl, subPath),
+    toLlmProxyUpstreamUrl(request, target.upstreamBaseUrl, subPath, target.modelProtocol),
     init,
   );
 
@@ -789,6 +807,7 @@ export function registerDriverRoute(app: Hono<ApiGatewayEnvironment>) {
     try {
       target = await resolveRuntimeLlmProxyTarget(c.env, {
         credentialId,
+        modelProtocol: grant.modelProtocol,
         projectId: grant.projectId,
       });
     } catch (error) {

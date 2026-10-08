@@ -7,6 +7,7 @@ import type {
 import { sessionExecutionSnapshotsTable, sessionsTable } from "@mosoo/db";
 import { createPlatformId, parseNullablePlatformId, parsePlatformId } from "@mosoo/id";
 import type { AccountId, AgentId, CredentialId, ProjectId, SessionId } from "@mosoo/id";
+import { resolveRuntimeModelProtocol } from "@mosoo/runtime-catalog";
 import { getAgentSessionActionCapability } from "@mosoo/session-policy";
 
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
@@ -33,6 +34,7 @@ import { resolveReadyEnvironmentPackageArtifact } from "../../../environments/ap
 import { resolveAgentEnvironmentSnapshot } from "../../../environments/application/environment.service";
 import { ensureProjectOwnership } from "../../../projects/application/project.service";
 import { PREVIEW_RETENTION_MS } from "../../../sessions/domain/preview-retention-policy";
+import { resolveVendorCredentialRef } from "../../../vendor-credentials/application/vendor-credential.service";
 import type { SessionExecutionPlan } from "../session-definition/session-execution.types";
 
 export interface CreateAgentSessionOptions {
@@ -172,6 +174,28 @@ async function buildSessionExecutionPlan(input: {
   source: AgentSessionExecutionSource;
 }): Promise<SessionExecutionPlan> {
   const storedConfig = parseAgentStoredConfig(input.source.configJson);
+  const credential = await resolveVendorCredentialRef({
+    bindings: input.bindings,
+    executionOwnerUserId: input.source.ownerId,
+    options: { modelId: input.source.model },
+    projectId: input.source.projectId,
+    vendorId: input.source.provider,
+  });
+  if (credential === null) {
+    throw validationError(
+      `No credential available for ${input.source.provider}. Configure in Providers.`,
+      "AGENT_SESSION_NOT_READY",
+    );
+  }
+  const protocol = resolveRuntimeModelProtocol({
+    runtimeId: input.source.runtimeId,
+    vendorId: credential.vendorId,
+    modelId: input.source.model,
+    customModelProtocol: credential.modelProtocol ?? null,
+  });
+  if (!protocol.ok) {
+    throw validationError(protocol.message, "AGENT_SESSION_NOT_READY");
+  }
   const [skills, tools, environmentSnapshot] = await Promise.all([
     input.source.liveVersion
       ? Promise.resolve(input.source.liveVersion.skills)
@@ -215,6 +239,7 @@ async function buildSessionExecutionPlan(input: {
     },
     builtInTools: storedConfig.builtInTools,
     configJson: input.source.configJson,
+    modelProtocol: protocol.modelProtocol,
     environment: {
       allowMcpServers: environmentSnapshot.record.allowMcpServers === 1,
       allowPackageManagers: environmentSnapshot.record.allowPackageManagers === 1,

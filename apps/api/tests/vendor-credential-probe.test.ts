@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
+import type { PresetModelProtocol } from "@mosoo/contracts/models";
+
 import {
   readVendorProbeBaseHost,
   toVendorProbeEndpointUrl,
@@ -93,5 +95,190 @@ describe("vendor credential probe", () => {
     expect(vendorProbeModelListIncludes({ data: [{ id: "model-a" }] }, "model-a")).toBe(true);
     expect(vendorProbeModelListIncludes(["model-a"], "model-a")).toBe(true);
     expect(vendorProbeModelListIncludes({ data: [{ name: "model-a" }] }, "model-a")).toBe(false);
+    expect(vendorProbeModelListIncludes({ models: [{ name: "models/model-a" }] }, "model-a")).toBe(
+      true,
+    );
+    expect(
+      vendorProbeModelListIncludes({ models: [{ name: "models/model-a" }] }, "models/model-a"),
+    ).toBe(true);
   });
+
+  const protocolCases: {
+    protocol: PresetModelProtocol;
+    path: string;
+    authHeader: string;
+    authValue: string;
+    response: object;
+  }[] = [
+    {
+      protocol: "openai-chat-completions",
+      path: "/chat/completions",
+      authHeader: "Authorization",
+      authValue: "Bearer probe-key",
+      response: {
+        choices: [{ message: { content: "pong", role: "assistant" }, finish_reason: "stop" }],
+      },
+    },
+    {
+      protocol: "openai-responses",
+      path: "/responses",
+      authHeader: "Authorization",
+      authValue: "Bearer probe-key",
+      response: { object: "response", status: "completed", output: [] },
+    },
+    {
+      protocol: "anthropic-messages",
+      path: "/v1/messages",
+      authHeader: "x-api-key",
+      authValue: "probe-key",
+      response: { type: "message", content: [{ type: "text", text: "pong" }] },
+    },
+    {
+      protocol: "google-gemini",
+      path: "/models/model-a:generateContent",
+      authHeader: "x-goog-api-key",
+      authValue: "probe-key",
+      response: { candidates: [{ content: { parts: [{ text: "pong" }], role: "model" } }] },
+    },
+  ];
+
+  for (const entry of protocolCases) {
+    test(`explicit ${entry.protocol} testing calls its model API with matching auth`, async () => {
+      const originalFetch = globalThis.fetch;
+      const requests: Request[] = [];
+      globalThis.fetch = async (url, init) => {
+        requests.push(new Request(url, init));
+        return Response.json(entry.response);
+      };
+      try {
+        const result = await probeVendorCredential({
+          apiBase: "https://models.example.com/gateway",
+          apiKey: "probe-key",
+          emitEvent: false,
+          modelId: "model-a",
+          modelProtocol: entry.protocol,
+          vendorId: "openai-compatible",
+          verifyModelProtocol: true,
+        });
+        expect(result.ok).toBe(true);
+        expect(requests).toHaveLength(1);
+        const request = requests[0];
+        expect(request.url).toBe(`https://models.example.com/gateway${entry.path}`);
+        expect(request.method).toBe("POST");
+        expect(request.headers.get(entry.authHeader)).toBe(entry.authValue);
+        if (entry.authHeader !== "Authorization")
+          expect(request.headers.has("Authorization")).toBe(false);
+        const body = await request.json();
+        if (entry.protocol === "google-gemini") {
+          expect(body).toMatchObject({ contents: [{ parts: [{ text: "ping" }], role: "user" }] });
+        } else {
+          expect(body).toMatchObject({ model: "model-a" });
+        }
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    });
+  }
+
+  test("Responses-only readiness never falls back to Chat Completions", async () => {
+    const originalFetch = globalThis.fetch;
+    const urls: string[] = [];
+    globalThis.fetch = async (url) => {
+      const request = new Request(url);
+      urls.push(request.url);
+      return request.url.endsWith("/models")
+        ? new Response(null, { status: 404 })
+        : Response.json({ output: [] });
+    };
+    try {
+      const result = await probeVendorCredential({
+        apiBase: "https://models.example.com/v1",
+        apiKey: "probe-key",
+        emitEvent: false,
+        modelId: "model-a",
+        modelProtocol: "openai-responses",
+        vendorId: "openai-compatible",
+      });
+      expect(result.ok).toBe(true);
+      expect(urls).toEqual([
+        "https://models.example.com/v1/models",
+        "https://models.example.com/v1/responses",
+      ]);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  test("Anthropic probe does not duplicate a versioned base path", async () => {
+    const originalFetch = globalThis.fetch;
+    const urls: string[] = [];
+    globalThis.fetch = async (url) => {
+      urls.push(new Request(url).url);
+      return Response.json({ type: "message", content: [] });
+    };
+    try {
+      const result = await probeVendorCredential({
+        apiBase: "https://models.example.com/anthropic/v1/",
+        apiKey: "probe-key",
+        emitEvent: false,
+        modelId: "model-a",
+        modelProtocol: "anthropic-messages",
+        vendorId: "openai-compatible",
+        verifyModelProtocol: true,
+      });
+      expect(result.ok).toBe(true);
+      expect(urls).toEqual(["https://models.example.com/anthropic/v1/messages"]);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  test("successful HTTP with a different protocol shape is not a passing protocol test", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () => Response.json({ choices: [] });
+    try {
+      expect(
+        await probeVendorCredential({
+          apiBase: "https://models.example.com/v1",
+          apiKey: "probe-key",
+          emitEvent: false,
+          modelId: "model-a",
+          modelProtocol: "openai-responses",
+          vendorId: "openai-compatible",
+          verifyModelProtocol: true,
+        }),
+      ).toMatchObject({ errorCode: "invalid_model_response", ok: false });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  for (const status of ["failed", "queued", "in_progress", "cancelled"]) {
+    test(`HTTP 200 Responses ${status} is not a passing model test`, async () => {
+      const originalFetch = globalThis.fetch;
+      globalThis.fetch = async () =>
+        Response.json({
+          id: "resp_probe",
+          object: "response",
+          status,
+          output: [],
+          error: status === "failed" ? { code: "server_error", message: "Model failed" } : null,
+        });
+      try {
+        expect(
+          await probeVendorCredential({
+            apiBase: "https://models.example.com/v1",
+            apiKey: "probe-key",
+            emitEvent: false,
+            modelId: "model-a",
+            modelProtocol: "openai-responses",
+            vendorId: "openai-compatible",
+            verifyModelProtocol: true,
+          }),
+        ).toMatchObject({ errorCode: "invalid_model_response", ok: false });
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    });
+  }
 });

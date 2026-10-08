@@ -5,6 +5,7 @@ import {
 } from "@mosoo/contracts/agent";
 import type { EnvironmentNetworkPolicy } from "@mosoo/contracts/environment";
 import type { AgentMcpCredentialMode } from "@mosoo/contracts/mcp";
+import type { PresetModelProtocol } from "@mosoo/contracts/models";
 import type { SkillResolutionMode } from "@mosoo/contracts/skill";
 import { sessionExecutionSnapshotsTable } from "@mosoo/db";
 import { parsePlatformId } from "@mosoo/id";
@@ -96,6 +97,18 @@ function readNetworkPolicy(value: unknown, field: string): EnvironmentNetworkPol
   }
 
   throw new Error(`${field} must be full or limited.`);
+}
+
+function readModelProtocol(value: unknown): PresetModelProtocol {
+  if (
+    value === "openai-chat-completions" ||
+    value === "openai-responses" ||
+    value === "anthropic-messages" ||
+    value === "google-gemini"
+  ) {
+    return value;
+  }
+  throw new TypeError("sessionExecutionPlan.modelProtocol must be a supported model protocol.");
 }
 
 function readSkillResolutionMode(value: unknown, field: string): SkillResolutionMode {
@@ -260,6 +273,9 @@ export function parseSessionExecutionPlanJson(planJson: string): SessionExecutio
   return {
     binding: parseBinding(record["binding"]),
     builtInTools: parseBuiltInTools(record["builtInTools"]),
+    ...(record["modelProtocol"] === undefined
+      ? {}
+      : { modelProtocol: readModelProtocol(record["modelProtocol"]) }),
     ...(previewRetentionMs === undefined ? {} : { previewRetentionMs }),
     ...(record["configJson"] === undefined
       ? {}

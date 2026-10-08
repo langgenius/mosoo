@@ -377,7 +377,7 @@ describe("API to driver boundary", () => {
       projectId: API_DRIVER_BOUNDARY_IDS.project,
       driverGeneration: 7,
       driverInstanceId: API_DRIVER_BOUNDARY_IDS.driverInstance,
-      modelId: "gpt-5.1",
+      modelId: "gpt-5.5",
       modelProtocol: "openai-responses",
       resourceId: PLATFORM_ID_FIXTURES.vendorCredential,
     });

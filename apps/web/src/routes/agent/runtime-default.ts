@@ -3,9 +3,11 @@ import {
   VENDOR_OPENAI_COMPATIBLE,
   getDefaultModelIdForVendor,
   listPresetModelsForVendor,
+  resolveRuntimeModelProtocol,
 } from "@mosoo/runtime-catalog";
 
 import type { VendorCredential } from "@/domains/vendor-credential/api/vendor-credential-client";
+import { listEffectiveCustomCredentialModels } from "@/domains/vendor-credential/model/custom-credential-models";
 
 const DEFAULT_CUSTOM_PROVIDER_RUNTIME_ID = "acp-fallback";
 
@@ -22,26 +24,23 @@ function toConfiguredVendorIds(credentials: readonly VendorCredential[]): Readon
 function defaultModelForVendor(
   entry: (typeof PUBLIC_RUNTIME_CATALOG)[number],
   vendorId: string,
-): string {
-  if (vendorId === entry.defaultProvider) {
-    return entry.defaultModel;
-  }
-
-  const supportedModels = entry.supportedModelIds;
+): string | null {
   const defaultModel = getDefaultModelIdForVendor(vendorId);
-
-  if (
-    defaultModel !== null &&
-    (supportedModels === undefined || supportedModels.includes(defaultModel))
-  ) {
-    return defaultModel;
-  }
-
-  const model = listPresetModelsForVendor(vendorId).find(
-    (candidate) => supportedModels === undefined || supportedModels.includes(candidate.modelId),
+  const candidates = [
+    ...(vendorId === entry.defaultProvider ? [entry.defaultModel] : []),
+    ...(defaultModel === null ? [] : [defaultModel]),
+    ...listPresetModelsForVendor(vendorId).map((model) => model.modelId),
+  ];
+  return (
+    candidates.find(
+      (modelId) =>
+        resolveRuntimeModelProtocol({
+          modelId,
+          runtimeId: entry.runtimeId,
+          vendorId,
+        }).ok,
+    ) ?? null
   );
-
-  return model?.modelId ?? entry.defaultModel;
 }
 
 export function resolveDefaultAgentRuntime(
@@ -55,39 +54,42 @@ export function resolveDefaultAgentRuntime(
       : PUBLIC_RUNTIME_CATALOG.filter((entry) => entry.runtimeId === selectedRuntimeId);
 
   for (const entry of runtimes) {
-    const configuredVendor = entry.vendors.find(
-      (vendor) =>
-        vendor.vendorId !== VENDOR_OPENAI_COMPATIBLE.vendorId &&
-        configuredVendorIds.has(vendor.vendorId),
-    );
-
-    if (configuredVendor !== undefined) {
-      return {
-        model: defaultModelForVendor(entry, configuredVendor.vendorId),
-        provider: configuredVendor.vendorId,
-        runtimeId: entry.runtimeId,
-      };
+    for (const vendor of entry.vendors) {
+      if (
+        vendor.vendorId === VENDOR_OPENAI_COMPATIBLE.vendorId ||
+        !configuredVendorIds.has(vendor.vendorId)
+      ) {
+        continue;
+      }
+      const model = defaultModelForVendor(entry, vendor.vendorId);
+      if (model !== null) {
+        return { model, provider: vendor.vendorId, runtimeId: entry.runtimeId };
+      }
     }
   }
 
-  const customCredential = credentials.find(
-    (credential) =>
-      credential.vendorId === VENDOR_OPENAI_COMPATIBLE.vendorId &&
-      (credential.models?.length ?? 0) > 0,
-  );
   const customRuntime = runtimes.find(
     (entry) =>
       entry.runtimeId === (selectedRuntimeId ?? DEFAULT_CUSTOM_PROVIDER_RUNTIME_ID) &&
       entry.acceptsCustomProvider,
   );
-  const customModel = customCredential?.models?.[0];
-
-  if (customCredential !== undefined && customRuntime !== undefined && customModel !== undefined) {
-    return {
-      model: customModel,
-      provider: VENDOR_OPENAI_COMPATIBLE.vendorId,
-      runtimeId: customRuntime.runtimeId,
-    };
+  if (customRuntime !== undefined) {
+    const customModel = listEffectiveCustomCredentialModels(credentials).find(
+      ({ credential, modelId }) =>
+        resolveRuntimeModelProtocol({
+          customModelProtocol: credential.modelProtocol,
+          modelId,
+          runtimeId: customRuntime.runtimeId,
+          vendorId: credential.vendorId,
+        }).ok,
+    );
+    if (customModel !== undefined) {
+      return {
+        model: customModel.modelId,
+        provider: VENDOR_OPENAI_COMPATIBLE.vendorId,
+        runtimeId: customRuntime.runtimeId,
+      };
+    }
   }
 
   const fallback = runtimes[0];

@@ -1,10 +1,15 @@
 import type { ProjectId, VendorCredentialId } from "@mosoo/contracts/id";
+import type { PresetModelProtocol } from "@mosoo/contracts/models";
 
 import { graphql } from "@/gql";
 import { requestGraphQL } from "@/platform/http/graphql-client";
 import { toProjectId, toVendorCredentialId } from "@/routes/typed-id";
 
-import { parseAvailableModelReason, parseModelCatalogSource } from "./model-catalog-parsers";
+import {
+  parseAvailableModelReason,
+  parseModelCatalogSource,
+  parseModelProtocol,
+} from "./model-catalog-parsers";
 
 const VENDOR_CREDENTIAL_LIST_QUERY = graphql(/* GraphQL */ `
   query VendorCredentialList($projectId: ULID!) {
@@ -13,6 +18,7 @@ const VENDOR_CREDENTIAL_LIST_QUERY = graphql(/* GraphQL */ `
       id
       isDefault
       maskedApiKey
+      modelProtocol
       models
       name
       projectId
@@ -28,6 +34,7 @@ const CREATE_VENDOR_CREDENTIAL_MUTATION = graphql(/* GraphQL */ `
       id
       isDefault
       maskedApiKey
+      modelProtocol
       models
       name
       projectId
@@ -43,6 +50,7 @@ const UPDATE_VENDOR_CREDENTIAL_MUTATION = graphql(/* GraphQL */ `
       id
       isDefault
       maskedApiKey
+      modelProtocol
       models
       name
       projectId
@@ -66,6 +74,7 @@ const SET_DEFAULT_VENDOR_CREDENTIAL_MUTATION = graphql(/* GraphQL */ `
       id
       isDefault
       maskedApiKey
+      modelProtocol
       models
       name
       projectId
@@ -90,6 +99,7 @@ const AVAILABLE_AGENT_MODELS_QUERY = graphql(/* GraphQL */ `
       available
       displayName
       modelId
+      modelProtocol
       reason
       source
       statusDetail
@@ -115,14 +125,16 @@ export interface VendorCredential {
   id: VendorCredentialId;
   isDefault: boolean;
   maskedApiKey: string;
+  modelProtocol: PresetModelProtocol | null;
   models: string[] | null;
   name: string;
   projectId: ProjectId;
   vendorId: string;
 }
 
-type GraphQLVendorCredential = Omit<VendorCredential, "id" | "projectId"> & {
+type GraphQLVendorCredential = Omit<VendorCredential, "id" | "projectId" | "modelProtocol"> & {
   id: string;
+  modelProtocol: string | null;
   projectId: string;
 };
 
@@ -130,6 +142,7 @@ function toVendorCredential(credential: GraphQLVendorCredential): VendorCredenti
   return {
     ...credential,
     id: toVendorCredentialId(credential.id),
+    modelProtocol: parseModelProtocol(credential.modelProtocol),
     projectId: toProjectId(credential.projectId),
   };
 }
@@ -142,6 +155,7 @@ export async function listVendorCredentials(projectId: ProjectId): Promise<Vendo
 export async function createVendorCredential(input: {
   apiBase?: string | null;
   apiKey: string;
+  modelProtocol?: PresetModelProtocol | null;
   models?: string[];
   name: string;
   projectId: ProjectId;
@@ -155,6 +169,7 @@ export async function updateVendorCredential(input: {
   apiBase?: string | null;
   apiKey?: string;
   id: VendorCredentialId;
+  modelProtocol?: PresetModelProtocol | null;
   models?: string[];
   name?: string;
   projectId: ProjectId;
@@ -183,12 +198,14 @@ export type AvailableModelReason =
   | "needs-key"
   | "unknown-model"
   | "unknown-provider"
+  | "wrong-protocol"
   | "wrong-runtime";
 
 export interface ResolvedModelEntry {
   available: boolean;
   displayName: string;
   modelId: string;
+  modelProtocol: PresetModelProtocol | null;
   reason: AvailableModelReason | null;
   source: ModelCatalogSource;
   statusDetail: string | null;
@@ -213,6 +230,7 @@ export async function listAvailableAgentModels(input: {
     available: entry.available,
     displayName: entry.displayName,
     modelId: entry.modelId,
+    modelProtocol: parseModelProtocol(entry.modelProtocol),
     reason: parseAvailableModelReason(entry.reason),
     source: parseModelCatalogSource(entry.source),
     statusDetail: entry.statusDetail,
@@ -226,6 +244,7 @@ export async function testVendorCredential(input: {
   apiBase?: string | null;
   apiKey: string;
   modelId?: string | null;
+  modelProtocol?: PresetModelProtocol | null;
   projectId: ProjectId;
   vendorId: string;
 }): Promise<{ errorCode: string | null; latencyMs: number; ok: boolean }> {

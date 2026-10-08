@@ -57,7 +57,7 @@ export function createDriverProfile(): DriverProfileConfig {
       EXISTING_ENV: "kept",
     },
     kind: "cattle",
-    model: "gpt-5.1",
+    model: "gpt-5.5",
     prompt: "You are a helpful runtime.",
     provider: "openai",
     providerOptions: {},

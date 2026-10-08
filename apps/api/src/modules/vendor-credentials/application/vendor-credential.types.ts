@@ -1,3 +1,4 @@
+import type { PresetModelProtocol } from "@mosoo/contracts/models";
 import type { PlatformId, ProjectId, VendorCredentialId } from "@mosoo/id";
 
 export interface VendorCredentialRow {
@@ -5,6 +6,7 @@ export interface VendorCredentialRow {
   apiKeySecretId: PlatformId;
   id: VendorCredentialId;
   isDefault: boolean;
+  modelProtocol?: PresetModelProtocol | null;
   modelsJson: string[] | null;
   name: string;
   projectId: ProjectId;
@@ -15,6 +17,7 @@ export interface ResolvedVendorCredential {
   apiBase: string | null;
   apiKey: string;
   credentialId: VendorCredentialId;
+  modelProtocol?: PresetModelProtocol | null;
   models: string[] | null;
 }
 
@@ -28,6 +31,7 @@ export interface ResolvedVendorCredentialRef {
   apiBase: string | null;
   projectId: ProjectId;
   credentialId: VendorCredentialId;
+  modelProtocol?: PresetModelProtocol | null;
   models: string[] | null;
   vendorId: string;
 }

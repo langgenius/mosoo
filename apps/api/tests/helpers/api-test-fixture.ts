@@ -669,6 +669,7 @@ function createApiTestSchema(database: SqliteD1Database): void {
       created_at integer NOT NULL,
       id text PRIMARY KEY NOT NULL,
       is_default integer DEFAULT false NOT NULL,
+      model_protocol text,
       models text,
       name text NOT NULL,
       project_id text NOT NULL,

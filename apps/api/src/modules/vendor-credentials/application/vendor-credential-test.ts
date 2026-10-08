@@ -1,9 +1,10 @@
+import type { PresetModelProtocol } from "@mosoo/contracts/models";
 import type {
   TestVendorCredentialInput,
   TestVendorCredentialResult,
 } from "@mosoo/contracts/vendor-credential";
 import type { RuntimeCatalogVendor } from "@mosoo/runtime-catalog";
-import { VENDOR_OPENAI_COMPATIBLE, getVendor } from "@mosoo/runtime-catalog";
+import { VENDOR_OPENAI_COMPATIBLE, getPresetModel, getVendor } from "@mosoo/runtime-catalog";
 
 import {
   captureServerProductEvent,
@@ -13,6 +14,7 @@ import { createApiWideEvent, emitApiWideEvent } from "../../../platform/cloudfla
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { ensureProjectOwnership } from "../../projects/application/project.service";
+import { resolveRuntimeLlmUpstreamPath } from "../../runtime/domain/runtime-llm-proxy-base-url";
 import type { ProviderFetchProxyConfig } from "./provider-fetch-proxy";
 import { resolveProviderFetchProxy } from "./provider-fetch-proxy";
 import {
@@ -24,41 +26,119 @@ import {
   validateVendorProbeBaseUrl,
   vendorProbeModelListIncludes,
 } from "./vendor-credential-probe";
-import { normalizeApiBase } from "./vendor-credential-validation";
+import { normalizeApiBase, normalizeCredentialModelProtocol } from "./vendor-credential-validation";
 
 export interface VendorCredentialProbeInput {
-  allowChatCompletionProbe?: boolean;
+  allowModelProbe?: boolean;
   apiBase?: string | null;
   apiKey: string;
   emitEvent?: boolean;
   fetchProxy?: ProviderFetchProxyConfig | null;
   modelId?: string | null;
+  modelProtocol?: PresetModelProtocol | null;
   timeoutMs?: number;
   vendorId: string;
+  verifyModelProtocol?: boolean;
 }
 
-async function probeChatCompletion(input: {
+function modelProbeRequest(
+  modelId: string,
+  protocol: PresetModelProtocol,
+): {
+  body: object;
+  path: string;
+} {
+  switch (protocol) {
+    case "anthropic-messages":
+      return {
+        body: { max_tokens: 1, messages: [{ content: "ping", role: "user" }], model: modelId },
+        path: "/v1/messages",
+      };
+    case "google-gemini": {
+      const modelPath = modelId.startsWith("models/") ? modelId : `models/${modelId}`;
+      if (!/^models\/[A-Za-z0-9._-]+$/u.test(modelPath)) {
+        throw new Error("Invalid Google model ID.");
+      }
+      return {
+        body: {
+          contents: [{ parts: [{ text: "ping" }], role: "user" }],
+          generationConfig: { maxOutputTokens: 1 },
+        },
+        path: `/${modelPath}:generateContent`,
+      };
+    }
+    case "openai-responses":
+      return {
+        body: { input: "ping", max_output_tokens: 16, model: modelId, store: false },
+        path: "/responses",
+      };
+    case "openai-chat-completions":
+      return {
+        body: { max_tokens: 1, messages: [{ content: "ping", role: "user" }], model: modelId },
+        path: "/chat/completions",
+      };
+  }
+}
+
+function isModelProbeResponse(payload: unknown, protocol: PresetModelProtocol): boolean {
+  if (typeof payload !== "object" || payload === null) return false;
+  if ("error" in payload && payload.error != null) return false;
+  switch (protocol) {
+    case "anthropic-messages":
+      return (
+        "type" in payload &&
+        payload.type === "message" &&
+        "content" in payload &&
+        Array.isArray(payload.content)
+      );
+    case "google-gemini":
+      return (
+        "candidates" in payload &&
+        Array.isArray(payload.candidates) &&
+        payload.candidates.length > 0
+      );
+    case "openai-responses":
+      return (
+        "object" in payload &&
+        payload.object === "response" &&
+        "status" in payload &&
+        ["completed", "incomplete"].includes(String(payload.status)) &&
+        "output" in payload &&
+        Array.isArray(payload.output)
+      );
+    case "openai-chat-completions":
+      return "choices" in payload && Array.isArray(payload.choices) && payload.choices.length > 0;
+  }
+}
+
+async function probeModelProtocol(input: {
   apiKey: string;
   baseUrl: string;
   fetchProxy: ProviderFetchProxyConfig | null;
   modelId: string;
+  modelProtocol: PresetModelProtocol;
   timeoutMs: number;
   vendor: RuntimeCatalogVendor;
+  verifyResponse: boolean;
 }): Promise<{ errorCode?: string; ok: boolean }> {
-  // OpenAI-shaped vendors can validate a model through chat/completions.
-  // Anthropic uses /v1/messages, so readiness disables this branch for non-OpenAI flows.
+  const request = modelProbeRequest(input.modelId, input.modelProtocol);
+  const url = new URL(input.baseUrl);
+  const basePath = url.pathname.replace(/\/+$/u, "");
+  url.pathname =
+    basePath +
+    resolveRuntimeLlmUpstreamPath({
+      basePath,
+      modelProtocol: input.modelProtocol,
+      subPath: request.path,
+    });
   const response = await fetchVendorProbe(
-    toVendorProbeEndpointUrl(input.baseUrl, "chat/completions"),
+    url.toString(),
     {
-      body: JSON.stringify({
-        max_tokens: 1,
-        messages: [{ content: "ping", role: "user" }],
-        model: input.modelId,
-      }),
+      body: JSON.stringify(request.body),
       headers: {
         Accept: "application/json",
         "Content-Type": "application/json",
-        ...toVendorProbeAuthHeaders(input.vendor, input.apiKey),
+        ...toVendorProbeAuthHeaders(input.vendor, input.apiKey, input.modelProtocol),
       },
       method: "POST",
     },
@@ -66,6 +146,17 @@ async function probeChatCompletion(input: {
     input.fetchProxy,
   );
 
+  if (response.ok && input.verifyResponse) {
+    let payload: unknown;
+    try {
+      payload = await response.json();
+    } catch {
+      return { errorCode: "invalid_model_response", ok: false };
+    }
+    return isModelProbeResponse(payload, input.modelProtocol)
+      ? { ok: true }
+      : { errorCode: "invalid_model_response", ok: false };
+  }
   return {
     ...(response.ok ? {} : { errorCode: await readVendorProbeErrorCode(response) }),
     ok: response.ok,
@@ -133,6 +224,8 @@ export async function testVendorCredential(
   const result = await probeVendorCredential({
     ...input,
     fetchProxy: resolveProviderFetchProxy(bindings),
+    modelProtocol: normalizeCredentialModelProtocol(input.vendorId, input.modelProtocol),
+    verifyModelProtocol: Boolean(input.modelId?.trim()),
   });
   if (result.ok) {
     await captureServerProductEvent(bindings, {
@@ -152,12 +245,12 @@ export async function probeVendorCredential(
   input: VendorCredentialProbeInput,
 ): Promise<TestVendorCredentialResult> {
   const startedAt = Date.now();
-  const allowChatCompletionProbe = input.allowChatCompletionProbe ?? true;
+  const allowModelProbe = input.allowModelProbe ?? true;
   const apiKey = input.apiKey.trim();
   const apiBase = normalizeApiBase(input.apiBase);
   const emitEvent = input.emitEvent ?? true;
   const fetchProxy = input.fetchProxy ?? null;
-  const modelId = input.modelId?.trim() ?? null;
+  const modelId = input.modelId?.trim() || null;
   const timeoutMs = input.timeoutMs ?? 10_000;
   const vendor = getVendor(input.vendorId);
 
@@ -165,6 +258,13 @@ export async function probeVendorCredential(
     throw new Error(`Unknown vendor: ${input.vendorId}.`);
   }
   const modelIdRequired = vendor.vendorId === VENDOR_OPENAI_COMPATIBLE.vendorId;
+  const modelProtocol =
+    input.modelProtocol ??
+    (vendor.vendorId === VENDOR_OPENAI_COMPATIBLE.vendorId
+      ? "openai-chat-completions"
+      : modelId === null
+        ? null
+        : (getPresetModel({ modelId, vendorId: vendor.vendorId })?.protocol ?? null));
 
   if (apiKey.length === 0) {
     return finishCredentialTest({
@@ -219,12 +319,35 @@ export async function probeVendorCredential(
   let errorCode: string | undefined;
 
   try {
+    if (input.verifyModelProtocol && modelId !== null) {
+      const result =
+        modelProtocol === null
+          ? { errorCode: "unknown_model_protocol", ok: false }
+          : await probeModelProtocol({
+              apiKey,
+              baseUrl,
+              fetchProxy,
+              modelId,
+              modelProtocol,
+              timeoutMs,
+              vendor,
+              verifyResponse: true,
+            });
+      return finishCredentialTest({
+        baseUrl,
+        emitEvent,
+        startedAt,
+        vendorId: input.vendorId,
+        ...result,
+      });
+    }
+
     const listResponse = await fetchVendorProbe(
       toVendorProbeEndpointUrl(baseUrl, "models"),
       {
         headers: {
           Accept: "application/json",
-          ...toVendorProbeAuthHeaders(vendor, apiKey),
+          ...toVendorProbeAuthHeaders(vendor, apiKey, modelProtocol),
         },
         method: "GET",
       },
@@ -240,17 +363,19 @@ export async function probeVendorCredential(
         ok = vendorProbeModelListIncludes(listPayload, modelId);
 
         if (!ok) {
-          if (allowChatCompletionProbe) {
-            const chatProbe = await probeChatCompletion({
+          if (allowModelProbe && modelProtocol !== null) {
+            const modelProbe = await probeModelProtocol({
               apiKey,
               baseUrl,
               fetchProxy,
               modelId,
+              modelProtocol,
               timeoutMs,
               vendor,
+              verifyResponse: false,
             });
-            ({ ok } = chatProbe);
-            errorCode = chatProbe.ok ? undefined : (chatProbe.errorCode ?? "model_not_found");
+            ({ ok } = modelProbe);
+            errorCode = modelProbe.ok ? undefined : (modelProbe.errorCode ?? "model_not_found");
           } else {
             errorCode = "model_not_found";
           }
@@ -260,17 +385,19 @@ export async function probeVendorCredential(
       errorCode = await readVendorProbeErrorCode(listResponse);
     } else if (modelId === null) {
       errorCode = "missing_model_id";
-    } else if (allowChatCompletionProbe) {
-      const chatProbe = await probeChatCompletion({
+    } else if (allowModelProbe && modelProtocol !== null) {
+      const modelProbe = await probeModelProtocol({
         apiKey,
         baseUrl,
         fetchProxy,
         modelId,
+        modelProtocol,
         timeoutMs,
         vendor,
+        verifyResponse: false,
       });
-      ({ ok } = chatProbe);
-      ({ errorCode } = chatProbe);
+      ({ ok } = modelProbe);
+      ({ errorCode } = modelProbe);
     } else {
       errorCode = await readVendorProbeErrorCode(listResponse);
     }

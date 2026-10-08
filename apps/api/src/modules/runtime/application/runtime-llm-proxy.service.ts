@@ -1,3 +1,4 @@
+import type { PresetModelProtocol } from "@mosoo/contracts/models";
 import type { DriverInstanceId, ProjectId, VendorCredentialId } from "@mosoo/id";
 import { getVendor } from "@mosoo/runtime-catalog";
 import type { RuntimeCatalogVendor } from "@mosoo/runtime-catalog";
@@ -17,6 +18,7 @@ import { isDriverInstanceGenerationActive } from "../infrastructure/driver-insta
  */
 export interface RuntimeLlmProxyTarget {
   apiKey: string;
+  modelProtocol: PresetModelProtocol;
   upstreamBaseUrl: string;
   vendor: RuntimeCatalogVendor;
 }
@@ -52,6 +54,7 @@ export async function resolveRuntimeLlmProxyTarget(
   bindings: ApiBindings,
   input: {
     credentialId: VendorCredentialId;
+    modelProtocol: PresetModelProtocol;
     projectId: ProjectId;
   },
 ): Promise<RuntimeLlmProxyTarget> {
@@ -69,6 +72,16 @@ export async function resolveRuntimeLlmProxyTarget(
 
   if (vendor === null) {
     throw new RuntimeLlmProxyError("Vendor is not available.", 502);
+  }
+
+  // Existing null protocols retain their legacy runtime-specific meaning.
+  // Once explicitly selected, a protocol change revokes older model grants.
+  if (
+    vendor.vendorId === "openai-compatible" &&
+    credential.modelProtocol !== null &&
+    credential.modelProtocol !== input.modelProtocol
+  ) {
+    throw new RuntimeLlmProxyError("Vendor credential model protocol has changed.", 403);
   }
 
   const secret = await readVendorCredentialSecret(bindings, {
@@ -102,6 +115,7 @@ export async function resolveRuntimeLlmProxyTarget(
 
   return {
     apiKey: secret.apiKey,
+    modelProtocol: input.modelProtocol,
     upstreamBaseUrl,
     vendor,
   };
