@@ -27,7 +27,10 @@ import {
   recordRuntimeRunLeaseReleased,
 } from "./runtime-run-lease-store";
 import type { RuntimeRunLeaseTransitionOutcome } from "./runtime-run-lease-store";
-import { getRuntimeSubjectErrorCode } from "./runtime-subject-errors";
+import {
+  getRuntimeSubjectErrorCode,
+  RuntimeSubjectCapacityExceededError,
+} from "./runtime-subject-errors";
 import {
   configureRuntimeSubjectNetwork,
   destroyRuntimeSubjectContainer,
@@ -45,6 +48,7 @@ import {
   markRuntimeSubjectActive,
   markRuntimeSubjectRestoring,
   preemptRuntimeSubjectActivationClaim,
+  readRuntimeSubjectCapacityShortfall,
 } from "./runtime-subject-store";
 import type { RuntimeSubjectActivationRecord } from "./runtime-subject-store";
 
@@ -429,6 +433,20 @@ export class RuntimeSubjectLifecycleService {
     });
 
     if (!claimed) {
+      // Only a cold activation consumes deployment and account capacity.
+      const shortfall =
+        record.status === "cold"
+          ? await readRuntimeSubjectCapacityShortfall(this.#bindings.DB, {
+              accountConcurrentSandboxLimit: this.#accountConcurrentSandboxLimit,
+              executionOwnerUserId: input.activation.executionOwnerUserId,
+              now: currentTimestampMs(),
+            })
+          : null;
+
+      if (shortfall !== null) {
+        throw new RuntimeSubjectCapacityExceededError(shortfall);
+      }
+
       throw new Error("Runtime subject is busy with lifecycle maintenance.");
     }
 

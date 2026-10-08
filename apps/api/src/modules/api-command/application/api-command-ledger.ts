@@ -1,7 +1,7 @@
 import { apiCommandsTable } from "@mosoo/db";
 import type { ApiCommandId, ApiCommandKind, ApiCommandRow } from "@mosoo/db";
 import { createPlatformId } from "@mosoo/id";
-import { and, asc, eq, inArray, lt, or, sql } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, lt, or, sql } from "drizzle-orm";
 
 import { createErrorLogContext, logError } from "../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
@@ -22,6 +22,14 @@ const API_COMMAND_QUEUE_DELIVERY_PENDING_MESSAGE = "API command is awaiting queu
 const API_COMMAND_QUEUE_SEND_FAILED_MESSAGE = "API command queue send failed.";
 
 const API_COMMAND_QUEUE_REDRIVE_LIMIT = 100;
+
+export const API_COMMAND_LEASE_EXPIRED_CODE = "lease_expired";
+
+// One claim per Queue delivery: the first attempt plus `max_retries = 5`.
+export const API_COMMAND_MAX_CLAIM_ATTEMPTS = 6;
+
+// A live consumer renews every minute; one extra minute avoids racing a late renewal.
+const API_COMMAND_LEASE_EXPIRY_GRACE_MS = 60_000;
 
 export interface EnqueueApiCommandInput {
   dedupeKey: string;
@@ -168,9 +176,53 @@ async function sendApiCommandMessage(
   }
 }
 
+// A consumer killed mid-run (wall-clock limit, deploy) leaves its command
+// `running`. Queue redeliveries that land inside the lease are acknowledged
+// without work, so nothing would ever resume it; hand it back to the outbox.
+export async function requeueExpiredApiCommandClaims(
+  database: D1Database,
+  nowMs: number = currentTimestampMs(),
+): Promise<void> {
+  const expiredClaim = and(
+    eq(apiCommandsTable.status, "running"),
+    lt(apiCommandsTable.claimExpiresAt, nowMs - API_COMMAND_LEASE_EXPIRY_GRACE_MS),
+  );
+  const appDb = getAppDatabase(database);
+
+  // Requeueing an exhausted command again would loop forever.
+  await appDb
+    .update(apiCommandsTable)
+    .set({
+      claimExpiresAt: null,
+      claimOwner: null,
+      completedAt: nowMs,
+      lastErrorCode: API_COMMAND_LEASE_EXPIRED_CODE,
+      lastErrorMessage: null,
+      status: "dead_lettered",
+      updatedAt: nowMs,
+    })
+    .where(and(expiredClaim, gte(apiCommandsTable.attemptCount, API_COMMAND_MAX_CLAIM_ATTEMPTS)))
+    .run();
+
+  await appDb
+    .update(apiCommandsTable)
+    .set({
+      claimExpiresAt: null,
+      claimOwner: null,
+      lastErrorCode: API_COMMAND_QUEUE_DELIVERY_PENDING_CODE,
+      lastErrorMessage: API_COMMAND_QUEUE_DELIVERY_PENDING_MESSAGE,
+      status: "queued",
+      updatedAt: nowMs,
+    })
+    .where(and(expiredClaim, lt(apiCommandsTable.attemptCount, API_COMMAND_MAX_CLAIM_ATTEMPTS)))
+    .run();
+}
+
 export async function redriveFailedApiCommandEnqueues(
   bindings: ApiCommandDeliveryBindings,
 ): Promise<void> {
+  await requeueExpiredApiCommandClaims(bindings.DB);
+
   const commands = await getAppDatabase(bindings.DB)
     .select({ id: apiCommandsTable.id, kind: apiCommandsTable.kind })
     .from(apiCommandsTable)

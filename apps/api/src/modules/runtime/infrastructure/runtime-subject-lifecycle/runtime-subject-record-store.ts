@@ -22,6 +22,7 @@ import {
 } from "../../domain/runtime-subject-lifecycle.machine";
 import type { RuntimeSubjectOperationStatus } from "../../domain/runtime-subject-lifecycle.machine";
 import { getRuntimeSubjectInactiveDeadline } from "../../domain/session-runtime-policy";
+import type { RuntimeSubjectCapacityShortfall } from "./runtime-subject-errors";
 import {
   activeConversationSessionQueryForListedSubject,
   activeSessionRunQueryForListedSubject,
@@ -75,31 +76,71 @@ const sessionBindingColumns = {
   foreignSessionCount: sql<number>`(SELECT COUNT(*) FROM sandbox_session AS peer WHERE peer.sandbox_id = ${sandboxesTable.id} AND peer.session_id <> ${sandboxesTable.subjectId})`,
 };
 
-function runtimeSubjectAccountCapacityPredicate(input: {
+// One atomic deployment ceiling across image classes, preserving the former
+// single class's 50-subject capacity instead of multiplying it by four.
+export const RUNTIME_SUBJECT_DEPLOYMENT_SANDBOX_LIMIT = 50;
+
+interface RuntimeSubjectCapacityInput {
   readonly accountConcurrentSandboxLimit: number;
   readonly executionOwnerUserId: AccountId;
   readonly now: number;
-}): SQL {
-  // ponytail: use the existing status/claim indexes until measured contention
-  // justifies durable admission counters.
-  // One atomic deployment ceiling across image classes, preserving the former
-  // single class's 50-subject capacity instead of multiplying it by four.
-  return sql`(
+}
+
+function deploymentSandboxCountSql(now: number): SQL<number> {
+  return sql<number>`(
     SELECT COUNT(*) FROM ${sandboxesTable} AS deployment_sandbox
     WHERE deployment_sandbox.status IN ('restoring', 'active', 'backing_up', 'destroying')
-      OR (deployment_sandbox.claim_owner IS NOT NULL AND deployment_sandbox.claim_expires_at > ${input.now})
-  ) < 50 AND (
+      OR (deployment_sandbox.claim_owner IS NOT NULL AND deployment_sandbox.claim_expires_at > ${now})
+  )`;
+}
+
+function accountSandboxCountSql(accountId: AccountId, now: number): SQL<number> {
+  return sql<number>`(
     SELECT COUNT(*)
     FROM ${sandboxesTable} AS account_sandbox
-    WHERE account_sandbox.owner_account_id = ${input.executionOwnerUserId}
+    WHERE account_sandbox.owner_account_id = ${accountId}
       AND (
         account_sandbox.status IN ('restoring', 'active', 'backing_up', 'destroying')
         OR (
           account_sandbox.claim_owner IS NOT NULL
-          AND account_sandbox.claim_expires_at > ${input.now}
+          AND account_sandbox.claim_expires_at > ${now}
         )
       )
-  ) < ${input.accountConcurrentSandboxLimit}`;
+  )`;
+}
+
+function runtimeSubjectAccountCapacityPredicate(input: RuntimeSubjectCapacityInput): SQL {
+  // ponytail: use the existing status/claim indexes until measured contention
+  // justifies durable admission counters.
+  return sql`${deploymentSandboxCountSql(input.now)} < ${RUNTIME_SUBJECT_DEPLOYMENT_SANDBOX_LIMIT}
+    AND ${accountSandboxCountSql(input.executionOwnerUserId, input.now)} < ${input.accountConcurrentSandboxLimit}`;
+}
+
+// Explains a refused cold activation after the fact. Counts can move between
+// the claim and this read, so `null` leaves the caller's generic failure.
+export async function readRuntimeSubjectCapacityShortfall(
+  database: D1Database,
+  input: RuntimeSubjectCapacityInput,
+): Promise<RuntimeSubjectCapacityShortfall | null> {
+  const counts = await getAppDatabase(database).get<{ account: number; deployment: number }>(
+    sql`SELECT
+      ${deploymentSandboxCountSql(input.now)} AS deployment,
+      ${accountSandboxCountSql(input.executionOwnerUserId, input.now)} AS account`,
+  );
+
+  if (!counts) {
+    return null;
+  }
+
+  if (counts.deployment >= RUNTIME_SUBJECT_DEPLOYMENT_SANDBOX_LIMIT) {
+    return { limit: RUNTIME_SUBJECT_DEPLOYMENT_SANDBOX_LIMIT, scope: "platform" };
+  }
+
+  if (counts.account >= input.accountConcurrentSandboxLimit) {
+    return { limit: input.accountConcurrentSandboxLimit, scope: "account" };
+  }
+
+  return null;
 }
 
 function runtimeSubjectStatusPatch(input: {

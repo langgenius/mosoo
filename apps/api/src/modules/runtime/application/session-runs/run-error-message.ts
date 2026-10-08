@@ -1,3 +1,7 @@
+import type { RunError } from "@mosoo/contracts/session-run";
+
+import { findRuntimeSubjectCapacityError } from "../../infrastructure/runtime-subject-lifecycle/runtime-subject-errors";
+
 export function describeRunError(error: unknown, fallback: string): string {
   if (!(error instanceof Error)) {
     return fallback;
@@ -22,4 +26,25 @@ export function describeRunError(error: unknown, fallback: string): string {
   }
 
   return messages.join("; caused by: ");
+}
+
+export function toProvisionRunError(error: unknown): RunError {
+  const capacityError = findRuntimeSubjectCapacityError(error);
+
+  // A full deployment or account is temporary: say so and let the caller resend.
+  if (capacityError !== null) {
+    return {
+      code: "runtime.capacity_exhausted",
+      details: { limit: capacityError.limit, scope: capacityError.scope },
+      message: capacityError.message,
+      retryable: true,
+    };
+  }
+
+  return {
+    code: "runtime.provision_failed",
+    details: {},
+    message: describeRunError(error, "Session run provisioning failed."),
+    retryable: false,
+  };
 }

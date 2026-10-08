@@ -48,9 +48,21 @@ export interface SessionRunDispatchCommandPayload {
   viewer: AuthenticatedViewer;
 }
 
-export class ApiCommandPayloadError extends Error {
-  constructor(message: string, options?: ErrorOptions) {
+// Retrying cannot succeed: the processor records the failure and acknowledges
+// the message instead of spending the Queue retry budget.
+export class ApiCommandPermanentError extends Error {
+  readonly code: string;
+
+  constructor(code: string, message: string, options?: ErrorOptions) {
     super(message, options);
+    this.name = "ApiCommandPermanentError";
+    this.code = code;
+  }
+}
+
+export class ApiCommandPayloadError extends ApiCommandPermanentError {
+  constructor(message: string, options?: ErrorOptions) {
+    super("invalid_payload", message, options);
     this.name = "ApiCommandPayloadError";
   }
 }

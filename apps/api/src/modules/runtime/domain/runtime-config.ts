@@ -4,7 +4,10 @@ import { getRuntimeCatalogEntry } from "@mosoo/runtime-catalog";
 
 export const DRIVER_BOOT_TOKEN_TTL_MS = 60_000;
 export const RUNTIME_ACTION_TOKEN_TTL_MS = 10 * 60_000;
-export const DRIVER_HEARTBEAT_INTERVAL_MS = 1000;
+// Every heartbeat is a billed Durable Object WebSocket invocation and a log
+// event. Staleness reads the canonical heartbeat persisted every 10 seconds
+// against RUNTIME_SOCKET_TIMEOUT_MS, so a faster cadence buys no detection.
+export const DRIVER_HEARTBEAT_INTERVAL_MS = 5_000;
 export const RUNTIME_RUN_RETENTION_MS = 24 * 60 * 60 * 1000;
 export const RUNTIME_SOCKET_TIMEOUT_MS = 30_000;
 export const DRIVER_COLD_READY_TIMEOUT_MS = 120_000;

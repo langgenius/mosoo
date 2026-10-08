@@ -21,7 +21,7 @@ import { buildSessionConfigTraceValue } from "../session-definition/session-conf
 import type { HydratedSessionRunContext } from "../session-definition/session-execution.types";
 import { cleanupDispatchedDriver } from "./dispatch-run-cleanup.service";
 import { withPreReadyRetry } from "./pre-ready-retry";
-import { describeRunError } from "./run-error-message";
+import { toProvisionRunError } from "./run-error-message";
 import { persistSessionRunSkills } from "./session-run-skill-snapshot.repository";
 import {
   acquireSessionRunDispatch,
@@ -332,13 +332,8 @@ export async function dispatchSessionRun(
       return;
     }
 
-    const message = describeRunError(error, "Session run provisioning failed.");
-    const runError = {
-      code: "runtime.provision_failed",
-      details: {},
-      message,
-      retryable: false,
-    } as const;
+    const runError = toProvisionRunError(error);
+    const { message } = runError;
 
     if (isTruthy(driverInstanceId)) {
       await cleanupDispatchedDriver(bindings, {

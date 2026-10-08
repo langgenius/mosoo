@@ -1,6 +1,10 @@
 import { describe, expect, test } from "bun:test";
 
-import { describeRunError } from "../src/modules/runtime/application/session-runs/run-error-message";
+import {
+  describeRunError,
+  toProvisionRunError,
+} from "../src/modules/runtime/application/session-runs/run-error-message";
+import { RuntimeSubjectCapacityExceededError } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-errors";
 
 describe("describeRunError", () => {
   test("returns the fallback for non-error values", () => {
@@ -37,5 +41,38 @@ describe("describeRunError", () => {
 
   test("falls back when every message in the chain is blank", () => {
     expect(describeRunError(new Error(""), "Fallback message.")).toBe("Fallback message.");
+  });
+});
+
+describe("toProvisionRunError", () => {
+  test("reports a full deployment as retryable capacity, even when wrapped", () => {
+    const capacity = new RuntimeSubjectCapacityExceededError({ limit: 50, scope: "platform" });
+
+    expect(toProvisionRunError(new Error("activation failed", { cause: capacity }))).toEqual({
+      code: "runtime.capacity_exhausted",
+      details: { limit: 50, scope: "platform" },
+      message: "mosoo is at capacity right now. Try again in a few minutes.",
+      retryable: true,
+    });
+  });
+
+  test("names the account quota the caller reached", () => {
+    expect(
+      toProvisionRunError(new RuntimeSubjectCapacityExceededError({ limit: 5, scope: "account" })),
+    ).toMatchObject({
+      code: "runtime.capacity_exhausted",
+      message:
+        "You already have 5 active sessions. Try again in a few minutes, after one of them finishes.",
+      retryable: true,
+    });
+  });
+
+  test("keeps other provisioning failures terminal", () => {
+    expect(toProvisionRunError(new Error("image pull failed"))).toEqual({
+      code: "runtime.provision_failed",
+      details: {},
+      message: "image pull failed",
+      retryable: false,
+    });
   });
 });
