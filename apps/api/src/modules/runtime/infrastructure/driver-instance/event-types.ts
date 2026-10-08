@@ -68,7 +68,7 @@ export interface ProjectRuntimeDriverEventsResult {
   nextLiveState: SessionLiveState | null;
   sessionTitle: string | null;
   transitions: RuntimeDriverRunTransition[];
-  usage: SessionUsageSummary | null;
+  usageUpdates: SessionUsageSummary[];
   runtimeEvents: ProjectedRuntimeEventRecord[];
   sessionDeliveryEvents: ProjectedSessionDeliveryEvent[];
 }

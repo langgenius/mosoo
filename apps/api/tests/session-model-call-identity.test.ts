@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
 
 import type { SessionUsageSummary } from "@mosoo/ag-ui-session";
-import { parsePlatformId } from "@mosoo/id";
+import type { DriverEventEnvelope } from "@mosoo/agent-driver/events";
+import { createPlatformId, parsePlatformId } from "@mosoo/id";
 import type {
   AccountId,
   AgentDeploymentVersionId,
@@ -9,11 +10,18 @@ import type {
   DriverInstanceId,
   OrganizationId,
   ProjectId,
+  RuntimeEventId,
   SessionId,
   SessionRunId,
 } from "@mosoo/id";
+import { createRuntimeEvent } from "@mosoo/runtime-events";
 
+import { persistProjectedRuntimeDriverEvents } from "../src/modules/runtime/infrastructure/driver-instance/event-persistence";
+import { createBaseLiveState } from "../src/modules/runtime/infrastructure/driver-instance/event-projection";
+import type { RuntimeSessionLink } from "../src/modules/runtime/infrastructure/driver-instance/event-types";
+import { projectRuntimeDriverEvents } from "../src/modules/runtime/infrastructure/driver-instance/events";
 import { upsertSessionModelCallUsage } from "../src/modules/sessions/infrastructure/session-model-call.repository";
+import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
 const ACTOR_ID = parsePlatformId<AccountId>("01J00000000000000000000011", "actor ID");
@@ -76,6 +84,10 @@ function createSessionModelCallDatabase(): SqliteD1Database {
 
     CREATE TABLE session (
       id text PRIMARY KEY NOT NULL,
+      agent_id text,
+      archived_at integer,
+      runtime_event_seq_cursor integer DEFAULT 0 NOT NULL,
+      status text DEFAULT 'IDLE' NOT NULL,
       metadata_json text DEFAULT '{}' NOT NULL,
       model text NOT NULL,
       project_id text NOT NULL,
@@ -127,6 +139,33 @@ function createSessionModelCallDatabase(): SqliteD1Database {
       UNIQUE (session_run_id, call_key)
     );
 
+CREATE TABLE session_event (
+  id text PRIMARY KEY NOT NULL,
+  session_id text NOT NULL,
+  run_id text,
+  agent_id text,
+  seq integer NOT NULL,
+  content_text text NOT NULL,
+  ended_at integer NOT NULL,
+  event_type text NOT NULL,
+  family text NOT NULL,
+  process_status text NOT NULL,
+  process_type text NOT NULL,
+  source text NOT NULL,
+  source_event_id text NOT NULL,
+  tool_call_id text,
+  tool_input_json text,
+  tool_name text,
+  tokens integer,
+  trace_id text,
+  visibility text NOT NULL,
+  occurred_at integer NOT NULL,
+  created_at integer NOT NULL
+);
+
+    CREATE UNIQUE INDEX session_event_session_source_idx ON session_event (session_id, source_event_id);
+    CREATE UNIQUE INDEX session_event_session_seq_idx ON session_event (session_id, seq);
+
     CREATE TABLE usage_event (
       actor_user_id text NOT NULL,
       agent_id text,
@@ -160,8 +199,8 @@ function createSessionModelCallDatabase(): SqliteD1Database {
   return database;
 }
 
-function createUsageLedgerFailingDatabase(database: D1Database): D1Database {
-  let shouldFailUsageLedgerWrite = true;
+function createUsageLedgerFailingDatabase(database: D1Database, failAtWrite = 1): D1Database {
+  let usageLedgerWriteCount = 0;
 
   function wrapStatement(
     statement: D1PreparedStatement,
@@ -178,9 +217,11 @@ function createUsageLedgerFailingDatabase(database: D1Database): D1Database {
 
         if (property === "run" && typeof value === "function") {
           return (...arguments_: unknown[]) => {
-            if (isUsageLedgerInsert && shouldFailUsageLedgerWrite) {
-              shouldFailUsageLedgerWrite = false;
-              throw new Error("injected usage ledger write failure");
+            if (isUsageLedgerInsert) {
+              usageLedgerWriteCount += 1;
+              if (usageLedgerWriteCount === failAtWrite) {
+                throw new Error("injected usage ledger write failure");
+              }
             }
 
             return Reflect.apply(value, target, arguments_);
@@ -500,5 +541,346 @@ describe("session model call identity", () => {
         .prepare("SELECT COUNT(*) AS count FROM usage_event")
         .first<{ count: number }>(),
     ).toEqual({ count: 1 });
+  });
+});
+
+// Totals reproduce the staging regression; the first three bucket splits are fixtures.
+const PI_USAGE_SAMPLES: readonly SessionUsageSummary[] = [
+  { inputTokens: 100, outputTokens: 142, cachedReadTokens: 1_800, totalTokens: 2_042 },
+  { inputTokens: 150, outputTokens: 112, cachedReadTokens: 1_900, totalTokens: 2_162 },
+  { inputTokens: 200, outputTokens: 68, cachedReadTokens: 2_000, totalTokens: 2_268 },
+  { inputTokens: 246, outputTokens: 129, cachedReadTokens: 2_048, totalTokens: 2_423 },
+].map(({ inputTokens, outputTokens, cachedReadTokens, totalTokens }) => ({
+  inputTokens,
+  outputTokens,
+  cachedReadTokens,
+  totalTokens,
+  source: "session_update",
+  usageContract: "anthropic_bucketed",
+}));
+
+function createUsageEnvelopes(
+  usages: readonly SessionUsageSummary[],
+  runtimeId = "pi",
+  eventPrefix = "usage-message",
+  sessionRunId = SESSION_RUN_ID,
+): DriverEventEnvelope[] {
+  return usages.map((usage, index) => {
+    const eventId = `${eventPrefix}-${index + 1}`;
+    const occurredAt = new Date(1_300 + index).toISOString();
+    return {
+      eventId,
+      occurredAt,
+      event: createRuntimeEvent({
+        id: createPlatformId<RuntimeEventId>(),
+        driverInstanceId: DRIVER_INSTANCE_ID,
+        sessionId: SESSION_ID,
+        runId: sessionRunId,
+        runtimeId,
+        occurredAt,
+        sourceEventId: eventId,
+        kind: "usage.updated",
+        payload: usage,
+      }),
+    };
+  });
+}
+
+async function seedUsageRuntime(database: SqliteD1Database, runtimeId = "pi"): Promise<void> {
+  await seedRunIdentity(database);
+  await database.prepare("UPDATE session SET runtime_id = ?").bind(runtimeId).run();
+  await database.prepare("UPDATE session_run SET runtime_id = ?").bind(runtimeId).run();
+}
+
+async function persistUsageEnvelopes(
+  database: D1Database,
+  events: readonly DriverEventEnvelope[],
+  sessionRunId = SESSION_RUN_ID,
+) {
+  const link: RuntimeSessionLink = {
+    agentId: AGENT_ID,
+    projectId: PROJECT_ID,
+    callerId: ACTOR_ID,
+    creatorId: OWNER_ID,
+    executionOwnerId: OWNER_ID,
+    sandboxId: null,
+    sandboxSubjectKind: "session",
+    sessionId: SESSION_ID,
+    sessionRunId,
+    sessionRunStatus: "completed",
+    sessionType: "ui",
+    traceId: "usage-regression",
+  };
+  const bindings = { DB: database } as ApiBindings;
+  const projection = await projectRuntimeDriverEvents(bindings, {
+    driverInstanceId: DRIVER_INSTANCE_ID,
+    events,
+    link,
+    currentLiveState: createBaseLiveState({
+      callerId: ACTOR_ID,
+      creatorId: OWNER_ID,
+      driverInstanceId: DRIVER_INSTANCE_ID,
+      sessionId: SESSION_ID,
+    }),
+  });
+  const result = await persistProjectedRuntimeDriverEvents(bindings, {
+    driverInstanceId: DRIVER_INSTANCE_ID,
+    projection,
+  });
+  return { projection, result };
+}
+
+async function readUsageTotals(database: D1Database) {
+  return {
+    calls: await database
+      .prepare(`SELECT COUNT(*) AS count,
+      SUM(input_tokens + output_tokens + COALESCE(cache_read_tokens, 0)
+        + COALESCE(cache_creation_tokens, 0)) AS tokens FROM session_model_call`)
+      .first(),
+    ledger: await database
+      .prepare(`SELECT COUNT(*) AS count,
+      SUM(input_tokens + output_tokens + cache_creation_tokens) AS tokens FROM usage_event`)
+      .first(),
+  };
+}
+
+describe("runtime model usage batch accounting", () => {
+  test("persists all four Pi assistant usages through projection and canonical event persistence", async () => {
+    const database = createSessionModelCallDatabase();
+    await seedUsageRuntime(database);
+    const events = createUsageEnvelopes(PI_USAGE_SAMPLES);
+    const expectedPayloads = structuredClone(PI_USAGE_SAMPLES);
+    const { projection, result } = await persistUsageEnvelopes(database, events);
+    expect(projection.runtimeEvents.map(({ event }) => event.payload)).toEqual(expectedPayloads);
+    expect(result.persistedSourceEventIds).toEqual(events.map(({ eventId }) => eventId));
+    expect(await readUsageTotals(database)).toEqual({
+      calls: { count: 4, tokens: 8_895 },
+      ledger: { count: 4, tokens: 8_895 },
+    });
+  });
+
+  test("deduplicates Pi messages across batches, retry order, and new canonical IDs", async () => {
+    const database = createSessionModelCallDatabase();
+    await seedUsageRuntime(database);
+    const events = createUsageEnvelopes(PI_USAGE_SAMPLES);
+    await persistUsageEnvelopes(database, events.slice(0, 2));
+    await persistUsageEnvelopes(database, events.slice(2));
+    // Transport identity remains stable when replay reconstructs canonical events.
+    const replay: DriverEventEnvelope[] = [];
+    for (const envelope of events.toReversed()) {
+      replay.push({
+        ...envelope,
+        event: { ...envelope.event, id: createPlatformId<RuntimeEventId>() },
+      });
+    }
+    await persistUsageEnvelopes(database, replay);
+    await persistUsageEnvelopes(database, events);
+    expect(await readUsageTotals(database)).toEqual({
+      calls: { count: 4, tokens: 8_895 },
+      ledger: { count: 4, tokens: 8_895 },
+    });
+    expect(await database.prepare("SELECT COUNT(*) AS count FROM session_event").first()).toEqual({
+      count: 4,
+    });
+    expect(
+      (await database.prepare("SELECT call_key FROM session_model_call ORDER BY call_key").all())
+        .results,
+    ).toEqual(events.map(({ eventId }) => ({ call_key: `model_call:pi-usage:${eventId}` })));
+  });
+
+  test.each(["pi", "openai-runtime"])(
+    "keeps distinct native call IDs and replaces repeated call updates for %s",
+    async (runtimeId) => {
+      const database = createSessionModelCallDatabase();
+      await seedUsageRuntime(database, runtimeId);
+      const usages: SessionUsageSummary[] = [
+        {
+          callId: "native-call-a",
+          inputTokens: 100,
+          outputTokens: 20,
+          source: "session_update",
+          usageContract: "anthropic_bucketed",
+        },
+        {
+          callId: "native-call-b",
+          inputTokens: 200,
+          outputTokens: 30,
+          source: "session_update",
+          usageContract: "anthropic_bucketed",
+        },
+      ];
+      await persistUsageEnvelopes(database, createUsageEnvelopes(usages, runtimeId));
+      expect(await readUsageTotals(database)).toEqual({
+        calls: { count: 2, tokens: 350 },
+        ledger: { count: 2, tokens: 350 },
+      });
+      const updates: SessionUsageSummary[] = [
+        {
+          callId: "native-call-a",
+          inputTokens: 130,
+          outputTokens: 30,
+          source: "session_update",
+          usageContract: "anthropic_bucketed",
+        },
+        {
+          callId: "native-call-a",
+          inputTokens: 140,
+          outputTokens: 40,
+          source: "session_update",
+          usageContract: "anthropic_bucketed",
+        },
+      ];
+      const updateEvents = createUsageEnvelopes(updates, runtimeId, "usage-update");
+      await persistUsageEnvelopes(database, updateEvents);
+      await persistUsageEnvelopes(database, updateEvents);
+      expect(await readUsageTotals(database)).toEqual({
+        calls: { count: 2, tokens: 410 },
+        ledger: { count: 2, tokens: 410 },
+      });
+      expect(
+        (
+          await database
+            .prepare("SELECT call_key, native_call_id FROM session_model_call ORDER BY call_key")
+            .all()
+        ).results,
+      ).toEqual([
+        { call_key: "model_call:native-call-a", native_call_id: "native-call-a" },
+        { call_key: "model_call:native-call-b", native_call_id: "native-call-b" },
+      ]);
+    },
+  );
+
+  test.each(["openai-runtime", "claude-agent-sdk", "acp-fallback"])(
+    "preserves cumulative no-ID replacement for %s",
+    async (runtimeId) => {
+      const database = createSessionModelCallDatabase();
+      await seedUsageRuntime(database, runtimeId);
+      const snapshots: SessionUsageSummary[] = [
+        {
+          inputTokens: 100,
+          outputTokens: 20,
+          source: "session_update",
+          usageContract: "anthropic_bucketed",
+        },
+        {
+          inputTokens: 300,
+          outputTokens: 70,
+          source: "session_update",
+          usageContract: "anthropic_bucketed",
+        },
+      ];
+      await persistUsageEnvelopes(database, createUsageEnvelopes(snapshots, runtimeId));
+      expect(await readUsageTotals(database)).toEqual({
+        calls: { count: 1, tokens: 370 },
+        ledger: { count: 1, tokens: 370 },
+      });
+      const updateEvents = createUsageEnvelopes(
+        [
+          {
+            inputTokens: 450,
+            outputTokens: 80,
+            source: "session_update",
+            usageContract: "anthropic_bucketed",
+          },
+        ],
+        runtimeId,
+        "cumulative-update",
+      );
+      await persistUsageEnvelopes(database, updateEvents);
+      await persistUsageEnvelopes(database, updateEvents);
+      expect(await readUsageTotals(database)).toEqual({
+        calls: { count: 1, tokens: 530 },
+        ledger: { count: 1, tokens: 530 },
+      });
+      expect(
+        await database.prepare("SELECT call_key, native_call_id FROM session_model_call").first(),
+      ).toEqual({
+        call_key: "run_usage",
+        native_call_id: null,
+      });
+    },
+  );
+
+  test("rolls back every Pi call and ledger row when the final ledger write fails, then retries once", async () => {
+    const database = createSessionModelCallDatabase();
+    await seedUsageRuntime(database);
+    const events = createUsageEnvelopes(PI_USAGE_SAMPLES);
+    await expect(
+      persistUsageEnvelopes(createUsageLedgerFailingDatabase(database, 4), events),
+    ).rejects.toThrow("injected usage ledger write failure");
+    expect(await readUsageTotals(database)).toEqual({
+      calls: { count: 0, tokens: null },
+      ledger: { count: 0, tokens: null },
+    });
+    // No canonical receipt can acknowledge a batch whose usage did not commit.
+    expect(await database.prepare("SELECT COUNT(*) AS count FROM session_event").first()).toEqual({
+      count: 0,
+    });
+    await persistUsageEnvelopes(database, events);
+    await persistUsageEnvelopes(database, events);
+    expect(await readUsageTotals(database)).toEqual({
+      calls: { count: 4, tokens: 8_895 },
+      ledger: { count: 4, tokens: 8_895 },
+    });
+    expect(await database.prepare("SELECT COUNT(*) AS count FROM session_event").first()).toEqual({
+      count: 4,
+    });
+  });
+
+  test("retains a legacy Pi Run snapshot after an unacknowledged upgrade replay and uses per-call rows for a new Run", async () => {
+    const database = createSessionModelCallDatabase();
+    await seedUsageRuntime(database);
+    // Old Host committed the Run snapshot but crashed before canonical events/ACK.
+    await upsertSessionModelCallUsage(database, {
+      driverInstanceId: DRIVER_INSTANCE_ID,
+      sessionId: SESSION_ID,
+      sessionRunId: SESSION_RUN_ID,
+      traceId: "legacy-usage",
+      usage: {
+        inputTokens: 100,
+        outputTokens: 20,
+        source: "session_update",
+        usageContract: "anthropic_bucketed",
+      },
+    });
+    expect(await database.prepare("SELECT COUNT(*) AS count FROM session_event").first()).toEqual({
+      count: 0,
+    });
+    const events = createUsageEnvelopes(PI_USAGE_SAMPLES);
+    await persistUsageEnvelopes(database, events);
+    await persistUsageEnvelopes(database, events);
+    expect(await readUsageTotals(database)).toEqual({
+      calls: { count: 1, tokens: 2_423 },
+      ledger: { count: 1, tokens: 2_423 },
+    });
+    expect(
+      await database.prepare("SELECT call_key, native_call_id FROM session_model_call").first(),
+    ).toEqual({
+      call_key: "run_usage",
+      native_call_id: null,
+    });
+    const nextRunId = parsePlatformId<SessionRunId>("01J00000000000000000000021", "next run ID");
+    await database
+      .prepare(`INSERT INTO session_run
+      (id, created_by_account_id, agent_id, model, provider, runtime_id, session_id, trigger, started_at, completed_at)
+      SELECT ?, created_by_account_id, agent_id, model, provider, runtime_id, session_id, trigger, started_at, completed_at
+      FROM session_run WHERE id = ?`)
+      .bind(nextRunId, SESSION_RUN_ID)
+      .run();
+    await persistUsageEnvelopes(
+      database,
+      createUsageEnvelopes(PI_USAGE_SAMPLES, "pi", "next-run-usage", nextRunId),
+      nextRunId,
+    );
+    expect(await readUsageTotals(database)).toEqual({
+      calls: { count: 5, tokens: 11_318 },
+      ledger: { count: 5, tokens: 11_318 },
+    });
+    expect(
+      await database
+        .prepare("SELECT COUNT(*) AS count FROM session_model_call WHERE session_run_id = ?")
+        .bind(nextRunId)
+        .first(),
+    ).toEqual({ count: 4 });
   });
 });
