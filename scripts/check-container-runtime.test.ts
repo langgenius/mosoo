@@ -1,6 +1,10 @@
 import { describe, expect, test } from "bun:test";
 
-import { findActiveContainers, findLongRunningContainers } from "./check-container-runtime";
+import {
+  countActiveContainersByApplication,
+  findActiveContainers,
+  findLongRunningContainers,
+} from "./check-container-runtime";
 
 describe("container runtime alert", () => {
   test("reports only billable states older than the threshold", () => {
@@ -28,6 +32,20 @@ describe("container runtime alert", () => {
       "starting",
       "ready",
       "stuck",
+    ]);
+  });
+
+  test("attributes active containers to every image application", () => {
+    const instances = [
+      { application: "mosoo-api-prod-sandboxpi-prod", created: null, id: "pi", state: "running" },
+      { application: "mosoo-api-prod-sandbox-prod", created: null, id: "a", state: "running" },
+      { application: "mosoo-api-prod-sandbox-prod", created: null, id: "b", state: "stopping" },
+      { application: "mosoo-api-prod-sandbox-prod", created: null, id: "c", state: "inactive" },
+    ];
+
+    expect(countActiveContainersByApplication(instances)).toEqual([
+      ["mosoo-api-prod-sandbox-prod", 2],
+      ["mosoo-api-prod-sandboxpi-prod", 1],
     ]);
   });
 });

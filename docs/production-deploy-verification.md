@@ -292,6 +292,22 @@ Configure the GitHub `try` Environment before the first release:
 - Protect `deploy/try` from force-push and deletion, and restrict who may push
   it. Advance it only to a reviewed commit from `main`.
 
+Configure the GitHub `container-monitor` Environment for the scheduled
+`.github/workflows/container-runtime-alert.yml` check. Scheduled runs execute on
+`main`, so they can never read the deploy-only `try` Environment:
+
+- Restrict deployment branches to `main`.
+- Add `CLOUDFLARE_ACCOUNT_ID` and a separate `CLOUDFLARE_API_TOKEN` limited to
+  the account permission **Containers Read** as Environment secrets. Never reuse
+  the deploy token here.
+- Run the workflow once with `workflow_dispatch` and confirm both the production
+  and stage jobs list every Sandbox image application. A job fails when an
+  application derived from `apps/api/wrangler.toml` is missing from the
+  Cloudflare listing, so a renamed class cannot silently drop out of the check.
+- The check only reports: it opens a GitHub issue when an environment has ten or
+  more active containers or any container older than two hours, and it never
+  stops a container itself.
+
 The workflow uses one `production` concurrency group and never cancels an
 in-progress release because D1 migration, queue updates, and Worker publication
 are not transactional.
