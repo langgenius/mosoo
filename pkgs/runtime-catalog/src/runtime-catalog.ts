@@ -20,12 +20,17 @@ import {
   GENERATED_VENDOR_CATALOG,
 } from "./catalog.generated";
 
-export type RuntimeCatalogTransport = "openai-app-server" | "claude-agent-sdk" | "acp-fallback";
+export type RuntimeCatalogTransport =
+  | "openai-app-server"
+  | "claude-agent-sdk"
+  | "acp-fallback"
+  | "pi-rpc";
 export type RuntimeCatalogVisibility = "internal" | "public";
 export type RuntimeDisplaySurface = "landing" | "provider-settings";
 export type RuntimeDisplayStatus = "available" | "coming-soon";
 export type RuntimeCatalogCapabilityId =
   | "custom_tool_execute"
+  | "file_change"
   | "input_start"
   | "mcp_execute"
   | "native_resume"

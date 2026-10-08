@@ -165,6 +165,17 @@ export async function buildExecutionSpec(
     sessionRunId?: SessionRunId | null;
   },
 ): Promise<DriverExecutionSpec> {
+  if (input.profile.runtimeId === "pi") {
+    if (input.profile.provider !== "openai-compatible") {
+      throw new Error("Pi requires an OpenAI-compatible provider.");
+    }
+    if (input.profile.permissionPolicy !== "full_access") {
+      throw new Error("Pi requires full_access.");
+    }
+    if (input.builtInTools.some((tool) => !tool.enabled)) {
+      throw new Error("Pi requires unrestricted built-in tools.");
+    }
+  }
   const organizationPath = getOrganizationPath(input.profile);
   const actionUrlContext: RuntimeActionUrlContext = {
     bindings,

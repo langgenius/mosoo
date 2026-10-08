@@ -16,7 +16,6 @@ import { Loader2 } from "@/shared/ui/icons";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 
-import type { RuntimeInfo } from "../agent.types";
 import { isRuntimeSelectable, listRuntimeOptions } from "../runtime-catalog";
 import { resolveDefaultAgentRuntime } from "../runtime-default";
 import { RuntimeIcon } from "./runtime-icon";
@@ -97,7 +96,11 @@ function CreateAgentLauncherBody({
       return;
     }
 
-    const runtimeConfig = resolveRuntimeConfig(activeRuntimeId, defaultRuntime, runtimeOptions);
+    const runtimeConfig = resolveDefaultAgentRuntime(credentials, activeRuntimeId);
+
+    if (runtimeConfig === null) {
+      return;
+    }
 
     try {
       const createdAgent = await createAgentMutation.mutateAsync({
@@ -211,30 +214,6 @@ function CreateAgentLauncherBody({
       </DialogFooter>
     </form>
   );
-}
-
-function resolveRuntimeConfig(
-  runtimeId: string,
-  defaultRuntime: { model: string; provider: string; runtimeId: string },
-  runtimeOptions: readonly RuntimeInfo[],
-): { model: string; provider: string; runtimeId: string } {
-  // Keep the resolved provider/model when the user keeps the default runtime, so
-  // custom-provider credentials (e.g. OpenAI-compatible) stay wired correctly.
-  if (runtimeId === defaultRuntime.runtimeId) {
-    return defaultRuntime;
-  }
-
-  const runtime = runtimeOptions.find((candidate) => candidate.id === runtimeId);
-
-  if (runtime === undefined) {
-    return defaultRuntime;
-  }
-
-  return {
-    model: runtime.defaultModel,
-    provider: runtime.provider,
-    runtimeId: runtime.id,
-  };
 }
 
 function LauncherStatus({ message }: { message: string }): ReactElement {

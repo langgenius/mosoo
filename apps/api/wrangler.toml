@@ -90,6 +90,17 @@ image_vars = { RUNTIME = "opencode" }
 instance_type = "lite"
 max_instances = 1
 
+[[durable_objects.bindings]]
+name = "SandboxPi"
+class_name = "SandboxPi"
+
+[[containers]]
+class_name = "SandboxPi"
+image = "../driver/Containerfile"
+image_vars = { RUNTIME = "pi" }
+instance_type = "lite"
+max_instances = 1
+
 [[containers]]
 class_name = "Sandbox"
 image = "../driver/Containerfile"
@@ -232,6 +243,17 @@ class_name = "SandboxOpenCode"
 class_name = "SandboxOpenCode"
 image = "../driver/Containerfile"
 image_vars = { RUNTIME = "opencode" }
+instance_type = "standard-2"
+max_instances = 50
+
+[[env.stage.durable_objects.bindings]]
+name = "SandboxPi"
+class_name = "SandboxPi"
+
+[[env.stage.containers]]
+class_name = "SandboxPi"
+image = "../driver/Containerfile"
+image_vars = { RUNTIME = "pi" }
 instance_type = "standard-2"
 max_instances = 50
 
@@ -392,6 +414,17 @@ image_vars = { RUNTIME = "opencode" }
 instance_type = "standard-2"
 max_instances = 50
 
+[[env.prod.durable_objects.bindings]]
+name = "SandboxPi"
+class_name = "SandboxPi"
+
+[[env.prod.containers]]
+class_name = "SandboxPi"
+image = "../driver/Containerfile"
+image_vars = { RUNTIME = "pi" }
+instance_type = "standard-2"
+max_instances = 50
+
 [[env.prod.containers]]
 class_name = "Sandbox"
 image = "../driver/Containerfile"
@@ -484,3 +517,15 @@ new_sqlite_classes = ["SandboxClaude", "SandboxOpenAI", "SandboxOpenCode"]
 [[env.prod.migrations]]
 tag = "v3-runtime-images"
 new_sqlite_classes = ["SandboxClaude", "SandboxOpenAI", "SandboxOpenCode"]
+
+[[migrations]]
+tag = "v4-pi-runtime"
+new_sqlite_classes = ["SandboxPi"]
+
+[[env.stage.migrations]]
+tag = "v4-pi-runtime"
+new_sqlite_classes = ["SandboxPi"]
+
+[[env.prod.migrations]]
+tag = "v4-pi-runtime"
+new_sqlite_classes = ["SandboxPi"]

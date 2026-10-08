@@ -7,6 +7,7 @@ export {
   SandboxClaude,
   SandboxOpenAI,
   SandboxOpenCode,
+  SandboxPi,
 } from "./adapters/durable-objects/sandbox.do";
 export { Session } from "./adapters/durable-objects/session.do";
 

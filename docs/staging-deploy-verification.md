@@ -70,7 +70,8 @@ tested, even when a later secret-only deployment changes the version ID.
 - Read both deployed versions and confirm source/Driver provenance. Check API
   health, Web-to-API routing, normal login, Project isolation, and current
   OpenAPI. Health alone is insufficient.
-- Wait for all four container applications to report ready before runtime
+- Wait for all five container applications (the legacy union image plus
+  Claude, OpenAI, OpenCode, and Pi) to report ready before runtime
   acceptance. Verify their actual image digests and Driver bundle contents.
   A Worker update can reuse an existing identical image, so its version ID does
   not necessarily identify a new image tag. Keep model admission closed until

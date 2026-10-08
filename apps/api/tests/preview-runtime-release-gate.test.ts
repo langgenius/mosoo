@@ -12,11 +12,13 @@ describe("Preview runtime release gate", () => {
       "acp-fallback",
       "claude-agent-sdk",
       "openai-runtime",
+      "pi",
     ]);
     expect(PUBLIC_RUNTIME_CATALOG.map((runtime) => runtime.transport).toSorted()).toEqual([
       "acp-fallback",
       "claude-agent-sdk",
       "openai-app-server",
+      "pi-rpc",
     ]);
 
     for (const runtime of PUBLIC_RUNTIME_CATALOG) {

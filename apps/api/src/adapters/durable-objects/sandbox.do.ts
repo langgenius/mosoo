@@ -155,3 +155,4 @@ for (const method of SANDBOX_RPC_FORWARD_METHODS) {
 export class SandboxClaude extends Sandbox {}
 export class SandboxOpenAI extends Sandbox {}
 export class SandboxOpenCode extends Sandbox {}
+export class SandboxPi extends Sandbox {}
