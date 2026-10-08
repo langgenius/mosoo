@@ -137,8 +137,7 @@ Finally inspect the remote ledger. This is read-only and must not apply migratio
 
 ```bash
 cd apps/api
-CLOUDFLARE_ACCOUNT_ID="$CLOUDFLARE_ACCOUNT_ID" \
-  ../../node_modules/.bin/vp exec wrangler d1 migrations list DB --remote --env prod
+CLOUDFLARE_ACCOUNT_ID="$CLOUDFLARE_ACCOUNT_ID" bun bin/prod-migrations.ts
 cd ../..
 ```
 
@@ -150,7 +149,15 @@ Acceptance:
   the last deployed commit by hand. Remember that Wrangler records applied
   migrations by filename: a rewritten migration is silently skipped by a
   production database that already recorded it.
-- For a no-op schema release, output says no migrations need to apply.
+- For a no-op schema release, the read-only inspector confirms that every
+  configured SQL filename is in the existing production ledger. Unlike Wrangler
+  `migrations list`, this does not issue `CREATE TABLE IF NOT EXISTS`.
+- Missing or unreadable ledgers, malformed responses, unsupported migration
+  patterns, or applied filenames absent from the checkout fail closed. Production
+  initialization requires a separate reviewed migration operation. The deploy
+  script repeats this check and skips `migrations apply` only when nothing is
+  pending; real pending migrations still use Wrangler apply and a second ledger
+  check, followed by the existing missing-table schema guard.
 - If pending migrations are listed, stop and review the exact SQL before any
   real deploy.
 - Pending migrations may be accepted only when they are additive or explicitly
