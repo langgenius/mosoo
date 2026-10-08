@@ -1,5 +1,4 @@
 import type { SessionUsageSummary } from "@mosoo/ag-ui-session";
-import type { AgentKind } from "@mosoo/contracts/agent";
 import type { SandboxSubjectKind } from "@mosoo/contracts/sandbox";
 import type { SessionType } from "@mosoo/contracts/session";
 import type { SessionRunStatus } from "@mosoo/contracts/session-run";
@@ -28,7 +27,6 @@ export interface RuntimeSessionLink {
   creatorId: PlatformId | null;
   executionOwnerId: AccountId | null;
   sandboxId: SandboxId | null;
-  sandboxKind: AgentKind | null;
   sessionId: SessionId | null;
   sessionRunId: SessionRunId | null;
   sessionRunStatus: SessionRunStatus | null;

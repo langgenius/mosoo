@@ -515,10 +515,8 @@ export async function recordRuntimeRunLeaseReleasedOutcome(
     .where(
       and(
         eq(sandboxesTable.id, driver.sandboxId),
-        or(
-          eq(sandboxesTable.kind, "pet"),
-          notExists(activeConversationSessionQuery(appDb, driver.sandboxId)),
-        ),
+        eq(sandboxesTable.subjectKind, "session"),
+        notExists(activeConversationSessionQuery(appDb, driver.sandboxId)),
         notExists(runLeaseQuery(appDb, driver.sandboxId)),
       ),
     )

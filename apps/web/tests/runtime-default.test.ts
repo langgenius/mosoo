@@ -41,6 +41,40 @@ describe("default agent runtime", () => {
     });
   });
 
+  test("does not select Pi's incomplete default for an undeclared custom model", () => {
+    expect(resolveDefaultAgentRuntime([credential("openai-compatible")])).toEqual(
+      resolveDefaultAgentRuntime([]),
+    );
+  });
+
+  test("uses a configured custom model when the launcher explicitly selects Pi", () => {
+    const credentials = [
+      credential("openai"),
+      credential("openai-compatible", ["qwen-coder", "another-model"]),
+    ];
+
+    expect(resolveDefaultAgentRuntime(credentials)?.runtimeId).toBe("openai-runtime");
+    expect(resolveDefaultAgentRuntime(credentials, "pi")).toEqual({
+      model: "qwen-coder",
+      provider: "openai-compatible",
+      runtimeId: "pi",
+    });
+  });
+
+  test("preserves Pi setup when the launcher selects it without a declared custom model", () => {
+    expect(
+      resolveDefaultAgentRuntime([credential("openai"), credential("openai-compatible")], "pi"),
+    ).toEqual({
+      model: "custom-model",
+      provider: "openai-compatible",
+      runtimeId: "pi",
+    });
+  });
+
+  test("does not silently substitute another runtime for an unsupported explicit selection", () => {
+    expect(resolveDefaultAgentRuntime([credential("openai")], "unsupported-runtime")).toBeNull();
+  });
+
   test("uses the mosoo Zhipu provider identity when only Zhipu is configured", () => {
     expect(resolveDefaultAgentRuntime([credential("zhipu")])).toEqual({
       model: "glm-4.7",

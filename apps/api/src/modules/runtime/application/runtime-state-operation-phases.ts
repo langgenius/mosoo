@@ -74,7 +74,7 @@ async function broadcastOperationPhase(
 export async function startRuntimeStateOperationPhase(
   bindings: ApiBindings,
   input: {
-    readonly agentId: AgentId;
+    readonly agentId: AgentId | null;
     readonly operation: RuntimeStateOperationName;
     readonly targetVersion: RuntimeOperationTargetVersion | null;
     readonly targets: RuntimeSessionTarget[];
@@ -107,7 +107,7 @@ export async function startRuntimeStateOperationPhase(
 export async function failRuntimeStateOperationPhase(
   bindings: ApiBindings,
   input: {
-    readonly agentId: AgentId;
+    readonly agentId: AgentId | null;
     readonly operation: RuntimeStateOperationName;
     readonly phase: RuntimeStateOperationPhase;
   },
@@ -131,7 +131,7 @@ export async function failRuntimeStateOperationPhase(
 export async function completeRuntimeStateOperationPhase(
   bindings: ApiBindings,
   input: {
-    readonly agentId: AgentId;
+    readonly agentId: AgentId | null;
     readonly operation: RuntimeStateOperationName;
     readonly phase: RuntimeStateOperationPhase;
   },

@@ -459,6 +459,11 @@ export const GENERATED_RUNTIME_CATALOG = [
         version: 1,
       },
       {
+        id: "file_change",
+        status: "supported",
+        version: 1,
+      },
+      {
         id: "input_start",
         status: "supported",
         version: 1,
@@ -577,6 +582,11 @@ export const GENERATED_RUNTIME_CATALOG = [
         version: 1,
       },
       {
+        id: "file_change",
+        status: "supported",
+        version: 1,
+      },
+      {
         id: "input_start",
         status: "supported",
         version: 1,
@@ -675,6 +685,11 @@ export const GENERATED_RUNTIME_CATALOG = [
         version: 1,
       },
       {
+        id: "file_change",
+        status: "supported",
+        version: 1,
+      },
+      {
         id: "input_start",
         status: "supported",
         version: 1,
@@ -761,6 +776,90 @@ export const GENERATED_RUNTIME_CATALOG = [
       "glm-5.2",
       "minimax-m2.7",
     ],
+  },
+  {
+    acceptsCustomProvider: true,
+    defaultIdentity: {
+      modelId: "custom-model",
+      providerId: "openai-compatible",
+    },
+    display: {
+      iconKey: "pi",
+      providerLabel: "OpenAI-Compatible",
+    },
+    label: "Pi",
+    runtimeId: "pi",
+    transport: "pi-rpc",
+    vendorIds: ["openai-compatible"],
+    visibility: "public",
+    capabilities: [
+      {
+        id: "custom_tool_execute",
+        status: "unsupported",
+        version: 1,
+      },
+      {
+        id: "file_change",
+        status: "supported",
+        version: 1,
+      },
+      {
+        id: "input_start",
+        status: "supported",
+        version: 1,
+      },
+      {
+        id: "mcp_execute",
+        status: "supported",
+        version: 1,
+      },
+      {
+        id: "native_resume",
+        status: "supported",
+        version: 1,
+      },
+      {
+        id: "permission_request",
+        status: "supported",
+        version: 1,
+      },
+      {
+        id: "session_stop",
+        status: "supported",
+        version: 1,
+      },
+      {
+        id: "thinking_stream",
+        status: "supported",
+        version: 1,
+      },
+      {
+        id: "text_stream",
+        status: "supported",
+        version: 1,
+      },
+      {
+        id: "tool_stream",
+        status: "supported",
+        version: 1,
+      },
+      {
+        id: "turn_cancel",
+        status: "supported",
+        version: 1,
+      },
+      {
+        id: "usage",
+        status: "supported",
+        version: 1,
+      },
+      {
+        id: "visible_activity",
+        status: "supported",
+        version: 1,
+      },
+    ],
+    supportedModelIds: [],
   },
 ] as const;
 

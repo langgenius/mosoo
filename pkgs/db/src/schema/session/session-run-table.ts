@@ -26,7 +26,7 @@ export function defineSessionRunsTable<
   return sqliteTable(
     "session_run",
     {
-      agentId: platformIdColumn<AgentId>("agent_id").notNull(),
+      agentId: platformIdColumn<AgentId>("agent_id"),
       ...extraColumns,
       completedAt: integer("completed_at"),
       createdAt: integer("created_at").notNull(),

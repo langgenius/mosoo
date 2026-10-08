@@ -76,36 +76,54 @@ export function CostAgentsPanel({
           {t("cost.noAgentCostEvents")}
         </div>
       ) : null}
-      {sortedAgents.map((agent) => (
-        <Link
-          key={agent.agentId}
-          to={`/agent/${agent.agentId}?tab=cost`}
-          className="border-border hover:bg-muted/40 grid grid-cols-[minmax(180px,1.4fr)_150px_110px_110px_110px_110px_110px_120px] items-center border-b px-4 py-3 text-sm last:border-b-0"
-        >
-          <div className="min-w-0">
-            <div className="text-foreground truncate font-semibold">{agent.agentName}</div>
-            <div className="text-muted-foreground mt-0.5 flex items-center gap-1 text-xs">
-              <ExternalLink className="size-3" />
-              {t("cost.openCostTab")}
+      {sortedAgents.map((agent) => {
+        const content = (
+          <>
+            <div className="min-w-0">
+              <div className="text-foreground truncate font-semibold">
+                {agent.agentId === null ? t("cost.directSessions") : agent.agentName}
+              </div>
+              {agent.agentId !== null ? (
+                <div className="text-muted-foreground mt-0.5 flex items-center gap-1 text-xs">
+                  <ExternalLink className="size-3" />
+                  {t("cost.openCostTab")}
+                </div>
+              ) : null}
             </div>
-          </div>
-          <div className="text-muted-foreground min-w-0">
-            <div className="truncate">{agent.ownerName}</div>
-            <div className="truncate text-xs">{agent.ownerEmail}</div>
-          </div>
-          <RunMixBar agent={agent} />
-          <AgentDelta agent={agent} />
-          <div>{formatCompactNumber(agent.requestCount)}</div>
-          <div>{formatCompactNumber(tokensTotal(agent))}</div>
-          <div>{formatPlainPercent(cacheHitRate(agent))}</div>
-          <div className="text-right">
-            <div className="font-mono font-semibold">{formatCurrency(agent.totalCostUsd)}</div>
-            <div className="text-muted-foreground text-xs">
-              {formatPlainPercent(agentShare(agent, agents))}
+            <div className="text-muted-foreground min-w-0">
+              <div className="truncate">{agent.ownerName}</div>
+              <div className="truncate text-xs">{agent.ownerEmail}</div>
             </div>
+            <RunMixBar agent={agent} />
+            <AgentDelta agent={agent} />
+            <div>{formatCompactNumber(agent.requestCount)}</div>
+            <div>{formatCompactNumber(tokensTotal(agent))}</div>
+            <div>{formatPlainPercent(cacheHitRate(agent))}</div>
+            <div className="text-right">
+              <div className="font-mono font-semibold">{formatCurrency(agent.totalCostUsd)}</div>
+              <div className="text-muted-foreground text-xs">
+                {formatPlainPercent(agentShare(agent, agents))}
+              </div>
+            </div>
+          </>
+        );
+        const rowClassName =
+          "border-border grid grid-cols-[minmax(180px,1.4fr)_150px_110px_110px_110px_110px_110px_120px] items-center border-b px-4 py-3 text-sm last:border-b-0";
+        const rowKey = `${agent.agentId ?? "direct"}:${agent.ownerId}`;
+        return agent.agentId === null ? (
+          <div key={rowKey} className={rowClassName}>
+            {content}
           </div>
-        </Link>
-      ))}
+        ) : (
+          <Link
+            key={rowKey}
+            to={`/agent/${agent.agentId}?tab=cost`}
+            className={cn(rowClassName, "hover:bg-muted/40")}
+          >
+            {content}
+          </Link>
+        );
+      })}
     </section>
   );
 }

@@ -86,7 +86,6 @@ export interface AgentManifest {
   advanced: AgentManifestAdvanced | null;
   builtInTools: AgentBuiltInToolConfig[];
   environment: AgentManifestEnvironmentReference;
-  kind: AgentKind;
   manifestVersion: typeof AGENT_MANIFEST_VERSION;
   mcpServers: AgentManifestMcpServerBinding[];
   metadata: {

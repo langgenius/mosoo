@@ -1,9 +1,5 @@
 import type { JsonObject } from "@mosoo/contracts";
-import type {
-  AgentBuiltInToolConfig,
-  AgentEnvironmentConfig,
-  AgentKind,
-} from "@mosoo/contracts/agent";
+import type { AgentBuiltInToolConfig, AgentEnvironmentConfig } from "@mosoo/contracts/agent";
 import type { AgentManifest, AgentManifestMcpServerBinding } from "@mosoo/contracts/agent-manifest";
 import { AGENT_MANIFEST_VERSION } from "@mosoo/contracts/agent-manifest";
 import type { EnvironmentPackageSpec } from "@mosoo/contracts/environment";
@@ -89,7 +85,6 @@ export interface AgentSpec {
     secretNames: string[];
     setupScript: string;
   };
-  kind: AgentKind;
   mcpBindings: AgentSpecMcpBinding[];
   model: string;
   name: string;
@@ -359,7 +354,6 @@ function buildAgentSpecFromProfile(input: {
     description: input.agent.description,
     environment: input.environment,
     environmentManifest: input.environmentManifest,
-    kind: input.agent.kind,
     mcpBindings: [...input.mcpBindings, ...packageMcpBindings],
     model: input.agent.model,
     name: input.agent.name,
@@ -403,7 +397,6 @@ export function toAgentManifest(spec: AgentSpec): AgentManifest {
       packages: spec.environmentManifest.packages,
       setupScript: spec.environmentManifest.setupScript,
     },
-    kind: spec.kind,
     manifestVersion: AGENT_MANIFEST_VERSION,
     mcpServers: spec.mcpBindings.map((binding) => ({
       authType: binding.authType,

@@ -5,7 +5,6 @@ const AGENT_FIELDS = graphql(/* GraphQL */ `
     createdAt
     description
     id
-    kind
     liveVersion {
       ...AgentDeploymentVersionFields
     }
@@ -44,7 +43,6 @@ const AGENT_DEPLOYMENT_VERSION_FIELDS = graphql(/* GraphQL */ `
     environmentId
     id
     isLive
-    kind
     model
     provider
     runtimeId
@@ -92,7 +90,6 @@ export const LIST_VISIBLE_AGENTS_QUERY = graphql(/* GraphQL */ `
       createdAt
       description
       id
-      kind
       name
       projectId
       owner {
@@ -116,7 +113,6 @@ export const GET_AGENT_QUERY = graphql(/* GraphQL */ `
       createdAt
       description
       id
-      kind
       liveVersion {
         ...AgentDeploymentVersionFields
       }

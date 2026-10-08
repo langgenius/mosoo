@@ -2,7 +2,6 @@ import type { JsonObject } from "@mosoo/contracts";
 import type {
   AgentBuiltInToolConfig,
   AgentDeploymentVersion,
-  AgentKind,
   AgentReadiness,
   AgentVisibility,
 } from "@mosoo/contracts/agent";
@@ -15,7 +14,6 @@ export type AgentStatus = "draft" | "published";
 // is always "owner". Non-owner consumption is a separate (future) surface.
 export type AgentRole = "owner";
 export type AgentMode = "create" | "preview" | "consume";
-export type { AgentKind };
 
 export type RuntimeId = string;
 
@@ -87,7 +85,6 @@ export interface UserInfo {
 export interface Agent {
   id: string;
   projectId: string;
-  kind: AgentKind;
   liveVersion: AgentDeploymentVersion | null;
   name: string;
   description: string;

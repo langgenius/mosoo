@@ -1,5 +1,6 @@
 import { toArrayBuffer, toBase64Url } from "../../../shared/bytes";
 import { isTruthy } from "../../../shared/truthiness";
+import { parseOAuthEndpoint } from "./mcp-oauth-endpoint";
 import type { OAuthMetadata } from "./mcp-types";
 
 interface DynamicOAuthClientRegistration {
@@ -36,7 +37,7 @@ export async function registerDynamicOAuthClient(
     throw new Error("OAuth dynamic registration is not available.");
   }
 
-  const response = await fetch(metadata.registration_endpoint, {
+  const response = await fetch(parseOAuthEndpoint(metadata.registration_endpoint), {
     body: JSON.stringify({
       client_name: "mosoo MCP",
       grant_types: ["authorization_code", "refresh_token"],
@@ -48,6 +49,7 @@ export async function registerDynamicOAuthClient(
       "content-type": "application/json",
     },
     method: "POST",
+    redirect: "manual",
   });
 
   if (!response.ok) {

@@ -78,6 +78,7 @@ function createContinuationSandbox(input: { restoreError?: Error } = {}): {
         return backup;
       },
       setKeepAlive: unavailable,
+      ensureContainerReady: unavailable,
       startProcess: unavailable,
       terminal: unavailable,
       unmountBucket: unavailable,
@@ -132,7 +133,7 @@ async function createContinuationFixture(): Promise<{
     .app()
     .insert(sandboxBackupsTable)
     .values({
-      createdAt: now - 20 * 24 * 60 * 60 * 1000,
+      createdAt: now - 90 * 24 * 60 * 60 * 1000,
       dir: SESSION_CWD,
       id: STORED_BACKUP_ID,
       keep: false,
@@ -159,7 +160,7 @@ function createInput(sandbox: SandboxHandle) {
 }
 
 describe("recycled cattle sandbox continuation", () => {
-  test("restores the complete 20-day-old Thread checkpoint before opening a new execution session", async () => {
+  test("selects the same 90-day-old checkpoint for restore before opening a new execution session", async () => {
     const { bindings } = await createContinuationFixture();
     const { restoredBackups, sandbox } = createContinuationSandbox();
 
@@ -171,6 +172,7 @@ describe("recycled cattle sandbox continuation", () => {
       {
         dir: SESSION_CWD,
         id: CLOUDFLARE_BACKUP_ID,
+        localBucket: true,
       },
     ]);
   });
@@ -199,6 +201,7 @@ describe("recycled cattle sandbox continuation", () => {
       {
         dir: SESSION_CWD,
         id: CLOUDFLARE_BACKUP_ID,
+        localBucket: true,
       },
     ]);
   });

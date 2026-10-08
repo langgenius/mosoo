@@ -27,6 +27,11 @@ Agent intact.
 The core export, import, and fork flows are available. An Agent's main setup
 and packaged Skills can travel with it.
 
+The unreleased #582 candidate imports and forks reusable configuration for
+Session-isolated execution. Legacy package `kind` values cannot request a
+shared machine, and package input may omit that field. Existing source Agent
+labels and Sessions remain unchanged until their verified Cloud migration.
+
 A `.agent` file is not a Project backup or a snapshot of a running Agent. It does
 not carry credentials, conversations, logs, usage history, or live runtime
 state. External connections must be reconnected, and imported Environment

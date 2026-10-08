@@ -1,4 +1,3 @@
-import type { AgentKind } from "@mosoo/contracts/agent";
 import type { SandboxSubjectKind } from "@mosoo/contracts/sandbox";
 import type { SessionType } from "@mosoo/contracts/session";
 import type { SessionRunStatus } from "@mosoo/contracts/session-run";
@@ -36,7 +35,6 @@ interface RuntimeSessionLinkRow {
   creator_account_id: PlatformId | null;
   origin_json: string | null;
   sandbox_id: SandboxId | null;
-  sandbox_kind: AgentKind | null;
   sandbox_subject_kind: SandboxSubjectKind | null;
   session_id: SessionId | null;
   session_run_id: SessionRunId | null;
@@ -101,7 +99,6 @@ export async function getRuntimeSessionLink(
         creator_account_id: sessionsTable.creatorAccountId,
         origin_json: sandboxSessionsTable.originJson,
         sandbox_id: driverInstancesTable.sandboxId,
-        sandbox_kind: sandboxesTable.kind,
         sandbox_subject_kind: sandboxesTable.subjectKind,
         session_id: linkedSessionId.as("session_id"),
         session_run_id: sessionRunsTable.id,
@@ -130,7 +127,6 @@ export async function getRuntimeSessionLink(
     creatorId: row?.creator_account_id ?? null,
     executionOwnerId: principals.executionOwnerId,
     sandboxId: row?.sandbox_id ?? null,
-    sandboxKind: row?.sandbox_kind ?? null,
     sandboxSubjectKind: row?.sandbox_subject_kind ?? null,
     sessionId: row?.session_id ?? null,
     sessionRunId: row?.session_run_id ?? null,

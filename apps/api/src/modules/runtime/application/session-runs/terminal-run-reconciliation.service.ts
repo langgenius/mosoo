@@ -3,15 +3,17 @@ import type { SessionRunStatus, SessionRunSummary } from "@mosoo/contracts/sessi
 import {
   driverInstancesTable,
   sessionEventsTable,
+  sessionModelCallsTable,
   sessionRunsTable,
   sessionsTable,
 } from "@mosoo/db";
 import type { SessionId, SessionRunId } from "@mosoo/id";
-import { and, asc, eq, inArray, isNull, notExists, or, sql } from "drizzle-orm";
+import { and, asc, eq, exists, inArray, isNull, notExists, or, sql } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../../platform/db/drizzle";
 import { appendSessionRuntimeEvents } from "../../../sessions/application/session-event-write.service";
+import { finalizeSessionModelCallUsage } from "../../../sessions/application/session-model-call.service";
 import { createSessionRunTerminalSourceId } from "../../domain/session-run-terminal-event-id";
 import {
   getSessionRunSummariesByIds,
@@ -36,6 +38,13 @@ interface TerminalRunCandidate {
 export interface TerminalRunReconciliationResult {
   readonly reconciledRunIds: readonly SessionRunId[];
   readonly reconciledSessionIds: readonly SessionId[];
+}
+
+interface RepairTerminalSessionRunProjectionsInput {
+  readonly preserveSessionLifecycle: boolean;
+  readonly run: SessionRunSummary;
+  readonly sessionId: SessionId;
+  readonly terminalEventExists?: boolean;
 }
 
 function assertTerminalRunProjection(outcome: SessionRunTransitionOutcome): void {
@@ -124,6 +133,17 @@ async function findTerminalRunCandidates(
         ),
       ),
   );
+  const unfinishedUsage = exists(
+    database
+      .select({ id: sessionModelCallsTable.id })
+      .from(sessionModelCallsTable)
+      .where(
+        and(
+          eq(sessionModelCallsTable.sessionRunId, sessionRunsTable.id),
+          eq(sessionModelCallsTable.status, "started"),
+        ),
+      ),
+  );
   const staleSessionProjection = and(
     eq(sessionsTable.lastRunId, sessionRunsTable.id),
     eq(sessionsTable.status, "RUNNING"),
@@ -149,7 +169,7 @@ async function findTerminalRunCandidates(
           isNull(driverInstancesTable.id),
           inArray(driverInstancesTable.status, TERMINAL_DRIVER_STATUSES),
         ),
-        or(staleSessionProjection, missingTerminalEvent),
+        or(staleSessionProjection, missingTerminalEvent, unfinishedUsage),
       ),
     )
     .orderBy(asc(sessionRunsTable.updatedAt), asc(sessionRunsTable.id))
@@ -161,15 +181,9 @@ async function readPersistedTerminalEventKeys(
   bindings: ApiBindings,
   runIds: readonly SessionRunId[],
 ): Promise<Set<string>> {
-  if (runIds.length === 0) {
-    return new Set<string>();
-  }
-
+  if (runIds.length === 0) return new Set();
   const rows = await getAppDatabase(bindings.DB)
-    .select({
-      eventType: sessionEventsTable.eventType,
-      runId: sessionEventsTable.runId,
-    })
+    .select({ eventType: sessionEventsTable.eventType, runId: sessionEventsTable.runId })
     .from(sessionEventsTable)
     .where(
       and(
@@ -178,10 +192,52 @@ async function readPersistedTerminalEventKeys(
       ),
     )
     .all();
-
   return new Set(
     rows.flatMap((row) => (row.runId === null ? [] : [`${row.runId}:${row.eventType}`])),
   );
+}
+
+export async function repairTerminalSessionRunProjections(
+  bindings: ApiBindings,
+  input: RepairTerminalSessionRunProjectionsInput,
+): Promise<boolean> {
+  const projection = await setSessionRunStatus(bindings.DB, {
+    preserveSessionLifecycle: input.preserveSessionLifecycle,
+    runId: input.run.id,
+    source: "maintenance",
+    status: input.run.status,
+  });
+  assertTerminalRunProjection(projection);
+  const usageFinalized = await finalizeSessionModelCallUsage(bindings.DB, input.run.id);
+  const kind = terminalEventKind(input.run.status);
+
+  const terminalEventExists =
+    input.terminalEventExists ??
+    Boolean(
+      await getAppDatabase(bindings.DB)
+        .select({ id: sessionEventsTable.id })
+        .from(sessionEventsTable)
+        .where(
+          and(eq(sessionEventsTable.runId, input.run.id), eq(sessionEventsTable.eventType, kind)),
+        )
+        .limit(1)
+        .get(),
+    );
+  if (terminalEventExists) return usageFinalized;
+
+  const persisted = await appendSessionRuntimeEvents({
+    bindings,
+    events: [
+      createTerminalRunRecoveryEvent({
+        kind,
+        run: input.run,
+        sessionId: input.sessionId,
+        sourceEventId: createSessionRunTerminalSourceId(input.run.id, kind),
+      }),
+    ],
+    sessionId: input.sessionId,
+  });
+  return usageFinalized || persisted.persistedCount > 0;
 }
 
 /**
@@ -213,37 +269,16 @@ export async function reconcileTerminalSessionRuns(
       continue;
     }
 
-    if (candidate.sessionLastRunId === run.id && candidate.sessionStatus === "RUNNING") {
-      const projection = await setSessionRunStatus(bindings.DB, {
-        runId: run.id,
-        source: "maintenance",
-        status: run.status,
-      });
-      assertTerminalRunProjection(projection);
-    }
-
-    const kind = terminalEventKind(run.status);
-    const eventKey = `${run.id}:${kind}`;
-
-    if (!persistedTerminalEventKeys.has(eventKey)) {
-      const sourceEventId = createSessionRunTerminalSourceId(run.id, kind);
-      const persisted = await appendSessionRuntimeEvents({
-        bindings,
-        events: [
-          createTerminalRunRecoveryEvent({
-            kind,
-            run,
-            sessionId: candidate.sessionId,
-            sourceEventId,
-          }),
-        ],
-        sessionId: candidate.sessionId,
-      });
-
-      if (persisted.persistedCount > 0) {
-        reconciledRunIds.push(run.id);
-      }
-    }
+    const repaired = await repairTerminalSessionRunProjections(bindings, {
+      preserveSessionLifecycle:
+        candidate.sessionLastRunId !== run.id || candidate.sessionStatus !== "RUNNING",
+      run,
+      sessionId: candidate.sessionId,
+      terminalEventExists: persistedTerminalEventKeys.has(
+        `${run.id}:${terminalEventKind(run.status)}`,
+      ),
+    });
+    if (repaired) reconciledRunIds.push(run.id);
 
     reconciledSessionIds.add(candidate.sessionId);
   }

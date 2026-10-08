@@ -1,31 +1,48 @@
-import {
-  SANDBOX_CACHE_PATH,
-  SANDBOX_MEMORY_PATH,
-  SANDBOX_SESSION_ROOT,
-} from "@mosoo/agent-driver/paths";
+import { SANDBOX_CACHE_PATH, SANDBOX_SESSION_ROOT } from "@mosoo/agent-driver/paths";
 import { sandboxesTable } from "@mosoo/db";
-import { discardPromiseResult } from "@mosoo/effects";
 import { parsePlatformId } from "@mosoo/id";
 import type { SandboxId } from "@mosoo/id";
 import { eq } from "drizzle-orm";
 
+import type { SandboxContainerObservation } from "../../../../adapters/durable-objects/sandbox.do";
+import { createErrorLogContext, logInfo, logWarn } from "../../../../platform/cloudflare/logger";
+import { withDisposedRpcResource } from "../../../../platform/cloudflare/rpc-disposal";
 import {
-  withDisposedRpcResource,
-  withDisposedRpcResult,
-} from "../../../../platform/cloudflare/rpc-disposal";
-import { requireCloudflareSandboxBinding } from "../../../../platform/cloudflare/sandbox-binding";
+  requireCloudflareSandboxBinding,
+  requireSandboxBinding,
+} from "../../../../platform/cloudflare/sandbox-binding";
+import { SANDBOX_STARTUP_RPC_TIMEOUT_MS } from "../../../../platform/cloudflare/sandbox-startup";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../../platform/db/drizzle";
-import type { RuntimeStateClearRule } from "../../domain/runtime-kind-policy";
 import type { SandboxNetworkConstraints } from "../../domain/sandbox-network-constraints";
 import { withRuntimeProvisionTimeout } from "../runtime-provision-timeout";
-import { decodeSandboxBackupIdForPlatform } from "../sandbox-backup-id";
 import { toSandboxHandle } from "../sandbox-handles";
 import type { SandboxHandle } from "../sandbox-handles";
-import type { ReadyRuntimeSubjectBackupRecord } from "./runtime-subject-store";
 
-function quoteShellArg(value: string): string {
-  return `'${value.replaceAll("'", `'"'"'`)}'`;
+async function readRuntimeSubjectSandboxBinding(
+  bindings: ApiBindings,
+  runtimeSubjectId: string,
+): Promise<string> {
+  const record = await getAppDatabase(bindings.DB)
+    .select({ sandboxBinding: sandboxesTable.sandboxBinding })
+    .from(sandboxesTable)
+    .where(
+      eq(sandboxesTable.id, parsePlatformId<SandboxId>(runtimeSubjectId, "Runtime subject ID")),
+    )
+    .get();
+  if (!record) throw new Error("Runtime subject has no recorded Sandbox binding.");
+  return record.sandboxBinding;
+}
+
+export async function getRuntimeSubjectContainerObservation(
+  bindings: ApiBindings,
+  runtimeSubjectId: string,
+): Promise<SandboxContainerObservation> {
+  const sandboxId = parsePlatformId<SandboxId>(runtimeSubjectId, "Runtime subject ID");
+  const binding = await readRuntimeSubjectSandboxBinding(bindings, sandboxId);
+  // Match getSandbox(normalizeId: true), without its configuration RPCs.
+  const subject = requireSandboxBinding(bindings, binding).getByName(sandboxId.toLowerCase());
+  return withDisposedRpcResource(subject, (handle) => handle.getContainerObservation());
 }
 
 export async function getRuntimeSubjectKeepAliveHandle(
@@ -36,18 +53,10 @@ export async function getRuntimeSubjectKeepAliveHandle(
     return Promise.resolve(toSandboxHandle(bindings.runtimeSubjectHandleFactory(runtimeSubjectId)));
   }
 
-  const record = await getAppDatabase(bindings.DB)
-    .select({ sandboxBinding: sandboxesTable.sandboxBinding })
-    .from(sandboxesTable)
-    .where(
-      eq(sandboxesTable.id, parsePlatformId<SandboxId>(runtimeSubjectId, "Runtime subject ID")),
-    )
-    .get();
-  if (!record) throw new Error("Runtime subject has no recorded Sandbox binding.");
   return getCloudflareRuntimeSubjectKeepAliveHandle(
     bindings,
     runtimeSubjectId,
-    record.sandboxBinding,
+    await readRuntimeSubjectSandboxBinding(bindings, runtimeSubjectId),
   );
 }
 
@@ -84,43 +93,43 @@ export async function configureRuntimeSubjectNetwork(
   );
 }
 
-export async function prepareRuntimeSubjectFilesystem(subject: SandboxHandle): Promise<void> {
-  // Guard these container RPCs with the provision timeout. On local Apple Silicon container
-  // reactivation the SDK's
-  // port-readiness wait can stall ~120s; without a timeout the run wedges in `booting`
-  // indefinitely until the next message reconciles it as `runtime.inactive`. Failing fast
-  // surfaces a retryable `runtime.provision_failed` instead.
-  // The four RPCs are mutually independent: setKeepAlive configures the
-  // container lifetime while the mkdirs assert platform roots. Awaiting all of
-  // them keeps the explicit completion barrier for each call while removing
-  // the serial keep-alive wait from the first-token critical path.
-  await withRuntimeProvisionTimeout(
-    Promise.all([
-      subject.setKeepAlive(true),
-      subject.mkdir(SANDBOX_CACHE_PATH, { recursive: true }),
-      subject.mkdir(SANDBOX_MEMORY_PATH, { recursive: true }),
-      subject.mkdir(SANDBOX_SESSION_ROOT, { recursive: true }),
-    ]).then(() => undefined),
-    "Runtime subject filesystem prepare",
-  );
-}
-
-export async function restoreRuntimeSubjectBackup(
+export async function prepareRuntimeSubjectFilesystem(
   subject: SandboxHandle,
-  input: {
-    readonly backup: ReadyRuntimeSubjectBackupRecord;
-    readonly runtimeSubjectId: string;
-  },
+  input: { allowStartupRecovery: boolean; runtimeSubjectId: string },
 ): Promise<void> {
-  await withDisposedRpcResult(
-    withRuntimeProvisionTimeout(
-      subject.restoreBackup({
-        dir: input.backup.dir,
-        id: decodeSandboxBackupIdForPlatform(input.backup.id),
-      }),
-      `Runtime subject restore for ${input.runtimeSubjectId}`,
+  async function step(name: string, task: () => Promise<void>, timeoutMs?: number): Promise<void> {
+    const startedAt = Date.now();
+    try {
+      await withRuntimeProvisionTimeout(task(), `Runtime subject ${name}`, timeoutMs);
+      logInfo("runtime.subject.prepare.step", {
+        durationMs: Date.now() - startedAt,
+        runtimeSubjectId: input.runtimeSubjectId,
+        step: name,
+      });
+    } catch (error) {
+      logWarn("runtime.subject.prepare.failed", {
+        ...createErrorLogContext(error),
+        durationMs: Date.now() - startedAt,
+        runtimeSubjectId: input.runtimeSubjectId,
+        step: name,
+      });
+      throw error;
+    }
+  }
+
+  await step("keep-alive", () => subject.setKeepAlive(true));
+  await step(
+    "container startup",
+    () => subject.ensureContainerReady({ allowRecovery: input.allowStartupRecovery }),
+    SANDBOX_STARTUP_RPC_TIMEOUT_MS,
+  );
+  // These operations now run against a ready container. Each keeps the original
+  // 15s limit and identifies the failing path instead of hiding startup retries
+  // inside parallel implicit default-session initializations.
+  await Promise.all(
+    [SANDBOX_CACHE_PATH, SANDBOX_SESSION_ROOT].map((path) =>
+      step(`mkdir ${path}`, () => subject.mkdir(path, { recursive: true })),
     ),
-    discardPromiseResult,
   );
 }
 
@@ -140,41 +149,5 @@ export async function destroyRuntimeSubjectContainer(
       ))(),
     `Runtime subject destroy for ${runtimeSubjectId}`,
     timeoutMs,
-  );
-}
-
-export async function clearRuntimeSubjectAgentState(
-  bindings: ApiBindings,
-  input: {
-    readonly rules: readonly RuntimeStateClearRule[];
-    readonly runtimeSubjectId: string;
-    readonly stateTargets: readonly string[];
-  },
-): Promise<void> {
-  await withDisposedRpcResource(
-    await getRuntimeSubjectKeepAliveHandle(bindings, input.runtimeSubjectId),
-    async (subject) => {
-      const commands = input.rules.flatMap((rule) => {
-        switch (rule.type) {
-          case "subject_memory": {
-            return [
-              `rm -rf ${quoteShellArg(rule.path)}`,
-              `mkdir -p ${quoteShellArg(SANDBOX_MEMORY_PATH)}`,
-            ];
-          }
-          case "session_runtime_state": {
-            return input.stateTargets.map((target) => `rm -rf ${quoteShellArg(target)}`);
-          }
-        }
-      });
-
-      const result = await subject.exec(`sh -lc ${quoteShellArg(commands.join("; "))}`);
-
-      if (!result.success || result.exitCode !== 0) {
-        throw new Error(
-          result.stderr.trim() || result.stdout.trim() || "Runtime agent-state cleanup failed.",
-        );
-      }
-    },
   );
 }

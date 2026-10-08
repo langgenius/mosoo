@@ -29,6 +29,10 @@ interface ModelPricingScheduleEntry extends ModelPricing {
 }
 
 const CLAUDE_SONNET_5_STANDARD_PRICE_START_MS = Date.UTC(2026, 8, 1);
+// Published reductions: https://developers.openai.com/api/docs/changelog
+// Standard rates: https://developers.openai.com/api/docs/pricing
+const OPENAI_LUNA_TERRA_PRICE_REDUCTION_MS = Date.UTC(2026, 6, 30);
+const OPENAI_SOL_PRICE_REDUCTION_MS = Date.UTC(2026, 7, 21);
 const OPENAI_LONG_CONTEXT_INPUT_THRESHOLD = 272_000;
 const OPENAI_LONG_CONTEXT_MODEL_IDS = new Set([
   "gpt-5.4",
@@ -90,21 +94,54 @@ const MODEL_PRICING: readonly ModelPricingScheduleEntry[] = [
     model: "claude-haiku-4-5",
     outputUsdPerMillion: 4,
   }),
-  openAiPricing({
-    inputUsdPerMillion: 5,
-    model: "gpt-5.6-sol",
-    outputUsdPerMillion: 30,
-  }),
-  openAiPricing({
-    inputUsdPerMillion: 2.5,
-    model: "gpt-5.6-terra",
-    outputUsdPerMillion: 15,
-  }),
-  openAiPricing({
-    inputUsdPerMillion: 1,
-    model: "gpt-5.6-luna",
-    outputUsdPerMillion: 6,
-  }),
+  {
+    ...openAiPricing({
+      inputUsdPerMillion: 5,
+      model: "gpt-5.6-sol",
+      outputUsdPerMillion: 30,
+    }),
+    effectiveUntilMs: OPENAI_SOL_PRICE_REDUCTION_MS,
+  },
+  {
+    ...openAiPricing({
+      inputUsdPerMillion: 4,
+      model: "gpt-5.6-sol",
+      outputUsdPerMillion: 20,
+    }),
+    effectiveFromMs: OPENAI_SOL_PRICE_REDUCTION_MS,
+  },
+  {
+    ...openAiPricing({
+      inputUsdPerMillion: 2.5,
+      model: "gpt-5.6-terra",
+      outputUsdPerMillion: 15,
+    }),
+    effectiveUntilMs: OPENAI_LUNA_TERRA_PRICE_REDUCTION_MS,
+  },
+  {
+    ...openAiPricing({
+      inputUsdPerMillion: 2,
+      model: "gpt-5.6-terra",
+      outputUsdPerMillion: 12,
+    }),
+    effectiveFromMs: OPENAI_LUNA_TERRA_PRICE_REDUCTION_MS,
+  },
+  {
+    ...openAiPricing({
+      inputUsdPerMillion: 1,
+      model: "gpt-5.6-luna",
+      outputUsdPerMillion: 6,
+    }),
+    effectiveUntilMs: OPENAI_LUNA_TERRA_PRICE_REDUCTION_MS,
+  },
+  {
+    ...openAiPricing({
+      inputUsdPerMillion: 0.2,
+      model: "gpt-5.6-luna",
+      outputUsdPerMillion: 1.2,
+    }),
+    effectiveFromMs: OPENAI_LUNA_TERRA_PRICE_REDUCTION_MS,
+  },
   openAiPricing({
     inputUsdPerMillion: 5,
     model: "gpt-5.5",
@@ -524,7 +561,7 @@ export function calculateUsageCost(input: {
   const longContextApplied =
     pricing.provider === "openai" &&
     OPENAI_LONG_CONTEXT_MODEL_IDS.has(pricing.model) &&
-    input.inputTokens > OPENAI_LONG_CONTEXT_INPUT_THRESHOLD;
+    input.inputTokens + input.cacheCreationTokens > OPENAI_LONG_CONTEXT_INPUT_THRESHOLD;
   const inputPriceFactor = longContextApplied ? 2 : 1;
   const outputPriceFactor = longContextApplied ? 1.5 : 1;
   const effectivePricing: ModelPricing = {

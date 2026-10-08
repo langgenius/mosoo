@@ -1,19 +1,22 @@
 import type { JsonObject, JsonValue } from "@mosoo/contracts";
 import type { AgentBuiltInToolConfig } from "@mosoo/contracts/agent";
-import { isAgentBuiltInToolName, normalizeAgentBuiltInTools } from "@mosoo/contracts/agent";
+import {
+  getAgentBuiltInToolSupportError,
+  isAgentBuiltInToolName,
+  normalizeAgentBuiltInTools,
+} from "@mosoo/contracts/agent";
 import type { AgentConfigChangeSnapshot } from "@mosoo/contracts/agent-config-change-plan";
 import { parseDocument, stringify } from "yaml";
 
 import { toEnvironmentId, toMcpServerId, toSkillId } from "@/routes/typed-id";
 
-import type { Agent, AgentKind, McpServer, RuntimeId, SkillInfo } from "../../agent.types";
+import type { Agent, McpServer, RuntimeId, SkillInfo } from "../../agent.types";
 import { getRuntimeInfo } from "../../runtime-catalog";
 
 export interface AgentEditorDraft {
   builtInTools: AgentBuiltInToolConfig[];
   description: string;
   environmentId: string | null;
-  kind: AgentKind;
   mcpServers: McpServer[];
   model: string;
   name: string;
@@ -29,7 +32,6 @@ export function createInitialDraft(agent: Agent): AgentEditorDraft {
     builtInTools: normalizeAgentBuiltInTools(agent.config.builtInTools),
     description: agent.description,
     environmentId: agent.config.environmentId,
-    kind: agent.kind,
     mcpServers: [...agent.config.mcpServers],
     model: agent.config.model,
     name: agent.name,
@@ -58,7 +60,6 @@ export function toAgentConfigChangeSnapshot(draft: AgentEditorDraft): AgentConfi
     builtInTools: normalizeAgentBuiltInTools(draft.builtInTools),
     description: draft.description,
     environmentId: draft.environmentId === null ? null : toEnvironmentId(draft.environmentId),
-    kind: draft.kind,
     mcpServerIds: draft.mcpServers.map((server) => toMcpServerId(server.id)),
     model: draft.model,
     name: draft.name,
@@ -84,7 +85,7 @@ export function normalizeMcpServers(servers: McpServer[]): McpServer[] {
 }
 
 interface AgentDraftYamlShape {
-  builtInTools: AgentBuiltInToolConfig[];
+  builtInTools?: AgentBuiltInToolConfig[];
   assets: {
     skills: {
       filename: string;
@@ -108,7 +109,6 @@ interface AgentDraftYamlShape {
     description: string;
     name: string;
   };
-  kind: AgentKind;
   prompt: string;
   runtime: {
     id: RuntimeId;
@@ -121,7 +121,10 @@ interface AgentDraftYamlShape {
 
 function toDraftYamlShape(draft: AgentEditorDraft): AgentDraftYamlShape {
   return {
-    builtInTools: normalizeAgentBuiltInTools(draft.builtInTools),
+    ...(draft.runtime === "claude-agent-sdk" ||
+    getAgentBuiltInToolSupportError(draft.runtime, draft.builtInTools)
+      ? { builtInTools: normalizeAgentBuiltInTools(draft.builtInTools) }
+      : {}),
     assets: {
       skills: draft.skills.map((skill) => ({
         filename: skill.filename,
@@ -138,7 +141,6 @@ function toDraftYamlShape(draft: AgentEditorDraft): AgentDraftYamlShape {
       description: draft.description,
       name: draft.name,
     },
-    kind: draft.kind,
     prompt: draft.prompt,
     runtime: {
       id: draft.runtime,
@@ -195,7 +197,6 @@ export function parseDraftYaml(yaml: string, fallback: AgentEditorDraft): AgentE
     builtInTools: readBuiltInTools(root["builtInTools"], fallback.builtInTools),
     description: readString(identity["description"], fallback.description),
     environmentId: readNullableString(environment["environmentId"], fallback.environmentId),
-    kind: readAgentKind(root["kind"], fallback.kind),
     mcpServers: readMcpServers(assets["mcpServers"], fallback.mcpServers),
     model: readString(runtime["model"], fallback.model),
     name: readString(identity["name"], fallback.name),
@@ -269,10 +270,6 @@ function readNullableString(value: unknown, fallback: string | null): string | n
   }
 
   return typeof value === "string" ? value : fallback;
-}
-
-function readAgentKind(value: unknown, fallback: AgentKind): AgentKind {
-  return value === "pet" || value === "cattle" ? value : fallback;
 }
 
 function readBuiltInTools(

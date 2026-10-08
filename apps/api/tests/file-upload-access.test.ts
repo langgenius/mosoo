@@ -54,11 +54,13 @@ function createFileUploadAccessDatabase(): SqliteD1Database {
 
   database.execute(`
     CREATE TABLE session (
+      archived_at integer,
       attributed_user_id text,
       creator_account_id text NOT NULL,
       id text PRIMARY KEY NOT NULL,
       project_id text NOT NULL,
       provider text NOT NULL,
+      status text NOT NULL DEFAULT 'IDLE',
       title text
     );
 
@@ -641,7 +643,7 @@ describe("file upload access", () => {
     ).rejects.toThrow();
   });
 
-  test("requires matching Project proof for raw session upload targets", async () => {
+  test("requires matching Project proof and refuses upload after the Session stops", async () => {
     const fixture = await createApiTestFixture();
     await fixture.client.loginAsMosooAiTestAccount();
     await insertRawFileRouteSessionFixture(fixture.database, {
@@ -708,6 +710,19 @@ describe("file upload access", () => {
     expect(acceptedBody.fileId).toBeString();
     expect(acceptedBody.path).toContain(acceptedBody.fileId);
     expect(await countSessionFileRecords(fixture.database, SESSION_ID)).toBe(1);
+    await fixture.database
+      .prepare("UPDATE session SET status = 'TERMINATED' WHERE id = ?")
+      .bind(SESSION_ID)
+      .run();
+    const stoppedUpload = await createHttpApp().request(
+      `${PUBLIC_API_PREFIX}/files/${acceptedBody.fileId}/content`,
+      { method: "PUT", headers: fixture.client.sessionHeaders(), body: "changed data" },
+      fixture.bindings,
+    );
+    expect(stoppedUpload.status).toBe(409);
+    expect(((await stoppedUpload.json()) as FileErrorResponse).error).toMatchObject({
+      code: "file_conflict",
+    });
   });
 
   test("raw HTTP file list defaults to visible Thread files and filters by session", async () => {

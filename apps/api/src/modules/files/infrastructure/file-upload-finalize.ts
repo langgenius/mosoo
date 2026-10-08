@@ -1,10 +1,13 @@
 import type { FileRecord } from "@mosoo/contracts/file";
 import { fileRecordsTable } from "@mosoo/db";
+import { parsePlatformId } from "@mosoo/id";
+import type { SessionId } from "@mosoo/id";
 import { eq } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../time";
+import { admitPreviewFileActivity } from "../../sessions/infrastructure/preview-retention.repository";
 import { FileControlError } from "./file-errors";
 import {
   deleteFileControlRows,
@@ -40,6 +43,13 @@ export async function finalizeReadyFileRecord(
     scopeKind: context.file.scope_kind,
   });
   const timestampMs = currentTimestampMs();
+  if (context.file.scope_kind === "session") {
+    await admitPreviewFileActivity(
+      bindings.DB,
+      parsePlatformId<SessionId>(context.file.scope_id, "upload session id"),
+      timestampMs,
+    );
+  }
   const nextVersion = existingReady ? existingReady.version + 1 : context.file.version;
 
   if (existingReady && existingReady.id !== context.file.id) {

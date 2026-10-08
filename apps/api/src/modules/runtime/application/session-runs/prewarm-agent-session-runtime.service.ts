@@ -5,6 +5,7 @@ import { disposeRpcResource } from "../../../../platform/cloudflare/rpc-disposal
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { isApiError } from "../../../../platform/errors";
 import type { AuthenticatedViewer } from "../../../auth/application/viewer-auth.service";
+import { assertPreviewAvailable } from "../../../sessions/infrastructure/preview-retention.repository";
 import { getSupportedRuntimeId } from "../../domain/runtime-config";
 import { prewarmDriverSession } from "../../infrastructure/driver-session.service";
 import { createRuntimeSubjectLifecycleService } from "../../infrastructure/runtime-subject-lifecycle/runtime-subject-lifecycle.service";
@@ -51,6 +52,7 @@ export async function prewarmAgentSessionRuntime(
   });
 
   try {
+    await assertPreviewAvailable(bindings.DB, session.id, Date.now());
     if (await hasActiveSessionRun(bindings.DB, session.id)) {
       logInfo("session.runtime.prewarm.skipped", {
         reason: "active_run_present",
@@ -78,19 +80,15 @@ export async function prewarmAgentSessionRuntime(
         runtimeId,
         agentId: hydrated.value.profile.agentId,
         executionOwnerUserId: hydrated.value.profile.session.origin.executionOwnerUserId,
-        kind: hydrated.value.profile.kind,
         networkConstraints: resolveRuntimeSubjectNetworkConstraints(bindings, {
           envVars: hydrated.value.profile.envVars,
-          kind: hydrated.value.profile.kind,
           network: hydrated.value.profile.network,
           requestUrl: request.requestUrl,
-          subjectKind: hydrated.value.profile.sandbox.subjectKind,
         }),
         runtimeSubjectId: sandboxId,
         projectId: session.projectId,
         purpose: "prewarm",
-        subjectId: hydrated.value.profile.sandbox.subjectId,
-        subjectKind: hydrated.value.profile.sandbox.subjectKind,
+        sessionId: session.id,
         timing,
       }),
     );
@@ -99,7 +97,6 @@ export async function prewarmAgentSessionRuntime(
     const executionSession = await timing.measure("ensureSandboxConversationSession", () =>
       ensureSandboxConversationSession(bindings, {
         agentId: hydrated.value.profile.configRevision.agentId,
-        kind: hydrated.value.profile.kind,
         mountSessionResources: false,
         origin: hydrated.value.profile.session.origin,
         sandbox,

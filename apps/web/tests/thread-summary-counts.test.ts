@@ -67,6 +67,19 @@ function run(input: Pick<SessionRunSummary, "status">): SessionRunSummary {
 }
 
 describe("thread summary counts", () => {
+  test("represents direct execution without an unavailable Agent label", () => {
+    const direct = { ...session("direct-session"), agentId: null };
+    const result = toThreadListItem({
+      actionCapabilities: [],
+      agentsById: new Map(),
+      session: direct,
+      ui: { pinnedThreadIds: new Set(), readAtByThreadId: {} },
+    });
+    expect(result.agent).toBeNull();
+    expect(result.agentName).toBe("threads.directInvocation");
+    expect(result.session).toBe(direct);
+  });
+
   test("counts filters and buckets in one summary pass", () => {
     const summary = summarizeThreads([
       thread({ bucket: "working", pinned: true, read: false }),

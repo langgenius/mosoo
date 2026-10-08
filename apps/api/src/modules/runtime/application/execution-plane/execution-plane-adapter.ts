@@ -87,6 +87,5 @@ export interface RuntimeExecutionPlaneAdapter {
     bindings: ApiBindings,
     input: RuntimeSubjectOperationInput,
   ): Promise<void>;
-  resetSubjectAgentState(bindings: ApiBindings, input: RuntimeSubjectOperationInput): Promise<void>;
   stopSubjectDrivers(bindings: ApiBindings, input: StopRuntimeSubjectDriversInput): Promise<void>;
 }

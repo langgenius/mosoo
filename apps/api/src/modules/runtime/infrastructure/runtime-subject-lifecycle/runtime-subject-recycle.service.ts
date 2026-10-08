@@ -1,16 +1,14 @@
-import type { AgentKind } from "@mosoo/contracts/agent";
 import { createPlatformId } from "@mosoo/id";
 import type { RuntimeOperationId, SandboxId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
-import { getRuntimeKindPolicy } from "../../domain/runtime-kind-policy";
 import type { RuntimeSubjectOperationStatus } from "../../domain/runtime-subject-lifecycle.machine";
-import { createSandboxCheckpoints } from "../sandbox-backup.service";
 import { stopRuntimeSubjectDrivers } from "./runtime-subject-driver-stop";
 import { getRuntimeSubjectOperationErrorCode } from "./runtime-subject-errors";
 import { destroyRuntimeSubjectContainer } from "./runtime-subject-platform";
 import {
   advanceRuntimeSubjectOperationStatus,
+  assertExclusiveSessionRuntimeSubject,
   claimInactiveRuntimeSubject,
   closeRuntimeSubjectSessionsForRecycle,
   markRuntimeSubjectCold,
@@ -28,7 +26,6 @@ function getRuntimeSubjectRecycleErrorMessage(error: unknown): string {
 async function runRuntimeSubjectRecycleOperation(
   bindings: ApiBindings,
   input: {
-    readonly kind: AgentKind;
     readonly operationId: RuntimeOperationId;
     readonly reason: string;
     readonly runtimeSubjectId: SandboxId;
@@ -37,19 +34,16 @@ async function runRuntimeSubjectRecycleOperation(
 ): Promise<void> {
   let destroyStarted = input.startStatus === "destroying";
 
+  await assertExclusiveSessionRuntimeSubject(bindings.DB, input.runtimeSubjectId, {
+    id: input.operationId,
+    status: input.startStatus,
+  });
   try {
-    const policy = getRuntimeKindPolicy(input.kind);
-
     if (input.startStatus === "backing_up") {
       await stopRuntimeSubjectDrivers(bindings, {
         operationId: input.operationId,
         reason: input.reason,
         runtimeSubjectId: input.runtimeSubjectId,
-      });
-      await createSandboxCheckpoints(bindings, {
-        operationId: input.operationId,
-        rules: policy.checkpoint.createOnHibernate,
-        sandboxId: input.runtimeSubjectId,
       });
       destroyStarted = await advanceRuntimeSubjectOperationStatus(bindings.DB, {
         expectedStatus: "backing_up",
@@ -63,6 +57,10 @@ async function runRuntimeSubjectRecycleOperation(
       }
     }
 
+    await assertExclusiveSessionRuntimeSubject(bindings.DB, input.runtimeSubjectId, {
+      id: input.operationId,
+      status: "destroying",
+    });
     await destroyRuntimeSubjectContainer(bindings, input.runtimeSubjectId);
     await closeRuntimeSubjectSessionsForRecycle(bindings.DB, input.runtimeSubjectId);
     const completed = await markRuntimeSubjectCold(bindings.DB, {
@@ -92,7 +90,6 @@ export async function recycleRuntimeSubject(
   bindings: ApiBindings,
   input: {
     readonly claimOwner: string;
-    readonly kind: AgentKind;
     readonly now: number;
     readonly reason: string;
     readonly runtimeSubjectId: SandboxId;
@@ -117,7 +114,6 @@ export async function recycleRuntimeSubject(
   }
 
   await runRuntimeSubjectRecycleOperation(bindings, {
-    kind: input.kind,
     operationId,
     reason: input.reason,
     runtimeSubjectId: input.runtimeSubjectId,
@@ -130,7 +126,6 @@ export async function recycleRuntimeSubject(
 export async function resumeRuntimeSubjectRecycleOperation(
   bindings: ApiBindings,
   input: {
-    readonly kind: AgentKind;
     readonly operationId: RuntimeOperationId;
     readonly reason: string;
     readonly runtimeSubjectId: SandboxId;
@@ -138,7 +133,6 @@ export async function resumeRuntimeSubjectRecycleOperation(
   },
 ): Promise<boolean> {
   await runRuntimeSubjectRecycleOperation(bindings, {
-    kind: input.kind,
     operationId: input.operationId,
     reason: input.reason,
     runtimeSubjectId: input.runtimeSubjectId,
@@ -151,7 +145,6 @@ export async function resumeRuntimeSubjectRecycleOperation(
 export async function recycleInactiveRuntimeSubjectNow(
   bindings: ApiBindings,
   input: {
-    readonly kind: AgentKind;
     readonly now?: number;
     readonly reason: string;
     readonly runtimeSubjectId: SandboxId;
@@ -172,7 +165,6 @@ export async function recycleInactiveRuntimeSubjectNow(
 
   return recycleRuntimeSubject(bindings, {
     claimOwner,
-    kind: input.kind,
     now,
     reason: input.reason,
     runtimeSubjectId: input.runtimeSubjectId,

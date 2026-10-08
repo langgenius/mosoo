@@ -1,140 +1,34 @@
-import { useState } from "react";
 import type { ReactElement } from "react";
 
 import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
-import { ShieldCheck, Undo2 } from "@/shared/ui/icons";
 
-import type { Agent } from "../agent.types";
-import { isAutoSaveEligible } from "../components/editor/use-auto-save";
 import type { AgentEditorModel } from "../components/editor/use-model";
-import { LiveConfigActionDialog } from "./live-config-action-dialog";
-import type { LifecycleActionKind } from "./live-config-action-dialog";
 
-export interface PendingChangesBannerProps {
-  agent: Agent;
-  model: AgentEditorModel;
-  onAfterApply?: (kind: LifecycleActionKind | "direct-update") => void;
-  onDiscard: () => void;
-}
-
-// Sticky banner for unsaved live-config edits.
-// It owns confirmation orchestration around the editor model's save action.
+// Autosave failures stay visible and retryable without changing the draft.
 export function PendingChangesBanner({
-  agent,
   model,
-  onAfterApply,
   onDiscard,
-}: PendingChangesBannerProps): ReactElement | null {
+}: {
+  model: AgentEditorModel;
+  onDiscard: () => void;
+}): ReactElement | null {
   const { t } = useTranslation();
-  const [dialogOpen, setDialogOpen] = useState(false);
-
-  if (!model.dirty || model.changePlan.fieldLabels.length === 0) {
-    return null;
-  }
-
-  // Auto-save handles these silently in Preview; the banner would just flicker
-  // for the debounce window before the save lands. Restart/recreate/fork still
-  // need explicit confirmation, so the banner stays for those.
-  if (isAutoSaveEligible(model.changePlan)) {
-    return null;
-  }
-
-  const { action } = model.changePlan;
-  const forkBlocked = action === "fork-agent";
-  // Drafts don't run drivers yet — saving propagates to the next test session
-  // Automatically, so we skip the runtime-op dialog and just save. Live agents
-  // (where requiresRuntimeOperation flips on) see the appropriate dialog.
-  const dialogEnabled =
-    forkBlocked || (model.changePlan.requiresRuntimeOperation && action !== "direct-update");
-
-  async function applySaved(reportedKind: LifecycleActionKind | "direct-update") {
-    const ok = await model.save();
-    if (ok) {
-      onAfterApply?.(reportedKind);
-    }
-  }
-
-  async function applyWithDialog() {
-    setDialogOpen(false);
-    if (action === "direct-update") {
-      return;
-    }
-    await applySaved(action);
-  }
-
-  function handleApplyClick() {
-    if (dialogEnabled) {
-      setDialogOpen(true);
-      return;
-    }
-    void applySaved("direct-update");
-  }
-
-  const fieldCount = model.changePlan.fieldLabels.length;
-
+  if (!model.dirty || !model.saveError) return null;
   return (
-    <>
-      <div className="border-amber/30 bg-amber-bg/95 shrink-0 border-b px-4 py-2.5">
-        <div className="flex items-center justify-between gap-3">
-          <div className="text-amber-fg flex min-w-0 items-center gap-2 text-[12.5px]">
-            <ShieldCheck className="size-3.5 shrink-0" />
-            <span className="min-w-0 truncate">
-              {fieldCount === 1
-                ? t("agentLifecycle.fieldEdited", { count: String(fieldCount) })
-                : t("agentLifecycle.fieldsEdited", { count: String(fieldCount) })}{" "}
-              · <span className="font-medium">{model.changePlan.actionLabel}</span>
-              {model.changePlan.agentStatePreserved && action !== "direct-update" ? (
-                <span className="text-amber-fg/70">
-                  {action === "recreate-preserving-state"
-                    ? ` · ${t("agentLifecycle.checkpointedPathsRestored")}`
-                    : action === "fork-agent"
-                      ? ` · ${t("agentLifecycle.originalStateUnchanged")}`
-                      : ` · ${t("agentLifecycle.currentSandboxRetained")}`}
-                </span>
-              ) : null}
-            </span>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <Button
-              className="text-amber-fg gap-1"
-              disabled={model.saving}
-              onClick={onDiscard}
-              size="xs"
-              variant="ghost"
-            >
-              <Undo2 className="size-3" />
-              {t("agentLifecycle.discard")}
-            </Button>
-            <Button
-              className="bg-amber hover:bg-amber/85"
-              disabled={model.saving}
-              onClick={handleApplyClick}
-              size="xs"
-            >
-              {model.saving ? t("agentLifecycle.applying") : t("agentLifecycle.applyChanges")}
-            </Button>
-          </div>
-        </div>
-        <p className="text-amber-fg/80 mt-1 pl-[22px] text-[12px] leading-relaxed">
-          {t("agentLifecycle.previewKeepsSavedConfig")}
-          {agent.status === "published" ? ` ${t("agentLifecycle.republishHint")}` : null}
-        </p>
+    <div
+      className="border-destructive/30 bg-destructive/5 shrink-0 border-b px-4 py-2.5"
+      role="alert"
+    >
+      <p className="text-destructive text-xs">{model.saveError}</p>
+      <div className="mt-2 flex justify-end gap-2">
+        <Button disabled={model.saving} onClick={onDiscard} size="xs" variant="ghost">
+          {t("agentLifecycle.discard")}
+        </Button>
+        <Button disabled={model.saving} onClick={() => void model.save()} size="xs">
+          {t("agent.retry")}
+        </Button>
       </div>
-
-      {dialogEnabled ? (
-        <LiveConfigActionDialog
-          affectedFields={model.changePlan.fieldLabels}
-          agentName={agent.name}
-          busy={model.saving}
-          kind={action}
-          onCancel={() => {
-            setDialogOpen(false);
-          }}
-          onConfirm={() => void applyWithDialog()}
-          open={dialogOpen}
-        />
-      ) : null}
-    </>
+    </div>
   );
 }

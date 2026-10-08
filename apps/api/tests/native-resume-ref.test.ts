@@ -10,7 +10,7 @@ const SESSION_ID_1 = "01J000000000000000000000G1";
 const SESSION_ID_2 = "01J000000000000000000000G2";
 
 describe("native resume refs", () => {
-  test("uses only the cursor committed with a Cattle checkpoint", async () => {
+  test("uses only committed cursors regardless of a Session's historical kind", async () => {
     const database = new SqliteD1Database();
     database.execute(`
       CREATE TABLE session (
@@ -58,10 +58,23 @@ describe("native resume refs", () => {
         runtimeId: "openai-runtime",
         sessionId: SESSION_ID_2,
       }),
+    ).resolves.toBeNull();
+
+    await database
+      .prepare(
+        "UPDATE native_resume_ref SET committed_value = ?, committed_session_run_id = ? WHERE session_id = ?",
+      )
+      .bind("thread-pet-committed", "01J000000000000000000000G4", SESSION_ID_2)
+      .run();
+    await expect(
+      getNativeResumeRefForRuntime(database, {
+        runtimeId: "openai-runtime",
+        sessionId: SESSION_ID_2,
+      }),
     ).resolves.toEqual({
       kind: "openai_thread_id",
       runtimeId: "openai-runtime",
-      value: "thread-pet-live",
+      value: "thread-pet-committed",
     });
   });
 

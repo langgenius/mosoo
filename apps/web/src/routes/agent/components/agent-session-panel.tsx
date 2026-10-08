@@ -8,6 +8,7 @@ import { SessionPermissionProvider } from "@/features/session-chat/assistant-ui/
 import { SessionThread } from "@/features/session-chat/assistant-ui/session-thread";
 import { SessionThreadComposer } from "@/features/session-chat/assistant-ui/session-thread-composer";
 import { useSessionAssistantRuntime } from "@/features/session-chat/assistant-ui/use-session-assistant-runtime";
+import { SessionRuntimeControls } from "@/features/session-chat/session-runtime-controls";
 import { useSessionResourceDraft } from "@/features/session-chat/use-session-resource-draft";
 import {
   completeSessionFileUpload,
@@ -72,7 +73,6 @@ export function AgentSessionPanel({
     model.reconnecting || model.lifecycle === "RESCHEDULING" ? t("agent.reconnecting") : null;
   const sendDisabledReason = sendDisabledReasonForSession(
     {
-      configurationRefreshRequired: model.configurationRefreshRequired,
       lifecycle: model.lifecycle,
       reconnecting: model.reconnecting,
       setupBlocked,
@@ -106,9 +106,7 @@ export function AgentSessionPanel({
   const sessionLoadErrorMessage = previewResetMode
     ? t("agent.failedToLoadPreviewChat")
     : t("agent.failedToLoadSessions");
-  const configurationRefreshMessage = previewResetMode
-    ? t("agent.resetChatToTestConfig")
-    : t("agent.startNewSessionToTestConfig");
+  const configurationRefreshMessage = t("agent.sessionPresetChanged");
   const configurationRefreshActionLabel = previewResetMode
     ? t("agent.resetChat")
     : t("agent.startNewSession");
@@ -203,11 +201,25 @@ export function AgentSessionPanel({
               onSessionControlClick={handleSessionControlClick}
               pill={pill}
               reconnectingSubtitle={reconnectingSubtitle}
+              runtimeControls={
+                model.activeSession ? (
+                  <SessionRuntimeControls
+                    key={model.activeSession.id}
+                    session={model.activeSession}
+                  />
+                ) : null
+              }
               sessionControlMode={sessionControlMode}
               sending={model.sending}
               sessionCount={model.sessionCount}
               tone={tone}
             />
+
+            {tone === "preview" && import.meta.env.VITE_MOSOO_DEPLOYMENT_MODE === "cloud" ? (
+              <p className="text-muted-foreground border-b px-4 py-2 text-xs leading-relaxed">
+                {t("agent.previewRetention")}
+              </p>
+            ) : null}
 
             {isTruthy(model.sessionLoadError) ? (
               <div className="border-amber/30 bg-amber-bg text-amber-fg border-b px-4 py-2.5 text-[12px] leading-relaxed">

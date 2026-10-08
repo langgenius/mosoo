@@ -23,6 +23,7 @@ import type { Deferred } from "./driver-instance-support";
 import type { RuntimeSessionLink } from "./event-types";
 import {
   DRIVER_INSTANCE_STATE_STORAGE_KEY,
+  DRIVER_FINALIZATION_RETRY_MS,
   HEARTBEAT_STATE_PERSIST_INTERVAL_MS,
   createEmptyStoredState,
   parseHeartbeatTimestampMs,
@@ -61,6 +62,7 @@ export class DriverInstanceRuntimeState {
   driverInstanceId: DriverInstanceId | null = null;
   driverEventReceiptSeq = 0;
   errorMessage: string | null = null;
+  finalizationCompleted = false;
   heartbeatCount = 0;
   readonly heartbeatWaiters: HeartbeatWaiter[] = [];
   hello: DriverHelloInput | null = null;
@@ -88,6 +90,7 @@ export class DriverInstanceRuntimeState {
     this.driverInstanceId = snapshot.driverInstanceId;
     this.driverEventReceiptSeq = 0;
     this.errorMessage = snapshot.errorMessage;
+    this.finalizationCompleted = snapshot.finalizationCompleted;
     this.heartbeatCount = snapshot.heartbeatCount;
     this.hello = snapshot.hello;
     this.lastHeartbeat = snapshot.lastHeartbeat;
@@ -114,6 +117,7 @@ export class DriverInstanceRuntimeState {
       driverGeneration: this.driverGeneration,
       driverInstanceId: this.driverInstanceId,
       errorMessage: this.errorMessage,
+      finalizationCompleted: this.finalizationCompleted,
       heartbeatCount: this.heartbeatCount,
       hello: this.hello,
       lastHeartbeat: this.lastHeartbeat,
@@ -137,8 +141,16 @@ export class DriverInstanceRuntimeState {
   }
 
   async persistClose(close: DriverInstanceCloseSnapshot): Promise<void> {
-    this.close = close;
-    await this.#persistState();
+    if (this.finalizationCompleted) {
+      return;
+    }
+    this.close ??= close;
+    this.terminalized = true;
+    // Writes without an intervening await commit atomically in DO storage.
+    await Promise.all([
+      this.#persistState(),
+      this.#ctx.storage.setAlarm(Date.now() + DRIVER_FINALIZATION_RETRY_MS),
+    ]);
   }
 
   async persistCommandQueue(): Promise<void> {
@@ -148,7 +160,14 @@ export class DriverInstanceRuntimeState {
   async persistTerminalSnapshot(): Promise<void> {
     this.requireDriverInstanceId();
     this.commandQueue = [];
-    await this.#persistState();
+    await Promise.all([
+      this.#ctx.storage.put(DRIVER_INSTANCE_STATE_STORAGE_KEY, {
+        ...this.#toStoredState(),
+        finalizationCompleted: true,
+      }),
+      this.#ctx.storage.deleteAlarm(),
+    ]);
+    this.finalizationCompleted = true;
   }
 
   async recordAcceptedConnection(input: {
@@ -280,6 +299,7 @@ export class DriverInstanceRuntimeState {
       driverInstanceId,
     });
     await this.#ctx.storage.deleteAll();
+    await this.#ctx.storage.deleteAlarm();
     await this.#persistState();
   }
 

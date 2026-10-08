@@ -403,6 +403,7 @@
     "none": [],
     "standard": [
       { "id": "custom_tool_execute", "status": "unsupported", "version": 1 },
+      { "id": "file_change", "status": "supported", "version": 1 },
       { "id": "input_start", "status": "supported", "version": 1 },
       { "id": "mcp_execute", "status": "supported", "version": 1 },
       { "id": "native_resume", "status": "supported", "version": 1 },
@@ -519,6 +520,27 @@
       "display": {
         "iconKey": "opencode",
         "providerLabel": "OpenCode",
+      },
+    },
+    {
+      "runtimeId": "pi",
+      "label": "Pi",
+      "visibility": "public",
+      "transport": "pi-rpc",
+      "acceptsCustomProvider": true,
+      "capabilityProfile": "standard",
+      "defaultIdentity": {
+        "providerId": "openai-compatible",
+        // A custom-only runtime has no preset model to use as a launchable default.
+        "modelId": "custom-model",
+      },
+      "vendorIds": ["openai-compatible"],
+      "supportedModels": {
+        "modelIds": [],
+      },
+      "display": {
+        "iconKey": "pi",
+        "providerLabel": "OpenAI-Compatible",
       },
     },
   ],

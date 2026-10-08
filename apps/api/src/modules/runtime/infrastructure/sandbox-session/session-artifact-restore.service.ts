@@ -20,7 +20,7 @@ import type { SandboxHandle } from "../sandbox-handles";
 export async function restoreSessionArtifactsToWorkspace(
   bindings: ApiBindings,
   input: {
-    agentId: AgentId;
+    agentId: AgentId | null;
     cwd: string;
     sandbox: SandboxHandle;
     sandboxId: SandboxId;

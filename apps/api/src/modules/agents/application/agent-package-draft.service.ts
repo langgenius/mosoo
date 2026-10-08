@@ -1,5 +1,6 @@
 import type { JsonObject } from "@mosoo/contracts";
-import type { AgentBuiltInToolConfig, AgentKind } from "@mosoo/contracts/agent";
+import { getAgentBuiltInToolSupportError } from "@mosoo/contracts/agent";
+import type { AgentBuiltInToolConfig } from "@mosoo/contracts/agent";
 import { createDefaultAgentBuiltInTools, normalizeAgentBuiltInTools } from "@mosoo/contracts/agent";
 import type {
   AgentManifestMcpServerBinding,
@@ -19,6 +20,7 @@ import type {
 
 import { getAppDatabase, runAppDatabaseBatch } from "../../../platform/db/drizzle";
 import type { AppDatabase } from "../../../platform/db/drizzle";
+import { validationError } from "../../../platform/errors";
 import { currentTimestampMs } from "../../../time";
 import { getAgentRow } from "./agent-repository";
 import { normalizeAgentSkillIds } from "./agent-skill-resolution.service";
@@ -31,7 +33,6 @@ export interface CreateDraftAgentInput {
   builtInTools?: readonly AgentBuiltInToolConfig[];
   description: string | null;
   environmentId: EnvironmentId | null;
-  kind: AgentKind;
   model: string;
   ownerId: AccountId;
   packageMcpServers: AgentManifestMcpServerBinding[];
@@ -62,6 +63,11 @@ export async function createDraftAgentBatch(
   database: D1Database,
   input: CreateDraftAgentBatchInput,
 ): Promise<AgentRow> {
+  const toolSupportError = getAgentBuiltInToolSupportError(
+    input.runtimeId,
+    input.builtInTools ?? [],
+  );
+  if (toolSupportError) throw validationError(toolSupportError);
   const agentId = createPlatformId<AgentId>();
   const timestampMs = currentTimestampMs();
   const uniqueSkillIds = normalizeAgentSkillIds(input.skillIds);
@@ -83,7 +89,7 @@ export async function createDraftAgentBatch(
       description: input.description,
       environmentId: input.environmentId,
       id: agentId,
-      kind: input.kind,
+      kind: "cattle",
       model: input.model,
       name: input.agentName,
       ownerId: input.ownerId,

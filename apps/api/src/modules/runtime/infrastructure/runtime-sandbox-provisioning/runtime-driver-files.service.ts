@@ -1,4 +1,4 @@
-import { SANDBOX_CACHE_PATH, SANDBOX_MEMORY_PATH } from "@mosoo/agent-driver/paths";
+import { SANDBOX_CACHE_PATH } from "@mosoo/agent-driver/paths";
 
 import { disposeRpcResource } from "../../../../platform/cloudflare/rpc-disposal";
 import type { DriverProfileConfig } from "../../domain/driver-snapshot";
@@ -11,7 +11,6 @@ import {
 import { sanitizeRuntimeVendorEnvVars } from "./runtime-vendor-env-policy";
 
 interface RuntimeMemoryMount {
-  sourcePath: string;
   targetRelativePath: string;
 }
 
@@ -26,7 +25,6 @@ type RuntimeMemoryMountsByRuntime = Partial<
 const RUNTIME_MEMORY_MOUNTS: RuntimeMemoryMountsByRuntime = {
   "openai-runtime": [
     {
-      sourcePath: `${SANDBOX_MEMORY_PATH}/openai-runtime/memories`,
       targetRelativePath: "memories",
     },
   ],
@@ -137,7 +135,7 @@ export async function ensureProvisioningDirectories(
 }
 
 export async function ensureRuntimeMemoryMounts(
-  session: ExecutionSessionHandle,
+  session: Pick<ExecutionSessionHandle, "exec">,
   profile: DriverProfileConfig,
 ): Promise<void> {
   const mounts = RUNTIME_MEMORY_MOUNTS[profile.runtimeId] ?? [];
@@ -145,25 +143,16 @@ export async function ensureRuntimeMemoryMounts(
   await Promise.all(
     mounts.map(async (mount) => {
       const targetPath = `${profile.session.homePath}/${mount.targetRelativePath}`;
-      const targetParent = getParentDirectory(targetPath);
-
-      // Bind-mounts need CAP_SYS_ADMIN, which the sandbox's unprivileged shell
-      // does not have. A symlink gives the runtime the same memory path without
-      // requiring a privileged syscall.
+      // Keep memory inside the Session checkpoint; never replace restored state.
       const command = [
         "set -eu",
-        `mkdir -p ${quoteShellArg(mount.sourcePath)} ${quoteShellArg(targetParent)}`,
-        `if [ -L ${quoteShellArg(targetPath)} ] && [ "$(readlink ${quoteShellArg(targetPath)})" = ${quoteShellArg(mount.sourcePath)} ]; then exit 0; fi`,
-        `rm -rf ${quoteShellArg(targetPath)}`,
-        `ln -s ${quoteShellArg(mount.sourcePath)} ${quoteShellArg(targetPath)}`,
+        `if [ -L ${quoteShellArg(targetPath)} ]; then echo 'Legacy runtime memory requires verified migration before this Thread can continue.' >&2; exit 1; fi`,
+        `mkdir -p ${quoteShellArg(targetPath)}`,
       ].join("\n");
       const result = await session.exec(`sh -lc ${quoteShellArg(command)}`);
-
       if (!result.success || result.exitCode !== 0) {
         throw new Error(
-          result.stderr.trim() ||
-            result.stdout.trim() ||
-            `Runtime memory link failed for ${targetPath}.`,
+          result.stderr.trim() || `Session runtime memory is unavailable at ${targetPath}.`,
         );
       }
     }),

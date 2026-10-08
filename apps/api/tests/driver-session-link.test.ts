@@ -107,7 +107,6 @@ describe("driver runtime session link", () => {
         creatorId: CREATOR_ID,
         executionOwnerId: EXECUTION_OWNER_FROM_ORIGIN_ID,
         sandboxId: SANDBOX_ID,
-        sandboxKind: "cattle",
         sandboxSubjectKind: "session",
         sessionId: SESSION_ID,
         sessionRunId: null,

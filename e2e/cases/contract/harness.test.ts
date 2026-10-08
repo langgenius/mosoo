@@ -8,6 +8,7 @@ import { e2eCases } from "../../cases";
 import { matchE2ERunTarget } from "../../cli-targets";
 import { loadRepoEnv } from "../../env";
 import {
+  requirePiRuntimeSettings,
   requirePreviewRuntimeCredential,
   requireProviderRuntimeEnv,
 } from "../../lib/env-preflight";
@@ -135,6 +136,62 @@ describe("E2E CLI target matching", () => {
     expect(target?.label).toBe("public-api runtime");
     expect(target?.args).toEqual(["--list"]);
     expect(target === null ? [] : commandNames(target)).toEqual(["public-api runtime"]);
+  });
+});
+
+describe("Pi public API runtime environment preflight", () => {
+  const settings = {
+    MOSOO_E2E_PI_BASE_URL: "https://models.example.test/v1",
+    MOSOO_E2E_PI_MODEL: "custom-coder",
+  };
+
+  test("requires the custom model and endpoint before API setup", () => {
+    expect(() => requirePiRuntimeSettings({})).toThrow("MOSOO_E2E_PI_MODEL");
+    expect(() => requirePiRuntimeSettings({ MOSOO_E2E_PI_MODEL: "custom-coder" })).toThrow(
+      "MOSOO_E2E_PI_BASE_URL",
+    );
+    expect(() => requirePiRuntimeSettings({ ...settings, MOSOO_E2E_PI_MODEL: "   " })).toThrow(
+      "MOSOO_E2E_PI_MODEL",
+    );
+  });
+
+  test("requires a Pi or generic key instead of borrowing another provider credential", () => {
+    expect(() =>
+      requirePiRuntimeSettings({ ...settings, MOSOO_E2E_OPENAI_API_KEY: "unrelated-key" }),
+    ).toThrow("MOSOO_E2E_PROVIDER_API_KEY or MOSOO_E2E_PI_API_KEY");
+  });
+
+  test("selects native Pi and trims the supplied model, endpoint, and credential", () => {
+    expect(
+      requirePiRuntimeSettings({
+        MOSOO_E2E_PI_API_KEY: " pi-key ",
+        MOSOO_E2E_PI_BASE_URL: " https://models.example.test/v1 ",
+        MOSOO_E2E_PI_MODEL: " custom-coder ",
+      }),
+    ).toEqual({
+      apiBase: "https://models.example.test/v1",
+      apiKey: "pi-key",
+      model: "custom-coder",
+      runtimeId: "pi",
+    });
+  });
+
+  test("prefers the generic key and rejects a different runtime override", () => {
+    expect(
+      requirePiRuntimeSettings({
+        ...settings,
+        MOSOO_E2E_PI_API_KEY: "pi-key",
+        MOSOO_E2E_PROVIDER_API_KEY: "generic-key",
+        MOSOO_E2E_RUNTIME_ID: "pi",
+      }).apiKey,
+    ).toBe("generic-key");
+    expect(() =>
+      requirePiRuntimeSettings({
+        ...settings,
+        MOSOO_E2E_PI_API_KEY: "pi-key",
+        MOSOO_E2E_RUNTIME_ID: "acp-fallback",
+      }),
+    ).toThrow("MOSOO_E2E_PROVIDER=pi requires MOSOO_E2E_RUNTIME_ID=pi");
   });
 });
 

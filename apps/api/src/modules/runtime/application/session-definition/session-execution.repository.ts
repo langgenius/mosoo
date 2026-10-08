@@ -1,6 +1,4 @@
 import {
-  AGENT_KIND_LIST_LABEL,
-  AgentKind,
   createDefaultAgentBuiltInTools,
   isAgentBuiltInToolName,
   normalizeAgentBuiltInTools,
@@ -25,6 +23,7 @@ import type {
 import { eq } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../../platform/db/drizzle";
+import { PREVIEW_RETENTION_MS } from "../../../sessions/domain/preview-retention-policy";
 import type { SessionExecutionPlan } from "./session-execution.types";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -91,14 +90,6 @@ function readBoolean(value: unknown, field: string): boolean {
   return value;
 }
 
-function readAgentKind(value: unknown, field: string): AgentKind {
-  if (AgentKind.allows(value)) {
-    return value;
-  }
-
-  throw new Error(`${field} must be ${AGENT_KIND_LIST_LABEL}.`);
-}
-
 function readNetworkPolicy(value: unknown, field: string): EnvironmentNetworkPolicy {
   if (value === "full" || value === "limited") {
     return value;
@@ -126,8 +117,11 @@ function readCredentialMode(value: unknown, field: string): AgentMcpCredentialMo
 function parseBinding(value: unknown): SessionExecutionPlan["binding"] {
   const record = readRecord(value, "sessionExecutionPlan.binding");
 
-  return {
-    agentId: readPlatformId(record["agentId"], "sessionExecutionPlan.binding.agentId") as AgentId,
+  const binding: SessionExecutionPlan["binding"] = {
+    agentId: readNullablePlatformId(
+      record["agentId"],
+      "sessionExecutionPlan.binding.agentId",
+    ) as AgentId | null,
     deploymentVersionId: readNullablePlatformId(
       record["deploymentVersionId"],
       "sessionExecutionPlan.binding.deploymentVersionId",
@@ -136,12 +130,20 @@ function parseBinding(value: unknown): SessionExecutionPlan["binding"] {
       record["deploymentVersionNumber"],
       "sessionExecutionPlan.binding.deploymentVersionNumber",
     ),
-    kind: readAgentKind(record["kind"], "sessionExecutionPlan.binding.kind"),
     model: readString(record["model"], "sessionExecutionPlan.binding.model"),
     prompt: readString(record["prompt"], "sessionExecutionPlan.binding.prompt"),
     provider: readString(record["provider"], "sessionExecutionPlan.binding.provider"),
     runtimeId: readString(record["runtimeId"], "sessionExecutionPlan.binding.runtimeId"),
   };
+  if (
+    binding.agentId === null &&
+    (binding.deploymentVersionId !== null || binding.deploymentVersionNumber !== null)
+  ) {
+    throw new TypeError(
+      "A Session without an Agent preset cannot reference a deployment revision.",
+    );
+  }
+  return binding;
 }
 
 function parseEnvironment(value: unknown): SessionExecutionPlan["environment"] {
@@ -247,13 +249,23 @@ function parseBuiltInTools(value: unknown): SessionExecutionPlan["builtInTools"]
   );
 }
 
-function parseSessionExecutionPlanJson(planJson: string): SessionExecutionPlan {
+export function parseSessionExecutionPlanJson(planJson: string): SessionExecutionPlan {
   const parsed: unknown = JSON.parse(planJson);
   const record = readRecord(parsed, "sessionExecutionPlan");
+  const previewRetentionMs = record["previewRetentionMs"];
+  if (previewRetentionMs !== undefined && previewRetentionMs !== PREVIEW_RETENTION_MS) {
+    throw new TypeError("Cloud debug Preview retention must be 30 days.");
+  }
 
   return {
     binding: parseBinding(record["binding"]),
     builtInTools: parseBuiltInTools(record["builtInTools"]),
+    ...(previewRetentionMs === undefined ? {} : { previewRetentionMs }),
+    ...(record["configJson"] === undefined
+      ? {}
+      : {
+          configJson: readString(record["configJson"], "sessionExecutionPlan.configJson"),
+        }),
     environment: parseEnvironment(record["environment"]),
     skills: readArray(record["skills"], "sessionExecutionPlan.skills").map(parseSkillReference),
     tools: readArray(record["tools"], "sessionExecutionPlan.tools").map(parseToolReference),

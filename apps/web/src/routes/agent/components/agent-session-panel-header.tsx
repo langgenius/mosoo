@@ -30,6 +30,7 @@ export function AgentSessionPanelHeader({
   activeTitle,
   agentName,
   onSessionControlClick,
+  runtimeControls,
   pill,
   reconnectingSubtitle,
   sessionControlMode,
@@ -40,6 +41,7 @@ export function AgentSessionPanelHeader({
   activeTitle: string | null;
   agentName: string;
   onSessionControlClick: () => Promise<void>;
+  runtimeControls?: React.ReactNode;
   pill: SessionPill;
   reconnectingSubtitle: string | null;
   sessionControlMode: SessionControlMode;
@@ -77,6 +79,7 @@ export function AgentSessionPanelHeader({
           {t("agent.sessionCount", { count: String(sessionCount) })}
         </span>
       ) : null}
+      {runtimeControls}
       <Button
         className="gap-1.5"
         disabled={sending}

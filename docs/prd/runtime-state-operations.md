@@ -6,6 +6,8 @@ Status: Apply Changes and Reset agent-state are available in the web console. Hi
 
 Builders need to improve a live Agent without guessing whether conversations will change or work will be lost. mosoo separates routine saves, interruption, sandbox replacement, and destructive recovery so risk is visible before action.
 
+The unreleased #582 candidate removes Agent type selection from new configuration. The shared-Agent maintenance operations below remain only for existing unconverted Cloud workspaces; they are not a new configuration option. New isolated Sessions preserve their own committed state, and configuration edits apply to later admission.
+
 ## Current User Flow
 
 - Edits that need no Assistant runtime action save automatically. Existing conversations keep their original settings; new conversations use the saved settings.
@@ -13,7 +15,7 @@ Builders need to improve a live Agent without guessing whether conversations wil
 - Restart keeps the current sandbox and stops the current Agent process. It starts again on later use.
 - Recreate first checkpoints long-term memory and eligible, non-terminated conversation workspaces, then removes the sandbox. Recovery occurs when the Agent is next used. A failed checkpoint prevents removal of the old sandbox.
 - **Reset agent-state** appears only for Assistant Agents under Settings > Danger zone. The Builder must type the Agent name to confirm.
-- After publication, Agent type and runtime cannot change in place. The Builder must fork; the original keeps its conversations and history.
+- After publication, the runtime cannot change in place. The Builder must fork; the original keeps its conversations and history. Historical kind metadata cannot be edited or used to select a new shared workspace.
 
 ## Safety And Visible Boundaries
 

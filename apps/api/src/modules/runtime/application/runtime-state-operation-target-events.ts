@@ -196,10 +196,6 @@ export async function appendRuntimeDriverRestartAttemptedEvents(
 
   const events = input.targets
     .flatMap((target) => {
-      if (!isTruthy(target.agentId)) {
-        return [];
-      }
-
       const agentId = target.agentId;
       const driverIds = driverIdsBySessionId.get(target.sessionId) ?? [];
       if (driverIds.length === 0) {
@@ -237,10 +233,6 @@ export async function appendRuntimeSubjectTerminatedEvents(
 ): Promise<void> {
   await appendOneRuntimeDiagnosticEventPerSession(bindings, {
     events: input.targets.flatMap((target) => {
-      if (!isTruthy(target.agentId)) {
-        return [];
-      }
-
       return [
         {
           eventName: RUNTIME_DIAGNOSTIC_EVENT.sandboxTerminated.name,

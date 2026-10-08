@@ -10,7 +10,7 @@ export interface FilesAgentOption {
 }
 
 export interface FilesSessionOption {
-  agentId: string;
+  agentId: string | null;
   id: string;
   title: string | null;
 }
@@ -65,7 +65,7 @@ function toAgentAttribution(
 
   const session = sessionById.get(file.sessionId);
 
-  if (session === undefined) {
+  if (session === undefined || session.agentId === null) {
     return null;
   }
 
@@ -89,6 +89,7 @@ export function createFilesViewModel(
   const agentIdsWithFiles = new Set(sessionsWithFiles.map((session) => session.agentId));
   const agentNameById = new Map(agents.map((agent) => [agent.id, agent.name]));
   const agentOptions = [...agentIdsWithFiles]
+    .filter((agentId): agentId is string => agentId !== null)
     .map((agentId) => ({
       id: agentId,
       name: agentNameById.get(agentId) ?? agentId,

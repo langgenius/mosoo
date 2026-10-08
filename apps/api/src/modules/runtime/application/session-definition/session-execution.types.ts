@@ -18,6 +18,10 @@ import type {
 export interface SessionExecutionPlan {
   binding: Omit<SessionExecutionBinding, "sessionId">;
   builtInTools: AgentBuiltInToolConfig[];
+  /** Absent only on Sessions admitted before execution config freezing. */
+  configJson?: string;
+  /** Explicit Cloud debug enrollment; absent on legacy and formal/API Sessions. */
+  previewRetentionMs?: number;
   environment: {
     allowMcpServers: boolean;
     allowPackageManagers: boolean;

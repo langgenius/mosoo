@@ -45,6 +45,7 @@ export async function restoreSandboxConversationDirectoryBackup(
   input: {
     readonly backup: SandboxConversationDirectoryBackup;
     readonly cwd: string;
+    readonly localBucket: boolean;
   },
 ): Promise<void> {
   await withDisposedRpcResult(
@@ -52,6 +53,7 @@ export async function restoreSandboxConversationDirectoryBackup(
       sandbox.restoreBackup({
         dir: input.backup.dir,
         id: decodeSandboxBackupIdForPlatform(input.backup.id),
+        localBucket: input.localBucket,
       }),
       `Sandbox session cwd restore for ${input.cwd}`,
     ),

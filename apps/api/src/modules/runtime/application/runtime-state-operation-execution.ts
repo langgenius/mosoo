@@ -1,4 +1,4 @@
-import type { RuntimeStateOperationName } from "@mosoo/contracts/agent";
+import type { SessionRuntimeOperationName } from "@mosoo/contracts/session";
 import type { RuntimeOperationId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
@@ -8,7 +8,7 @@ import type { RuntimeOperationSubject } from "./runtime-state-operation-subjects
 
 export type RuntimeStateOperationExecutionPlane = Pick<
   RuntimeExecutionPlaneAdapter,
-  "recreateSubjectPreservingState" | "resetSubjectAgentState" | "stopSubjectDrivers"
+  "recreateSubjectPreservingState" | "stopSubjectDrivers"
 >;
 
 const RUNTIME_OPERATION_SUBJECT_CONCURRENCY = 4;
@@ -17,7 +17,7 @@ function operationInput(input: RuntimeOperationSubject & { operationId: RuntimeO
   return {
     operationId: input.operationId,
     runtimeSubjectId: input.runtimeSubjectId,
-    reason: "agent.runtime_state_operation",
+    reason: "session.runtime_state_operation",
     targets: input.targets,
     terminalRun: {
       error: RUNTIME_STATE_OPERATION_INTERRUPTED_ERROR,
@@ -31,7 +31,7 @@ async function executeRuntimeStateOperationSubject(
   bindings: ApiBindings,
   input: {
     readonly operationId: RuntimeOperationId;
-    readonly operation: RuntimeStateOperationName;
+    readonly operation: SessionRuntimeOperationName;
   } & RuntimeOperationSubject,
 ): Promise<void> {
   switch (input.operation) {
@@ -46,10 +46,6 @@ async function executeRuntimeStateOperationSubject(
       await executionPlane.recreateSubjectPreservingState(bindings, operationInput(input));
       return;
     }
-    case "resetAgentState": {
-      await executionPlane.resetSubjectAgentState(bindings, operationInput(input));
-      return;
-    }
     default: {
       throw new Error("Unsupported runtime state operation.");
     }
@@ -61,7 +57,7 @@ export async function executeRuntimeStateOperationSubjects(
   input: {
     readonly executionPlane: RuntimeStateOperationExecutionPlane;
     readonly operationId: RuntimeOperationId;
-    readonly operation: RuntimeStateOperationName;
+    readonly operation: SessionRuntimeOperationName;
     readonly subjects: readonly RuntimeOperationSubject[];
   },
 ): Promise<void> {

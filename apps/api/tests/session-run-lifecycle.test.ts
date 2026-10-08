@@ -130,7 +130,7 @@ function advanceRunBeforeBatch(
 }
 
 describe("session run lifecycle", () => {
-  test("emits one structured business log for an applied terminal transition", async () => {
+  test("replays the original terminal observation until its durable event exists", async () => {
     const database = await createPublicHttpContractDatabase();
     await insertNonOwnerSession(database);
     await insertSessionRun(database, {
@@ -161,7 +161,8 @@ describe("session run lifecycle", () => {
       .map((entry) => JSON.parse(entry))
       .filter((entry) => entry.message === "session.run.terminal");
 
-    expect(terminalEntries).toHaveLength(1);
+    expect(terminalEntries).toHaveLength(2);
+    expect(terminalEntries[1]).toEqual(terminalEntries[0]);
     expect(terminalEntries[0]).toMatchObject({
       level: "info",
       metadata: {

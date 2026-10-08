@@ -16,6 +16,12 @@ type Translate = (key: string, variables?: Record<string, string>) => string;
 const FAILURE_STATUSES = new Set<SessionRunStatus>(["cancelled", "expired", "failed"]);
 
 const DEFAULT_FAILURE_COPY: Record<string, string> = {
+  "threads.runContentBlockedMessage":
+    "The model provider blocked this turn under its content policy. It did not identify whether the input or output was blocked. This run will not be retried automatically. Earlier tool actions may already have completed.",
+  "threads.runContentBlockedTitle": "Blocked by model provider",
+  "threads.runRefusedMessage":
+    "The agent refused to continue. This run will not be retried automatically. Earlier tool actions may already have completed.",
+  "threads.runRefusedTitle": "Agent refused to continue",
   "threads.runCancelledMessage": "The run was cancelled before it completed.",
   "threads.runCancelledTitle": "Run cancelled",
   "threads.runExpiredMessage": "The run expired before it completed.",
@@ -67,6 +73,21 @@ export function getThreadRunFailure(
 
   const fallback = getFailureFallback(run.status, t);
   const errorMessage = run.error?.message.trim() ?? "";
+
+  if (run.status === "failed" && run.error?.code === "acp.content_blocked") {
+    return {
+      code: run.error.code,
+      message: t("threads.runContentBlockedMessage"),
+      title: t("threads.runContentBlockedTitle"),
+    };
+  }
+  if (run.status === "failed" && run.error?.code === "acp.refused") {
+    return {
+      code: run.error.code,
+      message: t("threads.runRefusedMessage"),
+      title: t("threads.runRefusedTitle"),
+    };
+  }
 
   return {
     code: run.error?.code ?? null,

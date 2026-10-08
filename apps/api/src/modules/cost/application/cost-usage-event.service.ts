@@ -26,10 +26,10 @@ import type {
 } from "../domain/usage-contract";
 export interface RuntimeUsageRunContext {
   actorUserId: AccountId;
-  agentId: AgentId;
+  agentId: AgentId | null;
   agentOwnerUserId: AccountId;
   agentRevisionId: AgentDeploymentVersionId | null;
-  agentStatus: "draft" | "published";
+  agentStatus: "draft" | "published" | null;
   createdAtMs: number;
   model: string;
   organizationId: OrganizationId;
@@ -74,17 +74,24 @@ function requireUsageContract(usage: SessionUsageSummary): UsageContract {
 }
 
 function resolvePublicationState(input: RuntimeUsageRunContext): AgentPublicationStateAtRun {
+  if (input.agentId === null) return "not_applicable";
   if (isTruthy(input.agentRevisionId)) {
     return "published";
   }
 
-  return input.agentStatus === "published" ? "draft_of_published" : "unpublished";
+  return input.agentStatus === null
+    ? "archived"
+    : input.agentStatus === "published"
+      ? "draft_of_published"
+      : "unpublished";
 }
 
 function resolveRunPurpose(input: RuntimeUsageRunContext): RunPurpose {
   if (input.trigger === "system") {
     return "scheduled";
   }
+
+  if (input.agentId === null) return "production";
 
   if (isTruthy(input.agentRevisionId)) {
     return "production";

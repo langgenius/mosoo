@@ -135,6 +135,7 @@ export interface FileStore {
     viewer: AuthenticatedViewer,
     sessionId: SessionId,
     fileIds: FileId[],
+    options?: { resume?: boolean },
   ): Promise<FileRecord[]>;
   completeUpload(command: CompleteFileUploadCommand): Promise<CompleteFileUploadResponse>;
   createSessionResourceUpload(
@@ -843,6 +844,7 @@ async function claimToSession(
   viewer: AuthenticatedViewer,
   sessionId: SessionId,
   fileIds: FileId[],
+  options: { resume?: boolean } = {},
 ): Promise<FileRecord[]> {
   if (fileIds.length === 0) {
     return [];
@@ -853,6 +855,7 @@ async function claimToSession(
     projectId,
     attachmentIds: fileIds,
     sessionId,
+    resume: options.resume === true,
   });
 
   const rows = await listFileRecordsById(bindings.DB, fileIds);

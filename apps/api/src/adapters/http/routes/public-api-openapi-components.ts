@@ -1,4 +1,8 @@
-import { PUBLIC_API_OPENAPI_SCHEMAS } from "@mosoo/contracts/public-api";
+import {
+  PUBLIC_API_OPENAPI_SCHEMAS,
+  PUBLIC_API_OPENAPI_V2_SCHEMAS,
+} from "@mosoo/contracts/public-api";
+import type { PublicApiVersion } from "@mosoo/contracts/public-api";
 
 function jsonResponse(description: string, schema: Record<string, unknown>) {
   return {
@@ -11,7 +15,7 @@ function jsonResponse(description: string, schema: Record<string, unknown>) {
   };
 }
 
-export function createPublicApiOpenApiComponents() {
+export function createPublicApiOpenApiComponents(apiVersion: PublicApiVersion = "v1") {
   return {
     responses: {
       Conflict: jsonResponse(
@@ -51,7 +55,7 @@ export function createPublicApiOpenApiComponents() {
         $ref: "#/components/schemas/ErrorResponse",
       }),
     },
-    schemas: PUBLIC_API_OPENAPI_SCHEMAS,
+    schemas: apiVersion === "v1" ? PUBLIC_API_OPENAPI_SCHEMAS : PUBLIC_API_OPENAPI_V2_SCHEMAS,
     securitySchemes: {
       accessToken: {
         bearerFormat: "mosoo Access Token",

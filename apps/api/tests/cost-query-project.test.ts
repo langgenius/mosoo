@@ -29,6 +29,7 @@ async function createCostQueryDatabase(): Promise<SqliteD1Database> {
 
     CREATE TABLE agent (
       id text PRIMARY KEY NOT NULL,
+      project_id text NOT NULL,
       name text NOT NULL
     );
 
@@ -47,7 +48,7 @@ async function createCostQueryDatabase(): Promise<SqliteD1Database> {
       id text PRIMARY KEY NOT NULL,
       organization_id text NOT NULL,
       project_id text NOT NULL,
-      agent_id text NOT NULL,
+      agent_id text,
       actor_user_id text NOT NULL,
       agent_owner_user_id text NOT NULL,
       agent_publication_state_at_run text NOT NULL,
@@ -67,7 +68,8 @@ async function createCostQueryDatabase(): Promise<SqliteD1Database> {
     CREATE TABLE usage_daily_rollup (
       organization_id text NOT NULL,
       project_id text NOT NULL,
-      agent_id text NOT NULL,
+      agent_id text,
+      agent_scope_key text GENERATED ALWAYS AS (coalesce(agent_id, '')) VIRTUAL,
       actor_user_id text NOT NULL,
       agent_owner_user_id text NOT NULL,
       date text NOT NULL,
@@ -89,10 +91,10 @@ async function createCostQueryDatabase(): Promise<SqliteD1Database> {
       ('${OWNER_ID}', 'Owner One', 'owner@example.com'),
       ('${ACTOR_ID}', 'Actor One', 'actor1@example.com');
 
-    INSERT INTO agent (id, name)
+    INSERT INTO agent (id, name, project_id)
     VALUES
-      ('${PROJECT_ONE_AGENT_ID}', 'Planner'),
-      ('${PROJECT_TWO_AGENT_ID}', 'Support');
+      ('${PROJECT_ONE_AGENT_ID}', 'Planner', '${PROJECT_ONE_ID}'),
+      ('${PROJECT_TWO_AGENT_ID}', 'Support', '${PROJECT_TWO_ID}');
   `);
 
   await insertUsageEvent(database, {
@@ -114,7 +116,7 @@ async function createCostQueryDatabase(): Promise<SqliteD1Database> {
 async function insertUsageEvent(
   database: SqliteD1Database,
   input: {
-    agentId: string;
+    agentId: string | null;
     id: string;
     projectId: string;
     totalCostUsd: number;
@@ -160,6 +162,37 @@ async function insertUsageEvent(
 }
 
 describe("cost project queries", () => {
+  test("includes direct Sessions in Project usage without fabricating an Agent ID", async () => {
+    const database = await createCostQueryDatabase();
+    await insertUsageEvent(database, {
+      agentId: null,
+      id: "direct-one",
+      projectId: PROJECT_ONE_ID,
+      totalCostUsd: 3,
+    });
+    await insertUsageEvent(database, {
+      agentId: null,
+      id: "direct-two",
+      projectId: PROJECT_TWO_ID,
+      totalCostUsd: 11,
+    });
+    const input = {
+      organizationId: ORGANIZATION_ID,
+      projectId: PROJECT_ONE_ID,
+      window: resolveCostWindow("LAST_30_DAYS", new Date(Date.UTC(2026, 4, 21, 12))),
+    };
+    expect(await queryTotals(database, input)).toMatchObject({ requestCount: 2, totalCostUsd: 5 });
+    const rows = await queryAgents(database, input);
+    expect(rows).toHaveLength(2);
+    expect(rows.find((row) => row.agentId === null)).toMatchObject({
+      agentId: null,
+      agentName: "Direct sessions",
+      ownerId: OWNER_ID,
+      requestCount: 1,
+      totalCostUsd: 3,
+    });
+  });
+
   test("scopes usage totals to the requested Project", async () => {
     const database = await createCostQueryDatabase();
     const window = resolveCostWindow("LAST_30_DAYS", new Date(Date.UTC(2026, 4, 21, 12)));

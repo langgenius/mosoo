@@ -127,6 +127,49 @@ function createAvailableModelsDatabase(): SqliteD1Database {
 }
 
 describe("available models", () => {
+  test("makes only explicitly declared custom models available for Pi", async () => {
+    const entries = await resolveAvailableModels(createAvailableModelsDatabase(), {
+      projectId: PROJECT_ID,
+      runtimeId: "pi",
+    });
+
+    expect(entries.filter((entry) => entry.available)).toEqual([
+      expect.objectContaining({
+        modelId: "qwen-coder",
+        source: "custom",
+        vendorId: "openai-compatible",
+      }),
+    ]);
+    expect(entries.some((entry) => entry.modelId === "custom-model")).toBe(false);
+    expect(entries.find((entry) => entry.vendorId === "openai")).toMatchObject({
+      available: false,
+      reason: "wrong-runtime",
+      statusDetail: "OpenAI is not available for Pi.",
+    });
+  });
+
+  test("does not unlock Pi models from a custom credential without declared models", async () => {
+    const database = createAvailableModelsDatabase();
+    database.execute(
+      "UPDATE vendor_credential SET models = NULL WHERE vendor_id = 'openai-compatible'",
+    );
+
+    const entries = await resolveAvailableModels(database, {
+      currentModelId: "custom-model",
+      currentVendorId: "openai-compatible",
+      projectId: PROJECT_ID,
+      runtimeId: "pi",
+    });
+
+    expect(entries.filter((entry) => entry.available)).toEqual([]);
+    expect(entries.find((entry) => entry.modelId === "custom-model")).toMatchObject({
+      available: false,
+      reason: "needs-key",
+      source: "custom",
+      vendorId: "openai-compatible",
+    });
+  });
+
   test("makes custom models available for OpenAI runtime", async () => {
     const entries = await resolveAvailableModels(createAvailableModelsDatabase(), {
       projectId: PROJECT_ID,

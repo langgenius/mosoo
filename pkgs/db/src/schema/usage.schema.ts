@@ -8,6 +8,7 @@ import type {
   SessionId,
   SessionRunId,
 } from "@mosoo/id";
+import { sql } from "drizzle-orm";
 import {
   index,
   integer,
@@ -23,10 +24,10 @@ export const usageEventsTable = sqliteTable(
   "usage_event",
   {
     actorUserId: platformIdColumn<AccountId>("actor_user_id").notNull(),
-    agentId: platformIdColumn<AgentId>("agent_id").notNull(),
+    agentId: platformIdColumn<AgentId>("agent_id"),
     agentOwnerUserId: platformIdColumn<AccountId>("agent_owner_user_id").notNull(),
     agentPublicationStateAtRun: text("agent_publication_state_at_run")
-      .$type<"archived" | "draft_of_published" | "published" | "unpublished">()
+      .$type<"archived" | "draft_of_published" | "not_applicable" | "published" | "unpublished">()
       .notNull(),
     agentRevisionId: platformIdColumn<AgentDeploymentVersionId>("agent_revision_id"),
     cacheCreationTokens: integer("cache_creation_tokens").notNull(),
@@ -73,10 +74,13 @@ export const usageDailyRollupsTable = sqliteTable(
   "usage_daily_rollup",
   {
     actorUserId: platformIdColumn<AccountId>("actor_user_id").notNull(),
-    agentId: platformIdColumn<AgentId>("agent_id").notNull(),
+    agentId: platformIdColumn<AgentId>("agent_id"),
+    // SQLite treats NULLs as distinct in UNIQUE constraints. A separate grouping
+    // key keeps direct Sessions in one bucket without inventing an Agent ID.
+    agentScopeKey: text("agent_scope_key").generatedAlwaysAs(sql`coalesce("agent_id", '')`),
     agentOwnerUserId: platformIdColumn<AccountId>("agent_owner_user_id").notNull(),
     agentPublicationStateAtRun: text("agent_publication_state_at_run")
-      .$type<"archived" | "draft_of_published" | "published" | "unpublished">()
+      .$type<"archived" | "draft_of_published" | "not_applicable" | "published" | "unpublished">()
       .notNull(),
     cacheCreationTokens: integer("cache_creation_tokens").notNull(),
     cacheReadTokens: integer("cache_read_tokens").notNull(),
@@ -95,20 +99,18 @@ export const usageDailyRollupsTable = sqliteTable(
     unpricedRequestCount: integer("unpriced_request_count").notNull(),
   },
   (table) => [
-    primaryKey({
-      columns: [
-        table.organizationId,
-        table.projectId,
-        table.agentId,
-        table.actorUserId,
-        table.agentOwnerUserId,
-        table.date,
-        table.agentPublicationStateAtRun,
-        table.runPurpose,
-        table.provider,
-        table.model,
-      ],
-    }),
+    uniqueIndex("usage_daily_rollup_dimensions_idx").on(
+      table.organizationId,
+      table.projectId,
+      table.agentScopeKey,
+      table.actorUserId,
+      table.agentOwnerUserId,
+      table.date,
+      table.agentPublicationStateAtRun,
+      table.runPurpose,
+      table.provider,
+      table.model,
+    ),
     index("usage_daily_rollup_project_date_idx").on(table.projectId, table.date),
     index("usage_daily_rollup_organization_date_idx").on(table.organizationId, table.date),
     index("usage_daily_rollup_agent_date_idx").on(table.agentId, table.date),

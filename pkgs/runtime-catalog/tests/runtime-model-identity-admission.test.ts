@@ -30,6 +30,44 @@ import {
 import type { RuntimeCatalogEntry } from "@mosoo/runtime-catalog";
 
 describe("runtime catalog identity admission", () => {
+  test("admits Pi custom models without advertising a preset model", () => {
+    const runtime = getPublicRuntimeCatalogEntry("pi");
+    const custom = admitRuntimeModelIdentity(
+      createRuntimeModelIdentity({
+        modelId: "qwen-coder",
+        provider: {
+          kind: "custom",
+          providerId: VENDOR_OPENAI_COMPATIBLE.vendorId,
+        },
+        runtimeId: "pi",
+      }),
+    );
+    const preset = admitRuntimeModelIdentity(
+      createRuntimeModelIdentity({
+        modelId: OPENAI_DEFAULT_MODEL_ID,
+        provider: {
+          kind: "preset",
+          providerId: VENDOR_OPENAI.vendorId,
+        },
+        runtimeId: "pi",
+      }),
+    );
+
+    expect(runtime).toMatchObject({
+      acceptsCustomProvider: true,
+      supportedModelIds: [],
+      transport: "pi-rpc",
+    });
+    expect(custom).toMatchObject({
+      model: null,
+      ok: true,
+      vendor: { vendorId: VENDOR_OPENAI_COMPATIBLE.vendorId },
+    });
+    expect(preset).toMatchObject({ code: "provider-unsupported", ok: false });
+    expect(listPresetModelsForVendor(VENDOR_OPENAI_COMPATIBLE.vendorId)).toEqual([]);
+    expect(getRuntimeIconKey("pi")).toBe("pi");
+  });
+
   test("keeps the GA OpenAI default while exposing GPT-5.6 as limited preview", () => {
     const previewModels = PRESET_MODEL_CATALOG.filter(
       (model) => model.vendorId === VENDOR_OPENAI.vendorId && model.modelId.startsWith("gpt-5.6-"),

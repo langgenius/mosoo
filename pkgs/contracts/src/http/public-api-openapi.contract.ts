@@ -734,3 +734,142 @@ export const PUBLIC_API_OPENAPI_SCHEMAS = {
     type: "object",
   },
 } satisfies Record<string, PublicApiOpenApiSchema>;
+
+const PUBLIC_API_V2_CREATE_THREAD_REQUEST_SCHEMA = {
+  ...PUBLIC_API_OPENAPI_SCHEMAS.CreateThreadRequest,
+  description:
+    "Create a durable Thread from the latest saved private Agent configuration. userId is optional; omit input for an idle Thread. Existing Threads retain their admitted configuration.",
+  required: [],
+  properties: {
+    ...PUBLIC_API_OPENAPI_SCHEMAS.CreateThreadRequest.properties,
+  },
+};
+
+const { kind: _legacyThreadKind, ...v2ThreadProperties } =
+  PUBLIC_API_OPENAPI_SCHEMAS.ThreadSummary.properties;
+
+export const PUBLIC_API_OPENAPI_V2_SCHEMAS = {
+  ...PUBLIC_API_OPENAPI_SCHEMAS,
+  CreateThreadRequest: PUBLIC_API_V2_CREATE_THREAD_REQUEST_SCHEMA,
+  ThreadConfiguration: {
+    description:
+      "Choose inline execution or an owned Agent preset explicitly. The two sources cannot be combined; admitted configuration is frozen for the Session.",
+    oneOf: [
+      {
+        type: "object",
+        additionalProperties: false,
+        required: ["type", "harness", "provider", "model", "instructions"],
+        properties: {
+          type: { const: "inline" },
+          harness: {
+            type: "string",
+            minLength: 1,
+            maxLength: 255,
+            description:
+              "Supported runtime catalog ID, such as openai-runtime or claude-agent-sdk.",
+          },
+          provider: { type: "string", minLength: 1, maxLength: 255 },
+          model: { type: "string", minLength: 1, maxLength: 255 },
+          instructions: {
+            type: "string",
+            minLength: 1,
+            maxLength: PUBLIC_THREAD_INPUT_TEXT_MAX_LENGTH,
+          },
+        },
+      },
+      {
+        type: "object",
+        additionalProperties: false,
+        required: ["type", "agent_id"],
+        properties: { type: { const: "agent" }, agent_id: PLATFORM_ID_SCHEMA },
+      },
+    ],
+  },
+  CreateProjectThreadRequest: {
+    ...PUBLIC_API_V2_CREATE_THREAD_REQUEST_SCHEMA,
+    description:
+      "Create a Project-owned durable Session with inline configuration or an optional saved Agent preset. No Agent is created for inline execution. Model credentials must already be configured in this Project.",
+    required: ["configuration"],
+    properties: {
+      ...PUBLIC_API_V2_CREATE_THREAD_REQUEST_SCHEMA.properties,
+      configuration: { $ref: "#/components/schemas/ThreadConfiguration" },
+      resources: {
+        ...PUBLIC_API_V2_CREATE_THREAD_REQUEST_SCHEMA.properties.resources,
+        description: "Project draft files to attach to this Session and mount for execution.",
+      },
+    },
+  },
+  ThreadSummary: {
+    ...PUBLIC_API_OPENAPI_SCHEMAS.ThreadSummary,
+    required: PUBLIC_API_OPENAPI_SCHEMAS.ThreadSummary.required.filter((field) => field !== "kind"),
+    properties: {
+      ...v2ThreadProperties,
+      agent_id: {
+        ...PLATFORM_ID_SCHEMA,
+        type: ["string", "null"],
+        description:
+          "Optional saved Agent preset provenance. Null for a Session created with inline execution configuration.",
+      },
+      source: {
+        const: "api",
+        description:
+          "Public API response marker; does not indicate the Session's creation channel.",
+      },
+      userId: {
+        type: ["string", "null"],
+        description:
+          "The original application user identity, or null when none was supplied. Never replaced with an invented identity.",
+      },
+    },
+  },
+  ThreadUsageResponse: {
+    additionalProperties: false,
+    description:
+      "Persisted runtime usage observations in ID order. Null means unreported, not zero. Token conventions follow usageContract; reported costs are runtime estimates, not a settled bill. Poll again to observe updates to in-progress calls.",
+    type: "object",
+    required: ["usage", "nextCursor"],
+    properties: {
+      nextCursor: {
+        type: ["string", "null"],
+        description: "Pass as after to read the next page, or null on the final page.",
+      },
+      usage: {
+        type: "array",
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: [
+            "id",
+            "runId",
+            "provider",
+            "model",
+            "status",
+            "inputTokens",
+            "outputTokens",
+            "cacheReadTokens",
+            "cacheCreationTokens",
+            "reportedCostUsd",
+            "usageContract",
+          ],
+          properties: {
+            id: { type: "string", format: "ulid" },
+            runId: { type: "string", format: "ulid" },
+            provider: { type: "string" },
+            model: { type: "string" },
+            status: { enum: ["started", "completed", "failed"] },
+            inputTokens: { type: ["integer", "null"], minimum: 0 },
+            outputTokens: { type: ["integer", "null"], minimum: 0 },
+            cacheReadTokens: { type: ["integer", "null"], minimum: 0 },
+            cacheCreationTokens: { type: ["integer", "null"], minimum: 0 },
+            reportedCostUsd: { type: ["number", "null"], minimum: 0 },
+            usageContract: {
+              type: ["string", "null"],
+              description:
+                "anthropic_bucketed input excludes cache buckets; openai_total_with_cached_breakdown and openai_runtime_total_with_cached_breakdown include cache reads in input. Unknown remains null; do not infer it from the model name.",
+            },
+          },
+        },
+      },
+    },
+  },
+} satisfies Record<string, PublicApiOpenApiSchema>;

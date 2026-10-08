@@ -1,7 +1,14 @@
 import { describe, expect, test } from "bun:test";
 
+import { DRIVER_PROTOCOL_VERSION } from "@mosoo/agent-driver/boot";
 import { parsePlatformId } from "@mosoo/id";
-import type { DriverInstanceId, SandboxId, SessionId, SessionRunId } from "@mosoo/id";
+import type {
+  DriverInstanceId,
+  SandboxId,
+  SandboxSessionId,
+  SessionId,
+  SessionRunId,
+} from "@mosoo/id";
 import { PLATFORM_ID_FIXTURES } from "@mosoo/id/testing";
 
 import {
@@ -23,7 +30,11 @@ import {
   recordDriverInstanceHello,
 } from "../src/modules/runtime/infrastructure/driver-instance/lifecycle";
 import { cleanupDriverInstances } from "../src/modules/runtime/infrastructure/driver-instance/maintenance";
+import type { DriverInstanceMcpGrantRecord } from "../src/modules/runtime/infrastructure/driver-instance/mcp-grants.repository";
+import { provisionSessionDriver } from "../src/modules/runtime/infrastructure/runtime-sandbox-provisioning/runtime-driver-provisioning.service";
+import type { SandboxHandle } from "../src/modules/runtime/infrastructure/sandbox-handles";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
+import { createDriverProfile } from "./api-driver-boundary-fixtures";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
 const DRIVER_INSTANCE_ID = PLATFORM_ID_FIXTURES.driverInstance;
@@ -33,6 +44,7 @@ const REPLACEMENT_DRIVER_INSTANCE_ID = parsePlatformId<DriverInstanceId>(
 );
 const SANDBOX_ID = PLATFORM_ID_FIXTURES.sandbox;
 const SESSION_ID = PLATFORM_ID_FIXTURES.session;
+const EXECUTION_SESSION_ID = parsePlatformId<SandboxSessionId>("01J000000000000000000000Y2");
 const SESSION_RUN_ID = PLATFORM_ID_FIXTURES.sessionRun;
 const NEXT_SESSION_RUN_ID = parsePlatformId<SessionRunId>(
   "01J0000000000000000000000Q",
@@ -47,6 +59,16 @@ function createDriverInstanceRecordDatabase(): SqliteD1Database {
       driver_instance_id text NOT NULL
     );
 
+    CREATE TABLE sandbox_session (
+      session_id text PRIMARY KEY NOT NULL,
+      sandbox_id text NOT NULL,
+      cloudflare_session_id text NOT NULL,
+      status text NOT NULL
+    );
+
+    INSERT INTO sandbox_session (session_id, sandbox_id, cloudflare_session_id, status)
+    VALUES ('${SESSION_ID}', '${SANDBOX_ID}', '${EXECUTION_SESSION_ID}', 'active');
+
     CREATE TABLE driver_instance_mcp_grant (
       auth_type text NOT NULL,
       authorization_state text,
@@ -55,6 +77,7 @@ function createDriverInstanceRecordDatabase(): SqliteD1Database {
       created_at integer NOT NULL,
       credential_id text,
       driver_instance_id text NOT NULL,
+      project_id text NOT NULL,
       server_id text NOT NULL,
       updated_at integer NOT NULL
     );
@@ -241,6 +264,239 @@ function insertDriverRecord(
 }
 
 describe("driver instance records", () => {
+  for (const change of [
+    `UPDATE sandbox_session SET sandbox_id = '01J000000000000000000000Y1'`,
+    `UPDATE sandbox_session SET cloudflare_session_id = '01J000000000000000000000Y3'`,
+    "UPDATE sandbox_session SET status = 'closed'",
+    "DELETE FROM sandbox_session",
+  ]) {
+    test(`stale provisioning leaves driver records and commands intact: ${change}`, async () => {
+      const database = createDriverInstanceRecordDatabase();
+      insertDriverRecord(database, {});
+      database.execute(`INSERT INTO driver_command VALUES ('${DRIVER_INSTANCE_ID}')`);
+      database.execute(change);
+      const before = await readDriverRecord(database);
+      const input = {
+        bootTokenHash: token(3),
+        driverInstanceId: DRIVER_INSTANCE_ID,
+        executionSessionId: EXECUTION_SESSION_ID,
+        runtime: "openai-runtime" as const,
+        sandboxId: SANDBOX_ID,
+        sandboxSessionId: SESSION_ID,
+      };
+
+      await expect(createDriverInstanceRecord(createBindings(database), input)).rejects.toThrow(
+        "malformed JSON",
+      );
+      expect(await readDriverRecord(database)).toEqual(before);
+      expect(
+        await database.prepare("SELECT COUNT(*) AS count FROM driver_command").first(),
+      ).toEqual({ count: 1 });
+    });
+  }
+
+  test("stale prewarm cannot insert a driver after its workspace has moved", async () => {
+    const database = createDriverInstanceRecordDatabase();
+    database.execute(`UPDATE sandbox_session SET sandbox_id = '01J000000000000000000000Y1'`);
+    const input = {
+      bootTokenHash: token(2),
+      conflictStrategy: "insert-only" as const,
+      driverInstanceId: DRIVER_INSTANCE_ID,
+      executionSessionId: EXECUTION_SESSION_ID,
+      runtime: "openai-runtime" as const,
+      sandboxId: SANDBOX_ID,
+      sandboxSessionId: SESSION_ID,
+    };
+
+    await expect(createDriverInstanceRecord(createBindings(database), input)).rejects.toThrow(
+      "malformed JSON",
+    );
+    expect(await database.prepare("SELECT COUNT(*) AS count FROM driver_instance").first()).toEqual(
+      { count: 0 },
+    );
+  });
+
+  const grant: DriverInstanceMcpGrantRecord = {
+    authType: "none",
+    authorizationState: "active",
+    canInvalidate: false,
+    canRefresh: false,
+    credentialId: null,
+    projectId: PLATFORM_ID_FIXTURES.project,
+    serverId: parsePlatformId("01J000000000000000000000Y5"),
+  };
+  const creation = {
+    bootTokenHash: token(2),
+    driverInstanceId: DRIVER_INSTANCE_ID,
+    executionSessionId: EXECUTION_SESSION_ID,
+    mcpGrants: [grant],
+    runtime: "openai-runtime" as const,
+    sandboxId: SANDBOX_ID,
+    sandboxSessionId: SESSION_ID,
+  };
+
+  test("grants belong to the winning claim and skipped prewarm cannot add its grants", async () => {
+    const database = createDriverInstanceRecordDatabase();
+    const created = await createDriverInstanceRecord(createBindings(database), creation);
+    expect(created).toMatchObject({
+      status: "created",
+      generation: 0,
+      bootTokenExpiresAt: expect.any(Number),
+    });
+    const before = (await database.prepare("SELECT * FROM driver_instance_mcp_grant").all())
+      .results;
+    expect(before).toHaveLength(1);
+    expect(before[0]).toMatchObject({
+      project_id: grant.projectId,
+      server_id: grant.serverId,
+      can_invalidate: 0,
+      can_refresh: 0,
+    });
+
+    const skipped = await createDriverInstanceRecord(createBindings(database), {
+      ...creation,
+      bootTokenHash: token(3),
+      conflictStrategy: "insert-only",
+      mcpGrants: [{ ...grant, serverId: parsePlatformId("01J000000000000000000000Y6") }],
+    });
+    expect(skipped.status).toBe("skipped");
+    expect(
+      (await database.prepare("SELECT * FROM driver_instance_mcp_grant").all()).results,
+    ).toEqual(before);
+    expect(await readDriverRecord(database)).toMatchObject({ bootTokenHex: "02", generation: 0 });
+    const sameTokenRetry = await createDriverInstanceRecord(createBindings(database), {
+      ...creation,
+      conflictStrategy: "insert-only",
+      mcpGrants: [{ ...grant, serverId: parsePlatformId("01J000000000000000000000Y7") }],
+    });
+    expect(sameTokenRetry.status).toBe("skipped");
+    expect(
+      (await database.prepare("SELECT * FROM driver_instance_mcp_grant").all()).results,
+    ).toEqual(before);
+  });
+
+  test("a grant-write failure rolls back replacement, commands and old grants together", async () => {
+    const database = createDriverInstanceRecordDatabase();
+    await createDriverInstanceRecord(createBindings(database), creation);
+    database.execute(`INSERT INTO driver_command VALUES ('${DRIVER_INSTANCE_ID}')`);
+    const beforeDriver = await readDriverRecord(database);
+    const beforeGrants = (await database.prepare("SELECT * FROM driver_instance_mcp_grant").all())
+      .results;
+    database.execute(
+      "CREATE TRIGGER fail_grant BEFORE INSERT ON driver_instance_mcp_grant BEGIN SELECT RAISE(ABORT, 'injected grant failure'); END",
+    );
+
+    await expect(
+      createDriverInstanceRecord(createBindings(database), {
+        ...creation,
+        bootTokenHash: token(3),
+      }),
+    ).rejects.toThrow("injected grant failure");
+    expect(await readDriverRecord(database)).toEqual(beforeDriver);
+    expect(
+      (await database.prepare("SELECT * FROM driver_instance_mcp_grant").all()).results,
+    ).toEqual(beforeGrants);
+    expect(await database.prepare("SELECT COUNT(*) AS count FROM driver_command").first()).toEqual({
+      count: 1,
+    });
+  });
+
+  // Other readiness tests replace the re-exported provisioner. Exercise the
+  // real service in a fresh process so those mocks cannot weaken this seam.
+  if (process.env["MOSOO_TEST_DRIVER_BINDING_REAL_PROVISION"] === "1") {
+    for (const stale of [true, false]) {
+      test(`actual provisioning awaits its binding claim before any workspace access (stale=${stale})`, async () => {
+        const database = createDriverInstanceRecordDatabase();
+        database.execute(`
+        CREATE TABLE session (id text PRIMARY KEY, kind text);
+        CREATE TABLE native_resume_ref (session_id text, committed_value text, kind text, runtime_id text, value text);
+      `);
+        if (stale)
+          database.execute(`UPDATE sandbox_session SET sandbox_id = '01J000000000000000000000Y1'`);
+        let workspaceAccesses = 0;
+        const stop = async (): Promise<never> => {
+          workspaceAccesses++;
+          throw new Error("deliberate workspace stop");
+        };
+        const sandbox: SandboxHandle = {
+          configureNetworkConstraints: stop,
+          createBackup: stop,
+          createSession: stop,
+          deleteSession: stop,
+          destroy: stop,
+          exec: stop,
+          getSession: stop,
+          mkdir: stop,
+          mountBucket: stop,
+          readFile: stop,
+          restoreBackup: stop,
+          setKeepAlive: stop,
+          startProcess: stop,
+          terminal: stop,
+          unmountBucket: stop,
+          watch: stop,
+          writeFile: stop,
+          wsConnect: stop,
+        };
+        const profile = createDriverProfile();
+        await expect(
+          provisionSessionDriver(createBindings(database), {
+            builtInTools: [],
+            cloudflareSession: sandbox,
+            driverInstanceId: DRIVER_INSTANCE_ID,
+            driverRecordConflictStrategy: "insert-only",
+            profile: {
+              ...profile,
+              session: { ...profile.session, sandboxSessionId: EXECUTION_SESSION_ID },
+            },
+            requestUrl: "https://api.test/runtime",
+            resolvedMcpServers: [],
+            resolvedSkillCatalog: [],
+            resolvedSkills: [],
+            runtime: "openai-runtime",
+            sandbox,
+            sandboxSessionId: SESSION_ID,
+            sessionRunId: null,
+          }),
+        ).rejects.toThrow(stale ? "malformed JSON" : "deliberate workspace stop");
+        if (stale) {
+          expect(workspaceAccesses).toBe(0);
+          expect(
+            await database.prepare("SELECT COUNT(*) AS count FROM driver_instance").first(),
+          ).toEqual({ count: 0 });
+        } else {
+          expect(workspaceAccesses).toBeGreaterThan(0);
+          expect(await readDriverRecord(database)).toMatchObject({
+            generation: 0,
+            status: "failed",
+          });
+        }
+      });
+    }
+  } else {
+    test("real provisioning binding protection survives the full-suite mocks", async () => {
+      const child = Bun.spawn({
+        cmd: [
+          process.execPath,
+          "test",
+          import.meta.path,
+          "--test-name-pattern",
+          "actual provisioning awaits",
+        ],
+        env: { ...process.env, MOSOO_TEST_DRIVER_BINDING_REAL_PROVISION: "1" },
+        stdout: "pipe",
+        stderr: "pipe",
+      });
+      const [status, stdout, stderr] = await Promise.all([
+        child.exited,
+        new Response(child.stdout).text(),
+        new Response(child.stderr).text(),
+      ]);
+      if (status !== 0) throw new Error(`Real provisioning regression failed:\n${stdout}${stderr}`);
+      expect(status).toBe(0);
+    }, 10000);
+  }
+
   test("insert-only creation does not overwrite an existing record", async () => {
     const database = createDriverInstanceRecordDatabase();
     insertDriverRecord(database, {});
@@ -249,6 +505,7 @@ describe("driver instance records", () => {
       bootTokenHash: token(2),
       conflictStrategy: "insert-only",
       driverInstanceId: DRIVER_INSTANCE_ID,
+      executionSessionId: EXECUTION_SESSION_ID,
       runtime: "openai-runtime",
       sandboxId: SANDBOX_ID,
       sandboxSessionId: SESSION_ID,
@@ -278,6 +535,7 @@ describe("driver instance records", () => {
     const result = await createDriverInstanceRecord(createBindings(database), {
       bootTokenHash: token(3),
       driverInstanceId: DRIVER_INSTANCE_ID,
+      executionSessionId: EXECUTION_SESSION_ID,
       runtime: "openai-runtime",
       sandboxId: SANDBOX_ID,
       sandboxSessionId: SESSION_ID,
@@ -502,7 +760,7 @@ describe("driver instance records", () => {
         capabilities: [],
         driverVersion: "driver-test",
         pid: 11,
-        protocolVersion: 2,
+        protocolVersion: DRIVER_PROTOCOL_VERSION,
         runtime: "openai-runtime",
         startedAt: "2026-05-08T00:00:00.000Z",
       },
@@ -523,7 +781,7 @@ describe("driver instance records", () => {
           capabilities: [],
           driverVersion: "late-driver-test",
           pid: 99,
-          protocolVersion: 2,
+          protocolVersion: DRIVER_PROTOCOL_VERSION,
           runtime: "openai-runtime",
           startedAt: "2026-05-08T00:00:02.000Z",
         },
@@ -594,6 +852,7 @@ describe("driver instance records", () => {
     await createDriverInstanceRecord(bindings, {
       bootTokenHash: token(2),
       driverInstanceId: DRIVER_INSTANCE_ID,
+      executionSessionId: EXECUTION_SESSION_ID,
       runtime: "openai-runtime",
       sandboxId: SANDBOX_ID,
       sandboxSessionId: SESSION_ID,

@@ -24,7 +24,7 @@ import {
 import { getOrganizationPath } from "./runtime-sandbox-provisioning.paths";
 
 interface RuntimeDiagnosticBaseValue {
-  readonly agentId: string;
+  readonly agentId: string | null;
   readonly sessionId: string;
   readonly traceId?: string | null;
 }

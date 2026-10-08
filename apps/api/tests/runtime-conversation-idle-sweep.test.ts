@@ -267,7 +267,7 @@ describe("idle session-scoped conversation sweep", () => {
     ).resolves.toBe(true);
   });
 
-  test("lists only idle active cattle conversations without a run lease", async () => {
+  test("lists idle active conversations without a run lease regardless of historical kind", async () => {
     const database = createDatabase();
     await insertConversation(database, {
       kind: "cattle",
@@ -311,7 +311,10 @@ describe("idle session-scoped conversation sweep", () => {
       limit: 10,
     });
 
-    expect(idle).toEqual([{ sandboxId: "sb-idle", sessionId: "session-idle" }]);
+    expect(idle).toEqual([
+      { sandboxId: "sb-idle", sessionId: "session-idle" },
+      { sandboxId: "sb-pet", sessionId: "session-pet" },
+    ]);
   });
 
   test("atomic claim closes an idle conversation but loses to any re-activation", async () => {

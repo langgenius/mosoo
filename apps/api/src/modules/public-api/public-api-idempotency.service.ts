@@ -14,6 +14,7 @@ const PUBLIC_API_IDEMPOTENCY_RETENTION_MS = 24 * 60 * 60 * 1000;
 
 interface PublicApiIdempotencyRow {
   body_hash: string | null;
+  created_at: number;
   id: PlatformId;
   idempotency_key: string;
   method: string;
@@ -43,6 +44,7 @@ export type PublicApiIdempotencyBeginResult =
       status: "replay";
     }
   | {
+      createdAt: number;
       reservationId: PlatformId;
       retryAfterSeconds: number;
       status: "processing";
@@ -115,6 +117,7 @@ function toProcessingResult(
   const stale = row.updated_at < nowMs - PUBLIC_API_IDEMPOTENCY_PROCESSING_TTL_MS;
 
   return {
+    createdAt: row.created_at,
     reservationId: row.id,
     retryAfterSeconds: stale
       ? Math.max(
@@ -148,6 +151,7 @@ async function getIdempotencyRow(
     (await getAppDatabase(database)
       .select({
         body_hash: publicApiIdempotencyKeysTable.bodyHash,
+        created_at: publicApiIdempotencyKeysTable.createdAt,
         id: publicApiIdempotencyKeysTable.id,
         idempotency_key: publicApiIdempotencyKeysTable.idempotencyKey,
         method: publicApiIdempotencyKeysTable.method,

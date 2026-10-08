@@ -20,7 +20,7 @@ import type {
   SessionRunId,
 } from "@mosoo/id";
 import type { RuntimeEventEnvelope } from "@mosoo/runtime-events";
-import { and, eq, exists, inArray, isNull, ne, notExists, or, sql } from "drizzle-orm";
+import { and, eq, exists, inArray, isNull, notExists, or, sql } from "drizzle-orm";
 
 import {
   getAppDatabase,
@@ -30,11 +30,12 @@ import {
 import type { AppDatabase } from "../../../../platform/db/drizzle";
 import type { PreparedApiCommand } from "../../../api-command/application/api-command-ledger";
 import { createSessionRuntimeEventProjection } from "../../../sessions/domain/session-runtime-event-projection";
+import { previewAvailablePredicate } from "../../../sessions/infrastructure/preview-retention.repository";
 import { ACTIVE_SESSION_RUN_STATUSES } from "../../domain/session-run-lifecycle.machine";
 import { createSessionStatusTransitionPatch } from "./session-lifecycle-projection.repository";
 
 interface QueuedRunAdmissionRecord {
-  agentId: AgentId;
+  agentId: AgentId | null;
   createdBy: AccountId;
   createdByKeyId?: PersonalAccessTokenId;
   deploymentVersionId: AgentDeploymentVersionId | null;
@@ -57,13 +58,14 @@ interface QueuedMessageAdmissionRecord {
 }
 
 export interface CommitQueuedSessionRunAdmissionInput {
+  admissionRequestedAtMs?: number;
   apiCommand: PreparedApiCommand;
   clientRequestId: string | null;
   events: readonly RuntimeEventEnvelope[];
   message: QueuedMessageAdmissionRecord;
   run: QueuedRunAdmissionRecord;
   session: {
-    agentId: AgentId;
+    agentId: AgentId | null;
     projectId: ProjectId;
     id: SessionId;
   };
@@ -76,7 +78,9 @@ function selectedValue<T>(value: T, alias: string) {
 function admissionSessionPredicate(input: CommitQueuedSessionRunAdmissionInput) {
   return and(
     eq(sessionsTable.id, input.session.id),
-    eq(sessionsTable.agentId, input.session.agentId),
+    input.session.agentId === null
+      ? isNull(sessionsTable.agentId)
+      : eq(sessionsTable.agentId, input.session.agentId),
     eq(sessionsTable.projectId, input.session.projectId),
     eq(sessionsTable.lastRunId, input.run.id),
     eq(sessionsTable.status, "RUNNING"),
@@ -101,14 +105,16 @@ export function completedRunHistoryPredicate(
 
 function claimableSessionPredicate(db: AppDatabase, input: CommitQueuedSessionRunAdmissionInput) {
   return and(
+    previewAvailablePredicate(db, input.admissionRequestedAtMs ?? input.run.timestampMs),
     eq(sessionsTable.id, input.session.id),
-    eq(sessionsTable.agentId, input.session.agentId),
+    input.session.agentId === null
+      ? isNull(sessionsTable.agentId)
+      : eq(sessionsTable.agentId, input.session.agentId),
     eq(sessionsTable.projectId, input.session.projectId),
     isNull(sessionsTable.archivedAt),
     eq(sessionsTable.status, "IDLE"),
     isNull(sessionsTable.statusOperationId),
     or(
-      ne(sessionsTable.kind, "cattle"),
       eq(sessionsTable.workspaceCheckpointRequired, false),
       isNull(sessionsTable.lastRunId),
       notExists(
@@ -170,7 +176,7 @@ function claimableSessionPredicate(db: AppDatabase, input: CommitQueuedSessionRu
   );
 }
 
-export async function isCattleTerminalCheckpointReadyForNextRun(
+export async function isSessionTerminalCheckpointReadyForNextRun(
   database: D1Database,
   sessionId: SessionId,
 ): Promise<boolean> {
@@ -178,7 +184,6 @@ export async function isCattleTerminalCheckpointReadyForNextRun(
   const session =
     (await appDb
       .select({
-        kind: sessionsTable.kind,
         lastRunId: sessionsTable.lastRunId,
         lastRunStatus: sessionRunsTable.status,
         workspaceCheckpointRequired: sessionsTable.workspaceCheckpointRequired,
@@ -191,7 +196,6 @@ export async function isCattleTerminalCheckpointReadyForNextRun(
 
   if (
     session === null ||
-    session.kind !== "cattle" ||
     !session.workspaceCheckpointRequired ||
     session.lastRunId === null ||
     session.lastRunStatus !== "completed"
@@ -414,10 +418,10 @@ function createApiCommandInsertQuery(db: AppDatabase, input: CommitQueuedSession
   );
 }
 
-export async function commitQueuedSessionRunAdmission(
+export async function attemptQueuedSessionRunAdmission(
   database: D1Database,
   input: CommitQueuedSessionRunAdmissionInput,
-): Promise<boolean> {
+): Promise<"admitted" | "unavailable"> {
   if (input.events.length === 0) {
     throw new Error("Queued Session Run admission requires canonical runtime events.");
   }
@@ -447,7 +451,9 @@ export async function commitQueuedSessionRunAdmission(
       .where(
         and(
           eq(sessionsTable.id, input.session.id),
-          eq(sessionsTable.agentId, input.session.agentId),
+          input.session.agentId === null
+            ? isNull(sessionsTable.agentId)
+            : eq(sessionsTable.agentId, input.session.agentId),
           eq(sessionsTable.projectId, input.session.projectId),
           isNull(sessionsTable.archivedAt),
           eq(sessionsTable.status, "IDLE"),
@@ -465,5 +471,6 @@ export async function commitQueuedSessionRunAdmission(
     createApiCommandInsertQuery(db, input),
   ]);
 
-  return getD1ChangeCount((results as readonly unknown[])[0]) > 0;
+  if (getD1ChangeCount((results as readonly unknown[])[0]) > 0) return "admitted";
+  return "unavailable";
 }

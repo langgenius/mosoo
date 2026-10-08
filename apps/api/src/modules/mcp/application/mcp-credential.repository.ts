@@ -17,7 +17,7 @@ import type { AgentBindingRow, CredentialRow, ServerRow } from "./mcp-types";
 
 interface McpCredentialResolutionBinding {
   agentCredentialId: CredentialId | null;
-  agentId: AgentId;
+  agentId: AgentId | null;
   credentialMode: AgentBindingRow["credentialMode"];
   credentialScope: AgentBindingRow["credentialScope"];
   serverId: McpServerId;
@@ -59,6 +59,7 @@ function credentialMatchesExplicitAgentBinding(
   binding: McpCredentialResolutionBinding,
 ): credential is CredentialRow {
   return (
+    binding.agentId !== null &&
     credential !== null &&
     credential !== undefined &&
     credential.scope === "agent" &&
@@ -182,7 +183,10 @@ export async function resolveCredentialsForMcpBindings(
     ),
   ];
   const agentScopedBindings = bindings.filter(
-    (binding) => binding.credentialMode === "agent_bound" && !isTruthy(binding.agentCredentialId),
+    (binding): binding is McpCredentialResolutionBinding & { agentId: AgentId } =>
+      binding.agentId !== null &&
+      binding.credentialMode === "agent_bound" &&
+      !isTruthy(binding.agentCredentialId),
   );
   const projectCredentialServerIds = [
     ...new Set(
@@ -250,6 +254,7 @@ export async function resolveCredentialsForMcpBindings(
 
   bindings.forEach((binding, index) => {
     if (binding.credentialMode === "agent_bound") {
+      if (binding.agentId === null) return;
       if (isTruthy(binding.agentCredentialId)) {
         const credential = credentialsById.get(binding.agentCredentialId);
         resolvedCredentials[index] = credentialMatchesExplicitAgentBinding(credential, binding)

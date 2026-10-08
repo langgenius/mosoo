@@ -40,9 +40,6 @@ export async function prepareSessionRunCompletionCheckpoint(
   bindings: ApiBindings,
   link: RuntimeSessionLink,
 ): Promise<SessionRunCompletionCheckpoint | undefined> {
-  if (link.sandboxKind !== "cattle") {
-    return undefined;
-  }
   if (link.sandboxId === null || link.sessionId === null || link.sessionRunId === null) {
     throw new Error("Session completion requires a linked workspace.");
   }
@@ -89,10 +86,15 @@ export async function prepareSessionRunCompletionCheckpoint(
     }
     const backup = await createRuntimeSandboxBackup(bindings, {
       dir: target.cwd,
+      sanitizeTransientState: true,
       sandboxId: link.sandboxId,
       sessionId: link.sessionId,
+      skipMissingWorkspace: false,
       ttlSeconds: SANDBOX_BACKUP_TTL_SECONDS,
     });
+    if (backup === null) {
+      throw new Error("Session completion did not create its required workspace checkpoint.");
+    }
     return {
       backupId: parsePlatformId<SandboxBackupId>(backup.id, "completion checkpoint id"),
       dir: backup.dir,

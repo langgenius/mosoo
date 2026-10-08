@@ -2,6 +2,11 @@
 
 Status: available in the current Alpha console. The [mosoo Spec](../SPEC.md) defines how this configuration fits the managed Agent runtime.
 
+The unreleased #582 candidate treats the Manifest as an optional reusable preset.
+Direct Project invocation does not require one. Candidate exports omit Pet/Cattle;
+imports accept and discard a valid historical kind value, and also accept its absence.
+Existing stored labels and admitted Session configurations are preserved.
+
 ## What problem it solves
 
 An Agent needs a durable description of what it is and how it should behave. Without one, owners would have to manage each runtime's private files and remember which model, instructions, and integrations belong together.
@@ -22,4 +27,8 @@ Owners can also:
 
 Sharing preserves portable configuration, not a complete running machine. Credentials and secret values do not travel. Skills may be included, while MCP servers and Environments may need to be reconnected or selected after import. Forking does not copy sessions, usage history, logs, login state, or live runtime state.
 
-The saved Manifest remains authoritative for mosoo-managed updates. Changes made directly inside a Pet Agent's debug Terminal are not written back, and the current console does not compare or adopt that runtime state. Runtime-specific advanced settings are limited and are not portable between runtimes.
+The saved Manifest remains authoritative for future Session configuration. Changes
+inside a Session workspace do not update the preset, and editing a preset does not
+replace an admitted Session's frozen configuration. The candidate retires the shared
+Agent Terminal at the coordinated Cloud cutover. Runtime-specific advanced settings
+remain limited and are not portable between runtimes.

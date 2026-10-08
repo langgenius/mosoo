@@ -35,6 +35,17 @@ function bunTest(args: readonly string[]): E2ECommand {
 
 export const e2eCases: readonly E2ECase[] = [
   {
+    command: {
+      ...playwrightSpec("e2e/cases/ui/session-isolation.spec.ts"),
+      env: {
+        MOSOO_E2E_WEB_SERVER_COMMAND: "node_modules/.bin/vp run --filter @mosoo/web dev",
+      },
+    },
+    description: "Verify creation and editing without an Agent type choice or kind input.",
+    id: ["ui", "session-isolation"],
+    layer: "ui",
+  },
+  {
     command: bunTest(["e2e/cases/contract/harness.test.ts"]),
     description: "Verify local E2E harness helpers and environment preflight contracts.",
     id: ["contract", "harness"],
@@ -120,7 +131,7 @@ export const e2eCases: readonly E2ECase[] = [
     id: ["public-api", "runtime"],
     layer: "public-api",
     requiresEnv: [
-      "MOSOO_E2E_PROVIDER_API_KEY|MOSOO_E2E_OPENAI_API_KEY|MOSOO_E2E_ANTHROPIC_API_KEY|MOSOO_E2E_OPENCODE_API_KEY|MOSOO_E2E_DEEPSEEK_API_KEY",
+      "MOSOO_E2E_PROVIDER_API_KEY|MOSOO_E2E_OPENAI_API_KEY|MOSOO_E2E_ANTHROPIC_API_KEY|MOSOO_E2E_OPENCODE_API_KEY|MOSOO_E2E_DEEPSEEK_API_KEY|MOSOO_E2E_PI_API_KEY",
     ],
   },
   {

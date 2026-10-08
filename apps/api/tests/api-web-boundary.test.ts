@@ -1,6 +1,10 @@
 import { describe, expect, test } from "bun:test";
 
-import { PUBLIC_API_ERROR_CODES } from "@mosoo/contracts/public-api";
+import {
+  PUBLIC_API_ERROR_CODES,
+  PUBLIC_API_OPENAPI_SCHEMAS,
+  PUBLIC_API_OPENAPI_V2_SCHEMAS,
+} from "@mosoo/contracts/public-api";
 import type { AgentSessionEventBatch } from "@mosoo/contracts/session";
 import { PLATFORM_ID_INPUT_PATTERN } from "@mosoo/id";
 import { isEnumType, isInputObjectType, isObjectType } from "graphql";
@@ -470,6 +474,18 @@ describe("API to web boundary", () => {
     }
 
     expect(gaps).toEqual([]);
+  });
+
+  test("allows absent Agent provenance only in v2 responses", () => {
+    expect(PUBLIC_API_OPENAPI_SCHEMAS.ThreadSummary.properties.agent_id.type).toBe("string");
+    expect(PUBLIC_API_OPENAPI_V2_SCHEMAS.ThreadSummary.properties.agent_id.type).toEqual([
+      "string",
+      "null",
+    ]);
+    const sessionType = createGraphQLSchema().getType("Session");
+    expect(isObjectType(sessionType)).toBe(true);
+    if (!isObjectType(sessionType)) throw new Error("Session GraphQL type is missing.");
+    expect(sessionType.getFields()["agentId"]?.type.toString()).toBe("ULID");
   });
 
   test("documents public response essentials without internal runtime fields", () => {

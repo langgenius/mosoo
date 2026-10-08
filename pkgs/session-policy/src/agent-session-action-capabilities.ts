@@ -267,6 +267,10 @@ export function getAgentSessionActionCapability(input: {
   return capability;
 }
 
+export class AgentSessionActionUnavailableError extends Error {
+  override name = "AgentSessionActionUnavailableError";
+}
+
 export function getAvailableAgentSessionActionCapability(input: {
   action: AgentSessionActionCapabilityName;
   archivedAt?: number | string | null;
@@ -277,7 +281,9 @@ export function getAvailableAgentSessionActionCapability(input: {
   const capability = getAgentSessionActionCapability(input);
 
   if (capability.status === "unavailable") {
-    throw new Error(capability.reason ?? `Agent Session action ${input.action} is unavailable.`);
+    throw new AgentSessionActionUnavailableError(
+      capability.reason ?? `Agent Session action ${input.action} is unavailable.`,
+    );
   }
 
   return capability;

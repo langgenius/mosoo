@@ -26,7 +26,7 @@ export interface DailyRow extends AggregateRow {
 }
 
 export interface AgentAggregateRow extends AggregateRow {
-  agent_id: string;
+  agent_id: string | null;
   agent_name: string | null;
   debug_cost_usd: number | null;
   eval_cost_usd: number | null;
@@ -76,7 +76,7 @@ export interface CostDailyPointView extends CostTotalsView {
 }
 
 export interface CostAgentRowView extends CostTotalsView {
-  agentId: AgentId;
+  agentId: AgentId | null;
   agentName: string;
   debugCostUsd: number;
   evalCostUsd: number;

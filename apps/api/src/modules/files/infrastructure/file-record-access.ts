@@ -15,7 +15,7 @@ import type {
 } from "./file-record-model";
 import { getFileRecordById } from "./file-record-queries";
 import { getFileUploadAccessContextByFileId } from "./file-upload-context-store";
-import { ensureSessionFileAccess } from "./session-file-ownership";
+import { ensureSessionFileAccess, ensureSessionFileWritable } from "./session-file-ownership";
 
 export async function ensureProjectKeyFileScope(
   database: D1Database,
@@ -105,6 +105,7 @@ function ensureAccountFileAccess(
 export async function ensureUploadAccess({
   database,
   fileId,
+  requiredIntent,
   viewer,
 }: UploadAccessRequest): Promise<FileUploadContext> {
   const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
@@ -128,6 +129,9 @@ export async function ensureUploadAccess({
   } else if (context.upload.scope_kind === "session") {
     if (!context.sessionAccess) {
       throw createFileNotFoundError("Session not found.");
+    }
+    if (requiredIntent === "write") {
+      await ensureSessionFileWritable(database, context.sessionAccess.id);
     }
   } else if (
     context.upload.scope_kind === "agent_package" ||
@@ -153,6 +157,7 @@ export async function ensureUploadAccess({
 export async function ensureFileAccess({
   database,
   fileId,
+  requiredIntent,
   viewer,
 }: FileAccessRequest): Promise<FileRecordRow> {
   const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
@@ -169,11 +174,12 @@ export async function ensureFileAccess({
   } else if (file.scope_kind === "library") {
     await ensureLibraryFileAccess(database, viewerId, file, "file");
   } else if (file.scope_kind === "session") {
-    await ensureSessionFileAccess(
-      database,
-      viewerId,
-      parsePlatformId(requireScopeId(file.scope_id, "File"), "file session ID"),
+    const sessionId = parsePlatformId<SessionId>(
+      requireScopeId(file.scope_id, "File"),
+      "file session ID",
     );
+    await ensureSessionFileAccess(database, viewerId, sessionId);
+    if (requiredIntent === "write") await ensureSessionFileWritable(database, sessionId);
   } else if (file.scope_kind === "agent_package" || file.scope_kind === "app_draft") {
     await ensureAgentPackageFileAccess(
       database,

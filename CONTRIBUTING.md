@@ -146,6 +146,8 @@ just check             # fmt + doc links + lint + tc + tests + GraphQL freshness
 just public-api-openapi # regenerate the versioned Public API OpenAPI artifact
 just public-api-openapi-check # check artifact freshness and v1 compatibility
 just public-api-smoke   # smoke a configured deployed non-production API only
+just stage-preflight    # build and dry-run API/Driver/Web for isolated staging
+just deploy-stage       # publish a reviewed clean candidate to staging; no D1 apply
 just graphql-codegen   # regenerate GraphQL schema and web gql output
 just db-generate name  # append a Drizzle migration from the schema
 just db-reset-local    # destroy local D1 state and reapply migrations
@@ -202,6 +204,14 @@ check, no clean-worktree check, and no dry-run inside the deploy script. Run
 [Production Deploy Verification](./docs/production-deploy-verification.md)
 runbook before deploying.
 
+The existing `stage` environment has separate Workers, D1, R2, queues, and
+execution resources. Use the [staging runbook](./docs/staging-deploy-verification.md)
+and `just deploy-stage`; `deploy/try`, `just deploy-api`, and `just deploy-web`
+target production. Stage deployment builds both apps before publishing and tags
+both Worker versions with the same Git revision and Driver revision. It does
+not apply migrations or provision provider keys. The two Worker updates are
+sequential, not atomic; verify both versions before starting acceptance.
+
 ## GraphQL Codegen
 
 GraphQL sources of truth are:
@@ -229,6 +239,7 @@ Recommended baseline:
 
 - Documentation changes: `just fmt-check-path <path>`, plus link / path checks when moving documents.
 - TypeScript package changes: `just tc-package <package>` and focused unit tests; run root `just tc` when cross-contract behavior changes.
+- Root `just tc` rebuilds Driver declarations before checking consumers. Use it after changing Driver contracts so local checks cannot read stale declarations from a previous submodule revision.
 - API behavior changes: focused `just test-file <path>`; add `just tc-package @mosoo/api` when types or bindings are involved.
 - Web behavior changes: focused `just test-file <path>` and `just tc-package @mosoo/web`; user-visible flows need browser or manual checks.
 - GraphQL changes: `just graphql-codegen`.
@@ -250,7 +261,7 @@ just e2e public-api runtime
 just e2e public-api latency
 ```
 
-`just e2e deterministic session-log` is the local acceptance path without external credentials. `just e2e ui sidebar` is the fixture-backed console sidebar acceptance case and writes review screenshots to `.tmp/e2e/sidebar/`. `just e2e ui design-contract` measures the shared component recipes against `docs/design/console-design-contract.md` and writes before/after review screenshots to `.tmp/e2e/design-contract/`; `just e2e ui typography-proof` renders the typography comparison. `just e2e contract harness` covers local harness contracts that do not need live credentials. Preview and latency cases accept `openai|anthropic`; `public-api runtime` additionally accepts `opencode|deepseek`. Use the matching provider-specific key or `MOSOO_E2E_PROVIDER_API_KEY`. ACP fallback is the runtime path used by the OpenCode and DeepSeek public-API cases and is also covered by driver fixtures and API integration gates.
+`just e2e deterministic session-log` is the local acceptance path without external credentials. `just e2e ui sidebar` is the fixture-backed console sidebar acceptance case and writes review screenshots to `.tmp/e2e/sidebar/`. `just e2e ui design-contract` measures the shared component recipes against `docs/design/console-design-contract.md` and writes before/after review screenshots to `.tmp/e2e/design-contract/`; `just e2e ui typography-proof` renders the typography comparison. `just e2e contract harness` covers local harness contracts that do not need live credentials. Preview and latency cases accept `openai|anthropic`; `public-api runtime` additionally accepts `opencode|deepseek|pi`. Pi also requires its custom model and endpoint settings from [the E2E guide](./e2e/README.md). Use the matching provider-specific key or `MOSOO_E2E_PROVIDER_API_KEY`. ACP fallback is the runtime path used by the OpenCode and DeepSeek public-API cases and is also covered by driver fixtures and API integration gates.
 
 ## Engineering Principles
 

@@ -4,13 +4,11 @@ import type {
   FilePurpose,
   FileUploadStrategy,
 } from "@mosoo/contracts/file";
-import { fileRecordsTable, fileUploadsTable } from "@mosoo/db";
 import { createPlatformId, parsePlatformId } from "@mosoo/id";
 import type { AccountId, FileId, UploadId } from "@mosoo/id";
 
-import { logInfo } from "../../../platform/cloudflare/logger";
+import { createErrorLogContext, logInfo, logWarn } from "../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
-import { getAppDatabase } from "../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../time";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import {
@@ -37,7 +35,8 @@ import {
 } from "./file-record-store";
 import type { FileRecordRow } from "./file-record-store";
 import { getFileScopeDescriptor, resolveFileUploadTargetContext } from "./file-scope-descriptor";
-import { createMultipartUpload, normalizeR2Etag } from "./r2-s3-client";
+import { insertAdmittedFileUpload } from "./file-upload-admission.repository";
+import { abortMultipartUpload, createMultipartUpload, normalizeR2Etag } from "./r2-s3-client";
 
 const UPLOAD_SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -176,54 +175,70 @@ export async function createFileUpload(
     strategy,
   });
 
-  await getAppDatabase(bindings.DB)
-    .insert(fileRecordsTable)
-    .values({
-      committed: false,
-      createdAt: timestampMs,
-      createdByAccountId: viewerId,
-      etag: null,
-      expiresAt,
-      id: fileId,
-      mimeType: contentType,
-      name,
-      objectKey: stagingObjectKey,
-      ownerId,
-      ownerKind,
-      parentPath,
-      path: logicalPath,
-      purpose,
-      scopeId,
-      scopeKind,
-      sessionKind,
-      size: input.file.size,
-      status: "pending",
-      updatedAt: timestampMs,
-      version: 1,
-    })
-    .run();
-
-  await getAppDatabase(bindings.DB)
-    .insert(fileUploadsTable)
-    .values({
-      contentType,
-      createdAt: timestampMs,
-      createdByAccountId: viewerId,
-      expectedSize: input.file.size,
-      expiresAt,
-      fileId,
-      id: uploadId,
-      ifMatchEtag,
-      multipartUploadId,
-      overwrite,
-      partSize,
-      scopeId,
-      scopeKind,
-      status: "pending",
-      strategy,
-      updatedAt: timestampMs,
-    })
-    .run();
+  try {
+    const admitted = await insertAdmittedFileUpload(
+      bindings.DB,
+      {
+        committed: false,
+        createdAt: timestampMs,
+        createdByAccountId: viewerId,
+        etag: null,
+        expiresAt,
+        id: fileId,
+        mimeType: contentType,
+        name,
+        objectKey: stagingObjectKey,
+        ownerId,
+        ownerKind,
+        parentPath,
+        path: logicalPath,
+        purpose,
+        scopeId,
+        scopeKind,
+        sessionKind,
+        size: input.file.size,
+        status: "pending",
+        updatedAt: timestampMs,
+        version: 1,
+      },
+      {
+        contentType,
+        createdAt: timestampMs,
+        createdByAccountId: viewerId,
+        expectedSize: input.file.size,
+        expiresAt,
+        fileId,
+        id: uploadId,
+        ifMatchEtag,
+        multipartUploadId,
+        overwrite,
+        partSize,
+        scopeId,
+        scopeKind,
+        status: "pending",
+        strategy,
+        updatedAt: timestampMs,
+      },
+    );
+    if (!admitted) {
+      throw createFileConflictError(
+        "Session no longer accepts uploads. Start a new Preview if it expired.",
+      );
+    }
+  } catch (error) {
+    if (multipartUploadId !== null) {
+      await abortMultipartUpload(bindings, stagingObjectKey, multipartUploadId).catch(
+        (abortError: unknown) => {
+          logWarn("file.upload.admission_abort_failed", {
+            ...createErrorLogContext(abortError),
+            fileId,
+            uploadId,
+          });
+        },
+      );
+    }
+    throw error;
+  }
 
   logInfo("file.upload.created", {
     contentType,

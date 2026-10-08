@@ -46,12 +46,19 @@ function defaultModelForVendor(
 
 export function resolveDefaultAgentRuntime(
   credentials: readonly VendorCredential[],
+  selectedRuntimeId?: string,
 ): DefaultAgentRuntimeSelection | null {
   const configuredVendorIds = toConfiguredVendorIds(credentials);
+  const runtimes =
+    selectedRuntimeId === undefined
+      ? PUBLIC_RUNTIME_CATALOG
+      : PUBLIC_RUNTIME_CATALOG.filter((entry) => entry.runtimeId === selectedRuntimeId);
 
-  for (const entry of PUBLIC_RUNTIME_CATALOG) {
-    const configuredVendor = entry.vendors.find((vendor) =>
-      configuredVendorIds.has(vendor.vendorId),
+  for (const entry of runtimes) {
+    const configuredVendor = entry.vendors.find(
+      (vendor) =>
+        vendor.vendorId !== VENDOR_OPENAI_COMPATIBLE.vendorId &&
+        configuredVendorIds.has(vendor.vendorId),
     );
 
     if (configuredVendor !== undefined) {
@@ -68,9 +75,10 @@ export function resolveDefaultAgentRuntime(
       credential.vendorId === VENDOR_OPENAI_COMPATIBLE.vendorId &&
       (credential.models?.length ?? 0) > 0,
   );
-  const customRuntime = PUBLIC_RUNTIME_CATALOG.find(
+  const customRuntime = runtimes.find(
     (entry) =>
-      entry.runtimeId === DEFAULT_CUSTOM_PROVIDER_RUNTIME_ID && entry.acceptsCustomProvider,
+      entry.runtimeId === (selectedRuntimeId ?? DEFAULT_CUSTOM_PROVIDER_RUNTIME_ID) &&
+      entry.acceptsCustomProvider,
   );
   const customModel = customCredential?.models?.[0];
 
@@ -82,14 +90,14 @@ export function resolveDefaultAgentRuntime(
     };
   }
 
-  const fallback = PUBLIC_RUNTIME_CATALOG[0];
+  const fallback = runtimes[0];
 
   if (fallback === undefined) {
     return null;
   }
 
-  // No provider is configured yet. Create with the first public runtime so the
-  // editor can surface the missing provider key inline.
+  // No compatible provider is configured yet. Preserve the selected runtime so
+  // the editor can surface its missing provider setup inline.
   return {
     model: fallback.defaultModel,
     provider: fallback.defaultProvider,

@@ -59,14 +59,12 @@ export function readinessBlockSummary(
 
 export function sendDisabledReasonForSession(
   {
-    configurationRefreshRequired,
     lifecycle,
     reconnecting,
     setupBlocked,
     setupSummary,
     stopped,
   }: {
-    configurationRefreshRequired: boolean;
     lifecycle: SessionLiveState["lifecycle"];
     reconnecting: boolean;
     setupBlocked: boolean;
@@ -77,10 +75,6 @@ export function sendDisabledReasonForSession(
 ): string | null {
   if (setupBlocked) {
     return setupSummary ?? t("agent.fixSetupBeforeRun");
-  }
-
-  if (configurationRefreshRequired) {
-    return t("agent.startNewSessionToTestConfig");
   }
 
   if (reconnecting || lifecycle === "RESCHEDULING") {

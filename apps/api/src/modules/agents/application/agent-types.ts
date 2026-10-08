@@ -1,4 +1,4 @@
-import type { Agent } from "@mosoo/contracts/agent";
+import type { Agent, AgentKind } from "@mosoo/contracts/agent";
 import type {
   AccountId,
   AgentDeploymentVersionId,
@@ -13,7 +13,7 @@ export interface AgentRow {
   description: string | null;
   environmentId: EnvironmentId | null;
   id: AgentId;
-  kind: Agent["kind"];
+  kind: AgentKind;
   liveDeploymentVersionId: AgentDeploymentVersionId | null;
   model: string;
   name: string;

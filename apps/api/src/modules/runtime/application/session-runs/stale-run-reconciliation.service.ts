@@ -1,7 +1,7 @@
-import type { RunError } from "@mosoo/contracts/session-run";
+import type { RunError, SessionRunStatus } from "@mosoo/contracts/session-run";
 import { driverInstancesTable, sessionRunsTable } from "@mosoo/db";
 import type { DriverInstanceId, SessionId, SessionRunId } from "@mosoo/id";
-import { and, asc, desc, eq, inArray, isNull, lte, notInArray, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, lte, ne, notInArray, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 
 import { logWarn } from "../../../../platform/cloudflare/logger";
@@ -22,6 +22,7 @@ export interface ActiveRunDriverRow {
   driver_status: string | null;
   driver_updated_at: number | null;
   run_id: SessionRunId;
+  run_status: SessionRunStatus;
   session_id: SessionId;
   run_trace_id: string | null;
   run_updated_at: number;
@@ -60,8 +61,10 @@ function shouldFailActiveRunAsStale(row: ActiveRunDriverRow, nowMs: number): boo
     return true;
   }
 
+  // Cold preparation restores the workspace before attaching a driver. It
+  // needs the same startup allowance as a driver waiting to connect.
   const staleBeforeMs =
-    row.driver_status === "connecting"
+    row.run_status === "booting" || row.driver_status === "connecting"
       ? nowMs - DRIVER_COLD_READY_TIMEOUT_MS
       : nowMs - RUNTIME_SOCKET_TIMEOUT_MS;
   return latestRuntimeObservationMs(row) < staleBeforeMs;
@@ -79,6 +82,7 @@ function activeRunDriverColumns() {
     driver_status: runDriverInstancesTable.status,
     driver_updated_at: runDriverInstancesTable.updatedAt,
     run_id: sessionRunsTable.id,
+    run_status: sessionRunsTable.status,
     run_trace_id: sessionRunsTable.traceId,
     run_updated_at: sessionRunsTable.updatedAt,
     session_id: sessionRunsTable.sessionId,
@@ -97,10 +101,11 @@ function staleActiveRunPredicate(nowMs: number) {
   return or(
     inArray(runDriverInstancesTable.status, ["failed", "stopped"]),
     and(
-      eq(runDriverInstancesTable.status, "connecting"),
+      or(eq(sessionRunsTable.status, "booting"), eq(runDriverInstancesTable.status, "connecting")),
       lte(latestRuntimeObservationSql(), nowMs - DRIVER_COLD_READY_TIMEOUT_MS),
     ),
     and(
+      ne(sessionRunsTable.status, "booting"),
       or(
         isNull(runDriverInstancesTable.status),
         notInArray(runDriverInstancesTable.status, ["connecting", "failed", "stopped"]),

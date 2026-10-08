@@ -155,7 +155,7 @@ export async function queryAgents(
           SUM(CASE WHEN usage_source.run_purpose = 'eval'
             THEN usage_source.total_cost_usd ELSE 0 END) AS eval_cost_usd
         FROM usage_source
-        LEFT JOIN agent ON agent.id = usage_source.agent_id
+        LEFT JOIN agent ON agent.id = usage_source.agent_id AND agent.project_id = usage_source.project_id
         LEFT JOIN account ON account.id = usage_source.agent_owner_user_id
         WHERE ${where.sql}
         GROUP BY usage_source.agent_id, usage_source.agent_owner_user_id
@@ -165,12 +165,12 @@ export async function queryAgents(
   );
 
   return results.map((row) => {
-    const agentId = readAgentId(row.agent_id, "cost agent ID");
+    const agentId = row.agent_id === null ? null : readAgentId(row.agent_id, "cost agent ID");
     const ownerId = readAccountId(row.owner_id, "cost agent owner ID");
 
     return mergeTotalsView(toTotalsView(row), {
       agentId,
-      agentName: row.agent_name ?? agentId,
+      agentName: row.agent_name ?? agentId ?? "Direct sessions",
       debugCostUsd: row.debug_cost_usd ?? 0,
       evalCostUsd: row.eval_cost_usd ?? 0,
       ownerEmail: row.owner_email,

@@ -18,6 +18,7 @@ import {
   createPublicHttpContractDatabase,
   createPublicHttpTestBindings,
   createTestExecutionContext,
+  insertOwnerSession,
 } from "./helpers/public-api-http-test-fixture";
 
 const CREDENTIAL_ID = parsePlatformId<VendorCredentialId>(

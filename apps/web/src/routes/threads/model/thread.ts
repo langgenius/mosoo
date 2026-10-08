@@ -173,7 +173,8 @@ export function toThreadListItem(input: {
   session: SessionSummary;
   ui: ThreadUiSnapshot;
 }): ThreadListItem {
-  const agent = input.agentsById.get(input.session.agentId) ?? null;
+  const agent =
+    input.session.agentId === null ? null : (input.agentsById.get(input.session.agentId) ?? null);
   const lastActivityAt = getThreadLastActivityAt(input.session);
   const readAt = input.ui.readAtByThreadId[input.session.id] ?? null;
   const read = readAt !== null && new Date(readAt).getTime() >= new Date(lastActivityAt).getTime();
@@ -181,7 +182,10 @@ export function toThreadListItem(input: {
   return {
     actionCapabilities: input.actionCapabilities,
     agent,
-    agentName: agent?.name ?? AGENT_UNAVAILABLE,
+    agentName:
+      input.session.agentId === null
+        ? "threads.directInvocation"
+        : (agent?.name ?? AGENT_UNAVAILABLE),
     bucket: getThreadBucket(input.session),
     failed: isThreadFailed(input.session),
     id: input.session.id,

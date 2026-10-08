@@ -264,7 +264,10 @@ export async function resolveAvailableModels(
     scope.label,
     credentialRows,
   );
-  const presetEntries = PRESET_MODEL_CATALOG.map((entry) =>
+  // Custom providers only expose models explicitly declared by their credentials.
+  const presetEntries = PRESET_MODEL_CATALOG.filter(
+    (entry) => entry.vendorId !== VENDOR_OPENAI_COMPATIBLE.vendorId,
+  ).map((entry) =>
     resolvePresetEntry(
       entry,
       availableVendorIds,

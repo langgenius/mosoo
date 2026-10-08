@@ -26,12 +26,14 @@ import type { AuthenticatedViewer } from "../../../auth/application/viewer-auth.
 import { resolveReadyEnvironmentPackageArtifact } from "../../../environments/application/environment-package-artifact.service";
 import { fileStore } from "../../../files/application/file-store";
 import { publishPersistedSessionRuntimeEvents } from "../../../sessions/application/session-event-write.service";
+import { assertPreviewAvailable } from "../../../sessions/infrastructure/preview-retention.repository";
 import { getSupportedRuntimeId } from "../../domain/runtime-config";
 import {
-  commitQueuedSessionRunAdmission,
+  attemptQueuedSessionRunAdmission,
   hasSessionRunAdmissionClientRequestReceipt,
-  isCattleTerminalCheckpointReadyForNextRun,
+  isSessionTerminalCheckpointReadyForNextRun,
 } from "../../infrastructure/session-runs/session-run-admission.repository";
+import type { CommitQueuedSessionRunAdmissionInput } from "../../infrastructure/session-runs/session-run-admission.repository";
 import { getActiveSessionRunSummary } from "../../infrastructure/session-runs/session-run-read.repository";
 import { createInsertedSessionRunSummary } from "../../infrastructure/session-runs/session-run-write.repository";
 import { getSessionExecutionPlan } from "../session-definition/session-execution.repository";
@@ -39,23 +41,14 @@ import { dispatchQueuedSessionRun } from "./dispatch-queued-run.service";
 import { createQueuedSessionRunRuntimeEvents } from "./session-run-view-events.service";
 import { reconcileStaleActiveSessionRun } from "./stale-run-reconciliation.service";
 
-class SessionActiveRunExistsError extends Error {
-  readonly activeRun: SessionRunSummary;
-
-  constructor(activeRun: SessionRunSummary) {
-    super("This conversation already has an active run. Wait for it to finish or cancel it first.");
-    this.name = "SessionActiveRunExistsError";
-    this.activeRun = activeRun;
-  }
-}
-
 interface QueueSessionRunInput {
+  admissionRequestedAtMs?: number;
   accessViewer?: AuthenticatedViewer;
   attachmentIds: FileId[];
   clientRequestId: string | null;
   prompt: string;
   session: {
-    agent_id: AgentId;
+    agent_id: AgentId | null;
     deployment_version_id: AgentDeploymentVersionId | null;
     deployment_version_number: number | null;
     id: SessionId;
@@ -95,6 +88,7 @@ export async function queueSessionRun(request: QueueSessionRunRequest): Promise<
 }> {
   const { bindings, input, requestUrl, viewer } = request;
   const queueStartedAtMs = Date.now();
+  const admissionRequestedAtMs = input.admissionRequestedAtMs ?? currentTimestampMs();
 
   const runtimeId = getSupportedRuntimeId(input.session.runtime_id);
   const viewerId: AccountId = parsePlatformId(viewer.id, "viewer id");
@@ -106,8 +100,9 @@ export async function queueSessionRun(request: QueueSessionRunRequest): Promise<
   // Pre-admission guards are independent; run them concurrently instead of
   // paying three serial D1 round trips before the run row exists.
   await Promise.all([
+    assertPreviewAvailable(bindings.DB, input.session.id, admissionRequestedAtMs),
     reconcileStaleActiveSessionRun(bindings.DB, input.session.id),
-    isCattleTerminalCheckpointReadyForNextRun(bindings.DB, input.session.id).then((ready) => {
+    isSessionTerminalCheckpointReadyForNextRun(bindings.DB, input.session.id).then((ready) => {
       if (!ready) {
         throw createCheckpointPendingError(input.session.id);
       }
@@ -168,7 +163,8 @@ export async function queueSessionRun(request: QueueSessionRunRequest): Promise<
   const apiCommand = prepareApiCommand(createSessionRunDispatchApiCommandInput(dispatchPayload), {
     timestampMs: admittedAtMs,
   });
-  const admitted = await commitQueuedSessionRunAdmission(bindings.DB, {
+  const admission: CommitQueuedSessionRunAdmissionInput = {
+    admissionRequestedAtMs,
     apiCommand,
     clientRequestId: input.clientRequestId,
     events: queuedEvents,
@@ -198,9 +194,11 @@ export async function queueSessionRun(request: QueueSessionRunRequest): Promise<
       projectId: input.session.project_id,
       id: input.session.id,
     },
-  });
+  };
 
-  if (!admitted) {
+  const outcome = await attemptQueuedSessionRunAdmission(bindings.DB, admission);
+
+  if (outcome !== "admitted") {
     if (
       await hasSessionRunAdmissionClientRequestReceipt(bindings.DB, {
         clientRequestId: input.clientRequestId,
@@ -216,10 +214,15 @@ export async function queueSessionRun(request: QueueSessionRunRequest): Promise<
     const activeRun = await getActiveSessionRunSummary(bindings.DB, input.session.id);
 
     if (activeRun !== null) {
-      throw new SessionActiveRunExistsError(activeRun);
+      throw createApiError(
+        API_ERROR_CODE.sessionRunActive,
+        "This conversation already has an active run. Wait for it to finish or cancel it first.",
+      );
     }
 
-    if (!(await isCattleTerminalCheckpointReadyForNextRun(bindings.DB, input.session.id))) {
+    await assertPreviewAvailable(bindings.DB, input.session.id, admissionRequestedAtMs);
+
+    if (!(await isSessionTerminalCheckpointReadyForNextRun(bindings.DB, input.session.id))) {
       throw createCheckpointPendingError(input.session.id);
     }
 

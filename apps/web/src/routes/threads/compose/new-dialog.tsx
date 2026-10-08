@@ -255,16 +255,6 @@ function AgentAssignField({
                       <span className="text-fg-1 truncate text-[13px] font-semibold">
                         {agent.name}
                       </span>
-                      <span
-                        className={cn(
-                          "shrink-0 rounded-sm border px-1 py-0.5 text-[9.5px] font-bold uppercase tracking-wide",
-                          agent.kind === "pet"
-                            ? "border-soil/25 bg-soil-bg text-soil-fg"
-                            : "border-sky/30 bg-sky-bg text-sky-fg",
-                        )}
-                      >
-                        {agent.kind}
-                      </span>
                       {agent.status !== "published" ? (
                         <span className="text-fg-3 shrink-0 text-[10.5px]">
                           {t("threads.draft")}

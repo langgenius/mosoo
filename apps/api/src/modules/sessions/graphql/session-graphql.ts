@@ -4,6 +4,10 @@ import type { AgentId, ProjectId, SessionId } from "@mosoo/id";
 import type { GraphQLModule } from "../../../adapters/graphql/graphql-module";
 import { sessionGraphQLSpec } from "../../../adapters/graphql/graphql-module-specs";
 import {
+  restartSessionDriver,
+  recreateSessionSandbox,
+} from "../../runtime/application/runtime-state-operations.service";
+import {
   createAgentSession,
   sendAgentSessionEvents,
 } from "../../runtime/application/session-run.service";
@@ -78,6 +82,7 @@ interface StartAgentRunArgs {
 
 interface AgentSessionListArgs {
   agentId: string;
+  sessionId?: string | null;
   archived?: Parameters<typeof listAgentSessions>[2]["archived"];
   beforeCursor?: string | null;
   limit?: number | null;
@@ -106,6 +111,16 @@ function readSessionId(value: string): SessionId {
 export const sessionGraphQLModule = {
   ...sessionGraphQLSpec,
   authenticatedMutationResolvers: {
+    restartSessionDriver: async (_parent, args: SessionArgs, context) =>
+      restartSessionDriver(context.bindings, context.viewer, {
+        projectId: readProjectId(args.projectId),
+        sessionId: readSessionId(args.sessionId),
+      }),
+    recreateSessionSandbox: async (_parent, args: SessionArgs, context) =>
+      recreateSessionSandbox(context.bindings, context.viewer, {
+        projectId: readProjectId(args.projectId),
+        sessionId: readSessionId(args.sessionId),
+      }),
     addSessionResource: async (_parent, args: AddSessionResourceArgs, context) =>
       addSessionResource(context.bindings, context.viewer, args.input),
     archiveAgentSession: async (_parent, args: SessionArgs, context) => {
@@ -125,6 +140,7 @@ export const sessionGraphQLModule = {
         bindings: context.bindings,
         executionContext: context.executionContext,
         input: args.input,
+        options: { origin: "console_preview" },
         requestUrl: context.request.url,
         viewer: context.viewer,
       }),
@@ -199,6 +215,7 @@ export const sessionGraphQLModule = {
     agentSessionList: async (_parent, args: AgentSessionListArgs, context) =>
       listAgentSessions(context.bindings.DB, context.viewer, {
         agentId: readAgentId(args.agentId),
+        sessionId: args.sessionId == null ? null : readSessionId(args.sessionId),
         archived: args.archived ?? null,
         beforeCursor: args.beforeCursor ?? null,
         limit: args.limit ?? null,

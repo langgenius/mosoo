@@ -1,12 +1,17 @@
 import { DRIVER_PROTOCOL_VERSION } from "@mosoo/agent-driver/boot";
 import type { DriverRuntime } from "@mosoo/agent-driver/runtime";
-import { driverCommandsTable, driverInstanceMcpGrantsTable, driverInstancesTable } from "@mosoo/db";
-import type { DriverInstanceId, SandboxId, SessionId } from "@mosoo/id";
+import {
+  driverCommandsTable,
+  driverInstanceMcpGrantsTable,
+  driverInstancesTable,
+  sandboxSessionsTable,
+} from "@mosoo/db";
+import type { DriverInstanceId, SandboxId, SandboxSessionId, SessionId } from "@mosoo/id";
 import { and, desc, eq, gt, inArray, isNotNull, notInArray, or, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
-import { getAppDatabase, runAppDatabaseBatch } from "../../../../platform/db/drizzle";
+import { getAppDatabase } from "../../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../../time";
 import {
   REUSABLE_DRIVER_INSTANCE_STATUSES,
@@ -41,6 +46,7 @@ export async function createDriverInstanceRecord(
     bootTokenHash: Uint8Array;
     conflictStrategy?: "insert-only" | "replace";
     driverInstanceId: DriverInstanceId;
+    executionSessionId: SandboxSessionId;
     runtime: DriverRuntime;
     sandboxId: SandboxId;
     sandboxSessionId: SessionId;
@@ -94,18 +100,73 @@ export async function createDriverInstanceRecord(
     updatedAt: now,
   } as const;
 
-  if (input.conflictStrategy === "insert-only") {
-    const database = getAppDatabase(bindings.DB);
-    const inserted =
-      (await database
-        .insert(driverInstancesTable)
-        .values(driverRecord)
-        .onConflictDoNothing()
-        .returning({
-          bootTokenExpiresAt: driverInstancesTable.bootTokenExpiresAt,
-          generation: driverInstancesTable.generation,
+  const database = getAppDatabase(bindings.DB);
+  // The claim and record write must serialize with a binding conversion. A
+  // prior SELECT would allow a paused prewarm to resurrect the old Driver.
+  const bindingGuard = database
+    .select({
+      ready: sql<number>`CASE WHEN EXISTS (
+      SELECT 1 FROM ${sandboxSessionsTable}
+      WHERE ${sandboxSessionsTable.sessionId} = ${input.sandboxSessionId}
+        AND ${sandboxSessionsTable.sandboxId} = ${input.sandboxId}
+        AND ${sandboxSessionsTable.sandboxSessionId} = ${input.executionSessionId}
+        AND ${sandboxSessionsTable.status} = 'active'
+    ) THEN 1 ELSE json('driver workspace binding changed') END`,
+    })
+    .from(sql`(SELECT 1)`);
+  const ownedGrantInserts = mcpGrantRows.map((grant) =>
+    database.insert(driverInstanceMcpGrantsTable).select(
+      database
+        .select({
+          authType: sql<typeof grant.authType>`${grant.authType}`.as("auth_type"),
+          authorizationState: sql<typeof grant.authorizationState>`${grant.authorizationState}`.as(
+            "authorization_state",
+          ),
+          canInvalidate: sql<boolean>`${Number(grant.canInvalidate)}`.as("can_invalidate"),
+          canRefresh: sql<boolean>`${Number(grant.canRefresh)}`.as("can_refresh"),
+          createdAt: sql<number>`${grant.createdAt}`.as("created_at"),
+          credentialId: sql<typeof grant.credentialId>`${grant.credentialId}`.as("credential_id"),
+          driverInstanceId: sql<DriverInstanceId>`${input.driverInstanceId}`.as(
+            "driver_instance_id",
+          ),
+          projectId: sql<typeof grant.projectId>`${grant.projectId}`.as("project_id"),
+          serverId: sql<typeof grant.serverId>`${grant.serverId}`.as("server_id"),
+          updatedAt: sql<number>`${grant.updatedAt}`.as("updated_at"),
         })
-        .get()) ?? null;
+        .from(driverInstancesTable)
+        .where(
+          and(
+            eq(driverInstancesTable.id, input.driverInstanceId),
+            eq(driverInstancesTable.bootTokenHash, input.bootTokenHash),
+            // The Driver insert, then these one-row grant inserts, are adjacent in
+            // the same batch. A skipped insert propagates zero changes through all
+            // grants, including a retry that presents the same boot-token hash.
+            ...(input.conflictStrategy === "insert-only" ? [sql`changes() = 1`] : []),
+          ),
+        ),
+    ),
+  );
+
+  // Use the atomic D1 batch directly: the general compatibility adapter only
+  // accepts writes without returned rows. Compile through the canonical tables.
+  const executeClaim = (queries: { toSQL(): { sql: string; params: unknown[] } }[]) =>
+    bindings.DB.batch<{ boot_token_expires_at: number; generation: number }>(
+      queries.map((query) => {
+        const statement = query.toSQL();
+        return bindings.DB.prepare(statement.sql).bind(...statement.params);
+      }),
+    );
+
+  if (input.conflictStrategy === "insert-only") {
+    const [, insertedRows] = await executeClaim([
+      bindingGuard,
+      database.insert(driverInstancesTable).values(driverRecord).onConflictDoNothing().returning({
+        bootTokenExpiresAt: driverInstancesTable.bootTokenExpiresAt,
+        generation: driverInstancesTable.generation,
+      }),
+      ...ownedGrantInserts,
+    ]);
+    const inserted = insertedRows?.results[0] ?? null;
 
     if (inserted === null) {
       return {
@@ -116,28 +177,22 @@ export async function createDriverInstanceRecord(
       };
     }
 
-    if (mcpGrantRows.length > 0) {
-      await database.insert(driverInstanceMcpGrantsTable).values(mcpGrantRows).run();
-    }
-
     return {
-      bootTokenExpiresAt: inserted.bootTokenExpiresAt,
+      bootTokenExpiresAt: inserted.boot_token_expires_at,
       generation: inserted.generation,
       status: "created",
     };
   }
 
-  const database = getAppDatabase(bindings.DB);
-  await runAppDatabaseBatch(bindings.DB, (batchDb) => [
-    batchDb
+  const [, , , upsertedRows] = await executeClaim([
+    bindingGuard,
+    database
       .delete(driverCommandsTable)
       .where(eq(driverCommandsTable.driverInstanceId, input.driverInstanceId)),
-    batchDb
+    database
       .delete(driverInstanceMcpGrantsTable)
       .where(eq(driverInstanceMcpGrantsTable.driverInstanceId, input.driverInstanceId)),
-  ]);
-  const upserted =
-    (await database
+    database
       .insert(driverInstancesTable)
       .values(driverRecord)
       .onConflictDoUpdate({
@@ -177,19 +232,17 @@ export async function createDriverInstanceRecord(
       .returning({
         bootTokenExpiresAt: driverInstancesTable.bootTokenExpiresAt,
         generation: driverInstancesTable.generation,
-      })
-      .get()) ?? null;
-
-  if (mcpGrantRows.length > 0) {
-    await database.insert(driverInstanceMcpGrantsTable).values(mcpGrantRows).run();
-  }
+      }),
+    ...ownedGrantInserts,
+  ]);
+  const upserted = upsertedRows?.results[0] ?? null;
 
   if (upserted === null) {
     throw new Error("Driver instance record was not created.");
   }
 
   return {
-    bootTokenExpiresAt: upserted.bootTokenExpiresAt,
+    bootTokenExpiresAt: upserted.boot_token_expires_at,
     generation: upserted.generation,
     status: "created",
   };

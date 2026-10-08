@@ -12,7 +12,7 @@ import { and, asc, eq, exists, inArray, isNotNull, lte, or, sql } from "drizzle-
 
 import { createErrorLogContext, logWarn } from "../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
-import { getAppDatabase } from "../../../platform/db/drizzle";
+import { getAppDatabase, getD1ChangeCount } from "../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../time";
 import { fileStore } from "../../files/application/file-store";
 import { destroyDriverInstanceDurableObject } from "../../runtime/infrastructure/driver-instance/client";
@@ -31,6 +31,7 @@ import type {
   SessionDeleteCleanupStepOutcome,
   SessionDeleteCleanupTargets,
 } from "../domain/session-cleanup-plan";
+import { previewCleanupCandidatePredicate } from "../infrastructure/preview-retention.repository";
 import { destroySessionDurableObject } from "../infrastructure/session/client";
 
 type AppDatabase = ReturnType<typeof getAppDatabase>;
@@ -42,6 +43,8 @@ export interface SessionDeleteCleanupRepairCandidate {
 
 export interface DeleteSessionCascadeOptions {
   readonly operationId?: RuntimeOperationId;
+  /** Automatic cleanup must claim expiry atomically with terminal admission. */
+  readonly expiredPreviewAtMs?: number;
 }
 
 function driverInstancesForSessionCondition(
@@ -97,9 +100,11 @@ async function admitSessionDeleteCleanup(
     readonly operationId: RuntimeOperationId;
     readonly sessionId: SessionId;
     readonly timestampMs: number;
+    readonly expiredPreviewAtMs?: number;
   },
-): Promise<void> {
-  await getAppDatabase(database)
+): Promise<boolean> {
+  const db = getAppDatabase(database);
+  const result = await db
     .update(sessionsTable)
     .set({
       archivedAt: sql`COALESCE(${sessionsTable.archivedAt}, ${input.timestampMs})`,
@@ -108,8 +113,16 @@ async function admitSessionDeleteCleanup(
       statusSeq: sql`${sessionsTable.statusSeq} + 1`,
       updatedAt: input.timestampMs,
     })
-    .where(eq(sessionsTable.id, input.sessionId))
+    .where(
+      and(
+        eq(sessionsTable.id, input.sessionId),
+        input.expiredPreviewAtMs === undefined
+          ? undefined
+          : previewCleanupCandidatePredicate(db, input.expiredPreviewAtMs),
+      ),
+    )
     .run();
+  return getD1ChangeCount(result) > 0;
 }
 
 async function listSessionDeleteCleanupRepairCandidates(
@@ -160,6 +173,17 @@ export async function deleteSessionCascade(
   });
   const outcomes: SessionDeleteCleanupStepOutcome[] = [];
   let targets: SessionDeleteCleanupTargets | null = null;
+  const admitted = await admitSessionDeleteCleanup(bindings.DB, {
+    operationId,
+    sessionId,
+    timestampMs,
+    ...(options.expiredPreviewAtMs === undefined
+      ? {}
+      : { expiredPreviewAtMs: options.expiredPreviewAtMs }),
+  });
+  if (!admitted) {
+    return outcomes;
+  }
 
   async function loadCleanupTargets(): Promise<SessionDeleteCleanupTargets> {
     const sandboxSession =
@@ -197,11 +221,6 @@ export async function deleteSessionCascade(
   async function executeStep(step: SessionDeleteCleanupStep): Promise<void> {
     switch (step) {
       case "archive_session_row": {
-        await admitSessionDeleteCleanup(bindings.DB, {
-          operationId,
-          sessionId,
-          timestampMs,
-        });
         return;
       }
       case "load_cleanup_targets": {
@@ -331,6 +350,42 @@ export async function repairStaleSessionDeleteCleanups(
   );
 
   return candidates.length;
+}
+
+export async function cleanupExpiredPreviewSessions(
+  bindings: ApiBindings,
+  input: { readonly limit: number; readonly nowMs: number },
+): Promise<number> {
+  if (bindings.MOSOO_DEPLOYMENT_MODE !== "cloud") {
+    return 0;
+  }
+  if (!Number.isSafeInteger(input.limit) || input.limit <= 0) {
+    throw new Error("Preview cleanup limit must be a positive integer.");
+  }
+  const db = getAppDatabase(bindings.DB);
+  const candidates = await db
+    .select({ id: sessionsTable.id })
+    .from(sessionsTable)
+    .where(previewCleanupCandidatePredicate(db, input.nowMs))
+    .orderBy(asc(sessionsTable.updatedAt), asc(sessionsTable.id))
+    .limit(input.limit)
+    .all();
+  let deleted = 0;
+  for (const candidate of candidates) {
+    try {
+      const outcomes = await deleteSessionCascade(bindings, candidate.id, {
+        expiredPreviewAtMs: input.nowMs,
+      });
+      if (outcomes.length > 0) deleted += 1;
+    } catch (error) {
+      // The admitted terminal operation remains the existing repair queue's anchor.
+      logWarn("session.preview_cleanup.failed", {
+        ...createErrorLogContext(error),
+        sessionId: candidate.id,
+      });
+    }
+  }
+  return deleted;
 }
 
 function requireCleanupTargets(

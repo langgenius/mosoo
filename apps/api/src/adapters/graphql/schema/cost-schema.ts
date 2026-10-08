@@ -50,7 +50,7 @@ export const costSchema = /* GraphQL */ `
 
   type CostAgentRow implements CostAggregate {
     activeUsers: Int!
-    agentId: ULID!
+    agentId: ULID
     agentName: String!
     cacheCreationTokens: Int!
     cacheReadTokens: Int!

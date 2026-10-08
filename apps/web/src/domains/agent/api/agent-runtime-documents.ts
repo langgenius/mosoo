@@ -15,36 +15,3 @@ export const UNPUBLISH_AGENT_MUTATION = graphql(/* GraphQL */ `
     }
   }
 `);
-
-export const RESTART_DRIVER_MUTATION = graphql(/* GraphQL */ `
-  mutation RestartDriver($input: RuntimeStateOperationInput!) {
-    restartDriver(input: $input) {
-      affectedSessionCount
-      agentId
-      ok
-      operation
-    }
-  }
-`);
-
-export const RECREATE_SANDBOX_MUTATION = graphql(/* GraphQL */ `
-  mutation RecreateSandbox($input: RuntimeStateOperationInput!) {
-    recreateSandbox(input: $input) {
-      affectedSessionCount
-      agentId
-      ok
-      operation
-    }
-  }
-`);
-
-export const RESET_AGENT_STATE_MUTATION = graphql(/* GraphQL */ `
-  mutation ResetAgentState($input: RuntimeStateOperationInput!) {
-    resetAgentState(input: $input) {
-      affectedSessionCount
-      agentId
-      ok
-      operation
-    }
-  }
-`);

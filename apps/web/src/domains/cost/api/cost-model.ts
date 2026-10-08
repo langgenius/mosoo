@@ -19,7 +19,7 @@ export interface CostDailyPoint extends CostTotals {
 }
 
 export interface CostAgentRow extends CostTotals {
-  agentId: AgentId;
+  agentId: AgentId | null;
   agentName: string;
   debugCostUsd: number;
   evalCostUsd: number;

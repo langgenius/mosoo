@@ -54,6 +54,7 @@ function createRuntimeSubjectLeaseDatabase(): SqliteD1Database {
     );
 
     CREATE TABLE sandbox (
+      subject_kind text NOT NULL DEFAULT 'session',
       sandbox_binding text NOT NULL DEFAULT 'Sandbox',
       id text PRIMARY KEY NOT NULL,
       inactive_deadline_at integer,
@@ -157,29 +158,37 @@ describe("runtime subject run lease store", () => {
     expect(sandbox?.inactive_deadline_at).toBeNull();
   });
 
-  test("arms the pet idle deadline after the final run while its conversation stays active", async () => {
-    const database = createRuntimeSubjectLeaseDatabase();
-    database.execute(`UPDATE sandbox SET kind = 'pet' WHERE id = '${SANDBOX_ID}'`);
+  test.each(["active", "closed"])(
+    "historical kind cannot bypass conversation residency (%s)",
+    async (status) => {
+      const database = createRuntimeSubjectLeaseDatabase();
+      database.execute(`UPDATE sandbox SET kind = 'pet' WHERE id = '${SANDBOX_ID}'`);
 
-    await recordRuntimeRunLeaseAcquired(database, {
-      ...leaseInput(),
-    });
-    const releasedAfter = Date.now();
-    await expect(
-      recordRuntimeRunLeaseReleased(database, {
-        driverInstanceId: DRIVER_INSTANCE_ID,
-        expectedSessionRunId: SESSION_RUN_ID,
-      }),
-    ).resolves.toBe(true);
+      await recordRuntimeRunLeaseAcquired(database, {
+        ...leaseInput(),
+      });
+      database.execute(`UPDATE sandbox_session SET status = '${status}'`);
+      const releasedAfter = Date.now();
+      await expect(
+        recordRuntimeRunLeaseReleased(database, {
+          driverInstanceId: DRIVER_INSTANCE_ID,
+          expectedSessionRunId: SESSION_RUN_ID,
+        }),
+      ).resolves.toBe(true);
 
-    const deadline = await database
-      .prepare("SELECT inactive_deadline_at FROM sandbox WHERE id = ?")
-      .bind(SANDBOX_ID)
-      .first<number>("inactive_deadline_at");
+      const deadline = await database
+        .prepare("SELECT inactive_deadline_at FROM sandbox WHERE id = ?")
+        .bind(SANDBOX_ID)
+        .first<number>("inactive_deadline_at");
 
-    expect(deadline).toBeGreaterThanOrEqual(releasedAfter + 5 * 60_000);
-    expect(deadline).toBeLessThanOrEqual(Date.now() + 5 * 60_000);
-  });
+      if (status === "active") {
+        expect(deadline).toBeNull();
+      } else {
+        expect(deadline).toBeGreaterThanOrEqual(releasedAfter + 5 * 60_000);
+        expect(deadline).toBeLessThanOrEqual(Date.now() + 5 * 60_000);
+      }
+    },
+  );
 
   test("keeps terminal run history after lease release", async () => {
     const database = createRuntimeSubjectLeaseDatabase();

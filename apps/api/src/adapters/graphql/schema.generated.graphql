@@ -27,7 +27,6 @@ type Agent {
   createdAt: String!
   description: String
   id: ULID!
-  kind: AgentKind!
   liveVersion: AgentDeploymentVersion
   model: String!
   name: String!
@@ -81,7 +80,6 @@ type AgentDeploymentVersion {
   environmentId: ULID
   id: ULID!
   isLive: Boolean!
-  kind: AgentKind!
   model: String!
   provider: String!
   runtimeId: String!
@@ -93,7 +91,6 @@ type AgentDetail {
   createdAt: String!
   description: String
   id: ULID!
-  kind: AgentKind!
   liveVersion: AgentDeploymentVersion
   model: String!
   name: String!
@@ -407,7 +404,6 @@ type AgentSummary {
   createdAt: String!
   description: String
   id: ULID!
-  kind: AgentKind!
   name: String!
   owner: AgentOwnerSummary!
   projectId: ULID!
@@ -476,7 +472,7 @@ type ControlPlaneOverviewProjectList {
 
 type CostAgentRow implements CostAggregate {
   activeUsers: Int!
-  agentId: ULID!
+  agentId: ULID
   agentName: String!
   cacheCreationTokens: Int!
   cacheReadTokens: Int!
@@ -589,13 +585,13 @@ type CostTotals implements CostAggregate {
 
 input CreateAgentForkInput {
   agentId: ULID!
-  kind: AgentKind
+  kind: AgentKind @deprecated(reason: "Forks do not select a runtime ownership type.")
   projectId: ULID!
 }
 
 input CreateAgentInput {
   description: String
-  kind: AgentKind!
+  kind: AgentKind @deprecated(reason: "Every new Session has isolated execution.")
   model: String!
   name: String!
   projectId: ULID!
@@ -1013,13 +1009,12 @@ type Mutation {
   onboardingBootstrap(input: BootstrapOnboardingInput!): OnboardingStatus!
   prewarmAgentSession(projectId: ULID!, sessionId: ULID!): SessionRuntimePrewarmAck!
   publishAgent(input: PublishAgentInput!): Agent!
-  recreateSandbox(input: RuntimeStateOperationInput!): RuntimeStateOperationResult!
+  recreateSessionSandbox(projectId: ULID!, sessionId: ULID!): SessionRuntimeOperationResult!
   removeSessionResource(input: RemoveSessionResourceInput!): OperationResult!
   renameOrganization(input: RenameOrganizationInput!): Organization!
   renameProject(input: RenameProjectInput!): Project!
   renameSession(input: RenameSessionInput!): Session!
-  resetAgentState(input: RuntimeStateOperationInput!): RuntimeStateOperationResult!
-  restartDriver(input: RuntimeStateOperationInput!): RuntimeStateOperationResult!
+  restartSessionDriver(projectId: ULID!, sessionId: ULID!): SessionRuntimeOperationResult!
   revokeMcpCredential(projectId: ULID!, serverId: ULID!): McpServerWithCredential!
   sendAgentSessionEvents(events: [AgentSessionEventInput!]!, projectId: ULID!, sessionId: ULID!): AgentSessionEventBatch!
   setDefaultVendorCredential(input: SetDefaultVendorCredentialInput!): VendorCredential!
@@ -1092,7 +1087,6 @@ type ProjectOverview {
 type ProjectOverviewAgent {
   description: String
   id: ULID!
-  kind: AgentKind!
   model: String!
   name: String!
   projectId: ULID!
@@ -1149,7 +1143,7 @@ type Query {
   agentEditorState(agentId: ULID!, projectId: ULID!): AgentEditorState!
   agentManifest(agentId: ULID!, projectId: ULID!): AgentManifestExport!
   agentSessionDiagnostics(projectId: ULID!, sessionId: ULID!): AgentSessionDiagnostics!
-  agentSessionList(agentId: ULID!, archived: Boolean, beforeCursor: String, limit: Int, participantOnly: Boolean, projectId: ULID!, type: SessionType): SessionConnection!
+  agentSessionList(agentId: ULID!, archived: Boolean, beforeCursor: String, limit: Int, participantOnly: Boolean, projectId: ULID!, sessionId: ULID, type: SessionType): SessionConnection!
   agentSessionRetrieve(projectId: ULID!, sessionId: ULID!): AgentSessionRetrieve!
   appInfo: AppInfo!
   availableAgentModels(currentModelId: String, currentVendorId: String, projectId: ULID!, runtimeId: String!): [ResolvedModelEntry!]!
@@ -1237,34 +1231,13 @@ enum RuntimeStateOperation {
   restartDriver
 }
 
-input RuntimeStateOperationInput {
-  affectedFields: [String!]
-  agentId: ULID!
-  applyActionKind: String
-  projectId: ULID!
-  targetVersion: RuntimeStateTargetVersionInput
-}
-
-type RuntimeStateOperationResult {
-  affectedSessionCount: Int!
-  agentId: ULID!
-  ok: Boolean!
-  operation: RuntimeStateOperation!
-}
-
-input RuntimeStateTargetVersionInput {
-  id: ULID!
-  versionNumber: Int!
-}
-
 type Session {
-  agentId: ULID!
+  agentId: ULID
   archivedAt: String
   createdAt: String!
   deploymentVersionId: ULID
   deploymentVersionNumber: Int
   id: ULID!
-  kind: AgentKind!
   lastMessageAt: String
   lastRun: SessionRun
   model: String!
@@ -1283,10 +1256,9 @@ type SessionConnection {
 }
 
 type SessionExecutionBinding {
-  agentId: ULID!
+  agentId: ULID
   deploymentVersionId: ULID
   deploymentVersionNumber: Int
-  kind: AgentKind!
   model: String!
   prompt: String!
   provider: String!
@@ -1448,6 +1420,13 @@ enum SessionRunTrigger {
   retry
   system
   user_prompt
+}
+
+type SessionRuntimeOperationResult {
+  affectedSessionCount: Int!
+  ok: Boolean!
+  operation: RuntimeStateOperation!
+  sessionId: ULID!
 }
 
 type SessionRuntimePrewarmAck {
@@ -1616,7 +1595,7 @@ input UpdateAgentConfigInput {
   builtInTools: [AgentBuiltInToolConfigInput!]
   description: String
   environment: AgentEnvironmentConfigInput!
-  kind: AgentKind!
+  kind: AgentKind @deprecated(reason: "Configuration changes do not select a runtime ownership type.")
   mcpServerIds: [ULID!]!
   model: String!
   name: String!

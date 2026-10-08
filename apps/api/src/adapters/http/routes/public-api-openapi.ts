@@ -1,12 +1,11 @@
 import {
   createPublicApiPlatformIdSchema,
   PUBLIC_API_PREFIX,
-  PUBLIC_API_VERSION_PREFIX,
   PUBLIC_THREAD_API_THREADS_MAX_LIMIT,
   PUBLIC_THREAD_EVENTS_DEFAULT_LIMIT,
   PUBLIC_THREAD_EVENTS_MAX_LIMIT,
-  PUBLIC_API_VERSION,
 } from "@mosoo/contracts/public-api";
+import type { PublicApiVersion } from "@mosoo/contracts/public-api";
 
 import { createPublicApiOpenApiComponents } from "./public-api-openapi-components";
 
@@ -38,7 +37,7 @@ interface PublicApiOpenApiDocument {
   info: {
     description: string;
     title: string;
-    version: typeof PUBLIC_API_VERSION;
+    version: PublicApiVersion;
   };
   openapi: "3.1.0";
   paths: OpenApiPaths;
@@ -312,8 +311,11 @@ function operation(
   };
 }
 
-export function createPublicApiOpenApiDocument(origin: string): PublicApiOpenApiDocument {
-  const paths = {
+export function createPublicApiOpenApiDocument(
+  origin: string,
+  apiVersion: PublicApiVersion = "v1",
+): PublicApiOpenApiDocument {
+  const paths: OpenApiPaths = {
     "/agents/{agentId}/files": {
       post: operation({
         description:
@@ -400,16 +402,16 @@ export function createPublicApiOpenApiDocument(origin: string): PublicApiOpenApi
       }),
       post: operation({
         description:
-          "Creates a Thread and the backing AgentSession for the required application `userId`. If input is present, mosoo also queues the initial Run. If input is omitted, the Thread is immediately visible with IDLE status and no run.",
+          apiVersion === "v1"
+            ? "Creates a Thread and the backing AgentSession for the required application `userId`. If input is present, mosoo also queues the initial Run. If input is omitted, the Thread is immediately visible with IDLE status and no run."
+            : "Creates a durable Thread from the latest saved private Agent. Publishing and userId are not required. Input and files are optional. The admitted configuration is frozen for this Thread; subsequent Agent edits affect only new Threads.",
         parameters: [exampleAgentIdParameter, idempotencyKeyParameter],
         requestBody: jsonRequestBodyExamples(
           { $ref: "#/components/schemas/CreateThreadRequest" },
           {
             emptyThread: {
               summary: "Create an empty Thread",
-              value: {
-                userId: "customer-123",
-              },
+              value: apiVersion === "v1" ? { userId: "customer-123" } : {},
             },
             accessTokenWithFile: {
               summary: "Access Token with an uploaded file",
@@ -448,7 +450,7 @@ export function createPublicApiOpenApiDocument(origin: string): PublicApiOpenApi
               },
             },
           },
-          { required: true },
+          { required: apiVersion === "v1" },
         ),
         success: {
           "201": idempotentJsonResponse("Created Thread.", {
@@ -579,17 +581,115 @@ export function createPublicApiOpenApiDocument(origin: string): PublicApiOpenApi
     },
   } satisfies OpenApiPaths;
 
+  if (apiVersion === "v2") {
+    const projectIdParameter: OpenApiParameter = {
+      in: "path",
+      name: "projectId",
+      required: true,
+      schema: createPublicApiPlatformIdSchema(),
+      description:
+        "Owned Project. A Project key can access only its own Project; CLI login supplies an explicit owned Project.",
+    };
+    paths["/projects/{projectId}/files"] = {
+      post: operation({
+        description:
+          "Upload a Project draft file for direct or preset Session creation; no Agent is required.",
+        parameters: [projectIdParameter],
+        requestBody: multipartFileRequestBody(),
+        security: ACCESS_TOKEN_SECURITY,
+        success: {
+          "201": jsonResponse("Uploaded file.", {
+            $ref: "#/components/schemas/PublicFileResponse",
+          }),
+        },
+        summary: "Upload a Project file",
+      }),
+    };
+    paths["/projects/{projectId}/threads"] = {
+      post: operation({
+        description:
+          "Create a durable Session from explicit inline harness/model/instructions, or an optional saved Agent preset in this Project. Project model credentials are required. Input and files are optional. Creation freezes the effective configuration and never creates a hidden Agent; follow-ups use the returned Thread ID.",
+        parameters: [projectIdParameter, idempotencyKeyParameter],
+        requestBody: jsonRequestBodyExamples(
+          { $ref: "#/components/schemas/CreateProjectThreadRequest" },
+          {
+            inline: {
+              summary: "Execute without creating an Agent",
+              value: {
+                configuration: {
+                  type: "inline",
+                  harness: "openai-runtime",
+                  provider: "openai",
+                  model: "gpt-5.6-luna",
+                  instructions: "Analyze the supplied material and save the results.",
+                },
+                input: {
+                  type: "user.message",
+                  content: [{ type: "text", text: "Create an analysis report." }],
+                },
+              },
+            },
+            preset: {
+              summary: "Use an optional saved Agent preset",
+              value: {
+                configuration: { type: "agent", agent_id: "01ARZ3NDEKTSV4RRFFQ69G5FAV" },
+              },
+            },
+          },
+          { required: true },
+        ),
+        security: ACCESS_TOKEN_SECURITY,
+        success: {
+          "201": idempotentJsonResponse("Created Session.", {
+            $ref: "#/components/schemas/CreateThreadResponse",
+          }),
+        },
+        summary: "Create a Project Session",
+      }),
+    };
+    paths["/threads/{threadId}/usage"] = {
+      get: operation({
+        description:
+          "Read persisted model usage through the same Thread handle. Usage remains available while Session records exist; missing measurements are null. Costs reported by runtimes are estimates, not invoices. Re-read earlier pages to refresh in-progress observations.",
+        parameters: [
+          threadIdParameter,
+          {
+            in: "query",
+            name: "limit",
+            description: "Maximum usage observations per page.",
+            schema: { type: "integer", default: 100, minimum: 1, maximum: 1000 },
+          },
+          {
+            in: "query",
+            name: "after",
+            description: "The nextCursor returned by the previous page.",
+            schema: createPublicApiPlatformIdSchema(),
+          },
+        ],
+        security: ACCESS_TOKEN_SECURITY,
+        success: {
+          "200": jsonResponse("Runtime usage observations.", {
+            $ref: "#/components/schemas/ThreadUsageResponse",
+          }),
+        },
+        summary: "Read Thread usage",
+      }),
+    };
+  }
+
   return {
-    components: createPublicApiOpenApiComponents(),
+    components: createPublicApiOpenApiComponents(apiVersion),
     info: {
       description:
-        "Public HTTPS API for creating and retrieving Threads on mosoo Agent API Endpoints. v1 resource identifiers are bare ULIDs, not prefixed IDs. Access Tokens identify the account caller. Runtime execution resolves the Agent API Endpoint owner's capabilities while the Thread is attributed to the token owner.",
+        apiVersion === "v1"
+          ? "Public HTTPS API for creating and retrieving Threads on mosoo Agent API Endpoints. v1 resource identifiers are bare ULIDs, not prefixed IDs. Access Tokens identify the account caller. Runtime execution resolves the Agent API Endpoint owner's capabilities while the Thread is attributed to the token owner."
+          : "Project-owned durable Sessions with direct harness/model/instructions input and optional saved Agent presets. No Agent is required for direct execution. The returned Thread ID remains the conversation handle for reading, continuing, cancelling, and downloading files. Project model credentials are required; v1 retains its existing admission and published-configuration behavior.",
       title: "mosoo Public Thread API",
-      version: PUBLIC_API_VERSION,
+      version: apiVersion,
     },
     openapi: "3.1.0",
     paths,
     security: ACCESS_TOKEN_SECURITY,
-    servers: [{ url: `${origin}${PUBLIC_API_PREFIX}${PUBLIC_API_VERSION_PREFIX}` }],
+    servers: [{ url: `${origin}${PUBLIC_API_PREFIX}/${apiVersion}` }],
   };
 }

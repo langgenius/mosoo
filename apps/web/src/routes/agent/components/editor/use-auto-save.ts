@@ -1,23 +1,13 @@
-import type { AgentConfigChangePlan } from "@mosoo/contracts/agent-config-change-plan";
 import { useEffect, useRef } from "react";
 
 import type { AgentEditorModel } from "./use-model";
 
 const AUTO_SAVE_DEBOUNCE_MS = 400;
 
-// Changes that need an explicit Apply step: fork-agent (the API rejects in-place
-// saves) and any restart/recreate that interrupts a running runtime. Everything
-// else — name, description, draft-only edits — is safe to flush silently.
-export function isAutoSaveEligible(changePlan: AgentConfigChangePlan): boolean {
-  return changePlan.action !== "fork-agent" && !changePlan.requiresRuntimeOperation;
-}
-
-// Auto-flushes editor edits so the user can iterate against the live Preview
-// session without round-tripping through the Apply button. Runtime-restarting
-// and fork changes keep the explicit PendingChangesBanner flow.
+// Debounced synchronization with the saved preset. Existing Sessions retain their
+// admitted configuration; this does not perform runtime maintenance.
 export function useAgentEditorAutoSave(model: AgentEditorModel): void {
-  const { snapshotHash, dirty, saving, changePlan, readOnly, save } = model;
-  const eligible = isAutoSaveEligible(changePlan);
+  const { snapshotHash, dirty, saving, readOnly, save } = model;
   const saveRef = useRef(save);
   saveRef.current = save;
   // Tracks the snapshot we last attempted to flush. A retry of the exact same
@@ -26,7 +16,7 @@ export function useAgentEditorAutoSave(model: AgentEditorModel): void {
   const lastAttemptedHashRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (readOnly || !dirty || saving || !eligible) {
+    if (readOnly || !dirty || saving) {
       return;
     }
 
@@ -42,5 +32,5 @@ export function useAgentEditorAutoSave(model: AgentEditorModel): void {
     return () => {
       globalThis.clearTimeout(timer);
     };
-  }, [snapshotHash, dirty, saving, eligible, readOnly]);
+  }, [snapshotHash, dirty, saving, readOnly]);
 }

@@ -1,25 +1,71 @@
-# Agent Type
+# Session Isolation and Legacy Agent Types
 
-Status: available in the current Agent Preview flow.
+Status: new-admission behavior implemented for the unreleased #582 candidate; existing Cloud migration and full legacy runtime retirement remain open.
 
-## Why this matters
+## Product contract
 
-mosoo supports two Agent types because users need different kinds of continuity. Some Agents should feel like ongoing teammates; others should start each job cleanly so unrelated work does not share temporary state. The Project owner chooses the type based on that user expectation, not on the model or provider.
+An Agent is reusable configuration. Each new Session owns an independent working environment and its own native conversation, files and checkpoint lineage. Continuing the same Session restores its committed state after the live runtime has been reclaimed. Another Session never receives that state, even when both use the same Agent.
 
-## The two choices
+Owners choose a name, harness and model. They do not select Assistant/Task or Pet/Cattle, lock that choice at publication, or fork just to change a type. Creating, importing and forking configuration cannot opt into a shared machine. Old kind inputs remain accepted for compatibility but do not select execution behavior. Draft YAML and generated calling instructions expose no type choice; package input may omit the legacy kind field.
 
-- **Assistant Agent** keeps a stable working environment across sessions. It suits daily helpers, knowledge assistants, and copilots that benefit from ongoing context. Sessions may share local working state, so it is not the right choice when every job must be isolated. Continuity is bounded: a rebuild preserves selected memory and workspace content, but may lose local sign-ins, caches, or tool-specific state.
-- **Task Agent** gives each Thread an isolated working environment. The live container may stay warm briefly, but mosoo can recycle it while the Thread's last successfully completed turn remains committed. It suits PR reviews, ticket triage, webhooks, and batch work. Continuing the same Thread restores its last committed working directory and provider resume state before the follow-up starts, even after a cold recycle. That state never crosses into another Thread. Earlier attachments must still be selected again because attachment access follows the current message, not the workspace checkpoint.
+The candidate's Agent models, Project Agent listings and exported manifests no longer
+return a Pet/Cattle field. Import validates an optional historical label and discards
+it before producing reusable configuration. Existing database labels remain untouched.
+Every preset can select an owned environment with a full or limited network policy;
+the Session runtime enforces that policy. A historical Pet label cannot disable a
+limited-network choice in the editor.
 
-## User flow
+This applies to console Preview, v1 published/live admission, v2 saved presets and direct Project invocation. v1 retains its existing publication and identity requirements. Publishing an Agent remains separate from the Session ownership rule.
 
-1. The Project owner creates an Agent by choosing a name and runtime. New Agents start as Assistant Agents.
-2. In Preview, the owner can compare the two types, switch freely, and test the Agent before publishing.
-3. The first Publish locks the type. This prevents an existing Agent from silently changing its continuity and isolation behavior.
-4. To change type later, the owner forks the Agent into a new draft. Reusable configuration carries over; existing sessions, cost history, logs, and working state stay with the original Agent.
+All Sessions use the same durable completion boundary: the native cursor and complete
+workspace checkpoint commit with the successful turn. A later failed turn cannot replace
+that recovery point. Historical kind metadata cannot bypass checkpoint or output-history
+readiness when admitting another turn.
 
-## Current product boundary
+Runtime maintenance targets an explicit Session. Its Project owner can restart the
+Driver or recreate the Session's execution resource while retaining the public ID,
+frozen configuration and committed workspace/native boundary. This also works without
+an Agent preset. It never restarts a sibling Session or adopts the preset's latest
+configuration. An active turn may be cancelled by an explicit maintenance request;
+its historical outcome remains recorded. Archived, terminated, busy or incompletely
+checkpointed Sessions cannot be silently reset. A shared or mismatched legacy binding
+must cross the verified migration boundary before Session maintenance is available.
 
-Type selection, locking, forking, and type-specific working environments are available today. Owners can open a Terminal and reset working state for Assistant Agents; Task Agents do not show those controls. Both types otherwise use the same Preview, publishing, conversation, logs, and cost surfaces. Agents remain capabilities inside a Project, not standalone products.
+Saving an Agent preset changes configuration for new Sessions only, including changes
+to its harness. It never restarts, recreates or resets admitted Sessions. Existing
+Previews can continue with their original configuration. They show that newer
+configuration is available and require an explicit new Preview to test it. Failed saves remain retryable in the editor.
 
-See [Thread Continuation](./thread-continuation.md) for the Task Agent durability and isolation contract.
+The final Session-only console removes the old shared-Agent Terminal and Agent-wide
+state reset. These belonged to the retired shared machine. Explicit Session restart
+and recreation retain the committed state; starting a new Session is a separate user
+action. The old Terminal route and maintenance mutations retire at the coordinated
+Cloud cutover, after protected workloads are converted. This source change alone
+neither rewrites data nor authorizes deployment.
+
+## Existing Cloud Sessions
+
+The final runtime allocates and activates only exclusive Session resources. It uses
+the Session's frozen harness for image selection and applies its admitted network
+constraints on every activation. Historical type labels do not choose ownership,
+backup, recovery or maintenance behavior. Check actual Session/Project/owner bindings
+before allocation or lifecycle admission; a pre-existing shared, ambiguous or foreign
+binding must never be replaced by a fresh empty environment. Maintenance must leave
+unconverted shared resources untouched. The pinned conversion build owns their
+transition before the final candidate can be deployed.
+
+New admission does not rewrite any existing Agent label, Session binding or shared workspace. Existing Sessions retain their admitted configuration and maintenance access until their transition is verified. Migration must preserve the same ID, native conversation and promised working files; allocating an empty isolated workspace is not migration.
+
+The final September 22 decision allows reviewed old Sessions with no calls or file activity
+for 30 days to become read-only, even if the account remains active. Preserve history and
+saved files and permit a fresh direct or preset Session. All Run outcomes, file mutations
+and pending work must be checked before the approved cutover; uncertain cases remain
+protected. This is a one-time migration scope, not rolling expiry of formal Sessions.
+
+The compatibility storage fields and legacy maintenance paths are transitional. #582 is not complete until all protected Cloud Sessions have a verified transition and the remaining active type-dependent behavior is retired. Final main contains one Session model and no ongoing conversion service; necessary one-time operations use a pinned release build with a defined rollback window. Keeping inert historical metadata is not a product type choice.
+
+## Preview retention
+
+Cloud console debugging uses one inactivity period: 30 days since message, Run or file activity. Reads and console login do not renew it. After expiry, the console starts a new Preview. Formal or API-used Sessions are protected; historical enrollment and cleanup require the reviewed inventory, recoverable backup and approved cutover.
+
+See [Thread Continuation](./thread-continuation.md), the [Session transition contract](../session-isolation-transition.md) and the [implementation plan](../plans/2026-09-22-session-type-retirement-design.md).

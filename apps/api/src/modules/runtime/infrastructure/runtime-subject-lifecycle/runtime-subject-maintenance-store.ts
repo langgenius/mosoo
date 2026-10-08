@@ -21,8 +21,8 @@ import {
   activeConversationSessionQueryForListedSubject,
   activeSessionRunQueryForListedSubject,
   getRuntimeSubjectInactiveDeadlineSql,
+  exclusiveSessionRuntimeSubjectPredicate,
   LIVE_DRIVER_STATUSES,
-  liveDriverInstanceQueryForListedSubject,
   runLeaseQuery,
   runLeaseQueryForListedSubject,
 } from "./runtime-subject-store-queries";
@@ -136,16 +136,13 @@ export async function listInactiveRuntimeSubjects(
   return appDb
     .select({
       id: sandboxesTable.id,
-      kind: sandboxesTable.kind,
     })
     .from(sandboxesTable)
     .where(
       and(
         eq(sandboxesTable.status, "active"),
-        or(
-          eq(sandboxesTable.kind, "pet"),
-          notExists(activeConversationSessionQueryForListedSubject(appDb)),
-        ),
+        exclusiveSessionRuntimeSubjectPredicate(),
+        notExists(activeConversationSessionQueryForListedSubject(appDb)),
         notExists(runLeaseQueryForListedSubject(appDb)),
         isNotNull(sandboxesTable.inactiveDeadlineAt),
         lte(sandboxesTable.inactiveDeadlineAt, input.now),
@@ -156,17 +153,12 @@ export async function listInactiveRuntimeSubjects(
     .all();
 }
 
-export interface StrandedRuntimeSubjectDeadlineRepairResult {
-  readonly cattle: number;
-  readonly pet: number;
-}
-
 export async function repairStrandedRuntimeSubjectDeadlines(
   database: D1Database,
   input: { readonly now: number },
-): Promise<StrandedRuntimeSubjectDeadlineRepairResult> {
+): Promise<number> {
   const appDb = getAppDatabase(database);
-  const cattle = await appDb
+  const result = await appDb
     .update(sandboxesTable)
     .set({
       inactiveDeadlineAt: getRuntimeSubjectInactiveDeadlineSql(input.now),
@@ -174,43 +166,16 @@ export async function repairStrandedRuntimeSubjectDeadlines(
     })
     .where(
       and(
+        exclusiveSessionRuntimeSubjectPredicate(),
         eq(sandboxesTable.status, "active"),
-        eq(sandboxesTable.kind, "cattle"),
         isNull(sandboxesTable.inactiveDeadlineAt),
         notExists(activeConversationSessionQueryForListedSubject(appDb)),
-        notExists(runLeaseQueryForListedSubject(appDb)),
-      ),
-    )
-    .run();
-
-  // Pets re-arm the idle deadline on run-lease release, but a maintenance
-  // failure path that never released — or a driver row already deleted by the
-  // 24h retention sweep — leaves the pet active with a NULL deadline forever,
-  // invisible to the recycle sweep while its container keeps billing. Repair
-  // only clearly reclaimable pets: no live driver, no active subject run, no
-  // run lease.
-  const pet = await appDb
-    .update(sandboxesTable)
-    .set({
-      inactiveDeadlineAt: getRuntimeSubjectInactiveDeadlineSql(input.now),
-      updatedAt: input.now,
-    })
-    .where(
-      and(
-        eq(sandboxesTable.status, "active"),
-        eq(sandboxesTable.kind, "pet"),
-        isNull(sandboxesTable.inactiveDeadlineAt),
-        notExists(liveDriverInstanceQueryForListedSubject(appDb)),
         notExists(activeSessionRunQueryForListedSubject(appDb)),
         notExists(runLeaseQueryForListedSubject(appDb)),
       ),
     )
     .run();
-
-  return {
-    cattle: getD1ChangeCount(cattle),
-    pet: getD1ChangeCount(pet),
-  };
+  return getD1ChangeCount(result);
 }
 
 export async function listStaleRuntimeSubjectOperations(
@@ -223,13 +188,13 @@ export async function listStaleRuntimeSubjectOperations(
   const rows = await getAppDatabase(database)
     .select({
       id: sandboxesTable.id,
-      kind: sandboxesTable.kind,
       operationId: sandboxesTable.statusOperationId,
       status: sandboxesTable.status,
     })
     .from(sandboxesTable)
     .where(
       and(
+        exclusiveSessionRuntimeSubjectPredicate(),
         inArray(sandboxesTable.status, RUNTIME_SUBJECT_OPERATION_STATUSES),
         isNotNull(sandboxesTable.statusOperationId),
         lte(sandboxesTable.statusChangedAt, input.staleChangedAtLte),
@@ -245,7 +210,6 @@ export async function listStaleRuntimeSubjectOperations(
       : [
           {
             id: row.id,
-            kind: row.kind,
             operationId: row.operationId,
             status: row.status,
           },
@@ -275,10 +239,8 @@ export async function claimInactiveRuntimeSubject(
         and(
           eq(sandboxesTable.id, input.runtimeSubjectId),
           eq(sandboxesTable.status, "active"),
-          or(
-            eq(sandboxesTable.kind, "pet"),
-            notExists(activeConversationSessionQuery(appDb, input.runtimeSubjectId)),
-          ),
+          exclusiveSessionRuntimeSubjectPredicate(),
+          notExists(activeConversationSessionQuery(appDb, input.runtimeSubjectId)),
           notExists(runLeaseQuery(appDb, input.runtimeSubjectId)),
           isNotNull(sandboxesTable.inactiveDeadlineAt),
           lte(sandboxesTable.inactiveDeadlineAt, input.now),

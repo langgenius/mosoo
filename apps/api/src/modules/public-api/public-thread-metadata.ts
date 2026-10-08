@@ -1,6 +1,7 @@
+import type { PublicApiVersion } from "@mosoo/contracts/public-api";
 import type { PersonalAccessTokenId } from "@mosoo/id";
 
-const PUBLIC_API_FIELDS = new Set(["created_by", "idempotency_key", "source"]);
+const PUBLIC_API_FIELDS = new Set(["api_version", "created_by", "idempotency_key", "source"]);
 
 export interface PublicApiThreadCreatedByMetadata {
   token_id: PersonalAccessTokenId;
@@ -8,17 +9,21 @@ export interface PublicApiThreadCreatedByMetadata {
 }
 
 export interface PublicApiThreadMetadata {
+  api_version?: PublicApiVersion;
   created_by: PublicApiThreadCreatedByMetadata;
   idempotency_key: string | null;
   source: "public_api";
 }
 
 export interface PublicApiThreadRecordMetadata {
+  api_version?: PublicApiVersion;
   idempotency_key: string | null;
+  initial_request_id?: string | null;
   source: "public_api";
 }
 
 interface PublicApiThreadMetadataInput {
+  apiVersion?: PublicApiVersion | undefined;
   createdBy: PublicApiThreadCreatedByMetadata;
   idempotencyKey: string | null;
 }
@@ -35,6 +40,7 @@ export function createPublicApiThreadMetadata(
   input: PublicApiThreadMetadataInput,
 ): PublicApiThreadMetadata {
   return {
+    ...(input.apiVersion === "v2" ? { api_version: input.apiVersion } : {}),
     created_by: input.createdBy,
     idempotency_key: input.idempotencyKey,
     source: "public_api",
@@ -67,22 +73,31 @@ export function parsePublicApiThreadRecordMetadata(
   if (
     !isRecord(metadata) ||
     !hasOnlyFields(metadata, PUBLIC_API_FIELDS) ||
-    metadata["source"] !== "public_api"
+    metadata["source"] !== "public_api" ||
+    (metadata["api_version"] !== undefined &&
+      metadata["api_version"] !== "v1" &&
+      metadata["api_version"] !== "v2")
   ) {
     return null;
   }
 
   const idempotencyKey = metadata["idempotency_key"];
+  const initialRequestId = parsed["public_api_initial_request_id"];
 
   if (
     !isRecord(metadata["created_by"]) ||
-    (idempotencyKey !== null && typeof idempotencyKey !== "string")
+    (idempotencyKey !== null && typeof idempotencyKey !== "string") ||
+    (initialRequestId !== undefined &&
+      initialRequestId !== null &&
+      (typeof initialRequestId !== "string" || initialRequestId.length === 0))
   ) {
     return null;
   }
 
   return {
+    ...(metadata["api_version"] === "v2" ? { api_version: "v2" as const } : {}),
     idempotency_key: idempotencyKey,
+    ...(initialRequestId === undefined ? {} : { initial_request_id: initialRequestId }),
     source: "public_api",
   };
 }

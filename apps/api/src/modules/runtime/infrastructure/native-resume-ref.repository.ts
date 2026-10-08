@@ -18,8 +18,6 @@ interface NativeResumeRefRow {
   committed_value: string | null;
   kind: string;
   runtime_id: string;
-  session_kind: string;
-  value: string;
 }
 
 export interface NativeResumeRefObservation {
@@ -44,7 +42,7 @@ function enforceNativeRuntimeRefShape(ref: DriverNativeRuntimeRef): void {
 }
 
 function toNativeRuntimeRef(row: NativeResumeRefRow): DriverNativeRuntimeRef | null {
-  const value = row.session_kind === "cattle" ? row.committed_value : row.value;
+  const value = row.committed_value;
 
   if (value === null) {
     return null;
@@ -73,8 +71,6 @@ export async function getNativeResumeRefForRuntime(
         committed_value: nativeResumeRefsTable.committedValue,
         kind: nativeResumeRefsTable.kind,
         runtime_id: nativeResumeRefsTable.runtimeId,
-        session_kind: sessionsTable.kind,
-        value: nativeResumeRefsTable.value,
       })
       .from(nativeResumeRefsTable)
       .innerJoin(sessionsTable, eq(sessionsTable.id, nativeResumeRefsTable.sessionId))

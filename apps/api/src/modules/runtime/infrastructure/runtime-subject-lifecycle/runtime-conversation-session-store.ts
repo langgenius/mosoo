@@ -10,15 +10,16 @@ import { createPlatformId } from "@mosoo/id";
 import type { SandboxId, SandboxSessionId, SessionId } from "@mosoo/id";
 import { and, desc, eq, exists, inArray, isNull, lte, notExists, or, sql } from "drizzle-orm";
 
-import { getAppDatabase, runAppDatabaseBatch } from "../../../../platform/db/drizzle";
 import {
-  getRuntimeKindPolicy,
-  getRuntimeSubjectInactiveDeadline,
-} from "../../domain/runtime-kind-policy";
+  getAppDatabase,
+  getD1ChangeCount,
+  runAppDatabaseBatch,
+} from "../../../../platform/db/drizzle";
+import type { AppDatabase } from "../../../../platform/db/drizzle";
 import { toRuntimeSubjectStatusLifecycleEventName } from "../../domain/runtime-subject-lifecycle.machine";
 import {
   completedRunHistoryPredicate,
-  isCattleTerminalCheckpointReadyForNextRun,
+  isSessionTerminalCheckpointReadyForNextRun,
 } from "../session-runs/session-run-admission.repository";
 import {
   activeConversationSessionQuery,
@@ -94,7 +95,6 @@ export async function getRuntimeConversationSessionState(
       .select({
         agentId: sessionsTable.agentId,
         sandboxSessionId: sandboxSessionsTable.sandboxSessionId,
-        kind: sandboxesTable.kind,
         status: sandboxSessionsTable.status,
       })
       .from(sandboxSessionsTable)
@@ -111,7 +111,7 @@ export async function getRuntimeConversationSessionState(
   );
 }
 
-// Session-scoped (cattle) conversations stay open across terminal runs so the
+// Session conversations stay open across terminal runs so the
 // driver survives the idle grace. This lists the ones quiet past that grace so
 // the maintenance sweep can close them; the close path arms the subject
 // inactive deadline, which feeds the existing subject reclamation chain. Rows
@@ -136,7 +136,6 @@ export async function listIdleSessionScopedConversationSessions(
     .where(
       and(
         eq(sandboxSessionsTable.status, "active"),
-        eq(sandboxesTable.kind, "cattle"),
         sql`${sandboxSessionsTable.updatedAt} <= ${input.idleSinceLte}`,
         notExists(runLeaseQueryForListedSubject(appDb)),
         or(
@@ -195,7 +194,6 @@ export async function listPendingIdleConversationCheckpoints(
       and(
         eq(sandboxSessionsTable.status, "active"),
         eq(sandboxesTable.status, "active"),
-        eq(sandboxesTable.kind, "cattle"),
         eq(sessionsTable.status, "IDLE"),
         eq(sessionsTable.workspaceCheckpointRequired, true),
         eq(sessionRunsTable.status, "completed"),
@@ -224,7 +222,7 @@ export async function listPendingIdleConversationCheckpoints(
     .all();
 }
 
-// Atomically claim an idle cattle conversation for the sweep to close. Between
+// Atomically claim an idle Session conversation for the sweep to close. Between
 // the sweep's LIST and its per-row close there is a window where a follow-up
 // turn can re-use the resident session (ensureSandboxConversationSession
 // refreshes updatedAt) before its run lease exists — the list-time lease guard
@@ -244,7 +242,7 @@ export async function claimIdleSessionScopedConversationForClose(
     readonly sessionId: SessionId;
   },
 ): Promise<boolean> {
-  if (!(await isCattleTerminalCheckpointReadyForNextRun(database, input.sessionId))) {
+  if (!(await isSessionTerminalCheckpointReadyForNextRun(database, input.sessionId))) {
     return false;
   }
 
@@ -288,7 +286,17 @@ export async function ensureRuntimeConversationSessionRecord(
     return existing;
   }
 
-  await getAppDatabase(database)
+  const db = getAppDatabase(database);
+  const available = db
+    .select({
+      ready: sql<number>`CASE WHEN EXISTS (
+      SELECT 1 FROM ${sessionsTable} WHERE ${sessionsTable.id} = ${input.sessionId}
+    ) AND EXISTS (
+      SELECT 1 FROM ${sandboxesTable} WHERE ${sandboxesTable.id} = ${input.runtimeSubjectId}
+    ) THEN 1 ELSE json('sandbox allocation is missing its owner') END`,
+    })
+    .from(sql`(SELECT 1)`);
+  const insert = db
     .insert(sandboxSessionsTable)
     .values({
       sandboxSessionId: createPlatformId<SandboxSessionId>(input.now),
@@ -300,8 +308,13 @@ export async function ensureRuntimeConversationSessionRecord(
       status: "closed",
       updatedAt: input.now,
     })
-    .onConflictDoNothing({ target: sandboxSessionsTable.sessionId })
-    .run();
+    .onConflictDoNothing({ target: sandboxSessionsTable.sessionId });
+  await database.batch(
+    [available, insert].map((query) => {
+      const statement = query.toSQL();
+      return database.prepare(statement.sql).bind(...statement.params);
+    }),
+  );
 
   const created = await getRuntimeConversationSession(database, input.sessionId);
 
@@ -316,39 +329,42 @@ export async function ensureRuntimeConversationSessionRecord(
   return created;
 }
 
+interface ConversationSessionBinding {
+  readonly expectedSandboxSessionId: SandboxSessionId;
+  readonly runtimeSubjectId: SandboxId;
+  readonly sessionId: SessionId;
+}
+
+function conversationBindingPredicate(db: AppDatabase, input: ConversationSessionBinding) {
+  return and(
+    eq(sandboxSessionsTable.sessionId, input.sessionId),
+    eq(sandboxSessionsTable.sandboxId, input.runtimeSubjectId),
+    eq(sandboxSessionsTable.sandboxSessionId, input.expectedSandboxSessionId),
+    exists(
+      db
+        .select({ id: sandboxesTable.id })
+        .from(sandboxesTable)
+        .where(eq(sandboxesTable.id, input.runtimeSubjectId)),
+    ),
+  );
+}
+
 export async function recordRuntimeConversationSessionError(
   database: D1Database,
-  input: {
-    readonly sandboxSessionId: SandboxSessionId;
-    readonly cwd: string;
+  input: ConversationSessionBinding & {
     readonly message: string;
     readonly errorCode: RuntimeSubjectErrorCode;
     readonly now: number;
-    readonly originJson: string;
-    readonly runtimeSubjectId: SandboxId;
-    readonly sessionId: SessionId;
   },
 ): Promise<void> {
   await runAppDatabaseBatch(database, (appDb) => [
     appDb
-      .insert(sandboxSessionsTable)
-      .values({
-        sandboxSessionId: input.sandboxSessionId,
-        createdAt: input.now,
-        cwd: input.cwd,
-        originJson: input.originJson,
-        sandboxId: input.runtimeSubjectId,
-        sessionId: input.sessionId,
+      .update(sandboxSessionsTable)
+      .set({
         status: "error",
         updatedAt: input.now,
       })
-      .onConflictDoUpdate({
-        set: {
-          status: "error",
-          updatedAt: sql`excluded.updated_at`,
-        },
-        target: sandboxSessionsTable.sessionId,
-      }),
+      .where(conversationBindingPredicate(appDb, input)),
     appDb
       .update(sandboxesTable)
       .set({
@@ -366,6 +382,12 @@ export async function recordRuntimeConversationSessionError(
         and(
           eq(sandboxesTable.id, input.runtimeSubjectId),
           inArray(sandboxesTable.status, ["restoring", "active"]),
+          exists(
+            appDb
+              .select({ sessionId: sandboxSessionsTable.sessionId })
+              .from(sandboxSessionsTable)
+              .where(conversationBindingPredicate(appDb, input)),
+          ),
         ),
       ),
   ]);
@@ -373,65 +395,53 @@ export async function recordRuntimeConversationSessionError(
 
 export async function recordRuntimeConversationSessionActive(
   database: D1Database,
-  input: {
+  input: ConversationSessionBinding & {
     readonly sandboxSessionId: SandboxSessionId;
     readonly cwd: string;
     readonly now: number;
-    readonly originJson: string;
-    readonly runtimeSubjectId: SandboxId;
-    readonly sessionId: SessionId;
   },
 ): Promise<void> {
-  const petInactiveDeadlineAt = getRuntimeSubjectInactiveDeadline(
-    getRuntimeKindPolicy("pet"),
-    input.now,
-  );
-
-  await runAppDatabaseBatch(database, (appDb) => [
-    appDb
-      .insert(sandboxSessionsTable)
-      .values({
-        sandboxSessionId: input.sandboxSessionId,
-        createdAt: input.now,
-        cwd: input.cwd,
-        originJson: input.originJson,
-        sandboxId: input.runtimeSubjectId,
-        sessionId: input.sessionId,
-        status: "active",
-        updatedAt: input.now,
-      })
-      .onConflictDoUpdate({
-        set: {
-          sandboxSessionId: sql`excluded.cloudflare_session_id`,
-          cwd: sql`excluded.cwd`,
-          status: "active",
-          updatedAt: sql`excluded.updated_at`,
-        },
-        target: sandboxSessionsTable.sessionId,
-      }),
+  // Remote open/close calls can finish after a rebind or a newer execution
+  // session. Both writes compare the binding read before the remote operation.
+  const results = await runAppDatabaseBatch(database, (appDb) => [
     appDb
       .update(sandboxesTable)
       .set({
-        inactiveDeadlineAt: sql`
-          CASE
-            WHEN ${sandboxesTable.kind} = 'pet'
-              THEN COALESCE(${sandboxesTable.inactiveDeadlineAt}, ${petInactiveDeadlineAt})
-            ELSE NULL
-          END
-        `,
+        inactiveDeadlineAt: null,
         updatedAt: input.now,
       })
-      .where(eq(sandboxesTable.id, input.runtimeSubjectId)),
+      .where(
+        and(
+          eq(sandboxesTable.id, input.runtimeSubjectId),
+          exists(
+            appDb
+              .select({ sessionId: sandboxSessionsTable.sessionId })
+              .from(sandboxSessionsTable)
+              .where(conversationBindingPredicate(appDb, input)),
+          ),
+        ),
+      ),
+    appDb
+      .update(sandboxSessionsTable)
+      .set({
+        sandboxSessionId: input.sandboxSessionId,
+        cwd: input.cwd,
+        status: "active",
+        updatedAt: input.now,
+      })
+      .where(conversationBindingPredicate(appDb, input)),
   ]);
+
+  if (getD1ChangeCount((results as readonly unknown[])[1]) === 0) {
+    throw new Error("Sandbox session binding changed during activation.");
+  }
 }
 
 export async function recordRuntimeConversationSessionClosed(
   database: D1Database,
-  input: {
+  input: ConversationSessionBinding & {
     readonly inactiveDeadlineAt: number | null;
     readonly now: number;
-    readonly runtimeSubjectId: SandboxId;
-    readonly sessionId: SessionId;
   },
 ): Promise<void> {
   await runAppDatabaseBatch(database, (appDb) => [
@@ -441,7 +451,7 @@ export async function recordRuntimeConversationSessionClosed(
         status: "closed",
         updatedAt: input.now,
       })
-      .where(eq(sandboxSessionsTable.sessionId, input.sessionId)),
+      .where(conversationBindingPredicate(appDb, input)),
     appDb
       .update(sandboxesTable)
       .set({
@@ -451,6 +461,12 @@ export async function recordRuntimeConversationSessionClosed(
       .where(
         and(
           eq(sandboxesTable.id, input.runtimeSubjectId),
+          exists(
+            appDb
+              .select({ sessionId: sandboxSessionsTable.sessionId })
+              .from(sandboxSessionsTable)
+              .where(conversationBindingPredicate(appDb, input)),
+          ),
           notExists(activeConversationSessionQuery(appDb, input.runtimeSubjectId)),
           notExists(runLeaseQuery(appDb, input.runtimeSubjectId)),
         ),

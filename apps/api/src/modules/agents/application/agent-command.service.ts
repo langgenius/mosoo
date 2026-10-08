@@ -1,3 +1,4 @@
+import { getAgentBuiltInToolSupportError } from "@mosoo/contracts/agent";
 import type { Agent, CreateAgentInput, UpdateAgentConfigInput } from "@mosoo/contracts/agent";
 import { createDefaultAgentBuiltInTools, normalizeAgentBuiltInTools } from "@mosoo/contracts/agent";
 import {
@@ -16,6 +17,7 @@ import {
 } from "../../../platform/analytics/product-analytics";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase, runAppDatabaseBatch } from "../../../platform/db/drizzle";
+import { validationError } from "../../../platform/errors";
 import { forbiddenError } from "../../../platform/errors";
 import { currentTimestampMs } from "../../../time";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
@@ -35,7 +37,6 @@ import {
   loadAgentEnvironmentConfig,
   prepareAgentEnvironmentConfigWrite,
 } from "./agent-environment.service";
-import { enforceAgentKindChangeAllowed } from "./agent-kind-policy.service";
 import { toAgentModel } from "./agent-models";
 import {
   readAgentId,
@@ -52,7 +53,6 @@ import { buildAgentSpecForPreparedProfile, listAgentSpecSkillsByIds } from "./ag
 import { parseAgentStoredConfig, serializeAgentStoredConfig } from "./agent-stored-config.service";
 import {
   evaluateAgentRuntimeSelection,
-  enforcePublishedRuntimeStability,
   createAgentConfigChangeSnapshot,
   listAgentSkillIds,
   planVersionedAgentConfigChange,
@@ -122,7 +122,7 @@ export async function createAgent(
       description: input.description ?? null,
       environmentId,
       id: agentId,
-      kind: input.kind,
+      kind: "cattle",
       model: input.model,
       name: input.name,
       ownerId: viewer.id,
@@ -143,7 +143,6 @@ export async function createAgent(
     properties: {
       agent_id: agentId,
       project_id: projectId,
-      agent_kind: input.kind,
       provider: input.provider,
       runtime_id: runtimeId,
     },
@@ -169,7 +168,6 @@ export async function updateAgentConfig(
   }
 
   const { runtimeId } = runtimeSelection;
-  enforceAgentKindChangeAllowed(editable.agent, input.kind);
   const skillIds = normalizeAgentSkillIds(input.skillIds);
   const timestampMs = currentTimestampMs();
   const currentEnvironment = await loadAgentEnvironmentConfig(
@@ -183,6 +181,8 @@ export async function updateAgentConfig(
     input.builtInTools === undefined
       ? currentStoredConfig.builtInTools
       : normalizeAgentBuiltInTools(input.builtInTools);
+  const toolSupportError = getAgentBuiltInToolSupportError(runtimeId, builtInTools);
+  if (toolSupportError) throw validationError(toolSupportError);
   const requestedProviderOptions = input.providerOptions ?? {};
   const providerOptionsUnchanged =
     stableStringify(currentStoredConfig.providerOptions) ===
@@ -222,7 +222,6 @@ export async function updateAgentConfig(
         ...editable.agent,
         builtInTools,
         description: input.description ?? null,
-        kind: input.kind,
         model: input.model,
         name: input.name,
         prompt: input.prompt,
@@ -237,7 +236,6 @@ export async function updateAgentConfig(
   });
   const { environmentId } = input.environment;
 
-  enforcePublishedRuntimeStability(editable.agent, runtimeId);
   await ensureAgentSkillSelectionAccess(database, viewer, editable.agent.projectId, skillIds);
   if (
     environmentId !== null &&
@@ -263,7 +261,6 @@ export async function updateAgentConfig(
     configJson: preparedEnvironment.configJson,
     description: input.description ?? null,
     environmentId: preparedEnvironment.environmentId,
-    kind: input.kind,
     model: input.model,
     name: input.name,
     prompt: input.prompt,
@@ -304,7 +301,6 @@ export async function updateAgentConfig(
         configJson: preparedEnvironment.configJson,
         description: input.description ?? null,
         environmentId: preparedEnvironment.environmentId,
-        kind: input.kind,
         ...(deploymentVersion ? { liveDeploymentVersionId: deploymentVersion.record.id } : {}),
         model: input.model,
         name: input.name,

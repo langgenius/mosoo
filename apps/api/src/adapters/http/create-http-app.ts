@@ -16,7 +16,6 @@ import { registerFileRoute } from "./routes/file-route";
 import { registerGraphQLRoute } from "./routes/graphql-route";
 import { registerHealthRoute } from "./routes/health-route";
 import { registerMcpRoute } from "./routes/mcp-route";
-import { registerOwnerDebugTerminalRoute } from "./routes/owner-debug-terminal-route";
 import { registerPublicApiRoute } from "./routes/public-api-route";
 import { registerRootRoute } from "./routes/root-route";
 import { registerSkillRoute } from "./routes/skill-route";
@@ -40,7 +39,6 @@ export function createHttpApp() {
   registerAuthRoute(publicApi);
   registerFileRoute(publicApi);
   registerMcpRoute(publicApi);
-  registerOwnerDebugTerminalRoute(publicApi);
   registerPublicApiRoute(publicApi);
   registerSkillRoute(publicApi);
   registerGraphQLRoute(publicApi);

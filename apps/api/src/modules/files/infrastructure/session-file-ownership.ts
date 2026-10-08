@@ -1,10 +1,27 @@
+import { getAgentSessionUserLifecycleProjection } from "@mosoo/contracts/session";
 import { sessionsTable } from "@mosoo/db";
 import type { AccountId, ProjectId, SessionId } from "@mosoo/id";
 import { and, eq, or } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { ensureProjectOwnership } from "../../projects/application/project.service";
-import { createFileNotFoundError } from "./file-errors";
+import { createFileConflictError, createFileNotFoundError } from "./file-errors";
+
+export async function ensureSessionFileWritable(
+  database: D1Database,
+  sessionId: SessionId,
+): Promise<void> {
+  const session = await getAppDatabase(database)
+    .select({ archivedAt: sessionsTable.archivedAt, status: sessionsTable.status })
+    .from(sessionsTable)
+    .where(eq(sessionsTable.id, sessionId))
+    .get();
+  if (!session) throw createFileNotFoundError("Session not found.");
+  const lifecycle = getAgentSessionUserLifecycleProjection(session);
+  if (lifecycle.readOnly) {
+    throw createFileConflictError(lifecycle.recoverability.reason ?? "Session is read-only.");
+  }
+}
 
 export interface SessionFileAccessRow {
   id: SessionId;

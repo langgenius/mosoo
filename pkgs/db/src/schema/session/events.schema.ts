@@ -61,7 +61,7 @@ export const sessionModelCallsTable = sqliteTable(
 export const sessionEventsTable = sqliteTable(
   "session_event",
   {
-    agentId: platformIdColumn<AgentId>("agent_id").notNull(),
+    agentId: platformIdColumn<AgentId>("agent_id"),
     contentText: text("content_text").notNull(),
     createdAt: integer("created_at").notNull(),
     endedAt: integer("ended_at").notNull(),

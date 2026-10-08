@@ -9,6 +9,7 @@ import {
   withDisposedRpcResult,
 } from "../../../platform/cloudflare/rpc-disposal";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
+import { isRuntimeSandboxLocalBucketEnabled } from "./runtime-sandbox-bucket-mount";
 import {
   decodeSandboxBackupIdForPlatform,
   encodeSandboxBackupIdForStorage,
@@ -28,8 +29,8 @@ function quoteShellArg(value: string): string {
   return `'${value.replaceAll("'", `'"'"'`)}'`;
 }
 
-async function prepareRuntimeSessionWorkspaceCheckpoint(
-  sandbox: SandboxHandle,
+export async function prepareRuntimeSessionWorkspaceCheckpoint(
+  sandbox: Pick<SandboxHandle, "exec" | "unmountBucket">,
   input: {
     readonly cwd: string;
     readonly sessionId: string;
@@ -38,6 +39,7 @@ async function prepareRuntimeSessionWorkspaceCheckpoint(
   const resourceRoot = getSessionResourceRootPath(input.sessionId);
   const stateRoot = getSessionStateRootPath(input.sessionId);
   const openAiAuthPath = `${getSessionRuntimeStatePath(input.sessionId, "openai-runtime")}/auth.json`;
+  const openAiMemoryPath = `${getSessionRuntimeStatePath(input.sessionId, "openai-runtime")}/memories`;
 
   if (!resourceRoot.startsWith(`${input.cwd}/`) || !stateRoot.startsWith(`${input.cwd}/`)) {
     throw new Error("Session checkpoint exclusions must stay inside the session workspace.");
@@ -55,6 +57,7 @@ async function prepareRuntimeSessionWorkspaceCheckpoint(
     "set -eu",
     `cwd=${quoteShellArg(input.cwd)}`,
     'test -d "$cwd"',
+    `if [ -L ${quoteShellArg(openAiMemoryPath)} ]; then echo 'Legacy runtime memory requires verified migration before checkpoint commit.' >&2; exit 1; fi`,
     `resource_root=${quoteShellArg(resourceRoot)}`,
     'if [ -L "$resource_root" ]; then unlink "$resource_root"; elif mountpoint -q "$resource_root"; then fusermount -u "$resource_root"; fi',
     'if [ -e "$resource_root" ]; then rm -rf "$resource_root"; fi',
@@ -74,7 +77,7 @@ async function prepareRuntimeSessionWorkspaceCheckpoint(
   });
 }
 
-function getSandboxBackupObjectKeys(backupId: string): string[] {
+export function getSandboxBackupObjectKeys(backupId: string): string[] {
   const platformBackupId = decodeSandboxBackupIdForPlatform(backupId);
 
   return [`backups/${platformBackupId}/data.sqsh`, `backups/${platformBackupId}/meta.json`];
@@ -84,29 +87,52 @@ export async function createRuntimeSandboxBackup(
   bindings: ApiBindings,
   input: {
     readonly dir: string;
+    readonly sanitizeTransientState: boolean;
     readonly sandboxId: string;
     readonly sessionId: string | null;
+    readonly skipMissingWorkspace: boolean;
     readonly ttlSeconds: number;
   },
-): Promise<SandboxBackupObject> {
+): Promise<SandboxBackupObject | null> {
   const { getRuntimeSubjectKeepAliveHandle } =
     await import("./runtime-subject-lifecycle/runtime-subject-lifecycle.service");
 
   return withDisposedRpcResource(
     await getRuntimeSubjectKeepAliveHandle(bindings, input.sandboxId),
     async (sandbox) => {
-      if (input.sessionId !== null) {
+      if (input.sessionId !== null && input.sanitizeTransientState) {
         await prepareRuntimeSessionWorkspaceCheckpoint(sandbox, {
           cwd: input.dir,
           sessionId: input.sessionId,
         });
-      } else {
+      } else if (input.sessionId === null) {
         await sandbox.mkdir(input.dir, { recursive: true });
+      } else {
+        // A shared subject restores each conversation lazily. A closed
+        // conversation can have a checkpoint without being resident on this
+        // incarnation; creating its missing directory would overwrite that
+        // checkpoint with an empty archive and eventually prune the real one.
+        const dir = quoteShellArg(input.dir);
+        const command = `if test -d ${dir}; then printf resident; elif test ! -e ${dir} && test ! -L ${dir}; then printf missing; else exit 1; fi`;
+        const residency = await withDisposedRpcResult(
+          sandbox.exec(`sh -lc ${quoteShellArg(command)}`),
+          (result) => {
+            if (!result.success || result.exitCode !== 0) {
+              throw new Error("Session workspace residency could not be checked.");
+            }
+            return result.stdout.trim();
+          },
+        );
+        if (residency === "missing" && input.skipMissingWorkspace) return null;
+        if (residency !== "resident") {
+          throw new Error("Session workspace is missing its required checkpoint source.");
+        }
       }
 
       return withDisposedRpcResult(
         sandbox.createBackup({
           dir: input.dir,
+          localBucket: isRuntimeSandboxLocalBucketEnabled(bindings),
           ttl: input.ttlSeconds,
         }),
         (result) => ({

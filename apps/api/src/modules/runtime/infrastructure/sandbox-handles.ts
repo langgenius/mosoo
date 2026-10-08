@@ -68,6 +68,7 @@ export interface ExecutionSessionHandle {
 }
 
 export interface SandboxHandle extends ExecutionSessionHandle {
+  ensureContainerReady(options: { allowRecovery: boolean }): Promise<void>;
   configureNetworkConstraints(constraints: SandboxNetworkConstraints): Promise<void>;
   createBackup(options: {
     dir: string;
@@ -106,6 +107,7 @@ const SANDBOX_HANDLE_METHODS = [
   "createSession",
   "deleteSession",
   "destroy",
+  "ensureContainerReady",
   "exec",
   "getSession",
   "mkdir",

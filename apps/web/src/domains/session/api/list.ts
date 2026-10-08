@@ -42,7 +42,6 @@ const THREAD_AGENT_SESSION_LIST_QUERY = graphql(/* GraphQL */ `
           deploymentVersionId
           deploymentVersionNumber
           id
-          kind
           lastMessageAt
           lastRun {
             completedAt

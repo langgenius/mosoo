@@ -4,10 +4,11 @@ import { and, eq } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { ensureAgentEditor } from "../../agents/application/agent-access.service";
+import { ensureProjectOwnership } from "../../projects/application/project.service";
 import { sessionParticipantFlag } from "../domain/session-access.policy";
 
 export interface SessionReadAccess {
-  agentId: AgentId;
+  agentId: AgentId | null;
   id: SessionId;
   updatedAt: number;
 }
@@ -39,7 +40,9 @@ export async function getSessionReadAccess(
     throw new Error("Session not found.");
   }
 
-  if (row.isSessionParticipant !== 1) {
+  if (row.agentId === null) {
+    await ensureProjectOwnership(database, viewerId, input.projectId);
+  } else if (row.isSessionParticipant !== 1) {
     await ensureAgentEditor(database, viewerId, row.agentId);
   }
 

@@ -23,6 +23,43 @@ function validStateSnapshot(): SessionLiveState {
 }
 
 describe("AG-UI session codec boundary", () => {
+  test.each(["agent-1", null])(
+    "preserves explicit Agent provenance %s in configuration traces",
+    (agentId) => {
+      const event = {
+        name: "mosoo.session.config.trace",
+        type: "CUSTOM",
+        value: {
+          agentId,
+          configRevisionId: null,
+          deploymentVersionId: null,
+          deploymentVersionNumber: null,
+          driverBootPayload: {
+            credentialRefs: [],
+            cwd: "/workspace",
+            mcpServers: [],
+            model: "model-1",
+            nativeResumeRef: "absent",
+            provider: "provider-1",
+            runtimeId: "openai-runtime",
+            runtimeTransport: "websocket",
+          },
+          environmentId: "environment-1",
+          environmentRevisionId: "revision-1",
+          runId: "run-1",
+          sessionId: "session-1",
+        },
+      };
+
+      expect(parseAgUiSessionEventJson(JSON.stringify(event))).toEqual(event);
+      expect(() =>
+        parseAgUiSessionEventJson(
+          JSON.stringify({ ...event, value: { ...event.value, agentId: undefined } }),
+        ),
+      ).toThrow();
+    },
+  );
+
   test("accepts official AG-UI chunk events at the session boundary", () => {
     expect(
       parseAgUiSessionEventJson(

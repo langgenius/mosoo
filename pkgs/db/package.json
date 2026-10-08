@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./migration-schema": "./src/migration-schema.ts"
   },
   "scripts": {
     "db:generate": "vp exec drizzle-kit generate --config drizzle.config.ts",
