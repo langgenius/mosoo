@@ -576,7 +576,7 @@
       },
       "display": {
         "iconKey": "pi",
-        "providerLabel": "OpenAI-Compatible",
+        "providerLabel": "Multiple providers",
       },
     },
   ],

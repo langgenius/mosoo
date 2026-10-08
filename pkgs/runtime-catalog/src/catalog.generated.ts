@@ -1026,7 +1026,7 @@ export const GENERATED_RUNTIME_CATALOG = [
     },
     display: {
       iconKey: "pi",
-      providerLabel: "OpenAI-Compatible",
+      providerLabel: "Multiple providers",
     },
     label: "Pi",
     runtimeId: "pi",
