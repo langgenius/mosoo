@@ -107,7 +107,7 @@ export function inspectProdMigrations(apiDir: string, wranglerBin: string): stri
   );
   if (result.exitCode !== 0) {
     throw new Error(
-      `Could not read production migration ledger (exit ${result.exitCode}): ${result.stderr.toString("utf8")}`,
+      `Could not read production migration ledger (exit ${result.exitCode}):\n${result.stderr.toString("utf8")}\n${result.stdout.toString("utf8")}`,
     );
   }
   return findPendingProdMigrations(
