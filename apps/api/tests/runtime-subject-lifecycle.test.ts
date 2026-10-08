@@ -4,6 +4,7 @@ import { createPlatformId } from "@mosoo/id";
 import type { SandboxId, SessionId } from "@mosoo/id";
 
 import { decideRuntimeSubjectTransition } from "../src/modules/runtime/domain/runtime-subject-lifecycle.machine";
+import { RuntimeSubjectCapacityExceededError } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-errors";
 import { createRuntimeSubjectLifecycleService } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-lifecycle.service";
 import type { ActivateRuntimeSubjectInput } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-lifecycle.service";
 import { destroyRuntimeSubjectContainer } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-platform";
@@ -367,7 +368,14 @@ describe("runtime subject lifecycle machine", () => {
       }),
     );
     expect(outcomes.filter((outcome) => outcome.status === "fulfilled")).toHaveLength(50);
-    expect(outcomes.filter((outcome) => outcome.status === "rejected")).toHaveLength(1);
+    const rejected = outcomes.filter((outcome) => outcome.status === "rejected");
+    expect(rejected).toHaveLength(1);
+    expect(rejected[0]?.reason).toBeInstanceOf(RuntimeSubjectCapacityExceededError);
+    expect(rejected[0]?.reason).toMatchObject({
+      limit: 50,
+      message: "mosoo is at capacity right now. Try again in a few minutes.",
+      scope: "platform",
+    });
     const profiles = await database
       .prepare("SELECT DISTINCT sandbox_binding FROM sandbox ORDER BY sandbox_binding")
       .all<{ sandbox_binding: string }>();
@@ -473,7 +481,14 @@ describe("runtime subject lifecycle machine", () => {
     const admittedIndex = outcomes.findIndex((outcome) => outcome.status === "fulfilled");
 
     expect(outcomes.filter((outcome) => outcome.status === "fulfilled")).toHaveLength(2);
-    expect(outcomes.filter((outcome) => outcome.status === "rejected")).toHaveLength(1);
+    const rejected = outcomes.filter((outcome) => outcome.status === "rejected");
+    expect(rejected).toHaveLength(1);
+    expect(rejected[0]?.reason).toMatchObject({
+      limit: 2,
+      message:
+        "You already have 2 active sessions. Try again in a few minutes, after one of them finishes.",
+      scope: "account",
+    });
     expect(admittedIndex).toBeGreaterThanOrEqual(0);
     await expect(
       database

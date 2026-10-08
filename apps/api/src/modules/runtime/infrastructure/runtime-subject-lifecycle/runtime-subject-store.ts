@@ -34,6 +34,7 @@ export {
   markRuntimeSubjectOperationRepairNeeded,
   preemptRuntimeSubjectActivationClaim,
   markRuntimeSubjectRestoring,
+  readRuntimeSubjectCapacityShortfall,
 } from "./runtime-subject-record-store";
 export type {
   ReadyRuntimeSubjectBackupRecord,
