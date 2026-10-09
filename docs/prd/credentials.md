@@ -1,29 +1,17 @@
 # Credentials
 
-Status: Shipped for Provider keys and MCP connections in the current single-owner Project experience.
+How a Project's provider keys and MCP credentials are stored and used.
 
-## Why It Matters
+## Promises
 
-An Agent often needs a model provider or external tool to do useful work. Credentials let the Project owner connect those services without copying secret values into Agent settings, exported packages, or everyday troubleshooting output.
+- Credentials belong to one Project and are managed only by its owner. A run uses only a credential of its own Project; if none matches, setup or the run stops with a configuration error instead of borrowing another Project's secret.
+- Secrets are encrypted at rest. A saved provider key is shown only masked, and an MCP token is never shown again.
+- Raw keys never enter the Sandbox ([SPEC](../SPEC.md) section 5). Runtimes reach models through mosoo's LLM proxy, which reads the key on every call, so editing or deleting a key takes effect at once, even in running Sessions.
+- With several keys for one provider, runs use the provider's default key; the first key added becomes the default. A custom model resolves to the custom credential that declares it.
+- A custom provider has a public HTTPS endpoint (never a local, private, metadata or credential-bearing URL), at least one model ID, and one model protocol ([Runtime choice](./runtime-catalog.md)). Its provider ID in the API stays `openai-compatible`.
+- Exports and forks never carry credentials or secret values. An exported `.agent` file blanks secret Environment values, and importing or forking an Agent requires reconnecting its MCP servers.
 
-## Who Uses It
+## Limits
 
-The Project owner manages credentials. Agents in that same Project may use them when their provider or MCP connection is selected. People who trigger or use the Agent do not see or choose the underlying secret.
-
-## User Flow
-
-1. Open the active Project's Providers or MCP servers page.
-2. Add the provider key or authorize the MCP connection. Provider keys can be named, edited, tested, chosen as the default, and deleted. MCP connections can be connected, revoked, disabled, edited, and deleted.
-3. Select the provider and model or MCP connection while configuring an Agent.
-4. Run the Agent. mosoo supplies only a matching credential from that Project. If none exists, or ownership does not match, setup or the run stops with a configuration error instead of using another Project's secret.
-5. When moving an Agent package to another Project, reconnect credentials there; packages do not carry secrets.
-
-## Current Availability and Boundaries
-
-Provider keys and remote MCP credentials are available now, including custom provider endpoints. Custom credentials declare one model protocol for their endpoint: Chat Completions (the new-credential default), Responses, Anthropic Messages, or Google Gemini. OpenCode and Pi support these four protocols; OpenAI Runtime requires Responses. The historical API provider ID `openai-compatible` remains unchanged for custom credentials. A connection test is optional and does not make saving conditional on success; explicit protocol testing uses that protocol's model endpoint.
-
-Existing credentials with no declared protocol keep legacy behavior until configured explicitly. Editing unrelated fields preserves that state. Once a protocol is declared, it cannot be cleared to an unspecified state. Changing it may invalidate existing Sessions and proxy grants; create a new Session for a different protocol. Provider/model protocol compatibility is separate from key validity and does not prove every endpoint supports tool calls.
-
-Credentials belong to one Project and can be managed only by its owner. There is no organization-wide pool, personal key selection, caller-selected key, or cross-Project inheritance.
-
-Secrets are encrypted at rest. Saved Provider keys appear only in masked form, and saved MCP tokens are not shown again. Plaintext is limited to entry, explicit testing, authorization, and the Agent action that needs it. Agent settings, packages, logs, and diagnostics must not expose raw secrets.
+- No organization-wide pool, personal key, caller-selected key or cross-Project inheritance.
+- The connection test is optional and does not gate saving. Testing a model calls only that model's protocol endpoint, so passing it does not prove streaming or tool-call support.

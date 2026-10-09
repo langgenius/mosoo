@@ -1,35 +1,18 @@
 # MCP Connections
 
-Status: available in the console for Project-owned remote MCP servers and Agent use.
+How a Project connects remote MCP servers to its Agents, and what a business MCP server receives from mosoo.
 
-## Why It Matters
+## Promises
 
-mosoo Agents become more useful when they can act in products such as GitHub, Linear, or a Builder's own server. A Project owner should connect once, share it with selected Agents, and keep credentials out of Agent configuration.
+- An MCP server is a remote HTTPS endpoint that belongs to one Project and authorizes with OAuth or a bearer token. The owner adds it, authorizes it, and selects it in the Agent editor.
+- The authorization type is fixed after creation. Changing the server URL revokes the stored credential and requires authorizing again.
+- OAuth authorization, token and registration endpoints must use HTTPS without URL credentials or fragments, and mosoo follows no redirects during discovery, token exchange or registration; providers must publish canonical endpoints.
+- Only enabled, authorized servers are available to a run. Runtimes reach each server through mosoo's MCP proxy, which adds the stored credential on every request, so the Agent never sees it and revoking it takes effect at once.
+- When a Session has a `userId`, every proxied request carries an `X-Mosoo-Delegation` JWT naming the end user (`sub`), the Thread, the Run, the Agent and the Project (`act.app_id`). It is signed with HS256 under a key derived from the access token mosoo presents to that server, its audience is the server URL, and it lives 60 seconds; [`runtime-mcp-delegation.ts`](../../apps/api/src/modules/runtime/application/runtime-mcp-delegation.ts) defines the claims and the key derivation.
 
-## Who It Is For
+## Limits
 
-The Builder who owns a Project configures MCP. Project Users benefit when an Agent uses those tools, but do not manage connections.
-
-## User Flow
-
-1. In **MCP servers**, the Project owner adds a name and remote HTTPS address, then chooses OAuth or a bearer token.
-2. Saving immediately starts authorization. OAuth opens the provider's page; bearer authorization asks for a token.
-3. In the Agent editor, the owner selects one or more MCP servers from the same Project and saves the Agent.
-4. The owner tests it by asking the Agent to use it in Preview or a new Session. Only enabled, authorized connections are available during a run.
-5. The owner can later edit, disable, reconnect, revoke, or delete a connection. Its authorization type cannot be changed. Changing its address disconnects the existing credential and requires authorization again.
-
-## Current Availability and Boundaries
-
-OAuth authorization, token, and registration endpoints must also use HTTPS without embedded URL credentials or fragments. Discovery, token exchange, and client registration do not follow redirects; providers must publish their canonical endpoint addresses. Insecure cached metadata and saved authorization-flow endpoints are rejected before credentials are sent.
-
-The complete add-to-use path is available for remote HTTPS MCP servers. Binding before authorization is allowed, but does not make tools usable.
-
-“Connected” means mosoo has an active stored credential; it does not prove the server or its tools work. There is no standalone connection test or tool browser, so failures appear when an Agent first uses the server.
-
-Credentials are encrypted, are never shown again after entry, and stay inside their Project. mosoo gives Agents temporary, connection-specific access rather than revealing the stored secret. Exporting or forking an Agent does not carry credentials; the destination Project must reconnect. Local-process servers, cross-Project sharing, a connector marketplace, and tool-level selection are not available.
-
-For Driver-managed custom tool execution, the signed `X-Mosoo-Delegation` JWT
-includes the same `tool_call_id` exposed by Public Thread events. Business MCP
-servers should verify the JWT, enforce a uniqueness boundary such as
-`(app_id, tool_call_id)`, and return the stored result on duplicate delivery.
-This is an idempotency key, not an exactly-once guarantee.
+- "Connected" means mosoo holds an active credential, not that the server or its tools work. There is no connection test or tool browser, so failures appear on first use.
+- Selecting a server before authorizing it is allowed but makes no tools available.
+- No local-process servers, cross-Project sharing, marketplace, or per-tool selection.
+- The delegation JWT's `tool_call_id` claim is null for the calls runtimes make, so it cannot serve as a per-call idempotency key.

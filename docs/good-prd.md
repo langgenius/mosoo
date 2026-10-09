@@ -1,8 +1,6 @@
 # What Makes a Good PRD (v2 Writing Charter)
 
-> **Status**: Living document · **Maintainer**: Product Team · **Last updated**: 2026-05-09
-
-> This document is not a PRD for any single feature. It defines the writing constraints and acceptance criteria for every PRD under `docs/prd/`.
+> This document is not a PRD for any single feature. It defines the writing constraints and acceptance criteria for feature PRDs, which live in their issues; product notes under `docs/prd/` follow [their README](./prd/README.md).
 > Audience: product and design people who write PRDs, plus the engineers who pick up and implement them.
 
 ---
@@ -274,7 +272,7 @@ Record the product judgments that first principles and Musk's five steps ultimat
 
 Every PRD must declare this requirement's impact on the architecture. The goal is not to turn the PRD into an engineering design, but to ensure the implementer doesn't have to guess which boundaries, contracts, generated artifacts, and acceptance posture apply.
 
-This section records only the architectural impact triggered by the product requirement — not schema fields, API bodies, call stacks, or deployment details. If this requirement changes a long-term architectural assumption, you must also update or reference the stable source of truth in `docs/architecture.md` or the corresponding PRD / plan memo.
+This section records only the architectural impact triggered by the product requirement — not schema fields, API bodies, call stacks, or deployment details. If this requirement changes a long-term architectural assumption, you must also update or reference the stable source of truth in `docs/architecture.md` or the corresponding PRD / issue.
 
 `E2E proof required?` declares only the acceptance posture; it does not ask the PM to write engineering test details. Allowed values are `none` / `deterministic-e2e` / `live-smoke` / `manual-only` / `deferred-with-trigger`.
 
@@ -500,7 +498,7 @@ stateDiagram-v2
 | E2E proof required?                              | none / deterministic-e2e / live-smoke / manual-only / deferred-with-trigger; why it's sufficient: ... |
 | Which old architectural assumptions are retired? | ...                                                                                                   |
 
-> If this PRD changes a long-term architectural assumption, you must update or reference the stable source of truth in `docs/architecture.md` or the corresponding PRD / plan memo. Choose one of the E2E posture values above; don't write engineering implementation details in the PRD.
+> If this PRD changes a long-term architectural assumption, you must update or reference the stable source of truth in `docs/architecture.md` or the corresponding PRD / issue. Choose one of the E2E posture values above; don't write engineering implementation details in the PRD.
 
 ## Implementation Boundary
 

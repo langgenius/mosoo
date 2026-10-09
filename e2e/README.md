@@ -1,176 +1,27 @@
 # Local E2E Harness
 
-`just e2e` is the single local E2E entrypoint. The case catalog lives in
-`e2e/cases.ts`, and the dispatcher lives in `e2e/cli.ts`.
+The Playwright specs live in `e2e/cases`. Run them from the repository root with `just e2e`, which passes its arguments to `playwright test`: a path or part of one selects specs (`just e2e e2e/cases/ui/files-page.spec.ts`, `just e2e deterministic`), and `--grep` filters by test title. Without arguments it runs every spec, the live ones included.
 
-Run from the repo root:
+`e2e/playwright.config.ts` loads `.env` from the repository root when it exists; values already set in the shell win. An unset or empty `NO_PROXY` or `no_proxy` defaults to the loopback hosts, so a shell proxy never intercepts the local console.
 
-```bash
-just e2e --help
-just e2e contract
-just e2e public-api
-just e2e contract harness
-just e2e deterministic session-log
-just e2e ui files-page
-just e2e ui sidebar
-just e2e ui session-isolation
-just e2e ui design-contract
-just e2e ui typography-proof
-just e2e ui preview
-just e2e public-api runtime
-just e2e public-api latency
-```
+## Fixture-backed specs
 
-The harness is grouped by layer. `just e2e <layer>` runs every case in that layer;
-`just e2e <layer> <case>` runs one case.
+`deterministic/session-log.spec.ts` and every `ui` spec except `preview.spec.ts` need no provider keys or Worker bindings: they answer the console's GraphQL and auth-session requests with fixtures. Playwright reuses whatever already answers the base URL, `MOSOO_E2E_BASE_URL` or `http://127.0.0.1:$WEB_DEV_PORT` (port 5173) when it is unset, and otherwise starts only `@mosoo/web`. Screenshot specs write their review images under `.tmp/e2e/`.
 
-- `cases/contract`: local harness and signal contracts.
-- `cases/deterministic`: no-provider acceptance paths with fixture-backed data.
-- `cases/ui`: browser journeys.
-- `cases/public-api`: Public API-triggered live runtime checks.
-- `lib`: shared E2E clients, auth helpers, setup helpers, env preflight, and runtime progress.
+## Live specs
 
-`deterministic session-log` runs the real Web route with explicit GraphQL
-projection fixtures, so it is safe for local PR evidence and does not require
-provider keys or Worker runtime bindings. It starts only `@mosoo/web` by default;
-set `MOSOO_E2E_WEB_SERVER_COMMAND` to override the server command.
+`ui/preview.spec.ts` and `public-api/runtime.spec.ts` call real models. Start the local stack with `just dev` first: Playwright on its own starts only the console, without the API. They sign in through the local `@mosoo.ai` development login, so they cannot target a deployed environment.
 
-`ui sidebar` is the console sidebar acceptance case for the shell hierarchy
-(work zone, persistent zone, resource icons, collapsed rail, keyboard focus, CJK
-labels, mobile drawer, Org layer). It is fixture-backed like `ui files-page`,
-starts only `@mosoo/web`, and writes review screenshots to `.tmp/e2e/sidebar/`.
-Point it at a running console with `MOSOO_E2E_BASE_URL` to capture a branch that
-is already served on another port.
+Choose the provider with `MOSOO_E2E_PROVIDER` and set its key, or the generic `MOSOO_E2E_PROVIDER_API_KEY`, which wins when both are set. Omitting the provider selects `openai`, so a DeepSeek or OpenCode key alone is not enough.
 
-`ui design-contract` is the acceptance case for the Console design contract
-(`docs/design/console-design-contract.md`): it measures the shipped button,
-badge, switch, field, and row recipes, checks focus, disabled, invalid, and
-success states, and writes review screenshots to
-`.tmp/e2e/design-contract/<label>/`. `MOSOO_E2E_DESIGN_LABEL=before` captures
-the same views from a pre-change checkout for side-by-side evidence.
-`ui typography-proof` renders the same fixture-backed surfaces with only the
-type-role families swapped (`geist`, the shipped set, and `instrument-sans`,
-the previous Instrument Sans / IBM Plex Mono set) into
-`.tmp/e2e/typography-proof/<variant>/`, and writes the font files each variant
-made the page fetch to `font-requests.json` next to the PNGs. The previous
-set's SIL OFL files are fetched from the jsDelivr mirror of the Fontsource
-packages into `.tmp/e2e/typography-proof/fonts/` for the run and are never
-committed (if Node cannot reach the CDN through your network, download
-`instrument-sans-latin-wght-normal.woff2`, `ibm-plex-mono-latin-400-normal.woff2`,
-and `ibm-plex-mono-latin-500-normal.woff2` from the `@fontsource-variable/instrument-sans`
-and `@fontsource/ibm-plex-mono` packages into that folder first). Both cases
-share `e2e/lib/console-fixtures.ts`.
-`bun e2e/tools/theme-color-probe.ts` regenerates the reference-site evidence
-behind `docs/design/theme-color-usage.md`.
+| `MOSOO_E2E_PROVIDER` | Specs                                              | Key                           | Notes                                                                                                    |
+| -------------------- | -------------------------------------------------- | ----------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `openai` (default)   | `ui/preview.spec.ts`, `public-api/runtime.spec.ts` | `MOSOO_E2E_OPENAI_API_KEY`    |                                                                                                          |
+| `anthropic`          | `ui/preview.spec.ts`, `public-api/runtime.spec.ts` | `MOSOO_E2E_ANTHROPIC_API_KEY` |                                                                                                          |
+| `opencode`           | `public-api/runtime.spec.ts`                       | `MOSOO_E2E_OPENCODE_API_KEY`  | OpenCode Zen only                                                                                        |
+| `deepseek`           | `public-api/runtime.spec.ts`                       | `MOSOO_E2E_DEEPSEEK_API_KEY`  | Runs on OpenCode (`acp-fallback`); optional `MOSOO_E2E_DEEPSEEK_BASE_URL` and `MOSOO_E2E_DEEPSEEK_MODEL` |
+| `pi`                 | `public-api/runtime.spec.ts`                       | `MOSOO_E2E_PI_API_KEY`        | Requires `MOSOO_E2E_PI_MODEL` and `MOSOO_E2E_PI_BASE_URL` for a custom Chat Completions endpoint         |
 
-Each live case requires a key matching `MOSOO_E2E_PROVIDER` (or the generic
-`MOSOO_E2E_PROVIDER_API_KEY`):
+In `public-api/runtime.spec.ts`, `MOSOO_E2E_RUNTIME_ID` overrides the runtime chosen for the provider; with `pi` it must be `pi` or unset.
 
-```bash
-MOSOO_E2E_PROVIDER_API_KEY=...
-MOSOO_E2E_OPENAI_API_KEY=...
-MOSOO_E2E_ANTHROPIC_API_KEY=...
-MOSOO_E2E_OPENCODE_API_KEY=...
-MOSOO_E2E_DEEPSEEK_API_KEY=...
-MOSOO_E2E_PI_API_KEY=...
-```
-
-`ui preview` and `public-api latency` support `openai|anthropic`.
-`public-api runtime` supports `openai|anthropic|opencode|deepseek|pi`. Omitting
-`MOSOO_E2E_PROVIDER` selects `openai`, so an unrelated DeepSeek/OpenCode key does
-not satisfy preflight.
-Optional environment can live in `.env`, `MOSOO_ENV_FILE`, or
-`MOSOO_E2E_ENV_FILE`.
-
-`MOSOO_E2E_PROVIDER=deepseek` is supported by the `public-api runtime` case. It creates an
-official DeepSeek credential and runs the DeepSeek preset through the OpenCode ACP fallback
-runtime:
-
-```bash
-MOSOO_E2E_RUNTIME_ID=acp-fallback
-MOSOO_E2E_DEEPSEEK_API_KEY=...
-MOSOO_E2E_DEEPSEEK_BASE_URL=https://api.deepseek.com
-MOSOO_E2E_DEEPSEEK_MODEL=deepseek-v4-pro
-```
-
-Use `MOSOO_E2E_OPENCODE_API_KEY` only for the OpenCode Zen provider. DeepSeek official keys must use
-`MOSOO_E2E_DEEPSEEK_API_KEY` or the generic `MOSOO_E2E_PROVIDER_API_KEY` with
-`MOSOO_E2E_PROVIDER=deepseek`.
-
-`MOSOO_E2E_PROVIDER=pi` runs the native Pi runtime (`pi-rpc`) with a custom
-OpenAI-compatible Chat Completions model. Set the endpoint and model explicitly;
-the harness accepts either the Pi key or the generic provider key (preferred
-when both are present):
-
-```bash
-MOSOO_E2E_PROVIDER=pi
-MOSOO_E2E_RUNTIME_ID=pi
-MOSOO_E2E_PI_MODEL=custom-coder
-MOSOO_E2E_PI_BASE_URL=https://models.example.com/v1
-MOSOO_E2E_PI_API_KEY=...
-```
-
-Run `just e2e public-api runtime` against a configured non-production local stack.
-The case creates a Project credential and Agent, publishes the Agent, creates a
-Project-scoped API key, then verifies a real runtime response through the Public
-API. It makes model calls and requires a reachable Sandbox environment. This
-smoke covers text completion; it does not prove tool execution or cold resume.
-Pi uses full-access execution within the Session sandbox, without interactive
-tool approvals. `just e2e contract harness` validates the Pi configuration
-without provider calls. Keep credentials in the environment and out of
-committed files.
-
-Common optional values:
-
-```bash
-MOSOO_E2E_EMAIL=preview-smoke@mosoo.ai
-MOSOO_E2E_BASE_URL=http://127.0.0.1:5173
-WEB_DEV_PORT=5173
-MOSOO_E2E_RUNTIME_ID=openai-runtime
-MOSOO_E2E_LATENCY_LABEL=current
-MOSOO_E2E_LATENCY_OUTPUT=.tmp/e2e/preview-latency-current.json
-```
-
-Runtime signal artifacts are collected by `lib/runtime-progress.ts`.
-
-## Runtime performance overlay
-
-The Runtime E2E Scoreboard and frozen performance harness are intentionally
-maintained outside `main`, so their probes cannot affect the production
-runtime. Treat these remote refs as one staging-only overlay:
-
-| Repository                      | Remote ref                                 |
-| ------------------------------- | ------------------------------------------ |
-| `langgenius/mosoo`              | `origin/perf/runtime-e2e-scoreboard-infra` |
-| `langgenius/mosoo-agent-driver` | `origin/feat/runtime-performance-evidence` |
-
-The mosoo ref pins the paired Driver revision through `apps/driver`. Follow the
-[canonical overlay instructions](https://github.com/langgenius/mosoo/blob/perf/runtime-e2e-scoreboard-infra/e2e/README.md#unmerged-runtime-performance-overlay)
-for disposable worktrees, provenance, validation, and staging cleanup.
-
-The minimum checkout and identity check is:
-
-```bash
-git fetch origin perf/runtime-e2e-scoreboard-infra
-PERF_OVERLAY_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/mosoo-perf-overlay.XXXXXX")"
-git worktree add --detach \
-  "$PERF_OVERLAY_ROOT/before" origin/perf/runtime-e2e-scoreboard-infra
-git -C "$PERF_OVERLAY_ROOT/before" \
-  submodule update --init .skills/mosoo-skills apps/driver
-git -C "$PERF_OVERLAY_ROOT/before/apps/driver" \
-  fetch origin feat/runtime-performance-evidence
-test "$(git -C "$PERF_OVERLAY_ROOT/before/apps/driver" rev-parse HEAD)" = \
-  "$(git -C "$PERF_OVERLAY_ROOT/before/apps/driver" \
-    rev-parse origin/feat/runtime-performance-evidence)"
-```
-
-For instrumentation acceptance, compare target mosoo/Driver SHAs with those
-same SHAs plus the overlay. For product experiments, both sides must use the
-same overlay and only the candidate may add the mosoo and/or Driver
-optimization. An API-only candidate must keep the Driver submodule identical
-on both sides.
-
-Use dedicated performance staging only; never deploy the overlay to production.
-Missing provenance or stage evidence fails closed. The balanced 4-pair
-`1/2/17/18` run is staging acceptance, not statistical certification, and does
-not modify or replace the frozen 32-pair protocol.
+`public-api/runtime.spec.ts` creates a provider credential and an Agent, publishes the Agent, creates a Project key, and waits for a text reply through `/api/v1`. It proves text completion only, not tool execution or cold resume. Keep credentials in the environment, never in committed files.

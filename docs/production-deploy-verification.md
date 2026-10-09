@@ -1,448 +1,203 @@
-# Production Deploy Verification
+# Operator Runbook
 
-This runbook simulates `just deploy` without publishing Workers or mutating
-production D1. It is the required preflight before a production deploy.
+How to release mosoo to stage and production, recover from a failed release,
+manage operator credentials, notify users and handle incidents.
 
 ## Rules
 
-- Do not put Cloudflare account IDs, API tokens, secret values, or private keys
-  in tracked files.
-- Set `CLOUDFLARE_ACCOUNT_ID` only in the shell that runs the check.
-- Remove app-local `.env*` files that Wrangler or Vite would load implicitly,
-  and unset every `VITE_*` process variable before a production build.
-- Export the production account id in the current shell:
-
-```bash
-export CLOUDFLARE_ACCOUNT_ID="<production-account-id>"
-```
-
-- During simulation, do not run:
-
-```bash
-just deploy
-just deploy-api
-just deploy-web
-bun run deploy
-bun run deploy:api
-bun run deploy:web
-```
-
-Those commands publish or mutate production resources.
-
-## Step 0 - Confirm The Worktree
-
-```bash
-git status --short --branch
-```
-
-Acceptance:
-
-- Current branch is the intended release branch or `main`.
-- The whole repository, including `apps/driver`, has no staged, unstaged, or
-  untracked changes. The deploy script does not check this itself — it ships
-  whatever is on disk — so this manual check is the only worktree gate.
-- No tracked path uses Git `assume-unchanged` or `skip-worktree`, and no ignored
-  file exists under the Web `src` or `public` build-input directories.
-
-### Runtime image namespace compatibility
-
-The runtime image split adds `sandbox.sandbox_binding` with the legacy `Sandbox`
-default and registers `SandboxClaude`, `SandboxOpenAI`, `SandboxOpenCode`, and
-`SandboxPi`. Pi adds the append-only `v4-pi-runtime` Durable Object migration;
-it does not change the existing D1 schema or sandbox namespaces.
-Apply the additive D1 migration before deploying the Worker. The allocation
-flag `MOSOO_RUNTIME_IMAGES_ENABLED` defaults to `false`: deploy the routing-aware
-Worker and all five container classes (the legacy union plus four runtime
-images) first, drain requests from older Worker
-versions, then set it to `true` in a separately reviewed deployment. Reverting
-the flag stops new split-image allocations while existing subjects keep their
-recorded namespace. Verify this sequence in stage before production. Keep the legacy
-class and all new classes reachable during later deploys: an existing subject's
-recorded namespace must never be redirected or overwritten to change its image.
-New Cattle subjects select a single-runtime image; existing subjects, Pet shared
-workspaces, and Environment artifact builders retain the union image. D1
-admission keeps the deployment-wide ceiling at 50 runtime subjects despite the
-additional Cloudflare container classes.
-
-After the first split-image subject exists, rollback must retain the routing
-column and all five bindings. Do not roll back to a Worker that always uses
-`Sandbox`, or drop a class while any subject still references it. Use a forward
-fix that preserves routing and the pinned Driver protocol. This change does not
-upgrade the Driver protocol or migrate an existing subject's namespace.
-
-### #582 native continuation protocol cutover
-
-The unreleased Session changes use Driver protocol 6 to carry the
-native-continuation requirement and explicitly nullable Agent provenance.
-Boot payloads and new handshakes accept exactly protocol 6, including rejecting
-protocol 5. Compatible Driver main/release integration remains a release
-prerequisite. This internal API/Driver cutover preserves public Thread/Run routes
-and customer Session IDs.
-
-Prepare one matched API revision and Driver image set. Before switching versions,
-close new admission, finish admitted work and verify its committed recovery state,
-then stop old Drivers, including idle/prewarmed instances. Do not rely on a new
-handshake to protect a connection that was already accepted by the old Worker.
-Reopen admission only after the matched image/Worker versions and restored native
-continuation pass staging acceptance. Rehearse the reverse sequence with matched
-rollback artifacts and the same admission barrier; do not split API and Driver
-versions or interrupt customer work to force an upgrade. The production plan and
-its rollback still require the owner's concrete approval.
-
-Rollback qualification requires successful real tool work in the same direct
-Session on the rollback candidate, followed by successful continuation after
-switching forward. Verify the native identity, frozen configuration, original
-files, and work committed during rollback. A failed rollback Run remains a
-failed rehearsal even if switching forward restores the prior successful
-checkpoint; retain its Run and artifact evidence for diagnosis.
-
-Migration `0017_optional-session-agent.sql` preserves existing Agent references
-while allowing Project-owned execution without a preset. It rewrites the Agent
-association columns in Session, Run, event, and usage records, and rebuilds only
-the derived daily usage rollup. Before production application, verify a full D1
-backup and restore, row/relationship preservation on a recent copy, the admission
-barrier, and the exact matched release/rollback revisions with the owner. Once a
-Session without an Agent has been admitted, a previous build that requires an
-Agent is not a valid rollback target. Keep a nullable-aware Host/Driver rollback
-pair; do not delete direct Sessions or invent Agent IDs to fit an older schema.
-This schema change does not convert legacy Pet workspaces or authorize Preview
-cleanup.
-
-## Step 1 - Run The Full Repository Gate
-
-```bash
-just check
-```
-
-Acceptance:
-
-- Command exits `0`.
-- Formatting, lint, typecheck, tests, and generated output checks pass.
-
-## Step 2 - Confirm Production D1 Migration State
-
-Execute the complete migration chain against an isolated local D1 database:
-
-```bash
-(
-  cd apps/api
-  persist_dir="$(mktemp -d)"
-  trap 'rm -rf "$persist_dir"' EXIT
-  ../../node_modules/.bin/vp exec wrangler d1 migrations apply DB \
-    --local --env prod --persist-to "$persist_dir"
-)
-```
-
-Finally inspect the remote ledger. This is read-only and must not apply migrations:
-
-```bash
-cd apps/api
-CLOUDFLARE_ACCOUNT_ID="$CLOUDFLARE_ACCOUNT_ID" bun bin/prod-migrations.ts
-cd ../..
-```
-
-Acceptance:
-
-- The isolated full-chain apply exits `0`, proving the checked-in SQL chain
-  actually executes before production. No automated append-only or
-  trusted-range check exists; review the diff of `pkgs/db/drizzle/**` against
-  the last deployed commit by hand. Remember that Wrangler records applied
-  migrations by filename: a rewritten migration is silently skipped by a
-  production database that already recorded it.
-- For a no-op schema release, the read-only inspector confirms that every
-  configured SQL filename is in the existing production ledger. Unlike Wrangler
-  `migrations list`, this does not issue `CREATE TABLE IF NOT EXISTS`.
-- Missing or unreadable ledgers, malformed responses, unsupported migration
-  patterns, or applied filenames absent from the checkout fail closed. Production
-  initialization requires a separate reviewed migration operation. The deploy
-  script repeats this check and skips `migrations apply` only when nothing is
-  pending; real pending migrations still use Wrangler apply and a second ledger
-  check, followed by the existing missing-table schema guard.
-- If pending migrations are listed, stop and review the exact SQL before any
-  real deploy.
-- Pending migrations may be accepted only when they are additive or explicitly
-  approved for production.
-
-## Step 3 - Confirm Production Queues Exist
-
-This is read-only. It must not create queues.
-
-```bash
-cd apps/api
-CLOUDFLARE_ACCOUNT_ID="$CLOUDFLARE_ACCOUNT_ID" \
-  ../../node_modules/.bin/vp exec wrangler queues list
-cd ../..
-```
-
-Acceptance:
-
-- `api-command` exists.
-- `api-command-dlq` exists.
-- `environment-artifact-build` exists.
-
-## Step 4 - Build The Driver
-
-```bash
-./node_modules/.bin/vp run --filter agent-driver build
-```
-
-Acceptance:
-
-- Command exits `0`.
-- Driver bundle is produced without TypeScript or bundling errors.
-
-## Step 5 - Dry-Run The API Worker Upload
-
-This validates the API Worker bundle without publishing it. It does not run the
-full API deploy script because the real script applies D1 migrations and ensures
-the required environment-artifact queue.
-
-```bash
-cd apps/api
-CLOUDFLARE_ACCOUNT_ID="$CLOUDFLARE_ACCOUNT_ID" \
-  ../../node_modules/.bin/vp exec wrangler deploy --env prod --minify --dry-run
-cd ../..
-```
-
-Acceptance:
-
-- Command exits `0`.
-- Wrangler validates the `prod` environment.
-- No Worker is deployed.
-- No D1 migration is applied.
-- No queue is created.
-
-## Step 6 - Build The Web Worker Assets
-
-```bash
-./node_modules/.bin/vp run --filter @mosoo/web build
-```
-
-Acceptance:
-
-- Command exits `0`.
-- Web build succeeds.
-- `apps/web/dist` is produced.
-
-## Step 7 - Dry-Run The Web Worker Upload
-
-```bash
-cd apps/web
-CLOUDFLARE_ACCOUNT_ID="$CLOUDFLARE_ACCOUNT_ID" \
-  ../../node_modules/.bin/vp exec wrangler deploy --env prod --dry-run
-cd ../..
-```
-
-Acceptance:
-
-- Command exits `0`.
-- Wrangler validates the `prod` environment.
-- No Worker is deployed.
-
-## Step 8 - Confirm The Production D1 Contract
-
-```bash
-rg -n "wipeProdD1|Wiping prod D1|database delete|database create" apps/api/bin/deploy-prod*.ts
-```
-
-Acceptance:
-
-- The `rg` command returns no matches.
-- `apps/api/bin/deploy-prod.ts` still performs, in order: load and validate the
-  latest local Drizzle snapshot, apply pending remote D1 migrations (its first
-  remote mutation), verify every expected table exists in prod (the
-  DEPLOY-D1-001 missing-table guard), ensure the required environment-artifact
-  queue, build the Driver, then deploy the API Worker with an immediate Container rollout so the API and Driver protocol cannot split
-  across a gradual image rollout.
-- The guard does not compare columns, indexes, constraints, or extra live
-  tables. The script performs no clean-worktree check and no dry-run of its own;
-  Steps 0-7 of this runbook are the only preflight.
-
-## Step 9 - Final Worktree Check
-
-```bash
-git status --short
-```
-
-Acceptance:
-
-- No unexpected tracked files changed.
-- Build artifacts are ignored or intentionally left unstaged.
-- No secrets or local environment files are staged.
-
-## Real Deploy Safe Sequence
-
-Before advancing a reviewed commit to production, run the repository's `Public
-API non-production smoke` workflow against a deployed staging/preview base URL
-ending in `/api/v1`. The workflow validates the live OpenAPI and creates an empty
-Thread with the documented `userId`-only body. It hard-rejects `cloud.mosoo.ai`,
-`try.mosoo.ai`, and `mosoo.ai`; never repoint it at production.
-
-The normal production entry point is
-`.github/workflows/deploy-try.yml`. A push to `deploy/try` in
-`langgenius/mosoo` runs the simulation steps, invokes `just deploy`, and verifies
-the public production endpoints. The workflow intentionally refuses to deploy
-from a fork.
-
-Configure the GitHub `try` Environment before the first release:
-
-- Restrict deployment branches to `deploy/try`.
-- Add `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` as Environment
-  secrets. Keep Worker runtime secrets in Cloudflare.
-- Protect `deploy/try` from force-push and deletion, and restrict who may push
-  it. Advance it only to a reviewed commit from `main`.
-
-Configure the GitHub `container-monitor` Environment for the scheduled
-`.github/workflows/container-runtime-alert.yml` check. Scheduled runs execute on
-`main`, so they can never read the deploy-only `try` Environment:
-
-- Restrict deployment branches to `main`.
-- Add `CLOUDFLARE_ACCOUNT_ID` and a separate `CLOUDFLARE_API_TOKEN` limited to
-  the account permission **Containers Read** as Environment secrets. Never reuse
-  the deploy token here.
-- Run the workflow once with `workflow_dispatch` and confirm both the production
-  and stage jobs list every Sandbox image application. A job fails when an
-  application derived from `apps/api/wrangler.toml` is missing from the
-  Cloudflare listing, so a renamed class cannot silently drop out of the check.
-- The check only reports: it opens a GitHub issue when an environment has ten or
-  more active containers or any container older than two hours, and it never
-  stops a container itself.
-
-The workflow uses one `production` concurrency group and never cancels an
-in-progress release because D1 migration, queue updates, and Worker publication
-are not transactional.
-
-### First `cloud.mosoo.ai` Release
-
-Complete these one-time prerequisites before releasing the domain migration:
-
-- Attach `cloud.mosoo.ai` as an additional Custom Domain on the
-  `mosoo-web-prod` Worker and wait for its DNS record and certificate to become
-  active. The normal deploy publishes the API Worker first, and its
-  `cloud.mosoo.ai/api/*` route requires that hostname to exist already.
-- Add `https://cloud.mosoo.ai/api/auth/callback/google` to the Google OAuth
-  client. Keep the old callback during the compatibility window.
-- Expect existing browser sessions to sign in again because host-scoped cookies
-  do not move between subdomains.
-
-Keep the `try.mosoo.ai` Web Custom Domain and API route during the compatibility
-window. Web requests redirect to the new host; `/api/*` continues to execute on
-the API Worker so existing CLI requests do not cross a redirect boundary.
-
-For a manual release, run the real deploy only after all simulation steps above
-pass.
-
-```bash
-git status --short --branch
-just check
-just deploy
-```
-
-Acceptance before running `just deploy`:
-
-- The complete worktree and `apps/driver` submodule are clean; intended release
-  changes must already be committed.
-- `just check` exits `0` in the same shell shape used for deploy.
-- All simulation steps above passed on this exact commit.
-
-`just deploy` publishes production resources. It runs the full repository check
-(`just check`), then `deploy:api`, then `deploy:web`. The API deploy
-(`apps/api/bin/deploy-prod.ts`) applies pending remote D1 migrations as its
-very first remote action — after loading the local snapshot but before any
-build or bundle validation — then runs the latest-snapshot missing-table guard,
-ensures the required environment-artifact queue, builds the Driver, and deploys
-the API Worker. The Web deploy then builds and publishes the Web Worker. Neither
-deploy performs its own worktree check or dry-run; that is
-exactly why the simulation steps above are required.
-
-The preflights prevent deterministic build, bundle, config, and migration-chain
-failures from surfacing after a remote mutation. Cloudflare publication across
-D1, queues, the API Worker, and the Web Worker is not transactional: a provider,
-permission, or network failure can still leave an earlier remote step published.
-If the final Web publish fails, keep the same clean release commit, diagnose the
-provider failure, repeat Steps 6-7 (build and dry-run) manually, then rerun
-`just deploy-web`. Do not rewrite or roll back an already-applied D1 migration.
-
-## Real Deploy Acceptance
-
-After a real production deploy, verify the public surface:
-
-```bash
-curl https://cloud.mosoo.ai/
-curl https://cloud.mosoo.ai/api/health
-curl https://cloud.mosoo.ai/api/graphql \
-  -H 'content-type: application/json' \
-  --data '{"query":"query { __typename }"}'
-curl --head --max-redirs 0 \
-  'https://try.mosoo.ai/domain-migration-check?source=runbook'
-curl https://try.mosoo.ai/api/health
-```
-
-Acceptance:
-
-- `/` returns HTTP 200.
-- `/api/health` returns HTTP 200 and `{"name":"mosoo","ok":true}`.
-- `/api/graphql` returns HTTP 200 and `{"data":{"__typename":"Query"}}`.
-- The old Web URL returns HTTP 308 with the same path and query on
-  `https://cloud.mosoo.ai`.
-- The old `/api/health` URL returns HTTP 200 without redirecting.
-- If local HTTPS probes resolve through the local TUN/fake-IP path, keep
-  `--interface en0` and `--resolve` in the smoke commands.
+- Production D1 is append-only: never reset it, and never edit, rename, delete
+  or roll back an applied migration. Destructive or data-rewrite migrations need
+  explicit owner approval, a backup and a rollback plan
+  ([authoring rules](../CONTRIBUTING.md#database-and-migrations)).
+- Production deploys only reviewed commits, normally by advancing `deploy/try`
+  to a `main` commit.
+- Never cancel a running release: D1, queues and the two Workers change one
+  after another, not in one transaction.
+- Keep account IDs, tokens and secret values out of tracked files, issues and
+  shared output. Stop if the target Cloudflare account is unclear or a secret
+  appears in output or a diff.
+
+## Production Release
+
+1. Publish the commit to [stage](#staging) and run the
+   `Public API non-production smoke` workflow against its `/api/v1` URL.
+2. Complete the [migration review](#migration-review).
+3. Push the commit to `deploy/try`. `deploy-try.yml` runs the gate, a
+   migration-chain replay into a temporary local D1, a read-only ledger check
+   and a queue listing, the builds, both Worker dry-runs, `just deploy` and
+   endpoint checks.
+4. Run the [post-deploy checks](#post-deploy-checks).
+
+For a manual release, which every release with pending migrations needs:
+
+- Use a clean worktree, including the `apps/driver` submodule; the deploy ships
+  whatever is on disk. `git status` hides ignored files and paths marked
+  `assume-unchanged` or `skip-worktree`, so check for those too. Docker must be
+  running for the Sandbox image builds, dry-runs included.
+- Remove app-local `.env*` files and export exactly the `VITE_*` values from
+  `deploy-try.yml`; Vite bakes them into the console at build time.
+- Run the workflow's steps through the dry-runs; the ledger check may fail only
+  on the pending migrations you reviewed. Then run `just deploy`.
+  `just deploy-api` and `just deploy-web` skip `just check`.
+
+`just deploy` runs `just check`, the API deploy and then the Web deploy. The API
+deploy, [`deploy-prod.ts`](../apps/api/bin/deploy-prod.ts), applies migrations
+only when configured SQL files are missing from the ledger, then checks the
+ledger again. Its DEPLOY-D1-001 guard requires every table in the latest Drizzle
+snapshot to exist in production; columns and indexes are not compared. It
+creates the `environment-artifact-build` queue if missing; the other queues in
+`[env.prod]` of `apps/api/wrangler.toml` must already exist. It deploys with
+`--containers-rollout immediate`, so the API and Driver, which must share
+`DRIVER_PROTOCOL_VERSION`, never split across a gradual rollout. This stops
+every running Sandbox at once and ends in-flight turns.
+
+## Migration Review
+
+- No automated check enforces append-only. Diff `pkgs/db/drizzle/` against the
+  last deployed commit, normally `origin/deploy/try`: it may only add SQL and
+  snapshot files and append journal entries. Wrangler records migrations by
+  filename, so production silently skips an edited applied file.
+- Inspect production with `bun bin/prod-migrations.ts` from `apps/api`, never
+  `wrangler d1 migrations list`, which runs DDL. The inspector fails while
+  migrations are pending, when the ledger is missing or unreadable, and when
+  production has applied a migration absent from the checkout. Initializing a
+  database without a ledger is a separate reviewed operation.
+- Pending migrations ship only when additive or explicitly approved. Because the
+  inspector fails on them, `deploy/try` stops; release them manually.
+
+## Partial Failure And Rollback
+
+- The API publishes first. If the Web publish fails, keep the commit and the
+  `VITE_*` values, fix the cause, build and dry-run the Web as the workflow
+  does, then run `just deploy-web`.
+- If the API deploy fails, fix the cause and rerun `just deploy`; applied
+  migrations are skipped. Wrangler activates the new Worker before it builds the
+  Sandbox image and starts the rollout, so a failure in those steps leaves the
+  new Worker running against the old image.
+- Roll back by releasing a revert from `main` that keeps every migration file;
+  the inspector refuses a checkout that lacks an applied one. The revert also
+  restores the pinned Driver, so the API and Driver move together.
+- The rollback build must accept every row the newer build admitted, such as a
+  Session without an Agent. Never delete rows or invent values to fit it.
+
+## Runtime image namespace compatibility
+
+`MOSOO_RUNTIME_IMAGES_ENABLED` gives new runtime subjects a per-runtime Sandbox
+class. It is `"false"` in every environment, so they use the union `Sandbox`.
+
+- Turn it on only in its own reviewed deploy, after stage runs the same change,
+  while the Worker that routes by `sandbox.sandbox_binding` and every Sandbox
+  class are live. Turning it off stops new per-runtime allocations only.
+- A subject's recorded `sandbox_binding` is never redirected or rewritten. Once
+  any subject records a per-runtime class, every later deploy and rollback keeps
+  that column and every Sandbox class and binding.
+- Durable Object class migrations in `wrangler.toml` are append-only.
+
+## Post-Deploy Checks
+
+- The workflow's Verify step checks the public endpoints and redirects; run the
+  same commands after a manual release.
+- A successful deploy means the container rollout started. After a release that
+  touches the runtime, the Driver or provider routing, let the rollout finish,
+  then complete one real tool-executing turn through the Public API in an
+  operator-owned Project. Health checks do not prove model execution.
+- Confirm that [mosoo.ai/status](https://mosoo.ai/status) shows fresh
+  observations.
+
+## Staging
+
+Stage has its own Workers, D1, R2 buckets, queues and synthetic data
+(`[env.stage]` in both `wrangler.toml` files). Only `just deploy-stage` publishes
+to stage; `deploy/try`, `just deploy`, `just deploy-api` and `just deploy-web`
+target production.
+
+- Apply stage migrations separately from `apps/api`, after the chain replays
+  locally, with a reviewed
+  `../../node_modules/.bin/vp exec wrangler d1 migrations apply DB --remote --env stage`.
+  Never reset stage D1; it may hold long-lived Sessions for
+  delayed-continuation tests.
+- Finish or cancel running stage work, because container rollout is immediate.
+  Commit, then run `just deploy-stage`: it runs `just stage-preflight`, refuses
+  a dirty tree, and deploys the API and then the Web, tagged with the commit SHA
+  and the message `mosoo=<sha> driver=<sha>`. It applies no migrations or
+  secrets, and the two updates are not atomic.
+- Let the container rollout finish for every Sandbox application. Test with a
+  dedicated stage Project and key, and add provider credentials in the console,
+  never as Worker secrets.
+- Run the smoke workflow (or `just public-api-smoke`) and
+  `just public-api-session-workflow`. Both refuse production hosts.
+
+## Credentials
+
+GitHub environments:
+
+- `try`, limited to `deploy/try`: `CLOUDFLARE_ACCOUNT_ID`, the deploy
+  `CLOUDFLARE_API_TOKEN` and `POSTHOG_PROJECT_KEY`. Protect `deploy/try` from
+  force-push and deletion, and restrict who may push it.
+- `container-monitor`, limited to `main` because scheduled runs execute there:
+  `CLOUDFLARE_ACCOUNT_ID` and a `CLOUDFLARE_API_TOKEN` limited to Containers
+  Read, never the deploy token. With it, the `Container runtime alert` workflow
+  opens `[Ops]` issues for container count or age anomalies in prod and stage;
+  it never stops a container. A job fails when the token is missing or cannot
+  read containers, when the account cannot be resolved, or when a container
+  application derived from `apps/api/wrangler.toml` is missing from Cloudflare,
+  for example a class merged to `main` but not yet released. After setting or
+  rotating the secrets, run it with `workflow_dispatch` and confirm both jobs
+  pass.
+- `public-api-nonproduction`: the stage Agent and Project key for the smoke
+  workflow, never a production key.
+
+Required Worker secrets are listed in `[env.prod.secrets]` and
+`[env.stage.secrets]` of `apps/api/wrangler.toml`. Set one from `apps/api` with
+the pinned Wrangler:
+`../../node_modules/.bin/vp exec wrangler secret put <NAME> --env prod`.
+
+- `VAULT_ROOT_SECRET` wraps the key of every stored provider key, MCP credential
+  and Environment secret, with no versioning. Replacing it makes all of them
+  unreadable; never rotate it in place.
+- Sandbox file mounts and checkpoint uploads and restores authenticate with
+  `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY`, so a revoked or under-scoped
+  token fails every checkpoint and cold restore. The production pair is a
+  non-expiring Cloudflare user token limited to object read/write on the
+  production file and sandbox-state buckets; transfer it before removing that
+  user.
+- `POSTHOG_PROJECT_KEY` (Worker secret) and its GitHub namesake are optional;
+  without them the API and the console send no product events. Both take the
+  PostHog project's public ingestion key. Keep stage without one, because stage
+  labels its events `production`.
+
+The production API names `mosoo-website-prod` (`langgenius/mosoo-website`) as
+its Tail consumer. That Worker builds mosoo.ai/status and must exist with a
+`tail()` handler before an API deploy names it.
 
 ## Breaking-Change Notification
 
-Intentional breaking changes to the managed Agent API and configuration
-lifecycle require accurate migration instructions for affected users. Preserve
-the existing data, backup, rollback, and destructive-migration approval rules.
+[SPEC](./SPEC.md) decides when a change needs a notice. To send one:
 
-1. Before cutover, inventory affected integrations and active tasks. Record
-   the exact contract change, treatment of admitted work, preserved history
-   and artifacts, compatible API/console/CLI versions, and rollback point.
-   Prepare the affected recipient snapshot and notice before deploying.
-2. State the effective time, actual changes, preserved data, and concrete
-   user migration steps and links. Advance notices describe upcoming behavior.
-   A notice claiming the replacement is available follows deployment and
-   verification of the API, console, and applicable CLI. Documentation-only
-   synchronization does not trigger a rollout notice.
-3. Send through Cloudflare Email Service using the configured Mosoo sender.
-   Verify sample inbox delivery and actual content, send individually, and
-   retain private per-recipient attempts, outcomes, and provider message IDs.
-   Resolve uncertain outcomes before retrying to avoid duplicate notices.
-4. Reconcile the recipient snapshot with accepted, failed, suppressed,
-   unknown, and unattempted outcomes before declaring notification complete.
-   Resolve unknown outcomes and unattempted recipients; investigate known
-   failures and record their disposition or outstanding follow-up. Publish
-   only aggregate counts and sample verification. Provider acceptance is not
-   proof of delivery to every inbox.
+1. Before the release, snapshot the affected recipients and write the notice:
+   effective time, actual changes, preserved data, and the steps users take. A
+   notice saying the replacement is available goes out only after the API,
+   console and applicable CLI are deployed and verified.
+2. Check a sample inbox for delivery and content, then send individually through
+   Cloudflare Email Service. Keep private per-recipient attempts, outcomes and
+   provider message IDs, and resolve unknown outcomes before any retry.
+3. Notification is complete only when the snapshot reconciles: no unknown or
+   unattempted recipients, and every known failure investigated with its
+   disposition recorded. Provider acceptance is not inbox delivery. Publish
+   only aggregate counts.
 
-One coordinated notice may cover slices shipped together when it describes
-all affected workflows and client actions. The completed #581 key-rotation
-notice does not cover a future Session or Builder change. Describe that
-release's actual changes; require key rotation only if it changes valid keys.
+## Incidents
 
-For #582 Cloud conversion, also follow the
-[Session isolation transition](./session-isolation-transition.md) evidence,
-concurrent-admission, and functional rollback requirements. A ready backup row or
-a successful metadata check is not proof that the original workspace is usable.
+A production failure that affects users is an incident.
 
-The target #582 acceptance covers both ghFind single-turn evaluation and
-multi-turn continuation, including checkpoint failure and recovery after
-runtime reclamation. Verify that replies seconds or days later use the same
-Session, prior conversation context, working files, and admitted configuration
-without re-supplying that state. Include working files outside published
-artifacts. Record actual elapsed time for delayed live continuation separately
-from controlled-clock retention checks; backup creation alone is insufficient
-acceptance evidence. Update the existing Thread smoke for the implemented
-Session contract and verify both paths in non-production before cutover.
-
-## Stop Conditions
-
-Stop before any real deploy when any item below is true:
-
-- `just check` fails.
-- Production D1 has pending migrations that were not reviewed.
-- The isolated local migration apply in Step 2 fails, or `pkgs/db/drizzle/**`
-  rewrites SQL that production has already recorded.
-- The API or Web dry-run fails.
-- Production account identity is unclear.
-- Any secret value appears in command output, tracked files, or staged diff.
+- While it is live, keep the incident issue current. [mosoo.ai/status](https://mosoo.ai/status)
+  shows automated telemetry only and has no manual notice channel.
+- Open a GitHub issue from the
+  [Incident template](../.github/ISSUE_TEMPLATE/incident.yml). Its timeline,
+  evidence and postmortem stay in that issue, not in docs. Significant customer
+  impact, such as data loss or multi-hour unavailability, also gets a public
+  postmortem.
+- Close it once the fix ships with a regression test that pins it, and move any
+  standing rule into [architecture](./architecture.md) or this runbook.
+- Earlier postmortems are archived in
+  [operations/incidents](./operations/incidents/README.md).

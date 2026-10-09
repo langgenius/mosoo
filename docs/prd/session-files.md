@@ -1,52 +1,21 @@
 # Thread Files
 
-Status: partially available.
+What files a Thread holds, what the Agent can read, and how files are removed.
 
-## Why it matters
+## Promises
 
-Builders often need an Agent to read a brief, dataset, or reference document and
-keep useful output after a Run ends. Thread files give each conversation a
-durable, reviewable file surface. They are distinct from the private Thread
-workspace checkpoint used to continue a Task Agent.
+- A Thread's files are its attachments plus the artifacts the Agent records. Both outlive the Run that used or produced them.
+- An attachment belongs to one Thread. During a turn whose message carries attachments, the Agent can read all of the Thread's attachments, read-only.
+- Files the Agent writes under `outputs/` become downloadable artifacts. Other workspace files are restored with the Session's checkpoint for continuation, but are not listed or downloadable.
+- Access follows the Project and the Thread: knowing a file ID grants nothing, and files are never shared across Threads.
+- Deleting a file, or the Thread that holds it, is permanent. There is no trash or restore.
+- Archived and terminated Threads reject every file change, including deletes through the API.
 
-## Who uses it
+## Limits
 
-- Builders attach source material and review files created by the Agent.
-- Authorized integrations attach, list, download, or delete files for Threads
-  they can access.
-
-## User flow
-
-1. A Builder attaches files while starting a Thread or from an Agent session
-   chat. An integration can attach a file when starting a Thread or sending a
-   later message.
-2. An attachment belongs to that Thread. mosoo only promises to give the Agent
-   files explicitly selected for the current message.
-3. Outputs that mosoo records from the Agent appear as artifacts in the same
-   Thread. When an Agent reply links to a recorded `outputs/` file, selecting
-   that link opens the artifact in a Thread preview drawer with a download
-   action.
-4. The Files page lets the Builder search, filter, preview supported formats,
-   and download attachments and artifacts.
-
-## Current experience and boundaries
-
-Attachments and recorded artifacts outlive an individual Run. A Task Agent's
-private Thread checkpoint separately restores the complete working directory for
-continuation, including files that were not promoted to artifacts. That checkpoint
-is not a browseable file library and does not create `file_record` entries.
-Earlier attachments remain listed on the Thread, but they are not included in a
-later Run unless that message references them again through a surface that
-supports attachments; the attachment mount itself is excluded from checkpoints.
-
-The new-Thread composer and Agent session chat support attachments. The main
-Thread detail reply composer does not yet support them. The Files page has no
-create, rename, move, delete, or shared-library controls.
-
-Access follows the Project and Thread: knowing a file identifier does not grant
-access or enable cross-Thread sharing. Deleting a file through an authorized
-integration, or deleting its Thread, is permanent from the user's perspective;
-there is no trash or restore flow. This is not a certified secure-erasure
-guarantee. Archived, rescheduling, and finished Threads remain readable, while
-console attachment changes are blocked. Integration deletion does not yet apply
-that lifecycle rule consistently.
+- A turn whose message carries no attachment cannot read earlier attachments directly; they stay in the workspace only if the Agent copied them there.
+- In the console, attachments can be added when starting a Thread and in Preview, but not in a follow-up to a Thread in Runs. The API accepts attachments on creation and on follow-up messages.
+- The Files page searches, filters, previews and downloads. It cannot upload, rename, move or delete files, and there is no shared library.
+- An API upload is a single request of at most `PUBLIC_THREAD_FILE_UPLOAD_MAX_BYTES`.
+- The end-of-turn scan of `outputs/` records at most `RUNTIME_SESSION_OUTPUT_SCAN_MAX_FILES` files, in path order; a file past that limit is listed only if the runtime reported writing it.
+- Deleting a file removes it from the Thread, not from the Agent's workspace: copies there stay in the Session's checkpoint, and an artifact still under `outputs/` is recorded again when the next turn ends.

@@ -5,13 +5,13 @@
 <h1 align="center">mosoo</h1>
 
 <p align="center">
-  <strong>An open-source managed agent runtime for application backends.</strong><br />
-  Run OpenAI Codex, Claude Agent SDK, and OpenCode behind API endpoints in isolated AI agent sandboxes.
+  <strong>An open-source, API-first managed Agent runtime for application backends.</strong><br />
+  Run OpenAI Codex, Claude Agent SDK, OpenCode, and Pi behind one API, each Session in its own sandbox.
 </p>
 
 <p align="center">
   <a href="./LICENSE"><img src="https://img.shields.io/github/license/langgenius/mosoo" alt="License" /></a>
-  <a href="#product-status"><img src="https://img.shields.io/badge/status-alpha-orange" alt="Status: Alpha" /></a>
+  <img src="https://img.shields.io/badge/status-alpha-orange" alt="Status: Alpha" />
 </p>
 
 <p align="center">
@@ -23,124 +23,51 @@
   <a href="https://github.com/langgenius/mosoo-skills">mosoo-skills</a>
 </p>
 
-mosoo provides a Cloudflare-native control plane to stream tool activity, inspect Run history, and keep Threads and files across executions. It is self-hostable in your own account.
+Your application keeps its business logic, end-user authentication, and UI. mosoo runs the Agent: it executes each turn in an isolated sandbox, keeps the working directory and the native conversation between turns, stores input files and artifacts, streams events, and records usage. It is built on Cloudflare Workers, Durable Objects, D1, R2, and Containers.
 
-Your application remains yours. Its backend owns product behavior and end-user access. mosoo focuses on Agent execution and lifecycle.
-
-## Target Direction
-
-mosoo v1 targets research, data analysis, file processing, and report generation through `Project key + harness/model + instructions + Input + optional files -> durable Session`. The #582 release uses a configured Project model account (BYOK). Direct invocation is the primary path; a saved private Agent is an optional preset. Platform model supply and commercial billing are separate #636 work. Acceptance covers a single-turn ghFind repository evaluation and CSV analysis with durable follow-up, including recovery after runtime reclamation. Both use the same Session API and checkpoint gate. Project keys have shipped; the Session transition is not complete. See [SPEC](./docs/SPEC.md) and [remaining execution slices](./docs/prd/managed-agent-v1.md).
-
-The durable Session contract can use the existing Thread API and conversation IDs. Compatible names and fields do not need a separate API migration. Moving shared Agent machines to isolated Sessions does require a verified transition for existing Cloud workloads; see the [migration contract](./docs/SPEC.md#10-migration-and-breaking-change-notification).
-
-Cloud debug Previews have a separate target lifecycle: continue within 30 days of debugging activity, then clean up the Preview and start a new one on return. Formal and API-used Sessions retain their continuation contract. Existing Preview cleanup requires an approved inventory and backup plan; see [Thread Lifecycle](./docs/prd/session-lifecycle.md#cloud-debug-preview-retention-unreleased).
-
-The unreleased `/api/v2/projects/{projectId}/threads` entry point accepts inline harness/model configuration or an explicit saved Agent preset, with optional `userId`. Project file upload and direct creation use the same Session kernel; inline execution creates no hidden Agent. Direct hosted acceptance and coordinated release are still pending. `/api/v1` retains published/live selection and its existing identity contract. This version boundary changes configuration admission, not conversation IDs; see the [API compatibility contract](./docs/prd/public-thread-api-surface.md#unreleased-saved-agent-entry-point).
-
-## How It Works Today
+## How It Works
 
 ```text
-configure Agent + Skills + MCP + provider
-  -> preview and publish an Agent version
-  -> call it from a backend or the mosoo console
-  -> stream events, handle permission requests, inspect files and usage
-  -> continue a durable Thread across Runs
+Project API key + harness/model + instructions + input + optional files
+  -> create a durable Session (a Thread in the API) and run the first turn
+  -> follow status and events, download artifacts
+  -> optionally send follow-up input to the same Session
 ```
 
-## Features
+Model credentials belong to your Project: you bring your own provider key. On `/api/v2` the configuration is inline or a saved Agent, a reusable preset (harness, model, instructions, Skills, MCP servers, Environment); `/api/v1` takes only a published Agent and runs its live version. [docs/SPEC.md](./docs/SPEC.md) is the product contract.
 
-What works today across the Agent runtime and API:
-
-- **Agent runtime and control plane.** Configure and run OpenAI Codex, Claude Agent SDK, OpenCode, and Pi behind one normalized runtime protocol.
-- **Agent API.** Start, follow, continue, stop, archive, and delete Agent work from a trusted backend.
-- **AI agent sandboxes.** Stream responses and tool activity, handle permission requests, cancel work, and inspect diagnostics in isolated execution environments.
-- **Durable work.** Keep Threads, Runs, events, and managed files across individual executions.
-- **Agent observability.** Inspect Run status, replayable activity, diagnostics, and usage estimates; this is operational visibility, not a compliance audit trail or provider bill.
-
-## Who It Is For
-
-mosoo is for developers extending Codex, Claude Agent SDK, OpenCode, or another coding agent into products and automations who do not want to operate a separate agent runtime, Sandbox service, session store, file pipeline, and Agent API for every integration.
-
-## Product Status
-
-mosoo is in Alpha. The managed runtime and Agent API surfaces above are shipped and covered by repository tests, but production reliability and external adoption have not been proven. Public APIs and product behavior may still change.
-
-This candidate also adds [Pi through its native RPC transport](./docs/pi-runtime.md).
-Pi must be selected explicitly and uses the protocol declared for the selected
-provider/model, including Responses, Chat Completions, Anthropic Messages, and
-Google Gemini. Custom providers still default to OpenCode. See the
-[runtime compatibility contract](./docs/prd/runtime-catalog.md). Hosted availability requires the
-matched Driver, API, and Sandbox image rollout described in that guide.
+mosoo is in Alpha. Public APIs and product behavior may still change.
 
 ## Getting Started
 
-The fastest way to try mosoo is the hosted console at [cloud.mosoo.ai](https://cloud.mosoo.ai). To run it yourself, self-host from a clean clone as below.
-
-### Prerequisites
-
-- `bun >= 1.4.0-canary.1`
-- `just >= 1.51`
-- A Docker-compatible daemon for Agent runtime and Sandbox flows
-
-### Run Locally
+The fastest way to try mosoo is the hosted console at [cloud.mosoo.ai](https://cloud.mosoo.ai). To run it locally you need `bun >= 1.4.0-canary.1`, `just`, and a Docker-compatible daemon for Agent sandboxes.
 
 ```bash
 git clone --recurse-submodules https://github.com/langgenius/mosoo.git
 cd mosoo
-just setup
-just dev
+just setup   # dependencies, submodules, apps/api/.dev.vars, Git hooks, local D1
+just dev     # console on http://localhost:5173, API on http://localhost:8787
 ```
 
-`just setup` installs dependencies, initializes submodules, creates or completes `apps/api/.dev.vars`, installs Git hooks, and applies pending local D1 migrations. `just dev` reapplies pending migrations before starting the web and API development servers.
-
-Local URLs:
-
-- Web: `http://localhost:5173`
-- API: `http://localhost:8787`
-
-Minimum smoke:
-
-```bash
-curl http://localhost:5173/api/health
-curl http://localhost:8787/api/health
-```
-
-API health is `/api/health`, not `/health`. The mosoo control-plane development login uses OTP; under local loopback origins, addresses ending with `@mosoo.ai` skip that OTP and log in directly.
-
-### Troubleshooting
-
-If setup fails, start with the focused recipe: submodule issues use `git submodule update --init`, missing local secrets use `just env-init`, and D1 schema errors use `just db-migrate`. See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full workflow and verification expectations.
-
-The unreleased #582 candidate uses an independent durable workspace for every new Session. Agent creation, import and Fork no longer select Pet/Cattle; existing shared Cloud Sessions retain their bindings until verified migration. See [Session isolation](./docs/prd/agent-type.md) for continuity and the 30-day Cloud Preview policy.
-
-The final release uses one Session execution model, with direct harness invocation and optional Agent presets. Its one-time Cloud transition may make reviewed old Sessions read-only after 30 days without their own calls or file activity, preserving history and saved files even when the account remains active. Protected Sessions retain seamless continuation. Conversion, backup and rollback have a finite release procedure; they do not become a permanent migration product.
+From another terminal, `curl http://localhost:8787/api/health` returns `{"name":"mosoo","ok":true}`. [CONTRIBUTING.md](./CONTRIBUTING.md) covers local sign-in, verification, and the commit policy.
 
 ## Example: Build a Codex Agent API
 
-[Codex Pet](https://mosoo.ai/en/use-cases/codex-pet) shows a published mosoo Agent integrated into an existing product backend through the Thread API. The same API can expose Agents backed by Claude Agent SDK or OpenCode.
+[Codex Pet](https://mosoo.ai/en/use-cases/codex-pet) integrates a mosoo Agent into an existing product backend through the Thread API.
 
 https://github.com/user-attachments/assets/4a4bbaab-c192-4462-99e0-020eab966fff
 
 ## Documentation
 
-- API documentation: [mosoo.ai/docs](https://mosoo.ai/docs)
-- Canonical product contract: [docs/SPEC.md](./docs/SPEC.md)
-- Current implementation architecture: [docs/architecture.md](./docs/architecture.md)
-- Production SLO and incident policy: [docs/operations/reliability.md](./docs/operations/reliability.md)
-- PRD index and historical implementation contracts: [docs/prd/README.md](./docs/prd/README.md)
-
-The public landing page and blog live in the private `langgenius/mosoo-website` repository and are deployed separately on `mosoo.ai`.
-
-## Community & Support
-
-- Bug reports and feature requests: [GitHub Issues](https://github.com/langgenius/mosoo/issues)
-- Product updates: [mosoo.ai](https://mosoo.ai)
+- API reference: [mosoo.ai/docs](https://mosoo.ai/docs)
+- Product contract: [docs/SPEC.md](./docs/SPEC.md)
+- Architecture and invariants: [docs/architecture.md](./docs/architecture.md)
+- Product notes: [docs/prd/README.md](./docs/prd/README.md)
+- Production status: [mosoo.ai/status](https://mosoo.ai/status)
 
 ## Contributing
 
-Contributions are welcome. Read [CONTRIBUTING.md](./CONTRIBUTING.md) for the development workflow, commit policy, and verification expectations. Contributions are covered by the [Contributor License Agreement](./CLA.md); CLA Assistant will prompt you on your first pull request.
-
-## Contributors
+Report bugs and request features in [GitHub Issues](https://github.com/langgenius/mosoo/issues). Read [CONTRIBUTING.md](./CONTRIBUTING.md) before opening a pull request; CLA Assistant asks first-time contributors to sign the [Contributor License Agreement](./CLA.md).
 
 <a href="https://github.com/langgenius/mosoo/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=langgenius/mosoo" alt="mosoo contributors" />
