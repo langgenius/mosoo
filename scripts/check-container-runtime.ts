@@ -54,50 +54,35 @@ export function findLongRunningContainers(
   });
 }
 
-function readThresholdHours(raw: string | undefined): number {
-  const thresholdHours = Number(raw ?? "2");
-
-  if (!Number.isFinite(thresholdHours) || thresholdHours <= 0) {
-    throw new Error("Container runtime threshold must be a positive number of hours.");
-  }
-
-  return thresholdHours;
-}
+const LONG_RUNNING_HOURS = 2;
+const ACTIVE_CONTAINER_ALERT_COUNT = 10;
 
 if (import.meta.main) {
   const inputPath = process.argv[2];
   if (!inputPath) {
-    throw new Error(
-      "Usage: bun scripts/check-container-runtime.ts <instances.json> [hours] [active-count]",
-    );
-  }
-
-  const thresholdHours = readThresholdHours(process.argv[3]);
-  const activeContainerThreshold = Number(process.argv[4] ?? "10");
-  if (!Number.isSafeInteger(activeContainerThreshold) || activeContainerThreshold <= 0) {
-    throw new Error("Active container threshold must be a positive integer.");
+    throw new Error("Usage: bun scripts/check-container-runtime.ts <instances.json>");
   }
 
   const instances = (await Bun.file(inputPath).json()) as ContainerInstance[];
   const activeContainers = findActiveContainers(instances);
-  const longRunning = findLongRunningContainers(instances, Date.now(), thresholdHours);
+  const longRunning = findLongRunningContainers(instances, Date.now(), LONG_RUNNING_HOURS);
 
-  if (activeContainers.length < activeContainerThreshold && longRunning.length === 0) {
+  if (activeContainers.length < ACTIVE_CONTAINER_ALERT_COUNT && longRunning.length === 0) {
     console.log(
-      `${activeContainers.length} active container(s); none has run for ${thresholdHours} hours.`,
+      `${activeContainers.length} active container(s); none has run for ${LONG_RUNNING_HOURS} hours.`,
     );
     process.exit(0);
   }
 
   console.log(`# Container capacity alert\n`);
   console.log(
-    `- Active containers: ${activeContainers.length} (alert threshold: ${activeContainerThreshold})`,
+    `- Active containers: ${activeContainers.length} (alert threshold: ${ACTIVE_CONTAINER_ALERT_COUNT})`,
   );
   for (const [application, count] of countActiveContainersByApplication(instances)) {
     console.log(`  - \`${application}\`: ${count}`);
   }
   console.log(
-    `- Long-running containers: ${longRunning.length} (alert threshold: ${thresholdHours} hours)\n`,
+    `- Long-running containers: ${longRunning.length} (alert threshold: ${LONG_RUNNING_HOURS} hours)\n`,
   );
 
   if (longRunning.length > 0) {

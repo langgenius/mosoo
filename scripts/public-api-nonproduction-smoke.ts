@@ -35,39 +35,6 @@ export function assertNonProductionBaseUrl(value: string, version: "v1" | "v2" =
   return url;
 }
 
-export function assertCreateThreadContract(documentValue: unknown): void {
-  const document = requireRecord(documentValue, "OpenAPI document");
-  const components = requireRecord(document["components"], "OpenAPI components");
-  const schemas = requireRecord(components["schemas"], "OpenAPI schemas");
-  const createSchema = requireRecord(schemas["CreateThreadRequest"], "CreateThreadRequest");
-  const properties = requireRecord(createSchema["properties"], "CreateThreadRequest properties");
-  const required = createSchema["required"];
-
-  if (
-    JSON.stringify(Object.keys(properties).toSorted()) !==
-    JSON.stringify(["input", "resources", "userId"])
-  ) {
-    throw new Error("Live CreateThreadRequest allowed fields do not match the canonical contract.");
-  }
-
-  if (!Array.isArray(required) || JSON.stringify(required) !== JSON.stringify(["userId"])) {
-    throw new Error("Live CreateThreadRequest must require exactly userId.");
-  }
-
-  if (createSchema["additionalProperties"] !== false) {
-    throw new Error("Live CreateThreadRequest must reject unsupported fields.");
-  }
-
-  const paths = requireRecord(document["paths"], "OpenAPI paths");
-  const createPath = requireRecord(paths["/agents/{agentId}/threads"], "create Thread path");
-  const createOperation = requireRecord(createPath["post"], "create Thread operation");
-  const requestBody = requireRecord(createOperation["requestBody"], "create Thread request body");
-
-  if (requestBody["required"] !== true) {
-    throw new Error("Live create Thread requestBody must be required.");
-  }
-}
-
 export function createSmokeThreadBody(userId: string, inputText?: string): Record<string, unknown> {
   const body: Record<string, unknown> = { userId };
 
@@ -105,16 +72,6 @@ async function main(): Promise<void> {
   }
 
   const baseUrl = assertNonProductionBaseUrl(baseUrlValue);
-  const openApiResponse = await fetch(new URL(`${baseUrl.pathname}/openapi.json`, baseUrl), {
-    headers: { Accept: "application/json" },
-  });
-
-  if (!openApiResponse.ok) {
-    throw new Error(`Non-production OpenAPI request failed with HTTP ${openApiResponse.status}.`);
-  }
-
-  assertCreateThreadContract(await readJson(openApiResponse, "Non-production OpenAPI"));
-
   const createResponse = await fetch(
     new URL(`${baseUrl.pathname}/agents/${encodeURIComponent(agentId)}/threads`, baseUrl),
     {

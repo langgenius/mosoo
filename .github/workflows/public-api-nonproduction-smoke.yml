@@ -1,25 +1,6 @@
 name: Public API non-production smoke
 
 on:
-  workflow_call:
-    inputs:
-      base_url:
-        description: Deployed non-production Public API base URL ending in /api/v1
-        required: true
-        type: string
-      user_id:
-        description: Opaque synthetic user ID for the smoke Thread
-        required: false
-        type: string
-      input_text:
-        description: Optional synthetic input that also exercises the Agent runtime
-        required: false
-        type: string
-    secrets:
-      MOSOO_PUBLIC_API_SMOKE_AGENT_ID:
-        required: true
-      MOSOO_PUBLIC_API_SMOKE_TOKEN:
-        required: true
   workflow_dispatch:
     inputs:
       base_url:

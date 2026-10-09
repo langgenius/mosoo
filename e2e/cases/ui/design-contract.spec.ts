@@ -4,7 +4,13 @@ import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 import type { Locator, Page } from "@playwright/test";
 
-import { installConsoleFixtures } from "../../lib/console-fixtures";
+import {
+  CONSOLE_FIXTURE_IDS,
+  fulfillJson,
+  getOperationName,
+  installConsoleFixtures,
+  parseGraphQLRequestBody,
+} from "../../lib/console-fixtures";
 
 // Console design-contract acceptance (langgenius/mosoo#599, #601, #605): the
 // shell plus the settings/list surfaces that the contract's component recipes
@@ -12,7 +18,8 @@ import { installConsoleFixtures } from "../../lib/console-fixtures";
 // and doubles as the screenshot capture for design review. PNGs land in
 // .tmp/e2e/design-contract/<label>/ where the label defaults to "after";
 // `MOSOO_E2E_DESIGN_LABEL=before` captures the same views from a pre-change
-// checkout for the side-by-side evidence in docs/design/console-design-contract.md.
+// checkout for side-by-side review (captures are not committed; contract
+// section 11).
 
 const LABEL = process.env["MOSOO_E2E_DESIGN_LABEL"]?.trim() || "after";
 const SCREENSHOT_DIR = fileURLToPath(
@@ -36,8 +43,6 @@ const CONTRACT = {
   dataRowMinHeight: 40,
   rowRadius: 4,
   secondaryText: "rgba(51, 51, 51, 0.72)",
-  switchThumb: 10,
-  switchTrack: { height: 14, width: 24 },
   title: { fontSize: "24px", fontWeight: "500", letterSpacing: "-0.48px", lineHeight: "28px" },
 } as const;
 
@@ -285,23 +290,15 @@ test("Environments: 40px data rows keep multiline content on the rhythm", async 
   expect((await boxOf(singleLine)).height).toBeGreaterThanOrEqual(CONTRACT.dataRowMinHeight);
   expect((await boxOf(singleLine)).height).toBeLessThanOrEqual(CONTRACT.dataRowMinHeight + 12);
 
-  // Selected + disabled states on the same surface: the Create environment
-  // dialog exposes the switch recipe and a dropdown select.
+  // The Create environment dialog: fields and a dropdown select that opens
+  // the limited-network branch of the form.
   await page.getByRole("button", { name: "Create environment" }).first().click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
-  // The switches belong to the limited-network branch of the form.
   await dialog.getByRole("button", { exact: true, name: "Full" }).click();
   await page.getByRole("menuitem", { exact: true, name: "Limited" }).click();
   await expect(page.getByRole("menu")).toHaveCount(0);
-  const switches = dialog.getByRole("switch");
-  await expect(switches.first()).toBeVisible();
-  expect(await boxOf(switches.first())).toMatchObject(CONTRACT.switchTrack);
-  const thumb = switches.first().locator('[data-slot="switch-thumb"]');
-  expect(await boxOf(thumb)).toMatchObject({
-    height: CONTRACT.switchThumb,
-    width: CONTRACT.switchThumb,
-  });
+  await expect(dialog.getByText("Allowed hosts", { exact: true })).toBeVisible();
   await screenshot(page, "environments-create-dialog", dialog);
   await page.keyboard.press("Escape");
 });
@@ -463,6 +460,106 @@ test("Agents: list rows show the name, tools, and a plain status, no id chips", 
   await expect(page.getByText("Draft", { exact: true }).first()).toBeVisible();
   await expect(page.getByText(/^ID:/u)).toHaveCount(0);
   await expect(page.getByText(/agent\.published/u)).toHaveCount(0);
+});
+
+test("Agent header: a long name truncates inside its cluster before the tabs", async ({ page }) => {
+  // #623: the tab strip stays in the layout flow from lg and wraps to its own
+  // row below it, so a long name never runs underneath the tabs.
+  const agentId = CONSOLE_FIXTURE_IDS.agentIds[0];
+  const now = "2026-09-08T08:00:00.000Z";
+  const name =
+    "Quarterly revenue reconciliation agent for the EMEA finance operations team, " +
+    "covering subscriptions, refunds, chargebacks and partner payouts";
+  await installConsoleFixtures(page);
+  await page.route("**/api/graphql", async (route) => {
+    const body = parseGraphQLRequestBody(route.request().postData());
+    switch (getOperationName(body)) {
+      case "Agent":
+        await fulfillJson(route, {
+          agent: {
+            createdAt: now,
+            description: "Reconciles revenue.",
+            id: agentId,
+            liveVersion: null,
+            model: "gpt-5.4",
+            name,
+            owner: { id: CONSOLE_FIXTURE_IDS.accountId, imageUrl: null, name: "Ada Lovelace" },
+            projectId: CONSOLE_FIXTURE_IDS.projectId,
+            prompt: "Reconcile revenue.",
+            provider: "openai",
+            runtimeId: "openai-runtime",
+            skills: [],
+            status: "draft",
+            tools: [],
+            updatedAt: now,
+            versions: [],
+            viewerRole: "owner",
+            visibility: "private",
+          },
+        });
+        return;
+      case "AgentEditorState":
+        await fulfillJson(route, {
+          agentEditorState: {
+            builtInTools: [],
+            environment: { environmentId: null },
+            id: agentId,
+            mcpBindings: [],
+            packageResolution: null,
+            providerOptions: {},
+            readiness: { checkedAt: now, issues: [], ready: true },
+          },
+        });
+        return;
+      case "AgentCostCard":
+        await fulfillJson(route, {
+          agentCostCard: {
+            agentId,
+            agentName: name,
+            agents: [],
+            daily: [],
+            models: [],
+            ownerId: CONSOLE_FIXTURE_IDS.accountId,
+            ownerName: "Ada Lovelace",
+            recentSessions: [],
+            totals: {
+              activeUsers: 0,
+              cacheCreationTokens: 0,
+              cacheReadTokens: 0,
+              inputTokens: 0,
+              outputTokens: 0,
+              requestCount: 0,
+              totalCostUsd: 0,
+              unpricedRequestCount: 0,
+            },
+          },
+        });
+        return;
+      default:
+        await route.fallback();
+    }
+  });
+
+  for (const width of [1440, 1024, 800]) {
+    await page.setViewportSize({ height: 900, width });
+    await page.goto(`/agent/${agentId}?tab=cost`);
+    const title = page.getByTitle(name, { exact: true });
+    const tabs = page.getByRole("button", { exact: true, name: "Preview" });
+    await expect(title).toBeVisible();
+    await expect(tabs).toBeVisible();
+    // The full name stays available and the visible text is clipped.
+    expect(await title.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
+    const titleBox = await title.boundingBox();
+    const tabsBox = await tabs.boundingBox();
+    expect(titleBox).not.toBeNull();
+    expect(tabsBox).not.toBeNull();
+    if (width >= 1024) {
+      expect((titleBox?.x ?? 0) + (titleBox?.width ?? 0)).toBeLessThanOrEqual(tabsBox?.x ?? 0);
+    } else {
+      expect(tabsBox?.y ?? 0).toBeGreaterThanOrEqual((titleBox?.y ?? 0) + (titleBox?.height ?? 0));
+    }
+    await screenshot(page, `agent-header-long-${width}`, undefined, { height: 120, width });
+  }
 });
 
 test("Runs: dense rows stay on the 40px rhythm with working, done, and failed states", async ({

@@ -11,7 +11,6 @@ import type {
   PublicThreadUsageResponse,
 } from "@mosoo/contracts/public-api";
 
-import { loadRepoEnv } from "../e2e/env";
 import { parsePlatformId } from "../pkgs/id/src/index";
 import { assertNonProductionBaseUrl } from "./public-api-nonproduction-smoke";
 
@@ -281,7 +280,6 @@ export async function runSessionWorkflow(input: {
 }
 
 if (import.meta.main) {
-  loadRepoEnv();
   const agentId = process.env["MOSOO_PUBLIC_SESSION_AGENT_ID"]?.trim();
   const inlineFields = ["HARNESS", "PROVIDER", "MODEL", "INSTRUCTIONS"];
   if (

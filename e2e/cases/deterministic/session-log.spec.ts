@@ -1,8 +1,8 @@
 import { expect, test } from "@playwright/test";
 import type { Page, Route } from "@playwright/test";
 
+import { fulfillJson, getOperationName, parseGraphQLRequestBody } from "../../lib/console-fixtures";
 import { formatHarnessError } from "../../lib/env-preflight";
-import { createRuntimeSignalCollector } from "../../lib/runtime-progress";
 
 const agentId = "01J00000000000000000000001";
 const organizationId = "01J00000000000000000000002";
@@ -22,7 +22,6 @@ const liveVersion = {
   environmentId,
   id: deploymentVersionId,
   isLive: true,
-  kind: "pet",
   model: "gpt-4.1-mini",
   provider: "openai",
   runtimeId: "openai-runtime",
@@ -51,11 +50,9 @@ const sessionSummary = {
   deploymentVersionId: liveVersion.id,
   deploymentVersionNumber: liveVersion.versionNumber,
   id: sessionId,
-  kind: "pet",
   lastMessageAt: "2026-05-18T08:00:19.000Z",
   lastRun: sessionLastRun,
   model: liveVersion.model,
-  organizationId,
   provider: liveVersion.provider,
   projectId,
   runtimeId: liveVersion.runtimeId,
@@ -70,27 +67,19 @@ const owner = {
   name: "E2E Owner",
 };
 const organization = {
-  avatarUrl: null,
   createdAt: now,
   id: organizationId,
-  joinPolicy: "domain_request",
-  kind: "personal",
   name: "Harness E2E",
-  primaryDomain: null,
-  viewerRole: "owner",
 };
 const agentDetail = {
   projectId,
   createdAt: now,
   description: "Fixture-backed agent for deterministic session log coverage.",
   id: agentId,
-  kind: "pet",
   liveVersion,
   model: liveVersion.model,
   name: "Harness Contract Agent",
-  organizationId,
   owner,
-  packageSharingEnabled: false,
   prompt: "Replay harness contract posture.",
   provider: liveVersion.provider,
   runtimeId: liveVersion.runtimeId,
@@ -110,7 +99,6 @@ const agentDetail = {
   visibility: "private",
 };
 const editorState = {
-  collaborators: [],
   environment: {
     environmentId,
   },
@@ -189,130 +177,6 @@ const processEvents = [
   },
 ];
 
-interface GraphQLRequestBody {
-  operationName?: string;
-  query: string;
-  variables?: Record<string, unknown>;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
-}
-
-function parseGraphQLRequestBody(postData: string | null): GraphQLRequestBody {
-  if (postData === null) {
-    throw new Error(
-      formatHarnessError({
-        fix: "Use requestGraphQL(...) so the fixture can assert the operation and variables.",
-        what: "The deterministic E2E received an empty GraphQL request body.",
-        why: "L1 deterministic E2E must pin every API projection it depends on.",
-      }),
-    );
-  }
-
-  const parsed: unknown = JSON.parse(postData);
-
-  if (!isRecord(parsed) || typeof parsed["query"] !== "string") {
-    throw new Error(
-      formatHarnessError({
-        fix: "Send `{ query, variables }` from the Web GraphQL client or add a parser case for the new envelope.",
-        what: "The deterministic E2E received a GraphQL request envelope it cannot parse.",
-        why: "The fixture is the executable contract for the Web/API projection in this no-credential harness.",
-      }),
-    );
-  }
-
-  return {
-    ...(typeof parsed["operationName"] === "string"
-      ? { operationName: parsed["operationName"] }
-      : {}),
-    query: parsed["query"],
-    ...(isRecord(parsed["variables"]) ? { variables: parsed["variables"] } : {}),
-  };
-}
-
-function isGraphQLNameStart(value: string): boolean {
-  const code = value.charCodeAt(0);
-
-  return value === "_" || (code >= 65 && code <= 90) || (code >= 97 && code <= 122);
-}
-
-function isGraphQLNameContinue(value: string): boolean {
-  const code = value.charCodeAt(0);
-
-  return isGraphQLNameStart(value) || (code >= 48 && code <= 57);
-}
-
-function skipGraphQLIgnored(query: string, start: number): number {
-  let index = start;
-
-  while (index < query.length) {
-    const value = query[index];
-
-    if (value === " " || value === "\n" || value === "\r" || value === "\t" || value === ",") {
-      index += 1;
-      continue;
-    }
-
-    return index;
-  }
-
-  return index;
-}
-
-function readGraphQLName(query: string, start: number): { end: number; name: string } | null {
-  const first = query[start];
-
-  if (first === undefined || !isGraphQLNameStart(first)) {
-    return null;
-  }
-
-  let end = start + 1;
-
-  while (end < query.length) {
-    const value = query[end];
-
-    if (value === undefined || !isGraphQLNameContinue(value)) {
-      break;
-    }
-
-    end += 1;
-  }
-
-  return {
-    end,
-    name: query.slice(start, end),
-  };
-}
-
-function getOperationName(body: GraphQLRequestBody): string | null {
-  if (body.operationName !== undefined && body.operationName.trim().length > 0) {
-    return body.operationName;
-  }
-
-  const operation = readGraphQLName(body.query, skipGraphQLIgnored(body.query, 0));
-
-  if (operation === null || (operation.name !== "query" && operation.name !== "mutation")) {
-    return null;
-  }
-
-  const nameStart = skipGraphQLIgnored(body.query, operation.end);
-
-  if (body.query[nameStart] === "{" || body.query[nameStart] === "(") {
-    return null;
-  }
-
-  return readGraphQLName(body.query, nameStart)?.name ?? null;
-}
-
-async function fulfillJson(route: Route, data: unknown): Promise<void> {
-  await route.fulfill({
-    body: JSON.stringify({ data }),
-    contentType: "application/json",
-    status: 200,
-  });
-}
-
 async function fulfillAuthSessionFixture(route: Route): Promise<void> {
   await route.fulfill({
     body: JSON.stringify({
@@ -354,13 +218,8 @@ async function fulfillGraphQLFixture(route: Route): Promise<void> {
             id: owner.id,
             imageUrl: null,
             name: owner.name,
-            systemAgentModel: null,
           },
           activeOrganization: organization,
-          auth: {
-            currentSecurityLevel: "low",
-            methods: ["email_otp"],
-          },
           organizations: [organization],
         },
       });
@@ -384,9 +243,6 @@ async function fulfillGraphQLFixture(route: Route): Promise<void> {
       await fulfillJson(route, {
         mcpRegistry: {
           projectId,
-          currentUserEmail: viewerEmail,
-          currentUserId: ownerAccountId,
-          currentUserName: owner.name,
           servers: [],
         },
       });
@@ -406,9 +262,9 @@ async function fulfillGraphQLFixture(route: Route): Promise<void> {
       });
       return;
     }
-    case "AgentSessionProcessEvents": {
+    case "SessionProcessEvents": {
       await fulfillJson(route, {
-        sessionProcessEvents: processEvents,
+        threadSessionProcessEvents: processEvents,
       });
       return;
     }
@@ -419,7 +275,6 @@ async function fulfillGraphQLFixture(route: Route): Promise<void> {
             binding: {
               deploymentVersionId: liveVersion.id,
               deploymentVersionNumber: liveVersion.versionNumber,
-              kind: liveVersion.kind,
               model: liveVersion.model,
               provider: liveVersion.provider,
               runtimeId: liveVersion.runtimeId,
@@ -440,7 +295,6 @@ async function fulfillGraphQLFixture(route: Route): Promise<void> {
             deploymentVersionId: liveVersion.id,
             deploymentVersionNumber: liveVersion.versionNumber,
             id: sessionId,
-            kind: liveVersion.kind,
             lastRun: {
               deploymentVersionId: liveVersion.id,
               deploymentVersionNumber: liveVersion.versionNumber,
@@ -486,19 +340,8 @@ async function installDeterministicFixtures(page: Page): Promise<void> {
 
 test("Session log acceptance replay renders durable transcript and diagnostics without external credentials", async ({
   page,
-}, testInfo) => {
-  const runtimeSignals = createRuntimeSignalCollector({
-    source: "session-log-deterministic",
-  });
-
-  runtimeSignals.attachToPage(page);
+}) => {
   await installDeterministicFixtures(page);
-  await runtimeSignals.sampleResources(page, "before-session-log-navigation");
-  runtimeSignals.checkpoint("session-log.entry", {
-    route: `/agent/${agentId}?tab=logs`,
-    sessionId,
-  });
-
   await page.goto(`/agent/${agentId}?tab=logs`);
 
   const logs = page.getByTestId("agent-diagnostics-logs");
@@ -507,14 +350,8 @@ test("Session log acceptance replay renders durable transcript and diagnostics w
   await expect(logs).toContainText("Harness contract acceptance replay");
   await expect(logs).toContainText("Sessions");
   await expect(logs).not.toContainText("sessionEvents.event");
-  runtimeSignals.checkpoint("session-log.list.visible", {
-    sessionId,
-  });
   await logs.getByRole("button", { name: /Harness contract acceptance replay/u }).click();
   await expect(page).toHaveURL(new RegExp(`session=${sessionId}`, "u"));
-  runtimeSignals.checkpoint("session-log.diagnostics.visible", {
-    sessionId,
-  });
   await expect(logs).toContainText("Harness contract acceptance replay");
   await expect(logs).toContainText(
     "Check whether the session log PRD has deterministic E2E coverage.",
@@ -524,39 +361,13 @@ test("Session log acceptance replay renders durable transcript and diagnostics w
   await expect(logs).toContainText("Diagnostics");
   await logs.getByRole("button", { name: "Expand diagnostics" }).click();
   await expect(logs).toContainText("Session snapshot");
-  await runtimeSignals.sampleResources(page, "after-session-log-assertions");
-  runtimeSignals.checkpoint("session-log.exit", {
-    renderedEvents: processEvents.length,
-    sessionId,
-  });
-  runtimeSignals.assertCoverage();
-  await runtimeSignals.attachArtifact(testInfo);
 });
 
-test("reported Chinese help copy and MCP dialog scrolling render in a real browser", async ({
-  page,
-}) => {
+test("reported Chinese MCP dialog scrolling renders in a real browser", async ({ page }) => {
   await installDeterministicFixtures(page);
   await page.addInitScript(() => {
     localStorage.setItem("mosoo-locale", "zh-CN");
   });
-
-  await page.goto(`/agent/${agentId}?tab=logs`);
-  await page.getByRole("button", { name: "帮助与文档" }).click();
-
-  const helpDialog = page.getByRole("dialog");
-  await expect(helpDialog).toBeVisible();
-  await expect(helpDialog).toContainText("入门指南");
-  await expect(helpDialog).toContainText("快速开始");
-  await expect(helpDialog).toContainText("身份验证与访问");
-  await expect(helpDialog).toContainText("Thread 与运行");
-  await expect(helpDialog).not.toContainText("Getting started");
-  await expect(helpDialog).not.toContainText("Authentication and access");
-  await helpDialog.getByRole("textbox", { name: "搜索帮助和文档" }).fill("归档");
-  await expect(helpDialog).toContainText("归档 Thread");
-  await expect(helpDialog).toContainText("取消归档 Thread");
-  await expect(helpDialog).not.toContainText("Archive a Thread");
-  await page.keyboard.press("Escape");
 
   await page.setViewportSize({ height: 500, width: 900 });
   await page.goto("/integrations/mcp");

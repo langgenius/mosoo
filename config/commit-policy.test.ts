@@ -6,37 +6,8 @@ import {
   parseTrailerIdentity,
   validateAuthorIdentity,
   validateCommitBodyTrailers,
-  validateCommitMessage,
   validateCommitMetadata,
-  validateCommitSubject,
 } from "./commit-policy.ts";
-
-describe("validateCommitSubject", () => {
-  test("accepts a conventional commit with scope", () => {
-    expect(validateCommitSubject("feat(web): add in-app help search")).toEqual([]);
-  });
-
-  test("rejects legacy codex prefix", () => {
-    const violations = validateCommitSubject("[codex] Add API access publish panel");
-    expect(violations.some((violation) => violation.rule === "disallowed-prefix")).toBe(true);
-  });
-
-  test("rejects missing scope", () => {
-    const violations = validateCommitSubject("chore: relicense under vanilla Apache 2.0");
-    expect(violations.some((violation) => violation.rule === "conventional-commits")).toBe(true);
-  });
-
-  test("allows standard merge commits", () => {
-    expect(validateCommitSubject("Merge branch 'main' into feature/foo")).toEqual([]);
-  });
-
-  test("rejects long subjects", () => {
-    const violations = validateCommitSubject(
-      "docs(roadmap): drop version control/subscription/system log/file browser; add exports; defer cross-session memory; schedule multi-vendor for July",
-    );
-    expect(violations.some((violation) => violation.rule === "subject-length")).toBe(true);
-  });
-});
 
 describe("parseTrailerIdentity", () => {
   test("parses name and email trailers", () => {
@@ -82,6 +53,12 @@ describe("validateAuthorIdentity", () => {
   test("accepts maintainer and external contributor identities", () => {
     expect(validateAuthorIdentity("Yevanchen", "cyefan2@gmail.com")).toEqual([]);
     expect(validateAuthorIdentity("External Contributor", "contributor@example.com")).toEqual([]);
+    expect(
+      validateAuthorIdentity(
+        "dependabot[bot]",
+        "49699333+dependabot[bot]@users.noreply.github.com",
+      ),
+    ).toEqual([]);
   });
 
   test("rejects agent author identities", () => {
@@ -107,9 +84,6 @@ describe("validateAuthorIdentity", () => {
         (v) => v.rule === "author-name",
       ),
     ).toBe(true);
-    expect(
-      validateAuthorIdentity("dependabot[bot]", "dependabot[bot]@users.noreply.github.com").length,
-    ).toBeGreaterThan(0);
   });
 });
 
@@ -128,14 +102,6 @@ describe("validateCommitBodyTrailers", () => {
         ["feat(web): add panel", "", "Co-authored-by: Ada Lovelace <ada@example.com>"].join("\n"),
       ),
     ).toEqual([]);
-  });
-});
-
-describe("validateCommitMessage", () => {
-  test("uses only the first line of the commit message", () => {
-    expect(validateCommitMessage("feat(web): add panel\n\nBody text with [codex] noise.")).toEqual(
-      [],
-    );
   });
 });
 

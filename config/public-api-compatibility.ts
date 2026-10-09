@@ -1,12 +1,3 @@
-interface OpenApiBreakingChangeApproval {
-  baselineSha256: string;
-  change: string;
-  compatibilityStartedAt: string;
-  enforcementDate: string;
-  issue: string;
-  minimumClientVersion: string;
-}
-
 const HTTP_METHODS = ["delete", "get", "head", "options", "patch", "post", "put", "trace"];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -36,7 +27,7 @@ function stableValue(value: unknown): string {
 
   if (isRecord(value)) {
     return `{${Object.keys(value)
-      .sort()
+      .toSorted()
       .map((key) => `${JSON.stringify(key)}:${stableValue(value[key])}`)
       .join(",")}}`;
   }
@@ -405,69 +396,5 @@ export function findOpenApiBreakingChanges(beforeValue: unknown, afterValue: unk
     );
   }
 
-  return [...new Set(changes)].sort();
-}
-
-function isIsoDate(value: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return false;
-  }
-
-  const date = new Date(`${value}T00:00:00.000Z`);
-  return !Number.isNaN(date.valueOf()) && date.toISOString().startsWith(value);
-}
-
-export function validateOpenApiBreakingChangeApproval(
-  value: unknown,
-  expectedBaselineSha256: string,
-): string[] {
-  if (!isRecord(value)) {
-    return ["approval must be an object"];
-  }
-
-  const approval = value as Partial<OpenApiBreakingChangeApproval>;
-  const errors: string[] = [];
-
-  if (approval.baselineSha256 !== expectedBaselineSha256) {
-    errors.push("baselineSha256 must match the normalized base OpenAPI digest");
-  }
-
-  if (typeof approval.change !== "string" || approval.change.length === 0) {
-    errors.push("change must name one exact breaking-diff finding");
-  }
-
-  if (
-    typeof approval.issue !== "string" ||
-    !/^https:\/\/github\.com\/langgenius\/mosoo\/issues\/\d+$/.test(approval.issue)
-  ) {
-    errors.push("issue must link to a langgenius/mosoo compatibility decision");
-  }
-
-  if (
-    typeof approval.minimumClientVersion !== "string" ||
-    !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(approval.minimumClientVersion)
-  ) {
-    errors.push("minimumClientVersion must be a semantic version");
-  }
-
-  if (
-    typeof approval.compatibilityStartedAt !== "string" ||
-    !isIsoDate(approval.compatibilityStartedAt)
-  ) {
-    errors.push("compatibilityStartedAt must be an ISO date");
-  }
-
-  if (typeof approval.enforcementDate !== "string" || !isIsoDate(approval.enforcementDate)) {
-    errors.push("enforcementDate must be an ISO date");
-  }
-
-  if (
-    typeof approval.compatibilityStartedAt === "string" &&
-    typeof approval.enforcementDate === "string" &&
-    approval.enforcementDate <= approval.compatibilityStartedAt
-  ) {
-    errors.push("enforcementDate must be after compatibilityStartedAt");
-  }
-
-  return errors;
+  return [...new Set(changes)].toSorted();
 }

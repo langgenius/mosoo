@@ -43,5 +43,5 @@ jobs:
         with:
           bun-version: canary
 
-      - name: Validate commit messages and authors
+      - name: Validate commit identities
         run: bun scripts/validate-commit-range.ts ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }}

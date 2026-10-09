@@ -1,12 +1,12 @@
 export type PreviewProviderId = "anthropic" | "openai";
 
-export interface HarnessErrorInput {
+interface HarnessErrorInput {
   readonly fix: string;
   readonly what: string;
   readonly why: string;
 }
 
-export interface PreviewRuntimeCredential {
+interface PreviewRuntimeCredential {
   apiKey: string;
   providerId: PreviewProviderId;
   runtimeButtonName: string;
@@ -16,7 +16,7 @@ export function formatHarnessError(input: HarnessErrorInput): string {
   return [`WHAT: ${input.what}`, `WHY: ${input.why}`, `FIX: ${input.fix}`].join("\n");
 }
 
-export function readPreviewProviderId(): PreviewProviderId {
+function readPreviewProviderId(): PreviewProviderId {
   const provider = process.env["MOSOO_E2E_PROVIDER"]?.trim() ?? "";
 
   if (provider === "" || provider === "openai") {
@@ -36,7 +36,7 @@ export function readPreviewProviderId(): PreviewProviderId {
   );
 }
 
-export function readProviderApiKey(providerId: PreviewProviderId): string {
+function readProviderApiKey(providerId: PreviewProviderId): string {
   return (
     process.env["MOSOO_E2E_PROVIDER_API_KEY"]?.trim() ||
     (providerId === "anthropic"
@@ -67,24 +67,13 @@ export function requirePreviewRuntimeCredential(): PreviewRuntimeCredential {
   };
 }
 
-export function requireProviderRuntimeEnv(label: string): void {
-  const providerId = readPreviewProviderId();
-
-  if (readProviderApiKey(providerId).length > 0) {
-    return;
-  }
-
-  const providerSpecificKey =
-    providerId === "anthropic" ? "MOSOO_E2E_ANTHROPIC_API_KEY" : "MOSOO_E2E_OPENAI_API_KEY";
-
-  throw new Error(
-    `${label} requires MOSOO_E2E_PROVIDER_API_KEY or ${providerSpecificKey} for MOSOO_E2E_PROVIDER=${providerId}.`,
-  );
-}
-
-export function requirePiRuntimeSettings(
-  env: Readonly<Record<string, string | undefined>> = process.env,
-): { apiKey: string; apiBase: string; model: string; runtimeId: "pi" } {
+export function requirePiRuntimeSettings(): {
+  apiKey: string;
+  apiBase: string;
+  model: string;
+  runtimeId: "pi";
+} {
+  const env = process.env;
   const runtimeId = env["MOSOO_E2E_RUNTIME_ID"]?.trim() || "pi";
 
   if (runtimeId !== "pi") {

@@ -248,21 +248,14 @@ async function installFilesPageFixtures(
               id: accountId,
               imageUrl: null,
               name: "Files Page E2E",
-              systemAgentModel: null,
             },
             activeOrganization: {
-              avatarUrl: null,
               createdAt: now,
               id: organizationId,
               name: "Files Page E2E Org",
             },
-            auth: {
-              currentSecurityLevel: "low",
-              methods: ["email_otp"],
-            },
             organizations: [
               {
-                avatarUrl: null,
                 createdAt: now,
                 id: organizationId,
                 name: "Files Page E2E Org",
@@ -365,12 +358,12 @@ for (const withoutPreset of [false, true]) {
     await expect(page.getByRole("row", { name: /user-brief\.txt/u })).toBeVisible();
     await expect(page.getByRole("row", { name: /runtime-report\.md/u })).toBeVisible();
 
-    await page.getByRole("button", { name: "Artifacts" }).click();
+    await page.getByRole("radio", { name: "Artifacts" }).click();
 
     await expect(page.getByRole("row", { name: /runtime-report\.md/u })).toBeVisible();
     await expect(page.getByRole("row", { name: /user-brief\.txt/u })).toHaveCount(0);
 
-    await page.getByRole("button", { name: "Attachments" }).click();
+    await page.getByRole("radio", { name: "Attachments" }).click();
 
     await expect(page.getByRole("row", { name: /user-brief\.txt/u })).toBeVisible();
     await expect(page.getByRole("row", { name: /runtime-report\.md/u })).toHaveCount(0);

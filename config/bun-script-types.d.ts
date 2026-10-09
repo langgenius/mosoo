@@ -1,12 +1,6 @@
 export interface BunFile {
-  delete(): Promise<void>;
   exists(): Promise<boolean>;
   text(): Promise<string>;
-}
-
-export interface BunHasher {
-  digest(encoding: "hex"): string;
-  update(value: string): BunHasher;
 }
 
 export interface BunServer {
@@ -14,20 +8,8 @@ export interface BunServer {
   stop(closeActiveConnections?: boolean): void;
 }
 
-export interface BunShellOutput {
-  quiet(): Promise<unknown>;
-}
-
 export interface BunSubprocess {
   readonly exited: Promise<number>;
-  readonly exitCode: number | null;
-  readonly pid: number;
-  kill(signal?: number | string): void;
-  readonly stderr: ReadableStream<Uint8Array>;
-  readonly stdin: {
-    write(value: string | Uint8Array): void;
-  };
-  readonly stdout: ReadableStream<Uint8Array>;
 }
 
 export interface BunSpawnSyncResult {
@@ -46,8 +28,6 @@ interface BunProcessOptions {
 
 export interface BunRuntime {
   readonly TOML: { parse(source: string): unknown };
-  $(strings: TemplateStringsArray, ...values: readonly unknown[]): BunShellOutput;
-  readonly CryptoHasher: new (algorithm: "sha256") => BunHasher;
   file(path: string): BunFile;
   serve(options: {
     fetch(request: Request): Promise<Response> | Response;

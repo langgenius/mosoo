@@ -1,36 +1,6 @@
 import { expect } from "@playwright/test";
 import type { Page } from "@playwright/test";
 
-import { maybeClick } from "./setup-agent";
-
-async function openEmailLoginForm(page: Page): Promise<void> {
-  await page.goto("/login");
-
-  const emailInput = page.getByPlaceholder("you@company.com");
-  const emailInputAlreadyVisible = await emailInput
-    .isVisible({
-      timeout: 2_000,
-    })
-    .catch(() => false);
-
-  if (emailInputAlreadyVisible) {
-    return;
-  }
-
-  const legacyContinueButton = page.getByRole("button", {
-    name: "Continue with email or Google",
-  });
-  const clickedLegacyContinue = await maybeClick(legacyContinueButton);
-
-  if (!clickedLegacyContinue) {
-    await page.getByRole("button", { name: "Log in" }).first().click();
-  }
-
-  await expect(emailInput).toBeVisible({
-    timeout: 15_000,
-  });
-}
-
 async function waitForApiHealth(page: Page): Promise<void> {
   await expect
     .poll(
@@ -63,42 +33,16 @@ async function waitForApiHealth(page: Page): Promise<void> {
     .toBe("ready");
 }
 
-async function completePostLoginOnboarding(page: Page): Promise<void> {
-  const agentsLink = page.getByRole("link", { name: "Agents" });
-  const agentsLinkAlreadyVisible = await agentsLink
-    .isVisible({
-      timeout: 3_000,
-    })
-    .catch(() => false);
-
-  if (agentsLinkAlreadyVisible) {
-    return;
-  }
-
-  const domainOrganizationSetup = page.getByRole("button", {
-    name: /Create .+ organization/i,
-  });
-  const createOwnOrganization = page.getByRole("button", {
-    name: /Create my own organization/i,
-  });
-  const personalSetup = page.getByRole("button", {
-    name: /Just trying it personally/i,
-  });
-
-  (await maybeClick(domainOrganizationSetup, 15_000)) ||
-    (await maybeClick(createOwnOrganization, 2_000)) ||
-    (await maybeClick(personalSetup, 2_000));
-
-  await expect(agentsLink).toBeVisible({
-    timeout: 60_000,
-  });
-}
-
 export async function loginWithMosooAiBackdoor(page: Page, smokeEmail: string): Promise<void> {
   await waitForApiHealth(page);
-  await openEmailLoginForm(page);
-  await page.getByPlaceholder("you@company.com").fill(smokeEmail);
-  await page.getByRole("button", { name: "Send code" }).click();
+  await page.goto("/login");
 
-  await completePostLoginOnboarding(page);
+  const emailInput = page.getByPlaceholder("you@company.com");
+
+  await expect(emailInput).toBeVisible();
+  await emailInput.fill(smokeEmail);
+  await page.getByRole("button", { name: "Send code" }).click();
+  await expect(page.getByRole("link", { name: "Agents" })).toBeVisible({
+    timeout: 60_000,
+  });
 }

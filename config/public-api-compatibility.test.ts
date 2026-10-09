@@ -1,9 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import {
-  findOpenApiBreakingChanges,
-  validateOpenApiBreakingChangeApproval,
-} from "./public-api-compatibility";
+import { findOpenApiBreakingChanges } from "./public-api-compatibility";
 
 function document(input: {
   requestBodyRequired?: boolean;
@@ -53,12 +50,6 @@ function document(input: {
 }
 
 describe("public API compatibility", () => {
-  test("keeps the production check supplied with main history", async () => {
-    const workflow = await Bun.file(".github/workflows/deploy-try.yml").text();
-
-    expect(workflow).toMatch(/actions\/checkout@[^\n]*\n\s+with:\n\s+fetch-depth: 0\n/);
-  });
-
   test("reports request tightening, field removal, enum narrowing, and response removal", () => {
     const before = document({});
     const after = document({
@@ -114,23 +105,5 @@ describe("public API compatibility", () => {
         `components.schemas.CreateThreadRequest.properties.userId.${keyword} was added`,
       );
     }
-  });
-
-  test("requires staged approvals to bind to the base digest and rollout facts", () => {
-    const baselineSha256 = "a".repeat(64);
-
-    expect(
-      validateOpenApiBreakingChangeApproval(
-        {
-          baselineSha256,
-          change: "components.schemas.CreateThreadRequest.required added userId",
-          compatibilityStartedAt: "2026-08-01",
-          enforcementDate: "2026-09-01",
-          issue: "https://github.com/langgenius/mosoo/issues/532",
-          minimumClientVersion: "0.2.0",
-        },
-        baselineSha256,
-      ),
-    ).toEqual([]);
   });
 });
