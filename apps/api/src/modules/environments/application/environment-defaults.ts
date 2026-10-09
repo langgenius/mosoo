@@ -25,8 +25,6 @@ async function createBuiltInEnvironment(
   await createEnvironmentFromConfig(bindings, {
     actorId: input.actorId,
     config: {
-      allowMcpServers: true,
-      allowPackageManagers: true,
       allowedHosts: [],
       envVars: [],
       networkPolicy: "full",

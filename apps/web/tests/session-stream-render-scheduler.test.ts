@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
+import { createServerCustomEvent, MOSOO_CUSTOM_EVENT } from "@mosoo/ag-ui-session";
 import type { AgUiSessionEvent } from "@mosoo/ag-ui-session";
 
 import type { SessionStreamRenderSchedulerHost } from "../src/domains/runtime/session-stream/session-stream-render-scheduler";
@@ -90,10 +91,12 @@ function textEndEvent(messageId = "message-1"): AgUiSessionEvent {
   };
 }
 
-function stateDeltaEvent(): AgUiSessionEvent {
+function toolStartEvent(): AgUiSessionEvent {
   return {
-    delta: [],
-    type: "STATE_DELTA",
+    parentMessageId: "message-1",
+    toolCallId: "tool-1",
+    toolCallName: "Shell",
+    type: "TOOL_CALL_START",
   };
 }
 
@@ -117,13 +120,12 @@ describe("session stream render scheduler", () => {
   test("paces a mid-stream batch across frames instead of one jump", () => {
     const manual = createManualHost();
     const batches: AgUiSessionEvent[][] = [];
-    const scheduler = new SessionStreamRenderScheduler((_sessionId, events) => {
+    const scheduler = new SessionStreamRenderScheduler((events) => {
       batches.push(events);
-      return true;
     }, manual.host);
     const text = "x".repeat(1000);
 
-    scheduler.enqueueMany("session-1", [textEvent(text)]);
+    scheduler.enqueueMany([textEvent(text)]);
     const frames = drainFrames(manual);
 
     // 800 graphemes/s at 16ms frames is 12-13 graphemes per frame.
@@ -135,13 +137,12 @@ describe("session stream render scheduler", () => {
   test("delivers a batch that already ends the message without pacing", () => {
     const manual = createManualHost();
     const batches: AgUiSessionEvent[][] = [];
-    const scheduler = new SessionStreamRenderScheduler((_sessionId, events) => {
+    const scheduler = new SessionStreamRenderScheduler((events) => {
       batches.push(events);
-      return true;
     }, manual.host);
     const text = "x".repeat(1000);
 
-    scheduler.enqueueMany("session-1", [textEvent(text), textEndEvent()]);
+    scheduler.enqueueMany([textEvent(text), textEndEvent()]);
     drainFrames(manual);
 
     expect(batches.length).toBe(1);
@@ -152,18 +153,17 @@ describe("session stream render scheduler", () => {
   test("flushes the paced tail as soon as the end event arrives", () => {
     const manual = createManualHost();
     const batches: AgUiSessionEvent[][] = [];
-    const scheduler = new SessionStreamRenderScheduler((_sessionId, events) => {
+    const scheduler = new SessionStreamRenderScheduler((events) => {
       batches.push(events);
-      return true;
     }, manual.host);
     const text = "x".repeat(1000);
 
-    scheduler.enqueueMany("session-1", [textEvent(text)]);
+    scheduler.enqueueMany([textEvent(text)]);
     manual.fireFrame();
     manual.fireFrame();
     expect(batches.map(batchText).join("").length).toBeLessThan(30);
 
-    scheduler.enqueueMany("session-1", [textEndEvent()]);
+    scheduler.enqueueMany([textEndEvent()]);
     manual.fireFrame();
 
     expect(batches.length).toBe(3);
@@ -174,13 +174,25 @@ describe("session stream render scheduler", () => {
   test("run terminal events dump pending text immediately", () => {
     const manual = createManualHost();
     const batches: AgUiSessionEvent[][] = [];
-    const scheduler = new SessionStreamRenderScheduler((_sessionId, events) => {
+    const scheduler = new SessionStreamRenderScheduler((events) => {
       batches.push(events);
-      return true;
     }, manual.host);
     const text = "x".repeat(1000);
 
-    scheduler.enqueueMany("session-1", [textEvent(text), { message: "boom", type: "RUN_ERROR" }]);
+    scheduler.enqueueMany([
+      textEvent(text),
+      createServerCustomEvent(MOSOO_CUSTOM_EVENT.sessionRunUpdated.name, {
+        lifecycle: "IDLE",
+        run: {
+          completedAt: null,
+          error: null,
+          id: "run-1",
+          startedAt: null,
+          status: "failed",
+          traceId: null,
+        },
+      }),
+    ]);
     drainFrames(manual);
 
     expect(batches.length).toBe(1);
@@ -190,15 +202,11 @@ describe("session stream render scheduler", () => {
   test("state snapshots from reconnect catch-up are never animated", () => {
     const manual = createManualHost();
     const batches: AgUiSessionEvent[][] = [];
-    const scheduler = new SessionStreamRenderScheduler((_sessionId, events) => {
+    const scheduler = new SessionStreamRenderScheduler((events) => {
       batches.push(events);
-      return true;
     }, manual.host);
 
-    scheduler.enqueueMany("session-1", [
-      textEvent("x".repeat(500)),
-      { snapshot: {}, type: "STATE_SNAPSHOT" },
-    ]);
+    scheduler.enqueueMany([textEvent("x".repeat(500)), { snapshot: {}, type: "STATE_SNAPSHOT" }]);
     drainFrames(manual);
 
     expect(batches.length).toBe(1);
@@ -208,13 +216,12 @@ describe("session stream render scheduler", () => {
   test("dumps the whole backlog once it outgrows the pacing window", () => {
     const manual = createManualHost();
     const batches: AgUiSessionEvent[][] = [];
-    const scheduler = new SessionStreamRenderScheduler((_sessionId, events) => {
+    const scheduler = new SessionStreamRenderScheduler((events) => {
       batches.push(events);
-      return true;
     }, manual.host);
     const text = "x".repeat(5000);
 
-    scheduler.enqueueMany("session-1", [textEvent(text)]);
+    scheduler.enqueueMany([textEvent(text)]);
     manual.fireFrame();
 
     expect(batches.length).toBe(1);
@@ -224,14 +231,13 @@ describe("session stream render scheduler", () => {
   test("splits only at grapheme cluster boundaries", () => {
     const manual = createManualHost();
     const pieces: string[] = [];
-    const scheduler = new SessionStreamRenderScheduler((_sessionId, events) => {
+    const scheduler = new SessionStreamRenderScheduler((events) => {
       pieces.push(batchText(events));
-      return true;
     }, manual.host);
     const family = "👨‍👩‍👧‍👦";
     const text = family.repeat(40);
 
-    scheduler.enqueueMany("session-1", [textEvent(text)]);
+    scheduler.enqueueMany([textEvent(text)]);
     const frames = drainFrames(manual);
 
     expect(frames).toBeGreaterThan(5);
@@ -246,12 +252,11 @@ describe("session stream render scheduler", () => {
   test("keeps a tiny tail moving through the minimum rate floor", () => {
     const manual = createManualHost();
     const batches: AgUiSessionEvent[][] = [];
-    const scheduler = new SessionStreamRenderScheduler((_sessionId, events) => {
+    const scheduler = new SessionStreamRenderScheduler((events) => {
       batches.push(events);
-      return true;
     }, manual.host);
 
-    scheduler.enqueueMany("session-1", [textEvent("abc")]);
+    scheduler.enqueueMany([textEvent("abc")]);
     manual.fireFrame();
     manual.fireFrame();
     manual.fireFrame();
@@ -269,12 +274,11 @@ describe("session stream render scheduler", () => {
     const run = (frameMs: number, frameCount: number): number => {
       const manual = createManualHost();
       let delivered = "";
-      const scheduler = new SessionStreamRenderScheduler((_sessionId, events) => {
+      const scheduler = new SessionStreamRenderScheduler((events) => {
         delivered += batchText(events);
-        return true;
       }, manual.host);
 
-      scheduler.enqueueMany("session-1", [textEvent("x".repeat(100))]);
+      scheduler.enqueueMany([textEvent("x".repeat(100))]);
 
       for (let index = 0; index < frameCount; index += 1) {
         manual.fireFrame(frameMs);
@@ -292,33 +296,31 @@ describe("session stream render scheduler", () => {
   test("non-text events pass through but never overtake paced text", () => {
     const manual = createManualHost();
     const batches: AgUiSessionEvent[][] = [];
-    const scheduler = new SessionStreamRenderScheduler((_sessionId, events) => {
+    const scheduler = new SessionStreamRenderScheduler((events) => {
       batches.push(events);
-      return true;
     }, manual.host);
     const text = "x".repeat(200);
 
-    scheduler.enqueueMany("session-1", [stateDeltaEvent(), textEvent(text), stateDeltaEvent()]);
+    scheduler.enqueueMany([toolStartEvent(), textEvent(text), toolStartEvent()]);
     drainFrames(manual);
 
-    // The leading state delta rides the first frame; the trailing one may only
+    // The leading tool start rides the first frame; the trailing one may only
     // arrive after every queued character.
-    expect(batches[0]?.[0]?.type).toBe("STATE_DELTA");
+    expect(batches[0]?.[0]?.type).toBe("TOOL_CALL_START");
     const flat = batches.flat();
-    expect(flat.at(-1)?.type).toBe("STATE_DELTA");
+    expect(flat.at(-1)?.type).toBe("TOOL_CALL_START");
     expect(batchText(flat)).toBe(text);
   });
 
   test("split chunk remainders drop the role so replays cannot reset the message", () => {
     const manual = createManualHost();
     const chunks: AgUiSessionEvent[] = [];
-    const scheduler = new SessionStreamRenderScheduler((_sessionId, events) => {
+    const scheduler = new SessionStreamRenderScheduler((events) => {
       chunks.push(...events);
-      return true;
     }, manual.host);
     const text = "x".repeat(600);
 
-    scheduler.enqueueMany("session-1", [
+    scheduler.enqueueMany([
       { delta: text, messageId: "message-1", role: "assistant", type: "TEXT_MESSAGE_CHUNK" },
     ]);
     drainFrames(manual);
@@ -336,9 +338,8 @@ describe("session stream render scheduler", () => {
   test("delivers user chunks atomically instead of pacing the server echo", () => {
     const manual = createManualHost();
     const batches: AgUiSessionEvent[][] = [];
-    const scheduler = new SessionStreamRenderScheduler((_sessionId, events) => {
+    const scheduler = new SessionStreamRenderScheduler((events) => {
       batches.push(events);
-      return true;
     }, manual.host);
     const event = {
       delta: "用户发送的内容",
@@ -347,7 +348,7 @@ describe("session stream render scheduler", () => {
       type: "TEXT_MESSAGE_CHUNK",
     } as const satisfies AgUiSessionEvent;
 
-    scheduler.enqueue("session-1", event);
+    scheduler.enqueueMany([event]);
     manual.fireFrame();
 
     expect(batches).toEqual([[event]]);
@@ -357,16 +358,15 @@ describe("session stream render scheduler", () => {
   test("delivers user start/content events atomically instead of pacing the server echo", () => {
     const manual = createManualHost();
     const batches: AgUiSessionEvent[][] = [];
-    const scheduler = new SessionStreamRenderScheduler((_sessionId, events) => {
+    const scheduler = new SessionStreamRenderScheduler((events) => {
       batches.push(events);
-      return true;
     }, manual.host);
     const events = [
       { messageId: "message-user", role: "user", type: "TEXT_MESSAGE_START" },
       textEvent("用".repeat(1000), "message-user"),
     ] as const satisfies readonly AgUiSessionEvent[];
 
-    scheduler.enqueueMany("session-1", [...events]);
+    scheduler.enqueueMany([...events]);
     manual.fireFrame();
 
     expect(batches).toEqual([[...events]]);
@@ -376,16 +376,15 @@ describe("session stream render scheduler", () => {
   test("flushNow delivers the paced remainder exactly once", () => {
     const manual = createManualHost();
     const batches: AgUiSessionEvent[][] = [];
-    const scheduler = new SessionStreamRenderScheduler((_sessionId, events) => {
+    const scheduler = new SessionStreamRenderScheduler((events) => {
       batches.push(events);
-      return true;
     }, manual.host);
     const text = "x".repeat(1000);
 
-    scheduler.enqueueMany("session-1", [textEvent(text)]);
+    scheduler.enqueueMany([textEvent(text)]);
     manual.fireFrame();
     manual.fireFrame();
-    scheduler.flushNow("session-1");
+    scheduler.flushNow();
 
     expect(batches.map(batchText).join("")).toBe(text);
     expect(drainFrames(manual)).toBe(0);
@@ -394,17 +393,16 @@ describe("session stream render scheduler", () => {
   test("does not burst after an idle gap", () => {
     const manual = createManualHost();
     const batches: AgUiSessionEvent[][] = [];
-    const scheduler = new SessionStreamRenderScheduler((_sessionId, events) => {
+    const scheduler = new SessionStreamRenderScheduler((events) => {
       batches.push(events);
-      return true;
     }, manual.host);
 
-    scheduler.enqueueMany("session-1", [textEvent("abc"), textEndEvent()]);
+    scheduler.enqueueMany([textEvent("abc"), textEndEvent()]);
     drainFrames(manual);
     expect(batches.length).toBe(1);
 
     manual.advance(60_000);
-    scheduler.enqueueMany("session-1", [textEvent("x".repeat(1000))]);
+    scheduler.enqueueMany([textEvent("x".repeat(1000))]);
     manual.fireFrame();
 
     expect(batchText(batches[1] ?? []).length).toBeLessThanOrEqual(13);
@@ -413,13 +411,12 @@ describe("session stream render scheduler", () => {
   test("drains through the timeout fallback when frames never fire", () => {
     const manual = createManualHost();
     const batches: AgUiSessionEvent[][] = [];
-    const scheduler = new SessionStreamRenderScheduler((_sessionId, events) => {
+    const scheduler = new SessionStreamRenderScheduler((events) => {
       batches.push(events);
-      return true;
     }, manual.host);
     const text = "x".repeat(200);
 
-    scheduler.enqueueMany("session-1", [textEvent(text)]);
+    scheduler.enqueueMany([textEvent(text)]);
 
     let ticks = 0;
 
@@ -438,13 +435,12 @@ describe("session stream render scheduler", () => {
   test("delivers a finished stream through the flood guard in arrival order", () => {
     const manual = createManualHost();
     const batches: AgUiSessionEvent[][] = [];
-    const scheduler = new SessionStreamRenderScheduler((_sessionId, events) => {
+    const scheduler = new SessionStreamRenderScheduler((events) => {
       batches.push(events);
-      return true;
     }, manual.host);
     const events = Array.from({ length: 600 }, (_unused, index) => textEvent(`chunk-${index}`));
 
-    scheduler.enqueueMany("session-1", [...events, textEndEvent()]);
+    scheduler.enqueueMany([...events, textEndEvent()]);
     drainFrames(manual);
 
     // 601 events exceed one frame's flood guard, never more than two frames.
@@ -452,127 +448,40 @@ describe("session stream render scheduler", () => {
     expect(batches.flat().map(eventText).join("")).toBe(events.map(eventText).join(""));
   });
 
-  test("keeps another session queued while flushing the first session", () => {
-    const manual = createManualHost();
-    const applied: { events: AgUiSessionEvent[]; sessionId: string }[] = [];
-    const scheduler = new SessionStreamRenderScheduler((sessionId, events) => {
-      applied.push({ events, sessionId });
-      return true;
-    }, manual.host);
-
-    scheduler.enqueueMany("session-1", [textEvent("a"), textEvent("b")]);
-    scheduler.enqueueMany("session-2", [textEvent("c")]);
-    scheduler.flushNow("session-1");
-    drainFrames(manual);
-
-    expect(applied.map((batch) => batch.sessionId)).toEqual(["session-1", "session-2"]);
-    expect(applied.map((batch) => batchText(batch.events))).toEqual(["ab", "c"]);
-  });
-
   test("flushes only undelivered events after a partial frame drain", () => {
     const manual = createManualHost();
-    const applied: { events: AgUiSessionEvent[]; sessionId: string }[] = [];
-    const scheduler = new SessionStreamRenderScheduler((sessionId, events) => {
-      applied.push({ events, sessionId });
-      return true;
+    const batches: AgUiSessionEvent[][] = [];
+    const scheduler = new SessionStreamRenderScheduler((events) => {
+      batches.push(events);
     }, manual.host);
-    const sessionOneEvents = Array.from({ length: 600 }, (_unused, index) =>
-      textEvent(`a-${index}`),
-    );
+    const events = Array.from({ length: 600 }, (_unused, index) => textEvent(`chunk-${index}`));
 
-    scheduler.enqueueMany("session-1", [...sessionOneEvents, textEndEvent()]);
-    scheduler.enqueueMany("session-2", [textEvent("b")]);
+    scheduler.enqueueMany([...events, textEndEvent()]);
     manual.fireFrame();
-    scheduler.flushNow("session-2");
-    drainFrames(manual);
+    scheduler.flushNow();
 
-    expect(applied.map((batch) => batch.sessionId)).toEqual([
-      "session-1",
-      "session-2",
-      "session-1",
-    ]);
-    expect(applied.map((batch) => batch.events.length)).toEqual([512, 1, 89]);
-    expect(applied.flatMap((batch) => batch.events).map(eventText)).toEqual([
-      ...sessionOneEvents.slice(0, 512).map(eventText),
-      "b",
-      ...sessionOneEvents.slice(512).map(eventText),
-      "",
-    ]);
+    expect(batches.map((batch) => batch.length)).toEqual([512, 89]);
+    expect(batches.flat().map(eventText).join("")).toBe(events.map(eventText).join(""));
+    expect(drainFrames(manual)).toBe(0);
   });
 
   test("delivers mixed event types in arrival order", () => {
     const manual = createManualHost();
     const types: string[] = [];
-    const scheduler = new SessionStreamRenderScheduler((_sessionId, events) => {
+    const scheduler = new SessionStreamRenderScheduler((events) => {
       for (const event of events) {
         types.push(event.type);
       }
-      return true;
     }, manual.host);
 
-    scheduler.enqueueMany("session-1", [
-      textEvent("a"),
-      stateDeltaEvent(),
-      textEvent("b"),
-      textEndEvent(),
-    ]);
+    scheduler.enqueueMany([textEvent("a"), toolStartEvent(), textEvent("b"), textEndEvent()]);
     drainFrames(manual);
 
     expect(types).toEqual([
       "TEXT_MESSAGE_CONTENT",
-      "STATE_DELTA",
+      "TOOL_CALL_START",
       "TEXT_MESSAGE_CONTENT",
       "TEXT_MESSAGE_END",
     ]);
-  });
-
-  test("requeues a rejected paced batch without losing content", () => {
-    const manual = createManualHost();
-    let rejectNextBatch = true;
-    const batches: AgUiSessionEvent[][] = [];
-    const scheduler = new SessionStreamRenderScheduler((_sessionId, events) => {
-      if (rejectNextBatch) {
-        rejectNextBatch = false;
-        return false;
-      }
-
-      batches.push(events);
-      return true;
-    }, manual.host);
-    const text = "x".repeat(1300);
-
-    scheduler.enqueueMany("session-1", [textEvent(text)]);
-    drainFrames(manual);
-
-    expect(rejectNextBatch).toBe(false);
-    expect(batches.map(batchText).join("")).toBe(text);
-  });
-
-  test("requeues a rejected batch after compacting consumed events", () => {
-    const manual = createManualHost();
-    const appliedDeltas: string[] = [];
-    let applyAttempts = 0;
-    const scheduler = new SessionStreamRenderScheduler((_sessionId, events) => {
-      applyAttempts += 1;
-
-      if (applyAttempts === 4) {
-        return false;
-      }
-
-      for (const event of events) {
-        if (event.type === "TEXT_MESSAGE_CONTENT") {
-          appliedDeltas.push(event.delta);
-        }
-      }
-
-      return true;
-    }, manual.host);
-    const events = Array.from({ length: 3000 }, (_unused, index) => textEvent(`chunk-${index}`));
-
-    scheduler.enqueueMany("session-1", [...events, textEndEvent()]);
-    drainFrames(manual);
-
-    expect(applyAttempts).toBe(7);
-    expect(appliedDeltas).toEqual(events.map((event) => eventText(event)));
   });
 });

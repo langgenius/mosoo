@@ -28,7 +28,7 @@ export async function getSkillDetail(
   const row = await ensureSkillAccess(database, viewer.id, projectId, skillId);
   const snapshot = await getSkillSnapshot(database, row.currentSnapshotId);
 
-  if (snapshot === null || snapshot.projectId !== projectId) {
+  if (snapshot === null) {
     throw new Error("Skill snapshot not found.");
   }
 

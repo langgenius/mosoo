@@ -1,5 +1,4 @@
 import type { SandboxNetworkConstraints } from "../../modules/runtime/domain/sandbox-network-constraints";
-import { parseSandboxNetworkConstraints } from "../../modules/runtime/domain/sandbox-network-constraints";
 import type { SandboxHttpsInterception } from "./sandbox-https-interception";
 import { configureSandboxHttpsInterception } from "./sandbox-https-interception";
 
@@ -29,98 +28,50 @@ interface SandboxNetworkStorage {
   put(key: string, value: unknown): Promise<void>;
 }
 
-/**
- * With HTTPS interception disabled (local workerd omits the ephemeral CA),
- * the allowlist can never cover HTTPS egress, so a `limited` policy would be
- * claimed but not enforced. Refuse to configure instead of running open.
- */
-function createUnenforceableLimitedNetworkPolicyError(): Error {
-  return new Error(
-    "Environment network policy 'limited' cannot be enforced here: sandbox HTTPS " +
-      "interception is disabled (local workerd omits the ephemeral CA), so the egress " +
-      "allowlist would not cover HTTPS traffic. Failing closed instead of running with " +
-      "an unenforced policy. Use a 'full' network policy for local development.",
-  );
-}
-
-export function assertEnforceableSandboxNetworkConstraints(
-  constraints: SandboxNetworkConstraints,
-  options: { containerRunning: boolean; httpsInterceptionDisabled: boolean },
-): void {
-  if (constraints.networkPolicy === "limited" && options.httpsInterceptionDisabled) {
-    throw createUnenforceableLimitedNetworkPolicyError();
-  }
-}
-
-function createWarmUnclassifiedSandboxError(): Error {
-  return new Error(
-    "Environment network policy 'limited' cannot be applied to a warm sandbox whose prior " +
-      "egress policy is unknown. Failing closed so the runtime can destroy the container; retry " +
-      "the run to start a cold, policy-bound sandbox.",
-  );
-}
-
-function createImmutableSandboxNetworkPolicyError(): Error {
-  return new Error(
-    "Sandbox network policy cannot change after the subject is admitted. Failing closed to " +
-      "prevent the subject from retaining broader egress; start a new session-scoped sandbox.",
-  );
-}
-
 function sandboxNetworkConstraintsEqual(
-  left: SandboxNetworkConstraints | null,
+  left: SandboxNetworkConstraints,
   right: SandboxNetworkConstraints,
 ): boolean {
   return (
-    left !== null &&
     left.networkPolicy === right.networkPolicy &&
     left.allowedHosts.length === right.allowedHosts.length &&
     left.allowedHosts.every((host, index) => host === right.allowedHosts[index])
   );
 }
 
-async function readStoredSandboxNetworkConstraints(
-  storage: SandboxNetworkStorage,
-): Promise<SandboxNetworkConstraints | null> {
-  const stored = await storage.get<unknown>(SANDBOX_NETWORK_CONSTRAINTS_STORAGE_KEY);
-
-  if (stored === undefined) {
-    return null;
-  }
-
-  // A corrupt record on a possibly-limited sandbox must brick the sandbox
-  // rather than fall back to open internet.
-  return parseSandboxNetworkConstraints(stored);
-}
-
 export async function configureSandboxNetworkConstraints(
   storage: SandboxNetworkStorage,
   delegate: SandboxNetworkDelegate,
-  input: unknown,
-  options: { containerRunning: boolean; httpsInterceptionDisabled: boolean },
+  constraints: SandboxNetworkConstraints,
+  options: { httpsInterceptionDisabled: boolean },
 ): Promise<void> {
-  const constraints = parseSandboxNetworkConstraints(input);
-
-  assertEnforceableSandboxNetworkConstraints(constraints, options);
-
-  const previous = await readStoredSandboxNetworkConstraints(storage);
-
-  if (previous !== null && !sandboxNetworkConstraintsEqual(previous, constraints)) {
-    throw createImmutableSandboxNetworkPolicyError();
+  // With HTTPS interception disabled (local workerd omits the ephemeral CA),
+  // the allowlist can never cover HTTPS egress, so a `limited` policy would be
+  // claimed but not enforced. Refuse to configure instead of running open.
+  if (constraints.networkPolicy === "limited" && options.httpsInterceptionDisabled) {
+    throw new Error(
+      "Environment network policy 'limited' cannot be enforced here: sandbox HTTPS " +
+        "interception is disabled (local workerd omits the ephemeral CA), so the egress " +
+        "allowlist would not cover HTTPS traffic. Failing closed instead of running with " +
+        "an unenforced policy. Use a 'full' network policy for local development.",
+    );
   }
 
-  // Before this feature deployed, a subject could already have a running
-  // unrestricted container but no Mosoo policy record. Changing the instance
-  // property cannot revoke raw TCP on that live container, so let the lifecycle
-  // failure path destroy it and require a cold retry.
-  if (previous === null && constraints.networkPolicy === "limited" && options.containerRunning) {
-    throw createWarmUnclassifiedSandboxError();
+  const previous = await storage.get<SandboxNetworkConstraints>(
+    SANDBOX_NETWORK_CONSTRAINTS_STORAGE_KEY,
+  );
+
+  if (previous !== undefined && !sandboxNetworkConstraintsEqual(previous, constraints)) {
+    throw new Error(
+      "Sandbox network policy cannot change after the subject is admitted. Failing closed to " +
+        "prevent the subject from retaining broader egress; start a new session-scoped sandbox.",
+    );
   }
 
   if (constraints.networkPolicy === "limited") {
     delegate.enableInternet = false;
 
-    if (previous === null) {
+    if (previous === undefined) {
       await storage.put(SANDBOX_NETWORK_CONSTRAINTS_STORAGE_KEY, constraints);
     }
 
@@ -138,7 +89,7 @@ export async function configureSandboxNetworkConstraints(
   configureSandboxHttpsInterception(delegate, false);
   delegate.enableInternet = true;
 
-  if (previous === null) {
+  if (previous === undefined) {
     await storage.put(SANDBOX_NETWORK_CONSTRAINTS_STORAGE_KEY, constraints);
   }
 }
@@ -151,19 +102,16 @@ export async function configureSandboxNetworkConstraints(
 export async function restoreSandboxNetworkEnforcement(
   storage: SandboxNetworkStorage,
   delegate: SandboxNetworkDelegate,
-  options: { httpsInterceptionDisabled: boolean },
 ): Promise<void> {
   // The persisted policy is the only authority available after a DO wake.
-  // Close internet before reading it so storage or validation failures cannot
-  // leave a possibly-limited sandbox on the SDK's open default.
+  // Close internet before reading it so a storage failure cannot leave a
+  // possibly-limited sandbox on the SDK's open default.
   delegate.enableInternet = false;
-  const stored = await readStoredSandboxNetworkConstraints(storage);
+  const stored = await storage.get<SandboxNetworkConstraints>(
+    SANDBOX_NETWORK_CONSTRAINTS_STORAGE_KEY,
+  );
 
   if (stored?.networkPolicy === "limited") {
-    assertEnforceableSandboxNetworkConstraints(stored, {
-      containerRunning: false,
-      httpsInterceptionDisabled: options.httpsInterceptionDisabled,
-    });
     configureSandboxHttpsInterception(delegate, true);
     return;
   }

@@ -8,25 +8,24 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/shared/ui/dialog";
+import { ProjectIdBadge } from "@/shared/ui/project-id-badge";
 import { Separator } from "@/shared/ui/separator";
 
 import type { Agent } from "../agent.types";
-import { AgentSettingsSummary } from "./settings-dialog-agent-summary";
 import { AgentSettingsDangerZone } from "./settings-dialog-danger-zone";
 import { AgentSettingsPackageActions } from "./settings-dialog-package-actions";
 
 export function SettingsSheet({
   agent,
-  canManageAccess = true,
   open,
   onOpenChange,
 }: {
   agent: Agent;
-  canManageAccess?: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }): ReactElement {
   const { t } = useTranslation();
+  const published = agent.status === "published";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -34,22 +33,24 @@ export function SettingsSheet({
         <DialogHeader className="px-6 pt-6 pb-0">
           <DialogTitle>{t("agent.settings")}</DialogTitle>
           <DialogDescription>
-            {canManageAccess
-              ? t("agent.manageSettingsFor", { name: agent.name })
-              : t("agent.viewSettingsFor", { name: agent.name })}
+            {t("agent.manageSettingsFor", { name: agent.name })}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 px-6 pt-5 pb-4">
-          <AgentSettingsSummary agent={agent} />
-          <AgentSettingsPackageActions
-            agent={agent}
-            canManageAccess={canManageAccess}
-            onSettingsOpenChange={onOpenChange}
-          />
+          {published ? (
+            <ProjectIdBadge
+              className="w-fit"
+              copiedLabel={t("agent.agentIdCopied")}
+              copyLabel={t("agent.copyAgentId")}
+              label={t("agent.idPrefix")}
+              value={agent.id}
+            />
+          ) : null}
+          <AgentSettingsPackageActions agent={agent} onSettingsOpenChange={onOpenChange} />
         </div>
 
-        {canManageAccess ? (
+        {published ? (
           <>
             <Separator />
             <AgentSettingsDangerZone agent={agent} />

@@ -1,5 +1,3 @@
-import type { PtyOptions } from "@cloudflare/sandbox";
-
 import type { SandboxNetworkConstraints } from "../domain/sandbox-network-constraints";
 import type { RuntimeSandboxBucketMountOptions } from "./runtime-sandbox-bucket-mount";
 
@@ -26,14 +24,6 @@ export interface RuntimeProcessHandle {
   kill(): Promise<void>;
   pid: number;
   waitForExit(): Promise<RuntimeProcessExitHandle>;
-  waitForPort(
-    port: number,
-    options?: {
-      interval?: number;
-      mode?: "http" | "tcp";
-      timeout?: number;
-    },
-  ): Promise<void>;
 }
 
 export interface ExecutionSessionHandle {
@@ -52,14 +42,6 @@ export interface ExecutionSessionHandle {
       processId?: string;
     },
   ): Promise<RuntimeProcessHandle>;
-  watch(
-    path: string,
-    options?: {
-      exclude?: string[];
-      include?: string[];
-      recursive?: boolean;
-    },
-  ): Promise<ReadableStream<Uint8Array>>;
   writeFile(
     path: string,
     content: string,
@@ -96,43 +78,5 @@ export interface SandboxHandle extends ExecutionSessionHandle {
     localBucket?: boolean;
   }): Promise<{ dir: string; id: string }>;
   setKeepAlive(keepAlive: boolean): Promise<void>;
-  terminal(request: Request, options?: PtyOptions): Promise<Response>;
   unmountBucket(mountPath: string): Promise<void>;
-  wsConnect(request: Request, port: number): Promise<Response>;
-}
-
-const SANDBOX_HANDLE_METHODS = [
-  "configureNetworkConstraints",
-  "createBackup",
-  "createSession",
-  "deleteSession",
-  "destroy",
-  "ensureContainerReady",
-  "exec",
-  "getSession",
-  "mkdir",
-  "mountBucket",
-  "readFile",
-  "restoreBackup",
-  "setKeepAlive",
-  "startProcess",
-  "terminal",
-  "unmountBucket",
-  "watch",
-  "writeFile",
-  "wsConnect",
-] as const satisfies readonly (keyof SandboxHandle)[];
-
-export function toSandboxHandle(value: unknown): SandboxHandle {
-  if (typeof value !== "object" || value === null) {
-    throw new Error("Cloudflare Sandbox handle is not an object.");
-  }
-
-  for (const method of SANDBOX_HANDLE_METHODS) {
-    if (typeof Reflect.get(value, method) !== "function") {
-      throw new TypeError(`Cloudflare Sandbox handle is missing ${method}.`);
-    }
-  }
-
-  return value as SandboxHandle;
 }

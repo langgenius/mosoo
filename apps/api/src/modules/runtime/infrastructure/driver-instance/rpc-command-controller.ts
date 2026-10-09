@@ -1,48 +1,19 @@
-import type {
-  DriverCommandUpdateInput,
-  DriverExternalToolEffectClaimInput,
-  DriverExternalToolEffectClaimOutput,
-  DriverExternalToolEffectCompleteInput,
-  DriverExternalToolEffectUnknownInput,
-  DriverNextCommandInput,
-  DriverNextCommandOutput,
-} from "@mosoo/agent-driver/orpc";
-import { McpExecuteCommandResult, RuntimeCommandResult } from "@mosoo/contracts/runtime-command";
+import type { DriverCommandUpdateInput } from "@mosoo/agent-driver/orpc";
 import type { RuntimeCommand } from "@mosoo/contracts/runtime-command";
-import { parseSchemaValue } from "@mosoo/contracts/validation";
 import { parsePlatformId } from "@mosoo/id";
 import type { DriverCommandId } from "@mosoo/id";
 
 import { createErrorLogContext, logError } from "../../../../platform/cloudflare/logger";
 import {
-  claimExternalToolEffect,
-  completeExternalToolEffect,
-  markExternalToolEffectUnknown,
-} from "../session-runs/external-tool-effect-store.repository";
-import {
-  claimNextQueuedRuntimeCommandRecord,
+  claimNextQueuedRuntimeCommand,
   createRuntimeCommandRecord,
-  getRuntimeCommandRecord,
-  markRuntimeCommandRecordDelivered,
+  getRuntimeCommandKind,
   updateRuntimeCommandRecord,
 } from "../session-runs/runtime-command-store.repository";
-import {
-  COMMAND_LEASE_MS,
-  enqueueRuntimeCommand,
-  nextRuntimeCommand,
-  removeRuntimeCommandFromQueue,
-  watchRuntimeCommands,
-} from "./commands";
-import { currentTimestampPlus } from "./driver-instance-support";
+import { COMMAND_LEASE_MS } from "./connections";
 import type { DriverInstanceRpcOperationContext } from "./rpc";
 import type { DriverInstanceRpcControllerDependencies } from "./rpc-controller-dependencies";
 import { releaseLinkedTerminalDriverInstanceSessionRun } from "./terminal-run-release";
-
-function toStoredRuntimeCommandResult(
-  result: DriverCommandUpdateInput["result"],
-): RuntimeCommandResult {
-  return parseSchemaValue(RuntimeCommandResult, result);
-}
 
 export class DriverInstanceRpcCommandController {
   readonly #dependencies: DriverInstanceRpcControllerDependencies;
@@ -54,15 +25,14 @@ export class DriverInstanceRpcCommandController {
   async enqueueCommand(command: RuntimeCommand): Promise<void> {
     const { env, state } = this.#dependencies;
 
+    if (state.terminalized) {
+      throw new Error(`Driver instance ${state.requireDriverInstanceId()} is already closed.`);
+    }
+
     await createRuntimeCommandRecord(env.DB, {
       command,
       driverInstanceId: state.requireDriverInstanceId(),
-      expiresAt: currentTimestampPlus(COMMAND_LEASE_MS),
-    });
-    await enqueueRuntimeCommand(state.commandState(), command, {
-      onClosed: () =>
-        new Error(`Driver instance ${state.requireDriverInstanceId()} is already closed.`),
-      persistCommandQueue: async () => state.persistCommandQueue(),
+      expiresAt: Date.now() + COMMAND_LEASE_MS,
     });
   }
 
@@ -71,24 +41,17 @@ export class DriverInstanceRpcCommandController {
     context: DriverInstanceRpcOperationContext,
   ): Promise<{ ok: true }> {
     const { env, state } = this.#dependencies;
-
-    if (input.driverInstanceId !== state.requireDriverInstanceId()) {
-      throw new Error("Driver instance id mismatch.");
-    }
     const driverInstanceId = state.requireDriverInstanceId();
     context.assertActiveConnection();
 
     const commandId = parsePlatformId<DriverCommandId>(input.commandId, "driver command id");
-    const command = await getRuntimeCommandRecord(env.DB, driverInstanceId, commandId);
+    const commandKind = await getRuntimeCommandKind(env.DB, driverInstanceId, commandId);
     context.assertActiveConnection();
 
     const updateOutcome = await updateRuntimeCommandRecord(env.DB, {
       commandId,
-      deliveryConnectionId: context.connectionId,
       driverInstanceId,
-      ...(input.error === undefined ? {} : { error: input.error }),
       status: input.status,
-      ...(input.result === undefined ? {} : { result: toStoredRuntimeCommandResult(input.result) }),
     });
     context.assertActiveConnection();
 
@@ -97,7 +60,7 @@ export class DriverInstanceRpcCommandController {
     }
 
     if (
-      command?.payload.kind === "input.start" &&
+      commandKind === "input.start" &&
       (input.status === "completed" ||
         input.status === "failed" ||
         input.status === "cancelled" ||
@@ -119,130 +82,27 @@ export class DriverInstanceRpcCommandController {
     return { ok: true };
   }
 
-  async handleClaimExternalToolEffect(
-    input: DriverExternalToolEffectClaimInput,
-    context: DriverInstanceRpcOperationContext,
-  ): Promise<DriverExternalToolEffectClaimOutput> {
-    const { env, state } = this.#dependencies;
-
-    if (input.driverInstanceId !== state.requireDriverInstanceId()) {
-      throw new Error("Driver instance id mismatch.");
-    }
-    context.assertActiveConnection();
-
-    return claimExternalToolEffect(env.DB, {
-      commandId: parsePlatformId<DriverCommandId>(input.commandId, "driver command id"),
-      driverInstanceId: state.requireDriverInstanceId(),
-    });
-  }
-
-  async handleCompleteExternalToolEffect(
-    input: DriverExternalToolEffectCompleteInput,
-    context: DriverInstanceRpcOperationContext,
-  ): Promise<{ ok: true }> {
-    const { env, state } = this.#dependencies;
-
-    if (input.driverInstanceId !== state.requireDriverInstanceId()) {
-      throw new Error("Driver instance id mismatch.");
-    }
-    context.assertActiveConnection();
-    await completeExternalToolEffect(env.DB, {
-      commandId: parsePlatformId<DriverCommandId>(input.commandId, "driver command id"),
-      driverInstanceId: state.requireDriverInstanceId(),
-      ...(input.providerReceiptJson === undefined
-        ? {}
-        : { providerReceiptJson: input.providerReceiptJson }),
-      result: parseSchemaValue(McpExecuteCommandResult, input.result),
-    });
-    context.assertActiveConnection();
-    return { ok: true };
-  }
-
-  async handleMarkExternalToolEffectUnknown(
-    input: DriverExternalToolEffectUnknownInput,
-    context: DriverInstanceRpcOperationContext,
-  ): Promise<{ ok: true }> {
-    const { env, state } = this.#dependencies;
-
-    if (input.driverInstanceId !== state.requireDriverInstanceId()) {
-      throw new Error("Driver instance id mismatch.");
-    }
-    context.assertActiveConnection();
-    await markExternalToolEffectUnknown(env.DB, {
-      commandId: parsePlatformId<DriverCommandId>(input.commandId, "driver command id"),
-      driverInstanceId: state.requireDriverInstanceId(),
-    });
-    context.assertActiveConnection();
-    return { ok: true };
-  }
-
   async handleNextCommand(
-    input: DriverNextCommandInput,
     context: DriverInstanceRpcOperationContext,
-  ): Promise<DriverNextCommandOutput> {
+  ): Promise<{ command: RuntimeCommand | null }> {
     const { env, state } = this.#dependencies;
 
-    if (input.driverInstanceId !== state.requireDriverInstanceId()) {
-      throw new Error("Driver instance id mismatch.");
-    }
-    const driverInstanceId = state.requireDriverInstanceId();
-
-    if (state.commandState().terminalized) {
+    if (state.terminalized) {
       return { command: null };
     }
     context.assertActiveConnection();
 
-    const record = await claimNextQueuedRuntimeCommandRecord(
+    const command = await claimNextQueuedRuntimeCommand(
       env.DB,
-      driverInstanceId,
+      state.requireDriverInstanceId(),
       context.connectionId,
     );
 
-    if (record === null) {
+    if (command === null) {
       return { command: null };
     }
     context.assertActiveConnection();
 
-    await removeRuntimeCommandFromQueue(state.commandState(), record.id, {
-      persistCommandQueue: async () => state.persistCommandQueue(),
-    });
-
-    return { command: record.payload };
-  }
-
-  async *watchCommands(context: DriverInstanceRpcOperationContext): AsyncIterable<RuntimeCommand> {
-    const { state } = this.#dependencies;
-
-    context.assertActiveConnection();
-    yield* watchRuntimeCommands(state.commandState(), async () => this.#nextCommand(context));
-  }
-
-  async #markCommandDelivered(
-    command: RuntimeCommand,
-    context: DriverInstanceRpcOperationContext,
-  ): Promise<boolean> {
-    const { env, state } = this.#dependencies;
-
-    context.assertActiveConnection();
-    const commandId = parsePlatformId<DriverCommandId>(command.commandId, "runtime command id");
-    const deliveryOutcome = await markRuntimeCommandRecordDelivered(env.DB, {
-      commandId,
-      connectionId: context.connectionId,
-      driverInstanceId: state.requireDriverInstanceId(),
-    });
-    context.assertActiveConnection();
-
-    return deliveryOutcome.kind === "applied";
-  }
-
-  async #nextCommand(context: DriverInstanceRpcOperationContext): Promise<RuntimeCommand | null> {
-    const { state } = this.#dependencies;
-
-    return nextRuntimeCommand(state.commandState(), {
-      assertActiveConnection: () => context.assertActiveConnection(),
-      connectionId: context.connectionId,
-      markCommandDelivered: async (command) => this.#markCommandDelivered(command, context),
-      persistCommandQueue: async () => state.persistCommandQueue(),
-    });
+    return { command };
   }
 }

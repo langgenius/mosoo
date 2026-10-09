@@ -887,7 +887,7 @@
     }
   },
   "info": {
-    "description": "Public HTTPS API for creating and retrieving Threads on mosoo Agent API Endpoints. v1 resource identifiers are bare ULIDs, not prefixed IDs. Access Tokens identify the account caller. Runtime execution resolves the Agent API Endpoint owner's capabilities while the Thread is attributed to the token owner.",
+    "description": "Public HTTPS API for creating and retrieving Threads on mosoo Agent API Endpoints. v1 resource identifiers are bare ULIDs, not prefixed IDs. Access Tokens identify the account caller.",
     "title": "mosoo Public Thread API",
     "version": "v1"
   },
@@ -1362,21 +1362,6 @@
                       "type": "user.message"
                     },
                     "userId": "customer-123"
-                  }
-                },
-                "cattleAgentSameShape": {
-                  "summary": "Cattle Agent using the same request shape",
-                  "value": {
-                    "input": {
-                      "content": [
-                        {
-                          "text": "Run this one-off Public Thread API request.",
-                          "type": "text"
-                        }
-                      ],
-                      "type": "user.message"
-                    },
-                    "userId": "automation"
                   }
                 }
               },

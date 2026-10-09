@@ -1,54 +1,34 @@
-import { sessionsTable } from "@mosoo/db";
-import type { SandboxId, SessionId, SessionRunId } from "@mosoo/id";
-import { and, asc, eq, inArray, isNull, lte } from "drizzle-orm";
+import type { SandboxId, SessionId } from "@mosoo/id";
 
 import { createErrorLogContext, logError, logWarn } from "../../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
-import { getAppDatabase } from "../../../../platform/db/drizzle";
-import { isTruthy } from "../../../../shared/truthiness";
-import { toIsoString } from "../../../../time";
 import {
   cleanupExpiredPreviewSessions,
   repairStaleSessionDeleteCleanups,
 } from "../../../sessions/application/session-cleanup.service";
-import { appendSessionRuntimeEvents } from "../../../sessions/application/session-event-write.service";
-import { syncSessionViewerState } from "../../../sessions/application/session-viewer-events.service";
-import { RESCHEDULING_RECONNECT_WINDOW_MS } from "../../../sessions/domain/session-lifecycle";
+import { syncSessionViewerState } from "../../../sessions/infrastructure/session/client";
 import { stopOverdueSessionRuns } from "../../application/session-runs/session-run-time-limit.service";
-import { createSessionLifecycleTerminatedEvent } from "../../application/session-runs/session-run-view-events.service";
 import { reconcileStaleActiveSessionRuns } from "../../application/session-runs/stale-run-reconciliation.service";
 import { reconcileTerminalSessionRuns } from "../../application/session-runs/terminal-run-reconciliation.service";
 import { SESSION_RUNTIME_IDLE_GRACE_MS } from "../../domain/session-runtime-policy";
 import { cleanupDriverInstances } from "../driver-instance/maintenance";
-import { createSandboxCheckpoints } from "../sandbox-backup.service";
-import { repairRuntimeCommandRecords } from "../session-runs/runtime-command-store.repository";
-import { createSessionStatusTransitionPatch } from "../session-runs/session-lifecycle-projection.repository";
-import { setSessionRunStatus } from "../session-runs/session-run-store.repository";
-import type { SessionRunTransitionOutcome } from "../session-runs/session-run-store.repository";
-import {
-  listPendingIdleConversationCheckpoints,
-  listIdleSessionScopedConversationSessions,
-} from "./runtime-conversation-session-store";
-import { repairStrandedRuntimeSubjectDeadlines } from "./runtime-subject-maintenance-store";
+import { listIdleSessionScopedConversationSessions } from "./runtime-conversation-session-store";
 import {
   claimInactiveRuntimeSubject,
-  claimExpiredRuntimeSubjectActivations,
   listInactiveRuntimeSubjects,
   listStaleRuntimeSubjectOperations,
-} from "./runtime-subject-store";
+  repairStrandedRuntimeSubjectDeadlines,
+} from "./runtime-subject-maintenance-store";
+import { claimExpiredRuntimeSubjectActivations } from "./runtime-subject-record-store";
 import type {
   RuntimeSubjectMaintenanceCandidate,
   RuntimeSubjectOperationRepairCandidate,
-} from "./runtime-subject-store";
+} from "./runtime-subject-store.types";
 
 const MAINTENANCE_CLAIM_TTL_MS = 10 * 60_000;
 const MAINTENANCE_BATCH_SIZE = 20;
-// Checkpoints are the slow step. The budget keeps one sweep well inside the
-// 15-minute Queue consumer limit; unstarted candidates wait for the next minute.
-const MAINTENANCE_CHECKPOINT_REPAIR_BUDGET_MS = 5 * 60_000;
 const MAINTENANCE_OPERATION_REPAIR_AFTER_MS = 10 * 60_000;
-const RESCHEDULING_TIMEOUT_DB_BATCH_SIZE = 50;
-const RESCHEDULING_TIMEOUT_IO_BATCH_SIZE = 10;
+const VIEWER_SYNC_BATCH_SIZE = 10;
 type RecycleRuntimeSubject = (
   bindings: ApiBindings,
   input: {
@@ -67,39 +47,6 @@ type ResumeRuntimeSubjectRecycleOperation = (
     readonly status: RuntimeSubjectOperationRepairCandidate["status"];
   },
 ) => Promise<boolean>;
-
-interface StaleReschedulingSessionRow {
-  id: SessionId;
-  last_run_id: SessionRunId | null;
-}
-
-const RESCHEDULING_TIMEOUT_ERROR = {
-  code: "session.rescheduling_timeout",
-  details: {},
-  message: "Session could not reconnect within 120 seconds.",
-  retryable: false,
-} as const;
-
-function assertMaintenanceRunTransition(outcome: SessionRunTransitionOutcome): void {
-  switch (outcome.kind) {
-    case "applied":
-    case "duplicate": {
-      return;
-    }
-    case "stale": {
-      if (outcome.reason === "terminal_run") {
-        return;
-      }
-      throw new Error("Rescheduling timeout lost a concurrent run transition.");
-    }
-    case "repair_needed": {
-      throw new Error("Rescheduling timeout left session projection stale.");
-    }
-    case "rejected": {
-      throw new Error(`Rescheduling timeout run transition was rejected: ${outcome.reason}.`);
-    }
-  }
-}
 
 async function processInBatches<T>(
   items: readonly T[],
@@ -172,92 +119,6 @@ async function repairRuntimeSubjectOperationCandidate(
   }
 }
 
-async function publishReschedulingTimeoutEvent(
-  bindings: ApiBindings,
-  target: StaleReschedulingSessionRow,
-): Promise<void> {
-  const stoppedAt = Date.now();
-  const event = createSessionLifecycleTerminatedEvent({
-    lastSeen: toIsoString(stoppedAt),
-    message: RESCHEDULING_TIMEOUT_ERROR.message,
-    reason: RESCHEDULING_TIMEOUT_ERROR.code,
-    sessionId: target.id,
-  });
-
-  await appendSessionRuntimeEvents({
-    bindings,
-    events: [event],
-    sessionId: target.id,
-  });
-}
-
-export async function expireStaleReschedulingSessions(bindings: ApiBindings): Promise<void> {
-  const now = Date.now();
-  const staleSessions = await getAppDatabase(bindings.DB)
-    .select({
-      id: sessionsTable.id,
-    })
-    .from(sessionsTable)
-    .where(
-      and(
-        eq(sessionsTable.status, "RESCHEDULING"),
-        isNull(sessionsTable.statusOperationId),
-        lte(sessionsTable.updatedAt, now - RESCHEDULING_RECONNECT_WINDOW_MS),
-      ),
-    )
-    .orderBy(asc(sessionsTable.updatedAt), asc(sessionsTable.id))
-    .limit(RESCHEDULING_TIMEOUT_DB_BATCH_SIZE)
-    .all();
-
-  if (staleSessions.length === 0) {
-    return;
-  }
-
-  const results = await getAppDatabase(bindings.DB)
-    .update(sessionsTable)
-    .set(
-      createSessionStatusTransitionPatch({
-        status: "TERMINATED",
-        timestampMs: now,
-      }),
-    )
-    .where(
-      and(
-        inArray(
-          sessionsTable.id,
-          staleSessions.map((session) => session.id),
-        ),
-        eq(sessionsTable.status, "RESCHEDULING"),
-        isNull(sessionsTable.statusOperationId),
-        lte(sessionsTable.updatedAt, now - RESCHEDULING_RECONNECT_WINDOW_MS),
-      ),
-    )
-    .returning({
-      id: sessionsTable.id,
-      last_run_id: sessionsTable.lastRunId,
-    })
-    .all();
-
-  await processInBatches(
-    results.map((target) => target.last_run_id).filter(isTruthy),
-    RESCHEDULING_TIMEOUT_IO_BATCH_SIZE,
-    async (runId) => {
-      const outcome = await setSessionRunStatus(bindings.DB, {
-        error: RESCHEDULING_TIMEOUT_ERROR,
-        preserveSessionLifecycle: true,
-        runId,
-        source: "maintenance",
-        status: "failed",
-      });
-      assertMaintenanceRunTransition(outcome);
-    },
-  );
-
-  await processInBatches(results, RESCHEDULING_TIMEOUT_IO_BATCH_SIZE, async (target) =>
-    publishReschedulingTimeoutEvent(bindings, target),
-  );
-}
-
 // Session conversations no longer close on run terminal (the resident driver is
 // what makes follow-up turns warm), so this sweep is what ends them: close the
 // ones quiet past the Session idle grace, which arms the subject inactive
@@ -271,7 +132,8 @@ async function closeIdleSessionScopedConversationSessions(
     idleSinceLte,
     limit: MAINTENANCE_BATCH_SIZE,
   });
-  const { closeIdleConversationSession } = await import("../sandbox-session.service");
+  const { closeIdleConversationSession } =
+    await import("../sandbox-session/sandbox-conversation-session.service");
 
   for (const conversation of idle) {
     try {
@@ -288,36 +150,6 @@ async function closeIdleSessionScopedConversationSessions(
         ...createErrorLogContext(error),
         runtimeSubjectId: conversation.sandboxId,
         sessionId: conversation.sessionId,
-      });
-    }
-  }
-}
-
-export async function repairIdleConversationCheckpoints(
-  bindings: ApiBindings,
-  now: number,
-  deadlineMs: number = Number.POSITIVE_INFINITY,
-): Promise<void> {
-  const pending = await listPendingIdleConversationCheckpoints(bindings.DB, {
-    idleSinceLte: now - SESSION_RUNTIME_IDLE_GRACE_MS,
-    limit: MAINTENANCE_BATCH_SIZE,
-  });
-  for (const candidate of pending) {
-    if (Date.now() >= deadlineMs) {
-      return;
-    }
-
-    try {
-      await createSandboxCheckpoints(bindings, {
-        requiredSessionId: candidate.sessionId,
-        sandboxId: candidate.sandboxId,
-        sessionRunId: candidate.sessionRunId,
-      });
-    } catch (error) {
-      // Preserve the resident workspace and retry on the next sweep.
-      logWarn("runtime.conversation.checkpoint_repair_failed", {
-        ...createErrorLogContext(error),
-        ...candidate,
       });
     }
   }
@@ -374,7 +206,7 @@ async function syncReconciledSessionViewers(
   bindings: ApiBindings,
   sessionIds: readonly SessionId[],
 ): Promise<void> {
-  await processInBatches(sessionIds, RESCHEDULING_TIMEOUT_IO_BATCH_SIZE, async (sessionId) =>
+  await processInBatches(sessionIds, VIEWER_SYNC_BATCH_SIZE, async (sessionId) =>
     syncSessionViewerState(bindings, sessionId),
   );
 }
@@ -403,9 +235,6 @@ export async function runSandboxMaintenance(bindings: ApiBindings): Promise<void
   await runMaintenanceStep("stop_overdue_runs", async () =>
     stopOverdueSessionRuns(bindings, { limit: MAINTENANCE_BATCH_SIZE, nowMs: now }),
   );
-  await runMaintenanceStep("repair_runtime_commands", async () =>
-    repairRuntimeCommandRecords(bindings.DB, { nowMs: now }),
-  );
   await runMaintenanceStep("cleanup_driver_instances", async () =>
     cleanupDriverInstances(bindings),
   );
@@ -421,9 +250,6 @@ export async function runSandboxMaintenance(bindings: ApiBindings): Promise<void
     });
     await syncReconciledSessionViewers(bindings, reconciliation.reconciledSessionIds);
   });
-  await runMaintenanceStep("expire_rescheduling_sessions", async () =>
-    expireStaleReschedulingSessions(bindings),
-  );
   await runMaintenanceStep("repair_session_delete_cleanups", async () =>
     repairStaleSessionDeleteCleanups(bindings, {
       limit: MAINTENANCE_BATCH_SIZE,
@@ -432,13 +258,6 @@ export async function runSandboxMaintenance(bindings: ApiBindings): Promise<void
   );
   await runMaintenanceStep("cleanup_expired_previews", async () =>
     cleanupExpiredPreviewSessions(bindings, { limit: MAINTENANCE_BATCH_SIZE, nowMs: now }),
-  );
-  await runMaintenanceStep("repair_idle_checkpoints", async () =>
-    repairIdleConversationCheckpoints(
-      bindings,
-      now,
-      Date.now() + MAINTENANCE_CHECKPOINT_REPAIR_BUDGET_MS,
-    ),
   );
   await runMaintenanceStep("close_idle_conversations", async () =>
     closeIdleSessionScopedConversationSessions(bindings, now),

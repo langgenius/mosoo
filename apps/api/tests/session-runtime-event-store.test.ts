@@ -10,11 +10,7 @@ import type {
 import type { DriverEventInput } from "../../driver/src/protocol/events";
 import type { RunId } from "../../driver/src/protocol/id";
 import { AcpTurnEventState } from "../../driver/src/runtimes/acp/acp-event-translator";
-import { RuntimeEventPersistenceCompactor } from "../src/modules/runtime/infrastructure/driver-instance/runtime-event-persistence-compactor";
-import {
-  persistOneRuntimeEventPerSession,
-  persistSessionRuntimeEvents,
-} from "../src/modules/sessions/infrastructure/session-runtime-event-store.repository";
+import { persistSessionRuntimeEvents } from "../src/modules/sessions/infrastructure/session-runtime-event-store.repository";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
 function runtimeEvent(input: {
@@ -57,12 +53,6 @@ function createRuntimeEventStoreDatabase(
       archived_at integer,
       status text NOT NULL,
       runtime_event_seq_cursor integer DEFAULT 0 NOT NULL
-    );
-
-    CREATE TABLE session_run (
-      created_by_key_id text,
-      id text PRIMARY KEY NOT NULL,
-      session_id text NOT NULL
     );
 
     CREATE TABLE session_event (
@@ -133,18 +123,8 @@ function createRuntimeEventStoreDatabase(
       PRIMARY KEY (session_id, request_id)
     );
 
-    CREATE TABLE session_readiness_snapshot (
-      readiness_json text NOT NULL,
-      session_id text PRIMARY KEY NOT NULL,
-      updated_at integer NOT NULL
-    );
-
     INSERT INTO session (id, agent_id, archived_at, status)
     VALUES ('session-1', '01J00000000000000000000009', NULL, 'IDLE');
-
-    INSERT INTO session_run (id, session_id) VALUES
-      ('run-1', 'session-1'),
-      ('run-2', 'session-2');
   `);
 
   return database;
@@ -607,125 +587,6 @@ describe("session runtime event store", () => {
     expect(rows.results[3]?.content_text).toContain("Inspection complete result:");
   });
 
-  test("rejects runtime event batches for a different envelope session", async () => {
-    const database = createRuntimeEventStoreDatabase();
-
-    await expect(
-      persistSessionRuntimeEvents(database, {
-        records: [
-          {
-            event: runtimeEvent({
-              id: "wrong-session-event",
-              kind: "message.delta",
-              occurredAtMs: 2_100,
-              payload: {
-                contentDelta: "wrong session",
-                messageId: "message-1",
-              },
-              sessionId: "session-2",
-            }),
-            occurredAt: 2_100,
-            sourceEventId: null,
-          },
-        ],
-        sessionId: "session-1",
-      }),
-    ).rejects.toThrow();
-  });
-
-  test("rejects runtime event batches for a run owned by another session", async () => {
-    const database = createRuntimeEventStoreDatabase();
-
-    await expect(
-      persistSessionRuntimeEvents(database, {
-        records: [
-          {
-            event: runtimeEvent({
-              id: "wrong-run-event",
-              kind: "message.delta",
-              occurredAtMs: 2_110,
-              payload: {
-                contentDelta: "wrong run",
-                messageId: "message-1",
-              },
-              runId: "run-2",
-            }),
-            occurredAt: 2_110,
-            sourceEventId: null,
-          },
-        ],
-        sessionId: "session-1",
-      }),
-    ).rejects.toThrow();
-  });
-
-  test("persists compacted stream fragments as semantic rows", async () => {
-    const database = createRuntimeEventStoreDatabase();
-    const compactor = new RuntimeEventPersistenceCompactor();
-    const fragments = [
-      runtimeEvent({
-        id: "message-start",
-        kind: "message.started",
-        occurredAtMs: 3_000,
-        payload: { messageId: "message-1", role: "agent" },
-        runId: "run-1",
-      }),
-      runtimeEvent({
-        id: "message-delta-1",
-        kind: "message.delta",
-        occurredAtMs: 3_010,
-        payload: { contentDelta: "Hello ", messageId: "message-1", role: "agent" },
-        runId: "run-1",
-      }),
-      runtimeEvent({
-        id: "message-delta-2",
-        kind: "message.delta",
-        occurredAtMs: 3_020,
-        payload: { contentDelta: "world", messageId: "message-1", role: "agent" },
-        runId: "run-1",
-      }),
-      runtimeEvent({
-        id: "message-end",
-        kind: "message.completed",
-        occurredAtMs: 3_030,
-        payload: { messageId: "message-1", role: "agent" },
-        runId: "run-1",
-      }),
-    ];
-    const compacted = compactor.compact(
-      fragments.map((event) => ({
-        event,
-        occurredAt: Date.parse(event.occurredAt),
-        sourceEventId: `source-${event.id}`,
-      })),
-    );
-
-    await persistSessionRuntimeEvents(database, {
-      records: compacted,
-      sessionId: "session-1",
-    });
-
-    const rows = await database
-      .prepare(
-        `
-          SELECT content_text, event_type, process_type
-          FROM session_event
-        `,
-      )
-      .all<{
-        content_text: string;
-        event_type: string;
-        process_type: string;
-      }>();
-
-    expect(rows.results).toHaveLength(1);
-    expect(rows.results[0]).toMatchObject({
-      content_text: "Hello world",
-      event_type: "message.added",
-      process_type: "agent.message.delta",
-    });
-  });
-
   test("updates viewer projections only for inserted runtime events", async () => {
     const database = createRuntimeEventStoreDatabase();
     const permissionEvent = runtimeEvent({
@@ -766,25 +627,6 @@ describe("session runtime event store", () => {
       ],
       sessionId: "session-1",
     });
-    await persistSessionRuntimeEvents(database, {
-      records: [
-        {
-          event: runtimeEvent({
-            id: "readiness-event",
-            kind: "session.readiness.updated",
-            occurredAtMs: 4_010,
-            payload: {
-              checkedAt: "2026-05-08T00:00:04.010Z",
-              issues: [],
-              ready: true,
-            },
-          }),
-          occurredAt: 4_010,
-          sourceEventId: "readiness-source",
-        },
-      ],
-      sessionId: "session-1",
-    });
 
     const permissionRows = await database
       .prepare(
@@ -795,10 +637,6 @@ describe("session runtime event store", () => {
         `,
       )
       .all<{ request_id: string; run_id: string; title: string }>();
-    const readiness = await database
-      .prepare("SELECT readiness_json FROM session_readiness_snapshot WHERE session_id = ?")
-      .bind("session-1")
-      .first<{ readiness_json: string }>();
 
     expect(permissionRows.results).toEqual([
       {
@@ -807,11 +645,6 @@ describe("session runtime event store", () => {
         title: "Approve command",
       },
     ]);
-    expect(readiness === null ? null : JSON.parse(readiness.readiness_json)).toEqual({
-      checkedAt: "2026-05-08T00:00:04.010Z",
-      issues: [],
-      ready: true,
-    });
 
     await persistSessionRuntimeEvents(database, {
       records: [
@@ -934,102 +767,5 @@ describe("session runtime event store", () => {
 
     expect(result.persistedCount).toBe(1);
     expect(session?.runtime_event_seq_cursor).toBe(1);
-  });
-
-  test("reports skipped sessions when one-event batches replay source ids", async () => {
-    const database = createRuntimeEventStoreDatabase();
-    const event = runtimeEvent({
-      id: "event-1",
-      kind: "agent.task.updated",
-      occurredAtMs: 4_000,
-      payload: {
-        agentId: "01J00000000000000000000009",
-        operation: "restart",
-        startedAt: new Date(4_000).toISOString(),
-        status: "running",
-      },
-    });
-
-    const firstResult = await persistOneRuntimeEventPerSession(database, {
-      records: [
-        {
-          event,
-          occurredAt: 4_000,
-          sessionId: "session-1",
-        },
-      ],
-    });
-    const replayResult = await persistOneRuntimeEventPerSession(database, {
-      records: [
-        {
-          event,
-          occurredAt: 4_000,
-          sessionId: "session-1",
-        },
-      ],
-    });
-
-    expect(firstResult).toMatchObject({
-      persistedCount: 1,
-      skippedSessionIds: [],
-    });
-    expect(replayResult).toMatchObject({
-      persistedCount: 0,
-      skippedSessionIds: ["session-1"],
-    });
-  });
-
-  test("rejects one-event-per-session records for a different envelope session", async () => {
-    const database = createRuntimeEventStoreDatabase();
-
-    await expect(
-      persistOneRuntimeEventPerSession(database, {
-        records: [
-          {
-            event: runtimeEvent({
-              id: "wrong-session-event",
-              kind: "agent.task.updated",
-              occurredAtMs: 4_100,
-              payload: {
-                agentId: "01J00000000000000000000009",
-                operation: "restart",
-                startedAt: new Date(4_100).toISOString(),
-                status: "running",
-              },
-              sessionId: "session-2",
-            }),
-            occurredAt: 4_100,
-            sessionId: "session-1",
-          },
-        ],
-      }),
-    ).rejects.toThrow();
-  });
-
-  test("rejects one-event-per-session records for a run owned by another session", async () => {
-    const database = createRuntimeEventStoreDatabase();
-
-    await expect(
-      persistOneRuntimeEventPerSession(database, {
-        records: [
-          {
-            event: runtimeEvent({
-              id: "wrong-run-event",
-              kind: "agent.task.updated",
-              occurredAtMs: 4_110,
-              payload: {
-                agentId: "01J00000000000000000000009",
-                operation: "restart",
-                startedAt: new Date(4_110).toISOString(),
-                status: "running",
-              },
-              runId: "run-2",
-            }),
-            occurredAt: 4_110,
-            sessionId: "session-1",
-          },
-        ],
-      }),
-    ).rejects.toThrow();
   });
 });

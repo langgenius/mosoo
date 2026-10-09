@@ -33,7 +33,7 @@ function createBindings(input: { localBucket: boolean }): ApiBindings {
 }
 
 function createSandbox(input: {
-  pathExists: boolean;
+  pathExists: boolean | readonly boolean[];
   onMountBucket?: (
     bucket: string,
     mountPath: string,
@@ -60,6 +60,8 @@ function createSandbox(input: {
     }[],
   };
 
+  const probes = typeof input.pathExists === "boolean" ? [input.pathExists] : input.pathExists;
+
   return {
     calls,
     async configureNetworkConstraints() {},
@@ -75,7 +77,7 @@ function createSandbox(input: {
     async destroy() {},
     async exec(command) {
       calls.exec.push(command);
-      return commandResult(input.pathExists);
+      return commandResult(probes[Math.min(calls.exec.length, probes.length) - 1] ?? false);
     },
     async getSession() {
       throw new Error("getSession is not used in session resource mount tests.");
@@ -98,19 +100,10 @@ function createSandbox(input: {
     async startProcess() {
       throw new Error("startProcess is not used in session resource mount tests.");
     },
-    async terminal() {
-      return new Response();
-    },
     async unmountBucket() {
       throw new Error("unmountBucket is not used in session resource mount tests.");
     },
-    async watch() {
-      return new ReadableStream<Uint8Array>();
-    },
     async writeFile() {},
-    async wsConnect() {
-      return new Response(null, { status: 101 });
-    },
   };
 }
 
@@ -155,14 +148,12 @@ describe("ensureSessionResourcesMounted", () => {
     });
   });
 
-  test("accepts remote bucket already mounted at the same session resource path", async () => {
+  test("accepts a concurrent remote mount that became ready", async () => {
     const sandbox = createSandbox({
-      onMountBucket: async (bucket, mountPath, options) => {
-        throw new Error(
-          `InvalidMountConfigError: Mount path "${mountPath}" is already in use by bucket "${bucket}:${options.prefix}". Unmount the existing bucket first or use a different mount path.`,
-        );
+      onMountBucket: async (_bucket, mountPath) => {
+        throw new Error(`InvalidMountConfigError: Mount path "${mountPath}" is already in use.`);
       },
-      pathExists: false,
+      pathExists: [false, true],
     });
 
     await ensureSessionResourcesMounted({
@@ -172,16 +163,13 @@ describe("ensureSessionResourcesMounted", () => {
     });
 
     expect(sandbox.calls.exec).toHaveLength(2);
-    expect(sandbox.calls.mkdir).toHaveLength(1);
     expect(sandbox.calls.mountBucket.map((call) => call.mountPath)).toEqual(sandbox.calls.mkdir);
   });
 
-  test("rejects remote bucket conflict for a different prefix", async () => {
+  test("surfaces a failed remote mount when the path is still not mounted", async () => {
     const sandbox = createSandbox({
-      onMountBucket: async (bucket, mountPath) => {
-        throw new Error(
-          `InvalidMountConfigError: Mount path "${mountPath}" is already in use by bucket "${bucket}:/session/other/attachment/". Unmount the existing bucket first or use a different mount path.`,
-        );
+      onMountBucket: async (_bucket, mountPath) => {
+        throw new Error(`InvalidMountConfigError: Mount path "${mountPath}" is already in use.`);
       },
       pathExists: false,
     });
@@ -192,8 +180,9 @@ describe("ensureSessionResourcesMounted", () => {
         sandbox,
         sessionId: "session-remote",
       }),
-    ).rejects.toThrow();
+    ).rejects.toThrow("is already in use");
 
+    expect(sandbox.calls.exec).toHaveLength(2);
     expect(sandbox.calls.mountBucket).toHaveLength(1);
   });
 });

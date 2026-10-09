@@ -2,7 +2,6 @@ import { describe, expect, test } from "bun:test";
 
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
 import { connectAuthenticatedSessionViewerWebSocket } from "../src/modules/sessions/application/session-viewer-socket.service";
-import type { SessionViewerSocketConnector } from "../src/modules/sessions/application/session-viewer-socket.service";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import {
   createPublicHttpTestBindings,
@@ -39,13 +38,20 @@ function createSessionViewerSocketPrewarmDatabase(input: {
   database.execute(`
     CREATE TABLE session (
       id text PRIMARY KEY NOT NULL,
+      agent_id text,
       archived_at integer,
       attributed_user_id text,
       creator_account_id text NOT NULL,
+      deployment_version_id text,
+      deployment_version_number integer,
       metadata_json text DEFAULT '{}' NOT NULL,
+      model text NOT NULL DEFAULT 'gpt-5.4',
       project_id text NOT NULL,
+      provider text NOT NULL DEFAULT 'openai',
+      runtime_id text NOT NULL DEFAULT 'openai-runtime',
       status text NOT NULL,
-      type text NOT NULL
+      type text NOT NULL,
+      updated_at integer NOT NULL DEFAULT 1
     );
 
     CREATE TABLE project (
@@ -100,12 +106,6 @@ function createSessionViewerSocketPrewarmDatabase(input: {
   return database;
 }
 
-function createBindings(input: { type: "preview" | "ui" }): ApiBindings {
-  return createPublicHttpTestBindings(
-    createSessionViewerSocketPrewarmDatabase(input),
-  ) as ApiBindings;
-}
-
 function createSocketResponse(status: number): Response {
   if (status !== 101) {
     return new Response(null, { status });
@@ -114,30 +114,47 @@ function createSocketResponse(status: number): Response {
   return { status } as Response;
 }
 
-async function connectForTest(input: {
-  responseStatus: number;
-  type: "preview" | "ui";
-  viewer?: AuthenticatedViewer;
-}): Promise<{
+// The Session Durable Object is a stub; the fixture has no Sandbox or Driver
+// runtime, so any compute wake would fail.
+function createBindings(input: { responseStatus: number; type: "preview" | "ui" }): {
+  bindings: ApiBindings;
+  connectorCallCount: () => number;
+} {
+  let connectorCallCount = 0;
+
+  return {
+    bindings: {
+      ...(createPublicHttpTestBindings(
+        createSessionViewerSocketPrewarmDatabase(input),
+      ) as ApiBindings),
+      Session: {
+        get: () => ({
+          fetch: async () => {
+            connectorCallCount += 1;
+            return createSocketResponse(input.responseStatus);
+          },
+        }),
+        idFromName: (name: string) => name,
+      } as unknown as ApiBindings["Session"],
+    },
+    connectorCallCount: () => connectorCallCount,
+  };
+}
+
+async function connectForTest(input: { responseStatus: number; type: "preview" | "ui" }): Promise<{
   connectorCallCount: number;
   response: Response;
 }> {
-  let connectorCallCount = 0;
-  const sessionViewerSocketConnector: SessionViewerSocketConnector = async () => {
-    connectorCallCount += 1;
-    return createSocketResponse(input.responseStatus);
-  };
-
-  const response = await connectAuthenticatedSessionViewerWebSocket(createBindings(input), {
+  const { bindings, connectorCallCount } = createBindings(input);
+  const response = await connectAuthenticatedSessionViewerWebSocket(bindings, {
     request: new Request(SESSION_VIEWER_SOCKET_URL),
     projectId: PROJECT_ID,
     sessionId: SESSION_ID,
-    sessionViewerSocketConnector,
-    viewer: input.viewer ?? VIEWER,
+    viewer: VIEWER,
   });
 
   return {
-    connectorCallCount,
+    connectorCallCount: connectorCallCount(),
     response,
   };
 }
@@ -164,19 +181,19 @@ describe("session viewer socket subscriptions", () => {
   });
 
   test("does not connect when the viewer cannot access the session", async () => {
-    let connectorCallCount = 0;
+    const { bindings, connectorCallCount } = createBindings({
+      responseStatus: 101,
+      type: "preview",
+    });
+
     await expect(
-      connectAuthenticatedSessionViewerWebSocket(createBindings({ type: "preview" }), {
+      connectAuthenticatedSessionViewerWebSocket(bindings, {
         request: new Request(SESSION_VIEWER_SOCKET_URL),
         projectId: PROJECT_ID,
         sessionId: SESSION_ID,
-        sessionViewerSocketConnector: async () => {
-          connectorCallCount += 1;
-          return createSocketResponse(101);
-        },
         viewer: OUTSIDER_VIEWER,
       }),
     ).rejects.toThrow();
-    expect(connectorCallCount).toBe(0);
+    expect(connectorCallCount()).toBe(0);
   });
 });

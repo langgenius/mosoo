@@ -101,7 +101,7 @@ function loadSkillPackageFromZip(bytes: Uint8Array): NormalizedSkillPackage {
   return normalizeSkillEntries(toEntryRecord(entries));
 }
 
-async function toSkillSnapshotEntry(entry: SkillPackageEntry): Promise<SkillSnapshotEntry> {
+export async function toSkillSnapshotEntry(entry: SkillPackageEntry): Promise<SkillSnapshotEntry> {
   return {
     entryKind: entry.entryKind,
     isExecutable: entry.isExecutable,
@@ -112,7 +112,7 @@ async function toSkillSnapshotEntry(entry: SkillPackageEntry): Promise<SkillSnap
   };
 }
 
-function slugifyFileStem(value: string): string {
+export function slugifyFileStem(value: string): string {
   return (
     value
       .trim()

@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import { useLocation } from "react-router-dom";
 
-import { useAppSession } from "@/app/session-provider";
+import { useAppSession } from "@/app/session/session-context";
 
 import {
   captureProductEvent,
@@ -11,12 +11,7 @@ import {
   PRODUCT_ANALYTICS_EVENTS,
 } from "./product-analytics";
 
-configureProductAnalytics({
-  apiHost: import.meta.env.VITE_POSTHOG_API_HOST,
-  deploymentMode: import.meta.env.VITE_MOSOO_DEPLOYMENT_MODE,
-  environment: import.meta.env.VITE_MOSOO_ENVIRONMENT,
-  projectKey: import.meta.env.VITE_POSTHOG_PROJECT_KEY ?? "",
-});
+configureProductAnalytics(import.meta.env.VITE_POSTHOG_PROJECT_KEY ?? "");
 
 export function ProductAnalyticsProvider({ children }: { children: ReactNode }) {
   const location = useLocation();

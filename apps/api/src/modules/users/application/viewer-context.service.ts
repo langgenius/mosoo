@@ -1,173 +1,53 @@
-import type {
-  AccountProfile,
-  SetSystemAgentModelInput,
-  SystemAgentModelSetting,
-  UpdateAccountProfileInput,
-  Viewer,
-  ViewerAuth,
-} from "@mosoo/contracts/account";
-import type { AuthMethod, AuthSecurityLevel } from "@mosoo/contracts/auth";
+import type { AccountProfile, UpdateAccountProfileInput, Viewer } from "@mosoo/contracts/account";
 import { accountsTable } from "@mosoo/db";
-import type { AccountId, OrganizationId } from "@mosoo/id";
 import { eq } from "drizzle-orm";
 
-import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
-import { isTruthy } from "../../../shared/truthiness";
+import { requireName } from "../../../shared/require-name";
 import { currentTimestampMs } from "../../../time";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { normalizeAccountImageUrl } from "../domain/user-avatar";
-import { normalizeAccountName } from "../domain/user-name";
-import {
-  listViewerOrganizations,
-  resolveViewerOrganizationContextFromState,
-} from "./account-organization-context.service";
+import { listViewerOrganizations } from "./account-organization-context.service";
 
-interface ViewerAccountState {
-  id: AccountId;
-  imageUrl: string | null;
-  lastActiveOrganizationId: OrganizationId | null;
-  name: string;
-  systemAgentModel: SystemAgentModelSetting | null;
-}
-
-function parseSystemAgentModel(value: unknown): SystemAgentModelSetting | null {
-  if (!isTruthy(value)) {
-    return null;
-  }
-
-  const parsed: unknown = typeof value === "string" ? JSON.parse(value) : value;
-
-  if (
-    parsed === null ||
-    typeof parsed !== "object" ||
-    Array.isArray(parsed) ||
-    typeof (parsed as { vendor?: unknown }).vendor !== "string" ||
-    typeof (parsed as { modelId?: unknown }).modelId !== "string"
-  ) {
-    throw new Error("Stored system agent model must be a model setting object.");
-  }
-
-  return {
-    modelId: (parsed as { modelId: string }).modelId,
-    vendor: (parsed as { vendor: string }).vendor,
-  };
-}
-
-function createAccountProfile(
-  viewer: AuthenticatedViewer,
-  systemAgentModel: SystemAgentModelSetting | null,
-): AccountProfile {
+function createAccountProfile(viewer: AuthenticatedViewer): AccountProfile {
   return {
     email: viewer.email,
     id: viewer.id,
     imageUrl: viewer.imageUrl,
     name: viewer.name,
-    systemAgentModel,
-  };
-}
-
-function normalizeSystemAgentModel(input: SetSystemAgentModelInput): SystemAgentModelSetting {
-  const modelId = input.modelId.trim();
-  const vendor = input.vendor.trim();
-
-  if (!isTruthy(modelId) || !isTruthy(vendor)) {
-    throw new Error("System Agent model and provider are required.");
-  }
-
-  return { modelId, vendor };
-}
-
-async function getViewerAccountState(
-  database: D1Database,
-  accountId: AccountId,
-): Promise<ViewerAccountState> {
-  const row =
-    (await getAppDatabase(database)
-      .select({
-        id: accountsTable.id,
-        image: accountsTable.image,
-        lastActiveOrganizationId: accountsTable.lastActiveOrganizationId,
-        name: accountsTable.name,
-        systemAgentModel: accountsTable.systemAgentModel,
-      })
-      .from(accountsTable)
-      .where(eq(accountsTable.id, accountId))
-      .limit(1)
-      .get()) ?? null;
-
-  if (!row) {
-    throw new Error("Account not found.");
-  }
-
-  return {
-    id: row.id,
-    imageUrl: row.image,
-    lastActiveOrganizationId: row.lastActiveOrganizationId,
-    name: row.name,
-    systemAgentModel: parseSystemAgentModel(row.systemAgentModel),
-  };
-}
-
-function getViewerAuth(bindings: ApiBindings, viewer: AuthenticatedViewer | null): ViewerAuth {
-  const methods: AuthMethod[] = ["email_otp"];
-  const authBindings = bindings as ApiBindings & {
-    GOOGLE_OAUTH_CLIENT_ID?: string;
-    GOOGLE_OAUTH_CLIENT_SECRET?: string;
-  };
-
-  if (
-    authBindings.GOOGLE_OAUTH_CLIENT_ID?.trim() !== null &&
-    authBindings.GOOGLE_OAUTH_CLIENT_ID?.trim() !== undefined &&
-    authBindings.GOOGLE_OAUTH_CLIENT_ID?.trim() !== "" &&
-    authBindings.GOOGLE_OAUTH_CLIENT_SECRET?.trim() !== null &&
-    authBindings.GOOGLE_OAUTH_CLIENT_SECRET?.trim() !== undefined &&
-    authBindings.GOOGLE_OAUTH_CLIENT_SECRET?.trim() !== ""
-  ) {
-    methods.push("google_oauth");
-  }
-
-  const currentSecurityLevel: AuthSecurityLevel =
-    viewer?.emailVerified === true ? "verified_email" : "basic";
-
-  return {
-    currentSecurityLevel,
-    methods,
   };
 }
 
 export async function getViewer(
   database: D1Database,
-  bindings: ApiBindings,
   viewer: AuthenticatedViewer | null,
 ): Promise<Viewer> {
   if (!viewer) {
     return {
       account: null,
       activeOrganization: null,
-      auth: getViewerAuth(bindings, null),
       organizations: [],
     };
   }
 
-  const [accountState, organizations] = await Promise.all([
-    getViewerAccountState(database, viewer.id),
+  const [account, organizations] = await Promise.all([
+    getAppDatabase(database)
+      .select({ imageUrl: accountsTable.image, name: accountsTable.name })
+      .from(accountsTable)
+      .where(eq(accountsTable.id, viewer.id))
+      .limit(1)
+      .get(),
     listViewerOrganizations(database, viewer.id),
   ]);
-  const organizationContext = await resolveViewerOrganizationContextFromState(
-    database,
-    accountState,
-    organizations,
-  );
+
+  if (!account) {
+    throw new Error("Account not found.");
+  }
 
   return {
-    account: createAccountProfile(
-      { ...viewer, imageUrl: accountState.imageUrl, name: accountState.name },
-      accountState.systemAgentModel,
-    ),
-    activeOrganization: organizationContext.activeOrganization,
-    auth: getViewerAuth(bindings, viewer),
-    organizations: organizationContext.organizations,
+    account: createAccountProfile({ ...viewer, imageUrl: account.imageUrl, name: account.name }),
+    activeOrganization: organizations[0] ?? null,
+    organizations,
   };
 }
 
@@ -176,65 +56,24 @@ export async function updateProfile(
   viewer: AuthenticatedViewer,
   input: UpdateAccountProfileInput,
 ): Promise<AccountProfile> {
-  const timestampMs = currentTimestampMs();
-  const name = normalizeAccountName(input.name);
+  const name = requireName(input.name, "Name");
   const imageProvided = Object.prototype.hasOwnProperty.call(input, "imageUrl");
   const imageUrl = imageProvided ? normalizeAccountImageUrl(input.imageUrl) : viewer.imageUrl;
 
   const updates: { image?: string | null; name: string; updatedAt: number } = {
     name,
-    updatedAt: timestampMs,
+    updatedAt: currentTimestampMs(),
   };
 
   if (imageProvided) {
     updates.image = imageUrl;
   }
 
-  const updated =
-    (await getAppDatabase(database)
-      .update(accountsTable)
-      .set(updates)
-      .where(eq(accountsTable.id, viewer.id))
-      .returning({ systemAgentModel: accountsTable.systemAgentModel })
-      .get()) ?? null;
+  await getAppDatabase(database)
+    .update(accountsTable)
+    .set(updates)
+    .where(eq(accountsTable.id, viewer.id))
+    .run();
 
-  if (updated === null) {
-    throw new Error("Account not found.");
-  }
-
-  return createAccountProfile(
-    { ...viewer, imageUrl, name },
-    parseSystemAgentModel(updated.systemAgentModel),
-  );
-}
-
-export async function setSystemAgentModel(
-  database: D1Database,
-  viewer: AuthenticatedViewer,
-  input: SetSystemAgentModelInput,
-): Promise<AccountProfile> {
-  const systemAgentModel = normalizeSystemAgentModel(input);
-  const updated =
-    (await getAppDatabase(database)
-      .update(accountsTable)
-      .set({
-        systemAgentModel,
-        updatedAt: currentTimestampMs(),
-      })
-      .where(eq(accountsTable.id, viewer.id))
-      .returning({
-        imageUrl: accountsTable.image,
-        name: accountsTable.name,
-        systemAgentModel: accountsTable.systemAgentModel,
-      })
-      .get()) ?? null;
-
-  if (updated === null) {
-    throw new Error("Account not found.");
-  }
-
-  return createAccountProfile(
-    { ...viewer, imageUrl: updated.imageUrl, name: updated.name },
-    parseSystemAgentModel(updated.systemAgentModel),
-  );
+  return createAccountProfile({ ...viewer, imageUrl, name });
 }

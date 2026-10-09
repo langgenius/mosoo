@@ -1,58 +1,30 @@
 import { createResolutionIssue } from "@mosoo/agent-package";
-import type {
-  AgentResolutionIssue,
-  AgentResolutionTargetType,
-} from "@mosoo/contracts/agent-manifest";
+import type { AgentResolutionIssue } from "@mosoo/contracts/agent-manifest";
 import { vendorCredentialsTable } from "@mosoo/db";
-import type { AccountId, ProjectId } from "@mosoo/id";
+import type { ProjectId } from "@mosoo/id";
 import { getRuntimeCatalogEntry } from "@mosoo/runtime-catalog";
-import { and, asc, eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
-import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
-import { isApiError } from "../../../platform/errors";
-import { isTruthy } from "../../../shared/truthiness";
-import { ensureProjectOwnership } from "../../projects/application/project.service";
+import { getSupportedRuntimeId } from "../../runtime/domain/runtime-config";
 import { resolveAvailableModels } from "../../vendor-credentials/application/available-models";
-import type { ResolvedModelEntry } from "../../vendor-credentials/application/available-models";
-import {
-  probeVendorCredential,
-  resolveProviderFetchProxy,
-  resolveVendorApiKey,
-} from "../../vendor-credentials/application/vendor-credential.service";
-
-interface RuntimeCapabilitySelection {
-  model: string;
-  provider: string;
-  runtimeId: string;
-}
 
 interface RuntimeCapabilityIssueInput {
-  actorAccountId: AccountId;
-  bindings?: ApiBindings;
   codePrefix: "agent.fork" | "agent.import" | "agent.readiness";
   database: D1Database;
   projectId: ProjectId;
-  selection: RuntimeCapabilitySelection;
+  selection: {
+    model: string;
+    provider: string;
+    runtimeId: string;
+  };
 }
 
-const READINESS_PROVIDER_PROBE_TIMEOUT_MS = 10_000;
 async function hasProjectCredential(
   database: D1Database,
-  actorAccountId: AccountId,
   projectId: ProjectId,
   provider: string,
 ): Promise<boolean> {
-  try {
-    await ensureProjectOwnership(database, actorAccountId, projectId);
-  } catch (error) {
-    if (isApiError(error)) {
-      return false;
-    }
-
-    throw error;
-  }
-
   const row = await getAppDatabase(database)
     .select({ id: vendorCredentialsTable.id })
     .from(vendorCredentialsTable)
@@ -62,132 +34,10 @@ async function hasProjectCredential(
         eq(vendorCredentialsTable.vendorId, provider),
       ),
     )
-    .orderBy(asc(vendorCredentialsTable.name), asc(vendorCredentialsTable.id))
     .limit(1)
     .get();
 
-  return Boolean(row);
-}
-
-function createCapabilityIssue(input: {
-  actionLabel: string;
-  code: string;
-  message: string;
-  required: boolean;
-  status: AgentResolutionIssue["status"];
-  targetLabel: string;
-  targetType: AgentResolutionTargetType;
-}): AgentResolutionIssue {
-  return createResolutionIssue({
-    actionLabel: input.actionLabel,
-    code: input.code,
-    message: input.message,
-    required: input.required,
-    status: input.status,
-    targetLabel: input.targetLabel,
-    targetType: input.targetType,
-  });
-}
-
-async function collectCredentialIssues(
-  input: RuntimeCapabilityIssueInput,
-): Promise<AgentResolutionIssue[]> {
-  const { provider } = input.selection;
-  const required = true;
-  const projectCredentialAvailable = await hasProjectCredential(
-    input.database,
-    input.actorAccountId,
-    input.projectId,
-    provider,
-  );
-
-  if (projectCredentialAvailable) {
-    return [];
-  }
-
-  return [
-    createCapabilityIssue({
-      actionLabel: "Configure key",
-      code: `${input.codePrefix}.provider_credential.missing`,
-      message: `Provider ${provider} needs a key in this Project.`,
-      required,
-      status: "needs_reconnect",
-      targetLabel: provider,
-      targetType: "provider",
-    }),
-  ];
-}
-
-async function collectProviderProbeIssues(
-  input: RuntimeCapabilityIssueInput & {
-    modelEntry: ResolvedModelEntry | null;
-    priorIssues: readonly AgentResolutionIssue[];
-  },
-): Promise<AgentResolutionIssue[]> {
-  const { bindings, modelEntry } = input;
-
-  if (
-    !bindings ||
-    !modelEntry ||
-    !modelEntry.available ||
-    input.priorIssues.some((issue) => issue.severity === "error")
-  ) {
-    return [];
-  }
-
-  const credential = await resolveVendorApiKey({
-    bindings,
-    executionOwnerUserId: input.actorAccountId,
-    options: { modelId: input.selection.model },
-    projectId: input.projectId,
-    vendorId: input.selection.provider,
-  });
-
-  if (!credential) {
-    return [];
-  }
-
-  const result = await probeVendorCredential({
-    apiBase: credential.apiBase,
-    apiKey: credential.apiKey,
-    emitEvent: false,
-    fetchProxy: resolveProviderFetchProxy(bindings),
-    modelId: input.selection.model,
-    modelProtocol: modelEntry.modelProtocol ?? null,
-    timeoutMs: READINESS_PROVIDER_PROBE_TIMEOUT_MS,
-    vendorId: input.selection.provider,
-  });
-
-  if (result.ok) {
-    return [];
-  }
-
-  // Model availability is already settled upstream by `resolveAvailableModels`
-  // (preset catalog + custom credential allowlist). A strict mismatch against
-  // the provider's `GET /models` payload — provider only lists dated ids,
-  // alias not enumerated, custom OpenAI-compatible base url that requires a
-  // model id we already trust — must not block publish. Only auth /
-  // connectivity failures should.
-  if (result.errorCode === "model_not_found" || result.errorCode === "missing_model_id") {
-    return [];
-  }
-
-  const errorText = result.errorCode ?? "unknown_error";
-  const message = /[.!?。！？]$/.test(errorText)
-    ? `Provider error: ${errorText}`
-    : `Provider error: ${errorText}.`;
-
-  return [
-    createCapabilityIssue({
-      actionLabel: "Retry",
-      code: `${input.codePrefix}.provider.error`,
-      message,
-      required: true,
-      status: "needs_reconnect",
-      targetLabel: modelEntry.vendorLabel,
-      targetType: "provider",
-    }),
-  ];
+  return row !== undefined;
 }
 
 export async function collectRuntimeCapabilityIssues(
@@ -195,38 +45,21 @@ export async function collectRuntimeCapabilityIssues(
 ): Promise<AgentResolutionIssue[]> {
   const issues: AgentResolutionIssue[] = [];
   const { model, provider, runtimeId } = input.selection;
-  let modelEntry: ResolvedModelEntry | null = null;
-
   const runtime = getRuntimeCatalogEntry(runtimeId);
 
-  if (runtime === null) {
+  if (runtime === null || getSupportedRuntimeId(runtimeId) === null) {
     issues.push(
-      createCapabilityIssue({
+      createResolutionIssue({
         actionLabel: "Choose runtime",
         code: `${input.codePrefix}.runtime.unsupported`,
         message: `Unsupported runtime: ${runtimeId}.`,
-        required: true,
         status: "unsupported",
         targetLabel: runtimeId,
         targetType: "runtime",
       }),
     );
   } else {
-    if (isTruthy(runtime.disabledReason)) {
-      issues.push(
-        createCapabilityIssue({
-          actionLabel: "Choose runtime",
-          code: `${input.codePrefix}.runtime.disabled`,
-          message: runtime.disabledReason,
-          required: true,
-          status: "unsupported",
-          targetLabel: runtime.label,
-          targetType: "runtime",
-        }),
-      );
-    }
-
-    modelEntry =
+    const modelEntry =
       (
         await resolveAvailableModels(input.database, {
           currentModelId: model,
@@ -236,15 +69,14 @@ export async function collectRuntimeCapabilityIssues(
         })
       ).find((entry) => entry.vendorId === provider && entry.modelId === model) ?? null;
 
-    if (!modelEntry || !modelEntry.available) {
+    if (!modelEntry?.available) {
       issues.push(
-        createCapabilityIssue({
+        createResolutionIssue({
           actionLabel: "Choose model",
           code: `${input.codePrefix}.model.unavailable`,
           message: modelEntry?.reason
             ? `Model ${model} is not available: ${modelEntry.reason}.`
             : `Model ${model} is not available for runtime ${runtimeId}.`,
-          required: true,
           status: "unavailable",
           targetLabel: model,
           targetType: "model",
@@ -253,14 +85,18 @@ export async function collectRuntimeCapabilityIssues(
     }
   }
 
-  issues.push(...(await collectCredentialIssues(input)));
-  issues.push(
-    ...(await collectProviderProbeIssues({
-      ...input,
-      modelEntry,
-      priorIssues: issues,
-    })),
-  );
+  if (!(await hasProjectCredential(input.database, input.projectId, provider))) {
+    issues.push(
+      createResolutionIssue({
+        actionLabel: "Configure key",
+        code: `${input.codePrefix}.provider_credential.missing`,
+        message: `Provider ${provider} needs a key in this Project.`,
+        status: "needs_reconnect",
+        targetLabel: provider,
+        targetType: "provider",
+      }),
+    );
+  }
 
   return issues;
 }

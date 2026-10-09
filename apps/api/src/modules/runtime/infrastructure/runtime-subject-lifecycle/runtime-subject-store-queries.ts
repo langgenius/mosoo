@@ -10,18 +10,12 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 
 import type { getAppDatabase } from "../../../../platform/db/drizzle";
-import {
-  ASSIGNABLE_DRIVER_INSTANCE_STATUSES,
-  LIVE_DRIVER_INSTANCE_STATUSES,
-} from "../../domain/driver-instance-lifecycle.machine";
+import { LIVE_DRIVER_INSTANCE_STATUSES } from "../../domain/driver-instance-lifecycle.machine";
 import { ACTIVE_SESSION_RUN_STATUSES } from "../../domain/session-run-lifecycle.machine";
 import { getRuntimeSubjectInactiveDeadline } from "../../domain/session-runtime-policy";
 import type { ReadyRuntimeSubjectBackupRecord } from "./runtime-subject-store.types";
 
 export type AppDatabase = ReturnType<typeof getAppDatabase>;
-
-export const ASSIGNABLE_DRIVER_STATUSES = ASSIGNABLE_DRIVER_INSTANCE_STATUSES;
-export const LIVE_DRIVER_STATUSES = LIVE_DRIVER_INSTANCE_STATUSES;
 
 const activeConversationSessionsTable = alias(sandboxSessionsTable, "active_runtime_session");
 const activeRuntimeSubjectRunsTable = alias(sessionRunsTable, "active_runtime_subject_run");
@@ -87,7 +81,7 @@ export function liveDriverInstanceQueryForListedSubject(appDb: AppDatabase) {
     .where(
       and(
         eq(liveSubjectDriversTable.sandboxId, sandboxesTable.id),
-        inArray(liveSubjectDriversTable.status, LIVE_DRIVER_STATUSES),
+        inArray(liveSubjectDriversTable.status, LIVE_DRIVER_INSTANCE_STATUSES),
       ),
     );
 }

@@ -3,16 +3,6 @@ import type { SkillSummary } from "@mosoo/contracts/skill";
 import { toIsoString } from "../../../time";
 import type { SkillRegistryRow } from "./skill-types";
 
-function toTimestampIsoString(value: number | string): string {
-  const timestampMs = typeof value === "string" ? Number(value) : value;
-
-  if (!Number.isFinite(timestampMs)) {
-    throw new TypeError("Skill timestamp is invalid.");
-  }
-
-  return toIsoString(timestampMs);
-}
-
 export function toSkillSummary(row: SkillRegistryRow): SkillSummary {
   const forkedFromOwnerName = row.forkedFromOwnerName;
   const forkedFromSkillId = row.forkedFromSkillId;
@@ -20,7 +10,7 @@ export function toSkillSummary(row: SkillRegistryRow): SkillSummary {
 
   return {
     author: row.author,
-    createdAt: toTimestampIsoString(row.createdAt),
+    createdAt: toIsoString(row.createdAt),
     description: row.description,
     fileCount: row.fileCount,
     forkOrigin:
@@ -37,7 +27,6 @@ export function toSkillSummary(row: SkillRegistryRow): SkillSummary {
     ownerName: row.ownerName ?? row.author,
     projectId: row.projectId,
     snapshotId: row.currentSnapshotId,
-    sourceKind: row.sourceKind,
-    updatedAt: toTimestampIsoString(row.updatedAt),
+    updatedAt: toIsoString(row.updatedAt),
   };
 }

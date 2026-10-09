@@ -5,7 +5,7 @@ import { RUNTIME_SOCKET_TIMEOUT_MS } from "../src/modules/runtime/domain/runtime
 import { SESSION_RUNTIME_IDLE_GRACE_MS } from "../src/modules/runtime/domain/session-runtime-policy";
 import { cleanupDriverInstances } from "../src/modules/runtime/infrastructure/driver-instance/maintenance";
 import { repairStrandedRuntimeSubjectDeadlines } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-maintenance-store";
-import { listInactiveRuntimeSubjects } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-store";
+import { listInactiveRuntimeSubjects } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-maintenance-store";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import {
   createPublicHttpContractDatabase,

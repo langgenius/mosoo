@@ -22,60 +22,39 @@ const ownerViewer: AuthenticatedViewer = {
   name: "Owner",
 };
 
-async function withProviderProbeMock<T>(operation: () => Promise<T>): Promise<T> {
-  const original = globalThis.fetch;
-  globalThis.fetch = async () => Response.json({ data: [{ id: "gpt-5.4" }] });
-  try {
-    return await operation();
-  } finally {
-    globalThis.fetch = original;
-  }
-}
-
 describe("Agent type retirement", () => {
-  test.each([false, true])(
-    "configuration saves do not select or overwrite kind (concurrent migration: %s)",
-    async (migrating) => {
-      const { database, viewer, ids } = await createApiTestFixture();
-      if (migrating) {
-        const originalBatch = database.batch.bind(database);
-        database.batch = async <T = unknown>(statements: D1PreparedStatement[]) => {
-          await database
-            .prepare("UPDATE agent SET kind = 'cattle' WHERE id = ?")
-            .bind(ids.agentId)
-            .run();
-          return originalBatch<T>(statements);
-        };
-      }
-      const result = await updateAgentConfig(database, viewer, {
-        agentId: ids.agentId,
-        projectId: ids.projectId,
-        kind: migrating ? "pet" : "cattle",
-        name: "Edited configuration",
-        description: null,
-        environment: { environmentId: null },
-        mcpServerIds: [],
-        model: "gpt-5.4",
-        prompt: "New instructions for later admission.",
-        provider: "openai",
-        providerOptions: {},
-        runtimeId: "openai-runtime",
-        skillIds: [],
-      });
-      expect(result).not.toHaveProperty("kind");
-      expect(
-        await database.prepare("SELECT kind FROM agent WHERE id = ?").bind(ids.agentId).first(),
-      ).toEqual({ kind: migrating ? "cattle" : "pet" });
-      expect(result.prompt).toBe("New instructions for later admission.");
-    },
-  );
+  test("configuration saves do not select or overwrite kind", async () => {
+    const { database, viewer, ids } = await createApiTestFixture();
+    const result = await updateAgentConfig(database, viewer, {
+      agentId: ids.agentId,
+      projectId: ids.projectId,
+      kind: "cattle",
+      name: "Edited configuration",
+      description: null,
+      environment: { environmentId: null },
+      mcpServerIds: [],
+      model: "gpt-5.4",
+      prompt: "New instructions for later admission.",
+      provider: "openai",
+      providerOptions: {},
+      runtimeId: "openai-runtime",
+      skillIds: [],
+    });
+    expect(result).not.toHaveProperty("kind");
+    expect(
+      await database.prepare("SELECT kind FROM agent WHERE id = ?").bind(ids.agentId).first(),
+    ).toEqual({ kind: "pet" });
+    expect(result.prompt).toBe("New instructions for later admission.");
+  });
 
   test.each([undefined, null, "pet", "cattle"] as const)(
     "creation cannot select shared execution with legacy kind %s",
     async (kind) => {
       const database = await createPublicHttpContractDatabase();
-      const agent = await withProviderProbeMock(() =>
-        createAgent(createPublicHttpTestBindings(database) as ApiBindings, ownerViewer, {
+      const agent = await createAgent(
+        createPublicHttpTestBindings(database) as ApiBindings,
+        ownerViewer,
+        {
           ...(kind === undefined ? {} : { kind }),
           model: "gpt-5.4",
           name: "Session preset",
@@ -84,7 +63,7 @@ describe("Agent type retirement", () => {
           provider: "openai",
           runtimeId: "openai-runtime",
           skillIds: [],
-        }),
+        },
       );
       expect(agent).not.toHaveProperty("kind");
       expect(agent).toMatchObject({
@@ -111,13 +90,11 @@ describe("Agent type retirement", () => {
         .prepare("SELECT * FROM agent WHERE id = ?")
         .bind(ids.agentId)
         .first();
-      const result = await withProviderProbeMock(() =>
-        createAgentFork(bindings, viewer, {
-          agentId: ids.agentId,
-          projectId: ids.projectId,
-          ...(kind === undefined ? {} : { kind }),
-        }),
-      );
+      const result = await createAgentFork(bindings, viewer, {
+        agentId: ids.agentId,
+        projectId: ids.projectId,
+        ...(kind === undefined ? {} : { kind }),
+      });
       expect(result.agent.id).not.toBe(ids.agentId);
       expect(result.agent).not.toHaveProperty("kind");
       expect(

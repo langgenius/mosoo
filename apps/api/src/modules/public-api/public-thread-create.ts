@@ -5,36 +5,24 @@ import type { SessionSummary } from "@mosoo/contracts/session";
 import { createPlatformId } from "@mosoo/id";
 import type { FileId, SessionId } from "@mosoo/id";
 
-import { createErrorLogContext, logError } from "../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../platform/cloudflare/worker-types";
 import { API_ERROR_CODE, isApiError } from "../../platform/errors";
 import type { AuthenticatedViewer } from "../auth/application/viewer-auth.service";
 import { fileStore } from "../files/application/file-store";
 import {
+  autoTitleSessionFromPrompt,
   createAgentSession,
   createProjectSession,
   queueSessionRun,
 } from "../runtime/application/session-run.service";
+import { admitAgentApiEndpointCaller } from "./agent-api-endpoint-admission.service";
 import { publicInvalidRequest } from "./public-api-errors";
+import { admitPublicProjectCaller } from "./public-thread-admission";
+import { toCreateThreadResponse } from "./public-thread-presenter";
+import { admitPublicThread } from "./public-thread-session-query.service";
 import {
-  admitPublicProjectThreadCreator,
-  admitPublicThreadCreator,
-} from "./public-thread-admission";
-import type { ThreadCreationAdmission } from "./public-thread-admission";
-import { toPublicThreadSessionSummary } from "./public-thread-api-presenter";
-import { toPublicThreadId } from "./public-thread-ids";
-import { createPublicApiThreadMetadata } from "./public-thread-metadata";
-import {
-  toCreateEmptyThreadSessionSummary,
-  toCreateThreadResponse,
-  toCreateThreadSessionSummary,
-} from "./public-thread-presenter";
-import {
-  cleanupFailedThreadCreation,
   findPublicThreadSnapshotByIdempotencyKey,
-  getThreadSnapshot,
   getPublicThreadInitialRun,
-  setSessionTitleFromThreadPrompt,
 } from "./public-thread-store";
 import type { CreatePublicThreadRequest } from "./public-thread.types";
 
@@ -54,69 +42,29 @@ async function claimThreadFiles(input: {
   });
 }
 
-async function ensureThreadFilesClaimable(input: {
-  admission: ThreadCreationAdmission;
-  bindings: ApiBindings;
-  fileIds: FileId[];
-  sessionId: SessionId;
-}): Promise<void> {
-  if (input.fileIds.length === 0) {
-    return;
-  }
-
-  await fileStore.ensureClaimable(
-    input.bindings,
-    input.admission.fileViewer,
-    input.sessionId,
-    input.fileIds,
-  );
-}
-
 async function startInitialThreadRun(
   request: CreatePublicThreadRequest,
-  admission: ThreadCreationAdmission,
   session: SessionSummary,
   legacyKind: AgentKind,
   prompt: string,
   clientRequestId: string,
 ): Promise<PublicThreadApiCreateThreadResponse<string | null, PublicApiVersion>> {
-  const sessionId = session.id;
-  const queuedRun = await queueSessionRun({
+  const { run, sessionState } = await queueSessionRun({
     bindings: request.bindings,
     executionContext: request.executionContext ?? null,
     input: {
-      accessViewer: admission.accessViewer,
       attachmentIds: request.input.fileIds,
       clientRequestId,
       prompt,
-      session: {
-        agent_id: session.agentId,
-        deployment_version_id: session.deploymentVersionId,
-        deployment_version_number: session.deploymentVersionNumber,
-        id: sessionId,
-        model: session.model,
-        project_id: session.projectId,
-        provider: session.provider,
-        runtime_id: session.runtimeId,
-      },
+      session,
     },
     requestUrl: request.requestUrl,
-    viewer: admission.creatorViewer,
+    viewer: request.caller.viewer,
   });
-  const run = queuedRun.run;
-  const runSessionState = queuedRun.sessionState;
-
-  const titleUpdate = await setSessionTitleFromThreadPrompt({
+  const titleUpdate = await autoTitleSessionFromPrompt({
     database: request.bindings.DB,
-    prompt,
-    sessionId,
-  });
-
-  const updatedSession = toCreateThreadSessionSummary({
-    run,
-    session,
-    sessionState: runSessionState,
-    titleUpdate,
+    sessionId: session.id,
+    text: prompt,
   });
 
   return toCreateThreadResponse({
@@ -124,7 +72,12 @@ async function startInitialThreadRun(
     endUserId: request.input.userId,
     legacyKind,
     run,
-    session: updatedSession,
+    session: {
+      ...session,
+      ...titleUpdate,
+      lastRun: run,
+      status: sessionState.status,
+    },
   });
 }
 
@@ -134,117 +87,92 @@ export async function createPublicThread(
   if (request.source.type === "inline" && request.apiVersion !== "v2") {
     throw publicInvalidRequest("Inline execution requires API v2.");
   }
-  const admission =
+  // The v2 route admits the caller to the inline Session's Project before creation.
+  const projectId =
     request.source.type === "inline"
-      ? await admitPublicProjectThreadCreator(
+      ? request.source.projectId
+      : await admitAgentApiEndpointCaller(
           request.bindings.DB,
-          request.caller,
-          request.source.projectId,
-        )
-      : await admitPublicThreadCreator(request.bindings.DB, request.caller, {
-          agentId: request.source.agentId,
-          apiVersion: request.apiVersion,
-        });
-  let createdSessionId: SessionId | null = null;
-  let durableMutationStarted = false;
+          request.caller.viewer,
+          request.source.agentId,
+          request.apiVersion,
+        );
   const initialRequestId = createPlatformId();
-  const metadata = createPublicApiThreadMetadata({
-    apiVersion: request.apiVersion,
-    createdBy: admission.createdBy,
-    idempotencyKey: request.idempotencyKey,
+
+  await fileStore.ensureClaimable(
+    request.bindings,
+    request.caller.viewer,
+    projectId,
+    request.input.fileIds,
+  );
+
+  const creation = {
+    bindings: request.bindings,
+    executionContext: request.executionContext,
+    options: {
+      ...(request.apiVersion === "v2" ? { configurationSource: "saved" as const } : {}),
+      endUserId: request.input.userId,
+      metadata: {
+        public_api: {
+          ...(request.apiVersion === "v2" ? { api_version: request.apiVersion } : {}),
+          created_by: {
+            token_id: request.caller.tokenId,
+            token_label: request.caller.tokenLabel,
+          },
+          idempotency_key: request.idempotencyKey,
+          source: "public_api" as const,
+        },
+        // Outside the legacy public_api envelope so older readers can still
+        // recognize this Session during an application rollback.
+        public_api_initial_request_id:
+          request.input.inputText === undefined ? null : initialRequestId,
+      },
+    },
+    viewer: request.caller.viewer,
+  };
+  const session =
+    request.source.type === "inline"
+      ? await createProjectSession({ ...creation, input: request.source })
+      : await createAgentSession({
+          ...creation,
+          input: { agentId: request.source.agentId, projectId, type: "ui" },
+        });
+
+  await claimThreadFiles({
+    bindings: request.bindings,
+    fileIds: request.input.fileIds,
+    sessionId: session.id,
+    viewer: request.caller.viewer,
   });
 
-  try {
-    const creation = {
+  if (request.input.inputText === undefined) {
+    // File admission can still reject this request. Start runtime work only
+    // after the complete request has passed and its attachments are claimed.
+    const { scheduleAgentSessionRuntimePrewarm } =
+      await import("../runtime/application/session-runs/prewarm-agent-session-runtime.service");
+    scheduleAgentSessionRuntimePrewarm({
       bindings: request.bindings,
-      executionContext: request.executionContext,
-      options: {
-        accessViewer: admission.accessViewer,
-        ...(request.apiVersion === "v2" ? { configurationSource: "saved" as const } : {}),
-        endUserId: request.input.userId,
-        metadata: {
-          public_api: metadata,
-          // Outside the legacy public_api envelope so older readers can still
-          // recognize this Session during an application rollback.
-          public_api_initial_request_id:
-            request.input.inputText === undefined ? null : initialRequestId,
-        },
-      },
-      viewer: admission.creatorViewer,
-    };
-    const session =
-      request.source.type === "inline"
-        ? await createProjectSession({ ...creation, input: request.source })
-        : await createAgentSession({
-            ...creation,
-            input: { agentId: request.source.agentId, projectId: admission.projectId, type: "ui" },
-          });
-    const sessionId = session.id;
-    createdSessionId = sessionId;
-
-    await ensureThreadFilesClaimable({
-      admission,
-      bindings: request.bindings,
-      fileIds: request.input.fileIds,
-      sessionId,
-    });
-
-    // A failed response does not prove that file claim or turn admission rolled
-    // back. Retain their Session so a retry can reconcile the committed state.
-    durableMutationStarted = true;
-    await claimThreadFiles({
-      bindings: request.bindings,
-      fileIds: request.input.fileIds,
-      sessionId,
-      viewer: admission.fileViewer,
-    });
-
-    if (request.input.inputText === undefined) {
-      // File admission can still reject this request. Start runtime work only
-      // after the complete request has passed and its attachments are claimed.
-      const { scheduleAgentSessionRuntimePrewarm } =
-        await import("../runtime/application/session-runs/prewarm-agent-session-runtime.service");
-      scheduleAgentSessionRuntimePrewarm({
-        bindings: request.bindings,
-        executionContext: request.executionContext ?? null,
-        requestUrl: request.requestUrl,
-        session,
-        accessViewer: admission.accessViewer,
-        viewer: admission.creatorViewer,
-      });
-      return toCreateThreadResponse({
-        apiVersion: request.apiVersion,
-        endUserId: request.input.userId,
-        legacyKind: "cattle",
-        run: null,
-        session: toCreateEmptyThreadSessionSummary(session),
-      });
-    }
-
-    return await startInitialThreadRun(
-      request,
-      admission,
+      executionContext: request.executionContext ?? null,
+      requestUrl: request.requestUrl,
       session,
-      "cattle", // New Session rows retain this inert value for v1 compatibility.
-      request.input.inputText,
-      initialRequestId,
-    );
-  } catch (error) {
-    if (createdSessionId !== null && !durableMutationStarted) {
-      await cleanupFailedThreadCreation({
-        bindings: request.bindings,
-        fileIds: request.input.fileIds,
-        sessionId: createdSessionId,
-      }).catch((cleanupError: unknown) => {
-        logError("public-api.thread.cleanup_failed", {
-          ...createErrorLogContext(cleanupError),
-          sessionId: createdSessionId,
-        });
-      });
-    }
-
-    throw error;
+      viewer: request.caller.viewer,
+    });
+    return toCreateThreadResponse({
+      apiVersion: request.apiVersion,
+      endUserId: request.input.userId,
+      legacyKind: "cattle",
+      run: null,
+      session,
+    });
   }
+
+  return startInitialThreadRun(
+    request,
+    session,
+    "cattle", // New Session rows retain this inert value for v1 compatibility.
+    request.input.inputText,
+    initialRequestId,
+  );
 }
 
 export async function recoverPublicThreadCreation(
@@ -259,13 +187,14 @@ export async function recoverPublicThreadCreation(
   }
   // v2 recovery authorizes the frozen Session's Project, even when its optional
   // preset has been edited or removed since the first admitted request.
-  let admission =
-    request.apiVersion !== "v2" && request.source.type === "agent"
-      ? await admitPublicThreadCreator(request.bindings.DB, request.caller, {
-          agentId: request.source.agentId,
-          apiVersion: request.apiVersion,
-        })
-      : null;
+  if (request.apiVersion !== "v2" && request.source.type === "agent") {
+    await admitAgentApiEndpointCaller(
+      request.bindings.DB,
+      request.caller.viewer,
+      request.source.agentId,
+      request.apiVersion,
+    );
+  }
   let snapshot = await findPublicThreadSnapshotByIdempotencyKey(request.bindings.DB, {
     agentId: request.source.type === "agent" ? request.source.agentId : null,
     apiVersion: request.apiVersion,
@@ -282,13 +211,15 @@ export async function recoverPublicThreadCreation(
   if (!snapshot) {
     return null;
   }
-  admission ??= await admitPublicProjectThreadCreator(
-    request.bindings.DB,
-    request.caller,
-    snapshot.session.projectId,
-  );
+  if (request.apiVersion === "v2") {
+    await admitPublicProjectCaller(
+      request.bindings.DB,
+      request.caller.viewer,
+      snapshot.session.projectId,
+    );
+  }
 
-  const initialRequestId = snapshot.metadata?.initial_request_id;
+  const { initialRequestId } = snapshot;
   let initialRun =
     initialRequestId === undefined
       ? snapshot.session.lastRun // Pending requests admitted before creation receipts existed.
@@ -305,16 +236,15 @@ export async function recoverPublicThreadCreation(
       bindings: request.bindings,
       fileIds: request.input.fileIds,
       sessionId: snapshot.session.id,
-      viewer: admission.fileViewer,
+      viewer: request.caller.viewer,
       resume: true,
     });
     if (request.input.inputText !== undefined) {
       try {
         return await startInitialThreadRun(
           request,
-          admission,
           snapshot.session,
-          snapshot.row.kind,
+          snapshot.kind,
           request.input.inputText,
           initialRequestId ?? "public-api:initial-turn",
         );
@@ -327,11 +257,15 @@ export async function recoverPublicThreadCreation(
           throw error;
         // Another recovery won admission. Re-read it; the Session-scoped receipt
         // also prevents duplication if that turn finishes before this attempt.
-        snapshot = await getThreadSnapshot(
-          request.bindings.DB,
-          toPublicThreadId(snapshot.session.id),
-          request.apiVersion,
-        );
+        snapshot = {
+          ...(await admitPublicThread(
+            request.bindings.DB,
+            request.caller.viewer,
+            snapshot.session.id,
+            request.apiVersion,
+          )),
+          initialRequestId,
+        };
         initialRun = await getPublicThreadInitialRun(
           request.bindings.DB,
           snapshot.session.id,
@@ -345,8 +279,8 @@ export async function recoverPublicThreadCreation(
   return toCreateThreadResponse({
     apiVersion: request.apiVersion,
     endUserId: snapshot.endUserId,
-    legacyKind: snapshot.row.kind,
+    legacyKind: snapshot.kind,
     run: initialRun,
-    session: toPublicThreadSessionSummary(snapshot.session),
+    session: snapshot.session,
   });
 }

@@ -1,10 +1,9 @@
 import { PUBLIC_API_PREFIX } from "@mosoo/contracts/public-api";
-import { PUBLIC_RUNTIME_CATALOG, listPresetModelsForVendor } from "@mosoo/runtime-catalog";
+import { RUNTIME_CATALOG, listPresetModelsForVendor } from "@mosoo/runtime-catalog";
 import { expect, test } from "@playwright/test";
 import type { APIRequestContext } from "@playwright/test";
 
 import { requirePiRuntimeSettings } from "../../lib/env-preflight";
-import { createRuntimeSignalCollector } from "../../lib/runtime-progress";
 
 type ProviderId = "anthropic" | "deepseek" | "openai" | "opencode" | "pi";
 type RuntimeCredentialVendorId =
@@ -72,7 +71,7 @@ function requireProviderApiKey(providerId: ProviderId): string {
 }
 
 function findPublicRuntime(runtimeId: string) {
-  return PUBLIC_RUNTIME_CATALOG.find((entry) => entry.runtimeId === runtimeId);
+  return RUNTIME_CATALOG.find((entry) => entry.runtimeId === runtimeId);
 }
 
 function readRuntimeIdOverride(): string | null {
@@ -83,7 +82,7 @@ function selectPresetRuntime(providerId: "anthropic" | "openai"): RuntimeSelecti
   const runtimeIdOverride = readRuntimeIdOverride();
   const runtime =
     runtimeIdOverride === null
-      ? PUBLIC_RUNTIME_CATALOG.find(
+      ? RUNTIME_CATALOG.find(
           (entry) =>
             entry.defaultProvider === providerId &&
             entry.vendors.some((vendor) => vendor.vendorId === providerId),
@@ -106,7 +105,7 @@ function selectPresetRuntime(providerId: "anthropic" | "openai"): RuntimeSelecti
     runtime.defaultProvider === providerId
       ? runtime.defaultModel
       : listPresetModelsForVendor(providerId).find((entry) =>
-          runtime.supportedModelIds?.includes(entry.modelId),
+          runtime.supportedModelIds.includes(entry.modelId),
         )?.modelId;
 
   if (model === undefined) {
@@ -142,7 +141,7 @@ function selectAcpFallbackRuntime(providerId: "deepseek" | "opencode"): RuntimeS
       ? process.env["MOSOO_E2E_DEEPSEEK_MODEL"]?.trim() || DEFAULT_DEEPSEEK_MODEL
       : process.env["MOSOO_E2E_OPENCODE_MODEL"]?.trim() ||
         listPresetModelsForVendor("opencode").find((entry) =>
-          runtime.supportedModelIds?.includes(entry.modelId),
+          runtime.supportedModelIds.includes(entry.modelId),
         )?.modelId;
 
   if (model === undefined) {
@@ -151,9 +150,7 @@ function selectAcpFallbackRuntime(providerId: "deepseek" | "opencode"): RuntimeS
     );
   }
 
-  const supportsModel = runtime.supportedModelIds?.includes(model) ?? true;
-
-  if (!supportsModel) {
+  if (!runtime.supportedModelIds.includes(model)) {
     throw new Error(`Runtime ${runtime.runtimeId} does not expose ${providerId} model ${model}.`);
   }
 
@@ -358,7 +355,6 @@ async function createAgent(
     {
       input: {
         description: "Public API runtime E2E agent",
-        kind: "cattle",
         model: input.runtime.model,
         name: input.name,
         projectId: input.projectId,
@@ -589,35 +585,24 @@ async function waitForPublicApiRuntimeResult(
 
 test("Public API creates a real runtime thread and receives runtime events", async ({
   request,
-}, testInfo) => {
+}) => {
   const providerId = readProviderId();
   const apiKey = requireProviderApiKey(providerId);
   const runtime = getRuntimeSelection(providerId);
   const label = runId();
   const email = process.env["MOSOO_E2E_EMAIL"]?.trim() || `public-api-runtime-${label}@mosoo.ai`;
   const expectedToken = `PUBLIC_API_RUNTIME_${label.toUpperCase()}`;
-  const signals = createRuntimeSignalCollector({
-    progress: true,
-    source: "public-api-runtime",
-  });
 
-  signals.checkpoint("api.health.start");
   await waitForApiHealth(request);
-  signals.checkpoint("api.health.done");
+  console.log("[public-api-runtime] api healthy");
   await login(request, email);
-  signals.checkpoint("api.auth.done", { email });
   await ensureOnboarding(request);
   const projectId = await getActiveProjectId(request);
-  signals.checkpoint("api.project.ready", { projectId });
+  console.log(`[public-api-runtime] signed in as ${email}, project ${projectId}`);
   const agentId = await createAgent(request, {
     projectId,
     name: `Public API runtime ${label}`,
     runtime,
-  });
-  signals.checkpoint("api.agent.created", {
-    agentId,
-    provider: providerId,
-    runtimeId: runtime.runtimeId,
   });
   await configureProviderCredential(request, {
     apiKey,
@@ -627,29 +612,22 @@ test("Public API creates a real runtime thread and receives runtime events", asy
     providerId: runtime.credentialVendorId,
     providerModelIds: runtime.providerModelIds,
   });
-  signals.checkpoint("api.provider.configured", {
-    provider: providerId,
-    runtimeProvider: runtime.credentialVendorId,
-  });
   await publishAgent(request, { agentId, projectId });
-  signals.checkpoint("api.agent.published", { agentId });
+  console.log(
+    `[public-api-runtime] agent ${agentId} published (${providerId}/${runtime.runtimeId})`,
+  );
   const pat = await createPersonalAccessToken(request, `Public API runtime ${label}`, projectId);
-  signals.checkpoint("public-api.token.created");
   const threadId = await createThreadViaPublicApi(request, {
     agentId,
     expectedToken,
     label,
     pat,
   });
-  signals.checkpoint("public-api.thread.created", { threadId });
+  console.log(`[public-api-runtime] thread ${threadId} created`);
   await waitForPublicApiRuntimeResult(request, {
     expectedToken,
     pat,
     threadId,
   });
-  signals.checkpoint("public-api.runtime.completed", { threadId });
-  signals.assertCoverage({
-    requiredCategories: ["feature_path_execution"],
-  });
-  await signals.attachArtifact(testInfo);
+  console.log(`[public-api-runtime] thread ${threadId} completed`);
 });

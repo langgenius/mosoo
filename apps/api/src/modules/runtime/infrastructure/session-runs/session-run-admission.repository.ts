@@ -310,23 +310,8 @@ function createMessageInsertQuery(db: AppDatabase, input: CommitQueuedSessionRun
         sessionRunId: selectedValue(input.run.id, "session_run_id"),
       })
       .from(sessionsTable)
-      .where(
-        and(
-          admissionSessionPredicate(input),
-          exists(
-            db
-              .select({ id: sessionRunsTable.id })
-              .from(sessionRunsTable)
-              .where(eq(sessionRunsTable.id, input.run.id)),
-          ),
-        ),
-      ),
+      .where(admissionSessionPredicate(input)),
   );
-}
-
-function runtimeEventOccurredAt(event: RuntimeEventEnvelope, fallbackMs: number): number {
-  const occurredAt = Date.parse(event.occurredAt);
-  return Number.isFinite(occurredAt) ? occurredAt : fallbackMs;
 }
 
 function createEventInsertQuery(
@@ -337,7 +322,7 @@ function createEventInsertQuery(
 ) {
   const projection = createSessionRuntimeEventProjection(event);
   const timestampMs = input.run.timestampMs + index;
-  const occurredAt = runtimeEventOccurredAt(event, timestampMs);
+  const occurredAt = Date.parse(event.occurredAt);
   const sourceEventId =
     event.sourceEventId ?? (index === 0 ? input.clientRequestId : null) ?? event.id;
 
@@ -369,17 +354,7 @@ function createEventInsertQuery(
         visibility: selectedValue(projection.visibility, "visibility"),
       })
       .from(sessionsTable)
-      .where(
-        and(
-          admissionSessionPredicate(input),
-          exists(
-            db
-              .select({ id: sessionRunsTable.id })
-              .from(sessionRunsTable)
-              .where(eq(sessionRunsTable.id, input.run.id)),
-          ),
-        ),
-      ),
+      .where(admissionSessionPredicate(input)),
   );
 }
 
@@ -404,17 +379,7 @@ function createApiCommandInsertQuery(db: AppDatabase, input: CommitQueuedSession
         updatedAt: selectedValue(record.updatedAt, "updated_at"),
       })
       .from(sessionsTable)
-      .where(
-        and(
-          admissionSessionPredicate(input),
-          exists(
-            db
-              .select({ id: sessionRunsTable.id })
-              .from(sessionRunsTable)
-              .where(eq(sessionRunsTable.id, input.run.id)),
-          ),
-        ),
-      ),
+      .where(admissionSessionPredicate(input)),
   );
 }
 
@@ -422,16 +387,6 @@ export async function attemptQueuedSessionRunAdmission(
   database: D1Database,
   input: CommitQueuedSessionRunAdmissionInput,
 ): Promise<"admitted" | "unavailable"> {
-  if (input.events.length === 0) {
-    throw new Error("Queued Session Run admission requires canonical runtime events.");
-  }
-
-  for (const event of input.events) {
-    if (event.sessionId !== input.session.id || event.runId !== input.run.id) {
-      throw new Error("Queued Session Run admission event scope does not match the Run.");
-    }
-  }
-
   const results = await runAppDatabaseBatch(database, (db) => [
     createRunInsertQuery(db, input),
     db

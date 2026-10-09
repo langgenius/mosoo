@@ -165,10 +165,7 @@ describe("canonical session run terminal failure", () => {
     const database = await createPublicHttpContractDatabase();
     await insertLinkedRunFixture(database, "cancelled");
     const bindings = createPublicHttpTestBindings(database) as ApiBindings;
-    await recordDriverInstanceCompletion(bindings, {
-      driverInstanceId: DRIVER_ID,
-      driverReady: true,
-    });
+    await recordDriverInstanceCompletion(bindings, { driverInstanceId: DRIVER_ID });
     expect(
       await database
         .prepare("SELECT status, error_code FROM session_run WHERE id = ?")

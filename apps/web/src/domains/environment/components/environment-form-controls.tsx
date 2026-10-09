@@ -15,11 +15,7 @@ import { Check, ChevronDown } from "@/shared/ui/icons";
 import { fieldClassName } from "@/shared/ui/input";
 
 import { isTruthy } from "../../../shared/lib/truthiness";
-import {
-  NETWORK_POLICY_LABELS,
-  PACKAGE_MANAGERS,
-  PACKAGE_MANAGER_LABELS,
-} from "./environment-form-model";
+import { NETWORK_POLICY_LABELS, PACKAGE_MANAGERS } from "./environment-form-model";
 function SelectButton({ disabled = false, label }: { disabled?: boolean; label: string }) {
   return (
     <DropdownMenuTrigger asChild>
@@ -83,10 +79,7 @@ export function PackageManagerSelect({
 
   return (
     <DropdownMenu>
-      <SelectButton
-        disabled={disabled}
-        label={value ? PACKAGE_MANAGER_LABELS[value] : t("environments.manager")}
-      />
+      <SelectButton disabled={disabled} label={value ?? t("environments.manager")} />
       <DropdownMenuContent
         align="start"
         className="environment-scroll-area max-h-56 w-[var(--anchor-width)] overflow-y-auto"
@@ -99,7 +92,7 @@ export function PackageManagerSelect({
               onChange(manager);
             }}
           >
-            {PACKAGE_MANAGER_LABELS[manager]}
+            {manager}
             {manager === value ? <Check className="text-fg-1 size-3.5" /> : null}
           </DropdownMenuItem>
         ))}

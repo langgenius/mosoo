@@ -17,10 +17,23 @@ import { AgentFormView } from "./editor/form-view";
 import { useAgentEditorAutoSave } from "./editor/use-auto-save";
 import { useAgentEditorModel } from "./editor/use-model";
 
+// Route splitting: the session panel (assistant-ui and the streaming Markdown
+// renderer) is most of the agent detail route's weight. Loading it as its own
+// chunk keeps the route chunk under Vite's 500 kB warning and lets the editor
+// half paint while the chat half arrives.
 const AgentSessionPanel = lazy(async () => {
   const mod = await import("./agent-session-panel");
   return { default: mod.AgentSessionPanel };
 });
+
+function PreviewChatLoading(): ReactElement {
+  const { t } = useTranslation();
+  return (
+    <div className="text-fg-3 flex h-full items-center justify-center text-[13px]">
+      {t("agent.loadingConversation")}
+    </div>
+  );
+}
 
 interface PublishStatusMessage {
   readonly tone: "danger" | "neutral";
@@ -44,14 +57,6 @@ const PREVIEW_MODE_INITIAL_STATE: PreviewModeState = {
 export interface PreviewModeProps {
   agent: Agent;
   headerActionTarget: HTMLDivElement | null;
-}
-
-function PreviewChatLoading(): ReactElement {
-  return (
-    <div className="text-muted-foreground flex h-full items-center justify-center text-[13px]">
-      Loading preview…
-    </div>
-  );
 }
 
 function publishStatusMessage({
@@ -143,18 +148,16 @@ export function PreviewMode({ agent, headerActionTarget }: PreviewModeProps): Re
             headerActionTarget,
           )
         : null}
-      <div className="border-border-subtle flex h-[42%] w-full shrink-0 flex-col border-b md:h-auto md:w-1/2 md:border-r md:border-b-0">
+      <div className="border-border-soft flex h-[42%] w-full shrink-0 flex-col border-b md:h-auto md:w-1/2 md:border-r md:border-b-0">
         <div className="min-h-0 flex-1 overflow-hidden">
           <Suspense fallback={<PreviewChatLoading />}>
             <AgentSessionPanel
               agentId={agent.id}
               agentName={agent.name}
               configurationChangedAt={agent.updatedAt}
-              configurationRevisionKey={`${agent.updatedAt}:${agent.liveVersion?.id ?? "draft"}`}
               key={agent.id}
               projectId={agent.projectId}
               readiness={agent.readiness}
-              tone="preview"
             />
           </Suspense>
         </div>
@@ -163,24 +166,21 @@ export function PreviewMode({ agent, headerActionTarget }: PreviewModeProps): Re
       <div className="flex h-[58%] w-full min-w-0 flex-col md:h-auto md:w-1/2">
         <PendingChangesBanner model={model} onDiscard={model.discard} />
         <p
-          className="border-border-subtle text-muted-foreground border-b px-4 py-2 text-xs"
+          className="border-border-soft text-fg-3 border-b px-4 py-2 text-xs"
           data-testid="preset-session-scope"
         >
           {model.saving ? t("agent.savingPreset") : t("agent.presetSessionScope")}
         </p>
 
-        <div
-          className="min-h-0 flex-1 overflow-y-auto bg-white p-4 sm:p-5"
-          data-agent-editor-scroll
-        >
+        <div className="bg-card min-h-0 flex-1 overflow-y-auto p-4 sm:p-5" data-agent-editor-scroll>
           <div className="space-y-5">
             <AgentFormView agent={agent} model={model} />
           </div>
         </div>
 
         {publishStatus ? (
-          <div className="border-border-subtle text-muted-foreground flex shrink-0 items-center gap-3 border-t bg-white px-4 py-2.5 text-[12px]">
-            <span className={publishStatus.tone === "danger" ? "text-destructive" : undefined}>
+          <div className="border-border-soft text-fg-3 bg-card flex shrink-0 items-center gap-3 border-t px-4 py-2.5 text-[12px]">
+            <span className={publishStatus.tone === "danger" ? "text-danger" : undefined}>
               {publishStatus.text}
             </span>
           </div>

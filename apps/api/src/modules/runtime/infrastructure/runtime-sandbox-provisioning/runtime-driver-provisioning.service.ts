@@ -1,7 +1,6 @@
 import { DRIVER_BOOT_PAYLOAD_FILE_ENV_NAME } from "@mosoo/agent-driver/boot";
 import type { EnvironmentNetworkPolicy } from "@mosoo/contracts/environment";
 import { getRuntimeCatalogEntry } from "@mosoo/runtime-catalog";
-import { RUNTIME_DIAGNOSTIC_EVENT } from "@mosoo/runtime-events";
 
 import {
   createApiWideEvent,
@@ -13,11 +12,6 @@ import {
 } from "../../../../platform/cloudflare/logger";
 import { disposeRpcResource } from "../../../../platform/cloudflare/rpc-disposal";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
-import {
-  appendRuntimeDiagnosticEvent,
-  toRuntimeDiagnosticBaseValue,
-  toRuntimeDiagnosticReason,
-} from "../../application/runtime-diagnostic-events";
 import { createRuntimeTimingRecorder } from "../../application/session-runs/session-runtime-timing";
 import { DRIVER_HEARTBEAT_INTERVAL_MS } from "../../domain/runtime-config";
 import { getRuntimeDriverSocketPath } from "../../domain/runtime-driver-routes";
@@ -40,17 +34,10 @@ import {
 import {
   DriverPrewarmProvisionSkippedError,
   getLostPrewarmOwnershipError,
-  usesInsertOnlyDriverRecord,
 } from "./runtime-driver-prewarm-ownership";
 import { stopProvisionProcess } from "./runtime-driver-process-cleanup";
+import { installRuntimeEnvironment } from "./runtime-environment-install";
 import {
-  appendRuntimeEnvironmentInstallFailed,
-  createRuntimeEnvironmentInstallState,
-  installRuntimeEnvironment,
-  waitForRuntimeEnvironmentStartedEvents,
-} from "./runtime-environment-install";
-import {
-  getOrganizationPath,
   sanitizeProcessId,
   toContainerReachableOrigin,
 } from "./runtime-sandbox-provisioning.paths";
@@ -59,8 +46,6 @@ import type {
   RuntimeSmokeProvision,
 } from "./runtime-sandbox-provisioning.types";
 import { sanitizeRuntimeVendorEnvVars } from "./runtime-vendor-env-policy";
-
-export { DriverPrewarmProvisionSkippedError } from "./runtime-driver-prewarm-ownership";
 
 const RUNTIME_NO_PROXY_DEFAULTS = ["localhost", "127.0.0.1", "::1", "host.docker.internal"];
 
@@ -134,14 +119,7 @@ export function toRuntimeProcessProxyEnv(
   return env;
 }
 
-export async function provisionSessionDriver(
-  env: ApiBindings,
-  input: ProvisionDriverInput,
-): Promise<RuntimeSmokeProvision> {
-  return provisionDriver(env, input);
-}
-
-async function provisionDriver(
+export async function provisionDriver(
   env: ApiBindings,
   input: ProvisionDriverInput,
 ): Promise<RuntimeSmokeProvision> {
@@ -163,22 +141,13 @@ async function provisionDriver(
     throw new Error(`Unsupported runtime: ${input.runtime}.`);
   }
 
-  const runtimeEnvVars = sanitizeRuntimeVendorEnvVars(input.profile.envVars);
   const runtimeProfile = {
     ...input.profile,
-    envVarNames: input.profile.envVarNames.filter((name) => Object.hasOwn(runtimeEnvVars, name)),
-    envVars: runtimeEnvVars,
+    envVars: sanitizeRuntimeVendorEnvVars(input.profile.envVars),
   };
-  const organizationPath = getOrganizationPath(runtimeProfile);
   const driverControlPort = getDriverControlPort(driverInstanceId);
   const bootToken = await timing.measure("createBootToken", () => createOpaqueBootToken());
-  const insertOnlyDriverRecord = usesInsertOnlyDriverRecord(input);
   const traceparent = createCurrentTraceparent();
-  const runtimeBase = toRuntimeDiagnosticBaseValue({
-    agentId: input.profile.configRevision.agentId,
-    sessionId: input.sandboxSessionId,
-    traceId: input.traceId ?? null,
-  });
   const provisionEvent = createApiWideEvent("runtime.provision", {
     fields: {
       runtime: {
@@ -192,64 +161,48 @@ async function provisionDriver(
     driverInstanceId,
     sandboxId,
   });
-  const environmentRevisionId = input.profile.configRevision.environmentRevisionId;
-  const driverRecordPromise = timing.measure("createDriverInstanceRecord", () =>
-    createDriverInstanceRecord(env, {
-      bootTokenHash: bootToken.hash,
-      driverInstanceId,
-      executionSessionId: input.profile.session.sandboxSessionId,
-      mcpGrants: input.resolvedMcpServers.map(toDriverInstanceMcpGrantRecord),
-      conflictStrategy: input.driverRecordConflictStrategy ?? "replace",
-      runtime: input.runtime,
-      sandboxId,
-      sandboxSessionId: input.sandboxSessionId,
-    }),
-  );
-  void driverRecordPromise.catch(() => undefined);
-
-  const nativeResumeRefPromise = timing.measure("getNativeResumeRef", () =>
-    getNativeResumeRefForRuntime(env.DB, {
-      runtimeId: input.runtime,
-      sessionId: input.sandboxSessionId,
-    }),
-  );
-  void nativeResumeRefPromise.catch(() => undefined);
-
   const explicitControlOrigin = env.MOSOO_RUNTIME_CONTROL_ORIGIN?.trim() || undefined;
   const containerRequestUrl = toContainerReachableOrigin(input.requestUrl, explicitControlOrigin);
-  const environmentInstall = createRuntimeEnvironmentInstallState();
   let driverGeneration: number | null = null;
   let process: RuntimeProcessHandle | null = null;
-  let driverLaunchAttempted = false;
 
   try {
     // Claim the active binding before any remote filesystem/setup side effect.
     // The live record also prevents conversion while preparation is in flight.
-    const driverRecord = await driverRecordPromise;
+    const driverRecord = await timing.measure("createDriverInstanceRecord", () =>
+      createDriverInstanceRecord(env, {
+        bootTokenHash: bootToken.hash,
+        driverInstanceId,
+        executionSessionId: input.profile.session.sandboxSessionId,
+        mcpGrants: input.resolvedMcpServers.map(toDriverInstanceMcpGrantRecord),
+        runtime: input.runtime,
+        sandboxId,
+        sandboxSessionId: input.sandboxSessionId,
+      }),
+    );
     if (driverRecord.status === "skipped") {
       throw new DriverPrewarmProvisionSkippedError(driverInstanceId);
     }
-
-    await installRuntimeEnvironment(env, {
-      cloudflareSession: input.cloudflareSession,
-      environmentRevisionId,
-      profile: runtimeProfile,
-      runtimeBase,
-      sandbox: input.sandbox,
-      sessionId: input.sandboxSessionId,
-      state: environmentInstall,
-      timing,
-    });
-
-    const nativeResumeRef = await nativeResumeRefPromise;
     const activeDriverGeneration = driverRecord.generation;
     driverGeneration = activeDriverGeneration;
 
+    await installRuntimeEnvironment(env, {
+      cloudflareSession: input.cloudflareSession,
+      profile: runtimeProfile,
+      sandbox: input.sandbox,
+      timing,
+    });
+
+    const nativeResumeRef = await timing.measure("getNativeResumeRef", () =>
+      getNativeResumeRefForRuntime(env.DB, {
+        runtimeId: input.runtime,
+        sessionId: input.sandboxSessionId,
+      }),
+    );
     const lostPrewarmOwnershipError = await getLostPrewarmOwnershipError(env, {
       bootTokenHash: bootToken.hash,
       driverInstanceId,
       generation: activeDriverGeneration,
-      insertOnly: insertOnlyDriverRecord,
     });
 
     if (lostPrewarmOwnershipError !== null) {
@@ -263,7 +216,6 @@ async function provisionDriver(
         driverInstanceId,
         nativeResumeRef,
         profile: runtimeProfile,
-        recoveryMessages: [],
         requestUrl: containerRequestUrl,
         resolvedMcpServers: input.resolvedMcpServers,
         resolvedSkillCatalog: input.resolvedSkillCatalog,
@@ -286,32 +238,14 @@ async function provisionDriver(
       traceparent,
     });
     const bootPayloadPath = `${input.profile.session.homePath}/driver-boot-payload-${processId}.json`;
-    const bootPayloadJson = JSON.stringify(bootPayload);
 
-    const bootPayloadPreparedPromise = timing.measure("onBootPayloadPrepared", async () => {
-      await input.onBootPayloadPrepared?.({
-        bootPayload,
-      });
-    });
-    void bootPayloadPreparedPromise.catch(() => undefined);
-
-    driverLaunchAttempted = true;
-    const launchStartedEventPromise = appendRuntimeDiagnosticEvent(env, {
-      eventName: RUNTIME_DIAGNOSTIC_EVENT.driverLaunchStarted.name,
-      sessionId: input.sandboxSessionId,
-      value: {
-        ...runtimeBase,
-        driverInstanceId,
-      },
-    });
-    void launchStartedEventPromise.catch(() => undefined);
     await timing.measure("writeBootPayload", () =>
-      input.cloudflareSession.writeFile(bootPayloadPath, bootPayloadJson),
+      input.cloudflareSession.writeFile(bootPayloadPath, JSON.stringify(bootPayload)),
     );
     const startedProcess = await timing.measure("startProcess", () =>
       input.cloudflareSession.startProcess(AGENT_DRIVER_PROCESS_COMMAND, {
         autoCleanup: true,
-        cwd: organizationPath,
+        cwd: runtimeProfile.session.sessionOrganizationPath,
         env: {
           [DRIVER_BOOT_PAYLOAD_FILE_ENV_NAME]: bootPayloadPath,
           ...toRuntimeProcessProxyEnv(env, runtimeProfile.network.networkPolicy),
@@ -321,22 +255,17 @@ async function provisionDriver(
     );
     process = startedProcess;
 
-    const processRecordPromise = timing.measure("recordRuntimeProcessStarted", async () => {
-      const recorded = insertOnlyDriverRecord
-        ? await recordRuntimeProcessStarted(env, driverInstanceId, startedProcess.id, {
-            expectedBootTokenHash: bootToken.hash,
-            expectedGeneration: activeDriverGeneration,
-          })
-        : await recordRuntimeProcessStarted(env, driverInstanceId, startedProcess.id, {
-            expectedGeneration: activeDriverGeneration,
-          });
+    await timing.measure("recordRuntimeProcessStarted", async () => {
+      const recorded = await recordRuntimeProcessStarted(env, driverInstanceId, startedProcess.id, {
+        expectedBootTokenHash: bootToken.hash,
+        expectedGeneration: activeDriverGeneration,
+      });
 
       if (!recorded) {
         const staleError = await getLostPrewarmOwnershipError(env, {
           bootTokenHash: bootToken.hash,
           driverInstanceId,
           generation: activeDriverGeneration,
-          insertOnly: insertOnlyDriverRecord,
         });
 
         if (staleError !== null) {
@@ -344,12 +273,6 @@ async function provisionDriver(
         }
       }
     });
-    void processRecordPromise.catch(() => undefined);
-    await Promise.all([
-      bootPayloadPreparedPromise,
-      launchStartedEventPromise,
-      processRecordPromise,
-    ]);
 
     const timingSnapshot = timing.snapshot();
 
@@ -371,25 +294,14 @@ async function provisionDriver(
     });
 
     return {
-      bootPayload,
       bootTokenHash: bootToken.hash,
       driverGeneration: activeDriverGeneration,
       driverInstanceId,
       process: startedProcess,
-      sandbox: input.sandbox,
       sandboxId,
       timing: timingSnapshot,
     };
   } catch (error) {
-    await Promise.all([
-      driverRecordPromise.catch(() => undefined),
-      waitForRuntimeEnvironmentStartedEvents(environmentInstall),
-    ]);
-    const caughtDriverRecord = await driverRecordPromise.catch(() => null);
-    if (driverGeneration === null && caughtDriverRecord?.status === "created") {
-      driverGeneration = caughtDriverRecord.generation;
-    }
-
     const stalePrewarmError =
       error instanceof DriverPrewarmProvisionSkippedError
         ? error
@@ -399,7 +311,6 @@ async function provisionDriver(
               bootTokenHash: bootToken.hash,
               driverInstanceId,
               generation: driverGeneration,
-              insertOnly: insertOnlyDriverRecord,
             });
 
     if (stalePrewarmError !== null) {
@@ -421,26 +332,6 @@ async function provisionDriver(
         status: "success",
       });
       throw stalePrewarmError;
-    }
-
-    await appendRuntimeEnvironmentInstallFailed(env, {
-      environmentRevisionId,
-      error,
-      runtimeBase,
-      sessionId: input.sandboxSessionId,
-      state: environmentInstall,
-    });
-
-    if (driverLaunchAttempted && process === null) {
-      await appendRuntimeDiagnosticEvent(env, {
-        eventName: RUNTIME_DIAGNOSTIC_EVENT.driverLaunchFailed.name,
-        sessionId: input.sandboxSessionId,
-        value: {
-          ...runtimeBase,
-          driverInstanceId,
-          reason: toRuntimeDiagnosticReason(error, "Runtime driver launch failed."),
-        },
-      });
     }
 
     if (process) {

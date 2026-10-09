@@ -4,45 +4,31 @@ import type {
   PublicApiVersion,
   PublicThreadApiListThreadsResponse,
 } from "@mosoo/contracts/public-api";
-import { sessionRunsTable, sessionsTable } from "@mosoo/db";
-import type { AgentId, ProjectId, PublicThreadId, SessionId } from "@mosoo/id";
+import type { SessionSummary } from "@mosoo/contracts/session";
+import { agentsTable, projectsTable, sessionRunsTable, sessionsTable } from "@mosoo/db";
+import type { AgentId, SessionId } from "@mosoo/id";
 import type { SQL } from "drizzle-orm";
 import { and, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
 
 import { getAppDatabase } from "../../platform/db/drizzle";
 import type { AuthenticatedViewer } from "../auth/application/viewer-auth.service";
-import { ensureProjectOwnership } from "../projects/application/project.service";
 import {
   buildSessionSummaryFromJoinedRow,
   sessionSummaryWithLastRunColumns,
 } from "../sessions/application/session-summary-query.service";
 import { admitAgentApiEndpointCaller } from "./agent-api-endpoint-admission.service";
-import { publicNotFound } from "./public-api-errors";
-import { toPublicThreadSessionSummary } from "./public-thread-api-presenter";
-import { toBackingSessionId } from "./public-thread-ids";
-import { parsePublicApiThreadRecordMetadata } from "./public-thread-metadata";
+import { publicAgentNotExposed, publicNotFound } from "./public-api-errors";
 import { toPublicThreadSummary } from "./public-thread-presenter";
 
-interface PublicThreadSessionRow {
+export interface PublicThreadAdmission {
+  endUserId: string | null;
   kind: AgentKind;
-  agent_id: AgentId | null;
-  end_user_id: string | null;
-  id: SessionId;
-  project_id: ProjectId;
-  title: string | null;
-}
-
-interface PublicThreadSessionAccess {
-  row: PublicThreadSessionRow;
-}
-
-interface PublicThreadSessionAdmission {
-  session: PublicThreadSessionRow;
+  session: SessionSummary;
 }
 
 function publicThreadCallerScopeConditions(
   caller: AuthenticatedViewer,
-  apiVersion: PublicApiVersion = "v1",
+  apiVersion: PublicApiVersion,
 ): SQL[] {
   return [
     eq(sessionsTable.creatorAccountId, caller.id),
@@ -51,81 +37,59 @@ function publicThreadCallerScopeConditions(
       ? [
           sql`json_extract(${sessionsTable.metadataJson}, '$.public_api.source') = 'public_api'`,
           sql`coalesce(json_extract(${sessionsTable.metadataJson}, '$.public_api.api_version'), 'v1') = 'v1'`,
+          isNotNull(sessionsTable.endUserId),
         ]
       : []),
   ];
 }
 
-async function getPublicThreadSessionAccess(
+/** Admits a caller to a Thread it created in a Project it owns. */
+export async function admitPublicThread(
   database: D1Database,
   caller: AuthenticatedViewer,
-  threadId: PublicThreadId,
-  apiVersion: PublicApiVersion = "v1",
-): Promise<PublicThreadSessionAccess> {
-  const sessionId = toBackingSessionId(threadId);
+  threadId: SessionId,
+  apiVersion: PublicApiVersion,
+): Promise<PublicThreadAdmission> {
   const row =
     (await getAppDatabase(database)
       .select({
-        agent_id: sessionsTable.agentId,
+        ...sessionSummaryWithLastRunColumns(),
+        agent_status: agentsTable.status,
         end_user_id: sessionsTable.endUserId,
-        id: sessionsTable.id,
         kind: sessionsTable.kind,
-        metadata_json: sessionsTable.metadataJson,
-        project_id: sessionsTable.projectId,
-        title: sessionsTable.title,
       })
       .from(sessionsTable)
+      .innerJoin(projectsTable, eq(projectsTable.id, sessionsTable.projectId))
+      .leftJoin(
+        agentsTable,
+        and(
+          eq(agentsTable.id, sessionsTable.agentId),
+          eq(agentsTable.projectId, sessionsTable.projectId),
+        ),
+      )
+      .leftJoin(sessionRunsTable, eq(sessionRunsTable.id, sessionsTable.lastRunId))
       .where(
         and(
-          eq(sessionsTable.id, sessionId),
+          eq(sessionsTable.id, threadId),
+          eq(projectsTable.ownerAccountId, caller.id),
           ...publicThreadCallerScopeConditions(caller, apiVersion),
         ),
       )
       .limit(1)
       .get()) ?? null;
 
-  if (!row) {
+  if (row === null || (apiVersion === "v1" && row.agent_status === null)) {
     throw publicNotFound("Thread not found.");
   }
 
-  const metadata = parsePublicApiThreadRecordMetadata(row.metadata_json);
-
-  if (
-    apiVersion === "v1" &&
-    (!metadata || metadata.api_version === "v2" || row.end_user_id === null)
-  ) {
-    throw publicNotFound("Thread not found.");
+  if (apiVersion === "v1" && row.agent_status !== "published") {
+    throw publicAgentNotExposed("This Agent is not exposed as an active API endpoint.");
   }
 
   return {
-    row: {
-      agent_id: row.agent_id,
-      end_user_id: row.end_user_id,
-      id: row.id,
-      kind: row.kind,
-      project_id: row.project_id,
-      title: row.title,
-    },
-  };
-}
-
-export async function admitPublicSessionCaller(
-  database: D1Database,
-  caller: AuthenticatedViewer,
-  threadId: PublicThreadId,
-  apiVersion: PublicApiVersion = "v1",
-): Promise<PublicThreadSessionAdmission> {
-  const access = await getPublicThreadSessionAccess(database, caller, threadId, apiVersion);
-  if (apiVersion === "v1") {
-    if (access.row.agent_id === null) throw publicNotFound("Thread not found.");
-    const agent = await admitAgentApiEndpointCaller(database, caller, access.row.agent_id);
-    if (agent.projectId !== access.row.project_id) throw publicNotFound("Thread not found.");
-  } else {
-    await ensureProjectOwnership(database, caller.id, access.row.project_id);
-  }
-
-  return {
-    session: access.row,
+    endUserId: row.end_user_id,
+    kind: row.kind,
+    session: buildSessionSummaryFromJoinedRow(row),
   };
 }
 
@@ -134,7 +98,7 @@ export async function listAgentApiEndpointThreads(
   caller: AuthenticatedViewer,
   input: {
     agentId: AgentId;
-    apiVersion?: PublicApiVersion | undefined;
+    apiVersion: PublicApiVersion;
     archived: boolean | null;
   },
 ): Promise<PublicThreadApiListThreadsResponse<string | null, PublicApiVersion>> {
@@ -156,7 +120,6 @@ export async function listAgentApiEndpointThreads(
       ...sessionSummaryWithLastRunColumns(),
       kind: sessionsTable.kind,
       end_user_id: sessionsTable.endUserId,
-      metadata_json: sessionsTable.metadataJson,
     })
     .from(sessionsTable)
     .leftJoin(sessionRunsTable, eq(sessionRunsTable.id, sessionsTable.lastRunId))
@@ -166,23 +129,13 @@ export async function listAgentApiEndpointThreads(
     .all();
 
   return {
-    threads: rows.flatMap((row) => {
-      const metadata = parsePublicApiThreadRecordMetadata(row.metadata_json);
-      if (
-        (input.apiVersion ?? "v1") === "v1" &&
-        (!metadata || metadata.api_version === "v2" || row.end_user_id === null)
-      ) {
-        return [];
-      }
-
-      return [
-        toPublicThreadSummary({
-          apiVersion: input.apiVersion,
-          endUserId: row.end_user_id,
-          legacyKind: row.kind,
-          session: toPublicThreadSessionSummary(buildSessionSummaryFromJoinedRow(row)),
-        }),
-      ];
-    }),
+    threads: rows.map((row) =>
+      toPublicThreadSummary({
+        apiVersion: input.apiVersion,
+        endUserId: row.end_user_id,
+        legacyKind: row.kind,
+        session: buildSessionSummaryFromJoinedRow(row),
+      }),
+    ),
   };
 }

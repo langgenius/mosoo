@@ -1,12 +1,11 @@
 import type {
-  SessionListPageInfo,
   SessionStatus,
   SessionSummary,
   SessionSummaryConnection,
   SessionType,
 } from "@mosoo/contracts/session";
 import type { SessionRunStatus, SessionRunTrigger } from "@mosoo/contracts/session-run";
-import { sessionRunsTable, sessionsTable } from "@mosoo/db";
+import { projectsTable, sessionRunsTable, sessionsTable } from "@mosoo/db";
 import { parsePlatformId } from "@mosoo/id";
 import type {
   AccountId,
@@ -17,23 +16,13 @@ import type {
   SessionRunId,
 } from "@mosoo/id";
 import type { SQL } from "drizzle-orm";
-import { and, desc, eq, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
+import { and, desc, eq, lt, or, sql } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { forbiddenError, validationError } from "../../../platform/errors";
 import { toIsoString } from "../../../time";
-import { ensureProjectAgentOwner } from "../../agents/application/agent-access.service";
-import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import { ensureProjectOwnership } from "../../projects/application/project.service";
 import { toSessionRunSummary } from "../../runtime/infrastructure/session-runs/session-run-row.mapper";
 import type { SessionRunRow } from "../../runtime/infrastructure/session-runs/session-run-row.mapper";
-import { getSessionRunSummariesByIds } from "../../runtime/infrastructure/session-runs/session-run-store.repository";
-import {
-  sessionCreatorCondition,
-  sessionCreatorFlag,
-  sessionParticipantCondition,
-  sessionParticipantFlag,
-} from "../domain/session-access.policy";
 
 export const SESSION_SUMMARY_LIST_LIMIT = 100;
 
@@ -48,7 +37,7 @@ export interface SessionSummaryListOptions {
   type?: SessionType | null;
 }
 
-export interface SessionSummaryRow {
+interface SessionSummaryRow {
   agent_id: AgentId | null;
   archived_at: number | null;
   created_at: number;
@@ -83,25 +72,6 @@ export interface SessionSummaryWithLastRunRow extends SessionSummaryRow {
   run_trace_id: string | null;
   run_trigger: SessionRunTrigger | null;
   run_updated_at: number | null;
-}
-
-interface SessionSummaryAccessWithLastRunRow extends SessionSummaryWithLastRunRow {
-  is_session_creator: number;
-  is_session_participant: number;
-}
-
-interface ParticipantSessionSummaryAccessWithLastRunRow extends SessionSummaryWithLastRunRow {
-  is_session_creator: number;
-}
-
-export interface SessionSummaryAccess {
-  isSessionCreator: boolean;
-  session: SessionSummary;
-}
-
-export interface SessionSummaryAccessConnection {
-  nodes: SessionSummaryAccess[];
-  pageInfo: SessionListPageInfo;
 }
 
 function normalizeSessionSummaryListLimit(limit: number | null | undefined): number {
@@ -183,44 +153,7 @@ export async function listSessionSummaryConnection(input: {
   };
 }
 
-export async function listSessionSummaryAccessConnection(input: {
-  beforeCursor?: string | null;
-  database: D1Database;
-  filters: readonly SQL[];
-  limit?: number | null;
-  viewerId: AccountId;
-}): Promise<SessionSummaryAccessConnection> {
-  const limit = normalizeSessionSummaryListLimit(input.limit);
-  const beforeCursor = parseSessionSummaryCursor(input.beforeCursor);
-  const filters = [...input.filters];
-
-  if (beforeCursor !== null) {
-    filters.push(sessionSummaryCursorFilter(beforeCursor));
-  }
-
-  const rows = await getAppDatabase(input.database)
-    .select(sessionSummaryAccessWithLastRunColumns(input.viewerId))
-    .from(sessionsTable)
-    .leftJoin(sessionRunsTable, eq(sessionRunsTable.id, sessionsTable.lastRunId))
-    .where(and(...filters))
-    .orderBy(desc(sessionsTable.updatedAt), desc(sessionsTable.id))
-    .limit(limit + 1)
-    .all();
-  const nodeRows = rows.slice(0, limit);
-  const firstRow = nodeRows[0] ?? null;
-  const lastRow = nodeRows.at(-1) ?? null;
-
-  return {
-    nodes: nodeRows.map(buildSessionSummaryAccessFromJoinedRow),
-    pageInfo: {
-      endCursor: lastRow === null ? null : encodeSessionSummaryCursor(lastRow),
-      hasMore: rows.length > limit,
-      startCursor: firstRow === null ? null : encodeSessionSummaryCursor(firstRow),
-    },
-  };
-}
-
-export function sessionSummaryColumns() {
+function sessionSummaryColumns() {
   return {
     agent_id: sessionsTable.agentId,
     archived_at: sessionsTable.archivedAt,
@@ -276,24 +209,8 @@ export function sessionSummaryWithLastRunColumns() {
   };
 }
 
-function sessionSummaryAccessWithLastRunColumns(viewerId: AccountId) {
-  return {
-    ...sessionSummaryWithLastRunColumns(),
-    is_session_creator: sessionCreatorFlag(viewerId).as("is_session_creator"),
-    is_session_participant: sessionParticipantFlag(viewerId).as("is_session_participant"),
-  };
-}
-
-function participantSessionSummaryAccessWithLastRunColumns(viewerId: AccountId) {
-  return {
-    ...sessionSummaryWithLastRunColumns(),
-    is_session_creator: sessionCreatorFlag(viewerId).as("is_session_creator"),
-  };
-}
-
-function buildSessionSummaryFromRow(
-  row: SessionSummaryRow,
-  lastRun: SessionSummary["lastRun"],
+export function buildSessionSummaryFromJoinedRow(
+  row: SessionSummaryWithLastRunRow,
 ): SessionSummary {
   return {
     agentId: row.agent_id,
@@ -303,7 +220,7 @@ function buildSessionSummaryFromRow(
     deploymentVersionNumber: row.deployment_version_number,
     id: row.id,
     lastMessageAt: row.last_message_at === null ? null : toIsoString(row.last_message_at),
-    lastRun,
+    lastRun: toJoinedSessionRunSummary(row),
     model: row.model,
     provider: row.provider,
     projectId: row.project_id,
@@ -315,70 +232,6 @@ function buildSessionSummaryFromRow(
   };
 }
 
-export function buildSessionSummaryFromJoinedRow(
-  row: SessionSummaryWithLastRunRow,
-): SessionSummary {
-  return buildSessionSummaryFromRow(row, toJoinedSessionRunSummary(row));
-}
-
-export async function hydrateSessionSummariesFromRows(
-  database: D1Database,
-  rows: readonly SessionSummaryRow[],
-): Promise<SessionSummary[]> {
-  const runIds = rows.flatMap((row) => (row.last_run_id === null ? [] : [row.last_run_id]));
-  const runsById = await getSessionRunSummariesByIds(database, runIds);
-
-  return rows.map((row) =>
-    buildSessionSummaryFromRow(
-      row,
-      row.last_run_id === null ? null : (runsById.get(row.last_run_id) ?? null),
-    ),
-  );
-}
-
-function buildSessionSummaryAccessFromJoinedRow(
-  row: SessionSummaryAccessWithLastRunRow | ParticipantSessionSummaryAccessWithLastRunRow,
-): SessionSummaryAccess {
-  return {
-    isSessionCreator: row.is_session_creator === 1,
-    session: buildSessionSummaryFromJoinedRow(row),
-  };
-}
-
-export async function getSessionSummaryAccessById(
-  database: D1Database,
-  viewerId: AccountId,
-  input: {
-    projectId: ProjectId;
-    sessionId: SessionId;
-  },
-): Promise<SessionSummaryAccess> {
-  await ensureProjectOwnership(database, viewerId, input.projectId);
-  const row =
-    (await getAppDatabase(database)
-      .select(sessionSummaryAccessWithLastRunColumns(viewerId))
-      .from(sessionsTable)
-      .leftJoin(sessionRunsTable, eq(sessionRunsTable.id, sessionsTable.lastRunId))
-      .where(
-        and(eq(sessionsTable.id, input.sessionId), eq(sessionsTable.projectId, input.projectId)),
-      )
-      .limit(1)
-      .get()) ?? null;
-
-  if (!row) {
-    throw new Error("Session not found.");
-  }
-
-  if (row.is_session_participant !== 1 && row.agent_id !== null) {
-    await ensureProjectAgentOwner(database, viewerId, {
-      agentId: row.agent_id,
-      projectId: input.projectId,
-    });
-  }
-
-  return buildSessionSummaryAccessFromJoinedRow(row);
-}
-
 export async function getSessionSummaryById(
   database: D1Database,
   viewerId: AccountId,
@@ -387,28 +240,17 @@ export async function getSessionSummaryById(
     sessionId: SessionId;
   },
 ): Promise<SessionSummary> {
-  return (await getSessionSummaryAccessById(database, viewerId, input)).session;
-}
-
-export async function getParticipantSessionSummaryById(
-  database: D1Database,
-  viewerId: AccountId,
-  input: {
-    projectId: ProjectId;
-    sessionId: SessionId;
-  },
-): Promise<SessionSummary> {
-  await ensureProjectOwnership(database, viewerId, input.projectId);
   const row =
     (await getAppDatabase(database)
       .select(sessionSummaryWithLastRunColumns())
       .from(sessionsTable)
+      .innerJoin(projectsTable, eq(projectsTable.id, sessionsTable.projectId))
       .leftJoin(sessionRunsTable, eq(sessionRunsTable.id, sessionsTable.lastRunId))
       .where(
         and(
           eq(sessionsTable.id, input.sessionId),
           eq(sessionsTable.projectId, input.projectId),
-          sessionParticipantCondition(viewerId),
+          eq(projectsTable.ownerAccountId, viewerId),
         ),
       )
       .limit(1)
@@ -419,108 +261,6 @@ export async function getParticipantSessionSummaryById(
   }
 
   return buildSessionSummaryFromJoinedRow(row);
-}
-
-export async function getParticipantSessionSummaryAccessById(
-  database: D1Database,
-  viewerId: AccountId,
-  input: {
-    projectId: ProjectId;
-    sessionId: SessionId;
-  },
-): Promise<SessionSummaryAccess> {
-  await ensureProjectOwnership(database, viewerId, input.projectId);
-  const row =
-    (await getAppDatabase(database)
-      .select(participantSessionSummaryAccessWithLastRunColumns(viewerId))
-      .from(sessionsTable)
-      .leftJoin(sessionRunsTable, eq(sessionRunsTable.id, sessionsTable.lastRunId))
-      .where(
-        and(
-          eq(sessionsTable.id, input.sessionId),
-          eq(sessionsTable.projectId, input.projectId),
-          sessionParticipantCondition(viewerId),
-        ),
-      )
-      .limit(1)
-      .get()) ?? null;
-
-  if (!row) {
-    throw forbiddenError();
-  }
-
-  return buildSessionSummaryAccessFromJoinedRow(row);
-}
-
-export async function getSessionSummaryForCreator(
-  database: D1Database,
-  viewerId: AccountId,
-  input: {
-    projectId: ProjectId;
-    sessionId: SessionId;
-  },
-): Promise<SessionSummary> {
-  await ensureProjectOwnership(database, viewerId, input.projectId);
-  const row =
-    (await getAppDatabase(database)
-      .select(sessionSummaryWithLastRunColumns())
-      .from(sessionsTable)
-      .leftJoin(sessionRunsTable, eq(sessionRunsTable.id, sessionsTable.lastRunId))
-      .where(
-        and(
-          eq(sessionsTable.id, input.sessionId),
-          eq(sessionsTable.projectId, input.projectId),
-          sessionCreatorCondition(viewerId),
-        ),
-      )
-      .limit(1)
-      .get()) ?? null;
-
-  if (!row) {
-    throw new Error("Session not found.");
-  }
-
-  return buildSessionSummaryFromJoinedRow(row);
-}
-
-export async function listSessions(
-  database: D1Database,
-  viewer: AuthenticatedViewer,
-  input: SessionSummaryListOptions & {
-    archived?: boolean | null;
-    projectId: ProjectId;
-  },
-): Promise<SessionSummaryConnection> {
-  const archived = input.archived ?? false;
-  await ensureProjectOwnership(database, viewer.id, input.projectId);
-
-  const filters: SQL[] = [
-    eq(sessionsTable.projectId, input.projectId),
-    sessionParticipantCondition(viewer.id),
-    archived ? isNotNull(sessionsTable.archivedAt) : isNull(sessionsTable.archivedAt),
-  ];
-
-  if (input.type !== undefined && input.type !== null) {
-    filters.push(eq(sessionsTable.type, input.type));
-  }
-
-  return listSessionSummaryConnection({
-    beforeCursor: input.beforeCursor ?? null,
-    database,
-    filters,
-    limit: input.limit ?? null,
-  });
-}
-
-export async function getSession(
-  database: D1Database,
-  viewer: AuthenticatedViewer,
-  input: {
-    projectId: ProjectId;
-    sessionId: SessionId;
-  },
-): Promise<SessionSummary> {
-  return getSessionSummaryById(database, viewer.id, input);
 }
 
 function requireJoinedRunValue<T>(value: T | null, fieldName: string): T {

@@ -62,15 +62,9 @@ function SetupLaneTab({
 function CodingAgentLane(): ReactElement {
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
-  const [copyFailed, setCopyFailed] = useState(false);
 
   async function copyInstallCommand(): Promise<void> {
-    setCopyFailed(false);
-
-    const didCopy = await writeClipboardText(INSTALL_COMMAND);
-
-    if (!didCopy) {
-      setCopyFailed(true);
+    if (!(await writeClipboardText(INSTALL_COMMAND))) {
       return;
     }
 
@@ -82,7 +76,7 @@ function CodingAgentLane(): ReactElement {
 
   return (
     <>
-      <div className="border-border bg-bg-sunken mt-7 flex w-full flex-col items-stretch gap-3 rounded-lg border px-4 py-3 sm:flex-row sm:items-center">
+      <div className="border-border bg-sunken mt-7 flex w-full flex-col items-stretch gap-3 rounded-lg border px-4 py-3 sm:flex-row sm:items-center">
         <code className="text-fg-1 min-w-0 flex-1 truncate text-left font-mono text-[13px] sm:text-base">
           <span className="text-fg-3 select-none">$ </span>
           {INSTALL_COMMAND}
@@ -98,21 +92,6 @@ function CodingAgentLane(): ReactElement {
           {copied ? t("common.copied") : t("common.copy")}
         </Button>
       </div>
-
-      {copyFailed ? (
-        <div className="mt-2 w-full text-left">
-          <input
-            aria-label={t("projectOverview.installCommandLabel")}
-            readOnly
-            value={INSTALL_COMMAND}
-            onFocus={(event) => {
-              event.currentTarget.select();
-            }}
-            className="border-border bg-bg-sunken text-fg-1 w-full rounded-md border px-3 py-2 font-mono text-xs"
-          />
-          <p className="text-fg-3 mt-1 text-xs">{t("onboarding.copyFailed")}</p>
-        </div>
-      ) : null}
 
       <p className="text-fg-3 mt-3 max-w-2xl text-[13px] leading-5">
         {t("onboarding.setupDescription")}
@@ -157,11 +136,9 @@ export function ProjectOverviewInstallGuide(): ReactElement {
         <h2 className="text-foreground tracking-title text-3xl font-semibold sm:text-4xl">
           {t("onboarding.title")}
         </h2>
-        <p className="text-muted-foreground mt-3 max-w-2xl text-base leading-7">
-          {t("onboarding.subtitle")}
-        </p>
+        <p className="text-fg-3 mt-3 max-w-2xl text-base leading-7">{t("onboarding.subtitle")}</p>
 
-        <div className="border-border bg-bg-sunken mt-7 inline-flex rounded-lg border p-1">
+        <div className="border-border bg-sunken mt-7 inline-flex rounded-lg border p-1">
           <SetupLaneTab
             active={lane === "cli"}
             icon={<SquareTerminal className="size-4" />}

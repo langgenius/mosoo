@@ -6,13 +6,8 @@ import type { AuthenticatedViewer } from "../../../auth/application/viewer-auth.
 import type { Session } from "./do";
 import { SESSION_ID_HEADER, writeSessionViewerSocketHeaders } from "./socket-headers";
 
-function requireSessionBinding(env: ApiBindings): DurableObjectNamespace<Session> {
-  return env.Session;
-}
-
 function getSessionStub(env: ApiBindings, sessionId: SessionId): DurableObjectStub<Session> {
-  const binding = requireSessionBinding(env);
-  return binding.get(binding.idFromName(sessionId));
+  return env.Session.get(env.Session.idFromName(sessionId));
 }
 
 function createSessionDoRequest(sessionId: SessionId, path: string, init?: RequestInit): Request {
@@ -57,7 +52,7 @@ export async function publishSessionViewerEvents(
   sessionId: SessionId | null,
   events: AgUiSessionEvent[],
 ): Promise<void> {
-  if (sessionId === null || sessionId === "" || events.length === 0) {
+  if (sessionId === null || events.length === 0) {
     return;
   }
 
@@ -88,7 +83,7 @@ export async function syncSessionViewerState(
   env: ApiBindings,
   sessionId: SessionId | null,
 ): Promise<void> {
-  if (sessionId === null || sessionId === "") {
+  if (sessionId === null) {
     return;
   }
 
@@ -97,24 +92,16 @@ export async function syncSessionViewerState(
 
 export async function closeSessionViewerSockets(
   env: ApiBindings,
-  sessionId: SessionId | null,
+  sessionId: SessionId,
   reason: string,
 ): Promise<void> {
-  if (sessionId === null || sessionId === "") {
-    return;
-  }
-
   await getSessionStub(env, sessionId).closeViewers(sessionId, reason);
 }
 
 export async function destroySessionDurableObject(
   env: ApiBindings,
-  sessionId: SessionId | null,
+  sessionId: SessionId,
   reason: string,
 ): Promise<void> {
-  if (sessionId === null || sessionId === "") {
-    return;
-  }
-
-  await getSessionStub(env, sessionId).destroy(sessionId, reason);
+  await getSessionStub(env, sessionId).destroy(reason);
 }

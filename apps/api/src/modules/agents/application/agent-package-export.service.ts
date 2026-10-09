@@ -92,8 +92,8 @@ export async function exportAgentPackage(
     projectId: ProjectId;
   },
 ): Promise<AgentPackageExport> {
-  const packageAccess = await ensureProjectAgentOwner(bindings.DB, viewer.id, input);
-  const sourceSpec = await buildAgentSpec(bindings.DB, packageAccess.agent);
+  const agent = await ensureProjectAgentOwner(bindings.DB, viewer.id, input);
+  const sourceSpec = await buildAgentSpec(bindings.DB, agent);
   const sourceManifest = toAgentManifest(sourceSpec);
   const manifest = createPortableAgentPackageManifest(sourceManifest);
   const assets: AgentPackageAsset[] = [];
@@ -108,33 +108,33 @@ export async function exportAgentPackage(
     author: null,
     project: {
       avatarAssetKey: null,
-      description: packageAccess.agent.description,
-      name: packageAccess.agent.name,
+      description: agent.description,
+      name: agent.name,
     },
     assets,
     exportedAt: toIsoString(Date.now()),
     license: null,
     manifest,
     packageVersion: AGENT_PACKAGE_VERSION,
-    sourceAgentId: packageAccess.agent.id,
+    sourceAgentId: agent.id,
     version: null,
   };
-  const fileName = createAgentPackageFileName(packageAccess.agent.name);
+  const fileName = createAgentPackageFileName(agent.name);
   const archiveBytes = createAgentPackageArchiveBytes(agentPackage);
   const packageFile = await createAgentPackageFile({
     archiveBytes,
     bindings,
     fileName,
-    projectId: packageAccess.agent.projectId,
+    projectId: agent.projectId,
     viewer,
   });
 
   return {
-    agentId: packageAccess.agent.id,
+    agentId: agent.id,
     contentType: packageFile.contentType,
     fileId: packageFile.fileId,
     fileName: packageFile.fileName,
-    manifestYaml: serializeAgentManifestToYaml(manifest, packageAccess.agent.id),
+    manifestYaml: serializeAgentManifestToYaml(manifest, agent.id),
     size: packageFile.size,
   };
 }

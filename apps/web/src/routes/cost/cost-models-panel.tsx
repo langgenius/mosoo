@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 
+import type { CostModelRow } from "@/domains/cost/api/cost-client";
 import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 
@@ -12,7 +13,6 @@ import {
   summarizeCostVendors,
   tokensTotal,
 } from "./cost-model";
-import type { CostModelRow } from "./cost-model";
 
 export function CostModelsPanel({ models }: { models: CostModelRow[] }) {
   const { t } = useTranslation();
@@ -38,7 +38,7 @@ export function CostModelsPanel({ models }: { models: CostModelRow[] }) {
                   <div className="mb-1 flex items-center justify-between text-sm">
                     <div className="min-w-0">
                       <div className="text-foreground truncate font-medium">{vendor.vendor}</div>
-                      <div className="text-muted-foreground text-xs">
+                      <div className="text-fg-3 text-xs">
                         {t("cost.vendorSummary", {
                           modelCount: String(vendor.modelCount),
                           requestCount: formatCompactNumber(vendor.requestCount),
@@ -47,7 +47,7 @@ export function CostModelsPanel({ models }: { models: CostModelRow[] }) {
                     </div>
                     <div className="font-mono">{formatCurrency(vendor.totalCostUsd)}</div>
                   </div>
-                  <div className="bg-muted h-2 overflow-hidden rounded-full">
+                  <div className="bg-sunken h-2 overflow-hidden rounded-full">
                     <div
                       className="h-full rounded-full"
                       style={{
@@ -64,7 +64,7 @@ export function CostModelsPanel({ models }: { models: CostModelRow[] }) {
       </div>
 
       <div className="border-border bg-card overflow-x-auto rounded-lg border">
-        <div className="border-border bg-muted/30 text-fg-2 grid min-w-[980px] grid-cols-[minmax(180px,1.2fr)_110px_100px_120px_90px_120px_120px_100px_100px] border-b px-4 py-2 text-[12px] font-medium">
+        <div className="border-border bg-sunken/30 text-fg-2 grid min-w-[980px] grid-cols-[minmax(180px,1.2fr)_110px_100px_120px_90px_120px_120px_100px_100px] border-b px-4 py-2 text-[12px] font-medium">
           <div>{t("cost.model")}</div>
           <div>{t("cost.vendor")}</div>
           <div>{t("cost.requests")}</div>
@@ -76,7 +76,7 @@ export function CostModelsPanel({ models }: { models: CostModelRow[] }) {
           <div className="text-right">{t("cost.action")}</div>
         </div>
         {models.length === 0 ? (
-          <div className="text-muted-foreground px-4 py-10 text-center text-sm">
+          <div className="text-fg-3 px-4 py-10 text-center text-sm">
             {t("cost.noModelCostEvents")}
           </div>
         ) : null}
@@ -95,22 +95,22 @@ export function CostModelsPanel({ models }: { models: CostModelRow[] }) {
                     <span className={cn("size-2.5 rounded-full", modelColor(model.model))} />
                     <span className="truncate">{model.model}</span>
                   </div>
-                  <div className="text-muted-foreground truncate text-xs">{model.provider}</div>
+                  <div className="text-fg-3 truncate text-xs">{model.provider}</div>
                 </div>
                 <div>{model.vendor}</div>
                 <div>{formatCompactNumber(model.requestCount)}</div>
                 <div>
                   <div>{formatCompactNumber(tokensTotal(model))}</div>
-                  <div className="text-muted-foreground text-xs">{formatPlainPercent(share)}</div>
+                  <div className="text-fg-3 text-xs">{formatPlainPercent(share)}</div>
                 </div>
                 <div>{pricing.cacheHitLabel}</div>
                 <div className="font-mono text-xs">
                   {pricing.inputOutputPriceLabel}
-                  <div className="text-muted-foreground">{t("cost.per1M")}</div>
+                  <div className="text-fg-3">{t("cost.per1M")}</div>
                 </div>
                 <div className="font-mono text-xs">
                   {pricing.cacheReadPriceLabel}/{pricing.cacheWritePriceLabel}
-                  <div className="text-muted-foreground">{t("cost.per1M")}</div>
+                  <div className="text-fg-3">{t("cost.per1M")}</div>
                 </div>
                 <div className="text-right font-mono font-semibold">
                   {formatCurrency(model.totalCostUsd)}
@@ -119,12 +119,12 @@ export function CostModelsPanel({ models }: { models: CostModelRow[] }) {
                   {pricing.needsPricingAction ? (
                     <Link
                       to="/providers"
-                      className="border-amber/30 text-amber-fg hover:bg-amber-bg rounded-md border px-2 py-1 text-xs font-semibold"
+                      className="border-warning/30 text-warning-fg hover:bg-warning-bg rounded-md border px-2 py-1 text-xs font-semibold"
                     >
                       {t("cost.setPricing")}
                     </Link>
                   ) : (
-                    <span className="text-muted-foreground text-xs">{t("cost.priced")}</span>
+                    <span className="text-fg-3 text-xs">{t("cost.priced")}</span>
                   )}
                 </div>
               </div>
@@ -141,7 +141,7 @@ function ModelDonut({ models, totalCost }: { models: CostModelRow[]; totalCost: 
 
   if (models.length === 0 || totalCost <= 0) {
     return (
-      <div className="bg-muted/30 text-muted-foreground flex h-48 items-center justify-center rounded-lg text-sm">
+      <div className="bg-sunken/30 text-fg-3 flex h-48 items-center justify-center rounded-lg text-sm">
         {t("cost.noModelSpend")}
       </div>
     );
@@ -183,15 +183,15 @@ function ModelDonut({ models, totalCost }: { models: CostModelRow[]; totalCost: 
 }
 
 function vendorColor(index: number): string {
-  // mosoo brand palette: green-600, sky, ink-700, amber, soil, ember. Reference
-  // the design-system tokens so the chart tracks theme changes (incl. dark mode).
+  // Chart series: green-600, then the info, ink-700, warning, soil and danger
+  // roles. Reference the tokens so the chart tracks theme changes.
   const colors = [
     "var(--color-green-600)",
-    "var(--color-sky)",
+    "var(--color-info)",
     "var(--color-ink-700)",
-    "var(--color-amber)",
+    "var(--color-warning)",
     "var(--color-soil)",
-    "var(--color-ember)",
+    "var(--color-danger)",
   ] as const;
 
   return colors[index % colors.length] ?? "var(--color-ink-700)";

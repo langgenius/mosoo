@@ -9,7 +9,6 @@ export const fileSchema = /* GraphQL */ `
 
   input FileListInput {
     projectId: ULID!
-    scopeId: ULID
     scopeKind: FileScopeKind
     sessionId: ULID
     sessionKind: FileSessionKind

@@ -1,92 +1,48 @@
-import type { SessionType } from "@mosoo/contracts/session";
+import type { ProjectId } from "@mosoo/id";
 import { useQuery } from "@tanstack/react-query";
 
 import { useVisibleAgentsQuery } from "@/domains/agent/query/agent-queries";
-import { listPersonalAccessTokens } from "@/domains/auth/api/personal-access-token-client";
+import {
+  listPersonalAccessTokens,
+  personalAccessTokenKeys,
+} from "@/domains/auth/api/personal-access-token-client";
 import { threadSessions } from "@/domains/session/api/list";
-import { listVendorCredentials } from "@/domains/vendor-credential/api/vendor-credential-client";
-import { toProjectId } from "@/routes/typed-id";
+import { useVendorCredentialsQuery } from "@/domains/vendor-credential/model/provider-credential-query";
+import { threadKeys } from "@/routes/threads/model/query-keys";
 
 export interface OnboardingProgress {
   /** At least one provider credential exists on the active Project. */
-  hasProviderKey: boolean | null;
+  hasProviderKey: boolean;
   /** At least one active API key exists in the selected Project. */
-  hasApiToken: boolean | null;
+  hasApiToken: boolean;
   /** At least one agent is visible on the active Project. */
-  hasAgent: boolean | null;
+  hasAgent: boolean;
   /** At least one UI Thread has started a Run on the active Project. */
-  hasRunThread: boolean | null;
+  hasRunThread: boolean;
 }
-
-interface OnboardingThreadState {
-  session: {
-    lastRun: object | null;
-    type: SessionType;
-  };
-}
-
-export function hasRunUiThread(threads: readonly OnboardingThreadState[]): boolean {
-  return threads.some(({ session }) => session.type === "ui" && session.lastRun !== null);
-}
-
-const onboardingKeys = {
-  providerKeys: (projectId: string | null) =>
-    ["onboarding-progress", "provider-keys", projectId ?? "missing"] as const,
-  sessions: (projectId: string | null) =>
-    ["onboarding-progress", "sessions", projectId ?? "missing"] as const,
-  tokens: (projectId: string | null) =>
-    ["onboarding-progress", "access-tokens", projectId] as const,
-};
 
 /**
- * Completion state for the Overview onboarding checklist. Each flag is `null`
- * while unknown (loading or failed) so the checklist renders plain step
- * numbers instead of wrong checkmarks; a read error here must never surface
- * as a page banner, the steps stay clickable either way.
+ * Completion state for the Overview onboarding checklist. It reads the same
+ * queries as the Providers, API keys, Agents and Threads pages. A flag stays
+ * false while its read is loading or failed, so the checklist shows plain step
+ * numbers; a read error never surfaces as a page banner.
  */
-export function useOnboardingProgress(projectId: string | null): OnboardingProgress {
-  const providerKeysQuery = useQuery({
-    enabled: projectId !== null,
-    queryFn: async () => {
-      if (projectId === null) {
-        throw new Error("Project id is required to list provider credentials.");
-      }
-
-      return listVendorCredentials(toProjectId(projectId));
-    },
-    queryKey: onboardingKeys.providerKeys(projectId),
-    retry: 1,
-  });
+export function useOnboardingProgress(projectId: ProjectId): OnboardingProgress {
+  const { credentials } = useVendorCredentialsQuery(projectId);
   const tokensQuery = useQuery({
-    enabled: projectId !== null,
-    queryFn: () => {
-      if (projectId === null) throw new Error("Project ID is required to list API keys.");
-      return listPersonalAccessTokens(toProjectId(projectId));
-    },
-    queryKey: onboardingKeys.tokens(projectId),
-    retry: 1,
+    queryFn: async () => listPersonalAccessTokens(projectId),
+    queryKey: personalAccessTokenKeys.list(projectId),
   });
   const agentsQuery = useVisibleAgentsQuery(projectId);
-  const sessionsQuery = useQuery({
-    enabled: projectId !== null,
-    queryFn: async () => {
-      if (projectId === null) {
-        throw new Error("Project id is required to list Thread sessions.");
-      }
-
-      return threadSessions(toProjectId(projectId), "ui");
-    },
-    queryKey: onboardingKeys.sessions(projectId),
-    retry: 1,
+  const threadsQuery = useQuery({
+    queryFn: async () => threadSessions(projectId, "ui"),
+    queryKey: threadKeys.list(projectId),
   });
 
   return {
-    hasAgent: agentsQuery.data === undefined ? null : agentsQuery.data.length > 0,
-    hasApiToken:
-      tokensQuery.data === undefined
-        ? null
-        : tokensQuery.data.tokens.some((token) => token.revokedAt === null),
-    hasProviderKey: providerKeysQuery.data === undefined ? null : providerKeysQuery.data.length > 0,
-    hasRunThread: sessionsQuery.data === undefined ? null : hasRunUiThread(sessionsQuery.data),
+    hasAgent: (agentsQuery.data?.length ?? 0) > 0,
+    hasApiToken: tokensQuery.data?.tokens.some((token) => token.revokedAt === null) ?? false,
+    hasProviderKey: credentials.length > 0,
+    hasRunThread: threadsQuery.data?.some((thread) => thread.session.lastRun !== null) ?? false,
   };
 }

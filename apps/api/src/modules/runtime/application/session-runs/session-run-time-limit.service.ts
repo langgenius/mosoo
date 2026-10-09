@@ -1,13 +1,7 @@
 import type { RunError } from "@mosoo/contracts/session-run";
 import { sessionRunsTable } from "@mosoo/db";
 import { createPlatformId } from "@mosoo/id";
-import type {
-  DriverCommandId,
-  DriverInstanceId,
-  RuntimeEventId,
-  SessionId,
-  SessionRunId,
-} from "@mosoo/id";
+import type { DriverCommandId, DriverInstanceId, SessionId, SessionRunId } from "@mosoo/id";
 import { and, asc, inArray, lte, sql } from "drizzle-orm";
 
 import { createErrorLogContext, logInfo, logWarn } from "../../../../platform/cloudflare/logger";
@@ -17,7 +11,7 @@ import { appendSessionRuntimeEvents } from "../../../sessions/application/sessio
 import { SESSION_RUN_TIME_LIMIT_MS } from "../../domain/session-runtime-policy";
 import { sendDriverInstanceCommand } from "../../infrastructure/driver-instance/client";
 import { isDriverControlSocketMissingError } from "../../infrastructure/driver-session-stop-errors";
-import { recordRuntimeRunLeaseReleasedOutcome } from "../../infrastructure/runtime-subject-lifecycle/runtime-run-lease-store";
+import { releaseRuntimeRunLease } from "../../infrastructure/runtime-subject-lifecycle/runtime-run-lease-store";
 import { expireUndeliveredInputStartCommandsForRun } from "../../infrastructure/session-runs/runtime-command-store.repository";
 import { setSessionRunStatus } from "../../infrastructure/session-runs/session-run-store.repository";
 import { createCancelledSessionRunRuntimeEvent } from "./session-run-view-events.service";
@@ -92,18 +86,16 @@ async function releaseOverdueRunLease(
   database: D1Database,
   run: OverdueSessionRun & { readonly driverInstanceId: DriverInstanceId },
 ): Promise<void> {
-  const outcome = await recordRuntimeRunLeaseReleasedOutcome(database, {
+  const released = await releaseRuntimeRunLease(database, {
     driverInstanceId: run.driverInstanceId,
     expectedSessionRunId: run.runId,
   });
 
-  if (outcome.status !== "applied") {
+  if (!released) {
     logWarn("runtime.terminal.lease_release_skipped", {
       driverInstanceId: run.driverInstanceId,
-      reason: "reason" in outcome ? outcome.reason : outcome.status,
       sessionRunId: run.runId,
       source: "run_time_limit",
-      status: outcome.status,
     });
   }
 }
@@ -125,10 +117,6 @@ async function stopOverdueSessionRun(
     status: "cancelled",
   });
 
-  if (outcome.kind === "repair_needed") {
-    throw new Error("Run time limit left the session lifecycle projection stale.");
-  }
-
   if (outcome.kind === "rejected" || outcome.kind === "stale") {
     return false;
   }
@@ -149,7 +137,6 @@ async function stopOverdueSessionRun(
     bindings,
     events: [
       createCancelledSessionRunRuntimeEvent({
-        eventId: createPlatformId<RuntimeEventId>(),
         run: outcome.run,
         runError: SESSION_RUN_TIME_LIMIT_ERROR,
         sessionId: run.sessionId,

@@ -5,26 +5,18 @@ import { and, inArray } from "drizzle-orm";
 import { getAppDatabase } from "../../../../platform/db/drizzle";
 import { LIVE_DRIVER_INSTANCE_STATUSES } from "../../domain/driver-instance-lifecycle.machine";
 
-export async function listLiveDriverInstanceRefsForSandboxSessions(
+export async function listLiveDriverInstanceIdsForSandboxSessions(
   database: D1Database,
   sandboxSessionIds: readonly SessionId[],
-): Promise<
-  {
-    id: DriverInstanceId;
-    sandboxSessionId: SessionId;
-  }[]
-> {
+): Promise<DriverInstanceId[]> {
   const sessionIds = [...new Set(sandboxSessionIds)].filter(Boolean);
 
   if (sessionIds.length === 0) {
     return [];
   }
 
-  return getAppDatabase(database)
-    .select({
-      id: driverInstancesTable.id,
-      sandboxSessionId: driverInstancesTable.sandboxSessionId,
-    })
+  const rows = await getAppDatabase(database)
+    .select({ id: driverInstancesTable.id })
     .from(driverInstancesTable)
     .where(
       and(
@@ -33,12 +25,5 @@ export async function listLiveDriverInstanceRefsForSandboxSessions(
       ),
     )
     .all();
-}
-
-export async function listLiveDriverInstanceIdsForSandboxSessions(
-  database: D1Database,
-  sandboxSessionIds: readonly SessionId[],
-): Promise<DriverInstanceId[]> {
-  const rows = await listLiveDriverInstanceRefsForSandboxSessions(database, sandboxSessionIds);
   return rows.map((row) => row.id);
 }

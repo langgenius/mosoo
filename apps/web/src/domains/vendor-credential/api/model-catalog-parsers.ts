@@ -1,6 +1,6 @@
 import type { PresetModelProtocol } from "@mosoo/contracts/models";
 
-import type { AvailableModelReason, ModelCatalogSource } from "./vendor-credential-client";
+import type { AvailableModelReason } from "./vendor-credential-client";
 
 export function parseModelProtocol(protocol: string | null): PresetModelProtocol | null {
   switch (protocol) {
@@ -40,20 +40,6 @@ export function parseAvailableModelReason(reason: string | null): AvailableModel
     }
     default: {
       throw new Error(`Unsupported available model reason: ${reason}`);
-    }
-  }
-}
-
-export function parseModelCatalogSource(source: string): ModelCatalogSource {
-  switch (source) {
-    case "custom": {
-      return source;
-    }
-    case "preset": {
-      return source;
-    }
-    default: {
-      throw new Error(`Unsupported model catalog source: ${source}`);
     }
   }
 }

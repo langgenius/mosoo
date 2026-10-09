@@ -36,30 +36,10 @@ const AGENT_ROW: AgentRow = {
   runtimeId: "openai-runtime",
   status: "published",
   updatedAt: 2,
-  visibility: "private",
 };
 
-const OWNER_SUMMARY = {
-  id: "01J00000000000000000000001",
-  imageUrl: null,
-  name: "Owner",
-};
-
-function sqlString(value: string): string {
-  return `'${value.replaceAll("'", "''")}'`;
-}
-
-function createAgentDetailModelDatabase(
-  input: {
-    deploymentModel?: string;
-    deploymentProvider?: string;
-    deploymentRuntimeId?: string;
-  } = {},
-): D1Database {
+function createAgentDetailModelDatabase(): D1Database {
   const database = new SqliteD1Database({ foreignKeys: false });
-  const deploymentModel = input.deploymentModel ?? "gpt-5.4";
-  const deploymentProvider = input.deploymentProvider ?? "openai";
-  const deploymentRuntimeId = input.deploymentRuntimeId ?? "openai-runtime";
 
   database.execute(`
     CREATE TABLE account (
@@ -151,10 +131,10 @@ function createAgentDetailModelDatabase(
       '01J0000000000000000000006A',
       'pet',
       '[]',
-      ${sqlString(deploymentModel)},
+      'gpt-5.4',
       'Private prompt',
-      ${sqlString(deploymentProvider)},
-      ${sqlString(deploymentRuntimeId)},
+      'openai',
+      'openai-runtime',
       '[]',
       'Initial publish',
       1
@@ -168,73 +148,11 @@ describe("agent detail model", () => {
   test("derives editor live version from the version list", async () => {
     const database = createAgentDetailModelDatabase();
 
-    const detail = await toAgentDetailModel(database, VIEWER, AGENT_ROW, OWNER_SUMMARY, "owner");
+    const detail = await toAgentDetailModel(database, VIEWER, AGENT_ROW);
 
     expect(detail.liveVersion?.id).toBe("01J0000000000000000000006A");
     expect(detail.versions.map((version) => version.id)).toEqual(["01J0000000000000000000006A"]);
     expect(detail.prompt).toBe("Private prompt");
     expect(detail.model).toBe("gpt-5.4");
-  });
-
-  test("projects runtime model fields from admitted identity values", async () => {
-    const database = createAgentDetailModelDatabase({
-      deploymentModel: " gpt-5.4 ",
-      deploymentProvider: " openai ",
-      deploymentRuntimeId: " openai-runtime ",
-    });
-    const detail = await toAgentDetailModel(
-      database,
-      VIEWER,
-      {
-        ...AGENT_ROW,
-        model: " gpt-5.4 ",
-        provider: " openai ",
-        runtimeId: " openai-runtime ",
-      },
-      OWNER_SUMMARY,
-      "owner",
-    );
-
-    expect(detail).toMatchObject({
-      model: "gpt-5.4",
-      provider: "openai",
-      runtimeId: "openai-runtime",
-    });
-    expect(detail.liveVersion).toMatchObject({
-      model: "gpt-5.4",
-      provider: "openai",
-      runtimeId: "openai-runtime",
-    });
-  });
-
-  test("rejects invalid runtime model identity before projection", async () => {
-    await expect(
-      toAgentDetailModel(
-        createAgentDetailModelDatabase(),
-        VIEWER,
-        {
-          ...AGENT_ROW,
-          model: " ",
-        },
-        OWNER_SUMMARY,
-        "owner",
-      ),
-    ).rejects.toThrow("modelId is required.");
-  });
-
-  test("redacts deployment details for non-editor viewers", async () => {
-    const database = createAgentDetailModelDatabase();
-
-    const detail = await toAgentDetailModel(database, VIEWER, AGENT_ROW, OWNER_SUMMARY, "none");
-
-    expect(detail.liveVersion).toBeNull();
-    expect(detail.versions).toEqual([]);
-    expect(detail.prompt).toBe("");
-    expect(detail.model).toBe("");
-    expect(detail.owner).toEqual({
-      id: "01J00000000000000000000001",
-      imageUrl: null,
-      name: "Owner",
-    });
   });
 });

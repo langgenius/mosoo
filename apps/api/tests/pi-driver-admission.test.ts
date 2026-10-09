@@ -1,9 +1,8 @@
 import { expect, test } from "bun:test";
-import { readFileSync, readdirSync } from "node:fs";
 
 import { getSessionOrganizationPath, getSessionRuntimeStatePath } from "@mosoo/agent-driver/paths";
 import { PLATFORM_ID_FIXTURES as ids } from "@mosoo/id/testing";
-import { getPublicRuntimeCatalogEntry, resolveRuntimeModelProtocol } from "@mosoo/runtime-catalog";
+import { getRuntimeCatalogEntry, resolveRuntimeModelProtocol } from "@mosoo/runtime-catalog";
 import { createRuntimeEvent } from "@mosoo/runtime-events";
 
 import { createDriverInstanceRecord } from "../src/modules/runtime/infrastructure/driver-instance/driver-instance-record.repository";
@@ -19,11 +18,13 @@ import {
   createResolvedMcpServers,
   API_DRIVER_BOUNDARY_IDS,
 } from "./api-driver-boundary-fixtures";
-import { PUBLIC_API_TEST_IDS } from "./helpers/public-api-http-test-fixture";
-import { SqliteD1Database } from "./helpers/sqlite-d1";
+import {
+  PUBLIC_API_TEST_IDS,
+  createMigratedTestDatabase,
+} from "./helpers/public-api-http-test-fixture";
 
-test("Given Pi v1, When selecting the public runtime, Then admit its Cloudflare image and honest capabilities", () => {
-  const entry = getPublicRuntimeCatalogEntry("pi");
+test("Given Pi v1, When selecting the public runtime, Then admit its Cloudflare image and models", () => {
+  const entry = getRuntimeCatalogEntry("pi");
   expect(entry).not.toBeNull();
   expect(entry?.vendors.map((v) => v.vendorId)).toContain("openai-compatible");
   expect(
@@ -31,11 +32,6 @@ test("Given Pi v1, When selecting the public runtime, Then admit its Cloudflare 
   ).toEqual({
     ok: true,
     modelProtocol: "openai-responses",
-  });
-  expect(entry?.capabilities).toContainEqual({
-    id: "mcp_execute",
-    status: "supported",
-    version: 1,
   });
   expect(sandboxBindingForRuntime("pi")).toBe("SandboxPi");
 });
@@ -87,7 +83,6 @@ function piInput() {
       model: "custom-model",
       provider: "openai-compatible",
       providerOptions: {},
-      permissionPolicy: "full_access" as const,
       session: {
         ...profile.session,
         homePath: getSessionRuntimeStatePath(API_DRIVER_BOUNDARY_IDS.session, "pi"),
@@ -130,20 +125,6 @@ test("Given Pi MCP bindings, When building execution, Then issue the usual scope
   });
 });
 
-test("Given unsupported Pi permission settings, When building execution, Then reject before launch", async () => {
-  const input = piInput();
-  const bindings = { RUNTIME_ACTION_TOKEN_SECRET: "pi-product-test" };
-  await expect(
-    buildExecutionSpec(bindings, {
-      ...input,
-      profile: { ...input.profile, permissionPolicy: "supervised" },
-    }),
-  ).rejects.toThrow("Pi requires full_access");
-  await expect(
-    buildExecutionSpec(bindings, { ...input, builtInTools: [{ name: "bash", enabled: false }] }),
-  ).rejects.toThrow("unrestricted");
-});
-
 test("Given a Pi native session event, When recording continuation, Then use the Pi native session path", () => {
   const event = createRuntimeEvent({
     id: API_DRIVER_BOUNDARY_IDS.runtimeEvent,
@@ -161,13 +142,7 @@ test("Given a Pi native session event, When recording continuation, Then use the
 });
 
 test("Given a Pi session, When claiming a Driver and receiving native state, Then persist both through product repositories", async () => {
-  const db = new SqliteD1Database({ foreignKeys: false });
-  const migrations = new URL("../../../pkgs/db/drizzle/", import.meta.url);
-  for (const migrationName of readdirSync(migrations)
-    .filter((name) => name.endsWith(".sql"))
-    .toSorted()) {
-    db.execute(readFileSync(new URL(migrationName, migrations), "utf8"));
-  }
+  const db = createMigratedTestDatabase();
   await db
     .prepare(
       "INSERT OR REPLACE INTO sandbox_session (cloudflare_session_id, created_at, cwd, origin_json, sandbox_id, session_id, status, updated_at) VALUES (?, 1, ?, ?, ?, ?, 'active', 1)",

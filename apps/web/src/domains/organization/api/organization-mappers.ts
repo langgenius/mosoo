@@ -1,9 +1,8 @@
 import type { OrganizationSummary } from "@mosoo/contracts/organization";
-
-import { toOrganizationId } from "@/routes/typed-id";
+import type { OrganizationId, PlatformId } from "@mosoo/id";
 
 type GraphQLOrganizationSummary = Omit<OrganizationSummary, "id"> & {
-  id: string;
+  id: PlatformId;
 };
 
 export function toOrganizationSummary(
@@ -11,6 +10,6 @@ export function toOrganizationSummary(
 ): OrganizationSummary {
   return {
     ...organization,
-    id: toOrganizationId(organization.id),
+    id: organization.id as OrganizationId,
   };
 }

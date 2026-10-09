@@ -1,23 +1,4 @@
-import type { DriverConnection } from "../../adapters/durable-objects/driver-connection.do";
-import type { Sandbox } from "../../adapters/durable-objects/sandbox.do";
-import type { Session } from "../../adapters/durable-objects/session.do";
 import type { ApiCommandMessage } from "../../modules/api-command/application/api-command-message";
-
-interface OptionalSandboxBinding {
-  Sandbox?: DurableObjectNamespace<Sandbox>;
-  SandboxClaude?: DurableObjectNamespace<Sandbox>;
-  SandboxOpenAI?: DurableObjectNamespace<Sandbox>;
-  SandboxOpenCode?: DurableObjectNamespace<Sandbox>;
-  SandboxPi?: DurableObjectNamespace<Sandbox>;
-}
-
-interface OptionalDriverConnectionBinding {
-  DriverConnection?: DurableObjectNamespace<DriverConnection>;
-}
-
-interface OptionalSessionBinding {
-  Session?: DurableObjectNamespace<Session>;
-}
 
 interface ApiCommandQueueBinding {
   API_COMMAND_QUEUE: Queue<ApiCommandMessage>;
@@ -29,7 +10,6 @@ interface OptionalLocalProviderFetchProxyBindings {
 }
 
 interface OptionalRuntimeBindings {
-  MOSOO_RUNTIME_IMAGES_ENABLED?: string;
   MOSOO_RUNTIME_CONTROL_ORIGIN?: string;
   MOSOO_RUNTIME_ALL_PROXY?: string;
   MOSOO_RUNTIME_HTTP_PROXY?: string;
@@ -38,24 +18,15 @@ interface OptionalRuntimeBindings {
   // Secrets read by @cloudflare/sandbox backups; mirrored here so the limited
   // network policy can allowlist the R2 endpoint the container will curl.
   BACKUP_BUCKET_ENDPOINT?: string;
-  CLOUDFLARE_ACCOUNT_ID?: string;
   CLOUDFLARE_R2_ACCOUNT_ID?: string;
 }
 
 interface OptionalProductAnalyticsBindings {
-  MOSOO_DEPLOYMENT_MODE?: string;
-  MOSOO_ENVIRONMENT?: string;
-  POSTHOG_API_HOST?: string;
   POSTHOG_PROJECT_KEY?: string;
-}
-
-interface OptionalCostLedgerReconciliationBindings {
-  MOSOO_COST_LEDGER_RECONCILIATION_MODE?: string;
 }
 
 interface OptionalSkillsShBindings {
   SKILLS_SH_API_TOKEN?: string;
-  VERCEL_OIDC_TOKEN?: string;
 }
 
 interface OptionalRuntimeSubjectPlatformBindings {
@@ -64,10 +35,6 @@ interface OptionalRuntimeSubjectPlatformBindings {
 
 export type ApiBindings = Env &
   ApiCommandQueueBinding &
-  OptionalSandboxBinding &
-  OptionalDriverConnectionBinding &
-  OptionalSessionBinding &
-  OptionalCostLedgerReconciliationBindings &
   OptionalLocalProviderFetchProxyBindings &
   OptionalProductAnalyticsBindings &
   OptionalRuntimeBindings &
@@ -76,8 +43,4 @@ export type ApiBindings = Env &
 
 export interface ApiGatewayEnvironment {
   Bindings: ApiBindings;
-}
-
-export interface ApiServerContext extends ApiBindings {
-  executionCtx: ExecutionContext;
 }

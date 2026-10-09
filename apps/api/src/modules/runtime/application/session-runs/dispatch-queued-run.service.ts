@@ -1,4 +1,3 @@
-import type { UserWarning } from "@mosoo/contracts/session-run";
 import { parsePlatformId } from "@mosoo/id";
 import type { FileId, ProjectId, SessionId, SessionRunId } from "@mosoo/id";
 
@@ -7,12 +6,14 @@ import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import type { AuthenticatedViewer } from "../../../auth/application/viewer-auth.service";
 import { fileStore } from "../../../files/application/file-store";
 import { appendSessionRuntimeEvents } from "../../../sessions/application/session-event-write.service";
-import { getSupportedRuntimeId } from "../../domain/runtime-config";
-import { hydrateCachedRunContextFromSession } from "../session-definition/hydrate-run-context.service";
+import { hydrateRunContextFromSession } from "../session-definition/hydrate-run-context.service";
 import { appendSessionResourceContextToPrompt } from "../session-resources/session-resource-prompt.service";
 import { dispatchSessionRun } from "./dispatch-run.service";
 import { describeRunError } from "./run-error-message";
-import { getSessionRunState, updateSessionRunStatusIfActive } from "./session-run-state.repository";
+import {
+  getSessionRunStatus,
+  updateSessionRunStatusIfActive,
+} from "./session-run-state.repository";
 import { createFailedSessionRunRuntimeEvent } from "./session-run-view-events.service";
 import {
   appendSessionRuntimeTimingEventBestEffort,
@@ -46,13 +47,10 @@ async function failQueuedSessionRunBeforeDispatch(
   });
 
   if (!failedRun) {
-    const state = await getSessionRunState(bindings.DB, input.sessionRunId);
-
     logWarn("session.run.context_hydration.failed.run-not-queued", {
       message,
       runId: input.sessionRunId,
       sessionId: input.sessionId,
-      status: state?.status ?? null,
       traceId: input.traceId,
     });
 
@@ -102,28 +100,28 @@ interface DispatchQueuedSessionRunRequest {
 
 export async function dispatchQueuedSessionRun(
   request: DispatchQueuedSessionRunRequest,
-): Promise<UserWarning[]> {
+): Promise<void> {
   const { bindings, input, requestUrl, viewer } = request;
 
   // Inline dispatch starts inside the request that just created the queued
   // run, so re-reading its status is a wasted D1 round trip. Queue delivery
   // can arrive late or duplicated and must still skip stale runs.
   if (input.dispatchSource === "queue") {
-    const runState = await getSessionRunState(bindings.DB, input.sessionRunId);
+    const runStatus = await getSessionRunStatus(bindings.DB, input.sessionRunId);
 
-    if (!runState) {
+    if (runStatus === null) {
       throw new Error("Session run not found.");
     }
 
-    if (runState.status !== "queued") {
+    if (runStatus !== "queued") {
       logInfo("session.run.context_hydration.skipped", {
         dispatchSource: input.dispatchSource,
         runId: input.sessionRunId,
         sessionId: input.session.id,
-        status: runState.status,
+        status: runStatus,
         traceId: input.traceId,
       });
-      return [];
+      return;
     }
   }
 
@@ -146,7 +144,7 @@ export async function dispatchQueuedSessionRun(
       );
 
       const hydrated = await hydrationTiming.measure("hydrateRunContext", () =>
-        hydrateCachedRunContextFromSession(bindings, viewer, {
+        hydrateRunContextFromSession(bindings, viewer, {
           id: input.session.id,
           projectId: input.session.project_id,
           ...(input.accessViewer ? { accessViewer: input.accessViewer } : {}),
@@ -167,12 +165,6 @@ export async function dispatchQueuedSessionRun(
       throw error;
     }
   })();
-  const runtimeId = getSupportedRuntimeId(resolved.hydrated.value.profile.runtimeId);
-
-  if (runtimeId === null) {
-    throw new Error(`Unsupported runtime: ${resolved.hydrated.value.profile.runtimeId}.`);
-  }
-
   const hydrationSnapshot = hydrationTiming.snapshot();
   const hydrationTimingEventPromise = appendSessionRuntimeTimingEventBestEffort({
     bindings,
@@ -180,24 +172,23 @@ export async function dispatchQueuedSessionRun(
   });
 
   logInfo("session.run.context_hydrated", {
-    cacheHit: resolved.hydrated.cacheHit,
     dispatchSource: input.dispatchSource,
     hydrationLatencyMs: hydrationSnapshot.totalMs,
     queuedToHydratedMs: hydrationSnapshot.completedAtMs - input.queuedAtMs,
     runId: input.sessionRunId,
-    runtimeId,
+    runtimeId: resolved.hydrated.profile.runtimeId,
     sessionId: input.session.id,
     sessionResourceCount: resolved.sessionResources.length,
-    skillCount: resolved.hydrated.value.skills.length,
+    skillCount: resolved.hydrated.skills.length,
     traceId: input.traceId,
   });
 
-  if (resolved.hydrated.value.warnings.length > 0) {
+  if (resolved.hydrated.warnings.length > 0) {
     logInfo("session.run.context_hydration.warnings", {
       runId: input.sessionRunId,
       sessionId: input.session.id,
       traceId: input.traceId,
-      warningCodes: resolved.hydrated.value.warnings.map((warning) => warning.code),
+      warningCodes: resolved.hydrated.warnings.map((warning) => warning.code),
     });
   }
 
@@ -206,15 +197,12 @@ export async function dispatchQueuedSessionRun(
       attachmentIds: resolved.sessionResources.map((resource, index) =>
         parsePlatformId(resource.id, `session resource id ${index}`),
       ),
-      builtInTools: resolved.hydrated.value.builtInTools,
-      profile: {
-        ...resolved.hydrated.value.profile,
-        runtimeId,
-      },
+      builtInTools: resolved.hydrated.builtInTools,
+      profile: resolved.hydrated.profile,
       prompt: appendSessionResourceContextToPrompt(input.prompt, resolved.sessionResources),
-      resolvedMcpServers: resolved.hydrated.value.mcpServers,
-      resolvedSkillCatalog: resolved.hydrated.value.skillCatalog,
-      resolvedSkills: resolved.hydrated.value.skills,
+      resolvedMcpServers: resolved.hydrated.mcpServers,
+      resolvedSkillCatalog: resolved.hydrated.skillCatalog,
+      resolvedSkills: resolved.hydrated.skills,
       sessionId: input.session.id,
       sessionRunId: input.sessionRunId,
       traceId: input.traceId,
@@ -222,6 +210,4 @@ export async function dispatchQueuedSessionRun(
   } finally {
     await hydrationTimingEventPromise;
   }
-
-  return resolved.hydrated.value.warnings;
 }

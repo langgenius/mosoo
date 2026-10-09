@@ -1,181 +1,61 @@
-import { sleepPromise } from "@mosoo/effects";
-import { useCallback, useEffect, useReducer } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { useAppSession } from "@/app/session/session-context";
 import { useTranslation } from "@/shared/i18n";
+import { Button } from "@/shared/ui/button";
 import { Loader2 } from "@/shared/ui/icons";
 
 import { captureProductEvent, PRODUCT_ANALYTICS_EVENTS } from "../../analytics/product-analytics";
-import { useAppSession } from "../../app/session-provider";
 import { onboardingBootstrap } from "../../domains/onboarding/api/onboarding-client";
-import { isTruthy } from "../../shared/lib/truthiness";
-type OnboardingStep = "loading" | "provisioning" | "failed";
-type OnboardingBootstrapInput = { name?: string };
-
-interface OnboardingState {
-  bootstrapping: boolean;
-  error: string | null;
-  step: OnboardingStep;
-}
-
-type OnboardingAction = { type: "bootstrapFailed"; error: string } | { type: "bootstrapStarted" };
-
-const ONBOARDING_INITIAL_STATE: OnboardingState = {
-  bootstrapping: false,
-  error: null,
-  step: "loading",
-};
-
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "login.unexpectedError";
-}
-
-function toOnboardingBootstrapInput(input?: {
-  name?: string;
-}): OnboardingBootstrapInput | undefined {
-  if (input === undefined) {
-    return undefined;
-  }
-
-  const nextInput: OnboardingBootstrapInput = {};
-
-  if (input.name !== undefined) {
-    nextInput.name = input.name;
-  }
-
-  return nextInput;
-}
-
-function onboardingReducer(state: OnboardingState, action: OnboardingAction): OnboardingState {
-  switch (action.type) {
-    case "bootstrapFailed":
-      return { ...state, bootstrapping: false, error: action.error, step: "failed" };
-    case "bootstrapStarted":
-      return {
-        ...state,
-        bootstrapping: true,
-        error: null,
-        step: "provisioning",
-      };
-  }
-}
 
 export function Onboarding() {
   const { refreshOrganizations } = useAppSession();
   const navigate = useNavigate();
-  const [state, dispatch] = useReducer(onboardingReducer, ONBOARDING_INITIAL_STATE);
-  const { error, step } = state;
+  const { t } = useTranslation();
+  const [error, setError] = useState<string | null>(null);
 
-  const handleBootstrap = useCallback(
-    async (input?: { name?: string }) => {
-      dispatch({ type: "bootstrapStarted" });
-      captureProductEvent(PRODUCT_ANALYTICS_EVENTS.onboardingStarted);
-      try {
-        await onboardingBootstrap(toOnboardingBootstrapInput(input));
-        await Promise.all([refreshOrganizations(), sleepPromise(800)]);
-        void navigate("/", { replace: true });
-      } catch (caughtError: unknown) {
-        dispatch({
-          error: getErrorMessage(caughtError) || "common.somethingWentWrong",
-          type: "bootstrapFailed",
-        });
-      }
-    },
-    [navigate, refreshOrganizations],
-  );
+  const bootstrap = useCallback(async () => {
+    setError(null);
+    captureProductEvent(PRODUCT_ANALYTICS_EVENTS.onboardingStarted);
+    try {
+      await onboardingBootstrap();
+      await refreshOrganizations();
+      void navigate("/", { replace: true });
+    } catch (caughtError: unknown) {
+      setError(caughtError instanceof Error ? caughtError.message : "");
+    }
+  }, [navigate, refreshOrganizations]);
 
   useEffect(() => {
-    let cancelled = false;
+    void bootstrap();
+  }, [bootstrap]);
 
-    async function loadOnboarding() {
-      try {
-        await handleBootstrap();
-      } catch (caughtError: unknown) {
-        if (cancelled) {
-          return;
-        }
-
-        const message = getErrorMessage(caughtError);
-
-        if (message === "Unauthorized.") {
-          void navigate("/login", { replace: true });
-          return;
-        }
-
-        dispatch({ error: message, type: "bootstrapFailed" });
-      }
-    }
-
-    void loadOnboarding();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [handleBootstrap, navigate]);
-
-  if (step === "loading") {
-    return <OnboardingLoadingScreen />;
-  }
-
-  if (step === "provisioning") {
-    return <OnboardingProvisioningScreen />;
-  }
-
-  return <OnboardingErrorScreen error={error} onRetry={() => void handleBootstrap()} />;
-}
-
-function OnboardingLoadingScreen() {
-  const { t } = useTranslation();
-  return (
-    <div className="bg-background fixed inset-0 flex items-center justify-center">
-      <div className="flex flex-col items-center gap-4">
-        <Loader2 className="text-brand-mark size-8 animate-spin" />
-        <p className="text-muted-foreground text-sm">{t("onboarding.settingUp")}</p>
+  if (error === null) {
+    return (
+      <div className="bg-background fixed inset-0 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="text-brand-mark size-8 animate-spin" />
+          <p className="text-fg-3 text-sm">{t("onboarding.creatingDefaultProject")}</p>
+        </div>
       </div>
-    </div>
-  );
-}
-
-function OnboardingProvisioningScreen() {
-  const { t } = useTranslation();
-  return (
-    <div className="bg-background fixed inset-0 flex items-center justify-center">
-      <div className="flex flex-col items-center gap-4">
-        <Loader2 className="text-brand-mark size-8 animate-spin" />
-        <p className="text-muted-foreground text-sm">{t("onboarding.creatingDefaultProject")}</p>
-      </div>
-    </div>
-  );
-}
-
-function OnboardingErrorScreen({ error, onRetry }: { error: string | null; onRetry: () => void }) {
-  const { t } = useTranslation();
-  const errorText = isTruthy(error) ? error : t("onboarding.createDefaultProjectFailed");
-  const resolvedError =
-    errorText.startsWith("login.") || errorText.startsWith("common.") ? t(errorText) : errorText;
+    );
+  }
 
   return (
     <div className="bg-background fixed inset-0 flex flex-col">
       <div className="flex items-center px-4 py-5 sm:px-8">
-        <span className="text-xl font-light tracking-tight">mosoo</span>
+        <img src="/brand/logo-wordmark-onlight.svg" alt="mosoo" className="block h-5" />
       </div>
 
       <div className="flex flex-1 items-center justify-center">
-        <div className="w-full max-w-[520px] px-6">
-          <h2 className="text-foreground text-center text-2xl font-semibold">
-            {t("onboarding.setupFailed")}
-          </h2>
-          <p className="text-muted-foreground mt-2 text-center text-sm">{resolvedError}</p>
+        <div className="w-full max-w-[520px] px-6 text-center">
+          <h2 className="t-page-title">{t("onboarding.setupFailed")}</h2>
+          <p className="text-fg-3 mt-2 text-sm">{error || t("common.somethingWentWrong")}</p>
 
-          <div className="mt-6">
-            <button
-              type="button"
-              onClick={onRetry}
-              className="text-muted-foreground hover:bg-accent/50 hover:text-foreground flex w-full items-center justify-center gap-2 rounded-lg p-3 text-sm font-medium transition-colors"
-            >
-              {t("agent.retry")}
-            </button>
-          </div>
+          <Button className="mt-6" onClick={() => void bootstrap()} variant="outline">
+            {t("agent.retry")}
+          </Button>
         </div>
       </div>
     </div>

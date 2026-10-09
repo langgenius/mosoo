@@ -2,16 +2,13 @@ import { describe, expect, test } from "bun:test";
 
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
 import { getThreadSessionMessages } from "../src/modules/sessions/application/session-message-query.service";
-import { getSessionRuntimeRecoveryMessages } from "../src/modules/sessions/application/session-runtime-recovery-query.service";
-import { loadStoredSessionMessages } from "../src/modules/sessions/infrastructure/session-message-snapshot.repository";
+import { listSessionMessages } from "../src/modules/sessions/infrastructure/session-message-snapshot.repository";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
 const MESSAGE_ID_1 = "01J000000000000000000000G1";
 const MESSAGE_ID_2 = "01J000000000000000000000G2";
-const CURRENT_MESSAGE_ID = "01J000000000000000000000G6";
 const ORGANIZATION_ID = "01J00000000000000000000006";
 const PROJECT_ID = "01J0000000000000000000000Q";
-const RUN_ID = "01J000000000000000000000G3";
 const SESSION_ID = "01J000000000000000000000G4";
 const VIEWER_ID = "01J000000000000000000000G5";
 
@@ -41,7 +38,8 @@ function createSessionMessageQueryDatabase(): SqliteD1Database {
       provider text NOT NULL,
       runtime_id text NOT NULL,
       status text NOT NULL,
-      title text
+      title text,
+      updated_at integer DEFAULT 0 NOT NULL
     );
 
     CREATE TABLE project (
@@ -190,161 +188,9 @@ describe("session message query", () => {
   test("loads live-state transcript snapshots in message sequence order", async () => {
     const database = createSessionMessageQueryDatabase();
 
-    const messages = await loadStoredSessionMessages(database, SESSION_ID);
+    const messages = await listSessionMessages(database, SESSION_ID);
 
     expect(messages.map((message) => message.id)).toEqual([MESSAGE_ID_1, MESSAGE_ID_2]);
-  });
-
-  test("builds recovery history without replaying the current run input", async () => {
-    const database = createSessionMessageQueryDatabase();
-    await database
-      .prepare(
-        `INSERT INTO session_message (
-          id, content_text, created_at, created_by_account_id, plan_json, role,
-          segments_json, seq, session_id, session_run_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .bind(
-        CURRENT_MESSAGE_ID,
-        "Current run question",
-        1500,
-        VIEWER_ID,
-        null,
-        "user",
-        null,
-        3,
-        SESSION_ID,
-        RUN_ID,
-      )
-      .run();
-
-    await expect(
-      getSessionRuntimeRecoveryMessages(database, {
-        excludeRunId: RUN_ID,
-        sessionId: SESSION_ID,
-      }),
-    ).resolves.toEqual([
-      { content: "Hello from the thread", role: "user" },
-      { content: "Earlier timestamp, later sequence", role: "assistant" },
-    ]);
-    await expect(
-      getSessionRuntimeRecoveryMessages(database, {
-        excludeRunId: null,
-        sessionId: SESSION_ID,
-      }),
-    ).resolves.toEqual([
-      { content: "Hello from the thread", role: "user" },
-      { content: "Earlier timestamp, later sequence", role: "assistant" },
-      { content: "Current run question", role: "user" },
-    ]);
-  });
-
-  test("bounds recovery history to the latest messages", async () => {
-    const database = createSessionMessageQueryDatabase();
-
-    for (let index = 0; index < 101; index += 1) {
-      await database
-        .prepare(
-          `INSERT INTO session_message (
-            id, content_text, created_at, created_by_account_id, plan_json, role,
-            segments_json, seq, session_id, session_run_id
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        )
-        .bind(
-          `recovery-message-${index}`,
-          `Recovery ${index}`,
-          2000 + index,
-          VIEWER_ID,
-          null,
-          "user",
-          null,
-          3 + index,
-          SESSION_ID,
-          null,
-        )
-        .run();
-    }
-
-    const messages = await getSessionRuntimeRecoveryMessages(database, {
-      excludeRunId: null,
-      sessionId: SESSION_ID,
-    });
-
-    expect(messages).toHaveLength(100);
-    expect(messages.at(0)?.content).toBe("Recovery 1");
-    expect(messages.at(-1)?.content).toBe("Recovery 100");
-  });
-
-  test("bounds recovery history to a contiguous newest window within the content budget", async () => {
-    const database = createSessionMessageQueryDatabase();
-    // 15k chars per message against the 32k budget: only the newest two fit.
-    const contents = ["a".repeat(15_000), "b".repeat(15_000), "c".repeat(15_000)];
-
-    for (const [index, content] of contents.entries()) {
-      await database
-        .prepare(
-          `INSERT INTO session_message (
-            id, content_text, created_at, created_by_account_id, plan_json, role,
-            segments_json, seq, session_id, session_run_id
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        )
-        .bind(
-          `budget-message-${index}`,
-          content,
-          2000 + index,
-          VIEWER_ID,
-          null,
-          "user",
-          null,
-          3 + index,
-          SESSION_ID,
-          null,
-        )
-        .run();
-    }
-
-    const messages = await getSessionRuntimeRecoveryMessages(database, {
-      excludeRunId: null,
-      sessionId: SESSION_ID,
-    });
-
-    expect(messages).toHaveLength(2);
-    expect(messages.at(0)?.content.at(0)).toBe("b");
-    expect(messages.at(-1)?.content.at(0)).toBe("c");
-  });
-
-  test("keeps an oversized newest message truncated to the content budget", async () => {
-    const database = createSessionMessageQueryDatabase();
-
-    await database
-      .prepare(
-        `INSERT INTO session_message (
-          id, content_text, created_at, created_by_account_id, plan_json, role,
-          segments_json, seq, session_id, session_run_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .bind(
-        "oversized-message-1",
-        "d".repeat(40_000),
-        2000,
-        VIEWER_ID,
-        null,
-        "assistant",
-        null,
-        3,
-        SESSION_ID,
-        null,
-      )
-      .run();
-
-    const messages = await getSessionRuntimeRecoveryMessages(database, {
-      excludeRunId: null,
-      sessionId: SESSION_ID,
-    });
-
-    expect(messages).toHaveLength(1);
-    expect(messages.at(0)?.content).toHaveLength(32_000);
-    expect(messages.at(0)?.role).toBe("assistant");
   });
 
   test("removes provider-private citations from stored assistant message projections", async () => {
@@ -362,7 +208,7 @@ describe("session message query", () => {
         projectId: PROJECT_ID,
         sessionId: SESSION_ID,
       }),
-      loadStoredSessionMessages(database, SESSION_ID),
+      listSessionMessages(database, SESSION_ID),
     ]);
 
     expect(queryMessages[1]).toMatchObject({

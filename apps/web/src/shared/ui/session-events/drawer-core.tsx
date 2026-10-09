@@ -1,74 +1,196 @@
+import type { SessionProcessEvent } from "@mosoo/contracts/session";
 import { useMemo, useRef, useState } from "react";
-import type { ComponentType, ReactElement, ReactNode } from "react";
+import type { ReactElement, ReactNode } from "react";
 
-import { findVirtualizedStartIndex } from "./drawer-virtualization";
+import { useTranslation } from "@/shared/i18n";
+import { cn } from "@/shared/lib/class-names";
+import { ChevronRight } from "@/shared/ui/icons";
 
-const SESSION_EVENT_DRAWER_ROW_HEIGHT = 70;
-const SESSION_EVENT_DRAWER_OVERSCAN = 6;
+import {
+  getSessionEventChipTone,
+  getSessionEventDomain,
+  getSessionEventDomainLabel,
+  getSessionEventLabel,
+  isSessionEventAttentionWorthy,
+  SESSION_EVENT_DOMAIN_TONE,
+  SESSION_EVENT_FILTER_DOMAINS,
+  summarizeSessionEvent,
+} from "./domain";
+import { clipPreview } from "./feed-display";
+import { formatDuration, formatOffset, formatTokens, formatTotalDuration } from "./format";
+import { countSessionTurnDomains } from "./turns";
 
-export interface SessionEventDrawerCoreEvent {
-  durationMs: number | null;
-  id: string;
-  tokens: number | null;
+function SessionTimelineBar({
+  events,
+  onSelect,
+  selectedId,
+}: {
+  events: readonly SessionProcessEvent[];
+  onSelect: (eventId: string) => void;
+  selectedId: string | null;
+}): ReactElement {
+  const { t } = useTranslation();
+
+  return (
+    <div className="border-border-soft bg-sunken/10 flex h-7 w-full max-w-full min-w-0 items-center gap-0.5 overflow-hidden rounded-md border p-1">
+      {events.map((event) => {
+        const domain = getSessionEventDomain(event.type);
+        const tone = SESSION_EVENT_DOMAIN_TONE[domain];
+        const selected = selectedId === event.id;
+        const attention = isSessionEventAttentionWorthy(event);
+
+        return (
+          <button
+            key={event.id}
+            type="button"
+            onClick={() => {
+              onSelect(event.id);
+            }}
+            aria-label={t("sessionEvents.selectEvent", {
+              label: getSessionEventLabel(event.type, t),
+            })}
+            style={{ flexGrow: Math.max(event.durationMs ?? 1, 1) }}
+            className={cn(
+              "h-full min-w-[2px] rounded-[1px] border text-[0] transition-colors",
+              attention ? "border-danger/40 bg-danger/40" : cn("border-transparent", tone.bar),
+              selected ? "ring-1 ring-ink-900/55 ring-inset" : "",
+            )}
+          />
+        );
+      })}
+    </div>
+  );
 }
 
-interface SessionEventDrawerCoreProps<TEvent extends SessionEventDrawerCoreEvent> {
-  emptyState: ReactNode;
-  events: readonly TEvent[];
-  EventComponent: ComponentType<SessionEventDrawerEventComponentProps<TEvent>>;
-  focusEventId?: string | null;
-  LegendComponent: ComponentType<SessionEventDrawerLegendComponentProps<TEvent>>;
-  TimelineComponent: ComponentType<SessionEventDrawerTimelineComponentProps<TEvent>>;
+function SessionTimeline({
+  events,
+  onSelect,
+  selectedId,
+}: {
+  events: readonly SessionProcessEvent[];
+  onSelect: (eventId: string) => void;
+  selectedId: string | null;
+}): ReactElement {
+  const totalDurationMs = events.reduce((total, event) => total + (event.durationMs ?? 0), 0);
+
+  return (
+    <>
+      <div className="text-fg-3 flex items-center justify-between text-[10.5px] tabular-nums">
+        <span>0:00</span>
+        <span>{formatTotalDuration(totalDurationMs)}</span>
+      </div>
+      <SessionTimelineBar events={events} onSelect={onSelect} selectedId={selectedId} />
+    </>
+  );
 }
 
-export interface SessionEventDrawerEventComponentProps<TEvent extends SessionEventDrawerCoreEvent> {
-  event: TEvent;
+function SessionEventLegend({ events }: { events: readonly SessionProcessEvent[] }): ReactElement {
+  const { t } = useTranslation();
+  const counts = countSessionTurnDomains(events);
+
+  return (
+    <div className="text-fg-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10.5px]">
+      {SESSION_EVENT_FILTER_DOMAINS.map((domain) => (
+        <span key={domain} className="inline-flex items-center gap-1">
+          <span className={cn("size-2 rounded-sm", SESSION_EVENT_DOMAIN_TONE[domain].swatch)} />
+          <span>
+            {getSessionEventDomainLabel(domain, t)} {counts[domain]}
+          </span>
+        </span>
+      ))}
+      <span className="inline-flex items-center gap-1">
+        <span className="border-danger/40 bg-danger/40 size-2 rounded-sm border" />
+        <span>{t("common.error")}</span>
+      </span>
+    </div>
+  );
+}
+
+function DrawerEventRow({
+  event,
+  expanded,
+  index,
+  offsetMs,
+  onSelect,
+  onToggleExpanded,
+  selected,
+}: {
+  event: SessionProcessEvent;
   expanded: boolean;
   index: number;
   offsetMs: number;
   onSelect: () => void;
   onToggleExpanded: () => void;
   selected: boolean;
+}): ReactElement {
+  const { t } = useTranslation();
+  const chipTone = getSessionEventChipTone(event);
+  const preview = clipPreview(summarizeSessionEvent(event, t));
+
+  return (
+    <div
+      className={cn(
+        "border-border-soft bg-card relative w-full overflow-hidden rounded-md border transition-colors",
+        selected && "border-emphasis/35 ring-1 ring-emphasis/35 ring-inset",
+      )}
+    >
+      <button
+        type="button"
+        onClick={() => {
+          onSelect();
+          onToggleExpanded();
+        }}
+        className="grid w-full grid-cols-[16px_136px_minmax(122px,0.45fr)_minmax(0,1fr)_64px_64px_44px_54px] items-center gap-2 px-3 py-2 pl-4 text-left"
+      >
+        <ChevronRight
+          className={cn(
+            "text-fg-3 size-3 shrink-0 transition-transform duration-150 ease-out",
+            expanded ? "rotate-90" : "rotate-0",
+          )}
+        />
+        <span
+          className={cn(
+            "inline-flex items-center justify-self-start whitespace-nowrap rounded-sm px-1 py-0.5 text-[10px] font-semibold",
+            chipTone.chip,
+          )}
+        >
+          {getSessionEventLabel(event.type, t)}
+        </span>
+        <span className="text-fg-1 truncate text-[12.5px] font-semibold">
+          {getSessionEventLabel(event.type, t)}
+        </span>
+        <span className="text-fg-3 min-w-0 truncate text-[12px]">{preview}</span>
+        <span className="text-fg-3 justify-self-end text-[11px] tabular-nums">
+          {formatTokens(event.tokens)}
+        </span>
+        <span className="text-fg-3 justify-self-end text-[11px] tabular-nums">
+          {formatDuration(event.durationMs)}
+        </span>
+        <span className="text-fg-3 justify-self-end font-mono text-[11px] tabular-nums">
+          #{index + 1}
+        </span>
+        <span className="text-fg-3 justify-self-end font-mono text-[11px] tabular-nums">
+          {formatOffset(offsetMs)}
+        </span>
+      </button>
+
+      {expanded ? (
+        <div className="grid grid-rows-[1fr] transition-[grid-template-rows] duration-200 ease-out starting:grid-rows-[0fr]">
+          <div className="overflow-hidden">
+            <div className="border-border-soft bg-sunken/20 border-t px-3 py-2">
+              <div className="t-group-label">{t("sessionEvents.content")}</div>
+              <pre className="text-fg-2 mt-1 max-h-48 overflow-auto font-mono text-[11px] leading-relaxed whitespace-pre-wrap">
+                {event.content}
+              </pre>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
-export interface SessionEventDrawerLegendComponentProps<
-  TEvent extends SessionEventDrawerCoreEvent,
-> {
-  events: readonly TEvent[];
-}
-
-export interface SessionEventDrawerTimelineComponentProps<
-  TEvent extends SessionEventDrawerCoreEvent,
-> {
-  events: readonly TEvent[];
-  onSelect: (eventId: string) => void;
-  selectedId: string | null;
-}
-
-interface EventOffsets {
-  offsets: number[];
-  totalHeight: number;
-}
-
-function createEventOffsets(input: {
-  events: readonly SessionEventDrawerCoreEvent[];
-  expandedEventIds: ReadonlySet<string>;
-}): EventOffsets {
-  const offsets: number[] = [];
-  let currentOffset = 0;
-
-  for (const event of input.events) {
-    offsets.push(currentOffset);
-    currentOffset += input.expandedEventIds.has(event.id) ? 210 : SESSION_EVENT_DRAWER_ROW_HEIGHT;
-  }
-
-  return {
-    offsets,
-    totalHeight: currentOffset,
-  };
-}
-
-function calculateCumulativeOffsetsMs(events: readonly SessionEventDrawerCoreEvent[]): number[] {
+function calculateCumulativeOffsetsMs(events: readonly SessionProcessEvent[]): number[] {
   const result: number[] = [];
   let running = 0;
 
@@ -80,25 +202,23 @@ function calculateCumulativeOffsetsMs(events: readonly SessionEventDrawerCoreEve
   return result;
 }
 
-export function SessionEventDrawerCore<TEvent extends SessionEventDrawerCoreEvent>({
+export function SessionEventDrawerCore({
   emptyState,
   events,
-  EventComponent,
   focusEventId = null,
-  LegendComponent,
-  TimelineComponent,
-}: SessionEventDrawerCoreProps<TEvent>): ReactElement {
+}: {
+  emptyState: ReactNode;
+  events: readonly SessionProcessEvent[];
+  focusEventId?: string | null;
+}): ReactElement {
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [expandedEventIds, setExpandedEventIds] = useState<Set<string>>(() => new Set());
   const [expansionTouched, setExpansionTouched] = useState(false);
-  const [scrollTop, setScrollTop] = useState(0);
   const eventRefs = useRef<Map<string, HTMLDivElement> | null>(null);
   eventRefs.current ??= new Map<string, HTMLDivElement>();
   const eventRefMap = eventRefs.current;
-  const listRef = useRef<HTMLDivElement | null>(null);
   const initialScrollCompletedRef = useRef(false);
   const selectedId = selectedEventId ?? focusEventId ?? events[0]?.id ?? null;
-  const virtualized = events.length > 200;
   const expandedReadonly = useMemo(() => {
     const next = new Set(expandedEventIds);
 
@@ -108,59 +228,10 @@ export function SessionEventDrawerCore<TEvent extends SessionEventDrawerCoreEven
 
     return next;
   }, [expandedEventIds, expansionTouched, selectedId]);
-  const { offsets, totalHeight } = useMemo(
-    () => createEventOffsets({ events, expandedEventIds: expandedReadonly }),
-    [events, expandedReadonly],
-  );
   const cumulativeOffsetsMs = useMemo(() => calculateCumulativeOffsetsMs(events), [events]);
-  const visibleRange = useMemo(() => {
-    if (!virtualized) {
-      return { end: events.length, start: 0 };
-    }
-
-    const start = findVirtualizedStartIndex(offsets, scrollTop, SESSION_EVENT_DRAWER_OVERSCAN);
-    const viewportHeight = listRef.current?.clientHeight ?? 420;
-    const end = Math.min(
-      events.length,
-      start +
-        Math.ceil(viewportHeight / SESSION_EVENT_DRAWER_ROW_HEIGHT) +
-        SESSION_EVENT_DRAWER_OVERSCAN * 2,
-    );
-
-    return { end, start };
-  }, [events.length, offsets, scrollTop, virtualized]);
-
-  function scrollInitialSelection(): void {
-    if (initialScrollCompletedRef.current || selectedId === null) {
-      return;
-    }
-
-    const index = events.findIndex((event) => event.id === selectedId);
-    const offset = index === -1 ? null : offsets[index];
-
-    if (offset !== null && offset !== undefined && listRef.current !== null) {
-      initialScrollCompletedRef.current = true;
-      globalThis.requestAnimationFrame(() => {
-        listRef.current?.scrollTo({ top: offset });
-        eventRefMap.get(selectedId)?.scrollIntoView({ block: "nearest" });
-      });
-    }
-  }
 
   function selectEvent(eventId: string): void {
     setSelectedEventId(eventId);
-
-    if (virtualized) {
-      const index = events.findIndex((event) => event.id === eventId);
-      const offset = index === -1 ? null : offsets[index];
-
-      if (offset !== null && offset !== undefined) {
-        listRef.current?.scrollTo({ behavior: "smooth", top: offset });
-      }
-
-      return;
-    }
-
     eventRefMap.get(eventId)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }
 
@@ -186,81 +257,48 @@ export function SessionEventDrawerCore<TEvent extends SessionEventDrawerCoreEven
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-hidden px-7 py-4">
       <div className="min-w-0 shrink-0">
-        <TimelineComponent events={events} onSelect={selectEvent} selectedId={selectedId} />
+        <SessionTimeline events={events} onSelect={selectEvent} selectedId={selectedId} />
       </div>
       <div className="min-w-0 shrink-0">
-        <LegendComponent events={events} />
+        <SessionEventLegend events={events} />
       </div>
-      <div
-        ref={(node) => {
-          listRef.current = node;
-          if (node !== null) {
-            scrollInitialSelection();
-          }
-        }}
-        onScroll={(event) => {
-          setScrollTop(event.currentTarget.scrollTop);
-        }}
-        className="min-h-0 flex-1 overflow-y-auto pr-1"
-      >
-        {virtualized ? (
-          <div className="relative" style={{ height: totalHeight }}>
-            {events.slice(visibleRange.start, visibleRange.end).map((event, offsetIndex) => {
-              const eventIndex = visibleRange.start + offsetIndex;
-              const top = offsets[eventIndex] ?? 0;
+      <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+        <div className="flex flex-col gap-1.5">
+          {events.map((event, index) => (
+            <div
+              key={event.id}
+              ref={(node) => {
+                if (node === null) {
+                  eventRefMap.delete(event.id);
+                  return;
+                }
 
-              return (
-                <div key={event.id} className="absolute right-0 left-0 px-0.5" style={{ top }}>
-                  <EventComponent
-                    event={event}
-                    expanded={expandedReadonly.has(event.id)}
-                    index={eventIndex}
-                    offsetMs={cumulativeOffsetsMs[eventIndex] ?? 0}
-                    onSelect={() => {
-                      selectEvent(event.id);
-                    }}
-                    onToggleExpanded={() => {
-                      toggleExpanded(event.id);
-                    }}
-                    selected={selectedId === event.id}
-                  />
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="flex flex-col gap-1.5">
-            {events.map((event, index) => (
-              <div
-                key={event.id}
-                ref={(node) => {
-                  if (node) {
-                    eventRefMap.set(event.id, node);
-                    if (event.id === selectedId) {
-                      scrollInitialSelection();
-                    }
-                  } else {
-                    eventRefMap.delete(event.id);
-                  }
+                eventRefMap.set(event.id, node);
+
+                if (event.id === selectedId && !initialScrollCompletedRef.current) {
+                  initialScrollCompletedRef.current = true;
+                  globalThis.requestAnimationFrame(() => {
+                    node.scrollIntoView({ block: "start" });
+                  });
+                }
+              }}
+            >
+              <DrawerEventRow
+                event={event}
+                expanded={expandedReadonly.has(event.id)}
+                index={index}
+                offsetMs={cumulativeOffsetsMs[index] ?? 0}
+                onSelect={() => {
+                  selectEvent(event.id);
                 }}
-              >
-                <EventComponent
-                  event={event}
-                  expanded={expandedReadonly.has(event.id)}
-                  index={index}
-                  offsetMs={cumulativeOffsetsMs[index] ?? 0}
-                  onSelect={() => {
-                    selectEvent(event.id);
-                  }}
-                  onToggleExpanded={() => {
-                    toggleExpanded(event.id);
-                  }}
-                  selected={selectedId === event.id}
-                />
-              </div>
-            ))}
-          </div>
-        )}
+                onToggleExpanded={() => {
+                  toggleExpanded(event.id);
+                }}
+                selected={selectedId === event.id}
+              />
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

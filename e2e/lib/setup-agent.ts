@@ -1,5 +1,5 @@
 import { expect } from "@playwright/test";
-import type { Locator, Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
 
 import type { PreviewProviderId } from "./env-preflight";
 
@@ -9,15 +9,6 @@ export function createPreviewRunId(): string {
 
 export function getPreviewSmokeEmail(runId: string): string {
   return process.env["MOSOO_E2E_EMAIL"]?.trim() || `preview-smoke-${runId}@mosoo.ai`;
-}
-
-export async function maybeClick(locator: Locator, timeout = 2_000): Promise<boolean> {
-  try {
-    await locator.click({ timeout });
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 function getProviderLabelPattern(providerId: PreviewProviderId): RegExp {
@@ -33,12 +24,13 @@ export async function createPreviewRuntimeAgent(
 ): Promise<string> {
   await page.goto("/agent");
   await page.getByRole("button", { name: "Create agent" }).first().click();
-  await expect(page.getByRole("dialog", { name: "Create Agent" })).toBeVisible();
-  await page.getByLabel("Name").fill(input.name);
-  await page
+  const dialog = page.getByRole("dialog", { name: "New agent" });
+  await expect(dialog).toBeVisible();
+  await dialog.getByLabel("Name").fill(input.name);
+  await dialog
     .getByRole("button", { name: new RegExp(input.runtimeButtonName ?? "OpenAI", "iu") })
     .click();
-  await page.getByRole("button", { name: "Create agent" }).click();
+  await dialog.getByRole("button", { exact: true, name: "Create" }).click();
   await page.waitForURL(/\/agent\/[^/?#]+/u, { timeout: 30_000 });
 
   const match = /\/agent\/([^/?#]+)/u.exec(new URL(page.url()).pathname);

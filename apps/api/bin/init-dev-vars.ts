@@ -17,7 +17,6 @@ interface ParsedDevVarLine {
 
 const devVarsPath = `${scriptDir}/../.dev.vars`;
 const devVarsRepoPath = "apps/api/.dev.vars";
-const placeholderPattern = /^\([^)]*\)$/u;
 
 const devVarSpecs: readonly DevVarSpec[] = [
   { key: "VAULT_ROOT_SECRET", required: true },
@@ -58,24 +57,6 @@ function parseDevVarLine(line: string): ParsedDevVarLine | null {
   return { key, rawValue };
 }
 
-function unquoteValue(value: string): string {
-  const trimmed = value.trim();
-
-  if (
-    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
-    (trimmed.startsWith("'") && trimmed.endsWith("'"))
-  ) {
-    return trimmed.slice(1, -1);
-  }
-
-  return trimmed;
-}
-
-function shouldGenerateRequiredValue(value: string): boolean {
-  const normalized = unquoteValue(value);
-  return normalized.length === 0 || placeholderPattern.test(normalized);
-}
-
 function formatDevVarLine(spec: DevVarSpec): string {
   const value = spec.required ? createSecret() : "";
   return `${spec.key}=${value}`;
@@ -85,34 +66,8 @@ function writeStdout(message: string): void {
   process.stdout.write(`${message}\n`);
 }
 
-function writeStderr(message: string): void {
-  process.stderr.write(`${message}\n`);
-}
-
 function createDevVarsContent(): string {
   return `${devVarSpecs.map(formatDevVarLine).join("\n")}\n`;
-}
-
-function collectDuplicateKeys(lines: readonly string[]): string[] {
-  const seenKeys = new Set<string>();
-  const duplicateKeys = new Set<string>();
-
-  for (const line of lines) {
-    const parsed = parseDevVarLine(line);
-
-    if (parsed === null) {
-      continue;
-    }
-
-    if (seenKeys.has(parsed.key)) {
-      duplicateKeys.add(parsed.key);
-      continue;
-    }
-
-    seenKeys.add(parsed.key);
-  }
-
-  return [...duplicateKeys].toSorted();
 }
 
 function updateExistingContent(content: string): {
@@ -133,7 +88,7 @@ function updateExistingContent(content: string): {
     presentKeys.add(parsed.key);
 
     const spec = devVarSpecs.find((candidate) => candidate.key === parsed.key);
-    if (spec === undefined || !spec.required || !shouldGenerateRequiredValue(parsed.rawValue)) {
+    if (spec === undefined || !spec.required || parsed.rawValue.trim().length > 0) {
       return line;
     }
 
@@ -165,17 +120,7 @@ if (!(await Bun.file(devVarsPath).exists())) {
   process.exit(0);
 }
 
-const currentContent = await Bun.file(devVarsPath).text();
-const duplicateKeys = collectDuplicateKeys(currentContent.split(/\r?\n/u));
-
-if (duplicateKeys.length > 0) {
-  writeStderr(
-    `Refusing to edit ${devVarsRepoPath} because it has duplicate keys: ${duplicateKeys.join(", ")}`,
-  );
-  process.exit(1);
-}
-
-const updated = updateExistingContent(currentContent);
+const updated = updateExistingContent(await Bun.file(devVarsPath).text());
 
 if (updated.changedKeys.length === 0) {
   writeStdout(`${devVarsRepoPath} already has the required local env vars.`);

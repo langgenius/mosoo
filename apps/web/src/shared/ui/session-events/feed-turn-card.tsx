@@ -53,7 +53,6 @@ function SessionEventRow({
 }): ReactElement {
   const { t } = useTranslation();
   const domain = getSessionEventDomain(event.type);
-  const domainTone = SESSION_EVENT_DOMAIN_TONE[domain];
   const chipTone = getSessionEventChipTone(event);
   const preview = clipPreview(summarizeSessionEvent(event, t));
 
@@ -62,13 +61,12 @@ function SessionEventRow({
       type="button"
       onClick={onOpen}
       className={cn(
-        "group relative grid h-11 w-full grid-cols-[136px_minmax(118px,0.55fr)_minmax(0,1.45fr)_76px_82px] items-center gap-2 overflow-hidden rounded-md border border-border-subtle bg-card pr-2 pl-3 text-left transition-colors",
-        domainTone.row,
+        "group relative grid h-11 w-full grid-cols-[136px_minmax(118px,0.55fr)_minmax(0,1.45fr)_76px_82px] items-center gap-2 overflow-hidden rounded-md border border-border-soft bg-card pr-2 pl-3 text-left transition-colors hover:bg-hover",
       )}
     >
       <span
         className={cn(
-          "inline-flex items-center justify-self-start whitespace-nowrap rounded-sm px-1 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+          "inline-flex items-center justify-self-start whitespace-nowrap rounded-sm px-1 py-0.5 text-[10px] font-semibold",
           chipTone.chip,
         )}
       >
@@ -83,7 +81,7 @@ function SessionEventRow({
       </span>
       <span
         className={cn(
-          "justify-self-end rounded-sm border px-1 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+          "justify-self-end rounded-sm border px-1 py-0.5 text-[10px] font-semibold",
           statusClassName(event.status),
         )}
       >
@@ -112,7 +110,7 @@ export function TurnCard({
   const visibleTurnEventCount = turn.events.filter(isSessionEventVisibleInMainFeed).length;
 
   return (
-    <section className="border-border-subtle overflow-hidden rounded-lg border bg-white">
+    <section className="border-border-soft bg-card overflow-hidden rounded-lg border">
       <div className="flex items-start justify-between gap-3 px-3.5 py-3">
         <button
           type="button"
@@ -172,7 +170,7 @@ export function TurnCard({
           )}
         >
           <div className="overflow-hidden">
-            <div className="border-border-subtle bg-paper-100 flex flex-col gap-1.5 border-t p-2.5">
+            <div className="border-border-soft bg-paper-100 flex flex-col gap-1.5 border-t p-2.5">
               {filteredEvents.map((event) => (
                 <SessionEventRow
                   key={event.id}

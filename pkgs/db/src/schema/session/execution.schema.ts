@@ -11,5 +11,3 @@ export const sessionExecutionSnapshotsTable = sqliteTable("session_execution_sna
     .primaryKey()
     .references(() => sessionsTable.id, { onDelete: "cascade" }),
 });
-
-export type SessionExecutionSnapshotRow = typeof sessionExecutionSnapshotsTable.$inferSelect;

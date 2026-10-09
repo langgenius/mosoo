@@ -19,9 +19,9 @@ export function MarkdownPreviewDialog({
   return (
     <Dialog onOpenChange={onOpenChange} open={open}>
       <DialogContent className="max-h-[80vh] gap-0 overflow-hidden rounded-lg p-0 sm:max-w-[640px]">
-        <DialogHeader className="border-border-subtle border-b px-6 pt-5 pb-3">
+        <DialogHeader className="border-border-soft border-b px-6 pt-5 pb-3">
           <div className="flex items-center gap-2">
-            <FileText className="text-muted-foreground size-4" />
+            <FileText className="text-fg-3 size-4" />
             <DialogTitle className="min-w-0 truncate text-[15px] font-medium">{title}</DialogTitle>
             {badge}
           </div>

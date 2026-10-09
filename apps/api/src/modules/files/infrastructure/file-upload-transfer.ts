@@ -11,13 +11,13 @@ import {
   createUploadInvalidPartError,
   createUploadInvalidStateError,
 } from "./file-errors";
+import { ensureUploadAccess } from "./file-record-access";
 import {
-  ensureUploadAccess,
   expireUploadIfNeeded,
   updateFileRecordStatus,
   updateFileUploadStatus,
-} from "./file-record-store";
-import { abortMultipartUpload, deleteObject, putObject, uploadMultipartPart } from "./r2-s3-client";
+} from "./file-record-mutations";
+
 export async function uploadFileContent(
   bindings: ApiBindings,
   viewer: AuthenticatedViewer,
@@ -45,11 +45,10 @@ export async function uploadFileContent(
     throw createUploadContentMissingError("Upload content is required.");
   }
 
-  await putObject({
-    bindings,
-    body,
-    contentType: upload.content_type,
-    objectKey: context.file.object_key,
+  await bindings.FILE_BUCKET.put(context.file.object_key, body, {
+    httpMetadata: {
+      contentType: upload.content_type,
+    },
   });
 
   await updateFileUploadStatus(bindings.DB, {
@@ -90,13 +89,10 @@ export async function uploadFilePart(
     throw createUploadContentMissingError("Upload part content is required.");
   }
 
-  const uploadedPart = await uploadMultipartPart({
-    bindings,
-    body,
-    objectKey: context.file.object_key,
-    partNumber,
-    uploadId: upload.multipart_upload_id,
-  });
+  const uploadedPart = await bindings.FILE_BUCKET.resumeMultipartUpload(
+    context.file.object_key,
+    upload.multipart_upload_id,
+  ).uploadPart(partNumber, body);
 
   await updateFileUploadStatus(bindings.DB, {
     status: "uploading",
@@ -126,10 +122,13 @@ export async function abortFileUpload(
 
   const multipartUploadId = context.upload.multipart_upload_id;
   if (context.upload.strategy === "multipart" && multipartUploadId !== null) {
-    await abortMultipartUpload(bindings, context.file.object_key, multipartUploadId);
+    await bindings.FILE_BUCKET.resumeMultipartUpload(
+      context.file.object_key,
+      multipartUploadId,
+    ).abort();
   }
 
-  await deleteObject(bindings, context.file.object_key).catch(ignorePromiseRejection);
+  await bindings.FILE_BUCKET.delete(context.file.object_key).catch(ignorePromiseRejection);
 
   await updateFileUploadStatus(bindings.DB, {
     status: "aborted",

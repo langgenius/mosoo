@@ -1,9 +1,5 @@
 import type { AgentSummary } from "@mosoo/contracts/agent";
-import type {
-  AgentSessionActionCapability,
-  SessionMessage,
-  SessionProcessEvent,
-} from "@mosoo/contracts/session";
+import type { SessionMessage, SessionProcessEvent } from "@mosoo/contracts/session";
 import { useMemo, useState } from "react";
 import type { ReactElement } from "react";
 
@@ -26,10 +22,8 @@ import {
   Archive,
   ArrowLeft,
   ChevronRight,
-  CornerDownLeft,
   Inbox,
   MoreHorizontal,
-  Paperclip,
   Pin,
   PinOff,
   RotateCcw,
@@ -82,14 +76,14 @@ function ThreadActivityCard({
   const author = isUser ? viewer.name : agentName;
 
   return (
-    <div className="border-border-subtle bg-card rounded-lg border">
+    <div className="border-border-soft bg-card rounded-lg border">
       <button
         type="button"
         aria-expanded={open}
         onClick={() => {
           setOpen((current) => !current);
         }}
-        className="hover:bg-ink-900/[0.02] flex w-full items-center gap-2 rounded-t-lg px-3 py-2 text-left"
+        className="hover:bg-hover/50 flex w-full items-center gap-2 rounded-t-lg px-3 py-2 text-left"
       >
         <ChevronRight
           className={cn(
@@ -123,7 +117,7 @@ function ThreadActivityCard({
         )}
       >
         <div className="overflow-hidden">
-          <div className="border-border-subtle border-t px-4 py-3">
+          <div className="border-border-soft border-t px-4 py-3">
             {isUser ? (
               <div className="text-fg-1 text-[13.5px] leading-relaxed whitespace-pre-wrap">
                 {message.content}
@@ -182,7 +176,7 @@ function ThreadDetailHeader({
   const { t } = useTranslation();
 
   return (
-    <div className="border-border-subtle flex h-12 shrink-0 items-center gap-2 border-b px-4">
+    <div className="border-border-soft flex h-12 shrink-0 items-center gap-2 border-b px-4">
       <Button
         size="icon-sm"
         variant="ghost"
@@ -204,8 +198,8 @@ function ThreadDetailHeader({
         {working && !thread.failed ? (
           <Badge
             asChild
-            variant="primary"
-            className="cursor-pointer hover:bg-green-100 focus-visible:ring-offset-1"
+            variant="brand"
+            className="hover:bg-brand-soft-hover cursor-pointer focus-visible:ring-offset-1"
           >
             <button
               type="button"
@@ -289,47 +283,47 @@ function ThreadDetailHeader({
 function ThreadReplyComposer({
   actionError,
   canSend,
-  followUpMode,
   onChangeReply,
   onSend,
   readOnlyReason,
   reply,
   thread,
   threadActionCapabilities,
+  working,
 }: {
   actionError: string | null;
   canSend: boolean;
-  followUpMode: boolean;
   onChangeReply: (reply: string) => void;
   onSend: () => Promise<void>;
   readOnlyReason: string | null;
   reply: string;
   thread: ThreadListItem;
   threadActionCapabilities: ReturnType<typeof getThreadActionCapabilities>;
+  working: boolean;
 }): ReactElement {
   const { t } = useTranslation();
 
   return (
-    <div className="border-border-subtle bg-background shrink-0 border-t px-6 py-4">
+    <div className="border-border-soft bg-background shrink-0 border-t px-6 py-4">
       <div className="mx-auto max-w-[760px]">
         {readOnlyReason ? (
-          <div className="border-border bg-muted/40 text-fg-2 mb-2 rounded-md border px-3 py-2 text-[12.5px]">
+          <div className="border-border bg-sunken/40 text-fg-2 mb-2 rounded-md border px-3 py-2 text-[12.5px]">
             {t(readOnlyReason)}
           </div>
         ) : null}
         {actionError ? (
-          <div className="border-destructive/20 bg-destructive/[0.06] text-destructive mb-2 rounded-md border px-3 py-2 text-[12.5px]">
+          <div className="border-danger/20 bg-danger/[0.06] text-danger mb-2 rounded-md border px-3 py-2 text-[12.5px]">
             {actionError}
           </div>
         ) : null}
-        <div className="border-border-subtle bg-card flex items-end gap-2 rounded-lg border px-3 py-2.5">
+        <div className="border-border-soft bg-card flex items-end gap-2 rounded-lg border px-3 py-2.5">
           <Textarea
             value={reply}
             onChange={(event) => {
               const nextValue = event.target.value;
               onChangeReply(nextValue);
               if (
-                followUpMode &&
+                (thread.bucket === "archived" || !working) &&
                 nextValue.length > 0 &&
                 threadActionCapabilities.followUp.available
               ) {
@@ -343,38 +337,20 @@ function ThreadReplyComposer({
               }
             }}
             className="max-h-[200px] min-h-[36px] flex-1 resize-none border-0 bg-transparent p-0 text-[13px] shadow-none focus-visible:ring-0"
-            placeholder={
-              followUpMode
-                ? t("threads.followUpReDispatch", { agentName: t(thread.agentName) })
-                : t("threads.addComment")
-            }
+            placeholder={t("threads.followUpReDispatch", { agentName: t(thread.agentName) })}
           />
-          <Button
-            type="button"
-            size="icon-xs"
-            variant="ghost"
-            aria-label={t("threads.attachFiles")}
-            className="text-fg-3 shrink-0"
-            disabled
-          >
-            <Paperclip className="size-3.5" />
-          </Button>
           <Button
             type="button"
             size="icon-sm"
             variant="ghost"
             disabled={!canSend}
-            aria-label={followUpMode ? t("threads.followUp") : t("threads.sendComment")}
+            aria-label={t("threads.followUp")}
             className="text-fg-3 hover:text-fg-1 shrink-0"
             onClick={() => {
               void onSend();
             }}
           >
-            {followUpMode ? (
-              <RotateCcw className="size-3.5" />
-            ) : (
-              <CornerDownLeft className="size-3.5" />
-            )}
+            <RotateCcw className="size-3.5" />
           </Button>
         </div>
       </div>
@@ -397,7 +373,6 @@ export function ThreadDetail({
   processEvents,
   processEventsError,
   processEventsLoading,
-  sessionActionCapabilities,
   sending,
   thread,
   viewer,
@@ -416,7 +391,6 @@ export function ThreadDetail({
   processEvents: SessionProcessEvent[];
   processEventsError: Error | null;
   processEventsLoading: boolean;
-  sessionActionCapabilities: readonly AgentSessionActionCapability[] | null;
   sending: boolean;
   thread: ThreadListItem;
   viewer: ViewerInfo;
@@ -430,10 +404,9 @@ export function ThreadDetail({
     [artifacts, t],
   );
   const working = isThreadWorking(thread.session);
-  const followUpMode = thread.bucket === "archived" || !working;
   const threadActionCapabilities = getThreadActionCapabilities({
     bucket: thread.bucket,
-    capabilities: sessionActionCapabilities,
+    capabilities: thread.actionCapabilities,
     t,
   });
   const readOnlyReason = threadActionCapabilities.followUp.available
@@ -477,7 +450,7 @@ export function ThreadDetail({
 
       <div className="min-h-0 flex-1 overflow-y-auto p-6">
         <div className="mx-auto w-full max-w-[760px]">
-          <h1 className="text-fg-1 text-[24px] leading-tight font-bold">{t(thread.title)}</h1>
+          <h1 className="t-page-title">{t(thread.title)}</h1>
           <div className="text-fg-3 mt-1.5 flex flex-wrap items-center gap-1.5 text-[12px]">
             <AgentAvatar
               agent={thread.agent}
@@ -492,10 +465,8 @@ export function ThreadDetail({
           </div>
 
           {firstUserMessage !== null ? (
-            <div className="border-border-subtle bg-card mt-5 rounded-lg border px-4 py-3">
-              <div className="text-fg-3 mb-1.5 text-[10.5px] font-bold tracking-[0.16em] uppercase">
-                {t("threads.userRequest")}
-              </div>
+            <div className="border-border-soft bg-card mt-5 rounded-lg border px-4 py-3">
+              <div className="t-group-label mb-1.5">{t("threads.userRequest")}</div>
               <div className="text-fg-1 text-[13.5px] leading-relaxed whitespace-pre-wrap">
                 {firstUserMessage.content}
               </div>
@@ -514,9 +485,7 @@ export function ThreadDetail({
               {t("threads.loadingThread")}
             </div>
           ) : messagesError ? (
-            <div className="text-destructive py-12 text-center text-[13px]">
-              {messagesError.message}
-            </div>
+            <div className="text-danger py-12 text-center text-[13px]">{messagesError.message}</div>
           ) : activityMessages.length === 0 && firstUserMessage === null ? (
             <EmptyState
               icon={Inbox}
@@ -553,13 +522,13 @@ export function ThreadDetail({
       <ThreadReplyComposer
         actionError={actionError}
         canSend={canSend}
-        followUpMode={followUpMode}
         onChangeReply={setReply}
         onSend={send}
         readOnlyReason={readOnlyReason}
         reply={reply}
         thread={thread}
         threadActionCapabilities={threadActionCapabilities}
+        working={working}
       />
 
       <ThreadProcessModal

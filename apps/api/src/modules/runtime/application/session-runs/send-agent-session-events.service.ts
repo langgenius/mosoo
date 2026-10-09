@@ -1,4 +1,3 @@
-import type { SessionLiveState } from "@mosoo/ag-ui-session";
 import type {
   AgentSessionEventBatch,
   AgentSessionEventInput,
@@ -8,26 +7,23 @@ import type {
 import type { UserWarning } from "@mosoo/contracts/session-run";
 import { sessionsTable } from "@mosoo/db";
 import { parsePlatformId } from "@mosoo/id";
-import type { AccountId, ProjectId, SessionId, SessionRunId } from "@mosoo/id";
+import type { AccountId, FileId, ProjectId, SessionId, SessionRunId } from "@mosoo/id";
 import { getAvailableAgentSessionActionCapability } from "@mosoo/session-policy";
 import { and, eq, isNull } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../../platform/db/drizzle";
-import { runOrderedAsyncTasks } from "../../../../shared/ordered-async";
 import { currentTimestampMs, toIsoString } from "../../../../time";
 import type { AuthenticatedViewer } from "../../../auth/application/viewer-auth.service";
 import { appendSessionRuntimeEvents } from "../../../sessions/application/session-event-write.service";
-import { getParticipantSessionSummaryAccessById } from "../../../sessions/application/session-query.service";
-import type { SessionActionAuthorization } from "../../../sessions/domain/session-access.policy";
-import { resolveSessionActionCreatorFlag } from "../../../sessions/domain/session-access.policy";
+import { getSessionSummaryById } from "../../../sessions/application/session-summary-query.service";
 import { toSessionLifecycleStatusForRunStatus } from "../../../sessions/domain/session-lifecycle";
 import { deriveSessionTitleFromPrompt } from "../../../sessions/domain/session-title";
-import { getActiveSessionRunId } from "../../infrastructure/session-runs/session-run-store.repository";
+import { getActiveSessionRunSummary } from "../../infrastructure/session-runs/session-run-store.repository";
 import { cancelRun } from "./cancel-run.service";
+import { queueSessionRun } from "./queue-run.service";
 import type { QueuedSessionRunState } from "./queue-run.service";
 import { resolveSessionPermissionDecision } from "./session-permission-decision.service";
-import { parseAttachmentIds, startRuns } from "./start-runs.service";
 
 interface SendAgentSessionEventsInput {
   events: AgentSessionEventInput[];
@@ -38,8 +34,6 @@ interface SendAgentSessionEventsInput {
 interface AgentSessionEventsOptions {
   admissionRequestedAtMs?: number;
   accessViewer?: AuthenticatedViewer;
-  actionAuthorization?: SessionActionAuthorization;
-  cachedState?: SessionLiveState | null;
 }
 
 export interface SendAgentSessionEventsRequest {
@@ -99,16 +93,16 @@ async function getRunToInterrupt(
     return parsePlatformId<SessionRunId>(input.runId, "run id");
   }
 
-  const activeRunId = await getActiveSessionRunId(database, input.sessionId);
+  const activeRun = await getActiveSessionRunSummary(database, input.sessionId);
 
-  if (!activeRunId) {
+  if (!activeRun) {
     throw new Error("No active session run to cancel.");
   }
 
-  return activeRunId;
+  return activeRun.id;
 }
 
-async function autoTitleSessionFromPrompt(input: {
+export async function autoTitleSessionFromPrompt(input: {
   database: D1Database;
   sessionId: SessionId;
   text: string;
@@ -190,75 +184,68 @@ async function handleAgentSessionEvent(input: {
   executionContext: Pick<ExecutionContext, "waitUntil"> | null;
   options: AgentSessionEventsOptions;
   requestUrl: string;
-  projectId: ProjectId;
-  sessionId: SessionId;
+  session: SessionSummary;
   viewer: AuthenticatedViewer;
 }): Promise<{
   result: AgentSessionEventResult;
   sessionState: QueuedSessionRunState | null;
   titleUpdate: { title: string; updatedAt: string } | null;
-  warnings: UserWarning[];
 }> {
+  const sessionId = input.session.id;
+
   switch (input.event.type) {
     case "user_message": {
       const text = parseNonEmptyText(input.event.text, "User message text");
-      const started = await startRuns({
+      const queued = await queueSessionRun({
         bindings: input.bindings,
         executionContext: input.executionContext,
         input: {
-          requests: [
-            {
-              attachmentIds: parseAttachmentIds(input.event.attachmentIds),
-              prompt: {
-                content: text,
-              },
-              projectId: input.projectId,
-              sessionId: input.sessionId,
-              ...(input.event.clientRequestId !== null && input.event.clientRequestId !== undefined
-                ? { clientRequestId: input.event.clientRequestId }
-                : {}),
-            },
-          ],
+          attachmentIds: (input.event.attachmentIds ?? []).map((value, index) =>
+            parsePlatformId<FileId>(value, `attachment id ${index}`),
+          ),
+          clientRequestId: input.event.clientRequestId ?? null,
+          prompt: text,
+          session: input.session,
+          ...(input.options.admissionRequestedAtMs === undefined
+            ? {}
+            : { admissionRequestedAtMs: input.options.admissionRequestedAtMs }),
+          ...(input.options.accessViewer ? { accessViewer: input.options.accessViewer } : {}),
         },
-        options: input.options,
         requestUrl: input.requestUrl,
         viewer: input.viewer,
       });
       const titleUpdate = await autoTitleSessionFromPrompt({
         database: input.bindings.DB,
-        sessionId: input.sessionId,
+        sessionId,
         text,
       });
 
       return {
         result: {
           clientRequestId: input.event.clientRequestId ?? null,
-          run: started.runs[0] ?? null,
+          run: queued.run,
           type: input.event.type,
         },
-        sessionState: started.sessionStates[0] ?? null,
+        sessionState: queued.sessionState,
         titleUpdate,
-        warnings: started.warnings,
       };
     }
 
     case "permission_decision": {
       const requestId = parseNonEmptyText(input.event.requestId, "Permission request id");
       const decision = parsePermissionDecision(input.event.decision);
-      const updated = await resolveSessionPermissionDecision({
+      const resolved = await resolveSessionPermissionDecision({
         bindings: input.bindings,
-        cachedState: input.options.cachedState ?? null,
         decision,
         requestId,
-        projectId: input.projectId,
-        sessionId: input.sessionId,
+        sessionId,
         viewer: input.viewer,
       });
-      if (updated) {
+      if (resolved) {
         await appendSessionRuntimeEvents({
           bindings: input.bindings,
-          events: [updated.event],
-          sessionId: input.sessionId,
+          events: [resolved],
+          sessionId,
         });
       }
 
@@ -270,20 +257,15 @@ async function handleAgentSessionEvent(input: {
         },
         sessionState: null,
         titleUpdate: null,
-        warnings: [],
       };
     }
 
     case "user_interrupt": {
       const runId = await getRunToInterrupt(input.bindings.DB, {
         runId: input.event.runId,
-        sessionId: input.sessionId,
+        sessionId,
       });
-      const cancelled = await cancelRun(input.bindings, input.viewer, {
-        projectId: input.projectId,
-        runId,
-        sessionId: input.sessionId,
-      });
+      const cancelled = await cancelRun(input.bindings, input.viewer, { runId, sessionId });
 
       return {
         result: {
@@ -293,7 +275,6 @@ async function handleAgentSessionEvent(input: {
         },
         sessionState: null,
         titleUpdate: null,
-        warnings: [],
       };
     }
     default: {
@@ -314,54 +295,47 @@ export async function sendAgentSessionEvents(
     throw new Error("At least one session event is required.");
   }
 
-  const access = await getParticipantSessionSummaryAccessById(request.bindings.DB, viewerId, {
+  const session = await getSessionSummaryById(request.bindings.DB, viewerId, {
     projectId,
     sessionId,
-  });
-  const session = access.session;
-  const isSessionCreator = resolveSessionActionCreatorFlag({
-    authorization: options.actionAuthorization,
-    isSessionCreator: access.isSessionCreator,
   });
 
   const results: AgentSessionEventResult[] = [];
   const warnings: UserWarning[] = [];
+  const handledEvents: Awaited<ReturnType<typeof handleAgentSessionEvent>>[] = [];
 
-  const handledEvents = await runOrderedAsyncTasks(
-    request.input.events.map((event) => async () => {
-      const capability = getAvailableAgentSessionActionCapability({
-        action: toActionCapabilityName(event),
-        archivedAt: session.archivedAt,
-        isSessionCreator,
-        runtimeId: session.runtimeId,
-        status: session.status,
+  for (const event of request.input.events) {
+    const capability = getAvailableAgentSessionActionCapability({
+      action: toActionCapabilityName(event),
+      archivedAt: session.archivedAt,
+      runtimeId: session.runtimeId,
+      status: session.status,
+    });
+
+    if (capability.status === "degraded") {
+      warnings.push({
+        code: `agent_session.${capability.action}.degraded`,
+        message: capability.reason ?? `Agent Session action ${capability.action} is degraded.`,
       });
+    }
 
-      if (capability.status === "degraded") {
-        warnings.push({
-          code: `agent_session.${capability.action}.degraded`,
-          message: capability.reason ?? `Agent Session action ${capability.action} is degraded.`,
-        });
-      }
-
-      return handleAgentSessionEvent({
+    handledEvents.push(
+      await handleAgentSessionEvent({
         bindings: request.bindings,
         event,
         executionContext: request.executionContext,
         options,
-        projectId,
         requestUrl: request.requestUrl,
-        sessionId,
+        session,
         viewer: request.viewer,
-      });
-    }),
-  );
+      }),
+    );
+  }
 
   let responseSession = session;
 
   for (const handled of handledEvents) {
     results.push(handled.result);
-    warnings.push(...handled.warnings);
     responseSession = applyHandledEventToSessionSummary(responseSession, handled);
   }
 

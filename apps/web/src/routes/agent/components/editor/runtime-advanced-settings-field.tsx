@@ -91,12 +91,10 @@ function isCustomValue(
 
 function SelectSettingControl({
   definition,
-  readOnly,
   selected,
   setSetting,
 }: {
   definition: Extract<RuntimeAdvancedSettingDefinition, { type: "select" }>;
-  readOnly: boolean;
   selected: number | string | undefined;
   setSetting(value: string | undefined): void;
 }) {
@@ -109,11 +107,9 @@ function SelectSettingControl({
           className={cn(
             "min-h-8 rounded-md border px-2 text-[12px] font-medium transition-colors",
             selected === undefined
-              ? "border-brand bg-brand-light text-foreground"
-              : "border-border bg-white text-muted-foreground hover:border-brand/30 hover:text-foreground",
-            readOnly ? "pointer-events-none opacity-60" : null,
+              ? "border-emphasis bg-selected text-foreground"
+              : "border-border bg-card text-fg-3 hover:border-border-strong hover:text-foreground",
           )}
-          disabled={readOnly}
           onClick={() => {
             setSetting(undefined);
           }}
@@ -132,11 +128,9 @@ function SelectSettingControl({
             className={cn(
               "min-h-8 rounded-md border px-2 text-[12px] font-medium transition-colors",
               optionSelected
-                ? "border-brand bg-brand-light text-foreground"
-                : "border-border bg-white text-muted-foreground hover:border-brand/30 hover:text-foreground",
-              readOnly ? "pointer-events-none opacity-60" : null,
+                ? "border-emphasis bg-selected text-foreground"
+                : "border-border bg-card text-fg-3 hover:border-border-strong hover:text-foreground",
             )}
-            disabled={readOnly}
             key={option.value}
             onClick={() => {
               setSetting(option.value);
@@ -153,12 +147,10 @@ function SelectSettingControl({
 
 function NumberSettingControl({
   definition,
-  readOnly,
   selected,
   setSetting,
 }: {
   definition: Extract<RuntimeAdvancedSettingDefinition, { type: "number" }>;
-  readOnly: boolean;
   selected: number | string | undefined;
   setSetting(value: number | undefined): void;
 }) {
@@ -168,7 +160,6 @@ function NumberSettingControl({
     <Input
       aria-label={definition.label}
       className="max-w-40"
-      disabled={readOnly}
       min={definition.min}
       onChange={(event) => {
         const nextValue = event.target.value;
@@ -189,7 +180,6 @@ function NumberSettingControl({
         }
       }}
       placeholder={t("agent.runtimeDefault")}
-      readOnly={readOnly}
       step={definition.step ?? 1}
       type="number"
       value={typeof selected === "number" ? String(selected) : ""}
@@ -200,7 +190,6 @@ function NumberSettingControl({
 export function RuntimeAdvancedSettingsField({
   builtInTools,
   modelId,
-  readOnly,
   runtimeId,
   settings,
   setBuiltInTools,
@@ -208,7 +197,6 @@ export function RuntimeAdvancedSettingsField({
 }: {
   builtInTools?: AgentBuiltInToolConfig[];
   modelId: string;
-  readOnly: boolean;
   runtimeId: string;
   settings: JsonObject;
   setBuiltInTools?(tools: AgentBuiltInToolConfig[]): void;
@@ -249,13 +237,13 @@ export function RuntimeAdvancedSettingsField({
   return (
     <div className="pt-1">
       {toolSupportError ? (
-        <p role="alert" className="text-destructive text-[12px]">
+        <p role="alert" className="text-danger text-[12px]">
           {toolSupportError}
         </p>
       ) : null}
       <button
         aria-expanded={open}
-        className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-[12px] transition"
+        className="text-fg-3 hover:text-foreground flex items-center gap-1 text-[12px] transition"
         onClick={() => {
           setOpen((current) => !current);
         }}
@@ -264,15 +252,15 @@ export function RuntimeAdvancedSettingsField({
         <ChevronDown className={cn("size-3.5 transition-transform", open && "rotate-180")} />
         <span>{t("agent.advancedRuntimeSettings")}</span>
         {customCount > 0 ? (
-          <span className="border-border bg-muted text-muted-foreground ml-1 rounded-full border px-1.5 py-0.5 text-[10px] leading-none">
+          <span className="border-border bg-sunken text-fg-3 ml-1 rounded-full border px-1.5 py-0.5 text-[10px] leading-none">
             {t("agentEditor.customCount", { count: String(customCount) })}
           </span>
         ) : null}
       </button>
 
       {open ? (
-        <div className="border-border bg-muted/30 mt-3 space-y-4 rounded-md border p-3">
-          <p className="text-muted-foreground text-[11px] leading-relaxed">
+        <div className="border-border bg-sunken/30 mt-3 space-y-4 rounded-md border p-3">
+          <p className="text-fg-3 text-[11px] leading-relaxed">
             {t("agentEditor.runtimeSettingsNotPortable")}
           </p>
 
@@ -282,13 +270,12 @@ export function RuntimeAdvancedSettingsField({
             return (
               <div className="space-y-1.5" key={definition.key}>
                 <div className="flex items-center justify-between gap-3">
-                  <Label className="text-muted-foreground text-[12px]">{definition.label}</Label>
-                  <span className="text-muted-foreground text-[10px]">{definition.key}</span>
+                  <Label className="text-fg-3 text-[12px]">{definition.label}</Label>
+                  <span className="text-fg-3 text-[10px]">{definition.key}</span>
                 </div>
                 {definition.type === "select" ? (
                   <SelectSettingControl
                     definition={definition}
-                    readOnly={readOnly}
                     selected={selected}
                     setSetting={(value) => {
                       setSetting(definition, value);
@@ -297,7 +284,6 @@ export function RuntimeAdvancedSettingsField({
                 ) : (
                   <NumberSettingControl
                     definition={definition}
-                    readOnly={readOnly}
                     selected={selected}
                     setSetting={(value) => {
                       setSetting(definition, value);
@@ -311,16 +297,10 @@ export function RuntimeAdvancedSettingsField({
           {showBuiltInTools ? (
             <div className="border-border/70 space-y-2 border-t pt-3">
               <div className="flex items-center justify-between gap-3">
-                <Label className="text-muted-foreground text-[12px]">
-                  {t("agentEditor.tools")}
-                </Label>
-                <span className="text-muted-foreground text-[10px]">tools</span>
+                <Label className="text-fg-3 text-[12px]">{t("agentEditor.tools")}</Label>
+                <span className="text-fg-3 text-[10px]">tools</span>
               </div>
-              <BuiltInToolsField
-                readOnly={readOnly}
-                tools={builtInTools}
-                setTools={setBuiltInTools}
-              />
+              <BuiltInToolsField tools={builtInTools} setTools={setBuiltInTools} />
             </div>
           ) : null}
         </div>

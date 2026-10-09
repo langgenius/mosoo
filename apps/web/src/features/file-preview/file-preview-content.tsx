@@ -7,7 +7,7 @@ import type { ListedFileEntry } from "@/domains/file/api/files";
 import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import { Download, FileQuestion, LoaderCircle } from "@/shared/ui/icons";
-import { StaticMarkdown } from "@/shared/ui/static-markdown";
+import { documentMarkdownClassName, Markdown } from "@/shared/ui/markdown";
 
 import {
   getFilePreviewKind,
@@ -46,7 +46,11 @@ function TextPreview({ content, file, kind }: TextPreviewProps): ReactElement {
   const { t } = useTranslation();
 
   if (kind === "markdown") {
-    return <StaticMarkdown className="mx-auto max-w-4xl px-6 py-5">{content}</StaticMarkdown>;
+    return (
+      <Markdown className={`${documentMarkdownClassName} mx-auto max-w-4xl px-6 py-5`}>
+        {content}
+      </Markdown>
+    );
   }
 
   if (kind === "table") {
@@ -164,7 +168,7 @@ export function FilePreviewContent({ file }: { file: ListedFileEntry }): ReactEl
     return (
       <object
         aria-label={file.name}
-        className="h-full w-full bg-white"
+        className="bg-card h-full w-full"
         data={inlineDownload.url}
         type="application/pdf"
       >

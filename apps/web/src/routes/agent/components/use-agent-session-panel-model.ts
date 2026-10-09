@@ -1,76 +1,64 @@
-import type { SessionType } from "@mosoo/contracts/session";
+import { createLiveStateMessage } from "@mosoo/ag-ui-session";
+import type { SessionViewMessage } from "@mosoo/ag-ui-session";
 import { ignorePromiseRejection } from "@mosoo/effects";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { KeyboardEvent } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import { useSessionStream } from "@/domains/runtime/use-session-stream";
-import type { PermissionRequest } from "@/domains/runtime/use-session-stream";
-import { listAgentSessions, triggerAgentSessionPrewarm } from "@/domains/session/api/agent-session";
+import {
+  createAgentSession,
+  listAgentSessions,
+  triggerAgentSessionPrewarm,
+} from "@/domains/session/api/agent-session";
+import { deleteAgentSession } from "@/domains/session/api/mutations";
 import { createSessionResourceMentionMessagePayload } from "@/features/session-chat/session-resource-mentions";
-import { useSessionChatLayoutState } from "@/features/session-chat/use-session-chat-layout-state";
 import { toAgentId, toProjectId, toSessionId } from "@/routes/typed-id";
 import { useTranslation } from "@/shared/i18n";
 
 import type {
   AgentSessionPanelModel,
   ComposerError,
-  PermissionDecision,
   SendOptions,
   UseAgentSessionPanelModelInput,
 } from "./agent-session-panel-model-types";
 import {
-  createSessionAutoTitle,
   getReadinessBlockMessage,
   hasStaleSessionConfiguration,
   isComposerSendBlocked,
-  selectSessionPanelReadiness,
   shouldSpeculativelyCreateSessionOnTyping,
-  shouldWaitForRuntimeReadyOnNewSession,
 } from "./agent-session-panel-rules";
-import {
-  autoTitleSession,
-  createAgentSession,
-  deleteAgentSession,
-} from "./agent-session-panel-session-actions";
-import {
-  createPendingSendMessage,
-  mergePendingSendMessages,
-  PENDING_SEND_SWEEP_INTERVAL_MS,
-  prunePendingSends,
-  prunePendingSendsForSession,
-} from "./agent-session-pending-sends";
-import type { PendingSend } from "./agent-session-pending-sends";
 
 const SPECULATIVE_CREATE_FAILURE_COOLDOWN_MS = 30_000;
 
-async function autoTitleSessionAndRefresh(input: {
-  projectId: string | null;
-  refreshSessions: () => Promise<void>;
-  sessionId: string;
-  title: string;
-}): Promise<void> {
-  if (input.projectId === null) {
-    return;
+/** A send in flight: its user message and the user messages the transcript held before it. */
+interface PendingSend {
+  readonly message: SessionViewMessage;
+  readonly userMessageCount: number;
+}
+
+function countUserMessages(messages: readonly SessionViewMessage[]): number {
+  return messages.filter((message) => message.role === "user").length;
+}
+
+/**
+ * Shows the message of a send in flight like a sent user message until the
+ * server echo lands, which is the transcript gaining a user message.
+ */
+export function withPendingSend(
+  messages: SessionViewMessage[],
+  pendingSend: PendingSend | null,
+): SessionViewMessage[] {
+  if (pendingSend === null || countUserMessages(messages) > pendingSend.userMessageCount) {
+    return messages;
   }
 
-  await autoTitleSession(
-    toProjectId(input.projectId),
-    toSessionId(input.sessionId),
-    input.title,
-  ).catch(ignorePromiseRejection);
-  void input.refreshSessions();
+  return [...messages, pendingSend.message];
 }
 
 export function getResetSessionIds(input: {
   readonly activeSessionId: string | null;
   readonly sessions: readonly { readonly id: string }[];
-  readonly sessionType: SessionType;
 }): string[] {
-  if (input.sessionType !== "preview") {
-    return input.activeSessionId === null ? [] : [input.activeSessionId];
-  }
-
   const sessionIds = new Set(input.sessions.map((session) => session.id));
 
   if (input.activeSessionId !== null) {
@@ -80,37 +68,19 @@ export function getResetSessionIds(input: {
   return [...sessionIds];
 }
 
-export function removeSessionConfigurationRevisionKeys(
-  current: Readonly<Record<string, string>>,
-  sessionIds: readonly string[],
-): Record<string, string> {
-  const next = { ...current };
-
-  for (const sessionId of sessionIds) {
-    delete next[sessionId];
-  }
-
-  return next;
-}
-
 export function useAgentSessionPanelModel(
   input: UseAgentSessionPanelModelInput,
 ): AgentSessionPanelModel {
   const { t } = useTranslation();
   const [selectedSessionId, setSelectedSessionId] = useState<string | null | undefined>();
-  const [sessionConfigurationRevisions, setSessionConfigurationRevisions] = useState<
-    Record<string, string>
-  >({});
-  const [inputValue, setInputValue] = useState("");
   const [composerError, setComposerError] = useState<ComposerError | null>(null);
   const [sending, setSending] = useState(false);
-  const [pendingSends, setPendingSends] = useState<PendingSend[]>([]);
+  // Set only while handleSend is in flight; the send's own finally clears it.
+  const [pendingSend, setPendingSend] = useState<PendingSend | null>(null);
   const sessionCreatePromiseRef = useRef<Promise<string> | null>(null);
-  const sessionResolutionPromiseRef = useRef<Promise<string> | null>(null);
-  const retiredPreviewIdsRef = useRef(new Set<string>());
   const unlistedCreatedSessionIdRef = useRef<string | null>(null);
-  // Bumped by reset/new-session/retry so an in-flight create that they
-  // superseded cannot re-select its (now orphaned) session when it resolves.
+  // Bumped by reset/retry so an in-flight create that they superseded cannot
+  // re-select its (now orphaned) session when it resolves.
   const sessionEpochRef = useRef(0);
   const speculativeCreateFailedAtMsRef = useRef(0);
 
@@ -118,44 +88,19 @@ export function useAgentSessionPanelModel(
     enabled: input.projectId !== null,
     queryFn: async () => {
       if (input.projectId === null) return [];
-      const sessions = await listAgentSessions(
-        toProjectId(input.projectId),
-        toAgentId(input.agentId),
-        {
-          archived: false,
-          participantOnly: true,
-          type: input.sessionType,
-        },
-      );
-      // Absence from a page is not expiry. Preserve a still-valid selected Preview
-      // even when newer Sessions have pushed it beyond the first page.
-      if (
-        input.sessionType === "preview" &&
-        selectedSessionId != null &&
-        !sessions.some((session) => session.id === selectedSessionId)
-      ) {
-        const selected = await findAvailablePreview(selectedSessionId);
-        return [...sessions, ...selected];
-      }
-      return sessions;
+      return listAgentSessions(toProjectId(input.projectId), toAgentId(input.agentId), {
+        archived: false,
+        type: "preview",
+      });
     },
-    queryKey: ["agent-session-list", input.agentId, input.sessionType, "active", selectedSessionId],
+    queryKey: ["agent-session-list", input.agentId, "preview", "active"],
   });
-
-  async function findAvailablePreview(sessionId: string) {
-    if (input.projectId === null) throw new Error("Project id is required to query a Preview.");
-    return listAgentSessions(toProjectId(input.projectId), toAgentId(input.agentId), {
-      archived: false,
-      participantOnly: true,
-      sessionId: toSessionId(sessionId),
-      type: "preview",
-    });
-  }
 
   const agentSessions = sessionsQuery.data ?? [];
   const defaultSessionId = agentSessions[0]?.id ?? null;
+  // The list excludes expired Previews, so a selected Preview that drops out of
+  // it is gone and the next action starts a new one.
   const selectedPreviewWasRemoved =
-    input.sessionType === "preview" &&
     sessionsQuery.isSuccess &&
     selectedSessionId !== undefined &&
     selectedSessionId !== null &&
@@ -170,74 +115,21 @@ export function useAgentSessionPanelModel(
     activeSessionId === null
       ? null
       : (agentSessions.find((session) => session.id === activeSessionId) ?? null);
-  const activeSessionRevision =
-    activeSessionId === null ? null : (sessionConfigurationRevisions[activeSessionId] ?? null);
   const configurationRefreshRequired = hasStaleSessionConfiguration({
     activeSession,
-    activeSessionRevision,
     configurationChangedAt: input.configurationChangedAt,
-    configurationRevisionKey: input.configurationRevisionKey,
-    requireFreshConfiguration: input.requireFreshConfiguration,
   });
   const stream = useSessionStream(input.projectId, activeSessionId);
-  const readiness = selectSessionPanelReadiness({
-    agentReadiness: activeSessionId === null ? input.readiness : null,
-    streamReadiness: stream.readiness,
-  });
+  const readiness = activeSessionId === null ? input.readiness : null;
   const readinessBlockMessage = getReadinessBlockMessage(readiness);
-  const permissionScrollSignal = useMemo(
-    () => stream.permissionRequests.map((request) => request.requestId).join("|"),
-    [stream.permissionRequests],
+  // A send in flight counts as a running turn, so the composer shows Stop
+  // instead of accepting a second message.
+  const streaming = stream.streaming || pendingSend !== null;
+  // Memoized so the transcript keeps one array identity between stream updates.
+  const messages = useMemo(
+    () => withPendingSend(stream.messages, pendingSend),
+    [pendingSend, stream.messages],
   );
-  const layout = useSessionChatLayoutState(stream.messages, permissionScrollSignal);
-
-  // Fresh messages for the sweep interval without keying the effect on
-  // stream.messages — that identity changes every animation frame during
-  // streaming and would tear the interval down per frame.
-  const streamMessagesRef = useRef(stream.messages);
-  streamMessagesRef.current = stream.messages;
-
-  // Reconcile the optimistic overlay against server truth at render time, so
-  // the frame that first contains the echoed message never also paints the
-  // pending bubble (a post-commit effect alone leaves a duplicate frame). The
-  // session filter runs here too so a pending entry bound to another session
-  // can never ghost into the newly selected session's thread mid-switch.
-  const reconciledPendingSends = useMemo(
-    () =>
-      prunePendingSends(
-        prunePendingSendsForSession(pendingSends, activeSessionId),
-        stream.messages,
-        Date.now(),
-      ),
-    [activeSessionId, pendingSends, stream.messages],
-  );
-
-  useEffect(() => {
-    setPendingSends((current) => prunePendingSendsForSession(current, activeSessionId));
-  }, [activeSessionId]);
-
-  // State GC + TTL sweep: gates and visuals read the render-time reconciled
-  // value, so state only needs to catch up eventually — eagerly when the
-  // overlay changes, then every sweep tick so a stuck entry expires even when
-  // no further events arrive and the composer can never stay blocked forever.
-  useEffect(() => {
-    if (pendingSends.length === 0) {
-      return;
-    }
-
-    const sweep = (): void => {
-      setPendingSends((current) =>
-        prunePendingSends(current, streamMessagesRef.current, Date.now()),
-      );
-    };
-
-    sweep();
-    const interval = globalThis.setInterval(sweep, PENDING_SEND_SWEEP_INTERVAL_MS);
-
-    return () => {
-      globalThis.clearInterval(interval);
-    };
-  }, [pendingSends]);
 
   async function refreshSessions(): Promise<void> {
     if (input.projectId === null) {
@@ -246,7 +138,10 @@ export function useAgentSessionPanelModel(
 
     const current = await sessionsQuery.refetch();
     if (current.data?.some((session) => session.id === unlistedCreatedSessionIdRef.current)) {
+      // Once listed, the list owns the created Preview; a later removal must
+      // start a new one instead of reusing the settled create.
       unlistedCreatedSessionIdRef.current = null;
+      sessionCreatePromiseRef.current = null;
     }
   }
 
@@ -261,11 +156,7 @@ export function useAgentSessionPanelModel(
     sessionCreatePromiseRef.current = null;
   }
 
-  const streamingWithPending = stream.streaming || reconciledPendingSends.length > 0;
-
-  async function createSessionAndSelect(
-    options: { waitForRuntimeReady?: boolean } = {},
-  ): Promise<string> {
+  async function createSessionAndSelect(): Promise<string> {
     if (input.projectId === null) {
       throw new Error("Project id is required to create an agent session.");
     }
@@ -274,58 +165,19 @@ export function useAgentSessionPanelModel(
     const createdSession = await createAgentSession(
       toProjectId(input.projectId),
       toAgentId(input.agentId),
-      input.sessionType,
-      {
-        waitForRuntimeReady: options.waitForRuntimeReady === true,
-      },
+      "preview",
     );
 
     if (sessionEpochRef.current !== epoch) {
-      // Reset/new-session superseded this create while it was in flight; the
-      // orphaned session is reaped by the next reset.
+      // Reset superseded this create while it was in flight; the orphaned
+      // session is reaped by the next reset.
       return createdSession.id;
-    }
-
-    const revisionKey = input.configurationRevisionKey;
-
-    if (revisionKey !== null && revisionKey.length > 0) {
-      setSessionConfigurationRevisions((current) => ({
-        ...current,
-        [createdSession.id]: revisionKey,
-      }));
     }
 
     setSelectedSessionId(createdSession.id);
     unlistedCreatedSessionIdRef.current = createdSession.id;
     void refreshSessions();
     return createdSession.id;
-  }
-
-  async function handleStartNewSession(): Promise<void> {
-    if (sending) {
-      return;
-    }
-
-    setSending(true);
-    supersedeInFlightSessionCreate();
-    setSelectedSessionId(null);
-    setInputValue("");
-    setPendingSends([]);
-    clearComposerError();
-
-    try {
-      await createSessionAndSelect({
-        waitForRuntimeReady: shouldWaitForRuntimeReadyOnNewSession(input),
-      });
-    } catch (error) {
-      setComposerError({
-        actionLabel: t("agent.retry"),
-        message: error instanceof Error ? error.message : t("agent.sessionSetupFailed"),
-        retryable: true,
-      });
-    } finally {
-      setSending(false);
-    }
   }
 
   async function handleResetSession(): Promise<void> {
@@ -335,8 +187,6 @@ export function useAgentSessionPanelModel(
 
     setSending(true);
     supersedeInFlightSessionCreate();
-    setInputValue("");
-    setPendingSends([]);
     clearComposerError();
 
     try {
@@ -347,18 +197,11 @@ export function useAgentSessionPanelModel(
       const projectId = toProjectId(input.projectId);
       const resetSessionIds = getResetSessionIds({
         activeSessionId,
-        sessionType: input.sessionType,
         sessions: agentSessions,
       });
 
       for (const sessionId of resetSessionIds) {
         await deleteAgentSession(projectId, toSessionId(sessionId));
-      }
-
-      if (resetSessionIds.length > 0) {
-        setSessionConfigurationRevisions((current) =>
-          removeSessionConfigurationRevisionKeys(current, resetSessionIds),
-        );
       }
 
       setSelectedSessionId(null);
@@ -374,38 +217,8 @@ export function useAgentSessionPanelModel(
   }
 
   async function ensureActiveSession(): Promise<string> {
-    if (activeSessionId !== null && input.sessionType !== "preview") {
+    if (activeSessionId !== null) {
       return activeSessionId;
-    }
-
-    if (sessionResolutionPromiseRef.current !== null) {
-      return sessionResolutionPromiseRef.current;
-    }
-
-    const resolution = resolveSessionForAction();
-    sessionResolutionPromiseRef.current = resolution;
-    try {
-      return await resolution;
-    } finally {
-      if (sessionResolutionPromiseRef.current === resolution) {
-        sessionResolutionPromiseRef.current = null;
-      }
-    }
-  }
-
-  async function resolveSessionForAction(): Promise<string> {
-    const candidateId =
-      activeSessionId ?? (input.sessionType === "preview" ? (selectedSessionId ?? null) : null);
-    if (candidateId !== null && !retiredPreviewIdsRef.current.has(candidateId)) {
-      // An old tab may outlive Preview retention. Revalidate before upload/send;
-      // a failed list request must not replace a potentially continuable Session.
-      const current = await findAvailablePreview(candidateId);
-      if (current.some((session) => session.id === candidateId)) {
-        return candidateId;
-      }
-      retiredPreviewIdsRef.current.add(candidateId);
-      supersedeInFlightSessionCreate();
-      setSelectedSessionId(null);
     }
 
     // Typing-triggered speculative creation and send-triggered creation share
@@ -461,7 +274,6 @@ export function useAgentSessionPanelModel(
         // isSuccess, not isFetched: a failed list query must not spawn
         // invisible sessions the broken list cannot show.
         sessionListLoaded: sessionsQuery.isSuccess,
-        sessionType: input.sessionType,
       })
     ) {
       // Silent by design: the user has not acted yet, so the send path owns
@@ -473,31 +285,8 @@ export function useAgentSessionPanelModel(
     }
   }
 
-  async function retryProviderCheck(): Promise<void> {
-    if (sending) {
-      return;
-    }
-
-    setSending(true);
-    supersedeInFlightSessionCreate();
-    clearComposerError();
-    setSelectedSessionId(null);
-
-    try {
-      await createSessionAndSelect();
-    } catch (error) {
-      setComposerError({
-        actionLabel: t("agent.retry"),
-        message: error instanceof Error ? error.message : t("agent.providerCheckFailed"),
-        retryable: true,
-      });
-    } finally {
-      setSending(false);
-    }
-  }
-
-  async function handleSend(options: SendOptions = {}): Promise<boolean> {
-    const typedText = (options.text ?? inputValue).trim();
+  async function handleSend(options: SendOptions): Promise<boolean> {
+    const typedText = options.text.trim();
     const payload = createSessionResourceMentionMessagePayload({
       mentions: options.sessionResourceMentions ?? [],
       message: typedText,
@@ -509,124 +298,50 @@ export function useAgentSessionPanelModel(
         readinessBlockMessage,
         reconnecting: stream.reconnecting,
         sending,
-        // In-flight optimistic sends block re-submit like a running turn: the
-        // server allows one active run, so a second Enter before the echo
-        // would only surface an active-run error.
-        streaming: streamingWithPending,
+        streaming,
         typedText,
       })
     ) {
       return false;
     }
 
+    const clientRequestId = crypto.randomUUID();
     setSending(true);
     clearComposerError();
-    options.onAccepted?.();
-
-    const clientRequestId = crypto.randomUUID();
-    // Sending into an existing but not-yet-hydrated session would capture an
-    // empty baseline, letting an identical message from history falsely prune
-    // the overlay — skip optimism there (sub-second race, pre-existing UX).
-    const canRenderOptimistically = activeSessionId === null || stream.hydrated;
-    const pendingSend: PendingSend = {
-      baselineUserMessageIds: stream.messages
-        .filter((message) => message.role === "user")
-        .map((message) => message.id),
-      clientRequestId,
-      createdAtMs: Date.now(),
-      sessionId: activeSessionId,
-      text: payload.text,
-    };
-
-    if (canRenderOptimistically) {
-      setPendingSends((current) => [...current, pendingSend]);
-    }
-
-    const shouldAutoTitle =
-      activeSessionId === null ||
-      activeSession?.lastMessageAt === null ||
-      activeSession?.lastMessageAt === undefined;
+    setPendingSend({
+      message: createLiveStateMessage({
+        content: payload.text,
+        id: `pending:${clientRequestId}`,
+        role: "user",
+      }),
+      userMessageCount: countUserMessages(stream.messages),
+    });
 
     try {
       const sessionId = await ensureActiveSession();
-
-      if (pendingSend.sessionId !== sessionId) {
-        setPendingSends((current) =>
-          current.map((pending) =>
-            pending.clientRequestId === clientRequestId ? { ...pending, sessionId } : pending,
-          ),
-        );
-      }
-
       await stream.sendUserMessage({
         attachmentIds: payload.attachmentIds,
         clientRequestId,
         sessionId,
         text: payload.text,
       });
-      setInputValue("");
-
-      if (layout.inputRef.current) {
-        layout.inputRef.current.style.height = "auto";
-      }
-
-      if (shouldAutoTitle) {
-        const title = createSessionAutoTitle(typedText);
-        const titledSessionId = sessionId;
-
-        globalThis.setTimeout(() => {
-          void autoTitleSessionAndRefresh({
-            projectId: input.projectId,
-            refreshSessions,
-            sessionId: titledSessionId,
-            title,
-          });
-        }, 500);
-      }
 
       void refreshSessions();
       return true;
     } catch (error) {
-      setPendingSends((current) =>
-        current.filter((pending) => pending.clientRequestId !== clientRequestId),
-      );
       setComposerError({
         actionLabel: t("agent.retrySend"),
         message: error instanceof Error ? error.message : t("agent.messageSendFailed"),
         retryable: true,
       });
+      // The server rejects work on an expired Preview; once the list drops it,
+      // Retry starts a new Preview.
+      void refreshSessions();
       return false;
     } finally {
+      setPendingSend(null);
       setSending(false);
     }
-  }
-
-  async function handleKeyDown(event: KeyboardEvent, options: SendOptions = {}): Promise<boolean> {
-    if (event.key !== "Enter" || event.shiftKey) {
-      return false;
-    }
-
-    if (event.nativeEvent.isComposing) {
-      return false;
-    }
-
-    event.preventDefault();
-    return handleSend(options);
-  }
-
-  async function resolvePermission(
-    request: PermissionRequest,
-    decision: PermissionDecision,
-  ): Promise<void> {
-    if (activeSessionId === null) {
-      return;
-    }
-
-    await stream.sendPermissionDecision({
-      decision,
-      requestId: request.requestId,
-      sessionId: activeSessionId,
-    });
   }
 
   async function cancel(): Promise<void> {
@@ -638,28 +353,16 @@ export function useAgentSessionPanelModel(
 
     try {
       // A null runId is resolved to the session's active run server-side, so
-      // Stop works during the optimistic window too: once the send HTTP has
-      // resolved, the queued run exists and gets interrupted.
+      // Stop also works for a run whose id the stream has not reported yet.
       await stream.sendUserInterrupt({ runId, sessionId: activeSessionId });
     } catch (error) {
       if (runId !== null) {
         throw error;
       }
-      // Best-effort in the optimistic window: with no known run a failed
-      // interrupt just means there was nothing to stop yet.
+      // Stop shows while a send is in flight, before its run exists; with no
+      // known run a failed interrupt just means there was nothing to stop yet.
     }
   }
-
-  // Two-step memo keeps the pending bubbles' object identity stable across
-  // streaming frames, so assistant-ui's per-message memoization holds.
-  const pendingSendMessages = useMemo(
-    () => reconciledPendingSends.map((pending) => createPendingSendMessage(pending)),
-    [reconciledPendingSends],
-  );
-  const displayMessages = useMemo(
-    () => mergePendingSendMessages(stream.messages, pendingSendMessages),
-    [stream.messages, pendingSendMessages],
-  );
 
   return {
     activeSession,
@@ -668,30 +371,19 @@ export function useAgentSessionPanelModel(
     composerError,
     configurationRefreshRequired,
     ensureActiveSession,
-    fileInputRef: layout.fileInputRef,
-    handleKeyDown,
     handleResetSession,
     handleSend,
-    handleStartNewSession,
-    input: inputValue,
-    inputRef: layout.inputRef,
-    isConversationLoading:
-      activeSessionId !== null && !stream.hydrated && reconciledPendingSends.length === 0,
+    isConversationLoading: activeSessionId !== null && !stream.hydrated && pendingSend === null,
     lifecycle: stream.lifecycle,
-    messages: displayMessages,
-    messagesEndRef: layout.messagesEndRef,
+    messages,
     notifyComposerTyping,
-    permissionRequests: stream.permissionRequests,
     readiness,
     readinessBlockMessage,
     reconnecting: stream.reconnecting,
-    resolvePermission,
-    retryProviderCheck,
+    refreshSessions,
     run: stream.run,
     sending,
-    sessionCount: agentSessions.length,
     sessionLoadError: sessionsQuery.error instanceof Error ? sessionsQuery.error.message : null,
-    setInput: setInputValue,
-    streaming: streamingWithPending,
+    streaming,
   };
 }

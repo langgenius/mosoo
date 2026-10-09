@@ -6,8 +6,6 @@ import { useProjectSkillsQuery, useSkillSourceQuery } from "@/domains/skill/quer
 import type { SkillInfo } from "../../agent.types";
 
 export interface AgentSkillsFieldModel {
-  availablePersonalSkills: SkillSummary[];
-  availableSharedSkills: SkillSummary[];
   availableSkills: SkillSummary[];
   fileCountBySkillId: ReadonlyMap<string, number>;
   handleAddSkill(skill: SkillSummary): void;
@@ -21,7 +19,6 @@ export interface AgentSkillsFieldModel {
 
 function toSkillInfo(skill: SkillSummary): SkillInfo {
   return {
-    filename: `${skill.id}.md`,
     id: skill.id,
     name: skill.name,
     state: "active",
@@ -54,8 +51,6 @@ export function useAgentSkillsFieldModel({
     [skillsQuery.data],
   );
   const availableSkills = (skillsQuery.data ?? []).filter((skill) => !selectedIds.has(skill.id));
-  const availablePersonalSkills = availableSkills;
-  const availableSharedSkills: SkillSummary[] = [];
 
   function handleAddSkill(skill: SkillSummary): void {
     setSkills([...selectedSkills, toSkillInfo(skill)]);
@@ -66,8 +61,6 @@ export function useAgentSkillsFieldModel({
   }
 
   return {
-    availablePersonalSkills,
-    availableSharedSkills,
     availableSkills,
     fileCountBySkillId,
     handleAddSkill,

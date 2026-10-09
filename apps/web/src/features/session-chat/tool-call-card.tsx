@@ -1,15 +1,14 @@
 import type { ReactElement } from "react";
 
 import { useTranslation } from "@/shared/i18n";
-import { ChevronRight, Loader2, ShieldAlert } from "@/shared/ui/icons";
+import { ChevronRight, Loader2 } from "@/shared/ui/icons";
 
 import { isTruthy } from "../../shared/lib/truthiness";
 export interface ToolCall {
-  approvalInput?: string | null;
   argsText: string;
   output?: string;
   path: string | null;
-  status: "running" | "needs_approval" | "completed";
+  status: "running" | "completed";
   tool: string;
 }
 
@@ -19,16 +18,10 @@ export interface ToolCallCardProps {
 
 export function ToolCallCard({ call }: ToolCallCardProps): ReactElement {
   const { t } = useTranslation();
-  const inputText = call.argsText.trim().length > 0 ? call.argsText : (call.approvalInput ?? "");
-  const hasInput = inputText.trim().length > 0;
+  const hasInput = call.argsText.trim().length > 0;
   const hasOutput = call.output !== undefined && call.output.length > 0;
   const isCompleted = call.status === "completed";
-  const statusLabel =
-    call.status === "completed"
-      ? t("common.done")
-      : call.status === "needs_approval"
-        ? t("chat.toolNeedsApproval")
-        : t("chat.toolRunning");
+  const statusLabel = isCompleted ? t("common.done") : t("chat.toolRunning");
 
   return (
     <details
@@ -41,9 +34,7 @@ export function ToolCallCard({ call }: ToolCallCardProps): ReactElement {
           aria-hidden
         />
         {call.status === "running" ? (
-          <Loader2 className="text-accent size-3.5 shrink-0 animate-spin" aria-hidden />
-        ) : call.status === "needs_approval" ? (
-          <ShieldAlert className="text-amber size-3.5 shrink-0" aria-hidden />
+          <Loader2 className="text-brand-mark size-3.5 shrink-0 animate-spin" aria-hidden />
         ) : null}
         <span className="text-fg-1 min-w-0 truncate font-mono font-semibold">{call.tool}</span>
         {isTruthy(call.path) ? (
@@ -51,15 +42,13 @@ export function ToolCallCard({ call }: ToolCallCardProps): ReactElement {
             {call.path}
           </span>
         ) : null}
-        <span className="text-fg-3 ml-auto shrink-0 text-[10.5px] font-semibold tracking-wide uppercase">
-          {statusLabel}
-        </span>
+        <span className="text-fg-3 ml-auto shrink-0">{statusLabel}</span>
       </summary>
       {hasOutput || hasInput ? (
         <div className="mt-1.5 space-y-1.5">
           {hasInput ? (
             <pre className="bg-paper-200 max-h-48 overflow-auto rounded-sm p-2 font-mono text-[11.5px] leading-snug break-words whitespace-pre-wrap">
-              {inputText}
+              {call.argsText}
             </pre>
           ) : null}
           {hasOutput ? (

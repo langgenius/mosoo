@@ -16,9 +16,11 @@ export function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
 
 export function toBase64(bytes: Uint8Array): string {
   let binary = "";
+  // Chunked conversion keeps String.fromCharCode off argument-count limits.
+  const chunkSize = 0x8000;
 
-  for (const byte of bytes) {
-    binary += String.fromCodePoint(byte);
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize));
   }
 
   return btoa(binary);

@@ -1,24 +1,16 @@
 # Skills
 
-Status: Shipped for Project owners, with important editing gaps.
+How a Project adds Skills, attaches them to Agents, and what happens when one is removed.
 
-## Why it matters
+## Promises
 
-A Skill lets a Builder reuse trusted instructions and supporting files across Agents without copying prompts by hand. Skills are for the person who owns and configures a Project; Project Users do not manage them.
+- A Skill is added from a `.md`, `.zip` or `.skill` upload, a GitHub repository, or skills.sh, with a preview of its name, description and author before it is saved.
+- Skills belong to one Project. The owner manages them in the console; a Project API key can attach a Skill of its own Project by ID when it saves an Agent preset. A new Session gets the Skills its Agent has attached.
+- **Fork** makes an independent copy in the same Project. It does not follow later changes, and deleting the source leaves it intact.
+- Uninstalling a Skill keeps admitted Sessions unchanged. Agents show it as **Missing**, new Sessions skip it with the warning `skill.tombstone`, and saving the Agent drops the attachment.
 
-## Current user flow
+## Limits
 
-1. Open **Skills** in the active Project.
-2. Choose **Add skill**. Upload a `.md`, `.zip`, or `.skill` file, or import from GitHub or skills.sh. mosoo previews the name, description, and author before adding it.
-3. Open a Skill card to read its main instructions. From this view, the owner can download, fork, or uninstall it.
-4. Open an Agent, add one or more Skills from that Project, and save the Agent.
-5. When a new Session starts, its attached Skills become available to the Agent. The Agent reads a Skill only when the task calls for it.
-
-Importing an Agent can also add Skills bundled with it to the destination Project. If a referenced Skill is absent, the import reports the gap instead of borrowing a Skill from another Project.
-
-## Current availability and boundaries
-
-- Each Skill belongs to one Project. Only that Project's owner can view, download, fork, uninstall, or attach it. There is no sharing or cross-Project catalog.
-- There is no in-app editor and no user-facing update action. The detail view currently offers only **Download**, **Fork**, and **Uninstall**. Revising a Skill means editing it locally, adding it as a new Skill, and updating Agent attachments manually.
-- Fork creates an independent Project-local copy. It does not stay in sync with its source, and deleting the source does not delete the copy.
-- Uninstall does not list affected Agents. The Skill disappears from the registry, while affected Agents show it as **Missing**. New Sessions skip it with a warning; existing Sessions keep the configuration they started with. Saving an affected Agent removes the missing attachment.
+- No in-app editor and no update action: revise a Skill locally, add it again, and reattach it.
+- No sharing across Projects and no catalog. Uninstalling does not list the affected Agents.
+- An upload is at most `MAX_SKILL_UPLOAD_BYTES`. A GitHub import downloads the whole repository archive and fails when it exceeds `MAX_SKILL_UNCOMPRESSED_BYTES`, so a Skill in a large repository cannot be imported from GitHub.

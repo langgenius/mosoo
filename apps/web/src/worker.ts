@@ -1,28 +1,27 @@
 import { MOSOO_CONSOLE_HOST, MOSOO_LEGACY_CONSOLE_HOST } from "@mosoo/contracts/origin";
 
-// Locally-typed binding so we don't have to pull `@cloudflare/workers-types`
-// into the SPA build. ASSETS is provided by Workers Assets and only exposes
-// `fetch` at runtime.
-interface AssetsBinding {
-  readonly fetch: (request: Request) => Promise<Response>;
-}
-interface ServiceBinding {
+// Locally typed so the SPA build does not pull in `@cloudflare/workers-types`:
+// the API service binding and Workers Assets only expose `fetch` at runtime.
+interface FetchBinding {
   readonly fetch: (request: Request) => Promise<Response>;
 }
 export interface Env {
-  readonly API?: ServiceBinding;
-  readonly ASSETS: AssetsBinding;
+  readonly API: FetchBinding;
+  readonly ASSETS: FetchBinding;
 }
+
+// Agent-auth discovery for the Public Thread API, read by clients that follow
+// https://mosoo.ai/auth.md. There is no OAuth exchange: the account owner
+// creates a Project API key (`msp_`) on the API keys page and hands it to the
+// agent, and the key reaches only its own Project.
+const PROJECT_API_KEY_SCOPE = "project";
+const PROJECT_API_KEY_CREDENTIAL_TYPE = "mosoo_project_api_key";
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
 
-    if (
-      url.hostname === MOSOO_LEGACY_CONSOLE_HOST ||
-      (url.hostname === MOSOO_CONSOLE_HOST && url.protocol === "http:")
-    ) {
-      url.protocol = "https:";
+    if (url.hostname === MOSOO_LEGACY_CONSOLE_HOST) {
       url.hostname = MOSOO_CONSOLE_HOST;
       return Response.redirect(url.toString(), 308);
     }
@@ -38,6 +37,7 @@ export default {
         });
       }
 
+      const apiKeysUri = `${url.origin}/project-settings/api-keys`;
       const metadata =
         url.pathname === "/.well-known/oauth-protected-resource"
           ? {
@@ -45,23 +45,23 @@ export default {
               bearer_methods_supported: ["header"],
               resource: url.origin,
               resource_documentation: "https://mosoo.ai/docs/api-reference/",
-              resource_name: "Mosoo Public Thread API",
-              scopes_supported: ["full_account_access"],
+              resource_name: "mosoo Public Thread API",
+              scopes_supported: [PROJECT_API_KEY_SCOPE],
             }
           : {
               agent_auth: {
                 anonymous: {
-                  claim_uri: `${url.origin}/project-settings/api-keys`,
-                  credential_types_supported: ["mosoo_personal_access_token"],
+                  claim_uri: apiKeysUri,
+                  credential_types_supported: [PROJECT_API_KEY_CREDENTIAL_TYPE],
                 },
-                claim_uri: `${url.origin}/project-settings/api-keys`,
+                claim_uri: apiKeysUri,
                 identity_types_supported: ["anonymous"],
-                register_uri: `${url.origin}/project-settings/api-keys`,
-                revocation_uri: `${url.origin}/project-settings/api-keys`,
+                register_uri: apiKeysUri,
+                revocation_uri: apiKeysUri,
                 skill: "https://mosoo.ai/auth.md",
               },
               issuer: url.origin,
-              scopes_supported: ["full_account_access"],
+              scopes_supported: [PROJECT_API_KEY_SCOPE],
             };
       const body = JSON.stringify(metadata);
 
@@ -71,10 +71,6 @@ export default {
     }
 
     if (url.pathname === "/api" || url.pathname.startsWith("/api/")) {
-      if (env.API === undefined) {
-        return new Response("API binding is not configured.", { status: 502 });
-      }
-
       return env.API.fetch(request);
     }
 

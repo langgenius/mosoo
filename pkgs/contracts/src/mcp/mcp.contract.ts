@@ -1,5 +1,3 @@
-import { type } from "arktype";
-
 import type {
   AccountId,
   AgentMcpBindingId,
@@ -7,82 +5,42 @@ import type {
   McpOAuthFlowId,
   McpServerId,
   ProjectId,
-} from "../id/id.contract";
+} from "@mosoo/id";
 
 // "app" is a frozen manifest / D1 discriminator. ProjectId is the canonical
 // scope identifier; changing this token requires a versioned manifest rollout.
-export const MCP_SERVER_SOURCES = ["app"] as const;
-export const McpServerSource = type.enumerated(...MCP_SERVER_SOURCES);
-export type McpServerSource = typeof McpServerSource.infer;
+export type McpServerSource = "app";
 
-export const MCP_AUTH_TYPES = ["oauth", "bearer"] as const;
-export const McpAuthType = type.enumerated(...MCP_AUTH_TYPES);
-export type McpAuthType = typeof McpAuthType.infer;
+export type McpAuthType = "oauth" | "bearer";
 
-export const MCP_CREDENTIAL_SCOPES = ["app"] as const;
-export const McpCredentialScope = type.enumerated(...MCP_CREDENTIAL_SCOPES);
-export type McpCredentialScope = typeof McpCredentialScope.infer;
+export type McpCredentialScope = "app";
 
-export const MCP_CREDENTIAL_RECORD_SCOPES = [...MCP_CREDENTIAL_SCOPES, "agent"] as const;
-export const McpCredentialRecordScope = type.enumerated(...MCP_CREDENTIAL_RECORD_SCOPES);
-export type McpCredentialRecordScope = typeof McpCredentialRecordScope.infer;
+export type McpCredentialRecordScope = McpCredentialScope | "agent";
 
-export const AGENT_MCP_CREDENTIAL_MODES = ["runtime_resolved", "agent_bound"] as const;
-export const AgentMcpCredentialMode = type.enumerated(...AGENT_MCP_CREDENTIAL_MODES);
-export type AgentMcpCredentialMode = typeof AgentMcpCredentialMode.infer;
+export type AgentMcpCredentialMode = "runtime_resolved" | "agent_bound";
 
-export const MCP_CREDENTIAL_STATUSES = ["none", "active", "expired", "revoked"] as const;
-export const McpCredentialStatus = type.enumerated(...MCP_CREDENTIAL_STATUSES);
-export type McpCredentialStatus = typeof McpCredentialStatus.infer;
+export type McpCredentialStatus = "none" | "active" | "expired" | "revoked";
 
-export const MCP_PERSISTED_CREDENTIAL_STATUSES = [
-  "active",
-  "expired",
-  "revoked",
-] as const satisfies readonly McpCredentialStatus[];
-export const PersistedMcpCredentialStatus = type.enumerated(...MCP_PERSISTED_CREDENTIAL_STATUSES);
-export type PersistedMcpCredentialStatus = typeof PersistedMcpCredentialStatus.infer;
+export type UnavailableMcpCredentialStatus = "none" | "expired" | "revoked";
 
-export const MCP_UNAVAILABLE_CREDENTIAL_STATUSES = [
-  "none",
-  "expired",
-  "revoked",
-] as const satisfies readonly McpCredentialStatus[];
-export const UnavailableMcpCredentialStatus = type.enumerated(
-  ...MCP_UNAVAILABLE_CREDENTIAL_STATUSES,
-);
-export type UnavailableMcpCredentialStatus = typeof UnavailableMcpCredentialStatus.infer;
+export type ActiveMcpCredentialStatus = "active";
 
-export const ActiveMcpCredentialStatus = type('"active"');
-export type ActiveMcpCredentialStatus = typeof ActiveMcpCredentialStatus.infer;
+export type McpAuthorizationState =
+  | "active"
+  | "authorization_required"
+  | "disabled"
+  | "expired"
+  | "revoked";
 
-export const MCP_AUTHORIZATION_STATES = [
-  "active",
-  "authorization_required",
-  "disabled",
-  "expired",
-  "revoked",
-] as const;
-export const McpAuthorizationState = type.enumerated(...MCP_AUTHORIZATION_STATES);
-export type McpAuthorizationState = typeof McpAuthorizationState.infer;
+export type UnavailableMcpAuthorizationState =
+  | "authorization_required"
+  | "disabled"
+  | "expired"
+  | "revoked";
 
-export const MCP_UNAVAILABLE_AUTHORIZATION_STATES = [
-  "authorization_required",
-  "disabled",
-  "expired",
-  "revoked",
-] as const satisfies readonly McpAuthorizationState[];
-export const UnavailableMcpAuthorizationState = type.enumerated(
-  ...MCP_UNAVAILABLE_AUTHORIZATION_STATES,
-);
-export type UnavailableMcpAuthorizationState = typeof UnavailableMcpAuthorizationState.infer;
+export type ActiveMcpAuthorizationState = "active";
 
-export const ActiveMcpAuthorizationState = type('"active"');
-export type ActiveMcpAuthorizationState = typeof ActiveMcpAuthorizationState.infer;
-
-export const MCP_OAUTH_FLOW_STATUSES = ["pending", "succeeded", "failed", "expired"] as const;
-export const McpOAuthFlowStatus = type.enumerated(...MCP_OAUTH_FLOW_STATUSES);
-export type McpOAuthFlowStatus = typeof McpOAuthFlowStatus.infer;
+export type McpOAuthFlowStatus = "pending" | "succeeded" | "failed" | "expired";
 
 export interface McpCredentialSummary {
   authType: McpAuthType;
@@ -121,9 +79,6 @@ export interface McpServerWithCredential extends McpServer {
 }
 
 export interface McpRegistry {
-  currentUserEmail: string;
-  currentUserId: AccountId;
-  currentUserName: string;
   projectId: ProjectId;
   servers: McpServerWithCredential[];
 }
@@ -176,7 +131,6 @@ export interface ConnectMcpBearerInput {
 
 export interface StartMcpOAuthInput {
   projectId: ProjectId;
-  returnUrl?: string | null;
   serverId: McpServerId;
 }
 

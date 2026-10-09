@@ -15,7 +15,7 @@ import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer
 import {
   ensureFileAccess,
   ensureUploadAccess,
-} from "../src/modules/files/infrastructure/file-record-store";
+} from "../src/modules/files/infrastructure/file-record-access";
 import { createFileUpload } from "../src/modules/files/infrastructure/file-upload-create";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import { createApiTestFixture } from "./helpers/api-test-fixture";
@@ -54,14 +54,20 @@ function createFileUploadAccessDatabase(): SqliteD1Database {
 
   database.execute(`
     CREATE TABLE session (
+      agent_id text,
       archived_at integer,
       attributed_user_id text,
       creator_account_id text NOT NULL,
+      deployment_version_id text,
+      deployment_version_number integer,
       id text PRIMARY KEY NOT NULL,
+      model text NOT NULL DEFAULT 'gpt-5.4',
       project_id text NOT NULL,
       provider text NOT NULL,
+      runtime_id text NOT NULL DEFAULT 'openai-runtime',
       status text NOT NULL DEFAULT 'IDLE',
-      title text
+      title text,
+      updated_at integer NOT NULL DEFAULT 1
     );
 
     CREATE TABLE file_record (
@@ -453,6 +459,23 @@ describe("file upload access", () => {
         viewer: { ...VIEWER, id: OTHER_VIEWER_ID },
       }),
     ).rejects.toThrow();
+  });
+
+  test("denies files whose scope kind is no longer supported", async () => {
+    const database = createFileUploadAccessDatabase();
+    await database
+      .prepare("UPDATE file_record SET scope_kind = 'organization_draft' WHERE id = ?")
+      .bind(FILE_ID)
+      .run();
+
+    await expect(
+      ensureFileAccess({
+        database,
+        fileId: FILE_ID,
+        requiredIntent: "view",
+        viewer: VIEWER,
+      }),
+    ).rejects.toMatchObject({ code: "file_not_found" });
   });
 
   test("creates agent package uploads as project-owned files", async () => {

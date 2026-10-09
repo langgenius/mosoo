@@ -1,470 +1,101 @@
-import {
-  admitModelId,
-  admitProviderId,
-  admitRuntimeId,
-  createRuntimeModelIdentity,
-} from "@mosoo/contracts/models";
+import { admitModelId, admitProviderId, createRuntimeModelIdentity } from "@mosoo/contracts/models";
 import type {
   ModelId,
   PresetModelEntry,
   PresetModelProtocol,
   RuntimeModelIdentity,
-  RuntimeModelProviderRef,
 } from "@mosoo/contracts/models";
 
 import {
-  GENERATED_MODEL_DEFAULT_IDS,
-  GENERATED_PLANNED_RUNTIME_DISPLAY_CATALOG,
-  GENERATED_PRESET_MODEL_CATALOG,
-  GENERATED_RUNTIME_CATALOG,
-  GENERATED_VENDOR_CATALOG,
-} from "./catalog.generated";
+  MODEL_DEFAULTS,
+  PRESET_MODELS,
+  RUNTIMES,
+  VENDOR_OPENAI_COMPATIBLE,
+  VENDORS,
+} from "./catalog";
+import type { RuntimeCatalogRuntime, RuntimeCatalogVendor } from "./catalog";
 
-export type RuntimeCatalogTransport =
-  | "openai-app-server"
-  | "claude-agent-sdk"
-  | "acp-fallback"
-  | "pi-rpc";
-export type RuntimeCatalogVisibility = "internal" | "public";
-export type RuntimeDisplaySurface = "landing" | "provider-settings";
-export type RuntimeDisplayStatus = "available" | "coming-soon";
-export type RuntimeCatalogCapabilityId =
-  | "custom_tool_execute"
-  | "file_change"
-  | "input_start"
-  | "mcp_execute"
-  | "native_resume"
-  | "permission_request"
-  | "session_stop"
-  | "thinking_stream"
-  | "text_stream"
-  | "tool_stream"
-  | "turn_cancel"
-  | "usage"
-  | "visible_activity";
+export type { RuntimeCatalogVendor } from "./catalog";
+export {
+  VENDOR_ANTHROPIC,
+  VENDOR_DEEPSEEK,
+  VENDOR_GEMINI,
+  VENDOR_KIMI,
+  VENDOR_MINIMAX,
+  VENDOR_OPENAI,
+  VENDOR_OPENAI_COMPATIBLE,
+  VENDOR_QWEN,
+  VENDOR_ZHIPU,
+} from "./catalog";
 
-export interface RuntimeCatalogCapability {
-  readonly id: RuntimeCatalogCapabilityId;
-  readonly status: "supported" | "unsupported";
-  readonly version: 1;
+export interface RuntimeCatalogEntry extends RuntimeCatalogRuntime {
+  readonly supportedModelIds: readonly string[];
 }
 
-export type RuntimeCatalogVendorAuthHeader =
+type RuntimeModelProtocolResolution =
+  | { readonly ok: true; readonly modelProtocol: PresetModelProtocol }
   | {
-      readonly apiKeyHeader: "Authorization";
-      readonly scheme: "bearer";
-    }
-  | {
-      readonly apiKeyHeader: "x-api-key";
-      readonly extraHeaders: Readonly<Record<string, string>>;
-      readonly scheme: "api-key";
+      readonly code:
+        | "identity-invalid"
+        | "model-unknown"
+        | "protocol-unsupported"
+        | "provider-unsupported"
+        | "runtime-unknown";
+      readonly message: string;
+      readonly ok: false;
     };
 
-export type RuntimeCatalogVendorModelSource =
-  | {
-      readonly kind: "manual";
-    }
-  | {
-      readonly kind: "models.dev";
-      readonly providerId: string;
-    };
+export const ALL_VENDORS: readonly RuntimeCatalogVendor[] = VENDORS;
 
-export interface RuntimeCatalogOpenCodeProvider {
-  readonly apiBaseOption?: "baseURL";
-  readonly name: string;
-  readonly npmPackage: string;
-  /**
-   * Provider id expected by OpenCode for this adapter. mosoo keeps its own
-   * product-facing provider id in `vendorId`; this field is only for rendered
-   * OpenCode config/model ids when upstream uses a different provider key.
-   */
-  readonly providerId?: string;
-}
+export const PRESET_MODEL_CATALOG: readonly PresetModelEntry[] = PRESET_MODELS.map((model) => ({
+  displayName: model.displayName,
+  modelId: admitModelId(model.modelId),
+  protocol: model.protocol,
+  vendorId: admitProviderId(model.vendor.vendorId),
+  vendorLabel: model.vendor.label,
+}));
 
-/**
- * Describes the vendor whose API key is required to power a runtime,
- * and the env var names used to inject credentials into the agent process.
- *
- * `apiBaseEnvVar` is the env var the CLI reads to override the default
- * API endpoint (e.g. `ANTHROPIC_BASE_URL` for the Anthropic SDK). Absent
- * when the vendor's CLI pipeline offers no supported way to redirect the
- * endpoint via environment; in that case any custom apiBase stored on the
- * credential must be rejected at hydration time rather than silently
- * dropped.
- */
-export interface RuntimeCatalogVendor {
-  readonly apiBaseEnvVar?: string;
-  readonly authHeader: RuntimeCatalogVendorAuthHeader;
-  readonly defaultApiBase?: string;
-  readonly apiKeyEnvVar: string;
-  readonly iconKey: string;
-  readonly label: string;
-  readonly modelSource?: RuntimeCatalogVendorModelSource;
-  readonly openCodeProvider?: RuntimeCatalogOpenCodeProvider;
-  readonly vendorId: string;
-}
+export const RUNTIME_CATALOG: readonly RuntimeCatalogEntry[] = RUNTIMES.map((runtime) =>
+  Object.assign({}, runtime, {
+    supportedModelIds: [
+      ...new Set(
+        PRESET_MODEL_CATALOG.filter((model) =>
+          runtime.vendors.some((vendor) => vendor.vendorId === model.vendorId),
+        ).map((model) => model.modelId),
+      ),
+    ],
+  }),
+);
 
-export interface RuntimeCatalogDisplay {
-  readonly color?: string;
-  readonly iconKey: string;
-  readonly providerLabel?: string;
-  readonly showcaseLabel?: string;
-}
+const RUNTIME_CATALOG_BY_ID = new Map(RUNTIME_CATALOG.map((entry) => [entry.runtimeId, entry]));
+const RUNTIME_VENDOR_IDS = new Set(
+  RUNTIME_CATALOG.flatMap((entry) => entry.vendors.map((vendor) => vendor.vendorId)),
+);
 
-export interface RuntimeCatalogEntry {
-  readonly acceptsCustomProvider: boolean;
-  readonly capabilities: readonly RuntimeCatalogCapability[];
-  readonly defaultIdentity: RuntimeModelIdentity;
-  readonly defaultModel: string;
-  readonly defaultProvider: string;
-  readonly disabledReason?: string;
-  readonly display: RuntimeCatalogDisplay;
-  readonly label: string;
-  readonly runtimeId: string;
-  readonly supportedModelProtocols: readonly PresetModelProtocol[];
-  /** Preset allowlist keyed by both provider and model, avoiding cross-provider aliases. */
-  readonly supportedModelIdentities?: readonly Pick<PresetModelEntry, "vendorId" | "modelId">[];
-  /**
-   * Per-runtime preset model allowlist. When defined, only preset models whose
-   * `modelId` is listed here are surfaced as `available` for this runtime;
-   * other presets are returned with `reason: "wrong-runtime"`. Custom
-   * (OpenAI-Compatible) credentials are not constrained by this preset list;
-   * custom-provider admission and supportedModelProtocols govern them instead.
-   *
-   * Omit when every preset model for the runtime vendors is allowed.
-   */
-  readonly supportedModelIds?: readonly string[];
-  readonly transport: RuntimeCatalogTransport;
-  readonly vendors: readonly RuntimeCatalogVendor[];
-  readonly visibility: RuntimeCatalogVisibility;
-}
-
-export interface RuntimeDisplayCatalogEntry {
-  readonly color?: string;
-  readonly iconKey: string;
-  readonly label: string;
-  readonly providerLabel: string;
-  readonly runtimeId: string;
-  readonly status: RuntimeDisplayStatus;
-}
-
-export interface PlannedRuntimeDisplayEntry {
-  readonly iconKey: string;
-  readonly label: string;
-  readonly providerLabel: string;
-  readonly runtimeId: string;
-  readonly surfaces: readonly RuntimeDisplaySurface[];
-}
-
-interface GeneratedPlannedRuntimeDisplayEntry {
-  readonly iconKey: string;
-  readonly label: string;
-  readonly providerLabel: string;
-  readonly runtimeId: string;
-  readonly surfaces: readonly string[];
-}
-
-type RuntimeCatalogEntryInput = Omit<
-  RuntimeCatalogEntry,
-  "defaultModel" | "defaultProvider" | "runtimeId"
-> & {
-  readonly runtimeId: string;
-};
-
-function presetModel(input: (typeof GENERATED_PRESET_MODEL_CATALOG)[number]): PresetModelEntry {
-  return {
-    displayName: input.displayName,
-    modelId: admitModelId(input.modelId),
-    protocol: input.protocol as PresetModelProtocol,
-    vendorId: admitProviderId(input.vendorId),
-    vendorLabel: input.vendorLabel,
-  };
-}
-
-function runtimeCatalogVendorAuthHeader(
-  input: (typeof GENERATED_VENDOR_CATALOG)[number]["authHeader"],
-): RuntimeCatalogVendorAuthHeader {
-  if (input.scheme === "bearer") {
-    return {
-      apiKeyHeader: "Authorization",
-      scheme: "bearer",
-    };
-  }
-
-  return {
-    apiKeyHeader: "x-api-key",
-    extraHeaders: input.extraHeaders,
-    scheme: "api-key",
-  };
-}
-
-function runtimeCatalogVendor(
-  input: (typeof GENERATED_VENDOR_CATALOG)[number],
-): RuntimeCatalogVendor {
-  const apiBaseEnvVar = "apiBaseEnvVar" in input ? input.apiBaseEnvVar : undefined;
-  const defaultApiBase = "defaultApiBase" in input ? input.defaultApiBase : undefined;
-  const modelSource = "modelSource" in input ? input.modelSource : undefined;
-  const openCodeProvider = "openCodeProvider" in input ? input.openCodeProvider : undefined;
-
-  return {
-    ...(apiBaseEnvVar !== undefined ? { apiBaseEnvVar } : {}),
-    ...(defaultApiBase !== undefined ? { defaultApiBase } : {}),
-    ...(modelSource !== undefined ? { modelSource } : {}),
-    apiKeyEnvVar: input.apiKeyEnvVar,
-    authHeader: runtimeCatalogVendorAuthHeader(input.authHeader),
-    iconKey: input.iconKey,
-    label: input.label,
-    ...(openCodeProvider !== undefined
-      ? {
-          openCodeProvider: {
-            ...("apiBaseOption" in openCodeProvider
-              ? { apiBaseOption: openCodeProvider.apiBaseOption }
-              : {}),
-            name: openCodeProvider.name,
-            npmPackage: openCodeProvider.npmPackage,
-            ...("providerId" in openCodeProvider
-              ? { providerId: openCodeProvider.providerId }
-              : {}),
-          },
-        }
-      : {}),
-    vendorId: admitProviderId(input.vendorId),
-  };
-}
-
-function runtimeCatalogEntry(input: RuntimeCatalogEntryInput): RuntimeCatalogEntry {
-  const runtimeId = admitRuntimeId(input.runtimeId);
-
-  if (input.defaultIdentity.runtimeId !== runtimeId) {
-    throw new Error(`Runtime ${input.runtimeId} default identity has mismatched runtime id.`);
-  }
-
-  return {
-    ...input,
-    defaultModel: input.defaultIdentity.modelId,
-    defaultProvider: input.defaultIdentity.provider.providerId,
-    runtimeId,
-  };
-}
-
-function runtimeCatalogCapability(input: {
-  readonly id: string;
-  readonly status: "supported" | "unsupported";
-  readonly version: 1;
-}): RuntimeCatalogCapability {
-  return {
-    id: input.id as RuntimeCatalogCapabilityId,
-    status: input.status,
-    version: input.version,
-  };
-}
-
-function indexFirstBy<T>(
-  values: readonly T[],
-  keyOf: (value: T) => string,
-): ReadonlyMap<string, T> {
-  const indexed = new Map<string, T>();
-
-  for (const value of values) {
-    const key = keyOf(value);
-
-    if (!indexed.has(key)) {
-      indexed.set(key, value);
-    }
-  }
-
-  return indexed;
-}
-
-function groupPresetModelsByVendor(
-  models: readonly PresetModelEntry[],
-): ReadonlyMap<string, readonly PresetModelEntry[]> {
-  const grouped = new Map<string, PresetModelEntry[]>();
-
-  for (const model of models) {
-    const vendorModels = grouped.get(model.vendorId);
-
-    if (vendorModels === undefined) {
-      grouped.set(model.vendorId, [model]);
-      continue;
-    }
-
-    vendorModels.push(model);
-  }
-
-  return grouped;
-}
-
-function indexPresetModelsByIdentity(
-  models: readonly PresetModelEntry[],
-): ReadonlyMap<string, ReadonlyMap<string, PresetModelEntry>> {
-  const indexed = new Map<string, Map<string, PresetModelEntry>>();
-
-  for (const model of models) {
-    let vendorModels = indexed.get(model.vendorId);
-
-    if (vendorModels === undefined) {
-      vendorModels = new Map<string, PresetModelEntry>();
-      indexed.set(model.vendorId, vendorModels);
-    }
-
-    if (!vendorModels.has(model.modelId)) {
-      vendorModels.set(model.modelId, model);
-    }
-  }
-
-  return indexed;
-}
-
-function requireVendor(vendorId: string): RuntimeCatalogVendor {
-  const vendor = VENDORS_BY_ID.get(vendorId);
-
-  if (vendor === undefined) {
-    throw new Error(`Runtime catalog references unknown vendor ${vendorId}.`);
-  }
-
-  return vendor;
-}
-
-function createGeneratedRuntimeCatalogEntry(
-  input: (typeof GENERATED_RUNTIME_CATALOG)[number],
-): RuntimeCatalogEntry {
-  const disabledReason = "disabledReason" in input ? input.disabledReason : undefined;
-  const color = "color" in input.display ? input.display.color : undefined;
-  const providerLabel = "providerLabel" in input.display ? input.display.providerLabel : undefined;
-  const showcaseLabel = "showcaseLabel" in input.display ? input.display.showcaseLabel : undefined;
-
-  return runtimeCatalogEntry({
-    acceptsCustomProvider: input.acceptsCustomProvider,
-    capabilities: input.capabilities.map(runtimeCatalogCapability),
-    defaultIdentity: createCatalogRuntimeModelIdentity({
-      modelId: input.defaultIdentity.modelId,
-      providerId: input.defaultIdentity.providerId,
-      runtimeId: input.runtimeId,
-    }),
-    ...(disabledReason !== undefined ? { disabledReason } : {}),
-    display: {
-      ...(color !== undefined ? { color } : {}),
-      ...(providerLabel !== undefined ? { providerLabel } : {}),
-      ...(showcaseLabel !== undefined ? { showcaseLabel } : {}),
-      iconKey: input.display.iconKey,
-    },
-    label: input.label,
-    runtimeId: input.runtimeId,
-    supportedModelProtocols: input.supportedModelProtocols,
-    supportedModelIdentities: input.supportedModelIdentities.map((model) => ({
-      modelId: admitModelId(model.modelId),
-      vendorId: admitProviderId(model.vendorId),
-    })),
-    supportedModelIds: input.supportedModelIds.map((modelId) => admitModelId(modelId)),
-    transport: input.transport,
-    vendors: input.vendorIds.map(requireVendor),
-    visibility: input.visibility,
-  });
-}
-
-function plannedRuntimeDisplayEntry(
-  input: GeneratedPlannedRuntimeDisplayEntry,
-): PlannedRuntimeDisplayEntry {
-  return {
-    iconKey: input.iconKey,
-    label: input.label,
-    providerLabel: input.providerLabel,
-    runtimeId: input.runtimeId,
-    surfaces: input.surfaces.map(admitRuntimeDisplaySurface),
-  };
-}
-
-function admitRuntimeDisplaySurface(value: string): RuntimeDisplaySurface {
-  if (value === "landing" || value === "provider-settings") {
-    return value;
-  }
-
-  throw new Error(`Unsupported runtime display surface ${value}.`);
-}
-
-function toPublicRuntimeDisplayEntry(entry: RuntimeCatalogEntry): RuntimeDisplayCatalogEntry {
-  return {
-    ...(entry.display.color !== undefined ? { color: entry.display.color } : {}),
-    iconKey: entry.display.iconKey,
-    label: entry.display.showcaseLabel ?? entry.label,
-    providerLabel: entry.display.providerLabel ?? entry.vendors[0]?.label ?? entry.defaultProvider,
-    runtimeId: entry.runtimeId,
-    status: "available",
-  };
-}
-
-function toComingSoonRuntimeDisplayEntry(
-  entry: PlannedRuntimeDisplayEntry,
-): RuntimeDisplayCatalogEntry {
-  return {
-    iconKey: entry.iconKey,
-    label: entry.label,
-    providerLabel: entry.providerLabel,
-    runtimeId: entry.runtimeId,
-    status: "coming-soon",
-  };
-}
-
-export const PRESET_MODEL_CATALOG: readonly PresetModelEntry[] =
-  GENERATED_PRESET_MODEL_CATALOG.map(presetModel);
-const PRESET_MODELS_BY_VENDOR_ID = groupPresetModelsByVendor(PRESET_MODEL_CATALOG);
-const PRESET_MODEL_BY_VENDOR_AND_MODEL_ID = indexPresetModelsByIdentity(PRESET_MODEL_CATALOG);
-
-export const ANTHROPIC_DEFAULT_MODEL_ID = admitModelId(GENERATED_MODEL_DEFAULT_IDS.anthropic);
-export const DEEPSEEK_DEFAULT_MODEL_ID = admitModelId(GENERATED_MODEL_DEFAULT_IDS.deepseek);
-export const OPENAI_DEFAULT_MODEL_ID = admitModelId(GENERATED_MODEL_DEFAULT_IDS.openai);
-
-export const ALL_VENDORS: readonly RuntimeCatalogVendor[] =
-  GENERATED_VENDOR_CATALOG.map(runtimeCatalogVendor);
-const VENDORS_BY_ID = indexFirstBy(ALL_VENDORS, (vendor) => vendor.vendorId);
-
-export const VENDOR_ANTHROPIC = requireVendor("anthropic");
-export const VENDOR_DEEPSEEK = requireVendor("deepseek");
-export const VENDOR_GEMINI = requireVendor("gemini");
-export const VENDOR_KIMI = requireVendor("kimi");
-export const VENDOR_MINIMAX = requireVendor("minimax");
-export const VENDOR_OPENAI = requireVendor("openai");
-export const VENDOR_OPENAI_COMPATIBLE = requireVendor("openai-compatible");
-export const VENDOR_OPENCODE = requireVendor("opencode");
-export const VENDOR_QWEN = requireVendor("qwen");
-export const VENDOR_ZHIPU = requireVendor("zhipu");
-
-export const SYSTEM_AGENT_RUNTIME_ID = "system-agent";
-
-export function listPresetModelsForProvider(provider: RuntimeModelProviderRef): PresetModelEntry[] {
-  if (provider.kind !== "preset") {
-    return [];
-  }
-
-  return listPresetModelsForVendor(provider.providerId);
-}
+// Custom providers are created through the dedicated OpenAI-Compatible flow,
+// not rendered as a preset vendor card.
+export const PUBLIC_VENDORS: readonly RuntimeCatalogVendor[] = ALL_VENDORS.filter(
+  (vendor) => vendor !== VENDOR_OPENAI_COMPATIBLE && RUNTIME_VENDOR_IDS.has(vendor.vendorId),
+);
 
 export function listPresetModelsForVendor(vendorId: string): PresetModelEntry[] {
-  return [...(PRESET_MODELS_BY_VENDOR_ID.get(vendorId) ?? [])];
+  return PRESET_MODEL_CATALOG.filter((model) => model.vendorId === vendorId);
 }
 
 export function getDefaultModelIdForVendor(vendorId: string): ModelId | null {
-  const modelId = (GENERATED_MODEL_DEFAULT_IDS as Readonly<Record<string, string>>)[vendorId];
+  const modelId = MODEL_DEFAULTS[vendorId];
   return modelId === undefined ? null : admitModelId(modelId);
-}
-
-export function getPresetModelForIdentity(identity: RuntimeModelIdentity): PresetModelEntry | null {
-  if (identity.provider.kind !== "preset") {
-    return null;
-  }
-
-  return (
-    PRESET_MODEL_BY_VENDOR_AND_MODEL_ID.get(identity.provider.providerId)?.get(identity.modelId) ??
-    null
-  );
 }
 
 export function getPresetModel(input: {
   readonly modelId: string;
   readonly vendorId: string;
 }): PresetModelEntry | null {
-  return PRESET_MODEL_BY_VENDOR_AND_MODEL_ID.get(input.vendorId)?.get(input.modelId) ?? null;
+  return (
+    PRESET_MODEL_CATALOG.find(
+      (model) => model.vendorId === input.vendorId && model.modelId === input.modelId,
+    ) ?? null
+  );
 }
 
 export function createCatalogRuntimeModelIdentity(input: {
@@ -484,141 +115,65 @@ export function createCatalogRuntimeModelIdentity(input: {
   });
 }
 
-export const RUNTIME_CATALOG: readonly RuntimeCatalogEntry[] = GENERATED_RUNTIME_CATALOG.map(
-  createGeneratedRuntimeCatalogEntry,
-);
-const RUNTIME_CATALOG_BY_ID = indexFirstBy(RUNTIME_CATALOG, (entry) => entry.runtimeId);
-
-export const PUBLIC_RUNTIME_CATALOG: readonly RuntimeCatalogEntry[] = RUNTIME_CATALOG.filter(
-  (entry) => entry.visibility === "public",
-);
-const PUBLIC_RUNTIME_CATALOG_BY_ID = indexFirstBy(
-  PUBLIC_RUNTIME_CATALOG,
-  (entry) => entry.runtimeId,
-);
-const PUBLIC_VENDOR_IDS = new Set(
-  PUBLIC_RUNTIME_CATALOG.flatMap((entry) => entry.vendors.map((vendor) => vendor.vendorId)),
-);
-
-// Custom providers are created through the dedicated OpenAI-Compatible flow,
-// not rendered as a preset vendor card.
-export const PUBLIC_VENDORS: readonly RuntimeCatalogVendor[] = ALL_VENDORS.filter(
-  (vendor) =>
-    vendor.vendorId !== VENDOR_OPENAI_COMPATIBLE.vendorId && PUBLIC_VENDOR_IDS.has(vendor.vendorId),
-);
-
-export const PLANNED_RUNTIME_DISPLAY_CATALOG: readonly PlannedRuntimeDisplayEntry[] = (
-  GENERATED_PLANNED_RUNTIME_DISPLAY_CATALOG as readonly GeneratedPlannedRuntimeDisplayEntry[]
-).map(plannedRuntimeDisplayEntry);
-
-export const PUBLIC_RUNTIME_DISPLAY_CATALOG: readonly RuntimeDisplayCatalogEntry[] =
-  PUBLIC_RUNTIME_CATALOG.map(toPublicRuntimeDisplayEntry);
-
-export function listPlannedRuntimeDisplayEntries(
-  surface: RuntimeDisplaySurface,
-): RuntimeDisplayCatalogEntry[] {
-  return PLANNED_RUNTIME_DISPLAY_CATALOG.filter((entry) => entry.surfaces.includes(surface)).map(
-    toComingSoonRuntimeDisplayEntry,
-  );
-}
-
-export function listRuntimeShowcaseDisplayEntries(): RuntimeDisplayCatalogEntry[] {
-  return [...PUBLIC_RUNTIME_DISPLAY_CATALOG, ...listPlannedRuntimeDisplayEntries("landing")];
-}
-
-export function getRuntimeDisplayColor(runtimeId: string): string | null {
-  return RUNTIME_CATALOG_BY_ID.get(runtimeId)?.display.color ?? null;
-}
-
 export function getRuntimeCatalogEntry(runtimeId: string): RuntimeCatalogEntry | null {
   return RUNTIME_CATALOG_BY_ID.get(runtimeId) ?? null;
 }
 
-export function getPublicRuntimeCatalogEntry(runtimeId: string): RuntimeCatalogEntry | null {
-  return PUBLIC_RUNTIME_CATALOG_BY_ID.get(runtimeId) ?? null;
-}
-
-export function isPublicRuntimeCatalogEntry(runtimeId: string): boolean {
-  return PUBLIC_RUNTIME_CATALOG_BY_ID.has(runtimeId);
-}
-
-export type RuntimeModelIdentityRejectionCode =
-  | "custom-provider-kind-mismatch"
-  | "identity-invalid"
-  | "model-unsupported"
-  | "model-unknown"
-  | "provider-unsupported"
-  | "protocol-unsupported"
-  | "runtime-disabled"
-  | "runtime-unknown";
-
-export type RuntimeModelIdentityAdmission =
-  | {
-      readonly identity: RuntimeModelIdentity;
-      readonly model: null;
-      readonly modelProtocol: PresetModelProtocol;
-      readonly ok: true;
-      readonly runtime: RuntimeCatalogEntry;
-      readonly vendor: RuntimeCatalogVendor;
-    }
-  | {
-      readonly identity: RuntimeModelIdentity;
-      readonly model: PresetModelEntry;
-      readonly modelProtocol: PresetModelProtocol;
-      readonly ok: true;
-      readonly runtime: RuntimeCatalogEntry;
-      readonly vendor: RuntimeCatalogVendor;
-    }
-  | {
-      readonly code: RuntimeModelIdentityRejectionCode;
-      readonly message: string;
-      readonly ok: false;
-    };
-
-function rejectRuntimeModelIdentity(
-  code: RuntimeModelIdentityRejectionCode,
-  message: string,
-): RuntimeModelIdentityAdmission {
-  return { code, message, ok: false };
-}
-
-function isOpenAiCompatibleProvider(providerId: string): boolean {
-  return providerId === VENDOR_OPENAI_COMPATIBLE.vendorId;
-}
-
-function runtimeSupportsPresetModel(
-  runtime: RuntimeCatalogEntry,
-  model: PresetModelEntry,
-): boolean {
-  return (
-    (runtime.supportedModelIds === undefined ||
-      runtime.supportedModelIds.includes(model.modelId)) &&
-    (runtime.supportedModelIdentities === undefined ||
-      runtime.supportedModelIdentities.some(
-        (candidate) => candidate.vendorId === model.vendorId && candidate.modelId === model.modelId,
-      ))
-  );
-}
-
-export interface RuntimeModelProtocolOptions {
+export function resolveRuntimeModelProtocol(input: {
   readonly customModelProtocol?: PresetModelProtocol | null;
-}
+  readonly modelId: string;
+  readonly runtimeId: string;
+  readonly vendorId: string;
+}): RuntimeModelProtocolResolution {
+  try {
+    createCatalogRuntimeModelIdentity({
+      modelId: input.modelId,
+      providerId: input.vendorId,
+      runtimeId: input.runtimeId,
+    });
+  } catch {
+    return { code: "identity-invalid", message: "Invalid runtime model identity.", ok: false };
+  }
 
-export type RuntimeModelProtocolResolution =
-  | { readonly ok: true; readonly modelProtocol: PresetModelProtocol }
-  | Extract<RuntimeModelIdentityAdmission, { ok: false }>;
+  const runtime = RUNTIME_CATALOG_BY_ID.get(input.runtimeId);
 
-function resolveAdmittedModelProtocol(
-  runtime: RuntimeCatalogEntry,
-  model: PresetModelEntry | null,
-  options: RuntimeModelProtocolOptions,
-): RuntimeModelProtocolResolution {
-  // Historical custom credentials have no protocol declaration. Preserve their
-  // existing runtime-specific route until the credential explicitly declares one.
-  const modelProtocol =
-    model?.protocol ??
-    options.customModelProtocol ??
-    (runtime.transport === "openai-app-server" ? "openai-responses" : "openai-chat-completions");
+  if (runtime === undefined) {
+    return {
+      code: "runtime-unknown",
+      message: `Runtime ${input.runtimeId} is not in the catalog.`,
+      ok: false,
+    };
+  }
+
+  if (getRuntimeCatalogVendorForProvider(runtime, input.vendorId) === null) {
+    return {
+      code: "provider-unsupported",
+      message: `Runtime ${input.runtimeId} does not support provider ${input.vendorId}.`,
+      ok: false,
+    };
+  }
+
+  let modelProtocol: PresetModelProtocol;
+
+  if (input.vendorId === VENDOR_OPENAI_COMPATIBLE.vendorId) {
+    // Historical custom credentials have no protocol declaration. Preserve their
+    // existing runtime-specific route until the credential explicitly declares one.
+    modelProtocol =
+      input.customModelProtocol ??
+      (runtime.transport === "openai-app-server" ? "openai-responses" : "openai-chat-completions");
+  } else {
+    const model = getPresetModel(input);
+
+    if (model === null) {
+      return {
+        code: "model-unknown",
+        message: `Provider ${input.vendorId} does not declare model ${input.modelId}.`,
+        ok: false,
+      };
+    }
+
+    modelProtocol = model.protocol;
+  }
 
   if (!runtime.supportedModelProtocols.includes(modelProtocol)) {
     return {
@@ -629,143 +184,6 @@ function resolveAdmittedModelProtocol(
   }
 
   return { modelProtocol, ok: true };
-}
-
-export function resolveRuntimeModelProtocol(
-  input: RuntimeModelProtocolOptions & {
-    readonly modelId: string;
-    readonly runtimeId: string;
-    readonly vendorId: string;
-  },
-): RuntimeModelProtocolResolution {
-  let identity: RuntimeModelIdentity;
-  try {
-    identity = createCatalogRuntimeModelIdentity({
-      modelId: input.modelId,
-      providerId: input.vendorId,
-      runtimeId: input.runtimeId,
-    });
-  } catch {
-    return { code: "identity-invalid", message: "Invalid runtime model identity.", ok: false };
-  }
-  const admission = admitRuntimeModelIdentity(identity, input);
-  return admission.ok ? { modelProtocol: admission.modelProtocol, ok: true } : admission;
-}
-
-export function admitRuntimeModelIdentity(
-  identity: RuntimeModelIdentity,
-  options: RuntimeModelProtocolOptions = {},
-): RuntimeModelIdentityAdmission {
-  return admitRuntimeModelIdentityForCatalog(RUNTIME_CATALOG, identity, options);
-}
-
-export function admitRuntimeModelIdentityForCatalog(
-  catalog: readonly RuntimeCatalogEntry[],
-  identity: RuntimeModelIdentity,
-  options: RuntimeModelProtocolOptions = {},
-): RuntimeModelIdentityAdmission {
-  const runtime = catalog.find((candidate) => candidate.runtimeId === identity.runtimeId) ?? null;
-
-  if (runtime === null) {
-    return rejectRuntimeModelIdentity(
-      "runtime-unknown",
-      `Runtime ${identity.runtimeId} is not in the catalog.`,
-    );
-  }
-
-  if (runtime.disabledReason !== undefined && runtime.disabledReason !== "") {
-    return rejectRuntimeModelIdentity("runtime-disabled", runtime.disabledReason);
-  }
-
-  if (
-    identity.provider.kind === "custom" &&
-    !isOpenAiCompatibleProvider(identity.provider.providerId)
-  ) {
-    return rejectRuntimeModelIdentity(
-      "custom-provider-kind-mismatch",
-      "Custom provider identity must use the OpenAI-Compatible provider.",
-    );
-  }
-
-  if (
-    identity.provider.kind === "preset" &&
-    isOpenAiCompatibleProvider(identity.provider.providerId)
-  ) {
-    return rejectRuntimeModelIdentity(
-      "custom-provider-kind-mismatch",
-      "OpenAI-Compatible identity must be marked as custom.",
-    );
-  }
-
-  const vendor = getRuntimeCatalogVendorForProvider(runtime, identity.provider.providerId);
-
-  if (vendor === null) {
-    return rejectRuntimeModelIdentity(
-      "provider-unsupported",
-      `Runtime ${identity.runtimeId} does not support provider ${identity.provider.providerId}.`,
-    );
-  }
-
-  if (identity.provider.kind === "custom") {
-    const protocol = resolveAdmittedModelProtocol(runtime, null, options);
-    if (!protocol.ok) return protocol;
-    return {
-      identity,
-      model: null,
-      modelProtocol: protocol.modelProtocol,
-      ok: true,
-      runtime,
-      vendor,
-    };
-  }
-
-  const model = getPresetModelForIdentity(identity);
-
-  if (model === null) {
-    return rejectRuntimeModelIdentity(
-      "model-unknown",
-      `Provider ${identity.provider.providerId} does not declare model ${identity.modelId}.`,
-    );
-  }
-
-  if (!runtimeSupportsPresetModel(runtime, model)) {
-    return rejectRuntimeModelIdentity(
-      "model-unsupported",
-      `Runtime ${identity.runtimeId} does not support model ${identity.modelId}.`,
-    );
-  }
-
-  const protocol = resolveAdmittedModelProtocol(runtime, model, options);
-  if (!protocol.ok) return protocol;
-  return {
-    identity,
-    model,
-    modelProtocol: protocol.modelProtocol,
-    ok: true,
-    runtime,
-    vendor,
-  };
-}
-
-export function getRuntimeCatalogVendorForIdentity(
-  runtime: Pick<RuntimeCatalogEntry, "acceptsCustomProvider" | "vendors">,
-  identity: RuntimeModelIdentity,
-): RuntimeCatalogVendor | null {
-  return getRuntimeCatalogVendorForProvider(runtime, identity.provider.providerId);
-}
-
-export function runtimeCatalogEntrySupportsIdentity(
-  runtime: Pick<RuntimeCatalogEntry, "acceptsCustomProvider" | "vendors">,
-  identity: RuntimeModelIdentity,
-): boolean {
-  return getRuntimeCatalogVendorForIdentity(runtime, identity) !== null;
-}
-
-export function runtimeCatalogEntrySupportsProvider(
-  runtime: Pick<RuntimeCatalogEntry, "acceptsCustomProvider" | "vendors">,
-  provider: string,
-): boolean {
-  return getRuntimeCatalogVendorForProvider(runtime, provider) !== null;
 }
 
 export function getRuntimeCatalogVendorForProvider(
@@ -786,5 +204,5 @@ export function getRuntimeCatalogVendorForProvider(
 }
 
 export function getVendor(vendorId: string): RuntimeCatalogVendor | null {
-  return VENDORS_BY_ID.get(vendorId) ?? null;
+  return ALL_VENDORS.find((vendor) => vendor.vendorId === vendorId) ?? null;
 }

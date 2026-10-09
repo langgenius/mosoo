@@ -1,4 +1,4 @@
-import type { FileId } from "@mosoo/contracts/id";
+import type { FileId } from "@mosoo/id";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import type { ChangeEvent, ReactElement } from "react";
@@ -132,24 +132,24 @@ export function ImportAgentPackageDialog({
           />
 
           <button
-            className="border-border bg-muted/20 hover:bg-muted/40 flex w-full items-center gap-3 rounded-md border px-4 py-3 text-left transition"
+            className="border-border bg-sunken/20 hover:bg-sunken/40 flex w-full items-center gap-3 rounded-md border px-4 py-3 text-left transition"
             disabled={uploading || importMutation.isPending || Boolean(importedAgentId)}
             onClick={() => fileInputRef.current?.click()}
             type="button"
           >
-            <FileArchive className="text-muted-foreground size-5 shrink-0" />
+            <FileArchive className="text-fg-3 size-5 shrink-0" />
             <span className="min-w-0">
               <span className="text-foreground block truncate text-sm font-medium">
                 {fileName ?? "Choose .agent file"}
               </span>
-              <span className="text-muted-foreground block truncate text-xs">
+              <span className="text-fg-3 block truncate text-xs">
                 {uploading ? "Uploading..." : packageFileId ? "Ready to import" : ".agent"}
               </span>
             </span>
           </button>
 
           {uploadError !== null || importMutation.error ? (
-            <div className="border-destructive/20 bg-destructive/5 text-destructive flex gap-2 rounded-md border px-3 py-2 text-sm">
+            <div className="border-danger/20 bg-danger/5 text-danger flex gap-2 rounded-md border px-3 py-2 text-sm">
               <AlertTriangle className="mt-0.5 size-4 shrink-0" />
               <span>
                 {uploadError ??
@@ -161,12 +161,12 @@ export function ImportAgentPackageDialog({
           ) : null}
 
           {importResult !== null ? (
-            <div className="border-border bg-muted/20 rounded-md border p-3">
+            <div className="border-border bg-sunken/20 rounded-md border p-3">
               <div className="text-foreground flex items-center gap-2 text-sm font-medium">
                 <CheckCircle2 className="text-success-fg size-4" />
                 Draft created
               </div>
-              <div className="text-muted-foreground mt-2 grid gap-2 text-xs sm:grid-cols-2">
+              <div className="text-fg-3 mt-2 grid gap-2 text-xs sm:grid-cols-2">
                 <span>Skills {importResult.resolution.summary.boundSkillCount}</span>
                 <span>MCP {importResult.resolution.summary.boundMcpServerCount}</span>
               </div>

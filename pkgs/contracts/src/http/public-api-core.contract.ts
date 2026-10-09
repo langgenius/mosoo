@@ -1,4 +1,3 @@
-import { PLATFORM_ID_INPUT_PATTERN } from "@mosoo/id";
 import type {
   AgentId,
   FileId,
@@ -23,7 +22,6 @@ import type { JsonObject } from "../validation/primitives.contract";
 
 export const PUBLIC_API_PREFIX = "/api";
 export const PUBLIC_API_VERSION_PREFIX = "/v1";
-export const PUBLIC_API_VERSION = "v1";
 export type PublicApiVersion = "v1" | "v2";
 
 export type PublicThreadConfiguration =
@@ -58,10 +56,6 @@ export const PUBLIC_THREAD_INPUT_TEXT_MAX_LENGTH = 32_000;
 export const PUBLIC_THREAD_USER_ID_MAX_LENGTH = 255;
 export const PUBLIC_THREAD_FILE_ID_MAX_LENGTH = 26;
 export const PUBLIC_THREAD_FILE_UPLOAD_MAX_BYTES = SINGLE_PUT_THRESHOLD_BYTES;
-export const PUBLIC_THREAD_ID_PATTERN = PLATFORM_ID_INPUT_PATTERN;
-export const PUBLIC_THREAD_JSON_BODY_MAX_BYTES = PUBLIC_THREAD_INPUT_TEXT_MAX_LENGTH + 8192;
-export const PUBLIC_PROJECT_THREAD_JSON_BODY_MAX_BYTES =
-  2 * PUBLIC_THREAD_INPUT_TEXT_MAX_LENGTH + 8192;
 export const PUBLIC_THREAD_API_THREADS_MAX_LIMIT = 100;
 export const PUBLIC_THREAD_EVENTS_DEFAULT_LIMIT = 100;
 export const PUBLIC_THREAD_EVENTS_MAX_LIMIT = 1000;
@@ -85,15 +79,6 @@ export const PUBLIC_API_ERROR_CODES = [
 ] as const;
 
 export type PublicApiErrorCode = (typeof PUBLIC_API_ERROR_CODES)[number];
-
-export interface PublicApiErrorPayload {
-  code: PublicApiErrorCode;
-  message: string;
-}
-
-export interface PublicApiErrorResponse {
-  error: PublicApiErrorPayload;
-}
 
 export type PublicThreadRunStatus =
   | "booting"

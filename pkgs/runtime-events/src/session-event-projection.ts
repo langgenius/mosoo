@@ -2,10 +2,9 @@ import {
   EventType,
   MOSOO_CUSTOM_EVENT,
   createServerCustomEvent,
-  parseAgUiSessionEvent,
-  parseNullableSessionUsageSummary,
+  parseServerCustomEvent,
 } from "@mosoo/ag-ui-session";
-import type { AgUiSessionEvent } from "@mosoo/ag-ui-session";
+import type { AgUiSessionEvent, SessionUsageSummary } from "@mosoo/ag-ui-session";
 
 import type { RuntimeEventEnvelope } from "./runtime-event";
 import {
@@ -19,15 +18,6 @@ import {
   readRuntimeEventToolCallUpdate,
   toRuntimeRunLifecycleStatus,
 } from "./runtime-event-payload";
-import { projectRuntimeStatus, projectRuntimeTimingRecorded } from "./session-runtime-timing";
-
-function createValidatedSessionCustomEvent(name: string, value: unknown): AgUiSessionEvent {
-  return parseAgUiSessionEvent({
-    name,
-    type: EventType.CUSTOM,
-    value,
-  });
-}
 
 function projectPermissionRequest(event: RuntimeEventEnvelope): AgUiSessionEvent {
   const request = readRuntimeEventPermissionRequest(event);
@@ -36,7 +26,7 @@ function projectPermissionRequest(event: RuntimeEventEnvelope): AgUiSessionEvent
     throw new Error("Runtime event permission projection requires a permission request event.");
   }
 
-  return createValidatedSessionCustomEvent(MOSOO_CUSTOM_EVENT.sessionPermissionsUpdated.name, {
+  return parseServerCustomEvent(MOSOO_CUSTOM_EVENT.sessionPermissionsUpdated.name, {
     permissionRequests: [
       {
         driverInstanceId: request.driverInstanceId,
@@ -85,12 +75,11 @@ function projectSessionRunUpdated(event: RuntimeEventEnvelope): AgUiSessionEvent
   ];
 }
 
-type RuntimeStateOperationName = "recreateSandbox" | "resetAgentState" | "restartDriver";
+type RuntimeStateOperationName = "recreateSandbox" | "restartDriver";
 
 function toRuntimeStateOperationName(value: string | null): RuntimeStateOperationName | null {
   switch (value) {
     case "recreateSandbox":
-    case "resetAgentState":
     case "restartDriver": {
       return value;
     }
@@ -154,7 +143,7 @@ function projectPermissionResolved(event: RuntimeEventEnvelope): AgUiSessionEven
   const permissionRequests = payload["permissionRequests"];
 
   return [
-    createValidatedSessionCustomEvent(MOSOO_CUSTOM_EVENT.sessionPermissionsUpdated.name, {
+    parseServerCustomEvent(MOSOO_CUSTOM_EVENT.sessionPermissionsUpdated.name, {
       permissionRequests: Array.isArray(permissionRequests) ? permissionRequests : [],
     }),
   ];
@@ -200,24 +189,18 @@ function appendIfPresent<T>(target: T[], value: T | null): void {
 export function projectRuntimeEventToAgUiSessionEvents(
   event: RuntimeEventEnvelope,
 ): AgUiSessionEvent[] {
-  if (event.visibility === "owner_debug" || event.visibility === "system_internal") {
+  if (event.visibility === "owner_debug") {
     return [];
   }
 
   switch (event.kind) {
-    case "run.started": {
-      return projectSessionRunUpdated(event);
-    }
-    case "run.queued":
-    case "run.dispatched":
-    case "run.cancel.requested": {
-      return projectSessionRunUpdated(event);
-    }
+    case "run.cancel.requested":
+    case "run.cancelled":
     case "run.completed":
-    case "run.cancelled": {
-      return projectSessionRunUpdated(event);
-    }
-    case "run.failed": {
+    case "run.dispatched":
+    case "run.failed":
+    case "run.queued":
+    case "run.started": {
       return projectSessionRunUpdated(event);
     }
     case "message.added": {
@@ -309,16 +292,15 @@ export function projectRuntimeEventToAgUiSessionEvents(
     case "plan.updated": {
       const payload = readRuntimeEventPayload(event);
       return [
-        createValidatedSessionCustomEvent(MOSOO_CUSTOM_EVENT.sessionPlanUpdated.name, {
+        parseServerCustomEvent(MOSOO_CUSTOM_EVENT.sessionPlanUpdated.name, {
           plan: Array.isArray(payload["entries"]) ? payload["entries"] : [],
         }),
       ];
     }
     case "usage.updated": {
-      const usage = parseNullableSessionUsageSummary(event.payload);
       return [
-        createValidatedSessionCustomEvent(MOSOO_CUSTOM_EVENT.sessionUsageUpdated.name, {
-          usage,
+        createServerCustomEvent(MOSOO_CUSTOM_EVENT.sessionUsageUpdated.name, {
+          usage: event.payload as SessionUsageSummary | null,
         }),
       ];
     }
@@ -329,25 +311,15 @@ export function projectRuntimeEventToAgUiSessionEvents(
       return projectPermissionResolved(event);
     }
     case "session.files.updated": {
-      return [
-        createValidatedSessionCustomEvent(
-          MOSOO_CUSTOM_EVENT.sessionFilesUpdated.name,
-          event.payload,
-        ),
-      ];
+      return [parseServerCustomEvent(MOSOO_CUSTOM_EVENT.sessionFilesUpdated.name, event.payload)];
     }
     case "session.info.updated": {
-      return [
-        createValidatedSessionCustomEvent(
-          MOSOO_CUSTOM_EVENT.sessionInfoUpdated.name,
-          event.payload,
-        ),
-      ];
+      return [parseServerCustomEvent(MOSOO_CUSTOM_EVENT.sessionInfoUpdated.name, event.payload)];
     }
     case "session.config.updated": {
       const payload = readRuntimeEventPayload(event);
       return [
-        createValidatedSessionCustomEvent(MOSOO_CUSTOM_EVENT.sessionConfigUpdated.name, {
+        parseServerCustomEvent(MOSOO_CUSTOM_EVENT.sessionConfigUpdated.name, {
           configOptions: Array.isArray(payload["options"]) ? payload["options"] : [],
         }),
       ];
@@ -355,7 +327,7 @@ export function projectRuntimeEventToAgUiSessionEvents(
     case "session.mode.updated": {
       const payload = readRuntimeEventPayload(event);
       return [
-        createValidatedSessionCustomEvent(MOSOO_CUSTOM_EVENT.sessionModeUpdated.name, {
+        parseServerCustomEvent(MOSOO_CUSTOM_EVENT.sessionModeUpdated.name, {
           currentModeId: readRuntimeEventString(payload, "currentMode"),
           visibleModes: Array.isArray(payload["availableModes"]) ? payload["availableModes"] : [],
         }),
@@ -364,15 +336,8 @@ export function projectRuntimeEventToAgUiSessionEvents(
     case "session.commands.updated": {
       const payload = readRuntimeEventPayload(event);
       return [
-        createValidatedSessionCustomEvent(MOSOO_CUSTOM_EVENT.sessionCommandsUpdated.name, {
+        parseServerCustomEvent(MOSOO_CUSTOM_EVENT.sessionCommandsUpdated.name, {
           commands: Array.isArray(payload["commands"]) ? payload["commands"] : [],
-        }),
-      ];
-    }
-    case "session.readiness.updated": {
-      return [
-        createValidatedSessionCustomEvent(MOSOO_CUSTOM_EVENT.sessionReadiness.name, {
-          readiness: event.payload,
         }),
       ];
     }
@@ -381,17 +346,6 @@ export function projectRuntimeEventToAgUiSessionEvents(
     }
     case "agent.task.updated": {
       return projectAgentTaskUpdated(event);
-    }
-    case "runtime.config.updated":
-    case "runtime.driver.updated":
-    case "runtime.provisioning.updated":
-    case "runtime.sandbox.updated":
-    case "runtime.transport.updated":
-    case "diagnostic.reported": {
-      return [projectRuntimeStatus(event)];
-    }
-    case "runtime.timing.recorded": {
-      return projectRuntimeTimingRecorded(event);
     }
     default: {
       return [];

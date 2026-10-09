@@ -1,21 +1,8 @@
-import { mcpServersTable } from "@mosoo/db";
-import { eq } from "drizzle-orm";
-
-import { getAppDatabase } from "../../../platform/db/drizzle";
 import { isTruthy } from "../../../shared/truthiness";
-import { currentTimestampMs } from "../../../time";
 import { parseOAuthEndpoint } from "./mcp-oauth-endpoint";
-import type { OAuthMetadata, OAuthTokenResponse, ServerRow } from "./mcp-types";
+import type { OAuthMetadata, OAuthTokenResponse } from "./mcp-types";
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
-}
-
-function parseJsonBoundary(raw: string, invalidMessage: string): unknown {
-  try {
-    return JSON.parse(raw);
-  } catch {
-    throw new Error(invalidMessage);
-  }
 }
 
 function parseOptionalString(
@@ -109,54 +96,26 @@ function parseOAuthTokenResponse(value: unknown): OAuthTokenResponse {
   };
 }
 
-export async function getOrDiscoverOAuthMetadata(
-  database: D1Database,
-  server: ServerRow,
-): Promise<OAuthMetadata> {
-  if (isTruthy(server.oauthMetadataJson)) {
-    return parseOAuthMetadata(
-      parseJsonBoundary(server.oauthMetadataJson, "Cached OAuth metadata is invalid."),
-      "Cached OAuth metadata is invalid.",
-    );
-  }
+export async function discoverOAuthMetadata(serverUrl: string): Promise<OAuthMetadata> {
+  const { origin } = new URL(parseOAuthEndpoint(serverUrl));
 
-  const serverUrl = new URL(parseOAuthEndpoint(server.url));
-  const candidates = [
-    new URL("/.well-known/oauth-authorization-server", serverUrl.origin).toString(),
-    new URL("/.well-known/openid-configuration", serverUrl.origin).toString(),
-  ];
-  let metadata: OAuthMetadata | null = null;
-
-  for (const candidate of candidates) {
-    const response = await fetch(candidate, {
+  for (const path of [
+    "/.well-known/oauth-authorization-server",
+    "/.well-known/openid-configuration",
+  ]) {
+    const response = await fetch(new URL(path, origin).toString(), {
       headers: {
         accept: "application/json",
       },
       redirect: "manual",
     });
 
-    if (!response.ok) {
-      continue;
+    if (response.ok) {
+      return parseOAuthMetadata(await response.json(), "OAuth discovery metadata is invalid.");
     }
-
-    metadata = parseOAuthMetadata(await response.json(), "OAuth discovery metadata is invalid.");
-    break;
   }
 
-  if (!metadata) {
-    throw new Error("OAuth discovery failed for this MCP server.");
-  }
-
-  await getAppDatabase(database)
-    .update(mcpServersTable)
-    .set({
-      oauthMetadataJson: JSON.stringify(metadata),
-      updatedAt: currentTimestampMs(),
-    })
-    .where(eq(mcpServersTable.id, server.id))
-    .run();
-
-  return metadata;
+  throw new Error("OAuth discovery failed for this MCP server.");
 }
 
 export async function exchangeOAuthToken(input: {

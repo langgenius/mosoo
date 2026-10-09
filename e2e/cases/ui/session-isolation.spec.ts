@@ -18,7 +18,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 // UI wiring only. D1 creation/import/fork and existing Session ownership are
 // verified by API tests; this fixture never invokes a model or a real API.
 for (const status of ["draft", "published"] as const) {
-  test(`Session isolation: ${status} configuration has no type selection`, async ({ page }) => {
+  test(`Session isolation: editing ${status} configuration keeps existing sessions`, async ({
+    page,
+  }) => {
     await installConsoleFixtures(page, { locale: "en" });
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
@@ -65,7 +67,6 @@ for (const status of ["draft", "published"] as const) {
         const variables = body["variables"];
         const input = isRecord(variables) ? variables["input"] : null;
         if (!isRecord(input)) throw new Error("Expected a configuration input.");
-        expect(input).not.toHaveProperty("kind");
         writes.push(input);
         agent = {
           ...agent,
@@ -99,6 +100,7 @@ for (const status of ["draft", "published"] as const) {
               available: true,
               displayName: agent.model,
               modelId: agent.model,
+              modelProtocol: null,
               vendorId: agent.provider,
               vendorLabel: "OpenAI",
               source: "preset",
@@ -117,7 +119,7 @@ for (const status of ["draft", "published"] as const) {
 
     if (status === "draft") {
       await page.goto("/agent?create=1");
-      const dialog = page.getByRole("dialog", { name: "New Agent" });
+      const dialog = page.getByRole("dialog", { name: "New agent" });
       await expect(dialog).toBeVisible();
       await dialog.getByLabel("Name").fill("Session configuration");
       await dialog.getByRole("button", { name: /OpenAI/u }).click();
@@ -130,9 +132,6 @@ for (const status of ["draft", "published"] as const) {
     await expect(page.getByRole("textbox", { name: "System prompt", exact: true })).toBeVisible();
     await expect(page.getByTestId("agent-preview-panel")).toBeVisible();
     await expect(page.getByText(agent.model, { exact: true })).toBeVisible();
-    await expect(
-      page.getByText(/^(Assistant Agent|Task Agent|Agent type|Switch type)$/u),
-    ).toHaveCount(0);
     await page
       .getByRole("textbox", { name: "System prompt", exact: true })
       .fill("Edited durable instructions.");
@@ -167,7 +166,6 @@ for (const status of ["draft", "published"] as const) {
         }),
       )
       .toBe(true);
-    expect(agent).not.toHaveProperty("kind");
     expect(
       operations.filter((name) =>
         ["RestartDriver", "RecreateSandbox", "ResetAgentState", "CreateAgentFork"].includes(name),
@@ -176,7 +174,6 @@ for (const status of ["draft", "published"] as const) {
     await expect(page.getByTestId("preset-session-scope")).toContainText(
       "Existing sessions keep their original configuration",
     );
-    await expect(page.getByRole("button", { name: "Open terminal", exact: true })).toHaveCount(0);
     mkdirSync(output, { recursive: true });
     await page.screenshot({ path: `${output}${status}-editor.png`, fullPage: true });
     expect(errors).toEqual([]);
@@ -234,24 +231,11 @@ test("direct Session maintenance targets only the selected Session and exposes a
           },
         };
         break;
-      case "ThreadAgentSessionRetrieve":
-        data = {
-          threadAgentSessionRetrieve: {
-            capabilities,
-            recoverability: { status: "available", reason: null },
-            session: sessions.find((session) => session.id === variables["sessionId"]),
-          },
-        };
-        break;
       case "ThreadSessionMessages":
         data = { threadSessionMessages: [] };
         break;
-      case "ThreadSessionProcessEvents":
-        data = { threadSessionProcessEvents: [] };
-        break;
-      case "AgentSessionProcessEvents":
       case "SessionProcessEvents":
-        data = { sessionProcessEvents: [] };
+        data = { threadSessionProcessEvents: [] };
         break;
       case "RestartSessionDriver":
       case "RecreateSessionSandbox":
@@ -270,9 +254,7 @@ test("direct Session maintenance targets only the selected Session and exposes a
           [operation === "RestartSessionDriver"
             ? "restartSessionDriver"
             : "recreateSessionSandbox"]: {
-            affectedSessionCount: 1,
             ok: true,
-            operation: operation === "RestartSessionDriver" ? "restartDriver" : "recreateSandbox",
             sessionId: variables["sessionId"],
           },
         };

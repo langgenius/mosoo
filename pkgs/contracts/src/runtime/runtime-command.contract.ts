@@ -1,7 +1,6 @@
 import { type } from "arktype";
 
-import { RunError } from "../session/session-run.contract";
-import { NonEmptyString, parseSchemaValue } from "../validation/primitives.contract";
+import { NonEmptyString } from "../validation/primitives.contract";
 
 export const RuntimeCommandStatus = type(
   '"queued" | "delivered" | "accepted" | "completed" | "failed" | "expired" | "cancelled"',
@@ -79,59 +78,3 @@ export const RuntimeCommandResult = type("null")
   .or(InputStartCommandResult)
   .or(McpExecuteCommandResult);
 export type RuntimeCommandResult = typeof RuntimeCommandResult.infer;
-
-const runtimeCommandRecordBase = {
-  ackedAt: "string | null",
-  completedAt: "string | null",
-  driverInstanceId: NonEmptyString,
-  error: RunError.or("null"),
-  expiresAt: "string | null",
-  id: NonEmptyString,
-  issuedAt: "string",
-  seq: "number >= 0",
-  status: RuntimeCommandStatus,
-} as const;
-
-export const RuntimeCommandRecord = type({
-  ...runtimeCommandRecordBase,
-  kind: '"turn.cancel"',
-  payload: TurnCancelCommand,
-  result: "null",
-})
-  .or(
-    type({
-      ...runtimeCommandRecordBase,
-      kind: '"input.start"',
-      payload: InputStartCommand,
-      result: type("null").or(InputStartCommandResult),
-    }),
-  )
-  .or(
-    type({
-      ...runtimeCommandRecordBase,
-      kind: '"mcp.execute"',
-      payload: McpExecuteCommand,
-      result: type("null").or(McpExecuteCommandResult),
-    }),
-  )
-  .or(
-    type({
-      ...runtimeCommandRecordBase,
-      kind: '"session.stop"',
-      payload: SessionStopCommand,
-      result: "null",
-    }),
-  )
-  .or(
-    type({
-      ...runtimeCommandRecordBase,
-      kind: '"permission.resolve"',
-      payload: PermissionResolveCommand,
-      result: "null",
-    }),
-  );
-export type RuntimeCommandRecord = typeof RuntimeCommandRecord.infer;
-
-export function parseRuntimeCommand(value: unknown): RuntimeCommand {
-  return parseSchemaValue(RuntimeCommand, value);
-}

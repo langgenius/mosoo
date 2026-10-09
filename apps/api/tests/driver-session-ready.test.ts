@@ -18,34 +18,35 @@ mock.module("@cloudflare/sandbox", () => ({
   },
 }));
 
-type ProvisionSessionDriverInput = {
+type ProvisionDriverInput = {
   driverInstanceId: string;
   profile: DriverProfileConfig;
   sandboxSessionId: string;
 };
 
-type ProvisionSessionDriverResult = {
+type ProvisionDriverResult = {
   driverInstanceId: string;
   process: RuntimeProcessHandle;
   sandboxId: string;
   timing: { phases: [] };
 };
 
-type ProvisionSessionDriverMock = (
+type ProvisionDriverMock = (
   bindings: ApiBindings,
-  input: ProvisionSessionDriverInput,
-) => Promise<ProvisionSessionDriverResult>;
+  input: ProvisionDriverInput,
+) => Promise<ProvisionDriverResult>;
 
-class DriverPrewarmProvisionSkippedError extends Error {}
-
-let provisionSessionDriverMock: ProvisionSessionDriverMock = async () => {
-  throw new Error("provisionSessionDriver mock was not configured.");
+let provisionDriverMock: ProvisionDriverMock = async () => {
+  throw new Error("provisionDriver mock was not configured.");
 };
 
-mock.module("../src/modules/runtime/infrastructure/runtime-sandbox-provisioner", () => ({
-  DriverPrewarmProvisionSkippedError,
-  provisionSessionDriver: (bindings: ApiBindings, input: ProvisionSessionDriverInput) =>
-    provisionSessionDriverMock(bindings, input),
+const PROVISIONING_MODULE =
+  "../src/modules/runtime/infrastructure/runtime-sandbox-provisioning/runtime-driver-provisioning.service";
+const provisioning = await import(PROVISIONING_MODULE);
+mock.module(PROVISIONING_MODULE, () => ({
+  ...provisioning,
+  provisionDriver: (bindings: ApiBindings, input: ProvisionDriverInput) =>
+    provisionDriverMock(bindings, input),
 }));
 
 const { dispatchDriverTurn, ensureDriverSessionReady } =
@@ -72,7 +73,6 @@ const PROFILE: DriverProfileConfig = {
     runId: SESSION_RUN_ID,
     sessionId: SESSION_ID,
   },
-  envVarNames: [],
   envVars: {},
   kind: "pet",
   model: "gpt-5.4",
@@ -88,8 +88,6 @@ const PROFILE: DriverProfileConfig = {
   sandbox: {
     id: SANDBOX_ID,
     kind: "pet",
-    subjectId: AGENT_ID,
-    subjectKind: "agent",
   },
   session: {
     sandboxSessionId: SANDBOX_SESSION_ID,
@@ -103,7 +101,6 @@ const PROFILE: DriverProfileConfig = {
     sessionOrganizationPath: `/workspace/sessions/${SESSION_ID}`,
   },
   setupScript: "",
-  sourceKind: "agent",
 };
 
 function createDriverSessionDatabase(): SqliteD1Database {
@@ -189,22 +186,21 @@ function createHangingProcess(): RuntimeProcessHandle {
     kill: async () => {},
     pid: 123,
     waitForExit: async () => new Promise(() => undefined),
-    waitForPort: async () => {},
   };
 }
 
 function createFailingDriverConnectionBinding(
   requests: { count: number },
-  onFetch?: () => Promise<void>,
+  onCall?: () => Promise<void>,
 ) {
+  const unavailable = async () => {
+    requests.count += 1;
+    await onCall?.();
+    throw new Error("driver readiness unavailable");
+  };
+
   return {
-    get: () => ({
-      fetch: async () => {
-        requests.count += 1;
-        await onFetch?.();
-        return Response.json({ error: "driver readiness unavailable" }, { status: 500 });
-      },
-    }),
+    get: () => ({ fail: unavailable, snapshot: unavailable, waitForReady: unavailable }),
     idFromName: (name: string) => name,
   };
 }
@@ -212,13 +208,13 @@ function createFailingDriverConnectionBinding(
 function createBindings(
   database: D1Database,
   requests: { count: number },
-  onFetch?: () => Promise<void>,
+  onCall?: () => Promise<void>,
 ): ApiBindings {
   return {
     DB: database,
     DriverConnection: createFailingDriverConnectionBinding(
       requests,
-      onFetch,
+      onCall,
     ) as ApiBindings["DriverConnection"],
   } as ApiBindings;
 }
@@ -236,7 +232,6 @@ describe("driver session readiness", () => {
       resolvedSkillCatalog: [],
       resolvedSkills: [],
       sandbox: {} as SandboxHandle,
-      sandboxSessionId: SESSION_ID,
       sessionId: SESSION_ID,
       sessionRunId: SESSION_RUN_ID,
       traceId: "trace-prepare-failure",
@@ -267,7 +262,7 @@ describe("driver session readiness", () => {
 
     await database.prepare("DELETE FROM driver_instance").run();
 
-    provisionSessionDriverMock = async (bindings, input) => {
+    provisionDriverMock = async (bindings, input) => {
       await bindings.DB.prepare(
         `
           INSERT INTO driver_instance (
@@ -307,7 +302,6 @@ describe("driver session readiness", () => {
       resolvedSkillCatalog: [],
       resolvedSkills: [],
       sandbox: {} as SandboxHandle,
-      sandboxSessionId: SESSION_ID,
       sessionId: SESSION_ID,
       sessionRunId: SESSION_RUN_ID,
       traceId: "trace-new-provision-ready-wait",
@@ -343,7 +337,6 @@ describe("driver session readiness", () => {
       resolvedSkillCatalog: [],
       resolvedSkills: [],
       sandbox: {} as SandboxHandle,
-      sandboxSessionId: SESSION_ID,
       sessionId: SESSION_ID,
       sessionRunId: SESSION_RUN_ID,
       traceId: "trace-input-before-ready",

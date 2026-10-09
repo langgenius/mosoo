@@ -25,12 +25,12 @@ export async function exportAgentManifest(
     projectId: ProjectId;
   },
 ): Promise<AgentManifestExport> {
-  const editable = await ensureProjectAgentOwner(database, viewer.id, input);
-  const manifest = await buildAgentManifest(database, editable.agent);
+  const agent = await ensureProjectAgentOwner(database, viewer.id, input);
+  const manifest = await buildAgentManifest(database, agent);
 
   return {
-    agentId: editable.agent.id,
-    json: serializeAgentManifestToJson(manifest, editable.agent.id),
-    yaml: serializeAgentManifestToYaml(manifest, editable.agent.id),
+    agentId: agent.id,
+    json: serializeAgentManifestToJson(manifest, agent.id),
+    yaml: serializeAgentManifestToYaml(manifest, agent.id),
   };
 }

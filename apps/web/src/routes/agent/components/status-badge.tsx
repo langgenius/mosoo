@@ -10,9 +10,9 @@ const STATUS_LABEL_KEYS: Record<AgentStatus, string> = {
   published: "agent.published",
 };
 
-const STATUS_STYLES: Record<AgentStatus, { variant: "default" | "primary" }> = {
+const STATUS_STYLES: Record<AgentStatus, { variant: "default" | "brand" }> = {
   draft: { variant: "default" },
-  published: { variant: "primary" },
+  published: { variant: "brand" },
 };
 
 export function StatusBadge({ status }: { status: AgentStatus }): ReactElement {

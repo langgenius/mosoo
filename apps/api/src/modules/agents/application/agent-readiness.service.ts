@@ -5,24 +5,20 @@ import type {
   AgentReadinessIssue,
 } from "@mosoo/contracts/agent";
 import { getAgentBuiltInToolSupportError } from "@mosoo/contracts/agent";
-import type {
-  AgentPackageResolutionState,
-  AgentResolutionIssue,
-} from "@mosoo/contracts/agent-manifest";
+import type { AgentPackageResolutionState } from "@mosoo/contracts/agent-manifest";
 import {
   agentMcpBindingsTable,
   environmentRevisionsTable,
   environmentsTable,
   mcpServersTable,
 } from "@mosoo/db";
-import type { AccountId, AgentId, EnvironmentId, McpServerId, ProjectId } from "@mosoo/id";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import type { AgentId, EnvironmentId, McpServerId, ProjectId } from "@mosoo/id";
+import { and, eq, inArray } from "drizzle-orm";
 
-import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { toIsoString } from "../../../time";
 import { parseStoredEnvVarsJson } from "../../environments/application/environment-config";
-import { getSupportedRuntimeId } from "../../runtime/domain/runtime-config";
+import type { StoredEnvironmentVariable } from "../../environments/application/environment-types";
 import { collectRuntimeCapabilityIssues } from "./agent-runtime-capability-resolution.service";
 
 function createIssue(
@@ -37,10 +33,6 @@ function createIssue(
   };
 }
 
-function isSqliteEnabled(value: boolean | number | string): boolean {
-  return value === true || value === 1 || value === "1";
-}
-
 async function collectMcpIssues(
   database: D1Database,
   agentId: AgentId | null,
@@ -52,76 +44,58 @@ async function collectMcpIssues(
     }
 
     const requestedServerIds = [...new Set(snapshotServerIds)];
-    const results = await getAppDatabase(database)
+    const servers = await getAppDatabase(database)
       .select({
-        id: sql<string>`${mcpServersTable.id}`.as("id"),
-        serverEnabled: sql<boolean | number | string>`${mcpServersTable.enabled}`.as(
-          "serverEnabled",
-        ),
-        serverName: sql<string>`${mcpServersTable.name}`.as("serverName"),
+        enabled: mcpServersTable.enabled,
+        id: mcpServersTable.id,
+        name: mcpServersTable.name,
       })
       .from(mcpServersTable)
       .where(inArray(mcpServersTable.id, requestedServerIds))
       .all();
-
-    const resolvedIds = new Set(results.map((row) => row.id));
-    const missingIssues = requestedServerIds
-      .filter((serverId) => !resolvedIds.has(serverId))
-      .map((serverId) =>
-        createIssue(
-          "agent.mcp.invalid",
-          `MCP binding ${serverId} is enabled on the session snapshot, but the server no longer exists.`,
-        ),
-      );
+    const resolvedIds = new Set(servers.map((server) => server.id));
 
     return [
-      ...missingIssues,
-      ...results.flatMap((row) => {
-        if (isSqliteEnabled(row.serverEnabled)) {
-          return [];
-        }
-
-        return [
+      ...requestedServerIds
+        .filter((serverId) => !resolvedIds.has(serverId))
+        .map((serverId) =>
           createIssue(
             "agent.mcp.invalid",
-            `MCP binding ${row.serverName} is enabled on the session snapshot, but the server is disabled.`,
+            `MCP binding ${serverId} is enabled on the session snapshot, but the server no longer exists.`,
           ),
-        ];
-      }),
+        ),
+      ...servers
+        .filter((server) => !server.enabled)
+        .map((server) =>
+          createIssue(
+            "agent.mcp.invalid",
+            `MCP binding ${server.name} is enabled on the session snapshot, but the server is disabled.`,
+          ),
+        ),
     ];
   }
 
   if (agentId === null) return [];
 
-  const results = await getAppDatabase(database)
-    .select({
-      bindingEnabled: sql<boolean | number | string>`${agentMcpBindingsTable.enabled}`.as(
-        "bindingEnabled",
-      ),
-      serverEnabled: sql<boolean | number | string>`${mcpServersTable.enabled}`.as("serverEnabled"),
-      serverName: sql<string>`${mcpServersTable.name}`.as("serverName"),
-    })
+  const disabledServers = await getAppDatabase(database)
+    .select({ serverName: mcpServersTable.name })
     .from(agentMcpBindingsTable)
     .innerJoin(mcpServersTable, eq(mcpServersTable.id, agentMcpBindingsTable.serverId))
-    .where(eq(agentMcpBindingsTable.agentId, agentId))
+    .where(
+      and(
+        eq(agentMcpBindingsTable.agentId, agentId),
+        eq(agentMcpBindingsTable.enabled, true),
+        eq(mcpServersTable.enabled, false),
+      ),
+    )
     .all();
 
-  return results.flatMap((row) => {
-    if (!isSqliteEnabled(row.bindingEnabled)) {
-      return [];
-    }
-
-    if (!isSqliteEnabled(row.serverEnabled)) {
-      return [
-        createIssue(
-          "agent.mcp.invalid",
-          `MCP binding ${row.serverName} is enabled on the agent, but the server is disabled.`,
-        ),
-      ];
-    }
-
-    return [];
-  });
+  return disabledServers.map((server) =>
+    createIssue(
+      "agent.mcp.invalid",
+      `MCP binding ${server.serverName} is enabled on the agent, but the server is disabled.`,
+    ),
+  );
 }
 
 async function listBoundMcpServerNames(
@@ -157,52 +131,11 @@ async function listBoundMcpServerNames(
   return new Set(results.map((row) => row.serverName.toLowerCase()));
 }
 
-function isFilledEnvironmentValue(
-  environmentSecretNames: Set<string>,
-  key: string | null,
-): boolean {
-  if (key === null) {
-    return false;
-  }
-
-  return environmentSecretNames.has(key);
-}
-
-async function listEnvironmentSecretNames(
+async function listEnvironmentVariables(
   database: D1Database,
   environmentId: EnvironmentId | null,
-): Promise<Set<string>> {
-  if (environmentId === null || environmentId === "") {
-    return new Set();
-  }
-
-  const row = await getAppDatabase(database)
-    .select({ envVarsJson: environmentRevisionsTable.envVarsJson })
-    .from(environmentsTable)
-    .innerJoin(
-      environmentRevisionsTable,
-      eq(environmentRevisionsTable.id, environmentsTable.currentRevisionId),
-    )
-    .where(eq(environmentsTable.id, environmentId))
-    .limit(1)
-    .get();
-
-  if (!row) {
-    return new Set();
-  }
-
-  return new Set(
-    parseStoredEnvVarsJson(row.envVarsJson)
-      .filter((envVar) => envVar.secretId !== null)
-      .map((envVar) => envVar.key),
-  );
-}
-
-async function collectPendingEnvironmentSecretIssues(
-  database: D1Database,
-  environmentId: EnvironmentId | null,
-): Promise<AgentReadinessIssue[]> {
-  if (environmentId === null || environmentId === "") {
+): Promise<StoredEnvironmentVariable[]> {
+  if (!environmentId) {
     return [];
   }
 
@@ -217,18 +150,7 @@ async function collectPendingEnvironmentSecretIssues(
     .limit(1)
     .get();
 
-  if (!row) {
-    return [];
-  }
-
-  return parseStoredEnvVarsJson(row.envVarsJson)
-    .filter((envVar) => envVar.secretId === null)
-    .map((envVar) =>
-      createIssue(
-        "agent.environment_secret.pending",
-        `Environment variable ${envVar.key} must be configured before this Agent can run.`,
-      ),
-    );
+  return row ? parseStoredEnvVarsJson(row.envVarsJson) : [];
 }
 
 async function collectPackageResolutionIssues(
@@ -269,7 +191,8 @@ async function collectPackageResolutionIssues(
     if (
       issue.targetType === "environment" &&
       issue.code.includes("environment_secret") &&
-      isFilledEnvironmentValue(input.environmentSecretNames, issue.targetLabel)
+      issue.targetLabel !== null &&
+      input.environmentSecretNames.has(issue.targetLabel)
     ) {
       continue;
     }
@@ -310,34 +233,6 @@ async function collectPackageResolutionIssues(
   return issues;
 }
 
-function toReadinessIssue(issue: AgentResolutionIssue): AgentReadinessIssue {
-  return createIssue(
-    `agent.capability.${issue.code}`,
-    issue.actionLabel === undefined || issue.actionLabel === ""
-      ? issue.message
-      : `${issue.message} Next: ${issue.actionLabel}.`,
-    issue.severity === "error" ? "error" : "warning",
-  );
-}
-
-function dedupeReadinessIssues(issues: AgentReadinessIssue[]): AgentReadinessIssue[] {
-  const seen = new Set<string>();
-  const deduped: AgentReadinessIssue[] = [];
-
-  for (const issue of issues) {
-    const key = `${issue.code}:${issue.message}`;
-
-    if (seen.has(key)) {
-      continue;
-    }
-
-    seen.add(key);
-    deduped.push(issue);
-  }
-
-  return deduped;
-}
-
 export function formatAgentReadinessFailureMessage(
   prefix: string,
   readiness: Pick<AgentReadiness, "issues">,
@@ -351,14 +246,12 @@ export function formatAgentReadinessFailureMessage(
 
 export async function computeAgentReadiness(
   database: D1Database,
-  permissionPrincipalUserId: AccountId,
   input: {
     agentId: AgentId | null;
     builtInTools: readonly AgentBuiltInToolConfig[];
     environment: AgentEnvironmentConfig;
     model: string;
     packageResolution?: AgentPackageResolutionState | null;
-    bindings?: ApiBindings;
     mcpServerIds?: readonly McpServerId[];
     projectId: ProjectId;
     provider: string;
@@ -373,19 +266,8 @@ export async function computeAgentReadiness(
       ready: false,
     };
   }
-  const issues: AgentReadinessIssue[] = [];
-  if (getSupportedRuntimeId(input.runtimeId) === null) {
-    issues.push(
-      createIssue(
-        "agent.runtime.unsupported",
-        `Runtime ${input.runtimeId} is not supported by the current driver stack.`,
-      ),
-    );
-  }
 
   const capabilityIssues = await collectRuntimeCapabilityIssues({
-    actorAccountId: permissionPrincipalUserId,
-    ...(input.bindings === undefined ? {} : { bindings: input.bindings }),
     codePrefix: "agent.readiness",
     database,
     projectId: input.projectId,
@@ -395,28 +277,43 @@ export async function computeAgentReadiness(
       runtimeId: input.runtimeId,
     },
   });
-  issues.push(...capabilityIssues.map((issue) => toReadinessIssue(issue)));
-  issues.push(
+  const environmentVariables = await listEnvironmentVariables(
+    database,
+    input.environment.environmentId,
+  );
+  const issues: AgentReadinessIssue[] = [
+    ...capabilityIssues.map((issue) =>
+      createIssue(
+        `agent.capability.${issue.code}`,
+        issue.message,
+        issue.severity === "error" ? "error" : "warning",
+      ),
+    ),
     ...(await collectPackageResolutionIssues(database, {
       agentId: input.agentId,
       ...(input.mcpServerIds === undefined ? {} : { mcpServerIds: input.mcpServerIds }),
       environment: input.environment,
-      environmentSecretNames: await listEnvironmentSecretNames(
-        database,
-        input.environment.environmentId,
+      environmentSecretNames: new Set(
+        environmentVariables
+          .filter((envVar) => envVar.secretId !== null)
+          .map((envVar) => envVar.key),
       ),
       packageResolution: input.packageResolution,
     })),
-  );
-  issues.push(
-    ...(await collectPendingEnvironmentSecretIssues(database, input.environment.environmentId)),
-  );
-  issues.push(...(await collectMcpIssues(database, input.agentId, input.mcpServerIds)));
-  const dedupedIssues = dedupeReadinessIssues(issues);
+    ...environmentVariables
+      .filter((envVar) => envVar.secretId === null)
+      .map((envVar) =>
+        createIssue(
+          "agent.environment_secret.pending",
+          `Environment variable ${envVar.key} must be configured before this Agent can run.`,
+        ),
+      ),
+    ...(await collectMcpIssues(database, input.agentId, input.mcpServerIds)),
+  ];
 
   return {
     checkedAt: toIsoString(Date.now()),
-    issues: dedupedIssues,
-    ready: dedupedIssues.every((issue) => issue.severity !== "error"),
+    issues,
+    ready: issues.every((issue) => issue.severity !== "error"),
   };
 }

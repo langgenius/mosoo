@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import type { CSSProperties, ReactElement } from "react";
+import { useState } from "react";
+import type { ReactElement } from "react";
 
 import { cn } from "@/shared/lib/class-names";
 
@@ -37,23 +37,6 @@ interface Props {
 export function IconAvatar({ url, serverUrl, name, size = 40, className }: Props): ReactElement {
   const [errored, setErrored] = useState(false);
   const firstChar = (name.trim().at(0) ?? "?").toUpperCase();
-  const bg = hashToColor(name);
-  const placeholderStyle = useMemo<CSSProperties>(
-    () => ({
-      background: bg,
-      fontSize: Math.round(size * 0.4),
-      height: size,
-      width: size,
-    }),
-    [bg, size],
-  );
-  const imageFrameStyle = useMemo<CSSProperties>(
-    () => ({
-      height: size,
-      width: size,
-    }),
-    [size],
-  );
 
   const resolvedUrl =
     url !== undefined && url.length > 0 ? url : deriveDefaultFaviconUrl(serverUrl);
@@ -66,7 +49,12 @@ export function IconAvatar({ url, serverUrl, name, size = 40, className }: Props
           "rounded-lg flex items-center justify-center text-white font-semibold shrink-0",
           className,
         )}
-        style={placeholderStyle}
+        style={{
+          background: hashToColor(name),
+          fontSize: Math.round(size * 0.4),
+          height: size,
+          width: size,
+        }}
         aria-label={name}
       >
         {firstChar}
@@ -81,7 +69,7 @@ export function IconAvatar({ url, serverUrl, name, size = 40, className }: Props
         "flex items-center justify-center",
         className,
       )}
-      style={imageFrameStyle}
+      style={{ height: size, width: size }}
     >
       <img
         src={resolvedUrl}

@@ -3,10 +3,7 @@ import { describe, expect, test } from "bun:test";
 import { Hono } from "hono";
 
 import { registerDriverRoute } from "../src/adapters/http/routes/driver-route";
-import {
-  platformIdRouteErrorMessage,
-  platformIdRouteErrorResponse,
-} from "../src/adapters/http/routes/platform-id-route-error";
+import { platformIdRouteErrorMessage } from "../src/adapters/http/routes/platform-id-route-error";
 import { createRuntimeActionToken } from "../src/modules/runtime/infrastructure/runtime-boot-token";
 import type { ApiBindings, ApiGatewayEnvironment } from "../src/platform/cloudflare/worker-types";
 import {
@@ -28,16 +25,9 @@ describe("HTTP route platform ID errors", () => {
       "Agent ID must be a valid ULID.",
     );
     expect(platformIdRouteErrorMessage(new TypeError("Body stream already read."))).toBeNull();
-
-    const response = platformIdRouteErrorResponse(
-      new TypeError("Thread ID must be a ULID string."),
-      (message) => ({ error: message }),
-    );
-
-    expect(response?.status).toBe(400);
   });
 
-  test("maps malformed driver route IDs to 400", async () => {
+  test("rejects malformed driver route IDs as grant mismatches", async () => {
     const database = await createPublicHttpContractDatabase();
     const bindings = createPublicHttpTestBindings(database) as ApiBindings;
     const grant = await createRuntimeActionToken(bindings, {
@@ -53,9 +43,9 @@ describe("HTTP route platform ID errors", () => {
       createTestExecutionContext(),
     );
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(403);
     expect(await response.json()).toEqual({
-      error: "Skill snapshot ID must be a valid ULID.",
+      error: "Runtime action grant does not match this skill snapshot.",
     });
   });
 });

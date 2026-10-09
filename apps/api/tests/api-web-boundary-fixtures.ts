@@ -93,7 +93,7 @@ function objectSchemaProperties(schema: Record<string, unknown>): Record<string,
 }
 
 export function openApiSchemaProperties(schemaName: string): Record<string, unknown> {
-  const document = createPublicApiOpenApiDocument("https://api.example.com");
+  const document = createPublicApiOpenApiDocument("https://api.example.com", "v1");
   const schema = document.components.schemas[schemaName];
 
   if (!schema) {
@@ -103,27 +103,12 @@ export function openApiSchemaProperties(schemaName: string): Record<string, unkn
   return objectSchemaProperties(schema);
 }
 
-export function openApiJsonRequestExample(path: string, method: "post"): unknown {
-  const document = createPublicApiOpenApiDocument("https://api.example.com");
-  const operation = document.paths[path]?.[method];
-
-  if (!operation) {
-    throw new Error(`Expected ${method.toUpperCase()} ${path} OpenAPI operation.`);
-  }
-
-  const requestBody = requireRecord(operation.requestBody, `${method} ${path} request body`);
-  const content = requireRecord(requestBody["content"], `${method} ${path} request content`);
-  const jsonContent = requireRecord(content["application/json"], `${method} ${path} JSON content`);
-
-  return jsonContent["example"];
-}
-
 function openApiJsonResponseContent(
   path: string,
   method: "get" | "post" | "put",
   status: string,
 ): Record<string, unknown> {
-  const document = createPublicApiOpenApiDocument("https://api.example.com");
+  const document = createPublicApiOpenApiDocument("https://api.example.com", "v1");
   const operation = document.paths[path]?.[method];
 
   if (!operation) {
@@ -156,7 +141,7 @@ function requireRecord(value: unknown, description: string): Record<string, unkn
 }
 
 export function publicThreadRequestExamples(): Array<[string, unknown]> {
-  const document = createPublicApiOpenApiDocument("https://api.example.com");
+  const document = createPublicApiOpenApiDocument("https://api.example.com", "v1");
   const threadOperation = document.paths["/agents/{agentId}/threads"]?.post;
 
   if (!threadOperation) {

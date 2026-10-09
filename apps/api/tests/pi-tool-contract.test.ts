@@ -7,8 +7,13 @@ import {
 } from "@mosoo/ag-ui-session";
 import { createPlatformId } from "@mosoo/id";
 import { PLATFORM_ID_FIXTURES } from "@mosoo/id/testing";
-import { projectRuntimeEventToAgUiSessionEvents, toRuntimeEventInput } from "@mosoo/runtime-events";
+import {
+  parseRuntimeEventEnvelope,
+  projectRuntimeEventToAgUiSessionEvents,
+} from "@mosoo/runtime-events";
 
+import { toRuntimeEventInput } from "../../driver/src/protocol/events/runtime-events";
+import type { RuntimeEventBuildContext } from "../../driver/src/protocol/events/runtime-events";
 import type { JsonObject } from "../../driver/src/protocol/json";
 import { PiEventTranslator } from "../../driver/src/runtimes/pi/pi-event-translator";
 import { createSessionRuntimeEventProjection } from "../src/modules/sessions/domain/session-runtime-event-projection";
@@ -35,9 +40,9 @@ function createHarness() {
             runId: PLATFORM_ID_FIXTURES.sessionRun,
             runtimeId: "pi-runtime",
             sessionId: PLATFORM_ID_FIXTURES.session,
-          },
+          } as unknown as RuntimeEventBuildContext,
           event,
-        ),
+        ).map(parseRuntimeEventEnvelope),
       );
       const deliveryEvents = runtimeEvents.flatMap(projectRuntimeEventToAgUiSessionEvents);
       state = applyAgUiEventsToSessionLiveState(state, deliveryEvents);

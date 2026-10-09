@@ -1,12 +1,6 @@
-import { MOSOO_CONSOLE_ORIGIN } from "@mosoo/contracts/origin";
-
-import { HELP_DOCS_BASE_URL } from "@/shared/config/help-docs";
+import { MOSOO_DOCS_BASE_URL } from "@/shared/config/external-links";
 
 export const INSTALL_COMMAND = "curl -fsSL https://install.mosoo.ai/install.sh | bash";
-
-function currentOrigin(): string {
-  return globalThis.window !== undefined ? globalThis.location.origin : MOSOO_CONSOLE_ORIGIN;
-}
 
 /**
  * Copy-ready onboarding instruction for any coding agent (Codex, Claude Code,
@@ -17,12 +11,11 @@ function currentOrigin(): string {
  * its own token through the browser login callback.
  */
 export function buildOnboardingSetupPrompt(
-  origin: string = currentOrigin(),
-  t: (key: string, variables?: Record<string, string>) => string = (key) => key,
+  t: (key: string, variables?: Record<string, string>) => string,
 ): string {
   return t("projectOverview.setupPrompt", {
-    docsUrl: HELP_DOCS_BASE_URL,
+    docsUrl: MOSOO_DOCS_BASE_URL,
     installCommand: INSTALL_COMMAND,
-    origin,
+    origin: globalThis.location.origin,
   });
 }

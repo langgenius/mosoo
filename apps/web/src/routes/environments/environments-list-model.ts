@@ -13,6 +13,6 @@ export function filterEnvironments(
   return environments.filter(
     (environment) =>
       environment.name.toLowerCase().includes(query) ||
-      (environment.description ?? "").toLowerCase().includes(query),
+      environment.description.toLowerCase().includes(query),
   );
 }

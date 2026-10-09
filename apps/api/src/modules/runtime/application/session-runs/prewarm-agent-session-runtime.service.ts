@@ -6,14 +6,13 @@ import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { isApiError } from "../../../../platform/errors";
 import type { AuthenticatedViewer } from "../../../auth/application/viewer-auth.service";
 import { assertPreviewAvailable } from "../../../sessions/infrastructure/preview-retention.repository";
-import { getSupportedRuntimeId } from "../../domain/runtime-config";
 import { prewarmDriverSession } from "../../infrastructure/driver-session.service";
-import { createRuntimeSubjectLifecycleService } from "../../infrastructure/runtime-subject-lifecycle/runtime-subject-lifecycle.service";
+import { activateRuntimeSubject } from "../../infrastructure/runtime-subject-lifecycle/runtime-subject-lifecycle.service";
 import { resolveRuntimeSubjectNetworkConstraints } from "../../infrastructure/runtime-subject-lifecycle/runtime-subject-network";
 import type { ExecutionSessionHandle, SandboxHandle } from "../../infrastructure/sandbox-handles";
-import { ensureSandboxConversationSession } from "../../infrastructure/sandbox-session.service";
-import { hasActiveSessionRun } from "../../infrastructure/session-runs/session-run-store.repository";
-import { hydrateCachedRunContextFromSession } from "../session-definition/hydrate-run-context.service";
+import { ensureSandboxConversationSession } from "../../infrastructure/sandbox-session/sandbox-conversation-session.service";
+import { getActiveSessionRunSummary } from "../../infrastructure/session-runs/session-run-store.repository";
+import { hydrateRunContextFromSession } from "../session-definition/hydrate-run-context.service";
 import {
   appendSessionRuntimeTimingEvent,
   createRuntimeTimingRecorder,
@@ -22,7 +21,6 @@ import {
 interface AgentSessionRuntimePrewarmRequest {
   accessViewer?: AuthenticatedViewer;
   bindings: ApiBindings;
-  failureMode?: "best_effort" | "fail_fast";
   requestUrl: string;
   session: {
     id: SessionId;
@@ -31,7 +29,8 @@ interface AgentSessionRuntimePrewarmRequest {
   viewer: AuthenticatedViewer;
 }
 
-export async function prewarmAgentSessionRuntime(
+// Best effort: failures are logged, never thrown.
+async function prewarmAgentSessionRuntime(
   request: AgentSessionRuntimePrewarmRequest,
 ): Promise<void> {
   const { accessViewer, bindings, session, viewer } = request;
@@ -53,7 +52,7 @@ export async function prewarmAgentSessionRuntime(
 
   try {
     await assertPreviewAvailable(bindings.DB, session.id, Date.now());
-    if (await hasActiveSessionRun(bindings.DB, session.id)) {
+    if ((await getActiveSessionRunSummary(bindings.DB, session.id)) !== null) {
       logInfo("session.runtime.prewarm.skipped", {
         reason: "active_run_present",
         sessionId: session.id,
@@ -62,27 +61,21 @@ export async function prewarmAgentSessionRuntime(
     }
 
     const hydrated = await timing.measure("hydrateRunContext", () =>
-      hydrateCachedRunContextFromSession(bindings, viewer, {
+      hydrateRunContextFromSession(bindings, viewer, {
         id: session.id,
         projectId: session.projectId,
         ...(accessViewer ? { accessViewer } : {}),
       }),
     );
-    const runtimeId = getSupportedRuntimeId(hydrated.value.profile.runtimeId);
-
-    if (runtimeId === null) {
-      throw new Error(`Unsupported runtime: ${hydrated.value.profile.runtimeId}.`);
-    }
-
-    const sandboxId = hydrated.value.profile.sandbox.id;
-    const { subject: sandbox } = await timing.measure("activateRuntimeSubject", () =>
-      createRuntimeSubjectLifecycleService(bindings).activate({
-        runtimeId,
-        agentId: hydrated.value.profile.agentId,
-        executionOwnerUserId: hydrated.value.profile.session.origin.executionOwnerUserId,
+    const runtimeId = hydrated.profile.runtimeId;
+    const sandboxId = hydrated.profile.sandbox.id;
+    const sandbox = await timing.measure("activateRuntimeSubject", () =>
+      activateRuntimeSubject(bindings, {
+        agentId: hydrated.profile.agentId,
+        executionOwnerUserId: hydrated.profile.session.origin.executionOwnerUserId,
         networkConstraints: resolveRuntimeSubjectNetworkConstraints(bindings, {
-          envVars: hydrated.value.profile.envVars,
-          network: hydrated.value.profile.network,
+          envVars: hydrated.profile.envVars,
+          network: hydrated.profile.network,
           requestUrl: request.requestUrl,
         }),
         runtimeSubjectId: sandboxId,
@@ -96,9 +89,8 @@ export async function prewarmAgentSessionRuntime(
 
     const executionSession = await timing.measure("ensureSandboxConversationSession", () =>
       ensureSandboxConversationSession(bindings, {
-        agentId: hydrated.value.profile.configRevision.agentId,
         mountSessionResources: false,
-        origin: hydrated.value.profile.session.origin,
+        origin: hydrated.profile.session.origin,
         sandbox,
         sandboxId,
         sessionId: session.id,
@@ -107,7 +99,7 @@ export async function prewarmAgentSessionRuntime(
     );
     handles.executionSession = executionSession.cloudflareSession;
 
-    if (await hasActiveSessionRun(bindings.DB, session.id)) {
+    if ((await getActiveSessionRunSummary(bindings.DB, session.id)) !== null) {
       logInfo("session.runtime.prewarm.skipped", {
         reason: "active_run_present_after_session_prepare",
         sessionId: session.id,
@@ -116,25 +108,24 @@ export async function prewarmAgentSessionRuntime(
     }
 
     const driverProfile = {
-      ...hydrated.value.profile,
+      ...hydrated.profile,
       session: {
-        ...hydrated.value.profile.session,
+        ...hydrated.profile.session,
         sandboxSessionId: executionSession.sandboxSessionId,
-        homePath: hydrated.value.profile.session.homePath,
+        homePath: hydrated.profile.session.homePath,
         origin: executionSession.origin,
         sessionOrganizationPath: executionSession.cwd,
       },
     };
     const driverPrewarm = await timing.measure("prewarmDriverSession", () =>
       prewarmDriverSession(bindings, request.requestUrl, {
-        builtInTools: hydrated.value.builtInTools,
+        builtInTools: hydrated.builtInTools,
         cloudflareSession: executionSession.cloudflareSession,
         profile: driverProfile,
-        resolvedMcpServers: hydrated.value.mcpServers,
-        resolvedSkillCatalog: hydrated.value.skillCatalog,
-        resolvedSkills: hydrated.value.skills,
+        resolvedMcpServers: hydrated.mcpServers,
+        resolvedSkillCatalog: hydrated.skillCatalog,
+        resolvedSkills: hydrated.skills,
         sandbox,
-        sandboxSessionId: session.id,
         sessionId: session.id,
       }),
     );
@@ -157,7 +148,6 @@ export async function prewarmAgentSessionRuntime(
       timing: timingSnapshot,
     });
     logInfo("session.runtime.prewarm.completed", {
-      cacheHit: hydrated.cacheHit,
       driverInstanceId: driverPrewarm.driverInstanceId,
       driverPrewarm: "ready",
       runtimeId,
@@ -165,11 +155,7 @@ export async function prewarmAgentSessionRuntime(
       timings: timingSnapshot,
     });
   } catch (error) {
-    if (
-      request.failureMode !== "fail_fast" &&
-      isApiError(error) &&
-      error.code === "AGENT_SESSION_NOT_READY"
-    ) {
+    if (isApiError(error) && error.code === "AGENT_SESSION_NOT_READY") {
       logInfo("session.runtime.prewarm.skipped", {
         message: error.message,
         reason: "agent_not_ready",
@@ -182,9 +168,6 @@ export async function prewarmAgentSessionRuntime(
       message: error instanceof Error ? error.message : "Session runtime prewarm failed.",
       sessionId: session.id,
     });
-    if (request.failureMode === "fail_fast") {
-      throw error;
-    }
   } finally {
     disposeRpcResource(handles.executionSession);
     disposeRpcResource(handles.subject);
@@ -200,10 +183,5 @@ export function scheduleAgentSessionRuntimePrewarm(
     return;
   }
 
-  input.executionContext.waitUntil(
-    prewarmAgentSessionRuntime({
-      ...input,
-      failureMode: "best_effort",
-    }),
-  );
+  input.executionContext.waitUntil(prewarmAgentSessionRuntime(input));
 }

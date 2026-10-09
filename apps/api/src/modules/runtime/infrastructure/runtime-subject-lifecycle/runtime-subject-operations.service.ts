@@ -1,103 +1,32 @@
-import type { SandboxId } from "@mosoo/id";
-import { RUNTIME_DIAGNOSTIC_EVENT } from "@mosoo/runtime-events";
+import type { RunError, SessionRunStatus } from "@mosoo/contracts/session-run";
+import type { RuntimeOperationId, SandboxId, SessionId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
-import type { RuntimeSubjectOperationInput } from "../../application/execution-plane/execution-plane-adapter";
-import {
-  appendOneRuntimeDiagnosticEventPerSession,
-  toRuntimeDiagnosticBaseValue,
-  toRuntimeDiagnosticReason,
-} from "../../application/runtime-diagnostic-events";
-import { appendRuntimeSubjectTerminatedEvents } from "../../application/runtime-state-operation-target-events";
 import { stopRuntimeSubjectDrivers } from "./runtime-subject-driver-stop";
-import {
-  getRuntimeSubjectErrorCode,
-  getRuntimeSubjectOperationErrorCode,
-  RuntimeSubjectCheckpointFailedError,
-} from "./runtime-subject-errors";
+import { closeRuntimeSubjectSessionsForRecycle } from "./runtime-subject-maintenance-store";
 import { destroyRuntimeSubjectContainer } from "./runtime-subject-platform";
 import {
   advanceRuntimeSubjectOperationStatus,
-  assertExclusiveSessionRuntimeSubject,
-  closeRuntimeSubjectSessionsForRecycle,
-  getRuntimeSubject,
   markRuntimeSubjectCold,
   markRuntimeSubjectOperationStarted,
   markRuntimeSubjectOperationRepairNeeded,
-} from "./runtime-subject-store";
+} from "./runtime-subject-record-store";
 
-export { stopRuntimeSubjectDrivers } from "./runtime-subject-driver-stop";
-
-function getRuntimeOperationErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "Runtime state operation failed.";
-}
-
-async function appendCheckpointFailureDiagnostics(
-  bindings: ApiBindings,
-  input: {
-    readonly error: unknown;
-    readonly runtimeSubjectId: SandboxId;
-    readonly targets: RuntimeSubjectOperationInput["targets"];
-  },
-): Promise<void> {
-  const errorCode = getRuntimeSubjectErrorCode(input.error);
-
-  if (errorCode !== "runtime.subject_checkpoint_failed") {
-    return;
-  }
-
-  await appendOneRuntimeDiagnosticEventPerSession(bindings, {
-    events: input.targets.flatMap((target) => {
-      return [
-        {
-          eventName: RUNTIME_DIAGNOSTIC_EVENT.sandboxCheckpointFailed.name,
-          sessionId: target.sessionId,
-          value: {
-            ...toRuntimeDiagnosticBaseValue({
-              agentId: target.agentId,
-              sessionId: target.sessionId,
-            }),
-            backupId:
-              input.error instanceof RuntimeSubjectCheckpointFailedError
-                ? input.error.backupId
-                : null,
-            dir:
-              input.error instanceof RuntimeSubjectCheckpointFailedError ? input.error.dir : null,
-            errorCode,
-            reason: toRuntimeDiagnosticReason(input.error, "Runtime subject checkpoint failed."),
-            sandboxId: input.runtimeSubjectId,
-          },
-        },
-      ];
-    }),
-  });
-}
-
-async function appendTerminatedEventsForRuntimeSubject(
-  bindings: ApiBindings,
-  input: {
-    readonly reason: string;
-    readonly runtimeSubjectId: SandboxId;
-    readonly targets: RuntimeSubjectOperationInput["targets"];
-  },
-): Promise<void> {
-  await appendRuntimeSubjectTerminatedEvents(bindings, {
-    reason: input.reason,
-    runtimeSubjectId: input.runtimeSubjectId,
-    targets: input.targets,
-  });
+export interface RuntimeSubjectOperationInput {
+  operationId: RuntimeOperationId;
+  runtimeSubjectId: SandboxId;
+  reason: string;
+  targets: readonly { readonly sessionId: SessionId }[];
+  terminalRun: {
+    error?: RunError | null;
+    status: Extract<SessionRunStatus, "cancelled" | "failed">;
+  };
 }
 
 export async function recreateRuntimeSubjectPreservingState(
   bindings: ApiBindings,
   input: RuntimeSubjectOperationInput,
 ): Promise<void> {
-  const subject = await getRuntimeSubject(bindings.DB, input.runtimeSubjectId);
-
-  if (!subject) {
-    return;
-  }
-
   let destroyStarted = false;
 
   const started = await markRuntimeSubjectOperationStarted(bindings.DB, {
@@ -128,19 +57,9 @@ export async function recreateRuntimeSubjectPreservingState(
     if (!destroyStarted) {
       throw new Error("Runtime subject changed before destroy.");
     }
-    await assertExclusiveSessionRuntimeSubject(bindings.DB, input.runtimeSubjectId, {
-      id: input.operationId ?? null,
-      status: "destroying",
-    });
     await destroyRuntimeSubjectContainer(bindings, input.runtimeSubjectId);
-    await appendTerminatedEventsForRuntimeSubject(bindings, {
-      reason: input.reason,
-      runtimeSubjectId: input.runtimeSubjectId,
-      targets: input.targets,
-    });
     await closeRuntimeSubjectSessionsForRecycle(bindings.DB, input.runtimeSubjectId);
     const completed = await markRuntimeSubjectCold(bindings.DB, {
-      clearBackups: true,
       expectedStatus: "destroying",
       operationId: input.operationId,
       runtimeSubjectId: input.runtimeSubjectId,
@@ -149,18 +68,11 @@ export async function recreateRuntimeSubjectPreservingState(
       throw new Error("Runtime subject changed before recreate completion.");
     }
   } catch (error) {
-    await appendCheckpointFailureDiagnostics(bindings, {
-      error,
-      runtimeSubjectId: input.runtimeSubjectId,
-      targets: input.targets,
-    });
     await markRuntimeSubjectOperationRepairNeeded(bindings.DB, {
-      errorCode: getRuntimeSubjectOperationErrorCode(error),
-      errorMessage: getRuntimeOperationErrorMessage(error),
+      errorMessage: error instanceof Error ? error.message : "Runtime state operation failed.",
       expectedStatus: destroyStarted ? "destroying" : "backing_up",
       operationId: input.operationId,
       runtimeSubjectId: input.runtimeSubjectId,
-      source: "api",
     });
     throw error;
   }

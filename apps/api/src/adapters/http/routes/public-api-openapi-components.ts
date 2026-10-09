@@ -15,7 +15,7 @@ function jsonResponse(description: string, schema: Record<string, unknown>) {
   };
 }
 
-export function createPublicApiOpenApiComponents(apiVersion: PublicApiVersion = "v1") {
+export function createPublicApiOpenApiComponents(apiVersion: PublicApiVersion) {
   return {
     responses: {
       Conflict: jsonResponse(

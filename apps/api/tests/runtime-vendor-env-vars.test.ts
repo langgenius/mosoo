@@ -17,7 +17,6 @@ import type { DriverVendorCredentialProfile } from "../src/modules/runtime/domai
 import { verifyRuntimeActionToken } from "../src/modules/runtime/infrastructure/runtime-boot-token";
 import { sanitizeRuntimeVendorEnvVars } from "../src/modules/runtime/infrastructure/runtime-sandbox-provisioning/runtime-vendor-env-policy";
 import { buildVendorProxyEnvVars } from "../src/modules/runtime/infrastructure/runtime-sandbox-provisioning/runtime-vendor-proxy-env.builder";
-import { toArrayBuffer, toBase64Url } from "../src/shared/bytes";
 
 const BINDINGS = { RUNTIME_ACTION_TOKEN_SECRET: "test-runtime-action-token" };
 const DRIVER_GENERATION = 3;
@@ -32,34 +31,6 @@ const CREDENTIAL_ID = parsePlatformId<VendorCredentialId>(
 );
 const REQUEST_URL = "https://api.example.com/api/agents/run?probe=1";
 const PROXY_URL = `https://api.example.com/api/driver/llm/proxy/${CREDENTIAL_ID}`;
-
-async function createLegacyLlmProxyGrant(): Promise<string> {
-  const encoder = new TextEncoder();
-  const payload = toBase64Url(
-    encoder.encode(
-      JSON.stringify({
-        action: "llm_proxy",
-        appId: PROJECT_ID,
-        driverGeneration: DRIVER_GENERATION,
-        driverInstanceId: DRIVER_INSTANCE_ID,
-        expiresAt: Date.now() + 60_000,
-        modelId: "gpt-5.1",
-        modelProtocol: "openai-responses",
-        resourceId: CREDENTIAL_ID,
-      }),
-    ),
-  );
-  const key = await crypto.subtle.importKey(
-    "raw",
-    toArrayBuffer(encoder.encode(BINDINGS.RUNTIME_ACTION_TOKEN_SECRET)),
-    { hash: "SHA-256", name: "HMAC" },
-    false,
-    ["sign"],
-  );
-  const signature = await crypto.subtle.sign("HMAC", key, toArrayBuffer(encoder.encode(payload)));
-
-  return `${payload}.${toBase64Url(new Uint8Array(signature))}`;
-}
 
 function vendorCredential(
   overrides: Partial<DriverVendorCredentialProfile> & { vendorId: string },
@@ -102,15 +73,6 @@ function parseOpenCodeConfig(envVars: Record<string, string>): Record<string, un
 }
 
 describe("runtime vendor proxy env vars", () => {
-  test("accepts an unexpired pre-Project LLM proxy grant during rolling deploys", async () => {
-    const grant = await createLegacyLlmProxyGrant();
-
-    await expect(verifyRuntimeActionToken(BINDINGS, grant)).resolves.toMatchObject({
-      action: "llm_proxy",
-      projectId: PROJECT_ID,
-    });
-  });
-
   test("removes every runtime-managed provider variable before sandbox setup", () => {
     expect(
       sanitizeRuntimeVendorEnvVars({
@@ -338,46 +300,6 @@ describe("runtime vendor proxy env vars", () => {
     });
   });
 
-  test("fails closed before minting grants for unsafe stored API bases", async () => {
-    await expect(
-      buildVendorProxyEnvVars({
-        bindings: BINDINGS,
-        driverGeneration: DRIVER_GENERATION,
-        driverInstanceId: DRIVER_INSTANCE_ID,
-        profile: {
-          model: "gpt-5.4",
-          runtimeId: "openai-runtime",
-          vendorCredential: vendorCredential({
-            apiBase: "http://api.example.com/v1",
-            vendorId: "openai",
-          }),
-        },
-        requestUrl: REQUEST_URL,
-      }),
-    ).rejects.toThrow("Custom endpoint must use HTTPS.");
-  });
-
-  test("fails closed before minting grants for trailing-dot localhost API bases", async () => {
-    await expect(
-      buildVendorProxyEnvVars({
-        bindings: BINDINGS,
-        driverGeneration: DRIVER_GENERATION,
-        driverInstanceId: DRIVER_INSTANCE_ID,
-        profile: {
-          model: "gpt-5.4",
-          runtimeId: "openai-runtime",
-          vendorCredential: vendorCredential({
-            apiBase: "https://localhost./v1",
-            vendorId: "openai",
-          }),
-        },
-        requestUrl: REQUEST_URL,
-      }),
-    ).rejects.toThrow(
-      "Custom endpoint cannot target local, private, metadata, or credential-bearing URLs.",
-    );
-  });
-
   test("accepts custom API base query semantics for control-plane forwarding", async () => {
     const envVars = await buildVendorProxyEnvVars({
       bindings: BINDINGS,
@@ -399,35 +321,6 @@ describe("runtime vendor proxy env vars", () => {
       modelId: "gpt-custom",
       modelProtocol: "openai-responses",
     });
-  });
-
-  test.each([
-    "https://gateway.example.com/v1#responses",
-    "https://gateway.example.com/v1/../admin",
-    "https://gateway.example.com/v1/%2e%2e/admin",
-    "https://gateway.example.com/v1//admin",
-    "https://gateway.example.com/v1%2fadmin",
-    "https://gateway.example.com/v1%5cadmin",
-    "https://gateway.example.com/v1%252fadmin",
-    "https://gateway.example.com/v1\\admin",
-  ])("rejects non-canonical proxy base paths: %s", async (apiBase) => {
-    await expect(
-      buildVendorProxyEnvVars({
-        bindings: BINDINGS,
-        driverGeneration: DRIVER_GENERATION,
-        driverInstanceId: DRIVER_INSTANCE_ID,
-        profile: {
-          model: "gpt-custom",
-          runtimeId: "openai-runtime",
-          vendorCredential: vendorCredential({
-            apiBase,
-            models: ["gpt-custom"],
-            vendorId: "openai-compatible",
-          }),
-        },
-        requestUrl: REQUEST_URL,
-      }),
-    ).rejects.toThrow("Custom endpoint path is not canonical for runtime proxying.");
   });
 
   test("rejects an unsupported runtime/provider before rendering proxy configuration", async () => {

@@ -7,11 +7,9 @@ import {
   updateAgentConfig,
 } from "../src/modules/agents/application/agent-command.service";
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
-import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import {
   PUBLIC_API_TEST_IDS,
   createPublicHttpContractDatabase,
-  createPublicHttpTestBindings,
   nowMsForTest,
 } from "./helpers/public-api-http-test-fixture";
 
@@ -29,20 +27,6 @@ const INITIAL_CONFIG_JSON = JSON.stringify({
   packageResolution: null,
   packageSkills: [],
 });
-
-async function withProviderProbeMock<T>(operation: () => Promise<T>): Promise<T> {
-  const originalFetch = globalThis.fetch;
-  globalThis.fetch = async () =>
-    Response.json({
-      data: [{ id: "gpt-5.4" }],
-    });
-
-  try {
-    return await operation();
-  } finally {
-    globalThis.fetch = originalFetch;
-  }
-}
 
 describe("agent deployment version atomicity", () => {
   test("publish writes status, deployment version, and live pointer together", async () => {
@@ -73,12 +57,10 @@ describe("agent deployment version atomicity", () => {
       })
       .run();
 
-    const published = await withProviderProbeMock(() =>
-      publishAgent(createPublicHttpTestBindings(database) as ApiBindings, OWNER_VIEWER, {
-        agentId: DRAFT_AGENT_ID,
-        projectId: PUBLIC_API_TEST_IDS.project,
-      }),
-    );
+    const published = await publishAgent(database, OWNER_VIEWER, {
+      agentId: DRAFT_AGENT_ID,
+      projectId: PUBLIC_API_TEST_IDS.project,
+    });
 
     const row = await database
       .prepare(

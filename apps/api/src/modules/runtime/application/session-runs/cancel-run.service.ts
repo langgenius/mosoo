@@ -1,16 +1,8 @@
 import type { RuntimeCommand } from "@mosoo/contracts/runtime-command";
 import type { SessionRunSummary } from "@mosoo/contracts/session-run";
-import { sessionRunsTable, sessionsTable } from "@mosoo/db";
-import { createPlatformId, parsePlatformId } from "@mosoo/id";
-import type {
-  AccountId,
-  DriverCommandId,
-  DriverInstanceId,
-  ProjectId,
-  RuntimeEventId,
-  SessionId,
-  SessionRunId,
-} from "@mosoo/id";
+import { sessionRunsTable } from "@mosoo/db";
+import { createPlatformId } from "@mosoo/id";
+import type { DriverCommandId, SessionId, SessionRunId } from "@mosoo/id";
 import { and, eq } from "drizzle-orm";
 
 import { logInfo } from "../../../../platform/cloudflare/logger";
@@ -18,77 +10,41 @@ import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../../platform/db/drizzle";
 import { isTruthy } from "../../../../shared/truthiness";
 import type { AuthenticatedViewer } from "../../../auth/application/viewer-auth.service";
-import { ensureProjectOwnership } from "../../../projects/application/project.service";
 import { appendSessionRuntimeEvents } from "../../../sessions/application/session-event-write.service";
-import { sessionParticipantCondition } from "../../../sessions/domain/session-access.policy";
+import { isTerminalSessionRunStatus } from "../../domain/session-run-lifecycle.machine";
 import { sendDriverInstanceCommand } from "../../infrastructure/driver-instance/client";
 import { isDriverControlSocketMissingError } from "../../infrastructure/driver-session-stop-errors";
 import { expireUndeliveredInputStartCommandsForRun } from "../../infrastructure/session-runs/runtime-command-store.repository";
+import { sessionRunSummaryColumns } from "../../infrastructure/session-runs/session-run-read.repository";
 import { toSessionRunSummary } from "../../infrastructure/session-runs/session-run-row.mapper";
-import type { SessionRunRow } from "../../infrastructure/session-runs/session-run-row.mapper";
 import {
   getSessionRunSummary,
   setSessionRunStatus,
 } from "../../infrastructure/session-runs/session-run-store.repository";
 import { createCancelledSessionRunRuntimeEvent } from "./session-run-view-events.service";
 interface CancelSessionRunInput {
-  projectId: ProjectId;
   runId: SessionRunId;
   sessionId: SessionId;
 }
 
-async function getOwnedSessionRun(
-  database: D1Database,
-  viewerId: AccountId,
-  input: CancelSessionRunInput,
-): Promise<{
-  driverInstanceId: DriverInstanceId | null;
-  run: SessionRunSummary;
-  sessionId: SessionId;
-} | null> {
+// The caller authorized the Session; the Run id can come from the client, so scope it to that Session.
+async function getSessionRun(database: D1Database, input: CancelSessionRunInput) {
   const row =
     (await getAppDatabase(database)
       .select({
-        completed_at: sessionRunsTable.completedAt,
-        created_at: sessionRunsTable.createdAt,
-        deployment_version_id: sessionRunsTable.deploymentVersionId,
-        deployment_version_number: sessionRunsTable.deploymentVersionNumber,
+        ...sessionRunSummaryColumns(),
         driver_instance_id: sessionRunsTable.driverInstanceId,
-        error_code: sessionRunsTable.errorCode,
-        error_details_json: sessionRunsTable.errorDetailsJson,
-        error_message: sessionRunsTable.errorMessage,
-        id: sessionRunsTable.id,
-        model: sessionRunsTable.model,
-        provider: sessionRunsTable.provider,
-        session_id: sessionRunsTable.sessionId,
-        started_at: sessionRunsTable.startedAt,
-        status: sessionRunsTable.status,
-        trace_id: sessionRunsTable.traceId,
-        trigger: sessionRunsTable.trigger,
-        updated_at: sessionRunsTable.updatedAt,
       })
       .from(sessionRunsTable)
-      .innerJoin(sessionsTable, eq(sessionsTable.id, sessionRunsTable.sessionId))
       .where(
-        and(
-          eq(sessionRunsTable.id, input.runId),
-          eq(sessionRunsTable.sessionId, input.sessionId),
-          eq(sessionsTable.projectId, input.projectId),
-          sessionParticipantCondition(viewerId),
-        ),
+        and(eq(sessionRunsTable.id, input.runId), eq(sessionRunsTable.sessionId, input.sessionId)),
       )
       .limit(1)
       .get()) ?? null;
 
-  if (!row) {
-    return null;
-  }
-
-  return {
-    driverInstanceId: row.driver_instance_id,
-    run: toSessionRunSummary(row satisfies SessionRunRow),
-    sessionId: row.session_id,
-  };
+  return row === null
+    ? null
+    : { driverInstanceId: row.driver_instance_id, run: toSessionRunSummary(row) };
 }
 
 export async function cancelRun(
@@ -97,47 +53,17 @@ export async function cancelRun(
   input: CancelSessionRunInput,
 ): Promise<{ run: SessionRunSummary }> {
   const database = bindings.DB;
-  const runId = parsePlatformId<SessionRunId>(input.runId, "run id");
-  const sessionId = parsePlatformId<SessionId>(input.sessionId, "session id");
-  const projectId = parsePlatformId<ProjectId>(input.projectId, "project id");
-  const viewerId = parsePlatformId<AccountId>(viewer.id, "viewer id");
-  await ensureProjectOwnership(database, viewerId, projectId);
-  const run = await getOwnedSessionRun(database, viewerId, { projectId, runId, sessionId });
+  const { runId, sessionId } = input;
+  const sessionRun = await getSessionRun(database, input);
 
-  if (run === null) {
+  if (sessionRun === null) {
     throw new Error("Session run not found.");
   }
 
-  const currentRun = run.run;
+  const { driverInstanceId, run: currentRun } = sessionRun;
+  const alreadyTerminal = isTerminalSessionRunStatus(currentRun.status);
 
-  if (
-    currentRun.status === "completed" ||
-    currentRun.status === "failed" ||
-    currentRun.status === "cancelled" ||
-    currentRun.status === "expired"
-  ) {
-    logInfo("session.turn.cancel.ignored", {
-      driverInstanceId: run.driverInstanceId,
-      runId,
-      sessionId: run.sessionId,
-      status: currentRun.status,
-      traceId: currentRun.traceId,
-      viewerId: viewer.id,
-    });
-
-    if (isTruthy(run.driverInstanceId)) {
-      await expireUndeliveredInputStartCommandsForRun(database, {
-        driverInstanceId: run.driverInstanceId,
-        runId,
-      });
-    }
-
-    return {
-      run: currentRun,
-    };
-  }
-
-  if (isTruthy(run.driverInstanceId)) {
+  if (!alreadyTerminal && isTruthy(driverInstanceId)) {
     const command: RuntimeCommand = {
       commandId: createPlatformId<DriverCommandId>(),
       kind: "turn.cancel",
@@ -145,7 +71,7 @@ export async function cancelRun(
     };
 
     try {
-      await sendDriverInstanceCommand(bindings, run.driverInstanceId, command);
+      await sendDriverInstanceCommand(bindings, driverInstanceId, command);
     } catch (error) {
       if (!isDriverControlSocketMissingError(error)) {
         throw error;
@@ -153,67 +79,58 @@ export async function cancelRun(
     }
   }
 
-  const outcome = await setSessionRunStatus(database, {
-    runId,
-    source: "viewer",
-    status: "cancelled",
-  });
+  const outcome = alreadyTerminal
+    ? null
+    : await setSessionRunStatus(database, {
+        runId,
+        source: "viewer",
+        status: "cancelled",
+      });
 
-  if (outcome.kind === "repair_needed") {
-    throw new Error("Session lifecycle projection needs repair.");
+  if (isTruthy(driverInstanceId)) {
+    await expireUndeliveredInputStartCommandsForRun(database, { driverInstanceId, runId });
+  }
+
+  if (outcome === null) {
+    logInfo("session.turn.cancel.ignored", {
+      driverInstanceId,
+      runId,
+      sessionId,
+      status: currentRun.status,
+      traceId: currentRun.traceId,
+      viewerId: viewer.id,
+    });
+
+    return { run: currentRun };
   }
 
   if (outcome.kind === "duplicate") {
-    if (isTruthy(run.driverInstanceId)) {
-      await expireUndeliveredInputStartCommandsForRun(database, {
-        driverInstanceId: run.driverInstanceId,
-        runId,
-      });
-    }
-
-    return {
-      run: outcome.run,
-    };
+    return { run: outcome.run };
   }
 
   if (outcome.kind === "rejected" || outcome.kind === "stale") {
-    const latestRun = await getSessionRunSummary(database, runId);
-
-    return {
-      run: latestRun ?? currentRun,
-    };
+    return { run: (await getSessionRunSummary(database, runId)) ?? currentRun };
   }
 
-  const updatedRun = outcome.run;
-
-  if (isTruthy(run.driverInstanceId)) {
-    await expireUndeliveredInputStartCommandsForRun(database, {
-      driverInstanceId: run.driverInstanceId,
-      runId,
-    });
-  }
-
-  const cancelledEvent = createCancelledSessionRunRuntimeEvent({
-    eventId: createPlatformId<RuntimeEventId>(),
-    run: updatedRun,
-    sessionId: run.sessionId,
-    sourceEventId: `viewer-cancel:${runId}:cancelled`,
-  });
   await appendSessionRuntimeEvents({
     bindings,
-    events: [cancelledEvent],
-    sessionId: run.sessionId,
+    events: [
+      createCancelledSessionRunRuntimeEvent({
+        run: outcome.run,
+        sessionId,
+        sourceEventId: `viewer-cancel:${runId}:cancelled`,
+      }),
+    ],
+    sessionId,
   });
 
   logInfo("session.turn.cancelled", {
-    driverInstanceId: run.driverInstanceId,
+    driverInstanceId,
     runId,
-    sessionId: run.sessionId,
+    sessionId,
     traceId: currentRun.traceId,
     viewerId: viewer.id,
   });
 
-  return {
-    run: updatedRun,
-  };
+  return { run: outcome.run };
 }

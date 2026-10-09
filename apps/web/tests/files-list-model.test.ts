@@ -1,12 +1,14 @@
 import { describe, expect, test } from "bun:test";
 
 import type { FileSessionKind } from "@mosoo/contracts/file";
+import { parsePlatformId } from "@mosoo/id";
+import type { AccountId } from "@mosoo/id";
 
 import type { ListedFileEntry } from "../src/domains/file/api/files";
 import { createFilesViewModel } from "../src/routes/files/files-list-model";
-import { toAccountId, toFileId, toSessionId } from "../src/routes/typed-id";
+import { toFileId, toSessionId } from "../src/routes/typed-id";
 
-const ACCOUNT_ID = toAccountId("01J000000000000000000000A1");
+const ACCOUNT_ID = parsePlatformId<AccountId>("01J000000000000000000000A1");
 const FIRST_SESSION_ID = toSessionId("01J000000000000000000000S1");
 const EMPTY_SESSION_ID = toSessionId("01J000000000000000000000S2");
 const SECOND_SESSION_ID = toSessionId("01J000000000000000000000S3");

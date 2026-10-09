@@ -2,12 +2,9 @@ import { describe, expect, mock, test } from "bun:test";
 import { readFileSync, readdirSync } from "node:fs";
 
 import { PLATFORM_ID_FIXTURES as ids } from "@mosoo/id/testing";
-import { PUBLIC_RUNTIME_CATALOG } from "@mosoo/runtime-catalog";
+import { RUNTIME_CATALOG } from "@mosoo/runtime-catalog";
 
-import {
-  ensureRuntimeSubjectId,
-  getRuntimeSubject,
-} from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-record-store";
+import { ensureRuntimeSubjectId } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-record-store";
 import {
   requireCloudflareSandboxBinding,
   RUNTIME_SANDBOX_IMAGES,
@@ -45,11 +42,7 @@ mock.module("@cloudflare/sandbox", () => ({
     );
   },
 }));
-const {
-  getRuntimeSubjectKeepAliveHandle,
-  getRuntimeSubjectContainerObservation,
-  destroyRuntimeSubjectContainer,
-} =
+const { getRuntimeSubjectKeepAliveHandle, destroyRuntimeSubjectContainer } =
   await import("../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-platform");
 
 const allocation = {
@@ -75,6 +68,13 @@ function seedSessionAuthority(db: SqliteD1Database): void {
   `);
 }
 
+async function readSandboxBinding(db: SqliteD1Database): Promise<string | null> {
+  return db
+    .prepare("SELECT sandbox_binding FROM sandbox WHERE id = ?")
+    .bind(ids.sandbox)
+    .first<string>("sandbox_binding");
+}
+
 function database(): SqliteD1Database {
   const db = new SqliteD1Database();
   applyDrizzleMigrations(db);
@@ -88,7 +88,7 @@ describe("runtime-specific Sandbox images", () => {
       readFileSync(new URL("../../driver/runtime-images.json", import.meta.url), "utf8"),
     ) as { runtimeId: string; profile: string }[];
     expect(profiles.map(([runtimeId]) => runtimeId).toSorted()).toEqual(
-      PUBLIC_RUNTIME_CATALOG.map((runtime) => runtime.runtimeId).toSorted(),
+      RUNTIME_CATALOG.map((runtime) => runtime.runtimeId).toSorted(),
     );
     expect(
       Object.fromEntries(profiles.map(([runtimeId, , profile]) => [runtimeId, profile])),
@@ -121,9 +121,7 @@ describe("runtime-specific Sandbox images", () => {
         runtimeId: "claude-agent-sdk",
         runtimeImagesEnabled: false,
       });
-      expect((await getRuntimeSubject(db, ids.sandbox))?.sandboxBinding).toBe(
-        enabled ? "SandboxClaude" : "Sandbox",
-      );
+      expect(await readSandboxBinding(db)).toBe(enabled ? "SandboxClaude" : "Sandbox");
     }
   });
 
@@ -132,7 +130,7 @@ describe("runtime-specific Sandbox images", () => {
     async (runtimeId, binding) => {
       const db = database();
       await ensureRuntimeSubjectId(db, { ...allocation, runtimeId });
-      expect((await getRuntimeSubject(db, ids.sandbox))?.sandboxBinding).toBe(binding);
+      expect(await readSandboxBinding(db)).toBe(binding);
       const namespace = { name: binding };
       // Separate binding objects stand in for a fresh Worker isolate: routing
       // comes from D1, never a process cache or current Agent configuration.
@@ -163,67 +161,7 @@ describe("runtime-specific Sandbox images", () => {
     applyDrizzleMigration(db, "0015_runtime-sandbox-images");
     for (const [runtimeId] of profiles)
       await ensureRuntimeSubjectId(db, { ...allocation, runtimeId });
-    expect((await getRuntimeSubject(db, ids.sandbox))?.sandboxBinding).toBe("Sandbox");
-  });
-
-  test("observes the recorded namespace without configuring an SDK handle", async () => {
-    for (const sandboxBinding of ["Sandbox", ...profiles.map(([, binding]) => binding)]) {
-      const db = database();
-      await ensureRuntimeSubjectId(db, { ...allocation, runtimeId: "openai-runtime" });
-      db.execute(`UPDATE sandbox SET sandbox_binding = '${sandboxBinding}'`);
-      const sdkCalls = calls.length;
-      const names: string[] = [];
-      let disposed = 0;
-      const namespace = {
-        getByName(name: string) {
-          names.push(name);
-          return {
-            getContainerObservation: async () => ({ state: "stopped", observedAt: 123 }),
-            [Symbol.dispose]() {
-              disposed++;
-            },
-          };
-        },
-      };
-      const bindings = { DB: db, [sandboxBinding]: namespace } as unknown as ApiBindings;
-      expect(await getRuntimeSubjectContainerObservation(bindings, ids.sandbox)).toEqual({
-        state: "stopped",
-        observedAt: 123,
-      });
-      expect(names).toEqual([ids.sandbox.toLowerCase()]);
-      expect(disposed).toBe(1);
-      expect(calls).toHaveLength(sdkCalls);
-    }
-  });
-
-  test("observation does not fabricate stopped state for missing resources or failed RPCs", async () => {
-    const db = database();
-    const bindings = { DB: db } as ApiBindings;
-    await expect(getRuntimeSubjectContainerObservation(bindings, ids.sandbox)).rejects.toThrow(
-      "no recorded Sandbox binding",
-    );
-    await ensureRuntimeSubjectId(db, { ...allocation, runtimeId: "openai-runtime" });
-    await expect(getRuntimeSubjectContainerObservation(bindings, ids.sandbox)).rejects.toThrow(
-      "SandboxOpenAI binding is not configured",
-    );
-    let disposed = false;
-    const failedBindings = {
-      DB: db,
-      SandboxOpenAI: {
-        getByName: () => ({
-          getContainerObservation: async () => {
-            throw new Error("observation transport failed");
-          },
-          [Symbol.dispose]() {
-            disposed = true;
-          },
-        }),
-      },
-    } as unknown as ApiBindings;
-    await expect(
-      getRuntimeSubjectContainerObservation(failedBindings, ids.sandbox),
-    ).rejects.toThrow("observation transport failed");
-    expect(disposed).toBe(true);
+    expect(await readSandboxBinding(db)).toBe("Sandbox");
   });
 
   test("does not replace an old shared machine with a new image", async () => {
@@ -241,7 +179,7 @@ describe("runtime-specific Sandbox images", () => {
     expect(await db.prepare("SELECT * FROM sandbox").all()).toEqual(before);
   });
 
-  test("fails closed on unknown runtime, missing record, corrupt or unavailable binding", async () => {
+  test("fails closed on unknown runtime, missing record or corrupt binding", async () => {
     const db = database();
     const env = { DB: db } as ApiBindings;
     await expect(
@@ -251,9 +189,6 @@ describe("runtime-specific Sandbox images", () => {
       "no recorded Sandbox binding",
     );
     await ensureRuntimeSubjectId(db, { ...allocation, runtimeId: "claude-agent-sdk" });
-    await expect(getRuntimeSubjectKeepAliveHandle(env, ids.sandbox)).rejects.toThrow(
-      "SandboxClaude binding is not configured",
-    );
     db.execute(`UPDATE sandbox SET sandbox_binding = 'unknown' WHERE id = '${ids.sandbox}'`);
     await expect(getRuntimeSubjectKeepAliveHandle(env, ids.sandbox)).rejects.toThrow(
       "Unknown Sandbox binding",
@@ -295,6 +230,11 @@ describe("runtime-specific Sandbox images", () => {
       expect(
         value.containers.find((entry) => entry.class_name === "Sandbox")?.image_vars,
       ).toBeUndefined();
+    }
+    // Production Sandbox capacity stays within the Cloudflare Containers account quota.
+    const { prod } = config.env as { prod: { containers: Record<string, unknown>[] } };
+    for (const container of prod.containers) {
+      expect(container).toMatchObject({ instance_type: "standard-2", max_instances: 50 });
     }
   });
 });

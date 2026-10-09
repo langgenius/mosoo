@@ -5,8 +5,6 @@ import {
   configureSandboxNetworkConstraints,
   restoreSandboxNetworkEnforcement,
 } from "../src/adapters/durable-objects/sandbox-network-enforcement";
-import { waitForSandboxNetworkRestore } from "../src/adapters/durable-objects/sandbox-network-restore-gate";
-import { SANDBOX_RPC_FORWARD_METHODS } from "../src/adapters/durable-objects/sandbox-rpc-methods";
 
 function createStorage(initial: Record<string, unknown> = {}) {
   const values = new Map<string, unknown>(Object.entries(initial));
@@ -36,7 +34,7 @@ function createDelegate() {
   };
 }
 
-const ENFORCEABLE = { containerRunning: false, httpsInterceptionDisabled: false };
+const ENFORCEABLE = { httpsInterceptionDisabled: false };
 
 describe("sandbox network enforcement", () => {
   test("limited constraints disable internet, persist, and install the allowlist", async () => {
@@ -68,7 +66,7 @@ describe("sandbox network enforcement", () => {
         storage,
         delegate,
         { allowedHosts: [], networkPolicy: "limited" },
-        { containerRunning: false, httpsInterceptionDisabled: true },
+        { httpsInterceptionDisabled: true },
       ),
     ).rejects.toThrow("cannot be enforced");
 
@@ -87,7 +85,7 @@ describe("sandbox network enforcement", () => {
       storage,
       delegate,
       { allowedHosts: [], networkPolicy: "full" },
-      { containerRunning: false, httpsInterceptionDisabled: true },
+      { httpsInterceptionDisabled: true },
     );
 
     expect(delegate.enableInternet).toBe(true);
@@ -171,41 +169,6 @@ describe("sandbox network enforcement", () => {
     });
   });
 
-  test("rejects first-time Limited admission on a warm unclassified container", async () => {
-    const storage = createStorage();
-    const delegate = createDelegate();
-
-    await expect(
-      configureSandboxNetworkConstraints(
-        storage,
-        delegate,
-        { allowedHosts: ["api.example.com"], networkPolicy: "limited" },
-        { containerRunning: true, httpsInterceptionDisabled: false },
-      ),
-    ).rejects.toThrow("warm sandbox");
-
-    expect(delegate.enableInternet).toBe(true);
-    expect(delegate.allowedHostsCalls).toEqual([]);
-    expect(storage.values.size).toBe(0);
-  });
-
-  test("invalid RPC payloads are rejected before touching state", async () => {
-    const storage = createStorage();
-    const delegate = createDelegate();
-
-    await expect(
-      configureSandboxNetworkConstraints(
-        storage,
-        delegate,
-        { allowedHosts: "nope", networkPolicy: "limited" },
-        ENFORCEABLE,
-      ),
-    ).rejects.toThrow("array of strings");
-
-    expect(storage.values.size).toBe(0);
-    expect(delegate.allowedHostsCalls).toEqual([]);
-  });
-
   test("restore re-asserts the persisted internet switch on wake", async () => {
     const limited = createDelegate();
 
@@ -217,7 +180,6 @@ describe("sandbox network enforcement", () => {
         },
       }),
       limited,
-      { httpsInterceptionDisabled: false },
     );
     expect(limited.enableInternet).toBe(false);
     expect(limited.interceptHttps).toBe(true);
@@ -231,70 +193,9 @@ describe("sandbox network enforcement", () => {
 
     const untouched = createDelegate();
 
-    await restoreSandboxNetworkEnforcement(createStorage(), untouched, {
-      httpsInterceptionDisabled: false,
-    });
+    await restoreSandboxNetworkEnforcement(createStorage(), untouched);
     expect(untouched.enableInternet).toBe(true);
     expect(untouched.interceptHttps).toBe(false);
     expect(untouched.envVars).toEqual({});
-  });
-
-  test("restore fails closed for persisted Limited policy without HTTPS interception", async () => {
-    const delegate = createDelegate();
-
-    await expect(
-      restoreSandboxNetworkEnforcement(
-        createStorage({
-          [SANDBOX_NETWORK_CONSTRAINTS_STORAGE_KEY]: {
-            allowedHosts: ["api.example.com"],
-            networkPolicy: "limited",
-          },
-        }),
-        delegate,
-        { httpsInterceptionDisabled: true },
-      ),
-    ).rejects.toThrow("cannot be enforced");
-
-    expect(delegate.enableInternet).toBe(false);
-    expect(delegate.interceptHttps).toBe(false);
-    expect(delegate.envVars).toEqual({});
-  });
-
-  test("restore fails closed on a corrupt persisted record", async () => {
-    const delegate = createDelegate();
-
-    await expect(
-      restoreSandboxNetworkEnforcement(
-        createStorage({ [SANDBOX_NETWORK_CONSTRAINTS_STORAGE_KEY]: { networkPolicy: "open" } }),
-        delegate,
-        { httpsInterceptionDisabled: false },
-      ),
-    ).rejects.toThrow("unknown network policy");
-    expect(delegate.enableInternet).toBe(false);
-  });
-
-  test("rejected restore permits teardown only and blocks every access RPC", async () => {
-    const restoreError = new Error("corrupt stored network policy");
-    const rejectedRestore = Promise.reject(restoreError);
-
-    await expect(
-      waitForSandboxNetworkRestore(rejectedRestore, "destroy", []),
-    ).resolves.toBeUndefined();
-    await expect(
-      waitForSandboxNetworkRestore(rejectedRestore, "setKeepAlive", [false]),
-    ).resolves.toBeUndefined();
-    await expect(
-      waitForSandboxNetworkRestore(rejectedRestore, "setKeepAlive", [true]),
-    ).rejects.toBe(restoreError);
-
-    for (const method of SANDBOX_RPC_FORWARD_METHODS) {
-      if (method === "destroy" || method === "setKeepAlive") {
-        continue;
-      }
-
-      await expect(waitForSandboxNetworkRestore(rejectedRestore, method, [])).rejects.toBe(
-        restoreError,
-      );
-    }
   });
 });

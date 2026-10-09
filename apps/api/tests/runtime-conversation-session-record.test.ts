@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { getRuntimeConversationSession } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-store";
+import { getRuntimeConversationSession } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-conversation-session-store";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
 const SESSION_CWD = "session-cwd";

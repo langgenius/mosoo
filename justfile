@@ -12,15 +12,15 @@ setup:
 
 # Create or complete local development environment variables.
 env-init:
-    bun run env:init
+    bun apps/api/bin/init-dev-vars.ts
 
 # Install repository-managed Git hooks.
 hooks-install:
-    bun run hooks:install
+    ./node_modules/.bin/prek -c config/prek.toml install
 
 # Check commit metadata on the current branch against origin/main.
 commit-check:
-    bun run commit:check
+    bun scripts/validate-commit-range.ts origin/main HEAD
 
 # Start the local development stack after applying local migrations.
 dev:
@@ -35,13 +35,13 @@ fmt:
 fmt-check:
     bun run fmt:check
 
-# Check Markdown/MDX local links and image references.
+# Check local Markdown links and image references.
 docs-check:
     bun run docs:check
 
 # Check formatting for one file or directory.
 fmt-check-path path:
-    bun run fmt:check:path -- "{{ path }}"
+    ./node_modules/.bin/vp fmt --check --ignore-path .gitignore "{{ path }}"
 
 # Lint the repository.
 lint: fmt-check
@@ -89,7 +89,7 @@ db-generate name *args:
 
 # Apply pending migrations to the existing local D1 state.
 db-migrate:
-    bun run db:migrate:local
+    cd apps/api && ../../node_modules/.bin/vp exec wrangler d1 migrations apply DB --local
 
 # Explicitly destroy local API D1 state, then apply the migration chain.
 db-reset-local:
@@ -103,22 +103,6 @@ cf-types:
 # Find unused dependencies and exports.
 knip:
     bun run knip
-
-# Run React Doctor.
-react-doctor:
-    bun run react-doctor
-
-# Run React Doctor against the current diff.
-react-doctor-diff:
-    bun run react-doctor:diff
-
-# Write the React Doctor JSON report.
-react-doctor-report:
-    bun run react-doctor:report
-
-# Regenerate the help documentation index.
-help-docs-index:
-    bun run help-docs-index
 
 # Regenerate the canonical Public API OpenAPI artifact.
 public-api-openapi:
@@ -134,15 +118,11 @@ public-api-session-workflow:
 
 # Smoke the documented minimal Thread shape against configured non-production.
 public-api-smoke:
-    bun run public-api:smoke
+    bun scripts/public-api-nonproduction-smoke.ts
 
-# Run E2E cases. Use `just e2e --help`.
+# Run Playwright E2E specs, e.g. `just e2e e2e/cases/ui/sidebar.spec.ts`.
 e2e *args:
-    bun run e2e -- {{args}}
-
-# Verify the Agent Driver submodule cutover.
-driver-submodule-smoke:
-    bun run driver:submodule:smoke
+    e2e/node_modules/.bin/playwright test --config e2e/playwright.config.ts {{args}}
 
 # Update the Agent Driver submodule to upstream HEAD.
 driver-update:
@@ -161,7 +141,7 @@ stage-preflight:
     (cd apps/api && ../../node_modules/.bin/vp exec wrangler deploy --env stage --minify --dry-run)
     (cd apps/web && ../../node_modules/.bin/vp exec wrangler deploy --env stage --dry-run)
 
-# Publish a reviewed, clean staging candidate; follow docs/staging-deploy-verification.md.
+# Publish a reviewed, clean staging candidate; follow docs/production-deploy-verification.md#staging.
 # Does not apply migrations, upload model keys, or target production.
 deploy-stage: stage-preflight
     #!/usr/bin/env bash
@@ -189,4 +169,3 @@ clean:
     fd -u -t d -F node_modules . -X rm -rf
     fd -u -t d -F dist . -X rm -rf
     fd -u -t d -F .tmp . -X rm -rf
-    fd -u -t d -F .angular . -X rm -rf

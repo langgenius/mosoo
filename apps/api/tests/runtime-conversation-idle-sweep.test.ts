@@ -3,7 +3,6 @@ import { describe, expect, test } from "bun:test";
 import {
   claimIdleSessionScopedConversationForClose,
   listIdleSessionScopedConversationSessions,
-  listPendingIdleConversationCheckpoints,
 } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-conversation-session-store";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
@@ -132,7 +131,7 @@ async function insertActiveRunLease(
 }
 
 describe("idle session-scoped conversation sweep", () => {
-  test("keeps a completed cattle turn alive until its checkpoint and completion history are ready", async () => {
+  test("keeps a completed turn's Driver alive until its completion history is persisted", async () => {
     const database = createDatabase();
     await insertConversation(database, {
       kind: "cattle",
@@ -156,29 +155,6 @@ describe("idle session-scoped conversation sweep", () => {
         limit: 10,
       }),
     ).resolves.toEqual([]);
-    await expect(
-      claimIdleSessionScopedConversationForClose(database, {
-        idleSinceLte: NOW - GRACE_MS,
-        now: NOW,
-        runtimeSubjectId: "sb-checkpoint" as never,
-        sandboxSessionId: "cf-session-checkpoint" as never,
-        sessionId: "session-checkpoint" as never,
-      }),
-    ).resolves.toBe(false);
-
-    await database
-      .prepare(
-        "INSERT INTO sandbox_backup (dir, id, sandbox_id, session_run_id, status) VALUES (?, ?, ?, ?, ?)",
-      )
-      .bind("cwd", "backup-checkpoint", "sb-checkpoint", "run-checkpoint", "ready")
-      .run();
-
-    await expect(
-      listIdleSessionScopedConversationSessions(database, {
-        idleSinceLte: NOW - GRACE_MS,
-        limit: 10,
-      }),
-    ).resolves.toEqual([]);
     await database
       .prepare("INSERT INTO session_event (id, run_id, event_type) VALUES (?, ?, ?)")
       .bind("completion-history", "run-checkpoint", "run.completed")
@@ -190,46 +166,6 @@ describe("idle session-scoped conversation sweep", () => {
         limit: 10,
       }),
     ).resolves.toEqual([{ sandboxId: "sb-checkpoint", sessionId: "session-checkpoint" }]);
-  });
-
-  test("repairs only an idle completed workspace without a ready checkpoint or live lease", async () => {
-    const database = createDatabase();
-    await insertConversation(database, {
-      kind: "cattle",
-      sandboxId: "sb-repair",
-      sessionId: "session-repair",
-      status: "active",
-      updatedAt: NOW - GRACE_MS - 1,
-    });
-    database.execute(`
-      UPDATE sandbox SET subject_id = 'session-repair';
-      INSERT INTO session_run (id, session_id, status) VALUES ('run-repair', 'session-repair', 'completed');
-      UPDATE session SET last_run_id = 'run-repair', workspace_checkpoint_required = 1;
-    `);
-    const list = () =>
-      listPendingIdleConversationCheckpoints(database, {
-        idleSinceLte: NOW - GRACE_MS,
-        limit: 10,
-      });
-    expect(await list()).toEqual([]);
-    database.execute("INSERT INTO session_event VALUES ('event', 'run-repair', 'run.completed')");
-    expect(await list()).toEqual([
-      {
-        sandboxId: "sb-repair",
-        sessionId: "session-repair",
-        sessionRunId: "run-repair",
-      },
-    ]);
-    database.execute("UPDATE sandbox SET claim_owner = 'activation'");
-    expect(await list()).toEqual([]);
-    database.execute("UPDATE sandbox SET claim_owner = NULL");
-    await insertActiveRunLease(database, { runId: "other-run", sandboxId: "sb-repair" });
-    expect(await list()).toEqual([]);
-    database.execute("UPDATE session_run SET status = 'failed' WHERE id = 'other-run'");
-    database.execute(
-      "INSERT INTO sandbox_backup VALUES ('cwd', 'backup', 'sb-repair', 'run-repair', 'ready')",
-    );
-    expect(await list()).toEqual([]);
   });
 
   test("lets the idle sweep recycle a pre-rollout cattle conversation", async () => {

@@ -3,25 +3,12 @@ import type { RuntimeEventKind } from "@mosoo/runtime-events";
 
 import type { RuntimeSessionLink } from "./event-types";
 
-const runBoundRuntimeEventDomains = new Set<string>([
-  "image",
-  "item",
-  "message",
-  "review",
-  "shell",
-  "thought",
-  "tool",
-  "user",
-  "web",
-]);
+const runBoundRuntimeEventDomains = new Set<string>(["item", "message", "thought", "tool"]);
 
 const runBoundRuntimeEventKinds = new Set<RuntimeEventKind>([
   "file.change.updated",
-  "mcp.tool.updated",
   "permission.requested",
   "permission.resolved",
-  "permission.review.completed",
-  "permission.review.started",
 ]);
 
 function runtimeEventRequiresRunLink(kind: RuntimeEventKind): boolean {

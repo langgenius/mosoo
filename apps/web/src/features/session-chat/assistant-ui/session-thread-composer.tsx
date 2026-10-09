@@ -7,14 +7,13 @@ import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { isTruthy } from "@/shared/lib/truthiness";
 import { Button } from "@/shared/ui/button";
-import { ArrowUp, FileText, Paperclip } from "@/shared/ui/icons";
+import { ArrowUp, FileText, Loader2, Paperclip } from "@/shared/ui/icons";
 
 import type { SessionResourceMention } from "../session-resource-mentions";
 
 interface PendingSessionFileChip {
   id: string;
   name: string;
-  progress?: number;
   status: "failed" | "uploading";
 }
 
@@ -50,27 +49,32 @@ function SessionResourceChips({
       {pendingFiles.map((file) => (
         <span
           key={file.id}
+          aria-busy={file.status === "uploading" || undefined}
           className={cn(
             "inline-flex max-w-full items-center gap-1.5 rounded-md border px-2 py-1 text-[11px]",
             file.status === "failed"
-              ? "border-destructive/25 bg-destructive/[0.04] text-destructive"
-              : "border-border bg-muted/35 text-fg-2",
+              ? "border-danger/25 bg-danger/[0.04] text-danger"
+              : "border-border bg-sunken/35 text-fg-2",
           )}
           title={file.name}
         >
-          <FileText className="size-3 shrink-0" />
+          {file.status === "uploading" ? (
+            <Loader2 className="size-3 shrink-0 animate-spin" />
+          ) : (
+            <FileText className="size-3 shrink-0" />
+          )}
           <span className="max-w-[180px] truncate font-medium">{file.name}</span>
-          <span className="text-fg-3 shrink-0">
-            {file.status === "failed"
-              ? t("chat.uploadFailed")
-              : `${Math.round(file.progress ?? 0)}%`}
-          </span>
+          {file.status === "failed" ? (
+            <span className="text-fg-3 shrink-0">{t("chat.uploadFailed")}</span>
+          ) : (
+            <span className="sr-only">{t("settings.uploading")}</span>
+          )}
         </span>
       ))}
       {mentions.map((mention) => (
         <span
           key={mention.id}
-          className="border-border bg-muted/35 text-fg-2 inline-flex max-w-full items-center gap-1.5 rounded-md border px-2 py-1 text-[11px]"
+          className="border-border bg-sunken/35 text-fg-2 inline-flex max-w-full items-center gap-1.5 rounded-md border px-2 py-1 text-[11px]"
           title={`${mention.name} @${mention.path}`}
         >
           <FileText className="text-fg-3 size-3 shrink-0" />
@@ -102,13 +106,13 @@ export function SessionThreadComposer({
   return (
     <ComposerPrimitive.Root className={cn("border-border-strong bg-card rounded-lg border")}>
       {composerError ? (
-        <div className="border-destructive/20 bg-destructive/[0.06] text-destructive mx-3 mt-3 rounded-md border px-3 py-2 text-[13px]">
+        <div className="border-danger/20 bg-danger/[0.06] text-danger mx-3 mt-3 rounded-md border px-3 py-2 text-[13px]">
           <div>{composerError.message}</div>
           {composerError.retryable ? (
             <button
               type="button"
               onClick={onRetry}
-              className="text-destructive mt-1 text-[12px] font-semibold underline underline-offset-4"
+              className="text-danger mt-1 text-[12px] font-semibold underline underline-offset-4"
             >
               {composerError.actionLabel ?? t("agent.retry")}
             </button>
@@ -117,7 +121,7 @@ export function SessionThreadComposer({
       ) : null}
 
       {showSendDisabledReason && isTruthy(sendDisabledReason) ? (
-        <div className="border-border bg-muted/40 text-fg-2 mx-3 mt-3 rounded-md border px-3 py-2 text-[13px]">
+        <div className="border-border bg-sunken/40 text-fg-2 mx-3 mt-3 rounded-md border px-3 py-2 text-[13px]">
           {sendDisabledReason}
         </div>
       ) : null}

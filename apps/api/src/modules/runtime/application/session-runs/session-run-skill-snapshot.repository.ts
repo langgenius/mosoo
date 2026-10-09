@@ -33,10 +33,10 @@ export async function persistSessionRunSkills(
     warningCode: skill.warningCode,
   }));
 
-  // A run can reach this insert more than once (inline dispatch, queue
-  // fallback, queue retry). The first writer wins; a duplicate (run, skill)
-  // pair must not fail the run. Keep the bounded inserts in one D1 transaction
-  // so a later statement failure cannot leave a partial snapshot.
+  // Only the queued->booting dispatch winner reaches this insert. Skill
+  // references are not deduplicated upstream (explicit and package skills), so
+  // the first (run, skill) row wins. Keep the bounded inserts in one D1
+  // transaction so a later statement failure cannot leave a partial snapshot.
   await runAppDatabaseBatch(database, (db) => {
     const queries: [AppDatabaseBatchItem, ...AppDatabaseBatchItem[]] = [
       db

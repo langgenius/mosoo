@@ -1,5 +1,10 @@
+import type {
+  SessionMessage,
+  SessionMessagePlanEntry,
+  SessionMessageSegment,
+} from "@mosoo/contracts/session";
 import { sessionMessagesTable } from "@mosoo/db";
-import type { SessionId, SessionMessageId } from "@mosoo/id";
+import type { SessionId } from "@mosoo/id";
 import { asc, eq } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
@@ -8,69 +13,45 @@ import {
   sanitizeAssistantMessageSegments,
   sanitizeProviderPrivateMarkup,
 } from "../domain/provider-private-markup";
-import { parseStoredSessionMessageProjection } from "../domain/session-message-projection-parser";
-import type { SessionLiveStateMessage } from "./session-live-state.types";
 
-export interface StoredSessionMessageRow {
-  content_text: string;
-  created_at: number;
-  id: SessionMessageId;
-  plan_json: string | null;
-  role: "assistant" | "user";
-  segments_json: string | null;
-  seq: number;
+// plan_json and segments_json are written only by insertSessionMessage from typed arrays.
+function parseStoredJsonArray<T>(raw: string | null): T[] {
+  return raw === null || raw.length === 0 ? [] : (JSON.parse(raw) as T[]);
 }
 
-function compareStoredSessionMessageRows(
-  left: StoredSessionMessageRow,
-  right: StoredSessionMessageRow,
-): number {
-  return left.seq - right.seq;
-}
-
-function toLiveStateMessage(row: StoredSessionMessageRow): SessionLiveStateMessage {
-  const { plan, segments } = parseStoredSessionMessageProjection({
-    planJson: row.plan_json,
-    segmentsJson: row.segments_json,
-  });
-  const assistantMessage = row.role === "assistant";
-
-  return {
-    content: assistantMessage
-      ? sanitizeProviderPrivateMarkup(row.content_text).text
-      : row.content_text,
-    createdAt: toIsoString(row.created_at),
-    id: row.id,
-    plan,
-    role: row.role,
-    segments: assistantMessage ? sanitizeAssistantMessageSegments(segments) : segments,
-  };
-}
-
-function storedSessionMessageRowsToLiveMessages(
-  rows: StoredSessionMessageRow[],
-): SessionLiveStateMessage[] {
-  return [...rows].toSorted(compareStoredSessionMessageRows).map((row) => toLiveStateMessage(row));
-}
-
-export async function loadStoredSessionMessages(
+export async function listSessionMessages(
   database: D1Database,
   sessionId: SessionId,
-): Promise<SessionLiveStateMessage[]> {
-  const results = await getAppDatabase(database)
+): Promise<SessionMessage[]> {
+  const rows = await getAppDatabase(database)
     .select({
       content_text: sessionMessagesTable.contentText,
       created_at: sessionMessagesTable.createdAt,
+      created_by_account_id: sessionMessagesTable.createdByAccountId,
       id: sessionMessagesTable.id,
       plan_json: sessionMessagesTable.planJson,
       role: sessionMessagesTable.role,
       segments_json: sessionMessagesTable.segmentsJson,
-      seq: sessionMessagesTable.seq,
     })
     .from(sessionMessagesTable)
     .where(eq(sessionMessagesTable.sessionId, sessionId))
     .orderBy(asc(sessionMessagesTable.seq))
     .all();
 
-  return storedSessionMessageRowsToLiveMessages(results);
+  return rows.map((row) => {
+    const assistantMessage = row.role === "assistant";
+    const segments = parseStoredJsonArray<SessionMessageSegment>(row.segments_json);
+
+    return {
+      content: assistantMessage
+        ? sanitizeProviderPrivateMarkup(row.content_text).text
+        : row.content_text,
+      createdAt: toIsoString(row.created_at),
+      createdBy: row.created_by_account_id,
+      id: row.id,
+      plan: parseStoredJsonArray<SessionMessagePlanEntry>(row.plan_json),
+      role: row.role,
+      segments: assistantMessage ? sanitizeAssistantMessageSegments(segments) : segments,
+    };
+  });
 }

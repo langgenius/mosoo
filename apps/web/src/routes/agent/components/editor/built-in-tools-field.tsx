@@ -26,11 +26,9 @@ function setToolEnabled(
 }
 
 export function BuiltInToolsField({
-  readOnly,
   tools,
   setTools,
 }: {
-  readOnly: boolean;
   tools: AgentBuiltInToolConfig[];
   setTools(tools: AgentBuiltInToolConfig[]): void;
 }): ReactElement {
@@ -45,14 +43,13 @@ export function BuiltInToolsField({
 
         return (
           <label
-            className="border-border-subtle flex min-h-11 items-center justify-between gap-3 rounded-md border px-3 py-2"
+            className="border-border-soft flex min-h-11 items-center justify-between gap-3 rounded-md border px-3 py-2"
             htmlFor={id}
             key={toolName}
           >
             <span className="text-foreground text-[13px] font-medium">{TOOL_LABELS[toolName]}</span>
             <Switch
               checked={enabled}
-              disabled={readOnly}
               id={id}
               onCheckedChange={(checked) => {
                 setTools(setToolEnabled(normalizedTools, toolName, checked));

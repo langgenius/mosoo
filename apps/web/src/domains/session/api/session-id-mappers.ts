@@ -1,60 +1,16 @@
-import type { AgentDeploymentVersionId, SessionMessageId, SessionRunId } from "@mosoo/contracts/id";
 import type { SessionSummary } from "@mosoo/contracts/session";
 import type { SessionRunSummary } from "@mosoo/contracts/session-run";
-import { parsePlatformId } from "@mosoo/id";
+import type {
+  AgentDeploymentVersionId,
+  AgentId,
+  ProjectId,
+  SessionId,
+  SessionRunId,
+} from "@mosoo/id";
 
-import { toAgentId, toProjectId, toSessionId } from "@/routes/typed-id";
+import type { SessionFieldsFragment } from "@/gql/graphql";
 
-interface SessionRunSummaryLike {
-  completedAt: string | null;
-  createdAt: string;
-  deploymentVersionId: string | null;
-  deploymentVersionNumber: number | null;
-  error: SessionRunSummary["error"];
-  id: string;
-  model: string | null;
-  provider: string | null;
-  startedAt: string | null;
-  status: SessionRunSummary["status"];
-  traceId: string;
-  trigger: SessionRunSummary["trigger"];
-  updatedAt: string;
-}
-
-interface SessionSummaryLike {
-  agentId: string | null;
-  archivedAt: string | null;
-  createdAt: string;
-  deploymentVersionId: string | null;
-  deploymentVersionNumber: number | null;
-  id: string;
-  lastMessageAt?: string | null | undefined;
-  lastRun: SessionRunSummaryLike | null;
-  model: string;
-  provider: string;
-  projectId: string;
-  runtimeId: string;
-  status: SessionSummary["status"];
-  title: string | null;
-  type: SessionSummary["type"];
-  updatedAt: string;
-}
-
-function toNullableAgentDeploymentVersionId(id: string | null): AgentDeploymentVersionId | null {
-  return id === null
-    ? null
-    : (parsePlatformId(id, "Deployment version ID") as AgentDeploymentVersionId);
-}
-
-export function toSessionMessageId(id: string): SessionMessageId {
-  return parsePlatformId(id, "Session message ID") as SessionMessageId;
-}
-
-function toSessionRunId(id: string): SessionRunId {
-  return parsePlatformId(id, "Session run ID") as SessionRunId;
-}
-
-function toSessionRunSummary(run: SessionRunSummaryLike | null): SessionRunSummary | null {
+function toSessionRunSummary(run: SessionFieldsFragment["lastRun"]): SessionRunSummary | null {
   if (run === null) {
     return null;
   }
@@ -62,10 +18,10 @@ function toSessionRunSummary(run: SessionRunSummaryLike | null): SessionRunSumma
   return {
     completedAt: run.completedAt,
     createdAt: run.createdAt,
-    deploymentVersionId: toNullableAgentDeploymentVersionId(run.deploymentVersionId),
+    deploymentVersionId: run.deploymentVersionId as AgentDeploymentVersionId | null,
     deploymentVersionNumber: run.deploymentVersionNumber,
     error: run.error,
-    id: toSessionRunId(run.id),
+    id: run.id as SessionRunId,
     model: run.model,
     provider: run.provider,
     startedAt: run.startedAt,
@@ -76,23 +32,23 @@ function toSessionRunSummary(run: SessionRunSummaryLike | null): SessionRunSumma
   };
 }
 
-export function toSessionSummary(session: SessionSummaryLike): SessionSummary {
+export function toSessionSummary(session: SessionFieldsFragment): SessionSummary {
   return {
-    agentId: session.agentId === null ? null : toAgentId(session.agentId),
+    agentId: session.agentId as AgentId | null,
     archivedAt: session.archivedAt,
     createdAt: session.createdAt,
-    deploymentVersionId: toNullableAgentDeploymentVersionId(session.deploymentVersionId),
+    deploymentVersionId: session.deploymentVersionId as AgentDeploymentVersionId | null,
     deploymentVersionNumber: session.deploymentVersionNumber,
-    id: toSessionId(session.id),
+    id: session.id as SessionId,
+    lastMessageAt: session.lastMessageAt,
     lastRun: toSessionRunSummary(session.lastRun),
     model: session.model,
     provider: session.provider,
-    projectId: toProjectId(session.projectId),
+    projectId: session.projectId as ProjectId,
     runtimeId: session.runtimeId,
     status: session.status,
     title: session.title,
     type: session.type,
     updatedAt: session.updatedAt,
-    ...(session.lastMessageAt !== undefined ? { lastMessageAt: session.lastMessageAt } : {}),
   };
 }

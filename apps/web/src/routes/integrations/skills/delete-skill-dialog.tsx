@@ -52,7 +52,7 @@ export function DeleteSkillDialog({ onDeleted, onOpenChange, open, registry, ski
         </DialogHeader>
 
         {isTruthy(error) ? (
-          <div className="border-destructive/30 bg-destructive/5 text-destructive rounded-md border px-3 py-2 text-xs">
+          <div className="border-danger/30 bg-danger/5 text-danger rounded-md border px-3 py-2 text-xs">
             {error}
           </div>
         ) : null}

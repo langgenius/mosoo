@@ -3,14 +3,6 @@ export class ApiError extends Error {
   readonly status: ApiErrorStatus;
 
   constructor(status: ApiErrorStatus, code: ApiErrorCode, message: string) {
-    if (!isApiErrorStatus(status)) {
-      throw new Error(`Unsupported API error status: ${String(status)}.`);
-    }
-
-    if (!isApiErrorCode(code)) {
-      throw new Error(`Unsupported API error code: ${String(code)}.`);
-    }
-
     super(message);
     this.code = code;
     this.name = "ApiError";
@@ -18,37 +10,26 @@ export class ApiError extends Error {
   }
 }
 
-export const API_ERROR_STATUS = {
-  badGateway: 502,
+const API_ERROR_STATUS = {
   badRequest: 400,
   conflict: 409,
   forbidden: 403,
   internalServerError: 500,
   notFound: 404,
   unauthorized: 401,
-  upgradeRequired: 426,
 } as const;
 
 export type ApiErrorStatus = (typeof API_ERROR_STATUS)[keyof typeof API_ERROR_STATUS];
 
 export const API_ERROR_CODE = {
-  activeRuntimeLeaseRequired: "ACTIVE_RUNTIME_LEASE_REQUIRED",
-  agentLiveVersionConflict: "AGENT_LIVE_VERSION_CONFLICT",
   agentLiveVersionRequired: "AGENT_LIVE_VERSION_REQUIRED",
-  agentNotPublished: "AGENT_NOT_PUBLISHED",
   agentPublishNotReady: "AGENT_PUBLISH_NOT_READY",
-  agentPublishPersonalMcp: "AGENT_PUBLISH_PERSONAL_MCP",
   agentSessionNotReady: "AGENT_SESSION_NOT_READY",
   environmentArtifactFailed: "ENVIRONMENT_ARTIFACT_FAILED",
   environmentArtifactPreparing: "ENVIRONMENT_ARTIFACT_PREPARING",
   forbidden: "FORBIDDEN",
   internalError: "INTERNAL_ERROR",
   notFound: "NOT_FOUND",
-  personalOrganizationSlotOccupied: "PERSONAL_ORGANIZATION_SLOT_OCCUPIED",
-  runtimeBackupConfigMissing: "RUNTIME_BACKUP_CONFIG_MISSING",
-  runtimeEventCursorInvalid: "RUNTIME_EVENT_CURSOR_INVALID",
-  runtimeEventLimitInvalid: "RUNTIME_EVENT_LIMIT_INVALID",
-  runtimeReadyWaitUnsupported: "RUNTIME_READY_WAIT_UNSUPPORTED",
   sessionRunCheckpointPending: "SESSION_RUN_CHECKPOINT_PENDING",
   sessionRuntimeOperationUnavailable: "SESSION_RUNTIME_OPERATION_UNAVAILABLE",
   sessionPreviewExpired: "SESSION_PREVIEW_EXPIRED",
@@ -56,29 +37,19 @@ export const API_ERROR_CODE = {
   sessionRunClientRequestDuplicate: "SESSION_RUN_CLIENT_REQUEST_DUPLICATE",
   unauthorized: "UNAUTHORIZED",
   validationFailed: "VALIDATION_FAILED",
-  websocketRequired: "WEBSOCKET_REQUIRED",
 } as const;
 
 export type ApiErrorCode = (typeof API_ERROR_CODE)[keyof typeof API_ERROR_CODE];
 
 const API_ERROR_STATUS_BY_CODE = {
-  [API_ERROR_CODE.activeRuntimeLeaseRequired]: API_ERROR_STATUS.conflict,
-  [API_ERROR_CODE.agentLiveVersionConflict]: API_ERROR_STATUS.conflict,
   [API_ERROR_CODE.agentLiveVersionRequired]: API_ERROR_STATUS.conflict,
-  [API_ERROR_CODE.agentNotPublished]: API_ERROR_STATUS.badRequest,
   [API_ERROR_CODE.agentPublishNotReady]: API_ERROR_STATUS.badRequest,
-  [API_ERROR_CODE.agentPublishPersonalMcp]: API_ERROR_STATUS.badRequest,
   [API_ERROR_CODE.agentSessionNotReady]: API_ERROR_STATUS.badRequest,
   [API_ERROR_CODE.environmentArtifactFailed]: API_ERROR_STATUS.conflict,
   [API_ERROR_CODE.environmentArtifactPreparing]: API_ERROR_STATUS.conflict,
   [API_ERROR_CODE.forbidden]: API_ERROR_STATUS.forbidden,
   [API_ERROR_CODE.internalError]: API_ERROR_STATUS.internalServerError,
   [API_ERROR_CODE.notFound]: API_ERROR_STATUS.notFound,
-  [API_ERROR_CODE.personalOrganizationSlotOccupied]: API_ERROR_STATUS.badRequest,
-  [API_ERROR_CODE.runtimeBackupConfigMissing]: API_ERROR_STATUS.internalServerError,
-  [API_ERROR_CODE.runtimeEventCursorInvalid]: API_ERROR_STATUS.badRequest,
-  [API_ERROR_CODE.runtimeEventLimitInvalid]: API_ERROR_STATUS.badRequest,
-  [API_ERROR_CODE.runtimeReadyWaitUnsupported]: API_ERROR_STATUS.badRequest,
   [API_ERROR_CODE.sessionRunCheckpointPending]: API_ERROR_STATUS.conflict,
   [API_ERROR_CODE.sessionRuntimeOperationUnavailable]: API_ERROR_STATUS.conflict,
   [API_ERROR_CODE.sessionPreviewExpired]: API_ERROR_STATUS.conflict,
@@ -86,14 +57,7 @@ const API_ERROR_STATUS_BY_CODE = {
   [API_ERROR_CODE.sessionRunClientRequestDuplicate]: API_ERROR_STATUS.conflict,
   [API_ERROR_CODE.unauthorized]: API_ERROR_STATUS.unauthorized,
   [API_ERROR_CODE.validationFailed]: API_ERROR_STATUS.badRequest,
-  [API_ERROR_CODE.websocketRequired]: API_ERROR_STATUS.upgradeRequired,
 } as const satisfies Record<ApiErrorCode, ApiErrorStatus>;
-
-const API_ERROR_CODES = Object.values(API_ERROR_CODE);
-const API_ERROR_STATUSES = Object.values(API_ERROR_STATUS);
-
-const API_ERROR_CODE_SET: ReadonlySet<string> = new Set(API_ERROR_CODES);
-const API_ERROR_STATUS_SET: ReadonlySet<number> = new Set(API_ERROR_STATUSES);
 
 export interface ApiErrorResponseDetails {
   code: ApiErrorCode;
@@ -101,20 +65,8 @@ export interface ApiErrorResponseDetails {
   status: ApiErrorStatus;
 }
 
-export function isApiErrorCode(value: string): value is ApiErrorCode {
-  return API_ERROR_CODE_SET.has(value);
-}
-
-export function isApiErrorStatus(value: number): value is ApiErrorStatus {
-  return API_ERROR_STATUS_SET.has(value);
-}
-
-export function getApiErrorStatusForCode(code: ApiErrorCode): ApiErrorStatus {
-  return API_ERROR_STATUS_BY_CODE[code];
-}
-
 export function createApiError(code: ApiErrorCode, message: string): ApiError {
-  return new ApiError(getApiErrorStatusForCode(code), code, message);
+  return new ApiError(API_ERROR_STATUS_BY_CODE[code], code, message);
 }
 
 export function toApiErrorResponseDetails(
@@ -137,7 +89,7 @@ export function toApiErrorResponseDetails(
   return {
     code,
     message: fallback.message ?? "Internal server error.",
-    status: getApiErrorStatusForCode(code),
+    status: API_ERROR_STATUS_BY_CODE[code],
   };
 }
 

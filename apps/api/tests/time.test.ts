@@ -1,6 +1,6 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 
-import { createStopwatch, toIsoString } from "../src/time";
+import { createStopwatch, systemClock, toIsoString } from "../src/time";
 
 describe("time helpers", () => {
   test("serializes numeric timestamp strings returned by D1-compatible rows", () => {
@@ -10,13 +10,18 @@ describe("time helpers", () => {
   });
 
   test("normalizes stopwatch elapsed milliseconds", () => {
-    let now = 100.4;
-    const stopwatch = createStopwatch({ nowMs: () => now });
+    const now = spyOn(systemClock, "nowMs").mockReturnValue(100.4);
 
-    now = 135.6;
+    try {
+      const stopwatch = createStopwatch();
 
-    expect(stopwatch.startedAtMs).toBe(100.4);
-    expect(stopwatch.elapsedMs()).toBe(35);
-    expect(stopwatch.elapsedAt(132.8)).toBe(32);
+      now.mockReturnValue(135.6);
+
+      expect(stopwatch.startedAtMs).toBe(100.4);
+      expect(stopwatch.elapsedMs()).toBe(35);
+      expect(stopwatch.elapsedAt(132.8)).toBe(32);
+    } finally {
+      now.mockRestore();
+    }
   });
 });

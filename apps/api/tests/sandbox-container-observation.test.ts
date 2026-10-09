@@ -3,7 +3,7 @@ import { expect, mock, test } from "bun:test";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 
 // Isolate cloudflare:workers and SDK mocks from the other API integration tests.
-if (process.env.MOSOO_TEST_SANDBOX_OBSERVATION === "1") {
+if (process.env.MOSOO_TEST_SANDBOX_WRAPPER === "1") {
   let initializations = 0;
   let executions = 0;
   let destructions = 0;
@@ -50,39 +50,20 @@ if (process.env.MOSOO_TEST_SANDBOX_OBSERVATION === "1") {
   }));
 
   const { Sandbox } = await import("../src/adapters/durable-objects/sandbox.do");
-  function fixture(running?: boolean, corrupt = false) {
+  function fixture(running: boolean) {
     let reads = 0;
     const ctx = {
-      id: { toString: () => "sandbox-observation" },
-      ...(running === undefined ? {} : { container: { running } }),
+      id: { toString: () => "sandbox-wrapper" },
+      container: { running },
       storage: {
         async get() {
           reads++;
-          return corrupt ? { networkPolicy: "unknown" } : undefined;
+          return undefined;
         },
       },
     };
     const sandbox = new Sandbox(ctx as unknown as DurableObjectState, {} as ApiBindings);
     return { sandbox, reads: () => reads };
-  }
-
-  for (const [running, state] of [
-    [true, "running"],
-    [false, "stopped"],
-    [undefined, "unavailable"],
-  ] as const) {
-    test(`observes ${state} without SDK initialization or storage access`, async () => {
-      const before = initializations;
-      const { sandbox, reads } = fixture(running, true);
-      const started = Date.now();
-      const observed = sandbox.getContainerObservation();
-      await Promise.resolve();
-      expect(observed.state).toBe(state);
-      expect(observed.observedAt).toBeGreaterThanOrEqual(started);
-      expect(observed.observedAt).toBeLessThanOrEqual(Date.now());
-      expect(initializations).toBe(before);
-      expect(reads()).toBe(0);
-    });
   }
 
   test("concurrent access still initializes and restores the SDK exactly once", async () => {
@@ -93,30 +74,6 @@ if (process.env.MOSOO_TEST_SANDBOX_OBSERVATION === "1") {
     expect(initializations).toBe(before + 1);
     expect(reads()).toBe(1);
     expect(executions).toBe(2);
-    sandbox.getContainerObservation();
-    expect(initializations).toBe(before + 1);
-    expect(reads()).toBe(1);
-  });
-
-  test("corrupt policy still blocks execution and permits teardown and observation", async () => {
-    const before = executions;
-    const { sandbox } = fixture(false, true);
-    const exec = Reflect.get(sandbox, "exec") as () => Promise<unknown>;
-    await expect(exec.call(sandbox)).rejects.toThrow("unknown network policy");
-    expect(executions).toBe(before);
-    const destroy = Reflect.get(sandbox, "destroy") as () => Promise<void>;
-    await destroy.call(sandbox);
-    expect(destructions).toBe(1);
-    expect(sandbox.getContainerObservation().state).toBe("stopped");
-  });
-
-  test("teardown can be the first access even when policy restoration rejects", async () => {
-    const before = destructions;
-    const { sandbox } = fixture(false, true);
-    const destroy = Reflect.get(sandbox, "destroy") as () => Promise<void>;
-    await destroy.call(sandbox);
-    expect(destructions).toBe(before + 1);
-    expect(sandbox.getContainerObservation().state).toBe("stopped");
   });
 
   test("forwarded teardown invalidates old handles while fresh handles remain usable", async () => {
@@ -134,22 +91,6 @@ if (process.env.MOSOO_TEST_SANDBOX_OBSERVATION === "1") {
     const fresh = await createSession.call(sandbox);
     expect(await fresh.readFile()).toBe("synthetic file");
     expect(sessionReads).toBe(before + 1);
-  });
-
-  test("corrupt policy blocks explicit startup before any container attempt", async () => {
-    let attempts = 0;
-    onStartup = async () => {
-      attempts++;
-    };
-    try {
-      const { sandbox } = fixture(false, true);
-      await expect(sandbox.ensureContainerReady({ allowRecovery: true })).rejects.toThrow(
-        "unknown network policy",
-      );
-      expect(attempts).toBe(0);
-    } finally {
-      onStartup = async () => {};
-    }
   });
 
   test("forwarded teardown waits for startup cancellation without a recovery attempt", async () => {
@@ -186,10 +127,10 @@ if (process.env.MOSOO_TEST_SANDBOX_OBSERVATION === "1") {
     }
   });
 } else {
-  test("actual Sandbox wrapper observation and lazy initialization", async () => {
+  test("actual Sandbox wrapper initialization and teardown", async () => {
     const child = Bun.spawn({
       cmd: [process.execPath, "test", import.meta.path],
-      env: { ...process.env, MOSOO_TEST_SANDBOX_OBSERVATION: "1" },
+      env: { ...process.env, MOSOO_TEST_SANDBOX_WRAPPER: "1" },
       stdout: "pipe",
       stderr: "pipe",
     });
@@ -198,7 +139,7 @@ if (process.env.MOSOO_TEST_SANDBOX_OBSERVATION === "1") {
       new Response(child.stdout).text(),
       new Response(child.stderr).text(),
     ]);
-    if (status !== 0) throw new Error(`Sandbox observation regression failed:\n${stdout}${stderr}`);
+    if (status !== 0) throw new Error(`Sandbox wrapper regression failed:\n${stdout}${stderr}`);
     expect(status).toBe(0);
   }, 10_000);
 }

@@ -4,13 +4,13 @@ import type { PresetModelProtocol } from "@mosoo/contracts/models";
 import type { SessionId } from "@mosoo/id";
 
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
-import { hydrateCachedRunContextFromSession } from "../src/modules/runtime/application/session-definition/hydrate-run-context.service";
+import { hydrateRunContextFromSession } from "../src/modules/runtime/application/session-definition/hydrate-run-context.service";
 import { parseSessionExecutionPlanJson } from "../src/modules/runtime/application/session-definition/session-execution.repository";
 import {
   createAgentSession,
   createProjectSession,
 } from "../src/modules/runtime/application/session-run.service";
-import { createVendorCredential } from "../src/modules/vendor-credentials/application/vendor-credential.service";
+import { createVendorCredential } from "../src/modules/vendor-credentials/application/vendor-credential-commands";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import {
   createPublicHttpContractDatabase,
@@ -112,36 +112,32 @@ describe("Session model protocol admission and freezing", () => {
       expect(
         parseSessionExecutionPlanJson(await snapshot(database, session.id)).modelProtocol,
       ).toBe("openai-responses");
-      const hydrated = await hydrateCachedRunContextFromSession(bindings, OWNER, session);
-      expect(hydrated.value.profile.modelProtocol).toBe("openai-responses");
+      const hydrated = await hydrateRunContextFromSession(bindings, OWNER, session);
+      expect(hydrated.profile.modelProtocol).toBe("openai-responses");
     }
   });
 
-  test.each(PROTOCOLS)("freezes %s through cold and warm Pi hydration", async (protocol) => {
+  test.each(PROTOCOLS)("freezes %s through Pi hydration", async (protocol) => {
     const { bindings, credential, database } = await fixture(protocol);
     const session = await createInline(bindings);
     const plan = parseSessionExecutionPlanJson(await snapshot(database, session.id));
     expect(plan.modelProtocol).toBe(protocol);
-    const cold = await hydrateCachedRunContextFromSession(bindings, OWNER, session);
-    expect(cold.cacheHit).toBe(false);
-    expect(cold.value.profile.modelProtocol).toBe(protocol);
-    expect(cold.value.profile.vendorCredential.credentialId).toBe(credential.id);
-    expect(cold.value.profile.vendorCredential.modelProtocol).toBe(protocol);
-    const warm = await hydrateCachedRunContextFromSession(bindings, OWNER, session);
-    expect(warm.cacheHit).toBe(true);
-    expect(warm.value.profile.modelProtocol).toBe(protocol);
+    const hydrated = await hydrateRunContextFromSession(bindings, OWNER, session);
+    expect(hydrated.profile.modelProtocol).toBe(protocol);
+    expect(hydrated.profile.vendorCredential.credentialId).toBe(credential.id);
+    expect(hydrated.profile.vendorCredential.modelProtocol).toBe(protocol);
   });
 
-  test.each(["cold", "warm"])("rejects protocol edits during %s continuation", async (path) => {
+  test("rejects protocol edits during continuation", async () => {
     const { bindings, credential, database } = await fixture();
     const session = await createInline(bindings);
     const admitted = await snapshot(database, session.id);
-    if (path === "warm") await hydrateCachedRunContextFromSession(bindings, OWNER, session);
+    await hydrateRunContextFromSession(bindings, OWNER, session);
     await database
       .prepare("UPDATE vendor_credential SET model_protocol = 'openai-responses' WHERE id = ?")
       .bind(credential.id)
       .run();
-    await expect(hydrateCachedRunContextFromSession(bindings, OWNER, session)).rejects.toThrow(
+    await expect(hydrateRunContextFromSession(bindings, OWNER, session)).rejects.toThrow(
       "Restore the original protocol or start a new Session",
     );
     expect(await snapshot(database, session.id)).toBe(admitted);
@@ -151,8 +147,8 @@ describe("Session model protocol admission and freezing", () => {
       )
       .bind(credential.id)
       .run();
-    const restored = await hydrateCachedRunContextFromSession(bindings, OWNER, session);
-    expect(restored.value.profile.modelProtocol).toBe("openai-chat-completions");
+    const restored = await hydrateRunContextFromSession(bindings, OWNER, session);
+    expect(restored.profile.modelProtocol).toBe("openai-chat-completions");
   });
 
   test.each(["inline", "preset"])(
@@ -208,59 +204,43 @@ describe("Session model protocol admission and freezing", () => {
     });
     await expect(createInline(bindings, "openai-runtime")).rejects.toThrow("protocol");
     const session = await createInline(bindings);
-    const hydrated = await hydrateCachedRunContextFromSession(bindings, OWNER, session);
-    expect(hydrated.value.profile.vendorCredential.credentialId).toBe(credential.id);
+    const hydrated = await hydrateRunContextFromSession(bindings, OWNER, session);
+    expect(hydrated.profile.vendorCredential.credentialId).toBe(credential.id);
     expect(parseSessionExecutionPlanJson(await snapshot(database, session.id)).modelProtocol).toBe(
       "openai-chat-completions",
     );
   });
 
   for (const runtimeId of ["openai-runtime", "acp-fallback", "pi"]) {
-    test.each(["cold", "warm"])(
-      `preserves the historical ${runtimeId} protocol for a legacy %s Session`,
-      async (path) => {
-        const { bindings, credential, database } = await fixture();
-        await database
-          .prepare("UPDATE vendor_credential SET model_protocol = NULL WHERE id = ?")
-          .bind(credential.id)
-          .run();
-        const session = await createInline(bindings, runtimeId);
-        await database
-          .prepare(
-            "UPDATE session_execution_snapshot SET plan_json = json_remove(plan_json, '$.modelProtocol') WHERE session_id = ?",
-          )
-          .bind(session.id)
-          .run();
-        const admitted = await snapshot(database, session.id);
-        const expected =
-          runtimeId === "openai-runtime" ? "openai-responses" : "openai-chat-completions";
-        if (path === "warm") {
-          const original = await hydrateCachedRunContextFromSession(bindings, OWNER, session);
-          expect(original.value.profile.modelProtocol).toBe(expected);
-        }
-        await database
-          .prepare("UPDATE vendor_credential SET model_protocol = ? WHERE id = ?")
-          .bind(
-            expected === "openai-responses" ? "openai-chat-completions" : "openai-responses",
-            credential.id,
-          )
-          .run();
-        await expect(hydrateCachedRunContextFromSession(bindings, OWNER, session)).rejects.toThrow(
-          "Restore the original protocol or start a new Session",
-        );
-        expect(await snapshot(database, session.id)).toBe(admitted);
-      },
-    );
+    test(`preserves the historical ${runtimeId} protocol for a legacy Session`, async () => {
+      const { bindings, credential, database } = await fixture();
+      await database
+        .prepare("UPDATE vendor_credential SET model_protocol = NULL WHERE id = ?")
+        .bind(credential.id)
+        .run();
+      const session = await createInline(bindings, runtimeId);
+      await database
+        .prepare(
+          "UPDATE session_execution_snapshot SET plan_json = json_remove(plan_json, '$.modelProtocol') WHERE session_id = ?",
+        )
+        .bind(session.id)
+        .run();
+      const admitted = await snapshot(database, session.id);
+      const expected =
+        runtimeId === "openai-runtime" ? "openai-responses" : "openai-chat-completions";
+      const original = await hydrateRunContextFromSession(bindings, OWNER, session);
+      expect(original.profile.modelProtocol).toBe(expected);
+      await database
+        .prepare("UPDATE vendor_credential SET model_protocol = ? WHERE id = ?")
+        .bind(
+          expected === "openai-responses" ? "openai-chat-completions" : "openai-responses",
+          credential.id,
+        )
+        .run();
+      await expect(hydrateRunContextFromSession(bindings, OWNER, session)).rejects.toThrow(
+        "Restore the original protocol or start a new Session",
+      );
+      expect(await snapshot(database, session.id)).toBe(admitted);
+    });
   }
-
-  test("rejects corrupt protocol snapshots instead of taking the legacy path", async () => {
-    const { bindings, database } = await fixture();
-    const session = await createInline(bindings);
-    const plan = parseSessionExecutionPlanJson(await snapshot(database, session.id));
-    for (const modelProtocol of [null, "unknown-protocol", 1]) {
-      expect(() =>
-        parseSessionExecutionPlanJson(JSON.stringify({ ...plan, modelProtocol })),
-      ).toThrow("modelProtocol must be a supported model protocol");
-    }
-  });
 });

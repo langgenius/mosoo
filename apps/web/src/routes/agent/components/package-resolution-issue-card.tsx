@@ -2,11 +2,22 @@ import type { AgentResolutionIssue } from "@mosoo/contracts/agent-manifest";
 import type { ReactElement } from "react";
 import { Link } from "react-router-dom";
 
-import { cn } from "@/shared/lib/class-names";
+import { useTranslation } from "@/shared/i18n";
+import { Badge } from "@/shared/ui/badge";
 
-function formatIssueTarget(issue: AgentResolutionIssue): string {
+const TARGET_TYPE_LABEL_KEYS: Record<AgentResolutionIssue["targetType"], string> = {
+  agent: "agent.agent",
+  environment: "agent.environment",
+  mcp_server: "agent.mcpServer",
+  model: "agent.model",
+  provider: "agent.provider",
+  runtime: "agent.runtime",
+  skill: "skills.skill",
+};
+
+function formatIssueTarget(issue: AgentResolutionIssue, t: (key: string) => string): string {
   const target = issue.targetLabel === null ? "" : ` · ${issue.targetLabel}`;
-  return `${issue.targetType.replaceAll("_", " ")}${target}`;
+  return `${t(TARGET_TYPE_LABEL_KEYS[issue.targetType])}${target}`;
 }
 
 function formatIssueStatus(issue: AgentResolutionIssue): string {
@@ -57,30 +68,22 @@ export function PackageResolutionIssueCard({
   issue: AgentResolutionIssue;
   requiredTone?: "amber" | "muted";
 }): ReactElement {
+  const { t } = useTranslation();
   const actionLabel = getIssueActionLabel(issue);
   const actionLink = getIssueActionLink(issue);
 
   return (
-    <div className="rounded-md bg-white/70 px-3 py-2">
+    <div className="bg-card/70 rounded-md px-3 py-2">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-muted-foreground text-[11px] font-medium tracking-normal uppercase">
-            {formatIssueTarget(issue)}
-          </div>
+          <div className="t-group-label">{formatIssueTarget(issue, t)}</div>
           <div className="text-foreground mt-0.5 text-[12px] font-medium">{issue.message}</div>
         </div>
-        <span
-          className={cn(
-            "shrink-0 rounded-sm px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-normal",
-            issue.required && requiredTone === "amber"
-              ? "bg-amber-bg text-amber-fg"
-              : "bg-muted text-muted-foreground",
-          )}
-        >
-          {issue.required ? "required" : "optional"}
-        </span>
+        <Badge variant={issue.required && requiredTone === "amber" ? "warning" : "default"}>
+          {issue.required ? t("agent.required") : t("onboarding.optional")}
+        </Badge>
       </div>
-      <div className="text-muted-foreground mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px]">
+      <div className="text-fg-3 mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px]">
         <span>{formatIssueStatus(issue)}</span>
         <span className="text-border">/</span>
         {actionLink === null ? (

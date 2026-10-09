@@ -12,7 +12,7 @@ import { getRuntimeDriverLlmProxyPath } from "../src/modules/runtime/domain/runt
 import { createRuntimeActionToken } from "../src/modules/runtime/infrastructure/runtime-boot-token";
 import type { RuntimeActionTokenPayload } from "../src/modules/runtime/infrastructure/runtime-boot-token";
 import { buildVendorProxyEnvVars } from "../src/modules/runtime/infrastructure/runtime-sandbox-provisioning/runtime-vendor-proxy-env.builder";
-import { storeVendorCredentialSecret } from "../src/modules/vendor-credentials/application/vendor-credential.secret-resolution";
+import { storeSecret } from "../src/modules/vault/application/vault-secret-store";
 import { runWithRequestLogContext } from "../src/platform/cloudflare/logger";
 import type { ApiBindings, ApiGatewayEnvironment } from "../src/platform/cloudflare/worker-types";
 import {
@@ -27,7 +27,6 @@ import {
   createPublicHttpContractDatabase,
   createPublicHttpTestBindings,
   createTestExecutionContext,
-  insertOwnerSession,
 } from "./helpers/public-api-http-test-fixture";
 
 const CREDENTIAL_ID = parsePlatformId<VendorCredentialId>(
@@ -107,16 +106,18 @@ async function insertDriverInstance(
     driverInstanceId?: DriverInstanceId;
     generation?: number;
     lastHeartbeatAt?: number | null;
+    sandboxSessionId?: string;
     updatedAt?: number;
   } = {},
 ) {
   const nowMs = input.updatedAt ?? Date.now();
+  const driverInstanceId = input.driverInstanceId ?? DRIVER_INSTANCE_ID;
   await database
     .app()
     .insert(driverInstancesTable)
     .values({
       bootTokenExpiresAt: input.bootTokenExpiresAt ?? nowMs + 60_000,
-      bootTokenHash: new Uint8Array([1, 2, 3]),
+      bootTokenHash: new TextEncoder().encode(driverInstanceId),
       bootTokenUsedAt: null,
       closeCode: null,
       closeReason: null,
@@ -129,14 +130,14 @@ async function insertDriverInstance(
       expiresAt: nowMs + 60_000,
       generation: input.generation ?? 0,
       heartbeatCount: 0,
-      id: input.driverInstanceId ?? DRIVER_INSTANCE_ID,
+      id: driverInstanceId,
       lastHeartbeatAt: input.lastHeartbeatAt ?? null,
       processId: null,
       protocol: "orpc-ws",
       protocolVersion: 2,
       runtime: "claude-agent-sdk",
       sandboxId: PUBLIC_API_TEST_IDS.sandbox,
-      sandboxSessionId: PUBLIC_API_TEST_IDS.ownerSession,
+      sandboxSessionId: input.sandboxSessionId ?? PUBLIC_API_TEST_IDS.ownerSession,
       status,
       statusChangedAt: nowMs,
       statusSource: "api",
@@ -156,12 +157,9 @@ async function insertVendorCredential(
   },
 ) {
   const credentialId = input.credentialId ?? CREDENTIAL_ID;
-  const secretId = await storeVendorCredentialSecret(bindings, {
-    apiKey: UPSTREAM_API_KEY,
-    credentialId,
-    projectId: PROJECT_ID,
-    providerId: input.vendorId,
-    purpose: "credential_create_api_key",
+  const secretId = await storeSecret(bindings.DB, bindings, {
+    kind: "vendor_api_key",
+    value: UPSTREAM_API_KEY,
   });
   const nowMs = Date.now();
 
@@ -923,6 +921,7 @@ describe("driver LLM proxy route", () => {
     await insertDriverInstance(database, "provisioning", {
       bootTokenExpiresAt: Date.now() - 1,
       driverInstanceId: OTHER_DRIVER_INSTANCE_ID,
+      sandboxSessionId: PUBLIC_API_TEST_IDS.nonOwnerSession,
     });
 
     const response = await dispatch(bindings, llmProxyRequest("/v1/messages", { method: "POST" }));
@@ -1116,7 +1115,7 @@ describe("driver LLM proxy route", () => {
         }),
       );
 
-      expect(response.status).toBe(400);
+      expect(response.status).toBe(403);
       expect(captured).toHaveLength(0);
     },
   );
@@ -1192,7 +1191,7 @@ describe("driver LLM proxy route", () => {
       }),
     );
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(403);
     expect(captured).toHaveLength(0);
   });
 

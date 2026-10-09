@@ -4,8 +4,7 @@ import { Navigate, useLocation } from "react-router-dom";
 
 import { useTranslation } from "@/shared/i18n";
 
-import { UploadRecoveryDialog } from "../features/files/upload-recovery/upload-recovery-dialog";
-import { useAppSession } from "./session-provider";
+import { useAppSession } from "./session/session-context";
 
 // The authenticated app shell (sidebar navigation, account/help menus, org
 // chrome) only renders once a signed-in user clears the guards below. Loading
@@ -31,30 +30,22 @@ interface RouteChildrenProps {
 export function AppLoading(): ReactElement {
   const { t } = useTranslation();
   return (
-    <div className="text-muted-foreground flex h-dvh items-center justify-center">
-      {t("common.loading")}
-    </div>
+    <div className="text-fg-3 flex h-dvh items-center justify-center">{t("common.loading")}</div>
   );
 }
 
 export function GuestRoute({ children }: RouteChildrenProps): ReactNode {
-  const { onboardingState, user, userLoading } = useAppSession();
+  const { hasOrganization, user } = useAppSession();
 
   if (!user) {
     return children;
   }
-  if (userLoading) {
-    return <AppLoading />;
-  }
-  if (onboardingState === "loading" || onboardingState === null) {
-    return <AppLoading />;
-  }
 
-  return <Navigate to={onboardingState === "complete" ? "/" : "/onboarding"} replace />;
+  return <Navigate to={hasOrganization ? "/" : "/onboarding"} replace />;
 }
 
 export function OnboardingRoute({ children }: RouteChildrenProps): ReactNode {
-  const { onboardingState, user, userLoading } = useAppSession();
+  const { hasOrganization, user, userLoading } = useAppSession();
 
   if (userLoading) {
     return <AppLoading />;
@@ -62,11 +53,7 @@ export function OnboardingRoute({ children }: RouteChildrenProps): ReactNode {
   if (!user) {
     return <Navigate to="/login" replace />;
   }
-  if (onboardingState === "loading" || onboardingState === null) {
-    return <AppLoading />;
-  }
-
-  if (onboardingState === "complete") {
+  if (hasOrganization) {
     return <Navigate to="/" replace />;
   }
 
@@ -78,7 +65,7 @@ export function ProtectedRoute({
   shell = "project",
 }: RouteChildrenProps & { shell?: "project" | "org" }): ReactNode {
   const location = useLocation();
-  const { onboardingState, user, userLoading } = useAppSession();
+  const { hasOrganization, user, userLoading } = useAppSession();
   const redirectTarget = `${location.pathname}${location.search}${location.hash}`;
   const loginPath =
     redirectTarget === "/" ? "/login" : `/login?redirect=${encodeURIComponent(redirectTarget)}`;
@@ -89,19 +76,11 @@ export function ProtectedRoute({
   if (!user) {
     return <Navigate to={loginPath} replace />;
   }
-  if (onboardingState === "pending") {
+  if (!hasOrganization) {
     return <Navigate to="/onboarding" replace />;
-  }
-  if (onboardingState === "loading" || onboardingState === null) {
-    return <AppLoading />;
   }
 
   const Shell = shell === "org" ? OrgLayout : Layout;
 
-  return (
-    <Shell>
-      <UploadRecoveryDialog />
-      {children}
-    </Shell>
-  );
+  return <Shell>{children}</Shell>;
 }

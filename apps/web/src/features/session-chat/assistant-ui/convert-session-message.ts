@@ -107,8 +107,6 @@ function sessionSegmentsToParts(segments: readonly SessionViewSegment[]): Assist
 
 // External-store converter: SessionViewMessage -> ThreadMessageLike. Stable `id`
 // keeps assistant-ui's per-message memo + keys aligned with the live stream.
-// Permission/needs_approval is intentionally NOT folded here (this conversion is
-// identity-cached and permissionRequests live in a separate array).
 export function convertSessionMessage(
   message: SessionViewMessage,
   messageIndex?: number,

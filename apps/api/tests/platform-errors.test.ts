@@ -2,34 +2,22 @@ import { describe, expect, test } from "bun:test";
 
 import {
   API_ERROR_CODE,
-  API_ERROR_STATUS,
-  ApiError,
   createApiError,
-  getApiErrorStatusForCode,
-  isApiErrorCode,
-  isApiErrorStatus,
   toApiErrorResponseDetails,
   validationError,
 } from "../src/platform/errors";
-import type { ApiErrorCode, ApiErrorStatus } from "../src/platform/errors";
 
 describe("platform error taxonomy", () => {
   test("maps public error codes to finite HTTP statuses", () => {
-    expect(getApiErrorStatusForCode(API_ERROR_CODE.notFound)).toBe(API_ERROR_STATUS.notFound);
-    expect(
-      createApiError(API_ERROR_CODE.websocketRequired, "Expected WebSocket upgrade."),
-    ).toMatchObject({
-      code: "WEBSOCKET_REQUIRED",
-      message: "Expected WebSocket upgrade.",
-      status: 426,
+    expect(createApiError(API_ERROR_CODE.notFound, "Missing.")).toMatchObject({
+      code: "NOT_FOUND",
+      message: "Missing.",
+      status: 404,
     });
-  });
-
-  test("admits only known public codes and statuses", () => {
-    expect(isApiErrorCode("VALIDATION_FAILED")).toBe(true);
-    expect(isApiErrorCode("LOCAL_STRING")).toBe(false);
-    expect(isApiErrorStatus(400)).toBe(true);
-    expect(isApiErrorStatus(418)).toBe(false);
+    expect(createApiError(API_ERROR_CODE.sessionRunActive, "Run in progress.")).toMatchObject({
+      code: "SESSION_RUN_ACTIVE",
+      status: 409,
+    });
   });
 
   test("normalizes unknown errors through the public fallback", () => {
@@ -48,14 +36,5 @@ describe("platform error taxonomy", () => {
       message: "Access token request failed.",
       status: 500,
     });
-  });
-
-  test("rejects unsupported constructor values at runtime", () => {
-    expect(
-      () => new ApiError(418 as ApiErrorStatus, API_ERROR_CODE.validationFailed, "Nope."),
-    ).toThrow("Unsupported API error status");
-    expect(
-      () => new ApiError(API_ERROR_STATUS.badRequest, "LOCAL_STRING" as ApiErrorCode, "Nope."),
-    ).toThrow("Unsupported API error code");
   });
 });

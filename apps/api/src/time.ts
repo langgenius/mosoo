@@ -1,15 +1,11 @@
-export interface Clock {
-  nowMs(): number;
-}
-
 export interface Stopwatch {
   readonly startedAtMs: number;
   elapsedAt(timestampMs: number): number;
   elapsedMs(): number;
 }
 
-export const systemClock: Clock = {
-  nowMs: () => Date.now(),
+export const systemClock = {
+  nowMs: (): number => Date.now(),
 };
 
 export function currentTimestampMs(): number {
@@ -24,8 +20,8 @@ export function toDurationMs(durationMs: number): number {
   return Math.max(0, Math.round(durationMs));
 }
 
-export function createStopwatch(clock: Clock = systemClock): Stopwatch {
-  const startedAtMs = clock.nowMs();
+export function createStopwatch(): Stopwatch {
+  const startedAtMs = currentTimestampMs();
 
   return {
     startedAtMs,
@@ -33,7 +29,7 @@ export function createStopwatch(clock: Clock = systemClock): Stopwatch {
       return toDurationMs(timestampMs - startedAtMs);
     },
     elapsedMs() {
-      return toDurationMs(clock.nowMs() - startedAtMs);
+      return toDurationMs(currentTimestampMs() - startedAtMs);
     },
   };
 }

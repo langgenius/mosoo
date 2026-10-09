@@ -4,17 +4,10 @@ import type { SessionId, SessionRunId } from "@mosoo/id";
 import { and, desc, eq, inArray } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../../platform/db/drizzle";
+import { ACTIVE_SESSION_RUN_STATUSES } from "../../domain/session-run-lifecycle.machine";
 import { toSessionRunSummary } from "./session-run-row.mapper";
-import type { ActiveSessionRunStatus } from "./session-run-row.mapper";
 
-const ACTIVE_SESSION_RUN_STATUSES: ActiveSessionRunStatus[] = [
-  "queued",
-  "booting",
-  "running",
-  "waiting_input",
-];
-
-function sessionRunSummaryColumns() {
+export function sessionRunSummaryColumns() {
   return {
     completed_at: sessionRunsTable.completedAt,
     created_at: sessionRunsTable.createdAt,
@@ -105,45 +98,4 @@ export async function getActiveSessionRunSummary(
   }
 
   return toSessionRunSummary(row);
-}
-
-export async function getActiveSessionRunId(
-  database: D1Database,
-  sessionId: SessionId,
-): Promise<SessionRunId | null> {
-  const row =
-    (await getAppDatabase(database)
-      .select({ id: sessionRunsTable.id })
-      .from(sessionRunsTable)
-      .where(
-        and(
-          eq(sessionRunsTable.sessionId, sessionId),
-          inArray(sessionRunsTable.status, ACTIVE_SESSION_RUN_STATUSES),
-        ),
-      )
-      .orderBy(desc(sessionRunsTable.createdAt))
-      .limit(1)
-      .get()) ?? null;
-
-  return row?.id ?? null;
-}
-
-export async function hasActiveSessionRun(
-  database: D1Database,
-  sessionId: SessionId,
-): Promise<boolean> {
-  const row =
-    (await getAppDatabase(database)
-      .select({ id: sessionRunsTable.id })
-      .from(sessionRunsTable)
-      .where(
-        and(
-          eq(sessionRunsTable.sessionId, sessionId),
-          inArray(sessionRunsTable.status, ACTIVE_SESSION_RUN_STATUSES),
-        ),
-      )
-      .limit(1)
-      .get()) ?? null;
-
-  return row !== null;
 }

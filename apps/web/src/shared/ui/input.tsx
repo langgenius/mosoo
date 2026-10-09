@@ -4,7 +4,7 @@ import { cn } from "@/shared/lib/class-names";
 
 /**
  * Field recipe (docs/design/console-design-contract.md, section 4): 32px,
- * 10px radius, strong hairline, white surface. Focus turns the border into
+ * 6px radius, strong hairline, white surface. Focus turns the border into
  * the focus tone with a soft glow; invalid turns the border to danger and
  * leaves the focus treatment alone; read-only and disabled change the surface
  * and text instead of fading the control.

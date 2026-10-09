@@ -1,6 +1,6 @@
 import type { ReactElement } from "react";
 
-import { useFormatDate, useTranslation } from "@/shared/i18n";
+import { getCurrentLocale, useTranslation } from "@/shared/i18n";
 import { Badge } from "@/shared/ui/badge";
 import { GitBranch } from "@/shared/ui/icons";
 import { ScrollArea } from "@/shared/ui/scroll-area";
@@ -11,21 +11,18 @@ import { RuntimeIcon } from "./runtime-icon";
 
 export function VersionsTab({ agent }: { agent: Agent }): ReactElement {
   const { t } = useTranslation();
-  const { dateTime } = useFormatDate();
   const runtime = getRuntimeInfo(agent.runtime);
 
   return (
     <div className="bg-paper-200 flex h-full flex-col">
-      <header className="border-border-subtle shrink-0 border-b bg-white px-5 py-4 pr-12">
+      <header className="border-border-soft bg-card shrink-0 border-b px-5 py-4 pr-12">
         <div className="flex items-center gap-3">
-          <div className="border-border flex size-8 items-center justify-center rounded-lg border bg-white">
-            <GitBranch className="text-muted-foreground size-4" />
+          <div className="border-border bg-card flex size-8 items-center justify-center rounded-lg border">
+            <GitBranch className="text-fg-3 size-4" />
           </div>
           <div className="min-w-0">
             <div className="text-foreground text-[14px] font-medium">{t("agent.versions")}</div>
-            <div className="text-muted-foreground mt-0.5 text-[12px]">
-              {t("agent.versionsDescription")}
-            </div>
+            <div className="text-fg-3 mt-0.5 text-[12px]">{t("agent.versionsDescription")}</div>
           </div>
           <div className="flex-1" />
           {agent.liveVersion ? (
@@ -43,19 +40,17 @@ export function VersionsTab({ agent }: { agent: Agent }): ReactElement {
       <ScrollArea className="min-h-0 flex-1">
         <div className="mx-auto w-full max-w-4xl p-5">
           {agent.versions.length === 0 ? (
-            <div className="border-border rounded-lg border border-dashed bg-white px-5 py-8 text-center">
+            <div className="border-border bg-card rounded-lg border border-dashed px-5 py-8 text-center">
               <div className="text-foreground text-[14px] font-medium">
                 {t("agent.noPublishedVersions")}
               </div>
-              <div className="text-muted-foreground mt-1 text-[12px]">
-                {t("agent.publishToCreateVersion")}
-              </div>
+              <div className="text-fg-3 mt-1 text-[12px]">{t("agent.publishToCreateVersion")}</div>
             </div>
           ) : (
-            <div className="border-border overflow-hidden rounded-lg border bg-white">
+            <div className="border-border bg-card overflow-hidden rounded-lg border">
               {agent.versions.map((version, index) => (
                 <div
-                  className="border-border-subtle grid grid-cols-[96px_minmax(0,1fr)_180px] items-center gap-4 border-b px-4 py-3 last:border-b-0"
+                  className="border-border-soft grid grid-cols-[96px_minmax(0,1fr)_180px] items-center gap-4 border-b px-4 py-3 last:border-b-0"
                   key={version.id}
                 >
                   <div className="flex items-center gap-2">
@@ -73,7 +68,7 @@ export function VersionsTab({ agent }: { agent: Agent }): ReactElement {
                     <div className="text-foreground truncate text-[13px] font-medium">
                       {version.summary}
                     </div>
-                    <div className="text-muted-foreground mt-1 flex min-w-0 items-center gap-2 text-[11px]">
+                    <div className="text-fg-3 mt-1 flex min-w-0 items-center gap-2 text-[11px]">
                       <RuntimeIcon runtime={runtime} size={14} />
                       <span className="truncate">{version.runtimeId}</span>
                       <span>·</span>
@@ -81,10 +76,16 @@ export function VersionsTab({ agent }: { agent: Agent }): ReactElement {
                     </div>
                   </div>
 
-                  <div className="text-muted-foreground text-right text-[11px]">
-                    {dateTime(version.createdAt)}
+                  <div className="text-fg-3 text-right text-[11px]">
+                    {new Date(version.createdAt).toLocaleString(getCurrentLocale(), {
+                      day: "numeric",
+                      hour: "numeric",
+                      minute: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                    })}
                     {index === 0 && !version.isLive ? (
-                      <div className="text-muted-foreground mt-1 text-[10.5px]">
+                      <div className="text-fg-3 mt-1 text-[10.5px]">
                         {t("agent.historicalVersion")}
                       </div>
                     ) : null}

@@ -17,21 +17,10 @@ import {
   SERVER_PRODUCT_ANALYTICS_EVENTS,
 } from "../../../platform/analytics/product-analytics";
 import { logInfo, logWarn } from "../../../platform/cloudflare/logger";
+import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
-import type { AuthEmailBindings } from "./auth-email";
 import { sendOtpEmail } from "./auth-email";
 import { mosooAiDevelopmentBackdoorPlugin } from "./mosoo-ai-development-backdoor";
-
-export interface AuthBindings extends AuthEmailBindings {
-  readonly BETTER_AUTH_SECRET?: string;
-  readonly GOOGLE_OAUTH_CLIENT_ID?: string;
-  readonly GOOGLE_OAUTH_CLIENT_SECRET?: string;
-  readonly MOSOO_DEPLOYMENT_MODE?: string;
-  readonly MOSOO_ENVIRONMENT?: string;
-  readonly POSTHOG_API_HOST?: string;
-  readonly POSTHOG_PROJECT_KEY?: string;
-  readonly WEB_ORIGIN: string;
-}
 
 const authCache = new WeakMap<D1Database, ReturnType<typeof createAppAuth>>();
 
@@ -54,7 +43,7 @@ function serializeAccountUpdateTimestampFields<T extends Record<string, unknown>
   });
 }
 
-function getBetterAuthSecret(bindings: AuthBindings): string {
+function getBetterAuthSecret(bindings: ApiBindings): string {
   const secret = bindings.BETTER_AUTH_SECRET?.trim();
 
   if (!secret) {
@@ -64,13 +53,7 @@ function getBetterAuthSecret(bindings: AuthBindings): string {
   return secret;
 }
 
-export function isBetterAuthConfigured(
-  bindings: Pick<AuthBindings, "BETTER_AUTH_SECRET">,
-): boolean {
-  return Boolean(bindings.BETTER_AUTH_SECRET?.trim());
-}
-
-function createAppAuth(bindings: AuthBindings) {
+function createAppAuth(bindings: ApiBindings) {
   const googleClientId = bindings.GOOGLE_OAUTH_CLIENT_ID?.trim() ?? "";
   const googleClientSecret = bindings.GOOGLE_OAUTH_CLIENT_SECRET?.trim() ?? "";
   const authPlugins: BetterAuthPlugin[] = [
@@ -99,6 +82,12 @@ function createAppAuth(bindings: AuthBindings) {
     verification: authVerificationsTable,
   };
   const database = getAppDatabase(bindings.DB);
+  const googleOAuthConfigured = Boolean(googleClientId && googleClientSecret);
+
+  logInfo("auth.initialized", {
+    googleOAuthConfigured,
+    webOrigin: bindings.WEB_ORIGIN,
+  });
 
   return betterAuth({
     advanced: {
@@ -141,7 +130,7 @@ function createAppAuth(bindings: AuthBindings) {
       },
       expiresIn: 30 * 24 * 60 * 60,
     },
-    ...(googleClientId && googleClientSecret
+    ...(googleOAuthConfigured
       ? {
           socialProviders: {
             google: {
@@ -162,7 +151,7 @@ function createAppAuth(bindings: AuthBindings) {
   });
 }
 
-export function getBetterAuth(bindings: AuthBindings) {
+export function getBetterAuth(bindings: ApiBindings) {
   const cached = authCache.get(bindings.DB);
 
   if (cached) {
@@ -171,11 +160,5 @@ export function getBetterAuth(bindings: AuthBindings) {
 
   const auth = createAppAuth(bindings);
   authCache.set(bindings.DB, auth);
-  logInfo("auth.initialized", {
-    googleOAuthConfigured: Boolean(
-      bindings.GOOGLE_OAUTH_CLIENT_ID?.trim() && bindings.GOOGLE_OAUTH_CLIENT_SECRET?.trim(),
-    ),
-    webOrigin: bindings.WEB_ORIGIN,
-  });
   return auth;
 }

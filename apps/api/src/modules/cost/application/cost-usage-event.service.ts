@@ -1,6 +1,6 @@
 import type { SessionUsageSummary } from "@mosoo/ag-ui-session";
 import type { SessionRunTrigger } from "@mosoo/contracts/session-run";
-import { usageEventRollupReceiptsTable, usageEventsTable } from "@mosoo/db";
+import { usageEventsTable } from "@mosoo/db";
 import { createPlatformId } from "@mosoo/id";
 import type {
   AccountId,
@@ -12,13 +12,12 @@ import type {
   SessionId,
   SessionRunId,
 } from "@mosoo/id";
-import { and, eq, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 
-import { getAppDatabase } from "../../../platform/db/drizzle";
 import type { AppDatabase } from "../../../platform/db/drizzle";
 import { isTruthy } from "../../../shared/truthiness";
 import { calculateUsageCost } from "../domain/cost-pricing";
-import { normalizeUsageTokens } from "../domain/usage-contract";
+import { normalizeUsageTokens, toTokenCount, toUsdMicros } from "../domain/usage-contract";
 import type {
   AgentPublicationStateAtRun,
   RunPurpose,
@@ -49,28 +48,12 @@ export interface RecordRuntimeUsageEventInput {
   usage: SessionUsageSummary;
 }
 
-function toTokenCount(value: number | null | undefined): number {
-  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
-    return 0;
-  }
-
-  return Math.round(value);
-}
-
-function isUsageContract(value: string | null | undefined): value is UsageContract {
-  return (
-    value === "anthropic_bucketed" ||
-    value === "openai_runtime_total_with_cached_breakdown" ||
-    value === "openai_total_with_cached_breakdown"
-  );
-}
-
 function requireUsageContract(usage: SessionUsageSummary): UsageContract {
-  if (isUsageContract(usage.usageContract)) {
-    return usage.usageContract;
+  if (usage.usageContract === undefined) {
+    throw new Error("Usage contract must be declared by the runtime driver.");
   }
 
-  throw new Error("Usage contract must be declared by the runtime driver.");
+  return usage.usageContract;
 }
 
 function resolvePublicationState(input: RuntimeUsageRunContext): AgentPublicationStateAtRun {
@@ -87,10 +70,6 @@ function resolvePublicationState(input: RuntimeUsageRunContext): AgentPublicatio
 }
 
 function resolveRunPurpose(input: RuntimeUsageRunContext): RunPurpose {
-  if (input.trigger === "system") {
-    return "scheduled";
-  }
-
   if (input.agentId === null) return "production";
 
   if (isTruthy(input.agentRevisionId)) {
@@ -101,36 +80,18 @@ function resolveRunPurpose(input: RuntimeUsageRunContext): RunPurpose {
 }
 
 function toProvidedUsdCost(usage: SessionUsageSummary): number | null {
-  if (usage.costCurrency !== "USD") {
-    return null;
-  }
-
-  if (
-    typeof usage.costAmount !== "number" ||
-    !Number.isFinite(usage.costAmount) ||
-    usage.costAmount < 0
-  ) {
-    return null;
-  }
-
-  return usage.costAmount;
+  return usage.costCurrency === "USD" &&
+    typeof usage.costAmount === "number" &&
+    usage.costAmount >= 0
+    ? usage.costAmount
+    : null;
 }
 
-function toUsdMicros(value: number): number {
-  if (!Number.isFinite(value) || value < 0) {
-    return 0;
-  }
-
-  return Math.round(value * 1_000_000);
-}
-
-export function hasRecordableRuntimeUsage(usage: SessionUsageSummary): boolean {
+function hasRecordableRuntimeUsage(usage: SessionUsageSummary): boolean {
   return (
-    toTokenCount(usage.inputTokens) > 0 ||
-    toTokenCount(usage.outputTokens) > 0 ||
-    toTokenCount(usage.cachedReadTokens) > 0 ||
-    toTokenCount(usage.cachedWriteTokens) > 0 ||
-    toProvidedUsdCost(usage) !== null
+    [usage.inputTokens, usage.outputTokens, usage.cachedReadTokens, usage.cachedWriteTokens].some(
+      (value) => (toTokenCount(value) ?? 0) > 0,
+    ) || toProvidedUsdCost(usage) !== null
   );
 }
 
@@ -147,31 +108,7 @@ function resolveUsageEventIdentity(input: RecordRuntimeUsageEventInput): {
   return { source: RUNTIME_USAGE_SOURCE, sourceEventId };
 }
 
-async function isUsageEventAlreadyRolledUp(
-  database: AppDatabase,
-  identity: { source: string; sourceEventId: string },
-): Promise<boolean> {
-  const existing = await database
-    .select({ source: usageEventRollupReceiptsTable.source })
-    .from(usageEventRollupReceiptsTable)
-    .where(
-      and(
-        eq(usageEventRollupReceiptsTable.source, identity.source),
-        eq(usageEventRollupReceiptsTable.sourceEventId, identity.sourceEventId),
-      ),
-    )
-    .limit(1);
-
-  return existing.length > 0;
-}
-
 function createRuntimeUsageEventInsert(database: AppDatabase, input: RecordRuntimeUsageEventInput) {
-  const rawInputTokens = toTokenCount(input.usage.inputTokens);
-  const rawOutputTokens = toTokenCount(input.usage.outputTokens);
-  const rawCacheReadTokens = toTokenCount(input.usage.cachedReadTokens);
-  const rawCacheCreationTokens = toTokenCount(input.usage.cachedWriteTokens);
-  const providedCostUsd = toProvidedUsdCost(input.usage);
-
   if (!hasRecordableRuntimeUsage(input.usage)) {
     return null;
   }
@@ -180,10 +117,10 @@ function createRuntimeUsageEventInsert(database: AppDatabase, input: RecordRunti
   const model = input.run.model;
   const usageContract = requireUsageContract(input.usage);
   const tokens = normalizeUsageTokens({
-    cacheCreationTokens: rawCacheCreationTokens,
-    cacheReadTokens: rawCacheReadTokens,
-    inputTokens: rawInputTokens,
-    outputTokens: rawOutputTokens,
+    cacheCreationTokens: toTokenCount(input.usage.cachedWriteTokens) ?? 0,
+    cacheReadTokens: toTokenCount(input.usage.cachedReadTokens) ?? 0,
+    inputTokens: toTokenCount(input.usage.inputTokens) ?? 0,
+    outputTokens: toTokenCount(input.usage.outputTokens) ?? 0,
     usageContract,
   });
   const cost = calculateUsageCost({
@@ -193,7 +130,7 @@ function createRuntimeUsageEventInsert(database: AppDatabase, input: RecordRunti
     model,
     outputTokens: tokens.outputTokens,
     pricedAtMs: input.run.createdAtMs,
-    providedCostUsd,
+    providedCostUsd: toProvidedUsdCost(input.usage),
     provider,
   });
   const { source, sourceEventId } = resolveUsageEventIdentity(input);
@@ -222,7 +159,7 @@ function createRuntimeUsageEventInsert(database: AppDatabase, input: RecordRunti
     sessionRunId: input.run.sessionRunId,
     source,
     sourceEventId,
-    totalCostUsdMicros: toUsdMicros(cost.totalCostUsd),
+    totalCostUsdMicros: toUsdMicros(cost.totalCostUsd) ?? 0,
     usageContract,
   });
 }
@@ -252,42 +189,4 @@ export function createRuntimeUsageEventUpsert(
     },
     target: [usageEventsTable.source, usageEventsTable.sourceEventId],
   });
-}
-
-export function createRuntimeUsageEventInsertIfMissing(
-  database: AppDatabase,
-  input: RecordRuntimeUsageEventInput,
-) {
-  const query = createRuntimeUsageEventInsert(database, input);
-
-  if (query === null) {
-    return null;
-  }
-
-  return query.onConflictDoNothing({
-    target: [usageEventsTable.source, usageEventsTable.sourceEventId],
-  });
-}
-
-export async function recordRuntimeUsageEvent(
-  database: D1Database,
-  input: RecordRuntimeUsageEventInput,
-): Promise<void> {
-  if (!hasRecordableRuntimeUsage(input.usage)) {
-    return;
-  }
-
-  const appDatabase = getAppDatabase(database);
-
-  if (await isUsageEventAlreadyRolledUp(appDatabase, resolveUsageEventIdentity(input))) {
-    return;
-  }
-
-  const query = createRuntimeUsageEventUpsert(appDatabase, input);
-
-  if (query === null) {
-    return;
-  }
-
-  await query.run();
 }

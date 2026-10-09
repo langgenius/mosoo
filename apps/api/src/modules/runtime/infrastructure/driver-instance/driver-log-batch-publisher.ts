@@ -3,8 +3,6 @@ import type { DriverLogBatchInput } from "@mosoo/agent-driver/orpc";
 import { createApiChildLogger, runWithApiLogContext } from "../../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { isTruthy } from "../../../../shared/truthiness";
-import { runtimeSessionLinkNeedsRefresh } from "./event-types";
-import { getRuntimeSessionLink } from "./events";
 import type { DriverInstanceRuntimeState } from "./runtime-state";
 
 export async function publishDriverLogBatch(
@@ -13,12 +11,7 @@ export async function publishDriverLogBatch(
   input: DriverLogBatchInput,
 ): Promise<void> {
   const driverInstanceId = state.requireDriverInstanceId();
-  const cachedLink = state.runtimeSessionLink;
-  const link =
-    cachedLink !== null && !runtimeSessionLinkNeedsRefresh(cachedLink)
-      ? cachedLink
-      : await getRuntimeSessionLink(env.DB, driverInstanceId);
-  state.setRuntimeSessionLink(link);
+  const link = await state.getRuntimeSessionLink(env.DB);
 
   for (const entry of input.logs) {
     const logger = createApiChildLogger(

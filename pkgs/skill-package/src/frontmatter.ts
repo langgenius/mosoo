@@ -1,17 +1,13 @@
 import { parseDocument } from "yaml";
 
 import { SkillPackageError } from "./errors";
-import { createSkillPackageArchivePathAdmission } from "./path-admission";
-import type { SkillPackagePathKind } from "./path-admission";
 
 export { SkillPackageError } from "./errors";
 
 export interface SkillFrontmatter {
   author?: string;
-  dependencies?: string[];
   description: string;
   name: string;
-  userInvocable?: boolean;
   version?: string;
 }
 
@@ -52,8 +48,6 @@ export function parseSkillMarkdown(raw: string): ParsedSkillMarkdown {
   };
   const author = readOptionalStringField(rawFields, "author");
   const version = readOptionalStringField(rawFields, "version");
-  const userInvocable = readOptionalBooleanField(rawFields, "user-invocable");
-  const dependencies = readOptionalDependencyField(rawFields, "dependencies");
 
   if (author !== undefined && author.length > 0) {
     frontmatter.author = author;
@@ -61,14 +55,6 @@ export function parseSkillMarkdown(raw: string): ParsedSkillMarkdown {
 
   if (version !== undefined && version.length > 0) {
     frontmatter.version = version;
-  }
-
-  if (userInvocable !== undefined) {
-    frontmatter.userInvocable = userInvocable;
-  }
-
-  if (dependencies !== undefined && dependencies.length > 0) {
-    frontmatter.dependencies = dependencies;
   }
 
   return {
@@ -134,57 +120,4 @@ function readOptionalStringField(
   }
 
   return value;
-}
-
-function readOptionalBooleanField(
-  fields: Record<string, unknown>,
-  field: string,
-): boolean | undefined {
-  const value = fields[field];
-
-  if (value === undefined) {
-    return undefined;
-  }
-
-  if (typeof value !== "boolean") {
-    throw new SkillPackageError(`SKILL.md frontmatter field \`${field}\` must be a boolean.`);
-  }
-
-  return value;
-}
-
-function readOptionalDependencyField(
-  fields: Record<string, unknown>,
-  field: string,
-): string[] | undefined {
-  const value = fields[field];
-
-  if (value === undefined) {
-    return undefined;
-  }
-
-  if (!Array.isArray(value)) {
-    throw new SkillPackageError(
-      `SKILL.md frontmatter field \`${field}\` must be an array of strings.`,
-    );
-  }
-
-  const result: string[] = [];
-  const admission = createSkillPackageArchivePathAdmission();
-
-  for (const entry of value) {
-    if (typeof entry !== "string" || entry.length === 0) {
-      throw new SkillPackageError(
-        `SKILL.md frontmatter field \`${field}\` must be an array of strings.`,
-      );
-    }
-
-    result.push(admission.admit(entry, inferFrontmatterDependencyKind(entry)).path);
-  }
-
-  return result;
-}
-
-function inferFrontmatterDependencyKind(path: string): SkillPackagePathKind {
-  return path.endsWith("/") || path.endsWith("\\") ? "directory" : "file";
 }

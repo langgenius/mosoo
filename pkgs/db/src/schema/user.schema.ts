@@ -24,6 +24,3 @@ export const accountsTable = sqliteTable(
     index("account_last_active_organization_idx").on(table.lastActiveOrganizationId),
   ],
 );
-
-export type AccountRow = typeof accountsTable.$inferSelect;
-export type UserRow = AccountRow;

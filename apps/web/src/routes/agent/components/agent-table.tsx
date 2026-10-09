@@ -2,9 +2,6 @@ import type { ReactElement } from "react";
 
 import { getCurrentLocale, useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
-import { AvatarFallback } from "@/shared/ui/avatar-fallback";
-import { AvatarImage } from "@/shared/ui/avatar-image";
-import { Avatar } from "@/shared/ui/avatar-root";
 
 import type { Agent } from "../agent.types";
 import { getRuntimeInfo } from "../runtime-catalog";
@@ -22,29 +19,19 @@ function formatDate(iso: string): string {
   });
 }
 
-function getOwnerInitial(name: string): string {
-  const initial = name.charAt(0).toUpperCase();
-  return initial.length > 0 ? initial : "?";
-}
-
 export function AgentTable({
   agents,
   onSelect,
-  showOwner = false,
-  className,
 }: {
   agents: Agent[];
   onSelect: (id: string) => void;
-  showOwner?: boolean;
-  className?: string;
 }): ReactElement {
   const { t } = useTranslation();
-  const gridCols = showOwner
-    ? "grid-cols-[minmax(0,1fr)_auto_32px] lg:grid-cols-[minmax(0,1fr)_160px_120px_180px_140px_48px]"
-    : "grid-cols-[minmax(0,1fr)_auto_32px] lg:grid-cols-[minmax(0,1fr)_160px_120px_140px_48px]";
+  const gridCols =
+    "grid-cols-[minmax(0,1fr)_auto_32px] lg:grid-cols-[minmax(0,1fr)_160px_120px_140px_48px]";
 
   return (
-    <div className={className}>
+    <div>
       <div className="border-border bg-card overflow-hidden rounded-lg border">
         <div
           className={cn(
@@ -55,7 +42,6 @@ export function AgentTable({
           <span>{t("agent.agent")}</span>
           <span className="hidden lg:block">{t("agent.tools")}</span>
           <span>{t("agent.status")}</span>
-          {showOwner && <span className="hidden lg:block">{t("agent.owner")}</span>}
           <span className="hidden lg:block">{t("agent.created")}</span>
           <span />
         </div>
@@ -97,24 +83,6 @@ export function AgentTable({
 
                 <StatusBadge status={agent.status} />
 
-                {showOwner && (
-                  <div className="hidden min-w-0 items-center gap-2 lg:flex">
-                    <Avatar size="sm">
-                      {agent.owner.avatar !== undefined && agent.owner.avatar.length > 0 ? (
-                        <AvatarImage
-                          src={agent.owner.avatar}
-                          alt={agent.owner.name}
-                          referrerPolicy="no-referrer"
-                        />
-                      ) : null}
-                      <AvatarFallback className="bg-brand-soft text-brand text-[10px]">
-                        {getOwnerInitial(agent.owner.name)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="text-fg-2 truncate text-[12.5px]">{agent.owner.name}</span>
-                  </div>
-                )}
-
                 <span className="text-fg-3 hidden font-mono text-[12px] lg:inline">
                   {formatDate(agent.createdAt)}
                 </span>
@@ -124,10 +92,6 @@ export function AgentTable({
             </div>
           );
         })}
-
-        {agents.length === 0 && (
-          <div className="text-fg-3 py-12 text-center text-[13px]">{t("agent.noAgentsFound")}</div>
-        )}
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
 import type { CreateFileDownloadResponse } from "@mosoo/contracts/file";
-import type { FileId } from "@mosoo/contracts/id";
+import type { FileId } from "@mosoo/id";
 
 import { apiPath } from "@/platform/http/public-api";
 

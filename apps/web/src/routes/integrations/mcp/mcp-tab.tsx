@@ -1,4 +1,5 @@
-import { useMemo, useReducer } from "react";
+import type { CreateProjectMcpServerInput, McpServerWithCredential } from "@mosoo/contracts/mcp";
+import { useMemo, useState } from "react";
 
 import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
@@ -11,48 +12,16 @@ import { PageHeader } from "@/shared/ui/page-header";
 import { AddMcpDialog } from "./add-mcp-dialog";
 import { EditMcpDialog } from "./edit-mcp-dialog";
 import { McpListItem } from "./mcp-list-item";
-import type { McpServerWithCredential } from "./mcp-types";
 import { OAuthConnectDialog } from "./oauth-connect-dialog";
 import { useMcpRegistry } from "./use-mcp-registry";
-
-interface McpTabState {
-  addOpen: boolean;
-  editServer: McpServerWithCredential | null;
-  oauthServer: McpServerWithCredential | null;
-  search: string;
-}
-
-type McpTabAction =
-  | { type: "setAddOpen"; open: boolean }
-  | { type: "setEditServer"; server: McpServerWithCredential | null }
-  | { type: "setOauthServer"; server: McpServerWithCredential | null }
-  | { type: "setSearch"; search: string };
-
-const MCP_TAB_INITIAL_STATE: McpTabState = {
-  addOpen: false,
-  editServer: null,
-  oauthServer: null,
-  search: "",
-};
-
-function mcpTabReducer(state: McpTabState, action: McpTabAction): McpTabState {
-  switch (action.type) {
-    case "setAddOpen":
-      return { ...state, addOpen: action.open };
-    case "setEditServer":
-      return { ...state, editServer: action.server };
-    case "setOauthServer":
-      return { ...state, oauthServer: action.server };
-    case "setSearch":
-      return { ...state, search: action.search };
-  }
-}
 
 export function McpTab() {
   const registry = useMcpRegistry();
   const { t } = useTranslation();
-  const [state, dispatch] = useReducer(mcpTabReducer, MCP_TAB_INITIAL_STATE);
-  const { addOpen, editServer, oauthServer, search } = state;
+  const [addOpen, setAddOpen] = useState(false);
+  const [editServer, setEditServer] = useState<McpServerWithCredential | null>(null);
+  const [oauthServer, setOauthServer] = useState<McpServerWithCredential | null>(null);
+  const [search, setSearch] = useState("");
 
   const list: McpServerWithCredential[] = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -66,25 +35,8 @@ export function McpTab() {
     );
   }, [registry.servers, search]);
 
-  async function handleAddSubmit(input: {
-    name: string;
-    url: string;
-    description?: string;
-    iconUrl?: string;
-    authType: "oauth" | "bearer";
-    oauthClientId?: string;
-    oauthClientSecret?: string;
-  }) {
-    const created = await registry.addServer({
-      authType: input.authType,
-      name: input.name,
-      url: input.url,
-      ...(input.description && { description: input.description }),
-      ...(input.iconUrl && { iconUrl: input.iconUrl }),
-      ...(input.oauthClientId && { oauthClientId: input.oauthClientId }),
-      ...(input.oauthClientSecret && { oauthClientSecret: input.oauthClientSecret }),
-    });
-    dispatch({ server: created, type: "setOauthServer" });
+  async function handleAddSubmit(input: Omit<CreateProjectMcpServerInput, "projectId">) {
+    setOauthServer(await registry.addServer(input));
   }
 
   return (
@@ -92,7 +44,7 @@ export function McpTab() {
       <PageHeader title={t("mcp.title")} description={t("mcp.description")}>
         <Button
           onClick={() => {
-            dispatch({ open: true, type: "setAddOpen" });
+            setAddOpen(true);
           }}
         >
           <Plus className="size-3.5" />
@@ -107,7 +59,7 @@ export function McpTab() {
             placeholder={t("mcp.searchPlaceholder")}
             value={search}
             onChange={(e) => {
-              dispatch({ search: e.target.value, type: "setSearch" });
+              setSearch(e.target.value);
             }}
             className="h-8 pl-9"
           />
@@ -129,7 +81,7 @@ export function McpTab() {
           <McpEmptyState
             searching={search.length > 0}
             onAdd={() => {
-              dispatch({ open: true, type: "setAddOpen" });
+              setAddOpen(true);
             }}
           />
         ) : (
@@ -139,10 +91,10 @@ export function McpTab() {
                 key={server.id}
                 server={server}
                 onConnect={() => {
-                  dispatch({ server, type: "setOauthServer" });
+                  setOauthServer(server);
                 }}
                 onEdit={() => {
-                  dispatch({ server, type: "setEditServer" });
+                  setEditServer(server);
                 }}
                 onDelete={() => void registry.deleteServer(server.id)}
                 onRevoke={() => void registry.revokeCredential(server.id)}
@@ -153,20 +105,14 @@ export function McpTab() {
         )}
       </div>
 
-      <AddMcpDialog
-        open={addOpen}
-        onOpenChange={(open) => {
-          dispatch({ open, type: "setAddOpen" });
-        }}
-        onSubmit={handleAddSubmit}
-      />
+      <AddMcpDialog open={addOpen} onOpenChange={setAddOpen} onSubmit={handleAddSubmit} />
       {editServer !== null && (
         <EditMcpDialog
           key={editServer.id}
           server={editServer}
           onOpenChange={(next) => {
             if (!next) {
-              dispatch({ server: null, type: "setEditServer" });
+              setEditServer(null);
             }
           }}
           onSubmit={async (input) => {
@@ -180,34 +126,15 @@ export function McpTab() {
       <OAuthConnectDialog
         open={oauthServer !== null}
         server={oauthServer}
-        onBearerConnect={async (token) =>
-          oauthServer
-            ? registry
-                .connectBearer({
-                  serverId: oauthServer.id,
-                  token,
-                })
-                .then(() => {
-                  /* Empty */
-                })
-            : Promise.resolve()
-        }
-        onConnected={async () =>
-          registry.refresh().then(() => {
-            /* Empty */
-          })
-        }
+        onBearerConnect={async (serverId, token) => registry.connectBearer({ serverId, token })}
+        onConnected={registry.refresh}
         onOpenChange={(next) => {
           if (!next) {
-            dispatch({ server: null, type: "setOauthServer" });
+            setOauthServer(null);
           }
         }}
-        onPollOAuthFlow={async (flowId) => registry.getOAuthFlowState(flowId)}
-        onStartOAuth={async () =>
-          oauthServer
-            ? registry.startOAuth(oauthServer.id)
-            : Promise.reject(new Error(t("mcp.serverMissing")))
-        }
+        onPollOAuthFlow={registry.getOAuthFlowState}
+        onStartOAuth={registry.startOAuth}
       />
     </div>
   );

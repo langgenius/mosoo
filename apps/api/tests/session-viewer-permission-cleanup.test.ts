@@ -1,20 +1,24 @@
 import { describe, expect, test } from "bun:test";
 
-import type { ProjectId, SessionId } from "@mosoo/id";
+import type { AccountId, ProjectId, SessionId } from "@mosoo/id";
 
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
-import { readSessionViewerSocketHeaders } from "../src/modules/sessions/infrastructure/session/socket-headers";
+import type { SessionViewerSocketContext } from "../src/modules/sessions/infrastructure/session/socket-headers";
 import {
   runViewerPermissionCleanupAlarm,
   scheduleViewerPermissionCleanupAlarm,
   VIEWER_PERMISSION_CLEANUP_DELAY_MS,
 } from "../src/modules/sessions/infrastructure/session/viewer-permission-cleanup";
-import type { ViewerPermissionCleanupStorage } from "../src/modules/sessions/infrastructure/session/viewer-permission-cleanup";
-import { normalizeViewerSocketAttachment } from "../src/modules/sessions/infrastructure/session/viewer-socket";
-import type { ViewerSocketAttachment } from "../src/modules/sessions/infrastructure/session/viewer-socket";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
+import {
+  PUBLIC_API_TEST_IDS,
+  createPublicHttpContractDatabase,
+  createPublicHttpTestBindings,
+  insertOwnerSession,
+} from "./helpers/public-api-http-test-fixture";
+import type { SqliteD1Database } from "./helpers/sqlite-d1";
 
-class MemoryViewerPermissionCleanupStorage implements ViewerPermissionCleanupStorage {
+class MemoryAlarmStorage {
   alarmAt: Date | number | null = null;
   readonly values = new Map<string, unknown>();
 
@@ -37,184 +41,190 @@ class MemoryViewerPermissionCleanupStorage implements ViewerPermissionCleanupSto
   async setAlarm(scheduledTime: Date | number): Promise<void> {
     this.alarmAt = scheduledTime;
   }
+
+  asStorage(): DurableObjectStorage {
+    return this as unknown as DurableObjectStorage;
+  }
 }
 
-const VIEWER: AuthenticatedViewer = {
-  email: "viewer@example.com",
+const OWNER_VIEWER: AuthenticatedViewer = {
+  email: "owner@example.com",
   emailVerified: true,
-  id: "viewer-1",
+  id: PUBLIC_API_TEST_IDS.ownerAccount as AccountId,
   imageUrl: null,
-  name: "Viewer",
+  name: "Owner",
 };
-const PROJECT_ID = "01J0000000000000000000000Q" as ProjectId;
 
-function createAttachment(sessionId: SessionId = "session-1" as SessionId): ViewerSocketAttachment {
+const ATTACHMENT: SessionViewerSocketContext = {
+  projectId: PUBLIC_API_TEST_IDS.project as ProjectId,
+  publicOrigin: "https://mosoo.ai",
+  sessionId: PUBLIC_API_TEST_IDS.ownerSession as SessionId,
+  viewer: OWNER_VIEWER,
+};
+
+async function insertPendingPermissionRequest(database: SqliteD1Database): Promise<void> {
+  await database
+    .prepare(
+      `
+        INSERT INTO driver_instance (
+          id, sandbox_id, sandbox_session_id, runtime, protocol, protocol_version, status,
+          boot_token_hash, boot_token_expires_at, heartbeat_count, expires_at, created_at, updated_at
+        )
+        VALUES (?, ?, ?, 'cloudflare-container', 'driver-ws', 1, 'ready', ?, 10000, 0, 20000, 1, 1)
+      `,
+    )
+    .bind(
+      PUBLIC_API_TEST_IDS.driverOwner,
+      PUBLIC_API_TEST_IDS.sandbox,
+      PUBLIC_API_TEST_IDS.ownerSession,
+      new Uint8Array([1]),
+    )
+    .run();
+  await database
+    .prepare(
+      `
+        INSERT INTO session_run (
+          id, session_id, created_by_account_id, driver_instance_id, trigger, status, trace_id,
+          created_at, updated_at
+        )
+        VALUES (?, ?, ?, ?, 'user_prompt', 'waiting_input', 'trace-permission', 1, 1)
+      `,
+    )
+    .bind(
+      PUBLIC_API_TEST_IDS.run,
+      PUBLIC_API_TEST_IDS.ownerSession,
+      PUBLIC_API_TEST_IDS.ownerAccount,
+      PUBLIC_API_TEST_IDS.driverOwner,
+    )
+    .run();
+  await database
+    .prepare("UPDATE session SET last_run_id = ?, status = 'RUNNING' WHERE id = ?")
+    .bind(PUBLIC_API_TEST_IDS.run, PUBLIC_API_TEST_IDS.ownerSession)
+    .run();
+  await database
+    .prepare(
+      `
+        INSERT INTO session_permission_request (
+          created_at, driver_instance_id, request_id, run_id, session_id, title, updated_at
+        )
+        VALUES (1, ?, 'permission-1', ?, ?, 'Run a command', 1)
+      `,
+    )
+    .bind(
+      PUBLIC_API_TEST_IDS.driverOwner,
+      PUBLIC_API_TEST_IDS.run,
+      PUBLIC_API_TEST_IDS.ownerSession,
+    )
+    .run();
+}
+
+async function createAlarmFixture(): Promise<{
+  database: SqliteD1Database;
+  driverCommands: unknown[];
+  env: ApiBindings;
+}> {
+  const database = await createPublicHttpContractDatabase();
+  await insertOwnerSession(database);
+  await insertPendingPermissionRequest(database);
+  const driverCommands: unknown[] = [];
+
   return {
-    projectId: PROJECT_ID,
-    publicOrigin: "https://mosoo.ai",
-    role: "viewer",
-    sessionId,
-    viewer: VIEWER,
+    database,
+    driverCommands,
+    env: {
+      ...(createPublicHttpTestBindings(database) as ApiBindings),
+      DriverConnection: {
+        get: () => ({
+          sendControlCommand: async (_driverInstanceId: string, command: unknown) => {
+            driverCommands.push(command);
+          },
+        }),
+        idFromName: (name: string) => name,
+      } as unknown as ApiBindings["DriverConnection"],
+    },
   };
 }
 
-function createBindings(): ApiBindings {
-  return {
-    DB: {} as D1Database,
-  } as ApiBindings;
-}
-
 describe("viewer permission cleanup alarm", () => {
-  test("reads pre-Project internal websocket headers during a rolling release", () => {
-    const headers = new Headers({
-      "x-viewer-email": encodeURIComponent(VIEWER.email),
-      "x-viewer-email-verified": "true",
-      "x-viewer-id": "01J0000000000000000000000A",
-      "x-viewer-image-url": "",
-      "x-viewer-name": encodeURIComponent(VIEWER.name),
-      "x-viewer-origin": "https://mosoo.ai",
-      "x-viewer-app-id": PROJECT_ID,
-      "x-viewer-session-id": "01J0000000000000000000000S",
-    });
-
-    expect(readSessionViewerSocketHeaders(headers).projectId).toBe(PROJECT_ID);
-  });
-
-  test("normalizes hibernating pre-Project socket attachments", () => {
-    const { projectId: _, ...legacyAttachment } = createAttachment();
-
-    expect(normalizeViewerSocketAttachment({ ...legacyAttachment, appId: PROJECT_ID })).toEqual({
-      ...legacyAttachment,
-      appId: PROJECT_ID,
-      projectId: PROJECT_ID,
-    });
-  });
-
   test("schedules cleanup 120 seconds after the last viewer disconnects", async () => {
-    const storage = new MemoryViewerPermissionCleanupStorage();
+    const storage = new MemoryAlarmStorage();
+    const before = Date.now();
 
     await scheduleViewerPermissionCleanupAlarm({
-      attachment: createAttachment(),
-      nowMs: () => 1_000,
-      storage,
+      attachment: ATTACHMENT,
+      storage: storage.asStorage(),
     });
 
-    expect(storage.alarmAt).toBe(1_000 + VIEWER_PERMISSION_CLEANUP_DELAY_MS);
+    expect(storage.alarmAt).toBeGreaterThanOrEqual(before + VIEWER_PERMISSION_CLEANUP_DELAY_MS);
+    expect(storage.alarmAt).toBeLessThanOrEqual(Date.now() + VIEWER_PERMISSION_CLEANUP_DELAY_MS);
   });
 
-  test("does not reject permissions when a viewer is open at alarm time", async () => {
-    const storage = new MemoryViewerPermissionCleanupStorage();
-    let rejected = false;
+  test("does not touch the session when a viewer is open at alarm time", async () => {
+    const storage = new MemoryAlarmStorage();
 
     await scheduleViewerPermissionCleanupAlarm({
-      attachment: createAttachment(),
-      nowMs: () => 1_000,
-      storage,
+      attachment: ATTACHMENT,
+      storage: storage.asStorage(),
     });
     await runViewerPermissionCleanupAlarm({
-      cachedState: null,
-      ensureSessionActive: async () => {},
-      env: createBindings(),
+      env: { DB: {} as D1Database } as ApiBindings,
       hasOpenViewer: () => true,
-      rejectPermissions: async () => {
-        rejected = true;
-        return null;
-      },
-      storage,
-      updateLiveStateCache: () => {},
+      storage: storage.asStorage(),
     });
 
-    expect(rejected).toBe(false);
     expect(storage.alarmAt).toBeNull();
+    expect(storage.values.size).toBe(0);
   });
 
-  test("rejects permissions when no viewer reconnects before the alarm", async () => {
-    const storage = new MemoryViewerPermissionCleanupStorage();
-    let ensured = false;
-    let rejected = false;
+  test("rejects pending permissions when no viewer reconnects before the alarm", async () => {
+    const { database, driverCommands, env } = await createAlarmFixture();
+    const storage = new MemoryAlarmStorage();
 
     await scheduleViewerPermissionCleanupAlarm({
-      attachment: createAttachment(),
-      nowMs: () => 1_000,
-      storage,
+      attachment: ATTACHMENT,
+      storage: storage.asStorage(),
     });
     await runViewerPermissionCleanupAlarm({
-      cachedState: null,
-      ensureSessionActive: async () => {
-        ensured = true;
-      },
-      env: createBindings(),
+      env,
       hasOpenViewer: () => false,
-      rejectPermissions: async () => {
-        rejected = true;
-        return null;
-      },
-      storage,
-      updateLiveStateCache: () => {},
+      storage: storage.asStorage(),
     });
 
-    expect(ensured).toBe(true);
-    expect(rejected).toBe(true);
-    expect(storage.alarmAt).toBeNull();
-  });
-
-  test("runs a pending pre-Project cleanup record after a release", async () => {
-    const storage = new MemoryViewerPermissionCleanupStorage();
-    let ensuredProjectId: ProjectId | null = null;
-    let rejectedProjectId: ProjectId | null = null;
-    storage.values.set("viewer_permission_cleanup", {
-      appId: PROJECT_ID,
-      publicOrigin: "https://mosoo.ai",
-      scheduledAtMs: 1_000,
-      sessionId: "session-1",
-      viewer: VIEWER,
-    });
-
-    await runViewerPermissionCleanupAlarm({
-      cachedState: null,
-      ensureSessionActive: async (_database, _viewerId, input) => {
-        ensuredProjectId = input.projectId;
-      },
-      env: createBindings(),
-      hasOpenViewer: () => false,
-      rejectPermissions: async (input) => {
-        rejectedProjectId = input.attachment.projectId;
-        return null;
-      },
-      storage,
-      updateLiveStateCache: () => {},
-    });
-
-    expect(ensuredProjectId).toBe(PROJECT_ID);
-    expect(rejectedProjectId).toBe(PROJECT_ID);
+    expect(driverCommands).toEqual([
+      expect.objectContaining({
+        decision: "reject_once",
+        kind: "permission.resolve",
+        requestId: "permission-1",
+      }),
+    ]);
+    expect(
+      await database
+        .prepare("SELECT request_id FROM session_permission_request WHERE session_id = ?")
+        .bind(PUBLIC_API_TEST_IDS.ownerSession)
+        .all(),
+    ).toMatchObject({ results: [] });
     expect(storage.alarmAt).toBeNull();
   });
 
   test("skips rejection when the session is no longer active", async () => {
-    const storage = new MemoryViewerPermissionCleanupStorage();
-    let rejected = false;
+    const { database, driverCommands, env } = await createAlarmFixture();
+    const storage = new MemoryAlarmStorage();
+    await database
+      .prepare("UPDATE session SET archived_at = 1 WHERE id = ?")
+      .bind(PUBLIC_API_TEST_IDS.ownerSession)
+      .run();
 
     await scheduleViewerPermissionCleanupAlarm({
-      attachment: createAttachment(),
-      nowMs: () => 1_000,
-      storage,
+      attachment: ATTACHMENT,
+      storage: storage.asStorage(),
     });
     await runViewerPermissionCleanupAlarm({
-      cachedState: null,
-      ensureSessionActive: async () => {
-        throw new Error("inactive");
-      },
-      env: createBindings(),
+      env,
       hasOpenViewer: () => false,
-      rejectPermissions: async () => {
-        rejected = true;
-        return null;
-      },
-      storage,
-      updateLiveStateCache: () => {},
+      storage: storage.asStorage(),
     });
 
-    expect(rejected).toBe(false);
+    expect(driverCommands).toEqual([]);
     expect(storage.alarmAt).toBeNull();
   });
 });

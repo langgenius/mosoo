@@ -39,7 +39,7 @@ export function PublishSuccessModal({
       <DialogContent className="flex max-h-[88vh] flex-col overflow-hidden rounded-lg p-0 sm:max-w-[540px]">
         <DialogHeader className="px-6 pt-6 pb-3">
           <div className="flex items-center gap-3">
-            <div className="success-check-enter flex size-10 shrink-0 items-center justify-center rounded-full bg-green-100 text-green-800">
+            <div className="success-check-enter bg-success-bg text-success-fg flex size-10 shrink-0 items-center justify-center rounded-full">
               <Check className="size-5" strokeWidth={2.5} />
             </div>
             <div className="min-w-0">
@@ -54,7 +54,7 @@ export function PublishSuccessModal({
         </DialogHeader>
 
         <div className="min-h-0 space-y-2.5 overflow-y-auto px-6 pb-2">
-          <div className="border-border-subtle bg-card rounded-lg border px-3.5 py-3">
+          <div className="border-border-soft bg-card rounded-lg border px-3.5 py-3">
             <div className="flex items-start gap-3">
               <Globe className="text-fg-3 mt-0.5 size-4 shrink-0" />
               <div className="min-w-0 flex-1">

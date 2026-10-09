@@ -14,6 +14,7 @@ import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { isTruthy } from "../../../shared/truthiness";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { loadSkillPackageFromGithub } from "./skill-package-github.service";
+import { slugifyFileStem } from "./skill-package-source.service";
 import { createSkillFromUpload } from "./skill-package-write.service";
 import {
   MAX_ENTRY_COUNT,
@@ -561,9 +562,7 @@ function readApiTotal(pagination: unknown, payload: unknown): number | null {
 }
 
 function readSkillsShApiToken(bindings: ApiBindings): string | null {
-  const token = bindings.SKILLS_SH_API_TOKEN?.trim() || bindings.VERCEL_OIDC_TOKEN?.trim() || "";
-
-  return token.length > 0 ? token : null;
+  return bindings.SKILLS_SH_API_TOKEN?.trim() || null;
 }
 
 function isSkillsShCatalogSkillAvailable(
@@ -667,15 +666,4 @@ function skillsShSkillUrl(id: string): string {
 
 function encodeSkillsShId(id: string): string {
   return id.split("/").filter(Boolean).map(encodeURIComponent).join("/");
-}
-
-function slugifyFileStem(value: string): string {
-  return (
-    value
-      .trim()
-      .toLowerCase()
-      .replaceAll(/[^a-z0-9]+/g, "-")
-      .replaceAll(/^-+|-+$/g, "")
-      .slice(0, 64) || "skill"
-  );
 }

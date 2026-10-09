@@ -1,5 +1,3 @@
-import { type } from "arktype";
-
 import type {
   AccountId,
   AgentDeploymentVersionId,
@@ -8,20 +6,19 @@ import type {
   McpServerId,
   ProjectId,
   SkillId,
-} from "../id/id.contract";
+} from "@mosoo/id";
+
 import type { AgentMcpBinding } from "../mcp/mcp.contract";
 import type { JsonObject } from "../validation/primitives.contract";
 import type { AgentPackageResolutionState } from "./agent-manifest.contract";
 
 /** Historical storage and compatibility inputs only; never selects runtime ownership. */
 export const AGENT_KIND_VALUES = ["pet", "cattle"] as const;
-export const AGENT_KIND_LIST_LABEL = AGENT_KIND_VALUES.join(" or ");
-export const AgentKind = type.enumerated(...AGENT_KIND_VALUES);
-export type AgentKind = typeof AgentKind.infer;
+export type AgentKind = (typeof AGENT_KIND_VALUES)[number];
 export type AgentStatus = "draft" | "published";
 export type AgentVisibility = "private";
 export type AgentSkillState = "active" | "tombstone";
-export type AgentViewerRole = "owner" | "none";
+export type AgentViewerRole = "owner";
 export const AGENT_BUILT_IN_TOOL_NAMES = [
   "bash",
   "read",
@@ -196,8 +193,6 @@ export interface AgentEditorState {
 
 export interface CreateAgentInput {
   description?: string | null;
-  /** Legacy input; every new Agent uses Session-isolated execution. */
-  kind?: AgentKind | null;
   model: string;
   name: string;
   prompt: string;
@@ -212,8 +207,6 @@ export interface UpdateAgentConfigInput {
   builtInTools?: AgentBuiltInToolConfig[];
   description?: string | null;
   environment: AgentEnvironmentConfig;
-  /** Legacy input; changing configuration cannot migrate existing workspaces. */
-  kind?: AgentKind | null;
   mcpServerIds: McpServerId[];
   model: string;
   name: string;
@@ -234,5 +227,3 @@ export interface PublishAgentInput {
   agentId: AgentId;
   projectId: ProjectId;
 }
-
-export type RuntimeStateOperationName = "restartDriver" | "recreateSandbox" | "resetAgentState";

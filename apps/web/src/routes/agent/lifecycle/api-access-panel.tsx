@@ -71,9 +71,9 @@ export function AgentApiAccessPanel({
   }
 
   return (
-    <div className="border-border-subtle bg-card w-full overflow-hidden rounded-lg border">
+    <div className="border-border-soft bg-card w-full overflow-hidden rounded-lg border">
       {showTitle ? (
-        <div className="border-border-subtle flex items-center gap-2 border-b px-3.5 py-2.5">
+        <div className="border-border-soft flex items-center gap-2 border-b px-3.5 py-2.5">
           <Code className="text-fg-3 size-4 shrink-0" />
           <div className="text-foreground text-[13px] font-medium">
             {t("agentLifecycle.apiAccess")}
@@ -143,10 +143,10 @@ export function AgentApiAccessPanel({
 
 function ApiAccessDetailRow({ action, label, value }: ApiAccessDetailRowProps): ReactElement {
   return (
-    <div className="border-border-subtle bg-bg-1 rounded-md border px-3 py-2.5">
+    <div className="border-border-soft bg-card rounded-md border px-3 py-2.5">
       <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0 flex-1">
-          <div className="text-fg-3 text-[10.5px] font-medium tracking-wide uppercase">{label}</div>
+          <div className="t-group-label">{label}</div>
           <div className="text-fg-2 mt-0.5 font-mono text-[12px] leading-snug break-all">
             {value}
           </div>

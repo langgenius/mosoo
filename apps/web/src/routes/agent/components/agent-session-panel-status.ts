@@ -8,7 +8,7 @@ import type { AgentSessionPanelModel } from "./agent-session-panel-model-types";
 
 type Translate = (key: string, variables?: Record<string, string>) => string;
 
-export type SessionPill = "Setup required" | "Ready" | "Working" | "Needs approval" | "Stopped";
+export type SessionPill = "Setup required" | "Ready" | "Working" | "Stopped";
 
 export function deriveSessionPill(model: AgentSessionPanelModel): SessionPill {
   if (isTruthy(model.readinessBlockMessage)) {
@@ -17,10 +17,6 @@ export function deriveSessionPill(model: AgentSessionPanelModel): SessionPill {
 
   if (model.lifecycle === "TERMINATED") {
     return "Stopped";
-  }
-
-  if (model.permissionRequests.length > 0) {
-    return "Needs approval";
   }
 
   if (model.streaming || model.lifecycle === "RUNNING" || model.lifecycle === "RESCHEDULING") {
@@ -32,7 +28,7 @@ export function deriveSessionPill(model: AgentSessionPanelModel): SessionPill {
 
 export function readinessBlockSummary(
   readiness: AgentReadiness | null,
-  t: Translate = (key) => key,
+  t: Translate,
 ): string | null {
   const errors = readiness?.issues.filter((issue) => issue.severity === "error") ?? [];
 
@@ -71,7 +67,7 @@ export function sendDisabledReasonForSession(
     setupSummary: string | null;
     stopped: boolean;
   },
-  t: Translate = (key) => key,
+  t: Translate,
 ): string | null {
   if (setupBlocked) {
     return setupSummary ?? t("agent.fixSetupBeforeRun");
@@ -86,25 +82,4 @@ export function sendDisabledReasonForSession(
   }
 
   return null;
-}
-
-export function sessionIndicatorClassName(pill: SessionPill): string {
-  switch (pill) {
-    case "Ready": {
-      return "bg-green-500";
-    }
-    case "Working": {
-      return "bg-accent";
-    }
-    case "Needs approval": {
-      return "bg-amber";
-    }
-    case "Setup required":
-    case "Stopped": {
-      return "bg-muted-foreground";
-    }
-    default: {
-      return "bg-muted-foreground";
-    }
-  }
 }

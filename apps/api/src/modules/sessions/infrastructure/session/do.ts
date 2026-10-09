@@ -1,9 +1,6 @@
 import type { AgUiSessionEvent } from "@mosoo/ag-ui-session";
-import { parsePlatformId } from "@mosoo/id";
-import type { SessionId } from "@mosoo/id";
 import { DurableObject } from "cloudflare:workers";
 
-import { DurableObjectIdentity } from "../../../../platform/cloudflare/durable-object-support";
 import {
   createErrorLogContext,
   logError,
@@ -11,15 +8,11 @@ import {
 } from "../../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { SessionPublicEventSocketHub } from "./public-event-socket-hub";
-import { json, toErrorMessage } from "./requests";
 import { SESSION_ID_HEADER } from "./socket-headers";
 import { SessionViewerSocketHub } from "./viewer-socket-hub";
 export class Session extends DurableObject {
   #destroyed = false;
-  readonly #identity = new DurableObjectIdentity({
-    mismatchMessage: "Session id does not match the active Durable Object.",
-    requiredMessage: "Session id is required.",
-  });
+  #sessionId: string | null = null;
   readonly #publicEventSockets: SessionPublicEventSocketHub;
   readonly #viewerSockets: SessionViewerSocketHub;
 
@@ -28,15 +21,14 @@ export class Session extends DurableObject {
 
     this.#publicEventSockets = new SessionPublicEventSocketHub({
       ctx,
-      getSessionId: () => this.#identity.value,
+      getSessionId: () => this.#sessionId,
       withSessionLogContext: (fn) => this.#withSessionLogContext(fn),
     });
     this.#viewerSockets = new SessionViewerSocketHub({
       ctx,
       env,
-      getSessionId: () => this.#identity.value,
       rememberSessionId: (sessionId) => {
-        this.#identity.remember(sessionId);
+        this.#sessionId = sessionId;
       },
       withSessionLogContext: (fn) => this.#withSessionLogContext(fn),
     });
@@ -44,22 +36,12 @@ export class Session extends DurableObject {
 
   override async fetch(request: Request): Promise<Response> {
     try {
-      const url = new URL(request.url);
-
       if (this.#destroyed) {
-        if (request.method === "POST" && url.pathname === "/destroy") {
-          return json({ ok: true });
-        }
-
-        return json({ error: "Session Durable Object was destroyed." }, { status: 410 });
+        return Response.json({ error: "Session Durable Object was destroyed." }, { status: 410 });
       }
 
-      const sessionId = request.headers.get(SESSION_ID_HEADER);
-      this.#identity.ensure(
-        sessionId === null
-          ? null
-          : parsePlatformId<SessionId>(sessionId, "Session Durable Object ID"),
-      );
+      this.#sessionId = request.headers.get(SESSION_ID_HEADER);
+      const url = new URL(request.url);
 
       if (url.pathname === "/viewer/ws") {
         return this.#viewerSockets.connect(request);
@@ -69,16 +51,18 @@ export class Session extends DurableObject {
         return this.#publicEventSockets.connect(request);
       }
 
-      return json({ error: "Not Found" }, { status: 404 });
+      return Response.json({ error: "Not Found" }, { status: 404 });
     } catch (error) {
-      const message = toErrorMessage(error);
       this.#withSessionLogContext(() => {
         logError("session.do.request.failed", {
           ...createErrorLogContext(error),
-          sessionId: this.#identity.value,
+          sessionId: this.#sessionId,
         });
       });
-      return json({ error: message }, { status: 500 });
+      return Response.json(
+        { error: error instanceof Error ? error.message : "Session request failed." },
+        { status: 500 },
+      );
     }
   }
 
@@ -114,29 +98,12 @@ export class Session extends DurableObject {
     this.#viewerSockets.handleSocketError(ws, error);
   }
 
-  override async webSocketMessage(ws: WebSocket, message: ArrayBuffer | string): Promise<void> {
-    if (this.#destroyed) {
-      return;
-    }
-
-    if (this.#publicEventSockets.owns(ws)) {
-      return;
-    }
-
-    await this.#viewerSockets.handleSocketMessage(ws, message);
-  }
-
-  #ensureActiveRpcSession(sessionId: string): SessionId {
+  #ensureActiveRpcSession(sessionId: string): void {
     if (this.#destroyed) {
       throw new Error("Session Durable Object was destroyed.");
     }
 
-    const normalizedSessionId = parsePlatformId<SessionId>(
-      sessionId,
-      "Session Durable Object RPC session ID",
-    );
-    this.#identity.ensure(normalizedSessionId);
-    return normalizedSessionId;
+    this.#sessionId = sessionId;
   }
 
   async publishEvents(sessionId: string, events: AgUiSessionEvent[]): Promise<void> {
@@ -158,30 +125,19 @@ export class Session extends DurableObject {
     this.#publicEventSockets.closeSockets(reason);
   }
 
-  async destroy(sessionId: string, reason: string): Promise<void> {
+  async destroy(reason: string): Promise<void> {
     if (this.#destroyed) {
       return;
     }
 
-    this.#identity.ensure(
-      parsePlatformId<SessionId>(sessionId, "Session Durable Object RPC session ID"),
-    );
-    await this.#destroy(reason);
-  }
-
-  async #destroy(reason: string): Promise<void> {
     this.#destroyed = true;
     this.#viewerSockets.closeSockets(reason);
     this.#publicEventSockets.closeSockets(reason);
-    this.#identity.clear();
     await this.ctx.storage.deleteAlarm();
     await this.ctx.storage.deleteAll();
   }
 
   #withSessionLogContext<T>(fn: () => T): T {
-    return runWithApiLogContext(
-      this.#identity.value !== null ? { sessionId: this.#identity.value } : {},
-      fn,
-    );
+    return runWithApiLogContext(this.#sessionId !== null ? { sessionId: this.#sessionId } : {}, fn);
   }
 }

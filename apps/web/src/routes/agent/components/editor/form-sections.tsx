@@ -35,7 +35,7 @@ function PackageResolutionBanner({ agent }: { agent: Agent }) {
 
   return (
     <div
-      className="border-amber/30 bg-amber-bg text-amber-fg rounded-lg border px-3 py-2.5"
+      className="border-warning/30 bg-warning-bg text-warning-fg rounded-lg border px-3 py-2.5"
       role="alert"
     >
       <div className="flex items-center gap-2 text-[13px] font-semibold">
@@ -60,15 +60,7 @@ function PackageResolutionBanner({ agent }: { agent: Agent }) {
   );
 }
 
-export function BasicsSection({
-  agent,
-  model,
-  readOnly,
-}: {
-  agent: Agent;
-  model: AgentEditorModel;
-  readOnly: boolean;
-}) {
+export function BasicsSection({ agent, model }: { agent: Agent; model: AgentEditorModel }) {
   const { t } = useTranslation();
 
   return (
@@ -79,7 +71,7 @@ export function BasicsSection({
         <SectionHeader>{t("agent.identity")}</SectionHeader>
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label className="text-muted-foreground text-[12px]" htmlFor="agent-name">
+            <Label className="text-fg-3 text-[12px]" htmlFor="agent-name">
               {t("agentEditor.name")}
               <RequiredMark />
             </Label>
@@ -89,24 +81,22 @@ export function BasicsSection({
               onChange={(event) => {
                 model.setName(event.target.value);
               }}
-              readOnly={readOnly}
               value={model.draft.name}
             />
           </div>
 
           <div className="space-y-2">
-            <Label className="text-muted-foreground text-[12px]" htmlFor="agent-description">
+            <Label className="text-fg-3 text-[12px]" htmlFor="agent-description">
               {t("agent.descriptionLabel")}
             </Label>
             <textarea
               aria-label={t("agent.descriptionLabel")}
-              className="border-border focus:ring-brand-ring w-full rounded-lg border bg-white px-3 py-2 text-[13px] outline-none focus:ring-2"
+              className="border-border focus:ring-ring bg-card w-full rounded-lg border px-3 py-2 text-[13px] outline-none focus:ring-2"
               id="agent-description"
               onChange={(event) => {
                 model.setDescription(event.target.value);
               }}
               placeholder={t("agent.descriptionPlaceholder")}
-              readOnly={readOnly}
               rows={3}
               value={model.draft.description}
             />
@@ -114,7 +104,7 @@ export function BasicsSection({
 
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label className="text-muted-foreground text-[12px]">
+              <Label className="text-fg-3 text-[12px]">
                 {t("agent.runtime")}
                 <RequiredMark />
               </Label>
@@ -123,19 +113,18 @@ export function BasicsSection({
               {listRuntimeOptions(model.draft.runtime).map((runtime) => {
                 const selected = runtime.id === model.draft.runtime;
                 const selectable = isRuntimeSelectable(runtime.id);
-                const disabled = readOnly || !selectable;
 
                 return (
                   <button
                     aria-pressed={selected}
                     className={cn(
-                      "focus-visible:ring-brand-ring flex items-center gap-3 rounded-lg border px-3 py-3 text-left transition-colors focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:outline-none",
+                      "focus-visible:ring-ring flex items-center gap-3 rounded-lg border px-3 py-3 text-left transition-colors focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:outline-none",
                       selected && selectable
-                        ? "border-brand bg-brand-light"
-                        : "border-border hover:border-brand/30",
-                      disabled ? "pointer-events-none bg-muted/40 opacity-70" : null,
+                        ? "border-emphasis bg-selected"
+                        : "border-border hover:border-border-strong",
+                      selectable ? null : "pointer-events-none bg-sunken/40",
                     )}
-                    disabled={disabled}
+                    disabled={!selectable}
                     key={runtime.id}
                     onClick={() => {
                       model.setRuntime(runtime.id);
@@ -144,8 +133,15 @@ export function BasicsSection({
                   >
                     <RuntimeIcon runtime={runtime} size={24} />
                     <div className="min-w-0">
-                      <div className="text-foreground text-[13px] font-medium">{runtime.name}</div>
-                      <div className="text-muted-foreground text-[11px]">
+                      <div
+                        className={cn(
+                          "text-[13px] font-medium",
+                          selectable ? "text-foreground" : "text-fg-muted",
+                        )}
+                      >
+                        {runtime.name}
+                      </div>
+                      <div className="text-fg-3 text-[11px]">
                         {selectable
                           ? runtime.vendor
                           : selected
@@ -159,11 +155,10 @@ export function BasicsSection({
             </div>
           </div>
 
-          <ModelPickerField model={model} projectId={agent.projectId} readOnly={readOnly} />
+          <ModelPickerField model={model} projectId={agent.projectId} />
           <RuntimeAdvancedSettingsField
             builtInTools={model.draft.builtInTools}
             modelId={model.draft.model}
-            readOnly={readOnly}
             runtimeId={model.draft.runtime}
             settings={model.draft.providerOptions}
             setBuiltInTools={model.setBuiltInTools}
@@ -176,12 +171,11 @@ export function BasicsSection({
         <SectionHeader>{t("agent.systemPrompt")}</SectionHeader>
         <textarea
           aria-label={t("agent.systemPrompt")}
-          className="border-border focus:ring-brand-ring w-full resize-y rounded-lg border bg-white px-4 py-3 text-[13px] leading-relaxed outline-none focus:ring-2"
+          className="border-border focus:ring-ring bg-card w-full resize-y rounded-lg border px-4 py-3 text-[13px] leading-relaxed outline-none focus:ring-2"
           onChange={(event) => {
             model.setPrompt(event.target.value);
           }}
           placeholder={t("agentEditor.systemPromptPlaceholder")}
-          readOnly={readOnly}
           rows={8}
           value={model.draft.prompt}
         />
@@ -193,11 +187,9 @@ export function BasicsSection({
 export function IntegrationsSection({
   model,
   projectId,
-  readOnly,
 }: {
   model: AgentEditorModel;
   projectId: string | null;
-  readOnly: boolean;
 }) {
   const { t } = useTranslation();
 
@@ -207,7 +199,6 @@ export function IntegrationsSection({
         <SectionHeader>{t("agent.skills")}</SectionHeader>
         <AgentSkillsField
           projectId={projectId}
-          readOnly={readOnly}
           selectedSkills={model.draft.skills}
           setSkills={model.setSkills}
         />
@@ -217,7 +208,6 @@ export function IntegrationsSection({
         <SectionHeader>{t("agent.mcpServers")}</SectionHeader>
         <AgentMcpBindingsField
           projectId={projectId}
-          readOnly={readOnly}
           selectedServers={model.draft.mcpServers}
           setServers={model.setMcpServers}
         />
@@ -226,22 +216,14 @@ export function IntegrationsSection({
   );
 }
 
-export function EnvironmentSection({
-  agent,
-  model,
-  readOnly,
-}: {
-  agent: Agent;
-  model: AgentEditorModel;
-  readOnly: boolean;
-}) {
+export function EnvironmentSection({ agent, model }: { agent: Agent; model: AgentEditorModel }) {
   const { t } = useTranslation();
 
   return (
     <div className="space-y-5">
       <div>
         <SectionHeader>{t("agent.environment")}</SectionHeader>
-        <EnvironmentPicker model={model} projectId={agent.projectId} readOnly={readOnly} />
+        <EnvironmentPicker model={model} projectId={agent.projectId} />
       </div>
     </div>
   );

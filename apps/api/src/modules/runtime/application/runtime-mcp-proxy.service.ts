@@ -1,19 +1,18 @@
 import { sessionsTable } from "@mosoo/db";
-import { parsePlatformId } from "@mosoo/id";
-import type { CredentialId, DriverInstanceId, McpServerId } from "@mosoo/id";
+import type { DriverInstanceId, McpServerId } from "@mosoo/id";
 import { eq } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { isTruthy } from "../../../shared/truthiness";
-import { readMcpCredentialSecret } from "../../mcp/application/mcp-credential-secret-resolution";
 import { getCredentialByIdOrNull } from "../../mcp/application/mcp-credential.repository";
 import { getCredentialStatus } from "../../mcp/application/mcp-mappers";
 import { getServerRowOrNull } from "../../mcp/application/mcp-server.repository";
+import { readSecret } from "../../vault/application/vault-secret-store";
 import { getDriverInstanceMcpProxyGrant } from "../infrastructure/driver-instance/mcp-grants.repository";
 import { getRuntimeSessionLink } from "../infrastructure/driver-instance/session-link.repository";
 import { createRuntimeMcpDelegationToken } from "./runtime-mcp-delegation";
-import { createRuntimeMcpProxyError } from "./runtime-mcp-proxy-errors";
+import { RuntimeMcpProxyError } from "./runtime-mcp-proxy-errors";
 export interface RuntimeMcpProxyTarget {
   delegationToken: string | null;
   serverId: McpServerId;
@@ -38,14 +37,13 @@ async function createDelegationToken(
     .where(eq(sessionsTable.id, link.sessionId))
     .limit(1)
     .get();
-  if (!row) return null;
-  if (row.endUserId === null) return null;
-  if (link.agentId === null || link.projectId === null) {
-    throw createRuntimeMcpProxyError({
-      code: "mcp_proxy_forbidden",
-      message: "MCP end-user delegation context is unavailable.",
-      status: 403,
-    });
+  if (row?.endUserId === null) return null;
+  if (!row || link.agentId === null || link.projectId === null) {
+    throw new RuntimeMcpProxyError(
+      "mcp_proxy_forbidden",
+      403,
+      "MCP end-user delegation context is unavailable.",
+    );
   }
   return createRuntimeMcpDelegationToken({
     accessToken: input.accessToken,
@@ -72,109 +70,75 @@ export async function resolveRuntimeMcpProxyTarget(
   const grant = await getDriverInstanceMcpProxyGrant(bindings.DB, input);
 
   if (grant === null) {
-    throw createRuntimeMcpProxyError({
-      code: "mcp_proxy_forbidden",
-      message: "MCP proxy grant is not available.",
-      status: 403,
-    });
+    throw new RuntimeMcpProxyError("mcp_proxy_forbidden", 403, "MCP proxy grant is not available.");
   }
 
   if (grant.authorizationState !== "active") {
-    throw createRuntimeMcpProxyError({
-      code: "mcp_proxy_forbidden",
-      message: "MCP proxy grant is not active.",
-      status: 403,
-    });
+    throw new RuntimeMcpProxyError("mcp_proxy_forbidden", 403, "MCP proxy grant is not active.");
   }
 
   if (!isTruthy(grant.credentialId)) {
-    throw createRuntimeMcpProxyError({
-      code: "mcp_credential_unavailable",
-      message: "MCP credential is unavailable.",
-      status: 401,
-    });
+    throw new RuntimeMcpProxyError(
+      "mcp_credential_unavailable",
+      401,
+      "MCP credential is unavailable.",
+    );
   }
 
-  const credentialId = parsePlatformId<CredentialId>(grant.credentialId, "MCP credential id");
   const [credential, server] = await Promise.all([
-    getCredentialByIdOrNull(bindings.DB, credentialId),
+    getCredentialByIdOrNull(bindings.DB, grant.credentialId),
     getServerRowOrNull(bindings.DB, input.serverId),
   ]);
 
   if (server === null) {
-    throw createRuntimeMcpProxyError({
-      code: "mcp_proxy_not_found",
-      message: "MCP server is not available.",
-      status: 404,
-    });
+    throw new RuntimeMcpProxyError("mcp_proxy_not_found", 404, "MCP server is not available.");
   }
 
   if (credential === null) {
-    throw createRuntimeMcpProxyError({
-      code: "mcp_credential_unavailable",
-      message: "MCP credential is unavailable.",
-      status: 401,
-    });
+    throw new RuntimeMcpProxyError(
+      "mcp_credential_unavailable",
+      401,
+      "MCP credential is unavailable.",
+    );
   }
 
   if (credential.serverId !== input.serverId) {
-    throw createRuntimeMcpProxyError({
-      code: "mcp_proxy_forbidden",
-      message: "MCP proxy grant is not allowed.",
-      status: 403,
-    });
+    throw new RuntimeMcpProxyError("mcp_proxy_forbidden", 403, "MCP proxy grant is not allowed.");
   }
 
   if (server.projectId !== grant.projectId || credential.projectId !== grant.projectId) {
-    throw createRuntimeMcpProxyError({
-      code: "mcp_proxy_forbidden",
-      message: "MCP proxy grant is not allowed for this project.",
-      status: 403,
-    });
+    throw new RuntimeMcpProxyError(
+      "mcp_proxy_forbidden",
+      403,
+      "MCP proxy grant is not allowed for this project.",
+    );
   }
 
-  if (server.enabled !== 1) {
-    throw createRuntimeMcpProxyError({
-      code: "mcp_policy_disabled",
-      message: "MCP server is disabled.",
-      status: 403,
-    });
+  if (!server.enabled) {
+    throw new RuntimeMcpProxyError("mcp_policy_disabled", 403, "MCP server is disabled.");
   }
 
   const credentialStatus = getCredentialStatus(credential);
 
   if (credentialStatus !== "active") {
-    throw createRuntimeMcpProxyError({
-      code: "mcp_credential_unavailable",
-      message: "MCP credential is unavailable.",
-      status: 401,
-    });
+    throw new RuntimeMcpProxyError(
+      "mcp_credential_unavailable",
+      401,
+      "MCP credential is unavailable.",
+    );
   }
 
-  const accessToken = await readMcpCredentialSecret(bindings, {
-    credential,
-    purpose: "runtime_access_token",
-    projectId: grant.projectId,
-    server,
-  });
-
-  if (accessToken.status === "denied") {
-    throw createRuntimeMcpProxyError({
-      code: "mcp_credential_unavailable",
-      message: "MCP credential is unavailable.",
-      status: 401,
-    });
-  }
+  const accessToken = await readSecret(bindings.DB, bindings, credential.secretId);
 
   return {
     delegationToken: await createDelegationToken(bindings, {
-      accessToken: accessToken.value,
+      accessToken,
       driverInstanceId: input.driverInstanceId,
       toolCallId: input.toolCallId,
       url: server.url,
     }),
     serverId: server.id,
-    upstreamAccessToken: accessToken.value,
+    upstreamAccessToken: accessToken,
     url: server.url,
   };
 }

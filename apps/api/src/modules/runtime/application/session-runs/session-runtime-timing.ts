@@ -3,8 +3,7 @@ import type { RuntimeTimingPayload, RuntimeTimingPhase } from "@mosoo/runtime-ev
 
 import { createErrorLogContext, logWarn } from "../../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
-import { createStopwatch, systemClock, toDurationMs } from "../../../../time";
-import type { Clock } from "../../../../time";
+import { createStopwatch, currentTimestampMs, toDurationMs } from "../../../../time";
 import {
   appendSessionRuntimeEvents,
   createSessionRuntimeEvent,
@@ -25,7 +24,6 @@ export interface RuntimeTimingRecorder {
 }
 
 export function createRuntimeTimingRecorder(input: {
-  clock?: Clock;
   path?: RuntimeTimingPath;
   runId: SessionRunId | null;
   sessionId: SessionId;
@@ -33,8 +31,7 @@ export function createRuntimeTimingRecorder(input: {
   stage: RuntimeTimingStage;
   traceId: string | null;
 }): RuntimeTimingRecorder {
-  const clock = input.clock ?? systemClock;
-  const stopwatch = createStopwatch(clock);
+  const stopwatch = createStopwatch();
   const phases: RuntimeTimingPhase[] = [];
   const defaultPath = input.path ?? "unknown";
 
@@ -46,7 +43,7 @@ export function createRuntimeTimingRecorder(input: {
       });
     },
     async measure(name, task) {
-      const phase = createStopwatch(clock);
+      const phase = createStopwatch();
 
       try {
         return await task();
@@ -55,7 +52,7 @@ export function createRuntimeTimingRecorder(input: {
       }
     },
     snapshot(options) {
-      const completedAtMs = clock.nowMs();
+      const completedAtMs = currentTimestampMs();
 
       return {
         completedAtMs,

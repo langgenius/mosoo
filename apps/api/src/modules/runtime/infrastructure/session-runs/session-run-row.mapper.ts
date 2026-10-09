@@ -4,20 +4,9 @@ import type {
   SessionRunSummary,
   SessionRunTrigger,
 } from "@mosoo/contracts/session-run";
-import type { PrimitiveRecord } from "@mosoo/contracts/validation";
-import {
-  PrimitiveRecord as PrimitiveRecordSchema,
-  parseSchemaValue,
-} from "@mosoo/contracts/validation";
 import type { AgentDeploymentVersionId, SessionId, SessionRunId } from "@mosoo/id";
 
 import { toIsoString } from "../../../../time";
-import { ACTIVE_SESSION_RUN_STATUSES } from "../../domain/session-run-lifecycle.machine";
-
-export type ActiveSessionRunStatus = Extract<
-  SessionRunStatus,
-  "queued" | "booting" | "running" | "waiting_input"
->;
 
 export interface SessionRunRow {
   completed_at: number | null;
@@ -38,10 +27,6 @@ export interface SessionRunRow {
   updated_at: number;
 }
 
-export function buildActiveSessionRunStatusFilter(alias = "status"): string {
-  return `${alias} IN (${ACTIVE_SESSION_RUN_STATUSES.map((status) => `'${status}'`).join(", ")})`;
-}
-
 export function toSessionRunSummary(row: SessionRunRow): SessionRunSummary {
   return {
     completedAt: row.completed_at === null ? null : toIsoString(row.completed_at),
@@ -60,32 +45,6 @@ export function toSessionRunSummary(row: SessionRunRow): SessionRunSummary {
   };
 }
 
-function parseJsonRecord(raw: string | null): PrimitiveRecord {
-  if (raw === null) {
-    return {};
-  }
-
-  if (!raw.trim()) {
-    throw new Error("Session run error details must not be empty.");
-  }
-
-  const parsed = parseRunErrorDetailsJson(raw);
-
-  try {
-    return parseSchemaValue(PrimitiveRecordSchema, parsed);
-  } catch {
-    throw new Error("Session run error details must be a primitive record.");
-  }
-}
-
-function parseRunErrorDetailsJson(raw: string): unknown {
-  try {
-    return JSON.parse(raw);
-  } catch {
-    throw new Error("Session run error details are not valid JSON.");
-  }
-}
-
 function toRunError(row: SessionRunRow): RunError | null {
   if (
     row.error_code === null ||
@@ -98,7 +57,7 @@ function toRunError(row: SessionRunRow): RunError | null {
 
   return {
     code: row.error_code,
-    details: parseJsonRecord(row.error_details_json),
+    details: row.error_details_json === null ? {} : JSON.parse(row.error_details_json),
     message: row.error_message,
     retryable: false,
   };

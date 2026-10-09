@@ -1,11 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 
-import {
-  ENVIRONMENT_PACKAGE_MANAGERS,
-  isWritableEnvironmentPackageManager,
-  WRITABLE_ENVIRONMENT_PACKAGE_MANAGERS,
-} from "../src/environment/environment.contract";
+import { WRITABLE_ENVIRONMENT_PACKAGE_MANAGERS } from "../src/environment/environment.contract";
 
 interface DriverPackageManagerManifest {
   managers: string[];
@@ -27,13 +23,5 @@ describe("Environment package manager contract", () => {
 
     expect(manifest.schemaVersion).toBe(1);
     expect(manifest.managers).toEqual([...WRITABLE_ENVIRONMENT_PACKAGE_MANAGERS]);
-  });
-
-  test("keeps legacy managers readable without advertising them for writes", () => {
-    expect(ENVIRONMENT_PACKAGE_MANAGERS).toEqual(["apt", "cargo", "gem", "go", "npm", "pip"]);
-    expect(ENVIRONMENT_PACKAGE_MANAGERS.filter(isWritableEnvironmentPackageManager)).toEqual([
-      "npm",
-      "pip",
-    ]);
   });
 });

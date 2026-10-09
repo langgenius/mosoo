@@ -1,61 +1,17 @@
-import type {
-  DriverNativeRuntimeRef,
-  DriverNativeRuntimeRefKind,
-  DriverRuntime,
-} from "@mosoo/agent-driver/runtime";
-import {
-  getExpectedDriverNativeRuntimeRefKind,
-  parseDriverNativeRuntimeRef,
-} from "@mosoo/agent-driver/runtime";
-import { nativeResumeRefsTable, sessionsTable } from "@mosoo/db";
+import type { DriverNativeRuntimeRef, DriverRuntime } from "@mosoo/agent-driver/runtime";
+import { parseDriverNativeRuntimeRef } from "@mosoo/agent-driver/runtime";
+import { nativeResumeRefsTable } from "@mosoo/db";
 import type { DriverInstanceId, SessionId, SessionRunId } from "@mosoo/id";
-import { eq, inArray, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../time";
-
-interface NativeResumeRefRow {
-  committed_value: string | null;
-  kind: string;
-  runtime_id: string;
-}
 
 export interface NativeResumeRefObservation {
   driverInstanceId: DriverInstanceId;
   nativeResumeRef: DriverNativeRuntimeRef;
   sessionId: SessionId;
   sessionRunId: SessionRunId;
-}
-
-function expectedNativeRuntimeRefKind(
-  runtimeId: DriverNativeRuntimeRef["runtimeId"],
-): DriverNativeRuntimeRefKind {
-  return getExpectedDriverNativeRuntimeRefKind(runtimeId);
-}
-
-function enforceNativeRuntimeRefShape(ref: DriverNativeRuntimeRef): void {
-  const expectedKind = expectedNativeRuntimeRefKind(ref.runtimeId);
-
-  if (ref.kind !== expectedKind) {
-    throw new Error(`Native resume ref kind ${ref.kind} does not match runtime ${ref.runtimeId}.`);
-  }
-}
-
-function toNativeRuntimeRef(row: NativeResumeRefRow): DriverNativeRuntimeRef | null {
-  const value = row.committed_value;
-
-  if (value === null) {
-    return null;
-  }
-
-  const ref = parseDriverNativeRuntimeRef({
-    kind: row.kind,
-    runtimeId: row.runtime_id,
-    value,
-  });
-
-  enforceNativeRuntimeRefShape(ref);
-  return ref;
 }
 
 export async function getNativeResumeRefForRuntime(
@@ -68,47 +24,32 @@ export async function getNativeResumeRefForRuntime(
   const row =
     (await getAppDatabase(database)
       .select({
-        committed_value: nativeResumeRefsTable.committedValue,
+        committedValue: nativeResumeRefsTable.committedValue,
         kind: nativeResumeRefsTable.kind,
-        runtime_id: nativeResumeRefsTable.runtimeId,
+        runtimeId: nativeResumeRefsTable.runtimeId,
       })
       .from(nativeResumeRefsTable)
-      .innerJoin(sessionsTable, eq(sessionsTable.id, nativeResumeRefsTable.sessionId))
       .where(eq(nativeResumeRefsTable.sessionId, input.sessionId))
       .limit(1)
       .get()) ?? null;
 
-  if (!row) {
+  if (row === null || row.committedValue === null) {
     return null;
   }
 
-  const ref = toNativeRuntimeRef(row);
+  const ref = parseDriverNativeRuntimeRef({
+    kind: row.kind,
+    runtimeId: row.runtimeId,
+    value: row.committedValue,
+  });
 
-  return ref?.runtimeId === input.runtimeId ? ref : null;
-}
-
-export async function deleteNativeResumeRefsForSessions(
-  database: D1Database,
-  sessionIds: readonly SessionId[],
-): Promise<void> {
-  const uniqueSessionIds = [...new Set(sessionIds)];
-
-  if (uniqueSessionIds.length === 0) {
-    return;
-  }
-
-  await getAppDatabase(database)
-    .delete(nativeResumeRefsTable)
-    .where(inArray(nativeResumeRefsTable.sessionId, uniqueSessionIds))
-    .run();
+  return ref.runtimeId === input.runtimeId ? ref : null;
 }
 
 export async function upsertNativeResumeRef(
   database: D1Database,
   observation: NativeResumeRefObservation,
 ): Promise<void> {
-  enforceNativeRuntimeRefShape(observation.nativeResumeRef);
-
   const timestampMs = currentTimestampMs();
 
   await getAppDatabase(database)

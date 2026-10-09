@@ -1,29 +1,18 @@
-# Runs and Threads
+# Runs and Logs
 
-Status: available in the current mosoo web console as the human-facing view of managed Agent work.
+Where a Project owner sees Session work in the console: the **Runs** inbox for Threads, and an Agent's **Logs** tab for troubleshooting.
 
-## Product value
+## Promises
 
-Runs is mosoo's built-in task inbox. It lets a Project owner send meaningful work to an Agent, leave while it runs, then return later to review or continue it.
+- The sidebar entry **Runs** opens the **Threads** page, and **New thread** starts one for a chosen Agent. A Thread holds one Run per turn, so a follow-up adds a Run to the same Thread.
+- Runs lists the Project's Threads, including those created through the API; Previews are not listed. A Thread without an Agent is labelled **Direct invocation**.
+- Threads are grouped into Pinned, Working, Completed and Archive and can be filtered to unread, pinned or failed. A Thread shows its request, replies, status and an on-demand process view, and can be followed up, pinned, archived or deleted ([Thread lifecycle](./session-lifecycle.md)).
+- **Agent → Logs** lists that Agent's Sessions, Previews included, and replays one Session turn by turn, with a **Diagnostics** panel for its execution configuration.
+- Logs is a troubleshooting replay, not an audit trail or a billing record; use [Project usage](./cost-dashboard.md) for cost. Deleting a Session deletes its replay.
 
-The sidebar entry is **Runs**. Inside that surface, each task is a **Thread**: the page title is **Threads**, creation says **New thread**, and detail views keep the Thread name. A Thread can contain another execution when the user follows up.
+## Limits
 
-## Problem and users
-
-The primary user is a Project owner or operator who already has an Agent and needs to manage work that may take longer than a live chat. They need a task-first place to see what is still working, what completed or failed, and what needs attention.
-
-## User flow
-
-1. Open **Runs** from the Project sidebar.
-2. Select **New thread**, choose a published Agent, write a brief, and optionally attach files. A published Agent can also open this composer with that Agent already selected.
-3. Scan Pinned, Working, Completed, and Archive sections, or filter for unread, pinned, or failed work.
-4. Open a Thread to review the original request, Agent replies, status, and an on-demand process view.
-5. When the Thread allows it, add a follow-up. The user can also pin, archive, or permanently delete a Thread.
-
-## Current user-visible boundaries
-
-- Threads belong to the active Project, and only published Agents can receive a new Thread.
-- Some finished or archived Threads are read-only; the detail view explains when follow-up is unavailable.
-- Files can be attached when creating a Thread, but not from the follow-up composer.
-- Pins and read markers stay in the current browser rather than syncing across devices.
-- Completion notifications require browser permission and only work while the Threads page is open.
+- **New thread** offers only published Agents. Threads for unpublished presets or with no Agent come from the API.
+- Pins and read markers live in the current browser and do not sync across devices.
+- Completion notifications need browser permission and work only while the Threads page is open.
+- Logs has no cross-Session search, pagination or export, and Sessions without an Agent have no Logs view.

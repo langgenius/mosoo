@@ -1,94 +1,123 @@
 import type {
   CreateFileUploadRequest,
   CreateFileUploadResponse,
+  CreateFileUploadTarget,
+  FileOwnerId,
+  FileOwnerKind,
   FilePurpose,
-  FileUploadStrategy,
+  FileScopeId,
+  FileScopeKind,
+  FileSessionKind,
 } from "@mosoo/contracts/file";
+import { getParentPath } from "@mosoo/contracts/file";
 import { createPlatformId, parsePlatformId } from "@mosoo/id";
-import type { AccountId, FileId, UploadId } from "@mosoo/id";
+import type { AccountId, FileId, ProjectId, UploadId } from "@mosoo/id";
 
-import { createErrorLogContext, logInfo, logWarn } from "../../../platform/cloudflare/logger";
+import { createErrorLogContext, logWarn } from "../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { currentTimestampMs } from "../../../time";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import {
-  FileControlError,
-  createFileConflictError,
-  createFileInvalidRequestError,
-  createFileNotFoundError,
-  createFilePreconditionFailedError,
-} from "./file-errors";
+import { ensureProjectOwnership } from "../../projects/application/project.service";
+import { createFileConflictError, createFileInvalidRequestError } from "./file-errors";
 import {
   choosePartSize,
   chooseUploadStrategy,
+  createAccountAvatarPath,
+  createAttachmentPath,
   createStagingObjectKey,
   normalizeContentType,
+  normalizeFileName,
 } from "./file-paths";
-import { ensureProjectKeyFileScope } from "./file-record-access";
-import {
-  ensureUploadAccess,
-  expirePathLocks,
-  expireUploadIfNeeded,
-  getPendingFileByPath,
-  getReadyFileByPath,
-  toUploadSummary,
-} from "./file-record-store";
-import type { FileRecordRow } from "./file-record-store";
-import { getFileScopeDescriptor, resolveFileUploadTargetContext } from "./file-scope-descriptor";
+import { ensureProjectKeyFileScope, ensureUploadAccess } from "./file-record-access";
+import { toUploadSummary } from "./file-record-model";
+import { expireUploadIfNeeded } from "./file-record-mutations";
 import { insertAdmittedFileUpload } from "./file-upload-admission.repository";
-import { abortMultipartUpload, createMultipartUpload, normalizeR2Etag } from "./r2-s3-client";
+import { ensureSessionFileAccess } from "./session-file-ownership";
 
 const UPLOAD_SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 
-interface FileUploadOverwriteState {
-  ifMatchEtag: string | null;
-  overwrite: boolean;
+interface FileUploadTarget {
+  logicalPath: string;
+  name: string;
+  ownerId: FileOwnerId;
+  ownerKind: FileOwnerKind;
+  purpose: FilePurpose;
+  scopeId: Exclude<FileScopeId, null>;
+  scopeKind: FileScopeKind;
+  sessionKind: FileSessionKind | null;
 }
 
-function resolveFileUploadPurpose(input: CreateFileUploadRequest): FilePurpose {
-  const expectedPurpose = getFileScopeDescriptor(input.target.kind).uploadPurpose;
+async function resolveFileUploadTarget(
+  bindings: ApiBindings,
+  viewer: AuthenticatedViewer,
+  fileId: FileId,
+  target: CreateFileUploadTarget,
+): Promise<FileUploadTarget> {
+  switch (target.kind) {
+    case "account": {
+      const accountId = parsePlatformId<AccountId>(target.id, "upload account ID");
 
-  if (input.purpose !== expectedPurpose) {
-    throw createFileInvalidRequestError(
-      `File purpose ${input.purpose} cannot be used with ${input.target.kind} target.`,
-    );
+      if (accountId !== viewer.id) {
+        throw createFileInvalidRequestError(
+          "Avatars can only be uploaded for the current account.",
+        );
+      }
+
+      const name = normalizeFileName(target.name);
+
+      return {
+        logicalPath: createAccountAvatarPath(fileId, name),
+        name,
+        ownerId: accountId,
+        ownerKind: "account",
+        purpose: "account_avatar",
+        scopeId: accountId,
+        scopeKind: "account",
+        sessionKind: null,
+      };
+    }
+    case "session": {
+      const projectId = parsePlatformId<ProjectId>(target.projectId, "upload session project ID");
+      await ensureSessionFileAccess(
+        bindings.DB,
+        viewer.id,
+        { projectId, sessionId: target.id },
+        "view",
+      );
+      const name = normalizeFileName(target.name);
+
+      return {
+        logicalPath: createAttachmentPath(fileId, name),
+        name,
+        ownerId: target.id,
+        ownerKind: "session",
+        purpose: "session_attachment",
+        scopeId: target.id,
+        scopeKind: "session",
+        sessionKind: "attachment",
+      };
+    }
+    case "agent_package":
+    case "app_draft": {
+      const projectId = parsePlatformId<ProjectId>(target.id, "upload project ID");
+      await ensureProjectOwnership(bindings.DB, viewer.id, projectId);
+      const name = normalizeFileName(target.name);
+
+      return {
+        logicalPath: createAttachmentPath(fileId, name),
+        name,
+        ownerId: projectId,
+        ownerKind: "app",
+        purpose: target.kind,
+        scopeId: projectId,
+        scopeKind: target.kind,
+        sessionKind: target.kind === "app_draft" ? "attachment" : null,
+      };
+    }
+    default: {
+      throw createFileInvalidRequestError("Unsupported file upload target.");
+    }
   }
-
-  return input.purpose;
-}
-
-function resolveFileUploadOverwriteState(
-  input: CreateFileUploadRequest,
-  existingReady: FileRecordRow | null,
-): FileUploadOverwriteState {
-  const overwrite = input.overwrite === true;
-  const ifMatchEtag = normalizeR2Etag(input.ifMatchEtag);
-
-  if (existingReady !== null && !overwrite) {
-    throw new FileControlError(
-      409,
-      "file_conflict",
-      "A file with this path already exists.",
-      false,
-      {
-        currentEtag: existingReady.etag,
-      },
-    );
-  }
-
-  if (ifMatchEtag !== null && !overwrite) {
-    throw createFileInvalidRequestError("ifMatchEtag requires overwrite.");
-  }
-
-  if (overwrite && ifMatchEtag !== null && existingReady === null) {
-    throw createFileNotFoundError("File was deleted by someone else.");
-  }
-
-  if (overwrite && ifMatchEtag !== null && normalizeR2Etag(existingReady?.etag) !== ifMatchEtag) {
-    throw createFilePreconditionFailedError("File was changed by someone else, please refresh.");
-  }
-
-  return { ifMatchEtag, overwrite };
 }
 
 async function createMultipartUploadId(
@@ -96,21 +125,19 @@ async function createMultipartUploadId(
   input: {
     contentType: string;
     objectKey: string;
-    strategy: FileUploadStrategy;
+    strategy: "multipart" | "single_put";
   },
 ): Promise<string | null> {
   if (input.strategy !== "multipart") {
     return null;
   }
 
-  const multipartUpload = await createMultipartUpload(bindings, input.objectKey, input.contentType);
+  const multipartUpload = await bindings.FILE_BUCKET.createMultipartUpload(input.objectKey, {
+    httpMetadata: {
+      contentType: input.contentType,
+    },
+  });
   return multipartUpload.uploadId;
-}
-
-function validateUploadSize(size: number): void {
-  if (!Number.isSafeInteger(size) || size < 0) {
-    throw createFileInvalidRequestError("File size must be a non-negative integer.");
-  }
 }
 
 export async function createFileUpload(
@@ -118,7 +145,9 @@ export async function createFileUpload(
   viewer: AuthenticatedViewer,
   input: CreateFileUploadRequest,
 ): Promise<CreateFileUploadResponse> {
-  validateUploadSize(input.file.size);
+  if (!Number.isSafeInteger(input.file.size) || input.file.size < 0) {
+    throw createFileInvalidRequestError("File size must be a non-negative integer.");
+  }
 
   const timestampMs = currentTimestampMs();
   const uploadId = createPlatformId<UploadId>();
@@ -127,48 +156,17 @@ export async function createFileUpload(
   const strategy = chooseUploadStrategy(input.file.size);
   const partSize = strategy === "multipart" ? choosePartSize(input.file.size) : null;
   const expiresAt = timestampMs + UPLOAD_SESSION_TTL_MS;
-  const purpose = resolveFileUploadPurpose(input);
+  const target = await resolveFileUploadTarget(bindings, viewer, fileId, input.target);
 
-  const { logicalPath, name, ownerId, ownerKind, parentPath, scopeId, scopeKind, sessionKind } =
-    await resolveFileUploadTargetContext({
-      bindings,
-      fileId,
-      target: input.target,
-      viewer,
-    });
-  await ensureProjectKeyFileScope(bindings.DB, viewer, scopeKind, scopeId);
-  const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
-
-  if (getFileScopeDescriptor(scopeKind).capabilities.pathLocks) {
-    await expirePathLocks({
-      database: bindings.DB,
-      path: logicalPath,
-      scopeId,
-      scopeKind,
-    });
+  if (input.purpose !== target.purpose) {
+    throw createFileInvalidRequestError(
+      `File purpose ${input.purpose} cannot be used with ${target.scopeKind} target.`,
+    );
   }
 
-  if (
-    await getPendingFileByPath({
-      database: bindings.DB,
-      path: logicalPath,
-      scopeId,
-      scopeKind,
-    })
-  ) {
-    throw createFileConflictError("A pending upload already exists for this path.");
-  }
+  await ensureProjectKeyFileScope(bindings.DB, viewer, target.scopeKind, target.scopeId);
 
-  const existingReady = await getReadyFileByPath({
-    database: bindings.DB,
-    path: logicalPath,
-    scopeId,
-    scopeKind,
-  });
-
-  const { ifMatchEtag, overwrite } = resolveFileUploadOverwriteState(input, existingReady);
-
-  const stagingObjectKey = createStagingObjectKey(scopeKind, scopeId, fileId);
+  const stagingObjectKey = createStagingObjectKey(target.scopeKind, target.scopeId, fileId);
   const multipartUploadId = await createMultipartUploadId(bindings, {
     contentType,
     objectKey: stagingObjectKey,
@@ -181,21 +179,21 @@ export async function createFileUpload(
       {
         committed: false,
         createdAt: timestampMs,
-        createdByAccountId: viewerId,
+        createdByAccountId: viewer.id,
         etag: null,
         expiresAt,
         id: fileId,
         mimeType: contentType,
-        name,
+        name: target.name,
         objectKey: stagingObjectKey,
-        ownerId,
-        ownerKind,
-        parentPath,
-        path: logicalPath,
-        purpose,
-        scopeId,
-        scopeKind,
-        sessionKind,
+        ownerId: target.ownerId,
+        ownerKind: target.ownerKind,
+        parentPath: getParentPath(target.logicalPath),
+        path: target.logicalPath,
+        purpose: target.purpose,
+        scopeId: target.scopeId,
+        scopeKind: target.scopeKind,
+        sessionKind: target.sessionKind,
         size: input.file.size,
         status: "pending",
         updatedAt: timestampMs,
@@ -204,17 +202,16 @@ export async function createFileUpload(
       {
         contentType,
         createdAt: timestampMs,
-        createdByAccountId: viewerId,
+        createdByAccountId: viewer.id,
         expectedSize: input.file.size,
         expiresAt,
         fileId,
         id: uploadId,
-        ifMatchEtag,
         multipartUploadId,
-        overwrite,
+        overwrite: false,
         partSize,
-        scopeId,
-        scopeKind,
+        scopeId: target.scopeId,
+        scopeKind: target.scopeKind,
         status: "pending",
         strategy,
         updatedAt: timestampMs,
@@ -227,80 +224,30 @@ export async function createFileUpload(
     }
   } catch (error) {
     if (multipartUploadId !== null) {
-      await abortMultipartUpload(bindings, stagingObjectKey, multipartUploadId).catch(
-        (abortError: unknown) => {
+      await bindings.FILE_BUCKET.resumeMultipartUpload(stagingObjectKey, multipartUploadId)
+        .abort()
+        .catch((abortError: unknown) => {
           logWarn("file.upload.admission_abort_failed", {
             ...createErrorLogContext(abortError),
             fileId,
             uploadId,
           });
-        },
-      );
+        });
     }
     throw error;
   }
 
-  logInfo("file.upload.created", {
-    contentType,
-    fileId,
-    objectKey: stagingObjectKey,
-    owner_id: ownerId,
-    owner_kind: ownerKind,
-    overwrite,
-    path: logicalPath,
-    purpose,
-    scopeId,
-    scopeKind,
-    size: input.file.size,
-    strategy,
-    uploadId,
-    viewerId,
-  });
-
-  const fileRow: FileRecordRow = {
-    committed: 0,
-    created_at: timestampMs,
-    created_by_account_id: viewerId,
-    etag: null,
-    expires_at: expiresAt,
-    id: fileId,
-    mime_type: contentType,
-    name,
-    object_key: stagingObjectKey,
-    owner_id: ownerId,
-    owner_kind: ownerKind,
-    parent_path: parentPath,
-    path: logicalPath,
-    purpose,
-    scope_id: scopeId,
-    scope_kind: scopeKind,
-    session_kind: sessionKind,
-    size: input.file.size,
-    status: "pending",
-    updated_at: timestampMs,
-    version: 1,
-  };
-
   return toUploadSummary(
     {
       content_type: contentType,
-      created_at: timestampMs,
-      created_by_account_id: viewerId,
       expected_size: input.file.size,
       expires_at: expiresAt,
-      file_id: fileId,
-      id: uploadId,
-      if_match_etag: ifMatchEtag,
-      multipart_upload_id: multipartUploadId,
-      overwrite: overwrite ? 1 : 0,
       part_size: partSize,
-      scope_id: scopeId,
-      scope_kind: scopeKind,
+      scope_kind: target.scopeKind,
       status: "pending",
       strategy,
-      updated_at: timestampMs,
     },
-    fileRow,
+    { id: fileId, path: target.logicalPath },
   );
 }
 

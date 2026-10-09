@@ -28,7 +28,7 @@ function EnvironmentOption({
     <button
       className={cn(
         "flex w-full items-start gap-2.5 rounded-lg px-3 py-2 text-left transition-colors",
-        selected ? "bg-ink-100 text-fg-1" : "hover:bg-accent/50",
+        selected ? "bg-selected text-fg-1" : "hover:bg-hover/50",
       )}
       onClick={onSelect}
       type="button"
@@ -36,19 +36,17 @@ function EnvironmentOption({
       <div
         className={cn(
           "mt-0.5 flex size-4 shrink-0 items-center justify-center rounded border",
-          selected ? "border-brand bg-brand" : "border-border",
+          selected ? "border-emphasis bg-emphasis" : "border-border",
         )}
       >
-        {selected ? <Check className="size-3 text-white" /> : null}
+        {selected ? <Check className="text-emphasis-foreground size-3" /> : null}
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-center gap-1.5">
           <span className="truncate text-[13px] font-medium">{environment.name}</span>
           {environment.isDefault ? <Star className="size-3 shrink-0" /> : null}
         </div>
-        <div className="text-muted-foreground mt-0.5 text-[11px]">
-          {describeEnvironment(environment, t)}
-        </div>
+        <div className="text-fg-3 mt-0.5 text-[11px]">{describeEnvironment(environment, t)}</div>
       </div>
     </button>
   );
@@ -57,11 +55,9 @@ function EnvironmentOption({
 export function EnvironmentPicker({
   model,
   projectId,
-  readOnly = false,
 }: {
   model: AgentEditorModel;
   projectId: string | null;
-  readOnly?: boolean;
 }): ReactElement {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -81,22 +77,19 @@ export function EnvironmentPicker({
 
   return (
     <div className="space-y-2">
-      <Label className="text-muted-foreground text-[12px]">
-        {t("agentEditor.runtimeEnvironment")}
-      </Label>
+      <Label className="text-fg-3 text-[12px]">{t("agentEditor.runtimeEnvironment")}</Label>
       <Popover.Root modal={false} onOpenChange={setOpen} open={open}>
         <Popover.Trigger
           className={cn(
-            "flex min-h-[52px] w-full items-center justify-between gap-3 rounded-lg border border-border bg-white px-3 py-2 text-left transition-colors",
-            readOnly ? "cursor-default opacity-80" : "cursor-pointer hover:border-brand/30",
-            open ? "border-brand/30 ring-2 ring-brand-ring" : null,
+            "flex min-h-[52px] w-full cursor-pointer items-center justify-between gap-3 rounded-lg border border-border bg-card px-3 py-2 text-left transition-colors hover:border-border-strong",
+            open ? "border-ring" : null,
           )}
-          disabled={readOnly || activeProjectId === null}
+          disabled={activeProjectId === null}
           type="button"
         >
           <div className="flex min-w-0 items-center gap-2.5">
-            <div className="bg-secondary flex size-8 shrink-0 items-center justify-center rounded-lg">
-              <Box className="text-brand size-4" />
+            <div className="bg-paper-200 flex size-8 shrink-0 items-center justify-center rounded-lg">
+              <Box className="text-fg-2 size-4" />
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">
@@ -109,7 +102,7 @@ export function EnvironmentPicker({
                   <Star className="text-brand size-3" />
                 ) : null}
               </div>
-              <div className="text-muted-foreground mt-0.5 text-[11px]">
+              <div className="text-fg-3 mt-0.5 text-[11px]">
                 {selectedEnvironment
                   ? describeEnvironment(selectedEnvironment, t)
                   : selectedEnvironmentMissing
@@ -118,12 +111,12 @@ export function EnvironmentPicker({
               </div>
             </div>
           </div>
-          {readOnly ? null : <span className="text-muted-foreground">▾</span>}
+          <span className="text-fg-3">▾</span>
         </Popover.Trigger>
 
         <Popover.Portal>
           <Popover.Positioner align="start" className="z-50 w-[var(--anchor-width)]" sideOffset={4}>
-            <Popover.Popup className="border-border flex max-h-[var(--available-height)] flex-col overflow-hidden rounded-lg border bg-white p-1.5 shadow-lg outline-none">
+            <Popover.Popup className="border-border bg-card flex max-h-[var(--available-height)] flex-col overflow-hidden rounded-lg border p-1.5 shadow-lg outline-none">
               <div className="min-h-0 flex-1 overflow-y-auto">
                 <EnvironmentMenuContent
                   environments={environments}
@@ -136,9 +129,9 @@ export function EnvironmentPicker({
                   selectedEnvironment={selectedEnvironment}
                 />
               </div>
-              <div className="border-border-subtle mt-1 grid shrink-0 gap-1 border-t pt-1">
+              <div className="border-border-soft mt-1 grid shrink-0 gap-1 border-t pt-1">
                 <button
-                  className="text-brand hover:bg-brand-light/60 flex items-center gap-2 rounded-lg px-3 py-2 text-[13px] transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                  className="text-fg-1 hover:bg-selected/60 disabled:text-fg-muted flex items-center gap-2 rounded-lg px-3 py-2 text-[13px] transition-colors disabled:cursor-not-allowed"
                   disabled={activeProjectId === null}
                   onClick={() => {
                     setOpen(false);
@@ -151,7 +144,7 @@ export function EnvironmentPicker({
                 </button>
                 {selectedEnvironment ? (
                   <Link
-                    className="text-fg-2 hover:bg-accent/50 hover:text-fg-1 flex items-center gap-2 rounded-lg px-3 py-2 text-[13px] transition-colors"
+                    className="text-fg-2 hover:bg-hover/50 hover:text-fg-1 flex items-center gap-2 rounded-lg px-3 py-2 text-[13px] transition-colors"
                     onClick={() => {
                       setOpen(false);
                     }}
@@ -197,16 +190,12 @@ function EnvironmentMenuContent({
   const { t } = useTranslation();
 
   if (loading) {
-    return (
-      <div className="text-muted-foreground p-3 text-[12px]">
-        {t("agentEditor.loadingEnvironments")}
-      </div>
-    );
+    return <div className="text-fg-3 p-3 text-[12px]">{t("agentEditor.loadingEnvironments")}</div>;
   }
 
   if (error) {
     return (
-      <div className="text-destructive p-3 text-[12px]">
+      <div className="text-danger p-3 text-[12px]">
         {error instanceof Error ? error.message : t("agentEditor.failedToLoadEnvironments")}
       </div>
     );
@@ -214,9 +203,7 @@ function EnvironmentMenuContent({
 
   if (environments.length === 0) {
     return (
-      <div className="text-muted-foreground p-3 text-[12px]">
-        {t("agentEditor.noEnvironmentsAvailable")}
-      </div>
+      <div className="text-fg-3 p-3 text-[12px]">{t("agentEditor.noEnvironmentsAvailable")}</div>
     );
   }
 

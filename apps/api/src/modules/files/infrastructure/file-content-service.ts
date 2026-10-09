@@ -4,8 +4,7 @@ import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { createFileConflictError, createFileNotFoundError } from "./file-errors";
 import { createDownloadDisposition } from "./file-paths";
-import { ensureFileAccess } from "./file-record-store";
-import { getObjectBody } from "./r2-s3-client";
+import { ensureFileAccess } from "./file-record-access";
 
 export async function streamFileContent(
   bindings: ApiBindings,
@@ -24,9 +23,9 @@ export async function streamFileContent(
     throw createFileConflictError("Only a ready file can be downloaded.");
   }
 
-  const object = await getObjectBody(bindings, file.object_key);
+  const object = await bindings.FILE_BUCKET.get(file.object_key);
 
-  if (!object?.body) {
+  if (!object) {
     throw createFileNotFoundError("File content was not found in R2.");
   }
 

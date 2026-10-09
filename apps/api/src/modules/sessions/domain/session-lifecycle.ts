@@ -1,8 +1,6 @@
 import type { SessionStatus } from "@mosoo/contracts/session";
 import type { SessionRunStatus } from "@mosoo/contracts/session-run";
 
-export const RESCHEDULING_RECONNECT_WINDOW_MS = 120_000;
-
 export function toSessionLifecycleStatusForRunStatus(status: SessionRunStatus): SessionStatus {
   switch (status) {
     case "queued":

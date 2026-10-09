@@ -1,25 +1,20 @@
 import type { PublicThreadUsageResponse } from "@mosoo/contracts/public-api";
 import { sessionModelCallsTable } from "@mosoo/db";
-import type { PublicThreadId, SessionModelCallId } from "@mosoo/id";
+import type { SessionId, SessionModelCallId } from "@mosoo/id";
 import { and, asc, eq, gt, sql } from "drizzle-orm";
 
 import { getAppDatabase } from "../../platform/db/drizzle";
 import type { AuthenticatedViewer } from "../auth/application/viewer-auth.service";
-import { admitPublicSessionCaller } from "./public-thread-session-query.service";
+import { admitPublicThread } from "./public-thread-session-query.service";
 
 export async function listPublicThreadUsage(input: {
   database: D1Database;
   caller: AuthenticatedViewer;
-  threadId: PublicThreadId;
+  threadId: SessionId;
   after: SessionModelCallId | null;
   limit: number;
 }): Promise<PublicThreadUsageResponse> {
-  const { session } = await admitPublicSessionCaller(
-    input.database,
-    input.caller,
-    input.threadId,
-    "v2",
-  );
+  await admitPublicThread(input.database, input.caller, input.threadId, "v2");
   const rows = await getAppDatabase(input.database)
     .select({
       id: sessionModelCallsTable.id,
@@ -41,7 +36,7 @@ export async function listPublicThreadUsage(input: {
     .from(sessionModelCallsTable)
     .where(
       and(
-        eq(sessionModelCallsTable.sessionId, session.id),
+        eq(sessionModelCallsTable.sessionId, input.threadId),
         input.after === null ? undefined : gt(sessionModelCallsTable.id, input.after),
       ),
     )

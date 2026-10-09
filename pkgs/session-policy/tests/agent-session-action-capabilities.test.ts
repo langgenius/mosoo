@@ -13,7 +13,6 @@ import {
 function expectCapability(input: {
   action: AgentSessionActionCapabilityName;
   archivedAt?: string | null;
-  isSessionCreator?: boolean;
   reason?: string | null;
   runtimeId?: string;
   status?: AgentSessionActionCapabilityStatus;
@@ -34,7 +33,6 @@ function expectCapability(input: {
     getAgentSessionActionCapability({
       action: input.action,
       archivedAt: input.archivedAt ?? null,
-      isSessionCreator: input.isSessionCreator ?? true,
       runtimeId: input.runtimeId ?? "openai-runtime",
       status: input.sessionStatus ?? "IDLE",
     }),
@@ -42,7 +40,7 @@ function expectCapability(input: {
 }
 
 describe("agent session action capabilities", () => {
-  test("uses runtime catalog capabilities as the action owner", () => {
+  test("makes runtime actions available on a supported runtime", () => {
     expectCapability({ action: "send_user_message", reason: null });
     expectCapability({ action: "connect_stream", reason: null });
     expectCapability({ action: "permission_decision", reason: null });
@@ -50,17 +48,19 @@ describe("agent session action capabilities", () => {
     expectCapability({ action: "unarchive_session", status: "unavailable" });
   });
 
-  test("keeps capability-free actions available when runtime support is absent", () => {
-    expectCapability({ action: "retrieve_session", reason: null, runtimeId: "system-agent" });
-    expectCapability({ action: "delete_session", reason: null, runtimeId: "system-agent" });
+  test("keeps runtime-free actions available when the runtime is not supported", () => {
+    expectCapability({ action: "retrieve_session", reason: null, runtimeId: "retired-runtime" });
+    expectCapability({ action: "delete_session", reason: null, runtimeId: "retired-runtime" });
     expectCapability({
       action: "send_user_message",
-      runtimeId: "system-agent",
+      reason: "Runtime is not supported.",
+      runtimeId: "retired-runtime",
       status: "unavailable",
     });
     expectCapability({
       action: "user_interrupt",
-      runtimeId: "system-agent",
+      reason: "Runtime is not supported.",
+      runtimeId: "retired-runtime",
       status: "unavailable",
     });
   });
@@ -69,7 +69,6 @@ describe("agent session action capabilities", () => {
     const capabilities = new Map(
       getAgentSessionActionCapabilities({
         archivedAt: "2026-06-01T00:00:00.000Z",
-        isSessionCreator: true,
         runtimeId: "openai-runtime",
         status: "IDLE",
       }).map((capability) => [capability.action, capability]),
@@ -96,17 +95,12 @@ describe("agent session action capabilities", () => {
       reason: null,
       status: "available",
     });
-    expect(capabilities.get("list_session_resources")).toMatchObject({
-      reason: null,
-      status: "available",
-    });
   });
 
   test("terminal lifecycle keeps delete separate from archive read-only semantics", () => {
     const capabilities = new Map(
       getAgentSessionActionCapabilities({
         archivedAt: "2026-06-01T00:00:00.000Z",
-        isSessionCreator: true,
         runtimeId: "openai-runtime",
         status: "TERMINATED",
       }).map((capability) => [capability.action, capability]),
@@ -131,33 +125,9 @@ describe("agent session action capabilities", () => {
     expect(() =>
       getAvailableAgentSessionActionCapability({
         action: "send_user_message",
-        isSessionCreator: false,
-        runtimeId: "openai-runtime",
+        runtimeId: "system-agent",
         status: "IDLE",
       }),
     ).toThrow();
-  });
-
-  test("creator gate does not hide read or create capabilities", () => {
-    const capabilities = new Map(
-      getAgentSessionActionCapabilities({
-        archivedAt: null,
-        isSessionCreator: false,
-        runtimeId: "openai-runtime",
-        status: "IDLE",
-      }).map((capability) => [capability.action, capability]),
-    );
-
-    expect(capabilities.get("create_session")).toMatchObject({
-      reason: null,
-      status: "available",
-    });
-    expect(capabilities.get("retrieve_session")).toMatchObject({
-      reason: null,
-      status: "available",
-    });
-    expect(capabilities.get("send_user_message")).toMatchObject({
-      status: "unavailable",
-    });
   });
 });

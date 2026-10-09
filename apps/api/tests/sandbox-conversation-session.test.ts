@@ -4,6 +4,7 @@ import type { AgentKind } from "@mosoo/contracts/agent";
 import type { SandboxSessionStatus } from "@mosoo/contracts/sandbox";
 import { isPlatformId } from "@mosoo/id";
 
+import { createRuntimeTimingRecorder } from "../src/modules/runtime/application/session-runs/session-runtime-timing";
 import { encodeSandboxBackupIdForStorage } from "../src/modules/runtime/infrastructure/sandbox-backup-id";
 import type {
   ExecutionSessionHandle,
@@ -255,9 +256,6 @@ function createExecutionSession(options: {
     async startProcess() {
       throw new Error("startProcess is not used in conversation session tests.");
     },
-    async watch() {
-      return new ReadableStream<Uint8Array>();
-    },
     async writeFile(path) {
       options.onWriteFile?.(path);
     },
@@ -314,13 +312,7 @@ function createSandbox(
     },
     async setKeepAlive() {},
     async ensureContainerReady() {},
-    async terminal() {
-      return new Response();
-    },
     async unmountBucket() {},
-    async wsConnect() {
-      return new Response(null, { status: 101 });
-    },
   };
 }
 
@@ -348,13 +340,19 @@ async function setWorkspaceCheckpointRequired(
 
 function createInput(sandbox: SandboxHandle, kind: AgentKind = "pet") {
   return {
-    agentId: "01J00000000000000000000009",
     kind,
     mountSessionResources: false,
     origin: ORIGIN,
     sandbox,
     sandboxId: "01J0000000000000000000000D",
     sessionId: "session-1",
+    timing: createRuntimeTimingRecorder({
+      runId: null,
+      sessionId: "session-1",
+      source: "api",
+      stage: "prepare_run",
+      traceId: null,
+    }),
   };
 }
 
@@ -485,25 +483,34 @@ describe("ensureSandboxConversationSession", () => {
     },
   );
 
-  test("continues a warm closed cattle session with a new execution session id", async () => {
-    const database = createConversationSessionDatabase("cattle");
-    await insertConversationSession(database, { status: "closed" });
-    const sandbox = createSandbox();
+  test.each(["closed", "error"] as const)(
+    "continues a warm %s cattle session with a new execution session id",
+    async (status) => {
+      const database = createConversationSessionDatabase("cattle");
+      await insertConversationSession(database, { status });
+      let deletes = 0;
+      const sandbox = createSandbox({
+        onDelete: async () => {
+          deletes += 1;
+        },
+      });
 
-    const result = await ensureSandboxConversationSession(
-      createBindings(database),
-      createInput(sandbox, "cattle"),
-    );
+      const result = await ensureSandboxConversationSession(
+        createBindings(database),
+        createInput(sandbox, "cattle"),
+      );
 
-    expect(result.sandboxSessionId).not.toBe("01J00000000000000000000001");
-    expect(isPlatformId(result.sandboxSessionId)).toBe(true);
+      expect(result.sandboxSessionId).not.toBe("01J00000000000000000000001");
+      expect(isPlatformId(result.sandboxSessionId)).toBe(true);
+      expect(deletes).toBe(0);
 
-    await expect(readConversationSession(database)).resolves.toMatchObject({
-      cloudflare_session_id: result.sandboxSessionId,
-      status: "active",
-    });
-    await expect(readInactiveDeadline(database)).resolves.toBeNull();
-  });
+      await expect(readConversationSession(database)).resolves.toMatchObject({
+        cloudflare_session_id: result.sandboxSessionId,
+        status: "active",
+      });
+      await expect(readInactiveDeadline(database)).resolves.toBeNull();
+    },
+  );
 
   test.each(["true", "false"])(
     "restores a cold session checkpoint from its configured bucket (local %s)",

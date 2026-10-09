@@ -1,35 +1,21 @@
 # Environment
 
-Status: Partially available
+A reusable, Project-owned setup for Sessions: packages, a setup script, variables and a network policy.
 
-## Why it exists
+## Promises
 
-Agents often need the same tools and startup steps every time they run. An Environment lets a Project owner save that setup once, so Agents start consistently without hiding installation instructions in prompts or repeating manual preparation for every Session.
+- An Environment declares exact-version public npm and PyPI packages, a setup script and environment variables. Each Project has one default Environment, which an Agent without its own choice, or an inline API Session, uses.
+- A Session freezes the Environment revision it was created with. Later edits affect only new Sessions.
+- Packages are built once per package set, outside Session startup, and restored before the Agent starts; the setup script then runs in each new Sandbox. A build, restore or setup-script failure, or a variable that has no value, blocks startup instead of running with a partial setup. mosoo never falls back to installing packages at runtime: until the build is ready, creating a Session or starting a turn that needs it fails with "Environment packages are being prepared".
+- npm packages put their CLIs on `PATH` and CommonJS modules on `NODE_PATH`; PyPI packages put their scripts on `PATH` and modules on `PYTHONPATH`.
+- Variable values are stored encrypted and shown only as a masked hint. Leaving a value blank on edit keeps the stored one.
+- **Limited** network denies outbound traffic except the Environment's allowed hosts and mosoo's own control and storage endpoints, passes only HTTP(S), and stays fixed for the Session's lifetime. **Full** is unrestricted.
 
-## Who uses it
+## Limits
 
-The Project owner creates and manages Environments for Agents in one Project. Project Users do not configure them.
-
-## Current user flow
-
-1. On the Environments page, the owner creates a reusable setup with packages, a startup script, and environment variables.
-2. The owner can make one Environment the Project default. In the Agent editor, they can select another Environment or create one without leaving the flow.
-3. When a new Session is created, mosoo captures the Environment selected at that moment. If the Agent has no explicit selection, mosoo uses the Project default.
-4. mosoo prepares exact-version npm and PyPI packages once, stores the isolated dependency prefix as a Sandbox Backup, and restores it before the Agent starts. The custom setup script then runs with those package paths available. A package build, restore, script, or required variable failure prevents startup rather than running with an incomplete setup.
-5. Later Environment edits apply only to Sessions created afterward; an in-progress Session keeps the version it started with.
-
-## What works today
-
-The Web UI supports listing, searching, creating, editing, setting a default, and selecting an Environment. Owners can request deletion, but a Project default or an Environment still used by an Agent is protected. There is no duplicate or cross-Project reuse action in the current UI.
-
-New package declarations currently support `npm` and `pip`. The maintained Driver image verifies both tools during its build. Older revisions that contain `apt`, `cargo`, `gem`, or `go` remain readable, but the editor requires owners to remove or replace those declarations before saving a new revision; Runtime rejects them before allocating a Sandbox rather than failing later on a missing executable. System packages belong in the platform Driver image instead of Project-local Environment declarations.
-
-Secret values are encrypted after saving. The editor shows only a masked hint for an existing value, never the full stored value; leaving it blank preserves it.
-
-Package declarations accept public npm and PyPI packages with exact versions. They are prepared asynchronously and reused within the same Project when the declarations and artifact ABI are unchanged. A Session freezes its package declarations, so later Environment edits do not change an existing Session. Package managers never run on the Session provisioning hot path, and mosoo does not fall back to runtime installation when an artifact is unavailable.
-
-npm artifacts expose package CLIs through `PATH` and CommonJS packages through `NODE_PATH`. Node.js ESM bare imports do not use `NODE_PATH`; projects that need `import "package"` must install that dependency in the project itself. PyPI artifacts expose console scripts through `PATH` and modules through `PYTHONPATH`.
-
-OS packages belong in the maintained Driver image. `apt`, Cargo, RubyGems, and Go module installation are not writable Environment package options. The setup script is a per-Sandbox hook for custom initialization after prepared packages are restored; it is not persistent dependency storage.
-
-“Limited” is enforced for Session-owned Sandboxes, including every new Session in the unreleased #582 candidate. Each Session has its own Sandbox subject, where Limited denies outbound traffic by default and permits only the configured domains plus mosoo's control and artifact endpoints. Model and MCP calls use the mosoo control-plane proxies; raw provider hosts and ambient HTTP/HTTPS/ALL proxy settings are not automatically allowed. HTTP and HTTPS are checked at the Sandbox egress boundary and direct non-HTTP traffic stays disabled. The admitted policy is immutable for the Session subject's lifetime, including container restarts. The unreleased candidate preserves existing shared workspaces for verified migration before provisioning or maintenance. Historical Agent labels do not constrain new Session environment selection; Full keeps the unrestricted network defaults. Local development keeps HTTPS interception disabled for CA compatibility, so Limited also fails closed there. The “Allow MCP endpoints” and “Allow package registries” switches remain saved labels without runtime enforcement.
+- Packages come only from npm and pip; OS packages belong in the Driver image. The setup script is not a place to persist dependencies.
+- Node.js ESM bare imports ignore `NODE_PATH`; code that needs `import "pkg"` must install it in its own project.
+- Limited refuses to start with `HTTP_PROXY`, `HTTPS_PROXY` or `ALL_PROXY` set.
+- Variables that runtimes manage, such as provider key and endpoint variables and the OpenCode and Pi configuration variables, are dropped from the Environment ([`runtime-vendor-env-policy.ts`](../../apps/api/src/modules/runtime/infrastructure/runtime-sandbox-provisioning/runtime-vendor-env-policy.ts)).
+- Variable values reach the Sandbox as plain environment variables, so the Agent and any code it runs can read them. Keep model keys in Providers and tool tokens in MCP connections, which never enter the Sandbox.
+- The Project default, or an Environment an Agent still uses, cannot be deleted. There is no duplicate or cross-Project reuse.

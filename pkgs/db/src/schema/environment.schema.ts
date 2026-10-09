@@ -60,6 +60,3 @@ export const environmentRevisionsTable = sqliteTable(
     index("environment_revision_project_created_at_idx").on(table.projectId, table.createdAt),
   ],
 );
-
-export type EnvironmentRevisionRow = typeof environmentRevisionsTable.$inferSelect;
-export type EnvironmentRow = typeof environmentsTable.$inferSelect;

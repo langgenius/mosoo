@@ -5,10 +5,8 @@ import type { RuntimeCatalogVendor } from "@mosoo/runtime-catalog";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { isTruthy } from "../../../shared/truthiness";
-import { enforceSafeApiBase } from "../../vendor-credentials/application/vendor-credential-validation";
+import { readSecret } from "../../vault/application/vault-secret-store";
 import { getProjectCredentialRow } from "../../vendor-credentials/application/vendor-credential.repository";
-import { readVendorCredentialSecret } from "../../vendor-credentials/application/vendor-credential.secret-resolution";
-import { enforceCanonicalRuntimeLlmProxyBaseUrl } from "../domain/runtime-llm-proxy-base-url";
 import { isDriverInstanceGenerationActive } from "../infrastructure/driver-instance/driver-instance-record.repository";
 
 /**
@@ -84,17 +82,6 @@ export async function resolveRuntimeLlmProxyTarget(
     throw new RuntimeLlmProxyError("Vendor credential model protocol has changed.", 403);
   }
 
-  const secret = await readVendorCredentialSecret(bindings, {
-    credential,
-    projectId: input.projectId,
-    providerId: credential.vendorId,
-    purpose: "llm_proxy_api_key",
-  });
-
-  if (secret.status === "denied") {
-    throw new RuntimeLlmProxyError("Vendor credential is unavailable.", 401);
-  }
-
   const upstreamBaseUrl = isTruthy(credential.apiBase)
     ? credential.apiBase
     : (vendor.defaultApiBase ?? null);
@@ -103,18 +90,8 @@ export async function resolveRuntimeLlmProxyTarget(
     throw new RuntimeLlmProxyError("Vendor upstream endpoint is not configured.", 502);
   }
 
-  try {
-    enforceSafeApiBase(upstreamBaseUrl);
-    enforceCanonicalRuntimeLlmProxyBaseUrl(upstreamBaseUrl);
-  } catch (error) {
-    throw new RuntimeLlmProxyError(
-      error instanceof Error ? error.message : "Vendor upstream endpoint is not allowed.",
-      502,
-    );
-  }
-
   return {
-    apiKey: secret.apiKey,
+    apiKey: await readSecret(bindings.DB, bindings, credential.apiKeySecretId),
     modelProtocol: input.modelProtocol,
     upstreamBaseUrl,
     vendor,

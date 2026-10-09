@@ -1,14 +1,15 @@
 import type { SessionSummary } from "@mosoo/contracts/session";
+import { useQuery } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import { useState } from "react";
 
-import type { AgentSessionDiagnosticsQuery } from "@/gql/graphql";
+import { getAgentSessionDiagnostics } from "@/domains/session/api/agent-session-retrieve";
 import { useTranslation } from "@/shared/i18n";
 import { Badge } from "@/shared/ui/badge";
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from "@/shared/ui/icons";
 import { ScrollArea } from "@/shared/ui/scroll-area";
 
-type AgentSessionDiagnostics = AgentSessionDiagnosticsQuery["agentSessionDiagnostics"];
+const SESSION_DIAGNOSTICS_REFRESH_MS = 5000;
 
 function shortId(value: string | null | undefined): string {
   if (!value) {
@@ -21,7 +22,7 @@ function shortId(value: string | null | undefined): string {
 function DiagnosticRow({ label, value }: { label: string; value: string | null }): ReactElement {
   return (
     <div className="grid grid-cols-[104px_minmax(0,1fr)] gap-3 py-1.5 text-[11px]">
-      <div className="text-muted-foreground">{label}</div>
+      <div className="text-fg-3">{label}</div>
       <div className="text-foreground min-w-0 truncate font-mono">{value ?? "none"}</div>
     </div>
   );
@@ -32,20 +33,32 @@ function CountRow({ count, label }: { count: number | null; label: string }): Re
 }
 
 export function SessionDiagnosticsPanel({
-  diagnostics,
-  loading,
+  pollEvery,
   selected,
 }: {
-  diagnostics: AgentSessionDiagnostics | null;
-  loading: boolean;
+  /** The logs view's poll predicate: an interval while the run is live or settling. */
+  pollEvery: (intervalMs: number) => () => number | false;
   selected: SessionSummary;
 }): ReactElement {
   const { t } = useTranslation();
   const [collapsed, setCollapsed] = useState(true);
+  const { data, isLoading: loading } = useQuery({
+    enabled: !collapsed,
+    queryFn: async () =>
+      getAgentSessionDiagnostics({
+        projectId: selected.projectId,
+        sessionId: selected.id,
+      }),
+    queryKey: ["agent-session-diagnostics", selected.id],
+    refetchInterval: pollEvery(SESSION_DIAGNOSTICS_REFRESH_MS),
+  });
+  const diagnostics = data?.agentSessionDiagnostics ?? null;
   const execution = diagnostics?.execution ?? null;
   const binding = execution?.binding ?? null;
   const session = diagnostics?.session ?? null;
-  const run = session?.lastRun ?? selected.lastRun;
+  // The list snapshot is polled for as long as the view is open; the
+  // diagnostics snapshot stops once the run settles.
+  const run = selected.lastRun ?? session?.lastRun ?? null;
   const versionNumber =
     binding?.deploymentVersionNumber ??
     session?.deploymentVersionNumber ??
@@ -62,7 +75,7 @@ export function SessionDiagnosticsPanel({
 
   if (collapsed) {
     return (
-      <aside className="border-border-subtle flex w-full shrink-0 border-t bg-white xl:w-[44px] xl:flex-col xl:border-t-0 xl:border-l">
+      <aside className="border-border-soft bg-card flex w-full shrink-0 border-t xl:w-[44px] xl:flex-col xl:border-t-0 xl:border-l">
         <button
           type="button"
           onClick={() => {
@@ -70,7 +83,7 @@ export function SessionDiagnosticsPanel({
           }}
           aria-label={t("agent.expandDiagnostics")}
           aria-expanded={false}
-          className="text-muted-foreground hover:text-foreground hover:bg-accent/40 flex w-full items-center justify-between gap-2 px-4 py-3 text-left transition-colors xl:flex-col xl:justify-start xl:px-0 xl:py-3"
+          className="text-fg-3 hover:text-foreground hover:bg-hover/40 flex w-full items-center justify-between gap-2 px-4 py-3 text-left transition-colors xl:flex-col xl:justify-start xl:px-0 xl:py-3"
         >
           <span className="text-foreground text-[13px] font-medium xl:hidden">Diagnostics</span>
           <ChevronUp className="size-4 xl:hidden" />
@@ -81,8 +94,8 @@ export function SessionDiagnosticsPanel({
   }
 
   return (
-    <aside className="border-border-subtle flex max-h-[320px] w-full shrink-0 flex-col border-t bg-white xl:max-h-none xl:w-[360px] xl:border-t-0 xl:border-l">
-      <div className="border-border-subtle border-b px-4 py-3">
+    <aside className="border-border-soft bg-card flex max-h-[320px] w-full shrink-0 flex-col border-t xl:max-h-none xl:w-[360px] xl:border-t-0 xl:border-l">
+      <div className="border-border-soft border-b px-4 py-3">
         <div className="flex items-center justify-between gap-3">
           <div className="text-foreground text-[13px] font-medium">Diagnostics</div>
           <div className="flex items-center gap-2">
@@ -99,7 +112,7 @@ export function SessionDiagnosticsPanel({
               }}
               aria-label={t("agent.collapseDiagnostics")}
               aria-expanded={true}
-              className="text-muted-foreground hover:text-foreground hover:bg-accent/40 -mr-1 inline-flex size-5 items-center justify-center rounded transition-colors"
+              className="text-fg-3 hover:text-foreground hover:bg-hover/40 -mr-1 inline-flex size-5 items-center justify-center rounded transition-colors"
             >
               <ChevronDown className="size-4 xl:hidden" />
               <ChevronRight className="hidden size-4 xl:block" />
@@ -111,9 +124,7 @@ export function SessionDiagnosticsPanel({
       <ScrollArea className="flex-1">
         <div className="space-y-5 p-4">
           <section>
-            <div className="text-muted-foreground mb-2 text-[11px] font-medium uppercase">
-              Session snapshot
-            </div>
+            <div className="t-group-label mb-2">Session snapshot</div>
             <DiagnosticRow
               label={t("agent.deployment")}
               value={
@@ -134,30 +145,20 @@ export function SessionDiagnosticsPanel({
           </section>
 
           <section>
-            <div className="text-muted-foreground mb-2 text-[11px] font-medium uppercase">
-              Run state
-            </div>
+            <div className="t-group-label mb-2">Run state</div>
             <DiagnosticRow label="Run" value={shortId(run?.id ?? null)} />
             <DiagnosticRow label={t("agent.status")} value={run?.status ?? selected.status} />
             <DiagnosticRow label={t("agent.trace")} value={shortId(run?.traceId ?? null)} />
-            <CountRow
-              count={diagnostics?.pendingPermissionCount ?? null}
-              label={t("agent.permissions")}
-            />
           </section>
 
           <section>
-            <div className="text-muted-foreground mb-2 text-[11px] font-medium uppercase">
-              Frozen inputs
-            </div>
+            <div className="t-group-label mb-2">Frozen inputs</div>
             <CountRow count={execution?.skills.length ?? null} label={t("agent.skills")} />
             <CountRow count={execution?.tools.length ?? null} label="MCP" />
           </section>
 
           <section>
-            <div className="text-muted-foreground mb-2 text-[11px] font-medium uppercase">
-              Native ref
-            </div>
+            <div className="t-group-label mb-2">Native ref</div>
             <DiagnosticRow
               label={t("agent.status")}
               value={diagnostics?.nativeRuntimeRef.status ?? null}

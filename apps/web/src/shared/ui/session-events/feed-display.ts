@@ -29,13 +29,13 @@ export function clipPreview(content: string): string {
 export function statusClassName(status: SessionProcessEvent["status"]): string {
   switch (status) {
     case "available": {
-      return "border-border bg-muted/40 text-fg-3";
+      return "border-border bg-sunken/40 text-fg-3";
     }
     case "error": {
-      return "border-ember/25 bg-ember-bg text-ember-fg";
+      return "border-danger/25 bg-danger-bg text-danger-fg";
     }
     case "unsupported": {
-      return "border-amber/30 bg-amber-bg text-amber-fg";
+      return "border-warning/30 bg-warning-bg text-warning-fg";
     }
   }
 }
@@ -43,33 +43,29 @@ export function statusClassName(status: SessionProcessEvent["status"]): string {
 export function turnStatusClassName(status: SessionTurnStatus): string {
   switch (status) {
     case "completed": {
-      return "border-green-200 bg-green-50 text-green-800";
+      return "border-success/25 bg-success-bg text-success-fg";
     }
     case "failed": {
-      return "border-ember/25 bg-ember-bg text-ember-fg";
+      return "border-danger/25 bg-danger-bg text-danger-fg";
     }
     case "pending": {
-      return "border-border bg-muted/50 text-fg-3";
+      return "border-border bg-sunken/50 text-fg-3";
     }
     case "rescheduling": {
-      return "border-amber/30 bg-amber-bg text-amber-fg";
+      return "border-warning/30 bg-warning-bg text-warning-fg";
     }
     case "running": {
-      return "border-sky/30 bg-sky-bg text-sky-fg";
+      return "border-info/30 bg-info-bg text-info-fg";
     }
     case "terminated": {
-      return "border-ember/25 bg-ember-bg text-ember-fg";
+      return "border-danger/25 bg-danger-bg text-danger-fg";
     }
   }
 }
 
 type Translate = (key: string, variables?: Record<string, string>) => string;
-const defaultTranslate: Translate = (key) => key;
 
-export function turnStatusLabel(
-  status: SessionTurnStatus,
-  t: Translate = defaultTranslate,
-): string {
+export function turnStatusLabel(status: SessionTurnStatus, t: Translate): string {
   switch (status) {
     case "completed": {
       return t("threads.completed");
@@ -92,12 +88,15 @@ export function turnStatusLabel(
   }
 }
 
-export function createSessionEventCopyText(input: {
-  events: readonly SessionProcessEvent[];
-  title: string;
-}): string {
+export function createSessionEventCopyText(
+  input: {
+    events: readonly SessionProcessEvent[];
+    title: string;
+  },
+  t: Translate,
+): string {
   return [
-    `turn\t${input.title}`,
+    input.title,
     "type\tdomain\tstatus\ttokens\tduration\tcontent",
     ...input.events.map((event) =>
       [
@@ -106,7 +105,7 @@ export function createSessionEventCopyText(input: {
         event.status,
         formatTokens(event.tokens),
         formatDuration(event.durationMs),
-        summarizeSessionEvent(event),
+        summarizeSessionEvent(event, t),
       ].join("\t"),
     ),
   ].join("\n");

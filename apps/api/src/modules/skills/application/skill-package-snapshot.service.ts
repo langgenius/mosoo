@@ -10,8 +10,8 @@ import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase, runAppDatabaseBatch } from "../../../platform/db/drizzle";
 import { currentTimestampMs, toIsoString } from "../../../time";
 import { buildSkillBlobKey, readSkillBlobBytes, writeSkillBlob } from "./skill-blob-store";
-import { loadNormalizedSkillPackage } from "./skill-package-source.service";
-import { inferMimeType, SKILL_ARCHIVE_EXTRACT_OPTIONS, sha256Hex } from "./skill-package.shared";
+import { loadNormalizedSkillPackage, toSkillSnapshotEntry } from "./skill-package-source.service";
+import { SKILL_ARCHIVE_EXTRACT_OPTIONS, sha256Hex } from "./skill-package.shared";
 import type { InspectSkillInput } from "./skill-package.shared";
 
 const SKILL_SNAPSHOT_ENTRY_INSERT_BATCH_SIZE = 10;
@@ -46,7 +46,6 @@ export async function publishSkillSnapshot(
   const normalized = await loadNormalizedSkillPackage(input);
   const archiveBytes = createZipArchive(normalized.entries);
   const blobSha256 = await sha256Hex(archiveBytes);
-  const entries = await Promise.all(normalized.entries.map(toSkillSnapshotEntry));
   const existingSnapshot =
     (await getAppDatabase(bindings.DB)
       .select(skillSnapshotColumns())
@@ -61,14 +60,13 @@ export async function publishSkillSnapshot(
       .get()) ?? null;
 
   if (existingSnapshot) {
-    await ensureSkillSnapshotEntries(bindings.DB, existingSnapshot.id, entries);
-
     return {
       entries: await listSkillSnapshotEntries(bindings.DB, existingSnapshot.id),
       snapshot: toSkillSnapshotRecord(existingSnapshot),
     };
   }
 
+  const entries = await Promise.all(normalized.entries.map(toSkillSnapshotEntry));
   const timestampMs = currentTimestampMs();
   const snapshotId = createPlatformId<SkillSnapshotId>();
   const blobKey = buildSkillBlobKey(owner.projectId, blobSha256);
@@ -116,25 +114,6 @@ export async function publishSkillSnapshot(
       version: normalized.frontmatter.version ?? null,
     },
   };
-}
-
-async function ensureSkillSnapshotEntries(
-  database: D1Database,
-  snapshotId: SkillSnapshotId,
-  entries: SkillSnapshotEntry[],
-): Promise<void> {
-  const existingEntries = await listSkillSnapshotEntries(database, snapshotId);
-
-  if (existingEntries.length === entries.length) {
-    return;
-  }
-
-  await runAppDatabaseBatch(database, (db) => [
-    db
-      .delete(skillSnapshotEntriesTable)
-      .where(eq(skillSnapshotEntriesTable.snapshotId, snapshotId)),
-    ...createSkillSnapshotEntryInsertQueries(db, snapshotId, entries),
-  ]);
 }
 
 function createSkillSnapshotEntryInsertQueries(
@@ -313,15 +292,4 @@ async function readNormalizedSkillPackageFromSnapshot(
       ]),
     ),
   );
-}
-
-async function toSkillSnapshotEntry(entry: SkillPackageEntry): Promise<SkillSnapshotEntry> {
-  return {
-    entryKind: entry.entryKind,
-    isExecutable: entry.isExecutable,
-    mimeType: inferMimeType(entry.path),
-    path: entry.path,
-    sha256: entry.entryKind === "file" ? await sha256Hex(entry.body) : null,
-    size: entry.body.byteLength,
-  };
 }

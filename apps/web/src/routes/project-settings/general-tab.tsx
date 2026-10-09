@@ -2,10 +2,9 @@ import type { ProjectSummary } from "@mosoo/contracts/project";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { useAppSession } from "@/app/session-provider";
+import { useActiveProject } from "@/app/session/session-context";
 import { renameProject } from "@/domains/project/api/project-client";
 import { projectKeys } from "@/domains/project/query/project-queries";
-import { toProjectId } from "@/routes/typed-id";
 import { useTranslation } from "@/shared/i18n";
 import { isTruthy } from "@/shared/lib/truthiness";
 import { Button } from "@/shared/ui/button";
@@ -17,28 +16,25 @@ import { Label } from "@/shared/ui/label";
 import { SettingsTabBody, SettingsTabHeader } from "../settings/settings-tab-layout";
 
 export function GeneralTab() {
-  const { activeProject } = useAppSession();
-  const formKey =
-    activeProject === null ? "no-project" : `${activeProject.id}:${activeProject.name}`;
+  const project = useActiveProject();
 
-  return <GeneralForm key={formKey} activeProject={activeProject} />;
+  return <GeneralForm key={project.id} project={project} />;
 }
 
-function GeneralForm({ activeProject }: { activeProject: ProjectSummary | null }) {
+function GeneralForm({ project }: { project: ProjectSummary }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
 
-  const [name, setName] = useState(activeProject?.name ?? "");
+  const [name, setName] = useState(project.name);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const trimmedName = name.trim();
-  const dirty = activeProject !== null && trimmedName !== activeProject.name;
-  const canSave = dirty && trimmedName.length > 0 && !saving;
+  const canSave = trimmedName !== project.name && trimmedName.length > 0 && !saving;
 
   async function handleSave() {
-    if (!canSave || activeProject === null) {
+    if (!canSave) {
       return;
     }
 
@@ -46,7 +42,7 @@ function GeneralForm({ activeProject }: { activeProject: ProjectSummary | null }
     setError(null);
 
     try {
-      await renameProject({ projectId: toProjectId(activeProject.id), name: trimmedName });
+      await renameProject({ projectId: project.id, name: trimmedName });
       await queryClient.invalidateQueries({ queryKey: projectKeys.lists() });
       setSaved(true);
       setTimeout(() => {
@@ -71,7 +67,6 @@ function GeneralForm({ activeProject }: { activeProject: ProjectSummary | null }
             id="project-name"
             type="text"
             value={name}
-            disabled={activeProject === null}
             onChange={(event) => {
               setName(event.target.value);
             }}
@@ -103,17 +98,15 @@ function GeneralForm({ activeProject }: { activeProject: ProjectSummary | null }
           </Button>
         </div>
 
-        {activeProject === null ? null : (
-          <div className="mt-8 space-y-6">
-            <div className="space-y-2">
-              <div className="text-fg-1 text-[13px] font-medium">{t("agent.projectId")}</div>
-              <p className="text-fg-3 text-[12px] leading-4">
-                {t("projectSettings.projectIdDescription")}
-              </p>
-              <CommandBlock command={activeProject.id} prompt={null} />
-            </div>
+        <div className="mt-8 space-y-6">
+          <div className="space-y-2">
+            <div className="text-fg-1 text-[13px] font-medium">{t("agent.projectId")}</div>
+            <p className="text-fg-3 text-[12px] leading-4">
+              {t("projectSettings.projectIdDescription")}
+            </p>
+            <CommandBlock command={project.id} prompt={null} />
           </div>
-        )}
+        </div>
       </SettingsTabBody>
     </>
   );

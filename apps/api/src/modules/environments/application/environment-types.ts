@@ -11,8 +11,6 @@ export interface StoredEnvironmentVariable {
 }
 
 export interface EnvironmentRecordRow {
-  allowMcpServers: number;
-  allowPackageManagers: number;
   allowedHostsJson: string;
   createdAt: number;
   currentRevisionId: EnvironmentRevisionId;
@@ -26,18 +24,14 @@ export interface EnvironmentRecordRow {
   name: string;
   networkPolicy: EnvironmentNetworkPolicy;
   ownerId: AccountId | null;
-  ownerImageUrl: string | null;
-  ownerName: string | null;
   packagesJson: string;
   projectId: ProjectId;
   setupScript: string;
   updatedAt: number;
-  usedByAgentCount?: number;
+  usedByAgentCount: number;
 }
 
 export interface EnvironmentMutableConfig {
-  allowMcpServers: boolean;
-  allowPackageManagers: boolean;
   allowedHosts: string[];
   envVars: StoredEnvironmentVariable[];
   networkPolicy: EnvironmentNetworkPolicy;

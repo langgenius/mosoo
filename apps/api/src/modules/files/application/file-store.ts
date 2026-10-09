@@ -2,25 +2,15 @@ import { toSessionResourceMaterializedPath } from "@mosoo/contracts/file";
 import type {
   CompleteFileUploadRequest,
   CompleteFileUploadResponse,
-  CreateFileDownloadResponse,
-  CreateFileUploadRequest,
   CreateFileUploadResponse,
-  FileEntry,
   FileListing,
   FileListQuery,
   FileRecord,
   FileScope,
-  UpdateFileRequest,
-  UploadFilePartResponse,
 } from "@mosoo/contracts/file";
-import type {
-  AddSessionResourceInput,
-  RemoveSessionResourceInput,
-  SessionFile,
-  SessionResource,
-} from "@mosoo/contracts/session";
+import type { AddSessionResourceInput, SessionFile } from "@mosoo/contracts/session";
 import { fileRecordsTable, sessionsTable } from "@mosoo/db";
-import { createPlatformId, parsePlatformId } from "@mosoo/id";
+import { createPlatformId } from "@mosoo/id";
 import type { AccountId, ProjectId, FileId, SessionId } from "@mosoo/id";
 import { and, asc, desc, eq, inArray, or } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
@@ -32,10 +22,10 @@ import { currentTimestampMs } from "../../../time";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { assertProjectKeyAccess } from "../../auth/domain/project-key-access";
 import { ensureProjectOwnership } from "../../projects/application/project.service";
-import { publishSessionResourceUpsert as publishSessionResourceUpsertEvent } from "../../sessions/application/session-resource-events.service";
+import { publishSessionResourceUpsert } from "../../sessions/application/session-resource-events.service";
 import {
   claimProjectDraftFilesToSession,
-  ensureProjectDraftFilesClaimable,
+  loadClaimableDraftFiles,
 } from "../infrastructure/draft-file-service";
 import { streamFileContent } from "../infrastructure/file-content-service";
 import { deleteAccessibleFile, deleteFileScope } from "../infrastructure/file-delete";
@@ -53,41 +43,26 @@ import {
   normalizeContentType,
   normalizeFileName,
 } from "../infrastructure/file-paths";
+import { ensureFileAccess } from "../infrastructure/file-record-access";
 import {
-  ensureFileAccess,
   fileRecordRowColumns,
-  listFileRecords,
-  listFileRecordsById,
   parseRuntimeOutputSourcePath,
   toFileEntry,
   toFileRecord,
   toSessionFile,
-} from "../infrastructure/file-record-store";
-import { updateFile } from "../infrastructure/file-update";
-import { completeFileUpload as completeFileUploadRecord } from "../infrastructure/file-upload-complete";
+} from "../infrastructure/file-record-model";
+import type { FileAccessIntent, FileRecordRow } from "../infrastructure/file-record-model";
+import { listFileRecordsById } from "../infrastructure/file-record-queries";
+import { completeFileUpload } from "../infrastructure/file-upload-complete";
 import { createFileUpload, getFileUpload } from "../infrastructure/file-upload-create";
 import {
   abortFileUpload,
   uploadFileContent,
   uploadFilePart,
 } from "../infrastructure/file-upload-transfer";
-import { getObjectBody, putObject } from "../infrastructure/r2-s3-client";
-import { normalizeR2Etag } from "../infrastructure/r2-s3-client";
-import {
-  ensureProjectSessionFileAccess,
-  ensureSessionFileAccess,
-} from "../infrastructure/session-file-ownership";
-
-export type ContentBody = ReadableStream<Uint8Array> | null;
+import { ensureSessionFileAccess } from "../infrastructure/session-file-ownership";
 
 const SESSION_RESOURCE_LIMIT = 100;
-
-export interface CompleteFileUploadCommand {
-  bindings: ApiBindings;
-  fileId: FileId;
-  input: CompleteFileUploadRequest;
-  viewer: AuthenticatedViewer;
-}
 
 export interface RuntimeOutputFileInput {
   bindings: ApiBindings;
@@ -123,122 +98,6 @@ export interface SessionArtifactSource {
   sourcePath: string;
 }
 
-export interface FileStore {
-  abortUpload(bindings: ApiBindings, viewer: AuthenticatedViewer, fileId: FileId): Promise<void>;
-  admitAgentPackageFile(
-    bindings: ApiBindings,
-    viewer: AuthenticatedViewer,
-    input: AgentPackageFileAdmissionInput,
-  ): Promise<AdmittedAgentPackageFile>;
-  claimToSession(
-    bindings: ApiBindings,
-    viewer: AuthenticatedViewer,
-    sessionId: SessionId,
-    fileIds: FileId[],
-    options?: { resume?: boolean },
-  ): Promise<FileRecord[]>;
-  completeUpload(command: CompleteFileUploadCommand): Promise<CompleteFileUploadResponse>;
-  createSessionResourceUpload(
-    bindings: ApiBindings,
-    viewer: AuthenticatedViewer,
-    input: AddSessionResourceInput,
-  ): Promise<CreateFileUploadResponse>;
-  createDownload(
-    fileId: FileId,
-    disposition: "attachment" | "inline",
-  ): Promise<CreateFileDownloadResponse>;
-  createUpload(
-    bindings: ApiBindings,
-    viewer: AuthenticatedViewer,
-    request: CreateFileUploadRequest,
-  ): Promise<CreateFileUploadResponse>;
-  delete(
-    bindings: ApiBindings,
-    viewer: AuthenticatedViewer,
-    fileId: FileId,
-    options?: { ifMatchEtag?: string | null | undefined },
-  ): Promise<void>;
-  deleteSessionResource(
-    bindings: ApiBindings,
-    viewer: AuthenticatedViewer,
-    input: RemoveSessionResourceInput,
-  ): Promise<SessionResource>;
-  deleteScope(bindings: ApiBindings, scope: FileScope): Promise<void>;
-  ensureClaimable(
-    bindings: ApiBindings,
-    viewer: AuthenticatedViewer,
-    sessionId: SessionId,
-    fileIds: FileId[],
-  ): Promise<void>;
-  ensureSessionAttachments(
-    bindings: ApiBindings,
-    viewer: AuthenticatedViewer,
-    sessionId: SessionId,
-    fileIds: FileId[],
-  ): Promise<FileRecord[]>;
-  getRecord(
-    bindings: ApiBindings,
-    viewer: AuthenticatedViewer,
-    fileId: FileId,
-  ): Promise<FileRecord>;
-  getUpload(
-    bindings: ApiBindings,
-    viewer: AuthenticatedViewer,
-    fileId: FileId,
-  ): Promise<CreateFileUploadResponse>;
-  list(
-    bindings: ApiBindings,
-    viewer: AuthenticatedViewer,
-    query: FileListQuery,
-  ): Promise<FileListing>;
-  listLatestReadySessionArtifactSources(
-    database: D1Database,
-    sessionId: SessionId,
-  ): Promise<SessionArtifactSource[]>;
-  listReadySessionArtifactKeys(database: D1Database, sessionId: SessionId): Promise<string[]>;
-  listReadySessionFiles(database: D1Database, sessionId: SessionId): Promise<SessionFile[]>;
-  listSessionResourcePathEntries(
-    database: D1Database,
-    sessionId: SessionId,
-    fileIds?: readonly FileId[],
-  ): Promise<SessionResourcePathEntry[]>;
-  listSessionResources(database: D1Database, sessionId: SessionId): Promise<SessionResource[]>;
-  putContent(
-    bindings: ApiBindings,
-    viewer: AuthenticatedViewer,
-    fileId: FileId,
-    body: ContentBody,
-  ): Promise<void>;
-  putPart(
-    bindings: ApiBindings,
-    viewer: AuthenticatedViewer,
-    fileId: FileId,
-    partNumber: number,
-    body: ContentBody,
-  ): Promise<UploadFilePartResponse>;
-  readSessionArtifactBytes(bindings: ApiBindings, objectKey: string): Promise<Uint8Array | null>;
-  recordRuntimeOutput(input: RuntimeOutputFileInput): Promise<FileRecord>;
-  streamContent(
-    bindings: ApiBindings,
-    viewer: AuthenticatedViewer,
-    fileId: FileId,
-    disposition?: "attachment" | "inline",
-  ): Promise<Response>;
-  update(
-    bindings: ApiBindings,
-    viewer: AuthenticatedViewer,
-    fileId: FileId,
-    request: UpdateFileRequest,
-  ): Promise<FileEntry>;
-}
-
-async function publishSessionResourceUpsert(
-  bindings: ApiBindings,
-  file: FileRecord,
-): Promise<void> {
-  await publishSessionResourceUpsertEvent(bindings, file);
-}
-
 function readRuntimeOutputPathSegments(path: string): string[] {
   const normalizedPath = path.trim().replaceAll("\\", "/");
   const segments = normalizedPath
@@ -253,7 +112,7 @@ function readRuntimeOutputPathSegments(path: string): string[] {
   return segments;
 }
 
-export function getRuntimeOutputName(path: string): string {
+function getRuntimeOutputName(path: string): string {
   const name = readRuntimeOutputPathSegments(path).at(-1);
 
   if (name === undefined) {
@@ -270,18 +129,6 @@ export async function createRuntimeOutputContentSha256(body: Uint8Array): Promis
 
 export function createRuntimeOutputParentPath(path: string, contentSha256: string): string {
   return ["runtime-output", ...readRuntimeOutputPathSegments(path), contentSha256].join("/");
-}
-
-function toSessionResource(file: FileRecord): SessionResource {
-  return {
-    createdAt: file.createdAt,
-    id: file.id,
-    kind: file.sessionKind ?? "attachment",
-    mimeType: file.mimeType,
-    name: file.name,
-    path: toSessionResourceMaterializedPath(file.path),
-    size: file.size,
-  };
 }
 
 async function hasReachedSessionResourceLimit(
@@ -308,45 +155,21 @@ async function hasReachedSessionResourceLimit(
   return row !== null;
 }
 
-async function getSessionProjectId(database: D1Database, sessionId: SessionId): Promise<ProjectId> {
-  const row =
-    (await getAppDatabase(database)
-      .select({ projectId: sessionsTable.projectId })
-      .from(sessionsTable)
-      .where(eq(sessionsTable.id, sessionId))
-      .limit(1)
-      .get()) ?? null;
-
-  if (row === null) {
-    throw createFileNotFoundError("Session not found.");
-  }
-
-  return parsePlatformId<ProjectId>(row.projectId, "session project ID");
-}
-
-async function loadClaimContext(
+async function requireClaimTargetProjectId(
   bindings: ApiBindings,
   viewer: AuthenticatedViewer,
   sessionId: SessionId,
-): Promise<{ projectId: ProjectId; viewerId: AccountId }> {
-  const viewerId = parsePlatformId<AccountId>(viewer.id, "viewer ID");
-  const projectId = await getSessionProjectId(bindings.DB, sessionId);
-  assertProjectKeyAccess(viewer, projectId);
+  requiredIntent: FileAccessIntent,
+): Promise<ProjectId> {
+  const session = await ensureSessionFileAccess(
+    bindings.DB,
+    viewer.id,
+    { sessionId },
+    requiredIntent,
+  );
+  assertProjectKeyAccess(viewer, session.project_id);
 
-  await ensureProjectSessionFileAccess(bindings.DB, viewerId, {
-    projectId,
-    sessionId,
-  });
-
-  return { projectId, viewerId };
-}
-
-async function createUpload(
-  bindings: ApiBindings,
-  viewer: AuthenticatedViewer,
-  request: CreateFileUploadRequest,
-): Promise<CreateFileUploadResponse> {
-  return createFileUpload(bindings, viewer, request);
+  return session.project_id;
 }
 
 async function createSessionResourceUpload(
@@ -358,9 +181,8 @@ async function createSessionResourceUpload(
     throw createFileConflictError("Session File limit reached. Remove a file before uploading.");
   }
 
-  return createUpload(bindings, viewer, {
+  return createFileUpload(bindings, viewer, {
     file: input.file,
-    overwrite: false,
     purpose: "session_attachment",
     target: {
       id: input.sessionId,
@@ -371,52 +193,20 @@ async function createSessionResourceUpload(
   });
 }
 
-async function getUpload(
-  bindings: ApiBindings,
-  viewer: AuthenticatedViewer,
-  fileId: FileId,
-): Promise<CreateFileUploadResponse> {
-  return getFileUpload(bindings, viewer, fileId);
-}
+async function completeUpload(command: {
+  bindings: ApiBindings;
+  fileId: FileId;
+  input: CompleteFileUploadRequest;
+  viewer: AuthenticatedViewer;
+}): Promise<CompleteFileUploadResponse> {
+  const file = await completeFileUpload(command);
 
-async function putContent(
-  bindings: ApiBindings,
-  viewer: AuthenticatedViewer,
-  fileId: FileId,
-  body: ContentBody,
-): Promise<void> {
-  await uploadFileContent(bindings, viewer, fileId, body);
-}
-
-async function putPart(
-  bindings: ApiBindings,
-  viewer: AuthenticatedViewer,
-  fileId: FileId,
-  partNumber: number,
-  body: ContentBody,
-): Promise<UploadFilePartResponse> {
-  return uploadFilePart(bindings, viewer, fileId, partNumber, body);
-}
-
-async function abortUpload(
-  bindings: ApiBindings,
-  viewer: AuthenticatedViewer,
-  fileId: FileId,
-): Promise<void> {
-  await abortFileUpload(bindings, viewer, fileId);
-}
-
-async function completeUpload(
-  command: CompleteFileUploadCommand,
-): Promise<CompleteFileUploadResponse> {
-  const result = await completeFileUploadRecord(command);
-
-  if (result.file.scope.kind === "session") {
-    await publishSessionResourceUpsert(command.bindings, result.file);
+  if (file.scope.kind === "session") {
+    await publishSessionResourceUpsert(command.bindings, file);
   }
 
   return {
-    file: toFileEntry(result.file),
+    file: toFileEntry(file),
   };
 }
 
@@ -433,25 +223,6 @@ async function getRecord(
       viewer,
     }),
   );
-}
-
-async function streamContent(
-  bindings: ApiBindings,
-  viewer: AuthenticatedViewer,
-  fileId: FileId,
-  disposition: "attachment" | "inline" = "attachment",
-): Promise<Response> {
-  return streamFileContent(bindings, viewer, fileId, disposition);
-}
-
-async function createDownload(
-  fileId: FileId,
-  disposition: "attachment" | "inline",
-): Promise<CreateFileDownloadResponse> {
-  return {
-    method: "GET",
-    url: `/api/files/${fileId}/content?disposition=${encodeURIComponent(disposition)}`,
-  };
 }
 
 async function admitAgentPackageFile(
@@ -526,47 +297,30 @@ async function list(
   viewer: AuthenticatedViewer,
   query: FileListQuery,
 ): Promise<FileListing> {
-  const viewerId = parsePlatformId<AccountId>(viewer.id, "viewer ID");
-  const projectId = parsePlatformId<ProjectId>(query.projectId, "file list project ID");
-  const sessionId =
-    query.sessionId === undefined
-      ? undefined
-      : parsePlatformId<SessionId>(query.sessionId, "file list session ID");
+  assertProjectKeyAccess(viewer, query.projectId);
 
-  assertProjectKeyAccess(viewer, projectId);
-  await ensureProjectOwnership(bindings.DB, viewerId, projectId);
-
-  if (sessionId !== undefined) {
-    await ensureProjectSessionFileAccess(bindings.DB, viewerId, {
-      projectId,
-      sessionId,
-    });
+  if (query.sessionId === undefined) {
+    await ensureProjectOwnership(bindings.DB, viewer.id, query.projectId);
+  } else {
+    await ensureSessionFileAccess(
+      bindings.DB,
+      viewer.id,
+      { projectId: query.projectId, sessionId: query.sessionId },
+      "view",
+    );
   }
 
-  const rows = await listVisibleFileRecords(bindings.DB, viewerId, projectId, query, sessionId);
+  const rows = await listVisibleFileRecords(bindings.DB, query);
   return { files: rows.map(toFileRecord) };
 }
 
-function visibleSessionFilesCondition(
-  viewerId: AccountId,
-  projectId: ProjectId,
-  sessionId?: SessionId,
-): SQL {
-  const conditions: SQL[] = [
+function visibleSessionFilesCondition(projectId: ProjectId, sessionId?: SessionId): SQL {
+  return and(
     eq(fileRecordsTable.scopeKind, "session"),
     eq(fileRecordsTable.scopeId, sessionsTable.id),
     eq(sessionsTable.projectId, projectId),
-    or(
-      eq(sessionsTable.creatorAccountId, viewerId),
-      eq(sessionsTable.participantAccountId, viewerId),
-    )!,
-  ];
-
-  if (sessionId !== undefined) {
-    conditions.push(eq(fileRecordsTable.scopeId, sessionId));
-  }
-
-  return and(...conditions)!;
+    sessionId === undefined ? undefined : eq(fileRecordsTable.scopeId, sessionId),
+  )!;
 }
 
 function visibleLibraryFilesCondition(projectId: ProjectId): SQL {
@@ -578,13 +332,7 @@ function visibleLibraryFilesCondition(projectId: ProjectId): SQL {
   )!;
 }
 
-async function listVisibleFileRecords(
-  database: D1Database,
-  viewerId: AccountId,
-  projectId: ProjectId,
-  query: FileListQuery,
-  sessionId?: SessionId,
-) {
+async function listVisibleFileRecords(database: D1Database, query: FileListQuery) {
   if (
     query.scopeKind !== undefined &&
     query.scopeKind !== "library" &&
@@ -593,21 +341,21 @@ async function listVisibleFileRecords(
     throw createFileInvalidRequestError("Only library and session file listing are supported.");
   }
 
-  const conditions: SQL[] = [eq(fileRecordsTable.status, query.status ?? "ready")];
+  const conditions: SQL[] = [eq(fileRecordsTable.status, "ready")];
 
   if (query.sessionKind !== undefined && query.sessionKind !== null) {
     conditions.push(eq(fileRecordsTable.sessionKind, query.sessionKind));
   }
 
   if (query.scopeKind === "library") {
-    conditions.push(visibleLibraryFilesCondition(projectId));
-  } else if (query.scopeKind === "session" || sessionId !== undefined) {
-    conditions.push(visibleSessionFilesCondition(viewerId, projectId, sessionId));
+    conditions.push(visibleLibraryFilesCondition(query.projectId));
+  } else if (query.scopeKind === "session" || query.sessionId !== undefined) {
+    conditions.push(visibleSessionFilesCondition(query.projectId, query.sessionId));
   } else {
     conditions.push(
       or(
-        visibleLibraryFilesCondition(projectId),
-        visibleSessionFilesCondition(viewerId, projectId),
+        visibleLibraryFilesCondition(query.projectId),
+        visibleSessionFilesCondition(query.projectId),
       )!,
     );
   }
@@ -710,18 +458,6 @@ async function listLatestReadySessionArtifactSources(
   );
 }
 
-async function listSessionResources(
-  database: D1Database,
-  sessionId: SessionId,
-): Promise<SessionResource[]> {
-  const rows = await listFileRecords(database, {
-    scopeId: sessionId,
-    scopeKind: "session",
-  });
-
-  return rows.map(toFileRecord).map(toSessionResource);
-}
-
 async function listSessionResourcePathEntries(
   database: D1Database,
   sessionId: SessionId,
@@ -778,43 +514,6 @@ async function listSessionResourcePathEntries(
   });
 }
 
-async function update(
-  bindings: ApiBindings,
-  viewer: AuthenticatedViewer,
-  fileId: FileId,
-  request: UpdateFileRequest,
-): Promise<FileEntry> {
-  return toFileEntry(await updateFile(bindings, viewer, fileId, request));
-}
-
-async function deleteFile(
-  bindings: ApiBindings,
-  viewer: AuthenticatedViewer,
-  fileId: FileId,
-  options: { ifMatchEtag?: string | null | undefined } = {},
-): Promise<void> {
-  await deleteAccessibleFile(bindings, viewer, fileId, options);
-}
-
-async function deleteSessionResource(
-  bindings: ApiBindings,
-  viewer: AuthenticatedViewer,
-  input: RemoveSessionResourceInput,
-): Promise<SessionResource> {
-  const file = await getRecord(bindings, viewer, input.resourceId);
-
-  if (
-    file.scope.kind !== "session" ||
-    file.scope.id !== input.sessionId ||
-    file.sessionKind !== "attachment"
-  ) {
-    throw createFileNotFoundError("Session resource not found.");
-  }
-
-  await deleteFile(bindings, viewer, input.resourceId);
-  return toSessionResource(file);
-}
-
 async function deleteScope(bindings: ApiBindings, scope: FileScope): Promise<void> {
   await deleteFileScope(bindings, {
     scopeId: scope.id,
@@ -825,18 +524,10 @@ async function deleteScope(bindings: ApiBindings, scope: FileScope): Promise<voi
 async function ensureClaimable(
   bindings: ApiBindings,
   viewer: AuthenticatedViewer,
-  sessionId: SessionId,
+  projectId: ProjectId,
   fileIds: FileId[],
 ): Promise<void> {
-  if (fileIds.length === 0) {
-    return;
-  }
-
-  const { projectId } = await loadClaimContext(bindings, viewer, sessionId);
-  await ensureProjectDraftFilesClaimable(bindings, viewer, {
-    projectId,
-    attachmentIds: fileIds,
-  });
+  await loadClaimableDraftFiles(bindings.DB, viewer.id, projectId, fileIds);
 }
 
 async function claimToSession(
@@ -850,8 +541,8 @@ async function claimToSession(
     return [];
   }
 
-  const { projectId } = await loadClaimContext(bindings, viewer, sessionId);
-  await claimProjectDraftFilesToSession(bindings, viewer, {
+  const projectId = await requireClaimTargetProjectId(bindings, viewer, sessionId, "write");
+  await claimProjectDraftFilesToSession(bindings, viewer.id, {
     projectId,
     attachmentIds: fileIds,
     sessionId,
@@ -875,8 +566,7 @@ async function ensureSessionAttachments(
     return [];
   }
 
-  const viewerId = parsePlatformId<AccountId>(viewer.id, "viewer ID");
-  await ensureSessionFileAccess(bindings.DB, viewerId, sessionId);
+  await ensureSessionFileAccess(bindings.DB, viewer.id, { sessionId }, "view");
 
   const rows = await listFileRecordsById(bindings.DB, fileIds);
   const rowsById = new Map(rows.map((row) => [row.id, row]));
@@ -908,9 +598,9 @@ async function readSessionArtifactBytes(
   bindings: ApiBindings,
   objectKey: string,
 ): Promise<Uint8Array | null> {
-  const body = await getObjectBody(bindings, objectKey);
+  const object = await bindings.FILE_BUCKET.get(objectKey);
 
-  return body === null ? null : new Uint8Array(await body.arrayBuffer());
+  return object === null ? null : new Uint8Array(await object.arrayBuffer());
 }
 
 async function recordRuntimeOutput(input: RuntimeOutputFileInput): Promise<FileRecord> {
@@ -921,7 +611,6 @@ async function recordRuntimeOutput(input: RuntimeOutputFileInput): Promise<FileR
   const path = createSessionArtifactPath(fileId, name);
   const timestampMs = currentTimestampMs();
   const objectKey = createFinalObjectKey({
-    created_by_account_id: input.createdBy,
     id: fileId,
     name,
     path,
@@ -929,48 +618,63 @@ async function recordRuntimeOutput(input: RuntimeOutputFileInput): Promise<FileR
     scope_kind: "session",
     session_kind: "artifact",
   });
-  const object = await putObject({
-    bindings: input.bindings,
-    body: input.body,
-    contentType,
-    objectKey,
+  const object = await input.bindings.FILE_BUCKET.put(objectKey, input.body, {
+    httpMetadata: {
+      contentType,
+    },
   });
+  const row: FileRecordRow = {
+    committed: 1,
+    created_at: timestampMs,
+    created_by_account_id: input.createdBy,
+    etag: object.etag,
+    expires_at: null,
+    id: fileId,
+    mime_type: object.httpMetadata?.contentType ?? contentType,
+    name,
+    object_key: objectKey,
+    owner_id: input.sessionId,
+    owner_kind: "session",
+    parent_path: createRuntimeOutputParentPath(input.path, contentSha256),
+    path,
+    purpose: "session_artifact",
+    scope_id: input.sessionId,
+    scope_kind: "session",
+    session_kind: "artifact",
+    size: object.size,
+    status: "ready",
+    updated_at: timestampMs,
+    version: 1,
+  };
 
   await getAppDatabase(input.bindings.DB)
     .insert(fileRecordsTable)
     .values({
       committed: true,
-      createdAt: timestampMs,
-      createdByAccountId: input.createdBy,
-      etag: object.etag,
-      expiresAt: null,
-      id: fileId,
-      mimeType: object.contentType ?? contentType,
-      name,
-      objectKey,
-      ownerId: input.sessionId,
-      ownerKind: "session",
-      parentPath: createRuntimeOutputParentPath(input.path, contentSha256),
-      path,
-      purpose: "session_artifact",
-      scopeId: input.sessionId,
-      scopeKind: "session",
-      sessionKind: "artifact",
-      size: object.contentLength,
-      status: "ready",
-      updatedAt: timestampMs,
-      version: 1,
+      createdAt: row.created_at,
+      createdByAccountId: row.created_by_account_id,
+      etag: row.etag,
+      expiresAt: row.expires_at,
+      id: row.id,
+      mimeType: row.mime_type,
+      name: row.name,
+      objectKey: row.object_key,
+      ownerId: row.owner_id,
+      ownerKind: row.owner_kind,
+      parentPath: row.parent_path,
+      path: row.path,
+      purpose: row.purpose,
+      scopeId: row.scope_id,
+      scopeKind: row.scope_kind,
+      sessionKind: row.session_kind,
+      size: row.size,
+      status: row.status,
+      updatedAt: row.updated_at,
+      version: row.version,
     })
     .run();
 
-  const createdRows = await listFileRecordsById(input.bindings.DB, [fileId]);
-  const createdRow = createdRows[0];
-
-  if (createdRow === undefined) {
-    throw createFileNotFoundError("Runtime output file was not created.");
-  }
-
-  const file = toFileRecord(createdRow);
+  const file = toFileRecord(row);
   await publishSessionResourceUpsert(input.bindings, file);
   return file;
 }
@@ -980,34 +684,30 @@ export {
   createUnexpectedFileError,
   FileControlError,
   normalizeFileName,
-  normalizeR2Etag,
+  toFileEntry,
 };
 
-export const fileStore: FileStore = {
-  abortUpload,
+export const fileStore = {
+  abortUpload: abortFileUpload,
   admitAgentPackageFile,
   claimToSession,
   completeUpload,
-  createDownload,
   createSessionResourceUpload,
-  createUpload,
-  delete: deleteFile,
-  deleteSessionResource,
+  createUpload: createFileUpload,
+  delete: deleteAccessibleFile,
   deleteScope,
   ensureClaimable,
   ensureSessionAttachments,
   getRecord,
-  getUpload,
+  getUpload: getFileUpload,
   list,
   listLatestReadySessionArtifactSources,
   listReadySessionArtifactKeys,
   listReadySessionFiles,
   listSessionResourcePathEntries,
-  listSessionResources,
-  putContent,
-  putPart,
+  putContent: uploadFileContent,
+  putPart: uploadFilePart,
   readSessionArtifactBytes,
   recordRuntimeOutput,
-  streamContent,
-  update,
+  streamContent: streamFileContent,
 };

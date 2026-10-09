@@ -1,16 +1,13 @@
-import type { DriverCompletionInput, DriverFailureInput } from "@mosoo/agent-driver/orpc";
+import type { DriverFailureInput } from "@mosoo/agent-driver/orpc";
 
 import { logError, logInfo } from "../../../../platform/cloudflare/logger";
-import { syncSessionViewerState } from "../../../sessions/application/session-viewer-events.service";
-import { runtimeSessionLinkNeedsRefresh } from "./event-types";
-import {
-  getRuntimeSessionLink,
-  recordDriverInstanceCompletion,
-  recordDriverInstanceFailure,
-} from "./events";
-import type { RuntimeSessionLink } from "./events";
+import { syncSessionViewerState } from "../../../sessions/infrastructure/session/client";
 import type { DriverInstanceRpcOperationContext } from "./rpc";
 import type { DriverInstanceRpcControllerDependencies } from "./rpc-controller-dependencies";
+import {
+  recordDriverInstanceCompletion,
+  recordDriverInstanceFailure,
+} from "./terminal-driver-events";
 
 export class DriverInstanceRpcRunTerminalController {
   readonly #dependencies: DriverInstanceRpcControllerDependencies;
@@ -19,36 +16,18 @@ export class DriverInstanceRpcRunTerminalController {
     this.#dependencies = dependencies;
   }
 
-  async handleCompleteRun(
-    input: DriverCompletionInput,
-    context: DriverInstanceRpcOperationContext,
-  ): Promise<{ ok: true }> {
-    const {
-      env,
-      finalizeTerminalState,
-      sockets,
-      state,
-      viewerEventDelivery,
-      withRuntimeLogContext,
-    } = this.#dependencies;
-
-    if (input.driverInstanceId !== state.requireDriverInstanceId()) {
-      throw new Error("Driver instance id mismatch.");
-    }
+  async handleCompleteRun(context: DriverInstanceRpcOperationContext): Promise<{ ok: true }> {
+    const { env, finalizeTerminalState, sockets, state, withRuntimeLogContext } =
+      this.#dependencies;
     const driverInstanceId = state.requireDriverInstanceId();
     context.assertActiveConnection();
 
-    await viewerEventDelivery.flushSafely();
-    context.assertActiveConnection();
-    await recordDriverInstanceCompletion(env, {
-      driverInstanceId,
-      driverReady: state.hello !== null,
-    });
+    await recordDriverInstanceCompletion(env, { driverInstanceId });
     context.assertActiveConnection();
 
     withRuntimeLogContext(() => {
       logInfo("runtime.run.completed", {
-        driverInstanceId: input.driverInstanceId,
+        driverInstanceId,
         driverReady: state.hello !== null,
         heartbeatCount: state.heartbeatCount,
       });
@@ -67,9 +46,7 @@ export class DriverInstanceRpcRunTerminalController {
       await finalizeTerminalState();
     }
 
-    const link = await this.#getRuntimeSessionLink({
-      refresh: runtimeSessionLinkNeedsRefresh(state.runtimeSessionLink),
-    });
+    const link = await state.getRuntimeSessionLink(env.DB);
     await syncSessionViewerState(env, link.sessionId);
 
     return { ok: true };
@@ -79,26 +56,12 @@ export class DriverInstanceRpcRunTerminalController {
     input: DriverFailureInput,
     context: DriverInstanceRpcOperationContext,
   ): Promise<{ ok: true }> {
-    const {
-      env,
-      finalizeTerminalState,
-      sockets,
-      state,
-      viewerEventDelivery,
-      withRuntimeLogContext,
-    } = this.#dependencies;
-
-    if (input.driverInstanceId !== state.requireDriverInstanceId()) {
-      throw new Error("Driver instance id mismatch.");
-    }
+    const { env, finalizeTerminalState, sockets, state, withRuntimeLogContext } =
+      this.#dependencies;
     const driverInstanceId = state.requireDriverInstanceId();
     context.assertActiveConnection();
 
-    await viewerEventDelivery.flushSafely();
-    context.assertActiveConnection();
-    const link = await this.#getRuntimeSessionLink({
-      refresh: runtimeSessionLinkNeedsRefresh(state.runtimeSessionLink),
-    });
+    const link = await state.getRuntimeSessionLink(env.DB);
     await recordDriverInstanceFailure(env, {
       driverInstanceId,
       error: input.error,
@@ -108,7 +71,7 @@ export class DriverInstanceRpcRunTerminalController {
 
     withRuntimeLogContext(() => {
       logError("runtime.run.failed", {
-        driverInstanceId: input.driverInstanceId,
+        driverInstanceId,
         errorCode: input.error.code,
         errorDetails: input.error.details,
         errorMessage: input.error.message,
@@ -130,17 +93,5 @@ export class DriverInstanceRpcRunTerminalController {
     await syncSessionViewerState(env, link.sessionId);
 
     return { ok: true };
-  }
-
-  async #getRuntimeSessionLink(options: { refresh?: boolean } = {}): Promise<RuntimeSessionLink> {
-    const { env, state } = this.#dependencies;
-
-    if (options.refresh !== true && state.runtimeSessionLink !== null) {
-      return state.runtimeSessionLink;
-    }
-
-    const link = await getRuntimeSessionLink(env.DB, state.requireDriverInstanceId());
-    state.setRuntimeSessionLink(link);
-    return link;
   }
 }

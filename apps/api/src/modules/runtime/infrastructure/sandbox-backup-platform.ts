@@ -9,7 +9,9 @@ import {
   withDisposedRpcResult,
 } from "../../../platform/cloudflare/rpc-disposal";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
+import { quoteShellArg } from "../../../shared/shell";
 import { isRuntimeSandboxLocalBucketEnabled } from "./runtime-sandbox-bucket-mount";
+import { getRuntimeSubjectKeepAliveHandle } from "./runtime-subject-lifecycle/runtime-subject-platform";
 import {
   decodeSandboxBackupIdForPlatform,
   encodeSandboxBackupIdForStorage,
@@ -23,10 +25,6 @@ interface SandboxBackupObject {
 
 function isMissingRuntimeBucketMountError(error: unknown): boolean {
   return error instanceof Error && error.message.includes("No active mount found at path:");
-}
-
-function quoteShellArg(value: string): string {
-  return `'${value.replaceAll("'", `'"'"'`)}'`;
 }
 
 export async function prepareRuntimeSessionWorkspaceCheckpoint(
@@ -77,7 +75,7 @@ export async function prepareRuntimeSessionWorkspaceCheckpoint(
   });
 }
 
-export function getSandboxBackupObjectKeys(backupId: string): string[] {
+function getSandboxBackupObjectKeys(backupId: string): string[] {
   const platformBackupId = decodeSandboxBackupIdForPlatform(backupId);
 
   return [`backups/${platformBackupId}/data.sqsh`, `backups/${platformBackupId}/meta.json`];
@@ -87,47 +85,18 @@ export async function createRuntimeSandboxBackup(
   bindings: ApiBindings,
   input: {
     readonly dir: string;
-    readonly sanitizeTransientState: boolean;
     readonly sandboxId: string;
-    readonly sessionId: string | null;
-    readonly skipMissingWorkspace: boolean;
+    readonly sessionId: string;
     readonly ttlSeconds: number;
   },
-): Promise<SandboxBackupObject | null> {
-  const { getRuntimeSubjectKeepAliveHandle } =
-    await import("./runtime-subject-lifecycle/runtime-subject-lifecycle.service");
-
+): Promise<SandboxBackupObject> {
   return withDisposedRpcResource(
     await getRuntimeSubjectKeepAliveHandle(bindings, input.sandboxId),
     async (sandbox) => {
-      if (input.sessionId !== null && input.sanitizeTransientState) {
-        await prepareRuntimeSessionWorkspaceCheckpoint(sandbox, {
-          cwd: input.dir,
-          sessionId: input.sessionId,
-        });
-      } else if (input.sessionId === null) {
-        await sandbox.mkdir(input.dir, { recursive: true });
-      } else {
-        // A shared subject restores each conversation lazily. A closed
-        // conversation can have a checkpoint without being resident on this
-        // incarnation; creating its missing directory would overwrite that
-        // checkpoint with an empty archive and eventually prune the real one.
-        const dir = quoteShellArg(input.dir);
-        const command = `if test -d ${dir}; then printf resident; elif test ! -e ${dir} && test ! -L ${dir}; then printf missing; else exit 1; fi`;
-        const residency = await withDisposedRpcResult(
-          sandbox.exec(`sh -lc ${quoteShellArg(command)}`),
-          (result) => {
-            if (!result.success || result.exitCode !== 0) {
-              throw new Error("Session workspace residency could not be checked.");
-            }
-            return result.stdout.trim();
-          },
-        );
-        if (residency === "missing" && input.skipMissingWorkspace) return null;
-        if (residency !== "resident") {
-          throw new Error("Session workspace is missing its required checkpoint source.");
-        }
-      }
+      await prepareRuntimeSessionWorkspaceCheckpoint(sandbox, {
+        cwd: input.dir,
+        sessionId: input.sessionId,
+      });
 
       return withDisposedRpcResult(
         sandbox.createBackup({

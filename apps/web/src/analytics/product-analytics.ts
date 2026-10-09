@@ -1,50 +1,30 @@
 export const PRODUCT_ANALYTICS_EVENTS = {
-  projectCreated: "project_created",
-  integrationConnected: "integration_connected",
   loginStarted: "login_started",
-  onboardingCompleted: "onboarding_completed",
   onboardingStarted: "onboarding_started",
-  onboardingStepViewed: "onboarding_step_viewed",
   pageViewed: "page_viewed",
-  signupCompleted: "signup_completed",
 } as const;
 
-export type ProductAnalyticsEvent =
+type ProductAnalyticsEvent =
   (typeof PRODUCT_ANALYTICS_EVENTS)[keyof typeof PRODUCT_ANALYTICS_EVENTS];
 
-export interface ProductAnalyticsConfig {
-  apiHost?: string | undefined;
-  deploymentMode?: string | undefined;
-  environment?: string | undefined;
-  projectKey: string;
-}
-
-export interface ProductAnalyticsIdentity {
+interface ProductAnalyticsIdentity {
   accountId: string;
   email: string;
   name?: string | null;
 }
 
-export type ProductAnalyticsProperties = Readonly<
+type ProductAnalyticsProperties = Readonly<
   Record<string, boolean | number | string | null | undefined>
 >;
 
-type ProductAnalyticsTransport = (input: string, init: RequestInit) => Promise<Response>;
-
 interface ProductAnalyticsState {
-  apiHost: string;
-  deploymentMode: string;
   distinctId: string;
-  enabled: boolean;
-  environment: string;
   identifiedAccountId: string | null;
   projectKey: string;
 }
 
-const DEFAULT_POSTHOG_HOST = "https://us.i.posthog.com";
+const POSTHOG_CAPTURE_URL = "https://us.i.posthog.com/capture/";
 const ANONYMOUS_STORAGE_KEY = "mosoo_posthog_anonymous_id";
-let transportOverride: ProductAnalyticsTransport | null = null;
-let state: ProductAnalyticsState = createInitialState();
 
 function createAnonymousId(): string {
   const cryptoObject = globalThis.crypto;
@@ -55,71 +35,29 @@ function createAnonymousId(): string {
   return `mosoo_anon_${suffix}`;
 }
 
-function readStoredAnonymousId(): string | null {
-  try {
-    return globalThis.localStorage?.getItem(ANONYMOUS_STORAGE_KEY) ?? null;
-  } catch {
-    return null;
-  }
-}
-
-function storeAnonymousId(id: string): void {
-  try {
-    globalThis.localStorage?.setItem(ANONYMOUS_STORAGE_KEY, id);
-  } catch {
-    // Browser storage can be unavailable in restricted contexts.
-  }
-}
-
-function getOrCreateAnonymousId(): string {
-  const stored = readStoredAnonymousId();
-  if (stored !== null && stored.startsWith("mosoo_anon_")) {
-    return stored;
-  }
-
+function storeNewAnonymousId(): string {
   const id = createAnonymousId();
-  storeAnonymousId(id);
+  localStorage.setItem(ANONYMOUS_STORAGE_KEY, id);
   return id;
 }
 
-function createInitialState(): ProductAnalyticsState {
-  return {
-    apiHost: DEFAULT_POSTHOG_HOST,
-    deploymentMode: "cloud",
-    distinctId: getOrCreateAnonymousId(),
-    enabled: false,
-    environment: "production",
-    identifiedAccountId: null,
-    projectKey: "",
-  };
+function getOrCreateAnonymousId(): string {
+  const stored = localStorage.getItem(ANONYMOUS_STORAGE_KEY);
+  return stored?.startsWith("mosoo_anon_") ? stored : storeNewAnonymousId();
 }
 
-function trimTrailingSlash(value: string): string {
-  return value.replace(/\/+$/, "");
-}
-
-function locationProperties(): ProductAnalyticsProperties {
-  if (typeof window === "undefined") {
-    return {};
-  }
-
-  return {
-    $host: window.location.host,
-    $pathname: window.location.pathname,
-  };
-}
+let state: ProductAnalyticsState = {
+  distinctId: getOrCreateAnonymousId(),
+  identifiedAccountId: null,
+  projectKey: "",
+};
 
 function sanitizeProperties(properties: ProductAnalyticsProperties): Record<string, unknown> {
   return Object.fromEntries(Object.entries(properties).filter(([, value]) => value !== undefined));
 }
 
 function postEvent(event: string, properties: Readonly<Record<string, unknown>>): void {
-  if (!state.enabled) {
-    return;
-  }
-
-  const transport = transportOverride ?? globalThis.fetch;
-  if (typeof transport !== "function") {
+  if (state.projectKey === "") {
     return;
   }
 
@@ -127,16 +65,17 @@ function postEvent(event: string, properties: Readonly<Record<string, unknown>>)
     api_key: state.projectKey,
     event,
     properties: sanitizeProperties({
-      ...locationProperties(),
-      deployment_mode: state.deploymentMode,
+      $host: window.location.host,
+      $pathname: window.location.pathname,
+      deployment_mode: "cloud",
       distinct_id: state.distinctId,
-      environment: state.environment,
+      environment: "production",
       ...properties,
     }),
     timestamp: new Date().toISOString(),
   });
 
-  void transport(`${state.apiHost}/capture/`, {
+  void fetch(POSTHOG_CAPTURE_URL, {
     body,
     headers: { "Content-Type": "application/json" },
     keepalive: true,
@@ -144,16 +83,8 @@ function postEvent(event: string, properties: Readonly<Record<string, unknown>>)
   }).catch(() => undefined);
 }
 
-export function configureProductAnalytics(config: ProductAnalyticsConfig): void {
-  const projectKey = config.projectKey.trim();
-  state = {
-    ...state,
-    apiHost: trimTrailingSlash(config.apiHost?.trim() || DEFAULT_POSTHOG_HOST),
-    deploymentMode: config.deploymentMode?.trim() || "cloud",
-    enabled: projectKey.length > 0,
-    environment: config.environment?.trim() || "production",
-    projectKey,
-  };
+export function configureProductAnalytics(projectKey: string): void {
+  state = { ...state, projectKey: projectKey.trim() };
 }
 
 export function captureProductEvent(
@@ -182,21 +113,9 @@ export function identifyProductUser(identity: ProductAnalyticsIdentity): void {
 }
 
 export function resetProductAnalytics(): void {
-  const distinctId = createAnonymousId();
-  storeAnonymousId(distinctId);
   state = {
     ...state,
-    distinctId,
+    distinctId: storeNewAnonymousId(),
     identifiedAccountId: null,
   };
-}
-
-export function getProductAnalyticsState(): Readonly<ProductAnalyticsState> {
-  return state;
-}
-
-export function setProductAnalyticsTransportForTests(
-  transport: ProductAnalyticsTransport | null,
-): void {
-  transportOverride = transport;
 }

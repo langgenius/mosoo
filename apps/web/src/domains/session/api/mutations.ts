@@ -1,15 +1,7 @@
-import type { ProjectId, SessionId } from "@mosoo/contracts/id";
+import type { ProjectId, SessionId } from "@mosoo/id";
 
 import { graphql } from "@/gql";
 import { requestGraphQL } from "@/platform/http/graphql-client";
-
-const AUTO_TITLE_SESSION_MUTATION = graphql(/* GraphQL */ `
-  mutation AutoTitleSession($input: RenameSessionInput!) {
-    autoTitleSession(input: $input) {
-      id
-    }
-  }
-`);
 
 const ARCHIVE_SESSION_MUTATION = graphql(/* GraphQL */ `
   mutation ArchiveSession($projectId: ULID!, $sessionId: ULID!) {
@@ -35,45 +27,23 @@ const DELETE_AGENT_SESSION_MUTATION = graphql(/* GraphQL */ `
   }
 `);
 
-export async function autoTitleSession(
-  projectId: ProjectId,
-  sessionId: SessionId,
-  title: string,
-): Promise<{ _id: string; ok: true; title: string }> {
-  const payload = await requestGraphQL(AUTO_TITLE_SESSION_MUTATION, {
-    input: { projectId, sessionId, title },
-  });
-
-  return {
-    _id: payload.autoTitleSession.id,
-    ok: true,
-    title,
-  };
-}
-
 export async function archiveAgentSession(
   projectId: ProjectId,
   sessionId: SessionId,
-): Promise<{ ok: true }> {
+): Promise<void> {
   await requestGraphQL(ARCHIVE_SESSION_MUTATION, { projectId, sessionId });
-
-  return { ok: true };
 }
 
 export async function unarchiveAgentSession(
   projectId: ProjectId,
   sessionId: SessionId,
-): Promise<{ ok: true }> {
+): Promise<void> {
   await requestGraphQL(RESTORE_SESSION_MUTATION, { projectId, sessionId });
-
-  return { ok: true };
 }
 
 export async function deleteAgentSession(
   projectId: ProjectId,
   sessionId: SessionId,
-): Promise<{ ok: true }> {
+): Promise<void> {
   await requestGraphQL(DELETE_AGENT_SESSION_MUTATION, { projectId, sessionId });
-
-  return { ok: true };
 }

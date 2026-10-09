@@ -3,34 +3,55 @@ import type {
   PublicApiVersion,
   PublicThreadApiCreateThreadResponse,
   PublicThreadApiRetrieveThreadResponse,
+  PublicThreadApiSendEventsResponse,
   PublicThreadFinalOutput,
   PublicThreadLinks,
+  PublicThreadRunSummary,
   PublicThreadSummary,
 } from "@mosoo/contracts/public-api";
-import type { SessionSummary } from "@mosoo/contracts/session";
+import type { AgentSessionEventBatch, SessionSummary } from "@mosoo/contracts/session";
 import type { SessionRunSummary } from "@mosoo/contracts/session-run";
-import type { PublicThreadId } from "@mosoo/id";
+import type { SessionId } from "@mosoo/id";
 
-import {
-  toPublicThreadRunSummary,
-  toPublicThreadSessionSummary,
-} from "./public-thread-api-presenter";
-import type { PublicThreadSessionProjection } from "./public-thread-api-presenter";
-
-function createThreadLinks(
-  threadId: PublicThreadId,
-  apiVersion: PublicApiVersion = "v1",
-): PublicThreadLinks {
+function createThreadLinks(threadId: SessionId, apiVersion: PublicApiVersion): PublicThreadLinks {
   return {
     thread: `/api/${apiVersion}/threads/${threadId}`,
   };
 }
 
+function toPublicThreadRunSummary(
+  run: SessionRunSummary | null,
+  finalOutput: PublicThreadFinalOutput | null = null,
+): PublicThreadRunSummary | null {
+  if (run === null) {
+    return null;
+  }
+
+  return {
+    completedAt: run.completedAt,
+    createdAt: run.createdAt,
+    error:
+      run.error === null
+        ? null
+        : {
+            code: run.error.code,
+            message: run.error.message,
+            retryable: run.error.retryable,
+          },
+    finalOutput,
+    id: run.id,
+    startedAt: run.startedAt,
+    status: run.status,
+    trigger: run.trigger,
+    updatedAt: run.updatedAt,
+  };
+}
+
 export function toPublicThreadSummary<UserId extends string | null>(input: {
-  apiVersion?: PublicApiVersion | undefined;
+  apiVersion: PublicApiVersion;
   endUserId: UserId;
   legacyKind: AgentKind;
-  session: PublicThreadSessionProjection;
+  session: SessionSummary;
 }): PublicThreadSummary<UserId, PublicApiVersion> {
   return {
     agent_id: input.session.agentId,
@@ -46,73 +67,46 @@ export function toPublicThreadSummary<UserId extends string | null>(input: {
   };
 }
 
-export function toCreateThreadSessionSummary(input: {
-  run: SessionRunSummary;
-  session: SessionSummary;
-  sessionState: {
-    lastMessageAt: string;
-    status: "RUNNING";
-  };
-  titleUpdate: {
-    title: string;
-    updatedAt: string;
-  };
-}): PublicThreadSessionProjection {
-  return toPublicThreadSessionSummary({
-    ...input.session,
-    lastMessageAt: input.sessionState.lastMessageAt,
-    lastRun: input.run,
-    status: input.sessionState.status,
-    title: input.titleUpdate.title,
-    updatedAt: input.titleUpdate.updatedAt,
-  });
-}
-
-export function toCreateEmptyThreadSessionSummary(
-  session: SessionSummary,
-): PublicThreadSessionProjection {
-  return toPublicThreadSessionSummary(session);
-}
-
 export function toCreateThreadResponse<UserId extends string | null>(input: {
-  apiVersion?: PublicApiVersion | undefined;
+  apiVersion: PublicApiVersion;
   endUserId: UserId;
   legacyKind: AgentKind;
   run: SessionRunSummary | null;
-  session: PublicThreadSessionProjection;
+  session: SessionSummary;
 }): PublicThreadApiCreateThreadResponse<UserId, PublicApiVersion> {
   return {
     links: createThreadLinks(input.session.id, input.apiVersion),
     run: toPublicThreadRunSummary(input.run),
-    thread: toPublicThreadSummary({
-      apiVersion: input.apiVersion,
-      endUserId: input.endUserId,
-      legacyKind: input.legacyKind,
-      session: input.session,
-    }),
+    thread: toPublicThreadSummary(input),
   };
 }
 
 export function toRetrieveThreadResponse<UserId extends string | null>(input: {
-  apiVersion?: PublicApiVersion | undefined;
+  apiVersion: PublicApiVersion;
   endUserId: UserId;
   legacyKind: AgentKind;
   finalOutput: PublicThreadFinalOutput | null;
   session: SessionSummary;
 }): PublicThreadApiRetrieveThreadResponse<UserId, PublicApiVersion> {
-  const session = toPublicThreadSessionSummary(input.session);
-
   return {
-    links: createThreadLinks(session.id, input.apiVersion),
-    run:
-      input.session.lastRun === null
-        ? null
-        : toPublicThreadRunSummary(input.session.lastRun, { finalOutput: input.finalOutput }),
-    thread: toPublicThreadSummary({
-      apiVersion: input.apiVersion,
-      endUserId: input.endUserId,
-      legacyKind: input.legacyKind,
-      session,
-    }),
+    links: createThreadLinks(input.session.id, input.apiVersion),
+    run: toPublicThreadRunSummary(input.session.lastRun, input.finalOutput),
+    thread: toPublicThreadSummary(input),
+  };
+}
+
+export function toPublicThreadEventBatch<UserId extends string | null>(input: {
+  batch: AgentSessionEventBatch;
+  thread: PublicThreadSummary<UserId, PublicApiVersion>;
+}): PublicThreadApiSendEventsResponse<UserId, PublicApiVersion> {
+  return {
+    acceptedAt: input.batch.acceptedAt,
+    events: input.batch.events.map((event) => ({
+      requestId: event.clientRequestId,
+      run: toPublicThreadRunSummary(event.run),
+      type: event.type,
+    })),
+    thread: input.thread,
+    warnings: input.batch.warnings,
   };
 }

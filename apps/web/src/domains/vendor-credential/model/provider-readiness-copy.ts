@@ -4,35 +4,11 @@ type Translate = (key: string, variables?: Record<string, string>) => string;
 
 export const PROVIDER_KEY_REQUIRED_TEXT = "agent.providerKeyRequired";
 export const ADD_PROVIDER_KEY_TEXT = "agent.addProviderKey";
-export const RETRY_PROVIDER_CHECK_TEXT = "agent.retry";
 
-export type ProviderReadinessAction = "add-provider-key" | "retry-provider-check";
-
-export interface ProviderReadinessPresentation {
-  action: ProviderReadinessAction;
-  message: string;
-  originalMessage: string;
-  title: string;
-}
-
-const READINESS_CAPABILITY_PREFIX = "agent.capability.agent.readiness.";
 const MODEL_NEEDS_KEY_SUFFIX = ": needs-key.";
 
-function stripReadinessNextAction(message: string): string {
-  return message.replace(/\s+Next: [^.]+\.?$/, "").trim();
-}
-
 function sanitizeProviderErrorDetail(detail: string): string {
-  return detail
-    .trim()
-    .replace(/\s+/gu, " ")
-    .replace(/\b(sk|rk|pk)-[A-Za-z0-9_*.-]+/gu, "$1-***");
-}
-
-function stripProviderErrorPrefix(message: string): string {
-  return message.startsWith("Provider error:")
-    ? message.slice("Provider error:".length).trim()
-    : message;
+  return detail.trim().replace(/\s+/gu, " ");
 }
 
 function withProviderErrorPrefix(t: Translate, message: string): string {
@@ -47,9 +23,7 @@ export function formatProviderErrorMessage(
   message: string | null | undefined,
   t: Translate,
 ): string {
-  const detail = sanitizeProviderErrorDetail(
-    stripProviderErrorPrefix(stripReadinessNextAction(message?.trim() ?? "")),
-  );
+  const detail = sanitizeProviderErrorDetail(message ?? "");
   if (detail.length === 0) {
     return t("providers.providerError");
   }
@@ -142,97 +116,17 @@ export function formatProviderErrorMessage(
   }
 }
 
-function isProviderKeyRequiredIssue(issue: AgentReadinessIssue, originalMessage: string): boolean {
+function isProviderKeyRequiredIssue(issue: AgentReadinessIssue): boolean {
   return (
     issue.code.includes(".provider_credential.") ||
-    (issue.code.includes(".model.") && originalMessage.endsWith(MODEL_NEEDS_KEY_SUFFIX))
+    (issue.code.includes(".model.") && issue.message.endsWith(MODEL_NEEDS_KEY_SUFFIX))
   );
 }
 
-function createProviderKeyRequiredPresentation(
-  originalMessage: string,
-): ProviderReadinessPresentation {
-  return {
-    action: "add-provider-key",
-    message: PROVIDER_KEY_REQUIRED_TEXT,
-    originalMessage,
-    title: PROVIDER_KEY_REQUIRED_TEXT,
-  };
+export function isProviderKeyRequired(issues: readonly AgentReadinessIssue[]): boolean {
+  return issues.some((issue) => issue.severity === "error" && isProviderKeyRequiredIssue(issue));
 }
 
-function createProviderErrorPresentation(
-  originalMessage: string,
-  t: Translate,
-): ProviderReadinessPresentation {
-  return {
-    action: "retry-provider-check",
-    message: formatProviderErrorMessage(originalMessage, t),
-    originalMessage,
-    title: "providers.providerError",
-  };
-}
-
-function getProviderReadinessPresentation(
-  issue: AgentReadinessIssue,
-  t: Translate,
-): ProviderReadinessPresentation | null {
-  const originalMessage = stripReadinessNextAction(issue.message);
-
-  if (isProviderKeyRequiredIssue(issue, originalMessage)) {
-    return createProviderKeyRequiredPresentation(originalMessage);
-  }
-
-  if (issue.code === `${READINESS_CAPABILITY_PREFIX}provider.error`) {
-    return createProviderErrorPresentation(originalMessage, t);
-  }
-
-  return null;
-}
-
-export function getPrimaryProviderReadinessPresentation(
-  issues: readonly AgentReadinessIssue[],
-  t: Translate,
-): ProviderReadinessPresentation | null {
-  const errors = issues.filter((issue) => issue.severity === "error");
-
-  for (const issue of errors) {
-    const originalMessage = stripReadinessNextAction(issue.message);
-    if (isProviderKeyRequiredIssue(issue, originalMessage)) {
-      return createProviderKeyRequiredPresentation(originalMessage);
-    }
-  }
-
-  for (const issue of errors) {
-    const presentation = getProviderReadinessPresentation(issue, t);
-    if (presentation !== null) {
-      return presentation;
-    }
-  }
-
-  return null;
-}
-
-export function formatReadinessIssueMessages(
-  issues: readonly AgentReadinessIssue[],
-  t: Translate,
-): string[] {
-  const messages = new Set<string>();
-
-  for (const issue of issues) {
-    if (issue.severity !== "error") {
-      continue;
-    }
-
-    const presentation = getProviderReadinessPresentation(issue, t);
-    messages.add(t(presentation?.message ?? issue.message));
-  }
-
-  return [...messages];
-}
-
-export function formatReadinessIssueMessage(
-  issue: AgentReadinessIssue,
-  t: Translate = (key) => key,
-): string {
-  return t(getProviderReadinessPresentation(issue, t)?.message ?? issue.message);
+export function formatReadinessIssueMessage(issue: AgentReadinessIssue, t: Translate): string {
+  return t(isProviderKeyRequiredIssue(issue) ? PROVIDER_KEY_REQUIRED_TEXT : issue.message);
 }

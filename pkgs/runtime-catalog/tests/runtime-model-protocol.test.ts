@@ -4,10 +4,6 @@ import type { PresetModelProtocol } from "@mosoo/contracts/models";
 import {
   PRESET_MODEL_CATALOG,
   RUNTIME_CATALOG,
-  admitRuntimeModelIdentity,
-  admitRuntimeModelIdentityForCatalog,
-  createCatalogRuntimeModelIdentity,
-  getRuntimeCatalogEntry,
   resolveRuntimeModelProtocol,
 } from "@mosoo/runtime-catalog";
 
@@ -49,13 +45,7 @@ describe("runtime model protocol resolution", () => {
   });
 
   test("checks the complete custom protocol and runtime matrix", () => {
-    for (const runtimeId of [
-      "claude-agent-sdk",
-      "system-agent",
-      "openai-runtime",
-      "acp-fallback",
-      "pi",
-    ]) {
+    for (const runtimeId of ["claude-agent-sdk", "openai-runtime", "acp-fallback", "pi"]) {
       for (const customModelProtocol of PROTOCOLS) {
         const result = resolveRuntimeModelProtocol({
           customModelProtocol,
@@ -63,9 +53,7 @@ describe("runtime model protocol resolution", () => {
           runtimeId,
           vendorId: "openai-compatible",
         });
-        if (runtimeId === "system-agent") {
-          expect(result).toMatchObject({ code: "runtime-disabled", ok: false });
-        } else if (runtimeId === "claude-agent-sdk") {
+        if (runtimeId === "claude-agent-sdk") {
           expect(result).toMatchObject({ code: "provider-unsupported", ok: false });
         } else if (runtimeId === "openai-runtime" && customModelProtocol !== "openai-responses") {
           expect(result).toMatchObject({ code: "protocol-unsupported", ok: false });
@@ -91,18 +79,7 @@ describe("runtime model protocol resolution", () => {
     }
   });
 
-  test("identity admission shares explicit protocol validation and cannot override preset protocols", () => {
-    const identity = createCatalogRuntimeModelIdentity({
-      modelId: "custom-model",
-      providerId: "openai-compatible",
-      runtimeId: "openai-runtime",
-    });
-    expect(
-      admitRuntimeModelIdentity(identity, { customModelProtocol: "openai-chat-completions" }),
-    ).toMatchObject({
-      code: "protocol-unsupported",
-      ok: false,
-    });
+  test("cannot override preset protocols with a custom protocol declaration", () => {
     expect(
       resolveRuntimeModelProtocol({
         customModelProtocol: "openai-chat-completions",
@@ -111,46 +88,6 @@ describe("runtime model protocol resolution", () => {
         vendorId: "openai",
       }),
     ).toEqual({ modelProtocol: "openai-responses", ok: true });
-  });
-
-  test("a vendor-scoped allowlist cannot admit another vendor's model with the same name", () => {
-    const runtime = getRuntimeCatalogEntry("pi");
-    if (runtime === null) throw new Error("Pi runtime missing from catalog.");
-    const permitted = PRESET_MODEL_CATALOG.find(
-      (model) => model.vendorId === "gemini" && model.modelId === "gemini-3.5-flash",
-    );
-    if (permitted === undefined) throw new Error("Gemini fixture missing from catalog.");
-    const catalog = [
-      { ...runtime, supportedModelIds: [permitted.modelId], supportedModelIdentities: [permitted] },
-    ];
-    for (const providerId of ["gemini", "opencode"]) {
-      const identity = createCatalogRuntimeModelIdentity({
-        modelId: permitted.modelId,
-        providerId,
-        runtimeId: "pi",
-      });
-      expect(admitRuntimeModelIdentityForCatalog(catalog, identity)).toMatchObject(
-        providerId === "gemini"
-          ? { modelProtocol: "openai-chat-completions", ok: true }
-          : { code: "model-unsupported", ok: false },
-      );
-    }
-  });
-
-  test("rejects a preset protocol outside the runtime adapter even when its model is allowed", () => {
-    const runtime = getRuntimeCatalogEntry("pi");
-    if (runtime === null) throw new Error("Pi runtime missing from catalog.");
-    const supportedModelProtocols: PresetModelProtocol[] = ["openai-responses"];
-    expect(
-      admitRuntimeModelIdentityForCatalog(
-        [{ ...runtime, supportedModelProtocols }],
-        createCatalogRuntimeModelIdentity({
-          modelId: "gemini-3.5-flash",
-          providerId: "gemini",
-          runtimeId: "pi",
-        }),
-      ),
-    ).toMatchObject({ code: "protocol-unsupported", ok: false });
   });
 
   test("rejects unknown runtime, provider and model instead of inferring a protocol", () => {
@@ -168,7 +105,7 @@ describe("runtime model protocol resolution", () => {
     }
   });
 
-  test("generated runtime protocol declarations retain the existing native boundaries", () => {
+  test("runtime protocol declarations retain the existing native boundaries", () => {
     for (const runtime of RUNTIME_CATALOG) {
       expect(runtime.supportedModelProtocols).toEqual(
         runtime.runtimeId === "claude-agent-sdk"

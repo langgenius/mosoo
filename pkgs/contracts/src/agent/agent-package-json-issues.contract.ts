@@ -2,13 +2,11 @@ import {
   createValidationIssue,
   hasRequiredText,
   isRecord,
-  readAgentKind,
   readRecordField,
   readString,
 } from "./agent-manifest-parser-internals.contract";
 import { AGENT_MANIFEST_VERSION, AGENT_PACKAGE_VERSION } from "./agent-manifest-version.contract";
 import type { AgentResolutionIssue } from "./agent-manifest.contract";
-import { AGENT_KIND_LIST_LABEL } from "./agent.contract";
 
 const PACKAGE_MANIFEST_TOP_LEVEL_FIELDS = new Set([
   "author",
@@ -32,19 +30,6 @@ const PACKAGE_MANIFEST_TOP_LEVEL_FIELDS = new Set([
   "skills",
   "sourceAgentId",
   "version",
-]);
-
-const PACKAGE_MANIFEST_FORBIDDEN_FIELDS = new Set([
-  "cost",
-  "credentials",
-  "dependencies",
-  "logs",
-  "runtimeState",
-  "secrets",
-  "sessions",
-  "sourceOrgId",
-  "sourceOrganizationId",
-  "sourceProvenance",
 ]);
 
 const PACKAGE_MANIFEST_FORBIDDEN_SECRET_FIELDS = new Set([
@@ -93,18 +78,10 @@ export function createPackageIssue(
   message: string,
   status?: "unsupported",
 ): AgentResolutionIssue {
-  if (status === undefined) {
-    return createValidationIssue({
-      code,
-      message,
-      targetType: "agent",
-    });
-  }
-
   return createValidationIssue({
     code,
     message,
-    status,
+    ...(status === undefined ? {} : { status }),
     targetType: "agent",
   });
 }
@@ -129,17 +106,6 @@ export function collectPackageIssues(input: Record<string, unknown>): AgentResol
   }
 
   for (const field of Object.keys(input)) {
-    if (PACKAGE_MANIFEST_FORBIDDEN_FIELDS.has(field)) {
-      issues.push(
-        createPackageIssue(
-          "package.field.forbidden",
-          `Agent package manifest must not include ${field}.`,
-          "unsupported",
-        ),
-      );
-      continue;
-    }
-
     if (!PACKAGE_MANIFEST_TOP_LEVEL_FIELDS.has(field)) {
       issues.push(
         createPackageIssue(
@@ -176,15 +142,6 @@ export function collectPackageIssues(input: Record<string, unknown>): AgentResol
   issues.push(...collectMcpCatalogIssues(input["mcpServers"]));
   issues.push(...collectEnvironmentCatalogIssues(input["environment"]));
 
-  if (input["kind"] != null && readAgentKind(input["kind"]) === null) {
-    issues.push(
-      createPackageIssue(
-        "manifest.kind.missing",
-        `Legacy Agent Manifest kind must be ${AGENT_KIND_LIST_LABEL}.`,
-      ),
-    );
-  }
-
   if (!hasRequiredText(name)) {
     issues.push(createPackageIssue("manifest.metadata.name.missing", "Manifest name is required."));
   }
@@ -212,7 +169,6 @@ export function hasBlockingPackageIssue(issues: AgentResolutionIssue[]): boolean
   return issues.some(
     (issue) =>
       issue.status === "unsupported" ||
-      issue.code === "manifest.kind.missing" ||
       issue.code === "manifest.metadata.name.missing" ||
       issue.code === "manifest.runtime.missing" ||
       issue.code === "manifest.model.missing" ||

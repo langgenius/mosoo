@@ -8,7 +8,7 @@ export function RequiredMark(): ReactElement {
   return (
     <span
       aria-label={t("agent.required")}
-      className="text-destructive ml-0.5"
+      className="text-danger ml-0.5"
       title={t("agent.required")}
     >
       *

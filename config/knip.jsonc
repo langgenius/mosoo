@@ -7,11 +7,12 @@
   "workspaces": {
     ".": {
       "includeEntryExports": false,
-      "entry": ["config/**/*.ts", "scripts/**/*.ts", "vite.config.ts"],
+      "entry": ["config/**/*.ts", "scripts/**/*.ts"],
       "project": ["config/**/*.d.ts", "config/**/*.ts", "scripts/**/*.ts"],
       "ignoreDependencies": [
         "@graphql-codegen/client-preset",
         "@graphql-codegen/schema-ast",
+        "@j178/prek",
         "tsx",
       ],
     },
@@ -19,27 +20,27 @@
       "includeEntryExports": false,
       "entry": ["bin/**/*.ts", "src/adapters/graphql/codegen-schema.ts", "tests/**/*.test.ts"],
       "project": ["bin/**/*.ts", "src/**/*.ts!", "tests/**/*.ts"],
-      "ignoreDependencies": ["cloudflare", "wrangler"],
+      "ignoreDependencies": ["wrangler"],
     },
     "apps/driver": {
-      "entry": ["src/index.ts", "tests/**/*.test.ts"],
+      "entry": ["tests/**/*.test.ts"],
       "project": ["src/**/*.ts!", "tests/**/*.ts"],
     },
     "apps/web": {
       "includeEntryExports": false,
-      "entry": ["src/main.tsx", "vite.config.ts", "tests/**/*.test.ts"],
-      "project": ["src/**/*.ts!", "src/**/*.tsx!", "tests/**/*.ts"],
-      "ignoreDependencies": ["tailwindcss", "tw-animate-css", "wrangler"],
+      "entry": ["tests/**/*.test.ts"],
+      "project": ["src/**/*.ts!", "src/**/*.tsx!", "src/**/*.css!", "tests/**/*.ts"],
+      "ignoreDependencies": ["wrangler"],
     },
     "e2e": {
       "includeEntryExports": false,
-      "entry": ["playwright.config.ts", "*.spec.ts", "*.test.ts"],
-      "project": ["*.ts"],
+      "entry": ["playwright.config.ts", "cases/**/*.spec.ts"],
+      "project": ["**/*.ts"],
       "playwright": false,
     },
     "pkgs/ag-ui-session": {
       "includeEntryExports": false,
-      "entry": ["tests/**/*.test.ts", "tests/**/*.typecheck.ts"],
+      "entry": ["tests/**/*.test.ts"],
       "project": ["src/**/*.ts!", "tests/**/*.ts"],
     },
     "pkgs/id": {
@@ -49,20 +50,48 @@
     },
     "pkgs/db": {
       "includeEntryExports": false,
-      "entry": ["scripts/**/*.ts", "tests/**/*.test.ts"],
-      "project": ["scripts/**/*.ts", "src/**/*.ts!", "tests/**/*.ts"],
+      "entry": ["tests/**/*.test.ts"],
+      "project": ["src/**/*.ts!", "tests/**/*.ts"],
     },
     "pkgs/contracts": {
       "includeEntryExports": false,
       "entry": ["tests/**/*.test.ts"],
       "project": ["models/**/*.ts!", "src/**/*.ts!", "tests/**/*.ts"],
     },
-    "pkgs/{agent-package,runtime-catalog,runtime-events,session-policy,skill-package}": {
+    "pkgs/agent-package": {
       "includeEntryExports": false,
       "entry": ["tests/**/*.test.ts"],
       "project": ["src/**/*.ts!", "tests/**/*.ts"],
     },
-    "pkgs/{development-auth,effects,observability}": {
+    "pkgs/runtime-catalog": {
+      "includeEntryExports": false,
+      "entry": ["tests/**/*.test.ts"],
+      "project": ["src/**/*.ts!", "tests/**/*.ts"],
+    },
+    "pkgs/runtime-events": {
+      "includeEntryExports": false,
+      "entry": ["tests/**/*.test.ts"],
+      "project": ["src/**/*.ts!", "tests/**/*.ts"],
+    },
+    "pkgs/session-policy": {
+      "includeEntryExports": false,
+      "entry": ["tests/**/*.test.ts"],
+      "project": ["src/**/*.ts!", "tests/**/*.ts"],
+    },
+    "pkgs/skill-package": {
+      "includeEntryExports": false,
+      "entry": ["tests/**/*.test.ts"],
+      "project": ["src/**/*.ts!", "tests/**/*.ts"],
+    },
+    "pkgs/development-auth": {
+      "includeEntryExports": false,
+      "project": ["src/**/*.ts!"],
+    },
+    "pkgs/effects": {
+      "includeEntryExports": false,
+      "project": ["src/**/*.ts!"],
+    },
+    "pkgs/observability": {
       "includeEntryExports": false,
       "project": ["src/**/*.ts!"],
     },

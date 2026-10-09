@@ -8,10 +8,21 @@ function createSessionViewerStateDatabase(): SqliteD1Database {
 
   database.execute(`
     CREATE TABLE session (
+      agent_id text,
+      archived_at integer,
+      created_at integer DEFAULT 1 NOT NULL,
+      deployment_version_id text,
+      deployment_version_number integer,
       id text PRIMARY KEY NOT NULL,
+      last_message_at integer,
       last_run_id text,
+      model text DEFAULT 'gpt-5.4' NOT NULL,
+      project_id text DEFAULT 'project-1' NOT NULL,
+      provider text DEFAULT 'openai' NOT NULL,
+      runtime_id text DEFAULT 'openai-runtime' NOT NULL,
       status text NOT NULL,
       title text,
+      type text DEFAULT 'ui' NOT NULL,
       updated_at integer NOT NULL
     );
 
@@ -38,6 +49,7 @@ function createSessionViewerStateDatabase(): SqliteD1Database {
     CREATE TABLE session_message (
       content_text text NOT NULL,
       created_at integer NOT NULL,
+      created_by_account_id text DEFAULT 'viewer-1' NOT NULL,
       id text PRIMARY KEY NOT NULL,
       plan_json text,
       role text NOT NULL,
@@ -82,12 +94,6 @@ function createSessionViewerStateDatabase(): SqliteD1Database {
       tool_kind text,
       updated_at integer NOT NULL,
       PRIMARY KEY (session_id, request_id)
-    );
-
-    CREATE TABLE session_readiness_snapshot (
-      readiness_json text NOT NULL,
-      session_id text PRIMARY KEY NOT NULL,
-      updated_at integer NOT NULL
     );
 
     INSERT INTO session (
@@ -218,7 +224,7 @@ describe("session viewer state", () => {
     expect(state.messages).toHaveLength(1);
   });
 
-  test("loads active permissions and readiness projections", async () => {
+  test("loads active permission projections", async () => {
     const database = createSessionViewerStateDatabase();
     database.execute(`
       INSERT INTO session_permission_request (
@@ -245,17 +251,6 @@ describe("session viewer state", () => {
         'shell',
         14
       );
-
-      INSERT INTO session_readiness_snapshot (
-        readiness_json,
-        session_id,
-        updated_at
-      )
-      VALUES (
-        '{"checkedAt":"2026-05-08T00:00:00.000Z","issues":[],"ready":true}',
-        'session-1',
-        15
-      );
     `);
 
     const state = await loadSessionViewerState(database, {
@@ -274,10 +269,5 @@ describe("session viewer state", () => {
         toolKind: "shell",
       },
     ]);
-    expect(state.readiness).toEqual({
-      checkedAt: "2026-05-08T00:00:00.000Z",
-      issues: [],
-      ready: true,
-    });
   });
 });

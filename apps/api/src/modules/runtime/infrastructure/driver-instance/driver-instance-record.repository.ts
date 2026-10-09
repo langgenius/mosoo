@@ -1,7 +1,6 @@
 import { DRIVER_PROTOCOL_VERSION } from "@mosoo/agent-driver/boot";
 import type { DriverRuntime } from "@mosoo/agent-driver/runtime";
 import {
-  driverCommandsTable,
   driverInstanceMcpGrantsTable,
   driverInstancesTable,
   sandboxSessionsTable,
@@ -14,7 +13,7 @@ import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../../time";
 import {
-  REUSABLE_DRIVER_INSTANCE_STATUSES,
+  ASSIGNABLE_DRIVER_INSTANCE_STATUSES,
   LIVE_DRIVER_INSTANCE_STATUSES,
   toDriverInstanceStatusLifecycleEventName,
 } from "../../domain/driver-instance-lifecycle.machine";
@@ -44,7 +43,6 @@ export async function createDriverInstanceRecord(
   bindings: ApiBindings,
   input: {
     bootTokenHash: Uint8Array;
-    conflictStrategy?: "insert-only" | "replace";
     driverInstanceId: DriverInstanceId;
     executionSessionId: SandboxSessionId;
     runtime: DriverRuntime;
@@ -141,7 +139,7 @@ export async function createDriverInstanceRecord(
             // The Driver insert, then these one-row grant inserts, are adjacent in
             // the same batch. A skipped insert propagates zero changes through all
             // grants, including a retry that presents the same boot-token hash.
-            ...(input.conflictStrategy === "insert-only" ? [sql`changes() = 1`] : []),
+            sql`changes() = 1`,
           ),
         ),
     ),
@@ -157,93 +155,28 @@ export async function createDriverInstanceRecord(
       }),
     );
 
-  if (input.conflictStrategy === "insert-only") {
-    const [, insertedRows] = await executeClaim([
-      bindingGuard,
-      database.insert(driverInstancesTable).values(driverRecord).onConflictDoNothing().returning({
-        bootTokenExpiresAt: driverInstancesTable.bootTokenExpiresAt,
-        generation: driverInstancesTable.generation,
-      }),
-      ...ownedGrantInserts,
-    ]);
-    const inserted = insertedRows?.results[0] ?? null;
+  const [, insertedRows] = await executeClaim([
+    bindingGuard,
+    database.insert(driverInstancesTable).values(driverRecord).onConflictDoNothing().returning({
+      bootTokenExpiresAt: driverInstancesTable.bootTokenExpiresAt,
+      generation: driverInstancesTable.generation,
+    }),
+    ...ownedGrantInserts,
+  ]);
+  const inserted = insertedRows?.results[0] ?? null;
 
-    if (inserted === null) {
-      return {
-        bootTokenExpiresAt: null,
-        generation: null,
-        reason: "existing-driver",
-        status: "skipped",
-      };
-    }
-
+  if (inserted === null) {
     return {
-      bootTokenExpiresAt: inserted.boot_token_expires_at,
-      generation: inserted.generation,
-      status: "created",
+      bootTokenExpiresAt: null,
+      generation: null,
+      reason: "existing-driver",
+      status: "skipped",
     };
   }
 
-  const [, , , upsertedRows] = await executeClaim([
-    bindingGuard,
-    database
-      .delete(driverCommandsTable)
-      .where(eq(driverCommandsTable.driverInstanceId, input.driverInstanceId)),
-    database
-      .delete(driverInstanceMcpGrantsTable)
-      .where(eq(driverInstanceMcpGrantsTable.driverInstanceId, input.driverInstanceId)),
-    database
-      .insert(driverInstancesTable)
-      .values(driverRecord)
-      .onConflictDoUpdate({
-        set: {
-          bootTokenExpiresAt: sql`excluded.boot_token_expires_at`,
-          bootTokenHash: sql`excluded.boot_token_hash`,
-          bootTokenUsedAt: null,
-          closeCode: null,
-          closeReason: null,
-          connectionId: null,
-          createdAt: sql`excluded.created_at`,
-          driverPid: null,
-          driverStartedAt: null,
-          driverVersion: null,
-          errorMessage: null,
-          expiresAt: sql`excluded.expires_at`,
-          generation: sql`${driverInstancesTable.generation} + 1`,
-          heartbeatCount: 0,
-          lastHeartbeatAt: null,
-          processId: null,
-          protocol: sql`excluded.protocol`,
-          protocolVersion: sql`excluded.protocol_version`,
-          restartCount: sql`${driverInstancesTable.restartCount} + 1`,
-          runtime: sql`excluded.runtime`,
-          sandboxId: sql`excluded.sandbox_id`,
-          sandboxSessionId: sql`excluded.sandbox_session_id`,
-          status: sql`excluded.status`,
-          statusChangedAt: sql`excluded.status_changed_at`,
-          statusEvent: sql`excluded.status_event`,
-          statusOperationId: null,
-          statusSeq: sql`${driverInstancesTable.statusSeq} + 1`,
-          statusSource: sql`excluded.status_source`,
-          updatedAt: sql`excluded.updated_at`,
-        },
-        target: driverInstancesTable.id,
-      })
-      .returning({
-        bootTokenExpiresAt: driverInstancesTable.bootTokenExpiresAt,
-        generation: driverInstancesTable.generation,
-      }),
-    ...ownedGrantInserts,
-  ]);
-  const upserted = upsertedRows?.results[0] ?? null;
-
-  if (upserted === null) {
-    throw new Error("Driver instance record was not created.");
-  }
-
   return {
-    bootTokenExpiresAt: upserted.boot_token_expires_at,
-    generation: upserted.generation,
+    bootTokenExpiresAt: inserted.boot_token_expires_at,
+    generation: inserted.generation,
     status: "created",
   };
 }
@@ -375,7 +308,7 @@ export async function getReusableDriverInstanceRecord(
         and(
           eq(driverInstancesTable.sandboxId, input.sandboxId),
           eq(driverInstancesTable.sandboxSessionId, input.sandboxSessionId),
-          inArray(driverInstancesTable.status, REUSABLE_DRIVER_INSTANCE_STATUSES),
+          inArray(driverInstancesTable.status, ASSIGNABLE_DRIVER_INSTANCE_STATUSES),
         ),
       )
       .orderBy(desc(driverInstancesTable.updatedAt))

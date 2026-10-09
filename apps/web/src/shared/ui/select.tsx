@@ -103,40 +103,4 @@ function SelectItem({
   );
 }
 
-function SelectGroup(props: ComponentProps<typeof SelectPrimitive.Group>): ReactElement {
-  return <SelectPrimitive.Group data-slot="select-group" {...props} />;
-}
-
-function SelectGroupLabel({
-  className,
-  ...props
-}: ComponentProps<typeof SelectPrimitive.GroupLabel>): ReactElement {
-  return (
-    <SelectPrimitive.GroupLabel
-      data-slot="select-group-label"
-      className={cn("px-2 py-1.5 text-[12px] font-medium text-fg-3", className)}
-      {...props}
-    />
-  );
-}
-
-function SelectSeparator({ className, ...props }: ComponentProps<"div">): ReactElement {
-  return (
-    <div
-      data-slot="select-separator"
-      className={cn("-mx-1 my-1 h-px bg-border-soft", className)}
-      {...props}
-    />
-  );
-}
-
-export {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectGroupLabel,
-  SelectItem,
-  SelectSeparator,
-  SelectTrigger,
-  SelectValue,
-};
+export { Select, SelectContent, SelectItem, SelectTrigger, SelectValue };

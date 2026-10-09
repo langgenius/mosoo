@@ -13,7 +13,6 @@ import type { SessionProcessEvent } from "@mosoo/contracts/session";
 import { parseJsonObject } from "@mosoo/contracts/validation";
 import type { JsonObject } from "@mosoo/contracts/validation";
 import { sessionEventsTable, sessionMessagesTable } from "@mosoo/db";
-import { parsePlatformId } from "@mosoo/id";
 import type { RuntimeEventId, SessionId, SessionRunId } from "@mosoo/id";
 import { and, asc, desc, eq, gt, lt } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
@@ -23,11 +22,9 @@ import { getAppDatabase } from "../../platform/db/drizzle";
 import { createSessionProcessEventsFromSessionEventRows } from "../sessions/application/session-process-events.service";
 import type { SessionEventProcessRow } from "../sessions/application/session-process-events.service";
 import { connectSessionPublicEventWebSocket } from "../sessions/infrastructure/session/client";
-import { publicInternalError, publicInvalidRequest, toPublicApiError } from "./public-api-errors";
+import { publicInternalError, toPublicApiError } from "./public-api-errors";
 import { sanitizePublicOutput } from "./public-output-sanitization";
-import { admitPublicThreadReader } from "./public-thread-admission";
-import { toBackingSessionId } from "./public-thread-ids";
-import { getThreadSnapshot } from "./public-thread-store";
+import { admitPublicThread } from "./public-thread-session-query.service";
 import type {
   ListPublicThreadEventsRequest,
   StreamPublicThreadEventsRequest,
@@ -306,14 +303,6 @@ function isPublicThreadEventLogType(value: string): value is PublicThreadEventLo
   return PUBLIC_THREAD_EVENT_LOG_TYPE_SET.has(value);
 }
 
-function normalizePublicThreadEventsLimit(limit: number): number {
-  if (!Number.isInteger(limit) || limit < 1 || limit > PUBLIC_THREAD_EVENTS_MAX_LIMIT) {
-    throw publicInvalidRequest(`limit must be between 1 and ${PUBLIC_THREAD_EVENTS_MAX_LIMIT}.`);
-  }
-
-  return limit;
-}
-
 function toPublicThreadEventLogEntry(input: {
   event: SessionProcessEvent;
   row: PublicThreadEventProcessRow | undefined;
@@ -333,7 +322,7 @@ function toPublicThreadEventLogEntry(input: {
   return {
     content: sanitizePublicOutput(event.content).text,
     durationMs: event.durationMs,
-    id: parsePlatformId(event.id, "Runtime event ID") as RuntimeEventId,
+    id: event.id,
     occurredAt: event.occurredAt,
     runId: input.row?.run_id ?? null,
     status: event.status,
@@ -351,13 +340,12 @@ function toPublicThreadEventLogEntry(input: {
 
 function toPublicThreadEventLogEntries(
   rows: PublicThreadEventProcessRow[],
-  options: { foldStreamedRows?: boolean } = {},
 ): PublicThreadEventLogEntry[] {
   const rowsByEventId = new Map<RuntimeEventId, PublicThreadEventProcessRow>(
     rows.map((row) => [row.id, row]),
   );
 
-  return createSessionProcessEventsFromSessionEventRows(rows, options).flatMap((event) => {
+  return createSessionProcessEventsFromSessionEventRows(rows).flatMap((event) => {
     const publicEvent = toPublicThreadEventLogEntry({
       event,
       row: rowsByEventId.get(event.id),
@@ -512,25 +500,14 @@ export async function readPublicThreadRunFinalOutput(input: {
   };
 }
 
-async function resolvePublicThreadEventSessionId(
-  request: ListPublicThreadEventsRequest,
-): Promise<SessionId> {
-  const snapshot = await getThreadSnapshot(request.database, request.threadId, request.apiVersion);
-
-  await admitPublicThreadReader(request.database, request.caller, snapshot, request.apiVersion);
-
-  return toBackingSessionId(request.threadId);
-}
-
 export async function listPublicThreadEvents(
   request: ListPublicThreadEventsRequest,
 ): Promise<PublicThreadApiListThreadEventsResponse> {
-  const limit = normalizePublicThreadEventsLimit(request.limit);
-  const sessionId = await resolvePublicThreadEventSessionId(request);
+  await admitPublicThread(request.database, request.caller, request.threadId, request.apiVersion);
   const window = await readPublicThreadEventWindow({
     database: request.database,
-    limit,
-    sessionId,
+    limit: request.limit,
+    sessionId: request.threadId,
   });
 
   return {
@@ -592,8 +569,8 @@ function toSseErrorPayload(error: unknown) {
 export async function createPublicThreadEventStream(
   request: StreamPublicThreadEventsRequest,
 ): Promise<ReadableStream<Uint8Array>> {
-  const limit = normalizePublicThreadEventsLimit(request.limit);
-  const sessionId = await resolvePublicThreadEventSessionId(request);
+  const { limit, threadId: sessionId } = request;
+  await admitPublicThread(request.database, request.caller, sessionId, request.apiVersion);
   const wakeup = await connectPublicThreadEventWakeup(request, sessionId);
   let initialWindow: PublicThreadEventWindow;
 

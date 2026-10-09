@@ -1,15 +1,7 @@
-import type { SessionRunSummary, UserWarning } from "@mosoo/contracts/session-run";
+import type { SessionSummary } from "@mosoo/contracts/session";
+import type { SessionRunSummary } from "@mosoo/contracts/session-run";
 import { createPlatformId, parsePlatformId } from "@mosoo/id";
-import type {
-  AccountId,
-  AgentDeploymentVersionId,
-  AgentId,
-  FileId,
-  ProjectId,
-  SessionId,
-  SessionMessageId,
-  SessionRunId,
-} from "@mosoo/id";
+import type { AccountId, FileId, SessionId, SessionMessageId, SessionRunId } from "@mosoo/id";
 import { generateTraceId } from "@mosoo/observability";
 
 import { logError, logInfo } from "../../../../platform/cloudflare/logger";
@@ -47,16 +39,17 @@ interface QueueSessionRunInput {
   attachmentIds: FileId[];
   clientRequestId: string | null;
   prompt: string;
-  session: {
-    agent_id: AgentId | null;
-    deployment_version_id: AgentDeploymentVersionId | null;
-    deployment_version_number: number | null;
-    id: SessionId;
-    model: string;
-    project_id: ProjectId;
-    provider: string;
-    runtime_id: string;
-  };
+  session: Pick<
+    SessionSummary,
+    | "agentId"
+    | "deploymentVersionId"
+    | "deploymentVersionNumber"
+    | "id"
+    | "model"
+    | "projectId"
+    | "provider"
+    | "runtimeId"
+  >;
 }
 
 interface QueueSessionRunRequest {
@@ -84,33 +77,26 @@ function createCheckpointPendingError(sessionId: SessionId) {
 export async function queueSessionRun(request: QueueSessionRunRequest): Promise<{
   run: SessionRunSummary;
   sessionState: QueuedSessionRunState;
-  warnings: UserWarning[];
 }> {
   const { bindings, input, requestUrl, viewer } = request;
   const queueStartedAtMs = Date.now();
   const admissionRequestedAtMs = input.admissionRequestedAtMs ?? currentTimestampMs();
 
-  const runtimeId = getSupportedRuntimeId(input.session.runtime_id);
+  const runtimeId = getSupportedRuntimeId(input.session.runtimeId);
   const viewerId: AccountId = parsePlatformId(viewer.id, "viewer id");
 
   if (runtimeId === null) {
-    throw new Error(`Unsupported runtime: ${input.session.runtime_id}.`);
+    throw new Error(`Unsupported runtime: ${input.session.runtimeId}.`);
   }
 
   // Pre-admission guards are independent; run them concurrently instead of
   // paying three serial D1 round trips before the run row exists.
   await Promise.all([
-    assertPreviewAvailable(bindings.DB, input.session.id, admissionRequestedAtMs),
     reconcileStaleActiveSessionRun(bindings.DB, input.session.id),
-    isSessionTerminalCheckpointReadyForNextRun(bindings.DB, input.session.id).then((ready) => {
-      if (!ready) {
-        throw createCheckpointPendingError(input.session.id);
-      }
-    }),
     getSessionExecutionPlan(bindings.DB, input.session.id).then((executionPlan) =>
       resolveReadyEnvironmentPackageArtifact(
         bindings,
-        input.session.project_id,
+        input.session.projectId,
         executionPlan.environment.packagesJson,
       ),
     ),
@@ -127,8 +113,8 @@ export async function queueSessionRun(request: QueueSessionRunRequest): Promise<
   const traceId = generateTraceId();
   const createdRun = createInsertedSessionRunSummary(
     {
-      deploymentVersionId: input.session.deployment_version_id,
-      deploymentVersionNumber: input.session.deployment_version_number,
+      deploymentVersionId: input.session.deploymentVersionId,
+      deploymentVersionNumber: input.session.deploymentVersionNumber,
       model: input.session.model,
       provider: input.session.provider,
       sessionId: input.session.id,
@@ -153,7 +139,7 @@ export async function queueSessionRun(request: QueueSessionRunRequest): Promise<
     requestUrl,
     session: {
       id: input.session.id,
-      project_id: input.session.project_id,
+      project_id: input.session.projectId,
     },
     sessionRunId: createdRun.id,
     traceId: createdRun.traceId,
@@ -175,11 +161,11 @@ export async function queueSessionRun(request: QueueSessionRunRequest): Promise<
       timestampMs: admittedAtMs,
     },
     run: {
-      agentId: input.session.agent_id,
+      agentId: input.session.agentId,
       createdBy: viewerId,
       ...(viewer.apiKeyId === undefined ? {} : { createdByKeyId: viewer.apiKeyId }),
-      deploymentVersionId: input.session.deployment_version_id,
-      deploymentVersionNumber: input.session.deployment_version_number,
+      deploymentVersionId: input.session.deploymentVersionId,
+      deploymentVersionNumber: input.session.deploymentVersionNumber,
       id: createdRun.id,
       model: input.session.model,
       provider: input.session.provider,
@@ -190,8 +176,8 @@ export async function queueSessionRun(request: QueueSessionRunRequest): Promise<
       trigger: "user_prompt",
     },
     session: {
-      agentId: input.session.agent_id,
-      projectId: input.session.project_id,
+      agentId: input.session.agentId,
+      projectId: input.session.projectId,
       id: input.session.id,
     },
   };
@@ -240,18 +226,6 @@ export async function queueSessionRun(request: QueueSessionRunRequest): Promise<
     shouldDeliver: true,
   };
 
-  logInfo("session.run.queued", {
-    agentId: input.session.agent_id,
-    attachmentCount: input.attachmentIds.length,
-    clientRequestId: input.clientRequestId,
-    queuedLatencyMs: Date.now() - queueStartedAtMs,
-    runId: createdRun.id,
-    runtimeId,
-    sessionId: input.session.id,
-    traceId: createdRun.traceId,
-    viewerId: viewer.id,
-  });
-
   // Start both paths after durable admission. Queue delivery stays retryable,
   // while the queued->booting CAS prevents duplicate model execution.
   if (request.executionContext) {
@@ -272,7 +246,7 @@ export async function queueSessionRun(request: QueueSessionRunRequest): Promise<
         dispatchSource: "inline",
         prompt: input.prompt,
         queuedAtMs,
-        session: { id: input.session.id, project_id: input.session.project_id },
+        session: { id: input.session.id, project_id: input.session.projectId },
         sessionRunId: createdRun.id,
         traceId: createdRun.traceId,
         ...(input.accessViewer ? { accessViewer: input.accessViewer } : {}),
@@ -294,7 +268,7 @@ export async function queueSessionRun(request: QueueSessionRunRequest): Promise<
 
   logInfo("session.run.accepted", {
     acceptedLatencyMs: Date.now() - queueStartedAtMs,
-    agentId: input.session.agent_id,
+    agentId: input.session.agentId,
     attachmentCount: input.attachmentIds.length,
     clientRequestId: input.clientRequestId,
     inlineDispatch: Boolean(request.executionContext),
@@ -313,6 +287,5 @@ export async function queueSessionRun(request: QueueSessionRunRequest): Promise<
       status: "RUNNING",
       updatedAt: toIsoString(admittedAtMs),
     },
-    warnings: [],
   };
 }

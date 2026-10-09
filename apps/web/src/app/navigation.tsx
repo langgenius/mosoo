@@ -2,6 +2,7 @@ import Settings02Icon from "@hugeicons/core-free-icons/Settings02Icon";
 import type { ReactElement } from "react";
 
 import { useTranslation } from "@/shared/i18n";
+import { createHugeicon } from "@/shared/ui/icons";
 import { SidebarRow, SidebarSectionLabel } from "@/shared/ui/sidebar";
 import type { SidebarIcon } from "@/shared/ui/sidebar";
 import {
@@ -14,8 +15,6 @@ import {
   RunsIcon,
   SkillsIcon,
 } from "@/shared/ui/sidebar-icons";
-
-import { createHugeicon } from "./hugeicon";
 
 interface ProjectNavItem {
   icon: SidebarIcon;

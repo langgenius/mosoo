@@ -67,10 +67,6 @@ export const authVerificationsTable = sqliteTable(
   ],
 );
 
-export type AuthAccountRow = typeof authAccountsTable.$inferSelect;
-export type AuthSessionRow = typeof authSessionsTable.$inferSelect;
-export type AuthVerificationRow = typeof authVerificationsTable.$inferSelect;
-
 export const personalAccessTokensTable = sqliteTable(
   "personal_access_token",
   {
@@ -90,8 +86,6 @@ export const personalAccessTokensTable = sqliteTable(
     uniqueIndex("personal_access_token_hash_idx").on(table.tokenHash),
   ],
 );
-
-export type PersonalAccessTokenRow = typeof personalAccessTokensTable.$inferSelect;
 
 export const cliOAuthFlowsTable = sqliteTable(
   "cli_oauth_flow",
@@ -115,5 +109,3 @@ export const cliOAuthFlowsTable = sqliteTable(
     uniqueIndex("cli_oauth_flow_user_code_idx").on(table.userCode),
   ],
 );
-
-export type CliOAuthFlowRow = typeof cliOAuthFlowsTable.$inferSelect;

@@ -24,5 +24,4 @@ export interface AgentRow {
   runtimeId: string;
   status: Agent["status"];
   updatedAt: number;
-  visibility: Agent["visibility"];
 }

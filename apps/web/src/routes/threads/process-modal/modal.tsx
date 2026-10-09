@@ -1,9 +1,10 @@
 import type { AgentSummary } from "@mosoo/contracts/agent";
+import type { SessionProcessEvent } from "@mosoo/contracts/session";
 import { useState } from "react";
 import type { ReactElement } from "react";
 
 import { useTranslation } from "@/shared/i18n";
-import { cn } from "@/shared/lib/class-names";
+import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import {
   Dialog,
@@ -13,19 +14,20 @@ import {
   DialogTitle,
 } from "@/shared/ui/dialog";
 import { Check, Copy } from "@/shared/ui/icons";
-import { SessionEventDrawerCore } from "@/shared/ui/session-events";
+import {
+  createSessionEventCopyText,
+  formatTokens,
+  formatTotalDuration,
+  SessionEventDrawerCore,
+} from "@/shared/ui/session-events";
 
 import { AgentAvatar } from "../agent-avatar";
-import { createProcessCopyText } from "../model/process";
-import type { ThreadProcessEvent } from "../model/process";
-import { ProcessEventRow, ProcessLegend, ProcessTimeline } from "./events";
-import { formatTokens, formatTotalDuration } from "./format";
 
 interface ThreadProcessModalProps {
   agent: AgentSummary | null;
   agentName: string;
   errorMessage: string | null;
-  events: ThreadProcessEvent[];
+  events: SessionProcessEvent[];
   onOpenChange: (open: boolean) => void;
   open: boolean;
   threadFailed: boolean;
@@ -48,7 +50,9 @@ export function ThreadProcessModal({
   const totalTokens = events.reduce((total, event) => total + (event.tokens ?? 0), 0);
 
   async function copyProcessEvents(): Promise<void> {
-    await navigator.clipboard.writeText(createProcessCopyText({ agentName, events }, t));
+    await navigator.clipboard.writeText(
+      createSessionEventCopyText({ events, title: agentName }, t),
+    );
     setCopied(true);
     globalThis.setTimeout(() => {
       setCopied(false);
@@ -58,7 +62,7 @@ export function ThreadProcessModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[88vh] !w-[calc(100vw-2rem)] !max-w-[1080px] flex-col gap-0 overflow-hidden p-0">
-        <DialogHeader className="border-border-subtle shrink-0 border-b px-7 pt-4 pb-3">
+        <DialogHeader className="border-border-soft shrink-0 border-b px-7 pt-4 pb-3">
           <div className="flex items-start justify-between gap-4 pr-8">
             <div className="flex min-w-0 items-center gap-2.5">
               <AgentAvatar agent={agent} defaultName={agentName} className="size-7 text-[10px]" />
@@ -67,14 +71,7 @@ export function ThreadProcessModal({
                   <DialogTitle className="text-fg-1 text-[14px] font-semibold">
                     {agentName}
                   </DialogTitle>
-                  <span
-                    className={cn(
-                      "inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide",
-                      threadFailed
-                        ? "border-ember/25 bg-ember-bg text-ember-fg"
-                        : "border-green-200 bg-success-bg text-success-fg",
-                    )}
-                  >
+                  <Badge variant={threadFailed ? "danger" : "success"}>
                     {threadWorking && !threadFailed ? (
                       <span
                         aria-hidden="true"
@@ -89,7 +86,7 @@ export function ThreadProcessModal({
                       : threadWorking
                         ? t("threads.working")
                         : t("threads.completed")}
-                  </span>
+                  </Badge>
                 </div>
                 <DialogDescription className="text-fg-3 mt-0.5 text-[11.5px] tabular-nums">
                   {formatTotalDuration(totalDurationMs)} · {events.length} {t("threads.events")} ·{" "}
@@ -112,7 +109,6 @@ export function ThreadProcessModal({
 
         <SessionEventDrawerCore
           key={`${open}:${events[0]?.id ?? "none"}`}
-          EventComponent={ProcessEventRow}
           emptyState={
             <div className="px-7 py-12 text-center">
               <div className="text-fg-1 text-sm font-semibold">
@@ -124,8 +120,6 @@ export function ThreadProcessModal({
             </div>
           }
           events={events}
-          LegendComponent={ProcessLegend}
-          TimelineComponent={ProcessTimeline}
         />
       </DialogContent>
     </Dialog>

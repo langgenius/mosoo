@@ -4,24 +4,18 @@ import type { RuntimeOperationId, SandboxId } from "@mosoo/id";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import type { RuntimeSubjectOperationStatus } from "../../domain/runtime-subject-lifecycle.machine";
 import { stopRuntimeSubjectDrivers } from "./runtime-subject-driver-stop";
-import { getRuntimeSubjectOperationErrorCode } from "./runtime-subject-errors";
+import {
+  closeRuntimeSubjectSessionsForRecycle,
+  releaseInactiveRuntimeSubjectClaim,
+} from "./runtime-subject-maintenance-store";
 import { destroyRuntimeSubjectContainer } from "./runtime-subject-platform";
 import {
   advanceRuntimeSubjectOperationStatus,
-  assertExclusiveSessionRuntimeSubject,
-  claimInactiveRuntimeSubject,
-  closeRuntimeSubjectSessionsForRecycle,
+  assertRuntimeSubjectOperationCurrent,
   markRuntimeSubjectCold,
   markRuntimeSubjectOperationStarted,
   markRuntimeSubjectOperationRepairNeeded,
-  releaseInactiveRuntimeSubjectClaim,
-} from "./runtime-subject-store";
-
-const RECYCLE_CLAIM_TTL_MS = 10 * 60_000;
-
-function getRuntimeSubjectRecycleErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "Runtime subject recycle failed.";
-}
+} from "./runtime-subject-record-store";
 
 async function runRuntimeSubjectRecycleOperation(
   bindings: ApiBindings,
@@ -34,11 +28,9 @@ async function runRuntimeSubjectRecycleOperation(
 ): Promise<void> {
   let destroyStarted = input.startStatus === "destroying";
 
-  await assertExclusiveSessionRuntimeSubject(bindings.DB, input.runtimeSubjectId, {
-    id: input.operationId,
-    status: input.startStatus,
-  });
   try {
+    // `backing_up` means drivers may still be live, so a resumed repair stops
+    // them again before destroying the container.
     if (input.startStatus === "backing_up") {
       await stopRuntimeSubjectDrivers(bindings, {
         operationId: input.operationId,
@@ -49,7 +41,6 @@ async function runRuntimeSubjectRecycleOperation(
         expectedStatus: "backing_up",
         operationId: input.operationId,
         runtimeSubjectId: input.runtimeSubjectId,
-        source: "maintenance",
         status: "destroying",
       });
       if (!destroyStarted) {
@@ -57,30 +48,22 @@ async function runRuntimeSubjectRecycleOperation(
       }
     }
 
-    await assertExclusiveSessionRuntimeSubject(bindings.DB, input.runtimeSubjectId, {
-      id: input.operationId,
-      status: "destroying",
-    });
     await destroyRuntimeSubjectContainer(bindings, input.runtimeSubjectId);
     await closeRuntimeSubjectSessionsForRecycle(bindings.DB, input.runtimeSubjectId);
     const completed = await markRuntimeSubjectCold(bindings.DB, {
-      clearBackups: false,
       expectedStatus: "destroying",
       operationId: input.operationId,
       runtimeSubjectId: input.runtimeSubjectId,
-      source: "maintenance",
     });
     if (!completed) {
       throw new Error("Runtime subject changed before recycle completion.");
     }
   } catch (error) {
     await markRuntimeSubjectOperationRepairNeeded(bindings.DB, {
-      errorCode: getRuntimeSubjectOperationErrorCode(error),
-      errorMessage: getRuntimeSubjectRecycleErrorMessage(error),
+      errorMessage: error instanceof Error ? error.message : "Runtime subject recycle failed.",
       expectedStatus: destroyStarted ? "destroying" : "backing_up",
       operationId: input.operationId,
       runtimeSubjectId: input.runtimeSubjectId,
-      source: "maintenance",
     });
     throw error;
   }
@@ -132,6 +115,9 @@ export async function resumeRuntimeSubjectRecycleOperation(
     readonly status: RuntimeSubjectOperationStatus;
   },
 ): Promise<boolean> {
+  // A stale repair must not stop drivers or destroy a container that a later
+  // operation or activation now owns.
+  await assertRuntimeSubjectOperationCurrent(bindings.DB, input);
   await runRuntimeSubjectRecycleOperation(bindings, {
     operationId: input.operationId,
     reason: input.reason,
@@ -140,33 +126,4 @@ export async function resumeRuntimeSubjectRecycleOperation(
   });
 
   return true;
-}
-
-export async function recycleInactiveRuntimeSubjectNow(
-  bindings: ApiBindings,
-  input: {
-    readonly now?: number;
-    readonly reason: string;
-    readonly runtimeSubjectId: SandboxId;
-  },
-): Promise<boolean> {
-  const now = input.now ?? Date.now();
-  const claimOwner = `immediate-${crypto.randomUUID()}`;
-  const claimed = await claimInactiveRuntimeSubject(bindings.DB, {
-    claimExpiresAt: now + RECYCLE_CLAIM_TTL_MS,
-    claimOwner,
-    now,
-    runtimeSubjectId: input.runtimeSubjectId,
-  });
-
-  if (!claimed) {
-    return false;
-  }
-
-  return recycleRuntimeSubject(bindings, {
-    claimOwner,
-    now,
-    reason: input.reason,
-    runtimeSubjectId: input.runtimeSubjectId,
-  });
 }

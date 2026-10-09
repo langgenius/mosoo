@@ -2,28 +2,15 @@ import { describe, expect, test } from "bun:test";
 
 import {
   normalizeSandboxNetworkHost,
-  parseEnvironmentAllowedHosts,
-  parseSandboxNetworkConstraints,
-  resolveSandboxNetworkConstraints,
+  resolveLimitedSandboxNetworkConstraints,
   toSandboxSystemHostsFromUrls,
 } from "../src/modules/runtime/domain/sandbox-network-constraints";
 
 describe("sandbox network constraints", () => {
-  test("full policy carries no allowlist", () => {
-    expect(
-      resolveSandboxNetworkConstraints({
-        environmentAllowedHosts: ["ignored.example.com"],
-        networkPolicy: "full",
-        systemHosts: ["also-ignored.example.com"],
-      }),
-    ).toEqual({ allowedHosts: [], networkPolicy: "full" });
-  });
-
   test("limited policy merges system and environment hosts, deduped and sorted", () => {
     expect(
-      resolveSandboxNetworkConstraints({
+      resolveLimitedSandboxNetworkConstraints({
         environmentAllowedHosts: ["API.Example.com", "mcp.linear.app"],
-        networkPolicy: "limited",
         systemHosts: ["api.anthropic.com", "api.example.com"],
       }),
     ).toEqual({
@@ -34,12 +21,23 @@ describe("sandbox network constraints", () => {
 
   test("limited policy with no hosts denies everything", () => {
     expect(
-      resolveSandboxNetworkConstraints({
+      resolveLimitedSandboxNetworkConstraints({
         environmentAllowedHosts: [],
-        networkPolicy: "limited",
         systemHosts: [],
       }),
     ).toEqual({ allowedHosts: [], networkPolicy: "limited" });
+  });
+
+  test("limited policy rejects wildcard hosts before they reach the Sandbox", () => {
+    expect(() =>
+      resolveLimitedSandboxNetworkConstraints({ environmentAllowedHosts: ["*"], systemHosts: [] }),
+    ).toThrow("bare hostname");
+    expect(() =>
+      resolveLimitedSandboxNetworkConstraints({
+        environmentAllowedHosts: [],
+        systemHosts: toSandboxSystemHostsFromUrls(["https://*.example.com"]),
+      }),
+    ).toThrow("bare hostname");
   });
 
   test("host normalization accepts canonical DNS/IP values and rejects wildcard syntax", () => {
@@ -58,18 +56,6 @@ describe("sandbox network constraints", () => {
     expect(() => normalizeSandboxNetworkHost("user@example.com")).toThrow("bare hostname");
     expect(() => normalizeSandboxNetworkHost("999.1.1.1")).toThrow("bare hostname");
     expect(() => normalizeSandboxNetworkHost("[not-ipv6]")).toThrow("bare hostname");
-  });
-
-  test("environment allowlist snapshot parsing fails closed on malformed JSON", () => {
-    expect(parseEnvironmentAllowedHosts('["a.example.com","b.example.com"]')).toEqual([
-      "a.example.com",
-      "b.example.com",
-    ]);
-    expect(() => parseEnvironmentAllowedHosts("not json")).toThrow("not valid JSON");
-    expect(() => parseEnvironmentAllowedHosts('{"hosts":[]}')).toThrow("array of strings");
-    expect(() => parseEnvironmentAllowedHosts("[1]")).toThrow("array of strings");
-    expect(() => parseEnvironmentAllowedHosts('["127.0.0.1"]')).toThrow("domain name");
-    expect(() => parseEnvironmentAllowedHosts('["[::1]"]')).toThrow("domain name");
   });
 
   test("system host extraction handles URLs, proxy notation, and IPv6", () => {
@@ -98,27 +84,5 @@ describe("sandbox network constraints", () => {
 
   test("system host extraction fails closed on unparsable values", () => {
     expect(() => toSandboxSystemHostsFromUrls(["http://"])).toThrow("not parseable");
-  });
-
-  test("constraint parsing validates RPC and storage payloads", () => {
-    expect(
-      parseSandboxNetworkConstraints({
-        allowedHosts: ["A.example.com"],
-        networkPolicy: "limited",
-      }),
-    ).toEqual({ allowedHosts: ["a.example.com"], networkPolicy: "limited" });
-    expect(() => parseSandboxNetworkConstraints(null)).toThrow("must be an object");
-    expect(() =>
-      parseSandboxNetworkConstraints({ allowedHosts: [], networkPolicy: "open" }),
-    ).toThrow("unknown network policy");
-    expect(() =>
-      parseSandboxNetworkConstraints({ allowedHosts: [42], networkPolicy: "limited" }),
-    ).toThrow("array of strings");
-    expect(() =>
-      parseSandboxNetworkConstraints({ allowedHosts: ["*"], networkPolicy: "limited" }),
-    ).toThrow("bare hostname");
-    expect(() =>
-      parseSandboxNetworkConstraints({ allowedHosts: ["api.example.com"], networkPolicy: "full" }),
-    ).toThrow("cannot carry allowed hosts");
   });
 });

@@ -46,6 +46,3 @@ export const publicApiRateLimitWindowsTable = sqliteTable(
     index("public_api_rate_limit_window_updated_idx").on(table.updatedAt),
   ],
 );
-
-export type PublicApiIdempotencyKeyRow = typeof publicApiIdempotencyKeysTable.$inferSelect;
-export type PublicApiRateLimitWindowRow = typeof publicApiRateLimitWindowsTable.$inferSelect;

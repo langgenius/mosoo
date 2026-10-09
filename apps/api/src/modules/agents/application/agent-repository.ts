@@ -1,34 +1,10 @@
-import type { AgentOwnerSummary, AgentToolSummary, AgentVisibility } from "@mosoo/contracts/agent";
-import {
-  accountsTable,
-  agentMcpBindingsTable,
-  agentSkillsTable,
-  agentsTable,
-  projectsTable,
-  mcpServersTable,
-} from "@mosoo/db";
-import type {
-  AccountId,
-  AgentDeploymentVersionId,
-  AgentId,
-  EnvironmentId,
-  ProjectId,
-  SkillId,
-} from "@mosoo/id";
+import type { AgentToolSummary } from "@mosoo/contracts/agent";
+import { agentMcpBindingsTable, agentsTable, mcpServersTable } from "@mosoo/db";
+import type { AccountId, AgentId, ProjectId } from "@mosoo/id";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { notFoundError } from "../../../platform/errors";
-import {
-  readAccountId,
-  readAgentDeploymentVersionId,
-  readAgentId,
-  readEnvironmentId,
-  readMcpServerId,
-  readProjectId,
-} from "./agent-platform-ids";
-import { normalizeAgentSkillIds } from "./agent-skill-resolution.service";
-import { normalizeAgentStoredConfigJson } from "./agent-stored-config.service";
 import type { AgentRow } from "./agent-types";
 
 const agentRowColumns = {
@@ -48,66 +24,13 @@ const agentRowColumns = {
   runtimeId: agentsTable.runtimeId,
   status: agentsTable.status,
   updatedAt: agentsTable.updatedAt,
-  visibility: agentsTable.visibility,
 };
 
-type RawAgentRow = {
-  configJson: string;
-  createdAt: number;
-  description: string | null;
-  environmentId: EnvironmentId | null;
-  id: AgentId;
-  kind: AgentRow["kind"];
-  liveDeploymentVersionId: AgentDeploymentVersionId | null;
-  model: string;
-  name: string;
-  ownerId: AccountId;
-  projectId: ProjectId;
-  prompt: string;
-  provider: string;
-  runtimeId: string;
-  status: AgentRow["status"];
-  updatedAt: number;
-  visibility: string;
-};
-
-function readAgentVisibility(value: string): AgentVisibility {
-  if (value === "private") {
-    return value;
-  }
-
-  throw new Error("Agent visibility must be private for Project-scoped Agents.");
-}
-
-function toAgentRow(row: RawAgentRow): AgentRow {
-  return {
-    ...row,
-    configJson: normalizeAgentStoredConfigJson(row.configJson),
-    environmentId:
-      row.environmentId === null
-        ? null
-        : readEnvironmentId(row.environmentId, "Agent environment ID"),
-    id: readAgentId(row.id, "Agent ID"),
-    liveDeploymentVersionId:
-      row.liveDeploymentVersionId === null
-        ? null
-        : readAgentDeploymentVersionId(
-            row.liveDeploymentVersionId,
-            "Agent live deployment version ID",
-          ),
-    ownerId: readAccountId(row.ownerId, "Agent owner ID"),
-    projectId: readProjectId(row.projectId, "Agent project ID"),
-    visibility: readAgentVisibility(row.visibility),
-  };
-}
-
-export async function getAgentRow(database: D1Database, agentId: string): Promise<AgentRow> {
-  const normalizedAgentId = readAgentId(agentId);
+export async function getAgentRow(database: D1Database, agentId: AgentId): Promise<AgentRow> {
   const row = await getAppDatabase(database)
     .select(agentRowColumns)
     .from(agentsTable)
-    .innerJoin(projectsTable, eq(projectsTable.id, agentsTable.projectId))
-    .where(eq(agentsTable.id, normalizedAgentId))
+    .where(eq(agentsTable.id, agentId))
     .limit(1)
     .get();
 
@@ -115,7 +38,7 @@ export async function getAgentRow(database: D1Database, agentId: string): Promis
     throw notFoundError("Agent not found.");
   }
 
-  return toAgentRow(row);
+  return row;
 }
 
 export async function getProjectAgentRow(
@@ -125,16 +48,14 @@ export async function getProjectAgentRow(
     projectId: ProjectId;
   },
 ): Promise<AgentRow | null> {
-  const row =
+  return (
     (await getAppDatabase(database)
       .select(agentRowColumns)
       .from(agentsTable)
-      .innerJoin(projectsTable, eq(projectsTable.id, agentsTable.projectId))
       .where(and(eq(agentsTable.id, input.agentId), eq(agentsTable.projectId, input.projectId)))
       .limit(1)
-      .get()) ?? null;
-
-  return row === null ? null : toAgentRow(row);
+      .get()) ?? null
+  );
 }
 
 export async function listProjectOwnerAgentRows(
@@ -144,104 +65,12 @@ export async function listProjectOwnerAgentRows(
     viewerId: AccountId;
   },
 ): Promise<AgentRow[]> {
-  const rows = await getAppDatabase(database)
+  return getAppDatabase(database)
     .select(agentRowColumns)
     .from(agentsTable)
-    .innerJoin(projectsTable, eq(projectsTable.id, agentsTable.projectId))
     .where(and(eq(agentsTable.projectId, input.projectId), eq(agentsTable.ownerId, input.viewerId)))
     .orderBy(desc(agentsTable.updatedAt))
     .all();
-
-  return rows.map(toAgentRow);
-}
-
-export async function listProjectOwnerAgentRowsPage(
-  database: D1Database,
-  input: {
-    projectId: ProjectId;
-    limit: number;
-    viewerId: AccountId;
-  },
-): Promise<AgentRow[]> {
-  const rows = await getAppDatabase(database)
-    .select(agentRowColumns)
-    .from(agentsTable)
-    .innerJoin(projectsTable, eq(projectsTable.id, agentsTable.projectId))
-    .where(and(eq(agentsTable.projectId, input.projectId), eq(agentsTable.ownerId, input.viewerId)))
-    .orderBy(desc(agentsTable.updatedAt), asc(agentsTable.id))
-    .limit(input.limit)
-    .all();
-
-  return rows.map(toAgentRow);
-}
-
-export async function replaceAgentSkills(
-  database: D1Database,
-  agentId: AgentId,
-  skillIds: readonly SkillId[],
-  timestampMs: number,
-): Promise<void> {
-  const db = getAppDatabase(database);
-  const normalizedSkillIds = normalizeAgentSkillIds(skillIds);
-
-  await db.delete(agentSkillsTable).where(eq(agentSkillsTable.agentId, agentId)).run();
-
-  if (normalizedSkillIds.length === 0) {
-    return;
-  }
-
-  await db
-    .insert(agentSkillsTable)
-    .values(
-      normalizedSkillIds.map((skillId, index) => ({
-        agentId,
-        createdAt: timestampMs,
-        skillId,
-        sortOrder: index,
-      })),
-    )
-    .run();
-}
-
-export async function listAgentOwnerSummaries(
-  database: D1Database,
-  ownerIds: readonly AccountId[],
-): Promise<Map<AccountId, AgentOwnerSummary>> {
-  const uniqueOwnerIds = [...new Set(ownerIds)];
-  const ownersById = new Map<AccountId, AgentOwnerSummary>(
-    uniqueOwnerIds.map((ownerId) => [
-      ownerId,
-      {
-        id: readAccountId(ownerId, "Agent owner ID"),
-        imageUrl: null,
-        name: null,
-      },
-    ]),
-  );
-
-  if (uniqueOwnerIds.length === 0) {
-    return ownersById;
-  }
-
-  const owners = await getAppDatabase(database)
-    .select({
-      id: accountsTable.id,
-      imageUrl: accountsTable.image,
-      name: accountsTable.name,
-    })
-    .from(accountsTable)
-    .where(inArray(accountsTable.id, uniqueOwnerIds))
-    .all();
-
-  for (const owner of owners) {
-    ownersById.set(owner.id, {
-      id: readAccountId(owner.id, "Agent owner ID"),
-      imageUrl: owner.imageUrl,
-      name: owner.name,
-    });
-  }
-
-  return ownersById;
 }
 
 export async function listAgentToolSummaries(
@@ -287,7 +116,7 @@ export async function listAgentToolSummariesByAgentIds(
       enabled: row.enabled,
       iconUrl: row.iconUrl,
       name: row.name,
-      serverId: readMcpServerId(row.serverId, "MCP server ID"),
+      serverId: row.serverId,
     });
   }
 

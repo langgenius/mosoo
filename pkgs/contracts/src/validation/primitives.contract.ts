@@ -16,11 +16,8 @@ export function parseSchemaValue<Output>(schema: SchemaParser<Output>, value: un
 export const NonEmptyString = type("string > 0");
 export type NonEmptyString = typeof NonEmptyString.infer;
 
-export const PrimitiveValue = type("string | number | boolean | null");
-export type PrimitiveValue = typeof PrimitiveValue.infer;
-
 export const PrimitiveRecord = type({
-  "[string]": PrimitiveValue,
+  "[string]": "string | number | boolean | null",
 });
 export type PrimitiveRecord = typeof PrimitiveRecord.infer;
 

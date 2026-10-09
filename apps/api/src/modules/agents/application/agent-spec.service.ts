@@ -32,14 +32,7 @@ import {
   parseStoredEnvVarsJson,
 } from "../../environments/application/environment-config";
 import { listAgentBindingRows } from "../../mcp/application/mcp-agent-binding.repository";
-import { loadAgentEnvironmentConfig } from "./agent-environment.service";
-import {
-  readMcpServerId,
-  readNullableCredentialId,
-  readNullableSkillSnapshotId,
-  readSkillId,
-} from "./agent-platform-ids";
-import { parseAgentStoredConfig, serializeAgentStoredConfig } from "./agent-stored-config.service";
+import { parseAgentStoredConfig } from "./agent-stored-config.service";
 import type { AgentRow } from "./agent-types";
 
 interface EnvironmentNameRow {
@@ -197,13 +190,10 @@ export async function listAgentSpecSkills(
     .all();
 
   return results.map((row) => ({
-    currentSnapshotId:
-      row.currentSnapshotId === null
-        ? null
-        : readNullableSkillSnapshotId(row.currentSnapshotId, "Skill snapshot ID"),
+    currentSnapshotId: row.currentSnapshotId,
     ownerName: row.ownerName,
     packagePath: null,
-    skillId: readSkillId(row.skillId),
+    skillId: row.skillId,
     skillName: row.skillName ?? "(deleted)",
     sortOrder: row.sortOrder,
     state: isTruthy(row.skillName) ? "active" : "tombstone",
@@ -231,7 +221,7 @@ export async function listAgentSpecSkillsByIds(
     .leftJoin(accountsTable, eq(accountsTable.id, skillsTable.ownerAccountId))
     .where(inArray(skillsTable.id, uniqueSkillIds))
     .all();
-  const rowsBySkillId = new Map(results.map((row) => [readSkillId(row.skillId), row]));
+  const rowsBySkillId = new Map(results.map((row) => [row.skillId, row]));
 
   return uniqueSkillIds.map((skillId, index) => {
     const row = rowsBySkillId.get(skillId);
@@ -241,10 +231,7 @@ export async function listAgentSpecSkillsByIds(
     }
 
     return {
-      currentSnapshotId:
-        row.currentSnapshotId === null
-          ? null
-          : readNullableSkillSnapshotId(row.currentSnapshotId, "Skill snapshot ID"),
+      currentSnapshotId: row.currentSnapshotId,
       ownerName: row.ownerName,
       packagePath: null,
       skillId,
@@ -262,35 +249,23 @@ export async function listAgentSpecMcpBindings(
   const rows = await listAgentBindingRows(database, agentId);
 
   return rows.map((row, index) => ({
-    agentCredentialId: readNullableCredentialId(row.agentCredentialId),
+    agentCredentialId: row.agentCredentialId,
     authType: row.authType,
     credentialMode: row.credentialMode,
     credentialScope: row.credentialScope,
-    enabled: row.enabled === 1,
+    enabled: row.enabled,
     iconUrl: row.iconUrl,
     name: row.name,
-    serverId: readMcpServerId(row.serverId),
+    serverId: row.serverId,
     sortOrder: index,
     source: row.source,
     url: row.url,
   }));
 }
 
-function normalizeStoredConfigJson(input: { configJson: string }): string {
-  const stored = parseAgentStoredConfig(input.configJson);
-
-  return serializeAgentStoredConfig({
-    builtInTools: stored.builtInTools,
-    packageMcpServers: stored.packageMcpServers,
-    packageSkills: stored.packageSkills,
-    packageResolution: stored.packageResolution,
-    providerOptions: stored.providerOptions,
-  });
-}
-
 export async function buildAgentSpec(database: D1Database, agent: AgentRow): Promise<AgentSpec> {
   const storedConfig = parseAgentStoredConfig(agent.configJson);
-  const environment = await loadAgentEnvironmentConfig(database, agent.id, agent.environmentId);
+  const environment = { environmentId: agent.environmentId };
   const [skills, registryMcpBindings, environmentManifest] = await Promise.all([
     listAgentSpecSkills(database, agent.id),
     listAgentSpecMcpBindings(database, agent.id),
@@ -348,9 +323,7 @@ function buildAgentSpecFromProfile(input: {
   return {
     agentId: input.agent.id,
     builtInTools: input.storedConfig.builtInTools,
-    configJson: normalizeStoredConfigJson({
-      configJson: input.agent.configJson,
-    }),
+    configJson: input.agent.configJson,
     description: input.agent.description,
     environment: input.environment,
     environmentManifest: input.environmentManifest,

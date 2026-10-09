@@ -313,7 +313,7 @@ function operation(
 
 export function createPublicApiOpenApiDocument(
   origin: string,
-  apiVersion: PublicApiVersion = "v1",
+  apiVersion: PublicApiVersion,
 ): PublicApiOpenApiDocument {
   const paths: OpenApiPaths = {
     "/agents/{agentId}/files": {
@@ -437,16 +437,6 @@ export function createPublicApiOpenApiDocument(
                   type: "user.message",
                 },
                 userId: "customer-123",
-              },
-            },
-            cattleAgentSameShape: {
-              summary: "Cattle Agent using the same request shape",
-              value: {
-                input: {
-                  content: [{ text: "Run this one-off Public Thread API request.", type: "text" }],
-                  type: "user.message",
-                },
-                userId: "automation",
               },
             },
           },
@@ -682,7 +672,7 @@ export function createPublicApiOpenApiDocument(
     info: {
       description:
         apiVersion === "v1"
-          ? "Public HTTPS API for creating and retrieving Threads on mosoo Agent API Endpoints. v1 resource identifiers are bare ULIDs, not prefixed IDs. Access Tokens identify the account caller. Runtime execution resolves the Agent API Endpoint owner's capabilities while the Thread is attributed to the token owner."
+          ? "Public HTTPS API for creating and retrieving Threads on mosoo Agent API Endpoints. v1 resource identifiers are bare ULIDs, not prefixed IDs. Access Tokens identify the account caller."
           : "Project-owned durable Sessions with direct harness/model/instructions input and optional saved Agent presets. No Agent is required for direct execution. The returned Thread ID remains the conversation handle for reading, continuing, cancelling, and downloading files. Project model credentials are required; v1 retains its existing admission and published-configuration behavior.",
       title: "mosoo Public Thread API",
       version: apiVersion,

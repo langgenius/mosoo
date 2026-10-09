@@ -1,455 +1,315 @@
 # Console design contract
 
-Version: 1.1 (2026-09-09). Status: implemented for the shell plus the
-Overview, Providers, Environments, MCP servers, Runs, the Skills empty state,
-and the Settings surfaces; the rest of the console migrates recipe by recipe
-(section 12). 1.1 consolidates typography to two families and re-cuts the text
-tones, tracking, radius ladder, and elevation; the measurements behind it are
-in [typography-audit.md](./typography-audit.md).
+The visual rules for the mosoo web console (`apps/web`). Values live in code:
+tokens in [`app.css`](../../apps/web/src/shared/styles/app.css), measurements
+in the recipes under [`shared/ui`](../../apps/web/src/shared/ui/), and the
+gate (section 11) checks what can be checked. This page keeps the rules
+and the reasons code cannot carry; what the product is lives in
+[SPEC](../SPEC.md).
 
-Sources: [langgenius/mosoo#599](https://github.com/langgenius/mosoo/issues/599)
-(the contract and control-surface refactor),
-[#601](https://github.com/langgenius/mosoo/issues/601) (nested corners,
-layered borders, text levels), and
-[#605](https://github.com/langgenius/mosoo/issues/605) (theme colour usage,
-detailed in [theme-color-usage.md](./theme-color-usage.md)). The sidebar keeps
-its own record in [console-sidebar.md](./console-sidebar.md) and consumes this
-contract.
-
-What it governs: the visual language of the Mosoo Console (web app) as tokens,
-type roles, density, states, iconography, and motion. What it does not touch:
-routes, permissions, API, GraphQL, data, the public website, or Mosoo Computer
-(which may adopt the contract later, separately validated).
+The console serves technical people in the middle of a configuration or
+monitoring task, so it should feel native to users of GitHub, Linear and
+Vercel: precise, restrained, neutral first, with the brand green as
+punctuation. It is not a marketing template with hero metrics, not a
+chrome-heavy dashboard with modal-first flows, and not an over-rounded,
+glassy, shadow-heavy "AI startup" kit. Where this page is silent, copy the
+nearest surface built from the recipes (the sidebar, the Overview, Providers,
+the MCP servers, Environments, Runs and Agents lists, and the settings pages)
+instead of inventing a pattern. Older surfaces still show patterns this page
+retires, such as hand-built rows, chips and status pills; they are debt, not
+precedent: do not copy them, and bring what a change touches onto these rules.
 
 ## 1. Layers and ownership
 
-| Layer            | Owner                                                      | Contains                                                                                              | Rule                                                                                          |
-| ---------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| Primitive        | `apps/web/src/shared/styles/app.css`, `:root` top half     | green cluster, neutral ramps, status hues, type scale, spacing, radius ladder, elevation, motion      | Never consumed directly by components or routes.                                              |
-| Semantic         | same file, `:root` second half and the `.dark` block       | canvas/surface, text roles, borders, interaction fills, actions, focus, controls, brand, status roles | Every role is defined in both theme blocks (gate test).                                       |
-| Component recipe | `apps/web/src/shared/ui/*`                                 | Button, field, Select, Switch, Badge, rows, table, Dialog, menu, navigation, page header, empty state | Consumes semantic Tailwind classes only; no raw colour, no one-off type (gate test).          |
-| Route code       | `apps/web/src/routes/*`, `src/features/*`, `src/domains/*` | composition                                                                                           | Consumes recipes and semantic classes; a raw value needs a sentence in the PR explaining why. |
+Route code composes the recipes in `shared/ui`. A shape no recipe covers is
+built from the same tokens and the nearest recipe's measurements, and a shape
+that a second surface needs moves into `shared/ui`. Recipes consume the
+semantic classes that `app.css` bridges to Tailwind (`text-fg-2`,
+`bg-selected`, `bg-primary`) and use a bridged primitive (`bg-paper-300`) only
+where no semantic role fits. Never use a raw colour: a hex value, an
+arbitrary colour class, or a Tailwind palette class such as `bg-white` where a
+role exists (`bg-card`), because it bypasses the role and the next change to
+the role misses it. White stays literal only where it must stay white on any
+surface: the switch thumb and text on a solid danger fill. Fixed colours
+belong only to art that expresses no mosoo state: third-party brand marks,
+the MCP and user avatar palettes, the login illustration. A raw value in
+route code needs a sentence in the PR.
 
-The Tailwind bridge (`@theme inline`) turns semantic tokens into classes such
-as `text-fg-2`, `bg-selected`, `border-border-strong`, `bg-primary`,
-`text-success-fg`, `rounded-compact`, `font-heading`. Legacy aliases
-(`bg-muted`, `text-muted-foreground`, `bg-accent`, `text-brand`, `bg-brand-light`,
-`text-amber-fg`, and friends) still resolve so older call sites keep compiling;
-new code does not add consumers of them.
+The console ships one theme, light. Nothing sets the `.dark` class, so design
+and review against the light roles, and add no `dark:` utilities: Tailwind's
+`dark:` follows the operating system's colour scheme, so it darkens a single
+control on a light page. The dark mapping stays ready all the same: every
+semantic role is defined in `:root` and again in the `.dark` block, and a new
+role gets its dark value in the same change. The pre-contract aliases
+(`bg-muted`, `text-muted-foreground`, `bg-accent`, `border-border-subtle`,
+`text-destructive`, the `amber`, `ember` and `sky` names) are retired: nothing
+bridges them, so such a class renders nothing. Use the role each stood for:
+`bg-sunken`, `text-fg-3`, `bg-hover`, `border-border-soft`, `text-danger`, and
+`warning`, `danger` and `info`. The gate checks all three rules.
 
 ## 2. Colour
 
-### 2.1 Neutrals and surfaces
+### 2.1 Surfaces and fills
 
-Pure neutral greys (oklch chroma 0), replacing the cool GitHub-like ramp. The
-references behind #601 and the Apps cheatsheet behind #599 are pure neutral,
-and a cast in the greys is one more thing to keep consistent across tints and
-dark mode (Mintlify's tinted `#485450` was the option considered and set
-aside).
-
-| Role               | Light              | Dark                    | Use                                                               |
-| ------------------ | ------------------ | ----------------------- | ----------------------------------------------------------------- |
-| `--bg` (canvas)    | `#fafafa`          | `#1f1f1f`               | page canvas under white surfaces                                  |
-| `--bg-elevated`    | `#ffffff`          | `#333333`               | cards, dialogs, menus, fields                                     |
-| `--bg-sunken`      | `#f4f4f4`          | `#0d0d0d`               | nested groups, command blocks, segmented tracks                   |
-| `--bg-sidebar`     | `#f4f4f4`          | `#0d0d0d`               | navigation column                                                 |
-| `--hover`          | `rgba(0,0,0,.04)`  | `rgba(255,255,255,.06)` | hover fill on rows, menu items, ghost buttons (fine pointer only) |
-| `--selected`       | `rgba(0,0,0,.065)` | `rgba(255,255,255,.10)` | selected navigation, selected row, open menu trigger              |
-| `--pressed`        | `rgba(0,0,0,.09)`  | `rgba(255,255,255,.14)` | pressed fill                                                      |
-| `--border-soft`    | `rgba(0,0,0,.06)`  | `rgba(255,255,255,.06)` | separators between rows, zone hairlines                           |
-| `--border-default` | `rgba(0,0,0,.10)`  | `rgba(255,255,255,.10)` | card, dialog, menu, and list edges                                |
-| `--border-strong`  | `rgba(0,0,0,.16)`  | `rgba(255,255,255,.18)` | controls that must read as controls: inputs, outline buttons      |
+Neutrals are pure greys. Content sits on white `--bg-elevated` surfaces
+(`bg-card`) over the `--bg` canvas, and `--bg-sunken` holds nested groups,
+tinted rows, command blocks and segmented tracks. The sidebar sits one tonal
+step below the canvas (`--bg-sidebar`), and the content pane meets it with a
+hairline and an inset corner, so the navigation reads as a place rather than
+a column. Cards, lists, dialogs and menus take the default hairline, rows
+inside them the soft one, and `--border-strong` is only for controls that
+must read as controls. Hover, selected and pressed are neutral alpha fills; a
+selected navigation row adds weight and `aria-current="page"` to the fill, and
+selection is never green: no green fill, border, left bar or check mark. A
+selected option card takes the emphasis border on the selected fill
+(`border-emphasis bg-selected`).
 
 ### 2.2 Text roles
 
-| Role           | Light                    | Contrast on `#fff` / `#f4f4f4` | Dark                        | Contrast on `#1f1f1f` / `#333333` | Use                                                  |
-| -------------- | ------------------------ | ------------------------------ | --------------------------- | --------------------------------- | ---------------------------------------------------- |
-| `--fg-heading` | `#1f1f1f`                | 16.5 / 15.0                    | `#f5f5f5`                   | 15.1 / 11.6                       | page titles, section titles, row names               |
-| `--fg-1`       | `#333333`                | 12.6 / 11.5                    | `#ebebeb`                   | 13.8 / 10.6                       | default text, control labels, values                 |
-| `--fg-2`       | `rgba(51, 51, 51, 0.72)` | 5.3 / 5.0                      | `rgba(235, 235, 235, 0.72)` | 7.8 / 6.3                         | descriptions, helper text, secondary values          |
-| `--fg-3`       | `rgba(51, 51, 51, 0.7)`  | 5.0 / 4.7                      | `rgba(235, 235, 235, 0.62)` | 6.1 / 5.1                         | captions, group labels, metadata                     |
-| `--fg-muted`   | `rgba(51, 51, 51, 0.56)` | 3.3 / 3.2                      | `rgba(235, 235, 235, 0.45)` | 3.9 / 3.5                         | placeholders, disabled labels, decorative separators |
-
-Hierarchy comes from the grey scale, never from glow or a heavier weight. The
-ink is `#333`, never black, and off-white in dark, never `#fff`; every quieter
-tone is an alpha of that ink so it keeps the cast of the surface under it.
-Secondary sits at 72% of the ink. Subtle is 70% in light because that is the
-AA floor on the `#f4f4f4` sidebar and row tint (0.66 blends to `#757575`,
-4.2:1), so in light the third level is carried by size (12px captions, 11px
-group labels) rather than by a lighter grey; dark has room for a real 0.62
-step. `--fg-muted` is for text that is not required reading (3:1). The gate
-test composites the alpha tokens over each surface in both themes before
-taking the ratio.
+`--fg-heading` carries titles and row names, `--fg-1` text and values, `--fg-2`
+descriptions, `--fg-3` captions, group labels and metadata, and `--fg-muted`
+placeholders, disabled labels and decorative separators only, because it
+clears just 3:1. The quieter tones are alphas of the ink, which is never pure
+black, so they keep the cast of the surface below. Hierarchy comes from these
+tones and the type roles (section 3), never from glow or a heavier weight than
+the role sets.
 
 ### 2.3 Brand cluster
 
-One hue, anchored on the logo mark, with a job per tone:
+One hue, anchored on the logo mark, with one job per token:
 
-| Token                     | Light                          | Dark                   | Job                                                                                                |
-| ------------------------- | ------------------------------ | ---------------------- | -------------------------------------------------------------------------------------------------- |
-| `--action-primary-bg/-fg` | `#6fd305` / `#0f1a02` (9.4:1)  | same                   | the one focal action per surface; hover `#5cb300`, press `#55a600`; hairline `rgba(58,110,14,.35)` |
-| `--brand-mark`            | `#6fd305`                      | `#6fd305`              | logo mark, the running pulse, the unread dot                                                       |
-| `--focus-ring`            | `#498c07` (4.2:1)              | `#6fd305`              | keyboard focus, everywhere, nothing else                                                           |
-| `--control-checked`       | `#498c07`                      | `#6fd305`              | checked switch track (and future checkbox/radio)                                                   |
-| `--link/-hover`           | `#3a6e0e` / `#2c5113` (6.2:1)  | `#95dd2c` / `#b6e85f`  | action links, underlined                                                                           |
-| `--brand/-soft`           | `#3a6e0e` on `#f4fce4` (5.8:1) | `#95dd2c` on 14% green | lifecycle badges with Mosoo-specific meaning: default key, default environment                     |
+- `--action-primary-*` (`bg-primary`, the default Button): the one focal
+  action per surface. Never a second button, a row action, a filter or a
+  toggle.
+- `--focus-ring`: keyboard focus, and the border of an open `Select`.
+  `--control-checked`: the checked switch.
+- `--link`: text that is an action, underlined (`text-link underline`,
+  `hover:text-link-hover`).
+- `--brand` on `--brand-soft` (the `brand` Badge): markers with a
+  mosoo-specific meaning, such as the default key and the default
+  environment.
+- `--brand-mark` (the logo's green): small live markers (the working pulse,
+  the unread dot, a loading spinner); never text, borders or large surfaces.
 
-That list is the complete set of places the brand colour appears in the
-console. Selection, hover, backgrounds, feedback badges, and the second button
-on a surface are never green.
+That list, plus the pale text-selection highlight (`--green-100`), is the
+complete set of places the green appears: selection, hover, backgrounds,
+feedback badges and second buttons are never green. The strong neutral is
+`--emphasis` (near-black): tooltips, the border of a selected option card, and
+the sidebar's Create agent, which keeps the sidebar from adding a second green
+action to every screen.
 
 ### 2.4 Status roles
 
-Feedback colours, never brand. Success is a true green (hue 147) so that
-"Authorized" and "the action" (hue 135) are never the same colour.
-
-| Role    | Mark      | Text on tint (light)         | Dark text / tint                     | Glyph rule                                      |
-| ------- | --------- | ---------------------------- | ------------------------------------ | ----------------------------------------------- |
-| success | `#15b042` | `#0e6b33` on `#caface` (5.7) | `#7ee3a0` on `rgba(21,176,66,.16)`   | check                                           |
-| warning | `#e0a106` | `#8a5a00` on `#fdf1cf` (5.3) | `#f5cf6b` on `rgba(224,161,6,.16)`   | alert triangle or star for "default"            |
-| danger  | `#dc2a2a` | `#b91c1c` on `#fbeaea` (5.6) | `#f59a9a` on `rgba(220,42,42,.16)`   | x-circle; destructive buttons are solid         |
-| info    | `#2f6bd4` | `#235fbe` on `#e8f0fd` (5.3) | `#9cc0f5` on `rgba(47,107,212,.18)`  | info circle                                     |
-| pending | `#8a8a8a` | `#5c5c5c` on `#f4f4f4` (6.1) | `#b8b8b8` on `rgba(255,255,255,.08)` | power-off, dashed circle, clock                 |
-| soil    | `#7a5230` | `#5b3c22` on `#f4ece2` (8.5) | `#d8b08a` on `rgba(122,82,48,.2)`    | warm neutral for restrictions (limited network) |
+Success, warning, danger, info, pending and soil are feedback colours, never
+brand. Each has a mark, a tint, and a text tone that clears 4.5:1 on that
+tint. Success is a separate true green, so "connected" never looks like "the
+action". A solid danger fill is only for destructive buttons, and an
+irreversible action sits behind a confirm dialog. Soil marks restrictions
+such as a limited network. A status that stands alone carries a glyph or a
+label, not colour alone: a check for success, the alert triangle for a
+warning, the x-circle for a failure, power-off or a dashed circle for
+disabled and archived, and a star for a default. A status that a word
+already states ("Ready", "Needs key", "Draft") stays that word, without a
+status light beside it.
 
 ## 3. Typography
 
-Two families, self-hosted and SIL OFL: Geist (`--font-sans`, and
-`--font-heading` resolves to the same stack) and Geist Mono (`--font-mono`).
-The audit that reduced five families to two, with the bytes each page fetched
-before and after, is [typography-audit.md](./typography-audit.md).
+Two self-hosted families: Geist for every sans role, page titles included,
+and Geist Mono for precise information. Never add a web font to a fallback
+stack: the browser downloads the next face in a stack as soon as text holds a
+code point the earlier faces lack, so a fallback costs bytes even when it
+draws nothing. CJK text renders in the platform sans and never pulls a web
+font: `:root:lang(zh)` names the Chinese face for each OS, and Japanese falls
+through the system faces of the default stack.
 
-| Role                | Family                    | Size / line / weight / tracking                     | Where                                                                                             |
-| ------------------- | ------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| Page title          | `heading` = `sans` (Geist) | 24 / 28 / 500 / -0.02em (22px under 640px)         | `PageHeader` (`t-page-title`), the Org header                                                     |
-| Title, one step down | Geist                    | 16 / 20 / 500 or 600 / -0.01em                      | empty-state titles (500), dialog titles (600), the profile name                                   |
-| Section title       | Geist                     | 15 / 20 / 600 / -0.01em                             | card titles (`t-section-title`)                                                                   |
-| Label               | Geist                     | 13 / 20 / 500 / 0                                   | `Label`, sidebar rows, row names                                                                  |
-| Everyday UI         | Geist                     | 14 / 20 / 400 / 0; 13px inside controls             | descriptions, values, menu items, buttons                                                         |
-| Caption             | Geist                     | 12 / 16 / 400 / 0 (table headers 500, `--fg-2`)     | helper text, table headers, metadata                                                              |
-| Group label         | Geist                     | 12 / 16 / 500 / 0, sentence case (`t-group-label`)  | sidebar and settings navigation group labels; never tracked capitals                              |
-| Precise information | `mono` = Geist Mono       | 12-12.5px / inherits / 400 / 0, tabular numerals    | ids, masked keys, model ids, durations, versions, command blocks (`MonoText`, `data-slot="mono"`) |
+| Role                | Size / line / weight                         | Where                                        |
+| ------------------- | -------------------------------------------- | -------------------------------------------- |
+| Page title          | 24 / 28 / 500, 22px on narrow screens        | `PageHeader` (`t-page-title`)                |
+| Dialog title        | 16 / 20 / 600 (500 for empty-state titles)   | `DialogTitle`, `EmptyState`                  |
+| Section title       | 15 / 20 / 600                                | card titles (`t-section-title`)              |
+| Body                | 14 / 20 / 400                                | running text (the page default)              |
+| Control text        | 13 / 20 / 400                                | field values, rows, menu items, descriptions |
+| Label               | 13 / 500                                     | `Label`, buttons, sidebar rows, row names    |
+| Caption             | 12 / 16 / 400; table headers 500 in `--fg-2` | helper text, metadata, `Table` headers       |
+| Group label         | 12 / 16 / 500, sentence case                 | sidebar and settings (`t-group-label`)       |
+| Precise information | Geist Mono, tabular numerals                 | ids, keys, model ids, durations (`MonoText`) |
 
-Rules: body weight is 400 (a 500 base made every line semi-bold and flattened
-emphasis); headings never scale with the viewport; the heading voice is size,
-weight, tracking, and the heading tone, never a second face or a heavier
-weight; tracking scales with size (`--track-title` -0.02em at 22px and above,
-`--track-subtitle` -0.01em from 15 to 20px, 0 in body, controls, and the
-group label); line heights sit on the 4px grid at the size they pair with;
-nothing is set in tracked capitals: group labels are sentence case
-(`t-group-label`, 12px / 500), and no kicker sits above a heading
-(`PageHeader` has no eyebrow slot); table headers are sentence case in the
-`Table` recipe's 12px / 500; mono is for short precise
-strings and one-line command blocks, never for descriptions or whole forms.
-`index.html` preloads both files, `font-display: swap` keeps text visible, and
-the `Geist Fallback` face maps local Arial onto Geist's metrics so the swap
-does not reflow. CJK text falls back to the platform sans named in the
-`:root:lang(zh)` stack (PingFang SC, Hiragino Sans GB, Microsoft YaHei, Noto
-Sans CJK SC) in every role at the same weight, and no web font is fetched to
-discover the missing glyphs
-([proof](./assets/typography/geist/providers-zh-cn.png)).
+Use weights 400, 500 and 600. A heading differs by size, weight, tracking and
+tone, never by a second face. Tracking tightens only on titles
+(`tracking-title` on page titles, `tracking-subtitle` from 15 to 20px); body,
+labels, controls and group labels carry none. Sizes are fixed, never fluid,
+and line heights land on the 4px grid. Do not set text in tracked capitals or
+put a kicker above a heading. Mono is for short precise strings, never for
+descriptions or forms.
 
-### 3.1 The typography experiment
+## 4. Component recipes and states
 
-`just e2e ui typography-proof` renders Providers, Runs, the project settings
-form, and the environment dialog with identical fixture data, colours, and
-viewport, swapping only the heading and mono families, and writes the font
-files each variant made the page fetch to `font-requests.json`. Contract 1.0
-(2026-09-08) reviewed three variants, Geist / Geist Mono, General Sans / IBM
-Plex Mono, and Instrument Sans / IBM Plex Mono, and chose the last. The
-2026-09-09 audit re-ran the comparison with measurements and reversed it
-(assets under [`assets/typography/`](./assets/typography/)):
+Build screens from the shared recipes, so buttons, forms, rows and empty
+states read the same everywhere:
 
-| Variant         | Heading / mono                      | Providers                                                               | Specimen (2x)                                                                                                                      | Fetched on Providers                          |
-| --------------- | ----------------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
-| geist (shipped) | Geist 500 / Geist Mono              | [providers](./assets/typography/geist/providers-1440x900.png)           | [title](./assets/typography/geist/specimen-title-2x.png), [row](./assets/typography/geist/specimen-row-2x.png)                     | 2 files, 100,424 bytes                        |
-| instrument-sans | Instrument Sans 500 / IBM Plex Mono | [providers](./assets/typography/instrument-sans/providers-1440x900.png) | [title](./assets/typography/instrument-sans/specimen-title-2x.png), [row](./assets/typography/instrument-sans/specimen-row-2x.png) | the shipped two plus the evaluated files      |
+| Job                                  | Recipe                                                                                      |
+| ------------------------------------ | ------------------------------------------------------------------------------------------- |
+| Page title, description, actions     | `PageHeader`; `meta` holds an id badge or a status beside the title                         |
+| Search, filters and list content     | `ListPageToolbar`, `ListPageSearch`, `ListPageContent`                                      |
+| The surface's one focal action       | `Button` (default variant)                                                                  |
+| Every other action                   | `Button` `outline`; `ghost` for quiet and icon-only actions; `destructive` behind a confirm |
+| Records in a list                    | `DataRow` inside `RowList`                                                                  |
+| Credentials and integrations         | `ConnectionRow`, `tone="tinted"` inside a card                                              |
+| Columns of data                      | `Table`                                                                                     |
+| A status or lifecycle tag            | `Badge` with a status variant, or `brand`                                                   |
+| Ids, keys, model ids, durations      | `MonoText`; a command to copy is a `CommandBlock`                                           |
+| Fields                               | `Label` with `Input`, `Textarea` or `Select`; `Switch` for an on/off setting                |
+| List or grid view                    | `ViewToggle` (a radio group on the sunken track)                                            |
+| One of a few text options            | `SegmentedControl` (the same track with text segments)                                      |
+| Menus, dialogs, side panels, tooltip | `DropdownMenu`, `Dialog`, `Sheet`, `Tooltip`                                                |
+| Nothing to show yet                  | `EmptyState`: an icon, a title, one sentence and one primary action                         |
 
-Stress cases for the shipped set: [Runs](./assets/typography/geist/runs-1440x900.png),
-[project settings](./assets/typography/geist/settings-general.png),
-[environment dialog](./assets/typography/geist/environment-dialog.png),
-[zh-CN](./assets/typography/geist/providers-zh-cn.png).
+Controls are 32px tall by default: `sm` (28px) for row actions, `xs` (24px)
+inline, and an icon-only button matches the height of its neighbours. Rows
+are minimum heights (40px for data, 44px for connections) that grow by whole
+lines. Information cards have no recipe: `rounded-lg border border-border
+bg-card p-6`, flat.
 
-Observations:
+A list row shows the name, the attributes that differ between rows and the
+status as a word or a badge; ids and other detail belong in the detail view,
+where an id is a copyable badge. Filters sit in one wrapping toolbar row after
+the search box, without labels above them, and are disabled only when their
+options fail to load. Text that can grow (names, titles, paths) truncates
+inside its own cluster (`min-w-0`, `truncate`, the full text in `title`)
+before it reaches the next control, and controls stay in the layout flow
+rather than positioned over variable text. Nothing is decorative: a dot, a
+gradient, a badge or an animation must tell the user something the text does
+not.
 
-- At the baseline every console page fetched four files, 457,260 bytes, in
-  both locales: Geist, Instrument Sans, IBM Plex Mono Regular, and Inter,
-  which at 352,240 bytes was 77% of the total and drew nothing. Chromium
-  downloads the next face in a stack as soon as a run holds a code point the
-  earlier faces lack, so a fallback in `font-family` is fetched, not merely
-  declared. The two-family page fetches 100,424 bytes, both files preloaded.
-- At 24px / 500, Instrument Sans and Geist are interchangeable to the eye; the
-  1.0 observation that Geist "reads as a larger body line" was a tracking and
-  tone problem, not a family problem. With -0.02em, a 28px line, and the
-  heading tone, the Geist title is a title, and the sans below it is the same
-  family at 13-14px / 400, which is what the hierarchy rules ask for.
-- Geist Mono shares Geist's vertical metrics (ascent 1005, descent 295,
-  x-height 530 on 1000 units), so a 12.5px id sits on the baseline of its 13px
-  label without an optical nudge; Plex Mono's slab texture is texture, not
-  legibility, at that size.
-- Chinese titles, labels, and descriptions render in PingFang SC in both
-  variants, and the shipped variant fetches no web font to find that out.
-- No layout shift: `font-display: swap` behind a metric-matched local
-  fallback and a preload keeps the header height stable while the 29 KB and
-  71 KB files load.
+Design every state that applies: rest, hover, pressed and keyboard focus,
+crossed with disabled, read-only, loading, invalid, selected and open.
 
-Decision: Geist for every sans role including page titles, Geist Mono for
-precise information. Instrument Sans was retired as a third family without a
-role only it can perform. IBM Plex Mono was retired because Geist Mono was
-shipping as its fallback anyway, is lighter, and matches the UI face's
-metrics. General Sans stays rejected on licensing: the ITF Free Font License
-2.0 (17 Aug 2026) permits self-hosting for the licensee's own websites but
-forbids distributing the files through "another font website, font library,
-marketplace, repository, download service", which committing the binaries to
-this public repository would be; loading it from the Fontshare API at runtime
-is allowed but adds a third-party runtime dependency the console does not
-otherwise have. Inter was dropped from the stacks and from the repository
-(724 KB for two files that never rendered). Licences shipped next to the two
-remaining files: Geist and Geist Mono are SIL OFL 1.1.
+- Focus is the same 2px `--focus-ring` ring everywhere, independent of
+  invalid styling; fields turn their border to the focus tone with a soft
+  glow instead.
+- Disabled and read-only change the surface and the text, never the opacity
+  of the whole control, and keep the label.
+- Invalid is `aria-invalid` on the field, which turns its border to danger,
+  plus a `role="alert"` message.
+- Loading sets `aria-busy` and swaps the leading glyph for a spinner without
+  changing the width.
+- Selected, connected, warning, dangerous and pending states carry a glyph, a
+  label or a position as well as a colour.
+- Icon-only controls carry `aria-label`; a single-choice toggle is a radio
+  group.
 
-## 4. Density and component recipes
+## 5. Radius and elevation
 
-| Recipe                  | Measure                                                                                                       | File                                  |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
-| Button                  | default 32 / radius 6 / 13px; sm 28 / 4 / 12.5px (row actions); xs 24 / 4 / 12px (inline); lg 36 / 6 / 14px; flat at rest | `shared/ui/button.tsx`                |
-| Icon button             | 32, 28, 24, 36 square, same radii                                                                             | same                                  |
-| Field (Input, Textarea) | 32 / radius 6 / 13px, strong hairline, white surface, flat; textarea min 64                                   | `shared/ui/input.tsx`, `textarea.tsx` |
-| Select trigger          | 32 / 6 / 13px, flat; popup radius 6 with `--elev-md`, items radius 4                                          | `shared/ui/select.tsx`                |
-| Label                   | 13px / 500, 6px above its field                                                                               | `shared/ui/label.tsx`                 |
-| Switch                  | 24 x 14 track, 10 thumb inset 2, no shadow                                                                    | `shared/ui/switch.tsx`                |
-| Badge                   | 20 / radius 4 / 11.5px 600, 8px padding, 12px glyph                                                           | `shared/ui/badge.tsx`                 |
-| Card                    | radius 6, hairline `--border-default`, `--bg-elevated`, 24px padding, no shadow (`rounded-lg border p-6`)     | route sections                        |
-| `DataRow`               | min 40, 12px horizontal padding (16 in lists), 8px vertical; multiline grows by whole lines                   | `shared/ui/list-row.tsx`              |
-| `ConnectionRow`         | min 44, 10px vertical; `tone="tinted"` inside cards (radius 4 on `--bg-sunken`)                               | same                                  |
-| `RowList`               | radius 6, default hairline, rows divided by soft hairlines                                                    | same                                  |
-| Table                   | header 40 / 12px 500 `--fg-2`, sentence case; rows 40, hover and selected fills                               | `shared/ui/table.tsx`                 |
-| Sidebar row             | 32 / radius 6 / 13px (see console-sidebar.md)                                                                 | `shared/ui/sidebar.tsx`               |
-| Sidebar call to action | 32 / radius 6, `--emphasis` fill (black) with `--emphasis-fg` text, flat; the sidebar's one filled control | `app/app-shell.tsx` |
-| Dialog                  | radius 6, 24px padding, `--elev-lg`, title 16 / 20 / 600 / -0.01em, description 13px `--fg-2`, close 28 square radius 4 | `shared/ui/dialog.tsx`   |
-| Menu                    | radius 6, 4px padding, `--elev-md`, items 13px radius 4, label 12px `--fg-3`                                  | `shared/ui/dropdown-menu.tsx`         |
-| Segmented control       | 32 track on `--bg-sunken`, radius 6; checked segment white, radius 4, `--elev-xs`                             | `shared/ui/view-toggle.tsx`           |
-| Page header             | `t-page-title`, description 13px `--fg-2`, `meta` beside the title (id badge), actions at default size        | `shared/ui/page-header.tsx`           |
-| Empty state             | 48 icon tile, 16 / 20 / 500 / -0.01em title, 13px `--fg-3` sentence, one primary action                       | `shared/ui/empty-state.tsx`           |
-
-### 4.1 State matrix
-
-Interaction axis: rest, hover (fine pointer only, `hover:`), pressed
-(`active:`), keyboard focus (`focus-visible:` ring). Condition axis: disabled,
-readonly, loading, invalid, selected, open, editing.
-
-| Recipe             | rest                                                   | hover                    | pressed       | keyboard focus                                | disabled                                               | other conditions                                                                                        |
-| ------------------ | ------------------------------------------------------ | ------------------------ | ------------- | --------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
-| Button primary     | green fill, ink text, deep hairline                    | `#5cb300`                | `#55a600`     | 2px `--focus-ring`, 1px offset                | `#ebebeb` fill, `--fg-3` text, no hairline, no shadow  | loading: `aria-busy`, spinner replaces the leading glyph, width unchanged                               |
-| Button outline     | white, strong hairline, `--fg-1`                       | `--paper-100`            | `--paper-200` | ring                                          | `--paper-100`, soft hairline, `--fg-muted`             |                                                                                                         |
-| Button ghost       | `--fg-2`, no fill                                      | `--hover`, `--fg-1`      | `--pressed`   | ring                                          | `--fg-muted`, no fill                                  |                                                                                                         |
-| Button destructive | `--danger` fill, white                                 | 90%                      | 80%           | ring (same green ring; colour is not the cue) | `#ebebeb`, `--fg-3`                                    | always behind a confirm dialog when irreversible                                                        |
-| Field              | white, strong hairline                                 |                          |               | border `--focus-ring` + 2px 30% glow          | `--paper-200`, soft hairline, `--fg-3`, not-allowed    | readonly: `--paper-100`, `--fg-2`; invalid: `--danger` border + `role="alert"` message, focus unchanged |
-| Select             | as field                                               | `--paper-100`            |               | as field                                      | as field                                               | open: border `--focus-ring`; item highlighted `--hover`; item disabled `--fg-muted`                     |
-| Switch             | track `--control-unchecked`, white thumb               |                          |               | ring, 2px offset                              | track `--paper-300` (off) / `#b6e85f` (on), thumb kept | checked: track `--control-checked`, thumb right                                                         |
-| Badge              | tint + text tone, glyph                                | (links only) darker tint |               | ring when focusable                           | n/a                                                    | variants: default, outline, brand, success, warning, danger, info, pending, soil, destructive           |
-| Row                | none                                                   | `--hover`                |               | child controls ring; row `z-index` lifts      | text `--fg-3` plus a pending badge, never opacity      | selected `--selected`; tinted rows hover to `--paper-300`                                               |
-| Navigation row     | `--fg-2`                                               | `--hover`, `--fg-1`      | `--selected`  | ring, 1px offset on the sidebar surface       | `--fg-muted`, not-allowed, still labelled              | selected `--selected`, `--fg-1`, 600, `aria-current="page"`; open `--selected`                          |
-| Segmented          | `--fg-3` on track                                      | `--fg-1`                 |               | ring on the checked segment                   | n/a                                                    | checked: white, `--elev-xs`, `aria-checked`; arrows move the choice                                     |
-| Dialog             | white, default hairline, `--elev-lg`, 40% ink backdrop |                          |               | close button ring                             | n/a                                                    | open/close fade + 95% zoom, 200ms                                                                       |
-| Menu               | white, default hairline, `--elev-md`                   | item `--hover`           |               | roving highlight                              | item `--fg-muted`                                      | destructive item `--danger-fg` on `--danger-bg` when highlighted                                        |
-
-Rules that apply across recipes: the focus ring is the same ring everywhere
-and is independent of invalid or error decoration; disabled content stays
-legible (surface and text change, never a whole-control opacity); selected,
-connected, warning, dangerous, and pending states carry a glyph, a label, or a
-position as well as a colour; icon-only controls carry `aria-label`; a
-single-choice view toggle is a `radiogroup`.
-
-## 5. Radius, nesting, spacing, elevation
-
-Cards are work surfaces, not pillows. Ladder: `--r-xs 2`, `--r-sm 4`,
-`--r-md 6`, `--r-lg 6`. A child is never rounder than its parent (equal is
-allowed), and nothing but a pill rounds past 6:
-
-| Level                                                                                   | Radius | Example                                                        |
-| --------------------------------------------------------------------------------------- | ------ | -------------------------------------------------------------- |
-| Surface: card, dialog, menu, popover, list surface                                      | 6      | provider section card, `RowList`, dialog, Select popup         |
-| Control at 32px and up: button, field, select, segmented track, sidebar row and call to action | 6 | `Input`, default `Button`, the sidebar's Create agent          |
-| Nested: tinted row, badge, menu item, 24-28px control, dialog close, checked segment    | 4      | credential row inside a card, `Badge`, sm and xs buttons       |
-| Tag, kbd, checkbox, tooltip arrow                                                       | 2      | eyebrow pills, the tooltip arrow                               |
-
-The compact (8) and xl (20) rungs of contract 1.0 are gone; the gate test
-fails on `rounded-xl`, `rounded-compact`, or an arbitrary radius above 6px
-anywhere in `apps/web/src`. Spacing uses `--s-1 4 … --s-24 96`; information
-cards and dialogs pad 24, rows 12 (16 in lists), the gap between a label and
-its field is 6, between fields 12.
-
-Elevation: the canvas (`#fafafa`) sits under white surfaces separated by
-hairlines, and a resting surface is flat: no shadow on cards, fields, buttons,
-rows, the switch thumb, the sidebar call to action, or the login card. Shadows
-belong to floating layers and to the one raised control: `--elev-md` on menus
-and popovers, `--elev-lg` on dialogs, `--elev-xl` on the sheet, `--elev-xs` on
-the checked segment of a segmented control. The focus ring is the only
-box-shadow a field or button ever carries. A 1px border and a wide (16px+)
-shadow never share an element.
+Cards are work surfaces, not pillows. Surfaces and controls 32px and taller
+use the 6px corner, nested elements (rows inside a card, badges, menu items,
+smaller controls) 4px, and tags and kbd 2px. A child is never rounder than
+its parent, and only pills round past 6px. Information cards and dialogs pad
+24px. Resting surfaces are flat: shadows belong to floating layers (menus,
+popovers, dialogs, the sheet) and to the checked segment of a segmented
+control, and the focus ring is the only shadow a field or button carries.
 
 ## 6. Icons
 
-General interface glyphs come from Hugeicons Free through
-`apps/web/src/shared/ui/icons.tsx` (1.5 stroke, `currentColor`, 16px inline,
-20px in empty states). Purpose-built SVGs keep their own colour and never
-stand in for a general glyph: the product marks, the eight-glyph sidebar
-family, vendor and runtime marks, MCP channel avatars, run state glyphs, and
-the login illustration. The registry is
-[`registry/icons.yml`](./registry/icons.yml); the gate test fails when a
-`createHugeicon` registration is missing from it. No emoji, no second icon
-library.
+General glyphs are Hugeicons Free, wrapped by `createHugeicon` from
+`shared/ui/icons.tsx` (`currentColor`, 1.5 stroke), 16px inline and 20px in
+empty states. Routes import its semantic exports, so changing a glyph is a
+one-file edit; a shell file may register a glyph next to the surface that
+owns it. Add or remove a glyph in [`registry/icons.yml`](./registry/icons.yml)
+in the same change; the gate fails when the registry and the Hugeicons
+registrations disagree.
+Purpose-built art never stands in for a general glyph: the product marks, the
+sidebar family, vendor and runtime marks, MCP server avatars, the working
+pulse and the login illustration. Marks that own a brand colour keep it, and
+vendor and runtime marks sit in a neutral tile. No emoji and no second
+general icon library. The same rule is the shared icon contract with Mosoo
+Computer, which keeps its own adapter.
 
 ## 7. Motion
 
-Shared controls transition `background-color, border-color, color, box-shadow`
-at 150ms ease-out; rows transition background only; dialogs and menus use
-`tw-animate-css` fade/zoom at 200ms; the switch thumb translates at 150ms.
-`transition-all` and press-scale are not used in shared UI (gate test).
-`prefers-reduced-motion` zeroes control transitions, removes entrance
-animations, and keeps the success check as a fade. Motion always communicates
-a state change; nothing animates for decoration.
+Motion only communicates a state change. Controls transition just the
+properties that change, at 150ms ease-out, and overlays fade in with a zoom
+(the sheet slides instead). No `transition-all` and no press-scale.
+`prefers-reduced-motion` turns off the shared controls' transitions and the
+console's own animations in `app.css` (the success check falls back to a
+fade).
 
 ## 8. Accessibility
 
-Text roles clear WCAG AA on white and on the `#f4f4f4` tint; badge text
-clears 4.5:1 on its tint; the focus ring and checked track clear 3:1 on white.
-The gate test computes these from the token values and the browser case
-recomputes button and badge ratios on the rendered page, in light and dark.
-Every state has a non-colour cue (section 4.1). All controls are reachable and
-operable with the keyboard; the E2E case tabs to a button, focuses an invalid
-field, and drives the segmented control with arrow keys through its radiogroup
-semantics.
+The target is WCAG AA: text roles clear 4.5:1 on every light surface (muted
+text 3:1), badge text clears 4.5:1 on its tint, and the focus ring and the
+checked track clear 3:1 on white. Every state has a non-colour cue
+(section 4), every control works from the keyboard, and the mobile drawer
+raises its rows to 44px touch targets.
 
-## 9. Evidence
+## 9. Sidebar
 
-Captured by `just e2e ui design-contract` with non-production fixture data
-(`e2e/lib/console-fixtures.ts`). `before` is the checkout at `878535439b`
-(contract 1.0); `after` is contract 1.1. The 1.0 evidence against
-`a15b9d838a` is in the history of this file.
+`navigation.tsx` and `app-shell.tsx` split the column into three zones: a
+fixed header line (the identity row and the collapse toggle); a scrolling
+work list (Create agent; Overview, Runs, Agents, Files; Resources); and an
+anchored footer (Project settings, Help & docs, Language, the account card)
+that stays reachable however long the list grows. Spacing, not a rule,
+separates the zones; a hairline under the header appears only once the work
+list has scrolled. The Project and Org sidebars share one width, and the
+Project sidebar collapses to an icon rail (`SIDEBAR_WIDTH_CLASS` and
+`SIDEBAR_RAIL_WIDTH_CLASS` in `app-shell.tsx`).
 
-| Surface / state                                         | Before                                                         | After                                                           |
-| ------------------------------------------------------- | -------------------------------------------------------------- | --------------------------------------------------------------- |
-| Providers, 1440 x 900                                   | ![](./assets/contract/before/providers-1440x900.png)           | ![](./assets/contract/after/providers-1440x900.png)             |
-| Providers, 390 x 844                                    | ![](./assets/contract/before/providers-390x844.png)            | ![](./assets/contract/after/providers-390x844.png)              |
-| Providers, hover on "Add key"                           | ![](./assets/contract/before/providers-hover.png)              | ![](./assets/contract/after/providers-hover.png)                |
-| Providers, keyboard focus on "Add key"                  | ![](./assets/contract/before/providers-keyboard-focus.png)     | ![](./assets/contract/after/providers-keyboard-focus.png)       |
-| Credential dialog, rest                                 | ![](./assets/contract/before/providers-dialog.png)             | ![](./assets/contract/after/providers-dialog.png)               |
-| Credential dialog, invalid after submit                 | ![](./assets/contract/before/providers-dialog-invalid.png)     | ![](./assets/contract/after/providers-dialog-invalid.png)       |
-| Credential dialog, invalid field focused                | ![](./assets/contract/before/providers-dialog-invalid-focus.png) | ![](./assets/contract/after/providers-dialog-invalid-focus.png) |
-| Overview, header recipe and flat onboarding card        | not captured before                                            | ![](./assets/contract/after/overview-1440x900.png)              |
-| Environments, 40px data rows, CJK description           | ![](./assets/contract/before/environments-1440x900.png)        | ![](./assets/contract/after/environments-1440x900.png)          |
-| Environment dialog, fields, select, switches            | ![](./assets/contract/before/environments-create-dialog.png)   | ![](./assets/contract/after/environments-create-dialog.png)     |
-| MCP servers, 44px connection rows, success and disabled | ![](./assets/contract/before/mcp-1440x900.png)                 | ![](./assets/contract/after/mcp-1440x900.png)                   |
-| MCP servers, hover                                      | ![](./assets/contract/before/mcp-hover.png)                    | ![](./assets/contract/after/mcp-hover.png)                      |
-| Skills, empty state                                     | not captured before                                            | ![](./assets/contract/after/skills-empty-1440x900.png)          |
-| Project settings, disabled primary                      | ![](./assets/contract/before/settings-general-disabled.png)    | ![](./assets/contract/after/settings-general-disabled.png)      |
-| Project settings, enabled primary                       | ![](./assets/contract/before/settings-general-enabled.png)     | ![](./assets/contract/after/settings-general-enabled.png)       |
-| Project settings, field focus                           | ![](./assets/contract/before/settings-general-input-focus.png) | ![](./assets/contract/after/settings-general-input-focus.png)   |
-| Project API keys table                                  | ![](./assets/contract/before/settings-api-keys-1440x900.png)   | ![](./assets/contract/after/settings-api-keys-1440x900.png)     |
-| Account settings, 390 x 844, read-only field            | ![](./assets/contract/before/settings-profile-390x844.png)     | ![](./assets/contract/after/settings-profile-390x844.png)       |
-| Runs, working / done / failed rows                      | ![](./assets/contract/before/runs-1440x900.png)                | ![](./assets/contract/after/runs-1440x900.png)                  |
-| Providers, dark token block                             | ![](./assets/contract/before/providers-dark-1440x900.png)      | ![](./assets/contract/after/providers-dark-1440x900.png)        |
+- The identity row is the brand tile, the Project name and a chevron hugging
+  the name, without a border, so it reads as a title with a disclosure. Its
+  menu switches Projects and holds "Back to {org}"; in the rail the tile
+  alone is the trigger.
+- Create agent is the only filled control, black through `--sidebar-cta-*`
+  rather than `--primary`: a green fill in the persistent sidebar would put
+  two green actions on every screen. Without a Project it keeps its label on
+  a muted fill.
+- The account card (avatar, name, email, chevron) is the one bordered surface
+  in the sidebar; its menu holds only Account settings and Sign out.
+- Navigation rows, the Help link, the Language menu and the drawer share one
+  row recipe (`SidebarRow`, `sidebarRowClassName`), and group labels
+  (`SidebarSectionLabel`) are sentence case. Selection is a neutral fill, a
+  heavier weight and `aria-current="page"`; of the row states only the focus
+  ring is green, so "where am I" and "what has focus" never look alike.
+  Disabled rows keep their label in the muted tone.
+- The group is "Resources", not "Tools": an Agent's tools (MCP tools and
+  skills) already own that word. "Project settings" and "Account settings"
+  stay distinct in every locale.
+- The collapsed rail names rows by `aria-label` and tooltip, so each work row
+  needs a glyph that reads alone. The eight work rows share one original
+  family in
+  [`sidebar-icons.tsx`](../../apps/web/src/shared/ui/sidebar-icons.tsx): a
+  24-unit grid, a 1.5 stroke with round caps and joins, one plane of
+  `currentColor` at 12% opacity and no other colour, so the row decides every
+  state. The footer's utility rows keep Hugeicons.
+  [`assets/sidebar-icons/`](./assets/sidebar-icons/) holds standalone SVG
+  copies of the same paths for Mosoo Computer: change both in the same PR.
+- The Org layer keeps a horizontal header, which marks the account layer, but
+  shares the sidebar surface, the rows and the footer. The mobile drawer
+  opens from the left with the identity row at its head.
 
-## 10. Review gate
+## 10. Copy
 
-Automated:
+- Sentence case for every string, buttons, tabs, group labels and table
+  headers included: "Create agent", not "Create Agent". Proper nouns and
+  acronyms keep their capitals, but the brand on its own is "mosoo",
+  lowercase, even at the start of a sentence.
+- Buttons are a verb plus an object: "Save changes".
+- Name the concrete thing the product does. No marketing buzzwords, no
+  staccato slogans, no em dashes.
+- Every visible string comes from the four locale catalogs; a raw key on
+  screen is a bug. Read each label in context in every locale; two rows that
+  share a word are resolved, not tolerated.
 
-- `apps/web/tests/console-design-contract-boundary.test.ts`: every semantic
-  token in both themes; contrast of text and status pairs with the alpha text
-  tones composited over each light surface, and the text tones over the dark
-  canvas, card, and sidebar; the tones ordered (secondary about 72%, subtle
-  below it, muted below that) and the ink never pure black or white; brand and
-  success kept apart; neutral selection fills; Tailwind bridge, type roles,
-  and the tracking tokens; exactly the two families declared with `swap`, the
-  local metric fallback, only the two files plus their licences shipped, both
-  preloaded, and no retired family named; the 2 / 4 / 6 radius ladder with no
-  compact or xl rung and nothing in `apps/web/src` rounding past 6; no
-  resting shadow in a shared recipe while menus and dialogs keep theirs;
-  recipe measurements; one focus ring; no `transition-all`, press-scale, or
-  disabled-opacity in shared UI; no raw colour in shared UI; every Hugeicons
-  registration in the icon registry; no second icon library.
-- `apps/web/tests/sidebar-hierarchy-boundary.test.ts` (unchanged): sidebar
-  zones, resource icons, row recipe.
-- `just e2e ui design-contract`: rendered measurements (button 32/6, badge
-  20/4, switch 24x14/10, rows 40/44, card 6 with 24px padding and no shadow),
-  nested radii, contrast on the page, focus ring presence, flat fields and
-  buttons at rest, disabled without opacity, invalid with `role="alert"` and
-  `aria-invalid`, narrow viewport without overflow, dark tokens, the two type
-  families with the title role's 24 / 28 / 500 / -0.48px and the secondary
-  tone read off the page, the Overview on the shared header recipe, and the
-  Skills empty state; writes the evidence above.
-- `just e2e ui typography-proof`: the shipped and the previous typography
-  variants, with the font files each variant fetched; the shipped variant
-  may fetch only the two Geist files, in `en` and in `zh-CN`.
+## 11. Gate
 
-Human, before opening the PR (mirrored in the pull request template): look at
-every screenshot in every state before reading the diff; icons are Hugeicons
-or a purpose-built family; colours, spacing, and radii come from tokens and a
-raw value has a sentence explaining why; copy is read in context in every
-locale; nothing decorative without an interaction purpose.
-
-## 11. Decisions and rejected experiments
-
-| Decision         | Chosen                                                    | Rejected                                                                                                                     |
-| ---------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| Neutral ramp     | Pure neutral                                              | The cool GitHub-like ramp (blue cast fought the green); brand-cast neutrals (Mintlify)                                       |
-| Primary action   | Brand green fill, dark ink text, one per surface          | Black primary (brand invisible in the product); white text on mid greens (2.7:1); a `strong` black variant kept alongside    |
-| Selection        | Neutral fill, weight change, `aria-current`               | Green selection fills; a green left bar                                                                                      |
-| Sidebar "Create agent" | `--emphasis` (black) fill via the `--sidebar-cta-*` aliases (#616) | A brand-green sidebar control (two green fills on every screen); a quiet row (too easy to miss, per the #615 review) |
-| Success          | Separate true green with a glyph                          | Brand green as success                                                                                                       |
-| Checked controls | Deep brand tone (`#498c07`, 3:1 on white)                 | `#0077e6` blue from the cheatsheet (a second hue with no meaning here); the bright fill tone (2.7:1 against the white thumb) |
-| Focus ring       | Solid `#498c07` 2px, 1px offset; fields use border + glow | 45% alpha bright green ring (1.5:1, invisible on the sidebar); a red ring on invalid fields                                  |
-| Button radius    | 10 at 32px, stepping to 8 and 6 for smaller sizes         | 10 at every size (24px buttons became pills); 6 everywhere (cheatsheet's radius belonged to a 26px button)                   |
-| Card radius      | 14 maximum                                                | 16-24 from the #601 references                                                                                               |
-| Heading face     | Geist, the UI family, at 24 / 500 / -0.02em on a 28px line | Instrument Sans 500 (contract 1.0: a third family whose delta from Geist needs a 2x specimen to see, at a request per page); General Sans (licence forbids committing the files); Geist 600-800 (louder, not more distinct) |
-| Mono face        | Geist Mono                                                | IBM Plex Mono (contract 1.0: a fine face, but Geist Mono shipped anyway as its fallback, two Plex weights cost 92 KB against one 71 KB file, and it shares no metrics with the UI face) |
-| Sans fallback    | Metric-matched local Arial (`Geist Fallback`), then the platform sans; the platform CJK sans named per OS for `zh` | Inter as the second face (352 KB fetched on every page in both locales for glyphs it never drew) |
-| Font delivery    | Two preloaded variable files, `swap`                      | Seven `@font-face` blocks across five families (963 KB shipped, 457 KB fetched per page)                                     |
-| Body weight      | 400                                                       | 500 base (every line semi-bold, emphasis had nowhere to go)                                                                  |
-| Text tones       | Alphas of the ink: 0.72 / 0.70 / 0.56 in light, 0.72 / 0.62 / 0.45 in dark | Hex greys `#5c5c5c` / `#707070` (secondary at 80% of the ink read as a second primary); a subtle tone under 0.70 (fails AA on the sidebar tint) |
-| Tracking         | -0.02em on page titles, -0.01em at 15-20px, 0 in body, controls, and group labels | -0.01em on every title (contract 1.0); `tracking-tight` (-0.025em) on the onboarding hero; +0.06em tracked capitals on group labels |
-| Kickers          | None; `PageHeader` has no eyebrow slot                    | The Overview's uppercase "PROJECT" over the project name; the 1.0 eyebrow slot                                               |
-| Table headers    | The `Table` recipe: 12px / 500 / `--fg-2`, sentence case  | Four uppercase treatments across the API-keys, agents, cost, and logs tables                                                 |
-| Radius           | 6 for surfaces and 32px controls, 4 nested, 2 for tags    | 14 / 10 / 8 / 6 / 4 (contract 1.0: pillow cards; 24px buttons became pills at 10)                                            |
-| Shadows          | Floating layers and the checked segment only              | `--elev-xs` on resting cards, fields, buttons, the switch thumb, and the sidebar call to action                              |
-| Card padding     | 24                                                        | 16                                                                                                                           |
-| Row height       | 40 data / 44 connection as minimums                       | Fixed heights (clipped CJK descriptions and fork lines)                                                                      |
-
-## 12. Migration
-
-Done in 1.0: tokens and both theme blocks; Button, Input, Textarea,
-Label, Select, Switch, Badge, Table, Dialog, Sheet, DropdownMenu, Tooltip,
-PageHeader, EmptyState, ViewToggle, CommandBlock, the new `DataRow` /
-`ConnectionRow` / `RowList` / `MonoText` recipes; the Providers, Environments
-list, MCP servers list, Runs list, project settings (general, API keys),
-account profile, and Org settings surfaces; the settings sub-navigations; the
-agent detail tabs, agent grid, and skill cards (motion only).
-
-Done in 1.1: the two-family typography with its fallback and preload; the
-alpha text tones; the tracking and line-height tokens and the `t-*` roles on
-them; the 6 / 4 / 2 radius ladder through every recipe and route (the compact
-and xl rungs removed from the bridge); flat resting surfaces everywhere a
-shadow was found, including the login card, the composers, the agent grid,
-and the onboarding card; 24px information cards on Providers, the runtime
-availability section, API tokens, the cost panels, and the skills catalog;
-the Overview header on `PageHeader` with the new `meta` slot; group labels on
-`t-group-label` (sentence case) in the sidebar and settings navigations;
-table headers on the
-`Table` recipe in the agents, API-keys, cost, and logs tables. Still on the
-old uppercase micro-label style: the stat labels in the cost and agent cost
-panels and a few agent-editor labels, to move to captions when those
-surfaces migrate.
-
-Next, in order of how often people see them: the agent editor form sections and
-pickers, the agent list and status badges, the skills catalog, the environment
-detail page, the threads composer and detail view, the onboarding and login
-routes, then the remaining `bg-muted` / `text-muted-foreground` / `bg-accent`
-/ `text-brand` aliases, which are retired once no consumer remains. Mosoo
-Website and Mosoo Computer adopt the token layer and the recipes as a
-document, with their own validation.
-
-Known gaps for the first dark pass (the dark block maps every token but the
-console has no toggle yet): vendor and runtime marks with black artwork need a
-light tile on dark surfaces, the sidebar should switch to the on-dark wordmark,
-and MCP channel avatars keep their fixed palette, which was tuned for light.
+[`console-design-contract-boundary.test.ts`](../../apps/web/tests/console-design-contract-boundary.test.ts)
+and
+[`sidebar-hierarchy-boundary.test.ts`](../../apps/web/tests/sidebar-hierarchy-boundary.test.ts)
+check the rules that can be read from source and run in `just test`, which is
+the only part of this gate that CI runs. The fixture-backed browser cases
+[`design-contract.spec.ts`](../../e2e/cases/ui/design-contract.spec.ts) and
+[`sidebar.spec.ts`](../../e2e/cases/ui/sidebar.spec.ts) measure the rendered
+console and write screenshots to `.tmp/e2e/`; run them through `just e2e`.
+Those screenshots are the reference for the current look; the captures
+reviewed when these rules were set stay in git history
+(`git show 93125f606a:docs/design/assets/<path>`). A UI change attaches its
+screenshots, in every state that applies, to the Design section of the
+[pull request template](../../.github/PULL_REQUEST_TEMPLATE.md).

@@ -1,13 +1,9 @@
 import { readRuntimeRunPayload } from "@mosoo/runtime-events";
 import type { RuntimeEventEnvelope } from "@mosoo/runtime-events";
 
-import { createInitialSessionLiveState } from "../../../sessions/application/session-live-state.service";
-import type {
-  SessionLiveState,
-  SessionPermissionRequestView,
-} from "../../../sessions/application/session-live-state.service";
+import type { SessionPermissionRequestView } from "../../../sessions/application/session-live-state.service";
 import { normalizeSessionTitle } from "../../../sessions/domain/session-title";
-import type { RuntimeDriverRunTransition, RuntimeSessionLink } from "./event-types";
+import type { RuntimeDriverRunTransition } from "./event-types";
 
 export function compactRuntimeDriverRunTransitions(
   transitions: RuntimeDriverRunTransition[],
@@ -44,14 +40,12 @@ export function readRuntimeDriverRunTransition(
   event: RuntimeEventEnvelope,
 ): RuntimeDriverRunTransition | null {
   if (event.kind === "run.started") {
-    readRuntimeRunPayload(event);
     return {
       status: "running",
     };
   }
 
   if (event.kind === "run.completed") {
-    readRuntimeRunPayload(event);
     return {
       status: "completed",
     };
@@ -78,18 +72,6 @@ export function readRuntimeDriverRunTransition(
     error,
     status: "failed",
   };
-}
-
-export function createBaseLiveState(
-  input: Pick<RuntimeSessionLink, "callerId" | "creatorId" | "sessionId"> & {
-    driverInstanceId: string;
-  },
-): SessionLiveState {
-  return createInitialSessionLiveState({
-    sessionId: input.sessionId ?? input.driverInstanceId,
-    title: null,
-    viewerId: input.callerId ?? input.creatorId ?? input.driverInstanceId,
-  });
 }
 
 export function normalizeRuntimeSessionInfoTitle(title: string | null | undefined): string | null {

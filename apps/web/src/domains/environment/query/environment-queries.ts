@@ -1,34 +1,30 @@
-import { useQuery } from "@tanstack/react-query";
+import { skipToken, useQuery } from "@tanstack/react-query";
 
 import { toEnvironmentId, toProjectId } from "../../../routes/typed-id";
-import { isTruthy } from "../../../shared/lib/truthiness";
 import { getEnvironment, listProjectEnvironments } from "../api/environment-client";
 export const environmentKeys = {
   all: ["environment"] as const,
-  detail: (projectId: string, environmentId: string) =>
+  detail: (projectId: string | null, environmentId: string | null) =>
     [...environmentKeys.details(), projectId, environmentId] as const,
   details: () => [...environmentKeys.all, "detail"] as const,
-  list: (projectId: string) => [...environmentKeys.lists(), projectId] as const,
+  list: (projectId: string | null) => [...environmentKeys.lists(), projectId] as const,
   lists: () => [...environmentKeys.all, "list"] as const,
 };
 
 export function useProjectEnvironmentsQuery(projectId: string | null) {
   return useQuery({
-    enabled: projectId !== null,
-    queryFn: async () => listProjectEnvironments(toProjectId(projectId!)),
-    queryKey: isTruthy(projectId)
-      ? environmentKeys.list(projectId)
-      : [...environmentKeys.lists(), "missing"],
+    queryFn:
+      projectId === null ? skipToken : async () => listProjectEnvironments(toProjectId(projectId)),
+    queryKey: environmentKeys.list(projectId),
   });
 }
 
 export function useEnvironmentDetailQuery(projectId: string | null, environmentId: string | null) {
   return useQuery({
-    enabled: projectId !== null && environmentId !== null,
-    queryFn: async () => getEnvironment(toProjectId(projectId!), toEnvironmentId(environmentId!)),
-    queryKey:
-      isTruthy(projectId) && isTruthy(environmentId)
-        ? environmentKeys.detail(projectId, environmentId)
-        : [...environmentKeys.details(), "missing"],
+    queryFn:
+      projectId === null || environmentId === null
+        ? skipToken
+        : async () => getEnvironment(toProjectId(projectId), toEnvironmentId(environmentId)),
+    queryKey: environmentKeys.detail(projectId, environmentId),
   });
 }

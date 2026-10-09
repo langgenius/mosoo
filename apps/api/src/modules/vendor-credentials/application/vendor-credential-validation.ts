@@ -55,7 +55,7 @@ function formatUnsafeApiBaseMessage(reason: string): string {
   }
 }
 
-export function enforceSafeApiBase(apiBase: string): void {
+function enforceSafeApiBase(apiBase: string): void {
   const unsafeReason = validateVendorProbeBaseUrl(apiBase);
 
   if (unsafeReason !== null) {

@@ -1,0 +1,62 @@
+name: Incident
+description: Record a user-affecting production incident. Its postmortem lives in this issue.
+title: "incident: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Open this while the incident is live and keep it current until the fix ships; this issue is where users follow the incident (mosoo.ai/status shows automated telemetry only). Use UTC and write for affected users. The rule is in the [runbook](https://github.com/langgenius/mosoo/blob/main/docs/production-deploy-verification.md#incidents).
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact
+      description: Who was affected, on which surface, for how long, and how many Runs or users. State unknowns explicitly.
+    validations:
+      required: true
+
+  - type: textarea
+    id: symptoms
+    attributes:
+      label: User-visible symptoms
+      description: What users tried to do and what they saw, including error codes.
+    validations:
+      required: true
+
+  - type: textarea
+    id: timeline
+    attributes:
+      label: Timeline (UTC)
+      placeholder: |
+        HH:MM Detected by ...
+        HH:MM User impact confirmed
+        HH:MM Mitigated by ...
+        HH:MM Recovery verified by ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: root-cause
+    attributes:
+      label: Root cause
+      description: The conditions that made the incident possible, not only the last failing line. Fill this in once known.
+
+  - type: textarea
+    id: fix
+    attributes:
+      label: Fix and regression test
+      description: Link the fix PR and the test that pins the regression.
+
+  - type: textarea
+    id: follow-ups
+    attributes:
+      label: Follow-ups
+      description: Linked issues for remaining work, any standing rule added to docs/architecture.md or the runbook, and the public postmortem if the impact was significant.
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I redacted secrets and customer data, including prompts, outputs, emails, and account IDs.
+          required: true

@@ -8,16 +8,13 @@ type LintPlugin =
   | "jest"
   | "jsdoc"
   | "jsx-a11y"
-  | "nextjs"
   | "node"
   | "oxc"
   | "promise"
   | "react"
   | "react-perf"
   | "typescript"
-  | "unicorn"
-  | "vitest"
-  | "vue";
+  | "unicorn";
 
 const sharedLintCategories = {
   correctness: "error",
@@ -47,7 +44,6 @@ const sharedLintPlugins: LintPlugin[] = [
   "jest",
   "jsdoc",
   "jsx-a11y",
-  "nextjs",
   "node",
   "oxc",
   "promise",
@@ -55,8 +51,6 @@ const sharedLintPlugins: LintPlugin[] = [
   "react-perf",
   "typescript",
   "unicorn",
-  "vitest",
-  "vue",
 ] satisfies LintPlugin[];
 
 const sharedTestLintRules = {
@@ -104,9 +98,6 @@ const sharedLintRules = {
   "max-lines-per-function": "off",
   "max-params": "off",
   "max-statements": "off",
-  "nextjs/no-assign-module-variable": "off",
-  "nextjs/no-html-link-for-pages": "off",
-  "nextjs/no-img-element": "off",
   "no-await-in-loop": "off",
   "no-bitwise": "off",
   "no-continue": "off",
@@ -193,7 +184,6 @@ const sharedLintRules = {
   "unicorn/prefer-native-coercion-functions": "off",
   "unicorn/prefer-ternary": "off",
   "unicorn/prefer-top-level-await": "off",
-  "vitest/prefer-importing-vitest-globals": "off",
 } satisfies Record<string, LintRuleConfig>;
 
 const sharedLintSettings = {

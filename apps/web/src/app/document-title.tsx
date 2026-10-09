@@ -3,32 +3,9 @@ import { matchPath, useLocation } from "react-router-dom";
 
 import { useTranslation } from "@/shared/i18n";
 
-import { useAppSession } from "./session-provider";
+import { useAppSession } from "./session/session-context";
 
 const PRODUCT_NAME = "mosoo";
-const DEFAULT_TITLE_TRANSLATIONS: Record<string, string> = {
-  "pageTitle.projects": "Projects",
-  "pageTitle.mcpAuth": "MCP authorization",
-  "pageTitle.projectSettings": "Project settings",
-  "pageTitle.usage": "Usage",
-  "pageTitle.accessTokens": "Access tokens",
-  "pageTitle.profile": "Profile",
-  "pageTitle.settings": "Settings",
-  "pageTitle.environments": "Environments",
-  "pageTitle.skills": "Skills",
-  "pageTitle.mcpServers": "MCP servers",
-  "pageTitle.providers": "Providers",
-  "pageTitle.thread": "Thread",
-  "pageTitle.threads": "Threads",
-  "pageTitle.agent": "Agent",
-  "pageTitle.agents": "Agents",
-  "pageTitle.files": "Files",
-  "pageTitle.cliAuth": "CLI authorization",
-  "pageTitle.onboarding": "Onboarding",
-  "pageTitle.signIn": "Sign in",
-  "pageTitle.orgSettings": "Org settings",
-  "pageTitle.overview": "Overview",
-};
 
 type DocumentTitleScope = "project" | "global" | "org";
 
@@ -64,7 +41,7 @@ const DOCUMENT_TITLE_RULES: DocumentTitleRule[] = [
   { path: "/", scope: "project", titleKey: "pageTitle.overview" },
 ];
 
-function findDocumentTitleRule(pathname: string): DocumentTitleRule | null {
+export function findDocumentTitleRule(pathname: string): DocumentTitleRule | null {
   return (
     DOCUMENT_TITLE_RULES.find((rule) => matchPath({ end: true, path: rule.path }, pathname)) ?? null
   );
@@ -92,7 +69,7 @@ export function resolveDocumentTitle(input: {
   activeProjectName: string | null;
   activeOrganizationName: string | null;
   pathname: string;
-  t?: (key: string) => string;
+  t: (key: string) => string;
 }): string {
   const rule = findDocumentTitleRule(input.pathname);
 
@@ -100,8 +77,7 @@ export function resolveDocumentTitle(input: {
     return joinDocumentTitle([input.activeProjectName]);
   }
 
-  const title =
-    input.t?.(rule.titleKey) ?? DEFAULT_TITLE_TRANSLATIONS[rule.titleKey] ?? rule.titleKey;
+  const title = input.t(rule.titleKey);
 
   if (rule.scope === "project") {
     return joinDocumentTitle([title, input.activeProjectName]);

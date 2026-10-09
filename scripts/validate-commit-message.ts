@@ -73,9 +73,7 @@ function main(): void {
         "",
         formatViolations(violations),
         "",
-        "Format: type(scope): subject",
-        "Example: feat(web): add in-app help search",
-        "Use a real human author identity; do not attribute commits to AI tools, bots, or automation accounts.",
+        "Use a real human author identity; do not attribute commits to AI tools.",
       ].join("\n"),
     );
   }

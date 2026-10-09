@@ -3,22 +3,14 @@ import type {
   AgentBuiltInToolConfig,
   AgentDeploymentVersion,
   AgentReadiness,
-  AgentVisibility,
 } from "@mosoo/contracts/agent";
 import type { AgentPackageResolutionState } from "@mosoo/contracts/agent-manifest";
-import type { McpAuthorizationState, McpCredentialStatus } from "@mosoo/contracts/mcp";
 
 export type AgentStatus = "draft" | "published";
-// The web console only ever loads agents the viewer owns — the API returns
-// `viewerRole: "owner"` and 403s every other caller — so the view model role
-// is always "owner". Non-owner consumption is a separate (future) surface.
-export type AgentRole = "owner";
-export type AgentMode = "create" | "preview" | "consume";
 
 export type RuntimeId = string;
 
 export interface RuntimeInfo {
-  defaultModel: string;
   id: RuntimeId;
   name: string;
   provider: string;
@@ -36,33 +28,15 @@ export interface ToolInfo {
 export interface SkillInfo {
   id: string;
   name: string;
-  filename: string;
   state?: "active" | "tombstone";
 }
 
 export interface McpServer {
   id: string;
-  bindingId?: string;
   name: string;
   url: string;
   enabled: boolean;
-  authorizationState?: McpAuthorizationState;
   iconUrl?: string; // Connector icon
-  type?: "web" | "custom";
-  // "app" is the frozen manifest/storage token for Project-provided servers.
-  source?: "app";
-  /**
-   * Credential resolution mode for this Agent × Server binding.
-   * runtime_resolved = resolve at runtime from the active credential source.
-   * agent_bound = persist the selected credential on the agent itself.
-   */
-  credentialMode?: "runtime_resolved" | "agent_bound";
-  credentialStatus?: McpCredentialStatus;
-  /**
-   * When credentialMode === "agent_bound", the human-readable subject label of
-   * the bound credential (e.g. "alex@example.com" or "Bearer Token configured").
-   */
-  credentialSubject?: string;
 }
 
 export interface AgentConfig {
@@ -73,13 +47,6 @@ export interface AgentConfig {
   prompt: string;
   providerOptions: JsonObject;
   skills: SkillInfo[];
-}
-
-export interface UserInfo {
-  id: string;
-  name: string;
-  email: string;
-  avatar?: string;
 }
 
 export interface Agent {
@@ -96,9 +63,6 @@ export interface Agent {
   createdAt: string;
   updatedAt: string;
   versions: AgentDeploymentVersion[];
-  visibility: AgentVisibility;
-  owner: UserInfo;
   packageResolution: AgentPackageResolutionState | null;
-  role: AgentRole;
   config: AgentConfig;
 }

@@ -93,9 +93,9 @@ export function SessionRuntimeControls({
             <DialogTitle>{label}</DialogTitle>
             <DialogDescription>{t("agent.sessionMaintenanceDescription")}</DialogDescription>
           </DialogHeader>
-          <p className="text-muted-foreground text-xs break-all">{session.title ?? session.id}</p>
+          <p className="text-fg-3 text-xs break-all">{session.title ?? session.id}</p>
           {mutation.error ? (
-            <p className="text-destructive text-sm" role="alert">
+            <p className="text-danger text-sm" role="alert">
               {mutation.error.message}
             </p>
           ) : null}

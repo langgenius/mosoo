@@ -1,68 +1,19 @@
 import { describe, expect, test } from "bun:test";
 
-import { updateSessionLastRun } from "../src/modules/runtime/infrastructure/session-runs/session-run-session.repository";
-import {
-  createSessionRunRecordIfSessionIdle,
-  setSessionRunStatus,
-} from "../src/modules/runtime/infrastructure/session-runs/session-run-store.repository";
+import { setSessionRunStatus } from "../src/modules/runtime/infrastructure/session-runs/session-run-store.repository";
 import {
   createPublicHttpContractDatabase,
   insertNonOwnerSession,
+  insertSessionRunFixture,
 } from "./helpers/public-api-http-test-fixture";
 
-async function insertSessionRun(
-  database: D1Database,
-  input: {
-    runId: string;
-    sessionId?: string;
-    status: string;
-  },
-): Promise<void> {
-  await database
-    .prepare(
-      `
-        INSERT INTO session_run (
-          id,
-          session_id,
-          agent_id,
-          created_by_account_id,
-          trigger,
-          status,
-          provider,
-          model,
-          runtime_id,
-          trace_id,
-          created_at,
-          updated_at
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `,
-    )
-    .bind(
-      input.runId,
-      input.sessionId ?? "01J0000000000000000000000B",
-      "01J00000000000000000000009",
-      "01J00000000000000000000002",
-      "user_prompt",
-      input.status,
-      "openai",
-      "gpt-5.4",
-      "openai-runtime",
-      `trace-${input.runId}`,
-      1,
-      1,
-    )
-    .run();
-  await database
-    .prepare("UPDATE session SET last_run_id = ?, status = ?, updated_at = ? WHERE id = ?")
-    .bind(
-      input.runId,
-      input.status === "completed" ? "IDLE" : "RUNNING",
-      1,
-      "01J0000000000000000000000B",
-    )
-    .run();
-}
+const ATOMIC_TERMINAL_PROJECTION_RUN_ID = "01J0000000000000000000R001";
+const DUPLICATE_RUN_ID = "01J0000000000000000000R002";
+const STALE_SESSION_RUN_ID = "01J0000000000000000000R003";
+const STALE_TERMINAL_PROJECTION_RUN_ID = "01J0000000000000000000R004";
+const TERMINAL_RUN_ID = "01J0000000000000000000R005";
+const TERMINAL_LOG_RUN_ID = "01J0000000000000000000R006";
+const IDLE_PROJECTION_RUN_ID = "01J0000000000000000000R007";
 
 function failSessionProjectionStatementInBatch(database: D1Database): D1Database {
   return new Proxy(database, {
@@ -133,10 +84,7 @@ describe("session run lifecycle", () => {
   test("replays the original terminal observation until its durable event exists", async () => {
     const database = await createPublicHttpContractDatabase();
     await insertNonOwnerSession(database);
-    await insertSessionRun(database, {
-      runId: "run-terminal-log",
-      status: "running",
-    });
+    await insertSessionRunFixture(database, { id: TERMINAL_LOG_RUN_ID, status: "running" });
 
     const originalConsoleInfo = console.info;
     const output: string[] = [];
@@ -144,12 +92,12 @@ describe("session run lifecycle", () => {
 
     try {
       await setSessionRunStatus(database, {
-        runId: "run-terminal-log",
+        runId: TERMINAL_LOG_RUN_ID,
         source: "driver",
         status: "completed",
       });
       await setSessionRunStatus(database, {
-        runId: "run-terminal-log",
+        runId: TERMINAL_LOG_RUN_ID,
         source: "driver",
         status: "completed",
       });
@@ -167,12 +115,12 @@ describe("session run lifecycle", () => {
       level: "info",
       metadata: {
         errorCode: null,
-        runId: "run-terminal-log",
+        runId: TERMINAL_LOG_RUN_ID,
         runtimeId: "openai-runtime",
         sessionType: "ui",
         source: "driver",
         status: "completed",
-        traceId: "trace-run-terminal-log",
+        traceId: `trace-${TERMINAL_LOG_RUN_ID}`,
         trigger: "user_prompt",
       },
       namespace: "api",
@@ -183,13 +131,10 @@ describe("session run lifecycle", () => {
   test("does not let a stale terminal event revive or overwrite a completed run", async () => {
     const database = await createPublicHttpContractDatabase();
     await insertNonOwnerSession(database);
-    await insertSessionRun(database, {
-      runId: "run-terminal",
-      status: "running",
-    });
+    await insertSessionRunFixture(database, { id: TERMINAL_RUN_ID, status: "running" });
 
     await setSessionRunStatus(database, {
-      runId: "run-terminal",
+      runId: TERMINAL_RUN_ID,
       source: "driver",
       status: "completed",
     });
@@ -200,7 +145,7 @@ describe("session run lifecycle", () => {
         message: "Late failure.",
         retryable: false,
       },
-      runId: "run-terminal",
+      runId: TERMINAL_RUN_ID,
       source: "driver",
       status: "failed",
     });
@@ -213,7 +158,7 @@ describe("session run lifecycle", () => {
           WHERE id = ?
         `,
       )
-      .bind("run-terminal")
+      .bind(TERMINAL_RUN_ID)
       .first<{
         error_code: string | null;
         status: string;
@@ -227,93 +172,28 @@ describe("session run lifecycle", () => {
   test("leaves duplicate transitions idempotent", async () => {
     const database = await createPublicHttpContractDatabase();
     await insertNonOwnerSession(database);
-    await insertSessionRun(database, {
-      runId: "run-duplicate",
-      status: "running",
-    });
+    await insertSessionRunFixture(database, { id: DUPLICATE_RUN_ID, status: "running" });
 
     await setSessionRunStatus(database, {
-      runId: "run-duplicate",
+      runId: DUPLICATE_RUN_ID,
       source: "driver",
       status: "running",
     });
 
     const row = await database
       .prepare("SELECT status FROM session_run WHERE id = ?")
-      .bind("run-duplicate")
+      .bind(DUPLICATE_RUN_ID)
       .first<{ status: string }>();
     expect(row).toEqual({ status: "running" });
-  });
-
-  test("rejects new runs after the owning session is terminated", async () => {
-    const database = await createPublicHttpContractDatabase();
-    await insertNonOwnerSession(database);
-    await database
-      .prepare("UPDATE session SET status = ? WHERE id = ?")
-      .bind("TERMINATED", "01J0000000000000000000000B")
-      .run();
-
-    await expect(
-      createSessionRunRecordIfSessionIdle(database, {
-        agentId: "01J00000000000000000000009",
-        createdBy: "01J00000000000000000000002",
-        model: "gpt-5.4",
-        provider: "openai",
-        runtimeId: "openai-runtime",
-        sessionId: "01J0000000000000000000000B",
-        status: "queued",
-        trigger: "user_prompt",
-      }),
-    ).rejects.toThrow();
-  });
-
-  test("rejects new runs while a runtime operation owns the session", async () => {
-    const database = await createPublicHttpContractDatabase();
-    await insertNonOwnerSession(database);
-    await database
-      .prepare(
-        `
-          UPDATE session
-          SET status = ?, status_operation_id = ?
-          WHERE id = ?
-        `,
-      )
-      .bind("RESCHEDULING", "01J0000000000000000000000R", "01J0000000000000000000000B")
-      .run();
-
-    await expect(
-      createSessionRunRecordIfSessionIdle(database, {
-        agentId: "01J00000000000000000000009",
-        createdBy: "01J00000000000000000000002",
-        model: "gpt-5.4",
-        provider: "openai",
-        runtimeId: "openai-runtime",
-        sessionId: "01J0000000000000000000000B",
-        status: "queued",
-        trigger: "user_prompt",
-      }),
-    ).rejects.toThrow();
   });
 
   test("session run projections expose the session as idle after completion", async () => {
     const database = await createPublicHttpContractDatabase();
     await insertNonOwnerSession(database);
-    const run = await createSessionRunRecordIfSessionIdle(database, {
-      agentId: "01J00000000000000000000009",
-      createdBy: "01J00000000000000000000002",
-      model: "gpt-5.4",
-      provider: "openai",
-      runtimeId: "openai-runtime",
-      sessionId: "01J0000000000000000000000B",
-      status: "running",
-      trigger: "user_prompt",
-    });
-    if (run.createdRun === null) {
-      throw new Error("Expected session run creation.");
-    }
+    await insertSessionRunFixture(database, { id: IDLE_PROJECTION_RUN_ID, status: "running" });
 
     await setSessionRunStatus(database, {
-      runId: run.createdRun.id,
+      runId: IDLE_PROJECTION_RUN_ID,
       source: "driver",
       status: "completed",
     });
@@ -341,14 +221,14 @@ describe("session run lifecycle", () => {
   test("rolls back a terminal Run transition when its Session projection fails", async () => {
     const database = await createPublicHttpContractDatabase();
     await insertNonOwnerSession(database);
-    await insertSessionRun(database, {
-      runId: "run-atomic-terminal-projection",
+    await insertSessionRunFixture(database, {
+      id: ATOMIC_TERMINAL_PROJECTION_RUN_ID,
       status: "running",
     });
 
     await expect(
       setSessionRunStatus(failSessionProjectionStatementInBatch(database), {
-        runId: "run-atomic-terminal-projection",
+        runId: ATOMIC_TERMINAL_PROJECTION_RUN_ID,
         source: "driver",
         status: "completed",
       }),
@@ -372,36 +252,40 @@ describe("session run lifecycle", () => {
     });
 
     await setSessionRunStatus(database, {
-      runId: "run-atomic-terminal-projection",
+      runId: ATOMIC_TERMINAL_PROJECTION_RUN_ID,
       source: "driver",
       status: "completed",
     });
 
-    const admitted = await createSessionRunRecordIfSessionIdle(database, {
-      agentId: "01J00000000000000000000009",
-      createdBy: "01J00000000000000000000002",
-      model: "gpt-5.4",
-      provider: "openai",
-      runtimeId: "openai-runtime",
-      sessionId: "01J0000000000000000000000B",
-      status: "queued",
-      trigger: "user_prompt",
-    });
+    const completed = await database
+      .prepare(
+        `
+          SELECT session.status AS session_status, session_run.status AS run_status
+          FROM session
+          INNER JOIN session_run ON session_run.id = session.last_run_id
+          WHERE session.id = ?
+        `,
+      )
+      .bind("01J0000000000000000000000B")
+      .first<{ run_status: string; session_status: string }>();
 
-    expect(admitted.createdRun).not.toBeNull();
+    expect(completed).toEqual({
+      run_status: "completed",
+      session_status: "IDLE",
+    });
   });
 
   test("does not project a stale terminal transition onto a newer Run state", async () => {
     const database = await createPublicHttpContractDatabase();
     await insertNonOwnerSession(database);
-    await insertSessionRun(database, {
-      runId: "run-stale-terminal-projection",
+    await insertSessionRunFixture(database, {
+      id: STALE_TERMINAL_PROJECTION_RUN_ID,
       status: "booting",
     });
 
     const outcome = await setSessionRunStatus(
       advanceRunBeforeBatch(database, {
-        runId: "run-stale-terminal-projection",
+        runId: STALE_TERMINAL_PROJECTION_RUN_ID,
       }),
       {
         error: {
@@ -410,7 +294,7 @@ describe("session run lifecycle", () => {
           message: "The stale terminal transition must not update the Session.",
           retryable: false,
         },
-        runId: "run-stale-terminal-projection",
+        runId: STALE_TERMINAL_PROJECTION_RUN_ID,
         source: "driver",
         status: "failed",
       },
@@ -441,24 +325,12 @@ describe("session run lifecycle", () => {
   test("does not revive terminated sessions from stale run projections", async () => {
     const database = await createPublicHttpContractDatabase();
     await insertNonOwnerSession(database);
-    await insertSessionRun(database, {
-      runId: "run-stale-session",
-      status: "running",
-    });
+    await insertSessionRunFixture(database, { id: STALE_SESSION_RUN_ID, status: "running" });
     await database
       .prepare("UPDATE session SET status = ? WHERE id = ?")
       .bind("TERMINATED", "01J0000000000000000000000B")
       .run();
 
-    await expect(
-      updateSessionLastRun(database, {
-        model: "gpt-5.4",
-        provider: "openai",
-        runId: "run-stale-session",
-        sessionId: "01J0000000000000000000000B",
-        timestampMs: 2,
-      }),
-    ).resolves.toBe(false);
     await setSessionRunStatus(database, {
       error: {
         code: "runtime.stale_session",
@@ -467,7 +339,7 @@ describe("session run lifecycle", () => {
         retryable: false,
       },
       preserveSessionLifecycle: true,
-      runId: "run-stale-session",
+      runId: STALE_SESSION_RUN_ID,
       source: "maintenance",
       status: "failed",
     });

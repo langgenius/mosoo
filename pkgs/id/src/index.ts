@@ -1,4 +1,4 @@
-import { decodeTime, encodeTime, incrementBase32, TIME_MAX } from "ulid";
+import { monotonicFactory } from "ulid";
 
 declare const PlatformIdBrand: unique symbol;
 declare const SemanticPlatformIdBrand: unique symbol;
@@ -26,7 +26,8 @@ export type McpServerId = SemanticPlatformId<"McpServerId">;
 export type OrganizationId = SemanticPlatformId<"OrganizationId">;
 export type PersonalAccessTokenId = SemanticPlatformId<"PersonalAccessTokenId">;
 export type ProjectId = SemanticPlatformId<"ProjectId">;
-export type PublicThreadId = SemanticPlatformId<"PublicThreadId">;
+/** A public Thread is addressed by its backing Session ID. */
+export type PublicThreadId = SessionId;
 export type RuntimeEventId = SemanticPlatformId<"RuntimeEventId">;
 export type RuntimeOperationId = SemanticPlatformId<"RuntimeOperationId">;
 export type SandboxBackupId = SemanticPlatformId<"SandboxBackupId">;
@@ -41,194 +42,42 @@ export type SkillSnapshotId = SemanticPlatformId<"SkillSnapshotId">;
 export type UploadId = SemanticPlatformId<"UploadId">;
 export type VendorCredentialId = SemanticPlatformId<"VendorCredentialId">;
 
-export const PLATFORM_ID_PATTERN = "^[0-7][0-9A-HJKMNP-TV-Z]{25}$";
 export const PLATFORM_ID_INPUT_PATTERN = "^[0-7][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{25}$";
 
-const canonicalPlatformIdPattern = new RegExp(PLATFORM_ID_PATTERN, "u");
+const canonicalPlatformIdPattern = /^[0-7][0-9A-HJKMNP-TV-Z]{25}$/u;
 const inputPlatformIdPattern = new RegExp(PLATFORM_ID_INPUT_PATTERN, "u");
-const platformIdRandomAlphabet = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
-const platformIdRandomLength = 16;
+const nextUlid = monotonicFactory();
 
-let lastPlatformIdTimeMs = -1;
-let lastPlatformIdRandom: string | undefined;
-
-type PlatformIdCrypto = {
-  getRandomValues(bytes: Uint8Array): Uint8Array;
-};
-
-interface CreatePlatformId {
-  <TId extends PlatformId = PlatformId>(timeMs?: number, narrow?: (id: PlatformId) => TId): TId;
+// The caller chooses the semantic ID brand of a created or parsed ULID, so the
+// type parameter appears only in the return type.
+/* eslint-disable typescript/no-unnecessary-type-parameters */
+export function createPlatformId<TId extends PlatformId = PlatformId>(timeMs?: number): TId {
+  return nextUlid(timeMs) as TId;
 }
 
-interface NormalizePlatformId {
-  <TId extends PlatformId = PlatformId>(
-    value: string,
-    label?: string,
-    narrow?: (id: PlatformId) => TId,
-  ): TId;
-}
-
-interface ParsePlatformId {
-  <TId extends PlatformId = PlatformId>(
-    value: unknown,
-    label?: string,
-    narrow?: (id: PlatformId) => TId,
-  ): TId;
-}
-
-interface ParseNullablePlatformId {
-  <TId extends PlatformId = PlatformId>(
-    value: unknown,
-    label?: string,
-    narrow?: (id: PlatformId) => TId,
-  ): TId | null;
-}
-
-interface ParsePlatformIdList {
-  <TId extends PlatformId = PlatformId>(
-    values: readonly unknown[],
-    label?: string,
-    narrow?: (id: PlatformId) => TId,
-  ): TId[];
-}
-
-interface AssertPlatformId {
-  <TId extends PlatformId = PlatformId>(
-    value: unknown,
-    label?: string,
-    narrow?: (id: PlatformId) => TId,
-  ): TId;
-}
-
-function brandPlatformId(value: string): PlatformId {
-  return value as PlatformId;
-}
-
-function formatPlatformIdLabel(label: string | undefined): string {
-  const normalized = label?.trim();
-  return normalized && normalized.length > 0 ? normalized : "Platform ID";
-}
-
-function assertPlatformIdTimeMs(timeMs: number): number {
-  if (!Number.isFinite(timeMs) || !Number.isSafeInteger(timeMs)) {
-    throw new TypeError("Platform ID timeMs must be a finite safe integer.");
-  }
-
-  if (timeMs < 0 || timeMs > TIME_MAX) {
-    throw new RangeError(
-      `Platform ID timeMs must be within the ULID timestamp range 0..${TIME_MAX}.`,
-    );
-  }
-
-  return timeMs;
-}
-
-function readRandomByte(): number {
-  const crypto = (globalThis as { readonly crypto?: PlatformIdCrypto }).crypto;
-
-  if (crypto === undefined) {
-    throw new TypeError("Platform ID generation requires globalThis.crypto.");
-  }
-
-  const bytes = new Uint8Array(1);
-  crypto.getRandomValues(bytes);
-
-  const byte = bytes[0];
-  if (byte === undefined) {
-    throw new TypeError("Platform ID generation failed to read random bytes.");
-  }
-
-  return byte;
-}
-
-function createPlatformIdRandom(): string {
-  let value = "";
-
-  for (let index = 0; index < platformIdRandomLength; index += 1) {
-    const char = platformIdRandomAlphabet[readRandomByte() % platformIdRandomAlphabet.length];
-
-    if (char === undefined) {
-      throw new TypeError("Platform ID generation failed to encode random bytes.");
-    }
-
-    value += char;
-  }
-
-  return value;
-}
-
-function createPlatformIdValue(timeMs?: number): PlatformId {
-  const requestedTimeMs = assertPlatformIdTimeMs(timeMs ?? Date.now());
-
-  if (requestedTimeMs <= lastPlatformIdTimeMs && lastPlatformIdRandom !== undefined) {
-    lastPlatformIdRandom = incrementBase32(lastPlatformIdRandom);
-    return brandPlatformId(`${encodeTime(lastPlatformIdTimeMs)}${lastPlatformIdRandom}`);
-  }
-
-  lastPlatformIdTimeMs = requestedTimeMs;
-  lastPlatformIdRandom = createPlatformIdRandom();
-
-  return brandPlatformId(`${encodeTime(requestedTimeMs)}${lastPlatformIdRandom}`);
-}
-
-export const createPlatformId = createPlatformIdValue as CreatePlatformId;
-
-function normalizePlatformIdValue(value: string, label?: string): PlatformId {
-  if (!inputPlatformIdPattern.test(value)) {
-    throw new TypeError(`${formatPlatformIdLabel(label)} must be a valid ULID.`);
-  }
-
-  return brandPlatformId(value.toUpperCase());
-}
-
-export const normalizePlatformId = normalizePlatformIdValue as NormalizePlatformId;
-
-function parsePlatformIdValue(value: unknown, label?: string): PlatformId {
+export function parsePlatformId<TId extends PlatformId = PlatformId>(
+  value: unknown,
+  label = "Platform ID",
+): TId {
   if (typeof value !== "string") {
-    throw new TypeError(`${formatPlatformIdLabel(label)} must be a ULID string.`);
+    throw new TypeError(`${label} must be a ULID string.`);
   }
 
-  return normalizePlatformIdValue(value, label);
+  if (!inputPlatformIdPattern.test(value)) {
+    throw new TypeError(`${label} must be a valid ULID.`);
+  }
+
+  return value.toUpperCase() as TId;
 }
 
-export const parsePlatformId = parsePlatformIdValue as ParsePlatformId;
-
-function parseNullablePlatformIdValue(value: unknown, label?: string): PlatformId | null {
-  return value == null ? null : parsePlatformIdValue(value, label);
+export function parseNullablePlatformId<TId extends PlatformId = PlatformId>(
+  value: unknown,
+  label?: string,
+): TId | null {
+  return value == null ? null : parsePlatformId<TId>(value, label);
 }
-
-export const parseNullablePlatformId = parseNullablePlatformIdValue as ParseNullablePlatformId;
-
-function parsePlatformIdListValue(values: readonly unknown[], label?: string): PlatformId[] {
-  return values.map((value, index) =>
-    parsePlatformIdValue(value, `${formatPlatformIdLabel(label)}[${index}]`),
-  );
-}
-
-export const parsePlatformIdList = parsePlatformIdListValue as ParsePlatformIdList;
+/* eslint-enable typescript/no-unnecessary-type-parameters */
 
 export function isPlatformId(value: unknown): value is PlatformId {
   return typeof value === "string" && canonicalPlatformIdPattern.test(value);
-}
-
-function assertPlatformIdValue(value: unknown, label?: string): PlatformId {
-  if (!isPlatformId(value)) {
-    throw new TypeError(`${formatPlatformIdLabel(label)} must be a canonical ULID.`);
-  }
-
-  return value;
-}
-
-export const assertPlatformId = assertPlatformIdValue as AssertPlatformId;
-
-export function comparePlatformIds(left: PlatformId, right: PlatformId): number {
-  return left < right ? -1 : left > right ? 1 : 0;
-}
-
-export function sortPlatformIds<TId extends PlatformId>(ids: readonly TId[]): TId[] {
-  return ids.toSorted(comparePlatformIds);
-}
-
-export function readPlatformIdTime(id: PlatformId): number {
-  return decodeTime(id);
 }

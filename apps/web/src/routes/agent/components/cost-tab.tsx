@@ -4,6 +4,7 @@ import type { ReactElement, ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 import { fetchAgentCost } from "@/domains/cost/api/cost-client";
+import type { CostRunPurpose } from "@/domains/cost/api/cost-client";
 import { exportAttributionCostCsv } from "@/routes/cost/cost-csv";
 import {
   COST_RANGES,
@@ -12,22 +13,18 @@ import {
   formatCompactNumber,
   formatCurrency,
   formatPlainPercent,
+  rangeLabelKey,
   rangeToInput,
   runPurposeToQuery,
   tokensTotal,
 } from "@/routes/cost/cost-model";
-import type { CostRange, CostRunPurpose } from "@/routes/cost/cost-model";
+import type { CostRange } from "@/routes/cost/cost-model";
 import { toAgentId, toProjectId } from "@/routes/typed-id";
 import { getCurrentLocale, useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
+import { Button } from "@/shared/ui/button";
 import { BarChart3, Download, ExternalLink } from "@/shared/ui/icons";
-
-const COST_RANGE_KEYS = {
-  "7d": "cost.range7d",
-  "30d": "cost.range30d",
-  mtd: "cost.rangeMtd",
-  "90d": "cost.range90d",
-} as const satisfies Record<CostRange, string>;
+import { SegmentedControl } from "@/shared/ui/segmented-control";
 
 export function AgentCostTab({
   agentId,
@@ -57,70 +54,45 @@ export function AgentCostTab({
       <div className="mx-auto max-w-6xl space-y-5">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <h2 className="text-foreground text-lg font-semibold">{t("cost.cost")}</h2>
-            <p className="text-muted-foreground mt-1 text-sm">{t("cost.agentCostSubtitle")}</p>
+            <h2 className="t-section-title">{t("cost.cost")}</h2>
+            <p className="text-fg-3 mt-1 text-sm">{t("cost.agentCostSubtitle")}</p>
           </div>
           <div className="flex items-center gap-2">
-            <div className="border-border bg-card flex rounded-md border p-0.5">
-              {COST_RANGES.map((value) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => {
-                    setRange(value);
-                  }}
-                  className={cn(
-                    "rounded px-2.5 py-1 text-xs font-semibold uppercase",
-                    range === value ? "bg-ink-100 text-fg-1" : "text-muted-foreground",
-                  )}
-                >
-                  {t(COST_RANGE_KEYS[value])}
-                </button>
-              ))}
-            </div>
-            <Link
-              to="/cost"
-              className="border-border hover:bg-muted inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-sm font-semibold"
-            >
+            <SegmentedControl
+              label={t("cost.rangeLabel")}
+              onChange={setRange}
+              options={COST_RANGES.map((value) => ({ label: t(rangeLabelKey(value)), value }))}
+              value={range}
+            />
+            <Button render={<Link to="/project-settings/usage" />} variant="outline">
               <ExternalLink className="size-3.5" />
               {t("cost.openProjectUsage")}
-            </Link>
-            <button
-              type="button"
-              onClick={() => {
-                exportAttributionCostCsv("agent-cost.csv", card);
-              }}
+            </Button>
+            <Button
               disabled={!card}
-              className="border-border hover:bg-muted inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-sm font-semibold disabled:pointer-events-none disabled:opacity-50"
+              onClick={() => {
+                exportAttributionCostCsv("agent-cost.csv", card, t);
+              }}
+              variant="outline"
             >
               <Download className="size-3.5" />
               {t("cost.exportCsv")}
-            </button>
+            </Button>
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          {RUN_PURPOSE_FILTERS.map((item) => (
-            <button
-              key={item.value}
-              type="button"
-              onClick={() => {
-                setPurpose(item.value);
-              }}
-              className={cn(
-                "rounded-md border px-3 py-1.5 text-xs font-semibold",
-                purpose === item.value
-                  ? "border-border-strong bg-ink-100 text-fg-1"
-                  : "border-border text-muted-foreground hover:bg-muted",
-              )}
-            >
-              {t(item.labelKey)}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl
+          label={t("cost.runPurposeLabel")}
+          onChange={setPurpose}
+          options={RUN_PURPOSE_FILTERS.map((item) => ({
+            label: t(item.labelKey),
+            value: item.value,
+          }))}
+          value={purpose}
+        />
 
         {isLoading ? (
-          <div className="border-border bg-card text-muted-foreground rounded-lg border px-4 py-10 text-center text-sm">
+          <div className="border-border bg-card text-fg-3 rounded-lg border px-4 py-10 text-center text-sm">
             {t("cost.loadingAgentCost")}
           </div>
         ) : null}
@@ -150,14 +122,12 @@ export function AgentCostTab({
               key={label}
               className={cn(
                 "rounded-lg border border-border bg-card px-4 py-3",
-                index === 0 ? "bg-ink-50" : "",
+                index === 0 ? "bg-sunken" : "",
               )}
             >
-              <div className="text-muted-foreground text-[11px] font-semibold tracking-[0.12em] uppercase">
-                {label}
-              </div>
+              <div className="t-group-label">{label}</div>
               <div className="text-foreground mt-2 text-2xl font-semibold">{value}</div>
-              <div className="text-muted-foreground mt-1 text-xs">{detail}</div>
+              <div className="text-fg-3 mt-1 text-xs">{detail}</div>
             </div>
           ))}
         </section>
@@ -165,9 +135,7 @@ export function AgentCostTab({
         <section>
           <Panel title={t("agent.modelUsage")}>
             {(card?.models ?? []).length === 0 ? (
-              <div className="text-muted-foreground px-4 py-8 text-sm">
-                {t("cost.noModelUsageInRange")}
-              </div>
+              <div className="text-fg-3 px-4 py-8 text-sm">{t("cost.noModelUsageInRange")}</div>
             ) : null}
             {(card?.models ?? []).map((model) => (
               <div
@@ -176,13 +144,13 @@ export function AgentCostTab({
               >
                 <div className="min-w-0">
                   <div className="text-foreground truncate font-medium">{model.model}</div>
-                  <div className="text-muted-foreground text-xs">{model.vendor}</div>
+                  <div className="text-fg-3 text-xs">{model.vendor}</div>
                 </div>
                 <div className="text-right">
                   <div className="font-mono font-semibold">
                     {formatCurrency(model.totalCostUsd)}
                   </div>
-                  <div className="text-muted-foreground text-xs">
+                  <div className="text-fg-3 text-xs">
                     {t("cost.tokenCount", { count: formatCompactNumber(tokensTotal(model)) })}
                   </div>
                 </div>
@@ -193,23 +161,19 @@ export function AgentCostTab({
 
         <Panel title={t("agent.recentSessions")}>
           {(card?.recentSessions ?? []).length === 0 ? (
-            <div className="text-muted-foreground px-4 py-8 text-sm">
-              {t("cost.noSessionsInRange")}
-            </div>
+            <div className="text-fg-3 px-4 py-8 text-sm">{t("cost.noSessionsInRange")}</div>
           ) : null}
           {(card?.recentSessions ?? []).map((session) => (
             <div
               key={`${session.createdAt}-${session.sessionRunId ?? session.model}`}
               className="border-border grid grid-cols-[120px_minmax(160px,1fr)_130px_130px_100px] items-center border-b px-4 py-3 text-sm last:border-b-0"
             >
-              <div className="text-muted-foreground text-xs" suppressHydrationWarning>
+              <div className="text-fg-3 text-xs" suppressHydrationWarning>
                 {new Date(session.createdAt).toLocaleString(getCurrentLocale())}
               </div>
               <div className="min-w-0">
                 <div className="text-foreground truncate font-medium">{session.actorName}</div>
-                <div className="text-muted-foreground truncate font-mono text-xs">
-                  {session.model}
-                </div>
+                <div className="text-fg-3 truncate font-mono text-xs">{session.model}</div>
               </div>
               <div>
                 {t("cost.tokenCount", {
@@ -228,7 +192,7 @@ export function AgentCostTab({
           ))}
         </Panel>
 
-        <div className="border-border bg-card text-muted-foreground flex items-center gap-2 rounded-lg border px-4 py-3 text-xs">
+        <div className="border-border bg-card text-fg-3 flex items-center gap-2 rounded-lg border px-4 py-3 text-xs">
           <BarChart3 className="size-3.5" />
           {t("cost.agentCostPurposeNote")}
         </div>

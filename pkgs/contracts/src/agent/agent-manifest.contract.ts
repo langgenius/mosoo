@@ -1,8 +1,9 @@
+import type { AgentId, FileId, ProjectId } from "@mosoo/id";
+
 import type { EnvironmentPackageSpec } from "../environment/environment.contract";
-import type { AgentId, FileId, ProjectId } from "../id/id.contract";
 import type { JsonObject } from "../validation/primitives.contract";
 import { AGENT_MANIFEST_VERSION, AGENT_PACKAGE_VERSION } from "./agent-manifest-version.contract";
-import type { AgentBuiltInToolConfig, AgentKind } from "./agent.contract";
+import type { AgentBuiltInToolConfig } from "./agent.contract";
 
 export { AGENT_MANIFEST_VERSION, AGENT_PACKAGE_VERSION };
 
@@ -40,15 +41,6 @@ export interface AgentResolutionIssue {
 export interface AgentManifestValidationResult {
   issues: AgentResolutionIssue[];
   manifest: AgentManifest | null;
-}
-
-export interface AgentManifestAssetReference {
-  assetId: string | null;
-  assetKey: string | null;
-  filename: string;
-  mimeType: string | null;
-  mountPath: string;
-  role: AgentManifestAssetRole;
 }
 
 export interface AgentManifestSkillReference {
@@ -176,7 +168,6 @@ export interface ImportAgentPackageInput {
 
 export interface CreateAgentForkInput {
   agentId: AgentId;
-  kind?: AgentKind;
   projectId: ProjectId;
 }
 

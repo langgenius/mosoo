@@ -134,12 +134,14 @@ describe("Session runtime memory durability", () => {
     await mkdir(f.memory, { recursive: true });
     await writeFile(join(f.memory, "private.md"), "durable");
     await writeFile(join(f.home, "auth.json"), "ephemeral fixture credential");
+    await writeFile(join(f.home, "driver-boot-payload-driver.json"), "boot token");
     await prepareRuntimeSessionWorkspaceCheckpoint(
       { ...f.session, async unmountBucket() {} },
       { cwd: "/workspace/se/fixture", sessionId: "fixture" },
     );
     expect(await readFile(join(f.memory, "private.md"), "utf8")).toBe("durable");
     expect(await Bun.file(join(f.home, "auth.json")).exists()).toBe(false);
+    expect(await Bun.file(join(f.home, "driver-boot-payload-driver.json")).exists()).toBe(false);
   });
 
   test("historical type metadata cannot recreate a shared memory binding", async () => {

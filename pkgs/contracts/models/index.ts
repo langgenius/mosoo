@@ -8,13 +8,8 @@ export type {
   RuntimeModelProviderRef,
 } from "./model-identity";
 export {
-  RuntimeModelIdentityInput,
-  RuntimeModelProviderKindSchema,
   admitModelId,
   admitProviderId,
   admitRuntimeId,
   createRuntimeModelIdentity,
-  createRuntimeModelProviderRef,
-  isCustomRuntimeModelProvider,
-  parseRuntimeModelIdentity,
 } from "./model-identity";

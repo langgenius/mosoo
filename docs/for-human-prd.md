@@ -1,6 +1,6 @@
 ---
 name: for-human-prd
-description: Mirror an existing mosoo PRD into a high-readability for-human companion that preserves user intent while removing implementation detail. Use when a PRD needs a plain-language companion under `docs/prd/`, or when the user asks for a "for human" / "human-readable" PRD.
+description: Mirror an existing mosoo PRD into a high-readability for-human companion that preserves user intent while removing implementation detail. Use when a PRD needs a plain-language companion in its issue, or when the user asks for a "for human" / "human-readable" PRD.
 ---
 
 # For-Human PRD Companion
@@ -11,7 +11,7 @@ This does not replace [`good-prd.md`](./good-prd.md). The full PRD remains the i
 
 ## When to use
 
-Use when a full PRD exists, the user asks for a "for human" / "human-readable" version, the PRD has valuable grill / QA / user-input intent mixed with implementation detail, and the companion should live in `docs/prd/`.
+Use when a full PRD exists, the user asks for a "for human" / "human-readable" version, the PRD has valuable grill / QA / user-input intent mixed with implementation detail, and the companion should live with the PRD in its issue.
 
 Do not use this to create the original PRD. Draft and grill the full PRD first.
 
@@ -23,7 +23,7 @@ Preserve original user / QA / grill intent. Do not flatten real user language in
 
 ## Output
 
-Create `docs/prd/{prd-slug}.md`, then update `docs/prd/README.md` so the index links to the new companion and the PRD list stays current.
+Post the companion in the source PRD's issue, as a comment or a section of its body. Do not add a file or an index entry under `docs/prd/`, which holds one product note per area.
 
 ## Keep
 
@@ -52,14 +52,14 @@ Ask: "Can a non-engineer make a product decision from this?" If not, it belongs 
 2. Translate the contract into what the user can do / see / expect.
 3. Build a small glossary: keep product nouns, remove implementation entities.
 4. Mirror essential relationships with one simple mermaid only if it clarifies the product.
-5. Add a "do not confuse with" table and register the companion in `docs/prd/README.md`.
+5. Add a "do not confuse with" table and post the companion in the PRD's issue.
 
 ## Quality Gate
 
-Scan the companion for engineering-detail drift:
+Before posting, scan the companion draft for engineering-detail drift:
 
 ```bash
-rg -n "POST |GET |schema|interface|resolver|DB|database|call stack|deployment topology|endpoint|OpenAPI|curl" docs/prd/{prd-slug}.md
+rg -n "POST |GET |schema|interface|resolver|DB|database|call stack|deployment topology|endpoint|OpenAPI|curl" {companion-draft}.md
 ```
 
 Expected: no hits, except deliberate orientation links.
@@ -79,7 +79,7 @@ Run broader repo checks only when code, generated files, schemas, or contracts c
 - [ ] A non-engineer can explain the feature after one read.
 - [ ] Full PRD remains the only source for implementation details.
 - [ ] No endpoint list, schema, interface, DB field, deployment, or call-stack detail leaks in.
-- [ ] README links source PRD to companion.
+- [ ] Source PRD links to companion.
 - [ ] Companion links back to full PRD.
 
 ## Example Intent To Preserve

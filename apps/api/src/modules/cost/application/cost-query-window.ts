@@ -1,43 +1,33 @@
-import type { AgentId, OrganizationId, ProjectId } from "@mosoo/id";
+import type { AgentId, ProjectId } from "@mosoo/id";
 
 import { isTruthy } from "../../../shared/truthiness";
 import type { AggregateRow, CostRange, CostTotalsView, CostWindow } from "./cost-query.types";
+import { getUsageDetailRetentionCutoffMs, startOfUtcDay, toUtcDate } from "./cost-rollup.service";
 
 interface CostWhereInput {
   agentId?: AgentId;
   runPurposes?: readonly string[];
 }
 
-function toDateString(value: Date): string {
-  return value.toISOString().slice(0, 10);
-}
-
-function startOfUtcDay(value: Date): Date {
-  return new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()));
-}
-
 export function resolveCostWindow(range: CostRange, now = new Date()): CostWindow {
-  const today = startOfUtcDay(now);
-  const since = new Date(today);
+  const since = startOfUtcDay(now);
 
   if (range === "LAST_7_DAYS") {
-    since.setUTCDate(today.getUTCDate() - 6);
+    since.setUTCDate(since.getUTCDate() - 6);
   } else if (range === "LAST_90_DAYS") {
-    since.setUTCDate(today.getUTCDate() - 89);
+    since.setUTCDate(since.getUTCDate() - 89);
   } else if (range === "MONTH_TO_DATE") {
     since.setUTCDate(1);
   } else {
-    since.setUTCDate(today.getUTCDate() - 29);
+    since.setUTCDate(since.getUTCDate() - 29);
   }
 
-  const detailBoundary = new Date(today);
-  detailBoundary.setUTCDate(today.getUTCDate() - 7);
+  const detailBoundaryMs = getUsageDetailRetentionCutoffMs(now);
 
   return {
-    dailyBeforeDate: toDateString(detailBoundary),
-    detailSinceMs: Math.max(since.getTime(), detailBoundary.getTime()),
-    label: range,
-    sinceDate: toDateString(since),
+    dailyBeforeDate: toUtcDate(new Date(detailBoundaryMs)),
+    detailSinceMs: Math.max(since.getTime(), detailBoundaryMs),
+    sinceDate: toUtcDate(since),
     sinceMs: since.getTime(),
   };
 }
@@ -74,37 +64,27 @@ export function toTotalsView(row: AggregateRow | null): CostTotalsView {
 
 export function buildUsageSourceCte(
   window: CostWindow,
-  scope: {
-    organizationId: OrganizationId;
-    projectId?: ProjectId;
-  },
+  projectId: ProjectId,
 ): {
   bindings: (number | string)[];
   sql: string;
 } {
-  const detailProjectFilter = isTruthy(scope.projectId) ? "AND usage_event.project_id = ?" : "";
-  const rollupProjectFilter = isTruthy(scope.projectId) ? "AND project_id = ?" : "";
-
   return {
     bindings: [
-      scope.organizationId,
-      ...(isTruthy(scope.projectId) ? [scope.projectId] : []),
+      projectId,
       window.detailSinceMs,
-      scope.organizationId,
-      ...(isTruthy(scope.projectId) ? [scope.projectId] : []),
+      projectId,
       window.sinceDate,
       window.dailyBeforeDate,
     ],
     sql: `
       WITH usage_source AS (
         SELECT
-          usage_event.organization_id,
           usage_event.project_id,
           usage_event.agent_id,
           usage_event.actor_user_id,
           usage_event.agent_owner_user_id,
           date(usage_event.created_at / 1000, 'unixepoch') AS date,
-          usage_event.agent_publication_state_at_run,
           usage_event.run_purpose,
           usage_event.provider,
           usage_event.model,
@@ -117,18 +97,15 @@ export function buildUsageSourceCte(
           CASE WHEN usage_event.pricing_status = 'unknown' THEN 1 ELSE 0 END
             AS unpriced_request_count
         FROM usage_event
-        WHERE usage_event.organization_id = ?
-          ${detailProjectFilter}
+        WHERE usage_event.project_id = ?
           AND usage_event.created_at >= ?
         UNION ALL
         SELECT
-          organization_id,
           project_id,
           agent_id,
           actor_user_id,
           agent_owner_user_id,
           date,
-          agent_publication_state_at_run,
           run_purpose,
           provider,
           model,
@@ -140,8 +117,7 @@ export function buildUsageSourceCte(
           total_cost_usd_micros / 1000000.0 AS total_cost_usd,
           unpriced_request_count
         FROM usage_daily_rollup
-        WHERE organization_id = ?
-          ${rollupProjectFilter}
+        WHERE project_id = ?
           AND date >= ?
           AND date < ?
       )

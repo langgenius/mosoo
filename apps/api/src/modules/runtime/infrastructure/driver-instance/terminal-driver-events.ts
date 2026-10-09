@@ -7,55 +7,22 @@ import type { RuntimeEventEnvelope } from "@mosoo/runtime-events";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { appendSessionRuntimeEvents } from "../../../sessions/application/session-event-write.service";
 import { projectRuntimeEventToSessionDeliveryEvents } from "../../../sessions/application/session-live-state.service";
-import { finalizeSessionModelCallUsage } from "../../../sessions/application/session-model-call.service";
+import { finalizeSessionModelCallUsage } from "../../../sessions/infrastructure/session-model-call.repository";
 import { recordCanonicalSessionRunFailure } from "../../application/session-runs/session-run-terminal-failure.service";
-import { isTerminalSessionRunStatus } from "../../domain/session-run-status";
+import { isTerminalSessionRunStatus } from "../../domain/session-run-lifecycle.machine";
 import {
   discardUncommittedCompletionCheckpoint,
   prepareSessionRunCompletionCheckpoint,
 } from "../session-runs/session-run-completion-checkpoint";
-import { setSessionRunStatus } from "../session-runs/session-run-store.repository";
-import type { SessionRunTransitionOutcome } from "../session-runs/session-run-store.repository";
+import {
+  assertSessionRunTransition,
+  isStaleTerminalRunTransition,
+  setSessionRunStatus,
+} from "../session-runs/session-run-store.repository";
 import type { RuntimeSessionLink } from "./event-types";
 import { recordRuntimeSessionOutputDirectory } from "./runtime-session-output-store";
 import { getRuntimeSessionLink } from "./session-link.repository";
 import { releaseTerminalDriverInstanceSessionRun } from "./terminal-run-release";
-
-function assertTerminalDriverSessionRunTransition(outcome: SessionRunTransitionOutcome): void {
-  switch (outcome.kind) {
-    case "applied":
-    case "duplicate": {
-      return;
-    }
-    case "stale": {
-      if (outcome.reason === "terminal_run") {
-        return;
-      }
-      throw new Error("Terminal driver event lost a concurrent run transition.");
-    }
-    case "repair_needed": {
-      throw new Error("Terminal driver event left the session lifecycle projection stale.");
-    }
-    case "rejected": {
-      throw new Error(`Terminal driver event run transition was rejected: ${outcome.reason}.`);
-    }
-  }
-}
-
-function isStaleTerminalRunTransition(outcome: SessionRunTransitionOutcome): boolean {
-  return outcome.kind === "stale" && outcome.reason === "terminal_run";
-}
-
-function isStaleTerminalRunStatus(
-  outcome: SessionRunTransitionOutcome,
-  status: "completed" | "failed",
-): boolean {
-  return (
-    outcome.kind === "stale" &&
-    outcome.reason === "terminal_run" &&
-    outcome.currentStatus === status
-  );
-}
 
 function createTerminalDriverEventId(input: {
   readonly driverInstanceId: DriverInstanceId;
@@ -68,11 +35,9 @@ function createTerminalDriverEventId(input: {
 export async function recordDriverInstanceCompletion(
   bindings: ApiBindings,
   input: {
-    driverReady: boolean;
     driverInstanceId: DriverInstanceId;
   },
 ): Promise<void> {
-  void input.driverReady;
   const database = bindings.DB;
   const link = await getRuntimeSessionLink(database, input.driverInstanceId);
   if (
@@ -119,7 +84,7 @@ export async function recordDriverInstanceFailure(
       source: "driver",
     });
     if (outcome.kind !== "failed") {
-      assertTerminalDriverSessionRunTransition(outcome.transition);
+      assertSessionRunTransition(outcome.transition, "Terminal driver event");
     }
   } else if (link.sessionRunId !== null) {
     const outcome = await setSessionRunStatus(database, {
@@ -128,7 +93,7 @@ export async function recordDriverInstanceFailure(
       source: "driver",
       status: "failed",
     });
-    assertTerminalDriverSessionRunTransition(outcome);
+    assertSessionRunTransition(outcome, "Terminal driver event");
   }
 
   await releaseLinkedRunLease(bindings, {
@@ -186,8 +151,11 @@ async function synthesizeDriverRunFinished(
     source: "driver",
     status: "completed",
   }).finally(() => discardUncommittedCompletionCheckpoint(input.bindings, completionCheckpoint));
-  assertTerminalDriverSessionRunTransition(outcome);
-  if (isStaleTerminalRunTransition(outcome) && !isStaleTerminalRunStatus(outcome, "completed")) {
+  assertSessionRunTransition(outcome, "Terminal driver event");
+  if (
+    isStaleTerminalRunTransition(outcome) &&
+    !isStaleTerminalRunTransition(outcome, "completed")
+  ) {
     return;
   }
   await finalizeSessionModelCallUsage(database, input.link.sessionRunId);

@@ -51,7 +51,6 @@ async function fixture() {
   let failDestroy = false;
   const bindings = {
     ...createPublicHttpTestBindings(database),
-    MOSOO_DEPLOYMENT_MODE: "cloud",
     Session: {
       idFromName: (id: string) => id,
       get: () => ({
@@ -286,8 +285,8 @@ describe("Cloud Preview inactivity lifecycle", () => {
     const { database, bindings, destroyed } = await fixture();
     const upload = await admitUpload(database, DEADLINE - 1);
     expect(upload.admitted).toBe(true);
-    expect(await deleteSessionCascade(bindings, SESSION, { expiredPreviewAtMs: DEADLINE })).toEqual(
-      [],
+    expect(await deleteSessionCascade(bindings, SESSION, { expiredPreviewAtMs: DEADLINE })).toBe(
+      false,
     );
     expect(destroyed()).toBe(0);
     await database
@@ -374,15 +373,8 @@ describe("Cloud Preview inactivity lifecycle", () => {
     expect((await admitUpload(database, DEADLINE)).admitted).toBe(false);
   });
 
-  test("self-host maintenance leaves Previews alone; Cloud retries an interrupted terminal cleanup", async () => {
-    const { database, bindings, interrupt, destroyed } = await fixture();
-    expect(
-      await cleanupExpiredPreviewSessions(
-        { ...bindings, MOSOO_DEPLOYMENT_MODE: "self_hosted" },
-        { limit: 20, nowMs: DEADLINE },
-      ),
-    ).toBe(0);
-    expect(destroyed()).toBe(0);
+  test("retries an interrupted terminal cleanup", async () => {
+    const { database, bindings, interrupt } = await fixture();
     interrupt(true);
     expect(await cleanupExpiredPreviewSessions(bindings, { limit: 20, nowMs: DEADLINE })).toBe(0);
     expect(

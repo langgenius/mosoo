@@ -25,7 +25,7 @@ export async function createAgentFork(
   viewer: AuthenticatedViewer,
   input: CreateAgentForkInput,
 ): Promise<AgentPackageImportResult<Agent>> {
-  const { agent: sourceAgent } = await ensureProjectAgentOwner(bindings.DB, viewer.id, {
+  const sourceAgent = await ensureProjectAgentOwner(bindings.DB, viewer.id, {
     agentId: input.agentId,
     projectId: input.projectId,
   });
@@ -36,7 +36,6 @@ export async function createAgentFork(
 
   issues.push(
     ...(await collectRuntimeCapabilityIssues({
-      actorAccountId: viewer.id,
       codePrefix: "agent.fork",
       database: bindings.DB,
       projectId: sourceAgent.projectId,

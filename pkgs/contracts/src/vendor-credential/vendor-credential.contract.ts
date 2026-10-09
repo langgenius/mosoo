@@ -1,5 +1,6 @@
+import type { ProjectId, VendorCredentialId } from "@mosoo/id";
+
 import type { PresetModelProtocol } from "../../models/model-catalog.types";
-import type { ProjectId, VendorCredentialId } from "../id/id.contract";
 
 export interface VendorCredential {
   apiBase: string | null;
@@ -10,12 +11,6 @@ export interface VendorCredential {
   models: string[] | null;
   name: string;
   projectId: ProjectId;
-  vendorId: string;
-}
-
-export interface VendorCredentialSummary {
-  id: VendorCredentialId;
-  name: string;
   vendorId: string;
 }
 

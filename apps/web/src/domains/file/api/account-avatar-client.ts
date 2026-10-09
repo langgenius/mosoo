@@ -1,4 +1,4 @@
-import type { AccountId } from "@mosoo/contracts/id";
+import type { AccountId } from "@mosoo/id";
 
 import { apiPath } from "@/platform/http/public-api";
 
@@ -17,7 +17,6 @@ export async function uploadAccountAvatar(accountId: AccountId, file: File): Pro
         name: file.name,
         size: file.size,
       },
-      overwrite: true,
       purpose: "account_avatar",
       target: {
         id: accountId,

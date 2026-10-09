@@ -1,70 +1,11 @@
-import type { FileScopeKind, FileSessionKind, FileStatus } from "@mosoo/contracts/file";
+import type { FileScopeKind } from "@mosoo/contracts/file";
 import { fileRecordsTable, fileUploadsTable } from "@mosoo/db";
 import type { FileId, PlatformId } from "@mosoo/id";
-import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
-import type { SQL } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
-import type { FileCleanupRow, FilePathLookupRequest, FileRecordRow } from "./file-record-model";
+import type { FileCleanupRow, FileRecordRow } from "./file-record-model";
 import { fileRecordRowColumns } from "./file-record-model";
-
-export interface FileRecordListQuery {
-  ownerId?: PlatformId;
-  scopeId?: PlatformId | null;
-  scopeKind?: FileScopeKind;
-  sessionKind?: FileSessionKind | null;
-  status?: FileStatus;
-}
-
-function scopeIdWhere(column: typeof fileRecordsTable.scopeId, scopeId: PlatformId | null) {
-  return scopeId === null ? isNull(column) : eq(column, scopeId);
-}
-
-export async function getReadyFileByPath({
-  database,
-  path,
-  scopeId,
-  scopeKind,
-}: FilePathLookupRequest): Promise<FileRecordRow | null> {
-  return (
-    (await getAppDatabase(database)
-      .select(fileRecordRowColumns)
-      .from(fileRecordsTable)
-      .where(
-        and(
-          eq(fileRecordsTable.scopeKind, scopeKind),
-          scopeIdWhere(fileRecordsTable.scopeId, scopeId),
-          eq(fileRecordsTable.path, path),
-          eq(fileRecordsTable.status, "ready"),
-        ),
-      )
-      .limit(1)
-      .get()) ?? null
-  );
-}
-
-export async function getPendingFileByPath({
-  database,
-  path,
-  scopeId,
-  scopeKind,
-}: FilePathLookupRequest): Promise<FileRecordRow | null> {
-  return (
-    (await getAppDatabase(database)
-      .select(fileRecordRowColumns)
-      .from(fileRecordsTable)
-      .where(
-        and(
-          eq(fileRecordsTable.scopeKind, scopeKind),
-          scopeIdWhere(fileRecordsTable.scopeId, scopeId),
-          eq(fileRecordsTable.path, path),
-          eq(fileRecordsTable.status, "pending"),
-        ),
-      )
-      .limit(1)
-      .get()) ?? null
-  );
-}
 
 export async function getFileRecordById(
   database: D1Database,
@@ -97,34 +38,6 @@ export async function listFileRecordsById(
     .all();
 }
 
-export async function listFileRecords(
-  database: D1Database,
-  input: FileRecordListQuery,
-): Promise<FileRecordRow[]> {
-  const scopeKind = input.scopeKind ?? "library";
-  const scopeId = input.scopeId ?? null;
-  const conditions: SQL[] = [
-    eq(fileRecordsTable.scopeKind, scopeKind),
-    scopeIdWhere(fileRecordsTable.scopeId, scopeId),
-    eq(fileRecordsTable.status, input.status ?? "ready"),
-  ];
-
-  if (input.sessionKind !== undefined && input.sessionKind !== null) {
-    conditions.push(eq(fileRecordsTable.sessionKind, input.sessionKind));
-  }
-
-  if (input.ownerId !== undefined) {
-    conditions.push(eq(fileRecordsTable.ownerId, input.ownerId));
-  }
-
-  return getAppDatabase(database)
-    .select(fileRecordRowColumns)
-    .from(fileRecordsTable)
-    .where(and(...conditions))
-    .orderBy(desc(fileRecordsTable.createdAt), desc(fileRecordsTable.id))
-    .all();
-}
-
 export async function listFilesForScopeCleanup(
   database: D1Database,
   input: { scopeId: PlatformId | null; scopeKind: FileScopeKind },
@@ -141,7 +54,9 @@ export async function listFilesForScopeCleanup(
     .where(
       and(
         eq(fileRecordsTable.scopeKind, input.scopeKind),
-        scopeIdWhere(fileRecordsTable.scopeId, input.scopeId),
+        input.scopeId === null
+          ? isNull(fileRecordsTable.scopeId)
+          : eq(fileRecordsTable.scopeId, input.scopeId),
       ),
     )
     .all();

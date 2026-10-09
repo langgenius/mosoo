@@ -16,35 +16,21 @@ import {
   SERVER_PRODUCT_ANALYTICS_EVENTS,
 } from "../../../platform/analytics/product-analytics";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
-import { getAppDatabase, runAppDatabaseBatch } from "../../../platform/db/drizzle";
+import { runAppDatabaseBatch } from "../../../platform/db/drizzle";
 import { validationError } from "../../../platform/errors";
-import { forbiddenError } from "../../../platform/errors";
 import { currentTimestampMs } from "../../../time";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import {
-  canUseEnvironment,
-  getProjectDefaultEnvironmentId,
-} from "../../environments/application/environment.service";
+import { ensureEnvironmentAccess } from "../../environments/application/environment-access.service";
+import { getProjectDefaultEnvironmentId } from "../../environments/application/environment-defaults";
 import {
   listAgentMcpServerIds,
-  deletePreparedAgentMcpBindingCredentials,
   prepareAgentMcpBindingsForConfig,
 } from "../../mcp/application/mcp-agent-binding.service";
 import { ensureProjectOwnership } from "../../projects/application/project.service";
 import { ensureProjectAgentOwner } from "./agent-access.service";
 import { prepareAgentDeploymentVersionCandidate } from "./agent-deployment-version.service";
-import {
-  loadAgentEnvironmentConfig,
-  prepareAgentEnvironmentConfigWrite,
-} from "./agent-environment.service";
 import { toAgentModel } from "./agent-models";
-import {
-  readAgentId,
-  readEnvironmentId,
-  readMcpServerId,
-  readProjectId,
-} from "./agent-platform-ids";
-import { getAgentRow, replaceAgentSkills } from "./agent-repository";
+import { getAgentRow } from "./agent-repository";
 import {
   ensureAgentSkillSelectionAccess,
   normalizeAgentSkillIds,
@@ -52,10 +38,10 @@ import {
 import { buildAgentSpecForPreparedProfile, listAgentSpecSkillsByIds } from "./agent-spec.service";
 import { parseAgentStoredConfig, serializeAgentStoredConfig } from "./agent-stored-config.service";
 import {
-  evaluateAgentRuntimeSelection,
   createAgentConfigChangeSnapshot,
   listAgentSkillIds,
   planVersionedAgentConfigChange,
+  requireAgentRuntimeSelection,
   summarizeVersionedAgentConfigChange,
 } from "./agent-versioned-config.service";
 import { assertRuntimeAdvancedSettings } from "./runtime-advanced-settings-validation.service";
@@ -78,39 +64,23 @@ function stableStringify(value: unknown): string {
 }
 
 export async function createAgent(
-  bindings: Pick<
-    ApiBindings,
-    | "DB"
-    | "MOSOO_DEPLOYMENT_MODE"
-    | "MOSOO_ENVIRONMENT"
-    | "POSTHOG_API_HOST"
-    | "POSTHOG_PROJECT_KEY"
-  >,
+  bindings: ApiBindings,
   viewer: AuthenticatedViewer,
   input: CreateAgentInput,
 ): Promise<Agent> {
   const database = bindings.DB;
-  const projectId = readProjectId(input.projectId);
+  const { projectId } = input;
   await ensureProjectOwnership(database, viewer.id, projectId);
-  const environmentId = readEnvironmentId(
-    await getProjectDefaultEnvironmentId(database, projectId),
-  );
-  const runtimeSelection = evaluateAgentRuntimeSelection(input);
-
-  if (!runtimeSelection.ok) {
-    throw new Error(runtimeSelection.message);
-  }
-
-  const { runtimeId } = runtimeSelection;
+  const environmentId = await getProjectDefaultEnvironmentId(database, projectId);
+  const { model, provider, runtimeId } = requireAgentRuntimeSelection(input);
   const skillIds = normalizeAgentSkillIds(input.skillIds);
   const timestampMs = currentTimestampMs();
   const agentId = createPlatformId<AgentId>();
 
   await ensureAgentSkillSelectionAccess(database, viewer, projectId, skillIds);
 
-  await getAppDatabase(database)
-    .insert(agentsTable)
-    .values({
+  await runAppDatabaseBatch(database, (db) => [
+    db.insert(agentsTable).values({
       configJson: serializeAgentStoredConfig({
         builtInTools: createDefaultAgentBuiltInTools(),
         packageMcpServers: [],
@@ -123,18 +93,28 @@ export async function createAgent(
       environmentId,
       id: agentId,
       kind: "cattle",
-      model: input.model,
+      model,
       name: input.name,
       ownerId: viewer.id,
       projectId,
       prompt: input.prompt,
-      provider: input.provider,
+      provider,
       runtimeId,
       updatedAt: timestampMs,
-    })
-    .run();
-
-  await replaceAgentSkills(database, agentId, skillIds, timestampMs);
+    }),
+    ...(skillIds.length > 0
+      ? [
+          db.insert(agentSkillsTable).values(
+            skillIds.map((skillId, index) => ({
+              agentId,
+              createdAt: timestampMs,
+              skillId,
+              sortOrder: index,
+            })),
+          ),
+        ]
+      : []),
+  ]);
 
   const createdAgent = await getAgentRow(database, agentId);
   await captureServerProductEvent(bindings, {
@@ -143,7 +123,7 @@ export async function createAgent(
     properties: {
       agent_id: agentId,
       project_id: projectId,
-      provider: input.provider,
+      provider,
       runtime_id: runtimeId,
     },
   });
@@ -156,27 +136,15 @@ export async function updateAgentConfig(
   viewer: AuthenticatedViewer,
   input: UpdateAgentConfigInput,
 ): Promise<Agent> {
-  const agentId = readAgentId(input.agentId);
-  const editable = await ensureProjectAgentOwner(database, viewer.id, {
-    agentId,
-    projectId: readProjectId(input.projectId),
+  const agent = await ensureProjectAgentOwner(database, viewer.id, {
+    agentId: input.agentId,
+    projectId: input.projectId,
   });
-  const runtimeSelection = evaluateAgentRuntimeSelection(input);
-
-  if (!runtimeSelection.ok) {
-    throw new Error(runtimeSelection.message);
-  }
-
-  const { runtimeId } = runtimeSelection;
+  const { model, provider, runtimeId } = requireAgentRuntimeSelection(input);
   const skillIds = normalizeAgentSkillIds(input.skillIds);
   const timestampMs = currentTimestampMs();
-  const currentEnvironment = await loadAgentEnvironmentConfig(
-    database,
-    editable.agent.id,
-    editable.agent.environmentId,
-  );
-  const currentSkillIds = await listAgentSkillIds(database, editable.agent.id);
-  const currentStoredConfig = parseAgentStoredConfig(editable.agent.configJson);
+  const currentSkillIds = await listAgentSkillIds(database, agent.id);
+  const currentStoredConfig = parseAgentStoredConfig(agent.configJson);
   const builtInTools =
     input.builtInTools === undefined
       ? currentStoredConfig.builtInTools
@@ -189,89 +157,79 @@ export async function updateAgentConfig(
     stableStringify(requestedProviderOptions);
   const providerOptions = assertRuntimeAdvancedSettings({
     allowLegacyUnsupportedSettings:
-      providerOptionsUnchanged &&
-      editable.agent.model === input.model &&
-      editable.agent.runtimeId === runtimeId,
-    modelId: input.model,
+      providerOptionsUnchanged && agent.model === model && agent.runtimeId === runtimeId,
+    modelId: model,
     runtimeId,
     settings: requestedProviderOptions,
   });
-  const currentMcpServerIds = (await listAgentMcpServerIds(database, editable.agent.id)).map(
-    (serverId) => readMcpServerId(serverId),
-  );
-  const preparedMcpBindings = await prepareAgentMcpBindingsForConfig(database, viewer, {
-    agent: editable.agent,
+  const currentMcpServerIds = await listAgentMcpServerIds(database, agent.id);
+  const preparedMcpBindings = await prepareAgentMcpBindingsForConfig(database, {
+    agent,
     serverIds: input.mcpServerIds,
     updatedAt: timestampMs,
   });
-  const mcpServerIds = preparedMcpBindings.rows.map((row) => readMcpServerId(row.serverId));
+  const mcpServerIds = preparedMcpBindings.rows.map((row) => row.serverId);
+  const { environmentId } = input.environment;
+  const environment = { environmentId };
   const changePlan = planVersionedAgentConfigChange({
-    agentStatus: editable.agent.status,
+    agentStatus: agent.status,
     current: createAgentConfigChangeSnapshot({
       agent: {
-        ...editable.agent,
+        ...agent,
         builtInTools: currentStoredConfig.builtInTools,
         providerOptions: currentStoredConfig.providerOptions,
       },
-      environment: currentEnvironment,
+      environment: { environmentId: agent.environmentId },
       mcpServerIds: currentMcpServerIds,
       skillIds: currentSkillIds,
     }),
     next: createAgentConfigChangeSnapshot({
       agent: {
-        ...editable.agent,
+        ...agent,
         builtInTools,
         description: input.description ?? null,
-        model: input.model,
+        model,
         name: input.name,
         prompt: input.prompt,
-        provider: input.provider,
+        provider,
         providerOptions,
         runtimeId,
       },
-      environment: input.environment,
+      environment,
       mcpServerIds,
       skillIds,
     }),
   });
-  const { environmentId } = input.environment;
 
-  await ensureAgentSkillSelectionAccess(database, viewer, editable.agent.projectId, skillIds);
-  if (
-    environmentId !== null &&
-    environmentId !== "" &&
-    !(await canUseEnvironment(database, editable.agent.ownerId, {
+  await ensureAgentSkillSelectionAccess(database, viewer, agent.projectId, skillIds);
+  if (environmentId !== null && environmentId !== "") {
+    await ensureEnvironmentAccess(database, agent.ownerId, {
       environmentId,
-      projectId: editable.agent.projectId,
-    }))
-  ) {
-    throw forbiddenError("Selected Environment is not available to the agent owner.");
+      projectId: agent.projectId,
+    });
   }
 
-  const preparedEnvironment = prepareAgentEnvironmentConfigWrite({
-    agentId: editable.agent.id,
-    currentConfigJson: editable.agent.configJson,
-    environment: input.environment,
+  const configJson = serializeAgentStoredConfig({
+    ...currentStoredConfig,
     builtInTools,
     providerOptions,
-    updatedAt: timestampMs,
   });
   const nextAgent = {
-    ...editable.agent,
-    configJson: preparedEnvironment.configJson,
+    ...agent,
+    configJson,
     description: input.description ?? null,
-    environmentId: preparedEnvironment.environmentId,
-    model: input.model,
+    environmentId,
+    model,
     name: input.name,
     prompt: input.prompt,
-    provider: input.provider,
+    provider,
     runtimeId,
     updatedAt: timestampMs,
   };
   const specSkills = await listAgentSpecSkillsByIds(database, skillIds);
   const spec = await buildAgentSpecForPreparedProfile(database, {
     agent: nextAgent,
-    environment: preparedEnvironment.environment,
+    environment,
     mcpBindings: preparedMcpBindings.specBindings,
     skills: specSkills,
   });
@@ -286,42 +244,40 @@ export async function updateAgentConfig(
       })
     : null;
   const skillRows = skillIds.map((skillId, index) => ({
-    agentId: editable.agent.id,
+    agentId: agent.id,
     createdAt: timestampMs,
     skillId,
     sortOrder: index,
   }));
 
-  await deletePreparedAgentMcpBindingCredentials(database, preparedMcpBindings);
-
   await runAppDatabaseBatch(database, (db) => [
     db
       .update(agentsTable)
       .set({
-        configJson: preparedEnvironment.configJson,
+        configJson,
         description: input.description ?? null,
-        environmentId: preparedEnvironment.environmentId,
+        environmentId,
         ...(deploymentVersion ? { liveDeploymentVersionId: deploymentVersion.record.id } : {}),
-        model: input.model,
+        model,
         name: input.name,
         prompt: input.prompt,
-        provider: input.provider,
+        provider,
         runtimeId,
         updatedAt: timestampMs,
       })
-      .where(eq(agentsTable.id, editable.agent.id)),
+      .where(eq(agentsTable.id, agent.id)),
     ...(deploymentVersion
       ? [db.insert(agentDeploymentVersionsTable).values(deploymentVersion.values)]
       : []),
-    db.delete(agentSkillsTable).where(eq(agentSkillsTable.agentId, editable.agent.id)),
+    db.delete(agentSkillsTable).where(eq(agentSkillsTable.agentId, agent.id)),
     ...(skillRows.length > 0 ? [db.insert(agentSkillsTable).values(skillRows)] : []),
-    db.delete(agentMcpBindingsTable).where(eq(agentMcpBindingsTable.agentId, editable.agent.id)),
+    db.delete(agentMcpBindingsTable).where(eq(agentMcpBindingsTable.agentId, agent.id)),
     ...(preparedMcpBindings.rows.length > 0
       ? [db.insert(agentMcpBindingsTable).values(preparedMcpBindings.rows)]
       : []),
   ]);
 
-  const updatedAgent = await getAgentRow(database, editable.agent.id);
+  const updatedAgent = await getAgentRow(database, agent.id);
 
   return toAgentModel(database, viewer, updatedAgent);
 }

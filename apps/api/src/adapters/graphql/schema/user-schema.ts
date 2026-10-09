@@ -4,12 +4,6 @@ export const userSchema = /* GraphQL */ `
     id: ULID!
     imageUrl: String
     name: String!
-    systemAgentModel: SystemAgentModelSetting
-  }
-
-  type SystemAgentModelSetting {
-    modelId: String!
-    vendor: String!
   }
 
   type OnboardingStatus {
@@ -17,15 +11,9 @@ export const userSchema = /* GraphQL */ `
     organization: Organization
   }
 
-  type ViewerAuth {
-    currentSecurityLevel: AuthSecurityLevel!
-    methods: [AuthMethod!]!
-  }
-
   type Viewer {
     account: Account
     activeOrganization: Organization
-    auth: ViewerAuth!
     organizations: [Organization!]!
   }
 
@@ -36,10 +24,5 @@ export const userSchema = /* GraphQL */ `
   input UpdateAccountProfileInput {
     imageUrl: String
     name: String!
-  }
-
-  input SetSystemAgentModelInput {
-    modelId: String!
-    vendor: String!
   }
 `;

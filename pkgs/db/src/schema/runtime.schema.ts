@@ -1,9 +1,5 @@
 import type { AgentKind } from "@mosoo/contracts/agent";
 import type { DriverInstanceProtocol } from "@mosoo/contracts/driver-instance";
-import type {
-  ExternalToolEffectAttemptStatus,
-  ExternalToolEffectStatus,
-} from "@mosoo/contracts/external-tool-effect";
 import type { McpAuthType, McpAuthorizationState } from "@mosoo/contracts/mcp";
 import type { RuntimeCommandStatus } from "@mosoo/contracts/runtime-command";
 import type {
@@ -69,9 +65,14 @@ export const sandboxesTable = sqliteTable(
     ownerAccountId: platformIdColumn<AccountId>("owner_account_id"),
     status: text("status").$type<SandboxStatus>().notNull(),
     statusChangedAt: integer("status_changed_at").notNull().default(0),
+    // status_event and status_source are retired: the API no longer writes or
+    // reads them. Their values are frozen (the insert default on new rows, the
+    // last pre-retirement write on old rows) and must not be used to diagnose
+    // a subject. Dropping them needs an owner-approved migration.
     statusEvent: text("status_event").notNull().default("runtime_subject.cold"),
     statusOperationId: platformIdColumn<RuntimeOperationId>("status_operation_id"),
     statusSeq: integer("status_seq").notNull().default(0),
+    // Retired; see status_event.
     statusSource: text("status_source").notNull().default("system"),
     subjectId: platformIdColumn<PlatformId>("subject_id").notNull(),
     subjectKind: text("subject_kind").$type<SandboxSubjectKind>().notNull(),
@@ -260,7 +261,7 @@ export const externalToolEffectsTable = sqliteTable(
     sessionRunId: platformIdColumn<SessionRunId>("session_run_id")
       .notNull()
       .references(() => sessionRunsTable.id, { onDelete: "cascade" }),
-    status: text("status").$type<ExternalToolEffectStatus>().notNull(),
+    status: text("status").$type<"intent" | "executing" | "succeeded" | "unknown">().notNull(),
     toolName: text("tool_name").notNull(),
     updatedAt: integer("updated_at").notNull(),
   },
@@ -291,7 +292,7 @@ export const externalToolEffectAttemptsTable = sqliteTable(
       .references(() => externalToolEffectsTable.id, { onDelete: "cascade" }),
     providerReceiptJson: text("provider_receipt_json"),
     resultJson: text("result_json"),
-    status: text("status").$type<ExternalToolEffectAttemptStatus>().notNull(),
+    status: text("status").$type<"executing" | "succeeded" | "unknown">().notNull(),
   },
   (table) => [
     primaryKey({
@@ -355,13 +356,3 @@ export const nativeResumeRefsTable = sqliteTable(
   },
   (table) => [index("native_resume_ref_runtime_updated_idx").on(table.runtimeId, table.updatedAt)],
 );
-
-export type SandboxRow = typeof sandboxesTable.$inferSelect;
-export type SandboxSessionRow = typeof sandboxSessionsTable.$inferSelect;
-export type SandboxBackupRow = typeof sandboxBackupsTable.$inferSelect;
-export type DriverCommandRow = typeof driverCommandsTable.$inferSelect;
-export type ExternalToolEffectAttemptRow = typeof externalToolEffectAttemptsTable.$inferSelect;
-export type ExternalToolEffectRow = typeof externalToolEffectsTable.$inferSelect;
-export type DriverInstanceMcpGrantRow = typeof driverInstanceMcpGrantsTable.$inferSelect;
-export type DriverInstanceRow = typeof driverInstancesTable.$inferSelect;
-export type NativeResumeRefRow = typeof nativeResumeRefsTable.$inferSelect;

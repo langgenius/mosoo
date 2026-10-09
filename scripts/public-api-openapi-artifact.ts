@@ -11,8 +11,8 @@ export function renderPublicApiOpenApiArtifact(version: PublicApiVersion = "v1")
   return `${JSON.stringify(createPublicApiOpenApiDocument("https://cloud.mosoo.ai", version), null, 2)}\n`;
 }
 
-function runArtifactFormatter(path: string, mode: "--check" | "--write"): void {
-  const result = spawnSync("vp", ["fmt", path, mode], {
+function formatArtifact(path: string): void {
+  const result = spawnSync("vp", ["fmt", path, "--write"], {
     stdio: "inherit",
   });
 
@@ -30,7 +30,7 @@ async function updateArtifact(
 
   if (mode === "--write") {
     await writeFile(path, expected, "utf8");
-    runArtifactFormatter(path, "--write");
+    formatArtifact(path);
     console.log(`Wrote ${path}.`);
     return;
   }
@@ -52,7 +52,6 @@ async function updateArtifact(
     return;
   }
 
-  runArtifactFormatter(path, "--check");
   console.log(`Public API OpenAPI artifact is current: ${path}`);
 }
 

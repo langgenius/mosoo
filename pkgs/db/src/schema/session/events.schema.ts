@@ -1,8 +1,6 @@
 import type {
   SessionProcessEventStatus,
   SessionProcessEventType,
-  SessionRuntimeEventFamily,
-  SessionRuntimeEventSource,
   SessionRuntimeEventVisibility,
 } from "@mosoo/contracts/session";
 import type {
@@ -66,7 +64,7 @@ export const sessionEventsTable = sqliteTable(
     createdAt: integer("created_at").notNull(),
     endedAt: integer("ended_at").notNull(),
     eventType: text("event_type").notNull(),
-    family: text("family").$type<SessionRuntimeEventFamily>().notNull(),
+    family: text("family").notNull(),
     id: platformIdColumn<RuntimeEventId>("id").primaryKey(),
     occurredAt: integer("occurred_at").notNull(),
     processStatus: text("process_status").$type<SessionProcessEventStatus>().notNull(),
@@ -77,7 +75,7 @@ export const sessionEventsTable = sqliteTable(
       .notNull()
       .references(() => sessionsTable.id, { onDelete: "cascade" }),
     sourceEventId: text("source_event_id").notNull(),
-    source: text("source").$type<SessionRuntimeEventSource>().notNull(),
+    source: text("source").notNull(),
     toolCallId: text("tool_call_id"),
     toolInputJson: text("tool_input_json"),
     toolName: text("tool_name"),
@@ -109,6 +107,3 @@ export const sessionEventsTable = sqliteTable(
     uniqueIndex("session_event_session_source_idx").on(table.sessionId, table.sourceEventId),
   ],
 );
-
-export type SessionEventRow = typeof sessionEventsTable.$inferSelect;
-export type SessionModelCallRow = typeof sessionModelCallsTable.$inferSelect;

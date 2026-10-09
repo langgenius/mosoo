@@ -21,7 +21,6 @@ const config = {
       node: true,
       serviceworker: true,
       "shared-node-browser": true,
-      vitest: true,
       worker: true,
     },
     extraOverrides: [

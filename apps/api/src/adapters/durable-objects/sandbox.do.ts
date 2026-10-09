@@ -1,6 +1,8 @@
 import type { Sandbox as CloudflareSandbox } from "@cloudflare/sandbox";
 import { DurableObject } from "cloudflare:workers";
 
+import type { SandboxNetworkConstraints } from "../../modules/runtime/domain/sandbox-network-constraints";
+import { isRuntimeSandboxLocalBucketEnabled } from "../../modules/runtime/infrastructure/runtime-sandbox-bucket-mount";
 import { SandboxStartup } from "../../platform/cloudflare/sandbox-startup";
 import type { ApiBindings } from "../../platform/cloudflare/worker-types";
 import { SandboxHandleGuard } from "./sandbox-handle-guard";
@@ -9,7 +11,6 @@ import {
   restoreSandboxNetworkEnforcement,
 } from "./sandbox-network-enforcement";
 import type { SandboxNetworkDelegate } from "./sandbox-network-enforcement";
-import { waitForSandboxNetworkRestore } from "./sandbox-network-restore-gate";
 import { SANDBOX_RPC_FORWARD_METHODS } from "./sandbox-rpc-methods";
 import type { SandboxRpcForwardMethod } from "./sandbox-rpc-methods";
 
@@ -29,88 +30,54 @@ type SandboxContainerState = DurableObjectState<{}> & {
 
 const FORWARD_SANDBOX_METHOD = Symbol("forwardSandboxMethod");
 
-export interface SandboxContainerObservation {
-  readonly state: "running" | "stopped" | "unavailable";
-  readonly observedAt: number;
-}
-
 export class Sandbox extends DurableObject<ApiBindings> {
+  readonly #delegate: Promise<SandboxDelegate>;
   readonly #handleGuard = new SandboxHandleGuard();
-  #initialization?: {
-    delegate: Promise<SandboxDelegate>;
-    networkRestore: Promise<void>;
-    startup: Promise<SandboxStartup>;
-  };
   readonly #httpsInterceptionDisabled: boolean;
+  readonly #networkRestore: Promise<void>;
+  readonly #startup: Promise<SandboxStartup>;
 
   constructor(ctx: DurableObjectState<{}>, env: ApiBindings) {
     super(ctx, env);
 
-    this.#httpsInterceptionDisabled = env.SANDBOX_FILE_BUCKET_LOCAL === "true";
-  }
-
-  getContainerObservation(): SandboxContainerObservation {
-    const running = (this.ctx as SandboxContainerState).container?.running;
-    return {
-      state: running === true ? "running" : running === false ? "stopped" : "unavailable",
-      observedAt: Date.now(),
-    };
-  }
-
-  #initializeDelegate() {
-    if (this.#initialization) return this.#initialization;
-
-    // Observation must not initialize the SDK: its constructor restores lifetime
-    // settings and schedules alarms, even when the container is stopped.
-    const delegate = import("@cloudflare/sandbox").then(
-      ({ Sandbox: SandboxImplementation }) => new SandboxImplementation(this.ctx, this.env),
+    this.#httpsInterceptionDisabled = isRuntimeSandboxLocalBucketEnabled(env);
+    this.#delegate = import("@cloudflare/sandbox").then(
+      ({ Sandbox: SandboxImplementation }) => new SandboxImplementation(ctx, env),
     );
-    // Re-assert the persisted internet switch before any container start. A
-    // rejected restore blocks every access/start RPC, while teardown remains
-    // available so lifecycle repair can remove the untrusted container.
-    const networkRestore = delegate.then((sandbox) =>
-      restoreSandboxNetworkEnforcement(this.ctx.storage, sandbox, {
-        httpsInterceptionDisabled: this.#httpsInterceptionDisabled,
-      }),
+    // Re-assert the persisted internet switch before any container start. Every
+    // entry point waits for it, teardown included.
+    this.#networkRestore = this.#delegate.then((delegate) =>
+      restoreSandboxNetworkEnforcement(ctx.storage, delegate),
     );
-    const startup = delegate.then(
-      (sandbox) =>
-        new SandboxStartup(sandbox, {
-          sandboxId: this.ctx.id.toString(),
-          isRunning: () => (this.ctx as SandboxContainerState).container?.running === true,
+    this.#startup = this.#delegate.then(
+      (delegate) =>
+        new SandboxStartup(delegate, {
+          sandboxId: ctx.id.toString(),
+          isRunning: () => (ctx as SandboxContainerState).container?.running === true,
         }),
     );
-    this.#initialization = { delegate, networkRestore, startup };
-    return this.#initialization;
   }
 
   async ensureContainerReady(options: { allowRecovery: boolean }): Promise<void> {
-    const initialization = this.#initializeDelegate();
-    await initialization.networkRestore;
-    await (await initialization.startup).ensureReady(options.allowRecovery);
+    await this.#networkRestore;
+    await (await this.#startup).ensureReady(options.allowRecovery);
   }
 
-  async configureNetworkConstraints(constraints: unknown): Promise<void> {
-    const initialization = this.#initializeDelegate();
-    await initialization.networkRestore;
-    const delegate = await initialization.delegate;
-
-    await configureSandboxNetworkConstraints(this.ctx.storage, delegate, constraints, {
-      containerRunning: (this.ctx as SandboxContainerState).container?.running === true,
+  async configureNetworkConstraints(constraints: SandboxNetworkConstraints): Promise<void> {
+    await this.#networkRestore;
+    await configureSandboxNetworkConstraints(this.ctx.storage, await this.#delegate, constraints, {
       httpsInterceptionDisabled: this.#httpsInterceptionDisabled,
     });
   }
 
   override async fetch(request: Request): Promise<Response> {
-    const initialization = this.#initializeDelegate();
-    await initialization.networkRestore;
-    return (await initialization.delegate).fetch(request);
+    await this.#networkRestore;
+    return (await this.#delegate).fetch(request);
   }
 
   override async alarm(alarmProps?: { isRetry: boolean; retryCount: number }): Promise<void> {
-    const initialization = this.#initializeDelegate();
-    await initialization.networkRestore;
-    await (await initialization.delegate).alarm(alarmProps);
+    await this.#networkRestore;
+    await (await this.#delegate).alarm(alarmProps);
   }
 
   async [FORWARD_SANDBOX_METHOD](
@@ -127,17 +94,11 @@ export class Sandbox extends DurableObject<ApiBindings> {
     method: SandboxRpcForwardMethod,
     args: readonly unknown[],
   ): Promise<unknown> {
-    const initialization = this.#initializeDelegate();
-    await waitForSandboxNetworkRestore(initialization.networkRestore, method, args);
-    const delegate = await initialization.delegate;
-    if (method === "destroy") await (await initialization.startup).cancelAndDrain();
-    const action = Reflect.get(delegate, method);
-
-    if (typeof action !== "function") {
-      throw new TypeError(`Cloudflare Sandbox delegate is missing ${method}.`);
-    }
-
-    return await (Reflect.apply(action, delegate, args) as Promise<unknown>);
+    await this.#networkRestore;
+    const delegate = await this.#delegate;
+    if (method === "destroy") await (await this.#startup).cancelAndDrain();
+    const action = Reflect.get(delegate, method) as (...args: unknown[]) => Promise<unknown>;
+    return await Reflect.apply(action, delegate, args);
   }
 }
 

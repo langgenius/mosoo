@@ -2,7 +2,7 @@ import type { EnvironmentSummary } from "@mosoo/contracts/environment";
 
 export function describeEnvironment(
   environment: EnvironmentSummary,
-  t: (key: string, variables?: Record<string, string>) => string = (key) => key,
+  t: (key: string, variables?: Record<string, string>) => string,
 ): string {
   const network =
     environment.networkPolicy === "full"

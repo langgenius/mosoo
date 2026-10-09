@@ -1,7 +1,6 @@
 import type { SessionRunStatus } from "@mosoo/contracts/session-run";
-import { createMachine, transition } from "xstate";
 
-const TERMINAL_SESSION_RUN_STATUSES = [
+export const TERMINAL_SESSION_RUN_STATUSES = [
   "cancelled",
   "completed",
   "expired",
@@ -16,113 +15,38 @@ export const ACTIVE_SESSION_RUN_STATUSES = [
 ] as const satisfies readonly SessionRunStatus[];
 
 type TerminalSessionRunStatus = (typeof TERMINAL_SESSION_RUN_STATUSES)[number];
+type ActiveSessionRunStatus = (typeof ACTIVE_SESSION_RUN_STATUSES)[number];
 
-export type SessionRunLifecycleEvent =
-  | { type: "run.boot" }
-  | { type: "run.cancel" }
-  | { type: "run.complete" }
-  | { type: "run.expire" }
-  | { type: "run.fail" }
-  | { type: "run.queue" }
-  | { type: "run.start" }
-  | { type: "run.wait_for_input" };
+const NEXT_SESSION_RUN_STATUSES: Record<ActiveSessionRunStatus, readonly SessionRunStatus[]> = {
+  booting: ["cancelled", "completed", "expired", "failed", "running", "waiting_input"],
+  queued: ["booting", "cancelled", "expired", "failed", "running"],
+  running: ["cancelled", "completed", "expired", "failed", "waiting_input"],
+  waiting_input: ["cancelled", "completed", "expired", "failed", "running"],
+};
 
-const SESSION_RUN_STATUS_BY_EVENT = {
-  "run.boot": "booting",
-  "run.cancel": "cancelled",
-  "run.complete": "completed",
-  "run.expire": "expired",
-  "run.fail": "failed",
-  "run.queue": "queued",
-  "run.start": "running",
-  "run.wait_for_input": "waiting_input",
-} as const satisfies Record<SessionRunLifecycleEvent["type"], SessionRunStatus>;
-
-const SESSION_RUN_EVENT_BY_STATUS = {
-  booting: { type: "run.boot" },
-  cancelled: { type: "run.cancel" },
-  completed: { type: "run.complete" },
-  expired: { type: "run.expire" },
-  failed: { type: "run.fail" },
-  queued: { type: "run.queue" },
-  running: { type: "run.start" },
-  waiting_input: { type: "run.wait_for_input" },
-} as const satisfies Record<SessionRunStatus, SessionRunLifecycleEvent>;
-
-const sessionRunLifecycleMachine = createMachine({
-  id: "sessionRunLifecycle",
-  initial: "queued",
-  states: {
-    booting: {
-      on: {
-        "run.cancel": "cancelled",
-        "run.complete": "completed",
-        "run.expire": "expired",
-        "run.fail": "failed",
-        "run.start": "running",
-        "run.wait_for_input": "waiting_input",
-      },
-    },
-    cancelled: {},
-    completed: {},
-    expired: {},
-    failed: {},
-    queued: {
-      on: {
-        "run.boot": "booting",
-        "run.cancel": "cancelled",
-        "run.expire": "expired",
-        "run.fail": "failed",
-        "run.start": "running",
-      },
-    },
-    running: {
-      on: {
-        "run.cancel": "cancelled",
-        "run.complete": "completed",
-        "run.expire": "expired",
-        "run.fail": "failed",
-        "run.wait_for_input": "waiting_input",
-      },
-    },
-    waiting_input: {
-      on: {
-        "run.cancel": "cancelled",
-        "run.complete": "completed",
-        "run.expire": "expired",
-        "run.fail": "failed",
-        "run.start": "running",
-      },
-    },
-  },
-  types: {} as {
-    events: SessionRunLifecycleEvent;
-  },
-});
+const SESSION_RUN_STATUS_EVENT_NAMES = {
+  booting: "run.boot",
+  cancelled: "run.cancel",
+  completed: "run.complete",
+  expired: "run.expire",
+  failed: "run.fail",
+  queued: "run.queue",
+  running: "run.start",
+  waiting_input: "run.wait_for_input",
+} as const satisfies Record<SessionRunStatus, string>;
 
 export type SessionRunTransitionDecision =
+  | { kind: "accepted" }
+  | { currentStatus: SessionRunStatus; kind: "duplicate" }
   | {
-      kind: "accepted";
-      event: SessionRunLifecycleEvent;
-      nextStatus: SessionRunStatus;
-      previousStatus: SessionRunStatus;
-    }
-  | {
-      kind: "duplicate";
       currentStatus: SessionRunStatus;
-      event: SessionRunLifecycleEvent;
-    }
-  | {
       kind: "rejected";
-      currentStatus: SessionRunStatus;
-      event: SessionRunLifecycleEvent;
       reason: "illegal_transition";
       targetStatus: SessionRunStatus;
     }
   | {
-      kind: "stale";
       currentStatus: TerminalSessionRunStatus;
-      event: SessionRunLifecycleEvent;
+      kind: "stale";
       reason: "terminal_run";
       targetStatus: SessionRunStatus;
     };
@@ -135,64 +59,28 @@ export function isTerminalSessionRunStatus(
   );
 }
 
-function toSessionRunLifecycleEvent(status: SessionRunStatus): SessionRunLifecycleEvent {
-  return SESSION_RUN_EVENT_BY_STATUS[status];
-}
-
 export function toSessionRunStatusLifecycleEventName(status: SessionRunStatus): string {
-  return toSessionRunLifecycleEvent(status).type;
+  return SESSION_RUN_STATUS_EVENT_NAMES[status];
 }
 
-export function decideSessionRunTransition(input: {
+export function decideSessionRunTransition({
+  currentStatus,
+  targetStatus,
+}: {
   currentStatus: SessionRunStatus;
   targetStatus: SessionRunStatus;
 }): SessionRunTransitionDecision {
-  const event = toSessionRunLifecycleEvent(input.targetStatus);
-
-  if (input.currentStatus === input.targetStatus) {
-    return {
-      currentStatus: input.currentStatus,
-      event,
-      kind: "duplicate",
-    };
+  if (currentStatus === targetStatus) {
+    return { currentStatus, kind: "duplicate" };
   }
 
-  if (isTerminalSessionRunStatus(input.currentStatus)) {
-    return {
-      currentStatus: input.currentStatus,
-      event,
-      kind: "stale",
-      reason: "terminal_run",
-      targetStatus: input.targetStatus,
-    };
+  if (isTerminalSessionRunStatus(currentStatus)) {
+    return { currentStatus, kind: "stale", reason: "terminal_run", targetStatus };
   }
 
-  const snapshot = sessionRunLifecycleMachine.resolveState({ value: input.currentStatus });
-  const [nextSnapshot] = transition(sessionRunLifecycleMachine, snapshot, event);
-  const nextStatus = readSessionRunSnapshotValue(nextSnapshot.value);
-
-  if (nextStatus === input.currentStatus) {
-    return {
-      currentStatus: input.currentStatus,
-      event,
-      kind: "rejected",
-      reason: "illegal_transition",
-      targetStatus: input.targetStatus,
-    };
+  if (!NEXT_SESSION_RUN_STATUSES[currentStatus].includes(targetStatus)) {
+    return { currentStatus, kind: "rejected", reason: "illegal_transition", targetStatus };
   }
 
-  return {
-    event,
-    kind: "accepted",
-    nextStatus,
-    previousStatus: input.currentStatus,
-  };
-}
-
-function readSessionRunSnapshotValue(value: unknown): SessionRunStatus {
-  if (typeof value !== "string" || !(value in SESSION_RUN_EVENT_BY_STATUS)) {
-    throw new Error("Session run lifecycle machine returned an unknown state.");
-  }
-
-  return SESSION_RUN_STATUS_BY_EVENT[toSessionRunLifecycleEvent(value as SessionRunStatus).type];
+  return { kind: "accepted" };
 }

@@ -5,7 +5,6 @@ export {
 export { queueSessionRun } from "./session-runs/queue-run.service";
 export { rejectSessionPermissionRequests } from "./session-runs/session-permission-decision.service";
 export {
-  type QueueSessionRunsInput,
-  type QueueSessionRunsOutput,
-} from "./session-runs/start-runs.service";
-export { sendAgentSessionEvents } from "./session-runs/send-agent-session-events.service";
+  autoTitleSessionFromPrompt,
+  sendAgentSessionEvents,
+} from "./session-runs/send-agent-session-events.service";

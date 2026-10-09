@@ -1,26 +1,13 @@
 import { getSessionResourceRootPath } from "@mosoo/agent-driver/paths";
 
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
+import { quoteShellArg } from "../../../../shared/shell";
 import {
   createRuntimeSandboxBucketMountOptions,
   isRuntimeSandboxLocalBucketEnabled,
   resolveRuntimeSandboxBucketMountTarget,
 } from "../runtime-sandbox-bucket-mount";
-import { toRuntimeBucketMountConflictError } from "../runtime-sandbox-mount-errors";
-import { RuntimeBucketMountConflictError } from "../runtime-subject-lifecycle/runtime-subject-errors";
 import type { SandboxHandle } from "../sandbox-handles";
-
-function quoteShellArg(value: string): string {
-  return `'${value.replaceAll("'", `'"'"'`)}'`;
-}
-
-function getSessionResourceMountPath(sessionId: string): string {
-  return getSessionResourceRootPath(sessionId);
-}
-
-function getSessionResourceBucketPrefix(sessionId: string): string {
-  return `/session/${sessionId}/attachment/`;
-}
 
 async function sandboxBucketMountIsReady(input: {
   localBucket: boolean;
@@ -42,18 +29,11 @@ export async function ensureSessionResourcesMounted(input: {
   sandbox: SandboxHandle;
   sessionId: string;
 }): Promise<void> {
-  const mountPath = getSessionResourceMountPath(input.sessionId);
-  const bucket = resolveRuntimeSandboxBucketMountTarget(input.bindings);
-  const prefix = getSessionResourceBucketPrefix(input.sessionId);
+  const mountPath = getSessionResourceRootPath(input.sessionId);
   const localBucket = isRuntimeSandboxLocalBucketEnabled(input.bindings);
+  const probe = { localBucket, mountPath, sandbox: input.sandbox };
 
-  if (
-    await sandboxBucketMountIsReady({
-      localBucket,
-      mountPath,
-      sandbox: input.sandbox,
-    })
-  ) {
+  if (await sandboxBucketMountIsReady(probe)) {
     return;
   }
 
@@ -61,37 +41,17 @@ export async function ensureSessionResourcesMounted(input: {
 
   try {
     await input.sandbox.mountBucket(
-      bucket,
+      resolveRuntimeSandboxBucketMountTarget(input.bindings),
       mountPath,
       createRuntimeSandboxBucketMountOptions(input.bindings, {
-        prefix,
+        prefix: `/session/${input.sessionId}/attachment/`,
         readOnly: true,
       }),
     );
-  } catch (cause) {
-    const error =
-      toRuntimeBucketMountConflictError(cause, {
-        mountPath,
-      }) ?? cause;
-
-    if (
-      error instanceof RuntimeBucketMountConflictError &&
-      (localBucket ||
-        (await sandboxBucketMountIsReady({
-          localBucket,
-          mountPath,
-          sandbox: input.sandbox,
-        })))
-    ) {
-      return;
-    }
-
-    if (
-      !localBucket &&
-      error instanceof RuntimeBucketMountConflictError &&
-      error.bucket === bucket &&
-      error.prefix === prefix
-    ) {
+  } catch (error) {
+    // A concurrent Run may have mounted the same path first. Only a FUSE mount
+    // has a real mountpoint to probe; the local-sync probe passes after mkdir.
+    if (!localBucket && (await sandboxBucketMountIsReady(probe))) {
       return;
     }
 

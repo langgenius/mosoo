@@ -1,10 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
-import {
-  retrieveAgentSession,
-  retrieveThreadAgentSession,
-} from "../src/modules/sessions/application/agent-session-retrieve.service";
+import { retrieveThreadAgentSession } from "../src/modules/sessions/application/agent-session-retrieve.service";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
 const VIEWER: AuthenticatedViewer = {
@@ -127,10 +124,10 @@ function createAgentSessionRetrieveDatabase(): SqliteD1Database {
 }
 
 describe("agent session retrieve", () => {
-  test("computes creator capabilities from the retrieved session", async () => {
+  test("computes capabilities from the retrieved session", async () => {
     const database = createAgentSessionRetrieveDatabase();
 
-    const result = await retrieveAgentSession(database, VIEWER, {
+    const result = await retrieveThreadAgentSession(database, VIEWER, {
       projectId: PROJECT_ID,
       sessionId: "session-1",
     });
@@ -141,15 +138,19 @@ describe("agent session retrieve", () => {
     ).toBe(true);
   });
 
-  test("loads thread retrieve summaries for the creator", async () => {
+  test("rejects viewers who do not own the Project", async () => {
     const database = createAgentSessionRetrieveDatabase();
 
-    const result = await retrieveThreadAgentSession(database, VIEWER, {
-      projectId: PROJECT_ID,
-      sessionId: "session-1",
-    });
-
-    expect(result.session.id).toBe("session-1");
+    await expect(
+      retrieveThreadAgentSession(
+        database,
+        { ...VIEWER, id: "outsider-1" },
+        {
+          projectId: PROJECT_ID,
+          sessionId: "session-1",
+        },
+      ),
+    ).rejects.toMatchObject({ status: 403 });
   });
 
   test("projects terminal cleanup rows as not recoverable even with archive marker", async () => {
@@ -160,7 +161,7 @@ describe("agent session retrieve", () => {
       .bind(2, "TERMINATED", "session-1")
       .run();
 
-    const result = await retrieveAgentSession(database, VIEWER, {
+    const result = await retrieveThreadAgentSession(database, VIEWER, {
       projectId: PROJECT_ID,
       sessionId: "session-1",
     });

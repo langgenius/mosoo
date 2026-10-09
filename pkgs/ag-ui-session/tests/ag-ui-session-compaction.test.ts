@@ -1,13 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import {
-  EventType,
-  appendCompactedAgUiSessionEvents,
-  compactAgUiSessionEvents,
-  createServerCustomEvent,
-  getAgUiSessionEventDeltaLength,
-  isAgUiSessionEventBufferable,
-} from "@mosoo/ag-ui-session";
+import { EventType, compactAgUiSessionEvents, createServerCustomEvent } from "@mosoo/ag-ui-session";
 import type { AgUiSessionEvent } from "@mosoo/ag-ui-session";
 
 describe("AG-UI session event compaction", () => {
@@ -80,61 +73,5 @@ describe("AG-UI session event compaction", () => {
       { delta: "Hello", messageId: "message-1", type: EventType.TEXT_MESSAGE_CONTENT },
       second,
     ]);
-  });
-
-  test("appends compacted batches using full compaction semantics", () => {
-    const first = createServerCustomEvent("mosoo.session.info.updated", {
-      title: "Draft",
-    });
-    const second = createServerCustomEvent("mosoo.session.info.updated", {
-      title: "Final",
-    });
-
-    expect(
-      appendCompactedAgUiSessionEvents(
-        compactAgUiSessionEvents([
-          { delta: "Hel", messageId: "message-1", type: EventType.TEXT_MESSAGE_CONTENT },
-          first,
-        ]),
-        compactAgUiSessionEvents([
-          { delta: "lo", messageId: "message-1", type: EventType.TEXT_MESSAGE_CONTENT },
-          second,
-        ]),
-      ),
-    ).toEqual([
-      { delta: "Hello", messageId: "message-1", type: EventType.TEXT_MESSAGE_CONTENT },
-      second,
-    ]);
-  });
-
-  test("identifies bufferable events and measures streamed payload size", () => {
-    expect(
-      isAgUiSessionEventBufferable({
-        delta: "hello",
-        messageId: "message-1",
-        type: EventType.TEXT_MESSAGE_CONTENT,
-      }),
-    ).toBe(true);
-    expect(
-      getAgUiSessionEventDeltaLength({
-        delta: "hello",
-        messageId: "message-1",
-        type: EventType.TEXT_MESSAGE_CONTENT,
-      }),
-    ).toBe(5);
-    expect(
-      isAgUiSessionEventBufferable({
-        runId: "run-1",
-        threadId: "session-1",
-        type: EventType.RUN_STARTED,
-      }),
-    ).toBe(false);
-    expect(
-      getAgUiSessionEventDeltaLength({
-        runId: "run-1",
-        threadId: "session-1",
-        type: EventType.RUN_STARTED,
-      }),
-    ).toBe(0);
   });
 });

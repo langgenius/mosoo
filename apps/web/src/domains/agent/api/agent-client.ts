@@ -20,7 +20,17 @@ import type {
   CreateAgentForkInput,
   ImportAgentPackageInput,
 } from "@mosoo/contracts/agent-manifest";
-import type { AgentId, ProjectId } from "@mosoo/contracts/id";
+import type {
+  AccountId,
+  AgentDeploymentVersionId,
+  AgentId,
+  AgentMcpBindingId,
+  EnvironmentId,
+  FileId,
+  McpServerId,
+  ProjectId,
+  SkillId,
+} from "@mosoo/id";
 
 import type {
   AgentEditorStateQuery,
@@ -33,34 +43,24 @@ import type {
   ImportAgentPackageMutation,
 } from "@/gql/graphql";
 import { requestGraphQL } from "@/platform/http/graphql-client";
-import {
-  toAccountId,
-  toAgentDeploymentVersionId,
-  toAgentId,
-  toAgentMcpBindingId,
-  toEnvironmentId,
-  toFileId,
-  toMcpServerId,
-  toProjectId,
-  toSkillId,
-} from "@/routes/typed-id";
 
 import {
   CREATE_AGENT_MUTATION,
   DELETE_AGENT_MUTATION,
-  GET_AGENT_EDITOR_STATE_QUERY,
   GET_AGENT_QUERY,
   LIST_VISIBLE_AGENTS_QUERY,
-  PUBLISH_AGENT_MUTATION,
-  UNPUBLISH_AGENT_MUTATION,
+} from "./agent-core-documents";
+import {
+  GET_AGENT_EDITOR_STATE_QUERY,
   UPDATE_AGENT_CONFIG_MUTATION,
-} from "./agent-documents";
+} from "./agent-editor-documents";
 import {
   CREATE_AGENT_FORK_MUTATION,
   EXPORT_AGENT_PACKAGE_QUERY,
   GET_AGENT_MANIFEST_QUERY,
   IMPORT_AGENT_PACKAGE_MUTATION,
 } from "./agent-package-documents";
+import { PUBLISH_AGENT_MUTATION, UNPUBLISH_AGENT_MUTATION } from "./agent-runtime-documents";
 
 type GraphQLAgentSummary = AccessibleAgentsQuery["accessibleAgentList"][number];
 type GraphQLAgentDetail = AgentQuery["agent"];
@@ -68,7 +68,7 @@ type GraphQLAgentEditorState = AgentEditorStateQuery["agentEditorState"];
 function toAgentSkillReference(skill: AgentFieldsFragment["skills"][number]): AgentSkillReference {
   return {
     ...skill,
-    skillId: toSkillId(skill.skillId),
+    skillId: skill.skillId as SkillId,
   };
 }
 
@@ -77,33 +77,33 @@ function toAgentDeploymentVersion(
 ): AgentDeploymentVersion {
   return {
     ...version,
-    agentId: toAgentId(version.agentId),
-    createdByAccountId: toAccountId(version.createdByAccountId),
-    environmentId: version.environmentId === null ? null : toEnvironmentId(version.environmentId),
-    id: toAgentDeploymentVersionId(version.id),
+    agentId: version.agentId as AgentId,
+    createdByAccountId: version.createdByAccountId as AccountId,
+    environmentId: version.environmentId as EnvironmentId | null,
+    id: version.id as AgentDeploymentVersionId,
   };
 }
 
 function toAgentOwnerSummary(owner: GraphQLAgentSummary["owner"]): AgentOwnerSummary {
   return {
     ...owner,
-    id: toAccountId(owner.id),
+    id: owner.id as AccountId,
   };
 }
 
 function toAgentToolSummary(tool: GraphQLAgentSummary["tools"][number]): AgentToolSummary {
   return {
     ...tool,
-    serverId: toMcpServerId(tool.serverId),
+    serverId: tool.serverId as McpServerId,
   };
 }
 
 function toAgent(agent: AgentFieldsFragment): Agent {
   return {
     ...agent,
-    id: toAgentId(agent.id),
+    id: agent.id as AgentId,
     liveVersion: agent.liveVersion === null ? null : toAgentDeploymentVersion(agent.liveVersion),
-    projectId: toProjectId(agent.projectId),
+    projectId: agent.projectId as ProjectId,
     skills: agent.skills.map(toAgentSkillReference),
   };
 }
@@ -111,8 +111,8 @@ function toAgent(agent: AgentFieldsFragment): Agent {
 function toAgentSummary(agent: GraphQLAgentSummary): AgentSummary {
   return {
     ...agent,
-    id: toAgentId(agent.id),
-    projectId: toProjectId(agent.projectId),
+    id: agent.id as AgentId,
+    projectId: agent.projectId as ProjectId,
     owner: toAgentOwnerSummary(agent.owner),
     tools: agent.tools.map(toAgentToolSummary),
   };
@@ -121,9 +121,9 @@ function toAgentSummary(agent: GraphQLAgentSummary): AgentSummary {
 function toAgentDetail(agent: GraphQLAgentDetail): AgentDetail {
   return {
     ...agent,
-    id: toAgentId(agent.id),
+    id: agent.id as AgentId,
     liveVersion: agent.liveVersion === null ? null : toAgentDeploymentVersion(agent.liveVersion),
-    projectId: toProjectId(agent.projectId),
+    projectId: agent.projectId as ProjectId,
     owner: toAgentOwnerSummary(agent.owner),
     skills: agent.skills.map(toAgentSkillReference),
     tools: agent.tools.map(toAgentToolSummary),
@@ -135,8 +135,7 @@ function toAgentEnvironmentConfig(
   environment: GraphQLAgentEditorState["environment"],
 ): AgentEnvironmentConfig {
   return {
-    environmentId:
-      environment.environmentId === null ? null : toEnvironmentId(environment.environmentId),
+    environmentId: environment.environmentId as EnvironmentId | null,
   };
 }
 
@@ -144,11 +143,11 @@ function toAgentEditorState(state: GraphQLAgentEditorState): AgentEditorState {
   return {
     ...state,
     environment: toAgentEnvironmentConfig(state.environment),
-    id: toAgentId(state.id),
+    id: state.id as AgentId,
     mcpBindings: state.mcpBindings.map((binding) => ({
       ...binding,
-      id: toAgentMcpBindingId(binding.id),
-      serverId: toMcpServerId(binding.serverId),
+      id: binding.id as AgentMcpBindingId,
+      serverId: binding.serverId as McpServerId,
     })),
   };
 }
@@ -156,7 +155,7 @@ function toAgentEditorState(state: GraphQLAgentEditorState): AgentEditorState {
 function toAgentManifest(manifest: AgentManifestQuery["agentManifest"]): AgentManifestExport {
   return {
     ...manifest,
-    agentId: toAgentId(manifest.agentId),
+    agentId: manifest.agentId as AgentId,
   };
 }
 
@@ -165,9 +164,9 @@ function toAgentPackageExport(
 ): AgentPackageExport {
   return {
     ...exportedPackage,
-    agentId: toAgentId(exportedPackage.agentId),
+    agentId: exportedPackage.agentId as AgentId,
     contentType: "application/zip",
-    fileId: toFileId(exportedPackage.fileId),
+    fileId: exportedPackage.fileId as FileId,
   };
 }
 

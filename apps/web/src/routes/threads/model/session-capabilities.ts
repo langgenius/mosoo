@@ -26,13 +26,6 @@ export interface ThreadActionCapabilities {
   followUp: ThreadActionCapabilityView;
 }
 
-const DEFAULT_TRANSLATIONS: Record<string, string> = {
-  "threads.sessionCapabilitiesLoading": "Loading session capabilities.",
-  "threads.sessionCapabilityUnavailable": "Session capability is unavailable.",
-};
-
-const defaultTranslate: Translate = (key) => DEFAULT_TRANSLATIONS[key] ?? key;
-
 function unavailableCapability(input: {
   action: AgentSessionActionCapabilityName;
   reason: string;
@@ -54,16 +47,9 @@ function findCapability(input: {
 
 function getThreadActionCapability(input: {
   action: AgentSessionActionCapabilityName;
-  capabilities: readonly ThreadActionCapabilityInput[] | null;
+  capabilities: readonly ThreadActionCapabilityInput[];
   t: Translate;
 }): ThreadActionCapabilityView {
-  if (input.capabilities === null) {
-    return unavailableCapability({
-      action: input.action,
-      reason: input.t("threads.sessionCapabilitiesLoading"),
-    });
-  }
-
   const capability = findCapability({
     action: input.action,
     capabilities: input.capabilities,
@@ -93,26 +79,24 @@ function getFollowUpCapabilityAction(bucket: ThreadBucket): AgentSessionActionCa
 
 export function getThreadActionCapabilities(input: {
   bucket: ThreadBucket;
-  capabilities: readonly ThreadActionCapabilityInput[] | null;
-  t?: Translate;
+  capabilities: readonly ThreadActionCapabilityInput[];
+  t: Translate;
 }): ThreadActionCapabilities {
-  const t = input.t ?? defaultTranslate;
-
   return {
     archive: getThreadActionCapability({
       action: "archive_session",
       capabilities: input.capabilities,
-      t,
+      t: input.t,
     }),
     delete: getThreadActionCapability({
       action: "delete_session",
       capabilities: input.capabilities,
-      t,
+      t: input.t,
     }),
     followUp: getThreadActionCapability({
       action: getFollowUpCapabilityAction(input.bucket),
       capabilities: input.capabilities,
-      t,
+      t: input.t,
     }),
   };
 }

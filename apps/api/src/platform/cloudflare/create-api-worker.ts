@@ -1,12 +1,14 @@
-import { MOSOO_CONSOLE_HOST, MOSOO_LEGACY_CONSOLE_HOST } from "@mosoo/contracts/origin";
-
-import { enqueueScheduledMaintenanceCommand } from "../../modules/api-command/application/api-command-enqueue";
 import { redriveFailedApiCommandEnqueues } from "../../modules/api-command/application/api-command-ledger";
 import type { ApiCommandMessage } from "../../modules/api-command/application/api-command-message";
 import {
   processApiCommandDeadLetterMessage,
   processApiCommandMessage,
 } from "../../modules/api-command/application/api-command-processor";
+import { runUsageDailyRollup } from "../../modules/cost/application/cost-rollup.service";
+import { cleanupPublicApiIdempotencyKeys } from "../../modules/public-api/public-api-idempotency.service";
+import { cleanupPublicApiRateLimitWindows } from "../../modules/public-api/public-api-rate-limit.service";
+import { runSandboxMaintenance } from "../../modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-maintenance.service";
+import { createErrorLogContext, logError } from "./logger";
 import type { ApiBindings } from "./worker-types";
 
 interface ApiHttpApp {
@@ -26,16 +28,6 @@ function getHttpApp(): Promise<ApiHttpApp> {
 export function createApiWorker(): ExportedHandler<ApiBindings> {
   return {
     async fetch(request: Request, env: ApiBindings, ctx: ExecutionContext): Promise<Response> {
-      const url = new URL(request.url);
-
-      if (
-        url.protocol === "http:" &&
-        (url.hostname === MOSOO_CONSOLE_HOST || url.hostname === MOSOO_LEGACY_CONSOLE_HOST)
-      ) {
-        url.protocol = "https:";
-        return Response.redirect(url.toString(), 308);
-      }
-
       const app = await getHttpApp();
       const response = await app.fetch(request, env, ctx);
 
@@ -43,9 +35,23 @@ export function createApiWorker(): ExportedHandler<ApiBindings> {
     },
     async scheduled(controller: ScheduledController, env: ApiBindings): Promise<void> {
       await redriveFailedApiCommandEnqueues(env);
-      await enqueueScheduledMaintenanceCommand(env, {
-        scheduledTime: controller.scheduledTime,
+      await runSandboxMaintenance(env);
+      // Expired public API receipts and rate-limit windows; the next minute retries a failure.
+      await Promise.all([
+        cleanupPublicApiIdempotencyKeys(env.DB),
+        cleanupPublicApiRateLimitWindows(env.DB),
+      ]).catch((error: unknown) => {
+        logError("public-api.cleanup_failed", createErrorLogContext(error));
       });
+
+      // The rollup aggregates every row older than its cutoff, so a failed day
+      // is caught up by the next one.
+      const scheduledAt = new Date(controller.scheduledTime);
+      if (scheduledAt.getUTCHours() === 2 && scheduledAt.getUTCMinutes() === 0) {
+        await runUsageDailyRollup(env, scheduledAt).catch((error: unknown) => {
+          logError("cost.usage_daily_rollup_failed", createErrorLogContext(error));
+        });
+      }
     },
     async queue(batch: MessageBatch, env: ApiBindings): Promise<void> {
       // Queue names are account-global, so isolated environments (the perf
@@ -74,6 +80,8 @@ export function createApiWorker(): ExportedHandler<ApiBindings> {
 
         return;
       }
+
+      throw new Error(`No consumer for queue ${batch.queue}.`);
     },
   } satisfies ExportedHandler<ApiBindings>;
 }

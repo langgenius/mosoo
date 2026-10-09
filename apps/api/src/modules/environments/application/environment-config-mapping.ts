@@ -1,8 +1,7 @@
-import type { EnvironmentConfigInput, EnvironmentSummary } from "@mosoo/contracts/environment";
+import type { EnvironmentSummary } from "@mosoo/contracts/environment";
 
 import { toIsoString } from "../../../time";
 import {
-  normalizeEnvironmentConfigInput,
   parsePackagesJson,
   parseStoredEnvVarsJson,
   parseStringArrayJson,
@@ -11,8 +10,6 @@ import {
 import type { EnvironmentMutableConfig, EnvironmentRecordRow } from "./environment-types";
 
 interface EnvironmentRevisionSource {
-  allowMcpServers: number;
-  allowPackageManagers: number;
   allowedHostsJson: string;
   envVarsJson: string;
   networkPolicy: EnvironmentMutableConfig["networkPolicy"];
@@ -24,20 +21,12 @@ export const SYSTEM_DEFAULT_NAME = "System Default";
 
 export function toConfig(row: EnvironmentRevisionSource): EnvironmentMutableConfig {
   return {
-    allowMcpServers: row.allowMcpServers === 1,
-    allowPackageManagers: row.allowPackageManagers === 1,
     allowedHosts: parseStringArrayJson(row.allowedHostsJson, "allowedHosts"),
     envVars: parseStoredEnvVarsJson(row.envVarsJson),
     networkPolicy: row.networkPolicy,
     packages: parsePackagesJson(row.packagesJson),
     setupScript: row.setupScript,
   };
-}
-
-export function normalizeConfigForCreate(
-  input: EnvironmentConfigInput,
-): Omit<EnvironmentMutableConfig, "envVars"> {
-  return normalizeEnvironmentConfigInput(input);
 }
 
 export function toEnvironmentSummary(row: EnvironmentRecordRow): EnvironmentSummary {
@@ -68,16 +57,9 @@ export function toEnvironmentSummary(row: EnvironmentRecordRow): EnvironmentSumm
     id: row.id,
     isBuiltIn,
     isDefault,
-    isEditable: !isBuiltIn,
     name: row.name,
-    owner: {
-      id: row.ownerId,
-      imageUrl: row.ownerImageUrl,
-      name: row.ownerName,
-    },
     projectId: row.projectId,
-    role: "owner",
     updatedAt: toIsoString(row.updatedAt),
-    usedByAgentCount: row.usedByAgentCount ?? 0,
+    usedByAgentCount: row.usedByAgentCount,
   };
 }

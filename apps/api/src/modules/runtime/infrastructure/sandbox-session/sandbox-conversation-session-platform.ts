@@ -2,18 +2,15 @@ import { discardPromiseResult } from "@mosoo/effects";
 import type { SandboxBackupId, SandboxSessionId } from "@mosoo/id";
 
 import { withDisposedRpcResult } from "../../../../platform/cloudflare/rpc-disposal";
+import { quoteShellArg } from "../../../../shared/shell";
 import { getRuntimeSessionOutputDirectory } from "../driver-instance/runtime-session-outputs";
-import { withRuntimeProvisionTimeout } from "../runtime-provision-timeout";
+import { getParentDirectory } from "../runtime-sandbox-provisioning/runtime-sandbox-provisioning.paths";
 import { decodeSandboxBackupIdForPlatform } from "../sandbox-backup-id";
 import type { ExecutionSessionHandle, SandboxHandle } from "../sandbox-handles";
 
 interface SandboxConversationDirectoryBackup {
   readonly dir: string;
   readonly id: SandboxBackupId;
-}
-
-function quoteShellArg(value: string): string {
-  return `'${value.replaceAll("'", `'"'"'`)}'`;
 }
 
 function isSessionAlreadyExistsError(error: unknown): boolean {
@@ -32,10 +29,7 @@ export async function sandboxConversationDirectoryHasContent(
   const command = `test -d ${quoteShellArg(cwd)} && find ${quoteShellArg(cwd)} -mindepth 1 -maxdepth 1 -print -quit | grep -q .`;
 
   return withDisposedRpcResult(
-    withRuntimeProvisionTimeout(
-      sandbox.exec(`sh -lc ${quoteShellArg(command)}`),
-      `Sandbox session cwd probe for ${cwd}`,
-    ),
+    sandbox.exec(`sh -lc ${quoteShellArg(command)}`),
     (result) => result.success && result.exitCode === 0,
   );
 }
@@ -44,19 +38,16 @@ export async function restoreSandboxConversationDirectoryBackup(
   sandbox: SandboxHandle,
   input: {
     readonly backup: SandboxConversationDirectoryBackup;
-    readonly cwd: string;
     readonly localBucket: boolean;
   },
 ): Promise<void> {
+  await sandbox.mkdir(getParentDirectory(input.backup.dir), { recursive: true });
   await withDisposedRpcResult(
-    withRuntimeProvisionTimeout(
-      sandbox.restoreBackup({
-        dir: input.backup.dir,
-        id: decodeSandboxBackupIdForPlatform(input.backup.id),
-        localBucket: input.localBucket,
-      }),
-      `Sandbox session cwd restore for ${input.cwd}`,
-    ),
+    sandbox.restoreBackup({
+      dir: input.backup.dir,
+      id: decodeSandboxBackupIdForPlatform(input.backup.id),
+      localBucket: input.localBucket,
+    }),
     discardPromiseResult,
   );
 }
@@ -69,46 +60,25 @@ export async function prepareSandboxConversationDirectories(input: {
   await input.sandbox.mkdir(getRuntimeSessionOutputDirectory(input.cwd), { recursive: true });
 }
 
-export async function deleteSandboxConversationSessionBestEffort(input: {
-  readonly sandboxSessionId: SandboxSessionId;
-  readonly sandbox: SandboxHandle;
-}): Promise<void> {
-  try {
-    await input.sandbox.deleteSession(input.sandboxSessionId);
-  } catch {
-    // Best-effort cleanup for a partially configured session.
-  }
-}
-
 export async function openSandboxConversationSession(input: {
   readonly sandboxSessionId: SandboxSessionId;
   readonly cwd: string;
   readonly sandbox: SandboxHandle;
   readonly shouldCreate: boolean;
-}): Promise<{ created: boolean; session: ExecutionSessionHandle }> {
+}): Promise<ExecutionSessionHandle> {
   if (input.shouldCreate) {
     try {
-      return {
-        created: true,
-        session: await input.sandbox.createSession({
-          cwd: input.cwd,
-          id: input.sandboxSessionId,
-        }),
-      };
+      return await input.sandbox.createSession({
+        cwd: input.cwd,
+        id: input.sandboxSessionId,
+      });
     } catch (error) {
+      // Prewarm and dispatch can both create the first execution session id.
       if (!isSessionAlreadyExistsError(error)) {
         throw error;
       }
-
-      return {
-        created: false,
-        session: await input.sandbox.getSession(input.sandboxSessionId),
-      };
     }
   }
 
-  return {
-    created: false,
-    session: await input.sandbox.getSession(input.sandboxSessionId),
-  };
+  return input.sandbox.getSession(input.sandboxSessionId);
 }

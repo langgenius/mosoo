@@ -1,6 +1,10 @@
 import { describe, expect, test } from "bun:test";
 
 import { resolveDocumentTitle } from "../src/app/document-title";
+import en from "../src/shared/i18n/translations/en.json";
+
+const pageTitles: Record<string, string> = en.pageTitle;
+const t = (key: string) => pageTitles[key.replace("pageTitle.", "")] ?? key;
 
 describe("document title", () => {
   test("uses the current Project name for Project-layer pages", () => {
@@ -9,6 +13,7 @@ describe("document title", () => {
         activeProjectName: "Default Project",
         activeOrganizationName: "mosoo Org",
         pathname: "/integrations/skills",
+        t,
       }),
     ).toBe("Skills | Default Project | mosoo");
   });
@@ -19,6 +24,7 @@ describe("document title", () => {
         activeProjectName: "Default Project",
         activeOrganizationName: "mosoo Org",
         pathname: "/projects",
+        t,
       }),
     ).toBe("Projects | mosoo Org | mosoo");
   });
@@ -29,6 +35,7 @@ describe("document title", () => {
         activeProjectName: null,
         activeOrganizationName: null,
         pathname: "/login",
+        t,
       }),
     ).toBe("Sign in | mosoo");
   });
@@ -39,6 +46,7 @@ describe("document title", () => {
         activeProjectName: "Default Project",
         activeOrganizationName: null,
         pathname: "/unexpected",
+        t,
       }),
     ).toBe("Default Project | mosoo");
   });

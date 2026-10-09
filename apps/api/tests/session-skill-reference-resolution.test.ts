@@ -174,22 +174,4 @@ describe("session skill reference resolution", () => {
       }),
     ).rejects.toThrow("Skill snapshot belongs to another Project.");
   });
-
-  test("rejects package snapshots from another Project", async () => {
-    await expect(
-      resolveSessionSkillReferences({
-        database: createSessionSkillReferenceDatabase(),
-        sessionProjectId: IDS.project,
-        skillMountRoot: "skill-root",
-        skillReferences: [
-          createSkillReference({
-            skillId: "package:other",
-            skillName: "Other Package",
-            snapshotId: "snapshot-other-project",
-            sortOrder: 0,
-          }),
-        ],
-      }),
-    ).rejects.toThrow("Package-owned skill snapshot belongs to another Project.");
-  });
 });

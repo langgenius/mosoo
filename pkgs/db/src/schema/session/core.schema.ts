@@ -120,6 +120,3 @@ export const sessionMessagesTable = sqliteTable(
     index("session_message_run_idx").on(table.sessionRunId),
   ],
 );
-
-export type SessionMessageRow = typeof sessionMessagesTable.$inferSelect;
-export type SessionRow = typeof sessionsTable.$inferSelect;

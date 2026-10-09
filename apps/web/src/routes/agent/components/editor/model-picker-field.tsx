@@ -27,11 +27,9 @@ import type { AgentEditorModel } from "./use-model";
 export function ModelPickerField({
   model,
   projectId,
-  readOnly,
 }: {
   model: AgentEditorModel;
   projectId: string;
-  readOnly: boolean;
 }): ReactElement {
   const { t } = useTranslation();
   const runtimeId = model.draft.runtime;
@@ -64,19 +62,19 @@ export function ModelPickerField({
 
   return (
     <div className="space-y-2">
-      <Label className="text-muted-foreground text-[12px]">{t("agent.model")}</Label>
+      <Label className="text-fg-3 text-[12px]">{t("agent.model")}</Label>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
             className="w-full justify-between"
-            disabled={readOnly || loading || menuIsEmpty}
+            disabled={loading || menuIsEmpty}
             type="button"
             variant="outline"
           >
             <span className="text-foreground truncate text-left text-[13px] font-medium">
               {buttonLabel}
             </span>
-            <ChevronDown className="text-muted-foreground size-4" />
+            <ChevronDown className="text-fg-3 size-4" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-[var(--anchor-width)]">
@@ -108,7 +106,7 @@ export function ModelPickerField({
       </DropdownMenu>
 
       {showInvalidHint && currentEntry !== null ? (
-        <p className="text-destructive text-[11px]">
+        <p className="text-danger text-[11px]">
           {currentEntry.statusDetail ?? currentEntry.statusLabel}
         </p>
       ) : null}

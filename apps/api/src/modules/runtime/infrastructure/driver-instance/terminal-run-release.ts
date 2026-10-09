@@ -3,25 +3,25 @@ import { sessionRunsTable } from "@mosoo/db";
 import type { DriverInstanceId, SessionId, SessionRunId } from "@mosoo/id";
 import { and, desc, eq, inArray } from "drizzle-orm";
 
-import { logInfo, logWarn } from "../../../../platform/cloudflare/logger";
+import { logWarn } from "../../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../../platform/db/drizzle";
 import { appendSessionRuntimeEvents } from "../../../sessions/application/session-event-write.service";
-import { finalizeSessionModelCallUsage } from "../../../sessions/application/session-model-call.service";
+import { finalizeSessionModelCallUsage } from "../../../sessions/infrastructure/session-model-call.repository";
 import { createFailedSessionRunRuntimeEvent } from "../../application/session-runs/session-run-view-events.service";
 import { repairTerminalSessionRunProjections } from "../../application/session-runs/terminal-run-reconciliation.service";
-import { classifyReclaim, decideReclaimRecovery } from "../../domain/session-run-reclaim-recovery";
-import { isTerminalSessionRunStatus } from "../../domain/session-run-status";
-import { createSessionRunTerminalFailureSourceId } from "../../domain/session-run-terminal-event-id";
-import { recordRuntimeRunLeaseReleasedOutcome } from "../runtime-subject-lifecycle/runtime-run-lease-store";
-import { createSandboxCheckpoints } from "../sandbox-backup.service";
-import { markExecutingExternalToolEffectsUnknownForDriver } from "../session-runs/external-tool-effect-store.repository";
-import { failAcceptedRuntimeCommandsForTerminalDriver } from "../session-runs/runtime-command-store.repository";
 import {
+  isTerminalSessionRunStatus,
+  TERMINAL_SESSION_RUN_STATUSES,
+} from "../../domain/session-run-lifecycle.machine";
+import { classifyReclaim } from "../../domain/session-run-reclaim-recovery";
+import { createSessionRunTerminalFailureSourceId } from "../../domain/session-run-terminal-event-id";
+import { releaseRuntimeRunLease } from "../runtime-subject-lifecycle/runtime-run-lease-store";
+import {
+  assertSessionRunTransition,
   getSessionRunSummary,
   setSessionRunStatus,
 } from "../session-runs/session-run-store.repository";
-import type { SessionRunTransitionOutcome } from "../session-runs/session-run-store.repository";
 import type { RuntimeSessionLink } from "./event-types";
 import { getRuntimeSessionLink } from "./session-link.repository";
 
@@ -34,49 +34,6 @@ interface LinkedSessionRunStatusRow {
 export interface TerminalDriverInstanceSessionRunReleaseResult {
   readonly link: RuntimeSessionLink | null;
   readonly released: boolean;
-}
-
-async function checkpointTerminalRuntimeSessionIfNeeded(
-  bindings: ApiBindings,
-  link: RuntimeSessionLink,
-): Promise<void> {
-  if (
-    link.sandboxId === null ||
-    link.sessionId === null ||
-    link.sessionRunId === null ||
-    link.sessionRunStatus !== "completed"
-  ) {
-    return;
-  }
-
-  await createSandboxCheckpoints(bindings, {
-    requiredSessionId: link.sessionId,
-    sandboxId: link.sandboxId,
-    sessionRunId: link.sessionRunId,
-  });
-}
-
-function toFinalizedDriverRunTransitionRun(
-  outcome: SessionRunTransitionOutcome,
-): SessionRunSummary | null {
-  switch (outcome.kind) {
-    case "applied":
-    case "duplicate": {
-      return outcome.run;
-    }
-    case "stale": {
-      if (outcome.reason === "terminal_run") {
-        return null;
-      }
-      throw new Error("Finalized driver repair lost a concurrent run transition.");
-    }
-    case "repair_needed": {
-      throw new Error("Finalized driver repair left the session lifecycle projection stale.");
-    }
-    case "rejected": {
-      throw new Error(`Finalized driver repair run transition was rejected: ${outcome.reason}.`);
-    }
-  }
 }
 
 async function appendFinalizedDriverRunEvent(
@@ -113,21 +70,17 @@ export async function releaseTerminalDriverInstanceSessionRun(
     sessionRunId: input.sessionRunId,
   });
 
-  await checkpointTerminalRuntimeSessionIfNeeded(bindings, link);
   await finalizeSessionModelCallUsage(database, input.sessionRunId);
 
-  const outcome = await recordRuntimeRunLeaseReleasedOutcome(database, {
+  const released = await releaseRuntimeRunLease(database, {
     driverInstanceId: input.driverInstanceId,
     expectedSessionRunId: input.sessionRunId,
   });
-  const released = outcome.status === "applied";
 
   if (!released) {
     logWarn("runtime.terminal.lease_release_skipped", {
       driverInstanceId: input.driverInstanceId,
-      reason: "reason" in outcome ? outcome.reason : outcome.status,
       sessionRunId: input.sessionRunId,
-      status: outcome.status,
     });
   }
 
@@ -141,11 +94,6 @@ export async function repairFinalizedTerminalDriverRunState(
     status: "failed" | "stopped";
   },
 ): Promise<TerminalDriverInstanceSessionRunReleaseResult> {
-  await markExecutingExternalToolEffectsUnknownForDriver(bindings.DB, input.driverInstanceId);
-  await failAcceptedRuntimeCommandsForTerminalDriver(bindings.DB, {
-    driverInstanceId: input.driverInstanceId,
-  });
-
   const link = await getRuntimeSessionLink(bindings.DB, input.driverInstanceId);
 
   if (link.sessionRunId === null || link.sessionRunStatus === null) {
@@ -166,32 +114,13 @@ export async function repairFinalizedTerminalDriverRunState(
       source: "driver",
       status: "failed",
     });
-    const run = toFinalizedDriverRunTransitionRun(outcome);
+    assertSessionRunTransition(outcome, "Finalized driver repair");
+    const run = outcome.kind === "applied" || outcome.kind === "duplicate" ? outcome.run : null;
 
     if (link.sessionId !== null && run !== null) {
       await appendFinalizedDriverRunEvent(bindings, {
         run,
         runError,
-        sessionId: link.sessionId,
-      });
-
-      // Decide recovery for the reclaimed run. v1 records the decision so it is
-      // observable and unit-testable; executing the auto-requeue (a fresh
-      // `resume` run + re-dispatch) is a follow-up because this DO finalize
-      // context lacks the viewer + requestUrl that enqueueSessionRunDispatchCommand
-      // needs to rebuild the sandbox's action-token callback URLs.
-      const recovery = decideReclaimRecovery({
-        driverTerminalStatus: input.status,
-        priorTrigger: run.trigger,
-        reclaimReason: "socket_closed",
-        runStatus: link.sessionRunStatus,
-      });
-      logInfo("runtime.reclaim.recovery.recommended", {
-        executed: false,
-        recommendedAction: recovery.kind,
-        driverInstanceId: input.driverInstanceId,
-        priorTrigger: run.trigger,
-        runId: run.id,
         sessionId: link.sessionId,
       });
     }
@@ -219,7 +148,7 @@ export async function releaseLinkedTerminalDriverInstanceSessionRun(
       .where(
         and(
           eq(sessionRunsTable.driverInstanceId, driverInstanceId),
-          inArray(sessionRunsTable.status, ["cancelled", "completed", "expired", "failed"]),
+          inArray(sessionRunsTable.status, TERMINAL_SESSION_RUN_STATUSES),
         ),
       )
       .orderBy(desc(sessionRunsTable.id))

@@ -15,7 +15,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
  * the neutral `--sidebar-row-*` tokens; the brand green appears only on the
  * keyboard focus ring, so selection never competes with the one accent.
  *
- * State matrix (see docs/design/console-sidebar.md):
+ * State matrix (docs/design/console-design-contract.md, section 9):
  * rest -> hover (fine pointer only) -> pressed -> keyboard focus, crossed with
  * selected (`aria-current="page"`), open (`data-popup-open`), and disabled
  * (`aria-disabled`, legible muted text instead of whole-row opacity).

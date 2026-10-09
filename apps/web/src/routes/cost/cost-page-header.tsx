@@ -1,7 +1,8 @@
+import type { CostRunPurpose, ProjectCostCard } from "@/domains/cost/api/cost-client";
 import { useTranslation } from "@/shared/i18n";
-import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
 import { Download } from "@/shared/ui/icons";
+import { SegmentedControl } from "@/shared/ui/segmented-control";
 
 import { downloadCsv } from "./cost-csv";
 import {
@@ -12,7 +13,7 @@ import {
   rangeLabel,
   rangeLabelKey,
 } from "./cost-model";
-import type { CostRange, CostRunPurpose, CostTab, ProjectCostCard } from "./cost-model";
+import type { CostRange, CostTab } from "./cost-model";
 
 export function CostPageHeader({
   card,
@@ -32,7 +33,7 @@ export function CostPageHeader({
   const { t } = useTranslation();
 
   return (
-    <header className="border-border-subtle flex min-h-12 shrink-0 flex-col items-stretch gap-2 border-b px-4 py-3 sm:px-6 lg:h-12 lg:flex-row lg:items-center lg:justify-between lg:py-0">
+    <header className="border-border-soft flex min-h-12 shrink-0 flex-col items-stretch gap-2 border-b px-4 py-3 sm:px-6 lg:h-12 lg:flex-row lg:items-center lg:justify-between lg:py-0">
       <div className="flex min-w-0 items-baseline gap-2">
         <span className="text-sm font-medium">{t("cost.projectUsage")}</span>
         <span className="text-fg-3 hidden truncate text-xs sm:inline">
@@ -40,40 +41,21 @@ export function CostPageHeader({
         </span>
       </div>
       <div className="flex w-full flex-wrap items-center gap-2 lg:w-auto lg:flex-nowrap">
-        <div className="border-border bg-card flex rounded-md border p-0.5">
-          {RUN_PURPOSE_FILTERS.map((item) => (
-            <button
-              key={item.value}
-              type="button"
-              onClick={() => {
-                setRunPurpose(item.value);
-              }}
-              className={cn(
-                "min-h-10 rounded px-2.5 py-1 text-xs font-semibold lg:min-h-0",
-                runPurpose === item.value ? "bg-ink-100 text-fg-1" : "text-muted-foreground",
-              )}
-            >
-              {t(item.labelKey)}
-            </button>
-          ))}
-        </div>
-        <div className="border-border bg-card flex rounded-md border p-0.5">
-          {COST_RANGES.map((value) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => {
-                setRange(value);
-              }}
-              className={cn(
-                "min-h-10 rounded px-3 py-1 text-xs font-semibold uppercase lg:min-h-0",
-                range === value ? "bg-ink-100 text-fg-1" : "text-muted-foreground",
-              )}
-            >
-              {t(rangeLabelKey(value))}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl
+          label={t("cost.runPurposeLabel")}
+          onChange={setRunPurpose}
+          options={RUN_PURPOSE_FILTERS.map((item) => ({
+            label: t(item.labelKey),
+            value: item.value,
+          }))}
+          value={runPurpose}
+        />
+        <SegmentedControl
+          label={t("cost.rangeLabel")}
+          onChange={setRange}
+          options={COST_RANGES.map((value) => ({ label: t(rangeLabelKey(value)), value }))}
+          value={range}
+        />
         <Button
           variant="outline"
           size="xs"
@@ -105,7 +87,6 @@ function exportCostCsv(
         "agent",
         "owner",
         "cost",
-        "previous_cost",
         "requests",
         "production_cost",
         "debug_cost",
@@ -117,7 +98,6 @@ function exportCostCsv(
         row.agentName,
         row.ownerName,
         String(row.totalCostUsd),
-        String(row.previousCostUsd ?? ""),
         String(row.requestCount),
         String(row.productionCostUsd),
         String(row.debugCostUsd + row.previewCostUsd),

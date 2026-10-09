@@ -1,49 +1,27 @@
 # Product Notes
 
-These pages are short, code-checked product snapshots for non-engineers. Each
-one explains why a capability exists, what people can do today, and its visible
-limits. They are not implementation specifications.
+One note per area, stating what users can rely on and where it stops. Product promises and non-goals live in [SPEC](../SPEC.md), cross-cutting invariants in [architecture](../architecture.md), and the general doc rules in [CONTRIBUTING](../../CONTRIBUTING.md#documentation).
 
-Read [mosoo Spec](../SPEC.md) for the target product direction. When a product
-note, the Spec, and current code disagree, do not guess: verify the behavior and
-update the stale note. Exact APIs, data shapes, and runtime topology belong in
-their machine-readable contracts, code, or [Architecture](../architecture.md).
+A note has a purpose line, **Promises** and **Limits**, written in product language and kept under about 70 lines. Request shapes, schemas and mechanics stay in the OpenAPI documents, the GraphQL schema and code. When a note and the code disagree, find out which is wrong and fix it in the same change. A product question for the owner offers at least two user-visible options; decide engineering-only questions yourself.
 
-## Runtime and API
+## Sessions and API
 
-- [Managed Agent v1 target and remaining slices](./managed-agent-v1.md) — shipped Project keys, BYOK direct invocation with optional Agent presets, with single-turn and multi-turn acceptance; platform supply and billing are separate.
-- [Cloud migration and compatibility](../SPEC.md#10-migration-and-breaking-change-notification) — preserve compatible Thread APIs and verify the transition from shared machines to Session isolation.
-- [Agent API Endpoint](./agent-endpoint-mvp.md)
-- [Public Thread API](./public-thread-api-surface.md) — shipped v1 contract and the unreleased v2 Project-direct candidate with optional Agent presets; real hosted acceptance remains open.
-- [Runtime Sessions](./runtime-session-kernel.md)
-- [Runtime Choice](./runtime-catalog.md) — provider/model protocols, runtime compatibility, and frozen Session protocol selection.
-- [Runs and Threads](./default-consumption-surface.md)
-- [Agent Work History](./agent-session-api.md)
-- [Thread Lifecycle](./session-lifecycle.md) — formal continuation, Cloud debug Preview's 30-day policy, and the one-time old-Session inactivity exception.
-- [Thread Continuation](./thread-continuation.md)
-- [Runtime State Operations](./runtime-state-operations.md)
-- [Agent Terminal](./agent-terminal.md)
-- [Session Log](./session-log.md)
+- [Public Thread API](./public-thread-api-surface.md): v1 and v2, identity, events, idempotency, compatibility.
+- [Thread lifecycle](./session-lifecycle.md): stop, archive, delete, Session maintenance, Preview expiry.
+- [Thread files](./session-files.md): attachments, artifacts, deletion.
+- [Runs and Logs](./default-consumption-surface.md): the console inbox and an Agent's Logs replay.
 
-## Agent configuration
+## Configuration and resources
 
-- [Project Boundary](./project-boundary.md)
-- [Session Isolation and Legacy Agent Types](./agent-type.md)
-- [Agent Manifest](./agent-manifest.md)
-- [Agent Publishing and Versions](./agent-service-identity.md)
-- [Agent Version History](./agent-versions.md)
-- [Agent Import, Export, and Fork](./agent-package-import-export-fork.md)
-
-## Resources and operations
-
-- [Thread Files](./session-files.md)
+- [Runtime choice](./runtime-catalog.md): runtimes, providers, model protocols.
+- [Credentials](./credentials.md): provider keys and secret handling.
+- [MCP connections](./mcp-interaction.md): remote servers and the delegation token.
 - [Skills](./skill-interaction.md)
-- [MCP Connections](./mcp-interaction.md)
-- [Credentials](./credentials.md)
-- [Environment](./environment.md)
-- [Project Usage](./cost-dashboard.md)
+- [Environment](./environment.md): packages, variables, network policy.
+- [Project usage](./cost-dashboard.md): estimates, not invoices.
 
-## Legacy aliases
+## Working with product
 
-- [Files API](./files-api-contract.md)
-- [Public Task API](./public-task-api.md)
+- [Good PRD](../good-prd.md): how to write a feature PRD in its issue; notes here follow the format above.
+- [For-human PRD](../for-human-prd.md): a plain-language companion for a feature PRD, kept with that PRD.
+- [PM reverse interview](../pm-reverse-interview.md): bring an implementation question back to a product decision.

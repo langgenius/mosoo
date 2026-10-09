@@ -2,7 +2,6 @@ import { describe, expect, test } from "bun:test";
 
 import { createRuntimeEvent } from "@mosoo/runtime-events";
 
-import { createBaseLiveState } from "../src/modules/runtime/infrastructure/driver-instance/event-projection";
 import type { RuntimeSessionLink } from "../src/modules/runtime/infrastructure/driver-instance/event-types";
 import { projectRuntimeDriverEvents } from "../src/modules/runtime/infrastructure/driver-instance/events";
 import {
@@ -11,11 +10,9 @@ import {
   readRuntimeSessionOutputListing,
   toRuntimeSessionOutputFile,
 } from "../src/modules/runtime/infrastructure/driver-instance/runtime-session-outputs";
-import {
-  recordDriverInstanceCompletion,
-  recordDriverInstanceFailure,
-} from "../src/modules/runtime/infrastructure/driver-instance/terminal-driver-events";
+import { recordDriverInstanceFailure } from "../src/modules/runtime/infrastructure/driver-instance/terminal-driver-events";
 import type { SandboxHandle } from "../src/modules/runtime/infrastructure/sandbox-handles";
+import { createInitialSessionLiveState } from "../src/modules/sessions/application/session-live-state.service";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import { API_DRIVER_BOUNDARY_IDS } from "./api-driver-boundary-fixtures";
 import {
@@ -93,7 +90,6 @@ function createSandboxHandle(files: ReadonlyMap<string, string>): SandboxHandle 
       mkdir: unavailable,
       readFile,
       startProcess: unavailable,
-      watch: unavailable,
       writeFile: unavailable,
     }),
     mkdir: unavailable,
@@ -103,11 +99,8 @@ function createSandboxHandle(files: ReadonlyMap<string, string>): SandboxHandle 
     setKeepAlive: unavailable,
     ensureContainerReady: unavailable,
     startProcess: unavailable,
-    terminal: unavailable,
     unmountBucket: unavailable,
-    watch: unavailable,
     writeFile: unavailable,
-    wsConnect: unavailable,
   };
 }
 
@@ -230,11 +223,11 @@ async function dispatchRuntimeEvent(input: {
   link: RuntimeSessionLink;
 }): Promise<void> {
   await projectRuntimeDriverEvents(input.bindings, {
-    currentLiveState: createBaseLiveState({
-      callerId: input.link.callerId,
-      creatorId: input.link.creatorId,
-      driverInstanceId: PUBLIC_API_TEST_IDS.driverOwner,
-      sessionId: input.link.sessionId,
+    assertCurrentConnection: () => undefined,
+    currentLiveState: createInitialSessionLiveState({
+      sessionId: PUBLIC_API_TEST_IDS.ownerSession,
+      title: null,
+      viewerId: PUBLIC_API_TEST_IDS.ownerAccount,
     }),
     driverInstanceId: PUBLIC_API_TEST_IDS.driverOwner,
     events: [
@@ -260,8 +253,8 @@ describe("runtime session outputs", () => {
     const ids = PUBLIC_API_TEST_IDS;
     database.execute(`INSERT INTO driver_instance (id,sandbox_id,sandbox_session_id,runtime,protocol,protocol_version,status,boot_token_hash,boot_token_expires_at,heartbeat_count,expires_at,created_at,updated_at)
       VALUES ('${ids.driverOwner}','${ids.sandbox}','${ids.ownerSession}','openai-runtime','orpc-ws',1,'ready',X'01',1,0,1,1,1);
-      INSERT INTO session_run (id,session_id,agent_id,created_by_account_id,driver_instance_id,trigger,status,created_at,updated_at)
-      VALUES ('${ids.run}','${ids.ownerSession}','${ids.agent}','${ids.ownerAccount}','${ids.driverOwner}','user_prompt','running',1,1);
+      INSERT INTO session_run (id,session_id,agent_id,created_by_account_id,driver_instance_id,trigger,status,trace_id,created_at,updated_at)
+      VALUES ('${ids.run}','${ids.ownerSession}','${ids.agent}','${ids.ownerAccount}','${ids.driverOwner}','user_prompt','running','trace-outputs',1,1);
       UPDATE session SET last_run_id = '${ids.run}', status = 'RUNNING' WHERE id = '${ids.ownerSession}';`);
     const notify = () =>
       recordDriverInstanceFailure(bindings, {

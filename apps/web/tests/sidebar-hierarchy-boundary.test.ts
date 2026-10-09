@@ -13,7 +13,7 @@ function readSource(path: string): string {
 const SIDEBAR_SOURCES = {
   accountMenu: "../src/app/account-menu.tsx",
   appShell: "../src/app/app-shell.tsx",
-  helpMenu: "../src/features/help/help-menu.tsx",
+  helpLink: "../src/features/help/help-link.tsx",
   localeSwitcher: "../src/shared/i18n/locale-switcher.tsx",
   navigation: "../src/app/navigation.tsx",
   orgNavigation: "../src/app/org-navigation.tsx",
@@ -40,8 +40,9 @@ function rawColors(path: string): string[] {
 }
 
 // Console sidebar design gate. Each check encodes a decision from
-// docs/design/console-sidebar.md so a regression fails in `just test` instead
-// of depending on someone noticing it in a screenshot.
+// docs/design/console-design-contract.md, section 9 (Sidebar), so a regression
+// fails in `just test` instead of depending on someone noticing it in a
+// screenshot.
 describe("Console sidebar hierarchy", () => {
   test("splits the sidebar into a scrolling work zone and an anchored persistent zone", () => {
     const source = readSource(SIDEBAR_SOURCES.appShell);
@@ -132,14 +133,12 @@ describe("Console sidebar hierarchy", () => {
     expect(sidebar).not.toContain("active:scale");
     expect(sidebar).not.toMatch(/\bopacity-\d/u);
 
-    for (const path of [
-      SIDEBAR_SOURCES.navigation,
-      SIDEBAR_SOURCES.orgNavigation,
-      SIDEBAR_SOURCES.helpMenu,
-    ]) {
+    for (const path of [SIDEBAR_SOURCES.navigation, SIDEBAR_SOURCES.orgNavigation]) {
       expect(readSource(path)).toContain("SidebarRow");
     }
-    expect(readSource(SIDEBAR_SOURCES.localeSwitcher)).toContain("sidebarRowClassName");
+    for (const path of [SIDEBAR_SOURCES.helpLink, SIDEBAR_SOURCES.localeSwitcher]) {
+      expect(readSource(path)).toContain("sidebarRowClassName");
+    }
   });
 
   test("maps sidebar fills to semantic tokens in both themes", () => {
@@ -154,6 +153,17 @@ describe("Console sidebar hierarchy", () => {
     for (const path of Object.values(SIDEBAR_SOURCES)) {
       expect({ offenders: rawColors(path), path }).toEqual({ offenders: [], path });
     }
+  });
+
+  test("opens the mobile drawer from the left and gives both layers one width", () => {
+    const source = readSource(SIDEBAR_SOURCES.appShell);
+
+    expect(source).toContain('side="left"');
+    expect(readSource("../src/shared/ui/sheet.tsx")).toContain(
+      'left: "left-0 data-[closed]:slide-out-to-left data-[open]:slide-in-from-left"',
+    );
+    expect(source).toContain('const SIDEBAR_WIDTH_CLASS = "w-[240px]"');
+    expect(source).toContain("hidden w-[240px] shrink-0 flex-col");
   });
 
   test("disambiguates project settings from account settings in every locale", () => {

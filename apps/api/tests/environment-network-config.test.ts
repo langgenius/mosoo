@@ -4,8 +4,6 @@ import { normalizeEnvironmentConfigInput } from "../src/modules/environments/app
 
 function normalizeLimitedHosts(allowedHosts: string[]): string[] {
   return normalizeEnvironmentConfigInput({
-    allowMcpServers: false,
-    allowPackageManagers: false,
     allowedHosts,
     networkPolicy: "limited",
     packages: [],

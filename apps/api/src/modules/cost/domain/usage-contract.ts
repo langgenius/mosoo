@@ -12,7 +12,7 @@ export type AgentPublicationStateAtRun =
 
 export type PricingStatus = "priced" | "unknown";
 
-export type RunPurpose = "debug" | "eval" | "preview" | "production" | "scheduled";
+export type RunPurpose = "debug" | "preview" | "production";
 
 export interface UsageTokenInput {
   cacheCreationTokens: number;
@@ -46,4 +46,12 @@ export function normalizeUsageTokens(input: UsageTokenInput): NormalizedUsageTok
     inputTokens: Math.max(0, input.inputTokens - input.cacheCreationTokens),
     outputTokens: input.outputTokens,
   };
+}
+
+export function toTokenCount(value: number | null | undefined): number | null {
+  return typeof value === "number" && value >= 0 ? Math.round(value) : null;
+}
+
+export function toUsdMicros(value: number | null | undefined): number | null {
+  return typeof value === "number" && value >= 0 ? Math.round(value * 1_000_000) : null;
 }

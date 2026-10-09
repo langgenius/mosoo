@@ -8,7 +8,14 @@ import {
   cleanupPublicApiRateLimitWindows,
   enforcePublicApiRateLimit,
 } from "../src/modules/public-api/public-api-rate-limit.service";
-import { createPublicHttpContractDatabase } from "./helpers/public-api-http-test-fixture";
+import { createApiWorker } from "../src/platform/cloudflare/create-api-worker";
+import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
+import {
+  createApiCommandQueueStub,
+  createPublicHttpContractDatabase,
+  createPublicHttpTestBindings,
+  nowMsForTest,
+} from "./helpers/public-api-http-test-fixture";
 
 async function countRateLimitRequests(
   database: D1Database,
@@ -28,7 +35,7 @@ async function countRateLimitRequests(
 }
 
 describe("Public API rate limiting", () => {
-  test("records sharded hot-path windows and rejects requests over the window limit", async () => {
+  test("counts window requests and rejects requests over the window limit", async () => {
     const database = await createPublicHttpContractDatabase();
     const nowMs = 120_000;
 
@@ -90,5 +97,34 @@ describe("Public API rate limiting", () => {
     await expect(
       countRateLimitRequests(database, "public_api:stale-token", staleUpdatedAt),
     ).resolves.toBe(0);
+  });
+
+  test("prunes stale windows during scheduled maintenance", async () => {
+    const database = await createPublicHttpContractDatabase();
+    const bindings = createPublicHttpTestBindings(database, {
+      apiCommandQueue: createApiCommandQueueStub(),
+    }) as ApiBindings;
+
+    await database
+      .prepare(
+        `INSERT INTO public_api_rate_limit_window (
+          bucket_key,
+          window_start,
+          shard,
+          request_count,
+          updated_at
+        ) VALUES (?, ?, ?, ?, ?)`,
+      )
+      .bind("public_api:stale-token", 1_000, 0, 1, 1_000)
+      .run();
+    await createApiWorker().scheduled?.(
+      { cron: "* * * * *", noRetry() {}, scheduledTime: nowMsForTest() },
+      bindings,
+      {} as ExecutionContext,
+    );
+
+    await expect(countRateLimitRequests(database, "public_api:stale-token", 1_000)).resolves.toBe(
+      0,
+    );
   });
 });

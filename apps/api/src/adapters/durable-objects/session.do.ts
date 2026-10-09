@@ -6,13 +6,12 @@ import type { ApiBindings } from "../../platform/cloudflare/worker-types";
 interface SessionDelegate {
   alarm(): Promise<void>;
   closeViewers(sessionId: string, reason: string): Promise<void>;
-  destroy(sessionId: string, reason: string): Promise<void>;
+  destroy(reason: string): Promise<void>;
   fetch(request: Request): Promise<Response>;
   publishEvents(sessionId: string, events: AgUiSessionEvent[]): Promise<void>;
   syncViewers(sessionId: string): Promise<void>;
   webSocketClose(ws: WebSocket, code: number, reason: string): Promise<void>;
   webSocketError(ws: WebSocket, error: unknown): Promise<void> | void;
-  webSocketMessage(ws: WebSocket, message: ArrayBuffer | string): Promise<void>;
 }
 
 export class Session extends DurableObject {
@@ -21,7 +20,7 @@ export class Session extends DurableObject {
   constructor(ctx: DurableObjectState, env: ApiBindings) {
     super(ctx, env);
 
-    this.#delegatePromise = import("../../modules/sessions/application/session-do.service").then(
+    this.#delegatePromise = import("../../modules/sessions/infrastructure/session/do").then(
       ({ Session: SessionImplementation }) => new SessionImplementation(ctx, env),
     );
   }
@@ -46,8 +45,8 @@ export class Session extends DurableObject {
     await (await this.#delegatePromise).closeViewers(sessionId, reason);
   }
 
-  async destroy(sessionId: string, reason: string): Promise<void> {
-    await (await this.#delegatePromise).destroy(sessionId, reason);
+  async destroy(reason: string): Promise<void> {
+    await (await this.#delegatePromise).destroy(reason);
   }
 
   override async webSocketClose(ws: WebSocket, code: number, reason: string): Promise<void> {
@@ -58,7 +57,6 @@ export class Session extends DurableObject {
     await (await this.#delegatePromise).webSocketError(ws, error);
   }
 
-  override async webSocketMessage(ws: WebSocket, message: ArrayBuffer | string): Promise<void> {
-    await (await this.#delegatePromise).webSocketMessage(ws, message);
-  }
+  // Session sockets only push frames to clients; older browser tabs may still send sync requests.
+  override webSocketMessage(): void {}
 }

@@ -3,7 +3,7 @@ import type { AccountId, ProjectId, SessionId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import type { AuthenticatedViewer } from "../../../auth/application/viewer-auth.service";
-import { getParticipantSessionSummaryById } from "../../../sessions/application/session-summary-query.service";
+import { getSessionSummaryById } from "../../../sessions/application/session-summary-query.service";
 import { scheduleAgentSessionRuntimePrewarm } from "./prewarm-agent-session-runtime.service";
 
 export interface ScheduleSessionPrewarmRequest {
@@ -28,10 +28,10 @@ export interface SessionRuntimePrewarmAck {
  * Viewer sockets only subscribe to events. Explicit composer activity can
  * request prewarm here before a user sends another message.
  *
- * Authorization piggy-backs on participant access (same gate that lets a
+ * Authorization piggy-backs on Project session access (same gate that lets a
  * viewer read messages). The underlying scheduler is fire-and-forget through
- * `waitUntil`, runs with `failureMode: "best_effort"`, and skips when an
- * active run is already present, so repeated calls are safe and idempotent.
+ * `waitUntil`, logs prewarm failures instead of throwing them, and skips when
+ * an active run is already present, so repeated calls are safe and idempotent.
  */
 export async function scheduleSessionPrewarm(
   request: ScheduleSessionPrewarmRequest,
@@ -39,7 +39,7 @@ export async function scheduleSessionPrewarm(
   const sessionId = parsePlatformId<SessionId>(request.input.sessionId, "session id");
   const projectId = parsePlatformId<ProjectId>(request.input.projectId, "project id");
   const viewerId = parsePlatformId<AccountId>(request.viewer.id, "viewer id");
-  const session = await getParticipantSessionSummaryById(request.bindings.DB, viewerId, {
+  const session = await getSessionSummaryById(request.bindings.DB, viewerId, {
     projectId,
     sessionId,
   });

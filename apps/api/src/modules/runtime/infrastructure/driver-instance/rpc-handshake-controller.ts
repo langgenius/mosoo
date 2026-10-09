@@ -1,18 +1,9 @@
-import type {
-  DriverHeartbeatInput,
-  DriverHelloInput,
-  DriverHelloOutput,
-  DriverReadyInput,
-} from "@mosoo/agent-driver/orpc";
+import type { DriverHeartbeatInput, DriverReadyInput } from "@mosoo/agent-driver/orpc";
 import { SANDBOX_ORGANIZATION_ROOT } from "@mosoo/agent-driver/paths";
-import { createPlatformId } from "@mosoo/id";
 
 import { logInfo } from "../../../../platform/cloudflare/logger";
 import { DRIVER_HEARTBEAT_INTERVAL_MS } from "../../domain/runtime-config";
-import { COMMAND_LEASE_MS } from "./commands";
-import { EVENT_BATCH_MAX_SIZE } from "./connections";
-import { getRuntimeSessionLink } from "./events";
-import type { RuntimeSessionLink } from "./events";
+import { COMMAND_LEASE_MS, EVENT_BATCH_MAX_SIZE } from "./connections";
 import {
   markDriverInstanceReady,
   recordDriverInstanceHeartbeat,
@@ -20,6 +11,7 @@ import {
 } from "./lifecycle";
 import type { DriverInstanceRpcOperationContext } from "./rpc";
 import type { DriverInstanceRpcControllerDependencies } from "./rpc-controller-dependencies";
+import type { DriverHelloInput, DriverHelloOutput } from "./rpc-wire";
 
 export class DriverInstanceRpcHandshakeController {
   readonly #dependencies: DriverInstanceRpcControllerDependencies;
@@ -39,21 +31,18 @@ export class DriverInstanceRpcHandshakeController {
     }
     context.assertActiveConnection();
 
-    const record = await state.recordHeartbeat(input);
+    await state.recordHeartbeat(input);
+    context.assertActiveConnection();
+    const recorded = await recordDriverInstanceHeartbeat(env, {
+      connectionId: context.connectionId,
+      driverInstanceId: state.requireDriverInstanceId(),
+      generation: state.requireDriverGeneration(),
+      heartbeat: input,
+      heartbeatCount: state.heartbeatCount,
+    });
 
-    if (record.shouldPersistCanonical) {
-      context.assertActiveConnection();
-      const recorded = await recordDriverInstanceHeartbeat(env, {
-        connectionId: context.connectionId,
-        driverInstanceId: state.requireDriverInstanceId(),
-        generation: state.requireDriverGeneration(),
-        heartbeat: input,
-        heartbeatCount: state.heartbeatCount,
-      });
-
-      if (!recorded) {
-        throw new Error("Driver connection is no longer current.");
-      }
+    if (!recorded) {
+      throw new Error("Driver connection is no longer current.");
     }
 
     return {
@@ -85,10 +74,9 @@ export class DriverInstanceRpcHandshakeController {
     }
     context.assertActiveConnection();
 
-    const result = await state.recordHello(input);
-    state.resolveHelloWaiters(result);
+    await state.recordHello(input);
 
-    const link = await this.#getRuntimeSessionLink();
+    const link = await state.getRuntimeSessionLink(env.DB);
 
     if (state.traceId === null && link.traceId !== null) {
       await state.setTraceId(link.traceId);
@@ -96,8 +84,9 @@ export class DriverInstanceRpcHandshakeController {
 
     withRuntimeLogContext(() => {
       logInfo("runtime.driver.hello.received", {
-        capabilities: input.capabilities,
-        connectionId: state.connectionId,
+        // The capability list is unvalidated Driver input; log only its size.
+        capabilityCount: input.capabilities.length,
+        connectionId: context.connectionId,
         driverInstanceId: state.requireDriverInstanceId(),
         driverVersion: input.driverVersion,
         pid: input.pid,
@@ -107,7 +96,7 @@ export class DriverInstanceRpcHandshakeController {
 
     return {
       acceptedCapabilities: input.capabilities,
-      connectionId: state.connectionId ?? createPlatformId(),
+      connectionId: context.connectionId,
       driverInstanceId: state.requireDriverInstanceId(),
       heartbeatIntervalMs: DRIVER_HEARTBEAT_INTERVAL_MS,
       runConfig: {
@@ -125,10 +114,6 @@ export class DriverInstanceRpcHandshakeController {
     context: DriverInstanceRpcOperationContext,
   ): Promise<{ ok: true }> {
     const { env, state, withRuntimeLogContext } = this.#dependencies;
-
-    if (input.driverInstanceId !== state.requireDriverInstanceId()) {
-      throw new Error("Driver instance id mismatch.");
-    }
 
     if (!state.hello) {
       throw new Error("Driver hello is required before ready.");
@@ -151,8 +136,7 @@ export class DriverInstanceRpcHandshakeController {
     }
     context.assertActiveConnection();
 
-    const result = await state.recordReady(input);
-    state.resolveReadyWaiters(result);
+    await state.recordReady(input);
 
     withRuntimeLogContext(() => {
       logInfo("runtime.driver.ready.received", {
@@ -163,17 +147,5 @@ export class DriverInstanceRpcHandshakeController {
     });
 
     return { ok: true };
-  }
-
-  async #getRuntimeSessionLink(options: { refresh?: boolean } = {}): Promise<RuntimeSessionLink> {
-    const { env, state } = this.#dependencies;
-
-    if (options.refresh !== true && state.runtimeSessionLink !== null) {
-      return state.runtimeSessionLink;
-    }
-
-    const link = await getRuntimeSessionLink(env.DB, state.requireDriverInstanceId());
-    state.setRuntimeSessionLink(link);
-    return link;
   }
 }

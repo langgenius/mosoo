@@ -1,13 +1,8 @@
 import { expect, test } from "bun:test";
 
-import { createGraphQLSchema } from "../src/adapters/graphql/create-graphql-schema";
-import { createHttpApp } from "../src/adapters/http/create-http-app";
 import { updateAgentConfig } from "../src/modules/agents/application/agent-command.service";
-import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import {
   createPublicHttpContractDatabase,
-  createPublicHttpTestBindings,
-  createTestExecutionContext,
   insertOwnerSession,
   PUBLIC_API_TEST_IDS as IDS,
 } from "./helpers/public-api-http-test-fixture";
@@ -77,27 +72,4 @@ test("a published preset can change harness without mutating its admitted Sessio
   ).results;
   expect(versionsAfter).toHaveLength(versionsBefore.length + 1);
   expect(versionsAfter.slice(0, versionsBefore.length)).toEqual(versionsBefore);
-});
-
-test("the console schema exposes Session maintenance and retires Agent-wide operations", () => {
-  const fields = createGraphQLSchema().getMutationType()!.getFields();
-  for (const name of ["restartDriver", "recreateSandbox", "resetAgentState"])
-    expect(fields[name]).toBeUndefined();
-  for (const name of ["restartSessionDriver", "recreateSessionSandbox"]) {
-    expect(fields[name].args.map((arg) => arg.name).toSorted()).toEqual(["projectId", "sessionId"]);
-  }
-});
-
-test("the retired shared-Agent Terminal route cannot allocate a machine", async () => {
-  const database = await createPublicHttpContractDatabase();
-  const bindings = createPublicHttpTestBindings(database) as ApiBindings;
-  const response = await createHttpApp().fetch(
-    new Request(`https://api.example.com/api/agent/${IDS.agent}/owner-debug-terminal/ws`, {
-      headers: { Upgrade: "websocket" },
-    }),
-    bindings,
-    createTestExecutionContext(),
-  );
-  expect(response.status).toBe(404);
-  expect(await database.prepare("SELECT count(*) AS n FROM sandbox").first()).toEqual({ n: 0 });
 });

@@ -1,7 +1,6 @@
 import type { ProjectSummary } from "@mosoo/contracts/project";
-import { useQuery } from "@tanstack/react-query";
-
-import { toOrganizationId } from "@/routes/typed-id";
+import type { OrganizationId } from "@mosoo/id";
+import { skipToken, useQuery } from "@tanstack/react-query";
 
 import { listOrganizationProjects } from "../api/project-client";
 
@@ -11,16 +10,10 @@ export const projectKeys = {
   lists: () => [...projectKeys.all, "list"] as const,
 };
 
-export function useOrganizationProjectsQuery(organizationId: string | null) {
+export function useOrganizationProjectsQuery(organizationId: OrganizationId | null) {
   return useQuery<ProjectSummary[]>({
-    enabled: organizationId !== null,
-    queryFn: async () => {
-      if (organizationId === null) {
-        throw new Error("Organization id is required to list projects.");
-      }
-
-      return listOrganizationProjects(toOrganizationId(organizationId));
-    },
+    queryFn:
+      organizationId === null ? skipToken : async () => listOrganizationProjects(organizationId),
     queryKey: projectKeys.list(organizationId),
   });
 }

@@ -43,8 +43,6 @@ export interface DriverOrigin {
 
 export interface DriverSandboxContext {
   readonly id: SandboxId;
-  readonly subjectId: SessionId;
-  readonly subjectKind: "session";
 }
 
 export interface DriverSessionContext {
@@ -72,8 +70,6 @@ export interface DriverConfigRevision {
  * permission broker for an interactive decision.
  */
 export type DriverPermissionPolicy = "full_access" | "supervised";
-
-export const DEFAULT_DRIVER_PERMISSION_POLICY = "full_access" satisfies DriverPermissionPolicy;
 
 /**
  * Reference to the project-scoped vendor credential that powers the runtime.
@@ -103,14 +99,12 @@ export interface DriverNetworkProfile {
 export interface DriverProfileConfig {
   readonly agentId: AgentId | null;
   readonly configRevision: DriverConfigRevision;
-  readonly envVarNames: string[];
   readonly envVars: Record<string, string>;
-  readonly environmentArtifact?: DriverEnvironmentArtifactProfile | null;
+  readonly environmentArtifact: DriverEnvironmentArtifactProfile | null;
   readonly model: string;
   /** Selected protocol from the Session snapshot, distinct from the credential declaration. */
   readonly modelProtocol?: PresetModelProtocol;
   readonly network: DriverNetworkProfile;
-  readonly permissionPolicy: DriverPermissionPolicy;
   readonly prompt: string;
   readonly provider: string;
   readonly providerOptions: JsonObject;
@@ -119,7 +113,6 @@ export interface DriverProfileConfig {
   readonly sandbox: DriverSandboxContext;
   readonly session: DriverSessionContext;
   readonly setupScript: string;
-  readonly sourceKind: "agent";
   readonly vendorCredential: DriverVendorCredentialProfile;
 }
 

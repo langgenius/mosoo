@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useReducer } from "react";
+import { useMemo, useReducer } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
-import { useAppSession } from "@/app/session-provider";
+import { useAppSession } from "@/app/session/session-context";
 import { useVisibleAgentsQuery } from "@/domains/agent/query/agent-queries";
-import { useAuth } from "@/domains/auth/use-auth";
 import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import { EmptyState } from "@/shared/ui/empty-state";
@@ -26,20 +25,17 @@ import { ImportAgentPackageDialog } from "./components/import-agent-package-dial
 
 interface AgentListPageState {
   search: string;
-  showCreate: boolean;
   showImport: boolean;
   view: "list" | "grid";
 }
 
 type AgentListPageAction =
   | { type: "setSearch"; search: string }
-  | { type: "setShowCreate"; open: boolean }
   | { type: "setShowImport"; open: boolean }
   | { type: "setView"; view: "list" | "grid" };
 
 const AGENT_LIST_PAGE_INITIAL_STATE: AgentListPageState = {
   search: "",
-  showCreate: false,
   showImport: false,
   view: "list",
 };
@@ -51,8 +47,6 @@ function agentListPageReducer(
   switch (action.type) {
     case "setSearch":
       return { ...state, search: action.search };
-    case "setShowCreate":
-      return { ...state, showCreate: action.open };
     case "setShowImport":
       return { ...state, showImport: action.open };
     case "setView":
@@ -63,28 +57,33 @@ function agentListPageReducer(
 export function AgentListPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { user } = useAuth();
   const { activeProject } = useAppSession();
   const [searchParams, setSearchParams] = useSearchParams();
   const [state, dispatch] = useReducer(agentListPageReducer, AGENT_LIST_PAGE_INITIAL_STATE);
-  const { search, showCreate, showImport, view } = state;
+  const { search, showImport, view } = state;
   const projectId = activeProject?.id ?? null;
   const agentsQuery = useVisibleAgentsQuery(projectId);
+  const showCreate = searchParams.get("create") === "1";
 
-  useEffect(() => {
-    if (searchParams.get("create") !== "1") return;
-    dispatch({ open: true, type: "setShowCreate" });
-    const next = new URLSearchParams(searchParams);
-    next.delete("create");
-    setSearchParams(next, { replace: true });
-  }, [searchParams, setSearchParams]);
+  function setShowCreate(open: boolean): void {
+    setSearchParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        if (open) {
+          next.set("create", "1");
+        } else {
+          next.delete("create");
+        }
+        return next;
+      },
+      { replace: true },
+    );
+  }
 
   const agents = useMemo(
-    () => (agentsQuery.data ?? []).map((profile) => mapAgentSummaryToListView(profile, user)),
-    [agentsQuery.data, user],
+    () => (agentsQuery.data ?? []).map((profile) => mapAgentSummaryToListView(profile)),
+    [agentsQuery.data],
   );
-
-  const basePath = globalThis.location.pathname.startsWith("/demo") ? "/demo/agent" : "/agent";
 
   const filteredAgents = filterAgents(agents, search);
 
@@ -94,7 +93,7 @@ export function AgentListPage() {
         <Button
           disabled={projectId === null}
           onClick={() => {
-            dispatch({ open: true, type: "setShowCreate" });
+            setShowCreate(true);
           }}
           size="sm"
         >
@@ -138,7 +137,7 @@ export function AgentListPage() {
         {agentsQuery.isLoading ? (
           <div className="text-fg-3 py-12 text-center text-[13px]">{t("agent.loadingAgents")}</div>
         ) : agentsQuery.error ? (
-          <div className="text-destructive py-12 text-center text-[13px]">
+          <div className="text-danger py-12 text-center text-[13px]">
             {agentsQuery.error instanceof Error
               ? agentsQuery.error.message
               : t("agent.failedToLoadAgents")}
@@ -152,7 +151,7 @@ export function AgentListPage() {
             <Button
               disabled={projectId === null}
               onClick={() => {
-                dispatch({ open: true, type: "setShowCreate" });
+                setShowCreate(true);
               }}
               size="sm"
             >
@@ -164,30 +163,23 @@ export function AgentListPage() {
           <AgentTable
             agents={filteredAgents}
             onSelect={(id) => {
-              void navigate(`${basePath}/${id}`);
+              void navigate(`/agent/${id}`);
             }}
-            showOwner={false}
           />
         ) : (
           <AgentGrid
             agents={filteredAgents}
             onSelect={(id) => {
-              void navigate(`${basePath}/${id}`);
+              void navigate(`/agent/${id}`);
             }}
-            showOwner={false}
           />
         )}
       </ListPageContent>
 
-      <CreateAgentLauncherDialog
-        open={showCreate}
-        onOpenChange={(open) => {
-          dispatch({ open, type: "setShowCreate" });
-        }}
-      />
+      <CreateAgentLauncherDialog open={showCreate} onOpenChange={setShowCreate} />
       <ImportAgentPackageDialog
         onImportedAgentOpen={(agentId) => {
-          void navigate(`${basePath}/${agentId}`);
+          void navigate(`/agent/${agentId}`);
         }}
         onOpenChange={(open) => {
           dispatch({ open, type: "setShowImport" });

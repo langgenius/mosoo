@@ -1,7 +1,6 @@
+import type { ProjectId } from "@mosoo/id";
 import { useQuery } from "@tanstack/react-query";
 import type { UseQueryResult } from "@tanstack/react-query";
-
-import { toProjectId } from "@/routes/typed-id";
 
 import { listVendorCredentials } from "../api/vendor-credential-client";
 import type { VendorCredential } from "../api/vendor-credential-client";
@@ -12,10 +11,14 @@ interface VendorCredentialsQueryModel {
   loading: boolean;
 }
 
-export function useVendorCredentialsQuery(projectId: string): VendorCredentialsQueryModel {
+export const vendorCredentialKeys = {
+  list: (projectId: string) => ["vendor-credentials", projectId] as const,
+};
+
+export function useVendorCredentialsQuery(projectId: ProjectId): VendorCredentialsQueryModel {
   const credentialsQuery = useQuery({
-    queryFn: async () => listVendorCredentials(toProjectId(projectId)),
-    queryKey: ["vendor-credentials", projectId],
+    queryFn: async () => listVendorCredentials(projectId),
+    queryKey: vendorCredentialKeys.list(projectId),
   });
 
   return {

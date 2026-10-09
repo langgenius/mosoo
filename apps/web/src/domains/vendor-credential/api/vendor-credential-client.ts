@@ -1,28 +1,32 @@
-import type { ProjectId, VendorCredentialId } from "@mosoo/contracts/id";
 import type { PresetModelProtocol } from "@mosoo/contracts/models";
+import type { ProjectId, VendorCredentialId } from "@mosoo/id";
 
 import { graphql } from "@/gql";
+import type { VendorCredentialFieldsFragment } from "@/gql/graphql";
 import { requestGraphQL } from "@/platform/http/graphql-client";
-import { toProjectId, toVendorCredentialId } from "@/routes/typed-id";
 
-import {
-  parseAvailableModelReason,
-  parseModelCatalogSource,
-  parseModelProtocol,
-} from "./model-catalog-parsers";
+import { parseAvailableModelReason, parseModelProtocol } from "./model-catalog-parsers";
+
+const VENDOR_CREDENTIAL_FIELDS = graphql(/* GraphQL */ `
+  fragment VendorCredentialFields on VendorCredential {
+    apiBase
+    id
+    isDefault
+    maskedApiKey
+    modelProtocol
+    models
+    name
+    projectId
+    vendorId
+  }
+`);
+
+void VENDOR_CREDENTIAL_FIELDS;
 
 const VENDOR_CREDENTIAL_LIST_QUERY = graphql(/* GraphQL */ `
   query VendorCredentialList($projectId: ULID!) {
     vendorCredentialList(projectId: $projectId) {
-      apiBase
-      id
-      isDefault
-      maskedApiKey
-      modelProtocol
-      models
-      name
-      projectId
-      vendorId
+      ...VendorCredentialFields
     }
   }
 `);
@@ -30,15 +34,7 @@ const VENDOR_CREDENTIAL_LIST_QUERY = graphql(/* GraphQL */ `
 const CREATE_VENDOR_CREDENTIAL_MUTATION = graphql(/* GraphQL */ `
   mutation CreateVendorCredential($input: CreateVendorCredentialInput!) {
     createVendorCredential(input: $input) {
-      apiBase
-      id
-      isDefault
-      maskedApiKey
-      modelProtocol
-      models
-      name
-      projectId
-      vendorId
+      ...VendorCredentialFields
     }
   }
 `);
@@ -46,15 +42,7 @@ const CREATE_VENDOR_CREDENTIAL_MUTATION = graphql(/* GraphQL */ `
 const UPDATE_VENDOR_CREDENTIAL_MUTATION = graphql(/* GraphQL */ `
   mutation UpdateVendorCredential($input: UpdateVendorCredentialInput!) {
     updateVendorCredential(input: $input) {
-      apiBase
-      id
-      isDefault
-      maskedApiKey
-      modelProtocol
-      models
-      name
-      projectId
-      vendorId
+      ...VendorCredentialFields
     }
   }
 `);
@@ -70,15 +58,7 @@ const DELETE_VENDOR_CREDENTIAL_MUTATION = graphql(/* GraphQL */ `
 const SET_DEFAULT_VENDOR_CREDENTIAL_MUTATION = graphql(/* GraphQL */ `
   mutation SetDefaultVendorCredential($input: SetDefaultVendorCredentialInput!) {
     setDefaultVendorCredential(input: $input) {
-      apiBase
-      id
-      isDefault
-      maskedApiKey
-      modelProtocol
-      models
-      name
-      projectId
-      vendorId
+      ...VendorCredentialFields
     }
   }
 `);
@@ -132,18 +112,12 @@ export interface VendorCredential {
   vendorId: string;
 }
 
-type GraphQLVendorCredential = Omit<VendorCredential, "id" | "projectId" | "modelProtocol"> & {
-  id: string;
-  modelProtocol: string | null;
-  projectId: string;
-};
-
-function toVendorCredential(credential: GraphQLVendorCredential): VendorCredential {
+function toVendorCredential(credential: VendorCredentialFieldsFragment): VendorCredential {
   return {
     ...credential,
-    id: toVendorCredentialId(credential.id),
+    id: credential.id as VendorCredentialId,
     modelProtocol: parseModelProtocol(credential.modelProtocol),
-    projectId: toProjectId(credential.projectId),
+    projectId: credential.projectId as ProjectId,
   };
 }
 
@@ -232,7 +206,7 @@ export async function listAvailableAgentModels(input: {
     modelId: entry.modelId,
     modelProtocol: parseModelProtocol(entry.modelProtocol),
     reason: parseAvailableModelReason(entry.reason),
-    source: parseModelCatalogSource(entry.source),
+    source: entry.source,
     statusDetail: entry.statusDetail,
     statusLabel: entry.statusLabel,
     vendorId: entry.vendorId,

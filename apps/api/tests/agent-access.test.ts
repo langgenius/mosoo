@@ -1,9 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { createDefaultAgentBuiltInTools } from "@mosoo/contracts/agent";
-
 import { ensureProjectAgentOwner } from "../src/modules/agents/application/agent-access.service";
-import { getAgentRow } from "../src/modules/agents/application/agent-repository";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
 const AGENT_ACCESS_IDS = {
@@ -127,18 +124,13 @@ describe("project agent access", () => {
   test("resolves owner access with explicit Project proof", async () => {
     const database = createAgentAccessDatabase();
 
-    const access = await ensureProjectAgentOwner(database, AGENT_ACCESS_IDS.ownerAccount, {
+    const agent = await ensureProjectAgentOwner(database, AGENT_ACCESS_IDS.ownerAccount, {
       agentId: AGENT_ACCESS_IDS.ownerAgent,
       projectId: AGENT_ACCESS_IDS.project,
     });
 
-    expect(access.agent.id).toBe(AGENT_ACCESS_IDS.ownerAgent);
-    expect(access.agent.projectId).toBe(AGENT_ACCESS_IDS.project);
-    expect(access.owner).toMatchObject({
-      id: AGENT_ACCESS_IDS.ownerAccount,
-      name: "Owner",
-    });
-    expect(access.viewerRole).toBe("owner");
+    expect(agent.id).toBe(AGENT_ACCESS_IDS.ownerAgent);
+    expect(agent.projectId).toBe(AGENT_ACCESS_IDS.project);
   });
 
   test("fails closed for non-owner access even inside the same organization", async () => {
@@ -161,18 +153,5 @@ describe("project agent access", () => {
         projectId: AGENT_ACCESS_IDS.otherProject,
       }),
     ).rejects.toThrow();
-  });
-
-  test("normalizes legacy empty stored config when reading Agent rows", async () => {
-    const agent = await getAgentRow(createAgentAccessDatabase(), AGENT_ACCESS_IDS.ownerAgent);
-
-    expect(agent.projectId).toBe(AGENT_ACCESS_IDS.project);
-    expect(JSON.parse(agent.configJson)).toEqual({
-      builtInTools: createDefaultAgentBuiltInTools(),
-      packageMcpServers: [],
-      packageResolution: null,
-      packageSkills: [],
-      providerOptions: {},
-    });
   });
 });

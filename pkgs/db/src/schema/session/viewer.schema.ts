@@ -35,6 +35,3 @@ export const sessionReadinessSnapshotsTable = sqliteTable("session_readiness_sna
     .references(() => sessionsTable.id, { onDelete: "cascade" }),
   updatedAt: integer("updated_at").notNull(),
 });
-
-export type SessionPermissionRequestRow = typeof sessionPermissionRequestsTable.$inferSelect;
-export type SessionReadinessSnapshotRow = typeof sessionReadinessSnapshotsTable.$inferSelect;

@@ -23,13 +23,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu";
-import { Copy, Download, MoreHorizontal, Pencil, Settings, Trash2 } from "@/shared/ui/icons";
+import { Copy, Download, MoreHorizontal, Trash2 } from "@/shared/ui/icons";
 
 import type { Agent } from "../agent.types";
-
-function getBasePath(): string {
-  return globalThis.location.pathname.startsWith("/demo") ? "/demo/agent" : "/agent";
-}
 
 function sanitizeFileSegment(value: string): string {
   return (
@@ -62,8 +58,6 @@ export function AgentRowActions({ agent }: { agent: Agent }): ReactElement {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const isEditor = agent.role === "owner";
-  const canDelete = agent.role === "owner";
   const typedAgentId = toAgentId(agent.id);
   const typedProjectId = toProjectId(agent.projectId);
 
@@ -88,14 +82,6 @@ export function AgentRowActions({ agent }: { agent: Agent }): ReactElement {
     },
   });
 
-  function handleConfig(): void {
-    void navigate(`${getBasePath()}/${agent.id}?settings=1`);
-  }
-
-  function handleEdit(): void {
-    void navigate(`${getBasePath()}/${agent.id}?tab=preview`);
-  }
-
   async function handleDuplicate(): Promise<void> {
     try {
       setActionError(null);
@@ -104,7 +90,7 @@ export function AgentRowActions({ agent }: { agent: Agent }): ReactElement {
         projectId: typedProjectId,
       });
 
-      void navigate(`${getBasePath()}/${result.agent.id}`);
+      void navigate(`/agent/${result.agent.id}`);
     } catch (error) {
       setActionError(getActionErrorMessage(error, t("agent.duplicateFailed")));
     }
@@ -145,16 +131,6 @@ export function AgentRowActions({ agent }: { agent: Agent }): ReactElement {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-[180px]">
-          {isEditor && (
-            <DropdownMenuItem className="gap-2" onSelect={handleConfig}>
-              <Settings className="size-3.5" /> {t("nav.config")}
-            </DropdownMenuItem>
-          )}
-          {isEditor && (
-            <DropdownMenuItem className="gap-2" onSelect={handleEdit}>
-              <Pencil className="size-3.5" /> {t("common.edit")}
-            </DropdownMenuItem>
-          )}
           <DropdownMenuItem
             className="gap-2"
             disabled={forkMutation.isPending}
@@ -166,34 +142,28 @@ export function AgentRowActions({ agent }: { agent: Agent }): ReactElement {
             <Copy className="size-3.5" />
             {forkMutation.isPending ? t("agent.duplicating") : t("skills.duplicate")}
           </DropdownMenuItem>
-          {isEditor && (
-            <DropdownMenuItem
-              className="gap-2"
-              disabled={exportMutation.isPending}
-              onSelect={(event) => {
-                event.preventDefault();
-                void handleExport();
-              }}
-            >
-              <Download className="size-3.5" />
-              {exportMutation.isPending ? t("agent.exporting") : t("agent.exportConfig")}
-            </DropdownMenuItem>
-          )}
-          {canDelete && (
-            <>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                variant="destructive"
-                className="gap-2"
-                onSelect={(event) => {
-                  event.preventDefault();
-                  setConfirmDelete(true);
-                }}
-              >
-                <Trash2 className="size-3.5" /> {t("common.delete")}
-              </DropdownMenuItem>
-            </>
-          )}
+          <DropdownMenuItem
+            className="gap-2"
+            disabled={exportMutation.isPending}
+            onSelect={(event) => {
+              event.preventDefault();
+              void handleExport();
+            }}
+          >
+            <Download className="size-3.5" />
+            {exportMutation.isPending ? t("agent.exporting") : t("agent.exportConfig")}
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            variant="destructive"
+            className="gap-2"
+            onSelect={(event) => {
+              event.preventDefault();
+              setConfirmDelete(true);
+            }}
+          >
+            <Trash2 className="size-3.5" /> {t("common.delete")}
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 
@@ -218,7 +188,7 @@ export function AgentRowActions({ agent }: { agent: Agent }): ReactElement {
           </DialogHeader>
 
           {deleteMutation.error ? (
-            <div className="border-destructive/30 bg-destructive/5 text-destructive rounded-md border px-3 py-2 text-xs">
+            <div className="border-danger/30 bg-danger/5 text-danger rounded-md border px-3 py-2 text-xs">
               {deleteMutation.error instanceof Error
                 ? deleteMutation.error.message
                 : t("agent.deleteFailed")}

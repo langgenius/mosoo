@@ -1,11 +1,10 @@
-import { SANDBOX_SESSION_STATE_DIR } from "@mosoo/agent-driver/paths";
 import {
   driverInstancesTable,
   sandboxesTable,
   sandboxSessionsTable,
   sessionRunsTable,
 } from "@mosoo/db";
-import type { DriverInstanceId, SandboxId, SessionId } from "@mosoo/id";
+import type { DriverInstanceId, SandboxId } from "@mosoo/id";
 import { and, asc, eq, exists, inArray, isNotNull, isNull, lte, notExists, or } from "drizzle-orm";
 
 import {
@@ -14,6 +13,7 @@ import {
   runAppDatabaseBatch,
 } from "../../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../../time";
+import { LIVE_DRIVER_INSTANCE_STATUSES } from "../../domain/driver-instance-lifecycle.machine";
 import { RUNTIME_SUBJECT_OPERATION_STATUSES } from "../../domain/runtime-subject-lifecycle.machine";
 import { ACTIVE_SESSION_RUN_STATUSES } from "../../domain/session-run-lifecycle.machine";
 import {
@@ -21,8 +21,6 @@ import {
   activeConversationSessionQueryForListedSubject,
   activeSessionRunQueryForListedSubject,
   getRuntimeSubjectInactiveDeadlineSql,
-  exclusiveSessionRuntimeSubjectPredicate,
-  LIVE_DRIVER_STATUSES,
   runLeaseQuery,
   runLeaseQueryForListedSubject,
 } from "./runtime-subject-store-queries";
@@ -88,40 +86,15 @@ export async function listRuntimeSubjectDriverIds(
     .where(
       and(
         eq(driverInstancesTable.sandboxId, runtimeSubjectId),
-        or(inArray(driverInstancesTable.status, LIVE_DRIVER_STATUSES), exists(activeRunLeaseQuery)),
+        or(
+          inArray(driverInstancesTable.status, LIVE_DRIVER_INSTANCE_STATUSES),
+          exists(activeRunLeaseQuery),
+        ),
       ),
     )
     .all();
 
   return results.map((row) => row.id);
-}
-
-export async function listRuntimeSubjectSessionStateTargets(
-  database: D1Database,
-  input: {
-    readonly runtimeSubjectId: SandboxId;
-    readonly sessionIds?: readonly SessionId[];
-  },
-): Promise<string[]> {
-  const sessionIds =
-    input.sessionIds === undefined ? null : [...new Set(input.sessionIds)].filter(Boolean);
-
-  if (sessionIds !== null && sessionIds.length === 0) {
-    return [];
-  }
-
-  const results = await getAppDatabase(database)
-    .select({ cwd: sandboxSessionsTable.cwd })
-    .from(sandboxSessionsTable)
-    .where(
-      and(
-        eq(sandboxSessionsTable.sandboxId, input.runtimeSubjectId),
-        ...(sessionIds === null ? [] : [inArray(sandboxSessionsTable.sessionId, sessionIds)]),
-      ),
-    )
-    .all();
-
-  return results.map((row) => `${row.cwd}/${SANDBOX_SESSION_STATE_DIR}`);
 }
 
 export async function listInactiveRuntimeSubjects(
@@ -141,7 +114,7 @@ export async function listInactiveRuntimeSubjects(
     .where(
       and(
         eq(sandboxesTable.status, "active"),
-        exclusiveSessionRuntimeSubjectPredicate(),
+        eq(sandboxesTable.subjectKind, "session"),
         notExists(activeConversationSessionQueryForListedSubject(appDb)),
         notExists(runLeaseQueryForListedSubject(appDb)),
         isNotNull(sandboxesTable.inactiveDeadlineAt),
@@ -166,7 +139,7 @@ export async function repairStrandedRuntimeSubjectDeadlines(
     })
     .where(
       and(
-        exclusiveSessionRuntimeSubjectPredicate(),
+        eq(sandboxesTable.subjectKind, "session"),
         eq(sandboxesTable.status, "active"),
         isNull(sandboxesTable.inactiveDeadlineAt),
         notExists(activeConversationSessionQueryForListedSubject(appDb)),
@@ -194,7 +167,7 @@ export async function listStaleRuntimeSubjectOperations(
     .from(sandboxesTable)
     .where(
       and(
-        exclusiveSessionRuntimeSubjectPredicate(),
+        eq(sandboxesTable.subjectKind, "session"),
         inArray(sandboxesTable.status, RUNTIME_SUBJECT_OPERATION_STATUSES),
         isNotNull(sandboxesTable.statusOperationId),
         lte(sandboxesTable.statusChangedAt, input.staleChangedAtLte),
@@ -239,7 +212,7 @@ export async function claimInactiveRuntimeSubject(
         and(
           eq(sandboxesTable.id, input.runtimeSubjectId),
           eq(sandboxesTable.status, "active"),
-          exclusiveSessionRuntimeSubjectPredicate(),
+          eq(sandboxesTable.subjectKind, "session"),
           notExists(activeConversationSessionQuery(appDb, input.runtimeSubjectId)),
           notExists(runLeaseQuery(appDb, input.runtimeSubjectId)),
           isNotNull(sandboxesTable.inactiveDeadlineAt),

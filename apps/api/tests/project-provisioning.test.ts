@@ -129,7 +129,7 @@ describe("Project provisioning boundary", () => {
 
     await expect(
       listOrganizationProjects(database, makeViewer("account-1"), "org-1"),
-    ).rejects.toThrow("Organization owner could not be resolved.");
+    ).rejects.toThrow("You do not have permission");
   });
 
   test("createProject fails closed when the viewer does not own the Organization", async () => {

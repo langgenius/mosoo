@@ -59,14 +59,10 @@ const AGENT_OWNER_FIELDS = graphql(/* GraphQL */ `
   }
 `);
 
-const retainGraphQLFragments = (documents: readonly unknown[]): number => documents.length;
-
-retainGraphQLFragments([
-  AGENT_DEPLOYMENT_VERSION_FIELDS,
-  AGENT_FIELDS,
-  AGENT_OWNER_FIELDS,
-  AGENT_TOOL_SUMMARY_FIELDS,
-]);
+void AGENT_DEPLOYMENT_VERSION_FIELDS;
+void AGENT_FIELDS;
+void AGENT_OWNER_FIELDS;
+void AGENT_TOOL_SUMMARY_FIELDS;
 
 export const CREATE_AGENT_MUTATION = graphql(/* GraphQL */ `
   mutation CreateAgent($input: CreateAgentInput!) {

@@ -103,7 +103,6 @@ function createMcpServerUpdateDatabase(): SqliteD1Database {
       enabled,
       icon_url,
       name,
-      oauth_metadata_json,
       owner_account_id,
       project_id,
       source,
@@ -111,7 +110,7 @@ function createMcpServerUpdateDatabase(): SqliteD1Database {
       url
     )
     VALUES
-      ('${PROJECT_MCP_SERVER_ID}', 'bearer', 1, 'app', 'Old description', 1, 'https://icons.example.com/old.png', 'Project MCP', '{"cached":true}', '${OWNER_ID}', '${PROJECT_ID}', 'app', 1, 'https://app.example.com/mcp');
+      ('${PROJECT_MCP_SERVER_ID}', 'bearer', 1, 'app', 'Old description', 1, 'https://icons.example.com/old.png', 'Project MCP', '${OWNER_ID}', '${PROJECT_ID}', 'app', 1, 'https://app.example.com/mcp');
 
     INSERT INTO mcp_credential (
       id,
@@ -187,7 +186,7 @@ describe("MCP server update", () => {
     expect(record?.icon_url).toBeNull();
   });
 
-  test("revokes the project credential and clears cached OAuth metadata when the URL changes", async () => {
+  test("revokes the project credential when the URL changes", async () => {
     const database = createMcpServerUpdateDatabase();
 
     const server = await updateProjectMcpServer(database, createViewer(OWNER_ID), {
@@ -202,12 +201,6 @@ describe("MCP server update", () => {
     expect(server.url).toBe("https://moved.example.com/mcp");
     expect(server.credentialStatus).toBe("revoked");
     expect(server.hasCredential).toBe(false);
-
-    const row = database
-      .prepare("SELECT oauth_metadata_json FROM mcp_server WHERE id = ?")
-      .bind(PROJECT_MCP_SERVER_ID);
-    const record = await row.first<{ oauth_metadata_json: string | null }>();
-    expect(record?.oauth_metadata_json).toBeNull();
   });
 
   test("rejects a non-https URL", async () => {

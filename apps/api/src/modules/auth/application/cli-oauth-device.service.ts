@@ -7,15 +7,16 @@ import type {
   CliOAuthDeviceTokenRequest,
   CliOAuthDeviceTokenResponse,
 } from "@mosoo/contracts/auth";
-import { accountsTable, cliOAuthFlowsTable } from "@mosoo/db";
+import { cliOAuthFlowsTable } from "@mosoo/db";
 import { createPlatformId } from "@mosoo/id";
-import type { AccountId, CliOAuthFlowId } from "@mosoo/id";
+import type { CliOAuthFlowId } from "@mosoo/id";
 import { and, eq, inArray } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { toBase64Url } from "../../../shared/bytes";
 import { currentTimestampMs } from "../../../time";
 import { createPersonalAccessToken } from "./personal-access-token.service";
+import { getAccountViewer } from "./viewer-auth.service";
 import type { AuthenticatedViewer } from "./viewer-auth.service";
 
 const CLI_OAUTH_FLOW_TTL_MS = 10 * 60 * 1000;
@@ -45,7 +46,6 @@ export async function startCliOAuthDeviceFlow(
   input: StartCliOAuthDeviceFlowInput,
 ): Promise<CliOAuthDeviceStartResponse> {
   const provider = normalizeProvider(input.provider);
-  const webOrigin = normalizeWebOrigin(input.webOrigin);
   const hostname = normalizeHostname(input.hostname);
   const now = currentTimestampMs();
   const expiresAt = now + CLI_OAUTH_FLOW_TTL_MS;
@@ -53,7 +53,7 @@ export async function startCliOAuthDeviceFlow(
   const deviceCode = createDeviceCode();
   const deviceCodeHash = await hashCliOAuthDeviceCode(deviceCode);
   const userCode = createUserCode();
-  const verificationUri = new URL("/cli-auth", webOrigin);
+  const verificationUri = new URL("/cli-auth", input.webOrigin);
   const verificationUriComplete = new URL(verificationUri);
   verificationUriComplete.searchParams.set("code", userCode);
 
@@ -89,7 +89,7 @@ export async function pollCliOAuthDeviceToken(
   database: D1Database,
   input: CliOAuthDeviceTokenRequest,
 ): Promise<CliOAuthDeviceTokenResponse> {
-  const deviceCode = typeof input.device_code === "string" ? input.device_code.trim() : "";
+  const deviceCode = input.device_code.trim();
   if (deviceCode === "") {
     throw new CliOAuthDeviceError(400, "invalid_request", "Device code is required.");
   }
@@ -113,19 +113,11 @@ export async function pollCliOAuthDeviceToken(
     return { status: "expired" };
   }
 
-  if (flow.status === "pending" || flow.status === "denied" || flow.status === "consumed") {
+  if (flow.status !== "authorized") {
     return { status: flow.status };
   }
 
-  if (flow.status === "expired") {
-    return { status: "expired" };
-  }
-
-  if (!flow.accountId) {
-    throw new CliOAuthDeviceError(500, "invalid_flow", "CLI OAuth flow is missing account.");
-  }
-
-  const viewer = await getViewerByAccountId(database, flow.accountId);
+  const viewer = await getAccountViewer(database, flow.accountId!);
   if (!viewer) {
     throw new CliOAuthDeviceError(500, "invalid_flow", "CLI OAuth account no longer exists.");
   }
@@ -205,12 +197,12 @@ export async function confirmCliOAuthDeviceFlow(
   return { status: "authorized", user_code: userCode };
 }
 
-export async function hashCliOAuthDeviceCode(value: string): Promise<string> {
+async function hashCliOAuthDeviceCode(value: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
   return toBase64Url(new Uint8Array(digest));
 }
 
-export function normalizeCliOAuthUserCode(value: string): string | null {
+function normalizeCliOAuthUserCode(value: string): string | null {
   const normalized = value
     .trim()
     .toUpperCase()
@@ -234,19 +226,6 @@ function normalizeProvider(value: string | undefined): "google" {
   return "google";
 }
 
-function normalizeWebOrigin(value: string): string {
-  let url: URL;
-  try {
-    url = new URL(value);
-  } catch {
-    throw new CliOAuthDeviceError(500, "invalid_config", "WEB_ORIGIN is invalid.");
-  }
-  if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw new CliOAuthDeviceError(500, "invalid_config", "WEB_ORIGIN must use http or https.");
-  }
-  return url.origin;
-}
-
 function normalizeHostname(value: string | undefined): string | null {
   const hostname = value?.trim() ?? "";
   if (hostname === "") {
@@ -267,10 +246,9 @@ function createDeviceCode(): string {
 function createUserCode(): string {
   const bytes = new Uint8Array(8);
   crypto.getRandomValues(bytes);
-  const chars = Array.from(bytes, (byte) => {
-    const index = byte % CLI_OAUTH_USER_CODE_ALPHABET.length;
-    return CLI_OAUTH_USER_CODE_ALPHABET[index] ?? "A";
-  }).join("");
+  const chars = Array.from(bytes, (byte) =>
+    CLI_OAUTH_USER_CODE_ALPHABET.charAt(byte % CLI_OAUTH_USER_CODE_ALPHABET.length),
+  ).join("");
   return `${chars.slice(0, 4)}-${chars.slice(4)}`;
 }
 
@@ -279,14 +257,9 @@ async function markCliOAuthFlowStatus(
   flowId: CliOAuthFlowId,
   status: CliOAuthDeviceStatus,
   timestampMs: number,
-  expectedStatuses?: CliOAuthDeviceStatus[],
+  expectedStatuses: CliOAuthDeviceStatus[],
 ): Promise<boolean> {
   const timestamp = new Date(timestampMs);
-  const predicates = [eq(cliOAuthFlowsTable.id, flowId)];
-  if (expectedStatuses && expectedStatuses.length > 0) {
-    predicates.push(inArray(cliOAuthFlowsTable.status, expectedStatuses));
-  }
-
   const updated =
     (await getAppDatabase(database)
       .update(cliOAuthFlowsTable)
@@ -296,7 +269,12 @@ async function markCliOAuthFlowStatus(
         status,
         updatedAt: timestamp,
       })
-      .where(and(...predicates))
+      .where(
+        and(
+          eq(cliOAuthFlowsTable.id, flowId),
+          inArray(cliOAuthFlowsTable.status, expectedStatuses),
+        ),
+      )
       .returning({ id: cliOAuthFlowsTable.id })
       .get()) ?? null;
 
@@ -316,35 +294,4 @@ async function readCliOAuthFlowStatus(
       .get()) ?? null;
 
   return row?.status ?? null;
-}
-
-async function getViewerByAccountId(
-  database: D1Database,
-  accountId: AccountId,
-): Promise<AuthenticatedViewer | null> {
-  const row =
-    (await getAppDatabase(database)
-      .select({
-        email: accountsTable.email,
-        emailVerified: accountsTable.emailVerified,
-        id: accountsTable.id,
-        imageUrl: accountsTable.image,
-        name: accountsTable.name,
-      })
-      .from(accountsTable)
-      .where(eq(accountsTable.id, accountId))
-      .limit(1)
-      .get()) ?? null;
-
-  if (!row) {
-    return null;
-  }
-
-  return {
-    email: row.email,
-    emailVerified: row.emailVerified,
-    id: row.id,
-    imageUrl: row.imageUrl,
-    name: row.name,
-  };
 }

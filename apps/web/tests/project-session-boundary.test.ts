@@ -1,10 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
 
 import type { ProjectSummary } from "@mosoo/contracts/project";
+import { parsePlatformId } from "@mosoo/id";
+import type { AccountId } from "@mosoo/id";
 
 import { resolveActiveProject } from "../src/app/session/active-project";
-import { toAccountId, toOrganizationId, toProjectId } from "../src/routes/typed-id";
+import { toProjectId } from "../src/routes/typed-id";
 
 function projectSummary(id: string, name: string): ProjectSummary {
   return {
@@ -12,13 +13,8 @@ function projectSummary(id: string, name: string): ProjectSummary {
     defaultEnvironmentId: null,
     id: toProjectId(id),
     name,
-    organizationId: toOrganizationId("01J000000000000000000000A0"),
-    ownerAccountId: toAccountId("01J000000000000000000000A1"),
+    ownerAccountId: parsePlatformId<AccountId>("01J000000000000000000000A1"),
   };
-}
-
-function readSource(path: string): string {
-  return readFileSync(new URL(path, import.meta.url), "utf8");
 }
 
 describe("Project session boundary", () => {
@@ -48,12 +44,5 @@ describe("Project session boundary", () => {
     expect(
       resolveActiveProject([firstProject, secondProject], "01J000000000000000000000A7"),
     ).toBeNull();
-  });
-
-  test("does not derive active Project by Project list order", () => {
-    const source = readSource("../src/app/session/session-context.tsx");
-
-    expect(source).toContain("resolveActiveProject(projects, selectedProjectId)");
-    expect(source).not.toContain("projects[0]");
   });
 });

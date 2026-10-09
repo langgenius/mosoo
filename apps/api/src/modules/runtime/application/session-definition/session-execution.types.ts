@@ -26,8 +26,6 @@ export interface SessionExecutionPlan {
   /** Explicit Cloud debug enrollment; absent on legacy and formal/API Sessions. */
   previewRetentionMs?: number;
   environment: {
-    allowMcpServers: boolean;
-    allowPackageManagers: boolean;
     allowedHostsJson: string;
     envVarsJson: string;
     environmentId: EnvironmentId;

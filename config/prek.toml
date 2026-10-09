@@ -1,4 +1,4 @@
-default_install_hook_types = ['pre-commit', 'commit-msg', 'pre-push']
+default_install_hook_types = ['pre-commit', 'commit-msg']
 
 [[repos]]
 repo = 'builtin'
@@ -10,18 +10,14 @@ hooks = [
   { id = 'end-of-file-fixer' },
   { id = 'fix-byte-order-marker' },
   { id = 'check-json' },
-  { id = 'check-json5' },
-  # { id = 'pretty-format-json' },
   { id = 'check-toml' },
   { id = 'check-vcs-permalinks' },
   { id = 'check-yaml' },
-  { id = 'check-xml' },
   { id = 'mixed-line-ending' },
   { id = 'check-symlinks' },
   { id = 'destroyed-symlinks' },
   { id = 'check-merge-conflict' },
   { id = 'detect-private-key' },
-  # { id = 'no-commit-to-branch' },
   { id = 'check-executables-have-shebangs' },
   { id = 'check-shebang-scripts-are-executable' },
 ]
@@ -30,26 +26,9 @@ hooks = [
 repo = 'local'
 
 [[repos.hooks]]
-id = 'prek-validate-config'
-name = 'prek validate-config'
-entry = 'vp exec prek validate-config config/prek.toml'
-language = 'system'
-always_run = true
-pass_filenames = false
-
-[[repos.hooks]]
 id = 'validate-commit-message'
 name = 'validate commit message'
 entry = 'vp exec bun scripts/validate-commit-message.ts'
 language = 'system'
 stages = ['commit-msg']
 always_run = true
-
-[[repos.hooks]]
-id = 'validate-push-commits'
-name = 'validate push commits'
-entry = 'vp exec bun scripts/validate-push-commits.ts'
-language = 'system'
-stages = ['pre-push']
-always_run = true
-pass_filenames = false

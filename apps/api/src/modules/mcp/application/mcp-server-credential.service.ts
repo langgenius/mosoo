@@ -5,7 +5,6 @@ import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import {
   getProjectCredentialRow,
-  hasProjectCredential,
   revokeCredential,
   writeCredential,
 } from "./mcp-credential.repository";
@@ -17,14 +16,10 @@ export async function connectMcpBearer(
   viewer: AuthenticatedViewer,
   input: ConnectMcpBearerInput,
 ): Promise<McpServerWithCredential> {
-  const { server } = await ensureServerAccess(bindings.DB, viewer, input.projectId, input.serverId);
+  const server = await ensureServerAccess(bindings.DB, viewer, input.projectId, input.serverId);
 
   if (server.authType !== "bearer") {
     throw new Error("This MCP server does not use bearer authentication.");
-  }
-
-  if (server.credentialScope !== "app") {
-    throw new Error("This MCP server is not configured for project credentials.");
   }
 
   const existing = await getProjectCredentialRow(bindings.DB, server.id);
@@ -32,17 +27,12 @@ export async function connectMcpBearer(
     accessToken: input.token,
     authType: "bearer",
     credentialId: existing?.id ?? null,
-    scope: "app",
     scopeValues: [],
     server,
     subjectLabel: input.subjectLabel ?? viewer.email ?? null,
   });
 
-  return toServerWithCredential(
-    server,
-    credential,
-    await hasProjectCredential(bindings.DB, server.id),
-  );
+  return toServerWithCredential(server, credential);
 }
 
 export async function revokeMcpCredential(
@@ -51,13 +41,8 @@ export async function revokeMcpCredential(
   projectId: ProjectId,
   serverId: McpServerId,
 ): Promise<McpServerWithCredential> {
-  const { server } = await ensureServerAccess(database, viewer, projectId, serverId);
-  const credential = await getProjectCredentialRow(database, server.id);
-  await revokeCredential(database, credential);
-  const [nextCredential, hasCredential] = await Promise.all([
-    getProjectCredentialRow(database, server.id),
-    hasProjectCredential(database, server.id),
-  ]);
+  const server = await ensureServerAccess(database, viewer, projectId, serverId);
+  await revokeCredential(database, await getProjectCredentialRow(database, server.id));
 
-  return toServerWithCredential(server, nextCredential, hasCredential);
+  return toServerWithCredential(server, await getProjectCredentialRow(database, server.id));
 }

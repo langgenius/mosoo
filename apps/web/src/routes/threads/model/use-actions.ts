@@ -1,4 +1,4 @@
-import type { ProjectId, SessionId } from "@mosoo/contracts/id";
+import type { ProjectId, SessionId } from "@mosoo/id";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
 
@@ -12,7 +12,6 @@ import { uploadSessionResource } from "@/features/session-files/session-resource
 import { toAgentId, toFileId, toProjectId, toSessionId } from "@/routes/typed-id";
 
 import type { NewThreadSubmitInput } from "../compose/new-dialog";
-import type { ThreadFollowUpInput } from "./action-types";
 import { getMutationErrorMessage } from "./format";
 import { threadKeys } from "./query-keys";
 import type { ThreadListItem } from "./thread";
@@ -24,7 +23,6 @@ export function useThreadActions({
   markThreadReadLocal,
   navigateToList,
   threadsById,
-  togglePinnedThreadLocal,
 }: {
   activeProjectId: string | null;
   activeThreadId: string | null;
@@ -32,7 +30,6 @@ export function useThreadActions({
   markThreadReadLocal: (input: { readAt: string; threadId: string }) => void;
   navigateToList: () => void;
   threadsById: ReadonlyMap<string, ThreadListItem>;
-  togglePinnedThreadLocal: (threadId: string) => void;
 }) {
   const queryClient = useQueryClient();
   const [actionError, setActionError] = useState<string | null>(null);
@@ -108,7 +105,7 @@ export function useThreadActions({
     },
   });
   const followUpMutation = useMutation({
-    mutationFn: async (input: ThreadFollowUpInput) => {
+    mutationFn: async (input: { body: string; thread: ThreadListItem }) => {
       if (input.thread.bucket === "archived") {
         await unarchiveAgentSession(input.thread.session.projectId, toSessionId(input.thread.id));
       }
@@ -147,31 +144,6 @@ export function useThreadActions({
     [createMutation],
   );
 
-  const markThreadRead = useCallback(
-    async (input: { readAt: string; threadId: string }): Promise<void> => {
-      markThreadReadLocal(input);
-    },
-    [markThreadReadLocal],
-  );
-
-  const togglePinnedThread = useCallback(
-    async (threadId: string): Promise<void> => {
-      const thread = threadsById.get(threadId) ?? null;
-
-      if (thread === null) {
-        return;
-      }
-
-      try {
-        setActionError(null);
-        togglePinnedThreadLocal(threadId);
-      } catch (error) {
-        setActionError(getMutationErrorMessage(error, "Failed to update pinned state."));
-      }
-    },
-    [threadsById, togglePinnedThreadLocal],
-  );
-
   const archiveThread = useCallback(
     async (threadId: string): Promise<void> => {
       const thread = threadsById.get(threadId) ?? null;
@@ -195,7 +167,7 @@ export function useThreadActions({
 
   const deleteThread = useCallback(
     async (threadId: string): Promise<void> => {
-      // PRD AC-3.8 explicitly requires window.confirm for destructive delete.
+      // Delete is irreversible, so it asks for confirmation first.
       if (!globalThis.confirm("Delete this thread?")) {
         return;
       }
@@ -224,7 +196,7 @@ export function useThreadActions({
   );
 
   const sendFollowUp = useCallback(
-    async (input: ThreadFollowUpInput): Promise<void> => {
+    async (input: { body: string; thread: ThreadListItem }): Promise<void> => {
       try {
         await followUpMutation.mutateAsync(input);
       } catch (error) {
@@ -245,10 +217,7 @@ export function useThreadActions({
     createThread,
     creatingThread: createMutation.isPending,
     deleteThread,
-    markThreadRead,
     sendFollowUp,
     sendingFollowUp: followUpMutation.isPending,
-    setActionError,
-    togglePinnedThread,
   };
 }

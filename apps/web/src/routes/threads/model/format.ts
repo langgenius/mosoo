@@ -2,7 +2,7 @@ const RELATIVE_TIME_FORMATTER = new Intl.RelativeTimeFormat(undefined, { numeric
 
 type Translate = (key: string, variables?: Record<string, string>) => string;
 
-export function formatRelativeTime(value: string, t: Translate = (key) => key): string {
+export function formatRelativeTime(value: string, t: Translate): string {
   const deltaMs = new Date(value).getTime() - Date.now();
   const absMs = Math.abs(deltaMs);
 
@@ -21,7 +21,7 @@ export function formatRelativeTime(value: string, t: Translate = (key) => key): 
   return RELATIVE_TIME_FORMATTER.format(Math.round(deltaMs / 86_400_000), "day");
 }
 
-export function formatShortRelative(value: string, t: Translate = (key) => key): string {
+export function formatShortRelative(value: string, t: Translate): string {
   const deltaMs = Date.now() - new Date(value).getTime();
   const absMs = Math.abs(deltaMs);
 

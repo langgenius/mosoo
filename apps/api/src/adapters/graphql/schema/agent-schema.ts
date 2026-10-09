@@ -20,7 +20,6 @@ export const agentSchema = /* GraphQL */ `
 
   enum AgentViewerRole {
     owner
-    none
   }
 
   enum AgentBuiltInToolName {
@@ -68,12 +67,6 @@ export const agentSchema = /* GraphQL */ `
   enum AgentPackageResolutionSource {
     fork
     import
-  }
-
-  enum RuntimeStateOperation {
-    recreateSandbox
-    resetAgentState
-    restartDriver
   }
 
   type AgentSkillReference {

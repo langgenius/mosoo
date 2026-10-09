@@ -1,14 +1,11 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
 
-import type { AccountId, McpServerId, ProjectId } from "@mosoo/id";
-
 import { registerDynamicOAuthClient } from "../src/modules/mcp/application/mcp-oauth-client-registration.service";
 import {
+  discoverOAuthMetadata,
   exchangeOAuthToken,
-  getOrDiscoverOAuthMetadata,
 } from "../src/modules/mcp/application/mcp-oauth-discovery.service";
-import type { OAuthMetadata, ServerRow } from "../src/modules/mcp/application/mcp-types";
-import { SqliteD1Database } from "./helpers/sqlite-d1";
+import type { OAuthMetadata } from "../src/modules/mcp/application/mcp-types";
 
 const originalFetch = globalThis.fetch;
 afterEach(() => {
@@ -21,34 +18,7 @@ const metadata: OAuthMetadata = {
   token_endpoint: "https://oauth.example.com/token",
 };
 
-function server(oauthMetadataJson: string | null): ServerRow {
-  return {
-    authType: "oauth",
-    byoClientId: "test-client",
-    byoClientSecretSecretId: null,
-    createdAt: 1,
-    credentialScope: "app",
-    description: null,
-    enabled: 1,
-    iconUrl: null,
-    id: "01J00000000000000000000005" as McpServerId,
-    name: "MCP",
-    oauthMetadataJson,
-    ownerId: "01J00000000000000000000003" as AccountId,
-    ownerName: "Owner",
-    projectId: "01J00000000000000000000002" as ProjectId,
-    source: "app",
-    updatedAt: 1,
-    url: "https://mcp.example.com",
-  };
-}
-
-function database(): SqliteD1Database {
-  const db = new SqliteD1Database();
-  db.execute(`CREATE TABLE mcp_server (id TEXT PRIMARY KEY, oauth_metadata_json TEXT, updated_at INTEGER);
-    INSERT INTO mcp_server VALUES ('01J00000000000000000000005', NULL, 1);`);
-  return db;
-}
+const serverUrl = "https://mcp.example.com";
 
 const credentials = {
   clientId: "test-client",
@@ -117,28 +87,13 @@ describe("MCP OAuth HTTPS transport", () => {
     "token_endpoint",
     "registration_endpoint",
   ] as const) {
-    test(`rejects cached HTTP ${field} before discovery or authorization`, async () => {
-      const fetchMock = mock(async () => Response.json(metadata));
-      globalThis.fetch = fetchMock as typeof fetch;
-      await expect(
-        getOrDiscoverOAuthMetadata(
-          database(),
-          server(JSON.stringify({ ...metadata, [field]: "http://oauth.example.com/insecure" })),
-        ),
-      ).rejects.toThrow("OAuth endpoints must use HTTPS");
-      expect(fetchMock).not.toHaveBeenCalled();
-    });
-    test(`does not persist discovered HTTP ${field}`, async () => {
-      const db = database();
+    test(`rejects discovered HTTP ${field}`, async () => {
       globalThis.fetch = mock(async () =>
         Response.json({ ...metadata, [field]: "http://oauth.example.com/insecure" }),
       ) as typeof fetch;
-      await expect(getOrDiscoverOAuthMetadata(db, server(null))).rejects.toThrow(
+      await expect(discoverOAuthMetadata(serverUrl)).rejects.toThrow(
         "OAuth endpoints must use HTTPS",
       );
-      expect(
-        await db.prepare("SELECT oauth_metadata_json FROM mcp_server").first("oauth_metadata_json"),
-      ).toBeNull();
     });
   }
 
@@ -171,9 +126,7 @@ describe("MCP OAuth HTTPS transport", () => {
       await expect(registerDynamicOAuthClient(metadata, credentials.redirectUri)).rejects.toThrow(
         "OAuth dynamic registration failed",
       );
-      await expect(getOrDiscoverOAuthMetadata(database(), server(null))).rejects.toThrow(
-        "OAuth discovery failed",
-      );
+      await expect(discoverOAuthMetadata(serverUrl)).rejects.toThrow("OAuth discovery failed");
       expect(fetchMock).toHaveBeenCalledTimes(4);
     });
   }
@@ -216,14 +169,9 @@ describe("MCP OAuth HTTPS transport", () => {
     });
   });
 
-  test("preserves HTTPS metadata discovery, cache and registration", async () => {
-    const db = database();
+  test("preserves HTTPS metadata discovery and registration", async () => {
     globalThis.fetch = mock(async () => Response.json(metadata)) as typeof fetch;
-    expect(await getOrDiscoverOAuthMetadata(db, server(null))).toEqual(metadata);
-    const cached = await db
-      .prepare("SELECT oauth_metadata_json FROM mcp_server")
-      .first<string>("oauth_metadata_json");
-    expect(await getOrDiscoverOAuthMetadata(db, server(cached))).toEqual(metadata);
+    expect(await discoverOAuthMetadata(serverUrl)).toEqual(metadata);
     globalThis.fetch = mock(async () =>
       Response.json({ client_id: "test-client", client_secret: "fake-secret" }),
     ) as typeof fetch;

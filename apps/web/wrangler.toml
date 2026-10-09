@@ -7,7 +7,7 @@ main = "src/worker.ts"
 [assets]
 directory = "./dist"
 binding = "ASSETS"
-# Domain and HTTPS redirects must run before static asset matches.
+# Domain redirects must run before static asset matches.
 run_worker_first = true
 # The Worker (src/worker.ts) owns SPA fallback so unknown console paths can be
 # handled by react-router.

@@ -2,9 +2,8 @@ import { SkillPackageError } from "./errors";
 import { parseSkillMarkdown } from "./frontmatter";
 import type { SkillFrontmatter } from "./frontmatter";
 import {
-  admitSkillPackageArchivePath as admitSkillPackageArchivePathValue,
-  createSkillPackageArchivePathAdmission,
-  createSkillPackagePathAdmission,
+  admitSkillPackagePath,
+  inferSkillPackagePathKind,
   SKILL_PACKAGE_MANIFEST_PATH,
 } from "./path-admission";
 
@@ -43,60 +42,42 @@ export function normalizeSkillEntries(
     }
   >,
 ): NormalizedSkillPackage {
-  const inputAdmission = createSkillPackagePathAdmission();
-  const normalizedInput = Object.entries(rawEntries).map(([inputPath, entry]) => {
-    const entryKind = entry.entryKind ?? inferEntryKind(inputPath, entry.body);
+  const admitted = new Map<string, SkillPackageEntry>();
 
-    return {
-      body: entry.body,
+  for (const [inputPath, entry] of Object.entries(rawEntries)) {
+    const entryKind = entry.entryKind ?? inferSkillPackagePathKind(inputPath);
+    const path = admitSkillPackagePath(inputPath, entryKind);
+
+    if (admitted.has(path)) {
+      throw new SkillPackageError(
+        `The skill package contains a duplicate path after normalization: ${path}`,
+      );
+    }
+
+    admitted.set(path, {
+      body: entryKind === "directory" ? new Uint8Array() : entry.body,
       entryKind,
-      isExecutable: entry.isExecutable ?? false,
-      path: inputAdmission.admit(inputPath, entryKind).path,
-    };
-  });
-
-  if (normalizedInput.length === 0) {
-    throw new SkillPackageError("The skill package is empty.");
-  }
-
-  const wrapper = detectSingleWrapper(normalizedInput.map((entry) => entry.path));
-  const outputAdmission = createSkillPackageArchivePathAdmission();
-  const admittedEntries: SkillPackageEntry[] = [];
-
-  for (const entry of normalizedInput) {
-    const path = wrapper === null ? entry.path : stripWrapper(entry.path, wrapper);
-
-    if (!path) {
-      continue;
-    }
-
-    const normalizedPath = outputAdmission.admit(path, entry.entryKind).path;
-
-    if (entry.entryKind === "directory") {
-      admittedEntries.push({
-        body: new Uint8Array(),
-        entryKind: "directory",
-        isExecutable: false,
-        path: normalizedPath,
-      });
-      continue;
-    }
-
-    admittedEntries.push({
-      body: entry.body,
-      entryKind: "file",
-      isExecutable: entry.isExecutable,
-      path: normalizedPath,
+      isExecutable: entryKind === "file" && (entry.isExecutable ?? false),
+      path,
     });
   }
 
-  const normalized = new Map<string, SkillPackageEntry>(
-    admittedEntries.map((entry) => [entry.path, entry] as const),
-  );
+  if (admitted.size === 0) {
+    throw new SkillPackageError("The skill package is empty.");
+  }
 
-  for (const entry of admittedEntries) {
-    if (entry.entryKind === "file") {
-      ensureParentDirectories(normalized, entry.path);
+  for (const path of admitted.keys()) {
+    ensureParentDirectories(admitted, path);
+  }
+
+  const wrapper = detectSingleWrapper([...admitted.keys()]);
+  const normalized = new Map<string, SkillPackageEntry>();
+
+  for (const entry of admitted.values()) {
+    const path = wrapper === null ? entry.path : entry.path.slice(wrapper.length + 1);
+
+    if (path) {
+      normalized.set(path, { ...entry, path });
     }
   }
 
@@ -106,61 +87,19 @@ export function normalizeSkillEntries(
     throw new SkillPackageError("The normalized skill package root must contain SKILL.md.");
   }
 
-  const rawMarkdown = decodeSkillMarkdown(skillMarkdownEntry.body);
-  const { frontmatter } = parseSkillMarkdown(rawMarkdown);
-
-  const entries = [...normalized.values()].toSorted((left, right) => {
-    if (left.path === right.path) {
-      return 0;
-    }
-
-    return left.path.localeCompare(right.path);
-  });
+  const { frontmatter } = parseSkillMarkdown(decodeSkillMarkdown(skillMarkdownEntry.body));
 
   return {
-    entries,
+    entries: [...normalized.values()].toSorted((left, right) =>
+      left.path.localeCompare(right.path),
+    ),
     frontmatter,
     skillMarkdownPath: SKILL_PACKAGE_MANIFEST_PATH,
   };
 }
 
-export function toEntryRecord(entries: SkillPackageEntry[]): Record<
-  string,
-  {
-    body: Uint8Array;
-    entryKind: SkillEntryKind;
-    isExecutable: boolean;
-  }
-> {
-  const record: Record<
-    string,
-    {
-      body: Uint8Array;
-      entryKind: SkillEntryKind;
-      isExecutable: boolean;
-    }
-  > = {};
-  const admission = createSkillPackagePathAdmission();
-
-  for (const entry of entries) {
-    const admittedPath = admission.admit(entry.path, entry.entryKind).path;
-
-    record[admittedPath] = {
-      body: entry.body,
-      entryKind: entry.entryKind,
-      isExecutable: entry.isExecutable,
-    };
-  }
-
-  return record;
-}
-
-function inferEntryKind(path: string, _body: Uint8Array): SkillEntryKind {
-  if (path.endsWith("/") || path.endsWith("\\")) {
-    return "directory";
-  }
-
-  return "file";
+export function toEntryRecord(entries: SkillPackageEntry[]): Record<string, SkillPackageEntry> {
+  return Object.fromEntries(entries.map((entry) => [entry.path, entry]));
 }
 
 function decodeSkillMarkdown(bytes: Uint8Array): string {
@@ -173,44 +112,18 @@ function decodeSkillMarkdown(bytes: Uint8Array): string {
   }
 }
 
-function detectSingleWrapper(paths: string[]): string | null {
-  const topLevelDirectories = new Set<string>();
+function detectSingleWrapper(paths: readonly string[]): string | null {
+  const topLevelNames = new Set(paths.map((path) => path.split("/", 1)[0]));
 
-  for (const path of paths) {
-    const [firstSegment] = path.split("/");
-
-    if (firstSegment === undefined || firstSegment.length === 0) {
-      continue;
-    }
-
-    topLevelDirectories.add(firstSegment);
-  }
-
-  if (topLevelDirectories.size !== 1) {
+  if (topLevelNames.size !== 1) {
     return null;
   }
 
-  const [wrapper] = [...topLevelDirectories];
+  const [wrapper] = topLevelNames;
 
-  if (wrapper === undefined || wrapper.length === 0) {
-    return null;
-  }
-
-  const hasNestedSkillMarkdown = paths.some(
-    (path) => path === `${wrapper}/${SKILL_PACKAGE_MANIFEST_PATH}`,
-  );
-
-  return hasNestedSkillMarkdown ? wrapper : null;
-}
-
-function stripWrapper(path: string, wrapper: string): string {
-  if (path === wrapper) {
-    return "";
-  }
-
-  const prefix = `${wrapper}/`;
-
-  return path.startsWith(prefix) ? path.slice(prefix.length) : path;
+  return wrapper !== undefined && paths.includes(`${wrapper}/${SKILL_PACKAGE_MANIFEST_PATH}`)
+    ? wrapper
+    : null;
 }
 
 function ensureParentDirectories(entries: Map<string, SkillPackageEntry>, path: string): void {
@@ -237,17 +150,3 @@ function ensureParentDirectories(entries: Map<string, SkillPackageEntry>, path: 
     });
   }
 }
-
-export function normalizeSkillPackagePath(path: string): string {
-  return admitSkillPackagePath(path);
-}
-
-export function admitSkillPackagePath(path: string): string {
-  return admitSkillPackageArchivePathValue(path).path;
-}
-
-export function admitSkillPackageArchivePath(path: string): string {
-  return admitSkillPackageArchivePathValue(path).path;
-}
-
-export { SKILL_PACKAGE_MANIFEST_PATH } from "./path-admission";

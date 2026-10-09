@@ -151,7 +151,7 @@ export function createAgentPackageArchiveBytes(agentPackage: AgentPackage): Uint
 
   assertArchiveEntriesAdmitted(entries);
 
-  return createZipArchive(entries, { pathsAlreadyAdmitted: true });
+  return createZipArchive(entries);
 }
 
 export function parseAgentPackageArchiveBytes(
@@ -172,10 +172,7 @@ export function parseAgentPackageArchiveBytes(
 
   try {
     entries = toArchiveEntryRecord(
-      extractZipArchive(archiveBytes, {
-        ...AGENT_PACKAGE_ARCHIVE_EXTRACT_OPTIONS,
-        pathsAlreadyAdmitted: true,
-      }),
+      extractZipArchive(archiveBytes, AGENT_PACKAGE_ARCHIVE_EXTRACT_OPTIONS),
     );
   } catch {
     return invalidArchiveResult(

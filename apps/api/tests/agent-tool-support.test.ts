@@ -8,11 +8,9 @@ import { createDraftAgent } from "../src/modules/agents/application/agent-packag
 import { getAgentEditorState } from "../src/modules/agents/application/agent-query.service";
 import { computeAgentReadiness } from "../src/modules/agents/application/agent-readiness.service";
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
-import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import {
   PUBLIC_API_TEST_IDS as ids,
   createPublicHttpContractDatabase,
-  createPublicHttpTestBindings,
 } from "./helpers/public-api-http-test-fixture";
 
 const viewer: AuthenticatedViewer = {
@@ -24,14 +22,12 @@ const viewer: AuthenticatedViewer = {
 };
 const restricted = [{ name: "bash" as const, enabled: false }];
 
-test("readiness exposes unsupported restrictions before provider probing", async () => {
+test("readiness exposes unsupported restrictions", async () => {
   const db = await createPublicHttpContractDatabase();
-  const readiness = await computeAgentReadiness(db, ids.ownerAccount, {
+  const readiness = await computeAgentReadiness(db, {
     agentId: ids.agent,
-    bindings: createPublicHttpTestBindings(db) as ApiBindings,
     builtInTools: restricted,
     environment: { environmentId: ids.environment },
-    kind: "cattle",
     model: "gpt-5.6-luna",
     projectId: ids.project,
     provider: "openai",
@@ -118,7 +114,7 @@ test("publishing a legacy incompatible configuration fails before creating a ver
     .bind(ids.agent)
     .first();
   await expect(
-    publishAgent(createPublicHttpTestBindings(db) as ApiBindings, viewer, {
+    publishAgent(db, viewer, {
       agentId: ids.agent,
       projectId: ids.project,
     }),
@@ -140,7 +136,6 @@ test("package draft admission rejects restrictions before inserting an Agent", a
       builtInTools: restricted,
       description: null,
       environmentId: ids.environment,
-      kind: "pet",
       model: "gpt-5.4",
       ownerId: ids.ownerAccount,
       packageMcpServers: [],

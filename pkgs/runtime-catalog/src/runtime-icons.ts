@@ -1,9 +1,13 @@
 // Exposed as the `@mosoo/runtime-catalog/icons` entry point. This module must
-// stay free of imports from runtime-catalog.ts (and thus @mosoo/contracts /
-// arktype): the web app renders RuntimeIcon on nearly every page, and any
-// dependency added here lands on every page's critical download path.
-import { GENERATED_RUNTIME_ICON_KEYS } from "./runtime-icon-keys.generated";
+// stay free of runtime imports from @mosoo/contracts (arktype): the web app
+// renders RuntimeIcon on nearly every page, and any dependency added here lands
+// on every page's critical download path.
+import { RUNTIMES } from "./catalog";
+
+const RUNTIME_ICON_KEYS = new Map(
+  RUNTIMES.map((runtime) => [runtime.runtimeId, runtime.display.iconKey]),
+);
 
 export function getRuntimeIconKey(runtimeId: string): string | null {
-  return GENERATED_RUNTIME_ICON_KEYS[runtimeId] ?? null;
+  return RUNTIME_ICON_KEYS.get(runtimeId) ?? null;
 }

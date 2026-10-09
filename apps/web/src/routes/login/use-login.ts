@@ -10,7 +10,6 @@ import {
   deriveNameFromEmail,
   getAuthClientErrorMessage,
   getErrorMessage,
-  getSocialAuthErrorMessage,
 } from "./copy";
 
 export type AuthStep = "auth" | "otp";
@@ -98,7 +97,6 @@ export function useLoginFlow(): LoginFlow {
   async function finishSuccessfulLogin(): Promise<void> {
     clearPersistedLoginState();
     await queryClient.invalidateQueries({ queryKey: userKeys.viewer() });
-    await queryClient.refetchQueries({ queryKey: userKeys.viewer() });
     void navigate(redirectPath, { replace: true });
   }
 
@@ -114,7 +112,7 @@ export function useLoginFlow(): LoginFlow {
     });
 
     if (result.error) {
-      setError(getSocialAuthErrorMessage(result.error));
+      setError(getAuthClientErrorMessage(result.error));
     }
   }
 

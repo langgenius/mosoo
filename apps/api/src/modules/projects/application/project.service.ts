@@ -6,10 +6,10 @@ import { and, asc, eq } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { forbiddenError, notFoundError } from "../../../platform/errors";
+import { requireName } from "../../../shared/require-name";
 import { currentTimestampMs, toIsoString } from "../../../time";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { ensureOrganizationOwnership } from "../../organizations/domain/organization-ownership.policy";
-import { normalizeProjectName } from "../domain/project-name";
 
 export function toProjectSummary(row: ProjectRow): ProjectSummary {
   return {
@@ -61,7 +61,7 @@ export async function renameProject(
 ): Promise<ProjectSummary> {
   await ensureProjectOwnership(database, viewer.id, input.projectId);
 
-  const name = normalizeProjectName(input.name);
+  const name = requireName(input.name, "Project name");
 
   await getAppDatabase(database)
     .update(projectsTable)
@@ -89,32 +89,6 @@ export async function listOrganizationProjects(
       ),
     )
     .orderBy(asc(projectsTable.id))
-    .all();
-
-  return rows.map(toProjectSummary);
-}
-
-export async function listOrganizationProjectsPage(
-  database: D1Database,
-  viewer: AuthenticatedViewer,
-  input: {
-    limit: number;
-    organizationId: OrganizationId;
-  },
-): Promise<ProjectSummary[]> {
-  await ensureOrganizationOwnership(database, viewer.id, input.organizationId);
-
-  const rows = await getAppDatabase(database)
-    .select()
-    .from(projectsTable)
-    .where(
-      and(
-        eq(projectsTable.organizationId, input.organizationId),
-        eq(projectsTable.ownerAccountId, viewer.id),
-      ),
-    )
-    .orderBy(asc(projectsTable.id))
-    .limit(input.limit)
     .all();
 
   return rows.map(toProjectSummary);

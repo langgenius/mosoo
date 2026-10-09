@@ -14,21 +14,15 @@ import { Copy, Download, Upload } from "@/shared/ui/icons";
 import type { Agent } from "../agent.types";
 import { ImportAgentPackageDialog } from "./import-agent-package-dialog";
 
-function currentAgentBasePath(): string {
-  return globalThis.location.pathname.startsWith("/demo") ? "/demo/agent" : "/agent";
-}
-
 function packageErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
 }
 
 export function AgentSettingsPackageActions({
   agent,
-  canManageAccess,
   onSettingsOpenChange,
 }: {
   agent: Agent;
-  canManageAccess: boolean;
   onSettingsOpenChange: (open: boolean) => void;
 }): ReactElement {
   const { t } = useTranslation();
@@ -51,8 +45,6 @@ export function AgentSettingsPackageActions({
       await queryClient.invalidateQueries({ queryKey: agentKeys.lists() });
     },
   });
-  const hasEditorPackageAccess = agent.role === "owner";
-  const canUsePackageActions = canManageAccess && hasEditorPackageAccess;
   const packageActionError = exportPackageMutation.error ?? forkMutation.error;
 
   async function handleExportPackage(): Promise<void> {
@@ -67,11 +59,11 @@ export function AgentSettingsPackageActions({
       projectId: typedProjectId,
     });
     onSettingsOpenChange(false);
-    void navigate(`${currentAgentBasePath()}/${result.agent.id}`);
+    void navigate(`/agent/${result.agent.id}`);
   }
 
   function handleImportedAgentOpen(agentId: string): void {
-    void navigate(`${currentAgentBasePath()}/${agentId}`);
+    void navigate(`/agent/${agentId}`);
   }
 
   return (
@@ -79,7 +71,7 @@ export function AgentSettingsPackageActions({
       <div className="flex flex-wrap gap-2">
         <Button
           className="gap-1.5 rounded-lg text-[12px]"
-          disabled={exportPackageMutation.isPending || !canUsePackageActions}
+          disabled={exportPackageMutation.isPending}
           onClick={() => void handleExportPackage()}
           size="xs"
           variant="outline"
@@ -89,7 +81,6 @@ export function AgentSettingsPackageActions({
         </Button>
         <Button
           className="gap-1.5 rounded-lg text-[12px]"
-          disabled={!canManageAccess}
           onClick={() => {
             setShowImportPackage(true);
           }}
@@ -101,7 +92,7 @@ export function AgentSettingsPackageActions({
         </Button>
         <Button
           className="gap-1.5 rounded-lg text-[12px]"
-          disabled={forkMutation.isPending || !canUsePackageActions}
+          disabled={forkMutation.isPending}
           onClick={() => void handleForkAgent()}
           size="xs"
           variant="outline"
@@ -111,7 +102,7 @@ export function AgentSettingsPackageActions({
         </Button>
       </div>
       {packageActionError !== null ? (
-        <div className="text-destructive text-xs">
+        <div className="text-danger text-xs">
           {packageErrorMessage(packageActionError, t("agent.packageActionFailed"))}
         </div>
       ) : null}

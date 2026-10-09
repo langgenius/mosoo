@@ -20,5 +20,3 @@ export const organizationsTable = sqliteTable(
       .where(sql`${table.creatorAccountId} IS NOT NULL`),
   ],
 );
-
-export type OrganizationRow = typeof organizationsTable.$inferSelect;

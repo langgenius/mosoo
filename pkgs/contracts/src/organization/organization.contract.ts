@@ -1,7 +1,6 @@
-import type { OrganizationId } from "../id/id.contract";
+import type { OrganizationId } from "@mosoo/id";
 
 export interface OrganizationSummary {
-  avatarUrl: string | null;
   createdAt: string;
   id: OrganizationId;
   name: string;

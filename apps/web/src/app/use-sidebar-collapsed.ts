@@ -3,9 +3,6 @@ import { useCallback, useState } from "react";
 const STORAGE_KEY = "mosoo:sidebar-collapsed";
 
 function readInitialCollapsed(): boolean {
-  if (globalThis.window === undefined) {
-    return false;
-  }
   return globalThis.localStorage.getItem(STORAGE_KEY) === "true";
 }
 

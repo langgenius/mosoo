@@ -1,22 +1,21 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, spyOn, test } from "bun:test";
 
 import { createPlatformId } from "@mosoo/id";
 import type { SandboxId, SessionId } from "@mosoo/id";
 
-import { decideRuntimeSubjectTransition } from "../src/modules/runtime/domain/runtime-subject-lifecycle.machine";
+import { createRuntimeTimingRecorder } from "../src/modules/runtime/application/session-runs/session-runtime-timing";
 import { RuntimeSubjectCapacityExceededError } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-errors";
-import { createRuntimeSubjectLifecycleService } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-lifecycle.service";
+import { activateRuntimeSubject } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-lifecycle.service";
 import type { ActivateRuntimeSubjectInput } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-lifecycle.service";
-import { destroyRuntimeSubjectContainer } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-platform";
-import { recycleRuntimeSubject } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-recycle.service";
 import {
   advanceRuntimeSubjectOperationStatus,
+  ensureRuntimeSubjectId,
   markRuntimeSubjectCold,
   markRuntimeSubjectOperationStarted,
-} from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-store";
+} from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-record-store";
+import { recycleRuntimeSubject } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-recycle.service";
 import { encodeSandboxBackupIdForStorage } from "../src/modules/runtime/infrastructure/sandbox-backup-id";
 import type { SandboxHandle } from "../src/modules/runtime/infrastructure/sandbox-handles";
-import { setServerProductAnalyticsTransportForTests } from "../src/platform/analytics/product-analytics";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
@@ -28,16 +27,31 @@ const SESSION_ID = "01J00000000000000000000009";
 const CLOUDFLARE_BACKUP_ID = "550e8400-e29b-41d4-a716-446655440000";
 const STORED_BACKUP_ID = encodeSandboxBackupIdForStorage(CLOUDFLARE_BACKUP_ID);
 const RUNTIME_SUBJECT_QUOTA_SCOPE = {
-  runtimeId: "claude-agent-sdk",
   agentId: AGENT_ID,
   projectId: PROJECT_ID,
   sessionId: SESSION_ID,
   executionOwnerUserId: ACCOUNT_ID,
 } as const;
 
+let fetchSpy: { mockRestore(): void } | null = null;
+
 afterEach(() => {
-  setServerProductAnalyticsTransportForTests(null);
+  fetchSpy?.mockRestore();
+  fetchSpy = null;
 });
+
+function activate(bindings: ApiBindings, input: Omit<ActivateRuntimeSubjectInput, "timing">) {
+  return activateRuntimeSubject(bindings, {
+    ...input,
+    timing: createRuntimeTimingRecorder({
+      runId: null,
+      sessionId: input.sessionId,
+      source: "api",
+      stage: "prepare_run",
+      traceId: null,
+    }),
+  });
+}
 
 function createRuntimeSubjectLifecycleDatabase(): SqliteD1Database {
   const database = new SqliteD1Database();
@@ -132,14 +146,12 @@ async function insertRuntimeSubject(
           last_error_code,
           last_restore_backup_id,
           status,
-          status_event,
           status_seq,
-          status_source,
           subject_id,
           subject_kind,
           updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
     )
     .bind(
@@ -154,9 +166,7 @@ async function insertRuntimeSubject(
       input.lastErrorCode ?? null,
       null,
       input.status,
-      `runtime_subject.${input.status === "backing_up" ? "back_up" : input.status}`,
       input.statusSeq ?? 0,
-      "test",
       SESSION_ID,
       "session",
       1,
@@ -166,23 +176,19 @@ async function insertRuntimeSubject(
 
 async function readRuntimeSubject(database: D1Database): Promise<{
   status: string;
-  status_event: string;
   status_seq: number;
-  status_source: string;
 }> {
   const row = await database
     .prepare(
       `
-        SELECT status, status_event, status_seq, status_source
+        SELECT status, status_seq
         FROM sandbox
         WHERE id = '${RUNTIME_SUBJECT_ID}'
       `,
     )
     .first<{
       status: string;
-      status_event: string;
       status_seq: number;
-      status_source: string;
     }>();
 
   if (!row) {
@@ -229,11 +235,7 @@ function createSandboxHandle(
     },
     exec: unavailable,
     getSession: unavailable,
-    mkdir: async () => {
-      if (options.prepareError) {
-        throw options.prepareError;
-      }
-    },
+    mkdir: unavailable,
     mountBucket: unavailable,
     readFile: unavailable,
     restoreBackup: options.onRestore
@@ -243,21 +245,21 @@ function createSandboxHandle(
         }
       : unavailable,
     setKeepAlive: async () => {},
-    ensureContainerReady: async ({ allowRecovery }) => options.onStartup?.(allowRecovery),
+    ensureContainerReady: async ({ allowRecovery }) => {
+      if (options.prepareError) {
+        throw options.prepareError;
+      }
+      await options.onStartup?.(allowRecovery);
+    },
     startProcess: unavailable,
-    terminal: unavailable,
     unmountBucket: unavailable,
-    watch: unavailable,
     writeFile: unavailable,
-    wsConnect: unavailable,
   } as SandboxHandle;
 }
 
 function createBindings(
   database: D1Database,
   options: {
-    readonly accountConcurrentSandboxLimit?: string;
-    readonly runtimeImagesEnabled?: boolean;
     readonly configureNetworkError?: Error;
     readonly destroyError?: Error;
     readonly destroyPromise?: Promise<void>;
@@ -270,8 +272,6 @@ function createBindings(
 ): ApiBindings {
   return {
     DB: database,
-    MOSOO_ACCOUNT_CONCURRENT_SANDBOX_LIMIT: options.accountConcurrentSandboxLimit ?? "5",
-    MOSOO_RUNTIME_IMAGES_ENABLED: options.runtimeImagesEnabled ? "true" : "false",
     SANDBOX_FILE_BUCKET_LOCAL: "true",
     runtimeSubjectHandleFactory: () => createSandboxHandle(options),
   } as unknown as ApiBindings;
@@ -294,19 +294,20 @@ describe("runtime subject lifecycle machine", () => {
           .run();
       }
       const recoveries: boolean[] = [];
-      await createRuntimeSubjectLifecycleService(
+      await activate(
         createBindings(database, {
           onStartup: async (allowRecovery) => {
             recoveries.push(allowRecovery);
           },
         }),
-      ).activate({
-        ...RUNTIME_SUBJECT_QUOTA_SCOPE,
+        {
+          ...RUNTIME_SUBJECT_QUOTA_SCOPE,
 
-        networkConstraints: { allowedHosts: [], networkPolicy: "full" },
-        runtimeSubjectId: RUNTIME_SUBJECT_ID,
-        sessionId: SESSION_ID,
-      });
+          networkConstraints: { allowedHosts: [], networkPolicy: "full" },
+          runtimeSubjectId: RUNTIME_SUBJECT_ID,
+          sessionId: SESSION_ID,
+        },
+      );
       expect(recoveries).toEqual([expected]);
     }
   });
@@ -317,7 +318,7 @@ describe("runtime subject lifecycle machine", () => {
       await insertRuntimeSubject(database, { status: "cold" });
       let destroys = 0;
       await expect(
-        createRuntimeSubjectLifecycleService(
+        activate(
           createBindings(database, {
             onStartup: async () => {
               throw new Error("container startup attempt 2 timed out");
@@ -327,13 +328,14 @@ describe("runtime subject lifecycle machine", () => {
             },
             destroyError,
           }),
-        ).activate({
-          ...RUNTIME_SUBJECT_QUOTA_SCOPE,
+          {
+            ...RUNTIME_SUBJECT_QUOTA_SCOPE,
 
-          networkConstraints: { allowedHosts: [], networkPolicy: "full" },
-          runtimeSubjectId: RUNTIME_SUBJECT_ID,
-          sessionId: SESSION_ID,
-        }),
+            networkConstraints: { allowedHosts: [], networkPolicy: "full" },
+            runtimeSubjectId: RUNTIME_SUBJECT_ID,
+            sessionId: SESSION_ID,
+          },
+        ),
       ).rejects.toThrow("startup attempt 2");
       expect(destroys).toBe(1);
       expect((await readRuntimeSubject(database)).status).toBe(
@@ -344,29 +346,45 @@ describe("runtime subject lifecycle machine", () => {
 
   test("keeps one deployment ceiling across runtime image classes", async () => {
     const database = createRuntimeSubjectLifecycleDatabase();
-    const lifecycle = createRuntimeSubjectLifecycleService(
-      createBindings(database, {
-        accountConcurrentSandboxLimit: "100",
-        runtimeImagesEnabled: true,
-      }),
-    );
+    const bindings = createBindings(database);
     const runtimes = ["claude-agent-sdk", "openai-runtime", "acp-fallback"];
-    const outcomes = await Promise.allSettled(
+    const owners = Array.from({ length: 11 }, () => ({
+      accountId: createPlatformId(),
+      projectId: createPlatformId(),
+    }));
+    for (const owner of owners) {
+      await database
+        .prepare("INSERT INTO project (id, owner_account_id) VALUES (?, ?)")
+        .bind(owner.projectId, owner.accountId)
+        .run();
+    }
+    const inputs = await Promise.all(
       Array.from({ length: 51 }, async (_, index) => {
+        // Five Sessions per owner stay inside each account limit.
+        const owner = owners[Math.floor(index / 5)];
         const sessionId = createPlatformId<SessionId>();
         await database
           .prepare("INSERT INTO session (id, project_id) VALUES (?, ?)")
-          .bind(sessionId, PROJECT_ID)
+          .bind(sessionId, owner.projectId)
           .run();
-        return lifecycle.activate({
+        const scope = {
           ...RUNTIME_SUBJECT_QUOTA_SCOPE,
-          runtimeId: runtimes[index % runtimes.length],
-          networkConstraints: { allowedHosts: [], networkPolicy: "full" },
-          runtimeSubjectId: createPlatformId<SandboxId>(),
+          executionOwnerUserId: owner.accountId,
+          projectId: owner.projectId,
           sessionId,
-        });
+        };
+        return {
+          ...scope,
+          networkConstraints: { allowedHosts: [], networkPolicy: "full" as const },
+          runtimeSubjectId: await ensureRuntimeSubjectId(database, {
+            ...scope,
+            runtimeId: runtimes[index % runtimes.length],
+            runtimeImagesEnabled: true,
+          }),
+        };
       }),
     );
+    const outcomes = await Promise.allSettled(inputs.map((input) => activate(bindings, input)));
     expect(outcomes.filter((outcome) => outcome.status === "fulfilled")).toHaveLength(50);
     const rejected = outcomes.filter((outcome) => outcome.status === "rejected");
     expect(rejected).toHaveLength(1);
@@ -386,40 +404,6 @@ describe("runtime subject lifecycle machine", () => {
     ]);
   });
 
-  test("keeps subject operation transitions explicit", () => {
-    expect(
-      decideRuntimeSubjectTransition({
-        currentStatus: "cold",
-        targetStatus: "restoring",
-      }),
-    ).toMatchObject({ kind: "accepted", nextStatus: "restoring" });
-    expect(
-      decideRuntimeSubjectTransition({
-        currentStatus: "restoring",
-        targetStatus: "backing_up",
-      }),
-    ).toMatchObject({ kind: "rejected", reason: "illegal_transition" });
-    expect(
-      decideRuntimeSubjectTransition({
-        currentStatus: "backing_up",
-        targetStatus: "destroying",
-      }),
-    ).toMatchObject({ kind: "accepted", nextStatus: "destroying" });
-    expect(
-      decideRuntimeSubjectTransition({
-        currentStatus: "restoring",
-        targetStatus: "destroying",
-      }),
-    ).toMatchObject({ kind: "accepted", nextStatus: "destroying" });
-    // Confirmed teardown returns to cold; there is no `error` status.
-    expect(
-      decideRuntimeSubjectTransition({ currentStatus: "active", targetStatus: "cold" }),
-    ).toMatchObject({ kind: "accepted", nextStatus: "cold" });
-    expect(
-      decideRuntimeSubjectTransition({ currentStatus: "restoring", targetStatus: "cold" }),
-    ).toMatchObject({ kind: "accepted", nextStatus: "cold" });
-  });
-
   test("preserves an unconverted shared binding before any container admission", async () => {
     const database = createRuntimeSubjectLifecycleDatabase();
     await insertRuntimeSubject(database, { status: "cold" });
@@ -429,7 +413,7 @@ describe("runtime subject lifecycle machine", () => {
     const before = await database.prepare("SELECT * FROM sandbox").all();
     let containerCalls = 0;
     await expect(
-      createRuntimeSubjectLifecycleService(
+      activate(
         createBindings(database, {
           onConfigureNetwork: () => {
             containerCalls += 1;
@@ -441,52 +425,49 @@ describe("runtime subject lifecycle machine", () => {
             containerCalls += 1;
           },
         }),
-      ).activate({
-        ...RUNTIME_SUBJECT_QUOTA_SCOPE,
-        networkConstraints: { allowedHosts: ["api.example.com"], networkPolicy: "limited" },
-        runtimeSubjectId: RUNTIME_SUBJECT_ID,
-      }),
+        {
+          ...RUNTIME_SUBJECT_QUOTA_SCOPE,
+          networkConstraints: { allowedHosts: ["api.example.com"], networkPolicy: "limited" },
+          runtimeSubjectId: RUNTIME_SUBJECT_ID,
+        },
+      ),
     ).rejects.toThrow("verified exclusive execution binding");
     expect(containerCalls).toBe(0);
     expect(await database.prepare("SELECT * FROM sandbox").all()).toEqual(before);
   });
 
-  test("atomically applies the configured concurrent sandbox limit per account", async () => {
+  test("atomically applies the concurrent sandbox limit per account", async () => {
     const database = createRuntimeSubjectLifecycleDatabase();
-    const inputs: ActivateRuntimeSubjectInput[] = Array.from({ length: 3 }, () => {
-      const sessionId = createPlatformId<SessionId>();
-
-      return {
-        agentId: AGENT_ID,
-        runtimeId: "claude-agent-sdk",
-        projectId: PROJECT_ID,
-        executionOwnerUserId: ACCOUNT_ID,
-
-        networkConstraints: { allowedHosts: [], networkPolicy: "full" },
-        runtimeSubjectId: createPlatformId<SandboxId>(),
-        sessionId: sessionId,
-      };
-    });
-
-    for (const input of inputs) {
+    const bindings = createBindings(database);
+    const allocate = async (scope: typeof RUNTIME_SUBJECT_QUOTA_SCOPE) => {
       await database
         .prepare("INSERT INTO session (id, project_id) VALUES (?, ?)")
-        .bind(input.sessionId, input.projectId)
+        .bind(scope.sessionId, scope.projectId)
         .run();
-    }
-    const lifecycle = createRuntimeSubjectLifecycleService(
-      createBindings(database, { accountConcurrentSandboxLimit: "2" }),
+      return {
+        ...scope,
+        networkConstraints: { allowedHosts: [], networkPolicy: "full" as const },
+        runtimeSubjectId: await ensureRuntimeSubjectId(database, {
+          ...scope,
+          runtimeId: "claude-agent-sdk",
+        }),
+      };
+    };
+    const inputs = await Promise.all(
+      Array.from({ length: 6 }, async () =>
+        allocate({ ...RUNTIME_SUBJECT_QUOTA_SCOPE, sessionId: createPlatformId<SessionId>() }),
+      ),
     );
-    const outcomes = await Promise.allSettled(inputs.map((input) => lifecycle.activate(input)));
+    const outcomes = await Promise.allSettled(inputs.map((input) => activate(bindings, input)));
     const admittedIndex = outcomes.findIndex((outcome) => outcome.status === "fulfilled");
 
-    expect(outcomes.filter((outcome) => outcome.status === "fulfilled")).toHaveLength(2);
+    expect(outcomes.filter((outcome) => outcome.status === "fulfilled")).toHaveLength(5);
     const rejected = outcomes.filter((outcome) => outcome.status === "rejected");
     expect(rejected).toHaveLength(1);
     expect(rejected[0]?.reason).toMatchObject({
-      limit: 2,
+      limit: 5,
       message:
-        "You already have 2 active sessions. Try again in a few minutes, after one of them finishes.",
+        "You already have 5 active sessions. Try again in a few minutes, after one of them finishes.",
       scope: "account",
     });
     expect(admittedIndex).toBeGreaterThanOrEqual(0);
@@ -497,14 +478,12 @@ describe("runtime subject lifecycle machine", () => {
         )
         .bind(ACCOUNT_ID)
         .first<{ count: number }>(),
-    ).resolves.toEqual({ count: 2 });
-    await expect(lifecycle.activate(inputs[admittedIndex])).resolves.toBeDefined();
+    ).resolves.toEqual({ count: 5 });
+    await expect(activate(bindings, inputs[admittedIndex])).resolves.toBeDefined();
 
     await expect(
-      lifecycle.activate({
+      activate(bindings, {
         ...inputs[0],
-        agentId: createPlatformId(),
-        projectId: createPlatformId(),
         runtimeSubjectId: createPlatformId<SandboxId>(),
         sessionId: createPlatformId<SessionId>(),
       }),
@@ -512,34 +491,21 @@ describe("runtime subject lifecycle machine", () => {
 
     const otherOwner = createPlatformId();
     const otherProject = createPlatformId();
-    const otherSession = createPlatformId<SessionId>();
     await database
       .prepare("INSERT INTO project (id, owner_account_id) VALUES (?, ?)")
       .bind(otherProject, otherOwner)
       .run();
-    await database
-      .prepare("INSERT INTO session (id, project_id) VALUES (?, ?)")
-      .bind(otherSession, otherProject)
-      .run();
     await expect(
-      lifecycle.activate({
-        ...inputs[0],
-        projectId: otherProject,
-        executionOwnerUserId: otherOwner,
-        runtimeSubjectId: createPlatformId<SandboxId>(),
-        sessionId: otherSession,
-      }),
-    ).resolves.toBeDefined();
-  });
-
-  test("rejects an invalid concurrent sandbox limit", () => {
-    expect(() =>
-      createRuntimeSubjectLifecycleService(
-        createBindings(createRuntimeSubjectLifecycleDatabase(), {
-          accountConcurrentSandboxLimit: "0",
+      activate(
+        bindings,
+        await allocate({
+          ...RUNTIME_SUBJECT_QUOTA_SCOPE,
+          executionOwnerUserId: otherOwner,
+          projectId: otherProject,
+          sessionId: createPlatformId<SessionId>(),
         }),
       ),
-    ).toThrow("MOSOO_ACCOUNT_CONCURRENT_SANDBOX_LIMIT must be a positive integer.");
+    ).resolves.toBeDefined();
   });
 
   test("records operation transitions with monotonic status metadata", async () => {
@@ -561,16 +527,13 @@ describe("runtime subject lifecycle machine", () => {
       }),
     ).resolves.toBe(true);
     await markRuntimeSubjectCold(database, {
-      clearBackups: false,
       expectedStatus: "destroying",
       runtimeSubjectId: "01J0000000000000000000000D",
     });
 
     await expect(readRuntimeSubject(database)).resolves.toEqual({
       status: "cold",
-      status_event: "runtime_subject.cold",
       status_seq: 3,
-      status_source: "api",
     });
   });
 
@@ -579,16 +542,13 @@ describe("runtime subject lifecycle machine", () => {
     await insertRuntimeSubject(database, { status: "active", statusSeq: 7 });
 
     await markRuntimeSubjectCold(database, {
-      clearBackups: false,
       expectedStatus: "backing_up",
       runtimeSubjectId: "01J0000000000000000000000D",
     });
 
     await expect(readRuntimeSubject(database)).resolves.toEqual({
       status: "active",
-      status_event: "runtime_subject.active",
       status_seq: 7,
-      status_source: "test",
     });
   });
 
@@ -606,9 +566,7 @@ describe("runtime subject lifecycle machine", () => {
       .bind("prewarm-activation-stalled", Date.now() + 60_000, RUNTIME_SUBJECT_ID)
       .run();
 
-    const activation = await createRuntimeSubjectLifecycleService(
-      createBindings(database),
-    ).activate({
+    const activation = await activate(createBindings(database), {
       ...RUNTIME_SUBJECT_QUOTA_SCOPE,
 
       networkConstraints: { allowedHosts: [], networkPolicy: "full" },
@@ -617,7 +575,7 @@ describe("runtime subject lifecycle machine", () => {
       sessionId: SESSION_ID,
     });
 
-    expect(activation.subject).toBeTruthy();
+    expect(activation).toBeTruthy();
     const row = await database
       .prepare(
         `
@@ -644,15 +602,15 @@ describe("runtime subject lifecycle machine", () => {
     const database = createRuntimeSubjectLifecycleDatabase();
     await insertRuntimeSubject(database, { status: "cold" });
     const capturedEvents: unknown[] = [];
-    setServerProductAnalyticsTransportForTests(async (_input, init) => {
-      capturedEvents.push(JSON.parse(init.body as string) as unknown);
+    fetchSpy = spyOn(globalThis, "fetch").mockImplementation(async (_input, init) => {
+      capturedEvents.push(JSON.parse(init?.body as string) as unknown);
       return new Response(null, { status: 200 });
     });
     const bindings = {
       ...createBindings(database),
+      POSTHOG_API_HOST: "https://us.i.posthog.com",
       POSTHOG_PROJECT_KEY: "phc_test",
     } as ApiBindings;
-    const service = createRuntimeSubjectLifecycleService(bindings);
     const activation = {
       ...RUNTIME_SUBJECT_QUOTA_SCOPE,
       executionOwnerUserId: "01J00000000000000000000002",
@@ -663,8 +621,8 @@ describe("runtime subject lifecycle machine", () => {
       sessionId: "01J00000000000000000000009",
     };
 
-    await service.activate(activation);
-    await service.activate(activation);
+    await activate(bindings, activation);
+    await activate(bindings, activation);
 
     expect(capturedEvents).toHaveLength(1);
     expect(capturedEvents[0]).toMatchObject({
@@ -761,7 +719,7 @@ describe("runtime subject lifecycle machine", () => {
     let restoredBackup: { readonly dir: string; readonly id: string } | null = null;
     let configureNetworkCalls = 0;
 
-    const activation = await createRuntimeSubjectLifecycleService(
+    const activation = await activate(
       createBindings(database, {
         onRestore: (backup) => {
           restoredBackup = backup;
@@ -770,16 +728,17 @@ describe("runtime subject lifecycle machine", () => {
           configureNetworkCalls += 1;
         },
       }),
-    ).activate({
-      ...RUNTIME_SUBJECT_QUOTA_SCOPE,
+      {
+        ...RUNTIME_SUBJECT_QUOTA_SCOPE,
 
-      networkConstraints: { allowedHosts: [], networkPolicy: "full" },
-      runtimeSubjectId: RUNTIME_SUBJECT_ID,
-      spaceAliases: [],
-      sessionId: SESSION_ID,
-    });
+        networkConstraints: { allowedHosts: [], networkPolicy: "full" },
+        runtimeSubjectId: RUNTIME_SUBJECT_ID,
+        spaceAliases: [],
+        sessionId: SESSION_ID,
+      },
+    );
 
-    expect(activation.subject).toBeTruthy();
+    expect(activation).toBeTruthy();
     expect(configureNetworkCalls).toBe(1);
     expect(restoredBackup).toBeNull();
     expect((await readRuntimeSubject(database)).status).toBe("active");
@@ -797,9 +756,7 @@ describe("runtime subject lifecycle machine", () => {
       statusSeq: 7,
     });
 
-    const activation = await createRuntimeSubjectLifecycleService(
-      createBindings(database),
-    ).activate({
+    const activation = await activate(createBindings(database), {
       ...RUNTIME_SUBJECT_QUOTA_SCOPE,
 
       networkConstraints: { allowedHosts: [], networkPolicy: "full" },
@@ -808,7 +765,7 @@ describe("runtime subject lifecycle machine", () => {
       sessionId: SESSION_ID,
     });
 
-    expect(activation.subject).toBeTruthy();
+    expect(activation).toBeTruthy();
     const row = await database
       .prepare(
         `
@@ -838,12 +795,13 @@ describe("runtime subject lifecycle machine", () => {
     });
   });
 
-  test("clears activation claim when filesystem preparation fails", async () => {
+  test("clears activation claim when container preparation fails", async () => {
     const database = createRuntimeSubjectLifecycleDatabase();
+    await insertRuntimeSubject(database, { status: "cold" });
     const prepareError = new Error("Runtime subject filesystem prepare timed out after 15000ms.");
 
     await expect(
-      createRuntimeSubjectLifecycleService(createBindings(database, { prepareError })).activate({
+      activate(createBindings(database, { prepareError }), {
         ...RUNTIME_SUBJECT_QUOTA_SCOPE,
 
         networkConstraints: { allowedHosts: [], networkPolicy: "full" },
@@ -884,22 +842,24 @@ describe("runtime subject lifecycle machine", () => {
 
   test("keeps activation failure destroying with an operation id when teardown fails", async () => {
     const database = createRuntimeSubjectLifecycleDatabase();
+    await insertRuntimeSubject(database, { status: "cold" });
     const prepareError = new Error("original activation failure");
 
     await expect(
-      createRuntimeSubjectLifecycleService(
+      activate(
         createBindings(database, {
           destroyError: new Error("container destroy failed"),
           prepareError,
         }),
-      ).activate({
-        ...RUNTIME_SUBJECT_QUOTA_SCOPE,
+        {
+          ...RUNTIME_SUBJECT_QUOTA_SCOPE,
 
-        networkConstraints: { allowedHosts: [], networkPolicy: "full" },
-        runtimeSubjectId: RUNTIME_SUBJECT_ID,
-        spaceAliases: [],
-        sessionId: SESSION_ID,
-      }),
+          networkConstraints: { allowedHosts: [], networkPolicy: "full" },
+          runtimeSubjectId: RUNTIME_SUBJECT_ID,
+          spaceAliases: [],
+          sessionId: SESSION_ID,
+        },
+      ),
     ).rejects.toThrow("original activation failure");
 
     const row = await database
@@ -926,19 +886,6 @@ describe("runtime subject lifecycle machine", () => {
     expect(row?.status_operation_id).toMatch(/^01/);
   });
 
-  test("bounds teardown with the runtime provision timeout", async () => {
-    const database = createRuntimeSubjectLifecycleDatabase();
-    const destroyPromise = new Promise<void>(() => {});
-
-    await expect(
-      destroyRuntimeSubjectContainer(
-        createBindings(database, { destroyPromise }),
-        RUNTIME_SUBJECT_ID,
-        5,
-      ),
-    ).rejects.toThrow("Runtime subject destroy");
-  });
-
   test("fails activation and destroys the container when network constraints cannot apply", async () => {
     const database = createRuntimeSubjectLifecycleDatabase();
     await insertRuntimeSubject(database, { status: "cold", statusSeq: 0 });
@@ -948,19 +895,20 @@ describe("runtime subject lifecycle machine", () => {
     let destroyCalls = 0;
 
     await expect(
-      createRuntimeSubjectLifecycleService(
+      activate(
         createBindings(database, {
           configureNetworkError,
           onDestroy: () => (destroyCalls += 1),
         }),
-      ).activate({
-        ...RUNTIME_SUBJECT_QUOTA_SCOPE,
+        {
+          ...RUNTIME_SUBJECT_QUOTA_SCOPE,
 
-        networkConstraints: { allowedHosts: [], networkPolicy: "limited" },
-        runtimeSubjectId: RUNTIME_SUBJECT_ID,
-        spaceAliases: [],
-        sessionId: SESSION_ID,
-      }),
+          networkConstraints: { allowedHosts: [], networkPolicy: "limited" },
+          runtimeSubjectId: RUNTIME_SUBJECT_ID,
+          spaceAliases: [],
+          sessionId: SESSION_ID,
+        },
+      ),
     ).rejects.toThrow("cannot be enforced");
 
     expect(destroyCalls).toBe(1);
@@ -979,9 +927,7 @@ describe("runtime subject lifecycle machine", () => {
     // is the production death loop (sandbox 01KYC1ZB…): reproduce it and prove
     // it converges instead of looping.
     await expect(
-      createRuntimeSubjectLifecycleService(
-        createBindings(database, { onDestroy: () => (destroyCalls += 1), prepareError }),
-      ).activate({
+      activate(createBindings(database, { onDestroy: () => (destroyCalls += 1), prepareError }), {
         ...RUNTIME_SUBJECT_QUOTA_SCOPE,
 
         networkConstraints: { allowedHosts: [], networkPolicy: "full" },
@@ -996,18 +942,16 @@ describe("runtime subject lifecycle machine", () => {
 
     // Second activation on the now-cold subject succeeds — self-healed, no
     // manual recreate needed.
-    const recovered = await createRuntimeSubjectLifecycleService(createBindings(database)).activate(
-      {
-        ...RUNTIME_SUBJECT_QUOTA_SCOPE,
+    const recovered = await activate(createBindings(database), {
+      ...RUNTIME_SUBJECT_QUOTA_SCOPE,
 
-        networkConstraints: { allowedHosts: [], networkPolicy: "full" },
-        runtimeSubjectId: RUNTIME_SUBJECT_ID,
-        spaceAliases: [],
-        sessionId: SESSION_ID,
-      },
-    );
+      networkConstraints: { allowedHosts: [], networkPolicy: "full" },
+      runtimeSubjectId: RUNTIME_SUBJECT_ID,
+      spaceAliases: [],
+      sessionId: SESSION_ID,
+    });
 
-    expect(recovered.subject).toBeTruthy();
+    expect(recovered).toBeTruthy();
     expect((await readRuntimeSubject(database)).status).toBe("active");
   });
 });

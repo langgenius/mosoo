@@ -39,16 +39,12 @@ const MCP_SERVER_FIELDS = graphql(/* GraphQL */ `
   }
 `);
 
-const retainGraphQLFragments = (documents: readonly unknown[]): number => documents.length;
-
-retainGraphQLFragments([MCP_CREDENTIAL_FIELDS, MCP_SERVER_FIELDS]);
+void MCP_CREDENTIAL_FIELDS;
+void MCP_SERVER_FIELDS;
 
 export const MCP_REGISTRY_QUERY = graphql(/* GraphQL */ `
   query McpRegistry($projectId: ULID!) {
     mcpRegistry(projectId: $projectId) {
-      currentUserEmail
-      currentUserId
-      currentUserName
       projectId
       servers {
         ...McpServerFields

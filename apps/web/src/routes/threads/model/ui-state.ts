@@ -35,7 +35,6 @@ const DEFAULT_THREAD_UI_STATE: ThreadUiState = {
   readAtByThreadId: {},
 };
 
-const THREAD_FILTERS = new Set<ThreadFilter>(["all", "failed", "pinned", "unread"]);
 const THREAD_SECTIONS: ThreadSection[] = ["pinned", "working", "completed", "archived"];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -60,9 +59,7 @@ function isThreadFilter(value: unknown): value is ThreadFilter {
 }
 
 function readThreadFilter(value: unknown): ThreadFilter {
-  return isThreadFilter(value) && THREAD_FILTERS.has(value)
-    ? value
-    : DEFAULT_THREAD_UI_STATE.filter;
+  return isThreadFilter(value) ? value : DEFAULT_THREAD_UI_STATE.filter;
 }
 
 function readStringArray(value: unknown): string[] {

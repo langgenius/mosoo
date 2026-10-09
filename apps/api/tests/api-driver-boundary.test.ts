@@ -1,5 +1,4 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
 
 import { EventType, MOSOO_CUSTOM_EVENT } from "@mosoo/ag-ui-session";
 import {
@@ -18,7 +17,6 @@ import {
   assertRuntimeEventMatchesDriverLink,
 } from "../src/modules/runtime/infrastructure/driver-instance/event-link-assertion";
 import {
-  createBaseLiveState,
   readPermissionRequestViews,
   removePermissionRequest,
 } from "../src/modules/runtime/infrastructure/driver-instance/event-projection";
@@ -29,11 +27,9 @@ import {
   createDriverBootPayload,
   verifyRuntimeActionToken,
 } from "../src/modules/runtime/infrastructure/runtime-boot-token";
-import { AGENT_DRIVER_PROCESS_COMMAND } from "../src/modules/runtime/infrastructure/runtime-sandbox-provisioning/runtime-driver-artifact";
 import { buildExecutionSpec } from "../src/modules/runtime/infrastructure/runtime-sandbox-provisioning/runtime-driver-execution-spec.builder";
 import type { RuntimeExecutionSpecBindings } from "../src/modules/runtime/infrastructure/runtime-sandbox-provisioning/runtime-driver-execution-spec.builder";
-import { runSetupScript } from "../src/modules/runtime/infrastructure/runtime-sandbox-provisioning/runtime-driver-files.service";
-import type { ExecutionSessionHandle } from "../src/modules/runtime/infrastructure/sandbox-handles";
+import { createInitialSessionLiveState } from "../src/modules/sessions/application/session-live-state.service";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import {
   API_DRIVER_BOUNDARY_IDS,
@@ -44,6 +40,7 @@ import {
   createResolvedSkills,
   createRuntimeSessionLink,
 } from "./api-driver-boundary-fixtures";
+import { createPublicHttpContractDatabase } from "./helpers/public-api-http-test-fixture";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
 const bindings = {
@@ -55,10 +52,6 @@ const artifactPaths = {
   node: ["/workspace/.mosoo/environment-artifacts/artifact/npm/node_modules"],
   python: ["/workspace/.mosoo/environment-artifacts/artifact/python/site-packages"],
 };
-
-function readText(path: string): string {
-  return readFileSync(new URL(path, import.meta.url), "utf8");
-}
 
 describe("API to driver boundary", () => {
   test.each([
@@ -83,7 +76,6 @@ describe("API to driver boundary", () => {
           value: "committed-thread",
         },
         profile: historicalProfile,
-        recoveryMessages: [{ role: "user", content: "A partial legacy transcript" }],
         requestUrl: "https://api.example.com/api/driver/connect",
         resolvedMcpServers: [],
         resolvedSkillCatalog: [],
@@ -117,199 +109,6 @@ describe("API to driver boundary", () => {
     expect(port).toBeLessThanOrEqual(DRIVER_CONTROL_PORT_MAX);
   });
 
-  test("starts the named agent-driver artifact in the sandbox image", () => {
-    expect(AGENT_DRIVER_PROCESS_COMMAND).toBe("agent-driver");
-  });
-
-  test("uses the agent-driver runtime contract for runtime selection", () => {
-    const runtimeConfig = readText("../src/modules/runtime/domain/runtime-config.ts");
-    const agentConfig = readText(
-      "../src/modules/agents/application/agent-versioned-config.service.ts",
-    );
-    const nativeResumeRef = readText(
-      "../src/modules/runtime/infrastructure/native-resume-ref.repository.ts",
-    );
-    const nativeResumeRefEvent = readText(
-      "../src/modules/runtime/infrastructure/driver-instance/native-resume-ref-event.ts",
-    );
-
-    expect(runtimeConfig).toContain('from "@mosoo/agent-driver/runtime"');
-    expect(runtimeConfig).not.toContain('from "@mosoo/driver-protocol"');
-    expect(agentConfig).toContain('from "@mosoo/agent-driver/runtime"');
-    expect(agentConfig).not.toContain('from "@mosoo/driver-protocol"');
-    expect(nativeResumeRef).toContain('from "@mosoo/agent-driver/runtime"');
-    expect(nativeResumeRef).not.toContain('from "@mosoo/driver-protocol"');
-    expect(nativeResumeRefEvent).toContain('from "@mosoo/agent-driver/runtime"');
-    expect(nativeResumeRefEvent).not.toContain('from "@mosoo/driver-protocol"');
-  });
-
-  test("uses agent-driver boot constants for process startup", () => {
-    const bootToken = readText("../src/modules/runtime/infrastructure/runtime-boot-token.ts");
-    const provisioning = readText(
-      "../src/modules/runtime/infrastructure/runtime-sandbox-provisioning/runtime-driver-provisioning.service.ts",
-    );
-    const driverRecord = readText(
-      "../src/modules/runtime/infrastructure/driver-instance/driver-instance-record.repository.ts",
-    );
-    const sandboxLayout = readText("../src/modules/runtime/domain/sandbox-layout.ts");
-
-    expect(bootToken).toContain('from "@mosoo/agent-driver/boot"');
-    expect(bootToken).toContain("DRIVER_PROTOCOL_VERSION");
-    expect(bootToken).not.toContain('from "@mosoo/driver-protocol"');
-    expect(provisioning).toContain('from "@mosoo/agent-driver/boot"');
-    expect(provisioning).toContain("DRIVER_BOOT_PAYLOAD_FILE_ENV_NAME");
-    expect(provisioning).toContain("const bootPayload = createDriverBootPayload");
-    expect(provisioning).toContain("JSON.stringify(bootPayload)");
-    expect(driverRecord).toContain('from "@mosoo/agent-driver/boot"');
-    expect(driverRecord).toContain("DRIVER_PROTOCOL_VERSION");
-    expect(sandboxLayout).toContain('from "@mosoo/agent-driver/boot"');
-    expect(sandboxLayout).toContain("DRIVER_CONTROL_PORT_COUNT");
-    expect(sandboxLayout).toContain("DRIVER_CONTROL_PORT_MIN");
-  });
-
-  test("uses agent-driver sandbox path contracts", () => {
-    const runtimeProfile = readText("../src/modules/runtime/application/agent-runtime-profile.ts");
-    const subjectPlatform = readText(
-      "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-platform.ts",
-    );
-
-    expect(runtimeProfile).toContain('from "@mosoo/agent-driver/paths"');
-    expect(subjectPlatform).toContain('from "@mosoo/agent-driver/paths"');
-  });
-
-  test("publishes agent-driver event envelope contracts", () => {
-    const driverPublicEvents = readText("../../driver/src/events.ts");
-    const rpc = readText("../src/modules/runtime/infrastructure/driver-instance/rpc.ts");
-    const rpcWire = readText("../src/modules/runtime/infrastructure/driver-instance/rpc-wire.ts");
-    const ingestion = readText(
-      "../src/modules/runtime/infrastructure/driver-instance/rpc-event-ingestion-controller.ts",
-    );
-    const projection = readText("../src/modules/runtime/infrastructure/driver-instance/events.ts");
-    const receipts = readText(
-      "../src/modules/runtime/infrastructure/driver-instance/driver-event-receipts.ts",
-    );
-    const replayFilter = readText(
-      "../src/modules/runtime/infrastructure/driver-instance/runtime-event-replay-filter.ts",
-    );
-    const fixtures = readText("./api-driver-boundary-fixtures.ts");
-
-    expect(driverPublicEvents).toContain("./protocol/events");
-    expect(rpcWire).toContain('from "@mosoo/agent-driver/events"');
-    expect(rpcWire).toContain("parseDriverEventEnvelope");
-    expect(rpcWire).not.toContain('from "@mosoo/driver-protocol"');
-    expect(rpc).not.toContain("toAgentDriverEventEnvelopes");
-    expect(ingestion).toContain("state.readProcessedDriverEventReceipts(input.events)");
-    expect(ingestion).toContain("state.filterUnprocessedDriverEvents(input.events)");
-    expect(projection).toContain('from "@mosoo/agent-driver/events"');
-    expect(projection).not.toContain('from "@mosoo/driver-protocol"');
-    expect(receipts).toContain('from "@mosoo/agent-driver/events"');
-    expect(replayFilter).toContain('from "@mosoo/agent-driver/events"');
-    expect(fixtures).toContain('from "@mosoo/agent-driver/events"');
-  });
-
-  test("uses agent-driver ORPC contracts behind the API wire parser", () => {
-    const rpc = readText("../src/modules/runtime/infrastructure/driver-instance/rpc.ts");
-    const controller = readText(
-      "../src/modules/runtime/infrastructure/driver-instance/rpc-controller.ts",
-    );
-    const command = readText(
-      "../src/modules/runtime/infrastructure/driver-instance/rpc-command-controller.ts",
-    );
-    const eventIngestion = readText(
-      "../src/modules/runtime/infrastructure/driver-instance/rpc-event-ingestion-controller.ts",
-    );
-    const handshake = readText(
-      "../src/modules/runtime/infrastructure/driver-instance/rpc-handshake-controller.ts",
-    );
-    const state = readText("../src/modules/runtime/infrastructure/driver-instance/state.ts");
-    const runtimeState = readText(
-      "../src/modules/runtime/infrastructure/driver-instance/runtime-state.ts",
-    );
-    const runtimeStateStore = readText(
-      "../src/modules/runtime/infrastructure/driver-instance/runtime-state-store.ts",
-    );
-    const lifecycle = readText(
-      "../src/modules/runtime/infrastructure/driver-instance/lifecycle.ts",
-    );
-    const handler = readText(
-      "../src/modules/runtime/infrastructure/driver-instance/rpc-handler.ts",
-    );
-    const rpcWire = readText("../src/modules/runtime/infrastructure/driver-instance/rpc-wire.ts");
-
-    expect(rpc).toContain('from "@mosoo/agent-driver/orpc"');
-    expect(rpc).toContain('from "./rpc-wire"');
-    expect(controller).toContain('from "@mosoo/agent-driver/orpc"');
-    expect(command).toContain('from "@mosoo/agent-driver/orpc"');
-    expect(eventIngestion).toContain('from "@mosoo/agent-driver/orpc"');
-    expect(handshake).toContain('from "@mosoo/agent-driver/orpc"');
-    expect(state).toContain('from "@mosoo/agent-driver/orpc"');
-    expect(runtimeState).toContain('from "@mosoo/agent-driver/orpc"');
-    expect(runtimeStateStore).toContain('from "@mosoo/agent-driver/orpc"');
-    expect(runtimeStateStore).toContain("parseDriverHelloInput");
-    expect(runtimeStateStore).not.toContain('from "@mosoo/driver-protocol"');
-    expect(lifecycle).toContain('from "@mosoo/agent-driver/orpc"');
-    expect(controller).not.toContain('from "@mosoo/driver-protocol"');
-    expect(eventIngestion).not.toContain('from "@mosoo/driver-protocol"');
-    expect(rpc).not.toContain('from "@mosoo/driver-protocol"');
-    expect(rpcWire).toContain("runtimeOrpcRouter");
-    expect(rpcWire).toContain('from "@mosoo/agent-driver/orpc"');
-    expect(rpcWire).toContain('from "@mosoo/agent-driver/events"');
-    expect(rpcWire).not.toContain('from "@mosoo/driver-protocol"');
-    expect(handler).not.toContain('from "@mosoo/driver-protocol"');
-    expect(handler).toContain("runtimeOrpcRouter");
-  });
-
-  test("builds session config traces from the agent-driver boot payload", () => {
-    const dispatchRun = readText(
-      "../src/modules/runtime/application/session-runs/dispatch-run.service.ts",
-    );
-    const callbackContract = readText(
-      "../src/modules/runtime/application/execution-plane/driver-boot-payload-prepared.ts",
-    );
-    const configTrace = readText(
-      "../src/modules/runtime/application/session-definition/session-config-trace-event.ts",
-    );
-
-    expect(callbackContract).toContain('from "@mosoo/agent-driver/boot"');
-    expect(dispatchRun).toContain("onBootPayloadPrepared: async ({ bootPayload })");
-    expect(dispatchRun).not.toContain("toAgentDriverBootPayload(bootPayload)");
-    expect(dispatchRun).toContain("buildSessionConfigTraceValue(bootPayload)");
-    expect(dispatchRun).toContain("bootPayload.execution.session.mcpServers.length");
-    expect(dispatchRun).toContain("bootPayload.execution.provider");
-    expect(configTrace).toContain('from "@mosoo/agent-driver/boot"');
-    expect(configTrace).not.toContain('from "@mosoo/driver-protocol"');
-  });
-
-  test("owns platform driver snapshots inside the API runtime domain", () => {
-    const driverSnapshot = readText("../src/modules/runtime/domain/driver-snapshot.ts");
-    const runtimeProfile = readText("../src/modules/runtime/application/agent-runtime-profile.ts");
-    const executionTypes = readText(
-      "../src/modules/runtime/application/session-definition/session-execution.types.ts",
-    );
-    const executionSpec = readText(
-      "../src/modules/runtime/infrastructure/runtime-sandbox-provisioning/runtime-driver-execution-spec.builder.ts",
-    );
-    const sandboxSessionTypes = readText(
-      "../src/modules/runtime/infrastructure/sandbox-session/sandbox-session.types.ts",
-    );
-    const sandboxConversationCodec = readText(
-      "../src/modules/runtime/infrastructure/sandbox-session/sandbox-conversation-session-codec.ts",
-    );
-    const mcpRuntime = readText("../src/modules/mcp/application/mcp-runtime.service.ts");
-    const fixtures = readText("./api-driver-boundary-fixtures.ts");
-
-    expect(driverSnapshot).toContain('from "@mosoo/agent-driver/runtime"');
-    expect(driverSnapshot).not.toContain('from "@mosoo/driver-protocol"');
-    expect(runtimeProfile).toContain('from "../domain/driver-snapshot"');
-    expect(executionTypes).toContain('from "../../domain/driver-snapshot"');
-    expect(executionSpec).toContain('from "../../domain/driver-snapshot"');
-    expect(sandboxSessionTypes).toContain('from "../../domain/driver-snapshot"');
-    expect(sandboxConversationCodec).toContain('from "../../domain/driver-snapshot"');
-    expect(sandboxConversationCodec).toContain("readSandboxConversationOriginRecord");
-    expect(mcpRuntime).toContain('from "../../runtime/domain/driver-snapshot"');
-    expect(fixtures).toContain('from "../src/modules/runtime/domain/driver-snapshot"');
-  });
-
   test("builds a driver execution spec with scoped grants and profile env", async () => {
     const execution = await buildExecutionSpec(bindings, {
       builtInTools: [
@@ -331,18 +130,7 @@ describe("API to driver boundary", () => {
       },
       profile: {
         ...createDriverProfile(),
-        envVarNames: [
-          "EXISTING_ENV",
-          "OPENAI_API_KEY",
-          "OPENAI_BASE_URL",
-          "OPENCODE_CONFIG_CONTENT",
-        ],
-        envVars: {
-          EXISTING_ENV: "kept",
-          OPENAI_API_KEY: "raw-environment-key",
-          OPENAI_BASE_URL: "https://attacker.example.com/v1",
-          OPENCODE_CONFIG_CONTENT: '{"provider":{"openai":{"options":{"apiKey":"raw"}}}}',
-        },
+        envVars: { EXISTING_ENV: "kept" },
         environmentArtifact: {
           backupDir: "/workspace/.mosoo/environment-artifacts/artifact",
           backupId: "11111111-1111-4111-8111-111111111111",
@@ -358,10 +146,7 @@ describe("API to driver boundary", () => {
 
     expect(execution.configRevision.runId).toBe(API_DRIVER_BOUNDARY_IDS.sessionRun);
     expect(execution.profilePrompt).toContain("You are a helpful runtime.");
-    expect(execution.profilePrompt).toContain("Runtime artifact delivery:");
-    expect(execution.profilePrompt).toContain("only user-downloadable session output directory");
-    expect(execution.profilePrompt).toContain("even if the user does not explicitly ask");
-    expect(execution.profilePrompt).toContain("Files written anywhere else are scratch");
+    expect(execution.profilePrompt).toContain("`outputs/`");
     const llmProxyGrant = execution.environment.variables["OPENAI_API_KEY"];
     if (llmProxyGrant === undefined) {
       throw new Error("Expected an LLM proxy grant env var.");
@@ -419,42 +204,6 @@ describe("API to driver boundary", () => {
       execution.skills.find((entry) => entry.skillId === API_DRIVER_BOUNDARY_IDS.tombstoneSkill)
         ?.downloadUrl,
     ).toBe("https://invalid.local/tombstone.skill");
-  });
-
-  test("removes runtime-managed provider values from the setup process", async () => {
-    let setupEnv: Record<string, string | undefined> | undefined;
-    const session: ExecutionSessionHandle = {
-      exec: async () => ({ exitCode: 0, stderr: "", stdout: "missing", success: true }),
-      mkdir: async () => undefined,
-      readFile: async () => ({ content: "", encoding: "utf8" }),
-      startProcess: async (_command, options) => {
-        setupEnv = options.env;
-        return {
-          getLogs: async () => "",
-          getStatus: async () => "completed",
-          id: "setup",
-          kill: async () => undefined,
-          pid: 1,
-          waitForExit: async () => ({ exitCode: 0 }),
-          waitForPort: async () => undefined,
-        };
-      },
-      watch: async () => new ReadableStream<Uint8Array>(),
-      writeFile: async () => undefined,
-    };
-
-    await runSetupScript(session, {
-      ...createDriverProfile(),
-      envVarNames: ["EXISTING_ENV", "OPENAI_API_KEY", "OPENAI_BASE_URL"],
-      envVars: {
-        EXISTING_ENV: "kept",
-        OPENAI_API_KEY: "raw-environment-key",
-        OPENAI_BASE_URL: "https://attacker.example.com/v1",
-      },
-      setupScript: "echo setup",
-    });
-
-    expect(setupEnv).toEqual({ EXISTING_ENV: "kept" });
   });
 
   test("emits a boot payload that the driver protocol parser accepts", async () => {
@@ -590,11 +339,11 @@ describe("API to driver boundary", () => {
     const projection = await projectRuntimeDriverEvents(
       { DB: new SqliteD1Database() } as ApiBindings,
       {
-        currentLiveState: createBaseLiveState({
-          callerId: link.callerId,
-          creatorId: link.creatorId,
-          driverInstanceId: API_DRIVER_BOUNDARY_IDS.driverInstance,
-          sessionId: link.sessionId,
+        assertCurrentConnection: () => undefined,
+        currentLiveState: createInitialSessionLiveState({
+          sessionId: API_DRIVER_BOUNDARY_IDS.session,
+          title: null,
+          viewerId: API_DRIVER_BOUNDARY_IDS.account,
         }),
         driverInstanceId: API_DRIVER_BOUNDARY_IDS.driverInstance,
         events: batch.events,
@@ -633,14 +382,12 @@ describe("API to driver boundary", () => {
   });
 
   test("adds failed tool result delivery before terminal run update", async () => {
-    const database = new SqliteD1Database();
-    database.execute(readText("./helpers/public-api-http-runtime-schema.sql"));
+    const database = await createPublicHttpContractDatabase();
     const link = createRuntimeSessionLink();
-    const baseLiveState = createBaseLiveState({
-      callerId: link.callerId,
-      creatorId: link.creatorId,
-      driverInstanceId: API_DRIVER_BOUNDARY_IDS.driverInstance,
-      sessionId: link.sessionId,
+    const baseLiveState = createInitialSessionLiveState({
+      sessionId: API_DRIVER_BOUNDARY_IDS.session,
+      title: null,
+      viewerId: API_DRIVER_BOUNDARY_IDS.account,
     });
     const runFailed = createDriverEvent({
       kind: "run.failed",
@@ -664,6 +411,7 @@ describe("API to driver boundary", () => {
     });
 
     const projection = await projectRuntimeDriverEvents({ DB: database } as ApiBindings, {
+      assertCurrentConnection: () => undefined,
       currentLiveState: {
         ...baseLiveState,
         lifecycle: "RUNNING",
@@ -721,18 +469,6 @@ describe("API to driver boundary", () => {
       tool: "Shell",
       toolCallId: "tool-1",
     });
-  });
-
-  test("rejects legacy event shapes from the driver channel", () => {
-    expect(() =>
-      createDriverEvent({
-        name: "mosoo.session.sync.request",
-        type: "CUSTOM",
-        value: {
-          reason: "manual",
-        },
-      }),
-    ).toThrow("canonical runtime event draft");
   });
 
   test("rejects canonical driver events that do not match the linked session", () => {

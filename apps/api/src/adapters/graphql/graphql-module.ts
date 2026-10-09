@@ -1,3 +1,4 @@
+import { DrizzleQueryError } from "drizzle-orm/errors";
 import { GraphQLError } from "graphql";
 
 import { createErrorLogContext, logError } from "../../platform/cloudflare/logger";
@@ -20,11 +21,7 @@ type AuthenticatedGraphQLResolver = GraphQLResolverFor<AuthenticatedGraphQLConte
 export interface GraphQLModule {
   authenticatedMutationResolvers?: Record<string, AuthenticatedGraphQLResolver>;
   authenticatedQueryResolvers?: Record<string, AuthenticatedGraphQLResolver>;
-  mutationFields?: string[];
-  mutationResolvers?: Record<string, GraphQLResolver>;
-  queryFields?: string[];
   queryResolvers?: Record<string, GraphQLResolver>;
-  typeDefs?: string;
 }
 
 function mergeFieldResolvers(
@@ -58,7 +55,7 @@ function withAuthenticatedContext(resolver: AuthenticatedGraphQLResolver): Graph
   };
 }
 
-function toGraphQLError(error: unknown): unknown {
+function toGraphQLError(error: unknown): GraphQLError {
   if (isApiError(error)) {
     const details = toApiErrorResponseDetails(error);
     return new GraphQLError(details.message, {
@@ -73,46 +70,21 @@ function toGraphQLError(error: unknown): unknown {
 
   // graphql-yoga's default `maskedErrors: true` replaces any non-GraphQLError
   // with the literal string "Unexpected error.", which hides actionable info
-  // from admin operators. Wrap unknown Errors so the original message reaches
-  // the client; the underlying error is also recorded via `logUnhandledResolverError`.
-  if (error instanceof Error) {
-    return new GraphQLError(error.message, {
-      extensions: {
-        code: "INTERNAL_ERROR",
-        http: {
-          status: 500,
-        },
-      },
-    });
-  }
+  // from admin operators. Wrap unknown errors so the original message reaches
+  // the client; `withApiErrors` also logs the underlying error. Database driver
+  // errors embed SQL and bound parameters, so their messages stay in the logs.
+  const exposeMessage =
+    error instanceof Error &&
+    !(error instanceof DrizzleQueryError) &&
+    !error.message.includes("D1_ERROR");
 
-  return new GraphQLError("Internal server error.", {
+  return new GraphQLError(exposeMessage ? error.message : "Internal server error.", {
     extensions: {
       code: "INTERNAL_ERROR",
       http: {
         status: 500,
       },
     },
-  });
-}
-
-function logUnhandledResolverError(
-  error: unknown,
-  operationContext: { fieldName: string; typeName: string },
-): void {
-  if (error instanceof Error) {
-    logError("graphql.unhandled_resolver_error", {
-      ...createErrorLogContext(error),
-      operationName: operationContext.fieldName,
-      operationType: operationContext.typeName,
-    });
-    return;
-  }
-
-  logError("graphql.unhandled_resolver_throw", {
-    operationName: operationContext.fieldName,
-    operationType: operationContext.typeName,
-    valueType: typeof error,
   });
 }
 
@@ -160,7 +132,11 @@ function withApiErrors(
       return await resolver(parent, args, context);
     } catch (error) {
       if (!isApiError(error)) {
-        logUnhandledResolverError(error, { fieldName, typeName });
+        logError("graphql.unhandled_resolver_error", {
+          ...createErrorLogContext(error),
+          operationName: fieldName,
+          operationType: typeName,
+        });
       }
 
       throw toGraphQLError(error);
@@ -187,28 +163,16 @@ function mergeAuthenticatedFieldResolvers(
   mergeFieldResolvers(target, wrappedResolvers, typeName);
 }
 
-function collectRootFields(
-  modules: GraphQLModule[],
-  key: "queryFields" | "mutationFields",
-): string[] {
-  return modules.flatMap((module) => module[key] ?? []);
-}
-
 export function composeGraphQLModules(modules: GraphQLModule[]): {
-  mutationFields: string[];
   mutationResolvers: Record<string, GraphQLResolver>;
-  queryFields: string[];
   queryResolvers: Record<string, GraphQLResolver>;
-  typeDefs: string[];
 } {
   const queryResolvers: Record<string, GraphQLResolver> = {};
   const mutationResolvers: Record<string, GraphQLResolver> = {};
-  const mutationFields = collectRootFields(modules, "mutationFields");
 
   for (const module of modules) {
     mergeFieldResolvers(queryResolvers, module.queryResolvers, "Query");
     mergeAuthenticatedFieldResolvers(queryResolvers, module.authenticatedQueryResolvers, "Query");
-    mergeFieldResolvers(mutationResolvers, module.mutationResolvers, "Mutation");
     mergeAuthenticatedFieldResolvers(
       mutationResolvers,
       module.authenticatedMutationResolvers,
@@ -216,11 +180,5 @@ export function composeGraphQLModules(modules: GraphQLModule[]): {
     );
   }
 
-  return {
-    mutationFields,
-    mutationResolvers,
-    queryFields: collectRootFields(modules, "queryFields"),
-    queryResolvers,
-    typeDefs: modules.flatMap((module) => (module.typeDefs ? [module.typeDefs] : [])),
-  };
+  return { mutationResolvers, queryResolvers };
 }

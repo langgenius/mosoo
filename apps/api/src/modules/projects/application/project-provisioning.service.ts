@@ -9,12 +9,11 @@ import {
 } from "../../../platform/analytics/product-analytics";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
-import { validationError } from "../../../platform/errors";
+import { requireName } from "../../../shared/require-name";
 import { currentTimestampMs } from "../../../time";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import { createProjectEnvironmentDefaults } from "../../environments/application/environment.service";
+import { createProjectEnvironmentDefaults } from "../../environments/application/environment-defaults";
 import { ensureOrganizationOwnership } from "../../organizations/domain/organization-ownership.policy";
-import { normalizeProjectName } from "./project-defaults";
 import { getProjectRow, toProjectSummary } from "./project.service";
 
 interface CreateProjectInput {
@@ -26,26 +25,14 @@ interface CreateProjectInput {
 // onboarding default-Project provisioning (insert Project row + default Environment).
 // Kept out of project.service to avoid a projects <-> environments cycle.
 export async function createProject(
-  bindings: Pick<
-    ApiBindings,
-    | "DB"
-    | "MOSOO_DEPLOYMENT_MODE"
-    | "MOSOO_ENVIRONMENT"
-    | "POSTHOG_API_HOST"
-    | "POSTHOG_PROJECT_KEY"
-  >,
+  bindings: ApiBindings,
   viewer: AuthenticatedViewer,
   input: CreateProjectInput,
 ): Promise<ProjectSummary> {
   const database = bindings.DB;
   await ensureOrganizationOwnership(database, viewer.id, input.organizationId);
 
-  const name = normalizeProjectName(input.name);
-
-  if (name.length > 200) {
-    throw validationError("Project name is too long.");
-  }
-
+  const name = requireName(input.name, "Project name");
   const projectId: ProjectId = createPlatformId();
   const timestampMs = currentTimestampMs();
 

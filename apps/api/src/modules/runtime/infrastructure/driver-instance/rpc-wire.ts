@@ -4,46 +4,37 @@ import type {
   DriverCommandUpdateInput,
   DriverCompletionInput,
   DriverEventBatchInput,
-  DriverEventBatchOutput,
-  DriverExternalToolEffectClaimInput,
-  DriverExternalToolEffectClaimOutput,
-  DriverExternalToolEffectCompleteInput,
-  DriverExternalToolEffectUnknownInput,
+  DriverEventReceipt,
   DriverFailureInput,
   DriverHeartbeatInput,
   DriverHeartbeatOutput,
-  DriverHelloInput,
-  DriverHelloOutput,
   DriverLogBatchInput,
   DriverLogBatchOutput,
   DriverNextCommandInput,
-  DriverNextCommandOutput,
   DriverReadyInput,
 } from "@mosoo/agent-driver/orpc";
-import { DriverCapability } from "@mosoo/contracts/driver-instance";
-import { ExternalToolEffectClaim } from "@mosoo/contracts/external-tool-effect";
 import {
   RuntimeCommand,
-  McpExecuteCommandResult,
   RuntimeCommandResult,
   RuntimeCommandStatus,
 } from "@mosoo/contracts/runtime-command";
 import { RunError } from "@mosoo/contracts/session-run";
-import { NonEmptyString, PrimitiveRecord, parseSchemaValue } from "@mosoo/contracts/validation";
-import { eventIterator, os } from "@orpc/server";
+import { NonEmptyString, PrimitiveRecord } from "@mosoo/contracts/validation";
+import { os } from "@orpc/server";
 import { type } from "arktype";
 
 const DriverHelloInputWire = type({
-  capabilities: DriverCapability.array(),
+  capabilities: "unknown[]",
   driverVersion: NonEmptyString,
   pid: "number",
   protocolVersion: type.unit(DRIVER_PROTOCOL_VERSION),
   runtime: '"openai-runtime" | "claude-agent-sdk" | "acp-fallback" | "pi"',
   startedAt: "string",
 });
+export type DriverHelloInput = typeof DriverHelloInputWire.infer;
 
 const DriverHelloOutputWire = type({
-  acceptedCapabilities: DriverCapability.array(),
+  acceptedCapabilities: "unknown[]",
   connectionId: NonEmptyString,
   driverInstanceId: NonEmptyString,
   heartbeatIntervalMs: "number >= 250",
@@ -55,9 +46,10 @@ const DriverHelloOutputWire = type({
   },
   runId: "string | null",
 });
+export type DriverHelloOutput = typeof DriverHelloOutputWire.infer;
 
 const DriverHeartbeatInputWire = type({
-  at: "string",
+  at: "string.date.iso",
   pid: "number",
   reason: '"interval" | "ping"',
 });
@@ -138,23 +130,6 @@ const DriverCommandUpdateInputWire = type({
   status: RuntimeCommandStatus,
 });
 
-const DriverExternalToolEffectClaimInputWire = type({
-  commandId: NonEmptyString,
-  driverInstanceId: NonEmptyString,
-});
-
-const DriverExternalToolEffectCompleteInputWire = type({
-  commandId: NonEmptyString,
-  driverInstanceId: NonEmptyString,
-  "providerReceiptJson?": "string | null | undefined",
-  result: McpExecuteCommandResult,
-});
-
-const DriverExternalToolEffectUnknownInputWire = type({
-  commandId: NonEmptyString,
-  driverInstanceId: NonEmptyString,
-});
-
 const DriverNextCommandInputWire = type({
   driverInstanceId: NonEmptyString,
 });
@@ -172,129 +147,43 @@ const DriverFailureInputWire = type({
   error: RunError,
 });
 
-type DriverEventBatchOutputWireValue = typeof DriverEventBatchOutputWire.infer;
-type DriverHelloOutputWireValue = typeof DriverHelloOutputWire.infer;
-type DriverNextCommandOutputWireValue = typeof DriverNextCommandOutputWire.infer;
-
 export interface RuntimeOrpcContext {
   onCommandUpdate(input: DriverCommandUpdateInput): Promise<{ ok: true }>;
-  onClaimExternalToolEffect(
-    input: DriverExternalToolEffectClaimInput,
-  ): Promise<DriverExternalToolEffectClaimOutput>;
-  onCompleteExternalToolEffect(input: DriverExternalToolEffectCompleteInput): Promise<{ ok: true }>;
   onCompleteRun(input: DriverCompletionInput): Promise<{ ok: true }>;
   onFailRun(input: DriverFailureInput): Promise<{ ok: true }>;
   onHeartbeat(input: DriverHeartbeatInput): Promise<DriverHeartbeatOutput>;
   onHello(input: DriverHelloInput): Promise<DriverHelloOutput>;
-  onNextCommand(input: DriverNextCommandInput): Promise<DriverNextCommandOutput>;
-  onPushEvents(input: DriverEventBatchInput): Promise<DriverEventBatchOutput>;
+  onNextCommand(input: DriverNextCommandInput): Promise<{ command: RuntimeCommand | null }>;
+  onPushEvents(input: DriverEventBatchInput): Promise<{ accepted: DriverEventReceipt[] }>;
   onPushLogs(input: DriverLogBatchInput): Promise<DriverLogBatchOutput>;
-  onMarkExternalToolEffectUnknown(
-    input: DriverExternalToolEffectUnknownInput,
-  ): Promise<{ ok: true }>;
   onReady(input: DriverReadyInput): Promise<{ ok: true }>;
-  onWatchCommands(): AsyncIteratorObject<RuntimeCommand>;
 }
 
-function parseDriverCommandUpdateInput(input: unknown): DriverCommandUpdateInput {
-  return parseSchemaValue(DriverCommandUpdateInputWire, input);
-}
-
-function parseDriverExternalToolEffectClaimInput(
-  input: unknown,
-): DriverExternalToolEffectClaimInput {
-  return parseSchemaValue(DriverExternalToolEffectClaimInputWire, input);
-}
-
-function parseDriverExternalToolEffectCompleteInput(
-  input: unknown,
-): DriverExternalToolEffectCompleteInput {
-  return parseSchemaValue(DriverExternalToolEffectCompleteInputWire, input);
-}
-
-function parseDriverExternalToolEffectUnknownInput(
-  input: unknown,
-): DriverExternalToolEffectUnknownInput {
-  return parseSchemaValue(DriverExternalToolEffectUnknownInputWire, input);
-}
-
-function parseDriverCompletionInput(input: unknown): DriverCompletionInput {
-  return parseSchemaValue(DriverCompletionInputWire, input);
-}
-
-export function parseDriverEventBatchInput(input: unknown): DriverEventBatchInput {
-  const batch = parseSchemaValue(DriverEventBatchInputWire, input);
-
+export function parseDriverEventBatchInput(
+  input: typeof DriverEventBatchInputWire.infer,
+): DriverEventBatchInput {
   return {
-    driverInstanceId: batch.driverInstanceId,
-    events: batch.events.map(parseDriverEventEnvelope),
+    driverInstanceId: input.driverInstanceId,
+    events: input.events.map(parseDriverEventEnvelope),
   };
-}
-
-function parseDriverFailureInput(input: unknown): DriverFailureInput {
-  return parseSchemaValue(DriverFailureInputWire, input);
-}
-
-function parseDriverLogBatchInput(input: unknown): DriverLogBatchInput {
-  return parseSchemaValue(DriverLogBatchInputWire, input);
-}
-
-function parseDriverNextCommandInput(input: unknown): DriverNextCommandInput {
-  return parseSchemaValue(DriverNextCommandInputWire, input);
-}
-
-export function parseDriverReadyInput(input: unknown): DriverReadyInput {
-  return parseSchemaValue(DriverReadyInputWire, input);
-}
-
-function toDriverEventBatchOutputWire(
-  output: DriverEventBatchOutput,
-): DriverEventBatchOutputWireValue {
-  return parseSchemaValue(DriverEventBatchOutputWire, output);
-}
-
-function toDriverHelloOutputWire(output: DriverHelloOutput): DriverHelloOutputWireValue {
-  return parseSchemaValue(DriverHelloOutputWire, output);
-}
-
-function toDriverNextCommandOutputWire(
-  output: DriverNextCommandOutput,
-): DriverNextCommandOutputWireValue {
-  return parseSchemaValue(DriverNextCommandOutputWire, output);
 }
 
 const base = os.$context<RuntimeOrpcContext>();
 
 export const runtimeOrpcRouter = {
   driver: {
-    claimExternalToolEffect: base
-      .input(DriverExternalToolEffectClaimInputWire)
-      .output(ExternalToolEffectClaim)
-      .handler(async ({ context, input }) =>
-        context.onClaimExternalToolEffect(parseDriverExternalToolEffectClaimInput(input)),
-      ),
     commandUpdate: base
       .input(DriverCommandUpdateInputWire)
       .output(type({ ok: "true" }))
-      .handler(async ({ context, input }) =>
-        context.onCommandUpdate(parseDriverCommandUpdateInput(input)),
-      ),
-    completeExternalToolEffect: base
-      .input(DriverExternalToolEffectCompleteInputWire)
-      .output(type({ ok: "true" }))
-      .handler(async ({ context, input }) =>
-        context.onCompleteExternalToolEffect(parseDriverExternalToolEffectCompleteInput(input)),
-      ),
+      .handler(async ({ context, input }) => context.onCommandUpdate(input)),
     completeRun: base
       .input(DriverCompletionInputWire)
       .output(type({ ok: "true" }))
-      .handler(async ({ context, input }) =>
-        context.onCompleteRun(parseDriverCompletionInput(input)),
-      ),
+      .handler(async ({ context, input }) => context.onCompleteRun(input)),
     failRun: base
       .input(DriverFailureInputWire)
       .output(type({ ok: "true" }))
-      .handler(async ({ context, input }) => context.onFailRun(parseDriverFailureInput(input))),
+      .handler(async ({ context, input }) => context.onFailRun(input)),
     heartbeat: base
       .input(DriverHeartbeatInputWire)
       .output(DriverHeartbeatOutputWire)
@@ -302,41 +191,26 @@ export const runtimeOrpcRouter = {
     hello: base
       .input(DriverHelloInputWire)
       .output(DriverHelloOutputWire)
-      .handler(async ({ context, input }) => toDriverHelloOutputWire(await context.onHello(input))),
+      .handler(async ({ context, input }) => context.onHello(input)),
     pushEvents: base
       .input(DriverEventBatchInputWire)
       .output(DriverEventBatchOutputWire)
       .handler(async ({ context, input }) =>
-        toDriverEventBatchOutputWire(await context.onPushEvents(parseDriverEventBatchInput(input))),
+        context.onPushEvents(parseDriverEventBatchInput(input)),
       ),
     pushLogs: base
       .input(DriverLogBatchInputWire)
       .output(DriverLogBatchOutputWire)
-      .handler(async ({ context, input }) => context.onPushLogs(parseDriverLogBatchInput(input))),
+      .handler(async ({ context, input }) => context.onPushLogs(input)),
     ready: base
       .input(DriverReadyInputWire)
       .output(type({ ok: "true" }))
-      .handler(async ({ context, input }) => context.onReady(parseDriverReadyInput(input))),
-    markExternalToolEffectUnknown: base
-      .input(DriverExternalToolEffectUnknownInputWire)
-      .output(type({ ok: "true" }))
-      .handler(async ({ context, input }) =>
-        context.onMarkExternalToolEffectUnknown(parseDriverExternalToolEffectUnknownInput(input)),
-      ),
+      .handler(async ({ context, input }) => context.onReady(input)),
   },
   driverInstance: {
     nextCommand: base
       .input(DriverNextCommandInputWire)
       .output(DriverNextCommandOutputWire)
-      .handler(async ({ context, input }) =>
-        toDriverNextCommandOutputWire(
-          await context.onNextCommand(parseDriverNextCommandInput(input)),
-        ),
-      ),
-    watchCommands: base
-      .output(eventIterator(RuntimeCommand))
-      .handler(({ context }) => context.onWatchCommands()),
+      .handler(async ({ context, input }) => context.onNextCommand(input)),
   },
 };
-
-export type DriverRuntimeOrpcRouter = typeof runtimeOrpcRouter;

@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
-import { useAppSession } from "@/app/session-provider";
+import { useAppSession } from "@/app/session/session-context";
 import { renameOrganization } from "@/domains/organization/api/organization-client";
 import { useTranslation } from "@/shared/i18n";
 import { isTruthy } from "@/shared/lib/truthiness";
@@ -13,16 +13,12 @@ import { Label } from "@/shared/ui/label";
 // Org-layer General settings — the account/billing shell's identity.
 export function OrgSettingsPage() {
   const { t } = useTranslation();
-  const { activeOrganization, organizationsLoading, refreshOrganizations } = useAppSession();
+  const { activeOrganization, refreshOrganizations } = useAppSession();
 
   const [name, setName] = useState(activeOrganization?.name ?? "");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    setName(activeOrganization?.name ?? "");
-  }, [activeOrganization?.name]);
 
   const trimmedName = name.trim();
   const dirty = activeOrganization !== null && trimmedName !== activeOrganization.name;
@@ -37,7 +33,11 @@ export function OrgSettingsPage() {
     setError(null);
 
     try {
-      await renameOrganization({ organizationId: activeOrganization.id, name: trimmedName });
+      const renamed = await renameOrganization({
+        organizationId: activeOrganization.id,
+        name: trimmedName,
+      });
+      setName(renamed.name);
       await refreshOrganizations();
       setSaved(true);
       setTimeout(() => {
@@ -55,9 +55,7 @@ export function OrgSettingsPage() {
       <main className="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-8">
         <div className="max-w-[560px]">
           {activeOrganization === null ? (
-            <div className="text-muted-foreground text-sm">
-              {organizationsLoading ? t("common.loading") : t("common.noActiveOrganization")}
-            </div>
+            <div className="text-fg-3 text-sm">{t("common.noActiveOrganization")}</div>
           ) : (
             <div className="space-y-6">
               <div className="space-y-1.5">

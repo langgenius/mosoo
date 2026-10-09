@@ -1,18 +1,12 @@
 import { getSessionOrganizationPath } from "@mosoo/agent-driver/paths";
 import { createPlatformId } from "@mosoo/id";
 import type { SandboxId, SandboxSessionId, SessionId } from "@mosoo/id";
-import { RUNTIME_DIAGNOSTIC_EVENT } from "@mosoo/runtime-events";
 
 import { disposeRpcResource } from "../../../../platform/cloudflare/rpc-disposal";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { currentTimestampMs } from "../../../../time";
-import {
-  appendRuntimeDiagnosticEvent,
-  toRuntimeDiagnosticBaseValue,
-} from "../../application/runtime-diagnostic-events";
 import { getRuntimeSubjectInactiveDeadline } from "../../domain/session-runtime-policy";
 import { isRuntimeSandboxLocalBucketEnabled } from "../runtime-sandbox-bucket-mount";
-import type { RuntimeConversationSessionRecord } from "../runtime-subject-lifecycle/runtime-subject-store";
 import {
   claimIdleSessionScopedConversationForClose,
   ensureRuntimeConversationSessionRecord,
@@ -21,12 +15,14 @@ import {
   recordRuntimeConversationSessionActive,
   recordRuntimeConversationSessionClosed,
   recordRuntimeConversationSessionError,
-} from "../runtime-subject-lifecycle/runtime-subject-store";
-import type { RuntimeConversationSessionState } from "../runtime-subject-lifecycle/runtime-subject-store";
+} from "../runtime-subject-lifecycle/runtime-conversation-session-store";
+import type {
+  RuntimeConversationSessionRecord,
+  RuntimeConversationSessionState,
+} from "../runtime-subject-lifecycle/runtime-subject-store.types";
 import { ensureSessionResourcesMounted } from "../session-resources/session-resource-mount.service";
 import { parseSandboxConversationOrigin } from "./sandbox-conversation-session-codec";
 import {
-  deleteSandboxConversationSessionBestEffort,
   openSandboxConversationSession,
   prepareSandboxConversationDirectories,
   restoreSandboxConversationDirectoryBackup,
@@ -38,21 +34,12 @@ import type {
 } from "./sandbox-session.types";
 import { restoreSessionArtifactsToWorkspace } from "./session-artifact-restore.service";
 
-function measureOptional<T>(
-  timing: EnsureSandboxConversationSessionInput["timing"],
-  name: string,
-  task: () => Promise<T>,
-): Promise<T> {
-  return timing ? timing.measure(name, task) : task();
-}
-
 function resolveConversationContinuationPlan(input: {
   existingSession: RuntimeConversationSessionRecord | null;
 }): {
   sandboxSessionId?: SandboxSessionId;
   requireCwdCheckpoint: boolean;
   shouldCreateCloudflareSession: boolean;
-  shouldDeleteErrorSession: boolean;
   shouldRestoreCwd: boolean;
   shouldRestoreSessionArtifacts: boolean;
 } {
@@ -64,7 +51,6 @@ function resolveConversationContinuationPlan(input: {
   if (input.existingSession === null) {
     return {
       shouldCreateCloudflareSession: true,
-      shouldDeleteErrorSession: false,
       requireCwdCheckpoint: false,
       shouldRestoreCwd: false,
       shouldRestoreSessionArtifacts,
@@ -74,21 +60,15 @@ function resolveConversationContinuationPlan(input: {
   if (input.existingSession.status === "active") {
     return {
       shouldCreateCloudflareSession: false,
-      shouldDeleteErrorSession: false,
       requireCwdCheckpoint: false,
       shouldRestoreCwd: false,
       shouldRestoreSessionArtifacts: false,
     };
   }
 
-  const shouldUseNewCloudflareSession = input.existingSession.status === "closed";
-
   return {
-    ...(shouldUseNewCloudflareSession
-      ? { sandboxSessionId: createPlatformId<SandboxSessionId>() }
-      : {}),
+    sandboxSessionId: createPlatformId<SandboxSessionId>(),
     shouldCreateCloudflareSession: true,
-    shouldDeleteErrorSession: input.existingSession.status === "error",
     requireCwdCheckpoint:
       input.existingSession.status === "closed" &&
       input.existingSession.workspaceCheckpointRequired,
@@ -122,7 +102,6 @@ async function restoreSandboxSessionCwdIfMissing(input: {
   try {
     await restoreSandboxConversationDirectoryBackup(input.sandbox, {
       backup: input.latestReadyBackup,
-      cwd: input.cwd,
       localBucket: input.localBucket,
     });
   } catch (cause) {
@@ -138,7 +117,7 @@ export async function ensureSandboxConversationSession(
   input: EnsureSandboxConversationSessionInput,
 ): Promise<SandboxConversationSessionResult> {
   const now = Date.now();
-  const existingSession = await measureOptional(input.timing, "conversation.loadSession", () =>
+  const existingSession = await input.timing.measure("conversation.loadSession", () =>
     getRuntimeConversationSession(bindings.DB, input.sessionId),
   );
   const continuation = resolveConversationContinuationPlan({
@@ -158,7 +137,7 @@ export async function ensureSandboxConversationSession(
   // too), so the round trip is only needed for first-time allocation.
   const sessionRecord =
     existingSession ??
-    (await measureOptional(input.timing, "conversation.ensureRecord", () =>
+    (await input.timing.measure("conversation.ensureRecord", () =>
       ensureRuntimeConversationSessionRecord(bindings.DB, {
         cwd,
         now,
@@ -170,7 +149,7 @@ export async function ensureSandboxConversationSession(
   const sandboxSessionId = continuation.sandboxSessionId ?? sessionRecord.sandboxSessionId;
 
   if (continuation.shouldRestoreCwd && existingSession) {
-    await measureOptional(input.timing, "conversation.restoreCwd", () =>
+    await input.timing.measure("conversation.restoreCwd", () =>
       restoreSandboxSessionCwdIfMissing({
         cwd,
         localBucket: isRuntimeSandboxLocalBucketEnabled(bindings),
@@ -183,7 +162,7 @@ export async function ensureSandboxConversationSession(
   }
 
   if (continuation.shouldCreateCloudflareSession) {
-    await measureOptional(input.timing, "conversation.prepareDirectories", () =>
+    await input.timing.measure("conversation.prepareDirectories", () =>
       prepareSandboxConversationDirectories({
         cwd,
         sandbox: input.sandbox,
@@ -191,12 +170,10 @@ export async function ensureSandboxConversationSession(
     );
 
     if (continuation.shouldRestoreSessionArtifacts) {
-      await measureOptional(input.timing, "conversation.restoreSessionArtifacts", () =>
+      await input.timing.measure("conversation.restoreSessionArtifacts", () =>
         restoreSessionArtifactsToWorkspace(bindings, {
-          agentId: input.agentId,
           cwd,
           sandbox: input.sandbox,
-          sandboxId: input.sandboxId,
           sessionId: input.sessionId,
         }),
       );
@@ -204,7 +181,7 @@ export async function ensureSandboxConversationSession(
   }
 
   if (input.mountSessionResources) {
-    await measureOptional(input.timing, "conversation.mountResources", () =>
+    await input.timing.measure("conversation.mountResources", () =>
       ensureSessionResourcesMounted({
         bindings,
         sandbox: input.sandbox,
@@ -213,30 +190,17 @@ export async function ensureSandboxConversationSession(
     );
   }
 
-  if (continuation.shouldDeleteErrorSession) {
-    await measureOptional(input.timing, "conversation.deleteErrorSession", () =>
-      deleteSandboxConversationSessionBestEffort({
-        sandboxSessionId: sessionRecord.sandboxSessionId,
-        sandbox: input.sandbox,
-      }),
-    );
-  }
-
-  const openedCloudflareSession = await measureOptional(
-    input.timing,
-    "conversation.openSession",
-    () =>
-      openSandboxConversationSession({
-        sandboxSessionId,
-        cwd,
-        sandbox: input.sandbox,
-        shouldCreate: continuation.shouldCreateCloudflareSession,
-      }),
+  const cloudflareSession = await input.timing.measure("conversation.openSession", () =>
+    openSandboxConversationSession({
+      sandboxSessionId,
+      cwd,
+      sandbox: input.sandbox,
+      shouldCreate: continuation.shouldCreateCloudflareSession,
+    }),
   );
-  const cloudflareSession = openedCloudflareSession.session;
 
   try {
-    await measureOptional(input.timing, "conversation.activateRecord", () =>
+    await input.timing.measure("conversation.activateRecord", () =>
       recordRuntimeConversationSessionActive(bindings.DB, {
         expectedSandboxSessionId: sessionRecord.sandboxSessionId,
         sandboxSessionId,
@@ -357,21 +321,6 @@ async function finalizeSandboxConversationClose(
       sandboxSessionId: input.state.sandboxSessionId,
       sandboxId: input.sandboxId,
     });
-
-    if (input.state.agentId) {
-      await appendRuntimeDiagnosticEvent(bindings, {
-        eventName: RUNTIME_DIAGNOSTIC_EVENT.sandboxSessionDestroyed.name,
-        sessionId: input.sessionId,
-        value: {
-          ...toRuntimeDiagnosticBaseValue({
-            agentId: input.state.agentId,
-            sessionId: input.sessionId,
-          }),
-          reason: "runtime_subject_session_closed",
-          sandboxId: input.sandboxId,
-        },
-      });
-    }
   } finally {
     // Remote cleanup must not strand the local subject outside reclamation.
     await recordRuntimeConversationSessionClosed(bindings.DB, {

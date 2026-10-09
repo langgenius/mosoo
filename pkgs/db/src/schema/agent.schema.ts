@@ -128,8 +128,3 @@ export const agentSkillsTable = sqliteTable(
     index("agent_skill_agent_sort_idx").on(table.agentId, table.sortOrder),
   ],
 );
-
-export type AgentDeploymentVersionRow = typeof agentDeploymentVersionsTable.$inferSelect;
-export type AgentMcpBindingRow = typeof agentMcpBindingsTable.$inferSelect;
-export type AgentRow = typeof agentsTable.$inferSelect;
-export type AgentSkillRow = typeof agentSkillsTable.$inferSelect;

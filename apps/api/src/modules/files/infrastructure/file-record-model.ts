@@ -12,9 +12,8 @@ import type {
 } from "@mosoo/contracts/file";
 import { toSessionResourceMaterializedPath } from "@mosoo/contracts/file";
 import type { SessionFile } from "@mosoo/contracts/session";
-import { fileRecordsTable } from "@mosoo/db";
-import { parsePlatformId } from "@mosoo/id";
-import type { AccountId, FileId, PlatformId, ProjectId, SessionId, UploadId } from "@mosoo/id";
+import { fileRecordsTable, fileUploadsTable } from "@mosoo/db";
+import type { AccountId, FileId, PlatformId, UploadId } from "@mosoo/id";
 import { sql } from "drizzle-orm";
 
 import { toIsoString } from "../../../time";
@@ -73,22 +72,31 @@ export const fileRecordRowColumns = {
 
 export interface FileUploadRow {
   content_type: string;
-  created_at: number;
   created_by_account_id: AccountId;
   expected_size: number;
   expires_at: number;
-  file_id: FileId;
   id: UploadId;
-  if_match_etag: string | null;
   multipart_upload_id: string | null;
-  overwrite: number;
   part_size: number | null;
   scope_id: PlatformId | null;
   scope_kind: FileScopeKind;
   status: FileUploadStatus;
   strategy: "multipart" | "single_put";
-  updated_at: number;
 }
+
+export const fileUploadRowColumns = {
+  content_type: fileUploadsTable.contentType,
+  created_by_account_id: fileUploadsTable.createdByAccountId,
+  expected_size: fileUploadsTable.expectedSize,
+  expires_at: fileUploadsTable.expiresAt,
+  id: fileUploadsTable.id,
+  multipart_upload_id: fileUploadsTable.multipartUploadId,
+  part_size: fileUploadsTable.partSize,
+  scope_id: fileUploadsTable.scopeId,
+  scope_kind: fileUploadsTable.scopeKind,
+  status: fileUploadsTable.status,
+  strategy: fileUploadsTable.strategy,
+};
 
 const RUNTIME_OUTPUT_PARENT_ROOT = "runtime-output";
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
@@ -137,65 +145,11 @@ export interface FileUploadContext {
   upload: FileUploadRow;
 }
 
-export interface FilePathLookupRequest {
-  database: D1Database;
-  path: string;
-  scopeId: PlatformId | null;
-  scopeKind: FileScopeKind;
-}
-
-export interface UploadAccessRequest {
-  database: D1Database;
-  fileId: FileId;
-  requiredIntent: FileAccessIntent;
-  viewer: AuthenticatedViewer;
-}
-
 export interface FileAccessRequest {
   database: D1Database;
   fileId: FileId;
   requiredIntent: FileAccessIntent;
   viewer: AuthenticatedViewer;
-}
-
-function toFileScopeId(scopeKind: FileScopeKind, scopeId: PlatformId | null): FileScopeId {
-  if (scopeId === null) {
-    throw new Error(`${scopeKind} file scope ID is required.`);
-  }
-
-  if (scopeKind === "account") {
-    return parsePlatformId<AccountId>(scopeId, "file account ID");
-  }
-
-  if (scopeKind === "agent_package" || scopeKind === "app_draft" || scopeKind === "library") {
-    return parsePlatformId<ProjectId>(scopeId, "file project ID");
-  }
-
-  if (scopeKind === "session") {
-    return parsePlatformId<SessionId>(scopeId, "file session ID");
-  }
-
-  const unsupported: never = scopeKind;
-  void unsupported;
-  throw new Error("Unsupported file scope kind.");
-}
-
-function toFileOwnerId(ownerKind: FileOwnerKind, ownerId: PlatformId): FileOwnerId {
-  if (ownerKind === "account") {
-    return parsePlatformId<AccountId>(ownerId, "file owner account ID");
-  }
-
-  if (ownerKind === "app") {
-    return parsePlatformId<ProjectId>(ownerId, "file owner project ID");
-  }
-
-  if (ownerKind === "session") {
-    return parsePlatformId<SessionId>(ownerId, "file owner session ID");
-  }
-
-  const unsupported: never = ownerKind;
-  void unsupported;
-  throw new Error("Unsupported file owner kind.");
 }
 
 export function toFileRecord(row: FileRecordRow): FileRecord {
@@ -208,12 +162,12 @@ export function toFileRecord(row: FileRecordRow): FileRecord {
     mimeType: row.mime_type,
     name: row.name,
     owner: {
-      id: toFileOwnerId(row.owner_kind, row.owner_id),
+      id: row.owner_id as FileOwnerId,
       kind: row.owner_kind,
     },
     path: row.scope_kind === "session" ? toSessionResourceMaterializedPath(row.path) : row.path,
     purpose: row.purpose,
-    scope: createScope(row.scope_kind, toFileScopeId(row.scope_kind, row.scope_id)),
+    scope: createScope(row.scope_kind, row.scope_id as FileScopeId),
     sessionKind: row.session_kind,
     sourcePath: toRuntimeOutputSourcePath(row),
     size: row.size,
@@ -241,7 +195,19 @@ export function toFileEntry(file: FileRecord): FileEntry {
   };
 }
 
-export function toUploadSummary(upload: FileUploadRow, file: FileRecordRow): FileUploadSummary {
+export function toUploadSummary(
+  upload: Pick<
+    FileUploadRow,
+    | "content_type"
+    | "expected_size"
+    | "expires_at"
+    | "part_size"
+    | "scope_kind"
+    | "status"
+    | "strategy"
+  >,
+  file: Pick<FileRecordRow, "id" | "path">,
+): FileUploadSummary {
   return {
     contentType: upload.content_type,
     expectedSize: upload.expected_size,

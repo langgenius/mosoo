@@ -1,4 +1,3 @@
-import type { ProjectId, SkillId } from "@mosoo/contracts/id";
 import type {
   CreateSkillForkInput,
   InstallSkillsShSkillInput,
@@ -8,12 +7,12 @@ import type {
   SkillsShCatalogResult,
   SkillsShCatalogView,
 } from "@mosoo/contracts/skill";
+import type { AccountId, ProjectId, SkillId, SkillSnapshotId } from "@mosoo/id";
 
 import { graphql } from "@/gql";
 import type { SkillDetailFieldsFragment, SkillSummaryFieldsFragment } from "@/gql/graphql";
 import { requestGraphQL } from "@/platform/http/graphql-client";
 import { apiFetch } from "@/platform/http/public-api";
-import { toAccountId, toProjectId, toSkillId, toSkillSnapshotId } from "@/routes/typed-id";
 
 const SKILL_SUMMARY_FIELDS = graphql(/* GraphQL */ `
   fragment SkillSummaryFields on SkillSummary {
@@ -32,7 +31,6 @@ const SKILL_SUMMARY_FIELDS = graphql(/* GraphQL */ `
     ownerName
     projectId
     snapshotId
-    sourceKind
     updatedAt
   }
 `);
@@ -54,7 +52,6 @@ const SKILL_DETAIL_FIELDS = graphql(/* GraphQL */ `
     ownerName
     projectId
     snapshotId
-    sourceKind
     updatedAt
     currentSnapshot {
       archiveFormat
@@ -82,9 +79,8 @@ const SKILL_DETAIL_FIELDS = graphql(/* GraphQL */ `
   }
 `);
 
-const retainGraphQLFragments = (documents: readonly unknown[]): number => documents.length;
-
-retainGraphQLFragments([SKILL_DETAIL_FIELDS, SKILL_SUMMARY_FIELDS]);
+void SKILL_DETAIL_FIELDS;
+void SKILL_SUMMARY_FIELDS;
 
 function toSkillSummary(skill: SkillSummaryFieldsFragment): SkillSummary {
   return {
@@ -94,12 +90,12 @@ function toSkillSummary(skill: SkillSummaryFieldsFragment): SkillSummary {
         ? null
         : {
             ...skill.forkOrigin,
-            skillId: toSkillId(skill.forkOrigin.skillId),
+            skillId: skill.forkOrigin.skillId as SkillId,
           },
-    id: toSkillId(skill.id),
-    ownerId: toAccountId(skill.ownerId),
-    projectId: toProjectId(skill.projectId),
-    snapshotId: toSkillSnapshotId(skill.snapshotId),
+    id: skill.id as SkillId,
+    ownerId: skill.ownerId as AccountId,
+    projectId: skill.projectId as ProjectId,
+    snapshotId: skill.snapshotId as SkillSnapshotId,
   };
 }
 
@@ -108,7 +104,7 @@ function toSkillDetail(skill: SkillDetailFieldsFragment): SkillDetail {
     ...toSkillSummary(skill),
     currentSnapshot: {
       ...skill.currentSnapshot,
-      id: toSkillSnapshotId(skill.currentSnapshot.id),
+      id: skill.currentSnapshot.id as SkillSnapshotId,
     },
     entries: skill.entries,
   };
@@ -200,15 +196,10 @@ export async function inspectSkillUpload(input: {
 export async function publishSkillPackage(input: {
   file?: File;
   githubUrl?: string;
-  skillId?: SkillId;
   projectId: ProjectId;
 }): Promise<SkillSummary> {
   const form = new FormData();
   form.append("projectId", input.projectId);
-
-  if (input.skillId !== undefined && input.skillId.length > 0) {
-    form.append("skillId", input.skillId);
-  }
 
   if (input.file !== undefined) {
     form.append("file", input.file, input.file.name);

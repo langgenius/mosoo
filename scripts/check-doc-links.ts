@@ -1,5 +1,5 @@
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { dirname, extname, isAbsolute, relative, resolve } from "node:path";
+import { existsSync, readFileSync, statSync } from "node:fs";
+import { dirname, isAbsolute, relative, resolve } from "node:path";
 
 type LinkKind = "image" | "link";
 
@@ -10,30 +10,13 @@ interface LinkCandidate {
   target: string;
 }
 
-interface BrokenLink extends LinkCandidate {
-  checkedPaths: string[];
-}
-
 const REPO_ROOT = process.cwd();
-const IMAGE_EXTENSIONS = new Set([
-  ".apng",
-  ".avif",
-  ".gif",
-  ".jpeg",
-  ".jpg",
-  ".png",
-  ".svg",
-  ".webp",
-]);
 const URI_SCHEME_PATTERN = /^[a-z][a-z0-9+.-]*:/i;
 const MARKDOWN_LINK_PATTERN = /(!)?\[[^\]\n]*\]\(([^)\n]+)\)/g;
-const REFERENCE_LINK_PATTERN = /^\s{0,3}\[[^\]\n]+\]:\s+(\S+)/gm;
-const HTML_IMAGE_SRC_PATTERN = /<(?:img|source|Image)\b[^>]*\bsrc\s*=\s*["']([^"']+)["']/g;
-const IMAGE_PROPERTY_PATTERN =
-  /\b(?:heroImage|image|ogImage|thumbnail|src)\s*:\s*["']([^"']+)["']/g;
+const HTML_IMAGE_SRC_PATTERN = /<img\b[^>]*\bsrc\s*=\s*["']([^"']+)["']/g;
 
-function runGitLsFiles(patterns: readonly string[]): string[] {
-  const result = Bun.spawnSync(["git", "ls-files", "-z", "--", ...patterns], {
+function listMarkdownFiles(): string[] {
+  const result = Bun.spawnSync(["git", "ls-files", "-z", "--", "*.md"], {
     cwd: REPO_ROOT,
     stderr: "pipe",
     stdout: "pipe",
@@ -49,10 +32,6 @@ function runGitLsFiles(patterns: readonly string[]): string[] {
     .split("\0")
     .filter((path) => path.length > 0)
     .toSorted();
-}
-
-function toDisplayPath(path: string): string {
-  return relative(REPO_ROOT, path).replaceAll("\\", "/");
 }
 
 function getLineNumber(text: string, index: number): number {
@@ -99,7 +78,7 @@ function decodePath(target: string): string {
   }
 }
 
-function normalizeTarget(rawTarget: string, kind: LinkKind): string | null {
+function normalizeTarget(rawTarget: string): string | null {
   const parsedTarget = parseMarkdownDestination(rawTarget);
   if (parsedTarget === null) {
     return null;
@@ -109,165 +88,64 @@ function normalizeTarget(rawTarget: string, kind: LinkKind): string | null {
   if (
     target.length === 0 ||
     parsedTarget.startsWith("#") ||
-    target.startsWith("//") ||
+    target.startsWith("/") ||
     URI_SCHEME_PATTERN.test(target) ||
     target.includes("<") ||
-    target.includes(">") ||
-    target.includes("{{") ||
-    target.includes("}}")
+    target.includes(">")
   ) {
-    return null;
-  }
-
-  if (target.startsWith("/") && kind === "link") {
     return null;
   }
 
   return target;
 }
 
-function hasImageExtension(target: string): boolean {
-  return IMAGE_EXTENSIONS.has(extname(stripQueryAndAnchor(target)).toLowerCase());
-}
-
-function isInsideRepo(path: string): boolean {
-  const relativePath = relative(REPO_ROOT, path);
-  return relativePath.length === 0 || (!relativePath.startsWith("..") && !isAbsolute(relativePath));
-}
-
-function findAppPublicRoots(): string[] {
-  const appsPath = resolve(REPO_ROOT, "apps");
-
-  if (!existsSync(appsPath)) {
-    return [];
-  }
-
-  return readdirSync(appsPath, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => resolve(appsPath, entry.name, "public"))
-    .filter((path) => existsSync(path));
-}
-
-function getCandidatePaths(sourcePath: string, target: string, kind: LinkKind): string[] {
-  if (!target.startsWith("/")) {
-    return [resolve(REPO_ROOT, dirname(sourcePath), target)];
-  }
-
-  if (kind !== "image") {
-    return [];
-  }
-
-  const strippedTarget = target.replace(/^\/+/, "");
-  const paths = [resolve(REPO_ROOT, strippedTarget)];
-
-  for (const publicRoot of findAppPublicRoots()) {
-    paths.push(resolve(publicRoot, strippedTarget));
-
-    const appName = publicRoot.split("/").at(-2);
-    if (appName !== undefined && strippedTarget.startsWith(`${appName}/`)) {
-      paths.push(resolve(publicRoot, strippedTarget.slice(appName.length + 1)));
-    }
-  }
-
-  return Array.from(new Set(paths));
-}
-
 function targetExists(path: string, kind: LinkKind): boolean {
-  if (!isInsideRepo(path) || !existsSync(path)) {
+  const relativePath = relative(REPO_ROOT, path);
+
+  if (relativePath.startsWith("..") || isAbsolute(relativePath) || !existsSync(path)) {
     return false;
   }
 
   return kind === "image" ? statSync(path).isFile() : true;
 }
 
-function addCandidate(
-  candidates: LinkCandidate[],
-  sourcePath: string,
-  text: string,
-  index: number,
-  rawTarget: string,
-  kind: LinkKind,
-): void {
-  const target = normalizeTarget(rawTarget, kind);
-  if (target === null) {
-    return;
-  }
+function extractCandidates(sourcePath: string, text: string): LinkCandidate[] {
+  const matches = [
+    ...[...text.matchAll(MARKDOWN_LINK_PATTERN)].map((match) => ({
+      index: match.index,
+      kind: match[1] === "!" ? ("image" as const) : ("link" as const),
+      rawTarget: match[2] ?? "",
+    })),
+    ...[...text.matchAll(HTML_IMAGE_SRC_PATTERN)].map((match) => ({
+      index: match.index,
+      kind: "image" as const,
+      rawTarget: match[1] ?? "",
+    })),
+  ];
 
-  candidates.push({
-    kind,
-    line: getLineNumber(text, index),
-    sourcePath,
-    target,
+  return matches.flatMap(({ index, kind, rawTarget }) => {
+    const target = normalizeTarget(rawTarget);
+    return target === null ? [] : [{ kind, line: getLineNumber(text, index), sourcePath, target }];
   });
 }
 
-function extractCandidates(sourcePath: string, text: string): LinkCandidate[] {
-  const candidates: LinkCandidate[] = [];
-
-  for (const match of text.matchAll(MARKDOWN_LINK_PATTERN)) {
-    addCandidate(
-      candidates,
-      sourcePath,
-      text,
-      match.index,
-      match[2],
-      match[1] === "!" ? "image" : "link",
-    );
-  }
-
-  for (const match of text.matchAll(REFERENCE_LINK_PATTERN)) {
-    addCandidate(candidates, sourcePath, text, match.index, match[1], "link");
-  }
-
-  for (const match of text.matchAll(HTML_IMAGE_SRC_PATTERN)) {
-    addCandidate(candidates, sourcePath, text, match.index, match[1], "image");
-  }
-
-  for (const match of text.matchAll(IMAGE_PROPERTY_PATTERN)) {
-    if (hasImageExtension(match[1])) {
-      addCandidate(candidates, sourcePath, text, match.index, match[1], "image");
-    }
-  }
-
-  return candidates;
-}
-
-function checkCandidate(candidate: LinkCandidate): BrokenLink | null {
-  const checkedPaths = getCandidatePaths(candidate.sourcePath, candidate.target, candidate.kind);
-
-  if (checkedPaths.some((path) => targetExists(path, candidate.kind))) {
-    return null;
-  }
-
-  return {
-    ...candidate,
-    checkedPaths: checkedPaths.map(toDisplayPath),
-  };
-}
-
-const files = runGitLsFiles(["*.md", "*.mdx"]);
-const brokenLinks: BrokenLink[] = [];
-const seenCandidates = new Set<string>();
+const files = listMarkdownFiles();
+const brokenLinks: (LinkCandidate & { checkedPath: string })[] = [];
 
 for (const sourcePath of files) {
   const text = readFileSync(resolve(REPO_ROOT, sourcePath), "utf8");
 
   for (const candidate of extractCandidates(sourcePath, text)) {
-    const key = `${candidate.sourcePath}:${candidate.line}:${candidate.kind}:${candidate.target}`;
-    if (seenCandidates.has(key)) {
-      continue;
-    }
+    const checkedPath = resolve(REPO_ROOT, dirname(sourcePath), candidate.target);
 
-    seenCandidates.add(key);
-    const brokenLink = checkCandidate(candidate);
-    if (brokenLink !== null) {
-      brokenLinks.push(brokenLink);
+    if (!targetExists(checkedPath, candidate.kind)) {
+      brokenLinks.push({ ...candidate, checkedPath: relative(REPO_ROOT, checkedPath) });
     }
   }
 }
 
 if (brokenLinks.length > 0) {
-  console.error(`Found ${brokenLinks.length} broken local Markdown/MDX link(s).`);
+  console.error(`Found ${brokenLinks.length} broken local Markdown link(s).`);
 
   for (const brokenLink of brokenLinks) {
     console.error(
@@ -275,10 +153,10 @@ if (brokenLinks.length > 0) {
         brokenLink.target,
       )}`,
     );
-    console.error(`  checked: ${brokenLink.checkedPaths.join(", ")}`);
+    console.error(`  checked: ${brokenLink.checkedPath}`);
   }
 
   process.exitCode = 1;
 } else {
-  console.log(`Docs link check passed for ${files.length} Markdown/MDX file(s).`);
+  console.log(`Docs link check passed for ${files.length} Markdown file(s).`);
 }

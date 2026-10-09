@@ -1,10 +1,22 @@
-import type { DriverInstanceId } from "@mosoo/id";
+import type { RunError, SessionRunStatus } from "@mosoo/contracts/session-run";
+import type { DriverInstanceId, RuntimeOperationId, SandboxId, SessionId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
-import type { StopRuntimeSubjectDriversInput } from "../../application/execution-plane/execution-plane-adapter";
 import { listLiveDriverInstanceIdsForSandboxSessions } from "../driver-instance/live-driver-instance.repository";
-import { stopDriverSession } from "../driver-session.service";
-import { listRuntimeSubjectDriverIds } from "./runtime-subject-store";
+import { stopDriverSession } from "../driver-session-stop.service";
+import { listRuntimeSubjectDriverIds } from "./runtime-subject-maintenance-store";
+
+export interface StopRuntimeSubjectDriversInput {
+  operationId?: RuntimeOperationId;
+  runtimeSubjectId: SandboxId;
+  preserveSessionLifecycle?: boolean;
+  reason: string;
+  targets?: readonly { readonly sessionId: SessionId }[];
+  terminalRun?: {
+    error?: RunError | null;
+    status: Extract<SessionRunStatus, "cancelled" | "failed">;
+  };
+}
 
 async function listRuntimeSubjectOperationDriverIds(
   bindings: ApiBindings,

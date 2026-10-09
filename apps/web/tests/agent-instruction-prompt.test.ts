@@ -1,13 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
 
 import type { Agent } from "../src/routes/agent/agent.types";
 import type { AgentDistribution } from "../src/routes/agent/lifecycle/distribution-info";
 import { buildAgentInstructionPrompt } from "../src/routes/agent/lifecycle/distribution-info";
-
-function readSource(path: string): string {
-  return readFileSync(new URL(path, import.meta.url), "utf8");
-}
 
 const distribution: AgentDistribution = {
   apiBasePath: "/api/public/v1",
@@ -90,15 +85,5 @@ describe("agent instruction prompt", () => {
     expect(prompt).toContain("# Localized instruction: Research Agent");
     expect(prompt).toContain("localized:agentLifecycle.instructionIntro");
     expect(prompt).toContain("> localized:agentLifecycle.sessionContinuityHint");
-  });
-
-  test("uses the publish menu item as a clipboard instruction action", () => {
-    const source = readSource("../src/routes/agent/lifecycle/publish-menu.tsx");
-
-    expect(source).toContain('t("agentLifecycle.instructionForLlm")');
-    expect(source).toContain("buildAgentInstructionPrompt(agent, distribution, t)");
-    expect(source).toContain('import { writeClipboardText } from "@/shared/lib/clipboard"');
-    expect(source).not.toContain("downloadTextFile");
-    expect(source).not.toContain("skill.md</span>");
   });
 });

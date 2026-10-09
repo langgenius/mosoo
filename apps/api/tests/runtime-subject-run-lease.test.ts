@@ -1,14 +1,12 @@
 import { describe, expect, test } from "bun:test";
 
 import { parsePlatformId } from "@mosoo/id";
-import type { DriverInstanceId, SandboxId, SessionId, SessionRunId } from "@mosoo/id";
+import type { DriverInstanceId, SessionRunId } from "@mosoo/id";
 import { PLATFORM_ID_FIXTURES } from "@mosoo/id/testing";
 
 import {
-  recordRuntimeRunLeaseAcquired,
-  recordRuntimeRunLeaseAcquiredOutcome,
-  recordRuntimeRunLeaseReleased,
-  recordRuntimeRunLeaseReleasedOutcome,
+  acquireRuntimeRunLease,
+  releaseRuntimeRunLease,
 } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-run-lease-store";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
@@ -20,14 +18,6 @@ const OTHER_DRIVER_INSTANCE_ID = parsePlatformId<DriverInstanceId>(
 const MISSING_SESSION_RUN_ID = parsePlatformId<SessionRunId>(
   "01J0000000000000000000000R",
   "missing session run id",
-);
-const OTHER_SANDBOX_ID = parsePlatformId<SandboxId>(
-  "01J0000000000000000000000T",
-  "other sandbox id",
-);
-const OTHER_SESSION_ID = parsePlatformId<SessionId>(
-  "01J0000000000000000000000P",
-  "other session id",
 );
 const OTHER_SESSION_RUN_ID = parsePlatformId<SessionRunId>(
   "01J0000000000000000000000Q",
@@ -123,13 +113,9 @@ describe("runtime subject run lease store", () => {
   test("acquires and releases a run lease with atomic driver transitions", async () => {
     const database = createRuntimeSubjectLeaseDatabase();
 
+    await expect(acquireRuntimeRunLease(database, leaseInput())).resolves.toEqual({ ok: true });
     await expect(
-      recordRuntimeRunLeaseAcquired(database, {
-        ...leaseInput(),
-      }),
-    ).resolves.toBe(true);
-    await expect(
-      recordRuntimeRunLeaseReleased(database, {
+      releaseRuntimeRunLease(database, {
         driverInstanceId: DRIVER_INSTANCE_ID,
         expectedSessionRunId: SESSION_RUN_ID,
       }),
@@ -164,13 +150,11 @@ describe("runtime subject run lease store", () => {
       const database = createRuntimeSubjectLeaseDatabase();
       database.execute(`UPDATE sandbox SET kind = 'pet' WHERE id = '${SANDBOX_ID}'`);
 
-      await recordRuntimeRunLeaseAcquired(database, {
-        ...leaseInput(),
-      });
+      await acquireRuntimeRunLease(database, leaseInput());
       database.execute(`UPDATE sandbox_session SET status = '${status}'`);
       const releasedAfter = Date.now();
       await expect(
-        recordRuntimeRunLeaseReleased(database, {
+        releaseRuntimeRunLease(database, {
           driverInstanceId: DRIVER_INSTANCE_ID,
           expectedSessionRunId: SESSION_RUN_ID,
         }),
@@ -193,9 +177,7 @@ describe("runtime subject run lease store", () => {
   test("keeps terminal run history after lease release", async () => {
     const database = createRuntimeSubjectLeaseDatabase();
 
-    await recordRuntimeRunLeaseAcquired(database, {
-      ...leaseInput(),
-    });
+    await acquireRuntimeRunLease(database, leaseInput());
     database.execute(`
       INSERT INTO session_run (driver_instance_id, id, session_id, status, status_seq, updated_at)
       VALUES ('${OTHER_DRIVER_INSTANCE_ID}', '${UNLINKED_SESSION_RUN_ID}', '${SESSION_ID}', 'running', 0, 1)
@@ -208,7 +190,7 @@ describe("runtime subject run lease store", () => {
     `);
 
     await expect(
-      recordRuntimeRunLeaseReleased(database, {
+      releaseRuntimeRunLease(database, {
         driverInstanceId: DRIVER_INSTANCE_ID,
         expectedSessionRunId: SESSION_RUN_ID,
       }),
@@ -230,213 +212,83 @@ describe("runtime subject run lease store", () => {
   test("treats acquiring the same run as idempotent", async () => {
     const database = createRuntimeSubjectLeaseDatabase();
 
-    await recordRuntimeRunLeaseAcquired(database, {
-      ...leaseInput(),
-    });
+    await acquireRuntimeRunLease(database, leaseInput());
 
-    await expect(
-      recordRuntimeRunLeaseAcquired(database, {
-        ...leaseInput(),
-      }),
-    ).resolves.toBe(true);
-    await expect(
-      recordRuntimeRunLeaseAcquiredOutcome(database, {
-        ...leaseInput(),
-      }),
-    ).resolves.toEqual({
-      status: "duplicate",
-      transition: "acquire",
-    });
+    await expect(acquireRuntimeRunLease(database, leaseInput())).resolves.toEqual({ ok: true });
   });
 
-  test("does not acquire a lease for a missing run", async () => {
-    const database = createRuntimeSubjectLeaseDatabase();
-
-    await expect(
-      recordRuntimeRunLeaseAcquired(database, {
-        ...leaseInput({ sessionRunId: MISSING_SESSION_RUN_ID }),
-      }),
-    ).resolves.toBe(false);
-
-    const run = await database
-      .prepare(
-        `
-          SELECT driver_instance_id
-          FROM session_run
-          WHERE id = '${SESSION_RUN_ID}'
-        `,
-      )
-      .first<{ driver_instance_id: string | null }>();
-
-    expect(run?.driver_instance_id).toBeNull();
-  });
-
-  test("does not steal a run linked to another driver", async () => {
-    const database = createRuntimeSubjectLeaseDatabase();
-
-    database.execute(`
+  test("retries while the run or the driver is leased elsewhere", async () => {
+    const runLeased = createRuntimeSubjectLeaseDatabase();
+    runLeased.execute(`
       UPDATE session_run
       SET driver_instance_id = '${OTHER_DRIVER_INSTANCE_ID}'
       WHERE id = '${SESSION_RUN_ID}'
     `);
 
-    await expect(
-      recordRuntimeRunLeaseAcquired(database, {
-        ...leaseInput(),
-      }),
-    ).resolves.toBe(false);
-    await expect(
-      recordRuntimeRunLeaseAcquiredOutcome(database, {
-        ...leaseInput(),
-      }),
-    ).resolves.toEqual({
+    await expect(acquireRuntimeRunLease(runLeased, leaseInput())).resolves.toEqual({
+      ok: false,
       reason: "run_already_leased",
-      status: "rejected",
-      transition: "acquire",
+      retryable: true,
     });
-
-    const run = await database
-      .prepare(
-        `
-          SELECT driver_instance_id
-          FROM session_run
-          WHERE id = '${SESSION_RUN_ID}'
-        `,
-      )
+    const run = await runLeased
+      .prepare(`SELECT driver_instance_id FROM session_run WHERE id = '${SESSION_RUN_ID}'`)
       .first<{ driver_instance_id: string | null }>();
-
     expect(run?.driver_instance_id).toBe(OTHER_DRIVER_INSTANCE_ID);
-  });
 
-  test("rejects a run outside the driver sandbox session scope", async () => {
-    const database = createRuntimeSubjectLeaseDatabase();
-
-    database.execute(`
-      INSERT INTO session_run (id, session_id, status, status_seq, updated_at)
-      VALUES ('${OTHER_SESSION_RUN_ID}', '${OTHER_SESSION_ID}', 'running', 0, 1)
+    const driverLeased = createRuntimeSubjectLeaseDatabase();
+    driverLeased.execute(`
+      INSERT INTO session_run (driver_instance_id, id, session_id, status, status_seq, updated_at)
+      VALUES ('${DRIVER_INSTANCE_ID}', '${OTHER_SESSION_RUN_ID}', '${SESSION_ID}', 'running', 0, 1)
     `);
 
-    await expect(
-      recordRuntimeRunLeaseAcquiredOutcome(database, {
-        ...leaseInput({ sessionRunId: OTHER_SESSION_RUN_ID }),
-      }),
-    ).resolves.toEqual({
-      reason: "run_scope_mismatch",
-      status: "rejected",
-      transition: "acquire",
-    });
-
-    const run = await database
-      .prepare(
-        `
-          SELECT driver_instance_id
-          FROM session_run
-          WHERE id = '${OTHER_SESSION_RUN_ID}'
-        `,
-      )
-      .first<{ driver_instance_id: string | null }>();
-
-    expect(run?.driver_instance_id).toBeNull();
-  });
-
-  test("rejects a driver outside the expected sandbox session scope", async () => {
-    const database = createRuntimeSubjectLeaseDatabase();
-
-    await expect(
-      recordRuntimeRunLeaseAcquiredOutcome(database, {
-        ...leaseInput(),
-        runtimeSubjectId: OTHER_SANDBOX_ID,
-      }),
-    ).resolves.toEqual({
-      reason: "driver_scope_mismatch",
-      status: "rejected",
-      transition: "acquire",
+    await expect(acquireRuntimeRunLease(driverLeased, leaseInput())).resolves.toEqual({
+      ok: false,
+      reason: "driver_already_leased",
+      retryable: true,
     });
   });
 
-  test("rejects inactive sandbox session leases", async () => {
+  test.each([
+    ["a missing run", "", MISSING_SESSION_RUN_ID],
+    [
+      "a terminal run",
+      `UPDATE session_run SET status = 'completed', status_seq = 1 WHERE id = '${SESSION_RUN_ID}'`,
+      SESSION_RUN_ID,
+    ],
+    [
+      "an inactive sandbox session",
+      `UPDATE sandbox_session SET status = 'closed' WHERE session_id = '${SESSION_ID}'`,
+      SESSION_RUN_ID,
+    ],
+    [
+      "a terminal driver that already holds the run",
+      `UPDATE driver_instance SET status = 'stopped' WHERE id = '${DRIVER_INSTANCE_ID}';
+       UPDATE session_run SET driver_instance_id = '${DRIVER_INSTANCE_ID}' WHERE id = '${SESSION_RUN_ID}'`,
+      SESSION_RUN_ID,
+    ],
+    [
+      "a run of another Session",
+      `INSERT INTO session_run (id, session_id, status, status_seq, updated_at)
+       VALUES ('${OTHER_SESSION_RUN_ID}', '01J0000000000000000000000P', 'running', 0, 1)`,
+      OTHER_SESSION_RUN_ID,
+    ],
+    [
+      "a driver in another sandbox",
+      `UPDATE driver_instance SET sandbox_id = '01J0000000000000000000000T' WHERE id = '${DRIVER_INSTANCE_ID}'`,
+      SESSION_RUN_ID,
+    ],
+    [
+      "a driver of another Session",
+      `UPDATE driver_instance SET sandbox_session_id = '01J0000000000000000000000P' WHERE id = '${DRIVER_INSTANCE_ID}'`,
+      SESSION_RUN_ID,
+    ],
+  ] as const)("fails without retry for %s", async (_name, change, sessionRunId) => {
     const database = createRuntimeSubjectLeaseDatabase();
-
-    database.execute(`
-      UPDATE sandbox_session
-      SET status = 'closed'
-      WHERE session_id = '${SESSION_ID}'
-    `);
+    if (change) database.execute(change);
 
     await expect(
-      recordRuntimeRunLeaseAcquiredOutcome(database, {
-        ...leaseInput(),
-      }),
-    ).resolves.toEqual({
-      reason: "sandbox_session_not_active",
-      status: "rejected",
-      transition: "acquire",
-    });
-  });
-
-  test("rejects terminal run leases", async () => {
-    const database = createRuntimeSubjectLeaseDatabase();
-
-    database.execute(`
-      UPDATE session_run
-      SET status = 'completed',
-          status_seq = 1
-      WHERE id = '${SESSION_RUN_ID}'
-    `);
-
-    await expect(
-      recordRuntimeRunLeaseAcquiredOutcome(database, {
-        ...leaseInput(),
-      }),
-    ).resolves.toEqual({
-      reason: "run_not_active",
-      status: "rejected",
-      transition: "acquire",
-    });
-  });
-
-  test("rejects duplicate leases on terminal drivers", async () => {
-    const database = createRuntimeSubjectLeaseDatabase();
-
-    database.execute(`
-      UPDATE driver_instance
-      SET status = 'stopped'
-      WHERE id = '${DRIVER_INSTANCE_ID}';
-
-      UPDATE session_run
-      SET driver_instance_id = '${DRIVER_INSTANCE_ID}'
-      WHERE id = '${SESSION_RUN_ID}';
-    `);
-
-    await expect(
-      recordRuntimeRunLeaseAcquiredOutcome(database, {
-        ...leaseInput(),
-      }),
-    ).resolves.toEqual({
-      reason: "driver_not_assignable",
-      status: "rejected",
-      transition: "acquire",
-    });
-  });
-
-  test("rejects leases on stopping drivers", async () => {
-    const database = createRuntimeSubjectLeaseDatabase();
-
-    database.execute(`
-      UPDATE driver_instance
-      SET status = 'stopping'
-      WHERE id = '${DRIVER_INSTANCE_ID}'
-    `);
-
-    await expect(
-      recordRuntimeRunLeaseAcquiredOutcome(database, {
-        ...leaseInput(),
-      }),
-    ).resolves.toEqual({
-      reason: "driver_not_assignable",
-      status: "rejected",
-      transition: "acquire",
-    });
+      acquireRuntimeRunLease(database, leaseInput({ sessionRunId })),
+    ).resolves.toMatchObject({ ok: false, retryable: false });
   });
 
   test("active lease unique constraint rejects two active runs on the same driver", () => {
@@ -463,26 +315,14 @@ describe("runtime subject run lease store", () => {
   test("does not release a lease for a different run", async () => {
     const database = createRuntimeSubjectLeaseDatabase();
 
-    await recordRuntimeRunLeaseAcquired(database, {
-      ...leaseInput(),
-    });
+    await acquireRuntimeRunLease(database, leaseInput());
 
     await expect(
-      recordRuntimeRunLeaseReleased(database, {
+      releaseRuntimeRunLease(database, {
         driverInstanceId: DRIVER_INSTANCE_ID,
         expectedSessionRunId: UNLINKED_SESSION_RUN_ID,
       }),
     ).resolves.toBe(false);
-    await expect(
-      recordRuntimeRunLeaseReleasedOutcome(database, {
-        driverInstanceId: DRIVER_INSTANCE_ID,
-        expectedSessionRunId: UNLINKED_SESSION_RUN_ID,
-      }),
-    ).resolves.toEqual({
-      reason: "lease_mismatch",
-      status: "stale",
-      transition: "release",
-    });
 
     const run = await database
       .prepare(

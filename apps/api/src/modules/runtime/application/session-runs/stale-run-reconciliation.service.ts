@@ -1,4 +1,4 @@
-import type { RunError, SessionRunStatus } from "@mosoo/contracts/session-run";
+import type { RunError } from "@mosoo/contracts/session-run";
 import { driverInstancesTable, sessionRunsTable } from "@mosoo/db";
 import type { DriverInstanceId, SessionId, SessionRunId } from "@mosoo/id";
 import { and, asc, desc, eq, inArray, isNull, lte, ne, notInArray, or, sql } from "drizzle-orm";
@@ -11,34 +11,22 @@ import {
   DRIVER_COLD_READY_TIMEOUT_MS,
   RUNTIME_SOCKET_TIMEOUT_MS,
 } from "../../domain/runtime-config";
+import { ACTIVE_SESSION_RUN_STATUSES } from "../../domain/session-run-lifecycle.machine";
 import { classifyReclaim } from "../../domain/session-run-reclaim-recovery";
-import { recordRuntimeRunLeaseReleasedOutcome } from "../../infrastructure/runtime-subject-lifecycle/runtime-run-lease-store";
+import { releaseRuntimeRunLease } from "../../infrastructure/runtime-subject-lifecycle/runtime-run-lease-store";
 import { setSessionRunStatus } from "../../infrastructure/session-runs/session-run-store.repository";
 
-export interface ActiveRunDriverRow {
+interface ActiveRunDriverRow {
   driver_error_message: string | null;
   driver_instance_id: DriverInstanceId | null;
-  driver_last_heartbeat_at: number | null;
   driver_status: string | null;
-  driver_updated_at: number | null;
   run_id: SessionRunId;
-  run_status: SessionRunStatus;
   session_id: SessionId;
-  run_trace_id: string | null;
-  run_updated_at: number;
 }
 
 export interface StaleActiveRunReconciliationResult {
   readonly reconciledRunIds: readonly SessionRunId[];
   readonly reconciledSessionIds: readonly SessionId[];
-}
-
-function latestRuntimeObservationMs(row: ActiveRunDriverRow): number {
-  return Math.max(
-    row.run_updated_at,
-    row.driver_updated_at ?? 0,
-    row.driver_last_heartbeat_at ?? 0,
-  );
 }
 
 function staleRunError(row: ActiveRunDriverRow): RunError {
@@ -56,35 +44,14 @@ function staleRunError(row: ActiveRunDriverRow): RunError {
   });
 }
 
-function shouldFailActiveRunAsStale(row: ActiveRunDriverRow, nowMs: number): boolean {
-  if (row.driver_status === "failed" || row.driver_status === "stopped") {
-    return true;
-  }
-
-  // Cold preparation restores the workspace before attaching a driver. It
-  // needs the same startup allowance as a driver waiting to connect.
-  const staleBeforeMs =
-    row.run_status === "booting" || row.driver_status === "connecting"
-      ? nowMs - DRIVER_COLD_READY_TIMEOUT_MS
-      : nowMs - RUNTIME_SOCKET_TIMEOUT_MS;
-  return latestRuntimeObservationMs(row) < staleBeforeMs;
-}
-
 const runDriverInstancesTable = alias(driverInstancesTable, "run_driver");
-
-const ACTIVE_SESSION_RUN_STATUSES = ["queued", "booting", "running", "waiting_input"] as const;
 
 function activeRunDriverColumns() {
   return {
     driver_error_message: runDriverInstancesTable.errorMessage,
     driver_instance_id: sessionRunsTable.driverInstanceId,
-    driver_last_heartbeat_at: runDriverInstancesTable.lastHeartbeatAt,
     driver_status: runDriverInstancesTable.status,
-    driver_updated_at: runDriverInstancesTable.updatedAt,
     run_id: sessionRunsTable.id,
-    run_status: sessionRunsTable.status,
-    run_trace_id: sessionRunsTable.traceId,
-    run_updated_at: sessionRunsTable.updatedAt,
     session_id: sessionRunsTable.sessionId,
   };
 }
@@ -98,6 +65,8 @@ function latestRuntimeObservationSql() {
 }
 
 function staleActiveRunPredicate(nowMs: number) {
+  // Cold preparation restores the workspace before attaching a driver. It
+  // needs the same startup allowance as a driver waiting to connect.
   return or(
     inArray(runDriverInstancesTable.status, ["failed", "stopped"]),
     and(
@@ -119,7 +88,7 @@ async function findStaleActiveRun(
   database: D1Database,
   sessionId: SessionId,
 ): Promise<ActiveRunDriverRow | null> {
-  const row =
+  return (
     (await getAppDatabase(database)
       .select(activeRunDriverColumns())
       .from(sessionRunsTable)
@@ -131,6 +100,7 @@ async function findStaleActiveRun(
         and(
           eq(sessionRunsTable.sessionId, sessionId),
           inArray(sessionRunsTable.status, ACTIVE_SESSION_RUN_STATUSES),
+          staleActiveRunPredicate(currentTimestampMs()),
         ),
       )
       .orderBy(
@@ -138,13 +108,8 @@ async function findStaleActiveRun(
         desc(sql`COALESCE(${runDriverInstancesTable.updatedAt}, 0)`),
       )
       .limit(1)
-      .get()) ?? null;
-
-  if (!row) {
-    return null;
-  }
-
-  return shouldFailActiveRunAsStale(row, currentTimestampMs()) ? row : null;
+      .get()) ?? null
+  );
 }
 
 async function findStaleActiveRuns(
@@ -181,22 +146,12 @@ async function failStaleActiveRun(database: D1Database, staleRun: ActiveRunDrive
     status: "failed",
   });
 
-  switch (outcome.kind) {
-    case "applied":
-    case "duplicate": {
-      await releaseStaleRunLease(database, staleRun);
-      return true;
-    }
-    case "repair_needed": {
-      throw new Error(
-        "Stale session run reconciliation left the session lifecycle projection stale.",
-      );
-    }
-    case "rejected":
-    case "stale": {
-      return false;
-    }
+  if (outcome.kind !== "applied" && outcome.kind !== "duplicate") {
+    return false;
   }
+
+  await releaseStaleRunLease(database, staleRun);
+  return true;
 }
 
 // Failing the run ends the lease, but only the release write re-arms the
@@ -210,18 +165,16 @@ async function releaseStaleRunLease(
     return;
   }
 
-  const outcome = await recordRuntimeRunLeaseReleasedOutcome(database, {
+  const released = await releaseRuntimeRunLease(database, {
     driverInstanceId: staleRun.driver_instance_id,
     expectedSessionRunId: staleRun.run_id,
   });
 
-  if (outcome.status !== "applied") {
+  if (!released) {
     logWarn("runtime.terminal.lease_release_skipped", {
       driverInstanceId: staleRun.driver_instance_id,
-      reason: "reason" in outcome ? outcome.reason : outcome.status,
       sessionRunId: staleRun.run_id,
       source: "stale_run_reconciliation",
-      status: outcome.status,
     });
   }
 }

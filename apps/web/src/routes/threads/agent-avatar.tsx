@@ -32,7 +32,7 @@ export function AgentAvatar({
   return (
     <span
       className={cn(
-        "bg-card text-fg-2 border-border-subtle flex shrink-0 items-center justify-center overflow-hidden rounded-md border font-bold",
+        "bg-card text-fg-2 border-border-soft flex shrink-0 items-center justify-center overflow-hidden rounded-md border font-bold",
         className ?? "size-5 text-[9px] font-bold",
       )}
     >

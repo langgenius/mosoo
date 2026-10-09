@@ -13,73 +13,32 @@ import { createSessionRuntimeEvent } from "../../../sessions/application/session
 import {
   finalizeSessionModelCallUsage,
   upsertSessionModelCallUsage,
-} from "../../../sessions/application/session-model-call.service";
+} from "../../../sessions/infrastructure/session-model-call.repository";
 import { persistSessionRuntimeEvents } from "../../../sessions/infrastructure/session-runtime-event-store.repository";
 import {
   discardUncommittedCompletionCheckpoint,
   prepareSessionRunCompletionCheckpoint,
 } from "../session-runs/session-run-completion-checkpoint";
-import { setSessionRunStatus } from "../session-runs/session-run-store.repository";
+import {
+  assertSessionRunTransition,
+  isStaleTerminalRunTransition,
+  setSessionRunStatus,
+} from "../session-runs/session-run-store.repository";
 import type { SessionRunTransitionOutcome } from "../session-runs/session-run-store.repository";
 import { persistAssistantMessageProjection } from "./assistant-message-projection";
 import { compactRuntimeDriverRunTransitions } from "./event-projection";
-import type {
-  ProjectRuntimeDriverEventsResult,
-  RuntimeDriverRunTransition,
-  RuntimeSessionLink,
-  SessionLiveState,
-} from "./event-types";
-import { hasTerminalRuntimeDriverRunTransition } from "./run-transitions";
-
-async function loadTerminalRunRelease() {
-  return import("./terminal-run-release");
-}
+import type { ProjectRuntimeDriverEventsResult, SessionLiveState } from "./event-types";
+import { releaseTerminalDriverInstanceSessionRun } from "./terminal-run-release";
 
 type DriverProjectedSessionRunStatusInput = Parameters<typeof setSessionRunStatus>[1];
-
-function assertDriverProjectedSessionRunTransition(outcome: SessionRunTransitionOutcome): void {
-  switch (outcome.kind) {
-    case "applied":
-    case "duplicate": {
-      return;
-    }
-    case "stale": {
-      if (outcome.reason === "terminal_run") {
-        return;
-      }
-      throw new Error("Driver run transition lost a concurrent status race.");
-    }
-    case "repair_needed": {
-      throw new Error("Driver run transition left the session lifecycle projection stale.");
-    }
-    case "rejected": {
-      throw new Error(`Driver run transition was rejected: ${outcome.reason}.`);
-    }
-  }
-}
 
 async function setDriverProjectedSessionRunStatus(
   database: D1Database,
   input: DriverProjectedSessionRunStatusInput,
 ): Promise<SessionRunTransitionOutcome> {
   const outcome = await setSessionRunStatus(database, input);
-  assertDriverProjectedSessionRunTransition(outcome);
+  assertSessionRunTransition(outcome, "Driver event");
   return outcome;
-}
-
-function isStaleTerminalRunTransition(outcome: SessionRunTransitionOutcome | null): boolean {
-  return outcome?.kind === "stale" && outcome.reason === "terminal_run";
-}
-
-function isMatchingStaleTerminalRunTransition(input: {
-  readonly outcome: SessionRunTransitionOutcome | null;
-  readonly transition: RuntimeDriverRunTransition | undefined;
-}): boolean {
-  if (input.outcome?.kind !== "stale" || input.outcome.reason !== "terminal_run") {
-    return true;
-  }
-
-  return input.transition !== undefined && input.outcome.currentStatus === input.transition.status;
 }
 
 function getRunDurationMs(outcome: SessionRunTransitionOutcome): number | null {
@@ -97,10 +56,10 @@ function getRunDurationMs(outcome: SessionRunTransitionOutcome): number | null {
 
 async function autoTitleRuntimeSession(
   database: D1Database,
-  link: RuntimeSessionLink,
+  link: ProjectRuntimeDriverEventsResult["link"],
   title: string,
 ): Promise<void> {
-  if (link.creatorId === null || link.sessionId === null) {
+  if (link.creatorId === null) {
     return;
   }
 
@@ -144,13 +103,6 @@ export async function persistProjectedRuntimeDriverEvents(
   const deferCompletedRunTransition = runTransition?.status === "completed";
   let runTransitionOutcome: SessionRunTransitionOutcome | null = null;
 
-  if (link.sessionId === null) {
-    return {
-      liveState: null,
-      persistedSourceEventIds: [],
-    };
-  }
-
   if (runTransition !== undefined && link.sessionRunId !== null && !deferCompletedRunTransition) {
     if (runTransition.status === "running") {
       runTransitionOutcome = await setDriverProjectedSessionRunStatus(database, {
@@ -174,18 +126,14 @@ export async function persistProjectedRuntimeDriverEvents(
     }
   }
 
-  const shouldReleaseDriverRun = hasTerminalRuntimeDriverRunTransition(transitions);
+  const shouldReleaseDriverRun = runTransition !== undefined && runTransition.status !== "running";
   let staleTerminalRunTransition = isStaleTerminalRunTransition(runTransitionOutcome);
 
   if (
     staleTerminalRunTransition &&
-    !isMatchingStaleTerminalRunTransition({
-      outcome: runTransitionOutcome,
-      transition: runTransition,
-    })
+    !isStaleTerminalRunTransition(runTransitionOutcome, runTransition?.status)
   ) {
     if (shouldReleaseDriverRun && link.sessionRunId !== null) {
-      const { releaseTerminalDriverInstanceSessionRun } = await loadTerminalRunRelease();
       await releaseTerminalDriverInstanceSessionRun(bindings, {
         driverInstanceId: input.driverInstanceId,
         sessionRunId: link.sessionRunId,
@@ -202,14 +150,16 @@ export async function persistProjectedRuntimeDriverEvents(
     await autoTitleRuntimeSession(database, link, projection.sessionTitle);
   }
 
-  const traceId = link.traceId ?? link.sessionRunId ?? link.sessionId;
-
   if (projection.usage && link.sessionRunId !== null) {
+    if (link.traceId === null) {
+      throw new Error("Runtime session link is missing the session run trace id.");
+    }
+
     await upsertSessionModelCallUsage(database, {
       driverInstanceId: input.driverInstanceId,
       sessionId: link.sessionId,
       sessionRunId: link.sessionRunId,
-      traceId,
+      traceId: link.traceId,
       usage: projection.usage,
     });
   }
@@ -251,13 +201,9 @@ export async function persistProjectedRuntimeDriverEvents(
 
     if (
       staleTerminalRunTransition &&
-      !isMatchingStaleTerminalRunTransition({
-        outcome: runTransitionOutcome,
-        transition: runTransition,
-      })
+      !isStaleTerminalRunTransition(runTransitionOutcome, runTransition?.status)
     ) {
       if (shouldReleaseDriverRun) {
-        const { releaseTerminalDriverInstanceSessionRun } = await loadTerminalRunRelease();
         await releaseTerminalDriverInstanceSessionRun(bindings, {
           driverInstanceId: input.driverInstanceId,
           sessionRunId: link.sessionRunId,
@@ -274,7 +220,6 @@ export async function persistProjectedRuntimeDriverEvents(
   if (
     completedTransition !== undefined &&
     projection.finalAssistantMessage !== null &&
-    nextLiveState !== null &&
     link.sessionRunId !== null &&
     nextLiveState.run.id === link.sessionRunId
   ) {
@@ -342,18 +287,13 @@ export async function persistProjectedRuntimeDriverEvents(
   });
   persistedSourceEventIds.push(...persistedTerminalEvents.persistedSourceEventIds);
 
-  let committedLiveState: SessionLiveState | null = null;
-
-  if (projection.liveStateChanged && nextLiveState !== null) {
-    committedLiveState = nextLiveState;
-  }
+  const committedLiveState = projection.liveStateChanged ? nextLiveState : null;
 
   if (
     runTransition === undefined &&
     !staleTerminalRunTransition &&
     link.sessionRunId !== null &&
     projection.liveStateChanged &&
-    nextLiveState !== null &&
     nextLiveState.run.id === link.sessionRunId &&
     nextLiveState.run.status === "waiting_input"
   ) {
@@ -388,7 +328,6 @@ export async function persistProjectedRuntimeDriverEvents(
   }
 
   if (shouldReleaseDriverRun && link.sessionRunId !== null) {
-    const { releaseTerminalDriverInstanceSessionRun } = await loadTerminalRunRelease();
     await releaseTerminalDriverInstanceSessionRun(bindings, {
       driverInstanceId: input.driverInstanceId,
       sessionRunId: link.sessionRunId,

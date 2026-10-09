@@ -177,7 +177,6 @@ describe("cost project queries", () => {
       totalCostUsd: 11,
     });
     const input = {
-      organizationId: ORGANIZATION_ID,
       projectId: PROJECT_ONE_ID,
       window: resolveCostWindow("LAST_30_DAYS", new Date(Date.UTC(2026, 4, 21, 12))),
     };
@@ -197,35 +196,15 @@ describe("cost project queries", () => {
     const database = await createCostQueryDatabase();
     const window = resolveCostWindow("LAST_30_DAYS", new Date(Date.UTC(2026, 4, 21, 12)));
 
-    const [projectTotals, organizationTotals, projectAgents, projectModels] = await Promise.all([
-      queryTotals(database, {
-        organizationId: ORGANIZATION_ID,
-        projectId: PROJECT_ONE_ID,
-        window,
-      }),
-      queryTotals(database, {
-        organizationId: ORGANIZATION_ID,
-        window,
-      }),
-      queryAgents(database, {
-        organizationId: ORGANIZATION_ID,
-        projectId: PROJECT_ONE_ID,
-        window,
-      }),
-      queryModels(database, {
-        organizationId: ORGANIZATION_ID,
-        projectId: PROJECT_ONE_ID,
-        window,
-      }),
+    const [projectTotals, projectAgents, projectModels] = await Promise.all([
+      queryTotals(database, { projectId: PROJECT_ONE_ID, window }),
+      queryAgents(database, { projectId: PROJECT_ONE_ID, window }),
+      queryModels(database, { projectId: PROJECT_ONE_ID, window }),
     ]);
 
     expect(projectTotals).toMatchObject({
       requestCount: 1,
       totalCostUsd: 2,
-    });
-    expect(organizationTotals).toMatchObject({
-      requestCount: 2,
-      totalCostUsd: 7,
     });
     expect(projectAgents.map((agent) => agent.agentId)).toEqual([PROJECT_ONE_AGENT_ID]);
     expect(projectModels).toHaveLength(1);

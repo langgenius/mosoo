@@ -11,7 +11,7 @@ import type { PersonalAccessTokenId, ProjectId } from "@mosoo/id";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
-import { forbiddenError, validationError } from "../../../platform/errors";
+import { validationError } from "../../../platform/errors";
 import { toBase64Url } from "../../../shared/bytes";
 import { isTruthy } from "../../../shared/truthiness";
 import { currentTimestampMs, toIsoString } from "../../../time";
@@ -94,7 +94,6 @@ export async function listPersonalAccessTokens(
   viewer: AuthenticatedViewer,
   projectId: ProjectId,
 ): Promise<PersonalAccessTokenListResponse> {
-  if (viewer.projectId !== undefined) throw forbiddenError();
   await ensureProjectOwnership(database, viewer.id, projectId);
   const results = await getAppDatabase(database)
     .select({
@@ -127,7 +126,6 @@ async function createToken(
   input: CreatePersonalAccessTokenRequest,
   projectId: ProjectId | null,
 ): Promise<CreatePersonalAccessTokenResponse> {
-  if (viewer.projectId !== undefined) throw forbiddenError();
   const label = normalizeTokenLabel(input.label);
   const tokenValue = createTokenValue(projectId);
   const tokenHash = await hashTokenValue(tokenValue);
@@ -176,7 +174,6 @@ export async function createProjectApiKey(
   viewer: AuthenticatedViewer,
   input: CreateProjectApiKeyRequest,
 ): Promise<CreatePersonalAccessTokenResponse> {
-  if (viewer.projectId !== undefined) throw forbiddenError();
   await ensureProjectOwnership(database, viewer.id, input.projectId);
   return createToken(database, viewer, input, input.projectId);
 }
@@ -186,26 +183,7 @@ export async function revokePersonalAccessToken(
   viewer: AuthenticatedViewer,
   tokenId: PersonalAccessTokenId,
 ): Promise<void> {
-  if (viewer.projectId !== undefined) throw forbiddenError();
   const timestampMs = currentTimestampMs();
-  const token =
-    (await getAppDatabase(database)
-      .select({
-        id: personalAccessTokensTable.id,
-      })
-      .from(personalAccessTokensTable)
-      .where(
-        and(
-          eq(personalAccessTokensTable.id, tokenId),
-          eq(personalAccessTokensTable.accountId, viewer.id),
-        ),
-      )
-      .limit(1)
-      .get()) ?? null;
-
-  if (!token) {
-    return;
-  }
 
   await getAppDatabase(database)
     .update(personalAccessTokensTable)
@@ -222,6 +200,7 @@ export async function revokePersonalAccessToken(
     .run();
 }
 
+/** Project keys rely on mint-time ownership checks because Projects never change owner. */
 export async function authenticatePersonalAccessToken(
   database: D1Database,
   tokenValue: string,
@@ -254,17 +233,8 @@ export async function authenticatePersonalAccessToken(
       .limit(1)
       .get()) ?? null;
 
-  if (
-    !row ||
-    (tokenValue.startsWith(PROJECT_TOKEN_PREFIX)
-      ? row.project_id === null
-      : row.project_id !== null)
-  ) {
+  if (!row) {
     return null;
-  }
-
-  if (row.project_id !== null) {
-    await ensureProjectOwnership(database, row.account_id, row.project_id);
   }
 
   const timestampMs = currentTimestampMs();

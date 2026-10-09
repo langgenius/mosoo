@@ -1,6 +1,6 @@
-import type { AccountId, ProjectId, SkillId, SkillSnapshotId } from "../id/id.contract";
+import type { AccountId, ProjectId, SkillId, SkillSnapshotId } from "@mosoo/id";
 
-export type SkillSourceKind = "official" | "user";
+export type SkillSourceKind = "user";
 export type SkillSnapshotEntryKind = "directory" | "file";
 export type SkillResolutionMode = "auto" | "explicit" | "tombstone";
 export type SkillMaterializationStatus = "failed" | "pending" | "ready" | "skipped";
@@ -50,7 +50,6 @@ export interface SkillSummary {
   ownerName: string;
   projectId: ProjectId;
   snapshotId: SkillSnapshotId;
-  sourceKind: SkillSourceKind;
   updatedAt: string;
 }
 

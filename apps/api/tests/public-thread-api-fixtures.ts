@@ -96,20 +96,6 @@ export async function requestPublicApiWithBindings(
   );
 }
 
-export async function withProviderProbeMock<T>(operation: () => Promise<T>): Promise<T> {
-  const originalFetch = globalThis.fetch;
-  globalThis.fetch = async () =>
-    Response.json({
-      data: [{ id: "gpt-5.4" }],
-    });
-
-  try {
-    return await operation();
-  } finally {
-    globalThis.fetch = originalFetch;
-  }
-}
-
 const RUNTIME_EVENT_IDS_BY_SEQ = [
   "01J00000000000000000000010",
   "01J00000000000000000000011",
@@ -146,7 +132,7 @@ export async function insertRuntimeEvent(
   const runId = input.runId ?? null;
   const visibility = input.visibility ?? "participant";
   const databaseVisibility: SessionRuntimeEventVisibility =
-    visibility === "public" || visibility === "participant" ? "all_consumers" : "owner_debug";
+    visibility === "participant" ? "all_consumers" : "owner_debug";
   const eventId = runtimeEventIdForSeq(input.seq);
   const event = createRuntimeEvent({
     actor: "driver",
@@ -187,6 +173,12 @@ export async function insertRuntimeEvent(
       traceId: null,
       visibility: databaseVisibility,
     })
+    .run();
+  await database
+    .prepare(
+      "UPDATE session SET runtime_event_seq_cursor = max(runtime_event_seq_cursor, ?) WHERE id = ?",
+    )
+    .bind(input.seq, input.sessionId)
     .run();
 }
 

@@ -1,4 +1,4 @@
-import type { FileControlError } from "../../../modules/files/application/file-control-errors";
+import type { FileControlError } from "../../../modules/files/application/file-store";
 import type { PublicApiError } from "../../../modules/public-api/public-api-errors";
 import {
   publicForbidden,

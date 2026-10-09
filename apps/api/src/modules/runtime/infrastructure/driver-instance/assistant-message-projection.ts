@@ -17,7 +17,7 @@ import type {
   SessionLiveStateMessage,
   SessionViewSegment,
 } from "../../../sessions/application/session-live-state.service";
-import { insertSessionMessage } from "../../../sessions/application/session-message-write.service";
+import { insertSessionMessage } from "../../../sessions/infrastructure/session-message-store.repository";
 
 function toSessionMessageSegments(segments: SessionViewSegment[]): SessionMessageSegment[] {
   const result: SessionMessageSegment[] = [];

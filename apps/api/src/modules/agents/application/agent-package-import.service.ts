@@ -28,19 +28,14 @@ import {
   resolvePackageEnvironment,
   resolvePackageSkills,
 } from "./agent-package-resolution.service";
-import { readFileId, readProjectId } from "./agent-platform-ids";
 import { assertRuntimeAdvancedSettings } from "./runtime-advanced-settings-validation.service";
 export async function importAgentPackage(
   bindings: ApiBindings,
   viewer: AuthenticatedViewer,
   input: ImportAgentPackageInput,
 ): Promise<AgentPackageImportResult<Agent>> {
-  const fileId = readFileId(input.fileId, "Agent package file ID");
-  const project = await ensureProjectOwnership(
-    bindings.DB,
-    viewer.id,
-    readProjectId(input.projectId),
-  );
+  const { fileId } = input;
+  const project = await ensureProjectOwnership(bindings.DB, viewer.id, input.projectId);
   const packageFile = await readAgentPackageArchiveFile({
     bindings,
     fileId,
@@ -67,9 +62,7 @@ export async function importAgentPackage(
     settings: manifest.runtime.providerOptions,
   });
   issues.push(...collectPackageDeclarationIssues(parsed.package));
-  issues.push(
-    ...(await collectRuntimeResolutionIssues(bindings.DB, viewer.id, project.id, manifest)),
-  );
+  issues.push(...(await collectRuntimeResolutionIssues(bindings.DB, project.id, manifest)));
 
   const [skillResolution, environmentId, mcpServerIds] = await Promise.all([
     resolvePackageSkills({

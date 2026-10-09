@@ -1,4 +1,4 @@
-import type { CostAttributionCard } from "./cost-model";
+import type { CostAttributionCard } from "@/domains/cost/api/cost-client";
 
 type TranslateFn = (key: string, variables?: Record<string, string>) => string;
 
@@ -15,15 +15,24 @@ export function downloadCsv(filename: string, rows: string[][]) {
   URL.revokeObjectURL(url);
 }
 
-function attributionCsvRows(label: string, card: CostAttributionCard, t: TranslateFn): string[][] {
-  return [
-    [label, "summary", "total_cost", "", String(card.totals.totalCostUsd), ""],
-    [label, "summary", "requests", "", "", String(card.totals.requestCount)],
-    [label, "summary", "input_tokens", "", "", String(card.totals.inputTokens)],
-    [label, "summary", "output_tokens", "", "", String(card.totals.outputTokens)],
-    [label, "summary", "cache_read_tokens", "", "", String(card.totals.cacheReadTokens)],
+export function exportAttributionCostCsv(
+  filename: string,
+  card: CostAttributionCard | undefined,
+  t: TranslateFn,
+) {
+  if (!card) {
+    return;
+  }
+
+  downloadCsv(filename, [
+    ["scope", "kind", "name", "secondary", "cost", "quantity"],
+    ["cost", "summary", "total_cost", "", String(card.totals.totalCostUsd), ""],
+    ["cost", "summary", "requests", "", "", String(card.totals.requestCount)],
+    ["cost", "summary", "input_tokens", "", "", String(card.totals.inputTokens)],
+    ["cost", "summary", "output_tokens", "", "", String(card.totals.outputTokens)],
+    ["cost", "summary", "cache_read_tokens", "", "", String(card.totals.cacheReadTokens)],
     ...card.agents.map((agent) => [
-      label,
+      "cost",
       "agent",
       agent.agentName,
       agent.ownerName,
@@ -31,7 +40,7 @@ function attributionCsvRows(label: string, card: CostAttributionCard, t: Transla
       t("cost.csvRequests", { count: String(agent.requestCount) }),
     ]),
     ...card.models.map((model) => [
-      label,
+      "cost",
       "model",
       model.vendor,
       model.model,
@@ -41,20 +50,5 @@ function attributionCsvRows(label: string, card: CostAttributionCard, t: Transla
         unpriced: String(model.unpricedRequestCount),
       }),
     ]),
-  ];
-}
-
-export function exportAttributionCostCsv(
-  filename: string,
-  card: CostAttributionCard | undefined,
-  t: TranslateFn = (key) => key,
-) {
-  if (!card) {
-    return;
-  }
-
-  downloadCsv(filename, [
-    ["scope", "kind", "name", "secondary", "cost", "quantity"],
-    ...attributionCsvRows("cost", card, t),
   ]);
 }

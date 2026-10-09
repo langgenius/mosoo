@@ -1,12 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
-import {
-  getViewer,
-  setSystemAgentModel,
-  updateProfile,
-} from "../src/modules/users/application/viewer-context.service";
-import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
+import { getViewer, updateProfile } from "../src/modules/users/application/viewer-context.service";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
 const VIEWER: AuthenticatedViewer = {
@@ -65,7 +60,6 @@ function createViewerContextDatabase(): SqliteD1Database {
 	    )
 	    VALUES
 	      ('01J00000000000000000000006', 'First Org', NULL, 'account-1', 1, 1),
-	      ('org-2', 'Second Org', NULL, 'account-1', 2, 2),
 	      ('org-other-owner', 'Other Owner Org', NULL, 'other-owner', 3, 3);
 
   `);
@@ -81,11 +75,11 @@ describe("viewer organization context", () => {
       name: "Updated Viewer",
     });
 
-    expect(account).toMatchObject({
+    expect(account).toEqual({
       email: "viewer@example.com",
       id: "account-1",
+      imageUrl: null,
       name: "Updated Viewer",
-      systemAgentModel: null,
     });
   });
 
@@ -155,66 +149,15 @@ describe("viewer organization context", () => {
     expect(stored?.name).toBe("Renamed");
   });
 
-  test("builds the viewer payload with owner organizations", async () => {
+  test("builds the viewer payload with the owned organization", async () => {
     const database = createViewerContextDatabase();
 
-    const viewer = await getViewer(database, {} as ApiBindings, VIEWER);
+    const viewer = await getViewer(database, VIEWER);
 
     expect(viewer.activeOrganization?.id).toBe("01J00000000000000000000006");
     expect(viewer.organizations.map((organization) => organization.id)).toEqual([
-      "org-2",
       "01J00000000000000000000006",
     ]);
-    expect(viewer.organizations).not.toContainEqual(
-      expect.objectContaining({ id: "org-other-owner" }),
-    );
-  });
-
-  test("builds the viewer payload with account settings", async () => {
-    const database = createViewerContextDatabase();
-    database.execute(`
-      UPDATE account
-      SET system_agent_model = '{"vendor":"openai","modelId":"model-1"}'
-      WHERE id = 'account-1';
-    `);
-
-    const viewer = await getViewer(database, {} as ApiBindings, VIEWER);
-
-    expect(viewer.account?.systemAgentModel).toEqual({
-      modelId: "model-1",
-      vendor: "openai",
-    });
-  });
-
-  test("updates the System Agent model setting", async () => {
-    const database = createViewerContextDatabase();
-
-    const account = await setSystemAgentModel(database, VIEWER, {
-      modelId: " gpt-5.5 ",
-      vendor: " openai ",
-    });
-
-    expect(account.systemAgentModel).toEqual({
-      modelId: "gpt-5.5",
-      vendor: "openai",
-    });
-
-    const viewer = await getViewer(database, {} as ApiBindings, VIEWER);
-    expect(viewer.account?.systemAgentModel).toEqual({
-      modelId: "gpt-5.5",
-      vendor: "openai",
-    });
-  });
-
-  test("rejects an empty System Agent model setting", async () => {
-    const database = createViewerContextDatabase();
-
-    await expect(
-      setSystemAgentModel(database, VIEWER, {
-        modelId: " ",
-        vendor: "openai",
-      }),
-    ).rejects.toThrow("System Agent model and provider are required.");
   });
 
   test("reads the account name and image from the database, not the session", async () => {
@@ -227,7 +170,7 @@ describe("viewer organization context", () => {
 
     // Session viewer is intentionally stale (e.g. better-auth cookie cache).
     const staleViewer = { ...VIEWER, imageUrl: null, name: "Stale Name" };
-    const viewer = await getViewer(database, {} as ApiBindings, staleViewer);
+    const viewer = await getViewer(database, staleViewer);
 
     expect(viewer.account?.imageUrl).toBe("https://cdn.example.com/fresh.png");
     expect(viewer.account?.name).toBe("Fresh Name");

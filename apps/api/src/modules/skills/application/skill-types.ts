@@ -1,4 +1,3 @@
-import type { SkillSummary } from "@mosoo/contracts/skill";
 import type { AccountId, ProjectId, SkillId, SkillSnapshotId } from "@mosoo/id";
 
 export interface SkillRegistryRow {
@@ -14,7 +13,6 @@ export interface SkillRegistryRow {
   name: string;
   ownerId: AccountId;
   ownerName: string | null;
-  sourceKind: SkillSummary["sourceKind"];
   updatedAt: number;
   projectId: ProjectId;
 }

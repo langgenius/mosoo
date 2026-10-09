@@ -1,5 +1,4 @@
 import { getSessionOrganizationPath } from "@mosoo/agent-driver/paths";
-import { getAgentBuiltInToolSupportError } from "@mosoo/contracts/agent";
 import type { PresetModelProtocol } from "@mosoo/contracts/models";
 import type { SessionSummary } from "@mosoo/contracts/session";
 import type { UserWarning } from "@mosoo/contracts/session-run";
@@ -9,7 +8,6 @@ import { createPlatformId } from "@mosoo/id";
 import type {
   AccountId,
   AgentId,
-  PlatformId,
   ProjectId,
   SandboxId,
   SandboxSessionId,
@@ -21,7 +19,6 @@ import {
   getRuntimeCatalogVendorForProvider,
   resolveRuntimeModelProtocol,
 } from "@mosoo/runtime-catalog";
-import { RUNTIME_DIAGNOSTIC_EVENT } from "@mosoo/runtime-events";
 import { eq } from "drizzle-orm";
 
 import { runtimeImagesEnabled } from "../../../../platform/cloudflare/sandbox-binding";
@@ -44,37 +41,18 @@ import {
 import { resolveReadyEnvironmentPackageArtifact } from "../../../environments/application/environment-package-artifact.service";
 import { resolveEnvironmentSetupScriptForExecution } from "../../../environments/application/environment-runtime-snapshot";
 import { resolveRuntimeMcpServersForSnapshot } from "../../../mcp/application/mcp-runtime.service";
-import { resolveVendorCredentialRef } from "../../../vendor-credentials/application/vendor-credential.service";
+import { resolveVendorCredentialRef } from "../../../vendor-credentials/application/vendor-credential.secret-resolution";
 import type {
-  DriverNetworkProfile,
-  DriverProfileConfig,
   DriverSkillCatalogEntry,
   DriverVendorCredentialProfile,
 } from "../../domain/driver-snapshot";
 import { getSupportedRuntimeId } from "../../domain/runtime-config";
-import { parseEnvironmentAllowedHosts } from "../../domain/sandbox-network-constraints";
-import {
-  ensureRuntimeSubjectId,
-  getRuntimeConversationSession,
-} from "../../infrastructure/runtime-subject-lifecycle/runtime-subject-store";
+import { getRuntimeConversationSession } from "../../infrastructure/runtime-subject-lifecycle/runtime-conversation-session-store";
+import { ensureRuntimeSubjectId } from "../../infrastructure/runtime-subject-lifecycle/runtime-subject-record-store";
 import { createAgentRuntimeProfile } from "../agent-runtime-profile";
-import {
-  appendRuntimeDiagnosticEvent,
-  toRuntimeDiagnosticBaseValue,
-  toRuntimeDiagnosticReason,
-} from "../runtime-diagnostic-events";
 import { getSessionExecutionPlan } from "./session-execution.repository";
 import type { HydratedSessionRunContext, SessionExecutionPlan } from "./session-execution.types";
 import { resolveSessionSkillReferences } from "./session-skill-reference-resolution.service";
-import { buildSnapshotAgentEnvironment } from "./session-snapshot-hydration";
-
-interface HydratedRunContextCacheEntry {
-  expiresAtMs: number;
-  value: HydratedSessionRunContext;
-}
-
-const HYDRATED_RUN_CONTEXT_CACHE_TTL_MS = 20_000;
-const hydratedRunContextCache = new Map<string, HydratedRunContextCacheEntry>();
 
 async function resolveSessionExecutionConfiguration(input: {
   database: D1Database;
@@ -111,7 +89,7 @@ async function resolveSessionExecutionConfiguration(input: {
     if (input.plan.binding.agentId === null) {
       throw new Error("A direct Session requires its frozen execution configuration.");
     }
-    const { agent } = await ensureProjectAgentOwner(input.database, accessViewer.id, {
+    const agent = await ensureProjectAgentOwner(input.database, accessViewer.id, {
       agentId: input.plan.binding.agentId,
       projectId: authority.projectId,
     });
@@ -131,13 +109,6 @@ async function resolveSessionExecutionConfiguration(input: {
     executionOwnerUserId: authority.ownerAccountId,
     storedConfig: parseAgentStoredConfig(configJson),
   };
-}
-
-function assertSessionToolSupport(plan: SessionExecutionPlan): void {
-  const message = getAgentBuiltInToolSupportError(plan.binding.runtimeId, plan.builtInTools);
-  if (message !== null) {
-    throw validationError(`Agent is not ready to run: ${message}`, "AGENT_SESSION_NOT_READY");
-  }
 }
 
 function resolveSessionModelProtocol(
@@ -217,66 +188,7 @@ async function resolveRuntimeProfileIds(
   };
 }
 
-function getHydratedRunContextCacheKey(input: {
-  accessViewerId?: PlatformId;
-  sessionId: SessionId;
-  viewerId: PlatformId;
-}): string {
-  return [input.sessionId, input.viewerId, input.accessViewerId ?? input.viewerId].join(":");
-}
-
-function readHydratedRunContextCache(
-  cacheKey: string,
-  nowMs: number,
-): HydratedSessionRunContext | null {
-  const entry = hydratedRunContextCache.get(cacheKey);
-
-  if (!entry) {
-    return null;
-  }
-
-  if (entry.expiresAtMs <= nowMs) {
-    hydratedRunContextCache.delete(cacheKey);
-    return null;
-  }
-
-  return entry.value;
-}
-
-function writeHydratedRunContextCache(
-  cacheKey: string,
-  value: HydratedSessionRunContext,
-  nowMs: number,
-): void {
-  hydratedRunContextCache.set(cacheKey, {
-    expiresAtMs: nowMs + HYDRATED_RUN_CONTEXT_CACHE_TTL_MS,
-    value: sanitizeHydratedRunContextForCache(value),
-  });
-}
-
-function sanitizeHydratedRunContextForCache(
-  value: HydratedSessionRunContext,
-): HydratedSessionRunContext {
-  return {
-    ...value,
-    mcpServers: [],
-    profile: {
-      ...value.profile,
-      envVarNames: [],
-      envVars: {},
-    },
-  };
-}
-
-export function toDriverNetworkProfile(input: {
-  environment: { allowedHostsJson: string; networkPolicy: DriverNetworkProfile["networkPolicy"] };
-}): DriverNetworkProfile {
-  return {
-    environmentAllowedHosts: parseEnvironmentAllowedHosts(input.environment.allowedHostsJson),
-    networkPolicy: input.environment.networkPolicy,
-  };
-}
-async function hydrateRunContextFromSession(
+export async function hydrateRunContextFromSession(
   bindings: ApiBindings,
   viewer: AuthenticatedViewer,
   session: Pick<SessionSummary, "id"> & {
@@ -285,7 +197,6 @@ async function hydrateRunContextFromSession(
   },
 ): Promise<HydratedSessionRunContext> {
   const executionPlan = await getSessionExecutionPlan(bindings.DB, session.id);
-  assertSessionToolSupport(executionPlan);
   const binding = {
     ...executionPlan.binding,
     sessionId: session.id,
@@ -312,9 +223,6 @@ async function hydrateRunContextFromSession(
   const toolReferences = executionPlan.tools.toSorted(
     (left, right) => left.sortOrder - right.sortOrder,
   );
-  const snapshotEnvironment = buildSnapshotAgentEnvironment({
-    environmentId: environmentSnapshot.environmentId,
-  });
   const skillMountRoot = `${getSessionOrganizationPath(session.id)}/.mosoo/skill`;
 
   const resolvedSkillReferences = await resolveSessionSkillReferences({
@@ -330,13 +238,10 @@ async function hydrateRunContextFromSession(
     warnings.push(...resolvedSkillReference.warnings);
   }
 
-  const catalogEntry = getRuntimeCatalogEntry(runtimeId);
-
-  if (catalogEntry === null) {
-    throw new Error(`Unsupported runtime: ${runtimeId}.`);
-  }
-
-  const vendor = getRuntimeCatalogVendorForProvider(catalogEntry, binding.provider);
+  const vendor = getRuntimeCatalogVendorForProvider(
+    getRuntimeCatalogEntry(runtimeId)!,
+    binding.provider,
+  );
 
   if (!vendor) {
     throw new Error(`Runtime ${binding.runtimeId} does not declare vendor ${binding.provider}.`);
@@ -345,15 +250,11 @@ async function hydrateRunContextFromSession(
   const [vendorCredential, envVars, environmentArtifact, setupScript] = await Promise.all([
     resolveVendorCredentialRef({
       bindings,
-      executionOwnerUserId,
       options: { modelId: binding.model },
       projectId: session.projectId,
       vendorId: vendor.vendorId,
     }),
-    decryptEnvironmentVariables(bindings, {
-      environmentId: environmentSnapshot.environmentId,
-      envVars: parseStoredEnvVarsJson(environmentSnapshot.envVarsJson),
-    }),
+    decryptEnvironmentVariables(bindings, parseStoredEnvVarsJson(environmentSnapshot.envVarsJson)),
     resolveReadyEnvironmentPackageArtifact(
       bindings,
       session.projectId,
@@ -363,32 +264,14 @@ async function hydrateRunContextFromSession(
   ]);
 
   if (!vendorCredential) {
-    await appendRuntimeDiagnosticEvent(bindings, {
-      eventName: RUNTIME_DIAGNOSTIC_EVENT.configCredentialMissing.name,
-      sessionId: session.id,
-      value: {
-        ...toRuntimeDiagnosticBaseValue({
-          agentId: binding.agentId,
-          sessionId: session.id,
-        }),
-        provider: binding.provider,
-        reason: "no_active_key",
-      },
-    });
     throw new Error(`No credential available for ${vendor.label}. Configure in Providers.`);
   }
 
-  let profile: DriverProfileConfig;
   const modelProtocol = resolveSessionModelProtocol(executionPlan, vendorCredential);
-  // No `bindings` here on purpose: passing them makes readiness run a live
-  // provider probe (GET /models plus a possible POST /chat/completions, 10s
-  // timeout each) on the first-token critical path. D1-backed checks still
-  // gate the run; broken credentials surface from the actual model call.
-  // Config/publish readiness callers keep the live probe.
-  const agentReadiness = await computeAgentReadiness(bindings.DB, executionOwnerUserId, {
+  const agentReadiness = await computeAgentReadiness(bindings.DB, {
     agentId: binding.agentId,
     builtInTools: executionPlan.builtInTools,
-    environment: snapshotEnvironment,
+    environment: { environmentId: environmentSnapshot.environmentId },
     mcpServerIds: toolReferences.map((reference) => reference.serverId),
     model: binding.model,
     packageResolution: storedConfig.packageResolution,
@@ -412,161 +295,6 @@ async function hydrateRunContextFromSession(
     sessionId: session.id,
   });
 
-  try {
-    profile = createAgentRuntimeProfile({
-      agentId: binding.agentId,
-      sandboxSessionId: runtimeProfileIds.sandboxSessionId,
-      callerUserId: viewer.id,
-      configRevision: {
-        agentId: binding.agentId,
-        deploymentVersionId: binding.deploymentVersionId,
-        deploymentVersionNumber: binding.deploymentVersionNumber,
-        environmentId: environmentSnapshot.environmentId,
-        environmentRevisionId: environmentSnapshot.revisionId,
-        runId: null,
-        sessionId: session.id,
-      },
-      envVars,
-      environmentArtifact,
-      executionOwnerUserId,
-      model: binding.model,
-      modelProtocol,
-      network: toDriverNetworkProfile({
-        environment: environmentSnapshot,
-      }),
-      prompt: binding.prompt,
-      provider: binding.provider,
-      providerOptions: storedConfig.providerOptions,
-      readiness: agentReadiness,
-      runtimeId,
-      sandboxId: runtimeProfileIds.sandboxId,
-      sessionId: session.id,
-      setupScript,
-      vendorCredential,
-    });
-  } catch (error) {
-    await appendRuntimeDiagnosticEvent(bindings, {
-      eventName: RUNTIME_DIAGNOSTIC_EVENT.configManifestRenderFailed.name,
-      sessionId: session.id,
-      value: {
-        ...toRuntimeDiagnosticBaseValue({
-          agentId: binding.agentId,
-          sessionId: session.id,
-        }),
-        fieldPath: "runtimeProfile",
-        reason: toRuntimeDiagnosticReason(error, "Runtime manifest render failed."),
-      },
-    });
-    throw error;
-  }
-  const mcpServers = await resolveRuntimeMcpServersForSnapshot(bindings, {
-    projectId: session.projectId,
-    agentId: binding.agentId,
-    bindings: toolReferences.map((reference) => ({
-      agentCredentialId: reference.agentCredentialId,
-      credentialMode: reference.credentialMode,
-      enabled: true,
-      serverId: reference.serverId,
-      sortOrder: reference.sortOrder,
-    })),
-    callerUserId: viewer.id,
-    executionOwnerUserId,
-  });
-
-  return {
-    builtInTools: executionPlan.builtInTools,
-    mcpServers,
-    profile,
-    skillCatalog,
-    skills,
-    warnings,
-  };
-}
-
-async function refreshCachedRunContextVolatileFields(
-  bindings: ApiBindings,
-  viewer: AuthenticatedViewer,
-  session: Pick<SessionSummary, "id"> & {
-    accessViewer?: AuthenticatedViewer;
-    projectId: ProjectId;
-  },
-  cached: HydratedSessionRunContext,
-): Promise<HydratedSessionRunContext> {
-  const executionPlan = await getSessionExecutionPlan(bindings.DB, session.id);
-  assertSessionToolSupport(executionPlan);
-  const binding = {
-    ...executionPlan.binding,
-    sessionId: session.id,
-  };
-  const runtimeId = getSupportedRuntimeId(binding.runtimeId);
-
-  if (runtimeId === null) {
-    throw new Error(`Unsupported runtime: ${binding.runtimeId}.`);
-  }
-
-  const { executionOwnerUserId, storedConfig } = await resolveSessionExecutionConfiguration({
-    database: bindings.DB,
-    plan: executionPlan,
-    session,
-    viewer,
-  });
-  const catalogEntry = getRuntimeCatalogEntry(runtimeId);
-
-  if (catalogEntry === null) {
-    throw new Error(`Unsupported runtime: ${runtimeId}.`);
-  }
-
-  const vendor = getRuntimeCatalogVendorForProvider(catalogEntry, binding.provider);
-
-  if (!vendor) {
-    throw new Error(`Runtime ${binding.runtimeId} does not declare vendor ${binding.provider}.`);
-  }
-
-  const environmentSnapshot = executionPlan.environment;
-  const toolReferences = executionPlan.tools.toSorted(
-    (left, right) => left.sortOrder - right.sortOrder,
-  );
-  const [vendorCredential, envVars, mcpServers] = await Promise.all([
-    resolveVendorCredentialRef({
-      bindings,
-      executionOwnerUserId,
-      options: { modelId: binding.model },
-      projectId: session.projectId,
-      vendorId: vendor.vendorId,
-    }),
-    decryptEnvironmentVariables(bindings, {
-      environmentId: environmentSnapshot.environmentId,
-      envVars: parseStoredEnvVarsJson(environmentSnapshot.envVarsJson),
-    }),
-    toolReferences.length > 0
-      ? resolveRuntimeMcpServersForSnapshot(bindings, {
-          projectId: session.projectId,
-          agentId: binding.agentId,
-          bindings: toolReferences.map((reference) => ({
-            agentCredentialId: reference.agentCredentialId,
-            credentialMode: reference.credentialMode,
-            enabled: true,
-            serverId: reference.serverId,
-            sortOrder: reference.sortOrder,
-          })),
-          callerUserId: viewer.id,
-          executionOwnerUserId,
-        })
-      : Promise.resolve([]),
-  ]);
-
-  if (!vendorCredential) {
-    throw new Error(`No credential available for ${vendor.label}. Configure in Providers.`);
-  }
-
-  const modelProtocol = resolveSessionModelProtocol(executionPlan, vendorCredential);
-  const runtimeProfileIds = await resolveRuntimeProfileIds(bindings, {
-    runtimeId,
-    agentId: binding.agentId,
-    projectId: session.projectId,
-    executionOwnerUserId,
-    sessionId: session.id,
-  });
   const profile = createAgentRuntimeProfile({
     agentId: binding.agentId,
     sandboxSessionId: runtimeProfileIds.sandboxSessionId,
@@ -581,60 +309,35 @@ async function refreshCachedRunContextVolatileFields(
       sessionId: session.id,
     },
     envVars,
-    environmentArtifact: cached.profile.environmentArtifact ?? null,
+    environmentArtifact,
     executionOwnerUserId,
     model: binding.model,
     modelProtocol,
-    network: toDriverNetworkProfile({
-      environment: environmentSnapshot,
-    }),
+    network: {
+      environmentAllowedHosts: JSON.parse(environmentSnapshot.allowedHostsJson) as string[],
+      networkPolicy: environmentSnapshot.networkPolicy,
+    },
     prompt: binding.prompt,
     provider: binding.provider,
     providerOptions: storedConfig.providerOptions,
-    readiness: cached.profile.readiness,
+    readiness: agentReadiness,
     runtimeId,
     sandboxId: runtimeProfileIds.sandboxId,
     sessionId: session.id,
-    setupScript: environmentSnapshot.setupScript,
+    setupScript,
     vendorCredential,
+  });
+  const mcpServers = await resolveRuntimeMcpServersForSnapshot(bindings.DB, {
+    projectId: session.projectId,
+    serverIds: toolReferences.map((reference) => reference.serverId),
   });
 
   return {
-    ...cached,
     builtInTools: executionPlan.builtInTools,
     mcpServers,
     profile,
-  };
-}
-
-export async function hydrateCachedRunContextFromSession(
-  bindings: ApiBindings,
-  viewer: AuthenticatedViewer,
-  session: Pick<SessionSummary, "id"> & {
-    accessViewer?: AuthenticatedViewer;
-    projectId: ProjectId;
-  },
-): Promise<{ cacheHit: boolean; value: HydratedSessionRunContext }> {
-  const nowMs = Date.now();
-  const cacheKey = getHydratedRunContextCacheKey({
-    ...(session.accessViewer ? { accessViewerId: session.accessViewer.id } : {}),
-    sessionId: session.id,
-    viewerId: viewer.id,
-  });
-  const cached = readHydratedRunContextCache(cacheKey, nowMs);
-
-  if (cached !== null) {
-    return {
-      cacheHit: true,
-      value: await refreshCachedRunContextVolatileFields(bindings, viewer, session, cached),
-    };
-  }
-
-  const hydrated = await hydrateRunContextFromSession(bindings, viewer, session);
-  writeHydratedRunContextCache(cacheKey, hydrated, nowMs);
-
-  return {
-    cacheHit: false,
-    value: hydrated,
+    skillCatalog,
+    skills,
+    warnings,
   };
 }

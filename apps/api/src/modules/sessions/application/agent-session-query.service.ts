@@ -8,7 +8,6 @@ import { getAppDatabase } from "../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../time";
 import { ensureProjectAgentOwner } from "../../agents/application/agent-access.service";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import { sessionParticipantCondition } from "../domain/session-access.policy";
 import { previewAvailablePredicate } from "../infrastructure/preview-retention.repository";
 import type { SessionSummaryListOptions } from "./session-summary-query.service";
 import { listSessionSummaryConnection } from "./session-summary-query.service";
@@ -19,7 +18,6 @@ export async function listAgentSessions(
   input: SessionSummaryListOptions & {
     agentId: AgentId;
     archived?: boolean | null;
-    participantOnly?: boolean | null;
     projectId: ProjectId;
     sessionId?: SessionId | null;
     type?: SessionType | null;
@@ -49,10 +47,6 @@ export async function listAgentSessions(
     if (input.type === "preview" && input.archived === false) {
       filters.push(previewAvailablePredicate(getAppDatabase(database), currentTimestampMs()));
     }
-  }
-
-  if (input.participantOnly === true) {
-    filters.push(sessionParticipantCondition(viewer.id));
   }
 
   return listSessionSummaryConnection({

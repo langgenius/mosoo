@@ -8,13 +8,8 @@ import {
 
 export async function cleanupExpiredOAuthFlows(bindings: ApiBindings): Promise<void> {
   const now = currentTimestampMs();
-  const flows = await listOAuthFlowsForCleanup(bindings.DB, {
-    cleanupAfterLte: now,
-    includePendingExpired: true,
-  });
-  const expiredPendingFlows = flows.filter(
-    (flow) => flow.status === "pending" && flow.expiresAt <= now,
-  );
+  const flows = await listOAuthFlowsForCleanup(bindings.DB, now);
+  const expiredPendingFlows = flows.filter((flow) => flow.status === "pending");
   const removableFlows = flows.filter((flow) => flow.status !== "pending");
 
   await markOAuthFlowsExpiredBatch(bindings.DB, expiredPendingFlows);

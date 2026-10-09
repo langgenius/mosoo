@@ -1,8 +1,9 @@
 import type { SkillsShCatalogSkill, SkillsShCatalogView } from "@mosoo/contracts/skill";
-import { useEffect, useMemo, useReducer, useState } from "react";
+import type { SkillId } from "@mosoo/id";
+import { useMemo, useState } from "react";
 
 import { useSkillsShCatalogQuery } from "@/domains/skill/query/skill-queries";
-import { useTranslation } from "@/shared/i18n";
+import { getCurrentLocale, useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -30,59 +31,15 @@ import { Switch } from "@/shared/ui/switch";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 
 import { isTruthy } from "../../../shared/lib/truthiness";
-import { formatCatalogCount } from "./format";
 import type { useSkillRegistry } from "./use-skill-registry";
 
 const CATALOG_PER_PAGE = 24;
 
-interface SkillsShCatalogState {
-  availableOnly: boolean;
-  error: string | null;
-  installingId: string | null;
-  page: number;
-  view: SkillsShCatalogView;
-}
-
-type SkillsShCatalogAction =
-  | { type: "clearError" }
-  | { type: "installFailed"; error: string }
-  | { type: "installStart"; id: string }
-  | { type: "installSuccess" }
-  | { type: "resetPage" }
-  | { type: "setAvailableOnly"; availableOnly: boolean }
-  | { type: "setPage"; page: number }
-  | { type: "setView"; view: SkillsShCatalogView };
-
-const SKILLS_SH_CATALOG_INITIAL_STATE: SkillsShCatalogState = {
-  availableOnly: true,
-  error: null,
-  installingId: null,
-  page: 0,
-  view: "trending",
-};
-
-function skillsShCatalogReducer(
-  state: SkillsShCatalogState,
-  action: SkillsShCatalogAction,
-): SkillsShCatalogState {
-  switch (action.type) {
-    case "clearError":
-      return { ...state, error: null };
-    case "installFailed":
-      return { ...state, error: action.error, installingId: null };
-    case "installStart":
-      return { ...state, error: null, installingId: action.id };
-    case "installSuccess":
-      return { ...state, error: null, installingId: null };
-    case "resetPage":
-      return { ...state, page: 0 };
-    case "setAvailableOnly":
-      return { ...state, availableOnly: action.availableOnly, page: 0 };
-    case "setPage":
-      return { ...state, page: Math.max(action.page, 0) };
-    case "setView":
-      return { ...state, page: 0, view: action.view };
-  }
+function formatCount(value: number): string {
+  return new Intl.NumberFormat(getCurrentLocale(), {
+    maximumFractionDigits: value >= 1000 ? 1 : 0,
+    notation: value >= 10_000 ? "compact" : "standard",
+  }).format(value);
 }
 
 export function SkillsShCatalog({
@@ -90,39 +47,49 @@ export function SkillsShCatalog({
   registry,
   search,
 }: {
-  onInstalled: (skillId: string) => void;
+  onInstalled: (skillId: SkillId) => void;
   registry: ReturnType<typeof useSkillRegistry>;
   search: string;
 }) {
   const { t } = useTranslation();
-  const [state, dispatch] = useReducer(skillsShCatalogReducer, SKILLS_SH_CATALOG_INITIAL_STATE);
+  const [availableOnly, setAvailableOnly] = useState(true);
+  const [view, setView] = useState<SkillsShCatalogView>("trending");
+  const [error, setError] = useState<string | null>(null);
+  const [installingId, setInstallingId] = useState<string | null>(null);
   const [confirmingSkill, setConfirmingSkill] = useState<SkillsShCatalogSkill | null>(null);
-  const { availableOnly, error, installingId, page, view } = state;
   const trimmedSearch = search.trim();
+  // The page belongs to one search; a new search starts again at page 0.
+  const [paging, setPaging] = useState({ page: 0, search: trimmedSearch });
+  const page = paging.search === trimmedSearch ? paging.page : 0;
   const catalogQuery = useSkillsShCatalogQuery({
     availableOnly,
-    enabled: isTruthy(registry.projectId),
     page,
     perPage: CATALOG_PER_PAGE,
     query: trimmedSearch,
     view,
   });
 
-  useEffect(() => {
-    dispatch({ type: "resetPage" });
-  }, [trimmedSearch]);
-
   const installedNames = useMemo(
-    () => new Set(registry.personal.map((skill) => skill.name.trim().toLowerCase())),
-    [registry.personal],
+    () => new Set(registry.skills.map((skill) => skill.name.trim().toLowerCase())),
+    [registry.skills],
   );
+
+  function goToPage(nextPage: number): void {
+    setPaging({ page: nextPage, search: trimmedSearch });
+  }
+
+  function selectView(nextView: SkillsShCatalogView): void {
+    setView(nextView);
+    goToPage(0);
+  }
 
   async function handleInstall(skill: SkillsShCatalogSkill) {
     if (installingId !== null) {
       return;
     }
 
-    dispatch({ id: skill.id, type: "installStart" });
+    setError(null);
+    setInstallingId(skill.id);
 
     try {
       const created = await registry.installSkillsShSkill({
@@ -130,14 +97,12 @@ export function SkillsShCatalog({
         installUrl: skill.installUrl,
         slug: skill.slug,
       });
-      dispatch({ type: "installSuccess" });
+      setInstallingId(null);
       setConfirmingSkill(null);
       onInstalled(created.id);
     } catch (caughtError) {
-      dispatch({
-        error: caughtError instanceof Error ? caughtError.message : t("skills.failedToInstall"),
-        type: "installFailed",
-      });
+      setError(caughtError instanceof Error ? caughtError.message : t("skills.failedToInstall"));
+      setInstallingId(null);
     }
   }
 
@@ -156,7 +121,7 @@ export function SkillsShCatalog({
             icon={TrendingUp}
             label={t("skills.trending")}
             onClick={() => {
-              dispatch({ type: "setView", view: "trending" });
+              selectView("trending");
             }}
           />
           <CatalogViewButton
@@ -164,7 +129,7 @@ export function SkillsShCatalog({
             icon={Flame}
             label={t("skills.hot")}
             onClick={() => {
-              dispatch({ type: "setView", view: "hot" });
+              selectView("hot");
             }}
           />
           <CatalogViewButton
@@ -172,7 +137,7 @@ export function SkillsShCatalog({
             icon={Check}
             label={t("skills.allTime")}
             onClick={() => {
-              dispatch({ type: "setView", view: "all-time" });
+              selectView("all-time");
             }}
           />
         </div>
@@ -185,7 +150,8 @@ export function SkillsShCatalog({
             checked={availableOnly}
             id="skills-sh-show-available-only"
             onCheckedChange={(checked) => {
-              dispatch({ availableOnly: checked, type: "setAvailableOnly" });
+              setAvailableOnly(checked);
+              goToPage(0);
             }}
           />
           {t("skills.showAvailableOnly")}
@@ -196,7 +162,7 @@ export function SkillsShCatalog({
         {result ? (
           <div className="text-fg-3 flex items-center gap-1.5 text-[12px] tabular-nums">
             <span>
-              {formatCatalogCount(result.total ?? result.count)}
+              {formatCount(result.total ?? result.count)}
               {result.source === "public-page" ? t("skills.publicIndex") : t("skills.skillsShApi")}
             </span>
             <SkillsShSourceTooltip source={result.source} />
@@ -205,7 +171,7 @@ export function SkillsShCatalog({
       </div>
 
       {isTruthy(error) ? (
-        <div className="border-destructive/30 bg-destructive/5 text-destructive rounded-md border px-3 py-2 text-xs">
+        <div className="border-danger/30 bg-danger/5 text-danger rounded-md border px-3 py-2 text-xs">
           {error}
         </div>
       ) : null}
@@ -213,7 +179,7 @@ export function SkillsShCatalog({
       {catalogQuery.isLoading ? (
         <div className="text-fg-3 py-12 text-center text-[13px]">{t("skills.loadingSkillsSh")}</div>
       ) : catalogQuery.error ? (
-        <div className="border-destructive/30 bg-destructive/5 text-destructive rounded-md border px-3 py-2 text-xs">
+        <div className="border-danger/30 bg-danger/5 text-danger rounded-md border px-3 py-2 text-xs">
           {catalogQuery.error instanceof Error
             ? catalogQuery.error.message
             : t("skills.failedToLoad")}
@@ -250,7 +216,7 @@ export function SkillsShCatalog({
             variant="outline"
             disabled={page === 0 || catalogQuery.isFetching}
             onClick={() => {
-              dispatch({ page: page - 1, type: "setPage" });
+              goToPage(page - 1);
             }}
           >
             <ArrowLeft className="size-3.5" />
@@ -261,7 +227,7 @@ export function SkillsShCatalog({
             variant="outline"
             disabled={!result.hasMore || catalogQuery.isFetching}
             onClick={() => {
-              dispatch({ page: page + 1, type: "setPage" });
+              goToPage(page + 1);
             }}
           >
             {t("skills.next")}
@@ -294,7 +260,7 @@ function SkillsShSourceTooltip({ source }: { source: "api" | "public-page" }) {
         <button
           type="button"
           aria-label={t("skills.source")}
-          className="text-fg-3 hover:text-fg-1 focus-visible:ring-brand-ring inline-flex size-5 items-center justify-center rounded-full transition-colors focus-visible:ring-2 focus-visible:outline-none"
+          className="text-fg-3 hover:text-fg-1 focus-visible:ring-ring inline-flex size-5 items-center justify-center rounded-full transition-colors focus-visible:ring-2 focus-visible:outline-none"
         >
           <Info className="size-3.5" />
         </button>
@@ -332,7 +298,9 @@ function SkillsShInstallConfirmDialog({
             <div className="border-border bg-card rounded-lg border p-6">
               <div className="flex min-w-0 items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="text-fg-1 truncate text-[15px] font-bold">{skill.name}</div>
+                  <div className="text-fg-heading truncate text-[15px] font-semibold">
+                    {skill.name}
+                  </div>
                   <a
                     className="text-fg-3 hover:text-fg-1 mt-1 inline-flex max-w-full items-center gap-1 font-mono text-[11px]"
                     href={skill.url}
@@ -355,7 +323,7 @@ function SkillsShInstallConfirmDialog({
                   <Badge variant="warning">{t("skills.duplicate")}</Badge>
                 ) : null}
                 <Badge variant="default">
-                  {formatCatalogCount(skill.installs)} {t("common.installs")}
+                  {formatCount(skill.installs)} {t("common.installs")}
                 </Badge>
               </div>
             </div>
@@ -424,7 +392,7 @@ function SkillsShCatalogCard({
     <article className="border-border bg-card hover:border-border-strong flex min-h-[168px] min-w-0 flex-col gap-3 rounded-lg border p-4 transition-[border-color] duration-150 ease-out">
       <div className="flex min-w-0 items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="text-fg-1 truncate text-[14px] font-bold">{skill.name}</div>
+          <div className="text-fg-heading truncate text-[14px] font-semibold">{skill.name}</div>
           <a
             className="text-fg-3 hover:text-fg-1 mt-1 inline-flex max-w-full items-center gap-1 font-mono text-[11px]"
             href={skill.url}
@@ -448,7 +416,7 @@ function SkillsShCatalogCard({
 
       <div className="flex min-w-0 items-center justify-between gap-3">
         <div className="text-fg-3 min-w-0 text-[11px]">
-          <span className="font-mono tabular-nums">{formatCatalogCount(skill.installs)}</span>{" "}
+          <span className="font-mono tabular-nums">{formatCount(skill.installs)}</span>{" "}
           {t("common.installs")}
         </div>
         {installRequiresApi ? (
@@ -513,9 +481,7 @@ function CatalogViewButton({
       aria-pressed={active}
       className={cn(
         "inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-[12.5px] font-medium transition-colors",
-        active
-          ? "border-border-strong bg-card text-fg-1 border shadow-sm"
-          : "text-fg-3 hover:bg-paper-200/70 hover:text-fg-1",
+        active ? "bg-selected text-fg-1" : "text-fg-2 hover:bg-hover hover:text-fg-1",
       )}
     >
       <Icon className="size-3.5" />

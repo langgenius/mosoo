@@ -2,7 +2,6 @@ import type { UserWarning } from "@mosoo/contracts/session-run";
 import type { ResolvedRunSkill } from "@mosoo/contracts/skill";
 import type { ProjectId, SkillSnapshotId } from "@mosoo/id";
 
-import { isPackageSkillRuntimeId } from "../../../agents/application/agent-stored-config.service";
 import { listSkillSnapshotsByIds } from "../../../skills/application/skill-package-snapshot.service";
 import type { LoadedSkillSnapshotRow } from "../../../skills/application/skill-package-snapshot.service";
 import type { DriverSkillCatalogEntry } from "../../domain/driver-snapshot";
@@ -111,7 +110,6 @@ export async function resolveSessionSkillReferences(input: {
   return input.skillReferences.map((skillReference) => {
     const mountPath = `${input.skillMountRoot}/${skillReference.skillId}`;
     const snapshotId = skillReference.snapshotId;
-    const isPackageSkill = isPackageSkillRuntimeId(skillReference.skillId);
 
     if (skillReference.resolutionMode === "tombstone" || snapshotId === null) {
       return createTombstoneSessionSkillReference({
@@ -124,22 +122,10 @@ export async function resolveSessionSkillReferences(input: {
     const snapshot = snapshotsById.get(snapshotId);
 
     if (snapshot === undefined) {
-      if (isPackageSkill) {
-        return createTombstoneSessionSkillReference({
-          message: `${skillReference.skillName} is unavailable and was skipped.`,
-          mountPath,
-          skillReference,
-        });
-      }
-
       throw new Error("Skill snapshot not found.");
     }
 
     if (snapshot.projectId !== input.sessionProjectId) {
-      if (isPackageSkill) {
-        throw new Error("Package-owned skill snapshot belongs to another Project.");
-      }
-
       throw new Error("Skill snapshot belongs to another Project.");
     }
 

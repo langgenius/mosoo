@@ -29,10 +29,6 @@ const SESSION_RUN_ID = parsePlatformId<SessionRunId>(
   "01J00000000000000000000016",
   "session run ID",
 );
-const DEPLOYMENT_ID = parsePlatformId<AgentDeploymentVersionId>(
-  "01J00000000000000000000018",
-  "deployment ID",
-);
 const DRIVER_INSTANCE_ID = parsePlatformId<DriverInstanceId>(
   "01J00000000000000000000017",
   "driver instance ID",

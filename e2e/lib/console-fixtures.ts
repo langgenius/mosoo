@@ -2,7 +2,7 @@ import type { Page, Route } from "@playwright/test";
 
 import { formatHarnessError } from "./env-preflight";
 
-// Deterministic console fixtures for the design-contract and typography cases
+// Deterministic console fixtures for the design-contract and session cases
 // (langgenius/mosoo#599, #601, #605). Every Web/API projection the Providers,
 // Environments, MCP servers, Runs, and Settings surfaces read is pinned here
 // with sanitized demo data, so the browser runs need no provider keys and the
@@ -30,13 +30,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-function parseGraphQLRequestBody(postData: string | null): GraphQLRequestBody {
+export function parseGraphQLRequestBody(postData: string | null): GraphQLRequestBody {
   if (postData === null) {
     throw new Error(
       formatHarnessError({
         fix: "Use requestGraphQL(...) so the fixture can assert the operation and variables.",
-        what: "The console fixture received an empty GraphQL request body.",
-        why: "Deterministic console cases must pin every API projection they depend on.",
+        what: "The E2E GraphQL fixture received an empty request body.",
+        why: "Deterministic E2E cases must pin every API projection they depend on.",
       }),
     );
   }
@@ -47,8 +47,8 @@ function parseGraphQLRequestBody(postData: string | null): GraphQLRequestBody {
     throw new Error(
       formatHarnessError({
         fix: "Send `{ query, variables }` from the Web GraphQL client or add a parser case for the new envelope.",
-        what: "The console fixture received a GraphQL request envelope it cannot parse.",
-        why: "The fixture is the executable contract for the console surfaces under test.",
+        what: "The E2E GraphQL fixture received a request envelope it cannot parse.",
+        why: "The fixture is the executable contract for the surfaces under test.",
       }),
     );
   }
@@ -62,7 +62,7 @@ function parseGraphQLRequestBody(postData: string | null): GraphQLRequestBody {
   };
 }
 
-function getOperationName(body: GraphQLRequestBody): string | null {
+export function getOperationName(body: GraphQLRequestBody): string | null {
   if (body.operationName !== undefined && body.operationName.trim().length > 0) {
     return body.operationName;
   }
@@ -71,7 +71,7 @@ function getOperationName(body: GraphQLRequestBody): string | null {
   return match?.[1] ?? null;
 }
 
-async function fulfillJson(route: Route, data: unknown): Promise<void> {
+export async function fulfillJson(route: Route, data: unknown): Promise<void> {
   await route.fulfill({
     body: JSON.stringify({ data }),
     contentType: "application/json",
@@ -115,21 +115,14 @@ function viewer() {
         id: CONSOLE_FIXTURE_IDS.accountId,
         imageUrl: null,
         name: "Ada Lovelace",
-        systemAgentModel: null,
       },
       activeOrganization: {
-        avatarUrl: null,
         createdAt: now,
         id: CONSOLE_FIXTURE_IDS.organizationId,
         name: "Analytical Engines",
       },
-      auth: {
-        currentSecurityLevel: "low",
-        methods: ["email_otp"],
-      },
       organizations: [
         {
-          avatarUrl: null,
           createdAt: now,
           id: CONSOLE_FIXTURE_IDS.organizationId,
           name: "Analytical Engines",
@@ -161,7 +154,6 @@ function agents() {
       createdAt: lastWeek,
       description: "Reviews pull requests and leaves inline comments.",
       id: reviewAgentId,
-      kind: "cattle",
       name: "Review bot",
       owner: owner(),
       projectId: CONSOLE_FIXTURE_IDS.projectId,
@@ -176,7 +168,6 @@ function agents() {
       createdAt: lastWeek,
       description: "Prepares release notes from merged changes.",
       id: releaseAgentId,
-      kind: "pet",
       name: "Release notes",
       owner: owner(),
       projectId: CONSOLE_FIXTURE_IDS.projectId,
@@ -242,7 +233,6 @@ function session(
       deploymentVersionId: null,
       deploymentVersionNumber: null,
       id,
-      kind: "cattle",
       lastMessageAt: options.lastRun?.updatedAt ?? earlier,
       lastRun: options.lastRun,
       model: "claude-sonnet-5",
@@ -356,8 +346,6 @@ function environment(
   const isBuiltIn = options.isBuiltIn === true;
 
   return {
-    allowMcpServers: true,
-    allowPackageManagers: !isBuiltIn,
     allowedHosts:
       options.networkPolicy === "limited" ? ["api.github.com", "registry.npmjs.org"] : [],
     canDelete: !isBuiltIn,
@@ -370,13 +358,10 @@ function environment(
     id,
     isBuiltIn,
     isDefault: options.isDefault === true,
-    isEditable: !isBuiltIn,
     name,
     networkPolicy: options.networkPolicy,
-    owner: owner(),
     packages: [{ manager: "npm", packages: ["typescript@5.9.2"] }],
     projectId: CONSOLE_FIXTURE_IDS.projectId,
-    role: "owner",
     setupScript: "",
     updatedAt: earlier,
     usedByAgentCount: options.usedByAgentCount,
@@ -462,9 +447,6 @@ function mcpServer(
 function mcpRegistry() {
   return {
     mcpRegistry: {
-      currentUserEmail: "ada@example.com",
-      currentUserId: CONSOLE_FIXTURE_IDS.accountId,
-      currentUserName: "Ada Lovelace",
       projectId: CONSOLE_FIXTURE_IDS.projectId,
       servers: [
         mcpServer("01J00000000000000000000801", "GitHub", {
@@ -518,8 +500,6 @@ function accessTokens() {
 }
 
 export interface ConsoleFixtureOptions {
-  /** `html[data-typography]` variant for the typography proof; omitted keeps the shipped roles. */
-  typography?: string;
   locale?: string;
 }
 
@@ -533,19 +513,15 @@ export async function installConsoleFixtures(
   options: ConsoleFixtureOptions = {},
 ): Promise<void> {
   await page.addInitScript(
-    ({ locale, projectId, typography }) => {
+    ({ locale, projectId }) => {
       localStorage.setItem("mosoo:selected-project", projectId);
       if (locale !== null) {
         localStorage.setItem("mosoo-locale", locale);
-      }
-      if (typography !== null) {
-        document.documentElement.dataset["typography"] = typography;
       }
     },
     {
       locale: options.locale ?? null,
       projectId: CONSOLE_FIXTURE_IDS.projectId,
-      typography: options.typography ?? null,
     },
   );
 

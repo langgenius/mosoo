@@ -3,9 +3,8 @@ import type { ReactElement } from "react";
 
 import { AssistantMessage, UserMessage } from "./session-message-parts";
 
-// Message viewport built from assistant-ui primitives. Viewport's built-in
-// autoScroll replaces the bespoke use-session-chat-layout-state stick-to-bottom
-// hook; the centered width + spacing mirror the previous SessionMessageList.
+// Message viewport built from assistant-ui primitives; Viewport's built-in
+// autoScroll keeps the latest message in view.
 export function SessionThread(): ReactElement {
   return (
     <ThreadPrimitive.Root className="h-full min-h-0">

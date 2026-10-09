@@ -28,6 +28,7 @@ describe("thread action capabilities", () => {
           status: "unavailable",
         }),
       ],
+      t: (key) => key,
     });
 
     expect(actions.followUp).toEqual({
@@ -49,6 +50,7 @@ describe("thread action capabilities", () => {
         }),
         capability({ action: "unarchive_session" }),
       ],
+      t: (key) => key,
     });
 
     expect(actions.followUp).toEqual({
@@ -75,6 +77,7 @@ describe("thread action capabilities", () => {
         }),
         capability({ action: "unarchive_session" }),
       ],
+      t: (key) => key,
     });
 
     expect(actions.archive).toEqual({
@@ -87,20 +90,6 @@ describe("thread action capabilities", () => {
       action: "delete_session",
       available: false,
       reason: "Only the session creator can mutate this session.",
-      status: "unavailable",
-    });
-  });
-
-  test("keeps mutations disabled until capabilities load", () => {
-    const actions = getThreadActionCapabilities({
-      bucket: "completed",
-      capabilities: null,
-    });
-
-    expect(actions.followUp).toEqual({
-      action: "send_user_message",
-      available: false,
-      reason: "Loading session capabilities.",
       status: "unavailable",
     });
   });

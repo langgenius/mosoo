@@ -21,7 +21,6 @@ import { useAgentSkillsFieldModel } from "./use-skills-field-model";
 
 interface AgentSkillsFieldProps {
   projectId: string | null;
-  readOnly?: boolean;
   selectedSkills: SkillInfo[];
   setSkills(skills: SkillInfo[]): void;
 }
@@ -29,14 +28,13 @@ interface AgentSkillsFieldProps {
 function MissingSkillBadge(): ReactElement {
   const { t } = useTranslation();
   return (
-    <span className="bg-amber-bg text-amber-fg rounded-md px-1.5 py-0.5 text-[10px] font-medium">
+    <span className="bg-warning-bg text-warning-fg rounded-md px-1.5 py-0.5 text-[10px] font-medium">
       {t("agentEditor.missing")}
     </span>
   );
 }
 
 export function AgentSkillsField({
-  readOnly = false,
   selectedSkills,
   setSkills,
   projectId,
@@ -68,82 +66,76 @@ export function AgentSkillsField({
 
   return (
     <div>
-      {selectedSkills.length > 0 || !readOnly ? (
-        <div className="border-border divide-border-subtle divide-y overflow-hidden rounded-lg border">
-          {selectedSkills.map((skill) => {
-            const fileCount = model.fileCountBySkillId.get(skill.id) ?? null;
+      <div className="border-border divide-border-soft divide-y overflow-hidden rounded-lg border">
+        {selectedSkills.map((skill) => {
+          const fileCount = model.fileCountBySkillId.get(skill.id) ?? null;
 
-            return (
-              <div
-                key={skill.id}
-                className="group hover:bg-accent/30 flex items-center gap-3 px-3 py-2.5 transition-colors"
+          return (
+            <div
+              key={skill.id}
+              className="group hover:bg-hover/30 flex items-center gap-3 px-3 py-2.5 transition-colors"
+            >
+              <button
+                className="min-w-0 flex-1 cursor-pointer bg-transparent p-0 text-left"
+                onClick={() => {
+                  model.setPreviewSkill(skill);
+                }}
+                type="button"
               >
-                <button
-                  className="min-w-0 flex-1 cursor-pointer bg-transparent p-0 text-left"
-                  onClick={() => {
-                    model.setPreviewSkill(skill);
-                  }}
-                  type="button"
-                >
-                  <div className="flex items-center gap-2">
-                    <div className="text-foreground truncate text-[13px] font-medium">
-                      {skill.name}
-                    </div>
-                    {skill.state === "tombstone" ? <MissingSkillBadge /> : null}
+                <div className="flex items-center gap-2">
+                  <div className="text-foreground truncate text-[13px] font-medium">
+                    {skill.name}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground font-mono text-[11px]">SKILL.md</span>
-                    {fileCount === null ? null : <SkillFileCountBadge count={fileCount} />}
-                  </div>
-                </button>
-                {!readOnly ? (
-                  <button
-                    className="text-muted-foreground hover:text-destructive text-xs font-medium opacity-0 transition-colors group-hover:opacity-100"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      model.handleRemoveSkill(skill.id);
-                    }}
-                    type="button"
-                  >
-                    {t("common.remove")}
-                  </button>
-                ) : null}
-              </div>
-            );
-          })}
+                  {skill.state === "tombstone" ? <MissingSkillBadge /> : null}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-fg-3 font-mono text-[11px]">SKILL.md</span>
+                  {fileCount === null ? null : <SkillFileCountBadge count={fileCount} />}
+                </div>
+              </button>
+              <button
+                className="text-fg-3 hover:text-danger text-xs font-medium opacity-0 transition-colors group-hover:opacity-100"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  model.handleRemoveSkill(skill.id);
+                }}
+                type="button"
+              >
+                {t("common.remove")}
+              </button>
+            </div>
+          );
+        })}
 
-          {!readOnly ? (
-            <DropdownMenu onOpenChange={setOpen} open={open}>
-              <DropdownMenuTrigger asChild>
-                <button
-                  className="text-muted-foreground hover:bg-accent/30 hover:text-foreground flex w-full items-center gap-1.5 px-3 py-2.5 text-left text-[13px] font-medium transition-colors disabled:opacity-60"
-                  disabled={model.skillsLoading}
-                  type="button"
-                >
-                  <Plus className="size-3.5 shrink-0" />
-                  {triggerLabel}
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="start"
-                className="max-h-[320px] w-[var(--anchor-width)] overflow-y-auto"
+        <DropdownMenu onOpenChange={setOpen} open={open}>
+          <DropdownMenuTrigger asChild>
+            <button
+              className="text-fg-3 hover:bg-hover/30 hover:text-foreground disabled:text-fg-muted flex w-full items-center gap-1.5 px-3 py-2.5 text-left text-[13px] font-medium transition-colors"
+              disabled={model.skillsLoading}
+              type="button"
+            >
+              <Plus className="size-3.5 shrink-0" />
+              {triggerLabel}
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            align="start"
+            className="max-h-[320px] w-[var(--anchor-width)] overflow-y-auto"
+          >
+            {dropdownContent}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link
+                className="text-fg-3 flex w-full items-center gap-1.5 text-[12px]"
+                to="/integrations/skills"
               >
-                {dropdownContent}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link
-                    className="text-muted-foreground flex w-full items-center gap-1.5 text-[12px]"
-                    to="/integrations/skills"
-                  >
-                    <ExternalLink className="size-3" />
-                    {t("agentEditor.manageSkills")}
-                  </Link>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : null}
-        </div>
-      ) : null}
+                <ExternalLink className="size-3" />
+                {t("agentEditor.manageSkills")}
+              </Link>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
 
       {model.previewSkill ? (
         <MarkdownPreviewDialog
@@ -177,7 +169,7 @@ function renderSkillsDropdownContent({
 }): ReactElement {
   if (model.skillsError) {
     return (
-      <div className="text-destructive p-3 text-[12px]">
+      <div className="text-danger p-3 text-[12px]">
         {model.skillsError instanceof Error
           ? model.skillsError.message
           : t("agentEditor.failedToLoadSkills")}
@@ -191,17 +183,15 @@ function renderSkillsDropdownContent({
         ? t("agentEditor.noSkillsAvailable")
         : t("agentEditor.allSkillsAdded");
 
-    return <div className="text-muted-foreground p-3 text-[12px]">{message}</div>;
+    return <div className="text-fg-3 p-3 text-[12px]">{message}</div>;
   }
 
   return (
-    <>
-      <SkillPickerGroup
-        label={t("agent.projectSkills")}
-        onAdd={onAdd}
-        skills={model.availablePersonalSkills}
-      />
-    </>
+    <SkillPickerGroup
+      label={t("agent.projectSkills")}
+      onAdd={onAdd}
+      skills={model.availableSkills}
+    />
   );
 }
 
@@ -220,9 +210,7 @@ function SkillPickerGroup({
 
   return (
     <>
-      <DropdownMenuLabel className="text-muted-foreground text-[10px] tracking-wider uppercase">
-        {label}
-      </DropdownMenuLabel>
+      <DropdownMenuLabel>{label}</DropdownMenuLabel>
       {skills.map((skill) => (
         <DropdownMenuItem
           className="gap-2 py-2"
@@ -233,7 +221,7 @@ function SkillPickerGroup({
         >
           <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{skill.name}</span>
           <SkillFileCountBadge count={skill.fileCount} />
-          <span className="text-muted-foreground shrink-0 text-[11px]">{skill.ownerName}</span>
+          <span className="text-fg-3 shrink-0 text-[11px]">{skill.ownerName}</span>
         </DropdownMenuItem>
       ))}
     </>

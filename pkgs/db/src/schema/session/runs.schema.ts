@@ -33,6 +33,3 @@ export const sessionRunSkillsTable = sqliteTable(
     index("session_run_skill_run_resolution_idx").on(table.sessionRunId, table.resolutionMode),
   ],
 );
-
-export type SessionRunRow = typeof sessionRunsTable.$inferSelect;
-export type SessionRunSkillRow = typeof sessionRunSkillsTable.$inferSelect;

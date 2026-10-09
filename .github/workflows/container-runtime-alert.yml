@@ -63,7 +63,7 @@ jobs:
           bun scripts/collect-container-instances.ts apps/api/wrangler.toml "$WRANGLER_ENV" "$instances_file"
 
           set +e
-          bun scripts/check-container-runtime.ts "$instances_file" 2 10 > "$report_file"
+          bun scripts/check-container-runtime.ts "$instances_file" > "$report_file"
           status=$?
           set -e
 

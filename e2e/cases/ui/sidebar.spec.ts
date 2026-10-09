@@ -186,21 +186,14 @@ async function installSidebarFixtures(
               id: accountId,
               imageUrl: null,
               name: "Ada Lovelace",
-              systemAgentModel: null,
             },
             activeOrganization: {
-              avatarUrl: null,
               createdAt: now,
               id: organizationId,
               name: "Analytical Engines",
             },
-            auth: {
-              currentSecurityLevel: "low",
-              methods: ["email_otp"],
-            },
             organizations: [
               {
-                avatarUrl: null,
                 createdAt: now,
                 id: organizationId,
                 name: "Analytical Engines",
@@ -335,7 +328,10 @@ test("expanded sidebar separates the work zone from the persistent zone", async 
 
   const persistent = nav.locator('[data-sidebar-zone="persistent"]');
   await expect(persistent.getByRole("link", { name: "Project settings" })).toBeVisible();
-  await expect(persistent.getByRole("button", { name: "Help & docs" })).toBeVisible();
+  const helpLink = persistent.getByRole("link", { name: "Help & docs" });
+  await expect(helpLink).toBeVisible();
+  await expect(helpLink).toHaveAttribute("href", "https://mosoo.ai/docs/");
+  await expect(helpLink).toHaveAttribute("target", "_blank");
   await expect(persistent.getByRole("button", { name: /^Language:/u })).toBeVisible();
 
   await expectZonesStacked(page, nav);
@@ -469,7 +465,9 @@ test("labels stay on one line in CJK locales", async ({ page }) => {
 test("no Project keeps creation visible but disabled", async ({ page }) => {
   await page.setViewportSize({ height: 900, width: 1440 });
   await installSidebarFixtures(page, { projects: "none" });
-  await page.goto("/files");
+  // Project routes redirect to /projects without a Project; account settings
+  // stay in the Project shell, so the disabled call to action is reachable.
+  await page.goto("/settings/profile");
 
   const nav = desktopSidebar(page);
   await expect(nav.getByRole("button", { name: /No Project available/u })).toBeVisible();

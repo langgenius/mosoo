@@ -1,27 +1,25 @@
 import { Link } from "react-router-dom";
 
+import type { CostAgentRow } from "@/domains/cost/api/cost-client";
 import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { ExternalLink } from "@/shared/ui/icons";
 
 import {
-  agentCostChange,
   cacheHitRate,
   formatCompactNumber,
   formatCurrency,
-  formatPercent,
   formatPlainPercent,
   runMixSegments,
   sortCostAgents,
   tokensTotal,
 } from "./cost-model";
-import type { AgentCostSort, CostAgentRow } from "./cost-model";
+import type { AgentCostSort } from "./cost-model";
 
 const SORT_OPTIONS: { labelKey: string; value: AgentCostSort }[] = [
   { labelKey: "cost.sortCostDesc", value: "cost_desc" },
   { labelKey: "cost.sortCostAsc", value: "cost_asc" },
   { labelKey: "cost.sortRuns", value: "runs_desc" },
-  { labelKey: "cost.sortBiggestSpike", value: "spike_desc" },
 ];
 
 export function CostAgentsPanel({
@@ -41,9 +39,9 @@ export function CostAgentsPanel({
       <div className="border-border flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
         <div>
           <h2 className="text-foreground text-sm font-semibold">{t("cost.byAgent")}</h2>
-          <p className="text-muted-foreground mt-0.5 text-xs">{t("cost.agentsSubtitle")}</p>
+          <p className="text-fg-3 mt-0.5 text-xs">{t("cost.agentsSubtitle")}</p>
         </div>
-        <label className="text-muted-foreground flex items-center gap-2 text-xs font-semibold">
+        <label className="text-fg-3 flex items-center gap-2 text-xs font-semibold">
           {t("cost.sort")}
           <select
             value={sort}
@@ -61,18 +59,17 @@ export function CostAgentsPanel({
         </label>
       </div>
 
-      <div className="border-border bg-muted/30 text-fg-2 grid grid-cols-[minmax(180px,1.4fr)_150px_110px_110px_110px_110px_110px_120px] border-b px-4 py-2 text-[12px] font-medium">
+      <div className="border-border bg-sunken/30 text-fg-2 grid grid-cols-[minmax(180px,1.4fr)_150px_110px_110px_110px_110px_120px] border-b px-4 py-2 text-[12px] font-medium">
         <div>{t("cost.agent")}</div>
         <div>{t("cost.owner")}</div>
         <div>{t("cost.runMix")}</div>
-        <div>{t("cost.vsPrev")}</div>
         <div>{t("cost.requests")}</div>
         <div>{t("cost.tokens")}</div>
         <div>{t("cost.cacheHit")}</div>
         <div className="text-right">{t("cost.cost")}</div>
       </div>
       {agents.length === 0 ? (
-        <div className="text-muted-foreground px-4 py-10 text-center text-sm">
+        <div className="text-fg-3 px-4 py-10 text-center text-sm">
           {t("cost.noAgentCostEvents")}
         </div>
       ) : null}
@@ -84,31 +81,30 @@ export function CostAgentsPanel({
                 {agent.agentId === null ? t("cost.directSessions") : agent.agentName}
               </div>
               {agent.agentId !== null ? (
-                <div className="text-muted-foreground mt-0.5 flex items-center gap-1 text-xs">
+                <div className="text-fg-3 mt-0.5 flex items-center gap-1 text-xs">
                   <ExternalLink className="size-3" />
                   {t("cost.openCostTab")}
                 </div>
               ) : null}
             </div>
-            <div className="text-muted-foreground min-w-0">
+            <div className="text-fg-3 min-w-0">
               <div className="truncate">{agent.ownerName}</div>
               <div className="truncate text-xs">{agent.ownerEmail}</div>
             </div>
             <RunMixBar agent={agent} />
-            <AgentDelta agent={agent} />
             <div>{formatCompactNumber(agent.requestCount)}</div>
             <div>{formatCompactNumber(tokensTotal(agent))}</div>
             <div>{formatPlainPercent(cacheHitRate(agent))}</div>
             <div className="text-right">
               <div className="font-mono font-semibold">{formatCurrency(agent.totalCostUsd)}</div>
-              <div className="text-muted-foreground text-xs">
+              <div className="text-fg-3 text-xs">
                 {formatPlainPercent(agentShare(agent, agents))}
               </div>
             </div>
           </>
         );
         const rowClassName =
-          "border-border grid grid-cols-[minmax(180px,1.4fr)_150px_110px_110px_110px_110px_110px_120px] items-center border-b px-4 py-3 text-sm last:border-b-0";
+          "border-border grid grid-cols-[minmax(180px,1.4fr)_150px_110px_110px_110px_110px_120px] items-center border-b px-4 py-3 text-sm last:border-b-0";
         const rowKey = `${agent.agentId ?? "direct"}:${agent.ownerId}`;
         return agent.agentId === null ? (
           <div key={rowKey} className={rowClassName}>
@@ -118,28 +114,13 @@ export function CostAgentsPanel({
           <Link
             key={rowKey}
             to={`/agent/${agent.agentId}?tab=cost`}
-            className={cn(rowClassName, "hover:bg-muted/40")}
+            className={cn(rowClassName, "hover:bg-sunken/40")}
           >
             {content}
           </Link>
         );
       })}
     </section>
-  );
-}
-
-function AgentDelta({ agent }: { agent: CostAgentRow }) {
-  const { t } = useTranslation();
-  const delta = agentCostChange(agent);
-
-  if (delta === null) {
-    return <div className="text-muted-foreground text-xs">{t("cost.new")}</div>;
-  }
-
-  return (
-    <div className={cn("font-mono text-xs", delta > 0 ? "text-amber-fg" : "text-success-fg")}>
-      {formatPercent(delta)}
-    </div>
   );
 }
 
@@ -153,14 +134,14 @@ function RunMixBar({ agent }: { agent: CostAgentRow }) {
   const parts = runMixSegments(agent);
 
   if (total <= 0 || parts.length === 0) {
-    return <div className="bg-muted h-2 rounded-full" />;
+    return <div className="bg-sunken h-2 rounded-full" />;
   }
 
   return (
-    <div className="bg-muted flex h-2 overflow-hidden rounded-full">
+    <div className="bg-sunken flex h-2 overflow-hidden rounded-full">
       {parts.map((part) => (
         <span
-          key={part.label}
+          key={part.className}
           className={part.className}
           style={{ width: `${Math.max(4, (part.value / total) * 100)}%` }}
         />

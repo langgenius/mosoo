@@ -15,18 +15,7 @@ import { API_ERROR_CODE, createApiError } from "../../../platform/errors";
 import { isTruthy } from "../../../shared/truthiness";
 import { currentTimestampMs, toIsoString } from "../../../time";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import {
-  readAccountId,
-  readAgentDeploymentVersionId,
-  readAgentId,
-  readMcpServerId,
-  readNullableCredentialId,
-  readNullableEnvironmentId,
-  readNullableSkillSnapshotId,
-  readSkillId,
-} from "./agent-platform-ids";
 import { getAgentRow } from "./agent-repository";
-import { toAgentRuntimeModelProjection } from "./agent-runtime-model-identity";
 import {
   buildAgentSpec,
   listAgentSpecMcpBindings,
@@ -36,7 +25,6 @@ import {
   toAgentSpecToolReferences,
 } from "./agent-spec.service";
 import type { AgentSpec, AgentSpecMcpBindingSnapshot } from "./agent-spec.service";
-import { normalizeAgentStoredConfigJson } from "./agent-stored-config.service";
 import type { AgentRow } from "./agent-types";
 
 interface AgentDeploymentVersionRow {
@@ -121,44 +109,28 @@ export interface AgentDeploymentVersionCandidate {
   values: typeof agentDeploymentVersionsTable.$inferInsert;
 }
 
+// The JSON snapshots are written only by prepareAgentDeploymentVersionCandidate.
 function toRecord(row: AgentDeploymentVersionRow): AgentDeploymentVersionRecord {
-  const runtimeModel = toAgentRuntimeModelProjection(row);
-  const mcpBindings: AgentVersionMcpBindingSnapshot[] = parseSchemaValue(
-    AgentVersionMcpBindingSnapshotJsonArray,
-    JSON.parse(row.mcpBindingsJson),
-  ).map((binding) => ({
-    agentCredentialId: readNullableCredentialId(binding.agentCredentialId),
-    credentialMode: binding.credentialMode,
-    enabled: binding.enabled,
-    serverId: readMcpServerId(binding.serverId),
-    sortOrder: binding.sortOrder,
-  }));
-
-  const skills: Omit<SessionExecutionSkillReference, "sessionId">[] = parseSchemaValue(
-    AgentVersionSkillReferenceJsonArray,
-    JSON.parse(row.skillsJson),
-  ).map((skill) => ({
-    resolutionMode: skill.resolutionMode,
-    skillId: readSkillId(skill.skillId),
-    skillName: skill.skillName,
-    snapshotId: readNullableSkillSnapshotId(skill.snapshotId),
-    sortOrder: skill.sortOrder,
-  }));
-
   return {
-    agentId: readAgentId(row.agentId, "Agent ID"),
-    configJson: normalizeAgentStoredConfigJson(row.configJson),
+    agentId: row.agentId,
+    configJson: row.configJson,
     createdAt: row.createdAt,
-    createdByAccountId: readAccountId(row.createdByAccountId, "Account ID"),
-    environmentId: readNullableEnvironmentId(row.environmentId, "Environment ID"),
-    id: readAgentDeploymentVersionId(row.id, "Agent deployment version ID"),
+    createdByAccountId: row.createdByAccountId,
+    environmentId: row.environmentId,
+    id: row.id,
     kind: row.kind,
-    mcpBindings,
-    model: runtimeModel.model,
+    mcpBindings: parseSchemaValue(
+      AgentVersionMcpBindingSnapshotJsonArray,
+      JSON.parse(row.mcpBindingsJson),
+    ) as AgentVersionMcpBindingSnapshot[],
+    model: row.model,
     prompt: row.prompt,
-    provider: runtimeModel.provider,
-    runtimeId: runtimeModel.runtimeId,
-    skills,
+    provider: row.provider,
+    runtimeId: row.runtimeId,
+    skills: parseSchemaValue(
+      AgentVersionSkillReferenceJsonArray,
+      JSON.parse(row.skillsJson),
+    ) as Omit<SessionExecutionSkillReference, "sessionId">[],
     summary: row.summary,
     versionNumber: row.versionNumber,
   };
@@ -241,7 +213,7 @@ export async function prepareAgentDeploymentVersionCandidate(
       agentId: agent.id,
       configJson: spec.configJson,
       createdAt: timestampMs,
-      createdByAccountId: readAccountId(viewer.id, "Account ID"),
+      createdByAccountId: viewer.id,
       environmentId: spec.environment.environmentId,
       id: versionId,
       kind: agent.kind,
@@ -359,8 +331,6 @@ export function toAgentDeploymentVersionModel(
   version: AgentDeploymentVersionRecord,
   liveDeploymentVersionId: AgentDeploymentVersionId | null,
 ): AgentDeploymentVersion {
-  const runtimeModel = toAgentRuntimeModelProjection(version);
-
   return {
     agentId: version.agentId,
     createdAt: toIsoString(version.createdAt),
@@ -368,9 +338,9 @@ export function toAgentDeploymentVersionModel(
     environmentId: version.environmentId,
     id: version.id,
     isLive: version.id === liveDeploymentVersionId,
-    model: runtimeModel.model,
-    provider: runtimeModel.provider,
-    runtimeId: runtimeModel.runtimeId,
+    model: version.model,
+    provider: version.provider,
+    runtimeId: version.runtimeId,
     summary: version.summary,
     versionNumber: version.versionNumber,
   };

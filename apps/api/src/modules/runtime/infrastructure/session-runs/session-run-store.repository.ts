@@ -1,12 +1,12 @@
 export {
-  getActiveSessionRunId,
+  getActiveSessionRunSummary,
   getSessionRunSummariesByIds,
   getSessionRunSummary,
-  hasActiveSessionRun,
 } from "./session-run-read.repository";
 export {
+  assertSessionRunTransition,
   cancelActiveSessionRunsForRuntimeOperation,
-  createSessionRunRecordIfSessionIdle,
+  isStaleTerminalRunTransition,
   setSessionRunStatus,
 } from "./session-run-write.repository";
 export type { SessionRunTransitionOutcome } from "./session-run-write.repository";
