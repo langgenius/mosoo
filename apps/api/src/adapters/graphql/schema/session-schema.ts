@@ -21,9 +21,7 @@ import { graphQLEnumValues } from "./graphql-enum-values";
 
 export const sessionSchema = /* GraphQL */ `
   type SessionRuntimeOperationResult {
-    affectedSessionCount: Int!
     ok: Boolean!
-    operation: RuntimeStateOperation!
     sessionId: ULID!
   }
 
@@ -175,36 +173,6 @@ export const sessionSchema = /* GraphQL */ `
     warnings: [UserWarning!]!
   }
 
-  input StartAgentRunInput {
-    agentId: ULID
-    projectId: ULID!
-    clientRequestId: String
-    prompt: String!
-    sessionId: ULID
-    type: SessionType
-    waitForRuntimeReady: Boolean
-  }
-
-  type AgentRunEventSurface {
-    projectId: ULID!
-    graphqlUrl: String!
-    messagesOperation: String!
-    processEventsOperation: String!
-    retrieveOperation: String!
-    sessionId: ULID!
-    streamUrl: String
-    suggestedPollIntervalMs: Int!
-  }
-
-  type AgentRunWorkflow {
-    acceptedAt: String!
-    createdSession: Boolean!
-    eventBatch: AgentSessionEventBatch!
-    eventSurface: AgentRunEventSurface!
-    run: SessionRun
-    session: Session!
-  }
-
   type SessionRuntimePrewarmAck {
     scheduledAt: String!
     sessionId: ULID!
@@ -297,17 +265,10 @@ export const sessionSchema = /* GraphQL */ `
     ${graphQLEnumValues(SESSION_STATUSES)}
   }
 
-  input RenameSessionInput {
-    projectId: ULID!
-    sessionId: ULID!
-    title: String!
-  }
-
   input CreateAgentSessionInput {
     agentId: ULID!
     projectId: ULID!
     type: SessionType
-    waitForRuntimeReady: Boolean
   }
 
   enum FileScopeKind {
@@ -340,16 +301,6 @@ export const sessionSchema = /* GraphQL */ `
     kind: FileOwnerKind!
   }
 
-  type SessionResource {
-    createdAt: String!
-    id: ULID!
-    kind: FileSessionKind!
-    mimeType: String
-    name: String!
-    path: String!
-    size: Int!
-  }
-
   input AddSessionResourceFileInput {
     contentType: String!
     name: String!
@@ -359,12 +310,6 @@ export const sessionSchema = /* GraphQL */ `
   input AddSessionResourceInput {
     file: AddSessionResourceFileInput!
     projectId: ULID!
-    sessionId: ULID!
-  }
-
-  input RemoveSessionResourceInput {
-    projectId: ULID!
-    resourceId: ULID!
     sessionId: ULID!
   }
 

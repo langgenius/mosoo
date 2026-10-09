@@ -9,20 +9,16 @@ import type {
   SessionSummary,
 } from "@mosoo/contracts/session";
 import { getAgentSessionUserLifecycleProjection } from "@mosoo/contracts/session";
-import { nativeResumeRefsTable } from "@mosoo/db";
+import { nativeResumeRefsTable, sessionPermissionRequestsTable } from "@mosoo/db";
 import type { ProjectId, SessionId } from "@mosoo/id";
 import { getAgentSessionActionCapabilities } from "@mosoo/session-policy";
-import { eq } from "drizzle-orm";
+import { and, count, eq } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { findSessionExecutionPlan } from "../../runtime/application/session-definition/session-execution.repository";
-import { loadSessionViewerState } from "./session-live-state.service";
-import {
-  getSessionSummaryAccessById,
-  getSessionSummaryById,
-  getSessionSummaryForCreator,
-} from "./session-summary-query.service";
+import { isTerminalSessionRunStatus } from "../../runtime/domain/session-run-lifecycle.machine";
+import { getSessionSummaryById } from "./session-summary-query.service";
 
 interface AgentSessionLookupInput {
   projectId: ProjectId;
@@ -62,40 +58,19 @@ function toDiagnosticToolReference(
   };
 }
 
-export async function retrieveAgentSession(
-  database: D1Database,
-  viewer: AuthenticatedViewer,
-  input: AgentSessionLookupInput,
-): Promise<AgentSessionRetrieveResult> {
-  const access = await getSessionSummaryAccessById(database, viewer.id, input);
-
-  return toAgentSessionRetrieveResult(access);
-}
-
 export async function retrieveThreadAgentSession(
   database: D1Database,
   viewer: AuthenticatedViewer,
   input: AgentSessionLookupInput,
 ): Promise<AgentSessionRetrieveResult> {
-  const session = await getSessionSummaryForCreator(database, viewer.id, input);
-
-  return toAgentSessionRetrieveResult({
-    isSessionCreator: true,
-    session,
-  });
+  return toAgentSessionRetrieveResult(await getSessionSummaryById(database, viewer.id, input));
 }
 
-export function toAgentSessionRetrieveResult(input: {
-  isSessionCreator: boolean;
-  session: SessionSummary;
-}): AgentSessionRetrieveResult {
+export function toAgentSessionRetrieveResult(session: SessionSummary): AgentSessionRetrieveResult {
   return {
-    capabilities: getAgentSessionActionCapabilities({
-      ...input.session,
-      isSessionCreator: input.isSessionCreator,
-    }),
-    recoverability: getAgentSessionRecoverability(input.session),
-    session: input.session,
+    capabilities: getAgentSessionActionCapabilities(session),
+    recoverability: getAgentSessionRecoverability(session),
+    session,
   };
 }
 
@@ -111,12 +86,9 @@ export async function getAgentSessionDiagnostics(
   input: AgentSessionLookupInput,
 ): Promise<AgentSessionDiagnostics> {
   const session = await getSessionSummaryById(database, viewer.id, input);
-  const [execution, viewerState, nativeRuntimeRef] = await Promise.all([
+  const [execution, pendingPermissionCount, nativeRuntimeRef] = await Promise.all([
     loadSessionExecutionDiagnostics(database, input.sessionId),
-    loadSessionViewerState(database, {
-      sessionId: input.sessionId,
-      viewerId: viewer.id,
-    }),
+    countPendingPermissionRequests(database, session),
     loadNativeRuntimeRefDiagnosticsRow(database, input.sessionId),
   ]);
 
@@ -127,9 +99,33 @@ export async function getAgentSessionDiagnostics(
       nativeRuntimeRef,
       execution?.binding.runtimeId ?? null,
     ),
-    pendingPermissionCount: viewerState.permissionRequests.length,
+    pendingPermissionCount,
     session,
   };
+}
+
+async function countPendingPermissionRequests(
+  database: D1Database,
+  session: SessionSummary,
+): Promise<number> {
+  const run = session.lastRun;
+
+  if (run === null || isTerminalSessionRunStatus(run.status)) {
+    return 0;
+  }
+
+  const row = await getAppDatabase(database)
+    .select({ count: count() })
+    .from(sessionPermissionRequestsTable)
+    .where(
+      and(
+        eq(sessionPermissionRequestsTable.sessionId, session.id),
+        eq(sessionPermissionRequestsTable.runId, run.id),
+      ),
+    )
+    .get();
+
+  return row?.count ?? 0;
 }
 
 async function loadSessionExecutionDiagnostics(

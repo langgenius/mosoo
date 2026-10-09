@@ -10,10 +10,7 @@ import {
   updateVendorCredential,
 } from "../src/modules/vendor-credentials/application/vendor-credential-commands";
 import { listVendorCredentials } from "../src/modules/vendor-credentials/application/vendor-credential-list";
-import {
-  resolveVendorApiKey,
-  resolveVendorCredentialRef,
-} from "../src/modules/vendor-credentials/application/vendor-credential.secret-resolution";
+import { resolveVendorCredentialRef } from "../src/modules/vendor-credentials/application/vendor-credential.secret-resolution";
 import { createApiTestFixture, insertTestVendorCredential } from "./helpers/api-test-fixture";
 
 const PROTOCOLS = [
@@ -56,12 +53,10 @@ describe("vendor credential model protocol", () => {
       ).toBe(modelProtocol);
       const request = {
         bindings: fixture.bindings,
-        executionOwnerUserId: fixture.viewer.id,
         options: { modelId: "custom-model" },
         projectId: fixture.ids.projectId,
         vendorId: "openai-compatible",
       };
-      expect((await resolveVendorApiKey(request))?.modelProtocol).toBe(modelProtocol);
       const reference = await resolveVendorCredentialRef(request);
       expect(reference?.modelProtocol).toBe(modelProtocol);
       expect(reference).not.toHaveProperty("apiKey");
@@ -119,7 +114,6 @@ describe("vendor credential model protocol", () => {
     ).toBeNull();
     const reference = await resolveVendorCredentialRef({
       bindings: fixture.bindings,
-      executionOwnerUserId: fixture.viewer.id,
       options: { modelId: "custom-model" },
       projectId: fixture.ids.projectId,
       vendorId: "openai-compatible",

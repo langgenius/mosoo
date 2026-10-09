@@ -1,41 +1,11 @@
-import type { SessionLifecycleStatus, SessionRunView } from "@mosoo/ag-ui-session";
+import type { SessionRunView } from "@mosoo/ag-ui-session";
 import type { RunError, SessionRunStatus, SessionRunSummary } from "@mosoo/contracts/session-run";
-import type { PrimitiveRecord } from "@mosoo/contracts/validation";
-import type { RuntimeEventId, SessionId, SessionMessageId } from "@mosoo/id";
+import type { SessionId, SessionMessageId } from "@mosoo/id";
 import type { RuntimeEventEnvelope, RuntimeEventKind } from "@mosoo/runtime-events";
 
 import { createSessionRuntimeEvent } from "../../../sessions/application/session-event-write.service";
-import { isTerminalSessionRunStatus } from "../../domain/session-run-status";
-
-function toPrimitiveRecord(value: Record<string, unknown>): PrimitiveRecord {
-  const details: PrimitiveRecord = {};
-
-  for (const [key, entry] of Object.entries(value)) {
-    if (
-      typeof entry === "string" ||
-      typeof entry === "number" ||
-      typeof entry === "boolean" ||
-      entry === null
-    ) {
-      details[key] = entry;
-    }
-  }
-
-  return details;
-}
-
-function toSessionLifecycleStatusForRunView(status: SessionRunStatus): SessionLifecycleStatus {
-  if (
-    status === "queued" ||
-    status === "booting" ||
-    status === "running" ||
-    status === "waiting_input"
-  ) {
-    return "RUNNING";
-  }
-
-  return "IDLE";
-}
+import { toSessionLifecycleStatusForRunStatus } from "../../../sessions/domain/session-lifecycle";
+import { isTerminalSessionRunStatus } from "../../domain/session-run-lifecycle.machine";
 
 function toSessionRunView(run: SessionRunSummary): SessionRunView {
   return {
@@ -57,7 +27,7 @@ function toPersistedTerminalEventTime(run: SessionRunSummary) {
 export function createSessionRunUpdatedEvent(
   run: SessionRunSummary,
   sessionId: SessionId,
-  lifecycle = toSessionLifecycleStatusForRunView(run.status),
+  lifecycle = toSessionLifecycleStatusForRunStatus(run.status),
   sourceEventId?: string,
 ): RuntimeEventEnvelope {
   return createSessionRuntimeEvent({
@@ -74,27 +44,35 @@ export function createSessionRunUpdatedEvent(
   });
 }
 
-function toRuntimeEventKindForRunStatus(status: SessionRunStatus): RuntimeEventKind {
+export function toTerminalRunEventKind(
+  status: SessionRunStatus,
+): "run.cancelled" | "run.completed" | "run.failed" {
   switch (status) {
-    case "queued": {
-      return "run.queued";
+    case "completed": {
+      return "run.completed";
     }
-    case "booting":
-    case "running":
-    case "waiting_input": {
-      return "run.dispatched";
+    case "failed": {
+      return "run.failed";
     }
     case "cancelled":
     case "expired": {
       return "run.cancelled";
     }
-    case "failed": {
-      return "run.failed";
-    }
-    case "completed": {
-      return "run.completed";
+    case "queued":
+    case "booting":
+    case "running":
+    case "waiting_input": {
+      throw new Error(`Expected terminal Session Run status, received ${status}.`);
     }
   }
+}
+
+function toRuntimeEventKindForRunStatus(status: SessionRunStatus): RuntimeEventKind {
+  if (isTerminalSessionRunStatus(status)) {
+    return toTerminalRunEventKind(status);
+  }
+
+  return status === "queued" ? "run.queued" : "run.dispatched";
 }
 
 export function createQueuedSessionRunRuntimeEvents(input: {
@@ -118,7 +96,7 @@ export function createQueuedSessionRunRuntimeEvents(input: {
     createSessionRuntimeEvent({
       kind: "run.queued",
       payload: {
-        lifecycle: toSessionLifecycleStatusForRunView(input.run.status),
+        lifecycle: toSessionLifecycleStatusForRunStatus(input.run.status),
         run: toSessionRunView(input.run),
       },
       runId: input.run.id,
@@ -129,8 +107,6 @@ export function createQueuedSessionRunRuntimeEvents(input: {
 }
 
 export function createCancelledSessionRunRuntimeEvent(input: {
-  eventId?: RuntimeEventId;
-  lifecycle?: Extract<SessionLifecycleStatus, "IDLE" | "TERMINATED">;
   run: SessionRunSummary;
   runError?: RunError | null;
   sessionId: SessionId;
@@ -138,22 +114,16 @@ export function createCancelledSessionRunRuntimeEvent(input: {
 }): RuntimeEventEnvelope {
   const run: SessionRunView = {
     ...toSessionRunView(input.run),
-    error: input.runError
-      ? {
-          ...input.runError,
-          details: toPrimitiveRecord(input.runError.details),
-        }
-      : input.run.error,
+    error: input.runError ?? input.run.error,
     status: "cancelled",
   };
 
   return createSessionRuntimeEvent({
     ...toPersistedTerminalEventTime(input.run),
-    ...(input.eventId === undefined ? {} : { id: input.eventId }),
     ...(input.sourceEventId === undefined ? {} : { sourceEventId: input.sourceEventId }),
     kind: "run.cancelled",
     payload: {
-      lifecycle: input.lifecycle ?? "IDLE",
+      lifecycle: "IDLE",
       run,
     },
     runId: input.run.id,
@@ -174,7 +144,7 @@ export function createFailedSessionRunRuntimeEvent(input: {
     payload: {
       error: {
         code: input.runError.code,
-        details: toPrimitiveRecord(input.runError.details),
+        details: input.runError.details,
         message: input.runError.message,
         retryable: input.runError.retryable,
       },
@@ -185,27 +155,5 @@ export function createFailedSessionRunRuntimeEvent(input: {
     sessionId: input.sessionId,
     ...(input.sourceEventId === undefined ? {} : { sourceEventId: input.sourceEventId }),
     traceId: input.run.traceId,
-  });
-}
-
-export function createSessionLifecycleTerminatedEvent(input: {
-  eventId?: RuntimeEventId;
-  lastSeen: string;
-  message: string;
-  reason: string;
-  sessionId: SessionId;
-  sourceEventId?: string;
-}): RuntimeEventEnvelope {
-  return createSessionRuntimeEvent({
-    ...(input.eventId === undefined ? {} : { id: input.eventId }),
-    ...(input.sourceEventId === undefined ? {} : { sourceEventId: input.sourceEventId }),
-    kind: "session.lifecycle.updated",
-    payload: {
-      lastSeen: input.lastSeen,
-      message: input.message,
-      reason: input.reason,
-      status: "TERMINATED",
-    },
-    sessionId: input.sessionId,
   });
 }

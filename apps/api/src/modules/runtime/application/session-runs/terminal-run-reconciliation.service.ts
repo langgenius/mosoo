@@ -1,5 +1,5 @@
 import type { SessionStatus } from "@mosoo/contracts/session";
-import type { SessionRunStatus, SessionRunSummary } from "@mosoo/contracts/session-run";
+import type { SessionRunSummary } from "@mosoo/contracts/session-run";
 import {
   driverInstancesTable,
   sessionEventsTable,
@@ -8,24 +8,25 @@ import {
   sessionsTable,
 } from "@mosoo/db";
 import type { SessionId, SessionRunId } from "@mosoo/id";
-import { and, asc, eq, exists, inArray, isNull, notExists, or, sql } from "drizzle-orm";
+import { and, asc, eq, exists, inArray, isNull, not, or } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../../platform/db/drizzle";
 import { appendSessionRuntimeEvents } from "../../../sessions/application/session-event-write.service";
-import { finalizeSessionModelCallUsage } from "../../../sessions/application/session-model-call.service";
+import { finalizeSessionModelCallUsage } from "../../../sessions/infrastructure/session-model-call.repository";
+import { TERMINAL_SESSION_RUN_STATUSES } from "../../domain/session-run-lifecycle.machine";
 import { createSessionRunTerminalSourceId } from "../../domain/session-run-terminal-event-id";
 import {
   getSessionRunSummariesByIds,
   setSessionRunStatus,
 } from "../../infrastructure/session-runs/session-run-store.repository";
-import type { SessionRunTransitionOutcome } from "../../infrastructure/session-runs/session-run-store.repository";
+import { sessionRunTerminalEventExists } from "../../infrastructure/session-runs/session-run-write.repository";
 import {
   createFailedSessionRunRuntimeEvent,
   createSessionRunUpdatedEvent,
+  toTerminalRunEventKind,
 } from "./session-run-view-events.service";
 
-const TERMINAL_RUN_STATUSES = ["cancelled", "completed", "expired", "failed"] as const;
 const TERMINAL_DRIVER_STATUSES = ["failed", "stopped"] as const;
 
 interface TerminalRunCandidate {
@@ -33,6 +34,7 @@ interface TerminalRunCandidate {
   readonly sessionId: SessionId;
   readonly sessionLastRunId: SessionRunId | null;
   readonly sessionStatus: SessionStatus;
+  readonly terminalEventExists: number;
 }
 
 export interface TerminalRunReconciliationResult {
@@ -45,45 +47,6 @@ interface RepairTerminalSessionRunProjectionsInput {
   readonly run: SessionRunSummary;
   readonly sessionId: SessionId;
   readonly terminalEventExists?: boolean;
-}
-
-function assertTerminalRunProjection(outcome: SessionRunTransitionOutcome): void {
-  switch (outcome.kind) {
-    case "applied":
-    case "duplicate": {
-      return;
-    }
-    case "repair_needed": {
-      throw new Error("Terminal run reconciliation left the session lifecycle projection stale.");
-    }
-    case "rejected":
-    case "stale": {
-      throw new Error("Terminal run reconciliation lost a concurrent run transition.");
-    }
-  }
-}
-
-function terminalEventKind(
-  status: SessionRunStatus,
-): "run.cancelled" | "run.completed" | "run.failed" {
-  switch (status) {
-    case "completed": {
-      return "run.completed";
-    }
-    case "failed": {
-      return "run.failed";
-    }
-    case "cancelled":
-    case "expired": {
-      return "run.cancelled";
-    }
-    case "queued":
-    case "booting":
-    case "running":
-    case "waiting_input": {
-      throw new Error(`Expected terminal Session Run status, received ${status}.`);
-    }
-  }
 }
 
 function createTerminalRunRecoveryEvent(input: {
@@ -114,25 +77,6 @@ async function findTerminalRunCandidates(
   limit: number,
 ): Promise<TerminalRunCandidate[]> {
   const database = getAppDatabase(bindings.DB);
-  const expectedEventType = sql<string>`
-    CASE ${sessionRunsTable.status}
-      WHEN 'completed' THEN 'run.completed'
-      WHEN 'failed' THEN 'run.failed'
-      ELSE 'run.cancelled'
-    END
-  `;
-  const missingTerminalEvent = notExists(
-    database
-      .select({ id: sessionEventsTable.id })
-      .from(sessionEventsTable)
-      .where(
-        and(
-          eq(sessionEventsTable.sessionId, sessionRunsTable.sessionId),
-          eq(sessionEventsTable.runId, sessionRunsTable.id),
-          sql`${sessionEventsTable.eventType} = ${expectedEventType}`,
-        ),
-      ),
-  );
   const unfinishedUsage = exists(
     database
       .select({ id: sessionModelCallsTable.id })
@@ -155,13 +99,14 @@ async function findTerminalRunCandidates(
       sessionId: sessionRunsTable.sessionId,
       sessionLastRunId: sessionsTable.lastRunId,
       sessionStatus: sessionsTable.status,
+      terminalEventExists: sessionRunTerminalEventExists(),
     })
     .from(sessionRunsTable)
     .innerJoin(sessionsTable, eq(sessionsTable.id, sessionRunsTable.sessionId))
     .leftJoin(driverInstancesTable, eq(driverInstancesTable.id, sessionRunsTable.driverInstanceId))
     .where(
       and(
-        inArray(sessionRunsTable.status, TERMINAL_RUN_STATUSES),
+        inArray(sessionRunsTable.status, TERMINAL_SESSION_RUN_STATUSES),
         isNull(sessionsTable.archivedAt),
         inArray(sessionsTable.status, ["IDLE", "RESCHEDULING", "RUNNING"]),
         or(
@@ -169,32 +114,12 @@ async function findTerminalRunCandidates(
           isNull(driverInstancesTable.id),
           inArray(driverInstancesTable.status, TERMINAL_DRIVER_STATUSES),
         ),
-        or(staleSessionProjection, missingTerminalEvent, unfinishedUsage),
+        or(staleSessionProjection, not(sessionRunTerminalEventExists()), unfinishedUsage),
       ),
     )
     .orderBy(asc(sessionRunsTable.updatedAt), asc(sessionRunsTable.id))
     .limit(limit)
     .all();
-}
-
-async function readPersistedTerminalEventKeys(
-  bindings: ApiBindings,
-  runIds: readonly SessionRunId[],
-): Promise<Set<string>> {
-  if (runIds.length === 0) return new Set();
-  const rows = await getAppDatabase(bindings.DB)
-    .select({ eventType: sessionEventsTable.eventType, runId: sessionEventsTable.runId })
-    .from(sessionEventsTable)
-    .where(
-      and(
-        inArray(sessionEventsTable.runId, [...runIds]),
-        inArray(sessionEventsTable.eventType, ["run.cancelled", "run.completed", "run.failed"]),
-      ),
-    )
-    .all();
-  return new Set(
-    rows.flatMap((row) => (row.runId === null ? [] : [`${row.runId}:${row.eventType}`])),
-  );
 }
 
 export async function repairTerminalSessionRunProjections(
@@ -207,9 +132,11 @@ export async function repairTerminalSessionRunProjections(
     source: "maintenance",
     status: input.run.status,
   });
-  assertTerminalRunProjection(projection);
+  if (projection.kind !== "applied" && projection.kind !== "duplicate") {
+    throw new Error("Terminal run reconciliation lost a concurrent run transition.");
+  }
   const usageFinalized = await finalizeSessionModelCallUsage(bindings.DB, input.run.id);
-  const kind = terminalEventKind(input.run.status);
+  const kind = toTerminalRunEventKind(input.run.status);
 
   const terminalEventExists =
     input.terminalEventExists ??
@@ -254,11 +181,10 @@ export async function reconcileTerminalSessionRuns(
   },
 ): Promise<TerminalRunReconciliationResult> {
   const candidates = await findTerminalRunCandidates(bindings, input.limit);
-  const runIds = candidates.map((candidate) => candidate.runId);
-  const [runsById, persistedTerminalEventKeys] = await Promise.all([
-    getSessionRunSummariesByIds(bindings.DB, runIds),
-    readPersistedTerminalEventKeys(bindings, runIds),
-  ]);
+  const runsById = await getSessionRunSummariesByIds(
+    bindings.DB,
+    candidates.map((candidate) => candidate.runId),
+  );
   const reconciledRunIds: SessionRunId[] = [];
   const reconciledSessionIds = new Set<SessionId>();
 
@@ -274,9 +200,7 @@ export async function reconcileTerminalSessionRuns(
         candidate.sessionLastRunId !== run.id || candidate.sessionStatus !== "RUNNING",
       run,
       sessionId: candidate.sessionId,
-      terminalEventExists: persistedTerminalEventKeys.has(
-        `${run.id}:${terminalEventKind(run.status)}`,
-      ),
+      terminalEventExists: candidate.terminalEventExists === 1,
     });
     if (repaired) reconciledRunIds.push(run.id);
 

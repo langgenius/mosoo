@@ -1,11 +1,10 @@
 import type { AuthenticatedViewer } from "../../modules/auth/application/viewer-auth.service";
-import type { ApiBindings, ApiServerContext } from "../../platform/cloudflare/worker-types";
+import type { ApiBindings } from "../../platform/cloudflare/worker-types";
 
-export interface GraphQLContext extends ApiServerContext {
+export interface GraphQLContext {
   bindings: ApiBindings;
   executionContext: Pick<ExecutionContext, "waitUntil"> | null;
   request: Request;
-  serverContext: ApiServerContext;
   viewer: AuthenticatedViewer | null;
 }
 

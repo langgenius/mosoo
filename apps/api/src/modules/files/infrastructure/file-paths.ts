@@ -2,17 +2,13 @@ import {
   createAccountAvatarPath as createContractAccountAvatarPath,
   createAttachmentPath as createContractAttachmentPath,
   createFileObjectKey as createContractFileObjectKey,
-  createFileRecordObjectKey,
   createScope as createContractScope,
   createSessionArtifactPath as createContractSessionArtifactPath,
-  ensureLibraryFilePathHasExtension as ensureContractLibraryFilePathHasExtension,
   normalizeFileName as normalizeContractFileName,
-  normalizeLibraryDirectoryPath as normalizeContractLibraryDirectoryPath,
-  normalizeLibraryFilePath as normalizeContractLibraryFilePath,
 } from "@mosoo/contracts/file";
-import type { FileRecord, FileScopeKind, FileSessionKind } from "@mosoo/contracts/file";
+import type { FileScopeKind, FileSessionKind } from "@mosoo/contracts/file";
 import type { FileScopeId } from "@mosoo/contracts/file";
-import type { AccountId, FileId, PlatformId } from "@mosoo/id";
+import type { FileId, PlatformId } from "@mosoo/id";
 
 import { createFileInvalidRequestError } from "./file-errors";
 
@@ -25,7 +21,6 @@ export {
 } from "@mosoo/contracts/file";
 
 interface ObjectKeyRecord {
-  created_by_account_id: AccountId;
   id: FileId;
   name: string;
   path: string;
@@ -59,18 +54,6 @@ export function normalizeFileName(name: string): string {
   return translatePathAdmission(() => normalizeContractFileName(name));
 }
 
-export function normalizeLibraryDirectoryPath(path?: string | null): string {
-  return translatePathAdmission(() => normalizeContractLibraryDirectoryPath(path));
-}
-
-export function normalizeLibraryFilePath(path: string): string {
-  return translatePathAdmission(() => normalizeContractLibraryFilePath(path));
-}
-
-export function ensureLibraryFilePathHasExtension(path: string): string {
-  return translatePathAdmission(() => ensureContractLibraryFilePathHasExtension(path));
-}
-
 export function createStagingObjectKey(
   scopeKind: FileScopeKind,
   scopeId: FileScopeId,
@@ -79,18 +62,14 @@ export function createStagingObjectKey(
   return `staging/${scopeKind}/${scopeId ?? "unscoped"}/${fileId}`;
 }
 
-export function createFinalObjectKey(file: ObjectKeyRecord | FileRecord): string {
-  return translatePathAdmission(() => {
-    if ("scope_id" in file) {
-      return createContractFileObjectKey({
-        id: file.id,
-        name: file.name,
-        path: file.path,
-        scope: createContractScope(file.scope_kind, file.scope_id as FileScopeId),
-        sessionKind: file.session_kind ?? null,
-      });
-    }
-
-    return createFileRecordObjectKey(file);
-  });
+export function createFinalObjectKey(file: ObjectKeyRecord): string {
+  return translatePathAdmission(() =>
+    createContractFileObjectKey({
+      id: file.id,
+      name: file.name,
+      path: file.path,
+      scope: createContractScope(file.scope_kind, file.scope_id as FileScopeId),
+      sessionKind: file.session_kind ?? null,
+    }),
+  );
 }

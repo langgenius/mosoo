@@ -1,9 +1,10 @@
 import { describe, expect, test } from "bun:test";
 
 import { runUsageDailyRollup } from "../src/modules/cost/application/cost-rollup.service";
-import { recordRuntimeUsageEvent } from "../src/modules/cost/application/cost-usage-event.service";
+import { createRuntimeUsageEventUpsert } from "../src/modules/cost/application/cost-usage-event.service";
 import type { RecordRuntimeUsageEventInput } from "../src/modules/cost/application/cost-usage-event.service";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
+import { getAppDatabase } from "../src/platform/db/drizzle";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
 const PROJECT_ID = "01J0000000000000000000000Q";
@@ -85,13 +86,6 @@ function createUsageDatabase(): SqliteD1Database {
         model
       )
     );
-
-    CREATE TABLE usage_event_rollup_receipt (
-      rolled_up_at integer NOT NULL,
-      source text NOT NULL,
-      source_event_id text NOT NULL,
-      PRIMARY KEY (source, source_event_id)
-    );
   `);
 
   return database;
@@ -132,22 +126,14 @@ function createUsageEventInput(): RecordRuntimeUsageEventInput {
   };
 }
 
-async function readRollupTotals(
+async function recordRuntimeUsageEvent(
   database: SqliteD1Database,
-): Promise<{ requestCount: number; totalCostUsdMicros: number }> {
-  const row = await database
-    .prepare(
-      "SELECT SUM(request_count) AS request_count, SUM(total_cost_usd_micros) AS total_cost_usd_micros FROM usage_daily_rollup",
-    )
-    .first<{ request_count: number | null; total_cost_usd_micros: number | null }>();
-
-  return {
-    requestCount: row?.request_count ?? 0,
-    totalCostUsdMicros: row?.total_cost_usd_micros ?? 0,
-  };
+  input: RecordRuntimeUsageEventInput,
+): Promise<void> {
+  await createRuntimeUsageEventUpsert(getAppDatabase(database), input)?.run();
 }
 
-describe("runtime usage idempotency across rollup", () => {
+describe("runtime usage rollup", () => {
   test("groups direct usage once across separate rollup batches without an Agent ID", async () => {
     const database = createUsageDatabase();
     const env = { DB: database } as unknown as ApiBindings;
@@ -164,11 +150,7 @@ describe("runtime usage idempotency across rollup", () => {
       run_purpose: "production",
     });
     await runUsageDailyRollup(env, ROLLUP_TIME);
-    const second = { ...first, nativeCallId: "direct-second-call" };
-    await recordRuntimeUsageEvent(database, second);
-    await runUsageDailyRollup(env, ROLLUP_TIME);
-    await recordRuntimeUsageEvent(database, first);
-    await recordRuntimeUsageEvent(database, second);
+    await recordRuntimeUsageEvent(database, { ...first, nativeCallId: "direct-second-call" });
     await runUsageDailyRollup(env, ROLLUP_TIME);
     expect(
       await database
@@ -180,59 +162,5 @@ describe("runtime usage idempotency across rollup", () => {
     expect(await database.prepare("SELECT COUNT(*) AS count FROM usage_event").first()).toEqual({
       count: 0,
     });
-  });
-
-  test("does not double-count an event replayed after its raw row is rolled up", async () => {
-    const database = createUsageDatabase();
-    const env = { DB: database } as unknown as ApiBindings;
-
-    await recordRuntimeUsageEvent(database, createUsageEventInput());
-    await runUsageDailyRollup(env, ROLLUP_TIME);
-
-    const afterFirstRollup = await readRollupTotals(database);
-    expect(afterFirstRollup).toEqual({ requestCount: 1, totalCostUsdMicros: 5_000_000 });
-
-    const rawAfterRollup = await database
-      .prepare("SELECT COUNT(*) AS count FROM usage_event")
-      .first<{ count: number }>();
-    expect(rawAfterRollup?.count).toBe(0);
-
-    const receipts = await database
-      .prepare("SELECT source, source_event_id FROM usage_event_rollup_receipt")
-      .all<{ source: string; source_event_id: string }>();
-    expect(receipts.results).toEqual([
-      { source: "runtime_driver", source_event_id: `${DRIVER_INSTANCE_ID}:native-call-1` },
-    ]);
-
-    await recordRuntimeUsageEvent(database, createUsageEventInput());
-
-    const rawAfterReplay = await database
-      .prepare("SELECT COUNT(*) AS count FROM usage_event")
-      .first<{ count: number }>();
-    expect(rawAfterReplay?.count).toBe(0);
-
-    await runUsageDailyRollup(env, ROLLUP_TIME);
-
-    const afterSecondRollup = await readRollupTotals(database);
-    expect(afterSecondRollup).toEqual({ requestCount: 1, totalCostUsdMicros: 5_000_000 });
-  });
-
-  test("prunes rollup receipts past the daily rollup retention window", async () => {
-    const database = createUsageDatabase();
-    const env = { DB: database } as unknown as ApiBindings;
-
-    await database
-      .prepare(
-        "INSERT INTO usage_event_rollup_receipt (source, source_event_id, rolled_up_at) VALUES (?, ?, ?)",
-      )
-      .bind("runtime_driver", "stale:receipt", Date.UTC(2025, 0, 1))
-      .run();
-
-    await runUsageDailyRollup(env, ROLLUP_TIME);
-
-    const receipts = await database
-      .prepare("SELECT COUNT(*) AS count FROM usage_event_rollup_receipt")
-      .first<{ count: number }>();
-    expect(receipts?.count).toBe(0);
   });
 });

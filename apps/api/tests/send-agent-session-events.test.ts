@@ -30,8 +30,6 @@ function createQueuedRunExecutionPlan() {
     },
     builtInTools: createDefaultAgentBuiltInTools(),
     environment: {
-      allowMcpServers: true,
-      allowPackageManagers: true,
       allowedHostsJson: "[]",
       envVarsJson: "[]",
       environmentId: PUBLIC_API_TEST_IDS.environment,
@@ -433,7 +431,7 @@ describe("send agent session events", () => {
           name: "Owner",
         },
       }),
-    ).resolves.toEqual([]);
+    ).resolves.toBeUndefined();
 
     const row = await database
       .prepare("SELECT status, error_code FROM session_run WHERE id = ?")
@@ -464,8 +462,6 @@ describe("send agent session events", () => {
       },
       builtInTools: createDefaultAgentBuiltInTools(),
       environment: {
-        allowMcpServers: true,
-        allowPackageManagers: true,
         allowedHostsJson: "[]",
         envVarsJson: "[]",
         environmentId: PUBLIC_API_TEST_IDS.environment,

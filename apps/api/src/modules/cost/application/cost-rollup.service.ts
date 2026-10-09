@@ -1,4 +1,4 @@
-import { usageDailyRollupsTable, usageEventRollupReceiptsTable, usageEventsTable } from "@mosoo/db";
+import { usageDailyRollupsTable, usageEventsTable } from "@mosoo/db";
 import { lt, sql } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
@@ -6,13 +6,13 @@ import { runAppDatabaseBatch } from "../../../platform/db/drizzle";
 
 const DETAIL_RETENTION_DAYS = 7;
 
-export const DAILY_ROLLUP_RETENTION_DAYS = 180;
+const DAILY_ROLLUP_RETENTION_DAYS = 180;
 
-function startOfUtcDay(date: Date): Date {
+export function startOfUtcDay(date: Date): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
 }
 
-function toUtcDate(value: Date): string {
+export function toUtcDate(value: Date): string {
   return value.toISOString().slice(0, 10);
 }
 
@@ -28,33 +28,14 @@ export function getUsageDetailRetentionCutoffMs(now: Date): number {
   return cutoff.getTime();
 }
 
-export function getUsageRollupReceiptRetentionCutoffMs(now: Date): number {
-  const cutoff = startOfUtcDay(now);
-  cutoff.setUTCDate(cutoff.getUTCDate() - DAILY_ROLLUP_RETENTION_DAYS);
-  return cutoff.getTime();
-}
-
 export function createDailyRollupRetentionPredicate(now: Date) {
   return lt(usageDailyRollupsTable.date, getDailyRollupRetentionCutoffDate(now));
 }
 
 export async function runUsageDailyRollup(env: ApiBindings, now = new Date()): Promise<void> {
   const cutoffMs = getUsageDetailRetentionCutoffMs(now);
-
-  if (!Number.isSafeInteger(cutoffMs)) {
-    throw new Error("Usage detail retention cutoff must be a valid timestamp.");
-  }
-
-  const receiptCutoffMs = getUsageRollupReceiptRetentionCutoffMs(now);
-  const rolledUpAtMs = now.getTime();
-
-  if (!Number.isSafeInteger(rolledUpAtMs)) {
-    throw new Error("Usage rollup timestamp must be a valid timestamp.");
-  }
-
   // Drizzle's D1 batch cannot prepare parameterized db.run(sql) queries.
   const cutoffSql = sql.raw(String(cutoffMs));
-  const rolledUpAtSql = sql.raw(String(rolledUpAtMs));
 
   await runAppDatabaseBatch(env.DB, (db) => [
     db.run(sql`
@@ -133,20 +114,7 @@ export async function runUsageDailyRollup(env: ApiBindings, now = new Date()): P
           unpriced_request_count =
             usage_daily_rollup.unpriced_request_count + excluded.unpriced_request_count
       `),
-    db.run(sql`
-        INSERT INTO ${usageEventRollupReceiptsTable} (source, source_event_id, rolled_up_at)
-        SELECT
-          ${usageEventsTable.source},
-          ${usageEventsTable.sourceEventId},
-          ${rolledUpAtSql}
-        FROM ${usageEventsTable}
-        WHERE ${usageEventsTable.createdAt} < ${cutoffSql}
-        ON CONFLICT(source, source_event_id) DO NOTHING
-      `),
     db.delete(usageEventsTable).where(lt(usageEventsTable.createdAt, cutoffMs)),
     db.delete(usageDailyRollupsTable).where(createDailyRollupRetentionPredicate(now)),
-    db
-      .delete(usageEventRollupReceiptsTable)
-      .where(lt(usageEventRollupReceiptsTable.rolledUpAt, receiptCutoffMs)),
   ]);
 }

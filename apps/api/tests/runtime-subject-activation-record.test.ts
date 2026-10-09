@@ -43,7 +43,6 @@ async function fixture() {
 
 const claim = {
   ...scope,
-  accountConcurrentSandboxLimit: 5,
   claimExpiresAt: 1000,
   claimOwner: "activation",
   expectedStatus: "cold",
@@ -55,7 +54,7 @@ describe("exclusive Session execution ownership", () => {
     const database = await fixture();
     expect(await ensureRuntimeSubjectId(database, scope)).toBe(ids.sandbox);
     await database
-      .prepare("UPDATE sandbox SET kind = 'pet', last_backup_id = 'legacy-pointer'")
+      .prepare("UPDATE sandbox SET kind = 'pet', last_backup_id = '01J0000000000000000000BAK1'")
       .run();
     expect(await ensureRuntimeSubjectId(database, scope)).toBe(ids.sandbox);
     const record = await getRuntimeSubjectActivationRecord(database, ids.sandbox);
@@ -65,7 +64,6 @@ describe("exclusive Session execution ownership", () => {
       projectId: ids.project,
       subjectId: ids.ownerSession,
       subjectKind: "session",
-      foreignSessionCount: 0,
     });
     expect(record).not.toHaveProperty("lastBackup");
     expect(await database.prepare("SELECT count(*) AS count FROM sandbox").first()).toEqual({
@@ -131,7 +129,7 @@ describe("exclusive Session execution ownership", () => {
     expect(await database.prepare("SELECT * FROM sandbox_session").all()).toEqual(before);
   });
 
-  test("a closed foreign peer blocks both activation and idle reclamation", async () => {
+  test("a closed foreign peer blocks activation but not idle reclamation", async () => {
     const database = await fixture();
     await insertNonOwnerSession(database);
     await ensureRuntimeSubjectId(database, scope);
@@ -141,15 +139,21 @@ describe("exclusive Session execution ownership", () => {
       VALUES (?, ?, ?, '/workspace', '{}', 'closed', 1, 1)`)
       .bind(ids.nonOwnerSession, ids.sandbox, ids.nonOwnerSession)
       .run();
-    expect(
-      (await getRuntimeSubjectActivationRecord(database, ids.sandbox))?.foreignSessionCount,
-    ).toBe(1);
-    await expect(ensureRuntimeSubjectId(database, scope)).rejects.toThrow(
-      "verified exclusive execution binding",
-    );
+    const before = await database.prepare("SELECT * FROM sandbox").all();
     expect(await claimRuntimeSubjectActivation(database, claim)).toBe(false);
+    expect(await database.prepare("SELECT * FROM sandbox").all()).toEqual(before);
+
     await database.prepare("UPDATE sandbox SET status = 'active', inactive_deadline_at = 1").run();
-    expect(await listInactiveRuntimeSubjects(database, { limit: 10, now: 10 })).toEqual([]);
+    expect(await listInactiveRuntimeSubjects(database, { limit: 10, now: 10 })).toEqual([
+      { id: ids.sandbox },
+    ]);
+
+    await database.prepare("UPDATE sandbox SET status = 'cold'").run();
+    await database
+      .prepare("DELETE FROM sandbox_session WHERE session_id = ?")
+      .bind(ids.nonOwnerSession)
+      .run();
+    expect(await claimRuntimeSubjectActivation(database, claim)).toBe(true);
   });
 
   test("does not choose arbitrarily between duplicate historical kind tuples", async () => {

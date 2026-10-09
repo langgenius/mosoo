@@ -1,5 +1,5 @@
-import { driverInstancesTable, externalToolEffectsTable } from "@mosoo/db";
-import { and, eq, inArray, isNull, lte, notExists, sql } from "drizzle-orm";
+import { driverInstancesTable } from "@mosoo/db";
+import { and, eq, inArray, isNull, lte, sql } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../../platform/db/drizzle";
@@ -68,7 +68,7 @@ export async function cleanupDriverInstances(bindings: ApiBindings): Promise<voi
     })
     .where(
       and(
-        inArray(driverInstancesTable.status, ["ready", "stopping"]),
+        eq(driverInstancesTable.status, "ready"),
         lte(
           sql<number>`COALESCE(${driverInstancesTable.lastHeartbeatAt}, ${driverInstancesTable.updatedAt})`,
           now - RUNTIME_SOCKET_TIMEOUT_MS,
@@ -83,17 +83,6 @@ export async function cleanupDriverInstances(bindings: ApiBindings): Promise<voi
       and(
         inArray(driverInstancesTable.status, ["stopped", "failed"]),
         lte(driverInstancesTable.expiresAt, now),
-        notExists(
-          database
-            .select({ id: externalToolEffectsTable.id })
-            .from(externalToolEffectsTable)
-            .where(
-              and(
-                eq(externalToolEffectsTable.driverInstanceId, driverInstancesTable.id),
-                inArray(externalToolEffectsTable.status, ["executing", "unknown"]),
-              ),
-            ),
-        ),
       ),
     )
     .run();

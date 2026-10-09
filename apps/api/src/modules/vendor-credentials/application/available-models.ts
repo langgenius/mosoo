@@ -12,7 +12,6 @@ import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.ser
 import { ensureProjectOwnership } from "../../projects/application/project.service";
 import { listEffectiveCustomCredentialModelRows } from "./vendor-credential-custom-models";
 import { listProjectVendorCredentialRows } from "./vendor-credential.repository";
-import { collectAvailableVendorIds } from "./vendor-credential.secret-resolution";
 import type { VendorCredentialRow } from "./vendor-credential.types";
 export interface AvailableModelsInput {
   currentModelId?: string;
@@ -45,12 +44,7 @@ export interface ResolvedModelEntry {
 interface RuntimeModelScope {
   acceptsCustomProvider: boolean;
   label: string | null;
-  /**
-   * Per-runtime preset model allowlist. `null` means the runtime has no
-   * per-model allowlist and falls back to vendor-only filtering; an empty set
-   * would mark every preset as wrong-runtime.
-   */
-  supportedModelIds: ReadonlySet<string> | null;
+  supportedModelIds: ReadonlySet<string>;
   vendorIds: Set<string>;
 }
 
@@ -61,7 +55,7 @@ function runtimeModelScope(runtimeId: string): RuntimeModelScope {
     return {
       acceptsCustomProvider: false,
       label: null,
-      supportedModelIds: null,
+      supportedModelIds: new Set<string>(),
       vendorIds: new Set<string>(),
     };
   }
@@ -69,8 +63,7 @@ function runtimeModelScope(runtimeId: string): RuntimeModelScope {
   return {
     acceptsCustomProvider: runtime.acceptsCustomProvider,
     label: runtime.label,
-    supportedModelIds:
-      runtime.supportedModelIds === undefined ? null : new Set(runtime.supportedModelIds),
+    supportedModelIds: new Set(runtime.supportedModelIds),
     vendorIds: new Set(runtime.vendors.map((vendor) => vendor.vendorId)),
   };
 }
@@ -303,7 +296,7 @@ export async function resolveAvailableModels(
 ): Promise<ResolvedModelEntry[]> {
   const scope = runtimeModelScope(input.runtimeId);
   const credentialRows = await listProjectVendorCredentialRows(database, input.projectId);
-  const availableVendorIds = collectAvailableVendorIds(credentialRows);
+  const availableVendorIds = new Set(credentialRows.map((row) => row.vendorId));
   const customEntries = resolveCustomEntries(
     input.runtimeId,
     scope.acceptsCustomProvider,
@@ -320,7 +313,7 @@ export async function resolveAvailableModels(
       availableVendorIds,
       scope.label,
       scope.vendorIds.has(entry.vendorId),
-      scope.supportedModelIds === null || scope.supportedModelIds.has(entry.modelId),
+      scope.supportedModelIds.has(entry.modelId),
     ),
   );
   const missingCurrentEntries = resolveMissingCurrentEntry({

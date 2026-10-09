@@ -6,16 +6,13 @@ import type {
   SessionRunTrigger,
 } from "@mosoo/contracts/session-run";
 import { sessionEventsTable, sessionRunsTable, sessionsTable } from "@mosoo/db";
-import { createPlatformId } from "@mosoo/id";
 import type {
-  AccountId,
   AgentDeploymentVersionId,
-  AgentId,
   RuntimeOperationId,
   SessionId,
   SessionRunId,
 } from "@mosoo/id";
-import { createConsoleLogger, generateTraceId } from "@mosoo/observability";
+import { createConsoleLogger } from "@mosoo/observability";
 import { and, eq, exists, inArray, notInArray, sql } from "drizzle-orm";
 
 import { createErrorLogContext, logWarn } from "../../../../platform/cloudflare/logger";
@@ -39,10 +36,9 @@ import {
   completionCheckpointWrites,
 } from "./session-run-completion-checkpoint";
 import type { SessionRunCompletionCheckpoint } from "./session-run-completion-checkpoint";
-import { getActiveSessionRunSummary } from "./session-run-read.repository";
-import { buildActiveSessionRunStatusFilter, toSessionRunSummary } from "./session-run-row.mapper";
-import type { ActiveSessionRunStatus } from "./session-run-row.mapper";
-import { updateSessionLastRun } from "./session-run-session.repository";
+import { sessionRunSummaryColumns } from "./session-run-read.repository";
+import { toSessionRunSummary } from "./session-run-row.mapper";
+import type { SessionRunRow } from "./session-run-row.mapper";
 
 type SessionRunStatusUpdateInput = {
   error?: RunError | null;
@@ -81,8 +77,6 @@ type SessionRunTransitionSource =
   | "system"
   | "viewer";
 
-const SESSION_RUN_STATUS_WRITE_BATCH_SIZE = 50;
-
 const terminalRunLogger = createConsoleLogger({ namespace: "api", service: "api" });
 const terminalRunTransports = [...terminalRunLogger.getTransports()];
 terminalRunLogger.removeTransport("console");
@@ -102,45 +96,25 @@ terminalRunLogger.addTransport({
   },
 });
 
-interface LoadedSessionRunLifecycleRow {
-  completed_at: number | null;
-  created_at: number;
-  deployment_version_id: AgentDeploymentVersionId | null;
-  deployment_version_number: number | null;
-  error_code: string | null;
-  error_details_json: string | null;
-  error_message: string | null;
-  id: SessionRunId;
-  model: string | null;
-  provider: string | null;
+interface LoadedSessionRunLifecycleRow extends SessionRunRow {
   runtime_id: string;
-  session_id: SessionId;
   session_last_run_id: SessionRunId | null;
   session_status: SessionStatus;
   session_type: SessionType;
-  started_at: number | null;
-  status: SessionRunStatus;
   status_seq: number;
   status_source: string;
   terminal_event_exists: number;
-  trace_id: string;
-  trigger: SessionRunTrigger;
-  updated_at: number;
 }
 
 export type SessionRunTransitionOutcome =
   | {
       kind: "applied";
-      previousStatus: SessionRunStatus;
       run: SessionRunSummary;
-      sessionLifecycle: "current_last_run_updated" | "not_current_last_run" | "preserved";
-      statusSeq: number;
     }
   | {
       currentStatus: SessionRunStatus;
       kind: "duplicate";
       run: SessionRunSummary;
-      statusSeq: number;
     }
   | {
       currentStatus: SessionRunStatus;
@@ -158,14 +132,38 @@ export type SessionRunTransitionOutcome =
       kind: "stale";
       reason: "concurrent_transition" | "terminal_run";
       targetStatus: SessionRunStatus;
-    }
-  | {
-      kind: "repair_needed";
-      previousStatus: SessionRunStatus;
-      reason: "session_lifecycle_not_updated";
-      run: SessionRunSummary;
-      statusSeq: number;
     };
+
+export function isStaleTerminalRunTransition(
+  outcome: SessionRunTransitionOutcome | null,
+  currentStatus?: SessionRunStatus,
+): boolean {
+  return (
+    outcome?.kind === "stale" &&
+    outcome.reason === "terminal_run" &&
+    (currentStatus === undefined || outcome.currentStatus === currentStatus)
+  );
+}
+
+/** Accepts applied and duplicate transitions, and a Run that was already terminal. */
+export function assertSessionRunTransition(
+  outcome: SessionRunTransitionOutcome,
+  label: string,
+): void {
+  if (
+    outcome.kind === "applied" ||
+    outcome.kind === "duplicate" ||
+    isStaleTerminalRunTransition(outcome)
+  ) {
+    return;
+  }
+
+  throw new Error(
+    outcome.kind === "stale"
+      ? `${label} lost a concurrent run transition.`
+      : `${label} run transition was rejected: ${outcome.reason}.`,
+  );
+}
 
 export interface NonTerminalSessionRunsStatusUpdateResult {
   readonly runIds: readonly SessionRunId[];
@@ -266,69 +264,30 @@ function applySessionRunStatusUpdate(
   };
 }
 
+/** Whether the persisted session_event matching the Run's terminal status exists. */
+export function sessionRunTerminalEventExists() {
+  return sql<number>`EXISTS (
+    SELECT 1 FROM ${sessionEventsTable}
+    WHERE ${sessionEventsTable.runId} = ${sessionRunsTable.id}
+      AND ${sessionEventsTable.eventType} = CASE ${sessionRunsTable.status}
+        WHEN 'completed' THEN 'run.completed'
+        WHEN 'failed' THEN 'run.failed'
+        ELSE 'run.cancelled'
+      END
+  )`;
+}
+
 function sessionRunLifecycleColumns() {
   return {
-    completed_at: sessionRunsTable.completedAt,
-    created_at: sessionRunsTable.createdAt,
-    deployment_version_id: sessionRunsTable.deploymentVersionId,
-    deployment_version_number: sessionRunsTable.deploymentVersionNumber,
-    error_code: sessionRunsTable.errorCode,
-    error_details_json: sessionRunsTable.errorDetailsJson,
-    error_message: sessionRunsTable.errorMessage,
-    id: sessionRunsTable.id,
-    model: sessionRunsTable.model,
-    provider: sessionRunsTable.provider,
+    ...sessionRunSummaryColumns(),
     runtime_id: sql<string>`COALESCE(${sessionRunsTable.runtimeId}, ${sessionsTable.runtimeId})`,
-    session_id: sessionRunsTable.sessionId,
     session_last_run_id: sessionsTable.lastRunId,
     session_status: sessionsTable.status,
     session_type: sessionsTable.type,
-    started_at: sessionRunsTable.startedAt,
-    status: sessionRunsTable.status,
     status_seq: sessionRunsTable.statusSeq,
     status_source: sessionRunsTable.statusSource,
-    terminal_event_exists: sql<number>`EXISTS (
-      SELECT 1 FROM ${sessionEventsTable}
-      WHERE ${sessionEventsTable.runId} = ${sessionRunsTable.id}
-        AND ${sessionEventsTable.eventType} = CASE ${sessionRunsTable.status}
-          WHEN 'completed' THEN 'run.completed'
-          WHEN 'failed' THEN 'run.failed'
-          ELSE 'run.cancelled'
-        END
-    )`,
-    trace_id: sessionRunsTable.traceId,
-    trigger: sessionRunsTable.trigger,
-    updated_at: sessionRunsTable.updatedAt,
+    terminal_event_exists: sessionRunTerminalEventExists(),
   };
-}
-
-function toSessionRunSummaryFromLifecycleRow(row: LoadedSessionRunLifecycleRow): SessionRunSummary {
-  return toSessionRunSummary({
-    completed_at: row.completed_at,
-    created_at: row.created_at,
-    deployment_version_id: row.deployment_version_id,
-    deployment_version_number: row.deployment_version_number,
-    error_code: row.error_code,
-    error_details_json: row.error_details_json,
-    error_message: row.error_message,
-    id: row.id,
-    model: row.model,
-    provider: row.provider,
-    session_id: row.session_id,
-    started_at: row.started_at,
-    status: row.status,
-    trace_id: row.trace_id,
-    trigger: row.trigger,
-    updated_at: row.updated_at,
-  });
-}
-
-function toUpdatedSessionRunSummary(
-  row: LoadedSessionRunLifecycleRow,
-  input: SessionRunStatusUpdateInput,
-  timestampMs: number,
-): SessionRunSummary {
-  return applySessionRunStatusUpdate(toSessionRunSummaryFromLifecycleRow(row), input, timestampMs);
 }
 
 export function createInsertedSessionRunSummary(
@@ -359,152 +318,6 @@ export function createInsertedSessionRunSummary(
   });
 }
 
-export async function createSessionRunRecordIfSessionIdle(
-  database: D1Database,
-  input: {
-    agentId: AgentId | null;
-    createdBy: AccountId;
-    deploymentVersionId?: AgentDeploymentVersionId | null;
-    deploymentVersionNumber?: number | null;
-    model?: string | null;
-    provider?: string | null;
-    runtimeId?: string | null;
-    sessionId: SessionId;
-    startedAt?: number | null;
-    status: ActiveSessionRunStatus;
-    traceId?: string;
-    trigger: SessionRunTrigger;
-  },
-): Promise<
-  | {
-      activeRun: null;
-      createdRun: SessionRunSummary;
-    }
-  | {
-      activeRun: SessionRunSummary;
-      createdRun: null;
-    }
-> {
-  const timestampMs = currentTimestampMs();
-  const runId = createPlatformId<SessionRunId>();
-  const traceId = input.traceId ?? generateTraceId();
-
-  const inserted =
-    (await getAppDatabase(database).get<{ id: SessionRunId }>(
-      sql`
-          INSERT INTO session_run
-            (
-              id,
-              session_id,
-              trigger,
-              status,
-              agent_id,
-              deployment_version_id,
-              deployment_version_number,
-              runtime_id,
-              provider,
-              model,
-              trace_id,
-              error_code,
-              error_message,
-              error_details_json,
-              started_at,
-              completed_at,
-              created_by_account_id,
-              created_at,
-              status_changed_at,
-              status_event,
-              status_operation_id,
-              status_seq,
-              status_source,
-              updated_at
-            )
-          SELECT
-            ${runId},
-            ${input.sessionId},
-            ${input.trigger},
-            ${input.status},
-            ${input.agentId},
-            ${input.deploymentVersionId ?? null},
-            ${input.deploymentVersionNumber ?? null},
-            ${input.runtimeId ?? null},
-            ${input.provider ?? null},
-            ${input.model ?? null},
-            ${traceId},
-            NULL,
-            NULL,
-            NULL,
-            ${input.startedAt ?? null},
-            NULL,
-            ${input.createdBy},
-            ${timestampMs},
-            ${timestampMs},
-            ${toSessionRunStatusLifecycleEventName(input.status)},
-            NULL,
-            0,
-            'api',
-            ${timestampMs}
-          FROM session
-          WHERE id = ${input.sessionId}
-            AND archived_at IS NULL
-            AND status = 'IDLE'
-            AND status_operation_id IS NULL
-            AND NOT EXISTS (
-              SELECT 1
-              FROM session_run
-              WHERE session_id = ${input.sessionId}
-                AND ${sql.raw(buildActiveSessionRunStatusFilter())}
-            )
-          RETURNING id
-        `,
-    )) ?? null;
-
-  if (!inserted) {
-    const activeRun = await getActiveSessionRunSummary(database, input.sessionId);
-
-    if (!activeRun) {
-      throw new Error("Session cannot accept a new run.");
-    }
-
-    return {
-      activeRun,
-      createdRun: null,
-    };
-  }
-
-  const sessionUpdated = await updateSessionLastRun(database, {
-    model: input.model ?? null,
-    provider: input.provider ?? null,
-    runId,
-    sessionId: input.sessionId,
-    timestampMs,
-  });
-
-  if (!sessionUpdated) {
-    await getAppDatabase(database)
-      .delete(sessionRunsTable)
-      .where(eq(sessionRunsTable.id, runId))
-      .run();
-    throw new Error("Session cannot accept a new run.");
-  }
-
-  return {
-    activeRun: null,
-    createdRun: createInsertedSessionRunSummary(input, {
-      runId,
-      timestampMs,
-      traceId,
-    }),
-  };
-}
-
-export async function setSessionRunStatus(
-  database: D1Database,
-  input: UpdateSessionRunStatusInput,
-): Promise<SessionRunTransitionOutcome> {
-  return transitionSessionRunStatusAt(database, input, currentTimestampMs());
-}
-
 export async function cancelActiveSessionRunsForRuntimeOperation(
   database: D1Database,
   input: {
@@ -513,127 +326,53 @@ export async function cancelActiveSessionRunsForRuntimeOperation(
     readonly runIds: readonly SessionRunId[];
   },
 ): Promise<NonTerminalSessionRunsStatusUpdateResult> {
-  const runIds = [...new Set(input.runIds)].filter((runId) => runId !== "");
-
-  if (runIds.length === 0) {
-    return {
-      runIds: [],
-      timestampMs: currentTimestampMs(),
-    };
-  }
-
-  const cancelledRunIds = new Set<SessionRunId>();
-  let timestampMs = currentTimestampMs();
-
-  for (let index = 0; index < runIds.length; index += SESSION_RUN_STATUS_WRITE_BATCH_SIZE) {
-    const runIdBatch = runIds.slice(index, index + SESSION_RUN_STATUS_WRITE_BATCH_SIZE);
-    const updated = await setNonTerminalSessionRunsStatus(database, {
-      error: input.error,
-      operationId: input.operationId,
-      preserveSessionLifecycle: true,
-      runIds: runIdBatch,
-      source: "runtime_operation",
-      status: "cancelled",
-    });
-    timestampMs = updated.timestampMs;
-
-    const rows = await getAppDatabase(database)
-      .select({ id: sessionRunsTable.id })
-      .from(sessionRunsTable)
-      .where(
-        and(
-          inArray(sessionRunsTable.id, runIdBatch),
-          eq(sessionRunsTable.status, "cancelled"),
-          eq(sessionRunsTable.statusOperationId, input.operationId),
-        ),
-      )
-      .all();
-
-    for (const row of rows) {
-      cancelledRunIds.add(row.id);
-    }
-  }
-
-  return {
-    runIds: [...cancelledRunIds],
-    timestampMs,
-  };
-}
-
-async function setNonTerminalSessionRunsStatus(
-  database: D1Database,
-  input: SessionRunStatusUpdateInput & {
-    readonly preserveSessionLifecycle?: boolean;
-    readonly runIds: readonly SessionRunId[];
-  },
-): Promise<NonTerminalSessionRunsStatusUpdateResult> {
-  const runIds = [...new Set(input.runIds)].filter((runId) => runId !== "");
   const timestampMs = currentTimestampMs();
 
-  if (runIds.length === 0) {
+  if (input.runIds.length === 0) {
     return {
       runIds: [],
       timestampMs,
     };
   }
 
-  const updatedRuns = await getAppDatabase(database)
+  const db = getAppDatabase(database);
+  await db
     .update(sessionRunsTable)
-    .set(createSessionRunStatusUpdate(input, timestampMs))
+    .set(
+      createSessionRunStatusUpdate(
+        {
+          error: input.error,
+          operationId: input.operationId,
+          source: "runtime_operation",
+          status: "cancelled",
+        },
+        timestampMs,
+      ),
+    )
     .where(
       and(
-        inArray(sessionRunsTable.id, runIds),
+        inArray(sessionRunsTable.id, input.runIds),
         inArray(sessionRunsTable.status, ACTIVE_SESSION_RUN_STATUSES),
       ),
     )
-    .returning({
-      id: sessionRunsTable.id,
-      sessionId: sessionRunsTable.sessionId,
-    })
-    .all();
-
-  if (input.preserveSessionLifecycle === true || updatedRuns.length === 0) {
-    return {
-      runIds: updatedRuns.map((run) => run.id),
-      timestampMs,
-    };
-  }
-
-  await getAppDatabase(database)
-    .update(sessionsTable)
-    .set(
-      createSessionStatusTransitionPatch({
-        status: toSessionLifecycleStatusForRunStatus(input.status),
-        timestampMs,
-      }),
-    )
+    .run();
+  // Re-read by operation so a replay after a crash still reports the Runs it cancelled.
+  const rows = await db
+    .select({ id: sessionRunsTable.id })
+    .from(sessionRunsTable)
     .where(
       and(
-        inArray(
-          sessionsTable.id,
-          updatedRuns.map((run) => run.sessionId),
-        ),
-        inArray(
-          sessionsTable.lastRunId,
-          updatedRuns.map((run) => run.id),
-        ),
-        notInArray(sessionsTable.status, ["TERMINATED"]),
+        inArray(sessionRunsTable.id, input.runIds),
+        eq(sessionRunsTable.status, "cancelled"),
+        eq(sessionRunsTable.statusOperationId, input.operationId),
       ),
     )
-    .run();
+    .all();
 
   return {
-    runIds: updatedRuns.map((run) => run.id),
+    runIds: rows.map((row) => row.id),
     timestampMs,
   };
-}
-
-async function transitionSessionRunStatusAt(
-  database: D1Database,
-  input: UpdateSessionRunStatusInput,
-  timestampMs: number,
-): Promise<SessionRunTransitionOutcome> {
-  return transitionSessionRunStatus(database, input, timestampMs);
 }
 
 async function repairCurrentSessionRunProjection(
@@ -643,19 +382,15 @@ async function repairCurrentSessionRunProjection(
     readonly timestampMs: number;
     readonly targetStatus: SessionRunStatus;
   },
-): Promise<"not_current_last_run" | "repaired" | "already_projected" | "repair_needed"> {
-  if (input.current.session_last_run_id !== input.current.id) {
-    return "not_current_last_run";
-  }
-
+): Promise<void> {
   const projectedStatus = toSessionLifecycleStatusForRunStatus(input.targetStatus);
 
-  if (input.current.session_status === projectedStatus) {
-    return "already_projected";
-  }
-
-  if (input.current.session_status === "TERMINATED") {
-    return "already_projected";
+  if (
+    input.current.session_last_run_id !== input.current.id ||
+    input.current.session_status === projectedStatus ||
+    input.current.session_status === "TERMINATED"
+  ) {
+    return;
   }
 
   const sessionUpdateResult = await getAppDatabase(database)
@@ -675,14 +410,16 @@ async function repairCurrentSessionRunProjection(
     )
     .run();
 
-  return getD1ChangeCount(sessionUpdateResult) > 0 ? "repaired" : "repair_needed";
+  if (getD1ChangeCount(sessionUpdateResult) === 0) {
+    throw new Error("Session lifecycle projection needs repair.");
+  }
 }
 
-async function transitionSessionRunStatus(
+export async function setSessionRunStatus(
   database: D1Database,
   input: UpdateSessionRunStatusInput,
-  timestampMs: number,
 ): Promise<SessionRunTransitionOutcome> {
+  const timestampMs = currentTimestampMs();
   const current =
     (await getAppDatabase(database)
       .select(sessionRunLifecycleColumns())
@@ -720,22 +457,14 @@ async function transitionSessionRunStatus(
     }
     case "duplicate": {
       if (input.preserveSessionLifecycle !== true) {
-        const projection = await repairCurrentSessionRunProjection(database, {
+        await repairCurrentSessionRunProjection(database, {
           current,
           targetStatus: input.status,
           timestampMs,
         });
-
-        if (projection === "repair_needed") {
-          return {
-            kind: "repair_needed",
-            previousStatus: current.status,
-            reason: "session_lifecycle_not_updated",
-            run: toSessionRunSummaryFromLifecycleRow(current),
-            statusSeq: current.status_seq,
-          };
-        }
       }
+
+      const run = toSessionRunSummary(current);
 
       if (isTerminalSessionRunStatus(current.status) && !current.terminal_event_exists) {
         // A cancelled waitUntil can commit the Run but lose both its log and
@@ -744,7 +473,7 @@ async function transitionSessionRunStatus(
         logTerminalSessionRun(
           current,
           {
-            error: toSessionRunSummaryFromLifecycleRow(current).error,
+            error: run.error,
             status: current.status,
           },
           current.completed_at ?? current.updated_at,
@@ -754,8 +483,7 @@ async function transitionSessionRunStatus(
       return {
         currentStatus: decision.currentStatus,
         kind: "duplicate",
-        run: toSessionRunSummaryFromLifecycleRow(current),
-        statusSeq: current.status_seq,
+        run,
       };
     }
     case "rejected": {
@@ -776,7 +504,7 @@ async function transitionSessionRunStatus(
     }
   }
 
-  const run = toUpdatedSessionRunSummary(current, input, timestampMs);
+  const run = applySessionRunStatusUpdate(toSessionRunSummary(current), input, timestampMs);
   const statusSeq = current.status_seq + 1;
   const checkpoint = input.completionCheckpoint;
   if (
@@ -790,7 +518,7 @@ async function transitionSessionRunStatus(
     throw new Error("A completion checkpoint must belong to the current Session Run.");
   }
 
-  if (input.preserveSessionLifecycle === true) {
+  if (input.preserveSessionLifecycle === true || current.session_last_run_id !== input.runId) {
     const runUpdateResult = await getAppDatabase(database)
       .update(sessionRunsTable)
       .set(createSessionRunStatusUpdate(input, timestampMs))
@@ -814,46 +542,7 @@ async function transitionSessionRunStatus(
 
     logTerminalSessionRun(current, input, timestampMs);
 
-    return {
-      kind: "applied",
-      previousStatus: current.status,
-      run,
-      sessionLifecycle: "preserved",
-      statusSeq,
-    };
-  }
-
-  if (current.session_last_run_id !== input.runId) {
-    const runUpdateResult = await getAppDatabase(database)
-      .update(sessionRunsTable)
-      .set(createSessionRunStatusUpdate(input, timestampMs))
-      .where(
-        and(
-          eq(sessionRunsTable.id, input.runId),
-          eq(sessionRunsTable.status, current.status),
-          eq(sessionRunsTable.statusSeq, current.status_seq),
-        ),
-      )
-      .run();
-
-    if (getD1ChangeCount(runUpdateResult) === 0) {
-      return {
-        currentStatus: current.status,
-        kind: "stale",
-        reason: "concurrent_transition",
-        targetStatus: input.status,
-      };
-    }
-
-    logTerminalSessionRun(current, input, timestampMs);
-
-    return {
-      kind: "applied",
-      previousStatus: current.status,
-      run,
-      sessionLifecycle: "not_current_last_run",
-      statusSeq,
-    };
+    return { kind: "applied", run };
   }
 
   const results = await runAppDatabaseBatch(database, (db) => [
@@ -918,20 +607,8 @@ async function transitionSessionRunStatus(
   logTerminalSessionRun(current, input, timestampMs);
 
   if (getD1ChangeCount(sessionUpdateResult) === 0 && current.session_status !== "TERMINATED") {
-    return {
-      kind: "repair_needed",
-      previousStatus: current.status,
-      reason: "session_lifecycle_not_updated",
-      run,
-      statusSeq,
-    };
+    throw new Error("Session lifecycle projection needs repair.");
   }
 
-  return {
-    kind: "applied",
-    previousStatus: current.status,
-    run,
-    sessionLifecycle: "current_last_run_updated",
-    statusSeq,
-  };
+  return { kind: "applied", run };
 }

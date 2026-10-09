@@ -1,12 +1,7 @@
-import type { AgentId, SandboxId, SessionId } from "@mosoo/id";
-import { RUNTIME_DIAGNOSTIC_EVENT } from "@mosoo/runtime-events";
+import type { SessionId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { fileStore } from "../../../files/application/file-store";
-import {
-  appendRuntimeDiagnosticEvent,
-  toRuntimeDiagnosticBaseValue,
-} from "../../application/runtime-diagnostic-events";
 import { RUNTIME_SESSION_OUTPUT_DIR_NAME } from "../driver-instance/runtime-session-outputs";
 import { writeSandboxFileBytes } from "../sandbox-file-bytes";
 import type { SandboxHandle } from "../sandbox-handles";
@@ -20,23 +15,17 @@ import type { SandboxHandle } from "../sandbox-handles";
 export async function restoreSessionArtifactsToWorkspace(
   bindings: ApiBindings,
   input: {
-    agentId: AgentId | null;
     cwd: string;
     sandbox: SandboxHandle;
-    sandboxId: SandboxId;
     sessionId: SessionId;
   },
-): Promise<number> {
+): Promise<void> {
   const outputsPrefix = `${RUNTIME_SESSION_OUTPUT_DIR_NAME}/`;
   // Recording only admits paths under outputs/; anything else in the record
   // set is malformed data and is skipped rather than written into the cwd.
   const sources = (
     await fileStore.listLatestReadySessionArtifactSources(bindings.DB, input.sessionId)
   ).filter((source) => source.sourcePath.startsWith(outputsPrefix));
-
-  if (sources.length === 0) {
-    return 0;
-  }
 
   const preparedDirectories = new Set<string>();
 
@@ -59,19 +48,4 @@ export async function restoreSessionArtifactsToWorkspace(
 
     await writeSandboxFileBytes(input.sandbox, targetPath, bytes);
   }
-
-  await appendRuntimeDiagnosticEvent(bindings, {
-    eventName: RUNTIME_DIAGNOSTIC_EVENT.sandboxSessionArtifactsRestored.name,
-    sessionId: input.sessionId,
-    value: {
-      ...toRuntimeDiagnosticBaseValue({
-        agentId: input.agentId,
-        sessionId: input.sessionId,
-      }),
-      artifactCount: sources.length,
-      sandboxId: input.sandboxId,
-    },
-  });
-
-  return sources.length;
 }

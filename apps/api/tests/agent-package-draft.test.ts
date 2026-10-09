@@ -178,7 +178,6 @@ describe("agent package draft", () => {
       provider: "openai",
       runtimeId: "openai-runtime",
       status: "draft",
-      visibility: "private",
     });
     expect(agent.id).toHaveLength(26);
 
@@ -194,35 +193,6 @@ describe("agent package draft", () => {
       packageSkills: [],
       providerOptions: {},
     });
-  });
-
-  test("rejects package-owned Skill references before writing agent_skill rows", async () => {
-    const database = createAgentPackageDraftDatabase();
-
-    await expect(
-      createDraftAgent(database, {
-        agentName: "Imported Agent",
-        description: "Imported from package",
-        environmentId: null,
-        model: "gpt-5.4",
-        ownerId: DRAFT_IDS.owner,
-        packageMcpServers: [],
-        packageResolution: null,
-        packageSkills: [],
-        prompt: "Help",
-        provider: "openai",
-        providerOptions: {},
-        projectId: DRAFT_IDS.project,
-        runtimeId: "openai-runtime",
-        skillIds: ["package:docs" as SkillId],
-      }),
-    ).rejects.toThrow("Agent skill ID must be a valid ULID.");
-
-    const row = await database.prepare("SELECT COUNT(*) AS count FROM agent_skill").first<{
-      count: number;
-    }>();
-
-    expect(row?.count).toBe(0);
   });
 
   test("keeps package-owned Skill references out of platform Skill ID admission", async () => {

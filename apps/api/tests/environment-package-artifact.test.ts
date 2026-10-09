@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -9,7 +9,6 @@ import { parsePlatformId } from "@mosoo/id";
 import type { ProjectId } from "@mosoo/id";
 import { eq } from "drizzle-orm";
 
-import { parseApiCommandPayload } from "../src/modules/api-command/application/api-command-payload";
 import { processApiCommandDeadLetterMessage } from "../src/modules/api-command/application/api-command-processor";
 import { normalizePackages } from "../src/modules/environments/application/environment-config";
 import {
@@ -33,14 +32,6 @@ import {
 const PROJECT_ID = parsePlatformId<ProjectId>("01J0000000000000000000000A", "project id");
 
 describe("Environment package artifacts", () => {
-  test("configures the Sandbox SDK backup bucket in local, stage, and production", () => {
-    const wrangler = readFileSync(new URL("../wrangler.toml", import.meta.url), "utf8");
-
-    expect(wrangler.match(/^binding = "BACKUP_BUCKET"$/gmu)).toHaveLength(3);
-    expect(wrangler.match(/^BACKUP_BUCKET_NAME = "mosoo-sandbox-state"$/gmu)).toHaveLength(2);
-    expect(wrangler.match(/^BACKUP_BUCKET_NAME = "mosoo-stage-sandbox-state"$/gmu)).toHaveLength(1);
-  });
-
   test("normalizes pinned npm and pip packages into a stable artifact key", async () => {
     const packages = normalizePackages([
       { manager: "pip", packages: ["requests==2.32.4", "jsonschema==4.25.1"] },
@@ -58,12 +49,6 @@ describe("Environment package artifacts", () => {
     ]);
     expect(key.inputDigest).toMatch(/^[0-9a-f]{64}$/u);
     expect(environmentPackageArtifactSandboxId(key).length).toBeLessThanOrEqual(63);
-    expect(
-      parseApiCommandPayload(
-        "environment_package_artifact_build",
-        JSON.stringify({ ...key, artifactAbi: "environment-artifact-v1", packages }),
-      ),
-    ).toEqual({ ...key, artifactAbi: "environment-artifact-v1", packages });
   });
 
   test.each([
@@ -135,14 +120,23 @@ describe("Environment package artifacts", () => {
       .prepare("UPDATE environment_revision SET setup_script = ? WHERE id = ?")
       .bind("echo custom", PUBLIC_API_TEST_IDS.environmentRevision)
       .run();
+    const legacySnapshot = {
+      packagesJson: JSON.stringify([{ manager: "pip", packages: ["requests==2.32.4"] }]),
+      revisionId: PUBLIC_API_TEST_IDS.environmentRevision,
+      setupScript: "pip install 'requests==2.32.4'\n\necho custom",
+    };
 
-    await expect(
-      resolveEnvironmentSetupScriptForExecution(database, {
-        packagesJson: JSON.stringify([{ manager: "pip", packages: ["requests==2.32.4"] }]),
-        revisionId: PUBLIC_API_TEST_IDS.environmentRevision,
-        setupScript: "pip install 'requests==2.32.4'\n\necho custom",
-      }),
-    ).resolves.toBe("echo custom");
+    await expect(resolveEnvironmentSetupScriptForExecution(database, legacySnapshot)).resolves.toBe(
+      "echo custom",
+    );
+
+    await database
+      .prepare("DELETE FROM environment_revision WHERE id = ?")
+      .bind(PUBLIC_API_TEST_IDS.environmentRevision)
+      .run();
+    await expect(resolveEnvironmentSetupScriptForExecution(database, legacySnapshot)).resolves.toBe(
+      legacySnapshot.setupScript,
+    );
   });
 
   test("exposes restored npm packages through standard ESM resolution", async () => {

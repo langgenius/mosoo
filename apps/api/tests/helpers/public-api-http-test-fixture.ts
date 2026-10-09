@@ -1,6 +1,5 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 
-import type { SessionSummary } from "@mosoo/contracts/session";
 import {
   accountsTable,
   agentDeploymentVersionsTable,
@@ -17,7 +16,7 @@ import {
 import type { VendorCredentialId } from "@mosoo/id";
 
 import { hashTokenValue } from "../../src/modules/auth/application/personal-access-token.service";
-import { storeVendorCredentialSecret } from "../../src/modules/vendor-credentials/application/vendor-credential.secret-resolution";
+import { storeSecret } from "../../src/modules/vault/application/vault-secret-store";
 import type { ApiBindings } from "../../src/platform/cloudflare/worker-types";
 import type { ApiCommandQueueStub } from "./api-command-queue-fixture";
 import { createApiCommandQueueStub } from "./api-command-queue-fixture";
@@ -27,17 +26,16 @@ export {
   createApiCommandQueueStub,
   createRecordedQueueMessage,
   type ApiCommandQueueStub,
-  type CapturedApiCommandMessage,
-  type RecordedQueueMessage,
-  type RecordedQueueMessageAction,
 } from "./api-command-queue-fixture";
 
-const CONTRACT_SCHEMA_SQL = readFileSync(
-  new URL("./public-api-http-core-schema.sql", import.meta.url),
-  "utf8",
-)
-  .concat("\n")
-  .concat(readFileSync(new URL("./public-api-http-runtime-schema.sql", import.meta.url), "utf8"));
+const MIGRATIONS_DIRECTORY = new URL("../../../../pkgs/db/drizzle/", import.meta.url);
+const migratedDatabase = new SqliteD1Database({ foreignKeys: false });
+for (const name of readdirSync(MIGRATIONS_DIRECTORY)
+  .filter((migration) => migration.endsWith(".sql"))
+  .toSorted()) {
+  migratedDatabase.execute(readFileSync(new URL(name, MIGRATIONS_DIRECTORY), "utf8"));
+}
+const MIGRATED_DATABASE_IMAGE = await migratedDatabase.dump();
 
 const INITIAL_AGENT_CONFIG_JSON = JSON.stringify({
   packageMcpServers: [],
@@ -75,7 +73,7 @@ export const PUBLIC_API_TEST_IDS = {
   driverOwner: "01J0000000000000000000000F",
 } as const;
 
-const PUBLIC_API_VENDOR_CREDENTIAL_ID = "vendor-openai-project" as VendorCredentialId;
+const PUBLIC_API_VENDOR_CREDENTIAL_ID = "01J00000000000000000000071" as VendorCredentialId;
 
 export function createTestExecutionContext(): ExecutionContext {
   return {
@@ -281,20 +279,26 @@ export function createPublicHttpTestBindings(
     RUNTIME_ACTION_TOKEN_SECRET: "test-runtime-action-token",
     SANDBOX_FILE_BUCKET_LOCAL: "true",
     SANDBOX_STATE_BUCKET: unavailableBinding<R2Bucket>("SANDBOX_STATE_BUCKET"),
-    SANDBOX_STATE_BUCKET_NAME: "mosoo-sandbox-state",
     Session: options.sessionNamespace ?? createOkDurableObjectNamespace(),
     VAULT_ROOT_SECRET: "test-vault-secret",
     WEB_ORIGIN: "https://mosoo.ai",
+    runtimeSubjectHandleFactory: () => {
+      throw new Error("Sandbox is not used by this public HTTP contract test.");
+    },
   };
+}
+
+export function createMigratedTestDatabase(
+  input: { maxBoundParams?: number } = {},
+): SqliteD1Database {
+  return new SqliteD1Database({ ...input, foreignKeys: false, image: MIGRATED_DATABASE_IMAGE });
 }
 
 export async function createPublicHttpContractDatabase(
   input: { maxBoundParams?: number } = {},
 ): Promise<SqliteD1Database> {
-  const database = new SqliteD1Database(input);
+  const database = createMigratedTestDatabase(input);
   const nowMs = nowMsForTest();
-
-  database.execute(CONTRACT_SCHEMA_SQL);
 
   const db = database.app();
   await db
@@ -312,9 +316,7 @@ export async function createPublicHttpContractDatabase(
         emailVerified: true,
         id,
         image: null,
-        lastActiveOrganizationId: null,
         name,
-        systemAgentModel: null,
         updatedAt: nowMs,
       })),
     )
@@ -323,7 +325,6 @@ export async function createPublicHttpContractDatabase(
   await db
     .insert(organizationsTable)
     .values({
-      avatarUrl: null,
       createdAt: nowMs,
       creatorAccountId: PUBLIC_API_TEST_IDS.ownerAccount,
       id: PUBLIC_API_TEST_IDS.organization,
@@ -380,16 +381,11 @@ export async function createPublicHttpContractDatabase(
     })
     .run();
 
-  const apiKeySecretId = await storeVendorCredentialSecret(
-    createPublicHttpTestBindings(database) as ApiBindings,
-    {
-      apiKey: "sk-test",
-      credentialId: PUBLIC_API_VENDOR_CREDENTIAL_ID,
-      projectId: PUBLIC_API_TEST_IDS.project,
-      providerId: "openai",
-      purpose: "credential_create_api_key",
-    },
-  );
+  const bindings = createPublicHttpTestBindings(database) as ApiBindings;
+  const apiKeySecretId = await storeSecret(bindings.DB, bindings, {
+    kind: "vendor_api_key",
+    value: "sk-test",
+  });
 
   await db
     .insert(vendorCredentialsTable)
@@ -507,6 +503,48 @@ export async function insertOwnerSession(database: SqliteD1Database): Promise<vo
   });
 }
 
+/** Inserts a Run and makes it the Session's last Run, as admission would. */
+export async function insertSessionRunFixture(
+  database: D1Database,
+  input: {
+    createdAt?: number;
+    createdByAccountId?: string;
+    driverInstanceId?: string;
+    id: string;
+    sessionId?: string;
+    status: string;
+    updatedAt?: number;
+  },
+): Promise<void> {
+  const sessionId = input.sessionId ?? PUBLIC_API_TEST_IDS.nonOwnerSession;
+  const createdAt = input.createdAt ?? 1;
+  const terminal = ["cancelled", "completed", "expired", "failed"].includes(input.status);
+
+  await database.batch([
+    database
+      .prepare(
+        `INSERT INTO session_run (
+          id, session_id, agent_id, created_by_account_id, trigger, status, provider, model,
+          runtime_id, trace_id, driver_instance_id, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, 'user_prompt', ?, 'openai', 'gpt-5.4', 'openai-runtime', ?, ?, ?, ?)`,
+      )
+      .bind(
+        input.id,
+        sessionId,
+        PUBLIC_API_TEST_IDS.agent,
+        input.createdByAccountId ?? PUBLIC_API_TEST_IDS.nonOwnerAccount,
+        input.status,
+        `trace-${input.id}`,
+        input.driverInstanceId ?? null,
+        createdAt,
+        input.updatedAt ?? createdAt,
+      ),
+    database
+      .prepare("UPDATE session SET last_run_id = ?, status = ? WHERE id = ?")
+      .bind(input.id, terminal ? "IDLE" : "RUNNING", sessionId),
+  ]);
+}
+
 async function insertPat(input: {
   accountId: string;
   database: SqliteD1Database;
@@ -586,8 +624,6 @@ async function insertSession(
           runtimeId: "openai-runtime",
         },
         environment: {
-          allowMcpServers: true,
-          allowPackageManagers: true,
           allowedHostsJson: "[]",
           envVarsJson: "[]",
           environmentId: PUBLIC_API_TEST_IDS.environment,

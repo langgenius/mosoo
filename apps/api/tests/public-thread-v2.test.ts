@@ -22,7 +22,6 @@ import {
   readJson,
   requestPublicApiWithBindings,
   insertRuntimeEvent,
-  withProviderProbeMock,
 } from "./public-thread-api-fixtures";
 
 async function setup(
@@ -133,20 +132,16 @@ describe("Project direct Session API v2", () => {
     instructions: "Use the supplied files and preserve these instructions.",
   };
 
-  test("rejects retired monetary caps and exposes no budget on a direct turn", async () => {
+  test("rejects unknown top-level fields on create and send-events", async () => {
     const { create, createProject, request } = await setup();
     const input = { type: "user.message", content: [{ type: "text", text: "Read the input" }] };
     const capped = { input, maxCostUsd: 0.02 };
     expect((await createProject({ configuration, ...capped })).status).toBe(400);
     expect((await create("v2", capped)).status).toBe(400);
-    await withProviderProbeMock(async () => {
+    {
       const response = await createProject({ configuration, input });
       expect(response.status).toBe(201);
-      const created = await readJson(response);
-      expect(expectRecord(created["run"])).not.toHaveProperty("budget");
-      const id = expectString(expectRecord(created["thread"])["id"]);
-      const retrieved = await readJson(await request(`v2/threads/${id}`));
-      expect(expectRecord(retrieved["run"])).not.toHaveProperty("budget");
+      const id = expectString(expectRecord((await readJson(response))["thread"])["id"]);
       const events = await request(`v2/threads/${id}/events`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -156,7 +151,7 @@ describe("Project direct Session API v2", () => {
         }),
       });
       expect(events.status).toBe(400);
-    });
+    }
   });
 
   test("uploads and admits exactly one Session and Run without an Agent", async () => {
@@ -175,7 +170,7 @@ describe("Project direct Session API v2", () => {
       resources: [{ type: "file", file_id: fileId }],
       input: { type: "user.message", content: [{ type: "text", text: "Analyze the CSV." }] },
     };
-    await withProviderProbeMock(async () => {
+    {
       const response = await createProject(body, "direct-once");
       expect(response.status).toBe(201);
       const created = await readJson(response);
@@ -215,7 +210,7 @@ describe("Project direct Session API v2", () => {
       expect((await request(`v2/threads/${id}`)).status).toBe(200);
       expect((await request(`v1/threads/${id}`)).status).toBe(404);
       expect(await (await request(`v2/files/${fileId}/content`)).text()).toBe("a,b\n1,2\n");
-    });
+    }
   });
 
   test("recovers a committed inline Session without repeating creation", async () => {
@@ -224,7 +219,7 @@ describe("Project direct Session API v2", () => {
         loseCommittedBatchResponse(db, 'insert into "session_execution_snapshot"'),
     });
     await database.prepare("DELETE FROM agent").run();
-    await withProviderProbeMock(async () => {
+    {
       expect((await createProject({ configuration }, "direct-recover")).status).toBe(500);
       const row = await database.prepare("SELECT id FROM session").first<{ id: string }>();
       await database
@@ -238,7 +233,7 @@ describe("Project direct Session API v2", () => {
       expect(await database.prepare("SELECT count(*) AS count FROM session").first()).toEqual({
         count: 1,
       });
-    });
+    }
   });
 
   test("keeps keys route-bound and recovers a frozen Session after its preset is deleted", async () => {
@@ -247,7 +242,7 @@ describe("Project direct Session API v2", () => {
       requestDatabase: (db) =>
         loseCommittedBatchResponse(db, 'insert into "session_execution_snapshot"', () => interrupt),
     });
-    await withProviderProbeMock(async () => {
+    {
       const old = await readJson(await create("v2", {}, "shared-key"));
       const oldId = expectString(expectRecord(old["thread"])["id"]);
       interrupt = true;
@@ -270,13 +265,13 @@ describe("Project direct Session API v2", () => {
       expect(await database.prepare("SELECT count(*) AS count FROM session").first()).toEqual({
         count: 2,
       });
-    });
+    }
   });
 
   test("continues a zero-Agent Session with files after 90 days despite an old recovery deadline", async () => {
     const { createProject, database, request, snapshot } = await setup();
     await database.prepare("DELETE FROM agent").run();
-    await withProviderProbeMock(async () => {
+    {
       const saved = new FormData();
       saved.set("file", new File(["original result"], "saved.txt"));
       const uploaded = await readJson(
@@ -372,12 +367,12 @@ describe("Project direct Session API v2", () => {
       expect(await database.prepare("SELECT count(*) AS count FROM agent").first()).toEqual({
         count: 0,
       });
-    });
+    }
   });
 
   test("rejects ambiguous configuration, unsupported selections and missing credentials before admission", async () => {
     const { createProject, database } = await setup();
-    await withProviderProbeMock(async () => {
+    {
       for (const candidate of [
         { ...configuration, agent_id: IDS.agent },
         { type: "agent", agent_id: IDS.agent, instructions: "Hidden override" },
@@ -402,7 +397,7 @@ describe("Project direct Session API v2", () => {
       expect(await database.prepare("SELECT count(*) AS count FROM session").first()).toEqual({
         count: 0,
       });
-    });
+    }
   });
 
   test("denies a Project key on another Project before upload or execution", async () => {
@@ -440,7 +435,7 @@ describe("Project direct Session API v2", () => {
       headers: { "Content-Type": "application/json", "Idempotency-Key": "cli-project-once" },
       body: JSON.stringify({ configuration }),
     };
-    await withProviderProbeMock(async () => {
+    {
       expect((await request(path, init, TOKENS.outsider)).status).toBe(403);
       expect((await request(path, init, TOKENS.owner)).status).toBe(500);
       const row = await database.prepare("SELECT id FROM session").first<{ id: string }>();
@@ -461,7 +456,7 @@ describe("Project direct Session API v2", () => {
       expect(await database.prepare("SELECT count(*) AS count FROM session").first()).toEqual({
         count: 1,
       });
-    });
+    }
   });
 
   test("rejects a foreign preset and file even for CLI login owning both Projects", async () => {
@@ -488,7 +483,7 @@ describe("Project direct Session API v2", () => {
       .run();
     const prewarm = spyOn(runtimePrewarm, "scheduleAgentSessionRuntimePrewarm");
     try {
-      await withProviderProbeMock(async () => {
+      {
         for (const [body, status] of [
           [{ configuration: { type: "agent", agent_id: IDS.agent } }, 403],
           [{ configuration, resources: [{ type: "file", file_id: fileId }] }, 400],
@@ -508,7 +503,7 @@ describe("Project direct Session API v2", () => {
           count: 0,
         });
         expect(prewarm).not.toHaveBeenCalled();
-      });
+      }
     } finally {
       prewarm.mockRestore();
     }
@@ -518,7 +513,7 @@ describe("Project direct Session API v2", () => {
 describe("saved-Agent Thread API v2", () => {
   test("does not claim draft files when the Session becomes read-only during transfer", async () => {
     const { bucket, create, database, request } = await setup();
-    await withProviderProbeMock(async () => {
+    {
       const created = await readJson(await create("v2", {}));
       const id = expectString(expectRecord(created["thread"])["id"]);
       const upload = new FormData();
@@ -560,13 +555,13 @@ describe("saved-Agent Thread API v2", () => {
       } finally {
         copy.mockRestore();
       }
-    });
+    }
   });
 
   test("reviewed read-only cutover preserves history and files while allowing a fresh Session", async () => {
     const { create, database, request } = await setup();
     await database.prepare("UPDATE agent SET kind = 'cattle' WHERE id = ?").bind(IDS.agent).run();
-    await withProviderProbeMock(async () => {
+    {
       const savedFile = new FormData();
       savedFile.set("file", new File(["saved result"], "report.txt"));
       const uploadedSaved = await readJson(
@@ -647,7 +642,7 @@ describe("saved-Agent Thread API v2", () => {
       expect(await (await request(`v2/files/${savedId}/content`)).text()).toBe("saved result");
       const fresh = await create("v2", { resources: [{ type: "file", file_id: fileId }] });
       expect(fresh.status).toBe(201);
-    });
+    }
   });
 
   test("does not mistake a later message for the interrupted creation input", async () => {
@@ -661,7 +656,7 @@ describe("saved-Agent Thread API v2", () => {
         content: [{ type: "text", text: "Original creation input." }],
       },
     };
-    await withProviderProbeMock(async () => {
+    {
       expect((await create("v2", input, "interleaved-message")).status).toBe(500);
       const list = await readJson(await request(`v2/agents/${IDS.agent}/threads`));
       const id = expectString(expectRecord(expectArray(list["threads"])[0])["id"]);
@@ -699,7 +694,7 @@ describe("saved-Agent Thread API v2", () => {
           content: "Original creation input.",
         }),
       );
-    });
+    }
   });
 
   test("does not recover an older Session when a retained key expires and is reused", async () => {
@@ -708,7 +703,7 @@ describe("saved-Agent Thread API v2", () => {
       requestDatabase: (db) =>
         loseCommittedBatchResponse(db, 'insert into "session_execution_snapshot"', () => interrupt),
     });
-    await withProviderProbeMock(async () => {
+    {
       const old = await readJson(await create("v2", {}, "reused-key"));
       const oldId = expectString(expectRecord(old["thread"])["id"]);
       const priorDay = Date.now() - 25 * 60 * 60 * 1000;
@@ -731,7 +726,7 @@ describe("saved-Agent Thread API v2", () => {
       const recovered = await create("v2", {}, "reused-key");
       expect(recovered.status).toBe(201);
       expect(expectRecord((await readJson(recovered))["thread"])["id"]).not.toBe(oldId);
-    });
+    }
   });
 
   test("retains uploaded material when its claim commits but the response is lost", async () => {
@@ -751,7 +746,7 @@ describe("saved-Agent Thread API v2", () => {
       resources: [{ type: "file", file_id: fileId }],
       input: { type: "user.message", content: [{ type: "text", text: "Analyze the CSV." }] },
     };
-    await withProviderProbeMock(async () => {
+    {
       expect((await create("v2", input, "lost-file-claim")).status).toBe(500);
       const list = await readJson(await request(`v2/agents/${IDS.agent}/threads`));
       const threads = expectArray(list["threads"]);
@@ -772,7 +767,7 @@ describe("saved-Agent Thread API v2", () => {
       const files = await readJson(await request(`v2/threads/${id}/files`));
       expect(expectArray(files["files"])).toHaveLength(1);
       expect(await (await request(`v2/files/${fileId}/content`)).text()).toBe(material);
-    });
+    }
   });
 
   test("resumes an interrupted creation using its original Session and saved configuration", async () => {
@@ -786,7 +781,7 @@ describe("saved-Agent Thread API v2", () => {
         content: [{ type: "text", text: "Analyze original material." }],
       },
     };
-    await withProviderProbeMock(async () => {
+    {
       expect((await create("v2", input, "lost-session-commit")).status).toBe(500);
       const list = await readJson(await request(`v2/agents/${IDS.agent}/threads`));
       const threads = expectArray(list["threads"]);
@@ -818,7 +813,7 @@ describe("saved-Agent Thread API v2", () => {
       expect(expectArray(events["events"])).toContainEqual(
         expect.objectContaining({ type: "user.message", content: "Analyze original material." }),
       );
-    });
+    }
   });
 
   test("recovers one admitted initial turn when D1 loses the commit response", async () => {
@@ -828,7 +823,7 @@ describe("saved-Agent Thread API v2", () => {
     const input = {
       input: { type: "user.message", content: [{ type: "text", text: "Analyze fixed material." }] },
     };
-    await withProviderProbeMock(async () => {
+    {
       expect((await create("v2", input, "lost-run-commit")).status).toBe(500);
       const list = await readJson(await request(`v2/agents/${IDS.agent}/threads`));
       const threads = expectArray(list["threads"]);
@@ -852,7 +847,7 @@ describe("saved-Agent Thread API v2", () => {
           (event) => expectRecord(event)["type"] === "user.message",
         ),
       ).toHaveLength(1);
-    });
+    }
   });
 
   test("replays persisted events over v2 SSE for an owner-created Session", async () => {
@@ -917,7 +912,7 @@ describe("saved-Agent Thread API v2", () => {
     await insertOwnerSession(database);
     await database
       .prepare(
-        "INSERT INTO session_model_call (id, session_id, session_run_id, provider, model, status, input_tokens, output_tokens, cost_currency, total_cost_usd_micros, metadata_json) VALUES (?, ?, ?, 'openai', 'gpt-5.4', 'completed', 100, 20, 'USD', 250000, ?)",
+        "INSERT INTO session_model_call (id, session_id, session_run_id, call_key, trace_id, provider, model, status, input_tokens, output_tokens, cost_currency, total_cost_usd_micros, metadata_json, created_at, updated_at) VALUES (?, ?, ?, 'call-a', 'trace-usage', 'openai', 'gpt-5.4', 'completed', 100, 20, 'USD', 250000, ?, 1, 1)",
       )
       .bind(
         "01J0000000000000000000008A",
@@ -928,7 +923,7 @@ describe("saved-Agent Thread API v2", () => {
       .run();
     await database
       .prepare(
-        "INSERT INTO session_model_call (id, session_id, session_run_id, provider, model, status) VALUES (?, ?, ?, 'openai', 'gpt-5.4', 'started')",
+        "INSERT INTO session_model_call (id, session_id, session_run_id, call_key, trace_id, provider, model, status, created_at, updated_at) VALUES (?, ?, ?, 'call-b', 'trace-usage', 'openai', 'gpt-5.4', 'started', 1, 1)",
       )
       .bind("01J0000000000000000000008B", IDS.ownerSession, IDS.run)
       .run();
@@ -1008,7 +1003,7 @@ describe("saved-Agent Thread API v2", () => {
       )
       .bind("Saved instructions A", IDS.agent)
       .run();
-    await withProviderProbeMock(async () => {
+    {
       const response = await fixture.create("v2", {}, "private-create");
       expect(response.status).toBe(201);
       const body = await readJson(response);
@@ -1048,7 +1043,7 @@ describe("saved-Agent Thread API v2", () => {
       const legacy = await fixture.create("v1", { userId: "customer" });
       expect(legacy.status).toBe(409);
       expect(expectRecord((await readJson(legacy))["error"])["code"]).toBe("agent_not_published");
-    });
+    }
   });
 
   test("preserves v1 historical labels through recovery, reads and events without exposing them in v2", async () => {
@@ -1056,7 +1051,7 @@ describe("saved-Agent Thread API v2", () => {
       requestDatabase: (db) =>
         loseCommittedBatchResponse(db, 'insert into "session_execution_snapshot"'),
     });
-    await withProviderProbeMock(async () => {
+    {
       expect((await create("v1", { userId: "customer" }, "legacy-recover")).status).toBe(500);
       const row = await database.prepare("SELECT id FROM session").first<{ id: string }>();
       const id = expectString(row?.id);
@@ -1090,7 +1085,7 @@ describe("saved-Agent Thread API v2", () => {
       expect(await database.prepare("SELECT count(*) AS count FROM session").first()).toEqual({
         count: 1,
       });
-    });
+    }
   });
 
   test("keeps v1 live selection, required identity, links, and listing separate", async () => {
@@ -1099,7 +1094,7 @@ describe("saved-Agent Thread API v2", () => {
       .prepare("UPDATE agent SET prompt = ? WHERE id = ?")
       .bind("Unpublished edit", IDS.agent)
       .run();
-    await withProviderProbeMock(async () => {
+    {
       expect((await fixture.create("v1", {})).status).toBe(400);
       const legacy = await readJson(
         await fixture.create("v1", { userId: "customer" }, "shared-key"),
@@ -1128,7 +1123,7 @@ describe("saved-Agent Thread API v2", () => {
       ]);
       const read = await readJson(await fixture.request(`v2/threads/${legacyId}`));
       expect(read["thread"]).toMatchObject({ id: legacyId, userId: "customer" });
-    });
+    }
   });
 
   test("admits owner Sessions from the console and retains history when publication changes", async () => {
@@ -1171,7 +1166,7 @@ describe("saved-Agent Thread API v2", () => {
     });
     expect(uploaded.status).toBe(201);
     const fileId = expectString(expectRecord((await readJson(uploaded))["file"])["id"]);
-    await withProviderProbeMock(async () => {
+    {
       const created = await fixture.create("v2", {
         resources: [{ type: "file", file_id: fileId }],
       });
@@ -1206,6 +1201,6 @@ describe("saved-Agent Thread API v2", () => {
         const denied = await fixture.request(`v2/${path}`, {}, otherKey.value);
         expect([403, 404]).toContain(denied.status);
       }
-    });
+    }
   });
 });

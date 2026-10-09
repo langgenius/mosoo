@@ -1,5 +1,7 @@
 import { PUBLIC_API_PREFIX } from "@mosoo/contracts/public-api";
 
+import { validationError } from "../../../platform/errors";
+
 const MAX_AVATAR_URL_LENGTH = 2048;
 
 const INTERNAL_FILE_PATH_PATTERN = new RegExp(
@@ -18,7 +20,7 @@ export function normalizeAccountImageUrl(value: string | null | undefined): stri
   }
 
   if (trimmed.length > MAX_AVATAR_URL_LENGTH) {
-    throw new Error("Avatar URL is too long.");
+    throw validationError("Avatar URL is too long.");
   }
 
   if (INTERNAL_FILE_PATH_PATTERN.test(trimmed)) {
@@ -30,11 +32,11 @@ export function normalizeAccountImageUrl(value: string | null | undefined): stri
   try {
     parsed = new URL(trimmed);
   } catch {
-    throw new Error("Avatar URL must be a valid http(s) URL.");
+    throw validationError("Avatar URL must be a valid http(s) URL.");
   }
 
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    throw new Error("Avatar URL must use http or https.");
+    throw validationError("Avatar URL must use http or https.");
   }
 
   return parsed.toString();

@@ -4,12 +4,12 @@ import {
 } from "../../../platform/cloudflare/rpc-disposal";
 import { requireCloudflareSandboxBinding } from "../../../platform/cloudflare/sandbox-binding";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
+import { quoteShellArg } from "../../../shared/shell";
 import { ApiCommandPermanentError } from "../../api-command/application/api-command-payload";
 import type { EnvironmentPackageArtifactBuildCommandPayload } from "../../api-command/application/api-command-payload";
 import { isRuntimeSandboxLocalBucketEnabled } from "../../runtime/infrastructure/runtime-sandbox-bucket-mount";
 import { deleteSandboxBackupObjects } from "../../runtime/infrastructure/sandbox-backup-platform";
 import type { SandboxHandle } from "../../runtime/infrastructure/sandbox-handles";
-import { toSandboxHandle } from "../../runtime/infrastructure/sandbox-handles";
 import {
   createEnvironmentPackageArtifactKey,
   environmentPackageArtifactDir,
@@ -22,11 +22,7 @@ import type { EnvironmentPackageArtifactPaths } from "../domain/environment-pack
 import { normalizePackages } from "./environment-config";
 import { readEnvironmentPackageArtifactMetadata } from "./environment-package-artifact.service";
 
-function quoteShellArg(value: string): string {
-  return `'${value.replaceAll("'", `'"'"'`)}'`;
-}
-
-export function createEnvironmentPackageArtifactBuildScript(input: {
+function createEnvironmentPackageArtifactBuildScript(input: {
   npmRoot: string;
   npmSpecs: readonly string[];
   pipRoot: string;
@@ -99,17 +95,15 @@ export async function buildEnvironmentPackageArtifact(
   const pipRoot = `${dir}/python`;
   let backupId: string | null = null;
   const { getSandbox } = await import("@cloudflare/sandbox");
-  const sandbox = toSandboxHandle(
-    getSandbox(
-      requireCloudflareSandboxBinding(bindings),
-      environmentPackageArtifactSandboxId(key),
-      // A running command keeps the builder awake. Without keepAlive, a builder
-      // orphaned before `finally` (consumer wall-clock limit, deploy) sleeps
-      // after inactivity instead of billing until someone notices. `false` also
-      // clears the flag persisted by earlier builds of the same key.
-      { keepAlive: false, normalizeId: true },
-    ),
-  );
+  const sandbox = getSandbox(
+    requireCloudflareSandboxBinding(bindings),
+    environmentPackageArtifactSandboxId(key),
+    // A running command keeps the builder awake. Without keepAlive, a builder
+    // orphaned before `finally` (consumer wall-clock limit, deploy) sleeps
+    // after inactivity instead of billing until someone notices. `false` also
+    // clears the flag persisted by earlier builds of the same key.
+    { keepAlive: false, normalizeId: true },
+  ) as unknown as SandboxHandle;
 
   try {
     const reset = await sandbox.exec(

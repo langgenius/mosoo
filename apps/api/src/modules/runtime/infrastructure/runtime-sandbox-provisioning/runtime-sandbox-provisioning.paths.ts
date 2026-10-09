@@ -1,4 +1,4 @@
-import { SANDBOX_CACHE_PATH, SANDBOX_MEMORY_PATH } from "@mosoo/agent-driver/paths";
+import { SANDBOX_CACHE_PATH } from "@mosoo/agent-driver/paths";
 
 import type { DriverProfileConfig } from "../../domain/driver-snapshot";
 
@@ -27,10 +27,6 @@ export function sanitizeProcessId(value: string): string {
   return value.replaceAll(/[^a-zA-Z0-9_-]/g, "-").slice(0, 63);
 }
 
-export function getOrganizationPath(profile: DriverProfileConfig): string {
-  return profile.session.sessionOrganizationPath;
-}
-
 export function getParentDirectory(path: string): string {
   const parts = path.split("/").filter(Boolean);
 
@@ -41,16 +37,12 @@ export function getParentDirectory(path: string): string {
   return `/${parts.slice(0, -1).join("/")}`;
 }
 
-export function listAdditionalDirectories(
-  profile: DriverProfileConfig,
-  organizationPath: string,
-): string[] {
-  const directories = new Set<string>([
-    SANDBOX_CACHE_PATH,
-    SANDBOX_MEMORY_PATH,
-    profile.session.homePath,
-    organizationPath,
-  ]);
-
-  return [...directories];
+export function listAdditionalDirectories(profile: DriverProfileConfig): string[] {
+  return [
+    ...new Set([
+      SANDBOX_CACHE_PATH,
+      profile.session.homePath,
+      profile.session.sessionOrganizationPath,
+    ]),
+  ];
 }

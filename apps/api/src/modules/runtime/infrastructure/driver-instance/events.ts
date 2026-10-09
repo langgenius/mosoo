@@ -1,11 +1,8 @@
-import {
-  EventType,
-  MOSOO_CUSTOM_EVENT,
-  createServerCustomEvent,
-  parseNullableSessionUsageSummary,
-} from "@mosoo/ag-ui-session";
+import { EventType, MOSOO_CUSTOM_EVENT, createServerCustomEvent } from "@mosoo/ag-ui-session";
+import type { SessionUsageSummary } from "@mosoo/ag-ui-session";
 import type { DriverEventEnvelope } from "@mosoo/agent-driver/events";
-import type { DriverInstanceId } from "@mosoo/id";
+import { parsePlatformId } from "@mosoo/id";
+import type { DriverInstanceId, SessionRunId } from "@mosoo/id";
 import {
   parseRuntimeEventEnvelope,
   readRuntimeEventPayload,
@@ -34,7 +31,6 @@ import {
   assertRuntimeEventMatchesDriverLink,
 } from "./event-link-assertion";
 import {
-  createBaseLiveState,
   normalizeRuntimeSessionInfoTitle,
   readPermissionRequestViews,
   readRuntimeDriverRunTransition,
@@ -52,18 +48,6 @@ import {
   recordRuntimeFileChanges,
   recordRuntimeSessionOutputDirectory,
 } from "./runtime-session-output-store";
-import { getRuntimeSessionLink } from "./session-link.repository";
-export type {
-  ProjectRuntimeDriverEventsResult,
-  RuntimeDriverRunTransition,
-  RuntimeSessionLink,
-} from "./event-types";
-export { persistProjectedRuntimeDriverEvents } from "./event-persistence";
-export { getRuntimeSessionLink } from "./session-link.repository";
-export {
-  recordDriverInstanceCompletion,
-  recordDriverInstanceFailure,
-} from "./terminal-driver-events";
 
 function readTerminalPendingToolResult(event: RuntimeEventEnvelope): string | null {
   if (event.kind === "run.failed") {
@@ -120,19 +104,21 @@ function createPendingToolResultEvents(
 export async function projectRuntimeDriverEvents(
   bindings: ApiBindings,
   input: {
-    assertCurrentConnection?: () => void;
-    currentLiveState?: SessionLiveState | null;
+    assertCurrentConnection: () => void;
+    currentLiveState: SessionLiveState | null;
     events: readonly DriverEventEnvelope[];
     driverInstanceId: DriverInstanceId;
-    link?: RuntimeSessionLink | null;
+    link: RuntimeSessionLink;
   },
 ): Promise<ProjectRuntimeDriverEventsResult> {
   const database = bindings.DB;
-  const link = input.link ?? (await getRuntimeSessionLink(database, input.driverInstanceId));
+  const { sessionId } = input.link;
 
-  if (!isTruthy(link.sessionId)) {
+  if (!isTruthy(sessionId)) {
     throw new Error("Runtime driver event session link is missing a session id.");
   }
+
+  const link = { ...input.link, sessionId };
 
   if (
     input.events.some((envelope) => envelope.event.kind.startsWith("run.")) &&
@@ -142,11 +128,7 @@ export async function projectRuntimeDriverEvents(
   }
 
   const currentLiveState =
-    input.currentLiveState ??
-    (await loadStoredRuntimeLiveState(database, {
-      driverInstanceId: input.driverInstanceId,
-      link,
-    }));
+    input.currentLiveState ?? (await loadStoredRuntimeLiveState(database, link));
 
   let nextLiveState = currentLiveState;
   let liveStateChanged = false;
@@ -161,24 +143,23 @@ export async function projectRuntimeDriverEvents(
     runtimeEvents.push({
       event,
       occurredAt: toDriverEventOccurredAtMs(source.occurredAt),
-      sourceEventId: resolveDriverEventPersistenceSourceId(source, event),
+      sourceEventId: resolveDriverEventPersistenceSourceId(source),
     });
   }
 
   function appendSessionDeliveryEvent(
     source: DriverEventEnvelope,
-    event: RuntimeEventEnvelope,
     deliveryEvent: SessionDeliveryEvent,
   ): void {
     sessionDeliveryEvents.push({
       event: deliveryEvent,
       occurredAt: toDriverEventOccurredAtMs(source.occurredAt),
-      sourceEventId: resolveDriverEventPersistenceSourceId(source, event),
+      sourceEventId: resolveDriverEventPersistenceSourceId(source),
     });
   }
 
   for (const envelope of input.events) {
-    input.assertCurrentConnection?.();
+    input.assertCurrentConnection();
     const event = parseRuntimeEventEnvelope(envelope.event);
     assertRuntimeEventMatchesDriverLink(event, {
       driverInstanceId: input.driverInstanceId,
@@ -218,7 +199,7 @@ export async function projectRuntimeDriverEvents(
         continue;
       }
 
-      input.assertCurrentConnection?.();
+      input.assertCurrentConnection();
       await upsertNativeResumeRef(database, {
         driverInstanceId: input.driverInstanceId,
         nativeResumeRef,
@@ -279,7 +260,7 @@ export async function projectRuntimeDriverEvents(
         );
 
         nextLiveState = applyAgUiEventToSessionLiveState(nextLiveState, permissionsUpdatedEvent);
-        appendSessionDeliveryEvent(envelope, event, permissionsUpdatedEvent);
+        appendSessionDeliveryEvent(envelope, permissionsUpdatedEvent);
         liveStateChanged = true;
       }
 
@@ -304,7 +285,7 @@ export async function projectRuntimeDriverEvents(
         );
 
         nextLiveState = applyAgUiEventToSessionLiveState(nextLiveState, permissionsUpdatedEvent);
-        appendSessionDeliveryEvent(envelope, event, permissionsUpdatedEvent);
+        appendSessionDeliveryEvent(envelope, permissionsUpdatedEvent);
         liveStateChanged = true;
       }
 
@@ -331,7 +312,7 @@ export async function projectRuntimeDriverEvents(
 
     for (const liveEvent of liveEvents) {
       nextLiveState = applyAgUiEventToSessionLiveState(nextLiveState, liveEvent);
-      appendSessionDeliveryEvent(envelope, event, liveEvent);
+      appendSessionDeliveryEvent(envelope, liveEvent);
       liveStateChanged = true;
     }
   }
@@ -360,15 +341,14 @@ function toDriverEventOccurredAtMs(occurredAt: DriverEventEnvelope["occurredAt"]
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function resolveDriverEventPersistenceSourceId(
-  source: DriverEventEnvelope,
-  event: RuntimeEventEnvelope,
-): string | null {
-  if (event.kind === "run.failed" && event.runId !== undefined) {
-    return createSessionRunTerminalFailureSourceId(event.runId);
+export function resolveDriverEventPersistenceSourceId(envelope: DriverEventEnvelope): string {
+  if (envelope.event.kind === "run.failed" && envelope.event.runId !== undefined) {
+    return createSessionRunTerminalFailureSourceId(
+      parsePlatformId<SessionRunId>(envelope.event.runId, "driver failed event run id"),
+    );
   }
 
-  return source.eventId.trim().length > 0 ? source.eventId : null;
+  return envelope.eventId;
 }
 
 function appendRuntimeDriverCanonicalSideEffects(
@@ -389,7 +369,7 @@ function appendRuntimeDriverCanonicalSideEffects(
   }
 
   if (event.kind === "usage.updated") {
-    output.setUsage(parseNullableSessionUsageSummary(event.payload));
+    output.setUsage(event.payload as SessionUsageSummary | null);
     return;
   }
 
@@ -402,28 +382,16 @@ function appendRuntimeDriverCanonicalSideEffects(
 
 async function loadStoredRuntimeLiveState(
   database: D1Database,
-  input: {
-    driverInstanceId: DriverInstanceId;
-    link: RuntimeSessionLink;
-  },
+  link: ProjectRuntimeDriverEventsResult["link"],
 ): Promise<SessionLiveState> {
-  if (isTruthy(input.link.sessionId)) {
-    const viewerId = input.link.callerId ?? input.link.creatorId;
+  const viewerId = link.callerId ?? link.creatorId;
 
-    if (!isTruthy(viewerId)) {
-      throw new Error("Runtime session link is missing a viewer principal.");
-    }
-
-    return loadSessionViewerState(database, {
-      sessionId: input.link.sessionId,
-      viewerId,
-    });
+  if (!isTruthy(viewerId)) {
+    throw new Error("Runtime session link is missing a viewer principal.");
   }
 
-  return createBaseLiveState({
-    callerId: input.link.callerId,
-    creatorId: input.link.creatorId,
-    driverInstanceId: input.driverInstanceId,
-    sessionId: input.link.sessionId,
+  return loadSessionViewerState(database, {
+    sessionId: link.sessionId,
+    viewerId,
   });
 }

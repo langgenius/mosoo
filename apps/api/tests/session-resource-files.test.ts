@@ -6,11 +6,7 @@ import type { AccountId, FileId, OrganizationId, ProjectId, SessionId } from "@m
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
 import { fileStore } from "../src/modules/files/application/file-store";
 import { appendSessionResourceContextToPrompt } from "../src/modules/runtime/application/session-resources/session-resource-prompt.service";
-import { removeSessionResource } from "../src/modules/sessions/application/session-resource-removal.service";
-import {
-  addSessionResource,
-  listSessionResources,
-} from "../src/modules/sessions/application/session-resource.service";
+import { addSessionResource } from "../src/modules/sessions/application/session-resource.service";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import {
   PUBLIC_API_TEST_IDS,
@@ -43,6 +39,10 @@ const ORGANIZATION_ID = parsePlatformId<OrganizationId>(
   "organization ID",
 );
 const PROJECT_ID = parsePlatformId<ProjectId>("01J0000000000000000000000Q", "project ID");
+const OTHER_PROJECT_ID = parsePlatformId<ProjectId>(
+  "01J0000000000000000000000R",
+  "other project ID",
+);
 
 const VIEWER: AuthenticatedViewer = {
   email: "owner@example.com",
@@ -59,18 +59,23 @@ function createSessionResourceDatabase(input: { includeFile?: boolean } = {}): S
   database.execute(`
     CREATE TABLE session (
       id text PRIMARY KEY NOT NULL,
+      agent_id text,
       created_at integer NOT NULL DEFAULT 1,
+      deployment_version_id text,
+      deployment_version_number integer,
       last_message_at integer,
       type text NOT NULL DEFAULT 'preview',
       creator_account_id text NOT NULL,
       attributed_user_id text,
       archived_at integer,
       metadata_json text DEFAULT '{}' NOT NULL,
+      model text NOT NULL DEFAULT 'gpt-5.4',
       project_id text NOT NULL,
       provider text NOT NULL,
       runtime_id text NOT NULL,
       status text NOT NULL,
-      title text
+      title text,
+      updated_at integer NOT NULL DEFAULT 1
     );
 
     CREATE TABLE session_execution_snapshot (
@@ -239,15 +244,6 @@ function createSessionResourceDatabase(input: { includeFile?: boolean } = {}): S
   return database;
 }
 
-function makeOwnerAttributedParticipant(database: SqliteD1Database): void {
-  database.execute(`
-    UPDATE session
-       SET creator_account_id = '${OTHER_CREATOR_ID}',
-           attributed_user_id = '${OWNER_ID}'
-     WHERE id = '${SESSION_ID}';
-  `);
-}
-
 function insertSessionArtifact(database: SqliteD1Database): void {
   database.execute(`
     INSERT INTO file_record (
@@ -370,7 +366,7 @@ function insertInaccessibleSessionFile(database: SqliteD1Database): void {
       NULL,
       NULL,
       '{}',
-      '${PROJECT_ID}',
+      '${OTHER_PROJECT_ID}',
       'openai',
       'openai-runtime',
       'IDLE',
@@ -478,24 +474,6 @@ describe("session resource files", () => {
     });
   });
 
-  test("lists file records after session admission", async () => {
-    const database = createSessionResourceDatabase();
-
-    const resources = await fileStore.listSessionResources(database, SESSION_ID);
-
-    expect(resources).toEqual([
-      {
-        createdAt: "1970-01-01T00:00:00.001Z",
-        id: FILE_ID,
-        kind: "attachment",
-        mimeType: "text/plain",
-        name: "notes.txt",
-        path: `session-files/${FILE_ID}/notes.txt`,
-        size: 12,
-      },
-    ]);
-  });
-
   test("lists prompt path entries with stable resource ids", async () => {
     const database = createSessionResourceDatabase();
 
@@ -528,38 +506,6 @@ describe("session resource files", () => {
 
   test("leaves prompts unchanged when the session has no files", () => {
     expect(appendSessionResourceContextToPrompt("No files here.", [])).toBe("No files here.");
-  });
-
-  test("lists resources through the session service without delete-side dependencies", async () => {
-    const database = createSessionResourceDatabase();
-
-    const resources = await listSessionResources(database, VIEWER, {
-      projectId: PROJECT_ID,
-      sessionId: SESSION_ID,
-    });
-
-    expect(resources).toEqual([
-      {
-        createdAt: "1970-01-01T00:00:00.001Z",
-        id: FILE_ID,
-        kind: "attachment",
-        mimeType: "text/plain",
-        name: "notes.txt",
-        path: `session-files/${FILE_ID}/notes.txt`,
-        size: 12,
-      },
-    ]);
-  });
-
-  test("lists empty accessible sessions", async () => {
-    const database = createSessionResourceDatabase({ includeFile: false });
-
-    const resources = await listSessionResources(database, VIEWER, {
-      projectId: PROJECT_ID,
-      sessionId: SESSION_ID,
-    });
-
-    expect(resources).toEqual([]);
   });
 
   test("lists visible Thread files and filters by session", async () => {
@@ -625,62 +571,23 @@ describe("session resource files", () => {
     expect(file.sessionKind).toBe("artifact");
     expect(file.sourcePath).toBe("outputs/reports/summary.md");
 
-    const resources = await listSessionResources(database, ownerViewer, {
-      projectId: PUBLIC_API_TEST_IDS.project,
-      sessionId: PUBLIC_API_TEST_IDS.ownerSession,
-    });
+    const listing = await fileStore.list(
+      createPublicHttpTestBindings(database) as ApiBindings,
+      ownerViewer,
+      {
+        projectId: PUBLIC_API_TEST_IDS.project,
+        sessionId: PUBLIC_API_TEST_IDS.ownerSession,
+      },
+    );
 
-    expect(resources).toEqual([
+    expect(listing.files).toEqual([
       expect.objectContaining({
         id: file.id,
-        kind: "artifact",
         name: "summary.md",
         path: `session-artifacts/${file.id}/summary.md`,
+        sessionKind: "artifact",
       }),
     ]);
-  });
-
-  test("lists session artifacts but does not treat them as removable attachments", async () => {
-    const database = createSessionResourceDatabase();
-    insertSessionArtifact(database);
-    const bucket = new RecordingDeleteBucket();
-    const bindings = createFileBindings(database, bucket);
-
-    const resources = await listSessionResources(database, VIEWER, {
-      projectId: PROJECT_ID,
-      sessionId: SESSION_ID,
-    });
-
-    expect(resources).toEqual([
-      {
-        createdAt: "1970-01-01T00:00:00.002Z",
-        id: ARTIFACT_FILE_ID,
-        kind: "artifact",
-        mimeType: "text/markdown",
-        name: "summary.md",
-        path: `session-artifacts/${ARTIFACT_FILE_ID}/summary.md`,
-        size: 23,
-      },
-      {
-        createdAt: "1970-01-01T00:00:00.001Z",
-        id: FILE_ID,
-        kind: "attachment",
-        mimeType: "text/plain",
-        name: "notes.txt",
-        path: `session-files/${FILE_ID}/notes.txt`,
-        size: 12,
-      },
-    ]);
-
-    await expect(
-      removeSessionResource(bindings, VIEWER, {
-        projectId: PROJECT_ID,
-        resourceId: ARTIFACT_FILE_ID,
-        sessionId: SESSION_ID,
-      }),
-    ).rejects.toThrow("Session resource not found.");
-
-    expect(bucket.deletedKeys).toEqual([]);
   });
 
   test("marks session resources deleting before R2 delete failure can leave a ready row", async () => {
@@ -717,29 +624,24 @@ describe("session resource files", () => {
     expect(row).toBeNull();
   });
 
-  test("rejects participant resource mutations when the viewer is not the session creator", async () => {
+  test("rejects resource uploads when the viewer does not own the Project", async () => {
     const database = createSessionResourceDatabase();
-    makeOwnerAttributedParticipant(database);
     const bindings = { DB: database } as ApiBindings;
 
     await expect(
-      addSessionResource(bindings, VIEWER, {
-        file: {
-          contentType: "text/plain",
-          name: "notes.txt",
-          size: 12,
+      addSessionResource(
+        bindings,
+        { ...VIEWER, id: OTHER_CREATOR_ID },
+        {
+          file: {
+            contentType: "text/plain",
+            name: "notes.txt",
+            size: 12,
+          },
+          projectId: PROJECT_ID,
+          sessionId: SESSION_ID,
         },
-        projectId: PROJECT_ID,
-        sessionId: SESSION_ID,
-      }),
-    ).rejects.toThrow();
-
-    await expect(
-      removeSessionResource(bindings, VIEWER, {
-        projectId: PROJECT_ID,
-        resourceId: FILE_ID,
-        sessionId: SESSION_ID,
-      }),
+      ),
     ).rejects.toThrow();
   });
 });

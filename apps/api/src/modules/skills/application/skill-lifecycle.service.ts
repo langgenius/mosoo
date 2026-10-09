@@ -8,7 +8,7 @@ import { getAppDatabase } from "../../../platform/db/drizzle";
 import { isTruthy } from "../../../shared/truthiness";
 import { currentTimestampMs } from "../../../time";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import { ensureSkillAccess, ensureSkillDestructiveManager } from "./skill-access.service";
+import { ensureSkillAccess } from "./skill-access.service";
 import { getSkillSummary } from "./skill-query.service";
 
 export async function createSkillFork(
@@ -51,7 +51,7 @@ export async function deleteOwnedSkill(
   projectId: ProjectId,
   skillId: SkillId,
 ): Promise<void> {
-  await ensureSkillDestructiveManager(database, viewer.id, projectId, skillId);
+  await ensureSkillAccess(database, viewer.id, projectId, skillId);
 
   await getAppDatabase(database)
     .delete(skillsTable)

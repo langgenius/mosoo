@@ -1,7 +1,7 @@
 import type { EnvironmentPackageSpec } from "@mosoo/contracts/environment";
 import type { ProjectId } from "@mosoo/id";
 
-export const ENVIRONMENT_PACKAGE_ARTIFACT_ROOT = "/workspace/.mosoo/environment-artifacts";
+const ENVIRONMENT_PACKAGE_ARTIFACT_ROOT = "/workspace/.mosoo/environment-artifacts";
 export const ENVIRONMENT_PACKAGE_ARTIFACT_ABI = "environment-artifact-v1";
 export const ENVIRONMENT_PACKAGE_ARTIFACT_MAX_BUILD_MS = 10 * 60 * 1000;
 export const ENVIRONMENT_PACKAGE_ARTIFACT_BACKUP_TTL_SECONDS = 10 * 365 * 24 * 60 * 60;

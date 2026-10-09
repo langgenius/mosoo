@@ -1,9 +1,4 @@
 export const skillSchema = /* GraphQL */ `
-  enum SkillSourceKind {
-    official
-    user
-  }
-
   enum SkillSnapshotEntryKind {
     directory
     file
@@ -52,7 +47,6 @@ export const skillSchema = /* GraphQL */ `
     ownerName: String!
     projectId: ULID!
     snapshotId: ULID!
-    sourceKind: SkillSourceKind!
     updatedAt: String!
   }
 
@@ -70,7 +64,6 @@ export const skillSchema = /* GraphQL */ `
     ownerName: String!
     projectId: ULID!
     snapshotId: ULID!
-    sourceKind: SkillSourceKind!
     updatedAt: String!
   }
 

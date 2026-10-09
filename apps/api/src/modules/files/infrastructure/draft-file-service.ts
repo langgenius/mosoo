@@ -1,24 +1,17 @@
 import { fileRecordsTable, fileUploadsTable, sessionsTable } from "@mosoo/db";
-import { parsePlatformId } from "@mosoo/id";
 import type { AccountId, FileId, ProjectId, SessionId } from "@mosoo/id";
 import { and, eq, exists, isNull, ne, sql } from "drizzle-orm";
 
 import { createErrorLogContext, logError } from "../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getD1ChangeCount, runAppDatabaseBatch } from "../../../platform/db/drizzle";
-import { isTruthy } from "../../../shared/truthiness";
 import { currentTimestampMs } from "../../../time";
-import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import { ensureProjectOwnership } from "../../projects/application/project.service";
 import { createFileConflictError } from "./file-errors";
 import { createFinalObjectKey } from "./file-paths";
-import { listFileRecordsById } from "./file-record-store";
-import type { FileRecordRow } from "./file-record-store";
-import { copyObject, deleteObject } from "./r2-s3-client";
-import {
-  ensureProjectSessionFileAccess,
-  ensureSessionFileWritable,
-} from "./session-file-ownership";
+import type { FileRecordRow } from "./file-record-model";
+import { listFileRecordsById } from "./file-record-queries";
+import { copyR2Object } from "./r2-object";
+
 interface ClaimedDraftFile {
   etag: string;
   file: FileRecordRow;
@@ -39,16 +32,14 @@ function toSessionAttachmentRecord(file: FileRecordRow, sessionId: SessionId): F
   };
 }
 
-async function loadClaimableDraftFiles(
+/** The caller has already authorized the viewer for the owning Project and target Session. */
+export async function loadClaimableDraftFiles(
   database: D1Database,
-  viewer: AuthenticatedViewer,
+  viewerId: AccountId,
   projectId: ProjectId,
   fileIds: readonly FileId[],
   sessionId?: SessionId,
 ): Promise<FileRecordRow[]> {
-  const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
-  await ensureProjectOwnership(database, viewerId, projectId);
-
   const files = await listFileRecordsById(database, fileIds);
   const filesById = new Map(files.map((file) => [file.id, file]));
   const orderedFiles: FileRecordRow[] = [];
@@ -102,24 +93,10 @@ async function loadClaimableDraftFiles(
   return orderedFiles;
 }
 
-export async function ensureProjectDraftFilesClaimable(
-  bindings: ApiBindings,
-  viewer: AuthenticatedViewer,
-  input: {
-    attachmentIds: FileId[];
-    projectId: ProjectId;
-  },
-): Promise<void> {
-  if (input.attachmentIds.length === 0) {
-    return;
-  }
-
-  await loadClaimableDraftFiles(bindings.DB, viewer, input.projectId, input.attachmentIds);
-}
-
+/** The caller has already authorized the viewer for the owning Project and writable Session. */
 export async function claimProjectDraftFilesToSession(
   bindings: ApiBindings,
-  viewer: AuthenticatedViewer,
+  viewerId: AccountId,
   input: {
     attachmentIds: FileId[];
     projectId: ProjectId;
@@ -127,20 +104,9 @@ export async function claimProjectDraftFilesToSession(
     resume?: boolean;
   },
 ): Promise<void> {
-  if (input.attachmentIds.length === 0) {
-    return;
-  }
-
-  const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
-  await ensureProjectSessionFileAccess(bindings.DB, viewerId, {
-    projectId: input.projectId,
-    sessionId: input.sessionId,
-  });
-  await ensureSessionFileWritable(bindings.DB, input.sessionId);
-
   const files = await loadClaimableDraftFiles(
     bindings.DB,
-    viewer,
+    viewerId,
     input.projectId,
     input.attachmentIds,
     input.resume ? input.sessionId : undefined,
@@ -152,14 +118,7 @@ export async function claimProjectDraftFilesToSession(
   // already reference them. Retrying this Session reuses the admitted file IDs.
   for (const file of files) {
     const nextObjectKey = createFinalObjectKey(toSessionAttachmentRecord(file, input.sessionId));
-    const copyOptions = isTruthy(file.etag) ? { sourceIfMatch: file.etag } : {};
-
-    const copied = await copyObject({
-      bindings,
-      destinationObjectKey: nextObjectKey,
-      options: copyOptions,
-      sourceObjectKey: file.object_key,
-    });
+    const copied = await copyR2Object(bindings.FILE_BUCKET, file.object_key, nextObjectKey);
 
     claimedFiles.push({
       etag: copied.etag,
@@ -238,7 +197,7 @@ export async function claimProjectDraftFilesToSession(
 
   await Promise.all(
     claimedFiles.map(async ({ file }) =>
-      deleteObject(bindings, file.object_key).catch((error: unknown) => {
+      bindings.FILE_BUCKET.delete(file.object_key).catch((error: unknown) => {
         logError("file.draft-claim.source-delete.failed", {
           ...createErrorLogContext(error),
           fileId: file.id,

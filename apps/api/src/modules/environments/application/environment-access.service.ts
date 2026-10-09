@@ -1,5 +1,4 @@
 import {
-  accountsTable,
   agentsTable,
   environmentRevisionsTable,
   environmentsTable,
@@ -9,7 +8,7 @@ import type { AccountId, EnvironmentId, EnvironmentRevisionId, ProjectId } from 
 import { and, eq, sql } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
-import { forbiddenError } from "../../../platform/errors";
+import { forbiddenError, notFoundError } from "../../../platform/errors";
 import type { EnvironmentRecordRow } from "./environment-types";
 
 export interface EnvironmentAccessResult {
@@ -18,12 +17,6 @@ export interface EnvironmentAccessResult {
 
 export function environmentRecordColumns() {
   return {
-    allowMcpServers: sql<number>`${environmentRevisionsTable.allowMcpServers}`.as(
-      "allowMcpServers",
-    ),
-    allowPackageManagers: sql<number>`${environmentRevisionsTable.allowPackageManagers}`.as(
-      "allowPackageManagers",
-    ),
     allowedHostsJson: sql<string>`${environmentRevisionsTable.allowedHostsJson}`.as(
       "allowedHostsJson",
     ),
@@ -52,8 +45,6 @@ export function environmentRecordColumns() {
       EnvironmentRecordRow["networkPolicy"]
     >`${environmentRevisionsTable.networkPolicy}`.as("networkPolicy"),
     ownerId: sql<AccountId | null>`${environmentsTable.ownerAccountId}`.as("ownerId"),
-    ownerImageUrl: sql<string | null>`${accountsTable.image}`.as("ownerImageUrl"),
-    ownerName: sql<string | null>`${accountsTable.name}`.as("ownerName"),
     packagesJson: sql<string>`${environmentRevisionsTable.packagesJson}`.as("packagesJson"),
     projectId: sql<ProjectId>`${environmentsTable.projectId}`.as("projectId"),
     setupScript: sql<string>`${environmentRevisionsTable.setupScript}`.as("setupScript"),
@@ -78,8 +69,7 @@ function selectEnvironmentRecord(database: D1Database) {
       environmentRevisionsTable,
       eq(environmentRevisionsTable.id, environmentsTable.currentRevisionId),
     )
-    .innerJoin(projectsTable, eq(projectsTable.id, environmentsTable.projectId))
-    .leftJoin(accountsTable, eq(accountsTable.id, environmentsTable.ownerAccountId));
+    .innerJoin(projectsTable, eq(projectsTable.id, environmentsTable.projectId));
 }
 
 export async function getEnvironmentRecordRow(
@@ -120,7 +110,7 @@ export async function ensureEnvironmentAccess(
       .get()) ?? null;
 
   if (row === null || row.projectOwnerAccountId !== viewerId) {
-    throw new Error("Environment not found.");
+    throw notFoundError("Environment not found.");
   }
 
   const { projectOwnerAccountId: _projectOwnerAccountId, ...environmentRow } = row;
@@ -144,9 +134,5 @@ export async function ensureEnvironmentEditor(
     throw forbiddenError("Built-in environments cannot be edited.");
   }
 
-  if (access.row.ownerId === viewerId) {
-    return access;
-  }
-
-  throw forbiddenError();
+  return access;
 }

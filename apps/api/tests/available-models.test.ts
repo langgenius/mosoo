@@ -247,27 +247,6 @@ describe("available models", () => {
     ]);
   });
 
-  test("does not advertise models for the disabled internal System Agent runtime", async () => {
-    const entries = await resolveAvailableModels(createAvailableModelsDatabase(), {
-      projectId: PROJECT_ID,
-      runtimeId: "system-agent",
-    });
-
-    expect(
-      entries.find((entry) => entry.vendorId === "openai" && entry.modelId === "gpt-5.4"),
-    ).toMatchObject({
-      available: false,
-      reason: "wrong-runtime",
-      statusLabel: "Not available",
-    });
-    expect(entries.find((entry) => entry.vendorId === "anthropic")).toMatchObject({
-      available: false,
-      reason: "wrong-runtime",
-      statusDetail: "Anthropic is not available for System Agent.",
-      statusLabel: "Not available",
-    });
-  });
-
   test("makes OpenCode runtime models available through their owning providers", async () => {
     const entries = await resolveAvailableModels(createAvailableModelsDatabase(), {
       projectId: PROJECT_ID,

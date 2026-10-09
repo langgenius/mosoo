@@ -81,6 +81,5 @@ describe("agent package export", () => {
       expect(manifestYaml).not.toContain(sourceId);
     }
     expect(manifestYaml).toContain("requests==2.32.4");
-    expect(manifestYaml).not.toContain("kind:");
   });
 });

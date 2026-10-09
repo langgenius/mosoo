@@ -4,7 +4,6 @@ import type {
   McpCredentialStatus,
   McpCredentialSummary,
   McpOAuthFlowState,
-  McpServer,
   McpServerWithCredential,
 } from "@mosoo/contracts/mcp";
 
@@ -22,16 +21,10 @@ export function parseHttpsUrl(rawUrl: string): string {
   return parsed.toString();
 }
 
-function deriveDefaultFaviconUrl(serverUrl: string): string | null {
-  try {
-    return new URL("/favicon.ico", new URL(serverUrl).origin).toString();
-  } catch {
-    return null;
-  }
-}
-
-function resolveIconUrl(row: { iconUrl: string | null; url: string }): string | null {
-  return isTruthy(row.iconUrl) ? row.iconUrl : deriveDefaultFaviconUrl(row.url);
+function resolveIconUrl(row: { iconUrl: string | null; url: string }): string {
+  return isTruthy(row.iconUrl)
+    ? row.iconUrl
+    : new URL("/favicon.ico", new URL(row.url).origin).toString();
 }
 
 export function decodeJsonArray(raw: string | null): string[] {
@@ -48,43 +41,25 @@ export function decodeJsonArray(raw: string | null): string[] {
   return parsed;
 }
 
-export function getCredentialStatus(row: CredentialRow | null): McpCredentialStatus {
-  if (row?.status === "active" && row.expiresAt !== null && row.expiresAt <= Date.now()) {
-    return "expired";
-  }
+function getStoredCredentialStatus(row: CredentialRow): CredentialRow["status"] {
+  return row.status === "active" && row.expiresAt !== null && row.expiresAt <= Date.now()
+    ? "expired"
+    : row.status;
+}
 
-  return row?.status ?? "none";
+export function getCredentialStatus(row: CredentialRow | null): McpCredentialStatus {
+  return row === null ? "none" : getStoredCredentialStatus(row);
 }
 
 export function toAuthorizationState(
   server: Pick<ServerRow, "enabled">,
   credential: CredentialRow | null,
 ): McpAuthorizationState {
-  if (server.enabled !== 1) {
+  if (!server.enabled) {
     return "disabled";
   }
 
-  if (!credential) {
-    return "authorization_required";
-  }
-
-  switch (getCredentialStatus(credential)) {
-    case "active": {
-      return "active";
-    }
-    case "expired": {
-      return "expired";
-    }
-    case "revoked": {
-      return "revoked";
-    }
-    case "none": {
-      throw new Error("Credential status cannot be none when a credential row exists.");
-    }
-    default: {
-      throw new Error(`Unsupported MCP credential status: ${getCredentialStatus(credential)}.`);
-    }
-  }
+  return credential === null ? "authorization_required" : getStoredCredentialStatus(credential);
 }
 
 export function toUnavailableCredentialStatus(
@@ -106,9 +81,6 @@ export function toUnavailableCredentialStatus(
     case "revoked": {
       return "revoked";
     }
-    default: {
-      throw new Error("Unsupported MCP authorization state.");
-    }
   }
 }
 
@@ -120,20 +92,26 @@ function toCredentialSummary(row: CredentialRow): McpCredentialSummary {
     id: row.id,
     scope: row.scope,
     scopeValues: decodeJsonArray(row.scopeValuesJson),
-    status: getCredentialStatus(row) as Exclude<McpCredentialStatus, "none">,
+    status: getStoredCredentialStatus(row),
     subjectLabel: row.subjectLabel,
     updatedAt: toIsoString(row.updatedAt),
   };
 }
 
-function toServer(row: ServerRow, hasCredential: boolean): McpServer {
+export function toServerWithCredential(
+  row: ServerRow,
+  credential: CredentialRow | null,
+): McpServerWithCredential {
   return {
     authType: row.authType,
+    authorizationState: toAuthorizationState(row, credential),
     createdAt: toIsoString(row.createdAt),
+    credential: credential ? toCredentialSummary(credential) : null,
     credentialScope: row.credentialScope,
+    credentialStatus: getCredentialStatus(credential),
     description: row.description,
-    enabled: row.enabled === 1,
-    hasCredential,
+    enabled: row.enabled,
+    hasCredential: credential?.status === "active",
     iconUrl: resolveIconUrl(row),
     id: row.id,
     name: row.name,
@@ -146,39 +124,22 @@ function toServer(row: ServerRow, hasCredential: boolean): McpServer {
   };
 }
 
-export function toServerWithCredential(
-  row: ServerRow,
-  credential: CredentialRow | null,
-  hasCredential: boolean,
-): McpServerWithCredential {
-  return {
-    ...toServer(row, hasCredential),
-    authorizationState: toAuthorizationState(row, credential),
-    credential: credential ? toCredentialSummary(credential) : null,
-    credentialStatus: getCredentialStatus(credential),
-  };
-}
-
 export function toAgentBinding(
   row: AgentBindingRow,
   credential: CredentialRow | null,
-  hasCredential: boolean,
 ): AgentMcpBinding {
-  const authorizationState =
-    row.enabled === 1 && row.serverEnabled === 1
-      ? toAuthorizationState({ enabled: row.serverEnabled }, credential)
-      : "disabled";
-
   return {
     authType: row.authType,
-    authorizationState,
+    authorizationState: row.enabled
+      ? toAuthorizationState({ enabled: row.serverEnabled }, credential)
+      : "disabled",
     createdAt: toIsoString(row.createdAt),
     credentialMode: row.credentialMode,
     credentialScope: row.credentialScope,
     credentialStatus: getCredentialStatus(credential),
     credentialSubject: credential?.subjectLabel ?? null,
-    enabled: row.enabled === 1,
-    hasCredential,
+    enabled: row.enabled,
+    hasCredential: credential?.status === "active",
     iconUrl: resolveIconUrl(row),
     id: row.id,
     name: row.name,
@@ -192,9 +153,7 @@ export function toAgentBinding(
 export function toOAuthFlowState(flow: OAuthFlowRow, server: ServerRow): McpOAuthFlowState {
   return {
     authorizationState:
-      flow.status === "succeeded"
-        ? ((server.enabled === 1 ? "active" : "disabled") as McpAuthorizationState)
-        : null,
+      flow.status === "succeeded" ? (server.enabled ? "active" : "disabled") : null,
     errorMessage: flow.errorMessage,
     flowId: flow.id,
     serverId: flow.serverId,

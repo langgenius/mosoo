@@ -1,41 +1,8 @@
-import { emailLogsTable } from "@mosoo/db";
-import { createPlatformId } from "@mosoo/id";
-
-import { logInfo, logWarn } from "../../../platform/cloudflare/logger";
-import { getAppDatabase } from "../../../platform/db/drizzle";
+import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { isTruthy } from "../../../shared/truthiness";
-import { currentTimestampMs } from "../../../time";
-
-interface AuthEmailRequest {
-  emailType: string;
-  subject: string;
-  text: string;
-  to: string;
-}
-
-type AuthEmailSender = string | { email: string; name: string };
-
-interface AuthEmailMessage {
-  from: AuthEmailSender;
-  subject: string;
-  text: string;
-  to: string;
-}
-
-interface AuthEmailProvider {
-  send(input: AuthEmailMessage): Promise<unknown>;
-}
-
-export interface AuthEmailBindings {
-  readonly AUTH_EMAIL?: AuthEmailProvider;
-  readonly AUTH_EMAIL_FROM: string;
-  readonly DB: D1Database;
-}
 
 const SIMPLE_EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/u;
 const DISPLAY_NAME_EMAIL_PATTERN = /^(?<name>.+?)\s*<(?<address>[^<>\s@]+@[^<>\s@]+)>$/u;
-
-type EmailProviderStatus = "sent" | "failed";
 
 function normalizeSenderName(name: string): string {
   const trimmedName = name.trim();
@@ -47,7 +14,7 @@ function normalizeSenderName(name: string): string {
   return trimmedName;
 }
 
-function getAuthEmailSender(bindings: AuthEmailBindings): AuthEmailSender {
+function getAuthEmailSender(bindings: ApiBindings): string | EmailAddress {
   const from = bindings.AUTH_EMAIL_FROM?.trim();
 
   if (!from) {
@@ -106,97 +73,8 @@ function buildOtpMessage(type: string, otp: string): { subject: string; text: st
   }
 }
 
-function maskEmail(email: string): { domain: string | null; masked: string } {
-  const [localPart = "", domain = ""] = email.toLowerCase().split("@");
-
-  if (!domain) {
-    return {
-      domain: null,
-      masked: "***",
-    };
-  }
-
-  const visiblePrefix = localPart.slice(0, 1) || "*";
-
-  return {
-    domain,
-    masked: `${visiblePrefix}***@${domain}`,
-  };
-}
-
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
-async function recordEmailLog(
-  bindings: AuthEmailBindings,
-  payload: AuthEmailRequest,
-  status: EmailProviderStatus,
-  provider: string,
-  errorMessage: string | null = null,
-): Promise<void> {
-  const recipient = maskEmail(payload.to);
-
-  try {
-    await getAppDatabase(bindings.DB)
-      .insert(emailLogsTable)
-      .values({
-        createdAt: currentTimestampMs(),
-        errorMessage,
-        id: createPlatformId(),
-        provider,
-        recipientDomain: recipient.domain,
-        recipientMasked: recipient.masked,
-        status,
-        subject: payload.subject,
-        type: payload.emailType,
-      })
-      .run();
-  } catch (error) {
-    logWarn("email.log_failed", {
-      emailType: payload.emailType,
-      error: getErrorMessage(error),
-      provider,
-      status,
-    });
-  }
-}
-
-async function sendAuthEmail(
-  bindings: AuthEmailBindings,
-  payload: AuthEmailRequest,
-): Promise<void> {
-  const emailBinding = bindings.AUTH_EMAIL;
-
-  if (!emailBinding) {
-    logInfo("email.dev_console.sent", {
-      emailType: payload.emailType,
-      recipient: maskEmail(payload.to).masked,
-      subject: payload.subject,
-      text: payload.text,
-    });
-    await recordEmailLog(bindings, payload, "sent", "console");
-    return;
-  }
-
-  try {
-    await emailBinding.send({
-      from: getAuthEmailSender(bindings),
-      subject: payload.subject,
-      text: payload.text,
-      to: payload.to,
-    });
-    await recordEmailLog(bindings, payload, "sent", "cloudflare-email");
-  } catch (error) {
-    await recordEmailLog(bindings, payload, "failed", "cloudflare-email", getErrorMessage(error));
-    throw new Error("Failed to send auth email via Cloudflare Email Workers.", {
-      cause: error,
-    });
-  }
-}
-
 export async function sendOtpEmail(
-  bindings: AuthEmailBindings,
+  bindings: ApiBindings,
   input: {
     email: string;
     otp: string;
@@ -205,10 +83,16 @@ export async function sendOtpEmail(
 ): Promise<void> {
   const message = buildOtpMessage(input.type, input.otp);
 
-  await sendAuthEmail(bindings, {
-    emailType: `auth.${input.type}`,
-    subject: message.subject,
-    text: message.text,
-    to: input.email,
-  });
+  try {
+    await bindings.AUTH_EMAIL.send({
+      from: getAuthEmailSender(bindings),
+      subject: message.subject,
+      text: message.text,
+      to: input.email,
+    });
+  } catch (error) {
+    throw new Error("Failed to send auth email via Cloudflare Email Workers.", {
+      cause: error,
+    });
+  }
 }

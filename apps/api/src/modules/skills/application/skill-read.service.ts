@@ -1,4 +1,3 @@
-import { parsePlatformId } from "@mosoo/id";
 import type { ProjectId, SkillId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
@@ -13,10 +12,9 @@ export async function readSkillSource(
   bindings: ApiBindings,
   viewer: AuthenticatedViewer,
   projectId: ProjectId,
-  skillId: string,
+  skillId: SkillId,
 ): Promise<string> {
-  const parsedSkillId = parsePlatformId<SkillId>(skillId, "skill ID");
-  const skill = await ensureSkillAccess(bindings.DB, viewer.id, projectId, parsedSkillId);
+  const skill = await ensureSkillAccess(bindings.DB, viewer.id, projectId, skillId);
   return readSkillMarkdownFromSnapshot(bindings, skill.currentSnapshotId);
 }
 
@@ -24,13 +22,12 @@ export async function downloadSkillPackage(
   bindings: ApiBindings,
   viewer: AuthenticatedViewer,
   projectId: ProjectId,
-  skillId: string,
+  skillId: SkillId,
 ): Promise<{
   bytes: Uint8Array;
   fileName: string;
 }> {
-  const parsedSkillId = parsePlatformId<SkillId>(skillId, "skill ID");
-  const skill = await ensureSkillAccess(bindings.DB, viewer.id, projectId, parsedSkillId);
+  const skill = await ensureSkillAccess(bindings.DB, viewer.id, projectId, skillId);
 
   return {
     bytes: await readSkillPackageBytesFromSnapshot(bindings, skill.currentSnapshotId),

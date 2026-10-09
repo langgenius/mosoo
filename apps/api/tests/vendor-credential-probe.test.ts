@@ -76,7 +76,6 @@ describe("vendor credential probe", () => {
       const result = await probeVendorCredential({
         apiBase: "http://api.example.com/v1",
         apiKey: "sk-probe",
-        emitEvent: false,
         modelId: "custom-model",
         vendorId: "openai-compatible",
       });
@@ -154,7 +153,6 @@ describe("vendor credential probe", () => {
         const result = await probeVendorCredential({
           apiBase: "https://models.example.com/gateway",
           apiKey: "probe-key",
-          emitEvent: false,
           modelId: "model-a",
           modelProtocol: entry.protocol,
           vendorId: "openai-compatible",
@@ -194,7 +192,6 @@ describe("vendor credential probe", () => {
       const result = await probeVendorCredential({
         apiBase: "https://models.example.com/v1",
         apiKey: "probe-key",
-        emitEvent: false,
         modelId: "model-a",
         modelProtocol: "openai-responses",
         vendorId: "openai-compatible",
@@ -220,7 +217,6 @@ describe("vendor credential probe", () => {
       const result = await probeVendorCredential({
         apiBase: "https://models.example.com/anthropic/v1/",
         apiKey: "probe-key",
-        emitEvent: false,
         modelId: "model-a",
         modelProtocol: "anthropic-messages",
         vendorId: "openai-compatible",
@@ -241,7 +237,6 @@ describe("vendor credential probe", () => {
         await probeVendorCredential({
           apiBase: "https://models.example.com/v1",
           apiKey: "probe-key",
-          emitEvent: false,
           modelId: "model-a",
           modelProtocol: "openai-responses",
           vendorId: "openai-compatible",
@@ -269,7 +264,6 @@ describe("vendor credential probe", () => {
           await probeVendorCredential({
             apiBase: "https://models.example.com/v1",
             apiKey: "probe-key",
-            emitEvent: false,
             modelId: "model-a",
             modelProtocol: "openai-responses",
             vendorId: "openai-compatible",

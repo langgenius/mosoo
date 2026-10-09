@@ -2,7 +2,7 @@ import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import type { DriverNetworkProfile } from "../../domain/driver-snapshot";
 import type { SandboxNetworkConstraints } from "../../domain/sandbox-network-constraints";
 import {
-  resolveSandboxNetworkConstraints,
+  resolveLimitedSandboxNetworkConstraints,
   toSandboxSystemHostsFromUrls,
 } from "../../domain/sandbox-network-constraints";
 import { toContainerReachableOrigin } from "../runtime-sandbox-provisioning/runtime-sandbox-provisioning.paths";
@@ -32,9 +32,8 @@ export function resolveRuntimeSubjectNetworkConstraints(
 
   const explicitControlOrigin = bindings.MOSOO_RUNTIME_CONTROL_ORIGIN?.trim() || undefined;
 
-  return resolveSandboxNetworkConstraints({
+  return resolveLimitedSandboxNetworkConstraints({
     environmentAllowedHosts: input.network.environmentAllowedHosts,
-    networkPolicy: "limited",
     systemHosts: toSandboxSystemHostsFromUrls([
       toContainerReachableOrigin(input.requestUrl, explicitControlOrigin),
       resolveSandboxBackupEndpointUrl(bindings),

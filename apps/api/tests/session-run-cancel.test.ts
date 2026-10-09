@@ -6,13 +6,15 @@ import type { AccountId, DriverInstanceId, SandboxId, SessionId, SessionRunId } 
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
 import { cancelRun } from "../src/modules/runtime/application/session-runs/cancel-run.service";
 import { resolvePermissionRequest } from "../src/modules/runtime/application/session-runs/resolve-permission-request.service";
-import { recordRuntimeRunLeaseAcquired } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-run-lease-store";
+import { acquireRuntimeRunLease } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-run-lease-store";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import {
-  PUBLIC_API_TEST_IDS,
   createPublicHttpContractDatabase,
   createPublicHttpTestBindings,
+  insertNonOwnerSession,
   insertOwnerSession,
+  insertSessionRunFixture,
+  PUBLIC_API_TEST_IDS,
 } from "./helpers/public-api-http-test-fixture";
 
 const OWNER_ACCOUNT_ID = parsePlatformId<AccountId>(
@@ -22,6 +24,10 @@ const OWNER_ACCOUNT_ID = parsePlatformId<AccountId>(
 const OWNER_SESSION_ID = parsePlatformId<SessionId>(
   "01J0000000000000000000000C",
   "owner session id",
+);
+const OTHER_SESSION_ID = parsePlatformId<SessionId>(
+  PUBLIC_API_TEST_IDS.nonOwnerSession,
+  "other session id",
 );
 const RUN_ID = parsePlatformId<SessionRunId>("01J0000000000000000000000N", "run id");
 const SANDBOX_ID = parsePlatformId<SandboxId>("01J0000000000000000000000D", "sandbox id");
@@ -41,13 +47,8 @@ const ownerViewer: AuthenticatedViewer = {
 function createDriverConnectionBinding(requests: unknown[]) {
   return {
     get: () => ({
-      fetch: async (request: Request) => {
-        const body = request.method === "GET" ? null : await request.json();
-        requests.push({
-          body,
-          path: new URL(request.url).pathname,
-        });
-        return Response.json({ ok: true });
+      sendControlCommand: async (_driverInstanceId: string, command: unknown) => {
+        requests.push(command);
       },
     }),
     idFromName: (name: string) => name,
@@ -61,99 +62,13 @@ function withDriverConnection(bindings: ApiBindings, requests: unknown[]): ApiBi
   };
 }
 
-async function ensureRuntimeLeaseTables(database: D1Database): Promise<void> {
-  await database
-    .prepare(
-      `
-        CREATE TABLE IF NOT EXISTS driver_command (
-          acked_at integer,
-          completed_at integer,
-          delivery_connection_id text,
-          driver_instance_id text NOT NULL,
-          error_json text,
-          expires_at integer,
-          id text PRIMARY KEY NOT NULL,
-          issued_at integer NOT NULL,
-          kind text NOT NULL,
-          payload_json text NOT NULL,
-          result_json text,
-          seq integer NOT NULL,
-          status text NOT NULL
-        )
-      `,
-    )
-    .run();
-  await database
-    .prepare(
-      `
-        CREATE TABLE IF NOT EXISTS sandbox (
-          id text PRIMARY KEY NOT NULL,
-          inactive_deadline_at integer,
-          kind text NOT NULL,
-          updated_at integer NOT NULL
-        )
-      `,
-    )
-    .run();
-  await database
-    .prepare(
-      `
-        CREATE TABLE IF NOT EXISTS sandbox_session (
-          sandbox_id text NOT NULL,
-          session_id text PRIMARY KEY NOT NULL,
-          status text NOT NULL
-        )
-      `,
-    )
-    .run();
-}
-
-async function insertRunningSessionRun(
-  database: D1Database,
-  input: {
-    createdByAccountId: AccountId;
-    sessionId: SessionId;
-  },
-): Promise<void> {
-  await database
-    .prepare(
-      `
-        INSERT INTO session_run (
-          id,
-          session_id,
-          agent_id,
-          created_by_account_id,
-          trigger,
-          status,
-          provider,
-          model,
-          runtime_id,
-          trace_id,
-          created_at,
-          updated_at
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `,
-    )
-    .bind(
-      RUN_ID,
-      input.sessionId,
-      "01J00000000000000000000009",
-      input.createdByAccountId,
-      "user_prompt",
-      "running",
-      "openai",
-      "gpt-5.4",
-      "openai-runtime",
-      "trace-cancel",
-      1,
-      1,
-    )
-    .run();
-  await database
-    .prepare("UPDATE session SET last_run_id = ?, status = ? WHERE id = ?")
-    .bind(RUN_ID, "RUNNING", input.sessionId)
-    .run();
+async function insertRunningSessionRun(database: D1Database): Promise<void> {
+  await insertSessionRunFixture(database, {
+    createdByAccountId: OWNER_ACCOUNT_ID,
+    id: RUN_ID,
+    sessionId: OWNER_SESSION_ID,
+    status: "running",
+  });
 }
 
 async function insertRunDriverInstance(
@@ -212,14 +127,10 @@ describe("session run cancel", () => {
   test("cancels an owned run and emits the cancellation event", async () => {
     const database = await createPublicHttpContractDatabase();
     await insertOwnerSession(database);
-    await insertRunningSessionRun(database, {
-      createdByAccountId: OWNER_ACCOUNT_ID,
-      sessionId: OWNER_SESSION_ID,
-    });
+    await insertRunningSessionRun(database);
     const bindings = createPublicHttpTestBindings(database) as ApiBindings;
 
     const result = await cancelRun(bindings, ownerViewer, {
-      projectId: PUBLIC_API_TEST_IDS.project,
       runId: RUN_ID,
       sessionId: OWNER_SESSION_ID,
     });
@@ -240,11 +151,7 @@ describe("session run cancel", () => {
   test("cancels a cold-start run after the runtime lease binds the driver from the run", async () => {
     const database = await createPublicHttpContractDatabase();
     await insertOwnerSession(database);
-    await insertRunningSessionRun(database, {
-      createdByAccountId: OWNER_ACCOUNT_ID,
-      sessionId: OWNER_SESSION_ID,
-    });
-    await ensureRuntimeLeaseTables(database);
+    await insertRunningSessionRun(database);
     await database
       .prepare(
         `
@@ -280,7 +187,7 @@ describe("session run cancel", () => {
         `,
       )
       .bind(
-        "cloudflare-session-1",
+        "01J0000000000000000000000Z",
         1,
         "/workspace",
         "{}",
@@ -297,13 +204,13 @@ describe("session run cancel", () => {
     });
 
     await expect(
-      recordRuntimeRunLeaseAcquired(database, {
+      acquireRuntimeRunLease(database, {
         driverInstanceId: DRIVER_INSTANCE_ID,
         runtimeSubjectId: SANDBOX_ID,
         sessionId: OWNER_SESSION_ID,
         sessionRunId: RUN_ID,
       }),
-    ).resolves.toBe(true);
+    ).resolves.toEqual({ ok: true });
 
     const linkedRun = await database
       .prepare("SELECT driver_instance_id FROM session_run WHERE id = ?")
@@ -318,7 +225,6 @@ describe("session run cancel", () => {
     );
 
     const result = await cancelRun(bindings, ownerViewer, {
-      projectId: PUBLIC_API_TEST_IDS.project,
       runId: RUN_ID,
       sessionId: OWNER_SESSION_ID,
     });
@@ -327,13 +233,10 @@ describe("session run cancel", () => {
     expect(driverRequests).toHaveLength(1);
   });
 
-  test("resolves permission requests for the Project owner through Project ownership", async () => {
+  test("resolves permission requests through the active Run's driver", async () => {
     const database = await createPublicHttpContractDatabase();
     await insertOwnerSession(database);
-    await insertRunningSessionRun(database, {
-      createdByAccountId: OWNER_ACCOUNT_ID,
-      sessionId: OWNER_SESSION_ID,
-    });
+    await insertRunningSessionRun(database);
     await insertRunDriverInstance(database, {
       bindRun: true,
       sessionId: OWNER_SESSION_ID,
@@ -345,14 +248,66 @@ describe("session run cancel", () => {
     );
 
     await expect(
-      resolvePermissionRequest(bindings, ownerViewer, {
+      resolvePermissionRequest(bindings, {
         decision: "allow_once",
         driverInstanceId: DRIVER_INSTANCE_ID,
-        projectId: PUBLIC_API_TEST_IDS.project,
         requestId: "permission-1",
         sessionId: OWNER_SESSION_ID,
       }),
     ).resolves.toBeUndefined();
     expect(driverRequests).toHaveLength(1);
+  });
+
+  // The caller authorized OWNER_SESSION_ID; ids naming another Session's Run or
+  // Driver must not reach that Run.
+  test("does not cancel a Run of another Session", async () => {
+    const database = await createPublicHttpContractDatabase();
+    await insertOwnerSession(database);
+    await insertNonOwnerSession(database);
+    await insertSessionRunFixture(database, {
+      id: RUN_ID,
+      sessionId: OTHER_SESSION_ID,
+      status: "running",
+    });
+    const driverRequests: unknown[] = [];
+    const bindings = withDriverConnection(
+      createPublicHttpTestBindings(database) as ApiBindings,
+      driverRequests,
+    );
+
+    await expect(
+      cancelRun(bindings, ownerViewer, { runId: RUN_ID, sessionId: OWNER_SESSION_ID }),
+    ).rejects.toThrow("Session run not found.");
+    await expect(
+      database.prepare("SELECT status FROM session_run WHERE id = ?").bind(RUN_ID).first(),
+    ).resolves.toEqual({ status: "running" });
+    expect(driverRequests).toEqual([]);
+  });
+
+  test("does not resolve a permission through another Session's Driver", async () => {
+    const database = await createPublicHttpContractDatabase();
+    await insertOwnerSession(database);
+    await insertNonOwnerSession(database);
+    await insertSessionRunFixture(database, {
+      id: RUN_ID,
+      sessionId: OTHER_SESSION_ID,
+      status: "running",
+    });
+    await insertRunDriverInstance(database, { bindRun: true, sessionId: OTHER_SESSION_ID });
+    const driverRequests: unknown[] = [];
+    const bindings = withDriverConnection(
+      createPublicHttpTestBindings(database) as ApiBindings,
+      driverRequests,
+    );
+
+    await expect(
+      resolvePermissionRequest(bindings, {
+        decision: "allow_once",
+        driverInstanceId: DRIVER_INSTANCE_ID,
+        requestId: "permission-1",
+        sessionId: OWNER_SESSION_ID,
+      }),
+    ).rejects.toThrow("Driver instance not found.");
+    expect(driverRequests).toEqual([]);
   });
 });

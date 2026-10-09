@@ -1,79 +1,46 @@
 import type { PublicApiVersion } from "@mosoo/contracts/public-api";
-import type { AgentId } from "@mosoo/id";
+import { agentsTable, projectsTable } from "@mosoo/db";
+import type { AgentId, ProjectId } from "@mosoo/id";
+import { eq } from "drizzle-orm";
 
-import { isApiError } from "../../platform/errors";
-import { isTruthy } from "../../shared/truthiness";
-import { getAgentRow } from "../agents/application/agent-repository";
-import type { AgentRow } from "../agents/application/agent-types";
+import { getAppDatabase } from "../../platform/db/drizzle";
 import type { AuthenticatedViewer } from "../auth/application/viewer-auth.service";
 import { assertProjectKeyAccess } from "../auth/domain/project-key-access";
-import { ensureProjectOwnership } from "../projects/application/project.service";
-import {
-  publicAgentNotExposed,
-  publicForbidden,
-  publicNotFound,
-  publicServiceInactive,
-} from "./public-api-errors";
+import { publicAgentNotExposed, publicForbidden, publicNotFound } from "./public-api-errors";
+
+/** Admits the Project owner to an Agent API Endpoint and returns the Agent's Project. */
 export async function admitAgentApiEndpointCaller(
   database: D1Database,
   caller: AuthenticatedViewer,
   agentId: AgentId,
-  apiVersion: PublicApiVersion = "v1",
-): Promise<AgentRow> {
-  const agent = await getAgentRow(database, agentId).catch((error: unknown) => {
-    if (isApiError(error) && error.status === 404) {
-      throw publicNotFound("Agent not found.");
-    }
+  apiVersion: PublicApiVersion,
+): Promise<ProjectId> {
+  const agent =
+    (await getAppDatabase(database)
+      .select({
+        projectId: agentsTable.projectId,
+        projectOwnerAccountId: projectsTable.ownerAccountId,
+        status: agentsTable.status,
+      })
+      .from(agentsTable)
+      .innerJoin(projectsTable, eq(projectsTable.id, agentsTable.projectId))
+      .where(eq(agentsTable.id, agentId))
+      .limit(1)
+      .get()) ?? null;
 
-    throw error;
-  });
+  if (agent === null) {
+    throw publicNotFound("Agent not found.");
+  }
 
-  await ensureAgentApiEndpointCallerAccess(database, caller, agent, apiVersion);
-
-  return agent;
-}
-
-export async function ensureAgentApiEndpointCallerAccess(
-  database: D1Database,
-  caller: AuthenticatedViewer,
-  agent: AgentRow,
-  apiVersion: PublicApiVersion = "v1",
-): Promise<void> {
   assertProjectKeyAccess(caller, agent.projectId);
-  if (apiVersion === "v1") ensureAgentApiEndpointReady(agent);
-  await ensureCallerOwnsAgentProject(database, caller, agent);
-}
 
-function ensureAgentApiEndpointReady(agent: AgentRow): void {
-  if (agent.status !== "published") {
+  if (apiVersion === "v1" && agent.status !== "published") {
     throw publicAgentNotExposed("This Agent is not exposed as an active API endpoint.");
   }
 
-  if (!isTruthy(agent.liveDeploymentVersionId)) {
-    throw publicServiceInactive("This Agent does not have a live API endpoint version.");
+  if (agent.projectOwnerAccountId !== caller.id) {
+    throw publicForbidden("Caller is not the Project owner for this Agent.");
   }
-}
 
-async function ensureCallerOwnsAgentProject(
-  database: D1Database,
-  caller: AuthenticatedViewer,
-  agent: AgentRow,
-): Promise<void> {
-  const project = await ensureProjectOwnership(database, caller.id, agent.projectId).catch(
-    (error: unknown) => {
-      if (isApiError(error) && error.status === 404) {
-        throw publicNotFound("Agent not found.");
-      }
-
-      if (isApiError(error) && error.status === 403) {
-        throw publicForbidden("Caller is not the Project owner for this Agent.");
-      }
-
-      throw error;
-    },
-  );
-
-  if (agent.ownerId !== project.ownerAccountId) {
-    throw publicForbidden("Agent owner does not match the Project owner.");
-  }
+  return agent.projectId;
 }

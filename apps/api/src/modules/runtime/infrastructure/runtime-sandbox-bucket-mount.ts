@@ -1,6 +1,5 @@
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 
-type RuntimeSandboxBucketProvider = "r2" | "s3" | "gcs";
 const RUNTIME_SANDBOX_FILE_BUCKET_BINDING = "FILE_BUCKET";
 
 interface RuntimeSandboxBucketMountBaseOptions {
@@ -16,23 +15,17 @@ interface RuntimeSandboxRemoteBucketMountOptions extends RuntimeSandboxBucketMou
   credentialProxy: true;
   endpoint: string;
   localBucket: false;
-  provider: RuntimeSandboxBucketProvider;
+  provider: "r2";
 }
 
 export type RuntimeSandboxBucketMountOptions =
   | RuntimeSandboxLocalBucketMountOptions
   | RuntimeSandboxRemoteBucketMountOptions;
 
-const SANDBOX_FILE_BUCKET_LOCAL_ENV = "SANDBOX_FILE_BUCKET_LOCAL";
-const CLOUDFLARE_ACCOUNT_ID_ENV = "CLOUDFLARE_ACCOUNT_ID";
-const FILE_BUCKET_NAME_ENV = "FILE_BUCKET_NAME";
-
-type RuntimeSandboxBucketEnvKey =
-  | typeof SANDBOX_FILE_BUCKET_LOCAL_ENV
-  | typeof CLOUDFLARE_ACCOUNT_ID_ENV
-  | typeof FILE_BUCKET_NAME_ENV;
-
-function requireRuntimeSandboxBucketEnv(bindings: ApiBindings, key: RuntimeSandboxBucketEnvKey) {
+function requireRuntimeSandboxBucketEnv(
+  bindings: ApiBindings,
+  key: "CLOUDFLARE_ACCOUNT_ID" | "FILE_BUCKET_NAME",
+) {
   const value = bindings[key];
 
   if (typeof value !== "string" || value.trim().length === 0) {
@@ -40,35 +33,6 @@ function requireRuntimeSandboxBucketEnv(bindings: ApiBindings, key: RuntimeSandb
   }
 
   return value.trim();
-}
-
-function parseRuntimeSandboxBucketBoolean(
-  value: string | undefined,
-  key: RuntimeSandboxBucketEnvKey,
-) {
-  if (value === undefined || value.trim().length === 0) {
-    return false;
-  }
-
-  const normalizedValue = value.trim().toLowerCase();
-
-  switch (normalizedValue) {
-    case "1":
-    case "true":
-    case "yes":
-    case "on": {
-      return true;
-    }
-    case "0":
-    case "false":
-    case "no":
-    case "off": {
-      return false;
-    }
-    default: {
-      throw new Error(`${key} must be one of: true, false, 1, 0, yes, no, on, off.`);
-    }
-  }
 }
 
 function normalizeRuntimeSandboxBucketPrefix(prefix: string): string {
@@ -87,17 +51,10 @@ function normalizeRuntimeSandboxBucketPrefix(prefix: string): string {
     : `${prefixWithLeadingSlash}/`;
 }
 
-function createRuntimeSandboxBucketEndpoint(bindings: ApiBindings): string {
-  const accountId = requireRuntimeSandboxBucketEnv(bindings, CLOUDFLARE_ACCOUNT_ID_ENV);
-
-  return `https://${accountId}.r2.cloudflarestorage.com`;
-}
-
-export function isRuntimeSandboxLocalBucketEnabled(bindings: ApiBindings): boolean {
-  return parseRuntimeSandboxBucketBoolean(
-    bindings.SANDBOX_FILE_BUCKET_LOCAL,
-    SANDBOX_FILE_BUCKET_LOCAL_ENV,
-  );
+export function isRuntimeSandboxLocalBucketEnabled(
+  bindings: Pick<ApiBindings, "SANDBOX_FILE_BUCKET_LOCAL">,
+): boolean {
+  return bindings.SANDBOX_FILE_BUCKET_LOCAL === "true";
 }
 
 export function createRuntimeSandboxBucketMountOptions(
@@ -107,13 +64,12 @@ export function createRuntimeSandboxBucketMountOptions(
     readOnly?: boolean;
   },
 ): RuntimeSandboxBucketMountOptions {
-  const localBucket = isRuntimeSandboxLocalBucketEnabled(bindings);
   const baseOptions = {
     prefix: normalizeRuntimeSandboxBucketPrefix(mount.prefix),
     readOnly: mount.readOnly ?? false,
   } satisfies RuntimeSandboxBucketMountBaseOptions;
 
-  if (localBucket) {
+  if (isRuntimeSandboxLocalBucketEnabled(bindings)) {
     return {
       ...baseOptions,
       localBucket: true,
@@ -123,14 +79,10 @@ export function createRuntimeSandboxBucketMountOptions(
   return {
     ...baseOptions,
     credentialProxy: true,
-    endpoint: createRuntimeSandboxBucketEndpoint(bindings),
+    endpoint: `https://${requireRuntimeSandboxBucketEnv(bindings, "CLOUDFLARE_ACCOUNT_ID")}.r2.cloudflarestorage.com`,
     localBucket: false,
     provider: "r2",
   };
-}
-
-function getRuntimeSandboxRemoteBucketName(bindings: ApiBindings): string {
-  return requireRuntimeSandboxBucketEnv(bindings, FILE_BUCKET_NAME_ENV);
 }
 
 export function resolveRuntimeSandboxBucketMountTarget(bindings: ApiBindings): string {
@@ -138,5 +90,5 @@ export function resolveRuntimeSandboxBucketMountTarget(bindings: ApiBindings): s
     return RUNTIME_SANDBOX_FILE_BUCKET_BINDING;
   }
 
-  return getRuntimeSandboxRemoteBucketName(bindings);
+  return requireRuntimeSandboxBucketEnv(bindings, "FILE_BUCKET_NAME");
 }

@@ -1,105 +1,33 @@
 import { getAgentSessionUserLifecycleProjection } from "@mosoo/contracts/session";
-import { sessionsTable } from "@mosoo/db";
 import type { AccountId, ProjectId, SessionId } from "@mosoo/id";
-import { and, eq, or } from "drizzle-orm";
 
-import { getAppDatabase } from "../../../platform/db/drizzle";
-import { ensureProjectOwnership } from "../../projects/application/project.service";
+import { findProjectSession } from "../../sessions/domain/session-access.policy";
+import type { ProjectSessionRow } from "../../sessions/domain/session-access.policy";
 import { createFileConflictError, createFileNotFoundError } from "./file-errors";
-
-export async function ensureSessionFileWritable(
-  database: D1Database,
-  sessionId: SessionId,
-): Promise<void> {
-  const session = await getAppDatabase(database)
-    .select({ archivedAt: sessionsTable.archivedAt, status: sessionsTable.status })
-    .from(sessionsTable)
-    .where(eq(sessionsTable.id, sessionId))
-    .get();
-  if (!session) throw createFileNotFoundError("Session not found.");
-  const lifecycle = getAgentSessionUserLifecycleProjection(session);
-  if (lifecycle.readOnly) {
-    throw createFileConflictError(lifecycle.recoverability.reason ?? "Session is read-only.");
-  }
-}
-
-export interface SessionFileAccessRow {
-  id: SessionId;
-  provider: string;
-  title: string | null;
-}
-
-export interface ProjectSessionFileAccessRow extends SessionFileAccessRow {
-  project_id: ProjectId;
-}
+import type { FileAccessIntent } from "./file-record-model";
 
 export async function ensureSessionFileAccess(
   database: D1Database,
   viewerId: AccountId,
-  sessionId: SessionId,
-): Promise<SessionFileAccessRow> {
-  const row =
-    (await getAppDatabase(database)
-      .select({
-        id: sessionsTable.id,
-        provider: sessionsTable.provider,
-        title: sessionsTable.title,
-      })
-      .from(sessionsTable)
-      .where(
-        and(
-          eq(sessionsTable.id, sessionId),
-          or(
-            eq(sessionsTable.creatorAccountId, viewerId),
-            eq(sessionsTable.participantAccountId, viewerId),
-          ),
-        ),
-      )
-      .limit(1)
-      .get()) ?? null;
+  input: { projectId?: ProjectId; sessionId: SessionId },
+  requiredIntent: FileAccessIntent,
+): Promise<ProjectSessionRow> {
+  const session = await findProjectSession(database, viewerId, input);
 
-  if (!row) {
+  if (session === null) {
     throw createFileNotFoundError("Session not found.");
   }
 
-  return row;
-}
+  if (requiredIntent === "write") {
+    const lifecycle = getAgentSessionUserLifecycleProjection({
+      archivedAt: session.archived_at,
+      status: session.status,
+    });
 
-export async function ensureProjectSessionFileAccess(
-  database: D1Database,
-  viewerId: AccountId,
-  input: {
-    projectId: ProjectId;
-    sessionId: SessionId;
-  },
-): Promise<ProjectSessionFileAccessRow> {
-  await ensureProjectOwnership(database, viewerId, input.projectId);
-
-  const row =
-    (await getAppDatabase(database)
-      .select({
-        id: sessionsTable.id,
-        project_id: sessionsTable.projectId,
-        provider: sessionsTable.provider,
-        title: sessionsTable.title,
-      })
-      .from(sessionsTable)
-      .where(
-        and(
-          eq(sessionsTable.id, input.sessionId),
-          eq(sessionsTable.projectId, input.projectId),
-          or(
-            eq(sessionsTable.creatorAccountId, viewerId),
-            eq(sessionsTable.participantAccountId, viewerId),
-          ),
-        ),
-      )
-      .limit(1)
-      .get()) ?? null;
-
-  if (!row) {
-    throw createFileNotFoundError("Session not found.");
+    if (lifecycle.readOnly) {
+      throw createFileConflictError(lifecycle.recoverability.reason ?? "Session is read-only.");
+    }
   }
 
-  return row;
+  return session;
 }

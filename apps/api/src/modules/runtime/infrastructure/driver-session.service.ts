@@ -4,7 +4,6 @@ import type { DriverInstanceId, FileId, SandboxId, SessionId, SessionRunId } fro
 
 import { logWarn } from "../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
-import type { DriverBootPayloadPreparedHandler } from "../application/execution-plane/driver-boot-payload-prepared";
 import { createRuntimeTimingRecorder } from "../application/session-runs/session-runtime-timing";
 import type { RuntimeTimingSnapshot } from "../application/session-runs/session-runtime-timing";
 import type {
@@ -15,31 +14,23 @@ import type {
   DriverSkillCatalogEntry,
 } from "../domain/driver-snapshot";
 import { DRIVER_COLD_READY_TIMEOUT_MS } from "../domain/runtime-config";
-import { getDriverControlPort } from "../domain/sandbox-layout";
-import { failDriverInstance } from "./driver-instance/client";
+import { failDriverInstance, getDriverInstanceSnapshot } from "./driver-instance/client";
 import {
   driverInstanceRecordMatchesBootToken,
   getReusableDriverInstanceRecord,
   markDriverInstanceFailedIfBootTokenMatches,
 } from "./driver-instance/driver-instance-record.repository";
-import { currentTimestampPlus } from "./driver-instance/driver-instance-support";
-import {
-  appendDriverSocketReconnectFailedIfNeeded,
-  appendDriverSocketReconnectSucceededIfNeeded,
-  DRIVER_SOCKET_MISSING_MESSAGE,
-  startDriverSocketReconnectAttempt,
-} from "./driver-session-reconnect";
-import type { DriverSocketReconnectAttempt } from "./driver-session-reconnect";
 import { disposeDriverProcess, waitForDriverReady } from "./driver-session-startup";
-import type { DriverRuntimeStartupEventContext } from "./driver-session-startup";
-import { driverReadySocketIsConnected, getDriverUsage } from "./driver-session-state";
-import {
-  DriverPrewarmProvisionSkippedError,
-  provisionSessionDriver,
-} from "./runtime-sandbox-provisioner";
+import { getDriverUsage } from "./driver-session-state";
+import { DRIVER_SOCKET_MISSING_MESSAGE } from "./driver-session-stop-errors";
+import { DriverPrewarmProvisionSkippedError } from "./runtime-sandbox-provisioning/runtime-driver-prewarm-ownership";
 import { stopProvisionProcess } from "./runtime-sandbox-provisioning/runtime-driver-process-cleanup";
-import type { RuntimeRunLeaseTransitionOutcome } from "./runtime-subject-lifecycle/runtime-run-lease-store";
-import { createRuntimeSubjectLifecycleService } from "./runtime-subject-lifecycle/runtime-subject-lifecycle.service";
+import { provisionDriver } from "./runtime-sandbox-provisioning/runtime-driver-provisioning.service";
+import {
+  acquireRuntimeRunLease,
+  releaseRuntimeRunLease,
+} from "./runtime-subject-lifecycle/runtime-run-lease-store";
+import type { RuntimeRunLeaseAcquireOutcome } from "./runtime-subject-lifecycle/runtime-run-lease-store";
 import type {
   ExecutionSessionHandle,
   RuntimeProcessHandle,
@@ -53,58 +44,38 @@ async function allocateDriverInstanceId(
   database: D1Database,
   input: {
     sandboxId: SandboxId;
-    sandboxSessionId: SessionId;
+    sessionId: SessionId;
   },
 ): Promise<DriverInstanceId> {
-  const reusable = await getReusableDriverInstanceRecord(database, input);
+  const reusable = await getReusableDriverInstanceRecord(database, {
+    sandboxId: input.sandboxId,
+    sandboxSessionId: input.sessionId,
+  });
   return reusable?.id ?? createPlatformId();
 }
 
-function isRuntimeRunLeaseAcquireSuccess(outcome: RuntimeRunLeaseTransitionOutcome): boolean {
-  return (
-    outcome.transition === "acquire" &&
-    (outcome.status === "applied" || outcome.status === "duplicate")
-  );
-}
-
-function isRetryableRuntimeRunLeaseAcquireOutcome(
-  outcome: RuntimeRunLeaseTransitionOutcome,
-): boolean {
-  if (outcome.transition !== "acquire") {
-    return false;
-  }
-
-  if (outcome.status === "stale") {
-    return true;
-  }
-
-  return (
-    outcome.status === "rejected" &&
-    (outcome.reason === "driver_already_leased" || outcome.reason === "run_already_leased")
-  );
-}
-
 async function waitForRetryableRunLeaseOutcome(
-  outcome: RuntimeRunLeaseTransitionOutcome,
+  outcome: Extract<RuntimeRunLeaseAcquireOutcome, { ok: false }>,
 ): Promise<void> {
-  if (isRetryableRuntimeRunLeaseAcquireOutcome(outcome)) {
+  if (outcome.retryable) {
     await sleepPromise(DRIVER_SESSION_POLL_MS);
     return;
   }
 
-  const reason = "reason" in outcome ? outcome.reason : outcome.status;
-  throw new Error(`Runtime run lease acquire failed: ${reason}.`);
+  throw new Error(`Runtime run lease acquire failed: ${outcome.reason}.`);
 }
 
-async function releasePreparedRunLeaseAfterFailure(input: {
-  driverInstanceId: DriverInstanceId;
-  runtimeSubjectLifecycle: ReturnType<typeof createRuntimeSubjectLifecycleService>;
-  sessionId: SessionId;
-  sessionRunId: SessionRunId;
-  traceId: string;
-}): Promise<void> {
+async function releasePreparedRunLeaseAfterFailure(
+  database: D1Database,
+  input: {
+    driverInstanceId: DriverInstanceId;
+    sessionId: SessionId;
+    sessionRunId: SessionRunId;
+    traceId: string;
+  },
+): Promise<void> {
   try {
-    const released = await input.runtimeSubjectLifecycle.releaseRunLease({
+    const released = await releaseRuntimeRunLease(database, {
       driverInstanceId: input.driverInstanceId,
       expectedSessionRunId: input.sessionRunId,
     });
@@ -139,20 +110,19 @@ export async function ensureDriverSessionReady(
     resolvedSkillCatalog: DriverSkillCatalogEntry[];
     resolvedSkills: Omit<DriverResolvedSkill, "downloadUrl">[];
     sandbox: SandboxHandle;
-    sandboxSessionId: SessionId;
     sessionId: SessionId;
     sessionRunId: SessionRunId;
     traceId: string;
-    onBootPayloadPrepared?: DriverBootPayloadPreparedHandler;
   },
 ): Promise<{
   driverInstanceId: DriverInstanceId;
   readiness(): Promise<RuntimeTimingSnapshot>;
   timing: RuntimeTimingSnapshot;
 }> {
+  const sandboxId = input.profile.sandbox.id;
   let driverInstanceId = await allocateDriverInstanceId(bindings.DB, {
-    sandboxId: input.profile.sandbox.id,
-    sandboxSessionId: input.sandboxSessionId,
+    sandboxId,
+    sessionId: input.sessionId,
   });
   const timing = createRuntimeTimingRecorder({
     runId: input.sessionRunId,
@@ -161,17 +131,18 @@ export async function ensureDriverSessionReady(
     stage: "prepare_run",
     traceId: input.traceId,
   });
-  const runtimeSubjectLifecycle = createRuntimeSubjectLifecycleService(bindings);
-  let reconnectAttempt: DriverSocketReconnectAttempt | null = null;
+  const leaseInput = {
+    runtimeSubjectId: sandboxId,
+    sessionId: input.sessionId,
+    sessionRunId: input.sessionRunId,
+  };
+  const releaseInput = {
+    sessionId: input.sessionId,
+    sessionRunId: input.sessionRunId,
+    traceId: input.traceId,
+  };
 
   while (true) {
-    const eventContext: DriverRuntimeStartupEventContext = {
-      agentId: input.profile.configRevision.agentId,
-      driverControlPort: getDriverControlPort(driverInstanceId),
-      driverInstanceId,
-      sessionId: input.sessionId,
-      traceId: input.traceId,
-    };
     const usage = await timing.measure("driver.getUsage", () =>
       getDriverUsage(bindings.DB, driverInstanceId),
     );
@@ -184,57 +155,37 @@ export async function ensureDriverSessionReady(
 
     if (usage && (usage.status === "failed" || usage.status === "stopped")) {
       driverInstanceId = createPlatformId();
-      reconnectAttempt = null;
       continue;
     }
 
     if (usage?.status === "ready") {
-      if (
-        !(await timing.measure("driver.readySocketCheck", () =>
-          driverReadySocketIsConnected(bindings, driverInstanceId),
-        ))
-      ) {
-        reconnectAttempt = await startDriverSocketReconnectAttempt(bindings, {
-          currentAttempt: reconnectAttempt,
-          eventContext,
+      const snapshot = await timing.measure("driver.readySocketCheck", () =>
+        getDriverInstanceSnapshot(bindings, driverInstanceId),
+      );
+
+      if (!snapshot.driverSocketConnected) {
+        logWarn("runtime.driver.socket_missing", {
+          driverInstanceId,
+          runId: input.sessionRunId,
+          sessionId: input.sessionId,
+          traceId: input.traceId,
         });
-
-        try {
-          await failDriverInstance(bindings, driverInstanceId, DRIVER_SOCKET_MISSING_MESSAGE);
-          await runtimeSubjectLifecycle.releaseRunLease({
-            driverInstanceId,
-            expectedSessionRunId: input.sessionRunId,
-          });
-        } catch (error) {
-          await appendDriverSocketReconnectFailedIfNeeded(bindings, {
-            attempt: reconnectAttempt,
-            error,
-            eventContext,
-          });
-          throw error;
-        }
-
+        await failDriverInstance(bindings, driverInstanceId, DRIVER_SOCKET_MISSING_MESSAGE);
+        await releaseRuntimeRunLease(bindings.DB, {
+          driverInstanceId,
+          expectedSessionRunId: input.sessionRunId,
+        });
         continue;
       }
 
       const runLeaseOutcome = await timing.measure("driver.bindRun", () =>
-        runtimeSubjectLifecycle.acquireRunLease({
-          driverInstanceId,
-          runtimeSubjectId: input.profile.sandbox.id,
-          sessionId: input.sessionId,
-          sessionRunId: input.sessionRunId,
-        }),
+        acquireRuntimeRunLease(bindings.DB, { ...leaseInput, driverInstanceId }),
       );
 
-      if (!isRuntimeRunLeaseAcquireSuccess(runLeaseOutcome)) {
+      if (!runLeaseOutcome.ok) {
         await waitForRetryableRunLeaseOutcome(runLeaseOutcome);
         continue;
       }
-
-      await appendDriverSocketReconnectSucceededIfNeeded(bindings, {
-        attempt: reconnectAttempt,
-        eventContext,
-      });
 
       const readyTiming = timing.snapshot({ path: "warm" });
 
@@ -247,15 +198,10 @@ export async function ensureDriverSessionReady(
 
     if (usage && (usage.status === "provisioning" || usage.status === "connecting")) {
       const runLeaseOutcome = await timing.measure("driver.bindProvisioningRun", () =>
-        runtimeSubjectLifecycle.acquireRunLease({
-          driverInstanceId,
-          runtimeSubjectId: input.profile.sandbox.id,
-          sessionId: input.sessionId,
-          sessionRunId: input.sessionRunId,
-        }),
+        acquireRuntimeRunLease(bindings.DB, { ...leaseInput, driverInstanceId }),
       );
 
-      if (!isRuntimeRunLeaseAcquireSuccess(runLeaseOutcome)) {
+      if (!runLeaseOutcome.ok) {
         await waitForRetryableRunLeaseOutcome(runLeaseOutcome);
         continue;
       }
@@ -267,10 +213,9 @@ export async function ensureDriverSessionReady(
             await timing.measure("driver.waitProvisioningReady", () =>
               waitForDriverReady(bindings, {
                 driverInstanceId,
-                eventContext,
                 logContext: {
                   driverInstanceId,
-                  sandboxId: input.profile.sandbox.id,
+                  sandboxId,
                   sessionId: input.sessionId,
                   sessionRunId: input.sessionRunId,
                   traceId: input.traceId,
@@ -278,24 +223,12 @@ export async function ensureDriverSessionReady(
               }),
             );
           } catch (error) {
-            await appendDriverSocketReconnectFailedIfNeeded(bindings, {
-              attempt: reconnectAttempt,
-              error,
-              eventContext,
-            });
-            await releasePreparedRunLeaseAfterFailure({
+            await releasePreparedRunLeaseAfterFailure(bindings.DB, {
+              ...releaseInput,
               driverInstanceId,
-              runtimeSubjectLifecycle,
-              sessionId: input.sessionId,
-              sessionRunId: input.sessionRunId,
-              traceId: input.traceId,
             });
             throw error;
           }
-          await appendDriverSocketReconnectSucceededIfNeeded(bindings, {
-            attempt: reconnectAttempt,
-            eventContext,
-          });
 
           return timing.snapshot({ path: "prewarm" });
         },
@@ -303,58 +236,38 @@ export async function ensureDriverSessionReady(
       };
     }
 
-    const provisionInput = {
-      builtInTools: input.builtInTools,
-      cloudflareSession: input.cloudflareSession,
-      driverRecordConflictStrategy: "insert-only" as const,
-      driverInstanceId,
-      profile: input.profile,
-      requestUrl,
-      resolvedMcpServers: input.resolvedMcpServers,
-      resolvedSkillCatalog: input.resolvedSkillCatalog,
-      resolvedSkills: input.resolvedSkills,
-      runtime: input.profile.runtimeId,
-      sandbox: input.sandbox,
-      sandboxSessionId: input.sandboxSessionId,
-      sessionRunId: input.sessionRunId,
-      traceId: input.traceId,
-    };
-    const { onBootPayloadPrepared } = input;
     let provisionProcess: RuntimeProcessHandle | null = null;
-    let reconnectFailureEventContext = eventContext;
 
     try {
       const provision = await timing.measure("driver.provision", () =>
-        provisionSessionDriver(
-          bindings,
-          onBootPayloadPrepared
-            ? {
-                ...provisionInput,
-                onBootPayloadPrepared,
-              }
-            : provisionInput,
-        ),
+        provisionDriver(bindings, {
+          builtInTools: input.builtInTools,
+          cloudflareSession: input.cloudflareSession,
+          driverInstanceId,
+          profile: input.profile,
+          requestUrl,
+          resolvedMcpServers: input.resolvedMcpServers,
+          resolvedSkillCatalog: input.resolvedSkillCatalog,
+          resolvedSkills: input.resolvedSkills,
+          runtime: input.profile.runtimeId,
+          sandbox: input.sandbox,
+          sandboxSessionId: input.sessionId,
+          sessionRunId: input.sessionRunId,
+        }),
       );
       for (const phase of provision.timing.phases) {
         timing.addPhase(`driver.provision.${phase.name}`, phase.durationMs);
       }
       provisionProcess = provision.process;
-      const provisionEventContext = {
-        ...eventContext,
-        driverInstanceId: provision.driverInstanceId,
-      };
-      reconnectFailureEventContext = provisionEventContext;
 
       const provisioningRunLeaseOutcome = await timing.measure("driver.bindProvisioningRun", () =>
-        runtimeSubjectLifecycle.acquireRunLease({
+        acquireRuntimeRunLease(bindings.DB, {
+          ...leaseInput,
           driverInstanceId: provision.driverInstanceId,
-          runtimeSubjectId: input.profile.sandbox.id,
-          sessionId: input.sessionId,
-          sessionRunId: input.sessionRunId,
         }),
       );
 
-      if (!isRuntimeRunLeaseAcquireSuccess(provisioningRunLeaseOutcome)) {
+      if (!provisioningRunLeaseOutcome.ok) {
         await waitForRetryableRunLeaseOutcome(provisioningRunLeaseOutcome);
         continue;
       }
@@ -369,7 +282,6 @@ export async function ensureDriverSessionReady(
             await timing.measure("driver.waitForReady", () =>
               waitForDriverReady(bindings, {
                 driverInstanceId: provision.driverInstanceId,
-                eventContext: provisionEventContext,
                 logContext: {
                   driverInstanceId: provision.driverInstanceId,
                   sandboxId: provision.sandboxId,
@@ -381,27 +293,14 @@ export async function ensureDriverSessionReady(
               }),
             );
           } catch (error) {
-            await releasePreparedRunLeaseAfterFailure({
+            await releasePreparedRunLeaseAfterFailure(bindings.DB, {
+              ...releaseInput,
               driverInstanceId: provision.driverInstanceId,
-              runtimeSubjectLifecycle,
-              sessionId: input.sessionId,
-              sessionRunId: input.sessionRunId,
-              traceId: input.traceId,
-            });
-            await appendDriverSocketReconnectFailedIfNeeded(bindings, {
-              attempt: reconnectAttempt,
-              error,
-              eventContext: provisionEventContext,
             });
             throw error;
           } finally {
             disposeDriverProcess(readyProcess);
           }
-
-          await appendDriverSocketReconnectSucceededIfNeeded(bindings, {
-            attempt: reconnectAttempt,
-            eventContext: provisionEventContext,
-          });
 
           return timing.snapshot({ path: "cold" });
         },
@@ -412,7 +311,7 @@ export async function ensureDriverSessionReady(
         await stopProvisionProcess({
           context: {
             driverInstanceId,
-            sandboxId: input.profile.sandbox.id,
+            sandboxId,
             sessionId: input.sessionId,
             sessionRunId: input.sessionRunId,
           },
@@ -420,23 +319,14 @@ export async function ensureDriverSessionReady(
           process: provisionProcess,
         });
         driverInstanceId = await allocateDriverInstanceId(bindings.DB, {
-          sandboxId: input.profile.sandbox.id,
-          sandboxSessionId: input.sandboxSessionId,
+          sandboxId,
+          sessionId: input.sessionId,
         });
-        reconnectAttempt = null;
         continue;
       }
-      await releasePreparedRunLeaseAfterFailure({
+      await releasePreparedRunLeaseAfterFailure(bindings.DB, {
+        ...releaseInput,
         driverInstanceId,
-        runtimeSubjectLifecycle,
-        sessionId: input.sessionId,
-        sessionRunId: input.sessionRunId,
-        traceId: input.traceId,
-      });
-      await appendDriverSocketReconnectFailedIfNeeded(bindings, {
-        attempt: reconnectAttempt,
-        error,
-        eventContext: reconnectFailureEventContext,
       });
       throw error;
     } finally {
@@ -456,16 +346,16 @@ export async function prewarmDriverSession(
     resolvedSkillCatalog: DriverSkillCatalogEntry[];
     resolvedSkills: Omit<DriverResolvedSkill, "downloadUrl">[];
     sandbox: SandboxHandle;
-    sandboxSessionId: SessionId;
     sessionId: SessionId;
   },
 ): Promise<{
   driverInstanceId: DriverInstanceId;
   timing: RuntimeTimingSnapshot;
 } | null> {
+  const sandboxId = input.profile.sandbox.id;
   let driverInstanceId = await allocateDriverInstanceId(bindings.DB, {
-    sandboxId: input.profile.sandbox.id,
-    sandboxSessionId: input.sandboxSessionId,
+    sandboxId,
+    sessionId: input.sessionId,
   });
   const timing = createRuntimeTimingRecorder({
     path: "prewarm",
@@ -477,13 +367,6 @@ export async function prewarmDriverSession(
   });
 
   while (true) {
-    const eventContext: DriverRuntimeStartupEventContext = {
-      agentId: input.profile.configRevision.agentId,
-      driverControlPort: getDriverControlPort(driverInstanceId),
-      driverInstanceId,
-      sessionId: input.sessionId,
-      traceId: null,
-    };
     const usage = await timing.measure("driver.getUsage", () =>
       getDriverUsage(bindings.DB, driverInstanceId),
     );
@@ -498,11 +381,11 @@ export async function prewarmDriverSession(
     }
 
     if (usage?.status === "ready") {
-      const socketConnected = await timing.measure("driver.readySocketCheck", () =>
-        driverReadySocketIsConnected(bindings, driverInstanceId),
+      const snapshot = await timing.measure("driver.readySocketCheck", () =>
+        getDriverInstanceSnapshot(bindings, driverInstanceId),
       );
 
-      if (socketConnected) {
+      if (snapshot.driverSocketConnected) {
         return { driverInstanceId, timing: timing.snapshot({ path: "warm" }) };
       }
 
@@ -514,10 +397,9 @@ export async function prewarmDriverSession(
       await timing.measure("driver.waitProvisioningReady", () =>
         waitForDriverReady(bindings, {
           driverInstanceId,
-          eventContext,
           logContext: {
             driverInstanceId,
-            sandboxId: input.profile.sandbox.id,
+            sandboxId,
             sessionId: input.sessionId,
             sessionRunId: null,
           },
@@ -527,27 +409,24 @@ export async function prewarmDriverSession(
       return { driverInstanceId, timing: timing.snapshot({ path: "prewarm" }) };
     }
 
-    const provisionInput = {
-      builtInTools: input.builtInTools,
-      cloudflareSession: input.cloudflareSession,
-      driverRecordConflictStrategy: "insert-only" as const,
-      driverInstanceId,
-      profile: input.profile,
-      requestUrl,
-      resolvedMcpServers: input.resolvedMcpServers,
-      resolvedSkillCatalog: input.resolvedSkillCatalog,
-      resolvedSkills: input.resolvedSkills,
-      runtime: input.profile.runtimeId,
-      sandbox: input.sandbox,
-      sandboxSessionId: input.sandboxSessionId,
-      sessionRunId: null,
-      traceId: null,
-    };
     let provisionProcess: RuntimeProcessHandle | null = null;
 
     try {
       const provision = await timing.measure("driver.provision", () =>
-        provisionSessionDriver(bindings, provisionInput),
+        provisionDriver(bindings, {
+          builtInTools: input.builtInTools,
+          cloudflareSession: input.cloudflareSession,
+          driverInstanceId,
+          profile: input.profile,
+          requestUrl,
+          resolvedMcpServers: input.resolvedMcpServers,
+          resolvedSkillCatalog: input.resolvedSkillCatalog,
+          resolvedSkills: input.resolvedSkills,
+          runtime: input.profile.runtimeId,
+          sandbox: input.sandbox,
+          sandboxSessionId: input.sessionId,
+          sessionRunId: null,
+        }),
       );
       for (const phase of provision.timing.phases) {
         timing.addPhase(`driver.provision.${phase.name}`, phase.durationMs);
@@ -557,10 +436,6 @@ export async function prewarmDriverSession(
       await timing.measure("driver.waitForReady", () =>
         waitForDriverReady(bindings, {
           driverInstanceId: provision.driverInstanceId,
-          eventContext: {
-            ...eventContext,
-            driverInstanceId: provision.driverInstanceId,
-          },
           getStaleStartupError: async () => {
             const stillOwnsRecord = await driverInstanceRecordMatchesBootToken(bindings.DB, {
               bootTokenHash: provision.bootTokenHash,
@@ -609,7 +484,7 @@ export async function prewarmDriverSession(
         await stopProvisionProcess({
           context: {
             driverInstanceId,
-            sandboxId: input.profile.sandbox.id,
+            sandboxId,
             sessionId: input.sessionId,
             sessionRunId: null,
           },
@@ -648,8 +523,6 @@ export async function dispatchDriverTurn(
       runId: input.sessionRunId,
     },
     driverInstanceId: input.driverInstanceId,
-    expiresAt: currentTimestampPlus(DRIVER_COLD_READY_TIMEOUT_MS),
+    expiresAt: Date.now() + DRIVER_COLD_READY_TIMEOUT_MS,
   });
 }
-
-export { stopDriverSession } from "./driver-session-stop.service";

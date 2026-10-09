@@ -1,5 +1,4 @@
 import type { CompleteFileUploadRequest } from "@mosoo/contracts/file";
-import type { UploadId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import {
@@ -8,31 +7,13 @@ import {
   createUploadInvalidPartError,
   createUploadInvalidStateError,
 } from "./file-errors";
-import { markUploadFailed, updateFileUploadStatus } from "./file-record-store";
-import type { FileUploadContext } from "./file-record-store";
-import { completeMultipartUpload, headObject, normalizeR2Etag } from "./r2-s3-client";
-import type {
-  CompleteMultipartUploadInput,
-  CopyObjectOptions,
-  HeadObjectResult,
-} from "./r2-s3-client";
+import type { FileUploadContext } from "./file-record-model";
+import { markUploadFailed, updateFileUploadStatus } from "./file-record-mutations";
 
 interface CompleteStagingUploadInput {
   bindings: ApiBindings;
   context: FileUploadContext;
   request: CompleteFileUploadRequest;
-}
-
-interface VerifyStagingObjectInput {
-  bindings: ApiBindings;
-  context: FileUploadContext;
-}
-
-interface FinalizeCopyOptionsInput {
-  existingDestinationEtag: string | null | undefined;
-  ifMatchEtag: string | null;
-  overwrite: boolean;
-  sourceEtag: string;
 }
 
 export function ensureUploadCanComplete(context: FileUploadContext): void {
@@ -45,18 +26,19 @@ export async function completeStagingUpload(input: CompleteStagingUploadInput): 
   const { bindings, context, request } = input;
 
   if (context.upload.strategy === "multipart") {
-    const multipartInput = toCompleteMultipartUploadInput(input);
+    const parts = toCompletedMultipartParts(input);
     if (context.upload.status === "completing") {
-      const existingStagingObject = await headObject(bindings, context.file.object_key);
-
-      if (existingStagingObject) {
+      if (await bindings.FILE_BUCKET.head(context.file.object_key)) {
         return;
       }
     } else {
-      await markUploadCompleting(bindings.DB, context.upload.id);
+      await markUploadCompleting(bindings.DB, context);
     }
 
-    await completeMultipartUpload(multipartInput);
+    await bindings.FILE_BUCKET.resumeMultipartUpload(
+      context.file.object_key,
+      parts.multipartUploadId,
+    ).complete(parts.parts);
     return;
   }
 
@@ -65,58 +47,44 @@ export async function completeStagingUpload(input: CompleteStagingUploadInput): 
   }
 
   if (context.upload.status !== "completing") {
-    await markUploadCompleting(bindings.DB, context.upload.id);
+    await markUploadCompleting(bindings.DB, context);
   }
 }
 
-export async function readVerifiedStagingObject(
-  input: VerifyStagingObjectInput,
-): Promise<HeadObjectResult> {
+export async function readVerifiedStagingObject(input: {
+  bindings: ApiBindings;
+  context: FileUploadContext;
+}): Promise<R2Object> {
   const { bindings, context } = input;
-  const stagingHead = await headObject(bindings, context.file.object_key);
+  const stagingObject = await bindings.FILE_BUCKET.head(context.file.object_key);
 
-  if (!stagingHead) {
+  if (!stagingObject) {
     await markUploadFailed(bindings.DB, context);
     throw createUploadContentMissingError("Uploaded object could not be found in R2.");
   }
 
-  if (stagingHead.contentLength !== context.upload.expected_size) {
+  if (stagingObject.size !== context.upload.expected_size) {
     await markUploadFailed(bindings.DB, context);
     throw createUploadIntegrityError("Uploaded object size does not match the expected size.");
   }
 
-  if ((stagingHead.contentType ?? "application/octet-stream") !== context.upload.content_type) {
+  if (
+    (stagingObject.httpMetadata?.contentType ?? "application/octet-stream") !==
+    context.upload.content_type
+  ) {
     await markUploadFailed(bindings.DB, context);
     throw createUploadIntegrityError(
       "Uploaded object content type does not match the declared upload.",
     );
   }
 
-  return stagingHead;
+  return stagingObject;
 }
 
-export function buildFinalizeCopyOptions(input: FinalizeCopyOptionsInput): CopyObjectOptions {
-  const copyOptions: CopyObjectOptions = {
-    sourceIfMatch: input.sourceEtag,
-  };
-
-  if (input.overwrite) {
-    const expectedDestinationEtag =
-      normalizeR2Etag(input.ifMatchEtag) ?? normalizeR2Etag(input.existingDestinationEtag);
-
-    if (expectedDestinationEtag !== null && expectedDestinationEtag.length > 0) {
-      copyOptions.destinationIfMatch = expectedDestinationEtag;
-    }
-  } else {
-    copyOptions.destinationIfNoneMatch = "*";
-  }
-
-  return copyOptions;
-}
-
-function toCompleteMultipartUploadInput(
-  input: CompleteStagingUploadInput,
-): CompleteMultipartUploadInput {
+function toCompletedMultipartParts(input: CompleteStagingUploadInput): {
+  multipartUploadId: string;
+  parts: R2UploadedPart[];
+} {
   const parts = (input.request.parts ?? [])
     .map((part) => ({
       etag: part.etag,
@@ -133,16 +101,17 @@ function toCompleteMultipartUploadInput(
   }
 
   return {
-    bindings: input.bindings,
-    objectKey: input.context.file.object_key,
+    multipartUploadId,
     parts: parts.toSorted((left, right) => left.partNumber - right.partNumber),
-    uploadId: multipartUploadId,
   };
 }
 
-async function markUploadCompleting(database: D1Database, uploadId: UploadId): Promise<void> {
+async function markUploadCompleting(
+  database: D1Database,
+  context: FileUploadContext,
+): Promise<void> {
   await updateFileUploadStatus(database, {
     status: "completing",
-    uploadId,
+    uploadId: context.upload.id,
   });
 }

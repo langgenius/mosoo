@@ -1,6 +1,6 @@
-import { sessionsTable } from "@mosoo/db";
-import { parsePlatformId } from "@mosoo/id";
-import type { AccountId, ProjectId, SessionId } from "@mosoo/id";
+import type { FileScopeKind } from "@mosoo/contracts/file";
+import { fileRecordsTable, fileUploadsTable, sessionsTable } from "@mosoo/db";
+import type { PlatformId, ProjectId, SessionId } from "@mosoo/id";
 import { and, eq } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
@@ -8,20 +8,20 @@ import type { AuthenticatedViewer } from "../../auth/domain/authenticated-viewer
 import { ensureProjectOwnership } from "../../projects/application/project.service";
 import { createFileNotFoundError } from "./file-errors";
 import type {
+  FileAccessIntent,
   FileAccessRequest,
   FileRecordRow,
   FileUploadContext,
-  UploadAccessRequest,
 } from "./file-record-model";
+import { fileRecordRowColumns, fileUploadRowColumns } from "./file-record-model";
 import { getFileRecordById } from "./file-record-queries";
-import { getFileUploadAccessContextByFileId } from "./file-upload-context-store";
-import { ensureSessionFileAccess, ensureSessionFileWritable } from "./session-file-ownership";
+import { ensureSessionFileAccess } from "./session-file-ownership";
 
 export async function ensureProjectKeyFileScope(
   database: D1Database,
   viewer: AuthenticatedViewer,
-  scopeKind: string,
-  scopeId: string | null,
+  scopeKind: FileScopeKind,
+  scopeId: PlatformId | null,
 ): Promise<void> {
   if (viewer.projectId === undefined) return;
   if (scopeKind === "session" && scopeId !== null) {
@@ -30,7 +30,7 @@ export async function ensureProjectKeyFileScope(
       .from(sessionsTable)
       .where(
         and(
-          eq(sessionsTable.id, parsePlatformId<SessionId>(scopeId, "session ID")),
+          eq(sessionsTable.id, scopeId as SessionId),
           eq(sessionsTable.projectId, viewer.projectId),
         ),
       )
@@ -46,59 +46,50 @@ export async function ensureProjectKeyFileScope(
   throw createFileNotFoundError("File not found.");
 }
 
-async function ensureAgentPackageFileAccess(
+async function ensureFileRowAccess(
   database: D1Database,
-  viewerId: AccountId,
-  projectId: ProjectId,
-  createdBy: AccountId,
-  resourceKind: "file" | "upload",
-): Promise<void> {
-  await ensureProjectOwnership(database, viewerId, projectId);
-
-  if (createdBy !== viewerId) {
-    throw createFileNotFoundError(
-      resourceKind === "file" ? "File not found." : "Upload not found.",
-    );
-  }
-}
-
-function requireScopeId(scopeId: string | null, label: string): string {
-  if (scopeId === null) {
-    throw createFileNotFoundError(`${label} not found.`);
-  }
-
-  return scopeId;
-}
-
-async function ensureLibraryFileAccess(
-  database: D1Database,
-  viewerId: AccountId,
+  viewer: AuthenticatedViewer,
   file: FileRecordRow,
-  resourceKind: "file" | "upload",
+  requiredIntent: FileAccessIntent,
+  resource: "File" | "Upload",
 ): Promise<void> {
-  const projectId = parsePlatformId<ProjectId>(
-    requireScopeId(file.scope_id, "Library file"),
-    "file project ID",
-  );
+  await ensureProjectKeyFileScope(database, viewer, file.scope_kind, file.scope_id);
 
-  if (file.owner_kind !== "app" || file.owner_id !== projectId) {
-    throw createFileNotFoundError(
-      resourceKind === "file" ? "File not found." : "Upload not found.",
-    );
-  }
+  switch (file.scope_kind) {
+    case "account": {
+      if (file.owner_kind !== "account" || file.owner_id !== viewer.id) {
+        throw createFileNotFoundError(`${resource} not found.`);
+      }
+      return;
+    }
+    case "library": {
+      if (file.owner_kind !== "app" || file.owner_id !== file.scope_id) {
+        throw createFileNotFoundError(`${resource} not found.`);
+      }
+      await ensureProjectOwnership(database, viewer.id, file.scope_id as ProjectId);
+      return;
+    }
+    case "session": {
+      await ensureSessionFileAccess(
+        database,
+        viewer.id,
+        { sessionId: file.scope_id as SessionId },
+        requiredIntent,
+      );
+      return;
+    }
+    case "agent_package":
+    case "app_draft": {
+      await ensureProjectOwnership(database, viewer.id, file.scope_id as ProjectId);
 
-  await ensureProjectOwnership(database, viewerId, projectId);
-}
-
-function ensureAccountFileAccess(
-  viewerId: AccountId,
-  file: FileRecordRow,
-  resourceKind: "file" | "upload",
-): void {
-  if (file.owner_kind !== "account" || file.owner_id !== viewerId) {
-    throw createFileNotFoundError(
-      resourceKind === "file" ? "File not found." : "Upload not found.",
-    );
+      if (file.created_by_account_id !== viewer.id) {
+        throw createFileNotFoundError(`${resource} not found.`);
+      }
+      return;
+    }
+    default: {
+      throw createFileNotFoundError(`${resource} not found.`);
+    }
   }
 }
 
@@ -107,50 +98,21 @@ export async function ensureUploadAccess({
   fileId,
   requiredIntent,
   viewer,
-}: UploadAccessRequest): Promise<FileUploadContext> {
-  const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
-  const context = await getFileUploadAccessContextByFileId(database, fileId, viewerId);
+}: FileAccessRequest): Promise<FileUploadContext> {
+  const context =
+    (await getAppDatabase(database)
+      .select({ file: fileRecordRowColumns, upload: fileUploadRowColumns })
+      .from(fileUploadsTable)
+      .innerJoin(fileRecordsTable, eq(fileRecordsTable.id, fileUploadsTable.fileId))
+      .where(eq(fileUploadsTable.fileId, fileId))
+      .limit(1)
+      .get()) ?? null;
 
   if (!context) {
     throw createFileNotFoundError("Upload not found.");
   }
 
-  await ensureProjectKeyFileScope(
-    database,
-    viewer,
-    context.upload.scope_kind,
-    context.upload.scope_id,
-  );
-
-  if (context.upload.scope_kind === "account") {
-    ensureAccountFileAccess(viewerId, context.file, "upload");
-  } else if (context.upload.scope_kind === "library") {
-    await ensureLibraryFileAccess(database, viewerId, context.file, "upload");
-  } else if (context.upload.scope_kind === "session") {
-    if (!context.sessionAccess) {
-      throw createFileNotFoundError("Session not found.");
-    }
-    if (requiredIntent === "write") {
-      await ensureSessionFileWritable(database, context.sessionAccess.id);
-    }
-  } else if (
-    context.upload.scope_kind === "agent_package" ||
-    context.upload.scope_kind === "app_draft"
-  ) {
-    await ensureAgentPackageFileAccess(
-      database,
-      viewerId,
-      parsePlatformId<ProjectId>(
-        requireScopeId(context.upload.scope_id, "Upload"),
-        "upload project ID",
-      ),
-      context.upload.created_by_account_id,
-      "upload",
-    );
-  } else {
-    throw createFileNotFoundError("Upload not found.");
-  }
-
+  await ensureFileRowAccess(database, viewer, context.file, requiredIntent, "Upload");
   return context;
 }
 
@@ -160,37 +122,12 @@ export async function ensureFileAccess({
   requiredIntent,
   viewer,
 }: FileAccessRequest): Promise<FileRecordRow> {
-  const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
   const file = await getFileRecordById(database, fileId);
 
   if (!file) {
     throw createFileNotFoundError("File not found.");
   }
 
-  await ensureProjectKeyFileScope(database, viewer, file.scope_kind, file.scope_id);
-
-  if (file.scope_kind === "account") {
-    ensureAccountFileAccess(viewerId, file, "file");
-  } else if (file.scope_kind === "library") {
-    await ensureLibraryFileAccess(database, viewerId, file, "file");
-  } else if (file.scope_kind === "session") {
-    const sessionId = parsePlatformId<SessionId>(
-      requireScopeId(file.scope_id, "File"),
-      "file session ID",
-    );
-    await ensureSessionFileAccess(database, viewerId, sessionId);
-    if (requiredIntent === "write") await ensureSessionFileWritable(database, sessionId);
-  } else if (file.scope_kind === "agent_package" || file.scope_kind === "app_draft") {
-    await ensureAgentPackageFileAccess(
-      database,
-      viewerId,
-      parsePlatformId<ProjectId>(requireScopeId(file.scope_id, "File"), "file project ID"),
-      file.created_by_account_id,
-      "file",
-    );
-  } else {
-    throw createFileNotFoundError("File not found.");
-  }
-
+  await ensureFileRowAccess(database, viewer, file, requiredIntent, "File");
   return file;
 }

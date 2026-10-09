@@ -8,10 +8,8 @@ export const costSchema = /* GraphQL */ `
 
   enum CostRunPurpose {
     debug
-    eval
     preview
     production
-    scheduled
   }
 
   interface CostAggregate {
@@ -55,17 +53,14 @@ export const costSchema = /* GraphQL */ `
     cacheCreationTokens: Int!
     cacheReadTokens: Int!
     debugCostUsd: Float!
-    evalCostUsd: Float!
     inputTokens: Int!
     outputTokens: Int!
     ownerEmail: String
     ownerId: ULID!
     ownerName: String!
-    previousCostUsd: Float
     previewCostUsd: Float!
     productionCostUsd: Float!
     requestCount: Int!
-    scheduledCostUsd: Float!
     totalCostUsd: Float!
     unpricedRequestCount: Int!
   }
@@ -102,21 +97,6 @@ export const costSchema = /* GraphQL */ `
     sessionId: ULID
     sessionRunId: ULID
     totalCostUsd: Float!
-  }
-
-  type CostAttributionCard {
-    agents: [CostAgentRow!]!
-    daily: [CostDailyPoint!]!
-    models: [CostModelRow!]!
-    recentSessions: [CostRecentSession!]!
-    totals: CostTotals!
-  }
-
-  type OrganizationBillingCostCard {
-    daily: [CostDailyPoint!]!
-    models: [CostModelRow!]!
-    previousTotals: CostTotals!
-    totals: CostTotals!
   }
 
   type ProjectCostCard {

@@ -16,12 +16,10 @@ interface PublicApiIdempotencyRow {
   body_hash: string | null;
   created_at: number;
   id: PlatformId;
-  idempotency_key: string;
   method: string;
   response_json: string | null;
   response_status: number | null;
   route: string;
-  token_id: PlatformId;
   updated_at: number;
 }
 
@@ -98,22 +96,18 @@ function enforceSameIdempotentRequest(
   }
 }
 
-function parseStoredReplayBody(raw: string): unknown {
-  try {
-    return JSON.parse(raw);
-  } catch (error) {
-    throw new Error("Stored public API idempotency response JSON is invalid.", { cause: error });
-  }
-}
-
-function isCompletedIdempotencyRow(row: PublicApiIdempotencyRow): boolean {
-  return row.response_status !== null && row.response_json !== null;
-}
-
-function toProcessingResult(
+function toExistingResult(
   row: PublicApiIdempotencyRow,
   nowMs: number,
 ): PublicApiIdempotencyBeginResult {
+  if (row.response_status !== null && row.response_json !== null) {
+    return {
+      body: JSON.parse(row.response_json),
+      responseStatus: row.response_status,
+      status: "replay",
+    };
+  }
+
   const stale = row.updated_at < nowMs - PUBLIC_API_IDEMPOTENCY_PROCESSING_TTL_MS;
 
   return {
@@ -130,18 +124,6 @@ function toProcessingResult(
   };
 }
 
-function toReplayResult(row: PublicApiIdempotencyRow): PublicApiIdempotencyBeginResult {
-  if (row.response_status === null || row.response_json === null) {
-    throw new Error("Cannot replay an incomplete public API idempotency record.");
-  }
-
-  return {
-    body: parseStoredReplayBody(row.response_json),
-    responseStatus: row.response_status,
-    status: "replay",
-  };
-}
-
 async function getIdempotencyRow(
   database: D1Database,
   tokenId: PlatformId,
@@ -153,12 +135,10 @@ async function getIdempotencyRow(
         body_hash: publicApiIdempotencyKeysTable.bodyHash,
         created_at: publicApiIdempotencyKeysTable.createdAt,
         id: publicApiIdempotencyKeysTable.id,
-        idempotency_key: publicApiIdempotencyKeysTable.idempotencyKey,
         method: publicApiIdempotencyKeysTable.method,
         response_json: publicApiIdempotencyKeysTable.responseJson,
         response_status: publicApiIdempotencyKeysTable.responseStatus,
         route: publicApiIdempotencyKeysTable.route,
-        token_id: publicApiIdempotencyKeysTable.tokenId,
         updated_at: publicApiIdempotencyKeysTable.updatedAt,
       })
       .from(publicApiIdempotencyKeysTable)
@@ -183,23 +163,18 @@ export async function beginPublicApiIdempotency(
   if (existing) {
     enforceSameIdempotentRequest(existing, input);
 
-    if (existing.updated_at < nowMs - PUBLIC_API_IDEMPOTENCY_RETENTION_MS) {
-      await getAppDatabase(database)
-        .delete(publicApiIdempotencyKeysTable)
-        .where(eq(publicApiIdempotencyKeysTable.id, existing.id))
-        .run();
-    } else if (!isCompletedIdempotencyRow(existing)) {
-      return toProcessingResult(existing, nowMs);
-    } else {
-      return toReplayResult(existing);
+    if (existing.updated_at >= nowMs - PUBLIC_API_IDEMPOTENCY_RETENTION_MS) {
+      return toExistingResult(existing, nowMs);
     }
+
+    await getAppDatabase(database)
+      .delete(publicApiIdempotencyKeysTable)
+      .where(eq(publicApiIdempotencyKeysTable.id, existing.id))
+      .run();
   }
 
-  await cleanupPublicApiIdempotencyKeys(database, nowMs);
-
   const reservationId = createPlatformId();
-
-  await getAppDatabase(database)
+  const reserved = await getAppDatabase(database)
     .insert(publicApiIdempotencyKeysTable)
     .values({
       bodyHash: input.bodyHash,
@@ -214,8 +189,17 @@ export async function beginPublicApiIdempotency(
       updatedAt: nowMs,
     })
     .onConflictDoNothing()
-    .run();
+    .returning({ id: publicApiIdempotencyKeysTable.id })
+    .get();
 
+  if (reserved !== undefined) {
+    return {
+      reservationId,
+      status: "reserved",
+    };
+  }
+
+  // A concurrent request holds the key, or has already cleared its reservation.
   const current = await getIdempotencyRow(database, input.tokenId, input.idempotencyKey);
 
   if (!current) {
@@ -225,20 +209,8 @@ export async function beginPublicApiIdempotency(
     );
   }
 
-  if (current.id !== reservationId) {
-    enforceSameIdempotentRequest(current, input);
-
-    if (!isCompletedIdempotencyRow(current)) {
-      return toProcessingResult(current, nowMs);
-    }
-
-    return toReplayResult(current);
-  }
-
-  return {
-    reservationId,
-    status: "reserved",
-  };
+  enforceSameIdempotentRequest(current, input);
+  return toExistingResult(current, nowMs);
 }
 
 export async function completePublicApiIdempotency(
@@ -277,7 +249,7 @@ export async function clearPublicApiIdempotencyReservation(
     .run();
 }
 
-async function cleanupPublicApiIdempotencyKeys(
+export async function cleanupPublicApiIdempotencyKeys(
   database: D1Database,
   nowMs = currentTimestampMs(),
 ): Promise<void> {

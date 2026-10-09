@@ -1,6 +1,5 @@
 import { closeOpenSocket } from "../../../../platform/cloudflare/durable-object-support";
 import { createErrorLogContext, logError } from "../../../../platform/cloudflare/logger";
-import { json } from "./requests";
 
 declare const WebSocketPair: new () => [WebSocket, WebSocket];
 
@@ -47,13 +46,13 @@ export class SessionPublicEventSocketHub {
 
   connect(request: Request): Response {
     if (request.headers.get("upgrade") !== "websocket") {
-      return json({ error: "WebSocket upgrade is required." }, { status: 426 });
+      return Response.json({ error: "WebSocket upgrade is required." }, { status: 426 });
     }
 
     const sessionId = this.#getSessionId();
 
     if (sessionId === null) {
-      return json({ error: "Session id is required." }, { status: 400 });
+      return Response.json({ error: "Session id is required." }, { status: 400 });
     }
 
     const pair = new WebSocketPair();

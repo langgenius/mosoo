@@ -19,18 +19,7 @@ import { destroyDriverInstanceDurableObject } from "../../runtime/infrastructure
 import { listLiveDriverInstanceIdsForSandboxSessions } from "../../runtime/infrastructure/driver-instance/live-driver-instance.repository";
 import { stopDriverSession } from "../../runtime/infrastructure/driver-session-stop.service";
 import { deleteSandboxBackupsForDir } from "../../runtime/infrastructure/sandbox-backup.service";
-import { closeSandboxConversationSession } from "../../runtime/infrastructure/sandbox-session.service";
-import {
-  SESSION_DELETE_CLEANUP_STEPS,
-  completeSessionDeleteCleanupStep,
-  shouldSkipSessionDeleteCleanupStep,
-  skipSessionDeleteCleanupStep,
-} from "../domain/session-cleanup-plan";
-import type {
-  SessionDeleteCleanupStep,
-  SessionDeleteCleanupStepOutcome,
-  SessionDeleteCleanupTargets,
-} from "../domain/session-cleanup-plan";
+import { closeSandboxConversationSession } from "../../runtime/infrastructure/sandbox-session/sandbox-conversation-session.service";
 import { previewCleanupCandidatePredicate } from "../infrastructure/preview-retention.repository";
 import { destroySessionDurableObject } from "../infrastructure/session/client";
 
@@ -163,165 +152,95 @@ export async function deleteSessionCascade(
   bindings: ApiBindings,
   sessionId: SessionId,
   options: DeleteSessionCascadeOptions = {},
-): Promise<SessionDeleteCleanupStepOutcome[]> {
-  const timestampMs = currentTimestampMs();
-  const sessionCwd = getSessionOrganizationPath(sessionId);
+): Promise<boolean> {
   const db = getAppDatabase(bindings.DB);
   const operationId = await resolveSessionDeleteCleanupOperationId(bindings.DB, {
     ...(options.operationId === undefined ? {} : { operationId: options.operationId }),
     sessionId,
   });
-  const outcomes: SessionDeleteCleanupStepOutcome[] = [];
-  let targets: SessionDeleteCleanupTargets | null = null;
   const admitted = await admitSessionDeleteCleanup(bindings.DB, {
     operationId,
     sessionId,
-    timestampMs,
+    timestampMs: currentTimestampMs(),
     ...(options.expiredPreviewAtMs === undefined
       ? {}
       : { expiredPreviewAtMs: options.expiredPreviewAtMs }),
   });
   if (!admitted) {
-    return outcomes;
+    return false;
   }
 
-  async function loadCleanupTargets(): Promise<SessionDeleteCleanupTargets> {
-    const sandboxSession =
-      (await db
-        .select({ sandbox_id: sandboxSessionsTable.sandboxId })
-        .from(sandboxSessionsTable)
-        .where(eq(sandboxSessionsTable.sessionId, sessionId))
-        .limit(1)
-        .get()) ?? null;
-
-    const liveDriverInstanceIds = await listLiveDriverInstanceIdsForSandboxSessions(bindings.DB, [
-      sessionId,
-    ]);
-
-    const sessionRuns = await db
+  const sandboxSession =
+    (await db
+      .select({ sandbox_id: sandboxSessionsTable.sandboxId })
+      .from(sandboxSessionsTable)
+      .where(eq(sandboxSessionsTable.sessionId, sessionId))
+      .limit(1)
+      .get()) ?? null;
+  const liveDriverInstanceIds = await listLiveDriverInstanceIdsForSandboxSessions(bindings.DB, [
+    sessionId,
+  ]);
+  const runIds = (
+    await db
       .select({ id: sessionRunsTable.id })
       .from(sessionRunsTable)
       .where(eq(sessionRunsTable.sessionId, sessionId))
-      .all();
-    const runIds = sessionRuns.map((row) => row.id);
-    const associatedDriverInstanceRows = await db
+      .all()
+  ).map((row) => row.id);
+  const associatedDriverInstanceIds = (
+    await db
       .select({ id: driverInstancesTable.id })
       .from(driverInstancesTable)
       .where(driverInstancesForSessionCondition(db, sessionId, runIds))
-      .all();
+      .all()
+  ).map((row) => row.id);
 
-    return {
-      associatedDriverInstanceIds: associatedDriverInstanceRows.map((row) => row.id),
-      liveDriverInstanceIds,
-      sandboxId: sandboxSession?.sandbox_id ?? null,
+  await Promise.all(
+    liveDriverInstanceIds.map((driverInstanceId) =>
+      stopDriverSession(bindings, {
+        driverInstanceId,
+        reason: "session.deleted",
+        terminalRun: {
+          error: {
+            code: "session.deleted",
+            details: {},
+            message: "Session was deleted before the run completed.",
+            retryable: false,
+          },
+          status: "cancelled",
+        },
+      }),
+    ),
+  );
+
+  if (sandboxSession !== null) {
+    await closeSandboxConversationSession(bindings, {
+      sandboxId: sandboxSession.sandbox_id,
       sessionId,
-    };
+    });
   }
 
-  async function executeStep(step: SessionDeleteCleanupStep): Promise<void> {
-    switch (step) {
-      case "archive_session_row": {
-        return;
-      }
-      case "load_cleanup_targets": {
-        targets = await loadCleanupTargets();
-        return;
-      }
-      case "stop_live_drivers": {
-        await Promise.all(
-          requireCleanupTargets(targets).liveDriverInstanceIds.map((driverInstanceId) =>
-            stopDriverSession(bindings, {
-              driverInstanceId,
-              reason: "session.deleted",
-              terminalRun: {
-                error: {
-                  code: "session.deleted",
-                  details: {},
-                  message: "Session was deleted before the run completed.",
-                  retryable: false,
-                },
-                status: "cancelled",
-              },
-            }),
-          ),
-        );
-        return;
-      }
-      case "close_sandbox_session": {
-        const cleanupTargets = requireCleanupTargets(targets);
-        if (cleanupTargets.sandboxId === null) {
-          return;
-        }
+  await Promise.all(
+    liveDriverInstanceIds.map((driverInstanceId) =>
+      destroyDriverInstanceDurableObject(bindings, driverInstanceId, "session.deleted"),
+    ),
+  );
+  await destroySessionDurableObject(bindings, sessionId, "session.deleted");
+  await deleteSandboxBackupsForDir(bindings, { dir: getSessionOrganizationPath(sessionId) });
+  await fileStore.deleteScope(bindings, {
+    id: sessionId,
+    kind: "session",
+  });
 
-        await closeSandboxConversationSession(bindings, {
-          sandboxId: cleanupTargets.sandboxId,
-          sessionId,
-        });
-        return;
-      }
-      case "destroy_driver_objects": {
-        await Promise.all(
-          requireCleanupTargets(targets).liveDriverInstanceIds.map((driverInstanceId) =>
-            destroyDriverInstanceDurableObject(bindings, driverInstanceId, "session.deleted"),
-          ),
-        );
-        return;
-      }
-      case "destroy_session_object": {
-        await destroySessionDurableObject(bindings, sessionId, "session.deleted");
-        return;
-      }
-      case "delete_session_backups": {
-        await deleteSandboxBackupsForDir(bindings, { dir: sessionCwd });
-        return;
-      }
-      case "delete_session_files": {
-        await fileStore.deleteScope(bindings, {
-          id: sessionId,
-          kind: "session",
-        });
-        return;
-      }
-      case "delete_driver_rows": {
-        const associatedDriverInstanceIds =
-          requireCleanupTargets(targets).associatedDriverInstanceIds;
-        if (associatedDriverInstanceIds.length === 0) {
-          return;
-        }
-
-        await db
-          .delete(driverInstancesTable)
-          .where(inArray(driverInstancesTable.id, associatedDriverInstanceIds))
-          .run();
-        return;
-      }
-      case "delete_session_row": {
-        await db.delete(sessionsTable).where(eq(sessionsTable.id, sessionId)).run();
-        return;
-      }
-      default: {
-        throw new Error("Unknown session delete cleanup step.");
-      }
-    }
+  if (associatedDriverInstanceIds.length > 0) {
+    await db
+      .delete(driverInstancesTable)
+      .where(inArray(driverInstancesTable.id, associatedDriverInstanceIds))
+      .run();
   }
 
-  for (const step of SESSION_DELETE_CLEANUP_STEPS) {
-    if (
-      targets !== null &&
-      shouldSkipSessionDeleteCleanupStep({
-        step,
-        targets,
-      })
-    ) {
-      outcomes.push(skipSessionDeleteCleanupStep(step));
-      continue;
-    }
-
-    await executeStep(step);
-    outcomes.push(completeSessionDeleteCleanupStep(step));
-  }
-
-  return outcomes;
+  await db.delete(sessionsTable).where(eq(sessionsTable.id, sessionId)).run();
+  return true;
 }
 
 export async function repairStaleSessionDeleteCleanups(
@@ -356,9 +275,6 @@ export async function cleanupExpiredPreviewSessions(
   bindings: ApiBindings,
   input: { readonly limit: number; readonly nowMs: number },
 ): Promise<number> {
-  if (bindings.MOSOO_DEPLOYMENT_MODE !== "cloud") {
-    return 0;
-  }
   if (!Number.isSafeInteger(input.limit) || input.limit <= 0) {
     throw new Error("Preview cleanup limit must be a positive integer.");
   }
@@ -373,10 +289,10 @@ export async function cleanupExpiredPreviewSessions(
   let deleted = 0;
   for (const candidate of candidates) {
     try {
-      const outcomes = await deleteSessionCascade(bindings, candidate.id, {
+      const admitted = await deleteSessionCascade(bindings, candidate.id, {
         expiredPreviewAtMs: input.nowMs,
       });
-      if (outcomes.length > 0) deleted += 1;
+      if (admitted) deleted += 1;
     } catch (error) {
       // The admitted terminal operation remains the existing repair queue's anchor.
       logWarn("session.preview_cleanup.failed", {
@@ -386,14 +302,4 @@ export async function cleanupExpiredPreviewSessions(
     }
   }
   return deleted;
-}
-
-function requireCleanupTargets(
-  targets: SessionDeleteCleanupTargets | null,
-): SessionDeleteCleanupTargets {
-  if (targets === null) {
-    throw new Error("Session delete cleanup targets have not been loaded.");
-  }
-
-  return targets;
 }

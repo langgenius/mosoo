@@ -79,33 +79,6 @@ function normalizeBracketedIpv6(host: string): string | null {
   }
 }
 
-export function parseEnvironmentAllowedHosts(allowedHostsJson: string): string[] {
-  let parsed: unknown;
-
-  try {
-    parsed = JSON.parse(allowedHostsJson);
-  } catch {
-    throw new Error("Environment allowed hosts snapshot is not valid JSON.");
-  }
-
-  if (!Array.isArray(parsed) || parsed.some((entry) => typeof entry !== "string")) {
-    throw new Error("Environment allowed hosts snapshot must be a JSON array of strings.");
-  }
-
-  return parsed.map((host) => {
-    const normalized = normalizeSandboxNetworkHost(host);
-
-    // Environment configuration exposes domain allowlisting only. IP literals
-    // remain valid for trusted platform/RPC constraints, but a stored user
-    // snapshot must not widen that public contract.
-    if (!normalized.includes(".") || /^[0-9.]+$/u.test(normalized) || normalized.startsWith("[")) {
-      throw new Error(`Environment allowed host must be a domain name: "${host}".`);
-    }
-
-    return normalized;
-  });
-}
-
 /**
  * Extracts allowlist hostnames from platform URLs (control origin and R2
  * backup endpoint). Values without a scheme are retried as http:// URLs so a
@@ -125,7 +98,7 @@ export function toSandboxSystemHostsFromUrls(
       continue;
     }
 
-    hosts.add(normalizeSandboxNetworkHost(parseUrlHostname(trimmed)));
+    hosts.add(parseUrlHostname(trimmed));
   }
 
   return [...hosts];
@@ -147,15 +120,15 @@ function parseUrlHostname(value: string): string {
   throw new Error(`Sandbox system host URL is not parseable: "${value}".`);
 }
 
-export function resolveSandboxNetworkConstraints(input: {
+/**
+ * The single runtime host check: every limited allowlist, system hosts
+ * included, passes through here before reaching the Sandbox Durable Object,
+ * whose platform matcher treats `*` as a glob.
+ */
+export function resolveLimitedSandboxNetworkConstraints(input: {
   readonly environmentAllowedHosts: readonly string[];
-  readonly networkPolicy: EnvironmentNetworkPolicy;
   readonly systemHosts: readonly string[];
 }): SandboxNetworkConstraints {
-  if (input.networkPolicy === "full") {
-    return { allowedHosts: [], networkPolicy: "full" };
-  }
-
   const merged = new Set<string>();
 
   for (const host of [...input.systemHosts, ...input.environmentAllowedHosts]) {
@@ -166,31 +139,4 @@ export function resolveSandboxNetworkConstraints(input: {
     allowedHosts: [...merged].toSorted(),
     networkPolicy: "limited",
   };
-}
-
-export function parseSandboxNetworkConstraints(value: unknown): SandboxNetworkConstraints {
-  if (typeof value !== "object" || value === null) {
-    throw new Error("Sandbox network constraints must be an object.");
-  }
-
-  const networkPolicy = Reflect.get(value, "networkPolicy");
-  const allowedHosts = Reflect.get(value, "allowedHosts");
-
-  if (networkPolicy !== "full" && networkPolicy !== "limited") {
-    throw new Error("Sandbox network constraints have an unknown network policy.");
-  }
-
-  if (!Array.isArray(allowedHosts) || allowedHosts.some((entry) => typeof entry !== "string")) {
-    throw new Error("Sandbox network constraints allowed hosts must be an array of strings.");
-  }
-
-  const normalizedAllowedHosts = [
-    ...new Set(allowedHosts.map(normalizeSandboxNetworkHost)),
-  ].toSorted();
-
-  if (networkPolicy === "full" && normalizedAllowedHosts.length > 0) {
-    throw new Error("Full sandbox network constraints cannot carry allowed hosts.");
-  }
-
-  return { allowedHosts: normalizedAllowedHosts, networkPolicy };
 }

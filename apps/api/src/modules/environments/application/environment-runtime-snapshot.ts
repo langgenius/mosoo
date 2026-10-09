@@ -2,14 +2,17 @@ import { environmentRevisionsTable } from "@mosoo/db";
 import type { AccountId, EnvironmentId, EnvironmentRevisionId, ProjectId } from "@mosoo/id";
 import { eq } from "drizzle-orm";
 
-import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { ensureEnvironmentAccess } from "./environment-access.service";
-import { decryptEnvironmentVariables, parsePackagesJson } from "./environment-config";
-import { toConfig } from "./environment-config-mapping";
+import { parsePackagesJson } from "./environment-config";
 import { getProjectDefaultEnvironmentId } from "./environment-defaults";
 import type { EnvironmentRecordRow } from "./environment-types";
 
+// Sessions admitted before package artifacts froze package install lines into
+// their snapshot setup script, while their revision keeps only the custom
+// script; running the revision's script keeps them from installing packages at
+// runtime. Newer snapshots equal their revision, so a revision deleted with its
+// Environment falls back to the snapshot.
 export async function resolveEnvironmentSetupScriptForExecution(
   database: D1Database,
   input: {
@@ -29,15 +32,11 @@ export async function resolveEnvironmentSetupScriptForExecution(
     .limit(1)
     .get();
 
-  if (!row) {
-    throw new Error("Session Environment revision is unavailable.");
-  }
-
-  return row.setupScript;
+  return row?.setupScript ?? input.setupScript;
 }
 
-async function resolveAgentEnvironmentRecord(
-  bindings: ApiBindings,
+export async function resolveAgentEnvironmentRecord(
+  database: D1Database,
   input: {
     agentEnvironmentId: EnvironmentId | null;
     agentOwnerId: AccountId;
@@ -45,40 +44,11 @@ async function resolveAgentEnvironmentRecord(
   },
 ): Promise<EnvironmentRecordRow> {
   const environmentId =
-    input.agentEnvironmentId ??
-    (await getProjectDefaultEnvironmentId(bindings.DB, input.projectId));
-  const access = await ensureEnvironmentAccess(bindings.DB, input.agentOwnerId, {
+    input.agentEnvironmentId ?? (await getProjectDefaultEnvironmentId(database, input.projectId));
+  const access = await ensureEnvironmentAccess(database, input.agentOwnerId, {
     environmentId,
     projectId: input.projectId,
   });
 
   return access.row;
-}
-
-export async function resolveAgentEnvironmentSnapshot(
-  bindings: ApiBindings,
-  input: {
-    agentEnvironmentId: EnvironmentId | null;
-    agentOwnerId: AccountId;
-    projectId: ProjectId;
-  },
-): Promise<{
-  envVars: Record<string, string>;
-  name: string;
-  record: EnvironmentRecordRow;
-  setupScript: string;
-}> {
-  const row = await resolveAgentEnvironmentRecord(bindings, input);
-  const config = toConfig(row);
-  const envVars = await decryptEnvironmentVariables(bindings, {
-    environmentId: row.id,
-    envVars: config.envVars,
-  });
-
-  return {
-    envVars,
-    name: row.name,
-    record: row,
-    setupScript: config.setupScript,
-  };
 }

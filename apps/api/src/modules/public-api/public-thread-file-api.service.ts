@@ -1,5 +1,4 @@
 import type { FileEntry, FileRecord } from "@mosoo/contracts/file";
-import { PUBLIC_THREAD_FILE_UPLOAD_MAX_BYTES } from "@mosoo/contracts/public-api";
 import type {
   PublicApiVersion,
   PublicFile,
@@ -7,60 +6,35 @@ import type {
   PublicThreadFile,
   PublicThreadFileListResponse,
 } from "@mosoo/contracts/public-api";
-import { parsePlatformId } from "@mosoo/id";
-import type { AgentId, ProjectId, FileId, PublicThreadId, SessionId } from "@mosoo/id";
+import type { AgentId, ProjectId, FileId, SessionId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../platform/cloudflare/worker-types";
 import type { AuthenticatedViewer } from "../auth/application/viewer-auth.service";
-import { FileControlError } from "../files/application/file-control-errors";
-import { fileStore } from "../files/application/file-store";
+import { FileControlError, fileStore } from "../files/application/file-store";
 import { publishSessionResourceDelete } from "../sessions/application/session-resource-events.service";
 import { assertPreviewAvailable } from "../sessions/infrastructure/preview-retention.repository";
 import { admitAgentApiEndpointCaller } from "./agent-api-endpoint-admission.service";
 import { admitPublicProjectCaller } from "./public-thread-admission";
-import { toBackingSessionId, toPublicThreadId } from "./public-thread-ids";
-import { admitPublicSessionCaller } from "./public-thread-session-query.service";
+import { admitPublicThread } from "./public-thread-session-query.service";
 
-async function admitPublicThreadFileAccess(
-  bindings: ApiBindings,
-  caller: AuthenticatedViewer,
-  threadId: PublicThreadId,
-  apiVersion: PublicApiVersion = "v1",
-): Promise<{ projectId: ProjectId; sessionId: SessionId }> {
-  const admission = await admitPublicSessionCaller(bindings.DB, caller, threadId, apiVersion);
-  return {
-    projectId: admission.session.project_id,
-    sessionId: toBackingSessionId(threadId),
-  };
-}
-
-function assertPublicThreadFile(file: FileRecord, sessionId: SessionId): void {
-  if (
-    file.scope.kind !== "session" ||
-    file.scope.id !== sessionId ||
-    (file.sessionKind !== "attachment" && file.sessionKind !== "artifact")
-  ) {
-    throw new FileControlError(404, "file_not_found", `Thread file ${file.id} was not found.`);
-  }
-}
-
-function requirePublicThreadFile(file: FileRecord): PublicThreadId {
+function requirePublicThreadFile(file: FileRecord, sessionId?: SessionId): SessionId {
   if (
     file.scope.kind !== "session" ||
     file.scope.id === null ||
+    (sessionId !== undefined && file.scope.id !== sessionId) ||
     (file.sessionKind !== "attachment" && file.sessionKind !== "artifact")
   ) {
     throw new FileControlError(404, "file_not_found", `Thread file ${file.id} was not found.`);
   }
 
-  return toPublicThreadId(parsePlatformId<SessionId>(file.scope.id, "File session ID"));
+  return file.scope.id as SessionId;
 }
 
 function toPublicThreadFile(file: FileEntry | FileRecord): PublicThreadFile {
   return {
     committed: true,
     createdAt: file.createdAt,
-    id: parsePlatformId<FileId>(file.id, "File ID"),
+    id: file.id,
     kind: file.sessionKind ?? "attachment",
     mimeType: file.mimeType,
     name: file.name,
@@ -71,7 +45,7 @@ function toPublicThreadFile(file: FileEntry | FileRecord): PublicThreadFile {
 function toPublicFile(file: FileEntry | FileRecord): PublicFile {
   return {
     createdAt: file.createdAt,
-    id: parsePlatformId<FileId>(file.id, "File ID"),
+    id: file.id,
     mimeType: file.mimeType,
     name: file.name,
     size: file.size,
@@ -82,13 +56,12 @@ async function admitPublicFileRecord(
   bindings: ApiBindings,
   caller: AuthenticatedViewer,
   fileId: FileId,
-  apiVersion: PublicApiVersion = "v1",
+  apiVersion: PublicApiVersion,
 ): Promise<FileRecord> {
   const file = await fileStore.getRecord(bindings, caller, fileId);
 
   if (file.scope.kind === "session") {
-    const threadId = requirePublicThreadFile(file);
-    await admitPublicSessionCaller(bindings.DB, caller, threadId, apiVersion);
+    await admitPublicThread(bindings.DB, caller, requirePublicThreadFile(file), apiVersion);
     return file;
   }
 
@@ -102,20 +75,15 @@ async function admitPublicFileRecord(
 export async function listPublicThreadFiles(
   bindings: ApiBindings,
   caller: AuthenticatedViewer,
-  threadId: PublicThreadId,
-  apiVersion: PublicApiVersion = "v1",
+  threadId: SessionId,
+  apiVersion: PublicApiVersion,
 ): Promise<PublicThreadFileListResponse> {
-  const { projectId, sessionId } = await admitPublicThreadFileAccess(
-    bindings,
-    caller,
-    threadId,
-    apiVersion,
-  );
+  const thread = await admitPublicThread(bindings.DB, caller, threadId, apiVersion);
   return {
     files: (
       await fileStore.list(bindings, caller, {
-        projectId,
-        sessionId,
+        projectId: thread.session.projectId,
+        sessionId: threadId,
       })
     ).files.map(toPublicThreadFile),
   };
@@ -128,19 +96,10 @@ export async function createPublicAgentFile(
     agentId: AgentId;
     file: File;
   },
-  apiVersion: PublicApiVersion = "v1",
+  apiVersion: PublicApiVersion,
 ): Promise<PublicFileResponse> {
-  if (input.file.size > PUBLIC_THREAD_FILE_UPLOAD_MAX_BYTES) {
-    throw new FileControlError(
-      400,
-      "file_invalid_request",
-      `file.size must be ${PUBLIC_THREAD_FILE_UPLOAD_MAX_BYTES} bytes or fewer.`,
-    );
-  }
-
-  const agent = await admitAgentApiEndpointCaller(bindings.DB, caller, input.agentId, apiVersion);
   return uploadPublicProjectFile(bindings, caller, {
-    projectId: agent.projectId,
+    projectId: await admitAgentApiEndpointCaller(bindings.DB, caller, input.agentId, apiVersion),
     file: input.file,
   });
 }
@@ -150,13 +109,6 @@ export async function createPublicProjectFile(
   caller: AuthenticatedViewer,
   input: { projectId: ProjectId; file: File },
 ): Promise<PublicFileResponse> {
-  if (input.file.size > PUBLIC_THREAD_FILE_UPLOAD_MAX_BYTES) {
-    throw new FileControlError(
-      400,
-      "file_invalid_request",
-      `file.size must be ${PUBLIC_THREAD_FILE_UPLOAD_MAX_BYTES} bytes or fewer.`,
-    );
-  }
   await admitPublicProjectCaller(bindings.DB, caller, input.projectId);
   return uploadPublicProjectFile(bindings, caller, input);
 }
@@ -172,7 +124,6 @@ async function uploadPublicProjectFile(
       name: input.file.name,
       size: input.file.size,
     },
-    overwrite: false,
     purpose: "app_draft",
     target: {
       id: input.projectId,
@@ -198,7 +149,7 @@ export async function retrievePublicFile(
   bindings: ApiBindings,
   caller: AuthenticatedViewer,
   fileId: FileId,
-  apiVersion: PublicApiVersion = "v1",
+  apiVersion: PublicApiVersion,
 ): Promise<PublicFileResponse> {
   const file = await admitPublicFileRecord(bindings, caller, fileId, apiVersion);
   return {
@@ -206,37 +157,36 @@ export async function retrievePublicFile(
   };
 }
 
+/** Claims draft files into a Thread the caller has already been admitted to. */
 export async function claimPublicThreadFiles(
   bindings: ApiBindings,
   caller: AuthenticatedViewer,
   input: {
     fileIds: FileId[];
     admissionRequestedAtMs: number;
-    threadId: PublicThreadId;
+    sessionId: SessionId;
   },
-  apiVersion: PublicApiVersion = "v1",
 ): Promise<FileId[]> {
   if (input.fileIds.length === 0) {
     return [];
   }
 
-  const { sessionId } = await admitPublicThreadFileAccess(
+  await assertPreviewAvailable(bindings.DB, input.sessionId, input.admissionRequestedAtMs);
+  const claimedFiles = await fileStore.claimToSession(
     bindings,
     caller,
-    input.threadId,
-    apiVersion,
+    input.sessionId,
+    input.fileIds,
   );
-  await assertPreviewAvailable(bindings.DB, sessionId, input.admissionRequestedAtMs);
-  const claimedFiles = await fileStore.claimToSession(bindings, caller, sessionId, input.fileIds);
 
-  return claimedFiles.map((file) => parsePlatformId<FileId>(file.id, "File ID"));
+  return claimedFiles.map((file) => file.id);
 }
 
 export async function deletePublicFile(
   bindings: ApiBindings,
   caller: AuthenticatedViewer,
   fileId: FileId,
-  apiVersion: PublicApiVersion = "v1",
+  apiVersion: PublicApiVersion,
 ): Promise<void> {
   const file = await admitPublicFileRecord(bindings, caller, fileId, apiVersion);
 
@@ -246,7 +196,7 @@ export async function deletePublicFile(
     await publishSessionResourceDelete({
       bindings,
       resourceId: fileId,
-      sessionId: parsePlatformId<SessionId>(file.scope.id, "File session ID"),
+      sessionId: file.scope.id as SessionId,
     });
   }
 }
@@ -258,12 +208,11 @@ export async function downloadPublicThreadFileContent(
     disposition: "attachment" | "inline";
     fileId: FileId;
   },
-  apiVersion: PublicApiVersion = "v1",
+  apiVersion: PublicApiVersion,
 ): Promise<Response> {
   const file = await fileStore.getRecord(bindings, caller, input.fileId);
-  const threadId = requirePublicThreadFile(file);
 
-  await admitPublicSessionCaller(bindings.DB, caller, threadId, apiVersion);
+  await admitPublicThread(bindings.DB, caller, requirePublicThreadFile(file), apiVersion);
   const response = await fileStore.streamContent(bindings, caller, input.fileId, input.disposition);
   const headers = new Headers(response.headers);
   headers.set("Cache-Control", "no-store");
@@ -279,24 +228,20 @@ export async function deletePublicThreadFile(
   caller: AuthenticatedViewer,
   input: {
     fileId: FileId;
-    threadId: PublicThreadId;
+    threadId: SessionId;
   },
-  apiVersion: PublicApiVersion = "v1",
+  apiVersion: PublicApiVersion,
 ): Promise<void> {
-  const { sessionId } = await admitPublicThreadFileAccess(
-    bindings,
-    caller,
+  await admitPublicThread(bindings.DB, caller, input.threadId, apiVersion);
+  requirePublicThreadFile(
+    await fileStore.getRecord(bindings, caller, input.fileId),
     input.threadId,
-    apiVersion,
   );
-  const file = await fileStore.getRecord(bindings, caller, input.fileId);
-
-  assertPublicThreadFile(file, sessionId);
 
   await fileStore.delete(bindings, caller, input.fileId);
   await publishSessionResourceDelete({
     bindings,
     resourceId: input.fileId,
-    sessionId,
+    sessionId: input.threadId,
   });
 }

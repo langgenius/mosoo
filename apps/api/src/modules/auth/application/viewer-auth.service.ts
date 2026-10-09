@@ -1,4 +1,5 @@
 import { accountsTable } from "@mosoo/db";
+import { parsePlatformId } from "@mosoo/id";
 import type { AccountId } from "@mosoo/id";
 import { eq } from "drizzle-orm";
 
@@ -29,22 +30,26 @@ export async function getAccountViewer(
   );
 }
 
-function isSessionAuthConfigured(bindings: Pick<ApiBindings, "BETTER_AUTH_SECRET">): boolean {
-  return Boolean(bindings.BETTER_AUTH_SECRET?.trim());
-}
-
 export async function getViewerFromRequest(
   bindings: ApiBindings,
   request: Request,
 ): Promise<AuthenticatedViewer | null> {
-  if (!isSessionAuthConfigured(bindings)) {
+  const { getBetterAuth } = await import("../infrastructure/better-auth");
+  const session = await getBetterAuth(bindings).api.getSession({
+    headers: request.headers,
+  });
+
+  if (!session) {
     return null;
   }
 
-  const { getViewerFromRequest: readViewerFromRequest } =
-    await import("../infrastructure/session-auth");
-
-  return readViewerFromRequest(bindings, request);
+  return {
+    email: session.user.email,
+    emailVerified: session.user.emailVerified,
+    id: parsePlatformId<AccountId>(session.user.id, "Viewer ID"),
+    imageUrl: session.user.image ?? null,
+    name: session.user.name,
+  };
 }
 
 export async function getApiViewerFromRequest(

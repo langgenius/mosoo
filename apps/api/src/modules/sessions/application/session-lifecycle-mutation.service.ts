@@ -6,59 +6,29 @@ import { and, eq, inArray } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
-import { forbiddenError } from "../../../platform/errors";
 import { currentTimestampMs } from "../../../time";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import {
-  createSessionStatusTransitionPatch,
-  setSystemSessionRunStatus,
-} from "../../runtime/application/session-lifecycle-transition.service";
+import { ensureProjectOwnership } from "../../projects/application/project.service";
 import { ACTIVE_SESSION_RUN_STATUSES } from "../../runtime/domain/session-run-lifecycle.machine";
 import { listLiveDriverInstanceIdsForSandboxSessions } from "../../runtime/infrastructure/driver-instance/live-driver-instance.repository";
 import { stopDriverSession } from "../../runtime/infrastructure/driver-session-stop.service";
-import { closeSandboxConversationSession } from "../../runtime/infrastructure/sandbox-session.service";
-import type {
-  SessionActionAuthorization,
-  SessionParticipantCapabilityAccessRow,
-} from "../domain/session-access.policy";
-import {
-  getProjectSessionParticipantCapabilityAccess,
-  lookupProjectSessionParticipantCapabilityAccess,
-  resolveSessionActionCreatorFlag,
-} from "../domain/session-access.policy";
-import {
-  SESSION_ARCHIVE_CLEANUP_STEPS,
-  completeSessionArchiveCleanupStep,
-  shouldSkipSessionArchiveCleanupStep,
-  skipSessionArchiveCleanupStep,
-} from "../domain/session-cleanup-plan";
-import type {
-  SessionArchiveCleanupStep,
-  SessionArchiveCleanupStepOutcome,
-  SessionArchiveCleanupTargets,
-} from "../domain/session-cleanup-plan";
+import { closeSandboxConversationSession } from "../../runtime/infrastructure/sandbox-session/sandbox-conversation-session.service";
+import { createSessionStatusTransitionPatch } from "../../runtime/infrastructure/session-runs/session-lifecycle-projection.repository";
+import { setSessionRunStatus } from "../../runtime/infrastructure/session-runs/session-run-store.repository";
+import { findProjectSession, requireProjectSession } from "../domain/session-access.policy";
+import type { ProjectSessionRow } from "../domain/session-access.policy";
 import { closeSessionViewerSockets } from "../infrastructure/session/client";
 import { deleteSessionCascade } from "./session-cleanup.service";
 
-export interface ArchiveAgentSessionRequest {
-  authorization?: SessionActionAuthorization | undefined;
+interface SessionMutationRequest {
   bindings: ApiBindings;
   projectId: ProjectId;
   sessionId: SessionId;
   viewer: AuthenticatedViewer;
 }
 
-export interface UnarchiveAgentSessionRequest {
-  authorization?: SessionActionAuthorization | undefined;
+interface UnarchiveAgentSessionRequest {
   database: D1Database;
-  projectId: ProjectId;
-  sessionId: SessionId;
-  viewer: AuthenticatedViewer;
-}
-
-export interface DeleteAgentSessionRequest {
-  authorization?: SessionActionAuthorization | undefined;
-  bindings: ApiBindings;
   projectId: ProjectId;
   sessionId: SessionId;
   viewer: AuthenticatedViewer;
@@ -71,20 +41,15 @@ const ARCHIVED_RUN_ERROR = {
   retryable: false,
 } as const;
 
-function ensureLifecycleActionCapability(input: {
-  action: AgentSessionActionCapabilityName;
-  authorization?: SessionActionAuthorization | undefined;
-  session: SessionParticipantCapabilityAccessRow;
-}): void {
+function ensureLifecycleActionCapability(
+  action: AgentSessionActionCapabilityName,
+  session: ProjectSessionRow,
+): void {
   getAvailableAgentSessionActionCapability({
-    action: input.action,
-    archivedAt: input.session.archived_at,
-    isSessionCreator: resolveSessionActionCreatorFlag({
-      authorization: input.authorization,
-      isSessionCreator: input.session.is_session_creator === 1,
-    }),
-    runtimeId: input.session.runtime_id,
-    status: input.session.status,
+    action,
+    archivedAt: session.archived_at,
+    runtimeId: session.runtime_id,
+    status: session.status,
   });
 }
 
@@ -113,15 +78,12 @@ async function cancelActiveSessionRunsForLifecycle(
   const activeRunIds = await listActiveSessionRunIds(database, sessionId);
 
   for (const runId of activeRunIds) {
-    const outcome = await setSystemSessionRunStatus(database, {
+    await setSessionRunStatus(database, {
       error: ARCHIVED_RUN_ERROR,
       runId,
+      source: "system",
       status: "cancelled",
     });
-
-    if (outcome.kind === "repair_needed") {
-      throw new Error("Session archive left the session lifecycle projection stale.");
-    }
   }
 }
 
@@ -149,145 +111,62 @@ async function normalizeSessionRuntimeLifecycle(
 }
 
 export async function archiveAgentSession({
-  authorization,
   bindings,
   projectId,
   sessionId,
   viewer,
-}: ArchiveAgentSessionRequest): Promise<SessionArchiveCleanupStepOutcome[]> {
-  const session = await getProjectSessionParticipantCapabilityAccess(bindings.DB, viewer.id, {
+}: SessionMutationRequest): Promise<void> {
+  const session = await requireProjectSession(bindings.DB, viewer.id, { projectId, sessionId });
+  ensureLifecycleActionCapability("archive_session", session);
+
+  await writeSessionArchivedAt(bindings.DB, {
+    archivedAt: currentTimestampMs(),
     projectId,
     sessionId,
   });
-  ensureLifecycleActionCapability({
-    action: "archive_session",
-    authorization,
-    session,
-  });
-  const timestampMs = currentTimestampMs();
-  const outcomes: SessionArchiveCleanupStepOutcome[] = [];
-  let targets: SessionArchiveCleanupTargets | null = null;
+  await closeSessionViewerSockets(bindings, sessionId, "session.archived");
 
-  async function loadRuntimeTargets(): Promise<SessionArchiveCleanupTargets> {
-    const sandboxSession =
-      (await getAppDatabase(bindings.DB)
-        .select({ sandbox_id: sandboxSessionsTable.sandboxId })
-        .from(sandboxSessionsTable)
-        .where(eq(sandboxSessionsTable.sessionId, sessionId))
-        .limit(1)
-        .get()) ?? null;
+  const sandboxSession =
+    (await getAppDatabase(bindings.DB)
+      .select({ sandbox_id: sandboxSessionsTable.sandboxId })
+      .from(sandboxSessionsTable)
+      .where(eq(sandboxSessionsTable.sessionId, sessionId))
+      .limit(1)
+      .get()) ?? null;
+  const liveDriverInstanceIds = await listLiveDriverInstanceIdsForSandboxSessions(bindings.DB, [
+    sessionId,
+  ]);
 
-    const liveDriverInstanceIds = await listLiveDriverInstanceIdsForSandboxSessions(bindings.DB, [
+  await Promise.all(
+    liveDriverInstanceIds.map((driverInstanceId) =>
+      stopDriverSession(bindings, {
+        driverInstanceId,
+        reason: "session.archived",
+        terminalRun: {
+          error: ARCHIVED_RUN_ERROR,
+          status: "cancelled",
+        },
+      }),
+    ),
+  );
+  await normalizeSessionRuntimeLifecycle(bindings.DB, sessionId);
+
+  if (sandboxSession !== null) {
+    await closeSandboxConversationSession(bindings, {
+      sandboxId: sandboxSession.sandbox_id,
       sessionId,
-    ]);
-
-    return {
-      liveDriverInstanceIds,
-      sandboxId: sandboxSession?.sandbox_id ?? null,
-      sessionId,
-    };
+    });
   }
-
-  async function executeStep(step: SessionArchiveCleanupStep): Promise<void> {
-    switch (step) {
-      case "archive_session_row": {
-        await writeSessionArchivedAt(bindings.DB, {
-          archivedAt: timestampMs,
-          projectId,
-          sessionId,
-        });
-        return;
-      }
-      case "close_viewer_sockets": {
-        await closeSessionViewerSockets(bindings, sessionId, "session.archived");
-        return;
-      }
-      case "load_runtime_targets": {
-        targets = await loadRuntimeTargets();
-        return;
-      }
-      case "stop_live_drivers": {
-        await Promise.all(
-          requireArchiveCleanupTargets(targets).liveDriverInstanceIds.map((driverInstanceId) =>
-            stopDriverSession(bindings, {
-              driverInstanceId,
-              reason: "session.archived",
-              terminalRun: {
-                error: ARCHIVED_RUN_ERROR,
-                status: "cancelled",
-              },
-            }),
-          ),
-        );
-        return;
-      }
-      case "normalize_runtime_lifecycle": {
-        await normalizeSessionRuntimeLifecycle(bindings.DB, sessionId);
-        return;
-      }
-      case "close_sandbox_session": {
-        const cleanupTargets = requireArchiveCleanupTargets(targets);
-        if (cleanupTargets.sandboxId === null) {
-          return;
-        }
-
-        await closeSandboxConversationSession(bindings, {
-          sandboxId: cleanupTargets.sandboxId,
-          sessionId,
-        });
-        return;
-      }
-      default: {
-        throw new Error("Unknown session archive cleanup step.");
-      }
-    }
-  }
-
-  for (const step of SESSION_ARCHIVE_CLEANUP_STEPS) {
-    if (
-      targets !== null &&
-      shouldSkipSessionArchiveCleanupStep({
-        step,
-        targets,
-      })
-    ) {
-      outcomes.push(skipSessionArchiveCleanupStep(step));
-      continue;
-    }
-
-    await executeStep(step);
-    outcomes.push(completeSessionArchiveCleanupStep(step));
-  }
-
-  return outcomes;
-}
-
-function requireArchiveCleanupTargets(
-  targets: SessionArchiveCleanupTargets | null,
-): SessionArchiveCleanupTargets {
-  if (targets === null) {
-    throw new Error("Session archive cleanup targets have not been loaded.");
-  }
-
-  return targets;
 }
 
 export async function unarchiveAgentSession({
-  authorization,
   database,
   projectId,
   sessionId,
   viewer,
 }: UnarchiveAgentSessionRequest): Promise<void> {
-  const session = await getProjectSessionParticipantCapabilityAccess(database, viewer.id, {
-    projectId,
-    sessionId,
-  });
-  ensureLifecycleActionCapability({
-    action: "unarchive_session",
-    authorization,
-    session,
-  });
+  const session = await requireProjectSession(database, viewer.id, { projectId, sessionId });
+  ensureLifecycleActionCapability("unarchive_session", session);
 
   await normalizeSessionRuntimeLifecycle(database, sessionId);
 
@@ -306,33 +185,22 @@ async function writeSessionArchivedAt(
 }
 
 export async function deleteAgentSession({
-  authorization,
   bindings,
   projectId,
   sessionId,
   viewer,
-}: DeleteAgentSessionRequest): Promise<void> {
-  const lookup = await lookupProjectSessionParticipantCapabilityAccess(bindings.DB, viewer.id, {
-    projectId,
-    sessionId,
-  });
+}: SessionMutationRequest): Promise<void> {
+  const session = await findProjectSession(bindings.DB, viewer.id, { projectId, sessionId });
 
   // Delete must stay idempotent: clients can hold a session id that was
   // already removed (stale tab, replaced preview session). Treat the missing
   // row as deleted instead of reporting a permission error.
-  if (lookup.kind === "missing") {
+  if (session === null) {
+    await ensureProjectOwnership(bindings.DB, viewer.id, projectId);
     return;
   }
 
-  if (lookup.kind === "not_participant") {
-    throw forbiddenError();
-  }
-
-  ensureLifecycleActionCapability({
-    action: "delete_session",
-    authorization,
-    session: lookup.row,
-  });
+  ensureLifecycleActionCapability("delete_session", session);
 
   await deleteSessionCascade(bindings, sessionId);
 }

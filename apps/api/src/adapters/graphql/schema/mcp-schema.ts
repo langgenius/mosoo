@@ -61,24 +61,6 @@ export const mcpSchema = /* GraphQL */ `
     updatedAt: String!
   }
 
-  type McpServer {
-    authType: McpAuthType!
-    createdAt: String!
-    credentialScope: McpCredentialScope!
-    description: String
-    enabled: Boolean!
-    hasCredential: Boolean!
-    iconUrl: String
-    id: ULID!
-    name: String!
-    ownerId: ULID!
-    ownerName: String!
-    projectId: ULID!
-    source: McpServerSource!
-    updatedAt: String!
-    url: String!
-  }
-
   type McpServerWithCredential {
     authType: McpAuthType!
     authorizationState: McpAuthorizationState!
@@ -101,9 +83,6 @@ export const mcpSchema = /* GraphQL */ `
   }
 
   type McpRegistry {
-    currentUserEmail: String!
-    currentUserId: ULID!
-    currentUserName: String!
     projectId: ULID!
     servers: [McpServerWithCredential!]!
   }
@@ -170,7 +149,6 @@ export const mcpSchema = /* GraphQL */ `
 
   input StartMcpOAuthInput {
     projectId: ULID!
-    returnUrl: String
     serverId: ULID!
   }
 `;

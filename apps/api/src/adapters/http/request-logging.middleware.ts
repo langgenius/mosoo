@@ -12,33 +12,34 @@ export function requestLoggingMiddleware(): MiddlewareHandler<ApiGatewayEnvironm
   return async (c, next) =>
     runWithRequestLogContext(c.req.raw, async () => {
       const startedAt = Date.now();
-      let requestError: unknown = null;
       const requestEvent = createApiWideEvent("http.request", {
         fields: {
           http: createRequestLogContext(c.req.raw),
         },
       });
 
-      try {
-        await next();
-      } catch (error) {
-        requestError = error;
-        requestEvent.setError(error, createRequestLogContext(c.req.raw));
-        throw error;
-      } finally {
-        const url = new URL(c.req.url);
-        const statusCode = requestError ? 500 : c.res.status;
+      // Hono hands handler errors to onError and records them on c.error, so
+      // next() resolves with the error response instead of throwing.
+      await next();
 
-        requestEvent.merge("http", {
-          duration_ms: Date.now() - startedAt,
-          path: url.pathname,
-          status_code: statusCode,
-        });
+      const statusCode = c.res.status;
+      // A mapped client error can quote the request (a JSON SyntaxError quotes
+      // the body), so only server errors attach their error to the log.
+      const loggedError = statusCode >= 500 ? c.error : undefined;
 
-        emitApiWideEvent(requestEvent, {
-          ...(requestError instanceof Error ? { error: requestError } : {}),
-          status: statusCode >= 500 ? "error" : "success",
-        });
+      if (loggedError !== undefined) {
+        requestEvent.setError(loggedError, createRequestLogContext(c.req.raw));
       }
+
+      requestEvent.merge("http", {
+        duration_ms: Date.now() - startedAt,
+        path: new URL(c.req.url).pathname,
+        status_code: statusCode,
+      });
+
+      emitApiWideEvent(requestEvent, {
+        ...(loggedError === undefined ? {} : { error: loggedError }),
+        status: statusCode >= 500 ? "error" : "success",
+      });
     });
 }

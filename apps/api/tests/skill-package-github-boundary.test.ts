@@ -10,22 +10,6 @@ afterEach(() => {
   globalThis.fetch = originalFetch;
 });
 
-function mockGithubContentPayload(payload: unknown): void {
-  globalThis.fetch = async (input) => {
-    const url = typeof input === "string" ? input : input.url;
-
-    if (url === "https://api.github.com/repos/acme/repo/branches?per_page=100") {
-      return Response.json([{ name: "main" }]);
-    }
-
-    if (url === "https://api.github.com/repos/acme/repo/contents/skills?ref=main") {
-      return Response.json(payload);
-    }
-
-    throw new Error(`Unexpected fetch URL: ${url}`);
-  };
-}
-
 function createGithubArchive(files: Record<string, string>): Uint8Array {
   return zipSync(
     Object.fromEntries(
@@ -44,110 +28,20 @@ function githubArchiveResponse(files: Record<string, string>): Response {
 }
 
 describe("GitHub skill package boundary", () => {
-  test("rejects malformed content entries instead of treating them as empty", async () => {
-    mockGithubContentPayload([{ path: "skills/SKILL.md", type: "file" }]);
-
-    await expect(
-      loadSkillPackageFromGithub("https://github.com/acme/repo/tree/main/skills"),
-    ).rejects.toThrow("GitHub content entry is invalid: skills/SKILL.md");
-  });
-
-  test("imports directory packages by downloading each listed file once", async () => {
-    const fileBodies = new Map([
-      [
-        "https://raw.githubusercontent.com/acme/repo/main/skills/SKILL.md",
-        "---\nname: github-skill\ndescription: test skill\n---\n# Skill\n",
-      ],
-      ["https://raw.githubusercontent.com/acme/repo/main/skills/references/a.md", "# A\n"],
-      ["https://raw.githubusercontent.com/acme/repo/main/skills/references/b.md", "# B\n"],
-    ]);
-    const downloads = new Map<string, number>();
-
+  test("resolves tree URLs whose branch names contain slashes", async () => {
+    const requestedUrls: string[] = [];
     globalThis.fetch = async (input) => {
       const url = typeof input === "string" ? input : input.url;
+      requestedUrls.push(url);
 
-      if (url === "https://api.github.com/repos/acme/repo/branches?per_page=100") {
-        return Response.json([{ name: "main" }]);
-      }
-
-      if (url === "https://api.github.com/repos/acme/repo/contents/skills?ref=main") {
-        return Response.json([
-          {
-            download_url: "https://raw.githubusercontent.com/acme/repo/main/skills/SKILL.md",
-            path: "skills/SKILL.md",
-            type: "file",
-          },
-          {
-            download_url: "https://raw.githubusercontent.com/acme/repo/main/skills/references/a.md",
-            path: "skills/references/a.md",
-            type: "file",
-          },
-          {
-            download_url: "https://raw.githubusercontent.com/acme/repo/main/skills/references/b.md",
-            path: "skills/references/b.md",
-            type: "file",
-          },
-        ]);
-      }
-
-      const body = fileBodies.get(url);
-
-      if (body !== undefined) {
-        downloads.set(url, (downloads.get(url) ?? 0) + 1);
-        return new Response(body, {
-          headers: {
-            "content-length": String(new TextEncoder().encode(body).byteLength),
-          },
+      if (url === "https://codeload.github.com/acme/repo/zip/release/2026") {
+        return githubArchiveResponse({
+          "repo-release-2026/skills/SKILL.md":
+            "---\nname: slash-branch-skill\ndescription: branch ref test\n---\n# Skill\n",
         });
       }
 
-      throw new Error(`Unexpected fetch URL: ${url}`);
-    };
-
-    const normalized = await loadSkillPackageFromGithub(
-      "https://github.com/acme/repo/tree/main/skills",
-    );
-
-    expect(normalized.entries.map((entry) => entry.path)).toEqual([
-      "references",
-      "references/a.md",
-      "references/b.md",
-      "SKILL.md",
-    ]);
-    expect(downloads).toEqual(new Map([...fileBodies.keys()].map((url) => [url, 1] as const)));
-  });
-
-  test("resolves tree URLs whose branch names contain slashes", async () => {
-    globalThis.fetch = async (input) => {
-      const url = typeof input === "string" ? input : input.url;
-
-      if (url === "https://api.github.com/repos/acme/repo/branches?per_page=100") {
-        return Response.json([{ name: "main" }, { name: "release/2026" }]);
-      }
-
-      if (url === "https://api.github.com/repos/acme/repo/contents/skills?ref=release%2F2026") {
-        return Response.json([
-          {
-            download_url:
-              "https://raw.githubusercontent.com/acme/repo/release/2026/skills/SKILL.md",
-            path: "skills/SKILL.md",
-            type: "file",
-          },
-        ]);
-      }
-
-      if (url === "https://raw.githubusercontent.com/acme/repo/release/2026/skills/SKILL.md") {
-        return new Response(
-          "---\nname: slash-branch-skill\ndescription: branch ref test\n---\n# Skill\n",
-          {
-            headers: {
-              "content-length": "69",
-            },
-          },
-        );
-      }
-
-      throw new Error(`Unexpected fetch URL: ${url}`);
+      return new Response("Not Found", { status: 404 });
     };
 
     const normalized = await loadSkillPackageFromGithub(
@@ -156,6 +50,10 @@ describe("GitHub skill package boundary", () => {
 
     expect(normalized.frontmatter.name).toBe("slash-branch-skill");
     expect(normalized.entries.map((entry) => entry.path)).toEqual(["SKILL.md"]);
+    expect(requestedUrls).toEqual([
+      "https://codeload.github.com/acme/repo/zip/release/2026/skills",
+      "https://codeload.github.com/acme/repo/zip/release/2026",
+    ]);
   });
 
   test("resolves a --skill selector to the skills/<name> directory", async () => {
@@ -211,18 +109,14 @@ describe("GitHub skill package boundary", () => {
     expect(normalized.frontmatter.name).toBe("grill-me");
   });
 
-  test("falls back to GitHub archives when the GitHub API is rate limited", async () => {
+  test("imports tree directories from the GitHub archive", async () => {
     globalThis.fetch = async (input) => {
       const url = typeof input === "string" ? input : input.url;
-
-      if (url === "https://api.github.com/repos/acme/repo/branches?per_page=100") {
-        return new Response("rate limited", { status: 403 });
-      }
 
       if (url === "https://codeload.github.com/acme/repo/zip/main") {
         return githubArchiveResponse({
           "repo-main/skills/SKILL.md":
-            "---\nname: archived-skill\ndescription: fallback skill\n---\n# Skill\n",
+            "---\nname: archived-skill\ndescription: archived skill\n---\n# Skill\n",
           "repo-main/skills/references/a.md": "# A\n",
         });
       }
@@ -253,10 +147,6 @@ describe("GitHub skill package boundary", () => {
         });
       }
 
-      if (url === "https://api.github.com/repos/acme/repo") {
-        return Response.json({ default_branch: "main" });
-      }
-
       return new Response("Not Found", { status: 404 });
     };
 
@@ -264,4 +154,58 @@ describe("GitHub skill package boundary", () => {
       loadSkillPackageFromGithub("https://github.com/acme/repo", "missing"),
     ).rejects.toThrow('Skill "missing" was not found in acme/repo');
   });
+
+  test("inflates only the selected entries of the repository archive", async () => {
+    const archive = createGithubArchive({
+      "repo-main/other/unreadable.bin": "never inflated",
+      "repo-main/skills/SKILL.md":
+        "---\nname: archived-skill\ndescription: archived skill\n---\n# Skill\n",
+    });
+    // Inflating this entry would throw, so the import proves it was skipped.
+    setCentralDirectoryCompression(archive, "repo-main/other/unreadable.bin", 99);
+    globalThis.fetch = async () => new Response(archive);
+
+    const normalized = await loadSkillPackageFromGithub(
+      "https://github.com/acme/repo/tree/main/skills",
+    );
+
+    expect(normalized.entries.map((entry) => entry.path)).toEqual(["SKILL.md"]);
+  });
+
+  test("rejects an oversized selected file", async () => {
+    globalThis.fetch = async () =>
+      githubArchiveResponse({
+        "repo-main/skills/SKILL.md":
+          "---\nname: archived-skill\ndescription: archived skill\n---\n# Skill\n",
+        "repo-main/skills/large.txt": "x".repeat(2 * 1024 * 1024 + 1),
+      });
+
+    await expect(
+      loadSkillPackageFromGithub("https://github.com/acme/repo/tree/main/skills"),
+    ).rejects.toThrow("GitHub file exceeds the limit (2 MB): large.txt");
+  });
 });
+
+function setCentralDirectoryCompression(archive: Uint8Array, name: string, method: number): void {
+  const view = new DataView(archive.buffer, archive.byteOffset, archive.byteLength);
+  const expectedName = new TextEncoder().encode(name);
+
+  for (let offset = 0; offset + 46 <= archive.byteLength; offset += 1) {
+    if (view.getUint32(offset, true) !== 0x02_01_4b_50) {
+      continue;
+    }
+
+    const nameStart = offset + 46;
+    const entryName = archive.subarray(nameStart, nameStart + view.getUint16(offset + 28, true));
+
+    if (
+      entryName.length === expectedName.length &&
+      entryName.every((byte, index) => byte === expectedName[index])
+    ) {
+      view.setUint16(offset + 10, method, true);
+      return;
+    }
+  }
+
+  throw new Error(`The archive has no central directory record for ${name}.`);
+}

@@ -3,10 +3,7 @@ import { describe, expect, test } from "bun:test";
 import type { SessionType } from "@mosoo/contracts/session";
 
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
-import {
-  SESSION_SUMMARY_LIST_LIMIT,
-  listSessions,
-} from "../src/modules/sessions/application/session-summary-query.service";
+import { SESSION_SUMMARY_LIST_LIMIT } from "../src/modules/sessions/application/session-summary-query.service";
 import { listThreadAgentSessions } from "../src/modules/sessions/application/thread-agent-session-list.service";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
@@ -22,7 +19,7 @@ const ORGANIZATION_ID = "01J00000000000000000000006";
 const PROJECT_ID = "01J0000000000000000000000Q";
 const PREVIEW_SESSION_ID = "01J0000000000000000000A900";
 const UI_SESSION_ID = "01J0000000000000000000A901";
-const ATTRIBUTED_SESSION_ID = "01J0000000000000000000A902";
+const OTHER_CREATOR_SESSION_ID = "01J0000000000000000000A902";
 const EXTRA_SESSION_ID_PREFIX = "01J0000000000000000000A";
 
 function extraSessionId(index: number): string {
@@ -194,43 +191,42 @@ function findCapability(
 
 describe("session type queries", () => {
   test("lists only sessions with the requested type", async () => {
-    const sessions = await listSessions(createSessionTypeDatabase(), VIEWER, {
+    const sessions = await listThreadAgentSessions(createSessionTypeDatabase(), VIEWER, {
       archived: false,
       projectId: PROJECT_ID,
       type: "preview",
     });
 
-    expect(sessions.nodes.map((session) => [session.id, session.type])).toEqual([
+    expect(sessions.nodes.map(({ session }) => [session.id, session.type])).toEqual([
       [PREVIEW_SESSION_ID, "preview"],
     ]);
   });
 
   test("lists all visible session summaries", async () => {
-    const sessions = await listSessions(createSessionTypeDatabase(), VIEWER, {
+    const sessions = await listThreadAgentSessions(createSessionTypeDatabase(), VIEWER, {
       archived: false,
       projectId: PROJECT_ID,
       type: null,
     });
 
-    expect(sessions.nodes.map((session) => session.id)).toEqual([
+    expect(sessions.nodes.map(({ session }) => session.id)).toEqual([
       PREVIEW_SESSION_ID,
       UI_SESSION_ID,
     ]);
   });
 
-  test("lists thread sessions with row capability state", async () => {
+  test("lists every Project thread session with row capability state", async () => {
     const database = createSessionTypeDatabase();
     insertSession(database, {
-      id: ATTRIBUTED_SESSION_ID,
-      title: "Attributed UI session",
+      id: OTHER_CREATOR_SESSION_ID,
+      title: "Other creator UI session",
       type: "ui",
       updatedAt: 4,
     });
     database.execute(`
       UPDATE session
-         SET creator_account_id = 'owner-1',
-             attributed_user_id = 'account-1'
-       WHERE id = '${ATTRIBUTED_SESSION_ID}'
+         SET creator_account_id = 'owner-1'
+       WHERE id = '${OTHER_CREATOR_SESSION_ID}'
     `);
 
     const sessions = await listThreadAgentSessions(database, VIEWER, {
@@ -238,27 +234,16 @@ describe("session type queries", () => {
       projectId: PROJECT_ID,
       type: "ui",
     });
-    const attributed = sessions.nodes.find((node) => node.session.id === ATTRIBUTED_SESSION_ID);
-    const creator = sessions.nodes.find((node) => node.session.id === UI_SESSION_ID);
 
     expect(sessions.nodes.map((node) => node.session.id)).toEqual([
-      ATTRIBUTED_SESSION_ID,
+      OTHER_CREATOR_SESSION_ID,
       UI_SESSION_ID,
     ]);
-    expect(creator && findCapability(creator, "archive_session")).toMatchObject({
-      status: "available",
-    });
-    expect(creator && findCapability(creator, "delete_session")).toMatchObject({
-      status: "available",
-    });
-    expect(attributed && findCapability(attributed, "archive_session")).toMatchObject({
-      reason: "Only the session creator can mutate this session.",
-      status: "unavailable",
-    });
-    expect(attributed && findCapability(attributed, "delete_session")).toMatchObject({
-      reason: "Only the session creator can mutate this session.",
-      status: "unavailable",
-    });
+
+    for (const node of sessions.nodes) {
+      expect(findCapability(node, "archive_session")).toMatchObject({ status: "available" });
+      expect(findCapability(node, "delete_session")).toMatchObject({ status: "available" });
+    }
   });
 
   test("bounds project session summaries on stable updated ordering", async () => {
@@ -275,15 +260,15 @@ describe("session type queries", () => {
       });
     }
 
-    const sessions = await listSessions(database, VIEWER, {
+    const sessions = await listThreadAgentSessions(database, VIEWER, {
       archived: false,
       projectId: PROJECT_ID,
       type: null,
     });
 
     expect(sessions.nodes).toHaveLength(SESSION_SUMMARY_LIST_LIMIT);
-    expect(sessions.nodes[0]?.id).toBe(extraSessionId(104));
-    expect(sessions.nodes.at(-1)?.id).toBe(extraSessionId(5));
+    expect(sessions.nodes[0]?.session.id).toBe(extraSessionId(104));
+    expect(sessions.nodes.at(-1)?.session.id).toBe(extraSessionId(5));
     expect(sessions.pageInfo).toMatchObject({
       endCursor: `15:${extraSessionId(5)}`,
       hasMore: true,
@@ -305,13 +290,13 @@ describe("session type queries", () => {
       });
     }
 
-    const firstPage = await listSessions(database, VIEWER, {
+    const firstPage = await listThreadAgentSessions(database, VIEWER, {
       archived: false,
       limit: 2,
       projectId: PROJECT_ID,
       type: null,
     });
-    const secondPage = await listSessions(database, VIEWER, {
+    const secondPage = await listThreadAgentSessions(database, VIEWER, {
       archived: false,
       beforeCursor: firstPage.pageInfo.endCursor,
       limit: 2,
@@ -319,7 +304,7 @@ describe("session type queries", () => {
       type: null,
     });
 
-    expect(firstPage.nodes.map((session) => session.id)).toEqual([
+    expect(firstPage.nodes.map(({ session }) => session.id)).toEqual([
       extraSessionId(4),
       extraSessionId(3),
     ]);
@@ -328,7 +313,7 @@ describe("session type queries", () => {
       hasMore: true,
       startCursor: `10:${extraSessionId(4)}`,
     });
-    expect(secondPage.nodes.map((session) => session.id)).toEqual([
+    expect(secondPage.nodes.map(({ session }) => session.id)).toEqual([
       extraSessionId(2),
       extraSessionId(1),
     ]);
@@ -341,7 +326,7 @@ describe("session type queries", () => {
 
   test("rejects invalid session summary page inputs", async () => {
     await expect(
-      listSessions(createSessionTypeDatabase(), VIEWER, {
+      listThreadAgentSessions(createSessionTypeDatabase(), VIEWER, {
         limit: 0,
         projectId: PROJECT_ID,
         type: null,
@@ -349,7 +334,7 @@ describe("session type queries", () => {
     ).rejects.toThrow("Session list limit must be a positive integer.");
 
     await expect(
-      listSessions(createSessionTypeDatabase(), VIEWER, {
+      listThreadAgentSessions(createSessionTypeDatabase(), VIEWER, {
         beforeCursor: "10:not-a-ulid",
         projectId: PROJECT_ID,
         type: null,

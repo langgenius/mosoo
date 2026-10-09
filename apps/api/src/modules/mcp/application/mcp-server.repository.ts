@@ -1,54 +1,35 @@
 import { accountsTable, mcpServersTable } from "@mosoo/db";
 import type { AccountId, McpServerId, ProjectId } from "@mosoo/id";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
-import { forbiddenError } from "../../../platform/errors";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { ensureProjectOwnership } from "../../projects/application/project.service";
-import { readAccountId } from "./mcp-platform-ids";
 import type { ServerRow, ViewerRow } from "./mcp-types";
 
-const serverColumns = {
-  authType: sql<ServerRow["authType"]>`${mcpServersTable.authType}`.as("authType"),
-  byoClientId: sql<string | null>`${mcpServersTable.byoClientId}`.as("byoClientId"),
-  byoClientSecretSecretId: sql<string | null>`${mcpServersTable.byoClientSecretSecretId}`.as(
-    "byoClientSecretSecretId",
-  ),
-  createdAt: sql<number>`${mcpServersTable.createdAt}`.as("createdAt"),
-  credentialScope: sql<ServerRow["credentialScope"]>`${mcpServersTable.credentialScope}`.as(
-    "credentialScope",
-  ),
+export const serverColumns = {
+  authType: mcpServersTable.authType,
+  byoClientId: mcpServersTable.byoClientId,
+  byoClientSecretSecretId: mcpServersTable.byoClientSecretSecretId,
+  createdAt: mcpServersTable.createdAt,
+  credentialScope: mcpServersTable.credentialScope,
   description: mcpServersTable.description,
   enabled: mcpServersTable.enabled,
-  iconUrl: sql<string | null>`${mcpServersTable.iconUrl}`.as("iconUrl"),
+  iconUrl: mcpServersTable.iconUrl,
   id: mcpServersTable.id,
   name: mcpServersTable.name,
-  oauthMetadataJson: sql<string | null>`${mcpServersTable.oauthMetadataJson}`.as(
-    "oauthMetadataJson",
-  ),
   ownerId: mcpServersTable.ownerId,
-  ownerName: sql<string | null>`${accountsTable.name}`.as("ownerName"),
+  ownerName: accountsTable.name,
   projectId: mcpServersTable.projectId,
-  source: sql<ServerRow["source"]>`${mcpServersTable.source}`.as("source"),
-  updatedAt: sql<number>`${mcpServersTable.updatedAt}`.as("updatedAt"),
+  source: mcpServersTable.source,
+  updatedAt: mcpServersTable.updatedAt,
   url: mcpServersTable.url,
 };
-
-function toServerRow(
-  row: Omit<ServerRow, "enabled"> & { enabled: boolean | number | string },
-): ServerRow {
-  return {
-    ...row,
-    enabled: row.enabled === true || row.enabled === 1 || row.enabled === "1" ? 1 : 0,
-  };
-}
 
 export async function getViewerRow(database: D1Database, viewerId: AccountId): Promise<ViewerRow> {
   const row = await getAppDatabase(database)
     .select({
       email: accountsTable.email,
-      imageUrl: accountsTable.image,
       name: accountsTable.name,
     })
     .from(accountsTable)
@@ -58,7 +39,6 @@ export async function getViewerRow(database: D1Database, viewerId: AccountId): P
 
   return {
     email: row?.email ?? null,
-    imageUrl: row?.imageUrl ?? null,
     name: row?.name ?? null,
   };
 }
@@ -88,7 +68,7 @@ export async function getServerRowOrNull(
     .limit(1)
     .get();
 
-  return row ? toServerRow(row) : null;
+  return row ?? null;
 }
 
 export async function listServerRowsById(
@@ -108,7 +88,7 @@ export async function listServerRowsById(
     .where(inArray(mcpServersTable.id, uniqueServerIds))
     .all();
 
-  return new Map(rows.map((row) => [row.id, toServerRow(row)]));
+  return new Map(rows.map((row) => [row.id, row]));
 }
 
 export async function ensureServerAccess(
@@ -116,40 +96,19 @@ export async function ensureServerAccess(
   viewer: AuthenticatedViewer,
   projectId: ProjectId,
   serverId: McpServerId,
-): Promise<{
-  server: ServerRow;
-}> {
-  const viewerId = readAccountId(viewer.id);
-  await ensureProjectOwnership(database, viewerId, projectId);
-  const row =
-    (await getAppDatabase(database)
-      .select(serverColumns)
-      .from(mcpServersTable)
-      .leftJoin(accountsTable, eq(accountsTable.id, mcpServersTable.ownerId))
-      .where(and(eq(mcpServersTable.id, serverId), eq(mcpServersTable.projectId, projectId)))
-      .limit(1)
-      .get()) ?? null;
+): Promise<ServerRow> {
+  await ensureProjectOwnership(database, viewer.id, projectId);
+  const server = await getAppDatabase(database)
+    .select(serverColumns)
+    .from(mcpServersTable)
+    .leftJoin(accountsTable, eq(accountsTable.id, mcpServersTable.ownerId))
+    .where(and(eq(mcpServersTable.id, serverId), eq(mcpServersTable.projectId, projectId)))
+    .limit(1)
+    .get();
 
-  if (!row) {
+  if (!server) {
     throw new Error("MCP server not found.");
   }
 
-  const server = toServerRow(row);
-
-  if (server.ownerId !== viewerId) {
-    throw forbiddenError("You do not have access to this MCP server.");
-  }
-
-  return { server };
-}
-
-export async function ensureServerManageAccess(
-  database: D1Database,
-  viewer: AuthenticatedViewer,
-  projectId: ProjectId,
-  serverId: McpServerId,
-): Promise<{
-  server: ServerRow;
-}> {
-  return ensureServerAccess(database, viewer, projectId, serverId);
+  return server;
 }

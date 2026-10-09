@@ -2,16 +2,15 @@ import { mcpOauthFlowsTable } from "@mosoo/db";
 import type { McpOAuthFlowId, McpServerId } from "@mosoo/id";
 import { and, eq, inArray, lte, or } from "drizzle-orm";
 
+import { createErrorLogContext, logError } from "../../../platform/cloudflare/logger";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../time";
-import { cleanupStoredMcpOAuthFlowClientSecret } from "./mcp-oauth-secret-resolution";
-import type { McpOAuthSecretActor } from "./mcp-oauth-secret-resolution";
+import { deleteSecret } from "../../vault/application/vault-secret-store";
 import { OAUTH_FLOW_RESULT_RETENTION_MS } from "./mcp-oauth.constants";
 import type { OAuthFlowRow } from "./mcp-types";
 
 const oauthFlowColumns = {
   codeVerifier: mcpOauthFlowsTable.codeVerifier,
-  createdAt: mcpOauthFlowsTable.createdAt,
   errorMessage: mcpOauthFlowsTable.errorMessage,
   expiresAt: mcpOauthFlowsTable.expiresAt,
   id: mcpOauthFlowsTable.id,
@@ -19,7 +18,6 @@ const oauthFlowColumns = {
   oauthClientId: mcpOauthFlowsTable.oauthClientId,
   oauthClientSecretSecretId: mcpOauthFlowsTable.oauthClientSecretSecretId,
   projectId: mcpOauthFlowsTable.projectId,
-  returnUrl: mcpOauthFlowsTable.returnUrl,
   scopeValuesJson: mcpOauthFlowsTable.scopeValuesJson,
   serverId: mcpOauthFlowsTable.serverId,
   status: mcpOauthFlowsTable.status,
@@ -27,27 +25,21 @@ const oauthFlowColumns = {
   tokenEndpoint: mcpOauthFlowsTable.tokenEndpoint,
 };
 
+type OAuthFlowSecretOwner = Pick<OAuthFlowRow, "id" | "oauthClientSecretSecretId">;
+
 export async function listOAuthFlowsForCleanup(
   database: D1Database,
-  input: {
-    cleanupAfterLte: number;
-    includePendingExpired: boolean;
-  },
+  now: number,
 ): Promise<OAuthFlowRow[]> {
   return getAppDatabase(database)
     .select(oauthFlowColumns)
     .from(mcpOauthFlowsTable)
     .where(
       and(
-        lte(mcpOauthFlowsTable.cleanupAfter, input.cleanupAfterLte),
+        lte(mcpOauthFlowsTable.cleanupAfter, now),
         or(
           inArray(mcpOauthFlowsTable.status, ["succeeded", "failed", "expired"]),
-          input.includePendingExpired
-            ? and(
-                eq(mcpOauthFlowsTable.status, "pending"),
-                lte(mcpOauthFlowsTable.expiresAt, input.cleanupAfterLte),
-              )
-            : undefined,
+          and(eq(mcpOauthFlowsTable.status, "pending"), lte(mcpOauthFlowsTable.expiresAt, now)),
         ),
       ),
     )
@@ -67,26 +59,30 @@ export async function listOAuthFlowRowsByServerId(
 
 export async function markOAuthFlowTerminal(
   database: D1Database,
+  flow: OAuthFlowSecretOwner,
   input: {
     errorMessage: string | null;
-    flowId: McpOAuthFlowId;
     status: Exclude<OAuthFlowRow["status"], "pending">;
-    subjectLabel?: string | null;
+    subjectLabel: string | null;
   },
 ): Promise<void> {
   const now = currentTimestampMs();
 
+  // Delete the vault row before dropping its last reference, so a failure
+  // leaves a retryable reference instead of orphaned ciphertext.
+  await deleteSecret(database, flow.oauthClientSecretSecretId);
   await getAppDatabase(database)
     .update(mcpOauthFlowsTable)
     .set({
       cleanupAfter: now + OAUTH_FLOW_RESULT_RETENTION_MS,
       completedAt: now,
       errorMessage: input.errorMessage,
+      oauthClientSecretSecretId: null,
       status: input.status,
-      subjectLabel: input.subjectLabel ?? null,
+      subjectLabel: input.subjectLabel,
       updatedAt: now,
     })
-    .where(eq(mcpOauthFlowsTable.id, input.flowId))
+    .where(eq(mcpOauthFlowsTable.id, flow.id))
     .run();
 }
 
@@ -115,83 +111,44 @@ export async function markOAuthFlowsExpiredBatch(
     .run();
 }
 
+// Best effort and never rejects: a flow whose secret cannot be deleted keeps
+// its row, and so its reference, for the next cleanup to retry.
 export async function destroyOAuthFlowArtifactsBatch(
   database: D1Database,
-  flows: readonly Pick<
-    OAuthFlowRow,
-    "id" | "initiatorUserId" | "oauthClientSecretSecretId" | "projectId" | "serverId"
-  >[],
-  actor: McpOAuthSecretActor = {
-    name: "mcp_oauth_flow_retention_cleanup",
-    type: "system",
-  },
+  flows: readonly OAuthFlowSecretOwner[],
 ): Promise<void> {
-  const removableFlowIds: McpOAuthFlowId[] = [];
+  const results = await Promise.allSettled(
+    flows.map(async (flow) => deleteSecret(database, flow.oauthClientSecretSecretId)),
+  );
+  const removableFlowIds = flows.flatMap((flow, index) => {
+    const result = results[index];
 
-  for (const flow of flows) {
-    const cleanupSucceeded = await cleanupStoredMcpOAuthFlowClientSecret({
-      command: {
-        actor,
-        flow,
-        purpose: "oauth_flow_artifact_cleanup",
-        projectId: flow.projectId,
-        secretId: flow.oauthClientSecretSecretId,
-        secretKind: "flow_client_secret",
-      },
-      database,
-    });
-
-    if (cleanupSucceeded) {
-      removableFlowIds.push(flow.id);
+    if (result?.status === "rejected") {
+      logError("mcp-oauth.flow-client-secret-cleanup.failed", {
+        ...createErrorLogContext(result.reason),
+        flowId: flow.id,
+      });
+      return [];
     }
-  }
 
-  const uniqueFlowIds = [...new Set(removableFlowIds)];
-
-  if (uniqueFlowIds.length === 0) {
-    return;
-  }
-
-  await getAppDatabase(database)
-    .delete(mcpOauthFlowsTable)
-    .where(inArray(mcpOauthFlowsTable.id, uniqueFlowIds))
-    .run();
-}
-
-export async function clearOAuthFlowSecret(
-  database: D1Database,
-  flow: Pick<
-    OAuthFlowRow,
-    "id" | "initiatorUserId" | "oauthClientSecretSecretId" | "projectId" | "serverId"
-  >,
-): Promise<void> {
-  const cleanupSucceeded = await cleanupStoredMcpOAuthFlowClientSecret({
-    command: {
-      actor: {
-        name: "mcp_oauth_flow_terminal_cleanup",
-        type: "system",
-      },
-      flow,
-      purpose: "oauth_flow_terminal_cleanup",
-      projectId: flow.projectId,
-      secretId: flow.oauthClientSecretSecretId,
-      secretKind: "flow_client_secret",
-    },
-    database,
+    return [flow.id];
   });
 
-  if (!cleanupSucceeded) {
+  if (removableFlowIds.length === 0) {
     return;
   }
 
-  await getAppDatabase(database)
-    .update(mcpOauthFlowsTable)
-    .set({
-      oauthClientSecretSecretId: null,
-      updatedAt: currentTimestampMs(),
-    })
-    .where(eq(mcpOauthFlowsTable.id, flow.id))
-    .run();
+  try {
+    await getAppDatabase(database)
+      .delete(mcpOauthFlowsTable)
+      .where(inArray(mcpOauthFlowsTable.id, removableFlowIds))
+      .run();
+  } catch (error) {
+    logError("mcp-oauth.flow-cleanup.failed", {
+      ...createErrorLogContext(error),
+      flowCount: removableFlowIds.length,
+    });
+  }
 }
 
 export async function getOAuthFlowRowById(

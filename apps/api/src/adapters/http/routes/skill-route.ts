@@ -1,13 +1,15 @@
+import { parsePlatformId } from "@mosoo/id";
 import type { ProjectId, SkillId } from "@mosoo/id";
 import type { Hono } from "hono";
 
 import { getAuthenticatedViewerFromRequest } from "../../../modules/auth/application/viewer-auth.service";
 import { inspectSkillInput } from "../../../modules/skills/application/skill-package-source.service";
+import { createSkillFromUpload } from "../../../modules/skills/application/skill-package-write.service";
 import {
-  createSkillFromUpload,
-  updateOwnedSkillPackage,
-} from "../../../modules/skills/application/skill-package-write.service";
-import { SkillRequestError } from "../../../modules/skills/application/skill-package.shared";
+  MAX_SKILL_UPLOAD_BYTES,
+  SkillRequestError,
+} from "../../../modules/skills/application/skill-package.shared";
+import type { UploadSkillFile } from "../../../modules/skills/application/skill-package.shared";
 import {
   downloadSkillPackage,
   readSkillSource,
@@ -20,10 +22,7 @@ import { createErrorLogContext, logError } from "../../../platform/cloudflare/lo
 import type { ApiGatewayEnvironment } from "../../../platform/cloudflare/worker-types";
 import { isApiError } from "../../../platform/errors";
 import { toArrayBuffer } from "../../../shared/bytes";
-import { toPlatformId } from "../../../shared/platform-id";
 import { platformIdRouteErrorMessage } from "./platform-id-route-error";
-
-const MAX_SKILL_UPLOAD_BYTES = 10 * 1024 * 1024; // 10 MB per PRD
 
 function unauthorized(): Response {
   return Response.json({ error: "Unauthorized." }, { status: 401 });
@@ -57,6 +56,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+// Reject by declared size before copying the upload into another buffer.
+async function readUploadedSkillFile(file: File): Promise<UploadSkillFile> {
+  if (file.size > MAX_SKILL_UPLOAD_BYTES) {
+    throw new SkillRequestError(
+      `File exceeds the limit (${Math.floor(MAX_SKILL_UPLOAD_BYTES / 1024 / 1024)} MB).`,
+    );
+  }
+
+  return { bytes: new Uint8Array(await file.arrayBuffer()), name: file.name };
+}
+
 export function registerSkillRoute(app: Hono<ApiGatewayEnvironment>) {
   app.post("/skill/inspect", async (c) => {
     try {
@@ -73,9 +83,8 @@ export function registerSkillRoute(app: Hono<ApiGatewayEnvironment>) {
         throw new SkillRequestError("Either file or githubUrl must be provided.");
       }
 
-      const bytes = file instanceof File ? new Uint8Array(await file.arrayBuffer()) : undefined;
       const inspected = await inspectSkillInput({
-        ...(bytes && file instanceof File ? { file: { bytes, name: file.name } } : {}),
+        ...(file instanceof File ? { file: await readUploadedSkillFile(file) } : {}),
         ...(typeof githubUrl === "string" && githubUrl.trim()
           ? { githubUrl: githubUrl.trim() }
           : {}),
@@ -152,9 +161,9 @@ export function registerSkillRoute(app: Hono<ApiGatewayEnvironment>) {
         await createSkillFromSkillsSh(
           c.env,
           viewer,
-          toPlatformId<ProjectId>(projectId, "Project ID"),
+          parsePlatformId<ProjectId>(projectId, "Project ID"),
           {
-            projectId: toPlatformId<ProjectId>(projectId, "Project ID"),
+            projectId: parsePlatformId<ProjectId>(projectId, "Project ID"),
             id,
             ...(installUrl !== undefined ? { installUrl } : {}),
             slug,
@@ -175,7 +184,6 @@ export function registerSkillRoute(app: Hono<ApiGatewayEnvironment>) {
 
       const form = await c.req.raw.formData();
       const projectId = form.get("projectId");
-      const skillId = form.get("skillId");
       const file = form.get("file");
       const githubUrl = form.get("githubUrl");
 
@@ -185,44 +193,18 @@ export function registerSkillRoute(app: Hono<ApiGatewayEnvironment>) {
       if (!(file instanceof File) && typeof githubUrl !== "string") {
         throw new SkillRequestError("Either file or githubUrl must be provided.");
       }
-      if (file instanceof File && file.size > MAX_SKILL_UPLOAD_BYTES) {
-        throw new SkillRequestError(
-          `File exceeds the limit (${Math.floor(MAX_SKILL_UPLOAD_BYTES / 1024 / 1024)} MB).`,
-        );
-      }
-
-      const uploadInput = {
-        ...(file instanceof File
-          ? {
-              file: {
-                bytes: new Uint8Array(await file.arrayBuffer()),
-                name: file.name,
-              },
-            }
-          : {}),
-        ...(typeof githubUrl === "string" && githubUrl.trim()
-          ? { githubUrl: githubUrl.trim() }
-          : {}),
-      };
-
-      if (typeof skillId === "string" && skillId) {
-        return c.json(
-          await updateOwnedSkillPackage(
-            c.env,
-            viewer,
-            toPlatformId<ProjectId>(projectId, "Project ID"),
-            toPlatformId<SkillId>(skillId, "Skill ID"),
-            uploadInput,
-          ),
-        );
-      }
 
       return c.json(
         await createSkillFromUpload(
           c.env,
           viewer,
-          toPlatformId<ProjectId>(projectId, "Project ID"),
-          uploadInput,
+          parsePlatformId<ProjectId>(projectId, "Project ID"),
+          {
+            ...(file instanceof File ? { file: await readUploadedSkillFile(file) } : {}),
+            ...(typeof githubUrl === "string" && githubUrl.trim()
+              ? { githubUrl: githubUrl.trim() }
+              : {}),
+          },
         ),
       );
     } catch (error) {
@@ -244,8 +226,8 @@ export function registerSkillRoute(app: Hono<ApiGatewayEnvironment>) {
       const content = await readSkillSource(
         c.env,
         viewer,
-        toPlatformId<ProjectId>(projectId, "Project ID"),
-        toPlatformId<SkillId>(c.req.param("skillId"), "Skill ID"),
+        parsePlatformId<ProjectId>(projectId, "Project ID"),
+        parsePlatformId<SkillId>(c.req.param("skillId"), "Skill ID"),
       );
       return new Response(content, {
         headers: { "Content-Type": "text/markdown; charset=utf-8" },
@@ -269,8 +251,8 @@ export function registerSkillRoute(app: Hono<ApiGatewayEnvironment>) {
       const { bytes, fileName } = await downloadSkillPackage(
         c.env,
         viewer,
-        toPlatformId<ProjectId>(projectId, "Project ID"),
-        c.req.param("skillId"),
+        parsePlatformId<ProjectId>(projectId, "Project ID"),
+        parsePlatformId<SkillId>(c.req.param("skillId"), "Skill ID"),
       );
       return new Response(toArrayBuffer(bytes), {
         headers: {

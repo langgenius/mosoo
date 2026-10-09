@@ -7,67 +7,28 @@ import {
 import {
   createPublicHttpContractDatabase,
   insertNonOwnerSession,
+  insertSessionRunFixture,
 } from "./helpers/public-api-http-test-fixture";
 
-async function insertQueuedSessionRun(database: D1Database): Promise<void> {
-  await database
-    .prepare(
-      `
-        INSERT INTO session_run (
-          id,
-          session_id,
-          agent_id,
-          created_by_account_id,
-          trigger,
-          status,
-          provider,
-          model,
-          runtime_id,
-          trace_id,
-          created_at,
-          updated_at
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `,
-    )
-    .bind(
-      "run-active-transition",
-      "01J0000000000000000000000B",
-      "01J00000000000000000000009",
-      "01J00000000000000000000002",
-      "user_prompt",
-      "queued",
-      "openai",
-      "gpt-5.4",
-      "openai-runtime",
-      "trace-active-transition",
-      1,
-      1,
-    )
-    .run();
-  await database
-    .prepare("UPDATE session SET last_run_id = ?, status = ?, updated_at = ? WHERE id = ?")
-    .bind("run-active-transition", "RUNNING", 1, "01J0000000000000000000000B")
-    .run();
-}
+const ACTIVE_TRANSITION_RUN_ID = "01J0000000000000000000R001";
 
 describe("session run state", () => {
   test("returns active status transitions", async () => {
     const database = await createPublicHttpContractDatabase();
     await insertNonOwnerSession(database);
-    await insertQueuedSessionRun(database);
+    await insertSessionRunFixture(database, { id: ACTIVE_TRANSITION_RUN_ID, status: "queued" });
 
     const run = await updateSessionRunStatusIfActive(database, {
-      runId: "run-active-transition",
+      runId: ACTIVE_TRANSITION_RUN_ID,
       status: "booting",
     });
 
-    expect(run?.id).toBe("run-active-transition");
+    expect(run?.id).toBe(ACTIVE_TRANSITION_RUN_ID);
     expect(run?.status).toBe("booting");
 
     const stored = await database
       .prepare("SELECT status FROM session_run WHERE id = ?")
-      .bind("run-active-transition")
+      .bind(ACTIVE_TRANSITION_RUN_ID)
       .first<{ status: string }>();
     expect(stored).toEqual({ status: "booting" });
   });
@@ -75,18 +36,18 @@ describe("session run state", () => {
   test("only the first dispatch acquire can continue a run", async () => {
     const database = await createPublicHttpContractDatabase();
     await insertNonOwnerSession(database);
-    await insertQueuedSessionRun(database);
+    await insertSessionRunFixture(database, { id: ACTIVE_TRANSITION_RUN_ID, status: "queued" });
 
-    const first = await acquireSessionRunDispatch(database, "run-active-transition");
-    const second = await acquireSessionRunDispatch(database, "run-active-transition");
+    const first = await acquireSessionRunDispatch(database, ACTIVE_TRANSITION_RUN_ID);
+    const second = await acquireSessionRunDispatch(database, ACTIVE_TRANSITION_RUN_ID);
 
-    expect(first?.id).toBe("run-active-transition");
+    expect(first?.id).toBe(ACTIVE_TRANSITION_RUN_ID);
     expect(first?.status).toBe("booting");
     expect(second).toBeNull();
 
     const stored = await database
       .prepare("SELECT status FROM session_run WHERE id = ?")
-      .bind("run-active-transition")
+      .bind(ACTIVE_TRANSITION_RUN_ID)
       .first<{ status: string }>();
     expect(stored).toEqual({ status: "booting" });
   });

@@ -1,5 +1,4 @@
 import type {
-  RuntimeSubjectErrorCode,
   SandboxSessionStatus,
   SandboxStatus,
   SandboxSubjectKind,
@@ -8,7 +7,6 @@ import type {
   AccountId,
   ProjectId,
   PlatformId,
-  AgentId,
   DriverInstanceId,
   RuntimeOperationId,
   SandboxBackupId,
@@ -22,13 +20,6 @@ import type { RuntimeSubjectOperationStatus } from "../../domain/runtime-subject
 
 export type RuntimeSubjectStatus = SandboxStatus;
 
-export interface RuntimeSubjectRecord {
-  readonly sandboxBinding: string;
-  readonly id: SandboxId;
-  readonly status: RuntimeSubjectStatus;
-  readonly subjectKind: SandboxSubjectKind;
-}
-
 export interface RuntimeSubjectActivationRecord {
   readonly claimExpiresAt: number | null;
   readonly claimOwner: string | null;
@@ -37,9 +28,6 @@ export interface RuntimeSubjectActivationRecord {
   readonly projectId: ProjectId | null;
   readonly subjectId: PlatformId;
   readonly subjectKind: SandboxSubjectKind;
-  readonly foreignSessionCount: number;
-  readonly lastError: string | null;
-  readonly lastErrorCode: RuntimeSubjectErrorCode | null;
   readonly status: RuntimeSubjectStatus;
 }
 
@@ -59,7 +47,6 @@ export interface RuntimeConversationSessionRecord {
 }
 
 export interface RuntimeConversationSessionState {
-  readonly agentId: AgentId | null;
   readonly sandboxSessionId: SandboxSessionId;
   readonly status: RuntimeConversationSessionRecord["status"];
 }

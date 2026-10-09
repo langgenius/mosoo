@@ -1,12 +1,6 @@
 import type { EnvironmentDetail, EnvironmentSummary } from "@mosoo/contracts/environment";
-import {
-  accountsTable,
-  environmentRevisionsTable,
-  environmentsTable,
-  projectsTable,
-} from "@mosoo/db";
-import { parsePlatformId } from "@mosoo/id";
-import type { AccountId, EnvironmentId, ProjectId } from "@mosoo/id";
+import { environmentRevisionsTable, environmentsTable, projectsTable } from "@mosoo/db";
+import type { EnvironmentId, ProjectId } from "@mosoo/id";
 import { and, desc, eq, sql } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
@@ -20,7 +14,6 @@ export async function listProjectEnvironments(
   viewer: AuthenticatedViewer,
   projectId: ProjectId,
 ): Promise<EnvironmentSummary[]> {
-  const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
   const results = await getAppDatabase(bindings.DB)
     .select(environmentRecordColumns())
     .from(environmentsTable)
@@ -29,9 +22,8 @@ export async function listProjectEnvironments(
       eq(environmentRevisionsTable.id, environmentsTable.currentRevisionId),
     )
     .innerJoin(projectsTable, eq(projectsTable.id, environmentsTable.projectId))
-    .leftJoin(accountsTable, eq(accountsTable.id, environmentsTable.ownerAccountId))
     .where(
-      and(eq(environmentsTable.projectId, projectId), eq(projectsTable.ownerAccountId, viewerId)),
+      and(eq(environmentsTable.projectId, projectId), eq(projectsTable.ownerAccountId, viewer.id)),
     )
     .orderBy(
       desc(sql`CASE WHEN ${environmentsTable.ownerAccountId} IS NULL THEN 1 ELSE 0 END`),
@@ -50,23 +42,6 @@ export async function getEnvironmentDetail(
     projectId: ProjectId;
   },
 ): Promise<EnvironmentDetail> {
-  const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
-  const access = await ensureEnvironmentAccess(bindings.DB, viewerId, input);
+  const access = await ensureEnvironmentAccess(bindings.DB, viewer.id, input);
   return toEnvironmentSummary(access.row);
-}
-
-export async function canUseEnvironment(
-  database: D1Database,
-  viewerId: AccountId,
-  input: {
-    environmentId: EnvironmentId;
-    projectId: ProjectId;
-  },
-): Promise<boolean> {
-  try {
-    await ensureEnvironmentAccess(database, viewerId, input);
-    return true;
-  } catch {
-    return false;
-  }
 }

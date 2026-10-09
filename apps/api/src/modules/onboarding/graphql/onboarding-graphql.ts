@@ -1,5 +1,4 @@
 import type { GraphQLModule } from "../../../adapters/graphql/graphql-module";
-import { onboardingGraphQLSpec } from "../../../adapters/graphql/graphql-module-specs";
 import { bootstrapOnboarding } from "../application/onboarding.service";
 
 interface BootstrapOnboardingArgs {
@@ -7,7 +6,6 @@ interface BootstrapOnboardingArgs {
 }
 
 export const onboardingGraphQLModule = {
-  ...onboardingGraphQLSpec,
   authenticatedMutationResolvers: {
     onboardingBootstrap: async (_parent, args: BootstrapOnboardingArgs, context) =>
       bootstrapOnboarding(context.bindings, context.viewer, args.input),

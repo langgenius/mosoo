@@ -1,290 +1,56 @@
-import {
-  createDefaultAgentBuiltInTools,
-  isAgentBuiltInToolName,
-  normalizeAgentBuiltInTools,
-} from "@mosoo/contracts/agent";
-import type { EnvironmentNetworkPolicy } from "@mosoo/contracts/environment";
-import type { AgentMcpCredentialMode } from "@mosoo/contracts/mcp";
-import type { PresetModelProtocol } from "@mosoo/contracts/models";
-import type { SkillResolutionMode } from "@mosoo/contracts/skill";
+import { createDefaultAgentBuiltInTools, normalizeAgentBuiltInTools } from "@mosoo/contracts/agent";
 import { sessionExecutionSnapshotsTable } from "@mosoo/db";
-import { parsePlatformId } from "@mosoo/id";
-import type {
-  AgentDeploymentVersionId,
-  AgentId,
-  CredentialId,
-  EnvironmentId,
-  EnvironmentRevisionId,
-  McpServerId,
-  PlatformId,
-  SessionId,
-  SkillId,
-  SkillSnapshotId,
-} from "@mosoo/id";
+import type { SessionId } from "@mosoo/id";
 import { eq } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../../platform/db/drizzle";
-import { PREVIEW_RETENTION_MS } from "../../../sessions/domain/preview-retention-policy";
 import type { SessionExecutionPlan } from "./session-execution.types";
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
-}
-
-function readRecord(value: unknown, field: string): Record<string, unknown> {
-  if (!isRecord(value)) {
-    throw new TypeError(`${field} must be an object.`);
-  }
-
-  return value;
-}
-
-function readArray(value: unknown, field: string): unknown[] {
-  if (!Array.isArray(value)) {
-    throw new TypeError(`${field} must be an array.`);
-  }
-
-  return value;
-}
-
-function readString(value: unknown, field: string): string {
-  if (typeof value !== "string") {
-    throw new TypeError(`${field} must be a string.`);
-  }
-
-  return value;
-}
-
-function readPlatformId(value: unknown, field: string): PlatformId {
-  return parsePlatformId(value, field);
-}
-
-function readNullablePlatformId(value: unknown, field: string): PlatformId | null {
-  if (value === null) {
-    return null;
-  }
-
-  return readPlatformId(value, field);
-}
-
-function readNumber(value: unknown, field: string): number {
-  if (typeof value !== "number" || !Number.isFinite(value)) {
-    throw new TypeError(`${field} must be a finite number.`);
-  }
-
-  return value;
-}
-
-function readNullableNumber(value: unknown, field: string): number | null {
-  if (value === null) {
-    return null;
-  }
-
-  return readNumber(value, field);
-}
-
-function readBoolean(value: unknown, field: string): boolean {
-  if (typeof value !== "boolean") {
-    throw new TypeError(`${field} must be a boolean.`);
-  }
-
-  return value;
-}
-
-function readNetworkPolicy(value: unknown, field: string): EnvironmentNetworkPolicy {
-  if (value === "full" || value === "limited") {
-    return value;
-  }
-
-  throw new Error(`${field} must be full or limited.`);
-}
-
-function readModelProtocol(value: unknown): PresetModelProtocol {
-  if (
-    value === "openai-chat-completions" ||
-    value === "openai-responses" ||
-    value === "anthropic-messages" ||
-    value === "google-gemini"
-  ) {
-    return value;
-  }
-  throw new TypeError("sessionExecutionPlan.modelProtocol must be a supported model protocol.");
-}
-
-function readSkillResolutionMode(value: unknown, field: string): SkillResolutionMode {
-  if (value === "auto" || value === "explicit" || value === "tombstone") {
-    return value;
-  }
-
-  throw new Error(`${field} must be auto, explicit, or tombstone.`);
-}
-
-function readCredentialMode(value: unknown, field: string): AgentMcpCredentialMode {
-  if (value === "agent_bound" || value === "runtime_resolved") {
-    return value;
-  }
-
-  throw new Error(`${field} must be agent_bound or runtime_resolved.`);
-}
-
-function parseBinding(value: unknown): SessionExecutionPlan["binding"] {
-  const record = readRecord(value, "sessionExecutionPlan.binding");
-
-  const binding: SessionExecutionPlan["binding"] = {
-    agentId: readNullablePlatformId(
-      record["agentId"],
-      "sessionExecutionPlan.binding.agentId",
-    ) as AgentId | null,
-    deploymentVersionId: readNullablePlatformId(
-      record["deploymentVersionId"],
-      "sessionExecutionPlan.binding.deploymentVersionId",
-    ) as AgentDeploymentVersionId | null,
-    deploymentVersionNumber: readNullableNumber(
-      record["deploymentVersionNumber"],
-      "sessionExecutionPlan.binding.deploymentVersionNumber",
-    ),
-    model: readString(record["model"], "sessionExecutionPlan.binding.model"),
-    prompt: readString(record["prompt"], "sessionExecutionPlan.binding.prompt"),
-    provider: readString(record["provider"], "sessionExecutionPlan.binding.provider"),
-    runtimeId: readString(record["runtimeId"], "sessionExecutionPlan.binding.runtimeId"),
-  };
-  if (
-    binding.agentId === null &&
-    (binding.deploymentVersionId !== null || binding.deploymentVersionNumber !== null)
-  ) {
-    throw new TypeError(
-      "A Session without an Agent preset cannot reference a deployment revision.",
-    );
-  }
-  return binding;
-}
-
-function parseEnvironment(value: unknown): SessionExecutionPlan["environment"] {
-  const record = readRecord(value, "sessionExecutionPlan.environment");
-
-  return {
-    allowMcpServers: readBoolean(
-      record["allowMcpServers"],
-      "sessionExecutionPlan.environment.allowMcpServers",
-    ),
-    allowPackageManagers: readBoolean(
-      record["allowPackageManagers"],
-      "sessionExecutionPlan.environment.allowPackageManagers",
-    ),
-    allowedHostsJson: readString(
-      record["allowedHostsJson"],
-      "sessionExecutionPlan.environment.allowedHostsJson",
-    ),
-    envVarsJson: readString(record["envVarsJson"], "sessionExecutionPlan.environment.envVarsJson"),
-    environmentId: readPlatformId(
-      record["environmentId"],
-      "sessionExecutionPlan.environment.environmentId",
-    ) as EnvironmentId,
-    environmentName: readString(
-      record["environmentName"],
-      "sessionExecutionPlan.environment.environmentName",
-    ),
-    networkPolicy: readNetworkPolicy(
-      record["networkPolicy"],
-      "sessionExecutionPlan.environment.networkPolicy",
-    ),
-    packagesJson: readString(
-      record["packagesJson"],
-      "sessionExecutionPlan.environment.packagesJson",
-    ),
-    revisionId: readPlatformId(
-      record["revisionId"],
-      "sessionExecutionPlan.environment.revisionId",
-    ) as EnvironmentRevisionId,
-    setupScript: readString(record["setupScript"], "sessionExecutionPlan.environment.setupScript"),
-  };
-}
-
-function parseSkillReference(
-  value: unknown,
-  index: number,
-): SessionExecutionPlan["skills"][number] {
-  const field = `sessionExecutionPlan.skills.${index}`;
-  const record = readRecord(value, field);
-
-  return {
-    resolutionMode: readSkillResolutionMode(record["resolutionMode"], `${field}.resolutionMode`),
-    skillId: readPlatformId(record["skillId"], `${field}.skillId`) as SkillId,
-    skillName: readString(record["skillName"], `${field}.skillName`),
-    snapshotId: readNullablePlatformId(
-      record["snapshotId"],
-      `${field}.snapshotId`,
-    ) as SkillSnapshotId | null,
-    sortOrder: readNumber(record["sortOrder"], `${field}.sortOrder`),
-  };
-}
-
-function parseToolReference(value: unknown, index: number): SessionExecutionPlan["tools"][number] {
-  const field = `sessionExecutionPlan.tools.${index}`;
-  const record = readRecord(value, field);
-
-  return {
-    agentCredentialId: readNullablePlatformId(
-      record["agentCredentialId"],
-      `${field}.agentCredentialId`,
-    ) as CredentialId | null,
-    credentialMode: readCredentialMode(record["credentialMode"], `${field}.credentialMode`),
-    serverId: readPlatformId(record["serverId"], `${field}.serverId`) as McpServerId,
-    sortOrder: readNumber(record["sortOrder"], `${field}.sortOrder`),
-  };
-}
-
-function parseBuiltInTool(
-  value: unknown,
-  index: number,
-): SessionExecutionPlan["builtInTools"][number] {
-  const field = `sessionExecutionPlan.builtInTools.${index}`;
-  const record = readRecord(value, field);
-  const name = readString(record["name"], `${field}.name`);
-
-  if (!isAgentBuiltInToolName(name)) {
-    throw new TypeError(`${field}.name is unsupported.`);
-  }
-
-  return {
-    enabled: readBoolean(record["enabled"], `${field}.enabled`),
-    name,
-  };
-}
-
-function parseBuiltInTools(value: unknown): SessionExecutionPlan["builtInTools"] {
-  if (value === undefined) {
-    return createDefaultAgentBuiltInTools();
-  }
-
-  return normalizeAgentBuiltInTools(
-    readArray(value, "sessionExecutionPlan.builtInTools").map(parseBuiltInTool),
-  );
-}
-
+// Written only from a typed plan at Session admission. Historical rows may lack
+// builtInTools or carry retired keys (binding.kind, recoveryRetentionMs).
 export function parseSessionExecutionPlanJson(planJson: string): SessionExecutionPlan {
-  const parsed: unknown = JSON.parse(planJson);
-  const record = readRecord(parsed, "sessionExecutionPlan");
-  const previewRetentionMs = record["previewRetentionMs"];
-  if (previewRetentionMs !== undefined && previewRetentionMs !== PREVIEW_RETENTION_MS) {
-    throw new TypeError("Cloud debug Preview retention must be 30 days.");
-  }
+  const plan = JSON.parse(planJson) as SessionExecutionPlan;
+  const { binding, environment } = plan;
 
   return {
-    binding: parseBinding(record["binding"]),
-    builtInTools: parseBuiltInTools(record["builtInTools"]),
-    ...(record["modelProtocol"] === undefined
+    binding: {
+      agentId: binding.agentId,
+      deploymentVersionId: binding.deploymentVersionId,
+      deploymentVersionNumber: binding.deploymentVersionNumber,
+      model: binding.model,
+      prompt: binding.prompt,
+      provider: binding.provider,
+      runtimeId: binding.runtimeId,
+    },
+    builtInTools: normalizeAgentBuiltInTools(plan.builtInTools ?? createDefaultAgentBuiltInTools()),
+    ...(plan.configJson === undefined ? {} : { configJson: plan.configJson }),
+    ...(plan.modelProtocol === undefined ? {} : { modelProtocol: plan.modelProtocol }),
+    ...(plan.previewRetentionMs === undefined
       ? {}
-      : { modelProtocol: readModelProtocol(record["modelProtocol"]) }),
-    ...(previewRetentionMs === undefined ? {} : { previewRetentionMs }),
-    ...(record["configJson"] === undefined
-      ? {}
-      : {
-          configJson: readString(record["configJson"], "sessionExecutionPlan.configJson"),
-        }),
-    environment: parseEnvironment(record["environment"]),
-    skills: readArray(record["skills"], "sessionExecutionPlan.skills").map(parseSkillReference),
-    tools: readArray(record["tools"], "sessionExecutionPlan.tools").map(parseToolReference),
+      : { previewRetentionMs: plan.previewRetentionMs }),
+    environment: {
+      allowedHostsJson: environment.allowedHostsJson,
+      envVarsJson: environment.envVarsJson,
+      environmentId: environment.environmentId,
+      environmentName: environment.environmentName,
+      networkPolicy: environment.networkPolicy,
+      packagesJson: environment.packagesJson,
+      revisionId: environment.revisionId,
+      setupScript: environment.setupScript,
+    },
+    skills: plan.skills.map((skill) => ({
+      resolutionMode: skill.resolutionMode,
+      skillId: skill.skillId,
+      skillName: skill.skillName,
+      snapshotId: skill.snapshotId,
+      sortOrder: skill.sortOrder,
+    })),
+    tools: plan.tools.map((tool) => ({
+      agentCredentialId: tool.agentCredentialId,
+      credentialMode: tool.credentialMode,
+      serverId: tool.serverId,
+      sortOrder: tool.sortOrder,
+    })),
   };
 }
 

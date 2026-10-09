@@ -1,13 +1,7 @@
-import type {
-  SessionPermissionRequestView,
-  SessionReadinessSnapshotView,
-} from "@mosoo/ag-ui-session";
-import {
-  SessionPermissionRequestViewSchema,
-  SessionReadinessSnapshotViewSchema,
-} from "@mosoo/ag-ui-session";
+import type { SessionPermissionRequestView } from "@mosoo/ag-ui-session";
+import { SessionPermissionRequestViewSchema } from "@mosoo/ag-ui-session";
 import { parseSchemaValue } from "@mosoo/contracts/validation";
-import { sessionPermissionRequestsTable, sessionReadinessSnapshotsTable } from "@mosoo/db";
+import { sessionPermissionRequestsTable } from "@mosoo/db";
 import type { DriverInstanceId, SessionId, SessionRunId } from "@mosoo/id";
 import {
   readRuntimeEventPayload,
@@ -187,34 +181,6 @@ async function projectPermissionResolution(
   }
 }
 
-async function upsertReadinessSnapshot(
-  database: D1Database,
-  record: SessionViewerProjectionRuntimeEvent,
-): Promise<void> {
-  const readiness = parseSchemaValue(
-    SessionReadinessSnapshotViewSchema,
-    record.event.payload,
-  ) satisfies SessionReadinessSnapshotView;
-  const timestamp = toProjectionTimestamp(record);
-  const readinessJson = JSON.stringify(readiness);
-
-  await getAppDatabase(database)
-    .insert(sessionReadinessSnapshotsTable)
-    .values({
-      readinessJson,
-      sessionId: record.sessionId,
-      updatedAt: timestamp,
-    })
-    .onConflictDoUpdate({
-      set: {
-        readinessJson,
-        updatedAt: timestamp,
-      },
-      target: sessionReadinessSnapshotsTable.sessionId,
-    })
-    .run();
-}
-
 export async function projectSessionViewerRuntimeEvents(
   database: D1Database,
   records: readonly SessionViewerProjectionRuntimeEvent[],
@@ -233,10 +199,6 @@ export async function projectSessionViewerRuntimeEvents(
       case "run.completed":
       case "run.failed": {
         await clearRunPermissionRequests(database, record);
-        break;
-      }
-      case "session.readiness.updated": {
-        await upsertReadinessSnapshot(database, record);
         break;
       }
       default: {

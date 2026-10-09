@@ -15,6 +15,9 @@ import {
   PUBLIC_API_TEST_IDS,
 } from "./helpers/public-api-http-test-fixture";
 
+const OVERDUE_RUN_ID = "01J0000000000000000000R001";
+const RECENT_RUN_ID = "01J0000000000000000000R002";
+
 type TestDatabase = Awaited<ReturnType<typeof createPublicHttpContractDatabase>>;
 
 async function insertActiveRun(
@@ -22,7 +25,6 @@ async function insertActiveRun(
   input: {
     readonly runId: string;
     readonly sessionId: string;
-    readonly sessionStatus?: string;
     readonly startedAt: number;
   },
 ): Promise<void> {
@@ -49,7 +51,7 @@ async function insertActiveRun(
     .run();
   await database
     .prepare("UPDATE session SET last_run_id = ?, status = ?, updated_at = ? WHERE id = ?")
-    .bind(input.runId, input.sessionStatus ?? "RUNNING", input.startedAt, input.sessionId)
+    .bind(input.runId, "RUNNING", input.startedAt, input.sessionId)
     .run();
 }
 
@@ -74,22 +76,22 @@ describe("session run time limit", () => {
     await insertOwnerSession(database);
     const now = Date.now();
     await insertActiveRun(database, {
-      runId: "run-overdue",
+      runId: OVERDUE_RUN_ID,
       sessionId: PUBLIC_API_TEST_IDS.nonOwnerSession,
       startedAt: now - SESSION_RUN_TIME_LIMIT_MS - 60_000,
     });
     await insertActiveRun(database, {
-      runId: "run-recent",
+      runId: RECENT_RUN_ID,
       sessionId: PUBLIC_API_TEST_IDS.ownerSession,
       startedAt: now - 60 * 60_000,
     });
     const bindings = createPublicHttpTestBindings(database) as ApiBindings;
 
     await expect(stopOverdueSessionRuns(bindings, { limit: 20, nowMs: now })).resolves.toEqual([
-      "run-overdue",
+      OVERDUE_RUN_ID,
     ]);
 
-    await expect(readRun(database, "run-overdue")).resolves.toEqual({
+    await expect(readRun(database, OVERDUE_RUN_ID)).resolves.toEqual({
       error_code: SESSION_RUN_TIME_LIMIT_ERROR.code,
       error_message: "This turn reached the 2-hour limit and was stopped.",
       status: "cancelled",
@@ -100,11 +102,11 @@ describe("session run time limit", () => {
     await expect(
       database
         .prepare("SELECT event_type FROM session_event WHERE run_id = ?")
-        .bind("run-overdue")
+        .bind(OVERDUE_RUN_ID)
         .all<{ event_type: string }>()
         .then((result) => result.results.map((row) => row.event_type)),
     ).resolves.toContain("run.cancelled");
-    await expect(readRun(database, "run-recent")).resolves.toEqual({
+    await expect(readRun(database, RECENT_RUN_ID)).resolves.toEqual({
       error_code: null,
       error_message: null,
       status: "running",
@@ -117,29 +119,18 @@ describe("session run time limit", () => {
     await insertOwnerSession(database);
     const now = Date.now();
     await insertActiveRun(database, {
-      runId: "run-overdue",
+      runId: OVERDUE_RUN_ID,
       sessionId: PUBLIC_API_TEST_IDS.nonOwnerSession,
       startedAt: now - SESSION_RUN_TIME_LIMIT_MS - 60_000,
     });
-    await insertActiveRun(database, {
-      runId: "run-rescheduling",
-      sessionId: PUBLIC_API_TEST_IDS.ownerSession,
-      sessionStatus: "RESCHEDULING",
-      startedAt: now - 60 * 60_000,
-    });
-    // Driver cleanup and stale-run reconciliation both read this table.
+    // Reclamation, which runs before the turn time limit, reads this table.
     database.execute("DROP TABLE driver_instance");
     const bindings = createPublicHttpTestBindings(database) as ApiBindings;
 
     await runSandboxMaintenance(bindings);
 
-    await expect(readRun(database, "run-overdue")).resolves.toMatchObject({
+    await expect(readRun(database, OVERDUE_RUN_ID)).resolves.toMatchObject({
       status: "cancelled",
-    });
-    // The rescheduling sweep runs after the failing steps.
-    await expect(readRun(database, "run-rescheduling")).resolves.toMatchObject({
-      error_code: "session.rescheduling_timeout",
-      status: "failed",
     });
   });
 });

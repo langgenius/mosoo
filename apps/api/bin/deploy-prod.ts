@@ -187,6 +187,7 @@ writeStdout("▶ Building driver");
 runVp(["run", "--filter", "agent-driver", "build"]);
 
 writeStdout("▶ Deploying worker");
+// immediate: the API and Driver protocol must switch together (#555).
 run(["deploy", "--env", ENV, "--minify", "--containers-rollout", "immediate"]);
 
 writeStdout("✓ deploy complete");

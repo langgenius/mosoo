@@ -2,13 +2,11 @@ import { FILE_SESSION_KINDS } from "@mosoo/contracts/file";
 import type {
   CompleteFileUploadRequest,
   CreateFileUploadRequest,
-  FileEntry,
   FileErrorResponse,
   FileEntryListing,
-  FileRecord,
-  UpdateFileRequest,
 } from "@mosoo/contracts/file";
 import type { FileListQuery, FileSessionKind } from "@mosoo/contracts/file";
+import { parsePlatformId } from "@mosoo/id";
 import type { ProjectId, FileId, SessionId } from "@mosoo/id";
 import type { Hono } from "hono";
 
@@ -18,12 +16,11 @@ import {
   createFileErrorResponse,
   createUnexpectedFileError,
   fileStore,
-  normalizeR2Etag,
+  toFileEntry,
 } from "../../../modules/files/application/file-store";
 import { createErrorLogContext, logError } from "../../../platform/cloudflare/logger";
 import type { ApiGatewayEnvironment } from "../../../platform/cloudflare/worker-types";
 import { isApiError } from "../../../platform/errors";
-import { toPlatformId } from "../../../shared/platform-id";
 import { platformIdRouteErrorMessage } from "./platform-id-route-error";
 
 function unauthorizedFileError(): FileControlError {
@@ -96,45 +93,17 @@ function readFileListQuery(
     );
   }
 
-  const projectId = toPlatformId<ProjectId>(projectIdValue, "Project ID");
+  const projectId = parsePlatformId<ProjectId>(projectIdValue, "Project ID");
   const sessionId =
     sessionIdValue === undefined || sessionIdValue.trim().length === 0
       ? undefined
-      : toPlatformId<SessionId>(sessionIdValue, "Session ID");
+      : parsePlatformId<SessionId>(sessionIdValue, "Session ID");
   const sessionKind = readFileSessionKind(c.req.query("sessionKind"));
 
   return {
     projectId,
     ...(sessionId === undefined ? {} : { sessionId }),
     ...(sessionKind === undefined ? {} : { sessionKind }),
-  };
-}
-
-function assertUserFileUploadTarget(request: CreateFileUploadRequest): void {
-  if (request.target.kind === "library") {
-    throw new FileControlError(
-      400,
-      "file_invalid_request",
-      "Project file library uploads are not supported in this version.",
-    );
-  }
-}
-
-function toFileEntry(file: FileRecord): FileEntry {
-  return {
-    createdAt: file.createdAt,
-    createdBy: file.createdBy,
-    etag: file.etag,
-    expiresAt: file.expiresAt,
-    id: file.id,
-    mimeType: file.mimeType,
-    name: file.name,
-    path: file.path,
-    sessionKind: file.sessionKind,
-    size: file.size,
-    status: file.status,
-    updatedAt: file.updatedAt,
-    version: file.version,
   };
 }
 
@@ -170,7 +139,6 @@ export function registerFileRoute(app: Hono<ApiGatewayEnvironment>) {
       }
 
       const body = await c.req.json<CreateFileUploadRequest>();
-      assertUserFileUploadTarget(body);
       return c.json(await fileStore.createUpload(c.env, viewer, body));
     } catch (error) {
       return toErrorResponse(error);
@@ -189,7 +157,7 @@ export function registerFileRoute(app: Hono<ApiGatewayEnvironment>) {
         await fileStore.getUpload(
           c.env,
           viewer,
-          toPlatformId<FileId>(c.req.param("fileId"), "File ID"),
+          parsePlatformId<FileId>(c.req.param("fileId"), "File ID"),
         ),
       );
     } catch (error) {
@@ -208,7 +176,7 @@ export function registerFileRoute(app: Hono<ApiGatewayEnvironment>) {
       await fileStore.putContent(
         c.env,
         viewer,
-        toPlatformId<FileId>(c.req.param("fileId"), "File ID"),
+        parsePlatformId<FileId>(c.req.param("fileId"), "File ID"),
         c.req.raw.body,
       );
       return c.json({ ok: true });
@@ -229,7 +197,7 @@ export function registerFileRoute(app: Hono<ApiGatewayEnvironment>) {
         await fileStore.putPart(
           c.env,
           viewer,
-          toPlatformId<FileId>(c.req.param("fileId"), "File ID"),
+          parsePlatformId<FileId>(c.req.param("fileId"), "File ID"),
           Number(c.req.param("partNumber")),
           c.req.raw.body,
         ),
@@ -251,7 +219,7 @@ export function registerFileRoute(app: Hono<ApiGatewayEnvironment>) {
       return c.json(
         await fileStore.completeUpload({
           bindings: c.env,
-          fileId: toPlatformId<FileId>(c.req.param("fileId"), "File ID"),
+          fileId: parsePlatformId<FileId>(c.req.param("fileId"), "File ID"),
           input: body,
           viewer,
         }),
@@ -272,7 +240,7 @@ export function registerFileRoute(app: Hono<ApiGatewayEnvironment>) {
       await fileStore.abortUpload(
         c.env,
         viewer,
-        toPlatformId<FileId>(c.req.param("fileId"), "File ID"),
+        parsePlatformId<FileId>(c.req.param("fileId"), "File ID"),
       );
       return c.json({ ok: true });
     } catch (error) {
@@ -297,30 +265,8 @@ export function registerFileRoute(app: Hono<ApiGatewayEnvironment>) {
       return await fileStore.streamContent(
         c.env,
         viewer,
-        toPlatformId<FileId>(c.req.param("fileId"), "File ID"),
+        parsePlatformId<FileId>(c.req.param("fileId"), "File ID"),
         disposition,
-      );
-    } catch (error) {
-      return toErrorResponse(error);
-    }
-  });
-
-  app.patch("/files/:fileId", async (c) => {
-    try {
-      const viewer = await getApiViewerFromRequest(c.env, c.req.raw);
-
-      if (!viewer) {
-        return Response.json(createFileErrorResponse(unauthorizedFileError()), { status: 401 });
-      }
-
-      const body = await c.req.json<UpdateFileRequest>();
-      return c.json(
-        await fileStore.update(
-          c.env,
-          viewer,
-          toPlatformId<FileId>(c.req.param("fileId"), "File ID"),
-          body,
-        ),
       );
     } catch (error) {
       return toErrorResponse(error);
@@ -343,10 +289,7 @@ export function registerFileRoute(app: Hono<ApiGatewayEnvironment>) {
       await fileStore.delete(
         c.env,
         viewer,
-        toPlatformId<FileId>(c.req.param("fileId"), "File ID"),
-        {
-          ifMatchEtag: normalizeR2Etag(c.req.header("If-Match")),
-        },
+        parsePlatformId<FileId>(c.req.param("fileId"), "File ID"),
       );
       return c.json({ ok: true });
     } catch (error) {

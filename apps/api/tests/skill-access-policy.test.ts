@@ -2,8 +2,6 @@ import { describe, expect, test } from "bun:test";
 
 import {
   ensureSkillAccess,
-  ensureSkillDestructiveManager,
-  ensureSkillEditor,
   listProjectSkillRows,
 } from "../src/modules/skills/application/skill-access.service";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
@@ -112,21 +110,12 @@ function createSkillAccessDatabase(): SqliteD1Database {
 }
 
 describe("skill access policy", () => {
-  test("allows project owner to read and edit a Project Skill", async () => {
+  test("allows project owner to access a Project Skill", async () => {
     const database = createSkillAccessDatabase();
 
     const readable = await ensureSkillAccess(database, IDS.owner, IDS.project, IDS.skill);
-    const editable = await ensureSkillEditor(database, IDS.owner, IDS.project, IDS.skill);
-    const destructive = await ensureSkillDestructiveManager(
-      database,
-      IDS.owner,
-      IDS.project,
-      IDS.skill,
-    );
 
     expect(readable.id).toBe(IDS.skill);
-    expect(editable.id).toBe(IDS.skill);
-    expect(destructive.id).toBe(IDS.skill);
   });
 
   test("fails closed when the Skill belongs to another Project", async () => {

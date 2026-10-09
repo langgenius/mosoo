@@ -1,30 +1,25 @@
 import type { AgentSkillReference } from "@mosoo/contracts/agent";
 import { accountsTable, agentsTable, agentSkillsTable, skillsTable } from "@mosoo/db";
 import type { AgentId, ProjectId, SkillId } from "@mosoo/id";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import { ensureProjectOwnership } from "../../projects/application/project.service";
-import { readSkillId } from "./agent-platform-ids";
 
 export function normalizeAgentSkillIds(skillIds: readonly SkillId[]): SkillId[] {
-  return [...new Set(skillIds.map((skillId) => readSkillId(skillId, "Agent skill ID")))];
+  return [...new Set(skillIds)];
 }
 
+// Callers have already proven Project ownership; each Skill must belong to it.
 export async function ensureAgentSkillSelectionAccess(
   database: D1Database,
   viewer: AuthenticatedViewer,
   projectId: ProjectId,
   skillIds: readonly SkillId[],
 ): Promise<void> {
-  const uniqueSkillIds = normalizeAgentSkillIds(skillIds);
-
-  if (uniqueSkillIds.length === 0) {
+  if (skillIds.length === 0) {
     return;
   }
-
-  await ensureProjectOwnership(database, viewer.id, projectId);
 
   const rows = await getAppDatabase(database)
     .select({
@@ -33,11 +28,11 @@ export async function ensureAgentSkillSelectionAccess(
       skillId: skillsTable.id,
     })
     .from(skillsTable)
-    .where(inArray(skillsTable.id, uniqueSkillIds))
+    .where(inArray(skillsTable.id, [...skillIds]))
     .all();
   const rowsBySkillId = new Map(rows.map((row) => [row.skillId, row]));
 
-  for (const skillId of uniqueSkillIds) {
+  for (const skillId of skillIds) {
     const row = rowsBySkillId.get(skillId);
 
     if (row === undefined || row.projectId !== projectId || row.ownerId !== viewer.id) {
@@ -51,26 +46,8 @@ export async function listResolvedAgentSkills(
   viewer: AuthenticatedViewer,
   agentId: AgentId,
 ): Promise<AgentSkillReference[]> {
-  return (await listResolvedAgentSkillsByAgentIds(database, viewer, [agentId])).get(agentId) ?? [];
-}
-
-async function listResolvedAgentSkillsByAgentIds(
-  database: D1Database,
-  viewer: AuthenticatedViewer,
-  agentIds: readonly AgentId[],
-): Promise<Map<AgentId, AgentSkillReference[]>> {
-  const uniqueAgentIds = [...new Set(agentIds)];
-  const skillsByAgentId = new Map<AgentId, AgentSkillReference[]>(
-    uniqueAgentIds.map((agentId) => [agentId, []]),
-  );
-
-  if (uniqueAgentIds.length === 0) {
-    return skillsByAgentId;
-  }
-
   const results = await getAppDatabase(database)
     .select({
-      agentId: agentSkillsTable.agentId,
       hasAccess: sql<number>`
         CASE
           WHEN ${skillsTable.id} IS NULL THEN 0
@@ -88,18 +65,14 @@ async function listResolvedAgentSkillsByAgentIds(
     .innerJoin(agentsTable, eq(agentsTable.id, agentSkillsTable.agentId))
     .leftJoin(skillsTable, eq(skillsTable.id, agentSkillsTable.skillId))
     .leftJoin(accountsTable, eq(accountsTable.id, skillsTable.ownerAccountId))
-    .where(and(inArray(agentSkillsTable.agentId, uniqueAgentIds)))
-    .orderBy(agentSkillsTable.agentId, agentSkillsTable.sortOrder)
+    .where(eq(agentSkillsTable.agentId, agentId))
+    .orderBy(agentSkillsTable.sortOrder)
     .all();
 
-  for (const row of results) {
-    skillsByAgentId.get(row.agentId)?.push({
-      ownerName: row.hasAccess === 1 ? row.ownerName : null,
-      skillId: row.skillId,
-      skillName: row.skillName ?? "(deleted)",
-      state: row.hasAccess === 1 ? "active" : "tombstone",
-    });
-  }
-
-  return skillsByAgentId;
+  return results.map((row) => ({
+    ownerName: row.hasAccess === 1 ? row.ownerName : null,
+    skillId: row.skillId,
+    skillName: row.skillName ?? "(deleted)",
+    state: row.hasAccess === 1 ? "active" : "tombstone",
+  }));
 }

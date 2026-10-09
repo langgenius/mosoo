@@ -78,11 +78,7 @@ export function publicAgentNotExposed(message: string): PublicApiError {
   return new PublicApiError({ code: "agent_not_published", message, status: 409 });
 }
 
-export function publicServiceInactive(message: string): PublicApiError {
-  return new PublicApiError({ code: "service_inactive", message, status: 409 });
-}
-
-export function publicReadinessBlocked(message: string): PublicApiError {
+function publicReadinessBlocked(message: string): PublicApiError {
   return new PublicApiError({ code: "readiness_blocked", message, status: 409 });
 }
 

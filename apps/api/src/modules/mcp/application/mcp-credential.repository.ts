@@ -1,35 +1,22 @@
-import type { McpCredentialRecordScope } from "@mosoo/contracts/mcp";
-import { mcpCredentialsTable, mcpServersTable } from "@mosoo/db";
-import type { AccountId, AgentId, AgentMcpBindingId, CredentialId, McpServerId } from "@mosoo/id";
-import { and, eq, inArray, or } from "drizzle-orm";
-import type { SQL } from "drizzle-orm";
+import { mcpCredentialsTable } from "@mosoo/db";
+import { createPlatformId } from "@mosoo/id";
+import type { CredentialId, McpServerId } from "@mosoo/id";
+import { and, eq, inArray } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { isTruthy } from "../../../shared/truthiness";
 import { currentTimestampMs } from "../../../time";
-import {
-  deleteMcpCredentialSecret,
-  replaceMcpCredentialSecret,
-} from "./mcp-credential-secret-resolution";
-import { createCredentialId } from "./mcp-platform-ids";
-import type { AgentBindingRow, CredentialRow, ServerRow } from "./mcp-types";
+import { deleteSecret, storeSecret } from "../../vault/application/vault-secret-store";
+import type { CredentialRow, ServerRow } from "./mcp-types";
 
-interface McpCredentialResolutionBinding {
-  agentCredentialId: CredentialId | null;
-  agentId: AgentId | null;
-  credentialMode: AgentBindingRow["credentialMode"];
-  credentialScope: AgentBindingRow["credentialScope"];
-  serverId: McpServerId;
-}
+const MCP_CREDENTIAL_SECRET_KIND = "mcp_credential";
 
-const credentialColumns = {
-  agentId: mcpCredentialsTable.agentId,
+export const credentialColumns = {
   authType: mcpCredentialsTable.authType,
   createdAt: mcpCredentialsTable.createdAt,
   expiresAt: mcpCredentialsTable.expiresAt,
   id: mcpCredentialsTable.id,
-  lastRefreshedAt: mcpCredentialsTable.lastRefreshedAt,
   oauthClientId: mcpCredentialsTable.oauthClientId,
   oauthClientSecretSecretId: mcpCredentialsTable.oauthClientSecretSecretId,
   projectId: mcpCredentialsTable.projectId,
@@ -41,32 +28,7 @@ const credentialColumns = {
   status: mcpCredentialsTable.status,
   subjectLabel: mcpCredentialsTable.subjectLabel,
   updatedAt: mcpCredentialsTable.updatedAt,
-  userId: mcpCredentialsTable.accountId,
 };
-
-const credentialSecretServerColumns = {
-  credentialScope: mcpServersTable.credentialScope,
-  id: mcpServersTable.id,
-  projectId: mcpServersTable.projectId,
-};
-
-function scopedCredentialKey(input: { agentId: AgentId | null; serverId: McpServerId }): string {
-  return `${input.serverId}:${input.agentId ?? ""}`;
-}
-
-function credentialMatchesExplicitAgentBinding(
-  credential: CredentialRow | null | undefined,
-  binding: McpCredentialResolutionBinding,
-): credential is CredentialRow {
-  return (
-    binding.agentId !== null &&
-    credential !== null &&
-    credential !== undefined &&
-    credential.scope === "agent" &&
-    credential.agentId === binding.agentId &&
-    credential.serverId === binding.serverId
-  );
-}
 
 export async function getProjectCredentialRow(
   database: D1Database,
@@ -82,7 +44,31 @@ export async function getProjectCredentialRow(
   );
 }
 
-export async function getCredentialById(
+export async function listProjectCredentialRowsByServerId(
+  database: D1Database,
+  serverIds: readonly McpServerId[],
+): Promise<Map<McpServerId, CredentialRow>> {
+  const uniqueServerIds = [...new Set(serverIds)];
+
+  if (uniqueServerIds.length === 0) {
+    return new Map();
+  }
+
+  const rows = await getAppDatabase(database)
+    .select(credentialColumns)
+    .from(mcpCredentialsTable)
+    .where(
+      and(
+        inArray(mcpCredentialsTable.serverId, uniqueServerIds),
+        eq(mcpCredentialsTable.scope, "app"),
+      ),
+    )
+    .all();
+
+  return new Map(rows.map((row) => [row.serverId, row]));
+}
+
+async function getCredentialById(
   database: D1Database,
   credentialId: CredentialId,
 ): Promise<CredentialRow> {
@@ -120,157 +106,28 @@ export async function listCredentialRowsByServerId(
     .all();
 }
 
-export async function hasProjectCredential(
-  database: D1Database,
-  serverId: McpServerId,
-): Promise<boolean> {
-  return (await listServerIdsWithProjectCredentials(database, [serverId])).has(serverId);
+async function storeCredentialSecret(
+  bindings: ApiBindings,
+  value: string | null | undefined,
+): Promise<string | null> {
+  return isTruthy(value)
+    ? storeSecret(bindings.DB, bindings, { kind: MCP_CREDENTIAL_SECRET_KIND, value })
+    : null;
 }
 
-export async function listServerIdsWithProjectCredentials(
+async function deleteCredentialSecrets(
   database: D1Database,
-  serverIds: McpServerId[],
-): Promise<Set<McpServerId>> {
-  const uniqueServerIds = [...new Set(serverIds)];
-
-  if (uniqueServerIds.length === 0) {
-    return new Set();
-  }
-
-  const rows = await getAppDatabase(database)
-    .select({ serverId: mcpCredentialsTable.serverId })
-    .from(mcpCredentialsTable)
-    .where(
-      and(
-        inArray(mcpCredentialsTable.serverId, uniqueServerIds),
-        eq(mcpCredentialsTable.scope, "app"),
-        eq(mcpCredentialsTable.status, "active"),
-      ),
-    )
-    .all();
-
-  return new Set(rows.map((row) => row.serverId));
-}
-
-export async function resolveRegistryCredential(
-  database: D1Database,
-  server: ServerRow,
-): Promise<CredentialRow | null> {
-  return getProjectCredentialRow(database, server.id);
-}
-
-export async function listCredentialsForAgentBindings(
-  database: D1Database,
-  bindings: AgentBindingRow[],
-): Promise<Map<AgentMcpBindingId, CredentialRow | null>> {
-  const credentials = await resolveCredentialsForMcpBindings(database, bindings);
-
-  return new Map(bindings.map((binding, index) => [binding.id, credentials[index] ?? null]));
-}
-
-export async function resolveCredentialsForMcpBindings(
-  database: D1Database,
-  bindings: readonly McpCredentialResolutionBinding[],
-): Promise<(CredentialRow | null)[]> {
-  const resolvedCredentials = bindings.map(() => null as CredentialRow | null);
-
-  const credentialIds = [
-    ...new Set(
-      bindings
-        .filter((binding) => binding.credentialMode === "agent_bound")
-        .map((binding) => binding.agentCredentialId)
-        .filter((credentialId): credentialId is CredentialId => isTruthy(credentialId)),
-    ),
-  ];
-  const agentScopedBindings = bindings.filter(
-    (binding): binding is McpCredentialResolutionBinding & { agentId: AgentId } =>
-      binding.agentId !== null &&
-      binding.credentialMode === "agent_bound" &&
-      !isTruthy(binding.agentCredentialId),
-  );
-  const projectCredentialServerIds = [
-    ...new Set(
-      bindings
-        .filter(
-          (binding) =>
-            binding.credentialMode === "runtime_resolved" && binding.credentialScope === "app",
-        )
-        .map((binding) => binding.serverId),
-    ),
-  ];
-  const conditions: SQL[] = [];
-
-  if (credentialIds.length > 0) {
-    conditions.push(inArray(mcpCredentialsTable.id, credentialIds));
-  }
-
-  if (agentScopedBindings.length > 0) {
-    const agentIds = [...new Set(agentScopedBindings.map((binding) => binding.agentId))];
-    const serverIds = [...new Set(agentScopedBindings.map((binding) => binding.serverId))];
-    const condition = and(
-      eq(mcpCredentialsTable.scope, "agent"),
-      inArray(mcpCredentialsTable.agentId, agentIds),
-      inArray(mcpCredentialsTable.serverId, serverIds),
-    );
-
-    if (condition) {
-      conditions.push(condition);
-    }
-  }
-
-  if (projectCredentialServerIds.length > 0) {
-    const condition = and(
-      eq(mcpCredentialsTable.scope, "app"),
-      inArray(mcpCredentialsTable.serverId, projectCredentialServerIds),
-    );
-
-    if (condition) {
-      conditions.push(condition);
-    }
-  }
-
-  const condition = conditions.length === 1 ? conditions[0] : or(...conditions);
-
-  if (!condition) {
-    return resolvedCredentials;
-  }
-
-  const credentials = await getAppDatabase(database)
-    .select(credentialColumns)
-    .from(mcpCredentialsTable)
-    .where(condition)
-    .all();
-  const credentialsById = new Map(credentials.map((credential) => [credential.id, credential]));
-  const agentCredentialsByKey = new Map(
+  credentials: readonly CredentialRow[],
+): Promise<void> {
+  await Promise.all(
     credentials
-      .filter((credential) => credential.scope === "agent")
-      .map((credential) => [scopedCredentialKey(credential), credential]),
+      .flatMap((credential) => [
+        credential.secretId,
+        credential.refreshSecretId,
+        credential.oauthClientSecretSecretId,
+      ])
+      .map(async (secretId) => deleteSecret(database, secretId)),
   );
-  const projectCredentialsByServerId = new Map(
-    credentials
-      .filter((credential) => credential.scope === "app")
-      .map((credential) => [credential.serverId, credential]),
-  );
-
-  bindings.forEach((binding, index) => {
-    if (binding.credentialMode === "agent_bound") {
-      if (binding.agentId === null) return;
-      if (isTruthy(binding.agentCredentialId)) {
-        const credential = credentialsById.get(binding.agentCredentialId);
-        resolvedCredentials[index] = credentialMatchesExplicitAgentBinding(credential, binding)
-          ? credential
-          : null;
-        return;
-      }
-
-      resolvedCredentials[index] = agentCredentialsByKey.get(scopedCredentialKey(binding)) ?? null;
-      return;
-    }
-
-    resolvedCredentials[index] = projectCredentialsByServerId.get(binding.serverId) ?? null;
-  });
-
-  return resolvedCredentials;
 }
 
 export async function writeCredential(
@@ -278,84 +135,47 @@ export async function writeCredential(
   bindings: ApiBindings,
   input: {
     accessToken: string;
-    agentId?: AgentId | null;
     authType: "oauth" | "bearer";
-    credentialId?: CredentialId | null;
+    credentialId: CredentialId | null;
     oauthClientId?: string | null;
     oauthClientSecret?: string | null;
-    oauthClientSecretSecretId?: string | null;
     refreshToken?: string | null;
-    scope: McpCredentialRecordScope;
     scopeValues: string[];
-    server: Pick<ServerRow, "credentialScope" | "id" | "projectId">;
+    server: Pick<ServerRow, "id" | "projectId">;
     subjectLabel?: string | null;
     tokenExpiresAt?: number | null;
-    userId?: AccountId | null;
   },
 ): Promise<CredentialRow> {
-  const existing =
-    input.credentialId === undefined || input.credentialId === null
-      ? null
-      : await getCredentialById(database, input.credentialId).catch(() => null);
-  const id = existing?.id ?? createCredentialId();
-  const createdAt = existing?.createdAt ?? currentTimestampMs();
-  const updatedAt = currentTimestampMs();
-  const secretOwner = {
-    agentId: input.agentId ?? null,
-    credentialId: id,
-    scope: input.scope,
-    server: input.server,
-    userId: input.userId ?? null,
-  };
-  const accessSecretId = await replaceMcpCredentialSecret(bindings, {
-    ...secretOwner,
-    currentSecretId: existing?.secretId,
-    purpose: "credential_access_token",
-    secretKind: "access_token",
-    value: input.accessToken,
-  });
-  const refreshSecretId =
-    input.authType === "oauth"
-      ? await replaceMcpCredentialSecret(bindings, {
-          ...secretOwner,
-          currentSecretId: existing?.refreshSecretId,
-          purpose: "credential_refresh_token",
-          secretKind: "refresh_token",
-          value: input.refreshToken ?? null,
-        })
-      : null;
-  const oauthClientSecretSecretId =
-    input.authType === "oauth"
-      ? input.oauthClientSecret !== undefined
-        ? await replaceMcpCredentialSecret(bindings, {
-            ...secretOwner,
-            currentSecretId: existing?.oauthClientSecretSecretId,
-            purpose: "credential_oauth_client_secret",
-            secretKind: "oauth_client_secret",
-            value: input.oauthClientSecret ?? null,
-          })
-        : (input.oauthClientSecretSecretId ?? existing?.oauthClientSecretSecretId ?? null)
-      : null;
-
-  if (!isTruthy(accessSecretId)) {
+  if (!isTruthy(input.accessToken)) {
     throw new Error("Access token is required.");
   }
 
+  const existing =
+    input.credentialId === null ? null : await getCredentialById(database, input.credentialId);
+  const id = existing?.id ?? createPlatformId<CredentialId>();
+  const updatedAt = currentTimestampMs();
+  const isOAuth = input.authType === "oauth";
+  const [secretId, refreshSecretId, oauthClientSecretSecretId] = await Promise.all([
+    storeSecret(bindings.DB, bindings, {
+      kind: MCP_CREDENTIAL_SECRET_KIND,
+      value: input.accessToken,
+    }),
+    storeCredentialSecret(bindings, isOAuth ? input.refreshToken : null),
+    storeCredentialSecret(bindings, isOAuth ? input.oauthClientSecret : null),
+  ]);
   const credentialValues = {
-    accountId: input.userId ?? null,
-    agentId: input.agentId ?? null,
     authType: input.authType,
-    createdAt,
+    createdAt: existing?.createdAt ?? updatedAt,
     expiresAt: input.tokenExpiresAt ?? null,
     id,
-    lastRefreshedAt: input.authType === "oauth" ? updatedAt : null,
+    lastRefreshedAt: isOAuth ? updatedAt : null,
     oauthClientId: input.oauthClientId ?? existing?.oauthClientId ?? null,
     oauthClientSecretSecretId,
     projectId: input.server.projectId,
     refreshSecretId,
-    scope: input.scope,
+    scope: "app" as const,
     scopeValuesJson: JSON.stringify(input.scopeValues),
-    secretId: accessSecretId,
+    secretId,
     serverId: input.server.id,
     status: "active" as const,
     subjectLabel: input.subjectLabel ?? null,
@@ -370,6 +190,10 @@ export async function writeCredential(
       target: mcpCredentialsTable.id,
     })
     .run();
+
+  if (existing) {
+    await deleteCredentialSecrets(database, [existing]);
+  }
 
   return getCredentialById(database, id);
 }
@@ -389,132 +213,23 @@ export async function revokeCredential(
     .run();
 }
 
-export async function expireCredential(
-  database: D1Database,
-  credentialId: CredentialId,
-): Promise<void> {
-  await getAppDatabase(database)
-    .update(mcpCredentialsTable)
-    .set({ status: "expired", updatedAt: currentTimestampMs() })
-    .where(eq(mcpCredentialsTable.id, credentialId))
-    .run();
-}
-
 export async function deleteCredentialArtifactsBatch(
   database: D1Database,
-  credentials: readonly (CredentialRow | null | undefined)[],
+  credentials: readonly CredentialRow[],
 ): Promise<void> {
-  const credentialRows = credentials.filter(
-    (credential): credential is CredentialRow => credential !== null && credential !== undefined,
-  );
-  const credentialIds = [...new Set(credentialRows.map((credential) => credential.id))];
-
-  if (credentialIds.length === 0) {
+  if (credentials.length === 0) {
     return;
   }
 
-  const serverRows = await getAppDatabase(database)
-    .select(credentialSecretServerColumns)
-    .from(mcpServersTable)
-    .where(inArray(mcpServersTable.id, [...new Set(credentialRows.map((row) => row.serverId))]))
-    .all();
-  const serversById = new Map(serverRows.map((server) => [server.id, server]));
-
-  for (const credential of credentialRows) {
-    const server = serversById.get(credential.serverId);
-
-    if (!server) {
-      throw new Error("MCP credential server not found.");
-    }
-
-    const owner = {
-      agentId: credential.agentId,
-      credentialId: credential.id,
-      scope: credential.scope,
-      server,
-      userId: credential.userId,
-    };
-    const outcomes = await Promise.all([
-      deleteMcpCredentialSecret(database, {
-        ...owner,
-        purpose: "credential_artifact_cleanup",
-        secretId: credential.secretId,
-        secretKind: "access_token",
-      }),
-      deleteMcpCredentialSecret(database, {
-        ...owner,
-        purpose: "credential_artifact_cleanup",
-        secretId: credential.refreshSecretId,
-        secretKind: "refresh_token",
-      }),
-      deleteMcpCredentialSecret(database, {
-        ...owner,
-        purpose: "credential_artifact_cleanup",
-        secretId: credential.oauthClientSecretSecretId,
-        secretKind: "oauth_client_secret",
-      }),
-    ]);
-    const denied = outcomes.find((outcome) => outcome.status === "denied");
-
-    if (denied?.status === "denied") {
-      throw new Error(`MCP credential secret cleanup denied: ${denied.reason}.`);
-    }
-  }
-
+  // Secrets go first: if one delete fails, the rows still reference it.
+  await deleteCredentialSecrets(database, credentials);
   await getAppDatabase(database)
     .delete(mcpCredentialsTable)
-    .where(inArray(mcpCredentialsTable.id, credentialIds))
+    .where(
+      inArray(
+        mcpCredentialsTable.id,
+        credentials.map((credential) => credential.id),
+      ),
+    )
     .run();
-}
-
-export async function listCredentialsForAgentBindingDeletion(
-  database: D1Database,
-  input: {
-    agentId: AgentId;
-    bindings: readonly { agentCredentialId: CredentialId | null; serverId: McpServerId }[];
-  },
-): Promise<CredentialRow[]> {
-  const explicitCredentialIds = [
-    ...new Set(
-      input.bindings
-        .map((binding) => binding.agentCredentialId)
-        .filter((credentialId): credentialId is CredentialId => isTruthy(credentialId)),
-    ),
-  ];
-  const implicitAgentServerIds = [
-    ...new Set(
-      input.bindings
-        .filter((binding) => !isTruthy(binding.agentCredentialId))
-        .map((binding) => binding.serverId),
-    ),
-  ];
-  const conditions: SQL[] = [];
-
-  if (explicitCredentialIds.length > 0) {
-    conditions.push(inArray(mcpCredentialsTable.id, explicitCredentialIds));
-  }
-
-  if (implicitAgentServerIds.length > 0) {
-    const condition = and(
-      eq(mcpCredentialsTable.scope, "agent"),
-      eq(mcpCredentialsTable.agentId, input.agentId),
-      inArray(mcpCredentialsTable.serverId, implicitAgentServerIds),
-    );
-
-    if (condition) {
-      conditions.push(condition);
-    }
-  }
-
-  const condition = conditions.length === 1 ? conditions[0] : or(...conditions);
-
-  if (!condition) {
-    return [];
-  }
-
-  return getAppDatabase(database)
-    .select(credentialColumns)
-    .from(mcpCredentialsTable)
-    .where(condition)
-    .all();
 }

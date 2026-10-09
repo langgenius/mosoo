@@ -1,24 +1,9 @@
 import type { PresetModelProtocol } from "@mosoo/contracts/models";
-import type {
-  CredentialId,
-  DriverInstanceId,
-  McpServerId,
-  SkillSnapshotId,
-  VendorCredentialId,
-} from "@mosoo/id";
+import { parsePlatformId } from "@mosoo/id";
+import type { DriverInstanceId } from "@mosoo/id";
 import type { Context } from "hono";
 import { Hono } from "hono";
 
-import {
-  invalidateRuntimeCredential,
-  refreshRuntimeCredential,
-} from "../../../modules/mcp/application/mcp-runtime.service";
-import type { RuntimeActionTokenPayload } from "../../../modules/runtime/application/runtime-driver-access.service";
-import {
-  cleanupDriverInstances,
-  requireRuntimeDriverInstanceGrant,
-  verifyRuntimeActionToken,
-} from "../../../modules/runtime/application/runtime-driver-access.service";
 import type { RuntimeLlmProxyTarget } from "../../../modules/runtime/application/runtime-llm-proxy.service";
 import {
   RuntimeLlmProxyError,
@@ -30,23 +15,20 @@ import {
   RUNTIME_MCP_TOOL_CALL_ID_HEADER,
   readRuntimeMcpToolCallId,
 } from "../../../modules/runtime/application/runtime-mcp-delegation";
-import {
-  createRuntimeMcpProxyError,
-  runtimeMcpProxyErrorBody,
-  toRuntimeMcpProxyPublicErrorDetails,
-} from "../../../modules/runtime/application/runtime-mcp-proxy-errors";
+import { RuntimeMcpProxyError } from "../../../modules/runtime/application/runtime-mcp-proxy-errors";
 import { resolveRuntimeMcpProxyTarget } from "../../../modules/runtime/application/runtime-mcp-proxy.service";
 import { getRuntimeDriverRoutePrefix } from "../../../modules/runtime/domain/runtime-driver-routes";
 import { resolveRuntimeLlmUpstreamPath } from "../../../modules/runtime/domain/runtime-llm-proxy-base-url";
 import { upgradeDriverInstanceSocket } from "../../../modules/runtime/infrastructure/driver-instance/client";
-import { getDriverInstanceRecord } from "../../../modules/runtime/infrastructure/driver-instance/driver-instance-record.repository";
+import type { RuntimeActionTokenPayload } from "../../../modules/runtime/infrastructure/runtime-boot-token";
+import { verifyRuntimeActionToken } from "../../../modules/runtime/infrastructure/runtime-boot-token";
 import { readSkillPackageBytesFromSnapshot } from "../../../modules/skills/application/skill-package-snapshot.service";
 import { createErrorLogContext, logError, logWarn } from "../../../platform/cloudflare/logger";
 import type { ApiGatewayEnvironment } from "../../../platform/cloudflare/worker-types";
 import { toArrayBuffer } from "../../../shared/bytes";
-import { toPlatformId } from "../../../shared/platform-id";
 import { isTruthy } from "../../../shared/truthiness";
-import { platformIdRouteErrorResponse } from "./platform-id-route-error";
+import { platformIdRouteErrorMessage } from "./platform-id-route-error";
+
 const HOP_BY_HOP_HEADERS = new Set([
   "connection",
   "content-length",
@@ -64,7 +46,6 @@ const HOP_BY_HOP_HEADERS = new Set([
 // request goes upstream and replaced with the vendor's real credential.
 const LLM_PROXY_GRANT_HEADERS = new Set(["authorization", "x-api-key", "x-goog-api-key"]);
 const LLM_PROXY_PATH_MARKER = "/llm/proxy/";
-const LLM_PROXY_UNSAFE_PATH_ENCODING = /%(?:25|2f|5c)/iu;
 const OPENAI_IMAGE_API_PATHS = new Set(["/images/edits", "/images/generations"]);
 
 async function requireDriverActionGrant(c: Context<ApiGatewayEnvironment>) {
@@ -135,51 +116,6 @@ function toUpstreamProxyUrl(request: Request, upstreamUrl: string): string {
   return target.toString();
 }
 
-function driverPlatformIdErrorResponse(error: unknown): Response | null {
-  return platformIdRouteErrorResponse(error, (message) => ({ error: message }));
-}
-
-async function isStartupSkillDownloadGrant(
-  c: Context<ApiGatewayEnvironment>,
-  grant: RuntimeActionTokenPayload & { action: "skill_snapshot" },
-): Promise<boolean> {
-  const driver = await getDriverInstanceRecord(c.env.DB, grant.driverInstanceId);
-  return driver?.status === "provisioning" || driver?.status === "connecting";
-}
-
-async function requireSkillSnapshotDownloadGrant(
-  c: Context<ApiGatewayEnvironment>,
-  input: {
-    grant: RuntimeActionTokenPayload & { action: "skill_snapshot" };
-    snapshotId: SkillSnapshotId;
-  },
-): Promise<void> {
-  try {
-    await requireRuntimeDriverInstanceGrant(c.env.DB, {
-      driverInstanceId: input.grant.driverInstanceId,
-      requireAction: "skill_snapshot",
-      snapshotId: input.snapshotId,
-    });
-    return;
-  } catch (error) {
-    if (
-      !(error instanceof Error) ||
-      error.message !== "Snapshot is not available for this driver instance."
-    ) {
-      throw error;
-    }
-
-    // Cold drivers materialize skills during boot, before the run lease is linked
-    // to session_run.driver_instance_id. The signed action token already binds
-    // this request to the driver instance and snapshot; this fallback only spans
-    // that provisioning window.
-    if (await isStartupSkillDownloadGrant(c, input.grant)) {
-      return;
-    }
-    throw error;
-  }
-}
-
 function readLlmProxyGrantToken(headers: Headers): string | null {
   const apiKey = headers.get("x-api-key")?.trim();
 
@@ -212,33 +148,7 @@ function extractLlmProxySubPath(pathname: string): string | null {
 
   const rest = pathname.slice(markerIndex + LLM_PROXY_PATH_MARKER.length);
   const slashIndex = rest.indexOf("/");
-  const subPath = slashIndex === -1 ? "" : rest.slice(slashIndex);
-
-  if (subPath.includes("\\") || LLM_PROXY_UNSAFE_PATH_ENCODING.test(subPath)) {
-    return null;
-  }
-
-  for (const segment of subPath.split("/")) {
-    let decoded: string;
-
-    try {
-      decoded = decodeURIComponent(segment);
-    } catch {
-      return null;
-    }
-
-    if (
-      decoded === "." ||
-      decoded === ".." ||
-      decoded.includes("/") ||
-      decoded.includes("\\") ||
-      decoded.includes("%")
-    ) {
-      return null;
-    }
-  }
-
-  return subPath;
+  return slashIndex === -1 ? "" : rest.slice(slashIndex);
 }
 
 function resolveGrantedLlmProxyModelId(
@@ -248,16 +158,10 @@ function resolveGrantedLlmProxyModelId(
   modelProtocol: PresetModelProtocol,
   imageModelId?: string,
 ): string | null {
-  const decodedPath = decodeURIComponent(subPath);
-
-  if (decodedPath !== subPath) {
-    return null;
-  }
-
   switch (modelProtocol) {
     case "anthropic-messages":
       return method === "POST" &&
-        ["/messages", "/v1/messages", "/v1/messages/count_tokens"].includes(decodedPath)
+        ["/messages", "/v1/messages", "/v1/messages/count_tokens"].includes(subPath)
         ? modelId
         : null;
     case "google-gemini": {
@@ -274,24 +178,22 @@ function resolveGrantedLlmProxyModelId(
 
       return method === "POST" &&
         modelPathIsCanonical &&
-        [`/${modelPath}:generateContent`, `/${modelPath}:streamGenerateContent`].includes(
-          decodedPath,
-        )
+        [`/${modelPath}:generateContent`, `/${modelPath}:streamGenerateContent`].includes(subPath)
         ? modelId
         : null;
     }
     case "openai-chat-completions":
-      return method === "POST" && decodedPath === "/chat/completions" ? modelId : null;
+      return method === "POST" && subPath === "/chat/completions" ? modelId : null;
     case "openai-responses": {
       if (method !== "POST") {
         return null;
       }
 
-      if (["/responses", "/responses/compact"].includes(decodedPath)) {
+      if (["/responses", "/responses/compact"].includes(subPath)) {
         return modelId;
       }
 
-      return imageModelId !== undefined && OPENAI_IMAGE_API_PATHS.has(decodedPath)
+      return imageModelId !== undefined && OPENAI_IMAGE_API_PATHS.has(subPath)
         ? imageModelId
         : null;
     }
@@ -400,15 +302,6 @@ function toLlmProxyUpstreamUrl(
   const basePath = base.pathname === "/" ? "" : base.pathname.replace(/\/+$/u, "");
   const upstreamPath = resolveRuntimeLlmUpstreamPath({ basePath, subPath, modelProtocol });
   const expectedPath = `${basePath}${upstreamPath}`;
-
-  if (
-    base.hash !== "" ||
-    basePath.includes("\\") ||
-    LLM_PROXY_UNSAFE_PATH_ENCODING.test(basePath)
-  ) {
-    throw new RuntimeLlmProxyError("LLM proxy upstream base URL is invalid.", 502);
-  }
-
   const target = new URL(`${base.origin}${expectedPath}`);
 
   for (const [key, value] of base.searchParams) {
@@ -540,25 +433,23 @@ export function registerDriverRoute(app: Hono<ApiGatewayEnvironment>) {
     let driverInstanceId: DriverInstanceId;
 
     try {
-      driverInstanceId = toPlatformId<DriverInstanceId>(
+      driverInstanceId = parsePlatformId<DriverInstanceId>(
         c.req.query("driverInstanceId") ?? "",
         "Driver instance ID",
       );
     } catch (error) {
-      const response = driverPlatformIdErrorResponse(error);
-      if (response !== null) {
-        return response;
+      const message = platformIdRouteErrorMessage(error);
+      if (message === null) {
+        throw error;
       }
-      throw error;
+      return Response.json({ error: message }, { status: 400 });
     }
 
     return upgradeDriverInstanceSocket(c.env, driverInstanceId, c.req.raw);
   });
 
   driver.get("/skill/:snapshotId/package", async (c) => {
-    await cleanupDriverInstances(c.env);
-
-    let grant: Awaited<ReturnType<typeof requireDriverActionGrant>>;
+    let grant: RuntimeActionTokenPayload;
 
     try {
       grant = await requireDriverActionGrant(c);
@@ -576,127 +467,20 @@ export function registerDriverRoute(app: Hono<ApiGatewayEnvironment>) {
       );
     }
 
-    let snapshotId: SkillSnapshotId;
-
-    try {
-      snapshotId = toPlatformId<SkillSnapshotId>(c.req.param("snapshotId"), "Skill snapshot ID");
-    } catch (error) {
-      const response = driverPlatformIdErrorResponse(error);
-      if (response !== null) {
-        return response;
-      }
-      throw error;
-    }
-
-    if (grant.resourceId !== snapshotId) {
+    if (grant.resourceId !== c.req.param("snapshotId")) {
       return Response.json(
         { error: "Runtime action grant does not match this skill snapshot." },
         { status: 403 },
       );
     }
 
-    try {
-      await requireSkillSnapshotDownloadGrant(c, {
-        grant,
-        snapshotId,
-      });
-    } catch (error) {
-      return Response.json(
-        {
-          error:
-            error instanceof Error
-              ? error.message
-              : "Snapshot is not available for this driver instance.",
-        },
-        { status: 403 },
-      );
-    }
-
-    const bytes = await readSkillPackageBytesFromSnapshot(c.env, snapshotId);
+    const bytes = await readSkillPackageBytesFromSnapshot(c.env, grant.resourceId);
 
     return new Response(toArrayBuffer(bytes), {
       headers: {
         "Content-Type": "application/zip",
       },
     });
-  });
-
-  driver.post("/mcp/credential/:credentialId/refresh", async (c) => {
-    await cleanupDriverInstances(c.env);
-
-    try {
-      const grant = await requireDriverActionGrant(c);
-      const credentialId = toPlatformId<CredentialId>(c.req.param("credentialId"), "Credential ID");
-
-      if (grant.action !== "credential_refresh") {
-        return Response.json(
-          { error: "Runtime action grant is invalid for credential refresh." },
-          { status: 403 },
-        );
-      }
-
-      if (grant.resourceId !== credentialId) {
-        return Response.json(
-          { error: "Runtime action grant does not match this credential." },
-          { status: 403 },
-        );
-      }
-
-      await requireRuntimeDriverInstanceGrant(c.env.DB, {
-        credentialId,
-        driverInstanceId: toPlatformId<DriverInstanceId>(
-          grant.driverInstanceId,
-          "Driver instance ID",
-        ),
-        requireAction: "refresh",
-      });
-      const refreshed = await refreshRuntimeCredential(c.env, credentialId);
-      return c.json(refreshed);
-    } catch (error) {
-      return Response.json(
-        { error: error instanceof Error ? error.message : "Credential refresh failed." },
-        { status: 400 },
-      );
-    }
-  });
-
-  driver.post("/mcp/credential/:credentialId/invalidate", async (c) => {
-    await cleanupDriverInstances(c.env);
-
-    try {
-      const grant = await requireDriverActionGrant(c);
-      const credentialId = toPlatformId<CredentialId>(c.req.param("credentialId"), "Credential ID");
-
-      if (grant.action !== "credential_invalidate") {
-        return Response.json(
-          { error: "Runtime action grant is invalid for credential invalidation." },
-          { status: 403 },
-        );
-      }
-
-      if (grant.resourceId !== credentialId) {
-        return Response.json(
-          { error: "Runtime action grant does not match this credential." },
-          { status: 403 },
-        );
-      }
-
-      await requireRuntimeDriverInstanceGrant(c.env.DB, {
-        credentialId,
-        driverInstanceId: toPlatformId<DriverInstanceId>(
-          grant.driverInstanceId,
-          "Driver instance ID",
-        ),
-        requireAction: "invalidate",
-      });
-      await invalidateRuntimeCredential(c.env.DB, credentialId);
-      return c.json({ ok: true as const });
-    } catch (error) {
-      return Response.json(
-        { error: error instanceof Error ? error.message : "Credential invalidate failed." },
-        { status: 400 },
-      );
-    }
   });
 
   driver.all("/llm/proxy/:credentialId/*", async (c) => {
@@ -727,22 +511,7 @@ export function registerDriverRoute(app: Hono<ApiGatewayEnvironment>) {
       );
     }
 
-    let credentialId: VendorCredentialId;
-
-    try {
-      credentialId = toPlatformId<VendorCredentialId>(
-        c.req.param("credentialId"),
-        "Vendor credential ID",
-      );
-    } catch (error) {
-      const response = driverPlatformIdErrorResponse(error);
-      if (response !== null) {
-        return response;
-      }
-      throw error;
-    }
-
-    if (grant.resourceId !== credentialId) {
+    if (grant.resourceId !== c.req.param("credentialId")) {
       return Response.json(
         { error: "Runtime action grant does not match this credential." },
         { status: 403 },
@@ -806,7 +575,7 @@ export function registerDriverRoute(app: Hono<ApiGatewayEnvironment>) {
 
     try {
       target = await resolveRuntimeLlmProxyTarget(c.env, {
-        credentialId,
+        credentialId: grant.resourceId,
         modelProtocol: grant.modelProtocol,
         projectId: grant.projectId,
       });
@@ -829,9 +598,7 @@ export function registerDriverRoute(app: Hono<ApiGatewayEnvironment>) {
   });
 
   driver.all("/mcp/proxy/:serverId", async (c) => {
-    await cleanupDriverInstances(c.env);
-
-    let grant: Awaited<ReturnType<typeof requireDriverAuthorizationGrant>>;
+    let grant: RuntimeActionTokenPayload;
 
     try {
       grant = await requireDriverAuthorizationGrant(c);
@@ -842,18 +609,6 @@ export function registerDriverRoute(app: Hono<ApiGatewayEnvironment>) {
       );
     }
 
-    let serverId: McpServerId;
-
-    try {
-      serverId = toPlatformId<McpServerId>(c.req.param("serverId"), "MCP server ID");
-    } catch (error) {
-      const response = driverPlatformIdErrorResponse(error);
-      if (response !== null) {
-        return response;
-      }
-      throw error;
-    }
-
     if (grant.action !== "mcp_proxy") {
       return Response.json(
         { error: "Runtime action grant is invalid for MCP proxy." },
@@ -861,7 +616,7 @@ export function registerDriverRoute(app: Hono<ApiGatewayEnvironment>) {
       );
     }
 
-    if (grant.resourceId !== serverId) {
+    if (grant.resourceId !== c.req.param("serverId")) {
       return Response.json(
         { error: "Runtime action grant does not match this MCP server." },
         { status: 403 },
@@ -882,28 +637,26 @@ export function registerDriverRoute(app: Hono<ApiGatewayEnvironment>) {
 
     try {
       target = await resolveRuntimeMcpProxyTarget(c.env, {
-        driverInstanceId: toPlatformId<DriverInstanceId>(
-          grant.driverInstanceId,
-          "Driver instance ID",
-        ),
-        serverId,
+        driverInstanceId: grant.driverInstanceId,
+        serverId: grant.resourceId,
         toolCallId,
       });
     } catch (error) {
-      const details = toRuntimeMcpProxyPublicErrorDetails(error);
-      return Response.json(runtimeMcpProxyErrorBody(details), { status: details.status });
+      if (error instanceof RuntimeMcpProxyError) {
+        return error.toResponse();
+      }
+      throw error;
     }
 
     try {
       return await proxyRuntimeMcpRequest(c.req.raw, target);
-    } catch {
-      const proxyError = createRuntimeMcpProxyError({
-        code: "mcp_upstream_unavailable",
-        message: "MCP proxy upstream request failed.",
-        status: 502,
-      });
-      const details = toRuntimeMcpProxyPublicErrorDetails(proxyError);
-      return Response.json(runtimeMcpProxyErrorBody(details), { status: details.status });
+    } catch (error) {
+      logError("runtime.mcp_proxy.upstream_failed", createErrorLogContext(error));
+      return new RuntimeMcpProxyError(
+        "mcp_upstream_unavailable",
+        502,
+        "MCP proxy upstream request failed.",
+      ).toResponse();
     }
   });
 

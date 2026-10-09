@@ -1,4 +1,3 @@
-import type { DriverRecoveryMessage } from "@mosoo/agent-driver/boot";
 import type { DriverNativeRuntimeRef } from "@mosoo/agent-driver/runtime";
 import { parsePlatformId } from "@mosoo/id";
 import type {
@@ -26,11 +25,7 @@ import {
 import type { DriverInstanceMcpGrantRecord } from "../driver-instance/mcp-grants.repository";
 import { createRuntimeActionToken } from "../runtime-boot-token";
 import type { RuntimeActionTokenBindings } from "../runtime-boot-token";
-import {
-  getOrganizationPath,
-  listAdditionalDirectories,
-} from "./runtime-sandbox-provisioning.paths";
-import { sanitizeRuntimeVendorEnvVars } from "./runtime-vendor-env-policy";
+import { listAdditionalDirectories } from "./runtime-sandbox-provisioning.paths";
 import { buildVendorProxyEnvVars } from "./runtime-vendor-proxy-env.builder";
 
 interface RuntimeActionUrlContext {
@@ -159,24 +154,12 @@ export async function buildExecutionSpec(
     requestUrl: string;
     resolvedMcpServers: DriverResolvedMcpServer[];
     nativeResumeRef?: DriverNativeRuntimeRef | null;
-    recoveryMessages?: DriverRecoveryMessage[];
     resolvedSkillCatalog: DriverSkillCatalogEntry[];
     resolvedSkills: Omit<DriverResolvedSkill, "downloadUrl">[];
     sessionRunId?: SessionRunId | null;
   },
 ): Promise<DriverExecutionSpec> {
-  if (input.profile.runtimeId === "pi") {
-    if (input.profile.provider !== "openai-compatible") {
-      throw new Error("Pi requires an OpenAI-compatible provider.");
-    }
-    if (input.profile.permissionPolicy !== "full_access") {
-      throw new Error("Pi requires full_access.");
-    }
-    if (input.builtInTools.some((tool) => !tool.enabled)) {
-      throw new Error("Pi requires unrestricted built-in tools.");
-    }
-  }
-  const organizationPath = getOrganizationPath(input.profile);
+  const organizationPath = input.profile.session.sessionOrganizationPath;
   const actionUrlContext: RuntimeActionUrlContext = {
     bindings,
     driverInstanceId: input.driverInstanceId,
@@ -211,24 +194,24 @@ export async function buildExecutionSpec(
         python: [],
       },
       variables: {
-        ...sanitizeRuntimeVendorEnvVars(input.profile.envVars),
+        ...input.profile.envVars,
         ...vendorProxyEnvVars,
       },
     },
     model: input.profile.model,
-    permissionPolicy: input.profile.permissionPolicy,
+    permissionPolicy: "full_access",
     profilePrompt: appendRuntimeArtifactContextToPrompt(input.profile.prompt),
     provider: input.profile.provider,
     providerOptions: input.profile.providerOptions,
     session: {
-      additionalDirectories: listAdditionalDirectories(input.profile, organizationPath),
+      additionalDirectories: listAdditionalDirectories(input.profile),
       context: {
         sandboxSessionId: input.profile.session.sandboxSessionId,
         homePath: input.profile.session.homePath,
         origin: input.profile.session.origin,
         sandboxId: input.profile.sandbox.id,
-        sandboxSubjectId: input.profile.sandbox.subjectId,
-        sandboxSubjectKind: input.profile.sandbox.subjectKind,
+        sandboxSubjectId: input.profile.configRevision.sessionId,
+        sandboxSubjectKind: "session",
         sessionOrganizationPath: organizationPath,
       },
       cwd: organizationPath,

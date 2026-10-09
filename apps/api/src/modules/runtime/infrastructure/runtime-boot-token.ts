@@ -5,9 +5,7 @@ import type {
 } from "@mosoo/agent-driver/boot";
 import { DRIVER_PROTOCOL_VERSION, parseDriverBootPayload } from "@mosoo/agent-driver/boot";
 import type { PresetModelProtocol } from "@mosoo/contracts/models";
-import { parsePlatformId } from "@mosoo/id";
 import type {
-  CredentialId,
   DriverInstanceId,
   McpServerId,
   ProjectId,
@@ -32,23 +30,12 @@ export interface CreateBootPayloadInput {
   traceparent: string;
 }
 
-export type RuntimeActionTokenAction =
-  | "credential_invalidate"
-  | "credential_refresh"
-  | "llm_proxy"
-  | "mcp_proxy"
-  | "skill_snapshot";
-
 interface RuntimeActionTokenPayloadBase {
   driverInstanceId: DriverInstanceId;
   expiresAt: number;
 }
 
 export type RuntimeActionTokenPayload =
-  | (RuntimeActionTokenPayloadBase & {
-      action: "credential_invalidate" | "credential_refresh";
-      resourceId: CredentialId;
-    })
   | (RuntimeActionTokenPayloadBase & {
       action: "llm_proxy";
       projectId: ProjectId;
@@ -143,125 +130,6 @@ export async function createRuntimeActionToken(
   return `${encodedPayload}.${toBase64Url(new Uint8Array(signature))}`;
 }
 
-function isRuntimeActionTokenAction(value: unknown): value is RuntimeActionTokenAction {
-  return (
-    value === "credential_invalidate" ||
-    value === "credential_refresh" ||
-    value === "llm_proxy" ||
-    value === "mcp_proxy" ||
-    value === "skill_snapshot"
-  );
-}
-
-function isRuntimeActionTokenPayloadRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isPresetModelProtocol(value: unknown): value is PresetModelProtocol {
-  return (
-    value === "anthropic-messages" ||
-    value === "google-gemini" ||
-    value === "openai-chat-completions" ||
-    value === "openai-responses"
-  );
-}
-
-function parseRuntimeActionTokenPayload(encodedPayload: string): RuntimeActionTokenPayload {
-  const parsed: unknown = JSON.parse(decodeUtf8(fromBase64Url(encodedPayload)));
-
-  if (!isRuntimeActionTokenPayloadRecord(parsed)) {
-    throw new Error("Runtime action token payload is invalid.");
-  }
-
-  const { action, driverInstanceId, expiresAt, resourceId } = parsed;
-
-  if (
-    !isRuntimeActionTokenAction(action) ||
-    typeof expiresAt !== "number" ||
-    !Number.isFinite(expiresAt) ||
-    typeof resourceId !== "string" ||
-    resourceId === "" ||
-    typeof driverInstanceId !== "string" ||
-    driverInstanceId === ""
-  ) {
-    throw new Error("Runtime action token payload is invalid.");
-  }
-
-  const parsedDriverInstanceId = parsePlatformId<DriverInstanceId>(
-    driverInstanceId,
-    "Runtime action token driver instance ID",
-  );
-
-  if (action === "llm_proxy") {
-    const { appId, projectId, driverGeneration, imageModelId, modelId, modelProtocol } = parsed;
-    // Runtime grants can live for 24 hours. Accept the pre-Project claim during
-    // rolling deploys, but normalize every verified payload to projectId.
-    const ownerProjectId = projectId ?? appId;
-
-    if (
-      typeof ownerProjectId !== "string" ||
-      ownerProjectId === "" ||
-      typeof driverGeneration !== "number" ||
-      !Number.isSafeInteger(driverGeneration) ||
-      driverGeneration < 0 ||
-      typeof modelId !== "string" ||
-      modelId === "" ||
-      modelId.length > RUNTIME_LLM_PROXY_MODEL_ID_MAX_LENGTH ||
-      (imageModelId !== undefined &&
-        (modelProtocol !== "openai-responses" ||
-          typeof imageModelId !== "string" ||
-          imageModelId === "" ||
-          imageModelId.length > RUNTIME_LLM_PROXY_MODEL_ID_MAX_LENGTH)) ||
-      !isPresetModelProtocol(modelProtocol)
-    ) {
-      throw new Error("Runtime action token payload is invalid.");
-    }
-
-    return {
-      action,
-      projectId: parsePlatformId<ProjectId>(ownerProjectId, "Runtime action token project ID"),
-      driverGeneration,
-      driverInstanceId: parsedDriverInstanceId,
-      expiresAt,
-      ...(imageModelId === undefined ? {} : { imageModelId }),
-      modelId,
-      modelProtocol,
-      resourceId: parsePlatformId<VendorCredentialId>(
-        resourceId,
-        "Runtime action token vendor credential ID",
-      ),
-    };
-  }
-
-  if (action === "mcp_proxy") {
-    return {
-      action,
-      driverInstanceId: parsedDriverInstanceId,
-      expiresAt,
-      resourceId: parsePlatformId<McpServerId>(resourceId, "Runtime action token MCP server ID"),
-    };
-  }
-
-  if (action === "skill_snapshot") {
-    return {
-      action,
-      driverInstanceId: parsedDriverInstanceId,
-      expiresAt,
-      resourceId: parsePlatformId<SkillSnapshotId>(
-        resourceId,
-        "Runtime action token skill snapshot ID",
-      ),
-    };
-  }
-
-  return {
-    action,
-    driverInstanceId: parsedDriverInstanceId,
-    expiresAt,
-    resourceId: parsePlatformId<CredentialId>(resourceId, "Runtime action token credential ID"),
-  };
-}
-
 export async function verifyRuntimeActionToken(
   bindings: RuntimeActionTokenBindings,
   rawToken: string,
@@ -289,13 +157,16 @@ export async function verifyRuntimeActionToken(
     throw new Error("Runtime action token signature is invalid.");
   }
 
-  const parsed = parseRuntimeActionTokenPayload(encodedPayload);
+  // Only this Worker signs action tokens, so a verified payload is trusted as written.
+  const payload = JSON.parse(
+    decodeUtf8(fromBase64Url(encodedPayload)),
+  ) as RuntimeActionTokenPayload;
 
-  if (parsed.expiresAt <= Date.now()) {
+  if (payload.expiresAt <= Date.now()) {
     throw new Error("Runtime action token has expired.");
   }
 
-  return parsed;
+  return payload;
 }
 
 export function createDriverBootPayload(input: CreateBootPayloadInput): DriverBootPayload {

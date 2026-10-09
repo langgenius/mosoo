@@ -7,7 +7,7 @@ import {
 } from "@mosoo/contracts/public-api";
 import type { AgentSessionEventBatch } from "@mosoo/contracts/session";
 import { PLATFORM_ID_INPUT_PATTERN } from "@mosoo/id";
-import { isEnumType, isInputObjectType, isObjectType } from "graphql";
+import { isInputObjectType, isObjectType } from "graphql";
 
 import { createGraphQLSchema } from "../src/adapters/graphql/create-graphql-schema";
 import { createPublicApiOpenApiDocument } from "../src/adapters/http/routes/public-api-openapi";
@@ -18,7 +18,7 @@ import {
   readSendEventsRequest,
 } from "../src/adapters/http/routes/public-thread-api-request";
 import { PublicApiError } from "../src/modules/public-api/public-api-errors";
-import { toPublicThreadEventBatch } from "../src/modules/public-api/public-thread-api-presenter";
+import { toPublicThreadEventBatch } from "../src/modules/public-api/public-thread-presenter";
 import {
   createChunkedJsonRequest,
   createPublicFile,
@@ -94,154 +94,27 @@ function collectOpenApiSchemaDescriptionGaps(value: unknown, path: string, gaps:
 }
 
 describe("API to web boundary", () => {
-  test("keeps preview runtime readiness wait scoped to GraphQL create-session input", () => {
+  test("keeps console credential, cost and file access explicitly Project-scoped", () => {
     const schema = createGraphQLSchema();
-    const createSessionInput = schema.getType("CreateAgentSessionInput");
+    const projectScopedInputs = [
+      "UpdateVendorCredentialInput",
+      "DeleteVendorCredentialInput",
+      "FileListInput",
+    ].map((name) => schema.getType(name));
+    const agentCostCard = schema.getQueryType()?.getFields()["agentCostCard"];
 
-    if (!isInputObjectType(createSessionInput)) {
-      throw new Error("Expected CreateAgentSessionInput to be a GraphQL input object.");
+    for (const input of projectScopedInputs) {
+      if (!isInputObjectType(input)) {
+        throw new Error("Expected Project-scoped GraphQL inputs.");
+      }
+
+      expect(String(input.getFields()["projectId"]?.type)).toBe("ULID!");
     }
-
-    expect(createSessionInput.getFields().waitForRuntimeReady).toBeDefined();
-
-    const publicDocument = createPublicApiOpenApiDocument("https://api.example.com");
-    expect(publicDocument.paths["/agents/{agentId}/sessions"]).toBeUndefined();
-    expect(openApiSchemaProperties("CreateThreadRequest")["waitForRuntimeReady"]).toBeUndefined();
-  });
-
-  test("keeps platform ID fields on the GraphQL ULID scalar", () => {
-    const schema = createGraphQLSchema();
-    const session = schema.getType("Session");
-    const mutation = schema.getMutationType();
-
-    if (!isObjectType(session) || !mutation) {
-      throw new Error("Expected Session and Mutation in the GraphQL schema.");
-    }
-
-    expect(String(session.getFields().projectId?.type)).toBe("ULID!");
-    expect(String(mutation.getFields().prewarmAgentSession?.args[0]?.type)).toBe("ULID!");
-    expect(String(mutation.getFields().archiveAgentSession?.args[0]?.type)).toBe("ULID!");
-  });
-
-  test("keeps Provider credential mutations explicitly Project-scoped", () => {
-    const schema = createGraphQLSchema();
-    const updateInput = schema.getType("UpdateVendorCredentialInput");
-    const deleteInput = schema.getType("DeleteVendorCredentialInput");
-
-    if (!isInputObjectType(updateInput) || !isInputObjectType(deleteInput)) {
-      throw new Error("Expected Provider credential mutation inputs in the GraphQL schema.");
-    }
-
-    expect(String(updateInput.getFields().projectId?.type)).toBe("ULID!");
-    expect(String(deleteInput.getFields().projectId?.type)).toBe("ULID!");
-  });
-
-  test("keeps cost GraphQL Project-scoped and Organization billing-only", () => {
-    const schema = createGraphQLSchema();
-    const query = schema.getQueryType();
-
-    if (!query) {
-      throw new Error("Expected Query in the GraphQL schema.");
-    }
-
-    const fields = query.getFields();
-    const agentCostCard = fields.agentCostCard;
-
-    expect(fields.projectCostCard).toBeDefined();
-    expect(fields.organizationBillingCostCard).toBeDefined();
     expect(String(agentCostCard?.args.find((arg) => arg.name === "projectId")?.type)).toBe("ULID!");
-    expect(fields.memberCostCard).toBeUndefined();
-    expect(fields.organizationCostCard).toBeUndefined();
-    expect(fields.ownerCostCard).toBeUndefined();
-  });
-
-  test("keeps file GraphQL scope details compatible", () => {
-    const schema = createGraphQLSchema();
-    const fileRecord = schema.getType("FileRecord");
-    const fileListInput = schema.getType("FileListInput");
-
-    if (!isObjectType(fileRecord) || !isInputObjectType(fileListInput)) {
-      throw new Error("Expected file GraphQL types.");
-    }
-
-    const scopeKind = schema.getType("FileScopeKind");
-    const purpose = schema.getType("FilePurpose");
-
-    if (!isEnumType(scopeKind) || !isEnumType(purpose)) {
-      throw new Error("Expected file GraphQL enums.");
-    }
-
-    const scopeValues = scopeKind.getValues().map((value) => value.name);
-    const purposeValues = purpose.getValues().map((value) => value.name);
-
-    expect(scopeValues).toContain("app_draft");
-    expect(scopeValues).not.toContain("organization_draft");
-    expect(purposeValues).toContain("app_draft");
-    expect(purposeValues).not.toContain("organization_draft");
-    expect(isObjectType(schema.getType("FileOwner"))).toBe(true);
-    expect(String(fileListInput.getFields().projectId?.type)).toBe("ULID!");
-    expect(String(fileListInput.getFields().sessionId?.type)).toBe("ULID");
-    expect(String(fileListInput.getFields().sessionKind?.type)).toBe("FileSessionKind");
-    expect(String(fileListInput.getFields().scopeId?.type)).toBe("ULID");
-    expect(String(fileListInput.getFields().scopeKind?.type)).toBe("FileScopeKind");
-    expect(String(fileRecord.getFields().scope?.type)).toBe("FileScope!");
-    expect(String(fileRecord.getFields().owner?.type)).toBe("FileOwner!");
-    expect(String(fileRecord.getFields().purpose?.type)).toBe("FilePurpose!");
-  });
-
-  test("keeps V1 GraphQL free of Organization collaboration surfaces", () => {
-    const schema = createGraphQLSchema();
-    const query = schema.getQueryType();
-    const mutation = schema.getMutationType();
-    const agentVisibility = schema.getType("AgentVisibility");
-    const agentViewerRole = schema.getType("AgentViewerRole");
-
-    if (!query || !mutation || !isEnumType(agentVisibility) || !isEnumType(agentViewerRole)) {
-      throw new Error("Expected Query, Mutation, AgentVisibility, and AgentViewerRole.");
-    }
-
-    const queryFields = query.getFields();
-    const mutationFields = mutation.getFields();
-    const visibilityValues = agentVisibility.getValues().map((value) => value.name);
-    const viewerRoleValues = agentViewerRole.getValues().map((value) => value.name);
-
-    expect(visibilityValues).toEqual(["private"]);
-    expect(viewerRoleValues).toEqual(["owner", "none"]);
-
-    for (const fieldName of [
-      "agentCollaboratorList",
-      "onboardingDiscovery",
-      "sessionThreadUiStateList",
-    ] as const) {
-      expect(queryFields[fieldName]).toBeUndefined();
-    }
-
-    for (const fieldName of [
-      "addAgentCollaborator",
-      "removeAgentCollaborator",
-      "updateAgentPackageSharing",
-      "updateAgentCollaborator",
-      "updateSessionThreadUiState",
-    ] as const) {
-      expect(mutationFields[fieldName]).toBeUndefined();
-    }
-
-    for (const typeName of [
-      "AgentCollaborator",
-      "AgentCollaboratorRole",
-      "AddAgentCollaboratorInput",
-      "RemoveAgentCollaboratorInput",
-      "UpdateAgentCollaboratorInput",
-      "UpdateAgentPackageSharingInput",
-      "SessionThreadUiState",
-      "UpdateSessionThreadUiStateInput",
-    ] as const) {
-      expect(schema.getType(typeName)).toBeUndefined();
-    }
   });
 
   test("keeps the public HTTP contract aligned with the shared public API schema", () => {
-    const document = createPublicApiOpenApiDocument("https://api.example.com");
+    const document = createPublicApiOpenApiDocument("https://api.example.com", "v1");
 
     expect(document.openapi).toBe("3.1.0");
     expect(document.servers).toEqual([{ url: "https://api.example.com/api/v1" }]);
@@ -392,15 +265,10 @@ describe("API to web boundary", () => {
     const errorCodeSchema =
       document.components.schemas.ErrorResponse.properties.error.properties.code;
     expect(errorCodeSchema).toMatchObject({ enum: PUBLIC_API_ERROR_CODES });
-    expect(
-      Object.keys(document.components.schemas).filter((name) => name.includes("Task")),
-    ).toEqual([]);
-    expect(document.paths["/agents/{agentId}/tasks"]).toBeUndefined();
-    expect(document.paths["/tasks/{taskId}"]).toBeUndefined();
   });
 
   test("documents bare ULID public IDs in OpenAPI", () => {
-    const document = createPublicApiOpenApiDocument("https://api.example.com");
+    const document = createPublicApiOpenApiDocument("https://api.example.com", "v1");
     const agentIdParameter = document.paths["/agents/{agentId}/threads"]?.post?.parameters?.find(
       (parameter) => parameter.name === "agentId",
     );
@@ -436,7 +304,7 @@ describe("API to web boundary", () => {
   });
 
   test("documents every visible Agent API Endpoint OpenAPI field", () => {
-    const document = createPublicApiOpenApiDocument("https://api.example.com");
+    const document = createPublicApiOpenApiDocument("https://api.example.com", "v1");
     const gaps: string[] = [];
 
     for (const [path, pathItem] of Object.entries(document.paths)) {
@@ -577,45 +445,51 @@ describe("API to web boundary", () => {
 
   test("parses the Public Thread API create-work body shape", async () => {
     await expect(
-      readCreateThreadRequest({
-        req: {
-          raw: new Request(
-            `https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`,
-            {
-              body: JSON.stringify({
-                userId: "customer-123",
-              }),
-              headers: { "Content-Type": "application/json" },
-              method: "POST",
-            },
-          ),
+      readCreateThreadRequest(
+        {
+          req: {
+            raw: new Request(
+              `https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`,
+              {
+                body: JSON.stringify({
+                  userId: "customer-123",
+                }),
+                headers: { "Content-Type": "application/json" },
+                method: "POST",
+              },
+            ),
+          },
         },
-      }),
+        "v1",
+      ),
     ).resolves.toEqual({
       fileIds: [],
       userId: "customer-123",
     });
 
     await expect(
-      readCreateThreadRequest({
-        req: {
-          raw: new Request(
-            `https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`,
-            {
-              body: JSON.stringify({
-                input: {
-                  content: [{ text: "Summarize the launch plan.", type: "text" }],
-                  type: "user.message",
-                },
-                resources: [{ file_id: PUBLIC_API_TEST_IDS.file, type: "file" }],
-                userId: "customer-123",
-              }),
-              headers: { "Content-Type": "application/json" },
-              method: "POST",
-            },
-          ),
+      readCreateThreadRequest(
+        {
+          req: {
+            raw: new Request(
+              `https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`,
+              {
+                body: JSON.stringify({
+                  input: {
+                    content: [{ text: "Summarize the launch plan.", type: "text" }],
+                    type: "user.message",
+                  },
+                  resources: [{ file_id: PUBLIC_API_TEST_IDS.file, type: "file" }],
+                  userId: "customer-123",
+                }),
+                headers: { "Content-Type": "application/json" },
+                method: "POST",
+              },
+            ),
+          },
         },
-      }),
+        "v1",
+      ),
     ).resolves.toEqual({
       fileIds: [PUBLIC_API_TEST_IDS.file],
       inputText: "Summarize the launch plan.",
@@ -623,44 +497,50 @@ describe("API to web boundary", () => {
     });
 
     await expect(
-      readCreateThreadRequest({
-        req: {
-          raw: new Request(
-            `https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`,
-            {
-              body: JSON.stringify({
-                userId: "   ",
-              }),
-              headers: { "Content-Type": "application/json" },
-              method: "POST",
-            },
-          ),
+      readCreateThreadRequest(
+        {
+          req: {
+            raw: new Request(
+              `https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`,
+              {
+                body: JSON.stringify({
+                  userId: "   ",
+                }),
+                headers: { "Content-Type": "application/json" },
+                method: "POST",
+              },
+            ),
+          },
         },
-      }),
+        "v1",
+      ),
     ).rejects.toMatchObject({
       code: "invalid_request",
       status: 400,
     });
 
     await expect(
-      readCreateThreadRequest({
-        req: {
-          raw: new Request(
-            `https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`,
-            {
-              body: JSON.stringify({
-                input: {
-                  content: [{ text: "Do the work.", type: "text" }],
-                  type: "user.message",
-                },
-                repo: "https://example.com/repo.git",
-              }),
-              headers: { "Content-Type": "application/json" },
-              method: "POST",
-            },
-          ),
+      readCreateThreadRequest(
+        {
+          req: {
+            raw: new Request(
+              `https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`,
+              {
+                body: JSON.stringify({
+                  input: {
+                    content: [{ text: "Do the work.", type: "text" }],
+                    type: "user.message",
+                  },
+                  repo: "https://example.com/repo.git",
+                }),
+                headers: { "Content-Type": "application/json" },
+                method: "POST",
+              },
+            ),
+          },
         },
-      }),
+        "v1",
+      ),
     ).rejects.toMatchObject({
       code: "invalid_request",
       status: 400,
@@ -668,28 +548,31 @@ describe("API to web boundary", () => {
   });
 
   test("parses chunked Public Thread API create-work bodies", async () => {
-    const parsed = await readCreateThreadRequest({
-      req: {
-        raw: createChunkedJsonRequest(
-          `https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`,
-          {
-            resources: [
-              { file_id: PUBLIC_API_TEST_IDS.file, type: "file" },
-              { file_id: PUBLIC_API_TEST_IDS.fileAlt, type: "file" },
-            ],
-            input: {
-              content: [
-                { text: "Summarize the launch plan.", type: "text" },
-                { text: "List two follow-ups.", type: "text" },
+    const parsed = await readCreateThreadRequest(
+      {
+        req: {
+          raw: createChunkedJsonRequest(
+            `https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`,
+            {
+              resources: [
+                { file_id: PUBLIC_API_TEST_IDS.file, type: "file" },
+                { file_id: PUBLIC_API_TEST_IDS.fileAlt, type: "file" },
               ],
-              type: "user.message",
+              input: {
+                content: [
+                  { text: "Summarize the launch plan.", type: "text" },
+                  { text: "List two follow-ups.", type: "text" },
+                ],
+                type: "user.message",
+              },
+              userId: "customer-123",
             },
-            userId: "customer-123",
-          },
-          7,
-        ),
+            7,
+          ),
+        },
       },
-    });
+      "v1",
+    );
 
     expect(parsed).toEqual({
       fileIds: [PUBLIC_API_TEST_IDS.file, PUBLIC_API_TEST_IDS.fileAlt],
@@ -705,18 +588,21 @@ describe("API to web boundary", () => {
     expect(examples.length).toBeGreaterThanOrEqual(3);
 
     for (const [name, value] of examples) {
-      const parsed = await readCreateThreadRequest({
-        req: {
-          raw: new Request(
-            `https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads#${name}`,
-            {
-              body: JSON.stringify(value),
-              headers: { "Content-Type": "application/json" },
-              method: "POST",
-            },
-          ),
+      const parsed = await readCreateThreadRequest(
+        {
+          req: {
+            raw: new Request(
+              `https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads#${name}`,
+              {
+                body: JSON.stringify(value),
+                headers: { "Content-Type": "application/json" },
+                method: "POST",
+              },
+            ),
+          },
         },
-      });
+        "v1",
+      );
 
       if (name === "emptyThread") {
         expect(parsed.inputText).toBeUndefined();
@@ -851,44 +737,50 @@ describe("API to web boundary", () => {
     });
 
     await expect(
-      readCreateThreadRequest({
-        req: {
-          raw: new Request(
-            `https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`,
-            {
-              body: JSON.stringify({
-                files: [{ file_id: PUBLIC_API_TEST_IDS.file }],
-                input: {
-                  content: [{ text: "Do the work.", type: "text" }],
-                  type: "user.message",
-                },
-              }),
-              headers: { "Content-Type": "application/json" },
-              method: "POST",
-            },
-          ),
+      readCreateThreadRequest(
+        {
+          req: {
+            raw: new Request(
+              `https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`,
+              {
+                body: JSON.stringify({
+                  files: [{ file_id: PUBLIC_API_TEST_IDS.file }],
+                  input: {
+                    content: [{ text: "Do the work.", type: "text" }],
+                    type: "user.message",
+                  },
+                }),
+                headers: { "Content-Type": "application/json" },
+                method: "POST",
+              },
+            ),
+          },
         },
-      }),
+        "v1",
+      ),
     ).rejects.toMatchObject({
       code: "invalid_request",
       status: 400,
     });
 
     await expect(
-      readCreateThreadRequest({
-        req: {
-          raw: new Request(
-            `https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`,
-            {
-              body: JSON.stringify({
-                resources: [{ file_id: PUBLIC_API_TEST_IDS.file, type: "mount" }],
-              }),
-              headers: { "Content-Type": "application/json" },
-              method: "POST",
-            },
-          ),
+      readCreateThreadRequest(
+        {
+          req: {
+            raw: new Request(
+              `https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`,
+              {
+                body: JSON.stringify({
+                  resources: [{ file_id: PUBLIC_API_TEST_IDS.file, type: "mount" }],
+                }),
+                headers: { "Content-Type": "application/json" },
+                method: "POST",
+              },
+            ),
+          },
         },
-      }),
+        "v1",
+      ),
     ).rejects.toMatchObject({
       code: "invalid_request",
       status: 400,

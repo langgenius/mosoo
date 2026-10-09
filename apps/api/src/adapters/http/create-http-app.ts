@@ -1,12 +1,6 @@
 import { PUBLIC_API_PREFIX } from "@mosoo/contracts/public-api";
 import { Hono } from "hono";
-import { cors } from "hono/cors";
 
-import {
-  createErrorLogContext,
-  createRequestLogContext,
-  logError,
-} from "../../platform/cloudflare/logger";
 import type { ApiGatewayEnvironment } from "../../platform/cloudflare/worker-types";
 import { requestLoggingMiddleware } from "./request-logging.middleware";
 import { registerAccessTokenRoute } from "./routes/access-token-route";
@@ -23,14 +17,8 @@ import { registerSkillRoute } from "./routes/skill-route";
 export function createHttpApp() {
   const app = new Hono<ApiGatewayEnvironment>();
   const publicApi = new Hono<ApiGatewayEnvironment>();
-  const graphQLCorsMiddleware = cors({
-    allowHeaders: ["Content-Type"],
-    allowMethods: ["GET", "POST", "OPTIONS"],
-    origin: (_origin, c) => c.env.WEB_ORIGIN,
-  });
 
   app.use("*", requestLoggingMiddleware());
-  publicApi.use("/graphql", graphQLCorsMiddleware);
 
   registerDriverRoute(app);
   registerRootRoute(app);
@@ -53,22 +41,15 @@ export function createHttpApp() {
     ),
   );
 
-  app.onError((error, c) => {
-    const url = new URL(c.req.url);
-
-    logError("request.failed", {
-      ...createRequestLogContext(c.req.raw),
-      ...createErrorLogContext(error),
-      path: url.pathname,
-    });
-
-    return c.json(
+  // The request logging middleware records the error on its http.request event.
+  app.onError((_error, c) =>
+    c.json(
       {
         error: "Internal Server Error",
       },
       500,
-    );
-  });
+    ),
+  );
 
   return app;
 }

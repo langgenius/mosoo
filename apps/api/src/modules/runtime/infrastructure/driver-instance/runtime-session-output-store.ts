@@ -6,14 +6,15 @@ import type { RuntimeEventEnvelope } from "@mosoo/runtime-events";
 import { createErrorLogContext, logWarn } from "../../../../platform/cloudflare/logger";
 import { withDisposedRpcResource } from "../../../../platform/cloudflare/rpc-disposal";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
+import { quoteShellArg } from "../../../../shared/shell";
 import { isTruthy } from "../../../../shared/truthiness";
 import {
   createRuntimeOutputContentSha256,
   createRuntimeOutputParentPath,
   fileStore,
 } from "../../../files/application/file-store";
-import { getRuntimeSubjectKeepAliveHandle } from "../runtime-subject-lifecycle/runtime-subject-lifecycle.service";
-import { getRuntimeConversationSession } from "../runtime-subject-lifecycle/runtime-subject-store";
+import { getRuntimeConversationSession } from "../runtime-subject-lifecycle/runtime-conversation-session-store";
+import { getRuntimeSubjectKeepAliveHandle } from "../runtime-subject-lifecycle/runtime-subject-platform";
 import { readSandboxFileBytes } from "../sandbox-file-bytes";
 import type { ExecutionSessionHandle } from "../sandbox-handles";
 import type { RuntimeSessionLink } from "./event-types";
@@ -26,10 +27,6 @@ import {
   toRuntimeSessionOutputArtifactPath,
   toRuntimeSessionOutputFile,
 } from "./runtime-session-outputs";
-
-function quoteShellArg(value: string): string {
-  return `'${value.replaceAll("'", `'"'"'`)}'`;
-}
 
 function resolveRuntimeOutputCreator(link: RuntimeSessionLink): AccountId | null {
   const actorId = link.executionOwnerId ?? link.callerId ?? link.creatorId;

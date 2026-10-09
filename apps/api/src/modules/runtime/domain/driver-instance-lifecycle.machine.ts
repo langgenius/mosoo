@@ -4,7 +4,6 @@ export const LIVE_DRIVER_INSTANCE_STATUSES = [
   "provisioning",
   "connecting",
   "ready",
-  "stopping",
 ] as const satisfies readonly DriverInstanceStatus[];
 
 export const ASSIGNABLE_DRIVER_INSTANCE_STATUSES = [
@@ -13,35 +12,14 @@ export const ASSIGNABLE_DRIVER_INSTANCE_STATUSES = [
   "ready",
 ] as const satisfies readonly DriverInstanceStatus[];
 
-export const REUSABLE_DRIVER_INSTANCE_STATUSES = [
-  "provisioning",
-  "connecting",
-  "ready",
-] as const satisfies readonly DriverInstanceStatus[];
-
-export type DriverInstanceLifecycleEvent =
-  | { type: "driver.connect" }
-  | { type: "driver.fail" }
-  | { type: "driver.provision" }
-  | { type: "driver.ready" }
-  | { type: "driver.stop" }
-  | { type: "driver.stopping" };
-
-const DRIVER_EVENT_BY_STATUS = {
-  connecting: { type: "driver.connect" },
-  failed: { type: "driver.fail" },
-  provisioning: { type: "driver.provision" },
-  ready: { type: "driver.ready" },
-  stopped: { type: "driver.stop" },
-  stopping: { type: "driver.stopping" },
-} as const satisfies Record<DriverInstanceStatus, DriverInstanceLifecycleEvent>;
-
-function toDriverInstanceLifecycleEvent(
-  status: DriverInstanceStatus,
-): DriverInstanceLifecycleEvent {
-  return DRIVER_EVENT_BY_STATUS[status];
-}
+const DRIVER_INSTANCE_STATUS_EVENT_NAMES = {
+  connecting: "driver.connect",
+  failed: "driver.fail",
+  provisioning: "driver.provision",
+  ready: "driver.ready",
+  stopped: "driver.stop",
+} as const satisfies Record<DriverInstanceStatus, string>;
 
 export function toDriverInstanceStatusLifecycleEventName(status: DriverInstanceStatus): string {
-  return toDriverInstanceLifecycleEvent(status).type;
+  return DRIVER_INSTANCE_STATUS_EVENT_NAMES[status];
 }

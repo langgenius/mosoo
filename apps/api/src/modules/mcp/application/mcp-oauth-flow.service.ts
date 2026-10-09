@@ -1,11 +1,12 @@
 import type {
-  McpCredentialRecordScope,
   McpOAuthFlowState,
   McpOAuthFlowStatus,
   StartMcpOAuthInput,
   StartMcpOAuthPayload,
 } from "@mosoo/contracts/mcp";
 import { mcpOauthFlowsTable } from "@mosoo/db";
+import { ignorePromiseRejection } from "@mosoo/effects";
+import { createPlatformId } from "@mosoo/id";
 import type { McpOAuthFlowId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
@@ -13,29 +14,22 @@ import { getAppDatabase } from "../../../platform/db/drizzle";
 import { isTruthy } from "../../../shared/truthiness";
 import { currentTimestampMs } from "../../../time";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import { ensureProjectOwnership } from "../../projects/application/project.service";
+import { deleteSecret, readSecret, storeSecret } from "../../vault/application/vault-secret-store";
 import { getProjectCredentialRow, writeCredential } from "./mcp-credential.repository";
 import { decodeJsonArray, toOAuthFlowState } from "./mcp-mappers";
 import {
   createPkcePair,
   registerDynamicOAuthClient,
 } from "./mcp-oauth-client-registration.service";
-import { exchangeOAuthToken, getOrDiscoverOAuthMetadata } from "./mcp-oauth-discovery.service";
+import { discoverOAuthMetadata, exchangeOAuthToken } from "./mcp-oauth-discovery.service";
 import { cleanupExpiredOAuthFlows } from "./mcp-oauth-flow-cleanup.service";
-import {
-  clearOAuthFlowSecret,
-  getOAuthFlowRowById,
-  markOAuthFlowTerminal,
-} from "./mcp-oauth-flow.repository";
-import {
-  readMcpOAuthFlowClientSecret,
-  readMcpOAuthServerClientSecret,
-  cleanupStoredMcpOAuthFlowClientSecret,
-  storeMcpOAuthFlowClientSecret,
-} from "./mcp-oauth-secret-resolution";
+import { getOAuthFlowRowById, markOAuthFlowTerminal } from "./mcp-oauth-flow.repository";
 import { createSignedOAuthState, verifySignedOAuthState } from "./mcp-oauth-state.service";
-import { OAUTH_FLOW_RESULT_RETENTION_MS, OAUTH_FLOW_TTL_MS } from "./mcp-oauth.constants";
-import { createMcpOAuthFlowId, readAccountId } from "./mcp-platform-ids";
+import {
+  MCP_OAUTH_CLIENT_SECRET_KIND,
+  OAUTH_FLOW_RESULT_RETENTION_MS,
+  OAUTH_FLOW_TTL_MS,
+} from "./mcp-oauth.constants";
 import { ensureServerAccess, getServerRow, getViewerRow } from "./mcp-server.repository";
 import type { OAuthFlowRow } from "./mcp-types";
 import { getCallbackUrl } from "./mcp-urls";
@@ -64,20 +58,13 @@ export async function getMcpOAuthFlowState(
   flowId: McpOAuthFlowId,
 ): Promise<McpOAuthFlowState> {
   await cleanupExpiredOAuthFlows(bindings);
-  const viewerId = readAccountId(viewer.id);
-
   const flow = await getOAuthFlowRowById(bindings.DB, flowId);
 
-  if (!flow || flow.initiatorUserId !== viewerId) {
+  if (!flow || flow.initiatorUserId !== viewer.id) {
     throw new Error("OAuth flow not found.");
   }
 
-  await ensureProjectOwnership(bindings.DB, viewerId, flow.projectId);
-  const server = await getServerRow(bindings.DB, flow.serverId);
-  if (server.projectId !== flow.projectId) {
-    throw new Error("OAuth flow server is not available in this project.");
-  }
-  return toOAuthFlowState(flow, server);
+  return toOAuthFlowState(flow, await getServerRow(bindings.DB, flow.serverId));
 }
 
 export async function startMcpOAuth(
@@ -87,67 +74,29 @@ export async function startMcpOAuth(
   input: StartMcpOAuthInput,
 ): Promise<StartMcpOAuthPayload> {
   await cleanupExpiredOAuthFlows(bindings);
-  const viewerId = readAccountId(viewer.id);
-  const { server } = await ensureServerAccess(bindings.DB, viewer, input.projectId, input.serverId);
+  const server = await ensureServerAccess(bindings.DB, viewer, input.projectId, input.serverId);
   const redirectUri = getCallbackUrl(requestUrl);
 
   if (server.authType !== "oauth") {
     throw new Error("This MCP server does not use OAuth authentication.");
   }
 
-  const metadata = await getOrDiscoverOAuthMetadata(bindings.DB, server);
+  const metadata = await discoverOAuthMetadata(server.url);
   let clientId = server.byoClientId;
-  let clientSecret: string | null = null;
-
-  if (isTruthy(server.byoClientSecretSecretId)) {
-    const secret = await readMcpOAuthServerClientSecret(bindings, {
-      actor: {
-        accountId: viewerId,
-        type: "user",
-      },
-      purpose: "oauth_authorization_client_secret",
-      projectId: server.projectId,
-      secretKind: "server_client_secret",
-      server,
-    });
-
-    if (secret.status === "denied") {
-      throw new Error(`MCP OAuth server client secret unavailable: ${secret.reason}.`);
-    }
-
-    clientSecret = secret.value;
-  }
+  let clientSecret = isTruthy(server.byoClientSecretSecretId)
+    ? await readSecret(bindings.DB, bindings, server.byoClientSecretSecretId)
+    : null;
 
   if (!isTruthy(clientId)) {
-    const registration = await registerDynamicOAuthClient(metadata, redirectUri);
-    ({ clientId } = registration);
-    ({ clientSecret } = registration);
-  }
-
-  if (!clientId) {
-    throw new Error("OAuth client registration is not configured for this MCP server.");
+    ({ clientId, clientSecret } = await registerDynamicOAuthClient(metadata, redirectUri));
   }
 
   const { challenge, verifier } = await createPkcePair();
-  const flowId = createMcpOAuthFlowId();
+  const flowId = createPlatformId<McpOAuthFlowId>();
   const now = currentTimestampMs();
-  const flowOwner = {
-    id: flowId,
-    initiatorUserId: viewerId,
-    projectId: server.projectId,
-    serverId: server.id,
-  };
-  const actor = {
-    accountId: viewerId,
-    type: "user" as const,
-  };
   const clientSecretSecretId = isTruthy(clientSecret)
-    ? await storeMcpOAuthFlowClientSecret(bindings, {
-        actor,
-        flow: flowOwner,
-        purpose: "oauth_flow_start_client_secret",
-        projectId: server.projectId,
-        secretKind: "flow_client_secret",
+    ? await storeSecret(bindings.DB, bindings, {
+        kind: MCP_OAUTH_CLIENT_SECRET_KIND,
         value: clientSecret,
       })
     : null;
@@ -164,12 +113,11 @@ export async function startMcpOAuth(
         errorMessage: null,
         expiresAt: now + OAUTH_FLOW_TTL_MS,
         id: flowId,
-        initiatorUserId: viewerId,
+        initiatorUserId: viewer.id,
         oauthClientId: clientId,
         oauthClientSecretSecretId: clientSecretSecretId,
         projectId: server.projectId,
         registrationEndpoint: metadata.registration_endpoint ?? null,
-        returnUrl: input.returnUrl ?? null,
         scopeValuesJson: JSON.stringify(metadata.scopes_supported ?? []),
         serverId: server.id,
         status: "pending",
@@ -179,23 +127,13 @@ export async function startMcpOAuth(
       })
       .run();
   } catch (error) {
-    await cleanupStoredMcpOAuthFlowClientSecret({
-      command: {
-        actor,
-        flow: flowOwner,
-        purpose: "oauth_flow_insert_cleanup",
-        projectId: server.projectId,
-        secretId: clientSecretSecretId,
-        secretKind: "flow_client_secret",
-      },
-      database: bindings.DB,
-    });
+    await deleteSecret(bindings.DB, clientSecretSecretId).catch(ignorePromiseRejection);
     throw error;
   }
 
   const state = await createSignedOAuthState(bindings, {
     flowId,
-    userId: viewerId,
+    userId: viewer.id,
   });
   const authorizationUrl = new URL(metadata.authorization_endpoint);
   authorizationUrl.searchParams.set("client_id", clientId);
@@ -248,13 +186,11 @@ export async function completeMcpOAuthCallback(
     }
 
     if (flow.expiresAt < currentTimestampMs()) {
-      await markOAuthFlowTerminal(bindings.DB, {
+      await markOAuthFlowTerminal(bindings.DB, flow, {
         errorMessage: "OAuth flow expired.",
-        flowId: flow.id,
         status: "expired",
         subjectLabel: flow.subjectLabel,
       });
-      await clearOAuthFlowSecret(bindings.DB, flow);
       return redirectToOAuthCompletion(request.url, {
         flowId: flow.id,
         status: "expired",
@@ -262,13 +198,11 @@ export async function completeMcpOAuthCallback(
     }
 
     if (isTruthy(error)) {
-      await markOAuthFlowTerminal(bindings.DB, {
+      await markOAuthFlowTerminal(bindings.DB, flow, {
         errorMessage: error,
-        flowId: flow.id,
         status: "failed",
         subjectLabel: flow.subjectLabel,
       });
-      await clearOAuthFlowSecret(bindings.DB, flow);
       return redirectToOAuthCompletion(request.url, {
         flowId: flow.id,
         status: "failed",
@@ -280,34 +214,9 @@ export async function completeMcpOAuthCallback(
     }
 
     const server = await getServerRow(bindings.DB, flow.serverId);
-
-    if (server.authType !== "oauth") {
-      throw new Error("This MCP server does not use OAuth authentication.");
-    }
-
-    await ensureProjectOwnership(bindings.DB, flow.initiatorUserId, flow.projectId);
-    if (server.projectId !== flow.projectId) {
-      throw new Error("OAuth flow server is not available in this project.");
-    }
-    const clientSecretOutcome = isTruthy(flow.oauthClientSecretSecretId)
-      ? await readMcpOAuthFlowClientSecret(bindings, {
-          actor: {
-            accountId: flow.initiatorUserId,
-            type: "user",
-          },
-          flow,
-          purpose: "oauth_callback_client_secret",
-          projectId: flow.projectId,
-          secretKind: "flow_client_secret",
-          server,
-        })
+    const clientSecret = isTruthy(flow.oauthClientSecretSecretId)
+      ? await readSecret(bindings.DB, bindings, flow.oauthClientSecretSecretId)
       : null;
-
-    if (clientSecretOutcome !== null && clientSecretOutcome.status === "denied") {
-      throw new Error(`MCP OAuth flow client secret unavailable: ${clientSecretOutcome.reason}.`);
-    }
-
-    const clientSecret = clientSecretOutcome === null ? null : clientSecretOutcome.value;
     const token = await exchangeOAuthToken({
       clientId: flow.oauthClientId,
       clientSecret,
@@ -322,7 +231,6 @@ export async function completeMcpOAuthCallback(
     const scopeValues = isTruthy(token.scope)
       ? token.scope.split(/\s+/).filter(Boolean)
       : decodeJsonArray(flow.scopeValuesJson);
-    const scope: McpCredentialRecordScope = "app";
     const existing = await getProjectCredentialRow(bindings.DB, server.id);
     const credential = await writeCredential(bindings.DB, bindings, {
       accessToken: token.access_token,
@@ -331,20 +239,17 @@ export async function completeMcpOAuthCallback(
       oauthClientId: flow.oauthClientId,
       oauthClientSecret: clientSecret,
       refreshToken: token.refresh_token ?? null,
-      scope,
       scopeValues,
       server,
       subjectLabel: viewerRow.email ?? viewerRow.name ?? flow.initiatorUserId,
       tokenExpiresAt,
     });
 
-    await markOAuthFlowTerminal(bindings.DB, {
+    await markOAuthFlowTerminal(bindings.DB, flow, {
       errorMessage: null,
-      flowId: flow.id,
       status: "succeeded",
       subjectLabel: credential.subjectLabel,
     });
-    await clearOAuthFlowSecret(bindings.DB, flow);
 
     return redirectToOAuthCompletion(request.url, {
       flowId: flow.id,
@@ -352,14 +257,12 @@ export async function completeMcpOAuthCallback(
     });
   } catch (callbackError) {
     if (flow?.status === "pending") {
-      await markOAuthFlowTerminal(bindings.DB, {
+      await markOAuthFlowTerminal(bindings.DB, flow, {
         errorMessage:
           callbackError instanceof Error ? callbackError.message : "OAuth callback failed.",
-        flowId: flow.id,
         status: "failed",
         subjectLabel: flow.subjectLabel,
       });
-      await clearOAuthFlowSecret(bindings.DB, flow);
       return redirectToOAuthCompletion(request.url, {
         flowId: flow.id,
         status: "failed",

@@ -9,17 +9,17 @@ import { getAppDatabase, getD1ChangeCount } from "../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../time";
 import type { ApiCommandMessage } from "./api-command-message";
 
-export const API_COMMAND_LEASE_MS = 5 * 60 * 1000;
-
-export const API_COMMAND_LEASE_RENEWAL_INTERVAL_MS = API_COMMAND_LEASE_MS / 5;
-
-export const API_COMMAND_QUEUE_SEND_FAILED_CODE = "queue_send_failed";
+// A Queue consumer invocation cannot outlive 15 minutes of wall time, so a
+// claim never expires under a live consumer.
+const API_COMMAND_LEASE_MS = 15 * 60 * 1000;
 
 export const API_COMMAND_QUEUE_DELIVERY_PENDING_CODE = "queue_delivery_pending";
 
-const API_COMMAND_QUEUE_DELIVERY_PENDING_MESSAGE = "API command is awaiting queue delivery.";
+// Older builds marked a failed Queue send "queue_send_failed" instead of leaving
+// it pending. Redrive those rows until production holds none, then delete it.
+const REDRIVABLE_DELIVERY_CODES = [API_COMMAND_QUEUE_DELIVERY_PENDING_CODE, "queue_send_failed"];
 
-const API_COMMAND_QUEUE_SEND_FAILED_MESSAGE = "API command queue send failed.";
+const API_COMMAND_QUEUE_DELIVERY_PENDING_MESSAGE = "API command is awaiting queue delivery.";
 
 const API_COMMAND_QUEUE_REDRIVE_LIMIT = 100;
 
@@ -28,7 +28,7 @@ export const API_COMMAND_LEASE_EXPIRED_CODE = "lease_expired";
 // One claim per Queue delivery: the first attempt plus `max_retries = 5`.
 export const API_COMMAND_MAX_CLAIM_ATTEMPTS = 6;
 
-// A live consumer renews every minute; one extra minute avoids racing a late renewal.
+// One extra minute absorbs clock skew against the consumer wall-time limit.
 const API_COMMAND_LEASE_EXPIRY_GRACE_MS = 60_000;
 
 export interface EnqueueApiCommandInput {
@@ -56,22 +56,10 @@ export interface ApiCommandAdmission {
   readonly shouldDeliver: boolean;
 }
 
-type ApiCommandDeliveryBindings = Pick<ApiBindings, "API_COMMAND_QUEUE" | "DB"> &
-  Partial<Pick<ApiBindings, "ENVIRONMENT_ARTIFACT_BUILD_QUEUE">>;
-
-function normalizeDedupeKey(value: string): string {
-  const dedupeKey = value.trim();
-
-  if (dedupeKey.length === 0) {
-    throw new Error("API command dedupe key is required.");
-  }
-
-  return dedupeKey;
-}
-
-function toQueueMessage(commandId: ApiCommandId): ApiCommandMessage {
-  return { commandId };
-}
+type ApiCommandDeliveryBindings = Pick<
+  ApiBindings,
+  "API_COMMAND_QUEUE" | "DB" | "ENVIRONMENT_ARTIFACT_BUILD_QUEUE"
+>;
 
 export async function findApiCommandByDedupeKey(
   database: D1Database,
@@ -92,22 +80,7 @@ export async function findApiCommandByDedupeKey(
   );
 }
 
-async function markApiCommandQueueSendFailed(input: {
-  commandId: ApiCommandId;
-  database: D1Database;
-}): Promise<void> {
-  await getAppDatabase(input.database)
-    .update(apiCommandsTable)
-    .set({
-      lastErrorCode: API_COMMAND_QUEUE_SEND_FAILED_CODE,
-      lastErrorMessage: API_COMMAND_QUEUE_SEND_FAILED_MESSAGE,
-      updatedAt: currentTimestampMs(),
-    })
-    .where(and(eq(apiCommandsTable.id, input.commandId), eq(apiCommandsTable.status, "queued")))
-    .run();
-}
-
-async function clearApiCommandQueueSendFailure(input: {
+async function clearApiCommandDeliveryPending(input: {
   commandId: ApiCommandId;
   database: D1Database;
 }): Promise<void> {
@@ -122,10 +95,7 @@ async function clearApiCommandQueueSendFailure(input: {
       and(
         eq(apiCommandsTable.id, input.commandId),
         eq(apiCommandsTable.status, "queued"),
-        inArray(apiCommandsTable.lastErrorCode, [
-          API_COMMAND_QUEUE_DELIVERY_PENDING_CODE,
-          API_COMMAND_QUEUE_SEND_FAILED_CODE,
-        ]),
+        inArray(apiCommandsTable.lastErrorCode, REDRIVABLE_DELIVERY_CODES),
       ),
     )
     .run();
@@ -140,23 +110,11 @@ async function sendApiCommandMessage(
     kind === "environment_package_artifact_build"
       ? bindings.ENVIRONMENT_ARTIFACT_BUILD_QUEUE
       : bindings.API_COMMAND_QUEUE;
-  if (!queue) {
-    throw new Error("Environment artifact build queue binding is required.");
-  }
   try {
-    await queue.send(toQueueMessage(commandId));
+    await queue.send({ commandId } satisfies ApiCommandMessage);
   } catch (error) {
     // A rejected producer response does not prove that Queue discarded the message.
-    // The durable outbox record remains eligible for scheduled redrive either way.
-    try {
-      await markApiCommandQueueSendFailed({ commandId, database: bindings.DB });
-    } catch (markError) {
-      logError("api-command.enqueue_failure_mark_failed", {
-        ...createErrorLogContext(markError),
-        commandId,
-      });
-    }
-
+    // The durable outbox record stays pending and eligible for scheduled redrive.
     logError("api-command.enqueue_deferred", {
       ...createErrorLogContext(error),
       commandId,
@@ -165,7 +123,7 @@ async function sendApiCommandMessage(
   }
 
   try {
-    await clearApiCommandQueueSendFailure({ commandId, database: bindings.DB });
+    await clearApiCommandDeliveryPending({ commandId, database: bindings.DB });
   } catch (error) {
     // Queue accepted the command. Leaving its delivery marker intact is safe:
     // a later redrive may send a duplicate, and consumer claiming is idempotent.
@@ -229,10 +187,7 @@ export async function redriveFailedApiCommandEnqueues(
     .where(
       and(
         eq(apiCommandsTable.status, "queued"),
-        inArray(apiCommandsTable.lastErrorCode, [
-          API_COMMAND_QUEUE_DELIVERY_PENDING_CODE,
-          API_COMMAND_QUEUE_SEND_FAILED_CODE,
-        ]),
+        inArray(apiCommandsTable.lastErrorCode, REDRIVABLE_DELIVERY_CODES),
       ),
     )
     .orderBy(asc(apiCommandsTable.id))
@@ -246,10 +201,10 @@ export async function redriveFailedApiCommandEnqueues(
 
 export function prepareApiCommand(
   input: EnqueueApiCommandInput,
-  options: { commandId?: ApiCommandId; timestampMs?: number } = {},
+  options: { timestampMs?: number } = {},
 ): PreparedApiCommand {
   const timestampMs = options.timestampMs ?? currentTimestampMs();
-  const commandId = options.commandId ?? createPlatformId<ApiCommandId>();
+  const commandId = createPlatformId<ApiCommandId>();
 
   return {
     commandId,
@@ -259,7 +214,7 @@ export function prepareApiCommand(
       claimOwner: null,
       completedAt: null,
       createdAt: timestampMs,
-      dedupeKey: normalizeDedupeKey(input.dedupeKey),
+      dedupeKey: input.dedupeKey,
       id: commandId,
       kind: input.kind,
       lastErrorCode: API_COMMAND_QUEUE_DELIVERY_PENDING_CODE,
@@ -288,11 +243,8 @@ export async function admitApiCommand(
     return { commandId: prepared.commandId, kind: input.kind, shouldDeliver: true };
   }
 
-  const current = await findApiCommandByDedupeKey(bindings.DB, prepared.record.dedupeKey);
-
-  if (current === null) {
-    throw new Error("API command enqueue could not confirm the ledger row.");
-  }
+  // Rows are never deleted, so the conflicting dedupe key always resolves.
+  const current = (await findApiCommandByDedupeKey(bindings.DB, prepared.record.dedupeKey))!;
 
   if (input.retryTerminal === true && current.status !== "queued" && current.status !== "running") {
     await database
@@ -318,15 +270,13 @@ export async function admitApiCommand(
     return { commandId: current.id, kind: input.kind, shouldDeliver: true };
   }
 
-  if (
-    current.status === "queued" &&
-    (current.lastErrorCode === API_COMMAND_QUEUE_DELIVERY_PENDING_CODE ||
-      current.lastErrorCode === API_COMMAND_QUEUE_SEND_FAILED_CODE)
-  ) {
-    return { commandId: current.id, kind: input.kind, shouldDeliver: true };
-  }
-
-  return { commandId: current.id, kind: input.kind, shouldDeliver: false };
+  return {
+    commandId: current.id,
+    kind: input.kind,
+    shouldDeliver:
+      current.status === "queued" &&
+      REDRIVABLE_DELIVERY_CODES.includes(current.lastErrorCode ?? ""),
+  };
 }
 
 export async function deliverApiCommand(
@@ -384,31 +334,6 @@ export async function claimApiCommand(input: {
       .get()) ?? null;
 
   return row;
-}
-
-export async function renewApiCommandClaim(input: {
-  commandId: ApiCommandId;
-  database: D1Database;
-  nowMs?: number;
-  ownerId: string;
-}): Promise<boolean> {
-  const nowMs = input.nowMs ?? currentTimestampMs();
-  const result = await getAppDatabase(input.database)
-    .update(apiCommandsTable)
-    .set({
-      claimExpiresAt: nowMs + API_COMMAND_LEASE_MS,
-      updatedAt: nowMs,
-    })
-    .where(
-      and(
-        eq(apiCommandsTable.id, input.commandId),
-        eq(apiCommandsTable.status, "running"),
-        eq(apiCommandsTable.claimOwner, input.ownerId),
-      ),
-    )
-    .run();
-
-  return getD1ChangeCount(result) > 0;
 }
 
 export async function completeApiCommand(input: {

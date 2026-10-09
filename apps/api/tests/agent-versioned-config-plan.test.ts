@@ -50,7 +50,7 @@ describe("Agent preset change plan", () => {
     { mcpServerIds: ["01J000000000000000000000B2"] },
     { skills: [{ id: "01J000000000000000000000B3", state: "active" as const }] },
     { builtInTools: [] },
-  ])("records execution edits for future consumers without a runtime action: %j", (patch) => {
+  ])("records execution edits as a new deployment version: %j", (patch) => {
     const plan = planVersionedAgentConfigChange({
       agentStatus: "published",
       current,
@@ -58,8 +58,6 @@ describe("Agent preset change plan", () => {
     });
     expect(plan.fieldLabels).toHaveLength(1);
     expect(plan.requiresDeploymentVersion).toBe(true);
-    expect(plan).not.toHaveProperty("action");
-    expect(plan).not.toHaveProperty("requiresRuntimeOperation");
   });
   test("draft presets need no publishing step to save a different harness", () => {
     expect(

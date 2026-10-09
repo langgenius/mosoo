@@ -17,6 +17,7 @@ import { getAppDatabase, runAppDatabaseBatch } from "../../../platform/db/drizzl
 import { currentTimestampMs } from "../../../time";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { ensureProjectOwnership } from "../../projects/application/project.service";
+import { deleteSecret, readSecret, storeSecret } from "../../vault/application/vault-secret-store";
 import {
   enforceApiBaseAllowed,
   enforceCredentialModelShape,
@@ -31,45 +32,18 @@ import {
   getProjectCredentialRow,
   getProjectVendorCredentialRow,
 } from "./vendor-credential.repository";
-import {
-  deleteVendorCredentialSecret,
-  readVendorCredentialSecret,
-  storeVendorCredentialSecret,
-} from "./vendor-credential.secret-resolution";
 import type { VendorCredentialRow } from "./vendor-credential.types";
 
-function toSecretOwnerCommand(row: VendorCredentialRow) {
-  return {
-    credentialId: row.id,
-    projectId: row.projectId,
-    providerId: row.vendorId,
-  };
-}
-
-function ensureVendorCredentialSecretDeleted(
-  outcome: Awaited<ReturnType<typeof deleteVendorCredentialSecret>>,
-): void {
-  if (outcome.status === "denied") {
-    throw new Error(`Vendor credential secret delete denied: ${outcome.reason}.`);
-  }
-}
+const VENDOR_API_KEY_SECRET_KIND = "vendor_api_key";
 
 async function toVisibleVendorCredential(
   bindings: ApiBindings,
   row: VendorCredentialRow,
 ): Promise<VendorCredential> {
-  const secret = await readVendorCredentialSecret(bindings, {
-    credential: row,
-    projectId: row.projectId,
-    providerId: row.vendorId,
-    purpose: "credential_display_api_key",
-  });
-
-  if (secret.status === "denied") {
-    throw new Error("Vendor credential secret is unavailable.");
-  }
-
-  return toVendorCredentialWithSecret(row, secret.apiKey);
+  return toVendorCredentialWithSecret(
+    row,
+    await readSecret(bindings.DB, bindings, row.apiKeySecretId),
+  );
 }
 
 export async function createVendorCredential(
@@ -102,12 +76,9 @@ export async function createVendorCredential(
     (await getProjectVendorCredentialRow(bindings.DB, input.projectId, input.vendorId)) === null;
   const id = createPlatformId<VendorCredentialId>();
   const timestampMs = currentTimestampMs();
-  const secretId = await storeVendorCredentialSecret(bindings, {
-    apiKey,
-    credentialId: id,
-    projectId: input.projectId,
-    providerId: input.vendorId,
-    purpose: "credential_create_api_key",
+  const secretId = await storeSecret(bindings.DB, bindings, {
+    kind: VENDOR_API_KEY_SECRET_KIND,
+    value: apiKey,
   });
 
   try {
@@ -128,13 +99,7 @@ export async function createVendorCredential(
       })
       .run();
   } catch (error) {
-    await deleteVendorCredentialSecret(bindings.DB, {
-      credentialId: id,
-      projectId: input.projectId,
-      providerId: input.vendorId,
-      purpose: "credential_create_rollback",
-      secretId,
-    }).catch(ignorePromiseRejection);
+    await deleteSecret(bindings.DB, secretId).catch(ignorePromiseRejection);
     throw error;
   }
 
@@ -178,10 +143,9 @@ export async function updateVendorCredential(
     input.apiKey?.trim() !== null &&
     input.apiKey?.trim() !== undefined &&
     input.apiKey?.trim() !== ""
-      ? await storeVendorCredentialSecret(bindings, {
-          ...toSecretOwnerCommand(row),
-          apiKey: input.apiKey.trim(),
-          purpose: "credential_update_api_key",
+      ? await storeSecret(bindings.DB, bindings, {
+          kind: VENDOR_API_KEY_SECRET_KIND,
+          value: input.apiKey.trim(),
         })
       : row.apiKeySecretId;
 
@@ -205,23 +169,13 @@ export async function updateVendorCredential(
       .run();
   } catch (error) {
     if (nextSecretId !== row.apiKeySecretId) {
-      await deleteVendorCredentialSecret(bindings.DB, {
-        ...toSecretOwnerCommand(row),
-        purpose: "credential_update_rollback",
-        secretId: nextSecretId,
-      }).catch(ignorePromiseRejection);
+      await deleteSecret(bindings.DB, nextSecretId).catch(ignorePromiseRejection);
     }
     throw error;
   }
 
   if (nextSecretId !== row.apiKeySecretId) {
-    ensureVendorCredentialSecretDeleted(
-      await deleteVendorCredentialSecret(bindings.DB, {
-        ...toSecretOwnerCommand(row),
-        purpose: "credential_update_replaced",
-        secretId: row.apiKeySecretId,
-      }),
-    );
+    await deleteSecret(bindings.DB, row.apiKeySecretId);
   }
 
   const updated = await getProjectCredentialRow(bindings.DB, input.projectId, input.id);
@@ -299,13 +253,7 @@ export async function deleteVendorCredential(
       ),
     )
     .run();
-  ensureVendorCredentialSecretDeleted(
-    await deleteVendorCredentialSecret(bindings.DB, {
-      ...toSecretOwnerCommand(row),
-      purpose: "credential_delete",
-      secretId: row.apiKeySecretId,
-    }),
-  );
+  await deleteSecret(bindings.DB, row.apiKeySecretId);
 
   // Deleting the default leaves the vendor with no default; promote the next
   // remaining credential so resolution stays deterministic.

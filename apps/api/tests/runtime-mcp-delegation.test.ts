@@ -5,8 +5,35 @@ import {
   RUNTIME_MCP_TOOL_CALL_ID_HEADER,
   createRuntimeMcpDelegationToken,
   readRuntimeMcpToolCallId,
-  verifyRuntimeMcpDelegationToken,
 } from "../src/modules/runtime/application/runtime-mcp-delegation";
+import { fromBase64Url } from "../src/shared/bytes";
+
+// What a business MCP server does with the shared bearer token to trust the claims.
+async function verifyDelegationToken(token: string, accessToken: string) {
+  const [header, payload, signature] = token.split(".") as [string, string, string];
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    await crypto.subtle.digest(
+      "SHA-256",
+      encoder.encode(`mosoo-mcp-delegation-v1\0${accessToken}`),
+    ),
+    { hash: "SHA-256", name: "HMAC" },
+    false,
+    ["verify"],
+  );
+  if (
+    !(await crypto.subtle.verify(
+      "HMAC",
+      key,
+      fromBase64Url(signature),
+      encoder.encode(`${header}.${payload}`),
+    ))
+  ) {
+    throw new Error("MCP delegation token signature is invalid.");
+  }
+  return JSON.parse(new TextDecoder().decode(fromBase64Url(payload)));
+}
 
 const claims = {
   agentId: "01J00000000000000000000009",
@@ -26,31 +53,19 @@ describe("runtime MCP end-user delegation", () => {
       nowMs: 1_800_000_000_000,
     });
 
-    await expect(
-      verifyRuntimeMcpDelegationToken({
-        accessToken: "mcp-upstream-secret",
-        audience: "https://tools.example.com/mcp",
-        nowMs: 1_800_000_030_000,
-        token,
-      }),
-    ).resolves.toMatchObject({
+    await expect(verifyDelegationToken(token, "mcp-upstream-secret")).resolves.toMatchObject({
       act: { agent_id: claims.agentId, app_id: claims.projectId },
       aud: "https://tools.example.com/mcp",
       exp: 1_800_000_060,
+      iat: 1_800_000_000,
+      iss: "mosoo",
       run_id: claims.runId,
       sub: "customer-123",
       thread_id: claims.threadId,
       tool_call_id: "tool-call-1",
     });
 
-    await expect(
-      verifyRuntimeMcpDelegationToken({
-        accessToken: "wrong-secret",
-        audience: "https://tools.example.com/mcp",
-        nowMs: 1_800_000_030_000,
-        token,
-      }),
-    ).rejects.toThrow("signature");
+    await expect(verifyDelegationToken(token, "wrong-secret")).rejects.toThrow("signature");
   });
 
   test("strips a driver-supplied identity header and injects the trusted token", () => {
@@ -76,54 +91,10 @@ describe("runtime MCP end-user delegation", () => {
       nowMs: 1_800_000_000_000,
     });
 
-    await expect(
-      verifyRuntimeMcpDelegationToken({
-        accessToken: "mcp-upstream-secret",
-        audience: "https://tools.example.com/mcp",
-        nowMs: 1_800_000_030_000,
-        token,
-      }),
-    ).resolves.toMatchObject({ run_id: null, sub: claims.endUserId });
-  });
-
-  test("applies a replayed business effect once by signed tool call ID", async () => {
-    let writeCount = 0;
-    const storedResults = new Map<string, { recordId: string }>();
-    const applyBusinessEffect = async (token: string) => {
-      const verified = await verifyRuntimeMcpDelegationToken({
-        accessToken: "mcp-upstream-secret",
-        audience: "https://tools.example.com/mcp",
-        nowMs: 1_800_000_030_000,
-        token,
-      });
-      const key = `${verified.act.app_id}:${verified.tool_call_id}`;
-      const stored = storedResults.get(key);
-
-      if (stored !== undefined) {
-        return stored;
-      }
-
-      writeCount += 1;
-      const result = { recordId: `record-${writeCount}` };
-      storedResults.set(key, result);
-      return result;
-    };
-    const firstToken = await createRuntimeMcpDelegationToken({
-      accessToken: "mcp-upstream-secret",
-      audience: "https://tools.example.com/mcp",
-      claims,
-      nowMs: 1_800_000_000_000,
+    await expect(verifyDelegationToken(token, "mcp-upstream-secret")).resolves.toMatchObject({
+      run_id: null,
+      sub: claims.endUserId,
     });
-    const replayToken = await createRuntimeMcpDelegationToken({
-      accessToken: "mcp-upstream-secret",
-      audience: "https://tools.example.com/mcp",
-      claims,
-      nowMs: 1_800_000_001_000,
-    });
-
-    await applyBusinessEffect(firstToken); // The write commits; its response is lost.
-    await expect(applyBusinessEffect(replayToken)).resolves.toEqual({ recordId: "record-1" });
-    expect(writeCount).toBe(1);
   });
 
   test("validates the Driver-only tool call identity header", () => {

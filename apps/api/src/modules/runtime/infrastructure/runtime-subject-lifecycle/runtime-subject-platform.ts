@@ -1,22 +1,15 @@
-import { SANDBOX_CACHE_PATH, SANDBOX_SESSION_ROOT } from "@mosoo/agent-driver/paths";
 import { sandboxesTable } from "@mosoo/db";
+import { promiseWithTimeout } from "@mosoo/effects";
 import { parsePlatformId } from "@mosoo/id";
 import type { SandboxId } from "@mosoo/id";
 import { eq } from "drizzle-orm";
 
-import type { SandboxContainerObservation } from "../../../../adapters/durable-objects/sandbox.do";
-import { createErrorLogContext, logInfo, logWarn } from "../../../../platform/cloudflare/logger";
+import { createErrorLogContext, logWarn } from "../../../../platform/cloudflare/logger";
 import { withDisposedRpcResource } from "../../../../platform/cloudflare/rpc-disposal";
-import {
-  requireCloudflareSandboxBinding,
-  requireSandboxBinding,
-} from "../../../../platform/cloudflare/sandbox-binding";
+import { requireCloudflareSandboxBinding } from "../../../../platform/cloudflare/sandbox-binding";
 import { SANDBOX_STARTUP_RPC_TIMEOUT_MS } from "../../../../platform/cloudflare/sandbox-startup";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../../platform/db/drizzle";
-import type { SandboxNetworkConstraints } from "../../domain/sandbox-network-constraints";
-import { withRuntimeProvisionTimeout } from "../runtime-provision-timeout";
-import { toSandboxHandle } from "../sandbox-handles";
 import type { SandboxHandle } from "../sandbox-handles";
 
 async function readRuntimeSubjectSandboxBinding(
@@ -34,120 +27,50 @@ async function readRuntimeSubjectSandboxBinding(
   return record.sandboxBinding;
 }
 
-export async function getRuntimeSubjectContainerObservation(
-  bindings: ApiBindings,
-  runtimeSubjectId: string,
-): Promise<SandboxContainerObservation> {
-  const sandboxId = parsePlatformId<SandboxId>(runtimeSubjectId, "Runtime subject ID");
-  const binding = await readRuntimeSubjectSandboxBinding(bindings, sandboxId);
-  // Match getSandbox(normalizeId: true), without its configuration RPCs.
-  const subject = requireSandboxBinding(bindings, binding).getByName(sandboxId.toLowerCase());
-  return withDisposedRpcResource(subject, (handle) => handle.getContainerObservation());
-}
-
 export async function getRuntimeSubjectKeepAliveHandle(
   bindings: ApiBindings,
   runtimeSubjectId: string,
 ): Promise<SandboxHandle> {
   if (bindings.runtimeSubjectHandleFactory) {
-    return Promise.resolve(toSandboxHandle(bindings.runtimeSubjectHandleFactory(runtimeSubjectId)));
+    return bindings.runtimeSubjectHandleFactory(runtimeSubjectId) as SandboxHandle;
   }
 
-  return getCloudflareRuntimeSubjectKeepAliveHandle(
-    bindings,
-    runtimeSubjectId,
-    await readRuntimeSubjectSandboxBinding(bindings, runtimeSubjectId),
-  );
-}
-
-async function getCloudflareRuntimeSubjectKeepAliveHandle(
-  bindings: ApiBindings,
-  runtimeSubjectId: string,
-  sandboxBinding: string,
-): Promise<SandboxHandle> {
+  const sandboxBinding = await readRuntimeSubjectSandboxBinding(bindings, runtimeSubjectId);
   const { getSandbox } = await import("@cloudflare/sandbox");
-  const sandbox = getSandbox(
-    requireCloudflareSandboxBinding(bindings, sandboxBinding),
-    runtimeSubjectId,
-    {
-      keepAlive: true,
-      normalizeId: true,
-    },
-  );
-  return toSandboxHandle(sandbox);
+  return getSandbox(requireCloudflareSandboxBinding(bindings, sandboxBinding), runtimeSubjectId, {
+    keepAlive: true,
+    normalizeId: true,
+  }) as unknown as SandboxHandle;
 }
 
-/**
- * Pushes the environment egress policy into the sandbox Durable Object. Must
- * run before any container-starting call (mkdir/exec/session create): the
- * internet switch only takes effect at container start, and a limited policy
- * must fail closed here rather than let the container come up unrestricted.
- */
-export async function configureRuntimeSubjectNetwork(
-  subject: SandboxHandle,
-  constraints: SandboxNetworkConstraints,
-): Promise<void> {
-  await withRuntimeProvisionTimeout(
-    subject.configureNetworkConstraints(constraints),
-    "Runtime subject network configure",
-  );
-}
-
-export async function prepareRuntimeSubjectFilesystem(
+export async function startRuntimeSubjectContainer(
   subject: SandboxHandle,
   input: { allowStartupRecovery: boolean; runtimeSubjectId: string },
 ): Promise<void> {
-  async function step(name: string, task: () => Promise<void>, timeoutMs?: number): Promise<void> {
-    const startedAt = Date.now();
-    try {
-      await withRuntimeProvisionTimeout(task(), `Runtime subject ${name}`, timeoutMs);
-      logInfo("runtime.subject.prepare.step", {
-        durationMs: Date.now() - startedAt,
-        runtimeSubjectId: input.runtimeSubjectId,
-        step: name,
-      });
-    } catch (error) {
-      logWarn("runtime.subject.prepare.failed", {
-        ...createErrorLogContext(error),
-        durationMs: Date.now() - startedAt,
-        runtimeSubjectId: input.runtimeSubjectId,
-        step: name,
-      });
-      throw error;
-    }
+  try {
+    await subject.setKeepAlive(true);
+    await promiseWithTimeout(
+      subject.ensureContainerReady({ allowRecovery: input.allowStartupRecovery }),
+      { label: "Runtime subject container startup", timeoutMs: SANDBOX_STARTUP_RPC_TIMEOUT_MS },
+    );
+  } catch (error) {
+    logWarn("runtime.subject.prepare.failed", {
+      ...createErrorLogContext(error),
+      runtimeSubjectId: input.runtimeSubjectId,
+    });
+    throw error;
   }
-
-  await step("keep-alive", () => subject.setKeepAlive(true));
-  await step(
-    "container startup",
-    () => subject.ensureContainerReady({ allowRecovery: input.allowStartupRecovery }),
-    SANDBOX_STARTUP_RPC_TIMEOUT_MS,
-  );
-  // These operations now run against a ready container. Each keeps the original
-  // 15s limit and identifies the failing path instead of hiding startup retries
-  // inside parallel implicit default-session initializations.
-  await Promise.all(
-    [SANDBOX_CACHE_PATH, SANDBOX_SESSION_ROOT].map((path) =>
-      step(`mkdir ${path}`, () => subject.mkdir(path, { recursive: true })),
-    ),
-  );
 }
 
 export async function destroyRuntimeSubjectContainer(
   bindings: ApiBindings,
   runtimeSubjectId: string,
-  timeoutMs?: number,
 ): Promise<void> {
-  await withRuntimeProvisionTimeout(
-    (async () =>
-      withDisposedRpcResource(
-        await getRuntimeSubjectKeepAliveHandle(bindings, runtimeSubjectId),
-        async (subject) => {
-          await subject.setKeepAlive(false);
-          await subject.destroy();
-        },
-      ))(),
-    `Runtime subject destroy for ${runtimeSubjectId}`,
-    timeoutMs,
+  await withDisposedRpcResource(
+    await getRuntimeSubjectKeepAliveHandle(bindings, runtimeSubjectId),
+    async (subject) => {
+      await subject.setKeepAlive(false);
+      await subject.destroy();
+    },
   );
 }

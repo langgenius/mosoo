@@ -38,34 +38,22 @@ export async function relayDriverProcessLogs(input: {
   context?: Record<string, unknown>;
   message: string;
   process: RuntimeProcessHandle;
-  severity?: "error" | "warn";
-}): Promise<string | null> {
+}): Promise<void> {
   try {
     const driverLogTail = normalizeDriverLogTail(await input.process.getLogs());
 
-    if (driverLogTail === null) {
-      return null;
+    if (driverLogTail !== null) {
+      logError(input.message, {
+        ...input.context,
+        driverLogTail,
+        processId: input.process.id,
+      });
     }
-
-    const metadata = {
-      ...input.context,
-      driverLogTail,
-      processId: input.process.id,
-    };
-
-    if (input.severity === "warn") {
-      logWarn(input.message, metadata);
-      return driverLogTail;
-    }
-
-    logError(input.message, metadata);
-    return driverLogTail;
   } catch (error) {
     logWarn("runtime.driver.process.logs.read.failed", {
       ...input.context,
       processId: input.process.id,
       ...createErrorLogContext(error),
     });
-    return null;
   }
 }

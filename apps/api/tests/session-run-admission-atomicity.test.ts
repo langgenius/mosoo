@@ -4,7 +4,7 @@ import { createPlatformId, parsePlatformId } from "@mosoo/id";
 import type { AgentDeploymentVersionId, RuntimeEventId, SessionId, SessionRunId } from "@mosoo/id";
 import { createRuntimeEvent } from "@mosoo/runtime-events";
 
-import { API_COMMAND_QUEUE_SEND_FAILED_CODE } from "../src/modules/api-command/application/api-command-ledger";
+import { API_COMMAND_QUEUE_DELIVERY_PENDING_CODE } from "../src/modules/api-command/application/api-command-ledger";
 import { getAccountViewer } from "../src/modules/auth/application/viewer-auth.service";
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
 import { queueSessionRun } from "../src/modules/runtime/application/session-run.service";
@@ -160,19 +160,19 @@ function queueOwnerRun(input: {
       clientRequestId: input.clientRequestId ?? "issue-329-request",
       prompt: "Admit this request atomically.",
       session: {
-        agent_id: input.withoutPreset ? null : PUBLIC_API_TEST_IDS.agent,
-        project_id: PUBLIC_API_TEST_IDS.project,
-        deployment_version_id: input.withoutPreset
+        agentId: input.withoutPreset ? null : PUBLIC_API_TEST_IDS.agent,
+        deploymentVersionId: input.withoutPreset
           ? null
           : parsePlatformId<AgentDeploymentVersionId>(
               PUBLIC_API_TEST_IDS.deployment,
               "fixture deployment version",
             ),
-        deployment_version_number: input.withoutPreset ? null : 1,
+        deploymentVersionNumber: input.withoutPreset ? null : 1,
         id: parsePlatformId<SessionId>(PUBLIC_API_TEST_IDS.ownerSession, "fixture session"),
         model: "gpt-5.4",
+        projectId: PUBLIC_API_TEST_IDS.project,
         provider: "openai",
-        runtime_id: "openai-runtime",
+        runtimeId: "openai-runtime",
       },
     },
     requestUrl: "https://api.example.com/api/graphql",
@@ -277,6 +277,30 @@ describe("Session Run atomic admission", () => {
     expect((await readSessionState(database)).status).toBe("RUNNING");
     await expect(queueOwnerRun({ bindings, viewer, withoutPreset: true })).rejects.toThrow();
     expect(await readAdmissionCounts(database)).toEqual(firstCounts);
+  });
+
+  test.each([
+    ["terminated", "UPDATE session SET status = 'TERMINATED' WHERE id = ?"],
+    [
+      "owned by a runtime operation",
+      `UPDATE session SET status = 'RESCHEDULING', status_operation_id = '${PUBLIC_API_TEST_IDS.operation}' WHERE id = ?`,
+    ],
+  ])("rejects admission while the Session is %s", async (_label, update) => {
+    const { database, viewer } = await createFixture();
+    await database.prepare(update).bind(PUBLIC_API_TEST_IDS.ownerSession).run();
+    const bindings = createPublicHttpTestBindings(database, {
+      apiCommandQueue: createApiCommandQueueStub(),
+    }) as ApiBindings;
+
+    await expect(queueOwnerRun({ bindings, viewer })).rejects.toThrow(
+      "Session cannot accept a new run.",
+    );
+    expect(await readAdmissionCounts(database)).toEqual({
+      apiCommand: 0,
+      event: 0,
+      message: 0,
+      run: 0,
+    });
   });
 
   test("rechecks Preview expiry inside the native admission batch without enqueuing work", async () => {
@@ -661,7 +685,7 @@ describe("Session Run atomic admission", () => {
     await expect(
       database.prepare("SELECT last_error_code AS lastErrorCode, status FROM api_command").first(),
     ).resolves.toEqual({
-      lastErrorCode: API_COMMAND_QUEUE_SEND_FAILED_CODE,
+      lastErrorCode: API_COMMAND_QUEUE_DELIVERY_PENDING_CODE,
       status: "queued",
     });
     expect(sent).toHaveLength(1);

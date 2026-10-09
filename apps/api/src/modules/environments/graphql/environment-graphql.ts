@@ -1,17 +1,13 @@
 import type { EnvironmentId, ProjectId } from "@mosoo/id";
 
 import type { GraphQLModule } from "../../../adapters/graphql/graphql-module";
-import { environmentGraphQLSpec } from "../../../adapters/graphql/graphql-module-specs";
 import {
   createEnvironment,
-  createEnvironmentFork,
   deleteEnvironment,
-  getEnvironmentDetail,
-  listProjectEnvironments,
-  setEnvironmentVariableValue,
   setProjectDefaultEnvironment,
   updateEnvironment,
-} from "../application/environment.service";
+} from "../application/environment-commands";
+import { getEnvironmentDetail, listProjectEnvironments } from "../application/environment-queries";
 
 interface EnvironmentIdArgs {
   environmentId: EnvironmentId;
@@ -30,10 +26,6 @@ interface UpdateEnvironmentArgs {
   input: Parameters<typeof updateEnvironment>[2];
 }
 
-interface CreateEnvironmentForkArgs {
-  input: Parameters<typeof createEnvironmentFork>[2];
-}
-
 interface DeleteEnvironmentArgs {
   input: Parameters<typeof deleteEnvironment>[2];
 }
@@ -42,23 +34,14 @@ interface SetProjectDefaultEnvironmentArgs {
   input: Parameters<typeof setProjectDefaultEnvironment>[2];
 }
 
-interface SetEnvironmentVariableValueArgs {
-  input: Parameters<typeof setEnvironmentVariableValue>[2];
-}
-
 export const environmentGraphQLModule = {
-  ...environmentGraphQLSpec,
   authenticatedMutationResolvers: {
     createEnvironment: async (_parent, args: CreateEnvironmentArgs, context) =>
       createEnvironment(context.bindings, context.viewer, args.input),
-    createEnvironmentFork: async (_parent, args: CreateEnvironmentForkArgs, context) =>
-      createEnvironmentFork(context.bindings, context.viewer, args.input),
     deleteEnvironment: async (_parent, args: DeleteEnvironmentArgs, context) => {
       await deleteEnvironment(context.bindings, context.viewer, args.input);
       return { ok: true } as const;
     },
-    setEnvironmentVariableValue: async (_parent, args: SetEnvironmentVariableValueArgs, context) =>
-      setEnvironmentVariableValue(context.bindings, context.viewer, args.input),
     setProjectDefaultEnvironment: async (
       _parent,
       args: SetProjectDefaultEnvironmentArgs,

@@ -1540,21 +1540,6 @@
                     },
                     "userId": "customer-123"
                   }
-                },
-                "cattleAgentSameShape": {
-                  "summary": "Cattle Agent using the same request shape",
-                  "value": {
-                    "input": {
-                      "content": [
-                        {
-                          "text": "Run this one-off Public Thread API request.",
-                          "type": "text"
-                        }
-                      ],
-                      "type": "user.message"
-                    },
-                    "userId": "automation"
-                  }
                 }
               },
               "schema": {

@@ -15,13 +15,12 @@ import { userGraphQLModule } from "../../modules/users/graphql/user-graphql";
 import { vendorCredentialGraphQLModule } from "../../modules/vendor-credentials/graphql/vendor-credential-graphql";
 import type { GraphQLContext } from "./graphql-context";
 import { composeGraphQLModules } from "./graphql-module";
-import { commonGraphQLModule } from "./modules/common-graphql";
+import { graphqlTypeDefs } from "./graphql-module-specs";
 import { jsonObjectScalar } from "./scalars/json-object-scalar";
 import { primitiveRecordScalar } from "./scalars/primitive-record-scalar";
 import { ulidScalar } from "./scalars/ulid-scalar";
 
 const composedGraphQLModules = composeGraphQLModules([
-  commonGraphQLModule,
   agentGraphQLModule,
   costGraphQLModule,
   environmentGraphQLModule,
@@ -36,18 +35,6 @@ const composedGraphQLModules = composeGraphQLModules([
   vendorCredentialGraphQLModule,
 ]);
 
-const typeDefs = /* GraphQL */ `
-  ${composedGraphQLModules.typeDefs.join("\n")}
-
-  type Query {
-    ${composedGraphQLModules.queryFields.join("\n    ")}
-  }
-
-  type Mutation {
-    ${composedGraphQLModules.mutationFields.join("\n    ")}
-  }
-`;
-
 export function createGraphQLSchema() {
   return createSchema<GraphQLContext>({
     resolvers: {
@@ -58,6 +45,6 @@ export function createGraphQLSchema() {
       SessionProcessEventType: SESSION_PROCESS_EVENT_TYPE_BY_CODE,
       ULID: ulidScalar,
     },
-    typeDefs,
+    typeDefs: graphqlTypeDefs,
   });
 }

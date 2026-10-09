@@ -225,43 +225,6 @@ function createPackageFixture(): AgentPackage {
 
 async function createFixture(input: { archiveBytes?: Uint8Array } = {}) {
   const database = await createPublicHttpContractDatabase();
-  database.execute(`
-    CREATE TABLE IF NOT EXISTS skill (
-      author text NOT NULL,
-      created_at integer NOT NULL,
-      current_snapshot_id text NOT NULL,
-      description text NOT NULL,
-      forked_from_owner_name text,
-      forked_from_skill_id text,
-      forked_from_skill_name text,
-      id text PRIMARY KEY NOT NULL,
-      name text NOT NULL,
-      owner_account_id text NOT NULL,
-      project_id text NOT NULL,
-      source_kind text NOT NULL,
-      updated_at integer NOT NULL,
-      version text
-    );
-
-    CREATE TABLE IF NOT EXISTS agent_skill (
-      agent_id text NOT NULL,
-      created_at integer NOT NULL,
-      skill_id text NOT NULL,
-      sort_order integer NOT NULL,
-      PRIMARY KEY (agent_id, skill_id)
-    );
-
-    CREATE TABLE IF NOT EXISTS skill_snapshot_entry (
-      snapshot_id text NOT NULL,
-      path text NOT NULL,
-      entry_kind text NOT NULL,
-      is_executable integer NOT NULL,
-      mime_type text,
-      sha256 text,
-      size integer NOT NULL,
-      PRIMARY KEY (snapshot_id, path)
-    );
-  `);
   const bucket = new MemoryByteBucket();
   const bindings = createPublicHttpTestBindings(database, {
     fileBucket: bucket as unknown as R2Bucket,
@@ -480,7 +443,7 @@ describe("agent package file import", () => {
       VALUES
         (
           1,
-          NULL,
+          '01J000000000000000000000B4',
           '',
           NULL,
           NULL,

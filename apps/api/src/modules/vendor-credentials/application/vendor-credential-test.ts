@@ -29,10 +29,8 @@ import {
 import { normalizeApiBase, normalizeCredentialModelProtocol } from "./vendor-credential-validation";
 
 export interface VendorCredentialProbeInput {
-  allowModelProbe?: boolean;
   apiBase?: string | null;
   apiKey: string;
-  emitEvent?: boolean;
   fetchProxy?: ProviderFetchProxyConfig | null;
   modelId?: string | null;
   modelProtocol?: PresetModelProtocol | null;
@@ -165,7 +163,6 @@ async function probeModelProtocol(input: {
 
 function finishCredentialTest(input: {
   baseUrl: string | null;
-  emitEvent: boolean;
   errorCode?: string;
   ok: boolean;
   startedAt: number;
@@ -173,21 +170,19 @@ function finishCredentialTest(input: {
 }): TestVendorCredentialResult {
   const latencyMs = Date.now() - input.startedAt;
 
-  if (input.emitEvent) {
-    emitApiWideEvent(
-      createApiWideEvent("provider.credential_test", {
-        fields: {
-          provider: {
-            baseURLHost: input.baseUrl === null ? "" : readVendorProbeBaseHost(input.baseUrl),
-            errorCode: input.errorCode ?? "",
-            latencyMs,
-            ok: input.ok,
-            vendorId: input.vendorId,
-          },
+  emitApiWideEvent(
+    createApiWideEvent("provider.credential_test", {
+      fields: {
+        provider: {
+          baseURLHost: input.baseUrl === null ? "" : readVendorProbeBaseHost(input.baseUrl),
+          errorCode: input.errorCode ?? "",
+          latencyMs,
+          ok: input.ok,
+          vendorId: input.vendorId,
         },
-      }),
-    );
-  }
+      },
+    }),
+  );
 
   return {
     ...(input.errorCode === undefined ? {} : { errorCode: input.errorCode }),
@@ -205,17 +200,7 @@ async function ensureCredentialTestAccess(
 }
 
 export async function testVendorCredential(
-  bindings: Pick<
-    ApiBindings,
-    | "DB"
-    | "MOSOO_DEPLOYMENT_MODE"
-    | "MOSOO_ENVIRONMENT"
-    | "MOSOO_PROVIDER_FETCH_PROXY_TOKEN"
-    | "MOSOO_PROVIDER_FETCH_PROXY_URL"
-    | "POSTHOG_API_HOST"
-    | "POSTHOG_PROJECT_KEY"
-    | "WEB_ORIGIN"
-  >,
+  bindings: ApiBindings,
   viewer: AuthenticatedViewer,
   input: TestVendorCredentialInput,
 ): Promise<TestVendorCredentialResult> {
@@ -245,10 +230,8 @@ export async function probeVendorCredential(
   input: VendorCredentialProbeInput,
 ): Promise<TestVendorCredentialResult> {
   const startedAt = Date.now();
-  const allowModelProbe = input.allowModelProbe ?? true;
   const apiKey = input.apiKey.trim();
   const apiBase = normalizeApiBase(input.apiBase);
-  const emitEvent = input.emitEvent ?? true;
   const fetchProxy = input.fetchProxy ?? null;
   const modelId = input.modelId?.trim() || null;
   const timeoutMs = input.timeoutMs ?? 10_000;
@@ -269,7 +252,6 @@ export async function probeVendorCredential(
   if (apiKey.length === 0) {
     return finishCredentialTest({
       baseUrl: apiBase,
-      emitEvent,
       errorCode: "missing_api_key",
       ok: false,
       startedAt,
@@ -283,7 +265,6 @@ export async function probeVendorCredential(
   if (baseUrl === null) {
     return finishCredentialTest({
       baseUrl: null,
-      emitEvent,
       errorCode: "missing_api_base",
       ok: false,
       startedAt,
@@ -296,7 +277,6 @@ export async function probeVendorCredential(
   if (baseUrlErrorCode !== null) {
     return finishCredentialTest({
       baseUrl,
-      emitEvent,
       errorCode: baseUrlErrorCode,
       ok: false,
       startedAt,
@@ -307,7 +287,6 @@ export async function probeVendorCredential(
   if (modelIdRequired && modelId === null) {
     return finishCredentialTest({
       baseUrl,
-      emitEvent,
       errorCode: "missing_model_id",
       ok: false,
       startedAt,
@@ -335,7 +314,6 @@ export async function probeVendorCredential(
             });
       return finishCredentialTest({
         baseUrl,
-        emitEvent,
         startedAt,
         vendorId: input.vendorId,
         ...result,
@@ -363,7 +341,7 @@ export async function probeVendorCredential(
         ok = vendorProbeModelListIncludes(listPayload, modelId);
 
         if (!ok) {
-          if (allowModelProbe && modelProtocol !== null) {
+          if (modelProtocol !== null) {
             const modelProbe = await probeModelProtocol({
               apiKey,
               baseUrl,
@@ -385,7 +363,7 @@ export async function probeVendorCredential(
       errorCode = await readVendorProbeErrorCode(listResponse);
     } else if (modelId === null) {
       errorCode = "missing_model_id";
-    } else if (allowModelProbe && modelProtocol !== null) {
+    } else if (modelProtocol !== null) {
       const modelProbe = await probeModelProtocol({
         apiKey,
         baseUrl,
@@ -408,7 +386,6 @@ export async function probeVendorCredential(
 
   return finishCredentialTest({
     baseUrl,
-    emitEvent,
     ...(errorCode === undefined ? {} : { errorCode }),
     ok,
     startedAt,

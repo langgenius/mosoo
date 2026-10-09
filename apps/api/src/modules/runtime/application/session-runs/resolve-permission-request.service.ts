@@ -1,36 +1,29 @@
-import { driverInstancesTable, sessionRunsTable, sessionsTable } from "@mosoo/db";
-import { createPlatformId, parsePlatformId } from "@mosoo/id";
-import type { AccountId, DriverInstanceId, ProjectId, SessionId } from "@mosoo/id";
+import { driverInstancesTable, sessionRunsTable } from "@mosoo/db";
+import { createPlatformId } from "@mosoo/id";
+import type { DriverInstanceId, SessionId } from "@mosoo/id";
 import { and, eq, inArray } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../../platform/db/drizzle";
-import type { AuthenticatedViewer } from "../../../auth/application/viewer-auth.service";
-import { ensureProjectOwnership } from "../../../projects/application/project.service";
-import { sessionParticipantCondition } from "../../../sessions/domain/session-access.policy";
 import { ACTIVE_SESSION_RUN_STATUSES } from "../../domain/session-run-lifecycle.machine";
 import { sendDriverInstanceCommand } from "../../infrastructure/driver-instance/client";
 
 interface ResolveDriverPermissionInput {
   decision: "allow_once" | "reject_once";
   driverInstanceId: DriverInstanceId;
-  projectId: ProjectId;
   requestId: string;
   sessionId: SessionId;
 }
 
+// The caller authorized the Session. The Driver id comes from Driver-emitted
+// live state, so it must belong to an active Run of that Session.
 export async function resolvePermissionRequest(
   bindings: ApiBindings,
-  viewer: AuthenticatedViewer,
   input: ResolveDriverPermissionInput,
 ): Promise<void> {
-  const viewerId: AccountId = parsePlatformId(viewer.id, "viewer id");
-  await ensureProjectOwnership(bindings.DB, viewerId, input.projectId);
   const row =
     (await getAppDatabase(bindings.DB)
-      .select({
-        sessionId: sessionsTable.id,
-      })
+      .select({ sessionId: sessionRunsTable.sessionId })
       .from(driverInstancesTable)
       .innerJoin(
         sessionRunsTable,
@@ -39,13 +32,10 @@ export async function resolvePermissionRequest(
           inArray(sessionRunsTable.status, ACTIVE_SESSION_RUN_STATUSES),
         ),
       )
-      .innerJoin(sessionsTable, eq(sessionsTable.id, sessionRunsTable.sessionId))
       .where(
         and(
           eq(driverInstancesTable.id, input.driverInstanceId),
-          eq(sessionsTable.id, input.sessionId),
-          eq(sessionsTable.projectId, input.projectId),
-          sessionParticipantCondition(viewerId),
+          eq(sessionRunsTable.sessionId, input.sessionId),
         ),
       )
       .limit(1)

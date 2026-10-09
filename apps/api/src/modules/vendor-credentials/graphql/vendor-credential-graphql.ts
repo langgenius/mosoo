@@ -1,21 +1,19 @@
-import { parsePlatformId } from "@mosoo/id";
 import type { ProjectId } from "@mosoo/id";
 
 import type { GraphQLModule } from "../../../adapters/graphql/graphql-module";
-import { vendorCredentialGraphQLSpec } from "../../../adapters/graphql/graphql-module-specs";
 import { isTruthy } from "../../../shared/truthiness";
+import { resolveAvailableModelsForViewer } from "../application/available-models";
 import {
   createVendorCredential,
   deleteVendorCredential,
-  listVendorCredentials,
-  resolveAvailableModelsForViewer,
   setDefaultVendorCredential,
-  testVendorCredential,
   updateVendorCredential,
-} from "../application/vendor-credential.service";
+} from "../application/vendor-credential-commands";
+import { listVendorCredentials } from "../application/vendor-credential-list";
+import { testVendorCredential } from "../application/vendor-credential-test";
 
 interface VendorCredentialsArgs {
-  projectId: string;
+  projectId: ProjectId;
 }
 
 interface CreateVendorCredentialArgs {
@@ -37,7 +35,7 @@ interface SetDefaultVendorCredentialArgs {
 interface AvailableAgentModelsArgs {
   currentModelId?: string | null;
   currentVendorId?: string | null;
-  projectId: string;
+  projectId: ProjectId;
   runtimeId: string;
 }
 
@@ -45,12 +43,7 @@ interface TestVendorCredentialArgs {
   input: Parameters<typeof testVendorCredential>[2];
 }
 
-function parseProjectId(value: string): ProjectId {
-  return parsePlatformId<ProjectId>(value, "Project ID");
-}
-
 export const vendorCredentialGraphQLModule = {
-  ...vendorCredentialGraphQLSpec,
   authenticatedMutationResolvers: {
     createVendorCredential: async (_parent, args: CreateVendorCredentialArgs, context) =>
       createVendorCredential(context.bindings, context.viewer, args.input),
@@ -70,10 +63,10 @@ export const vendorCredentialGraphQLModule = {
       resolveAvailableModelsForViewer(context.bindings.DB, context.viewer, {
         ...(isTruthy(args.currentModelId) ? { currentModelId: args.currentModelId } : {}),
         ...(isTruthy(args.currentVendorId) ? { currentVendorId: args.currentVendorId } : {}),
-        projectId: parseProjectId(args.projectId),
+        projectId: args.projectId,
         runtimeId: args.runtimeId,
       }),
     vendorCredentialList: async (_parent, args: VendorCredentialsArgs, context) =>
-      listVendorCredentials(context.bindings, context.viewer, parseProjectId(args.projectId)),
+      listVendorCredentials(context.bindings, context.viewer, args.projectId),
   },
 } satisfies GraphQLModule;

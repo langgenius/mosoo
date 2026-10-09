@@ -17,10 +17,9 @@ export function registerGraphQLRoute(app: Hono<ApiGatewayEnvironment>) {
   app.all("/graphql", async (c) => {
     const graphqlGateway = await getGraphQLGateway();
 
-    // @ts-expect-error -- Cloudflare Request<unknown, CfProperties> vs whatwg-node Request
     return graphqlGateway.fetch(c.req.raw, {
-      ...c.env,
-      executionCtx: c.executionCtx,
+      bindings: c.env,
+      executionContext: c.executionCtx,
     });
   });
 }

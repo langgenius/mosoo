@@ -1,40 +1,34 @@
-import type { SessionId } from "@mosoo/id";
-import { RUNTIME_DIAGNOSTIC_EVENT } from "@mosoo/runtime-events";
+import type { DriverInstanceId, FileId, SessionId, SessionRunId } from "@mosoo/id";
 
-import {
-  disposeRpcResource,
-  withDisposedRpcResource,
-} from "../../../../platform/cloudflare/rpc-disposal";
+import { disposeRpcResource } from "../../../../platform/cloudflare/rpc-disposal";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
-import { createStopwatch } from "../../../../time";
-import type {
-  DispatchRuntimeTurnInput,
-  PrepareRuntimeRunInput,
-  RuntimeExecutionPlaneAdapter,
-  RuntimeExecutionPlaneRunLease,
-  RuntimeSubjectOperationInput,
-  StopRuntimeSubjectDriversInput,
-} from "../../application/execution-plane/execution-plane-adapter";
-import {
-  appendRuntimeDiagnosticEvent,
-  toRuntimeDiagnosticBaseValue,
-  toRuntimeDiagnosticReason,
-} from "../../application/runtime-diagnostic-events";
+import type { HydratedSessionRunContext } from "../../application/session-definition/session-execution.types";
 import { createRuntimeTimingRecorder } from "../../application/session-runs/session-runtime-timing";
-import { dispatchDriverTurn, ensureDriverSessionReady } from "../driver-session.service";
-import {
-  createRuntimeSubjectLifecycleService,
-  getRuntimeSubjectKeepAliveHandle,
-} from "../runtime-subject-lifecycle/runtime-subject-lifecycle.service";
+import type { RuntimeTimingSnapshot } from "../../application/session-runs/session-runtime-timing";
+import { ensureDriverSessionReady } from "../driver-session.service";
+import { activateRuntimeSubject } from "../runtime-subject-lifecycle/runtime-subject-lifecycle.service";
 import { resolveRuntimeSubjectNetworkConstraints } from "../runtime-subject-lifecycle/runtime-subject-network";
-import {
-  recreateRuntimeSubjectPreservingState,
-  stopRuntimeSubjectDrivers,
-} from "../runtime-subject-lifecycle/runtime-subject-operations.service";
-import { getRuntimeConversationSession } from "../runtime-subject-lifecycle/runtime-subject-store";
 import type { ExecutionSessionHandle, SandboxHandle } from "../sandbox-handles";
-import { ensureSandboxConversationSession } from "../sandbox-session.service";
-import { ensureSessionResourcesMounted } from "../session-resources/session-resource-mount.service";
+import { ensureSandboxConversationSession } from "../sandbox-session/sandbox-conversation-session.service";
+
+export interface RuntimeExecutionPlaneRunLease {
+  driverInstanceId: DriverInstanceId;
+  timing: RuntimeTimingSnapshot;
+  readiness(): Promise<RuntimeTimingSnapshot>;
+  release(): void;
+}
+
+export interface PrepareRuntimeRunInput {
+  attachmentIds: FileId[];
+  builtInTools: HydratedSessionRunContext["builtInTools"];
+  profile: HydratedSessionRunContext["profile"];
+  resolvedMcpServers: HydratedSessionRunContext["mcpServers"];
+  resolvedSkillCatalog: HydratedSessionRunContext["skillCatalog"];
+  resolvedSkills: HydratedSessionRunContext["skills"];
+  sessionId: SessionId;
+  sessionRunId: SessionRunId;
+  traceId: string;
+}
 
 function releaseRunResources(handles: {
   executionSession: ExecutionSessionHandle | null;
@@ -46,209 +40,104 @@ function releaseRunResources(handles: {
   handles.subject = null;
 }
 
-class SandboxExecutionPlaneAdapter implements RuntimeExecutionPlaneAdapter {
-  async prepareRun(
-    bindings: ApiBindings,
-    requestUrl: string,
-    input: PrepareRuntimeRunInput,
-  ): Promise<RuntimeExecutionPlaneRunLease> {
-    const sandboxId = input.profile.sandbox.id;
-    const runtimeBase = toRuntimeDiagnosticBaseValue({
-      agentId: input.profile.configRevision.agentId,
+export async function prepareRun(
+  bindings: ApiBindings,
+  requestUrl: string,
+  input: PrepareRuntimeRunInput,
+): Promise<RuntimeExecutionPlaneRunLease> {
+  const sandboxId = input.profile.sandbox.id;
+  const handles: {
+    executionSession: ExecutionSessionHandle | null;
+    subject: SandboxHandle | null;
+  } = {
+    executionSession: null,
+    subject: null,
+  };
+
+  try {
+    const timing = createRuntimeTimingRecorder({
+      runId: input.sessionRunId,
       sessionId: input.sessionId,
+      source: "api",
+      stage: "prepare_run",
       traceId: input.traceId,
     });
-    const sandboxProvisioningTimer = createStopwatch();
-    let sandboxProvisioned = false;
-    const handles: {
-      executionSession: ExecutionSessionHandle | null;
-      subject: SandboxHandle | null;
-    } = {
-      executionSession: null,
-      subject: null,
-    };
-    // Success diagnostics are owner-debug, persist-only (deliver: false) and
-    // swallow their own errors; keep them off the first-token critical path and
-    // settle them before the lease is returned.
-    let pendingDiagnostics: Promise<unknown> = Promise.resolve();
-
-    try {
-      const timing = createRuntimeTimingRecorder({
-        runId: input.sessionRunId,
+    const sandbox = await timing.measure("activateRuntimeSubject", () =>
+      activateRuntimeSubject(bindings, {
+        agentId: input.profile.agentId,
+        executionOwnerUserId: input.profile.session.origin.executionOwnerUserId,
+        networkConstraints: resolveRuntimeSubjectNetworkConstraints(bindings, {
+          envVars: input.profile.envVars,
+          network: input.profile.network,
+          requestUrl,
+        }),
+        runtimeSubjectId: sandboxId,
+        projectId: input.profile.vendorCredential.projectId,
         sessionId: input.sessionId,
-        source: "api",
-        stage: "prepare_run",
-        traceId: input.traceId,
-      });
-      const runtimeSubjectLifecycle = createRuntimeSubjectLifecycleService(bindings);
-      pendingDiagnostics = appendRuntimeDiagnosticEvent(bindings, {
-        eventName: RUNTIME_DIAGNOSTIC_EVENT.sandboxProvisioningStarted.name,
-        sessionId: input.sessionId,
-        value: {
-          ...runtimeBase,
-          sandboxId,
-        },
-      });
-      const { subject: sandbox } = await timing.measure("activateRuntimeSubject", () =>
-        runtimeSubjectLifecycle.activate({
-          runtimeId: input.profile.runtimeId,
-          agentId: input.profile.agentId,
-          diagnosticContext: {
-            agentId: input.profile.configRevision.agentId,
-            sessionId: input.sessionId,
-            traceId: input.traceId,
-          },
-          executionOwnerUserId: input.profile.session.origin.executionOwnerUserId,
-          networkConstraints: resolveRuntimeSubjectNetworkConstraints(bindings, {
-            envVars: input.profile.envVars,
-            network: input.profile.network,
-            requestUrl,
-          }),
-          runtimeSubjectId: sandboxId,
-          projectId: input.profile.vendorCredential.projectId,
-          sessionId: input.sessionId,
-          timing,
-        }),
-      );
-      handles.subject = sandbox;
-      const provisioningCompletedValue = {
-        ...runtimeBase,
-        coldStartMs: sandboxProvisioningTimer.elapsedMs(),
-        sandboxId,
-      };
-      // Chain after the started event so the two diagnostics keep their order.
-      pendingDiagnostics = pendingDiagnostics.then(() =>
-        appendRuntimeDiagnosticEvent(bindings, {
-          eventName: RUNTIME_DIAGNOSTIC_EVENT.sandboxProvisioningCompleted.name,
-          sessionId: input.sessionId,
-          value: provisioningCompletedValue,
-        }),
-      );
-      sandboxProvisioned = true;
-
-      const executionSession = await timing.measure("ensureSandboxConversationSession", () =>
-        ensureSandboxConversationSession(bindings, {
-          agentId: input.profile.configRevision.agentId,
-          mountSessionResources: input.attachmentIds.length > 0,
-          origin: input.profile.session.origin,
-          sandbox,
-          sandboxId,
-          sessionId: input.sessionId,
-          timing,
-        }),
-      );
-      handles.executionSession = executionSession.cloudflareSession;
-
-      const driverProfile = {
-        ...input.profile,
-        session: {
-          ...input.profile.session,
-          sandboxSessionId: executionSession.sandboxSessionId,
-          homePath: input.profile.session.homePath,
-          origin: executionSession.origin,
-          sessionOrganizationPath: executionSession.cwd,
-        },
-      };
-      const driver = await timing.measure("ensureDriverSessionReady", () =>
-        ensureDriverSessionReady(bindings, requestUrl, {
-          builtInTools: input.builtInTools,
-          cloudflareSession: executionSession.cloudflareSession,
-          ...(input.onBootPayloadPrepared
-            ? { onBootPayloadPrepared: input.onBootPayloadPrepared }
-            : {}),
-          profile: driverProfile,
-          resolvedMcpServers: input.resolvedMcpServers,
-          resolvedSkillCatalog: input.resolvedSkillCatalog,
-          resolvedSkills: input.resolvedSkills,
-          sandbox,
-          sandboxSessionId: input.sessionId,
-          sessionId: input.sessionId,
-          sessionRunId: input.sessionRunId,
-          traceId: input.traceId,
-        }),
-      );
-      for (const phase of driver.timing.phases) {
-        timing.addPhase(phase.name, phase.durationMs);
-      }
-      const initialDriverPhaseCount = driver.timing.phases.length;
-
-      await pendingDiagnostics;
-
-      return {
-        driverInstanceId: driver.driverInstanceId,
-        readiness: async () => {
-          const driverTiming = await driver.readiness();
-
-          for (const phase of driverTiming.phases.slice(initialDriverPhaseCount)) {
-            timing.addPhase(phase.name, phase.durationMs);
-          }
-
-          return timing.snapshot({ path: driverTiming.path });
-        },
-        timing: timing.snapshot({ path: driver.timing.path }),
-        release: () => {
-          releaseRunResources(handles);
-        },
-      };
-    } catch (error) {
-      await pendingDiagnostics;
-      if (!sandboxProvisioned) {
-        await appendRuntimeDiagnosticEvent(bindings, {
-          eventName: RUNTIME_DIAGNOSTIC_EVENT.sandboxProvisioningFailed.name,
-          sessionId: input.sessionId,
-          value: {
-            ...runtimeBase,
-            reason: toRuntimeDiagnosticReason(error, "Runtime sandbox provisioning failed."),
-            sandboxId,
-          },
-        });
-      }
-      releaseRunResources(handles);
-      throw error;
-    }
-  }
-
-  async dispatchTurn(bindings: ApiBindings, input: DispatchRuntimeTurnInput): Promise<void> {
-    await dispatchDriverTurn(bindings, input);
-  }
-
-  async materializeActiveSessionResources(
-    bindings: ApiBindings,
-    input: { sessionId: SessionId },
-  ): Promise<void> {
-    const sandboxSession = await getRuntimeConversationSession(bindings.DB, input.sessionId);
-
-    if (sandboxSession?.status !== "active") {
-      return;
-    }
-
-    await withDisposedRpcResource(
-      await getRuntimeSubjectKeepAliveHandle(bindings, sandboxSession.sandboxId),
-      async (sandbox) => {
-        await ensureSessionResourcesMounted({
-          bindings,
-          sandbox,
-          sessionId: input.sessionId,
-        });
-      },
+        timing,
+      }),
     );
-  }
+    handles.subject = sandbox;
 
-  async stopSubjectDrivers(
-    bindings: ApiBindings,
-    input: StopRuntimeSubjectDriversInput,
-  ): Promise<void> {
-    await stopRuntimeSubjectDrivers(bindings, input);
-  }
+    const executionSession = await timing.measure("ensureSandboxConversationSession", () =>
+      ensureSandboxConversationSession(bindings, {
+        mountSessionResources: input.attachmentIds.length > 0,
+        origin: input.profile.session.origin,
+        sandbox,
+        sandboxId,
+        sessionId: input.sessionId,
+        timing,
+      }),
+    );
+    handles.executionSession = executionSession.cloudflareSession;
 
-  async recreateSubjectPreservingState(
-    bindings: ApiBindings,
-    input: RuntimeSubjectOperationInput,
-  ): Promise<void> {
-    await recreateRuntimeSubjectPreservingState(bindings, input);
-  }
-}
+    const driverProfile = {
+      ...input.profile,
+      session: {
+        ...input.profile.session,
+        sandboxSessionId: executionSession.sandboxSessionId,
+        homePath: input.profile.session.homePath,
+        origin: executionSession.origin,
+        sessionOrganizationPath: executionSession.cwd,
+      },
+    };
+    const driver = await timing.measure("ensureDriverSessionReady", () =>
+      ensureDriverSessionReady(bindings, requestUrl, {
+        builtInTools: input.builtInTools,
+        cloudflareSession: executionSession.cloudflareSession,
+        profile: driverProfile,
+        resolvedMcpServers: input.resolvedMcpServers,
+        resolvedSkillCatalog: input.resolvedSkillCatalog,
+        resolvedSkills: input.resolvedSkills,
+        sandbox,
+        sessionId: input.sessionId,
+        sessionRunId: input.sessionRunId,
+        traceId: input.traceId,
+      }),
+    );
+    for (const phase of driver.timing.phases) {
+      timing.addPhase(phase.name, phase.durationMs);
+    }
+    const initialDriverPhaseCount = driver.timing.phases.length;
 
-export function createSandboxExecutionPlaneAdapter(): RuntimeExecutionPlaneAdapter {
-  return new SandboxExecutionPlaneAdapter();
+    return {
+      driverInstanceId: driver.driverInstanceId,
+      readiness: async () => {
+        const driverTiming = await driver.readiness();
+
+        for (const phase of driverTiming.phases.slice(initialDriverPhaseCount)) {
+          timing.addPhase(phase.name, phase.durationMs);
+        }
+
+        return timing.snapshot({ path: driverTiming.path });
+      },
+      timing: timing.snapshot({ path: driver.timing.path }),
+      release: () => {
+        releaseRunResources(handles);
+      },
+    };
+  } catch (error) {
+    releaseRunResources(handles);
+    throw error;
+  }
 }

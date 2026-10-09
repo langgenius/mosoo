@@ -4,14 +4,12 @@ import { getVendor, resolveRuntimeModelProtocol } from "@mosoo/runtime-catalog";
 import type { RuntimeCatalogVendor } from "@mosoo/runtime-catalog";
 
 import { isTruthy } from "../../../../shared/truthiness";
-import { enforceSafeApiBase } from "../../../vendor-credentials/application/vendor-credential-validation";
 import type {
   DriverProfileConfig,
   DriverVendorCredentialProfile,
 } from "../../domain/driver-snapshot";
 import { RUNTIME_RUN_RETENTION_MS } from "../../domain/runtime-config";
 import { getRuntimeDriverLlmProxyPath } from "../../domain/runtime-driver-routes";
-import { enforceCanonicalRuntimeLlmProxyBaseUrl } from "../../domain/runtime-llm-proxy-base-url";
 import {
   RUNTIME_LLM_PROXY_MODEL_ID_MAX_LENGTH,
   createRuntimeActionToken,
@@ -121,13 +119,6 @@ export async function buildVendorProxyEnvVars(
 
   if (credential.vendorId === "openai-compatible" && !isTruthy(credential.apiBase)) {
     throw new Error("Custom providers require an endpoint.");
-  }
-
-  if (isTruthy(credential.apiBase)) {
-    // Fail fast at provisioning time; the proxy enforces this again on every
-    // forwarded request in case the credential changes mid-session.
-    enforceSafeApiBase(credential.apiBase);
-    enforceCanonicalRuntimeLlmProxyBaseUrl(credential.apiBase);
   }
 
   const modelBinding = resolveLlmProxyModelBinding(input.profile, vendor);
@@ -271,10 +262,7 @@ function buildOpenCodeProviderConfig(input: OpenCodeProviderConfigInput): OpenCo
     };
   }
 
-  options[provider.apiBaseOption ?? "baseURL"] = resolveOpenCodeProxyBaseUrl(
-    input.vendor,
-    input.proxyUrl,
-  );
+  options["baseURL"] = resolveOpenCodeProxyBaseUrl(input.vendor, input.proxyUrl);
 
   return {
     models,

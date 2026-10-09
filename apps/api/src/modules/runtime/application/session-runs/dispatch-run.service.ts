@@ -1,33 +1,20 @@
-import type { DriverBootPayload, DriverRuntime } from "@mosoo/agent-driver/boot";
-import { parsePlatformId } from "@mosoo/id";
-import type { AgentId, DriverInstanceId, FileId, SessionId, SessionRunId } from "@mosoo/id";
-import { RUNTIME_DIAGNOSTIC_EVENT } from "@mosoo/runtime-events";
+import type { DriverInstanceId, FileId, SessionId, SessionRunId } from "@mosoo/id";
 
 import { logError, logInfo, logWarn } from "../../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { isTruthy } from "../../../../shared/truthiness";
-import {
-  appendSessionRuntimeEvents,
-  createSessionRuntimeEvent,
-} from "../../../sessions/application/session-event-write.service";
-import { createSandboxExecutionPlaneAdapter } from "../../infrastructure/execution-plane/sandbox-execution-plane-adapter";
-import type { RuntimeExecutionPlaneRunLease } from "../execution-plane/execution-plane-adapter";
-import {
-  appendRuntimeDiagnosticEvents,
-  toRuntimeDiagnosticBaseValue,
-} from "../runtime-diagnostic-events";
-import type { RuntimeDiagnosticEventInput } from "../runtime-diagnostic-events";
-import { buildSessionConfigTraceValue } from "../session-definition/session-config-trace-event";
+import { appendSessionRuntimeEvents } from "../../../sessions/application/session-event-write.service";
+import { dispatchDriverTurn } from "../../infrastructure/driver-session.service";
+import { prepareRun } from "../../infrastructure/execution-plane/sandbox-execution-plane-adapter";
+import type { RuntimeExecutionPlaneRunLease } from "../../infrastructure/execution-plane/sandbox-execution-plane-adapter";
 import type { HydratedSessionRunContext } from "../session-definition/session-execution.types";
 import { cleanupDispatchedDriver } from "./dispatch-run-cleanup.service";
-import { withPreReadyRetry } from "./pre-ready-retry";
 import { toProvisionRunError } from "./run-error-message";
 import { persistSessionRunSkills } from "./session-run-skill-snapshot.repository";
 import {
   acquireSessionRunDispatch,
   SessionRunNoLongerActiveError,
   ensureSessionRunIsActive,
-  getSessionRunState,
 } from "./session-run-state.repository";
 import { recordCanonicalSessionRunFailure } from "./session-run-terminal-failure.service";
 import { createSessionRunUpdatedEvent } from "./session-run-view-events.service";
@@ -36,69 +23,6 @@ import {
   createRuntimeTimingRecorder,
 } from "./session-runtime-timing";
 
-const executionPlane = createSandboxExecutionPlaneAdapter();
-
-const PRE_READY_DISPATCH_RETRY_LIMIT = 1;
-
-async function appendBootPayloadRuntimeEvents(
-  bindings: ApiBindings,
-  input: {
-    bootPayload: DriverBootPayload;
-    sessionId: SessionId;
-    traceId: string;
-  },
-): Promise<void> {
-  const configRevision = input.bootPayload.execution.configRevision;
-  const agentId = parsePlatformId<AgentId>(
-    configRevision.agentId,
-    "Driver boot payload config agent ID",
-  );
-  const runtimeBase = toRuntimeDiagnosticBaseValue({
-    agentId,
-    sessionId: input.sessionId,
-    traceId: input.traceId,
-  });
-  const events: RuntimeDiagnosticEventInput[] = [];
-
-  if (
-    configRevision.deploymentVersionId !== null &&
-    configRevision.deploymentVersionNumber !== null
-  ) {
-    events.push({
-      eventName: RUNTIME_DIAGNOSTIC_EVENT.configDeploymentVersionApplied.name,
-      value: {
-        ...runtimeBase,
-        deploymentVersionId: configRevision.deploymentVersionId,
-        deploymentVersionNumber: configRevision.deploymentVersionNumber,
-      },
-    });
-  }
-
-  events.push({
-    eventName: RUNTIME_DIAGNOSTIC_EVENT.configManifestRendered.name,
-    value: {
-      ...runtimeBase,
-      mcpServerCount: input.bootPayload.execution.session.mcpServers.length,
-      model: input.bootPayload.execution.model,
-      provider: input.bootPayload.execution.provider,
-      skillCount: input.bootPayload.execution.skills.length,
-    },
-  });
-
-  events.push({
-    eventName: RUNTIME_DIAGNOSTIC_EVENT.configCredentialResolved.name,
-    value: {
-      ...runtimeBase,
-      provider: input.bootPayload.execution.provider,
-    },
-  });
-
-  await appendRuntimeDiagnosticEvents(bindings, {
-    events,
-    sessionId: input.sessionId,
-  });
-}
-
 export async function dispatchSessionRun(
   bindings: ApiBindings,
   requestUrl: string,
@@ -106,9 +30,7 @@ export async function dispatchSessionRun(
     attachmentIds: FileId[];
     builtInTools: HydratedSessionRunContext["builtInTools"];
     prompt: string;
-    profile: HydratedSessionRunContext["profile"] & {
-      runtimeId: DriverRuntime;
-    };
+    profile: HydratedSessionRunContext["profile"];
     resolvedMcpServers: HydratedSessionRunContext["mcpServers"];
     resolvedSkillCatalog: HydratedSessionRunContext["skillCatalog"];
     resolvedSkills: HydratedSessionRunContext["skills"];
@@ -120,9 +42,6 @@ export async function dispatchSessionRun(
   const sandboxId = input.profile.sandbox.id;
   let driverInstanceId: DriverInstanceId | null = null;
   let prepareTimingEventPromise: Promise<void> = Promise.resolve();
-  // Boot-payload config traces are owner-debug telemetry; they persist off the
-  // provision critical path and settle with the post-dispatch awaits.
-  let pendingBootPayloadEvents: Promise<void> = Promise.resolve();
   let runLease: RuntimeExecutionPlaneRunLease | null = null;
 
   try {
@@ -131,14 +50,11 @@ export async function dispatchSessionRun(
     const bootingRun = await acquireSessionRunDispatch(bindings.DB, input.sessionRunId);
 
     if (!bootingRun) {
-      const state = await getSessionRunState(bindings.DB, input.sessionRunId);
-
       logInfo("session.run.dispatch.skipped", {
         driverInstanceId,
         runId: input.sessionRunId,
         sandboxId,
         sessionId: input.sessionId,
-        status: state?.status ?? null,
         traceId: input.traceId,
       });
 
@@ -157,48 +73,9 @@ export async function dispatchSessionRun(
     ]);
 
     const attemptPrepareAndDispatch = async (): Promise<RuntimeExecutionPlaneRunLease> => {
-      const preparedRunLease = await executionPlane.prepareRun(bindings, requestUrl, {
+      const preparedRunLease = await prepareRun(bindings, requestUrl, {
         attachmentIds: input.attachmentIds,
         builtInTools: input.builtInTools,
-        onBootPayloadPrepared: async ({ bootPayload }) => {
-          const configTraceValue = buildSessionConfigTraceValue(bootPayload);
-
-          pendingBootPayloadEvents = pendingBootPayloadEvents
-            .then(() =>
-              appendSessionRuntimeEvents({
-                bindings,
-                events: [
-                  createSessionRuntimeEvent({
-                    kind: "runtime.config.updated",
-                    payload: configTraceValue,
-                    runId: input.sessionRunId,
-                    sessionId: input.sessionId,
-                    traceId: input.traceId,
-                    visibility: "owner_debug",
-                  }),
-                ],
-                sessionId: input.sessionId,
-              }),
-            )
-            .then(() =>
-              appendBootPayloadRuntimeEvents(bindings, {
-                bootPayload,
-                sessionId: input.sessionId,
-                traceId: input.traceId,
-              }),
-            )
-            .then(
-              () => undefined,
-              (error: unknown) => {
-                logWarn("session.run.config_trace.append_failed", {
-                  message: error instanceof Error ? error.message : String(error),
-                  runId: input.sessionRunId,
-                  sessionId: input.sessionId,
-                  traceId: input.traceId,
-                });
-              },
-            );
-        },
         profile: input.profile,
         resolvedMcpServers: input.resolvedMcpServers,
         resolvedSkillCatalog: input.resolvedSkillCatalog,
@@ -230,7 +107,7 @@ export async function dispatchSessionRun(
         traceId: input.traceId,
       });
       await dispatchTiming.measure("dispatchDriverTurn", () =>
-        executionPlane.dispatchTurn(bindings, {
+        dispatchDriverTurn(bindings, {
           attachmentIds: input.attachmentIds,
           driverInstanceId: preparedDriverInstanceId,
           prompt: input.prompt,
@@ -248,7 +125,6 @@ export async function dispatchSessionRun(
       });
       await Promise.all([
         prepareTimingEventPromise,
-        pendingBootPayloadEvents,
         appendSessionRuntimeTimingEventBestEffort({
           bindings,
           timing: dispatchTimingSnapshot,
@@ -258,15 +134,13 @@ export async function dispatchSessionRun(
       return preparedRunLease;
     };
 
-    const handlePreReadyRetry = async (failure: Error, retriesRemaining: number): Promise<void> => {
+    const handlePreReadyRetry = async (failure: Error): Promise<void> => {
       await prepareTimingEventPromise;
-      await pendingBootPayloadEvents;
       prepareTimingEventPromise = Promise.resolve();
 
       logWarn("session.run.dispatch.pre_ready_retry", {
         driverInstanceId,
         message: failure.message,
-        retriesRemaining,
         runId: input.sessionRunId,
         sandboxId,
         sessionId: input.sessionId,
@@ -292,11 +166,18 @@ export async function dispatchSessionRun(
       await ensureSessionRunIsActive(bindings.DB, input.sessionRunId);
     };
 
-    runLease = await withPreReadyRetry({
-      attempt: attemptPrepareAndDispatch,
-      onRetry: handlePreReadyRetry,
-      retryLimit: PRE_READY_DISPATCH_RETRY_LIMIT,
-    });
+    try {
+      runLease = await attemptPrepareAndDispatch();
+    } catch (error) {
+      // A driver can die before ready for transient reasons (boot crash,
+      // container rollout window); retry exactly once.
+      if (!(error instanceof Error) || !error.message.includes("closed before ready")) {
+        throw error;
+      }
+
+      await handlePreReadyRetry(error);
+      runLease = await attemptPrepareAndDispatch();
+    }
 
     logInfo("session.run.driver.dispatched", {
       driverInstanceId,
@@ -307,7 +188,6 @@ export async function dispatchSessionRun(
     });
   } catch (error) {
     await prepareTimingEventPromise;
-    await pendingBootPayloadEvents;
 
     if (error instanceof SessionRunNoLongerActiveError) {
       if (isTruthy(driverInstanceId)) {
@@ -351,21 +231,14 @@ export async function dispatchSessionRun(
       sessionId: input.sessionId,
       source: "api",
     });
-    if (failureOutcome.kind === "repair_needed") {
-      throw new Error("Session lifecycle projection needs repair.", {
-        cause: error,
-      });
-    }
 
     if (failureOutcome.kind === "not_failed") {
-      const state = await getSessionRunState(bindings.DB, input.sessionRunId);
-
       logWarn("session.run.provision.failed.after-terminal", {
         driverInstanceId,
         message,
+        outcome: failureOutcome.transition.kind,
         runId: input.sessionRunId,
         sessionId: input.sessionId,
-        status: state?.status ?? null,
         traceId: input.traceId,
       });
 

@@ -1,145 +1,47 @@
-import type { SessionLiveState } from "@mosoo/ag-ui-session";
-import type { AccountId, ProjectId, SessionId } from "@mosoo/id";
+import type { SessionId } from "@mosoo/id";
 
 import { createErrorLogContext, logWarn } from "../../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { currentTimestampMs } from "../../../../time";
-import type { AuthenticatedViewer } from "../../../auth/application/viewer-auth.service";
-import { getActiveProjectSessionParticipantAccess } from "../../domain/session-access.policy";
-import type { PermissionStateUpdateResult } from "./viewer-permissions";
-import { rejectDisconnectedViewerPermissionRequests } from "./viewer-permissions";
-import { normalizeViewerSocketAttachment } from "./viewer-socket";
-import type { ViewerSocketAttachment } from "./viewer-socket";
+import { rejectSessionPermissionRequests } from "../../../runtime/application/session-run.service";
+import { appendSessionRuntimeEvents } from "../../application/session-event-write.service";
+import { requireActiveProjectSession } from "../../domain/session-access.policy";
+import type { SessionViewerSocketContext } from "./socket-headers";
 
 const VIEWER_PERMISSION_CLEANUP_STORAGE_KEY = "viewer_permission_cleanup";
 export const VIEWER_PERMISSION_CLEANUP_DELAY_MS = 120_000;
 
-export interface ViewerPermissionCleanupStorage {
-  delete(key: string): Promise<boolean>;
-  deleteAlarm(): Promise<void>;
-  get<T>(key: string): Promise<T | undefined>;
-  put(key: string, value: unknown): Promise<void>;
-  setAlarm(scheduledTime: Date | number): Promise<void>;
-}
-
-interface PendingViewerPermissionCleanup {
-  publicOrigin: string;
-  projectId: ProjectId;
-  scheduledAtMs: number;
-  sessionId: SessionId;
-  viewer: AuthenticatedViewer;
-}
-
-function parsePendingViewerPermissionCleanup(
-  value: unknown,
-): PendingViewerPermissionCleanup | null {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) {
-    return null;
-  }
-
-  const record = value as Record<string, unknown>;
-  const attachment = normalizeViewerSocketAttachment({ ...record, role: "viewer" });
-
-  if (!attachment || typeof record["scheduledAtMs"] !== "number") {
-    return null;
-  }
-
-  return {
-    publicOrigin: attachment.publicOrigin,
-    projectId: attachment.projectId,
-    scheduledAtMs: record["scheduledAtMs"],
-    sessionId: attachment.sessionId,
-    viewer: attachment.viewer,
-  };
-}
-
-type RejectDisconnectedViewerPermissions = (
-  input: Parameters<typeof rejectDisconnectedViewerPermissionRequests>[0],
-) => Promise<PermissionStateUpdateResult | null>;
-
-type EnsureSessionActive = (
-  database: D1Database,
-  viewerId: AccountId,
-  input: {
-    projectId: ProjectId;
-    sessionId: SessionId;
-  },
-) => Promise<void>;
-
-async function ensureActiveProjectSessionParticipantAccess(
-  database: D1Database,
-  viewerId: AccountId,
-  input: {
-    projectId: ProjectId;
-    sessionId: SessionId;
-  },
+export async function clearViewerPermissionCleanupAlarm(
+  storage: DurableObjectStorage,
 ): Promise<void> {
-  await getActiveProjectSessionParticipantAccess(database, viewerId, input);
-}
-
-export async function clearViewerPermissionCleanupAlarm(input: {
-  storage: ViewerPermissionCleanupStorage;
-}): Promise<void> {
-  await input.storage.delete(VIEWER_PERMISSION_CLEANUP_STORAGE_KEY);
-  await input.storage.deleteAlarm();
+  await storage.delete(VIEWER_PERMISSION_CLEANUP_STORAGE_KEY);
+  await storage.deleteAlarm();
 }
 
 export async function scheduleViewerPermissionCleanupAlarm(input: {
-  attachment: ViewerSocketAttachment;
-  nowMs?: () => number;
-  storage: ViewerPermissionCleanupStorage;
+  attachment: SessionViewerSocketContext;
+  storage: DurableObjectStorage;
 }): Promise<void> {
-  const nowMs = input.nowMs?.() ?? currentTimestampMs();
-  const pending: PendingViewerPermissionCleanup = {
-    publicOrigin: input.attachment.publicOrigin,
-    projectId: input.attachment.projectId,
-    scheduledAtMs: nowMs,
-    sessionId: input.attachment.sessionId,
-    viewer: input.attachment.viewer,
-  };
-
-  await input.storage.put(VIEWER_PERMISSION_CLEANUP_STORAGE_KEY, pending);
-  await input.storage.setAlarm(nowMs + VIEWER_PERMISSION_CLEANUP_DELAY_MS);
-}
-
-function toViewerSocketAttachment(pending: PendingViewerPermissionCleanup): ViewerSocketAttachment {
-  return {
-    publicOrigin: pending.publicOrigin,
-    projectId: pending.projectId,
-    role: "viewer",
-    sessionId: pending.sessionId,
-    viewer: pending.viewer,
-  };
+  await input.storage.put(VIEWER_PERMISSION_CLEANUP_STORAGE_KEY, input.attachment);
+  await input.storage.setAlarm(currentTimestampMs() + VIEWER_PERMISSION_CLEANUP_DELAY_MS);
 }
 
 export async function runViewerPermissionCleanupAlarm(input: {
-  cachedState: SessionLiveState | null;
-  ensureSessionActive?: EnsureSessionActive;
   env: ApiBindings;
   hasOpenViewer: (sessionId: SessionId) => boolean;
-  rejectPermissions?: RejectDisconnectedViewerPermissions;
-  storage: ViewerPermissionCleanupStorage;
-  updateLiveStateCache: (state: SessionLiveState | null) => void;
+  storage: DurableObjectStorage;
 }): Promise<void> {
-  const pending = parsePendingViewerPermissionCleanup(
-    await input.storage.get<unknown>(VIEWER_PERMISSION_CLEANUP_STORAGE_KEY),
+  const pending = await input.storage.get<SessionViewerSocketContext>(
+    VIEWER_PERMISSION_CLEANUP_STORAGE_KEY,
   );
 
-  if (pending === null) {
-    await clearViewerPermissionCleanupAlarm({ storage: input.storage });
+  if (pending === undefined || input.hasOpenViewer(pending.sessionId)) {
+    await clearViewerPermissionCleanupAlarm(input.storage);
     return;
   }
-
-  if (input.hasOpenViewer(pending.sessionId)) {
-    await clearViewerPermissionCleanupAlarm({ storage: input.storage });
-    return;
-  }
-
-  const ensureSessionActive =
-    input.ensureSessionActive ?? ensureActiveProjectSessionParticipantAccess;
 
   try {
-    await ensureSessionActive(input.env.DB, pending.viewer.id, {
+    await requireActiveProjectSession(input.env.DB, pending.viewer.id, {
       projectId: pending.projectId,
       sessionId: pending.sessionId,
     });
@@ -149,15 +51,12 @@ export async function runViewerPermissionCleanupAlarm(input: {
       sessionId: pending.sessionId,
       viewerId: pending.viewer.id,
     });
-    await clearViewerPermissionCleanupAlarm({ storage: input.storage });
+    await clearViewerPermissionCleanupAlarm(input.storage);
     return;
   }
 
-  const rejectPermissions = input.rejectPermissions ?? rejectDisconnectedViewerPermissionRequests;
-  const result = await rejectPermissions({
-    attachment: toViewerSocketAttachment(pending),
-    cachedState: input.cachedState,
-    env: input.env,
+  const rejected = await rejectSessionPermissionRequests({
+    bindings: input.env,
     onPermissionCleanupError: (error, requestId) => {
       logWarn("session.viewer_socket.permission_cleanup.failed", {
         ...createErrorLogContext(error),
@@ -166,11 +65,20 @@ export async function runViewerPermissionCleanupAlarm(input: {
         viewerId: pending.viewer.id,
       });
     },
+    projectId: pending.projectId,
+    sessionId: pending.sessionId,
+    viewer: pending.viewer,
   });
 
-  if (result !== null) {
-    input.updateLiveStateCache(result.state);
+  if (rejected !== null) {
+    // The alarm runs inside this Session DO and no viewer is connected, so persist only.
+    await appendSessionRuntimeEvents({
+      bindings: input.env,
+      deliver: false,
+      events: [rejected],
+      sessionId: pending.sessionId,
+    });
   }
 
-  await clearViewerPermissionCleanupAlarm({ storage: input.storage });
+  await clearViewerPermissionCleanupAlarm(input.storage);
 }

@@ -5,7 +5,6 @@ export type CostRange = "LAST_7_DAYS" | "LAST_30_DAYS" | "MONTH_TO_DATE" | "LAST
 export interface CostWindow {
   dailyBeforeDate: string;
   detailSinceMs: number;
-  label: string;
   sinceDate: string;
   sinceMs: number;
 }
@@ -26,16 +25,14 @@ export interface DailyRow extends AggregateRow {
 }
 
 export interface AgentAggregateRow extends AggregateRow {
-  agent_id: string | null;
+  agent_id: AgentId | null;
   agent_name: string | null;
   debug_cost_usd: number | null;
-  eval_cost_usd: number | null;
   owner_email: string | null;
-  owner_id: string;
+  owner_id: AccountId;
   owner_name: string | null;
   preview_cost_usd: number | null;
   production_cost_usd: number | null;
-  scheduled_cost_usd: number | null;
 }
 
 export interface ModelAggregateRow extends AggregateRow {
@@ -46,7 +43,7 @@ export interface ModelAggregateRow extends AggregateRow {
 export interface RecentUsageRow {
   actor_email: string | null;
   actor_name: string | null;
-  actor_user_id: string;
+  actor_user_id: AccountId;
   cache_creation_tokens: number;
   cache_read_tokens: number;
   created_at: number;
@@ -55,8 +52,8 @@ export interface RecentUsageRow {
   output_tokens: number;
   provider: string;
   run_purpose: string;
-  session_id: string | null;
-  session_run_id: string | null;
+  session_id: SessionId | null;
+  session_run_id: SessionRunId | null;
   total_cost_usd: number;
 }
 
@@ -79,14 +76,11 @@ export interface CostAgentRowView extends CostTotalsView {
   agentId: AgentId | null;
   agentName: string;
   debugCostUsd: number;
-  evalCostUsd: number;
   ownerEmail: string | null;
   ownerId: AccountId;
   ownerName: string;
-  previousCostUsd: number | null;
   previewCostUsd: number;
   productionCostUsd: number;
-  scheduledCostUsd: number;
 }
 
 export interface CostModelRowView extends CostTotalsView {
@@ -120,13 +114,6 @@ export interface CostAttributionCardView {
   daily: CostDailyPointView[];
   models: CostModelRowView[];
   recentSessions: CostRecentSessionView[];
-  totals: CostTotalsView;
-}
-
-export interface OrganizationBillingCostCardView {
-  daily: CostDailyPointView[];
-  models: CostModelRowView[];
-  previousTotals: CostTotalsView;
   totals: CostTotalsView;
 }
 

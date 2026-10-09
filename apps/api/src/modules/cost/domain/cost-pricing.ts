@@ -12,7 +12,6 @@ export interface ModelPricing {
 
 export interface CostCalculationResult {
   priceSnapshotJson: string | null;
-  pricing: ModelPricing | null;
   pricingStatus: PricingStatus;
   totalCostUsd: number;
 }
@@ -167,17 +166,21 @@ const MODEL_PRICING: readonly ModelPricingScheduleEntry[] = [
     model: "gpt-5.2",
     outputUsdPerMillion: 14,
   }),
-  deepseekPricing({
+  providerPricing({
     cacheReadUsdPerMillion: 0.003625,
     inputUsdPerMillion: 0.435,
     model: "deepseek-v4-pro",
     outputUsdPerMillion: 0.87,
+    provider: "deepseek",
+    vendor: "DeepSeek",
   }),
-  deepseekPricing({
+  providerPricing({
     cacheReadUsdPerMillion: 0.0028,
     inputUsdPerMillion: 0.14,
     model: "deepseek-v4-flash",
     outputUsdPerMillion: 0.28,
+    provider: "deepseek",
+    vendor: "DeepSeek",
   }),
   providerPricing({
     cacheReadUsdPerMillion: 0.15,
@@ -252,56 +255,47 @@ const MODEL_PRICING: readonly ModelPricingScheduleEntry[] = [
     provider: "minimax",
     vendor: "MiniMax",
   }),
-  // Keep legacy upstream provider IDs for usage rows written before mosoo provider IDs were canonical.
   providerPricing({
-    cacheReadUsdPerMillion: 0.125,
-    cacheWriteUsdPerMillion: 1.875,
-    inputUsdPerMillion: 1.25,
-    model: "gemini-2.5-pro",
-    outputUsdPerMillion: 10,
-    provider: "google",
-    vendor: "Google",
-  }),
-  providerPricing({
-    cacheReadUsdPerMillion: 0.12,
-    cacheWriteUsdPerMillion: 1.5,
-    inputUsdPerMillion: 1.2,
-    model: "qwen3-max",
-    outputUsdPerMillion: 6,
-    provider: "alibaba",
-    vendor: "Alibaba",
-  }),
-  opencodePricing({
     cacheReadUsdPerMillion: 0.145,
     inputUsdPerMillion: 1.74,
     model: "deepseek-v4-pro",
     outputUsdPerMillion: 3.48,
+    provider: "opencode",
+    vendor: "OpenCode Zen",
   }),
-  opencodePricing({
+  providerPricing({
     cacheReadUsdPerMillion: 0.05,
     cacheWriteUsdPerMillion: 0.625,
     inputUsdPerMillion: 0.5,
     model: "qwen3.6-plus",
     outputUsdPerMillion: 3,
+    provider: "opencode",
+    vendor: "OpenCode Zen",
   }),
-  opencodePricing({
+  providerPricing({
     cacheReadUsdPerMillion: 0.26,
     inputUsdPerMillion: 1.4,
     model: "glm-5.2",
     outputUsdPerMillion: 4.4,
+    provider: "opencode",
+    vendor: "OpenCode Zen",
   }),
-  opencodePricing({
+  providerPricing({
     cacheReadUsdPerMillion: 0.06,
     cacheWriteUsdPerMillion: 0.375,
     inputUsdPerMillion: 0.3,
     model: "minimax-m2.7",
     outputUsdPerMillion: 1.2,
+    provider: "opencode",
+    vendor: "OpenCode Zen",
   }),
-  opencodePricing({
+  providerPricing({
     cacheReadUsdPerMillion: 0.15,
     inputUsdPerMillion: 1.5,
     model: "gemini-3.5-flash",
     outputUsdPerMillion: 9,
+    provider: "opencode",
+    vendor: "OpenCode Zen",
   }),
 ];
 
@@ -337,24 +331,6 @@ function openAiPricing(input: {
   };
 }
 
-function deepseekPricing(input: {
-  cacheReadUsdPerMillion: number;
-  cacheWriteUsdPerMillion?: number;
-  inputUsdPerMillion: number;
-  model: string;
-  outputUsdPerMillion: number;
-}): ModelPricing {
-  return {
-    cacheReadUsdPerMillion: input.cacheReadUsdPerMillion,
-    cacheWriteUsdPerMillion: input.cacheWriteUsdPerMillion ?? 0,
-    inputUsdPerMillion: input.inputUsdPerMillion,
-    model: input.model,
-    outputUsdPerMillion: input.outputUsdPerMillion,
-    provider: "deepseek",
-    vendor: "DeepSeek",
-  };
-}
-
 function providerPricing(input: {
   cacheReadUsdPerMillion: number;
   cacheWriteUsdPerMillion?: number;
@@ -372,24 +348,6 @@ function providerPricing(input: {
     outputUsdPerMillion: input.outputUsdPerMillion,
     provider: input.provider,
     vendor: input.vendor,
-  };
-}
-
-function opencodePricing(input: {
-  cacheReadUsdPerMillion: number;
-  cacheWriteUsdPerMillion?: number;
-  inputUsdPerMillion: number;
-  model: string;
-  outputUsdPerMillion: number;
-}): ModelPricing {
-  return {
-    cacheReadUsdPerMillion: input.cacheReadUsdPerMillion,
-    cacheWriteUsdPerMillion: input.cacheWriteUsdPerMillion ?? 0,
-    inputUsdPerMillion: input.inputUsdPerMillion,
-    model: input.model,
-    outputUsdPerMillion: input.outputUsdPerMillion,
-    provider: "opencode",
-    vendor: "OpenCode Zen",
   };
 }
 
@@ -423,37 +381,6 @@ function normalizeAnthropicSeparator(modelId: string): string {
   return modelId.startsWith("claude-") ? modelId.replace(/\./gu, "-") : modelId;
 }
 
-function appendModelKey(keys: string[], modelId: string): void {
-  const normalizedModelId = normalizeModelId(modelId);
-
-  if (normalizedModelId.length === 0) {
-    return;
-  }
-
-  const candidates = [
-    normalizedModelId,
-    stripProviderPrefix(normalizedModelId),
-    stripContextWindowSuffix(normalizedModelId),
-    stripVersionSuffix(normalizedModelId),
-    stripVersionSuffix(stripContextWindowSuffix(stripProviderPrefix(normalizedModelId))),
-    normalizeAnthropicSeparator(normalizedModelId),
-  ];
-
-  for (const candidate of candidates) {
-    if (candidate.length > 0 && !keys.includes(candidate)) {
-      keys.push(candidate);
-    }
-  }
-}
-
-function modelLookupKeys(modelId: string): readonly string[] {
-  const keys: string[] = [];
-
-  appendModelKey(keys, modelId);
-
-  return keys;
-}
-
 function pricingMapKey(providerId: string, modelId: string): string {
   return `${normalizeProviderId(providerId)}:${normalizeModelId(modelId)}`;
 }
@@ -479,31 +406,28 @@ function isPricingEffective(pricing: ModelPricingScheduleEntry, atMs: number): b
   );
 }
 
-function toModelPricing(pricing: ModelPricingScheduleEntry): ModelPricing {
-  return {
-    cacheReadUsdPerMillion: pricing.cacheReadUsdPerMillion,
-    cacheWriteUsdPerMillion: pricing.cacheWriteUsdPerMillion,
-    inputUsdPerMillion: pricing.inputUsdPerMillion,
-    model: pricing.model,
-    outputUsdPerMillion: pricing.outputUsdPerMillion,
-    provider: pricing.provider,
-    vendor: pricing.vendor,
-  };
-}
-
 const PRICING_BY_PROVIDER_MODEL = buildPricingMap();
 
 export function findModelPricing(input: ModelPricingLookup): ModelPricing | null {
   const atMs = input.atMs ?? Date.now();
   const providerId = normalizeProviderId(input.providerId);
+  const modelId = normalizeModelId(input.modelId);
+  const candidates = new Set([
+    modelId,
+    stripProviderPrefix(modelId),
+    stripContextWindowSuffix(modelId),
+    stripVersionSuffix(modelId),
+    stripVersionSuffix(stripContextWindowSuffix(stripProviderPrefix(modelId))),
+    normalizeAnthropicSeparator(modelId),
+  ]);
 
-  for (const modelId of modelLookupKeys(input.modelId)) {
-    const pricing = PRICING_BY_PROVIDER_MODEL.get(`${providerId}:${modelId}`)?.find((entry) =>
+  for (const candidate of candidates) {
+    const pricing = PRICING_BY_PROVIDER_MODEL.get(`${providerId}:${candidate}`)?.find((entry) =>
       isPricingEffective(entry, atMs),
     );
 
     if (pricing) {
-      return toModelPricing(pricing);
+      return pricing;
     }
   }
 
@@ -543,7 +467,6 @@ export function calculateUsageCost(input: {
               source: "runtime_reported_usd",
               tokenCountersUnavailable: true,
             }),
-      pricing,
       pricingStatus: pricing === null ? "unknown" : "priced",
       totalCostUsd: input.providedCostUsd,
     };
@@ -552,7 +475,6 @@ export function calculateUsageCost(input: {
   if (!pricing) {
     return {
       priceSnapshotJson: null,
-      pricing,
       pricingStatus: "unknown",
       totalCostUsd: input.providedCostUsd ?? 0,
     };
@@ -592,7 +514,6 @@ export function calculateUsageCost(input: {
       provider: effectivePricing.provider,
       source: "mosoo_seed_2026_07_10",
     }),
-    pricing: effectivePricing,
     pricingStatus: "priced",
     totalCostUsd,
   };

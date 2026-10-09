@@ -104,7 +104,7 @@ describe("cost pricing", () => {
         pricedAtMs,
         provider: "openai",
       });
-      expect(result.pricing).toMatchObject({
+      expect(JSON.parse(result.priceSnapshotJson ?? "{}")).toMatchObject({
         inputUsdPerMillion: rates[0],
         outputUsdPerMillion: rates[1],
       });

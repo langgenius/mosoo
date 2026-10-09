@@ -1,5 +1,6 @@
 import type { AgentMcpBinding } from "@mosoo/contracts/mcp";
 import { agentMcpBindingsTable } from "@mosoo/db";
+import { createPlatformId } from "@mosoo/id";
 import type { AgentId, AgentMcpBindingId, CredentialId, McpServerId } from "@mosoo/id";
 import { eq } from "drizzle-orm";
 
@@ -10,16 +11,9 @@ import type { AgentSpecMcpBinding } from "../../agents/application/agent-spec.se
 import type { AgentRow } from "../../agents/application/agent-types";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { listAgentBindingRows } from "./mcp-agent-binding.repository";
-import {
-  deleteCredentialArtifactsBatch,
-  listCredentialsForAgentBindingDeletion,
-  listCredentialsForAgentBindings,
-  listServerIdsWithProjectCredentials,
-} from "./mcp-credential.repository";
+import { listProjectCredentialRowsByServerId } from "./mcp-credential.repository";
 import { toAgentBinding } from "./mcp-mappers";
-import { createAgentMcpBindingId, normalizeMcpServerIds, readAccountId } from "./mcp-platform-ids";
 import { listServerRowsById } from "./mcp-server.repository";
-import type { CredentialRow, ServerRow } from "./mcp-types";
 
 export interface PreparedAgentMcpBindingRow {
   agentCredentialId: CredentialId | null;
@@ -34,37 +28,8 @@ export interface PreparedAgentMcpBindingRow {
 }
 
 export interface PreparedAgentMcpBindingsForConfig {
-  removedCredentials: CredentialRow[];
   rows: PreparedAgentMcpBindingRow[];
   specBindings: AgentSpecMcpBinding[];
-}
-
-async function ensureConfigMcpServerAccess(input: {
-  agent: AgentRow;
-  database: D1Database;
-  serverIds: readonly McpServerId[];
-  viewer: AuthenticatedViewer;
-}): Promise<Map<McpServerId, ServerRow>> {
-  const serversById = await listServerRowsById(input.database, input.serverIds);
-  const viewerId = readAccountId(input.viewer.id);
-
-  for (const serverId of input.serverIds) {
-    const server = serversById.get(serverId);
-
-    if (server === undefined) {
-      throw new Error(`Cannot bind MCP server ${serverId}: MCP server not found.`);
-    }
-
-    if (server.projectId !== input.agent.projectId) {
-      throw forbiddenError("MCP server and agent profile must belong to the same project.");
-    }
-
-    if (server.ownerId !== viewerId || input.agent.ownerId !== viewerId) {
-      throw forbiddenError("You can only bind MCP servers owned by this project owner.");
-    }
-  }
-
-  return serversById;
 }
 
 export async function listAgentMcpBindings(
@@ -72,24 +37,14 @@ export async function listAgentMcpBindings(
   viewer: AuthenticatedViewer,
   agentId: AgentId,
 ): Promise<AgentMcpBinding[]> {
-  const viewerId = readAccountId(viewer.id);
-  const { agent } = await ensureAgentEditor(database, viewerId, agentId);
+  const agent = await ensureAgentEditor(database, viewer.id, agentId);
   const rows = await listAgentBindingRows(database, agent.id);
-  const [credentialsByBindingId, projectCredentialServerIds] = await Promise.all([
-    listCredentialsForAgentBindings(database, rows),
-    listServerIdsWithProjectCredentials(
-      database,
-      rows.map((row) => row.serverId),
-    ),
-  ]);
-
-  return rows.map((row) =>
-    toAgentBinding(
-      row,
-      credentialsByBindingId.get(row.id) ?? null,
-      projectCredentialServerIds.has(row.serverId),
-    ),
+  const credentialsByServerId = await listProjectCredentialRowsByServerId(
+    database,
+    rows.map((row) => row.serverId),
   );
+
+  return rows.map((row) => toAgentBinding(row, credentialsByServerId.get(row.serverId) ?? null));
 }
 
 export async function listAgentMcpServerIds(
@@ -101,138 +56,79 @@ export async function listAgentMcpServerIds(
   return rows.map((row) => row.serverId);
 }
 
-export async function replaceAgentMcpBindingsForConfig(
-  database: D1Database,
-  viewer: AuthenticatedViewer,
-  input: {
-    agent: AgentRow;
-    serverIds: readonly string[];
-    updatedAt: number;
-  },
-): Promise<void> {
-  const prepared = await prepareAgentMcpBindingsForConfig(database, viewer, input);
-  await deleteCredentialArtifactsBatch(database, prepared.removedCredentials);
-  await getAppDatabase(database)
-    .delete(agentMcpBindingsTable)
-    .where(eq(agentMcpBindingsTable.agentId, input.agent.id))
-    .run();
-
-  if (prepared.rows.length > 0) {
-    await getAppDatabase(database).insert(agentMcpBindingsTable).values(prepared.rows).run();
-  }
-}
-
-function readBoolean(value: boolean | number | string): boolean {
-  return value === true || value === 1 || value === "1";
-}
-
 export async function prepareAgentMcpBindingsForConfig(
   database: D1Database,
-  viewer: AuthenticatedViewer,
   input: {
     agent: AgentRow;
-    serverIds: readonly string[];
+    serverIds: readonly McpServerId[];
     updatedAt: number;
   },
 ): Promise<PreparedAgentMcpBindingsForConfig> {
-  const serverIds = normalizeMcpServerIds(input.serverIds);
-  const serversById = await ensureConfigMcpServerAccess({
-    agent: input.agent,
-    database,
-    serverIds,
-    viewer,
-  });
+  const serverIds = [...new Set(input.serverIds)];
+  const serversById = await listServerRowsById(database, serverIds);
   const existingRows = await getAppDatabase(database)
     .select({
       agentCredentialId: agentMcpBindingsTable.agentCredentialId,
-      agentId: agentMcpBindingsTable.agentId,
       createdAt: agentMcpBindingsTable.createdAt,
       credentialMode: agentMcpBindingsTable.credentialMode,
       enabled: agentMcpBindingsTable.enabled,
       id: agentMcpBindingsTable.id,
       serverId: agentMcpBindingsTable.serverId,
-      sortOrder: agentMcpBindingsTable.sortOrder,
-      updatedAt: agentMcpBindingsTable.updatedAt,
     })
     .from(agentMcpBindingsTable)
     .where(eq(agentMcpBindingsTable.agentId, input.agent.id))
     .all();
   const existingByServerId = new Map(existingRows.map((row) => [row.serverId, row]));
-  const nextServerIdSet = new Set(serverIds);
-  const removedRows = existingRows.filter((row) => !nextServerIdSet.has(row.serverId));
-  const removedCredentials = await listCredentialsForAgentBindingDeletion(database, {
-    agentId: input.agent.id,
-    bindings: removedRows,
-  });
+  const rows: PreparedAgentMcpBindingRow[] = [];
+  const specBindings: AgentSpecMcpBinding[] = [];
 
-  const nextRows = serverIds.map((serverId, sortOrder) => {
+  for (const [sortOrder, serverId] of serverIds.entries()) {
+    const server = serversById.get(serverId);
+
+    if (server === undefined) {
+      throw new Error(`Cannot bind MCP server ${serverId}: MCP server not found.`);
+    }
+
+    if (server.projectId !== input.agent.projectId) {
+      throw forbiddenError("MCP server and agent profile must belong to the same project.");
+    }
+
     const existing = existingByServerId.get(serverId);
-
-    return {
+    const row: PreparedAgentMcpBindingRow = {
       agentCredentialId: existing?.agentCredentialId ?? null,
       agentId: input.agent.id,
       createdAt: existing?.createdAt ?? input.updatedAt,
       credentialMode: existing?.credentialMode ?? "runtime_resolved",
-      enabled: existing === undefined ? true : readBoolean(existing.enabled),
-      id: existing?.id ?? createAgentMcpBindingId(),
+      enabled: existing?.enabled ?? true,
+      id: existing?.id ?? createPlatformId<AgentMcpBindingId>(),
       serverId,
       sortOrder,
       updatedAt: input.updatedAt,
     };
-  });
 
-  return {
-    removedCredentials,
-    rows: nextRows,
-    specBindings: nextRows.map((row): AgentSpecMcpBinding => {
-      const server = serversById.get(row.serverId);
+    rows.push(row);
+    specBindings.push({
+      agentCredentialId: row.agentCredentialId,
+      authType: server.authType,
+      credentialMode: row.credentialMode,
+      credentialScope: server.credentialScope,
+      enabled: row.enabled,
+      iconUrl: server.iconUrl,
+      name: server.name,
+      serverId,
+      sortOrder,
+      source: server.source,
+      url: server.url,
+    });
+  }
 
-      if (!server) {
-        throw new Error(`Cannot bind MCP server ${row.serverId}: MCP server not found.`);
-      }
-
-      return {
-        agentCredentialId: row.agentCredentialId,
-        authType: server.authType,
-        credentialMode: row.credentialMode,
-        credentialScope: server.credentialScope,
-        enabled: readBoolean(row.enabled),
-        iconUrl: server.iconUrl,
-        name: server.name,
-        serverId: row.serverId,
-        sortOrder: row.sortOrder,
-        source: server.source,
-        url: server.url,
-      };
-    }),
-  };
-}
-
-export async function deletePreparedAgentMcpBindingCredentials(
-  database: D1Database,
-  prepared: PreparedAgentMcpBindingsForConfig,
-): Promise<void> {
-  await deleteCredentialArtifactsBatch(database, prepared.removedCredentials);
+  return { rows, specBindings };
 }
 
 export async function removeAllAgentMcpBindings(
   database: D1Database,
   agentId: AgentId,
 ): Promise<void> {
-  const rows = await getAppDatabase(database)
-    .select({
-      agentCredentialId: agentMcpBindingsTable.agentCredentialId,
-      serverId: agentMcpBindingsTable.serverId,
-    })
-    .from(agentMcpBindingsTable)
-    .where(eq(agentMcpBindingsTable.agentId, agentId))
-    .all();
-  const credentials = await listCredentialsForAgentBindingDeletion(database, {
-    agentId,
-    bindings: rows,
-  });
-  await deleteCredentialArtifactsBatch(database, credentials);
-
   await getAppDatabase(database)
     .delete(agentMcpBindingsTable)
     .where(eq(agentMcpBindingsTable.agentId, agentId))

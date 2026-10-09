@@ -5,72 +5,25 @@ import { eq } from "drizzle-orm";
 
 import {
   API_COMMAND_LEASE_EXPIRED_CODE,
-  API_COMMAND_LEASE_MS,
   API_COMMAND_MAX_CLAIM_ATTEMPTS,
   API_COMMAND_QUEUE_DELIVERY_PENDING_CODE,
-  API_COMMAND_QUEUE_SEND_FAILED_CODE,
   admitApiCommand,
   claimApiCommand,
   deliverApiCommand,
   enqueueApiCommand,
   redriveFailedApiCommandEnqueues,
-  renewApiCommandClaim,
   requeueExpiredApiCommandClaims,
 } from "../src/modules/api-command/application/api-command-ledger";
 import type { ApiCommandMessage } from "../src/modules/api-command/application/api-command-message";
-import { parseApiCommandPayload } from "../src/modules/api-command/application/api-command-payload";
-import { processApiCommandMessage } from "../src/modules/api-command/application/api-command-processor";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import {
   createApiCommandQueueStub,
   createPublicHttpContractDatabase,
   createPublicHttpTestBindings,
-  createRecordedQueueMessage,
   nowMsForTest,
 } from "./helpers/public-api-http-test-fixture";
 
 describe("API command queue", () => {
-  test("normalizes durable payloads written before the Project rename", () => {
-    const projectId = "01J0000000000000000000000E";
-    const sessionId = "01J0000000000000000000000K";
-    const sessionRunId = "01J0000000000000000000000N";
-    const viewer = {
-      email: "owner@example.com",
-      emailVerified: true,
-      id: "01J00000000000000000000001",
-      imageUrl: null,
-      name: "Owner",
-    };
-
-    expect(
-      parseApiCommandPayload(
-        "session_run_dispatch",
-        JSON.stringify({
-          attachmentIds: [],
-          prompt: "continue",
-          queuedAtMs: nowMsForTest(),
-          requestUrl: "https://cloud.mosoo.ai/graphql",
-          session: { app_id: projectId, id: sessionId },
-          sessionRunId,
-          traceId: "trace-1",
-          viewer,
-        }),
-      ),
-    ).toMatchObject({ session: { id: sessionId, project_id: projectId } });
-
-    expect(
-      parseApiCommandPayload(
-        "environment_package_artifact_build",
-        JSON.stringify({
-          appId: projectId,
-          artifactAbi: "abi-1",
-          inputDigest: "digest-1",
-          packages: [],
-        }),
-      ),
-    ).toMatchObject({ projectId });
-  });
-
   test("dedupes producer-side and sends only the command id", async () => {
     const database = await createPublicHttpContractDatabase();
     const queue = createApiCommandQueueStub();
@@ -80,13 +33,13 @@ describe("API command queue", () => {
 
     const firstId = await enqueueApiCommand(bindings, {
       dedupeKey: "scheduled:test",
-      kind: "scheduled_maintenance",
-      payload: { scheduledTime: nowMsForTest() },
+      kind: "session_run_dispatch",
+      payload: {},
     });
     const duplicateId = await enqueueApiCommand(bindings, {
       dedupeKey: "scheduled:test",
-      kind: "scheduled_maintenance",
-      payload: { scheduledTime: nowMsForTest() },
+      kind: "session_run_dispatch",
+      payload: {},
     });
 
     expect(duplicateId).toBe(firstId);
@@ -103,7 +56,7 @@ describe("API command queue", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
       id: firstId,
-      kind: "scheduled_maintenance",
+      kind: "session_run_dispatch",
       status: "queued",
     });
   });
@@ -117,8 +70,8 @@ describe("API command queue", () => {
 
     const admission = await admitApiCommand(bindings, {
       dedupeKey: "scheduled:deferred",
-      kind: "scheduled_maintenance",
-      payload: { scheduledTime: nowMsForTest() },
+      kind: "session_run_dispatch",
+      payload: {},
     });
 
     expect(queue.sent).toEqual([]);
@@ -139,44 +92,6 @@ describe("API command queue", () => {
     expect(queue.sent[0]?.body).toEqual({ commandId: admission.commandId });
   });
 
-  test("marks malformed payload commands failed and acks the message", async () => {
-    const database = await createPublicHttpContractDatabase();
-    const queue = createApiCommandQueueStub();
-    const bindings = createPublicHttpTestBindings(database, {
-      apiCommandQueue: queue,
-    }) as ApiBindings;
-    const commandId = await enqueueApiCommand(bindings, {
-      dedupeKey: "scheduled:malformed",
-      kind: "scheduled_maintenance",
-      payload: { scheduledTime: "bad" },
-    });
-    const queued = queue.sent[0]?.body;
-
-    if (!queued) {
-      throw new Error("Expected API command message to be queued.");
-    }
-
-    const recorded = createRecordedQueueMessage<ApiCommandMessage>({ body: queued });
-
-    await processApiCommandMessage(bindings, recorded.message, nowMsForTest);
-
-    const row = await database
-      .app()
-      .select({
-        lastErrorCode: apiCommandsTable.lastErrorCode,
-        status: apiCommandsTable.status,
-      })
-      .from(apiCommandsTable)
-      .where(eq(apiCommandsTable.id, commandId))
-      .get();
-
-    expect(row).toEqual({
-      lastErrorCode: "invalid_payload",
-      status: "failed",
-    });
-    expect(recorded.recorded).toEqual([{ type: "ack" }]);
-  });
-
   test("keeps a command claimable when Queue accepts it but send reports a timeout", async () => {
     const database = await createPublicHttpContractDatabase();
     const retainedMessages: ApiCommandMessage[] = [];
@@ -193,8 +108,8 @@ describe("API command queue", () => {
 
     const commandId = await enqueueApiCommand(bindings, {
       dedupeKey: "scheduled:ambiguous-send",
-      kind: "scheduled_maintenance",
-      payload: { scheduledTime: nowMsForTest() },
+      kind: "session_run_dispatch",
+      payload: {},
     });
 
     const retained = retainedMessages[0];
@@ -212,7 +127,7 @@ describe("API command queue", () => {
       .get();
 
     expect(row).toEqual({
-      lastErrorCode: API_COMMAND_QUEUE_SEND_FAILED_CODE,
+      lastErrorCode: API_COMMAND_QUEUE_DELIVERY_PENDING_CODE,
       status: "queued",
     });
     expect(commandId).toBe(retained.commandId);
@@ -246,8 +161,8 @@ describe("API command queue", () => {
 
     await enqueueApiCommand(bindings, {
       dedupeKey: "scheduled:redrive",
-      kind: "scheduled_maintenance",
-      payload: { scheduledTime: nowMsForTest() },
+      kind: "session_run_dispatch",
+      payload: {},
     });
 
     await redriveFailedApiCommandEnqueues(bindings);
@@ -289,10 +204,10 @@ describe("API command queue", () => {
         createdAt: nowMsForTest(),
         dedupeKey: "scheduled:pending-before-send",
         id: commandId,
-        kind: "scheduled_maintenance",
+        kind: "session_run_dispatch",
         lastErrorCode: API_COMMAND_QUEUE_DELIVERY_PENDING_CODE,
         lastErrorMessage: "API command is awaiting queue delivery.",
-        payloadJson: JSON.stringify({ scheduledTime: nowMsForTest() }),
+        payloadJson: "{}",
         status: "queued",
         updatedAt: nowMsForTest(),
       })
@@ -315,44 +230,53 @@ describe("API command queue", () => {
     expect(row).toEqual({ lastErrorCode: null, lastErrorMessage: null });
   });
 
-  test("renews a running command claim for the current owner", async () => {
+  test("still delivers a command an older build marked queue_send_failed", async () => {
     const database = await createPublicHttpContractDatabase();
     const queue = createApiCommandQueueStub();
     const bindings = createPublicHttpTestBindings(database, {
       apiCommandQueue: queue,
     }) as ApiBindings;
-    const commandId = await enqueueApiCommand(bindings, {
-      dedupeKey: "scheduled:renew",
-      kind: "scheduled_maintenance",
-      payload: { scheduledTime: nowMsForTest() },
-    });
+    const commandId = "01J0000000000000000000000C";
+    const dedupeKey = "scheduled:legacy-send-failed";
 
-    await claimApiCommand({
-      commandId,
-      database,
-      nowMs: 1_000,
-      ownerId: "owner-1",
-    });
+    await database
+      .app()
+      .insert(apiCommandsTable)
+      .values({
+        attemptCount: 0,
+        claimExpiresAt: null,
+        claimOwner: null,
+        completedAt: null,
+        createdAt: nowMsForTest(),
+        dedupeKey,
+        id: commandId,
+        kind: "session_run_dispatch",
+        lastErrorCode: "queue_send_failed",
+        lastErrorMessage: "API command queue send failed.",
+        payloadJson: "{}",
+        status: "queued",
+        updatedAt: nowMsForTest(),
+      })
+      .run();
 
     await expect(
-      renewApiCommandClaim({
-        commandId,
-        database,
-        nowMs: 2_000,
-        ownerId: "owner-1",
-      }),
-    ).resolves.toBe(true);
+      admitApiCommand(bindings, { dedupeKey, kind: "session_run_dispatch", payload: {} }),
+    ).resolves.toMatchObject({ commandId, shouldDeliver: true });
 
-    const row = await database
-      .app()
-      .select({
-        claimExpiresAt: apiCommandsTable.claimExpiresAt,
-      })
-      .from(apiCommandsTable)
-      .where(eq(apiCommandsTable.id, commandId))
-      .get();
+    await redriveFailedApiCommandEnqueues(bindings);
 
-    expect(row?.claimExpiresAt).toBe(2_000 + API_COMMAND_LEASE_MS);
+    expect(queue.sent.map((message) => message.body)).toEqual([{ commandId }]);
+    await expect(
+      database
+        .app()
+        .select({
+          lastErrorCode: apiCommandsTable.lastErrorCode,
+          lastErrorMessage: apiCommandsTable.lastErrorMessage,
+        })
+        .from(apiCommandsTable)
+        .where(eq(apiCommandsTable.id, commandId))
+        .get(),
+    ).resolves.toEqual({ lastErrorCode: null, lastErrorMessage: null });
   });
 
   describe("expired claims", () => {
@@ -371,10 +295,10 @@ describe("API command queue", () => {
           createdAt: 1_000,
           dedupeKey: `scheduled:${input.id}`,
           id: input.id,
-          kind: "scheduled_maintenance",
+          kind: "session_run_dispatch",
           lastErrorCode: null,
           lastErrorMessage: null,
-          payloadJson: JSON.stringify({ scheduledTime: 1_000 }),
+          payloadJson: "{}",
           status: "running",
           updatedAt: 1_000,
         })
@@ -441,7 +365,7 @@ describe("API command queue", () => {
       });
     });
 
-    test("leaves a claim alone inside the renewal grace period", async () => {
+    test("leaves a claim alone inside the expiry grace period", async () => {
       const database = await createPublicHttpContractDatabase();
       const commandId = "01J0000000000000000000000F";
       await insertRunningCommand(database, {

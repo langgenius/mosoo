@@ -47,54 +47,10 @@ test("frozen MCP references use Project authority without a mutable Agent", asyn
     })
     .run();
   await database.prepare("DELETE FROM agent WHERE id = ?").bind(IDS.agent).run();
-  const input = {
-    agentId: IDS.agent,
-    bindings: [
-      {
-        agentCredentialId: null,
-        credentialMode: "runtime_resolved" as const,
-        enabled: true,
-        serverId,
-        sortOrder: 0,
-      },
-    ],
-    callerUserId: IDS.ownerAccount,
-    executionOwnerUserId: IDS.ownerAccount,
-    projectId: IDS.project,
-  };
-  const resolved = await resolveRuntimeMcpServersForSnapshot({ DB: database }, input);
-  expect(resolved).toMatchObject([
+  const input = { projectId: IDS.project, serverIds: [serverId] };
+  expect(await resolveRuntimeMcpServersForSnapshot(database, input)).toMatchObject([
     { authorizationState: "active", credentialId, projectId: IDS.project, serverId },
   ]);
-  expect(
-    await resolveRuntimeMcpServersForSnapshot({ DB: database }, { ...input, agentId: null }),
-  ).toMatchObject([
-    { authorizationState: "active", credentialId, projectId: IDS.project, serverId },
-  ]);
-  await expect(
-    resolveRuntimeMcpServersForSnapshot(
-      { DB: database },
-      {
-        ...input,
-        agentId: null,
-        bindings: [
-          { ...input.bindings[0], credentialMode: "agent_bound", agentCredentialId: credentialId },
-        ],
-      },
-    ),
-  ).rejects.toThrow("Agent-bound MCP credentials require an Agent preset");
-  await expect(
-    resolveRuntimeMcpServersForSnapshot(
-      { DB: database },
-      { ...input, callerUserId: IDS.outsiderAccount },
-    ),
-  ).rejects.toThrow("permission");
-  await expect(
-    resolveRuntimeMcpServersForSnapshot(
-      { DB: database },
-      { ...input, executionOwnerUserId: IDS.outsiderAccount },
-    ),
-  ).rejects.toThrow("Project owner");
 
   const otherProjectId = createPlatformId<ProjectId>();
   await db
@@ -109,6 +65,6 @@ test("frozen MCP references use Project authority without a mutable Agent", asyn
     })
     .run();
   await expect(
-    resolveRuntimeMcpServersForSnapshot({ DB: database }, { ...input, projectId: otherProjectId }),
+    resolveRuntimeMcpServersForSnapshot(database, { ...input, projectId: otherProjectId }),
   ).rejects.toThrow("not available in this project");
 });

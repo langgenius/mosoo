@@ -1,17 +1,14 @@
-import {
-  createNoRuntimeEventsRecordedEventId,
-  createProcessEventsTruncatedEventId,
-} from "@mosoo/contracts/session";
+import { createProcessEventsTruncatedEventId } from "@mosoo/contracts/session";
 import type { SessionProcessEvent } from "@mosoo/contracts/session";
 import { sessionEventsTable } from "@mosoo/db";
-import type { AccountId, ProjectId, RuntimeEventId, SessionId, SessionRunId } from "@mosoo/id";
+import type { ProjectId, RuntimeEventId, SessionId, SessionRunId } from "@mosoo/id";
 import { and, desc, eq } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { validationError } from "../../../platform/errors";
 import { toIsoString } from "../../../time";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import { getProjectSessionParticipantTimelineAccess } from "../domain/session-access.policy";
+import { requireProjectSession } from "../domain/session-access.policy";
 import { foldStreamedSessionEventRows } from "../domain/session-event-stream-fold";
 
 export interface SessionEventProcessRow {
@@ -38,11 +35,6 @@ interface ProcessEventProjection {
   order: number;
   runId: SessionRunId | null;
   startMs: number;
-}
-
-interface SessionProcessEventAccess {
-  id: SessionId;
-  updatedAt: string;
 }
 
 function normalizeProcessEventLimit(limit: number | null | undefined): number {
@@ -113,29 +105,10 @@ function toProcessEventProjectionFromSessionEventRow(
 
 export function createSessionProcessEventsFromSessionEventRows(
   rows: SessionEventProcessRow[],
-  options: { foldStreamedRows?: boolean } = {},
 ): SessionProcessEvent[] {
-  const foldedRows =
-    options.foldStreamedRows === false
-      ? rows
-      : foldStreamedSessionEventRows(rows, { flushOpenStreams: true }).rows;
-  const projections = foldedRows.map(toProcessEventProjectionFromSessionEventRow);
-
-  return finalizeProcessEventDurations(projections);
-}
-
-function createNoRuntimeEventsRecordedEvent(
-  session: SessionProcessEventAccess,
-): SessionProcessEvent {
-  return {
-    content: "No runtime events have been recorded for this thread.",
-    durationMs: null,
-    id: createNoRuntimeEventsRecordedEventId(session.id),
-    occurredAt: session.updatedAt,
-    status: "unsupported",
-    tokens: null,
-    type: "session.status",
-  };
+  return finalizeProcessEventDurations(
+    foldStreamedSessionEventRows(rows).map(toProcessEventProjectionFromSessionEventRow),
+  );
 }
 
 function createProcessEventsTruncatedEvent(input: {
@@ -154,33 +127,19 @@ function createProcessEventsTruncatedEvent(input: {
   };
 }
 
-async function getThreadSessionProcessEventAccess(
-  database: D1Database,
-  viewerId: AccountId,
-  input: {
-    projectId: ProjectId;
-    sessionId: SessionId;
-  },
-): Promise<SessionProcessEventAccess> {
-  const row = await getProjectSessionParticipantTimelineAccess(database, viewerId, input);
-
-  return {
-    id: row.id,
-    updatedAt: toIsoString(row.updated_at),
-  };
-}
-
-async function listSessionProcessEvents(
+export async function getThreadSessionProcessEvents(
   database: D1Database,
   viewer: AuthenticatedViewer,
   input: {
-    limit?: number | null;
     projectId: ProjectId;
     sessionId: SessionId;
   },
+  options: {
+    limit?: number | null;
+  } = {},
 ): Promise<SessionProcessEvent[]> {
-  const limit = normalizeProcessEventLimit(input.limit);
-  const session = await getThreadSessionProcessEventAccess(database, viewer.id, {
+  const limit = normalizeProcessEventLimit(options.limit);
+  const session = await requireProjectSession(database, viewer.id, {
     projectId: input.projectId,
     sessionId: input.sessionId,
   });
@@ -208,10 +167,6 @@ async function listSessionProcessEvents(
     .limit(limit + 1)
     .all();
 
-  if (rows.length === 0) {
-    return [createNoRuntimeEventsRecordedEvent(session)];
-  }
-
   const hasMore = rows.length > limit;
   const processEvents = createSessionProcessEventsFromSessionEventRows(
     rows.slice(0, limit).toReversed(),
@@ -235,40 +190,4 @@ async function listSessionProcessEvents(
     }),
     ...processEvents,
   ];
-}
-
-export async function getSessionProcessEvents(
-  database: D1Database,
-  viewer: AuthenticatedViewer,
-  session: {
-    projectId: ProjectId;
-    sessionId: SessionId;
-  },
-  options: {
-    limit?: number | null;
-  } = {},
-): Promise<SessionProcessEvent[]> {
-  return listSessionProcessEvents(database, viewer, {
-    ...(options.limit === undefined ? {} : { limit: options.limit }),
-    projectId: session.projectId,
-    sessionId: session.sessionId,
-  });
-}
-
-export async function getThreadSessionProcessEvents(
-  database: D1Database,
-  viewer: AuthenticatedViewer,
-  session: {
-    projectId: ProjectId;
-    sessionId: SessionId;
-  },
-  options: {
-    limit?: number | null;
-  } = {},
-): Promise<SessionProcessEvent[]> {
-  return listSessionProcessEvents(database, viewer, {
-    ...(options.limit === undefined ? {} : { limit: options.limit }),
-    projectId: session.projectId,
-    sessionId: session.sessionId,
-  });
 }

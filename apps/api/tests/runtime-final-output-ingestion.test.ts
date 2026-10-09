@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, spyOn, test } from "bun:test";
 
 import type { DriverEventEnvelope } from "@mosoo/agent-driver/events";
 import type { DriverEventReceipt } from "@mosoo/agent-driver/orpc";
@@ -18,15 +18,8 @@ import {
   reconcileTerminalSessionRuns,
   repairTerminalSessionRunProjections,
 } from "../src/modules/runtime/application/session-runs/terminal-run-reconciliation.service";
-import {
-  createReceiptsForDriverEvents,
-  filterNewDriverEvents,
-  readReceiptsForProcessedDriverEvents,
-  rememberDriverEventReceipts,
-} from "../src/modules/runtime/infrastructure/driver-instance/driver-event-receipts";
-import type { RuntimeSessionLink } from "../src/modules/runtime/infrastructure/driver-instance/event-types";
 import { DriverInstanceRpcEventIngestionController } from "../src/modules/runtime/infrastructure/driver-instance/rpc-event-ingestion-controller";
-import { RuntimeSessionViewCache } from "../src/modules/runtime/infrastructure/driver-instance/runtime-session-view-cache";
+import { DriverInstanceRuntimeState } from "../src/modules/runtime/infrastructure/driver-instance/runtime-state";
 import { recordDriverInstanceCompletion } from "../src/modules/runtime/infrastructure/driver-instance/terminal-driver-events";
 import type { SandboxHandle } from "../src/modules/runtime/infrastructure/sandbox-handles";
 import { isSessionTerminalCheckpointReadyForNextRun } from "../src/modules/runtime/infrastructure/session-runs/session-run-admission.repository";
@@ -35,7 +28,6 @@ import { setSessionRunStatus } from "../src/modules/runtime/infrastructure/sessi
 import { loadSessionViewerState } from "../src/modules/sessions/application/session-live-state.service";
 import { createSessionProcessEventsFromSessionEventRows } from "../src/modules/sessions/application/session-process-events.service";
 import type { SessionEventProcessRow } from "../src/modules/sessions/application/session-process-events.service";
-import { setServerProductAnalyticsTransportForTests } from "../src/platform/analytics/product-analytics";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import {
   createPublicHttpContractDatabase,
@@ -75,60 +67,19 @@ const PROGRESS_TEXTS = [
   "进度 3：artifact 已创建。",
 ] as const;
 
+let fetchSpy: { mockRestore(): void } | null = null;
+
 afterEach(() => {
-  setServerProductAnalyticsTransportForTests(null);
+  fetchSpy?.mockRestore();
+  fetchSpy = null;
 });
 
-interface TestDriverState {
-  createDriverEventReceipts(events: readonly DriverEventEnvelope[]): DriverEventReceipt[];
-  filterUnprocessedDriverEvents(events: readonly DriverEventEnvelope[]): DriverEventEnvelope[];
-  hello: { pid: number };
-  readProcessedDriverEventReceipts(events: readonly DriverEventEnvelope[]): DriverEventReceipt[];
-  rememberProcessedDriverEventReceipts(receipts: DriverEventReceipt[]): void;
-  requireDriverInstanceId(): DriverInstanceId;
-  runtimeSessionLink: RuntimeSessionLink | null;
-  setRuntimeSessionLink(link: RuntimeSessionLink): void;
-}
-
-function createDriverState(): TestDriverState {
-  const processedReceipts = new Map<string, DriverEventReceipt>();
-  let nextSeq = 0;
-
-  return {
-    createDriverEventReceipts(events) {
-      const result = createReceiptsForDriverEvents({ events, nextSeq });
-      nextSeq = result.nextSeq;
-      return result.receipts;
-    },
-    filterUnprocessedDriverEvents(events) {
-      return filterNewDriverEvents({ events, processedReceipts });
-    },
-    hello: { pid: 1 },
-    readProcessedDriverEventReceipts(events) {
-      return readReceiptsForProcessedDriverEvents({ events, processedReceipts });
-    },
-    rememberProcessedDriverEventReceipts(receipts) {
-      rememberDriverEventReceipts({ processedReceipts, receipts });
-    },
-    requireDriverInstanceId() {
-      return DRIVER_ID;
-    },
-    runtimeSessionLink: null,
-    setRuntimeSessionLink(link) {
-      this.runtimeSessionLink = link;
-    },
-  };
-}
-
 function createController(bindings: ApiBindings): DriverInstanceRpcEventIngestionController {
-  return new DriverInstanceRpcEventIngestionController({
-    env: bindings,
-    state: createDriverState(),
-    viewCache: new RuntimeSessionViewCache(),
-    viewerEventDelivery: {
-      enqueue: () => undefined,
-    },
-  } as never);
+  const state = new DriverInstanceRuntimeState({ storage: {} as never });
+  state.driverInstanceId = DRIVER_ID;
+  state.hello = {} as never;
+
+  return new DriverInstanceRpcEventIngestionController({ env: bindings, state } as never);
 }
 
 function runtimeEvent(input: {
@@ -220,7 +171,7 @@ async function insertRuntimeFixture(database: SqliteD1Database): Promise<void> {
       session_id, status, updated_at
     )
     VALUES (
-      'canary-cloudflare-session', 1, '/workspace',
+      '01J0000000000000000000000Z', 1, '/workspace',
       '{"callerUserId":"${PUBLIC_API_TEST_IDS.ownerAccount}","entrypoint":"api","executionOwnerUserId":"${PUBLIC_API_TEST_IDS.ownerAccount}","type":"agent"}',
       '${PUBLIC_API_TEST_IDS.sandbox}', '${SESSION_ID}', 'active', 1
     );
@@ -266,18 +217,6 @@ async function createCheckpointCompletionFixture(
     UPDATE session SET kind = 'cattle', last_message_at = 1 WHERE id = '${SESSION_ID}';
     UPDATE sandbox SET kind = 'cattle', subject_kind = 'session', subject_id = '${SESSION_ID}';
     UPDATE sandbox_session SET cwd = '/workspace/se/${SESSION_ID}';
-    CREATE TABLE native_resume_ref (
-      committed_session_run_id text,
-      committed_value text,
-      created_at integer NOT NULL,
-      kind text NOT NULL,
-      observed_driver_instance_id text,
-      observed_session_run_id text,
-      runtime_id text NOT NULL,
-      session_id text PRIMARY KEY NOT NULL,
-      updated_at integer NOT NULL,
-      value text NOT NULL
-    );
     INSERT INTO native_resume_ref (
       created_at, kind, observed_driver_instance_id, observed_session_run_id,
       runtime_id, session_id, updated_at, value
@@ -304,11 +243,8 @@ async function createCheckpointCompletionFixture(
     setKeepAlive: unavailable,
     ensureContainerReady: unavailable,
     startProcess: unavailable,
-    terminal: unavailable,
     unmountBucket: async () => {},
-    watch: unavailable,
     writeFile: unavailable,
-    wsConnect: unavailable,
   };
   const deletedBackupKeys: string[] = [];
   const baseBindings = createPublicHttpTestBindings(database);
@@ -426,6 +362,23 @@ describe("runtime final output ingestion", () => {
       input_tokens: 100,
       output_tokens: 20,
     });
+  });
+
+  test("acknowledges a replay mixing new and durable events in submission order", async () => {
+    const { bindings } = await createCheckpointCompletionFixture();
+    const durableEvents = messageEvents({
+      messageId: createPlatformId<SessionMessageId>(),
+      sourcePrefix: "replay:durable",
+      text: "Already persisted.",
+    });
+    await pushFreshController(bindings, durableEvents);
+    const replay = [usageEvent("replay:new"), ...durableEvents];
+
+    const accepted = await pushFreshController(bindings, replay);
+
+    expect(accepted.map((receipt) => [receipt.eventId, receipt.type])).toEqual(
+      replay.map((envelope) => [envelope.eventId, envelope.event.kind]),
+    );
   });
 
   test("late usage follows the persisted terminal outcome and does not duplicate the ledger", async () => {
@@ -758,7 +711,9 @@ describe("runtime final output ingestion", () => {
         sourceEventId: TERMINAL_SOURCE_EVENT_ID,
       }),
     ];
-    await expect(pushFreshController(bindings, events)).rejects.toThrow("concurrent status race");
+    await expect(pushFreshController(bindings, events)).rejects.toThrow(
+      "lost a concurrent run transition",
+    );
     expect((await getSessionRunSummary(database, RUN_ID))?.status).toBe("running");
     await expect(
       database
@@ -788,14 +743,11 @@ describe("runtime final output ingestion", () => {
       return { dir: options.dir, id: crypto.randomUUID() };
     });
     await expect(
-      recordDriverInstanceCompletion(bindings, { driverInstanceId: DRIVER_ID, driverReady: true }),
+      recordDriverInstanceCompletion(bindings, { driverInstanceId: DRIVER_ID }),
     ).rejects.toBeInstanceOf(Error);
     expect((await getSessionRunSummary(database, RUN_ID))?.status).toBe("running");
     backupAvailable = true;
-    await recordDriverInstanceCompletion(bindings, {
-      driverInstanceId: DRIVER_ID,
-      driverReady: true,
-    });
+    await recordDriverInstanceCompletion(bindings, { driverInstanceId: DRIVER_ID });
     expect((await getSessionRunSummary(database, RUN_ID))?.status).toBe("completed");
     await expect(
       database.prepare("SELECT committed_value FROM native_resume_ref").first(),
@@ -820,10 +772,7 @@ describe("runtime final output ingestion", () => {
         );
       }
       await expect(
-        recordDriverInstanceCompletion(bindings, {
-          driverInstanceId: DRIVER_ID,
-          driverReady: true,
-        }),
+        recordDriverInstanceCompletion(bindings, { driverInstanceId: DRIVER_ID }),
       ).rejects.toThrow("checkpoint failed");
       expect((await getSessionRunSummary(database, RUN_ID))?.status).toBe("running");
       expect(backupCalls).toBe(0);
@@ -839,10 +788,7 @@ describe("runtime final output ingestion", () => {
     database.execute(
       `UPDATE native_resume_ref SET observed_session_run_id = '${previousRunId}', committed_session_run_id = '${previousRunId}', committed_value = value`,
     );
-    await recordDriverInstanceCompletion(bindings, {
-      driverInstanceId: DRIVER_ID,
-      driverReady: true,
-    });
+    await recordDriverInstanceCompletion(bindings, { driverInstanceId: DRIVER_ID });
     await expect(
       database
         .prepare("SELECT committed_session_run_id, committed_value FROM native_resume_ref")
@@ -887,10 +833,7 @@ describe("runtime final output ingestion", () => {
       await expect(isSessionTerminalCheckpointReadyForNextRun(database, SESSION_ID)).resolves.toBe(
         false,
       );
-      await recordDriverInstanceCompletion(bindings, {
-        driverInstanceId: DRIVER_ID,
-        driverReady: true,
-      });
+      await recordDriverInstanceCompletion(bindings, { driverInstanceId: DRIVER_ID });
       await expect(isSessionTerminalCheckpointReadyForNextRun(database, SESSION_ID)).resolves.toBe(
         false,
       );
@@ -914,12 +857,13 @@ describe("runtime final output ingestion", () => {
     async (_driverBehavior, driverProvidesSnapshot) => {
       const { bindings: fixtureBindings, database } = await createCheckpointCompletionFixture();
       const capturedEvents: unknown[] = [];
-      setServerProductAnalyticsTransportForTests(async (_input, init) => {
-        capturedEvents.push(JSON.parse(init.body as string) as unknown);
+      fetchSpy = spyOn(globalThis, "fetch").mockImplementation(async (_input, init) => {
+        capturedEvents.push(JSON.parse(init?.body as string) as unknown);
         return new Response(null, { status: 200 });
       });
       const bindings = {
         ...fixtureBindings,
+        POSTHOG_API_HOST: "https://us.i.posthog.com",
         POSTHOG_PROJECT_KEY: "phc_test",
       } as ApiBindings;
       const finalText = "The final answer.";
@@ -1335,10 +1279,7 @@ describe("runtime final output ingestion", () => {
     });
 
     await pushFreshController(bindings, progressEvents);
-    await recordDriverInstanceCompletion(bindings, {
-      driverInstanceId: DRIVER_ID,
-      driverReady: true,
-    });
+    await recordDriverInstanceCompletion(bindings, { driverInstanceId: DRIVER_ID });
 
     const finalOutput = await readPublicThreadRunFinalOutput({
       database,

@@ -4,17 +4,17 @@ import { isPlatformId, parsePlatformId } from "@mosoo/id";
 import type { RuntimeOperationId } from "@mosoo/id";
 import { PLATFORM_ID_FIXTURES } from "@mosoo/id/testing";
 
-import { repairStrandedRuntimeSubjectDeadlines } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-maintenance-store";
 import {
-  recycleInactiveRuntimeSubjectNow,
+  claimInactiveRuntimeSubject,
+  listInactiveRuntimeSubjects,
+  listStaleRuntimeSubjectOperations,
+  repairStrandedRuntimeSubjectDeadlines,
+} from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-maintenance-store";
+import { claimExpiredRuntimeSubjectActivations } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-record-store";
+import {
   recycleRuntimeSubject,
   resumeRuntimeSubjectRecycleOperation,
 } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-recycle.service";
-import {
-  listInactiveRuntimeSubjects,
-  listStaleRuntimeSubjectOperations,
-  claimExpiredRuntimeSubjectActivations,
-} from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-store";
 import { encodeSandboxBackupIdForStorage } from "../src/modules/runtime/infrastructure/sandbox-backup-id";
 import type { SandboxHandle } from "../src/modules/runtime/infrastructure/sandbox-handles";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
@@ -205,11 +205,8 @@ function createSandboxHandle(): SandboxHandle {
     setKeepAlive: async () => {},
     ensureContainerReady: async () => {},
     startProcess: unavailable,
-    terminal: unavailable,
     unmountBucket: unavailable,
-    watch: unavailable,
     writeFile: unavailable,
-    wsConnect: unavailable,
   } as SandboxHandle;
 }
 
@@ -279,7 +276,37 @@ describe("runtime subject recycle", () => {
     expect(isPlatformId(subject?.status_operation_id)).toBe(true);
   });
 
-  test("preserves a shared machine and all its conversation bindings", async () => {
+  test("reclaims the sandbox of a deleted Session", async () => {
+    const database = createRuntimeSubjectRecycleDatabase();
+    database.execute(`
+      UPDATE sandbox SET claim_expires_at = NULL, claim_owner = NULL, inactive_deadline_at = 1;
+      DELETE FROM session;
+    `);
+    currentSandbox = createSandboxHandle();
+
+    expect(await listInactiveRuntimeSubjects(database, { limit: 10, now: 10 })).toEqual([
+      { id: SANDBOX_ID },
+    ]);
+    await expect(
+      claimInactiveRuntimeSubject(database, {
+        claimExpiresAt: 100,
+        claimOwner: CLAIM_OWNER,
+        now: 10,
+        runtimeSubjectId: SANDBOX_ID,
+      }),
+    ).resolves.toBe(true);
+    await expect(
+      recycleRuntimeSubject(createBindings(database), {
+        claimOwner: CLAIM_OWNER,
+        now: 10,
+        reason: "test.deleted_session",
+        runtimeSubjectId: SANDBOX_ID,
+      }),
+    ).resolves.toBe(true);
+    expect(await readRuntimeSubjectRecycleRow(database)).toMatchObject({ status: "cold" });
+  });
+
+  test("does not list a shared machine for reclamation", async () => {
     const database = createRuntimeSubjectRecycleDatabase();
     database.execute(`
       UPDATE sandbox SET claim_expires_at = NULL, claim_owner = NULL,
@@ -287,30 +314,7 @@ describe("runtime subject recycle", () => {
       INSERT INTO sandbox_session (cwd, sandbox_id, session_id, status, updated_at)
         VALUES ('/workspace', '${SANDBOX_ID}', '01J0000000000000000000000T', 'closed', 1);
     `);
-    const before = await database.prepare("SELECT * FROM sandbox").all();
-    const conversations = await database.prepare("SELECT * FROM sandbox_session").all();
-    let physicalCalls = 0;
-    currentSandbox = {
-      ...createSandboxHandle(),
-      destroy: async () => {
-        physicalCalls++;
-      },
-      createBackup: async () => {
-        physicalCalls++;
-        throw new Error("Unexpected backup");
-      },
-    };
     expect(await listInactiveRuntimeSubjects(database, { limit: 10, now: 10 })).toEqual([]);
-    expect(
-      await recycleInactiveRuntimeSubjectNow(createBindings(database), {
-        now: 10,
-        reason: "test.shared",
-        runtimeSubjectId: SANDBOX_ID,
-      }),
-    ).toBe(false);
-    expect(physicalCalls).toBe(0);
-    expect(await database.prepare("SELECT * FROM sandbox").all()).toEqual(before);
-    expect(await database.prepare("SELECT * FROM sandbox_session").all()).toEqual(conversations);
   });
 
   test("resumes a stale destroy phase using the recorded operation id", async () => {

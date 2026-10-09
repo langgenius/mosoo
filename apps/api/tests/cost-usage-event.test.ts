@@ -4,7 +4,6 @@ import type { SessionUsageSummary } from "@mosoo/ag-ui-session";
 import { parsePlatformId } from "@mosoo/id";
 import type {
   AccountId,
-  AgentDeploymentVersionId,
   AgentId,
   DriverInstanceId,
   OrganizationId,
@@ -13,8 +12,12 @@ import type {
   SessionRunId,
 } from "@mosoo/id";
 
-import { recordRuntimeUsageEvent } from "../src/modules/cost/application/cost-usage-event.service";
-import type { RuntimeUsageRunContext } from "../src/modules/cost/application/cost-usage-event.service";
+import { createRuntimeUsageEventUpsert } from "../src/modules/cost/application/cost-usage-event.service";
+import type {
+  RecordRuntimeUsageEventInput,
+  RuntimeUsageRunContext,
+} from "../src/modules/cost/application/cost-usage-event.service";
+import { getAppDatabase } from "../src/platform/db/drizzle";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
 const ACTOR_ID = parsePlatformId<AccountId>("01J00000000000000000000001", "actor ID");
@@ -84,16 +87,16 @@ function createUsageEventDatabase(): SqliteD1Database {
       usage_contract text NOT NULL,
       UNIQUE (source, source_event_id)
     );
-
-    CREATE TABLE usage_event_rollup_receipt (
-      rolled_up_at integer NOT NULL,
-      source text NOT NULL,
-      source_event_id text NOT NULL,
-      PRIMARY KEY (source, source_event_id)
-    );
   `);
 
   return database;
+}
+
+async function recordRuntimeUsageEvent(
+  database: SqliteD1Database,
+  input: RecordRuntimeUsageEventInput,
+): Promise<void> {
+  await createRuntimeUsageEventUpsert(getAppDatabase(database), input)?.run();
 }
 
 const RUN_CONTEXT: RuntimeUsageRunContext = {

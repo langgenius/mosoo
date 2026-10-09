@@ -18,10 +18,6 @@ export type CanonicalSessionRunFailureOutcome =
   | {
       kind: "not_failed";
       transition: SessionRunTransitionOutcome;
-    }
-  | {
-      kind: "repair_needed";
-      transition: Extract<SessionRunTransitionOutcome, { kind: "repair_needed" }>;
     };
 
 export async function recordCanonicalSessionRunFailure(
@@ -39,10 +35,6 @@ export async function recordCanonicalSessionRunFailure(
     source: input.source,
     status: "failed",
   });
-
-  if (outcome.kind === "repair_needed") {
-    return { kind: "repair_needed", transition: outcome };
-  }
 
   const run =
     outcome.kind === "applied" || outcome.kind === "duplicate"

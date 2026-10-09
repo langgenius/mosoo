@@ -129,22 +129,11 @@ export async function storeSecret(
   return id;
 }
 
-export type SecretReadOutcome =
-  | {
-      status: "found";
-      value: string;
-    }
-  | {
-      reason: "secret_not_found";
-      status: "missing";
-    };
-
-export async function readSecretOutcome(
+export async function readSecret(
   database: D1Database,
   bindings: VaultSecretBindings,
   secretId: string,
-): Promise<SecretReadOutcome> {
-  const vaultSecretId = readVaultSecretId(secretId);
+): Promise<string> {
   const row = await getAppDatabase(database)
     .select({
       ciphertext: vaultSecretsTable.ciphertext,
@@ -153,15 +142,15 @@ export async function readSecretOutcome(
       wrappedDekIv: vaultSecretsTable.wrappedDekIv,
     })
     .from(vaultSecretsTable)
-    .where(eq(vaultSecretsTable.id, vaultSecretId))
+    .where(eq(vaultSecretsTable.id, readVaultSecretId(secretId)))
     .limit(1)
     .get();
 
   if (!row) {
-    return { reason: "secret_not_found", status: "missing" };
+    throw new Error("Secret not found.");
   }
 
-  return { status: "found", value: await decryptSecretPayload(requireVaultSecret(bindings), row) };
+  return decryptSecretPayload(requireVaultSecret(bindings), row);
 }
 
 export async function deleteSecret(

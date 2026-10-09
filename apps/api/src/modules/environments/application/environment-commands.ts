@@ -1,19 +1,23 @@
 import type {
   CreateEnvironmentInput,
+  DeleteEnvironmentInput,
   EnvironmentDetail,
   EnvironmentSummary,
   SetProjectDefaultEnvironmentInput,
-  SetEnvironmentVariableValueInput,
   UpdateEnvironmentInput,
 } from "@mosoo/contracts/environment";
-import { environmentsTable, projectsTable } from "@mosoo/db";
-import { createPlatformId, parsePlatformId } from "@mosoo/id";
-import type { AccountId, EnvironmentId } from "@mosoo/id";
+import {
+  agentsTable,
+  environmentRevisionsTable,
+  environmentsTable,
+  projectsTable,
+} from "@mosoo/db";
+import { createPlatformId } from "@mosoo/id";
+import type { EnvironmentId } from "@mosoo/id";
 import { eq } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
-import { forbiddenError } from "../../../platform/errors";
 import { currentTimestampMs } from "../../../time";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { ensureProjectOwnership } from "../../projects/application/project.service";
@@ -23,18 +27,13 @@ import {
   getEnvironmentRecordRow,
 } from "./environment-access.service";
 import {
-  assertWritableEnvironmentPackageManagers,
   buildStoredEnvVars,
+  normalizeEnvironmentConfigInput,
   normalizeEnvironmentMetadata,
 } from "./environment-config";
-import {
-  normalizeConfigForCreate,
-  toConfig,
-  toEnvironmentSummary,
-} from "./environment-config-mapping";
+import { toConfig, toEnvironmentSummary } from "./environment-config-mapping";
 import { resolveEnvironmentPackageArtifact } from "./environment-package-artifact.service";
 import { getEnvironmentDetail } from "./environment-queries";
-import type { EnvironmentMutableConfig } from "./environment-types";
 import { createEnvironmentFromConfig, createRevision } from "./environment-write.service";
 
 export async function createEnvironment(
@@ -42,30 +41,25 @@ export async function createEnvironment(
   viewer: AuthenticatedViewer,
   input: CreateEnvironmentInput,
 ): Promise<EnvironmentSummary> {
-  const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
-  const project = await ensureProjectOwnership(bindings.DB, viewerId, input.projectId);
+  const project = await ensureProjectOwnership(bindings.DB, viewer.id, input.projectId);
 
   const metadata = normalizeEnvironmentMetadata(input);
   const environmentId = createPlatformId<EnvironmentId>();
-  const normalized = normalizeConfigForCreate(input);
+  const normalized = normalizeEnvironmentConfigInput(input);
   const timestampMs = currentTimestampMs();
   const [envVars] = await Promise.all([
-    buildStoredEnvVars(bindings, { envVars: input.envVars, environmentId }),
+    buildStoredEnvVars(bindings, { envVars: input.envVars }),
     resolveEnvironmentPackageArtifact(bindings, project.id, normalized.packages, {
       retryFailed: true,
     }),
   ]);
-  const config: EnvironmentMutableConfig = {
-    ...normalized,
-    envVars,
-  };
   await createEnvironmentFromConfig(bindings, {
-    actorId: viewerId,
-    config,
+    actorId: viewer.id,
+    config: { ...normalized, envVars },
     description: metadata.description,
     environmentId,
     name: metadata.name,
-    ownerId: viewerId,
+    ownerId: viewer.id,
     projectId: project.id,
     timestampMs,
   });
@@ -84,32 +78,25 @@ export async function updateEnvironment(
   viewer: AuthenticatedViewer,
   input: UpdateEnvironmentInput,
 ): Promise<EnvironmentDetail> {
-  const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
-  const access = await ensureEnvironmentEditor(bindings.DB, viewerId, {
+  const access = await ensureEnvironmentEditor(bindings.DB, viewer.id, {
     environmentId: input.environmentId,
     projectId: input.projectId,
   });
-  const beforeConfig = toConfig(access.row);
   const metadata = normalizeEnvironmentMetadata(input);
-  const normalized = normalizeConfigForCreate(input);
+  const normalized = normalizeEnvironmentConfigInput(input);
   const timestampMs = currentTimestampMs();
   const [envVars] = await Promise.all([
     buildStoredEnvVars(bindings, {
       envVars: input.envVars,
-      environmentId: access.row.id,
-      previousEnvVars: beforeConfig.envVars,
+      previousEnvVars: toConfig(access.row).envVars,
     }),
     resolveEnvironmentPackageArtifact(bindings, access.row.projectId, normalized.packages, {
       retryFailed: true,
     }),
   ]);
-  const config: EnvironmentMutableConfig = {
-    ...normalized,
-    envVars,
-  };
   const revisionId = await createRevision(bindings, {
-    actorId: viewerId,
-    config,
+    actorId: viewer.id,
+    config: { ...normalized, envVars },
     environmentId: access.row.id,
     projectId: access.row.projectId,
     timestampMs,
@@ -132,85 +119,15 @@ export async function updateEnvironment(
   });
 }
 
-export async function setEnvironmentVariableValue(
-  bindings: ApiBindings,
-  viewer: AuthenticatedViewer,
-  input: SetEnvironmentVariableValueInput,
-): Promise<EnvironmentDetail> {
-  const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
-  const access = await ensureEnvironmentEditor(bindings.DB, viewerId, {
-    environmentId: input.environmentId,
-    projectId: input.projectId,
-  });
-  const beforeConfig = toConfig(access.row);
-  const key = input.key.trim();
-  const value = input.value;
-
-  if (!/^[A-Z_][A-Z0-9_]*$/u.test(key)) {
-    throw new Error(`Environment variable ${key} must use shell-style uppercase naming.`);
-  }
-
-  if (!value) {
-    throw new Error("Environment variable value is required.");
-  }
-
-  if (!beforeConfig.envVars.some((envVar) => envVar.key === key)) {
-    throw new Error(`Environment variable ${key} is not configured on this Environment.`);
-  }
-
-  assertWritableEnvironmentPackageManagers(beforeConfig.packages);
-
-  const timestampMs = currentTimestampMs();
-  const envVars = await buildStoredEnvVars(bindings, {
-    envVars: beforeConfig.envVars.map((envVar) => ({
-      key: envVar.key,
-      value: envVar.key === key ? value : null,
-    })),
-    environmentId: access.row.id,
-    previousEnvVars: beforeConfig.envVars,
-  });
-  const revisionId = await createRevision(bindings, {
-    actorId: viewerId,
-    config: {
-      ...beforeConfig,
-      envVars,
-    },
-    environmentId: access.row.id,
-    projectId: access.row.projectId,
-    timestampMs,
-  });
-
-  await getAppDatabase(bindings.DB)
-    .update(environmentsTable)
-    .set({
-      currentRevisionId: revisionId,
-      updatedAt: timestampMs,
-    })
-    .where(eq(environmentsTable.id, access.row.id))
-    .run();
-
-  return getEnvironmentDetail(bindings, viewer, {
-    environmentId: access.row.id,
-    projectId: access.row.projectId,
-  });
-}
-
 export async function setProjectDefaultEnvironment(
   bindings: ApiBindings,
   viewer: AuthenticatedViewer,
   input: SetProjectDefaultEnvironmentInput,
 ): Promise<EnvironmentSummary> {
-  const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
-  await ensureProjectOwnership(bindings.DB, viewerId, input.projectId);
-
-  const access = await ensureEnvironmentAccess(bindings.DB, viewerId, {
+  const access = await ensureEnvironmentAccess(bindings.DB, viewer.id, {
     environmentId: input.environmentId,
     projectId: input.projectId,
   });
-
-  if (access.row.projectId !== input.projectId) {
-    throw forbiddenError("Environment belongs to another Project.");
-  }
 
   await getAppDatabase(bindings.DB)
     .update(projectsTable)
@@ -221,11 +138,40 @@ export async function setProjectDefaultEnvironment(
     .where(eq(projectsTable.id, input.projectId))
     .run();
 
-  const row = await getEnvironmentRecordRow(bindings.DB, access.row.id);
+  return toEnvironmentSummary({ ...access.row, defaultEnvironmentId: access.row.id });
+}
 
-  if (!row) {
-    throw new Error("Environment not found.");
+export async function deleteEnvironment(
+  bindings: ApiBindings,
+  viewer: AuthenticatedViewer,
+  input: DeleteEnvironmentInput,
+): Promise<void> {
+  const access = await ensureEnvironmentEditor(bindings.DB, viewer.id, {
+    environmentId: input.environmentId,
+    projectId: input.projectId,
+  });
+
+  if (access.row.defaultEnvironmentId === access.row.id) {
+    throw new Error("This environment is the Project default.");
   }
 
-  return toEnvironmentSummary(row);
+  const agent = await getAppDatabase(bindings.DB)
+    .select({ id: agentsTable.id })
+    .from(agentsTable)
+    .where(eq(agentsTable.environmentId, access.row.id))
+    .limit(1)
+    .get();
+
+  if (agent) {
+    throw new Error("This environment is still used by one or more of the owner's agents.");
+  }
+
+  await getAppDatabase(bindings.DB)
+    .delete(environmentRevisionsTable)
+    .where(eq(environmentRevisionsTable.environmentId, access.row.id))
+    .run();
+  await getAppDatabase(bindings.DB)
+    .delete(environmentsTable)
+    .where(eq(environmentsTable.id, access.row.id))
+    .run();
 }

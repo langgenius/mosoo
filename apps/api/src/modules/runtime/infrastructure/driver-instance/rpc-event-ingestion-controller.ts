@@ -1,7 +1,7 @@
+import { compactAgUiSessionEvents } from "@mosoo/ag-ui-session";
 import type { DriverEventEnvelope } from "@mosoo/agent-driver/events";
 import type {
   DriverEventBatchInput,
-  DriverEventBatchOutput,
   DriverEventReceipt,
   DriverLogBatchInput,
   DriverLogBatchOutput,
@@ -10,22 +10,17 @@ import { parsePlatformId } from "@mosoo/id";
 import type { SessionRunId } from "@mosoo/id";
 
 import { createErrorLogContext, logError } from "../../../../platform/cloudflare/logger";
-import type { SessionDeliveryEvent } from "../../../sessions/application/session-live-state.service";
+import { publishSessionViewerEventsSafely } from "../../../sessions/application/session-event-write.service";
 import { getSessionRuntimeEventSourceReceipts } from "../../../sessions/infrastructure/session-runtime-event-store.repository";
-import { createSessionRunTerminalFailureSourceId } from "../../domain/session-run-terminal-event-id";
 import { EVENT_BATCH_MAX_SIZE, LOG_BATCH_MAX_SIZE } from "./connections";
 import { DriverEventTerminalGate } from "./driver-event-terminal-gate";
 import { publishDriverLogBatch } from "./driver-log-batch-publisher";
+import { persistProjectedRuntimeDriverEvents } from "./event-persistence";
 import { runtimeSessionLinkNeedsRefresh } from "./event-types";
-import {
-  getRuntimeSessionLink,
-  persistProjectedRuntimeDriverEvents,
-  projectRuntimeDriverEvents,
-} from "./events";
-import type { RuntimeSessionLink } from "./events";
+import type { RuntimeSessionLink } from "./event-types";
+import { projectRuntimeDriverEvents, resolveDriverEventPersistenceSourceId } from "./events";
 import type { DriverInstanceRpcOperationContext } from "./rpc";
 import type { DriverInstanceRpcControllerDependencies } from "./rpc-controller-dependencies";
-import { filterDurablyAcceptedRuntimeStreamReplays } from "./runtime-event-replay-filter";
 
 function summarizeDriverEvents(events: readonly DriverEventEnvelope[]) {
   return {
@@ -59,23 +54,9 @@ function resolveEventSessionRunId(
     : parsePlatformId<SessionRunId>(eventRunId, "driver event run id");
 }
 
-function resolveDriverEventPersistenceSourceId(event: DriverEventEnvelope): string {
-  if (event.event.kind === "run.failed" && event.event.runId !== undefined) {
-    return createSessionRunTerminalFailureSourceId(
-      parsePlatformId<SessionRunId>(event.event.runId, "driver failed event run id"),
-    );
-  }
-
-  return event.eventId;
-}
-
-const PRE_HELLO_LOG_BATCH_LIMIT = 16;
-
 export class DriverInstanceRpcEventIngestionController {
   readonly #dependencies: DriverInstanceRpcControllerDependencies;
   readonly #eventTerminalGate = new DriverEventTerminalGate();
-  #droppedPreHelloLogBatches = 0;
-  readonly #pendingPreHelloLogBatches: DriverLogBatchInput[] = [];
 
   public constructor(dependencies: DriverInstanceRpcControllerDependencies) {
     this.#dependencies = dependencies;
@@ -84,17 +65,12 @@ export class DriverInstanceRpcEventIngestionController {
   public async handlePushEvents(
     input: DriverEventBatchInput,
     context: DriverInstanceRpcOperationContext,
-  ): Promise<DriverEventBatchOutput> {
+  ): Promise<{ accepted: DriverEventReceipt[] }> {
     const { state } = this.#dependencies;
 
     if (!state.hello) {
       throw new Error("Driver hello is required before pushEvents.");
     }
-
-    if (input.driverInstanceId !== state.requireDriverInstanceId()) {
-      throw new Error("Driver instance id mismatch.");
-    }
-    const driverInstanceId = state.requireDriverInstanceId();
 
     if (input.events.length > EVENT_BATCH_MAX_SIZE) {
       throw new Error(`Event batch exceeds max size ${EVENT_BATCH_MAX_SIZE}.`);
@@ -103,40 +79,51 @@ export class DriverInstanceRpcEventIngestionController {
 
     return this.#eventTerminalGate.run(async () => {
       context.assertActiveConnection();
-      const { env, viewCache, viewerEventDelivery } = this.#dependencies;
+      const { env } = this.#dependencies;
+      const driverInstanceId = state.requireDriverInstanceId();
       const cachedLink = state.runtimeSessionLink;
       const eventSessionRunId = resolveEventSessionRunId(input.events);
-      const shouldRefreshLink =
-        input.events.some((envelope) => envelope.event.kind === "run.started") ||
-        runtimeSessionLinkNeedsRefresh(cachedLink) ||
-        (eventSessionRunId !== undefined && cachedLink?.sessionRunId !== eventSessionRunId);
-      const link = await this.#getRuntimeSessionLink({
-        refresh: shouldRefreshLink,
+      const link = await state.getRuntimeSessionLink(env.DB, {
+        refresh:
+          input.events.some((envelope) => envelope.event.kind === "run.started") ||
+          runtimeSessionLinkNeedsRefresh(cachedLink) ||
+          (eventSessionRunId !== undefined && cachedLink?.sessionRunId !== eventSessionRunId),
         ...(eventSessionRunId === undefined ? {} : { sessionRunId: eventSessionRunId }),
       });
       context.assertActiveConnection();
-      const replayedReceipts = state.readProcessedDriverEventReceipts(input.events);
-      const candidateEvents = state.filterUnprocessedDriverEvents(input.events);
-      const durableReceipts = await this.#readPersistedEventReceipts(link, candidateEvents);
+      const receipts = await this.#readPersistedEventReceipts(link, input.events);
       context.assertActiveConnection();
-      const durableEventIds = new Set(
-        durableReceipts.flatMap((receipt) =>
-          receipt.eventId === undefined ? [] : [receipt.eventId],
-        ),
-      );
-      const events = filterDurablyAcceptedRuntimeStreamReplays(candidateEvents, durableEventIds);
-      const replayedAccepted = [...replayedReceipts, ...durableReceipts];
+      // Receipts must be a prefix of the submitted batch in submission order;
+      // durable events keep their persisted receipt, new ones get the next seq.
+      const accepted: DriverEventReceipt[] = [];
+      const events: DriverEventEnvelope[] = [];
+
+      for (const envelope of input.events) {
+        let receipt = receipts.get(envelope.eventId);
+
+        if (receipt === undefined) {
+          state.driverEventReceiptSeq += 1;
+          receipt = {
+            eventId: envelope.eventId,
+            seq: state.driverEventReceiptSeq,
+            type: envelope.event.kind,
+          };
+          receipts.set(envelope.eventId, receipt);
+          events.push(envelope);
+        }
+
+        accepted.push(receipt);
+      }
 
       if (events.length === 0) {
-        state.rememberProcessedDriverEventReceipts(replayedAccepted);
-        return { accepted: replayedAccepted };
+        return { accepted };
       }
 
       const projection = await (async () => {
         try {
           return await projectRuntimeDriverEvents(env, {
             assertCurrentConnection: () => context.assertActiveConnection(),
-            currentLiveState: viewCache.currentState,
+            currentLiveState: state.liveState,
             driverInstanceId,
             events,
             link,
@@ -153,50 +140,37 @@ export class DriverInstanceRpcEventIngestionController {
       // An accepted source identity must already be durable. Buffering stream
       // fragments only in this hibernatable DO would acknowledge text that a
       // fresh instance cannot reconstruct, so persist every canonical event.
-      const persistenceRuntimeEvents = projection.runtimeEvents;
-
       const commit = await (async () => {
         try {
           return await persistProjectedRuntimeDriverEvents(env, {
             driverInstanceId,
-            projection: {
-              ...projection,
-              runtimeEvents: persistenceRuntimeEvents,
-            },
+            projection,
           });
         } catch (error) {
           logError("runtime.driver.events.persistence_failed", {
             ...createErrorLogContext(error),
             driverInstanceId,
             ...summarizeDriverEvents(events),
-            persistenceEventKinds: persistenceRuntimeEvents
-              .map((event) => event.event.kind)
-              .slice(0, 24),
-            persistenceEventSourceIds: persistenceRuntimeEvents
-              .map((event) => event.sourceEventId)
-              .slice(0, 24),
           });
           throw error;
         }
       })();
       context.assertActiveConnection();
 
-      if (commit.liveState) {
-        viewCache.update(commit.liveState);
+      if (commit.liveState !== null) {
+        state.liveState = commit.liveState;
       }
 
-      viewerEventDelivery.enqueue(
+      const persistedSourceEventIds = new Set(commit.persistedSourceEventIds);
+      await publishSessionViewerEventsSafely(
+        env,
         projection.link.sessionId,
-        filterDurablyCommittedDeliveryEvents({
-          persistenceEvents: persistenceRuntimeEvents,
-          persistedSourceEventIds: commit.persistedSourceEventIds,
-          sessionDeliveryEvents: projection.sessionDeliveryEvents,
-        }),
+        compactAgUiSessionEvents(
+          projection.sessionDeliveryEvents.flatMap((record) =>
+            persistedSourceEventIds.has(record.sourceEventId) ? [record.event] : [],
+          ),
+        ),
       );
-
-      const accepted = [...replayedAccepted, ...state.createDriverEventReceipts(events)];
-
-      state.rememberProcessedDriverEventReceipts(accepted);
 
       return { accepted };
     });
@@ -208,59 +182,14 @@ export class DriverInstanceRpcEventIngestionController {
   ): Promise<DriverLogBatchOutput> {
     const { env, state } = this.#dependencies;
 
-    if (input.driverInstanceId !== state.requireDriverInstanceId()) {
-      throw new Error("Driver instance id mismatch.");
-    }
-
     if (input.logs.length > LOG_BATCH_MAX_SIZE) {
       throw new Error(`Log batch exceeds max size ${LOG_BATCH_MAX_SIZE}.`);
     }
     context.assertActiveConnection();
 
-    if (!state.hello) {
-      // Drivers can flush their first batches while the hello round-trip is
-      // still in flight (production DO latency routinely exceeds the flush
-      // interval). Rejecting here used to kill boots; hold a bounded window
-      // instead and publish it once hello commits.
-      if (this.#pendingPreHelloLogBatches.length >= PRE_HELLO_LOG_BATCH_LIMIT) {
-        this.#pendingPreHelloLogBatches.shift();
-        this.#droppedPreHelloLogBatches += 1;
-      }
-
-      this.#pendingPreHelloLogBatches.push(input);
-
-      return { ok: true };
-    }
-
     await publishDriverLogBatch(env, state, input);
 
     return { ok: true };
-  }
-
-  public async publishPendingPreHelloLogs(): Promise<void> {
-    const { env, state } = this.#dependencies;
-    const pending = this.#pendingPreHelloLogBatches.splice(0);
-    const dropped = this.#droppedPreHelloLogBatches;
-    this.#droppedPreHelloLogBatches = 0;
-
-    if (dropped > 0) {
-      logError("runtime.driver.log.pre_hello_overflow", {
-        driverInstanceId: state.requireDriverInstanceId(),
-        droppedBatches: dropped,
-      });
-    }
-
-    for (const batch of pending) {
-      try {
-        await publishDriverLogBatch(env, state, batch);
-      } catch (error) {
-        logError("runtime.driver.log.pre_hello_publish_failed", {
-          ...createErrorLogContext(error),
-          batchSize: batch.logs.length,
-          driverInstanceId: state.requireDriverInstanceId(),
-        });
-      }
-    }
   }
 
   public async runAfterPendingEvents<T>(operation: () => Promise<T>): Promise<T> {
@@ -269,90 +198,32 @@ export class DriverInstanceRpcEventIngestionController {
     return this.#eventTerminalGate.run(operation);
   }
 
-  async #getRuntimeSessionLink(
-    options: { refresh?: boolean; sessionRunId?: SessionRunId } = {},
-  ): Promise<RuntimeSessionLink> {
-    const { env, state } = this.#dependencies;
-
-    if (options.refresh !== true && state.runtimeSessionLink !== null) {
-      return state.runtimeSessionLink;
-    }
-
-    const link = await getRuntimeSessionLink(
-      env.DB,
-      state.requireDriverInstanceId(),
-      options.sessionRunId === undefined ? {} : { sessionRunId: options.sessionRunId },
-    );
-    state.setRuntimeSessionLink(link);
-    return link;
-  }
-
   async #readPersistedEventReceipts(
     link: RuntimeSessionLink,
     events: readonly DriverEventEnvelope[],
-  ): Promise<DriverEventReceipt[]> {
+  ): Promise<Map<string, DriverEventReceipt>> {
+    const receipts = new Map<string, DriverEventReceipt>();
+
     if (link.sessionId === null) {
-      return [];
+      return receipts;
     }
 
-    const sourceEventIds = events
-      .map(resolveDriverEventPersistenceSourceId)
-      .filter((eventId) => eventId.length > 0);
-
-    if (sourceEventIds.length === 0) {
-      return [];
-    }
-
-    const receiptsByEventId = await getSessionRuntimeEventSourceReceipts(
+    const persistedReceipts = await getSessionRuntimeEventSourceReceipts(
       this.#dependencies.env.DB,
       {
         sessionId: link.sessionId,
-        sourceEventIds,
+        sourceEventIds: events.map(resolveDriverEventPersistenceSourceId),
       },
     );
-    const receipts: DriverEventReceipt[] = [];
-    const seenEventIds = new Set<string>();
 
     for (const event of events) {
-      if (event.eventId.length === 0 || seenEventIds.has(event.eventId)) {
-        continue;
+      const receipt = persistedReceipts.get(resolveDriverEventPersistenceSourceId(event));
+
+      if (receipt !== undefined) {
+        receipts.set(event.eventId, { ...receipt, eventId: event.eventId });
       }
-
-      seenEventIds.add(event.eventId);
-
-      const receipt = receiptsByEventId.get(resolveDriverEventPersistenceSourceId(event));
-
-      if (receipt === undefined) {
-        continue;
-      }
-
-      receipts.push({ ...receipt, eventId: event.eventId });
     }
 
     return receipts;
   }
-}
-
-function filterDurablyCommittedDeliveryEvents(input: {
-  persistenceEvents: readonly { readonly sourceEventId: string | null }[];
-  persistedSourceEventIds: readonly string[];
-  sessionDeliveryEvents: readonly {
-    readonly event: SessionDeliveryEvent;
-    readonly sourceEventId: string | null;
-  }[];
-}): SessionDeliveryEvent[] {
-  const persistedSourceEventIds = new Set(input.persistedSourceEventIds);
-  const persistenceSourceEventIds = new Set(
-    input.persistenceEvents.flatMap((event) =>
-      event.sourceEventId === null ? [] : [event.sourceEventId],
-    ),
-  );
-
-  return input.sessionDeliveryEvents.flatMap((record) => {
-    if (record.sourceEventId === null || !persistenceSourceEventIds.has(record.sourceEventId)) {
-      return [record.event];
-    }
-
-    return persistedSourceEventIds.has(record.sourceEventId) ? [record.event] : [];
-  });
 }

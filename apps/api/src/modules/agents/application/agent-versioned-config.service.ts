@@ -10,44 +10,29 @@ import type {
 import type { AgentId, McpServerId, SkillId } from "@mosoo/id";
 import { getRuntimeCatalogEntry } from "@mosoo/runtime-catalog";
 
+import { validationError } from "../../../platform/errors";
 import { listEditableAgentSkillReferences } from "./agent-deployment-version.service";
 import type { AgentRow } from "./agent-types";
 
-export type AgentRuntimeSelectionResult =
-  | {
-      ok: true;
-      runtimeId: DriverRuntime;
-    }
-  | {
-      message: string;
-      ok: false;
-    };
-
-export function evaluateAgentRuntimeSelection(input: {
+export function requireAgentRuntimeSelection(input: {
   model: string;
   provider: string;
   runtimeId: string;
-}): AgentRuntimeSelectionResult {
+}): { model: string; provider: string; runtimeId: DriverRuntime } {
   const entry = getRuntimeCatalogEntry(input.runtimeId);
 
   if (entry === null || !isSupportedDriverRuntime(entry.runtimeId)) {
-    return {
-      message: `Unsupported runtime: ${input.runtimeId}.`,
-      ok: false,
-    };
+    throw validationError(`Unsupported runtime: ${input.runtimeId}.`);
   }
 
-  if (entry.disabledReason !== undefined && entry.disabledReason !== "") {
-    return {
-      message: entry.disabledReason,
-      ok: false,
-    };
+  const model = input.model.trim();
+  const provider = input.provider.trim();
+
+  if (model === "" || provider === "") {
+    throw validationError("Model and provider are required.");
   }
 
-  return {
-    ok: true,
-    runtimeId: entry.runtimeId,
-  };
+  return { model, provider, runtimeId: entry.runtimeId };
 }
 
 export async function listAgentSkillIds(

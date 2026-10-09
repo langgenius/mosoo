@@ -106,7 +106,7 @@ function createOnboardingDatabase(): SqliteD1Database {
 }
 
 describe("onboarding bootstrap", () => {
-  test("creates an organization and activates it for the viewer", async () => {
+  test("creates an organization with a default Project for the viewer", async () => {
     const database = createOnboardingDatabase();
 
     const status = await bootstrapOnboarding({ DB: database }, VIEWER, {
@@ -117,13 +117,6 @@ describe("onboarding bootstrap", () => {
     expect(status.organization).toMatchObject({
       name: "Created Org",
     });
-    expect(status.organization).not.toHaveProperty("viewerRole");
-
-    const account = await database
-      .prepare("SELECT last_active_organization_id FROM account WHERE id = 'account-1'")
-      .first<{ last_active_organization_id: string | null }>();
-
-    expect(account?.last_active_organization_id).toBe(status.organization?.id);
 
     const project = await database
       .prepare(
@@ -141,5 +134,20 @@ describe("onboarding bootstrap", () => {
       organization_id: status.organization?.id,
       owner_account_id: VIEWER.id,
     });
+  });
+
+  test("returns the viewer's existing organization when called again", async () => {
+    const database = createOnboardingDatabase();
+
+    const first = await bootstrapOnboarding({ DB: database }, VIEWER, { name: "Created Org" });
+    const second = await bootstrapOnboarding({ DB: database }, VIEWER, { name: "Other Org" });
+
+    expect(second).toEqual(first);
+    expect(
+      await database
+        .prepare("SELECT COUNT(*) AS count FROM organization WHERE creator_account_id = ?")
+        .bind(VIEWER.id)
+        .first(),
+    ).toEqual({ count: 1 });
   });
 });

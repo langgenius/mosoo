@@ -4,7 +4,6 @@ import type { DriverCommandId, DriverInstanceId, SessionRunId } from "@mosoo/id"
 import { parsePlatformId } from "@mosoo/id";
 
 import { DriverInstanceRpcCommandController } from "../src/modules/runtime/infrastructure/driver-instance/rpc-command-controller";
-import { getRuntimeCommandRecord } from "../src/modules/runtime/infrastructure/session-runs/runtime-command-store.repository";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
@@ -150,6 +149,7 @@ describe("terminal runtime command acknowledgement", () => {
       {
         assertActiveConnection: () => undefined,
         connectionId: "connection-1",
+        driverInstanceId: DRIVER_INSTANCE_ID,
       },
     );
 
@@ -167,7 +167,7 @@ describe("terminal runtime command acknowledgement", () => {
     expect(acknowledgedBeforeCleanup).toBeTrue();
     expect(result).toEqual({ ok: true });
     await expect(
-      getRuntimeCommandRecord(database, DRIVER_INSTANCE_ID, COMMAND_ID),
-    ).resolves.toMatchObject({ status: "completed" });
+      database.prepare("SELECT status FROM driver_command WHERE id = ?").bind(COMMAND_ID).first(),
+    ).resolves.toEqual({ status: "completed" });
   });
 });

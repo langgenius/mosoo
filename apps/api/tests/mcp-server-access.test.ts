@@ -1,10 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
-import {
-  ensureServerAccess,
-  ensureServerManageAccess,
-} from "../src/modules/mcp/application/mcp-server.repository";
+import { ensureServerAccess } from "../src/modules/mcp/application/mcp-server.repository";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
 const OWNER_ID = "01J00000000000000000000001";
@@ -109,14 +106,14 @@ describe("MCP server access", () => {
   test("resolves project owner access", async () => {
     const database = createMcpServerAccessDatabase();
 
-    const access = await ensureServerAccess(
+    const server = await ensureServerAccess(
       database,
       createViewer(OWNER_ID),
       PROJECT_ID,
       PROJECT_MCP_SERVER_ID,
     );
 
-    expect(access.server.id).toBe(PROJECT_MCP_SERVER_ID);
+    expect(server.id).toBe(PROJECT_MCP_SERVER_ID);
   });
 
   test("denies non-owner project access", async () => {
@@ -131,12 +128,7 @@ describe("MCP server access", () => {
     const database = createMcpServerAccessDatabase();
 
     await expect(
-      ensureServerManageAccess(
-        database,
-        createViewer(OWNER_ID),
-        PROJECT_ID,
-        OTHER_PROJECT_MCP_SERVER_ID,
-      ),
+      ensureServerAccess(database, createViewer(OWNER_ID), PROJECT_ID, OTHER_PROJECT_MCP_SERVER_ID),
     ).rejects.toThrow();
   });
 });

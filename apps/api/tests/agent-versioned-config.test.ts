@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 
 import {
-  evaluateAgentRuntimeSelection,
   listAgentSkillIds,
+  requireAgentRuntimeSelection,
 } from "../src/modules/agents/application/agent-versioned-config.service";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
@@ -47,15 +47,27 @@ function createAgentVersionedConfigDatabase(): D1Database {
 describe("agent versioned config", () => {
   test("keeps Runtime selection independent from model provider selection", () => {
     expect(
-      evaluateAgentRuntimeSelection({
-        model: "claude-sonnet-4-5",
+      requireAgentRuntimeSelection({
+        model: " claude-sonnet-4-5 ",
         provider: "anthropic",
         runtimeId: "openai-runtime",
       }),
     ).toEqual({
-      ok: true,
+      model: "claude-sonnet-4-5",
+      provider: "anthropic",
       runtimeId: "openai-runtime",
     });
+  });
+
+  test("rejects unsupported runtimes and blank models as validation errors", () => {
+    for (const input of [
+      { model: "gpt-5.4", provider: "openai", runtimeId: "system-agent" },
+      { model: " ", provider: "openai", runtimeId: "openai-runtime" },
+    ]) {
+      expect(() => requireAgentRuntimeSelection(input)).toThrow(
+        expect.objectContaining({ code: "VALIDATION_FAILED" }),
+      );
+    }
   });
 
   test("editable skill id snapshots exclude package-owned skill runtime ids", async () => {

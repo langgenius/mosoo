@@ -1,4 +1,4 @@
-import type { RuntimeSubjectErrorCode, SandboxSubjectKind } from "@mosoo/contracts/sandbox";
+import type { SandboxSubjectKind } from "@mosoo/contracts/sandbox";
 import { projectsTable, sandboxesTable, sandboxSessionsTable, sessionsTable } from "@mosoo/db";
 import { createPlatformId } from "@mosoo/id";
 import type {
@@ -16,10 +16,7 @@ import type { SQL } from "drizzle-orm";
 import { sandboxBindingForRuntime } from "../../../../platform/cloudflare/sandbox-binding";
 import { getAppDatabase, getD1ChangeCount } from "../../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../../time";
-import {
-  RUNTIME_SUBJECT_CLAIMABLE_STATUSES,
-  toRuntimeSubjectStatusLifecycleEventName,
-} from "../../domain/runtime-subject-lifecycle.machine";
+import { RUNTIME_SUBJECT_CLAIMABLE_STATUSES } from "../../domain/runtime-subject-lifecycle.machine";
 import type { RuntimeSubjectOperationStatus } from "../../domain/runtime-subject-lifecycle.machine";
 import { getRuntimeSubjectInactiveDeadline } from "../../domain/session-runtime-policy";
 import type { RuntimeSubjectCapacityShortfall } from "./runtime-subject-errors";
@@ -34,12 +31,10 @@ import {
 import type {
   RuntimeSubjectActivationRecord,
   RuntimeSubjectOperationRepairCandidate,
-  RuntimeSubjectRecord,
   RuntimeSubjectStatus,
 } from "./runtime-subject-store.types";
 
-interface RuntimeSubjectQuotaScope {
-  readonly agentId: AgentId | null;
+interface SessionRuntimeSubjectScope {
   readonly projectId: ProjectId;
   readonly executionOwnerUserId: AccountId;
   readonly sessionId: SessionId;
@@ -50,19 +45,17 @@ export interface SessionRuntimeSubjectBinding {
   readonly projectId: ProjectId | null;
   readonly subjectId: PlatformId;
   readonly subjectKind: SandboxSubjectKind;
-  readonly foreignSessionCount: number;
 }
 
 export function assertSessionRuntimeSubjectBinding(
   record: SessionRuntimeSubjectBinding,
-  input: Pick<RuntimeSubjectQuotaScope, "executionOwnerUserId" | "projectId" | "sessionId">,
+  input: SessionRuntimeSubjectScope,
 ): void {
   if (
     record.subjectKind !== "session" ||
     record.subjectId !== input.sessionId ||
     record.projectId !== input.projectId ||
-    record.ownerAccountId !== input.executionOwnerUserId ||
-    record.foreignSessionCount !== 0
+    record.ownerAccountId !== input.executionOwnerUserId
   ) {
     throw new Error("Session does not have a verified exclusive execution binding.");
   }
@@ -73,15 +66,14 @@ const sessionBindingColumns = {
   projectId: sandboxesTable.projectId,
   subjectId: sandboxesTable.subjectId,
   subjectKind: sandboxesTable.subjectKind,
-  foreignSessionCount: sql<number>`(SELECT COUNT(*) FROM sandbox_session AS peer WHERE peer.sandbox_id = ${sandboxesTable.id} AND peer.session_id <> ${sandboxesTable.subjectId})`,
 };
 
 // One atomic deployment ceiling across image classes, preserving the former
 // single class's 50-subject capacity instead of multiplying it by four.
-export const RUNTIME_SUBJECT_DEPLOYMENT_SANDBOX_LIMIT = 50;
+const RUNTIME_SUBJECT_DEPLOYMENT_SANDBOX_LIMIT = 50;
+const ACCOUNT_CONCURRENT_SANDBOX_LIMIT = 5;
 
 interface RuntimeSubjectCapacityInput {
-  readonly accountConcurrentSandboxLimit: number;
   readonly executionOwnerUserId: AccountId;
   readonly now: number;
 }
@@ -113,7 +105,7 @@ function runtimeSubjectAccountCapacityPredicate(input: RuntimeSubjectCapacityInp
   // ponytail: use the existing status/claim indexes until measured contention
   // justifies durable admission counters.
   return sql`${deploymentSandboxCountSql(input.now)} < ${RUNTIME_SUBJECT_DEPLOYMENT_SANDBOX_LIMIT}
-    AND ${accountSandboxCountSql(input.executionOwnerUserId, input.now)} < ${input.accountConcurrentSandboxLimit}`;
+    AND ${accountSandboxCountSql(input.executionOwnerUserId, input.now)} < ${ACCOUNT_CONCURRENT_SANDBOX_LIMIT}`;
 }
 
 // Explains a refused cold activation after the fact. Counts can move between
@@ -136,8 +128,8 @@ export async function readRuntimeSubjectCapacityShortfall(
     return { limit: RUNTIME_SUBJECT_DEPLOYMENT_SANDBOX_LIMIT, scope: "platform" };
   }
 
-  if (counts.account >= input.accountConcurrentSandboxLimit) {
-    return { limit: input.accountConcurrentSandboxLimit, scope: "account" };
+  if (counts.account >= ACCOUNT_CONCURRENT_SANDBOX_LIMIT) {
+    return { limit: ACCOUNT_CONCURRENT_SANDBOX_LIMIT, scope: "account" };
   }
 
   return null;
@@ -146,16 +138,13 @@ export async function readRuntimeSubjectCapacityShortfall(
 function runtimeSubjectStatusPatch(input: {
   readonly now: number;
   readonly operationId: RuntimeOperationId | null;
-  readonly source: "api" | "maintenance" | "runtime";
   readonly status: RuntimeSubjectStatus;
 }) {
   return {
     status: input.status,
     statusChangedAt: input.now,
-    statusEvent: toRuntimeSubjectStatusLifecycleEventName(input.status),
     statusOperationId: input.operationId ?? null,
     statusSeq: sql`${sandboxesTable.statusSeq} + 1`,
-    statusSource: input.source,
     updatedAt: input.now,
   } as const;
 }
@@ -172,29 +161,9 @@ function runtimeSubjectStatusOperationCondition(
     : [eq(sandboxesTable.statusOperationId, operationId)];
 }
 
-export async function getRuntimeSubject(
-  database: D1Database,
-  runtimeSubjectId: SandboxId,
-): Promise<RuntimeSubjectRecord | null> {
-  const row =
-    (await getAppDatabase(database)
-      .select({
-        id: sandboxesTable.id,
-        sandboxBinding: sandboxesTable.sandboxBinding,
-        status: sandboxesTable.status,
-        subjectKind: sandboxesTable.subjectKind,
-      })
-      .from(sandboxesTable)
-      .where(eq(sandboxesTable.id, runtimeSubjectId))
-      .limit(1)
-      .get()) ?? null;
-
-  return row ?? null;
-}
-
 async function findRuntimeSubjectAllocation(
   database: D1Database,
-  input: RuntimeSubjectQuotaScope & { readonly runtimeSubjectId?: SandboxId },
+  input: SessionRuntimeSubjectScope & { readonly runtimeSubjectId?: SandboxId },
   boundSandboxId: SandboxId | null,
 ): Promise<{ id: SandboxId; sandboxBinding: string } | null> {
   const rows = await getAppDatabase(database)
@@ -290,10 +259,8 @@ export async function ensureRuntimeSubjectId(
       ownerAccountId: input.executionOwnerUserId,
       status: "cold",
       statusChangedAt: now,
-      statusEvent: toRuntimeSubjectStatusLifecycleEventName("cold"),
       statusOperationId: null,
       statusSeq: 0,
-      statusSource: "api",
       subjectId: input.sessionId,
       subjectKind: "session",
       updatedAt: now,
@@ -336,8 +303,6 @@ export async function getRuntimeSubjectActivationRecord(
         claimOwner: sandboxesTable.claimOwner,
         id: sandboxesTable.id,
         ...sessionBindingColumns,
-        lastError: sandboxesTable.lastError,
-        lastErrorCode: sandboxesTable.lastErrorCode,
         status: sandboxesTable.status,
       })
       .from(sandboxesTable)
@@ -348,10 +313,10 @@ export async function getRuntimeSubjectActivationRecord(
 
 export async function claimRuntimeSubjectActivation(
   database: D1Database,
-  input: RuntimeSubjectQuotaScope & {
-    readonly accountConcurrentSandboxLimit: number;
+  input: {
     readonly claimExpiresAt: number;
     readonly claimOwner: string;
+    readonly executionOwnerUserId: AccountId;
     readonly expectedStatus: RuntimeSubjectStatus;
     readonly now: number;
     readonly runtimeSubjectId: SandboxId;
@@ -368,11 +333,6 @@ export async function claimRuntimeSubjectActivation(
       .where(
         and(
           eq(sandboxesTable.id, input.runtimeSubjectId),
-          eq(sandboxesTable.projectId, input.projectId),
-          eq(sandboxesTable.ownerAccountId, input.executionOwnerUserId),
-          eq(sandboxesTable.subjectKind, "session"),
-          eq(sandboxesTable.subjectId, input.sessionId),
-          eq(sessionBindingColumns.foreignSessionCount, 0),
           exclusiveSessionRuntimeSubjectPredicate(),
           eq(sandboxesTable.status, input.expectedStatus),
           inArray(sandboxesTable.status, RUNTIME_SUBJECT_CLAIMABLE_STATUSES),
@@ -394,7 +354,7 @@ export async function claimRuntimeSubjectActivation(
 
 export async function preemptRuntimeSubjectActivationClaim(
   database: D1Database,
-  input: RuntimeSubjectQuotaScope & {
+  input: {
     readonly claimExpiresAt: number;
     readonly claimOwner: string;
     readonly expectedClaimExpiresAt: number;
@@ -415,11 +375,6 @@ export async function preemptRuntimeSubjectActivationClaim(
       .where(
         and(
           eq(sandboxesTable.id, input.runtimeSubjectId),
-          eq(sandboxesTable.projectId, input.projectId),
-          eq(sandboxesTable.ownerAccountId, input.executionOwnerUserId),
-          eq(sandboxesTable.subjectKind, "session"),
-          eq(sandboxesTable.subjectId, input.sessionId),
-          eq(sessionBindingColumns.foreignSessionCount, 0),
           exclusiveSessionRuntimeSubjectPredicate(),
           eq(sandboxesTable.status, input.expectedStatus),
           inArray(sandboxesTable.status, RUNTIME_SUBJECT_CLAIMABLE_STATUSES),
@@ -431,38 +386,6 @@ export async function preemptRuntimeSubjectActivationClaim(
       .get()) ?? null;
 
   return Boolean(preempted?.id);
-}
-
-export async function markRuntimeSubjectRestoring(
-  database: D1Database,
-  input: {
-    readonly claimOwner: string;
-    readonly runtimeSubjectId: SandboxId;
-  },
-): Promise<boolean> {
-  const now = currentTimestampMs();
-  const result = await getAppDatabase(database)
-    .update(sandboxesTable)
-    .set({
-      lastError: null,
-      lastErrorCode: null,
-      ...runtimeSubjectStatusPatch({
-        now,
-        operationId: null,
-        source: "api",
-        status: "restoring",
-      }),
-    })
-    .where(
-      and(
-        eq(sandboxesTable.id, input.runtimeSubjectId),
-        eq(sandboxesTable.claimOwner, input.claimOwner),
-        eq(sandboxesTable.status, "cold"),
-      ),
-    )
-    .run();
-
-  return getD1ChangeCount(result) > 0;
 }
 
 export async function markRuntimeSubjectActive(
@@ -490,23 +413,11 @@ export async function markRuntimeSubjectActive(
 	          ELSE ${now}
 	        END
 	      `,
-      statusEvent: sql`
-	        CASE
-	          WHEN ${sandboxesTable.status} = 'active' THEN ${sandboxesTable.statusEvent}
-	          ELSE ${toRuntimeSubjectStatusLifecycleEventName("active")}
-	        END
-	      `,
       statusOperationId: null,
       statusSeq: sql`
 	        CASE
 	          WHEN ${sandboxesTable.status} = 'active' THEN ${sandboxesTable.statusSeq}
 	          ELSE ${sandboxesTable.statusSeq} + 1
-	        END
-	      `,
-      statusSource: sql`
-	        CASE
-	          WHEN ${sandboxesTable.status} = 'active' THEN ${sandboxesTable.statusSource}
-	          ELSE 'api'
 	        END
 	      `,
       updatedAt: now,
@@ -515,7 +426,7 @@ export async function markRuntimeSubjectActive(
       and(
         eq(sandboxesTable.id, input.runtimeSubjectId),
         eq(sandboxesTable.claimOwner, input.claimOwner),
-        inArray(sandboxesTable.status, ["restoring", "active"]),
+        inArray(sandboxesTable.status, RUNTIME_SUBJECT_CLAIMABLE_STATUSES),
       ),
     )
     .run();
@@ -534,6 +445,7 @@ export async function claimExpiredRuntimeSubjectActivations(
 ): Promise<RuntimeSubjectOperationRepairCandidate[]> {
   const appDb = getAppDatabase(database);
   const eligible = and(
+    eq(sandboxesTable.subjectKind, "session"),
     eq(sandboxesTable.status, "restoring"),
     lte(sandboxesTable.statusChangedAt, input.staleChangedAtLte),
     or(isNull(sandboxesTable.claimExpiresAt), lte(sandboxesTable.claimExpiresAt, input.now)),
@@ -563,13 +475,11 @@ export async function claimExpiredRuntimeSubjectActivations(
         ...runtimeSubjectStatusPatch({
           now: input.now,
           operationId,
-          source: "maintenance",
           status: "destroying",
         }),
       })
       .where(
         and(
-          exclusiveSessionRuntimeSubjectPredicate(),
           eligible,
           eq(sandboxesTable.id, candidate.id),
           eq(sandboxesTable.statusSeq, candidate.seq),
@@ -588,7 +498,6 @@ export async function markRuntimeSubjectActivationDestroying(
   input: {
     readonly claimOwner: string;
     readonly message: string;
-    readonly errorCode: RuntimeSubjectErrorCode;
     readonly operationId: RuntimeOperationId;
     readonly runtimeSubjectId: SandboxId;
   },
@@ -601,11 +510,10 @@ export async function markRuntimeSubjectActivationDestroying(
       claimExpiresAt: null,
       claimOwner: null,
       lastError: input.message,
-      lastErrorCode: input.errorCode,
+      lastErrorCode: "runtime.subject_activation_failed",
       ...runtimeSubjectStatusPatch({
         now,
         operationId: input.operationId,
-        source: "api",
         status: "destroying",
       }),
     })
@@ -614,8 +522,8 @@ export async function markRuntimeSubjectActivationDestroying(
         eq(sandboxesTable.id, input.runtimeSubjectId),
         eq(sandboxesTable.claimOwner, input.claimOwner),
         // Activation can fail at any point after the claim: still cold (during
-        // prepareFilesystem), restoring (during restore), or active.
-        inArray(sandboxesTable.status, ["cold", "restoring", "active"]),
+        // prepareFilesystem) or active.
+        inArray(sandboxesTable.status, RUNTIME_SUBJECT_CLAIMABLE_STATUSES),
       ),
     )
     .run();
@@ -627,7 +535,6 @@ export async function markRuntimeSubjectActivationFailed(
   database: D1Database,
   input: {
     readonly message: string;
-    readonly errorCode: RuntimeSubjectErrorCode;
     readonly operationId: RuntimeOperationId;
     readonly runtimeSubjectId: SandboxId;
   },
@@ -642,11 +549,10 @@ export async function markRuntimeSubjectActivationFailed(
       // Preserve the activation failure even though teardown succeeded. The
       // next activation can diagnose why this cold start was required.
       lastError: input.message,
-      lastErrorCode: input.errorCode,
+      lastErrorCode: "runtime.subject_activation_failed",
       ...runtimeSubjectStatusPatch({
         now,
         operationId: null,
-        source: "api",
         status: "cold",
       }),
     })
@@ -669,7 +575,7 @@ export async function markRuntimeSubjectOperationStarted(
     readonly now?: number;
     readonly operationId?: RuntimeOperationId | null;
     readonly runtimeSubjectId: SandboxId;
-    readonly source?: "api" | "maintenance" | "runtime";
+    readonly source?: "api" | "maintenance";
     readonly status: RuntimeSubjectOperationStatus;
   },
 ): Promise<boolean> {
@@ -694,13 +600,12 @@ export async function markRuntimeSubjectOperationStarted(
       ...runtimeSubjectStatusPatch({
         now,
         operationId: input.operationId ?? null,
-        source: input.source ?? "api",
         status: input.status,
       }),
     })
     .where(
       and(
-        exclusiveSessionRuntimeSubjectPredicate(),
+        eq(sandboxesTable.subjectKind, "session"),
         eq(sandboxesTable.id, input.runtimeSubjectId),
         inArray(sandboxesTable.status, RUNTIME_SUBJECT_CLAIMABLE_STATUSES),
         claimPredicate,
@@ -724,7 +629,6 @@ export async function advanceRuntimeSubjectOperationStatus(
     readonly expectedStatus: RuntimeSubjectOperationStatus;
     readonly operationId?: RuntimeOperationId | null;
     readonly runtimeSubjectId: SandboxId;
-    readonly source?: "api" | "maintenance" | "runtime";
     readonly status: RuntimeSubjectOperationStatus;
   },
 ): Promise<boolean> {
@@ -735,13 +639,12 @@ export async function advanceRuntimeSubjectOperationStatus(
       ...runtimeSubjectStatusPatch({
         now,
         operationId: input.operationId ?? null,
-        source: input.source ?? "api",
         status: input.status,
       }),
     })
     .where(
       and(
-        exclusiveSessionRuntimeSubjectPredicate(),
+        eq(sandboxesTable.subjectKind, "session"),
         eq(sandboxesTable.id, input.runtimeSubjectId),
         eq(sandboxesTable.status, input.expectedStatus),
         ...runtimeSubjectStatusOperationCondition(input.operationId),
@@ -752,28 +655,41 @@ export async function advanceRuntimeSubjectOperationStatus(
   return getD1ChangeCount(result) > 0;
 }
 
+export async function assertRuntimeSubjectOperationCurrent(
+  database: D1Database,
+  input: {
+    readonly operationId: RuntimeOperationId;
+    readonly runtimeSubjectId: SandboxId;
+    readonly status: RuntimeSubjectOperationStatus;
+  },
+): Promise<void> {
+  const record = await getAppDatabase(database)
+    .select({ id: sandboxesTable.id })
+    .from(sandboxesTable)
+    .where(
+      and(
+        eq(sandboxesTable.id, input.runtimeSubjectId),
+        eq(sandboxesTable.status, input.status),
+        eq(sandboxesTable.statusOperationId, input.operationId),
+      ),
+    )
+    .get();
+  if (!record) throw new Error("Runtime subject moved on from this lifecycle operation.");
+}
+
 export async function markRuntimeSubjectCold(
   database: D1Database,
   input: {
-    readonly clearBackups: boolean;
     readonly expectedStatus: RuntimeSubjectOperationStatus;
     readonly operationId?: RuntimeOperationId | null;
     readonly runtimeSubjectId: SandboxId;
-    readonly source?: "api" | "maintenance" | "runtime";
   },
 ): Promise<boolean> {
   const now = currentTimestampMs();
-  const backupFields = input.clearBackups
-    ? {
-        lastBackupId: null,
-        lastRestoreBackupId: null,
-      }
-    : {};
 
   const result = await getAppDatabase(database)
     .update(sandboxesTable)
     .set({
-      ...backupFields,
       claimExpiresAt: null,
       claimOwner: null,
       inactiveDeadlineAt: null,
@@ -782,7 +698,6 @@ export async function markRuntimeSubjectCold(
       ...runtimeSubjectStatusPatch({
         now,
         operationId: input.operationId ?? null,
-        source: input.source ?? "api",
         status: "cold",
       }),
     })
@@ -802,11 +717,9 @@ export async function markRuntimeSubjectOperationRepairNeeded(
   database: D1Database,
   input: {
     readonly errorMessage: string;
-    readonly errorCode: RuntimeSubjectErrorCode;
     readonly expectedStatus: RuntimeSubjectOperationStatus;
     readonly operationId: RuntimeOperationId;
     readonly runtimeSubjectId: SandboxId;
-    readonly source?: "api" | "maintenance" | "runtime";
   },
 ): Promise<boolean> {
   const now = currentTimestampMs();
@@ -816,17 +729,16 @@ export async function markRuntimeSubjectOperationRepairNeeded(
       claimExpiresAt: null,
       claimOwner: null,
       lastError: input.errorMessage,
-      lastErrorCode: input.errorCode,
+      lastErrorCode: "runtime.subject_operation_failed",
       ...runtimeSubjectStatusPatch({
         now,
         operationId: input.operationId,
-        source: input.source ?? "maintenance",
         status: input.expectedStatus,
       }),
     })
     .where(
       and(
-        exclusiveSessionRuntimeSubjectPredicate(),
+        eq(sandboxesTable.subjectKind, "session"),
         eq(sandboxesTable.id, input.runtimeSubjectId),
         eq(sandboxesTable.status, input.expectedStatus),
         eq(sandboxesTable.statusOperationId, input.operationId),
@@ -835,74 +747,4 @@ export async function markRuntimeSubjectOperationRepairNeeded(
     .run();
 
   return getD1ChangeCount(result) > 0;
-}
-
-export async function markRuntimeSubjectFailed(
-  database: D1Database,
-  input: {
-    readonly errorMessage: string;
-    readonly errorCode: RuntimeSubjectErrorCode;
-    readonly expectedStatus?: RuntimeSubjectStatus;
-    readonly operationId?: RuntimeOperationId | null;
-    readonly runtimeSubjectId: SandboxId;
-    readonly source?: "api" | "maintenance" | "runtime";
-    readonly status: RuntimeSubjectStatus;
-  },
-): Promise<boolean> {
-  const now = currentTimestampMs();
-  const conditions: SQL[] = [eq(sandboxesTable.id, input.runtimeSubjectId)];
-
-  if (input.expectedStatus !== undefined) {
-    conditions.push(eq(sandboxesTable.status, input.expectedStatus));
-  }
-
-  if (input.operationId !== undefined) {
-    conditions.push(...runtimeSubjectStatusOperationCondition(input.operationId));
-  }
-
-  const result = await getAppDatabase(database)
-    .update(sandboxesTable)
-    .set({
-      claimExpiresAt: null,
-      claimOwner: null,
-      lastError: input.errorMessage,
-      lastErrorCode: input.errorCode,
-      ...runtimeSubjectStatusPatch({
-        now,
-        operationId: input.operationId ?? null,
-        source: input.source ?? "api",
-        status: input.status,
-      }),
-    })
-    .where(and(...conditions))
-    .run();
-
-  return getD1ChangeCount(result) > 0;
-}
-
-export async function assertExclusiveSessionRuntimeSubject(
-  database: D1Database,
-  runtimeSubjectId: SandboxId,
-  operation?: {
-    readonly id: RuntimeOperationId | null;
-    readonly status: RuntimeSubjectOperationStatus;
-  },
-): Promise<void> {
-  const record = await getAppDatabase(database)
-    .select({ id: sandboxesTable.id })
-    .from(sandboxesTable)
-    .where(
-      and(
-        eq(sandboxesTable.id, runtimeSubjectId),
-        exclusiveSessionRuntimeSubjectPredicate(),
-        ...(operation === undefined
-          ? []
-          : [
-              eq(sandboxesTable.status, operation.status),
-              ...runtimeSubjectStatusOperationCondition(operation.id),
-            ]),
-      ),
-    )
-    .get();
-  if (!record) throw new Error("Session does not have a verified exclusive execution binding.");
 }

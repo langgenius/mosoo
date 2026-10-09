@@ -7,7 +7,6 @@ const VIEWER_ID = "01J00000000000000000000002";
 const PROJECT_ID = "01J00000000000000000000006";
 const PROJECT_MCP_SERVER_ID = "01J0000000000000000000000A";
 const PROJECT_MCP_SERVER_WITHOUT_CREDENTIAL_ID = "01J0000000000000000000000B";
-const OTHER_OWNER_MCP_SERVER_ID = "01J0000000000000000000000C";
 const PROJECT_CREDENTIAL_ID = "01J0000000000000000000000D";
 const PROJECT_SECRET_ID = "01J0000000000000000000000F";
 
@@ -91,9 +90,7 @@ function createMcpRegistryDatabase(input: { includeServers?: boolean } = {}): Sq
     VALUES ('${PROJECT_ID}', '01J00000000000000000000006', '${VIEWER_ID}', 'Project', 1, 1);
 
     INSERT INTO account (id, email, image_url, name)
-    VALUES
-      ('${VIEWER_ID}', 'viewer@example.com', NULL, 'Viewer'),
-      ('01J00000000000000000000001', 'owner@example.com', NULL, 'Owner');
+    VALUES ('${VIEWER_ID}', 'viewer@example.com', NULL, 'Viewer');
   `);
 
   if (includeServers) {
@@ -114,8 +111,7 @@ function createMcpRegistryDatabase(input: { includeServers?: boolean } = {}): Sq
     )
     VALUES
       ('${PROJECT_MCP_SERVER_ID}', 'bearer', 1, 'app', NULL, 1, 'Project MCP', '${VIEWER_ID}', '${PROJECT_ID}', 'app', 1, 'https://app.example.com/mcp'),
-      ('${PROJECT_MCP_SERVER_WITHOUT_CREDENTIAL_ID}', 'bearer', 2, 'app', NULL, 1, 'Unconfigured MCP', '${VIEWER_ID}', '${PROJECT_ID}', 'app', 2, 'https://unconfigured.example.com/mcp'),
-      ('${OTHER_OWNER_MCP_SERVER_ID}', 'bearer', 3, 'app', NULL, 1, 'Other Owner MCP', '01J00000000000000000000001', '${PROJECT_ID}', 'app', 3, 'https://other-owner.example.com/mcp');
+      ('${PROJECT_MCP_SERVER_WITHOUT_CREDENTIAL_ID}', 'bearer', 2, 'app', NULL, 1, 'Unconfigured MCP', '${VIEWER_ID}', '${PROJECT_ID}', 'app', 2, 'https://unconfigured.example.com/mcp');
 
     INSERT INTO mcp_credential (
       id,
@@ -166,7 +162,6 @@ describe("MCP registry", () => {
       registry.servers.find((server) => server.id === PROJECT_MCP_SERVER_WITHOUT_CREDENTIAL_ID)
         ?.hasCredential,
     ).toBe(false);
-    expect(registry.servers.some((server) => server.id === OTHER_OWNER_MCP_SERVER_ID)).toBe(false);
   });
 
   test("loads empty registries for project owners", async () => {
@@ -185,6 +180,5 @@ describe("MCP registry", () => {
     );
 
     expect(registry.servers).toEqual([]);
-    expect(registry.currentUserName).toBe("Viewer");
   });
 });

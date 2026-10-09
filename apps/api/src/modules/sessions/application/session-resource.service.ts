@@ -1,46 +1,26 @@
-import type {
-  AddSessionResourceInput,
-  AddSessionResourceResult,
-  SessionResource,
-} from "@mosoo/contracts/session";
-import { parsePlatformId } from "@mosoo/id";
-import type { ProjectId, SessionId } from "@mosoo/id";
+import type { AddSessionResourceInput, AddSessionResourceResult } from "@mosoo/contracts/session";
+import { getAvailableAgentSessionActionCapability } from "@mosoo/session-policy";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { fileStore } from "../../files/application/file-store";
-import { ensureProjectSessionParticipantAccess } from "../domain/session-access.policy";
-import type { SessionActionAuthorization } from "../domain/session-access.policy";
-import { ensureSessionResourceCapability } from "./session-resource-capability.service";
+import { requireProjectSession } from "../domain/session-access.policy";
 
 export async function addSessionResource(
   bindings: ApiBindings,
   viewer: AuthenticatedViewer,
   input: AddSessionResourceInput,
-  options: { authorization?: SessionActionAuthorization } = {},
 ): Promise<AddSessionResourceResult> {
-  const sessionId = parsePlatformId<SessionId>(input.sessionId, "session id");
-  const projectId = parsePlatformId<ProjectId>(input.projectId, "project id");
-  await ensureSessionResourceCapability({
+  const session = await requireProjectSession(bindings.DB, viewer.id, {
+    projectId: input.projectId,
+    sessionId: input.sessionId,
+  });
+  getAvailableAgentSessionActionCapability({
     action: "add_session_resource",
-    ...(options.authorization ? { authorization: options.authorization } : {}),
-    database: bindings.DB,
-    projectId,
-    sessionId,
-    viewer,
+    archivedAt: session.archived_at,
+    runtimeId: session.runtime_id,
+    status: session.status,
   });
 
-  return fileStore.createSessionResourceUpload(bindings, viewer, { ...input, sessionId });
-}
-
-export async function listSessionResources(
-  database: D1Database,
-  viewer: AuthenticatedViewer,
-  input: {
-    projectId: ProjectId;
-    sessionId: SessionId;
-  },
-): Promise<SessionResource[]> {
-  await ensureProjectSessionParticipantAccess(database, viewer.id, input);
-  return fileStore.listSessionResources(database, input.sessionId);
+  return fileStore.createSessionResourceUpload(bindings, viewer, input);
 }

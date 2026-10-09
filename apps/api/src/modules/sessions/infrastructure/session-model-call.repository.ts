@@ -1,3 +1,4 @@
+import type { SessionUsageSummary } from "@mosoo/ag-ui-session";
 import {
   agentsTable,
   projectsTable,
@@ -27,7 +28,8 @@ import {
 import { isTruthy } from "../../../shared/truthiness";
 import { currentTimestampMs } from "../../../time";
 import { createRuntimeUsageEventUpsert } from "../../cost/application/cost-usage-event.service";
-import type { SessionUsageSummary } from "./session-live-state.types";
+import { toTokenCount, toUsdMicros } from "../../cost/domain/usage-contract";
+
 interface SessionModelCallRunRow {
   agent_id: AgentId | null;
   agent_owner_user_id: AccountId;
@@ -48,30 +50,12 @@ interface SessionModelCallRunRow {
   trigger: "resume" | "retry" | "system" | "user_prompt";
 }
 
-export type SessionModelCallStatus = "completed" | "failed" | "started";
-
 export interface UpsertSessionModelCallUsageInput {
   driverInstanceId: DriverInstanceId;
   sessionId: SessionId;
   sessionRunId: SessionRunId;
   traceId: string;
   usage: SessionUsageSummary | null;
-}
-
-function toTokenCount(value: number | null | undefined): number | null {
-  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
-    return null;
-  }
-
-  return Math.round(value);
-}
-
-function toUsdMicros(value: number | null | undefined): number | null {
-  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
-    return null;
-  }
-
-  return Math.round(value * 1_000_000);
 }
 
 function buildUsageMetadata(usage: SessionUsageSummary): string {

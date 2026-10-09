@@ -27,7 +27,7 @@ export function sandboxBindingForRuntime(runtimeId: string): SandboxBinding {
   return RUNTIME_SANDBOX_IMAGES[runtimeId].binding;
 }
 
-export function requireSandboxBinding(
+function requireSandboxBinding(
   env: ApiBindings,
   name: string = "Sandbox",
 ): DurableObjectNamespace<Sandbox> {
@@ -38,13 +38,8 @@ export function requireSandboxBinding(
   if (bindingName === undefined) {
     throw new Error(`Unknown Sandbox binding: ${name}.`);
   }
-  const binding = env[bindingName];
 
-  if (binding === undefined) {
-    throw new Error(`${name} binding is not configured in wrangler.toml.`);
-  }
-
-  return binding;
+  return env[bindingName];
 }
 
 export function requireCloudflareSandboxBinding(

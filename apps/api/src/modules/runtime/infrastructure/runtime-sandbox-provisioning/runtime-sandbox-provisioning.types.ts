@@ -1,7 +1,5 @@
-import type { DriverBootPayload } from "@mosoo/agent-driver/boot";
 import type { DriverInstanceId, SandboxId, SessionId, SessionRunId } from "@mosoo/id";
 
-import type { DriverBootPayloadPreparedHandler } from "../../application/execution-plane/driver-boot-payload-prepared";
 import type { RuntimeTimingSnapshot } from "../../application/session-runs/session-runtime-timing";
 import type {
   DriverProfileConfig,
@@ -18,22 +16,18 @@ import type {
 } from "../sandbox-handles";
 
 export interface RuntimeSmokeProvision {
-  bootPayload: DriverBootPayload;
   bootTokenHash: Uint8Array;
   driverGeneration: number;
   driverInstanceId: DriverInstanceId;
   timing: RuntimeTimingSnapshot;
   process: RuntimeProcessHandle;
-  sandbox: SandboxHandle;
   sandboxId: SandboxId;
 }
 
 export interface ProvisionDriverInput {
   builtInTools: DriverExecutionSpec["builtInTools"];
   cloudflareSession: ExecutionSessionHandle;
-  driverRecordConflictStrategy?: "insert-only" | "replace";
   driverInstanceId: DriverInstanceId;
-  onBootPayloadPrepared?: DriverBootPayloadPreparedHandler;
   profile: DriverProfileConfig;
   requestUrl: string;
   resolvedMcpServers: DriverResolvedMcpServer[];
@@ -43,5 +37,4 @@ export interface ProvisionDriverInput {
   sandbox: SandboxHandle;
   sandboxSessionId: SessionId;
   sessionRunId?: SessionRunId | null;
-  traceId?: string | null;
 }

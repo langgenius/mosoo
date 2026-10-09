@@ -11,69 +11,40 @@ import {
 import {
   createPublicHttpContractDatabase,
   insertNonOwnerSession,
+  insertSessionRunFixture,
 } from "./helpers/public-api-http-test-fixture";
 
+const STALE_RUN_ID = "01J0000000000000000000R001";
+
 describe("session run reconciliation", () => {
-  test.each(["single", "batch"] as const)(
-    "%s reconciliation preserves a cold boot before a driver is attached",
-    async (mode) => {
-      const database = await createPublicHttpContractDatabase();
-      await insertNonOwnerSession(database);
-      const sessionId = "01J0000000000000000000000B";
-      const runId = "01J0000000000000000000000N";
-      // The delayed staging continuation was reclaimed after 41 seconds of
-      // booting, before preparation had attached any driver to the run.
-      const bootStartedAt = Date.now() - 41_000;
-      await database
-        .prepare(
-          `INSERT INTO session_run (
-            id, session_id, agent_id, created_by_account_id, trigger, status,
-            provider, model, runtime_id, trace_id, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        )
-        .bind(
-          runId,
-          sessionId,
-          "01J00000000000000000000009",
-          "01J00000000000000000000002",
-          "user_prompt",
-          "booting",
-          "anthropic",
-          "claude-sonnet-5",
-          "claude-agent-sdk",
-          "trace-cold-prepare",
-          bootStartedAt,
-          bootStartedAt,
-        )
-        .run();
-      await database
-        .prepare("UPDATE session SET last_run_id = ?, status = ? WHERE id = ?")
-        .bind(runId, "RUNNING", sessionId)
-        .run();
+  test("preserves a cold boot before a driver is attached", async () => {
+    const database = await createPublicHttpContractDatabase();
+    await insertNonOwnerSession(database);
+    const sessionId = "01J0000000000000000000000B";
+    const runId = "01J0000000000000000000000N";
+    // The delayed staging continuation was reclaimed after 41 seconds of
+    // booting, before preparation had attached any driver to the run.
+    await insertSessionRunFixture(database, {
+      createdAt: Date.now() - 41_000,
+      id: runId,
+      status: "booting",
+    });
 
-      const reconcile = async () =>
-        mode === "single"
-          ? reconcileStaleActiveSessionRun(database, sessionId)
-          : (
-              await reconcileStaleActiveSessionRuns(database, { limit: 10 })
-            ).reconciledRunIds.includes(runId);
-
-      expect(await reconcile()).toBe(false);
-      expect(
-        await database
-          .prepare("SELECT status, driver_instance_id FROM session_run WHERE id = ?")
-          .bind(runId)
-          .first(),
-      ).toEqual({ status: "booting", driver_instance_id: null });
-
-      // An abandoned preparation still expires at the cold-ready deadline.
+    expect(await reconcileStaleActiveSessionRun(database, sessionId)).toBe(false);
+    expect(
       await database
-        .prepare("UPDATE session_run SET updated_at = ? WHERE id = ?")
-        .bind(Date.now() - DRIVER_COLD_READY_TIMEOUT_MS - 1_000, runId)
-        .run();
-      expect(await reconcile()).toBe(true);
-    },
-  );
+        .prepare("SELECT status, driver_instance_id FROM session_run WHERE id = ?")
+        .bind(runId)
+        .first(),
+    ).toEqual({ status: "booting", driver_instance_id: null });
+
+    // An abandoned preparation still expires at the cold-ready deadline.
+    await database
+      .prepare("UPDATE session_run SET updated_at = ? WHERE id = ?")
+      .bind(Date.now() - DRIVER_COLD_READY_TIMEOUT_MS - 1_000, runId)
+      .run();
+    expect(await reconcileStaleActiveSessionRun(database, sessionId)).toBe(true);
+  });
 
   test("keeps connecting runs alive for the cold ready budget", async () => {
     const database = await createPublicHttpContractDatabase();
@@ -120,47 +91,11 @@ describe("session run reconciliation", () => {
         Date.now() - RUNTIME_SOCKET_TIMEOUT_MS - 1_000,
       )
       .run();
-    await database
-      .prepare(
-        `
-          INSERT INTO session_run (
-            id,
-            session_id,
-            agent_id,
-            created_by_account_id,
-            trigger,
-            status,
-            provider,
-            model,
-            runtime_id,
-            trace_id,
-            driver_instance_id,
-            created_at,
-            updated_at
-          )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `,
-      )
-      .bind(
-        runId,
-        "01J0000000000000000000000B",
-        "01J00000000000000000000009",
-        "01J00000000000000000000002",
-        "user_prompt",
-        "running",
-        "openai",
-        "gpt-5.4",
-        "openai-runtime",
-        "trace-connecting",
-        driverId,
-        1,
-        1,
-      )
-      .run();
-    await database
-      .prepare("UPDATE session SET last_run_id = ?, status = ? WHERE id = ?")
-      .bind(runId, "RUNNING", "01J0000000000000000000000B")
-      .run();
+    await insertSessionRunFixture(database, {
+      driverInstanceId: driverId,
+      id: runId,
+      status: "running",
+    });
 
     await expect(
       reconcileStaleActiveSessionRun(database, "01J0000000000000000000000B"),
@@ -180,45 +115,7 @@ describe("session run reconciliation", () => {
     const database = await createPublicHttpContractDatabase();
     await insertNonOwnerSession(database);
 
-    await database
-      .prepare(
-        `
-          INSERT INTO session_run (
-            id,
-            session_id,
-            agent_id,
-            created_by_account_id,
-            trigger,
-            status,
-            provider,
-            model,
-            runtime_id,
-            trace_id,
-            created_at,
-            updated_at
-          )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `,
-      )
-      .bind(
-        "run-stale",
-        "01J0000000000000000000000B",
-        "01J00000000000000000000009",
-        "01J00000000000000000000002",
-        "user_prompt",
-        "running",
-        "openai",
-        "gpt-5.4",
-        "openai-runtime",
-        "trace-stale",
-        1,
-        1,
-      )
-      .run();
-    await database
-      .prepare("UPDATE session SET last_run_id = ?, status = ? WHERE id = ?")
-      .bind("run-stale", "RUNNING", "01J0000000000000000000000B")
-      .run();
+    await insertSessionRunFixture(database, { id: STALE_RUN_ID, status: "running" });
 
     await expect(
       reconcileStaleActiveSessionRun(database, "01J0000000000000000000000B"),
@@ -226,7 +123,7 @@ describe("session run reconciliation", () => {
 
     const run = await database
       .prepare("SELECT error_code, status FROM session_run WHERE id = ?")
-      .bind("run-stale")
+      .bind(STALE_RUN_ID)
       .first<{ error_code: string | null; status: string }>();
     expect(run).toMatchObject({
       status: "failed",
@@ -238,58 +135,20 @@ describe("session run reconciliation", () => {
     const database = await createPublicHttpContractDatabase();
     await insertNonOwnerSession(database);
 
-    await database
-      .prepare(
-        `
-          INSERT INTO session_run (
-            id,
-            session_id,
-            agent_id,
-            created_by_account_id,
-            trigger,
-            status,
-            provider,
-            model,
-            runtime_id,
-            trace_id,
-            created_at,
-            updated_at
-          )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `,
-      )
-      .bind(
-        "run-stale",
-        "01J0000000000000000000000B",
-        "01J00000000000000000000009",
-        "01J00000000000000000000002",
-        "user_prompt",
-        "running",
-        "openai",
-        "gpt-5.4",
-        "openai-runtime",
-        "trace-stale",
-        1,
-        1,
-      )
-      .run();
-    await database
-      .prepare("UPDATE session SET last_run_id = ?, status = ? WHERE id = ?")
-      .bind("run-stale", "RUNNING", "01J0000000000000000000000B")
-      .run();
+    await insertSessionRunFixture(database, { id: STALE_RUN_ID, status: "running" });
 
     await expect(
       reconcileStaleActiveSessionRuns(database, {
         limit: 10,
       }),
     ).resolves.toEqual({
-      reconciledRunIds: ["run-stale"],
+      reconciledRunIds: [STALE_RUN_ID],
       reconciledSessionIds: ["01J0000000000000000000000B"],
     });
 
     const run = await database
       .prepare("SELECT error_code, status FROM session_run WHERE id = ?")
-      .bind("run-stale")
+      .bind(STALE_RUN_ID)
       .first<{ error_code: string | null; status: string }>();
     expect(run).toMatchObject({
       status: "failed",

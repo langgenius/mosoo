@@ -1,8 +1,4 @@
-import type {
-  DriverHeartbeatInput,
-  DriverHelloInput,
-  DriverReadyInput,
-} from "@mosoo/agent-driver/orpc";
+import type { DriverHeartbeatInput, DriverReadyInput } from "@mosoo/agent-driver/orpc";
 import { driverInstancesTable } from "@mosoo/db";
 import type { DriverInstanceId } from "@mosoo/id";
 import { and, eq, inArray, sql } from "drizzle-orm";
@@ -14,6 +10,7 @@ import {
   LIVE_DRIVER_INSTANCE_STATUSES,
   toDriverInstanceStatusLifecycleEventName,
 } from "../../domain/driver-instance-lifecycle.machine";
+import type { DriverHelloInput } from "./rpc-wire";
 import { parseDriverTimestampMs, driverInstanceExpiresAt } from "./status";
 import type { DriverInstanceStatus } from "./status";
 
@@ -21,14 +18,11 @@ export async function markDriverInstanceConnected(
   bindings: ApiBindings,
   input: {
     bootTokenHash: Uint8Array;
-    connectedAt: number;
     connectionId: string;
     driverInstanceId: DriverInstanceId;
     generation: number;
   },
 ): Promise<boolean> {
-  void input.connectedAt;
-
   const row =
     (await getAppDatabase(bindings.DB)
       .update(driverInstancesTable)
@@ -60,10 +54,6 @@ export async function recordDriverInstanceHello(
   },
 ): Promise<boolean> {
   const now = currentTimestampMs();
-
-  if (input.hello === undefined) {
-    throw new Error("Driver hello payload is required before marking the driver ready.");
-  }
 
   const row =
     (await getAppDatabase(bindings.DB)
@@ -166,9 +156,6 @@ export async function finalizeDriverInstance(
     closeCode?: number | null;
     closeReason?: string | null;
     connectionId: string;
-    connectedAt?: number | null;
-    driverPid?: number | null;
-    driverStartedAt?: string | null;
     errorMessage?: string | null;
     generation: number;
     heartbeatCount: number;
@@ -178,10 +165,6 @@ export async function finalizeDriverInstance(
 ): Promise<boolean> {
   const completedAt = currentTimestampMs();
 
-  const driverStartedAt =
-    typeof input.driverStartedAt === "string" && input.driverStartedAt.length > 0
-      ? parseDriverTimestampMs(input.driverStartedAt, "Driver startedAt")
-      : null;
   const lastHeartbeatAt =
     typeof input.lastHeartbeatAt === "string" && input.lastHeartbeatAt.length > 0
       ? parseDriverTimestampMs(input.lastHeartbeatAt, "Driver heartbeat timestamp")
@@ -193,8 +176,6 @@ export async function finalizeDriverInstance(
       .set({
         closeCode: sql`COALESCE(${driverInstancesTable.closeCode}, ${input.closeCode ?? null})`,
         closeReason: sql`COALESCE(${driverInstancesTable.closeReason}, ${input.closeReason ?? null})`,
-        driverPid: sql`COALESCE(${driverInstancesTable.driverPid}, ${input.driverPid ?? null})`,
-        driverStartedAt: sql`COALESCE(${driverInstancesTable.driverStartedAt}, ${driverStartedAt})`,
         errorMessage: sql`COALESCE(${driverInstancesTable.errorMessage}, ${input.errorMessage ?? null})`,
         expiresAt: driverInstanceExpiresAt(completedAt),
         heartbeatCount: input.heartbeatCount,

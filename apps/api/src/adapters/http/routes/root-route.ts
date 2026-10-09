@@ -20,26 +20,22 @@ export function registerRootRoute(app: Hono<ApiGatewayEnvironment>) {
       );
     }
 
-    // Old browser tabs can reconnect during the rolling API/Web release.
-    const projectId = c.req.query("projectId") ?? c.req.query("appId");
-    const sessionId = c.req.param("sessionId");
+    const projectId = c.req.query("projectId");
+
+    if (projectId === undefined) {
+      return c.json({ error: "projectId is required." }, 400);
+    }
 
     try {
       return await connectAuthenticatedSessionViewerWebSocket(c.env, {
-        projectId: projectId ?? "",
+        projectId,
         request: c.req.raw,
-        sessionId,
+        sessionId: c.req.param("sessionId"),
         viewer,
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Session not available.";
-
-      if (message === "Session not found.") {
-        return c.json({ error: message }, 404);
-      }
-
-      if (message === "Session is archived.") {
-        return c.json({ error: message }, 409);
+      if (error instanceof Error && error.message === "Session is archived.") {
+        return c.json({ error: error.message }, 409);
       }
 
       throw error;

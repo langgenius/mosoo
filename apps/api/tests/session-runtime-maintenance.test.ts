@@ -75,9 +75,6 @@ async function setup(options: { failDestroy?: boolean } = {}) {
       .run();
   }
   await database.prepare("DELETE FROM agent").run();
-  database.execute(
-    `CREATE TABLE native_resume_ref (session_id text PRIMARY KEY, runtime_id text, kind text, value text, observed_session_run_id text, committed_value text, committed_session_run_id text, updated_at integer)`,
-  );
   const bindings = {
     ...createPublicHttpTestBindings(database),
     runtimeSubjectHandleFactory: (sandboxId: string) =>
@@ -112,8 +109,12 @@ async function setup(options: { failDestroy?: boolean } = {}) {
 
 const input = { projectId: IDS.project, sessionId: IDS.ownerSession };
 
-// Change the real database after the Session CAS, before physical dispatch.
-function changeAfterAdmission(database: D1Database, change: () => Promise<void>) {
+// Change the real database right before or after the Session admission CAS.
+function changeAroundAdmission(
+  database: D1Database,
+  when: "after" | "before",
+  change: () => Promise<void>,
+) {
   let changed = false;
   const rawStatements = new WeakMap<D1PreparedStatement, D1PreparedStatement>();
   const wrap = (statement: D1PreparedStatement, query: string): D1PreparedStatement => {
@@ -124,17 +125,11 @@ function changeAfterAdmission(database: D1Database, change: () => Promise<void>)
         const value = Reflect.get(target, property, receiver);
         if (typeof value !== "function") return value;
         return async (...args: unknown[]) => {
+          const admission = !changed && query.startsWith('update "session"');
+          if (admission) changed = true;
+          if (admission && when === "before") await change();
           const result = await value.apply(target, args);
-          if (!changed && query.startsWith('update "session"')) {
-            const row = await database
-              .prepare("SELECT status FROM session WHERE id = ?")
-              .bind(IDS.ownerSession)
-              .first<{ status: string }>();
-            if (row?.status === "RESCHEDULING") {
-              changed = true;
-              await change();
-            }
-          }
+          if (admission && when === "after") await change();
           return result;
         };
       },
@@ -173,7 +168,9 @@ async function committedBoundary(database: D1Database) {
     .run();
   await database
     .prepare(
-      "INSERT INTO native_resume_ref VALUES (?, 'openai-runtime', 'thread', 'observed-native', ?, 'committed-native', ?, 2)",
+      `INSERT INTO native_resume_ref (session_id, runtime_id, kind, value, observed_session_run_id,
+        committed_value, committed_session_run_id, created_at, updated_at)
+      VALUES (?, 'openai-runtime', 'thread', 'observed-native', ?, 'committed-native', ?, 2, 2)`,
     )
     .bind(IDS.ownerSession, IDS.run, IDS.run)
     .run();
@@ -196,6 +193,37 @@ async function committedBoundary(database: D1Database) {
   });
 }
 
+async function eventTypes(database: D1Database, sessionId: string) {
+  const rows = await database
+    .prepare("SELECT event_type FROM session_event WHERE session_id = ? ORDER BY seq")
+    .bind(sessionId)
+    .all<{ event_type: string }>();
+  return rows.results.map((row) => row.event_type);
+}
+
+async function startRun(database: D1Database, sessionId: string, runId: string) {
+  await database
+    .prepare(`INSERT INTO session_run (id, session_id, created_by_account_id, trigger, status, runtime_id, trace_id, created_at, updated_at)
+    VALUES (?, ?, ?, 'user_prompt', 'running', 'openai-runtime', 'maintenance-running', 1, 1)`)
+    .bind(runId, sessionId, IDS.ownerAccount)
+    .run();
+  await database
+    .prepare("UPDATE session SET status = 'RUNNING', last_run_id = ? WHERE id = ?")
+    .bind(runId, sessionId)
+    .run();
+}
+
+async function runOutcome(database: D1Database) {
+  return database
+    .prepare(
+      `SELECT session.status AS session_status, session.status_operation_id AS operation_id,
+        session_run.status AS run_status, session_run.error_code AS run_error_code
+      FROM session INNER JOIN session_run ON session_run.id = ? WHERE session.id = ?`,
+    )
+    .bind(IDS.run, IDS.ownerSession)
+    .first();
+}
+
 describe("Session runtime maintenance", () => {
   test("recreates a 90-day-idle direct Session and preserves committed state despite an old deadline", async () => {
     const { bindings, calls, database, siblingSandbox } = await setup();
@@ -216,13 +244,13 @@ describe("Session runtime maintenance", () => {
     const nativeBefore = await database.prepare("SELECT * FROM native_resume_ref").all();
     const backupBefore = await database.prepare("SELECT * FROM sandbox_backup").all();
     const result = await recreateSessionSandbox(bindings, OWNER_VIEWER, input);
-    expect(result).toEqual({
-      affectedSessionCount: 1,
-      ok: true,
-      operation: "recreateSandbox",
-      sessionId: IDS.ownerSession,
-    });
+    expect(result).toEqual({ ok: true, sessionId: IDS.ownerSession });
     expect(calls).toEqual([`keepAlive:${IDS.sandbox}:false`, `destroy:${IDS.sandbox}`]);
+    expect(await eventTypes(database, IDS.ownerSession)).toEqual([
+      "run.completed",
+      "agent.task.updated",
+      "agent.task.updated",
+    ]);
     expect(await database.prepare("SELECT count(*) AS n FROM agent").first()).toEqual({ n: 0 });
     expect(
       await database
@@ -336,7 +364,7 @@ describe("Session runtime maintenance", () => {
       case "wrong_subject":
         await database
           .prepare("UPDATE sandbox SET subject_id = ? WHERE id = ?")
-          .bind(IDS.nonOwnerSession, IDS.sandbox)
+          .bind(createPlatformId(), IDS.sandbox)
           .run();
         break;
     }
@@ -368,62 +396,30 @@ describe("Session runtime maintenance", () => {
     expect(calls).toEqual([]);
   });
 
-  test.each(["binding", "exclusive_binding", "checkpoint"])(
-    "rechecks %s after admission and rejects a concurrent change",
-    async (change) => {
-      const { bindings, calls, database, siblingSandbox } = await setup();
-      await committedBoundary(database);
-      const race = changeAfterAdmission(database, async () => {
-        if (change === "exclusive_binding") {
-          const replacement = createPlatformId();
-          await database
-            .prepare(`INSERT INTO sandbox (id, project_id, owner_account_id, kind, subject_kind, subject_id, status, created_at, updated_at)
-          VALUES (?, ?, ?, 'cattle', 'session', ?, 'active', 1, 1)`)
-            .bind(replacement, IDS.project, IDS.ownerAccount, IDS.ownerSession)
-            .run();
-          await database
-            .prepare("UPDATE sandbox_session SET sandbox_id = ? WHERE session_id = ?")
-            .bind(replacement, IDS.ownerSession)
-            .run();
-        } else if (change === "binding") {
-          await database
-            .prepare("UPDATE sandbox_session SET sandbox_id = ? WHERE session_id = ?")
-            .bind(siblingSandbox, IDS.ownerSession)
-            .run();
-        } else {
-          await database.prepare("DELETE FROM sandbox_backup").run();
-        }
-      });
-      await expect(
-        recreateSessionSandbox({ ...bindings, DB: race.database }, OWNER_VIEWER, input),
-      ).rejects.toMatchObject({
-        code:
-          change === "checkpoint"
-            ? "SESSION_RUN_CHECKPOINT_PENDING"
-            : "SESSION_RUNTIME_OPERATION_UNAVAILABLE",
-        status: 409,
-      });
-      expect(race.changed()).toBe(true);
-      expect(calls).toEqual([]);
-      expect(
-        await database
-          .prepare("SELECT status, status_operation_id FROM session WHERE id = ?")
-          .bind(IDS.ownerSession)
-          .first(),
-      ).toEqual({ status: "IDLE", status_operation_id: null });
-      expect(
-        await database.prepare("SELECT status FROM sandbox WHERE id = ?").bind(IDS.sandbox).first(),
-      ).toEqual({ status: "active" });
-      if (change === "binding") {
-        expect(
-          await database
-            .prepare("SELECT sandbox_id FROM sandbox_session WHERE session_id = ?")
-            .bind(IDS.ownerSession)
-            .first(),
-        ).toEqual({ sandbox_id: siblingSandbox });
-      }
-    },
-  );
+  test("does not act on a Session that changed after its checks", async () => {
+    const { bindings, calls, database } = await setup();
+    await committedBoundary(database);
+    const race = changeAroundAdmission(database, "before", async () => {
+      await database
+        .prepare("UPDATE session SET status_seq = status_seq + 1 WHERE id = ?")
+        .bind(IDS.ownerSession)
+        .run();
+    });
+    await expect(
+      recreateSessionSandbox({ ...bindings, DB: race.database }, OWNER_VIEWER, input),
+    ).rejects.toMatchObject({ code: "SESSION_RUNTIME_OPERATION_UNAVAILABLE", status: 409 });
+    expect(race.changed()).toBe(true);
+    expect(calls).toEqual([]);
+    expect(
+      await database
+        .prepare("SELECT status, status_operation_id, status_seq FROM session WHERE id = ?")
+        .bind(IDS.ownerSession)
+        .first(),
+    ).toEqual({ status: "IDLE", status_operation_id: null, status_seq: 1 });
+    expect(
+      await database.prepare("SELECT status FROM sandbox WHERE id = ?").bind(IDS.sandbox).first(),
+    ).toEqual({ status: "active" });
+  });
 
   test("does not renew an expired debug Preview through maintenance", async () => {
     const { bindings, calls, database } = await setup();
@@ -463,9 +459,9 @@ describe("Session runtime maintenance", () => {
       .prepare("SELECT * FROM session WHERE id = ?")
       .bind(IDS.ownerSession)
       .first();
-    expect(await recreateSessionSandbox(bindings, OWNER_VIEWER, input)).toMatchObject({
-      affectedSessionCount: 0,
+    expect(await recreateSessionSandbox(bindings, OWNER_VIEWER, input)).toEqual({
       ok: true,
+      sessionId: IDS.ownerSession,
     });
     expect(
       await database.prepare("SELECT * FROM session WHERE id = ?").bind(IDS.ownerSession).first(),
@@ -477,19 +473,15 @@ describe("Session runtime maintenance", () => {
     "exposes %s with Project and Session IDs, account authentication and no Agent",
     async (operation) => {
       const { bindings, calls } = await setup();
-      const executionContext = createTestExecutionContext();
       const context: GraphQLContext = {
-        ...bindings,
         bindings,
-        executionContext,
-        executionCtx: executionContext,
+        executionContext: createTestExecutionContext(),
         request: new Request("https://api.example.com/api/graphql"),
-        serverContext: { ...bindings, executionCtx: executionContext },
         viewer: OWNER_VIEWER,
       };
       const request = {
         schema: createGraphQLSchema(),
-        source: `mutation Maintain($projectId: ULID!, $sessionId: ULID!) { ${operation}(projectId: $projectId, sessionId: $sessionId) { ok affectedSessionCount operation sessionId } }`,
+        source: `mutation Maintain($projectId: ULID!, $sessionId: ULID!) { ${operation}(projectId: $projectId, sessionId: $sessionId) { ok sessionId } }`,
         variableValues: input,
       };
       const unauthenticated = await graphql({
@@ -505,12 +497,7 @@ describe("Session runtime maintenance", () => {
       expect(calls).toEqual([]);
       const response = await graphql({ ...request, contextValue: context });
       expect(response.errors).toBeUndefined();
-      expect(response.data?.[operation]).toEqual({
-        affectedSessionCount: 1,
-        ok: true,
-        operation: operation === "restartSessionDriver" ? "restartDriver" : "recreateSandbox",
-        sessionId: IDS.ownerSession,
-      });
+      expect(response.data?.[operation]).toEqual({ ok: true, sessionId: IDS.ownerSession });
     },
   );
 
@@ -542,9 +529,9 @@ describe("Session runtime maintenance", () => {
     const { bindings, calls, database } = await setup();
     await committedBoundary(database);
     await database.prepare("UPDATE sandbox SET kind = 'pet' WHERE id = ?").bind(IDS.sandbox).run();
-    expect(await recreateSessionSandbox(bindings, OWNER_VIEWER, input)).toMatchObject({
-      affectedSessionCount: 1,
+    expect(await recreateSessionSandbox(bindings, OWNER_VIEWER, input)).toEqual({
       ok: true,
+      sessionId: IDS.ownerSession,
     });
     expect(calls).toEqual([`keepAlive:${IDS.sandbox}:false`, `destroy:${IDS.sandbox}`]);
     expect(await database.prepare("SELECT committed_value FROM native_resume_ref").first()).toEqual(
@@ -557,27 +544,23 @@ describe("Session runtime maintenance", () => {
 
   test("restart cancels only the selected direct Session's active Run", async () => {
     const { bindings, calls, database } = await setup();
-    for (const [sessionId, runId] of [
-      [IDS.ownerSession, IDS.run],
-      [IDS.nonOwnerSession, IDS.runAlt],
-    ]) {
-      await database
-        .prepare(`INSERT INTO session_run (id, session_id, created_by_account_id, trigger, status, runtime_id, trace_id, created_at, updated_at)
-        VALUES (?, ?, ?, 'user_prompt', 'running', 'openai-runtime', 'maintenance-running', 1, 1)`)
-        .bind(runId, sessionId, IDS.ownerAccount)
-        .run();
-      await database
-        .prepare("UPDATE session SET status = 'RUNNING', last_run_id = ? WHERE id = ?")
-        .bind(runId, sessionId)
-        .run();
-    }
-    expect(await restartSessionDriver(bindings, OWNER_VIEWER, input)).toMatchObject({
-      affectedSessionCount: 1,
+    await startRun(database, IDS.ownerSession, IDS.run);
+    await startRun(database, IDS.nonOwnerSession, IDS.runAlt);
+    expect(await restartSessionDriver(bindings, OWNER_VIEWER, input)).toEqual({
+      ok: true,
       sessionId: IDS.ownerSession,
     });
-    expect(
-      await database.prepare("SELECT status FROM session_run WHERE id = ?").bind(IDS.run).first(),
-    ).toEqual({ status: "cancelled" });
+    expect(await runOutcome(database)).toEqual({
+      operation_id: null,
+      run_error_code: "agent.runtime_state_operation",
+      run_status: "cancelled",
+      session_status: "IDLE",
+    });
+    expect(await eventTypes(database, IDS.ownerSession)).toEqual([
+      "agent.task.updated",
+      "run.cancelled",
+      "agent.task.updated",
+    ]);
     expect(
       await database
         .prepare("SELECT status FROM session_run WHERE id = ?")
@@ -585,6 +568,90 @@ describe("Session runtime maintenance", () => {
         .first(),
     ).toEqual({ status: "running" });
     expect(calls).toEqual([]);
+  });
+
+  test("reports the Run a stopped Driver cancelled", async () => {
+    const { bindings, database } = await setup();
+    const driverInstanceId = IDS.driverOwner;
+    await startRun(database, IDS.ownerSession, IDS.run);
+    await database
+      .prepare(`INSERT INTO driver_instance (id, sandbox_id, sandbox_session_id, runtime, protocol, protocol_version,
+        status, boot_token_hash, boot_token_expires_at, heartbeat_count, expires_at, created_at, updated_at)
+      VALUES (?, ?, ?, 'cloudflare-container', 'driver-ws', 1, 'connecting', ?, 10000, 0, 20000, 1, 1)`)
+      .bind(driverInstanceId, IDS.sandbox, IDS.ownerSession, new Uint8Array([1, 2, 3]))
+      .run();
+    await database
+      .prepare("UPDATE session_run SET driver_instance_id = ? WHERE id = ?")
+      .bind(driverInstanceId, IDS.run)
+      .run();
+    const driverCalls: string[] = [];
+    const driverConnection = {
+      get: (id: string) => ({
+        fail: async () => {
+          driverCalls.push(`${id}:fail`);
+        },
+      }),
+      idFromName: (name: string) => name,
+    };
+    await restartSessionDriver(
+      { ...bindings, DriverConnection: driverConnection } as unknown as ApiBindings,
+      OWNER_VIEWER,
+      input,
+    );
+    expect(driverCalls).toEqual([`${driverInstanceId}:fail`]);
+    expect(await runOutcome(database)).toEqual({
+      operation_id: null,
+      run_error_code: "agent.runtime_state_operation",
+      run_status: "cancelled",
+      session_status: "IDLE",
+    });
+    expect(await eventTypes(database, IDS.ownerSession)).toEqual([
+      "agent.task.updated",
+      "run.cancelled",
+      "agent.task.updated",
+    ]);
+  });
+
+  test("a failed recreate returns the Session to IDLE and reports the interrupted Run", async () => {
+    const { bindings, database } = await setup({ failDestroy: true });
+    await startRun(database, IDS.ownerSession, IDS.run);
+    await expect(recreateSessionSandbox(bindings, OWNER_VIEWER, input)).rejects.toThrow(
+      "Simulated container destroy failure",
+    );
+    expect(await runOutcome(database)).toEqual({
+      operation_id: null,
+      run_error_code: "agent.runtime_state_operation",
+      run_status: "cancelled",
+      session_status: "IDLE",
+    });
+    expect(await eventTypes(database, IDS.ownerSession)).toEqual([
+      "agent.task.updated",
+      "run.cancelled",
+      "agent.task.updated",
+    ]);
+  });
+
+  test("does not report a Run that finished on its own as cancelled", async () => {
+    const { bindings, database } = await setup();
+    await startRun(database, IDS.ownerSession, IDS.run);
+    const race = changeAroundAdmission(database, "after", async () => {
+      await database
+        .prepare("UPDATE session_run SET status = 'completed' WHERE id = ?")
+        .bind(IDS.run)
+        .run();
+    });
+    await restartSessionDriver({ ...bindings, DB: race.database }, OWNER_VIEWER, input);
+    expect(race.changed()).toBe(true);
+    expect(await runOutcome(database)).toEqual({
+      operation_id: null,
+      run_error_code: null,
+      run_status: "completed",
+      session_status: "IDLE",
+    });
+    expect(await eventTypes(database, IDS.ownerSession)).toEqual([
+      "agent.task.updated",
+      "agent.task.updated",
+    ]);
   });
 
   test.each(["updating", "ready"])(

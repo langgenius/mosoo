@@ -14,18 +14,10 @@ import type {
 import { createErrorLogContext, logWarn } from "../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { currentTimestampMs } from "../../../time";
-import {
-  persistOneRuntimeEventPerSession,
-  persistSessionRuntimeEvents,
-} from "../infrastructure/session-runtime-event-store.repository";
+import { persistSessionRuntimeEvents } from "../infrastructure/session-runtime-event-store.repository";
 import type { PersistSessionRuntimeEventsResult } from "../infrastructure/session-runtime-event-store.repository";
+import { publishSessionViewerEvents } from "../infrastructure/session/client";
 import { projectRuntimeEventsToSessionDeliveryEvents } from "./session-live-state.service";
-import { publishSessionViewerEvents } from "./session-viewer-events.service";
-
-export interface AppendOneSessionEventPerSessionResult {
-  readonly persistedCount: number;
-  readonly skippedSessionIds: readonly string[];
-}
 
 export interface CreateSessionRuntimeEventInput {
   actor?: RuntimeEventActor;
@@ -42,7 +34,7 @@ export interface CreateSessionRuntimeEventInput {
   visibility?: RuntimeEventVisibility;
 }
 
-async function publishSessionViewerEventsSafely(
+export async function publishSessionViewerEventsSafely(
   bindings: ApiBindings,
   sessionId: SessionId,
   events: AgUiSessionEvent[],
@@ -76,11 +68,6 @@ export interface AppendSessionRuntimeEventsInput {
   events: RuntimeEventEnvelope[];
   sessionId: SessionId;
   sourceEventId?: string | null;
-}
-
-export interface OneSessionRuntimeEventInput {
-  event: RuntimeEventEnvelope;
-  sessionId: SessionId;
 }
 
 function toRuntimeEventOccurredAtMs(event: RuntimeEventEnvelope): number | null {
@@ -139,48 +126,6 @@ export async function appendSessionRuntimeEvents(
       sessionId: input.sessionId,
     });
   }
-
-  return result;
-}
-
-export async function appendOneSessionRuntimeEventPerSession(input: {
-  bindings: ApiBindings;
-  deliver?: boolean;
-  records: readonly OneSessionRuntimeEventInput[];
-}): Promise<AppendOneSessionEventPerSessionResult> {
-  if (input.records.length === 0) {
-    return {
-      persistedCount: 0,
-      skippedSessionIds: [],
-    };
-  }
-
-  const result = await persistOneRuntimeEventPerSession(input.bindings.DB, {
-    records: input.records.map((record) => ({
-      event: record.event,
-      occurredAt: toRuntimeEventOccurredAtMs(record.event),
-      sessionId: record.sessionId,
-    })),
-  });
-
-  if (input.deliver === false) {
-    return result;
-  }
-
-  const skippedSessionIds = new Set(result.skippedSessionIds);
-  await Promise.all(
-    input.records.flatMap((record) => {
-      if (skippedSessionIds.has(record.sessionId)) {
-        return [];
-      }
-
-      const deliveryEvents = projectRuntimeEventsToSessionDeliveryEvents([record.event]);
-
-      return deliveryEvents.length === 0
-        ? []
-        : [publishSessionViewerEventsSafely(input.bindings, record.sessionId, deliveryEvents)];
-    }),
-  );
 
   return result;
 }

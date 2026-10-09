@@ -27,7 +27,6 @@ import {
   expectRecord,
   expectString,
   readJson,
-  withProviderProbeMock,
   requestPublicApiWithBindings,
 } from "./public-thread-api-fixtures";
 
@@ -62,12 +61,10 @@ async function fixture() {
     const headers = new Headers(init.headers);
     headers.set("Authorization", `Bearer ${token}`);
     if (typeof init.body === "string") headers.set("Content-Type", "application/json");
-    return withProviderProbeMock(() =>
-      requestPublicApiWithBindings(
-        app,
-        new Request(`https://api.example.com${PUBLIC_API_PREFIX}${path}`, { ...init, headers }),
-        bindings,
-      ),
+    return requestPublicApiWithBindings(
+      app,
+      new Request(`https://api.example.com${PUBLIC_API_PREFIX}${path}`, { ...init, headers }),
+      bindings,
     );
   }
   return { database, bindings, key, secondKey, replacement, request };
@@ -244,6 +241,7 @@ describe("Project API keys and CLI account credentials", () => {
     const replacementCaller = await authenticatePersonalAccessToken(database, replacement.value);
     if (!replacementCaller) throw new Error("Replacement key must authenticate.");
     await sendPublicThreadSessionEvents({
+      apiVersion: "v1",
       bindings,
       caller: replacementCaller.viewer,
       executionContext: null,
@@ -272,6 +270,7 @@ describe("Project API keys and CLI account credentials", () => {
     const successorCaller = await authenticatePersonalAccessToken(database, successor.value);
     if (!successorCaller) throw new Error("Successor key must authenticate.");
     await sendPublicThreadSessionEvents({
+      apiVersion: "v1",
       bindings,
       caller: successorCaller.viewer,
       executionContext: null,

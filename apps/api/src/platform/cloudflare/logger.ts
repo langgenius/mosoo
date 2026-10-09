@@ -7,9 +7,8 @@ import {
   createTraceparentFromContext,
   emitWideEvent,
   formatLogValue as formatSharedLogValue,
-  normalizeLogMetadata,
-  runWithLogContext,
-  runWithLogContextAsync,
+  withContext,
+  withContextAsync,
 } from "@mosoo/observability";
 import type { Logger, WideEventBuilder, WideEventEndOptions } from "@mosoo/observability";
 
@@ -103,7 +102,7 @@ export function createCurrentTraceparent(): string {
 }
 
 export function runWithApiLogContext<T>(context: LogContext, fn: () => T): T {
-  return runWithLogContext(context, fn);
+  return withContext(context, fn);
 }
 
 export async function runWithRequestLogContext<T>(
@@ -116,7 +115,7 @@ export async function runWithRequestLogContext<T>(
     request.headers.get("traceparent") ?? requestUrl.searchParams.get("traceparent");
   const requestMetadata = createIngressRequestMetadataProjection(request);
 
-  return runWithLogContextAsync(
+  return withContextAsync(
     createTraceLogContext({
       context: {
         ...context,
@@ -131,13 +130,13 @@ export async function runWithRequestLogContext<T>(
 }
 
 export function logError(message: string, context: LogContext = {}): void {
-  apiLogger.error(message, normalizeLogMetadata(context));
+  apiLogger.error(message, context);
 }
 
 export function logInfo(message: string, context: LogContext = {}): void {
-  apiLogger.info(message, normalizeLogMetadata(context));
+  apiLogger.info(message, context);
 }
 
 export function logWarn(message: string, context: LogContext = {}): void {
-  apiLogger.warn(message, normalizeLogMetadata(context));
+  apiLogger.warn(message, context);
 }

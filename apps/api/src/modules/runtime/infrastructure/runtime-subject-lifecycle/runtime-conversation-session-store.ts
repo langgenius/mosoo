@@ -1,29 +1,17 @@
 import type { RuntimeSubjectErrorCode } from "@mosoo/contracts/sandbox";
-import {
-  sandboxBackupsTable,
-  sandboxesTable,
-  sandboxSessionsTable,
-  sessionRunsTable,
-  sessionsTable,
-} from "@mosoo/db";
+import { sandboxesTable, sandboxSessionsTable, sessionRunsTable, sessionsTable } from "@mosoo/db";
 import { createPlatformId } from "@mosoo/id";
 import type { SandboxId, SandboxSessionId, SessionId } from "@mosoo/id";
-import { and, desc, eq, exists, inArray, isNull, lte, notExists, or, sql } from "drizzle-orm";
+import { and, desc, eq, exists, isNull, lte, notExists, or, sql } from "drizzle-orm";
 
 import {
   getAppDatabase,
   getD1ChangeCount,
   runAppDatabaseBatch,
 } from "../../../../platform/db/drizzle";
-import type { AppDatabase } from "../../../../platform/db/drizzle";
-import { toRuntimeSubjectStatusLifecycleEventName } from "../../domain/runtime-subject-lifecycle.machine";
-import {
-  completedRunHistoryPredicate,
-  isSessionTerminalCheckpointReadyForNextRun,
-} from "../session-runs/session-run-admission.repository";
+import { completedRunHistoryPredicate } from "../session-runs/session-run-admission.repository";
 import {
   activeConversationSessionQuery,
-  activeSessionRunQueryForListedSubject,
   mapReadyRuntimeSubjectBackup,
   readyConversationBackupTable,
   runLeaseQuery,
@@ -51,7 +39,7 @@ export async function getRuntimeConversationSession(
         workspaceCheckpointRequired: sessionsTable.workspaceCheckpointRequired,
       })
       .from(sandboxSessionsTable)
-      .leftJoin(sessionsTable, eq(sessionsTable.id, sandboxSessionsTable.sessionId))
+      .innerJoin(sessionsTable, eq(sessionsTable.id, sandboxSessionsTable.sessionId))
       .leftJoin(
         readyConversationBackupTable,
         and(
@@ -79,7 +67,7 @@ export async function getRuntimeConversationSession(
     originJson: row.originJson,
     sandboxId: row.sandboxId,
     status: row.status,
-    workspaceCheckpointRequired: row.workspaceCheckpointRequired ?? false,
+    workspaceCheckpointRequired: row.workspaceCheckpointRequired,
   };
 }
 
@@ -93,13 +81,10 @@ export async function getRuntimeConversationSessionState(
   return (
     (await getAppDatabase(database)
       .select({
-        agentId: sessionsTable.agentId,
         sandboxSessionId: sandboxSessionsTable.sandboxSessionId,
         status: sandboxSessionsTable.status,
       })
       .from(sandboxSessionsTable)
-      .innerJoin(sessionsTable, eq(sessionsTable.id, sandboxSessionsTable.sessionId))
-      .innerJoin(sandboxesTable, eq(sandboxesTable.id, sandboxSessionsTable.sandboxId))
       .where(
         and(
           eq(sandboxSessionsTable.sessionId, input.sessionId),
@@ -152,72 +137,11 @@ export async function listIdleSessionScopedConversationSessions(
                 ),
               ),
           ),
-          exists(
-            appDb
-              .select({ id: sandboxBackupsTable.id })
-              .from(sandboxBackupsTable)
-              .where(
-                and(
-                  eq(sandboxBackupsTable.sandboxId, sandboxSessionsTable.sandboxId),
-                  eq(sandboxBackupsTable.dir, sandboxSessionsTable.cwd),
-                  eq(sandboxBackupsTable.sessionRunId, sessionsTable.lastRunId),
-                  eq(sandboxBackupsTable.status, "ready"),
-                  completedRunHistoryPredicate(appDb, sessionsTable.lastRunId),
-                ),
-              ),
-          ),
+          // Keep the Driver until replay has persisted the completed turn's history.
+          completedRunHistoryPredicate(appDb, sessionsTable.lastRunId),
         ),
       ),
     )
-    .limit(input.limit)
-    .all();
-}
-
-// Older releases could publish success before the terminal checkpoint. A follow-up
-// is blocked by the admission gate until this exact completed turn is durable.
-export async function listPendingIdleConversationCheckpoints(
-  database: D1Database,
-  input: { readonly idleSinceLte: number; readonly limit: number },
-) {
-  const appDb = getAppDatabase(database);
-  return appDb
-    .select({
-      sandboxId: sandboxSessionsTable.sandboxId,
-      sessionId: sandboxSessionsTable.sessionId,
-      sessionRunId: sessionRunsTable.id,
-    })
-    .from(sandboxSessionsTable)
-    .innerJoin(sandboxesTable, eq(sandboxesTable.id, sandboxSessionsTable.sandboxId))
-    .innerJoin(sessionsTable, eq(sessionsTable.id, sandboxSessionsTable.sessionId))
-    .innerJoin(sessionRunsTable, eq(sessionRunsTable.id, sessionsTable.lastRunId))
-    .where(
-      and(
-        eq(sandboxSessionsTable.status, "active"),
-        eq(sandboxesTable.status, "active"),
-        eq(sessionsTable.status, "IDLE"),
-        eq(sessionsTable.workspaceCheckpointRequired, true),
-        eq(sessionRunsTable.status, "completed"),
-        lte(sandboxSessionsTable.updatedAt, input.idleSinceLte),
-        isNull(sandboxesTable.claimOwner),
-        notExists(activeSessionRunQueryForListedSubject(appDb)),
-        notExists(runLeaseQueryForListedSubject(appDb)),
-        completedRunHistoryPredicate(appDb, sessionsTable.lastRunId),
-        notExists(
-          appDb
-            .select({ id: sandboxBackupsTable.id })
-            .from(sandboxBackupsTable)
-            .where(
-              and(
-                eq(sandboxBackupsTable.sandboxId, sandboxSessionsTable.sandboxId),
-                eq(sandboxBackupsTable.dir, sandboxSessionsTable.cwd),
-                eq(sandboxBackupsTable.sessionRunId, sessionRunsTable.id),
-                eq(sandboxBackupsTable.status, "ready"),
-              ),
-            ),
-        ),
-      ),
-    )
-    .orderBy(sandboxSessionsTable.sessionId)
     .limit(input.limit)
     .all();
 }
@@ -242,10 +166,6 @@ export async function claimIdleSessionScopedConversationForClose(
     readonly sessionId: SessionId;
   },
 ): Promise<boolean> {
-  if (!(await isSessionTerminalCheckpointReadyForNextRun(database, input.sessionId))) {
-    return false;
-  }
-
   const appDb = getAppDatabase(database);
   const claimed = await appDb
     .update(sandboxSessionsTable)
@@ -286,17 +206,7 @@ export async function ensureRuntimeConversationSessionRecord(
     return existing;
   }
 
-  const db = getAppDatabase(database);
-  const available = db
-    .select({
-      ready: sql<number>`CASE WHEN EXISTS (
-      SELECT 1 FROM ${sessionsTable} WHERE ${sessionsTable.id} = ${input.sessionId}
-    ) AND EXISTS (
-      SELECT 1 FROM ${sandboxesTable} WHERE ${sandboxesTable.id} = ${input.runtimeSubjectId}
-    ) THEN 1 ELSE json('sandbox allocation is missing its owner') END`,
-    })
-    .from(sql`(SELECT 1)`);
-  const insert = db
+  await getAppDatabase(database)
     .insert(sandboxSessionsTable)
     .values({
       sandboxSessionId: createPlatformId<SandboxSessionId>(input.now),
@@ -308,13 +218,8 @@ export async function ensureRuntimeConversationSessionRecord(
       status: "closed",
       updatedAt: input.now,
     })
-    .onConflictDoNothing({ target: sandboxSessionsTable.sessionId });
-  await database.batch(
-    [available, insert].map((query) => {
-      const statement = query.toSQL();
-      return database.prepare(statement.sql).bind(...statement.params);
-    }),
-  );
+    .onConflictDoNothing({ target: sandboxSessionsTable.sessionId })
+    .run();
 
   const created = await getRuntimeConversationSession(database, input.sessionId);
 
@@ -335,17 +240,11 @@ interface ConversationSessionBinding {
   readonly sessionId: SessionId;
 }
 
-function conversationBindingPredicate(db: AppDatabase, input: ConversationSessionBinding) {
+function conversationBindingPredicate(input: ConversationSessionBinding) {
   return and(
     eq(sandboxSessionsTable.sessionId, input.sessionId),
     eq(sandboxSessionsTable.sandboxId, input.runtimeSubjectId),
     eq(sandboxSessionsTable.sandboxSessionId, input.expectedSandboxSessionId),
-    exists(
-      db
-        .select({ id: sandboxesTable.id })
-        .from(sandboxesTable)
-        .where(eq(sandboxesTable.id, input.runtimeSubjectId)),
-    ),
   );
 }
 
@@ -364,7 +263,7 @@ export async function recordRuntimeConversationSessionError(
         status: "error",
         updatedAt: input.now,
       })
-      .where(conversationBindingPredicate(appDb, input)),
+      .where(conversationBindingPredicate(input)),
     appDb
       .update(sandboxesTable)
       .set({
@@ -372,21 +271,19 @@ export async function recordRuntimeConversationSessionError(
         lastErrorCode: input.errorCode,
         status: "cold",
         statusChangedAt: input.now,
-        statusEvent: toRuntimeSubjectStatusLifecycleEventName("cold"),
         statusOperationId: null,
         statusSeq: sql`${sandboxesTable.statusSeq} + 1`,
-        statusSource: "runtime",
         updatedAt: input.now,
       })
       .where(
         and(
           eq(sandboxesTable.id, input.runtimeSubjectId),
-          inArray(sandboxesTable.status, ["restoring", "active"]),
+          eq(sandboxesTable.status, "active"),
           exists(
             appDb
               .select({ sessionId: sandboxSessionsTable.sessionId })
               .from(sandboxSessionsTable)
-              .where(conversationBindingPredicate(appDb, input)),
+              .where(conversationBindingPredicate(input)),
           ),
         ),
       ),
@@ -417,7 +314,7 @@ export async function recordRuntimeConversationSessionActive(
             appDb
               .select({ sessionId: sandboxSessionsTable.sessionId })
               .from(sandboxSessionsTable)
-              .where(conversationBindingPredicate(appDb, input)),
+              .where(conversationBindingPredicate(input)),
           ),
         ),
       ),
@@ -429,7 +326,7 @@ export async function recordRuntimeConversationSessionActive(
         status: "active",
         updatedAt: input.now,
       })
-      .where(conversationBindingPredicate(appDb, input)),
+      .where(conversationBindingPredicate(input)),
   ]);
 
   if (getD1ChangeCount((results as readonly unknown[])[1]) === 0) {
@@ -451,7 +348,7 @@ export async function recordRuntimeConversationSessionClosed(
         status: "closed",
         updatedAt: input.now,
       })
-      .where(conversationBindingPredicate(appDb, input)),
+      .where(conversationBindingPredicate(input)),
     appDb
       .update(sandboxesTable)
       .set({
@@ -465,7 +362,7 @@ export async function recordRuntimeConversationSessionClosed(
             appDb
               .select({ sessionId: sandboxSessionsTable.sessionId })
               .from(sandboxSessionsTable)
-              .where(conversationBindingPredicate(appDb, input)),
+              .where(conversationBindingPredicate(input)),
           ),
           notExists(activeConversationSessionQuery(appDb, input.runtimeSubjectId)),
           notExists(runLeaseQuery(appDb, input.runtimeSubjectId)),

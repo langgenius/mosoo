@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { getBetterAuth } from "../src/modules/auth/application/auth-session.service";
+import { getBetterAuth } from "../src/modules/auth/infrastructure/better-auth";
 import { createApiTestFixture } from "./helpers/api-test-fixture";
 
 describe("development login admission", () => {

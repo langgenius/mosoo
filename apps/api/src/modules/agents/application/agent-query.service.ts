@@ -5,7 +5,6 @@ import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.ser
 import { listAgentMcpBindings } from "../../mcp/application/mcp-agent-binding.service";
 import { ensureProjectOwnership } from "../../projects/application/project.service";
 import { ensureProjectAgentOwner } from "./agent-access.service";
-import { loadAgentEnvironmentConfig } from "./agent-environment.service";
 import { toAgentDetailModel, toAgentSummaryModels } from "./agent-models";
 import { computeAgentReadiness } from "./agent-readiness.service";
 import { listProjectOwnerAgentRows } from "./agent-repository";
@@ -20,7 +19,7 @@ export async function getAgent(
   },
 ): Promise<AgentDetail> {
   const agent = await ensureProjectAgentOwner(database, viewer.id, input);
-  return toAgentDetailModel(database, viewer, agent.agent, agent.owner, agent.viewerRole);
+  return toAgentDetailModel(database, viewer, agent);
 }
 
 export async function getAgentEditorState(
@@ -31,30 +30,26 @@ export async function getAgentEditorState(
     projectId: ProjectId;
   },
 ): Promise<AgentEditorState> {
-  const editable = await ensureProjectAgentOwner(database, viewer.id, input);
-  const environment = await loadAgentEnvironmentConfig(
-    database,
-    editable.agent.id,
-    editable.agent.environmentId,
-  );
-  const storedConfig = parseAgentStoredConfig(editable.agent.configJson);
+  const agent = await ensureProjectAgentOwner(database, viewer.id, input);
+  const environment = { environmentId: agent.environmentId };
+  const storedConfig = parseAgentStoredConfig(agent.configJson);
 
   return {
     builtInTools: storedConfig.builtInTools,
     environment,
-    id: editable.agent.id,
-    mcpBindings: await listAgentMcpBindings(database, viewer, editable.agent.id),
+    id: agent.id,
+    mcpBindings: await listAgentMcpBindings(database, viewer, agent.id),
     packageResolution: storedConfig.packageResolution,
     providerOptions: storedConfig.providerOptions,
-    readiness: await computeAgentReadiness(database, editable.agent.ownerId, {
-      agentId: editable.agent.id,
+    readiness: await computeAgentReadiness(database, {
+      agentId: agent.id,
       builtInTools: storedConfig.builtInTools,
       environment,
-      model: editable.agent.model,
+      model: agent.model,
       packageResolution: storedConfig.packageResolution,
-      projectId: editable.agent.projectId,
-      provider: editable.agent.provider,
-      runtimeId: editable.agent.runtimeId,
+      projectId: agent.projectId,
+      provider: agent.provider,
+      runtimeId: agent.runtimeId,
     }),
   };
 }
@@ -70,8 +65,5 @@ export async function listVisibleAgents(
     viewerId: viewer.id,
   });
 
-  return toAgentSummaryModels(
-    database,
-    agents.map((agent) => ({ agent, viewerRole: "owner" })),
-  );
+  return toAgentSummaryModels(database, viewer, agents);
 }

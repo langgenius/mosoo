@@ -1,9 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import {
-  createNoRuntimeEventsRecordedEventId,
-  createProcessEventsTruncatedEventId,
-} from "@mosoo/contracts/session";
+import { createProcessEventsTruncatedEventId } from "@mosoo/contracts/session";
 import type {
   SessionProcessEventStatus,
   SessionProcessEventType,
@@ -673,18 +670,6 @@ describe("session process event projection", () => {
           limit: 2,
         },
       );
-    const readEmpty = async () =>
-      getThreadSessionProcessEvents(
-        innerDatabase,
-        VIEWER,
-        {
-          projectId: PROJECT_ID,
-          sessionId: ATTRIBUTED_SESSION_ID,
-        },
-        {
-          limit: 10,
-        },
-      );
 
     const firstTruncated = await readTruncated();
     const secondTruncated = await readTruncated();
@@ -692,13 +677,6 @@ describe("session process event projection", () => {
     expect(firstTruncated[0]?.id).toBe(createProcessEventsTruncatedEventId(SESSION_ID));
     expect(secondTruncated[0]?.id).toBe(firstTruncated[0]?.id ?? "");
     expect(() => parsePlatformId(firstTruncated[0]?.id, "truncated marker id")).not.toThrow();
-
-    const firstEmpty = await readEmpty();
-    const secondEmpty = await readEmpty();
-
-    expect(firstEmpty[0]?.id).toBe(createNoRuntimeEventsRecordedEventId(ATTRIBUTED_SESSION_ID));
-    expect(secondEmpty[0]?.id).toBe(firstEmpty[0]?.id ?? "");
-    expect(() => parsePlatformId(firstEmpty[0]?.id, "empty placeholder id")).not.toThrow();
   });
 
   test("admits attributed participants through the shared thread access path", async () => {
@@ -714,22 +692,6 @@ describe("session process event projection", () => {
       },
     );
 
-    expect(events).toHaveLength(1);
-
-    const event = events[0];
-
-    if (event === undefined) {
-      throw new Error("Expected an empty process event placeholder.");
-    }
-
-    expect(() => parsePlatformId(event.id, "empty process event id")).not.toThrow();
-    expect(event).toMatchObject({
-      durationMs: null,
-      status: "unsupported",
-      tokens: null,
-      type: "session.status",
-    });
-    expect(event.content).toBeString();
-    expect(event.content.length).toBeGreaterThan(0);
+    expect(events).toEqual([]);
   });
 });

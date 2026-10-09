@@ -46,12 +46,16 @@ class RetriableSessionFileBucket {
 }
 
 function createDriverConnectionBinding(paths: string[]) {
+  const record = (method: string) => async () => {
+    paths.push(method);
+  };
+
   return {
     get: () => ({
-      fetch: async (request: Request) => {
-        paths.push(new URL(request.url).pathname);
-        return Response.json({ ok: true });
-      },
+      destroy: record("destroy"),
+      fail: record("fail"),
+      sendControlCommand: record("sendControlCommand"),
+      waitForClose: record("waitForClose"),
     }),
     idFromName: (name: string) => name,
   };
@@ -70,7 +74,7 @@ function createSessionLifecycleBinding(paths: string[], options: { destroyError?
       closeViewers: async (_sessionId: string, reason: string) => {
         paths.push(`close:${reason}`);
       },
-      destroy: async (_sessionId: string, reason: string) => {
+      destroy: async (reason: string) => {
         paths.push(`destroy:${reason}`);
         if (options.destroyError !== undefined) {
           throw options.destroyError;
@@ -95,57 +99,10 @@ function withSessionLifecycleBinding(
   };
 }
 
-async function ensureRuntimeLifecycleTables(database: D1Database): Promise<void> {
-  await database
-    .prepare(
-      `
-        CREATE TABLE IF NOT EXISTS sandbox (
-          id text PRIMARY KEY NOT NULL,
-          inactive_deadline_at integer,
-          kind text NOT NULL,
-          status text DEFAULT 'active' NOT NULL,
-          updated_at integer DEFAULT 1 NOT NULL
-        )
-      `,
-    )
-    .run();
-  await database
-    .prepare(
-      `
-        CREATE TABLE IF NOT EXISTS sandbox_session (
-          cloudflare_session_id text NOT NULL,
-          created_at integer NOT NULL,
-          cwd text NOT NULL,
-          origin_json text NOT NULL,
-          sandbox_id text NOT NULL,
-          session_id text PRIMARY KEY NOT NULL,
-          status text NOT NULL,
-          updated_at integer NOT NULL
-        )
-      `,
-    )
-    .run();
-  await database
-    .prepare(
-      `
-        CREATE TABLE IF NOT EXISTS sandbox_backup (
-          id text PRIMARY KEY NOT NULL,
-          dir text NOT NULL,
-          sandbox_id text NOT NULL,
-          status text NOT NULL,
-          created_at integer NOT NULL,
-          updated_at integer NOT NULL
-        )
-      `,
-    )
-    .run();
-}
-
 async function insertSandboxSession(
   database: D1Database,
   sessionId: string = PUBLIC_API_TEST_IDS.nonOwnerSession,
 ): Promise<void> {
-  await ensureRuntimeLifecycleTables(database);
   await database
     .prepare(
       `
@@ -392,7 +349,7 @@ describe("session lifecycle mutations", () => {
       withDriverConnection(createPublicHttpTestBindings(database) as ApiBindings, driverRequests),
     );
 
-    const outcomes = await deleteSessionCascade(bindings, PUBLIC_API_TEST_IDS.nonOwnerSession);
+    const admitted = await deleteSessionCascade(bindings, PUBLIC_API_TEST_IDS.nonOwnerSession);
 
     const remainingDrivers = await database
       .prepare(
@@ -413,7 +370,7 @@ describe("session lifecycle mutations", () => {
     expect(remainingDrivers.results).toEqual([]);
     expect(session).toBeNull();
     expect(driverRequests.length).toBeGreaterThan(0);
-    expect(outcomes.every((outcome) => outcome.status === "completed")).toBe(true);
+    expect(admitted).toBe(true);
   });
 
   test("delete cascade completes when the session has no runtime state", async () => {
@@ -423,14 +380,14 @@ describe("session lifecycle mutations", () => {
       createPublicHttpTestBindings(database) as ApiBindings,
     );
 
-    const outcomes = await deleteSessionCascade(bindings, PUBLIC_API_TEST_IDS.nonOwnerSession);
+    const admitted = await deleteSessionCascade(bindings, PUBLIC_API_TEST_IDS.nonOwnerSession);
     const session = await database
       .prepare("SELECT id FROM session WHERE id = ?")
       .bind(PUBLIC_API_TEST_IDS.nonOwnerSession)
       .first();
 
     expect(session).toBeNull();
-    expect(outcomes.every((outcome) => outcome.status !== "failed")).toBe(true);
+    expect(admitted).toBe(true);
   });
 
   test("delete cleanup keeps a durable anchor and repair resumes after interruption", async () => {
@@ -542,7 +499,6 @@ describe("session lifecycle mutations", () => {
   test("archive cancels active runs and exposes an idle archived session", async () => {
     const database = await createPublicHttpContractDatabase();
     await insertOwnerSession(database);
-    await ensureRuntimeLifecycleTables(database);
     await insertSandboxSession(database, PUBLIC_API_TEST_IDS.ownerSession);
     await insertSessionRun(database, {
       createdByAccountId: PUBLIC_API_TEST_IDS.ownerAccount,
@@ -553,7 +509,7 @@ describe("session lifecycle mutations", () => {
       createPublicHttpTestBindings(database) as ApiBindings,
     );
 
-    const outcomes = await archiveAgentSession({
+    await archiveAgentSession({
       bindings,
       projectId: PUBLIC_API_TEST_IDS.project,
       sessionId: PUBLIC_API_TEST_IDS.ownerSession,
@@ -583,7 +539,6 @@ describe("session lifecycle mutations", () => {
       run_status: "cancelled",
       session_status: "IDLE",
     });
-    expect(outcomes.every((outcome) => outcome.status !== "failed")).toBe(true);
   });
 
   test("unarchive normalizes stale rescheduling state before exposing the session", async () => {
@@ -642,17 +597,10 @@ describe("session lifecycle mutations", () => {
     });
   });
 
-  test("lifecycle mutations reject attributed participants who are not session creators", async () => {
+  test("lifecycle mutations reject viewers who do not own the Project", async () => {
     const database = await createPublicHttpContractDatabase();
     await insertOwnerSession(database);
-    await database
-      .prepare("UPDATE session SET creator_account_id = ?, attributed_user_id = ? WHERE id = ?")
-      .bind(
-        PUBLIC_API_TEST_IDS.nonOwnerAccount,
-        PUBLIC_API_TEST_IDS.ownerAccount,
-        PUBLIC_API_TEST_IDS.ownerSession,
-      )
-      .run();
+    const nonOwnerViewer = { ...OWNER_VIEWER, id: PUBLIC_API_TEST_IDS.nonOwnerAccount };
     const bindings = withSessionLifecycleBinding(
       createPublicHttpTestBindings(database) as ApiBindings,
     );
@@ -662,7 +610,7 @@ describe("session lifecycle mutations", () => {
         bindings,
         projectId: PUBLIC_API_TEST_IDS.project,
         sessionId: PUBLIC_API_TEST_IDS.ownerSession,
-        viewer: OWNER_VIEWER,
+        viewer: nonOwnerViewer,
       }),
     ).rejects.toThrow();
 
@@ -676,7 +624,7 @@ describe("session lifecycle mutations", () => {
         database,
         projectId: PUBLIC_API_TEST_IDS.project,
         sessionId: PUBLIC_API_TEST_IDS.ownerSession,
-        viewer: OWNER_VIEWER,
+        viewer: nonOwnerViewer,
       }),
     ).rejects.toThrow();
 
@@ -685,7 +633,7 @@ describe("session lifecycle mutations", () => {
         bindings,
         projectId: PUBLIC_API_TEST_IDS.project,
         sessionId: PUBLIC_API_TEST_IDS.ownerSession,
-        viewer: OWNER_VIEWER,
+        viewer: nonOwnerViewer,
       }),
     ).rejects.toThrow();
   });

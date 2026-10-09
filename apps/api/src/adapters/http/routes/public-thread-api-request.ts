@@ -6,10 +6,7 @@ import type {
 import {
   PUBLIC_THREAD_EVENTS_DEFAULT_LIMIT,
   PUBLIC_THREAD_EVENTS_MAX_LIMIT,
-  PUBLIC_THREAD_FILE_ID_MAX_LENGTH,
   PUBLIC_THREAD_INPUT_TEXT_MAX_LENGTH,
-  PUBLIC_THREAD_JSON_BODY_MAX_BYTES,
-  PUBLIC_PROJECT_THREAD_JSON_BODY_MAX_BYTES,
   PUBLIC_API_OPENAPI_SCHEMAS,
   PUBLIC_THREAD_USER_ID_MAX_LENGTH,
 } from "@mosoo/contracts/public-api";
@@ -18,7 +15,7 @@ import type {
   AgentId,
   FileId,
   ProjectId,
-  PublicThreadId,
+  SessionId,
   SessionModelCallId,
   SessionRunId,
 } from "@mosoo/id";
@@ -27,6 +24,7 @@ import {
   PublicApiError,
   publicInvalidRequest,
 } from "../../../modules/public-api/public-api-errors";
+import type { CreatePublicThreadInput } from "../../../modules/public-api/public-thread.types";
 
 interface JsonRequestContext {
   req: {
@@ -60,13 +58,7 @@ const CREATE_THREAD_REQUEST_FIELDS: ReadonlySet<string> = new Set(
   Object.keys(PUBLIC_API_OPENAPI_SCHEMAS.CreateThreadRequest.properties),
 );
 
-export interface ParsedCreateThreadRequest {
-  fileIds: FileId[];
-  inputText?: string | undefined;
-  userId: string | null;
-}
-
-export interface ParsedCreateProjectThreadRequest extends ParsedCreateThreadRequest {
+interface ParsedCreateProjectThreadRequest extends CreatePublicThreadInput {
   configuration: PublicThreadConfiguration;
 }
 
@@ -74,75 +66,9 @@ export function parseProjectIdParam(value: string): ProjectId {
   return parsePublicPlatformId(value, "projectId") as ProjectId;
 }
 
-function parseContentLength(value: string | null): number | null {
-  if (value === null) {
-    return null;
-  }
-
-  if (!/^\d+$/.test(value)) {
-    throw publicInvalidRequest("Content-Length must be a non-negative integer.");
-  }
-
-  const length = Number.parseInt(value, 10);
-
-  if (!Number.isSafeInteger(length)) {
-    throw publicInvalidRequest("Content-Length is too large.");
-  }
-
-  return length;
-}
-
-async function readRequestTextWithLimit(request: Request, maxBytes: number): Promise<string> {
-  const contentLength = parseContentLength(request.headers.get("content-length"));
-
-  if (contentLength !== null && contentLength > maxBytes) {
-    throw publicInvalidRequest(`Request body must be ${maxBytes} bytes or fewer.`);
-  }
-
-  if (!request.body) {
-    return "";
-  }
-
-  const reader = request.body.getReader();
-  const decoder = new TextDecoder();
-  let bytesRead = 0;
-  const bodyChunks: string[] = [];
-
-  for (;;) {
-    const chunk = await reader.read();
-
-    if (chunk.done) {
-      const finalChunk = decoder.decode();
-
-      if (finalChunk.length > 0) {
-        bodyChunks.push(finalChunk);
-      }
-
-      return bodyChunks.join("");
-    }
-
-    bytesRead += chunk.value.byteLength;
-
-    if (bytesRead > maxBytes) {
-      await reader.cancel();
-      throw publicInvalidRequest(`Request body must be ${maxBytes} bytes or fewer.`);
-    }
-
-    bodyChunks.push(decoder.decode(chunk.value, { stream: true }));
-  }
-}
-
-async function readOptionalJsonBodyWithLimit(
-  c: RawJsonRequestContext,
-  maxBytes: number,
-): Promise<unknown> {
-  const body = await readRequestTextWithLimit(c.req.raw, maxBytes);
-
-  if (body.trim().length === 0) {
-    return {};
-  }
-
-  return JSON.parse(body);
+async function readOptionalJsonBody(c: RawJsonRequestContext): Promise<unknown> {
+  const body = await c.req.raw.text();
+  return body.trim().length === 0 ? {} : JSON.parse(body);
 }
 
 export function parseOptionalBoolean(value: string | undefined): boolean | null {
@@ -212,8 +138,8 @@ export function parseAgentIdParam(value: string): AgentId {
   return parsePublicPlatformId(value, "Agent ID") as AgentId;
 }
 
-export function parseThreadIdParam(value: string): PublicThreadId {
-  return parsePublicPlatformId(value, "Thread ID") as PublicThreadId;
+export function parseThreadIdParam(value: string): SessionId {
+  return parsePublicPlatformId(value, "Thread ID") as SessionId;
 }
 
 export function parseFileIdParam(value: string): FileId {
@@ -310,12 +236,7 @@ function readPublicThreadResourceFileIds(
       throw publicInvalidRequest("resource.type must be file.");
     }
 
-    fileIds.push(
-      parsePublicPlatformId(
-        readLimitedStringField(resource, "file_id", PUBLIC_THREAD_FILE_ID_MAX_LENGTH),
-        "file_id",
-      ) as FileId,
-    );
+    fileIds.push(parsePublicPlatformId(readStringField(resource, "file_id"), "file_id") as FileId);
   }
 
   return fileIds;
@@ -473,9 +394,9 @@ export async function readSendEventsRequest(
 
 export async function readCreateThreadRequest(
   c: RawJsonRequestContext,
-  apiVersion: PublicApiVersion = "v1",
-): Promise<ParsedCreateThreadRequest> {
-  const body = await readOptionalJsonBodyWithLimit(c, PUBLIC_THREAD_JSON_BODY_MAX_BYTES);
+  apiVersion: PublicApiVersion,
+): Promise<CreatePublicThreadInput> {
+  const body = await readOptionalJsonBody(c);
 
   if (!isRecord(body)) {
     throw publicInvalidRequest("Request body must be an object.");
@@ -488,7 +409,7 @@ export async function readCreateThreadRequest(
 function parseCreateThreadFields(
   body: Record<string, unknown>,
   apiVersion: PublicApiVersion,
-): ParsedCreateThreadRequest {
+): CreatePublicThreadInput {
   const userId =
     apiVersion === "v2" && body["userId"] === undefined
       ? null
@@ -505,7 +426,7 @@ function parseCreateThreadFields(
 export async function readCreateProjectThreadRequest(
   c: RawJsonRequestContext,
 ): Promise<ParsedCreateProjectThreadRequest> {
-  const body = await readOptionalJsonBodyWithLimit(c, PUBLIC_PROJECT_THREAD_JSON_BODY_MAX_BYTES);
+  const body = await readOptionalJsonBody(c);
   if (!isRecord(body)) throw publicInvalidRequest("Request body must be an object.");
   assertOnlyFields(
     body,

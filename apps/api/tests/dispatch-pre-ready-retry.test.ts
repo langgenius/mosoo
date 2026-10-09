@@ -1,121 +1,102 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 
+import type { DriverInstanceId, SessionId, SessionRunId } from "@mosoo/id";
+
+import { dispatchSessionRun } from "../src/modules/runtime/application/session-runs/dispatch-run.service";
+import { createRuntimeTimingRecorder } from "../src/modules/runtime/application/session-runs/session-runtime-timing";
+import * as driverSession from "../src/modules/runtime/infrastructure/driver-session.service";
+import * as executionPlane from "../src/modules/runtime/infrastructure/execution-plane/sandbox-execution-plane-adapter";
+import type { RuntimeExecutionPlaneRunLease } from "../src/modules/runtime/infrastructure/execution-plane/sandbox-execution-plane-adapter";
+import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import {
-  isDriverClosedBeforeReadyError,
-  withPreReadyRetry,
-} from "../src/modules/runtime/application/session-runs/pre-ready-retry";
+  PUBLIC_API_TEST_IDS,
+  createPublicHttpContractDatabase,
+  createPublicHttpTestBindings,
+  insertOwnerSession,
+  insertSessionRunFixture,
+} from "./helpers/public-api-http-test-fixture";
 
-function closedBeforeReadyError(): Error {
-  return new Error("Driver instance driver-x closed before ready.");
+const RUN_ID = PUBLIC_API_TEST_IDS.run as SessionRunId;
+const SESSION_ID = PUBLIC_API_TEST_IDS.ownerSession as SessionId;
+
+async function dispatchWithReadinessFailures(closedBeforeReadyFailures: number) {
+  const database = await createPublicHttpContractDatabase();
+  await insertOwnerSession(database);
+  await insertSessionRunFixture(database, { id: RUN_ID, sessionId: SESSION_ID, status: "queued" });
+  const timing = createRuntimeTimingRecorder({
+    runId: RUN_ID,
+    sessionId: SESSION_ID,
+    source: "api",
+    stage: "prepare_run",
+    traceId: null,
+  }).snapshot();
+  let readinessFailures = closedBeforeReadyFailures;
+  const prepareRun = spyOn(executionPlane, "prepareRun").mockImplementation(
+    async (): Promise<RuntimeExecutionPlaneRunLease> => ({
+      driverInstanceId: PUBLIC_API_TEST_IDS.driverOwner as DriverInstanceId,
+      readiness: async () => {
+        if (readinessFailures > 0) {
+          readinessFailures -= 1;
+          throw new Error(
+            `Driver instance ${PUBLIC_API_TEST_IDS.driverOwner} closed before ready.`,
+          );
+        }
+
+        return timing;
+      },
+      release: () => {},
+      timing,
+    }),
+  );
+  const dispatchTurn = spyOn(driverSession, "dispatchDriverTurn").mockResolvedValue(undefined);
+
+  try {
+    const dispatch = dispatchSessionRun(
+      createPublicHttpTestBindings(database) as ApiBindings,
+      "https://api.example.com/api/graphql",
+      {
+        attachmentIds: [],
+        builtInTools: [],
+        profile: { runtimeId: "openai-runtime", sandbox: { id: PUBLIC_API_TEST_IDS.sandbox } },
+        prompt: "Retry a driver that closed before ready.",
+        resolvedMcpServers: [],
+        resolvedSkillCatalog: [],
+        resolvedSkills: [],
+        sessionId: SESSION_ID,
+        sessionRunId: RUN_ID,
+        traceId: "trace-pre-ready-retry",
+      } as unknown as Parameters<typeof dispatchSessionRun>[2],
+    ).then(
+      () => null,
+      (error: unknown) => error,
+    );
+    const error = await dispatch;
+    const run = await database
+      .prepare("SELECT status, error_code FROM session_run WHERE id = ?")
+      .bind(RUN_ID)
+      .first<{ error_code: string | null; status: string }>();
+
+    return { attempts: prepareRun.mock.calls.length, error, run };
+  } finally {
+    prepareRun.mockRestore();
+    dispatchTurn.mockRestore();
+  }
 }
 
-describe("isDriverClosedBeforeReadyError", () => {
-  test("matches the closed-before-ready signature", () => {
-    expect(isDriverClosedBeforeReadyError(closedBeforeReadyError())).toBe(true);
-    expect(isDriverClosedBeforeReadyError(new Error("Driver process exited before ready."))).toBe(
-      false,
-    );
-    expect(
-      isDriverClosedBeforeReadyError(
-        new Error("Runtime subject is busy with lifecycle maintenance."),
-      ),
-    ).toBe(false);
-    expect(isDriverClosedBeforeReadyError("closed before ready")).toBe(false);
-  });
-});
+describe("dispatchSessionRun pre-ready retry", () => {
+  test("retries once when the driver closes before ready", async () => {
+    const result = await dispatchWithReadinessFailures(1);
 
-describe("withPreReadyRetry", () => {
-  test("returns the first successful attempt without retrying", async () => {
-    const retries: number[] = [];
-
-    const result = await withPreReadyRetry({
-      attempt: async () => "ok",
-      onRetry: async (_error, remaining) => {
-        retries.push(remaining);
-      },
-      retryLimit: 1,
-    });
-
-    expect(result).toBe("ok");
-    expect(retries).toEqual([]);
+    expect(result.error).toBeNull();
+    expect(result.attempts).toBe(2);
+    expect(result.run).toEqual({ error_code: null, status: "booting" });
   });
 
-  test("retries a closed-before-ready failure and succeeds", async () => {
-    const failures = [closedBeforeReadyError()];
-    const attempts: number[] = [];
-    const retried: { message: string; remaining: number }[] = [];
+  test("fails the run when the retry also closes before ready", async () => {
+    const result = await dispatchWithReadinessFailures(2);
 
-    const result = await withPreReadyRetry({
-      attempt: async () => {
-        attempts.push(attempts.length + 1);
-        const failure = failures.shift();
-        if (failure) {
-          throw failure;
-        }
-        return "recovered";
-      },
-      onRetry: async (error, remaining) => {
-        retried.push({ message: error.message, remaining });
-      },
-      retryLimit: 1,
-    });
-
-    expect(result).toBe("recovered");
-    expect(attempts).toEqual([1, 2]);
-    expect(retried).toEqual([
-      { message: "Driver instance driver-x closed before ready.", remaining: 0 },
-    ]);
-  });
-
-  test("gives up once the retry budget is exhausted", async () => {
-    let attempts = 0;
-
-    await expect(
-      withPreReadyRetry({
-        attempt: async () => {
-          attempts += 1;
-          throw closedBeforeReadyError();
-        },
-        onRetry: async () => undefined,
-        retryLimit: 1,
-      }),
-    ).rejects.toThrow("closed before ready");
-
-    expect(attempts).toBe(2);
-  });
-
-  test("does not retry other errors", async () => {
-    let attempts = 0;
-    const retries: number[] = [];
-
-    await expect(
-      withPreReadyRetry({
-        attempt: async () => {
-          attempts += 1;
-          throw new Error("Runtime subject is busy with lifecycle maintenance.");
-        },
-        onRetry: async (_error, remaining) => {
-          retries.push(remaining);
-        },
-        retryLimit: 1,
-      }),
-    ).rejects.toThrow("busy with lifecycle maintenance");
-
-    expect(attempts).toBe(1);
-    expect(retries).toEqual([]);
-  });
-
-  test("propagates onRetry failures such as run-no-longer-active", async () => {
-    await expect(
-      withPreReadyRetry({
-        attempt: async () => {
-          throw closedBeforeReadyError();
-        },
-        onRetry: async () => {
-          throw new Error("Session run is already cancelled.");
-        },
-        retryLimit: 1,
-      }),
-    ).rejects.toThrow("already cancelled");
+    expect(result.error).toBeInstanceOf(Error);
+    expect(result.attempts).toBe(2);
+    expect(result.run).toEqual({ error_code: "runtime.provision_failed", status: "failed" });
   });
 });

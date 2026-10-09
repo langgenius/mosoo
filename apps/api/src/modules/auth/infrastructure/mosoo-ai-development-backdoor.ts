@@ -50,32 +50,6 @@ export function mosooAiDevelopmentBackdoorPlugin(): BetterAuthPlugin {
         "/development-backdoor/mosoo-ai-login",
         {
           body: DevelopmentBackdoorBody,
-          metadata: {
-            openapi: {
-              description: "Local development backdoor sign-in for @mosoo.ai emails.",
-              responses: {
-                200: {
-                  content: {
-                    "application/json": {
-                      schema: {
-                        properties: {
-                          token: {
-                            type: "string",
-                          },
-                          user: {
-                            $ref: "#/components/schemas/User",
-                          },
-                        },
-                        required: ["token", "user"],
-                        type: "object",
-                      },
-                    },
-                  },
-                  description: "Signed in successfully.",
-                },
-              },
-            },
-          },
           method: "POST",
         },
         async (ctx) => {

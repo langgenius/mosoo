@@ -8,17 +8,33 @@ type RawOptions = { columnNames?: boolean } | undefined;
 const statementQueries = new WeakMap<D1PreparedStatement, string>();
 
 export class SqliteD1Database implements D1Database {
-  readonly #database = new Database(":memory:");
+  readonly #database: Database;
   readonly #maxBoundParams: number | undefined;
   #batchTail: Promise<void> = Promise.resolve();
 
-  constructor(input: { foreignKeys?: boolean; maxBoundParams?: number } = {}) {
+  constructor(input: { foreignKeys?: boolean; image?: ArrayBuffer; maxBoundParams?: number } = {}) {
+    this.#database =
+      input.image === undefined
+        ? new Database(":memory:")
+        : Database.deserialize(new Uint8Array(input.image));
     this.#maxBoundParams = input.maxBoundParams;
     this.#database.run(`PRAGMA foreign_keys = ${input.foreignKeys === false ? "OFF" : "ON"}`);
   }
 
+  // bun:sqlite exec() drops errors from every statement but the last, so run
+  // statements one at a time and let each failure throw, as D1 does.
   execute(query: string): void {
-    this.#database.exec(query);
+    let rest = query;
+    while (rest.replace(/--[^\n]*|\/\*[\s\S]*?\*\//gu, "").trim().length > 0) {
+      const statement = this.#database.prepare(rest);
+      const text = statement.toString();
+      try {
+        statement.run();
+      } finally {
+        statement.finalize();
+      }
+      rest = rest.slice(text.length);
+    }
   }
 
   prepare(query: string): D1PreparedStatement {
@@ -60,7 +76,7 @@ export class SqliteD1Database implements D1Database {
   }
 
   async dump(): Promise<ArrayBuffer> {
-    throw new Error("D1 dump is unavailable in SQLite test fixture.");
+    return new Uint8Array(this.#database.serialize()).buffer;
   }
 
   async exec(query: string): Promise<D1ExecResult> {

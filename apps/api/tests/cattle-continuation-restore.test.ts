@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import { sandboxBackupsTable, sandboxSessionsTable, sandboxesTable } from "@mosoo/db";
 
+import { createRuntimeTimingRecorder } from "../src/modules/runtime/application/session-runs/session-runtime-timing";
 import { encodeSandboxBackupIdForStorage } from "../src/modules/runtime/infrastructure/sandbox-backup-id";
 import type {
   ExecutionSessionHandle,
@@ -52,7 +53,6 @@ function createContinuationSandbox(input: { restoreError?: Error } = {}): {
     mkdir: async () => {},
     readFile: unavailable,
     startProcess: unavailable,
-    watch: unavailable,
     writeFile: unavailable,
   };
 
@@ -80,11 +80,8 @@ function createContinuationSandbox(input: { restoreError?: Error } = {}): {
       setKeepAlive: unavailable,
       ensureContainerReady: unavailable,
       startProcess: unavailable,
-      terminal: unavailable,
       unmountBucket: unavailable,
-      watch: unavailable,
       writeFile: unavailable,
-      wsConnect: unavailable,
     },
   };
 }
@@ -149,13 +146,19 @@ async function createContinuationFixture(): Promise<{
 
 function createInput(sandbox: SandboxHandle) {
   return {
-    agentId: PUBLIC_API_TEST_IDS.agent,
     kind: "cattle" as const,
     mountSessionResources: false,
     origin: ORIGIN,
     sandbox,
     sandboxId: PUBLIC_API_TEST_IDS.sandbox,
     sessionId: PUBLIC_API_TEST_IDS.ownerSession,
+    timing: createRuntimeTimingRecorder({
+      runId: null,
+      sessionId: PUBLIC_API_TEST_IDS.ownerSession,
+      source: "api",
+      stage: "prepare_run",
+      traceId: null,
+    }),
   };
 }
 

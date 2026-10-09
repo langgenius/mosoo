@@ -1,4 +1,4 @@
-import type { PlatformId, PublicThreadId } from "@mosoo/id";
+import type { PlatformId } from "@mosoo/id";
 import type { Context } from "hono";
 
 import {
@@ -7,13 +7,12 @@ import {
 } from "../../../modules/auth/application/personal-access-token.service";
 import type { PersonalAccessTokenCaller } from "../../../modules/auth/application/personal-access-token.service";
 import type { AuthenticatedViewer } from "../../../modules/auth/application/viewer-auth.service";
-import { FileControlError } from "../../../modules/files/application/file-control-errors";
+import { FileControlError } from "../../../modules/files/application/file-store";
 import {
   publicInternalError,
   publicIdempotencyConflict,
   publicInvalidJson,
   publicInvalidRequest,
-  publicReadinessBlocked,
   publicUnauthenticated,
   toPublicApiError,
 } from "../../../modules/public-api/public-api-errors";
@@ -27,22 +26,10 @@ import {
 import { enforcePublicApiRateLimit } from "../../../modules/public-api/public-api-rate-limit.service";
 import { createErrorLogContext, logInfo, logError } from "../../../platform/cloudflare/logger";
 import type { ApiGatewayEnvironment } from "../../../platform/cloudflare/worker-types";
-import { API_ERROR_CODE, isApiError } from "../../../platform/errors";
-import type { ApiError } from "../../../platform/errors";
 import { isTruthy } from "../../../shared/truthiness";
 import { mapFileControlErrorToPublicApiError } from "./public-api-file-error-mapping";
 
 type PublicApiRouteContext = Context<ApiGatewayEnvironment>;
-
-interface PublicApiThreadOperation {
-  caller: AuthenticatedViewer;
-}
-
-interface PublicApiTokenOperation {
-  caller: PersonalAccessTokenCaller;
-}
-
-type RouteValue<T> = T | (() => T);
 
 interface PublicApiJsonErrorResponse {
   body: {
@@ -55,11 +42,7 @@ interface PublicApiJsonErrorResponse {
   status: number;
 }
 
-function resolveRequiredRouteValue<T>(value: RouteValue<T>): T {
-  return typeof value === "function" ? (value as () => T)() : value;
-}
-
-async function requireAccessTokenCaller(
+export async function requirePublicApiCaller(
   c: PublicApiRouteContext,
 ): Promise<PersonalAccessTokenCaller> {
   const token = readBearerToken(c.req.raw);
@@ -84,12 +67,12 @@ async function requireAccessTokenCaller(
   return caller;
 }
 
-async function requireRateLimitedAccessTokenCaller(
+export async function requireRateLimitedPublicApiViewer(
   c: PublicApiRouteContext,
-): Promise<PersonalAccessTokenCaller> {
-  const caller = await requireAccessTokenCaller(c);
+): Promise<AuthenticatedViewer> {
+  const caller = await requirePublicApiCaller(c);
   await enforcePublicApiRateLimit(c.env.DB, caller.viewer.projectId ?? caller.tokenId);
-  return caller;
+  return caller.viewer;
 }
 
 function errorHeaders(error: PublicApiError): HeadersInit {
@@ -100,6 +83,14 @@ function errorHeaders(error: PublicApiError): HeadersInit {
   return {
     "Retry-After": String(error.retryAfterSeconds),
   };
+}
+
+function isInvalidRequestError(error: unknown): error is Error {
+  return (
+    error instanceof Error &&
+    (error.message === "No active session run to cancel." ||
+      error.message.startsWith("Attachment "))
+  );
 }
 
 function toErrorResponseDetails(error: unknown): PublicApiJsonErrorResponse {
@@ -122,74 +113,23 @@ function toErrorResponseDetails(error: unknown): PublicApiJsonErrorResponse {
     return toErrorResponseDetails(mapFileControlErrorToPublicApiError(error));
   }
 
-  if (isPublicApiRequestValidationError(error)) {
-    return toErrorResponseDetails(publicInvalidRequest(error.message));
-  }
-
   if (isInvalidRequestError(error)) {
-    return {
-      body: {
-        error: {
-          code: "invalid_request",
-          message: toPublicInvalidRequestMessage(error.message),
-        },
-      },
-      headers: {},
-      status: 400,
-    };
-  }
-
-  if (error instanceof Error && error.message.startsWith("Agent is not ready to run:")) {
-    return toErrorResponseDetails(publicReadinessBlocked(error.message));
+    return toErrorResponseDetails(publicInvalidRequest(error.message));
   }
 
   if (error instanceof SyntaxError) {
     return toErrorResponseDetails(publicInvalidJson());
   }
 
-  logError("public-api.failed", createErrorLogContext(error));
   return toErrorResponseDetails(publicInternalError());
 }
 
-function toPublicInvalidRequestMessage(message: string): string {
-  return message === "At least one session event is required."
-    ? "At least one thread event is required."
-    : message;
-}
-
-function toErrorResponse(error: unknown): Response {
+export function toErrorResponse(error: unknown): Response {
   const response = toErrorResponseDetails(error);
   return Response.json(response.body, {
     headers: response.headers,
     status: response.status,
   });
-}
-
-function isPublicApiRequestValidationError(error: unknown): error is ApiError {
-  if (!isApiError(error) || error.status !== 400) {
-    return false;
-  }
-
-  return (
-    error.code === API_ERROR_CODE.runtimeEventCursorInvalid ||
-    error.code === API_ERROR_CODE.runtimeEventLimitInvalid
-  );
-}
-
-function isInvalidRequestError(error: unknown): error is Error {
-  if (!(error instanceof Error)) {
-    return false;
-  }
-
-  return (
-    [
-      "At least one session event is required.",
-      "No active session run to cancel.",
-      "Permission decision is required.",
-      "Permission request id is required.",
-      "User message text is required.",
-    ].includes(error.message) || error.message.startsWith("Attachment ")
-  );
 }
 
 function jsonReplayResponse(body: unknown, status: number): Response {
@@ -201,68 +141,51 @@ function jsonReplayResponse(body: unknown, status: number): Response {
   });
 }
 
-async function runPublicApiIdempotentJson<T>(
+/**
+ * Runs a retry-safe mutation. Replays are answered before the rate limit, so
+ * they never count against it. Mutations with `recover` persist 4xx responses
+ * for replay and keep 5xx reservations recoverable.
+ */
+export async function withPublicApiIdempotency<T>(
   c: PublicApiRouteContext,
   input: {
     bodyHash: string | null;
-    idempotencySubjectId: PlatformId;
-    beforeOperation?: (() => Promise<void>) | undefined;
     operation: (idempotencyKey: string | null) => Promise<T>;
-    persistOperationErrors?: boolean | undefined;
     recover?: ((idempotencyKey: string, createdAt: number) => Promise<T | null>) | undefined;
     status: number;
+    subject: PlatformId;
   },
 ): Promise<Response> {
   const idempotencyKey = readPublicApiIdempotencyKey(c.req.raw);
 
   if (!isTruthy(idempotencyKey)) {
-    await input.beforeOperation?.();
+    await enforcePublicApiRateLimit(c.env.DB, input.subject);
     return Response.json(await input.operation(null), { status: input.status });
   }
 
   const route = new URL(c.req.url).pathname;
-  let reservation = await beginPublicApiIdempotency(c.env.DB, {
-    bodyHash: input.bodyHash,
-    idempotencyKey,
-    method: c.req.raw.method,
-    route,
-    tokenId: input.idempotencySubjectId,
-  });
-
-  if (reservation.status === "replay") {
-    return jsonReplayResponse(reservation.body, reservation.responseStatus);
-  }
-
-  if (reservation.status === "processing") {
-    if (!reservation.stale) {
-      throw publicIdempotencyConflict(
-        "A request with this Idempotency-Key is still processing.",
-        reservation.retryAfterSeconds,
-      );
-    }
-
-    const recovered = input.recover
-      ? await input.recover(idempotencyKey, reservation.createdAt)
-      : null;
-
-    if (recovered !== null) {
-      try {
-        await completePublicApiIdempotency(c.env.DB, reservation.reservationId, {
-          body: recovered,
-          status: input.status,
-        });
-      } catch (error) {
-        logError("public-api.idempotency_recovery_completion_failed", {
+  const begin = () =>
+    beginPublicApiIdempotency(c.env.DB, {
+      bodyHash: input.bodyHash,
+      idempotencyKey,
+      method: c.req.raw.method,
+      route,
+      tokenId: input.subject,
+    });
+  const complete = (reservationId: PlatformId, body: unknown, status: number) =>
+    completePublicApiIdempotency(c.env.DB, reservationId, { body, status }).catch(
+      (error: unknown) => {
+        logError("public-api.idempotency_completion_failed", {
           ...createErrorLogContext(error),
-          reservationId: reservation.reservationId,
+          reservationId,
           route,
-          tokenId: input.idempotencySubjectId,
+          tokenId: input.subject,
         });
-      }
+      },
+    );
+  let reservation = await begin();
 
-      return jsonReplayResponse(recovered, input.status);
-    }
-
+  if (reservation.status === "processing" && reservation.stale) {
     if (!input.recover) {
       throw publicIdempotencyConflict(
         "A previous request with this Idempotency-Key cannot be safely replayed. Its reservation will remain retained to prevent duplicate execution.",
@@ -270,248 +193,57 @@ async function runPublicApiIdempotentJson<T>(
       );
     }
 
+    const recovered = await input.recover(idempotencyKey, reservation.createdAt);
+
+    if (recovered !== null) {
+      await complete(reservation.reservationId, recovered, input.status);
+      return jsonReplayResponse(recovered, input.status);
+    }
+
     await clearPublicApiIdempotencyReservation(c.env.DB, reservation.reservationId);
-    reservation = await beginPublicApiIdempotency(c.env.DB, {
-      bodyHash: input.bodyHash,
-      idempotencyKey,
-      method: c.req.raw.method,
-      route,
-      tokenId: input.idempotencySubjectId,
-    });
+    reservation = await begin();
+  }
 
-    if (reservation.status === "replay") {
-      return jsonReplayResponse(reservation.body, reservation.responseStatus);
-    }
+  if (reservation.status === "replay") {
+    return jsonReplayResponse(reservation.body, reservation.responseStatus);
+  }
 
-    if (reservation.status === "processing") {
-      throw publicIdempotencyConflict(
-        "A request with this Idempotency-Key is still processing.",
-        reservation.retryAfterSeconds,
-      );
-    }
+  if (reservation.status === "processing") {
+    throw publicIdempotencyConflict(
+      "A request with this Idempotency-Key is still processing.",
+      reservation.retryAfterSeconds,
+    );
+  }
+
+  const { reservationId } = reservation;
+
+  try {
+    await enforcePublicApiRateLimit(c.env.DB, input.subject);
+  } catch (error) {
+    await clearPublicApiIdempotencyReservation(c.env.DB, reservationId);
+    throw error;
   }
 
   let body: T;
 
   try {
-    await input.beforeOperation?.();
-  } catch (error) {
-    await clearPublicApiIdempotencyReservation(c.env.DB, reservation.reservationId);
-    throw error;
-  }
-
-  try {
     body = await input.operation(idempotencyKey);
   } catch (error) {
-    if (input.persistOperationErrors === true) {
-      const errorResponse = toErrorResponseDetails(error);
-      if (input.recover && errorResponse.status >= 500) {
-        // Creation may already have committed. Keep the reservation recoverable
-        // instead of making an ambiguous infrastructure error the stored result.
-        return Response.json(errorResponse.body, { status: errorResponse.status });
-      }
-      await completePublicApiIdempotency(c.env.DB, reservation.reservationId, {
-        body: errorResponse.body,
-        status: errorResponse.status,
-      }).catch((completionError: unknown) => {
-        logError("public-api.idempotency_error_completion_failed", {
-          ...createErrorLogContext(completionError),
-          reservationId: reservation.reservationId,
-          route,
-          tokenId: input.idempotencySubjectId,
-        });
-      });
+    if (!input.recover) {
+      await clearPublicApiIdempotencyReservation(c.env.DB, reservationId);
+    } else {
+      const response = toErrorResponseDetails(error);
 
-      return Response.json(errorResponse.body, {
-        headers: errorResponse.headers,
-        status: errorResponse.status,
-      });
+      // Creation may already have committed. Keep a 5xx reservation recoverable
+      // instead of making an ambiguous infrastructure error the stored result.
+      if (response.status < 500) {
+        await complete(reservationId, response.body, response.status);
+      }
     }
 
-    await clearPublicApiIdempotencyReservation(c.env.DB, reservation.reservationId);
     throw error;
   }
 
-  try {
-    await completePublicApiIdempotency(c.env.DB, reservation.reservationId, {
-      body,
-      status: input.status,
-    });
-  } catch (error) {
-    logError("public-api.idempotency_completion_failed", {
-      ...createErrorLogContext(error),
-      reservationId: reservation.reservationId,
-      route,
-      tokenId: input.idempotencySubjectId,
-    });
-  }
-
+  await complete(reservationId, body, input.status);
   return Response.json(body, { status: input.status });
-}
-
-export async function runPublicApiAuthenticatedJson<T>(
-  c: PublicApiRouteContext,
-  operation: (caller: AuthenticatedViewer) => Promise<T>,
-  status = 200,
-): Promise<Response> {
-  try {
-    const caller = await requireRateLimitedAccessTokenCaller(c);
-    return Response.json(await operation(caller.viewer), { status });
-  } catch (error) {
-    return toErrorResponse(error);
-  }
-}
-
-export async function runPublicApiAuthenticatedResponse(
-  c: PublicApiRouteContext,
-  operation: (caller: AuthenticatedViewer) => Promise<Response>,
-): Promise<Response> {
-  try {
-    const caller = await requireRateLimitedAccessTokenCaller(c);
-    return await operation(caller.viewer);
-  } catch (error) {
-    return toErrorResponse(error);
-  }
-}
-
-export async function runPublicApiSessionMutation<T, Prepared = undefined>(
-  c: PublicApiRouteContext,
-  input: {
-    bodyHash?: (prepared: Prepared) => string | null;
-    operation: (
-      input: PublicApiThreadOperation & {
-        prepared: Prepared;
-        threadId: PublicThreadId;
-      },
-    ) => Promise<T>;
-    prepare?: (input: PublicApiThreadOperation) => Promise<Prepared>;
-    status?: number | undefined;
-    threadId: RouteValue<PublicThreadId>;
-  },
-): Promise<Response> {
-  try {
-    const caller = await requireAccessTokenCaller(c);
-    const threadId = resolveRequiredRouteValue(input.threadId);
-    const operationInput: PublicApiThreadOperation = { caller: caller.viewer };
-    const prepared = input.prepare ? await input.prepare(operationInput) : (undefined as Prepared);
-    const status = input.status ?? 200;
-    const operation = async (_idempotencyKey: string | null) =>
-      input.operation({ ...operationInput, prepared, threadId });
-    const beforeOperation = () =>
-      enforcePublicApiRateLimit(c.env.DB, caller.viewer.projectId ?? caller.tokenId);
-
-    if (input.bodyHash) {
-      return await runPublicApiIdempotentJson(c, {
-        bodyHash: input.bodyHash(prepared),
-        beforeOperation,
-        idempotencySubjectId: caller.viewer.projectId ?? caller.tokenId,
-        operation,
-        status,
-      });
-    }
-
-    await beforeOperation();
-    return Response.json(await operation(null), { status });
-  } catch (error) {
-    return toErrorResponse(error);
-  }
-}
-
-export async function runPublicApiThreadReadJson<T>(
-  c: PublicApiRouteContext,
-  input: {
-    operation: (input: PublicApiThreadOperation & { threadId: PublicThreadId }) => Promise<T>;
-    status?: number | undefined;
-    threadId: RouteValue<PublicThreadId>;
-  },
-): Promise<Response> {
-  try {
-    const caller = await requireRateLimitedAccessTokenCaller(c);
-    const threadId = resolveRequiredRouteValue(input.threadId);
-    const status = input.status ?? 200;
-
-    return Response.json(await input.operation({ caller: caller.viewer, threadId }), { status });
-  } catch (error) {
-    return toErrorResponse(error);
-  }
-}
-
-export async function runPublicApiThreadReadResponse(
-  c: PublicApiRouteContext,
-  input: {
-    operation: (
-      input: PublicApiThreadOperation & { threadId: PublicThreadId },
-    ) => Promise<Response>;
-    threadId: RouteValue<PublicThreadId>;
-  },
-): Promise<Response> {
-  try {
-    const caller = await requireRateLimitedAccessTokenCaller(c);
-    const threadId = resolveRequiredRouteValue(input.threadId);
-
-    return await input.operation({ caller: caller.viewer, threadId });
-  } catch (error) {
-    return toErrorResponse(error);
-  }
-}
-
-export async function runPublicApiThreadMutation<T, Prepared = undefined>(
-  c: PublicApiRouteContext,
-  input: {
-    idempotencySubjectId?: (prepared: Prepared) => PlatformId;
-    bodyHash?: (prepared: Prepared) => string | null;
-    operation: (
-      input: PublicApiTokenOperation & {
-        idempotencyKey: string | null;
-        prepared: Prepared;
-      },
-    ) => Promise<T>;
-    prepare?: (input: PublicApiTokenOperation) => Promise<Prepared>;
-    recover?: (
-      input: PublicApiTokenOperation & {
-        idempotencyKey: string;
-        idempotencyCreatedAt: number;
-        prepared: Prepared;
-      },
-    ) => Promise<T | null>;
-    status?: number | undefined;
-  },
-): Promise<Response> {
-  try {
-    const caller = await requireAccessTokenCaller(c);
-    const operationInput: PublicApiTokenOperation = { caller };
-    const prepared = input.prepare ? await input.prepare(operationInput) : (undefined as Prepared);
-    const status = input.status ?? 200;
-    const operation = async (idempotencyKey: string | null) =>
-      input.operation({ ...operationInput, idempotencyKey, prepared });
-    const recover = input.recover
-      ? async (idempotencyKey: string, idempotencyCreatedAt: number) =>
-          input.recover?.({
-            ...operationInput,
-            idempotencyKey,
-            idempotencyCreatedAt,
-            prepared,
-          }) ?? null
-      : undefined;
-    const subjectId =
-      input.idempotencySubjectId?.(prepared) ?? caller.viewer.projectId ?? caller.tokenId;
-    const beforeOperation = () => enforcePublicApiRateLimit(c.env.DB, subjectId);
-
-    if (input.bodyHash) {
-      return await runPublicApiIdempotentJson(c, {
-        bodyHash: input.bodyHash(prepared),
-        beforeOperation,
-        idempotencySubjectId: subjectId,
-        operation,
-        persistOperationErrors: true,
-        recover,
-        status,
-      });
-    }
-
-    await beforeOperation();
-    return Response.json(await operation(null), { status });
-  } catch (error) {
-    return toErrorResponse(error);
-  }
 }

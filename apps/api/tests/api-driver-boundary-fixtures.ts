@@ -8,8 +8,9 @@ import type {
   SkillSnapshotId,
 } from "@mosoo/id";
 import { PLATFORM_ID_FIXTURES } from "@mosoo/id/testing";
-import { toRuntimeEventInput } from "@mosoo/runtime-events";
 
+import { toRuntimeEventInput } from "../../driver/src/protocol/events/runtime-events";
+import type { RuntimeEventBuildContext } from "../../driver/src/protocol/events/runtime-events";
 import type {
   DriverProfileConfig,
   DriverResolvedMcpServer,
@@ -52,7 +53,6 @@ export function createDriverProfile(): DriverProfileConfig {
       runId: null,
       sessionId: API_DRIVER_BOUNDARY_IDS.session,
     },
-    envVarNames: ["EXISTING_ENV"],
     envVars: {
       EXISTING_ENV: "kept",
     },
@@ -70,8 +70,6 @@ export function createDriverProfile(): DriverProfileConfig {
     sandbox: {
       id: API_DRIVER_BOUNDARY_IDS.sandbox,
       kind: "cattle",
-      subjectId: API_DRIVER_BOUNDARY_IDS.session,
-      subjectKind: "session",
     },
     session: {
       sandboxSessionId: API_DRIVER_BOUNDARY_IDS.sandboxSession,
@@ -85,7 +83,6 @@ export function createDriverProfile(): DriverProfileConfig {
       sessionOrganizationPath: "/organization",
     },
     setupScript: "",
-    sourceKind: "agent",
     vendorCredential: {
       apiBase: null,
       projectId: API_DRIVER_BOUNDARY_IDS.project,
@@ -174,7 +171,7 @@ export function createDriverEvent(value: object): DriverEvent {
       driverInstanceId: API_DRIVER_BOUNDARY_IDS.driverInstance,
       occurredAt: "1970-01-01T00:00:00.010Z",
       sessionId: API_DRIVER_BOUNDARY_IDS.session,
-    },
+    } as unknown as RuntimeEventBuildContext,
     value,
   );
 

@@ -1,9 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import {
-  getActiveProjectSessionParticipantAccess,
-  getActiveProjectSessionQueueAccess,
-} from "../src/modules/sessions/domain/session-access.policy";
+import { requireActiveProjectSession } from "../src/modules/sessions/domain/session-access.policy";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
 const PROJECT_ID = "01J0000000000000000000000Q";
@@ -28,7 +25,8 @@ function createRuntimeActionAccessDatabase(): SqliteD1Database {
       runtime_id text NOT NULL,
       status text NOT NULL,
       title text,
-      type text NOT NULL
+      type text NOT NULL,
+      updated_at integer DEFAULT 0 NOT NULL
     );
 
     CREATE TABLE project (
@@ -104,11 +102,11 @@ function createRuntimeActionAccessDatabase(): SqliteD1Database {
 }
 
 describe("session runtime action access", () => {
-  test("admits active session participants", async () => {
+  test("admits active sessions in the viewer's Project", async () => {
     const database = createRuntimeActionAccessDatabase();
 
     await expect(
-      getActiveProjectSessionParticipantAccess(database, "viewer-1", {
+      requireActiveProjectSession(database, "viewer-1", {
         projectId: PROJECT_ID,
         sessionId: "session-1",
       }),
@@ -117,31 +115,11 @@ describe("session runtime action access", () => {
     });
   });
 
-  test("queue access returns the execution payload", async () => {
-    const database = createRuntimeActionAccessDatabase();
-
-    const access = await getActiveProjectSessionQueueAccess(database, "viewer-1", {
-      projectId: PROJECT_ID,
-      sessionId: "session-1",
-    });
-
-    expect(access).toEqual({
-      agent_id: "01J00000000000000000000009",
-      deployment_version_id: "01J0000000000000000000000A",
-      deployment_version_number: 1,
-      id: "session-1",
-      model: "gpt-5.4",
-      project_id: PROJECT_ID,
-      provider: "openai",
-      runtime_id: "openai-runtime",
-    });
-  });
-
   test("fails closed when the requested Project does not own the session", async () => {
     const database = createRuntimeActionAccessDatabase();
 
     await expect(
-      getActiveProjectSessionParticipantAccess(database, "viewer-1", {
+      requireActiveProjectSession(database, "viewer-1", {
         projectId: WRONG_PROJECT_ID,
         sessionId: "session-1",
       }),
@@ -155,7 +133,7 @@ describe("session runtime action access", () => {
     const database = createRuntimeActionAccessDatabase();
 
     await expect(
-      getActiveProjectSessionQueueAccess(database, "outsider-1", {
+      requireActiveProjectSession(database, "outsider-1", {
         projectId: PROJECT_ID,
         sessionId: "session-1",
       }),

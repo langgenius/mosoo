@@ -1,66 +1,102 @@
 import type { CompleteFileUploadRequest, FileRecord } from "@mosoo/contracts/file";
-import { parsePlatformId } from "@mosoo/id";
-import type { AccountId, FileId } from "@mosoo/id";
+import { fileRecordsTable } from "@mosoo/db";
+import type { FileId, SessionId } from "@mosoo/id";
+import { eq } from "drizzle-orm";
 
 import {
   createApiWideEvent,
   createErrorLogContext,
   emitApiWideEvent,
   logError,
-  logInfo,
-  logWarn,
 } from "../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
+import { getAppDatabase } from "../../../platform/db/drizzle";
+import { currentTimestampMs } from "../../../time";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import { FileControlError, createFileConflictError } from "./file-errors";
+import { admitPreviewFileActivity } from "../../sessions/infrastructure/preview-retention.repository";
 import { createFinalObjectKey } from "./file-paths";
-import { ensureUploadAccess, expireUploadIfNeeded, getReadyFileByPath } from "./file-record-store";
-import { getFileScopeDescriptor } from "./file-scope-descriptor";
+import { ensureUploadAccess } from "./file-record-access";
+import { toFileRecord } from "./file-record-model";
+import type { FileRecordRow, FileUploadContext } from "./file-record-model";
+import { expireUploadIfNeeded, updateFileUploadStatus } from "./file-record-mutations";
 import {
-  buildFinalizeCopyOptions,
   completeStagingUpload,
   ensureUploadCanComplete,
   readVerifiedStagingObject,
 } from "./file-upload-completion-steps";
-import { finalizeReadyFileRecord } from "./file-upload-finalize";
-import {
-  commitPendingFileVersionSafely,
-  createPendingFileVersion,
-  findPendingFileVersion,
-} from "./file-version-store";
-import type { PendingFileVersion } from "./file-version-store";
-import { copyObject, deleteObject, headObject, normalizeR2Etag } from "./r2-s3-client";
-import type { HeadObjectResult } from "./r2-s3-client";
+import { copyR2Object, normalizeR2Etag } from "./r2-object";
 
 function isMatchingRecoveredFinalObject(
-  finalHead: HeadObjectResult | null,
-  stagingHead: HeadObjectResult,
-): finalHead is HeadObjectResult {
+  finalObject: R2Object | null,
+  stagingObject: R2Object,
+): finalObject is R2Object {
   return (
-    finalHead !== null &&
-    normalizeR2Etag(finalHead.etag) === normalizeR2Etag(stagingHead.etag) &&
-    finalHead.contentLength === stagingHead.contentLength &&
-    (finalHead.contentType ?? "application/octet-stream") ===
-      (stagingHead.contentType ?? "application/octet-stream")
+    finalObject !== null &&
+    normalizeR2Etag(finalObject.etag) === normalizeR2Etag(stagingObject.etag) &&
+    finalObject.size === stagingObject.size &&
+    (finalObject.httpMetadata?.contentType ?? "application/octet-stream") ===
+      (stagingObject.httpMetadata?.contentType ?? "application/octet-stream")
   );
 }
 
-export interface CompleteFileUploadOperation {
+async function finalizeReadyFileRecord(
+  bindings: ApiBindings,
+  context: FileUploadContext,
+  finalObject: R2Object,
+  finalObjectKey: string,
+): Promise<FileRecord> {
+  const timestampMs = currentTimestampMs();
+
+  if (context.file.scope_kind === "session") {
+    await admitPreviewFileActivity(bindings.DB, context.file.scope_id as SessionId, timestampMs);
+  }
+
+  const finalized: FileRecordRow = {
+    ...context.file,
+    committed: context.file.scope_kind === "session" || context.file.committed === 1 ? 1 : 0,
+    etag: finalObject.etag,
+    expires_at:
+      context.file.purpose === "agent_package" || context.file.purpose === "app_draft"
+        ? context.file.expires_at
+        : null,
+    mime_type: finalObject.httpMetadata?.contentType ?? null,
+    object_key: finalObjectKey,
+    size: finalObject.size,
+    status: "ready",
+    updated_at: timestampMs,
+  };
+
+  await getAppDatabase(bindings.DB)
+    .update(fileRecordsTable)
+    .set({
+      committed: finalized.committed === 1,
+      etag: finalized.etag,
+      expiresAt: finalized.expires_at,
+      mimeType: finalized.mime_type,
+      objectKey: finalized.object_key,
+      size: finalized.size,
+      status: finalized.status,
+      updatedAt: timestampMs,
+    })
+    .where(eq(fileRecordsTable.id, context.file.id))
+    .run();
+
+  await updateFileUploadStatus(bindings.DB, {
+    status: "completed",
+    timestampMs,
+    uploadId: context.upload.id,
+  });
+
+  return toFileRecord(finalized);
+}
+
+export async function completeFileUpload(operation: {
   bindings: ApiBindings;
   fileId: FileId;
   input: CompleteFileUploadRequest;
   viewer: AuthenticatedViewer;
-}
-
-export interface CompleteFileUploadResult {
-  file: FileRecord;
-}
-
-export async function completeFileUpload(
-  operation: CompleteFileUploadOperation,
-): Promise<CompleteFileUploadResult> {
+}): Promise<FileRecord> {
   const { bindings, fileId, input, viewer } = operation;
-  const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
   const context = await ensureUploadAccess({
     database: bindings.DB,
     fileId,
@@ -68,7 +104,6 @@ export async function completeFileUpload(
     viewer,
   });
   const { file, upload } = context;
-  const uploadId = upload.id;
   const uploadEvent = createApiWideEvent("file.upload.complete", {
     fields: {
       file: {
@@ -78,10 +113,9 @@ export async function completeFileUpload(
         scope_kind: upload.scope_kind,
       },
       upload: {
-        id: uploadId,
-        overwrite: upload.overwrite === 1,
+        id: upload.id,
         strategy: upload.strategy,
-        viewer_account_id: viewerId,
+        viewer_account_id: viewer.id,
       },
     },
   });
@@ -89,168 +123,53 @@ export async function completeFileUpload(
   try {
     await expireUploadIfNeeded(bindings.DB, context);
     ensureUploadCanComplete(context);
-
-    const readyConflict = await getReadyFileByPath({
-      database: bindings.DB,
-      path: file.path,
-      scopeId: upload.scope_id,
-      scopeKind: upload.scope_kind,
-    });
-
-    if (readyConflict && readyConflict.id !== file.id && upload.overwrite !== 1) {
-      throw createFileConflictError("A file already exists at this path.");
-    }
-
     await completeStagingUpload({ bindings, context, request: input });
 
-    const stagingHead = await readVerifiedStagingObject({ bindings, context });
+    const stagingObject = await readVerifiedStagingObject({ bindings, context });
     const finalObjectKey = createFinalObjectKey(file);
-    const finalizeCopyOptions = buildFinalizeCopyOptions({
-      existingDestinationEtag: readyConflict?.etag,
-      ifMatchEtag: upload.if_match_etag,
-      overwrite: upload.overwrite === 1,
-      sourceEtag: stagingHead.etag,
-    });
-
-    let overwrittenVersion: PendingFileVersion | null = null;
-
-    if (
-      readyConflict &&
-      readyConflict.id !== file.id &&
-      getFileScopeDescriptor(upload.scope_kind).capabilities.versioning
-    ) {
-      overwrittenVersion =
-        (await findPendingFileVersion(bindings.DB, {
-          fileId: readyConflict.id,
-          path: file.path,
-          reason: "overwrite",
-          sourceObjectKey: readyConflict.object_key,
-          version: readyConflict.version,
-        })) ?? (await createPendingFileVersion(bindings, readyConflict, viewerId, "overwrite"));
-    }
-
-    let finalHead: HeadObjectResult | null =
+    let finalObject =
       upload.status === "completing" && file.object_key !== finalObjectKey
-        ? await headObject(bindings, finalObjectKey)
+        ? await bindings.FILE_BUCKET.head(finalObjectKey)
         : null;
 
-    if (!isMatchingRecoveredFinalObject(finalHead, stagingHead)) {
-      await copyObject({
-        bindings,
-        destinationObjectKey: finalObjectKey,
-        options: finalizeCopyOptions,
-        sourceObjectKey: file.object_key,
-      });
-
-      finalHead = await headObject(bindings, finalObjectKey);
+    if (!isMatchingRecoveredFinalObject(finalObject, stagingObject)) {
+      finalObject = await copyR2Object(bindings.FILE_BUCKET, file.object_key, finalObjectKey);
     }
 
-    if (!finalHead) {
-      throw new FileControlError(
-        503,
-        "file_storage_unavailable",
-        "Finalized object could not be read from R2.",
-        true,
-      );
-    }
-
-    const finalizedFile = await finalizeReadyFileRecord({
+    const finalizedFile = await finalizeReadyFileRecord(
       bindings,
       context,
-      finalHead,
+      finalObject,
       finalObjectKey,
-    });
-    await commitPendingFileVersionSafely(bindings, overwrittenVersion, {
-      fileId: readyConflict?.id,
-      objectKey: readyConflict?.object_key,
-      path: file.path,
-      reason: "overwrite",
-      scopeId: upload.scope_id,
-      uploadId,
-    });
+    );
 
-    if (readyConflict && readyConflict.id !== file.id) {
-      await deleteObject(bindings, readyConflict.object_key, {
-        ifMatch: readyConflict.etag ?? undefined,
-      }).catch((error: unknown) => {
-        logError("file.cleanup.failed.old-ready-object", {
-          ...createErrorLogContext(error),
-          fileId: readyConflict.id,
-          objectKey: readyConflict.object_key,
-          uploadId,
-        });
-      });
-    }
-
-    await deleteObject(bindings, file.object_key, {
-      ifMatch: stagingHead.etag,
-    }).catch((error: unknown) => {
+    await bindings.FILE_BUCKET.delete(file.object_key).catch((error: unknown) => {
       logError("file.cleanup.failed.staging-object", {
         ...createErrorLogContext(error),
         fileId: file.id,
         objectKey: file.object_key,
-        uploadId,
+        uploadId: upload.id,
       });
-    });
-
-    logInfo("file.upload.completed", {
-      fileId: file.id,
-      finalObjectKey,
-      overwrite: upload.overwrite === 1,
-      path: file.path,
-      scopeId: upload.scope_id,
-      scopeKind: upload.scope_kind,
-      uploadId,
-      viewerId,
     });
 
     uploadEvent.merge("storage", {
       final_object_key: finalObjectKey,
-      size: finalHead.contentLength,
+      size: finalObject.size,
     });
     emitApiWideEvent(uploadEvent, {
       status: "success",
     });
 
-    return {
-      file: finalizedFile,
-    };
+    return finalizedFile;
   } catch (error) {
-    const logContext = {
+    uploadEvent.setError(error, {
       fileId: file.id,
       path: file.path,
       scopeId: upload.scope_id,
       scopeKind: upload.scope_kind,
-      uploadId,
-      viewerId,
-    };
-
-    if (error instanceof FileControlError) {
-      if (error.status >= 500) {
-        logError("file.upload.failed", {
-          ...createErrorLogContext(error),
-          ...logContext,
-          errorCode: error.code,
-          retryable: error.retryable,
-          status: error.status,
-        });
-      } else {
-        logWarn("file.upload.rejected", {
-          ...logContext,
-          errorCode: error.code,
-          errorMessage: error.message,
-          retryable: error.retryable,
-          status: error.status,
-        });
-      }
-    } else {
-      logError("file.upload.failed", {
-        ...createErrorLogContext(error),
-        ...logContext,
-      });
-    }
-
-    uploadEvent.setError(error, logContext);
+      uploadId: upload.id,
+      viewerId: viewer.id,
+    });
     emitApiWideEvent(uploadEvent, {
       ...(error instanceof Error ? { error } : {}),
       status: "error",

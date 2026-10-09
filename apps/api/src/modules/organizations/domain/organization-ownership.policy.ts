@@ -7,40 +7,33 @@ import { getAppDatabase } from "../../../platform/db/drizzle";
 import { forbiddenError } from "../../../platform/errors";
 import { toIsoString } from "../../../time";
 
-export interface OrganizationSummaryRow {
-  avatar_url: string | null;
+interface OrganizationSummaryRow {
   created_at: number;
   id: OrganizationId;
   name: string;
 }
 
-export interface OrganizationOwnership {
-  organizationId: OrganizationId;
-  ownerAccountId: AccountId;
-}
-
 export function toOrganizationSummary(row: OrganizationSummaryRow): OrganizationSummary {
   return {
-    avatarUrl: row.avatar_url,
     createdAt: toIsoString(row.created_at),
     id: row.id,
     name: row.name,
   };
 }
 
-function organizationSummaryColumns() {
+export function organizationSummaryColumns() {
   return {
-    avatar_url: organizationsTable.avatarUrl,
     created_at: organizationsTable.createdAt,
     id: organizationsTable.id,
     name: organizationsTable.name,
   };
 }
 
-async function getOrganizationOwnerAccountId(
+export async function ensureOrganizationOwnership(
   database: D1Database,
+  viewerId: AccountId,
   organizationId: OrganizationId,
-): Promise<AccountId> {
+): Promise<void> {
   const organization =
     (await getAppDatabase(database)
       .select({ creatorAccountId: organizationsTable.creatorAccountId })
@@ -53,41 +46,7 @@ async function getOrganizationOwnerAccountId(
     throw new Error("Organization not found.");
   }
 
-  if (organization.creatorAccountId === null) {
-    throw new Error("Organization owner could not be resolved.");
-  }
-
-  return organization.creatorAccountId;
-}
-
-export async function ensureOrganizationOwnership(
-  database: D1Database,
-  viewerId: AccountId,
-  organizationId: OrganizationId,
-): Promise<OrganizationOwnership> {
-  const ownerAccountId = await getOrganizationOwnerAccountId(database, organizationId);
-
-  if (ownerAccountId !== viewerId) {
+  if (organization.creatorAccountId !== viewerId) {
     throw forbiddenError();
   }
-
-  return {
-    organizationId,
-    ownerAccountId,
-  };
-}
-
-export async function getOrganizationSummary(
-  database: D1Database,
-  organizationId: OrganizationId,
-): Promise<OrganizationSummary | null> {
-  const row =
-    (await getAppDatabase(database)
-      .select(organizationSummaryColumns())
-      .from(organizationsTable)
-      .where(eq(organizationsTable.id, organizationId))
-      .limit(1)
-      .get()) ?? null;
-
-  return row === null ? null : toOrganizationSummary(row);
 }

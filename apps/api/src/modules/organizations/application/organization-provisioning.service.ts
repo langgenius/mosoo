@@ -6,15 +6,9 @@ import type { AccountId, OrganizationId, ProjectId } from "@mosoo/id";
 import { runAppDatabaseBatch } from "../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../time";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import { createProjectEnvironmentDefaults } from "../../environments/application/environment.service";
+import { createProjectEnvironmentDefaults } from "../../environments/application/environment-defaults";
 import { DEFAULT_PROJECT_NAME } from "../../projects/application/project-defaults";
-import { recordLastActiveOrganization } from "../../users/application/account-organization-context.service";
 import { toOrganizationSummary } from "../domain/organization-ownership.policy";
-
-interface ProvisionOrganizationWithOwnerInput {
-  makeActive: boolean;
-  name: string;
-}
 
 interface ProvisionOrganizationWriteInput {
   name: string;
@@ -50,14 +44,14 @@ async function writeOrganizationWithOwner(
 export async function provisionOrganizationWithOwner(
   database: D1Database,
   owner: AuthenticatedViewer,
-  input: ProvisionOrganizationWithOwnerInput,
+  name: string,
 ): Promise<OrganizationSummary> {
   const timestampMs = currentTimestampMs();
   const organizationId: OrganizationId = createPlatformId();
   const defaultProjectId: ProjectId = createPlatformId();
 
   await writeOrganizationWithOwner(database, {
-    name: input.name,
+    name,
     defaultProjectId,
     organizationId,
     ownerId: owner.id,
@@ -73,14 +67,9 @@ export async function provisionOrganizationWithOwner(
     },
   );
 
-  if (input.makeActive) {
-    await recordLastActiveOrganization(database, owner.id, organizationId);
-  }
-
   return toOrganizationSummary({
-    avatar_url: null,
     created_at: timestampMs,
     id: organizationId,
-    name: input.name,
+    name,
   });
 }

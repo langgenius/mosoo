@@ -42,13 +42,13 @@ export function runtimeSessionLinkNeedsRefresh(link: RuntimeSessionLink | null):
 export interface ProjectedRuntimeEventRecord {
   event: RuntimeEventEnvelope;
   occurredAt: number | null;
-  sourceEventId: string | null;
+  sourceEventId: string;
 }
 
 export interface ProjectedSessionDeliveryEvent {
   event: SessionDeliveryEvent;
   occurredAt: number | null;
-  sourceEventId: string | null;
+  sourceEventId: string;
 }
 
 export interface RuntimeDriverRunTransition {
@@ -63,9 +63,9 @@ export interface RuntimeDriverRunTransition {
 
 export interface ProjectRuntimeDriverEventsResult {
   finalAssistantMessage: { id: string; text: string } | null;
-  link: RuntimeSessionLink;
+  link: RuntimeSessionLink & { sessionId: SessionId };
   liveStateChanged: boolean;
-  nextLiveState: SessionLiveState | null;
+  nextLiveState: SessionLiveState;
   sessionTitle: string | null;
   transitions: RuntimeDriverRunTransition[];
   usage: SessionUsageSummary | null;

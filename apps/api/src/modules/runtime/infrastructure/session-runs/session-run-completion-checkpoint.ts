@@ -8,7 +8,7 @@ import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../../platform/db/drizzle";
 import type { AppDatabase } from "../../../../platform/db/drizzle";
 import { shouldBackupSandboxSession } from "../../../sessions/domain/session-lifecycle";
-import { isTerminalSessionRunStatus } from "../../domain/session-run-status";
+import { isTerminalSessionRunStatus } from "../../domain/session-run-lifecycle.machine";
 import type { RuntimeSessionLink } from "../driver-instance/event-types";
 import { RuntimeSubjectCheckpointFailedError } from "../runtime-subject-lifecycle/runtime-subject-errors";
 import { SANDBOX_BACKUP_TTL_SECONDS } from "../sandbox-backup-config";
@@ -86,15 +86,10 @@ export async function prepareSessionRunCompletionCheckpoint(
     }
     const backup = await createRuntimeSandboxBackup(bindings, {
       dir: target.cwd,
-      sanitizeTransientState: true,
       sandboxId: link.sandboxId,
       sessionId: link.sessionId,
-      skipMissingWorkspace: false,
       ttlSeconds: SANDBOX_BACKUP_TTL_SECONDS,
     });
-    if (backup === null) {
-      throw new Error("Session completion did not create its required workspace checkpoint.");
-    }
     return {
       backupId: parsePlatformId<SandboxBackupId>(backup.id, "completion checkpoint id"),
       dir: backup.dir,

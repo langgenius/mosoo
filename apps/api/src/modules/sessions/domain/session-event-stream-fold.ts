@@ -4,9 +4,7 @@ import type { RuntimeEventId, SessionRunId } from "@mosoo/id";
 // per fragment so every accepted source identity stays durable (#274). Reading
 // them back verbatim renders each fragment as its own timeline entry, so read
 // paths fold a fragment stream into a single row before projecting process
-// events. The merge rules mirror the pre-persistence compactor
-// (runtime-event-compaction.ts): deltas append, snapshots prefer the longer
-// prefix-matching text.
+// events: deltas append, snapshots prefer the longer prefix-matching text.
 //
 // Rows carry no message identity, so a stream whose driver-side identity
 // fractured (a dropped message_start splits one reply across several
@@ -26,16 +24,6 @@ export interface StreamFoldableSessionEventRow {
   run_id: SessionRunId | null;
   seq: number;
   tokens: number | null;
-}
-
-export interface FoldedStreamedSessionEventRows<R> {
-  /**
-   * Raw rows of streams that have not seen their closing event yet, in seq
-   * order. Only populated when `flushOpenStreams` is false; callers carry them
-   * into the next fold so a stream spanning reads still emits exactly once.
-   */
-  openStreamRows: R[];
-  rows: R[];
 }
 
 type StreamRowPhase = "added" | "completed" | "delta" | "started";
@@ -159,8 +147,7 @@ function createFoldedStreamRow<R extends StreamFoldableSessionEventRow>(
 
 export function foldStreamedSessionEventRows<R extends StreamFoldableSessionEventRow>(
   rows: readonly R[],
-  options: { flushOpenStreams: boolean },
-): FoldedStreamedSessionEventRows<R> {
+): R[] {
   const output: (R | null)[] = [];
   const openGroups = new Map<string, OpenStreamGroup<R>>();
   const fragmentSegments = new Map<string, ClosedFragmentSegment[]>();
@@ -279,18 +266,9 @@ export function foldStreamedSessionEventRows<R extends StreamFoldableSessionEven
     }
   }
 
-  if (options.flushOpenStreams) {
-    for (const [key, group] of openGroups) {
-      closeGroupAsFragment(key, group);
-    }
-
-    return { openStreamRows: [], rows: output.filter((row): row is R => row !== null) };
+  for (const [key, group] of openGroups) {
+    closeGroupAsFragment(key, group);
   }
 
-  return {
-    openStreamRows: [...openGroups.values()]
-      .flatMap((group) => group.rows)
-      .toSorted((a, b) => a.seq - b.seq),
-    rows: output.filter((row): row is R => row !== null),
-  };
+  return output.filter((row): row is R => row !== null);
 }

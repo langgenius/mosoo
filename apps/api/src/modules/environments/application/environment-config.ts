@@ -10,13 +10,9 @@ import type {
   EnvironmentRevisionConfig,
   EnvironmentVariableInput,
 } from "@mosoo/contracts/environment";
-import type { EnvironmentId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
-import {
-  readEnvironmentVariableSecret,
-  storeEnvironmentVariableSecret,
-} from "./environment-secret-store";
+import { readSecret, storeSecret } from "../../vault/application/vault-secret-store";
 import type { EnvironmentMutableConfig, StoredEnvironmentVariable } from "./environment-types";
 
 const PACKAGE_MANAGER_SET = new Set<string>(ENVIRONMENT_PACKAGE_MANAGERS);
@@ -24,14 +20,6 @@ const WRITABLE_PACKAGE_MANAGER_NAMES = WRITABLE_ENVIRONMENT_PACKAGE_MANAGERS.joi
 
 function unsupportedPackageManagerWriteMessage(manager: EnvironmentPackageManager): string {
   return `Package manager ${manager} is not supported by the current Driver runtime. Remove it or replace it with ${WRITABLE_PACKAGE_MANAGER_NAMES} before saving.`;
-}
-
-export function assertWritableEnvironmentPackageManagers(packages: EnvironmentPackageSpec[]): void {
-  const unsupported = packages.find((entry) => !isWritableEnvironmentPackageManager(entry.manager));
-
-  if (unsupported) {
-    throw new Error(unsupportedPackageManagerWriteMessage(unsupported.manager));
-  }
 }
 
 function parseStringArray(value: unknown, fieldName: string): string[] {
@@ -120,8 +108,6 @@ export function parseStoredEnvVarsJson(value: string): StoredEnvironmentVariable
 
 export function toPublicRevisionConfig(input: EnvironmentMutableConfig): EnvironmentRevisionConfig {
   return {
-    allowMcpServers: input.allowMcpServers,
-    allowPackageManagers: input.allowPackageManagers,
     allowedHosts: [...input.allowedHosts],
     envVars: input.envVars.map((envVar) => ({
       key: envVar.key,
@@ -199,10 +185,6 @@ export function normalizePackages(
   const grouped: Record<"npm" | "pip", Set<string>> = { npm: new Set(), pip: new Set() };
 
   for (const entry of packages) {
-    if (!PACKAGE_MANAGER_SET.has(entry.manager)) {
-      throw new Error("Package manager must be apt, cargo, gem, go, npm, or pip.");
-    }
-
     if (!isWritableEnvironmentPackageManager(entry.manager)) {
       throw new Error(unsupportedPackageManagerWriteMessage(entry.manager));
     }
@@ -244,10 +226,6 @@ function previewSecret(value: string): string {
   return `${value.slice(0, 4)}…${value.slice(-4)}`;
 }
 
-function serializeEnvVars(envVars: StoredEnvironmentVariable[]): string {
-  return JSON.stringify(envVars);
-}
-
 export function normalizeEnvironmentMetadata(input: {
   description?: string | null;
   name: string;
@@ -266,8 +244,6 @@ export function normalizeEnvironmentConfigInput(
   }
 
   return {
-    allowMcpServers: input.allowMcpServers,
-    allowPackageManagers: input.allowPackageManagers,
     allowedHosts:
       input.networkPolicy === "limited" ? normalizeAllowedHosts(input.allowedHosts) : [],
     networkPolicy: input.networkPolicy,
@@ -280,7 +256,6 @@ export async function buildStoredEnvVars(
   bindings: ApiBindings,
   input: {
     envVars: EnvironmentVariableInput[];
-    environmentId: EnvironmentId;
     previousEnvVars?: StoredEnvironmentVariable[];
   },
 ): Promise<StoredEnvironmentVariable[]> {
@@ -304,9 +279,8 @@ export async function buildStoredEnvVars(
     }
 
     if (value) {
-      const secretId = await storeEnvironmentVariableSecret(bindings, {
-        environmentId: input.environmentId,
-        envVarKey: key,
+      const secretId = await storeSecret(bindings.DB, bindings, {
+        kind: "environment_variable",
         value,
       });
       stored.push({
@@ -333,29 +307,19 @@ export async function buildStoredEnvVars(
 
 export async function decryptEnvironmentVariables(
   bindings: ApiBindings,
-  input: {
-    environmentId: EnvironmentId;
-    envVars: StoredEnvironmentVariable[];
-  },
+  envVars: StoredEnvironmentVariable[],
 ): Promise<Record<string, string>> {
-  // Decrypt all secrets concurrently. Each readEnvironmentVariableSecret does
-  // D1 reads + an AES-GCM unwrap; run serially this was N sequential D1
-  // round-trips per hydration (the dominant cause of the multi-second
-  // context_hydration tail on prod), and hydration runs on every run —
-  // including cache hits, since the volatile fields are re-resolved.
+  // Decrypt all secrets concurrently. Each readSecret does a D1 read + an
+  // AES-GCM unwrap; run serially this was N sequential D1 round-trips per
+  // hydration (the dominant cause of the multi-second context_hydration tail
+  // on prod), and hydration runs on every run.
   const entries = await Promise.all(
-    input.envVars.map(async (envVar) => {
+    envVars.map(async (envVar) => {
       if (envVar.secretId === null) {
         throw new Error(`Environment variable ${envVar.key} is pending and has no secret value.`);
       }
 
-      const value = await readEnvironmentVariableSecret(bindings, {
-        environmentId: input.environmentId,
-        envVarKey: envVar.key,
-        purpose: "runtime_snapshot_hydration",
-        secretId: envVar.secretId,
-      });
-      return [envVar.key, value] as const;
+      return [envVar.key, await readSecret(bindings.DB, bindings, envVar.secretId)] as const;
     }),
   );
 
@@ -369,7 +333,7 @@ export function serializeConfig(input: EnvironmentMutableConfig): {
 } {
   return {
     allowedHostsJson: JSON.stringify(input.allowedHosts),
-    envVarsJson: serializeEnvVars(input.envVars),
+    envVarsJson: JSON.stringify(input.envVars),
     packagesJson: JSON.stringify(input.packages),
   };
 }

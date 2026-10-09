@@ -13,19 +13,9 @@ export const environmentSchema = /* GraphQL */ `
     pip
   }
 
-  enum EnvironmentRegistryRole {
-    owner
-  }
-
   enum EnvironmentVariableStatus {
     configured
     pending
-  }
-
-  type EnvironmentOwnerSummary {
-    id: ULID
-    imageUrl: String
-    name: String
   }
 
   type EnvironmentForkOrigin {
@@ -46,8 +36,6 @@ export const environmentSchema = /* GraphQL */ `
   }
 
   type EnvironmentSummary {
-    allowMcpServers: Boolean!
-    allowPackageManagers: Boolean!
     allowedHosts: [String!]!
     canDelete: Boolean!
     canEdit: Boolean!
@@ -59,12 +47,9 @@ export const environmentSchema = /* GraphQL */ `
     id: ULID!
     isBuiltIn: Boolean!
     isDefault: Boolean!
-    isEditable: Boolean!
     name: String!
     networkPolicy: EnvironmentNetworkPolicy!
-    owner: EnvironmentOwnerSummary!
     packages: [EnvironmentPackageSpec!]!
-    role: EnvironmentRegistryRole!
     setupScript: String!
     updatedAt: String!
     usedByAgentCount: Int!
@@ -72,8 +57,6 @@ export const environmentSchema = /* GraphQL */ `
   }
 
   type EnvironmentDetail {
-    allowMcpServers: Boolean!
-    allowPackageManagers: Boolean!
     allowedHosts: [String!]!
     canDelete: Boolean!
     canEdit: Boolean!
@@ -85,12 +68,9 @@ export const environmentSchema = /* GraphQL */ `
     id: ULID!
     isBuiltIn: Boolean!
     isDefault: Boolean!
-    isEditable: Boolean!
     name: String!
     networkPolicy: EnvironmentNetworkPolicy!
-    owner: EnvironmentOwnerSummary!
     packages: [EnvironmentPackageSpec!]!
-    role: EnvironmentRegistryRole!
     setupScript: String!
     updatedAt: String!
     usedByAgentCount: Int!
@@ -108,8 +88,6 @@ export const environmentSchema = /* GraphQL */ `
   }
 
   input CreateEnvironmentInput {
-    allowMcpServers: Boolean!
-    allowPackageManagers: Boolean!
     allowedHosts: [String!]!
     description: String
     envVars: [EnvironmentVariableInput!]!
@@ -121,8 +99,6 @@ export const environmentSchema = /* GraphQL */ `
   }
 
   input UpdateEnvironmentInput {
-    allowMcpServers: Boolean!
-    allowPackageManagers: Boolean!
     allowedHosts: [String!]!
     description: String
     environmentId: ULID!
@@ -134,11 +110,6 @@ export const environmentSchema = /* GraphQL */ `
     setupScript: String!
   }
 
-  input CreateEnvironmentForkInput {
-    environmentId: ULID!
-    projectId: ULID!
-  }
-
   input DeleteEnvironmentInput {
     environmentId: ULID!
     projectId: ULID!
@@ -147,12 +118,5 @@ export const environmentSchema = /* GraphQL */ `
   input SetProjectDefaultEnvironmentInput {
     environmentId: ULID!
     projectId: ULID!
-  }
-
-  input SetEnvironmentVariableValueInput {
-    environmentId: ULID!
-    key: String!
-    projectId: ULID!
-    value: String!
   }
 `;

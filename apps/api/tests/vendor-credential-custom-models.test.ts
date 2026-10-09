@@ -2,10 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import type { PlatformId, ProjectId, VendorCredentialId } from "@mosoo/id";
 
-import {
-  findCustomCredentialRowForModel,
-  listEffectiveCustomCredentialModelRows,
-} from "../src/modules/vendor-credentials/application/vendor-credential-custom-models";
+import { listEffectiveCustomCredentialModelRows } from "../src/modules/vendor-credentials/application/vendor-credential-custom-models";
 import type { VendorCredentialRow } from "../src/modules/vendor-credentials/application/vendor-credential.types";
 
 function credentialRow(input: {
@@ -43,21 +40,5 @@ describe("vendor credential custom models", () => {
       { modelId: "primary-only", row: primary },
       { modelId: "secondary-only", row: secondary },
     ]);
-  });
-
-  test("finds the first sorted credential for a model without requiring a full effective list", () => {
-    const secondary = credentialRow({
-      id: "credential-b",
-      modelsJson: ["target-model"],
-      name: "B Custom",
-    });
-    const primary = credentialRow({
-      id: "credential-a",
-      modelsJson: ["target-model"],
-      name: "A Custom",
-    });
-
-    expect(findCustomCredentialRowForModel([secondary, primary], "target-model")).toBe(primary);
-    expect(findCustomCredentialRowForModel([secondary, primary], "missing-model")).toBeNull();
   });
 });
