@@ -1,4 +1,3 @@
-import type { McpOAuthFlowId, McpServerId, ProjectId } from "@mosoo/contracts/id";
 import type {
   ConnectMcpBearerInput,
   CreateProjectMcpServerInput,
@@ -9,6 +8,7 @@ import type {
   StartMcpOAuthPayload,
   UpdateProjectMcpServerInput,
 } from "@mosoo/contracts/mcp";
+import type { AccountId, CredentialId, McpOAuthFlowId, McpServerId, ProjectId } from "@mosoo/id";
 
 import type {
   ConnectMcpBearerMutation,
@@ -21,13 +21,6 @@ import type {
   UpdateProjectMcpServerMutation,
 } from "@/gql/graphql";
 import { requestGraphQL } from "@/platform/http/graphql-client";
-import {
-  toAccountId,
-  toCredentialId,
-  toMcpOAuthFlowId,
-  toMcpServerId,
-  toProjectId,
-} from "@/routes/typed-id";
 
 import {
   CONNECT_MCP_BEARER_MUTATION,
@@ -59,19 +52,18 @@ function toMcpServerWithCredential(
         ? null
         : {
             ...server.credential,
-            id: toCredentialId(server.credential.id),
+            id: server.credential.id as CredentialId,
           },
-    id: toMcpServerId(server.id),
-    ownerId: toAccountId(server.ownerId),
-    projectId: toProjectId(server.projectId),
+    id: server.id as McpServerId,
+    ownerId: server.ownerId as AccountId,
+    projectId: server.projectId as ProjectId,
   };
 }
 
 function toMcpRegistry(registry: McpRegistryQuery["mcpRegistry"]): McpRegistry {
   return {
     ...registry,
-    currentUserId: toAccountId(registry.currentUserId),
-    projectId: toProjectId(registry.projectId),
+    projectId: registry.projectId as ProjectId,
     servers: registry.servers.map(toMcpServerWithCredential),
   };
 }
@@ -81,7 +73,7 @@ function toStartMcpOAuthPayload(
 ): StartMcpOAuthPayload {
   return {
     ...payload,
-    flowId: toMcpOAuthFlowId(payload.flowId),
+    flowId: payload.flowId as McpOAuthFlowId,
   };
 }
 
@@ -90,8 +82,8 @@ function toMcpOAuthFlowState(
 ): McpOAuthFlowState {
   return {
     ...state,
-    flowId: toMcpOAuthFlowId(state.flowId),
-    serverId: toMcpServerId(state.serverId),
+    flowId: state.flowId as McpOAuthFlowId,
+    serverId: state.serverId as McpServerId,
   };
 }
 

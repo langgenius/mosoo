@@ -1,8 +1,10 @@
-import type { SkillDetail, SkillSummary } from "@mosoo/contracts/skill";
-import { useEffect, useMemo, useReducer } from "react";
+import type { SkillSummary } from "@mosoo/contracts/skill";
+import { useQuery } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
 
-import { skillPackageUrl } from "@/domains/skill/api/skill-client";
+import { getSkillDetail, skillPackageUrl } from "@/domains/skill/api/skill-client";
 import { countSkillFiles } from "@/domains/skill/lib/skill-entries";
+import { skillKeys, useSkillSourceQuery } from "@/domains/skill/query/skill-queries";
 import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import {
@@ -12,9 +14,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/shared/ui/dialog";
+import { documentMarkdownClassName, Markdown } from "@/shared/ui/markdown";
 import { Separator } from "@/shared/ui/separator";
 import { SkillFileCountBadge } from "@/shared/ui/skill-file-count-badge";
-import { StaticMarkdown } from "@/shared/ui/static-markdown";
 
 import { isTruthy } from "../../../shared/lib/truthiness";
 import { DeleteSkillDialog } from "./delete-skill-dialog";
@@ -27,105 +29,32 @@ interface Props {
   skill: SkillSummary;
 }
 
-interface SkillDetailDialogState {
-  actionError: string | null;
-  content: string;
-  contentError: string | null;
-  contentLoading: boolean;
-  detail: SkillDetail | null;
-  forking: boolean;
-  showDelete: boolean;
-}
-
-type SkillDetailDialogAction =
-  | { type: "contentFailed"; error: string }
-  | { type: "contentLoaded"; content: string; detail: SkillDetail }
-  | { type: "setActionError"; error: string | null }
-  | { type: "setForking"; forking: boolean }
-  | { type: "setShowDelete"; open: boolean };
-
-const SKILL_DETAIL_DIALOG_INITIAL_STATE: SkillDetailDialogState = {
-  actionError: null,
-  content: "",
-  contentError: null,
-  contentLoading: true,
-  detail: null,
-  forking: false,
-  showDelete: false,
-};
-
-function skillDetailDialogReducer(
-  state: SkillDetailDialogState,
-  action: SkillDetailDialogAction,
-): SkillDetailDialogState {
-  switch (action.type) {
-    case "contentFailed":
-      return { ...state, contentError: action.error, contentLoading: false };
-    case "contentLoaded":
-      return {
-        ...state,
-        content: action.content,
-        contentLoading: false,
-        detail: action.detail,
-      };
-    case "setActionError":
-      return { ...state, actionError: action.error };
-    case "setForking":
-      return { ...state, forking: action.forking };
-    case "setShowDelete":
-      return { ...state, showDelete: action.open };
-  }
-}
-
 export function SkillDetailDialog({ onOpenChange, registry, skill }: Props) {
   const { t } = useTranslation();
-  const [state, dispatch] = useReducer(skillDetailDialogReducer, SKILL_DETAIL_DIALOG_INITIAL_STATE);
-  const { actionError, content, contentError, contentLoading, detail, forking, showDelete } = state;
-
-  useEffect(() => {
-    const abortController = new AbortController();
-    void (async () => {
-      try {
-        const [nextDetail, text] = await Promise.all([
-          registry.getSkillDetail(skill.id),
-          registry.getSkillSource(skill.id),
-        ]);
-        if (abortController.signal.aborted) {
-          return;
-        }
-        dispatch({ content: text, detail: nextDetail, type: "contentLoaded" });
-      } catch (error) {
-        if (!abortController.signal.aborted) {
-          dispatch({
-            error: error instanceof Error ? error.message : String(error),
-            type: "contentFailed",
-          });
-        }
-      }
-    })();
-    return () => {
-      abortController.abort();
-    };
-  }, [registry.getSkillDetail, registry.getSkillSource, skill.id]);
-
-  const body = useMemo(() => stripSkillFrontmatter(content), [content]);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [forking, setForking] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
+  const detailQuery = useQuery({
+    queryFn: async () => getSkillDetail(skill.projectId, skill.id),
+    queryKey: [...skillKeys.all, "detail", skill.id],
+  });
+  const sourceQuery = useSkillSourceQuery(skill.projectId, skill.id);
+  const contentError = detailQuery.error ?? sourceQuery.error;
+  const body = useMemo(() => stripSkillFrontmatter(sourceQuery.data ?? ""), [sourceQuery.data]);
 
   async function handleFork() {
     if (forking) {
       return;
     }
-    dispatch({ error: null, type: "setActionError" });
-    dispatch({ forking: true, type: "setForking" });
+    setActionError(null);
+    setForking(true);
 
     try {
       await registry.createSkillFork(skill.id);
     } catch (error) {
-      dispatch({
-        error: error instanceof Error ? error.message : t("skills.failedToFork"),
-        type: "setActionError",
-      });
+      setActionError(error instanceof Error ? error.message : t("skills.failedToFork"));
     } finally {
-      dispatch({ forking: false, type: "setForking" });
+      setForking(false);
     }
   }
 
@@ -133,7 +62,7 @@ export function SkillDetailDialog({ onOpenChange, registry, skill }: Props) {
     globalThis.location.href = skillPackageUrl(skill.projectId, skill.id);
   }
 
-  const canManageSkill = true;
+  const detail = detailQuery.data ?? null;
   const displaySkill = detail ?? skill;
   const fileCount = detail === null ? skill.fileCount : countSkillFiles(detail.entries);
 
@@ -145,7 +74,7 @@ export function SkillDetailDialog({ onOpenChange, registry, skill }: Props) {
             <div className="min-w-0">
               <DialogTitle className="flex items-baseline gap-2 text-[18px] font-semibold">
                 <span className="truncate">{displaySkill.name}</span>
-                <span className="text-muted-foreground shrink-0 text-[13px] font-medium">
+                <span className="text-fg-3 shrink-0 text-[13px] font-medium">
                   {t("skills.skill")}
                 </span>
               </DialogTitle>
@@ -161,27 +90,27 @@ export function SkillDetailDialog({ onOpenChange, registry, skill }: Props) {
 
           <div className="text-foreground min-h-0 flex-1 overflow-y-auto px-6 py-5 text-[13.5px] leading-relaxed">
             <div className="mb-4 flex items-center gap-2">
-              <span className="border-border bg-muted/50 text-foreground inline-flex items-center rounded-md border px-2 py-1 font-mono text-[11px]">
+              <span className="border-border bg-sunken/50 text-foreground inline-flex items-center rounded-md border px-2 py-1 font-mono text-[11px]">
                 SKILL.md
               </span>
               <SkillFileCountBadge count={fileCount} />
             </div>
             {displaySkill.forkOrigin ? (
-              <div className="bg-muted/50 text-muted-foreground mb-4 rounded-md px-2.5 py-1.5 text-[11px]">
+              <div className="bg-sunken/50 text-fg-3 mb-4 rounded-md px-2.5 py-1.5 text-[11px]">
                 {t("skills.forkedFrom")}{" "}
                 <span className="text-foreground font-medium">
                   {displaySkill.forkOrigin.ownerName} / {displaySkill.forkOrigin.name}
                 </span>
               </div>
             ) : null}
-            {contentLoading ? (
-              <p className="text-muted-foreground">{t("common.loading")}</p>
-            ) : isTruthy(contentError) ? (
-              <p className="text-destructive">
-                {t("skills.failedToLoadContent", { error: contentError })}
+            {detailQuery.isLoading || sourceQuery.isLoading ? (
+              <p className="text-fg-3">{t("common.loading")}</p>
+            ) : contentError ? (
+              <p className="text-danger">
+                {t("skills.failedToLoadContent", { error: contentError.message })}
               </p>
             ) : (
-              <StaticMarkdown>{body}</StaticMarkdown>
+              <Markdown className={documentMarkdownClassName}>{body}</Markdown>
             )}
           </div>
 
@@ -190,22 +119,20 @@ export function SkillDetailDialog({ onOpenChange, registry, skill }: Props) {
           <div className="flex items-center justify-between gap-2 px-6 py-4">
             <div>
               {isTruthy(actionError) ? (
-                <div className="border-destructive/30 bg-destructive/5 text-destructive rounded-md border px-3 py-2 text-xs">
+                <div className="border-danger/30 bg-danger/5 text-danger rounded-md border px-3 py-2 text-xs">
                   {actionError}
                 </div>
               ) : null}
-              {canManageSkill ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    dispatch({ open: true, type: "setShowDelete" });
-                  }}
-                  className="text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30"
-                >
-                  {t("skills.uninstall")}
-                </Button>
-              ) : null}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setShowDelete(true);
+                }}
+                className="text-danger hover:bg-danger/10 hover:text-danger border-danger/30"
+              >
+                {t("skills.uninstall")}
+              </Button>
             </div>
             <div className="flex items-center gap-1.5">
               <Button variant="outline" size="sm" onClick={handleDownload}>
@@ -224,23 +151,17 @@ export function SkillDetailDialog({ onOpenChange, registry, skill }: Props) {
         </DialogContent>
       </Dialog>
 
-      {canManageSkill ? (
-        <>
-          {showDelete ? (
-            <DeleteSkillDialog
-              skill={skill}
-              open={showDelete}
-              onOpenChange={(open) => {
-                dispatch({ open, type: "setShowDelete" });
-              }}
-              registry={registry}
-              onDeleted={() => {
-                dispatch({ open: false, type: "setShowDelete" });
-                onOpenChange(false);
-              }}
-            />
-          ) : null}
-        </>
+      {showDelete ? (
+        <DeleteSkillDialog
+          skill={skill}
+          open
+          onOpenChange={setShowDelete}
+          registry={registry}
+          onDeleted={() => {
+            setShowDelete(false);
+            onOpenChange(false);
+          }}
+        />
       ) : null}
     </>
   );

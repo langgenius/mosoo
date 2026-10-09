@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import type { ProjectCostCard } from "@/domains/cost/api/cost-client";
 import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Badge } from "@/shared/ui/badge";
@@ -14,7 +15,7 @@ import {
   rangeLabel,
   tokensTotal,
 } from "./cost-model";
-import type { CostRange, CostTab, ProjectCostCard } from "./cost-model";
+import type { CostRange, CostTab } from "./cost-model";
 
 export function CostOverviewPanel({
   card,
@@ -56,14 +57,12 @@ export function CostOverviewPanel({
             key={label}
             className={cn(
               "rounded-lg border border-border bg-card px-4 py-3",
-              index === 0 ? "bg-ink-50" : "",
+              index === 0 ? "bg-sunken" : "",
             )}
           >
-            <div className="text-muted-foreground text-[11px] font-semibold tracking-[0.12em] uppercase">
-              {label}
-            </div>
+            <div className="t-group-label">{label}</div>
             <div className="text-foreground mt-2 text-2xl font-semibold">{value}</div>
-            <div className="text-muted-foreground mt-1 text-xs">{detail}</div>
+            <div className="text-fg-3 mt-1 text-xs">{detail}</div>
           </div>
         ))}
       </section>
@@ -90,13 +89,13 @@ export function CostOverviewPanel({
                 onClick={() => {
                   setActiveTab("agents");
                 }}
-                className="hover:bg-muted/50 flex w-full items-center justify-between rounded-md p-2 text-left"
+                className="hover:bg-sunken/50 flex w-full items-center justify-between rounded-md p-2 text-left"
               >
                 <span className="min-w-0">
                   <span className="text-foreground block truncate text-sm font-medium">
                     {agent.agentName}
                   </span>
-                  <span className="text-muted-foreground text-xs">{agent.ownerName}</span>
+                  <span className="text-fg-3 text-xs">{agent.ownerName}</span>
                 </span>
                 <span className="font-mono text-sm">{formatCurrency(agent.totalCostUsd)}</span>
               </button>
@@ -125,7 +124,7 @@ export function CostOverviewPanel({
                     </div>
                     <span className="font-mono">{formatCurrency(model.totalCostUsd)}</span>
                   </div>
-                  <div className="bg-muted h-2 overflow-hidden rounded-full">
+                  <div className="bg-sunken h-2 overflow-hidden rounded-full">
                     <div
                       className={cn("h-full rounded-full", modelColor(model.model))}
                       style={{ width: `${Math.max(2, share * 100)}%` }}
@@ -143,7 +142,7 @@ export function CostOverviewPanel({
 
 function PanelEmpty({ children }: { children: ReactNode }) {
   return (
-    <div className="text-muted-foreground flex h-[120px] items-center justify-center text-center text-[13px]">
+    <div className="text-fg-3 flex h-[120px] items-center justify-center text-center text-[13px]">
       {children}
     </div>
   );
@@ -155,7 +154,7 @@ function DailySpendChart({ dailyCosts }: { dailyCosts: { date: string; totalCost
 
   if (dailyCosts.length === 0) {
     return (
-      <div className="text-muted-foreground flex h-[220px] items-center justify-center text-sm">
+      <div className="text-fg-3 flex h-[220px] items-center justify-center text-sm">
         {t("cost.noCostEvents")}
       </div>
     );
@@ -166,11 +165,11 @@ function DailySpendChart({ dailyCosts }: { dailyCosts: { date: string; totalCost
       {dailyCosts.map((day) => (
         <div key={day.date} className="flex min-w-4 flex-1 flex-col items-center gap-2">
           <div
-            className="bg-accent-press w-full rounded-t"
+            className="bg-brand w-full rounded-t"
             style={{ height: `${Math.max(10, (day.totalCostUsd / maxSpend) * 190)}px` }}
             title={`${day.date}: ${formatCurrency(day.totalCostUsd)}`}
           />
-          <div className="text-muted-foreground text-[10.5px]">{day.date.slice(5)}</div>
+          <div className="text-fg-3 text-[10.5px]">{day.date.slice(5)}</div>
         </div>
       ))}
     </div>

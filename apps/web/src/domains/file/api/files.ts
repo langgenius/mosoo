@@ -4,12 +4,11 @@ import type {
   FileListQuery as FileListRequest,
   FileStatus,
 } from "@mosoo/contracts/file";
-import type { SessionId } from "@mosoo/contracts/id";
+import type { AccountId, FileId, SessionId } from "@mosoo/id";
 
 import { graphql } from "@/gql";
 import type { FileListQuery as FileListGraphQLQuery } from "@/gql/graphql";
 import { requestGraphQL } from "@/platform/http/graphql-client";
-import { toAccountId, toFileId, toSessionId } from "@/routes/typed-id";
 
 const FILE_LIST_QUERY = graphql(/* GraphQL */ `
   query FileList($input: FileListInput!) {
@@ -72,16 +71,16 @@ function toFileSessionId(file: FileRecordNode): SessionId | null {
     throw new Error("Session-scoped file is missing its Session id.");
   }
 
-  return toSessionId(file.scope.id);
+  return file.scope.id as SessionId;
 }
 
 function toFileEntry(file: FileRecordNode): ListedFileEntry {
   return {
     createdAt: file.createdAt,
-    createdBy: toAccountId(file.createdBy),
+    createdBy: file.createdBy as AccountId,
     etag: file.etag,
     expiresAt: file.expiresAt,
-    id: toFileId(file.id),
+    id: file.id as FileId,
     mimeType: file.mimeType,
     name: file.name,
     path: file.path,

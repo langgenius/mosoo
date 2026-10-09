@@ -26,6 +26,7 @@ import {
   Check,
   ChevronDown,
   FileText,
+  Loader2,
   Maximize2,
   Minimize2,
   Paperclip,
@@ -170,9 +171,7 @@ function AgentAssignField({
 
   return (
     <div className="flex items-center gap-3">
-      <span className="text-fg-3 shrink-0 text-[10.5px] font-bold tracking-[0.16em] uppercase">
-        {t("threads.assignTo")}
-      </span>
+      <span className="t-group-label shrink-0">{t("threads.assignTo")}</span>
       {noAgentsAvailable ? (
         <Button
           type="button"
@@ -181,7 +180,7 @@ function AgentAssignField({
           onClick={onCreateAgent}
         >
           <span className="flex min-w-0 items-center gap-2">
-            <span className="bg-muted/40 text-fg-3 inline-flex size-6 shrink-0 items-center justify-center rounded-full">
+            <span className="bg-sunken/40 text-fg-3 inline-flex size-6 shrink-0 items-center justify-center rounded-full">
               <Plus className="size-3.5" />
             </span>
             <span className="min-w-0 flex-1">
@@ -198,7 +197,7 @@ function AgentAssignField({
       ) : locked ? (
         <div
           aria-readonly="true"
-          className="border-border-strong bg-card dark:border-input dark:bg-input/30 flex h-auto min-h-10 min-w-0 flex-1 items-center gap-2 rounded-md border px-2.5 py-1.5 text-left"
+          className="border-border-strong bg-card flex h-auto min-h-10 min-w-0 flex-1 items-center gap-2 rounded-md border px-2.5 py-1.5 text-left"
         >
           <AgentBadge agent={selectedAgent} size="sm" />
           <span className="min-w-0 flex-1">
@@ -267,9 +266,7 @@ function AgentAssignField({
                       </div>
                     ) : null}
                   </div>
-                  {isSelected ? (
-                    <Check className="text-accent-press mt-1 size-3.5 shrink-0" />
-                  ) : null}
+                  {isSelected ? <Check className="text-fg-1 mt-1 size-3.5 shrink-0" /> : null}
                 </DropdownMenuItem>
               );
             })}
@@ -339,7 +336,7 @@ export function NewThreadDialog({
       <DialogContent
         className={cn("gap-0 p-0", expanded ? "sm:max-w-[1100px]" : "sm:max-w-[760px]")}
       >
-        <DialogHeader className="border-border-subtle border-b px-5 py-3">
+        <DialogHeader className="border-border-soft border-b px-5 py-3">
           <div className="flex items-start justify-between gap-4 pr-8">
             <div className="min-w-0">
               <DialogTitle className="text-fg-1 text-[14px] font-semibold">
@@ -367,11 +364,8 @@ export function NewThreadDialog({
             locked={locked}
             noAgentsAvailable={noAgentsAvailable}
             onCreateAgent={() => {
-              const basePath = globalThis.location.pathname.startsWith("/demo")
-                ? "/demo/agent"
-                : "/agent";
               onOpenChange(false);
-              void navigate(basePath);
+              void navigate("/agent");
             }}
             onSelectAgent={(agentId) => {
               dispatch({ agentId, type: "setSelectedAgentId" });
@@ -380,7 +374,7 @@ export function NewThreadDialog({
             selectedAgentId={selectedAgentId}
           />
 
-          <div className="border-border-subtle bg-card focus-within:border-ring focus-within:ring-ring/50 rounded-lg border px-3.5 py-3 transition-[color,box-shadow] focus-within:ring-[3px]">
+          <div className="border-border-soft bg-card focus-within:border-ring focus-within:ring-ring/50 rounded-lg border px-3.5 py-3 transition-[color,box-shadow] focus-within:ring-[3px]">
             <Textarea
               value={body}
               onChange={(event) => {
@@ -405,7 +399,7 @@ export function NewThreadDialog({
               {files.map((file, index) => (
                 <span
                   key={`${file.name}:${file.size}:${index}`}
-                  className="border-border bg-muted/35 text-fg-2 inline-flex max-w-full items-center gap-1.5 rounded-md border px-2 py-1 text-[11px]"
+                  className="border-border bg-sunken/35 text-fg-2 inline-flex max-w-full items-center gap-1.5 rounded-md border px-2 py-1 text-[11px]"
                 >
                   <FileText className="size-3 shrink-0" />
                   <span className="max-w-[180px] truncate">{file.name}</span>
@@ -425,25 +419,25 @@ export function NewThreadDialog({
           ) : null}
 
           {missingLockedAgent ? (
-            <div className="border-destructive/20 bg-destructive/[0.06] text-destructive rounded-md border px-3 py-2 text-[12.5px]">
+            <div className="border-danger/20 bg-danger/[0.06] text-danger rounded-md border px-3 py-2 text-[12.5px]">
               {t("agent.notAvailable")}
             </div>
           ) : null}
 
           {draftSelected ? (
-            <div className="border-amber/30 bg-amber-bg text-amber-fg rounded-md border px-3 py-2 text-[12.5px]">
+            <div className="border-warning/30 bg-warning-bg text-warning-fg rounded-md border px-3 py-2 text-[12.5px]">
               {t("agent.publishFirst")}
             </div>
           ) : null}
 
           {error ? (
-            <div className="border-destructive/20 bg-destructive/[0.06] text-destructive rounded-md border px-3 py-2 text-[12.5px]">
+            <div className="border-danger/20 bg-danger/[0.06] text-danger rounded-md border px-3 py-2 text-[12.5px]">
               {error}
             </div>
           ) : null}
 
           {discardWarning ? (
-            <div className="border-amber/30 bg-amber-bg text-amber-fg rounded-md border px-3 py-2 text-[12.5px]">
+            <div className="border-warning/30 bg-warning-bg text-warning-fg rounded-md border px-3 py-2 text-[12.5px]">
               {t("threads.discardDraft")}
             </div>
           ) : null}
@@ -466,7 +460,7 @@ export function NewThreadDialog({
           }}
         />
 
-        <DialogFooter className="border-border-subtle gap-2 border-t px-5 py-3">
+        <DialogFooter className="border-border-soft gap-2 border-t px-5 py-3">
           <div className="mr-auto flex items-center gap-2">
             <Button
               aria-label={t("threads.attachFiles")}
@@ -485,14 +479,18 @@ export function NewThreadDialog({
             </span>
           </div>
           <Button
+            aria-busy={submitting || undefined}
             type="button"
             disabled={!canSubmit}
             onClick={() => {
               void submit();
             }}
-            className={cn(submitting && "opacity-70")}
           >
-            <Send className="size-3.5" />
+            {submitting ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <Send className="size-3.5" />
+            )}
             {submitting ? t("threads.dispatching") : t("threads.dispatch")}
           </Button>
         </DialogFooter>

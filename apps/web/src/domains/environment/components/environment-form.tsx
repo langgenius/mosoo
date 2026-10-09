@@ -6,7 +6,6 @@ import { Button } from "@/shared/ui/button";
 import { Check, Plus, Trash2 } from "@/shared/ui/icons";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
-import { Switch } from "@/shared/ui/switch";
 import { Textarea } from "@/shared/ui/textarea";
 
 import { isTruthy } from "../../../shared/lib/truthiness";
@@ -75,7 +74,7 @@ function EnvironmentPackagesSection({
                 "font-mono text-[12px]",
                 row.packagesText.trim() &&
                   (!row.manager || !isWritableEnvironmentPackageManager(row.manager))
-                  ? "border-destructive"
+                  ? "border-danger"
                   : null,
               )}
               disabled={disabled}
@@ -90,7 +89,7 @@ function EnvironmentPackagesSection({
             />
             <Button
               aria-label={t("environments.removePackage")}
-              className="text-fg-3 hover:text-destructive size-9"
+              className="text-fg-3 hover:text-danger size-9"
               disabled={disabled}
               onClick={() => {
                 onRemove(row.id);
@@ -105,7 +104,7 @@ function EnvironmentPackagesSection({
         ))}
 
         {packageManagerError ? (
-          <div className="text-destructive text-[11px]">{packageManagerError}</div>
+          <div className="text-danger text-[11px]">{packageManagerError}</div>
         ) : null}
       </div>
     </EnvironmentFormSection>
@@ -201,7 +200,7 @@ function EnvironmentVariablesSection({
             />
             <Button
               aria-label={t("environments.removeEnvVar")}
-              className="text-fg-3 hover:text-destructive size-9"
+              className="text-fg-3 hover:text-danger size-9"
               disabled={disabled}
               onClick={() => {
                 onRemove(envVar.id);
@@ -346,40 +345,6 @@ export function EnvironmentForm({
 
           {limited ? (
             <div className="environment-row-enter space-y-3">
-              <label
-                className="text-fg-1 flex items-center justify-between gap-3 text-[13px] font-medium"
-                htmlFor="environment-form-allow-mcp-servers"
-              >
-                {t("environments.allowMcpServers")}
-                <Switch
-                  checked={draft.allowMcpServers}
-                  disabled={disabled}
-                  id="environment-form-allow-mcp-servers"
-                  onCheckedChange={(checked) => {
-                    update((current) => ({
-                      ...current,
-                      allowMcpServers: checked,
-                    }));
-                  }}
-                />
-              </label>
-              <label
-                className="text-fg-1 flex items-center justify-between gap-3 text-[13px] font-medium"
-                htmlFor="environment-form-allow-package-registries"
-              >
-                {t("environments.allowPackageRegistries")}
-                <Switch
-                  checked={draft.allowPackageManagers}
-                  disabled={disabled}
-                  id="environment-form-allow-package-registries"
-                  onCheckedChange={(checked) => {
-                    update((current) => ({
-                      ...current,
-                      allowPackageManagers: checked,
-                    }));
-                  }}
-                />
-              </label>
               <div className="space-y-1.5">
                 <Label>{t("environments.allowedHosts")}</Label>
                 <Textarea

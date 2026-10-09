@@ -1,9 +1,10 @@
 import type { ProjectSummary } from "@mosoo/contracts/project";
+import type { ProjectId } from "@mosoo/id";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { useAppSession } from "@/app/session-provider";
+import { useAppSession } from "@/app/session/session-context";
 import { useVisibleAgentsQuery } from "@/domains/agent/query/agent-queries";
 import { createProject } from "@/domains/project/api/project-client";
 import { projectKeys } from "@/domains/project/query/project-queries";
@@ -46,15 +47,21 @@ function ProjectCard({
           {project.name}
         </span>
         {isCurrent ? (
-          <span className="bg-accent-soft text-accent-press rounded-full px-2 py-0.5 text-[10.5px] font-semibold">
+          <span className="bg-brand-soft text-brand rounded-full px-2 py-0.5 text-[10.5px] font-semibold">
             {t("projects.current")}
           </span>
         ) : null}
         <ChevronRight className="text-fg-3 group-hover:text-fg-1 size-4 shrink-0 transition-colors" />
       </div>
       <div className="pointer-events-none relative z-10 flex min-w-0 flex-col gap-2">
-        <ProjectIdBadge projectId={project.id} className="pointer-events-auto w-fit" />
-        <div className="text-muted-foreground text-xs">{agentLabel}</div>
+        <ProjectIdBadge
+          className="pointer-events-auto w-fit"
+          copiedLabel={t("agent.projectIdCopied")}
+          copyLabel={t("agent.copyProjectId")}
+          label={`${t("agent.projectId")}:`}
+          value={project.id}
+        />
+        <div className="text-fg-3 text-xs">{agentLabel}</div>
       </div>
     </div>
   );
@@ -103,7 +110,7 @@ export function ProjectsListPage() {
     },
   });
 
-  function enterProject(projectId: string) {
+  function enterProject(projectId: ProjectId) {
     setActiveProject(projectId);
     void navigate("/");
   }
@@ -147,15 +154,15 @@ export function ProjectsListPage() {
 
         <div className="mt-5">
           {projectsLoading ? (
-            <div className="border-border bg-card text-muted-foreground rounded-md border px-4 py-6 text-sm">
+            <div className="border-border bg-card text-fg-3 rounded-md border px-4 py-6 text-sm">
               {t("projects.loadingProjects")}
             </div>
           ) : projects.length === 0 ? (
-            <div className="border-border text-muted-foreground rounded-md border border-dashed px-4 py-10 text-center text-sm">
+            <div className="border-border text-fg-3 rounded-md border border-dashed px-4 py-10 text-center text-sm">
               {t("projects.noProjectsYet")}
             </div>
           ) : filteredProjects.length === 0 ? (
-            <div className="border-border text-muted-foreground rounded-md border border-dashed px-4 py-10 text-center text-sm">
+            <div className="border-border text-fg-3 rounded-md border border-dashed px-4 py-10 text-center text-sm">
               {t("projects.noProjectsMatch", { search })}
             </div>
           ) : (
@@ -201,7 +208,7 @@ export function ProjectsListPage() {
                 }
               }}
             />
-            {error === null ? null : <p className="text-destructive text-xs">{error}</p>}
+            {error === null ? null : <p className="text-danger text-xs">{error}</p>}
           </div>
           <DialogFooter>
             <Button variant="ghost" size="sm" onClick={() => setCreateOpen(false)}>

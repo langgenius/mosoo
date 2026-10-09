@@ -1,4 +1,5 @@
-import { useReducer } from "react";
+import type { McpServerWithCredential } from "@mosoo/contracts/mcp";
+import { useState } from "react";
 
 import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
@@ -17,7 +18,6 @@ import { Textarea } from "@/shared/ui/textarea";
 import { isTruthy } from "../../../shared/lib/truthiness";
 import { authTypeLabel } from "./format";
 import { IconAvatar } from "./icon-avatar";
-import type { McpServerWithCredential } from "./mcp-types";
 
 interface EditMcpInput {
   name: string;
@@ -32,58 +32,14 @@ interface Props {
   onSubmit: (input: EditMcpInput) => Promise<void> | void;
 }
 
-interface EditMcpDialogState {
-  description: string;
-  iconUrl: string;
-  name: string;
-  submitError: string | null;
-  submitting: boolean;
-  url: string;
-}
-
-type EditMcpDialogAction =
-  | { type: "changeDescription"; description: string }
-  | { type: "changeIconUrl"; iconUrl: string }
-  | { type: "changeName"; name: string }
-  | { type: "changeUrl"; url: string }
-  | { type: "setSubmitError"; error: string | null }
-  | { type: "setSubmitting"; submitting: boolean };
-
-function createInitialState(server: McpServerWithCredential): EditMcpDialogState {
-  return {
-    description: server.description ?? "",
-    iconUrl: server.iconUrl ?? "",
-    name: server.name,
-    submitError: null,
-    submitting: false,
-    url: server.url,
-  };
-}
-
-function editMcpDialogReducer(
-  state: EditMcpDialogState,
-  action: EditMcpDialogAction,
-): EditMcpDialogState {
-  switch (action.type) {
-    case "changeDescription":
-      return { ...state, description: action.description };
-    case "changeIconUrl":
-      return { ...state, iconUrl: action.iconUrl };
-    case "changeName":
-      return { ...state, name: action.name };
-    case "changeUrl":
-      return { ...state, url: action.url };
-    case "setSubmitError":
-      return { ...state, submitError: action.error };
-    case "setSubmitting":
-      return { ...state, submitting: action.submitting };
-  }
-}
-
 export function EditMcpDialog({ server, onOpenChange, onSubmit }: Props) {
   const { t } = useTranslation();
-  const [state, dispatch] = useReducer(editMcpDialogReducer, server, createInitialState);
-  const { description, iconUrl, name, submitError, submitting, url } = state;
+  const [description, setDescription] = useState(server.description ?? "");
+  const [iconUrl, setIconUrl] = useState(server.iconUrl ?? "");
+  const [name, setName] = useState(server.name);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [url, setUrl] = useState(server.url);
 
   const urlValid = url.trim().startsWith("https://");
   const canSubmit = name.trim().length > 0 && urlValid;
@@ -96,8 +52,8 @@ export function EditMcpDialog({ server, onOpenChange, onSubmit }: Props) {
     }
     const trimmedDesc = description.trim();
     const trimmedIcon = iconUrl.trim();
-    dispatch({ error: null, type: "setSubmitError" });
-    dispatch({ submitting: true, type: "setSubmitting" });
+    setSubmitError(null);
+    setSubmitting(true);
 
     try {
       await onSubmit({
@@ -108,12 +64,9 @@ export function EditMcpDialog({ server, onOpenChange, onSubmit }: Props) {
       });
       onOpenChange(false);
     } catch (error) {
-      dispatch({
-        error: error instanceof Error ? error.message : t("mcp.failedToUpdate"),
-        type: "setSubmitError",
-      });
+      setSubmitError(error instanceof Error ? error.message : t("mcp.failedToUpdate"));
     } finally {
-      dispatch({ submitting: false, type: "setSubmitting" });
+      setSubmitting(false);
     }
   }
 
@@ -142,7 +95,7 @@ export function EditMcpDialog({ server, onOpenChange, onSubmit }: Props) {
                 id="mcp-edit-name"
                 value={name}
                 onChange={(e) => {
-                  dispatch({ name: e.target.value, type: "changeName" });
+                  setName(e.target.value);
                 }}
                 placeholder={t("mcp.namePlaceholder")}
               />
@@ -156,15 +109,15 @@ export function EditMcpDialog({ server, onOpenChange, onSubmit }: Props) {
               id="mcp-edit-url"
               value={url}
               onChange={(e) => {
-                dispatch({ type: "changeUrl", url: e.target.value });
+                setUrl(e.target.value);
               }}
               placeholder="https://mcp.figma.com/mcp"
             />
             {url.length > 0 && !urlValid && (
-              <p className="text-destructive text-[11px]">{t("mcp.urlMustStartWithHttps")}</p>
+              <p className="text-danger text-[11px]">{t("mcp.urlMustStartWithHttps")}</p>
             )}
             {disconnectsOnSave && (
-              <p className="text-amber-fg text-[11px]">{t("mcp.urlChangeDisconnects")}</p>
+              <p className="text-warning-fg text-[11px]">{t("mcp.urlChangeDisconnects")}</p>
             )}
           </div>
 
@@ -175,11 +128,11 @@ export function EditMcpDialog({ server, onOpenChange, onSubmit }: Props) {
               id="mcp-edit-icon"
               value={iconUrl}
               onChange={(e) => {
-                dispatch({ iconUrl: e.target.value, type: "changeIconUrl" });
+                setIconUrl(e.target.value);
               }}
               placeholder="https://logo.clearbit.com/example.com"
             />
-            <p className="text-muted-foreground text-[10px]">{t("mcp.leaveEmptyToUseInitial")}</p>
+            <p className="text-fg-3 text-[10px]">{t("mcp.leaveEmptyToUseInitial")}</p>
           </div>
 
           {/* Description */}
@@ -189,7 +142,7 @@ export function EditMcpDialog({ server, onOpenChange, onSubmit }: Props) {
               id="mcp-edit-desc"
               value={description}
               onChange={(e) => {
-                dispatch({ description: e.target.value, type: "changeDescription" });
+                setDescription(e.target.value);
               }}
               rows={2}
               placeholder={t("mcp.descriptionPlaceholder")}
@@ -199,7 +152,7 @@ export function EditMcpDialog({ server, onOpenChange, onSubmit }: Props) {
 
         <DialogFooter>
           {isTruthy(submitError) ? (
-            <div className="border-destructive/30 bg-destructive/5 text-destructive w-full rounded-md border px-3 py-2 text-xs">
+            <div className="border-danger/30 bg-danger/5 text-danger w-full rounded-md border px-3 py-2 text-xs">
               {submitError}
             </div>
           ) : null}

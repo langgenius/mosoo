@@ -6,13 +6,8 @@ import type { ComponentProps, ReactElement } from "react";
 import { cn } from "@/shared/lib/class-names";
 import { asChildRender } from "@/shared/ui/render-prop";
 
-function TooltipProvider({
-  delayDuration = 0,
-  ...props
-}: Omit<ComponentProps<typeof TooltipPrimitive.Provider>, "delay"> & {
-  delayDuration?: number;
-}): ReactElement {
-  return <TooltipPrimitive.Provider delay={delayDuration} {...props} />;
+function TooltipProvider(props: ComponentProps<typeof TooltipPrimitive.Provider>): ReactElement {
+  return <TooltipPrimitive.Provider delay={0} {...props} />;
 }
 
 function Tooltip({ ...props }: ComponentProps<typeof TooltipPrimitive.Root>): ReactElement {

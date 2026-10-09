@@ -83,7 +83,7 @@ const AssistantReasoning: ReasoningMessagePartComponent = ({ status, text }) => 
         ) : null}
       </button>
       {expanded ? (
-        <div className="border-ink-900/10 mt-1.5 max-h-64 overflow-y-auto border-l-2 pl-3 leading-[1.5] break-words whitespace-pre-wrap">
+        <div className="border-border mt-1.5 max-h-64 overflow-y-auto border-l-2 pl-3 leading-[1.5] break-words whitespace-pre-wrap">
           {text}
         </div>
       ) : null}
@@ -94,7 +94,7 @@ const AssistantReasoning: ReasoningMessagePartComponent = ({ status, text }) => 
 export function UserMessage(): ReactElement {
   return (
     <MessagePrimitive.Root className="flex min-w-0 justify-start">
-      <div className="bg-ink-100 text-ink-900 max-w-[82%] min-w-0 rounded-lg rounded-tl-[4px] px-4 py-3 text-[14.5px] leading-[1.55]">
+      <div className="bg-paper-300 text-fg-heading max-w-[82%] min-w-0 rounded-lg rounded-tl-[4px] px-4 py-3 text-[14.5px] leading-[1.55]">
         <MessagePrimitive.Parts components={{ Text: UserText }} />
       </div>
     </MessagePrimitive.Root>
@@ -136,7 +136,7 @@ export function AssistantMessage(): ReactElement {
           >
             <ActionBarPrimitive.Copy
               aria-label={t("chat.copyMessage")}
-              className="hover:bg-ink-900/[0.05] hover:text-fg-1 inline-flex size-6 items-center justify-center rounded-md transition-colors"
+              className="hover:bg-hover hover:text-fg-1 inline-flex size-6 items-center justify-center rounded-md transition-colors"
             >
               <Copy className="size-3.5" />
             </ActionBarPrimitive.Copy>

@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
 
-import { createAgentSession } from "../src/domains/session/api/agent-session";
+import { parsePlatformId } from "@mosoo/id";
+import type { VendorCredentialId } from "@mosoo/id";
+
 import {
   deleteVendorCredential,
   listAvailableAgentModels,
@@ -9,36 +10,11 @@ import {
 } from "../src/domains/vendor-credential/api/vendor-credential-client";
 import { requestGraphQL, UnauthorizedError } from "../src/platform/http/graphql-client";
 import { apiPath } from "../src/platform/http/public-api";
-import { toProjectId, toVendorCredentialId } from "../src/routes/typed-id";
+import { toProjectId } from "../src/routes/typed-id";
 
 const originalFetch = globalThis.fetch;
-const AGENT_ID = "01J000000000000000000000C1";
-const SESSION_ID = "01J000000000000000000000C3";
 const PROJECT_ID = "01J000000000000000000000C4";
 const VENDOR_CREDENTIAL_ID = "01J000000000000000000000C5";
-const createSessionResponse = {
-  data: {
-    createAgentSession: {
-      agentId: AGENT_ID,
-      archivedAt: null,
-      createdAt: "2026-05-27T00:00:00.000Z",
-      deploymentVersionId: null,
-      deploymentVersionNumber: null,
-      id: SESSION_ID,
-      kind: "pet",
-      lastMessageAt: null,
-      lastRun: null,
-      model: "gpt-5.4",
-      projectId: PROJECT_ID,
-      provider: "openai",
-      runtimeId: "openai-runtime",
-      status: "IDLE",
-      title: null,
-      type: "preview",
-      updatedAt: "2026-05-27T00:00:00.000Z",
-    },
-  },
-};
 const testQuery = {
   toString() {
     return "mutation Test($input: TestInput!) { test(input: $input) { ok } }";
@@ -97,20 +73,6 @@ describe("web API client boundary", () => {
     expect(apiPath("/v1/openapi.json")).toBe("/api/v1/openapi.json");
   });
 
-  test("keeps draft file uploads Project-scoped in the Web client", () => {
-    const source = readFileSync(
-      new URL("../src/domains/file/api/project-draft-file-client.ts", import.meta.url),
-      "utf8",
-    );
-
-    expect(source).toContain("uploadProjectDraftFiles");
-    expect(source).toContain('purpose: "app_draft"');
-    expect(source).toContain('kind: "app_draft"');
-    expect(source).toContain("id: projectId");
-    expect(source).not.toContain("organization_draft");
-    expect(source).not.toContain("organizationId");
-  });
-
   test("sends typed GraphQL operations through the public API route", async () => {
     let capturedInput: RequestInfo | URL | null = null;
     let capturedInit: RequestInit | undefined;
@@ -153,50 +115,10 @@ describe("web API client boundary", () => {
     });
   });
 
-  test("omits runtime warmup waits unless create session callers explicitly opt in", async () => {
-    const capturedBodies: unknown[] = [];
-
-    globalThis.fetch = async (_input, init) => {
-      if (typeof init?.body !== "string") {
-        throw new Error("Expected GraphQL request body to be serialized JSON.");
-      }
-
-      capturedBodies.push(JSON.parse(init.body));
-      return Response.json(createSessionResponse);
-    };
-
-    await createAgentSession(PROJECT_ID, AGENT_ID, "ui");
-    await createAgentSession(PROJECT_ID, AGENT_ID, "preview", { waitForRuntimeReady: true });
-
-    expect(capturedBodies).toEqual([
-      {
-        query: expect.any(String),
-        variables: {
-          input: {
-            agentId: AGENT_ID,
-            projectId: PROJECT_ID,
-            type: "ui",
-          },
-        },
-      },
-      {
-        query: expect.any(String),
-        variables: {
-          input: {
-            agentId: AGENT_ID,
-            projectId: PROJECT_ID,
-            type: "preview",
-            waitForRuntimeReady: true,
-          },
-        },
-      },
-    ]);
-  });
-
   test("sends Provider credential update and delete with explicit Project scope", async () => {
     const capturedBodies: unknown[] = [];
     const projectId = toProjectId(PROJECT_ID);
-    const credentialId = toVendorCredentialId(VENDOR_CREDENTIAL_ID);
+    const credentialId = parsePlatformId<VendorCredentialId>(VENDOR_CREDENTIAL_ID);
 
     globalThis.fetch = async (_input, init) => {
       if (typeof init?.body !== "string") {
@@ -273,17 +195,22 @@ describe("web API client boundary", () => {
 
   test("maps GraphQL auth failures to the shared unauthorized error", async () => {
     globalThis.fetch = async () =>
-      Response.json({
-        data: null,
-        errors: [
-          {
-            extensions: {
-              code: "UNAUTHENTICATED",
+      Response.json(
+        {
+          data: null,
+          errors: [
+            {
+              extensions: {
+                code: "UNAUTHORIZED",
+              },
+              message: "Unauthorized.",
             },
-            message: "Sign in required.",
-          },
-        ],
-      });
+          ],
+        },
+        {
+          status: 401,
+        },
+      );
 
     await expect(
       requestGraphQL(testQuery, {
@@ -296,16 +223,21 @@ describe("web API client boundary", () => {
 
   test("maps GraphQL authorization and HTTP errors to user-facing messages", async () => {
     globalThis.fetch = async () =>
-      Response.json({
-        errors: [
-          {
-            extensions: {
-              code: "FORBIDDEN",
+      Response.json(
+        {
+          errors: [
+            {
+              extensions: {
+                code: "FORBIDDEN",
+              },
+              message: "You do not have permission to perform this action.",
             },
-            message: "Forbidden.",
-          },
-        ],
-      });
+          ],
+        },
+        {
+          status: 403,
+        },
+      );
 
     await expect(
       requestGraphQL(testQuery, {

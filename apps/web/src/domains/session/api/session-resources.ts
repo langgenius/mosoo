@@ -1,10 +1,9 @@
 import type { FileUploadSummary } from "@mosoo/contracts/file";
-import type { ProjectId, SessionId } from "@mosoo/contracts/id";
+import type { FileId, ProjectId, SessionId } from "@mosoo/id";
 
 import { graphql } from "@/gql";
 import type { AddSessionResourceMutation } from "@/gql/graphql";
 import { requestGraphQL } from "@/platform/http/graphql-client";
-import { toFileId } from "@/routes/typed-id";
 
 const ADD_SESSION_RESOURCE_MUTATION = graphql(/* GraphQL */ `
   mutation AddSessionResource($input: AddSessionResourceInput!) {
@@ -35,7 +34,7 @@ function toFileUploadSummary(
     contentType: upload.contentType,
     expectedSize: upload.expectedSize,
     expiresAt: upload.expiresAt,
-    fileId: toFileId(upload.fileId),
+    fileId: upload.fileId as FileId,
     partSize: upload.partSize,
     path: upload.path,
     status: upload.status,

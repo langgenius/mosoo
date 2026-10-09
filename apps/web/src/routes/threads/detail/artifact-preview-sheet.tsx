@@ -28,7 +28,7 @@ export function ArtifactPreviewSheet({
       open
     >
       <SheetContent className="w-[min(760px,calc(100vw-1rem))] max-w-none overflow-hidden">
-        <header className="border-border-subtle flex min-w-0 shrink-0 items-start justify-between gap-4 border-b px-5 py-4 pr-14">
+        <header className="border-border-soft flex min-w-0 shrink-0 items-start justify-between gap-4 border-b px-5 py-4 pr-14">
           <div className="min-w-0">
             <SheetTitle className="truncate text-[15px]">{file.name}</SheetTitle>
             <p className="text-fg-3 mt-1 truncate text-[12px]">

@@ -4,9 +4,8 @@ import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 
 type Translate = (key: string, variables?: Record<string, string>) => string;
-const defaultTranslate: Translate = (key) => key;
 
-export function formatSkillFileCount(count: number, t: Translate = defaultTranslate): string {
+export function formatSkillFileCount(count: number, t: Translate): string {
   if (count === 1) {
     return t("skills.fileCountOne");
   }
@@ -26,7 +25,7 @@ export function SkillFileCountBadge({
   return (
     <span
       className={cn(
-        "border-border-subtle text-muted-foreground inline-flex shrink-0 items-center rounded-md border px-1.5 py-0.5 text-[10px] font-medium whitespace-nowrap",
+        "border-border-soft text-fg-3 inline-flex shrink-0 items-center rounded-md border px-1.5 py-0.5 text-[10px] font-medium whitespace-nowrap",
         className,
       )}
     >

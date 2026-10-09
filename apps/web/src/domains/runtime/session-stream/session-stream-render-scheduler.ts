@@ -6,7 +6,6 @@ interface QueuedSessionEvent {
   // Grapheme clusters of a paceable text delta, precomputed at enqueue time so
   // per-frame budgeting is O(pending items). Null for events pacing ignores.
   segments: string[] | null;
-  sessionId: string;
 }
 
 export interface SessionStreamRenderSchedulerHost {
@@ -17,10 +16,7 @@ export interface SessionStreamRenderSchedulerHost {
   requestTimeout: (callback: () => void, delayMs: number) => number;
 }
 
-export type SessionStreamRenderSchedulerApply = (
-  targetSessionId: string,
-  events: AgUiSessionEvent[],
-) => boolean;
+export type SessionStreamRenderSchedulerApply = (events: AgUiSessionEvent[]) => void;
 
 // Flood guard: bounds a single React commit during pathological event storms.
 const MAX_EVENTS_PER_FRAME = 512;
@@ -30,14 +26,14 @@ const MAX_EVENTS_PER_FRAME = 512;
 // the transcript freezes while the socket keeps receiving events.
 const THROTTLED_FRAME_FALLBACK_MS = 50;
 
-// The server coalesces stream deltas into ~150ms batches (apps/api
-// session-viewer-event-delivery-buffer.ts), so one websocket message carries
-// hundreds of characters and rendering it in a single frame shows one visible
-// jump per batch. Pacing spreads queued text across frames instead: each frame
-// emits pending * dt / τ graphemes, an exponential drain with time constant τ.
-// With τ ≈ 250ms a 150ms batch is still draining when the next one lands, so
-// batch jumps fuse into continuous flow while on-screen text lags the socket
-// by at most ~τ.
+// The server publishes one viewer message per committed Driver event batch
+// (apps/api rpc-event-ingestion-controller.ts), so one websocket message can
+// carry hundreds of characters and rendering it in a single frame shows one
+// visible jump per batch. Pacing spreads queued text across frames instead:
+// each frame emits pending * dt / τ graphemes, an exponential drain with time
+// constant τ. With τ ≈ 250ms a batch is still draining when the next one
+// lands, so batch jumps fuse into continuous flow while on-screen text lags
+// the socket by at most ~τ.
 const PACING_TIME_CONSTANT_MS = 250;
 
 // Rate clamps: never crawl below 20 graphemes/s on a tiny tail, never animate
@@ -68,8 +64,7 @@ function createGraphemeSegmenter(): (text: string) => string[] {
 const segmentGraphemes = createGraphemeSegmenter();
 
 // Only visible streaming text is paced. Tool-call args and lifecycle events
-// pass through so pacing never delays structural updates, and reasoning-chunk /
-// thinking deltas are live-state reducer no-ops not worth throttling.
+// pass through so pacing never delays structural updates.
 function getPaceableTextDelta(
   event: AgUiSessionEvent,
   messageRole: "assistant" | "user" | undefined,
@@ -100,13 +95,9 @@ function getPaceableTextDelta(
 // already finished would only delay the settled state, and snapshot replays
 // must never be animated.
 const PACING_BARRIER_EVENT_TYPES = new Set<string>([
-  "MESSAGES_SNAPSHOT",
-  "REASONING_END",
   "REASONING_MESSAGE_END",
   "STATE_SNAPSHOT",
   "TEXT_MESSAGE_END",
-  "THINKING_END",
-  "THINKING_TEXT_MESSAGE_END",
 ]);
 
 function isPacingBarrierEvent(event: AgUiSessionEvent): boolean {
@@ -160,7 +151,6 @@ export class SessionStreamRenderScheduler {
   readonly #messageRoles = new Map<string, "assistant" | "user">();
   #pacingCarry = 0;
   #queue: QueuedSessionEvent[] = [];
-  #queueOffset = 0;
   #timeoutHandle: number | null = null;
 
   public constructor(
@@ -174,83 +164,42 @@ export class SessionStreamRenderScheduler {
   public clear(): void {
     this.#cancelPending();
     this.#queue = [];
-    this.#queueOffset = 0;
     this.#lastDrainAt = null;
     this.#messageRoles.clear();
     this.#pacingCarry = 0;
   }
 
-  public enqueue(sessionId: string, event: AgUiSessionEvent): void {
-    this.enqueueMany(sessionId, [event]);
-  }
-
-  public enqueueMany(sessionId: string, events: AgUiSessionEvent[]): void {
-    if (events.length === 0) {
-      return;
-    }
-
+  public enqueueMany(events: AgUiSessionEvent[]): void {
     for (const event of events) {
-      const messageKey =
-        "messageId" in event && typeof event.messageId === "string"
-          ? `${sessionId}\0${event.messageId}`
-          : null;
-
       if (
         event.type === "TEXT_MESSAGE_START" &&
         (event.role === "assistant" || event.role === "user")
       ) {
-        this.#messageRoles.set(`${sessionId}\0${event.messageId}`, event.role);
+        this.#messageRoles.set(event.messageId, event.role);
       }
 
-      this.#queue.push(this.#toQueueItem(sessionId, event));
+      this.#queue.push(this.#toQueueItem(event));
 
-      if (event.type === "TEXT_MESSAGE_END" && messageKey !== null) {
-        this.#messageRoles.delete(messageKey);
+      if (event.type === "TEXT_MESSAGE_END") {
+        this.#messageRoles.delete(event.messageId);
       }
     }
 
     this.#schedule();
   }
 
-  public flushNow(sessionId: string): void {
+  public flushNow(): void {
     this.#cancelPending();
 
-    const events: AgUiSessionEvent[] = [];
-    const remaining: QueuedSessionEvent[] = [];
+    const events = this.#queue.map((item) => item.event);
 
-    for (let index = this.#queueOffset; index < this.#queue.length; index += 1) {
-      const item = this.#queue[index];
-
-      if (!item) {
-        continue;
-      }
-
-      if (item.sessionId === sessionId) {
-        events.push(item.event);
-      } else {
-        remaining.push(item);
-      }
-    }
-
-    this.#queue = remaining;
-    this.#queueOffset = 0;
+    this.#queue = [];
+    this.#lastDrainAt = null;
     this.#pacingCarry = 0;
 
     if (events.length > 0) {
-      if (!this.#apply(sessionId, events)) {
-        this.#queue = [
-          ...events.map((event) => this.#toQueueItem(sessionId, event)),
-          ...this.#queue,
-        ];
-        this.#queueOffset = 0;
-      }
+      this.#apply(events);
     }
-
-    if (this.#queue.length === 0) {
-      this.#lastDrainAt = null;
-    }
-
-    this.#schedule();
   }
 
   #cancelPending(): void {
@@ -284,42 +233,18 @@ export class SessionStreamRenderScheduler {
   }
 
   #drainFrame(): void {
-    const batch = this.#takeFrameBatch();
+    const events = this.#takeFrameBatch();
 
-    if (batch && batch.events.length > 0 && !this.#apply(batch.sessionId, batch.events)) {
-      this.#queue = [
-        ...batch.events.map((event) => this.#toQueueItem(batch.sessionId, event)),
-        ...this.#queue.slice(this.#queueOffset),
-      ];
-      this.#queueOffset = 0;
+    if (events.length > 0) {
+      this.#apply(events);
     }
 
-    if (this.#queueOffset >= this.#queue.length) {
+    if (this.#queue.length === 0) {
       this.#lastDrainAt = null;
       this.#pacingCarry = 0;
     }
 
     this.#schedule();
-  }
-
-  #compactConsumedQueue(): void {
-    if (this.#queueOffset === 0) {
-      return;
-    }
-
-    if (this.#queueOffset >= this.#queue.length) {
-      this.#queue = [];
-      this.#queueOffset = 0;
-      return;
-    }
-
-    if (
-      this.#queueOffset >= MAX_EVENTS_PER_FRAME * 4 &&
-      this.#queueOffset * 2 >= this.#queue.length
-    ) {
-      this.#queue = this.#queue.slice(this.#queueOffset);
-      this.#queueOffset = 0;
-    }
   }
 
   #computePacingBudget(pendingPacedGraphemes: number, elapsedMs: number): number {
@@ -348,39 +273,19 @@ export class SessionStreamRenderScheduler {
     return wholeGraphemes;
   }
 
-  #takeFrameBatch(): {
-    events: AgUiSessionEvent[];
-    sessionId: string;
-  } | null {
-    const first = this.#queue[this.#queueOffset];
+  #takeFrameBatch(): AgUiSessionEvent[] {
+    let pacedFrom = 0;
 
-    if (!first) {
-      this.#compactConsumedQueue();
-      return null;
-    }
-
-    const { sessionId } = first;
-    let runEnd = this.#queueOffset;
-    let pacedFrom = this.#queueOffset;
-
-    while (runEnd < this.#queue.length) {
-      const item = this.#queue[runEnd];
-
-      if (!item || item.sessionId !== sessionId) {
-        break;
-      }
-
+    for (const [index, item] of this.#queue.entries()) {
       if (isPacingBarrierEvent(item.event)) {
-        pacedFrom = runEnd + 1;
+        pacedFrom = index + 1;
       }
-
-      runEnd += 1;
     }
 
     let pendingPacedGraphemes = 0;
 
-    for (let index = pacedFrom; index < runEnd; index += 1) {
-      pendingPacedGraphemes += this.#queue[index]?.segments?.length ?? 0;
+    for (const item of this.#queue.slice(pacedFrom)) {
+      pendingPacedGraphemes += item.segments?.length ?? 0;
     }
 
     const now = this.#host.now();
@@ -390,25 +295,23 @@ export class SessionStreamRenderScheduler {
     let budget = this.#computePacingBudget(pendingPacedGraphemes, elapsedMs);
 
     const events: AgUiSessionEvent[] = [];
-    let nextQueueOffset = this.#queueOffset;
+    let consumed = 0;
 
-    while (nextQueueOffset < runEnd && events.length < MAX_EVENTS_PER_FRAME) {
-      const item = this.#queue[nextQueueOffset];
-
-      if (!item) {
+    for (const item of this.#queue) {
+      if (events.length >= MAX_EVENTS_PER_FRAME) {
         break;
       }
 
-      if (nextQueueOffset < pacedFrom || item.segments === null) {
+      if (consumed < pacedFrom || item.segments === null) {
         events.push(item.event);
-        nextQueueOffset += 1;
+        consumed += 1;
         continue;
       }
 
       if (item.segments.length <= budget) {
         budget -= item.segments.length;
         events.push(item.event);
-        nextQueueOffset += 1;
+        consumed += 1;
         continue;
       }
 
@@ -417,10 +320,9 @@ export class SessionStreamRenderScheduler {
         const tailSegments = item.segments.slice(budget);
 
         events.push(withTextDelta(item.event, headDelta, false));
-        this.#queue[nextQueueOffset] = {
+        this.#queue[consumed] = {
           event: withTextDelta(item.event, tailSegments.join(""), true),
           segments: tailSegments,
-          sessionId,
         };
       }
 
@@ -429,23 +331,21 @@ export class SessionStreamRenderScheduler {
       break;
     }
 
-    this.#queueOffset = nextQueueOffset;
-    this.#compactConsumedQueue();
+    this.#queue.splice(0, consumed);
 
-    return { events, sessionId };
+    return events;
   }
 
-  #toQueueItem(sessionId: string, event: AgUiSessionEvent): QueuedSessionEvent {
+  #toQueueItem(event: AgUiSessionEvent): QueuedSessionEvent {
     const messageRole =
       "messageId" in event && typeof event.messageId === "string"
-        ? this.#messageRoles.get(`${sessionId}\0${event.messageId}`)
+        ? this.#messageRoles.get(event.messageId)
         : undefined;
     const delta = getPaceableTextDelta(event, messageRole);
 
     return {
       event,
       segments: delta === null ? null : segmentGraphemes(delta),
-      sessionId,
     };
   }
 }

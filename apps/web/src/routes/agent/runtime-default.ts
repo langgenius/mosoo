@@ -1,5 +1,5 @@
 import {
-  PUBLIC_RUNTIME_CATALOG,
+  RUNTIME_CATALOG,
   VENDOR_OPENAI_COMPATIBLE,
   getDefaultModelIdForVendor,
   listPresetModelsForVendor,
@@ -22,7 +22,7 @@ function toConfiguredVendorIds(credentials: readonly VendorCredential[]): Readon
 }
 
 function defaultModelForVendor(
-  entry: (typeof PUBLIC_RUNTIME_CATALOG)[number],
+  entry: (typeof RUNTIME_CATALOG)[number],
   vendorId: string,
 ): string | null {
   const defaultModel = getDefaultModelIdForVendor(vendorId);
@@ -50,8 +50,8 @@ export function resolveDefaultAgentRuntime(
   const configuredVendorIds = toConfiguredVendorIds(credentials);
   const runtimes =
     selectedRuntimeId === undefined
-      ? PUBLIC_RUNTIME_CATALOG
-      : PUBLIC_RUNTIME_CATALOG.filter((entry) => entry.runtimeId === selectedRuntimeId);
+      ? RUNTIME_CATALOG
+      : RUNTIME_CATALOG.filter((entry) => entry.runtimeId === selectedRuntimeId);
 
   for (const entry of runtimes) {
     for (const vendor of entry.vendors) {

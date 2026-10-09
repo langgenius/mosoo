@@ -1,18 +1,14 @@
-import {
-  PUBLIC_RUNTIME_CATALOG,
-  getRuntimeCatalogEntry,
-  isPublicRuntimeCatalogEntry,
-} from "@mosoo/runtime-catalog";
+import { RUNTIME_CATALOG, getRuntimeCatalogEntry } from "@mosoo/runtime-catalog";
 
 import type { RuntimeInfo } from "./agent.types";
 
-const FALLBACK_RUNTIME_COLOR_INK_700 = "#3d434b";
-const FALLBACK_RUNTIME_COLOR_INK_500 = "#656c75";
+// Initials for a runtime without a mark use the neutral ink ramp.
+const FALLBACK_RUNTIME_COLOR_INK_700 = "var(--ink-700)";
+const FALLBACK_RUNTIME_COLOR_INK_500 = "var(--ink-500)";
 
-function toRuntimeInfo(entry: (typeof PUBLIC_RUNTIME_CATALOG)[number]): RuntimeInfo {
+function toRuntimeInfo(entry: (typeof RUNTIME_CATALOG)[number]): RuntimeInfo {
   return {
     color: entry.display.color ?? FALLBACK_RUNTIME_COLOR_INK_700,
-    defaultModel: entry.defaultModel,
     icon: entry.label
       .split(/\s+/)
       .slice(0, 2)
@@ -21,28 +17,15 @@ function toRuntimeInfo(entry: (typeof PUBLIC_RUNTIME_CATALOG)[number]): RuntimeI
     id: entry.runtimeId,
     name: entry.label,
     provider: entry.defaultProvider,
-    vendor: entry.display.providerLabel ?? entry.vendors[0]?.label ?? entry.defaultProvider,
+    vendor: entry.display.providerLabel,
   };
 }
 
-const RUNTIMES: RuntimeInfo[] = PUBLIC_RUNTIME_CATALOG.map((entry) => toRuntimeInfo(entry));
+const RUNTIMES: RuntimeInfo[] = RUNTIME_CATALOG.map((entry) => toRuntimeInfo(entry));
 
 function createExternalRuntimeInfo(runtimeId: string): RuntimeInfo {
-  if (runtimeId === "__private_runtime__") {
-    return {
-      color: FALLBACK_RUNTIME_COLOR_INK_500,
-      defaultModel: "",
-      icon: "RT",
-      id: runtimeId,
-      name: "Runtime",
-      provider: "private",
-      vendor: "Runtime",
-    };
-  }
-
   return {
     color: FALLBACK_RUNTIME_COLOR_INK_500,
-    defaultModel: "",
     icon:
       runtimeId
         .split(/[^a-z0-9]+/i)
@@ -62,22 +45,16 @@ export function listRuntimeOptions(currentRuntimeId?: string | null): RuntimeInf
     currentRuntimeId === undefined ||
     currentRuntimeId === null ||
     currentRuntimeId.length === 0 ||
-    isPublicRuntimeCatalogEntry(currentRuntimeId)
+    isRuntimeSelectable(currentRuntimeId)
   ) {
     return RUNTIMES;
   }
 
-  const currentRuntime = getRuntimeCatalogEntry(currentRuntimeId);
-
-  if (currentRuntime === null) {
-    return [...RUNTIMES, createExternalRuntimeInfo(currentRuntimeId)];
-  }
-
-  return [...RUNTIMES, toRuntimeInfo(currentRuntime)];
+  return [...RUNTIMES, createExternalRuntimeInfo(currentRuntimeId)];
 }
 
 export function isRuntimeSelectable(runtimeId: string): boolean {
-  return isPublicRuntimeCatalogEntry(runtimeId);
+  return getRuntimeCatalogEntry(runtimeId) !== null;
 }
 
 export function getRuntimeInfo(id: string): RuntimeInfo {

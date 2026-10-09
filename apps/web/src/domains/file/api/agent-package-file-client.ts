@@ -1,4 +1,4 @@
-import type { FileId, ProjectId } from "@mosoo/contracts/id";
+import type { FileId, ProjectId } from "@mosoo/id";
 
 import { createAndRunFileUpload } from "./file-upload-client";
 
@@ -13,7 +13,6 @@ export async function uploadAgentPackageFile(
         name: file.name,
         size: file.size,
       },
-      overwrite: true,
       purpose: "agent_package",
       target: {
         id: projectId,

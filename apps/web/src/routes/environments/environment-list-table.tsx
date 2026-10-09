@@ -1,4 +1,5 @@
 import type { EnvironmentSummary } from "@mosoo/contracts/environment";
+import type { EnvironmentId } from "@mosoo/id";
 import { useState } from "react";
 import type { ReactElement } from "react";
 import { Link } from "react-router-dom";
@@ -28,8 +29,8 @@ import { EnvironmentBadges } from "./environment-badges";
 
 export interface EnvironmentListTableProps {
   readonly environments: readonly EnvironmentSummary[];
-  readonly onDelete: (environmentId: string) => void;
-  readonly onSetDefault: (environmentId: string) => void;
+  readonly onDelete: (environmentId: EnvironmentId) => void;
+  readonly onSetDefault: (environmentId: EnvironmentId) => void;
 }
 
 type Translate = (key: string, variables?: Record<string, string>) => string;

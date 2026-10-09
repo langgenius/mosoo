@@ -1,4 +1,5 @@
-import { useReducer } from "react";
+import type { CreateProjectMcpServerInput, McpAuthType } from "@mosoo/contracts/mcp";
+import { useState } from "react";
 
 import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
@@ -18,49 +19,25 @@ import { Textarea } from "@/shared/ui/textarea";
 
 import { isTruthy } from "../../../shared/lib/truthiness";
 import { IconAvatar } from "./icon-avatar";
-interface AddMcpInput {
-  name: string;
-  url: string;
-  description?: string;
-  iconUrl?: string;
-  authType: "oauth" | "bearer";
-  oauthClientId?: string;
-  oauthClientSecret?: string;
-}
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (input: AddMcpInput) => Promise<void> | void;
+  onSubmit: (input: Omit<CreateProjectMcpServerInput, "projectId">) => Promise<void> | void;
 }
 
-interface AddMcpDialogState {
+interface AddMcpForm {
   advancedOpen: boolean;
-  authType: "oauth" | "bearer";
+  authType: McpAuthType;
   description: string;
   iconUrl: string;
   name: string;
   oauthClientId: string;
   oauthClientSecret: string;
-  submitError: string | null;
-  submitting: boolean;
   url: string;
 }
 
-type AddMcpDialogAction =
-  | { type: "changeAuthType"; authType: "oauth" | "bearer" }
-  | { type: "changeDescription"; description: string }
-  | { type: "changeIconUrl"; iconUrl: string }
-  | { type: "changeName"; name: string }
-  | { type: "changeOauthClientId"; oauthClientId: string }
-  | { type: "changeOauthClientSecret"; oauthClientSecret: string }
-  | { type: "changeUrl"; url: string }
-  | { type: "reset" }
-  | { type: "setSubmitError"; error: string | null }
-  | { type: "setSubmitting"; submitting: boolean }
-  | { type: "toggleAdvanced" };
-
-const ADD_MCP_DIALOG_INITIAL_STATE: AddMcpDialogState = {
+const EMPTY_FORM: AddMcpForm = {
   advancedOpen: false,
   authType: "oauth",
   description: "",
@@ -68,44 +45,14 @@ const ADD_MCP_DIALOG_INITIAL_STATE: AddMcpDialogState = {
   name: "",
   oauthClientId: "",
   oauthClientSecret: "",
-  submitError: null,
-  submitting: false,
   url: "",
 };
 
-function addMcpDialogReducer(
-  state: AddMcpDialogState,
-  action: AddMcpDialogAction,
-): AddMcpDialogState {
-  switch (action.type) {
-    case "changeAuthType":
-      return { ...state, authType: action.authType };
-    case "changeDescription":
-      return { ...state, description: action.description };
-    case "changeIconUrl":
-      return { ...state, iconUrl: action.iconUrl };
-    case "changeName":
-      return { ...state, name: action.name };
-    case "changeOauthClientId":
-      return { ...state, oauthClientId: action.oauthClientId };
-    case "changeOauthClientSecret":
-      return { ...state, oauthClientSecret: action.oauthClientSecret };
-    case "changeUrl":
-      return { ...state, url: action.url };
-    case "reset":
-      return ADD_MCP_DIALOG_INITIAL_STATE;
-    case "setSubmitError":
-      return { ...state, submitError: action.error };
-    case "setSubmitting":
-      return { ...state, submitting: action.submitting };
-    case "toggleAdvanced":
-      return { ...state, advancedOpen: !state.advancedOpen };
-  }
-}
-
 export function AddMcpDialog({ open, onOpenChange, onSubmit }: Props) {
   const { t } = useTranslation();
-  const [state, dispatch] = useReducer(addMcpDialogReducer, ADD_MCP_DIALOG_INITIAL_STATE);
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const {
     advancedOpen,
     authType,
@@ -114,18 +61,13 @@ export function AddMcpDialog({ open, onOpenChange, onSubmit }: Props) {
     name,
     oauthClientId,
     oauthClientSecret,
-    submitError,
-    submitting,
     url,
-  } = state;
-
-  function reset() {
-    dispatch({ type: "reset" });
-  }
+  } = form;
 
   function handleOpenChange(next: boolean) {
     if (!next) {
-      reset();
+      setForm(EMPTY_FORM);
+      setSubmitError(null);
     }
     onOpenChange(next);
   }
@@ -141,8 +83,8 @@ export function AddMcpDialog({ open, onOpenChange, onSubmit }: Props) {
     const trimmedIcon = iconUrl.trim();
     const trimmedClientId = oauthClientId.trim();
     const trimmedClientSecret = oauthClientSecret.trim();
-    dispatch({ error: null, type: "setSubmitError" });
-    dispatch({ submitting: true, type: "setSubmitting" });
+    setSubmitError(null);
+    setSubmitting(true);
 
     try {
       await onSubmit({
@@ -156,12 +98,9 @@ export function AddMcpDialog({ open, onOpenChange, onSubmit }: Props) {
       });
       handleOpenChange(false);
     } catch (error) {
-      dispatch({
-        error: error instanceof Error ? error.message : t("mcp.failedToAdd"),
-        type: "setSubmitError",
-      });
+      setSubmitError(error instanceof Error ? error.message : t("mcp.failedToAdd"));
     } finally {
-      dispatch({ submitting: false, type: "setSubmitting" });
+      setSubmitting(false);
     }
   }
 
@@ -188,7 +127,7 @@ export function AddMcpDialog({ open, onOpenChange, onSubmit }: Props) {
                 id="mcp-name"
                 value={name}
                 onChange={(e) => {
-                  dispatch({ name: e.target.value, type: "changeName" });
+                  setForm({ ...form, name: e.target.value });
                 }}
                 placeholder={t("mcp.namePlaceholder")}
               />
@@ -202,12 +141,12 @@ export function AddMcpDialog({ open, onOpenChange, onSubmit }: Props) {
               id="mcp-url"
               value={url}
               onChange={(e) => {
-                dispatch({ type: "changeUrl", url: e.target.value });
+                setForm({ ...form, url: e.target.value });
               }}
               placeholder="https://mcp.figma.com/mcp"
             />
             {url.length > 0 && !urlValid && (
-              <p className="text-destructive text-[11px]">{t("mcp.urlMustStartWithHttps")}</p>
+              <p className="text-danger text-[11px]">{t("mcp.urlMustStartWithHttps")}</p>
             )}
           </div>
 
@@ -220,19 +159,19 @@ export function AddMcpDialog({ open, onOpenChange, onSubmit }: Props) {
                   key={authTypeOption}
                   type="button"
                   onClick={() => {
-                    dispatch({ authType: authTypeOption, type: "changeAuthType" });
+                    setForm({ ...form, authType: authTypeOption });
                   }}
                   className={cn(
                     "rounded-md border px-3 py-2 text-[13px] text-left transition",
                     authType === authTypeOption
                       ? "border-emphasis bg-selected text-fg-1"
-                      : "border-border text-muted-foreground hover:bg-muted/40",
+                      : "border-border text-fg-3 hover:bg-sunken/40",
                   )}
                 >
                   <div className="text-foreground font-medium">
                     {authTypeOption === "oauth" ? t("mcp.oauth") : t("mcp.bearerToken")}
                   </div>
-                  <div className="text-muted-foreground mt-0.5 text-[11px]">
+                  <div className="text-fg-3 mt-0.5 text-[11px]">
                     {authTypeOption === "oauth"
                       ? t("mcp.authorizeWithProvider")
                       : t("mcp.pasteAToken")}
@@ -247,9 +186,9 @@ export function AddMcpDialog({ open, onOpenChange, onSubmit }: Props) {
             <button
               type="button"
               onClick={() => {
-                dispatch({ type: "toggleAdvanced" });
+                setForm({ ...form, advancedOpen: !advancedOpen });
               }}
-              className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-[12px] transition"
+              className="text-fg-3 hover:text-foreground flex items-center gap-1 text-[12px] transition"
             >
               <ChevronDown
                 className={cn("size-3.5 transition-transform", advancedOpen && "rotate-180")}
@@ -258,20 +197,18 @@ export function AddMcpDialog({ open, onOpenChange, onSubmit }: Props) {
             </button>
 
             {advancedOpen && (
-              <div className="border-border bg-muted/30 mt-3 space-y-4 rounded-md border p-3">
+              <div className="border-border bg-sunken/30 mt-3 space-y-4 rounded-md border p-3">
                 <div className="space-y-1.5">
                   <Label htmlFor="mcp-icon">{t("mcp.iconUrl")}</Label>
                   <Input
                     id="mcp-icon"
                     value={iconUrl}
                     onChange={(e) => {
-                      dispatch({ iconUrl: e.target.value, type: "changeIconUrl" });
+                      setForm({ ...form, iconUrl: e.target.value });
                     }}
                     placeholder="https://logo.clearbit.com/example.com"
                   />
-                  <p className="text-muted-foreground text-[10px]">
-                    {t("mcp.leaveEmptyToUseInitial")}
-                  </p>
+                  <p className="text-fg-3 text-[10px]">{t("mcp.leaveEmptyToUseInitial")}</p>
                 </div>
 
                 <div className="space-y-1.5">
@@ -280,7 +217,7 @@ export function AddMcpDialog({ open, onOpenChange, onSubmit }: Props) {
                     id="mcp-desc"
                     value={description}
                     onChange={(e) => {
-                      dispatch({ description: e.target.value, type: "changeDescription" });
+                      setForm({ ...form, description: e.target.value });
                     }}
                     rows={2}
                     placeholder={t("mcp.descriptionPlaceholder")}
@@ -295,10 +232,7 @@ export function AddMcpDialog({ open, onOpenChange, onSubmit }: Props) {
                         id="mcp-client-id"
                         value={oauthClientId}
                         onChange={(e) => {
-                          dispatch({
-                            oauthClientId: e.target.value,
-                            type: "changeOauthClientId",
-                          });
+                          setForm({ ...form, oauthClientId: e.target.value });
                         }}
                         placeholder={t("mcp.oauthClientIdPlaceholder")}
                       />
@@ -310,10 +244,7 @@ export function AddMcpDialog({ open, onOpenChange, onSubmit }: Props) {
                         type="password"
                         value={oauthClientSecret}
                         onChange={(e) => {
-                          dispatch({
-                            oauthClientSecret: e.target.value,
-                            type: "changeOauthClientSecret",
-                          });
+                          setForm({ ...form, oauthClientSecret: e.target.value });
                         }}
                       />
                     </div>
@@ -326,7 +257,7 @@ export function AddMcpDialog({ open, onOpenChange, onSubmit }: Props) {
 
         <DialogFooter>
           {isTruthy(submitError) ? (
-            <div className="border-destructive/30 bg-destructive/5 text-destructive w-full rounded-md border px-3 py-2 text-xs">
+            <div className="border-danger/30 bg-danger/5 text-danger w-full rounded-md border px-3 py-2 text-xs">
               {submitError}
             </div>
           ) : null}

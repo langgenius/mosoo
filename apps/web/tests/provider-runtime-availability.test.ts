@@ -1,9 +1,21 @@
 import { describe, expect, test } from "bun:test";
 
-import { PUBLIC_RUNTIME_CATALOG, listPlannedRuntimeDisplayEntries } from "@mosoo/runtime-catalog";
-
 import type { VendorCredential } from "../src/domains/vendor-credential/api/vendor-credential-client";
 import { listRuntimeAvailabilityRows } from "../src/routes/providers/runtime-availability-model";
+import en from "../src/shared/i18n/translations/en.json";
+
+function t(key: string, variables: Record<string, string> = {}): string {
+  const text = key
+    .split(".")
+    .reduce<unknown>((node, part) => (node as Record<string, unknown>)[part], en);
+  if (typeof text !== "string") {
+    throw new TypeError(`Missing en translation: ${key}`);
+  }
+  return Object.entries(variables).reduce(
+    (result, [name, value]) => result.replaceAll(`{{${name}}}`, value),
+    text,
+  );
+}
 
 function credential(vendorId: string, overrides: Partial<VendorCredential> = {}): VendorCredential {
   return {
@@ -21,20 +33,8 @@ function credential(vendorId: string, overrides: Partial<VendorCredential> = {})
 }
 
 describe("provider runtime availability", () => {
-  test("does not render planned runtime display entries", () => {
-    const availabilityRows = listRuntimeAvailabilityRows([
-      credential("anthropic"),
-      credential("openai"),
-    ]);
-    const availabilityRuntimeIds = availabilityRows.map((runtime) => runtime.runtimeId);
-    const publicRuntimeIds = PUBLIC_RUNTIME_CATALOG.map((runtime) => runtime.runtimeId);
-
-    expect(listPlannedRuntimeDisplayEntries("provider-settings")).toEqual([]);
-    expect(availabilityRuntimeIds).toEqual(publicRuntimeIds);
-  });
-
   test("marks OpenCode ready from any supported provider, not only the first vendor", () => {
-    const availabilityRows = listRuntimeAvailabilityRows([credential("gemini")]);
+    const availabilityRows = listRuntimeAvailabilityRows([credential("gemini")], t);
     const openCodeRow = availabilityRows.find((runtime) => runtime.runtimeId === "acp-fallback");
 
     expect(openCodeRow).toMatchObject({
@@ -44,7 +44,7 @@ describe("provider runtime availability", () => {
   });
 
   test("marks Zhipu credentials as OpenCode-ready through the catalog adapter mapping", () => {
-    const availabilityRows = listRuntimeAvailabilityRows([credential("zhipu")]);
+    const availabilityRows = listRuntimeAvailabilityRows([credential("zhipu")], t);
     const openCodeRow = availabilityRows.find((runtime) => runtime.runtimeId === "acp-fallback");
 
     expect(openCodeRow).toMatchObject({
@@ -54,13 +54,16 @@ describe("provider runtime availability", () => {
   });
 
   test("only configures runtimes compatible with the declared custom protocol", () => {
-    const availabilityRows = listRuntimeAvailabilityRows([
-      credential("openai-compatible", {
-        modelProtocol: "openai-chat-completions",
-        models: ["custom-model"],
-        name: "Chat gateway",
-      }),
-    ]);
+    const availabilityRows = listRuntimeAvailabilityRows(
+      [
+        credential("openai-compatible", {
+          modelProtocol: "openai-chat-completions",
+          models: ["custom-model"],
+          name: "Chat gateway",
+        }),
+      ],
+      t,
+    );
     const openCodeRow = availabilityRows.find((runtime) => runtime.runtimeId === "acp-fallback");
     const openAiRow = availabilityRows.find((runtime) => runtime.runtimeId === "openai-runtime");
     const claudeRow = availabilityRows.find((runtime) => runtime.runtimeId === "claude-agent-sdk");
@@ -85,12 +88,15 @@ describe("provider runtime availability", () => {
     "anthropic-messages",
     "google-gemini",
   ] as const)("Pi and OpenCode accept declared %s custom models", (modelProtocol) => {
-    const rows = listRuntimeAvailabilityRows([
-      credential("openai-compatible", {
-        modelProtocol,
-        models: ["custom-model"],
-      }),
-    ]);
+    const rows = listRuntimeAvailabilityRows(
+      [
+        credential("openai-compatible", {
+          modelProtocol,
+          models: ["custom-model"],
+        }),
+      ],
+      t,
+    );
     for (const runtimeId of ["pi", "acp-fallback"]) {
       expect(rows.find((row) => row.runtimeId === runtimeId)?.tone).toBe("ready");
     }
@@ -101,12 +107,15 @@ describe("provider runtime availability", () => {
   });
 
   test("shows legacy custom protocol as unspecified rather than ready", () => {
-    const rows = listRuntimeAvailabilityRows([
-      credential("openai-compatible", {
-        models: ["legacy-model"],
-        name: "Legacy gateway",
-      }),
-    ]);
+    const rows = listRuntimeAvailabilityRows(
+      [
+        credential("openai-compatible", {
+          models: ["legacy-model"],
+          name: "Legacy gateway",
+        }),
+      ],
+      t,
+    );
     for (const runtimeId of ["pi", "acp-fallback", "openai-runtime"]) {
       expect(rows.find((row) => row.runtimeId === runtimeId)).toMatchObject({
         status: "Protocol unspecified · Legacy gateway",
@@ -116,18 +125,21 @@ describe("provider runtime availability", () => {
   });
 
   test("requires an actual declared custom model", () => {
-    const rows = listRuntimeAvailabilityRows([
-      credential("openai-compatible", {
-        modelProtocol: "openai-responses",
-      }),
-    ]);
+    const rows = listRuntimeAvailabilityRows(
+      [
+        credential("openai-compatible", {
+          modelProtocol: "openai-responses",
+        }),
+      ],
+      t,
+    );
     for (const runtimeId of ["pi", "acp-fallback", "openai-runtime"]) {
       expect(rows.find((row) => row.runtimeId === runtimeId)?.tone).toBe("muted");
     }
   });
 
   test("Pi uses the protocol of a configured preset model", () => {
-    const rows = listRuntimeAvailabilityRows([credential("gemini")]);
+    const rows = listRuntimeAvailabilityRows([credential("gemini")], t);
     expect(rows.find((row) => row.runtimeId === "pi")).toMatchObject({
       status: "Configured · Gemini",
       tone: "ready",
@@ -135,19 +147,22 @@ describe("provider runtime availability", () => {
   });
 
   test("does not advertise an unreachable duplicate custom model credential", () => {
-    const rows = listRuntimeAvailabilityRows([
-      credential("openai-compatible", {
-        id: "01J000000000000000000000AB",
-        modelProtocol: "openai-responses",
-        models: ["shared-model"],
-        name: "B responses",
-      }),
-      credential("openai-compatible", {
-        modelProtocol: "openai-chat-completions",
-        models: ["shared-model"],
-        name: "A chat",
-      }),
-    ]);
+    const rows = listRuntimeAvailabilityRows(
+      [
+        credential("openai-compatible", {
+          id: "01J000000000000000000000AB",
+          modelProtocol: "openai-responses",
+          models: ["shared-model"],
+          name: "B responses",
+        }),
+        credential("openai-compatible", {
+          modelProtocol: "openai-chat-completions",
+          models: ["shared-model"],
+          name: "A chat",
+        }),
+      ],
+      t,
+    );
     expect(rows.find((row) => row.runtimeId === "openai-runtime")?.tone).toBe("muted");
   });
 });

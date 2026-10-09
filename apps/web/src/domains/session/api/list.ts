@@ -1,9 +1,9 @@
-import type { ProjectId } from "@mosoo/contracts/id";
 import type {
   AgentSessionActionCapability,
   SessionSummary,
   SessionType,
 } from "@mosoo/contracts/session";
+import type { ProjectId } from "@mosoo/id";
 
 import { graphql } from "@/gql";
 import type { ThreadAgentSessionListQuery } from "@/gql/graphql";
@@ -36,41 +36,7 @@ const THREAD_AGENT_SESSION_LIST_QUERY = graphql(/* GraphQL */ `
           status
         }
         session {
-          agentId
-          archivedAt
-          createdAt
-          deploymentVersionId
-          deploymentVersionNumber
-          id
-          lastMessageAt
-          lastRun {
-            completedAt
-            createdAt
-            deploymentVersionId
-            deploymentVersionNumber
-            error {
-              code
-              details
-              message
-              retryable
-            }
-            id
-            model
-            provider
-            startedAt
-            status
-            traceId
-            trigger
-            updatedAt
-          }
-          model
-          provider
-          projectId
-          runtimeId
-          status
-          title
-          type
-          updatedAt
+          ...SessionFields
         }
       }
       pageInfo {

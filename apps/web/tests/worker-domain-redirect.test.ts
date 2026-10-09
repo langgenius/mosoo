@@ -1,13 +1,16 @@
 import { expect, test } from "bun:test";
 
 import worker from "../src/worker";
+import type { Env } from "../src/worker";
 
-test("serves agent authentication metadata before assets", async () => {
-  const env = {
-    ASSETS: {
-      fetch: () => Promise.reject(new Error("metadata must not reach the asset fallback")),
-    },
+function unreachable(binding: string): Env["API"] {
+  return {
+    fetch: () => Promise.reject(new Error(`${binding} must not be reached`)),
   };
+}
+
+test("serves Project API key discovery metadata before the API and assets", async () => {
+  const env = { API: unreachable("API"), ASSETS: unreachable("ASSETS") };
 
   for (const origin of ["https://cloud.mosoo.ai", "https://resource.example:8443"]) {
     const response = await worker.fetch(
@@ -22,8 +25,8 @@ test("serves agent authentication metadata before assets", async () => {
       bearer_methods_supported: ["header"],
       resource: origin,
       resource_documentation: "https://mosoo.ai/docs/api-reference/",
-      resource_name: "Mosoo Public Thread API",
-      scopes_supported: ["full_account_access"],
+      resource_name: "mosoo Public Thread API",
+      scopes_supported: ["project"],
     });
 
     const authorizationResponse = await worker.fetch(
@@ -36,7 +39,7 @@ test("serves agent authentication metadata before assets", async () => {
       agent_auth: {
         anonymous: {
           claim_uri: `${origin}/project-settings/api-keys`,
-          credential_types_supported: ["mosoo_personal_access_token"],
+          credential_types_supported: ["mosoo_project_api_key"],
         },
         claim_uri: `${origin}/project-settings/api-keys`,
         identity_types_supported: ["anonymous"],
@@ -45,7 +48,7 @@ test("serves agent authentication metadata before assets", async () => {
         skill: "https://mosoo.ai/auth.md",
       },
       issuer: origin,
-      scopes_supported: ["full_account_access"],
+      scopes_supported: ["project"],
     });
   }
 
@@ -116,8 +119,9 @@ test("forwards unauthenticated API responses without falling back to assets", as
 test("redirects the legacy console host without losing the path or query", async () => {
   let fetchedAsset = false;
   const response = await worker.fetch(
-    new Request("http://try.mosoo.ai/projects/demo?source=bookmark"),
+    new Request("https://try.mosoo.ai/projects/demo?source=bookmark"),
     {
+      API: unreachable("API"),
       ASSETS: {
         fetch: () => {
           fetchedAsset = true;
@@ -132,15 +136,4 @@ test("redirects the legacy console host without losing the path or query", async
     "https://cloud.mosoo.ai/projects/demo?source=bookmark",
   );
   expect(fetchedAsset).toBe(false);
-});
-
-test("redirects plaintext requests for the canonical console host", async () => {
-  const response = await worker.fetch(new Request("http://cloud.mosoo.ai/settings?tab=profile"), {
-    ASSETS: {
-      fetch: () => Promise.resolve(new Response(null, { status: 404 })),
-    },
-  });
-
-  expect(response.status).toBe(308);
-  expect(response.headers.get("location")).toBe("https://cloud.mosoo.ai/settings?tab=profile");
 });

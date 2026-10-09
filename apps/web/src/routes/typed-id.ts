@@ -1,50 +1,25 @@
 import type {
-  AccountId,
-  AgentDeploymentVersionId,
   AgentId,
-  AgentMcpBindingId,
-  CredentialId,
   EnvironmentId,
-  EnvironmentRevisionId,
   FileId,
-  McpOAuthFlowId,
   McpServerId,
-  OrganizationId,
   ProjectId,
   SessionRunId,
   SessionId,
   SkillId,
-  SkillSnapshotId,
-  VendorCredentialId,
-} from "@mosoo/contracts/id";
+} from "@mosoo/id";
 import { parsePlatformId } from "@mosoo/id";
 
-export function toAccountId(id: string): AccountId {
-  return parsePlatformId(id, "Account ID") as AccountId;
-}
-
-export function toAgentDeploymentVersionId(id: string): AgentDeploymentVersionId {
-  return parsePlatformId(id, "Agent deployment version ID") as AgentDeploymentVersionId;
-}
+// Validating conversions for IDs that reach an API call as plain strings: route
+// params, query strings, and view state. IDs the API returns are already typed
+// PlatformId by GraphQL codegen, so the domain mappers narrow them with a cast.
 
 export function toAgentId(id: string): AgentId {
   return parsePlatformId(id, "Agent ID") as AgentId;
 }
 
-export function toAgentMcpBindingId(id: string): AgentMcpBindingId {
-  return parsePlatformId(id, "Agent MCP binding ID") as AgentMcpBindingId;
-}
-
-export function toCredentialId(id: string): CredentialId {
-  return parsePlatformId(id, "Credential ID") as CredentialId;
-}
-
 export function toEnvironmentId(id: string): EnvironmentId {
   return parsePlatformId(id, "Environment ID") as EnvironmentId;
-}
-
-export function toEnvironmentRevisionId(id: string): EnvironmentRevisionId {
-  return parsePlatformId(id, "Environment revision ID") as EnvironmentRevisionId;
 }
 
 export function toFileId(id: string): FileId {
@@ -55,16 +30,8 @@ export function toFileIds(ids: readonly string[]): FileId[] {
   return ids.map((id, index) => parsePlatformId(id, `File ID[${index}]`));
 }
 
-export function toMcpOAuthFlowId(id: string): McpOAuthFlowId {
-  return parsePlatformId(id, "MCP OAuth flow ID") as McpOAuthFlowId;
-}
-
 export function toMcpServerId(id: string): McpServerId {
   return parsePlatformId(id, "MCP server ID") as McpServerId;
-}
-
-export function toOrganizationId(id: string): OrganizationId {
-  return parsePlatformId(id, "Organization ID") as OrganizationId;
 }
 
 export function toProjectId(id: string): ProjectId {
@@ -75,22 +42,10 @@ export function toSessionId(id: string): SessionId {
   return parsePlatformId(id, "Session ID") as SessionId;
 }
 
-export function toNullableSessionId(id: string | null): SessionId | null {
-  return id === null ? null : toSessionId(id);
-}
-
 export function toNullableSessionRunId(id: string | null | undefined): SessionRunId | null {
   return id == null ? null : (parsePlatformId(id, "Session run ID") as SessionRunId);
 }
 
 export function toSkillId(id: string): SkillId {
   return parsePlatformId(id, "Skill ID") as SkillId;
-}
-
-export function toSkillSnapshotId(id: string): SkillSnapshotId {
-  return parsePlatformId(id, "Skill snapshot ID") as SkillSnapshotId;
-}
-
-export function toVendorCredentialId(id: string): VendorCredentialId {
-  return parsePlatformId(id, "Vendor credential ID") as VendorCredentialId;
 }

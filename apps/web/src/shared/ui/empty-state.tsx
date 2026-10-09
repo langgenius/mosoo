@@ -7,19 +7,15 @@ export function EmptyState({
   icon: Icon,
   title,
   description,
-  action,
   children,
   className,
 }: {
   icon: AppIcon;
   title: ReactNode;
   description?: ReactNode;
-  action?: ReactNode;
   children?: ReactNode;
   className?: string;
 }): ReactElement {
-  const actionContent = children ?? action;
-
   return (
     <div
       className={cn(
@@ -36,7 +32,7 @@ export function EmptyState({
       {description ? (
         <p className="text-fg-3 mt-1.5 max-w-[360px] text-[13px] text-pretty">{description}</p>
       ) : null}
-      {actionContent ? <div className="mt-5">{actionContent}</div> : null}
+      {children ? <div className="mt-5">{children}</div> : null}
     </div>
   );
 }

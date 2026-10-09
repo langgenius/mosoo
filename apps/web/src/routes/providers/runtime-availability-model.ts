@@ -1,5 +1,5 @@
 import {
-  PUBLIC_RUNTIME_CATALOG,
+  RUNTIME_CATALOG,
   VENDOR_OPENAI_COMPATIBLE,
   listPresetModelsForVendor,
   resolveRuntimeModelProtocol,
@@ -17,22 +17,6 @@ export interface RuntimeAvailabilityRow {
 
 type Translate = (key: string, variables?: Record<string, string>) => string;
 
-const DEFAULT_TRANSLATIONS: Record<string, string> = {
-  "providers.customProvider": "Custom Provider",
-  "providers.customProviderRequired": "custom provider",
-  "providers.needsKeyAdd": "Needs key · Add {{vendors}}",
-  "providers.or": "or",
-  "providers.readyConfigured": "Configured · {{vendors}}",
-  "providers.protocolUnspecifiedConfigured": "Protocol unspecified · {{vendors}}",
-  "providers.noCompatibleModels": "No compatible models · Check provider protocol and models",
-};
-
-const defaultTranslate: Translate = (key, variables) =>
-  Object.entries(variables ?? {}).reduce(
-    (text, [name, value]) => text.replaceAll(`{{${name}}}`, value),
-    DEFAULT_TRANSLATIONS[key] ?? key,
-  );
-
 function formatJoin(items: readonly string[], t: Translate): string {
   if (items.length <= 2) {
     return items.join(` ${t("providers.or")} `);
@@ -49,10 +33,10 @@ function formatJoin(items: readonly string[], t: Translate): string {
 
 export function listRuntimeAvailabilityRows(
   credentials: readonly VendorCredential[],
-  t: Translate = defaultTranslate,
+  t: Translate,
 ): RuntimeAvailabilityRow[] {
   const customModels = listEffectiveCustomCredentialModels(credentials);
-  return PUBLIC_RUNTIME_CATALOG.map((runtime) => {
+  return RUNTIME_CATALOG.map((runtime) => {
     const readyLabels = new Set<string>();
     const unspecifiedLabels = new Set<string>();
     let hasRelevantCredential = false;
@@ -92,23 +76,21 @@ export function listRuntimeAvailabilityRows(
       ...runtime.vendors.map((vendor) => vendor.label),
       ...(runtime.acceptsCustomProvider ? [t("providers.customProviderRequired")] : []),
     ];
-    const status =
-      runtime.disabledReason ??
-      (ready
-        ? t("providers.readyConfigured", { vendors: [...readyLabels].join(" / ") })
-        : unspecifiedLabels.size > 0
-          ? t("providers.protocolUnspecifiedConfigured", {
-              vendors: [...unspecifiedLabels].join(" / "),
-            })
-          : hasRelevantCredential
-            ? t("providers.noCompatibleModels")
-            : t("providers.needsKeyAdd", { vendors: formatJoin(requiredLabels, t) }));
+    const status = ready
+      ? t("providers.readyConfigured", { vendors: [...readyLabels].join(" / ") })
+      : unspecifiedLabels.size > 0
+        ? t("providers.protocolUnspecifiedConfigured", {
+            vendors: [...unspecifiedLabels].join(" / "),
+          })
+        : hasRelevantCredential
+          ? t("providers.noCompatibleModels")
+          : t("providers.needsKeyAdd", { vendors: formatJoin(requiredLabels, t) });
 
     return {
       label: runtime.label,
       runtimeId: runtime.runtimeId,
       status,
-      tone: ready && runtime.disabledReason === undefined ? "ready" : "muted",
+      tone: ready ? "ready" : "muted",
     };
   });
 }

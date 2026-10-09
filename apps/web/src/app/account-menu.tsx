@@ -13,23 +13,17 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu";
+import { createHugeicon } from "@/shared/ui/icons";
 import { SidebarTooltip } from "@/shared/ui/sidebar";
 
 import { authClient } from "../domains/auth/api/auth-client";
 import { getAvatarBackground, getAvatarInitial } from "../shared/lib/avatar";
 import { isTruthy } from "../shared/lib/truthiness";
-import { createHugeicon } from "./hugeicon";
+import type { SessionUser } from "./session/session-context";
 
 const AccountMenuChevronIcon = createHugeicon(ChevronDownIcon, "AccountMenuChevronIcon");
 const AccountMenuSettingsIcon = createHugeicon(Settings02Icon, "AccountMenuSettingsIcon");
 const AccountMenuSignOutIcon = createHugeicon(Logout01Icon, "AccountMenuSignOutIcon");
-
-interface AccountMenuUser {
-  email: string;
-  id: string;
-  image?: string | null;
-  name: string;
-}
 
 function UserAvatar({
   size = 26,
@@ -77,7 +71,7 @@ export function AccountMenu({
   user,
 }: {
   collapsed: boolean;
-  user: AccountMenuUser | null;
+  user: SessionUser | null;
 }): ReactElement {
   const { t } = useTranslation();
   const name = user?.name ?? t("nav.account");

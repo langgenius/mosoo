@@ -86,7 +86,7 @@ export function PublishMenu({
             <span className="text-[13px] font-medium">
               {isLive ? t("agentLifecycle.republishUpdate") : t("agentLifecycle.publish")}
             </span>
-            <span className="text-muted-foreground text-[11.5px] leading-snug">
+            <span className="text-fg-3 text-[11.5px] leading-snug">
               {isLive
                 ? t("agentLifecycle.republishDescription")
                 : t("agentLifecycle.publishDescription")}
@@ -94,14 +94,12 @@ export function PublishMenu({
           </div>
         </DropdownMenuItem>
         {errorMessage ? (
-          <div className="border-destructive/30 bg-destructive/5 text-destructive mx-1 mt-0.5 mb-1 rounded-sm border px-2 py-1.5 text-[11.5px]">
+          <div className="border-danger/30 bg-danger/5 text-danger mx-1 mt-0.5 mb-1 rounded-sm border px-2 py-1.5 text-[11.5px]">
             {errorMessage}
           </div>
         ) : null}
         <DropdownMenuSeparator />
-        <DropdownMenuLabel className="text-[10.5px] tracking-wide uppercase">
-          {t("agentLifecycle.distribution")}
-        </DropdownMenuLabel>
+        <DropdownMenuLabel>{t("agentLifecycle.distribution")}</DropdownMenuLabel>
         <DropdownMenuItem
           className="items-start gap-2.5 py-2"
           disabled={!isLive}
@@ -117,7 +115,7 @@ export function PublishMenu({
           )}
           <div className="flex min-w-0 flex-col">
             <span className="text-[13px] font-medium">{t("agentLifecycle.instructionForLlm")}</span>
-            <span className="text-muted-foreground text-[11.5px] leading-snug">
+            <span className="text-fg-3 text-[11.5px] leading-snug">
               {copiedInstruction
                 ? t("agentLifecycle.copiedToClipboard")
                 : t("agentLifecycle.copyInstructionDescription")}
@@ -135,7 +133,7 @@ export function PublishMenu({
           <Code className="mt-0.5 size-4" />
           <div className="flex min-w-0 flex-col">
             <span className="text-[13px] font-medium">{t("agentLifecycle.apiAccess")}</span>
-            <span className="text-muted-foreground text-[11.5px] leading-snug">
+            <span className="text-fg-3 text-[11.5px] leading-snug">
               {t("agentLifecycle.apiAccessDescription")}
             </span>
           </div>
@@ -148,7 +146,7 @@ export function PublishMenu({
           <Inbox className="mt-0.5 size-4" />
           <div className="flex min-w-0 flex-col">
             <span className="text-[13px] font-medium">{t("pageTitle.thread")}</span>
-            <span className="text-muted-foreground text-[11.5px] leading-snug">
+            <span className="text-fg-3 text-[11.5px] leading-snug">
               {t("agentLifecycle.threadDescription")}
             </span>
           </div>

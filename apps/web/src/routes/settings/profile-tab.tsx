@@ -1,79 +1,32 @@
-import { useEffect, useReducer, useRef } from "react";
+import { useRef, useState } from "react";
 
+import { useAppSession } from "@/app/session/session-context";
 import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import { Check, Loader2, Upload } from "@/shared/ui/icons";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 
-import { useAppSession } from "../../app/session-provider";
 import { uploadAccountAvatar } from "../../domains/file/api/account-avatar-client";
 import { updateProfile } from "../../domains/user/api/user-client";
 import { apiPath } from "../../platform/http/public-api";
 import { getAvatarBackground, getAvatarInitial } from "../../shared/lib/avatar";
 import { isTruthy } from "../../shared/lib/truthiness";
-import { toAccountId } from "../typed-id";
 import { SettingsTabBody, SettingsTabHeader } from "./settings-tab-layout";
 
-const MAX_AVATAR_URL_LENGTH = 2048;
 const MAX_AVATAR_FILE_BYTES = 5 * 1024 * 1024;
+const MAX_AVATAR_URL_LENGTH = 2048;
 const INTERNAL_FILE_PATH_PATTERN = new RegExp(
   `^${apiPath("/files")}/[A-Za-z0-9]+/content(?:\\?disposition=inline)?$`,
 );
 
-interface ProfileFormState {
-  avatarInput: string;
-  error: string | null;
-  name: string;
-  saved: boolean;
-  saving: boolean;
-  uploading: boolean;
-}
-
-type ProfileFormAction =
-  | { type: "changeAvatar"; avatarInput: string }
-  | { type: "changeName"; name: string }
-  | { type: "clearSaved" }
-  | { type: "saveError"; error: string }
-  | { type: "saveStart" }
-  | { type: "saveSuccess" }
-  | { type: "setError"; error: string }
-  | { type: "syncAvatar"; avatarInput: string }
-  | { type: "syncName"; name: string }
-  | { type: "uploadError"; error: string }
-  | { type: "uploadStart" }
-  | { type: "uploadSuccess"; avatarInput: string };
-
-function profileFormReducer(state: ProfileFormState, action: ProfileFormAction): ProfileFormState {
-  switch (action.type) {
-    case "changeAvatar":
-      return { ...state, avatarInput: action.avatarInput };
-    case "changeName":
-      return { ...state, name: action.name };
-    case "clearSaved":
-      return { ...state, saved: false };
-    case "saveError":
-      return { ...state, error: action.error, saving: false };
-    case "saveStart":
-      return { ...state, error: null, saving: true };
-    case "saveSuccess":
-      return { ...state, saved: true, saving: false };
-    case "setError":
-      return { ...state, error: action.error };
-    case "syncAvatar":
-      return { ...state, avatarInput: action.avatarInput };
-    case "syncName":
-      return { ...state, name: action.name };
-    case "uploadError":
-      return { ...state, error: action.error, uploading: false };
-    case "uploadStart":
-      return { ...state, error: null, uploading: true };
-    case "uploadSuccess":
-      return { ...state, avatarInput: action.avatarInput, uploading: false };
-  }
-}
-
+// Mirrors the server's avatar URL rule so the field can show a localized
+// invalid state (contract section 4) before a save is attempted.
 function isValidAvatarValue(value: string): boolean {
+  if (value.length > MAX_AVATAR_URL_LENGTH) {
+    return false;
+  }
+
   if (INTERNAL_FILE_PATH_PATTERN.test(value)) {
     return true;
   }
@@ -86,48 +39,24 @@ function isValidAvatarValue(value: string): boolean {
   }
 }
 
-// Only an http(s) URL or an internal file path may ever reach an <img src>.
-// Routing the value through this guard (rather than a separately computed
-// boolean) keeps the validation on the exact value that flows to the sink.
-function sanitizeAvatarSrc(value: string): string {
-  return isValidAvatarValue(value) ? value : "";
-}
-
 export function ProfileTab() {
   const { t } = useTranslation();
   const { refreshOrganizations, user } = useAppSession();
-  const [state, dispatch] = useReducer(profileFormReducer, {
-    avatarInput: user?.image ?? "",
-    error: null,
-    name: user?.name ?? "",
-    saved: false,
-    saving: false,
-    uploading: false,
-  });
-  const { avatarInput, error, name, saved, saving, uploading } = state;
+  const [avatarInput, setAvatarInput] = useState(user?.image ?? "");
+  const [name, setName] = useState(user?.name ?? "");
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    dispatch({ name: user?.name ?? "", type: "syncName" });
-  }, [user?.name]);
-
-  useEffect(() => {
-    dispatch({ avatarInput: user?.image ?? "", type: "syncAvatar" });
-  }, [user?.image]);
 
   const trimmedName = name.trim();
   const trimmedAvatar = avatarInput.trim();
   const currentAvatar = user?.image ?? "";
-  const nameChanged = trimmedName !== (user?.name ?? "");
-  const avatarChanged = trimmedAvatar !== currentAvatar;
-  const dirty = nameChanged || avatarChanged;
-  const nameValid = trimmedName.length > 0;
-  const avatarValid =
-    trimmedAvatar === "" ||
-    (trimmedAvatar.length <= MAX_AVATAR_URL_LENGTH && isValidAvatarValue(trimmedAvatar));
-  const avatarPreview = trimmedAvatar || currentAvatar;
-  const avatarPreviewSrc = sanitizeAvatarSrc(avatarPreview);
-  const canSave = dirty && nameValid && avatarValid && !saving && !uploading;
+  const dirty = trimmedName !== (user?.name ?? "") || trimmedAvatar !== currentAvatar;
+  const avatarValid = trimmedAvatar === "" || isValidAvatarValue(trimmedAvatar);
+  const canSave = dirty && trimmedName.length > 0 && avatarValid && !saving && !uploading;
+  const avatarPreview = (avatarValid ? trimmedAvatar : "") || currentAvatar;
   const avatarBackground = getAvatarBackground(user?.email ?? user?.name);
 
   async function handleSave() {
@@ -135,63 +64,60 @@ export function ProfileTab() {
       return;
     }
 
-    dispatch({ type: "saveStart" });
+    setError(null);
+    setSaving(true);
 
     try {
-      await updateProfile({
+      // The server normalizes the avatar URL; show what it stored.
+      const profile = await updateProfile({
         imageUrl: trimmedAvatar === "" ? null : trimmedAvatar,
         name: trimmedName,
       });
+      setName(profile.name);
+      setAvatarInput(profile.imageUrl ?? "");
       await refreshOrganizations();
-      dispatch({ type: "saveSuccess" });
+      setSaved(true);
       setTimeout(() => {
-        dispatch({ type: "clearSaved" });
+        setSaved(false);
       }, 2000);
     } catch (nextError) {
-      dispatch({
-        error: nextError instanceof Error ? nextError.message : t("settings.failedToSaveChanges"),
-        type: "saveError",
-      });
+      setError(nextError instanceof Error ? nextError.message : t("settings.failedToSaveChanges"));
+    } finally {
+      setSaving(false);
     }
   }
 
   async function handleFileSelected(file: File) {
     if (!file.type.startsWith("image/")) {
-      dispatch({ error: t("settings.chooseImageFile"), type: "setError" });
+      setError(t("settings.chooseImageFile"));
       return;
     }
 
     if (file.size > MAX_AVATAR_FILE_BYTES) {
-      dispatch({ error: t("settings.imageSizeLimit"), type: "setError" });
+      setError(t("settings.imageSizeLimit"));
       return;
     }
 
-    if (!isTruthy(user?.id)) {
-      dispatch({ error: t("settings.uploadUnavailable"), type: "setError" });
-      return;
-    }
-
-    dispatch({ type: "uploadStart" });
+    setError(null);
+    setUploading(true);
 
     try {
-      const imageUrl = await uploadAccountAvatar(toAccountId(user.id), file);
-      dispatch({ avatarInput: imageUrl, type: "uploadSuccess" });
+      setAvatarInput(await uploadAccountAvatar(user!.id, file));
     } catch (nextError) {
-      dispatch({
-        error: nextError instanceof Error ? nextError.message : t("settings.uploadImageFailed"),
-        type: "uploadError",
-      });
+      setError(nextError instanceof Error ? nextError.message : t("settings.uploadImageFailed"));
+    } finally {
+      setUploading(false);
     }
   }
 
   return (
-    <>
+    <div className="flex h-full min-w-0 flex-col overflow-hidden">
       <SettingsTabHeader title={t("settings.profile")} />
       <SettingsTabBody>
         <div className="mb-8 flex items-center gap-5">
-          {isTruthy(avatarPreviewSrc) ? (
+          {isTruthy(avatarPreview) ? (
             <img
-              src={avatarPreviewSrc}
+              src={avatarPreview}
               alt={user?.name ?? ""}
               className="size-16 rounded-full object-cover"
               referrerPolicy="no-referrer"
@@ -253,16 +179,17 @@ export function ProfileTab() {
             type="text"
             inputMode="url"
             placeholder="https://example.com/avatar.png"
+            aria-invalid={avatarValid ? undefined : true}
             value={avatarInput}
             onChange={(event) => {
-              dispatch({ avatarInput: event.target.value, type: "changeAvatar" });
+              setAvatarInput(event.target.value);
             }}
           />
-          {trimmedAvatar !== "" && !avatarValid ? (
+          {avatarValid ? null : (
             <p className="text-danger-fg text-[12px]" role="alert">
               {t("settings.invalidUrl")}
             </p>
-          ) : null}
+          )}
         </div>
 
         <div className="mt-4 space-y-2">
@@ -273,7 +200,7 @@ export function ProfileTab() {
             type="text"
             value={name}
             onChange={(event) => {
-              dispatch({ name: event.target.value, type: "changeName" });
+              setName(event.target.value);
             }}
           />
         </div>
@@ -318,6 +245,6 @@ export function ProfileTab() {
           </Button>
         </div>
       </SettingsTabBody>
-    </>
+    </div>
   );
 }

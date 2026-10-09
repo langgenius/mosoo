@@ -1,8 +1,8 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
-import { useAppSession } from "@/app/session-provider";
+import { useActiveProject } from "@/app/session/session-context";
 import {
   deleteEnvironment,
   setProjectDefaultEnvironment,
@@ -18,7 +18,6 @@ import {
   environmentKeys,
   useEnvironmentDetailQuery,
 } from "@/domains/environment/query/environment-queries";
-import { toEnvironmentId, toProjectId } from "@/routes/typed-id";
 import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
 import { Lock, Star } from "@/shared/ui/icons";
@@ -30,12 +29,10 @@ type EnvironmentDetail = NonNullable<ReturnType<typeof useEnvironmentDetailQuery
 
 function EnvironmentDetailHeader({
   environment,
-  isAdmin,
   onDelete,
   onSetDefault,
 }: {
   environment: EnvironmentDetail;
-  isAdmin: boolean;
   onDelete: () => void;
   onSetDefault: () => void;
 }) {
@@ -53,7 +50,7 @@ function EnvironmentDetailHeader({
         </div>
       </div>
       <div className="flex flex-wrap gap-2">
-        {isAdmin && !environment.isDefault ? (
+        {environment.canEdit && !environment.isDefault ? (
           <Button className="gap-2" onClick={onSetDefault} variant="outline">
             <Star className="size-4" />
             {t("environments.setDefault")}
@@ -71,71 +68,46 @@ function EnvironmentDetailHeader({
 
 export function EnvironmentDetailPage({ environmentId }: { environmentId: string }) {
   const { t } = useTranslation();
-  const { activeProjectId } = useAppSession();
-  const projectId = activeProjectId;
-  const typedEnvironmentId = toEnvironmentId(environmentId);
-  const environmentQuery = useEnvironmentDetailQuery(projectId, environmentId);
+  const project = useActiveProject();
+  const navigate = useNavigate();
+  const environmentQuery = useEnvironmentDetailQuery(project.id, environmentId);
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
   const environment = environmentQuery.data ?? null;
   const [draftOverride, setDraftOverride] = useState<EnvironmentDraft | null>(null);
 
+  async function invalidateEnvironment(): Promise<void> {
+    await Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: environmentKeys.detail(project.id, environmentId),
+      }),
+      queryClient.invalidateQueries({ queryKey: environmentKeys.list(project.id) }),
+    ]);
+  }
+
   const updateMutation = useMutation({
     mutationFn: updateEnvironment,
-    onSuccess: async () => {
-      await Promise.all([
-        projectId !== null
-          ? queryClient.invalidateQueries({
-              queryKey: environmentKeys.detail(projectId, environmentId),
-            })
-          : Promise.resolve(),
-        projectId !== null
-          ? queryClient.invalidateQueries({ queryKey: environmentKeys.list(projectId) })
-          : Promise.resolve(),
-      ]);
-    },
+    onSuccess: invalidateEnvironment,
   });
   const defaultMutation = useMutation({
     mutationFn: setProjectDefaultEnvironment,
-    onSuccess: async () => {
-      await Promise.all([
-        projectId !== null
-          ? queryClient.invalidateQueries({
-              queryKey: environmentKeys.detail(projectId, environmentId),
-            })
-          : Promise.resolve(),
-        projectId !== null
-          ? queryClient.invalidateQueries({ queryKey: environmentKeys.list(projectId) })
-          : Promise.resolve(),
-      ]);
-    },
+    onSuccess: invalidateEnvironment,
   });
   const deleteMutation = useMutation({
     mutationFn: deleteEnvironment,
     onSuccess: async () => {
-      await Promise.all([
-        projectId !== null
-          ? queryClient.invalidateQueries({
-              queryKey: environmentKeys.detail(projectId, environmentId),
-            })
-          : Promise.resolve(),
-        projectId !== null
-          ? queryClient.invalidateQueries({ queryKey: environmentKeys.list(projectId) })
-          : Promise.resolve(),
-      ]);
+      await queryClient.invalidateQueries({ queryKey: environmentKeys.list(project.id) });
+      void navigate("/environment");
     },
   });
   const initialDraft = useMemo(() => createEnvironmentDraft(environment), [environment]);
   const effectiveDraft = draftOverride ?? initialDraft;
 
-  async function handleSave() {
-    if (!environment) {
-      return;
-    }
+  async function handleSave(target: EnvironmentDetail) {
     setError(null);
     try {
       const updated = await updateMutation.mutateAsync(
-        toUpdateEnvironmentInput(environment.projectId, environment.id, effectiveDraft, t),
+        toUpdateEnvironmentInput(target.projectId, target.id, effectiveDraft, t),
       );
       setDraftOverride(createEnvironmentDraft(updated));
     } catch (caughtError) {
@@ -143,15 +115,12 @@ export function EnvironmentDetailPage({ environmentId }: { environmentId: string
     }
   }
 
-  async function handleSetDefault() {
-    if (!environment || !isTruthy(projectId)) {
-      return;
-    }
+  async function handleSetDefault(target: EnvironmentDetail) {
     setError(null);
     try {
       await defaultMutation.mutateAsync({
-        environmentId: typedEnvironmentId,
-        projectId: toProjectId(projectId),
+        environmentId: target.id,
+        projectId: target.projectId,
       });
     } catch (caughtError) {
       setError(
@@ -160,15 +129,12 @@ export function EnvironmentDetailPage({ environmentId }: { environmentId: string
     }
   }
 
-  async function handleDelete() {
-    if (!environment) {
-      return;
-    }
+  async function handleDelete(target: EnvironmentDetail) {
     setError(null);
     try {
       await deleteMutation.mutateAsync({
-        environmentId: typedEnvironmentId,
-        projectId: environment.projectId,
+        environmentId: target.id,
+        projectId: target.projectId,
       });
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : t("environments.deleteFailed"));
@@ -185,7 +151,7 @@ export function EnvironmentDetailPage({ environmentId }: { environmentId: string
 
   if (environmentQuery.error || !environment) {
     return (
-      <div className="text-destructive flex-1 overflow-y-auto py-12 text-center text-[13px]">
+      <div className="text-danger flex-1 overflow-y-auto py-12 text-center text-[13px]">
         {environmentQuery.error instanceof Error
           ? environmentQuery.error.message
           : t("environments.notFound")}
@@ -198,33 +164,32 @@ export function EnvironmentDetailPage({ environmentId }: { environmentId: string
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 p-6">
         <EnvironmentDetailHeader
           environment={environment}
-          isAdmin={environment.canEdit}
           onDelete={() => {
-            void handleDelete();
+            void handleDelete(environment);
           }}
           onSetDefault={() => {
-            void handleSetDefault();
+            void handleSetDefault(environment);
           }}
         />
 
         {isTruthy(error) ? (
-          <div className="border-destructive/30 bg-destructive/10 text-destructive rounded-md border px-3 py-2 text-[13px]">
+          <div className="border-danger/30 bg-danger/10 text-danger rounded-md border px-3 py-2 text-[13px]">
             {error}
           </div>
         ) : null}
 
-        <section className="border-border rounded-md border bg-white p-4">
+        <section className="border-border bg-card rounded-md border p-4">
           <EnvironmentForm
             disabled={!environment.canEdit || updateMutation.isPending}
             draft={effectiveDraft}
             onChange={setDraftOverride}
-            onSubmit={() => void handleSave()}
+            onSubmit={() => void handleSave(environment)}
             submitLabel={
               updateMutation.isPending ? t("settings.saving") : t("settings.saveChanges")
             }
           />
           {!environment.canEdit ? (
-            <div className="bg-secondary text-fg-3 mt-3 flex items-center gap-2 rounded-md px-3 py-2 text-[12px]">
+            <div className="bg-paper-200 text-fg-3 mt-3 flex items-center gap-2 rounded-md px-3 py-2 text-[12px]">
               <Lock className="size-3.5" />
               {t("environments.readOnly")}
             </div>

@@ -33,15 +33,15 @@ export function CliAuthPage() {
 
   return (
     <main className="mx-auto flex w-full max-w-xl flex-col gap-5 px-6 py-12">
-      <div className="border-border-default bg-bg-elevated rounded-lg border p-6">
+      <div className="border-border bg-card rounded-lg border p-6">
         <div className="flex items-start gap-4">
-          <div className="bg-accent-soft text-accent flex size-10 shrink-0 items-center justify-center rounded-md">
+          <div className="bg-sunken text-fg-3 flex size-10 shrink-0 items-center justify-center rounded-md">
             <KeyRound className="size-5" />
           </div>
           <div className="min-w-0 flex-1">
             <h1 className="text-fg-1 text-lg font-semibold">{t("cliAuth.title")}</h1>
             <p className="text-fg-2 mt-2 text-sm leading-6">{t("cliAuth.connectDescription")}</p>
-            <div className="border-border-default bg-bg-sunken text-fg-1 mt-4 rounded-md border px-3 py-2 font-mono text-sm">
+            <div className="border-border bg-sunken text-fg-1 mt-4 rounded-md border px-3 py-2 font-mono text-sm">
               {code || t("cliAuth.missingCode")}
             </div>
           </div>

@@ -1,57 +1,63 @@
-import type { AgentId, ProjectId, SessionId } from "@mosoo/contracts/id";
 import type {
   AgentSessionEventInput,
   SessionMessage,
-  SessionProcessEvent,
   SessionSummary,
   SessionType,
 } from "@mosoo/contracts/session";
+import type { AgentId, ProjectId, SessionId, SessionMessageId } from "@mosoo/id";
 
 import { graphql } from "@/gql";
 import type { ThreadSessionMessagesQuery } from "@/gql/graphql";
 import { requestGraphQL } from "@/platform/http/graphql-client";
 
-import { toSessionMessageId, toSessionSummary } from "./session-id-mappers";
-import { SESSION_PROCESS_EVENT_QUERY_LIMIT, toSessionProcessEvent } from "./session-process-events";
+import { toSessionSummary } from "./session-id-mappers";
+
+const SESSION_FIELDS = graphql(/* GraphQL */ `
+  fragment SessionFields on Session {
+    agentId
+    archivedAt
+    createdAt
+    deploymentVersionId
+    deploymentVersionNumber
+    id
+    lastMessageAt
+    lastRun {
+      completedAt
+      createdAt
+      deploymentVersionId
+      deploymentVersionNumber
+      error {
+        code
+        details
+        message
+        retryable
+      }
+      id
+      model
+      provider
+      startedAt
+      status
+      traceId
+      trigger
+      updatedAt
+    }
+    model
+    provider
+    projectId
+    runtimeId
+    status
+    title
+    type
+    updatedAt
+  }
+`);
+
+void SESSION_FIELDS;
 
 const CREATE_AGENT_SESSION_MUTATION = graphql(/* GraphQL */ `
   mutation CreateAgentSession($input: CreateAgentSessionInput!) {
     createAgentSession(input: $input) {
-      agentId
-      archivedAt
-      createdAt
-      deploymentVersionId
-      deploymentVersionNumber
-      id
-      lastMessageAt
-      lastRun {
-        completedAt
-        createdAt
-        deploymentVersionId
-        deploymentVersionNumber
-        error {
-          code
-          details
-          message
-          retryable
-        }
-        id
-        model
-        provider
-        startedAt
-        status
-        traceId
-        trigger
-        updatedAt
-      }
-      model
-      provider
-      projectId
-      runtimeId
-      status
-      title
-      type
-      updatedAt
+      ...SessionFields
     }
   }
 `);
@@ -60,7 +66,6 @@ const AGENT_SESSION_LIST_QUERY = graphql(/* GraphQL */ `
   query AgentSessionList(
     $agentId: ULID!
     $archived: Boolean
-    $participantOnly: Boolean
     $projectId: ULID!
     $sessionId: ULID
     $type: SessionType
@@ -68,62 +73,13 @@ const AGENT_SESSION_LIST_QUERY = graphql(/* GraphQL */ `
     agentSessionList(
       agentId: $agentId
       archived: $archived
-      participantOnly: $participantOnly
       projectId: $projectId
       sessionId: $sessionId
       type: $type
     ) {
       nodes {
-        agentId
-        archivedAt
-        createdAt
-        deploymentVersionId
-        deploymentVersionNumber
-        id
-        lastMessageAt
-        lastRun {
-          completedAt
-          createdAt
-          deploymentVersionId
-          deploymentVersionNumber
-          error {
-            code
-            details
-            message
-            retryable
-          }
-          id
-          model
-          provider
-          startedAt
-          status
-          traceId
-          trigger
-          updatedAt
-        }
-        model
-        provider
-        projectId
-        runtimeId
-        status
-        title
-        type
-        updatedAt
+        ...SessionFields
       }
-    }
-  }
-`);
-
-const AGENT_SESSION_PROCESS_EVENTS_QUERY = graphql(/* GraphQL */ `
-  query AgentSessionProcessEvents($limit: Int!, $projectId: ULID!, $sessionId: ULID!) {
-    sessionProcessEvents(limit: $limit, projectId: $projectId, sessionId: $sessionId) {
-      content
-      durationMs
-      id
-      occurredAt
-      status
-      tokens
-      type
     }
   }
 `);
@@ -269,17 +225,12 @@ export async function createAgentSession(
   projectId: ProjectId,
   agentId: AgentId,
   type?: SessionType | null,
-  options: {
-    waitForRuntimeReady?: boolean;
-  } = {},
 ): Promise<SessionSummary> {
-  const waitForRuntimeReady = options.waitForRuntimeReady === true;
   const payload = await requestGraphQL(CREATE_AGENT_SESSION_MUTATION, {
     input: {
       agentId,
       projectId,
       type: type ?? null,
-      ...(waitForRuntimeReady ? { waitForRuntimeReady } : {}),
     },
   });
 
@@ -291,7 +242,6 @@ export async function listAgentSessions(
   agentId: AgentId,
   options: {
     archived?: boolean | null;
-    participantOnly?: boolean | null;
     sessionId?: SessionId | null;
     type?: SessionType | null;
   } = {},
@@ -299,26 +249,12 @@ export async function listAgentSessions(
   const payload = await requestGraphQL(AGENT_SESSION_LIST_QUERY, {
     agentId,
     archived: options.archived ?? null,
-    participantOnly: options.participantOnly ?? null,
     projectId,
     sessionId: options.sessionId ?? null,
     type: options.type ?? null,
   });
 
   return payload.agentSessionList.nodes.map(toSessionSummary);
-}
-
-export async function getAgentSessionProcessEvents(
-  projectId: ProjectId,
-  sessionId: SessionId,
-): Promise<SessionProcessEvent[]> {
-  const payload = await requestGraphQL(AGENT_SESSION_PROCESS_EVENTS_QUERY, {
-    limit: SESSION_PROCESS_EVENT_QUERY_LIMIT,
-    projectId,
-    sessionId,
-  });
-
-  return payload.sessionProcessEvents.map(toSessionProcessEvent);
 }
 
 export async function getThreadSessionMessages(
@@ -340,7 +276,7 @@ function toClientSessionMessage(
     content: message.content,
     createdAt: message.createdAt,
     createdBy: message.createdBy,
-    id: toSessionMessageId(message.id),
+    id: message.id as SessionMessageId,
     plan: message.plan.map((entry) => ({
       content: entry.content,
       priority: entry.priority,

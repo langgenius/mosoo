@@ -1,10 +1,11 @@
-import type { ProjectId, SessionId } from "@mosoo/contracts/id";
 import type { SessionProcessEvent } from "@mosoo/contracts/session";
+import { SESSION_PROCESS_EVENT_TYPE_BY_CODE } from "@mosoo/contracts/session";
+import type { ProjectId, RuntimeEventId, SessionId } from "@mosoo/id";
 
 import { graphql } from "@/gql";
 import { requestGraphQL } from "@/platform/http/graphql-client";
 
-import { SESSION_PROCESS_EVENT_QUERY_LIMIT, toSessionProcessEvent } from "./session-process-events";
+const SESSION_PROCESS_EVENT_QUERY_LIMIT = 1000;
 
 const SESSION_PROCESS_EVENTS_QUERY = graphql(/* GraphQL */ `
   query SessionProcessEvents($limit: Int!, $projectId: ULID!, $sessionId: ULID!) {
@@ -30,5 +31,13 @@ export async function getSessionProcessEvents(
     sessionId,
   });
 
-  return payload.threadSessionProcessEvents.map(toSessionProcessEvent);
+  return payload.threadSessionProcessEvents.map((event) => ({
+    content: event.content,
+    durationMs: event.durationMs,
+    id: event.id as RuntimeEventId,
+    occurredAt: event.occurredAt,
+    status: event.status,
+    tokens: event.tokens,
+    type: SESSION_PROCESS_EVENT_TYPE_BY_CODE[event.type],
+  }));
 }

@@ -7,7 +7,7 @@ import { convertSessionMessage } from "./convert-session-message";
 
 interface UseSessionAssistantRuntimeInput {
   // Source of truth stays the live WebSocket stream — these are passed straight
-  // through from useSessionStreamActions; the runtime never owns chat state.
+  // through from useSessionStream; the runtime never owns chat state.
   messages: readonly SessionViewMessage[];
   streaming: boolean;
   // Blocks sending (config refresh / setup / stopped / reconnecting) while

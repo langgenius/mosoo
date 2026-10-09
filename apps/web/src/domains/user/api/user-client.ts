@@ -1,9 +1,9 @@
 import type { Viewer } from "@mosoo/contracts/account";
+import type { AccountId } from "@mosoo/id";
 
 import { graphql } from "@/gql";
 import type { ViewerQuery } from "@/gql/graphql";
 import { requestGraphQL } from "@/platform/http/graphql-client";
-import { toAccountId } from "@/routes/typed-id";
 
 import { toOrganizationSummary } from "../../organization/api/organization-mappers";
 
@@ -15,23 +15,13 @@ const VIEWER_QUERY = graphql(/* GraphQL */ `
         id
         imageUrl
         name
-        systemAgentModel {
-          modelId
-          vendor
-        }
       }
       activeOrganization {
-        avatarUrl
         createdAt
         id
         name
       }
-      auth {
-        currentSecurityLevel
-        methods
-      }
       organizations {
-        avatarUrl
         createdAt
         id
         name
@@ -57,7 +47,7 @@ function toViewer(viewer: ViewerQuery["viewer"]): Viewer {
         ? null
         : {
             ...viewer.account,
-            id: toAccountId(viewer.account.id),
+            id: viewer.account.id as AccountId,
           },
     activeOrganization:
       viewer.activeOrganization === null ? null : toOrganizationSummary(viewer.activeOrganization),

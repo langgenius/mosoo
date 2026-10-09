@@ -1,7 +1,7 @@
-import { useCallback, useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import type { ReactElement } from "react";
 
-import { useAppSession } from "@/app/session-provider";
+import { useAppSession } from "@/app/session/session-context";
 import type { ListedFileEntry } from "@/domains/file/api/files";
 import { useTranslation } from "@/shared/i18n";
 import { Button } from "@/shared/ui/button";
@@ -20,7 +20,6 @@ import {
 } from "./list/view";
 import { useThreadCompletionNotifications } from "./model/completion-notifications";
 import { getMutationErrorMessage } from "./model/format";
-import { useSelectedThreadReadSync } from "./model/read-sync";
 import { useThreadRouteState } from "./model/route-state";
 import { SECTION_ORDER } from "./model/thread";
 import { useThreadUiState } from "./model/ui-state";
@@ -84,21 +83,35 @@ function ThreadsWorkspace({
     markThreadReadLocal: ui.markThreadRead,
     navigateToList: route.backToList,
     threadsById: threads.threadsById,
-    togglePinnedThreadLocal: ui.togglePinnedThread,
   });
-  const handleReadSyncError = useCallback(
-    (error: unknown) => {
-      actions.setActionError(getMutationErrorMessage(error, t("threads.failedToMarkThreadRead")));
-    },
-    [actions, t],
-  );
+  const { markThreadRead } = ui;
+  const { selectedThread } = threads;
 
   useThreadCompletionNotifications(threads.allThreads, t);
-  useSelectedThreadReadSync({
-    markRead: actions.markThreadRead,
-    onError: handleReadSyncError,
-    selectedThread: threads.selectedThread,
-  });
+  useEffect(() => {
+    if (selectedThread !== null && !selectedThread.read) {
+      markThreadRead({ readAt: selectedThread.lastActivityAt, threadId: selectedThread.id });
+    }
+  }, [markThreadRead, selectedThread]);
+
+  const newThreadDialog = (
+    <NewThreadDialog
+      key={route.composeOpen ? "open" : "closed"}
+      agents={threads.agentsQuery.data ?? []}
+      error={actions.createError}
+      lastAgentId={ui.state.lastAgentId}
+      lockedAgentId={route.lockedAgentId}
+      onLastAgentChange={ui.setLastAgentId}
+      onOpenChange={(open) => {
+        if (!open) {
+          route.closeComposeDialog();
+        }
+      }}
+      onSubmit={actions.createThread}
+      open={route.composeOpen}
+      submitting={actions.creatingThread}
+    />
+  );
 
   if (route.activeThreadId !== null) {
     return (
@@ -120,9 +133,6 @@ function ThreadsWorkspace({
                 : null
             }
             processEventsLoading={threads.processEventsQuery.isLoading}
-            sessionActionCapabilities={
-              threads.retrieveQuery.data?.agentSessionRetrieve.capabilities ?? null
-            }
             sending={actions.sendingFollowUp}
             thread={threads.selectedThread}
             viewer={{ image: viewerImage, name: viewerName }}
@@ -134,9 +144,7 @@ function ThreadsWorkspace({
               void actions.deleteThread(threadId);
             }}
             onSendFollowUp={actions.sendFollowUp}
-            onTogglePinned={(threadId) => {
-              void actions.togglePinnedThread(threadId);
-            }}
+            onTogglePinned={ui.togglePinnedThread}
           />
         ) : threads.isLoading ? (
           <div className="text-fg-3 flex h-full items-center justify-center text-[13px]">
@@ -146,22 +154,7 @@ function ThreadsWorkspace({
           <ThreadsMissingDetail onBack={route.backToList} />
         )}
 
-        <NewThreadDialog
-          key={route.composeOpen ? "open" : "closed"}
-          agents={threads.agentsQuery.data ?? []}
-          error={actions.createError}
-          lastAgentId={ui.state.lastAgentId}
-          lockedAgentId={route.lockedAgentId}
-          onLastAgentChange={ui.setLastAgentId}
-          onOpenChange={(open) => {
-            if (!open) {
-              route.closeComposeDialog();
-            }
-          }}
-          onSubmit={actions.createThread}
-          open={route.composeOpen}
-          submitting={actions.creatingThread}
-        />
+        {newThreadDialog}
       </div>
     );
   }
@@ -206,7 +199,7 @@ function ThreadsWorkspace({
         />
 
         {threads.loadError ? (
-          <div className="text-destructive border-destructive/20 bg-destructive/[0.06] rounded-md border px-3 py-2 text-[13px]">
+          <div className="text-danger border-danger/20 bg-danger/[0.06] rounded-md border px-3 py-2 text-[13px]">
             {getMutationErrorMessage(threads.loadError, t("threads.failedToLoadThreads"))}
           </div>
         ) : threads.isLoading ? (
@@ -241,31 +234,14 @@ function ThreadsWorkspace({
                   void actions.deleteThread(threadId);
                 }}
                 onOpenThread={route.openThread}
-                onPinToggle={(threadId) => {
-                  void actions.togglePinnedThread(threadId);
-                }}
+                onPinToggle={ui.togglePinnedThread}
               />
             ))}
           </div>
         )}
       </ListPageContent>
 
-      <NewThreadDialog
-        key={route.composeOpen ? "open" : "closed"}
-        agents={threads.agentsQuery.data ?? []}
-        error={actions.createError}
-        lastAgentId={ui.state.lastAgentId}
-        lockedAgentId={route.lockedAgentId}
-        onLastAgentChange={ui.setLastAgentId}
-        onOpenChange={(open) => {
-          if (!open) {
-            route.closeComposeDialog();
-          }
-        }}
-        onSubmit={actions.createThread}
-        open={route.composeOpen}
-        submitting={actions.creatingThread}
-      />
+      {newThreadDialog}
     </div>
   );
 }

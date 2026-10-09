@@ -24,7 +24,7 @@ export function ModelProviderLink({ lockedVendors }: { lockedVendors: string[] }
 
   return (
     <Link
-      className="text-muted-foreground flex w-full items-center gap-1.5 text-[12px]"
+      className="text-fg-3 flex w-full items-center gap-1.5 text-[12px]"
       to="/providers"
       title={title}
     >
@@ -38,7 +38,7 @@ export function ModelPickerEmptyItem(): ReactElement {
   const { t } = useTranslation();
 
   return (
-    <div className="text-muted-foreground px-3 py-6 text-center text-[12px]">
+    <div className="text-fg-3 px-3 py-6 text-center text-[12px]">
       {t("providers.noMatchingModels")}
     </div>
   );
@@ -59,7 +59,7 @@ export function ModelPickerItem({
     <DropdownMenuItem
       className={cn(
         "flex flex-col items-start gap-0.5 py-2",
-        entry.available ? null : "bg-muted/40 text-muted-foreground opacity-100",
+        entry.available ? null : "bg-sunken/40 text-fg-3 opacity-100",
         selected ? "bg-ink-100" : null,
       )}
       disabled={!entry.available}
@@ -76,19 +76,19 @@ export function ModelPickerItem({
         <span
           className={cn(
             "truncate text-[13px] font-medium",
-            entry.available ? "text-foreground" : "text-muted-foreground",
+            entry.available ? "text-foreground" : "text-fg-3",
           )}
         >
           {entry.displayName}
         </span>
         <ModelStateBadge entry={entry} />
       </div>
-      <div className="text-muted-foreground flex w-full items-center justify-between gap-2 text-[11px]">
+      <div className="text-fg-3 flex w-full items-center justify-between gap-2 text-[11px]">
         <span>
           {entry.vendorLabel} · {entry.modelId}
         </span>
         {entry.available ? null : (
-          <span className="text-muted-foreground min-w-0 truncate">{entry.statusDetail}</span>
+          <span className="text-fg-3 min-w-0 truncate">{entry.statusDetail}</span>
         )}
       </div>
     </DropdownMenuItem>

@@ -3,7 +3,7 @@ import type {
   SkillsShCatalogResult,
   SkillsShCatalogView,
 } from "@mosoo/contracts/skill";
-import { useQuery } from "@tanstack/react-query";
+import { skipToken, useQuery } from "@tanstack/react-query";
 import type { UseQueryResult } from "@tanstack/react-query";
 
 import { toProjectId, toSkillId } from "@/routes/typed-id";
@@ -20,33 +20,28 @@ export const skillKeys = {
     availableOnly: boolean,
   ) => [...skillKeys.catalogs(), view, query, page, perPage, availableOnly] as const,
   catalogs: () => [...skillKeys.all, "skills-sh-catalog"] as const,
-  detail: (skillId: string) => [...skillKeys.details(), skillId] as const,
-  details: () => [...skillKeys.all, "detail"] as const,
-  list: (projectId: string) => [...skillKeys.lists(), projectId] as const,
+  list: (projectId: string | null) => [...skillKeys.lists(), projectId] as const,
   lists: () => [...skillKeys.all, "list"] as const,
-  source: (projectId: string, skillId: string) =>
+  source: (projectId: string | null, skillId: string | null) =>
     [...skillKeys.sources(), projectId, skillId] as const,
   sources: () => [...skillKeys.all, "source"] as const,
 };
 
 export function useProjectSkillsQuery(projectId: string | null): UseQueryResult<SkillSummary[]> {
   return useQuery({
-    enabled: projectId !== null,
-    queryFn: async () => (projectId === null ? [] : listProjectSkills(toProjectId(projectId))),
-    queryKey: projectId === null ? [...skillKeys.lists(), "missing"] : skillKeys.list(projectId),
+    queryFn: projectId === null ? skipToken : async () => listProjectSkills(toProjectId(projectId)),
+    queryKey: skillKeys.list(projectId),
   });
 }
 
 export function useSkillsShCatalogQuery(input: {
   availableOnly: boolean;
-  enabled?: boolean;
   page: number;
   perPage: number;
   query: string;
   view: SkillsShCatalogView;
 }): UseQueryResult<SkillsShCatalogResult> {
   return useQuery({
-    enabled: input.enabled ?? true,
     queryFn: async () =>
       listSkillsShCatalog({
         availableOnly: input.availableOnly,
@@ -72,14 +67,10 @@ export function useSkillSourceQuery(
   enabled = true,
 ): UseQueryResult<string | null> {
   return useQuery({
-    enabled: enabled && projectId !== null && skillId !== null,
-    queryFn: async () =>
-      projectId === null || skillId === null
-        ? null
-        : fetchSkillSource(toProjectId(projectId), toSkillId(skillId)),
-    queryKey:
-      projectId === null || skillId === null
-        ? [...skillKeys.sources(), "missing"]
-        : skillKeys.source(projectId, skillId),
+    queryFn:
+      !enabled || projectId === null || skillId === null
+        ? skipToken
+        : async () => fetchSkillSource(toProjectId(projectId), toSkillId(skillId)),
+    queryKey: skillKeys.source(projectId, skillId),
   });
 }

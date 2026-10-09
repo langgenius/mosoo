@@ -33,7 +33,7 @@ export function FilePreviewDialog({ file, onClose }: FilePreviewDialogProps): Re
       open
     >
       <DialogContent className="flex h-[82vh] max-h-[860px] flex-col gap-0 overflow-hidden p-0 sm:max-w-[960px]">
-        <DialogHeader className="border-border-subtle shrink-0 border-b px-6 py-4 pr-14">
+        <DialogHeader className="border-border-soft shrink-0 border-b px-6 py-4 pr-14">
           <div className="flex min-w-0 items-start justify-between gap-4">
             <div className="min-w-0">
               <DialogTitle className="truncate text-[15px]">{file.name}</DialogTitle>

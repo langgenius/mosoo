@@ -19,15 +19,8 @@ import {
 } from "@/routes/typed-id";
 
 import type { Agent, McpServer, RuntimeId, SkillInfo } from "../../agent.types";
-import {
-  createEditorSaveSnapshot,
-  createInitialDraft,
-  createSnapshotHash,
-  normalizeMcpServers,
-} from "./draft";
+import { createEditorSaveSnapshot, createInitialDraft, normalizeMcpServers } from "./draft";
 import type { AgentEditorDraft } from "./draft";
-import { applyAgentEditorPatch, withEnvironmentId } from "./patch";
-import type { AgentFormSectionId } from "./section-ids";
 
 export type { AgentEditorDraft } from "./draft";
 
@@ -35,12 +28,10 @@ export interface AgentEditorModel {
   draft: AgentEditorDraft;
   discard(): void;
   dirty: boolean;
-  readOnly: boolean;
   save(): Promise<boolean>;
   saveError: string | null;
   saving: boolean;
-  revision: number;
-  snapshotHash: string;
+  snapshot: string;
   setBuiltInTools(tools: AgentBuiltInToolConfig[]): void;
   setDescription(description: string): void;
   setEnvironmentId(environmentId: string | null): void;
@@ -52,26 +43,12 @@ export interface AgentEditorModel {
   setProviderOptions(providerOptions: JsonObject): void;
   setRuntime(runtime: RuntimeId): void;
   setSkills(skills: SkillInfo[]): void;
-  applyPatch(patch: Record<string, unknown>): void;
-  focusSection: AgentFormSectionId | null;
-  highlightedSections: ReadonlySet<AgentFormSectionId>;
 }
 
-export function useAgentEditorModel({
-  agent,
-  readOnly = false,
-}: {
-  agent: Agent;
-  readOnly?: boolean;
-}): AgentEditorModel {
+export function useAgentEditorModel({ agent }: { agent: Agent }): AgentEditorModel {
   const queryClient = useQueryClient();
   const initialDraft = createInitialDraft(agent);
   const [draft, setDraft] = useState<AgentEditorDraft>(initialDraft);
-  const [revision, setRevision] = useState(0);
-  const [focusSection, setFocusSection] = useState<AgentFormSectionId | null>(null);
-  const [highlightedSections, setHighlightedSections] = useState<ReadonlySet<AgentFormSectionId>>(
-    new Set(),
-  );
   const [savedDraft, setSavedDraft] = useState<AgentEditorDraft>(initialDraft);
   const [savedSnapshot, setSavedSnapshot] = useState(() => createEditorSaveSnapshot(initialDraft));
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -91,21 +68,13 @@ export function useAgentEditorModel({
       ]);
     },
   });
-  const dirty = createEditorSaveSnapshot(draft) !== savedSnapshot;
+  const snapshot = createEditorSaveSnapshot(draft);
+  const dirty = snapshot !== savedSnapshot;
   const saving = configMutation.isPending;
-
-  function updateDraft(transform: (current: AgentEditorDraft) => AgentEditorDraft) {
-    setDraft((current) => transform(current));
-    setRevision((currentRevision) => currentRevision + 1);
-  }
 
   async function persistDraft(
     draftToSave: AgentEditorDraft,
   ): Promise<{ error: string | null; ok: boolean }> {
-    if (readOnly) {
-      return { error: null, ok: false };
-    }
-
     const name = draftToSave.name.trim();
     const model = draftToSave.model.trim();
     const provider = draftToSave.provider.trim();
@@ -177,49 +146,42 @@ export function useAgentEditorModel({
   }
 
   return {
-    applyPatch(patch) {
-      updateDraft((current) => applyAgentEditorPatch(current, patch));
-    },
     dirty,
     discard() {
       setDraft(savedDraft);
-      setRevision((currentRevision) => currentRevision + 1);
-      setHighlightedSections(new Set());
-      setFocusSection(null);
       setSaveError(null);
     },
     draft,
-    focusSection,
-    highlightedSections,
-    readOnly,
-    revision,
     save,
     saveError,
     saving,
-    snapshotHash: createSnapshotHash(draft),
+    snapshot,
     setBuiltInTools(tools) {
-      updateDraft((current) => ({
+      setDraft((current) => ({
         ...current,
         builtInTools: normalizeAgentBuiltInTools(tools),
       }));
     },
     setDescription(description) {
-      updateDraft((current) => ({
+      setDraft((current) => ({
         ...current,
         description,
       }));
     },
     setEnvironmentId(environmentId) {
-      updateDraft((current) => withEnvironmentId(current, environmentId));
+      setDraft((current) => ({
+        ...current,
+        environmentId,
+      }));
     },
     setMcpServers(servers) {
-      updateDraft((current) => ({
+      setDraft((current) => ({
         ...current,
         mcpServers: normalizeMcpServers(servers),
       }));
     },
     setModel(model) {
-      updateDraft((current) => ({
+      setDraft((current) => ({
         ...current,
         model,
         providerOptions: normalizeRuntimeAdvancedSettings({
@@ -230,7 +192,7 @@ export function useAgentEditorModel({
       }));
     },
     setModelSelection(selection) {
-      updateDraft((current) => ({
+      setDraft((current) => ({
         ...current,
         model: selection.model,
         provider: selection.provider,
@@ -242,25 +204,25 @@ export function useAgentEditorModel({
       }));
     },
     setName(name) {
-      updateDraft((current) => ({
+      setDraft((current) => ({
         ...current,
         name,
       }));
     },
     setPrompt(prompt) {
-      updateDraft((current) => ({
+      setDraft((current) => ({
         ...current,
         prompt,
       }));
     },
     setProviderOptions(providerOptions) {
-      updateDraft((current) => ({
+      setDraft((current) => ({
         ...current,
         providerOptions,
       }));
     },
     setRuntime(runtime) {
-      updateDraft((current) => ({
+      setDraft((current) => ({
         ...current,
         providerOptions: normalizeRuntimeAdvancedSettings({
           modelId: current.model,
@@ -271,7 +233,7 @@ export function useAgentEditorModel({
       }));
     },
     setSkills(skills) {
-      updateDraft((current) => ({
+      setDraft((current) => ({
         ...current,
         skills,
       }));

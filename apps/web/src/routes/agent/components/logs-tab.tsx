@@ -4,11 +4,8 @@ import type { ComponentProps, ReactElement } from "react";
 import { useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 
-import {
-  getAgentSessionProcessEvents,
-  listAgentSessions,
-} from "@/domains/session/api/agent-session";
-import { getAgentSessionDiagnostics } from "@/domains/session/api/agent-session-retrieve";
+import { listAgentSessions } from "@/domains/session/api/agent-session";
+import { getSessionProcessEvents } from "@/domains/session/api/thread-projections";
 import { toAgentId, toProjectId } from "@/routes/typed-id";
 import { getCurrentLocale, useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
@@ -24,11 +21,10 @@ import { SessionDiagnosticsPanel } from "./session-diagnostics-panel";
 const SESSION_QUERY_PARAM = "session";
 const SESSION_LIST_REFRESH_MS = 5000;
 const SESSION_EVENTS_REFRESH_MS = 2500;
-const SESSION_DIAGNOSTICS_REFRESH_MS = 5000;
-
-function isSessionLive(status: SessionSummary["status"]): boolean {
-  return status !== "TERMINATED";
-}
+// The session turns IDLE before its run's last output is written, and a run
+// shorter than the list poll may never be listed as RUNNING, so the
+// per-session polls outlive the run by this window.
+const RUN_SETTLE_MS = 15_000;
 
 function formatRelativeTime(iso: string): string {
   const now = Date.now();
@@ -37,18 +33,22 @@ function formatRelativeTime(iso: string): string {
   const minute = 60_000;
   const hour = 60 * minute;
   const day = 24 * hour;
+  const relativeTime = new Intl.RelativeTimeFormat(getCurrentLocale(), {
+    numeric: "auto",
+    style: "narrow",
+  });
 
   if (diff < minute) {
-    return "just now";
+    return relativeTime.format(0, "second");
   }
   if (diff < hour) {
-    return `${Math.floor(diff / minute)}m ago`;
+    return relativeTime.format(-Math.floor(diff / minute), "minute");
   }
   if (diff < day) {
-    return `${Math.floor(diff / hour)}h ago`;
+    return relativeTime.format(-Math.floor(diff / hour), "hour");
   }
   if (diff < 7 * day) {
-    return `${Math.floor(diff / day)}d ago`;
+    return relativeTime.format(-Math.floor(diff / day), "day");
   }
   return new Date(iso).toLocaleDateString(getCurrentLocale(), {
     day: "numeric",
@@ -57,39 +57,43 @@ function formatRelativeTime(iso: string): string {
 }
 
 function EmptyState(): ReactElement {
+  const { t } = useTranslation();
+
   return (
     <div className="bg-paper-200 flex h-full items-center justify-center px-8">
       <div className="max-w-md text-center">
-        <div className="text-foreground text-[16px] font-medium">No sessions yet.</div>
-        <p className="text-muted-foreground mt-2 text-[13px] leading-6">
-          Once this agent runs a conversation, its runs will appear here with full transcript.
-        </p>
+        <div className="text-foreground text-[16px] font-medium">{t("agent.noSessionsTitle")}</div>
+        <p className="text-fg-3 mt-2 text-[13px] leading-6">{t("agent.noSessionsDescription")}</p>
       </div>
     </div>
   );
 }
 
-function formatRuntimeChip(session: SessionSummary): string | null {
-  if (isTruthy(session.runtimeId)) {
-    return session.runtimeId;
-  }
+type Translate = (key: string) => string;
 
-  return null;
-}
-
-function getReplayTimestamp(session: SessionSummary): { label: string; value: string } {
+function getReplayTimestamp(
+  session: SessionSummary,
+  t: Translate,
+): { label: string; value: string } {
   if (isTruthy(session.lastRun?.completedAt)) {
     return {
-      label: "ended",
+      label: t("agent.sessionEnded"),
       value: formatRelativeTime(session.lastRun.completedAt),
     };
   }
 
   return {
-    label: "updated",
+    label: t("files.updated"),
     value: formatRelativeTime(session.updatedAt),
   };
 }
+
+const SESSION_STATUS_LABEL_KEYS: Record<SessionSummary["status"], string> = {
+  IDLE: "agent.sessionIdle",
+  RESCHEDULING: "sessionEvents.turnStatusReconnecting",
+  RUNNING: "sessionEvents.turnStatusRunning",
+  TERMINATED: "sessionEvents.turnStatusTerminated",
+};
 
 function getSessionStatusVariant(
   status: SessionSummary["status"],
@@ -113,13 +117,13 @@ function getSessionStatusVariant(
   }
 }
 
-function getSessionTypeLabel(type: SessionSummary["type"]): string {
+function getSessionTypeLabel(type: SessionSummary["type"], t: Translate): string {
   switch (type) {
     case "preview": {
-      return "Preview";
+      return t("agent.preview");
     }
     case "ui": {
-      return "UI";
+      return t("agent.sessionTypeUi");
     }
     default: {
       return unreachableCase(type, "Unsupported session type.");
@@ -135,7 +139,7 @@ function getSessionTypeVariant(
       return "warning";
     }
     case "ui": {
-      return "primary";
+      return "default";
     }
     default: {
       return unreachableCase(type, "Unsupported session type.");
@@ -154,7 +158,8 @@ function SessionListRow({
   session: SessionSummary;
   onSelect: () => void;
 }): ReactElement {
-  const replay = getReplayTimestamp(session);
+  const { t } = useTranslation();
+  const replay = getReplayTimestamp(session, t);
   const model = session.lastRun?.model ?? session.model ?? null;
 
   return (
@@ -168,9 +173,9 @@ function SessionListRow({
     >
       <div className="min-w-0">
         <div className="text-foreground line-clamp-1 text-[13.5px] font-medium">
-          {session.title ?? "Untitled session"}
+          {session.title ?? t("agent.untitledSession")}
         </div>
-        <div className="text-muted-foreground mt-0.5 flex min-w-0 items-center gap-1.5 text-[11.5px]">
+        <div className="text-fg-3 mt-0.5 flex min-w-0 items-center gap-1.5 text-[11.5px]">
           <span className="truncate font-mono" title={session.id}>
             {session.id}
           </span>
@@ -179,20 +184,15 @@ function SessionListRow({
           ) : null}
         </div>
       </div>
-      <Badge
-        variant={getSessionStatusVariant(session.status)}
-        className="h-5 justify-self-start text-[10px]"
-      >
-        {session.status}
+      <Badge variant={getSessionStatusVariant(session.status)} className="justify-self-start">
+        {t(SESSION_STATUS_LABEL_KEYS[session.status])}
       </Badge>
-      <span className="text-muted-foreground truncate text-[11.5px]">
-        {session.runtimeId ?? "—"}
-      </span>
-      <span className="text-muted-foreground truncate text-[11.5px]">{model ?? "—"}</span>
-      <span className="text-muted-foreground text-[11.5px]" suppressHydrationWarning>
+      <span className="text-fg-3 truncate text-[11.5px]">{session.runtimeId ?? "—"}</span>
+      <span className="text-fg-3 truncate text-[11.5px]">{model ?? "—"}</span>
+      <span className="text-fg-3 text-[11.5px]" suppressHydrationWarning>
         {replay.label} {replay.value}
       </span>
-      <ChevronRight className="text-muted-foreground size-4 justify-self-end transition-transform group-hover:translate-x-0.5" />
+      <ChevronRight className="text-fg-3 size-4 justify-self-end transition-transform group-hover:translate-x-0.5" />
     </button>
   );
 }
@@ -211,11 +211,15 @@ function SessionListView({
       <ScrollArea className="min-h-0 flex-1">
         <div className="mx-auto w-full max-w-5xl p-5">
           <div className="mb-3 flex items-baseline justify-between gap-3">
-            <h2 className="text-foreground text-[15px] font-semibold">Sessions</h2>
-            <span className="text-muted-foreground text-[12px]">{sessions.length} total</span>
+            <h2 className="text-foreground text-[15px] font-semibold">
+              {t("agent.sessionsHeading")}
+            </h2>
+            <span className="text-fg-3 text-[12px]">
+              {t("agent.sessionsTotal", { count: String(sessions.length) })}
+            </span>
           </div>
-          <div className="border-border-subtle overflow-hidden rounded-lg border bg-white">
-            <div className="border-border-subtle bg-muted/30 text-fg-2 grid grid-cols-[minmax(0,1fr)_120px_140px_160px_120px_24px] gap-4 border-b px-4 py-2 text-[12px] font-medium">
+          <div className="border-border-soft bg-card overflow-hidden rounded-lg border">
+            <div className="border-border-soft bg-sunken/30 text-fg-2 grid grid-cols-[minmax(0,1fr)_120px_140px_160px_120px_24px] gap-4 border-b px-4 py-2 text-[12px] font-medium">
               <span>{t("agent.session")}</span>
               <span>{t("agent.status")}</span>
               <span>{t("agent.runtime")}</span>
@@ -250,57 +254,53 @@ function SessionDetailView({
   onBack: () => void;
 }): ReactElement {
   const { t } = useTranslation();
-  const sessionLive = isSessionLive(selected.status);
+  // `selected` comes from the polled list, so a newly started or newly
+  // finished run turns the per-session polls back on.
+  const running = selected.status === "RUNNING" || selected.status === "RESCHEDULING";
+  const settleUntilMs = Date.parse(selected.lastRun?.completedAt ?? "") + RUN_SETTLE_MS;
+  // TanStack re-evaluates a function interval after every fetch, so each poll
+  // switches itself off once the settle window closes.
+  const pollEvery = (intervalMs: number) => (): number | false =>
+    running || Date.now() < settleUntilMs ? intervalMs : false;
   const {
     data: processEvents = [],
     error: processEventsError,
     isLoading: processEventsLoading,
   } = useQuery({
-    queryFn: async () => getAgentSessionProcessEvents(selected.projectId, selected.id),
+    queryFn: async () => getSessionProcessEvents(selected.projectId, selected.id),
     queryKey: ["session-process-events", selected.id],
-    refetchInterval: sessionLive ? SESSION_EVENTS_REFRESH_MS : false,
+    refetchInterval: pollEvery(SESSION_EVENTS_REFRESH_MS),
   });
-  const { data: sessionDiagnostics, isLoading: sessionDiagnosticsLoading } = useQuery({
-    queryFn: async () =>
-      getAgentSessionDiagnostics({
-        projectId: selected.projectId,
-        sessionId: selected.id,
-      }),
-    queryKey: ["agent-session-diagnostics", selected.id],
-    refetchInterval: sessionLive ? SESSION_DIAGNOSTICS_REFRESH_MS : false,
-  });
-  const diagnostics = sessionDiagnostics?.agentSessionDiagnostics ?? null;
-  const runtimeChip = formatRuntimeChip(selected);
-  const replay = getReplayTimestamp(selected);
+  const replay = getReplayTimestamp(selected, t);
 
   return (
     <div className="bg-paper-200 flex h-full flex-col" data-testid="agent-diagnostics-logs">
-      <header className="border-border-subtle border-b bg-white px-5 py-3">
+      <header className="border-border-soft bg-card border-b px-5 py-3">
         <div className="flex items-start gap-3">
           <Button
             variant="ghost"
             size="icon-sm"
             onClick={onBack}
             aria-label={t("agent.backToSessions")}
-            className="text-muted-foreground mt-0.5 -ml-1"
+            className="text-fg-3 mt-0.5 -ml-1"
           >
             <ArrowLeft className="size-4" />
           </Button>
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 flex-wrap items-center gap-2">
               <div className="text-foreground line-clamp-1 min-w-0 text-[14px] font-medium">
-                {selected.title ?? "Untitled session"}
+                {selected.title ?? t("agent.untitledSession")}
               </div>
-              {runtimeChip ? (
-                <span className="border-border bg-muted/40 text-fg-2 rounded-sm border px-1 py-0.5 text-[10.5px] font-semibold">
-                  {runtimeChip}
+              {isTruthy(selected.runtimeId) ? (
+                <span className="border-border bg-sunken/40 text-fg-2 rounded-sm border px-1 py-0.5 text-[10.5px] font-semibold">
+                  {selected.runtimeId}
                 </span>
               ) : null}
               <Badge variant={getSessionTypeVariant(selected.type)}>
-                {getSessionTypeLabel(selected.type)}
+                {getSessionTypeLabel(selected.type, t)}
               </Badge>
             </div>
-            <div className="text-muted-foreground mt-1 flex flex-wrap items-center gap-2 text-[11px]">
+            <div className="text-fg-3 mt-1 flex flex-wrap items-center gap-2 text-[11px]">
               <span>{t("agent.replay")}</span>
               <span>·</span>
               <span suppressHydrationWarning>
@@ -326,32 +326,30 @@ function SessionDetailView({
               ) : null}
             </div>
           </div>
-          <Badge variant={getSessionStatusVariant(selected.status)}>{selected.status}</Badge>
+          <Badge variant={getSessionStatusVariant(selected.status)}>
+            {t(SESSION_STATUS_LABEL_KEYS[selected.status])}
+          </Badge>
         </div>
       </header>
 
       <div className="flex min-h-0 flex-1 flex-col xl:flex-row">
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           {processEventsLoading ? (
-            <div className="text-muted-foreground flex flex-1 items-center justify-center text-[13px]">
-              Loading session events…
+            <div className="text-fg-3 flex flex-1 items-center justify-center text-[13px]">
+              {t("agent.loadingSessionEvents")}
             </div>
           ) : processEventsError ? (
-            <div className="text-destructive flex flex-1 items-center justify-center px-6 text-[13px]">
+            <div className="text-danger flex flex-1 items-center justify-center px-6 text-[13px]">
               {processEventsError instanceof Error
                 ? processEventsError.message
-                : "Failed to load session events."}
+                : t("agent.loadSessionEventsFailed")}
             </div>
           ) : (
             <SessionEventFeed events={processEvents} />
           )}
         </div>
 
-        <SessionDiagnosticsPanel
-          diagnostics={diagnostics}
-          loading={sessionDiagnosticsLoading}
-          selected={selected}
-        />
+        <SessionDiagnosticsPanel pollEvery={pollEvery} selected={selected} />
       </div>
     </div>
   );
@@ -364,6 +362,7 @@ export function LogsTab({
   agentId: string;
   projectId: string;
 }): ReactElement {
+  const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const sessionParam = searchParams.get(SESSION_QUERY_PARAM);
   const { data: agentSessions = [], isLoading } = useQuery({
@@ -407,8 +406,8 @@ export function LogsTab({
 
   if (isLoading) {
     return (
-      <div className="text-muted-foreground flex h-full items-center justify-center text-[13px]">
-        Loading sessions…
+      <div className="text-fg-3 flex h-full items-center justify-center text-[13px]">
+        {t("agent.loadingSessions")}
       </div>
     );
   }

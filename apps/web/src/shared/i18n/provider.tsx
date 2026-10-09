@@ -1,7 +1,7 @@
 import { createContext, useContext, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
-import { DEFAULT_LOCALE, resolveLocale } from "./locales";
+import { DEFAULT_LOCALE, getCurrentLocale } from "./locales";
 import type { SupportedLocale } from "./locales";
 import en from "./translations/en.json";
 import ja from "./translations/ja.json";
@@ -33,13 +33,8 @@ function lookup(tree: TranslationTree, key: string): string {
   return typeof value === "string" ? value : key;
 }
 
-function detectInitialLocale(): SupportedLocale {
-  if (typeof window === "undefined") return DEFAULT_LOCALE;
-  return resolveLocale(localStorage.getItem("mosoo-locale") ?? navigator.language);
-}
-
 export function I18nProvider({ children }: { children: ReactNode }) {
-  const [language, setLanguage] = useState<SupportedLocale>(detectInitialLocale);
+  const [language, setLanguage] = useState<SupportedLocale>(getCurrentLocale);
   const value = useMemo<I18nContextValue>(
     () => ({
       language,

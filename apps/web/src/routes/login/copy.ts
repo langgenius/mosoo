@@ -27,17 +27,6 @@ export function getAuthClientErrorMessage(
   return error.message ?? error.error ?? "login.unexpectedError";
 }
 
-export function getSocialAuthErrorMessage(
-  error: {
-    code?: string | undefined;
-    error?: string | undefined;
-    message?: string | undefined;
-    status?: number | undefined;
-  } | null,
-): string {
-  return getAuthClientErrorMessage(error);
-}
-
 export function decodeAuthError(errorCode: string | null | undefined): string | null {
   if (errorCode === null || errorCode === undefined) {
     return null;

@@ -61,8 +61,8 @@ export function ThreadFilterBar({
           className={cn(
             "inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2.5 text-[12px] font-semibold transition-colors",
             activeFilter === filter.value
-              ? "bg-ink-900 text-white"
-              : "text-fg-2 hover:bg-ink-900/[0.05] hover:text-fg-1",
+              ? "bg-emphasis text-emphasis-foreground"
+              : "text-fg-2 hover:bg-hover hover:text-fg-1",
           )}
         >
           <span>{t(filter.label)}</span>
@@ -95,7 +95,7 @@ export function NotificationPrompt({
   }
 
   return (
-    <div className="border-border-subtle bg-ink-50 mb-3 flex items-center gap-2 rounded-md border px-3 py-2">
+    <div className="border-border-soft bg-sunken mb-3 flex items-center gap-2 rounded-md border px-3 py-2">
       <Bell className="text-fg-3 size-3.5 shrink-0" />
       <div className="text-fg-2 min-w-0 flex-1 text-[12px] font-medium">
         {t("threads.enableNotifications")}
@@ -169,7 +169,7 @@ function ThreadRow({
         />
 
         {thread.pinned ? (
-          <Pin className="text-amber -mr-1 size-3 shrink-0" aria-label={t("threads.pinned")} />
+          <Pin className="text-warning -mr-1 size-3 shrink-0" aria-label={t("threads.pinned")} />
         ) : null}
 
         <span
@@ -206,7 +206,7 @@ function ThreadRow({
           className="absolute inset-0 rounded-md"
           style={{
             backgroundImage:
-              "linear-gradient(rgba(11,26,20,0.025),rgba(11,26,20,0.025)),linear-gradient(var(--bg),var(--bg))",
+              "linear-gradient(var(--hover),var(--hover)),linear-gradient(var(--bg),var(--bg))",
             maskImage: "linear-gradient(to right, transparent, black 24px)",
             WebkitMaskImage: "linear-gradient(to right, transparent, black 24px)",
           }}
@@ -280,23 +280,6 @@ export function ThreadSectionGroup({
     return null;
   }
 
-  if (threads.length === 0 && section === "archived") {
-    return (
-      <section>
-        <button
-          type="button"
-          onClick={() => {
-            onCollapseChange(!collapsed);
-          }}
-          className="text-fg-3 hover:text-fg-1 flex h-7 items-center gap-1.5 text-[12px] font-medium"
-        >
-          {collapsed ? <ChevronRight className="size-3" /> : <ChevronDown className="size-3" />}
-          {t(SECTION_LABELS[section])} ({threads.length})
-        </button>
-      </section>
-    );
-  }
-
   return (
     <section>
       <button
@@ -309,7 +292,7 @@ export function ThreadSectionGroup({
         {collapsed ? <ChevronRight className="size-3" /> : <ChevronDown className="size-3" />}
         {t(SECTION_LABELS[section])} ({threads.length})
       </button>
-      {collapsed ? null : (
+      {collapsed || (threads.length === 0 && section === "archived") ? null : (
         <div className="mt-1 flex flex-col gap-0.5">
           {threads.map((thread) => (
             <ThreadRow

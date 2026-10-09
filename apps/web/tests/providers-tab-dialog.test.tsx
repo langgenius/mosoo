@@ -383,16 +383,16 @@ describe("ProvidersTab custom model dialog", () => {
     setupFetch();
     await renderProviders();
 
-    expect(document.querySelector("main")?.textContent).not.toContain("Custom Provider");
+    expect(document.querySelector("main")?.textContent).not.toContain("Custom provider");
 
     await openCustomModelDialog();
 
     const dialog = queryDialog();
-    expect(dialog?.textContent).toContain("Add Custom Provider key");
+    expect(dialog?.textContent).toContain("Add Custom provider key");
     expect(dialog?.textContent).toContain("Base URL");
     expect(dialog?.textContent).toContain("Models");
     expect(protocolSelect().textContent).toContain("OpenAI Chat Completions");
-    expect(document.querySelector("main")?.textContent).not.toContain("Add Custom Provider key");
+    expect(document.querySelector("main")?.textContent).not.toContain("Add Custom provider key");
   });
 
   test("cancel closes the custom model dialog and clears draft state", async () => {

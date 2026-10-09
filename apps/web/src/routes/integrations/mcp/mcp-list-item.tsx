@@ -1,3 +1,5 @@
+import type { McpServerWithCredential } from "@mosoo/contracts/mcp";
+
 import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Badge } from "@/shared/ui/badge";
@@ -12,9 +14,8 @@ import {
 import { Check, MoreHorizontal, Pencil, Power, PowerOff, Trash2, Unplug } from "@/shared/ui/icons";
 import { ConnectionRow } from "@/shared/ui/list-row";
 
-import { authTypeLabel, statusText } from "./format";
+import { authTypeLabel } from "./format";
 import { IconAvatar } from "./icon-avatar";
-import type { McpServerWithCredential } from "./mcp-types";
 
 interface Props {
   server: McpServerWithCredential;
@@ -84,7 +85,7 @@ export function McpListItem({
         {isAuthorized ? (
           <Badge variant="success">
             <Check />
-            {statusText("active", t)}
+            {t("mcp.statusAuthorized")}
           </Badge>
         ) : (
           <Button disabled={!server.enabled} onClick={onConnect} size="sm" variant="outline">

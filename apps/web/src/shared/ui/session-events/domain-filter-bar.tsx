@@ -32,7 +32,7 @@ export function DomainFilterBar({
   const filtered = visibleCount !== totalCount;
 
   return (
-    <div className="border-border-subtle sticky top-0 z-10 flex min-h-12 flex-wrap items-center justify-between gap-2 border-b bg-white/95 px-4 py-2 backdrop-blur">
+    <div className="border-border-soft bg-card/95 sticky top-0 z-10 flex min-h-12 flex-wrap items-center justify-between gap-2 border-b px-4 py-2 backdrop-blur">
       <div className="flex flex-wrap items-center gap-1.5">
         {SESSION_EVENT_FILTER_DOMAINS.map((domain) => {
           const active = domains.has(domain);
@@ -47,7 +47,7 @@ export function DomainFilterBar({
               }}
               className={cn(
                 "inline-flex h-7 items-center gap-1.5 rounded-md border px-2 text-[11.5px] font-semibold transition-colors",
-                active ? tone.chip : "border-border bg-card text-fg-3 hover:bg-muted/50",
+                active ? tone.chip : "border-border bg-card text-fg-3 hover:bg-sunken/50",
               )}
             >
               <span className={cn("size-2 rounded-sm", tone.swatch)} />
@@ -61,8 +61,8 @@ export function DomainFilterBar({
           className={cn(
             "inline-flex h-7 items-center gap-1.5 rounded-md border px-2 text-[11.5px] font-semibold transition-colors",
             errorsOnly
-              ? "border-amber/30 bg-amber-bg text-amber-fg"
-              : "border-border bg-card text-fg-3 hover:bg-muted/50",
+              ? "border-warning/30 bg-warning-bg text-warning-fg"
+              : "border-border bg-card text-fg-3 hover:bg-sunken/50",
           )}
         >
           {errorsOnly ? <AlertTriangle className="size-3" /> : null}
@@ -80,7 +80,7 @@ export function DomainFilterBar({
           <button
             type="button"
             onClick={onReset}
-            className="text-accent-press font-semibold hover:underline"
+            className="text-link hover:text-link-hover font-semibold underline"
           >
             {t("sessionEvents.resetFilter")}
           </button>

@@ -10,7 +10,6 @@ const ONBOARDING_BOOTSTRAP_MUTATION = graphql(/* GraphQL */ `
     onboardingBootstrap(input: $input) {
       completed
       organization {
-        avatarUrl
         createdAt
         id
         name
@@ -19,12 +18,8 @@ const ONBOARDING_BOOTSTRAP_MUTATION = graphql(/* GraphQL */ `
   }
 `);
 
-export async function onboardingBootstrap(input?: {
-  name?: string;
-}): Promise<{ organization: OrganizationSummary }> {
-  const payload = await requestGraphQL(ONBOARDING_BOOTSTRAP_MUTATION, {
-    input: input ?? {},
-  });
+export async function onboardingBootstrap(): Promise<{ organization: OrganizationSummary }> {
+  const payload = await requestGraphQL(ONBOARDING_BOOTSTRAP_MUTATION, { input: {} });
 
   if (!payload.onboardingBootstrap.organization) {
     throw new Error("Project provisioning failed.");

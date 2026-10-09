@@ -26,6 +26,7 @@ const RECIPES = {
   label: "../src/shared/ui/label.tsx",
   listRow: "../src/shared/ui/list-row.tsx",
   pageHeader: "../src/shared/ui/page-header.tsx",
+  segmentedControl: "../src/shared/ui/segmented-control.tsx",
   select: "../src/shared/ui/select.tsx",
   sidebar: "../src/shared/ui/sidebar.tsx",
   switch: "../src/shared/ui/switch.tsx",
@@ -310,16 +311,15 @@ describe("Console design contract", () => {
     // Group labels are sentence case (owner review, #619): no tracked capitals.
     expect(CSS).not.toMatch(/\.t-group-label \{[^}]*text-transform: uppercase/u);
     expect(CSS).not.toContain("--track-caps");
-    expect(CSS).toContain(".t-mono");
     expect(CSS).toMatch(/\.t-page-title \{[^}]*letter-spacing: var\(--track-title\)/u);
     expect(CSS).toMatch(/\.t-page-title \{[^}]*line-height: 1\.75rem/u);
   });
 
   test("ships one sans family and one mono family, self-hosted with licences", () => {
-    // Typography (contract section 3, docs/design/typography-audit.md): Geist
-    // carries every sans role including page titles, Geist Mono carries
-    // precise information, and a metric-matched local fallback covers the
-    // swap. No other family is declared or shipped.
+    // Typography (contract section 3): Geist carries every sans role including
+    // page titles, Geist Mono carries precise information, and a
+    // metric-matched local fallback covers the swap. No other family is
+    // declared or shipped.
     const faces = [...CSS.matchAll(/@font-face \{[^}]*font-family: "([^"]+)"/gu)].map(
       (match) => match[1],
     );
@@ -382,12 +382,81 @@ describe("Console design contract", () => {
     expect(rows).toContain('data-slot="connection-row"');
     expect(rows).toContain("min-h-11");
 
+    // Precise information (ids, keys, durations) is the one mono role.
+    const mono = readSource("../src/shared/ui/mono-text.tsx");
+    expect(mono).toContain('data-slot="mono"');
+    expect(mono).toContain("font-mono");
+    expect(mono).toContain("tabular-nums");
+
     expect(readSource(RECIPES.pageHeader)).toContain("t-page-title");
     // The single-choice view toggle is a real radio group (Base UI supplies
     // the roles, roving focus, and arrow-key movement).
     expect(readSource(RECIPES.viewToggle)).toContain('from "@base-ui/react/radio-group"');
     expect(readSource(RECIPES.viewToggle)).toContain("<Radio.Root");
     expect(readSource(RECIPES.viewToggle)).not.toContain('role="radio"');
+  });
+
+  test("the Overview stays on the shared header and button recipes", () => {
+    // The Overview's header is PageHeader with no kicker, and its install lane
+    // copies through the shared Button, never a raw brand value (#617, #621).
+    const route = readSource("../src/routes/project-overview/project-overview.route.tsx");
+    const install = readSource("../src/routes/project-overview/project-overview-install.tsx");
+    expect(route).toContain("<PageHeader");
+    expect(route).not.toContain("uppercase");
+    expect(install).toContain("<Button");
+    expect(install).not.toContain("rgb(111_211_4)");
+    expect(install).not.toMatch(/#[0-9a-f]{6}\b/iu);
+  });
+
+  test("ships the light theme only: no dark: utilities in the console", () => {
+    // Nothing sets the .dark class, and Tailwind's dark: variant follows the
+    // operating system, so a dark: utility darkens one control on a light page
+    // (contract section 1).
+    const offenders: string[] = [];
+    for (const file of readdirSync(SRC_DIR, { recursive: true }).map(String)) {
+      if (!/\.tsx?$/u.test(file)) {
+        continue;
+      }
+      const match = /(?:^|[\s"'`])dark:[\w[!-]/mu.exec(
+        readFileSync(new URL(file, SRC_DIR), "utf8"),
+      );
+      if (match) {
+        offenders.push(`${file}: ${match[0].trim()}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  test("sets no text in tracked capitals", () => {
+    // Labels are sentence case (contract section 3, #619, #621).
+    const offenders: string[] = [];
+    for (const file of readdirSync(SRC_DIR, { recursive: true }).map(String)) {
+      if (!file.endsWith(".tsx")) {
+        continue;
+      }
+      if (/(?<![\w-])uppercase(?![\w-])/u.test(readFileSync(new URL(file, SRC_DIR), "utf8"))) {
+        offenders.push(file);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  test("the console uses the semantic roles, not the retired aliases", () => {
+    // The pre-contract aliases are no longer bridged, so such a class would
+    // render nothing (contract section 1).
+    const retired =
+      /(?<![\w-])(?:[^\s"'`{}]*:)?!?(?:bg|text|border|border-[trblxyse]|ring|ring-offset|outline|fill|stroke|divide|from|via|to|decoration|placeholder|caret|shadow)-(?:muted-foreground|muted|accent-soft|accent-press|accent|on-accent|brand-light|brand-ring|border-subtle|border-default|bg-sunken|secondary|amber(?:-fg|-bg)?|ember(?:-fg|-bg)?|sky(?:-fg|-bg)?|destructive)(?:\/[\w.[\]]+)?(?![\w-])|var\(--color-(?:amber|ember|sky)\)/u;
+    const offenders: string[] = [];
+    for (const file of readdirSync(SRC_DIR, { recursive: true }).map(String)) {
+      if (!/\.tsx?$/u.test(file) || file.startsWith("gql/")) {
+        continue;
+      }
+      const match = retired.exec(readFileSync(new URL(file, SRC_DIR), "utf8"));
+      if (match) {
+        offenders.push(`${file}: ${match[0]}`);
+      }
+    }
+    expect(offenders).toEqual([]);
   });
 
   test("shared recipes use the one focus ring and never fade disabled controls", () => {
@@ -398,6 +467,7 @@ describe("Console design contract", () => {
       RECIPES.switch,
       RECIPES.sidebar,
       RECIPES.viewToggle,
+      RECIPES.segmentedControl,
     ]) {
       expect({ path, ring: readSource(path).includes("focus-visible:ring-2") }).toEqual({
         path,
@@ -443,6 +513,7 @@ describe("Console design contract", () => {
       RECIPES.table,
       RECIPES.textarea,
       RECIPES.viewToggle,
+      RECIPES.segmentedControl,
       RECIPES.sidebar,
     ]) {
       expect({ path, offender: restingShadow.exec(readSource(path))?.[0] ?? null }).toEqual({
@@ -457,6 +528,7 @@ describe("Console design contract", () => {
       });
     }
     expect(readSource(RECIPES.viewToggle)).toContain("data-[checked]:shadow-xs");
+    expect(readSource(RECIPES.segmentedControl)).toContain("data-[checked]:shadow-xs");
   });
 
   test("nothing in the console rounds past the 6px surface corner", () => {
@@ -493,7 +565,7 @@ describe("Console design contract", () => {
     }
   });
 
-  test("every general icon registration is in the icon registry", () => {
+  test("the icon registry lists exactly the registered Hugeicons glyphs", () => {
     const registry = parseYaml(readSource("../../../docs/design/registry/icons.yml")) as {
       general: Record<string, string>;
       navigation: Record<string, { owner: string; source: string }>;
@@ -501,32 +573,29 @@ describe("Console design contract", () => {
     };
 
     const adapter = readSource("../src/shared/ui/icons.tsx");
+    const general: Record<string, string> = {};
     for (const [, exportName, source] of adapter.matchAll(
       /export const (\w+) = \/\* @__PURE__ \*\/ createHugeicon\(\s*(\w+),/gu,
     )) {
-      expect({ exportName, registered: registry.general[exportName ?? ""] }).toEqual({
-        exportName,
-        registered: source,
-      });
+      general[exportName ?? ""] = source ?? "";
     }
+    // Both directions: a new glyph is registered in the same change, and a
+    // deleted export leaves the registry with it.
+    expect(registry.general).toEqual(general);
 
-    const localSources = [
-      "../src/app/account-menu.tsx",
-      "../src/app/app-shell.tsx",
-      "../src/app/navigation.tsx",
-      "../src/app/org-navigation.tsx",
-      "../src/shared/i18n/locale-switcher.tsx",
-    ];
-    for (const path of localSources) {
-      for (const [, source, name] of readSource(path).matchAll(
+    // Glyphs a shell file registers next to the surface that owns it.
+    const navigation: Record<string, { owner: string; source: string }> = {};
+    for (const owner of readdirSync(SRC_DIR, { recursive: true }).map(String)) {
+      if (!owner.endsWith(".tsx") || owner === "shared/ui/icons.tsx") {
+        continue;
+      }
+      for (const [, source, name] of readFileSync(new URL(owner, SRC_DIR), "utf8").matchAll(
         /createHugeicon\(\s*(\w+),\s*"(\w+)"/gu,
       )) {
-        expect({ name, entry: registry.navigation[name ?? ""]?.source }).toEqual({
-          name,
-          entry: source,
-        });
+        navigation[name ?? ""] = { owner, source: source ?? "" };
       }
     }
+    expect(registry.navigation).toEqual(navigation);
 
     for (const group of ["product", "sidebar", "vendor", "runtime", "channel", "state"]) {
       expect(registry.purpose_built[group]).toBeDefined();

@@ -5,12 +5,9 @@ import { requestGraphQL } from "@/platform/http/graphql-client";
 
 import { toOrganizationSummary } from "./organization-mappers";
 
-export * from "./index";
-
 const RENAME_ORGANIZATION_MUTATION = graphql(/* GraphQL */ `
   mutation RenameOrganization($input: RenameOrganizationInput!) {
     renameOrganization(input: $input) {
-      avatarUrl
       createdAt
       id
       name

@@ -8,6 +8,17 @@ import {
   ThreadRunFailureNotice,
 } from "../src/routes/threads/detail/run-failure-notice";
 import { I18nProvider } from "../src/shared/i18n";
+import en from "../src/shared/i18n/translations/en.json";
+
+function translate(key: string, variables: Record<string, string> = {}): string {
+  const text = key
+    .split(".")
+    .reduce<unknown>((node, part) => (node as Record<string, unknown>)[part], en);
+  return Object.entries(variables).reduce(
+    (result, [name, value]) => result.replaceAll(`{{${name}}}`, value),
+    String(text),
+  );
+}
 
 function createRun(
   status: SessionRunStatus,
@@ -40,7 +51,7 @@ describe("thread run failure notice", () => {
         message: "Upstream rejection",
         retryable: false,
       });
-      const failure = getThreadRunFailure(run);
+      const failure = getThreadRunFailure(run, translate);
       expect(failure?.message).toContain("will not be retried automatically");
       expect(failure?.message).toContain("Earlier tool actions may already have completed");
       expect(failure?.title).not.toBe("Run failed");
@@ -70,12 +81,12 @@ describe("thread run failure notice", () => {
   });
 
   test("provides status-specific copy when no run error was recorded", () => {
-    expect(getThreadRunFailure(createRun("cancelled"))).toMatchObject({
+    expect(getThreadRunFailure(createRun("cancelled"), translate)).toMatchObject({
       code: null,
       message: "The run was cancelled before it completed.",
       title: "Run cancelled",
     });
-    expect(getThreadRunFailure(createRun("expired"))).toMatchObject({
+    expect(getThreadRunFailure(createRun("expired"), translate)).toMatchObject({
       code: null,
       message: "The run expired before it completed.",
       title: "Run expired",
@@ -91,7 +102,7 @@ describe("thread run failure notice", () => {
   test("does not render for a successful run", () => {
     const run = createRun("completed");
 
-    expect(getThreadRunFailure(run)).toBeNull();
+    expect(getThreadRunFailure(run, translate)).toBeNull();
     expect(
       renderToStaticMarkup(
         <I18nProvider>

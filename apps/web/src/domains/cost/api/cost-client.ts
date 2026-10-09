@@ -1,20 +1,12 @@
-import type { AgentId, ProjectId } from "@mosoo/contracts/id";
+import type { AccountId, AgentId, ProjectId, SessionId, SessionRunId } from "@mosoo/id";
 
 import type {
   AgentCostCardQuery,
   CostAgentFieldsFragment,
-  CostAttributionFieldsFragment,
   CostRecentSessionFieldsFragment,
   ProjectCostCardQuery,
 } from "@/gql/graphql";
 import { requestGraphQL } from "@/platform/http/graphql-client";
-import {
-  toAccountId,
-  toAgentId,
-  toNullableSessionId,
-  toNullableSessionRunId,
-  toProjectId,
-} from "@/routes/typed-id";
 
 import { AGENT_COST_QUERY, PROJECT_COST_QUERY } from "./cost-graphql-documents";
 import type {
@@ -31,33 +23,32 @@ export type {
   AgentCostCard,
   CostAgentRow,
   CostAttributionCard,
-  CostDailyPoint,
   CostModelRow,
   CostRangeInput,
-  CostRecentSession,
   CostRunPurpose,
   CostTotals,
-  OrganizationBillingCostCard,
   ProjectCostCard,
 } from "./cost-model";
 
 function toCostAgentRow(agent: CostAgentFieldsFragment): CostAgentRow {
   return {
     ...agent,
-    agentId: agent.agentId == null ? null : toAgentId(agent.agentId),
-    ownerId: toAccountId(agent.ownerId),
+    agentId: agent.agentId as AgentId | null,
+    ownerId: agent.ownerId as AccountId,
   };
 }
 
 function toCostRecentSession(session: CostRecentSessionFieldsFragment): CostRecentSession {
   return {
     ...session,
-    sessionId: toNullableSessionId(session.sessionId),
-    sessionRunId: toNullableSessionRunId(session.sessionRunId),
+    sessionId: session.sessionId as SessionId | null,
+    sessionRunId: session.sessionRunId as SessionRunId | null,
   };
 }
 
-function toCostAttributionCard(card: CostAttributionFieldsFragment): CostAttributionCard {
+function toCostAttributionCard(
+  card: AgentCostCardQuery["agentCostCard"] | ProjectCostCardQuery["projectCostCard"],
+): CostAttributionCard {
   return {
     ...card,
     agents: card.agents.map(toCostAgentRow),
@@ -69,7 +60,7 @@ function toProjectCostCard(card: ProjectCostCardQuery["projectCostCard"]): Proje
   return {
     ...toCostAttributionCard(card),
     previousTotals: card.previousTotals,
-    projectId: toProjectId(card.projectId),
+    projectId: card.projectId as ProjectId,
     projectName: card.projectName,
   };
 }
@@ -77,9 +68,9 @@ function toProjectCostCard(card: ProjectCostCardQuery["projectCostCard"]): Proje
 function toAgentCostCard(card: AgentCostCardQuery["agentCostCard"]): AgentCostCard {
   return {
     ...toCostAttributionCard(card),
-    agentId: toAgentId(card.agentId),
+    agentId: card.agentId as AgentId,
     agentName: card.agentName,
-    ownerId: toAccountId(card.ownerId),
+    ownerId: card.ownerId as AccountId,
     ownerName: card.ownerName,
   };
 }

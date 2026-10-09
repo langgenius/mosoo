@@ -1,5 +1,5 @@
 import type { SkillInspectResult } from "@mosoo/contracts/skill";
-import { useReducer, useRef } from "react";
+import { useRef, useState } from "react";
 
 import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
@@ -15,6 +15,7 @@ import {
 import { Input } from "@/shared/ui/input";
 import { SkillFileCountBadge } from "@/shared/ui/skill-file-count-badge";
 
+import { inspectSkillUpload } from "../../../domains/skill/api/skill-client";
 import { countSkillFiles } from "../../../domains/skill/lib/skill-entries";
 import type { SkillFolderSelection } from "../../../domains/skill/lib/skill-folder-archive";
 import {
@@ -23,84 +24,51 @@ import {
   readFolderInputSelection,
 } from "../../../domains/skill/lib/skill-folder-archive";
 import { isTruthy } from "../../../shared/lib/truthiness";
-import type { useSkillRegistry } from "./use-skill-registry";
 type Mode = "file" | "url";
 
 type Prepared =
   | { kind: "file"; file: File; preview: SkillInspectResult }
   | { kind: "url"; url: string; preview: SkillInspectResult };
 
-interface UploadSkillState {
-  dragOver: boolean;
-  error: string | null;
-  inspecting: boolean;
-  mode: Mode;
-  prepared: Prepared | null;
-  submitting: boolean;
-  url: string;
-}
-
-type UploadSkillAction =
-  | { type: "clearError" }
-  | { type: "inspectUrlStart" }
-  | { type: "prepare"; prepared: Prepared }
-  | { type: "reset" }
-  | { type: "setDragOver"; dragOver: boolean }
-  | { type: "setError"; error: string }
-  | { type: "setMode"; mode: Mode }
-  | { type: "setSubmitting"; submitting: boolean }
-  | { type: "setUrl"; url: string };
-
-const UPLOAD_SKILL_INITIAL_STATE: UploadSkillState = {
-  dragOver: false,
-  error: null,
-  inspecting: false,
-  mode: "file",
-  prepared: null,
-  submitting: false,
-  url: "",
-};
-
-function uploadSkillReducer(state: UploadSkillState, action: UploadSkillAction): UploadSkillState {
-  switch (action.type) {
-    case "clearError":
-      return { ...state, error: null };
-    case "inspectUrlStart":
-      return { ...state, error: null, inspecting: true };
-    case "prepare":
-      return { ...state, error: null, inspecting: false, prepared: action.prepared };
-    case "reset":
-      return UPLOAD_SKILL_INITIAL_STATE;
-    case "setDragOver":
-      return { ...state, dragOver: action.dragOver };
-    case "setError":
-      return { ...state, error: action.error, inspecting: false, submitting: false };
-    case "setMode":
-      return { ...state, error: null, mode: action.mode };
-    case "setSubmitting":
-      return { ...state, submitting: action.submitting };
-    case "setUrl":
-      return { ...state, url: action.url };
-  }
-}
-
 interface Props {
   onOpenChange: (open: boolean) => void;
   onUpload: (file: File) => Promise<void> | void;
   onImportUrl: (url: string) => Promise<void> | void;
   open: boolean;
-  registry?: ReturnType<typeof useSkillRegistry>;
 }
 
-export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, registry }: Props) {
+export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open }: Props) {
   const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
-  const [state, dispatch] = useReducer(uploadSkillReducer, UPLOAD_SKILL_INITIAL_STATE);
-  const { dragOver, error, inspecting, mode, prepared, submitting, url } = state;
+  const [dragOver, setDragOver] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [inspecting, setInspecting] = useState(false);
+  const [mode, setMode] = useState<Mode>("file");
+  const [prepared, setPrepared] = useState<Prepared | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [url, setUrl] = useState("");
+
+  // A failure ends whatever step was running.
+  function fail(message: string) {
+    setError(message);
+    setInspecting(false);
+    setSubmitting(false);
+  }
+
+  function prepare(next: Prepared) {
+    setError(null);
+    setInspecting(false);
+    setPrepared(next);
+  }
 
   function reset() {
-    dispatch({ type: "reset" });
+    setError(null);
+    setInspecting(false);
+    setMode("file");
+    setPrepared(null);
+    setSubmitting(false);
+    setUrl("");
     if (inputRef.current) {
       inputRef.current.value = "";
     }
@@ -117,26 +85,19 @@ export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, r
   }
 
   async function inspectFile(file: File) {
-    const preview = registry ? await registry.inspectFile(file) : null;
-
-    if (!preview) {
-      throw new Error(t("skills.inspectUnavailable"));
-    }
-
-    dispatch({ prepared: { kind: "file", file, preview }, type: "prepare" });
+    prepare({ kind: "file", file, preview: await inspectSkillUpload({ file }) });
   }
 
-  function dispatchInspectError(caughtError: unknown) {
-    dispatch({
-      error: t("skills.failedToInspect", {
+  function failInspect(caughtError: unknown) {
+    fail(
+      t("skills.failedToInspect", {
         error: caughtError instanceof Error ? caughtError.message : String(caughtError),
       }),
-      type: "setError",
-    });
+    );
   }
 
   async function handleFiles(files: FileList | null) {
-    dispatch({ type: "clearError" });
+    setError(null);
     if (!files || files.length === 0) {
       return;
     }
@@ -144,12 +105,12 @@ export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, r
     try {
       await inspectFile(file);
     } catch (caughtError) {
-      dispatchInspectError(caughtError);
+      failInspect(caughtError);
     }
   }
 
   async function handleFolder(loadSelection: () => Promise<SkillFolderSelection | null>) {
-    dispatch({ type: "clearError" });
+    setError(null);
     try {
       const selection = await loadSelection();
 
@@ -160,32 +121,25 @@ export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, r
       const archive = await createSkillFolderArchiveFile(selection);
       await inspectFile(archive);
     } catch (caughtError) {
-      dispatchInspectError(caughtError);
+      failInspect(caughtError);
     }
   }
 
   async function handleInspectUrl() {
     const trimmed = url.trim();
+    setError(null);
     if (!trimmed) {
-      dispatch({ type: "clearError" });
       return;
     }
-    dispatch({ type: "inspectUrlStart" });
+    setInspecting(true);
     try {
-      const preview = registry ? await registry.inspectGithub(trimmed) : null;
-
-      if (!preview) {
-        throw new Error(t("skills.inspectUnavailable"));
-      }
-
-      dispatch({ prepared: { kind: "url", preview, url: trimmed }, type: "prepare" });
-    } catch (caughtError) {
-      dispatch({
-        error: t("skills.failedToInspect", {
-          error: caughtError instanceof Error ? caughtError.message : String(caughtError),
-        }),
-        type: "setError",
+      prepare({
+        kind: "url",
+        preview: await inspectSkillUpload({ githubUrl: trimmed }),
+        url: trimmed,
       });
+    } catch (caughtError) {
+      failInspect(caughtError);
     }
   }
 
@@ -193,7 +147,7 @@ export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, r
     if (!prepared) {
       return;
     }
-    dispatch({ submitting: true, type: "setSubmitting" });
+    setSubmitting(true);
     try {
       if (prepared.kind === "file") {
         await onUpload(prepared.file);
@@ -202,12 +156,11 @@ export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, r
       }
       handleOpenChange(false);
     } catch (caughtError) {
-      dispatch({
-        error: t("skills.failedToAdd", {
+      fail(
+        t("skills.failedToAdd", {
           error: caughtError instanceof Error ? caughtError.message : String(caughtError),
         }),
-        type: "setError",
-      });
+      );
     }
   }
 
@@ -254,7 +207,8 @@ export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, r
               active={mode === "file"}
               label={t("skills.uploadFile")}
               onClick={() => {
-                dispatch({ mode: "file", type: "setMode" });
+                setError(null);
+                setMode("file");
               }}
             />
             <span className="bg-border-strong h-5 w-px" />
@@ -262,36 +216,33 @@ export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, r
               active={mode === "url"}
               label={t("skills.fromUrl")}
               onClick={() => {
-                dispatch({ mode: "url", type: "setMode" });
+                setError(null);
+                setMode("url");
               }}
             />
           </div>
         ) : null}
 
         {prepared ? (
-          <div className="border-border bg-muted/30 flex min-w-0 flex-col gap-3 rounded-lg border p-4">
+          <div className="border-border bg-sunken/30 flex min-w-0 flex-col gap-3 rounded-lg border p-4">
             <div className="flex min-w-0 items-center gap-2 text-sm">
-              <span className="text-muted-foreground min-w-0 flex-1 font-mono text-xs break-all">
+              <span className="text-fg-3 min-w-0 flex-1 font-mono text-xs break-all">
                 {prepared.kind === "file" ? prepared.file.name : prepared.url}
               </span>
               <SkillFileCountBadge count={countSkillFiles(prepared.preview.entries)} />
             </div>
             <div>
-              <div className="text-muted-foreground text-[11px] tracking-wider uppercase">
-                {t("skills.name")}
-              </div>
+              <div className="t-group-label">{t("skills.name")}</div>
               <div className="text-sm font-medium">{prepared.preview.frontmatter.name}</div>
             </div>
             <div>
-              <div className="text-muted-foreground text-[11px] tracking-wider uppercase">
-                {t("skills.descriptionLabel")}
-              </div>
+              <div className="t-group-label">{t("skills.descriptionLabel")}</div>
               <div className="text-foreground text-sm">
                 {prepared.preview.frontmatter.description}
               </div>
             </div>
             {isTruthy(prepared.preview.frontmatter.author) ? (
-              <div className="text-muted-foreground text-xs">
+              <div className="text-fg-3 text-xs">
                 {t("skills.byAuthor", { author: prepared.preview.frontmatter.author })}
               </div>
             ) : null}
@@ -307,14 +258,14 @@ export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, r
               )}
               onDragOver={(e) => {
                 e.preventDefault();
-                dispatch({ dragOver: true, type: "setDragOver" });
+                setDragOver(true);
               }}
               onDragLeave={() => {
-                dispatch({ dragOver: false, type: "setDragOver" });
+                setDragOver(false);
               }}
               onDrop={(e) => {
                 e.preventDefault();
-                dispatch({ dragOver: false, type: "setDragOver" });
+                setDragOver(false);
                 const entry =
                   e.dataTransfer.items.length === 1
                     ? e.dataTransfer.items[0]?.webkitGetAsEntry()
@@ -333,9 +284,9 @@ export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, r
               <div className="text-foreground text-[15px] font-medium">
                 {t("skills.dragAndDrop")}
               </div>
-              <div className="text-muted-foreground text-xs">{t("skills.dropFileOrFolder")}</div>
+              <div className="text-fg-3 text-xs">{t("skills.dropFileOrFolder")}</div>
             </button>
-            <div className="text-muted-foreground text-center text-xs">
+            <div className="text-fg-3 text-center text-xs">
               {t("skills.or")}{" "}
               <button
                 type="button"
@@ -355,7 +306,7 @@ export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, r
                 placeholder="https://github.com/owner/repo or npx skills add … --skill name"
                 aria-label={t("skills.sourceUrlPlaceholder")}
                 onChange={(e) => {
-                  dispatch({ type: "setUrl", url: e.target.value });
+                  setUrl(e.target.value);
                 }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
@@ -378,7 +329,7 @@ export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, r
         )}
 
         {isTruthy(error) ? (
-          <div className="border-destructive/30 bg-destructive/5 text-destructive rounded-md border px-3 py-2 text-xs">
+          <div className="border-danger/30 bg-danger/5 text-danger rounded-md border px-3 py-2 text-xs">
             {error}
           </div>
         ) : null}
@@ -388,7 +339,7 @@ export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, r
             <div className="text-foreground text-[13px] font-medium">
               {t("skills.fileRequirements")}
             </div>
-            <ul className="text-muted-foreground marker:text-muted-foreground/60 list-disc space-y-1 pl-4 text-[12.5px]">
+            <ul className="text-fg-3 marker:text-fg-3/60 list-disc space-y-1 pl-4 text-[12.5px]">
               <li>{t("skills.fileRequirementMd")}</li>
               <li>{t("skills.fileRequirementArchive")}</li>
               <li>{t("skills.folderMustIncludeSkillMd")}</li>
@@ -401,7 +352,7 @@ export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, r
             <div className="text-foreground text-[13px] font-medium">
               {t("skills.supportedSources")}
             </div>
-            <ul className="text-muted-foreground marker:text-muted-foreground/60 list-disc space-y-1 pl-4 text-[12.5px]">
+            <ul className="text-fg-3 marker:text-fg-3/60 list-disc space-y-1 pl-4 text-[12.5px]">
               <li>{t("skills.githubRepoLink")}</li>
               <li>
                 <a

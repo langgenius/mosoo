@@ -35,17 +35,14 @@ const AGENT_FRAGMENT = graphql(/* GraphQL */ `
     cacheCreationTokens
     cacheReadTokens
     debugCostUsd
-    evalCostUsd
     inputTokens
     outputTokens
     ownerEmail
     ownerId
     ownerName
-    previousCostUsd
     previewCostUsd
     productionCostUsd
     requestCount
-    scheduledCostUsd
     totalCostUsd
     unpricedRequestCount
   }
@@ -89,32 +86,11 @@ const RECENT_SESSION_FRAGMENT = graphql(/* GraphQL */ `
   }
 `);
 
-const ATTRIBUTION_FRAGMENT = graphql(/* GraphQL */ `
-  fragment CostAttributionFields on CostAttributionCard {
-    agents {
-      ...CostAgentFields
-    }
-    daily {
-      ...CostDailyFields
-    }
-    models {
-      ...CostModelFields
-    }
-    recentSessions {
-      ...CostRecentSessionFields
-    }
-    totals {
-      ...CostTotalsFields
-    }
-  }
-`);
-
 void TOTALS_FRAGMENT;
 void DAILY_FRAGMENT;
 void AGENT_FRAGMENT;
 void MODEL_FRAGMENT;
 void RECENT_SESSION_FRAGMENT;
-void ATTRIBUTION_FRAGMENT;
 
 export const PROJECT_COST_QUERY = graphql(/* GraphQL */ `
   query ProjectCostCard($projectId: ULID!, $range: CostRange!, $runPurposes: [CostRunPurpose!]) {

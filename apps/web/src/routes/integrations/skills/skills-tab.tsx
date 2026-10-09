@@ -1,3 +1,5 @@
+import type { SkillSummary } from "@mosoo/contracts/skill";
+import type { SkillId } from "@mosoo/id";
 import { useMemo, useState } from "react";
 
 import { useTranslation } from "@/shared/i18n";
@@ -24,35 +26,29 @@ export function SkillsTab() {
   const [search, setSearch] = useState("");
   const [mode, setMode] = useState<SkillsTabMode>("installed");
   const [uploadOpen, setUploadOpen] = useState(false);
-  const [detailSkillId, setDetailSkillId] = useState<string | null>(null);
+  const [detailSkillId, setDetailSkillId] = useState<SkillId | null>(null);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) {
-      return registry.personal;
+      return registry.skills;
     }
-    return registry.personal.filter(
+    return registry.skills.filter(
       (s) =>
         s.name.toLowerCase().includes(q) ||
         s.description.toLowerCase().includes(q) ||
         s.author.toLowerCase().includes(q),
     );
-  }, [registry.personal, search]);
+  }, [registry.skills, search]);
 
   const detailSkill = isTruthy(detailSkillId) ? (registry.getSkill(detailSkillId) ?? null) : null;
 
   async function handleUpload(file: File) {
-    const created = await registry.publishFromFile(file);
-    if (created) {
-      setDetailSkillId(created.id);
-    }
+    setDetailSkillId((await registry.publishFromFile(file)).id);
   }
 
   async function handleImportUrl(url: string) {
-    const created = await registry.publishFromGithub(url);
-    if (created) {
-      setDetailSkillId(created.id);
-    }
+    setDetailSkillId((await registry.publishFromGithub(url)).id);
   }
 
   return (
@@ -73,7 +69,7 @@ export function SkillsTab() {
         <div
           role="tablist"
           aria-label={t("skills.skillView")}
-          className="border-border-subtle inline-flex h-8 items-center gap-5 border-b"
+          className="border-border-soft inline-flex h-8 items-center gap-5 border-b"
         >
           <SkillsModeButton
             active={mode === "installed"}
@@ -141,7 +137,6 @@ export function SkillsTab() {
         onOpenChange={setUploadOpen}
         onUpload={handleUpload}
         onImportUrl={handleImportUrl}
-        registry={registry}
       />
       {detailSkill ? (
         <SkillDetailDialog
@@ -166,9 +161,9 @@ function InstalledSkillsGrid({
   onUpload,
   search,
 }: {
-  filtered: ReturnType<typeof useSkillRegistry>["personal"];
+  filtered: SkillSummary[];
   loading: boolean;
-  onOpenSkill: (skillId: string) => void;
+  onOpenSkill: (skillId: SkillId) => void;
   onUpload: () => void;
   search: string;
 }) {

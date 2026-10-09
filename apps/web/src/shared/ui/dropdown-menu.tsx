@@ -62,14 +62,12 @@ function DropdownMenuContent({
 
 function DropdownMenuItem({
   className,
-  inset,
   variant = "default",
   asChild,
   onSelect,
   children,
   ...props
 }: ComponentProps<typeof MenuPrimitive.Item> & {
-  inset?: boolean;
   variant?: "default" | "destructive";
   asChild?: boolean;
   /** Radix compatibility: fires on click / keyboard select and closes the menu. */
@@ -79,7 +77,6 @@ function DropdownMenuItem({
   return (
     <MenuPrimitive.Item
       data-slot="dropdown-menu-item"
-      data-inset={inset}
       data-variant={variant}
       onClick={
         onSelect
@@ -95,7 +92,7 @@ function DropdownMenuItem({
           : undefined
       }
       className={cn(
-        "relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-[13px] text-fg-1 outline-none transition-[background-color,color] duration-150 ease-out data-[highlighted]:bg-hover data-[highlighted]:text-fg-1 data-[disabled]:pointer-events-none data-[disabled]:text-fg-muted data-[inset]:pl-8 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 data-[variant=destructive]:text-danger-fg data-[variant=destructive]:data-[highlighted]:bg-danger-bg data-[variant=destructive]:data-[highlighted]:text-danger-fg",
+        "relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-[13px] text-fg-1 outline-none transition-[background-color,color] duration-150 ease-out data-[highlighted]:bg-hover data-[highlighted]:text-fg-1 data-[disabled]:pointer-events-none data-[disabled]:text-fg-muted [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 data-[variant=destructive]:text-danger-fg data-[variant=destructive]:data-[highlighted]:bg-danger-bg data-[variant=destructive]:data-[highlighted]:text-danger-fg",
         className,
       )}
       {...(render ? { render } : { children })}
@@ -117,16 +114,11 @@ function DropdownMenuSeparator({
   );
 }
 
-function DropdownMenuLabel({
-  className,
-  inset,
-  ...props
-}: ComponentProps<"div"> & { inset?: boolean }): ReactElement {
+function DropdownMenuLabel({ className, ...props }: ComponentProps<"div">): ReactElement {
   return (
     <div
       data-slot="dropdown-menu-label"
-      data-inset={inset}
-      className={cn("px-2 py-1.5 text-[12px] font-medium text-fg-3 data-[inset]:pl-8", className)}
+      className={cn("px-2 py-1.5 text-[12px] font-medium text-fg-3", className)}
       {...props}
     />
   );

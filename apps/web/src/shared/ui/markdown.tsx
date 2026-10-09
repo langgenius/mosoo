@@ -55,17 +55,14 @@ function MarkdownAnchor({
 const baseMarkdownComponents: Components = {
   a: MarkdownAnchor,
   blockquote: ({ className, ...props }) => (
-    <blockquote
-      className={cn("border-l-2 border-border pl-3 text-muted-foreground", className)}
-      {...props}
-    />
+    <blockquote className={cn("border-l-2 border-border pl-3 text-fg-3", className)} {...props} />
   ),
   em: ({ className, ...props }) => <em className={cn("italic", className)} {...props} />,
   hr: ({ className, ...props }) => <hr className={cn("border-border", className)} {...props} />,
   inlineCode: ({ className, ...props }) => (
     <code
       className={cn(
-        "rounded bg-muted/70 px-1 py-0.5 font-mono text-[0.92em] text-foreground",
+        "rounded bg-sunken/70 px-1 py-0.5 font-mono text-[0.92em] text-foreground",
         className,
       )}
       {...props}
@@ -73,10 +70,7 @@ const baseMarkdownComponents: Components = {
   ),
   li: ({ className, ...props }) => <li className={cn("leading-relaxed", className)} {...props} />,
   ol: ({ className, ...props }) => (
-    <ol
-      className={cn("ml-5 list-decimal space-y-1.5 marker:text-muted-foreground/70", className)}
-      {...props}
-    />
+    <ol className={cn("ml-5 list-decimal space-y-1.5 marker:text-fg-3/70", className)} {...props} />
   ),
   p: ({ className, ...props }) => <p className={cn("leading-relaxed", className)} {...props} />,
   strong: ({ className, ...props }) => (
@@ -93,17 +87,17 @@ const baseMarkdownComponents: Components = {
   th: ({ className, ...props }) => (
     <th
       className={cn(
-        "border border-border bg-muted/50 px-2 py-1 text-left font-semibold",
+        "border border-border bg-sunken/50 px-2 py-1 text-left font-semibold",
         className,
       )}
       {...props}
     />
   ),
+  thead: ({ className, node: _node, ...props }) => (
+    <thead className={cn("bg-sunken/80", className)} {...props} />
+  ),
   ul: ({ className, ...props }) => (
-    <ul
-      className={cn("ml-5 list-disc space-y-1.5 marker:text-muted-foreground/70", className)}
-      {...props}
-    />
+    <ul className={cn("ml-5 list-disc space-y-1.5 marker:text-fg-3/70", className)} {...props} />
   ),
 };
 
@@ -131,6 +125,16 @@ const markdownClassName = cn(
   "[&_a]:text-current [&_a:hover]:text-current/80",
   "[&_blockquote]:text-inherit/80 [&_strong]:text-inherit",
   "[&_pre]:max-w-full [&_pre]:overflow-x-auto",
+  // Streamdown's bundled code-block header (like its thead, overridden above)
+  // uses the retired muted aliases, which nothing bridges.
+  "[&_[data-streamdown=code-block-header]]:text-fg-3",
+);
+
+export const documentMarkdownClassName = cn(
+  "text-[13.5px] leading-relaxed text-foreground",
+  "[&_a]:text-link [&_a:hover]:text-link-hover [&_blockquote]:text-fg-3",
+  "[&_h1]:mt-2 [&_h1]:mb-3 [&_h1]:text-[16px] [&_h2]:mt-5 [&_h2]:mb-2 [&_h2]:text-[14.5px]",
+  "[&_h3]:mt-4 [&_h3]:mb-1.5 [&_h3]:text-[13.5px]",
 );
 
 type RequiredRehypePlugin = NonNullable<(typeof defaultRehypePlugins)["sanitize" | "harden"]>;

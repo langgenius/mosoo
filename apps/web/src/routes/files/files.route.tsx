@@ -2,13 +2,13 @@ import { useQuery } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import { useMemo, useState } from "react";
 
-import { useAppSession } from "@/app/session-provider";
+import { useActiveProject } from "@/app/session/session-context";
 import { useVisibleAgentsQuery } from "@/domains/agent/query/agent-queries";
 import { createFileDownload } from "@/domains/file/api/file-download-client";
 import { fileKeys, listFiles } from "@/domains/file/api/files";
 import type { ListedFileEntry } from "@/domains/file/api/files";
 import { allThreadSessions } from "@/domains/session/api/list";
-import { toProjectId } from "@/routes/typed-id";
+import { formatFileSize } from "@/features/file-preview/file-preview-content";
 import { getCurrentLocale, useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { Badge } from "@/shared/ui/badge";
@@ -22,6 +22,7 @@ import {
   ListPageToolbarSpacer,
 } from "@/shared/ui/list-page";
 import { PageHeader } from "@/shared/ui/page-header";
+import { SegmentedControl } from "@/shared/ui/segmented-control";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui/table";
 
@@ -31,59 +32,6 @@ import type { FilesTableEntry, SessionKindFilter } from "./files-list-model";
 import { ThreadFilter } from "./thread-filter";
 
 const EMPTY_FILES: ListedFileEntry[] = [];
-
-function SegmentedButtonGroup<T extends string>({
-  label,
-  onChange,
-  options,
-  value,
-}: {
-  label: string;
-  onChange: (value: T) => void;
-  options: { label: string; value: T }[];
-  value: T;
-}): ReactElement {
-  return (
-    <fieldset
-      aria-label={label}
-      className="bg-sunken m-0 inline-flex h-8 w-full min-w-0 items-center gap-0.5 rounded-md p-0.5 sm:w-auto"
-    >
-      {options.map((option) => (
-        <button
-          key={option.value}
-          aria-pressed={option.value === value}
-          className={cn(
-            "rounded-sm focus-visible:ring-ring h-full min-w-0 flex-1 px-3 text-[12.5px] font-medium outline-none transition-[background-color,color,box-shadow] duration-150 ease-out focus-visible:ring-2 sm:flex-none",
-            option.value === value ? "bg-card text-fg-1 shadow-xs" : "text-fg-2 hover:text-fg-1",
-          )}
-          onClick={() => {
-            onChange(option.value);
-          }}
-          type="button"
-        >
-          {option.label}
-        </button>
-      ))}
-    </fieldset>
-  );
-}
-
-function formatBytes(size: number): string {
-  if (size < 1024) {
-    return `${size} B`;
-  }
-
-  const units = ["KB", "MB", "GB", "TB"];
-  let value = size / 1024;
-  let unitIndex = 0;
-
-  while (value >= 1024 && unitIndex < units.length - 1) {
-    value /= 1024;
-    unitIndex += 1;
-  }
-
-  return `${value >= 10 ? value.toFixed(1) : value.toFixed(2)} ${units[unitIndex]}`;
-}
 
 function formatDateTime(value: string): string {
   return new Intl.DateTimeFormat(getCurrentLocale(), {
@@ -179,7 +127,7 @@ function FileTable({
                   )}
                 </TableCell>
                 <TableCell className="text-fg-2 hidden text-right text-[12px] tabular-nums md:table-cell">
-                  {formatBytes(file.size)}
+                  {formatFileSize(file.size)}
                 </TableCell>
                 <TableCell className="text-fg-3 hidden text-[12px] lg:table-cell">
                   {formatDateTime(file.updatedAt)}
@@ -204,7 +152,7 @@ function FileTable({
 }
 
 export function FilesPage(): ReactElement {
-  const { activeProjectId } = useAppSession();
+  const project = useActiveProject();
   const { t } = useTranslation();
   const [agentId, setAgentId] = useState("");
   const [sessionId, setSessionId] = useState("");
@@ -215,22 +163,15 @@ export function FilesPage(): ReactElement {
     data: agents = [],
     isFetching: agentsFetching,
     refetch: refetchAgents,
-  } = useVisibleAgentsQuery(activeProjectId);
+  } = useVisibleAgentsQuery(project.id);
   const {
     data: sessionOptions = [],
     error: sessionOptionsError,
     isFetching: sessionOptionsFetching,
     refetch: refetchSessionOptions,
   } = useQuery({
-    enabled: activeProjectId !== null,
-    queryFn: async () => {
-      if (activeProjectId === null) {
-        throw new Error("Project id is required to list sessions.");
-      }
-
-      return allThreadSessions(toProjectId(activeProjectId));
-    },
-    queryKey: [...fileKeys.all, "session-options", activeProjectId],
+    queryFn: async () => allThreadSessions(project.id),
+    queryKey: [...fileKeys.all, "session-options", project.id],
   });
   const {
     data: fileList,
@@ -239,18 +180,8 @@ export function FilesPage(): ReactElement {
     isLoading: filesLoading,
     refetch: refetchFiles,
   } = useQuery({
-    enabled: activeProjectId !== null,
-    queryFn: async () => {
-      if (activeProjectId === null) {
-        throw new Error("Project id is required to list files.");
-      }
-
-      return listFiles({ projectId: toProjectId(activeProjectId) });
-    },
-    queryKey:
-      activeProjectId === null
-        ? [...fileKeys.lists(), "missing"]
-        : fileKeys.list({ projectId: toProjectId(activeProjectId) }),
+    queryFn: async () => listFiles({ projectId: project.id }),
+    queryKey: fileKeys.list({ projectId: project.id }),
   });
   const files = fileList?.files ?? EMPTY_FILES;
   const sessionKindOptions: { label: string; value: SessionKindFilter }[] = useMemo(
@@ -344,7 +275,7 @@ export function FilesPage(): ReactElement {
           value={filesView.sessionId}
         />
         <ListPageToolbarSpacer />
-        <SegmentedButtonGroup<SessionKindFilter>
+        <SegmentedControl<SessionKindFilter>
           label={t("files.threadFileCategory")}
           onChange={setSessionKind}
           options={sessionKindOptions}
@@ -354,7 +285,7 @@ export function FilesPage(): ReactElement {
 
       <ListPageContent className="space-y-3">
         {filesError ? (
-          <div className="text-destructive border-destructive/20 bg-destructive/[0.06] rounded-md border px-3 py-2 text-[13px]">
+          <div className="text-danger border-danger/20 bg-danger/[0.06] rounded-md border px-3 py-2 text-[13px]">
             {filesError instanceof Error ? filesError.message : t("files.failedToLoad")}
           </div>
         ) : filesLoading ? (

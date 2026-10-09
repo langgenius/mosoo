@@ -1,25 +1,20 @@
 import type React from "react";
 
 import { useTranslation } from "@/shared/i18n";
-import { cn } from "@/shared/lib/class-names";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
-import { Plus, RotateCcw } from "@/shared/ui/icons";
+import { RotateCcw } from "@/shared/ui/icons";
 
-import type { SessionControlMode } from "./agent-session-panel-rules";
-import { sessionIndicatorClassName } from "./agent-session-panel-status";
 import type { SessionPill } from "./agent-session-panel-status";
 
 const PILL_VARIANTS: Record<SessionPill, React.ComponentProps<typeof Badge>["variant"]> = {
-  "Needs approval": "warning",
   Ready: "success",
   "Setup required": "danger",
   Stopped: "outline",
-  Working: "primary",
+  Working: "brand",
 };
 
 const PILL_LABEL_KEYS: Record<SessionPill, string> = {
-  "Needs approval": "agent.pillNeedsApproval",
   Ready: "agent.pillReady",
   "Setup required": "agent.setupRequired",
   Stopped: "agent.pillStopped",
@@ -33,10 +28,7 @@ export function AgentSessionPanelHeader({
   runtimeControls,
   pill,
   reconnectingSubtitle,
-  sessionControlMode,
   sending,
-  sessionCount,
-  tone,
 }: {
   activeTitle: string | null;
   agentName: string;
@@ -44,41 +36,25 @@ export function AgentSessionPanelHeader({
   runtimeControls?: React.ReactNode;
   pill: SessionPill;
   reconnectingSubtitle: string | null;
-  sessionControlMode: SessionControlMode;
   sending: boolean;
-  sessionCount: number;
-  tone: "preview" | "consume";
 }) {
   const { t } = useTranslation();
-  const SessionControlIcon = sessionControlMode === "reset" ? RotateCcw : Plus;
-  const sessionControlLabel =
-    sessionControlMode === "reset" ? t("agent.resetChat") : t("agent.newSession");
 
   return (
-    <div className="border-border-subtle flex h-10 shrink-0 items-center gap-2 border-b bg-white px-4">
-      <div className={cn("size-2 rounded-full", sessionIndicatorClassName(pill))} />
+    <div className="border-border-soft bg-card flex h-10 shrink-0 items-center gap-2 border-b px-4">
       <span className="text-foreground min-w-0 truncate text-[12px] font-medium">
-        {tone === "preview" ? t("agent.testing", { name: agentName }) : agentName}
+        {t("agent.testing", { name: agentName })}
       </span>
-      <Badge
-        variant={PILL_VARIANTS[pill]}
-        className="h-4 text-[10px]"
-        data-testid="agent-session-pill"
-      >
+      <Badge variant={PILL_VARIANTS[pill]} data-testid="agent-session-pill">
         {t(PILL_LABEL_KEYS[pill])}
       </Badge>
       {reconnectingSubtitle ? (
-        <span className="text-muted-foreground text-[10.5px]">{reconnectingSubtitle}</span>
+        <span className="text-fg-3 text-[10.5px]">{reconnectingSubtitle}</span>
       ) : null}
       {activeTitle ? (
-        <span className="text-muted-foreground min-w-0 truncate text-[11px]">{activeTitle}</span>
+        <span className="text-fg-3 min-w-0 truncate text-[11px]">{activeTitle}</span>
       ) : null}
       <div className="flex-1" />
-      {sessionControlMode === "new_session" && sessionCount > 0 ? (
-        <span className="text-muted-foreground text-[10.5px]">
-          {t("agent.sessionCount", { count: String(sessionCount) })}
-        </span>
-      ) : null}
       {runtimeControls}
       <Button
         className="gap-1.5"
@@ -87,8 +63,8 @@ export function AgentSessionPanelHeader({
         size="xs"
         variant="ghost"
       >
-        <SessionControlIcon className="size-3" />
-        {sessionControlLabel}
+        <RotateCcw className="size-3" />
+        {t("agent.resetChat")}
       </Button>
     </div>
   );

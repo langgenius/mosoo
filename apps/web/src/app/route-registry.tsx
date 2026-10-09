@@ -1,6 +1,6 @@
 import { lazy } from "react";
 import type { ComponentType, ReactElement, ReactNode } from "react";
-import { Link, Navigate, useParams, useRoutes } from "react-router-dom";
+import { Link, Navigate, useRoutes } from "react-router-dom";
 import type { RouteObject } from "react-router-dom";
 
 import { useTranslation } from "@/shared/i18n";
@@ -9,6 +9,7 @@ import { EmptyState } from "@/shared/ui/empty-state";
 import { FileQuestion } from "@/shared/ui/icons";
 
 import { GuestRoute, OnboardingRoute, ProtectedRoute } from "./route-guards";
+import { useAppSession } from "./session/session-context";
 
 type RouteModule<TName extends string> = Record<TName, ComponentType>;
 
@@ -22,23 +23,38 @@ function lazyNamed<TName extends string>(
   });
 }
 
+// A multi-Project owner without a selected Project picks one on the Projects list.
+function ActiveProjectGate({ children }: { children: ReactElement }): ReactElement {
+  const { activeProject, projectsLoading } = useAppSession();
+  const { t } = useTranslation();
+
+  if (projectsLoading) {
+    return (
+      <div className="text-fg-3 flex h-full items-center justify-center text-[13px]">
+        {t("common.loadingProject")}
+      </div>
+    );
+  }
+
+  return activeProject === null ? <Navigate to="/projects" replace /> : children;
+}
+
 function protectedRoute(element: ReactElement): ReactElement {
+  return (
+    <ProtectedRoute>
+      <ActiveProjectGate>{element}</ActiveProjectGate>
+    </ProtectedRoute>
+  );
+}
+
+// CLI sign-in, account settings and the not-found page need a signed-in user
+// but no active Project.
+function accountRoute(element: ReactElement): ReactElement {
   return <ProtectedRoute>{element}</ProtectedRoute>;
 }
 
 function orgProtectedRoute(element: ReactElement): ReactElement {
   return <ProtectedRoute shell="org">{element}</ProtectedRoute>;
-}
-
-function NavigateToEnvironmentAlias(): ReactElement {
-  const { environmentId } = useParams();
-
-  return (
-    <Navigate
-      replace
-      to={environmentId === undefined ? "/environment" : `/environment/${environmentId}`}
-    />
-  );
 }
 
 function NotFoundPage(): ReactElement {
@@ -101,10 +117,7 @@ const ProjectSettingsGeneral = lazyNamed(
   async () => import("../routes/project-settings/general-tab"),
   "GeneralTab",
 );
-const ProjectUsage = lazyNamed(
-  async () => import("../routes/project-settings/usage-tab"),
-  "ProjectUsageTab",
-);
+const ProjectUsage = lazyNamed(async () => import("../routes/cost/cost.route"), "CostPage");
 const AgentList = lazyNamed(
   async () => import("../routes/agent/agent-list.route"),
   "AgentListPage",
@@ -113,7 +126,7 @@ const AgentDetail = lazyNamed(
   async () => import("../routes/agent/agent-detail.route"),
   "AgentDetailPage",
 );
-const Threads = lazyNamed(async () => import("../routes/threads/route"), "ThreadsPage");
+const Threads = lazyNamed(async () => import("../routes/threads/controller"), "ThreadsController");
 const ProjectOverview = lazyNamed(
   async () => import("../routes/project-overview/project-overview.route"),
   "ProjectOverviewPage",
@@ -145,7 +158,7 @@ const appRoutes = [
     path: "/onboarding",
   },
   { element: <McpOAuthComplete />, path: "/integrations/mcp/oauth-complete" },
-  { element: protectedRoute(<CliAuth />), path: "/cli-auth" },
+  { element: accountRoute(<CliAuth />), path: "/cli-auth" },
   { element: protectedRoute(<ProjectOverview />), path: "/" },
   { element: orgProtectedRoute(<ProjectsList />), path: "/projects" },
   // Read-only redirects preserve bookmarks written before the Project rename.
@@ -154,18 +167,6 @@ const appRoutes = [
   { element: protectedRoute(<Files />), path: "/files" },
   { element: protectedRoute(<Environments />), path: "/environment" },
   { element: protectedRoute(<Environments />), path: "/environment/:environmentId" },
-  { element: protectedRoute(<Navigate to="/environment" replace />), path: "/environments" },
-  {
-    element: protectedRoute(<NavigateToEnvironmentAlias />),
-    path: "/environments/:environmentId",
-  },
-  {
-    element: protectedRoute(<Navigate to="/integrations/skills" replace />),
-    path: "/integrations",
-  },
-  { element: protectedRoute(<Navigate to="/integrations/skills" replace />), path: "/skill" },
-  { element: protectedRoute(<Navigate to="/integrations/skills" replace />), path: "/skills" },
-  { element: protectedRoute(<Navigate to="/integrations/mcp" replace />), path: "/mcp" },
   { element: protectedRoute(<SkillsTabRoute />), path: "/integrations/skills" },
   { element: protectedRoute(<McpTabRoute />), path: "/integrations/mcp" },
   { element: protectedRoute(<AgentList />), path: "/agent" },
@@ -178,7 +179,6 @@ const appRoutes = [
       { element: <ProjectSettingsGeneral />, path: "general" },
       { element: <SettingsAccessTokens />, path: "api-keys" },
       { element: <ProjectUsage />, path: "usage" },
-      { element: <Navigate to="/project-settings/usage" replace />, path: "cost" },
     ],
     element: protectedRoute(<ProjectSettingsLayout />),
     path: "/project-settings",
@@ -196,28 +196,16 @@ const appRoutes = [
     path: "/app-settings/usage",
   },
   {
-    element: protectedRoute(<Navigate to="/project-settings/usage" replace />),
-    path: "/app-settings/cost",
-  },
-  {
     children: [
       { element: <Navigate to="/settings/profile" replace />, index: true },
       { element: <SettingsProfile />, path: "profile" },
       { element: <Navigate to="/project-settings/api-keys" replace />, path: "access-tokens" },
-      { element: <Navigate to="/project-settings/general" replace />, path: "project" },
-      { element: <Navigate to="/project-settings/general" replace />, path: "app" },
-      { element: <Navigate to="/project-settings/usage" replace />, path: "usage" },
-      { element: <Navigate to="/environment" replace />, path: "environments" },
-      { element: <Navigate to="/project-settings/usage" replace />, path: "cost" },
     ],
-    element: protectedRoute(<SettingsLayout />),
+    element: accountRoute(<SettingsLayout />),
     path: "/settings",
   },
-  { element: protectedRoute(<Navigate to="/settings/profile" replace />), path: "/profile" },
-  { element: protectedRoute(<Navigate to="/project-settings/usage" replace />), path: "/usage" },
   { element: protectedRoute(<Providers />), path: "/providers" },
-  { element: protectedRoute(<Navigate to="/project-settings/usage" replace />), path: "/cost" },
-  { element: protectedRoute(<NotFoundPage />), path: "*" },
+  { element: accountRoute(<NotFoundPage />), path: "*" },
 ] satisfies RouteObject[];
 
 export function AppRoutes(): ReactNode {

@@ -5,7 +5,6 @@ import { useMemo } from "react";
 import { useVisibleAgentsQuery } from "@/domains/agent/query/agent-queries";
 import { fileKeys, listFiles } from "@/domains/file/api/files";
 import { getThreadSessionMessages } from "@/domains/session/api/agent-session";
-import { retrieveThreadAgentSession } from "@/domains/session/api/agent-session-retrieve";
 import { archivedThreadSessions, threadSessions } from "@/domains/session/api/list";
 import { getSessionProcessEvents } from "@/domains/session/api/thread-projections";
 import { toProjectId, toSessionId } from "@/routes/typed-id";
@@ -139,22 +138,6 @@ export function useThreadQueries({
     refetchInterval:
       selectedThread !== null && isThreadWorking(selectedThread.session) ? 3000 : false,
   });
-  const retrieveQuery = useQuery({
-    enabled: selectedThread !== null,
-    queryFn: async () => {
-      if (selectedThread === null) {
-        throw new Error("Thread id is required to retrieve thread state.");
-      }
-
-      return retrieveThreadAgentSession({
-        projectId: selectedThread.session.projectId,
-        sessionId: toSessionId(selectedThread.id),
-      });
-    },
-    queryKey: threadKeys.retrieve(activeThreadId),
-    refetchInterval:
-      selectedThread !== null && isThreadWorking(selectedThread.session) ? 5000 : false,
-  });
   const filteredThreads = useMemo(
     () => allThreads.filter((thread) => matchesThreadFilter(thread, filter)),
     [allThreads, filter],
@@ -189,7 +172,6 @@ export function useThreadQueries({
     loadError,
     messagesQuery,
     processEventsQuery,
-    retrieveQuery,
     selectedThread,
     threadsBySection,
     threadsById,

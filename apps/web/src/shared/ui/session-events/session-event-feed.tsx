@@ -4,11 +4,7 @@ import type { ReactElement } from "react";
 
 import { ScrollArea } from "@/shared/ui/scroll-area";
 
-import {
-  isSessionEventVisibleInMainFeed,
-  isSyntheticNoRuntimeEventsEvent,
-  SESSION_EVENT_FILTER_DOMAINS,
-} from "./domain";
+import { isSessionEventVisibleInMainFeed, SESSION_EVENT_FILTER_DOMAINS } from "./domain";
 import type { SessionEventDomain } from "./domain";
 import { DomainFilterBar } from "./domain-filter-bar";
 import { EmptyFeedState } from "./empty-feed-state";
@@ -28,15 +24,8 @@ interface DrawerState {
 }
 
 export function SessionEventFeed({ events }: SessionEventFeedProps): ReactElement {
-  const visibleSourceEvents = useMemo(
-    () => events.filter((event) => !isSyntheticNoRuntimeEventsEvent(event)),
-    [events],
-  );
-  const mainFeedEvents = useMemo(
-    () => visibleSourceEvents.filter(isSessionEventVisibleInMainFeed),
-    [visibleSourceEvents],
-  );
-  const turns = useSessionTurns(visibleSourceEvents);
+  const mainFeedEvents = useMemo(() => events.filter(isSessionEventVisibleInMainFeed), [events]);
+  const turns = useSessionTurns(events);
   const [activeDomains, setActiveDomains] = useState<Set<SessionEventDomain>>(
     () => new Set(SESSION_EVENT_FILTER_DOMAINS),
   );

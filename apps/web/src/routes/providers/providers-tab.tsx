@@ -1,6 +1,7 @@
+import type { ProjectId, VendorCredentialId } from "@mosoo/id";
 import { PUBLIC_VENDORS, getVendor } from "@mosoo/runtime-catalog";
 import type { RuntimeCatalogVendor } from "@mosoo/runtime-catalog";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import { useId, useMemo, useState } from "react";
 
@@ -8,19 +9,20 @@ import type { VendorCredential } from "@/domains/vendor-credential/api/vendor-cr
 import {
   createVendorCredential,
   deleteVendorCredential,
-  listVendorCredentials,
   setDefaultVendorCredential,
   testVendorCredential,
   updateVendorCredential,
 } from "@/domains/vendor-credential/api/vendor-credential-client";
 import { canUseCustomEndpoint } from "@/domains/vendor-credential/model/provider-credential-endpoint";
-import { getErrorMessage } from "@/domains/vendor-credential/model/provider-credential-error";
+import {
+  useVendorCredentialsQuery,
+  vendorCredentialKeys,
+} from "@/domains/vendor-credential/model/provider-credential-query";
 import {
   CUSTOM_MODEL_PROTOCOL_OPTIONS,
   modelProtocolLabel,
 } from "@/domains/vendor-credential/model/provider-model-protocol";
 import { formatProviderErrorMessage } from "@/domains/vendor-credential/model/provider-readiness-copy";
-import { toProjectId, toVendorCredentialId } from "@/routes/typed-id";
 import { useTranslation } from "@/shared/i18n";
 import { Badge } from "@/shared/ui/badge";
 import { VendorIcon, hasVendorIcon } from "@/shared/ui/brand-icons";
@@ -33,7 +35,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/shared/ui/dialog";
-import { Pencil, Plus, Trash2 } from "@/shared/ui/icons";
+import { Check, Pencil, Plus, Trash2 } from "@/shared/ui/icons";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { ConnectionRow } from "@/shared/ui/list-row";
@@ -41,7 +43,6 @@ import { MonoText } from "@/shared/ui/mono-text";
 import { PageHeader } from "@/shared/ui/page-header";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
 
-import { ProviderTestStatus } from "./provider-test-status";
 import { RuntimeAvailabilitySection } from "./runtime-availability-section";
 
 const CUSTOM_PROVIDER_VENDOR_ID = "openai-compatible";
@@ -56,7 +57,7 @@ type TestState = "failure" | "idle" | "running" | "success";
 interface CredentialForm {
   apiBase: string;
   apiKey: string;
-  id: string | null;
+  id: VendorCredentialId | null;
   maskedApiKey: string | null;
   modelProtocol: PresetModelProtocol | null;
   modelsText: string;
@@ -85,10 +86,6 @@ interface ProviderFormControls {
   saving: boolean;
   testState: TestState;
 }
-
-const providerCredentialKeys = {
-  list: (projectId: string) => ["vendor-credentials", projectId] as const,
-};
 
 // Preset providers can carry a default endpoint; pre-fill it so the user does
 // not have to look it up. OpenAI-compatible has no default.
@@ -149,23 +146,19 @@ function credentialsByVendor(
   return grouped;
 }
 
-export function ProvidersTab({ projectId }: { projectId: string }): ReactElement {
+export function ProvidersTab({ projectId }: { projectId: ProjectId }): ReactElement {
   const { t } = useTranslation();
-  const typedProjectId = toProjectId(projectId);
   const queryClient = useQueryClient();
   const [form, setForm] = useState<CredentialForm>(EMPTY_FORM);
   const [formError, setFormError] = useState<string | null>(null);
   const [pageError, setPageError] = useState<string | null>(null);
   const [testState, setTestState] = useState<TestState>("idle");
-  const { data: credentials = [], isLoading: credentialsLoading } = useQuery({
-    queryFn: async () => listVendorCredentials(typedProjectId),
-    queryKey: providerCredentialKeys.list(projectId),
-  });
+  const { credentials, loading: credentialsLoading } = useVendorCredentialsQuery(projectId);
   const groupedCredentials = useMemo(() => credentialsByVendor(credentials), [credentials]);
 
   async function invalidateProviderQueries(): Promise<void> {
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: providerCredentialKeys.list(projectId) }),
+      queryClient.invalidateQueries({ queryKey: vendorCredentialKeys.list(projectId) }),
       queryClient.invalidateQueries({ queryKey: ["available-agent-models", projectId] }),
     ]);
   }
@@ -186,12 +179,12 @@ export function ProvidersTab({ projectId }: { projectId: string }): ReactElement
 
       if (name.length === 0 || (nextForm.id === null && apiKey.length === 0)) {
         throw new Error(
-          nextForm.id === null ? "providers.nameAndApiKeyRequired" : "providers.nameRequired",
+          t(nextForm.id === null ? "providers.nameAndApiKeyRequired" : "providers.nameRequired"),
         );
       }
 
       if (nextForm.vendorId === CUSTOM_PROVIDER_VENDOR_ID && (!models || models.length === 0)) {
-        throw new Error("providers.modelsRequired");
+        throw new Error(t("providers.modelsRequired"));
       }
 
       if (nextForm.id === null) {
@@ -200,7 +193,7 @@ export function ProvidersTab({ projectId }: { projectId: string }): ReactElement
           apiBase,
           apiKey,
           name,
-          projectId: typedProjectId,
+          projectId,
           vendorId: nextForm.vendorId,
           ...(models === undefined ? {} : { models }),
         });
@@ -210,9 +203,9 @@ export function ProvidersTab({ projectId }: { projectId: string }): ReactElement
         ...protocolInput,
         apiBase,
         ...(apiKey.length > 0 ? { apiKey } : {}),
-        id: toVendorCredentialId(nextForm.id),
+        id: nextForm.id,
         name,
-        projectId: typedProjectId,
+        projectId,
         ...(models === undefined ? {} : { models }),
       });
     },
@@ -226,7 +219,7 @@ export function ProvidersTab({ projectId }: { projectId: string }): ReactElement
 
   const deleteMutation = useMutation({
     mutationFn: async (credential: VendorCredential) =>
-      deleteVendorCredential({ id: credential.id, projectId: typedProjectId }),
+      deleteVendorCredential({ id: credential.id, projectId }),
     onSuccess: async () => {
       await invalidateProviderQueries();
     },
@@ -234,7 +227,7 @@ export function ProvidersTab({ projectId }: { projectId: string }): ReactElement
 
   const setDefaultMutation = useMutation({
     mutationFn: async (credential: VendorCredential) =>
-      setDefaultVendorCredential({ id: credential.id, projectId: typedProjectId }),
+      setDefaultVendorCredential({ id: credential.id, projectId }),
     onSuccess: async () => {
       await invalidateProviderQueries();
     },
@@ -245,7 +238,9 @@ export function ProvidersTab({ projectId }: { projectId: string }): ReactElement
     try {
       await saveMutation.mutateAsync(form);
     } catch (caughtError) {
-      setFormError(t(getErrorMessage(caughtError, "providers.failedToSaveProviderKey")));
+      setFormError(
+        caughtError instanceof Error ? caughtError.message : t("providers.failedToSaveProviderKey"),
+      );
     }
   }
 
@@ -269,7 +264,7 @@ export function ProvidersTab({ projectId }: { projectId: string }): ReactElement
         ...(form.vendorId === CUSTOM_PROVIDER_VENDOR_ID
           ? { modelProtocol: form.modelProtocol }
           : {}),
-        projectId: typedProjectId,
+        projectId,
         vendorId: form.vendorId,
       });
       setTestState(result.ok ? "success" : "failure");
@@ -280,7 +275,7 @@ export function ProvidersTab({ projectId }: { projectId: string }): ReactElement
       setTestState("failure");
       setFormError(
         formatProviderErrorMessage(
-          t(getErrorMessage(caughtError, "providers.connectionTestFailed")),
+          caughtError instanceof Error ? caughtError.message : t("providers.connectionTestFailed"),
           t,
         ),
       );
@@ -319,6 +314,26 @@ export function ProvidersTab({ projectId }: { projectId: string }): ReactElement
     setTestState("idle");
   }
 
+  function handleDelete(credential: VendorCredential): void {
+    void deleteMutation.mutateAsync(credential).catch((caughtError) => {
+      setPageError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : t("providers.failedToDeleteProviderKey"),
+      );
+    });
+  }
+
+  function handleSetDefault(credential: VendorCredential): void {
+    void setDefaultMutation.mutateAsync(credential).catch((caughtError) => {
+      setPageError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : t("providers.failedToSetDefaultProviderKey"),
+      );
+    });
+  }
+
   const formControls: ProviderFormControls = {
     error: formError,
     form,
@@ -342,7 +357,7 @@ export function ProvidersTab({ projectId }: { projectId: string }): ReactElement
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <PageHeader
-        className="border-border-subtle border-b"
+        className="border-border-soft border-b"
         title={t("providers.title")}
         description={t("providers.description")}
       >
@@ -376,21 +391,9 @@ export function ProvidersTab({ projectId }: { projectId: string }): ReactElement
               credentials={groupedCredentials.get(vendor.vendorId) ?? []}
               key={vendor.vendorId}
               onCreate={() => startCreate(vendor.vendorId)}
-              onDelete={(credential) => {
-                void deleteMutation.mutateAsync(credential).catch((caughtError) => {
-                  setPageError(
-                    t(getErrorMessage(caughtError, "providers.failedToDeleteProviderKey")),
-                  );
-                });
-              }}
+              onDelete={handleDelete}
               onEdit={startEdit}
-              onSetDefault={(credential) => {
-                void setDefaultMutation.mutateAsync(credential).catch((caughtError) => {
-                  setPageError(
-                    t(getErrorMessage(caughtError, "providers.failedToSetDefaultProviderKey")),
-                  );
-                });
-              }}
+              onSetDefault={handleSetDefault}
               vendor={vendor}
             />
           ))}
@@ -399,21 +402,9 @@ export function ProvidersTab({ projectId }: { projectId: string }): ReactElement
             <ProviderCredentialSection
               credentials={groupedCredentials.get(CUSTOM_PROVIDER_VENDOR_ID) ?? []}
               onCreate={() => startCreate(CUSTOM_PROVIDER_VENDOR_ID)}
-              onDelete={(credential) => {
-                void deleteMutation.mutateAsync(credential).catch((caughtError) => {
-                  setPageError(
-                    t(getErrorMessage(caughtError, "providers.failedToDeleteProviderKey")),
-                  );
-                });
-              }}
+              onDelete={handleDelete}
               onEdit={startEdit}
-              onSetDefault={(credential) => {
-                void setDefaultMutation.mutateAsync(credential).catch((caughtError) => {
-                  setPageError(
-                    t(getErrorMessage(caughtError, "providers.failedToSetDefaultProviderKey")),
-                  );
-                });
-              }}
+              onSetDefault={handleSetDefault}
               vendor={CUSTOM_PROVIDER_DISPLAY}
             />
           ) : null}
@@ -445,16 +436,7 @@ function ProviderCredentialDialogForm({
   onTest,
   saving,
   testState,
-}: {
-  error: string | null;
-  form: CredentialForm;
-  onCancel: () => void;
-  onChange: (form: CredentialForm) => void;
-  onSave: () => void;
-  onTest: () => void;
-  saving: boolean;
-  testState: TestState;
-}): ReactElement {
+}: ProviderFormControls): ReactElement {
   const { t } = useTranslation();
   const endpointEnabled = canUseCustomEndpoint(form.vendorId);
   const formId = useId();
@@ -598,7 +580,13 @@ function ProviderCredentialDialogForm({
           >
             {testState === "running" ? t("providers.testing") : t("providers.test")}
           </Button>
-          <ProviderTestStatus state={testState} />
+          {/* Failures surface in the form-level alert, so only success shows here. */}
+          {testState === "success" ? (
+            <span className="text-success-fg inline-flex items-center gap-1 text-[12px] font-medium">
+              <Check className="size-3.5 shrink-0" />
+              {t("providers.connectionOk")}
+            </span>
+          ) : null}
         </div>
         <Button aria-busy={saving || undefined} disabled={saving} onClick={onSave}>
           {saving ? t("providers.saving") : t("common.save")}
@@ -656,7 +644,7 @@ function ProviderCredentialSection({
                     <Badge variant="brand">{t("providers.default")}</Badge>
                   ) : null}
                   {credential.vendorId === CUSTOM_PROVIDER_VENDOR_ID ? (
-                    <Badge variant="secondary">
+                    <Badge>
                       {credential.modelProtocol === null
                         ? t("providers.protocolUnspecified")
                         : modelProtocolLabel(credential.modelProtocol)}

@@ -138,9 +138,7 @@ export function LoginAuthCard({
 
               <div className="flex items-center gap-3">
                 <Separator className="flex-1" />
-                <span className="text-fg-3 text-[11.5px] font-semibold tracking-[0.14em] uppercase">
-                  {t("login.or")}
-                </span>
+                <span className="text-fg-3 text-[12px]">{t("login.or")}</span>
                 <Separator className="flex-1" />
               </div>
 
@@ -183,7 +181,7 @@ export function LoginAuthCard({
           )}
 
           {resolvedError === null ? null : (
-            <p className="text-destructive text-center text-[13px]">{resolvedError}</p>
+            <p className="text-danger text-center text-[13px]">{resolvedError}</p>
           )}
 
           <p className="text-fg-3 pt-2 text-center text-[13px]">{t("login.firstTimeNote")}</p>

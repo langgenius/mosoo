@@ -2,8 +2,8 @@ import type { ReactElement } from "react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
-import { useAppSession } from "@/app/session-provider";
-import { HELP_DOCS_HOME_URL } from "@/shared/config/help-docs";
+import { useActiveProject } from "@/app/session/session-context";
+import { MOSOO_DOCS_URL } from "@/shared/config/external-links";
 import { useTranslation } from "@/shared/i18n";
 import { writeClipboardText } from "@/shared/lib/clipboard";
 import { Badge } from "@/shared/ui/badge";
@@ -35,7 +35,7 @@ function StepMarker({ done, number }: { done: boolean; number: number }): ReactE
 
   if (done) {
     return (
-      <span className="text-on-accent flex size-6 shrink-0 items-center justify-center rounded-full bg-green-500">
+      <span className="bg-success-bg text-success-fg flex size-6 shrink-0 items-center justify-center rounded-full">
         <Check className="size-3.5" strokeWidth={3} />
         <span className="sr-only">{t("common.done")}</span>
       </span>
@@ -43,7 +43,7 @@ function StepMarker({ done, number }: { done: boolean; number: number }): ReactE
   }
 
   return (
-    <span className="border-border-strong bg-bg-sunken text-fg-2 flex size-6 shrink-0 items-center justify-center rounded-full border text-xs font-semibold">
+    <span className="border-border-strong bg-sunken text-fg-2 flex size-6 shrink-0 items-center justify-center rounded-full border text-xs font-semibold">
       {number}
     </span>
   );
@@ -76,31 +76,31 @@ function StepRow({ step }: { step: OnboardingStepView }): ReactElement {
  * exists.
  */
 export function OnboardingSteps(): ReactElement {
-  const { activeProjectId } = useAppSession();
+  const project = useActiveProject();
   const { t } = useTranslation();
-  const progress = useOnboardingProgress(activeProjectId);
+  const progress = useOnboardingProgress(project.id);
 
   const steps: OnboardingStepView[] = [
     {
-      done: progress.hasProviderKey === true,
+      done: progress.hasProviderKey,
       label: t("onboarding.addProviderKey"),
       number: 1,
       optional: false,
       to: "/providers",
     },
     {
-      done: progress.hasApiToken === true,
+      done: progress.hasApiToken,
       label: t("onboarding.createApiToken"),
       number: 2,
       optional: true,
       to: "/project-settings/api-keys",
     },
     {
-      done: progress.hasAgent === true && progress.hasRunThread === true,
+      done: progress.hasAgent && progress.hasRunThread,
       label: t("onboarding.createAgent"),
       number: 3,
       optional: false,
-      to: progress.hasAgent === true ? "/threads?compose=1" : "/agent?create=1",
+      to: progress.hasAgent ? "/threads?compose=1" : "/agent?create=1",
     },
   ];
 
@@ -123,7 +123,7 @@ export function DocsAction(): ReactElement {
   return (
     <a
       className="group border-border bg-card hover:bg-paper-100 flex w-full items-center gap-4 rounded-lg border px-4 py-3.5 text-left transition-colors"
-      href={HELP_DOCS_HOME_URL}
+      href={MOSOO_DOCS_URL}
       rel="noreferrer"
       target="_blank"
     >
@@ -152,7 +152,7 @@ export function OnboardingActions(): ReactElement {
   async function copySetupPrompt(): Promise<void> {
     setCopyFailed(false);
 
-    const didCopy = await writeClipboardText(buildOnboardingSetupPrompt(undefined, t));
+    const didCopy = await writeClipboardText(buildOnboardingSetupPrompt(t));
 
     if (!didCopy) {
       setCopyFailed(true);
@@ -188,7 +188,7 @@ export function OnboardingActions(): ReactElement {
         >
           {CODING_AGENT_HARNESSES.map((harness) => (
             <span
-              className="border-border bg-bg-sunken inline-flex size-7 items-center justify-center rounded-md border"
+              className="border-border bg-sunken inline-flex size-7 items-center justify-center rounded-md border"
               key={harness.runtimeId}
               title={harness.label}
             >
@@ -204,12 +204,12 @@ export function OnboardingActions(): ReactElement {
         <div className="w-full text-left">
           <textarea
             aria-label={t("projectOverview.setupPromptLabel")}
-            className="border-border bg-bg-sunken text-fg-1 h-28 w-full rounded-md border px-3 py-2 font-mono text-xs"
+            className="border-border bg-sunken text-fg-1 h-28 w-full rounded-md border px-3 py-2 font-mono text-xs"
             onFocus={(event) => {
               event.currentTarget.select();
             }}
             readOnly
-            value={buildOnboardingSetupPrompt(undefined, t)}
+            value={buildOnboardingSetupPrompt(t)}
           />
           <p className="text-fg-3 mt-1 text-xs">{t("projectOverview.copyPromptFailed")}</p>
         </div>

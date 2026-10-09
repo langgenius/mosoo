@@ -24,16 +24,9 @@ const badgeVariants = cva(
         brand: "bg-brand-soft text-brand [a&]:hover:bg-brand-soft-hover",
         danger: "bg-danger-bg text-danger-fg [a&]:hover:bg-danger-bg/70",
         default: "bg-paper-200 text-fg-2 [a&]:hover:bg-paper-300",
-        destructive: "bg-danger text-white [a&]:hover:bg-danger/90",
-        ghost: "text-fg-2 [a&]:hover:bg-hover [a&]:hover:text-fg-1",
         info: "bg-info-bg text-info-fg [a&]:hover:bg-info-bg/70",
-        link: "text-link underline underline-offset-2 [a&]:hover:text-link-hover",
         outline: "border-border-strong bg-card text-fg-2 [a&]:hover:bg-paper-100",
         pending: "bg-pending-bg text-pending-fg [a&]:hover:bg-paper-300",
-        /** Legacy alias of `brand`. */
-        primary: "bg-brand-soft text-brand [a&]:hover:bg-brand-soft-hover",
-        /** Legacy alias of `default`. */
-        secondary: "bg-paper-200 text-fg-2 [a&]:hover:bg-paper-300",
         soil: "bg-soil-bg text-soil-fg [a&]:hover:bg-soil-bg/70",
         success: "bg-success-bg text-success-fg [a&]:hover:bg-success-bg/70",
         warning: "bg-warning-bg text-warning-fg [a&]:hover:bg-warning-bg/70",

@@ -9,7 +9,6 @@ export function EnvironmentBadges({
     isBuiltIn: boolean;
     isDefault: boolean;
     networkPolicy: "full" | "limited";
-    role: "owner";
   };
 }) {
   const { t } = useTranslation();

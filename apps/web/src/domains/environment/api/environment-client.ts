@@ -6,20 +6,11 @@ import type {
   SetProjectDefaultEnvironmentInput,
   UpdateEnvironmentInput,
 } from "@mosoo/contracts/environment";
-import type { EnvironmentId, ProjectId } from "@mosoo/contracts/id";
+import type { EnvironmentId, EnvironmentRevisionId, ProjectId } from "@mosoo/id";
 
 import { graphql } from "@/gql";
-import type {
-  EnvironmentDetailFieldsFragment,
-  EnvironmentSummaryFieldsFragment,
-} from "@/gql/graphql";
+import type { EnvironmentSummaryFieldsFragment } from "@/gql/graphql";
 import { requestGraphQL } from "@/platform/http/graphql-client";
-import {
-  toAccountId,
-  toEnvironmentId,
-  toEnvironmentRevisionId,
-  toProjectId,
-} from "@/routes/typed-id";
 
 const ENVIRONMENT_PACKAGE_FIELDS = graphql(/* GraphQL */ `
   fragment EnvironmentPackageFields on EnvironmentPackageSpec {
@@ -36,18 +27,8 @@ const ENVIRONMENT_ENV_VAR_FIELDS = graphql(/* GraphQL */ `
   }
 `);
 
-const ENVIRONMENT_OWNER_FIELDS = graphql(/* GraphQL */ `
-  fragment EnvironmentOwnerFields on EnvironmentOwnerSummary {
-    id
-    imageUrl
-    name
-  }
-`);
-
 const ENVIRONMENT_SUMMARY_FIELDS = graphql(/* GraphQL */ `
   fragment EnvironmentSummaryFields on EnvironmentSummary {
-    allowMcpServers
-    allowPackageManagers
     allowedHosts
     canDelete
     canEdit
@@ -65,16 +46,11 @@ const ENVIRONMENT_SUMMARY_FIELDS = graphql(/* GraphQL */ `
     id
     isBuiltIn
     isDefault
-    isEditable
     name
     networkPolicy
-    owner {
-      ...EnvironmentOwnerFields
-    }
     packages {
       ...EnvironmentPackageFields
     }
-    role
     setupScript
     updatedAt
     usedByAgentCount
@@ -84,8 +60,6 @@ const ENVIRONMENT_SUMMARY_FIELDS = graphql(/* GraphQL */ `
 
 const ENVIRONMENT_DETAIL_FIELDS = graphql(/* GraphQL */ `
   fragment EnvironmentDetailFields on EnvironmentDetail {
-    allowMcpServers
-    allowPackageManagers
     allowedHosts
     canDelete
     canEdit
@@ -103,16 +77,11 @@ const ENVIRONMENT_DETAIL_FIELDS = graphql(/* GraphQL */ `
     id
     isBuiltIn
     isDefault
-    isEditable
     name
     networkPolicy
-    owner {
-      ...EnvironmentOwnerFields
-    }
     packages {
       ...EnvironmentPackageFields
     }
-    role
     setupScript
     updatedAt
     usedByAgentCount
@@ -120,38 +89,25 @@ const ENVIRONMENT_DETAIL_FIELDS = graphql(/* GraphQL */ `
   }
 `);
 
-const retainGraphQLFragments = (documents: readonly unknown[]): number => documents.length;
-
-retainGraphQLFragments([
-  ENVIRONMENT_DETAIL_FIELDS,
-  ENVIRONMENT_ENV_VAR_FIELDS,
-  ENVIRONMENT_OWNER_FIELDS,
-  ENVIRONMENT_PACKAGE_FIELDS,
-  ENVIRONMENT_SUMMARY_FIELDS,
-]);
+void ENVIRONMENT_DETAIL_FIELDS;
+void ENVIRONMENT_ENV_VAR_FIELDS;
+void ENVIRONMENT_PACKAGE_FIELDS;
+void ENVIRONMENT_SUMMARY_FIELDS;
 
 function toEnvironmentSummary(environment: EnvironmentSummaryFieldsFragment): EnvironmentSummary {
   return {
     ...environment,
-    currentRevisionId: toEnvironmentRevisionId(environment.currentRevisionId),
+    currentRevisionId: environment.currentRevisionId as EnvironmentRevisionId,
     forkOrigin:
       environment.forkOrigin === null
         ? null
         : {
             ...environment.forkOrigin,
-            environmentId: toEnvironmentId(environment.forkOrigin.environmentId),
+            environmentId: environment.forkOrigin.environmentId as EnvironmentId,
           },
-    id: toEnvironmentId(environment.id),
-    owner: {
-      ...environment.owner,
-      id: environment.owner.id === null ? null : toAccountId(environment.owner.id),
-    },
-    projectId: toProjectId(environment.projectId),
+    id: environment.id as EnvironmentId,
+    projectId: environment.projectId as ProjectId,
   };
-}
-
-function toEnvironmentDetail(environment: EnvironmentDetailFieldsFragment): EnvironmentDetail {
-  return toEnvironmentSummary(environment);
 }
 
 const LIST_ENVIRONMENTS_QUERY = graphql(/* GraphQL */ `
@@ -212,7 +168,7 @@ export async function getEnvironment(
   environmentId: EnvironmentId,
 ): Promise<EnvironmentDetail> {
   const payload = await requestGraphQL(GET_ENVIRONMENT_QUERY, { environmentId, projectId });
-  return toEnvironmentDetail(payload.environment);
+  return toEnvironmentSummary(payload.environment);
 }
 
 export async function createEnvironment(
@@ -224,7 +180,7 @@ export async function createEnvironment(
 
 export async function updateEnvironment(input: UpdateEnvironmentInput): Promise<EnvironmentDetail> {
   const payload = await requestGraphQL(UPDATE_ENVIRONMENT_MUTATION, { input });
-  return toEnvironmentDetail(payload.updateEnvironment);
+  return toEnvironmentSummary(payload.updateEnvironment);
 }
 
 export async function deleteEnvironment(input: DeleteEnvironmentInput): Promise<void> {

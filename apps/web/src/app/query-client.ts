@@ -1,8 +1,7 @@
 import { MutationCache, QueryCache, QueryClient } from "@tanstack/react-query";
 
+import { userKeys } from "@/domains/user/query/user-queries";
 import { UnauthorizedError } from "@/platform/http/graphql-client";
-
-const VIEWER_QUERY_KEY = ["user", "viewer"] as const;
 
 function handleAuthError(error: unknown) {
   if (!(error instanceof UnauthorizedError)) {
@@ -10,16 +9,8 @@ function handleAuthError(error: unknown) {
   }
   // Force viewer to null. ProtectedRoute then redirects to /login?redirect=...
   // And stays there until the user signs in again.
-  appQueryClient.setQueryData(VIEWER_QUERY_KEY, null);
-  void cancelQueriesAfterAuthError();
-}
-
-async function cancelQueriesAfterAuthError() {
-  try {
-    await appQueryClient.cancelQueries();
-  } catch {
-    // Best-effort; ignore cancel errors
-  }
+  appQueryClient.setQueryData(userKeys.viewer(), null);
+  void appQueryClient.cancelQueries();
 }
 
 export const appQueryClient = new QueryClient({

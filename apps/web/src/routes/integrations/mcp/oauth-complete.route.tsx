@@ -32,9 +32,9 @@ export function McpOAuthCompletePage() {
     <div className="bg-background flex min-h-dvh items-center justify-center px-6">
       <div className="border-border bg-card w-full max-w-md rounded-lg border p-6">
         <h1 className="text-foreground text-[20px] font-semibold">MCP OAuth</h1>
-        <p className="text-muted-foreground mt-3 text-sm">{t(getStatusLabel(status))}</p>
+        <p className="text-fg-3 mt-3 text-sm">{t(getStatusLabel(status))}</p>
         {flowId && (
-          <p className="bg-muted text-muted-foreground mt-4 rounded-md px-3 py-2 font-mono text-[12px] break-all">
+          <p className="bg-sunken text-fg-3 mt-4 rounded-md px-3 py-2 font-mono text-[12px] break-all">
             {t("mcp.flowId", { flowId })}
           </p>
         )}

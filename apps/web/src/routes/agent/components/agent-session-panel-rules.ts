@@ -1,16 +1,10 @@
 import type { SessionLiveState } from "@mosoo/ag-ui-session";
 import type { AgentReadiness } from "@mosoo/contracts/agent";
-import type { SessionSummary, SessionType } from "@mosoo/contracts/session";
-
-export type AgentSessionPanelTone = "consume" | "preview";
-export type SessionControlMode = "new_session" | "reset";
+import type { SessionSummary } from "@mosoo/contracts/session";
 
 export interface SessionConfigurationFreshnessInput {
   activeSession: SessionSummary | null;
-  activeSessionRevision: string | null;
   configurationChangedAt: string | null;
-  configurationRevisionKey: string | null;
-  requireFreshConfiguration: boolean;
 }
 
 export interface ComposerSendBlockInput {
@@ -22,41 +16,6 @@ export interface ComposerSendBlockInput {
   typedText: string;
 }
 
-export interface RuntimeReadyWaitInput {
-  sessionType: SessionType;
-  waitForRuntimeReadyOnNewSession: boolean;
-}
-
-export interface SessionPanelReadinessInput {
-  agentReadiness: AgentReadiness | null;
-  streamReadiness: AgentReadiness | null;
-}
-
-export function selectSessionPanelReadiness(
-  input: SessionPanelReadinessInput,
-): AgentReadiness | null {
-  if (input.streamReadiness === null) {
-    return input.agentReadiness;
-  }
-
-  if (input.agentReadiness === null) {
-    return input.streamReadiness;
-  }
-
-  const agentCheckedAtMs = parseTimestampMs(input.agentReadiness.checkedAt);
-  const streamCheckedAtMs = parseTimestampMs(input.streamReadiness.checkedAt);
-
-  if (
-    agentCheckedAtMs !== null &&
-    streamCheckedAtMs !== null &&
-    agentCheckedAtMs >= streamCheckedAtMs
-  ) {
-    return input.agentReadiness;
-  }
-
-  return input.streamReadiness;
-}
-
 export function getReadinessBlockMessage(readiness: AgentReadiness | null): string | null {
   if (readiness === null || readiness.issues.length === 0 || readiness.ready) {
     return null;
@@ -66,16 +25,8 @@ export function getReadinessBlockMessage(readiness: AgentReadiness | null): stri
 }
 
 export function hasStaleSessionConfiguration(input: SessionConfigurationFreshnessInput): boolean {
-  if (!input.requireFreshConfiguration || input.activeSession === null) {
+  if (input.activeSession === null) {
     return false;
-  }
-
-  if (
-    input.activeSessionRevision !== null &&
-    input.configurationRevisionKey !== null &&
-    input.activeSessionRevision !== input.configurationRevisionKey
-  ) {
-    return true;
   }
 
   const sessionCreatedAtMs = parseTimestampMs(input.activeSession.createdAt);
@@ -102,41 +53,26 @@ export function isComposerSendBlocked(input: ComposerSendBlockInput): boolean {
   );
 }
 
-export function shouldWaitForRuntimeReadyOnNewSession(input: RuntimeReadyWaitInput): boolean {
-  return input.waitForRuntimeReadyOnNewSession && input.sessionType === "preview";
-}
-
 export interface SpeculativeSessionCreateInput {
   activeSessionId: string | null;
   projectId: string | null;
   readinessBlockMessage: string | null;
   sending: boolean;
   sessionListLoaded: boolean;
-  sessionType: SessionType;
 }
 
-// Speculatively creating a session on typing is preview-only: preview sessions
-// are reset-scoped and cheap to abandon, while consume ("ui") sessions are
-// user-visible history and must not be created before a real send.
+// Preview sessions are reset-scoped and cheap to abandon, so typing may create
+// one before the first send.
 export function shouldSpeculativelyCreateSessionOnTyping(
   input: SpeculativeSessionCreateInput,
 ): boolean {
   return (
-    input.sessionType === "preview" &&
     input.projectId !== null &&
     input.activeSessionId === null &&
     input.sessionListLoaded &&
     !input.sending &&
     input.readinessBlockMessage === null
   );
-}
-
-export function getSessionControlMode(tone: AgentSessionPanelTone): SessionControlMode {
-  return tone === "preview" ? "reset" : "new_session";
-}
-
-export function createSessionAutoTitle(typedText: string): string {
-  return typedText.length > 30 ? `${typedText.slice(0, 27)}...` : typedText;
 }
 
 function parseTimestampMs(value: string | null): number | null {

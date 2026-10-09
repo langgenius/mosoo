@@ -1,40 +1,40 @@
-import { parseFileApiError } from "@/shared/lib/file-api-error";
+import type { FileErrorResponse } from "@mosoo/contracts/file";
 
 import { apiFetch } from "./public-api";
 import type { ApiPath } from "./public-api";
 
-interface JsonRequestInit<TBody extends object | undefined = undefined> extends RequestInit {
-  bodyJson?: TBody;
+// File routes answer `{ error: { message } }`, auth routes `{ error: string }`
+// and Better Auth `{ message: string }`; anything else falls back to the status line.
+export async function readFileApiError(response: Response): Promise<Error> {
+  const payload = (await response.json().catch(() => null)) as {
+    error?: string | Partial<FileErrorResponse["error"]>;
+    message?: unknown;
+  } | null;
+  const message =
+    typeof payload?.error === "string"
+      ? payload.error
+      : (payload?.error?.message ?? payload?.message);
+
+  return new Error(
+    typeof message === "string" ? message : `${response.status} ${response.statusText}`,
+  );
 }
 
-export async function requestJson<TResponse, TBody extends object | undefined = undefined>(
+export async function requestJson<TResponse>(
   path: ApiPath,
-  init?: JsonRequestInit<TBody>,
+  init: { bodyJson?: object; method?: "DELETE" | "GET" | "POST" } = {},
 ): Promise<TResponse> {
-  const headers = new Headers(init?.headers);
-
-  if (init?.bodyJson !== undefined) {
-    headers.set("Content-Type", "application/json");
-  }
-
-  const requestInit: RequestInit = {
+  const response = await apiFetch(path, {
     credentials: "include",
-    headers,
-    method: init?.method ?? "GET",
-  };
-
-  if (init?.bodyJson !== undefined) {
-    requestInit.body = JSON.stringify(init.bodyJson);
-  } else if (init?.body !== undefined) {
-    requestInit.body = init.body;
-  }
-
-  const response = await apiFetch(path, requestInit);
+    method: init.method ?? "GET",
+    ...(init.bodyJson === undefined
+      ? {}
+      : { body: JSON.stringify(init.bodyJson), headers: { "Content-Type": "application/json" } }),
+  });
 
   if (!response.ok) {
-    throw await parseFileApiError(response);
+    throw await readFileApiError(response);
   }
 
-  const payload: unknown = await response.json();
-  return payload as TResponse;
+  return (await response.json()) as TResponse;
 }

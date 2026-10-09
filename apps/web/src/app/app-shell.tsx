@@ -5,11 +5,12 @@ import ChevronDownIcon from "@hugeicons/core-free-icons/ChevronDownIcon";
 import PanelLeftCloseIcon from "@hugeicons/core-free-icons/PanelLeftCloseIcon";
 import PanelLeftOpenIcon from "@hugeicons/core-free-icons/PanelLeftOpenIcon";
 import type { ProjectSummary } from "@mosoo/contracts/project";
+import type { ProjectId } from "@mosoo/id";
 import { useEffect, useState } from "react";
 import type { ReactElement, ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
-import { HelpMenu } from "@/features/help/help-menu";
+import { HelpLink } from "@/features/help/help-link";
 import { useTranslation } from "@/shared/i18n";
 import { LocaleSwitcher } from "@/shared/i18n/locale-switcher";
 import { cn } from "@/shared/lib/class-names";
@@ -21,15 +22,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu";
+import { createHugeicon } from "@/shared/ui/icons";
 import { Sheet, SheetContent, SheetTitle } from "@/shared/ui/sheet";
 import { SidebarTooltip } from "@/shared/ui/sidebar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/shared/ui/tooltip";
 
 import { AccountMenu } from "./account-menu";
-import { createHugeicon } from "./hugeicon";
+import { findDocumentTitleRule } from "./document-title";
 import { ProjectNavigation } from "./navigation";
 import { OrgNavigation } from "./org-navigation";
-import { useAppSession } from "./session-provider";
+import { useAppSession } from "./session/session-context";
 import { useSidebarCollapsed } from "./use-sidebar-collapsed";
 
 const BackIcon = createHugeicon(ArrowLeft01Icon, "BackIcon");
@@ -96,7 +98,7 @@ function ProjectSwitcher({
   activeProject: ProjectSummary | null;
   collapsed: boolean;
   loading: boolean;
-  onSwitch: (projectId: string) => void;
+  onSwitch: (projectId: ProjectId) => void;
   orgName: string | null;
   projects: ProjectSummary[];
 }): ReactElement {
@@ -278,11 +280,9 @@ function SidebarHeader({
 function ConsoleSidebarFooter({
   children,
   collapsed,
-  helpShortcutEnabled = true,
 }: {
   children?: ReactNode;
   collapsed: boolean;
-  helpShortcutEnabled?: boolean;
 }): ReactElement {
   const { user } = useAppSession();
 
@@ -290,7 +290,7 @@ function ConsoleSidebarFooter({
     <div data-sidebar-zone="persistent" className="flex shrink-0 flex-col pt-3">
       <div className="flex flex-col gap-0.5">
         {children}
-        <HelpMenu collapsed={collapsed} shortcutEnabled={helpShortcutEnabled} />
+        <HelpLink collapsed={collapsed} />
         <LocaleSwitcher collapsed={collapsed} />
       </div>
       <AccountMenu collapsed={collapsed} user={user} />
@@ -321,10 +321,6 @@ function MobileNavigation({
   }
 
   useEffect(() => {
-    if (typeof globalThis.matchMedia !== "function") {
-      return;
-    }
-
     const desktopBreakpoint = globalThis.matchMedia("(min-width: 768px)");
 
     function handleBreakpointChange(event: MediaQueryListEvent): void {
@@ -385,25 +381,11 @@ function MobileNavigation({
           >
             {renderNavigation(closeNavigation)}
             <div className="min-h-4 flex-1" />
-            <ConsoleSidebarFooter collapsed={false} helpShortcutEnabled={false}>
-              {footer}
-            </ConsoleSidebarFooter>
+            <ConsoleSidebarFooter collapsed={false}>{footer}</ConsoleSidebarFooter>
           </nav>
         </SheetContent>
       </Sheet>
     </div>
-  );
-}
-
-const ORG_HEADER_TITLES = [
-  { path: "/projects", titleKey: "pageTitle.projects" },
-  { path: "/org/settings", titleKey: "pageTitle.orgSettings" },
-] as const;
-
-function getOrgHeaderTitle(pathname: string): string | null {
-  return (
-    ORG_HEADER_TITLES.find((item) => pathname === item.path || pathname.startsWith(`${item.path}/`))
-      ?.titleKey ?? null
   );
 }
 
@@ -480,7 +462,7 @@ export function Layout({ children }: { children: ReactNode }): ReactElement {
   const navigate = useNavigate();
   const { collapsed, toggleCollapsed } = useSidebarCollapsed();
 
-  function switchProject(projectId: string): void {
+  function switchProject(projectId: ProjectId): void {
     setActiveProject(projectId);
     void navigate("/");
   }
@@ -547,8 +529,8 @@ export function OrgLayout({ children }: { children: ReactNode }): ReactElement {
   const { t } = useTranslation();
   const { activeOrganization } = useAppSession();
   const location = useLocation();
-  const headerTitle = getOrgHeaderTitle(location.pathname);
-  const resolvedHeaderTitle = headerTitle === null ? null : t(headerTitle);
+  const titleRule = findDocumentTitleRule(location.pathname);
+  const resolvedHeaderTitle = titleRule?.scope === "org" ? t(titleRule.titleKey) : null;
 
   return (
     <TooltipProvider>

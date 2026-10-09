@@ -24,7 +24,6 @@ export interface SessionTurn {
   events: SessionProcessEvent[];
   id: string;
   index: number;
-  runId: string | null;
   startedAt: string;
   status: SessionTurnStatus;
 }
@@ -40,7 +39,6 @@ interface MutableSessionTurn {
   endedAt: string | null;
   events: SessionProcessEvent[];
   id: string;
-  runId: string | null;
   startedAt: string;
   status: SessionTurnStatus;
 }
@@ -65,7 +63,6 @@ function createPendingTurn(events: SessionProcessEvent[]): MutableSessionTurn | 
     endedAt: null,
     events: [...events],
     id: `pending:${first.id}`,
-    runId: null,
     startedAt: first.occurredAt,
     status: "pending",
   };
@@ -93,7 +90,6 @@ export function projectSessionTurns(events: readonly SessionProcessEvent[]): Ses
         endedAt: null,
         events: [...pendingEvents, event],
         id: event.id,
-        runId: null,
         startedAt: pendingEvents[0]?.occurredAt ?? event.occurredAt,
         status: "running",
       };

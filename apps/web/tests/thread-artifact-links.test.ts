@@ -1,15 +1,28 @@
 import { describe, expect, test } from "bun:test";
 
 import type { FileSessionKind } from "@mosoo/contracts/file";
+import { parsePlatformId } from "@mosoo/id";
+import type { AccountId } from "@mosoo/id";
 
 import type { ListedFileEntry } from "../src/domains/file/api/files";
 import {
   createThreadArtifactLinkResolver,
   normalizeArtifactSourcePath,
 } from "../src/routes/threads/detail/artifact-links";
-import { toAccountId, toFileId, toSessionId } from "../src/routes/typed-id";
+import { toFileId, toSessionId } from "../src/routes/typed-id";
+import en from "../src/shared/i18n/translations/en.json";
 
-const ACCOUNT_ID = toAccountId("01J000000000000000000000A1");
+function translate(key: string, variables: Record<string, string> = {}): string {
+  const text = key
+    .split(".")
+    .reduce<unknown>((node, part) => (node as Record<string, unknown>)[part], en);
+  return Object.entries(variables).reduce(
+    (result, [name, value]) => result.replaceAll(`{{${name}}}`, value),
+    String(text),
+  );
+}
+
+const ACCOUNT_ID = parsePlatformId<AccountId>("01J000000000000000000000A1");
 const SESSION_ID = toSessionId("01J000000000000000000000S1");
 
 function createArtifact(
@@ -51,9 +64,13 @@ describe("Thread artifact links", () => {
     const first = createArtifact("01J000000000000000000000F1", "outputs/one/report.md");
     const second = createArtifact("01J000000000000000000000F2", "outputs/two/report.md");
     const opened: ListedFileEntry[] = [];
-    const resolve = createThreadArtifactLinkResolver([first, second], (file) => {
-      opened.push(file);
-    });
+    const resolve = createThreadArtifactLinkResolver(
+      [first, second],
+      (file) => {
+        opened.push(file);
+      },
+      translate,
+    );
 
     const resolution = resolve("outputs/two/report.md");
 
@@ -66,7 +83,7 @@ describe("Thread artifact links", () => {
   });
 
   test("marks missing artifacts unavailable without relaxing normal link safety", () => {
-    const resolve = createThreadArtifactLinkResolver([], () => {});
+    const resolve = createThreadArtifactLinkResolver([], () => {}, translate);
     const missing = resolve("outputs/missing.md");
 
     expect(missing).toMatchObject({

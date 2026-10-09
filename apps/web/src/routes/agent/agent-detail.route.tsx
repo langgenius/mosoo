@@ -1,18 +1,17 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useMemo, useState } from "react";
 import type { ReactElement } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
-import { useAppSession } from "@/app/session-provider";
+import { useAppSession } from "@/app/session/session-context";
 import { useAgentDetailQuery, useAgentEditorStateQuery } from "@/domains/agent/query/agent-queries";
-import { useAuth } from "@/domains/auth/use-auth";
 import { useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
+import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { ArrowLeft, Settings } from "@/shared/ui/icons";
 
-import { isTruthy } from "../../shared/lib/truthiness";
 import { mapAgentDetailToView } from "./agent-view.mapper";
-import type { Agent, AgentMode } from "./agent.types";
+import type { Agent } from "./agent.types";
 import { PreviewMode } from "./components/preview-mode";
 import { RuntimeIcon } from "./components/runtime-icon";
 import { getRuntimeInfo } from "./runtime-catalog";
@@ -32,12 +31,7 @@ const SettingsSheet = lazy(async () => {
   return { default: mod.SettingsSheet };
 });
 
-const ConsumeMode = lazy(async () => {
-  const mod = await import("./components/consume-mode");
-  return { default: mod.ConsumeMode };
-});
-
-type DetailMode = AgentMode | "cost" | "logs";
+type DetailMode = "cost" | "logs" | "preview";
 
 interface VersionsSheetProps {
   agent: Agent;
@@ -76,9 +70,7 @@ const MODE_TABS: { id: DetailMode; labelKey: string }[] = [
 
 function toDetailMode(value: string | null): DetailMode | null {
   switch (value) {
-    case "consume":
     case "cost":
-    case "create":
     case "logs":
     case "preview":
       return value;
@@ -109,14 +101,14 @@ function AgentDetailHeader({
   const { t } = useTranslation();
 
   return (
-    <header className="border-border-subtle flex min-h-13 shrink-0 flex-wrap items-center gap-y-2 border-b bg-white px-3 py-2 sm:px-5 lg:h-13 lg:flex-nowrap lg:py-0">
+    <header className="border-border-soft bg-card flex min-h-13 shrink-0 flex-wrap items-center gap-y-2 border-b px-3 py-2 sm:px-5 lg:h-13 lg:flex-nowrap lg:py-0">
       <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3 lg:flex-initial">
         <Button
           aria-label={t("agent.backToAgents")}
           variant="ghost"
           size="icon-sm"
           onClick={onBack}
-          className="text-muted-foreground shrink-0"
+          className="text-fg-3 shrink-0"
         >
           <ArrowLeft className="size-4" />
         </Button>
@@ -133,30 +125,40 @@ function AgentDetailHeader({
           {agent.name}
         </span>
         {agent.status === "draft" ? (
-          <button
-            type="button"
-            onClick={onOpenVersions}
-            className="focus-visible:ring-ring bg-amber-bg text-amber-fg hover:bg-amber-bg/70 ml-1 inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors focus:outline-none focus-visible:ring-2"
-            aria-label={t("agent.openVersionHistory")}
+          <Badge
+            asChild
+            variant="warning"
+            className="hover:bg-warning-bg/70 ml-1 cursor-pointer focus:outline-none"
           >
-            {t("agent.draft")}
-          </button>
+            <button
+              type="button"
+              onClick={onOpenVersions}
+              aria-label={t("agent.openVersionHistory")}
+            >
+              {t("agent.draft")}
+            </button>
+          </Badge>
         ) : agent.liveVersion ? (
-          <button
-            type="button"
-            onClick={onOpenVersions}
-            className="focus-visible:ring-ring ml-1 inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-medium text-green-800 transition-colors hover:bg-green-200/70 focus:outline-none focus-visible:ring-2"
-            aria-label={t("agent.openVersionHistory")}
+          <Badge
+            asChild
+            variant="brand"
+            className="hover:bg-brand-soft-hover ml-1 cursor-pointer focus:outline-none"
           >
-            v{agent.liveVersion.versionNumber} {t("agent.live")}
-          </button>
+            <button
+              type="button"
+              onClick={onOpenVersions}
+              aria-label={t("agent.openVersionHistory")}
+            >
+              v{agent.liveVersion.versionNumber} {t("agent.live")}
+            </button>
+          </Badge>
         ) : null}
       </div>
 
       {/* From lg the tab strip stays in flow with auto margins: centred while there
           is room, and a long name truncates inside the identity cluster instead of
           running underneath the tabs. Below lg the strip wraps to its own row. */}
-      <div className="border-border-subtle order-3 flex w-full items-center gap-1 overflow-x-auto border-t pt-2 lg:order-none lg:mx-auto lg:w-auto lg:shrink-0 lg:border-0 lg:px-3 lg:pt-0">
+      <div className="border-border-soft order-3 flex w-full items-center gap-1 overflow-x-auto border-t pt-2 lg:order-none lg:mx-auto lg:w-auto lg:shrink-0 lg:border-0 lg:px-3 lg:pt-0">
         {MODE_TABS.map((tab) => (
           <button
             key={tab.id}
@@ -179,10 +181,11 @@ function AgentDetailHeader({
       <div className="flex shrink-0 items-center gap-1 sm:gap-2">
         <div ref={headerActionTargetRef} className="flex items-center gap-2" />
         <Button
+          aria-label={t("agent.settings")}
           variant="ghost"
           size="icon-sm"
           onClick={onOpenSettings}
-          className="text-muted-foreground"
+          className="text-fg-3"
         >
           <Settings className="size-4" />
         </Button>
@@ -194,7 +197,7 @@ function AgentDetailHeader({
 function PanelLoading(): ReactElement {
   const { t } = useTranslation();
   return (
-    <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
+    <div className="text-fg-3 flex h-full items-center justify-center text-sm">
       {t("common.loading")}
     </div>
   );
@@ -206,28 +209,25 @@ export function AgentDetailPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { activeProjectId } = useAppSession();
-  const { user } = useAuth();
   const [selectedMode, setSelectedMode] = useState<DetailMode | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showVersions, setShowVersions] = useState(false);
   const [headerActionTarget, setHeaderActionTarget] = useState<HTMLDivElement | null>(null);
 
   const detailQuery = useAgentDetailQuery(activeProjectId, agentId ?? null);
-  const canEdit = detailQuery.data ? detailQuery.data.viewerRole === "owner" : false;
-  const editorStateQuery = useAgentEditorStateQuery(activeProjectId, agentId ?? null, canEdit);
+  const detailLoaded = detailQuery.data !== undefined;
+  const editorStateQuery = useAgentEditorStateQuery(activeProjectId, agentId ?? null, detailLoaded);
 
   const agent = useMemo<Agent | null>(() => {
     if (!detailQuery.data) {
       return null;
     }
 
-    return mapAgentDetailToView(detailQuery.data, editorStateQuery.data ?? null, user);
-  }, [detailQuery.data, editorStateQuery.data, user]);
+    return mapAgentDetailToView(detailQuery.data, editorStateQuery.data ?? null);
+  }, [detailQuery.data, editorStateQuery.data]);
 
-  const basePath = globalThis.location.pathname.startsWith("/demo") ? "/demo/agent" : "/agent";
   const runtime = useMemo(() => (agent ? getRuntimeInfo(agent.runtime) : null), [agent]);
-  const canManageAgentAccess = detailQuery.data?.viewerRole === "owner";
-  const urlMode = toDetailMode(searchParams.get("tab") ?? searchParams.get("mode"));
+  const urlMode = toDetailMode(searchParams.get("tab"));
 
   const handleSelectMode = useCallback(
     (nextMode: DetailMode) => {
@@ -244,41 +244,15 @@ export function AgentDetailPage() {
     [setSearchParams],
   );
 
-  // Allow other surfaces (e.g. the Agents list dropdown) to deep-link
-  // Straight into the settings sheet via `?settings=1`.
-  const settingsParam = searchParams.get("settings");
-  useEffect(() => {
-    if (settingsParam !== "1") {
-      return;
-    }
-    setShowSettings(true);
-    setSearchParams(
-      (current) => {
-        const nextParams = new URLSearchParams(current);
-        nextParams.delete("settings");
-        return nextParams;
-      },
-      { replace: true },
-    );
-  }, [settingsParam, setSearchParams]);
+  // Default mode is Preview (config + test chat).
+  const mode = selectedMode ?? urlMode ?? "preview";
 
-  // Default mode is Preview (config + test chat). Consume is still reachable
-  // via `?tab=consume` (e.g. the post-publish success modal's "Open Chat" CTA),
-  // and the Preview tab offers an in-context test chat.
-  const defaultMode: DetailMode = "preview";
-  const mode = selectedMode ?? urlMode ?? defaultMode;
-
-  if (!isTruthy(agentId)) {
+  if (
+    detailQuery.isLoading ||
+    (detailLoaded && editorStateQuery.isLoading && !editorStateQuery.data)
+  ) {
     return (
-      <div className="text-destructive flex h-full items-center justify-center text-sm">
-        {t("agent.agentIdMissing")}
-      </div>
-    );
-  }
-
-  if (detailQuery.isLoading || (canEdit && editorStateQuery.isLoading && !editorStateQuery.data)) {
-    return (
-      <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
+      <div className="text-fg-3 flex h-full items-center justify-center text-sm">
         {t("agent.loadingAgent")}
       </div>
     );
@@ -289,51 +263,18 @@ export function AgentDetailPage() {
   if (loadError || !agent) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-4">
-        <div className="text-destructive text-sm">
+        <div className="text-danger text-sm">
           {loadError instanceof Error ? loadError.message : t("agent.notFound")}
         </div>
         <Button
           variant="outline"
           onClick={() => {
-            void navigate(basePath);
+            void navigate("/agent");
           }}
         >
           {t("agent.backToAgents")}
         </Button>
       </div>
-    );
-  }
-
-  const detail = detailQuery.data;
-
-  if (!detail) {
-    return (
-      <div className="flex h-full flex-col items-center justify-center gap-4">
-        <div className="text-destructive text-sm">{t("agent.notFound")}</div>
-        <Button
-          variant="outline"
-          onClick={() => {
-            void navigate(basePath);
-          }}
-        >
-          {t("agent.backToAgents")}
-        </Button>
-      </div>
-    );
-  }
-
-  // Consume mode keeps a config entry point back into the editor.
-  if (mode === "consume") {
-    return (
-      <Suspense fallback={<PanelLoading />}>
-        <ConsumeMode
-          agent={agent}
-          onOpenConfig={() => {
-            handleSelectMode("preview");
-          }}
-          showConfigButton
-        />
-      </Suspense>
     );
   }
 
@@ -344,7 +285,7 @@ export function AgentDetailPage() {
         headerActionTargetRef={setHeaderActionTarget}
         mode={mode}
         onBack={() => {
-          void navigate(basePath);
+          void navigate("/agent");
         }}
         onOpenSettings={() => {
           setShowSettings(true);
@@ -375,12 +316,7 @@ export function AgentDetailPage() {
 
       {showSettings ? (
         <Suspense fallback={null}>
-          <SettingsSheet
-            agent={agent}
-            open={showSettings}
-            onOpenChange={setShowSettings}
-            canManageAccess={canManageAgentAccess}
-          />
+          <SettingsSheet agent={agent} open={showSettings} onOpenChange={setShowSettings} />
         </Suspense>
       ) : null}
 

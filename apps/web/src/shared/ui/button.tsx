@@ -28,8 +28,6 @@ const buttonVariants = cva(
     variants: {
       size: {
         default: "h-8 rounded-md px-3 text-[13px] has-[>svg]:px-2.5",
-        icon: "size-8 rounded-md",
-        "icon-lg": "size-9 rounded-md",
         "icon-sm": "size-7 rounded-sm",
         "icon-xs": "size-6 rounded-sm [&_svg:not([class*='size-'])]:size-3",
         lg: "h-9 rounded-md px-4 text-[14px] has-[>svg]:px-3.5",
@@ -40,18 +38,12 @@ const buttonVariants = cva(
         /** The focal action: brand green fill, dark ink text, deep-tone hairline. */
         default:
           "border border-primary-border bg-primary text-primary-foreground hover:bg-primary-hover active:bg-primary-active disabled:border-transparent disabled:bg-paper-300 disabled:text-fg-3",
-        /** Legacy alias of `default`; new call sites use `default`. */
-        accent:
-          "border border-primary-border bg-primary text-primary-foreground hover:bg-primary-hover active:bg-primary-active disabled:border-transparent disabled:bg-paper-300 disabled:text-fg-3",
         destructive:
           "bg-danger text-white hover:bg-danger/90 active:bg-danger/80 disabled:bg-paper-300 disabled:text-fg-3",
         ghost:
           "text-fg-2 hover:bg-hover hover:text-fg-1 active:bg-pressed disabled:bg-transparent disabled:text-fg-muted",
-        link: "h-auto rounded-none px-0 text-link underline decoration-link/45 underline-offset-[3px] hover:text-link-hover hover:decoration-current disabled:text-fg-muted",
         outline:
           "border border-border-strong bg-card text-fg-1 hover:bg-paper-100 active:bg-paper-200 disabled:border-border-soft disabled:bg-paper-100 disabled:text-fg-muted",
-        secondary:
-          "bg-paper-200 text-fg-1 hover:bg-paper-300 active:bg-paper-400 disabled:bg-paper-200 disabled:text-fg-muted",
         tonal:
           "bg-brand-soft text-brand hover:bg-brand-soft-hover active:bg-green-200 disabled:bg-paper-200 disabled:text-fg-muted",
       },

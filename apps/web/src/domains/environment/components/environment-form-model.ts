@@ -11,8 +11,9 @@ import type {
   EnvironmentVariableStatus,
   UpdateEnvironmentInput,
 } from "@mosoo/contracts/environment";
+import type { EnvironmentId, ProjectId } from "@mosoo/id";
 
-import { toEnvironmentId, toProjectId } from "@/routes/typed-id";
+import { toProjectId } from "@/routes/typed-id";
 
 type EnvironmentLike = EnvironmentSummary | EnvironmentDetail;
 
@@ -31,8 +32,6 @@ export interface EditablePackageRow {
 }
 
 export interface EnvironmentDraft {
-  allowMcpServers: boolean;
-  allowPackageManagers: boolean;
   allowedHostsText: string;
   description: string;
   envVars: EditableEnvVar[];
@@ -45,15 +44,6 @@ export interface EnvironmentDraft {
 export const PACKAGE_MANAGERS = WRITABLE_ENVIRONMENT_PACKAGE_MANAGERS;
 const WRITABLE_PACKAGE_MANAGER_NAMES = WRITABLE_ENVIRONMENT_PACKAGE_MANAGERS.join(" or ");
 
-export const PACKAGE_MANAGER_LABELS: Record<EnvironmentPackageManager, string> = {
-  apt: "apt",
-  cargo: "cargo",
-  gem: "gem",
-  go: "go",
-  npm: "npm",
-  pip: "pip",
-};
-
 export const NETWORK_POLICY_LABELS: Record<EnvironmentNetworkPolicy, string> = {
   full: "environments.networkPolicyFull",
   limited: "environments.networkPolicyLimited",
@@ -61,34 +51,18 @@ export const NETWORK_POLICY_LABELS: Record<EnvironmentNetworkPolicy, string> = {
 
 type Translate = (key: string, variables?: Record<string, string>) => string;
 
-const DEFAULT_TRANSLATIONS: Record<string, string> = {
-  "environments.choosePackageManager": "Choose a package manager for every package row.",
-  "environments.packageManagerNotSupported":
-    "{{manager}} is not supported by the current Driver runtime. Change it to {{writable}}, or remove this row before saving.",
-};
-
-const defaultTranslate: Translate = (key, variables) =>
-  Object.entries(variables ?? {}).reduce(
-    (text, [name, value]) => text.replaceAll(`{{${name}}}`, value),
-    DEFAULT_TRANSLATIONS[key] ?? key,
-  );
-
 function unsupportedPackageManagerMessage(
   manager: EnvironmentPackageManager,
-  t: Translate = defaultTranslate,
+  t: Translate,
 ): string {
   return t("environments.packageManagerNotSupported", {
-    manager: PACKAGE_MANAGER_LABELS[manager] ?? manager,
+    manager,
     writable: WRITABLE_PACKAGE_MANAGER_NAMES,
   });
 }
 
 export function createDraftId(): string {
-  if ("randomUUID" in crypto) {
-    return crypto.randomUUID();
-  }
-
-  return `env-var-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  return crypto.randomUUID();
 }
 
 export function createPackageRow(
@@ -104,8 +78,6 @@ export function createPackageRow(
 
 function emptyDraft(): EnvironmentDraft {
   return {
-    allowMcpServers: true,
-    allowPackageManagers: true,
     allowedHostsText: "",
     description: "",
     envVars: [],
@@ -129,8 +101,6 @@ export function createEnvironmentDraft(environment?: EnvironmentLike | null): En
       : [createPackageRow()];
 
   return {
-    allowMcpServers: environment.allowMcpServers,
-    allowPackageManagers: environment.allowPackageManagers,
     allowedHostsText: environment.allowedHosts.join(", "),
     description: environment.description,
     envVars: environment.envVars.map((envVar) => ({
@@ -154,7 +124,7 @@ function parseAllowedHosts(text: string): string[] {
   });
 }
 
-function parsePackages(rows: EditablePackageRow[], t: Translate = defaultTranslate) {
+function parsePackages(rows: EditablePackageRow[], t: Translate) {
   return rows.flatMap((row) => {
     if (!row.manager) {
       return [];
@@ -187,10 +157,7 @@ function toEnvVarInputs(envVars: EditableEnvVar[]) {
   });
 }
 
-export function getPackageManagerError(
-  rows: EditablePackageRow[],
-  t: Translate = defaultTranslate,
-): string | null {
+export function getPackageManagerError(rows: EditablePackageRow[], t: Translate): string | null {
   const invalidRow = rows.find((row) => row.packagesText.trim() && !row.manager);
 
   if (invalidRow) {
@@ -214,11 +181,9 @@ export function getPackageManagerError(
 export function toCreateEnvironmentInput(
   projectId: string,
   draft: EnvironmentDraft,
-  t: Translate = defaultTranslate,
+  t: Translate,
 ): CreateEnvironmentInput {
   return {
-    allowMcpServers: draft.allowMcpServers,
-    allowPackageManagers: draft.allowPackageManagers,
     allowedHosts:
       draft.networkPolicy === "limited" ? parseAllowedHosts(draft.allowedHostsText) : [],
     description: draft.description.trim() || null,
@@ -232,23 +197,21 @@ export function toCreateEnvironmentInput(
 }
 
 export function toUpdateEnvironmentInput(
-  projectId: string,
-  environmentId: string,
+  projectId: ProjectId,
+  environmentId: EnvironmentId,
   draft: EnvironmentDraft,
-  t: Translate = defaultTranslate,
+  t: Translate,
 ): UpdateEnvironmentInput {
   return {
-    allowMcpServers: draft.allowMcpServers,
-    allowPackageManagers: draft.allowPackageManagers,
     allowedHosts:
       draft.networkPolicy === "limited" ? parseAllowedHosts(draft.allowedHostsText) : [],
     description: draft.description.trim() || null,
     envVars: toEnvVarInputs(draft.envVars),
-    environmentId: toEnvironmentId(environmentId),
+    environmentId,
     name: draft.name.trim(),
     networkPolicy: draft.networkPolicy,
     packages: parsePackages(draft.packages, t),
-    projectId: toProjectId(projectId),
+    projectId,
     setupScript: draft.setupScript,
   };
 }

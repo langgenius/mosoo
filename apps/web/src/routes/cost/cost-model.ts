@@ -1,23 +1,17 @@
 import type {
   CostAgentRow,
-  CostAttributionCard,
-  CostDailyPoint,
   CostModelRow,
   CostRangeInput,
-  CostRecentSession,
   CostRunPurpose,
   CostTotals,
-  OrganizationBillingCostCard,
-  ProjectCostCard,
 } from "@/domains/cost/api/cost-client";
 import { getCurrentLocale } from "@/shared/i18n";
-import type { SupportedLocale } from "@/shared/i18n/locales";
 
 export const COST_RANGES = ["7d", "30d", "mtd", "90d"] as const;
 
 export type CostRange = (typeof COST_RANGES)[number];
 export type CostTab = "overview" | "agents" | "models";
-export type AgentCostSort = "cost_asc" | "cost_desc" | "runs_desc" | "spike_desc";
+export type AgentCostSort = "cost_asc" | "cost_desc" | "runs_desc";
 
 export interface CostVendorRow {
   modelCount: number;
@@ -28,7 +22,6 @@ export interface CostVendorRow {
 
 export interface RunMixSegment {
   className: string;
-  label: string;
   value: number;
 }
 
@@ -46,14 +39,10 @@ export const COST_TABS: { id: CostTab; labelKey: string }[] = [
   { id: "models", labelKey: "cost.byModel" },
 ];
 
-export const RUN_PURPOSE_FILTERS: {
-  label: string;
-  labelKey: string;
-  value: CostRunPurpose | "all";
-}[] = [
-  { label: "All", labelKey: "cost.all", value: "all" },
-  { label: "Production", labelKey: "cost.production", value: "production" },
-  { label: "Debug", labelKey: "cost.debug", value: "debug" },
+export const RUN_PURPOSE_FILTERS: { labelKey: string; value: CostRunPurpose | "all" }[] = [
+  { labelKey: "cost.all", value: "all" },
+  { labelKey: "cost.production", value: "production" },
+  { labelKey: "cost.debug", value: "debug" },
 ];
 
 // The UI only distinguishes production vs. debug usage. "Debug" covers every
@@ -70,37 +59,28 @@ export function runPurposeToQuery(value: CostRunPurpose | "all"): CostRunPurpose
   return [value];
 }
 
-export function formatCurrency(
-  value: number,
-  locale: SupportedLocale = getCurrentLocale(),
-): string {
-  return new Intl.NumberFormat(locale, {
+export function formatCurrency(value: number): string {
+  return new Intl.NumberFormat(getCurrentLocale(), {
     currency: "USD",
     maximumFractionDigits: value >= 100 ? 0 : 2,
     style: "currency",
   }).format(value);
 }
 
-export function formatCompactNumber(
-  value: number,
-  locale: SupportedLocale = getCurrentLocale(),
-): string {
-  return new Intl.NumberFormat(locale, {
+export function formatCompactNumber(value: number): string {
+  return new Intl.NumberFormat(getCurrentLocale(), {
     maximumFractionDigits: 1,
     notation: "compact",
   }).format(value);
 }
 
-export function formatPercent(value: number, locale: SupportedLocale = getCurrentLocale()): string {
-  const amount = new Intl.NumberFormat(locale).format(Math.round(value * 100));
+export function formatPercent(value: number): string {
+  const amount = new Intl.NumberFormat(getCurrentLocale()).format(Math.round(value * 100));
   return `${value >= 0 ? "+" : ""}${amount}%`;
 }
 
-export function formatPlainPercent(
-  value: number,
-  locale: SupportedLocale = getCurrentLocale(),
-): string {
-  return `${new Intl.NumberFormat(locale).format(Math.round(value * 100))}%`;
+export function formatPlainPercent(value: number): string {
+  return `${new Intl.NumberFormat(getCurrentLocale()).format(Math.round(value * 100))}%`;
 }
 
 export function rangeToInput(range: CostRange): CostRangeInput {
@@ -168,20 +148,12 @@ export function modelColor(model: string): string {
     return "bg-green-500";
   }
   if (normalized.includes("gemini")) {
-    return "bg-sky";
+    return "bg-info";
   }
   if (normalized.includes("qwen")) {
-    return "bg-amber";
+    return "bg-warning";
   }
   return "bg-ink-500";
-}
-
-export function agentCostChange(agent: CostAgentRow): number | null {
-  if (agent.previousCostUsd === null || agent.previousCostUsd <= 0) {
-    return null;
-  }
-
-  return (agent.totalCostUsd - agent.previousCostUsd) / agent.previousCostUsd;
 }
 
 export function sortCostAgents(agents: CostAgentRow[], sort: AgentCostSort): CostAgentRow[] {
@@ -194,38 +166,31 @@ export function sortCostAgents(agents: CostAgentRow[], sort: AgentCostSort): Cos
       return right.requestCount - left.requestCount;
     }
 
-    if (sort === "spike_desc") {
-      return (agentCostChange(right) ?? -Infinity) - (agentCostChange(left) ?? -Infinity);
-    }
-
     return right.totalCostUsd - left.totalCostUsd;
   });
 }
 
 export function runMixSegments(agent: CostAgentRow): RunMixSegment[] {
   return [
-    { className: "bg-green-600", label: "Production", value: agent.productionCostUsd },
-    { className: "bg-amber", label: "Debug", value: agent.debugCostUsd + agent.previewCostUsd },
+    { className: "bg-green-600", value: agent.productionCostUsd },
+    { className: "bg-warning", value: agent.debugCostUsd + agent.previewCostUsd },
   ].filter((segment) => segment.value > 0);
 }
 
-function formatPricePerMillion(
-  value: number | null,
-  t: (key: string) => string,
-  locale: SupportedLocale,
-): string {
-  return value === null ? t("cost.unknown") : `$${new Intl.NumberFormat(locale).format(value)}`;
+function formatPricePerMillion(value: number | null, t: (key: string) => string): string {
+  return value === null
+    ? t("cost.unknown")
+    : `$${new Intl.NumberFormat(getCurrentLocale()).format(value)}`;
 }
 
 export function formatModelPricingSummary(
   model: CostModelRow,
   t: (key: string) => string,
-  locale: SupportedLocale = getCurrentLocale(),
 ): ModelPricingSummary {
   return {
-    cacheHitLabel: formatPlainPercent(cacheHitRate(model), locale),
-    cacheReadPriceLabel: formatPricePerMillion(model.cacheReadUsdPerMillion, t, locale),
-    cacheWritePriceLabel: formatPricePerMillion(model.cacheWriteUsdPerMillion, t, locale),
+    cacheHitLabel: formatPlainPercent(cacheHitRate(model)),
+    cacheReadPriceLabel: formatPricePerMillion(model.cacheReadUsdPerMillion, t),
+    cacheWritePriceLabel: formatPricePerMillion(model.cacheWriteUsdPerMillion, t),
     inputOutputPriceLabel:
       model.inputUsdPerMillion === null || model.outputUsdPerMillion === null
         ? t("cost.unknown")
@@ -258,15 +223,3 @@ export function summarizeCostVendors(models: CostModelRow[]): CostVendorRow[] {
 
   return [...rows.values()].toSorted((left, right) => right.totalCostUsd - left.totalCostUsd);
 }
-
-export type {
-  CostAgentRow,
-  CostAttributionCard,
-  CostDailyPoint,
-  CostRunPurpose,
-  CostModelRow,
-  CostRecentSession,
-  CostTotals,
-  OrganizationBillingCostCard,
-  ProjectCostCard,
-};

@@ -4,7 +4,6 @@ import { Link } from "react-router-dom";
 
 import { useMcpRegistryQuery } from "@/domains/mcp/query/mcp-queries";
 import { useTranslation } from "@/shared/i18n";
-import { cn } from "@/shared/lib/class-names";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,29 +13,18 @@ import {
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu";
 import { ExternalLink, Plus, X } from "@/shared/ui/icons";
-import { Switch } from "@/shared/ui/switch";
 
 import { isTruthy } from "../../../../shared/lib/truthiness";
 import { IconAvatar } from "../../../integrations/mcp/icon-avatar";
 import type { McpServer } from "../../agent.types";
-import { createPoolServerById } from "./mcp-bindings-projections";
 
 function toDraftMcpServer(server: PoolServer): McpServer {
   const draftServer: McpServer = {
-    authorizationState: server.authorizationState,
-    credentialMode: "runtime_resolved",
-    credentialStatus: server.credentialStatus,
     enabled: true,
     id: server.id,
     name: server.name,
-    source: server.source,
-    type: "web",
     url: server.url,
   };
-
-  if (isTruthy(server.credential?.subjectLabel)) {
-    draftServer.credentialSubject = server.credential.subjectLabel;
-  }
 
   if (isTruthy(server.iconUrl)) {
     draftServer.iconUrl = server.iconUrl;
@@ -67,7 +55,7 @@ function McpAddDropdown({
     <DropdownMenu onOpenChange={onOpenChange} open={open}>
       <DropdownMenuTrigger asChild>
         <button
-          className="text-muted-foreground hover:bg-accent/30 hover:text-foreground flex w-full items-center gap-1.5 px-3 py-2.5 text-left text-[13px] font-medium transition-colors"
+          className="text-fg-3 hover:bg-hover/30 hover:text-foreground flex w-full items-center gap-1.5 px-3 py-2.5 text-left text-[13px] font-medium transition-colors"
           type="button"
         >
           <Plus className="size-3.5 shrink-0" />
@@ -79,14 +67,12 @@ function McpAddDropdown({
         className="max-h-[320px] w-[var(--anchor-width)] overflow-y-auto"
       >
         {nothingLeft ? (
-          <div className="text-muted-foreground p-3 text-[12px]">
+          <div className="text-fg-3 p-3 text-[12px]">
             {noServersAtAll ? t("mcp.noServers") : t("mcp.allAdded")}
           </div>
         ) : (
           <>
-            <DropdownMenuLabel className="text-muted-foreground text-[10px] tracking-wider uppercase">
-              {t("agentEditor.projectMcp")}
-            </DropdownMenuLabel>
+            <DropdownMenuLabel>{t("agentEditor.projectMcp")}</DropdownMenuLabel>
             {availableServers.map((server) => (
               <McpPickerItem key={server.id} server={server} onPick={() => onPick(server)} />
             ))}
@@ -96,7 +82,7 @@ function McpAddDropdown({
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
           <Link
-            className="text-muted-foreground flex w-full items-center gap-1.5 text-[12px]"
+            className="text-fg-3 flex w-full items-center gap-1.5 text-[12px]"
             to="/integrations/mcp"
           >
             <ExternalLink className="size-3" />
@@ -118,18 +104,16 @@ function McpPickerItem({ server, onPick }: { server: PoolServer; onPick(): void 
         size={24}
       />
       <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{server.name}</span>
-      <span className="text-muted-foreground shrink-0 text-[11px]">{server.ownerName}</span>
+      <span className="text-fg-3 shrink-0 text-[11px]">{server.ownerName}</span>
     </DropdownMenuItem>
   );
 }
 
 export function AgentMcpBindingsField({
-  readOnly = false,
   projectId,
   selectedServers,
   setServers,
 }: {
-  readOnly?: boolean;
   projectId: string | null;
   selectedServers: McpServer[];
   setServers: (servers: McpServer[]) => void;
@@ -139,7 +123,10 @@ export function AgentMcpBindingsField({
   const registryQuery = useMcpRegistryQuery(projectId);
 
   const poolServers = registryQuery.data?.servers ?? [];
-  const poolServerById = useMemo(() => createPoolServerById(poolServers), [poolServers]);
+  const poolServerById = useMemo(
+    () => new Map<string, PoolServer>(poolServers.map((server) => [server.id, server])),
+    [poolServers],
+  );
   const addedIds = useMemo(
     () => new Set(selectedServers.map((server) => server.id)),
     [selectedServers],
@@ -160,7 +147,7 @@ export function AgentMcpBindingsField({
 
   if (!isTruthy(projectId)) {
     return (
-      <div className="border-border text-muted-foreground rounded-lg border p-3 text-[12px]">
+      <div className="border-border text-fg-3 rounded-lg border p-3 text-[12px]">
         {t("agentEditor.selectProjectFirst")}
       </div>
     );
@@ -168,7 +155,7 @@ export function AgentMcpBindingsField({
 
   if (registryQuery.error) {
     return (
-      <div className="border-destructive/30 text-destructive rounded-lg border p-3 text-[12px]">
+      <div className="border-danger/30 text-danger rounded-lg border p-3 text-[12px]">
         {registryQuery.error instanceof Error
           ? registryQuery.error.message
           : t("agentEditor.failedToLoadMcpRegistry")}
@@ -176,22 +163,15 @@ export function AgentMcpBindingsField({
     );
   }
 
-  if (selectedServers.length === 0 && readOnly) {
-    return null;
-  }
-
   return (
-    <div className="border-border divide-border-subtle divide-y overflow-hidden rounded-lg border">
+    <div className="border-border divide-border-soft divide-y overflow-hidden rounded-lg border">
       {selectedServers.map((server) => {
         const pool = poolServerById.get(server.id);
         const sourceLabel = `${t("nav.project")} · ${pool?.ownerName ?? t("agentEditor.owner")}`;
 
         return (
           <div
-            className={cn(
-              "group flex items-center gap-3 px-3 py-2.5 transition-colors",
-              server.enabled ? "hover:bg-accent/30" : "opacity-60 hover:bg-accent/20",
-            )}
+            className="group hover:bg-hover/30 flex items-center gap-3 px-3 py-2.5 transition-colors"
             key={server.id}
           >
             <IconAvatar
@@ -206,35 +186,29 @@ export function AgentMcpBindingsField({
                 <span className="text-foreground truncate text-[13px] font-medium">
                   {server.name}
                 </span>
-                <span className="text-muted-foreground shrink-0 text-[10px]">{sourceLabel}</span>
+                <span className="text-fg-3 shrink-0 text-[10px]">{sourceLabel}</span>
               </div>
             </div>
 
-            <Switch checked={server.enabled} disabled />
-
-            {!readOnly ? (
-              <button
-                aria-label={t("common.remove")}
-                className="text-muted-foreground hover:text-destructive opacity-0 transition-colors group-hover:opacity-100"
-                onClick={() => removeServer(server.id)}
-                type="button"
-              >
-                <X className="size-3.5" />
-              </button>
-            ) : null}
+            <button
+              aria-label={t("common.remove")}
+              className="text-fg-3 hover:text-danger opacity-0 transition-colors group-hover:opacity-100"
+              onClick={() => removeServer(server.id)}
+              type="button"
+            >
+              <X className="size-3.5" />
+            </button>
           </div>
         );
       })}
 
-      {!readOnly ? (
-        <McpAddDropdown
-          addedIds={addedIds}
-          onOpenChange={setAddOpen}
-          onPick={addServer}
-          open={addOpen}
-          servers={poolServers}
-        />
-      ) : null}
+      <McpAddDropdown
+        addedIds={addedIds}
+        onOpenChange={setAddOpen}
+        onPick={addServer}
+        open={addOpen}
+        servers={poolServers}
+      />
     </div>
   );
 }

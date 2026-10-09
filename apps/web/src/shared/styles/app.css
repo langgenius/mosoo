@@ -8,7 +8,7 @@
  * Console design contract, token layer (docs/design/console-design-contract.md).
  *
  * Three layers, top to bottom:
- *   1. Primitives: raw palettes, type scale, spacing, radii, elevation, motion.
+ *   1. Primitives: raw palettes, type scale, radii, elevation, motion.
  *   2. Semantic roles: canvas/surface/text/border/action/focus and the status
  *      quartet, mapped for light and dark.
  *   3. Component recipes live in src/shared/ui and consume semantic roles only.
@@ -19,7 +19,8 @@
  * failure; see the design gate test apps/web/tests/console-design-contract-boundary.test.ts.
  */
 
-/* Type: one sans family and one mono family (docs/design/typography-audit.md).
+/* Type: one sans family and one mono family (docs/design/console-design-contract.md,
+   section 3).
    Geist carries every sans role, page titles included; Geist Mono carries
    precise information. Both are SIL OFL 1.1 and self-hosted with their
    licences next to the files in public/fonts. `swap` keeps text visible while
@@ -74,7 +75,6 @@
   --green-700: #498c07;
   --green-800: #3a6e0e;
   --green-900: #2c5113;
-  --green-950: #1a310b;
 
   /* Neutrals: pure neutral, no blue or green cast (oklch chroma 0). The
      references for #601 and the Apps cheatsheet for #599 are all pure
@@ -92,12 +92,11 @@
   --ink-950: #0d0d0d;
 
   /* Paper: near-white surface ramp. 100 is the canvas, 200 the sidebar and
-     sunken groups, 300/400 pressed and disabled fills. */
+     sunken groups, 300 pressed and disabled fills. */
   --paper-50: #ffffff;
   --paper-100: #fafafa;
   --paper-200: #f4f4f4;
   --paper-300: #ebebeb;
-  --paper-400: #e0e0e0;
 
   /* Status hues: feedback colours, never brand. Success is a true green
      (hue ~147) so a "connected" badge is never mistaken for the brand lime
@@ -127,42 +126,20 @@
   --font-heading: var(--font-sans);
   --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
-  --fs-11: 0.6875rem;
   --fs-12: 0.75rem;
-  --fs-13: 0.8125rem;
   --fs-14: 0.875rem;
   --fs-15: 0.9375rem;
-  --fs-16: 1rem;
-  --fs-18: 1.125rem;
-  --fs-20: 1.25rem;
   --fs-24: 1.5rem;
-  --fs-28: 1.75rem;
 
   /* Line heights land on the 4px grid at the size they pair with:
-     tight 24 -> 28, snug 15 -> 20 and 12 -> 16, normal 14 -> 20. */
-  --lh-tight: 1.1667;
-  --lh-snug: 1.3334;
+     normal 14 -> 20. */
   --lh-normal: 1.4286;
-  --lh-loose: 1.6;
 
   /* Tracking scales with size: page titles tighten by 0.02em (-0.48px at
      24px), 15-20px titles by 0.01em, body, control text, and the sentence-case
      group label stay at 0 (no tracked capitals anywhere in the console). */
   --track-title: -0.02em;
   --track-subtitle: -0.01em;
-
-  --s-1: 4px;
-  --s-2: 8px;
-  --s-3: 12px;
-  --s-4: 16px;
-  --s-5: 20px;
-  --s-6: 24px;
-  --s-8: 32px;
-  --s-10: 40px;
-  --s-12: 48px;
-  --s-16: 64px;
-  --s-20: 80px;
-  --s-24: 96px;
 
   /* Radius ladder (contract section 5). Cards are work surfaces, not
      pillows: surfaces (cards, dialogs, menus, popovers) and their 32px
@@ -183,15 +160,11 @@
   --elev-md: 0 4px 12px rgba(0, 0, 0, 0.07), 0 1px 3px rgba(0, 0, 0, 0.05);
   --elev-lg: 0 12px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
   --elev-xl: 0 30px 60px rgba(0, 0, 0, 0.16), 0 10px 20px rgba(0, 0, 0, 0.07);
-  --elev-inset: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
 
   --ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
-  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --dur-1: 120ms;
-  --dur-2: 180ms;
   --dur-3: 260ms;
-  --dur-4: 420ms;
 
   /* ------------------------------------------------------------------ */
   /* 2. Semantic roles (light)                                            */
@@ -201,7 +174,6 @@
   --bg: var(--paper-100);
   --bg-elevated: var(--paper-50);
   --bg-sunken: var(--paper-200);
-  --bg-canvas: var(--paper-50);
   --bg-sidebar: var(--paper-200);
   /* Interaction fills on any surface: neutral, never green. */
   --hover: rgba(0, 0, 0, 0.04);
@@ -221,7 +193,6 @@
   --fg-2: rgba(51, 51, 51, 0.72);
   --fg-3: rgba(51, 51, 51, 0.7);
   --fg-muted: rgba(51, 51, 51, 0.56);
-  --fg-inverse: var(--paper-50);
 
   /* Borders: thin and low-contrast; strong is for controls that must read
      as controls (inputs, outline buttons). */
@@ -298,7 +269,6 @@
   --bg: var(--ink-900);
   --bg-elevated: var(--ink-800);
   --bg-sunken: var(--ink-950);
-  --bg-canvas: var(--ink-800);
   --bg-sidebar: var(--ink-950);
   --hover: rgba(255, 255, 255, 0.06);
   --selected: rgba(255, 255, 255, 0.1);
@@ -314,7 +284,6 @@
   --fg-2: rgba(235, 235, 235, 0.72);
   --fg-3: rgba(235, 235, 235, 0.62);
   --fg-muted: rgba(235, 235, 235, 0.45);
-  --fg-inverse: var(--ink-900);
 
   --border-soft: rgba(255, 255, 255, 0.06);
   --border-default: rgba(255, 255, 255, 0.1);
@@ -367,21 +336,19 @@
   --elev-md: 0 4px 12px rgba(0, 0, 0, 0.45), 0 1px 3px rgba(0, 0, 0, 0.4);
   --elev-lg: 0 12px 32px rgba(0, 0, 0, 0.55);
   --elev-xl: 0 30px 60px rgba(0, 0, 0, 0.6);
-  --elev-inset: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
 }
 
-/* Tailwind bridge: semantic roles become utility classes. Legacy aliases at
-   the bottom keep older call sites compiling while they migrate to the
-   role names above. */
+/* Tailwind bridge: semantic roles become utility classes. The pre-contract
+   aliases (bg-muted, text-muted-foreground, bg-accent, text-destructive, the
+   amber/ember/sky names, ...) are retired: nothing bridges them, so such a
+   class renders nothing, and the design gate fails on one. */
 @theme inline {
   --color-background: var(--bg);
   --color-foreground: var(--fg-1);
   --color-card: var(--bg-elevated);
-  --color-card-foreground: var(--fg-1);
   --color-popover: var(--bg-elevated);
   --color-popover-foreground: var(--fg-1);
   --color-sunken: var(--bg-sunken);
-  --color-canvas: var(--bg-canvas);
 
   --color-hover: var(--hover);
   --color-selected: var(--selected);
@@ -392,7 +359,6 @@
   --color-fg-2: var(--fg-2);
   --color-fg-3: var(--fg-3);
   --color-fg-muted: var(--fg-muted);
-  --color-fg-inverse: var(--fg-inverse);
 
   --color-border: var(--border-default);
   --color-border-soft: var(--border-soft);
@@ -405,7 +371,6 @@
   --color-primary-active: var(--action-primary-active);
   --color-primary-border: var(--action-primary-border);
   --color-emphasis: var(--emphasis);
-  --color-emphasis-hover: var(--emphasis-hover);
   --color-emphasis-foreground: var(--emphasis-fg);
   --color-sidebar-cta: var(--sidebar-cta-bg);
   --color-sidebar-cta-hover: var(--sidebar-cta-bg-hover);
@@ -433,19 +398,13 @@
   --color-info: var(--info);
   --color-info-fg: var(--info-fg);
   --color-info-bg: var(--info-bg);
-  --color-pending: var(--pending);
   --color-pending-fg: var(--pending-fg);
   --color-pending-bg: var(--pending-bg);
   --color-soil: var(--soil);
   --color-soil-fg: var(--soil-fg);
   --color-soil-bg: var(--soil-bg);
-  --color-destructive: var(--danger);
-  --color-destructive-foreground: #ffffff;
 
   --color-sidebar: var(--bg-sidebar);
-  --color-sidebar-foreground: var(--fg-2);
-  --color-sidebar-border: var(--border-soft);
-  --color-sidebar-ring: var(--focus-ring);
   --color-sidebar-row-hover: var(--sidebar-row-hover);
   --color-sidebar-row-active: var(--sidebar-row-active);
 
@@ -453,7 +412,6 @@
   --color-paper-100: var(--paper-100);
   --color-paper-200: var(--paper-200);
   --color-paper-300: var(--paper-300);
-  --color-paper-400: var(--paper-400);
   --color-ink-50: var(--ink-50);
   --color-ink-100: var(--ink-100);
   --color-ink-200: var(--ink-200);
@@ -473,7 +431,6 @@
   --color-green-600: var(--green-600);
   --color-green-700: var(--green-700);
   --color-green-800: var(--green-800);
-  --color-green-900: var(--green-900);
 
   --radius-xs: var(--r-xs);
   --radius-sm: var(--r-sm);
@@ -485,7 +442,6 @@
   --shadow-md: var(--elev-md);
   --shadow-lg: var(--elev-lg);
   --shadow-xl: var(--elev-xl);
-  --inset-shadow-hairline: var(--elev-inset);
 
   --font-sans: var(--font-sans);
   --font-heading: var(--font-heading);
@@ -493,36 +449,6 @@
 
   --tracking-title: var(--track-title);
   --tracking-subtitle: var(--track-subtitle);
-
-  /* Legacy aliases (migration in progress; do not add new consumers). */
-  --color-secondary: var(--paper-200);
-  --color-secondary-foreground: var(--fg-1);
-  --color-muted: var(--bg-sunken);
-  --color-muted-foreground: var(--fg-3);
-  --color-accent: var(--hover);
-  --color-accent-foreground: var(--fg-1);
-  --color-accent-soft: var(--brand-soft);
-  --color-accent-soft-hover: var(--brand-soft-hover);
-  --color-accent-press: var(--brand);
-  --color-accent-hover: var(--green-700);
-  --color-on-accent: var(--action-primary-fg);
-  --color-brand-light: var(--selected);
-  --color-brand-ring: var(--focus-ring);
-  --color-surface-warm: var(--paper-200);
-  --color-text-secondary: var(--fg-2);
-  --color-text-muted: var(--fg-3);
-  --color-border-subtle: var(--border-soft);
-  --color-border-default: var(--border-default);
-  --color-bg-sunken: var(--bg-sunken);
-  --color-amber: var(--warning);
-  --color-amber-fg: var(--warning-fg);
-  --color-amber-bg: var(--warning-bg);
-  --color-ember: var(--danger);
-  --color-ember-fg: var(--danger-fg);
-  --color-ember-bg: var(--danger-bg);
-  --color-sky: var(--info);
-  --color-sky-fg: var(--info-fg);
-  --color-sky-bg: var(--info-bg);
 }
 
 @layer base {
@@ -575,31 +501,6 @@
     font-weight: 600;
     color: var(--fg-heading);
   }
-  .t-label {
-    font-size: var(--fs-13);
-    line-height: 1.25rem;
-    letter-spacing: 0;
-    font-weight: 500;
-    color: var(--fg-1);
-  }
-  .t-body {
-    font-size: var(--fs-14);
-    line-height: 1.25rem;
-    letter-spacing: 0;
-    color: var(--fg-1);
-  }
-  .t-body-sm {
-    font-size: var(--fs-13);
-    line-height: 1.25rem;
-    letter-spacing: 0;
-    color: var(--fg-2);
-  }
-  .t-caption {
-    font-size: var(--fs-12);
-    line-height: 1rem;
-    letter-spacing: 0;
-    color: var(--fg-3);
-  }
   /* Group label: the quiet sentence-case heading over a run of rows (sidebar
      sections, settings navigations). One weight step above the caption, no
      capitals, no tracking (owner review, #619). */
@@ -609,23 +510,6 @@
     font-weight: 500;
     letter-spacing: 0;
     color: var(--fg-3);
-  }
-  .t-mono {
-    font-family: var(--font-mono);
-    font-size: var(--fs-12);
-    letter-spacing: 0;
-    font-variant-numeric: tabular-nums;
-  }
-  .t-link {
-    color: var(--link);
-    text-decoration: underline;
-    text-decoration-color: color-mix(in srgb, var(--link) 45%, transparent);
-    text-underline-offset: 3px;
-    transition: color var(--dur-1) var(--ease-out);
-  }
-  .t-link:hover {
-    color: var(--link-hover);
-    text-decoration-color: currentColor;
   }
 }
 

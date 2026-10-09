@@ -15,19 +15,15 @@ export function PageHeader({
   title,
   description,
   meta,
-  actions,
   children,
   className,
 }: {
   title: ReactNode;
   description?: ReactNode;
   meta?: ReactNode;
-  actions?: ReactNode;
   children?: ReactNode;
   className?: string;
 }): ReactElement {
-  const actionContent = children ?? actions;
-
   return (
     <div
       className={cn(
@@ -50,9 +46,9 @@ export function PageHeader({
           </p>
         ) : null}
       </div>
-      {actionContent ? (
+      {children ? (
         <div className="flex w-full shrink-0 flex-wrap items-center gap-2 sm:w-auto sm:justify-end [&_button]:min-h-10 sm:[&_button]:min-h-0">
-          {actionContent}
+          {children}
         </div>
       ) : null}
     </div>

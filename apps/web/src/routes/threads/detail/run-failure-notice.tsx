@@ -15,28 +15,6 @@ type Translate = (key: string, variables?: Record<string, string>) => string;
 
 const FAILURE_STATUSES = new Set<SessionRunStatus>(["cancelled", "expired", "failed"]);
 
-const DEFAULT_FAILURE_COPY: Record<string, string> = {
-  "threads.runContentBlockedMessage":
-    "The model provider blocked this turn under its content policy. It did not identify whether the input or output was blocked. This run will not be retried automatically. Earlier tool actions may already have completed.",
-  "threads.runContentBlockedTitle": "Blocked by model provider",
-  "threads.runRefusedMessage":
-    "The agent refused to continue. This run will not be retried automatically. Earlier tool actions may already have completed.",
-  "threads.runRefusedTitle": "Agent refused to continue",
-  "threads.runCancelledMessage": "The run was cancelled before it completed.",
-  "threads.runCancelledTitle": "Run cancelled",
-  "threads.runExpiredMessage": "The run expired before it completed.",
-  "threads.runExpiredTitle": "Run expired",
-  "threads.runFailedMessage": "The run failed before an error message was recorded.",
-  "threads.runFailedTitle": "Run failed",
-};
-
-function defaultTranslate(key: string, variables?: Record<string, string>): string {
-  return Object.entries(variables ?? {}).reduce(
-    (result, [name, replacement]) => result.replaceAll(`{{${name}}}`, replacement),
-    DEFAULT_FAILURE_COPY[key] ?? key,
-  );
-}
-
 function getFailureFallback(
   status: SessionRunStatus,
   t: Translate,
@@ -65,7 +43,7 @@ function getFailureFallback(
 
 export function getThreadRunFailure(
   run: SessionRunSummary | null,
-  t: Translate = defaultTranslate,
+  t: Translate,
 ): ThreadRunFailureDetails | null {
   if (run === null || !FAILURE_STATUSES.has(run.status)) {
     return null;
@@ -112,14 +90,14 @@ export function ThreadRunFailureNotice({
 
   return (
     <div
-      className="border-destructive/20 bg-destructive/[0.04] mt-4 flex flex-col gap-3 rounded-lg border px-4 py-3 sm:flex-row sm:items-start"
+      className="border-danger/20 bg-danger/[0.04] mt-4 flex flex-col gap-3 rounded-lg border px-4 py-3 sm:flex-row sm:items-start"
       data-testid="thread-run-failure"
       role="alert"
     >
       <div className="flex min-w-0 flex-1 items-start gap-2.5">
-        <CircleX className="text-destructive mt-0.5 size-4 shrink-0" aria-hidden="true" />
+        <CircleX className="text-danger mt-0.5 size-4 shrink-0" aria-hidden="true" />
         <div className="min-w-0">
-          <div className="text-destructive text-[12.5px] font-semibold">{failure.title}</div>
+          <div className="text-danger text-[12.5px] font-semibold">{failure.title}</div>
           <div className="text-fg-2 mt-0.5 text-[12.5px] leading-relaxed break-words">
             {failure.message}
           </div>

@@ -1,10 +1,10 @@
-import type { ProjectId } from "@mosoo/contracts/id";
+import type { ProjectId } from "@mosoo/id";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import type { FormEvent, ReactElement } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { useAppSession } from "@/app/session-provider";
+import { useAppSession } from "@/app/session/session-context";
 import { createAgent } from "@/domains/agent/api/agent-client";
 import { agentKeys } from "@/domains/agent/query/agent-queries";
 import { useVendorCredentialsQuery } from "@/domains/vendor-credential/model/provider-credential-query";
@@ -16,7 +16,7 @@ import { Loader2 } from "@/shared/ui/icons";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 
-import { isRuntimeSelectable, listRuntimeOptions } from "../runtime-catalog";
+import { listRuntimeOptions } from "../runtime-catalog";
 import { resolveDefaultAgentRuntime } from "../runtime-default";
 import { RuntimeIcon } from "./runtime-icon";
 
@@ -32,7 +32,7 @@ export function CreateAgentLauncherDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent showCloseButton className="gap-0 overflow-hidden rounded-lg sm:max-w-[460px]">
+      <DialogContent className="gap-0 overflow-hidden rounded-lg sm:max-w-[460px]">
         {activeOrganization === null ? (
           <LauncherStatus message={t("agent.finishSetup")} />
         ) : activeProject === null ? (
@@ -62,10 +62,7 @@ function CreateAgentLauncherBody({
 
   // The runtime catalog is static, so the cards render immediately. Credentials
   // only refine which runtime is preselected once they arrive.
-  const runtimeOptions = useMemo(
-    () => listRuntimeOptions().filter((runtime) => isRuntimeSelectable(runtime.id)),
-    [],
-  );
+  const runtimeOptions = listRuntimeOptions();
   const defaultRuntime = useMemo(
     () => (credentialsLoading ? null : resolveDefaultAgentRuntime(credentials)),
     [credentials, credentialsLoading],
@@ -114,20 +111,14 @@ function CreateAgentLauncherBody({
       });
 
       onOpenChange(false);
-      void navigate(
-        globalThis.location.pathname.startsWith("/demo")
-          ? `/demo/agent/${createdAgent.id}?tab=preview`
-          : `/agent/${createdAgent.id}?tab=preview`,
-      );
+      void navigate(`/agent/${createdAgent.id}?tab=preview`);
     } catch {
       // Error state is rendered from the mutation object.
     }
   }
 
-  const noRuntimeAvailable = !credentialsLoading && defaultRuntime === null;
-  const mutationError =
+  const error =
     createAgentMutation.error instanceof Error ? createAgentMutation.error.message : null;
-  const error = noRuntimeAvailable ? t("agent.configureProviderBeforeCreating") : mutationError;
 
   return (
     <form onSubmit={handleSubmit}>
@@ -137,7 +128,7 @@ function CreateAgentLauncherBody({
 
       <div className="space-y-5 px-6 py-5">
         <div className="space-y-2">
-          <Label className="text-muted-foreground text-[12px]" htmlFor="new-agent-name">
+          <Label className="text-fg-3 text-[12px]" htmlFor="new-agent-name">
             {t("agent.name")}
           </Label>
           <Input
@@ -151,47 +142,41 @@ function CreateAgentLauncherBody({
         </div>
 
         <div className="space-y-2">
-          <Label className="text-muted-foreground text-[12px]">{t("agent.runtime")}</Label>
-          {runtimeOptions.length === 0 ? (
-            <div className="text-muted-foreground text-[13px]">
-              {t("agent.noRuntimesAvailable")}
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-3">
-              {runtimeOptions.map((runtime) => {
-                const selected = runtime.id === activeRuntimeId;
+          <Label className="text-fg-3 text-[12px]">{t("agent.runtime")}</Label>
+          <div className="grid grid-cols-2 gap-3">
+            {runtimeOptions.map((runtime) => {
+              const selected = runtime.id === activeRuntimeId;
 
-                return (
-                  <button
-                    aria-pressed={selected}
-                    className={cn(
-                      "focus-visible:ring-brand-ring flex items-center gap-3 rounded-lg border px-3 py-3 text-left transition-colors focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:outline-none",
-                      selected
-                        ? "border-brand bg-brand-light"
-                        : "border-border hover:border-brand/30",
-                    )}
-                    key={runtime.id}
-                    onClick={() => {
-                      setSelectedRuntimeId(runtime.id);
-                    }}
-                    type="button"
-                  >
-                    <RuntimeIcon runtime={runtime} size={24} />
-                    <div className="min-w-0">
-                      <div className="text-foreground text-[13px] font-medium">{runtime.name}</div>
-                      <div className="text-muted-foreground text-[11px]">{runtime.vendor}</div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
+              return (
+                <button
+                  aria-pressed={selected}
+                  className={cn(
+                    "focus-visible:ring-ring flex items-center gap-3 rounded-lg border px-3 py-3 text-left transition-colors focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:outline-none",
+                    selected
+                      ? "border-emphasis bg-selected"
+                      : "border-border hover:border-border-strong",
+                  )}
+                  key={runtime.id}
+                  onClick={() => {
+                    setSelectedRuntimeId(runtime.id);
+                  }}
+                  type="button"
+                >
+                  <RuntimeIcon runtime={runtime} size={24} />
+                  <div className="min-w-0">
+                    <div className="text-foreground text-[13px] font-medium">{runtime.name}</div>
+                    <div className="text-fg-3 text-[11px]">{runtime.vendor}</div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
-        {error !== null ? <div className="text-destructive text-[13px]">{error}</div> : null}
+        {error !== null ? <div className="text-danger text-[13px]">{error}</div> : null}
       </div>
 
-      <DialogFooter className="border-border-subtle border-t px-6 py-4">
+      <DialogFooter className="border-border-soft border-t px-6 py-4">
         <Button
           onClick={() => {
             onOpenChange(false);
@@ -219,7 +204,7 @@ function CreateAgentLauncherBody({
 function LauncherStatus({ message }: { message: string }): ReactElement {
   const { t } = useTranslation();
   return (
-    <div className="text-muted-foreground px-7 py-10 text-center text-[13px]">
+    <div className="text-fg-3 px-7 py-10 text-center text-[13px]">
       <DialogTitle className="sr-only">{t("agent.create")}</DialogTitle>
       {message}
     </div>

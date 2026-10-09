@@ -1,4 +1,9 @@
-import type { McpOAuthFlowState, StartMcpOAuthPayload } from "@mosoo/contracts/mcp";
+import type {
+  McpOAuthFlowState,
+  McpServerWithCredential,
+  StartMcpOAuthPayload,
+} from "@mosoo/contracts/mcp";
+import type { McpOAuthFlowId, McpServerId } from "@mosoo/id";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useTranslation } from "@/shared/i18n";
@@ -16,22 +21,18 @@ import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 
 import { isTruthy } from "../../../shared/lib/truthiness";
-import type { McpServerWithCredential } from "./mcp-types";
 type Stage = "confirm" | "pending" | "done";
 
-export type McpConnectTargetServer = Pick<
-  McpServerWithCredential,
-  "authType" | "id" | "name" | "url"
->;
+type McpConnectTargetServer = Pick<McpServerWithCredential, "authType" | "id" | "name" | "url">;
 
 interface Props {
   open: boolean;
   server: McpConnectTargetServer | null;
-  onBearerConnect: (token: string) => Promise<void>;
+  onBearerConnect: (serverId: McpServerId, token: string) => Promise<void>;
   onConnected: () => Promise<void> | void;
   onOpenChange: (open: boolean) => void;
-  onPollOAuthFlow: (flowId: string) => Promise<McpOAuthFlowState>;
-  onStartOAuth: () => Promise<StartMcpOAuthPayload>;
+  onPollOAuthFlow: (flowId: McpOAuthFlowId) => Promise<McpOAuthFlowState>;
+  onStartOAuth: (serverId: McpServerId) => Promise<StartMcpOAuthPayload>;
 }
 
 export function OAuthConnectDialog({
@@ -47,7 +48,7 @@ export function OAuthConnectDialog({
   const [stage, setStage] = useState<Stage>("confirm");
   const [token, setToken] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const flowIdRef = useRef<string | null>(null);
+  const flowIdRef = useRef<McpOAuthFlowId | null>(null);
   const popupRef = useRef<Window | null>(null);
 
   const handleOpenChange = useCallback(
@@ -74,19 +75,12 @@ export function OAuthConnectDialog({
 
     let cancelled = false;
     const currentFlowId = flowId;
-    const serverId = server.id;
 
     async function pollFlowStatus() {
       try {
         const flow = await onPollOAuthFlow(currentFlowId);
 
         if (cancelled) {
-          return;
-        }
-
-        if (flow.serverId !== serverId) {
-          setStage("confirm");
-          setError(t("mcp.oauthUnexpectedServer"));
           return;
         }
 
@@ -136,6 +130,7 @@ export function OAuthConnectDialog({
   }
 
   const isBearer = server.authType === "bearer";
+  const serverId = server.id;
 
   async function handleConfirm() {
     if (isBearer) {
@@ -146,7 +141,7 @@ export function OAuthConnectDialog({
       setError(null);
 
       try {
-        await onBearerConnect(token.trim());
+        await onBearerConnect(serverId, token.trim());
         setStage("done");
         await onConnected();
         handleOpenChange(false);
@@ -162,7 +157,7 @@ export function OAuthConnectDialog({
 
     try {
       setError(null);
-      const payload = await onStartOAuth();
+      const payload = await onStartOAuth(serverId);
       const popup = window.open(payload.authorizationUrl, "_blank", "width=720,height=760");
 
       if (!popup) {
@@ -209,21 +204,19 @@ export function OAuthConnectDialog({
           </div>
         ) : stage === "confirm" ? (
           <div className="space-y-3 py-2">
-            <div className="text-muted-foreground text-[12px]">{t("mcp.willOpen")}</div>
-            <div className="text-muted-foreground bg-muted/50 rounded-md px-3 py-2 font-mono text-[11px] break-all">
+            <div className="text-fg-3 text-[12px]">{t("mcp.willOpen")}</div>
+            <div className="text-fg-3 bg-sunken/50 rounded-md px-3 py-2 font-mono text-[11px] break-all">
               {server.url}
             </div>
           </div>
         ) : stage === "pending" ? (
           <div className="flex flex-col items-center justify-center gap-3 py-10">
             <Loader2 className="text-brand-mark size-6 animate-spin" />
-            <div className="text-muted-foreground text-[13px]">
-              {t("mcp.completingAuthorization")}
-            </div>
+            <div className="text-fg-3 text-[13px]">{t("mcp.completingAuthorization")}</div>
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center gap-3 py-10">
-            <div className="flex size-9 items-center justify-center rounded-full bg-green-500/15">
+            <div className="bg-success-bg flex size-9 items-center justify-center rounded-full">
               <Check className="text-success-fg size-4" />
             </div>
             <div className="text-foreground text-[13px] font-medium">
@@ -232,7 +225,7 @@ export function OAuthConnectDialog({
           </div>
         )}
 
-        {Boolean(error) && <div className="text-destructive text-[12px]">{error}</div>}
+        {Boolean(error) && <div className="text-danger text-[12px]">{error}</div>}
 
         {stage === "confirm" && (
           <DialogFooter>

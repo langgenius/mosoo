@@ -1,14 +1,16 @@
 import type { SkillSummary } from "@mosoo/contracts/skill";
 
-import { useTranslation } from "@/shared/i18n";
+import { getCurrentLocale, useTranslation } from "@/shared/i18n";
 import { cn } from "@/shared/lib/class-names";
 import { formatSkillFileCount } from "@/shared/ui/skill-file-count-badge";
 
-import { formatDate } from "./format";
-
 export function SkillCard({ onOpen, skill }: { onOpen: () => void; skill: SkillSummary }) {
   const { t } = useTranslation();
-  const sourceLabel = skill.sourceKind === "official" ? t("skills.official") : skill.ownerName;
+  const updatedDate = new Date(skill.updatedAt).toLocaleDateString(getCurrentLocale(), {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
 
   return (
     <button
@@ -29,14 +31,14 @@ export function SkillCard({ onOpen, skill }: { onOpen: () => void; skill: SkillS
 
       <div className="text-fg-3 flex items-center justify-between gap-2 text-[11px]">
         <span className="inline-flex min-w-0 items-center gap-1.5">
-          <span className="truncate">{sourceLabel}</span>
+          <span className="truncate">{skill.ownerName}</span>
           <span aria-hidden>·</span>
           <span className="shrink-0 whitespace-nowrap">
             {formatSkillFileCount(skill.fileCount, t)}
           </span>
         </span>
         <span className="shrink-0 font-mono tabular-nums">
-          {t("skills.updated", { date: formatDate(skill.updatedAt) })}
+          {t("skills.updated", { date: updatedDate })}
         </span>
       </div>
     </button>

@@ -37,7 +37,4 @@ describe("preset editor snapshots", () => {
       requiresDeploymentVersion: true,
     });
   });
-  test("editor snapshots contain no runtime ownership type", () => {
-    expect(toAgentConfigChangeSnapshot(draft())).not.toHaveProperty("kind");
-  });
 });

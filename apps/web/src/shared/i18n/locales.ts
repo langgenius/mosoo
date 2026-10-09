@@ -2,8 +2,8 @@
  * Supported locales for the mosoo Project Console.
  *
  * The default locale is en-US. All date/number formatting should use the
- * current locale rather than hardcoded "en-US" — use the `useLocale()` hook
- * or the `useFormatDate()` / `useFormatNumber()` helpers.
+ * current locale rather than hardcoded "en-US" — pass `getCurrentLocale()`
+ * to the Intl formatters.
  */
 export const SUPPORTED_LOCALES = ["en", "zh-CN", "zh-TW", "ja"] as const;
 
@@ -23,7 +23,7 @@ export const LOCALE_DISPLAY_NAMES: Record<SupportedLocale, string> = {
  * Returns the closest supported locale for a given language tag.
  * Falls back to DEFAULT_LOCALE.
  */
-export function resolveLocale(raw: string): SupportedLocale {
+function resolveLocale(raw: string): SupportedLocale {
   const normalized = raw.trim().toLowerCase();
   if (normalized.startsWith("zh") || normalized.startsWith("cn")) {
     // zh-Hant / zh-TW → zh-TW; zh-Hans / zh-CN → zh-CN
@@ -36,4 +36,14 @@ export function resolveLocale(raw: string): SupportedLocale {
     return "ja";
   }
   return DEFAULT_LOCALE;
+}
+
+/**
+ * Returns the locale persisted by the browser.
+ */
+export function getCurrentLocale(): SupportedLocale {
+  if (typeof window === "undefined") {
+    return DEFAULT_LOCALE;
+  }
+  return resolveLocale(localStorage.getItem("mosoo-locale") ?? navigator.language);
 }

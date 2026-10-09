@@ -5,10 +5,10 @@ import Wallet02Icon from "@hugeicons/core-free-icons/Wallet02Icon";
 import type { ReactElement } from "react";
 
 import { useTranslation } from "@/shared/i18n";
+import { Badge } from "@/shared/ui/badge";
+import { createHugeicon } from "@/shared/ui/icons";
 import { SidebarRow } from "@/shared/ui/sidebar";
 import type { SidebarIcon } from "@/shared/ui/sidebar";
-
-import { createHugeicon } from "./hugeicon";
 
 interface OrgNavItem {
   icon: SidebarIcon;
@@ -48,11 +48,7 @@ function isOrgNavItemActive(pathname: string, path: string): boolean {
 function ComingSoonBadge(): ReactElement {
   const { t } = useTranslation();
 
-  return (
-    <span className="bg-muted text-fg-3 rounded-sm px-1 text-[10px] leading-4 font-semibold tracking-[0.04em] uppercase">
-      {t("agent.soon")}
-    </span>
-  );
+  return <Badge>{t("agent.soon")}</Badge>;
 }
 
 export function OrgNavigation({

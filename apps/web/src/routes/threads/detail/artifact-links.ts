@@ -5,16 +5,6 @@ import type { MarkdownLinkResolver } from "@/shared/ui/markdown";
 type Translate = (key: string, variables?: Record<string, string>) => string;
 
 const UNAVAILABLE_ARTIFACT_HREF = "/api/files/unavailable/content";
-const DEFAULT_TRANSLATIONS: Record<string, string> = {
-  "threads.fileUnavailable": "File unavailable",
-  "threads.previewFile": "Preview {{name}}",
-};
-
-const defaultTranslate: Translate = (key, variables) =>
-  Object.entries(variables ?? {}).reduce(
-    (text, [name, value]) => text.replaceAll(`{{${name}}}`, value),
-    DEFAULT_TRANSLATIONS[key] ?? key,
-  );
 
 export function normalizeArtifactSourcePath(href: string): string | null {
   const trimmed = href.trim();
@@ -54,7 +44,7 @@ export function normalizeArtifactSourcePath(href: string): string | null {
 export function createThreadArtifactLinkResolver(
   artifacts: readonly ListedFileEntry[],
   onOpenArtifact: (file: ListedFileEntry) => void,
-  t: Translate = defaultTranslate,
+  t: Translate,
 ): MarkdownLinkResolver {
   const artifactBySourcePath = new Map<string, ListedFileEntry>();
   const artifactByDownloadHref = new Map<string, ListedFileEntry>();
