@@ -1,10 +1,6 @@
 import type { AgUiSessionEvent } from "./ag-ui-session-events";
 import { REPLACEABLE_CUSTOM_EVENT_NAMES } from "./custom-event-registry";
 
-interface CompactAgUiSessionEventsOptions {
-  skipToolCallArgs?: boolean;
-}
-
 type ReplaceableCustomEvent = Extract<AgUiSessionEvent, { type: "CUSTOM" }>;
 
 const replaceableCustomEventNames = new Set<string>(REPLACEABLE_CUSTOM_EVENT_NAMES);
@@ -15,36 +11,6 @@ function isReplaceableCustomEvent(event: AgUiSessionEvent): event is Replaceable
     typeof event.name === "string" &&
     replaceableCustomEventNames.has(event.name)
   );
-}
-
-export function isAgUiSessionEventBufferable(event: AgUiSessionEvent): boolean {
-  if (
-    event.type === "REASONING_MESSAGE_CONTENT" ||
-    event.type === "TEXT_MESSAGE_CHUNK" ||
-    event.type === "TEXT_MESSAGE_CONTENT" ||
-    event.type === "TOOL_CALL_ARGS" ||
-    event.type === "TOOL_CALL_CHUNK"
-  ) {
-    return true;
-  }
-
-  return isReplaceableCustomEvent(event);
-}
-
-export function getAgUiSessionEventDeltaLength(event: AgUiSessionEvent): number {
-  if (
-    event.type === "REASONING_MESSAGE_CONTENT" ||
-    event.type === "TEXT_MESSAGE_CONTENT" ||
-    event.type === "TOOL_CALL_ARGS"
-  ) {
-    return event.delta.length;
-  }
-
-  if (event.type === "TEXT_MESSAGE_CHUNK" || event.type === "TOOL_CALL_CHUNK") {
-    return event.delta?.length ?? 0;
-  }
-
-  return 0;
 }
 
 function mergeTextContentEvent(
@@ -122,27 +88,6 @@ function mergeToolCallArgsEvent(
   };
 }
 
-function mergeToolCallChunkEvent(
-  previous: AgUiSessionEvent,
-  next: AgUiSessionEvent,
-): AgUiSessionEvent | null {
-  if (
-    previous.type !== "TOOL_CALL_CHUNK" ||
-    next.type !== "TOOL_CALL_CHUNK" ||
-    previous.toolCallId === undefined ||
-    previous.toolCallId !== next.toolCallId ||
-    previous.delta === undefined ||
-    next.delta === undefined
-  ) {
-    return null;
-  }
-
-  return {
-    ...previous,
-    delta: `${previous.delta}${next.delta}`,
-  };
-}
-
 function mergeAdjacentSessionEvents(
   previous: AgUiSessionEvent,
   next: AgUiSessionEvent,
@@ -151,8 +96,7 @@ function mergeAdjacentSessionEvents(
     mergeTextContentEvent(previous, next) ??
     mergeTextChunkEvent(previous, next) ??
     mergeReasoningContentEvent(previous, next) ??
-    mergeToolCallArgsEvent(previous, next) ??
-    mergeToolCallChunkEvent(previous, next)
+    mergeToolCallArgsEvent(previous, next)
   );
 }
 
@@ -186,10 +130,7 @@ function findLatestReplaceableEventIndexes(events: AgUiSessionEvent[]): Set<numb
   return new Set(indexesByName.values());
 }
 
-export function compactAgUiSessionEvents(
-  events: AgUiSessionEvent[],
-  options: CompactAgUiSessionEventsOptions = {},
-): AgUiSessionEvent[] {
+export function compactAgUiSessionEvents(events: AgUiSessionEvent[]): AgUiSessionEvent[] {
   const compacted: AgUiSessionEvent[] = [];
   const latestReplaceableEventIndexes = findLatestReplaceableEventIndexes(events);
 
@@ -202,10 +143,6 @@ export function compactAgUiSessionEvents(
       continue;
     }
 
-    if (event.type === "TOOL_CALL_ARGS" && options.skipToolCallArgs === true) {
-      continue;
-    }
-
     if (isReplaceableCustomEvent(event) && !latestReplaceableEventIndexes.has(index)) {
       continue;
     }
@@ -214,11 +151,4 @@ export function compactAgUiSessionEvents(
   }
 
   return compacted;
-}
-
-export function appendCompactedAgUiSessionEvents(
-  current: AgUiSessionEvent[],
-  incoming: AgUiSessionEvent[],
-): AgUiSessionEvent[] {
-  return compactAgUiSessionEvents([...current, ...incoming]);
 }

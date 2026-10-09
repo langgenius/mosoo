@@ -9,26 +9,9 @@ export function appendTextDelta(
 ): SessionLiveState {
   const messages = [...state.messages];
   const index = messages.findIndex((message) => message.id === messageId);
+  const current = index === -1 ? undefined : messages[index];
 
-  if (index === -1) {
-    messages.push(
-      createLiveStateMessage({
-        content: delta,
-        id: messageId,
-        role: "assistant",
-        segments: [{ kind: "text", text: delta }],
-      }),
-    );
-
-    return touchSessionLiveState({
-      ...state,
-      messages,
-    });
-  }
-
-  const current = messages[index];
-
-  if (!current) {
+  if (current === undefined) {
     messages.push(
       createLiveStateMessage({
         content: delta,

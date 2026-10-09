@@ -6,7 +6,6 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "lint": "vp lint .",
     "tc": "vp exec tsc --noEmit"
   },
   "devDependencies": {

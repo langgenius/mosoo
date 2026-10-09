@@ -4,7 +4,6 @@ import {
   isRecord,
   readBuiltInToolConfig,
   readEnvironmentPackageSpec,
-  readAgentKind,
   readBooleanOrDefault,
   readNullableString,
   readParsedArray,
@@ -52,7 +51,6 @@ export function buildPackageManifest(input: Record<string, unknown>): AgentManif
   const runtimeSettings = input["settings"] ?? input["providerOptions"];
 
   if (
-    (input["kind"] != null && readAgentKind(input["kind"]) === null) ||
     !hasRequiredText(name) ||
     !hasRequiredText(runtime) ||
     !hasRequiredText(provider) ||

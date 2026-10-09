@@ -140,7 +140,3 @@ export const fileVersionsTable = sqliteTable(
       .where(sql`${table.committed} = 0`),
   ],
 );
-
-export type FileRecordRow = typeof fileRecordsTable.$inferSelect;
-export type FileUploadRow = typeof fileUploadsTable.$inferSelect;
-export type FileVersionRow = typeof fileVersionsTable.$inferSelect;

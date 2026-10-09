@@ -2,7 +2,7 @@ import type { MosooCustomEvent, MosooSessionFileChange } from "./ag-ui-session-e
 import { MOSOO_CUSTOM_EVENT as CUSTOM_EVENT_REGISTRY } from "./custom-event-registry";
 import type { SessionLiveState } from "./live-state";
 import { updateSessionMetadataState } from "./live-state-custom-metadata.reducer";
-import { completePendingToolUses, normalizeMessagePlan } from "./live-state-message.reducer";
+import { normalizeMessagePlan } from "./live-state-message.reducer";
 import {
   currentIsoTimestamp,
   isTerminalRunStatus,
@@ -245,14 +245,13 @@ function stopSession(
   state: SessionLiveState,
   event: CustomEventByName<typeof CUSTOM_EVENT_REGISTRY.sessionStopped.name>,
 ): SessionLiveState {
-  const terminalState = completePendingToolUses(state);
   const message = event.value.message ?? null;
-  const lastSeen = "lastSeen" in event.value ? event.value.lastSeen : terminalState.infra.lastSeen;
+  const lastSeen = "lastSeen" in event.value ? event.value.lastSeen : state.infra.lastSeen;
 
   return touchSessionLiveState({
-    ...terminalState,
+    ...state,
     infra: {
-      ...terminalState.infra,
+      ...state.infra,
       lastFailureMessage: message,
       lastFailureReason: event.value.reason,
       lastSeen,
@@ -261,27 +260,20 @@ function stopSession(
     lifecycle: "TERMINATED",
     permissionRequests: [],
     run: {
-      ...terminalState.run,
-      completedAt: terminalState.run.completedAt ?? currentIsoTimestamp(),
-      error: terminalState.run.error ?? {
+      ...state.run,
+      completedAt: state.run.completedAt ?? currentIsoTimestamp(),
+      error: state.run.error ?? {
         code: event.value.reason,
         details: {},
         message: message ?? "Session stopped.",
         retryable: false,
       },
-      status: terminalState.run.status === "completed" ? terminalState.run.status : "failed",
+      status: state.run.status === "completed" ? state.run.status : "failed",
     },
   });
 }
 
 export function updateCustomState(
-  state: SessionLiveState,
-  event: MosooCustomEvent,
-): SessionLiveState {
-  return updateRuntimeCustomState(state, event);
-}
-
-function updateRuntimeCustomState(
   state: SessionLiveState,
   event: MosooCustomEvent,
 ): SessionLiveState {
@@ -303,13 +295,6 @@ function updateRuntimeCustomState(
 
     case CUSTOM_EVENT_REGISTRY.sessionPermissionsUpdated.name: {
       return updatePermissionRequests(state, event);
-    }
-
-    case CUSTOM_EVENT_REGISTRY.sessionReadiness.name: {
-      return touchSessionLiveState({
-        ...state,
-        readiness: event.value.readiness,
-      });
     }
 
     case CUSTOM_EVENT_REGISTRY.sessionRunUpdated.name: {

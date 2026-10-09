@@ -1,12 +1,9 @@
-import { createWideEvent } from "vestig";
+import { createWideEvent, getContext } from "vestig";
 import type { Logger, WideEventBuilder, WideEventConfig, WideEventEndOptions } from "vestig";
 
-import { getActiveLogContext } from "./log-context";
-
 export function createScopedWideEvent(config: WideEventConfig): WideEventBuilder {
-  const activeContext = getActiveLogContext();
   const context = {
-    ...activeContext,
+    ...getContext(),
     ...config.context,
   };
 

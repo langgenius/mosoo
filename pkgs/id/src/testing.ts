@@ -1,62 +1,34 @@
-import { normalizePlatformId } from "./index";
+import { parsePlatformId } from "./index";
 import type {
   AccountId,
   AgentDeploymentVersionId,
   AgentId,
-  AgentMcpBindingId,
   DriverInstanceId,
   EnvironmentId,
   EnvironmentRevisionId,
-  FileId,
   OrganizationId,
-  PlatformId,
   ProjectId,
-  PublicThreadId,
   RuntimeEventId,
-  RuntimeOperationId,
   SandboxId,
   SessionId,
-  SessionMessageId,
   SessionRunId,
   SkillId,
   VendorCredentialId,
 } from "./index";
 
-function fixture(value: string): PlatformId {
-  return normalizePlatformId(value, "Platform ID fixture");
-}
-
 export const PLATFORM_ID_FIXTURES = {
-  account: fixture("01J00000000000000000000001") as AccountId,
-  agent: fixture("01J00000000000000000000002") as AgentId,
-  agentDeploymentVersion: fixture("01J00000000000000000000006") as AgentDeploymentVersionId,
-  agentMcpBinding: fixture("01J00000000000000000000007") as AgentMcpBindingId,
-  driverInstance: fixture("01J00000000000000000000008") as DriverInstanceId,
-  environment: fixture("01J0000000000000000000000A") as EnvironmentId,
-  environmentRevision: fixture("01J0000000000000000000000B") as EnvironmentRevisionId,
-  file: fixture("01J0000000000000000000000C") as FileId,
-  organization: fixture("01J0000000000000000000000D") as OrganizationId,
-  project: fixture("01J0000000000000000000000E") as ProjectId,
-  publicThread: fixture("01J0000000000000000000000F") as PublicThreadId,
-  runtimeEvent: fixture("01J0000000000000000000000G") as RuntimeEventId,
-  runtimeOperation: fixture("01J0000000000000000000000H") as RuntimeOperationId,
-  sandbox: fixture("01J0000000000000000000000J") as SandboxId,
-  session: fixture("01J0000000000000000000000K") as SessionId,
-  sessionMessage: fixture("01J0000000000000000000000M") as SessionMessageId,
-  sessionRun: fixture("01J0000000000000000000000N") as SessionRunId,
-  skill: fixture("01J0000000000000000000000P") as SkillId,
-  vendorCredential: fixture("01J0000000000000000000000R") as VendorCredentialId,
+  account: parsePlatformId<AccountId>("01J00000000000000000000001"),
+  agent: parsePlatformId<AgentId>("01J00000000000000000000002"),
+  agentDeploymentVersion: parsePlatformId<AgentDeploymentVersionId>("01J00000000000000000000006"),
+  driverInstance: parsePlatformId<DriverInstanceId>("01J00000000000000000000008"),
+  environment: parsePlatformId<EnvironmentId>("01J0000000000000000000000A"),
+  environmentRevision: parsePlatformId<EnvironmentRevisionId>("01J0000000000000000000000B"),
+  organization: parsePlatformId<OrganizationId>("01J0000000000000000000000D"),
+  project: parsePlatformId<ProjectId>("01J0000000000000000000000E"),
+  runtimeEvent: parsePlatformId<RuntimeEventId>("01J0000000000000000000000G"),
+  sandbox: parsePlatformId<SandboxId>("01J0000000000000000000000J"),
+  session: parsePlatformId<SessionId>("01J0000000000000000000000K"),
+  sessionRun: parsePlatformId<SessionRunId>("01J0000000000000000000000N"),
+  skill: parsePlatformId<SkillId>("01J0000000000000000000000P"),
+  vendorCredential: parsePlatformId<VendorCredentialId>("01J0000000000000000000000R"),
 } as const;
-
-export const MALFORMED_PLATFORM_ID_FIXTURES = [
-  "",
-  "agent-1",
-  "session-1",
-  "driver-instance-1",
-  "01J0000000000000000000000",
-  "81J00000000000000000000001",
-  "01J0000000000000000000000I",
-  "01J0000000000000000000000L",
-  "01J0000000000000000000000O",
-  "01J0000000000000000000000U",
-] as const;

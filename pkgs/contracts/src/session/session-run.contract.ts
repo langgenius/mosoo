@@ -1,6 +1,6 @@
+import type { AgentDeploymentVersionId, SessionRunId } from "@mosoo/id";
 import { type } from "arktype";
 
-import type { AgentDeploymentVersionId, SessionRunId } from "../id/id.contract";
 import { NonEmptyString, PrimitiveRecord } from "../validation/primitives.contract";
 
 export const RunError = type({
@@ -12,8 +12,7 @@ export const RunError = type({
 export type RunError = typeof RunError.infer;
 
 export const SESSION_RUN_TRIGGERS = ["user_prompt", "retry", "resume", "system"] as const;
-export const SessionRunTrigger = type.enumerated(...SESSION_RUN_TRIGGERS);
-export type SessionRunTrigger = typeof SessionRunTrigger.infer;
+export type SessionRunTrigger = (typeof SESSION_RUN_TRIGGERS)[number];
 
 export const SESSION_RUN_STATUSES = [
   "queued",
@@ -25,8 +24,7 @@ export const SESSION_RUN_STATUSES = [
   "cancelled",
   "expired",
 ] as const;
-export const SessionRunStatus = type.enumerated(...SESSION_RUN_STATUSES);
-export type SessionRunStatus = typeof SessionRunStatus.infer;
+export type SessionRunStatus = (typeof SESSION_RUN_STATUSES)[number];
 
 export interface SessionRunSummary {
   completedAt: string | null;

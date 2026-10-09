@@ -3,13 +3,9 @@ import type { ZipOptions, Zippable } from "fflate";
 
 import type { SkillPackageEntry } from "./bundle";
 import { SkillPackageError } from "./errors";
-import { admitSkillPackagePath, createSkillPackagePathAdmission } from "./path-admission";
-import type { AdmittedSkillPackagePath, SkillPackagePathKind } from "./path-admission";
+import { inferSkillPackagePathKind } from "./path-admission";
 
-const DEFAULT_ZIP_OPTIONS: ZipOptions = {
-  level: 6,
-};
-const DEFAULT_ZIP_LEVEL = 6 as const;
+const DEFAULT_ZIP_LEVEL = 6;
 const FIXED_ZIP_MTIME = new Date("1980-01-01T00:00:00.000Z");
 const UNIX_ZIP_OS = 3;
 const EXECUTABLE_FILE_MODE = 0o10_0755;
@@ -20,42 +16,28 @@ const ZIP_EXTERNAL_ATTRIBUTE_MODE_FACTOR = 0x01_00_00;
 const ZIP_STORED_COMPRESSION = 0;
 const ZIP_DEFLATE_COMPRESSION = 8;
 
-export interface SkillArchiveExtractOptions {
+interface SkillArchiveExtractOptions {
   maxEntryCount?: number;
   maxFileBytes?: number;
   maxTotalFileBytes?: number;
-  pathsAlreadyAdmitted?: boolean;
-}
-
-export interface SkillArchiveCreateOptions {
-  pathsAlreadyAdmitted?: boolean;
 }
 
 interface ZipArchiveMetadata {
-  entryKind: SkillPackagePathKind;
   isExecutable: boolean;
   path: string;
-  uncompressedSize: number;
 }
 
-export function createZipArchive(
-  entries: SkillPackageEntry[],
-  options: SkillArchiveCreateOptions = {},
-): Uint8Array {
+export function createZipArchive(entries: SkillPackageEntry[]): Uint8Array {
   const archive: Zippable = {};
-  const admission = options.pathsAlreadyAdmitted ? null : createSkillPackagePathAdmission();
 
   for (const entry of entries) {
-    const admittedPath =
-      admission?.admit(entry.path, entry.entryKind).path ??
-      normalizeAdmittedArchivePath(entry.path, entry.entryKind);
-    const archivePath = entry.entryKind === "directory" ? `${admittedPath}/` : admittedPath;
+    const archivePath = entry.entryKind === "directory" ? `${entry.path}/` : entry.path;
 
     archive[archivePath] = [entry.body, createZipEntryOptions(entry)];
   }
 
   try {
-    return zipSync(archive, DEFAULT_ZIP_OPTIONS);
+    return zipSync(archive);
   } catch (error) {
     throw new SkillPackageError(
       error instanceof Error ? error.message : "Skill zip compression failed.",
@@ -67,10 +49,12 @@ export function extractZipArchive(
   bytes: Uint8Array,
   options: SkillArchiveExtractOptions = {},
 ): SkillPackageEntry[] {
-  const metadataByPath = listZipArchiveEntries(bytes, options);
-  const metadataLookup = createZipMetadataLookup(metadataByPath);
-  const extractedEntries = new Map<string, SkillPackageEntry>();
+  const metadataLookup = createZipMetadataLookup(listZipArchiveEntries(bytes, options));
+  const extractedEntries: SkillPackageEntry[] = [];
   const extractionState: { error: SkillPackageError | null } = { error: null };
+  // The central directory can under-declare or repeat the streamed entries, so
+  // the stream is bounded and de-duplicated on its own.
+  const extractedPaths = new Set<string>();
   let totalExtractedBytes = 0;
   const unzip = new Unzip((file) => {
     if (extractionState.error !== null) {
@@ -82,31 +66,25 @@ export function extractZipArchive(
       return;
     }
 
-    const admittedEntry = readAdmittedZipArchivePath(file.name, options.pathsAlreadyAdmitted);
+    const metadata = metadataLookup.get(file.name);
+    const path = metadata?.path ?? file.name;
+    const duplicate = extractedPaths.has(path);
 
-    if (admittedEntry instanceof SkillPackageError) {
-      extractionState.error = admittedEntry;
-      file.terminate();
-      return;
-    }
-
-    const metadata = metadataLookup.get(admittedEntry.path);
-
-    if (!metadata) {
+    if (
+      duplicate ||
+      (options.maxEntryCount !== undefined && extractedPaths.size >= options.maxEntryCount)
+    ) {
       extractionState.error = new SkillPackageError(
-        `The skill zip archive contains an undeclared entry: ${file.name}`,
+        duplicate
+          ? `The skill zip archive contains a duplicate entry: ${file.name}`
+          : `The ZIP entry count exceeds the limit (${options.maxEntryCount}).`,
       );
       file.terminate();
       return;
     }
 
-    if (metadata.entryKind !== admittedEntry.entryKind) {
-      extractionState.error = new SkillPackageError(
-        `ZIP entry kind does not match the central directory: ${file.name}`,
-      );
-      file.terminate();
-      return;
-    }
+    extractedPaths.add(path);
+    const entryKind = inferSkillPackagePathKind(path);
 
     if (
       file.compression !== ZIP_STORED_COMPRESSION &&
@@ -133,19 +111,17 @@ export function extractZipArchive(
         return;
       }
 
-      const currentChunk = chunk;
-
-      if (metadata.entryKind === "directory") {
-        if (currentChunk.byteLength !== 0) {
+      if (entryKind === "directory") {
+        if (chunk.byteLength !== 0) {
           extractionState.error = new SkillPackageError(
             `ZIP directory entries cannot contain file contents: ${file.name}`,
           );
           file.terminate();
           return;
         }
-      } else if (currentChunk.byteLength > 0) {
-        entryBytes += currentChunk.byteLength;
-        totalExtractedBytes += currentChunk.byteLength;
+      } else if (chunk.byteLength > 0) {
+        entryBytes += chunk.byteLength;
+        totalExtractedBytes += chunk.byteLength;
 
         if (options.maxFileBytes !== undefined && entryBytes > options.maxFileBytes) {
           extractionState.error = new SkillPackageError(
@@ -166,27 +142,18 @@ export function extractZipArchive(
           return;
         }
 
-        chunks.push(new Uint8Array(currentChunk));
+        chunks.push(new Uint8Array(chunk));
       }
 
       if (!final) {
         return;
       }
 
-      if (metadata.entryKind === "file" && entryBytes !== metadata.uncompressedSize) {
-        extractionState.error = new SkillPackageError(
-          `ZIP entry size does not match the central directory: ${file.name}`,
-        );
-        file.terminate();
-        return;
-      }
-
-      extractedEntries.set(metadata.path, {
-        body:
-          metadata.entryKind === "directory" ? new Uint8Array() : concatChunks(chunks, entryBytes),
-        entryKind: metadata.entryKind,
-        isExecutable: metadata.isExecutable,
-        path: metadata.path,
+      extractedEntries.push({
+        body: entryKind === "directory" ? new Uint8Array() : concatChunks(chunks, entryBytes),
+        entryKind,
+        isExecutable: entryKind === "file" && (metadata?.isExecutable ?? false),
+        path,
       });
     };
 
@@ -205,17 +172,7 @@ export function extractZipArchive(
     throw extractionState.error;
   }
 
-  return metadataByPath.map((metadata) => {
-    const extractedEntry = extractedEntries.get(metadata.path);
-
-    if (!extractedEntry) {
-      throw new SkillPackageError(
-        `The skill zip archive is missing entry contents: ${metadata.path}`,
-      );
-    }
-
-    return extractedEntry;
-  });
+  return extractedEntries;
 }
 
 function createZipMetadataLookup(
@@ -310,7 +267,6 @@ function listZipArchiveEntries(
   const centralDirectorySize = readUint32LE(bytes, endOfCentralDirectoryOffset + 12);
   const centralDirectoryOffset = readUint32LE(bytes, endOfCentralDirectoryOffset + 16);
   const metadata: ZipArchiveMetadata[] = [];
-  const admission = options.pathsAlreadyAdmitted ? null : createSkillPackagePathAdmission();
   let totalFileBytes = 0;
   let offset = centralDirectoryOffset;
   const endOffset = centralDirectoryOffset + centralDirectorySize;
@@ -339,21 +295,19 @@ function listZipArchiveEntries(
       throw new SkillPackageError("A skill zip archive filename exceeds bounds.");
     }
 
-    const rawPath = decodeZipFileName(bytes.subarray(fileNameStart, fileNameEnd));
+    const path = decodeZipFileName(bytes.subarray(fileNameStart, fileNameEnd));
     const nextOffset = fileNameEnd + extraLength + commentLength;
 
     if (nextOffset > endOffset) {
       throw new SkillPackageError("The skill zip archive central directory exceeds bounds.");
     }
 
-    if (isIgnoredZipMetadataPath(rawPath)) {
+    if (isIgnoredZipMetadataPath(path)) {
       offset = nextOffset;
       continue;
     }
 
-    const entryKind = inferZipEntryKind(rawPath);
-    const path =
-      admission?.admit(rawPath, entryKind).path ?? normalizeAdmittedArchivePath(rawPath, entryKind);
+    const entryKind = inferSkillPackagePathKind(path);
 
     if (options.maxEntryCount !== undefined && metadata.length >= options.maxEntryCount) {
       throw new SkillPackageError(
@@ -378,11 +332,8 @@ function listZipArchiveEntries(
     }
 
     metadata.push({
-      entryKind,
-      isExecutable:
-        entryKind === "directory" ? false : isZipEntryExecutable(versionMadeBy, externalAttributes),
+      isExecutable: isZipEntryExecutable(versionMadeBy, externalAttributes),
       path,
-      uncompressedSize,
     });
 
     offset = nextOffset;
@@ -433,34 +384,6 @@ function findEndOfCentralDirectory(bytes: Uint8Array): number {
   }
 
   return -1;
-}
-
-function readAdmittedZipArchivePath(
-  path: string,
-  pathsAlreadyAdmitted = false,
-): AdmittedSkillPackagePath | SkillPackageError {
-  if (pathsAlreadyAdmitted) {
-    const entryKind = inferZipEntryKind(path);
-
-    return {
-      entryKind,
-      path: normalizeAdmittedArchivePath(path, entryKind),
-    };
-  }
-
-  try {
-    return admitSkillPackagePath(path, inferZipEntryKind(path));
-  } catch (error) {
-    return toSkillZipError(error, "Skill zip decompression failed.");
-  }
-}
-
-function normalizeAdmittedArchivePath(path: string, entryKind: SkillPackagePathKind): string {
-  return entryKind === "directory" && path.endsWith("/") ? path.slice(0, -1) : path;
-}
-
-function inferZipEntryKind(path: string): SkillPackagePathKind {
-  return path.endsWith("/") || path.endsWith("\\") ? "directory" : "file";
 }
 
 function decodeZipFileName(bytes: Uint8Array): string {

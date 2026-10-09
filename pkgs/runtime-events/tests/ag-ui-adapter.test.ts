@@ -8,20 +8,25 @@ import {
   createRuntimeEvent,
   parseRuntimeEventEnvelope,
   projectRuntimeEventToAgUiSessionEvents,
-  toRuntimeEventInput,
+  RUNTIME_EVENT_SCHEMA_VERSION,
 } from "@mosoo/runtime-events";
-import type { RuntimeEventBuildContext } from "@mosoo/runtime-events";
 
 const OCCURRED_AT = "2026-05-26T00:00:00.000Z";
 
-function createContext(): RuntimeEventBuildContext {
+function driverEnvelope(input: Record<string, unknown>): Record<string, unknown> {
   return {
-    createId: createPlatformId,
+    actor: "driver",
+    delivery: "lossless",
     driverInstanceId: PLATFORM_ID_FIXTURES.driverInstance,
+    id: createPlatformId(),
     occurredAt: OCCURRED_AT,
+    origin: "driver",
     runId: PLATFORM_ID_FIXTURES.sessionRun,
     runtimeId: "openai-runtime",
+    schemaVersion: RUNTIME_EVENT_SCHEMA_VERSION,
     sessionId: PLATFORM_ID_FIXTURES.session,
+    visibility: "participant",
+    ...input,
   };
 }
 
@@ -36,43 +41,6 @@ function first<T>(values: readonly T[]): T {
 }
 
 describe("runtime event AG-UI adapter", () => {
-  test("normalizes canonical driver drafts into canonical runtime envelopes", () => {
-    const event = first(
-      toRuntimeEventInput(createContext(), {
-        kind: "run.started",
-        payload: {
-          startedAt: OCCURRED_AT,
-        },
-        runId: PLATFORM_ID_FIXTURES.sessionRun,
-      }),
-    );
-
-    expect(event.kind).toBe("run.started");
-    expect(event.runId).toBe(PLATFORM_ID_FIXTURES.sessionRun);
-    expect(event.sessionId).toBe(PLATFORM_ID_FIXTURES.session);
-    expect(event.schemaVersion).toBe("2026-05-26");
-  });
-
-  test("uses the build context run id as the canonical runtime run id", () => {
-    const event = first(
-      toRuntimeEventInput(
-        {
-          ...createContext(),
-          runId: PLATFORM_ID_FIXTURES.sessionRun,
-        },
-        {
-          kind: "run.started",
-          payload: {
-            startedAt: OCCURRED_AT,
-          },
-          runId: "provider-turn-1",
-        },
-      ),
-    );
-
-    expect(event.runId).toBe(PLATFORM_ID_FIXTURES.sessionRun);
-  });
-
   test("projects runtime run events through session run updates", () => {
     const started = first(
       projectRuntimeEventToAgUiSessionEvents(
@@ -145,25 +113,27 @@ describe("runtime event AG-UI adapter", () => {
     const completedAt = "2026-05-26T00:00:03.000Z";
     const completed = first(
       projectRuntimeEventToAgUiSessionEvents(
-        createRuntimeEvent({
-          id: createPlatformId(),
-          kind: "run.completed",
-          occurredAt: completedAt,
-          payload: {
-            lifecycle: "TERMINATED",
-            run: {
-              completedAt,
-              error: null,
-              id: "provider-run",
-              startedAt: OCCURRED_AT,
-              status: "completed",
-              traceId: "provider-trace",
+        parseRuntimeEventEnvelope(
+          createRuntimeEvent({
+            id: createPlatformId(),
+            kind: "run.completed",
+            occurredAt: completedAt,
+            payload: {
+              lifecycle: "TERMINATED",
+              run: {
+                completedAt,
+                error: null,
+                id: "provider-run",
+                startedAt: OCCURRED_AT,
+                status: "completed",
+                traceId: "provider-trace",
+              },
             },
-          },
-          runId: PLATFORM_ID_FIXTURES.sessionRun,
-          sessionId: PLATFORM_ID_FIXTURES.session,
-          traceId: "trace-envelope",
-        }),
+            runId: PLATFORM_ID_FIXTURES.sessionRun,
+            sessionId: PLATFORM_ID_FIXTURES.session,
+            traceId: "trace-envelope",
+          }),
+        ),
       ),
     );
 
@@ -197,39 +167,34 @@ describe("runtime event AG-UI adapter", () => {
       sessionId: PLATFORM_ID_FIXTURES.session,
     });
 
-    expect(() => projectRuntimeEventToAgUiSessionEvents(failed)).toThrow();
-    expect(() => createProcessDraftFromRuntimeEvent(failed)).toThrow();
+    expect(() => parseRuntimeEventEnvelope(failed)).toThrow();
   });
 
-  test("rejects runtime event drafts with unsupported canonical fields", () => {
+  test("rejects runtime events with unsupported canonical fields", () => {
     expect(() =>
-      toRuntimeEventInput(createContext(), {
-        kind: "message.unknown",
-        payload: {},
-      }),
+      parseRuntimeEventEnvelope(
+        driverEnvelope({
+          kind: "message.unknown",
+          payload: {},
+        }),
+      ),
     ).toThrow();
 
     expect(() =>
-      toRuntimeEventInput(createContext(), {
-        actor: "viewer",
-        kind: "message.delta",
-        payload: {
-          contentDelta: "hello",
-        },
-      }),
+      parseRuntimeEventEnvelope(
+        driverEnvelope({
+          actor: "viewer",
+          kind: "message.delta",
+          payload: {
+            contentDelta: "hello",
+          },
+        }),
+      ),
     ).toThrow();
   });
 
-  test("validates runtime envelope context, native refs, and payload presence", () => {
+  test("validates runtime envelope native refs and payload presence", () => {
     const event = createRuntimeEvent({
-      context: {
-        agentId: PLATFORM_ID_FIXTURES.agent,
-        surface: {
-          id: "surface-1",
-          triggerId: "trigger-1",
-          type: "web",
-        },
-      },
       id: createPlatformId(),
       kind: "diagnostic.reported",
       native: {
@@ -245,14 +210,6 @@ describe("runtime event AG-UI adapter", () => {
     });
 
     expect(parseRuntimeEventEnvelope(event)).toMatchObject({
-      context: {
-        agentId: PLATFORM_ID_FIXTURES.agent,
-        surface: {
-          id: "surface-1",
-          triggerId: "trigger-1",
-          type: "web",
-        },
-      },
       kind: "diagnostic.reported",
       native: {
         provider: "openai",
@@ -263,37 +220,15 @@ describe("runtime event AG-UI adapter", () => {
       },
       sessionId: PLATFORM_ID_FIXTURES.session,
     });
-    expect(parseRuntimeEventEnvelope({ ...event, seq: 7 })).toMatchObject({
-      kind: "diagnostic.reported",
-      seq: 7,
-    });
-
-    expect(() =>
-      parseRuntimeEventEnvelope({
-        ...event,
-        context: {
-          surface: {
-            type: "desktop",
-          },
-        },
-      }),
-    ).toThrow();
 
     const { payload: _payload, ...missingPayload } = event;
 
     expect(() => parseRuntimeEventEnvelope(missingPayload)).toThrow();
   });
 
-  test("parses envelope and context IDs into canonical semantic IDs", () => {
+  test("parses envelope IDs into canonical semantic IDs", () => {
     const event = {
       actor: "driver",
-      context: {
-        agentId: PLATFORM_ID_FIXTURES.agent.toLowerCase(),
-        callerId: PLATFORM_ID_FIXTURES.account.toLowerCase(),
-        deploymentVersionId: PLATFORM_ID_FIXTURES.agentDeploymentVersion.toLowerCase(),
-        environmentRevisionId: PLATFORM_ID_FIXTURES.environmentRevision.toLowerCase(),
-        executionActorId: PLATFORM_ID_FIXTURES.account.toLowerCase(),
-      },
       delivery: "lossless",
       driverInstanceId: PLATFORM_ID_FIXTURES.driverInstance.toLowerCase(),
       id: PLATFORM_ID_FIXTURES.runtimeEvent.toLowerCase(),
@@ -310,13 +245,6 @@ describe("runtime event AG-UI adapter", () => {
     };
 
     expect(parseRuntimeEventEnvelope(event)).toMatchObject({
-      context: {
-        agentId: PLATFORM_ID_FIXTURES.agent,
-        callerId: PLATFORM_ID_FIXTURES.account,
-        deploymentVersionId: PLATFORM_ID_FIXTURES.agentDeploymentVersion,
-        environmentRevisionId: PLATFORM_ID_FIXTURES.environmentRevision,
-        executionActorId: PLATFORM_ID_FIXTURES.account,
-      },
       driverInstanceId: PLATFORM_ID_FIXTURES.driverInstance,
       id: PLATFORM_ID_FIXTURES.runtimeEvent,
       runId: PLATFORM_ID_FIXTURES.sessionRun,
@@ -324,15 +252,6 @@ describe("runtime event AG-UI adapter", () => {
     });
 
     expect(() => parseRuntimeEventEnvelope({ ...event, runId: "run-1" })).toThrow();
-    expect(() =>
-      parseRuntimeEventEnvelope({
-        ...event,
-        context: {
-          ...event.context,
-          organizationId: PLATFORM_ID_FIXTURES.organization,
-        },
-      }),
-    ).toThrow("Runtime event context organizationId is not supported.");
   });
 
   test("rejects malformed public runtime event payloads at ingress", () => {
@@ -387,42 +306,9 @@ describe("runtime event AG-UI adapter", () => {
     ).toThrow();
   });
 
-  test("runtime timing projection keeps envelope identity authoritative", () => {
-    const event = createRuntimeEvent({
-      id: createPlatformId(),
-      kind: "runtime.timing.recorded",
-      occurredAt: OCCURRED_AT,
-      payload: {
-        completedAtMs: 1_050,
-        path: "warm",
-        phases: [],
-        runId: "payload-run",
-        sessionId: "payload-session",
-        source: "driver",
-        stage: "driver_turn",
-        startedAtMs: 1_000,
-        totalMs: 50,
-        traceId: "payload-trace",
-      },
-      runId: PLATFORM_ID_FIXTURES.sessionRun,
-      sessionId: PLATFORM_ID_FIXTURES.session,
-      traceId: "envelope-trace",
-    });
-
-    const deliveryEvents = projectRuntimeEventToAgUiSessionEvents(event);
-
-    expect(deliveryEvents[0]).toMatchObject({
-      value: {
-        runId: PLATFORM_ID_FIXTURES.sessionRun,
-        sessionId: PLATFORM_ID_FIXTURES.session,
-        traceId: "envelope-trace",
-      },
-    });
-  });
-
   test("round-trips permission requests through canonical events and session delivery events", () => {
-    const event = first(
-      toRuntimeEventInput(createContext(), {
+    const event = parseRuntimeEventEnvelope(
+      driverEnvelope({
         kind: "permission.requested",
         payload: {
           details: '{"command":"pwd"}',
@@ -573,7 +459,7 @@ describe("runtime event AG-UI adapter", () => {
     });
   });
 
-  test("rejects malformed tool call projection payloads", () => {
+  test("rejects malformed tool call payloads at ingress", () => {
     const event = createRuntimeEvent({
       id: createPlatformId(),
       kind: "tool.call.updated",
@@ -585,7 +471,7 @@ describe("runtime event AG-UI adapter", () => {
       sessionId: PLATFORM_ID_FIXTURES.session,
     });
 
-    expect(() => projectRuntimeEventToAgUiSessionEvents(event)).toThrow();
+    expect(() => parseRuntimeEventEnvelope(event)).toThrow();
   });
 
   test("does not project owner diagnostics into participant delivery by default", () => {
@@ -613,116 +499,6 @@ describe("runtime event AG-UI adapter", () => {
 
     expect(projectRuntimeEventToAgUiSessionEvents(defaultDiagnostic)).toEqual([]);
     expect(projectRuntimeEventToAgUiSessionEvents(ownerDebugDiagnostic)).toEqual([]);
-  });
-
-  test("does not project system internal events into participant run success", () => {
-    const event = createRuntimeEvent({
-      id: createPlatformId(),
-      kind: "driver.heartbeat",
-      occurredAt: OCCURRED_AT,
-      payload: {
-        lifecycle: "IDLE",
-        run: {
-          completedAt: OCCURRED_AT,
-          error: null,
-          id: PLATFORM_ID_FIXTURES.sessionRun,
-          startedAt: OCCURRED_AT,
-          status: "completed",
-          traceId: "trace-1",
-        },
-      },
-      runId: PLATFORM_ID_FIXTURES.sessionRun,
-      sessionId: PLATFORM_ID_FIXTURES.session,
-    });
-
-    expect(projectRuntimeEventToAgUiSessionEvents(event)).toEqual([]);
-  });
-
-  test("projects diagnostics only when the event explicitly opts into participant delivery", () => {
-    const event = createRuntimeEvent({
-      id: createPlatformId(),
-      kind: "diagnostic.reported",
-      occurredAt: OCCURRED_AT,
-      payload: {
-        message: "transport connected",
-        severity: "info",
-      },
-      sessionId: PLATFORM_ID_FIXTURES.session,
-      visibility: "participant",
-    });
-
-    expect(projectRuntimeEventToAgUiSessionEvents(event)).toHaveLength(1);
-  });
-
-  test("projects runtime timing payloads without losing detailed timing fields", () => {
-    const event = createRuntimeEvent({
-      id: createPlatformId(),
-      kind: "runtime.timing.recorded",
-      occurredAt: "2026-05-26T00:00:01.050Z",
-      payload: {
-        completedAtMs: 1_050,
-        path: "warm",
-        phases: [
-          {
-            durationMs: 20,
-            name: "spawn",
-          },
-        ],
-        runId: PLATFORM_ID_FIXTURES.sessionRun,
-        sessionId: PLATFORM_ID_FIXTURES.session,
-        source: "driver",
-        stage: "driver_turn",
-        startedAtMs: 1_000,
-        totalMs: 50,
-        traceId: "trace-1",
-      },
-      sessionId: PLATFORM_ID_FIXTURES.session,
-    });
-
-    const deliveryEvents = projectRuntimeEventToAgUiSessionEvents(event);
-    const [timelineEvent, timingEvent] = deliveryEvents;
-
-    expect(timelineEvent).toMatchObject({
-      name: MOSOO_CUSTOM_EVENT.sessionRuntimeTimelineUpdated.name,
-      type: EventType.CUSTOM,
-      value: {
-        durationMs: 50,
-        path: "warm",
-        stage: "driver_turn",
-      },
-    });
-    expect(timingEvent).toMatchObject({
-      name: MOSOO_CUSTOM_EVENT.sessionRuntimeTiming.name,
-      type: EventType.CUSTOM,
-      value: {
-        phases: [
-          {
-            durationMs: 20,
-            name: "spawn",
-          },
-        ],
-        totalMs: 50,
-      },
-    });
-  });
-
-  test("rejects malformed runtime timing projection payloads", () => {
-    const event = createRuntimeEvent({
-      id: createPlatformId(),
-      kind: "runtime.timing.recorded",
-      occurredAt: "2026-05-26T00:00:01.050Z",
-      payload: {
-        completedAtMs: 1_050,
-        path: "warm",
-        source: "driver",
-        stage: "driver_turn",
-        startedAtMs: 1_000,
-        totalMs: 50,
-      },
-      sessionId: PLATFORM_ID_FIXTURES.session,
-    });
-
-    expect(() => projectRuntimeEventToAgUiSessionEvents(event)).toThrow();
   });
 
   test("creates process drafts directly from canonical runtime timing payloads", () => {

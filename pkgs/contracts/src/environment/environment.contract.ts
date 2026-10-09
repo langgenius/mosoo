@@ -1,4 +1,4 @@
-import type { AccountId, EnvironmentId, EnvironmentRevisionId, ProjectId } from "../id/id.contract";
+import type { EnvironmentId, EnvironmentRevisionId, ProjectId } from "@mosoo/id";
 
 export type EnvironmentNetworkPolicy = "full" | "limited";
 
@@ -22,14 +22,6 @@ export function isWritableEnvironmentPackageManager(
   return WRITABLE_ENVIRONMENT_PACKAGE_MANAGER_SET.has(manager);
 }
 
-export type EnvironmentRegistryRole = "owner";
-
-export interface EnvironmentOwnerSummary {
-  id: AccountId | null;
-  imageUrl: string | null;
-  name: string | null;
-}
-
 export interface EnvironmentForkOrigin {
   environmentId: EnvironmentId;
   name: string;
@@ -50,8 +42,6 @@ export interface EnvironmentVariablePreview {
 }
 
 export interface EnvironmentRevisionConfig {
-  allowMcpServers: boolean;
-  allowPackageManagers: boolean;
   allowedHosts: string[];
   envVars: EnvironmentVariablePreview[];
   networkPolicy: EnvironmentNetworkPolicy;
@@ -69,10 +59,7 @@ export interface EnvironmentSummary extends EnvironmentRevisionConfig {
   id: EnvironmentId;
   isBuiltIn: boolean;
   isDefault: boolean;
-  isEditable: boolean;
   name: string;
-  owner: EnvironmentOwnerSummary;
-  role: EnvironmentRegistryRole;
   updatedAt: string;
   usedByAgentCount: number;
   projectId: ProjectId;
@@ -85,16 +72,7 @@ export interface EnvironmentVariableInput {
   value?: string | null;
 }
 
-export interface SetEnvironmentVariableValueInput {
-  environmentId: EnvironmentId;
-  key: string;
-  projectId: ProjectId;
-  value: string;
-}
-
 export interface EnvironmentConfigInput {
-  allowMcpServers: boolean;
-  allowPackageManagers: boolean;
   allowedHosts: string[];
   envVars: EnvironmentVariableInput[];
   networkPolicy: EnvironmentNetworkPolicy;
@@ -115,11 +93,6 @@ export interface UpdateEnvironmentInput extends EnvironmentConfigInput {
   projectId: ProjectId;
 }
 
-export interface CreateEnvironmentForkInput {
-  environmentId: EnvironmentId;
-  projectId: ProjectId;
-}
-
 export interface DeleteEnvironmentInput {
   environmentId: EnvironmentId;
   projectId: ProjectId;
@@ -128,10 +101,4 @@ export interface DeleteEnvironmentInput {
 export interface SetProjectDefaultEnvironmentInput {
   environmentId: EnvironmentId;
   projectId: ProjectId;
-}
-
-export interface SessionEnvironmentSnapshot extends EnvironmentRevisionConfig {
-  environmentId: EnvironmentId;
-  environmentName: string;
-  revisionId: EnvironmentRevisionId;
 }

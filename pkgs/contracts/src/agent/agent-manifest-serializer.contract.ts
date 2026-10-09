@@ -232,7 +232,7 @@ function toAgentManifestExportJson(
   };
 }
 
-export function toAgentPackageManifestJson(agentPackage: AgentPackage): Record<string, unknown> {
+function toAgentPackageManifestJson(agentPackage: AgentPackage): Record<string, unknown> {
   const manifest = agentPackage.manifest;
   const builtInTools = normalizeAgentBuiltInTools(manifest.builtInTools ?? []);
 

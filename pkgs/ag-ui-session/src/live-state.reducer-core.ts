@@ -1,7 +1,5 @@
 import type { SessionLiveState } from "./live-state";
 
-export type JsonObject = Record<string, unknown>;
-
 export function currentIsoTimestamp(): string {
   return new Date().toISOString();
 }
@@ -28,6 +26,6 @@ export function isTerminalRunStatus(status: SessionLiveState["run"]["status"]): 
   );
 }
 
-export function isRecord(value: unknown): value is JsonObject {
+export function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }

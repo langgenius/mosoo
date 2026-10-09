@@ -1,15 +1,11 @@
 import { type } from "arktype";
 
-import { NullableString, OptionalNullableString } from "./ag-ui-session-schema-primitives";
 import { MOSOO_CUSTOM_EVENT } from "./custom-event-registry";
 import {
   SessionCommandOptionSchema,
   SessionConfigOptionSchema,
   SessionModeOptionSchema,
   SessionPermissionRequestViewSchema,
-  SessionReadinessSnapshotViewSchema,
-  SessionRunViewSchema,
-  SessionUsageSummarySchema,
   SessionViewFileSchema,
   SessionViewPlanEntrySchema,
 } from "./session-live-state-schema";
@@ -17,15 +13,6 @@ import {
 function eventNameLiteral(name: string): `"${string}"` {
   return JSON.stringify(name) as `"${string}"`;
 }
-
-export const MosooViewerCustomEventSchema = type({
-  name: eventNameLiteral(MOSOO_CUSTOM_EVENT.sessionSyncRequest.name),
-  type: '"CUSTOM"',
-  value: {
-    reason: '"manual" | "reconnect"',
-  },
-});
-export type MosooViewerCustomEventSchema = typeof MosooViewerCustomEventSchema.infer;
 
 const MosooSessionFileDeleteChangeSchema = type({
   change: '"delete"',
@@ -42,85 +29,7 @@ const MosooSessionFilesUpdatedValueSchema = type({
   "files?": SessionViewFileSchema.array(),
 });
 
-const MosooSessionConfigTraceMcpServerSchema = type({
-  authorizationState: "string",
-  credentialRef: '"absent" | "redacted"',
-  name: "string",
-  serverId: "string",
-});
-
-const MosooSessionConfigTraceBootPayloadSchema = type({
-  credentialRefs: type('"redacted"').array(),
-  cwd: "string",
-  mcpServers: MosooSessionConfigTraceMcpServerSchema.array(),
-  model: "string",
-  nativeResumeRef: '"absent" | "present"',
-  provider: "string",
-  runtimeId: "string",
-  runtimeTransport: "string",
-});
-
-const MosooSessionConfigTraceValueSchema = type({
-  agentId: NullableString,
-  configRevisionId: NullableString,
-  deploymentVersionId: NullableString,
-  deploymentVersionNumber: "number | null",
-  driverBootPayload: MosooSessionConfigTraceBootPayloadSchema,
-  environmentId: "string",
-  environmentRevisionId: "string",
-  runId: NullableString,
-  sessionId: "string",
-});
-
-const MosooSessionRuntimeTimingPhaseSchema = type({
-  durationMs: "number",
-  name: "string",
-});
-
-const MosooSessionRuntimeTimingValueSchema = type({
-  completedAtMs: "number",
-  path: '"cold" | "warm" | "prewarm" | "unknown"',
-  phases: MosooSessionRuntimeTimingPhaseSchema.array(),
-  runId: NullableString,
-  sessionId: "string",
-  source: '"api" | "driver"',
-  stage: '"context_hydration" | "driver_backend" | "driver_turn" | "prepare_run" | "prewarm"',
-  startedAtMs: "number",
-  totalMs: "number",
-  traceId: NullableString,
-});
-
-const MosooSessionRuntimeTimelineValueSchema = type({
-  completedAtMs: "number",
-  durationMs: "number",
-  path: '"cold" | "warm" | "prewarm" | "unknown"',
-  runId: NullableString,
-  sessionId: "string",
-  source: '"api" | "driver"',
-  stage: '"context_hydration" | "driver_backend" | "driver_turn" | "prepare_run" | "prewarm"',
-  startedAtMs: "number",
-  traceId: NullableString,
-});
-
-export const MosooServerCustomEventSchema = type.or(
-  type({
-    name: eventNameLiteral(MOSOO_CUSTOM_EVENT.agentReady.name),
-    type: '"CUSTOM"',
-    value: {
-      agentId: NullableString,
-      operation: '"recreateSandbox" | "resetAgentState" | "restartDriver"',
-      readyAt: "string",
-    },
-  }),
-  type({
-    name: eventNameLiteral(MOSOO_CUSTOM_EVENT.agentUpdating.name),
-    type: '"CUSTOM"',
-    value: {
-      agentId: NullableString,
-      operation: '"recreateSandbox" | "resetAgentState" | "restartDriver"',
-      startedAt: "string",
-    },
-  }),
+export const MosooCustomEventSchema = type.or(
   type({
     name: eventNameLiteral(MOSOO_CUSTOM_EVENT.sessionCommandsUpdated.name),
     type: '"CUSTOM"',
@@ -136,46 +45,15 @@ export const MosooServerCustomEventSchema = type.or(
     },
   }),
   type({
-    name: eventNameLiteral(MOSOO_CUSTOM_EVENT.sessionConfigTrace.name),
-    type: '"CUSTOM"',
-    value: MosooSessionConfigTraceValueSchema,
-  }),
-  type({
-    name: eventNameLiteral(MOSOO_CUSTOM_EVENT.sessionRuntimeTiming.name),
-    type: '"CUSTOM"',
-    value: MosooSessionRuntimeTimingValueSchema,
-  }),
-  type({
-    name: eventNameLiteral(MOSOO_CUSTOM_EVENT.sessionRuntimeTimelineUpdated.name),
-    type: '"CUSTOM"',
-    value: MosooSessionRuntimeTimelineValueSchema,
-  }),
-  type({
     name: eventNameLiteral(MOSOO_CUSTOM_EVENT.sessionFilesUpdated.name),
     type: '"CUSTOM"',
     value: MosooSessionFilesUpdatedValueSchema,
   }),
   type({
-    name: eventNameLiteral(MOSOO_CUSTOM_EVENT.sessionInfraRescheduling.name),
-    type: '"CUSTOM"',
-    value: {
-      lastSeen: NullableString,
-      reason: NullableString,
-      rescheduleStartedAt: "string",
-    },
-  }),
-  type({
-    name: eventNameLiteral(MOSOO_CUSTOM_EVENT.sessionInfraRunning.name),
-    type: '"CUSTOM"',
-    value: {
-      resumedAt: "string",
-    },
-  }),
-  type({
     name: eventNameLiteral(MOSOO_CUSTOM_EVENT.sessionModeUpdated.name),
     type: '"CUSTOM"',
     value: {
-      currentModeId: NullableString,
+      currentModeId: "string | null",
       visibleModes: SessionModeOptionSchema.array(),
     },
   }),
@@ -194,50 +72,11 @@ export const MosooServerCustomEventSchema = type.or(
     },
   }),
   type({
-    name: eventNameLiteral(MOSOO_CUSTOM_EVENT.sessionReadiness.name),
-    type: '"CUSTOM"',
-    value: {
-      readiness: SessionReadinessSnapshotViewSchema,
-    },
-  }),
-  type({
-    name: eventNameLiteral(MOSOO_CUSTOM_EVENT.sessionRunUpdated.name),
-    type: '"CUSTOM"',
-    value: {
-      lifecycle: '"IDLE" | "RUNNING" | "RESCHEDULING" | "TERMINATED"',
-      run: SessionRunViewSchema,
-    },
-  }),
-  type({
-    name: eventNameLiteral(MOSOO_CUSTOM_EVENT.sessionStopped.name),
-    type: '"CUSTOM"',
-    value: {
-      "heartbeatMissedMs?": "number | null",
-      "lastSeen?": OptionalNullableString,
-      "message?": OptionalNullableString,
-      reason: "string",
-    },
-  }),
-  type({
-    name: eventNameLiteral(MOSOO_CUSTOM_EVENT.sessionUsageUpdated.name),
-    type: '"CUSTOM"',
-    value: {
-      usage: type("null").or(SessionUsageSummarySchema),
-    },
-  }),
-  type({
     name: eventNameLiteral(MOSOO_CUSTOM_EVENT.sessionInfoUpdated.name),
     type: '"CUSTOM"',
     value: {
-      "title?": OptionalNullableString,
-      "updatedAt?": OptionalNullableString,
+      "title?": "string | null",
+      "updatedAt?": "string | null",
     },
   }),
 );
-export type MosooServerCustomEventSchema = typeof MosooServerCustomEventSchema.infer;
-
-export const MosooCustomEventSchema = type.or(
-  MosooViewerCustomEventSchema,
-  MosooServerCustomEventSchema,
-);
-export type MosooCustomEventSchema = typeof MosooCustomEventSchema.infer;

@@ -5,11 +5,7 @@ import { platformIdColumn } from "./id-column";
 
 export type ApiCommandId = SemanticPlatformId<"ApiCommandId">;
 
-export type ApiCommandKind =
-  | "cost_ledger_reconciliation"
-  | "environment_package_artifact_build"
-  | "scheduled_maintenance"
-  | "session_run_dispatch";
+export type ApiCommandKind = "environment_package_artifact_build" | "session_run_dispatch";
 export type ApiCommandStatus = "dead_lettered" | "failed" | "queued" | "running" | "succeeded";
 
 export const apiCommandsTable = sqliteTable(

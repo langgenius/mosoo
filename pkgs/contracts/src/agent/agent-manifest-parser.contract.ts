@@ -1,4 +1,3 @@
-export { parseAgentManifestInput } from "./agent-manifest-input-parser.contract";
 export {
   attachAgentPackageAssets,
   parseAgentPackageJson,

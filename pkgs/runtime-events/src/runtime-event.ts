@@ -1,10 +1,6 @@
 import { parsePlatformId } from "@mosoo/id";
 import type {
-  AccountId,
-  AgentDeploymentVersionId,
-  AgentId,
   DriverInstanceId,
-  EnvironmentRevisionId,
   PlatformId,
   RuntimeEventId,
   SessionId,
@@ -16,56 +12,22 @@ import { admitRuntimeEventPayload } from "./runtime-event-payload";
 export const RUNTIME_EVENT_SCHEMA_VERSION = "2026-05-26" as const;
 
 export const RUNTIME_EVENT_KINDS = [
-  "account.limits.updated",
-  "account.updated",
   "agent.task.updated",
   "auth.methods.updated",
   "auth.session.updated",
-  "catalog.updated",
-  "context.added",
   "context.compacted",
   "diagnostic.reported",
-  "driver.command.updated",
-  "driver.connected",
-  "driver.disconnected",
-  "driver.heartbeat",
-  "driver.log.recorded",
-  "driver.ready",
   "file.change.updated",
   "file.changed",
-  "file.indexed",
-  "hook.completed",
-  "hook.started",
-  "image.updated",
   "item.completed",
   "item.started",
-  "item.updated",
-  "mcp.oauth.completed",
-  "mcp.server.updated",
-  "mcp.tool.updated",
   "message.added",
   "message.completed",
   "message.delta",
   "message.started",
-  "model.routing.updated",
-  "model.verification.updated",
-  "oauth.updated",
   "permission.requested",
   "permission.resolved",
-  "permission.review.completed",
-  "permission.review.started",
   "plan.updated",
-  "process.exited",
-  "process.output.delta",
-  "realtime.audio.delta",
-  "realtime.closed",
-  "realtime.failed",
-  "realtime.sdp.updated",
-  "realtime.session.updated",
-  "realtime.transcript.completed",
-  "realtime.transcript.delta",
-  "remote.control.updated",
-  "review.updated",
   "run.cancel.requested",
   "run.cancelled",
   "run.completed",
@@ -73,22 +35,10 @@ export const RUNTIME_EVENT_KINDS = [
   "run.failed",
   "run.queued",
   "run.started",
-  "run.steered",
-  "run.waiting",
   "runtime.capabilities.updated",
-  "runtime.config.updated",
-  "runtime.driver.updated",
-  "runtime.provisioning.updated",
   "runtime.resume.updated",
-  "runtime.sandbox.released",
-  "runtime.sandbox.updated",
   "runtime.timing.recorded",
-  "runtime.transport.updated",
-  "search.session.completed",
-  "search.session.updated",
-  "session.archived",
   "session.capabilities.updated",
-  "session.closed",
   "session.commands.updated",
   "session.config.updated",
   "session.created",
@@ -97,10 +47,7 @@ export const RUNTIME_EVENT_KINDS = [
   "session.lifecycle.updated",
   "session.mode.updated",
   "session.models.updated",
-  "session.readiness.updated",
   "session.resumed",
-  "session.unarchived",
-  "shell.command.updated",
   "terminal.created",
   "terminal.exited",
   "terminal.killed",
@@ -110,39 +57,14 @@ export const RUNTIME_EVENT_KINDS = [
   "thought.delta",
   "thought.started",
   "tool.call.updated",
-  "tool.dynamic.updated",
   "usage.updated",
-  "user.input.requested",
-  "user.input.resolved",
-  "web.search.updated",
-  "workspace.files.changed",
 ] as const;
 
 export type RuntimeEventKind = (typeof RUNTIME_EVENT_KINDS)[number];
 export type RuntimeEventActor = "agent" | "api" | "driver" | "system" | "tool" | "user";
 export type RuntimeEventOrigin = "api" | "driver" | "file" | "runtime" | "system" | "viewer";
-export type RuntimeEventVisibility = "owner_debug" | "participant" | "public" | "system_internal";
+export type RuntimeEventVisibility = "owner_debug" | "participant";
 export type RuntimeEventDelivery = "best_effort" | "lossless";
-export type RuntimeEventLayer =
-  | "owner_diagnostic"
-  | "participant_state"
-  | "system_internal"
-  | "usage";
-
-export interface RuntimeEventContext {
-  readonly agentId?: AgentId | undefined;
-  readonly callerId?: AccountId | undefined;
-  readonly deploymentVersionId?: AgentDeploymentVersionId | undefined;
-  readonly environmentRevisionId?: EnvironmentRevisionId | undefined;
-  readonly executionActorId?: AccountId | undefined;
-  readonly surface?:
-    | {
-        readonly id?: string | undefined;
-        readonly triggerId?: string | undefined;
-        readonly type: "api" | "automation" | "system" | "web";
-      }
-    | undefined;
-}
 
 export interface RuntimeEventNativeRef {
   readonly eventName?: string | undefined;
@@ -157,7 +79,6 @@ export interface RuntimeEventNativeRef {
 
 export interface RuntimeEventEnvelope<TPayload = unknown> {
   readonly actor: RuntimeEventActor;
-  readonly context?: RuntimeEventContext | undefined;
   readonly correlationId?: string | undefined;
   readonly delivery: RuntimeEventDelivery;
   readonly driverInstanceId?: DriverInstanceId | undefined;
@@ -171,7 +92,6 @@ export interface RuntimeEventEnvelope<TPayload = unknown> {
   readonly runId?: SessionRunId | undefined;
   readonly runtimeId?: string | undefined;
   readonly schemaVersion: typeof RUNTIME_EVENT_SCHEMA_VERSION;
-  readonly seq?: number | undefined;
   readonly sessionId: SessionId;
   readonly sourceEventId?: string | undefined;
   readonly traceId?: string | undefined;
@@ -180,7 +100,6 @@ export interface RuntimeEventEnvelope<TPayload = unknown> {
 
 export interface RuntimeEventDraft<TPayload = unknown> {
   readonly actor?: RuntimeEventActor | undefined;
-  readonly context?: RuntimeEventContext | undefined;
   readonly correlationId?: string | undefined;
   readonly delivery?: RuntimeEventDelivery | undefined;
   readonly driverInstanceId?: DriverInstanceId | undefined;
@@ -209,32 +128,9 @@ const runtimeEventOrigins = new Set<string>([
   "system",
   "viewer",
 ]);
-const runtimeEventVisibilities = new Set<string>([
-  "owner_debug",
-  "participant",
-  "public",
-  "system_internal",
-]);
+const runtimeEventVisibilities = new Set<string>(["owner_debug", "participant"]);
 const runtimeEventDeliveries = new Set<string>(["best_effort", "lossless"]);
-const runtimeEventSurfaceTypes = new Set<string>(["api", "automation", "system", "web"]);
-const ownerDiagnosticRuntimeEventKinds = new Set<RuntimeEventKind>([
-  "diagnostic.reported",
-  "driver.log.recorded",
-  "runtime.config.updated",
-  "runtime.driver.updated",
-  "runtime.provisioning.updated",
-  "runtime.sandbox.released",
-  "runtime.sandbox.updated",
-  "runtime.transport.updated",
-]);
-const systemInternalRuntimeEventKinds = new Set<RuntimeEventKind>([
-  "driver.command.updated",
-  "driver.connected",
-  "driver.disconnected",
-  "driver.heartbeat",
-  "driver.ready",
-]);
-const usageRuntimeEventKinds = new Set<RuntimeEventKind>(["usage.updated"]);
+const ownerDiagnosticRuntimeEventKinds = new Set<RuntimeEventKind>(["diagnostic.reported"]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -319,41 +215,8 @@ function isRuntimeEventDelivery(value: unknown): value is RuntimeEventDelivery {
   return typeof value === "string" && runtimeEventDeliveries.has(value);
 }
 
-function isRuntimeEventSurfaceType(
-  value: unknown,
-): value is NonNullable<RuntimeEventContext["surface"]>["type"] {
-  return typeof value === "string" && runtimeEventSurfaceTypes.has(value);
-}
-
-export function getRuntimeEventLayer(kind: RuntimeEventKind): RuntimeEventLayer {
-  if (ownerDiagnosticRuntimeEventKinds.has(kind)) {
-    return "owner_diagnostic";
-  }
-
-  if (systemInternalRuntimeEventKinds.has(kind)) {
-    return "system_internal";
-  }
-
-  if (usageRuntimeEventKinds.has(kind)) {
-    return "usage";
-  }
-
-  return "participant_state";
-}
-
-export function getRuntimeEventDefaultVisibility(kind: RuntimeEventKind): RuntimeEventVisibility {
-  switch (getRuntimeEventLayer(kind)) {
-    case "owner_diagnostic": {
-      return "owner_debug";
-    }
-    case "system_internal": {
-      return "system_internal";
-    }
-    case "participant_state":
-    case "usage": {
-      return "participant";
-    }
-  }
+function getRuntimeEventDefaultVisibility(kind: RuntimeEventKind): RuntimeEventVisibility {
+  return ownerDiagnosticRuntimeEventKinds.has(kind) ? "owner_debug" : "participant";
 }
 
 export function createRuntimeEvent<TPayload>(
@@ -361,7 +224,6 @@ export function createRuntimeEvent<TPayload>(
 ): RuntimeEventEnvelope<TPayload> {
   return {
     actor: draft.actor ?? "driver",
-    ...(draft.context === undefined ? {} : { context: draft.context }),
     ...(draft.correlationId === undefined ? {} : { correlationId: draft.correlationId }),
     delivery: draft.delivery ?? "lossless",
     ...(draft.driverInstanceId === undefined ? {} : { driverInstanceId: draft.driverInstanceId }),
@@ -432,8 +294,6 @@ export function parseRuntimeEventEnvelope(value: unknown): RuntimeEventEnvelope 
     throw new Error("Runtime event payload is required.");
   }
 
-  const context =
-    value["context"] === undefined ? null : parseRuntimeEventContext(value["context"]);
   const native = value["native"] === undefined ? null : parseRuntimeEventNativeRef(value["native"]);
   const correlationId = readOptionalString(value, "correlationId");
   const driverInstanceId = readOptionalPlatformId(value, "driverInstanceId") as
@@ -442,7 +302,6 @@ export function parseRuntimeEventEnvelope(value: unknown): RuntimeEventEnvelope 
   const receivedAt = readOptionalString(value, "receivedAt");
   const runId = readOptionalPlatformId(value, "runId") as SessionRunId | undefined;
   const runtimeId = readOptionalString(value, "runtimeId");
-  const seq = readOptionalNumber(value, "seq");
   const sourceEventId = readOptionalString(value, "sourceEventId");
   const traceId = readOptionalString(value, "traceId");
 
@@ -464,7 +323,6 @@ export function parseRuntimeEventEnvelope(value: unknown): RuntimeEventEnvelope 
 
   return {
     actor,
-    ...(context === null ? {} : { context }),
     ...(correlationId === undefined ? {} : { correlationId }),
     delivery,
     ...(driverInstanceId === undefined ? {} : { driverInstanceId }),
@@ -478,66 +336,10 @@ export function parseRuntimeEventEnvelope(value: unknown): RuntimeEventEnvelope 
     ...(runId === undefined ? {} : { runId }),
     ...(runtimeId === undefined ? {} : { runtimeId }),
     schemaVersion: RUNTIME_EVENT_SCHEMA_VERSION,
-    ...(seq === undefined ? {} : { seq }),
     sessionId,
     ...(sourceEventId === undefined ? {} : { sourceEventId }),
     ...(traceId === undefined ? {} : { traceId }),
     visibility,
-  };
-}
-
-function parseRuntimeEventContext(value: unknown): RuntimeEventContext {
-  if (!isRecord(value)) {
-    throw new Error("Runtime event context must be an object when provided.");
-  }
-
-  if ("organizationId" in value) {
-    throw new Error("Runtime event context organizationId is not supported.");
-  }
-
-  const surface =
-    value["surface"] === undefined ? null : parseRuntimeEventSurfaceContext(value["surface"]);
-  const agentId = readOptionalPlatformId(value, "agentId") as AgentId | undefined;
-  const callerId = readOptionalPlatformId(value, "callerId") as AccountId | undefined;
-  const deploymentVersionId = readOptionalPlatformId(value, "deploymentVersionId") as
-    | AgentDeploymentVersionId
-    | undefined;
-  const environmentRevisionId = readOptionalPlatformId(value, "environmentRevisionId") as
-    | EnvironmentRevisionId
-    | undefined;
-  const executionActorId = readOptionalPlatformId(value, "executionActorId") as
-    | AccountId
-    | undefined;
-
-  return {
-    ...(agentId === undefined ? {} : { agentId }),
-    ...(callerId === undefined ? {} : { callerId }),
-    ...(deploymentVersionId === undefined ? {} : { deploymentVersionId }),
-    ...(environmentRevisionId === undefined ? {} : { environmentRevisionId }),
-    ...(executionActorId === undefined ? {} : { executionActorId }),
-    ...(surface === null ? {} : { surface }),
-  };
-}
-
-function parseRuntimeEventSurfaceContext(
-  value: unknown,
-): NonNullable<RuntimeEventContext["surface"]> {
-  if (!isRecord(value)) {
-    throw new Error("Runtime event context surface must be an object when provided.");
-  }
-
-  const type = value["type"];
-
-  if (!isRuntimeEventSurfaceType(type)) {
-    throw new Error("Runtime event context surface type is unsupported.");
-  }
-  const id = readOptionalString(value, "id");
-  const triggerId = readOptionalString(value, "triggerId");
-
-  return {
-    ...(id === undefined ? {} : { id }),
-    ...(triggerId === undefined ? {} : { triggerId }),
-    type,
   };
 }
 
@@ -571,32 +373,8 @@ function parseRuntimeEventNativeRef(value: unknown): RuntimeEventNativeRef {
   };
 }
 
-export function isRuntimeEventEnvelope(value: unknown): value is RuntimeEventEnvelope {
-  try {
-    parseRuntimeEventEnvelope(value);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-export function getRuntimeEventFamily(kind: RuntimeEventKind): string {
-  const [domain] = kind.split(".");
-  return domain ?? "diagnostics";
-}
-
-export function getRuntimeEventSource(event: RuntimeEventEnvelope): string {
-  if (event.origin === "runtime") {
-    return "driver";
-  }
-
-  return event.origin;
-}
-
 export function getRuntimeEventParticipantVisibility(
   event: RuntimeEventEnvelope,
 ): "all_consumers" | "owner_debug" {
-  return event.visibility === "public" || event.visibility === "participant"
-    ? "all_consumers"
-    : "owner_debug";
+  return event.visibility === "participant" ? "all_consumers" : "owner_debug";
 }

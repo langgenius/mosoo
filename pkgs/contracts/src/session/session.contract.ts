@@ -1,5 +1,3 @@
-import type { AgentBuiltInToolConfig } from "../agent/agent.contract";
-import type { FileUploadSummary } from "../file/file.contract";
 import type {
   AgentDeploymentVersionId,
   AgentId,
@@ -14,7 +12,10 @@ import type {
   SessionRunId,
   SkillId,
   SkillSnapshotId,
-} from "../id/id.contract";
+} from "@mosoo/id";
+
+import type { AgentBuiltInToolConfig } from "../agent/agent.contract";
+import type { FileUploadSummary } from "../file/file.contract";
 import type { AgentMcpCredentialMode } from "../mcp/mcp.contract";
 import type { SessionRunSummary, UserWarning } from "./session-run.contract";
 
@@ -32,9 +33,7 @@ export interface SessionRuntimeOperationInput {
 }
 
 export interface SessionRuntimeOperationResult {
-  affectedSessionCount: number;
   ok: boolean;
-  operation: SessionRuntimeOperationName;
   sessionId: SessionId;
 }
 
@@ -170,24 +169,11 @@ export const SESSION_PROCESS_EVENT_TYPE_CODES = {
   "user.message": "user_message",
 } as const satisfies Record<SessionProcessEventType, string>;
 
-export type SessionProcessEventTypeCode =
-  (typeof SESSION_PROCESS_EVENT_TYPE_CODES)[SessionProcessEventType];
-
-export const SESSION_PROCESS_EVENT_TYPE_BY_CODE = {
-  agent_message_delta: "agent.message.delta",
-  agent_thinking_delta: "agent.thinking.delta",
-  file_changed: "file.changed",
-  run_completed: "run.completed",
-  run_failed: "run.failed",
-  run_started: "run.started",
-  session_status: "session.status",
-  session_files_updated: "session_files.updated",
-  tool_confirmation_required: "tool.confirmation.required",
-  tool_use_completed: "tool.use.completed",
-  tool_use_started: "tool.use.started",
-  usage_updated: "usage.updated",
-  user_message: "user.message",
-} as const satisfies Record<SessionProcessEventTypeCode, SessionProcessEventType>;
+export const SESSION_PROCESS_EVENT_TYPE_BY_CODE = Object.fromEntries(
+  Object.entries(SESSION_PROCESS_EVENT_TYPE_CODES).map(([type, code]) => [code, type]),
+) as {
+  readonly [TType in SessionProcessEventType as (typeof SESSION_PROCESS_EVENT_TYPE_CODES)[TType]]: TType;
+};
 
 export const SESSION_PROCESS_EVENT_STATUSES = ["available", "error", "unsupported"] as const;
 
@@ -203,63 +189,22 @@ export interface SessionProcessEvent {
   type: SessionProcessEventType;
 }
 
-// Synthetic process events (the empty-feed placeholder and the hidden-older-
-// events marker) are minted at read time instead of being persisted. Their ids
-// must be valid platform ULIDs (the GraphQL ULID scalar validates output) AND
-// deterministic per session: readers poll this projection and key turn
-// grouping and drawer selection off event ids, so a fresh random id per read
-// makes every poll drop UI state. The ids reuse the session ULID's 10-char
-// time prefix plus a fixed Crockford-base32 tail that a random event tail
-// cannot realistically collide with.
+// The synthetic hidden-older-events marker is minted at read time instead of
+// being persisted. Its id must be a valid platform ULID (the GraphQL ULID
+// scalar validates output) AND deterministic per session: readers poll this
+// projection and key turn grouping and drawer selection off event ids, so a
+// fresh random id per read makes every poll drop UI state. The id reuses the
+// session ULID's 10-char time prefix plus a fixed Crockford-base32 tail that a
+// random event tail cannot realistically collide with.
 
 const SYNTHETIC_PROCESS_EVENT_TIME_PREFIX_LENGTH = 10;
-const NO_RUNTIME_EVENTS_RECORDED_EVENT_ID_TAIL = "0EVENTSEMPTY0000";
 const PROCESS_EVENTS_TRUNCATED_EVENT_ID_TAIL = "0EVENTSCAPPED000";
 
-function createSyntheticProcessEventId(sessionId: SessionId, tail: string): RuntimeEventId {
-  return `${sessionId.slice(0, SYNTHETIC_PROCESS_EVENT_TIME_PREFIX_LENGTH)}${tail}` as RuntimeEventId;
-}
-
-export function createNoRuntimeEventsRecordedEventId(sessionId: SessionId): RuntimeEventId {
-  return createSyntheticProcessEventId(sessionId, NO_RUNTIME_EVENTS_RECORDED_EVENT_ID_TAIL);
-}
-
 export function createProcessEventsTruncatedEventId(sessionId: SessionId): RuntimeEventId {
-  return createSyntheticProcessEventId(sessionId, PROCESS_EVENTS_TRUNCATED_EVENT_ID_TAIL);
+  return `${sessionId.slice(0, SYNTHETIC_PROCESS_EVENT_TIME_PREFIX_LENGTH)}${PROCESS_EVENTS_TRUNCATED_EVENT_ID_TAIL}` as RuntimeEventId;
 }
 
-export function isNoRuntimeEventsRecordedEventId(id: string): boolean {
-  return id.endsWith(NO_RUNTIME_EVENTS_RECORDED_EVENT_ID_TAIL);
-}
-
-export const SESSION_RUNTIME_EVENT_FAMILIES = [
-  "config",
-  "diagnostics",
-  "driver",
-  "file",
-  "input",
-  "lifecycle",
-  "message",
-  "permission",
-  "provisioning",
-  "resource",
-  "run",
-  "sandbox",
-  "state",
-  "tool",
-  "transport",
-  "usage",
-] as const;
-
-export type SessionRuntimeEventFamily = (typeof SESSION_RUNTIME_EVENT_FAMILIES)[number];
-
-export const SESSION_RUNTIME_EVENT_SOURCES = ["api", "driver", "file", "system", "viewer"] as const;
-
-export type SessionRuntimeEventSource = (typeof SESSION_RUNTIME_EVENT_SOURCES)[number];
-
-export const SESSION_RUNTIME_EVENT_VISIBILITIES = ["all_consumers", "owner_debug"] as const;
-
-export type SessionRuntimeEventVisibility = (typeof SESSION_RUNTIME_EVENT_VISIBILITIES)[number];
+export type SessionRuntimeEventVisibility = "all_consumers" | "owner_debug";
 
 export interface SessionFile {
   committed: boolean;
@@ -268,16 +213,6 @@ export interface SessionFile {
   kind: "artifact" | "attachment";
   mimeType: string | null;
   name: string;
-  size: number;
-}
-
-export interface SessionResource {
-  createdAt: string;
-  id: FileId;
-  kind: "artifact" | "attachment";
-  mimeType: string | null;
-  name: string;
-  path: string;
   size: number;
 }
 
@@ -291,19 +226,12 @@ export interface AddSessionResourceInput {
   sessionId: SessionId;
 }
 
-export interface RemoveSessionResourceInput {
-  projectId: ProjectId;
-  resourceId: FileId;
-  sessionId: SessionId;
-}
-
 export type AddSessionResourceResult = FileUploadSummary;
 
 export interface CreateAgentSessionInput {
   agentId: AgentId;
   projectId: ProjectId;
   type?: SessionType | null;
-  waitForRuntimeReady?: boolean | null;
 }
 
 export const AGENT_SESSION_EVENT_TYPES = [
@@ -346,36 +274,6 @@ export interface AgentSessionEventBatch {
   warnings: UserWarning[];
 }
 
-export interface StartAgentRunInput {
-  agentId?: AgentId | null;
-  projectId: ProjectId;
-  clientRequestId?: string | null;
-  prompt: string;
-  sessionId?: SessionId | null;
-  type?: SessionType | null;
-  waitForRuntimeReady?: boolean | null;
-}
-
-export interface AgentRunEventSurface {
-  projectId: ProjectId;
-  graphqlUrl: string;
-  messagesOperation: "threadSessionMessages";
-  processEventsOperation: "threadSessionProcessEvents";
-  retrieveOperation: "threadAgentSessionRetrieve";
-  sessionId: SessionId;
-  streamUrl: string | null;
-  suggestedPollIntervalMs: number;
-}
-
-export interface AgentRunWorkflow {
-  acceptedAt: string;
-  createdSession: boolean;
-  eventBatch: AgentSessionEventBatch;
-  eventSurface: AgentRunEventSurface;
-  run: SessionRunSummary | null;
-  session: SessionSummary;
-}
-
 export const AGENT_SESSION_RECOVERABILITY_STATUSES = [
   "not_recoverable",
   "read_only",
@@ -389,8 +287,7 @@ export interface AgentSessionRecoverability {
   status: AgentSessionRecoverabilityStatus;
 }
 
-export const AGENT_SESSION_USER_LIFECYCLE_STATES = ["alive", "asleep", "buried"] as const;
-export type AgentSessionUserLifecycleState = (typeof AGENT_SESSION_USER_LIFECYCLE_STATES)[number];
+export type AgentSessionUserLifecycleState = "alive" | "asleep" | "buried";
 
 export const AGENT_SESSION_ARCHIVED_READ_ONLY_REASON =
   "Session is archived and read-only until it is unarchived.";
@@ -409,10 +306,6 @@ export interface AgentSessionUserLifecycleInput {
   status?: SessionStatus;
 }
 
-export function hasAgentSessionArchiveMarker(value: number | string | null | undefined): boolean {
-  return value !== null && value !== undefined && value !== "";
-}
-
 export function getAgentSessionUserLifecycleProjection(
   session: AgentSessionUserLifecycleInput,
 ): AgentSessionUserLifecycleProjection {
@@ -428,7 +321,11 @@ export function getAgentSessionUserLifecycleProjection(
     };
   }
 
-  if (hasAgentSessionArchiveMarker(session.archivedAt)) {
+  if (
+    session.archivedAt !== null &&
+    session.archivedAt !== undefined &&
+    session.archivedAt !== ""
+  ) {
     return {
       readOnly: true,
       recoverability: {
@@ -478,9 +375,7 @@ export const AGENT_SESSION_ACTION_CAPABILITY_NAMES = [
   "archive_session",
   "create_session",
   "delete_session",
-  "list_session_resources",
   "permission_decision",
-  "remove_session_resource",
   "retrieve_session",
   "connect_stream",
   "send_user_message",
@@ -513,10 +408,4 @@ export interface AgentSessionRetrieveResult {
 export interface AgentSessionRetrieveConnection {
   nodes: AgentSessionRetrieveResult[];
   pageInfo: SessionListPageInfo;
-}
-
-export interface RenameSessionInput {
-  projectId: ProjectId;
-  sessionId: SessionId;
-  title: string;
 }

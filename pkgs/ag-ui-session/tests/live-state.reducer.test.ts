@@ -3,14 +3,10 @@ import { describe, expect, test } from "bun:test";
 import {
   applyAgUiEventsToSessionLiveState,
   createInitialSessionLiveState,
-  createSessionLiveStateMessage,
-  isSessionLiveStateStreaming,
+  createLiveStateMessage,
   MOSOO_CUSTOM_EVENT,
-  parseAgUiSessionEvent,
-  parseAgUiSessionEventJson,
-  serializeAgUiSessionEvent,
 } from "@mosoo/ag-ui-session";
-import type { AgUiEvent, SessionLiveState } from "@mosoo/ag-ui-session";
+import type { AgUiSessionEvent, SessionLiveState } from "@mosoo/ag-ui-session";
 
 function baseState(): SessionLiveState {
   return createInitialSessionLiveState({
@@ -29,9 +25,20 @@ function runView(
   };
 }
 
+function runUpdated(run: SessionLiveState["run"]): AgUiSessionEvent {
+  return {
+    name: MOSOO_CUSTOM_EVENT.sessionRunUpdated.name,
+    type: "CUSTOM",
+    value: {
+      lifecycle: run.status === "running" ? "RUNNING" : "IDLE",
+      run,
+    },
+  };
+}
+
 describe("session live-state transcript reducer", () => {
   test("replaces live state when a state snapshot arrives", () => {
-    const userMessage = createSessionLiveStateMessage({
+    const userMessage = createLiveStateMessage({
       content: "hello",
       createdAt: "2026-04-30T00:00:00.000Z",
       id: "user-1",
@@ -44,7 +51,7 @@ describe("session live-state transcript reducer", () => {
     const snapshot: SessionLiveState = {
       ...baseState(),
       messages: [
-        createSessionLiveStateMessage({
+        createLiveStateMessage({
           content: "Hi",
           createdAt: "2026-04-30T00:00:01.000Z",
           id: "assistant-1",
@@ -64,36 +71,6 @@ describe("session live-state transcript reducer", () => {
 
     expect(nextState.messages.map((message) => message.id)).toEqual(["assistant-1"]);
     expect(nextState.run.status).toBe("running");
-  });
-
-  test("replaces messages when a messages snapshot arrives", () => {
-    const existingMessage = createSessionLiveStateMessage({
-      content: "hello",
-      createdAt: "2026-04-30T00:00:00.000Z",
-      id: "user-1",
-      role: "user",
-    });
-    const initialState: SessionLiveState = {
-      ...baseState(),
-      messages: [existingMessage],
-    };
-
-    const nextState = applyAgUiEventsToSessionLiveState(initialState, [
-      {
-        messages: [
-          {
-            content: "Hi",
-            id: "assistant-1",
-            role: "assistant",
-          },
-        ],
-        type: "MESSAGES_SNAPSHOT",
-      },
-    ]);
-
-    expect(nextState.messages.map((message) => [message.id, message.content])).toEqual([
-      ["assistant-1", "Hi"],
-    ]);
   });
 
   test("applies text deltas in transcript order to one assistant message", () => {
@@ -292,7 +269,7 @@ describe("session live-state transcript reducer", () => {
 
   test("terminal run states do not synthesize missing tool results", () => {
     const nextState = applyAgUiEventsToSessionLiveState(baseState(), [
-      { runId: "run-1", threadId: "session-1", type: "RUN_STARTED" },
+      runUpdated(runView({ id: "run-1", status: "running" })),
       { messageId: "assistant-1", role: "assistant", type: "TEXT_MESSAGE_START" },
       {
         parentMessageId: "assistant-1",
@@ -300,7 +277,7 @@ describe("session live-state transcript reducer", () => {
         toolCallName: "Shell",
         type: "TOOL_CALL_START",
       },
-      { runId: "run-1", threadId: "session-1", type: "RUN_FINISHED" },
+      runUpdated(runView({ id: "run-1", status: "completed" })),
     ]);
 
     expect(nextState.run.status).toBe("completed");
@@ -309,117 +286,6 @@ describe("session live-state transcript reducer", () => {
     expect(nextState.messages[0]?.segments).toEqual([
       { argsText: "", kind: "tool_use", path: null, tool: "Shell", toolCallId: "tool-1" },
     ]);
-  });
-
-  test("run errors fail the run without terminating the session", () => {
-    const stateWithPermission: SessionLiveState = {
-      ...baseState(),
-      permissionRequests: [
-        {
-          driverInstanceId: "driver-1",
-          rawInput: "ls",
-          requestId: "permission-1",
-          runId: "run-1",
-          title: "Run shell",
-          toolCallId: "tool-1",
-          toolKind: "command",
-        },
-      ],
-    };
-    const nextState = applyAgUiEventsToSessionLiveState(stateWithPermission, [
-      { runId: "run-1", threadId: "session-1", type: "RUN_STARTED" },
-      { messageId: "assistant-1", role: "assistant", type: "TEXT_MESSAGE_START" },
-      {
-        parentMessageId: "assistant-1",
-        toolCallId: "tool-1",
-        toolCallName: "Shell",
-        type: "TOOL_CALL_START",
-      },
-      {
-        code: "runtime.provision_failed",
-        message: "Runtime failed to start.",
-        type: "RUN_ERROR",
-      },
-    ]);
-
-    expect(nextState.lifecycle).toBe("IDLE");
-    expect(nextState.permissionRequests).toEqual([]);
-    expect(nextState.run.status).toBe("failed");
-    expect(nextState.run.error?.code).toBe("runtime.provision_failed");
-    expect(nextState.messages[0]?.segments.at(-1)).toEqual({
-      argsText: "",
-      kind: "tool_use",
-      path: null,
-      tool: "Shell",
-      toolCallId: "tool-1",
-    });
-  });
-
-  test("ignores stale standard terminal events for inactive runs", () => {
-    const runningState = applyAgUiEventsToSessionLiveState(baseState(), [
-      { runId: "run-2", threadId: "session-1", type: "RUN_STARTED" },
-      { messageId: "assistant-1", role: "assistant", type: "TEXT_MESSAGE_START" },
-      {
-        parentMessageId: "assistant-1",
-        toolCallId: "tool-1",
-        toolCallName: "Shell",
-        type: "TOOL_CALL_START",
-      },
-    ]);
-
-    const nextState = applyAgUiEventsToSessionLiveState(runningState, [
-      { runId: "run-1", threadId: "session-1", type: "RUN_FINISHED" },
-    ]);
-
-    expect(nextState.lifecycle).toBe("RUNNING");
-    expect(nextState.run).toMatchObject({
-      id: "run-2",
-      status: "running",
-    });
-    expect(nextState.messages[0]?.segments).toEqual([
-      { argsText: "", kind: "tool_use", path: null, tool: "Shell", toolCallId: "tool-1" },
-    ]);
-  });
-
-  test("ignores standard run errors after the active run is terminal", () => {
-    const completedState = applyAgUiEventsToSessionLiveState(baseState(), [
-      { runId: "run-1", threadId: "session-1", type: "RUN_STARTED" },
-      { runId: "run-1", threadId: "session-1", type: "RUN_FINISHED" },
-    ]);
-
-    const nextState = applyAgUiEventsToSessionLiveState(completedState, [
-      {
-        code: "runtime.late_error",
-        message: "late failure",
-        type: "RUN_ERROR",
-      },
-    ]);
-
-    expect(nextState.run.status).toBe("completed");
-    expect(nextState.run.error).toBeNull();
-    expect(nextState.lifecycle).toBe("IDLE");
-  });
-
-  test("rejects unknown custom events before live state can mark a run successful", () => {
-    const state = baseState();
-
-    expect(() =>
-      parseAgUiSessionEvent({
-        name: "mosoo.session.run.completed",
-        type: "CUSTOM",
-        value: {
-          lifecycle: "IDLE",
-          run: runView({
-            completedAt: "2026-04-30T00:00:03.000Z",
-            id: "run-1",
-            startedAt: "2026-04-30T00:00:00.000Z",
-            status: "completed",
-          }),
-        },
-      }),
-    ).toThrow();
-    expect(isSessionLiveStateStreaming(state)).toBe(false);
-    expect(state.run.status).toBe("idle");
   });
 
   test("ignores stale custom run updates after another run is active", () => {
@@ -648,8 +514,8 @@ describe("session live-state transcript reducer", () => {
         },
       ],
     };
-    const events: AgUiEvent[] = [
-      { runId: "run-1", threadId: "session-1", type: "RUN_STARTED" },
+    const events: AgUiSessionEvent[] = [
+      runUpdated(runView({ id: "run-1", status: "running" })),
       { messageId: "assistant-1", role: "assistant", type: "TEXT_MESSAGE_START" },
       {
         parentMessageId: "assistant-1",
@@ -684,7 +550,7 @@ describe("session live-state transcript reducer", () => {
 
   test("agent ready clears updating overlay without marking the cancelled run as running", () => {
     const updatingState = applyAgUiEventsToSessionLiveState(baseState(), [
-      { runId: "run-1", threadId: "session-1", type: "RUN_STARTED" },
+      runUpdated(runView({ id: "run-1", status: "running" })),
       {
         name: "mosoo.agent.updating",
         type: "CUSTOM",
@@ -721,17 +587,5 @@ describe("session live-state transcript reducer", () => {
     expect(updatingState.lifecycle).toBe("IDLE");
     expect(updatingState.infra.reconnecting).toBe(false);
     expect(updatingState.run.status).toBe("cancelled");
-  });
-});
-
-describe("AG-UI session JSON payloads", () => {
-  test("round-trips an AG-UI event JSON payload", () => {
-    const event: AgUiEvent = {
-      delta: "hello",
-      messageId: "assistant-1",
-      type: "TEXT_MESSAGE_CONTENT",
-    };
-
-    expect(parseAgUiSessionEventJson(serializeAgUiSessionEvent(event))).toEqual(event);
   });
 });

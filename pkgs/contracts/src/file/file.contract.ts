@@ -1,6 +1,5 @@
 import { parsePlatformId } from "@mosoo/id";
-
-import type { AccountId, FileId, ProjectId, SessionId } from "../id/id.contract";
+import type { AccountId, FileId, ProjectId, SessionId } from "@mosoo/id";
 
 // These discriminator values predate the Project rename and are persisted in
 // D1 / public file payloads. Keep them as wire compatibility tokens; ProjectId
@@ -44,7 +43,6 @@ export const FILE_OWNER_KINDS = ["account", "app", "session"] as const;
 export type FileOwnerKind = (typeof FILE_OWNER_KINDS)[number];
 export const FILE_SESSION_KINDS = ["artifact", "attachment"] as const;
 export type FileSessionKind = (typeof FILE_SESSION_KINDS)[number];
-export const LIBRARY_FILE_EXTENSION_REQUIRED_MESSAGE = "File name must include an extension.";
 export const SINGLE_PUT_THRESHOLD_BYTES = 64 * 1024 * 1024;
 export const DEFAULT_MULTIPART_PART_SIZE_BYTES = 16 * 1024 * 1024;
 export const MIN_MULTIPART_PART_SIZE_BYTES = 5 * 1024 * 1024;
@@ -148,13 +146,6 @@ export function normalizeOptionalPath(path?: string | null): string {
   return trimSlashes(path);
 }
 
-export function joinPath(parentPath: string, name: string): string {
-  const normalizedName = normalizeFileName(name);
-  const normalizedParentPath = normalizeLibraryDirectoryPath(parentPath);
-
-  return normalizedParentPath ? `${normalizedParentPath}/${normalizedName}` : normalizedName;
-}
-
 export function getParentPath(path: string): string {
   const normalizedPath = normalizeOptionalPath(path);
 
@@ -167,37 +158,12 @@ export function getParentPath(path: string): string {
   return lastSlashIndex === -1 ? "" : normalizedPath.slice(0, lastSlashIndex);
 }
 
-export function getLibraryFileNameExtensionError(name: string): string | null {
-  const normalizedName = name.trim();
-
-  if (!normalizedName) {
-    return LIBRARY_FILE_EXTENSION_REQUIRED_MESSAGE;
-  }
-
-  const lastDotIndex = normalizedName.lastIndexOf(".");
-
-  if (lastDotIndex === -1 || lastDotIndex === normalizedName.length - 1) {
-    return LIBRARY_FILE_EXTENSION_REQUIRED_MESSAGE;
-  }
-
-  return null;
-}
-
-function normalizeLibraryPath(
-  path: string | null | undefined,
-  input: { allowEmpty: boolean },
-): string {
-  if (path != null) {
-    assertRelativePathOriginal(path);
-  }
+export function normalizeLibraryFilePath(path: string): string {
+  assertRelativePathOriginal(path);
 
   const normalized = normalizeOptionalPath(path);
 
   if (!normalized) {
-    if (input.allowEmpty) {
-      return "";
-    }
-
     throw new Error("Path is required.");
   }
 
@@ -205,26 +171,6 @@ function normalizeLibraryPath(
     .split("/")
     .map((segment) => normalizeFileName(segment))
     .join("/");
-}
-
-export function normalizeLibraryDirectoryPath(path?: string | null): string {
-  return normalizeLibraryPath(path, { allowEmpty: true });
-}
-
-export function normalizeLibraryFilePath(path: string): string {
-  return normalizeLibraryPath(path, { allowEmpty: false });
-}
-
-export function ensureLibraryFilePathHasExtension(path: string): string {
-  const normalized = normalizeLibraryFilePath(path);
-  const fileName = normalized.split("/").pop() ?? normalized;
-  const extensionError = getLibraryFileNameExtensionError(fileName);
-
-  if (extensionError !== null) {
-    throw new Error(extensionError);
-  }
-
-  return normalized;
 }
 
 export function normalizeContentType(contentType: string): string {
@@ -271,10 +217,6 @@ export function createAccountAvatarPath(fileId: FileId, fileName: string): strin
 
 export function createSessionArtifactPath(fileId: FileId, fileName: string): string {
   return `${SESSION_ARTIFACT_RECORD_DIR}/${fileId}/${normalizeFileName(fileName)}`;
-}
-
-export function createSessionFilePath(fileId: FileId, fileName: string): string {
-  return `${SESSION_RESOURCE_MOUNT_DIR}/${fileId}/${normalizeFileName(fileName)}`;
 }
 
 function readSessionResourcePathParts(fileRecordPath: string): {
@@ -379,10 +321,6 @@ export function createFileObjectKey(file: FileObjectKeyInput): string {
   return `session/${file.scope.id}/${sessionRoot}/${file.id}/${fileName}`;
 }
 
-export function createFileRecordObjectKey(file: FileRecord): string {
-  return createFileObjectKey(file);
-}
-
 export function createDownloadDisposition(
   name: string,
   disposition: "attachment" | "inline",
@@ -398,12 +336,9 @@ export function createDownloadDisposition(
 
 export type FileErrorCode =
   | "file_conflict"
-  | "file_delete_failed"
   | "file_forbidden"
   | "file_invalid_request"
-  | "file_move_failed"
   | "file_not_found"
-  | "file_precondition_failed"
   | "file_storage_unavailable"
   | "file_unauthorized"
   | "file_upload_content_missing"
@@ -475,11 +410,9 @@ export interface FileEntry {
 
 export interface FileListQuery {
   projectId: ProjectId;
-  scopeId?: FileScopeId;
   scopeKind?: FileScopeKind;
   sessionId?: SessionId;
   sessionKind?: FileSessionKind | null;
-  status?: FileStatus;
 }
 
 export interface FileListing {
@@ -494,12 +427,6 @@ export interface CreateAccountAvatarUploadTarget {
   id: AccountId;
   kind: "account";
   name: string;
-}
-
-export interface CreateLibraryFileUploadTarget {
-  id: ProjectId;
-  kind: "library";
-  path: string;
 }
 
 export interface CreateSessionFileUploadTarget {
@@ -524,7 +451,6 @@ export interface CreateAgentPackageFileUploadTarget {
 export type CreateFileUploadTarget =
   | CreateAccountAvatarUploadTarget
   | CreateSessionFileUploadTarget
-  | CreateLibraryFileUploadTarget
   | CreateAgentPackageFileUploadTarget
   | CreateProjectDraftFileUploadTarget;
 
@@ -534,8 +460,6 @@ export interface CreateFileUploadRequest {
     name: string;
     size: number;
   };
-  ifMatchEtag?: string;
-  overwrite?: boolean;
   purpose: FilePurpose;
   target: CreateFileUploadTarget;
 }
@@ -574,11 +498,4 @@ export interface UploadFilePartResponse {
 export interface CreateFileDownloadResponse {
   method: "GET";
   url: string;
-}
-
-export interface UpdateFileRequest {
-  ifMatchEtag?: string;
-  ifMatchVersion: number;
-  overwrite?: boolean;
-  path: string;
 }

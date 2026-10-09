@@ -18,5 +18,3 @@ export const emailLogsTable = sqliteTable(
     index("email_log_type_status_idx").on(table.type, table.status),
   ],
 );
-
-export type EmailLogRow = typeof emailLogsTable.$inferSelect;

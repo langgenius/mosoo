@@ -10,20 +10,16 @@
     "./agent-manifest": "./src/agent/agent-manifest.contract.ts",
     "./agent-manifest-parser": "./src/agent/agent-manifest-parser.contract.ts",
     "./agent-manifest-serializer": "./src/agent/agent-manifest-serializer.contract.ts",
-    "./app-info": "./src/metadata/app-info.contract.ts",
     "./auth": "./src/auth/auth.contract.ts",
     "./driver-instance": "./src/runtime/driver-instance.contract.ts",
-    "./external-tool-effect": "./src/runtime/external-tool-effect.contract.ts",
     "./environment": "./src/environment/environment.contract.ts",
     "./file": "./src/file/file.contract.ts",
     "./mcp": "./src/mcp/mcp.contract.ts",
     "./models": "./models/index.ts",
-    "./operation-result": "./src/transport/operation-result.contract.ts",
     "./origin": "./src/metadata/origin.contract.ts",
     "./project": "./src/project/project.contract.ts",
     "./public-api": "./src/http/public-api.contract.ts",
     "./public-api-core": "./src/http/public-api-core.contract.ts",
-    "./id": "./src/id/id.contract.ts",
     "./runtime-command": "./src/runtime/runtime-command.contract.ts",
     "./sandbox": "./src/runtime/sandbox.contract.ts",
     "./session": "./src/session/session.contract.ts",
@@ -34,7 +30,6 @@
     "./organization": "./src/organization/organization.contract.ts"
   },
   "scripts": {
-    "lint": "vp lint .",
     "test": "vp exec bun test tests",
     "tc": "vp exec tsc --noEmit"
   },

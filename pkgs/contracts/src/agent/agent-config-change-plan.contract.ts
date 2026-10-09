@@ -1,4 +1,5 @@
-import type { EnvironmentId, McpServerId, SkillId } from "../id/id.contract";
+import type { EnvironmentId, McpServerId, SkillId } from "@mosoo/id";
+
 import type { JsonObject } from "../validation/primitives.contract";
 import type { AgentBuiltInToolConfig, AgentStatus } from "./agent.contract";
 

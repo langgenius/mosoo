@@ -90,12 +90,7 @@ export function appendToolUse(
   const existingUse = locations.toolUse;
 
   if (existingUse !== null) {
-    const current = messages[existingUse.messageIndex];
-
-    if (current === undefined) {
-      return state;
-    }
-
+    const current = messages[existingUse.messageIndex]!;
     const segments = [...current.segments];
     segments[existingUse.segmentIndex] = {
       ...existingUse.segment,
@@ -119,12 +114,7 @@ export function appendToolUse(
   const existingResult = locations.toolResult;
 
   if (existingResult !== null) {
-    const current = messages[existingResult.messageIndex];
-
-    if (current === undefined) {
-      return state;
-    }
-
+    const current = messages[existingResult.messageIndex]!;
     const toolName = mergeToolName(existingResult.segment.tool, input.toolCallName);
     const segments = [...current.segments];
     segments.splice(existingResult.segmentIndex, 0, {
@@ -150,6 +140,7 @@ export function appendToolUse(
   }
 
   const index = locations.messageIndex;
+  const current = index === -1 ? undefined : messages[index];
   const toolSegment: SessionViewSegment = {
     argsText: "",
     kind: "tool_use",
@@ -157,24 +148,6 @@ export function appendToolUse(
     tool: input.toolCallName,
     toolCallId: input.toolCallId,
   };
-
-  if (index === -1) {
-    messages.push(
-      createLiveStateMessage({
-        content: "",
-        id: input.parentMessageId,
-        role: "assistant",
-        segments: [toolSegment],
-      }),
-    );
-
-    return touchSessionLiveState({
-      ...state,
-      messages,
-    });
-  }
-
-  const current = messages[index];
 
   if (current === undefined) {
     messages.push(
@@ -216,12 +189,7 @@ export function appendToolResult(
   const existingResult = locations.toolResult;
 
   if (existingResult !== null) {
-    const current = messages[existingResult.messageIndex];
-
-    if (current === undefined) {
-      return state;
-    }
-
+    const current = messages[existingResult.messageIndex]!;
     const segments = [...current.segments];
     segments[existingResult.segmentIndex] = {
       ...existingResult.segment,
@@ -241,11 +209,7 @@ export function appendToolResult(
   const existingUse = locations.toolUse;
 
   if (existingUse !== null) {
-    const current = messages[existingUse.messageIndex];
-
-    if (current === undefined) {
-      return state;
-    }
+    const current = messages[existingUse.messageIndex]!;
 
     messages[existingUse.messageIndex] = {
       ...current,
@@ -275,22 +239,6 @@ export function appendToolResult(
     tool: "tool",
     toolCallId: input.toolCallId,
   };
-
-  if (index === -1) {
-    messages.push(
-      createLiveStateMessage({
-        content: "",
-        id: input.messageId,
-        role: "assistant",
-        segments: [toolSegment],
-      }),
-    );
-
-    return touchSessionLiveState({
-      ...state,
-      messages,
-    });
-  }
 
   if (current === undefined) {
     messages.push(
@@ -337,12 +285,7 @@ export function appendToolArgs(
     return state;
   }
 
-  const message = messages[existingUse.messageIndex];
-
-  if (!message) {
-    return state;
-  }
-
+  const message = messages[existingUse.messageIndex]!;
   const segments = message.segments.map((segment) =>
     segment.kind === "tool_use" && segment.toolCallId === input.toolCallId
       ? {

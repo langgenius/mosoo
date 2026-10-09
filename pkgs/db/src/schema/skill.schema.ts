@@ -74,7 +74,3 @@ export const skillSnapshotEntriesTable = sqliteTable(
     }),
   ],
 );
-
-export type SkillRow = typeof skillsTable.$inferSelect;
-export type SkillSnapshotEntryRow = typeof skillSnapshotEntriesTable.$inferSelect;
-export type SkillSnapshotRow = typeof skillSnapshotsTable.$inferSelect;

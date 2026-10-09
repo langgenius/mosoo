@@ -46,10 +46,6 @@ export function updateSessionMetadataState(
       });
     }
 
-    case CUSTOM_EVENT_REGISTRY.sessionConfigTrace.name:
-    case CUSTOM_EVENT_REGISTRY.sessionSyncRequest.name: {
-      return state;
-    }
     default: {
       return state;
     }

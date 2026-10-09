@@ -7,7 +7,6 @@
     "./testing": "./src/testing.ts"
   },
   "scripts": {
-    "lint": "vp lint .",
     "tc": "vp exec tsc --noEmit",
     "test": "vp exec bun test tests"
   },

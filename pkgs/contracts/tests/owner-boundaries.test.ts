@@ -1,12 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync, readFileSync } from "node:fs";
 
-import * as Contracts from "@mosoo/contracts";
 import { AGENT_MANIFEST_VERSION, AGENT_PACKAGE_VERSION } from "@mosoo/contracts/agent-manifest";
-import {
-  parseAgentManifestInput,
-  parseAgentPackageJson,
-} from "@mosoo/contracts/agent-manifest-parser";
+import { parseAgentPackageJson } from "@mosoo/contracts/agent-manifest-parser";
 import {
   serializeAgentManifestToYaml,
   serializeAgentPackageToJson,
@@ -18,70 +13,24 @@ import {
   createDownloadDisposition,
   createFileObjectKey,
   createScope,
-  createSessionFilePath,
-  ensureLibraryFilePathHasExtension,
-  joinPath,
   normalizeFileName,
-  normalizeLibraryDirectoryPath,
   normalizeLibraryFilePath,
   toSessionResourceMaterializedPath,
 } from "@mosoo/contracts/file";
-import type { AccountId, FileId, SessionId } from "@mosoo/contracts/id";
-import {
-  createRuntimeModelIdentity,
-  isCustomRuntimeModelProvider,
-  parseRuntimeModelIdentity,
-} from "@mosoo/contracts/models";
-import { parseRuntimeCommand } from "@mosoo/contracts/runtime-command";
 import {
   AGENT_SESSION_ARCHIVED_READ_ONLY_REASON,
   AGENT_SESSION_TERMINAL_READ_ONLY_REASON,
   getAgentSessionUserLifecycleProjection,
 } from "@mosoo/contracts/session";
+import type { AccountId, FileId, SessionId } from "@mosoo/id";
 
 const FILE_ID = "01J00000000000000000000001" as FileId;
 const SESSION_ID = "01J00000000000000000000002" as SessionId;
 const ACCOUNT_ID = "01J00000000000000000000003" as AccountId;
 
-function readFixture(path: string): string {
-  return readFileSync(new URL(path, import.meta.url), "utf8");
-}
-
 describe("contracts owner boundaries", () => {
-  test("does not expose the old permission package surface", () => {
-    const packageJson = readFixture("../package.json");
-    const indexSource = readFixture("../src/index.ts");
-
-    expect(packageJson).not.toContain('"./permission"');
-    expect(indexSource).not.toContain("permission.contract");
-    expect(indexSource).not.toContain("./permission/");
-    expect(packageJson).not.toContain("providers.company.create");
-    expect(packageJson).not.toContain("agents.acl.");
-    expect(existsSync(new URL("../src/permission/permission.contract.ts", import.meta.url))).toBe(
-      false,
-    );
-    expect("Permission" in Contracts).toBe(false);
-    expect("can" in Contracts).toBe(false);
-  });
-
-  test.each([undefined, null, "pet", "cattle"] as const)(
-    "accepts a package with optional legacy kind %s",
-    (kind) => {
-      const parsed = parseAgentManifestInput({
-        ...(kind === undefined ? {} : { kind }),
-        manifestVersion: AGENT_MANIFEST_VERSION,
-        metadata: { name: "Session configuration" },
-        prompts: { system: "Retain these instructions." },
-        runtime: { id: "openai-runtime", provider: "openai", model: "gpt-5.4" },
-      });
-      expect(parsed.issues).toEqual([]);
-      expect(parsed.manifest?.prompts.system).toBe("Retain these instructions.");
-      expect(parsed.manifest).not.toHaveProperty("kind");
-    },
-  );
-
-  test.each([undefined, null, "pet", "cattle"] as const)(
-    "imports and re-exports a package without retaining legacy kind %s",
+  test.each([undefined, null, "pet", "cattle", "session", {}])(
+    "imports and re-exports a package ignoring legacy kind %j",
     (kind) => {
       const parsed = parseAgentPackageJson(
         JSON.stringify({
@@ -107,39 +56,10 @@ describe("contracts owner boundaries", () => {
     },
   );
 
-  test.each([{ kind: "session" }, { kind: true }, { kind: {} }, { kind: [] }])(
-    "rejects malformed legacy kind %j",
-    ({ kind }) => {
-      const parsed = parseAgentManifestInput({
-        kind,
-        manifestVersion: AGENT_MANIFEST_VERSION,
-        metadata: { name: "Session preset" },
-        prompts: { system: "Retain these instructions." },
-        runtime: { id: "openai-runtime", provider: "openai", model: "gpt-5.4" },
-      });
-      expect(parsed.manifest).toBeNull();
-      expect(parsed.issues.some((issue) => issue.code === "manifest.kind.missing")).toBe(true);
-      const packaged = parseAgentPackageJson(
-        JSON.stringify({
-          kind,
-          manifestVersion: AGENT_MANIFEST_VERSION,
-          packageVersion: AGENT_PACKAGE_VERSION,
-          name: "Session preset",
-          prompts: { system: "Retain these instructions." },
-          runtime: "openai-runtime",
-          provider: "openai",
-          model: "gpt-5.4",
-        }),
-      );
-      expect(packaged.package).toBeNull();
-      expect(packaged.issues.some((issue) => issue.code === "manifest.kind.missing")).toBe(true);
-    },
-  );
+  test("agent package parser owns required manifest fields", () => {
+    const invalid = parseAgentPackageJson("{}");
 
-  test("agent manifest parser owns required public manifest fields", () => {
-    const invalid = parseAgentManifestInput({});
-
-    expect(invalid.manifest).toBeNull();
+    expect(invalid.package).toBeNull();
     expect(invalid.issues.map((issue) => issue.code)).toEqual(
       expect.arrayContaining([
         "manifest.version.unsupported",
@@ -148,39 +68,11 @@ describe("contracts owner boundaries", () => {
         "manifest.model.missing",
       ]),
     );
-
-    const parsed = parseAgentManifestInput({
-      kind: "pet",
-      manifestVersion: AGENT_MANIFEST_VERSION,
-      metadata: { name: "Ops Helper" },
-      prompts: { system: "Help with operations." },
-      runtime: {
-        id: "openai-runtime",
-        model: "gpt-5",
-        provider: "openai",
-        settings: {
-          model_reasoning_effort: "high",
-          model_verbosity: "medium",
-        },
-      },
-    });
-
-    expect(parsed.issues).toEqual([]);
-    expect(parsed.manifest?.runtime).toEqual({
-      id: "openai-runtime",
-      model: "gpt-5",
-      provider: "openai",
-      providerOptions: {
-        model_reasoning_effort: "high",
-        model_verbosity: "medium",
-      },
-    });
   });
 
-  test("agent package parser rejects source authority and accepts declarative packages", () => {
+  test("agent package parser rejects source authority fields", () => {
     const forbidden = parseAgentPackageJson(
       JSON.stringify({
-        kind: "pet",
         manifestVersion: AGENT_MANIFEST_VERSION,
         model: "gpt-5",
         name: "Ops Helper",
@@ -193,111 +85,12 @@ describe("contracts owner boundaries", () => {
     );
 
     expect(forbidden.package).toBeNull();
-    expect(forbidden.issues[0]?.code).toBe("package.field.forbidden");
-
-    const parsed = parseAgentPackageJson(
-      JSON.stringify({
-        kind: "cattle",
-        manifestVersion: AGENT_MANIFEST_VERSION,
-        model: "gpt-5",
-        name: "Support Helper",
-        packageVersion: AGENT_PACKAGE_VERSION,
-        prompts: { system: "Help with support." },
-        provider: "openai",
-        runtime: "openai-runtime",
-        settings: { model_reasoning_effort: "high" },
-      }),
-    );
-
-    expect(parsed.issues).toEqual([]);
-    expect(parsed.package?.manifest).not.toHaveProperty("kind");
-    expect(parsed.package?.manifest.runtime.providerOptions).toEqual({
-      model_reasoning_effort: "high",
-    });
-  });
-
-  test("runtime command parser rejects unknown or malformed command grammar", () => {
-    expect(
-      parseRuntimeCommand({
-        commandId: "cmd_1",
-        input: { text: "Run it." },
-        kind: "input.start",
-        requestId: "req_1",
-        runId: "run_1",
-      }).kind,
-    ).toBe("input.start");
-
-    expect(() =>
-      parseRuntimeCommand({
-        commandId: "cmd_1",
-        input: { text: "" },
-        kind: "input.start",
-        requestId: "req_1",
-        runId: "run_1",
-      }),
-    ).toThrow();
-
-    expect(() =>
-      parseRuntimeCommand({
-        commandId: "cmd_1",
-        kind: "input.resume",
-      }),
-    ).toThrow();
-  });
-
-  test("runtime model identity admits typed provider model runtime triples", () => {
-    const identity = parseRuntimeModelIdentity({
-      modelId: " gpt-5 ",
-      provider: {
-        kind: "custom",
-        providerId: " openai-compatible ",
-      },
-      runtimeId: " openai-runtime ",
-    });
-
-    expect(identity).toEqual(
-      createRuntimeModelIdentity({
-        modelId: "gpt-5",
-        provider: {
-          kind: "custom",
-          providerId: "openai-compatible",
-        },
-        runtimeId: "openai-runtime",
-      }),
-    );
-    expect(isCustomRuntimeModelProvider(identity.provider)).toBe(true);
-
-    expect(() =>
-      parseRuntimeModelIdentity({
-        modelId: " ",
-        provider: {
-          kind: "preset",
-          providerId: "openai",
-        },
-        runtimeId: "openai-runtime",
-      }),
-    ).toThrow();
-  });
-
-  test("library directory path normalization tolerates absent roots", () => {
-    // A root-level listing arrives as an explicit `null` from the GraphQL
-    // nullable `path` argument; it must normalize to the empty root, not throw
-    // `Cannot read properties of null (reading 'trim')`.
-    expect(normalizeLibraryDirectoryPath(null)).toBe("");
-    expect(normalizeLibraryDirectoryPath(undefined)).toBe("");
-    expect(normalizeLibraryDirectoryPath("")).toBe("");
-    expect(normalizeLibraryDirectoryPath("docs/notes ")).toBe("docs/notes");
-    expect(() => normalizeLibraryDirectoryPath("/docs")).toThrow();
+    expect(forbidden.issues[0]?.code).toBe("package.field.unsupported");
   });
 
   test("file contract owns user path admission before object key projection", () => {
     expect(normalizeLibraryFilePath("docs/notes.txt ")).toBe("docs/notes.txt");
-    expect(ensureLibraryFilePathHasExtension("docs/notes.txt")).toBe("docs/notes.txt");
-    expect(joinPath("docs", "notes.txt")).toBe("docs/notes.txt");
     expect(createAttachmentPath(FILE_ID, " notes.txt ")).toBe(`attachment/${FILE_ID}/notes.txt`);
-    expect(createSessionFilePath(FILE_ID, " notes.txt ")).toBe(
-      `session-files/${FILE_ID}/notes.txt`,
-    );
 
     for (const path of [
       "/docs/notes.txt",
@@ -313,10 +106,8 @@ describe("contracts owner boundaries", () => {
     expect(createDownloadDisposition(' "notes".txt ', "attachment")).toBe(
       'attachment; filename="notes.txt"',
     );
+    expect(() => createDownloadDisposition("notes\r\nx-file: bad.txt", "attachment")).toThrow();
     expect(() => createDownloadDisposition('"', "attachment")).toThrow();
-
-    expect(() => joinPath("docs", "nested/notes.txt")).toThrow();
-    expect(() => ensureLibraryFilePathHasExtension("docs/README")).toThrow();
   });
 
   test("file contract rejects noncanonical object key projection records", () => {

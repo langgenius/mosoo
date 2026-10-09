@@ -128,7 +128,9 @@ function createOpenAiAdvancedSettings(
   ];
 }
 
-export const RUNTIME_ADVANCED_SETTINGS_REGISTRY = {
+const RUNTIME_ADVANCED_SETTINGS: Readonly<
+  Record<string, readonly RuntimeAdvancedSettingDefinition[]>
+> = {
   "claude-agent-sdk": [
     {
       description: "Controls Claude Agent SDK reasoning effort for this runtime.",
@@ -147,29 +149,7 @@ export const RUNTIME_ADVANCED_SETTINGS_REGISTRY = {
       valueType: "integer",
     },
   ],
-  "openai-runtime": [
-    {
-      defaultValue: "medium",
-      description: "Controls Codex reasoning depth for this runtime.",
-      key: "model_reasoning_effort",
-      label: "Reasoning effort",
-      options: ["low", "medium", "high", "xhigh"].map(option),
-      type: "select",
-    },
-    {
-      defaultValue: "medium",
-      description: "Controls response length for Responses API capable Codex models.",
-      key: "model_verbosity",
-      label: "Verbosity",
-      options: ["low", "medium", "high"].map(option),
-      type: "select",
-    },
-  ],
-} as const satisfies Record<string, readonly RuntimeAdvancedSettingDefinition[]>;
-
-const RUNTIME_ADVANCED_SETTINGS_BY_ID: Readonly<
-  Record<string, readonly RuntimeAdvancedSettingDefinition[]>
-> = RUNTIME_ADVANCED_SETTINGS_REGISTRY;
+};
 
 const SECURITY_BOUNDARY_SETTING_KEYS = new Set([
   "additionalDirectories",
@@ -198,7 +178,7 @@ const SECURITY_BOUNDARY_SETTING_KEYS = new Set([
   "systemPrompt",
 ]);
 
-function listDefinitions(
+export function listRuntimeAdvancedSettings(
   runtimeId: string,
   modelId?: string,
 ): readonly RuntimeAdvancedSettingDefinition[] {
@@ -206,39 +186,39 @@ function listDefinitions(
     return createOpenAiAdvancedSettings(modelId);
   }
 
-  return RUNTIME_ADVANCED_SETTINGS_BY_ID[runtimeId] ?? [];
+  return RUNTIME_ADVANCED_SETTINGS[runtimeId] ?? [];
 }
 
 function createDefinitionMap(
   runtimeId: string,
   modelId?: string,
 ): ReadonlyMap<string, RuntimeAdvancedSettingDefinition> {
-  const definitions = new Map<string, RuntimeAdvancedSettingDefinition>();
+  return new Map(
+    listRuntimeAdvancedSettings(runtimeId, modelId).map((definition) => [
+      definition.key,
+      definition,
+    ]),
+  );
+}
 
-  for (const definition of listDefinitions(runtimeId, modelId)) {
-    definitions.set(definition.key, definition);
+function settingValueIssue(
+  definition: RuntimeAdvancedSettingDefinition,
+  value: unknown,
+): string | null {
+  if (definition.type === "select") {
+    return definition.options.some((optionEntry) => optionEntry.value === value)
+      ? null
+      : `Runtime setting ${definition.key} must be one of ${definition.options
+          .map((optionEntry) => optionEntry.value)
+          .join(", ")}.`;
   }
 
-  return definitions;
-}
-
-function hasOption(definition: RuntimeAdvancedSelectSettingDefinition, value: string): boolean {
-  return definition.options.some((optionEntry) => optionEntry.value === value);
-}
-
-function isDefaultValue(definition: RuntimeAdvancedSettingDefinition, value: unknown): boolean {
-  return definition.defaultValue !== undefined && value === definition.defaultValue;
-}
-
-export function listRuntimeAdvancedSettings(
-  runtimeId: string,
-  modelId?: string,
-): readonly RuntimeAdvancedSettingDefinition[] {
-  return listDefinitions(runtimeId, modelId);
-}
-
-export function hasRuntimeAdvancedSettings(runtimeId: string, modelId?: string): boolean {
-  return listDefinitions(runtimeId, modelId).length > 0;
+  return typeof value === "number" &&
+    Number.isFinite(value) &&
+    (definition.valueType !== "integer" || Number.isInteger(value)) &&
+    value >= definition.min
+    ? null
+    : `Runtime setting ${definition.key} must be an integer greater than or equal to ${definition.min}.`;
 }
 
 export function normalizeRuntimeAdvancedSettings(input: {
@@ -252,24 +232,13 @@ export function normalizeRuntimeAdvancedSettings(input: {
   for (const [key, value] of Object.entries(input.settings)) {
     const definition = definitions.get(key);
 
-    if (definition === undefined || isDefaultValue(definition, value)) {
-      continue;
-    }
-
-    if (definition.type === "select") {
-      if (typeof value !== "string" || !hasOption(definition, value)) {
-        continue;
-      }
-    } else if (
-      typeof value !== "number" ||
-      !Number.isFinite(value) ||
-      (definition.valueType === "integer" && !Number.isInteger(value)) ||
-      value < definition.min
+    if (
+      definition !== undefined &&
+      value !== definition.defaultValue &&
+      settingValueIssue(definition, value) === null
     ) {
-      continue;
+      normalized[key] = value;
     }
-
-    normalized[key] = value;
   }
 
   return normalized;
@@ -303,30 +272,10 @@ export function validateRuntimeAdvancedSettings(input: {
       continue;
     }
 
-    if (definition.type === "select") {
-      if (typeof value !== "string" || !hasOption(definition, value)) {
-        issues.push({
-          code: "runtime_settings_invalid_value",
-          key,
-          message: `Runtime setting ${key} must be one of ${definition.options
-            .map((optionEntry) => optionEntry.value)
-            .join(", ")}.`,
-        });
-      }
-      continue;
-    }
+    const message = settingValueIssue(definition, value);
 
-    if (
-      typeof value !== "number" ||
-      !Number.isFinite(value) ||
-      (definition.valueType === "integer" && !Number.isInteger(value)) ||
-      value < definition.min
-    ) {
-      issues.push({
-        code: "runtime_settings_invalid_value",
-        key,
-        message: `Runtime setting ${key} must be an integer greater than or equal to ${definition.min}.`,
-      });
+    if (message !== null) {
+      issues.push({ code: "runtime_settings_invalid_value", key, message });
     }
   }
 

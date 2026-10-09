@@ -2,21 +2,7 @@ import { SkillPackageError } from "./errors";
 
 export type SkillPackagePathKind = "directory" | "file";
 
-export interface AdmittedSkillPackagePath {
-  entryKind: SkillPackagePathKind;
-  path: string;
-}
-
-export interface SkillPackagePathAdmission {
-  admit(path: string, entryKind: SkillPackagePathKind): AdmittedSkillPackagePath;
-}
-
 export const SKILL_PACKAGE_MANIFEST_PATH = "SKILL.md";
-
-interface SkillPackagePathAdmissionIndex {
-  entries: Map<string, SkillPackagePathKind>;
-  pathsWithDescendants: Set<string>;
-}
 
 const RESERVED_PATH_KEYS = new Set([
   "__proto__",
@@ -36,170 +22,33 @@ const RESERVED_PATH_KEYS = new Set([
   "vault",
 ]);
 
-export function createSkillPackagePathAdmission(): SkillPackagePathAdmission {
-  const index = createSkillPackagePathAdmissionIndex();
-
-  return {
-    admit(path, entryKind) {
-      const admitted = admitSkillPackagePath(path, entryKind);
-      addAdmittedPath(index, admitted.path, admitted.entryKind);
-
-      return admitted;
-    },
-  };
+export function inferSkillPackagePathKind(path: string): SkillPackagePathKind {
+  return path.endsWith("/") || path.endsWith("\\") ? "directory" : "file";
 }
 
-export function createSkillPackageArchivePathAdmission(): SkillPackagePathAdmission {
-  const index = createSkillPackagePathAdmissionIndex();
-
-  return {
-    admit(path, entryKind) {
-      const admitted = admitSkillPackageArchivePath(path, entryKind);
-      addAdmittedPath(index, admitted.path, admitted.entryKind);
-
-      return admitted;
-    },
-  };
-}
-
-export function admitSkillPackagePath(
-  path: string,
-  entryKind: SkillPackagePathKind = inferSkillPackagePathKind(path),
-): AdmittedSkillPackagePath {
-  if (path.length === 0) {
-    throw new SkillPackageError("The skill package contains an empty path.");
-  }
-
+export function admitSkillPackagePath(path: string, entryKind: SkillPackagePathKind): string {
   if (isAbsolutePath(path) || hasUnsafePathCharacter(path)) {
     throw new SkillPackageError(`The skill package contains an invalid path: ${path}`);
   }
 
-  const segments = readPathSegments(path, entryKind);
-
-  if (segments.length === 0) {
-    throw new SkillPackageError("The skill package contains an empty path.");
-  }
+  const normalizedSeparators = path.replaceAll("\\", "/");
+  const segments = (
+    entryKind === "directory" && normalizedSeparators.endsWith("/")
+      ? normalizedSeparators.slice(0, -1)
+      : normalizedSeparators
+  ).split("/");
 
   for (const segment of segments) {
     if (segment.length === 0 || segment === "." || segment === "..") {
       throw new SkillPackageError(`The skill package contains an invalid path: ${path}`);
     }
 
-    const reservedKey = readReservedPathKey(segment);
-
-    if (reservedKey !== null) {
-      throw new SkillPackageError(`The skill package path uses a reserved key: ${reservedKey}`);
+    if (isReservedPathSegment(segment)) {
+      throw new SkillPackageError(`The skill package path uses a reserved key: ${segment}`);
     }
   }
 
-  return {
-    entryKind,
-    path: segments.join("/"),
-  };
-}
-
-export function admitSkillPackageArchivePath(
-  path: string,
-  entryKind: SkillPackagePathKind = inferSkillPackagePathKind(path),
-): AdmittedSkillPackagePath {
-  const admitted = admitSkillPackagePath(path, entryKind);
-
-  rejectUnsupportedArchivePath(admitted);
-
-  return admitted;
-}
-
-function inferSkillPackagePathKind(path: string): SkillPackagePathKind {
-  return path.endsWith("/") || path.endsWith("\\") ? "directory" : "file";
-}
-
-function readPathSegments(path: string, entryKind: SkillPackagePathKind): string[] {
-  const normalizedSeparators = path.replaceAll("\\", "/");
-  const segmentSource =
-    entryKind === "directory" && normalizedSeparators.endsWith("/")
-      ? normalizedSeparators.slice(0, -1)
-      : normalizedSeparators;
-
-  return segmentSource.split("/");
-}
-
-function createSkillPackagePathAdmissionIndex(): SkillPackagePathAdmissionIndex {
-  return {
-    entries: new Map<string, SkillPackagePathKind>(),
-    pathsWithDescendants: new Set<string>(),
-  };
-}
-
-function addAdmittedPath(
-  index: SkillPackagePathAdmissionIndex,
-  path: string,
-  entryKind: SkillPackagePathKind,
-): void {
-  rejectDuplicateOrCollision(index, path, entryKind);
-  index.entries.set(path, entryKind);
-  markAncestorPathsWithDescendants(index, path);
-}
-
-function rejectDuplicateOrCollision(
-  index: SkillPackagePathAdmissionIndex,
-  path: string,
-  entryKind: SkillPackagePathKind,
-): void {
-  if (index.entries.has(path)) {
-    throw new SkillPackageError(
-      `The skill package contains a duplicate path after normalization: ${path}`,
-    );
-  }
-
-  if (entryKind === "file" && index.pathsWithDescendants.has(path)) {
-    throw new SkillPackageError(
-      `The skill package contains both a file and child path under: ${path}`,
-    );
-  }
-
-  forEachAncestorPath(path, (ancestor) => {
-    if (index.entries.get(ancestor) === "file") {
-      throw new SkillPackageError(
-        `The skill package contains both a file and child path under: ${ancestor}`,
-      );
-    }
-  });
-}
-
-function markAncestorPathsWithDescendants(
-  index: SkillPackagePathAdmissionIndex,
-  path: string,
-): void {
-  forEachAncestorPath(path, (ancestor) => {
-    index.pathsWithDescendants.add(ancestor);
-  });
-}
-
-function forEachAncestorPath(path: string, visit: (ancestor: string) => void): void {
-  let separatorIndex = path.indexOf("/");
-
-  while (separatorIndex !== -1) {
-    visit(path.slice(0, separatorIndex));
-    separatorIndex = path.indexOf("/", separatorIndex + 1);
-  }
-}
-
-function rejectUnsupportedArchivePath(admitted: AdmittedSkillPackagePath): void {
-  if (admitted.path === SKILL_PACKAGE_MANIFEST_PATH) {
-    if (admitted.entryKind !== "file") {
-      throw new SkillPackageError(
-        `The skill package manifest path must be a file: ${SKILL_PACKAGE_MANIFEST_PATH}`,
-      );
-    }
-
-    return;
-  }
-
-  if (admitted.path.startsWith(`${SKILL_PACKAGE_MANIFEST_PATH}/`)) {
-    throw new SkillPackageError(
-      `The skill package manifest path cannot contain child entries: ${admitted.path}`,
-    );
-  }
+  return segments.join("/");
 }
 
 function isAbsolutePath(path: string): boolean {
@@ -218,19 +67,14 @@ function hasUnsafePathCharacter(path: string): boolean {
   return false;
 }
 
-function readReservedPathKey(segment: string): string | null {
-  const normalized = segment.toLowerCase().replaceAll("_", "-");
+function isReservedPathSegment(segment: string): boolean {
+  const lowercase = segment.toLowerCase();
 
-  if (
-    RESERVED_PATH_KEYS.has(normalized) ||
-    normalized.startsWith(".") ||
-    normalized.startsWith(".env") ||
-    normalized.startsWith(".state") ||
-    normalized.endsWith(".key") ||
-    normalized.endsWith(".pem")
-  ) {
-    return segment;
-  }
-
-  return null;
+  return (
+    RESERVED_PATH_KEYS.has(lowercase) ||
+    RESERVED_PATH_KEYS.has(lowercase.replaceAll("_", "-")) ||
+    lowercase.startsWith(".") ||
+    lowercase.endsWith(".key") ||
+    lowercase.endsWith(".pem")
+  );
 }

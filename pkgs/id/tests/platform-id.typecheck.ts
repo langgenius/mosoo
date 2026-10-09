@@ -20,7 +20,7 @@ const plainString = "01J00000000000000000000001" as string;
 const accountId = "01J00000000000000000000001" as AccountId;
 const agentId = "01J00000000000000000000002" as AgentId;
 
-// @ts-expect-error plain strings must enter through create/parse/normalize/assert/is.
+// @ts-expect-error plain strings must enter through create/parse/is.
 const plainStringCannotBePlatformId: PlatformId = plainString;
 
 // @ts-expect-error lowercase literals must be normalized before they become PlatformId.

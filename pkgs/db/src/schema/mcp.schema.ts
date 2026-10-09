@@ -167,8 +167,3 @@ export const mcpOauthFlowsTable = sqliteTable(
     ),
   ],
 );
-
-export type McpCredentialRow = typeof mcpCredentialsTable.$inferSelect;
-export type McpOauthFlowRow = typeof mcpOauthFlowsTable.$inferSelect;
-export type McpServerRow = typeof mcpServersTable.$inferSelect;
-export type VaultSecretRow = typeof vaultSecretsTable.$inferSelect;

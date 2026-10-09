@@ -1,12 +1,6 @@
-import {
-  parseNullableSessionUsageSummary,
-  readSessionUsageTokenTotal as readAgUiSessionUsageTokenTotal,
-} from "@mosoo/ag-ui-session";
-import type {
-  SessionProcessEventStatus,
-  SessionProcessEventType,
-  SessionRuntimeEventFamily,
-} from "@mosoo/contracts/session";
+import { readSessionUsageTokenTotal } from "@mosoo/ag-ui-session";
+import type { SessionUsageSummary } from "@mosoo/ag-ui-session";
+import type { SessionProcessEventStatus, SessionProcessEventType } from "@mosoo/contracts/session";
 
 import type { RuntimeEventEnvelope } from "./runtime-event";
 import {
@@ -29,59 +23,6 @@ export interface ProcessDraft {
   status?: SessionProcessEventStatus;
   tokens?: number | null;
   type: ProcessDraftType;
-}
-
-const sessionFamilyByDomain: Readonly<Record<string, SessionRuntimeEventFamily | undefined>> = {
-  account: "diagnostics",
-  agent: "tool",
-  auth: "diagnostics",
-  catalog: "diagnostics",
-  context: "input",
-  diagnostic: "diagnostics",
-  driver: "driver",
-  file: "file",
-  hook: "diagnostics",
-  image: "tool",
-  item: "tool",
-  mcp: "tool",
-  message: "message",
-  model: "diagnostics",
-  oauth: "diagnostics",
-  permission: "permission",
-  plan: "diagnostics",
-  process: "diagnostics",
-  realtime: "diagnostics",
-  remote: "transport",
-  review: "tool",
-  run: "run",
-  runtime: "driver",
-  search: "tool",
-  session: "lifecycle",
-  shell: "tool",
-  space: "file",
-  terminal: "diagnostics",
-  thought: "message",
-  tool: "tool",
-  usage: "usage",
-  user: "input",
-  web: "tool",
-  workspace: "file",
-};
-
-const sessionFamilyByKind: Readonly<Record<string, SessionRuntimeEventFamily | undefined>> = {
-  "runtime.config.updated": "diagnostics",
-  "runtime.provisioning.updated": "provisioning",
-  "runtime.sandbox.released": "sandbox",
-  "runtime.sandbox.updated": "sandbox",
-  "runtime.timing.recorded": "diagnostics",
-  "runtime.transport.updated": "transport",
-};
-
-export function getRuntimeEventSessionFamily(
-  event: RuntimeEventEnvelope,
-): SessionRuntimeEventFamily {
-  const domain = event.kind.split(".")[0] ?? "diagnostic";
-  return sessionFamilyByKind[event.kind] ?? sessionFamilyByDomain[domain] ?? "diagnostics";
 }
 
 export function createProcessDraftFromRuntimeEvent(event: RuntimeEventEnvelope): ProcessDraft {
@@ -147,13 +88,7 @@ export function createProcessDraftFromRuntimeEvent(event: RuntimeEventEnvelope):
             : "tool.use.started",
       };
     }
-    case "mcp.tool.updated":
-    case "tool.dynamic.updated":
-    case "web.search.updated":
-    case "image.updated":
-    case "agent.task.updated":
-    case "review.updated":
-    case "shell.command.updated": {
+    case "agent.task.updated": {
       const status = readRuntimeEventToolStatusFromEvent(event);
       return {
         content:
@@ -175,10 +110,9 @@ export function createProcessDraftFromRuntimeEvent(event: RuntimeEventEnvelope):
       return { content: "Session files updated.", type: "session_files.updated" };
     }
     case "usage.updated": {
-      const usage = parseNullableSessionUsageSummary(event.payload);
       return {
         content: "Usage updated.",
-        tokens: readAgUiSessionUsageTokenTotal(usage),
+        tokens: readSessionUsageTokenTotal(event.payload as SessionUsageSummary | null),
         type: "usage.updated",
       };
     }

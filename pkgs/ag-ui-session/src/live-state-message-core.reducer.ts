@@ -56,15 +56,6 @@ export function createLiveStateMessage(input: {
   };
 }
 
-export function createSessionLiveStateMessage(input: {
-  content: string;
-  createdAt?: string;
-  id: string;
-  role: "assistant" | "user";
-}): SessionLiveStateMessage {
-  return createLiveStateMessage(input);
-}
-
 export function upsertMessage(
   state: SessionLiveState,
   nextMessage: SessionLiveStateMessage,

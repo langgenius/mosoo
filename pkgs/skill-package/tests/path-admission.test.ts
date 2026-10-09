@@ -10,6 +10,7 @@ import {
   toEntryRecord,
 } from "@mosoo/skill-package";
 import { zipSync } from "fflate";
+import type { Zippable } from "fflate";
 
 const markdown = new TextEncoder().encode(
   "---\nname: Test\ndescription: Test skill.\n---\n# Test\n",
@@ -157,53 +158,22 @@ describe("skill package path admission", () => {
     ).toThrow(SkillPackageError);
   });
 
-  test("rejects traversal in frontmatter paths but allows custom roots", () => {
-    expect(() =>
-      parseSkillMarkdown(
-        "---\nname: Test\ndescription: Test skill.\ndependencies:\n  - ../shared\n---\n",
-      ),
-    ).toThrow(SkillPackageError);
-
+  test("accepts frontmatter fields it does not use", () => {
     expect(
       parseSkillMarkdown(
-        "---\nname: Test\ndescription: Test skill.\ndependencies:\n  - docs/guide.md\n---\n",
-      ).frontmatter.dependencies,
-    ).toEqual(["docs/guide.md"]);
-
-    expect(
-      parseSkillMarkdown(
-        "---\nname: Test\ndescription: Test skill.\ndependencies:\n  - references/guide.md\n  - scripts/run.sh\n---\n",
-      ).frontmatter.dependencies,
-    ).toEqual(["references/guide.md", "scripts/run.sh"]);
+        "---\nname: Test\ndescription: Test skill.\ndependencies: python>=3.8, pandas>=1.5.0\nuser-invocable: yes\n---\n",
+      ).frontmatter,
+    ).toEqual({ description: "Test skill.", name: "Test" });
   });
 
-  test("rejects duplicate normalized zip entries", () => {
-    const archive = createZipArchive([
-      {
-        body: data,
-        entryKind: "file",
-        isExecutable: false,
-        path: "SKILL.md",
-      },
-    ]);
-
-    expect(extractZipArchive(archive)[0]?.path).toBe("SKILL.md");
-
+  test("rejects prototype keys from extracted entries", () => {
     expect(() =>
-      createZipArchive([
-        {
-          body: data,
-          entryKind: "file",
-          isExecutable: false,
-          path: "references/a.txt",
-        },
-        {
-          body: data,
-          entryKind: "file",
-          isExecutable: false,
-          path: "references\\a.txt",
-        },
-      ]),
+      normalizeSkillEntries(
+        toEntryRecord([
+          { body: markdown, entryKind: "file", isExecutable: false, path: "SKILL.md" },
+          { body: data, entryKind: "file", isExecutable: false, path: "__proto__" },
+        ]),
+      ),
     ).toThrow(SkillPackageError);
   });
 
@@ -340,6 +310,30 @@ describe("skill package path admission", () => {
     ).toThrow(SkillPackageError);
   });
 
+  test("bounds and de-duplicates entries the central directory does not declare", () => {
+    const underDeclared = zipWithUndeclaredEntries(
+      { "SKILL.md": markdown },
+      { "references/a.txt": data, "references/b.txt": data },
+    );
+
+    expect(extractZipArchive(underDeclared).map((entry) => entry.path)).toEqual([
+      "SKILL.md",
+      "references/a.txt",
+      "references/b.txt",
+    ]);
+    expect(() => extractZipArchive(underDeclared, { maxEntryCount: 2 })).toThrow(
+      "The ZIP entry count exceeds the limit (2).",
+    );
+    expect(() =>
+      extractZipArchive(
+        zipWithUndeclaredEntries(
+          { "SKILL.md": markdown, "notes.txt": data },
+          { "notes.txt": data },
+        ),
+      ),
+    ).toThrow("The skill zip archive contains a duplicate entry: notes.txt");
+  });
+
   test("admits root-level support files when normalizing entry records", () => {
     const archive = createZipArchive([
       {
@@ -370,6 +364,33 @@ function normalizeZipEntries(entries: SkillPackageEntry[]) {
   const archive = createZipArchive(entries);
 
   return normalizeSkillEntries(toEntryRecord(extractZipArchive(archive)));
+}
+
+// Streams the local entries of `declared` and then `undeclared`, while the
+// central directory lists only `declared`.
+function zipWithUndeclaredEntries(declared: Zippable, undeclared: Zippable): Uint8Array {
+  const directoryArchive = zipSync(declared);
+  const undeclaredArchive = zipSync(undeclared);
+  const directoryStart = readUint32LE(directoryArchive, directoryArchive.byteLength - 6);
+  const undeclaredLocals = undeclaredArchive.subarray(
+    0,
+    readUint32LE(undeclaredArchive, undeclaredArchive.byteLength - 6),
+  );
+  const archive = new Uint8Array(directoryArchive.byteLength + undeclaredLocals.byteLength);
+
+  archive.set(directoryArchive.subarray(0, directoryStart));
+  archive.set(undeclaredLocals, directoryStart);
+  archive.set(
+    directoryArchive.subarray(directoryStart),
+    directoryStart + undeclaredLocals.byteLength,
+  );
+  new DataView(archive.buffer).setUint32(
+    archive.byteLength - 6,
+    directoryStart + undeclaredLocals.byteLength,
+    true,
+  );
+
+  return archive;
 }
 
 function clearZipUtf8Flags(archive: Uint8Array): Uint8Array {

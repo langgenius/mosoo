@@ -1,8 +1,4 @@
-import type { PersonalAccessTokenId, ProjectId } from "../id/id.contract";
-
-export type AuthMethod = "email_otp" | "google_oauth";
-
-export type AuthSecurityLevel = "basic" | "verified_email" | "strong";
+import type { PersonalAccessTokenId, ProjectId } from "@mosoo/id";
 
 export interface PersonalAccessTokenSummary {
   projectId: ProjectId | null;

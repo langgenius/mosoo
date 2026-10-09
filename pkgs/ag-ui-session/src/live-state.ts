@@ -60,19 +60,6 @@ export interface SessionPermissionRequestView {
 
 export type SessionLifecycleStatus = "IDLE" | "RUNNING" | "RESCHEDULING" | "TERMINATED";
 
-export interface SessionReadinessIssueView {
-  code: string;
-  fixHref?: string | null;
-  message: string;
-  severity: "error" | "warning";
-}
-
-export interface SessionReadinessSnapshotView {
-  checkedAt: string;
-  issues: SessionReadinessIssueView[];
-  ready: boolean;
-}
-
 export interface SessionInfraState {
   lastFailureReason: string | null;
   lastFailureMessage: string | null;
@@ -169,7 +156,6 @@ export interface SessionLiveState {
   messages: SessionViewMessage[];
   permissionRequests: SessionPermissionRequestView[];
   plan: SessionViewPlanEntry[];
-  readiness: SessionReadinessSnapshotView | null;
   run: SessionRunView;
   sessionId: string;
   title: string | null;
@@ -183,10 +169,4 @@ export function isSessionLiveStateStreaming(
   state: Pick<SessionLiveState, "lifecycle"> | null,
 ): boolean {
   return state?.lifecycle === "RUNNING";
-}
-
-export interface JsonPatchOperation {
-  op: "add" | "remove" | "replace";
-  path: string;
-  value?: unknown;
 }

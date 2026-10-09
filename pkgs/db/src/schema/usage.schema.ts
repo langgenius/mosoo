@@ -42,9 +42,7 @@ export const usageEventsTable = sqliteTable(
     priceSnapshotJson: text("price_snapshot_json"),
     pricingStatus: text("pricing_status").$type<"priced" | "unknown">().notNull(),
     provider: text("provider").notNull(),
-    runPurpose: text("run_purpose")
-      .$type<"debug" | "eval" | "preview" | "production" | "scheduled">()
-      .notNull(),
+    runPurpose: text("run_purpose").$type<"debug" | "preview" | "production">().notNull(),
     runtimeId: text("runtime_id"),
     sessionId: platformIdColumn<SessionId>("session_id"),
     sessionRunId: platformIdColumn<SessionRunId>("session_run_id"),
@@ -92,9 +90,7 @@ export const usageDailyRollupsTable = sqliteTable(
     outputTokens: integer("output_tokens").notNull(),
     provider: text("provider").notNull(),
     requestCount: integer("request_count").notNull(),
-    runPurpose: text("run_purpose")
-      .$type<"debug" | "eval" | "preview" | "production" | "scheduled">()
-      .notNull(),
+    runPurpose: text("run_purpose").$type<"debug" | "preview" | "production">().notNull(),
     totalCostUsdMicros: integer("total_cost_usd_micros").notNull(),
     unpricedRequestCount: integer("unpriced_request_count").notNull(),
   },
@@ -131,7 +127,3 @@ export const usageEventRollupReceiptsTable = sqliteTable(
     index("usage_event_rollup_receipt_rolled_up_at_idx").on(table.rolledUpAt),
   ],
 );
-
-export type UsageDailyRollupRow = typeof usageDailyRollupsTable.$inferSelect;
-export type UsageEventRollupReceiptRow = typeof usageEventRollupReceiptsTable.$inferSelect;
-export type UsageEventRow = typeof usageEventsTable.$inferSelect;

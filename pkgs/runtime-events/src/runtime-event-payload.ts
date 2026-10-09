@@ -1,3 +1,4 @@
+import { parseNullableSessionUsageSummary } from "@mosoo/ag-ui-session";
 import type { DriverInstanceId, SessionId, SessionRunId } from "@mosoo/id";
 
 import type { RuntimeEventEnvelope, RuntimeEventKind } from "./runtime-event";
@@ -241,29 +242,14 @@ export function admitRuntimeEventPayload(
     case "run.dispatched":
     case "run.failed":
     case "run.queued":
-    case "run.started":
-    case "run.steered":
-    case "run.waiting": {
+    case "run.started": {
       return readStrictRuntimeRunPayload(context, payload);
-    }
-    case "runtime.config.updated":
-    case "runtime.driver.updated":
-    case "runtime.provisioning.updated":
-    case "runtime.sandbox.updated":
-    case "runtime.transport.updated": {
-      const record = requireRuntimeEventPayloadRecord(kind, payload);
-      requireRuntimeEventString(record, "status", kind);
-
-      if (kind === "runtime.transport.updated") {
-        requireRuntimeEventString(record, "channel", kind);
-      } else {
-        requireRuntimeEventString(record, "phase", kind);
-      }
-
-      return omitRuntimeEventPayloadIdentity(record);
     }
     case "runtime.timing.recorded": {
       return readStrictRuntimeTimingPayload(context, payload);
+    }
+    case "usage.updated": {
+      return parseNullableSessionUsageSummary(payload);
     }
     default: {
       return isRuntimeEventRecord(payload) ? omitRuntimeEventPayloadIdentity(payload) : payload;
@@ -276,21 +262,7 @@ export function readRuntimeEventPayload(event: RuntimeEventEnvelope): RuntimeEve
 }
 
 export function readRuntimeTimingPayload(event: RuntimeEventEnvelope): RuntimeTimingPayload {
-  if (event.kind !== "runtime.timing.recorded") {
-    throw new Error("Runtime timing payload can only be read from runtime.timing.recorded.");
-  }
-
-  return readStrictRuntimeTimingPayload(
-    {
-      ...(event.driverInstanceId === undefined ? {} : { driverInstanceId: event.driverInstanceId }),
-      kind: event.kind,
-      ...(event.runId === undefined ? {} : { runId: event.runId }),
-      ...(event.runtimeId === undefined ? {} : { runtimeId: event.runtimeId }),
-      sessionId: event.sessionId,
-      ...(event.traceId === undefined ? {} : { traceId: event.traceId }),
-    },
-    event.payload,
-  );
+  return event.payload as RuntimeTimingPayload;
 }
 
 export function readRuntimeEventString(value: unknown, field: string): string | null {
@@ -302,7 +274,7 @@ export function readRuntimeEventString(value: unknown, field: string): string | 
   return typeof entry === "string" && entry.length > 0 ? entry : null;
 }
 
-export function readRuntimeEventNullableString(
+function readRuntimeEventNullableString(
   value: RuntimeEventRecord,
   field: string,
 ): string | null | undefined {
@@ -315,36 +287,13 @@ export function readRuntimeEventNullableString(
   return typeof entry === "string" ? entry : undefined;
 }
 
-export function readRuntimeEventNumber(value: unknown, field: string): number | null {
+function readRuntimeEventNumber(value: unknown, field: string): number | null {
   if (!isRuntimeEventRecord(value)) {
     return null;
   }
 
   const entry = value[field];
   return typeof entry === "number" && Number.isFinite(entry) ? entry : null;
-}
-
-export function readRuntimeEventPrimitiveRecord(
-  value: unknown,
-): Record<string, string | number | boolean | null> {
-  if (!isRuntimeEventRecord(value)) {
-    return {};
-  }
-
-  const result: Record<string, string | number | boolean | null> = {};
-
-  for (const [key, entry] of Object.entries(value)) {
-    if (
-      entry === null ||
-      typeof entry === "string" ||
-      typeof entry === "number" ||
-      typeof entry === "boolean"
-    ) {
-      result[key] = entry;
-    }
-  }
-
-  return result;
 }
 
 export function readRuntimeEventToolStatus(status: unknown): RuntimeEventToolStatus {
@@ -360,34 +309,27 @@ export function readRuntimeEventToolStatusFromEvent(
 export function readRuntimeEventToolCallUpdate(
   event: RuntimeEventEnvelope,
 ): RuntimeEventToolCallUpdate {
-  if (event.kind !== "tool.call.updated") {
-    throw new Error("Runtime tool call update payload can only be read from tool.call.updated.");
-  }
+  const payload = readRuntimeEventPayload(event);
 
-  return readStrictRuntimeToolCallUpdatePayload(event.payload);
+  return {
+    content: readRuntimeEventString(payload, "content"),
+    kind: readRuntimeEventString(payload, "kind"),
+    messageId: readRuntimeEventString(payload, "messageId"),
+    parentMessageId: readRuntimeEventString(payload, "parentMessageId"),
+    rawInput: readRuntimeEventString(payload, "rawInput"),
+    rawOutput: readRuntimeEventString(payload, "rawOutput"),
+    status: readRuntimeEventToolStatus(payload["status"]),
+    title: readRuntimeEventString(payload, "title"),
+    toolCallId: payload["toolCallId"] as string,
+  };
 }
 
 export function readRuntimeRunPayload(event: RuntimeEventEnvelope): RuntimeRunPayload {
-  if (!isRuntimeRunPayloadKind(event.kind)) {
-    throw new Error("Runtime run payload can only be read from run events.");
-  }
-
-  const payload = readStrictRuntimeRunPayload(
-    {
-      ...(event.driverInstanceId === undefined ? {} : { driverInstanceId: event.driverInstanceId }),
-      kind: event.kind,
-      ...(event.runId === undefined ? {} : { runId: event.runId }),
-      ...(event.runtimeId === undefined ? {} : { runtimeId: event.runtimeId }),
-      sessionId: event.sessionId,
-      ...(event.traceId === undefined ? {} : { traceId: event.traceId }),
-    },
-    event.payload,
-  );
-  const run = readAdmittedRuntimeRunView(payload["run"]) ?? projectRuntimeRunView(event, payload);
+  const payload = readRuntimeEventPayload(event);
 
   return {
-    lifecycle: readRuntimeRunLifecycleStatus(payload["lifecycle"]),
-    run,
+    lifecycle: (payload["lifecycle"] as RuntimeRunLifecycleStatus | undefined) ?? null,
+    run: (payload["run"] as RuntimeRunView | undefined) ?? projectRuntimeRunView(event, payload),
   };
 }
 
@@ -491,12 +433,6 @@ export function readRuntimeEventToolName(event: RuntimeEventEnvelope): string | 
   const payload = readRuntimeEventPayload(event);
 
   return readRuntimeEventString(payload, "title") ?? readRuntimeEventString(payload, "kind");
-}
-
-export function readRuntimeEventToolResult(event: RuntimeEventEnvelope): string | null {
-  const payload = readRuntimeEventPayload(event);
-
-  return readRuntimeEventString(payload, "rawOutput") ?? readRuntimeEventString(payload, "content");
 }
 
 function readStrictRuntimeToolCallUpdatePayload(payload: unknown): RuntimeEventToolCallUpdate {
@@ -616,31 +552,15 @@ export function readRuntimeEventPermissionRequest(
     return null;
   }
 
-  const payload = readStrictRuntimePermissionRequestPayload(
-    {
-      ...(event.driverInstanceId === undefined ? {} : { driverInstanceId: event.driverInstanceId }),
-      kind: event.kind,
-      ...(event.runId === undefined ? {} : { runId: event.runId }),
-      sessionId: event.sessionId,
-    },
-    event.payload,
-  );
+  const payload = readRuntimeEventPayload(event);
   const toolCall = isRuntimeEventRecord(payload["toolCall"]) ? payload["toolCall"] : {};
-  const driverInstanceId = event.driverInstanceId;
-
-  if (driverInstanceId === undefined) {
-    throw new Error("Runtime event permission.requested requires a driver instance ID.");
-  }
-  if (event.runId === undefined) {
-    throw new Error("Runtime event permission.requested requires a run ID.");
-  }
 
   return {
-    driverInstanceId,
+    driverInstanceId: event.driverInstanceId as DriverInstanceId,
     rawInput: readRuntimeEventString(payload, "details"),
-    requestId: requireRuntimeEventString(payload, "requestId", event.kind),
-    runId: event.runId,
-    title: requireRuntimeEventString(payload, "title", event.kind),
+    requestId: payload["requestId"] as string,
+    runId: event.runId as SessionRunId,
+    title: payload["title"] as string,
     toolCallId:
       readRuntimeEventString(payload, "targetItemId") ??
       readRuntimeEventString(toolCall, "toolCallId"),
@@ -815,9 +735,7 @@ function isRuntimeRunStatusAllowedForKind(kind: RuntimeEventKind, status: string
   switch (kind) {
     case "run.cancel.requested":
     case "run.dispatched":
-    case "run.started":
-    case "run.steered":
-    case "run.waiting": {
+    case "run.started": {
       return status === "booting" || status === "running" || status === "waiting_input";
     }
     case "run.cancelled": {
@@ -868,109 +786,6 @@ function readStrictRuntimeRunError(
   };
 }
 
-function isRuntimeRunPayloadKind(kind: RuntimeEventKind): boolean {
-  switch (kind) {
-    case "run.cancel.requested":
-    case "run.cancelled":
-    case "run.completed":
-    case "run.dispatched":
-    case "run.failed":
-    case "run.queued":
-    case "run.started":
-    case "run.steered":
-    case "run.waiting": {
-      return true;
-    }
-    default: {
-      return false;
-    }
-  }
-}
-
-function readRuntimeRunLifecycleStatus(value: unknown): RuntimeRunLifecycleStatus | null {
-  switch (value) {
-    case "IDLE":
-    case "RESCHEDULING":
-    case "RUNNING":
-    case "TERMINATED": {
-      return value;
-    }
-    default: {
-      return null;
-    }
-  }
-}
-
-function readRuntimeRunStatus(value: unknown): RuntimeRunStatus | null {
-  switch (value) {
-    case "booting":
-    case "cancelled":
-    case "completed":
-    case "expired":
-    case "failed":
-    case "idle":
-    case "queued":
-    case "running":
-    case "waiting_input": {
-      return value;
-    }
-    default: {
-      return null;
-    }
-  }
-}
-
-function readRuntimeRunErrorRecord(value: unknown): RuntimeRunError | null {
-  if (!isRuntimeEventRecord(value)) {
-    return null;
-  }
-
-  const code = readRuntimeEventString(value, "code");
-  const message = readRuntimeEventString(value, "message");
-
-  if (code === null || message === null) {
-    return null;
-  }
-
-  return {
-    code,
-    details: readRuntimeEventPrimitiveRecord(value["details"]),
-    message,
-    retryable: value["retryable"] === true,
-  };
-}
-
-function readAdmittedRuntimeRunView(value: unknown): RuntimeRunView | null {
-  if (!isRuntimeEventRecord(value)) {
-    return null;
-  }
-
-  const status = readRuntimeRunStatus(value["status"]);
-  const completedAt = readRuntimeEventNullableString(value, "completedAt");
-  const id = readRuntimeEventNullableString(value, "id");
-  const startedAt = readRuntimeEventNullableString(value, "startedAt");
-  const traceId = readRuntimeEventNullableString(value, "traceId");
-
-  if (
-    status === null ||
-    completedAt === undefined ||
-    id === undefined ||
-    startedAt === undefined ||
-    traceId === undefined
-  ) {
-    return null;
-  }
-
-  return {
-    completedAt,
-    error: readRuntimeRunErrorRecord(value["error"]),
-    id: id as SessionRunId | null,
-    startedAt,
-    status,
-    traceId,
-  };
-}
-
 function projectRuntimeRunStatus(kind: RuntimeEventKind): RuntimeRunStatus | null {
   switch (kind) {
     case "run.started": {
@@ -1016,7 +831,7 @@ function projectRuntimeRunView(
 
   return {
     completedAt,
-    error: status === "failed" ? readRuntimeRunErrorRecord(payload["error"]) : null,
+    error: status === "failed" ? ((payload["error"] as RuntimeRunError | undefined) ?? null) : null,
     id: event.runId,
     startedAt,
     status,
