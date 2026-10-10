@@ -66,6 +66,7 @@ async function requestDriverTurnCancel(
       commandId: createPlatformId<DriverCommandId>(),
       kind: "turn.cancel",
       reason: SESSION_RUN_TIME_LIMIT_ERROR.code,
+      runId: run.runId,
     });
   } catch (error) {
     // A hung driver is the usual reason a turn runs this long. Ending the run

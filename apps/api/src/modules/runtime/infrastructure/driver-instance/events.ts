@@ -1,6 +1,7 @@
 import { EventType, MOSOO_CUSTOM_EVENT, createServerCustomEvent } from "@mosoo/ag-ui-session";
 import type { SessionUsageSummary } from "@mosoo/ag-ui-session";
 import type { DriverEventEnvelope } from "@mosoo/agent-driver/events";
+import { parseDriverNativeRuntimeRef, parseNativeCheckpoint } from "@mosoo/agent-driver/runtime";
 import { parsePlatformId } from "@mosoo/id";
 import type { DriverInstanceId, SessionRunId } from "@mosoo/id";
 import {
@@ -132,7 +133,9 @@ export async function projectRuntimeDriverEvents(
 
   let nextLiveState = currentLiveState;
   let liveStateChanged = false;
-  let finalAssistantMessage: ProjectRuntimeDriverEventsResult["finalAssistantMessage"] = null;
+  let checkpoint: ProjectRuntimeDriverEventsResult["checkpoint"] = null;
+  let sessionReset: ProjectRuntimeDriverEventsResult["sessionReset"] = null;
+  let finalAssistantMessageId: string | null = null;
   let sessionTitle: string | null = null;
   let usage: ProjectRuntimeDriverEventsResult["usage"] = null;
   const runtimeEvents: ProjectedRuntimeEventRecord[] = [];
@@ -216,6 +219,21 @@ export async function projectRuntimeDriverEvents(
       continue;
     }
 
+    if (event.kind === "runtime.session.reset") {
+      if (sessionReset !== null) throw new Error("Session resets must be projected in order.");
+      const payload = readRuntimeEventPayload(event);
+      sessionReset = {
+        newNativeRef: parseDriverNativeRuntimeRef(payload["newNativeRef"]),
+        previousCheckpoint:
+          payload["previousCheckpoint"] === null
+            ? null
+            : parseNativeCheckpoint(payload["previousCheckpoint"]),
+        previousNativeRef: parseDriverNativeRuntimeRef(payload["previousNativeRef"]),
+        record: runtimeEvents[runtimeEvents.length - 1]!,
+      };
+      continue;
+    }
+
     if (event.kind === "file.change.updated" || event.kind === "file.changed") {
       await recordRuntimeFileChanges({
         bindings,
@@ -227,12 +245,8 @@ export async function projectRuntimeDriverEvents(
 
     if (event.kind === "run.completed") {
       const payload = readRuntimeEventPayload(event);
-      const finalMessageId = readRuntimeEventString(payload, "finalMessageId");
-      const finalMessageText = readRuntimeEventString(payload, "finalMessageText");
-      finalAssistantMessage =
-        finalMessageId === null || finalMessageText === null
-          ? null
-          : { id: finalMessageId, text: finalMessageText };
+      checkpoint = parseNativeCheckpoint(payload["checkpoint"]);
+      finalAssistantMessageId = readRuntimeEventString(payload, "finalMessageId");
       await recordRuntimeSessionOutputDirectory({
         bindings,
         driverInstanceId: input.driverInstanceId,
@@ -318,7 +332,9 @@ export async function projectRuntimeDriverEvents(
   }
 
   return {
-    finalAssistantMessage,
+    checkpoint,
+    sessionReset,
+    finalAssistantMessageId,
     link,
     liveStateChanged,
     nextLiveState,

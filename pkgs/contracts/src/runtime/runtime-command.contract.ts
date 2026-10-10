@@ -17,6 +17,7 @@ export const TurnCancelCommand = type({
   commandId: NonEmptyString,
   kind: '"turn.cancel"',
   "reason?": "string",
+  runId: NonEmptyString,
 });
 export type TurnCancelCommand = typeof TurnCancelCommand.infer;
 
@@ -41,6 +42,7 @@ export const McpExecuteCommand = type({
   commandId: NonEmptyString,
   kind: '"mcp.execute"',
   requestId: NonEmptyString,
+  runId: NonEmptyString,
   serverId: NonEmptyString,
   toolCallId: NonEmptyString,
   toolName: NonEmptyString,
@@ -52,6 +54,7 @@ export const PermissionResolveCommand = type({
   decision: '"allow_once" | "reject_once"',
   kind: '"permission.resolve"',
   requestId: NonEmptyString,
+  runId: NonEmptyString,
 });
 export type PermissionResolveCommand = typeof PermissionResolveCommand.infer;
 
@@ -67,6 +70,7 @@ export const InputStartCommandResult = type({
 export type InputStartCommandResult = typeof InputStartCommandResult.infer;
 
 export const McpExecuteCommandResult = type({
+  "isError?": "boolean",
   outputText: "string",
   requestId: NonEmptyString,
   serverId: NonEmptyString,

@@ -211,6 +211,7 @@ describe("runtime command store", () => {
     await claimNextQueuedRuntimeCommand(database, DRIVER_INSTANCE_ID, "connection-1");
     const receipt = {
       commandId: COMMAND_IDS.accepted,
+      connectionId: "connection-1",
       driverInstanceId: DRIVER_INSTANCE_ID,
       status: "accepted" as const,
     };
@@ -253,6 +254,7 @@ describe("runtime command store", () => {
     });
     await updateRuntimeCommandRecord(database, {
       commandId: COMMAND_IDS.accepted,
+      connectionId: "connection-1",
       driverInstanceId: DRIVER_INSTANCE_ID,
       status: "accepted",
     });
@@ -280,6 +282,7 @@ describe("runtime command store", () => {
     await expect(
       updateRuntimeCommandRecord(database, {
         commandId: COMMAND_IDS.illegal,
+        connectionId: "connection-1",
         driverInstanceId: DRIVER_INSTANCE_ID,
         status: "completed",
       }),
@@ -291,6 +294,7 @@ describe("runtime command store", () => {
     await expect(
       updateRuntimeCommandRecord(database, {
         commandId: COMMAND_IDS.illegal,
+        connectionId: "connection-1",
         driverInstanceId: DRIVER_INSTANCE_ID,
         status: "accepted",
       }),
@@ -302,5 +306,85 @@ describe("runtime command store", () => {
     });
 
     expect(await readCommandStatus(database, COMMAND_IDS.illegal)).toBe("completed");
+  });
+
+  test("persists terminal payloads, accepts identical replay, and rejects a changed result", async () => {
+    const database = createRuntimeCommandDatabase();
+    await createRuntimeCommandRecord(database, {
+      command: inputStartCommand(COMMAND_IDS.first),
+      driverInstanceId: DRIVER_INSTANCE_ID,
+      expiresAt: Date.now() + 60_000,
+    });
+    await claimNextQueuedRuntimeCommand(database, DRIVER_INSTANCE_ID, "connection-1");
+    const receipt = {
+      commandId: COMMAND_IDS.first,
+      connectionId: "connection-1",
+      driverInstanceId: DRIVER_INSTANCE_ID,
+      result: { requestId: "request-1", outputText: "permission denied", isError: true },
+      status: "completed" as const,
+    };
+
+    expect(await updateRuntimeCommandRecord(database, receipt)).toEqual({
+      kind: "applied",
+      status: "completed",
+    });
+    expect(
+      await updateRuntimeCommandRecord(database, {
+        ...receipt,
+        result: { isError: true, outputText: "permission denied", requestId: "request-1" },
+      }),
+    ).toEqual({
+      kind: "duplicate",
+      status: "completed",
+    });
+    expect(
+      await updateRuntimeCommandRecord(database, { ...receipt, result: { requestId: "changed" } }),
+    ).toMatchObject({ kind: "rejected" });
+    const row = await database
+      .prepare("SELECT result_json, error_json, completed_at FROM driver_command WHERE id = ?")
+      .bind(COMMAND_IDS.first)
+      .first<{ result_json: string; error_json: null; completed_at: number }>();
+    expect(JSON.parse(row!.result_json)).toEqual(receipt.result);
+    expect(row!.error_json).toBeNull();
+    expect(row!.completed_at).toBeGreaterThan(0);
+  });
+
+  test("fences command updates by the current connection and preserves the durable failure", async () => {
+    const database = createRuntimeCommandDatabase();
+    await createRuntimeCommandRecord(database, {
+      command: inputStartCommand(COMMAND_IDS.first),
+      driverInstanceId: DRIVER_INSTANCE_ID,
+      expiresAt: Date.now() + 60_000,
+    });
+    await claimNextQueuedRuntimeCommand(database, DRIVER_INSTANCE_ID, "connection-1");
+    const receipt = {
+      commandId: COMMAND_IDS.first,
+      connectionId: "connection-old",
+      driverInstanceId: DRIVER_INSTANCE_ID,
+      error: {
+        code: "driver.failed",
+        details: { run: SESSION_RUN_ID, é: 1, "e\u0301": 2 },
+        message: "Failed",
+        retryable: false,
+      },
+      status: "failed" as const,
+    };
+    expect(await updateRuntimeCommandRecord(database, receipt)).toMatchObject({ kind: "rejected" });
+    expect(await readCommandStatus(database, COMMAND_IDS.first)).toBe("delivered");
+    expect(
+      await updateRuntimeCommandRecord(database, { ...receipt, connectionId: "connection-1" }),
+    ).toMatchObject({ kind: "applied" });
+    expect(
+      await updateRuntimeCommandRecord(database, {
+        ...receipt,
+        connectionId: "connection-1",
+        error: { ...receipt.error, details: { "e\u0301": 2, é: 1, run: SESSION_RUN_ID } },
+      }),
+    ).toMatchObject({ kind: "duplicate" });
+    const row = await database
+      .prepare("SELECT error_json FROM driver_command WHERE id = ?")
+      .bind(COMMAND_IDS.first)
+      .first<{ error_json: string }>();
+    expect(JSON.parse(row!.error_json)).toEqual(receipt.error);
   });
 });

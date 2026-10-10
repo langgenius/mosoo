@@ -10,7 +10,7 @@
     "test": "vp exec bun test tests"
   },
   "dependencies": {
-    "@cloudflare/sandbox": "0.12.6",
+    "@cloudflare/sandbox": "0.12.9",
     "@mosoo/ag-ui-session": "workspace:*",
     "@mosoo/agent-driver": "workspace:*",
     "@mosoo/agent-package": "workspace:*",
@@ -26,6 +26,7 @@
     "@mosoo/skill-package": "workspace:*",
     "@orpc/server": "^1.15.0",
     "arktype": "^2.2.0",
+    "aws4fetch": "^1.0.20",
     "better-auth": "1.6.28",
     "cloudflare": "7.0.0",
     "drizzle-orm": "^0.45.2",

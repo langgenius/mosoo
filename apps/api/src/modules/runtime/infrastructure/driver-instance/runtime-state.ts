@@ -26,7 +26,6 @@ export class DriverInstanceRuntimeState {
   connectionId: string | null = null;
   driverGeneration: number | null = null;
   driverInstanceId: DriverInstanceId | null = null;
-  driverEventReceiptSeq = 0;
   errorMessage: string | null = null;
   finalizationCompleted = false;
   heartbeatCount = 0;
@@ -49,7 +48,6 @@ export class DriverInstanceRuntimeState {
     this.connectionId = snapshot.connectionId;
     this.driverGeneration = snapshot.driverGeneration;
     this.driverInstanceId = snapshot.driverInstanceId;
-    this.driverEventReceiptSeq = 0;
     this.errorMessage = snapshot.errorMessage;
     this.finalizationCompleted = snapshot.finalizationCompleted;
     this.heartbeatCount = snapshot.heartbeatCount;

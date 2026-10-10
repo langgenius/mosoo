@@ -29,6 +29,32 @@ function row(input: {
 }
 
 describe("session event stream folding", () => {
+  test.each(["message.cancelled", "message.failed", "thought.cancelled"])(
+    "closes %s with the persisted partial text",
+    (eventType) => {
+      const thought = eventType.startsWith("thought.");
+      const processType = thought ? "agent.thinking.delta" : "agent.message.delta";
+      const folded = foldStreamedSessionEventRows([
+        row({
+          content: "Partial output",
+          eventType: thought ? "thought.delta" : "message.delta",
+          id: "partial",
+          processType,
+          seq: 1,
+        }),
+        row({
+          content: thought ? "Agent thinking updated." : "Message updated.",
+          eventType,
+          id: "terminal",
+          processType,
+          seq: 2,
+        }),
+      ]);
+      expect(folded).toHaveLength(1);
+      expect(folded[0]).toMatchObject({ content_text: "Partial output", event_type: eventType });
+    },
+  );
+
   test("folds a streamed assistant message into one row", () => {
     const folded = foldStreamedSessionEventRows([
       row({ content: "Message updated.", eventType: "message.started", id: "m-start", seq: 1 }),

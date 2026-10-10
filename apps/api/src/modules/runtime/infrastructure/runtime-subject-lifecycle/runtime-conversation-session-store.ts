@@ -9,6 +9,7 @@ import {
   getD1ChangeCount,
   runAppDatabaseBatch,
 } from "../../../../platform/db/drizzle";
+import { noNativeCheckpointInvalidation } from "../native-resume-ref.repository";
 import { completedRunHistoryPredicate } from "../session-runs/session-run-admission.repository";
 import {
   activeConversationSessionQuery,
@@ -123,6 +124,7 @@ export async function listIdleSessionScopedConversationSessions(
         eq(sandboxSessionsTable.status, "active"),
         sql`${sandboxSessionsTable.updatedAt} <= ${input.idleSinceLte}`,
         notExists(runLeaseQueryForListedSubject(appDb)),
+        noNativeCheckpointInvalidation(appDb, sandboxSessionsTable.sessionId),
         or(
           eq(sessionsTable.workspaceCheckpointRequired, false),
           isNull(sessionsTable.lastRunId),
@@ -178,6 +180,7 @@ export async function claimIdleSessionScopedConversationForClose(
         eq(sandboxSessionsTable.status, "active"),
         lte(sandboxSessionsTable.updatedAt, input.idleSinceLte),
         notExists(runLeaseQuery(appDb, input.runtimeSubjectId)),
+        noNativeCheckpointInvalidation(appDb, input.sessionId),
       ),
     )
     .returning({ sessionId: sandboxSessionsTable.sessionId })

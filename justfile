@@ -67,6 +67,11 @@ test-package package:
 test-file path:
     bun test "{{ path }}"
 
+# Verify Claude native checkpoints through Host D1 and SquashFS on Linux.
+test-native-host-checkpoint:
+    bun run --filter @mosoo/agent-driver build
+    MOSOO_NATIVE_HOST_CHECKPOINT=1 bun test apps/api/tests/claude-native-host-checkpoint.test.ts
+
 # Run the full repository verification gate.
 check:
     bun run check

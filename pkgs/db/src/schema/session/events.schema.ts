@@ -60,6 +60,7 @@ export const sessionEventsTable = sqliteTable(
   "session_event",
   {
     agentId: platformIdColumn<AgentId>("agent_id"),
+    canonicalEventJson: text("canonical_event_json"),
     contentText: text("content_text").notNull(),
     createdAt: integer("created_at").notNull(),
     endedAt: integer("ended_at").notNull(),

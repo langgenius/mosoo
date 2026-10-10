@@ -1,10 +1,11 @@
 import { parseNullableSessionUsageSummary } from "@mosoo/ag-ui-session";
+import type { RuntimeTimingPayload as DriverRuntimeTimingPayload } from "@mosoo/agent-driver/runtime-events";
 import type { DriverInstanceId, SessionId, SessionRunId } from "@mosoo/id";
 
 import type { RuntimeEventEnvelope, RuntimeEventKind } from "./runtime-event";
 
 export type RuntimeEventRecord = Record<string, unknown>;
-export type RuntimeEventToolStatus = "completed" | "failed" | "running";
+export type RuntimeEventToolStatus = "cancelled" | "completed" | "failed" | "running";
 export type RuntimeEventMessageRole = "agent" | "user";
 export type RuntimeRunLifecycleStatus = "IDLE" | "RESCHEDULING" | "RUNNING" | "TERMINATED";
 export type RuntimeRunStatus =
@@ -48,6 +49,7 @@ export interface RuntimeEventToolCallUpdate {
   readonly messageId: string | null;
   readonly parentMessageId: string | null;
   readonly rawInput: string | null;
+  readonly rawInputDelta: string | null;
   readonly rawOutput: string | null;
   readonly status: RuntimeEventToolStatus;
   readonly title: string | null;
@@ -93,168 +95,43 @@ export interface RuntimeTimingPayload {
   readonly traceId: string | null;
 }
 
-export interface RuntimeEventPayloadAdmissionContext {
-  readonly driverInstanceId?: DriverInstanceId | undefined;
-  readonly kind: RuntimeEventKind;
-  readonly runId?: SessionRunId | undefined;
-  readonly runtimeId?: string | undefined;
-  readonly sessionId: SessionId;
-  readonly traceId?: string | undefined;
-}
-
-const runtimeTimingPaths = new Set<string>(["cold", "prewarm", "unknown", "warm"]);
-const runtimeTimingSources = new Set<string>(["api", "driver"]);
-const runtimeTimingStages = new Set<string>([
-  "context_hydration",
-  "driver_backend",
-  "driver_turn",
-  "prepare_run",
-  "prewarm",
-]);
-const fileChangeKinds = new Set<string>(["delete", "upsert"]);
-const messageRoles = new Set<string>(["agent", "user"]);
-const runLifecycleStatuses = new Set<string>(["IDLE", "RESCHEDULING", "RUNNING", "TERMINATED"]);
-const runStatuses = new Set<string>([
-  "booting",
-  "cancelled",
-  "completed",
-  "expired",
-  "failed",
-  "idle",
-  "queued",
-  "running",
-  "waiting_input",
-]);
-const toolStatuses = new Set<string>(["completed", "failed", "running"]);
-const payloadIdentityFields = new Set<string>([
-  "occurredAt",
-  "receivedAt",
-  "runId",
-  "runtimeId",
-  "sessionId",
-  "traceId",
-]);
-
 export function isRuntimeEventRecord(value: unknown): value is RuntimeEventRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function omitRuntimeEventPayloadIdentity(payload: RuntimeEventRecord): RuntimeEventRecord {
-  const result: RuntimeEventRecord = {};
-
-  for (const [key, value] of Object.entries(payload)) {
-    if (!payloadIdentityFields.has(key)) {
-      result[key] = value;
+export function projectRuntimeEventPayload(event: RuntimeEventEnvelope): unknown {
+  if (event.kind === "usage.updated") {
+    return parseNullableSessionUsageSummary(event.payload);
+  }
+  if (event.kind === "permission.resolved") {
+    const requests = readRuntimeEventPayload(event)["permissionRequests"];
+    if (requests !== undefined && !Array.isArray(requests)) {
+      throw new Error(
+        "Runtime event permission.resolved payload permissionRequests must be an array.",
+      );
     }
   }
-
-  return result;
-}
-
-export function admitRuntimeEventPayload(
-  context: RuntimeEventPayloadAdmissionContext,
-  payload: unknown,
-): unknown {
-  const kind = context.kind;
-
-  switch (kind) {
-    case "diagnostic.reported": {
-      const record = requireRuntimeEventPayloadRecord(kind, payload);
-      requireOptionalString(record, "code", kind);
-      requireOptionalString(record, "message", kind);
-      requireOptionalString(record, "severity", kind);
-      return omitRuntimeEventPayloadIdentity(record);
+  if (event.kind === "runtime.timing.recorded") {
+    const payload = event.payload as DriverRuntimeTimingPayload;
+    const completedAtMs = Date.parse(payload.completedAt);
+    const startedAtMs = Date.parse(payload.startedAt);
+    if (completedAtMs < 0 || startedAtMs < 0) {
+      throw new Error("Runtime event timing timestamps must not precede the Unix epoch.");
     }
-    case "file.change.updated":
-    case "file.changed": {
-      const changes = readStrictRuntimeEventFileChanges(kind, payload);
-
-      if (changes.length === 0) {
-        throw new Error(`Runtime event ${kind} payload must include at least one file change.`);
-      }
-      return omitRuntimeEventPayloadIdentity(requireRuntimeEventPayloadRecord(kind, payload));
-    }
-    case "message.added":
-    case "message.completed":
-    case "message.started":
-    case "thought.completed":
-    case "thought.started": {
-      const record = requireRuntimeEventPayloadRecord(kind, payload);
-      requireOptionalMessageRole(record, kind);
-      requireOptionalString(record, "messageId", kind);
-      requireOptionalString(record, "thoughtId", kind);
-
-      if (kind === "message.added" && !hasRuntimeEventTextContent(record)) {
-        throw new Error("Runtime event message.added payload must include text content.");
-      }
-
-      return omitRuntimeEventPayloadIdentity(record);
-    }
-    case "message.delta": {
-      const record = requireRuntimeEventPayloadRecord(kind, payload);
-
-      if (!hasRuntimeEventTextContent(record)) {
-        throw new Error("Runtime event message.delta payload must include text content.");
-      }
-      requireOptionalMessageRole(record, kind);
-      requireOptionalString(record, "messageId", kind);
-      return omitRuntimeEventPayloadIdentity(record);
-    }
-    case "thought.delta": {
-      const record = requireRuntimeEventPayloadRecord(kind, payload);
-
-      if (!hasRuntimeEventTextContent(record)) {
-        throw new Error("Runtime event thought.delta payload must include text content.");
-      }
-      requireOptionalString(record, "thoughtId", kind);
-      return omitRuntimeEventPayloadIdentity(record);
-    }
-    case "tool.call.updated": {
-      const record = requireRuntimeEventPayloadRecord(kind, payload);
-      readStrictRuntimeToolCallUpdatePayload(record);
-      return omitRuntimeEventPayloadIdentity(record);
-    }
-    case "permission.requested": {
-      return readStrictRuntimePermissionRequestPayload(context, payload);
-    }
-    case "permission.resolved": {
-      const record = requireRuntimeEventPayloadRecord(kind, payload);
-      requireRuntimeEventString(record, "requestId", kind);
-      requireRuntimeEventString(record, "outcome", kind);
-      requireOptionalString(record, "optionId", kind);
-      requireOptionalString(record, "optionKind", kind);
-
-      if (
-        "permissionRequests" in record &&
-        record["permissionRequests"] !== undefined &&
-        !Array.isArray(record["permissionRequests"])
-      ) {
-        throw new Error(
-          "Runtime event permission.resolved payload permissionRequests must be an array.",
-        );
-      }
-
-      return omitRuntimeEventPayloadIdentity(record);
-    }
-    case "run.cancel.requested":
-    case "run.cancelled":
-    case "run.completed":
-    case "run.dispatched":
-    case "run.failed":
-    case "run.queued":
-    case "run.started": {
-      return readStrictRuntimeRunPayload(context, payload);
-    }
-    case "runtime.timing.recorded": {
-      return readStrictRuntimeTimingPayload(context, payload);
-    }
-    case "usage.updated": {
-      return parseNullableSessionUsageSummary(payload);
-    }
-    default: {
-      return isRuntimeEventRecord(payload) ? omitRuntimeEventPayloadIdentity(payload) : payload;
-    }
+    return {
+      completedAtMs,
+      path: payload.path,
+      phases: payload.phases,
+      runId: event.runId ?? null,
+      sessionId: event.sessionId,
+      source: payload.source,
+      stage: payload.stage,
+      startedAtMs,
+      totalMs: payload.totalMs,
+      traceId: event.traceId ?? null,
+    } satisfies RuntimeTimingPayload;
   }
+  return event.payload;
 }
 
 export function readRuntimeEventPayload(event: RuntimeEventEnvelope): RuntimeEventRecord {
@@ -274,30 +151,10 @@ export function readRuntimeEventString(value: unknown, field: string): string | 
   return typeof entry === "string" && entry.length > 0 ? entry : null;
 }
 
-function readRuntimeEventNullableString(
-  value: RuntimeEventRecord,
-  field: string,
-): string | null | undefined {
-  const entry = value[field];
-
-  if (entry === null) {
-    return null;
-  }
-
-  return typeof entry === "string" ? entry : undefined;
-}
-
-function readRuntimeEventNumber(value: unknown, field: string): number | null {
-  if (!isRuntimeEventRecord(value)) {
-    return null;
-  }
-
-  const entry = value[field];
-  return typeof entry === "number" && Number.isFinite(entry) ? entry : null;
-}
-
 export function readRuntimeEventToolStatus(status: unknown): RuntimeEventToolStatus {
-  return status === "failed" ? "failed" : status === "completed" ? "completed" : "running";
+  return status === "cancelled" || status === "completed" || status === "failed"
+    ? status
+    : "running";
 }
 
 export function readRuntimeEventToolStatusFromEvent(
@@ -317,6 +174,7 @@ export function readRuntimeEventToolCallUpdate(
     messageId: readRuntimeEventString(payload, "messageId"),
     parentMessageId: readRuntimeEventString(payload, "parentMessageId"),
     rawInput: readRuntimeEventString(payload, "rawInput"),
+    rawInputDelta: readRuntimeEventString(payload, "rawInputDelta"),
     rawOutput: readRuntimeEventString(payload, "rawOutput"),
     status: readRuntimeEventToolStatus(payload["status"]),
     title: readRuntimeEventString(payload, "title"),
@@ -356,11 +214,14 @@ export function readRuntimeEventMessageKey(event: RuntimeEventEnvelope): string 
 
   switch (event.kind) {
     case "message.added":
+    case "message.cancelled":
+    case "message.failed":
     case "message.completed":
     case "message.delta":
     case "message.started": {
       return readRuntimeEventString(payload, "messageId") ?? event.id;
     }
+    case "thought.cancelled":
     case "thought.completed":
     case "thought.delta":
     case "thought.started": {
@@ -397,14 +258,6 @@ function readRuntimeEventTextBlocks(value: unknown): string | null {
   return text.length > 0 ? text : null;
 }
 
-function hasRuntimeEventTextContent(payload: RuntimeEventRecord): boolean {
-  return (
-    readRuntimeEventString(payload, "contentDelta") !== null ||
-    readRuntimeEventString(payload, "content") !== null ||
-    readRuntimeEventTextBlocks(payload["content"]) !== null
-  );
-}
-
 export function readRuntimeEventMessageContent(event: RuntimeEventEnvelope): string | null {
   const payload = readRuntimeEventPayload(event);
 
@@ -433,24 +286,6 @@ export function readRuntimeEventToolName(event: RuntimeEventEnvelope): string | 
   const payload = readRuntimeEventPayload(event);
 
   return readRuntimeEventString(payload, "title") ?? readRuntimeEventString(payload, "kind");
-}
-
-function readStrictRuntimeToolCallUpdatePayload(payload: unknown): RuntimeEventToolCallUpdate {
-  const kind = "tool.call.updated";
-  const record = requireRuntimeEventPayloadRecord(kind, payload);
-  const status = requireEnumValue(record, "status", toolStatuses, kind);
-
-  return {
-    content: readOptionalRuntimeEventContentString(record, "content", kind),
-    kind: readOptionalRuntimeEventString(record, "kind", kind),
-    messageId: readOptionalRuntimeEventString(record, "messageId", kind),
-    parentMessageId: readOptionalRuntimeEventString(record, "parentMessageId", kind),
-    rawInput: readOptionalRuntimeEventString(record, "rawInput", kind),
-    rawOutput: readOptionalRuntimeEventString(record, "rawOutput", kind),
-    status: status as RuntimeEventToolStatus,
-    title: readOptionalRuntimeEventNullableString(record, "title", kind),
-    toolCallId: requireRuntimeEventString(record, "toolCallId", kind),
-  };
 }
 
 export function readRuntimeEventFileChangePath(payload: RuntimeEventRecord): string | null {
@@ -512,39 +347,6 @@ export function readRuntimeEventFileChanges(event: RuntimeEventEnvelope): Runtim
   });
 }
 
-function readStrictRuntimeEventFileChanges(
-  kind: RuntimeEventKind,
-  payload: unknown,
-): RuntimeEventFileChange[] {
-  const record = requireRuntimeEventPayloadRecord(kind, payload);
-  const changes = Array.isArray(record["changes"]) ? record["changes"] : [record];
-
-  return changes.map((change) => {
-    const changeRecord = requireRuntimeEventPayloadRecord(kind, change, "file change");
-    const path = requireRuntimeEventString(changeRecord, "path", kind);
-    const changeKind = changeRecord["change"];
-
-    if (typeof changeKind !== "string" || !fileChangeKinds.has(changeKind)) {
-      throw new Error(`Runtime event ${kind} file change must be delete or upsert.`);
-    }
-
-    const metadata = changeRecord["metadata"];
-
-    if (isRuntimeEventRecord(metadata)) {
-      return {
-        change: changeKind as RuntimeEventFileChange["change"],
-        metadata,
-        path,
-      };
-    }
-
-    return {
-      change: changeKind as RuntimeEventFileChange["change"],
-      path,
-    };
-  });
-}
-
 export function readRuntimeEventPermissionRequest(
   event: RuntimeEventEnvelope,
 ): RuntimeEventPermissionRequest | null {
@@ -565,224 +367,6 @@ export function readRuntimeEventPermissionRequest(
       readRuntimeEventString(payload, "targetItemId") ??
       readRuntimeEventString(toolCall, "toolCallId"),
     toolKind: readRuntimeEventString(toolCall, "kind"),
-  };
-}
-
-function readStrictRuntimePermissionRequestPayload(
-  context: RuntimeEventPayloadAdmissionContext,
-  payload: unknown,
-): RuntimeEventRecord {
-  const kind = "permission.requested";
-
-  if (context.driverInstanceId === undefined) {
-    throw new Error("Runtime event permission.requested requires a driver instance ID.");
-  }
-  if (context.runId === undefined) {
-    throw new Error("Runtime event permission.requested requires a run ID.");
-  }
-
-  const record = requireRuntimeEventPayloadRecord(kind, payload);
-  requireRuntimeEventString(record, "requestId", kind);
-  requireRuntimeEventString(record, "title", kind);
-  requireOptionalNullableString(record, "details", kind);
-  requireOptionalNullableString(record, "targetItemId", kind);
-
-  if ("options" in record && record["options"] !== undefined && !Array.isArray(record["options"])) {
-    throw new Error("Runtime event permission.requested payload options must be an array.");
-  }
-
-  if ("toolCall" in record && record["toolCall"] !== undefined && record["toolCall"] !== null) {
-    const toolCall = requireRuntimeEventPayloadRecord(kind, record["toolCall"], "toolCall");
-    requireOptionalString(toolCall, "kind", kind);
-    requireOptionalString(toolCall, "toolCallId", kind);
-  }
-
-  return omitRuntimeEventPayloadIdentity(record);
-}
-
-function readStrictRuntimeTimingPayload(
-  context: RuntimeEventPayloadAdmissionContext,
-  payload: unknown,
-): RuntimeTimingPayload {
-  const record = requireRuntimeEventPayloadRecord("runtime.timing.recorded", payload);
-  const completedAtMs = requireTimingTimestampMs(record, "completedAtMs", "completedAt");
-  const path = requireEnumValue(record, "path", runtimeTimingPaths, "runtime.timing.recorded");
-  const source = requireEnumValue(
-    record,
-    "source",
-    runtimeTimingSources,
-    "runtime.timing.recorded",
-  );
-  const stage = requireEnumValue(record, "stage", runtimeTimingStages, "runtime.timing.recorded");
-  const startedAtMs = requireTimingTimestampMs(record, "startedAtMs", "startedAt");
-  const totalMs = requireNonNegativeNumber(record, "totalMs");
-  const phases = readStrictRuntimeTimingPhases(record["phases"]);
-
-  if (completedAtMs < startedAtMs) {
-    throw new Error(
-      "Runtime event runtime.timing.recorded payload completedAtMs must not precede startedAtMs.",
-    );
-  }
-
-  return {
-    completedAtMs,
-    path: path as RuntimeTimingPath,
-    phases,
-    runId: context.runId ?? null,
-    sessionId: context.sessionId,
-    source: source as RuntimeTimingSource,
-    stage: stage as RuntimeTimingStage,
-    startedAtMs,
-    totalMs,
-    traceId: context.traceId ?? null,
-  };
-}
-
-function readStrictRuntimeTimingPhases(value: unknown): RuntimeTimingPhase[] {
-  if (!Array.isArray(value)) {
-    throw new Error("Runtime event runtime.timing.recorded phases must be an array.");
-  }
-
-  return value.map((phase) => {
-    const record = requireRuntimeEventPayloadRecord("runtime.timing.recorded", phase, "phase");
-
-    return {
-      durationMs: requireNonNegativeNumber(record, "durationMs"),
-      name: requireRuntimeEventString(record, "name", "runtime.timing.recorded"),
-    };
-  });
-}
-
-function readStrictRuntimeRunPayload(
-  context: RuntimeEventPayloadAdmissionContext,
-  payload: unknown,
-): RuntimeEventRecord {
-  const kind = context.kind;
-  const record = requireRuntimeEventPayloadRecord(kind, payload);
-
-  if (context.runId === undefined) {
-    throw new Error(`Runtime event ${kind} requires a run ID.`);
-  }
-
-  requireOptionalEnumValue(record, "lifecycle", runLifecycleStatuses, kind);
-  requireOptionalEnumValue(record, "status", runStatuses, kind);
-  requireOptionalString(record, "inputSummary", kind);
-  requireOptionalString(record, "reason", kind);
-  requireOptionalString(record, "requestedBy", kind);
-  requireOptionalString(record, "stopReason", kind);
-  requireOptionalString(record, "targetRunId", kind);
-  requireOptionalString(record, "userMessageId", kind);
-  requireOptionalStringArray(record, "inputItemIds", kind);
-  requireOptionalTimestampString(record, "completedAt", kind);
-  requireOptionalTimestampString(record, "startedAt", kind);
-
-  const admitted = omitRuntimeEventPayloadIdentity(record);
-
-  if ("run" in record && record["run"] !== undefined) {
-    admitted["run"] = readStrictRuntimeRunView(context, record["run"]);
-  }
-
-  if ("error" in record && record["error"] !== undefined && record["error"] !== null) {
-    admitted["error"] = readStrictRuntimeRunError(kind, record["error"], "error");
-  }
-
-  if (kind === "run.started" && !hasRuntimeRunStartedAt(admitted)) {
-    throw new Error("Runtime event run.started payload must include a start time.");
-  }
-
-  if (kind === "run.failed" && !isRuntimeEventRecord(admitted["error"])) {
-    throw new Error("Runtime event run.failed payload must include an error.");
-  }
-
-  return admitted;
-}
-
-function hasRuntimeRunStartedAt(record: RuntimeEventRecord): boolean {
-  if (readRuntimeEventString(record, "startedAt") !== null) {
-    return true;
-  }
-
-  const run = record["run"];
-  return isRuntimeEventRecord(run) && readRuntimeEventString(run, "startedAt") !== null;
-}
-
-function readStrictRuntimeRunView(
-  context: RuntimeEventPayloadAdmissionContext,
-  value: unknown,
-): RuntimeRunView {
-  const kind = context.kind;
-  const record = requireRuntimeEventPayloadRecord(kind, value, "run");
-  const status = requireEnumValue(record, "status", runStatuses, kind);
-
-  if (!isRuntimeRunStatusAllowedForKind(kind, status)) {
-    throw new Error(`Runtime event ${kind} payload run.status is inconsistent.`);
-  }
-
-  return {
-    completedAt: requireNullableTimestampString(record, "completedAt", kind, "run.completedAt"),
-    error:
-      record["error"] === null
-        ? null
-        : readStrictRuntimeRunError(kind, record["error"], "run.error"),
-    id: context.runId ?? null,
-    startedAt: requireNullableTimestampString(record, "startedAt", kind, "run.startedAt"),
-    status: status as RuntimeRunStatus,
-    traceId: context.traceId ?? null,
-  };
-}
-
-function isRuntimeRunStatusAllowedForKind(kind: RuntimeEventKind, status: string): boolean {
-  switch (kind) {
-    case "run.cancel.requested":
-    case "run.dispatched":
-    case "run.started": {
-      return status === "booting" || status === "running" || status === "waiting_input";
-    }
-    case "run.cancelled": {
-      return status === "cancelled" || status === "expired";
-    }
-    case "run.completed": {
-      return status === "completed";
-    }
-    case "run.failed": {
-      return status === "failed";
-    }
-    case "run.queued": {
-      return status === "queued";
-    }
-    default: {
-      return false;
-    }
-  }
-}
-
-function readStrictRuntimeRunError(
-  kind: RuntimeEventKind,
-  value: unknown,
-  label: string,
-): RuntimeRunError {
-  const record = requireRuntimeEventPayloadRecord(kind, value, label);
-  const details = record["details"];
-  const recoverable = record["recoverable"];
-  const retryable = record["retryable"];
-
-  if (details !== undefined && !isRuntimeEventRecord(details)) {
-    throw new Error(`Runtime event ${kind} payload ${label}.details must be an object.`);
-  }
-
-  if (recoverable !== undefined && typeof recoverable !== "boolean") {
-    throw new Error(`Runtime event ${kind} payload ${label}.recoverable must be a boolean.`);
-  }
-
-  if (retryable !== undefined && typeof retryable !== "boolean") {
-    throw new Error(`Runtime event ${kind} payload ${label}.retryable must be a boolean.`);
-  }
-
-  return {
-    code: requireRuntimeEventString(record, "code", kind),
-    details: readStrictRuntimeEventPrimitiveRecord(kind, details, `${label}.details`),
-    message: requireRuntimeEventString(record, "message", kind),
-    retryable: retryable === true || recoverable === true,
   };
 }
 
@@ -837,267 +421,4 @@ function projectRuntimeRunView(
     status,
     traceId: event.traceId ?? null,
   };
-}
-
-function readStrictRuntimeEventPrimitiveRecord(
-  kind: RuntimeEventKind,
-  value: unknown,
-  label: string,
-): Record<string, string | number | boolean | null> {
-  if (value === undefined) {
-    return {};
-  }
-
-  const record = requireRuntimeEventPayloadRecord(kind, value, label);
-  const result: Record<string, string | number | boolean | null> = {};
-
-  for (const [key, entry] of Object.entries(record)) {
-    if (
-      entry === null ||
-      typeof entry === "string" ||
-      typeof entry === "number" ||
-      typeof entry === "boolean"
-    ) {
-      result[key] = entry;
-      continue;
-    }
-
-    throw new Error(`Runtime event ${kind} payload ${label}.${key} must be primitive.`);
-  }
-
-  return result;
-}
-
-function requireRuntimeEventPayloadRecord(
-  kind: RuntimeEventKind,
-  payload: unknown,
-  label = "payload",
-): RuntimeEventRecord {
-  if (!isRuntimeEventRecord(payload)) {
-    throw new Error(`Runtime event ${kind} ${label} must be an object.`);
-  }
-
-  return payload;
-}
-
-function requireRuntimeEventString(
-  record: RuntimeEventRecord,
-  field: string,
-  kind: RuntimeEventKind,
-): string {
-  const value = readRuntimeEventString(record, field);
-
-  if (value === null) {
-    throw new Error(`Runtime event ${kind} payload ${field} must be a non-empty string.`);
-  }
-
-  return value;
-}
-
-function requireOptionalString(
-  record: RuntimeEventRecord,
-  field: string,
-  kind: RuntimeEventKind,
-): void {
-  if (!(field in record) || record[field] === undefined || record[field] === null) {
-    return;
-  }
-
-  requireRuntimeEventString(record, field, kind);
-}
-
-function readOptionalRuntimeEventString(
-  record: RuntimeEventRecord,
-  field: string,
-  kind: RuntimeEventKind,
-): string | null {
-  if (!(field in record) || record[field] === undefined || record[field] === null) {
-    return null;
-  }
-
-  return requireRuntimeEventString(record, field, kind);
-}
-
-function requireOptionalNullableString(
-  record: RuntimeEventRecord,
-  field: string,
-  kind: RuntimeEventKind,
-): void {
-  const value = record[field];
-
-  if (value === null || value === undefined) {
-    return;
-  }
-
-  if (typeof value === "string") {
-    return;
-  }
-
-  throw new Error(`Runtime event ${kind} payload ${field} must be a string or null.`);
-}
-
-function readOptionalRuntimeEventNullableString(
-  record: RuntimeEventRecord,
-  field: string,
-  kind: RuntimeEventKind,
-): string | null {
-  requireOptionalNullableString(record, field, kind);
-
-  const value = record[field];
-  return typeof value === "string" && value.length > 0 ? value : null;
-}
-
-function readOptionalRuntimeEventContentString(
-  record: RuntimeEventRecord,
-  field: string,
-  kind: RuntimeEventKind,
-): string | null {
-  const value = record[field];
-
-  if (value === undefined) {
-    return null;
-  }
-
-  if (typeof value !== "string") {
-    throw new Error(`Runtime event ${kind} payload ${field} must be a string.`);
-  }
-
-  return value.length > 0 ? value : null;
-}
-
-function requireOptionalStringArray(
-  record: RuntimeEventRecord,
-  field: string,
-  kind: RuntimeEventKind,
-): void {
-  if (!(field in record) || record[field] === undefined) {
-    return;
-  }
-
-  const value = record[field];
-
-  if (
-    !Array.isArray(value) ||
-    value.some((entry) => typeof entry !== "string" || entry.length === 0)
-  ) {
-    throw new Error(`Runtime event ${kind} payload ${field} must be an array of strings.`);
-  }
-}
-
-function requireOptionalMessageRole(record: RuntimeEventRecord, kind: RuntimeEventKind): void {
-  const role = record["role"];
-
-  if (role === undefined || role === null) {
-    return;
-  }
-
-  if (typeof role !== "string" || !messageRoles.has(role)) {
-    throw new Error(`Runtime event ${kind} payload role is unsupported.`);
-  }
-}
-
-function requireNonNegativeNumber(record: RuntimeEventRecord, field: string): number {
-  const value = readRuntimeEventNumber(record, field);
-
-  if (value === null || value < 0) {
-    throw new Error(
-      `Runtime event runtime.timing.recorded payload ${field} must be a non-negative finite number.`,
-    );
-  }
-
-  return value;
-}
-
-// Driver Contract v2 emits timing timestamps as ISO 8601 strings (completedAt/
-// startedAt) while API-produced timing snapshots still carry epoch-ms fields
-// (completedAtMs/startedAtMs). Accept either and normalize to epoch ms.
-function requireTimingTimestampMs(
-  record: RuntimeEventRecord,
-  msField: string,
-  isoField: string,
-): number {
-  if (record[msField] !== undefined) {
-    return requireNonNegativeNumber(record, msField);
-  }
-
-  const isoValue = record[isoField];
-  const parsed = typeof isoValue === "string" ? Date.parse(isoValue) : Number.NaN;
-
-  if (!Number.isFinite(parsed) || parsed < 0) {
-    throw new Error(
-      `Runtime event runtime.timing.recorded payload requires ${msField} or an ISO 8601 ${isoField}.`,
-    );
-  }
-
-  return parsed;
-}
-
-function requireOptionalEnumValue(
-  record: RuntimeEventRecord,
-  field: string,
-  allowedValues: ReadonlySet<string>,
-  kind: RuntimeEventKind,
-): void {
-  if (!(field in record) || record[field] === undefined) {
-    return;
-  }
-
-  requireEnumValue(record, field, allowedValues, kind);
-}
-
-function requireEnumValue(
-  record: RuntimeEventRecord,
-  field: string,
-  allowedValues: ReadonlySet<string>,
-  kind: RuntimeEventKind,
-): string {
-  const value = requireRuntimeEventString(record, field, kind);
-
-  if (!allowedValues.has(value)) {
-    throw new Error(`Runtime event ${kind} payload ${field} is unsupported.`);
-  }
-
-  return value;
-}
-
-function assertRuntimeEventPayloadTimestamp(
-  value: string,
-  kind: RuntimeEventKind,
-  label: string,
-): void {
-  if (!Number.isFinite(Date.parse(value))) {
-    throw new Error(`Runtime event ${kind} payload ${label} must be a valid timestamp.`);
-  }
-}
-
-function requireOptionalTimestampString(
-  record: RuntimeEventRecord,
-  field: string,
-  kind: RuntimeEventKind,
-): void {
-  if (!(field in record) || record[field] === undefined) {
-    return;
-  }
-
-  const value = requireRuntimeEventString(record, field, kind);
-  assertRuntimeEventPayloadTimestamp(value, kind, field);
-}
-
-function requireNullableTimestampString(
-  record: RuntimeEventRecord,
-  field: string,
-  kind: RuntimeEventKind,
-  label: string,
-): string | null {
-  const value = readRuntimeEventNullableString(record, field);
-
-  if (value === undefined) {
-    throw new Error(`Runtime event ${kind} payload ${label} must be a string or null.`);
-  }
-
-  if (value !== null) {
-    assertRuntimeEventPayloadTimestamp(value, kind, label);
-  }
-
-  return value;
 }

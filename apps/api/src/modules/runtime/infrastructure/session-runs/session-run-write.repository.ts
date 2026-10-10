@@ -23,6 +23,8 @@ import {
 } from "../../../../platform/db/drizzle";
 import { currentTimestampMs, toIsoString } from "../../../../time";
 import { toSessionLifecycleStatusForRunStatus } from "../../../sessions/domain/session-lifecycle";
+import type { PreparedSessionMessageInsert } from "../../../sessions/infrastructure/session-message-store.repository";
+import type { PreparedSessionRuntimeEventInsert } from "../../../sessions/infrastructure/session-runtime-event-store.repository";
 import {
   ACTIVE_SESSION_RUN_STATUSES,
   decideSessionRunTransition,
@@ -49,6 +51,10 @@ type SessionRunStatusUpdateInput = {
 
 type UpdateSessionRunStatusInput = SessionRunStatusUpdateInput & {
   completionCheckpoint?: SessionRunCompletionCheckpoint;
+  terminalProjection?: {
+    receipt: PreparedSessionRuntimeEventInsert;
+    finalMessage?: PreparedSessionMessageInsert | null;
+  };
   /**
    * Reject the transition unless the run is currently in this status. The
    * check is atomic with the write via the status_seq optimistic guard.
@@ -507,6 +513,17 @@ export async function setSessionRunStatus(
   const run = applySessionRunStatusUpdate(toSessionRunSummary(current), input, timestampMs);
   const statusSeq = current.status_seq + 1;
   const checkpoint = input.completionCheckpoint;
+  const terminalProjection = input.terminalProjection;
+  if (
+    terminalProjection !== undefined &&
+    (!isTerminalSessionRunStatus(input.status) ||
+      terminalProjection.receipt.row.runId !== input.runId ||
+      terminalProjection.receipt.row.sessionId !== current.session_id ||
+      current.session_last_run_id !== input.runId ||
+      input.preserveSessionLifecycle === true)
+  ) {
+    throw new Error("A terminal receipt must belong to the current Session Run.");
+  }
   if (
     checkpoint !== undefined &&
     (input.status !== "completed" ||
@@ -554,12 +571,36 @@ export async function setSessionRunStatus(
           eq(sessionRunsTable.id, input.runId),
           eq(sessionRunsTable.status, current.status),
           eq(sessionRunsTable.statusSeq, current.status_seq),
+          terminalProjection?.receipt.writableCondition,
           checkpoint === undefined
             ? undefined
             : completionCheckpointSnapshotCondition(db, checkpoint),
         ),
       ),
     ...(checkpoint === undefined ? [] : completionCheckpointWrites(db, checkpoint, timestampMs)),
+    ...(terminalProjection === undefined
+      ? []
+      : [
+          ...terminalProjection.receipt.writes(
+            db,
+            checkpoint === undefined
+              ? sql`changes() = 1`
+              : completionCheckpointRecordedCondition(db, checkpoint),
+          ),
+          ...(terminalProjection.finalMessage == null
+            ? []
+            : [
+                terminalProjection.finalMessage.insert(
+                  db,
+                  exists(
+                    db
+                      .select({ id: sessionEventsTable.id })
+                      .from(sessionEventsTable)
+                      .where(eq(sessionEventsTable.id, terminalProjection.receipt.row.id)),
+                  ),
+                ),
+              ]),
+        ]),
     db
       .update(sessionsTable)
       .set(

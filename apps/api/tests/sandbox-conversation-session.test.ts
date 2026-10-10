@@ -118,6 +118,11 @@ function createConversationSessionDatabase(kind: AgentKind = "pet"): SqliteD1Dat
       status text NOT NULL
     );
 
+    CREATE TABLE native_resume_ref (
+      session_id text PRIMARY KEY NOT NULL,
+      invalidated_at integer
+    );
+
     CREATE TABLE file_record (
       id text PRIMARY KEY NOT NULL,
       created_at integer NOT NULL,

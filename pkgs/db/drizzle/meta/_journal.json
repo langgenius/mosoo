@@ -134,6 +134,13 @@
       "when": 1791438250851,
       "tag": "0018_vendor-credential-model-protocol",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1791626317363,
+      "tag": "0019_native_checkpoint_receipts",
+      "breakpoints": true
     }
   ]
 }

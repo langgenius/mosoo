@@ -267,11 +267,11 @@ export function appendToolResult(
   });
 }
 
-export function appendToolArgs(
+export function updateToolArgs(
   state: SessionLiveState,
-  input: { delta: string; toolCallId: string },
+  input: { toolCallId: string } & ({ delta: string } | { rawInput: string }),
 ): SessionLiveState {
-  if (input.delta.length === 0) {
+  if ("delta" in input && input.delta.length === 0) {
     return state;
   }
 
@@ -290,7 +290,7 @@ export function appendToolArgs(
     segment.kind === "tool_use" && segment.toolCallId === input.toolCallId
       ? {
           ...segment,
-          argsText: `${segment.argsText}${input.delta}`,
+          argsText: "rawInput" in input ? input.rawInput : `${segment.argsText}${input.delta}`,
         }
       : segment,
   );

@@ -230,7 +230,9 @@ describe("session run cancel", () => {
     });
 
     expect(result.run.status).toBe("cancelled");
-    expect(driverRequests).toHaveLength(1);
+    expect(driverRequests).toEqual([
+      expect.objectContaining({ kind: "turn.cancel", runId: RUN_ID }),
+    ]);
   });
 
   test("resolves permission requests through the active Run's driver", async () => {
@@ -252,10 +254,50 @@ describe("session run cancel", () => {
         decision: "allow_once",
         driverInstanceId: DRIVER_INSTANCE_ID,
         requestId: "permission-1",
+        runId: RUN_ID,
         sessionId: OWNER_SESSION_ID,
       }),
     ).resolves.toBeUndefined();
-    expect(driverRequests).toHaveLength(1);
+    expect(driverRequests).toEqual([
+      expect.objectContaining({ kind: "permission.resolve", runId: RUN_ID }),
+    ]);
+  });
+
+  test("does not resolve a completed Run's permission through a reused driver", async () => {
+    const database = await createPublicHttpContractDatabase();
+    await insertOwnerSession(database);
+    await insertRunningSessionRun(database);
+    await insertRunDriverInstance(database, {
+      bindRun: true,
+      sessionId: OWNER_SESSION_ID,
+    });
+    await database
+      .prepare("UPDATE session_run SET status = 'completed' WHERE id = ?")
+      .bind(RUN_ID)
+      .run();
+    const nextRunId = "01J0000000000000000000000P";
+    await insertSessionRunFixture(database, {
+      driverInstanceId: DRIVER_INSTANCE_ID,
+      id: nextRunId,
+      sessionId: OWNER_SESSION_ID,
+      status: "running",
+    });
+    const driverRequests: unknown[] = [];
+    const bindings = withDriverConnection(
+      createPublicHttpTestBindings(database) as ApiBindings,
+      driverRequests,
+    );
+
+    await expect(
+      resolvePermissionRequest(bindings, {
+        decision: "allow_once",
+        driverInstanceId: DRIVER_INSTANCE_ID,
+        requestId: "permission-1",
+        runId: RUN_ID,
+        sessionId: OWNER_SESSION_ID,
+      }),
+    ).rejects.toThrow("Driver instance not found.");
+    expect(driverRequests).toEqual([]);
   });
 
   // The caller authorized OWNER_SESSION_ID; ids naming another Session's Run or
@@ -305,6 +347,7 @@ describe("session run cancel", () => {
         decision: "allow_once",
         driverInstanceId: DRIVER_INSTANCE_ID,
         requestId: "permission-1",
+        runId: RUN_ID,
         sessionId: OWNER_SESSION_ID,
       }),
     ).rejects.toThrow("Driver instance not found.");

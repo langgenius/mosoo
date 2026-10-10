@@ -22,7 +22,11 @@ import {
   recordRuntimeProcessStarted,
 } from "../driver-instance/driver-instance-record.repository";
 import { relayDriverProcessLogs } from "../driver-process-log-relay";
-import { getNativeResumeRefForRuntime } from "../native-resume-ref.repository";
+import { restoreNativeCheckpointBundle } from "../native-checkpoint-bundle";
+import {
+  getCommittedNativeCheckpointBackup,
+  getNativeContinuationForRuntime,
+} from "../native-resume-ref.repository";
 import { createDriverBootPayload, createOpaqueBootToken } from "../runtime-boot-token";
 import { runBestEffortRuntimeCleanup } from "../runtime-cleanup";
 import type { RuntimeProcessHandle } from "../sandbox-handles";
@@ -193,12 +197,29 @@ export async function provisionDriver(
       timing,
     });
 
-    const nativeResumeRef = await timing.measure("getNativeResumeRef", () =>
-      getNativeResumeRefForRuntime(env.DB, {
+    const continuation = await timing.measure("getNativeContinuation", () =>
+      getNativeContinuationForRuntime(env.DB, {
         runtimeId: input.runtime,
         sessionId: input.sandboxSessionId,
       }),
     );
+    if (continuation.status === "invalidated") {
+      // shortcut: reset has no standalone durable bundle; cold start waits for a
+      // successful live Run until Session checkpoints are supported.
+      throw new Error("Native continuation was reset and has no completed checkpoint yet.");
+    }
+    const nativeCheckpoint = continuation.status === "committed" ? continuation.checkpoint : null;
+    const nativeResumeRef = nativeCheckpoint?.nativeRef ?? null;
+    if (nativeCheckpoint !== null) {
+      const backupId = await getCommittedNativeCheckpointBackup(env.DB, nativeCheckpoint);
+      await timing.measure("restoreNativeCheckpoint", () =>
+        restoreNativeCheckpointBundle(env, input.sandbox, {
+          backupId,
+          checkpoint: nativeCheckpoint,
+          cwd: runtimeProfile.session.sessionOrganizationPath,
+        }),
+      );
+    }
     const lostPrewarmOwnershipError = await getLostPrewarmOwnershipError(env, {
       bootTokenHash: bootToken.hash,
       driverInstanceId,
@@ -214,6 +235,7 @@ export async function provisionDriver(
         builtInTools: input.builtInTools,
         driverGeneration: activeDriverGeneration,
         driverInstanceId,
+        nativeCheckpoint,
         nativeResumeRef,
         profile: runtimeProfile,
         requestUrl: containerRequestUrl,

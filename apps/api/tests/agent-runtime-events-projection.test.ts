@@ -10,6 +10,23 @@ import {
 import { createSessionRuntimeEventProjection } from "../src/modules/sessions/domain/session-runtime-event-projection";
 
 describe("agent runtime event projection", () => {
+  test("records a cancelled tool without reporting success", () => {
+    const event = parseRuntimeEventEnvelope(
+      createRuntimeEvent({
+        id: PLATFORM_ID_FIXTURES.runtimeEvent,
+        kind: "tool.call.updated",
+        occurredAt: "2026-10-10T00:00:00.000Z",
+        payload: { status: "cancelled", title: "Shell", toolCallId: "tool-1" },
+        runId: PLATFORM_ID_FIXTURES.sessionRun,
+        sessionId: PLATFORM_ID_FIXTURES.session,
+      }),
+    );
+    expect(createSessionRuntimeEventProjection(event)).toMatchObject({
+      contentText: "Shell cancelled.",
+      processType: "tool.use.completed",
+    });
+  });
+
   test("projects completed and failed tool output as process-ready content", () => {
     const completed = createSessionRuntimeEventProjection(
       createRuntimeEvent({
@@ -112,8 +129,9 @@ describe("agent runtime event projection", () => {
               exitCode: 1,
             },
             message: "Runtime failed.",
-            recoverable: true,
+            retryable: true,
           },
+          recoverable: true,
         },
         runId: PLATFORM_ID_FIXTURES.sessionRun,
         sessionId: PLATFORM_ID_FIXTURES.session,

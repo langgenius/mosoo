@@ -31,6 +31,8 @@ export function createProcessDraftFromRuntimeEvent(event: RuntimeEventEnvelope):
   switch (event.kind) {
     case "message.added":
     case "message.delta":
+    case "message.cancelled":
+    case "message.failed":
     case "message.completed":
     case "message.started": {
       const content = readRuntimeEventMessageDelta(event) || "Message updated.";
@@ -41,6 +43,7 @@ export function createProcessDraftFromRuntimeEvent(event: RuntimeEventEnvelope):
       };
     }
     case "thought.delta":
+    case "thought.cancelled":
     case "thought.completed":
     case "thought.started":
     case "plan.updated": {
@@ -82,10 +85,7 @@ export function createProcessDraftFromRuntimeEvent(event: RuntimeEventEnvelope):
       const toolCall = readRuntimeEventToolCallUpdate(event);
       return {
         content: toolCall.title ?? toolCall.kind ?? "Tool updated.",
-        type:
-          toolCall.status === "completed" || toolCall.status === "failed"
-            ? "tool.use.completed"
-            : "tool.use.started",
+        type: toolCall.status !== "running" ? "tool.use.completed" : "tool.use.started",
       };
     }
     case "agent.task.updated": {
@@ -95,8 +95,7 @@ export function createProcessDraftFromRuntimeEvent(event: RuntimeEventEnvelope):
           readRuntimeEventString(payload, "title") ??
           readRuntimeEventString(payload, "kind") ??
           "Tool updated.",
-        type:
-          status === "completed" || status === "failed" ? "tool.use.completed" : "tool.use.started",
+        type: status !== "running" ? "tool.use.completed" : "tool.use.started",
       };
     }
     case "file.changed":

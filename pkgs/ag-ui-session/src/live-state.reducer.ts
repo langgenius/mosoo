@@ -7,7 +7,7 @@ import { updateCustomState } from "./live-state-custom.reducer";
 import {
   appendReasoningDelta,
   appendTextDelta,
-  appendToolArgs,
+  updateToolArgs,
   appendToolResult,
   appendToolUse,
   createLiveStateMessage,
@@ -81,7 +81,7 @@ function applyEvent(state: SessionLiveState, event: AgUiSessionEvent): SessionLi
       });
     }
     case EventType.TOOL_CALL_ARGS: {
-      return appendToolArgs(currentState, {
+      return updateToolArgs(currentState, {
         delta: event.delta,
         toolCallId: event.toolCallId,
       });

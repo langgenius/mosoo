@@ -31,6 +31,7 @@ import type { AppDatabase } from "../../../../platform/db/drizzle";
 import type { PreparedApiCommand } from "../../../api-command/application/api-command-ledger";
 import { createSessionRuntimeEventProjection } from "../../../sessions/domain/session-runtime-event-projection";
 import { previewAvailablePredicate } from "../../../sessions/infrastructure/preview-retention.repository";
+import { canonicalRuntimeEventJson } from "../../../sessions/infrastructure/session-runtime-event-store.repository";
 import { ACTIVE_SESSION_RUN_STATUSES } from "../../domain/session-run-lifecycle.machine";
 import { createSessionStatusTransitionPatch } from "./session-lifecycle-projection.repository";
 
@@ -330,6 +331,7 @@ function createEventInsertQuery(
     db
       .select({
         agentId: sessionsTable.agentId,
+        canonicalEventJson: selectedValue(canonicalRuntimeEventJson(event), "canonical_event_json"),
         contentText: selectedValue(projection.contentText, "content_text"),
         createdAt: selectedValue(timestampMs, "created_at"),
         endedAt: selectedValue(Math.max(occurredAt, timestampMs), "ended_at"),

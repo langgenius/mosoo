@@ -1,4 +1,4 @@
-import type { DriverRecoveryMessage } from "@mosoo/agent-driver/boot";
+import type { DriverRecoveryMessage, NativeCheckpoint } from "@mosoo/agent-driver/boot";
 import type { DriverNativeRuntimeRef, DriverRuntime } from "@mosoo/agent-driver/runtime";
 import type { JsonObject } from "@mosoo/contracts";
 import type { AgentBuiltInToolConfig, AgentReadiness } from "@mosoo/contracts/agent";
@@ -212,7 +212,7 @@ export interface DriverExecutionSessionSpec {
   readonly cwd: string;
   readonly mcpServers: DriverBootMcpServer[];
   readonly nativeResumeRef: DriverNativeRuntimeRef | null;
-  readonly nativeResumeRequired: boolean;
+  readonly nativeCheckpoint: NativeCheckpoint | null;
   readonly recoveryMessages: DriverRecoveryMessage[];
 }
 

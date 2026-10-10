@@ -1,10 +1,12 @@
 import { sessionEventsTable, sessionsTable } from "@mosoo/db";
 import { createPlatformId } from "@mosoo/id";
-import type { AgentId, RuntimeEventId, SessionId } from "@mosoo/id";
+import type { RuntimeEventId, SessionId } from "@mosoo/id";
 import type { RuntimeEventEnvelope } from "@mosoo/runtime-events";
-import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, eq, exists, inArray, isNull, sql } from "drizzle-orm";
+import type { SQL } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
+import type { AppDatabase } from "../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../time";
 import { createSessionRuntimeEventProjection } from "../domain/session-runtime-event-projection";
 import { projectSessionViewerRuntimeEvents } from "./session-viewer-event-projection.repository";
@@ -22,6 +24,7 @@ export interface PersistSessionRuntimeEventsResult {
 }
 
 export interface SessionRuntimeEventSourceReceipt {
+  readonly canonicalEventJson: string | null;
   readonly eventId: string;
   readonly seq: number;
   readonly type: string;
@@ -42,8 +45,7 @@ interface InsertedSessionEventRow {
   readonly sourceEventId: string;
 }
 
-// D1 accepts at most 100 bound parameters; each session_event row binds 21.
-const MAX_SESSION_EVENT_ROWS_PER_INSERT = 4;
+type SessionEventInsertRow = Omit<typeof sessionEventsTable.$inferSelect, "agentId" | "seq">;
 const WRITABLE_SESSION_STATUSES = ["IDLE", "RUNNING", "RESCHEDULING"] as const;
 const TERMINAL_LIFECYCLE_WRITABLE_SESSION_STATUSES = [
   ...WRITABLE_SESSION_STATUSES,
@@ -88,36 +90,32 @@ function readRuntimeEventEndedAt(event: RuntimeEventEnvelope, fallbackMs: number
   return Number.isFinite(endedAt) && endedAt >= fallbackMs ? endedAt : fallbackMs;
 }
 
-async function allocateSessionRuntimeEventSeq(
+function writableSessionCondition(input: {
+  allowTerminatedSession: boolean;
+  sessionId: SessionId;
+}) {
+  return and(
+    eq(sessionsTable.id, input.sessionId),
+    isNull(sessionsTable.archivedAt),
+    inArray(sessionsTable.status, sessionWritableStatusValues(input.allowTerminatedSession)),
+  )!;
+}
+
+async function assertSessionWritable(
   database: D1Database,
   input: {
     allowTerminatedSession: boolean;
-    count: number;
     sessionId: SessionId;
   },
-): Promise<{ agentId: AgentId | null; firstSeq: number } | null> {
-  const session =
-    (await getAppDatabase(database)
-      .update(sessionsTable)
-      .set({
-        runtimeEventSeqCursor: sql`${sessionsTable.runtimeEventSeqCursor} + ${input.count}`,
-      })
-      .where(
-        and(
-          eq(sessionsTable.id, input.sessionId),
-          isNull(sessionsTable.archivedAt),
-          inArray(sessionsTable.status, sessionWritableStatusValues(input.allowTerminatedSession)),
-        ),
-      )
-      .returning({
-        agentId: sessionsTable.agentId,
-        seqCursor: sessionsTable.runtimeEventSeqCursor,
-      })
-      .get()) ?? null;
-
-  return session === null
-    ? null
-    : { agentId: session.agentId, firstSeq: session.seqCursor - input.count + 1 };
+): Promise<void> {
+  const session = await getAppDatabase(database)
+    .select({ id: sessionsTable.id })
+    .from(sessionsTable)
+    .where(writableSessionCondition(input))
+    .get();
+  if (session === undefined) {
+    throw new Error(`Session ${input.sessionId} is not writable for runtime events.`);
+  }
 }
 
 function projectRuntimeEvent(record: SourcedRuntimeEvent): ProjectedRuntimeEvent {
@@ -125,18 +123,16 @@ function projectRuntimeEvent(record: SourcedRuntimeEvent): ProjectedRuntimeEvent
 }
 
 function toSessionEventInsertValue(input: {
-  agentId: AgentId | null;
   record: ProjectedRuntimeEvent;
-  seq: number;
   sessionId: SessionId;
   sourceIndex: number;
   timestampMs: number;
-}): typeof sessionEventsTable.$inferInsert {
+}): SessionEventInsertRow {
   const { projection } = input.record;
   const occurredAt = input.record.occurredAt ?? input.timestampMs + input.sourceIndex;
 
   return {
-    agentId: input.agentId,
+    canonicalEventJson: canonicalRuntimeEventJson(input.record.event),
     contentText: projection.contentText,
     createdAt: input.timestampMs + input.sourceIndex,
     endedAt: readRuntimeEventEndedAt(input.record.event, occurredAt),
@@ -147,7 +143,6 @@ function toSessionEventInsertValue(input: {
     processStatus: projection.processStatus,
     processType: projection.processType,
     runId: projection.runId,
-    seq: input.seq,
     sessionId: input.sessionId,
     sourceEventId: input.record.sourceEventId,
     source: projection.source,
@@ -162,7 +157,8 @@ function toSessionEventInsertValue(input: {
 
 async function insertSessionEventRows(
   database: D1Database,
-  values: readonly (typeof sessionEventsTable.$inferInsert)[],
+  values: readonly SessionEventInsertRow[],
+  writable: SQL,
 ): Promise<InsertedSessionEventRow[]> {
   if (values.length === 0) {
     return [];
@@ -171,10 +167,8 @@ async function insertSessionEventRows(
   const appDatabase = getAppDatabase(database);
   const statements: D1PreparedStatement[] = [];
 
-  for (let index = 0; index < values.length; index += MAX_SESSION_EVENT_ROWS_PER_INSERT) {
-    const query = appDatabase
-      .insert(sessionEventsTable)
-      .values(values.slice(index, index + MAX_SESSION_EVENT_ROWS_PER_INSERT))
+  for (const row of values) {
+    const query = createSessionEventInsert(appDatabase, row, writable)
       .onConflictDoNothing({
         target: [sessionEventsTable.sessionId, sessionEventsTable.sourceEventId],
       })
@@ -185,6 +179,8 @@ async function insertSessionEventRows(
       .toSQL();
 
     statements.push(database.prepare(query.sql).bind(...query.params));
+    const cursorUpdate = advanceSessionEventCursor(appDatabase, row).toSQL();
+    statements.push(database.prepare(cursorUpdate.sql).bind(...cursorUpdate.params));
   }
 
   const results = await database.batch<{ session_id: SessionId; source_event_id: string }>(
@@ -230,6 +226,114 @@ async function filterNewSessionRuntimeEvents(
   });
 }
 
+// Sort object keys so JSON field order cannot change a durable source identity.
+export function canonicalRuntimeEventJson(event: RuntimeEventEnvelope): string {
+  return JSON.stringify(event, (_key, value: unknown) =>
+    isRecord(value)
+      ? Object.fromEntries(
+          Object.entries(value).toSorted(([left], [right]) =>
+            left < right ? -1 : left > right ? 1 : 0,
+          ),
+        )
+      : value,
+  );
+}
+
+export type PreparedSessionRuntimeEventInsert = NonNullable<
+  Awaited<ReturnType<typeof prepareSessionRuntimeEventInsert>>
+>;
+
+export async function prepareSessionRuntimeEventInsert(
+  database: D1Database,
+  input: { record: SessionRuntimeEventInput; sessionId: SessionId },
+) {
+  const sourceEventId = readSessionRuntimeEventSourceEventId(input.record);
+  const receipt = (
+    await getSessionRuntimeEventSourceReceipts(database, {
+      sessionId: input.sessionId,
+      sourceEventIds: [sourceEventId],
+    })
+  ).get(sourceEventId);
+  if (receipt !== undefined) {
+    if (receipt.canonicalEventJson !== canonicalRuntimeEventJson(input.record.event)) {
+      throw new Error("Source event identity already belongs to a different runtime event.");
+    }
+    return null;
+  }
+  const writableInput = {
+    allowTerminatedSession: canWriteAfterTerminatedSession([input.record]),
+    sessionId: input.sessionId,
+  };
+  await assertSessionWritable(database, writableInput);
+  const writable = writableSessionCondition(writableInput);
+  const row = toSessionEventInsertValue({
+    record: projectRuntimeEvent({ ...input.record, sourceEventId }),
+    sessionId: input.sessionId,
+    sourceIndex: 0,
+    timestampMs: currentTimestampMs(),
+  });
+  return {
+    row,
+    writableCondition: exists(
+      getAppDatabase(database).select({ id: sessionsTable.id }).from(sessionsTable).where(writable),
+    ),
+    // Sequence assignment and visibility must commit together for cursor readers.
+    writes(db: AppDatabase, condition: SQL) {
+      return [
+        createSessionEventInsert(db, row, and(writable, condition)!),
+        advanceSessionEventCursor(db, row),
+      ] as const;
+    },
+  };
+}
+
+function createSessionEventInsert(db: AppDatabase, row: SessionEventInsertRow, condition: SQL) {
+  return db.insert(sessionEventsTable).select(
+    db
+      .select({
+        agentId: sessionsTable.agentId,
+        canonicalEventJson: sql<typeof row.canonicalEventJson>`${row.canonicalEventJson}`.as(
+          "canonical_event_json",
+        ),
+        contentText: sql<typeof row.contentText>`${row.contentText}`.as("content_text"),
+        createdAt: sql<typeof row.createdAt>`${row.createdAt}`.as("created_at"),
+        endedAt: sql<typeof row.endedAt>`${row.endedAt}`.as("ended_at"),
+        eventType: sql<typeof row.eventType>`${row.eventType}`.as("event_type"),
+        family: sql<typeof row.family>`${row.family}`.as("family"),
+        id: sql<typeof row.id>`${row.id}`.as("id"),
+        occurredAt: sql<typeof row.occurredAt>`${row.occurredAt}`.as("occurred_at"),
+        processStatus: sql<typeof row.processStatus>`${row.processStatus}`.as("process_status"),
+        processType: sql<typeof row.processType>`${row.processType}`.as("process_type"),
+        runId: sql<typeof row.runId>`${row.runId}`.as("run_id"),
+        seq: sql<number>`${sessionsTable.runtimeEventSeqCursor} + 1`.as("seq"),
+        sessionId: sessionsTable.id,
+        sourceEventId: sql<typeof row.sourceEventId>`${row.sourceEventId}`.as("source_event_id"),
+        source: sql<typeof row.source>`${row.source}`.as("source"),
+        toolCallId: sql<typeof row.toolCallId>`${row.toolCallId}`.as("tool_call_id"),
+        toolInputJson: sql<typeof row.toolInputJson>`${row.toolInputJson}`.as("tool_input_json"),
+        toolName: sql<typeof row.toolName>`${row.toolName}`.as("tool_name"),
+        tokens: sql<typeof row.tokens>`${row.tokens}`.as("tokens"),
+        traceId: sql<typeof row.traceId>`${row.traceId}`.as("trace_id"),
+        visibility: sql<typeof row.visibility>`${row.visibility}`.as("visibility"),
+      })
+      .from(sessionsTable)
+      .where(and(eq(sessionsTable.id, row.sessionId), condition)),
+  );
+}
+
+function advanceSessionEventCursor(db: AppDatabase, row: SessionEventInsertRow) {
+  const insertedEvent = db
+    .select({ seq: sessionEventsTable.seq })
+    .from(sessionEventsTable)
+    .where(eq(sessionEventsTable.id, row.id));
+  return db
+    .update(sessionsTable)
+    .set({
+      runtimeEventSeqCursor: sql`max(${sessionsTable.runtimeEventSeqCursor}, (${insertedEvent}))`,
+    })
+    .where(and(eq(sessionsTable.id, row.sessionId), exists(insertedEvent)));
+}
+
 export async function persistSessionRuntimeEvents(
   database: D1Database,
   input: {
@@ -247,30 +351,26 @@ export async function persistSessionRuntimeEvents(
     };
   }
 
-  const allocation = await allocateSessionRuntimeEventSeq(database, {
+  const writableInput = {
     allowTerminatedSession: canWriteAfterTerminatedSession(records),
-    count: records.length,
     sessionId: input.sessionId,
-  });
-
-  if (allocation === null) {
-    throw new Error(`Session ${input.sessionId} is not writable for runtime events.`);
-  }
+  };
+  await assertSessionWritable(database, writableInput);
 
   const timestampMs = currentTimestampMs();
   const insertedRows = await insertSessionEventRows(
     database,
     records.map((record, sourceIndex) =>
       toSessionEventInsertValue({
-        agentId: allocation.agentId,
         record,
-        seq: allocation.firstSeq + sourceIndex,
         sessionId: input.sessionId,
         sourceIndex,
         timestampMs,
       }),
     ),
+    writableSessionCondition(writableInput),
   );
+  if (insertedRows.length === 0) await assertSessionWritable(database, writableInput);
   const insertedSourceEventIds = new Set(insertedRows.map((row) => row.sourceEventId));
   const insertedRecords = records.filter((record) =>
     insertedSourceEventIds.has(record.sourceEventId),
@@ -307,6 +407,7 @@ export async function getSessionRuntimeEventSourceReceipts(
 
   const rows = await getAppDatabase(database)
     .select({
+      canonicalEventJson: sessionEventsTable.canonicalEventJson,
       event_id: sessionEventsTable.sourceEventId,
       seq: sessionEventsTable.seq,
       type: sessionEventsTable.eventType,
@@ -324,6 +425,7 @@ export async function getSessionRuntimeEventSourceReceipts(
 
   for (const row of rows) {
     receipts.set(row.event_id, {
+      canonicalEventJson: row.canonicalEventJson,
       eventId: row.event_id,
       seq: row.seq,
       type: row.type,

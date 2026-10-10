@@ -63,7 +63,9 @@ function createDatabase(): SqliteD1Database {
       session_run_id text,
       status text NOT NULL
     );
+    CREATE TABLE native_resume_ref (session_id text PRIMARY KEY, invalidated_at integer);
     CREATE TABLE session_event (
+      canonical_event_json text,
       id text PRIMARY KEY NOT NULL,
       run_id text,
       event_type text NOT NULL
@@ -131,6 +133,40 @@ async function insertActiveRunLease(
 }
 
 describe("idle session-scoped conversation sweep", () => {
+  test("keeps the live Driver while a reset has no new committed native checkpoint", async () => {
+    const database = createDatabase();
+    await insertConversation(database, {
+      kind: "cattle",
+      sandboxId: "sb-reset",
+      sessionId: "session-reset",
+      status: "active",
+      updatedAt: NOW - GRACE_MS - 1,
+    });
+    database.execute("INSERT INTO native_resume_ref VALUES ('session-reset', 1)");
+    await expect(
+      listIdleSessionScopedConversationSessions(database, {
+        idleSinceLte: NOW - GRACE_MS,
+        limit: 10,
+      }),
+    ).resolves.toEqual([]);
+    await expect(
+      claimIdleSessionScopedConversationForClose(database, {
+        idleSinceLte: NOW - GRACE_MS,
+        now: NOW,
+        runtimeSubjectId: "sb-reset",
+        sandboxSessionId: "cf-session-reset",
+        sessionId: "session-reset",
+      }),
+    ).resolves.toBe(false);
+    database.execute("UPDATE native_resume_ref SET invalidated_at = NULL");
+    await expect(
+      listIdleSessionScopedConversationSessions(database, {
+        idleSinceLte: NOW - GRACE_MS,
+        limit: 10,
+      }),
+    ).resolves.toEqual([{ sandboxId: "sb-reset", sessionId: "session-reset" }]);
+  });
+
   test("keeps a completed turn's Driver alive until its completion history is persisted", async () => {
     const database = createDatabase();
     await insertConversation(database, {

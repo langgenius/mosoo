@@ -1,9 +1,16 @@
-import type { DriverNativeRuntimeRef, DriverRuntime } from "@mosoo/agent-driver/runtime";
-import { parseDriverNativeRuntimeRef } from "@mosoo/agent-driver/runtime";
-import { nativeResumeRefsTable } from "@mosoo/db";
+import type {
+  DriverNativeRuntimeRef,
+  DriverRuntime,
+  NativeCheckpoint,
+} from "@mosoo/agent-driver/runtime";
+import { parseDriverNativeRuntimeRef, parseNativeCheckpoint } from "@mosoo/agent-driver/runtime";
+import { nativeResumeRefsTable, sandboxBackupsTable } from "@mosoo/db";
+import { parsePlatformId } from "@mosoo/id";
 import type { DriverInstanceId, SessionId, SessionRunId } from "@mosoo/id";
-import { eq, sql } from "drizzle-orm";
+import { and, desc, eq, isNotNull, notExists, sql } from "drizzle-orm";
+import type { SQLWrapper } from "drizzle-orm";
 
+import type { AppDatabase } from "../../../platform/db/drizzle";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../time";
 
@@ -14,36 +21,82 @@ export interface NativeResumeRefObservation {
   sessionRunId: SessionRunId;
 }
 
-export async function getNativeResumeRefForRuntime(
-  database: D1Database,
-  input: {
-    runtimeId: DriverRuntime;
-    sessionId: SessionId;
-  },
-): Promise<DriverNativeRuntimeRef | null> {
-  const row =
-    (await getAppDatabase(database)
-      .select({
-        committedValue: nativeResumeRefsTable.committedValue,
-        kind: nativeResumeRefsTable.kind,
-        runtimeId: nativeResumeRefsTable.runtimeId,
-      })
+export type NativeContinuationState =
+  | { status: "first-use" }
+  | { status: "committed"; checkpoint: NativeCheckpoint }
+  | { status: "invalidated"; sourceEventId: string | null };
+
+export function noNativeCheckpointInvalidation(db: AppDatabase, sessionId: SessionId | SQLWrapper) {
+  return notExists(
+    db
+      .select({ sessionId: nativeResumeRefsTable.sessionId })
       .from(nativeResumeRefsTable)
-      .where(eq(nativeResumeRefsTable.sessionId, input.sessionId))
-      .limit(1)
-      .get()) ?? null;
+      .where(
+        and(
+          eq(nativeResumeRefsTable.sessionId, sessionId),
+          isNotNull(nativeResumeRefsTable.invalidatedAt),
+        ),
+      ),
+  );
+}
 
-  if (row === null || row.committedValue === null) {
-    return null;
+export async function getNativeContinuationForRuntime(
+  database: D1Database,
+  input: { runtimeId: DriverRuntime; sessionId: SessionId },
+): Promise<NativeContinuationState> {
+  const row = await getAppDatabase(database)
+    .select()
+    .from(nativeResumeRefsTable)
+    .where(eq(nativeResumeRefsTable.sessionId, input.sessionId))
+    .get();
+  if (row === undefined) return { status: "first-use" };
+  if (row.runtimeId !== input.runtimeId) {
+    throw new Error("Native continuation belongs to a different runtime.");
   }
+  if (row.invalidatedAt !== null) {
+    return { status: "invalidated", sourceEventId: row.invalidatedSourceEventId };
+  }
+  if (row.committedSessionRunId === null && row.committedValue === null) {
+    return { status: "first-use" };
+  }
+  if (row.committedFormatVersion !== 1) {
+    throw new Error("Legacy native continuation requires a verified checkpoint migration.");
+  }
+  return {
+    status: "committed",
+    checkpoint: parseNativeCheckpoint({
+      formatVersion: row.committedFormatVersion,
+      nativeRef: parseDriverNativeRuntimeRef({
+        kind: row.kind,
+        runtimeId: row.runtimeId,
+        value: row.committedValue,
+      }),
+      runId: row.committedSessionRunId,
+    }),
+  };
+}
 
-  const ref = parseDriverNativeRuntimeRef({
-    kind: row.kind,
-    runtimeId: row.runtimeId,
-    value: row.committedValue,
-  });
-
-  return ref.runtimeId === input.runtimeId ? ref : null;
+export async function getCommittedNativeCheckpointBackup(
+  database: D1Database,
+  checkpoint: NativeCheckpoint,
+): Promise<string> {
+  const backup = await getAppDatabase(database)
+    .select({ id: sandboxBackupsTable.id })
+    .from(sandboxBackupsTable)
+    .where(
+      and(
+        eq(
+          sandboxBackupsTable.sessionRunId,
+          parsePlatformId<SessionRunId>(checkpoint.runId, "checkpoint Run"),
+        ),
+        eq(sandboxBackupsTable.status, "ready"),
+      ),
+    )
+    .orderBy(desc(sandboxBackupsTable.createdAt))
+    .limit(1)
+    .get();
+  if (backup === undefined) throw new Error("Committed native checkpoint has no ready backup.");
+  return backup.id;
 }
 
 export async function upsertNativeResumeRef(

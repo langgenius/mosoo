@@ -162,7 +162,17 @@ function createCompletedRunEvent() {
     id: API_DRIVER_BOUNDARY_IDS.runtimeEvent,
     kind: "run.completed",
     occurredAt: "2026-06-22T00:00:00.000Z",
+    runtimeId: "openai-runtime",
     payload: {
+      checkpoint: {
+        formatVersion: 1,
+        runId: PUBLIC_API_TEST_IDS.run,
+        nativeRef: {
+          kind: "openai_thread_id",
+          runtimeId: "openai-runtime",
+          value: "thread-outputs",
+        },
+      },
       run: {
         completedAt: "2026-06-22T00:00:00.000Z",
         error: null,
@@ -234,7 +244,7 @@ async function dispatchRuntimeEvent(input: {
       {
         event: input.event,
         eventId: "source-runtime-session-outputs",
-        occurredAt: 1,
+        occurredAt: "1970-01-01T00:00:00.001Z",
       },
     ],
     link: input.link,
@@ -259,6 +269,7 @@ describe("runtime session outputs", () => {
     const notify = () =>
       recordDriverInstanceFailure(bindings, {
         driverInstanceId: ids.driverOwner,
+        runId: ids.run,
         error: { code: "sdk.stopped", message: "SDK stopped", details: {}, retryable: false },
       });
     await notify();

@@ -169,12 +169,19 @@ function toolCallStartEvent(
 function toolCallArgsEvent(
   toolCall: ReturnType<typeof readRuntimeEventToolCallUpdate>,
 ): AgUiSessionEvent | null {
-  if (toolCall.rawInput === null || toolCall.rawInput.length === 0) {
+  if (toolCall.rawInput !== null) {
+    return createServerCustomEvent(MOSOO_CUSTOM_EVENT.sessionToolInputUpdated.name, {
+      rawInput: toolCall.rawInput,
+      toolCallId: toolCall.toolCallId,
+    });
+  }
+  const delta = toolCall.rawInputDelta;
+  if (delta === null || delta.length === 0) {
     return null;
   }
 
   return {
-    delta: toolCall.rawInput,
+    delta,
     toolCallId: toolCall.toolCallId,
     type: EventType.TOOL_CALL_ARGS,
   };
@@ -189,7 +196,7 @@ function appendIfPresent<T>(target: T[], value: T | null): void {
 export function projectRuntimeEventToAgUiSessionEvents(
   event: RuntimeEventEnvelope,
 ): AgUiSessionEvent[] {
-  if (event.visibility === "owner_debug") {
+  if (event.visibility === "owner_debug" || event.visibility === "system_internal") {
     return [];
   }
 
@@ -224,6 +231,8 @@ export function projectRuntimeEventToAgUiSessionEvents(
         },
       ];
     }
+    case "message.cancelled":
+    case "message.failed":
     case "message.completed": {
       return [
         {
@@ -250,6 +259,7 @@ export function projectRuntimeEventToAgUiSessionEvents(
         },
       ];
     }
+    case "thought.cancelled":
     case "thought.completed": {
       return [
         {
@@ -265,12 +275,12 @@ export function projectRuntimeEventToAgUiSessionEvents(
       appendIfPresent(projected, toolCallStartEvent(toolCall));
       appendIfPresent(projected, toolCallArgsEvent(toolCall));
 
-      if (toolCall.status === "completed" || toolCall.status === "failed") {
+      if (toolCall.status !== "running") {
         const rawOutput = toolCall.rawOutput ?? toolCall.content;
         const result =
           rawOutput ??
-          (toolCall.status === "failed"
-            ? `${toolCall.title ?? toolCall.kind ?? "Tool"} failed.`
+          (toolCall.status === "failed" || toolCall.status === "cancelled"
+            ? `${toolCall.title ?? toolCall.kind ?? "Tool"} ${toolCall.status}.`
             : null);
 
         return result === null

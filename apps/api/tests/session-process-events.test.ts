@@ -84,6 +84,7 @@ function createProcessEventQueryDatabase(): SqliteD1Database {
     );
 
     CREATE TABLE session_event (
+      canonical_event_json text,
       id text PRIMARY KEY NOT NULL,
       content_text text NOT NULL,
       ended_at integer NOT NULL,
