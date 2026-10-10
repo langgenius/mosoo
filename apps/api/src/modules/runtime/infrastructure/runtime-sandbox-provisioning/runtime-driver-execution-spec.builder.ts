@@ -31,6 +31,7 @@ import { buildVendorProxyEnvVars } from "./runtime-vendor-proxy-env.builder";
 
 interface RuntimeActionUrlContext {
   bindings: RuntimeExecutionSpecBindings;
+  driverGeneration: number;
   driverInstanceId: DriverInstanceId;
   requestUrl: string;
 }
@@ -97,6 +98,7 @@ async function withRuntimeMcpProxy(
     projectId: server.projectId,
     proxyGrantId: await createRuntimeActionToken(context.bindings, {
       action: "mcp_proxy",
+      driverGeneration: context.driverGeneration,
       driverInstanceId: context.driverInstanceId,
       expiresAt: Date.now() + RUNTIME_RUN_RETENTION_MS,
       resourceId: serverId,
@@ -164,6 +166,7 @@ export async function buildExecutionSpec(
   const organizationPath = input.profile.session.sessionOrganizationPath;
   const actionUrlContext: RuntimeActionUrlContext = {
     bindings,
+    driverGeneration: input.driverGeneration,
     driverInstanceId: input.driverInstanceId,
     requestUrl: input.requestUrl,
   };

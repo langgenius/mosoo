@@ -16,6 +16,9 @@ describe("runtime advanced settings", () => {
       "effort",
       "maxTurns",
     ]);
+    expect(listRuntimeAdvancedSettings("pi").map((setting) => setting.key)).toEqual([
+      "thinkingLevel",
+    ]);
   });
 
   test("accepts supported settings and removes default values from storage", () => {
@@ -143,6 +146,33 @@ describe("runtime advanced settings", () => {
 
     expect(validation.ok).toBe(false);
     expect(validation.issues.map((issue) => issue.key)).toEqual(["effort", "maxTurns"]);
+  });
+
+  test("preserves explicit Pi thinking levels and leaves native defaults unset", () => {
+    for (const thinkingLevel of ["off", "max"]) {
+      const validation = validateRuntimeAdvancedSettings({
+        runtimeId: "pi",
+        settings: { thinkingLevel },
+      });
+
+      expect(validation.ok).toBe(true);
+      expect(validation.normalizedSettings).toEqual({ thinkingLevel });
+    }
+
+    expect(
+      validateRuntimeAdvancedSettings({ runtimeId: "pi", settings: {} }).normalizedSettings,
+    ).toEqual({});
+    expect(listRuntimeAdvancedSettings("pi")[0]?.defaultValue).toBeUndefined();
+  });
+
+  test("rejects invalid Pi thinking levels", () => {
+    const validation = validateRuntimeAdvancedSettings({
+      runtimeId: "pi",
+      settings: { thinkingLevel: "ultra" },
+    });
+
+    expect(validation.ok).toBe(false);
+    expect(validation.issues[0]?.code).toBe("runtime_settings_invalid_value");
   });
 
   test("rejects platform boundary settings", () => {

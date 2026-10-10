@@ -110,7 +110,7 @@ describe("runtime vendor proxy env vars", () => {
     ]);
     expect(JSON.parse(envVars["MOSOO_PI_CONFIG_CONTENT"] ?? "{}")).toEqual({
       providers: {
-        mosoo: {
+        "openai-compatible": {
           api: "openai-completions",
           apiKey: "${MOSOO_PI_PROXY_GRANT}",
           baseUrl: PROXY_URL,
@@ -168,7 +168,7 @@ describe("runtime vendor proxy env vars", () => {
         if (runtimeId === "pi") {
           expect(JSON.parse(env["MOSOO_PI_CONFIG_CONTENT"] ?? "{}")).toEqual({
             providers: {
-              mosoo: {
+              "openai-compatible": {
                 api,
                 apiKey: "${MOSOO_PI_PROXY_GRANT}",
                 baseUrl: PROXY_URL,
@@ -194,13 +194,63 @@ describe("runtime vendor proxy env vars", () => {
   );
 
   test.each([
-    { vendorId: "openai", model: "gpt-5.4", modelProtocol: "openai-responses" },
-    { vendorId: "anthropic", model: "claude-sonnet-5", modelProtocol: "anthropic-messages" },
-    { vendorId: "gemini", model: "gemini-3.5-flash", modelProtocol: "openai-chat-completions" },
-    { vendorId: "opencode", model: "gemini-3.5-flash", modelProtocol: "google-gemini" },
-  ] satisfies { vendorId: string; model: string; modelProtocol: PresetModelProtocol }[])(
+    { vendorId: "openai", provider: "openai", model: "gpt-5.4", modelProtocol: "openai-responses" },
+    {
+      vendorId: "anthropic",
+      provider: "anthropic",
+      model: "claude-sonnet-5",
+      modelProtocol: "anthropic-messages",
+    },
+    {
+      vendorId: "deepseek",
+      provider: "deepseek",
+      model: "deepseek-v4-pro",
+      modelProtocol: "openai-chat-completions",
+    },
+    {
+      vendorId: "gemini",
+      provider: "google",
+      model: "gemini-3.5-flash",
+      modelProtocol: "openai-chat-completions",
+    },
+    {
+      vendorId: "kimi",
+      provider: "moonshotai",
+      model: "kimi-k2.7-code",
+      modelProtocol: "openai-chat-completions",
+    },
+    {
+      vendorId: "zhipu",
+      provider: "zai",
+      model: "glm-4.7",
+      modelProtocol: "openai-chat-completions",
+    },
+    {
+      vendorId: "minimax",
+      provider: "minimax",
+      model: "MiniMax-M3",
+      modelProtocol: "anthropic-messages",
+    },
+    {
+      vendorId: "qwen",
+      provider: "qwen",
+      model: "qwen3.7-plus",
+      modelProtocol: "openai-chat-completions",
+    },
+    {
+      vendorId: "opencode",
+      provider: "opencode",
+      model: "gemini-3.5-flash",
+      modelProtocol: "google-gemini",
+    },
+  ] satisfies {
+    vendorId: string;
+    provider: string;
+    model: string;
+    modelProtocol: PresetModelProtocol;
+  }[])(
     "uses Pi preset $vendorId/$model's catalog protocol",
-    async ({ vendorId, model, modelProtocol }) => {
+    async ({ vendorId, provider, model, modelProtocol }) => {
       const env = await buildVendorProxyEnvVars({
         bindings: BINDINGS,
         driverGeneration: DRIVER_GENERATION,
@@ -209,6 +259,9 @@ describe("runtime vendor proxy env vars", () => {
         requestUrl: REQUEST_URL,
       });
       await expectLlmProxyGrant(env["MOSOO_PI_PROXY_GRANT"], { modelId: model, modelProtocol });
+      expect(Object.keys(JSON.parse(env["MOSOO_PI_CONFIG_CONTENT"] ?? "{}").providers)).toEqual([
+        provider,
+      ]);
     },
   );
 

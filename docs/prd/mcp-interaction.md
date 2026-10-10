@@ -8,6 +8,7 @@ How a Project connects remote MCP servers to its Agents, and what a business MCP
 - The authorization type is fixed after creation. Changing the server URL revokes the stored credential and requires authorizing again.
 - OAuth authorization, token and registration endpoints must use HTTPS without URL credentials or fragments, and mosoo follows no redirects during discovery, token exchange or registration; providers must publish canonical endpoints.
 - Only enabled, authorized servers are available to a run. Runtimes reach each server through mosoo's MCP proxy, which adds the stored credential on every request, so the Agent never sees it and revoking it takes effect at once.
+- Stopping or replacing a Driver invalidates its MCP access grants immediately.
 - When a Session has a `userId`, every proxied request carries an `X-Mosoo-Delegation` JWT naming the end user (`sub`), the Thread, the Run, the Agent and the Project (`act.app_id`). It is signed with HS256 under a key derived from the access token mosoo presents to that server, its audience is the server URL, and it lives 60 seconds; [`runtime-mcp-delegation.ts`](../../apps/api/src/modules/runtime/application/runtime-mcp-delegation.ts) defines the claims and the key derivation.
 
 ## Limits

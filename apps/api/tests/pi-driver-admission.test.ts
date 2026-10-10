@@ -56,9 +56,9 @@ test("Given a Pi credential, When provisioning, Then bind a Chat Completions gra
       },
     },
   });
-  expect(JSON.parse(variables.MOSOO_PI_CONFIG_CONTENT ?? "{}").providers.mosoo.baseUrl).toBe(
-    `https://api.example.com/api/driver/llm/proxy/${ids.vendorCredential}`,
-  );
+  expect(
+    JSON.parse(variables.MOSOO_PI_CONFIG_CONTENT ?? "{}").providers["openai-compatible"].baseUrl,
+  ).toBe(`https://api.example.com/api/driver/llm/proxy/${ids.vendorCredential}`);
   expect(
     await verifyRuntimeActionToken(bindings, variables.MOSOO_PI_PROXY_GRANT ?? ""),
   ).toMatchObject({
@@ -122,6 +122,7 @@ test("Given Pi MCP bindings, When building execution, Then issue the usual scope
   if (active?.authorizationState !== "active") throw new Error("Missing active MCP binding.");
   expect(await verifyRuntimeActionToken(bindings, active.proxyGrantId)).toMatchObject({
     action: "mcp_proxy",
+    driverGeneration: 3,
     driverInstanceId: API_DRIVER_BOUNDARY_IDS.driverInstance,
     resourceId: API_DRIVER_BOUNDARY_IDS.mcpServerLinear,
   });

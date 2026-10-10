@@ -91,6 +91,12 @@ const PI_API_BY_PROTOCOL: Record<PresetModelProtocol, string> = {
   "openai-responses": "openai-responses",
 };
 
+const PI_PROVIDER_BY_VENDOR: Readonly<Record<string, string>> = {
+  gemini: "google",
+  kimi: "moonshotai",
+  zhipu: "zai",
+};
+
 const OPENCODE_SDK_BY_PROTOCOL: Record<PresetModelProtocol, string> = {
   "anthropic-messages": "@ai-sdk/anthropic",
   "google-gemini": "@ai-sdk/google",
@@ -140,7 +146,7 @@ export async function buildVendorProxyEnvVars(
       [PI_PROXY_GRANT_ENV]: proxyGrant,
       [PI_CONFIG_CONTENT_ENV]: JSON.stringify({
         providers: {
-          mosoo: {
+          [PI_PROVIDER_BY_VENDOR[vendor.vendorId] ?? vendor.vendorId]: {
             api: PI_API_BY_PROTOCOL[modelBinding.modelProtocol],
             apiKey: `\${${PI_PROXY_GRANT_ENV}}`,
             baseUrl: proxyUrl,

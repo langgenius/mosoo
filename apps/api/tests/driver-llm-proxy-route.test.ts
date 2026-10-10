@@ -387,6 +387,108 @@ describe("driver LLM proxy route", () => {
     35_000,
   );
 
+  test.each([
+    {
+      vendorId: "deepseek",
+      model: "deepseek-v4-pro",
+      protocol: "openai-chat-completions",
+      provider: "deepseek",
+    },
+    { vendorId: "openai", model: "gpt-5.4", protocol: "openai-responses", provider: "openai" },
+    {
+      vendorId: "anthropic",
+      model: "claude-sonnet-5",
+      protocol: "anthropic-messages",
+      provider: "anthropic",
+    },
+    {
+      vendorId: "opencode",
+      model: "gemini-3.5-flash",
+      protocol: "google-gemini",
+      provider: "opencode",
+    },
+  ] satisfies {
+    vendorId: string;
+    model: string;
+    protocol: PresetModelProtocol;
+    provider: string;
+  }[])(
+    "preserves native $vendorId model parameters in real $protocol proxy requests",
+    async ({ vendorId, model, protocol, provider }) => {
+      const { bindings } = await setupFixture({ vendorId });
+      let modelCalls = 0;
+      const captured = captureUpstreamFetch(() =>
+        piProxyProtocolResponse(protocol, ++modelCalls === 1),
+      );
+      const proxy = Bun.serve({
+        hostname: "127.0.0.1",
+        port: 0,
+        fetch: (request) => dispatch(bindings, request),
+      });
+      try {
+        const env = await buildVendorProxyEnvVars({
+          bindings,
+          driverGeneration: 0,
+          driverInstanceId: DRIVER_INSTANCE_ID,
+          profile: {
+            model,
+            runtimeId: "pi",
+            vendorCredential: {
+              credentialId: CREDENTIAL_ID,
+              projectId: PROJECT_ID,
+              vendorId,
+              models: [model],
+            },
+          },
+          requestUrl: `http://127.0.0.1:${proxy.port}/api/sessions`,
+        });
+        const events = await runPiProxyTurn(env, "high");
+        expect(modelCalls).toBe(2);
+        const state = events.find((event) => event["id"] === "test-state");
+        expect(state).toMatchObject({ data: { model: { provider, id: model, reasoning: true } } });
+        expect(captured[1]?.body).toContain(PI_PROXY_TOOL_PROOF);
+        const body = JSON.parse(captured[0]?.body ?? "{}");
+        if (protocol === "openai-chat-completions") {
+          expect(body).toMatchObject({
+            model,
+            thinking: { type: "enabled" },
+            reasoning_effort: "high",
+          });
+          expect(body.max_tokens).toBeGreaterThan(0);
+          expect(body.max_completion_tokens).toBeUndefined();
+          expect(body.store).toBeUndefined();
+          expect(body.messages.some((entry: { role: string }) => entry.role === "developer")).toBe(
+            false,
+          );
+          const continuation = JSON.parse(captured[1]?.body ?? "{}");
+          expect(
+            continuation.messages.find((entry: { role: string }) => entry.role === "assistant")
+              .reasoning_content,
+          ).toBe("");
+        } else if (protocol === "openai-responses") {
+          expect(body).toMatchObject({ model, reasoning: { effort: "high" } });
+        } else if (protocol === "anthropic-messages") {
+          expect(body).toMatchObject({
+            model,
+            thinking: { type: "adaptive" },
+            output_config: { effort: "high" },
+          });
+          expect(body.max_tokens).toBeGreaterThan(0);
+        } else {
+          expect(new URL(captured[0]?.url ?? "").pathname).toEndWith(
+            `/models/${model}:streamGenerateContent`,
+          );
+          expect(body).toMatchObject({
+            generationConfig: { thinkingConfig: { thinkingLevel: "HIGH", includeThoughts: true } },
+          });
+        }
+      } finally {
+        await proxy.stop(true);
+      }
+    },
+    35_000,
+  );
+
   test.each(["/messages", "/v1/messages", "/v1/messages/count_tokens"])(
     "normalizes Anthropic client path %s without duplicating the upstream API version",
     async (path) => {
@@ -957,6 +1059,7 @@ describe("driver LLM proxy route", () => {
     const captured = captureUpstreamFetch();
     const grant = await createRuntimeActionToken(bindings, {
       action: "mcp_proxy",
+      driverGeneration: 0,
       driverInstanceId: DRIVER_INSTANCE_ID,
       expiresAt: Date.now() + 60_000,
       resourceId: parsePlatformId("01J0000000000000000000000G", "server id"),

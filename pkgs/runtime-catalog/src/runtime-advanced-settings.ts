@@ -149,6 +149,15 @@ const RUNTIME_ADVANCED_SETTINGS: Readonly<
       valueType: "integer",
     },
   ],
+  pi: [
+    {
+      description: "Controls Pi thinking depth when supported by the selected model.",
+      key: "thinkingLevel",
+      label: "Thinking level",
+      options: ["off", "minimal", "low", "medium", "high", "xhigh", "max"].map(option),
+      type: "select",
+    },
+  ],
 };
 
 const SECURITY_BOUNDARY_SETTING_KEYS = new Set([
